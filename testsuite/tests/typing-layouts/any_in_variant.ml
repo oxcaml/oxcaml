@@ -58,7 +58,7 @@ val of_option : 'a option -> 'a t = <fun>
 
 let nope = Nope
 [%%expect{|
-val nope : ('a : any). 'a t = Nope
+val nope : 'a t = Nope
 |}]
 
 let nope : 'a. 'a t = Nope
@@ -243,4 +243,406 @@ end = struct
 end
 [%%expect{|
 module M : sig type pt = { x : int; y : int; } and t = A of pt# end
+|}]
+
+(******************************)
+(* Requiring representability *)
+
+(* Uses of constructors require the type of the variant to determine
+   representable layouts for *all* constructors, because which constructors are
+   constant, and hence the runtime tags of all constructors, will depend on
+   whether arguments of layout [any] are instantiated to voids. *)
+
+(* An unannotated use is constrained to a sort, which defaults to value *)
+let q = Nope
+let bad = (q : unit# t)
+[%%expect{|
+val q : 'a t = Nope
+Line 2, characters 11-12:
+2 | let bad = (q : unit# t)
+               ^
+Error: This expression has type "'a t" but an expression was expected of type
+         "unit# t"
+       The layout of unit# is void
+         because it is the unboxed version of the primitive type unit.
+       But the layout of unit# must be a value layout
+         because of the definition of q at line 1, characters 8-12.
+|}]
+
+let ok =
+  let q = Nope in
+  (q : unit# t)
+[%%expect{|
+val ok : unit# t = Nope
+|}]
+
+(* Uses at determined instantiations are fine, void or not. *)
+let nope_value : int t = Nope
+let nope_void : unit# t = Nope
+let nope_bits : int64# t = Nope
+[%%expect{|
+val nope_value : int t = Nope
+val nope_void : unit# t = Nope
+val nope_bits : int64# t = Nope
+|}]
+
+(* Error if the representation cannot be representable *)
+let is_nope (type a : any) (t : a t) =
+  match t with Nope -> true | _ -> false
+[%%expect{|
+Line 2, characters 15-19:
+2 |   match t with Nope -> true | _ -> false
+                   ^^^^
+Error: The representation of the constructor "Nope"
+       depends on the layout of the argument of constructor "Yeah",
+       which this instantiation of the type a t does not determine.
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because it's the type of a constructor argument being projected.
+|}]
+
+let nope (type a : any) () : a t = Nope
+[%%expect{|
+Line 1, characters 35-39:
+1 | let nope (type a : any) () : a t = Nope
+                                       ^^^^
+Error: The representation of the constructor "Nope"
+       depends on the layout of the argument of constructor "Yeah",
+       which this instantiation of the type a t does not determine.
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because it's the type of a constructor argument being assigned a value.
+|}]
+
+type abstract_any : any
+let bad = (Nope : abstract_any t)
+[%%expect{|
+type abstract_any : any
+Line 2, characters 11-15:
+2 | let bad = (Nope : abstract_any t)
+               ^^^^
+Error: The representation of the constructor "Nope"
+       depends on the layout of the argument of constructor "Yeah",
+       which this instantiation of the type abstract_any t does not determine.
+       The layout of abstract_any is any
+         because of the definition of abstract_any at line 1, characters 0-23.
+       But the layout of abstract_any must be representable
+         because it's the type of a constructor argument being assigned a value.
+|}]
+
+(* Matching with a constant-constructor pattern likewise constrains the
+   instantiation to a sort. *)
+let _ = (fun x -> match x with Nope -> true | _ -> false) (Yeah #1L)
+[%%expect{|
+- : bool = false
+|}]
+
+let b =
+  let f x = match x with Nope -> true | _ -> false in
+  f (Yeah #1L)
+[%%expect{|
+val b : bool = false
+|}]
+
+(* Although at the top level it defaults to value *)
+let f x = match x with Nope -> true | _ -> false
+let bad = f (Yeah #1L)
+[%%expect{|
+val f : 'a t -> bool = <fun>
+Line 2, characters 18-21:
+2 | let bad = f (Yeah #1L)
+                      ^^^
+Error: This expression has type "int64#" but an expression was expected of type
+         "('a : value_or_null)"
+       The layout of int64# is bits64
+         because it is the unboxed version of the primitive type int64.
+       But the layout of int64# must be a value layout
+         because of the definition of f at line 1, characters 6-48.
+|}]
+
+(* The requirement applies to all of the variant's constructors, not just
+   constant ones: every constructor's tag depends on the variant's
+   representation. *)
+type ('a : any, 'b : any) two = T1 of 'a | T2 of 'b | T3 of int
+
+let ok = (T3 5 : (unit#, int) two)
+[%%expect{|
+type ('a : any, 'b : any) two = T1 of 'a | T2 of 'b | T3 of int
+val ok : (unit#, int) two = T3 5
+|}]
+
+let bad (type a : any) () : (a, int) two = T3 5
+[%%expect{|
+Line 1, characters 43-47:
+1 | let bad (type a : any) () : (a, int) two = T3 5
+                                               ^^^^
+Error: The representation of the constructor "T3"
+       depends on the layout of the argument of constructor "T1",
+       which this instantiation of the type (a, int) two does not determine.
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because it's the type of a constructor argument being assigned a value.
+|}]
+
+(* An unannotated use gets sorts that default to value. *)
+let y = T3 5
+[%%expect{|
+val y : ('a, 'b) two = T3 5
+|}]
+let bad = (y : (unit#, int) two)
+[%%expect{|
+Line 1, characters 11-12:
+1 | let bad = (y : (unit#, int) two)
+               ^
+Error: This expression has type "('a, 'b) two"
+       but an expression was expected of type "(unit#, int) two"
+       The layout of unit# is void
+         because it is the unboxed version of the primitive type unit.
+       But the layout of unit# must be a value layout
+         because of the definition of y at line 1, characters 8-12.
+|}]
+
+let match_t3 x = match x with T3 n -> n | _ -> 0
+[%%expect{|
+val match_t3 : ('a, 'b) two -> int = <fun>
+|}]
+
+let match_nope x = match x with Nope -> true | _ -> false
+[%%expect{|
+val match_nope : 'a t -> bool = <fun>
+|}]
+
+(* A GADT constructor's argument layouts must be determined even at
+   instantiations where its result type says it cannot occur: [Gint]'s argument
+   is never representable, so no constructor of [gadt] is usable. *)
+type (_ : any) gadt =
+  | Gint : abstract_any -> int gadt
+  | Gany : 'a gadt
+[%%expect{|
+type (_ : any) gadt = Gint : abstract_any -> int gadt | Gany : 'a gadt
+|}]
+
+let bad = (Gany : string gadt)
+[%%expect{|
+Line 1, characters 11-15:
+1 | let bad = (Gany : string gadt)
+               ^^^^
+Error: The representation of the constructor "Gany"
+       depends on the layout of the argument of constructor "Gint",
+       which this instantiation of the type string gadt does not determine.
+       The layout of abstract_any is any
+         because of the definition of abstract_any at line 1, characters 0-23.
+       But the layout of abstract_any must be representable
+         because it's the type of a constructor argument being assigned a value.
+|}]
+
+let bad = (Gany : int gadt)
+[%%expect{|
+Line 1, characters 11-15:
+1 | let bad = (Gany : int gadt)
+               ^^^^
+Error: The representation of the constructor "Gany"
+       depends on the layout of the argument of constructor "Gint",
+       which this instantiation of the type int gadt does not determine.
+       The layout of abstract_any is any
+         because of the definition of abstract_any at line 1, characters 0-23.
+       But the layout of abstract_any must be representable
+         because it's the type of a constructor argument being assigned a value.
+|}]
+
+let bad = Gany
+[%%expect{|
+Line 1, characters 10-14:
+1 | let bad = Gany
+              ^^^^
+Error: The representation of the constructor "Gany"
+       depends on the layout of the argument of constructor "Gint",
+       which this instantiation of the type 'a gadt does not determine.
+       The layout of abstract_any is any
+         because of the definition of abstract_any at line 1, characters 0-23.
+       But the layout of abstract_any must be representable
+         because it's the type of a constructor argument being assigned a value.
+|}]
+
+(* By contrast, a GADT constructor whose argument layouts are determined by its
+   own result type does not poison instantiations where it cannot
+   occur... *)
+type (_ : any) g2 = M | D : ('a : any). 'a -> #('a * int) g2
+
+let ok = (M : string g2)
+let ok = (D #() : #(unit# * int) g2)
+[%%expect{|
+type (_ : any) g2 = M | D : ('a : any). 'a -> #('a * int) g2
+val ok : string g2 = M
+val ok : #(unit# * int) g2 = D <void>
+|}]
+
+(* ... and an undetermined instantiation is not pinned to [D]'s result type,
+   but is constrained to a sort, since [D]'s representation at refining
+   instantiations depends on it. The sort defaults to value. *)
+let m = M
+[%%expect{|
+val m : 'a g2 = M
+|}]
+
+let ok = (m : string g2)
+[%%expect{|
+val ok : string g2 = M
+|}]
+
+let bad = (m : #(unit# * int) g2)
+[%%expect{|
+Line 1, characters 11-12:
+1 | let bad = (m : #(unit# * int) g2)
+               ^
+Error: This expression has type "'a g2" but an expression was expected of type
+         "#(unit# * int) g2"
+       The layout of #(unit# * int) is void & value non_pointer
+         because it is an unboxed tuple.
+       But the layout of #(unit# * int) must be a value layout
+         because of the definition of m at line 1, characters 8-9.
+       Note: The layout of immediate is value non_pointer.
+|}]
+
+let ok =
+  let m = M in
+  (m : #(unit# * int) g2)
+[%%expect{|
+val ok : #(unit# * int) g2 = M
+|}]
+
+(* When the instantiation already matches [D]'s result type, the sibling
+   check refines the part [D]'s argument depends on. *)
+let f (x : 'e) = (M : #('e * int) g2)
+[%%expect{|
+val f : 'e -> #('e * int) g2 = <fun>
+|}]
+
+(* An equality-refining sibling pins the parameters together and lowers the
+   shared variable to a sort. *)
+type (_ : any, _ : any) k = K2 | KE : ('a : any). 'a -> ('a, 'a) k
+
+let k2 = K2
+[%%expect{|
+type (_ : any, _ : any) k = K2 | KE : ('a : any). 'a -> ('a, 'a) k
+val k2 : ('a, 'a) k = K2
+|}]
+
+(* A constraint pinning the parameter to a type of layout [any] makes the
+   argument unrepresentable. *)
+type ('a : any) c = K of 'a | N constraint 'a = abstract_any
+[%%expect{|
+type 'a c = K of 'a | N constraint 'a = abstract_any
+|}]
+
+let bad = (N : abstract_any c)
+[%%expect{|
+Line 1, characters 11-12:
+1 | let bad = (N : abstract_any c)
+               ^
+Error: The representation of the constructor "N"
+       depends on the layout of the argument of constructor "K",
+       which this instantiation of the type abstract_any c does not determine.
+       The layout of abstract_any is any
+         because of the definition of abstract_any at line 1, characters 0-23.
+       But the layout of abstract_any must be representable
+         because it's the type of a constructor argument being assigned a value.
+|}]
+
+type (_ : any) gadt2 =
+  | Ga : 'a -> 'a gadt2
+  | Gint : int gadt2
+[%%expect{|
+type (_ : any) gadt2 = Ga : 'a -> 'a gadt2 | Gint : int gadt2
+|}]
+
+let ga x = Ga x
+[%%expect{|
+val ga : 'a -> 'a gadt2 = <fun>
+|}]
+
+let gint = Gint
+[%%expect{|
+val gint : int gadt2 = Gint
+|}]
+
+(* An existential argument of layout [any] is determined by no instantiation,
+   so every constructor of the variant is unusable. *)
+(* CR layouts: this could be relaxed by giving such a constructor both a
+   constant and a non-constant tag, with each construction choosing by its
+   payload's layout, making [Ex #()] an immediate and [Ex 5] a block. *)
+type ex = Ex : ('a : any). 'a -> ex | Nil
+[%%expect{|
+type ex = Ex : ('a : any). 'a -> ex | Nil
+|}]
+
+let bad = Nil
+[%%expect{|
+Line 1, characters 10-13:
+1 | let bad = Nil
+              ^^^
+Error: The representation of the constructor "Nil"
+       depends on the layout of the argument of constructor "Ex",
+       which this instantiation of the type ex does not determine.
+       The layout of 'a is any
+         because of the definition of ex at line 1, characters 0-41.
+       But the layout of 'a must be representable
+         because it's the type of a constructor argument being assigned a value.
+|}]
+
+let bad = Ex #()
+[%%expect{|
+Line 1, characters 10-16:
+1 | let bad = Ex #()
+              ^^^^^^
+Error: The representation of the constructor "Ex"
+       depends on the layout of its argument,
+       which this instantiation of the type ex does not determine.
+       The layout of 'a is any
+         because of the definition of ex at line 1, characters 0-41.
+       But the layout of 'a must be representable
+         because it's the type of a constructor argument being assigned a value.
+|}]
+
+let bad = Ex 5
+[%%expect{|
+Line 1, characters 10-14:
+1 | let bad = Ex 5
+              ^^^^
+Error: The representation of the constructor "Ex"
+       depends on the layout of its argument,
+       which this instantiation of the type ex does not determine.
+       The layout of 'a is any
+         because of the definition of ex at line 1, characters 0-41.
+       But the layout of 'a must be representable
+         because it's the type of a constructor argument being assigned a value.
+|}]
+
+let bad v = match v with Nil -> true | _ -> false
+[%%expect{|
+Line 1, characters 25-28:
+1 | let bad v = match v with Nil -> true | _ -> false
+                             ^^^
+Error: The representation of the constructor "Nil"
+       depends on the layout of the argument of constructor "Ex",
+       which this instantiation of the type ex does not determine.
+       The layout of 'a is any
+         because of the definition of ex at line 1, characters 0-41.
+       But the layout of 'a must be representable
+         because it's the type of a constructor argument being projected.
+|}]
+
+let bad v = match v with Ex _ -> true | Nil -> false
+[%%expect{|
+Line 1, characters 28-29:
+1 | let bad v = match v with Ex _ -> true | Nil -> false
+                                ^
+Error: Constructor arguments being projected must be representable.
+       The layout of $a is any
+         because of the definition of ex at line 1, characters 0-41.
+       But the layout of $a must be representable
+         because it's the type of a constructor argument being projected.
 |}]
