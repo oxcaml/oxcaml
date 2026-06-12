@@ -58,7 +58,10 @@ open! Int_replace_polymorphic_compare
       predecessors final equation set. The two possible failure cases are
       equations propagated to the function start and equations about an
       instruction's result that remain after removing the equations for the
-      matching results of two matched instructions. *)
+      matching results of two matched instructions. In addition, at GC points
+      (calls, allocations, polls) the machtypes of all equated register pairs
+      live across the instruction must agree, since a [Val]/[Int] discrepancy
+      there changes GC behavior. *)
 
 module DLL = Oxcaml_utils.Doubly_linked_list
 
@@ -525,18 +528,6 @@ let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
     for i = 0 to Array.length old_regs - 1 do
       let old_r = old_regs.(i) in
       let new_r = new_regs.(i) in
-      (* Machtypes are compared here in addition to the location-based
-         equivalence below: a [Val]/[Int] discrepancy changes GC behavior
-         without any structural difference. *)
-      if not (Cmm.equal_machtype_component old_r.Reg.typ new_r.Reg.typ)
-      then
-        Format.fprintf ppf_m
-          "Register machtype mismatch at old=%a(id:%a) new=%a(id:%a): %a[%a] \
-           vs %a[%a]@."
-          Label.format ol InstructionId.print old_instr.id Label.format nl
-          InstructionId.print new_instr.id Printreg.reg old_r
-          Printcmm.machtype_component old_r.Reg.typ Printreg.reg new_r
-          Printcmm.machtype_component new_r.Reg.typ;
       if
         Reg.equal_location old_r.Reg.loc Reg.Unknown
         && Reg.equal_location new_r.Reg.loc Reg.Unknown
@@ -553,7 +544,7 @@ let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
   (* Process a matched instruction pair: remove output equations, then add input
      equations. *)
   let process_instruction eqs ~(old_instr : _ Cfg.instruction)
-      ~(new_instr : _ Cfg.instruction) ~old_arg ~new_arg =
+      ~(new_instr : _ Cfg.instruction) ~old_arg ~new_arg ~is_gc_point =
     (* Check physical result registers match, then remove matched output
        pairs *)
     let eqs =
@@ -595,6 +586,23 @@ let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
     (* Remove all remaining output equations *)
     let eqs = Array.fold_left Equations.remove_old eqs old_instr.res in
     let eqs = Array.fold_left Equations.remove_new eqs new_instr.res in
+    (* At GC points (calls, allocations, polls), registers live across the
+       instruction are GC roots, so a [Val]/[Int] machtype discrepancy between
+       equated registers changes GC behavior. Elsewhere, machtypes may
+       legitimately differ. With outputs removed and inputs not yet added, the
+       current equations are exactly the pairs live across this instruction. *)
+    if is_gc_point
+    then
+      Equations.iter_old_to_new eqs ~f:(fun old_r new_r ->
+          if not (Cmm.equal_machtype_component old_r.Reg.typ new_r.Reg.typ)
+          then
+            Format.fprintf ppf_m
+              "Register machtype mismatch at GC point old=%a(id:%a) \
+               new=%a(id:%a): %a[%a] vs %a[%a]@."
+              Label.format ol InstructionId.print old_instr.id Label.format nl
+              InstructionId.print new_instr.id Printreg.reg old_r
+              Printcmm.machtype_component old_r.Reg.typ Printreg.reg new_r
+              Printcmm.machtype_component new_r.Reg.typ);
     (* Add input equations *)
     if Array.length old_arg <> Array.length new_arg
     then (
@@ -612,9 +620,17 @@ let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
   (* Process terminator *)
   let old_t = old_block.terminator in
   let new_t = new_block.terminator in
+  let terminator_is_gc_point =
+    match old_t.desc with
+    | Call _ | Call_no_return _ | Prim _ | Invalid _ -> true
+    | Never | Always _ | Parity_test _ | Truth_test _ | Int_test _
+    | Float_test _ | Switch _ | Return | Raise _ | Tailcall_self _
+    | Tailcall_func _ ->
+      false
+  in
   let eqs =
     process_instruction eqs ~old_instr:old_t ~new_instr:new_t ~old_arg:old_t.arg
-      ~new_arg:new_t.arg
+      ~new_arg:new_t.arg ~is_gc_point:terminator_is_gc_point
   in
   (* Process body backwards (iterating the cells back to front), skipping
      moves *)
@@ -639,6 +655,7 @@ let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
       let eqs =
         process_instruction eqs ~old_instr ~new_instr
           ~old_arg:(effective_arg old_instr) ~new_arg:(effective_arg new_instr)
+          ~is_gc_point:(Cfg.is_alloc old_instr || Cfg.is_poll old_instr)
       in
       loop eqs (DLL.prev old_c) (DLL.prev new_c)
     | Some _, None | None, Some _ ->
