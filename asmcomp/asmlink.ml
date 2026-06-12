@@ -67,6 +67,18 @@ let sourcefile_for_dwarf ~named_startup_file filename =
      purposes. *)
   if named_startup_file then filename else ".startup"
 
+(* On macOS the system linker does not copy debug information into executables:
+   instead a "debug map" in the executable points at the object files, from
+   which the debugger reads the debug information directly. When the startup
+   object file contains DWARF information (e.g. for the [caml_apply] and
+   [caml_curry] functions, which debuggers need in order to see through
+   generically-applied calls) it must accordingly be kept, at a predictable
+   location, rather than being a temporary file deleted after linking. *)
+let keep_startup_obj_for_dwarf () =
+  !Clflags.debug
+  && !Dwarf_flags.dwarf_for_startup_file
+  && String.equal Config.system "macosx"
+
 let emit_ocamlrunparam ~ppf_dump =
   Asmgen.compile_phrase ~ppf_dump
     (Cmm.Cdata
@@ -252,7 +264,7 @@ let link_shared_actual unix ml_objfiles output_name ~genfns ~units_tolink
   then
     (* CR gyorsh: restore after workaround. *)
     Emitaux.binary_backend_available := true;
-  remove_file startup_obj
+  if not (keep_startup_obj_for_dwarf ()) then remove_file startup_obj
 
 let link_shared unix ml_objfiles output_name ~genfns ~units_tolink ~ppf_dump =
   Profile.record_call "link_shared" (fun () ->
@@ -415,7 +427,12 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
     else Filename.temp_file "camlstartup" ext_asm
   in
   let sourcefile_for_dwarf = sourcefile_for_dwarf ~named_startup_file startup in
-  let startup_obj = Filename.temp_file "camlstartup" ext_obj in
+  let keep_startup_obj = keep_startup_obj_for_dwarf () in
+  let startup_obj =
+    if keep_startup_obj
+    then output_name ^ ".startup" ^ ext_obj
+    else Filename.temp_file "camlstartup" ext_obj
+  in
   let ml_objfiles =
     if not uses_eval
     then ml_objfiles
@@ -480,7 +497,7 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
   Misc.try_finally
     (fun () -> call_linker ?dissector_args ml_objfiles startup_obj output_name)
     ~always:(fun () ->
-      remove_file startup_obj;
+      if not keep_startup_obj then remove_file startup_obj;
       cleanup_dissector_temp_dir ())
 
 let link unix linkenv ml_objfiles output_name ~cached_genfns_imports ~genfns

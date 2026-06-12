@@ -126,6 +126,51 @@ let spilled_copy_rvalue ~(reg : Reg.t) ~avail ~stack_offset ~fun_contains_calls
                        (Targetint.of_int_exn (offset_in_bytes / Arch.size_addr)))
             | Some (Bytes_relative_to_domainstate_pointer _) -> None))))
 
+let dwarf_version () =
+  match !Dwarf_flags.gdwarf_version with
+  | Four -> Dwarf_version.four
+  | Five -> Dwarf_version.five
+
+(* If the given variable is a parameter of the function being compiled that
+   arrived in a register -- only parameters are available at the function's
+   entry point, whose availability set is [entry_available] -- then return an
+   rvalue describing the value of the variable as the DWARF "entry value" of
+   that register. Variables at this level are immutable, so such a description
+   is valid at any point in the function. Debuggers recover entry values by
+   virtually unwinding to the caller and consulting the call site information
+   there; in particular such descriptions remain valid at tail call sites,
+   whose enclosing frame has been destroyed by the time the callee executes
+   (recovery then chains through the tail-calling function's own incoming call
+   site information, one frame further up). *)
+let entry_value_rvalue ~(entry_available : Reg_availability_set.t) var :
+    _ SLDL.Rvalue.t option =
+  match entry_available with
+  | Unreachable -> None
+  | Ok entry_avail ->
+    RD.Set_distinguishing_names_and_locations.fold
+      (fun rd entry_value ->
+        match entry_value with
+        | Some _ -> entry_value
+        | None -> (
+          match RD.debug_info rd with
+          | None -> None
+          | Some debug_info -> (
+            match RD.Debug_info.holds_value_of debug_info with
+            | Var var'
+              when V.same var var'
+                   && RD.Debug_info.num_parts_of_value debug_info = 1 -> (
+              let reg = RD.reg rd in
+              match reg.loc with
+              | Reg phys_reg ->
+                let dwarf_reg_number = Regs.dwarf_reg_number reg.typ phys_reg in
+                Some
+                  (SLDL.Rvalue.entry_value_of_register ~dwarf_reg_number
+                     (dwarf_version ()))
+              | Stack _ | Unknown -> None)
+            | Var _ | Const_int _ | Const_naked_float _ | Const_symbol _ ->
+              None)))
+      entry_avail None
+
 (* The [DW_AT_call_value] (GNU: [DW_AT_GNU_call_site_value]) attribute of a call
    site parameter DIE describes how to compute the value passed for the
    parameter, as an expression to be evaluated in the context of the _caller_
@@ -136,13 +181,16 @@ let spilled_copy_rvalue ~(reg : Reg.t) ~avail ~stack_offset ~fun_contains_calls
 
    - spilled copies of the relevant value, at CFA-relative stack locations (such
    slots, unlike registers and the domainstate area, are preserved during the
-   call).
+   call);
+
+   - entry values (see [entry_value_rvalue] above), when the value passed is a
+   parameter of the calling function.
 
    For tail calls the caller's frame no longer exists by the time the callee
-   executes, so only constants may be quoted. *)
+   executes, so only constants and entry values may be quoted. *)
 let call_site_value_attribute ~(arg : Reg.t)
-    ~(available_before : Reg_availability_set.t) ~is_tail ~stack_offset
-    ~fun_contains_calls ~fun_num_stack_slots =
+    ~(available_before : Reg_availability_set.t) ~entry_available ~is_tail
+    ~stack_offset ~fun_contains_calls ~fun_num_stack_slots =
   match available_before with
   | Unreachable -> []
   | Ok avail -> (
@@ -170,30 +218,41 @@ let call_site_value_attribute ~(arg : Reg.t)
             (SLDL.compile
                (SLDL.of_rvalue
                   (Dwarf_reg_locations.address_of_cmm_symbol_rvalue sym)))
-        | Var _ -> (
-          if is_tail
-          then []
-          else
-            match
-              spilled_copy_rvalue ~reg:arg ~avail ~stack_offset
-                ~fun_contains_calls ~fun_num_stack_slots
-            with
-            | None -> []
-            | Some rvalue ->
-              single_call_value_attribute (SLDL.compile (SLDL.of_rvalue rvalue))
+        | Var var -> (
+          let rvalue =
+            (* Spilled copies are preferred to entry values: the debugger can
+               read them directly, without chaining through further call site
+               information. They cannot however be used at tail call sites
+               (the frame containing the spilled copy no longer exists when
+               the callee executes). *)
+            let spilled_copy =
+              if is_tail
+              then None
+              else
+                spilled_copy_rvalue ~reg:arg ~avail ~stack_offset
+                  ~fun_contains_calls ~fun_num_stack_slots
+            in
+            match spilled_copy with
+            | Some _ -> spilled_copy
+            | None -> entry_value_rvalue ~entry_available var
+          in
+          match rvalue with
+          | None -> []
+          | Some rvalue ->
+            single_call_value_attribute (SLDL.compile (SLDL.of_rvalue rvalue))
           ))))
 
 let add_call_site_parameter ~call_site_die ~arg_index ~(arg : Reg.t)
-    ~available_before ~is_tail ~stack_offset ~fun_contains_calls
-    ~fun_num_stack_slots =
+    ~available_before ~entry_available ~is_tail ~stack_offset
+    ~fun_contains_calls ~fun_num_stack_slots =
   match arg.loc with
   | Stack _ | Unknown ->
     (* Excess arguments are passed via the domainstate area; see above. *)
     ()
   | Reg _ -> (
     match
-      call_site_value_attribute ~arg ~available_before ~is_tail ~stack_offset
-        ~fun_contains_calls ~fun_num_stack_slots
+      call_site_value_attribute ~arg ~available_before ~entry_available
+        ~is_tail ~stack_offset ~fun_contains_calls ~fun_num_stack_slots
     with
     | [] ->
       (* A call site parameter DIE without a means of computing the value passed
@@ -222,8 +281,8 @@ let add_call_site_parameter ~call_site_die ~arg_index ~(arg : Reg.t)
 
 let add_call_site state ~function_proto_die ~(insn : L.instruction)
     ~return_label ~return_label_offset_in_bytes ~is_tail ~target_attributes
-    ~(args : Reg.t array) ~stack_offset ~fun_contains_calls ~fun_num_stack_slots
-    =
+    ~(args : Reg.t array) ~entry_available ~stack_offset ~fun_contains_calls
+    ~fun_num_stack_slots =
   let position_attributes =
     (* The innermost item of the debuginfo gives the source location of the call
        itself. *)
@@ -272,8 +331,8 @@ let add_call_site state ~function_proto_die ~(insn : L.instruction)
   Array.iteri
     (fun arg_index arg ->
       add_call_site_parameter ~call_site_die ~arg_index ~arg
-        ~available_before:insn.available_before ~is_tail ~stack_offset
-        ~fun_contains_calls ~fun_num_stack_slots)
+        ~available_before:insn.available_before ~entry_available ~is_tail
+        ~stack_offset ~fun_contains_calls ~fun_num_stack_slots)
     args
 
 let callee_attributes_from_symbol state ~fun_symbol ~demangled_name =
@@ -307,20 +366,22 @@ let external_callee_attributes state ~func =
     ~demangled_name:func
 
 let indirect_callee_attributes ~(callee : Reg.t) ~(args : Reg.t array)
-    ~(available_before : Reg_availability_set.t) ~is_tail ~stack_offset
-    ~fun_contains_calls ~fun_num_stack_slots =
+    ~(available_before : Reg_availability_set.t) ~entry_available ~is_tail
+    ~stack_offset ~fun_contains_calls ~fun_num_stack_slots =
   let closure_rvalue =
     (* The code pointer for an OCaml indirect call lies within the closure (more
        precisely the function slot), which is passed as the final argument. If
-       the closure is statically allocated (a symbol), or has a spilled copy
-       surviving the call, then the code pointer can be recomputed by the
+       the closure is statically allocated (a symbol), has a spilled copy
+       surviving the call, or is a parameter of the function being compiled
+       (whose value may be described as the entry value of the register in
+       which it arrived), then the code pointer can be recomputed by the
        debugger in the context of the caller's frame even after the call. This
        permits the use of [DW_AT_call_target] rather than the "clobbered"
        variant: debuggers cannot identify callees, in particular when resolving
        entry values during virtual unwinding, from clobbered target expressions.
        (Spilled copies are not usable for tail calls, whose frames no longer
-       exist by the time the callee executes; statically-allocated closures are
-       always usable.) *)
+       exist by the time the callee executes; statically-allocated closures and
+       entry values are always usable.) *)
     if Array.length args < 1
     then None
     else
@@ -343,12 +404,17 @@ let indirect_callee_attributes ~(callee : Reg.t) ~(args : Reg.t array)
               match RD.Debug_info.holds_value_of debug_info with
               | Const_symbol sym ->
                 Some (Dwarf_reg_locations.address_of_cmm_symbol_rvalue sym)
-              | Var _ ->
-                if is_tail
-                then None
-                else
-                  spilled_copy_rvalue ~reg:closure ~avail ~stack_offset
-                    ~fun_contains_calls ~fun_num_stack_slots
+              | Var var -> (
+                let spilled_copy =
+                  if is_tail
+                  then None
+                  else
+                    spilled_copy_rvalue ~reg:closure ~avail ~stack_offset
+                      ~fun_contains_calls ~fun_num_stack_slots
+                in
+                match spilled_copy with
+                | Some _ -> spilled_copy
+                | None -> entry_value_rvalue ~entry_available var)
               | Const_int _ | Const_naked_float _ -> None))))
   in
   match closure_rvalue with
@@ -357,8 +423,8 @@ let indirect_callee_attributes ~(callee : Reg.t) ~(args : Reg.t array)
        field of the function slot, chosen when the call was compiled: field 0
        for single-argument calls (generic applications of one argument, see
        [Cmm_helpers.apply_or_call_caml_apply], and full applications of
-       arity-one functions, see [Cmm_helpers.indirect_full_call]); field 2 for
-       full applications passing more than one argument
+       single-parameter functions, see [Cmm_helpers.indirect_full_call]); field
+       2 for full applications passing more than one argument
        ([Cmm_helpers.indirect_full_call], and likewise the [caml_applyN] inline
        fast path, whose arity guard ensures full application). Generic
        applications of more than one argument, including overapplications, are
@@ -367,12 +433,16 @@ let indirect_callee_attributes ~(callee : Reg.t) ~(args : Reg.t array)
        the closure may be of any arity (for example a partial application
        entering [caml_curryN], or a tupled function, whose arity is encoded
        negatively), yet field 0 is still the code pointer that was called. CR
-       mshinwell: a single Cmm argument occupying multiple machine registers (an
-       unboxed product, only possible for known-arity calls) is miscounted here,
-       yielding field 2 where the call site loaded field 0; fixing this would
-       require propagating the field index from Cmm to Linear. The consequence
-       is only that the debugger will fail to identify the callee for such call
-       sites. *)
+       mshinwell: the field selection in [Cmm_helpers.indirect_full_call] and
+       the function slot layout key on the number of source parameters (see
+       [args_ty] in [To_cmm_expr.translate_apply0] and
+       [To_cmm_set_of_closures.get_func_decl_params_arity]), whereas machine
+       arguments are counted here. These differ only for known-arity indirect
+       full applications of functions whose single parameter is unarized to
+       multiple machine registers (an unboxed product): field 2 is selected here
+       where the call site loaded field 0. Fixing this would require propagating
+       the field index from Cmm to Linear. The consequence is only that the
+       debugger will fail to identify the callee for such call sites. *)
     let num_value_args = Array.length args - 1 in
     let field = if num_value_args <= 1 then 0 else 2 in
     [ DAH.create_call_target
@@ -415,13 +485,29 @@ let insert_label_after (insn : L.instruction) =
 let dwarf state (fundecl : L.fundecl) ~function_proto_die =
   let fun_contains_calls = fundecl.fun_contains_calls in
   let fun_num_stack_slots = fundecl.fun_num_stack_slots in
+  (* The availability set at the function's entry point, which determines the
+     registers in which the function's parameters arrived (see
+     [entry_value_rvalue] above). The registers are not associated with the
+     parameters until the [Name_for_debugger] operations at the start of the
+     function's body have been processed, so the availability set is taken
+     from just after any such leading operations (at which point no register
+     has yet been modified). *)
+  let entry_available =
+    let rec after_leading_naming_ops (insn : L.instruction) =
+      match insn.desc with
+      | Lprologue | Llabel _ | Lop (Name_for_debugger _) ->
+        after_leading_naming_ops insn.next
+      | _ -> insn.available_before
+    in
+    after_leading_naming_ops fundecl.fun_body
+  in
   let described_a_call_site = ref false in
   let add_call_site insn ~return_label ?(return_label_offset_in_bytes = 0)
       ?(is_tail = false) ~target_attributes ~args ~stack_offset () =
     described_a_call_site := true;
     add_call_site state ~function_proto_die ~insn ~return_label
       ~return_label_offset_in_bytes ~is_tail ~target_attributes ~args
-      ~stack_offset ~fun_contains_calls ~fun_num_stack_slots
+      ~entry_available ~stack_offset ~fun_contains_calls ~fun_num_stack_slots
   in
   let rec traverse (insn : L.instruction) ~stack_offset =
     match insn.desc with
@@ -435,17 +521,19 @@ let dwarf state (fundecl : L.fundecl) ~function_proto_die =
         add_call_site insn ~return_label
           ~target_attributes:
             (indirect_callee_attributes ~callee ~args
-               ~available_before:insn.available_before ~is_tail:false
-               ~stack_offset ~fun_contains_calls ~fun_num_stack_slots)
+               ~available_before:insn.available_before ~entry_available
+               ~is_tail:false ~stack_offset ~fun_contains_calls
+               ~fun_num_stack_slots)
           ~args ~stack_offset ()
       | Lcall_imm { func } ->
         let return_label = insert_label_after insn in
         add_call_site insn ~return_label
           ~target_attributes:(direct_callee_attributes state ~callee:func)
           ~args:insn.arg ~stack_offset ()
-      (* For tail calls, only constant parameter values are currently described
-         (see [call_site_value_attribute] above). CR mshinwell: describe other
-         parameters of tail calls using chained entry values. *)
+      (* For tail calls, parameter values are described using constants and
+         chained entry values; likewise the targets of indirect tail calls
+         (see [call_site_value_attribute] and [indirect_callee_attributes]
+         above). *)
       | Ltailcall_ind ->
         let callee = insn.arg.(0) in
         let args = Array.sub insn.arg 1 (Array.length insn.arg - 1) in
@@ -453,8 +541,9 @@ let dwarf state (fundecl : L.fundecl) ~function_proto_die =
         add_call_site insn ~return_label ~is_tail:true
           ~target_attributes:
             (indirect_callee_attributes ~callee ~args
-               ~available_before:insn.available_before ~is_tail:true
-               ~stack_offset ~fun_contains_calls ~fun_num_stack_slots)
+               ~available_before:insn.available_before ~entry_available
+               ~is_tail:true ~stack_offset ~fun_contains_calls
+               ~fun_num_stack_slots)
           ~args ~stack_offset ()
       | Ltailcall_imm { func } ->
         (* Call site entries are not generated for self tail calls ("tail
@@ -504,14 +593,12 @@ let dwarf state (fundecl : L.fundecl) ~function_proto_die =
   traverse fundecl.fun_body ~stack_offset:0;
   (* Strictly speaking the "all calls" attribute asserts that every call in the
      function has a call site entry (DWARF-5 spec section 3.3.1.6), which is not
-     currently the case here: tail calls (and probes, and on some architectures
-     external calls) are not described. However LLDB will not parse the call
+     currently the case here: probes, self tail calls and, on architectures
+     where [Proc.extcall_code_size_after_return_address] returns [None],
+     external calls are not described. However LLDB will not parse the call
      site entries of a function at all unless its subprogram DIE carries this
      attribute (see [SymbolFileDWARF::CollectCallEdges]), so it is set whenever
-     any call site entry exists. The deviation from the spec only risks
-     confusing consumers' reconstruction of virtual tail-call frames, which
-     requires call site entries for tail calls; these are never emitted at
-     present. *)
+     any call site entry exists. *)
   if !described_a_call_site
   then
     Proto_die.add_or_replace_attribute_value function_proto_die
