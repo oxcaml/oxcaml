@@ -136,6 +136,11 @@ type t =
   | Degraded_to_partial_match               (* 74 *)
   | Unnecessarily_partial_tuple_pattern     (* 75 *)
   (* Oxcaml specific warnings: numbers should go down from 199 *)
+  | Imprecise_kind_annotation of {
+      name : string;
+      annotated : string;
+      inferred : string;
+    }                                       (* 181 *)
   | Untagged_external_small_int_return      (* 182 *)
   | Redundant_kind_modifier of string       (* 183 *)
   | Ignored_kind_modifier of string * string list (* 184 *)
@@ -240,6 +245,7 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
+  | Imprecise_kind_annotation _ -> 181
   | Untagged_external_small_int_return -> 182
   | Redundant_kind_modifier _ -> 183
   | Ignored_kind_modifier _ -> 184
@@ -615,6 +621,10 @@ let descriptions = [
     description = "A tuple pattern ends in .. but fully matches its expected \
                    type.";
     since = since 5 4 };
+  { number = 181;
+    names = ["imprecise-kind-annotation"];
+    description = "A kind annotation is less precise than the inferred kind.";
+    since = since 5 2 };
   { number = 182;
     names = ["untagged-external-small-int-return"];
     description = "An external declaration returns an (int8[@untagged]) or \
@@ -1456,6 +1466,12 @@ let message = function
         Style.inline_code name
   | Unused_kind_declaration s ->
       msg "unused kind %a." Style.inline_code s
+  | Imprecise_kind_annotation { name; annotated; inferred } ->
+      msg
+        "The type variable `%s'@ \
+         was annotated with kind `%s'@ \
+         but was inferred to have kind `%s'."
+        name annotated inferred
   | Zero_alloc_all_hidden_arrow s ->
       msg "The type of this item is an@ alias of a function type,@ \
            but the %a attribute for@ this signature does not apply to it@ \

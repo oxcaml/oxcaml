@@ -1271,6 +1271,8 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
     | Some c -> out_jkind_of_const_jkind env c
     | None -> assert false (* handled above *)
 
+let out_jkind_of_jkind env jkind = out_jkind_of_desc env (Jkind.get jkind)
+
 (* returns None for [value], according to (C2.1) from
    Note [When to print jkind annotations] *)
 (* CR layouts v2.8: This should use the annotation in the jkind, if there

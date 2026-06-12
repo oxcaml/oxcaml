@@ -255,11 +255,12 @@ let make_params env path params =
         ~level:(Ctype.get_current_level ())
     in
     try
-      (transl_type_param env path jkind sty, v)
+      let cty, annotated_jkind = transl_type_param env path jkind sty in
+      ((cty, v), annotated_jkind)
     with Already_bound ->
       raise(Error(sty.ptyp_loc, Repeated_parameter))
   in
-    List.map make_param params
+    List.split (List.map make_param params)
 
 (* Enter all declared types in the environment as abstract types *)
 
@@ -920,13 +921,39 @@ let shape_extension_constructor ext =
   | Debugging_shapes ->
     Type_shape.Type_decl_shape.of_extension_constructor_merlin_only ext
 
+let check_imprecise_type_param_annotation env (cty, _) annotated_jkind =
+  match cty.ctyp_desc, get_desc cty.ctyp_type, annotated_jkind with
+  | Ttyp_var (name_opt, Some _), Tvar { jkind; _ }, Some annotated_jkind
+    when not (Jkind.History.has_warned jkind) ->
+    if not (Jkind.equate env jkind annotated_jkind) then begin
+      let format_jkind jkind =
+        Format_doc.asprintf "%a" !Oprint.out_jkind
+          (Out_type.out_jkind_of_jkind env jkind)
+      in
+      let name =
+        match name_opt with
+        | Some name -> Pprintast.tyvar_of_name name
+        | None -> "anonymous type parameter"
+      in
+      Location.prerr_warning cty.ctyp_loc
+        (Warnings.Imprecise_kind_annotation {
+          name;
+          annotated = format_jkind annotated_jkind;
+          inferred = format_jkind jkind;
+        });
+      Types.set_var_jkind cty.ctyp_type (Jkind.History.with_warning jkind)
+    end
+  | _ -> ()
+
 let transl_declaration env sdecl (id, uid) =
   (* Bind type parameters *)
   Ctype.with_local_level begin fun () ->
   TyVarEnv.reset();
   let or_null, or_null_reexport = get_or_null_attributes sdecl in
   let path = Path.Pident id in
-  let tparams = make_params env path sdecl.ptype_params in
+  let tparams, param_annotated_jkinds =
+    make_params env path sdecl.ptype_params
+  in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
   let cstrs = List.map
     (fun (sty, sty', loc) ->
@@ -1239,6 +1266,9 @@ let transl_declaration env sdecl (id, uid) =
         try Ctype.unify env ty ty' with Ctype.Unify err ->
           raise(Error(loc, Inconsistent_constraint (env, err))))
       cstrs;
+  (* Check for imprecise type parameter annotations *)
+    List.iter2 (check_imprecise_type_param_annotation env)
+      tparams param_annotated_jkinds;
   (* Add abstract row *)
     if is_fixed_type sdecl then begin
       let p, _ =
@@ -4016,7 +4046,7 @@ let transl_type_extension extend env loc styext =
     let scope = Ctype.create_scope () in
     Ctype.with_local_level_generalize begin fun () ->
       TyVarEnv.reset();
-      let ttype_params = make_params env type_path styext.ptyext_params in
+      let ttype_params, _ = make_params env type_path styext.ptyext_params in
       let type_params = List.map (fun (cty, _) -> cty.ctyp_type) ttype_params in
       List.iter2 (Ctype.unify_var env)
         (Ctype.instance_list type_decl.type_params)
@@ -4750,7 +4780,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
   let env = outer_env in
   let decl_path = Path.Pident id in
   let loc = sdecl.ptype_loc in
-  let tparams = make_params env (Pident id) sdecl.ptype_params in
+  let tparams, _ = make_params env (Pident id) sdecl.ptype_params in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
   let arity = List.length params in
   let constraints =
