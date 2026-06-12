@@ -119,7 +119,7 @@ module M : sig type 'a t : value mod aliased end
 |}]
 
 module M : sig
-  type 'a t : value mod global aliased many portable contended
+  type 'a t : value mod global many portable contended
 end = struct
   type 'a t : immediate with 'a @@ aliased many contended global portable
 end
@@ -128,11 +128,6 @@ Line 4, characters 35-42:
 4 |   type 'a t : immediate with 'a @@ aliased many contended global portable
                                        ^^^^^^^
 Warning 219 [redundant-modality]: This modality is redundant.
-
-Line 2, characters 31-38:
-2 |   type 'a t : value mod global aliased many portable contended
-                                   ^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
 
 module M : sig type 'a t : value mod global many portable contended end
 |}]
