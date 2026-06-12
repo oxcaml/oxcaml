@@ -95,6 +95,8 @@ let compute_variance env visited vari ty =
         compute_variance_rec (Env.enter_splice ~loc:Location.none env) vari ty
     | Tquote_eval ty ->
         compute_variance_rec (Env.enter_quotation env) vari ty
+    | Tbox ty ->
+        compute_same ty
     | Tfield (_, _, ty1, ty2) ->
         compute_same ty1;
         compute_same ty2
