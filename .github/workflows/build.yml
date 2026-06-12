@@ -177,11 +177,11 @@ jobs:
             check_arch: true
             sysdeps: gdb
 
-          - name: runtime5 x86-peephole (x86_64-linux)
+          - name: runtime5 experimental-optimizations (x86_64-linux)
             config: --enable-runtime5
             os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: '_,w=-46,x86-peephole-optimize=1'
-            ocamlparam: '_,w=-46,x86-peephole-optimize=1'
+            build_ocamlparam: '_,w=-46,experimental-optimizations=1'
+            ocamlparam: '_,w=-46,experimental-optimizations=1'
             check_arch: true
             sysdeps: gdb
 
