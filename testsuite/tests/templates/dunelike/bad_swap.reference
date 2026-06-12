@@ -1,0 +1,8 @@
+File "_none_", line 1:
+Error: The implementation "(obtained by functorizing)"
+       does not match the interface "bundle_swap/bundle_swap.cmi":  ... ... ...
+       At position "module Intf : sig module type S = <here> end"
+       Illegal permutation of runtime components in a module type.
+         For example, 
+         the module "Basic__" and the module "Util__" are not in the same order
+         in the expected and actual module types.

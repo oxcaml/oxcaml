@@ -50,6 +50,9 @@ module type S = sig
 
   val instantiate : src:string -> args:string list -> string -> unit
 
+  val functorize :
+    ppf_dump:Format.formatter -> Env.t -> string list -> string -> unit
+
   val package_files :
     ppf_dump:Format.formatter -> Env.t -> string list -> string -> unit
 end
@@ -242,10 +245,68 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     let { Cmx_format.ui_unit; ui_arg_descr; ui_format; _ } = unit_info in
     { Instantiator.ui_unit; ui_arg_descr; ui_format }
 
+  let read_unit_info_of_cmx file : Functorizer.impl_unit_info =
+    let unit_info, _crc = Compilenv.read_unit_info file in
+    Functorizer.impl_unit_info_with_cmi_data ~ui_unit:unit_info.ui_unit
+      ~ui_format:unit_info.ui_format
+
+  let find_unit_info_by_name_cmx name : Functorizer.impl_unit_info =
+    let filename =
+      Load_path.find_normalized
+        (String.uncapitalize_ascii name ^ ext_flambda_obj)
+    in
+    read_unit_info_of_cmx filename
+
   let instantiate ~src ~args targetcmx =
     Instantiator.instantiate ~src ~args targetcmx
       ~expected_extension:ext_flambda_obj ~read_unit_info
       ~compile:(instance ~keep_symbol_tables:false)
+
+  (* Implementation mode: input is .cmx files. Outputs .cmx + .cmi + .cmt +
+     .cms. Respects -stop-after typing. Input files are read inside
+     [with_info]'s callback so each input's cmi is registered as an import of
+     the bundle. *)
+  let functorize_impl initial_env files target =
+    let output_prefix = Filename.remove_extension target in
+    let compilation_unit = Functorizer.make_compilation_unit target in
+    let source_file = List.hd files in
+    with_info ~source_file ~output_prefix
+      ~compilation_unit:(Exactly compilation_unit) ~kind:Impl
+      ~dump_ext:Backend.ext_flambda_obj
+    @@ fun info ->
+    if !Oxcaml_flags.internal_assembler
+    then Emitaux.binary_backend_available := true;
+    Compilenv.reset info.target;
+    if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
+    Misc.try_finally
+      (fun () ->
+        let compile_program info program =
+          compile_from_tlambda info program ~as_arg_for:None
+            ~keep_symbol_tables:false
+        in
+        Functorizer.functorize_impl_with ~initial_env ~info ~input_files:files
+          ~read_unit_info_of_input:read_unit_info_of_cmx
+          ~find_impl_unit_info_by_name:find_unit_info_by_name_cmx
+          ~compile_program)
+      ~exceptionally:(fun () ->
+        Misc.remove_file target;
+        Misc.remove_file
+          (Unit_info.Artifact.filename (Unit_info.cmi info.target)))
+
+  let functorize ~ppf_dump:_ initial_env files target =
+    let files =
+      List.map
+        (fun f ->
+          if Sys.file_exists f
+          then f
+          else Compenv.fatal (Printf.sprintf "File %s not found" f))
+        files
+    in
+    match files with
+    | [] -> Misc.fatal_error "No input files for -functorize"
+    | first :: _ when Filename.check_suffix first ".cmi" ->
+      Functorizer.functorize_intf initial_env files target
+    | _ -> functorize_impl initial_env files target
 end
 
 let native unix

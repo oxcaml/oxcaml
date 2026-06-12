@@ -3251,6 +3251,9 @@ let read_signature modname cmi =
   let mty, staticity = read_pers_mod modname cmi in
   Subst.Lazy.force_signature mty, staticity
 
+let import_cmi_for_link filename =
+  Persistent_env.import_cmi_for_link !persistent_env filename
+
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname
 
@@ -4269,7 +4272,36 @@ let remove_last_open root env0 =
 (* Open a signature from a file *)
 
 let open_pers_signature name env =
-  open_signature ~errors:false ~loc:Location.none None (Lident name) env
+  let path, _, env =
+    open_signature ~errors:false ~loc:Location.none None (Lident name) env
+  in
+  path, env
+
+let open_pers_signature_cmi filename env =
+  let global_name, _sign =
+    Persistent_env.read_cmi_file !persistent_env filename
+  in
+  let mda =
+    find_pers_mod ~allow_hidden:true global_name ~allow_excess_args:false
+  in
+  let path = Pident (Ident.create_global global_name) in
+  use_module ~use:true ~loc:Location.none path mda;
+  let comps =
+    match get_components mda.mda_components with
+    | Structure_comps c -> c
+    | Functor_comps _ ->
+        Misc.fatal_errorf
+          "open_pers_signature_cmi: %s is a functor, not a structure"
+          (Global_module.Name.to_string global_name)
+  in
+  let stage_locks, locks =
+    partition_locks (IdTbl.get_all_locks env.modules)
+  in
+  check_cross_quotation ~errors:false ~loc_use:Location.none
+    ~loc_def:Location.none env path Longident.(Lident (Path.name path))
+    stage_locks;
+  let env = add_components None path env comps locks in
+  path, env
 
 let open_signature
     ~used_slot

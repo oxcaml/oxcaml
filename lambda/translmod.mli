@@ -53,12 +53,36 @@ type runtime_arg =
     }
   | (* A module to pass in its entirety *)
     Main_module_block of Compilation_unit.t
+  | (* An in-scope local ident — either a functor parameter or an earlier
+       let-binding.  Used by [transl_functorize] but not [transl_instance]. *)
+    Lvar of Ident.t
   | Unit
 
 val transl_instance:
       Compilation_unit.t -> runtime_args:runtime_arg list
         -> main_module_block_repr:module_representation
         -> arg_block_idx:int option
+        -> program
+
+type instantiation = {
+  ident : Ident.t;
+      (** The let-binding's local ident, the name dependents use to refer
+          to this instantiation in subsequent [instantiations]. *)
+  cu : Compilation_unit.t;
+      (** The compunit being instantiated; feeds into [required_globals]. *)
+  args : runtime_arg list;
+      (** [[]]: the compunit is a plain [Mb_struct] — emit [Pgetglobal cu].
+          Non-empty: the compunit is an [Mb_instantiating_functor] — emit an
+          [Lapply] of its instantiating functor with these arguments.  In a
+          functor body, [args] typically uses [Lvar] / [Unit]. *)
+}
+
+val transl_functorize:
+      Compilation_unit.t
+        -> params:Ident.t list
+        -> instantiations:instantiation list
+        -> modules:Ident.t list
+        -> coercion:module_coercion
         -> program
 
 val toplevel_name: Ident.t -> string

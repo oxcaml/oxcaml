@@ -106,6 +106,40 @@ type 'a sig_reader =
 
 val read : 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
   -> Subst.Lazy.persistent_signature
+
+(** [read_cmi_file] is a variant of [read] that takes the path of a cmi
+    file directly: it reads the cmi and registers it as a hidden import
+    under the module name stored inside the cmi (rather than one inferred
+    from the filename or supplied by the caller). Returns the resulting
+    global name and signature. *)
+val read_cmi_file :
+     'a t -> string
+  -> Global_module.Name.t * Subst.Lazy.persistent_signature
+
+(** Cmi data made available to callers of [import_cmi_for_link].  Bundles the
+    fields needed to inline the module's signature into a containing module:
+    the compilation unit (absent for parameter cmis), the declared parameter
+    list, and the freshened signature together with its bound globals (the
+    latter is the right source for the modules referenced by [sign], as it
+    tracks substitution; the cmi's raw [cmi_globals] can drift from [sign] in
+    principle). *)
+type loaded_cmi = {
+  cu : Compilation_unit.t option;
+      (** [None] iff the cmi was compiled with [-as-parameter]. *)
+  params : Global_module.Parameter_name.t list;
+  sign_with_globals : Signature_with_global_bindings.t;
+}
+
+(** [import_cmi_for_link penv cmi_file] adds the cmi to the import table for
+    CRC tracking and consistency checking, but does not register it as a
+    persistent name in the type-checking environment.  Unlike [read_cmi_file]
+    and [read], it does not run the parameter-accessibility check, so it can be
+    used to import parameterised modules into compilations that do not
+    themselves declare those parameters (e.g., [-functorize], whose bundle is
+    implicitly parameterised by the union of its inputs).  Returns the loaded
+    cmi's compilation unit, declared parameters, and signature-with-globals so
+    the caller need not re-read the file. *)
+val import_cmi_for_link : 'a t -> string -> loaded_cmi
 val find : allow_hidden:bool -> 'a t -> 'a sig_reader
   -> Global_module.Name.t -> allow_excess_args:bool -> 'a
 

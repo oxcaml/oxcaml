@@ -1406,12 +1406,13 @@ type runtime_arg =
       ra_main_repr : module_representation;
     }
   | Main_module_block of Compilation_unit.t
+  | Lvar of Ident.t
   | Unit
 
 let unit_of_runtime_arg arg =
   match arg with
   | Argument_block { ra_unit = cu; _ } | Main_module_block cu -> Some cu
-  | Unit -> None
+  | Lvar _ | Unit -> None
 
 let transl_runtime_arg arg =
   match arg with
@@ -1421,6 +1422,8 @@ let transl_runtime_arg arg =
              Loc_unknown)
   | Main_module_block cu ->
       Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)
+  | Lvar id ->
+      Lambda.Lvar id
   | Unit ->
       lambda_unit
 
@@ -1475,6 +1478,145 @@ let transl_instance instance_unit ~runtime_args ~main_module_block_repr
     Misc.fatal_error "Trying to instantiate but passing no arguments";
   transl_instance_impl instance_unit ~runtime_args
     ~main_module_block_repr ~arg_block_idx
+
+type instantiation = {
+  ident : Ident.t;
+  cu : Compilation_unit.t;
+  args : runtime_arg list;
+}
+
+let transl_instantiation_rhs cu args =
+  match args with
+  | [] -> Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)
+  | _ :: _ ->
+    let func =
+      Lprim
+        ( mod_field 0 (Module_value_only { field_count = 1 }),
+          [Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)],
+          Loc_unknown )
+    in
+    Lapply
+      { ap_func = func;
+        ap_args = List.map transl_runtime_arg args;
+        ap_result_layout = layout_module;
+        ap_loc = Loc_unknown;
+        ap_inlined = Always_inlined;
+        ap_tailcall = Default_tailcall;
+        ap_specialised = Default_specialise;
+        ap_mode = alloc_heap;
+        ap_region_close = Rc_normal;
+        ap_probe = None
+      }
+
+(* Build a "bundle functor" Lambda.program for -functorize.
+
+   - [params]: functor parameter idents in declaration order.
+   - [instantiations]: let-bindings at the top of the functor body, in
+     runtime-dependency order (each entry's rhs is already fully resolved
+     w.r.t. parameter and dep idents).
+   - [modules]: compunits to expose in the bundle's returned struct, in
+     [all_modules] order; each must correspond to one of the
+     [instantiations].
+   - [coercion]: coercion from the generated signature to the user's
+     specified signature (e.g. via [-cmi-file]). *)
+(* Build the body of the bundle's outer functor: a Llet chain over the
+   [instantiations] (deps first) culminating in a Pmakeblock that carries
+   one field per ident in [modules], in [modules] order. *)
+let functorize_bundle_body
+      ~(instantiations : instantiation list)
+      ~(modules : Ident.t list) : lambda =
+  let result_block =
+    Lprim
+      ( Pmakeblock (0, Immutable, All_value, alloc_heap),
+        List.map (fun id -> Lambda.Lvar id) modules,
+        Loc_unknown )
+  in
+  List.fold_right
+    (fun { ident; cu; args } acc ->
+      let rhs = transl_instantiation_rhs cu args in
+      Llet (Strict, layout_module, ident, debug_uid_none, rhs, acc))
+    instantiations result_block
+
+let transl_functorize compilation_unit
+      ~(params : Ident.t list)
+      ~(instantiations : instantiation list)
+      ~(modules : Ident.t list)
+      ~coercion : program =
+  let body = functorize_bundle_body ~instantiations ~modules in
+  let mk_param layout name =
+    { name;
+      debug_uid = debug_uid_none;
+      layout;
+      attributes = default_param_attribute;
+      mode = alloc_heap
+    }
+  in
+  (* [Make] — generative functor over [params] + unit; carries the actual
+     bundle code. *)
+  let unit_ident = Ident.create_local "*unit*" in
+  let make_func_params =
+    List.map (mk_param layout_module) params
+    @ [mk_param layout_unit unit_ident]
+  in
+  let make_func =
+    lfunction ~params:make_func_params
+      ~kind:(Curried { nlocal = 0 })
+      ~return:layout_module
+      ~attr:
+        { default_function_attribute with
+          is_a_functor = true;
+          inline = Always_inline
+        }
+      ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:alloc_heap
+  in
+  (* [Intf] — applicative functor over [params] only; its body contains
+     just a [module type S], which has no runtime presence, so the returned
+     struct is an empty block.  When [params] is empty, [Intf] is the empty
+     struct directly (no functor wrapping). *)
+  let intf_empty_body =
+    Lprim (Pmakeblock (0, Immutable, All_value, alloc_heap), [], Loc_unknown)
+  in
+  let intf_func =
+    match params with
+    | [] -> intf_empty_body
+    | _ ->
+      let intf_params =
+        List.map
+          (fun id -> mk_param layout_module (Ident.rename id))
+          params
+      in
+      lfunction ~params:intf_params
+        ~kind:(Curried { nlocal = 0 })
+        ~return:layout_module
+        ~attr:
+          { default_function_attribute with
+            is_a_functor = true;
+            inline = Always_inline
+          }
+        ~loc:Loc_unknown ~body:intf_empty_body ~mode:alloc_heap
+        ~ret_mode:alloc_heap
+  in
+  let code =
+    apply_coercion Loc_unknown Strict coercion
+      (Lprim
+         ( Pmakeblock (0, Immutable, All_value, alloc_heap),
+           [intf_func; make_func],
+           Loc_unknown ))
+  in
+  let main_module_block_format =
+    Mb_struct { mb_repr = Module_value_only { field_count = 2 } }
+  in
+  let required_globals =
+    List.fold_left
+      (fun set { cu; _ } -> Compilation_unit.Set.add cu set)
+      Compilation_unit.Set.empty instantiations
+  in
+  { compilation_unit;
+    main_module_block_format;
+    arg_block_idx = None;
+    required_globals;
+    code
+  }
 
 (* Error report *)
 

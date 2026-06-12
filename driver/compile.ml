@@ -18,8 +18,9 @@ open Compile_common
 
 let tool_name = "ocamlc"
 
-let with_info =
-  Compile_common.with_info ~backend:Byte ~tool_name
+let with_info ~source_file ~output_prefix ~compilation_unit ~kind ~dump_ext k =
+  Compile_common.with_info ~backend:Byte ~tool_name ~source_file
+    ~output_prefix ~compilation_unit ~kind ~dump_ext k
 
 let interface ~source_file ~output_prefix =
   with_info ~source_file ~output_prefix ~dump_ext:"cmi"
@@ -163,3 +164,4 @@ let instance ~source_file ~output_prefix ~compilation_unit ~runtime_args
   in
   implementation_aux ~start_from ~source_file ~output_prefix ~keep_symbol_tables
     ~compilation_unit:(Exactly compilation_unit)
+

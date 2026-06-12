@@ -305,7 +305,13 @@ let read_one_param ppf position name v =
   | "runtime-variant" -> runtime_variant := v
   | "with-runtime" -> set "with-runtime" [ with_runtime ] v
   | "open" ->
-      open_modules := List.rev_append (String.split_on_char ',' v) !open_modules
+      let names = String.split_on_char ',' v in
+      open_args :=
+        List.rev_append (List.map (fun n -> Open n) names) !open_args
+  | "open-cmi" ->
+      let names = String.split_on_char ',' v in
+      open_args :=
+        List.rev_append (List.map (fun n -> Open_cmi n) names) !open_args
   | "cc" -> c_compiler := Some v
 
   | "clambda-checks" -> set "clambda-checks" [ clambda_checks ] v
@@ -737,7 +743,8 @@ let process_action
       if Filename.check_suffix name ocaml_mod_ext
       || Filename.check_suffix name ocaml_lib_ext then
         objfiles := name :: !objfiles
-      else if Filename.check_suffix name ".cmi" && !make_package then
+      else if Filename.check_suffix name ".cmi"
+           && (!make_package || !Clflags.functorize) then
         objfiles := name :: !objfiles
       else if Filename.check_suffix name Config.ext_obj
            || Filename.check_suffix name Config.ext_lib then begin

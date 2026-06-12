@@ -85,11 +85,18 @@ val package_units:
   Env.t -> string list -> Unit_info.Artifact.t -> Compilation_unit.t
   -> Typedtree.module_coercion
 
+val functorize_interface:
+  Env.t ->
+  sg:Types.signature ->
+  Unit_info.t ->
+  Compilation_unit.t ->
+  unit
+
 (* Should be in Envaux, but it breaks the build of the debugger *)
 val initial_env:
   loc:Location.t ->
   initially_opened_module:string option ->
-  open_implicit_modules:string list -> Env.t
+  open_implicit_args:Clflags.open_arg list -> Env.t
 
 module Sig_component_kind : sig
   type t =

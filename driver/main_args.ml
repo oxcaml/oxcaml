@@ -496,6 +496,11 @@ let mk_o f =
 let mk_open f =
   "-open", Arg.String f, "<module>  Opens the module <module> before typing"
 
+let mk_open_cmi f =
+  "-open-cmi", Arg.String f,
+  "<file.cmi>  Same as -open, but reads the signature from <file.cmi>\n\
+  \    rather than looking up a module on the include path"
+
 let mk_output_obj f =
   "-output-obj", Arg.Unit f, " Output an object file instead of an executable"
 
@@ -790,6 +795,14 @@ let mk_instantiate0 f ~ext =
 let mk_instantiate_byt = mk_instantiate0 ~ext:"cmo"
 
 let mk_instantiate_opt = mk_instantiate0 ~ext:"cmx"
+
+let mk_functorize_byt f =
+  "-functorize", Arg.Unit f,
+  " Bundle the given .cmo files into one .cmo bundle functor"
+
+let mk_functorize_opt f =
+  "-functorize", Arg.Unit f,
+  " Bundle the given .cmx files into one .cmx bundle functor"
 
 let mk_use_prims f =
   "-use-prims", Arg.String f, "<file>  (undocumented)"
@@ -1140,6 +1153,7 @@ module type Common_options = sig
   val _no_auto_include_otherlibs : unit -> unit
   val _nocwd : unit -> unit
   val _open : string -> unit
+  val _open_cmi : string -> unit
   val _ppx : string -> unit
   val _principal : unit -> unit
   val _no_principal : unit -> unit
@@ -1215,6 +1229,7 @@ module type Compiler_options = sig
   val _i : unit -> unit
   val _impl : string -> unit
   val _instantiate : unit -> unit
+  val _functorize : unit -> unit
   val _intf : string -> unit
   val _intf_suffix : string -> unit
   val _keep_docs : unit -> unit
@@ -1488,6 +1503,7 @@ struct
     mk_H_manifest F._H_manifest;
     mk_impl F._impl;
     mk_instantiate_byt F._instantiate;
+    mk_functorize_byt F._functorize;
     mk_intf F._intf;
     mk_intf_suffix F._intf_suffix;
     mk_intf_suffix_2 F._intf_suffix;
@@ -1519,6 +1535,7 @@ struct
     mk_o F._o;
     mk_opaque F._opaque;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_output_obj F._output_obj;
     mk_output_complete_obj F._output_complete_obj;
     mk_output_complete_exe F._output_complete_exe;
@@ -1638,6 +1655,7 @@ struct
     mk_nocwd F._nocwd;
     mk_nopervasives F._nopervasives;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_ppx F._ppx;
     mk_principal F._principal;
     mk_no_principal F._no_principal;
@@ -1760,6 +1778,7 @@ struct
     mk_inlining_report F._inlining_report;
     mk_insn_sched F._insn_sched;
     mk_instantiate_opt F._instantiate;
+    mk_functorize_opt F._functorize;
     mk_intf F._intf;
     mk_intf_suffix F._intf_suffix;
     mk_keep_docs F._keep_docs;
@@ -1796,6 +1815,7 @@ struct
     mk_o4 F._o4;
     mk_opaque F._opaque;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_output_obj F._output_obj;
     mk_output_complete_obj F._output_complete_obj;
     mk_p F._p;
@@ -1969,6 +1989,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_o3 F._o3;
     mk_o4 F._o4;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_ppx F._ppx;
     mk_principal F._principal;
     mk_no_principal F._no_principal;
@@ -2081,6 +2102,7 @@ struct
     mk_H_manifest F._H_manifest;
     mk_impl F._impl;
     mk_instantiate_byt F._instantiate;
+    mk_functorize_byt F._functorize;
     mk_intf F._intf;
     mk_intf_suffix F._intf_suffix;
     mk_intf_suffix_2 F._intf_suffix;
@@ -2111,6 +2133,7 @@ struct
     mk_o4 F._o4;
     mk_opaque F._opaque;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_output_obj F._output_obj;
     mk_pack_byt F._pack;
     mk_parameter F._parameter;
@@ -2239,6 +2262,7 @@ struct
     mk_no_auto_include_otherlibs F._no_auto_include_otherlibs;
     mk_nocwd F._nocwd;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_pp F._pp;
     mk_ppx F._ppx;
     mk_principal F._principal;
@@ -2356,7 +2380,8 @@ module Default = struct
     let _nostdlib = set no_std_include
     let _no_auto_include_otherlibs = set no_auto_include_otherlibs
     let _nocwd = set no_cwd
-    let _open s = open_modules := (s :: (!open_modules))
+    let _open s = open_args := Open s :: !open_args
+    let _open_cmi s = open_args := Open_cmi s :: !open_args
     let _principal = set principal
     let _rectypes = set recursive_types
     let _safer_matching = set safer_matching
@@ -2521,7 +2546,7 @@ module Default = struct
     let _cc s = c_compiler := (Some s)
     let _cclib s = Compenv.defer (ProcessObjects (Misc.rev_split_words s))
     let _ccopt s = Compenv.first_ccopts := (s :: (!Compenv.first_ccopts))
-    let _cmi_file s = cmi_file := (Some s)
+    let _cmi_file s = cmi_file := Some s
     let _config = Misc.show_config_and_exit
     let _config_var = Misc.show_config_variable_and_exit
     let _dprofile () = profile_columns := Profile.all_columns
@@ -2543,6 +2568,7 @@ module Default = struct
     let _i = set print_types
     let _impl = Compenv.impl
     let _instantiate = set instantiate
+    let _functorize = set functorize
     let _intf = Compenv.intf
     let _intf_suffix s = Config.interface_suffix := s
     let _keep_docs = set keep_docs

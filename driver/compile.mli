@@ -28,6 +28,7 @@ val instance:
   arg_descr:Lambda.arg_descr option ->
   keep_symbol_tables:bool -> unit
 
+
 (** {2 Internal functions} **)
 
 val to_bytecode :
@@ -48,3 +49,23 @@ val emit_bytecode :
     Lambda.arg_descr option ->
     unit
 (** [emit_bytecode bytecode] output the bytecode executable. *)
+
+val tlambda_to_bytecode :
+  Compile_common.info ->
+  Lambda.program ->
+  as_arg_for:Global_module.Parameter_name.t option ->
+  Instruct.instruction list * Compilation_unit.Set.t *
+    Lambda.main_module_block_format *
+    Lambda.arg_descr option
+(** [tlambda_to_bytecode info program] lowers a Lambda program to bytecode.
+    Used by [-functorize] (and [-instantiate]) to compile the bundle's
+    synthesised program after [Translmod.transl_functorize]. *)
+
+val with_info :
+  source_file:string ->
+  output_prefix:string ->
+  compilation_unit:Compile_common.compilation_unit_or_inferred ->
+  kind:Unit_info.intf_or_impl ->
+  dump_ext:string ->
+  (Compile_common.info -> 'a) -> 'a
+(** Bytecode-backend wrapper around [Compile_common.with_info]. *)
