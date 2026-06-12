@@ -23,7 +23,8 @@
 extern "C" {
 #endif
 
-#ifdef CAML_INTERNALS
+#ifndef CAML_COMPATIBILITY_H
+#define CAML_COMPATIBILITY_H
 
 #ifdef NATIVE_CODE
 

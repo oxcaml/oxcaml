@@ -17,9 +17,6 @@
 
 (* Processor descriptions *)
 
-(* Instruction selection *)
-val word_addressed : bool
-
 val phys_reg : Cmm.machtype_component -> Regs.Phys_reg.t -> Reg.t
 
 val precolored_regs : unit -> Reg.Set.t

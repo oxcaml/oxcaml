@@ -42,8 +42,6 @@ module type Const = sig
   include Lattice
 
   val legacy : t
-
-  val all : t list lazy_t
 end
 
 module type Const_product = sig
@@ -284,28 +282,6 @@ module type S = sig
 
       val meet : L.t -> L.t -> L.t
     end
-  end
-
-  (** Module for tests that validate internal mode lattice invariants. *)
-  module For_testing : sig
-    (** A failed internal invariant check. *)
-    type error
-
-    (** Print a detailed description of a failed check. *)
-    val print_error : Fmt.formatter -> error -> unit
-
-    (** Validates that morphism composition is sound.
-
-        For a selected subset of generated pair of morphisms [f : b -> c] and
-        [g : a -> b], this checks that [compose f g] and [fun x -> f (g x)]
-        agree on every selected element of [a].
-
-        The selected elements are either every possible lattice element (when
-        [full] is [true]) or a smaller spanning set where each axis value is
-        covered at least once, but every combination is not (when [full] is
-        [false]). *)
-    val check_composition_jobs :
-      full:bool -> unit -> (unit -> (unit, error) result) list
   end
 
   val print_longident : (Fmt.formatter -> Longident.t -> unit) ref
@@ -773,15 +749,9 @@ module type S = sig
 
     val proj_monadic : 'a Monadic.Axis.t -> ('l * 'r) t -> ('a, 'r * 'l) mode
 
-    val meet_const : Comonadic.Const.t -> ('l * 'r) t -> ('l * disallowed) t
+    val meet_const : Comonadic.Const.t -> ('l * 'r) t -> ('l * 'r) t
 
-    val join_const : Monadic.Const.t -> ('l * 'r) t -> (disallowed * 'r) t
-
-    val meet_const_with :
-      'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * disallowed) t
-
-    val join_const_with :
-      'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> (disallowed * 'r) t
+    val join_const : Monadic.Const.t -> ('l * 'r) t -> ('l * 'r) t
 
     (** [max_with ax elt] returns [max] but with the axis [ax] set to [elt]. *)
     val max_with_comonadic :
@@ -794,6 +764,11 @@ module type S = sig
     (* [min_with_monadic ax elt] returns [min] but with the monadic axis [ax] set to [elt]. *)
     val min_with_monadic :
       'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
+
+    val meet_const_with :
+      'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
+
+    val join_const_with : 'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
 
     val zap_to_legacy : lr -> Const.t
 
@@ -842,31 +817,30 @@ module type S = sig
     val locality_as_regionality : Locality.Const.t -> Regionality.Const.t
   end
 
+  (** Converts regional to local, identity otherwise *)
+  val regional_to_local : ('l * 'r) Regionality.t -> ('l * 'r) Locality.t
+
   (** Inject locality into regionality *)
-  val locality_as_regionality : Locality.l -> Regionality.l
+  val locality_as_regionality : ('l * 'r) Locality.t -> ('l * 'r) Regionality.t
+
+  (** Converts regional to global, identity otherwise *)
+  val regional_to_global : ('l * 'r) Regionality.t -> ('l * 'r) Locality.t
 
   (** Similar to [locality_as_regionality], behaves as identity on other axes *)
-  val alloc_as_value :
-    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Alloc.t -> ('l * 'r) Value.t
+  val alloc_as_value : ('l * 'r) Alloc.t -> ('l * 'r) Value.t
 
   (** Similar to [local_to_regional], behaves as identity in other axes *)
   val alloc_to_value_l2r : ('l * 'r) Alloc.t -> ('l * disallowed) Value.t
 
   (** Similar to [regional_to_local], behaves as identity on other axes *)
-  val value_to_alloc_r2l :
-    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
+  val value_to_alloc_r2l : ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   (** Similar to [regional_to_global], behaves as identity on other axes *)
-  val value_to_alloc_r2g :
-    ?hint:(disallowed * 'r) Hint.morph ->
-    ('l * 'r) Value.t ->
-    (disallowed * 'r) Alloc.t
+  val value_to_alloc_r2g : ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   (** Similar to [value_to_alloc_r2g], but followed by [alloc_as_value]. *)
   val value_r2g :
-    ?hint:(disallowed * 'r) Hint.morph ->
-    ('l * 'r) Value.t ->
-    (disallowed * 'r) Value.t
+    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Value.t
 
   module Modality : sig
     module Comonadic : sig
@@ -944,19 +918,13 @@ module type S = sig
 
       (* CR-soon zqian: make the [hint] below mandatory *)
 
-      (** Apply a modality on left mode. *)
-      val apply_left :
-        ?is_contained_by:Hint.is_contained_by ->
+      (** Apply a modality on mode. *)
+      val apply :
+        ?hint:
+          (('l * 'r) neg Hint.morph, ('l * 'r) pos Hint.morph) monadic_comonadic ->
         t ->
-        (allowed * 'r) Value.t ->
-        Value.l
-
-      (** Apply a modality on right mode. *)
-      val apply_right :
-        ?is_contained_by:Hint.is_contained_by ->
-        t ->
-        ('l * allowed) Value.t ->
-        Value.r
+        ('l * 'r) Value.t ->
+        ('l * 'r) Value.t
 
       (** [concat ~then t] returns the modality that is [then_] after [t]. *)
       val concat : then_:t -> t -> t
@@ -999,8 +967,11 @@ module type S = sig
     (** Apply a modality on a left mode. The calller should ensure that
         [apply t m] is only called for [m >= md_mode] for inferred modalities.
     *)
-    val apply_left :
-      ?is_contained_by:Hint.is_contained_by ->
+    val apply :
+      ?hint:
+        ( (allowed * 'r) neg Hint.morph,
+          (allowed * 'r) pos Hint.morph )
+        monadic_comonadic ->
       t ->
       (allowed * 'r) Value.t ->
       Value.l
@@ -1197,10 +1168,10 @@ module type S = sig
     val to_modality : t -> Modality.Const.t
 
     (** Apply mode crossing on a left mode, making it stronger. *)
-    val apply_left : t -> (allowed * 'r) Value.t -> Value.l
+    val apply_left : t -> ('l * 'r) Value.t -> ('l * disallowed) Value.t
 
     (** Apply mode crossing on a right mode, making it more permissive. *)
-    val apply_right : t -> ('l * allowed) Value.t -> Value.r
+    val apply_right : t -> ('l * 'r) Value.t -> (disallowed * 'r) Value.t
 
     (* We extend mode crossing on [Value] to [Alloc] via [alloc_as_value].
        Concretely, two [Alloc] modes are indistinguishable if their images under

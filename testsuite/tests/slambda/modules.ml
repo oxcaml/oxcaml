@@ -137,7 +137,7 @@ M.a
 Line 18, characters 2-9:
 18 |   kind_ l
        ^^^^^^^
-Warning 191 [unused-kind-declaration]: unused kind l.
+Warning 191 [unused-kind-declaration]: unused kind "l".
 { c = (let
         (two =
            { c = (missing);
@@ -170,9 +170,8 @@ Warning 191 [unused-kind-declaration]: unused kind l.
                         r = ⟪ (let
                                 (j_tables =o (opaque (makemutable 0 0 0 0))
                                  j_init =
-                                   (function {nlocal = 0} class
-                                     (function {nlocal = 0} env
-                                       self[value<genarray>]
+                                   (function {nlocal = 0} class?
+                                     (function {nlocal = 0} env self?
                                        (opaque
                                          (apply
                                            (field_imm 23
@@ -206,9 +205,8 @@ Warning 191 [unused-kind-declaration]: unused kind l.
                               (let
                                 (j_tables =o (opaque (makemutable 0 0 0 0))
                                  j_init =
-                                   (function {nlocal = 0} class
-                                     (function {nlocal = 0} env
-                                       self[value<genarray>]
+                                   (function {nlocal = 0} class?
+                                     (function {nlocal = 0} env self?
                                        (opaque
                                          (apply
                                            (field_imm 23
@@ -247,9 +245,8 @@ Warning 191 [unused-kind-declaration]: unused kind l.
                         (let
                           (j_tables =o (opaque (makemutable 0 0 0 0))
                            j_init =
-                             (function {nlocal = 0} class
-                               (function {nlocal = 0} env
-                                 self[value<genarray>]
+                             (function {nlocal = 0} class?
+                               (function {nlocal = 0} env self?
                                  (opaque
                                    (apply
                                      (field_imm 23 (global CamlinternalOO!))

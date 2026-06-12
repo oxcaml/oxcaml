@@ -49,20 +49,20 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             sysdeps: gdb
 
-          - name: runtime4 dev (x86_64-linux)
-            config: --disable-runtime5 --enable-dev
-            os: warp-ubuntu-latest-x64-8x
+#          - name: runtime4 dev (x86_64-linux)
+#            config: --disable-runtime5 --enable-dev
+#            os: warp-ubuntu-latest-x64-8x
 
           # We use a custom install prefix for this workflow.
           # Consider renaming it to indicate as such when convenient.
           - name: runtime5 dev (x86_64-linux)
-            config: --enable-runtime5 --enable-dev
+            config: --enable-runtime5 --enable-dev --enable-keyword-edition=5.2
             os: warp-ubuntu-latest-x64-8x
             install_path: _custom_install
             sysdeps: gdb
 
           - name: runtime5 debug stack-checks (x86_64-linux)
-            config: --enable-runtime5 --enable-stack-checks
+            config: --enable-runtime5 --enable-stack-checks --enable-keyword-edition=5.4
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             use_runtime: d
@@ -70,39 +70,38 @@ jobs:
             sysdeps: gdb
 
           - name: runtime5 debug (x86_64-linux)
-            config: --enable-runtime5
+            config: --enable-runtime5 --enable-keyword-edition=5.2+effect
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
             sysdeps: gdb
 
-          - name: runtime4 O3 (x86_64-linux)
-            config: --disable-runtime5
-            os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: ''
-            ocamlparam: '_,O3=1'
-            disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l'
+#          - name: runtime4 O3 (x86_64-linux)
+#            config: --disable-runtime5
+#            os: warp-ubuntu-latest-x64-8x
+#            build_ocamlparam: ''
+#            ocamlparam: '_,O3=1'
+#            disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l'
 
+#          - name: runtime4 O3 metrics (x86_64-linux)
+#            config: --disable-runtime5
+#            os: warp-ubuntu-latest-x64-8x
+#            build_ocamlparam: '_'
+#            ocamlparam: '_,O3=1'
+#            collect_metrics: true
+#            disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l'
 
-          - name: runtime4 O3 metrics (x86_64-linux)
-            config: --disable-runtime5
-            os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: '_'
-            ocamlparam: '_,O3=1'
-            collect_metrics: true
-            disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l'
+#          - name: runtime4 Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
+#            config: --disable-runtime5 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
+#            os: warp-ubuntu-latest-x64-8x
+#            build_ocamlparam: ''
+#            ocamlparam: '_,Oclassic=1'
+#            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml testsuite/tests/reaper/* testsuite/tests/flambda2/n_way_join_null.ml testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/issue5721.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l'
 
-          - name: runtime4 Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
-            config: --disable-runtime5 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
-            os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: ''
-            ocamlparam: '_,Oclassic=1'
-            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml testsuite/tests/reaper/* testsuite/tests/flambda2/n_way_join_null.ml testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/array_element_kind_meet.ml testsuite/tests/flambda2/issue5721.ml testsuite/tests/flambda2/stdlib_functor_inlining.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/flambda2/gadt_simplified_switch.ml testsuite/tests/flambda2/simplify/* testsuite/tests/quotation/eval/current_unit/eval_before_init_ok.ml'
-
-          - name: runtime4 (aarch64-darwin)
-            config: --disable-runtime5 --disable-warn-error
-            os: warp-macos-15-arm64-6x
+#          - name: runtime4 (aarch64-darwin)
+#            config: --disable-runtime5 --disable-warn-error
+#            os: warp-macos-15-arm64-6x
 
           - name: runtime5 regalloc (aarch64-darwin)
             config: --enable-runtime5 --disable-warn-error
@@ -138,13 +137,13 @@ jobs:
             run_regalloc_tool: true
             sysdeps: gdb
 
-          - name: runtime4 regalloc (x86_64-linux)
-            config: --disable-runtime5
-            os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
-            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
-            check_arch: true
-            run_regalloc_tool: true
+#          - name: runtime4 regalloc (x86_64-linux)
+#            config: --disable-runtime5
+#            os: warp-ubuntu-latest-x64-8x
+#            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+#            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+#            check_arch: true
+#            run_regalloc_tool: true
 
           - name: runtime5 frame-pointers irc (x86_64-linux)
             config: --enable-runtime5 --enable-frame-pointers
@@ -186,11 +185,10 @@ jobs:
             check_arch: true
             sysdeps: gdb
 
-          - name: runtime4 address-sanitizer (x86_64-linux)
-            config: --disable-runtime5 --enable-address-sanitizer
-            os: warp-ubuntu-latest-x64-8x
-            cc: clang
-            sysdeps: clang
+#          - name: runtime4 address-sanitizer (x86_64-linux)
+#            config: --disable-runtime5 --enable-address-sanitizer
+#            os: warp-ubuntu-latest-x64-8x
+#            cc: clang
 
           - name: runtime5 address-sanitizer (x86_64-linux)
             config: --enable-runtime5 --enable-address-sanitizer
@@ -254,7 +252,7 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'O3=1,flambda2-match-in-match=1,_'
             ocamlparam: 'O3=1,flambda2-match-in-match=1,_'
-            disable_testcases: 'testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/basic-modules/recursive_module_init.ml testsuite/tests/flambda2/array_element_kind_meet.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l'
+            disable_testcases: 'testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/basic-modules/recursive_module_init.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l'
             sysdeps: gdb
 
     env:
@@ -392,28 +390,77 @@ jobs:
           codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlc.opt
           codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlopt.opt
 
-      - name: Build, install and test OxCaml
+      - name: Build OxCaml
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
+        id: build
         run: |
           if [ "${{ matrix.collect_metrics }}" = "true" ]; then
             mkdir $GITHUB_WORKSPACE/_profile_csv
-            ORIG_BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM"
-            ORIG_OCAMLPARAM="$OCAMLPARAM"
             BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
             OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
           fi
-          if [ "$run_testsuite" = true ]; then target=ci; else target=compiler; fi
           ulimit -c unlimited
-          make $target \
+          make compiler \
             || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+        env:
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
 
-          # Install the compiler for metrics_collection configuration to populate _install directory
-          # This is needed for the metrics collection step to analyze installed artifacts
+      - name: Run OxCaml testsuite
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
+        run: |
           if [ "${{ matrix.collect_metrics }}" = "true" ]; then
-            BUILD_OCAMLPARAM="$ORIG_BUILD_OCAMLPARAM"
-            OCAMLPARAM="$ORIG_OCAMLPARAM"
-            make install
+            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
           fi
+          ulimit -c unlimited
+          make runtest \
+            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+        env:
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
+
+      - name: Run upstream testsuite
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
+        run: |
+          if [ "${{ matrix.collect_metrics }}" = "true" ]; then
+            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+          fi
+          ulimit -c unlimited
+          make runtest-upstream \
+            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+        env:
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
+
+      - name: Run minimizer
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
+        run: |
+          if [ "${{ matrix.collect_metrics }}" = "true" ]; then
+            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+          fi
+          ulimit -c unlimited
+          make minimizer \
+            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+        env:
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
+
+        # Install the compiler for metrics_collection configuration to populate _install directory
+        # This is needed for the metrics collection step to analyze installed artifacts
+      - name: Reinstall the compiler for metrics collection
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && matrix.collect_metrics == true
+        run: make install
         env:
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}

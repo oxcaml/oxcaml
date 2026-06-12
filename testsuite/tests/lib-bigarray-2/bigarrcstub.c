@@ -24,18 +24,16 @@ double ctab[DIMX][DIMY];
 
 void filltab(void)
 {
-  int x, y;
-  for (x = 0; x < DIMX; x++)
-    for (y = 0; y < DIMY; y++)
+  for (int x = 0; x < DIMX; x++)
+    for (int y = 0; y < DIMY; y++)
       ctab[x][y] = x * 100 + y;
 }
 
 void printtab(double tab[DIMX][DIMY])
 {
-  int x, y;
-  for (x = 0; x < DIMX; x++) {
+  for (int x = 0; x < DIMX; x++) {
     printf("%3d", x);
-    for (y = 0; y < DIMY; y++)
+    for (int y = 0; y < DIMY; y++)
       printf("  %6.1f", tab[x][y]);
     printf("\n");
   }
@@ -44,8 +42,15 @@ void printtab(double tab[DIMX][DIMY])
 value c_filltab(value unit)
 {
   filltab();
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma warning(push)
+#pragma warning(disable : 5287)
+#endif
   return caml_ba_alloc_dims(CAML_BA_FLOAT64 | CAML_BA_C_LAYOUT,
                             2, ctab, (intnat)DIMX, (intnat)DIMY);
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma warning(pop)
+#endif
 }
 
 value c_printtab(value ba)

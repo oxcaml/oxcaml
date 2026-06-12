@@ -90,7 +90,7 @@ let should_fail = [| Null; This 3.4 |]
 Line 1, characters 32-35:
 1 | let should_fail = [| Null; This 3.4 |]
                                     ^^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The constant "3.4" has type "float" but an expression was expected of type
          "('a : value non_float)"
        The layout of float is value
          because it is the primitive type float.
@@ -186,7 +186,7 @@ let should_fail_iarray = [: Null; This 3.4 :]
 Line 1, characters 39-42:
 1 | let should_fail_iarray = [: Null; This 3.4 :]
                                            ^^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The constant "3.4" has type "float" but an expression was expected of type
          "('a : value non_float)"
        The layout of float is value
          because it is the primitive type float.

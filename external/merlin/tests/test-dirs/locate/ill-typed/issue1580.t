@@ -26,7 +26,7 @@ Issue #1580:
         "type": "typer",
         "sub": [],
         "valid": true,
-        "message": "This expression has type 'a -> 'a -> int
+        "message": "The value compare has type 'a -> 'a -> int
   but an expression was expected of type 'a -> 'a -> bool
   Type int is not compatible with type bool"
       }
@@ -52,7 +52,7 @@ The typing recovery allows Merlin to perform the correct jump here:
   {
     "file": "lib/ocaml/stdlib.mli",
     "pos": {
-      "line": 169,
+      "line": 165,
       "col": 9
     }
   }
@@ -91,7 +91,7 @@ Issue #1588:
         "type": "typer",
         "sub": [],
         "valid": true,
-        "message": "This expression has type unit -> $fn but an expression was expected of type
+        "message": "The value f has type unit -> $fn but an expression was expected of type
     unit -> unit
   Type $fn is not compatible with type unit
   Hint: $fn is an existential type bound by the constructor F."

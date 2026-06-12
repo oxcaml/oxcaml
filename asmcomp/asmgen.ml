@@ -740,8 +740,9 @@ let compile_implementation_linear unix output_prefix ~progname ~ppf_dump =
       linear_gen_implementation ~ppf_dump unix progname)
 
 (* Error report *)
+module Style = Misc.Style
 
-let fprintf = Format_doc.fprintf
+let fprintf, dprintf = Format_doc.fprintf, Format_doc.dprintf
 
 let report_error_doc ppf = function
   | Assembler_error file ->
@@ -753,15 +754,17 @@ let report_error_doc ppf = function
   | Mismatched_for_pack saved ->
     let msg prefix =
       if Compilation_unit.Prefix.is_empty prefix
-      then "without -for-pack"
-      else "with -for-pack " ^ Compilation_unit.Prefix.to_string prefix
+      then dprintf "without %a" Style.inline_code "-for-pack"
+      else
+        dprintf "with %a" Style.inline_code
+          ("-for-pack " ^ Compilation_unit.Prefix.to_string prefix)
     in
-    fprintf ppf "This input file cannot be compiled %s: it was generated %s."
+    fprintf ppf "This input file cannot be compiled %t: it was generated %t."
       (msg (Compilation_unit.Prefix.from_clflags ()))
       (msg saved)
   | Asm_generation (fn, err) ->
-    fprintf ppf "Error producing assembly code for %s: %a" fn
-      Emitaux.report_error_doc err
+    fprintf ppf "Error producing assembly code for function %a: %a"
+      Style.inline_code fn Emitaux.report_error_doc err
 
 let () =
   Location.register_error_of_exn (function

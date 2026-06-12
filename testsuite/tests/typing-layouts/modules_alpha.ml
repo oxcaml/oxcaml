@@ -120,7 +120,7 @@ module type T2' = sig type ('a : immediate) t = 'a s2' end
 Line 5, characters 25-30:
 5 |   let f () : 'a X.t = `B "bad"
                              ^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : immediate)"
        The layout of string is value non_float
          because it is the primitive type string.
@@ -368,7 +368,7 @@ val x3 : int list = [42]
 Line 14, characters 17-23:
 14 | let x3' = M3_1.f "test";;
                       ^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : immediate)"
        The layout of string is value non_float
          because it is the primitive type string.
@@ -415,9 +415,9 @@ module type S6_2 = sig
 end;;
 [%%expect{|
 module type S6_1 = sig type t : void end
-Line 6, characters 10-41:
+Line 6, characters 18-40:
 6 |   val m : (module S6_1 with type t = int)
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      ^^^^^^^^^^^^^^^^^^^^^^
 Error: In this "with" constraint, the new definition of "t"
        does not match its original definition in the constrained signature:
        Type declarations do not match:
@@ -440,9 +440,9 @@ module type S6_4 = sig
 end;;
 [%%expect{|
 module type S6_3 = sig type t end
-Line 6, characters 10-44:
+Line 6, characters 18-43:
 6 |   val m : (module S6_3 with type t = t_void)
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this "with" constraint, the new definition of "t"
        does not match its original definition in the constrained signature:
        Type declarations do not match:
@@ -464,9 +464,9 @@ module type S6_6 = sig
 end
 [%%expect{|
 module type S6_5 = sig type t : immediate end
-Line 6, characters 10-44:
+Line 6, characters 18-43:
 6 |   val m : (module S6_5 with type t = string)
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this "with" constraint, the new definition of "t"
        does not match its original definition in the constrained signature:
        Type declarations do not match:
@@ -487,9 +487,9 @@ module type S6_6' = sig
   val m : (module S6_5 with type t = s)
 end
 [%%expect{|
-Line 3, characters 10-39:
+Line 3, characters 18-38:
 3 |   val m : (module S6_5 with type t = s)
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      ^^^^^^^^^^^^^^^^^^^^
 Error: In this "with" constraint, the new definition of "t"
        does not match its original definition in the constrained signature:
        Type declarations do not match:

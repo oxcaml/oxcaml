@@ -443,6 +443,7 @@ let ocaml_ignored_flags =
     "-compat-32";
     "-config";
     "-custom";
+    "-dcanonical-ids";
     "-dclambda";
     "-dcmm";
     "-dcse";
@@ -453,7 +454,10 @@ let ocaml_ignored_flags =
     "-dlambda";
     "-dblambda";
     "-dlinear";
+    "-dmatchcomp";
+    "-dno-canonical-ids";
     "-dparsetree";
+    "-dparsetree-loc-ghost-invariants";
     "-dshape";
     "-dtlambda";
     "-dslambda";
@@ -471,6 +475,7 @@ let ocaml_ignored_flags =
     "-fPIC";
     "-g";
     "-i";
+    "-i-variance";
     "-inlining-report";
     "-keep-docs";
     "-no-keep-docs";
@@ -539,6 +544,7 @@ let ocaml_ignored_flags =
     "-flambda2-result-types-all-functions";
     "-flambda2-result-types-functors-only";
     "-flambda2-speculative-inlining-only-if-arguments-useful";
+    "-flambda2-speculative-inlining-track-lifted-constants";
     "-flambda2-unbox-along-intra-function-control-flow";
     "-flambda2-unicode";
     "-flambda2-kind-checks";
@@ -554,6 +560,7 @@ let ocaml_ignored_flags =
     "-no-flambda2-expert-phantom-lets";
     "-no-flambda2-join-points";
     "-no-flambda2-speculative-inlining-only-if-arguments-useful";
+    "-no-flambda2-speculative-inlining-track-lifted-constants";
     "-no-flambda2-unbox-along-intra-function-control-flow";
     "-ocamlcfg";
     "-no-ocamlcfg";
@@ -567,11 +574,6 @@ let ocaml_ignored_flags =
     "-flambda2-basic-meet";
     "-flambda2-advanced-meet";
     "-directory";
-    "-flambda2-inline-large-functor-size";
-    "-flambda2-inline-small-functor-size";
-    "-flambda2-speculative-inlining-track-lifted-constants";
-    "-name-mangling-scheme";
-    "-no-flambda2-speculative-inlining-track-lifted-constants";
     (* Jane Street specific *)
     "-disable-builtin-check";
     "-disable-poll-insertion";
@@ -753,11 +755,7 @@ let ocaml_ignored_flags =
     "-no-unbox-free-vars-of-closures";
     "-verify-binary-emitter";
     "-ikinds-debug";
-    "-thunkify-compilation-unit-initialization";
-    "-flambda2-match-in-match";
-    "-no-flambda2-match-in-match";
-    "-frametables-in-rodata";
-    "-no-frametables-in-rodata"
+    "-thunkify-compilation-unit-initialization"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -784,6 +782,7 @@ let ocaml_ignored_parametrized_flags =
     "-intf";
     "-intf_suffix";
     "-intf-suffix";
+    "-keywords";
     "-o";
     "-rounds";
     "-runtime-variant";
@@ -819,8 +818,10 @@ let ocaml_ignored_parametrized_flags =
     "-flambda2-inline-prim-cost";
     "-flambda2-inline-small-function-size";
     "-flambda2-inline-threshold";
+    "-flambda2-inline-small-functor-size";
+    "-flambda2-inline-large-functor-size";
     "-flambda2-join-algorithm";
-    "-flambda2-expert-cont-specialization-threshold";
+    "-flambda2-expert-cont-specialization-budget";
     "-regalloc";
     "-regalloc-linscan-threshold";
     "-regalloc-param";
@@ -841,6 +842,7 @@ let ocaml_ignored_parametrized_flags =
     "-gdwarf-config-shape-reduce-depth";
     "-gdwarf-config-shape-eval-depth";
     "-gdwarf-config-max-cms-files-per-unit";
+    "-name-mangling-scheme";
     "-gdwarf-config-max-cms-files-per-variable";
     "-gdwarf-config-max-type-to-shape-depth";
     "-gdwarf-config-max-shape-reduce-steps-per-variable";
@@ -1032,9 +1034,12 @@ let ocaml_flags =
       Marg.int (fun kind_verbosity ocaml -> { ocaml with kind_verbosity }),
       "Set the verbosity used for printing kinds (0=not verbose, 1=expanded, \
        2=expanded with all mod bounds)" );
+    ( "-ikinds",
+      Marg.unit (fun ocaml -> { ocaml with ikinds = true }),
+      "Enable ikinds-based kind checker (experimental)" );
     ( "-no-ikinds",
-      Marg.bool (fun no_ikinds ocaml -> { ocaml with ikinds = not no_ikinds }),
-      "Disable ikinds-based kind checker" )
+      Marg.unit (fun ocaml -> { ocaml with ikinds = false }),
+      "Disable ikinds-based kind checker (experimental)" )
   ]
 
 (** {1 Main configuration} *)
@@ -1066,7 +1071,7 @@ let initial =
         zero_alloc_assert = Zero_alloc_annotations.Assert.Assert_default;
         infer_with_bounds = false;
         kind_verbosity = 0;
-        ikinds = false
+        ikinds = true
       };
     merlin =
       { build_path = [];

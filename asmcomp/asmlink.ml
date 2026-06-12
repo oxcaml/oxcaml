@@ -113,15 +113,10 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     (Cmm_helpers.data_segment_table (startup_comp_unit :: name_list));
   (* CR mshinwell: We should have a separate notion of "backend compilation
      unit" really, since the units here don't correspond to .ml source files. *)
-  let hot_comp_unit = CU.create CU.Prefix.empty (CU.Name.of_string "_hot") in
   let system_comp_unit =
     CU.create CU.Prefix.empty (CU.Name.of_string "_system")
   in
-  let code_comp_units =
-    if !Clflags.function_sections
-    then hot_comp_unit :: startup_comp_unit :: name_list
-    else startup_comp_unit :: name_list
-  in
+  let code_comp_units = startup_comp_unit :: name_list in
   let code_comp_units =
     if !Oxcaml_flags.use_cached_generic_functions
     then Generic_fns.imported_units cached_gen @ code_comp_units

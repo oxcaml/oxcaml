@@ -183,6 +183,7 @@ end) : S = struct
         members []
     in
     let ui =
+      (* [arg_descr] is None because we don't allow packs to be arguments. *)
       Compilenv.build_unit_info ~main_module_block_format ~arg_descr:None
     in
     let file_sections =

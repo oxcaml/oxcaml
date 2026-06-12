@@ -44,7 +44,7 @@ module Pat = struct
     }
 
   let record ?(loc = Location.none) pat_env pat_type lst closed_flag =
-    let pat_desc = Tpat_record (lst, Fixed, Record_boxed, closed_flag) in
+    let pat_desc = Tpat_record (lst, closed_flag) in
     { pat_desc;
       pat_loc = loc;
       pat_extra;
@@ -67,10 +67,7 @@ module Pat = struct
 
   let construct ?(loc = Location.none) pat_env pat_type lid cstr_desc args
       locs_coretype =
-    let pat_desc =
-      Tpat_construct
-        (lid, cstr_desc, Constructor_uniform_value, args, locs_coretype)
-    in
+    let pat_desc = Tpat_construct (lid, cstr_desc, args, locs_coretype) in
     { pat_desc;
       pat_loc = loc;
       pat_extra;
