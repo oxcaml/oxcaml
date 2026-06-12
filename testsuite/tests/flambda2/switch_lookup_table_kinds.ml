@@ -73,7 +73,7 @@ let code loopify(never) size(2) newer_version_of(match_naked_immediate_2)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm =
-  let arg = %array_load.int ($camlTOP4__switch_block79, t) in
+  let arg = %array_load.`int` ($camlTOP4__switch_block79, t) in
   cont k (arg)
 in
 let $camlTOP4__match_naked_immediate_3 =
@@ -264,7 +264,7 @@ let code loopify(never) size(3) newer_version_of(match_naked_int8_14)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : int8 =
-  let arg = %array_load.int8 ($camlTOP10__switch_block295, t) in
+  let arg = %array_load.`int8` ($camlTOP10__switch_block295, t) in
   cont k (arg)
 in
 let $camlTOP10__match_naked_int8_15 =
@@ -294,7 +294,7 @@ let code loopify(never) size(3) newer_version_of(match_naked_int16_16)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : int16 =
-  let arg = %array_load.int16 ($camlTOP11__switch_block331, t) in
+  let arg = %array_load.`int16` ($camlTOP11__switch_block331, t) in
   cont k (arg)
 in
 let $camlTOP11__match_naked_int16_17 =
