@@ -1151,12 +1151,22 @@ Error: The kind of type "t" is value
 type 'a t : value mod global portable contended many aliased unyielding =
   { x : 'a @@ global portable contended many aliased } [@@unboxed]
 [%%expect {|
+Line 2, characters 45-52:
+2 |   { x : 'a @@ global portable contended many aliased } [@@unboxed]
+                                                 ^^^^^^^
+Warning 219 [redundant-modality]: This modality is redundant.
+
 type 'a t = { x : 'a @@ global many portable contended; } [@@unboxed]
 |}]
 
 type 'a t : value mod global immutable stateless many aliased unyielding non_float =
   Foo of 'a @@ global immutable stateless many aliased [@@unboxed]
 [%%expect {|
+Line 2, characters 47-54:
+2 |   Foo of 'a @@ global immutable stateless many aliased [@@unboxed]
+                                                   ^^^^^^^
+Warning 219 [redundant-modality]: This modality is redundant.
+
 Lines 1-2, characters 0-66:
 1 | type 'a t : value mod global immutable stateless many aliased unyielding non_float =
 2 |   Foo of 'a @@ global immutable stateless many aliased [@@unboxed]
@@ -1192,9 +1202,19 @@ type ('a : value mod global) t : value mod global = Foo of 'a @@ local [@@unboxe
 [%%expect {|
 type ('a : value mod global) t = { x : 'a @@ global; } [@@unboxed]
 type ('a : immediate) t = { x : 'a @@ global; } [@@unboxed]
+Line 3, characters 64-69:
+3 | type ('a : value mod global) t : value mod global = { x : 'a @@ local } [@@unboxed]
+                                                                    ^^^^^
+Warning 219 [redundant-modality]: This modality is redundant.
+
 type ('a : value mod global) t = { x : 'a; } [@@unboxed]
 type ('a : value mod global) t = Foo of 'a @@ global [@@unboxed]
 type ('a : immediate) t = Foo of 'a @@ global [@@unboxed]
+Line 6, characters 65-70:
+6 | type ('a : value mod global) t : value mod global = Foo of 'a @@ local [@@unboxed]
+                                                                     ^^^^^
+Warning 219 [redundant-modality]: This modality is redundant.
+
 type ('a : value mod global) t = Foo of 'a [@@unboxed]
 |}]
 
@@ -1207,6 +1227,11 @@ type ('a : value mod many contended) t = { x : 'a @@ aliased; } [@@unboxed]
 type ('a : value mod external_) t : immediate =
   Foo of 'a @@ global portable contended many aliased [@@unboxed]
 [%%expect {|
+Line 2, characters 46-53:
+2 |   Foo of 'a @@ global portable contended many aliased [@@unboxed]
+                                                  ^^^^^^^
+Warning 219 [redundant-modality]: This modality is redundant.
+
 Lines 1-2, characters 0-65:
 1 | type ('a : value mod external_) t : immediate =
 2 |   Foo of 'a @@ global portable contended many aliased [@@unboxed]

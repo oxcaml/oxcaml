@@ -1992,6 +1992,11 @@ type 'a read_write = { read_write : 'a @@ read_write }
 type 'a immutable = { immutable : 'a @@ immutable }
 
 [%%expect{|
+Line 1, characters 42-52:
+1 | type 'a read_write = { read_write : 'a @@ read_write }
+                                              ^^^^^^^^^^
+Warning 219 [redundant-modality]: This modality is redundant.
+
 type 'a read_write = { read_write : 'a; }
 type 'a immutable = { immutable : 'a @@ immutable; }
 |}]
@@ -2100,6 +2105,11 @@ type 'a stateful = { stateful : 'a @@ stateful }
 type 'a stateless = { stateless : 'a @@ stateless }
 
 [%%expect{|
+Line 1, characters 38-46:
+1 | type 'a stateful = { stateful : 'a @@ stateful }
+                                          ^^^^^^^^
+Warning 219 [redundant-modality]: This modality is redundant.
+
 type 'a stateful = { stateful : 'a; }
 type 'a stateless = { stateless : 'a @@ stateless; }
 |}]
