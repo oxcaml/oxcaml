@@ -25,7 +25,7 @@ let consts : (structured_constant, Ident.t) Hashtbl.t = Hashtbl.create 17
 
 let share c =
   match c with
-    Const_block (_n, l) when l <> [] ->
+    Const_block (_n, _shape, l) when l <> [] ->
       begin try
         Lvar (Hashtbl.find consts c)
       with Not_found ->
@@ -167,7 +167,8 @@ let oo_wrap_gen env req f x =
            List.fold_left
              (fun lambda id ->
                 let cl =
-                  Lprim(Pmakeblock(0, Mutable, All_value, alloc_heap),
+                  Lprim(Pmakeblock(0, Mutable, block_shape_of_generic_values 3,
+                                   alloc_heap),
                         [lambda_unit; lambda_unit; lambda_unit],
                         Loc_unknown)
                 in

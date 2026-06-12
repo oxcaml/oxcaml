@@ -47,9 +47,9 @@ let rec eliminate_ref id = function
   | Lletrec(idel, e2) ->
       List.iter (fun rb -> check_function_escape id rb.def) idel;
       Lletrec(idel, eliminate_ref id e2)
-  | Lprim(Pfield (0, _, _), [Lvar v], _) when Ident.same v id ->
+  | Lprim(Pfield ([0], _, _), [Lvar v], _) when Ident.same v id ->
       Lmutvar id
-  | Lprim(Psetfield(0, _, _), [Lvar v; e], _) when Ident.same v id ->
+  | Lprim(Psetfield([0], _, _), [Lvar v; e], _) when Ident.same v id ->
       Lassign(id, eliminate_ref id e)
   | Lprim(Poffsetref delta, [Lvar v], loc) when Ident.same v id ->
     Lassign(id, add int ~loc (Lmutvar id) (tagged_immediate delta))
@@ -279,8 +279,8 @@ let simplify_exits lam =
          Lprim (Pmakeblock(tag, mut, shape, mode), fields, loc)
       | Pccall { Primitive.prim_name = "caml_obj_with_tag"; _ },
         [Lconst (Const_base (Const_int tag));
-         Lconst (Const_block (_, fields))] ->
-         Lconst (Const_block (tag, fields))
+         Lconst (Const_block (_, shape, fields))] ->
+         Lconst (Const_block (tag, shape, fields))
 
       | _ -> Lprim(p, ll, loc)
      end
@@ -654,10 +654,9 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
           mklet Strict kind v duid (Lprim(prim, [slinit], loc)) slbody
       in
       begin match kind_ref with
-        | All_value -> try_convert_mutlet Lambda.layout_value_field
-        | Shape [| Lambda.Value field_kind |] ->
+        | [| Lambda.Value field_kind |] ->
             try_convert_mutlet (Pvalue field_kind)
-        | Shape _ ->
+        | _ ->
             (* Non-value layout - this plausibly could also be optimised *)
             mklet Strict kind v duid (Lprim(prim, [slinit], loc)) slbody
       end

@@ -1393,29 +1393,25 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     match[@warning "-fragile-match"] layout with
     | Pvalue
         { nullable = Non_nullable;
-          raw_kind =
-            Pvariant
-              { consts = [];
-                non_consts = [(0, Constructor_uniform field_kinds)]
-              }
-        } ->
+          raw_kind = Pvariant { consts = []; non_consts = [(0, shape)] }
+        }
+      when Array.for_all (function Lambda.Value _ -> true | _ -> false) shape ->
       Some
         (Fields_of_block_with_tag_zero
-           (List.map
-              (Flambda_kind.With_subkind.from_lambda_value_kind
-                 ~machine_width:(Env.machine_width env))
-              field_kinds))
+           (Array.to_list shape
+           |> List.map (function
+             | Lambda.Value field_kind ->
+               Flambda_kind.With_subkind.from_lambda_value_kind
+                 ~machine_width:(Env.machine_width env) field_kind
+             | _ ->
+               Misc.fatal_error "unexpected non-value field in unboxing kind")))
     | Pvalue
         { nullable = Non_nullable;
-          raw_kind =
-            Pvariant
-              { consts = [];
-                non_consts = [(tag, Constructor_uniform field_kinds)]
-              }
+          raw_kind = Pvariant { consts = []; non_consts = [(tag, field_kinds)] }
         }
       when tag = Obj.double_array_tag ->
       assert (
-        List.for_all
+        Array.for_all
           (fun (kind : Lambda.value_kind) ->
             match kind.raw_kind with
             | Pboxedfloatval Boxed_float64 -> true
@@ -1423,8 +1419,14 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
             | Pgenval | Pintval | Pboxedintval _ | Pvariant _ | Parrayval _
             | Pboxedvectorval _ ->
               false)
-          field_kinds);
-      Some (Unboxed_float_record (List.length field_kinds))
+          (Array.map
+             (function
+               | Lambda.Value field_kind -> field_kind
+               | _ ->
+                 Misc.fatal_error
+                   "unexpected non-value field in float record unboxing kind")
+             field_kinds));
+      Some (Unboxed_float_record (Array.length field_kinds))
     | Pvalue
         { nullable = Non_nullable; raw_kind = Pboxedfloatval Boxed_float64 } ->
       Some (Unboxed_number Naked_float)

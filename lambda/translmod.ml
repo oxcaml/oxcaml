@@ -98,9 +98,7 @@ let transl_type_extension ~scopes env rootpath tyext body =
     tyext.tyext_constructors
     body
 
-let block_of_module_representation ~loc = function
-  | Module_value_only _ -> Pmakeblock(0, Immutable, All_value, alloc_heap)
-  | Module_mixed (shape, _) ->
+let block_of_module_representation ~loc (shape, _) =
     let mpb = Mixed_product_bytes.count (Product shape) in
     (* All-value/void shapes compile to uniform blocks, so the scannable
        prefix length limit doesn't apply. *)
@@ -108,7 +106,7 @@ let block_of_module_representation ~loc = function
     then
       Typedecl.assert_mixed_product_support loc Module
         ~value_prefix_len:(Mixed_product_bytes.value_prefix_len mpb);
-    Pmakeblock(0, Immutable, Shape shape, alloc_heap)
+    Pmakeblock(0, Immutable, shape, alloc_heap)
 
 (* Compile a coercion *)
 
@@ -299,10 +297,14 @@ let mod_prim = Lambda.transl_prim "CamlinternalMod"
 
 let undefined_location loc =
   let (fname, line, char) = Location.get_pos_info loc.Location.loc_start in
-  Lconst(Const_block(0,
-                     [Const_base(Const_string (fname, loc, None));
-                      const_int line;
-                      const_int char]))
+  let fields =
+    [ Const_base(Const_string (fname, loc, None));
+      const_int line;
+      const_int char
+    ]
+  in
+  Lconst(Const_block(0, block_shape_of_generic_values (List.length fields),
+                     fields))
 
 exception Initialization_failure of unsafe_info
 
@@ -315,7 +317,15 @@ let init_shape id modl =
         raise (Initialization_failure
                 (Unsafe {reason=Unsafe_module_binding;loc;subid}))
     | Mty_signature sg ->
-        Const_block(0, [Const_block(0, init_shape_struct env sg)])
+        let inner_fields = init_shape_struct env sg in
+        let fields =
+          [ Const_block
+              (0, block_shape_of_generic_values (List.length inner_fields),
+               inner_fields)
+          ]
+        in
+        Const_block(0, block_shape_of_generic_values (List.length fields),
+                    fields)
     | Mty_functor _ ->
         (* can we do better? *)
         raise (Initialization_failure
@@ -1030,15 +1040,12 @@ let required_globals ~flambda body =
   Translprim.clear_used_primitives ();
   required
 
-let add_arg_block_to_module_representation = function
-    (* NB: this assumes [arg_block] has layout value *)
-  | Module_value_only { field_count } ->
-    Module_value_only { field_count = field_count + 1 }
-  | Module_mixed (shape, shape_for_read) ->
-    Module_mixed
-      ( Array.append shape [| mixed_block_element_for_module |],
-        Array.append shape_for_read
-          [| mixed_block_element_with_locality_mode_for_module |] )
+let add_arg_block_to_module_representation (shape, shape_for_read) =
+  (* NB: this assumes [arg_block] has layout value *)
+  ( Array.append shape [| block_element_for_module |],
+    Array.append shape_for_read
+      [| block_element_with_locality_mode_for_module |]
+  )
 
 let add_arg_block_to_module_block ~loc primary_block_lam primary_repr restr =
   let primary_block_id = Ident.create_local "*primary-block*" in
@@ -1103,7 +1110,8 @@ let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
     add_arg_block_to_module_block ~loc lam repr cc2
 
 let wrap_toplevel_functor_in_struct code =
-  Lprim(Pmakeblock(0, Immutable, All_value, Lambda.alloc_heap),
+  Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 1,
+                   Lambda.alloc_heap),
         [ code ],
         Loc_unknown)
 
@@ -1195,11 +1203,12 @@ let toploop_getvalue id =
   if !Clflags.native_code then
     (* [toploop_getvalue] and [toploop_setvalue] are only used by bytecode, so
        we can hardcode the module representations passed to [mod_field] as
-       [Module_value_only]. *)
+       generic-value blocks. *)
     fatal_error "Translmod.toploop_getvalue: expected bytecode";
   Lapply{
     ap_loc=Loc_unknown;
-    ap_func=Lprim(Pfield (toploop_getvalue_pos, Pointer, Reads_agree),
+    ap_func=Lprim(Pfield
+                    ([toploop_getvalue_pos], All_value Pointer, Reads_agree),
                   [Lprim(Pgetglobal (toploop_unit, Dynamic), [], Loc_unknown)],
                   Loc_unknown);
     ap_args=[Lconst(Const_base(
@@ -1219,7 +1228,8 @@ let toploop_setvalue id lam =
     fatal_error "Translmod.toploop_setvalue: expected bytecode";
   Lapply{
     ap_loc=Loc_unknown;
-    ap_func=Lprim(Pfield (toploop_setvalue_pos, Pointer, Reads_agree),
+    ap_func=Lprim(Pfield
+                    ([toploop_setvalue_pos], All_value Pointer, Reads_agree),
                   [Lprim(Pgetglobal (toploop_unit, Dynamic), [], Loc_unknown)],
                   Loc_unknown);
     ap_args=
@@ -1402,7 +1412,9 @@ let transl_package component_names coercion =
   field_count,
   apply_coercion Loc_unknown Strict coercion
     (Lprim(block_of_module_representation ~loc:Location.none
-             (Module_value_only { field_count }),
+             ( block_shape_of_generic_values (List.length component_names),
+               block_shape_of_generic_values
+                 (List.length component_names) ),
            List.map get_component component_names,
            Loc_unknown))
 
@@ -1442,7 +1454,9 @@ let transl_instance_impl
   let instantiating_functor_lam =
     (* Any parameterised module has a block with exactly one field, namely the
        instantiating functor (see [Lambda.main_module_block_format]) *)
-    Lprim (mod_field 0 (Module_value_only { field_count = 1 }),
+    Lprim (mod_field 0
+             ( block_shape_of_generic_values 1,
+               block_shape_of_generic_values 1 ),
       [Lprim (Pgetglobal (base_compilation_unit, Dynamic), [], Loc_unknown)],
       Loc_unknown)
   in

@@ -263,7 +263,7 @@ let rec lay_out_into_mixed_block_exn
   let source_level_fields_array = Array.of_list source_level_fields in
   let mixed_block_shapes = List.map layout_to_types_layout layouts in
   let reordering =
-    Mixed_block_shape.of_mixed_block_elements
+    Mixed_block_shape.of_block_elements
       ~print_locality:(fun _ _ -> ())
       (Lambda.transl_mixed_product_shape (Array.of_list mixed_block_shapes))
   in

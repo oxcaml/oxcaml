@@ -161,33 +161,28 @@ type primitive =
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
   | Pmakelazyblock of lazy_block_tag
-  | Pfield of int * immediate_or_pointer * field_read_semantics
+  (* CR-someday xclerc: the first argument of `Pfield` and
+     `Psetfield` (the path / list of indices) should probably be
+     abstracted so that we do not check in multiple places that its length is
+     correct. *)
+  | Pfield of int list * locality_mode field_shape * field_read_semantics
   | Pfield_computed of field_read_semantics
-  | Psetfield of int * immediate_or_pointer * initialization_or_assignment
+  | Psetfield of int list * unit field_shape * initialization_or_assignment
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
   | Pfloatfield of int * field_read_semantics * locality_mode
   | Pufloatfield of int * field_read_semantics
-  (* CR-someday xclerc: the first argument of `Pmixedfield` and
-     `Psetmixedfield` (the path / list of indices) should probably be
-     abstracted so that we do not check in multiple places that its length is
-     correct. *)
-  | Pmixedfield of int list * mixed_block_shape_with_locality_mode
-      * field_read_semantics
   | Psetfloatfield of int * initialization_or_assignment
   | Psetufloatfield of int * initialization_or_assignment
-  | Psetmixedfield of int list * mixed_block_shape
-      * initialization_or_assignment
   | Pduprecord of Types.record_representation * int
   (* Unboxed products *)
   | Pmake_unboxed_product of layout list
   | Punboxed_product_field of int * layout list
   | Parray_element_size_in_bytes of array_kind
   (* Block indices *)
-  | Pmake_idx_field of int
-  | Pmake_idx_mixed_field of mixed_block_shape * int * int list
+  | Pmake_idx_field of block_shape * int * int list
   | Pmake_idx_array of
-      array_kind * array_index_kind * unit mixed_block_element * int list
-  | Pidx_deepen of unit mixed_block_element * int list
+      array_kind * array_index_kind * unit block_element * int list
+  | Pidx_deepen of unit block_element * int list
   (* Context switches *)
   | Pwith_stack
   | Pwith_stack_bind
@@ -446,7 +441,7 @@ and value_kind_non_null =
   | Pboxedintval of boxed_integer
   | Pvariant of {
       consts : int list;
-      non_consts : (int * constructor_shape) list;
+      non_consts : (int * block_shape) list;
     }
   | Parrayval of array_kind
   | Pboxedvectorval of boxed_vector
@@ -461,11 +456,7 @@ and layout =
   | Pbottom
   | Psplicevar of Ident.t
 
-and block_shape =
-  | All_value
-  | Shape of mixed_block_shape
-
-and 'a mixed_block_element =
+and 'a block_element =
   | Value of value_kind
   | Float_boxed of 'a
   | Float64
@@ -479,17 +470,13 @@ and 'a mixed_block_element =
   | Vec512
   | Word
   | Untagged_immediate
-  | Product of 'a mixed_block_element array
+  | Product of 'a block_element array
   | Splice_variable of Ident.t
 
-and mixed_block_shape = unit mixed_block_element array
+and block_shape = unit block_element array
 
-and mixed_block_shape_with_locality_mode
-  = locality_mode mixed_block_element array
-
-and constructor_shape =
-  | Constructor_uniform of value_kind list
-  | Constructor_mixed of mixed_block_shape
+and block_shape_with_locality_mode
+ = locality_mode block_element array
 
 and array_kind =
     Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
@@ -571,6 +558,10 @@ and boxed_vector = Primitive.boxed_vector =
   | Boxed_vec256
   | Boxed_vec512
 
+and 'a field_shape =
+  | All_value of immediate_or_pointer
+  | Shape of 'a block_element array
+
 and peek_or_poke =
   | Ppp_tagged_immediate
   | Ppp_untagged_immediate
@@ -646,7 +637,7 @@ let rec equal_value_kind_non_null x y =
     List.equal Int.equal consts1 consts2
       && List.equal (fun (tag1, cstr1) (tag2, cstr2) ->
              Int.equal tag1 tag2
-             && equal_constructor_shape cstr1 cstr2)
+             && equal_block_shape cstr1 cstr2)
            non_consts1 non_consts2
   | (Pgenval | Pboxedfloatval _ | Pboxedintval _ | Pintval | Pvariant _
       | Parrayval _ | Pboxedvectorval _), _ -> false
@@ -655,9 +646,9 @@ and equal_value_kind x y =
   equal_value_kind_non_null x.raw_kind y.raw_kind
   && equal_nullable x.nullable y.nullable
 
-and equal_mixed_block_element :
+and equal_block_element :
   type p.
-    (p -> p -> bool) -> p mixed_block_element -> p mixed_block_element
+    (p -> p -> bool) -> p block_element -> p block_element
     -> bool =
   fun eq_param m1 m2 ->
   match m1, m2 with
@@ -675,7 +666,7 @@ and equal_mixed_block_element :
   | Word, Word
   | Untagged_immediate, Untagged_immediate -> true
   | Product es1, Product es2 ->
-    Misc.Stdlib.Array.equal (equal_mixed_block_element eq_param)
+    Misc.Stdlib.Array.equal (equal_block_element eq_param)
       es1 es2
   | Splice_variable id1, Splice_variable id2 -> Ident.equal id1 id2
   | (Value _ | Float_boxed _ | Float64 | Float32
@@ -683,45 +674,27 @@ and equal_mixed_block_element :
      | Vec256 | Vec512 | Word | Untagged_immediate | Product _
      | Splice_variable _), _ -> false
 
-and equal_mixed_block_shape shape1 shape2 =
-  Misc.Stdlib.Array.equal (equal_mixed_block_element Unit.equal) shape1 shape2
+and equal_block_shape shape1 shape2 =
+  Misc.Stdlib.Array.equal (equal_block_element Unit.equal) shape1 shape2
 
-and equal_constructor_shape x y =
-  match x, y with
-  | Constructor_uniform fields1, Constructor_uniform fields2 ->
-      List.length fields1 = List.length fields2
-      && List.for_all2 equal_value_kind fields1 fields2
-  | Constructor_mixed shape1, Constructor_mixed shape2 ->
-      equal_mixed_block_shape shape1 shape2
-  | (Constructor_uniform _ | Constructor_mixed _), _ -> false
+let block_shape_of_value_kinds vks =
+  Misc.Stdlib.Array.of_list_map (fun vk -> Value vk) vks
 
-let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
-  match vks with
-  | None -> All_value
-  | Some vks -> Shape (Array.of_list (List.map (fun vk -> Value vk) vks))
+let block_shape_of_generic_values n =
+  Array.init n (fun _ -> Value generic_value)
 
 (* CR rtjoa: This function is redundant with [Mixed_product_bytes], but it's
    duplicated for now. We should fix the module dependency structure *)
-let rec is_value_or_void_element : _ mixed_block_element -> bool = function
+let rec is_value_or_void_element : _ block_element -> bool = function
   | Value _ -> true
   | Product elts -> Array.for_all is_value_or_void_element elts
   | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
   | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
   | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
     false
-(* CR layout poly: This function probably shouldn't exist at all and we should
-   merge mixed_block_shape and block_shape. *)
-let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
-    =
-  match shape with
-  | All_value -> None
-  | Shape shape ->
-    if Array.for_all is_value_or_void_element shape
-    then None
-    else Some shape
 
 let is_uniform_block_shape (shape : block_shape) : bool =
-  Option.is_none (mixed_block_of_block_shape shape)
+  Array.for_all is_value_or_void_element shape
 
 let equal_layout x y =
   match x, y with
@@ -757,8 +730,7 @@ let must_be_value layout =
 
 type structured_constant =
     Const_base of constant
-  | Const_block of int * structured_constant list
-  | Const_mixed_block of int * mixed_block_shape * structured_constant list
+  | Const_block of int * block_shape * structured_constant list
   | Const_float_array of string list
   | Const_immstring of string
   | Const_float_block of string list
@@ -1158,12 +1130,9 @@ type runtime_param =
   | Rp_unit
 
 type module_representation =
-  | Module_value_only of { field_count : int }
-  | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
+  block_shape * block_shape_with_locality_mode
 
-let module_representation_field_count = function
-  | Module_value_only { field_count } -> field_count
-  | Module_mixed (shape, _) -> Array.length shape
+let module_representation_field_count (shape, _) = Array.length shape
 
 type main_module_block_format =
   | Mb_struct of { mb_repr : module_representation }
@@ -1174,7 +1143,8 @@ type main_module_block_format =
 
 let main_module_representation = function
   | Mb_struct { mb_repr } -> mb_repr
-  | Mb_instantiating_functor _ -> Module_value_only { field_count = 1 }
+  | Mb_instantiating_functor _ ->
+    block_shape_of_generic_values 1, block_shape_of_generic_values 1
 
 type program =
   { compilation_unit : Compilation_unit.t;
@@ -1346,9 +1316,8 @@ let layout_list =
        { consts = [0];
          non_consts =
            [0,
-            Constructor_uniform
-              [generic_value;
-               { generic_value with nullable = Non_nullable}]] })
+            [| Value generic_value;
+               Value { generic_value with nullable = Non_nullable} |]] })
 let layout_tuple_element = nullable_value Pgenval
 let layout_value_field = nullable_value Pgenval
 let layout_tmc_field = nullable_value Pgenval
@@ -1392,8 +1361,7 @@ let layout_tupled_vector v =
     | Boxed_vec512 -> [| Vec128; Vec128; Vec128; Vec128 |]
   in
   Pvalue
-    { raw_kind =
-        Pvariant { consts = []; non_consts = [0, Constructor_mixed fields] };
+    { raw_kind = Pvariant { consts = []; non_consts = [0, fields] };
       nullable = Non_nullable
     }
 
@@ -1429,8 +1397,8 @@ let unboxed_vector_of_boxed_vector = function
 let layout_top = layout_any_value
 let layout_bottom = Pbottom
 
-let mixed_block_element_for_module = Value generic_value
-let mixed_block_element_with_locality_mode_for_module = Value generic_value
+let block_element_for_module = Value generic_value
+let block_element_with_locality_mode_for_module = Value generic_value
 
 let default_function_attribute = {
   inline = Default_inline;
@@ -1774,7 +1742,7 @@ let pointerness_of_separability sep =
   if Jkind_axis.Separability.(le sep (upper_bound_if_is_always_gc_ignorable ()))
   then Immediate else Pointer
 
-let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
+let rec transl_block_element (elt : Types.mixed_block_element) =
   match elt with
   | Scannable { separability; _ } ->
     let raw_kind =
@@ -1801,7 +1769,7 @@ let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
   | Void -> Product [||]
 
 and transl_mixed_product_shape shape =
-  Array.map transl_mixed_block_element shape
+  Array.map transl_block_element shape
 
 let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
   Array.mapi (fun i (elt : Types.mixed_block_element) ->
@@ -1833,11 +1801,8 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
     | Void -> Product [||]
   ) shape
 
-let mod_field ?(read_semantics=Reads_agree) pos = function
-  | Module_value_only _ ->
-    Pfield(pos, Pointer, read_semantics)
-  | Module_mixed (_, shape_for_read) ->
-    Pmixedfield([pos], shape_for_read, read_semantics)
+let mod_field ?(read_semantics=Reads_agree) pos (_, shape_for_read) =
+  Pfield([pos], Shape shape_for_read, read_semantics)
 
 let transl_module_representation repr =
   (* The shape here is potentially an underapproximation, since the scannable
@@ -1851,23 +1816,12 @@ let transl_module_representation repr =
          |> Types.mixed_block_element_of_const_sort)
       repr
   in
-  let is_value (elt : Types.mixed_block_element) =
-    match elt with
-    | Scannable _ -> true
-    | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
-    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
-    | Product _ | Void -> false
-  in
-  if Array.for_all is_value shape
-  then Module_value_only { field_count = Array.length shape }
-  else
-    Module_mixed
-      ( transl_mixed_product_shape shape,
-        transl_mixed_product_shape_for_read
-        ~get_value_kind:(fun _ -> generic_value)
-        ~get_mode:(fun _ ->
-           fatal_error "Lambda.transl_module_representation: \
-                          unexpected [Float_boxed].") shape)
+  ( transl_mixed_product_shape shape,
+    transl_mixed_product_shape_for_read
+    ~get_value_kind:(fun _ -> generic_value)
+    ~get_mode:(fun _ ->
+        fatal_error "Lambda.transl_module_representation: \
+                      unexpected [Float_boxed].") shape)
 
 (* Translate an access path *)
 
@@ -2338,10 +2292,10 @@ let find_exact_application kind ~arity args =
           if arity <> List.length tupled_args
           then None
           else Some tupled_args
-      | [Lconst(Const_block (_, const_args))] ->
-          if arity <> List.length const_args
-          then None
-          else Some (List.map (fun cst -> Lconst cst) const_args)
+      | [Lconst(Const_block (_, shape, const_args))] ->
+          if arity = List.length const_args && is_uniform_block_shape shape
+          then Some (List.map (fun cst -> Lconst cst) const_args)
+          else None
       | _ -> None
       end
 
@@ -2368,25 +2322,24 @@ let locality_mode_of_primitive_description (p : external_call_description) =
       *)
       if p.prim_alloc then Some alloc_heap else None
 
-let project_from_mixed_block_shape
-    : 'a. 'a mixed_block_element array -> path:int list
-          -> 'a mixed_block_element
+let project_from_block_shape
+    : 'a. 'a block_element array -> path:int list -> 'a block_element
     = fun shape ~path ->
   match path with
   | [] ->
-    Misc.fatal_error "project_from_mixed_block_shape: path must be non-empty"
+    Misc.fatal_error "project_from_block_shape: path must be non-empty"
   | field :: path ->
     (* Perform the initial projection to identify which boxed field is
        requested. *)
     if field < 0 || field >= Array.length shape
     then
       Misc.fatal_errorf
-        "project_from_mixed_block_shape: field index %d out of bounds for \
+        "project_from_block_shape: field index %d out of bounds for \
          shape of %d elements"
         field (Array.length shape);
     let element = shape.(field) in
     (* Now follow the path through any unboxed product nodes. *)
-    let rec project_from_mixed_block_element_by_path element path =
+    let rec project_from_block_element_by_path element path =
       match path with
       | [] ->
         (* End of path reached. *)
@@ -2399,20 +2352,20 @@ let project_from_mixed_block_shape
           if field < 0 || field >= Array.length shape
           then
             Misc.fatal_errorf
-              "project_from_mixed_block_element: field index %d out of bounds \
+              "project_from_block_element: field index %d out of bounds \
                for (nested) shape of %d elements"
               field (Array.length shape);
-          project_from_mixed_block_element_by_path shape.(field) path
+          project_from_block_element_by_path shape.(field) path
         | Value _
         | Float_boxed _
         | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
         | Untagged_immediate | Vec128 | Vec256 | Vec512 | Splice_variable _ ->
-          Misc.fatal_error "project_from_mixed_block_element: path too long \
+          Misc.fatal_error "project_from_block_element: path too long \
             for mixed block shape")
     in
-    project_from_mixed_block_element_by_path element path
+    project_from_block_element_by_path element path
 
-let mixed_block_projection_may_allocate shape ~path =
+let block_projection_may_allocate shape ~path =
   let rec allocates element =
     match element with
     | Float_boxed mode -> Some mode
@@ -2432,7 +2385,9 @@ let mixed_block_projection_may_allocate shape ~path =
        it's currently used by transl. *)
     | Splice_variable _ -> Some alloc_local
   in
-  allocates (project_from_mixed_block_shape shape ~path)
+  match shape with
+  | All_value _ -> None
+  | Shape shape -> allocates (project_from_block_shape shape ~path)
 
 (* Changes to this function may also require changes in Flambda 2 (e.g.
    closure_conversion.ml). *)
@@ -2452,14 +2407,12 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pmakefloatblock (_, m) -> Some m
   | Pmakeufloatblock (_, m) -> Some m
   | Pmakelazyblock _ -> Some alloc_heap
-  | Pfield _ | Pfield_computed _ | Psetfield _ | Psetfield_computed _ -> None
+  | Pfield (path, shape, _) -> block_projection_may_allocate shape ~path
+  | Pfield_computed _ | Psetfield _ | Psetfield_computed _ -> None
   | Pfloatfield (_, _, m) -> Some m
   | Pufloatfield _ -> None
-  | Pmixedfield (path, shape, _) ->
-    mixed_block_projection_may_allocate shape ~path
   | Psetfloatfield _ -> None
   | Psetufloatfield _ -> None
-  | Psetmixedfield _ -> None
   | Pduprecord _ -> Some alloc_heap
   | Pmake_unboxed_product _ | Punboxed_product_field _ -> None
   | Pccall p -> locality_mode_of_primitive_description p
@@ -2589,7 +2542,6 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Ppeek _ | Ppoke _ ->
     None
   | Pmake_idx_field _
-  | Pmake_idx_mixed_field _
   | Pmake_idx_array _
   | Pidx_deepen _
   | Preinterpret_tagged_int63_as_unboxed_int64 ->
@@ -2676,7 +2628,7 @@ let primitive_can_raise prim =
   | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Pduprecord _
   | Pmakeufloatblock _ | Pufloatfield _ | Psetufloatfield _ | Psequand | Psequor
   | Pmakelazyblock _
-  | Pmixedfield _ | Psetmixedfield _ | Pnot
+  | Pnot
   | Poffsetref _
   | Pstringlength | Pstringrefu | Pbyteslength | Pbytesrefu | Pbytessetu
   | Pmakearray _ | Pduparray _ | Parraylength _ | Parrayrefu _ | Parraysetu _
@@ -2773,7 +2725,7 @@ let primitive_can_raise prim =
   | Preinterpret_boxed_vector_as_tuple _
   | Preinterpret_tuple_as_boxed_vector _
   | Parray_element_size_in_bytes _
-  | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
+  | Pmake_idx_field _ | Pmake_idx_array _
   | Pidx_deepen _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
@@ -2801,7 +2753,7 @@ let constant_layout: constant -> layout = function
 
 let structured_constant_layout = function
   | Const_base const -> constant_layout const
-  | Const_mixed_block _ | Const_block _ | Const_immstring _ ->
+  | Const_block _ | Const_immstring _ ->
     non_null_value Pgenval
   | Const_float_array _ | Const_float_block _ ->
     non_null_value (Parrayval Pfloatarray)
@@ -2884,7 +2836,7 @@ let array_ref_kind_result_layout = function
   | Pgcscannableproductarray_ref kinds -> layout_of_scannable_kinds kinds
   | Pgcignorableproductarray_ref kinds -> layout_of_ignorable_kinds kinds
 
-let rec layout_of_mixed_block_element element =
+let rec layout_of_block_element element =
   match element with
   | Value value_kind -> Pvalue value_kind
   | Float_boxed _ -> layout_boxed_float Boxed_float64
@@ -2901,25 +2853,25 @@ let rec layout_of_mixed_block_element element =
   | Vec512 -> layout_unboxed_vector Unboxed_vec512
   | Product shape ->
     Punboxed_product
-      (Array.to_list (Array.map layout_of_mixed_block_element shape))
+      (Array.to_list (Array.map layout_of_block_element shape))
   | Splice_variable id -> Psplicevar id
 
-let layout_of_mixed_block_shape
-    : 'a. 'a mixed_block_element array -> path:int list -> layout
+let layout_of_field_shape
+    : 'a. 'a field_shape -> path:int list -> layout
     = fun shape ~path ->
-  layout_of_mixed_block_element (project_from_mixed_block_shape shape ~path)
+  match shape with
+  | All_value ptr -> nullable_value (value_kind_of_pointerness ptr)
+  | Shape shape ->
+    layout_of_block_element (project_from_block_shape shape ~path)
 
-let layout_of_module_field repr pos =
-  match repr with
-  | Module_value_only _ -> layout_value_field
-  | Module_mixed (shape, _) ->
-    layout_of_mixed_block_element shape.(pos)
+let layout_of_module_field (shape, _) pos =
+  layout_of_block_element shape.(pos)
 
-let rec mixed_block_element_of_layout (layout : layout) :
-    _ mixed_block_element =
+let rec block_element_of_layout (layout : layout) :
+    _ block_element =
   match layout with
   | Punboxed_product layouts ->
-    Product (List.map mixed_block_element_of_layout layouts |> Array.of_list)
+    Product (List.map block_element_of_layout layouts |> Array.of_list)
   | Ptop | Pbottom -> Misc.fatal_error "Pidxdeepen"
   | Pvalue value_kind -> Value value_kind
   | Punboxed_float Unboxed_float64 -> Float64
@@ -2941,15 +2893,15 @@ let pointerness_of_scannable_with_externality ext =
   if Jkind_axis.Externality.(le ext (upper_bound_if_is_always_gc_ignorable ()))
   then Immediate else Pointer
 
-let rec layout_of_mixed_block_element_for_idx_set
-  ext (mbe : _ mixed_block_element)
+let rec layout_of_block_element_for_idx_set
+  ext (mbe : _ block_element)
   : layout =
   match mbe with
   | Product mbes ->
     (* Propagate known externality to components *)
     Punboxed_product
       (Array.to_list
-        (Array.map (layout_of_mixed_block_element_for_idx_set ext) mbes))
+        (Array.map (layout_of_block_element_for_idx_set ext) mbes))
   | Value ({ raw_kind = Pgenval; _ } as value_kind) ->
     let raw_kind =
       value_kind_of_pointerness (pointerness_of_scannable_with_externality ext)
@@ -2969,18 +2921,17 @@ let rec layout_of_mixed_block_element_for_idx_set
   | Untagged_immediate -> Punboxed_or_untagged_integer Untagged_int
   | Splice_variable id -> Psplicevar id
 
-let rec mixed_block_element_leaves (el : _ mixed_block_element)
-  : _ mixed_block_element list =
+let rec block_element_leaves (el : _ block_element) : _ block_element list =
   match el with
   | Product els ->
-    List.concat_map mixed_block_element_leaves (Array.to_list els)
+    List.concat_map block_element_leaves (Array.to_list els)
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate
   | Splice_variable _ ->
     [el]
 
 type will_be_reordered_acc = { seen_flat : bool; last_value_after_flat : bool }
-let will_be_reordered (mbe : _ mixed_block_element) =
+let will_be_reordered (mbe : _ block_element) =
   let acc =
     List.fold_left
       (fun acc el ->
@@ -2995,7 +2946,7 @@ let will_be_reordered (mbe : _ mixed_block_element) =
         | Word | Vec128 |  Vec256 | Vec512 | Untagged_immediate ->
           { acc with seen_flat = true })
       { seen_flat = false; last_value_after_flat = false }
-      (mixed_block_element_leaves mbe)
+      (block_element_leaves mbe)
   in
   acc.last_value_after_flat
 
@@ -3033,7 +2984,7 @@ let primitive_result_layout (p : primitive) =
   | Popaque layout | Pobj_magic layout -> layout
   | Pbytes_to_string | Pbytes_of_string -> layout_string
   | Pignore | Psetfield _ | Psetfield_computed _ | Psetfloatfield _ | Poffsetref _
-  | Psetufloatfield _ | Psetmixedfield _
+  | Psetufloatfield _
   | Pbytessetu | Pbytessets | Parraysetu _ | Parraysets _ | Pbigarrayset _
   | Pbytes_set_8 _
   | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _
@@ -3053,11 +3004,12 @@ let primitive_result_layout (p : primitive) =
   | Pmakeblock _ | Pmakefloatblock _ | Pmakearray _ | Pmakearray_dynamic _
   | Pduprecord _ | Pmakeufloatblock _ | Pmakelazyblock _
   | Pduparray _ | Pbigarraydim _ | Pobj_dup -> layout_block
-  | Pfield _ | Pfield_computed _ -> layout_value_field
+  | Pfield (path, shape, _) -> layout_of_field_shape shape ~path
+  | Pfield_computed _ -> layout_value_field
   | Punboxed_product_field (field, layouts) -> (Array.of_list layouts).(field)
   | Pmake_unboxed_product layouts -> layout_unboxed_product layouts
   | Parray_element_size_in_bytes _ -> layout_int
-  | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
+  | Pmake_idx_field _ | Pmake_idx_array _
   | Pidx_deepen _ ->
     Punboxed_or_untagged_integer Unboxed_int64
   | Pfloatfield _ -> layout_boxed_float Boxed_float64
@@ -3068,7 +3020,6 @@ let primitive_result_layout (p : primitive) =
   | Psplit_vec256 ->
     Punboxed_product
       [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]
-  | Pmixedfield (path, shape, _) -> layout_of_mixed_block_shape shape ~path
   | Pccall { prim_native_repr_res = _, repr_res } -> layout_of_extern_repr repr_res
   | Praise _ -> layout_bottom
   | Psequor | Psequand | Pnot

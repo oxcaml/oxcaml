@@ -254,15 +254,13 @@ let mixed_block_element i ppf mixed_block_element =
 let record_representation i ppf = let open Types in function
   | Record_unboxed ->
     line i ppf "Record_unboxed\n"
-  | Record_boxed ->
+  | Record_boxed shape ->
     line i ppf "Record_boxed\n"
+    ; array (i+1) mixed_block_element ppf shape
   | Record_inlined (t, _c, v) ->
     line i ppf "Record_inlined (%a, %a)\n" tag t (variant_representation i) v
   | Record_float -> line i ppf "Record_float\n"
   | Record_ufloat -> line i ppf "Record_ufloat\n"
-  | Record_mixed shape ->
-    line i ppf "Record_mixed\n";
-    array (i+1) mixed_block_element ppf shape
   | Record_dummy { represent_as_float_array; flatten_floats } ->
     line i ppf "Record_dummy%s%s\n"
       (if represent_as_float_array then " [@@represent_as_float_array]" else "")

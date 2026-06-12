@@ -132,7 +132,8 @@ end) : S = struct
         let main_module_block_format : Lambda.main_module_block_format =
           Mb_struct
             { mb_repr =
-                Module_value_only { field_count = main_module_block_size }
+                ( Lambda.block_shape_of_generic_values main_module_block_size,
+                  Lambda.block_shape_of_generic_values main_module_block_size )
             }
         in
         let arg_block_idx =
@@ -198,7 +199,10 @@ end) : S = struct
     let format : Lambda.main_module_block_format =
       (* Open modules not supported with packs, so always just a record *)
       Mb_struct
-        { mb_repr = Module_value_only { field_count = main_module_block_size } }
+        { mb_repr =
+            ( Lambda.block_shape_of_generic_values main_module_block_size,
+              Lambda.block_shape_of_generic_values main_module_block_size )
+        }
     in
     let pkg_infos =
       { ui_unit = ui.ui_unit;
