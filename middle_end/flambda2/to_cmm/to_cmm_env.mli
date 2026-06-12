@@ -305,8 +305,8 @@ val add_phantom_let_binding :
     Returns [None] for variables bound by (not yet flushed) delayed bindings.
     For use when translating phantom lets, whose defining expressions may
     legitimately reference variables that were never bound (for example
-    variables whose only uses are phantom, the defining expressions of which
-    are therefore not evaluated). *)
+    variables whose only uses are phantom, the defining expressions of which are
+    therefore not evaluated). *)
 val find_bound_expression : t -> Variable.t -> Cmm.expression option
 
 (** Try and inline an Flambda variable using the delayed let-bindings. *)

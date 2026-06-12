@@ -60,6 +60,70 @@ let single_call_value_attribute simple_location_description =
       (Single_location_description.of_simple_location_description
          simple_location_description) ]
 
+(* If the value held in [reg] (at the relevant call point) also has a spilled
+   copy, at a CFA-relative stack location -- which, unlike registers and the
+   domainstate area, is preserved during the call -- then return an rvalue
+   describing the contents of such location. *)
+let spilled_copy_rvalue ~(reg : Reg.t) ~avail ~stack_offset ~fun_contains_calls
+    ~fun_num_stack_slots : _ SLDL.Rvalue.t option =
+  match
+    RD.Set_distinguishing_names_and_locations.find_reg_with_same_location_exn
+      avail reg
+  with
+  | exception Not_found -> None
+  | rd -> (
+    match RD.debug_info rd with
+    | None -> None
+    | Some debug_info -> (
+      match RD.Debug_info.holds_value_of debug_info with
+      | Const_int _ | Const_naked_float _ | Const_symbol _ -> None
+      | Var var -> (
+        if RD.Debug_info.num_parts_of_value debug_info <> 1
+        then None (* Values split across registers are not handled yet. *)
+        else
+          (* Note that [RD.assigned_to_stack] excludes the domainstate area. *)
+          let spilled_copy =
+            RD.Set_distinguishing_names_and_locations.fold
+              (fun rd' spilled_copy ->
+                match spilled_copy with
+                | Some _ -> spilled_copy
+                | None -> (
+                  if not (RD.assigned_to_stack rd')
+                  then None
+                  else
+                    match RD.debug_info rd' with
+                    | None -> None
+                    | Some debug_info' -> (
+                      match RD.Debug_info.holds_value_of debug_info' with
+                      | Var var'
+                        when V.same var var'
+                             && RD.Debug_info.num_parts_of_value debug_info' = 1
+                        ->
+                        Some rd'
+                      | Var _ | Const_int _ | Const_naked_float _
+                      | Const_symbol _ ->
+                        None)))
+              avail None
+          in
+          match spilled_copy with
+          | None -> None
+          | Some rd' -> (
+            let reg' = RD.reg rd' in
+            match
+              cfa_offset_for_stack_reg reg' ~stack_offset ~fun_contains_calls
+                ~fun_num_stack_slots
+            with
+            | None -> None
+            | Some (Bytes_relative_to_cfa offset_in_bytes) ->
+              if offset_in_bytes mod Arch.size_addr <> 0
+              then None
+              else
+                Some
+                  (SLDL.Rvalue.in_stack_slot
+                     ~offset_in_words:
+                       (Targetint.of_int_exn (offset_in_bytes / Arch.size_addr)))
+            | Some (Bytes_relative_to_domainstate_pointer _) -> None))))
+
 (* The [DW_AT_call_value] (GNU: [DW_AT_GNU_call_site_value]) attribute of a call
    site parameter DIE describes how to compute the value passed for the
    parameter, as an expression to be evaluated in the context of the _caller_
@@ -99,50 +163,18 @@ let call_site_value_attribute ~(arg : Reg.t)
             (SLDL.compile
                (SLDL.of_rvalue
                   (Dwarf_reg_locations.address_of_cmm_symbol_rvalue sym)))
-        | Var var -> (
+        | Var _ -> (
           if is_tail
           then []
-          else if RD.Debug_info.num_parts_of_value debug_info <> 1
-          then [] (* Values split across registers are not handled yet. *)
           else
-            (* Note that [RD.assigned_to_stack] excludes the domainstate
-               area. *)
-            let spilled_copy =
-              RD.Set_distinguishing_names_and_locations.fold
-                (fun rd' spilled_copy ->
-                  match spilled_copy with
-                  | Some _ -> spilled_copy
-                  | None -> (
-                    if not (RD.assigned_to_stack rd')
-                    then None
-                    else
-                      match RD.debug_info rd' with
-                      | None -> None
-                      | Some debug_info' -> (
-                        match RD.Debug_info.holds_value_of debug_info' with
-                        | Var var'
-                          when V.same var var'
-                               && RD.Debug_info.num_parts_of_value debug_info'
-                                  = 1 ->
-                          Some rd'
-                        | Var _ | Const_int _ | Const_naked_float _
-                        | Const_symbol _ ->
-                          None)))
-                avail None
-            in
-            match spilled_copy with
+            match
+              spilled_copy_rvalue ~reg:arg ~avail ~stack_offset
+                ~fun_contains_calls ~fun_num_stack_slots
+            with
             | None -> []
-            | Some rd' -> (
-              let reg' = RD.reg rd' in
-              match
-                cfa_offset_for_stack_reg reg' ~stack_offset ~fun_contains_calls
-                  ~fun_num_stack_slots
-              with
-              | None -> []
-              | Some offset ->
-                single_call_value_attribute
-                  (Dwarf_reg_locations.reg_location_description reg'
-                     ~offset:(Some offset) ~need_rvalue:true))))))
+            | Some rvalue ->
+              single_call_value_attribute (SLDL.compile (SLDL.of_rvalue rvalue))
+          ))))
 
 let add_call_site_parameter ~call_site_die ~arg_index ~(arg : Reg.t)
     ~available_before ~is_tail ~stack_offset ~fun_contains_calls
@@ -266,16 +298,54 @@ let external_callee_attributes state ~func =
     ~fun_symbol:(Asm_symbol.create_global func)
     ~demangled_name:func
 
-let indirect_callee_attributes ~(callee : Reg.t) =
-  match callee.loc with
-  | Reg _ ->
-    (* The register holding the callee's address is clobbered by the call itself
-       (hence "clobbered" in the attribute name). *)
-    [ DAH.create_call_target_clobbered
+let indirect_callee_attributes ~(callee : Reg.t) ~(args : Reg.t array)
+    ~(available_before : Reg_availability_set.t) ~is_tail ~stack_offset
+    ~fun_contains_calls ~fun_num_stack_slots =
+  let recomputable_target =
+    (* The code pointer for an OCaml indirect call is the first field of the
+       closure, which is passed as the final argument. If the closure has a
+       spilled copy, surviving the call, then the code pointer can be recomputed
+       by the debugger in the context of the caller's frame even after the call.
+       This permits the use of [DW_AT_call_target] rather than the "clobbered"
+       variant: debuggers cannot identify callees, in particular when resolving
+       entry values during virtual unwinding, from clobbered target expressions.
+       (Not applicable to tail calls, whose frames no longer exist by the time
+       the callee executes.) *)
+    if is_tail || Array.length args < 1
+    then None
+    else
+      match available_before with
+      | Unreachable -> None
+      | Ok avail -> (
+        let closure = args.(Array.length args - 1) in
+        match closure.loc with
+        | Stack _ | Unknown -> None
+        | Reg _ -> (
+          match
+            spilled_copy_rvalue ~reg:closure ~avail ~stack_offset
+              ~fun_contains_calls ~fun_num_stack_slots
+          with
+          | None -> None
+          | Some closure_rvalue ->
+            Some
+              (SLDL.Rvalue.read_field_unguarded ~block:closure_rvalue
+                 ~field:Targetint.zero)))
+  in
+  match recomputable_target with
+  | Some target_rvalue ->
+    [ DAH.create_call_target
         (Single_location_description.of_simple_location_description
-           (Dwarf_reg_locations.reg_location_description callee ~offset:None
-              ~need_rvalue:false)) ]
-  | Stack _ | Unknown -> []
+           (SLDL.compile (SLDL.of_rvalue target_rvalue))) ]
+  | None -> (
+    match callee.loc with
+    | Reg _ ->
+      (* The register holding the callee's address is clobbered by the call
+         itself (hence "clobbered" in the attribute name). *)
+      [ DAH.create_call_target_clobbered
+          (Single_location_description.of_simple_location_description
+             (Dwarf_reg_locations.reg_location_description callee ~offset:None
+                ~need_rvalue:false)) ]
+    | Stack _ | Unknown -> [])
 
 (* Insert a label immediately after [insn] (which the emitter will define at the
    return address of the call) and return it. *)
@@ -318,7 +388,10 @@ let dwarf state (fundecl : L.fundecl) ~function_proto_die =
         let args = Array.sub insn.arg 1 (Array.length insn.arg - 1) in
         let return_label = insert_label_after insn in
         add_call_site insn ~return_label
-          ~target_attributes:(indirect_callee_attributes ~callee)
+          ~target_attributes:
+            (indirect_callee_attributes ~callee ~args
+               ~available_before:insn.available_before ~is_tail:false
+               ~stack_offset ~fun_contains_calls ~fun_num_stack_slots)
           ~args ~stack_offset ()
       | Lcall_imm { func } ->
         let return_label = insert_label_after insn in
@@ -333,7 +406,10 @@ let dwarf state (fundecl : L.fundecl) ~function_proto_die =
         let args = Array.sub insn.arg 1 (Array.length insn.arg - 1) in
         let return_label = insert_label_after insn in
         add_call_site insn ~return_label ~is_tail:true
-          ~target_attributes:(indirect_callee_attributes ~callee)
+          ~target_attributes:
+            (indirect_callee_attributes ~callee ~args
+               ~available_before:insn.available_before ~is_tail:true
+               ~stack_offset ~fun_contains_calls ~fun_num_stack_slots)
           ~args ~stack_offset ()
       | Ltailcall_imm { func } ->
         (* Call site entries are not generated for self tail calls ("tail
