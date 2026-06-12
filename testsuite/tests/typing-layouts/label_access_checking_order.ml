@@ -40,9 +40,9 @@ Line 1, characters 39-53:
 1 | let set_bad (type a : any) (r : a t) = r.v <- "hello"
                                            ^^^^^^^^^^^^^^
 Error: Record element types must have a representable layout.
-       The layout of a/2 is any
+       The layout of a is any
          because of the annotation on the abstract type declaration for a.
-       But the layout of a/2 must be representable
+       But the layout of a must be representable
          because it's the type of a field being assigned a value.
 |}]
 
