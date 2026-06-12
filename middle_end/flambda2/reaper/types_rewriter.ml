@@ -1325,7 +1325,7 @@ let rewrite_result_types context ~old_typing_env ~my_closure:func_my_closure
         let var = Flambda2_types.Rewriter.Var.Map.find v new_vars in
         Bound_parameter.create var
           (Flambda_kind.With_subkind.anything (Variable.kind var))
-          Flambda_debug_uid.none)
+          Flambda_debug_uid.none ~dbg:Debuginfo.none)
       vars
   in
   let new_result_types =
@@ -1336,7 +1336,7 @@ let rewrite_result_types context ~old_typing_env ~my_closure:func_my_closure
               (fun (v, k) ->
                 Bound_parameter.create v
                   (Flambda_kind.With_subkind.anything k)
-                  Flambda_debug_uid.none)
+                  Flambda_debug_uid.none ~dbg:Debuginfo.none)
               unbox_my_closure_vars
            @ make_bp params_vars))
       ~results:(Bound_parameters.create (make_bp results_vars))

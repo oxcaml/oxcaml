@@ -119,6 +119,8 @@ let contents_of_domainstate_slot ~offset_in_bytes
 
 let value_of_symbol ~symbol : O.t = DW_op_addr (Symbol symbol)
 
+let address_of_label ~label : O.t = DW_op_addr (Label label)
+
 let signed_int_const i : O.t = DW_op_consts (Targetint.to_int64 i)
 
 let add_unsigned_const i : O.t list =
@@ -138,6 +140,11 @@ let implicit_pointer ~offset_in_bytes ~die_label dwarf_version : O.t =
   else if Dwarf_version.compare dwarf_version Dwarf_version.four = 0
   then DW_op_GNU_implicit_pointer { offset_in_bytes; label = die_label }
   else DW_op_implicit_pointer { offset_in_bytes; label = die_label }
+
+let entry_value_of_register ~dwarf_reg_number dwarf_version : O.t =
+  if Dwarf_version.compare dwarf_version Dwarf_version.five >= 0
+  then DW_op_entry_value_of_register { reg_number = dwarf_reg_number }
+  else DW_op_GNU_entry_value_of_register { reg_number = dwarf_reg_number }
 
 let call ~die_label ~compilation_unit_header_label : O.t =
   DW_op_call4 { label = die_label; compilation_unit_header_label }

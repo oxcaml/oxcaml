@@ -17,9 +17,50 @@
 open! Int_replace_polymorphic_compare
 module V = Backend_var
 
+module Holds_value_of = struct
+  type t =
+    | Var of V.t
+    (* CR mshinwell: There are more numeric cases to add here *)
+    | Const_int of nativeint
+    | Const_naked_float of Int64.t
+    | Const_symbol of Cmm.symbol
+
+  let compare_symbol (sym1 : Cmm.symbol) (sym2 : Cmm.symbol) =
+    let c = String.compare sym1.sym_name sym2.sym_name in
+    if c <> 0
+    then c
+    else
+      match sym1.sym_global, sym2.sym_global with
+      | Global, Global | Local, Local -> 0
+      | Global, Local -> -1
+      | Local, Global -> 1
+
+  let compare t1 t2 =
+    match t1, t2 with
+    | Var var1, Var var2 -> V.compare var1 var2
+    | Const_int i1, Const_int i2 -> Nativeint.compare i1 i2
+    | Const_naked_float f1, Const_naked_float f2 -> Int64.compare f1 f2
+    | Const_symbol sym1, Const_symbol sym2 -> compare_symbol sym1 sym2
+    | Var _, (Const_int _ | Const_naked_float _ | Const_symbol _) -> -1
+    | Const_int _, Var _ -> 1
+    | Const_int _, (Const_naked_float _ | Const_symbol _) -> -1
+    | Const_naked_float _, (Var _ | Const_int _) -> 1
+    | Const_naked_float _, Const_symbol _ -> -1
+    | Const_symbol _, (Var _ | Const_int _ | Const_naked_float _) -> 1
+
+  let equal t1 t2 = compare t1 t2 = 0
+
+  let print ppf t =
+    match t with
+    | Var var -> V.print ppf var
+    | Const_int i -> Format.fprintf ppf "%nd" i
+    | Const_naked_float f -> Format.fprintf ppf "0x%Lx" f
+    | Const_symbol sym -> Format.pp_print_string ppf sym.sym_name
+end
+
 module Debug_info = struct
   type t =
-    { holds_value_of : V.t;
+    { holds_value_of : Holds_value_of.t;
       part_of_value : int;
       num_parts_of_value : int;
       (* CR mshinwell: use [Is_parameter] *)
@@ -44,7 +85,7 @@ module Debug_info = struct
         } =
       t2
     in
-    let c = V.compare holds_value_of1 holds_value_of2 in
+    let c = Holds_value_of.compare holds_value_of1 holds_value_of2 in
     if c <> 0
     then c
     else
@@ -78,7 +119,7 @@ module Debug_info = struct
   let provenance t = t.provenance
 
   let print ppf t =
-    Format.fprintf ppf "%a" V.print t.holds_value_of;
+    Format.fprintf ppf "%a" Holds_value_of.print t.holds_value_of;
     if not (t.part_of_value = 0 && t.num_parts_of_value = 1)
     then Format.fprintf ppf "(%d/%d)" t.part_of_value t.num_parts_of_value;
     match t.which_parameter with
@@ -112,6 +153,12 @@ let create ~reg ~holds_value_of ~part_of_value ~num_parts_of_value
   assert (num_parts_of_value >= 1);
   assert (part_of_value >= 0 && part_of_value < num_parts_of_value);
   assert (match which_parameter with None -> true | Some index -> index >= 0);
+  assert (
+    match (holds_value_of : Holds_value_of.t) with
+    | Var _ -> true
+    | Const_int _ | Const_naked_float _ | Const_symbol _ ->
+      (* Constants do not relate to parameters and have no provenance. *)
+      Option.is_none which_parameter && Option.is_none provenance);
   let debug_info : Debug_info.t =
     { holds_value_of;
       part_of_value;

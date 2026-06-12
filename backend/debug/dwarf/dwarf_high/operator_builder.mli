@@ -41,6 +41,8 @@ val contents_of_domainstate_slot :
 
 val value_of_symbol : symbol:Asm_symbol.t -> Dwarf_operator.t
 
+val address_of_label : label:Asm_label.t -> Dwarf_operator.t
+
 val signed_int_const : Targetint.t -> Dwarf_operator.t
 
 val add_unsigned_const : Targetint.t -> Dwarf_operator.t list
@@ -52,6 +54,9 @@ val implicit_pointer :
   die_label:Asm_label.t ->
   Dwarf_version.t ->
   Dwarf_operator.t
+
+val entry_value_of_register :
+  dwarf_reg_number:int -> Dwarf_version.t -> Dwarf_operator.t
 
 val call :
   die_label:Asm_label.t ->

@@ -164,12 +164,17 @@ module Vars = struct
     let create _fundecl reg ~start_insn:_ =
       match RD.debug_info reg with
       | None -> None
-      | Some debug_info ->
-        let var = RD.Debug_info.holds_value_of debug_info in
-        let provenance = RD.Debug_info.provenance debug_info in
-        let is_parameter = RD.Debug_info.is_parameter debug_info in
-        let t = { provenance; is_parameter } in
-        Some (var, t)
+      | Some debug_info -> (
+        match RD.Debug_info.holds_value_of debug_info with
+        | Const_int _ | Const_naked_float _ | Const_symbol _ ->
+          (* Constants are tracked for call site information only; they do not
+             give rise to available ranges for variables. *)
+          None
+        | Var var ->
+          let provenance = RD.Debug_info.provenance debug_info in
+          let is_parameter = RD.Debug_info.is_parameter debug_info in
+          let t = { provenance; is_parameter } in
+          Some (var, t))
 
     let provenance t = t.provenance
 
@@ -186,10 +191,10 @@ module Vars = struct
   let availability_set_to_key_set (avail : Reg_availability_set.t) =
     Reg_availability_set.canonicalise avail
 
-  let available_before (insn : L.instruction) =
+  let available_before (_fundecl : L.fundecl) (insn : L.instruction) =
     Some (availability_set_to_key_set insn.available_before)
 
-  let available_across (insn : L.instruction) =
+  let available_across (_fundecl : L.fundecl) (insn : L.instruction) =
     Some (availability_set_to_key_set insn.available_across)
 end
 

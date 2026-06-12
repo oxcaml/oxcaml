@@ -98,6 +98,13 @@ let create_let uacc (bound_vars : Bound_pattern.t) (defining_expr : Named.t)
     then uacc
     else add_set_of_closures_offsets ~is_phantom defining_expr uacc
   in
+  (* Note that any rewriting of the [Debuginfo.t] values in [bound_vars], to
+     reflect inlined frames, has already been done: such rewriting happens
+     during the downwards traversal (see [Simplify_let_expr]). The
+     [inlined_debuginfo] in the [creation_dacc]'s environment must not be used
+     for this purpose: it is the value at the point where the upwards
+     accumulator was created, which bears no relation to the inlining context of
+     any particular [Let]. *)
   ( RE.create_let
       (UA.are_rebuilding_terms uacc)
       bound_vars defining_expr ~body ~free_names_of_body,
@@ -160,7 +167,8 @@ let create_coerced_singleton_let uacc var defining_expr
         let ((_body, _uacc) as outer) =
           let bound =
             Bound_pattern.singleton
-              (VB.create uncoerced_var uncoerced_var_duid name_mode)
+              (VB.create uncoerced_var uncoerced_var_duid name_mode
+                 ~dbg:Debuginfo.none ~is_parameter:VB.Is_parameter.local_var)
           in
           create_let uacc bound defining_expr ~free_names_of_defining_expr ~body
             ~cost_metrics_of_defining_expr
@@ -431,7 +439,8 @@ let create_let_symbols uacc lifted_constant ~body =
       let free_names_of_defining_expr = Named.free_names defining_expr in
       let expr, uacc =
         create_coerced_singleton_let uacc
-          (VB.create var Flambda_debug_uid.none Name_mode.normal)
+          (VB.create var Flambda_debug_uid.none Name_mode.normal
+             ~dbg:Debuginfo.none ~is_parameter:VB.Is_parameter.local_var)
           defining_expr ~coercion_from_defining_expr_to_var
           ~free_names_of_defining_expr ~body:expr ~cost_metrics_of_defining_expr
       in
@@ -685,7 +694,7 @@ let rewrite_fixed_arity_continuation0 uacc cont_or_apply_cont ~use_id arity :
               Variable.create "param" (Flambda_kind.With_subkind.kind kind)
             in
             let param_var_duid = Flambda_debug_uid.none in
-            BP.create param_var kind param_var_duid)
+            BP.create param_var kind param_var_duid ~dbg:Debuginfo.none)
           (Flambda_arity.unarized_components arity)
       in
       let args = List.map BP.simple params in

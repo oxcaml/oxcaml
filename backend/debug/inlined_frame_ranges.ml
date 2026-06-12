@@ -159,27 +159,47 @@ module Inlined_frames = struct
     let print ppf () = Format.pp_print_string ppf "()"
   end
 
-  let available_before (insn : L.instruction) =
-    let get_parents (dbg : Debuginfo.item list) : Debuginfo.t list =
-      match List.rev dbg with
-      | [] | [_] -> []
-      | _ :: parents ->
-        let rec loop (t : Debuginfo.item list) =
-          match t with
-          | [] -> []
-          | _ :: tl -> Debuginfo.of_items (List.rev t) :: loop tl
-        in
-        loop parents
-    in
-    let insn_dbg = Debuginfo.to_items insn.dbg in
-    match insn_dbg with
+  (* Given a non-empty Debuginfo.t, return the list of all non-empty prefixes:
+     the value itself and each of its parents (the path with progressively fewer
+     deeper frames). *)
+  let dbg_and_parents dbg =
+    let items = Debuginfo.to_items dbg in
+    match items with
+    | [] -> []
+    | _ :: _ ->
+      let rec parents (t : Debuginfo.item list) =
+        match List.rev t with
+        | [] | [_] -> []
+        | _ :: rest ->
+          let prefix = List.rev rest in
+          Debuginfo.of_items prefix :: parents prefix
+      in
+      dbg :: parents items
+
+  let available_before (_fundecl : L.fundecl) (insn : L.instruction) =
+    (* Inlined-frame keys are derived solely from the instruction's own [dbg]
+       (and all of its parents): an instruction physically located inside an
+       inlined frame keeps that frame alive. Since each instruction identifies
+       exactly one frame at each inlining depth, the ranges of sibling frames
+       may interleave but can never overlap, as required by the DWARF
+       specification for DW_TAG_inlined_subroutine DIEs.
+
+       In particular, the ranges are _not_ extended to cover the scopes of
+       phantom variables bound in inlined frames: such scopes extend to the end
+       of the enclosing function's body and would cause sibling frames' ranges
+       to overlap. (The consequence is that a fully optimized-out inlined
+       function, none of whose instructions remain, gets no
+       DW_TAG_inlined_subroutine DIE; the phantom lets corresponding to its
+       parameters are correspondingly restricted -- see
+       [Available_ranges_phantom_vars].) *)
+    match Debuginfo.to_items insn.dbg with
     | [] -> None
     | _ :: _ ->
-      Some (Key.Set.Ok (Key.Raw_set.of_list (insn.dbg :: get_parents insn_dbg)))
+      Some (Key.Set.Ok (Key.Raw_set.of_list (dbg_and_parents insn.dbg)))
 
-  let available_across insn =
+  let available_across fundecl insn =
     (* A single [Linear] instruction never spans inlined frames. *)
-    available_before insn
+    available_before fundecl insn
 
   let must_restart_ranges_upon_any_change () = false
 end
