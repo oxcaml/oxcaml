@@ -1003,8 +1003,8 @@ let fake_path { Location.loc; txt = lid } typ name =
 let pattern_paths (type k) { Typedtree.pat_desc; pat_extra; _ } =
   let init =
     match (pat_desc : k pattern_desc) with
-    | Tpat_construct (lid_loc, { Data_types.cstr_name; cstr_res; _ }, _, _, _) ->
-      fake_path lid_loc cstr_res cstr_name
+    | Tpat_construct (lid_loc, { Data_types.cstr_name; cstr_res; _ }, _, _, _)
+      -> fake_path lid_loc cstr_res cstr_name
     | Tpat_var { id; name = { loc; txt }; _ } ->
       [ (mkloc (Path.Pident id) loc, Some (Longident.Lident txt)) ]
     | Tpat_alias { id; name; _ } ->
@@ -1055,8 +1055,8 @@ let expression_paths { Typedtree.exp_desc; exp_extra; _ } =
         | _ -> assert false
       in
       [ (mkloc (Path.Pident id) loc, lid) ]
-    | Texp_construct (lid_loc, { Data_types.cstr_name; cstr_res; _ }, _, _, _) ->
-      fake_path lid_loc cstr_res cstr_name
+    | Texp_construct (lid_loc, { Data_types.cstr_name; cstr_res; _ }, _, _, _)
+      -> fake_path lid_loc cstr_res cstr_name
     | Texp_open (od, _) -> module_expr_paths od.open_expr
     (* Normally, [expression_paths] just works at top-level, without
        going deep into an expression. But freshly bound newtypes are
