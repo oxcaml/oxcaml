@@ -620,3 +620,14 @@ int32_safe_get:
   popq  %r11
   jmp   *%r11
 |}]
+
+(* [float# box] gets optimized like [float] *)
+let float_u_box_unsafe_set (a : float# box array) (i : int) (v : float# box) =
+  Array.unsafe_set a i v
+[%%expect_asm X86_64{|
+float_u_box_unsafe_set:
+  vmovsd (%rdi), %xmm0
+  vmovsd %xmm0, -4(%rax,%rbx,4)
+  movl  $1, %eax
+  ret
+|}]
