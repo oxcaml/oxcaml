@@ -525,6 +525,18 @@ let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
     for i = 0 to Array.length old_regs - 1 do
       let old_r = old_regs.(i) in
       let new_r = new_regs.(i) in
+      (* Machtypes are compared here in addition to the location-based
+         equivalence below: a [Val]/[Int] discrepancy changes GC behavior
+         without any structural difference. *)
+      if not (Cmm.equal_machtype_component old_r.Reg.typ new_r.Reg.typ)
+      then
+        Format.fprintf ppf_m
+          "Register machtype mismatch at old=%a(id:%a) new=%a(id:%a): %a[%a] \
+           vs %a[%a]@."
+          Label.format ol InstructionId.print old_instr.id Label.format nl
+          InstructionId.print new_instr.id Printreg.reg old_r
+          Printcmm.machtype_component old_r.Reg.typ Printreg.reg new_r
+          Printcmm.machtype_component new_r.Reg.typ;
       if
         Reg.equal_location old_r.Reg.loc Reg.Unknown
         && Reg.equal_location new_r.Reg.loc Reg.Unknown

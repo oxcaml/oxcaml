@@ -502,12 +502,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
 
   (* CR ttebbi: This duplicates [Select_utils.emit_parts_list], which the SSA
      pipeline uses. Once [Cfg_compare] has validated the two against each other
-     for a while, replace this copy with
-
-     [SU.emit_parts_list ~effects_of ~is_simple_expr ~emit:(fun env exp ->
-     emit_expr env sub_cfg exp ~bound_name:None) ~bind_result:(fun env id r ->
-     let tmp = Reg.createv_with_typs_and_id ~id r in SU.insert_moves env sub_cfg
-     r tmp; SU.env_add (VP.create id) tmp env)] *)
+     for a while, we can use the [Select_utils] version. *)
   let rec emit_parts env sub_cfg ~effects_after exp : _ Or_never_returns.t =
     let module EC = SU.Effect_and_coeffect in
     let may_defer_evaluation =

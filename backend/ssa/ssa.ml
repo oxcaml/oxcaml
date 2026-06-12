@@ -29,22 +29,23 @@ open! Int_replace_polymorphic_compare
 
 [@@@ocaml.warning "+a-40-41-42"]
 
-(** SSA graph implementation; the signature is in [ssa.mli].
+(** SSA graph implementation.
 
     A graph is a plain value of type ['g graph]. The construction-state tags
     [under_construction] and [finished] are defined as the same here, so the
     phantom collapses inside this module: a graph in either state has the same
-    representation and [finish_graph] is a plain identity that fills in metadata
-    and returns the same value re-tagged. The signature keeps the tags abstract,
-    so to every other module ['g] genuinely distinguishes the two states across
+    representation and [finish_graph] fills in metadata and returns the same
+    value as type [finished graph]. The signature keeps the tags abstract, so to
+    every other module ['g] genuinely distinguishes the two states across
     [Block.t] / [Instruction.t] / [Value.t] / [Terminator.t].
 
-    An [instruction] is a body element ([Op] / [Push_trap] / [Pop_trap]); a
-    [value] is an argument, either [Res (instr, i)] (the i-th result of an
-    emitted [Op]) or [Block_param (block, i)] (the i-th parameter of [block]).
-    [Res] values are only produced by [emit_op] (which returns one per result),
-    so they always point to an emitted instruction with an in-range output
-    index.
+    An [Instruction.t] is a body element of a basic block ([Op] / [Push_trap] /
+    [Pop_trap]); a [Value.t] is an argument of an instruction. [Block_param]
+    values refer to the parameters of a basic block, which are passed by a
+    [Continue] block terminator. This is an alternative to phi-functions in
+    other SSA representations. [Res] values are only produced by [emit_op]
+    (which returns one per result), so they always point to an emitted
+    instruction with an in-range output index.
 
     Construction appends each emitted instruction onto the current block's
     [pending_body] (newest-first); [finish_block] seals the terminator, and
@@ -63,20 +64,16 @@ open! Int_replace_polymorphic_compare
     - [finalize_block]: materialise [body] from [pending_body]. Always drops
       Push_trap/Pop_trap pairs whose handler is unreachable. When
       [keep_unused_ops] is false, also drops dead [Op]s and replaces
-      [Continue (Goto _)] args going to unused target params with [Undefined].
+      [Continue (Goto _)] args going to unused target params with the
+      [Undefined] value.
     - [check_value_invariants]: every use is dominated by its definition, and
-      [Undefined] only feeds unused block params.
-
-    Invariants enforced here:
-    - Every reachable block is finished via [finish_block] and all edges into a
-      block carry the same trap stack (checked during the reachability DFS).
-    - [Block_param] / [Res] output indices are in range by construction. *)
+      [Undefined] only feeds unused block params. *)
 
 module Block_id = Oxcaml_utils.Id_counter.Make ()
 module Instruction_id = Oxcaml_utils.Id_counter.Make ()
 
-(* The two construction-state tags are the same type here; the signature makes
-   them abstract and distinct. *)
+(* The two construction-state tags are the same type here; the signature keeps
+   them distinct. *)
 type finished
 
 type under_construction = finished
@@ -117,7 +114,6 @@ type block_param =
 
 type 'g block =
   { block_id : Block_id.t;
-    is_function_start : bool;
     params : block_param array;
     mutable predecessors : 'g block list;
     mutable body : 'g instruction array;
@@ -192,16 +188,16 @@ type 'g graph =
     mutable finished : bool
   }
 
-(* Sentinel used as the initial [terminator] of a freshly created block, and as
-   the placeholder dominator. [Cursor.is_finished] tests against it physically.
-   It is shared across all graphs; its id is [Block_id.dummy], which no real
-   block can have. *)
+(** Sentinels used as the initial [terminator] of a freshly created block, and
+    as the placeholder dominator. [Block.is_finished] checks for
+    [pending_terminator]. Doing it like this keeps the publicly visible
+    [finished Terminator.t] type clean, as it cannot contain
+    [pending_terminator]. *)
 let rec pending_terminator : under_construction terminator =
   Continue { continuation = Goto dummy_block; args = [||] }
 
 and dummy_block : under_construction block =
   { block_id = Block_id.dummy;
-    is_function_start = false;
     params = [||];
     predecessors = [];
     body = [||];
@@ -212,10 +208,9 @@ and dummy_block : under_construction block =
     block_end_trap_stack = []
   }
 
-let create_block ~block_id_gen ~is_function_start ~(params : block_param array)
-    : under_construction block =
+let create_block ~block_id_gen ~(params : block_param array) :
+    under_construction block =
   { block_id = Block_id.get_and_incr block_id_gen;
-    is_function_start;
     params;
     predecessors = [];
     body = [||];
@@ -231,29 +226,27 @@ module Block = struct
 
   let create (graph : under_construction graph) ~(params : Cmm.machtype) :
       under_construction t =
-    create_block ~block_id_gen:graph.block_id_gen ~is_function_start:false
+    create_block ~block_id_gen:graph.block_id_gen
       ~params:
         (params |> Array.map (fun typ -> { typ; name = None; usage_count = 0 }))
 
   let create_with_names (graph : under_construction graph)
       ~(params : (Cmm.machtype_component * string option) array) :
       under_construction t =
-    create_block ~block_id_gen:graph.block_id_gen ~is_function_start:false
+    create_block ~block_id_gen:graph.block_id_gen
       ~params:
         (params |> Array.map (fun (typ, name) -> { typ; name; usage_count = 0 }))
 
-  let is_function_start (b : 'g t) = b.is_function_start
-
-  let param (b : 'g t) index : 'g value =
-    if index < 0 || index >= Array.length b.params
+  let param (block : 'g t) index : 'g value =
+    if index < 0 || index >= Array.length block.params
     then
       Misc.fatal_errorf
         "Ssa.Block.param: index %d out of range for block with %d params" index
-        (Array.length b.params);
-    Block_param (b, index)
+        (Array.length block.params);
+    Block_param (block, index)
 
-  let params (b : 'g t) : 'g value array =
-    Array.init (Array.length b.params) (fun i -> Block_param (b, i))
+  let params (block : 'g t) : 'g value array =
+    Array.init (Array.length block.params) (fun i -> Block_param (block, i))
 
   let equal (a : 'g t) (b : 'g t) =
     (* Blocks have mutable fields, so physical equality is safe. *)
@@ -261,7 +254,7 @@ module Block = struct
 
   let compare (a : 'g t) (b : 'g t) = Block_id.compare a.block_id b.block_id
 
-  let hash (b : 'g t) = Block_id.hash b.block_id
+  let hash (block : 'g t) = Block_id.hash block.block_id
 
   module Self = struct
     type t = finished block
@@ -277,15 +270,27 @@ module Block = struct
   module Set = Set.Make (Self)
   module Tbl = Hashtbl.Make (Self)
 
-  let print_id ppf (b : 'g t) = Format.fprintf ppf "B%d" (b.block_id :> int)
+  let print_id ppf (block : 'g t) =
+    Format.fprintf ppf "B%d" (block.block_id :> int)
 
-  let predecessors (b : finished t) : finished t list = b.predecessors
+  let may_raise (block : finished t) =
+    match block.terminator with
+    | Continue { continuation = Raise _; _ } -> true
+    | Call { may_raise; _ } -> may_raise
+    | Continue { continuation = Goto _ | Return | Unreachable; _ }
+    | Switch _ | Invalid _ ->
+      false
 
-  let params_machtype (b : 'g t) : Cmm.machtype =
-    Array.map (fun (p : block_param) -> p.typ) b.params
+  let predecessors (block : finished t) : finished t list = block.predecessors
 
-  let non_exn_successors_of_continuation (c : 'g continuation) : 'g block list =
-    match c with Goto b -> [b] | Return | Raise _ | Unreachable -> []
+  let params_machtype (block : 'g t) : Cmm.machtype =
+    Array.map (fun (p : block_param) -> p.typ) block.params
+
+  let non_exn_successors_of_continuation (cont : 'g continuation) :
+      'g block list =
+    match cont with
+    | Goto block -> [block]
+    | Return | Raise _ | Unreachable -> []
 
   (* The terminator is missing the exception successors, which are derived from
      [block_end_trap_stack]. *)
@@ -297,21 +302,13 @@ module Block = struct
     | Invalid { continuation; _ } -> (
       match continuation with Some l -> [l] | None -> [])
 
-  let non_exn_successors (b : finished t) : finished t list =
-    non_exn_successors_of_terminator b.terminator
+  let non_exn_successors (block : finished t) : finished t list =
+    non_exn_successors_of_terminator block.terminator
 
   let exn_successor (block : finished t) : finished t option =
-    let raises =
-      match block.terminator with
-      | Continue { continuation = Raise _; _ } -> true
-      | Call { may_raise; _ } -> may_raise
-      | Continue { continuation = Goto _ | Return | Unreachable; _ }
-      | Switch _ | Invalid _ ->
-        false
-    in
-    if raises
-    then match block.block_end_trap_stack with [] -> None | h :: _ -> Some h
-    else None
+    match block.block_end_trap_stack with
+    | h :: _ when may_raise block -> Some h
+    | _ -> None
 
   let block_end_trap_stack (block : finished t) : finished t list =
     block.block_end_trap_stack
@@ -336,18 +333,23 @@ module Block = struct
     then common_dominator a b.dominator_info.dominator
     else common_dominator a.dominator_info.dominator b.dominator_info.dominator
 
-  let immediate_dominator (b : finished t) : finished t =
-    b.dominator_info.dominator
+  let immediate_dominator (block : finished t) : finished t =
+    block.dominator_info.dominator
 
-  let dominator_depth (b : finished t) : int = b.dominator_info.depth
+  let dominator_depth (block : finished t) : int = block.dominator_info.depth
 
-  let body (b : finished t) : finished instruction array = b.body
+  let body (block : finished t) : finished instruction array = block.body
 
-  let terminator (b : finished t) : finished terminator = b.terminator
+  let terminator (block : finished t) : finished terminator = block.terminator
 
-  let terminator_dbg (b : finished t) : Debuginfo.t = b.terminator_dbg
+  let terminator_dbg (block : finished t) : Debuginfo.t = block.terminator_dbg
 
-  let is_finished block = block.terminator != pending_terminator
+  let is_finished block =
+    match block.terminator with
+    | Continue { continuation = Goto block; _ } -> block != dummy_block
+    | Continue { continuation = Return | Raise _ | Unreachable; _ }
+    | Invalid _ | Call _ | Switch _ ->
+      true
 end
 
 (* Print the [name/vN] reference of an [Op]; shared by [Value.print] (which
@@ -391,10 +393,15 @@ module Value = struct
       Format.fprintf ppf "%a.%d" Block.print_id block i
     | Undefined -> Format.fprintf ppf "undef"
 
+  (* Keep an existing name: when a value is reused for another binding (e.g.
+     [let y = x] or a reducer substituting an existing value), the original name
+     describes it best. *)
   let set_name (value : 'g t) name =
     match value with
-    | Res (r, _) -> r.name <- Some name
-    | Block_param (block, i) -> block.params.(i).name <- Some name
+    | Res (r, _) -> if Option.is_none r.name then r.name <- Some name
+    | Block_param (block, i) ->
+      if Option.is_none block.params.(i).name
+      then block.params.(i).name <- Some name
     | Undefined -> ()
 
   let name (value : 'g t) : string option =
@@ -537,12 +544,10 @@ module Terminator = struct
           continuation : 'g block option
         }
 
-  let print_args ppf args =
-    Array.iteri
-      (fun i arg ->
-        if i > 0 then Format.fprintf ppf ", ";
-        Value.print ppf arg)
-      args
+  let print_args ppf arr =
+    Format.pp_print_array
+      ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+      Value.print ppf arr
 
   let print ppf (t : 'g t) =
     match t with
@@ -553,17 +558,13 @@ module Terminator = struct
     | Continue { continuation = Raise _; args } ->
       Format.fprintf ppf "raise(%a)" print_args args
     | Continue { continuation = Unreachable; args } ->
-      (* Invalid (rejected by [check_terminator]), but printable. *)
       Format.fprintf ppf "unreachable(%a)" print_args args
     | Switch { index; targets } ->
-      Format.fprintf ppf "switch(%a) [" Value.print index;
+      Format.fprintf ppf "switch(%a)" Value.print index;
       Array.iteri
-        (fun i tgt ->
-          if i > 0 then Format.fprintf ppf ", ";
-          Block.print_id ppf tgt)
-        targets;
-      Format.fprintf ppf "]"
-    | Call { op; args; continuation; may_raise; nontail } ->
+        (fun i block -> Format.fprintf ppf " | %i -> %a" i Block.print_id block)
+        targets
+    | Call { op; args; continuation; may_raise; nontail } -> (
       let kind =
         match continuation with
         | Return -> "tailcall"
@@ -577,13 +578,13 @@ module Terminator = struct
         Format.fprintf ppf "%s_prim %s(%a)" kind func_symbol print_args args
       | Probe { name; _ } ->
         Format.fprintf ppf "probe %s(%a)" name print_args args);
-      (match continuation with
+      if may_raise then Format.fprintf ppf " may_raise";
+      if nontail then Format.fprintf ppf " nontail";
+      match continuation with
       | Goto b -> Format.fprintf ppf " -> %a" Block.print_id b
       | Return -> ()
       | Raise _ -> Format.fprintf ppf " -> raise"
-      | Unreachable -> Format.fprintf ppf " -> unreachable");
-      if may_raise then Format.fprintf ppf " may_raise";
-      if nontail then Format.fprintf ppf " nontail"
+      | Unreachable -> Format.fprintf ppf " -> unreachable")
     | Invalid { message; args; continuation } -> (
       Format.fprintf ppf "invalid(%a) \"%s\"" print_args args message;
       match continuation with
@@ -640,9 +641,17 @@ module Cursor = struct
     assert (is_finished c);
     c.block <- new_pos
 
+  (* Emitting through a cursor whose block was already finished would silently
+     prepend to the (reversed-in-place by [finish_block]) body, so fail
+     loudly. *)
+  let check_not_finished (c : t) ~fun_name =
+    if is_finished c
+    then Misc.fatal_errorf "Ssa.Cursor.%s: block already finished" fun_name
+
   let emit_op (graph : under_construction graph) (c : t) (op : op)
       (dbg : Debuginfo.t) (typ : Cmm.machtype)
       (args : under_construction value array) : under_construction value array =
+    check_not_finished c ~fun_name:"emit_op";
     let operation =
       { id = Instruction_id.get_and_incr graph.instruction_id_gen;
         op;
@@ -657,9 +666,11 @@ module Cursor = struct
     Array.init (Array.length typ) (fun i -> Res (operation, i))
 
   let emit_push_trap (c : t) ~(handler : under_construction Block.t) =
+    check_not_finished c ~fun_name:"emit_push_trap";
     c.block.pending_body <- Push_trap { handler } :: c.block.pending_body
 
   let emit_pop_trap (c : t) ~(handler : under_construction Block.t) =
+    check_not_finished c ~fun_name:"emit_pop_trap";
     c.block.pending_body <- Pop_trap { handler } :: c.block.pending_body
 
   let finish_block (graph : under_construction graph) (c : t)
@@ -685,7 +696,7 @@ let create_graph (function_info : Function_info.t) ~keep_unused_ops :
   let block_id_gen = Block_id.create_generator () in
   let instruction_id_gen = Instruction_id.create_generator () in
   let entry =
-    create_block ~block_id_gen ~is_function_start:true
+    create_block ~block_id_gen
       ~params:
         (Function_info.flattened_parameters function_info
         |> Array.map (fun typ : block_param ->
@@ -874,30 +885,32 @@ let rec increment_use ~keep_unused_ops (value : finished value) =
 
 and increment_operation_use ~keep_unused_ops (r : finished op_data) =
   r.usage_count <- r.usage_count + 1;
+  (* With keep_unused_ops, we count arguments unconditionally. Without, we count
+     the moment the operation first gets a non-zero use count.*)
   if (not keep_unused_ops) && r.usage_count = 1
   then Array.iter (increment_use ~keep_unused_ops) r.args
 
 let increment_uses_in_terminator ~keep_unused_ops (term : finished terminator) =
   match term with
-  | Continue { continuation = Goto _; args } ->
-    (* An ordinary [Continue]'s args are counted through block-param use
-       propagation; only count them all here when keeping unused ops. *)
-    if keep_unused_ops then Array.iter (increment_use ~keep_unused_ops) args
-  | Continue { continuation = Return | Raise _ | Unreachable; args } ->
+  (* An ordinary [Continue]'s args are counted through block-param use. With
+     keep_unused_ops, that doesn't happen and we count them here. *)
+  | Continue { continuation = Goto _; args = _ } when not keep_unused_ops -> ()
+  | Continue { continuation = Goto _ | Return | Raise _ | Unreachable; args } ->
     Array.iter (increment_use ~keep_unused_ops) args
   | Switch { index; _ } -> increment_use ~keep_unused_ops index
   | Call { args; _ } | Invalid { args; _ } ->
     Array.iter (increment_use ~keep_unused_ops) args
 
 (* For each block, count uses originating from its body's must-keep operations
-   and from its terminator. Operations that are [removable_when_unused] only
-   acquire uses transitively, through the args of operations that are themselves
-   used. *)
+   and from its terminator. Operations that not [removable_when_unused] get an
+   extra use increment just for existing. *)
 let increment_uses_in_block ~keep_unused_ops (block : finished block) =
   block.pending_body
   |> List.iter (fun (instr : finished instruction) ->
       match instr with
       | Op ({ args; _ } as operation) ->
+        (* With keep_unused_ops, we count arguments unconditionally. Without, we
+           count the moment the operation gets a non-zero use count.*)
         if keep_unused_ops then Array.iter (increment_use ~keep_unused_ops) args;
         if not (Instruction.removable_when_unused instr)
         then increment_operation_use ~keep_unused_ops operation
@@ -966,10 +979,12 @@ let order_blocks_dominators_first (blocks : finished block list) :
 
 (* Check the SSA invariants that the construction interface cannot enforce and
    that no other pass checks: every value use must be dominated by its
-   definition, and [Undefined] may only appear as a [Goto] argument feeding an
-   unused block parameter. Requires [ordered_blocks] to list every block after
-   its dominators (so that, walking in order, the definitions dominating a use
-   have already been seen). *)
+   definition, [Undefined] may only appear as a [Goto] argument feeding an
+   unused block parameter, and trap handler arities are consistent ([Raise]
+   argument counts match their handler's parameter count; handlers entered from
+   calls take only the exception bucket). Requires [ordered_blocks] to list
+   every block after its dominators (so that, walking in order, the definitions
+   dominating a use have already been seen). *)
 let check_value_invariants (graph : finished graph)
     (ordered_blocks : finished block list) : unit =
   let fail fmt =
@@ -1005,32 +1020,74 @@ let check_value_invariants (graph : finished graph)
          unused block parameter"
         Block.print_id user
   in
+  let check_instr block = function
+    | Op { id; args; _ } ->
+      Array.iter (check_use block) args;
+      Instruction_id.Tbl.replace defining_block id block
+    | Push_trap _ | Pop_trap _ -> ()
+  in
+  let check_terminator block = function
+    | Continue { continuation = Goto goto; args } ->
+      args
+      |> Array.iteri (fun i (arg : finished value) ->
+          match arg with
+          | Undefined ->
+            if goto.params.(i).usage_count <> 0
+            then
+              fail "block %a: Undefined passed to live parameter %d of %a"
+                Block.print_id block i Block.print_id goto
+          | Res _ | Block_param _ -> check_use block arg)
+    | Continue { continuation = Raise _; args } ->
+      Array.iter (check_use block) args;
+      (* Extra raise args are passed by moving them into the target handler's
+         parameter registers, so their number must match the handler's parameter
+         count. A raise that leaves the function (empty trap stack) can only
+         carry the exception bucket: the runtime unwinding mechanism transports
+         nothing else. *)
+      let expected =
+        match Block.exn_successor block with
+        | Some handler -> Array.length handler.params
+        | None -> 1
+      in
+      if Array.length args <> expected
+      then
+        fail "block %a: raise passes %d values but its handler expects %d"
+          Block.print_id block (Array.length args) expected
+    | Call { args; continuation; _ } -> (
+      Array.iter (check_use block) args;
+      (* Tail calls are lowered without popping trap handlers, so the trap stack
+         must already be empty. *)
+      (match continuation with
+      | Return ->
+        if not (List.is_empty block.block_end_trap_stack)
+        then
+          fail "block %a: tail call with a non-empty trap stack" Block.print_id
+            block
+      | Goto _ | Raise _ | Unreachable -> ());
+      (* A raising call delivers only the exception bucket to its handler:
+         handlers with extra parameters can only be entered from explicit raises
+         ([to_cmm] guarantees they are never top of the trap stack across a
+         call, by wrapping such calls in a re-raising handler without extra
+         args). *)
+      match Block.exn_successor block with
+      | Some handler ->
+        if Array.length handler.params <> 1
+        then
+          fail
+            "block %a: handler %a of a call must take exactly one parameter \
+             (the exception bucket), but takes %d"
+            Block.print_id block Block.print_id handler
+            (Array.length handler.params)
+      | None -> ())
+    | Continue { continuation = Return | Unreachable; args }
+    | Invalid { args; _ } ->
+      Array.iter (check_use block) args
+    | Switch { index; _ } -> check_use block index
+  in
   ordered_blocks
-  |> List.iter (fun (block : finished block) ->
-      Array.iter
-        (fun (instr : finished instruction) ->
-          match instr with
-          | Op op ->
-            Array.iter (check_use block) op.args;
-            Instruction_id.Tbl.replace defining_block op.id block
-          | Push_trap _ | Pop_trap _ -> ())
-        block.body;
-      match block.terminator with
-      | Continue { continuation = Goto goto; args } ->
-        args
-        |> Array.iteri (fun i (arg : finished value) ->
-            match arg with
-            | Undefined ->
-              if goto.params.(i).usage_count <> 0
-              then
-                fail "block %a: Undefined passed to live parameter %d of %a"
-                  Block.print_id block i Block.print_id goto
-            | Res _ | Block_param _ -> check_use block arg)
-      | Continue { continuation = Return | Raise _ | Unreachable; args }
-      | Call { args; _ }
-      | Invalid { args; _ } ->
-        Array.iter (check_use block) args
-      | Switch { index; _ } -> check_use block index)
+  |> List.iter (fun block ->
+      block.body |> Array.iter (check_instr block);
+      check_terminator block block.terminator)
 
 let compute_metadata (graph : finished graph) : finished block list =
   let keep_unused_ops = graph.keep_unused_ops in
@@ -1038,9 +1095,9 @@ let compute_metadata (graph : finished graph) : finished block list =
   compute_dominators graph ~reachable_blocks;
   (* The function's entry parameters come from the ABI: count them as used, so
      they are never dropped. *)
-  Array.iteri
-    (fun i _ -> increment_use ~keep_unused_ops (Block.param graph.entry i))
-    graph.entry.params;
+  for i = 0 to Array.length graph.entry.params - 1 do
+    increment_use ~keep_unused_ops (Block.param graph.entry i)
+  done;
   reachable_blocks |> List.iter (increment_uses_in_block ~keep_unused_ops);
   reachable_blocks |> List.iter (finalize_block ~keep_unused_ops);
   let ordered_blocks = order_blocks_dominators_first reachable_blocks in

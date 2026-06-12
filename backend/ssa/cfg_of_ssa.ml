@@ -137,6 +137,19 @@ let emit_moves body ~src ~dst =
           (make_cfg_instr (Cfg.Op Move) [| s |] [| d |] Debuginfo.none))
     src dst
 
+(* Like [emit_moves], but safe when [src] and [dst] overlap (e.g. a permutation
+   of the target block's parameter registers): in that case the values are
+   routed through fresh temporaries. *)
+let emit_parallel_moves body ~src ~dst =
+  let dst_set = Reg.set_of_array dst in
+  let has_overlap = Array.exists (fun s -> Reg.Set.mem s dst_set) src in
+  if has_overlap
+  then (
+    let tmp_regs = Reg.createv_with_typs src in
+    emit_moves body ~src ~dst:tmp_regs;
+    emit_moves body ~src:tmp_regs ~dst)
+  else emit_moves body ~src ~dst
+
 (** A Branch condition that can be folded into the CFG test terminator,
     consuming the comparison's args directly. *)
 let fuse_comparison (cond : value) ~true_label ~false_label :
@@ -216,15 +229,19 @@ let move_to_extcall_arg_locs body (ty_args : Cmm.exttype list) virt_args dbg :
   then
     DLL.add_end body
       (make_cfg_instr (Cfg.Op (Stackoffset stack_ofs)) [||] [||] Debuginfo.none);
+  (* [locs] has one entry per [ty_args] element; consume the corresponding
+     number of flattened registers from [virt_args] for each. *)
+  let pos = ref 0 in
   Array.iteri
-    (fun i arg ->
-      let src = [| arg |] in
-      let dst = locs.(i) in
+    (fun i dst ->
+      let src = Array.sub virt_args !pos (Array.length dst) in
+      pos := !pos + Array.length dst;
       match Cfg_selection.insert_move_extcall_arg ty_args_arr.(i) src dst with
       | Rewritten (basic, src, dst) ->
         DLL.add_end body (make_cfg_instr basic src dst dbg)
       | Use_default -> emit_moves body ~src ~dst)
-    virt_args;
+    locs;
+  assert (!pos = Array.length virt_args);
   Array.concat (Array.to_list locs), stack_ofs, stack_align
 
 let is_exn_predecessor (pred : block) (target : block) =
@@ -349,7 +366,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
   let cfg_terminator =
     match Block.terminator block with
     | Continue { continuation = Goto start_block; args }
-      when Block.is_function_start start_block ->
+      when Block.equal start_block (Ssa.entry env.ssa_graph) ->
       (* A [Goto] back-edge to the entry block is a self-recursive tail call. We
          lower it to [Tailcall_self], passing the args through the ABI parameter
          locations: the entry block's prologue moves them back into the
@@ -374,19 +391,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
         |> Misc.Stdlib.Array.filteri (fun _ arg -> is_defined arg)
         |> Array.map (get_reg env)
       in
-      (* CR ttebbi: We should use a non-quadratic algorithm for long register
-         lists. *)
-      let has_overlap =
-        Array.exists
-          (fun s -> Array.exists (fun d -> Reg.same s d) dst_regs)
-          src_regs
-      in
-      if has_overlap
-      then (
-        let tmp_regs = Reg.createv_with_typs src_regs in
-        emit_moves body ~src:src_regs ~dst:tmp_regs;
-        emit_moves body ~src:tmp_regs ~dst:dst_regs)
-      else emit_moves body ~src:src_regs ~dst:dst_regs;
+      emit_parallel_moves body ~src:src_regs ~dst:dst_regs;
       make_cfg_instr (Cfg.Always (label_of env goto)) [||] [||] dbg
     | Continue { continuation = Return; args } ->
       (* Emit a [Poptrap] for each handler still on the trap stack at block
@@ -420,14 +425,10 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
           [||]
       in
       let dst = Array.append exn_bucket extra_dst in
-      let src =
-        if Array.length exn_val > Array.length dst
-        then Array.sub exn_val 0 (Array.length dst)
-        else (
-          assert (Array.length exn_val = Array.length dst);
-          exn_val)
-      in
-      emit_moves body ~src ~dst;
+      (* The argument count matches the handler's parameter count; this is
+         checked by [Ssa.finish_graph]. *)
+      assert (Array.length exn_val = Array.length dst);
+      emit_parallel_moves body ~src:exn_val ~dst;
       make_cfg_instr (Cfg.Raise raise_kind) exn_bucket [||] dbg
     | Continue { continuation = Unreachable; _ } ->
       Misc.fatal_error
@@ -460,10 +461,15 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
         | Direct sym -> Direct sym
         | Indirect candidates -> Indirect candidates
         | External _ | Probe _ ->
-          Misc.fatal_error "Cfg_of_ssa: a primitive cannot be tail called"
+          Misc.fatal_error
+            "Cfg_of_ssa: external functions cannot be tail called"
       in
       let virt_args = Array.map (get_reg env) args in
-      let rarg, loc_arg, _stack_ofs = call_arg_locations call_op virt_args in
+      let rarg, loc_arg, stack_ofs = call_arg_locations call_op virt_args in
+      (* [Ssa_tail_call] only creates tail calls whose arguments fit in
+         registers ([stack_offsets_zero]); a tail call with stack arguments
+         would write below the stack pointer. *)
+      assert (stack_ofs = 0);
       emit_moves body ~src:rarg ~dst:loc_arg;
       make_cfg_instr (Cfg.Tailcall_func call_op)
         (call_arg_for_terminator call_op virt_args loc_arg)
@@ -526,9 +532,9 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
              })
           loc_arg loc_res dbg
       | Probe { name; handler_code_sym; enabled_at_init } ->
-        (* Probes don't use the regular calling convention: their args stay in
-           virtual registers and there are no results ([Cprobe] has type
-           [typ_void]), so the continuation needs no result moves. *)
+        (* Probes don't use the regular calling convention: they use
+           register-saving wrappers instead. Therefore, we don't need to assign
+           the arguments to fixed registers. *)
         assert (Array.length virt_res = 0);
         Block.Tbl.replace env.call_result_locs continuation [||];
         make_cfg_instr
@@ -642,10 +648,10 @@ let make_entry_block env cfg ~ssa_entry_label ~fun_arg_locs : Cfg.basic_block =
     cold = false
   }
 
-(* Prepend the function-entry prologue to [entry]'s CFG block: param
-   [Name_for_debugger]s, moves from ABI param locations into the entry's virtual
-   param regs, then an optimistic [Poll] (whose id is returned so
-   [drop_optimistic_prologue_poll] can later remove it if unneeded). *)
+(** Prepend the function-entry prologue to [entry]'s CFG block: param
+    [Name_for_debugger]s, moves from ABI param locations into the entry's
+    virtual param regs, then an optimistic [Poll] (whose id is returned so
+    [drop_optimistic_prologue_poll] can later remove it if unneeded). *)
 let prepend_entry_prologue env (cfg_block : Cfg.basic_block) ~fun_arg_locs
     ~fun_arg_regs : InstructionId.t =
   let poll_instr = make_cfg_instr (Cfg.Op Poll) [||] [||] Debuginfo.none in
@@ -662,7 +668,8 @@ let prepend_entry_prologue env (cfg_block : Cfg.basic_block) ~fun_arg_locs
   |> List.iter (DLL.add_begin cfg_block.body);
   poll_instr.id
 
-(* Convert each SSA block to a CFG block and append it to [cfg] and [layout]. *)
+(** Convert each SSA block to a CFG block and append it to [cfg] and [layout].
+*)
 let convert_and_emit_blocks env cfg layout ~fun_arg_locs ~fun_arg_regs :
     InstructionId.t =
   let entry = Ssa.entry env.ssa_graph in

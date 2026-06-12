@@ -519,8 +519,8 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
   in
   let ssa =
     fd_cmm
-    ++ Ssa_of_cmm.convert ~keep_unused_ops:!Oxcaml_flags.ssa_validate
-    ++ Ssa_tail_call.run ~keep_unused_ops:!Oxcaml_flags.ssa_validate
+    ++ Ssa_of_cmm.convert ~keep_unused_ops:true
+    ++ Ssa_tail_call.run ~keep_unused_ops:true
   in
   if !Oxcaml_flags.ssa_validate
   then
@@ -529,7 +529,11 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
         Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
       in
       (* First conversion: used only for [Cfg_compare], so we emit a CFG that
-         stays faithful to plain [cfg_selectgen]. *)
+         stays faithful to plain [cfg_selectgen]. Note that both conversions
+         share the global [Sub_cfg.instr_id] counter and reset it, so
+         [cfg_without_ssa]'s [next_instruction_id] is stale by the time the
+         comparison runs; this is fine only because [Cfg_compare] never adds
+         instructions. *)
       let cfg_from_ssa_for_compare =
         Cfg_of_ssa.convert ~future_funcnames:funcnames ssa
       in
@@ -558,11 +562,11 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   Reg.clear_relocatable_regs ();
   fd_cmm
   ++ Profile.record ~accumulate:true "cmm_invariants" (cmm_invariants ppf_dump)
-  ++ (if !Oxcaml_flags.use_ssa
+  ++ (if Oxcaml_flags.ssa_enabled ()
       then compile_via_ssa ~ppf_dump ~funcnames
       else Cfg_selection.emit_fundecl ~future_funcnames:funcnames)
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg
-       (if !Oxcaml_flags.use_ssa then "After SSA" else "After selection")
+       (if Oxcaml_flags.ssa_enabled () then "After SSA" else "After selection")
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
       if !Clflags.llvm_backend

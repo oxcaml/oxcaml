@@ -489,9 +489,8 @@ let emit_parts_list ~effects_of ~is_simple_expr ~emit ~bind_result env exp_list
     (Or_never_returns.Ok ([], env))
     exp_list_right_to_left
 
-let chunk_of_machtype_component (c : Cmm.machtype_component) : Cmm.memory_chunk
-    =
-  match c with
+let chunk_of_machtype_component : Cmm.machtype_component -> Cmm.memory_chunk =
+  function
   | Float -> Double
   | Float32 -> Single { reg = Float32 }
   (* SIMD memory operations are unaligned by default. Aligned bigarray

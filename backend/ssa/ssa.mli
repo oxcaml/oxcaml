@@ -183,6 +183,9 @@ module Instruction : sig
       [false] for debug-info markers. *)
   val has_side_effect : 'g t -> bool
 
+  (** Number of uses of the instruction's results. Instructions that are not
+      [removable_when_unused] carry one extra synthetic use (marking their
+      existence), so their count is real uses + 1 and in particular never 0. *)
   val usage_count : finished op_data -> int
 
   val print : Format.formatter -> 'g t -> unit
@@ -201,15 +204,17 @@ module Value : sig
   val typ : 'g t -> Cmm.machtype_component
 
   (** Set the [name] hint on the value's defining [Op] (for a [Res]) or block
-      parameter (for a [Block_param]); a no-op for [Undefined]. Construction
-      only. *)
+      parameter (for a [Block_param]); a no-op for [Undefined] and for values
+      that already have a name (the first name wins). Construction only. *)
   val set_name : under_construction t -> string -> unit
 
   val name : 'g t -> string option
 
   (** Usage count of the underlying block parameter or operation. Note that this
       does not distinguish between the different results of an operation,
-      instead adding them all together in a single count. *)
+      instead adding them all together in a single count. For results of
+      operations that are not [Instruction.removable_when_unused], the count
+      includes the synthetic existence use (see [Instruction.usage_count]). *)
   val usage_count : finished t -> int
 
   val print : Format.formatter -> 'g t -> unit
@@ -299,8 +304,6 @@ module Block : sig
 
   val print_id : Format.formatter -> 'g t -> unit
 
-  val is_function_start : 'g t -> bool
-
   (** An array of [Block_param] values for this block's parameters. *)
   val params : 'g t -> 'g Value.t array
 
@@ -314,6 +317,8 @@ module Block : sig
      the graph metadata. *)
 
   val predecessors : finished t -> finished t list
+
+  val may_raise : finished t -> bool
 
   (** Structural successors of a terminator, not including the implicit
       exception successor derived from [block_end_trap_stack]. *)

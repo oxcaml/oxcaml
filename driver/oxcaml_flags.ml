@@ -123,6 +123,10 @@ let caml_apply_inline_fast_path = ref false  (* -caml-apply-inline-fast-path *)
 
 let use_ssa = ref true                       (* -use-ssa *)
 
+(* The SSA pipeline applies target register constraints that the LLVM backend
+   deliberately skips, so it must stay off under [-llvm-backend]. *)
+let ssa_enabled () = !use_ssa && not !Clflags.llvm_backend
+
 let ssa_simplify = ref true                 (* -ssa-simplify *)
 
 let ssa_validate = ref true                 (* -ssa-validate *)

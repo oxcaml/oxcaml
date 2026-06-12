@@ -36,8 +36,16 @@ open Ssa_reducer
     call's results, and whose enclosing block has an empty trap stack. Rewrites
     them as a self-recursive [Continue (Goto entry)] back-edge (when the callee
     is the current function by name) or a tail [Call] (continuation [Return]).
-    The matching predicates are equivalent to the checks in
-    [Cfg_selectgen.emit_tail_apply]. *)
+
+    The per-call predicates (empty trap stack, [stack_offsets_zero], no stack
+    check for self-calls) are equivalent to the checks in
+    [Cfg_selectgen.emit_tail_apply]. The detection, however, is structural
+    rather than syntactic: any call whose continuation block merely returns the
+    results unchanged is accepted, which covers shapes such as
+    [Clet (x, Capply ..., Cvar x)] in tail position that [Cfg_selectgen]
+    compiles as a normal call followed by a return. Such shapes would show up as
+    a [Cfg_compare] mismatch under [-ssa-validate]; they do not seem to be
+    produced in practice. *)
 module Tail_call_reducer (C : Context) = struct
   open! C
   include Default (C)

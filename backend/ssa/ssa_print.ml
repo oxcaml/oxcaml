@@ -46,10 +46,7 @@ let print_typed_params ppf (blk : block) =
     (Block.params blk)
 
 let print_block_header ppf (blk : block) =
-  let name =
-    if Block.is_function_start blk then "FUNCTION_START" else "BLOCK"
-  in
-  Format.fprintf ppf "%a: %s(%a)" Block.print_id blk name print_typed_params blk;
+  Format.fprintf ppf "%a(%a)" Block.print_id blk print_typed_params blk;
   Format.fprintf ppf " [dominator=%a depth=%d]" Block.print_id
     (Block.immediate_dominator blk)
     (Block.dominator_depth blk);
