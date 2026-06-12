@@ -3253,15 +3253,14 @@ and check_uniqueness_structure_item ~borrows ~preceding ienv item :
   | Tstr_value (_, vbs) -> check_uniqueness_value_bindings ~borrows ienv vbs
   | Tstr_module mb -> check_uniqueness_module_binding ~borrows ienv mb
   | Tstr_recmodule mbs ->
-    (* Recursive modules are not tracked: the recursive identifiers are
-       missing from [ienv], so uses of them are conservatively forced
-       aliased. *)
-    let ufs =
-      List.map
-        (fun mb -> snd (check_uniqueness_mod ~borrows ienv mb.mb_expr))
-        mbs
+    (* The recursive identifiers are missing from [ienv], so uses of them
+       within the bodies are conservatively forced aliased. The bindings,
+       however, share their bodies' paths (like [Tstr_module]), so an outer
+       value aliased by a recursive-module component remains tracked. *)
+    let exts, ufs =
+      List.split (List.map (check_uniqueness_module_binding ~borrows ienv) mbs)
     in
-    Ienv.Extension.empty, UF.pars ufs
+    Ienv.Extension.conjuncts exts, UF.pars ufs
   | Tstr_open od -> check_uniqueness_open_decl ~borrows ienv od
   | Tstr_include incl -> (
     let mv, uf = check_uniqueness_mod ~borrows ienv incl.incl_mod in

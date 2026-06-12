@@ -294,5 +294,12 @@ let recmodule_binding_aliases () =
   unique_id s;
   alias
 [%%expect{|
-val recmodule_binding_aliases : unit -> string = <fun>
+Line 8, characters 2-7:
+8 |   alias
+      ^^^^^
+Error: This value is used here, but it has already been used as unique at:
+Line 7, characters 12-13:
+7 |   unique_id s;
+                ^
+
 |}]
