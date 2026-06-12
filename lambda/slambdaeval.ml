@@ -312,19 +312,14 @@ and eval_lam_shallow env lam =
 
 and eval_structured_const env const =
   match const with
-  | Const_mixed_block (n, old_shape, old_consts) ->
+  | Const_block (n, old_shape, old_consts) ->
     let new_shape = eval_mixed_block_shape env old_shape in
     let new_consts =
       Misc.Stdlib.List.map_sharing (eval_structured_const env) old_consts
     in
     if new_shape == old_shape && new_consts == old_consts
     then const
-    else Const_mixed_block (n, new_shape, new_consts)
-  | Const_block (n, old_consts) ->
-    let new_consts =
-      Misc.Stdlib.List.map_sharing (eval_structured_const env) old_consts
-    in
-    if new_consts == old_consts then const else Const_block (n, new_consts)
+    else Const_block (n, new_shape, new_consts)
   | Const_base _ | Const_float_array _ | Const_immstring _ | Const_float_block _
   | Const_null ->
     const

@@ -338,9 +338,12 @@ external float32_of_string : string -> Obj.t = "caml_float32_of_string"
 
 let rec contains_float32s_or_nulls = function
   | Const_base (Const_float32 _ | Const_unboxed_float32 _) | Const_null -> true
-  | Const_block (_, fields) -> List.exists contains_float32s_or_nulls fields
-  | Const_mixed_block _ ->
-    Misc.fatal_error "[Const_mixed_block] not supported in bytecode."
+  | Const_block (_, shape, fields) ->
+    if Lambda.is_uniform_block_shape shape
+    then List.exists contains_float32s_or_nulls fields
+    else
+      Misc.fatal_error
+        "[Const_block] with mixed blcok shape not supported in bytecode."
   | _ -> false
 
 let rec translate_float32s_or_nulls stack_info env cst sz cont =
@@ -354,12 +357,14 @@ let rec translate_float32s_or_nulls stack_info env cst sz cont =
     Kconst (Const_base (Const_int 0))
     :: Kccall ("caml_int_as_pointer", 1)
     :: cont
-  | Const_block (tag, fields) as cst when contains_float32s_or_nulls cst ->
+  | Const_block (_, shape, _) when not (Lambda.is_uniform_block_shape shape) ->
+    Misc.fatal_error
+      "[Const_block] with mixed blcok shape not supported in bytecode."
+  | Const_block (tag, _shape, fields) as cst when contains_float32s_or_nulls cst
+    ->
     let fields = List.map (fun field -> Const field) fields in
     let cont = Kmakeblock (List.length fields, tag) :: cont in
     comp_args stack_info env fields sz cont
-  | Const_mixed_block _ ->
-    Misc.fatal_error "[Const_mixed_block] not supported in bytecode."
   | _ as cst -> Kconst cst :: cont
 
 and comp_expr stack_info env exp sz cont =

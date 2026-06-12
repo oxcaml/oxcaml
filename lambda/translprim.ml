@@ -2094,7 +2094,7 @@ let lambda_of_loc kind sloc =
       loc_start.Lexing.pos_cnum + cnum in
   match kind with
   | Loc_POS ->
-    Lconst (Const_block (0, [
+    Lconst (Const_block (0, block_shape_of_generic_values 4, [
       Const_immstring file;
       Const_base (Const_int lnum);
       Const_base (Const_int cnum);

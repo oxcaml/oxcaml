@@ -4540,6 +4540,7 @@ let failure_handler ~scopes loc ~failer () =
                 Lconst
                   (Const_block
                      ( 0,
+                       block_shape_of_generic_values 3,
                        [ Const_base (Const_string (fname, loc, None));
                          Const_base (Const_int line);
                          Const_base (Const_int char)
@@ -4753,7 +4754,8 @@ let assign_pat ~scopes body_layout opt nraise catch_ids loc pat pat_sort lam =
           (fun acc (_, pat) lam ->
              collect Jkind.Sort.Const.for_tuple_element acc pat lam)
           acc patl lams
-    | Tpat_tuple patl, Lconst (Const_block (_, scl)) ->
+    | Tpat_tuple patl, Lconst (Const_block (_, shape, scl))
+      when Lambda.is_uniform_block_shape shape ->
         opt := true;
         let collect_const acc (_, pat) sc =
           collect Jkind.Sort.Const.for_tuple_element acc pat (Lconst sc)

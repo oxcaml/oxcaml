@@ -575,7 +575,11 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       let path_consts =
         List.map (fun x -> Const_base (Const_int x)) (pos :: path)
       in
-      Const (Const_block (0, path_consts))
+      Const
+        (Const_block
+           ( 0,
+             Lambda.block_shape_of_generic_values (List.length path_consts),
+             path_consts ))
     | Pmake_idx_array (_, ik, _, path) -> (
       (* Make a block containing [ to_int index ] ++ path.
          See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
@@ -611,7 +615,14 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         let path_suffix_consts =
           List.map (fun x -> Const_base (Const_int x)) path
         in
-        let path_suffix = Const (Const_block (0, path_suffix_consts)) in
+        let path_suffix =
+          Const
+            (Const_block
+               ( 0,
+                 Lambda.block_shape_of_generic_values
+                   (List.length path_suffix_consts),
+                 path_suffix_consts ))
+        in
         Blambda.Prim
           (Ccall "caml_deepen_idx_bytecode", [path_prefix; path_suffix])
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)

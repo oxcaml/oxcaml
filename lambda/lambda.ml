@@ -730,8 +730,7 @@ let must_be_value layout =
 
 type structured_constant =
     Const_base of constant
-  | Const_block of int * structured_constant list
-  | Const_mixed_block of int * mixed_block_shape * structured_constant list
+  | Const_block of int * mixed_block_shape * structured_constant list
   | Const_float_array of string list
   | Const_immstring of string
   | Const_float_block of string list
@@ -1131,12 +1130,9 @@ type runtime_param =
   | Rp_unit
 
 type module_representation =
-  | Module_value_only of { field_count : int }
-  | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
+  mixed_block_shape * mixed_block_shape_with_locality_mode
 
-let module_representation_field_count = function
-  | Module_value_only { field_count } -> field_count
-  | Module_mixed (shape, _) -> Array.length shape
+let module_representation_field_count (shape, _) = Array.length shape
 
 type main_module_block_format =
   | Mb_struct of { mb_repr : module_representation }
@@ -1147,7 +1143,8 @@ type main_module_block_format =
 
 let main_module_representation = function
   | Mb_struct { mb_repr } -> mb_repr
-  | Mb_instantiating_functor _ -> Module_value_only { field_count = 1 }
+  | Mb_instantiating_functor _ ->
+    block_shape_of_generic_values 1, block_shape_of_generic_values 1
 
 type program =
   { compilation_unit : Compilation_unit.t;
@@ -1804,11 +1801,8 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
     | Void -> Product [||]
   ) shape
 
-let mod_field ?(read_semantics=Reads_agree) pos = function
-  | Module_value_only _ ->
-    Pfield([pos], All_value Pointer, read_semantics)
-  | Module_mixed (_, shape_for_read) ->
-    Pfield([pos], Shape shape_for_read, read_semantics)
+let mod_field ?(read_semantics=Reads_agree) pos (_, shape_for_read) =
+  Pfield([pos], Shape shape_for_read, read_semantics)
 
 let transl_module_representation repr =
   (* The shape here is potentially an underapproximation, since the scannable
@@ -1822,23 +1816,12 @@ let transl_module_representation repr =
          |> Types.mixed_block_element_of_const_sort)
       repr
   in
-  let is_value (elt : Types.mixed_block_element) =
-    match elt with
-    | Scannable _ -> true
-    | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
-    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
-    | Product _ | Void -> false
-  in
-  if Array.for_all is_value shape
-  then Module_value_only { field_count = Array.length shape }
-  else
-    Module_mixed
-      ( transl_mixed_product_shape shape,
-        transl_mixed_product_shape_for_read
-        ~get_value_kind:(fun _ -> generic_value)
-        ~get_mode:(fun _ ->
-           fatal_error "Lambda.transl_module_representation: \
-                          unexpected [Float_boxed].") shape)
+  ( transl_mixed_product_shape shape,
+    transl_mixed_product_shape_for_read
+    ~get_value_kind:(fun _ -> generic_value)
+    ~get_mode:(fun _ ->
+        fatal_error "Lambda.transl_module_representation: \
+                      unexpected [Float_boxed].") shape)
 
 (* Translate an access path *)
 
@@ -2309,10 +2292,10 @@ let find_exact_application kind ~arity args =
           if arity <> List.length tupled_args
           then None
           else Some tupled_args
-      | [Lconst(Const_block (_, const_args))] ->
-          if arity <> List.length const_args
-          then None
-          else Some (List.map (fun cst -> Lconst cst) const_args)
+      | [Lconst(Const_block (_, shape, const_args))] ->
+          if arity = List.length const_args && is_uniform_block_shape shape
+          then Some (List.map (fun cst -> Lconst cst) const_args)
+          else None
       | _ -> None
       end
 
@@ -2770,7 +2753,7 @@ let constant_layout: constant -> layout = function
 
 let structured_constant_layout = function
   | Const_base const -> constant_layout const
-  | Const_mixed_block _ | Const_block _ | Const_immstring _ ->
+  | Const_block _ | Const_immstring _ ->
     non_null_value Pgenval
   | Const_float_array _ | Const_float_block _ ->
     non_null_value (Parrayval Pfloatarray)
@@ -2881,11 +2864,8 @@ let layout_of_field_shape
   | Shape shape ->
     layout_of_mixed_block_element (project_from_mixed_block_shape shape ~path)
 
-let layout_of_module_field repr pos =
-  match repr with
-  | Module_value_only _ -> layout_value_field
-  | Module_mixed (shape, _) ->
-    layout_of_mixed_block_element shape.(pos)
+let layout_of_module_field (shape, _) pos =
+  layout_of_mixed_block_element shape.(pos)
 
 let rec mixed_block_element_of_layout (layout : layout) :
     _ mixed_block_element =

@@ -652,8 +652,7 @@ val extern_repr_involves_unboxed_products : extern_repr -> bool
 
 type structured_constant =
     Const_base of constant
-  | Const_block of int * structured_constant list
-  | Const_mixed_block of int * mixed_block_shape * structured_constant list
+  | Const_block of int * mixed_block_shape * structured_constant list
   | Const_float_array of string list
   | Const_immstring of string
   | Const_float_block of string list
@@ -1046,9 +1045,7 @@ type runtime_param =
                                              there are no other parameters) *)
 
 type module_representation =
-  | Module_value_only of { field_count : int }
-  (* All module fields are boxed. *)
-  | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
+  mixed_block_shape * mixed_block_shape_with_locality_mode
   (* The module contains both values and unboxed elements. We have two shapes:
      one for allocating (used by [block_of_module_representation]) and one for
      reading (used by [mod_field]). This will be cleaned up after we add

@@ -268,8 +268,10 @@ let transl_label l = share (Const_immstring l)
 
 let transl_meth_list lst =
   if lst = [] then Lconst const_unit else
-  share (Const_block
-            (0, List.map (fun lab -> Const_immstring lab) lst))
+  let fields = List.map (fun lab -> Const_immstring lab) lst in
+  share (Const_block (0,
+                      block_shape_of_generic_values (List.length fields),
+                      fields))
 
 let set_inst_var ~scopes obj id expr =
   let ptr_or_imm, _ = Typeopt.maybe_pointer expr in

@@ -242,7 +242,7 @@ let assert_failed loc ~scopes exp =
     (Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 2,
                       alloc_heap),
           [slot;
-           Lconst(Const_block(0,
+           Lconst(Const_block(0, block_shape_of_generic_values 3,
               [Const_base(Const_string (fname, exp.exp_loc, None));
                Const_base(Const_int line);
                Const_base(Const_int char)]))], loc))], loc)
@@ -540,12 +540,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         transl_value_list_with_shape ~scopes
           (List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) el)
       in
+      let shape = Lambda.block_shape_of_value_kinds shape in
       begin try
-        Lconst(Const_block(0, List.map extract_constant ll))
+        Lconst(Const_block(0, shape, List.map extract_constant ll))
       with Not_constant ->
-        Lprim(Pmakeblock(0, Immutable,
-                         Lambda.block_shape_of_value_kinds shape,
-                         transl_alloc_mode alloc_mode),
+        Lprim(Pmakeblock(0, Immutable, shape, transl_alloc_mode alloc_mode),
               ll,
               (of_location ~scopes e.exp_loc))
       end
@@ -607,14 +606,17 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                      as immediates *)
                   if !Clflags.native_code then
                     let shape = Lambda.transl_mixed_product_shape shape in
-                    Some (Const_mixed_block(runtime_tag, shape, constants))
+                    Some (Const_block(runtime_tag, shape, constants))
                   else
                     (* CR layouts v5.9: Structured constants for mixed blocks should
                        be supported in bytecode. See symtable.ml for the difficulty.
                     *)
                     None
               | Constructor_uniform_value ->
-                  Some (Const_block(runtime_tag, constants)))
+                  Some (Const_block(runtime_tag,
+                    Lambda.block_shape_of_generic_values
+                      (List.length constants),
+                    constants)))
           in
           begin match constant with
           | Some constant -> Lconst constant
@@ -697,7 +699,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | Some (arg, alloc_mode) ->
           let lam = transl_exp ~scopes Jkind.Sort.Const.for_poly_variant arg in
           try
-            Lconst(Const_block(0, [const_int tag; extract_constant lam]))
+            Lconst(Const_block(0, block_shape_of_generic_values 2,
+                               [const_int tag; extract_constant lam]))
           with Not_constant ->
             Lprim(Pmakeblock(0, Immutable,
                              block_shape_of_generic_values 2,
@@ -976,7 +979,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
               else
                 match kind with
                 | Paddrarray | Pgcignorableaddrarray | Pintarray ->
-                  Lconst(Const_block(0, cl))
+                  Lconst
+                    (Const_block
+                       (0, block_shape_of_generic_values (List.length cl),
+                        cl))
                 | Pfloatarray ->
                   Lconst(Const_float_array(List.map extract_float cl))
                 | Pgenarray ->
@@ -1422,7 +1428,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         ; Const_base (Const_int pos.pos_cnum)
         ]
       in
-      Lconst(Const_block(0, cl))
+      Lconst(
+        Const_block(0, block_shape_of_generic_values (List.length cl), cl))
   | Texp_overwrite (_, _) ->
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
   | Texp_hole _ ->
@@ -2339,10 +2346,13 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         if mut = Mutable then raise Not_constant;
         let cl = List.map extract_constant ll in
         match repres with
-        | Record_boxed -> Lconst(Const_block(0, cl))
+        | Record_boxed ->
+            Lconst(Const_block(0,
+              Lambda.block_shape_of_generic_values (List.length cl), cl))
         | Record_inlined (Ordinary {runtime_tag},
                           Constructor_uniform_value, Variant_boxed _) ->
-            Lconst(Const_block(runtime_tag, cl))
+            Lconst(Const_block(runtime_tag,
+              Lambda.block_shape_of_generic_values (List.length cl), cl))
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
             Lconst(match cl with [v] -> v | _ -> assert false)
         | Record_float ->
@@ -2356,7 +2366,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         | Record_mixed shape ->
             if !Clflags.native_code then
               let shape = Lambda.transl_mixed_product_shape shape in
-              Lconst(Const_mixed_block(0, shape, cl))
+              Lconst(Const_block(0, shape, cl))
             else
               (* CR layouts v5.9: Structured constants for mixed blocks should
                  be supported in bytecode. See symtable.ml for the difficulty.

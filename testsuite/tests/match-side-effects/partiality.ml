@@ -311,7 +311,14 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
                  (if (field_imm 1 *match*/13) (exit 21) 0))
                (exit 21))
             with (21)
-             (if (seq (setfield_ptr 0 r/1 [0: 0 0]) 0) 1
+             (if
+               (seq
+                 (setfield_ptr 0 r/1
+                   [0: (shape
+                    (value<int>,value<(consts (0)) (non_consts ([0: (?)]))>))
+                    0 0])
+                 0)
+               1
                (if *match*/12
                  (let
                    (*match*/14 =o? (field_mut 0 (field_imm 0 *match*/12))

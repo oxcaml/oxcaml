@@ -279,8 +279,8 @@ let simplify_exits lam =
          Lprim (Pmakeblock(tag, mut, shape, mode), fields, loc)
       | Pccall { Primitive.prim_name = "caml_obj_with_tag"; _ },
         [Lconst (Const_base (Const_int tag));
-         Lconst (Const_block (_, fields))] ->
-         Lconst (Const_block (tag, fields))
+         Lconst (Const_block (_, shape, fields))] ->
+         Lconst (Const_block (tag, shape, fields))
 
       | _ -> Lprim(p, ll, loc)
      end

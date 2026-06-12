@@ -1201,15 +1201,14 @@ let rec struct_const ppf = function
       fprintf ppf "%sL" (Misc.format_as_unboxed_literal (Int64.to_string i))
   | Const_base(Const_unboxed_nativeint i) ->
       fprintf ppf "%sn" (Misc.format_as_unboxed_literal (Nativeint.to_string i))
-  | Const_block(tag, []) ->
+  | Const_block(tag, _shape, []) ->
       fprintf ppf "[%i]" tag
-  | Const_block(tag, hd::tl) ->
-      fprintf ppf "@[<1>[%i:@ @[%a@]]@]" tag struct_consts (hd, tl)
-  | Const_mixed_block(_, _, []) -> Misc.fatal_error "empty mixed block"
-  | Const_mixed_block(tag, shape, hd::tl) ->
-      fprintf ppf "@[<1>[%i mixed:@ (shape@ %a)@ @[%a@]]@]" tag
-        mixed_block_shape shape
-        struct_consts (hd, tl)
+  | Const_block(tag, shape, hd::tl) ->
+    fprintf ppf "@[<1>[%i:%a@ @[%a@]]@]" tag
+      (elide_uniform
+        (fun ppf shape -> fprintf ppf "(shape@ %a)" mixed_block_shape shape))
+      shape
+      struct_consts (hd, tl)
   | Const_float_block [] ->
       fprintf ppf "[|b |]"
   | Const_float_block (f1 :: fl) ->

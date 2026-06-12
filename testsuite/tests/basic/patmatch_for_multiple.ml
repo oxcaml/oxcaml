@@ -340,7 +340,7 @@ let _ = fun a b -> match a, b with
       (makeblock 0 (value<int>,value<
                                 (consts ())
                                  (non_consts ([0: (value<int>,value<int>)]))>)
-        x/10 [0: 1 1]))
+        x/10 [0: (shape (value<int>,value<int>)) 1 1]))
     (let
       (x/11 =a[value<int>] a/7
        p/9 =a[value<(consts ()) (non_consts ([0: (value<int>,value<int>)]))>]
@@ -359,7 +359,7 @@ let _ = fun a b -> match a, b with
     (makeblock 0 (value<int>,value<
                               (consts ())
                                (non_consts ([0: (value<int>,value<int>)]))>)
-      a/7 [0: 1 1])
+      a/7 [0: (shape (value<int>,value<int>)) 1 1])
     (makeblock 0 (value<int>,value<
                               (consts ())
                                (non_consts ([0: (value<int>,value<int>)]))>)
