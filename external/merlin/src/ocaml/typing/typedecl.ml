@@ -5620,10 +5620,8 @@ let report_error ~loc = function
         Style.inline_code "nativeint"
   | Cannot_unbox_or_untag_type Untagged ->
       Location.errorf ~loc
-        "Don't know how to untag this type. Only %a, %a, %a, \
+        "Don't know how to untag this type. Only %a, \
          and@ other immediate types can be untagged."
-        Style.inline_code "int8"
-        Style.inline_code "int16"
         Style.inline_code "int"
   | Cannot_unbox_or_untag_type Unpacked ->
       Location.errorf ~loc
