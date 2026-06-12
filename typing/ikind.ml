@@ -296,7 +296,7 @@ module Solver = struct
           let unresolved_base =
             match jkind_desc.base with
             | Types.Layout _ -> None
-            | Types.Kconstr path -> Some path
+            | Types.Kconstr (path, _) -> Some path
           in
           jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
         in
@@ -312,7 +312,7 @@ module Solver = struct
             let unresolved_base =
               match jkind_desc.base with
               | Types.Layout _ -> None
-              | Types.Kconstr path -> Some path
+            | Types.Kconstr (path, _) -> Some path
             in
             jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
         in
@@ -357,7 +357,7 @@ module Solver = struct
           let unresolved_base =
             match jkind_desc.base with
             | Types.Layout _ -> None
-            | Types.Kconstr path -> Some path
+            | Types.Kconstr (path, _) -> Some path
           in
           jkind_desc.mod_bounds, unresolved_base
         | Some env -> (
@@ -367,7 +367,7 @@ module Solver = struct
             let unresolved_base =
               match jkind_desc.base with
               | Types.Layout _ -> None
-              | Types.Kconstr path -> Some path
+            | Types.Kconstr (path, _) -> Some path
             in
             jkind_desc.mod_bounds, unresolved_base)
       in
