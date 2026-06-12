@@ -1,7 +1,4 @@
 (* TEST
-   modules = "preemption_util.ml";
-   include unix;
-   hasunix;
    runtime5;
    poll_insertion;
    flags += "-w -21";
@@ -10,7 +7,6 @@
 
 open Effect
 open Effect.Deep
-open Preemption_util
 
 let () =
   let n = 5 in
@@ -28,7 +24,7 @@ let () =
       let done_ = ref false in
       let v = ref 0 in
       values := v :: !values;
-      match_with
+      Preemptible.match_with
         (fun () ->
           let start_at = Sys.time () in
           while not !done_ do
@@ -39,6 +35,7 @@ let () =
         ()
         { retc = (fun () -> ());
           exnc = raise;
+          tickc = (fun () -> Preempt);
           effc = fun (type a) (e : a t) ->
             match e with
             | Preemption -> Some (fun (k : (a, _) continuation) ->
@@ -48,6 +45,6 @@ let () =
             | _ -> None }
     end
   in
-  with_preemption_setup ~interval:0.01 ~repeating:true (fun () ->
+  Domain.Tick.with_ ~interval_usec:10_000 (fun _ ->
     collect n);
   List.iter (fun v -> assert (!v > 0)) !values;

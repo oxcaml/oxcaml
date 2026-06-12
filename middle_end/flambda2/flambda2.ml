@@ -133,6 +133,15 @@ type flambda_result =
     reachable_names : NO.t
   }
 
+let compilation_unit_callbacks = ref []
+
+let register_compilation_unit_callback f =
+  compilation_unit_callbacks := f :: !compilation_unit_callbacks
+
+let invoke_compilation_unit_callbacks res =
+  List.iter (( |> ) res) !compilation_unit_callbacks;
+  compilation_unit_callbacks := []
+
 let flambda_to_flambda0 : type m.
     ppf_dump:Format.formatter ->
     prefixname:string ->
@@ -302,6 +311,7 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
           ~big_endian:Arch.big_endian ~cmx_loader ~compilation_unit ~module_repr
           module_initializer)
   in
+  invoke_compilation_unit_callbacks compilation_unit;
   flambda_to_flambda0 ~ppf_dump:ppf ~prefixname ~cmx_loader ~machine_width ~mode
     ~close_prog_metadata ~code_slot_offsets raw_flambda
 

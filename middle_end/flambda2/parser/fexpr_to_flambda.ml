@@ -136,11 +136,7 @@ let field_of_block env (v : Fexpr.field_of_block) =
   let simple =
     match v with
     | Symbol s -> Simple.symbol (get_symbol env s)
-    | Tagged_immediate i ->
-      let i = Targetint_32_64.of_string machine_width i in
-      Simple.const
-        (Reg_width_const.tagged_immediate
-           (Target_ocaml_int.of_targetint machine_width i))
+    | Const cst -> Simple.const (const cst)
     | Dynamically_computed var ->
       let var = find_var env var in
       Simple.var var
@@ -239,7 +235,7 @@ module Acc = struct
       } )
 end
 
-let set_of_closures env fun_decls value_slots alloc =
+let set_of_closures env fun_decls value_slots =
   let fun_decls : Function_declarations.t =
     let translate_fun_decl (fun_decl : Fexpr.fun_decl) :
         Function_slot.t * Code_id.t =
@@ -266,8 +262,7 @@ let set_of_closures env fun_decls value_slots alloc =
     in
     List.map convert value_slots |> Value_slot.Map.of_list
   in
-  let alloc = alloc_mode_for_allocations env alloc in
-  Set_of_closures.create ~value_slots alloc fun_decls
+  Set_of_closures.create ~value_slots fun_decls
 
 let apply_cont env acc ({ cont; args; trap_action } : Fexpr.apply_cont) =
   let trap_action : Trap_action.t option =
@@ -330,11 +325,12 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
     in
     let bound = Bound_pattern.set_of_closures bound_vars in
     let closure_bindings = List.map snd vars_and_closure_bindings in
-    let soc = set_of_closures env closure_bindings value_slots alloc in
+    let soc = set_of_closures env closure_bindings value_slots in
     let name_mode = Bound_pattern.name_mode bound in
     let is_phantom = Name_mode.is_phantom name_mode in
     let acc = Acc.add_set_of_closures_offsets ~is_phantom acc soc in
-    let named = Flambda.Named.create_set_of_closures soc in
+    let alloc_mode = alloc_mode_for_allocations env alloc in
+    let named = Flambda.Named.create_set_of_closures ~alloc_mode soc in
     let acc, body = expr env acc body in
     let let_expr =
       Flambda.Let.create bound named ~body ~free_names_of_body:Unknown
@@ -568,9 +564,49 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           static_const
             (SC.immutable_float_array
                (List.map (or_variable float env) elements))
+        | Immutable_float32_array elements ->
+          static_const
+            (SC.immutable_float32_array
+               (List.map (or_variable float32 env) elements))
         | Immutable_value_array elements ->
           static_const
             (SC.immutable_value_array (List.map (field_of_block env) elements))
+        | Immutable_int_array elements ->
+          static_const
+            (SC.immutable_int_array
+               (List.map (or_variable targetint_31_63 env) elements))
+        | Immutable_int8_array elements ->
+          static_const
+            (SC.immutable_int8_array
+               (List.map (or_variable Fun.id env) elements))
+        | Immutable_int16_array elements ->
+          static_const
+            (SC.immutable_int16_array
+               (List.map (or_variable Fun.id env) elements))
+        | Immutable_int32_array elements ->
+          static_const
+            (SC.immutable_int32_array
+               (List.map (or_variable Fun.id env) elements))
+        | Immutable_int64_array elements ->
+          static_const
+            (SC.immutable_int64_array
+               (List.map (or_variable Fun.id env) elements))
+        | Immutable_nativeint_array elements ->
+          static_const
+            (SC.immutable_nativeint_array
+               (List.map (or_variable targetint env) elements))
+        | Immutable_vec128_array elements ->
+          static_const
+            (SC.immutable_vec128_array
+               (List.map (or_variable vec128 env) elements))
+        | Immutable_vec256_array elements ->
+          static_const
+            (SC.immutable_vec256_array
+               (List.map (or_variable vec256 env) elements))
+        | Immutable_vec512_array elements ->
+          static_const
+            (SC.immutable_vec512_array
+               (List.map (or_variable vec512 env) elements))
         | Empty_array array_kind -> static_const (SC.empty_array array_kind)
         | Mutable_string { initial_value = s } ->
           static_const (SC.mutable_string ~initial_value:s)
@@ -581,7 +617,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             (fun (b : Fexpr.static_closure_binding) -> b.fun_decl)
             bindings
         in
-        let set = set_of_closures env fun_decls elements Heap in
+        let set = set_of_closures env fun_decls elements in
         static_const (SC.set_of_closures set)
       | Closure _ -> assert false (* should have been filtered out above *)
       | Deleted_code _ -> acc, Flambda.Static_const_or_code.deleted_code

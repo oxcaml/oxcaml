@@ -21,7 +21,7 @@ let () =
   in
 
   let result = run_with_tick_handler
-    ~interval:0.02
+    ~interval_usec:20_000
     ~repeating:true
     ~on_preemption:(fun _resume ->
       incr count;

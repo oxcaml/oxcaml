@@ -35,6 +35,8 @@ end);;
 let () =
   Expectcommon.register_assembly_callback :=
     Some Emit.register_expect_asm_callback;
+  Expectcommon.register_compilation_unit_callback :=
+    Some Flambda2.register_compilation_unit_callback;
   Expectcommon.run
     ~read_anonymous_arg
     ~extra_args:Options.list

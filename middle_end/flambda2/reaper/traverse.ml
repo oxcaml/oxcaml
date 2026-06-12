@@ -480,6 +480,17 @@ let traverse_apply denv acc apply : rev_expr =
       List.iter
         (Acc.add_cond_any_usage acc ~denv)
         [valuec; exnc; effc; dyn; bind; f; arg]
+    | Effect
+        (With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg }) ->
+      List.iter
+        (Acc.add_cond_any_usage acc ~denv)
+        [valuec; exnc; effc; handle_tick; f; arg]
+    | Effect
+        (With_stack_bind_preemptible
+           { valuec; exnc; effc; handle_tick; dyn; bind; f; arg }) ->
+      List.iter
+        (Acc.add_cond_any_usage acc ~denv)
+        [valuec; exnc; effc; handle_tick; dyn; bind; f; arg]
     | Effect (Resume { cont; f; arg }) ->
       List.iter (Acc.add_cond_any_usage acc ~denv) [cont; f; arg]
   in
@@ -525,7 +536,7 @@ let rec traverse_let denv acc let_expr : rev_expr =
       (Named.free_names defining_expr)
   in
   (match defining_expr with
-  | Set_of_closures set_of_closures ->
+  | Set_of_closures (set_of_closures, _alloc_mode) ->
     traverse_set_of_closures denv acc ~bound_pattern set_of_closures
   | Static_consts group -> traverse_static_consts denv acc ~bound_pattern group
   | Prim (prim, _dbg) ->
@@ -540,13 +551,12 @@ let rec traverse_let denv acc let_expr : rev_expr =
   let make_set_of_closures set_of_closures =
     let function_decls = Set_of_closures.function_decls set_of_closures in
     let value_slots = Set_of_closures.value_slots set_of_closures in
-    let alloc_mode = Set_of_closures.alloc_mode set_of_closures in
-    { function_decls; value_slots; alloc_mode }
+    { function_decls; value_slots }
   in
   let named : rev_named =
     match defining_expr with
-    | Set_of_closures set_of_closures ->
-      Set_of_closures (make_set_of_closures set_of_closures)
+    | Set_of_closures (set_of_closures, alloc_mode) ->
+      Set_of_closures (make_set_of_closures set_of_closures, alloc_mode)
     | Static_consts group ->
       let bound_static =
         match bound_pattern with

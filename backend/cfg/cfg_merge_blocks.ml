@@ -169,11 +169,21 @@ let run_before_register_allocation cfg_with_layout =
   run ~equal_reg cfg_with_layout
 
 let run_after_register_allocation cfg_with_layout =
+  (* [same_loc] alone is not enough: it compares locations only up to register
+     or stack class, which conflates machtype components that share a class
+     (e.g. [Val], [Int], and [Addr] all map to the integer stack class). That
+     distinction matters because [Val] denotes a GC root recorded in the frame
+     descriptor at call sites, whereas [Int] does not. Two blocks that are
+     instruction-identical at the location level but disagree on whether a live
+     value is a pointer have different frame tables; merging them and keeping
+     only one would drop a GC root on the paths reaching the other, so we
+     additionally require the machtype components to be equal. *)
   let equal_reg x y =
     Reg.same_loc_fatal_on_unknown
       ~fatal_message:
         "Cfg_merge_blocks.run_after_register_allocation should only be run \
          after register allocation"
       x y
+    && Cmm.equal_machtype_component x.Reg.typ y.Reg.typ
   in
   run ~equal_reg cfg_with_layout

@@ -587,7 +587,8 @@ let execute_phrase print_outcome ppf phr =
       | Some d ->
           match d, pdir_arg with
           | Directive_none f, None -> f (); true
-          | Directive_string f, Some {pdira_desc = Pdir_string s; _} -> f s; true
+          | Directive_string f, Some {pdira_desc = Pdir_string s; _} ->
+              f s; true
           | Directive_int f, Some {pdira_desc = Pdir_int (n,None); _} ->
              begin match Int_literal_converter.int n with
              | n -> f n; true
@@ -601,8 +602,10 @@ let execute_phrase print_outcome ppf phr =
               fprintf ppf "Wrong integer literal for directive `%s'.@."
                 dir_name;
               false
-          | Directive_ident f, Some {pdira_desc = Pdir_ident lid; _} -> f lid; true
-          | Directive_bool f, Some {pdira_desc = Pdir_bool b; _} -> f b; true
+          | Directive_ident f, Some {pdira_desc = Pdir_ident lid; _} ->
+              f lid; true
+          | Directive_bool f, Some {pdira_desc = Pdir_bool b; _} ->
+              f b; true
           | _ ->
               fprintf ppf "Wrong type of argument for directive `%s'.@."
                 dir_name;
@@ -638,7 +641,8 @@ let use_channel ppf ~wrap_in_module ic name filename =
         List.iter
           (fun ph ->
             let ph = preprocess_phrase ppf ph in
-            if not (execute_phrase !use_print_results ppf ph) then raise Exit)
+            let success = execute_phrase !use_print_results ppf ph in
+            if not success then raise Exit)
           (if wrap_in_module then
              parse_mod_use_file name lb
            else

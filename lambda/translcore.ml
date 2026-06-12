@@ -47,8 +47,8 @@ let use_dup_for_constant_mutable_arrays_bigger_than = 4
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
-let field_offset_for_label lbl =
-  match lbl.lbl_repres with
+let field_offset_for_label lbl repres =
+  match repres with
   | Record_boxed
   | Record_inlined (_, Constructor_uniform_value, Variant_boxed _)
   | Record_inlined (_, Constructor_uniform_value, Variant_with_null) ->
@@ -71,6 +71,8 @@ let field_offset_for_label lbl =
       lbl.lbl_pos
   | Record_dummy _ ->
       fatal_error "field_offset_for_label: dummy record representation"
+  | Record_variable ->
+      fatal_error "field_offset_for_label: variable record representation"
 
 (* Forward declaration -- to be filled in by Translmod.transl_module *)
 let transl_module =
@@ -555,9 +557,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       Lprim(Pmake_unboxed_product shape,
             ll,
             of_location ~scopes e.exp_loc)
-  | Texp_construct(_, cstr, args, alloc_mode) ->
+  | Texp_construct(_, cstr, shape, args, alloc_mode) ->
       let args_with_sorts =
-        List.map2 (fun { ca_sort } e -> e, ca_sort) cstr.cstr_args args
+        List.map
+          (fun (sort, e) -> e, Jkind.Sort.default_for_transl_and_get sort)
+          args
       in
       let ll =
         List.map (fun (e, sort) -> transl_exp ~scopes sort e) args_with_sorts
@@ -585,7 +589,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             match List.map extract_constant ll with
             | exception Not_constant -> None
             | constants -> (
-              match cstr.cstr_shape with
+              match shape with
               | Constructor_mixed shape
                 when Mixed_product_bytes.types_shape_is_all_value shape ->
                   (* Note [Constant all-value mixed records]:
@@ -615,7 +619,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           | None ->
               let alloc_mode = transl_alloc_mode (Option.get alloc_mode) in
               let makeblock =
-                match cstr.cstr_shape with
+                match shape with
                 | Constructor_uniform_value ->
                     let shape =
                       List.map (fun (e, sort) ->
@@ -651,7 +655,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                value kind for the poly variant hash? *)
             let makeblock =
               match cstr.cstr_shape with
-              | Constructor_uniform_value ->
+              | Some Constructor_uniform_value ->
                   let shape =
                     List.map (fun (e, sort) ->
                         Lambda.must_be_value (layout_exp sort e))
@@ -661,7 +665,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                              Lambda.block_shape_of_value_kinds
                                (Some (Lambda.generic_value :: shape)),
                              alloc_mode)
-              | Constructor_mixed shape ->
+              | Some (Constructor_mixed shape) ->
                   (* CR layouts v5: once all-void records are allowed, handle
                      constructors with all-void inline records, which are stored
                      as immediates *)
@@ -674,6 +678,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                     Array.append [| Lambda.Value Lambda.generic_value |] shape
                   in
                   Pmakeblock(0, Immutable, Shape shape, alloc_mode)
+              | None ->
+                  fatal_error "Unexpected indeterminate representation in \
+                               extensible variant"
             in
             Lprim (makeblock, lam :: ll, of_location ~scopes e.exp_loc)
       | Extension _, (Variant_boxed _ | Variant_unboxed | Variant_with_null)
@@ -712,11 +719,20 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             |])
       in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
-      let (arg, lbl) = transl_atomic_loc ~scopes arg arg_sort lbl in
+      let repres =
+        match lbl.lbl_repres with
+        | Record_variable ->
+            Misc.fatal_errorf "Texp_atomic_loc on record with [any] field %s"
+              lbl.lbl_name
+        | repres -> repres
+      in
+      let (arg, lbl) = transl_atomic_loc ~scopes arg arg_sort lbl repres in
       let loc = of_location ~scopes e.exp_loc in
       Lprim (Pmakeblock (0, Immutable, shape, transl_alloc_mode alloc_mode),
              [arg; lbl], loc)
-  | Texp_field(arg, arg_sort, _id, lbl, float, ubr) ->
+  | Texp_field { record = arg; record_sort = arg_sort; record_repres;
+                 lid = _; label = lbl; boxing = float;
+                 unique_barrier = ubr } ->
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let targ = transl_exp ~scopes arg_sort arg in
       let sem =
@@ -724,7 +740,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       in
       let sem = add_barrier_to_read (transl_unique_barrier ubr) sem in
       let prim_and_args =
-        match lbl.lbl_repres with
+        match record_repres with
           Record_boxed
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
           let immediate_or_pointer, _ = maybe_pointer e in
@@ -733,7 +749,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             Some
               (Patomic_load_field { immediate_or_pointer },
                [targ;
-                Lconst (Const_base (Const_int (field_offset_for_label lbl)))])
+                Lconst (Const_base (Const_int (
+                  field_offset_for_label lbl record_repres)))])
           else
             Some (Pfield (lbl.lbl_pos, immediate_or_pointer, sem), [targ])
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> None
@@ -754,7 +771,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             Some
               (Patomic_load_field { immediate_or_pointer },
                [targ;
-                Lconst (Const_base (Const_int (field_offset_for_label lbl)))])
+                Lconst (Const_base (Const_int (
+                  field_offset_for_label lbl record_repres)))])
           else
             Some (Pfield (lbl.lbl_pos + 1, immediate_or_pointer, sem), [targ])
         | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
@@ -789,16 +807,32 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
           fatal_error "transl_exp0: dummy record representation"
+        | Record_variable ->
+          fatal_error "transl_exp0: variable record representation"
       in
       begin match prim_and_args with
       | None -> targ
       | Some (prim, args) -> Lprim (prim, args, of_location ~scopes e.exp_loc)
       end
-  | Texp_unboxed_field(arg, arg_sort, _id, lbl, _) ->
-    begin match lbl.lbl_repres with
+  | Texp_unboxed_field{ record = arg; record_sort = arg_sort; record_sorts;
+                        label = lbl; record_repres; _ } ->
+    begin match record_repres with
+    | Record_unboxed_product_variable ->
+      fatal_error "transl_exp0: variable unboxed-product record representation"
     | Record_unboxed_product ->
-      let lbl_layout l = layout e.exp_env l.lbl_loc l.lbl_sort l.lbl_arg in
-      let layouts = Array.to_list (Array.map lbl_layout lbl.lbl_all) in
+      let lbl_layout l =
+        let sort = unboxed_label_sort l record_sorts in
+        if l.lbl_pos = lbl.lbl_pos then
+          (* This is the field being projected, so give it a precise value kind
+             (by using the known type of the expression) *)
+          layout e.exp_env l.lbl_loc sort e.exp_type
+        else
+          (* We don't necessarily know this field's precise value kind
+             ([l.lbl_arg] may be an [any]) but for lambda's purposes the sort
+             is good enough *)
+          layout_of_sort l.lbl_loc sort
+      in
+      let layouts = Array.map lbl_layout lbl.lbl_all |> Array.to_list in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let targ = transl_exp ~scopes arg_sort arg in
       if Array.length lbl.lbl_all == 1 then
@@ -808,7 +842,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         Lprim (Punboxed_product_field (lbl.lbl_pos, layouts), [targ],
                of_location ~scopes e.exp_loc)
     end
-  | Texp_setfield(arg, arg_mode, _id, lbl, newval) ->
+  | Texp_setfield{ record = arg; record_repres; record_sorts;
+                   modality = arg_mode; lid = _id; label = lbl; newval } ->
       (* CR layouts v2.5: When we allow `any` in record fields and check
          representability on construction, [sort_of_jkind] will be unsafe here.
          Probably we should add a sort to `Texp_setfield` in the typed tree,
@@ -822,11 +857,16 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
            above. *)
         Jkind.Sort.Const.for_boxed_record
       in
+      let sort_newval =
+        match label_sort Legacy lbl record_sorts with
+        | `Sort s -> s
+        | `Same_as_record_sort -> sort_arg
+      in
       let arg_lambda = transl_exp ~scopes sort_arg arg in
       let field_lambda = Lconst (Const_base (Const_int lbl.lbl_pos)) in
-      let newval_lambda = transl_exp ~scopes lbl.lbl_sort newval in
+      let newval_lambda = transl_exp ~scopes sort_newval newval in
       let prim, args =
-        match lbl.lbl_repres with
+        match record_repres with
           Record_boxed
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
           let immediate_or_pointer, _ = maybe_pointer newval in
@@ -873,6 +913,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
             fatal_error "transl_exp0: unexpected dummy representation"
+        | Record_variable ->
+            fatal_error "transl_exp0: unexpected unknown representation"
       in
       Lprim(prim, args, of_location ~scopes e.exp_loc)
   | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
@@ -1113,7 +1155,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
            transl_exp ~scopes sort body)
   | Texp_pack modl ->
       !transl_module ~scopes Tcoerce_none None modl
-  | Texp_assert ({exp_desc=Texp_construct(_, {cstr_name="false"}, _, _)}, loc) ->
+  | Texp_assert ({exp_desc=Texp_construct(_, {cstr_name="false"}, _, _, _)},
+                 loc) ->
       assert_failed loc ~scopes e
   | Texp_assert (cond, loc) ->
       if !Clflags.noassert
@@ -2127,7 +2170,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
        of the copy *)
     let copy_id = Ident.create_local "newrecord" in
     let copy_id_duid = Lambda.debug_uid_none in
-    let update_field cont (lbl, definition) =
+    let update_field cont (lbl, lbl_sort, definition) =
+      let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
       (* CR layouts v5: allow more unboxed types here. *)
       match definition with
       | Kept _ -> cont
@@ -2169,9 +2213,11 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             | Record_inlined (_, _, Variant_with_null) -> assert false
             | Record_dummy _ ->
               fatal_error "transl_record: unexpected dummy representation"
+            | Record_variable ->
+              fatal_error "transl_record: unexpected variable representation"
           in
           Lsequence(Lprim(upd, [Lvar copy_id;
-                                transl_exp ~scopes lbl.lbl_sort expr],
+                                transl_exp ~scopes lbl_sort expr],
                           of_location ~scopes loc),
                     cont)
     in
@@ -2192,10 +2238,11 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
     let init_id_duid = Lambda.debug_uid_none in
     let lv =
       Array.mapi
-        (fun i (lbl, definition) ->
+        (fun i (lbl, lbl_sort, definition) ->
+           let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
            match definition with
            | Kept (typ, mut, _) ->
-               let field_layout = layout env lbl.lbl_loc lbl.lbl_sort typ in
+               let field_layout = layout env lbl.lbl_loc lbl_sort typ in
                let sem =
                  if Types.is_mutable mut then Reads_vary else Reads_agree
                in
@@ -2250,19 +2297,23 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                    Pmixedfield ([i], shape, sem)
                  | Record_inlined (_, _, Variant_with_null) -> assert false
                  | Record_dummy _ ->
-                   fatal_error "transl_record: unexpected dummy representation"
+                   fatal_error
+                     "transl_record: unexpected dummy representation"
+                 | Record_variable ->
+                   fatal_error
+                     "transl_record: unexpected variable representation"
                in
                Lprim(access, [Lvar init_id],
                      of_location ~scopes loc),
                field_layout
            | Overridden (_lid, expr) ->
-               let field_layout = layout_exp lbl.lbl_sort expr in
-               transl_exp ~scopes lbl.lbl_sort expr, field_layout)
+               let field_layout = layout_exp lbl_sort expr in
+               transl_exp ~scopes lbl_sort expr, field_layout)
         fields
     in
     let ll, shape = List.split (Array.to_list lv) in
     let mut : Lambda.mutable_flag =
-      if Array.exists (fun (lbl, _) -> Types.is_mutable lbl.lbl_mut) fields
+      if Array.exists (fun (lbl, _, _) -> Types.is_mutable lbl.lbl_mut) fields
       then Mutable
       else Immutable in
     let lam =
@@ -2312,6 +2363,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             raise Not_constant
         | Record_dummy _ ->
           fatal_error "transl_record: unexpected dummy representation"
+        | Record_variable ->
+          fatal_error "transl_record: unexpected variable representation"
       with Not_constant ->
         let loc = of_location ~scopes loc in
         match repres with
@@ -2365,6 +2418,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         | Record_inlined (Null, _, _) -> assert false
         | Record_dummy _ ->
           fatal_error "transl_record: unexpected dummy representation"
+        | Record_variable ->
+          fatal_error "transl_record: unexpected variable representation"
     in
     begin match opt_init_expr with
       None -> lam
@@ -2378,27 +2433,32 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
 
 and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
   match repres with
+  | Record_unboxed_product_variable ->
+    fatal_error
+      "transl_record_unboxed_product: variable unboxed-product representation"
   | Record_unboxed_product ->
     let init_id = Ident.create_local "init" in
     let init_id_duid = Lambda.debug_uid_none in
     let shape =
       Array.map
-        (fun (lbl, definition) ->
+        (fun (lbl, lbl_sort, definition) ->
+            let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
             match definition with
-            | Kept (typ, _mut, _) -> layout env lbl.lbl_loc lbl.lbl_sort typ
-            | Overridden (_lid, expr) -> layout_exp lbl.lbl_sort expr)
+            | Kept (typ, _mut, _) -> layout env lbl.lbl_loc lbl_sort typ
+            | Overridden (_lid, expr) -> layout_exp lbl_sort expr)
         fields
       |> Array.to_list
     in
     let ll =
       Array.mapi
-        (fun i (lbl, definition) ->
+        (fun i (_lbl, lbl_sort, definition) ->
+            let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
             match definition with
             | Kept (_typ, _mut, _) ->
               let access = Punboxed_product_field (i, shape) in
               Lprim (access, [Lvar init_id], of_location ~scopes loc)
             | Overridden (_lid, expr) ->
-              transl_exp ~scopes lbl.lbl_sort expr)
+              transl_exp ~scopes lbl_sort expr)
         fields
       |> Array.to_list
     in
@@ -2419,7 +2479,7 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
 
 (* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
 and transl_idx ~scopes loc env ba uas =
-  let ua_to_pos (Uaccess_unboxed_field (_, lbl)) =
+  let ua_to_pos (Uaccess_unboxed_field (_, lbl, _)) =
     (* erase singleton unboxed products before lambda *)
     if Array.length lbl.lbl_all == 1 then None else Some lbl.lbl_pos
   in
@@ -2429,14 +2489,14 @@ and transl_idx ~scopes loc env ba uas =
     let idx = transl_exp ~scopes Jkind.Sort.Const.for_idx idx in
     begin match uas with
     | [] -> idx
-    | Uaccess_unboxed_field (_, lbl) :: _ ->
+    | Uaccess_unboxed_field (_, lbl, sorts) :: _ ->
+      let sorts = unboxed_label_all_sorts lbl sorts in
       (* Preserve the invariant that products have at least two elements *)
       let base_sort =
-        if Int.equal (Array.length lbl.lbl_all) 1 then
-          lbl.lbl_sort
+        if Int.equal (Array.length sorts) 1 then
+          sorts.(0)
         else
-          Jkind.Sort.Const.Product
-            (Array.to_list (Array.map (fun lbl -> lbl.lbl_sort) lbl.lbl_all))
+          Jkind.Sort.Const.Product (Array.to_list sorts)
       in
       (* CR layouts v8: this might unnecessarily compute the value kind, which
          shouldn't be needed for deepening *)
@@ -2445,13 +2505,13 @@ and transl_idx ~scopes loc env ba uas =
       (* [uas_path] is a path into [mbe] *)
       Lprim (Pidx_deepen (mbe, uas_path), [idx], (of_location ~scopes loc))
     end
-  | Baccess_field (_id, lbl) ->
-    begin match lbl.lbl_repres with
+  | Baccess_field (_id, lbl, repres) ->
+    begin match repres with
     | Record_boxed
     | Record_float | Record_ufloat ->
       (* Assert that all unboxed fields are of singleton records *)
       List.iter
-        (fun (Uaccess_unboxed_field (_, l)) ->
+        (fun (Uaccess_unboxed_field (_, l, _)) ->
             if Array.length l.lbl_all <> 1 then
               Misc.fatal_error "Texp_idx: non-singleton unboxed record field \
                 in non-mixed boxed record")
@@ -2474,14 +2534,18 @@ and transl_idx ~scopes loc env ba uas =
              (of_location ~scopes loc))
     | Record_dummy _ ->
       fatal_error "transl_idx: unexpected dummy representation"
+    | Record_variable ->
+      fatal_error "transl_idx: unexpected unknown representation"
     end
   end
 
-and transl_atomic_loc ~scopes arg arg_sort lbl =
+and transl_atomic_loc ~scopes arg arg_sort lbl repres =
   let arg = transl_exp ~scopes arg_sort arg in
-  begin match lbl.lbl_repres with
+  begin match repres with
   | Record_dummy _ ->
     Misc.fatal_error "transl_atomic_loc: unexpected dummy representation"
+  | Record_variable ->
+    Misc.fatal_error "transl_atomic_loc: unexpected variable representation"
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
   | Record_float | Record_ufloat
     ->
@@ -2493,7 +2557,7 @@ and transl_atomic_loc ~scopes arg arg_sort lbl =
                           | Variant_with_null))
     -> ()
   end;
-  let field_offset = field_offset_for_label lbl in
+  let field_offset = field_offset_for_label lbl repres in
   let lbl = Lconst (Const_base (Const_int field_offset)) in
   (arg, lbl)
 

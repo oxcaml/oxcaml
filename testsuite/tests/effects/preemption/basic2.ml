@@ -15,7 +15,7 @@ let () =
   let iters = ref 0 in
 
   ignore (run_with_tick_handler
-    ~interval:0.05
+    ~interval_usec:50_000
     ~repeating:true
     ~on_preemption:(fun _resume -> incr count; Resume)
     (fun () ->

@@ -278,7 +278,7 @@ external f_6 : (int32#[@untagged]) -> bool -> string  = "foo" "bar";;
 Line 1, characters 16-22:
 1 | external f_6 : (int32#[@untagged]) -> bool -> string  = "foo" "bar";;
                     ^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
@@ -287,7 +287,7 @@ external f_7 : string -> (int64#[@untagged])  = "foo" "bar";;
 Line 1, characters 26-32:
 1 | external f_7 : string -> (int64#[@untagged])  = "foo" "bar";;
                               ^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
@@ -360,7 +360,7 @@ external f_6 : (int32'[@untagged]) -> bool -> string  = "foo" "bar";;
 Line 1, characters 16-22:
 1 | external f_6 : (int32'[@untagged]) -> bool -> string  = "foo" "bar";;
                     ^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
@@ -369,7 +369,7 @@ external f_7 : string -> (int64# int64'#[@untagged])  = "foo" "bar";;
 Line 1, characters 26-40:
 1 | external f_7 : string -> (int64# int64'#[@untagged])  = "foo" "bar";;
                               ^^^^^^^^^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
