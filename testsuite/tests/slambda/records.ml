@@ -43,7 +43,7 @@ type s = { e : t; f : t; }
   r = ⟪ (let
           (two =? (apply (field_imm 0 (global Toploop!)) "two")
            one =? (apply (field_imm 0 (global Toploop!)) "one"))
-          (makeblock 0 (value_or_null<int>,value_or_null<int>) one two)) ⟫ }
+          (makeblock 0 (value<int>,value<int>) one two)) ⟫ }
 - : t = {a = 1; b = 2}
 |}];;
 
@@ -61,9 +61,7 @@ type s = { e : t; f : t; }
           (two =? (apply (field_imm 0 (global Toploop!)) "two")
            one =? (apply (field_imm 0 (global Toploop!)) "one"))
           (region
-            (field_int 0
-              (makelocalblock 0 (value_or_null<int>,value_or_null<int>) one
-                two)))) ⟫ }
+            (field_int 0 (makelocalblock 0 (value<int>,value<int>) one two)))) ⟫ }
 - : int = 1
 |}];;
 
@@ -82,8 +80,7 @@ type s = { e : t; f : t; }
            one =? (apply (field_imm 0 (global Toploop!)) "one"))
           (region
             (field_imm 0 (value<int>,untagged_immediate)
-              (makelocalblock 0 (value_or_null<int>,untagged_immediate) one
-                two_u)))) ⟫ }
+              (makelocalblock 0 (value<int>,untagged_immediate) one two_u)))) ⟫ }
 - : int = 1
 |}];;
 
@@ -100,20 +97,22 @@ let y = { a = two; b = one } in
              r = ⟪ (apply (field_imm 0 (global Toploop!)) "one") ⟫ }
          x =
            { c = [ one.c; two.c; ];
-             r = ⟪ (makeblock 0 (value_or_null<int>,value_or_null<int>) one
-                     two) ⟫ }
+             r = ⟪ (makeblock 0 (value<int>,value<int>) one two) ⟫ }
          y =
            { c = [ two.c; one.c; ];
-             r = ⟪ (makeblock 0 (value_or_null<int>,value_or_null<int>) two
-                     one) ⟫ })
+             r = ⟪ (makeblock 0 (value<int>,value<int>) two one) ⟫ })
         [ x.c; y.c; ]);
   r = ⟪ (let
           (two =? (apply (field_imm 0 (global Toploop!)) "two")
            one =? (apply (field_imm 0 (global Toploop!)) "one")
            x =[value<(consts ()) (non_consts ([0: (value<int>,value<int>)]))>]
-             (makeblock 0 (value_or_null<int>,value_or_null<int>) one two)
+             (makeblock 0 (value<int>,value<int>) one two)
            y =[value<(consts ()) (non_consts ([0: (value<int>,value<int>)]))>]
-             (makeblock 0 (value_or_null<int>,value_or_null<int>) two one))
-          (makeblock 0 x y)) ⟫ }
+             (makeblock 0 (value<int>,value<int>) two one))
+          (makeblock 0 (value<
+                         (consts ())
+                          (non_consts ([0: (value<int>,value<int>)]))>,
+            value<(consts ()) (non_consts ([0: (value<int>,value<int>)]))>) x
+            y)) ⟫ }
 - : s = {e = {a = 1; b = 2}; f = {a = 2; b = 1}}
 |}];;

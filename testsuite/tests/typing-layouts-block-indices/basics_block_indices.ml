@@ -189,19 +189,27 @@ type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr  }
 let bad_f () = (.f)
 [%%expect{|
 type t_float64 : float64
->> Fatal error: Typedecl.remove_unboxed_versions
-Uncaught exception: Misc.Fatal_error
-
+type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr; }
+Line 4, characters 17-18:
+4 | let bad_f () = (.f)
+                     ^
+Error: Block indices do not support [@@flatten_floats] records.
 |}]
 
 let bad_fu () = (.fu)
 [%%expect{|
-val bad_fu : unit -> (t/2, float#) idx_imm = <fun>
+Line 1, characters 18-20:
+1 | let bad_fu () = (.fu)
+                      ^^
+Error: Block indices do not support [@@flatten_floats] records.
 |}]
 
 let bad_t_float64 () = (.t_float64)
 [%%expect{|
-val bad_t_float64 : unit -> (t/2, t_float64/2) idx_imm = <fun>
+Line 1, characters 25-34:
+1 | let bad_t_float64 () = (.t_float64)
+                             ^^^^^^^^^
+Error: Block indices do not support [@@flatten_floats] records.
 |}]
 
 let bad_fr_f () = (.fr.#f)
@@ -209,7 +217,7 @@ let bad_fr_f () = (.fr.#f)
 Line 1, characters 20-22:
 1 | let bad_fr_f () = (.fr.#f)
                         ^^
-Error: Block indices do not support float records.
+Error: Block indices do not support [@@flatten_floats] records.
 |}]
 
 let bad_fr () = (.fr)
@@ -217,7 +225,7 @@ let bad_fr () = (.fr)
 Line 1, characters 18-20:
 1 | let bad_fr () = (.fr)
                       ^^
-Error: Block indices do not support float records.
+Error: Block indices do not support [@@flatten_floats] records.
 |}]
 
 type t = { f : float# } [@@represent_as_float_array]
@@ -233,16 +241,18 @@ Error: Block indices do not support [@@represent_as_float_array] records.
 type t = { f : float; f' : float# } [@@flatten_floats]
 let bad_f () = (.f)
 [%%expect{|
->> Fatal error: Typedecl.remove_unboxed_versions
-Uncaught exception: Misc.Fatal_error
-
+type t = { f : float; f' : float#; }
+Line 2, characters 17-18:
+2 | let bad_f () = (.f)
+                     ^
+Error: Block indices do not support [@@flatten_floats] records.
 |}]
 let bad_f' () = (.f')
 [%%expect{|
 Line 1, characters 18-20:
 1 | let bad_f' () = (.f')
                       ^^
-Error: Unbound record field "f'"
+Error: Block indices do not support [@@flatten_floats] records.
 |}]
 
 (***************)

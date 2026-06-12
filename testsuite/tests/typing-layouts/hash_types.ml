@@ -220,9 +220,12 @@ Hint: Float records don't get unboxed versions.
 type r = { f : float ; f2 : float# } [@@flatten_floats]
 type bad = r#
 [%%expect{|
->> Fatal error: Typedecl.remove_unboxed_versions
-Uncaught exception: Misc.Fatal_error
-
+type r = { f : float; f2 : float#; }
+Line 2, characters 11-13:
+2 | type bad = r#
+               ^^
+Error: The type "r" has no unboxed version.
+Hint: Records with [@@flatten_floats] don't get unboxed versions.
 |}]
 type r = { i : int } [@@unboxed]
 type bad = r#

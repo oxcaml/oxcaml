@@ -2092,6 +2092,12 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           { tag = Tag.Scannable.create_exn runtime_tag;
             length = Target_ocaml_int.of_int machine_width num_fields
           }
+      | Record_inlined (_, shape, Variant_extensible)
+        when not (Mixed_product_bytes.types_shape_is_all_value shape) ->
+        (* CR layouts v5.9: support this *)
+        Misc.fatal_error
+          "Pduprecord: mixed inlined records are not supported for extensible \
+           variants"
       | Record_inlined (_, shape, _)
         when not (Mixed_product_bytes.types_shape_is_all_value shape) ->
         Mixed

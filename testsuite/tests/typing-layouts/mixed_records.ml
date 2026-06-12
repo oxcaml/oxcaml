@@ -34,9 +34,7 @@ type t =
   } [@@flatten_floats]
 
 [%%expect{|
->> Fatal error: Typedecl.remove_unboxed_versions
-Uncaught exception: Misc.Fatal_error
-
+type t = { a : float; b : float#; }
 |}];;
 
 type t =
@@ -45,15 +43,17 @@ type t =
   } [@@flatten_floats]
 
 [%%expect{|
->> Fatal error: Typedecl.remove_unboxed_versions
-Uncaught exception: Misc.Fatal_error
-
+type t = { a : float#; b : float; }
 |}];;
 
 (* [@@flatten_floats] records don't get unboxed versions. *)
 type bad = t#
 [%%expect{|
-type bad = t#
+Line 1, characters 11-13:
+1 | type bad = t#
+               ^^
+Error: The type "t" has no unboxed version.
+Hint: Records with [@@flatten_floats] don't get unboxed versions.
 |}]
 
 (* A mismatch in [@@flatten_floats] is caught in the representation check*)
@@ -63,9 +63,21 @@ end = struct
   type t = { a : float; b : float#; }
 end
 [%%expect{|
->> Fatal error: Typedecl.remove_unboxed_versions
-Uncaught exception: Misc.Fatal_error
-
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = { a : float; b : float#; }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = { a : float; b : float#; } end
+       is not included in
+         sig type t = { a : float; b : float#; } end
+       Type declarations do not match:
+         type t = { a : float; b : float#; }
+       is not included in
+         type t = { a : float; b : float#; }
+       Their internal representations differ:
+       the second declaration uses a mixed representation where boxed floats are stored flat.
 |}]
 
 module M : sig
@@ -74,9 +86,21 @@ end = struct
   type t = { a : float; b : float#; } [@@flatten_floats]
 end
 [%%expect{|
->> Fatal error: Typedecl.remove_unboxed_versions
-Uncaught exception: Misc.Fatal_error
-
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = { a : float; b : float#; } [@@flatten_floats]
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = { a : float; b : float#; } end
+       is not included in
+         sig type t = { a : float; b : float#; } end
+       Type declarations do not match:
+         type t = { a : float; b : float#; }
+       is not included in
+         type t = { a : float; b : float#; }
+       Their internal representations differ:
+       the first declaration uses a mixed representation where boxed floats are stored flat.
 |}]
 
 (* [@@flatten_floats] is rejected on records that don't mix [float] and
@@ -127,9 +151,8 @@ Error: The "[@@flatten_floats]" attribute is only allowed on records with one or
 type r = { f : float; u : float# } [@@flatten_floats]
 external id : r -> r = "%identity"
 [%%expect{|
->> Fatal error: Typedecl.remove_unboxed_versions
-Uncaught exception: Misc.Fatal_error
-
+type r = { f : float; u : float#; }
+external id : r -> r = "%identity"
 |}];;
 
 (* When a non-float/float# field appears, [float]
@@ -187,9 +210,7 @@ type t =
   } [@@flatten_floats]
 
 [%%expect{|
->> Fatal error: Typedecl.remove_unboxed_versions
-Uncaught exception: Misc.Fatal_error
-
+type t = { f1 : float#; f2 : float#; f3 : float; }
 |}];;
 
 (* The string [f3] can't appear in the flat suffix, thus it will be moved
@@ -335,9 +356,23 @@ end = struct
   let t = { u = 3.0; f = #4.0 }
 end
 [%%expect {|
->> Fatal error: Typedecl.remove_unboxed_versions
-Uncaught exception: Misc.Fatal_error
-
+Lines 5-9, characters 6-3:
+5 | ......struct
+6 |   type u = float
+7 |   type t = { u : float; f : float# } [@@flatten_floats]
+8 |   let t = { u = 3.0; f = #4.0 }
+9 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type u = float type t = { u : float; f : float#; } val t : t end
+       is not included in
+         sig type u type t = { u : u; f : float#; } val t : t end
+       Type declarations do not match:
+         type t = { u : float; f : float#; }
+       is not included in
+         type t = { u : u; f : float#; }
+       Their internal representations differ:
+       the first declaration uses a mixed representation where boxed floats are stored flat.
 |}]
 
 (* There is a cap on the number of fields in the scannable prefix. *)
@@ -446,9 +481,7 @@ type t =
     u : unit#;
   } [@@flatten_floats]
 [%%expect{|
->> Fatal error: Typedecl.remove_unboxed_versions
-Uncaught exception: Misc.Fatal_error
-
+type t = { a : float#; b : float; u : unit#; }
 |}];;
 
 (* product of voids not counted as void *)

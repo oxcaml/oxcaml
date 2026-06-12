@@ -947,6 +947,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       Array.for_all mixed_block_element_is_empty shape
     and mixed_block_element_is_empty (element : mixed_block_element) =
       match element with
+      | Void -> true
       | Product shape -> mixed_block_shape_is_empty shape
       | _ -> false
     in

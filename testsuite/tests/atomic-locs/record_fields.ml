@@ -235,8 +235,8 @@ end
        (function {nlocal = 0} param : int
          (if (%eq (field_imm 0 param) A) (atomic_load_field_imm param 1) 0))
      *match* =[value<int>]
-       (if (%eq (apply test (makemutable 0 (?,value_or_null<int>) A 42)) 42)
-         0 (raise (makeblock 0 (getpredef Assert_failure!!) [0: "" 11 11]))))
+       (if (%eq (apply test (makemutable 0 (?,value<int>) A 42)) 42) 0
+         (raise (makeblock 0 (getpredef Assert_failure!!) [0: "" 11 11]))))
     (makeblock 0 A test)))
 module Extension_with_inline_record :
   sig
@@ -270,7 +270,7 @@ represented as a flat float array.
          (makefloatblock Mutable x y))
      mk_t =
        (function {nlocal = 0} x[value<float>] y[value<float>]
-         (makemutable 0 x y))
+         (makemutable 0 (value<float>,value<float>) x y))
      get = (function {nlocal = 0} v : float (atomic_load_field_ptr v 1)))
     (makeblock 0 mk_flat mk_t get)))
 

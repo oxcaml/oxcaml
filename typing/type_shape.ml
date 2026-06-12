@@ -383,12 +383,15 @@ module Type_shape = struct
 end
 
 module Type_decl_shape = struct
-  let rec mixed_block_element_is_all_value = function
-    | Types.Scannable _ | Types.Void -> true
-    | Types.Product elts -> Array.for_all mixed_block_element_is_all_value elts
-    | Types.Float_boxed | Types.Float64 | Types.Float32 | Types.Bits8
-    | Types.Bits16 | Types.Bits32 | Types.Bits64 | Types.Untagged_immediate
-    | Types.Vec128 | Types.Vec256 | Types.Vec512 | Types.Word ->
+  let mixed_block_element_is_all_value = function
+    (* Note that [Void] and [Product] elements do not occupy exactly one word
+       at runtime, so records containing them need the per-field layouts of
+       [Record_mixed] for the debugger to compute field offsets. *)
+    | Types.Scannable _ -> true
+    | Types.Void | Types.Product _ | Types.Float_boxed | Types.Float64
+    | Types.Float32 | Types.Bits8 | Types.Bits16 | Types.Bits32 | Types.Bits64
+    | Types.Untagged_immediate | Types.Vec128 | Types.Vec256 | Types.Vec512
+    | Types.Word ->
       false
 
   let mixed_block_shape_is_all_value shape =

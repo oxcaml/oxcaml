@@ -10,9 +10,8 @@ type t = { flt : float; uflt : float# } [@@flatten_floats]
 let t = { flt = 4.0; uflt = #5.0 }
 
 [%%expect {|
->> Fatal error: Typedecl.remove_unboxed_versions
-Uncaught exception: Misc.Fatal_error
-
+type t = { flt : float; uflt : float#; }
+val t : t = {flt = 4.; uflt = <abstr>}
 |}];;
 
 (* Non-empty value prefix *)

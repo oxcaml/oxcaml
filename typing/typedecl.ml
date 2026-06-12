@@ -1320,7 +1320,8 @@ let record_gets_unboxed_version lbls repr =
   not (record_has_atomic_field lbls) &&
   match repr with
   | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
-  | Record_boxed _ | Record_variable -> true
+  | Record_boxed shape -> not (shape_has_float_boxed shape)
+  | Record_variable -> true
   | Record_dummy { represent_as_float_array; flatten_floats } ->
     not represent_as_float_array && not flatten_floats
 
