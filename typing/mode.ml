@@ -5393,6 +5393,8 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let to_const_exn m = S.to_const_exn obj m
 
+  let to_of_const_exn m = S.to_of_const_exn obj m
+
   let unhint = S.Unhint.unhint
 
   let hint ?hint = S.Unhint.hint obj ?hint
@@ -5494,6 +5496,8 @@ module Monadic_gen (Obj : Obj) = struct
    fun ?hint a -> S.of_const ?hint obj a
 
   let to_const_exn m = S.to_const_exn obj m
+
+  let to_of_const_exn m = S.to_of_const_exn obj m
 
   let unhint = S.Unhint.unhint
 
@@ -6197,6 +6201,12 @@ module Value_with (Areality : Areality) = struct
     let comonadic = Comonadic.to_const_exn comonadic in
     let monadic = Monadic.to_const_exn monadic in
     { comonadic; monadic } |> merge
+
+  let to_of_const_exn m =
+    let { comonadic; monadic } = m in
+    let comonadic = Comonadic.to_of_const_exn comonadic in
+    let monadic = Monadic.to_of_const_exn monadic in
+    { comonadic; monadic }
 
   let unhint { monadic; comonadic } =
     let comonadic = Comonadic.unhint comonadic in
