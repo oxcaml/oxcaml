@@ -437,8 +437,8 @@ type t = A of int | B of string | C of string | D of string
           case tag 0:
            (switch t2/0
             case tag 0:
-             (apply (field_imm 8 (global Stdlib__Int!)) (field_imm 0 t1/0)
-               (field_imm 0 t2/0))
+             (apply[unyielding] (field_imm 8 (global Stdlib__Int!))
+               (field_imm 0 t1/0) (field_imm 0 t2/0))
             default: -1)
           case tag 1:
            (catch
@@ -529,7 +529,7 @@ let check_results r1 r2 =
                                        value<
                                         (consts ()) (non_consts ([1: ?]
                                          [0: ?]))>]))>]
-            (apply r1/0 r2/0))
+            (apply[unyielding] r1/0 r2/0))
          (catch
            (catch
              (let (r/2 =a? (field_imm 0 *match*/16))
