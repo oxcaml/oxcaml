@@ -344,3 +344,36 @@ Line 7, characters 12-15:
                 ^^^
 
 |}]
+
+(* A module bound by aliasing shares the aliased module's entry, so the
+   reachable entries form a DAG. The analysis walks it without exponential
+   blow-up while still tracking the shared value precisely: the two paths to
+   the same component conflict. *)
+let shared_alias () =
+  let module A = struct let x = "foo" end in
+  let module B = struct module P = A module Q = A end in
+  unique_id B.P.x;
+  unique_id B.Q.x
+[%%expect{|
+Line 5, characters 12-17:
+5 |   unique_id B.Q.x
+                ^^^^^
+Error: This value is used here, but it has already been used as unique at:
+Line 4, characters 12-17:
+4 |   unique_id B.P.x;
+                ^^^^^
+
+|}]
+
+(* The same shared structure at the top level, which exercises the export
+   marking over the shared DAG. *)
+module Dag0 = struct let x = "foo" end
+module Dag1 = struct module X = Dag0 module Y = Dag0 end
+module Dag2 = struct module X = Dag1 module Y = Dag1 end
+module Dag3 = struct module X = Dag2 module Y = Dag2 end
+[%%expect{|
+module Dag0 : sig val x : string end
+module Dag1 : sig module X = Dag0 module Y = Dag0 end
+module Dag2 : sig module X = Dag1 module Y = Dag1 end
+module Dag3 : sig module X = Dag2 module Y = Dag2 end
+|}]

@@ -1974,12 +1974,26 @@ end = struct
           t0.components t1.components
     }
 
-  let rec mark_all f t =
-    UF.pars
-      (f t.paths
-      :: List.map
-           (fun (_, entry) -> mark_all f entry)
-           (String_map.bindings t.components))
+  let mark_all f t =
+    (* A module bound by aliasing (e.g. [module X = A]) shares the whole
+       [Entry.t] of the aliased module by reference, so the entries reachable
+       from [t] form a DAG, not a tree. Memoize by physical identity to visit
+       each shared entry once; otherwise [n] nested aliasing modules cost
+       [2^n]. *)
+    let visited = ref [] in
+    let rec go t =
+      if List.memq t !visited
+      then UF.unused
+      else begin
+        visited := t :: !visited;
+        UF.pars
+          (f t.paths
+          :: List.map
+               (fun (_, entry) -> go entry)
+               (String_map.bindings t.components))
+      end
+    in
+    go t
 
   let rec print ppf t =
     let module M = Print_utils.Map (String_map) in
