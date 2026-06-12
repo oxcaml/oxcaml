@@ -586,7 +586,13 @@ let mode_return mode =
     inside the region. *)
 let mode_region ?region mode =
   let hint = Option.map (fun x -> Hint.Escape_region x) region in
-  { (mode_default (mode |> value_r2g |> meet_regional ?hint)) with
+  let body_mode =
+    mode
+    |> value_to_alloc_r2g
+    |> alloc_as_value
+    |> meet_regional ?hint
+  in
+  { (mode_default body_mode) with
     position =
       RTail (Regionality.disallow_left
         (Value.proj_comonadic Areality mode), FNontail);
@@ -654,7 +660,15 @@ let mode_lazy expected_mode =
   expected_mode, closure_mode
 
 let mode_partial_application expected_mode =
-  mode_morph (value_r2g ~hint:Captured_by_partial_application) expected_mode
+  let allocation : Hint.allocation =
+    {loc = Location.none; txt = Captured_by_partial_application}
+  in
+  mode_morph
+    (fun mode ->
+       mode
+       |> value_to_alloc_r2g ~allocation
+       |> alloc_as_value ~allocation)
+    expected_mode
 
 let mode_trywith expected_mode =
   { expected_mode with position = RNontail }
@@ -757,10 +771,13 @@ let register_allocation_value_mode ~loc
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
   let alloc_mode = value_to_alloc_r2g mode in
   register_allocation_mode alloc_mode;
+  (* We must apply each morphism separately so that their hints correspond to
+     the correct morphism *)
   let mode =
-    value_r2g ~hint:(Allocation_r {loc; txt = desc})
+    value_to_alloc_r2g ~allocation:({loc; txt = desc})
       (Mode.Value.disallow_left mode)
   in
+  let mode = alloc_as_value ~allocation:({loc; txt = desc}) mode in
   alloc_mode, mode
 
 (* Unlike most allocations, which can be the highest mode allowed by
@@ -769,13 +786,13 @@ let register_allocation_value_mode ~loc
    to one argument must be global. As a result, a function gets an
    [Alloc.lr] allocation mode that can be further constrained. *)
 let register_closure_allocation (mode : Value.r) ~loc : Alloc.lr * Value.r =
-  let hint = Hint.Allocation_r {loc; txt = Unknown} in
+  let allocation : Hint.allocation = {loc; txt = Unknown} in
   let (alloc_mode : Alloc.lr), _ =
-    Alloc.newvar_below (value_to_alloc_r2g ~hint mode)
+    Alloc.newvar_below (value_to_alloc_r2g ~allocation mode)
   in
   register_allocation_mode (Alloc.disallow_left alloc_mode);
   let closed_over_mode =
-    alloc_as_value ~hint:Skip (Alloc.disallow_left alloc_mode)
+    alloc_as_value ~allocation (Alloc.disallow_left alloc_mode)
   in
   alloc_mode, closed_over_mode
 

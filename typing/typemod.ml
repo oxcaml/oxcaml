@@ -114,14 +114,16 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   Value.submode_exn mode (max |> Alloc.of_const |> alloc_as_value);
   mode
 
-let register_allocation () : Alloc.lr * Value.lr =
+let register_allocation loc : Alloc.lr * Value.lr =
   let upper_bound =
     Alloc.of_const
       ~hint_comonadic:Module_allocated_on_heap
       { Alloc.Const.max with areality = Global }
   in
   let alloc_mode, _ = Alloc.newvar_below upper_bound in
-  let closed_over_mode = alloc_as_value ~hint:Skip alloc_mode in
+  let closed_over_mode =
+    alloc_as_value ~allocation:({loc; txt = Unknown}) alloc_mode
+  in
   alloc_mode, closed_over_mode
 
 open Typedtree
@@ -3153,7 +3155,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
       let alloc_mode, closed_over_mode =
-        register_allocation ()
+        register_allocation sbody.pmod_loc
       in
       let newenv =
         Env.add_closure_lock
@@ -3614,8 +3616,8 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
   (* CR implicit-types: implement implicit variable jkinds in structures. *)
   let env = Env.clear_implicit_jkinds env in
   let names = Signature_names.create () in
-  let _, md_mode = register_allocation () in
   let loc_md = location_of_structure sstr in
+  let _, md_mode = register_allocation loc_md in
 
   let type_str_include ~loc env shape_map sincl sig_acc =
     let smodl = sincl.pincl_mod in
@@ -4274,7 +4276,7 @@ let type_package env m p fl =
       with Ctype.Unify _ ->
         raise (Error(modl.mod_loc, env, Scoping_pack (n,ty))))
     fl';
-  let _, mode = register_allocation () in
+  let _, mode = register_allocation modl.mod_loc in
   let modl =
     wrap_constraint_package env true modl mty mode Tmodtype_implicit
   in

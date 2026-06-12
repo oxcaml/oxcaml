@@ -847,26 +847,19 @@ module type S = sig
 
   (** Similar to [locality_as_regionality], behaves as identity on other axes *)
   val alloc_as_value :
-    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Alloc.t -> ('l * 'r) Value.t
+    ?allocation:Hint.allocation -> ('l * 'r) Alloc.t -> ('l * 'r) Value.t
 
   (** Similar to [local_to_regional], behaves as identity in other axes *)
   val alloc_to_value_l2r : ('l * 'r) Alloc.t -> ('l * disallowed) Value.t
 
   (** Similar to [regional_to_local], behaves as identity on other axes *)
-  val value_to_alloc_r2l :
-    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
+  val value_to_alloc_r2l : ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   (** Similar to [regional_to_global], behaves as identity on other axes *)
   val value_to_alloc_r2g :
-    ?hint:(disallowed * 'r) Hint.morph ->
+    ?allocation:Hint.allocation ->
     ('l * 'r) Value.t ->
     (disallowed * 'r) Alloc.t
-
-  (** Similar to [value_to_alloc_r2g], but followed by [alloc_as_value]. *)
-  val value_r2g :
-    ?hint:(disallowed * 'r) Hint.morph ->
-    ('l * 'r) Value.t ->
-    (disallowed * 'r) Value.t
 
   module Modality : sig
     module Comonadic : sig
