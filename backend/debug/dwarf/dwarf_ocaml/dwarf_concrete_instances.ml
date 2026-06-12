@@ -95,12 +95,13 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
     Dwarf_variables_and_parameters.build_proto_dies_for_vars
       available_ranges_all_vars
   in
+  let vars_at_entry = Dwarf_variables_and_parameters.vars_at_entry fundecl in
   let _inlined_frame_proto_dies =
     Profile.record "dwarf_inlined_frames"
       (fun () ->
         Dwarf_inlined_frames.dwarf state fundecl inlined_frame_ranges
           ~value_type_proto_die ~function_symbol:start_sym
-          ~function_proto_die:concrete_instance_proto_die
+          ~function_proto_die:concrete_instance_proto_die ~vars_at_entry
           ~available_ranges_all_vars ~proto_dies_for_vars ~fun_end_label)
       ~accumulate:true ()
   in
@@ -114,14 +115,14 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
           ~function_symbol:start_sym
           ~function_proto_die:concrete_instance_proto_die ~proto_dies_for_vars
           ~which_vars:Dwarf_variables_and_parameters.All_remaining_vars
-          ~fun_end_label available_ranges_all_vars)
+          ~vars_at_entry ~fun_end_label available_ranges_all_vars)
       ~accumulate:true ();
     Profile.record "dwarf_rvalue_dies"
       (fun () ->
         Dwarf_variables_and_parameters.dwarf_rvalue_dies state
           ~value_type_proto_die ~function_symbol:start_sym
           ~function_proto_die:concrete_instance_proto_die ~proto_dies_for_vars
-          ~fun_end_label available_ranges_all_vars)
+          ~vars_at_entry ~fun_end_label available_ranges_all_vars)
       ~accumulate:true ());
   if not !Dwarf_flags.restrict_to_upstream_dwarf
   then

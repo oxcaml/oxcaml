@@ -1563,9 +1563,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               loc_arg.(!loc_arg_index + index))
         in
         loc_arg_index := !loc_arg_index + num_regs_for_arg;
-        (* The naming operation is inserted even when [provenance] is [None],
-           in which case no named variable will be visible in the debugger
-           (such variables only receive hidden, artificial DIEs). The register
+        (* The naming operation is inserted even when [provenance] is [None], in
+           which case no named variable will be visible in the debugger (such
+           variables only receive hidden, artificial DIEs). The register
            availability information arising from the naming operation is
            nonetheless used when generating DWARF call site information -- in
            particular entry values, including for compiler-generated functions

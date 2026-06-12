@@ -48,6 +48,15 @@ type which_vars =
           [Inlined_frame_ranges]. *)
   | All_remaining_vars
 
+(** The variables associated, at the entry point of the given function, with the
+    locations in which the function's parameters arrived. This computation
+    distinguishes the function's own parameters from parameters of other
+    functions (for example inlined functions, or functions arising from
+    optional-argument elaboration) being described in the function's DWARF: only
+    the former may be described using entry values, or listed as the function's
+    formal parameters. *)
+val vars_at_entry : Linear.fundecl -> Backend_var.Set.t
+
 val dwarf :
   Dwarf_state.t ->
   value_type_proto_die:Proto_die.t ->
@@ -55,6 +64,7 @@ val dwarf :
   function_proto_die:Proto_die.t ->
   proto_dies_for_vars:proto_dies_for_vars ->
   which_vars:which_vars ->
+  vars_at_entry:Backend_var.Set.t ->
   fun_end_label:Asm_targets.Asm_label.t ->
   Available_ranges_all_vars.t ->
   unit
@@ -70,6 +80,7 @@ val dwarf_rvalue_dies :
   function_symbol:Asm_targets.Asm_symbol.t ->
   function_proto_die:Proto_die.t ->
   proto_dies_for_vars:proto_dies_for_vars ->
+  vars_at_entry:Backend_var.Set.t ->
   fun_end_label:Asm_targets.Asm_label.t ->
   Available_ranges_all_vars.t ->
   unit

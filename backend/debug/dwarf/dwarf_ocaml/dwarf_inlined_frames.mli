@@ -38,6 +38,7 @@ val dwarf :
   value_type_proto_die:Proto_die.t option ->
   function_symbol:Asm_targets.Asm_symbol.t ->
   function_proto_die:Proto_die.t ->
+  vars_at_entry:Backend_var.Set.t ->
   available_ranges_all_vars:Available_ranges_all_vars.t ->
   proto_dies_for_vars:Dwarf_variables_and_parameters.proto_dies_for_vars ->
   fun_end_label:Asm_targets.Asm_label.t ->
