@@ -312,5 +312,12 @@ let consume_unique_then_read_alias () =
   unique_id (module M : s);
   ignore y
 [%%expect{|
-val consume_unique_then_read_alias : unit -> unit = <fun>
+Line 5, characters 9-10:
+5 |   ignore y
+             ^
+Error: This value is used here, but it has already been used as unique at:
+Line 4, characters 20-21:
+4 |   unique_id (module M : s);
+                        ^
+
 |}]

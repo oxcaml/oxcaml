@@ -1801,6 +1801,12 @@ module Value : sig
   (** Mark the value as aliased_or_unique *)
   val mark_maybe_unique : t -> UF.t
 
+  (** [maybe_unique_marker t] composes the value's own [maybe_unique] usage on
+      arbitrary paths, or is [None] if the value is fresh (and so carries no
+      consumption mode). Used to consume a module's components at the same mode
+      as the module itself. *)
+  val maybe_unique_marker : t -> (Paths.t -> UF.t) option
+
   (** Mark the value's memory address as aliased_or_unique *)
   val mark_consumed_memory_address : t -> UF.t
 
@@ -1860,6 +1866,15 @@ end = struct
       Paths.mark
         (Usage.maybe_unique unique_use occ)
         Learned_tags.empty Overwrites.empty paths
+
+  let maybe_unique_marker = function
+    | Fresh -> None
+    | Existing { unique_use; occ; _ } ->
+      Some
+        (fun paths ->
+          Paths.mark
+            (Usage.maybe_unique unique_use occ)
+            Learned_tags.empty Overwrites.empty paths)
 
   let mark_consumed_memory_address = function
     | Fresh -> UF.unused
@@ -2501,16 +2516,22 @@ let entry_of_mod_value { mod_root; mod_components } =
   Entry.module_ paths mod_components
 
 (** Marks a module value as consumed (e.g. packed, or passed to a functor): the
-    module itself is used at its [unique_use], and all of its statically-known
-    components are used as aliased, since the consumer obtains references to
-    them. *)
+    module itself is used at its [unique_use], and so are its statically-known
+    components, since the consumer obtains references to them. Consuming the
+    module uniquely thus consumes its components uniquely (the consumer may
+    overwrite them); when the module's mode is unknown (a fresh root, e.g. a
+    structure literal), the components are conservatively marked aliased. *)
 let consume_mod_value ~loc mv =
   let uf_root = Value.mark_maybe_unique mv.mod_root in
   let occ = Occurrence.mk loc in
+  let mark_component =
+    match Value.maybe_unique_marker mv.mod_root with
+    | Some mark -> mark
+    | None -> fun paths -> Paths.mark_aliased occ Forced paths
+  in
   let uf_components =
     List.map
-      (fun (_, entry) ->
-        Entry.mark_all (fun paths -> Paths.mark_aliased occ Forced paths) entry)
+      (fun (_, entry) -> Entry.mark_all mark_component entry)
       (String_map.bindings mv.mod_components)
   in
   UF.pars (uf_root :: uf_components)
