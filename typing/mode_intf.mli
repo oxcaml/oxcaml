@@ -205,6 +205,9 @@ module type Common_axis = sig
   type 'd hint_const constraint 'd = 'l * 'r
 
   val of_const : ?hint:'d hint_const -> Const.t -> 'd t
+
+  (** Extract the constant of an already-constant mode, crashing otherwise. *)
+  val to_const_exn : lr -> Const.t
 end
 
 module type Axis = sig

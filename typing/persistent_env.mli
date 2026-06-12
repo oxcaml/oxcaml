@@ -95,8 +95,14 @@ type address =
   | Alocal of Ident.t
   | Adot of address * Types.module_representation * int
 
+(* The mode of a compilation unit: legacy on every axis, with the given
+   staticity. *)
+(* CR-soon zqian: all persistent modules should always be [Static], at which
+   point the [staticity] parameter can be removed. *)
+val mode_unit : staticity:Mode.Staticity.Const.t -> Mode.Value.lr
+
 type 'a sig_reader =
-  Subst.Lazy.persistent_signature
+  Allowance.left_only Subst.Lazy.persistent_signature
   -> Global_module.Name.t
   -> Shape.Uid.t
   -> shape:Shape.t
@@ -105,7 +111,7 @@ type 'a sig_reader =
   -> 'a
 
 val read : 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
-  -> Subst.Lazy.persistent_signature
+  -> Allowance.left_only Subst.Lazy.persistent_signature
 val find : allow_hidden:bool -> 'a t -> 'a sig_reader
   -> Global_module.Name.t -> allow_excess_args:bool -> 'a
 
@@ -154,7 +160,7 @@ val normalize_global_name : 'a t -> Global_module.Name.t -> Global_module.Name.t
 val make_cmi : 'a t
   -> Compilation_unit.Name.t
   -> Cmi_format.kind
-  -> Subst.Lazy.persistent_signature
+  -> Allowance.both Subst.Lazy.persistent_signature
   -> alerts
   -> Cmi_format.cmi_infos_lazy
 
