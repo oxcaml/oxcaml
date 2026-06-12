@@ -75,7 +75,7 @@ let update_lazy_prim =
 
 (* Simple blocks *)
 type block_size =
-  | Shape of Lambda.mixed_block_shape
+  | Shape of Lambda.block_shape
   | Float_record of int
   | Lazy_block
 
@@ -952,7 +952,7 @@ let compile_alloc size =
       alloc alloc_prim [all_value_mixed_block_size shape]
     else if !Clflags.native_code then
       let shape =
-        Mixed_block_shape.of_mixed_block_elements
+        Mixed_block_shape.of_block_elements
           ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
           shape
       in

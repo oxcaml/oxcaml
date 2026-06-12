@@ -214,7 +214,7 @@ let static_cast ~src ~dst x =
     a mutable field would alias the original, causing mutations via set_idx to
     affect both. *)
 let copy_unboxed_product shape ~path expr =
-  let rec copy_element (elt : _ Lambda.mixed_block_element) expr =
+  let rec copy_element (elt : _ Lambda.block_element) expr =
     match elt with
     | Product elements ->
       (* Bind expr to a variable so it's only evaluated once *)
@@ -232,7 +232,7 @@ let copy_unboxed_product shape ~path expr =
       expr
     | Splice_variable var -> Lambda.fatal_error_unevaluated_splice_var var
   in
-  copy_element (Lambda.project_from_mixed_block_shape shape ~path) expr
+  copy_element (Lambda.project_from_block_shape shape ~path) expr
 
 let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
   let comp_fun ({ params; body; loc = _ } as lfunction : Lambda.lfunction) :

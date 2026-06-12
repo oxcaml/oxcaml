@@ -132,7 +132,7 @@ type primitive =
   | Pgetglobal of Compilation_unit.t * staticity
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
-  | Pmakeblock of int * mutable_flag * mixed_block_shape * locality_mode
+  | Pmakeblock of int * mutable_flag * block_shape * locality_mode
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
   | Pmakelazyblock of lazy_block_tag
@@ -156,12 +156,12 @@ type primitive =
       (* the [layout list] is the layout of the whole product *)
   | Parray_element_size_in_bytes of array_kind
   (* Block indices *)
-  | Pmake_idx_field of mixed_block_shape * int * int list
-    (** The lone int is the index into the mixed_block_shape, the int list is
-        the path into that mixed_block_element *)
+  | Pmake_idx_field of block_shape * int * int list
+    (** The lone int is the index into the block_shape, the int list is
+        the path into that block_element *)
   | Pmake_idx_array of
-      array_kind * array_index_kind * unit mixed_block_element * int list
-  | Pidx_deepen of unit mixed_block_element * int list
+      array_kind * array_index_kind * unit block_element * int list
+  | Pidx_deepen of unit block_element * int list
   (* Context switches *)
   | Pwith_stack
   | Pwith_stack_bind
@@ -515,7 +515,7 @@ and value_kind_non_null =
   | Pboxedintval of boxed_integer
   | Pvariant of {
       consts : int list;
-      non_consts : (int * mixed_block_shape) list;
+      non_consts : (int * block_shape) list;
       (** [non_consts] must be non-empty.  For constant variants [Pintval]
           must be used.  This causes a small loss of precision but it is not
           expected to be significant. *)
@@ -535,7 +535,7 @@ and layout =
   | Pbottom
   | Psplicevar of Ident.t
 
-and 'a mixed_block_element =
+and 'a block_element =
   | Value of value_kind
   | Float_boxed of 'a
   | Float64
@@ -549,12 +549,12 @@ and 'a mixed_block_element =
   | Vec512
   | Word
   | Untagged_immediate
-  | Product of 'a mixed_block_element array
+  | Product of 'a block_element array
   | Splice_variable of Ident.t
 
-and mixed_block_shape = unit mixed_block_element array
+and block_shape = unit block_element array
 
-and mixed_block_shape_with_locality_mode = locality_mode mixed_block_element array
+and block_shape_with_locality_mode = locality_mode block_element array
 
 and unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64
@@ -589,7 +589,7 @@ and boxed_vector = Primitive.boxed_vector =
 
 and 'a field_shape =
   | All_value of immediate_or_pointer
-  | Shape of 'a mixed_block_element array
+  | Shape of 'a block_element array
 
 and peek_or_poke =
   | Ppp_tagged_immediate
@@ -652,7 +652,7 @@ val extern_repr_involves_unboxed_products : extern_repr -> bool
 
 type structured_constant =
     Const_base of constant
-  | Const_block of int * mixed_block_shape * structured_constant list
+  | Const_block of int * block_shape * structured_constant list
   | Const_float_array of string list
   | Const_immstring of string
   | Const_float_block of string list
@@ -1045,7 +1045,7 @@ type runtime_param =
                                              there are no other parameters) *)
 
 type module_representation =
-  mixed_block_shape * mixed_block_shape_with_locality_mode
+  block_shape * block_shape_with_locality_mode
   (* The module contains both values and unboxed elements. We have two shapes:
      one for allocating (used by [block_of_module_representation]) and one for
      reading (used by [mod_field]). This will be cleaned up after we add
@@ -1190,8 +1190,8 @@ val layout_unboxed_product : layout list -> layout
 val layout_top : layout
 val layout_bottom : layout
 
-val mixed_block_element_for_module : unit mixed_block_element
-val mixed_block_element_with_locality_mode_for_module : locality_mode mixed_block_element
+val block_element_for_module : unit block_element
+val block_element_with_locality_mode_for_module : locality_mode block_element
 
 
 (** [dummy_constant] produces a placeholder value with a recognizable
@@ -1271,19 +1271,19 @@ val value_kind_of_pointerness : immediate_or_pointer -> value_kind_non_null
 val pointerness_of_separability
   : Jkind_axis.Separability.t -> immediate_or_pointer
 
-val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
+val transl_mixed_product_shape : Types.mixed_product_shape -> block_shape
 
-val block_shape_of_value_kinds : value_kind list -> 'a mixed_block_element array
-val block_shape_of_generic_values : int -> 'a mixed_block_element array
+val block_shape_of_value_kinds : value_kind list -> 'a block_element array
+val block_shape_of_generic_values : int -> 'a block_element array
 
 (* Returns whether the block shape represents a block containing only values.
    Errors if there's a splice variable *)
-val is_uniform_block_shape : mixed_block_shape -> bool
+val is_uniform_block_shape : block_shape -> bool
 
 val transl_mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)
   -> Types.mixed_product_shape
-  -> 'a mixed_block_element array
+  -> 'a block_element array
 
 val transl_module_representation :
   Types.module_representation -> module_representation
@@ -1400,12 +1400,12 @@ val mod_field:
 
 val structured_constant_layout : structured_constant -> layout
 
-val mixed_block_element_of_layout : layout -> 'a mixed_block_element
+val block_element_of_layout : layout -> 'a block_element
 
 (** Returns the element at the given path in a mixed block shape.
     The path is a list of field indices for navigating into nested products. *)
-val project_from_mixed_block_shape
-  : 'a mixed_block_element array -> path:int list -> 'a mixed_block_element
+val project_from_block_shape
+  : 'a block_element array -> path:int list -> 'a block_element
 
 (** [Immediate] if a type of [scannable] jkind is GC-ignorable based on its
     provided externality, and [Pointer] otherwise. *)
@@ -1414,14 +1414,14 @@ val pointerness_of_scannable_with_externality
 
 (* Translates [Float_boxed] as [Punboxed_float Unboxed_float64], for
    compatibility with block indices. *)
-val layout_of_mixed_block_element_for_idx_set
-  : Jkind_axis.Externality.t -> _ mixed_block_element -> layout
+val layout_of_block_element_for_idx_set
+  : Jkind_axis.Externality.t -> _ block_element -> layout
 
-val mixed_block_element_leaves
-  : 'a mixed_block_element -> 'a mixed_block_element list
+val block_element_leaves
+  : 'a block_element -> 'a block_element list
 
 (** Whether there exists a non-value before a value *)
-val will_be_reordered : _ mixed_block_element -> bool
+val will_be_reordered : _ block_element -> bool
 
 val primitive_result_layout : primitive -> layout
 

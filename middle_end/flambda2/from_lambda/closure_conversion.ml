@@ -238,7 +238,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     register_const acc dbg const "const_block"
   | Const_block (tag, shape, args) ->
     let shape =
-      Mixed_block_shape.of_mixed_block_elements
+      Mixed_block_shape.of_block_elements
         ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
         shape
     in
@@ -287,12 +287,12 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
           | Float_boxed _ -> unbox_float_constant arg)
         args
     in
-    let mixed_block_shape : K.Scannable_block_shape.t =
+    let block_shape : K.Scannable_block_shape.t =
       match K.Scannable_block_shape.from_mixed_block_shape shape with
       | Value_only ->
         (* See Note [Constant all-value mixed records] in translcore.ml *)
         Misc.fatal_error "Const_block: from_block_shape returned Value_only"
-      | Mixed_record _ as mixed_block_shape -> mixed_block_shape
+      | Mixed_record _ as block_shape -> block_shape
     in
     let acc, fields =
       List.fold_left_map
@@ -302,7 +302,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
         acc args
     in
     let const : SC.t =
-      SC.block (Tag.Scannable.create_exn tag) Immutable mixed_block_shape fields
+      SC.block (Tag.Scannable.create_exn tag) Immutable block_shape fields
     in
     register_const acc dbg const "const_mixed_block"
   | Const_null -> acc, reg_width RWC.const_null, "null"
@@ -1505,7 +1505,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
             ( Variadic (Make_block (block_kind, Immutable, alloc_mode), fields),
               dbg ) -> (
           (* CR mshinwell: split into a separate function *)
-          let tag, mixed_block_shape = P.Block_kind.to_shape block_kind in
+          let tag, block_shape = P.Block_kind.to_shape block_kind in
           let approxs =
             List.map (find_value_approximation body_env) fields |> Array.of_list
           in
@@ -1519,7 +1519,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
           match fields_kind with
           | Constant static_fields | Computed_static static_fields -> (
             let approx, static_const =
-              match mixed_block_shape with
+              match block_shape with
               | Scannable scannable_block_shape -> (
                 match Tag.Scannable.of_tag tag with
                 | Some tag ->
@@ -1540,7 +1540,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                     "Binding of %a to %a has yielded a tag %a which is not \
                      scannable, yet the block shape appears to be: %a"
                     Ident.print id Named.print defining_expr Tag.print tag
-                    Flambda_kind.Block_shape.print mixed_block_shape)
+                    Flambda_kind.Block_shape.print block_shape)
               | Float_record ->
                 let static_fields =
                   List.map
@@ -1615,7 +1615,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
             | Dynamic_block -> (* Handled in outer match *) assert false)
           | Dynamic_block ->
             let body_env =
-              match mixed_block_shape with
+              match block_shape with
               | Scannable scannable_block_shape -> (
                 match Tag.Scannable.of_tag tag with
                 | Some tag ->
@@ -1628,7 +1628,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                      which is not scannable, yet the block shape appears to \
                      be: %a"
                     Ident.print id Named.print defining_expr Tag.print tag
-                    Flambda_kind.Block_shape.print mixed_block_shape)
+                    Flambda_kind.Block_shape.print block_shape)
               | Float_record ->
                 (* No approximations for float records at the moment. *)
                 body_env
@@ -3884,18 +3884,17 @@ let bind_static_consts_and_code acc body =
         defining_expr ~body)
     (acc, body) components
 
-(* Returns a tuple [mixed_block_shape, field_count, block_access,
-   kind_of_field]. [block_access] and [kind_of_field] are function that take an
-   index [pos] and return the block_access/kind of the [pos]th field of the
-   module. "Fields" are physical, so unboxed products count as more than one
-   field when indexing and determining [field_count]. *)
+(* Returns a tuple [block_shape, field_count, block_access, kind_of_field].
+   [block_access] and [kind_of_field] are function that take an index [pos] and
+   return the block_access/kind of the [pos]th field of the module. "Fields" are
+   physical, so unboxed products count as more than one field when indexing and
+   determining [field_count]. *)
 let final_module_block_representation acc
     ~(module_repr : Lambda.module_representation) =
-  let (mixed_block_shape : K.Scannable_block_shape.t), block_access, field_count
-      =
+  let (block_shape : K.Scannable_block_shape.t), block_access, field_count =
     match module_repr with
     | shape, _ when Lambda.is_uniform_block_shape shape ->
-      let rec count_fields acc (elt : unit Lambda.mixed_block_element) =
+      let rec count_fields acc (elt : unit Lambda.block_element) =
         match elt with
         | Value _ -> acc + 1
         | Product elts -> Array.fold_left count_fields acc elts
@@ -3918,40 +3917,37 @@ let final_module_block_representation acc
       Value_only, block_access, field_count
     | shape, _ ->
       let shape =
-        K.Mixed_block_lambda_shape.of_mixed_block_elements shape
+        K.Mixed_block_lambda_shape.of_block_elements shape
           ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
       in
       let flattened_reordered_shape =
         K.Mixed_block_lambda_shape.flattened_reordered_shape shape
       in
-      let mixed_block_shape =
-        K.Scannable_block_shape.from_mixed_block_shape shape
-      in
+      let block_shape = K.Scannable_block_shape.from_mixed_block_shape shape in
       let field_count = Array.length flattened_reordered_shape in
       let block_access pos : P.Block_access_kind.t =
         Lambda_to_flambda_primitives_helpers
         .block_access_kind_of_mixed_field_element
-          ~tag:(Known Tag.Scannable.zero) ~size:Unknown
-          ~kind_shape:mixed_block_shape
+          ~tag:(Known Tag.Scannable.zero) ~size:Unknown ~kind_shape:block_shape
           flattened_reordered_shape.(pos)
       in
-      mixed_block_shape, block_access, field_count
+      block_shape, block_access, field_count
   in
   let kind_of_field =
-    match mixed_block_shape with
+    match block_shape with
     | Value_only -> fun _ -> K.value
     | Mixed_record shape ->
       let field_kinds = K.Mixed_block_shape.field_kinds shape in
       fun pos -> field_kinds.(pos)
   in
-  mixed_block_shape, field_count, block_access, kind_of_field
+  block_shape, field_count, block_access, kind_of_field
 
 let wrap_final_module_block acc env ~program ~prog_return_cont
     ~(module_repr : Lambda.module_representation) ~return_cont ~module_symbol =
   let module_block_var = Variable.create "module_block" K.value in
   let module_block_var_duid = Flambda_debug_uid.none in
   let module_block_tag = Tag.Scannable.zero in
-  let mixed_block_shape, field_count, block_access, kind_of_field =
+  let block_shape, field_count, block_access, kind_of_field =
     final_module_block_representation acc ~module_repr
   in
   let load_fields_body acc =
@@ -3981,8 +3977,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
               Simple.With_debuginfo.create (Simple.var var) Debuginfo.none)
             field_vars
         in
-        Static_const.block module_block_tag Immutable mixed_block_shape
-          field_vars
+        Static_const.block module_block_tag Immutable block_shape field_vars
       in
       let acc, apply_cont =
         (* Module initialisers return unit, but since that is taken care of

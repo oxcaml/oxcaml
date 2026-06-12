@@ -88,7 +88,7 @@ module Constr : sig
   type t = {
     tag : int;
     flag: Lambda.mutable_flag;
-    shape : mixed_block_shape;
+    shape : block_shape;
     before: lambda list;
     after: lambda list;
     loc : Debuginfo.Scoped_location.t;
@@ -121,7 +121,7 @@ end = struct
   type t = {
     tag : int;
     flag: Lambda.mutable_flag;
-    shape : mixed_block_shape;
+    shape : block_shape;
     before: lambda list;
     after: lambda list;
     loc : Debuginfo.Scoped_location.t;

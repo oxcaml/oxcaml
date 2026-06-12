@@ -118,11 +118,10 @@ let convert_init_or_assign (i_or_a : L.initialization_or_assignment) :
   | Root_initialization ->
     Misc.fatal_error "[Root_initialization] should not appear in Flambda input"
 
-let convert_block_shape ~machine_width (shape : L.mixed_block_shape) ~num_fields
-    =
+let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
   (* This function is only called for uniform block shapes. We flatten products
      of values into individual value fields. *)
-  let rec collect_value_fields acc (elem : unit L.mixed_block_element) =
+  let rec collect_value_fields acc (elem : unit L.block_element) =
     match elem with
     | L.Value vk ->
       K.With_subkind.from_lambda_value_kind ~machine_width vk :: acc
@@ -1692,7 +1691,7 @@ let extract_block_index_offset ~machine_width idx =
    offsets needed to access each element *)
 let block_index_access_offsets ~machine_width layout idx =
   assert (Target_system.is_64_bit ());
-  let mbe = L.mixed_block_element_of_layout layout in
+  let mbe = L.block_element_of_layout layout in
   let cts = MPB.count mbe in
   if MPB.has_value_and_flat cts
   then
@@ -1703,12 +1702,12 @@ let block_index_access_offsets ~machine_width layout idx =
       in
       H.Binary (Int_shift (Naked_int64, Lsr), idx, shift)
     in
-    let f (to_left : MPB.t) (mbe : unit L.mixed_block_element) =
+    let f (to_left : MPB.t) (mbe : unit L.block_element) =
       let add x y = H.Binary (Int_arith (Naked_int64, Add), Prim x, y) in
       let offset_from_offset : H.simple_or_prim =
         match mbe with
         | Product _ ->
-          (* Products not produced by [L.mixed_block_element_leaves] *)
+          (* Products not produced by [L.block_element_leaves] *)
           Misc.fatal_errorf "Unexpected product in block index access: %a"
             Printlambda.layout layout
         (* Values are (values to left) beyond the offset *)
@@ -1729,9 +1728,9 @@ let block_index_access_offsets ~machine_width layout idx =
       let prim = add offset offset_from_offset in
       MPB.add to_left (MPB.count mbe), prim
     in
-    snd (List.fold_left_map f MPB.zero (L.mixed_block_element_leaves mbe))
+    snd (List.fold_left_map f MPB.zero (L.block_element_leaves mbe))
   else
-    let f (to_left : MPB.t) (mbe : unit L.mixed_block_element) =
+    let f (to_left : MPB.t) (mbe : unit L.block_element) =
       let summand =
         H.simple_i64
           (Int64.of_int
@@ -1740,7 +1739,7 @@ let block_index_access_offsets ~machine_width layout idx =
       let prim = H.Binary (Int_arith (Naked_int64, Add), idx, summand) in
       MPB.add to_left (MPB.count mbe), prim
     in
-    snd (List.fold_left_map f MPB.zero (L.mixed_block_element_leaves mbe))
+    snd (List.fold_left_map f MPB.zero (L.block_element_leaves mbe))
 
 let write_offset write_offset_kind layout mode ~machine_width ~ptr ~idx
     ~new_values =
@@ -1798,7 +1797,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     else
       (* Mixed block *)
       let shape =
-        Mixed_block_shape.of_mixed_block_elements
+        Mixed_block_shape.of_block_elements
           ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
           shape
       in
@@ -2583,7 +2582,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     if List.length field_path < 1
     then Misc.fatal_error "Pfield: field_path must be non-empty";
     let shape =
-      Mixed_block_shape.of_mixed_block_elements shape
+      Mixed_block_shape.of_block_elements shape
         ~print_locality:Printlambda.locality_mode
     in
     let flattened_reordered_shape =
@@ -2657,8 +2656,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     if List.length field_path < 1
     then Misc.fatal_error "Psetfield: field_path must be non-empty";
     let shape =
-      Mixed_block_shape.of_mixed_block_elements shape
-        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+      Mixed_block_shape.of_block_elements shape ~print_locality:(fun ppf () ->
+          Format.fprintf ppf "()")
     in
     let flattened_reordered_shape =
       Mixed_block_shape.flattened_reordered_shape shape

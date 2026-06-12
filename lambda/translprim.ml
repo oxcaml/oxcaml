@@ -1674,7 +1674,7 @@ let layout_of_ty_for_idx_set env loc ty =
   let mbe = transl_mixed_block_element env (to_location loc) ty mbe in
   let context = Ctype.mk_jkind_context_check_principal env in
   let ext = Jkind.get_externality_upper_bound ~context env jkind in
-  layout_of_mixed_block_element_for_idx_set ext mbe
+  layout_of_block_element_for_idx_set ext mbe
 
 (* Specialize a primitive from available type information. *)
 (* CR layouts v7: This function had a loc argument added just to support the void

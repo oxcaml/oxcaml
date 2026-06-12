@@ -1024,7 +1024,7 @@ module With_subkind = struct
                     if Lambda.is_uniform_block_shape shape
                     then
                       let fields =
-                        Lambda.mixed_block_element_leaves (Product shape)
+                        Lambda.block_element_leaves (Product shape)
                         |> List.map (function
                           | Lambda.Value value_kind -> value_kind
                           | Lambda.Product _ | Lambda.Float_boxed _
@@ -1041,7 +1041,7 @@ module With_subkind = struct
                       )
                     else
                       let mixed_block_shape =
-                        Mixed_block_lambda_shape.of_mixed_block_elements
+                        Mixed_block_lambda_shape.of_block_elements
                           ~print_locality:(fun ppf () ->
                             Format.fprintf ppf "()")
                           shape
@@ -1074,12 +1074,12 @@ module With_subkind = struct
                           (Array.map from_mixed_block_element
                              flattened_reordered_shape)
                       in
-                      let mixed_block_shape : Block_shape.t =
+                      let block_shape : Block_shape.t =
                         Scannable
                           (Scannable_block_shape.from_mixed_block_shape
                              mixed_block_shape)
                       in
-                      mixed_block_shape, fields
+                      block_shape, fields
                   in
                   Tag.Scannable.Map.add tag shape_and_fields non_consts
                 | None ->

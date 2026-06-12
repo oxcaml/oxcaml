@@ -799,7 +799,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       (field : Types.mixed_block_element) ty
-  : int * unit Lambda.mixed_block_element =
+  : int * unit Lambda.block_element =
   match field with
   | Scannable { separability } ->
     begin match ty with
@@ -978,7 +978,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
     in
     let rec mixed_block_shape_is_empty shape =
       Array.for_all mixed_block_element_is_empty shape
-    and mixed_block_element_is_empty (element : _ mixed_block_element) =
+    and mixed_block_element_is_empty (element : _ block_element) =
       match element with
       | Product shape -> mixed_block_shape_is_empty shape
       | _ -> false

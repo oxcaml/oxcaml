@@ -2529,7 +2529,7 @@ and transl_idx ~scopes loc env ba uas =
       (* CR layouts v8: this might unnecessarily compute the value kind, which
          shouldn't be needed for deepening *)
       let base_layout = layout env lbl.lbl_loc base_sort lbl.lbl_res in
-      let mbe = mixed_block_element_of_layout base_layout in
+      let mbe = block_element_of_layout base_layout in
       (* [uas_path] is a path into [mbe] *)
       Lprim (Pidx_deepen (mbe, uas_path), [idx], (of_location ~scopes loc))
     end
