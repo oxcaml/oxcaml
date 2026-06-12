@@ -8,8 +8,8 @@ let code loopify(done) size(22) newer_version_of(iter_0)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  cont self (param)
-    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+  cont `self` (param)
+    where rec `self` (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
       let f_1 = f in
       let prim = %is_int (param_1) in
       (switch prim
@@ -22,7 +22,7 @@ let code loopify(done) size(22) newer_version_of(iter_0)
                  cont k2)
               where k2 =
                 let Pfield = %block_load.[`1`] (param_1) in
-                cont self (Pfield)))
+                cont `self` (Pfield)))
 in
 let $camlProtect_refs__iter_6 = closure iter_0_1 @iter in
 let code loopify(never) size(7) newer_version_of(`fn[protect_refs.ml:28,24--50]_2`)

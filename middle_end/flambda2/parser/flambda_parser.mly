@@ -120,6 +120,10 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_AVAILABLE [@symbol "available"]
 %token KWD_BOXED [@symbol "boxed"]
 %token KWD_CCALL  [@symbol "ccall"]
+%token KWD_MCALL  [@symbol "mcall"]
+%token KWD_SELF  [@symbol "self"]
+%token KWD_PUBLIC  [@symbol "public"]
+%token KWD_CACHED  [@symbol "cached"]
 %token KWD_CLOSURE  [@symbol "closure"]
 %token KWD_CODE  [@symbol "code"]
 %token KWD_CONT  [@symbol "cont"]
@@ -585,6 +589,11 @@ apply_expr:
      } }
 ;
 
+method_kind:
+  | KWD_SELF { Call_kind.Method_kind.Self }
+  | KWD_PUBLIC { Call_kind.Method_kind.Public }
+  | KWD_CACHED { Call_kind.Method_kind.Cached }
+
 call_kind:
   | alloc = alloc_mode_for_applications_opt; { (Function Indirect, alloc) }
   | KWD_DIRECT; LPAREN;
@@ -595,6 +604,8 @@ call_kind:
     { (Function (Direct { code_id; function_slot; }), alloc) }
   | KWD_CCALL; noalloc = boption(KWD_NOALLOC)
     { (C_call { alloc = not noalloc }, (Heap : alloc_mode_for_applications)) }
+  | KWD_MCALL LPAREN; kind = method_kind; obj = simple; RPAREN
+    { (Method { kind; obj }, (Heap : alloc_mode_for_applications)) }
 ;
 
 inline:
