@@ -207,7 +207,7 @@ module Merge_straightline_blocks : sig
   val run : Cfg_with_layout.t -> Label.Set.t
 end = struct
   (* Two blocks `b1` and `b2` can be merged if:
-   * - `b1` is not the entry block;
+   * - neither `b1` nor `b2` is the entry block;
    * - `b1` has only one non-exceptional successor, `b2`;
    * - `b1` cannot raise;
    * - `b2` has only one predecessor, `b1`;
@@ -246,6 +246,9 @@ end = struct
             let b2_predecessors = Cfg.predecessor_labels b2_block in
             if
               (not (Label.equal b1_label cfg.entry_label))
+              (* the merge deletes `b2`, and the entry block must never be
+                 deleted (`cfg.entry_label` would be left dangling) *)
+              && (not (Label.equal b2_label cfg.entry_label))
               && (not (Label.equal b1_label b2_label))
               && List.compare_length_with b2_predecessors 1 = 0
               && Cfg.is_pure_terminator b1_block.terminator.desc
@@ -296,6 +299,9 @@ let run cfg_with_layout =
      [Eliminate_fallthrough_blocks] because merging blocks creates more
      opportunities for terminator simplification. *)
   Simplify_terminator.run (Cfg_with_layout.cfg cfg_with_layout);
+  (* [Simplify_terminator] can change successor sets, e.g. by short-circuiting
+     jumps to empty blocks, possibly making some blocks unreachable: hence the
+     second round of dead code elimination. *)
   Eliminate_dead_code.run cfg_with_layout |> acc;
   Cfg_with_layout.remove_blocks cfg_with_layout !dead_labels;
   cfg_with_layout
