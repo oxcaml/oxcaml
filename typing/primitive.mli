@@ -63,6 +63,9 @@ type mode =
    typechecking, all [Prim_poly] modes on a given primitive application
    will be instantiated either all to [Local] or all to [Global] *)
 
+(* Representation of the _syntax_ of an [external] declaration. In the case of
+   a builtin, it may be decidedly imprecise, but fields like [prim_alloc] will
+   be ignored anyway. *)
 type 'repr description_gen = private
   { prim_name: string;         (* Name of primitive  or C function *)
     prim_arity: int;           (* Number of arguments *)

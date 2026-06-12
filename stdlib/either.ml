@@ -15,10 +15,15 @@
 
 [@@@ocaml.flambda_o3]
 
-type ('a : value_or_null, 'b : value_or_null) t = Left of 'a | Right of 'b
+type ('a : any, 'b : any) t = Left of 'a | Right of 'b
 
 let left v = Left v
 let right v = Right v
+
+(* CR-someday lmaurer: It's reasonable (though not trivial to implement) to
+   allow matching a value of layout [any] with a blank (since it doesn't
+   actually bind anything). This would allow quite a few of these to have more
+   layout-polymorphic types. *)
 
 let is_left = function
 | Left _ -> true
@@ -30,11 +35,11 @@ let is_right = function
 
 let find_left = function
 | Left v -> Some v
-| Right _ -> None
+| _ -> None
 
 let find_right = function
-| Left _ -> None
 | Right v -> Some v
+| _ -> None
 
 let map_left f = function
 | Left v -> Left (f v)

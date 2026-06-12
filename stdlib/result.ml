@@ -18,13 +18,13 @@ open! Stdlib
 
 [@@@ocaml.flambda_o3]
 
-type ('a : value_or_null, 'e : value_or_null) t = ('a, 'e) result = Ok of 'a | Error of 'e
+type ('a : any, 'e : any) t = ('a, 'e) result = Ok of 'a | Error of 'e
 
 let ok v = Ok v
 let error e = Error e
-let value r ~default = match r with Ok v -> v | Error _ -> default
-let get_ok = function Ok v -> v | Error _ -> invalid_arg "result is Error _"
-let get_error = function Error e -> e | Ok _ -> invalid_arg "result is Ok _"
+let value r ~default = match r with Ok v -> v | _ -> default
+let get_ok = function Ok v -> v | _ -> invalid_arg "result is Error _"
+let get_error = function Error e -> e | _ -> invalid_arg "result is Ok _"
 let bind r f = match r with Ok v -> f v | Error _ as e -> e
 let join = function Ok r -> r | Error _ as e -> e
 let map f = function Ok v -> Ok (f v) | Error _ as e -> e
@@ -46,6 +46,6 @@ let compare ~ok ~error r0 r1 = match r0, r1 with
 | Ok _, Error _ -> -1
 | Error _, Ok _ -> 1
 
-let to_option = function Ok v -> Some v | Error _ -> None
-let to_list = function Ok v -> [v] | Error _ -> []
-let to_seq = function Ok v -> Seq.return v | Error _ -> Seq.empty
+let to_option = function Ok v -> Some v | _ -> None
+let to_list = function Ok v -> [v] | _ -> []
+let to_seq = function Ok v -> Seq.return v | _ -> Seq.empty

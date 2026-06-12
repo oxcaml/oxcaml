@@ -41,17 +41,11 @@ Error: This expression has type "('a : value_or_null)"
 (* List cases are less interesting because we don't allow unboxed types in lists
    at all.  These tests are here just so we remember to think about
    comprehensions when that changes. *)
+(* XXX Remember to think about this now *)
 let unbox_list x = [ Float_u.of_float a for a in x ]
 [%%expect{|
-Line 1, characters 21-39:
-1 | let unbox_list x = [ Float_u.of_float a for a in x ]
-                         ^^^^^^^^^^^^^^^^^^
-Error: This expression has type "Stdlib_upstream_compatible.Float_u.t" = "float#"
-       but an expression was expected of type "('a : value_or_null)"
-       The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be
-         a value layout
-         because the type argument of list has layout value_or_null.
+val unbox_list : float list -> Stdlib_upstream_compatible.Float_u.t list =
+  <fun>
 |}]
 
 let box_list x = [ Float_u.to_float a for a in x ]

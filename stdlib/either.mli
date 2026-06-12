@@ -55,7 +55,7 @@
    revisit this choice.
 *)
 
-type ('a : value_or_null, 'b : value_or_null) t = Left of 'a | Right of 'b (**)
+type ('a : any, 'b : any) t = Left of 'a | Right of 'b (**)
 (** A value of [('a, 'b) Either.t] contains
     either a value of ['a]  or a value of ['b] *)
 
@@ -75,11 +75,11 @@ val is_right : ('a : value_or_null) ('b : value_or_null)
   . ('a, 'b) t -> bool
 (** [is_right (Left v)] is [false], [is_right (Right v)] is [true]. *)
 
-val find_left : ('a : value_or_null) ('b : value_or_null)
+val find_left : ('a : value_or_null) ('b : any)
   . ('a, 'b) t -> 'a option
 (** [find_left (Left v)] is [Some v], [find_left (Right _)] is [None] *)
 
-val find_right : ('a : value_or_null) ('b : value_or_null)
+val find_right : ('a : any) ('b : value_or_null)
   . ('a, 'b) t -> 'b option
 (** [find_right (Right v)] is [Some v], [find_right (Left _)] is [None] *)
 
