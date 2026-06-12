@@ -215,8 +215,20 @@ module Solver = struct
            rigid variables that represent them in the solver. *)
         List.iter2
           (fun ty var ->
+            (* Parameters written as plain type variables may have explicit
+               bounds, as in [('a : bound)]. Cap their rigid variables by those
+               bounds (needed for recursive payload ikinds). Other parameter
+               expressions do not have a written parameter bound to apply here,
+               so keep their rigid atoms bare. *)
             let param_kind =
-              Ldd.meet (Ldd.node_of_var var) (kind ~use_tables:true ctx ty)
+              match Types.get_desc ty with
+              | Types.Tvar { jkind; _ } ->
+                Ldd.meet (Ldd.node_of_var var) (ckind_of_jkind ctx jkind)
+              | Types.Tunivar _ ->
+                Misc.fatal_error
+                  ("Ikind.type_declaration_ikind_of_jkind: "
+                 ^ "unexpected Tunivar in parameter list")
+              | _ -> Ldd.node_of_var var
             in
             TyTbl.add ctx.ty_to_kind ty param_kind)
           params rigid_vars;
