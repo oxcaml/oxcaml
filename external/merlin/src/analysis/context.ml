@@ -31,14 +31,14 @@ open Std
 let { Logger.log } = Logger.for_section "context"
 
 type t =
-  | Constructor of Types.constructor_description * Location.t
+  | Constructor of Data_types.constructor_description * Location.t
     (* We attach the constructor description here so in the case of
        disambiguated constructors we actually directly look for the type
        path (cf. #486, #794). *)
   | Unknown_constructor
   | Expr
   | Label :
-      'rep Types.gen_label_description * 'rep Types.record_form
+      'rep Data_types.gen_label_description * 'rep Data_types.record_form
       -> t (* Similar to constructors. *)
   | Unknown_label
   | Module_path
@@ -85,7 +85,8 @@ let cursor_on_longident_end ~cursor:cursor_pos
       (* FIXME: this is britle, but lids don't have precise enough location
          information to handle these cases correctly. *)
       let name_lenght = String.length name in
-      if Pprintast.needs_parens name then name_lenght + 2 else name_lenght
+      if Pprintast.needs_parens ~kind:Other name then name_lenght + 2
+      else name_lenght
     in
     let constr_pos =
       { loc.loc_end with pos_cnum = end_offset - cstr_name_size }
@@ -102,7 +103,7 @@ let inspect_pattern (type a) ~cursor ~lid (p : a Typedtree.general_pattern) =
     (* Assumption: if [Browse.enclosing] stopped on this node and not on the
        subpattern, then it must mean that the cursor is on the alias. *)
     None
-  | Tpat_construct (lid_loc, cd, _, _, _)
+  | Tpat_construct (lid_loc, cd, _, _)
     when cursor_on_longident_end ~cursor ~lid_loc cd.cstr_name
          && Longident.last lid = Longident.last lid_loc.txt ->
     (* Assumption: if [Browse.enclosing] stopped on this node and not on the
@@ -114,7 +115,7 @@ let inspect_pattern (type a) ~cursor ~lid (p : a Typedtree.general_pattern) =
 
 let inspect_expression ~cursor ~lid e : t =
   match e.Typedtree.exp_desc with
-  | Texp_construct (lid_loc, cd, _, _, _) ->
+  | Texp_construct (lid_loc, cd, _, _) ->
     (* TODO: is this first test necessary ? *)
     if Longident.last lid = Longident.last lid_loc.txt then
       if cursor_on_longident_end ~cursor ~lid_loc cd.cstr_name then

@@ -212,6 +212,21 @@ val jkind_declarations:
   loc:Location.t -> Env.t -> string ->
   jkind_declaration -> jkind_declaration ->
   jkind_mismatch option
+
+(** The functions [value_descriptions_consistency] and
+    [type_declarations_consistency] check if two declaration are consistent.
+    Declarations are consistent when there exists an environment such that the
+    first declaration is a subtype of the second one.
+
+    Notably, if a type declaration [td1] is consistent with [td2] then a type
+    expression [te] which is well-formed with the [td2] declaration in scope
+    is still well-formed with the [td1] declaration: [E, td2 |- te] => [E, td1
+    |- te]. *)
+val value_descriptions_consistency:
+  Env.t -> value_description -> value_description -> module_coercion
+val type_declarations_consistency:
+  Env.t -> type_declaration -> type_declaration -> type_mismatch option
+
 (*
 val class_types:
         Env.t -> class_type -> class_type -> bool

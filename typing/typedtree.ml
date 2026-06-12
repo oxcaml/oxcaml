@@ -17,6 +17,7 @@
 
 open Asttypes
 open Types
+open Data_types
 open Mode
 
 type constant =
@@ -214,7 +215,7 @@ and 'k pattern_desc =
       (string option * value general_pattern * Jkind.sort) list ->
       value pattern_desc
   | Tpat_construct :
-      Longident.t loc * Types.constructor_description *
+      Longident.t loc * constructor_description *
         Types.mixed_product_shape *
         (Jkind.sort * value general_pattern) list *
         ((Ident.t loc * Parsetree.jkind_annotation option) list * core_type)
@@ -297,8 +298,10 @@ and expression_desc =
   | Texp_apply of
       expression * (arg_label * apply_arg) list * apply_position *
         Mode.Locality.l * Zero_alloc.assume option
-  | Texp_match of expression * Jkind.sort * computation case list * partial
-  | Texp_try of expression * value case list
+  | Texp_match of
+      expression * Jkind.sort * computation case list * value case list
+      * partial
+  | Texp_try of expression * value case list * value case list
   | Texp_unboxed_unit
   | Texp_unboxed_bool of bool
   | Texp_tuple of (string option * expression) list * alloc_mode
@@ -309,7 +312,7 @@ and expression_desc =
   | Texp_variant of label * (expression * alloc_mode) option
   | Texp_record of {
       fields :
-        ( Types.label_description * Jkind.sort * record_label_definition )
+        ( Data_types.label_description * Jkind.sort * record_label_definition )
           array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
@@ -317,7 +320,7 @@ and expression_desc =
     }
   | Texp_record_unboxed_product of {
       fields :
-        ( Types.unboxed_label_description * Jkind.sort *
+        ( unboxed_label_description * Jkind.sort *
           record_label_definition ) array;
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
@@ -330,7 +333,7 @@ and expression_desc =
       record_sort : Jkind.sort;
       record_repres : Types.record_representation;
       lid : Longident.t loc;
-      label : Types.label_description;
+      label : Data_types.label_description;
       boxing : texp_field_boxing;
       unique_barrier : Unique_barrier.t;
     }
@@ -349,7 +352,7 @@ and expression_desc =
       record_sorts : record_sorts;
       modality : Mode.Locality.l;
       lid : Longident.t loc;
-      label : Types.label_description;
+      label : Data_types.label_description;
       newval : expression;
     }
   | Texp_array of mutability * Jkind.Sort.t * expression list * alloc_mode
@@ -422,12 +425,12 @@ and meth =
 
 and block_access =
   | Baccess_field of
-      Longident.t loc * Types.label_description * Types.record_representation
+      Longident.t loc * label_description * Types.record_representation
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =
   | Uaccess_unboxed_field of
-      Longident.t loc * Types.unboxed_label_description * record_sorts
+      Longident.t loc * unboxed_label_description * record_sorts
 
 and comprehension =
   {
@@ -460,6 +463,7 @@ and comprehension_iterator =
 and 'k case =
     {
      c_lhs: 'k general_pattern;
+     c_cont: Ident.t option;
      c_guard: expression option;
      c_rhs: expression;
     }
@@ -689,6 +693,7 @@ and module_coercion =
   | Tcoerce_functor of module_coercion * module_coercion
   | Tcoerce_primitive of primitive_coercion
   | Tcoerce_alias of Env.t * Path.t * module_coercion
+  | Tcoerce_invalid
 
 and module_type =
   { mty_desc: module_type_desc;
@@ -865,10 +870,10 @@ and core_type_desc =
   | Ttyp_call_pos
 
 and package_type = {
-  pack_path : Path.t;
-  pack_fields : (Longident.t loc * core_type) list;
-  pack_type : Types.module_type;
-  pack_txt : Longident.t loc;
+  tpt_path : Path.t;
+  tpt_cstrs : (Longident.t loc * core_type) list;
+  tpt_type : Types.module_type;
+  tpt_txt : Longident.t loc;
 }
 
 and row_field = {
@@ -1464,40 +1469,9 @@ let split_pattern pat =
   in
   split_pattern pat
 
-(* Expressions are considered nominal if they can be used as the subject of a
-   sentence or action. In practice, we consider that an expression is nominal
-   if they satisfy one of:
-   - Similar to an identifier: words separated by '.' or '#'.
-   - Do not contain spaces when printed.
-  *)
-let nominal_exp_doc lid t =
-  let open Format_doc.Doc in
-  let longident l = Format_doc.doc_printer lid l.Location.txt in
-  let rec nominal_exp_doc doc exp =
-    match exp.exp_desc with
-    | _ when exp.exp_attributes <> [] -> None
-    | Texp_ident { lid; _ } ->
-        Some (longident lid doc)
-    | Texp_instvar (_,_,s) ->
-        Some (string s.Location.txt doc)
-    | Texp_constant _ -> assert false
-    | Texp_variant (lbl, None) ->
-        Some (printf "`%s" lbl doc)
-    | Texp_construct (l, _, _, [], _) -> Some (longident l doc)
-    | Texp_field { record = parent; lid = lbl; _ } ->
-        Option.map
-          (printf ".%t" (longident lbl))
-          (nominal_exp_doc doc parent)
-    | Texp_send (parent, meth, _) ->
-        let name = match meth with
-          | Tmeth_name name -> name
-          | Tmeth_val id | Tmeth_ancestor (id,_) -> Ident.name id in
-        Option.map
-          (printf "#%s" name)
-          (nominal_exp_doc doc parent)
-    | _ -> None
-  in
-  nominal_exp_doc empty t
+let map_apply_arg f = function
+  | Arg arg -> Arg (f arg)
+  | Omitted _ as arg -> arg
 
 let loc_of_decl ~uid =
   let of_option { txt; loc } =
@@ -1550,12 +1524,14 @@ let rec fold_antiquote_exp f  acc exp =
   | Texp_apply (exp, list, _, _, _) ->
       let acc = fold_antiquote_exp f acc exp in
       fold_antiquote_args f acc list
-  | Texp_match (exp, _, cases, _) ->
+  | Texp_match (exp, _, cases, eff_cases, _) ->
       let acc = fold_antiquote_exp f acc exp in
-      fold_antiquote_cases f acc cases
-  | Texp_try (exp, cases) ->
+      let acc = fold_antiquote_cases f acc cases in
+      fold_antiquote_cases f acc eff_cases
+  | Texp_try (exp, cases, eff_cases) ->
       let acc = fold_antiquote_exp f acc exp in
-      fold_antiquote_cases f acc cases
+      let acc = fold_antiquote_cases f acc cases in
+      fold_antiquote_cases f acc eff_cases
   | Texp_tuple (list, _) ->
       List.fold_left (fun acc (_, e) -> fold_antiquote_exp f acc e) acc list
   | Texp_unboxed_tuple list ->

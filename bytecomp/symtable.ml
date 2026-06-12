@@ -51,12 +51,14 @@ module Global = struct
 
   let quote s = "`" ^ s ^ "'"
 
-  let description ppf = function
+  let description ppf g =
+    let open Format_doc in
+    match g with
     | Glob_compunit cu ->
-        Format_doc.fprintf ppf "compilation unit %a"
+        fprintf ppf "compilation unit %a"
           Compilation_unit.print_as_inline_code cu
     | Glob_predef (Predef_exn exn) ->
-        Format_doc.fprintf ppf "predefined exception %a"
+        fprintf ppf "predefined exception %a"
           Style.inline_code (quote exn)
 
   let of_compilation_unit cu = Glob_compunit cu
@@ -177,19 +179,25 @@ let output_primitive_table outchan =
   for i = 0 to Array.length prim - 1 do
     fprintf outchan "extern value %s(void);\n" prim.(i)
   done;
-  fprintf outchan "typedef value (*c_primitive)(void);\n";
-  fprintf outchan "#if defined __cplusplus\n";
-  fprintf outchan "extern\n";
-  fprintf outchan "#endif\n";
-  fprintf outchan "const c_primitive caml_builtin_cprim[] = {\n";
+  fprintf outchan {|
+typedef value (*c_primitive)(void);
+
+#if defined __cplusplus
+extern
+#endif
+const c_primitive caml_builtin_cprim[] = {
+|};
   for i = 0 to Array.length prim - 1 do
     fprintf outchan "  %s,\n" prim.(i)
   done;
-  fprintf outchan "  0 };\n";
-  fprintf outchan "#if defined __cplusplus\n";
-  fprintf outchan "extern\n";
-  fprintf outchan "#endif\n";
-  fprintf outchan "const char * const caml_names_of_builtin_cprim[] = {\n";
+  fprintf outchan
+{|  0 };
+
+#if defined __cplusplus
+extern
+#endif
+const char * const caml_names_of_builtin_cprim[] = {
+|};
   for i = 0 to Array.length prim - 1 do
     fprintf outchan "  \"%s\",\n" prim.(i)
   done;
@@ -372,11 +380,12 @@ type bytecode_sections =
     prim: string list;
     dlpt: string list }
 
+external get_bytecode_sections : unit -> bytecode_sections =
+  "caml_dynlink_get_bytecode_sections"
+
 (* Initialize the linker for toplevel use *)
 
-(* In oxcaml, [get_bytecode_sections] is passed in, because it is
-   absent from the 4.x runtime as used by the current system compiler. *)
-let init_toplevel ~get_bytecode_sections =
+let init_toplevel () =
   let sect = get_bytecode_sections () in
   global_table := sect.symb;
   c_prim_table := PrimMap.empty;

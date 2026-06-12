@@ -58,6 +58,7 @@
   (camlatomic.h as caml/camlatomic.h)
   (codefrag.h as caml/codefrag.h)
   (compare.h as caml/compare.h)
+  (compatibility.h as caml/compatibility.h)
   (config.h as caml/config.h)
   (custom.h as caml/custom.h)
   (debugger.h as caml/debugger.h)

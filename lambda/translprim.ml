@@ -16,7 +16,6 @@
 (* Translation of primitives *)
 
 open Primitive
-open Types
 open Typedtree
 open Typeopt
 open Lambda
@@ -107,7 +106,7 @@ type loc_kind =
 type atomic_kind =
   | Ref   (* operation on an atomic reference (takes only a pointer) *)
   | Field (* operation on an atomic field (takes a pointer and an offset) *)
-  | Loc (* operation on a first-class field (takes a (pointer, offset) pair *)
+  | Loc   (* operation on a first-class field (takes a (pointer, offset) pair *)
 
 type atomic_op =
   | Load
@@ -1670,7 +1669,7 @@ let layout_of_ty_for_idx_set env loc ty =
     | Some mbe -> mbe
     | None ->
       Misc.fatal_errorf "layout_of_ty_for_idx_set %a"
-        (Format_doc.compat Printtyp.type_expr) ty
+        Printtyp.type_expr ty
   in
   let mbe = transl_mixed_block_element env (to_location loc) ty mbe in
   let context = Ctype.mk_jkind_context_check_principal env in

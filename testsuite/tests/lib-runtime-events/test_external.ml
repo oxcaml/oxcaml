@@ -6,7 +6,8 @@
    include runtime_events;
    include unix;
    runtime5;
-   libunix;
+   hasunix;
+   not-target-windows;
    {
      bytecode;
    }{

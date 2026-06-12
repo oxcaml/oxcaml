@@ -95,30 +95,7 @@ val check_coherence:
 (* for fixed types *)
 val is_fixed_type : Parsetree.type_declaration -> bool
 
-type unrepresentable_constructor =
-  | Unrepresentable_argument of int
-  | Unrepresentable_argument_field of string
-
-(* Update the representation of a constructor whose representation at
-   declaration time was [None] because it has an argument of kind [any]. *)
-val update_constructor_representation:
-    Env.t -> Types.constructor_arguments -> (_ * _) jkind list ->
-    loc:Location.t -> is_extension_constructor:bool ->
-    (Types.constructor_representation, unrepresentable_constructor) Result.t
-
-type unrepresentable_record =
-  | Unrepresentable_field of string
-
-(* Update the representation of a record whose representation at declaration
-   time was [None] because it has a field of kind [any]. *)
-val update_record_representation:
-    why:Jkind_intf.History.concrete_creation_reason ->
-    Env.t -> Location.t -> 'rep Types.record_form ->
-    (Types.label_declaration * Types.type_expr) list ->
-    (Jkind.Sort.Const.t list * 'rep, unrepresentable_record) Result.t
-
-val mixed_block_element :
-    Env.t -> type_expr -> _ jkind -> mixed_block_element option
+val mixed_block_element : Env.t -> type_expr -> _ jkind -> mixed_block_element
 
 type native_repr_kind = Unboxed | Untagged | Unpacked
 
@@ -245,11 +222,11 @@ type error =
   | Atomic_field_in_mixed_block
   | Non_value_atomic_field
   | Layout_poly_unsupported
+  | Missing_flatten_floats
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
 
 exception Error of Location.t * error
 
-val report_error: error Format_doc.format_printer
-val report_error_doc: error Format_doc.printer
+val report_error: loc:Location.t -> error -> Location.report

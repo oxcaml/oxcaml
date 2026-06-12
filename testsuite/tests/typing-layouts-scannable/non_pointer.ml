@@ -354,7 +354,7 @@ let f (type a1 : value non_pointer) (type a2 : value) (a1 : a1) (a2 : a2) =
 Line 5, characters 19-20:
 5 |   cant_promote_snd v
                        ^
-Error: This expression has type "a2" but an expression was expected of type
+Error: The value "v" has type "a2" but an expression was expected of type
          "('a : value non_pointer)"
        The layout of a2 is value
          because of the annotation on the abstract type declaration for a2.
@@ -400,8 +400,8 @@ let outer (type a : value non_float) (nf : a or_null) =
 Line 8, characters 4-6:
 8 |   f nf
         ^^
-Error: This expression has type "a or_null"
-       but an expression was expected of type "'a or_null"
+Error: The value "nf" has type "a or_null" but an expression was expected of type
+         "'a or_null"
        The layout of a is value non_float
          because of the annotation on the abstract type declaration for a.
        But the layout of a must be a sublayout of value non_pointer

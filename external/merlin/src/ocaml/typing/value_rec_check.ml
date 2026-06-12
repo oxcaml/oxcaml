@@ -158,7 +158,7 @@ let classify_expression : Typedtree.expression -> sd =
         (* Note on module presence:
            For absent modules (i.e. module aliases), the module being bound
            does not have a physical representation, but its size can still be
-           derived from the alias itself, so we can re-use the same code as
+           derived from the alias itself, so we can reuse the same code as
            for modules that are present. *)
         let size = classify_module_expression env mexp in
         let env = Ident.add mid size env in
@@ -174,30 +174,42 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_exclave e ->
         classify_expression env e
 
-    | Texp_construct (_, {cstr_repr = Variant_unboxed}, _, [_, e], _) ->
+    | Texp_construct (_, {cstr_repr = Variant_unboxed}, [e], _) ->
         classify_expression env e
     | Texp_construct _ ->
         Static
 
     | Texp_record { representation = Record_unboxed;
-                    fields = [| _, _, Overridden (_,e) |] } ->
+                    fields = [| _, Overridden (_,e) |] } ->
         classify_expression env e
     | Texp_record { representation = Record_ufloat; _ } ->
         Dynamic
     | Texp_record _ ->
         Static
 
-    | Texp_record_unboxed_product { representation = Record_unboxed_product;
-                                    fields = [| _, _, Overridden (_,e) |] } ->
-        classify_expression env e
-    | Texp_record_unboxed_product _ ->
-        Dynamic
-
     | Texp_variant _
     | Texp_tuple _
     | Texp_atomic_loc _
     | Texp_extension_constructor _
-    | Texp_constant _
+    | Texp_constant _ ->
+        Static
+
+    | Texp_for _
+    | Texp_setfield _
+    | Texp_while _
+    | Texp_setinstvar _ ->
+        (* Unit-returning expressions *)
+        Static
+
+    | Texp_unreachable ->
+        Static
+
+    | Texp_record_unboxed_product { representation = Record_unboxed_product;
+                                    fields = [| _, Overridden (_,e) |] } ->
+        classify_expression env e
+    | Texp_record_unboxed_product _ ->
+        Dynamic
+
     | Texp_unboxed_unit
     | Texp_unboxed_bool _
     | Texp_src_pos ->
@@ -210,18 +222,8 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_hole _ ->
       Dynamic (* Disallowed for now *)
 
-    | Texp_for _
-    | Texp_setfield _
-    | Texp_while _
-    | Texp_setinstvar _ ->
-        (* Unit-returning expressions *)
-        Static
-
     | Texp_mutvar _
     | Texp_setmutvar _ ->
-        Static
-
-    | Texp_unreachable ->
         Static
 
     | Texp_probe _
@@ -357,6 +359,8 @@ let classify_expression : Typedtree.expression -> sd =
             Misc.fatal_error "letrec: primitive coercion on a module"
         | Tcoerce_alias _ ->
             Misc.fatal_error "letrec: alias coercion on a module"
+        | Tcoerce_invalid ->
+            Misc.fatal_error "letrec: invalid coercion on a module"
         end
     | Tmod_unpack (e, _) ->
         classify_expression env e
@@ -624,10 +628,10 @@ let (>>) : bind_judg -> term_judg -> term_judg =
 (* Compute the appropriate [mode] for an array expression *)
 let array_mode exp =
   match Typeopt.array_kind exp with
-  | Pfloatarray ->
+  | Lambda.Pfloatarray ->
     (* (flat) float arrays unbox their elements *)
     Dereference
-  | Pgenarray ->
+  | Lambda.Pgenarray ->
     (* This is counted as a use, because constructing a generic array
        involves inspecting to decide whether to unbox (PR#6939). *)
     Dereference
@@ -667,8 +671,8 @@ let rec expression : Typedtree.expression -> term_judg =
       value_bindings Nonrecursive [binding] >> expression body
     | Texp_letmodule (x, _, _, mexp, e) ->
       module_binding (x, mexp) >> expression e
-    | Texp_match (e, _, cases, _) ->
-      (*
+    | Texp_match (e, _, cases, eff_cases, _) ->
+      (* TODO: update comment below for eff_cases
          (Gi; mi |- pi -> ei : m)^i
          G |- e : sum(mi)^i
          ----------------------------------------------
@@ -678,7 +682,11 @@ let rec expression : Typedtree.expression -> term_judg =
         let pat_envs, pat_modes =
           List.split (List.map (fun c -> case c mode) cases) in
         let env_e = expression e (List.fold_left Mode.join Ignore pat_modes) in
-        Env.join_list (env_e :: pat_envs))
+        let eff_envs, eff_modes =
+          List.split (List.map (fun c -> case c mode) eff_cases) in
+        let eff_e = expression e (List.fold_left Mode.join Ignore eff_modes) in
+        Env.join_list
+          ((Env.join_list (env_e :: pat_envs)) :: (eff_e :: eff_envs)))
     | Texp_for tf ->
       (*
         G1 |- low: m[Dereference]
@@ -771,7 +779,7 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_array_comprehension (_, _, { comp_body; comp_clauses }) ->
       join ((expression comp_body << array_mode exp) ::
             comprehension_clauses comp_clauses)
-    | Texp_construct (_, desc, shape, exprs, _) ->
+    | Texp_construct (_, desc, exprs, _) ->
       let access_constructor =
         match desc.cstr_tag with
         | Extension pth ->
@@ -782,7 +790,7 @@ let rec expression : Typedtree.expression -> term_judg =
         | Variant_unboxed | Variant_with_null ->
           Return
         | Variant_boxed _ | Variant_extensible ->
-           (match shape with
+           (match desc.cstr_shape with
             | Constructor_uniform_value -> Guard
             | Constructor_mixed mixed_shape ->
                 (match mixed_shape.(i) with
@@ -792,7 +800,7 @@ let rec expression : Typedtree.expression -> term_judg =
                  | Void | Product _ ->
                    Dereference))
       in
-      let arg i (_sort, e) = expression e << arg_mode i in
+      let arg i e = expression e << arg_mode i in
       join [
         access_constructor;
         listi arg exprs;
@@ -821,11 +829,8 @@ let rec expression : Typedtree.expression -> term_judg =
                Dereference)
           | Record_dummy _ ->
             Misc.fatal_error "value_rec_check: unexpected dummy representation"
-          | Record_variable ->
-            Misc.fatal_error
-              "value_rec_check: unexpected unknown representation"
         in
-        let field (label, _sort, field_def) =
+        let field ((label : Data_types.label_description), field_def) =
           let env =
             match field_def with
             | Kept _ -> empty
@@ -841,7 +846,7 @@ let rec expression : Typedtree.expression -> term_judg =
                                     representation = rep } ->
       begin match rep with
       | Record_unboxed_product ->
-        let field (_, _, field_def) =
+        let field (_, field_def) =
           let env =
             match field_def with
             | Kept _ -> empty
@@ -853,9 +858,6 @@ let rec expression : Typedtree.expression -> term_judg =
           array field es;
           option expression (Option.map fst eo) << Dereference
         ]
-      | Record_unboxed_product_variable ->
-        Misc.fatal_error
-          "value_rec_check: unexpected unknown unboxed-product representation"
       end
     | Texp_ifthenelse (cond, ifso, ifnot) ->
       (*
@@ -873,7 +875,7 @@ let rec expression : Typedtree.expression -> term_judg =
         expression ifso;
         option expression ifnot;
       ]
-    | Texp_setfield { record = e1; newval = e2 } ->
+    | Texp_setfield (e1, _, _, _, e2) ->
       (*
         G1 |- e1: m[Dereference]
         G2 |- e2: m[Dereference]
@@ -921,14 +923,14 @@ let rec expression : Typedtree.expression -> term_judg =
       join [
         expression e1 << Dereference
       ]
-    | Texp_field { record = e; _ } ->
+    | Texp_field (e, _, _, _, _, _) ->
       (*
         G |- e: m[Dereference]
         -----------------------
         G |- e.x: m
       *)
       expression e << Dereference
-    | Texp_unboxed_field { record = e; _ } ->
+    | Texp_unboxed_field (e, _, _, _, _) ->
       expression e << Dereference
     | Texp_setinstvar (pth,_,_,e) ->
       (*
@@ -971,7 +973,7 @@ let rec expression : Typedtree.expression -> term_judg =
       modexp mexp
     | Texp_object (clsstrct, _) ->
       class_structure clsstrct
-    | Texp_try (e, cases) ->
+    | Texp_try (e, cases, eff_cases) ->
       (*
         G |- e: m      (Gi; _ |- pi -> ei : m)^i
         --------------------------------------------
@@ -985,6 +987,7 @@ let rec expression : Typedtree.expression -> term_judg =
       join [
         expression e;
         list case_env cases;
+        list case_env eff_cases;
       ]
     | Texp_override (pth, fields) ->
       (*
@@ -1212,6 +1215,8 @@ and modexp : Typedtree.module_expr -> term_judg =
           (* Alias coercions ignore their arguments, but they evaluate
              their alias module 'pth' under another coercion. *)
           coercion coe (fun m -> path pth << m)
+        | Tcoerce_invalid ->
+          Misc.fatal_error "Value_rec_check.modexp: invalid coercion"
       in
       coercion coe (fun m -> modexp mexp << m)
     | Tmod_unpack (e, _) ->
@@ -1540,8 +1545,8 @@ and is_destructuring_pattern : type k . k general_pattern -> bool =
     | Tpat_unboxed_tuple _ -> true
     | Tpat_construct _ -> true
     | Tpat_variant _ -> true
-    | Tpat_record _ -> true
-    | Tpat_record_unboxed_product _ -> true
+    | Tpat_record (_, _) -> true
+    | Tpat_record_unboxed_product (_, _) -> true
     | Tpat_array _ -> true
     | Tpat_lazy _ -> true
     | Tpat_value pat -> is_destructuring_pattern (pat :> pattern)

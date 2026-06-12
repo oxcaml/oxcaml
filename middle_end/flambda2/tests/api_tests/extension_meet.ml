@@ -176,5 +176,5 @@ let _ =
     Compilation_unit.create Compilation_unit.Prefix.empty linkage_name
   in
   let unit_info = Unit_info.make_dummy ~input_name:"camlTest" comp_unit in
-  Env.set_unit_name (Some unit_info);
+  Env.set_current_unit unit_info;
   test_double_recursion ()

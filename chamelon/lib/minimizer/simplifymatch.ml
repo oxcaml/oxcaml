@@ -57,7 +57,7 @@ let simplify_match_mapper should_remove =
       (fun mapper e ->
         Tast_mapper.default.expr mapper
           (match view_texp e.exp_desc with
-          | O (Texp_try (e_try, [{ c_lhs; c_guard; c_rhs }])) ->
+          | O (Texp_try (e_try, [{ c_lhs; c_guard; c_rhs; _ }], _)) ->
             (* try e1 with p -> e2 => e1 *)
             (* try e1 with p -> e2 => let p = __dummy2__ () in e2 *)
             if should_remove ()

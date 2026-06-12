@@ -236,7 +236,7 @@ let mkTexp_sequence ?id:(sort = Jkind.Sort.scannable) (e1, e2) =
 type texp_match_identifier = Jkind.sort
 
 let mkTexp_match ?id:(sort = Jkind.Sort.scannable) (e, cases, partial) =
-  Texp_match (e, sort, cases, partial)
+  Texp_match (e, sort, cases, [], partial)
 
 let mkTexp_assert e loc = Texp_assert (e, loc)
 
@@ -250,12 +250,12 @@ type matched_expression_desc =
       expression * (Asttypes.arg_label * apply_arg) list * texp_apply_identifier
   | Texp_construct of
       Longident.t Location.loc
-      * constructor_description
+      * Data_types.constructor_description
       * (texp_construct_arg_identifier * expression) list
       * texp_construct_identifier
   | Texp_record of
       { fields :
-          (Types.label_description
+          (Data_types.label_description
           * texp_record_field_identifier
           * record_label_definition)
           array;
@@ -339,7 +339,8 @@ let view_texp (e : expression_desc) =
       ( { params; body },
         { alloc_mode; ret_sort; ret_mode = ret_mode.mode_modes; zero_alloc } )
   | Texp_sequence (e1, sort, e2) -> Texp_sequence (e1, e2, sort)
-  | Texp_match (e, sort, cases, partial) -> Texp_match (e, cases, partial, sort)
+  | Texp_match (e, sort, cases, _, partial) ->
+    Texp_match (e, cases, partial, sort)
   | _ -> O e
 
 let mkpattern_data ~pat_desc ~pat_loc ~pat_extra ~pat_type ~pat_env
@@ -441,14 +442,14 @@ type 'a matched_pattern_desc =
       -> value matched_pattern_desc
   | Tpat_construct :
       Longident.t Location.loc
-      * Types.constructor_description
+      * Data_types.constructor_description
       * (value_binding_identifier * value general_pattern) list
       * (tpat_construct_type_arg list * core_type) option
       * tpat_construct_identifier
       -> value matched_pattern_desc
   | Tpat_record :
       (Longident.t Location.loc
-      * Types.label_description
+      * Data_types.label_description
       * value general_pattern)
       list
       * Asttypes.closed_flag
@@ -458,7 +459,7 @@ type 'a matched_pattern_desc =
      everywhere_ *)
   | Tpat_record_unboxed_product :
       (Longident.t Location.loc
-      * Types.unboxed_label_description
+      * Data_types.unboxed_label_description
       * value general_pattern)
       list
       * Asttypes.closed_flag
@@ -513,8 +514,8 @@ let option_of_arg_or_omitted arg =
   match arg with Arg (e, sort) -> Some (e, sort) | Omitted _ -> None
 
 let mk_constructor_description cstr_name =
-  { cstr_name;
-    cstr_res = newty2 ~level:0 (mkTvar (Some "a"));
+  { Data_types.cstr_name;
+    cstr_res = Btype.newty2 ~level:0 (mkTvar (Some "a"));
     cstr_shape = Some [||];
     cstr_existentials = [];
     cstr_args = [];
