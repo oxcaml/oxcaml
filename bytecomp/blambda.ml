@@ -137,7 +137,8 @@ and blambda =
   | Apply of
       { func : blambda;
         args : blambda list;
-        nontail : bool
+        nontail : bool;
+        yielding : Lambda.yielding_kind
       }
   | Function of bfunction
   | Let of

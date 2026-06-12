@@ -2292,6 +2292,7 @@ let lambda_of_prim prim_name prim loc args arg_exps =
         ap_probe = None;
         ap_region_close = pos;
         ap_mode = alloc_heap;
+        ap_yielding = May_yield;
       }
   | Peek None, _ | Poke None, _ ->
       raise(Error(to_location loc, Wrong_layout_for_peek_or_poke prim_name))

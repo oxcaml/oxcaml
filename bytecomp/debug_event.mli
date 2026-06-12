@@ -69,6 +69,12 @@ and debug_event_kind =
 and debug_event_info =
     Event_function
   | Event_return of int
+  | Event_unyielding_call of int
+      (* Number of arguments of a call that can never perform a free effect
+         (the function and all of its arguments are unyielding). Attached to
+         the [Event_after] event of a non-tail call, or to an [Event_pseudo]
+         event placed at the instruction of a tail call. Consumed by
+         js_of_ocaml to emit direct-style calls when compiling effects. *)
   | Event_other
 
 and debug_event_repr =

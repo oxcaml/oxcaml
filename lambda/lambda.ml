@@ -133,6 +133,15 @@ type region_close =
   | Rc_nontail
   | Rc_close_at_apply
 
+type yielding_kind =
+  | May_yield
+  | Unyielding_apply
+
+let join_yielding_kind a b =
+  match a, b with
+  | May_yield, _ | _, May_yield -> May_yield
+  | Unyielding_apply, Unyielding_apply -> Unyielding_apply
+
 type any_locality_mode = Scalar.any_locality_mode = Any_locality_mode
 
 module Scalar = Scalar
@@ -1052,6 +1061,7 @@ and lambda_apply =
     ap_result_layout : layout;
     ap_region_close : region_close;
     ap_mode : locality_mode;
+    ap_yielding : yielding_kind;
     ap_loc : scoped_location;
     ap_tailcall : tailcall_attribute;
     ap_inlined : inlined_attribute;
@@ -2127,8 +2137,8 @@ let shallow_map ~tail ~non_tail:f lam =
   | Lconst _
   | Lsplice _ -> lam
   | Lapply { ap_func = old_func; ap_args = old_args; ap_result_layout;
-             ap_region_close; ap_mode; ap_loc; ap_tailcall; ap_inlined;
-             ap_specialised; ap_probe } ->
+             ap_region_close; ap_mode; ap_yielding; ap_loc; ap_tailcall;
+             ap_inlined; ap_specialised; ap_probe } ->
       let new_func = f old_func in
       let new_args = Misc.Stdlib.List.map_sharing f old_args in
       if old_func == new_func && old_args == new_args
@@ -2140,6 +2150,7 @@ let shallow_map ~tail ~non_tail:f lam =
           ap_result_layout;
           ap_region_close;
           ap_mode;
+          ap_yielding;
           ap_loc;
           ap_tailcall;
           ap_inlined;

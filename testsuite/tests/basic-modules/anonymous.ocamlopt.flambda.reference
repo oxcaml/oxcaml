@@ -31,5 +31,5 @@
               (makeblock 0)))
           (let
             (drop = (function {nlocal = 0} param? : int 0)
-             *match* =[value<int>] (apply drop (field_mut 0 s)))
+             *match* =[value<int>] (apply[unyielding] drop (field_mut 0 s)))
             (makeblock 0 A B f s drop)))))))

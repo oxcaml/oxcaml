@@ -200,6 +200,7 @@ and eval_lam_shallow env lam =
         ap_result_layout = old_result_layout;
         ap_region_close;
         ap_mode;
+        ap_yielding;
         ap_loc;
         ap_tailcall;
         ap_inlined;
@@ -216,6 +217,7 @@ and eval_lam_shallow env lam =
           ap_result_layout = new_result_layout;
           ap_region_close;
           ap_mode;
+          ap_yielding;
           ap_loc;
           ap_tailcall;
           ap_inlined;
