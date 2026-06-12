@@ -144,7 +144,7 @@ module All_summaries = Identifiable.Make (struct
 end)
 
 let die_for_inlined_frame state ~compilation_unit_proto_die ~parent
-    ~value_type_proto_die ~function_symbol ~frame_path
+    ~value_type_proto_die ~function_symbol ~vars_at_entry ~frame_path
     ~(call_site_item : Debuginfo.item) range_list_attributes block
     ~available_ranges_all_vars ~proto_dies_for_vars ~fun_end_label =
   let abstract_instance_symbol =
@@ -207,7 +207,7 @@ let die_for_inlined_frame state ~compilation_unit_proto_die ~parent
           ~proto_dies_for_vars
           ~which_vars:
             (Dwarf_variables_and_parameters.Vars_for_inlined_frame frame_path)
-          ~fun_end_label available_ranges_all_vars)
+          ~vars_at_entry ~fun_end_label available_ranges_all_vars)
       ~accumulate:true ());
   concrete_inlined_instance_die
 
@@ -262,8 +262,8 @@ let rec create_down_to_innermost_frame fundecl state ~start_of_code_symbol
     ~dwarf_4_base_address_entry ~compilation_unit_proto_die
     ~(prefix : Debuginfo.item list) ~(blocks_outermost_first : Debuginfo.t)
     scope_proto_dies all_summaries ~parent_die range inlined_frame_ranges
-    ~value_type_proto_die ~function_symbol ~available_ranges_all_vars
-    ~proto_dies_for_vars ~fun_end_label =
+    ~value_type_proto_die ~function_symbol ~vars_at_entry
+    ~available_ranges_all_vars ~proto_dies_for_vars ~fun_end_label =
   DS.Debug.log ">> create_down_to_innermost_frame: %a || %a\n%!"
     Debuginfo.print_compact_extended
     (Debuginfo.of_items prefix)
@@ -294,7 +294,8 @@ let rec create_down_to_innermost_frame fundecl state ~start_of_code_symbol
         ~blocks_outermost_first:(Debuginfo.of_items deeper_blocks)
         scope_proto_dies all_summaries ~parent_die:existing_die range
         inlined_frame_ranges ~value_type_proto_die ~function_symbol
-        ~available_ranges_all_vars ~proto_dies_for_vars ~fun_end_label
+        ~vars_at_entry ~available_ranges_all_vars ~proto_dies_for_vars
+        ~fun_end_label
     | exception Not_found ->
       (* See comment in the [dwarf] function below. The DIEs for everything
          except the innermost inlined frame should already exist because of the
@@ -329,8 +330,9 @@ let rec create_down_to_innermost_frame fundecl state ~start_of_code_symbol
       let inlined_subroutine_die =
         die_for_inlined_frame state ~compilation_unit_proto_die
           ~parent:parent_die ~value_type_proto_die ~function_symbol
-          ~frame_path:scope_key ~call_site_item range_list_attributes block
-          ~available_ranges_all_vars ~proto_dies_for_vars ~fun_end_label
+          ~vars_at_entry ~frame_path:scope_key ~call_site_item
+          range_list_attributes block ~available_ranges_all_vars
+          ~proto_dies_for_vars ~fun_end_label
       in
       DS.Debug.log "Our DIE ref (DW_TAG_inlined_subroutine) for %a is %a\n%!"
         Debuginfo.print_compact_extended block Asm_label.print
@@ -341,8 +343,8 @@ let rec create_down_to_innermost_frame fundecl state ~start_of_code_symbol
       scope_proto_dies, all_summaries)
 
 let dwarf state (fundecl : L.fundecl) inlined_frame_ranges ~value_type_proto_die
-    ~function_symbol ~function_proto_die ~available_ranges_all_vars
-    ~proto_dies_for_vars ~fun_end_label =
+    ~function_symbol ~function_proto_die ~vars_at_entry
+    ~available_ranges_all_vars ~proto_dies_for_vars ~fun_end_label =
   DS.Debug.log "\n\nDwarf_inlined_frames.dwarf: function proto DIE is %a\n%!"
     Asm_label.print
     (Proto_die.reference function_proto_die);
@@ -401,7 +403,8 @@ let dwarf state (fundecl : L.fundecl) inlined_frame_ranges ~value_type_proto_die
               ~blocks_outermost_first:parents_outermost_first scope_proto_dies
               all_summaries ~parent_die:function_proto_die range
               inlined_frame_ranges ~value_type_proto_die ~function_symbol
-              ~available_ranges_all_vars ~proto_dies_for_vars ~fun_end_label
+              ~vars_at_entry ~available_ranges_all_vars ~proto_dies_for_vars
+              ~fun_end_label
           | exception Not_found ->
             Misc.fatal_errorf
               "Function %s:@ couldn't find block_with_parents=%a.@ All ranges:"

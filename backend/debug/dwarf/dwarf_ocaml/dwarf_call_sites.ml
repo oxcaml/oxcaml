@@ -138,10 +138,10 @@ let dwarf_version () =
    that register. Variables at this level are immutable, so such a description
    is valid at any point in the function. Debuggers recover entry values by
    virtually unwinding to the caller and consulting the call site information
-   there; in particular such descriptions remain valid at tail call sites,
-   whose enclosing frame has been destroyed by the time the callee executes
-   (recovery then chains through the tail-calling function's own incoming call
-   site information, one frame further up). *)
+   there; in particular such descriptions remain valid at tail call sites, whose
+   enclosing frame has been destroyed by the time the callee executes (recovery
+   then chains through the tail-calling function's own incoming call site
+   information, one frame further up). *)
 let entry_value_rvalue ~(entry_available : Reg_availability_set.t) var :
     _ SLDL.Rvalue.t option =
   match entry_available with
@@ -167,8 +167,8 @@ let entry_value_rvalue ~(entry_available : Reg_availability_set.t) var :
                   (SLDL.Rvalue.entry_value_of_register ~dwarf_reg_number
                      (dwarf_version ()))
               | Stack _ | Unknown -> None)
-            | Var _ | Const_int _ | Const_naked_float _ | Const_symbol _ ->
-              None)))
+            | Var _ | Const_int _ | Const_naked_float _ | Const_symbol _ -> None
+            )))
       entry_avail None
 
 (* The [DW_AT_call_value] (GNU: [DW_AT_GNU_call_site_value]) attribute of a call
@@ -222,9 +222,9 @@ let call_site_value_attribute ~(arg : Reg.t)
           let rvalue =
             (* Spilled copies are preferred to entry values: the debugger can
                read them directly, without chaining through further call site
-               information. They cannot however be used at tail call sites
-               (the frame containing the spilled copy no longer exists when
-               the callee executes). *)
+               information. They cannot however be used at tail call sites (the
+               frame containing the spilled copy no longer exists when the
+               callee executes). *)
             let spilled_copy =
               if is_tail
               then None
@@ -239,8 +239,8 @@ let call_site_value_attribute ~(arg : Reg.t)
           match rvalue with
           | None -> []
           | Some rvalue ->
-            single_call_value_attribute (SLDL.compile (SLDL.of_rvalue rvalue))
-          ))))
+            single_call_value_attribute (SLDL.compile (SLDL.of_rvalue rvalue))))
+      ))
 
 let add_call_site_parameter ~call_site_die ~arg_index ~(arg : Reg.t)
     ~available_before ~entry_available ~is_tail ~stack_offset
@@ -251,8 +251,8 @@ let add_call_site_parameter ~call_site_die ~arg_index ~(arg : Reg.t)
     ()
   | Reg _ -> (
     match
-      call_site_value_attribute ~arg ~available_before ~entry_available
-        ~is_tail ~stack_offset ~fun_contains_calls ~fun_num_stack_slots
+      call_site_value_attribute ~arg ~available_before ~entry_available ~is_tail
+        ~stack_offset ~fun_contains_calls ~fun_num_stack_slots
     with
     | [] ->
       (* A call site parameter DIE without a means of computing the value passed
@@ -373,15 +373,15 @@ let indirect_callee_attributes ~(callee : Reg.t) ~(args : Reg.t array)
        precisely the function slot), which is passed as the final argument. If
        the closure is statically allocated (a symbol), has a spilled copy
        surviving the call, or is a parameter of the function being compiled
-       (whose value may be described as the entry value of the register in
-       which it arrived), then the code pointer can be recomputed by the
-       debugger in the context of the caller's frame even after the call. This
-       permits the use of [DW_AT_call_target] rather than the "clobbered"
-       variant: debuggers cannot identify callees, in particular when resolving
-       entry values during virtual unwinding, from clobbered target expressions.
-       (Spilled copies are not usable for tail calls, whose frames no longer
-       exist by the time the callee executes; statically-allocated closures and
-       entry values are always usable.) *)
+       (whose value may be described as the entry value of the register in which
+       it arrived), then the code pointer can be recomputed by the debugger in
+       the context of the caller's frame even after the call. This permits the
+       use of [DW_AT_call_target] rather than the "clobbered" variant: debuggers
+       cannot identify callees, in particular when resolving entry values during
+       virtual unwinding, from clobbered target expressions. (Spilled copies are
+       not usable for tail calls, whose frames no longer exist by the time the
+       callee executes; statically-allocated closures and entry values are
+       always usable.) *)
     if Array.length args < 1
     then None
     else
@@ -489,9 +489,9 @@ let dwarf state (fundecl : L.fundecl) ~function_proto_die =
      registers in which the function's parameters arrived (see
      [entry_value_rvalue] above). The registers are not associated with the
      parameters until the [Name_for_debugger] operations at the start of the
-     function's body have been processed, so the availability set is taken
-     from just after any such leading operations (at which point no register
-     has yet been modified). *)
+     function's body have been processed, so the availability set is taken from
+     just after any such leading operations (at which point no register has yet
+     been modified). *)
   let entry_available =
     let rec after_leading_naming_ops (insn : L.instruction) =
       match insn.desc with
@@ -531,9 +531,8 @@ let dwarf state (fundecl : L.fundecl) ~function_proto_die =
           ~target_attributes:(direct_callee_attributes state ~callee:func)
           ~args:insn.arg ~stack_offset ()
       (* For tail calls, parameter values are described using constants and
-         chained entry values; likewise the targets of indirect tail calls
-         (see [call_site_value_attribute] and [indirect_callee_attributes]
-         above). *)
+         chained entry values; likewise the targets of indirect tail calls (see
+         [call_site_value_attribute] and [indirect_callee_attributes] above). *)
       | Ltailcall_ind ->
         let callee = insn.arg.(0) in
         let args = Array.sub insn.arg 1 (Array.length insn.arg - 1) in
@@ -595,8 +594,8 @@ let dwarf state (fundecl : L.fundecl) ~function_proto_die =
      function has a call site entry (DWARF-5 spec section 3.3.1.6), which is not
      currently the case here: probes, self tail calls and, on architectures
      where [Proc.extcall_code_size_after_return_address] returns [None],
-     external calls are not described. However LLDB will not parse the call
-     site entries of a function at all unless its subprogram DIE carries this
+     external calls are not described. However LLDB will not parse the call site
+     entries of a function at all unless its subprogram DIE carries this
      attribute (see [SymbolFileDWARF::CollectCallEdges]), so it is set whenever
      any call site entry exists. *)
   if !described_a_call_site
