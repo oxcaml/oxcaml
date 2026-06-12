@@ -1,5 +1,5 @@
 (* TEST
- flags = "-w +A-22-27-32-60-67-70-71-72";
+ flags = "-w +A-22-27-32-34-60-67-70-71-72";
  setup-ocamlc.byte-build-env;
  compile_only = "true";
  ocamlc.byte;

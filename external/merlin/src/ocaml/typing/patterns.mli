@@ -17,6 +17,7 @@
 open Asttypes
 open Typedtree
 open Types
+open Data_types
 
 val omega : pattern
 (** aka. "Tpat_any" or "_"  *)
@@ -45,15 +46,12 @@ module Simple : sig
     | `Tuple of (string option * pattern) list
     | `Unboxed_tuple of (string option * pattern * Jkind.sort) list
     | `Construct of
-        Longident.t loc * constructor_description * constructor_representation
-        * (Jkind.sort * pattern) list
+        Longident.t loc * constructor_description * pattern list
     | `Variant of label * pattern option * row_desc ref
     | `Record of
-        (Longident.t loc * label_description * pattern) list
-        * record_sorts * record_representation * closed_flag
+        (Longident.t loc * label_description * pattern) list * closed_flag
     | `Record_unboxed_product of
-        (Longident.t loc * unboxed_label_description * pattern) list
-        * record_sorts * record_unboxed_product_representation * closed_flag
+        (Longident.t loc * unboxed_label_description * pattern) list * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
     | `Lazy of pattern
   ]
@@ -91,18 +89,14 @@ end
 module Head : sig
   type desc =
     | Any
-    | Construct of
-        constructor_description * constructor_representation * Jkind.sort list
+    | Construct of constructor_description
     | Constant of constant
     | Unboxed_unit
     | Unboxed_bool of bool
     | Tuple of string option list
     | Unboxed_tuple of (string option * Jkind.sort) list
-    | Record of
-        label_description list * record_sorts * record_representation
-    | Record_unboxed_product of
-        unboxed_label_description list * record_sorts *
-        record_unboxed_product_representation
+    | Record of label_description list
+    | Record_unboxed_product of unboxed_label_description list
     | Variant of
         { tag: label; has_arg: bool;
           cstr_row: row_desc ref;

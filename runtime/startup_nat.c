@@ -43,11 +43,8 @@
 #include "caml/globroots.h"
 #include "caml/frame_descriptors.h"
 
-extern int caml_parser_trace;
 extern char caml_system__code_begin, caml_system__code_end;
-/* The two symbols above are defined in runtime/$ARCH.S.
-   They use the old `__` separator convention because the new convention
-   gives `caml_system__code_begin`, which is not a valid C identifier. */
+/* The two symbols above are defined in runtime/$ARCH.S. */
 
 extern uintnat caml_prelinking_in_use;
 
@@ -59,11 +56,10 @@ static void init_segments(void)
 {
   extern struct segment caml_code_segments[];
   char * caml_code_area_start, * caml_code_area_end;
-  int i;
 
   if (caml_prelinking_in_use) {
     /* Register each segment as a separate code fragment */
-    for (i = 0; caml_code_segments[i].begin != 0; i++) {
+    for (int i = 0; caml_code_segments[i].begin != 0; i++) {
       caml_register_code_fragment(caml_code_segments[i].begin,
                                   caml_code_segments[i].end,
                                   DIGEST_LATER, NULL);
@@ -71,7 +67,7 @@ static void init_segments(void)
   } else {
     caml_code_area_start = caml_code_segments[0].begin;
     caml_code_area_end = caml_code_segments[0].end;
-    for (i = 1; caml_code_segments[i].begin != 0; i++) {
+    for (int i = 1; caml_code_segments[i].begin != 0; i++) {
       if (caml_code_segments[i].begin < caml_code_area_start)
         caml_code_area_start = caml_code_segments[i].begin;
       if (caml_code_segments[i].end > caml_code_area_end)
@@ -86,6 +82,14 @@ static void init_segments(void)
   caml_register_code_fragment(&caml_system__code_begin,
                               &caml_system__code_end,
                               DIGEST_IGNORE, NULL);
+#ifdef FUNCTION_SECTIONS
+  /* And the "hot" code for OCamlFDO */
+  extern char caml_hot__code_begin, caml_hot__code_end;
+  caml_register_code_fragment(&caml_hot__code_begin,
+                              &caml_hot__code_end,
+                              DIGEST_IGNORE, NULL);
+#endif /* FUNCTION_SECTIONS */
+
 }
 
 extern value caml_start_program (caml_domain_state*);
@@ -102,7 +106,7 @@ extern void caml_install_invalid_parameter_handler(void);
 
 value caml_startup_common(char_os **argv, int pooling)
 {
-  char_os * exe_name, * proc_self_exe;
+  const char_os * exe_name, * proc_self_exe;
   value res;
 
   caml_init_os_params();
@@ -110,11 +114,6 @@ value caml_startup_common(char_os **argv, int pooling)
   /* Determine options */
   caml_parse_ocamlrunparam();
 
-#ifdef DEBUG
-  // Silenced in oxcaml to make it easier to run tests that
-  // check program output.
-  // CAML_GC_MESSAGE (ANY, "### OCaml runtime: debug mode ###\n");
-#endif
   if (caml_params->cleanup_on_exit)
     pooling = 1;
   if (!caml_startup_aux(pooling))
@@ -239,7 +238,8 @@ caml_unit_deps_find(const char *name)
 /* The result of this macro must not be exposed to the GC. */
 #define init_module_failure_exn(fmt, ...) \
   Make_exception_result( \
-    caml_failure_exn(caml_alloc_sprintf("%s: " fmt, __func__, __VA_ARGS__)))
+    caml_exception_failure_value( \
+      caml_alloc_sprintf("%s: " fmt, __func__, __VA_ARGS__)))
 
 /* Initialize a module and its dependencies in topological order.
    Uses a recursive depth-first approach.

@@ -48,25 +48,6 @@ type nullable =
   | Nullable
   | Non_nullable
 
-type 'a mixed_block_element =
-  | Value of unit
-  | Float_boxed of 'a
-  | Float64
-  | Float32
-  | Bits8
-  | Bits16
-  | Bits32
-  | Bits64
-  | Vec128
-  | Vec256
-  | Vec512
-  | Word
-  | Untagged_immediate
-  | Product of 'a mixed_block_element array
-  | Splice_variable of Ident.t
-
-type mixed_block_shape = unit mixed_block_element array
-
 let split_vectors =
   (* The compiler toggles this value based on the target architecture. Since we don't have
      a target architecture, we arbitrarily choose the x86 case. *)

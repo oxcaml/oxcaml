@@ -322,8 +322,7 @@ let _ = fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
 Line 2, characters 25-26:
 2 |             (x : M.t) -> x + 1
                              ^
-Error: This expression has type "M.t" but an expression was expected of type
-         "int"
+Error: The value "x" has type "M.t" but an expression was expected of type "int"
 |}]
 
 (* 1 ~~> 2 ~~> 1  @  1 <=> 0 *)
@@ -333,8 +332,7 @@ let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) (x : M.t) ->
 Line 2, characters 25-26:
 2 |     <[ $(Quote.Expr.int (x + 1)) * 2 ]> ]>
                              ^
-Error: This expression has type "M.t" but an expression was expected of type
-         "int"
+Error: The value "x" has type "M.t" but an expression was expected of type "int"
 |}]
 (* 1 ~~> 2 ~~> 1  @  0 <=> 1 *)
 let _ = <[ fun (Equal : (M.t, int) Type.eq) (x : <[M.t]> expr) ->
@@ -343,7 +341,7 @@ let _ = <[ fun (Equal : (M.t, int) Type.eq) (x : <[M.t]> expr) ->
 Line 2, characters 8-9:
 2 |     <[ $x + 1 ]> ]>
             ^
-Error: This expression has type "<[M.t]> expr"
+Error: The value "x" has type "<[M.t]> expr"
        but an expression was expected of type "<[int]> expr"
        Type "M.t" = "int" is not compatible with type "int"
 |}]
@@ -355,8 +353,7 @@ let _ = fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
 Line 2, characters 25-26:
 2 |             (x : M.t) -> x + 1
                              ^
-Error: This expression has type "M.t" but an expression was expected of type
-         "int"
+Error: The value "x" has type "M.t" but an expression was expected of type "int"
 |}]
 (* 0 ~~> 0  @  1 <=> 2 *)
 let _ = fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
@@ -365,7 +362,7 @@ let _ = fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
 Line 2, characters 50-51:
 2 |             (x : <[<[M.t]> expr]> expr) -> <[<[$($x) + 1]>]>
                                                       ^
-Error: This expression has type "<[<[M.t]> expr]> expr"
+Error: The value "x" has type "<[<[M.t]> expr]> expr"
        but an expression was expected of type "<[<[int]> expr]> expr"
        Type "<[M.t]>" = "<[int]>" is not compatible with type "<[int]>"
        Type "M.t" is not compatible with type "int"
@@ -377,7 +374,7 @@ let _ = <[ fun (Equal : (M.t, int) Type.eq)
 Line 2, characters 40-41:
 2 |                (x : <[M.t]> expr) -> <[$x + 1]> ]>
                                             ^
-Error: This expression has type "<[M.t]> expr"
+Error: The value "x" has type "<[M.t]> expr"
        but an expression was expected of type "<[int]> expr"
        Type "M.t" = "int" is not compatible with type "int"
 |}]
@@ -388,8 +385,7 @@ let _ = fun (Equal : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq)
 Line 2, characters 25-26:
 2 |             (x : M.t) -> x + 1
                              ^
-Error: This expression has type "M.t" but an expression was expected of type
-         "int"
+Error: The value "x" has type "M.t" but an expression was expected of type "int"
 |}]
 (* 0 ~~> 0  @  2 <=> 1 *)
 let _ = fun (Equal : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq)
@@ -398,7 +394,7 @@ let _ = fun (Equal : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq)
 Line 2, characters 37-38:
 2 |             (x : <[M.t]> expr) -> <[$x + 1]>
                                          ^
-Error: This expression has type "<[M.t]> expr"
+Error: The value "x" has type "<[M.t]> expr"
        but an expression was expected of type "<[int]> expr"
        Type "M.t" is not compatible with type "int"
 |}]
@@ -409,7 +405,7 @@ let _ = fun (Equal : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq)
 Line 2, characters 63-64:
 2 |             (x : <[<[<[M.t]> expr]> expr]> expr) -> <[<[<[$($($x)) + 1]>]>]>
                                                                    ^
-Error: This expression has type "<[<[<[M.t]> expr]> expr]> expr"
+Error: The value "x" has type "<[<[<[M.t]> expr]> expr]> expr"
        but an expression was expected of type "<[<[<[int]> expr]> expr]> expr"
        Type "M.t" is not compatible with type "int"
 |}]
@@ -420,8 +416,7 @@ let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
 Line 2, characters 28-29:
 2 |                (x : M.t) -> x + 1 ]>
                                 ^
-Error: This expression has type "M.t" but an expression was expected of type
-         "int"
+Error: The value "x" has type "M.t" but an expression was expected of type "int"
 |}]
 (* 1 ~~> 1  @  2 <=> 3 *)
 let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
@@ -430,7 +425,7 @@ let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
 Line 2, characters 53-54:
 2 |                (x : <[<[M.t]> expr]> expr) -> <[<[$($x) + 1]>]> ]>
                                                          ^
-Error: This expression has type "<[<[M.t]> expr]> expr"
+Error: The value "x" has type "<[<[M.t]> expr]> expr"
        but an expression was expected of type "<[<[int]> expr]> expr"
        Type "<[M.t]>" = "<[int]>" is not compatible with type "<[int]>"
        Type "M.t" is not compatible with type "int"
@@ -526,7 +521,7 @@ let _ = fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
 Line 2, characters 37-38:
 2 |      <[ fun (x : <[M.t]> expr) -> <[$x + 1]> ]>
                                          ^
-Error: This expression has type "<[M.t]> expr"
+Error: The value "x" has type "<[M.t]> expr"
        but an expression was expected of type "<[int]> expr"
        Type "M.t" = "int" is not compatible with type "int"
 |}]
@@ -537,8 +532,7 @@ let _ = fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
 Line 2, characters 25-26:
 2 |   <[ <[ fun (x : M.t) -> x + 1 ]> ]>
                              ^
-Error: This expression has type "M.t" but an expression was expected of type
-         "int"
+Error: The value "x" has type "M.t" but an expression was expected of type "int"
 |}]
 (* 1 ~~> 2  @  1 <=> 2 *)
 let _ = <[ fun (Equal : (M.t, int) Type.eq) ->
@@ -547,8 +541,7 @@ let _ = <[ fun (Equal : (M.t, int) Type.eq) ->
 Line 2, characters 28-29:
 2 |         <[ fun (x : M.t) -> x + 1 ]> ]>
                                 ^
-Error: This expression has type "M.t" but an expression was expected of type
-         "int"
+Error: The value "x" has type "M.t" but an expression was expected of type "int"
 |}]
 (* 0 ~~> 1  @  2 <=> 1 *)
 let _ = fun (Equal : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq) ->
@@ -557,8 +550,7 @@ let _ = fun (Equal : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq) ->
 Line 2, characters 25-26:
 2 |      <[ fun (x : M.t) -> x + 1 ]>
                              ^
-Error: This expression has type "M.t" but an expression was expected of type
-         "int"
+Error: The value "x" has type "M.t" but an expression was expected of type "int"
 |}]
 (* 0 ~~> 1  @  2 <=> 3 *)
 let _ = fun (Equal : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq) ->
@@ -567,7 +559,7 @@ let _ = fun (Equal : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq) ->
 Line 2, characters 50-51:
 2 |      <[ fun (x : <[<[M.t]> expr]> expr) -> <[<[$($x) + 1]>]> ]>
                                                       ^
-Error: This expression has type "<[<[M.t]> expr]> expr"
+Error: The value "x" has type "<[<[M.t]> expr]> expr"
        but an expression was expected of type "<[<[int]> expr]> expr"
        Type "<[M.t]>" = "<[int]>" is not compatible with type "<[int]>"
        Type "M.t" is not compatible with type "int"
@@ -579,7 +571,7 @@ let _ = fun (Equal : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq) ->
 Line 2, characters 37-38:
 2 |   <[ <[ fun (x : <[M.t]> expr) -> <[$x + 1]> ]> ]>
                                          ^
-Error: This expression has type "<[M.t]> expr"
+Error: The value "x" has type "<[M.t]> expr"
        but an expression was expected of type "<[int]> expr"
        Type "M.t" = "int" is not compatible with type "int"
 |}]
@@ -591,8 +583,7 @@ let _ = fun (Equal : (<[<[<[M.t]> expr]> expr]> expr,
 Line 3, characters 25-26:
 3 |   <[ <[ fun (x : M.t) -> x + 1 ]> ]>
                              ^
-Error: This expression has type "M.t" but an expression was expected of type
-         "int"
+Error: The value "x" has type "M.t" but an expression was expected of type "int"
 |}]
 (* 1 ~~> 2  @  2 <=> 3 *)
 let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
@@ -601,7 +592,7 @@ let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
 Line 2, characters 40-41:
 2 |         <[ fun (x : <[M.t]> expr) -> <[$x + 1]> ]> ]>
                                             ^
-Error: This expression has type "<[M.t]> expr"
+Error: The value "x" has type "<[M.t]> expr"
        but an expression was expected of type "<[int]> expr"
        Type "M.t" = "int" is not compatible with type "int"
 |}]
@@ -612,8 +603,7 @@ let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
 Line 2, characters 28-29:
 2 |      <[ <[ fun (x : M.t) -> x + 1 ]> ]> ]>
                                 ^
-Error: This expression has type "M.t" but an expression was expected of type
-         "int"
+Error: The value "x" has type "M.t" but an expression was expected of type "int"
 |}]
 
 (* 0 ~~> 1  @  0 <=> 1 *)
@@ -626,8 +616,7 @@ let _ = <[
 Line 4, characters 8-9:
 4 |       <[x + 1]>)
             ^
-Error: This expression has type "M.t" but an expression was expected of type
-         "int"
+Error: The value "x" has type "M.t" but an expression was expected of type "int"
 |}]
 
 (* Evidence travels to the right stage in the past -- should always fail:
@@ -682,7 +671,7 @@ let _ = fun (type t) (x : t expr) -> <[
 Line 3, characters 7-8:
 3 |       $x + 1)
            ^
-Error: This expression has type "t expr" but an expression was expected of type
+Error: The value "x" has type "t expr" but an expression was expected of type
          "<[int]> expr"
        Type "t" is not compatible with type "<[int]>"
 |}]
@@ -694,8 +683,7 @@ let _ = fun (type t) (x : t expr) -> <[
 Line 3, characters 21-22:
 3 |       let y = $x in (y : int) + 1)
                          ^
-Error: This expression has type "$(t)" but an expression was expected of type
-         "int"
+Error: The value "y" has type "$(t)" but an expression was expected of type "int"
 |}]
 (* 2 ~~> 1  @  1 <=> 1 *)
 let _ = <[ fun (type t) (x : t expr) -> <[
@@ -706,7 +694,7 @@ let _ = <[ fun (type t) (x : t expr) -> <[
 Line 3, characters 7-8:
 3 |       $x + 1)
            ^
-Error: This expression has type "t expr" but an expression was expected of type
+Error: The value "x" has type "t expr" but an expression was expected of type
          "<[int]> expr"
        Type "t" is not compatible with type "<[int]>"
 |}]
@@ -723,8 +711,7 @@ let _ = fun (x : M.t) ->
 Line 3, characters 25-26:
 3 |         $(Quote.Expr.int x) + 1 ]>
                              ^
-Error: This expression has type "M.t" but an expression was expected of type
-         "int"
+Error: The value "x" has type "M.t" but an expression was expected of type "int"
 |}]
 
 (* 2 ~~> 0  @  2 <=> 1 *)
@@ -735,7 +722,7 @@ let _ = fun (x : <[M.t]> expr) ->
 Line 3, characters 26-27:
 3 |         $(Quote.Expr.int $x) + 1 ]> ]>
                               ^
-Error: This expression has type "<[M.t]> expr"
+Error: The value "x" has type "<[M.t]> expr"
        but an expression was expected of type "<[int]> expr"
        Type "M.t" is not compatible with type "int"
 |}]
@@ -749,8 +736,7 @@ let _ =
 Line 4, characters 25-26:
 4 |         $(Quote.Expr.int x) + 1 ]> ]>
                              ^
-Error: This expression has type "M.t" but an expression was expected of type
-         "int"
+Error: The value "x" has type "M.t" but an expression was expected of type "int"
 |}]
 
 (* Repeated equations at different stages *)
@@ -783,7 +769,7 @@ let _ = fun (Equal : (M.t, string) Type.eq) ->
 Line 3, characters 38-39:
 3 |         fun (x : <[M.t]> expr) -> <[ $x ^ "" ]>
                                           ^
-Error: This expression has type "<[M.t]> expr"
+Error: The value "x" has type "<[M.t]> expr"
        but an expression was expected of type "<[string]> expr"
        Type "<[M.t]>" = "<[int]>" is not compatible with type "<[string]>"
        Type "int" is not compatible with type "string"
@@ -796,7 +782,7 @@ let _ = fun (Equal : (M.t, string) Type.eq) ->
 Line 3, characters 25-26:
 3 |         fun (x : M.t) -> x + 0
                              ^
-Error: This expression has type "M.t" = "string"
+Error: The value "x" has type "M.t" = "string"
        but an expression was expected of type "int"
 |}]
 
@@ -826,8 +812,8 @@ let _ = fun (Equal : (M.t, string) Type.eq) ->
 Line 3, characters 25-26:
 3 |         fun (x : M.t) -> x ^ "" ]>
                              ^
-Error: This expression has type "M.t" = "int"
-       but an expression was expected of type "string"
+Error: The value "x" has type "M.t" = "int" but an expression was expected of type
+         "string"
 |}]
 (* fails, because we only instantiate stage 0 *)
 let _ = fun (Equal : (M.t, string) Type.eq) ->
@@ -837,7 +823,7 @@ let _ = fun (Equal : (M.t, string) Type.eq) ->
 Line 3, characters 45-46:
 3 |         fun (Equal : (M.t, int) Type.eq) -> $x ^ "" ]>
                                                  ^
-Error: This expression has type "<[M.t]> expr"
+Error: The value "x" has type "<[M.t]> expr"
        but an expression was expected of type "<[string]> expr"
        Type "<[M.t]>" = "<[int]>" is not compatible with type "<[string]>"
        Type "int" is not compatible with type "string"
@@ -905,7 +891,7 @@ let _ =
 Line 4, characters 38-39:
 4 |         fun (x : <[M.t]> expr) -> <[ $x ^ "" ]> ]>
                                           ^
-Error: This expression has type "<[M.t]> expr"
+Error: The value "x" has type "<[M.t]> expr"
        but an expression was expected of type "<[string]> expr"
        Type "<[M.t]>" = "<[int]>" is not compatible with type "<[string]>"
        Type "int" is not compatible with type "string"
@@ -919,7 +905,7 @@ let _ =
 Line 4, characters 25-26:
 4 |         fun (x : M.t) -> x + 0 ]>
                              ^
-Error: This expression has type "M.t" = "string"
+Error: The value "x" has type "M.t" = "string"
        but an expression was expected of type "int"
 |}]
 
@@ -967,7 +953,7 @@ let magic_with_time_travel_and_past_types (type a b) (x : a) : b =
 Line 4, characters 22-23:
 4 |      $(result := Some x; <[()]>) ]> |> ignore;
                           ^
-Error: This expression has type "a" but an expression was expected of type "b"
+Error: The value "x" has type "a" but an expression was expected of type "b"
 |}]
 (* Splices are not instantiable *)
 let foo (type a) (c : a expr) = <[
@@ -978,7 +964,7 @@ let bad = foo <["abc"]>
 Line 3, characters 5-6:
 3 |     $c + 42 ]>
          ^
-Error: This expression has type "a expr" but an expression was expected of type
+Error: The value "c" has type "a expr" but an expression was expected of type
          "<[int]> expr"
        Type "a" is not compatible with type "<[int]>"
 |}]

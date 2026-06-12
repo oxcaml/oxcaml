@@ -1000,7 +1000,7 @@ let instr_load_printer ppf lexbuf =
 let instr_install_printer ppf lexbuf =
   let lid = longident_eol Lexer.lexeme lexbuf in
   try
-    Loadprinter.install_printer ppf lid
+    Loadprinter.install_printer lid
   with Loadprinter.Error e ->
     Loadprinter.report_error ppf e; raise Toplevel
 
@@ -1096,14 +1096,14 @@ Argument N means do this N times (or till program stops for another reason)." };
      (* Breakpoints *)
      { instr_name = "break"; instr_prio = false;
        instr_action = instr_break; instr_repeat = false; instr_help =
-"Set breakpoint.\
-\nSyntax: break\
-\n        break function-name\
-\n        break @ [module] linenum\
-\n        break @ [module] linenum columnnum\
-\n        break @ [module] # characternum\
-\n        break frag:pc\
-\n        break pc" };
+{|Set breakpoint.
+Syntax: break
+        break function-name
+        break @ [module] linenum
+        break @ [module] linenum columnnum
+        break @ [module] # characternum
+        break frag:pc
+        break pc|} };
      { instr_name = "delete"; instr_prio = false;
        instr_action = instr_delete; instr_repeat = false; instr_help =
 "delete some breakpoints.\n\

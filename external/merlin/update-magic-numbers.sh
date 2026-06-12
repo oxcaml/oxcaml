@@ -32,7 +32,7 @@ fi
 
 # Check that git repo is clean
 if [ -n "$(git status --porcelain)" ]; then
-  printf "Git workspace is unclean.\nCommit changes before continuing to ensure changes don't get overwritten.\n" >&2
+  echo "Git workspace is unclean.\nCommit changes before continuing to ensure changes don't get overwritten" >&2
   exit 1
 fi
 
@@ -80,7 +80,7 @@ replace_magic_number index_magic_number I Merl2023
 # the above magic numbers (or some other known string). This helps ensure that there were
 # not any new magic numbers added that this script does not know about.
 # This isn't important to do in $version_test_file since tests would catch the mistake.
-okay_strings="[A-Z][a-z]{3}[0-9]{4}[A-Z]$magic_number_version|.mli|[a-z_]+_magic_number||Config.config_var is unimplemented in Merlin|print_config is unimplemented in Merlin"
+okay_strings="[A-Z][a-z]{3}[0-9]{4}[A-Z]$magic_number_version|.mli|[a-z_]+_magic_number"
 regex='"(?!'"$okay_strings"')[^"]*"'
 if grep -q -P "$regex" "$config_file"; then
   echo "Warning: There may be new magic numbers in $config_file that were not updated:" >&2

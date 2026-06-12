@@ -27,13 +27,13 @@ type runtime_counter =
 | EV_C_REQUEST_MINOR_REALLOC_REF_TABLE
 | EV_C_REQUEST_MINOR_REALLOC_EPHE_REF_TABLE
 | EV_C_REQUEST_MINOR_REALLOC_CUSTOM_TABLE
+| EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE
 | EV_C_MAJOR_HEAP_POOL_WORDS
 | EV_C_MAJOR_HEAP_POOL_LIVE_WORDS
 | EV_C_MAJOR_HEAP_LARGE_WORDS
 | EV_C_MAJOR_HEAP_POOL_FRAG_WORDS
 | EV_C_MAJOR_HEAP_POOL_LIVE_BLOCKS
 | EV_C_MAJOR_HEAP_LARGE_BLOCKS
-| EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE
 | EV_C_MAJOR_SLICE_ALLOC_WORDS
 | EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS
 | EV_C_MAJOR_SLICE_NEW_WORK
@@ -90,6 +90,7 @@ type runtime_phase =
 | EV_COMPACT_EVACUATE
 | EV_COMPACT_FORWARD
 | EV_COMPACT_RELEASE
+| EV_EMPTY_MINOR
 | EV_MINOR_EPHE_CLEAN
 | EV_MINOR_DEPENDENT
 
@@ -118,6 +119,8 @@ let runtime_counter_name counter =
       "request_minor_realloc_ephe_ref_table"
   | EV_C_REQUEST_MINOR_REALLOC_CUSTOM_TABLE ->
       "request_minor_realloc_custom_table"
+  | EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE ->
+      "request_minor_realloc_dependent_table"
   | EV_C_MAJOR_HEAP_POOL_WORDS ->
       "major_heap_pool_words"
   | EV_C_MAJOR_HEAP_POOL_LIVE_WORDS ->
@@ -130,8 +133,6 @@ let runtime_counter_name counter =
       "major_heap_pool_live_blocks"
   | EV_C_MAJOR_HEAP_LARGE_BLOCKS ->
       "major_heap_large_blocks"
-  | EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE ->
-      "request_minor_realloc_dependent_table"
   | EV_C_MAJOR_SLICE_ALLOC_WORDS ->
     "major_slice_alloc_words"
   | EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS ->
@@ -195,6 +196,7 @@ let runtime_phase_name phase =
   | EV_COMPACT_EVACUATE -> "compaction_evacuate"
   | EV_COMPACT_FORWARD -> "compaction_forward"
   | EV_COMPACT_RELEASE -> "compaction_release"
+  | EV_EMPTY_MINOR -> "empty_minor"
   | EV_MINOR_EPHE_CLEAN -> "minor_ephe_clean"
   | EV_MINOR_DEPENDENT -> "minor_dependent"
 
@@ -216,6 +218,11 @@ module Timestamp = struct
 
   let to_int64 t =
     t
+
+  external get_current : unit -> (t [@unboxed]) =
+    "caml_ml_runtime_current_timestamp"
+    "caml_ml_runtime_current_timestamp_unboxed"
+    [@@noalloc]
 end
 
 module Type = struct
@@ -242,11 +249,11 @@ module Type = struct
 
   let int = Int
 
-  let next_id = ref 3
+  let next_id = Atomic.make 3
 
   let register ~encode ~decode =
-    incr next_id;
-    Custom { serialize = encode; deserialize = decode; id = !next_id - 1}
+    let id = Atomic.fetch_and_add next_id 1 in
+    Custom { serialize = encode; deserialize = decode; id; }
 
   let id: type a. a t -> int = function
     | Unit -> 0
@@ -285,25 +292,25 @@ module User = struct
        the write buffer across calls.
 
        To be safe for multi-domain programs, we use domain-local
-       storage for the write buffer. To accomodate for multi-threaded
+       storage for the write buffer. To accommodate multi-threaded
        programs (without depending on the Thread module), we store
        a list of caches for each domain. This might leak a bit of
        memory: the number of buffers for a domain is equal to the
        maximum number of threads that requested a buffer concurrently,
        and we never free those buffers. *)
     let create_buffer () = Bytes.create 1024 in
-    let open struct 
-      type buffer_cache = bytes Modes.Contended.t list Atomic.t 
+    let open struct
+      type buffer_cache = bytes Modes.Contended.t list Atomic.t
     end in
-    let write_buffer_cache = 
+    let write_buffer_cache =
       Domain.Safe.DLS.new_key (fun () : buffer_cache -> Atomic.make [])
     in
     let rec pop_or_create buffers =
       match Atomic.get buffers with
       | [] -> {Modes.Contended.contended = create_buffer ()}
       | (b :: bs) as old_buffers ->
-        if Atomic.compare_and_set buffers old_buffers bs 
-        then b 
+        if Atomic.compare_and_set buffers old_buffers bs
+        then b
         else pop_or_create buffers
     in
     let rec push buffers buf =
@@ -317,7 +324,7 @@ module User = struct
       let buffers = Domain.Safe.DLS.get write_buffer_cache in
       let buf = pop_or_create buffers in
       Fun.protect ~finally:(fun () -> push buffers buf)
-        (fun () -> 
+        (fun () ->
           (* Safe because [buffers] contains unique references and no other
              thread could have popped [buf]. *)
           let buf = Obj.magic_uncontended buf.Modes.Contended.contended in

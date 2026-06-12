@@ -28,20 +28,27 @@ type file_prefix = string
 
 (* CR lmaurer: These overlap with functionality in [Compilation_unit] **)
 
+type error = Invalid_encoding of filename
+exception Error of error
+
 (** [modulize s] capitalizes the first letter of [s]. *)
 val modulize: string -> modname
 
 (** [normalize s] uncapitalizes the first letter of [s]. *)
 val normalize: string -> string
 
-(** [modname_from_source filename] is [modulize stem] where [stem] is the
+(** [lax_modname_from_source filename] is [modulize stem] where [stem] is the
     basename of the filename [filename] stripped from all its extensions.
-    For instance, [modname_from_source "/pa.th/x.ml.pp"] is ["X"]. *)
-val modname_from_source: filename -> modname
+    For instance, [lax_modname_from_source "/pa.th/x.ml.pp"] is ["X"]. *)
+val lax_modname_from_source: filename -> modname
+
+(** Same as {!lax_modname_from_source} but raises an {!error.Invalid_encoding}
+    error on filename with invalid utf8 encoding. *)
+val strict_modname_from_source: filename -> modname
 
 (** {2:module_name_validation Module name validation function}*)
 
-(** [is_unit_name ~strict name] is true only if [name] can be used as a
+(** [is_unit_name name] is true only if [name] can be used as a
     valid module name. *)
 val is_unit_name : modname -> bool
 
@@ -94,8 +101,8 @@ val kind: t -> intf_or_impl
 val check_unit_name : t -> unit
 
 (** [make ~check ~source_file ~for_pack_prefix kind prefix] associates both the
-    [source_file] and the module name {!modname_from_source}[ target_prefix] to
-    the prefix filesystem path [prefix].
+    [source_file] and the module name {!lax_modname_from_source}[ target_prefix]
+    to the prefix filesystem path [prefix].
 
    If [check_modname=true], this function emits a warning if the derived module
    name is not valid according to {!check_unit_name}.
@@ -152,7 +159,7 @@ module Artifact: sig
    val modname: t -> Compilation_unit.t
 
    (** [from_filename ~for_pack_prefix filename] reconstructs the module name
-       [modname_from_source filename] associated to the artifact [filename],
+       [lax_modname_from_source filename] associated to the artifact [filename],
        assuming the pack prefix is [for_pack_prefix]. *)
    val from_filename: for_pack_prefix:Compilation_unit.Prefix.t -> filename -> t
 

@@ -99,6 +99,6 @@ module type S = sig type t val x : t end
 Line 15, characters 8-10:
 15 |   unify ()
              ^^
-Error: This expression has type "unit" but an expression was expected of type
-         "M.t"
+Error: The constructor "()" has type "unit"
+       but an expression was expected of type "M.t"
 |}];;

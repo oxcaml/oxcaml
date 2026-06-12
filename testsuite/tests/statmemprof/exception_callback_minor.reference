@@ -1,1 +1,1 @@
-Exception from memprof.
+Exception from alloc_minor callback.

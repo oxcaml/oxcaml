@@ -81,8 +81,9 @@ module Nominal = struct
   module N = F(M)
 end
 
-(* from ocaml/ocaml#13955 no unused warning should be triggered for [test] *)
+(* from ocaml/ocaml#13955 no warning 32 should be triggered for [test] *)
 
+[@@@warning "-60"]
 module I : sig
   module F (_ : sig val test : int end) : sig end
 end = struct
@@ -97,6 +98,8 @@ end = struct
   module F(X:sig val x:int end) = struct let _ = X.x end
 end
 and Y: sig end = struct end
+
+[@@@warning "+60"]
 
 (* TEST
  flags = "-w +A";

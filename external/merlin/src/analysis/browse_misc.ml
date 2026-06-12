@@ -27,6 +27,7 @@
    )* }}} *)
 
 open Std
+open Data_types
 
 let dummy_type_scheme desc =
   Types.create_expr desc ~level:0 ~id:0 ~scope:Btype.generic_level
@@ -34,7 +35,7 @@ let dummy_type_scheme desc =
 let print_constructor c =
   let open Types in
   match c.cstr_args with
-  | [] -> Printtyp.tree_of_type_scheme (dummy_type_scheme (get_desc c.cstr_res))
+  | [] -> Out_type.tree_of_type_scheme (dummy_type_scheme (get_desc c.cstr_res))
   | args ->
     let labeled_args_without_modalities =
       List.map ~f:(fun arg -> (None, arg.ca_type)) args
@@ -46,7 +47,7 @@ let print_constructor c =
           c.cstr_res,
           commu_ok )
     in
-    Printtyp.tree_of_type_scheme (dummy_type_scheme desc)
+    Out_type.tree_of_type_scheme (dummy_type_scheme desc)
 
 let summary_prev = function
   | Env.Env_empty -> None

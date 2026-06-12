@@ -15,6 +15,14 @@
 
 open Format
 
+(* type of toplevel inputs *)
+type input =
+  | Stdin
+  | File of string
+  | String of string
+
+val filename_of_input: input -> string
+
 (* Set the load paths, before running anything *)
 
 val set_paths : unit -> unit
@@ -199,3 +207,14 @@ val use_existing_compilerlibs_state_for_artifacts : unit -> unit
 (** Returns [true] iff [use_existing_compilerlibs_state_for_artifacts] has been
     called. *)
 val using_existing_compilerlibs_state_for_artifacts : unit -> bool
+
+val load_file : formatter -> string -> bool
+(** Load a .cmxs, .cmx, or .cmxa file in-core and execute it. *)
+
+val preload_objects : string list ref
+(** List of compilation units to be loaded before entering the interactive
+    loop. *)
+
+val prepare : Format.formatter -> ?input:input -> unit -> bool
+(** Setup the load paths and initial toplevel environment and load compilation
+    units in {!preload_objects}. *)

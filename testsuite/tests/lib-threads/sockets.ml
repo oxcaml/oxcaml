@@ -2,7 +2,7 @@
  include systhreads;
  hassysthreads;
  not-macos;
- libunix;
+ not-target-windows; (* Broken on Windows (missing join?), needs to be fixed *)
  {
    bytecode;
  }{
@@ -17,7 +17,6 @@ open Printf
 let serve_connection s =
   let buf = Bytes.make 1024 '>' in
   let n = Unix.read s buf 2 (Bytes.length buf - 2) in
-  Thread.delay 0.1;
   ignore (Unix.write s buf 0 (n + 2));
   Unix.close s
 
@@ -30,16 +29,29 @@ let server sock =
 let mutex = Mutex.create ()
 let lines = ref []
 
-let client (addr, msg) =
+let client1_done = Event.new_channel ()
+
+let wait_for_turn id =
+  if id = 2 then
+    Event.receive client1_done |> Event.sync |> ignore
+
+let signal_turn id =
+  if id = 1 then
+    Event.send client1_done 2 |> Event.sync
+
+let client (id, addr) =
+  let msg = "Client #" ^ Int.to_string id ^ "\n" in
   let sock =
     Unix.socket (Unix.domain_of_sockaddr addr) Unix.SOCK_STREAM 0 in
   Unix.connect sock addr;
   let buf = Bytes.make 1024 ' ' in
-  ignore(Unix.write_substring sock msg 0 (String.length msg));
+  ignore (Unix.write_substring sock msg 0 (String.length msg));
   let n = Unix.read sock buf 0 (Bytes.length buf) in
+  wait_for_turn id;
   Mutex.lock mutex;
   lines := (Bytes.sub buf 0 n) :: !lines;
-  Mutex.unlock mutex
+  Mutex.unlock mutex;
+  signal_turn id
 
 let () =
   let addr = Unix.ADDR_INET(Unix.inet_addr_loopback, 0) in
@@ -50,9 +62,8 @@ let () =
   let addr = Unix.getsockname sock in
   Unix.listen sock 5;
   ignore (Thread.create server sock);
-  let client1 = Thread.create client (addr, "Client #1\n") in
-  Thread.delay 0.05;
-  client (addr, "Client #2\n");
-  Thread.join client1;
+  let c = Thread.create client (2, addr) in
+  client (1, addr);
+  Thread.join c;
   List.iter print_bytes (List.sort Bytes.compare !lines);
   flush stdout

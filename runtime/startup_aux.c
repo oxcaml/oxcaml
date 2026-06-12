@@ -25,11 +25,14 @@
 #include "caml/backtrace.h"
 #include "caml/memory.h"
 #include "caml/callback.h"
+#include "caml/domain.h"
 #include "caml/major_gc.h"
 #ifndef NATIVE_CODE
 #include "caml/dynlink.h"
 #endif
+#include "caml/gc_stats.h"
 #include "caml/osdeps.h"
+#include "caml/shared_heap.h"
 #include "caml/startup_aux.h"
 #include "caml/prims.h"
 #include "caml/signals.h"
@@ -128,7 +131,6 @@ static void scanmult (char_os *opt, uintnat *var)
   case 'k':   *var = (uintnat) val * 1024; break;
   case 'M':   *var = (uintnat) val * (1024 * 1024); break;
   case 'G':   *var = (uintnat) val * (1024 * 1024 * 1024); break;
-  case 'v':   atomic_store_relaxed((atomic_uintnat *)var, val); break;
   default:    *var = (uintnat) val; break;
   }
 }
@@ -161,9 +163,9 @@ static void parse_gc_tweak(char_os** opt_p)
   *opt_p = opt;
 }
 
-
 static void parse_ocamlrunparam(char_os* opt)
 {
+  uintnat val;
   if (opt != NULL){
     while (*opt != '\0'){
       switch (*opt++){
@@ -186,7 +188,10 @@ static void parse_ocamlrunparam(char_os* opt)
       case 'R': break; /*  see stdlib/hashtbl.mli */
       case 's': scanmult (opt, &params.init_minor_heap_wsz); break;
       case 't': scanmult (opt, &params.trace_level); break;
-      case 'v': scanmult (opt, (uintnat *)&caml_verb_gc); break;
+      case 'v':
+        scanmult (opt, &val);
+        atomic_store_relaxed(&caml_verb_gc, val);
+        break;
       case 'V': scanmult (opt, &params.verify_heap); break;
       case 'w': break; /* major window in runtime 4 */
       case 'W': scanmult (opt, &caml_runtime_warnings); break;
@@ -259,16 +264,17 @@ int caml_startup_aux(int pooling)
   return 1;
 }
 
-static void call_registered_value(char* name)
+static void call_registered_value(const char* name)
 {
   const value *f = caml_named_value(name);
   if (f != NULL)
-    caml_callback_exn(*f, Val_unit);
+    caml_callback_res(*f, Val_unit);
 }
 
 CAMLexport void caml_shutdown(void)
 {
   Caml_check_caml_state();
+
   if (startup_count <= 0)
     caml_fatal_error("a call to caml_shutdown has no "
                      "corresponding call to caml_startup");
@@ -280,12 +286,21 @@ CAMLexport void caml_shutdown(void)
 
   call_registered_value("Pervasives.do_at_exit");
   call_registered_value("Thread.at_shutdown");
-  caml_finalise_heap();
+  if (!caml_domain_alone()) {
+    caml_gc_log("Some domains have not been joined prior to shutdown");
+    caml_stop_all_domains();
+  } else {
+    /* These calls are not safe to use if there are domains left running */
+    caml_domain_terminate(true);
+    caml_finalise_freelist();
+  }
+  caml_free_gc_stats();
   caml_free_locale();
 #ifndef NATIVE_CODE
   caml_free_shared_libs();
 #endif
-  caml_stat_destroy_pool();
+  if (caml_free_domains())
+    caml_stat_destroy_pool();
   caml_terminate_signals();
 #if defined(_WIN32) && defined(NATIVE_CODE)
   caml_win32_unregister_overflow_detection();

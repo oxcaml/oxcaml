@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "caml/alloc.h"
+#include <caml/alloc.h>
 
 #ifndef CAML_RUNTIME_5
 #define Cache_line_bsize 64

@@ -72,6 +72,10 @@ DISTCLEAN_FILES = \
   utils/config.common.ml \
   utils/config.generated.ml \
   compilerlibs/META \
+  otherlibs/dynlink/dynlink_cmo_format.mli \
+  otherlibs/dynlink/dynlink_cmxs_format.mli \
+  otherlibs/dynlink/dynlink_config.ml \
+  otherlibs/dynlink/dynlink_platform_intf.mli \
   otherlibs/unix/unix.ml \
   stdlib/META \
   stdlib/runtime.info \
