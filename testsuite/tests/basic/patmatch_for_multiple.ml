@@ -67,7 +67,8 @@ match (3, 2, 1) with
             (x/0 =a[value<
                      (consts ())
                       (non_consts ([0: value<int>, value<int>, value<int>]))>]
-               (makeblock 0 *match*/3 *match*/4 *match*/5))
+               (makeblock 0 (value<int>,value<int>,value<int>) *match*/3
+                 *match*/4 *match*/5))
             (exit 6 x/0)))
        with (8)
         (if (%int_notequal *match*/3 1) (exit 7)
@@ -75,7 +76,8 @@ match (3, 2, 1) with
             (x/1 =a[value<
                      (consts ())
                       (non_consts ([0: value<int>, value<int>, value<int>]))>]
-               (makeblock 0 *match*/3 *match*/4 *match*/5))
+               (makeblock 0 (value<int>,value<int>,value<int>) *match*/3
+                 *match*/4 *match*/5))
             (exit 6 x/1))))
      with (7) 0)
    with (6 x/2[value<
@@ -89,8 +91,12 @@ match (3, 2, 1) with
   (catch
     (if (%int_notequal *match*/4 3)
       (if (%int_notequal *match*/3 1) 0
-        (exit 6 (makeblock 0 *match*/3 *match*/4 *match*/5)))
-      (exit 6 (makeblock 0 *match*/3 *match*/4 *match*/5)))
+        (exit 6
+          (makeblock 0 (value<int>,value<int>,value<int>) *match*/3 *match*/4
+            *match*/5)))
+      (exit 6
+        (makeblock 0 (value<int>,value<int>,value<int>) *match*/3 *match*/4
+          *match*/5)))
    with (6 x/2[value<
                 (consts ())
                  (non_consts ([0: value<int>, value<int>, value<int>]))>])
@@ -128,10 +134,11 @@ let _ = fun a b -> match a, b with
   : (consts ()) (non_consts ([0: value<int>, ?]))
   (let
     (p/0 =a[value<(consts ()) (non_consts ([0: value<int>, ?]))>]
-       (makeblock 0 a/1 b/1))
+       (makeblock 0 (value<int>,?) a/1 b/1))
     p/0))
 (function {nlocal = 0} a/1[value<int>] b/1?
-  : (consts ()) (non_consts ([0: value<int>, ?])) (makeblock 0 a/1 b/1))
+  : (consts ()) (non_consts ([0: value<int>, ?]))
+  (makeblock 0 (value<int>,?) a/1 b/1))
 - : bool -> 'a -> bool * 'a = <fun>
 |}]
 
@@ -144,10 +151,11 @@ let _ = fun a b -> match a, b with
   : (consts ()) (non_consts ([0: value<int>, ?]))
   (let
     (p/1 =a[value<(consts ()) (non_consts ([0: value<int>, ?]))>]
-       (makeblock 0 a/2 b/2))
+       (makeblock 0 (value<int>,?) a/2 b/2))
     p/1))
 (function {nlocal = 0} a/2[value<int>] b/2?
-  : (consts ()) (non_consts ([0: value<int>, ?])) (makeblock 0 a/2 b/2))
+  : (consts ()) (non_consts ([0: value<int>, ?]))
+  (makeblock 0 (value<int>,?) a/2 b/2))
 - : bool -> 'a -> bool * 'a = <fun>
 |}];;
 
@@ -163,7 +171,7 @@ let _ = fun a b -> match a, b with
   (let
     (x/3 =a[value<int>] a/3
      p/2 =a[value<(consts ()) (non_consts ([0: value<int>, ?]))>]
-       (makeblock 0 a/3 b/3))
+       (makeblock 0 (value<int>,?) a/3 b/3))
     (makeblock 0 (value<int>,value<
                               (consts ()) (non_consts ([0: value<int>, ?]))>)
       x/3 p/2)))
@@ -173,7 +181,7 @@ let _ = fun a b -> match a, b with
                    value<(consts ()) (non_consts ([0: value<int>, ?]))>]))
   (makeblock 0 (value<int>,value<
                             (consts ()) (non_consts ([0: value<int>, ?]))>)
-    a/3 (makeblock 0 a/3 b/3)))
+    a/3 (makeblock 0 (value<int>,?) a/3 b/3)))
 - : bool -> 'a -> bool * (bool * 'a) = <fun>
 |}]
 
@@ -189,7 +197,7 @@ let _ = fun a b -> match a, b with
   (let
     (x/4 =a[value<int>] a/4
      p/3 =a[value<(consts ()) (non_consts ([0: value<int>, ?]))>]
-       (makeblock 0 a/4 b/4))
+       (makeblock 0 (value<int>,?) a/4 b/4))
     (makeblock 0 (value<int>,value<
                               (consts ()) (non_consts ([0: value<int>, ?]))>)
       x/4 p/3)))
@@ -199,7 +207,7 @@ let _ = fun a b -> match a, b with
                    value<(consts ()) (non_consts ([0: value<int>, ?]))>]))
   (makeblock 0 (value<int>,value<
                             (consts ()) (non_consts ([0: value<int>, ?]))>)
-    a/4 (makeblock 0 a/4 b/4)))
+    a/4 (makeblock 0 (value<int>,?) a/4 b/4)))
 - : bool -> 'a -> bool * (bool * 'a) = <fun>
 |}]
 
@@ -217,7 +225,7 @@ let _ = fun a b -> match a, b with
     (let
       (x/5 =a[value<int>] a/5
        p/4 =a[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
-         (makeblock 0 a/5 b/5))
+         (makeblock 0 (value<int>,value<int>) a/5 b/5))
       (makeblock 0 (value<int>,value<
                                 (consts ())
                                  (non_consts ([0: value<int>, value<int>]))>)
@@ -225,7 +233,7 @@ let _ = fun a b -> match a, b with
     (let
       (x/6 =a[value<(consts ()) (non_consts ([0: ]))>] b/5
        p/5 =a[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
-         (makeblock 0 a/5 b/5))
+         (makeblock 0 (value<int>,value<int>) a/5 b/5))
       (makeblock 0 (value<int>,value<
                                 (consts ())
                                  (non_consts ([0: value<int>, value<int>]))>)
@@ -239,11 +247,11 @@ let _ = fun a b -> match a, b with
     (makeblock 0 (value<int>,value<
                               (consts ())
                                (non_consts ([0: value<int>, value<int>]))>)
-      a/5 (makeblock 0 a/5 b/5))
+      a/5 (makeblock 0 (value<int>,value<int>) a/5 b/5))
     (makeblock 0 (value<int>,value<
                               (consts ())
                                (non_consts ([0: value<int>, value<int>]))>)
-      b/5 (makeblock 0 a/5 b/5))))
+      b/5 (makeblock 0 (value<int>,value<int>) a/5 b/5))))
 - : bool -> bool -> bool * (bool * bool) = <fun>
 |}]
 
@@ -263,12 +271,12 @@ let _ = fun a b -> match a, b with
       (let
         (x/7 =a[value<int>] a/6
          p/6 =a[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
-           (makeblock 0 a/6 b/6))
+           (makeblock 0 (value<int>,value<int>) a/6 b/6))
         (exit 31 x/7 p/6))
       (let
         (x/8 =a[value<(consts ()) (non_consts ([0: ]))>] b/6
          p/7 =a[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
-           (makeblock 0 a/6 b/6))
+           (makeblock 0 (value<int>,value<int>) a/6 b/6))
         (exit 31 x/8 p/7)))
    with (31 x/9[value<int>] p/8[value<
                                  (consts ())
@@ -283,8 +291,8 @@ let _ = fun a b -> match a, b with
                    value<
                     (consts ()) (non_consts ([0: value<int>, value<int>]))>]))
   (catch
-    (if a/6 (exit 31 a/6 (makeblock 0 a/6 b/6))
-      (exit 31 b/6 (makeblock 0 a/6 b/6)))
+    (if a/6 (exit 31 a/6 (makeblock 0 (value<int>,value<int>) a/6 b/6))
+      (exit 31 b/6 (makeblock 0 (value<int>,value<int>) a/6 b/6)))
    with (31 x/9[value<int>] p/8[value<
                                  (consts ())
                                   (non_consts ([0: value<int>, value<int>]))>])
@@ -313,7 +321,7 @@ let _ = fun a b -> match a, b with
     (let
       (x/10 =a[value<int>] a/7
        _p/0 =a[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
-         (makeblock 0 a/7 b/7))
+         (makeblock 0 (value<int>,value<int>) a/7 b/7))
       (makeblock 0 (value<int>,value<
                                 (consts ())
                                  (non_consts ([0: value<int>, value<int>]))>)
@@ -321,7 +329,7 @@ let _ = fun a b -> match a, b with
     (let
       (x/11 =a[value<int>] a/7
        p/9 =a[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
-         (makeblock 0 a/7 b/7))
+         (makeblock 0 (value<int>,value<int>) a/7 b/7))
       (makeblock 0 (value<int>,value<
                                 (consts ())
                                  (non_consts ([0: value<int>, value<int>]))>)
@@ -339,7 +347,7 @@ let _ = fun a b -> match a, b with
     (makeblock 0 (value<int>,value<
                               (consts ())
                                (non_consts ([0: value<int>, value<int>]))>)
-      a/7 (makeblock 0 a/7 b/7))))
+      a/7 (makeblock 0 (value<int>,value<int>) a/7 b/7))))
 - : bool -> bool -> bool * (bool * bool) = <fun>
 |}]
 
@@ -355,7 +363,7 @@ let _ = fun a b -> match a, b with
   (let
     (x/12 =a[value<int>] a/8
      p/10 =a[value<(consts ()) (non_consts ([0: value<int>, ?]))>]
-       (makeblock 0 a/8 b/8))
+       (makeblock 0 (value<int>,?) a/8 b/8))
     (makeblock 0 (value<int>,value<
                               (consts ()) (non_consts ([0: value<int>, ?]))>)
       x/12 p/10)))
@@ -365,7 +373,7 @@ let _ = fun a b -> match a, b with
                    value<(consts ()) (non_consts ([0: value<int>, ?]))>]))
   (makeblock 0 (value<int>,value<
                             (consts ()) (non_consts ([0: value<int>, ?]))>)
-    a/8 (makeblock 0 a/8 b/8)))
+    a/8 (makeblock 0 (value<int>,?) a/8 b/8)))
 - : bool -> 'a -> bool * (bool * 'a) = <fun>
 |}]
 
@@ -397,7 +405,13 @@ let _ =fun a b -> match a, b with
                 (consts ())
                  (non_consts ([0: value<int>,
                                value<(consts (0)) (non_consts ([0: *]))>]))>]
-         (makeblock 0 a/9 b/9))
+         (makeblock 0 (value<int>,value<
+                                   (consts (0))
+                                    (non_consts ([0:
+                                                  value<
+                                                   (consts ())
+                                                    (non_consts ([0: *, *]))>]))>)
+           a/9 b/9))
       p/12)))
 (function {nlocal = 0} a/9[value<int>]
   b/9[value<
@@ -406,7 +420,13 @@ let _ =fun a b -> match a, b with
   : (consts ())
      (non_consts ([0: value<int>, value<(consts (0)) (non_consts ([0: *]))>]))
   (catch (if a/9 (if b/9 (field_imm 0 b/9) (exit 42)) (exit 42)) with (42)
-    (makeblock 0 a/9 b/9)))
+    (makeblock 0 (value<int>,value<
+                              (consts (0))
+                               (non_consts ([0:
+                                             value<
+                                              (consts ())
+                                               (non_consts ([0: *, *]))>]))>)
+      a/9 b/9)))
 - : bool -> bool tuplist -> bool * bool tuplist = <fun>
 |}]
 
@@ -433,7 +453,13 @@ let _ = fun a b -> match a, b with
                   (consts ())
                    (non_consts ([0: value<int>,
                                  value<(consts (0)) (non_consts ([0: *]))>]))>]
-           (makeblock 0 a/10 b/10))
+           (makeblock 0 (value<int>,value<
+                                     (consts (0))
+                                      (non_consts ([0:
+                                                    value<
+                                                     (consts ())
+                                                      (non_consts ([0: *, *]))>]))>)
+             a/10 b/10))
         (exit 46 p/14)))
    with (46 p/15[value<
                   (consts ())
@@ -449,7 +475,15 @@ let _ = fun a b -> match a, b with
   (catch
     (catch
       (if a/10 (if b/10 (exit 46 (field_imm 0 b/10)) (exit 47)) (exit 47))
-     with (47) (exit 46 (makeblock 0 a/10 b/10)))
+     with (47)
+      (exit 46
+        (makeblock 0 (value<int>,value<
+                                  (consts (0))
+                                   (non_consts ([0:
+                                                 value<
+                                                  (consts ())
+                                                   (non_consts ([0: *, *]))>]))>)
+          a/10 b/10)))
    with (46 p/15[value<
                   (consts ())
                    (non_consts ([0: value<int>,

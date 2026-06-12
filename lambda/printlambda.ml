@@ -160,12 +160,19 @@ let locality_mode ppf = function
   | Alloc_heap -> fprintf ppf "heap"
   | Alloc_local -> fprintf ppf "local"
 
-let rec mixed_block_element print_value_kind ppf el =
-  match el with
-  | Value vk -> print_value_kind ppf vk
-  | Float_boxed _ -> fprintf ppf "float"
-  | Float32 -> fprintf ppf "float32"
+let or_null_suffix ppf nullable =
+  match nullable with
+  | Non_nullable -> ()
+  | Nullable -> fprintf ppf "_or_null"
+
+let rec mixed_block_element
+  : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element -> _ =
+  fun print_mode ppf elt ->
+  match elt with
+  | Value vk -> value_kind ppf vk
+  | Float_boxed param -> fprintf ppf "float_boxed%a" print_mode param
   | Float64 -> fprintf ppf "float64"
+  | Float32 -> fprintf ppf "float32"
   | Bits8 -> fprintf ppf "bits8"
   | Bits16 -> fprintf ppf "bits16"
   | Bits32 -> fprintf ppf "bits32"
@@ -177,40 +184,50 @@ let rec mixed_block_element print_value_kind ppf el =
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
   | Product shape ->
     fprintf ppf "product %a"
-      (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
-         (mixed_block_element print_value_kind)) (Array.to_list shape)
+      (mixed_block_shape print_mode) shape
   | Splice_variable id -> fprintf ppf "$%a" Ident.print id
 
-let constructor_shape print_value_kind ppf shape =
+and mixed_block_shape
+  : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element array -> _
+  = fun print_mode ppf shape ->
+  match Array.length shape with
+  | 0 -> fprintf ppf "()"
+  | 1 -> fprintf ppf "(%a)"
+          (mixed_block_element print_mode) shape.(0)
+  | _ -> begin
+    Array.iteri (fun i elt ->
+      if i = 0 then
+        fprintf ppf "(%a" (mixed_block_element print_mode) elt
+      else
+        fprintf ppf ",%a" (mixed_block_element print_mode) elt)
+      shape;
+    fprintf ppf ")"
+  end
+
+and tag_and_constructor_shape ppf (tag, shape) =
+  fprintf ppf "@[<hov 1>[%d:@ %a]@]"
+    tag
+    constructor_shape shape
+
+and constructor_shape ppf shape =
   match shape with
   | Constructor_uniform fields ->
      Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
-       print_value_kind ppf fields
-  | Constructor_mixed shape->
+       value_kind ppf fields
+  | Constructor_mixed shape ->
     fprintf ppf "%a"
       (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
-         (mixed_block_element print_value_kind)) (Array.to_list shape)
+         (mixed_block_element (fun _ () -> ()))) (Array.to_list shape)
 
-let tag_and_constructor_shape print_value_kind ppf (tag, shape) =
-  fprintf ppf "@[<hov 1>[%d:@ %a]@]"
-    tag
-    (constructor_shape print_value_kind)
-    shape
-
-let variant_kind print_value_kind ppf ~consts ~non_consts =
+and variant_kind ppf ~consts ~non_consts =
   fprintf ppf "@[<hov 1>(consts (%a))@ (non_consts (%a))@]"
     (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_int)
     consts
     (Format.pp_print_list ~pp_sep:Format.pp_print_space
-      (tag_and_constructor_shape print_value_kind))
+      tag_and_constructor_shape)
     non_consts
 
-let or_null_suffix ppf nullable =
-  match nullable with
-  | Non_nullable -> ()
-  | Nullable -> fprintf ppf "_or_null"
-
-let rec raw_value_kind ppf rk =
+and raw_value_kind ppf rk =
   match rk with
   | Pgenval -> fprintf ppf "value"
   | Pintval -> fprintf ppf "int"
@@ -219,7 +236,7 @@ let rec raw_value_kind ppf rk =
   | Pboxedintval bi -> fprintf ppf "%s" (boxed_integer bi)
   | Pboxedvectorval bv -> fprintf ppf "%s" (boxed_vector bv)
   | Pvariant { consts; non_consts; } ->
-    variant_kind value_kind ppf ~consts ~non_consts
+    variant_kind ppf ~consts ~non_consts
 
 and value_kind ppf vk =
   match vk with
@@ -229,6 +246,12 @@ and value_kind ppf vk =
     fprintf ppf "@[<hov 1>value%a<@,%a>@]"
       or_null_suffix nullable
       raw_value_kind raw_kind
+
+let mixed_block_shape_with_locality_mode ppf shape =
+  mixed_block_shape
+    (fun ppf mode -> fprintf ppf "(%s)" (locality_mode_if_local mode)) ppf shape
+
+let mixed_block_shape ppf shape = mixed_block_shape (fun _ () -> ()) ppf shape
 
 let rec layout ppf lay_ =
   match lay_ with
@@ -275,7 +298,7 @@ let return_kind ppf (mode, kind) =
       fprintf ppf ": %s%s%s@ " smode (boxed_vector bv) or_null_suffix
     | Pvariant { consts; non_consts; } ->
       fprintf ppf ": %a@ "
-        (fun ppf () -> variant_kind value_kind ppf ~consts ~non_consts) ()
+        (fun ppf () -> variant_kind ppf ~consts ~non_consts) ()
   end
   | Punboxed_float bf -> fprintf ppf ": %s@ " (unboxed_float bf)
   | Punboxed_or_untagged_integer bi -> fprintf ppf ": %s@ " (unboxed_integer bi)
@@ -323,48 +346,9 @@ let record_rep ppf r = match r with
   | Record_dummy _ -> fprintf ppf "dummy"
   | Record_variable -> fprintf ppf "variable"
 
-let rec mixed_block_element
-  : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element -> _ =
-  fun print_mode ppf elt ->
-  match elt with
-  | Value vk -> value_kind ppf vk
-  | Float_boxed param -> fprintf ppf "float_boxed(%a)" print_mode param
-  | Float64 -> fprintf ppf "float64"
-  | Float32 -> fprintf ppf "float32"
-  | Bits8 -> fprintf ppf "bits8"
-  | Bits16 -> fprintf ppf "bits16"
-  | Bits32 -> fprintf ppf "bits32"
-  | Bits64 -> fprintf ppf "bits64"
-  | Vec128 -> fprintf ppf "vec128"
-  | Vec256 -> fprintf ppf "vec256"
-  | Vec512 -> fprintf ppf "vec512"
-  | Word -> fprintf ppf "word"
-  | Untagged_immediate -> fprintf ppf "untagged_immediate"
-  | Product shape ->
-    fprintf ppf "product %a" (mixed_block_shape (fun _ _ -> ())) shape
-  | Splice_variable id -> fprintf ppf "$%a" Ident.print id
-
-and mixed_block_shape
-  : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element array -> _
-  = fun print_mode ppf shape ->
-  match Array.length shape with
-  | 0 -> ()
-  | 1 -> fprintf ppf " (%a)" (mixed_block_element print_mode) shape.(0)
-  | _ -> begin
-    Array.iteri (fun i elt ->
-      if i = 0 then
-        fprintf ppf " (%a" (mixed_block_element print_mode) elt
-      else
-        fprintf ppf ",%a" (mixed_block_element print_mode) elt)
-      shape;
-    fprintf ppf ")"
-  end
-
-let block_shape ppf shape = match shape with
-  | All_value -> ()
-  | Shape arr ->
-      if Array.for_all ((=) (Lambda.Value Lambda.generic_value)) arr then ()
-      else mixed_block_shape (fun _ () -> ()) ppf arr
+let elide_uniform print_mixed_block_shape ppf shape =
+  if Array.for_all ((=) (Lambda.Value Lambda.generic_value)) shape then ()
+  else fprintf ppf " %a" print_mixed_block_shape shape
 
 let field_read_semantics ppf sem =
   match sem with
@@ -409,13 +393,13 @@ let primitive ppf = function
   | Pgetpredef id -> fprintf ppf "getpredef %a!" Ident.print id
   | Pmakeblock(tag, Immutable, shape, mode) ->
       fprintf ppf "make%sblock %i%a"
-        (locality_mode_if_local mode) tag block_shape shape
+        (locality_mode_if_local mode) tag (elide_uniform mixed_block_shape) shape
   | Pmakeblock(tag, Immutable_unique, shape, mode) ->
       fprintf ppf "make%sblock_unique %i%a"
-        (locality_mode_if_local mode) tag block_shape shape
+        (locality_mode_if_local mode) tag (elide_uniform mixed_block_shape) shape
   | Pmakeblock(tag, Mutable, shape, mode) ->
       fprintf ppf "make%smutable %i%a"
-        (locality_mode_if_local mode) tag block_shape shape
+        (locality_mode_if_local mode) tag (elide_uniform mixed_block_shape) shape
   | Pmakefloatblock (Immutable, mode) ->
       fprintf ppf "make%sfloatblock Immutable"
         (locality_mode_if_local mode)
@@ -486,9 +470,7 @@ let primitive ppf = function
       fprintf ppf "mixedfield%a %a %a"
         field_read_semantics sem
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int) n
-        (mixed_block_shape
-          (fun ppf mode -> fprintf ppf "%s" (locality_mode_if_local mode)))
-        shape
+        mixed_block_shape_with_locality_mode shape
   | Psetfloatfield (n, init) ->
       let init =
         match init with
@@ -518,7 +500,7 @@ let primitive ppf = function
       fprintf ppf "setmixedfield%s %a %a"
         init
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int) n
-        (mixed_block_shape (fun _ _ -> ())) shape
+        mixed_block_shape shape
   | Pduprecord (rep, size) -> fprintf ppf "duprecord %a %i" record_rep rep size
   | Pwith_stack -> fprintf ppf "with_stack"
   | Pwith_stack_bind -> fprintf ppf "with_stack_bind"
@@ -541,7 +523,7 @@ let primitive ppf = function
       fprintf ppf "idx_field %d" pos
   | Pmake_idx_mixed_field (shape, pos, path) ->
       fprintf ppf "idx_mixed_field %a %a %a"
-        (mixed_block_shape (fun _ _ -> ())) shape
+        mixed_block_shape shape
         pp_print_int pos
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int)
           path
@@ -1239,7 +1221,7 @@ let rec struct_const ppf = function
   | Const_mixed_block(_, _, []) -> Misc.fatal_error "empty mixed block"
   | Const_mixed_block(tag, shape, hd::tl) ->
       fprintf ppf "@[<1>[%i mixed:@ (shape@ %a)@ @[%a@]]@]" tag
-        (mixed_block_shape (fun _ _ -> ())) shape
+        mixed_block_shape shape
         struct_consts (hd, tl)
   | Const_float_block [] ->
       fprintf ppf "[|b |]"

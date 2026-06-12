@@ -78,7 +78,7 @@ M.a
            M =
              (let (a =[value<int>] one b =[int] two_u)
                (makeblock 0 (?,untagged_immediate) a b)))
-          (mixedfield 0  (?,untagged_immediate) M)) ⟫ }
+          (mixedfield 0 (?,untagged_immediate) M)) ⟫ }
 - : int = 1
 |}];;
 

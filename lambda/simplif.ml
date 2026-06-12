@@ -654,10 +654,9 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
           mklet Strict kind v duid (Lprim(prim, [slinit], loc)) slbody
       in
       begin match kind_ref with
-        | All_value -> try_convert_mutlet Lambda.layout_value_field
-        | Shape [| Lambda.Value field_kind |] ->
+        | [| Lambda.Value field_kind |] ->
             try_convert_mutlet (Pvalue field_kind)
-        | Shape _ ->
+        | _ ->
             (* Non-value layout - this plausibly could also be optimised *)
             mklet Strict kind v duid (Lprim(prim, [slinit], loc)) slbody
       end

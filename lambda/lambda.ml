@@ -157,7 +157,7 @@ type primitive =
   | Pgetglobal of Compilation_unit.t * staticity
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
-  | Pmakeblock of int * mutable_flag * block_shape * locality_mode
+  | Pmakeblock of int * mutable_flag * mixed_block_shape * locality_mode
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
   | Pmakelazyblock of lazy_block_tag
@@ -461,10 +461,6 @@ and layout =
   | Pbottom
   | Psplicevar of Ident.t
 
-and block_shape =
-  | All_value
-  | Shape of mixed_block_shape
-
 and 'a mixed_block_element =
   | Value of value_kind
   | Float_boxed of 'a
@@ -695,10 +691,11 @@ and equal_constructor_shape x y =
       equal_mixed_block_shape shape1 shape2
   | (Constructor_uniform _ | Constructor_mixed _), _ -> false
 
-let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
-  match vks with
-  | None -> All_value
-  | Some vks -> Shape (Array.of_list (List.map (fun vk -> Value vk) vks))
+let block_shape_of_value_kinds vks =
+  Misc.Stdlib.Array.of_list_map (fun vk -> Value vk) vks
+
+let block_shape_of_generic_values n =
+  Array.init n (fun _ -> Value generic_value)
 
 (* CR rtjoa: This function is redundant with [Mixed_product_bytes], but it's
    duplicated for now. We should fix the module dependency structure *)
@@ -709,19 +706,9 @@ let rec is_value_or_void_element : _ mixed_block_element -> bool = function
   | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
   | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
     false
-(* CR layout poly: This function probably shouldn't exist at all and we should
-   merge mixed_block_shape and block_shape. *)
-let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
-    =
-  match shape with
-  | All_value -> None
-  | Shape shape ->
-    if Array.for_all is_value_or_void_element shape
-    then None
-    else Some shape
 
-let is_uniform_block_shape (shape : block_shape) : bool =
-  Option.is_none (mixed_block_of_block_shape shape)
+let is_uniform_block_shape (shape : mixed_block_shape) : bool =
+  Array.for_all is_value_or_void_element shape
 
 let equal_layout x y =
   match x, y with

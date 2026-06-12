@@ -4533,7 +4533,8 @@ let failure_handler ~scopes loc ~failer () =
     Lprim
       ( Praise Raise_regular,
         [ Lprim
-            ( Pmakeblock (0, Immutable, All_value, alloc_heap),
+            ( Pmakeblock (0, Immutable, block_shape_of_generic_values 2,
+                          alloc_heap),
               [ slot;
                 Lconst
                   (Const_block
@@ -4933,7 +4934,12 @@ let do_for_multiple_match ~scopes ~return_layout loc idl mode
   let param_lambda = List.map (fun (id, _, _) -> Lvar id) idl in
   let arg =
     let sloc = Scoped_location.of_location ~scopes loc in
-    Lprim (Pmakeblock (0, Immutable, All_value, mode), param_lambda, sloc)
+    let shape =
+      idl
+      |> List.map (fun (_lam, _sort, layout) -> must_be_value layout)
+      |> block_shape_of_value_kinds
+    in
+    Lprim (Pmakeblock (0, Immutable, shape, mode), param_lambda, sloc)
   in
   let input_args =
     { first = root_arg (Tuple arg) Strict

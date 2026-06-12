@@ -118,31 +118,29 @@ let convert_init_or_assign (i_or_a : L.initialization_or_assignment) :
   | Root_initialization ->
     Misc.fatal_error "[Root_initialization] should not appear in Flambda input"
 
-let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
-  match shape with
-  | All_value -> List.init num_fields (fun _field -> K.With_subkind.any_value)
-  | Shape shape ->
-    (* This function is only called for uniform block shapes. We flatten
-       products of values into individual value fields. *)
-    let rec collect_value_fields acc (elem : unit L.mixed_block_element) =
-      match elem with
-      | L.Value vk ->
-        K.With_subkind.from_lambda_value_kind ~machine_width vk :: acc
-      | Product elts -> Array.fold_left collect_value_fields acc elts
-      | Float_boxed ()
-      | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
-      | Vec512 | Word | Untagged_immediate | Splice_variable _ ->
-        Misc.fatal_error "convert_block_shape: non-uniform shape"
-    in
-    let fields = Array.fold_left collect_value_fields [] shape |> List.rev in
-    let fields_length = List.length fields in
-    if num_fields <> fields_length
-    then
-      Misc.fatal_errorf
-        "Flambda_arity.of_block_shape: num_fields is %d yet the shape has %d \
-         fields"
-        num_fields fields_length;
-    fields
+let convert_block_shape ~machine_width (shape : L.mixed_block_shape) ~num_fields
+    =
+  (* This function is only called for uniform block shapes. We flatten products
+     of values into individual value fields. *)
+  let rec collect_value_fields acc (elem : unit L.mixed_block_element) =
+    match elem with
+    | L.Value vk ->
+      K.With_subkind.from_lambda_value_kind ~machine_width vk :: acc
+    | Product elts -> Array.fold_left collect_value_fields acc elts
+    | Float_boxed ()
+    | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
+    | Vec512 | Word | Untagged_immediate | Splice_variable _ ->
+      Misc.fatal_error "convert_block_shape: non-uniform shape"
+  in
+  let fields = Array.fold_left collect_value_fields [] shape |> List.rev in
+  let fields_length = List.length fields in
+  if num_fields <> fields_length
+  then
+    Misc.fatal_errorf
+      "Flambda_arity.of_block_shape: num_fields is %d yet the shape has %d \
+       fields"
+      num_fields fields_length;
+  fields
 
 let check_float_array_optimisation_enabled dbg name =
   if not (Flambda_features.flat_float_array ())
@@ -1786,18 +1784,18 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pphys_equal eq, [[arg1]; [arg2]] ->
     let eq : P.equality_comparison = match eq with Eq -> Eq | Noteq -> Neq in
     [tag_int (Binary (Phys_equal eq, arg1, arg2))]
-  | Pmakeblock (tag, mutability, shape, mode), _ -> (
+  | Pmakeblock (tag, mutability, shape, mode), _ ->
     let args = List.flatten args in
     let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
     let tag = Tag.Scannable.create_exn tag in
     let mutability = Mutability.from_lambda mutability in
-    match L.mixed_block_of_block_shape shape with
-    | None ->
+    if L.is_uniform_block_shape shape
+    then
       let shape =
         convert_block_shape ~machine_width shape ~num_fields:(List.length args)
       in
       [Variadic (Make_block (Values (tag, shape), mutability, mode), args)]
-    | Some shape ->
+    else
       (* Mixed block *)
       let shape =
         Mixed_block_shape.of_mixed_block_elements
@@ -1838,10 +1836,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Mixed_record kind_shape -> kind_shape
         | Value_only ->
           Misc.fatal_error
-            "Pmakeblock: mixed_block_of_block_shape returned Some but \
-             from_mixed_block_shape returned Value_only"
+            "Pmakeblock: non-uniform block shape produced Value_only"
       in
-      [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)])
+      [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)]
   | Pmakelazyblock lazy_tag, [[arg]] -> [Unary (Make_lazy lazy_tag, arg)]
   | Pmake_unboxed_product layouts, _ ->
     (* CR mshinwell: this should check the unarized lengths of [layouts] and

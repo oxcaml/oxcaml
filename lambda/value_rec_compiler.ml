@@ -75,10 +75,9 @@ let update_lazy_prim =
 
 (* Simple blocks *)
 type block_size =
-  | Regular_block of int
+  | Shape of Lambda.mixed_block_shape
   | Float_record of int
   | Lazy_block
-  | Mixed_record of Lambda.mixed_block_shape
 
 type size =
   | Unreachable
@@ -166,7 +165,7 @@ let find_size_of_alloc_prim prim args =
     | _ ->  None
   in
   if same_as alloc_prim then
-    Option.map (fun n -> Regular_block n) int_arg
+    Option.map (fun n -> Shape (block_shape_of_generic_values n)) int_arg
   else if same_as alloc_float_record_prim then
     Option.map (fun n -> Float_record n) int_arg
   else if same_as alloc_lazy_prim then
@@ -258,16 +257,6 @@ let compute_static_size lam =
               join_sizes action size (compute_expression_size env action))
             size cases)
         Unreachable all_cases
-  (* In native code, void fields are erased, so the runtime block size is the
-     number of value fields only. In bytecode, void fields are kept, so the
-     block size includes all fields. *)
-  and all_value_mixed_block_size shape =
-    if !Clflags.native_code then
-      Mixed_product_bytes.value_prefix_len
-        (Mixed_product_bytes.count (Product shape))
-    else Array.length shape
-  and all_value_mixed_block_size_types shape =
-    all_value_mixed_block_size (Lambda.transl_mixed_product_shape shape)
   and size_of_primitive env p args =
     match p with
     | Pignore
@@ -308,18 +297,13 @@ let compute_static_size lam =
         | Record_boxed
         | Record_inlined (_, Constructor_uniform_value,
                           (Variant_boxed _ | Variant_extensible)) ->
-            Block (Regular_block size)
+            Block (Shape (block_shape_of_generic_values size))
+        | Record_mixed shape
+        | Record_inlined (_, Constructor_mixed shape,
+                          (Variant_boxed _ | Variant_extensible)) ->
+            Block (Shape (Lambda.transl_mixed_product_shape shape))
         | Record_float ->
             Block (Float_record size)
-        | Record_inlined (_, Constructor_mixed shape,
-                          (Variant_boxed _ | Variant_extensible))
-        | Record_mixed shape ->
-            if Mixed_product_bytes.types_shape_is_all_value shape
-            then
-              Block (Regular_block
-                (all_value_mixed_block_size_types shape))
-            else
-              Block (Mixed_record (Lambda.transl_mixed_product_shape shape))
         | Record_unboxed | Record_ufloat
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
@@ -331,28 +315,16 @@ let compute_static_size lam =
               "size_of_primitive: unexpected variable representation"
         end
     | Pmakeblock (_, _, shape, _) ->
-        (* The block shape is unfortunately an option, so we rely on the
-           number of arguments instead.
-           Note that flat float arrays/records use Pmakearray, so we don't need
+        (* Note that flat float arrays/records use Pmakearray, so we don't need
            to check the tag here. *)
-        (* CR layout poly: This is no longer known before slambda eval, we
-           should merge Regular_block and Mixed_record (and fix the error
-           produced by [mixed_block_of_block_shape]). *)
-        (match Lambda.mixed_block_of_block_shape shape with
-         | None ->
-           let size = match shape with
-             | All_value -> List.length args
-             | Shape shape -> all_value_mixed_block_size shape
-           in
-           Block (Regular_block size)
-         | Some arr -> Block (Mixed_record arr))
+        Block (Shape shape)
     | Pmakelazyblock _ ->
         Block Lazy_block
     | Pmakearray (kind, _, _) ->
         let size = List.length args in
         begin match kind with
         | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray ->
-            Block (Regular_block size)
+            Block (Shape (block_shape_of_generic_values size))
         | Pfloatarray ->
             Block (Float_record size)
         | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
@@ -605,7 +577,8 @@ let rec split_static_function lfun block_var local_idents lam :
         lfun.params
     in
     let ap_func =
-      Lprim (Pfield (0, Pointer, lifted_block_read_sem), [Lvar block_var], no_loc)
+      Lprim (Pfield (0, Pointer, lifted_block_read_sem),
+        [Lvar block_var], no_loc)
     in
     let body =
       Lapply {
@@ -634,8 +607,10 @@ let rec split_static_function lfun block_var local_idents lam :
     in
     let lifted = { lfun = wrapper; free_vars_block_size = 1 } in
     Reachable (lifted,
-               Lprim (Pmakeblock
-                        (0, lifted_block_mut, All_value, Lambda.alloc_heap),
+      Lprim (Pmakeblock
+                        (0, lifted_block_mut,
+                         Lambda.block_shape_of_generic_values 1,
+                         Lambda.alloc_heap),
                       [Lvar v], no_loc))
   | Lfunction lfun ->
     let free_vars = Lambda.free_variables lfun.body in
@@ -644,8 +619,7 @@ let rec split_static_function lfun block_var local_idents lam :
       Ident.Set.fold (fun var (i, subst, fields) ->
           let access =
             Lprim (Pfield (i, Pointer, lifted_block_read_sem),
-                   [Lvar block_var],
-                   no_loc)
+                   [Lvar block_var], no_loc)
           in
           (Stdlib.succ i, Ident.Map.add var access subst, Lvar var :: fields))
         local_free_vars (0, Ident.Map.empty, [])
@@ -661,7 +635,12 @@ let rec split_static_function lfun block_var local_idents lam :
     in
     let lifted = { lfun = new_fun; free_vars_block_size } in
     let block =
-      Lprim (Pmakeblock (0, lifted_block_mut, All_value, Lambda.alloc_heap),
+      Lprim (Pmakeblock
+               ( 0,
+                 lifted_block_mut,
+                 Lambda.block_shape_of_generic_values
+                   (List.length block_fields_rev),
+                 Lambda.alloc_heap),
              List.rev block_fields_rev,
              no_loc)
     in
@@ -943,6 +922,15 @@ let compile_indirect newval =
     ap_probe = None;
   }
 
+(* In native code, void fields are erased, so the runtime block size is the
+    number of value fields only. In bytecode, void fields are kept, so the
+    block size includes all fields. *)
+let all_value_mixed_block_size shape =
+  if !Clflags.native_code then
+    Mixed_product_bytes.value_prefix_len
+      (Mixed_product_bytes.count (Product shape))
+  else Array.length shape
+
 let compile_alloc size =
   let alloc prim const_args =
     Lprim (Pccall prim,
@@ -952,33 +940,35 @@ let compile_alloc size =
   (* if you add new allocation primitives below,
      you should update {!find_size_of_alloc_prim} as well. *)
   match size with
-  | Regular_block size ->
-      alloc alloc_prim [size]
   | Float_record size ->
       alloc alloc_float_record_prim [size]
   | Lazy_block ->
       Lprim(Pccall alloc_lazy_prim,
             [Lambda.lambda_unit],
             no_loc)
-  | Mixed_record shape ->
-      if !Clflags.native_code then
-        let shape =
-          Mixed_block_shape.of_mixed_block_elements
-            ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-            shape
-        in
-        let value_prefix_len = Mixed_block_shape.value_prefix_len shape in
-        let flat_suffix_len = Mixed_block_shape.flat_suffix_len shape in
-        let size = value_prefix_len + flat_suffix_len in
-        alloc alloc_mixed_record_prim [size; value_prefix_len]
-      else
-        let size = Array.length shape in
-        alloc alloc_mixed_record_prim [size; size]
+  | Shape shape ->
+    (* CR layout poly: This can no longer be computed before slambda eval, we
+       should use [Pmakeblock] here (or delay this until after). *)
+    if Mixed_product_bytes.shape_is_all_value shape then
+      alloc alloc_prim [all_value_mixed_block_size shape]
+    else if !Clflags.native_code then
+      let shape =
+        Mixed_block_shape.of_mixed_block_elements
+          ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+          shape
+      in
+      let value_prefix_len = Mixed_block_shape.value_prefix_len shape in
+      let flat_suffix_len = Mixed_block_shape.flat_suffix_len shape in
+      let size = value_prefix_len + flat_suffix_len in
+      alloc alloc_mixed_record_prim [size; value_prefix_len]
+    else
+      let size = Array.length shape in
+      alloc alloc_mixed_record_prim [size; size]
 
 let compile_update size dummy newval =
   let prim, newval =
     match size with
-    | Regular_block _ | Float_record _ | Mixed_record _ ->
+    | Shape _ | Float_record _ ->
       update_prim, newval
     | Lazy_block ->
       (* Consider the following example from Vincent Laviron:
@@ -1068,7 +1058,8 @@ let compile_letrec input_bindings body =
                 let functions = (id, duid, lfun) :: rev_bindings.functions in
                 let static =
                   (ctx_id, ctx_id_duid,
-                    Regular_block free_vars_block_size, lam)
+                    Shape (block_shape_of_generic_values free_vars_block_size),
+                    lam)
                   :: rev_bindings.static
                 in
                 { rev_bindings with functions; static }

@@ -505,7 +505,12 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
               | Pproduct_ignorable ignorables ->
                 let fields = List.map convert_ignorable ignorables in
                 Lprim
-                  ( Pmakeblock (0, Immutable, All_value, Lambda.alloc_heap),
+                  ( Pmakeblock
+                      ( 0,
+                        Immutable,
+                        Lambda.block_shape_of_generic_values
+                          (List.length fields),
+                        Lambda.alloc_heap ),
                     fields,
                     loc )
             in
@@ -527,20 +532,21 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         assert (kind = kind');
         comp_expr (Lambda.Lprim (Pmakearray (kind, mutability, m), args, loc))
       | _ -> unary (Ccall "caml_obj_dup"))
-    | Pmakeblock (tag, _mut, shape, _) -> (
-      match Lambda.mixed_block_of_block_shape shape with
-      | None -> pseudo_event (variadic (Makeblock { tag }))
-      | Some shape ->
+    | Pmakeblock (tag, _mut, shape, _) ->
+      if Lambda.is_uniform_block_shape shape
+      then pseudo_event (variadic (Makeblock { tag }))
+      else
         (* There is no notion of a mixed block at runtime in bytecode.
               Further, source-level unboxed types are represented as boxed in
               bytecode, so no ceremony is needed to box values before inserting
               them into the (normal, unmixed) block. *)
         let total_len = Array.length shape in
-        pseudo_event (variadic (Make_faux_mixedblock { total_len; tag })))
+        pseudo_event (variadic (Make_faux_mixedblock { total_len; tag }))
     | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
     | Pgetglobal (cu, _) -> nullary (Getglobal cu)
     | Pgetpredef id -> nullary (Getpredef id)
-    | Pfield (n, _, _) | Punboxed_product_field (n, _) -> unary (Getfield n)
+    | Pfield (n, _, _) -> unary (Getfield n)
+    | Punboxed_product_field (n, _) -> unary (Getfield n)
     | Parray_element_size_in_bytes _array_kind -> (
       match args with
       | [arg] ->

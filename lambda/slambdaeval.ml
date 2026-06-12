@@ -329,13 +329,6 @@ and eval_structured_const env const =
   | Const_null ->
     const
 
-and eval_block_shape env block_shape =
-  match block_shape with
-  | All_value -> block_shape
-  | Shape old_shape ->
-    let new_shape = eval_mixed_block_shape env old_shape in
-    if new_shape == old_shape then block_shape else Shape new_shape
-
 and eval_mixed_block_shape :
     'a. Env.t -> 'a mixed_block_element array -> 'a mixed_block_element array =
  fun env shape ->
@@ -399,7 +392,7 @@ and eval_lfunction_shallow env
 and eval_prim env prim =
   match prim with
   | Pmakeblock (n, mut, old_shape, mode) ->
-    let new_shape = eval_block_shape env old_shape in
+    let new_shape = eval_mixed_block_shape env old_shape in
     if new_shape == old_shape then prim else Pmakeblock (n, mut, new_shape, mode)
   | Pmixedfield (is, old_shape, sem) ->
     let new_shape = eval_mixed_block_shape env old_shape in
@@ -534,7 +527,7 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
     assert_layout_contains_no_splices layout
   | Pmake_unboxed_product layouts | Punboxed_product_field (_, layouts) ->
     List.iter assert_layout_contains_no_splices layouts
-  | Pmakeblock (_, _, Shape shape, _) ->
+  | Pmakeblock (_, _, shape, _) ->
     assert_mixed_block_shape_contains_no_splices shape
   | Pmixedfield (_, shape, _) ->
     Array.iter assert_mixed_block_element_contains_no_splices shape

@@ -867,10 +867,7 @@ let offset ~loc ~idx ~index_kind n =
 let make_boxed_vec256 ~loc ~mode args =
   L.Lprim
     ( Preinterpret_tuple_as_boxed_vector Boxed_vec256,
-      [ Lprim
-          ( Pmakeblock (0, Immutable, Shape [| Vec128; Vec128 |], mode),
-            args,
-            loc ) ],
+      [Lprim (Pmakeblock (0, Immutable, [| Vec128; Vec128 |], mode), args, loc)],
       loc )
 
 let boxed_vec256_to_mixed ~loc arg =

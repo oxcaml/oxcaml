@@ -99,7 +99,9 @@ let transl_type_extension ~scopes env rootpath tyext body =
     body
 
 let block_of_module_representation ~loc = function
-  | Module_value_only _ -> Pmakeblock(0, Immutable, All_value, alloc_heap)
+  | Module_value_only { field_count } ->
+    Pmakeblock(0, Immutable, block_shape_of_generic_values field_count,
+               alloc_heap)
   | Module_mixed (shape, _) ->
     let mpb = Mixed_product_bytes.count (Product shape) in
     (* All-value/void shapes compile to uniform blocks, so the scannable
@@ -108,7 +110,7 @@ let block_of_module_representation ~loc = function
     then
       Typedecl.assert_mixed_product_support loc Module
         ~value_prefix_len:(Mixed_product_bytes.value_prefix_len mpb);
-    Pmakeblock(0, Immutable, Shape shape, alloc_heap)
+    Pmakeblock(0, Immutable, shape, alloc_heap)
 
 (* Compile a coercion *)
 
@@ -1103,7 +1105,8 @@ let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
     add_arg_block_to_module_block ~loc lam repr cc2
 
 let wrap_toplevel_functor_in_struct code =
-  Lprim(Pmakeblock(0, Immutable, All_value, Lambda.alloc_heap),
+  Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 1,
+                   Lambda.alloc_heap),
         [ code ],
         Loc_unknown)
 

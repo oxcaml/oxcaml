@@ -669,9 +669,9 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
        let mode = get_first_arg_mode () in
        Primitive ((Psetfield(1, Pointer, Assignment mode)), 2);
     | "%makeblock" ->
-       Primitive ((Pmakeblock(0, Immutable, All_value, mode)), 1)
+      Primitive ((Pmakeblock(0, Immutable, [| Value generic_value |], mode)), 1)
     | "%makemutable" ->
-       Primitive ((Pmakeblock(0, Mutable, All_value, mode)), 1)
+      Primitive ((Pmakeblock(0, Mutable, [| Value generic_value |], mode)), 1)
     | "%raise" -> Raise Raise_regular
     | "%reraise" -> Raise Raise_reraise
     | "%raise_notrace" -> Raise Raise_notrace
@@ -1808,8 +1808,9 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       | Pbigarray_unknown, Pbigarray_unknown_layout -> None
       | _, _ -> Some (Primitive (Pbigarrayset(unsafe, n, k, l), arity))
     end
-  | Primitive (Pmakeblock(tag, mut, All_value, mode), arity), fields ->
-    begin
+  | Primitive (Pmakeblock(tag, mut, old_shape, mode), arity), fields
+    when Array.for_all (fun knd -> knd = Value Lambda.generic_value) old_shape
+    -> begin
       let shape =
         List.map (fun typ ->
           Lambda.must_be_value (Typeopt.layout env (to_location loc)
@@ -1819,7 +1820,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       let useful = List.exists (fun knd -> knd <> Lambda.generic_value) shape in
       if useful then
         Some (Primitive (Pmakeblock(tag, mut,
-                           Lambda.block_shape_of_value_kinds (Some shape),
+                           Lambda.block_shape_of_value_kinds shape,
                            mode), arity))
       else None
     end
@@ -2088,11 +2089,11 @@ let lambda_of_loc kind sloc =
   match kind with
   | Loc_POS ->
     Lconst (Const_block (0, [
-          Const_immstring file;
-          Const_base (Const_int lnum);
-          Const_base (Const_int cnum);
-          Const_base (Const_int enum);
-        ]))
+      Const_immstring file;
+      Const_base (Const_int lnum);
+      Const_base (Const_int cnum);
+      Const_base (Const_int enum);
+    ]))
   | Loc_FILE -> Lconst (Const_immstring file)
   | Loc_MODULE ->
     let filename = Filename.basename file in
@@ -2261,7 +2262,8 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       lambda_of_loc kind loc
   | Loc kind, [arg] ->
       let lam = lambda_of_loc kind loc in
-      Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
+      Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 2,
+                       alloc_heap),
             [lam; arg], loc)
   | Send (pos, layout), [obj; meth] ->
       Lsend(Public, meth, obj, [], pos, alloc_heap, loc, layout)
@@ -2310,7 +2312,8 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       Lprim (
         Praise Raise_regular,
         [Lprim (
-          Pmakeblock (0, Immutable, All_value, alloc_heap),
+          Pmakeblock (0, Immutable, block_shape_of_generic_values 2,
+                      alloc_heap),
           [exn; Lconst (Const_immstring msg)],
           loc)],
         loc)
