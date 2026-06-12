@@ -644,10 +644,10 @@ val mcomp : Env.t -> type_expr -> type_expr -> unit
 type unwrapped_type_expr =
   { ty : type_expr
   ; modality : Mode.Modality.Const.t
-  ; or_null : (type_declaration * unwrapped_type_expr) option;
-    (* We store the declaration rather than a bool to avoid re-writing the
-       with-bounds of [or_null], and to be more robust for the future where we
-       have user-defined [or_null]-like types
+  ; or_null : unwrapped_or_null option;
+    (* We store the declaration and arguments rather than a bool to avoid
+       re-writing the with-bounds of [or_null], and to be more robust for the
+       future where we have user-defined [or_null]-like types
 
        Note [unwrapped_type_expr backtracking for or_null]:
 
@@ -668,6 +668,8 @@ type unwrapped_type_expr =
        [estimate_type_jkind] to fix another bug.
     *)
   }
+
+and unwrapped_or_null
 
 val get_unboxed_type_representation :
   Env.t ->
