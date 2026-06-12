@@ -353,26 +353,25 @@ let indirect_callee_attributes ~(callee : Reg.t) ~(args : Reg.t array)
   in
   match closure_rvalue with
   | Some closure ->
-    (* The code pointer that an [Lcall_ind] branches to was loaded from a
-       fixed field of the function slot, chosen when the call was compiled:
-       field 0 for single-argument calls (generic applications of one
-       argument, see [Cmm_helpers.apply_or_call_caml_apply], and full
-       applications of arity-one functions, see
-       [Cmm_helpers.indirect_full_call]); field 2 for full applications
-       passing more than one argument ([Cmm_helpers.indirect_full_call], and
-       likewise the [caml_applyN] inline fast path, whose arity guard ensures
-       full application). Generic applications of more than one argument,
-       including overapplications, are direct calls to [caml_applyN] and do
-       not arise here. The closure information word must not be consulted
-       instead: at a field-0 call site the closure may be of any arity (for
-       example a partial application entering [caml_curryN], or a tupled
-       function, whose arity is encoded negatively), yet field 0 is still the
-       code pointer that was called. CR mshinwell: a single Cmm argument
-       occupying multiple machine registers (an unboxed product, only
-       possible for known-arity calls) is miscounted here, yielding field 2
-       where the call site loaded field 0; fixing this would require
-       propagating the field index from Cmm to Linear. The consequence is
-       only that the debugger will fail to identify the callee for such call
+    (* The code pointer that an [Lcall_ind] branches to was loaded from a fixed
+       field of the function slot, chosen when the call was compiled: field 0
+       for single-argument calls (generic applications of one argument, see
+       [Cmm_helpers.apply_or_call_caml_apply], and full applications of
+       arity-one functions, see [Cmm_helpers.indirect_full_call]); field 2 for
+       full applications passing more than one argument
+       ([Cmm_helpers.indirect_full_call], and likewise the [caml_applyN] inline
+       fast path, whose arity guard ensures full application). Generic
+       applications of more than one argument, including overapplications, are
+       direct calls to [caml_applyN] and do not arise here. The closure
+       information word must not be consulted instead: at a field-0 call site
+       the closure may be of any arity (for example a partial application
+       entering [caml_curryN], or a tupled function, whose arity is encoded
+       negatively), yet field 0 is still the code pointer that was called. CR
+       mshinwell: a single Cmm argument occupying multiple machine registers (an
+       unboxed product, only possible for known-arity calls) is miscounted here,
+       yielding field 2 where the call site loaded field 0; fixing this would
+       require propagating the field index from Cmm to Linear. The consequence
+       is only that the debugger will fail to identify the callee for such call
        sites. *)
     let num_value_args = Array.length args - 1 in
     let field = if num_value_args <= 1 then 0 else 2 in
