@@ -119,6 +119,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                   Texp_apply
                   apply_mode Tail
                   locality_mode global
+                  yielding_mode yielding
                   expression 
                     Texp_ident "Stdlib!.+"
                   [
@@ -128,6 +129,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                         Texp_apply
                         apply_mode Default
                         locality_mode global
+                        yielding_mode yielding
                         expression 
                           Texp_ident "fib"
                         [
@@ -137,6 +139,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                               Texp_apply
                               apply_mode Default
                               locality_mode global
+                              yielding_mode yielding
                               expression 
                                 Texp_ident "Stdlib!.-"
                               [
@@ -156,6 +159,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                         Texp_apply
                         apply_mode Default
                         locality_mode global
+                        yielding_mode yielding
                         expression 
                           Texp_ident "fib"
                         [
@@ -165,6 +169,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                               Texp_apply
                               apply_mode Default
                               locality_mode global
+                              yielding_mode yielding
                               expression 
                                 Texp_ident "Stdlib!.-"
                               [
@@ -187,5 +192,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
   (fib
      (function {nlocal = 0} n[value<int>] : int
        (if (isout 1 n)
-         (%int_add (apply fib (%int_sub n 1)) (apply fib (%int_sub n 2))) 1)))
+         (%int_add (apply[unyielding] fib (%int_sub n 1))
+           (apply[unyielding] fib (%int_sub n 2)))
+         1)))
   (makeblock 0 fib))

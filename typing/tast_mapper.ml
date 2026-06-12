@@ -538,14 +538,14 @@ let expr sub x =
         let ret_mode = sub.modes sub ret_mode in
         Texp_function { params; body; alloc_mode; ret_mode; ret_sort;
                         zero_alloc }
-    | Texp_apply (exp, list, pos, am, za) ->
+    | Texp_apply (exp, list, pos, am, ym, za) ->
         Texp_apply (
           sub.expr sub exp,
           List.map (function
             | (lbl, Arg (exp, sort)) -> (lbl, Arg (sub.expr sub exp, sort))
             | (lbl, Omitted o) -> (lbl, Omitted o))
             list,
-          pos, am, za
+          pos, am, ym, za
         )
     | Texp_match (exp, sort, cases, p) ->
         Texp_match (

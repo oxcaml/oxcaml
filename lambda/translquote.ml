@@ -361,6 +361,7 @@ let apply modname field loc args =
        { ap_func = Lazy.force comb;
          ap_args = args;
          ap_probe = None;
+         ap_yielding = May_yield;
          ap_loc = loc;
          ap_result_layout =
            Pvalue { raw_kind = Pgenval; nullable = Non_nullable };
@@ -3759,7 +3760,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
           e.exp_extra
       in
       Exp_desc.function_ loc fn
-    | Texp_apply (fn, args, _, _, _) ->
+    | Texp_apply (fn, args, _, _, _, _) ->
       let fn = quote_expression ~scopes ~transl stage fn in
       let args =
         List.filter

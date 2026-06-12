@@ -505,6 +505,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         ap_result_layout;
         ap_region_close;
         ap_mode;
+        ap_yielding = _;
         ap_loc;
         ap_tailcall = _;
         ap_inlined;

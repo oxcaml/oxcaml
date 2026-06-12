@@ -419,7 +419,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                                         desc = {val_kind = Val_prim p};
                                         kind = Id_prim (pmode, psort); _ };
                  exp_type = prim_type; } as funct,
-               oargs, pos, ap_mode, zero_alloc)
+               oargs, pos, ap_mode, ap_yielding, zero_alloc)
     when can_apply_primitive p pmode pos oargs ->
       let rec cut_args prim_repr oargs =
         match prim_repr, oargs with
@@ -467,14 +467,15 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         let specialised = Translattribute.get_specialised_attribute funct in
         let position = transl_apply_position pos in
         let mode = transl_locality_mode_l ap_mode in
+        let yielding = transl_yielding_mode_l ap_yielding in
         let result_layout = layout_exp sort e in
         event_after ~scopes e
           (transl_apply ~scopes ~tailcall ~inlined ~specialised
              ~assume_zero_alloc
-             ~position ~mode
+             ~position ~mode ~yielding
              ~result_layout lam extra_args (of_location ~scopes e.exp_loc))
       end
-  | Texp_apply(funct, oargs, position, ap_mode, zero_alloc)
+  | Texp_apply(funct, oargs, position, ap_mode, ap_yielding, zero_alloc)
     ->
       let tailcall = Translattribute.get_tailcall_attribute funct in
       let inlined = Translattribute.get_inlined_attribute funct in
@@ -482,6 +483,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let result_layout = layout_exp sort e in
       let position = transl_apply_position position in
       let mode = transl_locality_mode_l ap_mode in
+      let yielding = transl_yielding_mode_l ap_yielding in
       let assume_zero_alloc =
         zero_alloc_of_application ~num_args:(List.length oargs) zero_alloc funct
       in
@@ -489,7 +491,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         (transl_apply ~scopes ~tailcall ~inlined ~specialised
            ~assume_zero_alloc
            ~result_layout
-           ~position ~mode (transl_exp ~scopes Jkind.Sort.Const.for_function funct)
+           ~position ~mode ~yielding
+           (transl_exp ~scopes Jkind.Sort.Const.for_function funct)
            oargs (of_location ~scopes e.exp_loc))
   | Texp_match(arg, arg_sort, pat_expr_list, partial) ->
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
@@ -1044,6 +1047,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                     ap_args = [self];
                     ap_result_layout = layout;
                     ap_mode = mode;
+                    ap_yielding = May_yield;
                     ap_region_close = pos;
                     ap_probe = None;
                     ap_tailcall = Default_tailcall;
@@ -1063,6 +1067,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         ap_result_layout=layout_exp sort e;
         ap_region_close=pos;
         ap_mode=alloc_heap;
+        ap_yielding=May_yield;
         ap_tailcall=Default_tailcall;
         ap_inlined=Default_inlined;
         ap_specialised=Default_specialise;
@@ -1095,6 +1100,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
              ap_result_layout=Lambda.layout_object;
              ap_region_close=Rc_normal;
              ap_mode=alloc_heap;
+             ap_yielding=May_yield;
              ap_tailcall=Default_tailcall;
              ap_inlined=Default_inlined;
              ap_specialised=Default_specialise;
@@ -1355,6 +1361,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           ap_result_layout = return_layout;
           ap_region_close = Rc_normal;
           ap_mode = alloc_local;
+          ap_yielding = May_yield;
           ap_loc;
           ap_tailcall = Default_tailcall;
           ap_inlined = Never_inlined;
@@ -1488,6 +1495,7 @@ and transl_apply ~scopes
       ?(assume_zero_alloc = Zero_alloc_utils.Assume_info.none)
       ?(position=Rc_normal)
       ?(mode=alloc_heap)
+      ?(yielding=May_yield)
       ~result_layout
       lam sargs loc
   =
@@ -1512,9 +1520,14 @@ and transl_apply ~scopes
         Lsend(k, lmet, lobj, largs @ args, pos, mode, loc, result_layout)
     | Lapply ({ ap_region_close = (Rc_normal | Rc_nontail) } as ap),
       (Rc_normal | Rc_nontail) ->
+        (* The merged application applies more arguments through the
+           intermediate closure, so it is unyielding only if both layers
+           are. *)
         Lapply
           {ap with ap_args = ap.ap_args @ args; ap_loc = loc;
-                   ap_region_close = pos; ap_mode = mode; ap_result_layout = result_layout }
+                   ap_region_close = pos; ap_mode = mode;
+                   ap_yielding = join_yielding_kind ap.ap_yielding yielding;
+                   ap_result_layout = result_layout }
     | lexp, _ ->
       (* [assume_zero_alloc] is not used in the cases above but
          Misplaced_attribute won't be reported for it.
@@ -1534,6 +1547,7 @@ and transl_apply ~scopes
           ap_result_layout=result_layout;
           ap_region_close=pos;
           ap_mode=mode;
+          ap_yielding=yielding;
           ap_tailcall=tailcall;
           ap_inlined=inlined;
           ap_specialised=specialised;
@@ -2702,6 +2716,7 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
                ap_result_layout = result_layout;
                ap_region_close=Rc_normal;
                ap_mode=alloc_heap;
+               ap_yielding=May_yield;
                ap_tailcall = Default_tailcall;
                ap_inlined = Default_inlined;
                ap_specialised = Default_specialise;
@@ -2759,6 +2774,7 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
         let_.bop_op_type;
     ap_region_close=Rc_normal;
     ap_mode=alloc_heap;
+    ap_yielding=May_yield;
     ap_tailcall = Default_tailcall;
     ap_inlined = Default_inlined;
     ap_specialised = Default_specialise;
@@ -2779,13 +2795,13 @@ let transl_scoped_exp ~scopes sort exp =
   maybe_region_exp sort exp (transl_scoped_exp ~scopes sort exp)
 
 let transl_apply
-      ~scopes ?tailcall ?inlined ?specialised ?position ?mode ~result_layout fn
-      args loc =
+      ~scopes ?tailcall ?inlined ?specialised ?position ?mode ?yielding
+      ~result_layout fn args loc =
   maybe_region_layout result_layout
     (transl_apply
        ~scopes ?tailcall ?inlined ?specialised
        ~assume_zero_alloc:Zero_alloc_utils.Assume_info.none ?position ?mode
-       ~result_layout fn args loc)
+       ?yielding ~result_layout fn args loc)
 
 (* Error report *)
 

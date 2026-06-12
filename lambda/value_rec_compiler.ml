@@ -551,6 +551,7 @@ let rec split_static_function lfun block_var local_idents lam :
         ap_result_layout = lfun.return;
         ap_region_close = Rc_normal;
         ap_mode = lfun.ret_mode;
+        ap_yielding = May_yield;
         ap_probe = None;
       }
     in

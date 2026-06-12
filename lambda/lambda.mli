@@ -108,6 +108,18 @@ type region_close =
     tail call because the outer region needs to end there.)
 *)
 
+(** Whether an application might perform a free effect (i.e. an effect
+    handled in the parent stack). [Unyielding_apply] means the applied
+    function and all of its arguments were at mode [unyielding], so the
+    call can never perform a free effect. Only meaningful for bytecode
+    (it is recorded in debug events for consumers such as js_of_ocaml);
+    native backends ignore it. *)
+type yielding_kind =
+  | May_yield
+  | Unyielding_apply
+
+val join_yielding_kind : yielding_kind -> yielding_kind -> yielding_kind
+
 type any_locality_mode = Scalar.any_locality_mode = Any_locality_mode
 
 module Phys_equal : sig
@@ -1007,6 +1019,7 @@ and lambda_apply =
     ap_result_layout : layout;
     ap_region_close : region_close;
     ap_mode : locality_mode;
+    ap_yielding : yielding_kind;
     ap_loc : scoped_location;
     ap_tailcall : tailcall_attribute;
     ap_inlined : inlined_attribute; (* [@inlined] attribute in code *)

@@ -167,6 +167,12 @@ let merge_infos ev ev' =
   match ev.ev_info, ev'.ev_info with
   | Event_other, info -> info
   | info, Event_other -> info
+  (* Two call infos can collide at the same position, e.g. for [(f ()) x] in
+     tail position the [Event_after] of the inner call sits right at the
+     [Kappterm] where an [Event_unyielding_call] marker may be placed. Drop
+     the unyielding marker: its absence is the conservative "may yield". *)
+  | Event_unyielding_call _, info -> info
+  | info, Event_unyielding_call _ -> info
   | _ -> fatal_error "Bytegen.merge_infos"
 
 let merge_repr ev ev' =
@@ -196,7 +202,7 @@ let weaken_event ev cont =
     match cont with
     | Kpush :: Kevent ({ ev_repr = Event_none } as ev') :: c -> (
       match ev.ev_info with
-      | Event_return _ ->
+      | Event_return _ | Event_unyielding_call _ ->
         (* Weaken event *)
         let repr = ref 1 in
         let ev = copy_event ev Event_pseudo ev.ev_info (Event_parent repr)
@@ -384,7 +390,7 @@ and comp_expr stack_info env exp sz cont =
     if is_boot_compiler ()
     then translate_float32s_or_nulls stack_info env cst sz cont
     else add_const cst cont
-  | Apply { func; args; nontail } ->
+  | Apply { func; args; nontail; yielding = _ } ->
     let nargs = List.length args in
     if (not nontail) && is_tailcall cont
     then
@@ -737,11 +743,33 @@ and comp_expr stack_info env exp sz cont =
         | _ -> true
       in
       if preserve_tailcall && is_tailcall cont
-      then (* don't destroy tail call opt *)
-        comp_expr stack_info env lam sz cont
+      then
+        (* don't destroy tail call opt *)
+        match lam with
+        | Apply { func; args; nontail = false; yielding = Unyielding_apply } ->
+          (* A tail call has no "after" point to attach the event to.
+             Instead, place a pseudo event right at the [Kappterm]
+             instruction recording that the call is unyielding. [Kevent]
+             emits no instruction (it only records the position), so the
+             tail call is preserved. *)
+          let nargs = List.length args in
+          let ev =
+            { (event Event_pseudo (Event_unyielding_call nargs)) with
+              ev_stacksize = sz + nargs
+            }
+          in
+          comp_args stack_info env args sz
+            (Kpush
+            :: comp_expr stack_info env func (sz + nargs)
+                 (Kevent ev
+                 :: Kappterm (nargs, sz + nargs)
+                 :: discard_dead_code cont))
+        | _ -> comp_expr stack_info env lam sz cont
       else
         let info =
           match lam with
+          | Apply { args; yielding = Unyielding_apply; _ } ->
+            Event_unyielding_call (List.length args)
           | Apply { args; _ } -> Event_return (List.length args)
           | Send { obj; args; _ } -> Event_return (List.length (obj :: args))
           | Prim (_, args) | Context_switch (_, args) ->
