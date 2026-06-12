@@ -299,10 +299,11 @@ let with_additional_action =
             end
           | None -> raise(Error (loc, Unconstrained_jkind_variable))
         in
-        (* CR-someday zqian: preserve the hints *)
         (* modes and modalities should have been zapped already *)
         let prepare_mode mode =
-          Mode.Alloc.(mode |> to_const_exn |> of_const)
+          if !Clflags.keep_locs
+          then Mode.Alloc.to_of_const_exn mode
+          else Mode.Alloc.(mode |> to_const_exn |> of_const)
         in
         let prepare_modality modality =
           Mode.Modality.(modality |> to_const_exn|> of_const)

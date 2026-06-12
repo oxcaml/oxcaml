@@ -1145,6 +1145,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         (Fmt.compat (C.print obj))
         ceil
 
+  let to_of_const_exn : type a.
+      a C.obj -> (a, allowed * allowed) mode -> (a, allowed * allowed) mode =
+   fun obj m ->
+    match m with
+    | Amode _ -> m
+    | Amodevar mv ->
+      let a = to_const_exn obj m in
+      Amode (a, mlower_hint mv, mupper_hint mv)
+
   let print : type a l r.
       ?verbose:bool -> a C.obj -> Fmt.formatter -> (a, l * r) mode -> unit =
    fun ?verbose (obj : a C.obj) ppf m ->
