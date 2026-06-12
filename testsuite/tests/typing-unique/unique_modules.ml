@@ -303,3 +303,14 @@ Line 7, characters 12-13:
                 ^
 
 |}]
+
+(* Consuming a module uniquely consumes its components uniquely too: a value
+   aliased by a component cannot even be read afterwards. *)
+let consume_unique_then_read_alias () =
+  let y = "foo" in
+  let module M = struct let x = y end in
+  unique_id (module M : s);
+  ignore y
+[%%expect{|
+val consume_unique_then_read_alias : unit -> unit = <fun>
+|}]
