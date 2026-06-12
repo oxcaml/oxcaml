@@ -1133,11 +1133,8 @@ let apply_mode_annots ~loc ~env kind
   let min = Alloc.Const.Option.value ~default:Alloc.Const.min m.mode_modes in
   let max = Alloc.Const.Option.value ~default:Alloc.Const.max m.mode_modes in
   let loc =
-    match m.mode_desc with
-    | [] -> loc
-    | first_loc :: tl ->
-      let last_loc = List.fold_left (fun _ a -> a) first_loc tl in
-      { first_loc.loc with Location.loc_end = last_loc.loc.loc_end }
+    if List.is_empty m.mode_desc then loc else
+    Location.merge (List.map (fun a -> a.loc) m.mode_desc)
   in
   let hint = Hint.Annotation loc in
   let min = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint min in
