@@ -74,11 +74,6 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
           Oxcaml_utils.File_sections.from_array
             (Array.map (fun s -> Marshal.from_string s 0) sections)
         in
-        let export_info =
-          Option.map
-            (Flambda2_cmx.Flambda_cmx_format.from_raw ~sections)
-            uir.uir_export_info
-        in
         let ui : Cmx_format.unit_infos =
           { ui_unit = uir.uir_unit;
             ui_defines = uir.uir_defines;
@@ -89,11 +84,12 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
             ui_quoted_cmi = uir.uir_quoted_cmi |> Array.to_list;
             ui_quoted_cmx = uir.uir_quoted_cmx |> Array.to_list;
             ui_generic_fns = uir.uir_generic_fns;
-            ui_export_info = export_info;
+            ui_export_info = uir.uir_export_info;
             ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
             ui_force_link = uir.uir_force_link;
             ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
-            ui_external_symbols = uir.uir_external_symbols |> Array.to_list
+            ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
+            ui_file_sections = sections
           }
         in
         ui)
