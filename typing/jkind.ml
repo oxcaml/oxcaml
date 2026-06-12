@@ -3566,7 +3566,7 @@ module Violation = struct
     report_reason ppf t.violation;
     (* otherwise, we get notes for layout abbreviations that get omitted. *)
     report_layout_notes env ppf t.violation mismatch_type ~print_as_value_layout;
-    report_fuel ppf t.violation
+    if not !Clflags.ikinds then report_fuel ppf t.violation
 
   let pp_t ppf x = fprintf ppf "%t" x
 
