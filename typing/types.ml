@@ -523,6 +523,7 @@ and record_representation =
   | Record_mixed of mixed_product_shape
   | Record_dummy of { represent_as_float_array : bool; flatten_floats : bool }
   | Record_variable
+  | Record_inlined_variable of tag * variant_representation
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
@@ -979,8 +980,12 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
     Record_dummy { represent_as_float_array = a2; flatten_floats = b2 } ->
       Bool.equal a1 a2 && Bool.equal b1 b2
   | Record_variable, Record_variable -> true
+  | Record_inlined_variable (tag1, vr1), Record_inlined_variable (tag2, vr2) ->
+      equal_tag tag1 tag2 &&
+        equal_variant_representation_up_to_scannable_axes vr1 vr2
   | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
-    | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_variable), _ ->
+    | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_variable
+    | Record_inlined_variable _), _ ->
       false
 
 let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
@@ -1021,14 +1026,16 @@ let find_unboxed_type decl =
        Record_unboxed, _)
   | Type_record
       ([{ld_type = arg; ld_modalities = ms; _ }],
-       Record_inlined (_, _, Variant_unboxed), _)
+       ( Record_inlined (_, _, Variant_unboxed)
+       | Record_inlined_variable (_, Variant_unboxed)), _)
   | Type_record_unboxed_product
       ([{ld_type = arg; ld_modalities = ms; _ }],
        (Record_unboxed_product | Record_unboxed_product_variable), _)
   | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}], Variant_unboxed, _)
   | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
     Some (arg, ms)
-  | Type_record (_, ( Record_inlined _ | Record_unboxed
+  | Type_record (_, ( Record_inlined _ | Record_inlined_variable _
+                    | Record_unboxed
                     | Record_boxed | Record_float | Record_ufloat
                     | Record_mixed _ | Record_dummy _ | Record_variable), _)
   | Type_record_unboxed_product
