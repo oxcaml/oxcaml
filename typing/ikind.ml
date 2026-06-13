@@ -117,10 +117,11 @@ module Solver = struct
     let param_id = Types.get_id ty in
     rigid_name ctx (Ldd.Name.param param_id)
 
-  let type_may_be_circular (ty : Types.type_expr) : bool =
+  let rec type_may_be_circular (ty : Types.type_expr) : bool =
     match Types.get_desc ty with
     | Types.Tvariant _ -> true
     | Types.Tconstr _ -> true
+    | Types.Tmod (ty, _) -> type_may_be_circular ty
     | Types.Tobject _ -> true
     | _ -> false
 
@@ -422,6 +423,10 @@ module Solver = struct
         Ldd.meet (rigid ctx ty) (ckind_of_jkind ctx jkind)
       | Types.Tconstr (path, args, _abbrev_memo) ->
         constr ctx path args
+      | Types.Tmod (ty, mod_bounds) ->
+        Ldd.meet
+          (kind ~use_tables:true ctx ty)
+          (Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds))
       | Types.Ttuple elts ->
         (* Boxed tuples: immutable_data base + per-element contributions
            under id modality. *)
@@ -647,6 +652,16 @@ let make_gadt_payload_projector
        First hit wins: ['x] is mapped from the first result arg to kind('a);
        the second occurrence does not overwrite it. *)
   let fallback ty = Solver.kind ~use_tables:true ctx ty in
+  let decl_param_kind decl_param =
+    match Types.get_desc decl_param with
+    | Types.Tvar { jkind; _ } ->
+      Ldd.meet (Solver.rigid ctx decl_param) (Solver.ckind_of_jkind ctx jkind)
+    | Types.Tunivar _ ->
+      Misc.fatal_error
+        ("Ikind.make_gadt_payload_projector: "
+       ^ "unexpected Tunivar in declaration parameter list")
+    | _ -> Solver.rigid ctx decl_param
+  in
   fun (c : Types.constructor_declaration) ->
     match c.cd_res with
     | None -> fallback
@@ -670,7 +685,7 @@ let make_gadt_payload_projector
               add_plain_var_projection
                 ~local_vars
                 ~local_subst
-                ~lhs_kind:(Solver.kind ~use_tables:true ctx decl_param)
+                ~lhs_kind:(decl_param_kind decl_param)
                 res_arg)
             decl_params res_args;
           (* Step 3: apply the substitution to payload kinds:
@@ -679,17 +694,20 @@ let make_gadt_payload_projector
              - non-local names are left unchanged. *)
           (* Rewrite projected local vars in payload kinds; unmapped locals
              fall back to their declared bounds. *)
+          let local_bound id =
+            match Hashtbl.find_opt local_var_bounds id with
+            | Some bound -> bound
+            | None -> Ldd.const Axis_lattice.top
+          in
           let map_name (name : Ldd.Name.t) =
             match name with
             | Ldd.Name.Param id -> (
               match Hashtbl.find_opt local_subst id with
-              | Some projected -> projected
+              | Some projected ->
+                Ldd.meet projected (local_bound id)
               | None ->
                 if Hashtbl.mem local_vars id
-                then
-                  (match Hashtbl.find_opt local_var_bounds id with
-                  | Some bound -> bound
-                  | None -> Ldd.const Axis_lattice.top)
+                then local_bound id
                 else Solver.node_of_name ctx name)
             | Ldd.Name.Unknown _ | Ldd.Name.Atom _ | Ldd.Name.KAtom _ ->
               Solver.node_of_name ctx name

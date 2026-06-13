@@ -87,6 +87,8 @@ let compute_variance env visited vari ty =
           with Not_found ->
             List.iter (compute_variance_rec env unknown) tl
         end
+    | Tmod (ty, _) ->
+        compute_same ty
     | Tobject (ty, _) ->
         compute_same ty
     | Tquote ty ->

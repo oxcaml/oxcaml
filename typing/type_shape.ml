@@ -291,6 +291,8 @@ module Type_shape = struct
             Option.value shape ~default:unknown_shape_any
             (* CR sspies: We could ask the environment here for extra layout
                information about the type. *)
+          | Tmod (ty, _) ->
+            of_type_expr_go ~depth ~visited ty subst shape_for_constr
           | Ttuple exprs -> Shape.tuple (of_expr_list (List.map snd exprs))
           | Tvar { name = _; jkind } -> unknown_shape_from_jkind jkind
           | Tpoly (type_expr, _type_vars) ->
@@ -319,6 +321,7 @@ module Type_shape = struct
                 | Tarrow (_, _, _, _)
                 | Ttuple _ | Tunboxed_tuple _
                 | Tconstr (_, _, _)
+                | Tmod (_, _)
                 | Tobject (_, _)
                 | Tfield (_, _, _, _)
                 | Tvariant _ | Tunivar _
