@@ -110,8 +110,8 @@ val b' : baz =
 (* Test 2: evaluation order of variants with voids *)
 type void_variant =
     A of t_void * void_rec * int * void_rec * int * void_rec * t_void
-  | B of t_void
-  | C of void_rec * t_void
+  | B of t_void [@all_void_constructor]
+  | C of void_rec * t_void [@all_void_constructor]
   | D of { a1 : t_void;
            a2 : void_rec;
            x : int;
@@ -267,7 +267,7 @@ module M3_4 : sig end
 (* Test 4: Void to left of semicolon *)
 let () = r := []
 
-type void_holder = V of t_void
+type void_holder = V of t_void [@all_void_constructor]
 let vh : void_holder = V (t_void ())
 
 let [@warning "-10"] f4 (V v) =

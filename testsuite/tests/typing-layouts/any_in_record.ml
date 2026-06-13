@@ -468,12 +468,12 @@ module M : sig
   type t : k
   type a = A of t
 end with kind_ k := void and type t := unit# = struct
-  type a = A of unit#
+  type a = A of unit# [@all_void_constructor]
 end
 [%%expect{|
 Lines 5-7, characters 47-3:
 5 | ...............................................struct
-6 |   type a = A of unit#
+6 |   type a = A of unit# [@all_void_constructor]
 7 | end
 Error: Signature mismatch:
        Modules do not match:
