@@ -537,8 +537,8 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
       let cfg_from_ssa_for_compare =
         Cfg_of_ssa.convert ~future_funcnames:funcnames ssa
       in
-      Cfg_compare.compare ~fun_name:fd_cmm.fun_name.sym_name
-        ~old_cfg:cfg_without_ssa ~new_cfg:cfg_from_ssa_for_compare ppf_dump
+      Cfg_compare.compare ~old_cfg:cfg_without_ssa
+        ~new_cfg:cfg_from_ssa_for_compare ppf_dump
     with exn -> report_pipeline_error exn ssa
     end;
   if !Oxcaml_flags.dump_ssa
