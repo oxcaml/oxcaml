@@ -24,7 +24,7 @@ type unit_u : void mod everything
 
 type v : immediate = A of unit_u [@all_void_constructor]
 [%%expect{|
-type v = A of unit_u
+type v = A of unit_u [@all_void_constructor]
 |}]
 
 type v : immediate =
@@ -32,7 +32,10 @@ type v : immediate =
   | B of #(unit_u * #(unit_u * unit_u)) [@all_void_constructor]
   | C
 [%%expect{|
-type v = A of unit_u | B of #(unit_u * #(unit_u * unit_u)) | C
+type v =
+    A of unit_u [@all_void_constructor]
+  | B of #(unit_u * #(unit_u * unit_u)) [@all_void_constructor]
+  | C
 |}]
 
 type bad : immediate = A of unit_u [@all_void_constructor] | B of int
@@ -58,9 +61,9 @@ type key_holder2 : immediate with key =
   | A of #(unit_u * key r) [@all_void_constructor]
 [%%expect{|
 type key : void
-type key_holder1 = A of key
+type key_holder1 = A of key [@all_void_constructor]
 type ('a : void) r = #{ a : 'a; }
-type key_holder2 = A of #(unit_u * key r)
+type key_holder2 = A of #(unit_u * key r) [@all_void_constructor]
 |}]
 
 type bad : immediate = A of key [@all_void_constructor]
@@ -91,8 +94,8 @@ type t2 : immediate with void_mod_global =
   | A of void_mod_global [@all_void_constructor]
 [%%expect{|
 type void_mod_global : void mod global
-type t = A of void_mod_global
-type t2 = A of void_mod_global
+type t = A of void_mod_global [@all_void_constructor]
+type t2 = A of void_mod_global [@all_void_constructor]
 |}]
 
 type v1 : void
@@ -103,7 +106,9 @@ type t : immediate with v1 with v2 =
 [%%expect{|
 type v1 : void
 type v2 : void
-type t = A of v1 | B of #(unit_u * v2 r)
+type t =
+    A of v1 [@all_void_constructor]
+  | B of #(unit_u * v2 r) [@all_void_constructor]
 |}]
 
 type bad : immediate with v1 =
@@ -124,7 +129,7 @@ type vme : void
 type t : value mod external_ = A of vme [@all_void_constructor]
 [%%expect{|
 type vme : void
-type t = A of vme
+type t = A of vme [@all_void_constructor]
 |}]
 
 (* All-void records are not allowed *)
@@ -315,29 +320,29 @@ Error: Types whose layout contains [void] are not yet supported in arrays.
 
 type t = A of unit_u [@all_void_constructor]
 [%%expect{|
-type t = A of unit_u
+type t = A of unit_u [@all_void_constructor]
 |}]
 
 type t = A of unit_u [@all_void_constructor] | B of int | C
 [%%expect{|
-type t = A of unit_u | B of int | C
+type t = A of unit_u [@all_void_constructor] | B of int | C
 |}]
 
 type t = A of unit_u * #(unit_u * unit_u) [@all_void_constructor]
 [%%expect{|
-type t = A of unit_u * #(unit_u * unit_u)
+type t = A of unit_u * #(unit_u * unit_u) [@all_void_constructor]
 |}]
 
 type t = A : unit_u -> t [@all_void_constructor]
 [%%expect{|
-type t = A : unit_u -> t
+type t = A : unit_u -> t [@all_void_constructor]
 |}]
 
 module type S = sig
   type t = A of unit_u [@all_void_constructor]
 end
 [%%expect{|
-module type S = sig type t = A of unit_u end
+module type S = sig type t = A of unit_u [@all_void_constructor] end
 |}]
 
 (* Missing attribute *)

@@ -25,7 +25,7 @@ type t_float64 : float64
 type t_void : void
 type t_any_mod_separable : any separable
 type t_value_or_null : value_or_null
-type void_variant = VV of t_void
+type void_variant = VV of t_void [@all_void_constructor]
 type void_record = { vr_void : t_void; vr_int : int; }
 type void_unboxed_record = { vur_void : t_void; } [@@unboxed]
 |}];;
@@ -383,7 +383,7 @@ let id5 : 'a void5 -> 'a void5 = function
  * ;; *)
 
 [%%expect{|
-type ('a : void) void5 = Void5 of 'a
+type ('a : void) void5 = Void5 of 'a [@all_void_constructor]
 val id5 : ('a : void). 'a void5 -> 'a void5 = <fun>
 |}];;
 
@@ -844,7 +844,7 @@ end;;
 [%%expect{|
 module M11_3 :
   sig
-    type ('a : void) t = A of 'a
+    type ('a : void) t = A of 'a [@all_void_constructor]
     val foo : ('a : void) 'b. < usevoid : 'a -> 'b; .. > -> 'a t -> 'b
   end
 |}];;

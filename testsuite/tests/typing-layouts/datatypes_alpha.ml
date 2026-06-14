@@ -26,7 +26,7 @@ type t_void : void
 type t_any : any
 type t_value
 type t_immediate : immediate
-type t1_void = T1_void of t_void
+type t1_void = T1_void of t_void [@all_void_constructor]
 type t1_value = T1_value of t_value
 type t1_immediate = T1_immediate of t_immediate
 type t1_mixed1 = T1_mixed1 of t_void * t_immediate
@@ -38,7 +38,8 @@ type 'a t1_constraint = T1_con of 'a [@all_void_constructor]
   constraint 'a = 'b t1_constraint'
 and 'b t1_constraint' = t_void
 [%%expect {|
-type 'a t1_constraint = T1_con of 'a constraint 'a = 'b t1_constraint'
+type 'a t1_constraint = T1_con of 'a [@all_void_constructor]
+  constraint 'a = 'b t1_constraint'
 and 'b t1_constraint' = t_void
 |}]
 
@@ -282,7 +283,7 @@ and t7_void : void mod everything
 type t7_3 : immediate = t7_2
 
 [%%expect{|
-type t7 = A | B | C | D of t7_void
+type t7 = A | B | C | D of t7_void [@all_void_constructor]
 and t7_2 = { x : t7; } [@@unboxed]
 and t7_void : void mod everything
 type t7_3 = t7_2

@@ -612,7 +612,7 @@ and ('a : any) t4
 
 type ('a : void) void4 = Void4  of 'a [@all_void_constructor];;
 [%%expect{|
-type ('a : void) void4 = Void4 of 'a
+type ('a : void) void4 = Void4 of 'a [@all_void_constructor]
 |}];;
 
 type ('a : any) any4 = Any4 of 'a

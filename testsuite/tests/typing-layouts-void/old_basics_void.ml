@@ -152,8 +152,8 @@ let _ = assert (List.for_all2 (=) !r [10;9;8;7;6;5;4;3;2;1]);;
 [%%expect{|
 type void_variant =
     A of t_void * void_rec * int * void_rec * int * void_rec * t_void
-  | B of t_void
-  | C of void_rec * t_void
+  | B of t_void [@all_void_constructor]
+  | C of void_rec * t_void [@all_void_constructor]
   | D of { a1 : t_void; a2 : void_rec; x : int; v : void_rec; z : int;
       b1 : void_rec; b2 : t_void;
     }
@@ -282,7 +282,7 @@ let _ = f4 vh
 
 let _ = assert (List.for_all2 (=) !r [6;5;4;3;2;1]);;
 [%%expect{|
-type void_holder = V of t_void
+type void_holder = V of t_void [@all_void_constructor]
 val vh : void_holder = V <void>
 val f4 : void_holder -> unit = <fun>
 - : unit = ()
