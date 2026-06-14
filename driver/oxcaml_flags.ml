@@ -14,6 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 let dump_cfg = ref false                (* -dcfg *)
+let dump_ssa = ref false                (* -dssa *)
 let cfg_invariants = ref false          (* -dcfg-invariants *)
 let regalloc = ref Clflags.Register_allocator.Cfg (* -regalloc *)
 let default_regalloc_linscan_threshold = 100_000
@@ -119,6 +120,16 @@ let max_long_frames_threshold = 0x7FFF
 let long_frames_threshold = ref max_long_frames_threshold (* -debug-long-frames-threshold n *)
 
 let caml_apply_inline_fast_path = ref false  (* -caml-apply-inline-fast-path *)
+
+let use_ssa = ref true                       (* -use-ssa *)
+
+(* The SSA pipeline applies target register constraints that the LLVM backend
+   deliberately skips, so it must stay off under [-llvm-backend]. *)
+let ssa_enabled () = !use_ssa && not !Clflags.llvm_backend
+
+let ssa_simplify = ref true                 (* -ssa-simplify *)
+
+let ssa_validate = ref true                 (* -ssa-validate *)
 
 type function_result_types = Never | Functors_only | All_functions
 type join_algorithm = Binary | N_way | Checked

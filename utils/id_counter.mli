@@ -3,7 +3,7 @@
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -25,28 +25,37 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Instruction selection, parameterised over the target machine. *)
+(** Fresh integer-backed ID namespaces.
 
-[@@@ocaml.warning "+a-40-41-42"]
+    Each application of [Make] produces a new namespace with a distinct abstract
+    type [t], so IDs from different namespaces cannot be confused. The counter
+    lives in a [generator] value: a single namespace can therefore hand out
+    several independent ID sequences, each starting from zero. *)
 
-module Make (_ : Cfg_selectgen_target_intf.S) : sig
-  val emit_fundecl :
-    future_funcnames:Misc.Stdlib.String.Set.t ->
-    Cmm.fundecl ->
-    Cfg_with_layout.t
+module type S = sig
+  type t = private int
 
-  val is_immediate : Operation.integer_operation -> int -> bool
+  type generator
 
-  val select_condition : Cmm.expression -> Operation.test * Cmm.expression
+  val create_generator : unit -> generator
 
-  val select_operation :
-    Cmm.operation ->
-    Cmm.expression list ->
-    Debuginfo.t ->
-    label_after:Label.t ->
-    Cfg.basic_or_terminator * Cmm.expression list
+  (** Return the generator's current ID and advance it. *)
+  val get_and_incr : generator -> t
 
-  val effects_of : Cmm.expression -> Select_utils.Effect_and_coeffect.t
+  (** A placeholder ID (-1), never returned by [get_and_incr]. *)
+  val dummy : t
 
-  val is_simple_expr : Cmm.expression -> bool
+  val equal : t -> t -> bool
+
+  val compare : t -> t -> int
+
+  val hash : t -> int
+
+  module Set : Set.S with type elt = t
+
+  module Map : Map.S with type key = t
+
+  module Tbl : Hashtbl.S with type key = t
 end
+
+module Make () : S

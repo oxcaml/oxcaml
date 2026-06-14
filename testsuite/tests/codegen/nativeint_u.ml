@@ -35,9 +35,9 @@ sub:
 let neg x = Nativeint_u.neg x
 [%%expect_asm X86_64{|
 neg:
-  movq  %rax, %rbx
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  xorl  %ebx, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 
