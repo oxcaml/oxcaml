@@ -158,6 +158,8 @@ type error =
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
+  | Missing_all_void_constructor_attribute of string
+  | Misplaced_all_void_constructor_attribute of string
 
 open Typedtree
 
@@ -2445,6 +2447,14 @@ let rec update_decl_jkind env dpath decl =
     (* CR layouts: factor out duplication *)
     match cstrs, rep with
     | _, Variant_with_null ->
+      List.iter
+        (fun (cstr : Types.constructor_declaration) ->
+           if Builtin_attributes.has_all_void_constructor cstr.cd_attributes
+           then
+             raise (Error (cstr.cd_loc,
+                           Misplaced_all_void_constructor_attribute
+                             (Ident.name cstr.cd_id))))
+        cstrs;
       begin match Datarepr.find_variant_with_null_payload cstrs with
       | Some
           { payload_cstr = { Types.cd_uid; _ };
@@ -2482,6 +2492,12 @@ let rec update_decl_jkind env dpath decl =
         Misc.fatal_error "Invalid constructor for Variant_with_null"
       end
     | [{Types.cd_args} as cstr], Variant_unboxed -> begin
+        if Builtin_attributes.has_all_void_constructor
+             cstr.Types.cd_attributes
+        then
+          raise (Error (cstr.Types.cd_loc,
+                        Misplaced_all_void_constructor_attribute
+                          (Ident.name cstr.Types.cd_id)));
         match cd_args with
         | Cstr_tuple [{ca_type=ty; _} as arg] -> begin
             let jkind = Ctype.type_jkind env ty in
@@ -2511,10 +2527,27 @@ let rec update_decl_jkind env dpath decl =
     | cstrs, Variant_boxed cstr_layouts ->
       let cstrs =
         List.mapi (fun idx cstr ->
-          let cd_args, _all_void, jkinds, arg_sorts =
+          let cd_args, all_void, jkinds, arg_sorts =
             update_constructor_arguments_sorts env cstr.Types.cd_loc
               cstr.Types.cd_args
           in
+          let has_attr =
+            Builtin_attributes.has_all_void_constructor
+              cstr.Types.cd_attributes
+          in
+          let is_nonempty_all_void =
+            all_void
+            && (match cd_args with
+                | Cstr_tuple (_ :: _) -> true
+                | Cstr_tuple [] | Cstr_record _ -> false)
+          in
+          let name = Ident.name cstr.Types.cd_id in
+          if is_nonempty_all_void && not has_attr then
+            raise (Error (cstr.Types.cd_loc,
+                          Missing_all_void_constructor_attribute name));
+          if has_attr && not is_nonempty_all_void then
+            raise (Error (cstr.Types.cd_loc,
+                          Misplaced_all_void_constructor_attribute name));
           let cstr_repr =
             update_constructor_representation env cd_args jkinds
               ~is_extension_constructor:false
@@ -5877,6 +5910,19 @@ let report_error ~loc = function
       "%a can only be used on records whose fields \
        are all float64."
       Style.inline_code "[@@represent_as_float_array]"
+  | Missing_all_void_constructor_attribute name ->
+    Location.errorf ~loc
+      "All arguments of the constructor %a are void, so it must be@ \
+       annotated with %a."
+      Style.inline_code name
+      Style.inline_code "[@all_void_constructor]"
+  | Misplaced_all_void_constructor_attribute name ->
+    Location.errorf ~loc
+      "The %a attribute on constructor %a is not allowed:@ it may only be \
+       placed on constructors of boxed variants@ with at least one argument, \
+       all of which are void."
+      Style.inline_code "[@all_void_constructor]"
+      Style.inline_code name
 
 let () =
   Location.register_error_of_exn
