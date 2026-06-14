@@ -186,7 +186,7 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            type v = unit#
-           type t = A of v | B
+           type t = A of v [@all_void_constructor] | B
            val a : t
            val expose : ('a : any). ('a, 'a) type_equal
          end
@@ -198,7 +198,7 @@ Error: Signature mismatch:
            val expose : (v, unit#) type_equal
          end
        Type declarations do not match:
-         type t = A of v | B
+         type t = A of v [@all_void_constructor] | B
        is not included in
          type t = A of v | B
        Constructors do not match:
@@ -230,7 +230,11 @@ end = struct
   type t = A of pt [@all_void_constructor]
 end
 [%%expect{|
-module M : sig type pt = #{ x : unit#; y : unit#; } and t = A of pt end
+module M :
+  sig
+    type pt = #{ x : unit#; y : unit#; }
+    and t = A of pt [@all_void_constructor]
+  end
 |}]
 
 (* The contained type may also be the unboxed version of a boxed record. *)

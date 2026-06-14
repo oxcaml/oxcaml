@@ -477,11 +477,11 @@ Lines 5-7, characters 47-3:
 7 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig type a = A of unit# end
+         sig type a = A of unit# [@all_void_constructor] end
        is not included in
          sig type a = A of unit# end
        Type declarations do not match:
-         type a = A of unit#
+         type a = A of unit# [@all_void_constructor]
        is not included in
          type a = A of unit#
        Constructors do not match:

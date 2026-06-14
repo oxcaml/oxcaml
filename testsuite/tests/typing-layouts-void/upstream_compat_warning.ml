@@ -18,7 +18,7 @@ Warning 187 [incompatible-with-upstream]: This variant is immediate
   but after erasure for upstream compatibility, void is no longer zero-width,
   so it won't be immediate.
 
-type t = A of void
+type t = A of void [@all_void_constructor]
 |}]
 
 (* Multiple constructors, all void *)
@@ -37,13 +37,16 @@ Warning 187 [incompatible-with-upstream]: This variant is immediate
   but after erasure for upstream compatibility, void is no longer zero-width,
   so it won't be immediate.
 
-type t2 = A of void | B of void * void | C of #(void * void)
+type t2 =
+    A of void [@all_void_constructor]
+  | B of void * void [@all_void_constructor]
+  | C of #(void * void) [@all_void_constructor]
 |}]
 
 (* Mixed - should not warn *)
 type t3 = A of void [@all_void_constructor] | B of int
 [%%expect{|
-type t3 = A of void | B of int
+type t3 = A of void [@all_void_constructor] | B of int
 |}]
 
 (* No args - should not warn *)
