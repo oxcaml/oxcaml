@@ -110,13 +110,10 @@ type unrepresentable_record =
   | Unrepresentable_field of string
 
 (* Update the representation of a record whose representation at declaration
-   time was variable because it has a field of kind [any]. [old_repres] is the
-   declaration-time representation; for inlined records it carries the
-   constructor's tag and the containing variant's representation, which are
-   preserved in the updated representation. *)
+   time was variable because it has a field of kind [any] *)
 val update_record_representation:
-    why:Jkind_intf.History.concrete_creation_reason ->
-    Env.t -> Location.t -> 'rep Data_types.record_form -> old_repres:'rep ->
+    why:Jkind_intf.History.concrete_creation_reason -> old_repres:'rep ->
+    Env.t -> Location.t -> 'rep Data_types.record_form -> 
     (Types.label_declaration * Types.type_expr) list ->
     (Jkind.Sort.Const.t list * 'rep, unrepresentable_record) Result.t
 

@@ -964,11 +964,7 @@ and record_representation =
      representation cannot be determined because at least one field has layout
      [any]. The actual representation is decided at construction sites. *)
   | Record_inlined_variable of tag * variant_representation
-  (* Counterpart of [Record_variable] for inlined records: the
-     [constructor_representation] cannot be determined at typedecl time because
-     at least one field has layout [any], but the constructor's tag and the
-     containing variant's representation are fixed at declaration time. Use
-     sites replace this with [Record_inlined]; it must not reach lambda. *)
+  (* Counterpart of [Record_variable] for inlined records *)
 
 and record_unboxed_product_representation =
   | Record_unboxed_product

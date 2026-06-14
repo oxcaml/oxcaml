@@ -2353,82 +2353,79 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     Misc.fatal_error
       "Typedecl.update_record_kind: unexpected record representation"
 
+let update_record_inlined_kind env loc lbls jkinds tag vrep : _ Result.t =
+  match vrep with
+  | Variant_unboxed ->
+    (* The shape of an unboxed constructor is always
+       [Constructor_uniform_value], as at declaration time. *)
+    Ok (Record_inlined (tag, Constructor_uniform_value, Variant_unboxed))
+  | Variant_boxed _ as vrep ->
+    let lbl_decls =
+      List.map (fun (ld, ty) -> { ld with Types.ld_type = ty }) lbls
+    in
+    begin match
+      update_constructor_representation env (Cstr_record lbl_decls)
+        jkinds ~loc ~is_extension_constructor:false
+    with
+    | Ok shape -> Ok (Record_inlined (tag, shape, vrep))
+    | Error (Unrepresentable_argument_field name) ->
+      Error (Unrepresentable_field name)
+    | Error (Unrepresentable_argument _) ->
+      Misc.fatal_error
+        "Typedecl.update_record_kind: unexpected tuple constructor error"
+    end
+  | Variant_extensible | Variant_with_null ->
+    (* Extension constructors always have a known shape, and
+       [Variant_with_null] cannot have an inlined record argument. *)
+    Misc.fatal_error
+      "Typedecl.update_record_kind: unexpected variant representation"
+
 (* Given a record with a variable representation, but updated labels, compute
-   the updated sorts and representation. [old_repres] is the variable
-   representation from the declaration; for inlined records it carries the
-   constructor's tag and the containing variant's representation, which must be
-   preserved in the updated representation. *)
+   the updated sorts and representation *)
 let update_record_kind (type rep) env loc (form : rep record_form)
       ~(old_repres : rep) lbls ~warn :
     _ * (rep, _) Result.t =
   let types = List.map snd lbls in
   let sorts, jkinds = update_label_sorts env loc types ~form in
+  let reprs, repr_summary = compute_repr_summary env lbls jkinds in
   let rep : (rep, _) Result.t =
-    match form with
-    | Legacy ->
-      begin match (old_repres : record_representation) with
-      | Record_inlined_variable (tag, (Variant_unboxed as vrep)) ->
-        (* The shape of an unboxed constructor is always
-           [Constructor_uniform_value], as at declaration time. *)
-        Ok (Record_inlined (tag, Constructor_uniform_value, vrep))
-      | Record_inlined_variable (tag, (Variant_boxed _ as vrep)) ->
-        let lbl_decls =
-          List.map (fun (ld, ty) -> { ld with Types.ld_type = ty }) lbls
-        in
-        begin match
-          update_constructor_representation env (Cstr_record lbl_decls)
-            jkinds ~loc ~is_extension_constructor:false
-        with
-        | Ok shape -> Ok (Record_inlined (tag, shape, vrep))
-        | Error (Unrepresentable_argument_field name) ->
-          Error (Unrepresentable_field name)
-        | Error (Unrepresentable_argument _) ->
-          Misc.fatal_error
-            "Typedecl.update_record_kind: unexpected tuple constructor error"
-        end
-      | Record_inlined_variable (_, (Variant_extensible | Variant_with_null))
-        ->
-        (* Extension constructors always have a known shape, and
-           [Variant_with_null] cannot have an inlined record argument. *)
-        Misc.fatal_error
-          "Typedecl.update_record_kind: unexpected variant representation"
-      | Record_variable ->
-        let reprs, repr_summary = compute_repr_summary env lbls jkinds in
-        (* CR layouts: improve the readability of this match *)
-        let { values; floats; atomic_floats; float64s;
-                non_float64_unboxed_fields; atomic_fields; voids;
-                first_any } = repr_summary
-        in
-        let refining_block_with_any = true in
-        let rep =
-          compute_record_repr loc reprs lbls
-            ~represent_as_float_array:false ~flatten_floats:false ~warn
-            ~refining_block_with_any ~values ~floats ~atomic_floats ~float64s
-            ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
-        in
-        begin match rep with
-        | Ok (Record_boxed | Record_mixed _) -> ()
-        | Ok _ ->
-          Misc.fatal_error "none became something other than mixed"
-        | Error _ -> ()
-        end;
-        rep
-      | Record_unboxed | Record_inlined _ | Record_boxed | Record_float
-      | Record_ufloat | Record_mixed _ | Record_dummy _ ->
-        Misc.fatal_error
-          "Typedecl.update_record_kind: representation already determined"
-      end
-    | Unboxed_product ->
-      let _, repr_summary = compute_repr_summary env lbls jkinds in
+    match form, old_repres with
+    | Legacy, Record_variable ->
+      (* CR layouts: improve the readability of this match *)
+      let { values; floats; atomic_floats; float64s;
+              non_float64_unboxed_fields; atomic_fields; voids;
+              first_any } = repr_summary
+      in
+      let rep =
+        compute_record_repr loc reprs lbls
+          ~represent_as_float_array:false ~flatten_floats:false ~warn
+          ~refining_block_with_any:true ~values ~floats ~atomic_floats ~float64s
+          ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
+      in
+      begin match rep with
+      | Ok (Record_boxed | Record_mixed _) -> ()
+      | Ok _ ->
+        Misc.fatal_error "none became something other than mixed"
+      | Error _ -> ()
+      end;
+      rep
+    | Legacy, Record_inlined_variable (tag, vrep) ->
+      update_record_inlined_kind env loc lbls jkinds tag vrep
+    | Unboxed_product, _ ->
       (match repr_summary.first_any with
       | Some id -> Result.Error (Unrepresentable_field (Ident.name id))
       | None -> Ok Record_unboxed_product)
+    | Legacy,
+      (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
+      | Record_ufloat | Record_mixed _ | Record_dummy _) ->
+        Misc.fatal_error
+          "Typedecl.update_record_kind: representation already determined"
   in
   sorts, rep
 
 let update_record_representation
-      (type rep) ~why env loc (form : rep record_form) ~old_repres
-      lbls_and_types =
+      (type rep) ~why ~old_repres
+      env loc (form : rep record_form) lbls_and_types =
   let kloc : jkind_sort_loc =
     match form with
     | Legacy -> Record { unboxed = false }
