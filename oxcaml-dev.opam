@@ -20,7 +20,7 @@ depends: [
   "ocaml" {>= "5.4.0~~" & < "5.5.0~~"}
 
   # This should match dune-project; the effective version will usually be higher
-  "dune" {>= "3.13.0"}
+  "dune" {>= "3.22.0"}
   "menhir" {= "20231231"}
   "ocamlformat" {= "0.29.0"}
 
