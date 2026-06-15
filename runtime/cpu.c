@@ -14,7 +14,9 @@
 
 #define CAML_INTERNALS
 
+#ifdef __x86_64__
 #include <cpuid.h>
+#endif
 
 #include "caml/cpu.h"
 
