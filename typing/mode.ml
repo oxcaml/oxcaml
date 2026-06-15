@@ -6540,13 +6540,14 @@ module Value_with (Areality : Areality) = struct
             yielding;
             statefulness;
             visibility;
-            staticity
+            staticity;
+            allocation
           } =
         let option_print print ppf = function
           | None -> Fmt.fprintf ppf "None"
           | Some a -> Fmt.fprintf ppf "Some %a" print a
         in
-        Fmt.fprintf ppf "%a,%a,%a,%a,%a,%a,%a,%a,%a,%a"
+        Fmt.fprintf ppf "%a,%a,%a,%a,%a,%a,%a,%a,%a,%a,%a"
           (option_print Areality.Const.print)
           areality
           (option_print Linearity.Const.print)
@@ -6567,6 +6568,8 @@ module Value_with (Areality : Areality) = struct
           visibility
           (option_print Staticity.Const.print)
           staticity
+          (option_print Allocation.Const.print)
+          allocation
     end
 
     let diff m1 m2 =

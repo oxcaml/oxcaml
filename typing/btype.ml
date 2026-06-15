@@ -1581,7 +1581,7 @@ module Jkind0 = struct
          types with mutable fields, and an immediate64 does not have immutable
          fields.
 
-         * Allocation: CR-soon shsong: check whether it needs to be discussed here
+         * Allocation: CR shsong: check whether it needs to be discussed here
 
          In practice, the functor that creates immediate64s,
          [Stdlib.Sys.Immediate64.Make], will require these conditions on its

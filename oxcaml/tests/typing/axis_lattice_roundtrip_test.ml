@@ -30,6 +30,7 @@ type sample =
     statefulness : Mode.Statefulness.Const.t;
     visibility : Mode.Visibility.Const.t;
     staticity : Mode.Staticity.const;
+    allocation : Mode.Allocation.Const.t;
     externality : Jkind_axis.Externality.t
   }
 
@@ -44,6 +45,7 @@ let sample_of_lattice x =
     statefulness = statefulness x;
     visibility = visibility x;
     staticity = staticity x;
+    allocation = allocation x;
     externality = externality x
   }
 
@@ -53,7 +55,7 @@ let lattice_of_sample sample =
     ~contention:sample.contention ~forkable:sample.forkable
     ~yielding:sample.yielding ~statefulness:sample.statefulness
     ~visibility:sample.visibility ~staticity:sample.staticity
-    ~externality:sample.externality
+    ~allocation:sample.allocation ~externality:sample.externality
 
 let base_samples = [sample_of_lattice bot; sample_of_lattice top]
 
@@ -98,6 +100,9 @@ let mod_bounds_of_sample sample =
       ~statefulness:
         (Mode.Crossing.Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const sample.statefulness))
+      ~allocation:
+        (Mode.Crossing.Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const sample.allocation))
   in
   Btype.Jkind0.Mod_bounds.create { monadic; comonadic }
     ~externality:sample.externality
@@ -209,6 +214,10 @@ let mask_of_axis : type a. a Jkind_axis.Axis.t -> t =
       { sample with visibility = Mode.Visibility.Const.Read_write }
   | Modal (Monadic Staticity) ->
     lattice_of_sample { sample with staticity = Mode.Staticity.Static }
+  | Modal (Comonadic Allocation) ->
+    (* CR shsong: check this *)
+    lattice_of_sample
+      { sample with allocation = Mode.Allocation.Const.Noalloc_strict }
   | Nonmodal Externality ->
     lattice_of_sample
       { sample with externality = Jkind_axis.Externality.Internal }
@@ -308,6 +317,14 @@ let () =
     (fun sample staticity -> { sample with staticity })
     staticity
     [Mode.Staticity.Static; Mode.Staticity.Dynamic];
+  check_axis
+    (module Mode.Allocation.Const)
+    "allocation"
+    (fun sample allocation -> { sample with allocation })
+    allocation
+    [ Mode.Allocation.Const.Noalloc_strict;
+      Mode.Allocation.Const.Noalloc;
+      Mode.Allocation.Const.Alloc ];
   check_axis
     (module Jkind_axis.Externality)
     "externality"

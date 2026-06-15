@@ -169,7 +169,7 @@ let pp (v : t) : string =
 
 let to_string = pp
 
-(* CR-soon shsong: I think the 10 here is the binary encoding on the axis
+(* CR shsong: I think the 10 here is the binary encoding on the axis
     instead of decimal 10. Double check! *)
 (* Axis-wise residual:
     r = a & ~b zeroes axes where b >= a.
