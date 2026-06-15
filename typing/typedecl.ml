@@ -2424,6 +2424,13 @@ let update_record_representation
     end
   | Error _ as e -> e
 
+let check_misplaced_all_void_constructor_attribute
+      (cstr : Types.constructor_declaration) =
+  if Builtin_attributes.has_all_void_constructor cstr.cd_attributes then
+    raise (Error (cstr.cd_loc,
+                  Misplaced_all_void_constructor_attribute
+                    (Ident.name cstr.cd_id)))
+
 (* This function updates jkind stored in kinds with more accurate jkinds.
    It is called after the circularity checks and the delayed jkind checks
    have happened, so we can fully compute jkinds of types.
@@ -2447,14 +2454,7 @@ let rec update_decl_jkind env dpath decl =
     (* CR layouts: factor out duplication *)
     match cstrs, rep with
     | _, Variant_with_null ->
-      List.iter
-        (fun (cstr : Types.constructor_declaration) ->
-           if Builtin_attributes.has_all_void_constructor cstr.cd_attributes
-           then
-             raise (Error (cstr.cd_loc,
-                           Misplaced_all_void_constructor_attribute
-                             (Ident.name cstr.cd_id))))
-        cstrs;
+      List.iter check_misplaced_all_void_constructor_attribute cstrs;
       begin match Datarepr.find_variant_with_null_payload cstrs with
       | Some
           { payload_cstr = { Types.cd_uid; _ };
@@ -2492,12 +2492,7 @@ let rec update_decl_jkind env dpath decl =
         Misc.fatal_error "Invalid constructor for Variant_with_null"
       end
     | [{Types.cd_args} as cstr], Variant_unboxed -> begin
-        if Builtin_attributes.has_all_void_constructor
-             cstr.Types.cd_attributes
-        then
-          raise (Error (cstr.Types.cd_loc,
-                        Misplaced_all_void_constructor_attribute
-                          (Ident.name cstr.Types.cd_id)));
+        check_misplaced_all_void_constructor_attribute cstr;
         match cd_args with
         | Cstr_tuple [{ca_type=ty; _} as arg] -> begin
             let jkind = Ctype.type_jkind env ty in
@@ -2545,9 +2540,8 @@ let rec update_decl_jkind env dpath decl =
           if is_nonempty_all_void && not has_attr then
             raise (Error (cstr.Types.cd_loc,
                           Missing_all_void_constructor_attribute name));
-          if has_attr && not is_nonempty_all_void then
-            raise (Error (cstr.Types.cd_loc,
-                          Misplaced_all_void_constructor_attribute name));
+          if not is_nonempty_all_void then
+            check_misplaced_all_void_constructor_attribute cstr;
           let cstr_repr =
             update_constructor_representation env cd_args jkinds
               ~is_extension_constructor:false
