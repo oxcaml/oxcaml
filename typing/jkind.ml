@@ -1253,7 +1253,11 @@ module Base_and_axes = struct
                   ~statefulness:
                     (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
               in
-              let crossing : Mod_bounds.Crossing.t = { monadic; comonadic } in
+              let crossing : Mod_bounds.Crossing.t =
+                { crossing = { monadic; comonadic };
+                  unique_implies_uncontended = false
+                }
+              in
               Mod_bounds.create crossing
                 ~externality:(value_for_axis ~axis:(Nonmodal Externality))
             in
@@ -2484,7 +2488,11 @@ let for_object =
              ( Base Scannable,
                { nullability = Non_null; separability = Non_float } ));
       mod_bounds =
-        Mod_bounds.create { comonadic; monadic } ~externality:Externality.max;
+        Mod_bounds.create
+          { crossing = { comonadic; monadic };
+            unique_implies_uncontended = false
+          }
+          ~externality:Externality.max;
       with_bounds = No_with_bounds
     }
     ~annotation:None ~why:(Value_creation Object)

@@ -38,6 +38,70 @@ let fresh_unknown_uid () : Types.Uid.t =
   in
   Types.Uid.mk ~current_unit
 
+let axes_cross_contention axes =
+  let open Jkind_axis in
+  Axis_set.mem axes
+    (Axis.Modal Mode.Crossing.Axis.(Monadic Contention))
+
+let axes_cross_uniqueness axes =
+  let open Jkind_axis in
+  Axis_set.mem axes
+    (Axis.Modal Mode.Crossing.Axis.(Monadic Uniqueness))
+
+(* With-bounds only remember relevant axes, not the concrete modality that
+   produced them. Use a safe approximation: if contention is relevant, allow
+   unique-implies-uncontended; otherwise, if uniqueness is relevant, disable it.
+   Unrelated axes propagate unique-implies-uncontended unchanged. This is
+   conservative for aliased modalities but can lose precision. *)
+let apply_relevant_axes_to_kind
+    (axes : Jkind_axis.Axis_set.t) (payload_kind : Ldd.node) : Ldd.node =
+  let crosses_contention = axes_cross_contention axes in
+  let crosses_uniqueness = axes_cross_uniqueness axes in
+  if Jkind_axis.Axis_set.is_empty axes && not crosses_uniqueness
+  then Ldd.bot
+  else
+    let mask = Axis_lattice.of_axis_set axes in
+    let mask =
+      if crosses_contention
+      then Axis_lattice.without_unique_implies_uncontended_disabled mask
+      else if crosses_uniqueness
+      then Axis_lattice.with_unique_implies_uncontended_disabled mask
+      else mask
+    in
+    let payload_kind = Ldd.meet (Ldd.const mask) payload_kind in
+    if (not crosses_contention) && crosses_uniqueness
+    then
+      Ldd.join payload_kind
+        (Ldd.const Axis_lattice.unique_implies_uncontended_disabled)
+    else payload_kind
+
+let apply_modality_to_kind
+    (modality : Mode.Modality.Const.t) (payload_kind : Ldd.node) : Ldd.node =
+  let crosses_contention =
+    Axis_lattice.modality_crosses_contention modality
+  in
+  let crosses_uniqueness =
+    Axis_lattice.modality_crosses_uniqueness modality
+  in
+  let base_mask = Axis_lattice.mask_of_modality modality in
+  if Axis_lattice.equal base_mask Axis_lattice.bot && not crosses_uniqueness
+  then Ldd.bot
+  else
+    let mask =
+      if crosses_contention
+      then
+        Axis_lattice.without_unique_implies_uncontended_disabled base_mask
+      else if crosses_uniqueness
+      then Axis_lattice.with_unique_implies_uncontended_disabled base_mask
+      else base_mask
+    in
+    let payload_kind = Ldd.meet (Ldd.const mask) payload_kind in
+    if (not crosses_contention) && crosses_uniqueness
+    then
+      Ldd.join payload_kind
+        (Ldd.const Axis_lattice.unique_implies_uncontended_disabled)
+    else payload_kind
+
 (** A kind solver specialized to [Types.Ldd] and [Types.type_expr].
 
     The solver computes LDD polynomials of the form base ⊔ Σ_i (arg_i ⊓ coeff_i)
@@ -345,9 +409,8 @@ module Solver = struct
     |> Seq.fold_left
          (fun acc (ty, bound_info) ->
            let axes = bound_info.Types.With_bounds_type_info.relevant_axes in
-           let mask = Axis_lattice.of_axis_set axes in
            let ty_kind = kind ~use_tables:true ctx ty in
-           Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
+           Ldd.join acc (apply_relevant_axes_to_kind axes ty_kind))
          base
 
   and ckind_of_jkind : type l r. ctx -> (l * r) Types.jkind -> Ldd.node =
@@ -559,10 +622,9 @@ let sum_record_label_contributions ~(base : Ldd.node)
     (lbls : Types.label_declaration list) : Ldd.node =
   Ldd.sum lbls ~base ~f:(fun (lbl : Types.label_declaration) ->
       validate_label lbl;
-      let mask = Axis_lattice.mask_of_modality lbl.ld_modalities in
       Ldd.join
         (label_mutability_contribution lbl)
-        (Ldd.meet (Ldd.const mask) (payload_kind lbl.ld_type)))
+        (apply_modality_to_kind lbl.ld_modalities (payload_kind lbl.ld_type)))
 
 let no_validation (_ : Types.label_declaration) = ()
 
@@ -827,10 +889,8 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
               | Types.Cstr_tuple args ->
                 Ldd.sum args ~base:Ldd.bot
                   ~f:(fun (arg : Types.constructor_argument) ->
-                    let mask =
-                      Axis_lattice.mask_of_modality arg.ca_modalities
-                    in
-                    Ldd.meet (Ldd.const mask) (payload_kind arg.ca_type))
+                    apply_modality_to_kind arg.ca_modalities
+                      (payload_kind arg.ca_type))
               | Types.Cstr_record lbls ->
                 sum_record_label_contributions ~base:Ldd.bot ~payload_kind
                   ~validate_label:no_validation lbls

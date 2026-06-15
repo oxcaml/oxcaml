@@ -981,7 +981,11 @@ module Jkind0 = struct
         Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
           ~forkable ~statefulness
       in
-      let crossing : Mode.Crossing.t = { monadic; comonadic } in
+      let crossing : Mode.Crossing.t =
+        { crossing = { monadic; comonadic };
+          unique_implies_uncontended = false
+        }
+      in
       {
         crossing;
         externality;
@@ -1018,7 +1022,11 @@ module Jkind0 = struct
         Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
           ~forkable ~statefulness
       in
-      let crossing : Mode.Crossing.t = { monadic; comonadic } in
+      let crossing : Mode.Crossing.t =
+        { crossing = { monadic; comonadic };
+          unique_implies_uncontended = false
+        }
+      in
       {
         crossing;
         externality;
@@ -1113,6 +1121,7 @@ module Jkind0 = struct
         ~forkable:(forkable_const t) ~yielding:(yielding_const t)
         ~statefulness:(statefulness_const t) ~visibility:(visibility_const t)
         ~staticity:(staticity_const t) ~externality:(externality t)
+      |> Axis_lattice.with_unique_implies_uncontended_disabled
 
     let of_axis_lattice (x : Axis_lattice.t) : t =
       let crossing = Axis_lattice.to_mode_crossing x in
