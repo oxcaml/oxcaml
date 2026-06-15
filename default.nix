@@ -72,10 +72,10 @@ let
   # dune and the other dependencies with the patched system compiler.
   dune = pkgs.ocaml-ng.ocamlPackages_4_14.dune_3.overrideAttrs rec {
     # This version should be the same as in tools/ci/local-opam/packages/oxcaml-ci-deps
-    version = "3.20.2";
+    version = "3.23.1";
     src = pkgs.fetchurl {
       url = "https://github.com/ocaml/dune/releases/download/${version}/dune-${version}.tbz";
-      hash = "sha256-sahrLWC9tKi5u2hhvfL58opufLXYM86Br+zOue+cpUk=";
+      hash = "sha256-k7TnFX9rqP62HPxfhgCO/SxZA3unigF9krSr8wYyNI8=";
     };
   };
 
