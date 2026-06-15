@@ -598,7 +598,7 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
                               int participating_count,
                               caml_domain_state** participating)
 {
-  struct caml_minor_tables *self_minor_tables = domain->minor_tables;
+  const struct caml_minor_tables *self_minor_tables = domain->minor_tables;
   value* young_ptr = domain->young_ptr;
   value* young_end = domain->young_end;
   uintnat minor_allocated_bytes = (uintnat)young_end - (uintnat)young_ptr;
@@ -880,9 +880,9 @@ static void ephe_clean_minor (caml_domain_state* domain)
    code, but they cannot have any pointers into our minor heap. */
 static void custom_finalize_minor (caml_domain_state * domain)
 {
-  struct caml_custom_elt *elt;
-  for (elt = domain->minor_tables->custom.base;
-       elt < domain->minor_tables->custom.ptr; elt++) {
+  for (struct caml_custom_elt *elt = domain->minor_tables->custom.base;
+       elt < domain->minor_tables->custom.ptr;
+       elt++) {
     value *v = &elt->block;
     if (Is_block(*v) && Is_young(*v)) {
       if (!Is_promoted_hd(Hd_val(*v))) { /* value not copied to major heap */
@@ -1045,7 +1045,7 @@ caml_stw_empty_minor_heap_no_major_slice(caml_domain_state* domain,
 
 #ifdef DEBUG
   {
-    for (uintnat* p = initial_young_ptr; p < (uintnat*)domain->young_end; ++p)
+    for (uintnat *p = initial_young_ptr; p < (uintnat*)domain->young_end; ++p)
       *p = Debug_free_minor;
   }
 #endif
@@ -1112,12 +1112,16 @@ void caml_empty_minor_heaps_once (void)
   CAMLassert(!caml_domain_is_in_stw());
   #endif
 
+  CAML_EV_BEGIN(EV_EMPTY_MINOR);
+
   /* To handle the case where multiple domains try to execute a minor gc
      STW section */
   do {
     caml_try_empty_minor_heap_on_all_domains();
   } while (saved_minor_cycle ==
            atomic_load_relaxed(&caml_minor_cycles_started));
+
+  CAML_EV_END(EV_EMPTY_MINOR);
 }
 
 /* Called by minor allocations when [Caml_state->young_ptr] reaches
@@ -1138,9 +1142,8 @@ void caml_alloc_small_dispatch (caml_domain_state * dom_st,
     if (flags & CAML_FROM_CAML)
       /* In the case of allocations performed from OCaml, execute
          asynchronous callbacks. */
-      (void) caml_raise_async_if_exception(
-         caml_do_pending_actions_flags_exn(flags),
-        "minor GC");
+      (void) caml_get_value_or_raise_async(
+               caml_do_pending_actions_flags_res(flags), "minor GC");
     else {
       /* In the case of allocations performed from C, only perform
          non-delayable actions. */
@@ -1214,7 +1217,7 @@ CAMLexport value caml_check_urgent_gc (value extra_root)
 static void realloc_generic_table
 (struct generic_table *tbl, asize_t element_size,
  ev_runtime_counter ev_counter_name,
- char *msg_threshold, char *msg_growing, char *msg_error)
+ const char *msg_threshold, const char *msg_growing, const char *msg_error)
 {
   CAMLassert (tbl->ptr == tbl->limit);
   CAMLassert (tbl->limit <= tbl->end);

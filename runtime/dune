@@ -124,3 +124,20 @@
   )
   (section lib)
   (package ocaml_runtime_stdlib))
+
+(alias
+ (name runtime-only)
+ (deps
+    ocamlrun
+    ocamlrund
+    ocamlruni
+    libcamlrun.a
+    libcamlrund.a
+    libcamlruni.a
+    libcamlrun_pic.a
+    libcamlrun_shared.so
+    libasmrun.a
+    libasmrund.a
+    libasmruni.a
+    libasmrun_pic.a
+    libasmrun_shared.so))

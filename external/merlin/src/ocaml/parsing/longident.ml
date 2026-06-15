@@ -12,27 +12,46 @@
 (*   special exception on linking described in the file LICENSE.          *)
 (*                                                                        *)
 (**************************************************************************)
+open Location
 
 type t =
     Lident of string
-  | Ldot of t * string
-  | Lapply of t * t
+  | Ldot of t loc * string loc
+  | Lapply of t loc * t loc
+
+
+let rec same t t' =
+  t == t'
+  || match t, t' with
+  | Lident s, Lident s' ->
+      String.equal s s'
+  | Ldot ({ txt = t; _ }, { txt = s; _ }),
+    Ldot ({ txt = t'; _ }, { txt = s'; _ }) ->
+      if String.equal s s' then
+        same t t'
+      else
+        false
+  | Lapply ({ txt = tl; _ }, { txt = tr; _ }),
+    Lapply ({ txt = tl'; _ }, { txt = tr'; _ }) ->
+      same tl tl' && same tr tr'
+  | _, _ -> false
+
 
 let rec flat accu = function
     Lident s -> s :: accu
-  | Ldot(lid, s) -> flat (s :: accu) lid
+  | Ldot({ txt = lid; _ }, { txt = s; _ }) -> flat (s :: accu) lid
   | Lapply(_, _) -> Misc.fatal_error "Longident.flat"
 
 let flatten lid = flat [] lid
 
 let rec head = function
     Lident s -> s
-  | Ldot(lid, _) -> head lid
+  | Ldot({ txt = lid; _ }, _) -> head lid
   | Lapply(_, _) -> assert false
 
 let last = function
     Lident s -> s
-  | Ldot(_, s) -> s
+  | Ldot(_, s) -> s.txt
   | Lapply(_, _) -> Misc.fatal_error "Longident.last"
 
 
@@ -46,7 +65,9 @@ let rec split_at_dots s pos =
 let unflatten l =
   match l with
   | [] -> None
-  | hd :: tl -> Some (List.fold_left (fun p s -> Ldot(p, s)) (Lident hd) tl)
+  | hd :: tl ->
+    Some (List.fold_left (fun p s -> Ldot(mknoloc p, mknoloc s))
+                         (Lident hd) tl)
 
 let parse s =
   match unflatten (split_at_dots s 0) with
@@ -61,20 +82,20 @@ let keep_suffix =
         Some (Lident str, false)
       else
         None
-    | Ldot (t, str) ->
+    | Ldot (t, ({ txt = str; _ } as str_loc)) ->
       if String.uncapitalize_ascii str <> str then
-        match aux t with
+        match aux t.txt with
         | None -> Some (Lident str, true)
-        | Some (t, is_label) -> Some (Ldot (t, str), is_label)
+        | Some (t, is_label) -> Some (Ldot (Location.mknoloc t, str_loc), is_label)
       else
         None
     | t -> Some (t, false) (* Can be improved... *)
   in
   function
   | Lident s -> Lident s, false
-  | Ldot (t, s) ->
-    begin match aux t with
+  | Ldot (t, ({ txt = s; _ } as s_loc)) ->
+    begin match aux t.txt with
     | None -> Lident s, true
-    | Some (t, is_label) -> Ldot (t, s), is_label
+    | Some (t, is_label) -> Ldot (Location.mknoloc t, s_loc), is_label
     end
   | otherwise -> otherwise, false

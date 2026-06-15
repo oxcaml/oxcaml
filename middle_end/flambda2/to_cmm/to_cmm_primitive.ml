@@ -1229,7 +1229,10 @@ let unary_primitive env res dbg f arg =
     ( None,
       res,
       C.ite
-        (C.and_int arg (C.int 1 ~dbg) dbg)
+        (C.or_int
+           (C.and_int arg (C.int 1 ~dbg) dbg)
+           (C.eq arg (C.int 0 ~dbg) ~dbg)
+           dbg)
         ~dbg ~then_:(C.int 0 ~dbg) ~then_dbg:dbg
         ~else_:(C.eq (C.get_tag arg dbg) (C.int Obj.double_tag ~dbg) ~dbg)
         ~else_dbg:dbg )

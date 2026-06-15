@@ -271,8 +271,7 @@ Lines 2-7, characters 2-14:
 6 |   | #4L -> #0L
 7 |   | #5L -> #1L
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-#3L
+  Here is an example of a case that is not matched: "#3L"
 
 val f : int64# -> int64# = <fun>
 Exception: Match_failure ("", 2, 2).
@@ -319,8 +318,7 @@ Lines 2-4, characters 2-14:
 3 |   | #4. -> #0.
 4 |   | #5. -> #1.
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-#0.
+  Here is an example of a case that is not matched: "#0."
 
 val f : float# -> float# = <fun>
 Exception: Match_failure ("", 2, 2).
@@ -347,8 +345,7 @@ Lines 2-8, characters 2-14:
 7 |   | #4m -> #0m
 8 |   | #5m -> #1m
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-#6m
+  Here is an example of a case that is not matched: "#6m"
 
 val f : int# -> int# = <fun>
 Exception: Match_failure ("", 2, 2).

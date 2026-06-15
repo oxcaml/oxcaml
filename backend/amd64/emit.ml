@@ -2113,7 +2113,7 @@ let emit_instr ~first ~last ~fallthrough i =
         D.cfi_def_cfa_register ~reg:"r13";
         (* NB: gdb has asserts on contiguous stacks that mean it will not unwind
            through this unless we were to tag this calling frame with
-           cfi_signal_frame in it's definition. *)
+           cfi_signal_frame in its definition. *)
         I.mov (domain_field Domainstate.Domain_c_stack) rsp);
       emit_call (Cmm.global_symbol func);
       if switch_stacks
@@ -3130,12 +3130,16 @@ let end_assembly () =
   (* PR#6329 *)
   emit_global_label ~section:Data "data_end";
   D.int64 0L;
-  D.text ();
+  let frametable_section : Asm_targets.Asm_section.t =
+    if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Text
+  in
+  D.switch_to_section frametable_section;
   I.ud2 ();
-  (* data in text below *)
-  D.align ~fill:Nop ~bytes:8;
+  D.align
+    ~fill:(if !Oxcaml_flags.frametables_in_rodata then Zero else Nop)
+    ~bytes:8;
   (* PR#7591 *)
-  emit_global_label ~section:Text "frametable";
+  emit_global_label ~section:frametable_section "frametable";
   (* CR sspies: Share the [emit_frames] code with the Arm backend. *)
   emit_frames
     { efa_code_label =
@@ -3156,13 +3160,13 @@ let end_assembly () =
       efa_align = (fun n -> D.align ~fill:Nop ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
-          let lbl = label_to_asm_label ~section:Text lbl in
+          let lbl = label_to_asm_label ~section:frametable_section lbl in
           let ofs = Targetint.of_int32 ofs in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:ofs);
       efa_def_label =
         (fun l ->
-          let lbl = label_to_asm_label ~section:Text l in
+          let lbl = label_to_asm_label ~section:frametable_section l in
           D.define_label lbl);
       efa_string = (fun s -> D.string (s ^ "\000"))
     };

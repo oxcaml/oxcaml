@@ -301,6 +301,10 @@ module Sort = struct
     let for_type_extension = scannable
 
     let for_class = scannable
+
+    let for_effect = scannable
+
+    let for_continuation = scannable
   end
 
   module Var = struct

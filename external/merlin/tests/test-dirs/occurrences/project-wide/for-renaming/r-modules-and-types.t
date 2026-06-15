@@ -25,8 +25,9 @@
   $ ocaml-index aggregate *.cmti *.cmt
 
   $ ocaml-index dump project.ocaml-index
-  8 uids:
-  {uid: [intf]Lib.0; locs: "x": File "lib.mli", line 2, characters 6-7
+  10 uids:
+  {uid: Lib; locs: "Lib": File "main.ml", line 1, characters 11-14
+   uid: [intf]Lib.0; locs: "x": File "lib.mli", line 2, characters 6-7
    uid: Lib.0; locs: "x": File "lib.ml", line 2, characters 6-7
    uid: Main.0; locs:
      "x": File "main.ml", line 2, characters 6-7;
@@ -43,7 +44,10 @@
    uid: Lib.2; locs:
      "x": File "lib.ml", line 5, characters 32-33;
      "X.x": File "lib.ml", line 6, characters 2-5
-   uid: Main.2; locs: "N": File "main.ml", line 4, characters 7-8 },
+   uid: Main.2; locs:
+     "N": File "main.ml", line 4, characters 7-8;
+     "N": File "main.ml", line 5, characters 23-24
+   uid: Lib.3; locs: "X": File "lib.ml", line 6, characters 2-3 },
   0 approx shapes: {}, and shapes for CUS .
   and related uids:{([intf]Lib.1 Lib.1); ([intf]Lib.0 Lib.0 Main.0 Lib.2)}
 

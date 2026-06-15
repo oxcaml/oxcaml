@@ -3,7 +3,7 @@
  include runtime_events;
  include unix;
  hasunix;
- not-windows;
+ not-target-windows;
  {
    bytecode;
  }

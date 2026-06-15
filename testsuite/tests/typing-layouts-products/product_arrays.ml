@@ -2158,7 +2158,7 @@ external len : ('a : any separable). 'a array -> int = "%array_length"
 Line 5, characters 6-7:
 5 |   len x
           ^
-Error: This expression has type "#(float# * a * int * int64#) array"
+Error: The value "x" has type "#(float# * a * int * int64#) array"
        but an expression was expected of type "'a array"
        The layout of #(float# * a * int * int64#) is
            float64 & any separable & value non_pointer & bits64
@@ -2176,7 +2176,7 @@ let f_any_2 (type a : any mod separable) (x : #(string * a * bool option) array)
 Line 2, characters 6-7:
 2 |   len x
           ^
-Error: This expression has type "#(string * a * bool option) array"
+Error: The value "x" has type "#(string * a * bool option) array"
        but an expression was expected of type "'a array"
        The layout of #(string * a * bool option) is
            value non_float & any separable & value non_float
@@ -2195,7 +2195,7 @@ let f_any_external_1 (type a : any mod separable mod external_)
 Line 2, characters 53-54:
 2 |       (x : #(float# * a * int * int64#) array) = len x
                                                          ^
-Error: This expression has type "#(float# * a * int * int64#) array"
+Error: The value "x" has type "#(float# * a * int * int64#) array"
        but an expression was expected of type "'a array"
        The layout of #(float# * a * int * int64#) is
            float64 & any separable & value non_pointer & bits64
@@ -2213,7 +2213,7 @@ let f_any_external_2 (type a : any mod separable mod external_)
 Line 2, characters 52-53:
 2 |       (x : #(string * a * bool option) array) = len x
                                                         ^
-Error: This expression has type "#(string * a * bool option) array"
+Error: The value "x" has type "#(string * a * bool option) array"
        but an expression was expected of type "'a array"
        The layout of #(string * a * bool option) is
            value non_float & any separable & value non_float

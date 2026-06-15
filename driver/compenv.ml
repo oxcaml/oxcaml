@@ -220,6 +220,31 @@ let set_flambda_invariants ppf ~name v flag =
   | None -> ()
   | Some checks -> flag := checks
 
+let handle_dump_option ppf v =
+  let module D = Clflags.Dump_option in
+  let value, key =
+    (* "foo"  => true, "foo"
+       "-foo" => false, "foo"
+       "+foo" => true, "foo" *)
+    let tail () = String.sub v 1 (String.length v - 1) in
+    if String.starts_with ~prefix:"-" v
+    then false, tail ()
+    else if String.starts_with ~prefix:"+" v
+    then true, tail ()
+    else true, v
+  in
+  match D.of_string key with
+  | None ->
+      Printf.ksprintf (print_error ppf)
+        "bad value %s for option \"dump\"." key
+  | Some option ->
+  match D.available option with
+  | Error msg ->
+      Printf.ksprintf (print_error ppf)
+        "dump=%s: %s." key msg
+  | Ok () ->
+      D.flag option := value
+
 (* 'can-discard=' specifies which arguments can be discarded without warning
    because they are not understood by some versions of OCaml. *)
 let can_discard = ref []
@@ -298,7 +323,7 @@ let read_one_param ppf position name v =
   | "no-app-funct" -> clear "no-app-funct" [ applicative_functors ] v
   | "nodynlink" -> clear "nodynlink" [ dlcode ] v
   | "short-paths" -> clear "short-paths" [ real_paths ] v
-  | "trans-mod" -> set "trans-mod" [ transparent_modules ] v
+  | "no-alias-deps" -> set "no-alias-deps" [ no_alias_deps ] v
   | "opaque" -> set "opaque" [ opaque ] v
 
   | "pp" -> preprocessor := Some v
@@ -552,6 +577,11 @@ let read_one_param ppf position name v =
   | "disable-all-extensions" ->
     if check_bool ppf name v then
       Language_extension.set_universe_and_enable_all No_extensions
+
+  | "dump" ->
+      handle_dump_option ppf v
+
+  |  "keywords"  -> Clflags.keyword_edition := Some v
 
   | _ ->
     if !warnings_for_discarded_params &&

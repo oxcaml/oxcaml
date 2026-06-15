@@ -13,15 +13,16 @@
 /*                                                                        */
 /**************************************************************************/
 
+#define CAML_INTERNALS
 #include <caml/mlvalues.h>
 #include <caml/signals.h>
 #include "caml/unixsupport.h"
 
-CAMLprim value caml_unix_sleep(value t)
+CAMLprim value caml_unix_sleep(value sec)
 {
-  double d = Double_val(t);
+  DWORD msec = (DWORD) (Double_val(sec) * MSEC_PER_SEC);
   caml_enter_blocking_section();
-  Sleep(d * 1e3);
+  Sleep(msec);
   caml_leave_blocking_section();
   return Val_unit;
 }
