@@ -1229,6 +1229,7 @@ let mode_unit ~staticity =
       statefulness = Stateful;
       visibility = Read_write;
       staticity;
+      allocation = Alloc;
     }
     ~hint_monadic:hint ~hint_comonadic:hint
 

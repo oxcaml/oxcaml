@@ -264,8 +264,9 @@ module Axis_set = struct
     | Modal (Comonadic Statefulness) -> 7
     | Modal (Monadic Visibility) -> 8
     | Modal (Monadic Staticity) -> 9
+    | Modal (Comonadic Allocation) -> 10
     (* CR-soon zqian: call [Mode.Crossing.Axis.index] for modal axes *)
-    | Nonmodal Externality -> 10
+    | Nonmodal Externality -> 11
 
   let[@inline] axis_mask ax = 1 lsl axis_index ax
 

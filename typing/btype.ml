@@ -877,6 +877,7 @@ module Jkind0 = struct
     let statefulness = Crossing.Axis.Comonadic Statefulness
     let visibility = Crossing.Axis.Monadic Visibility
     let staticity = Crossing.Axis.Monadic Staticity
+    let allocation = Crossing.Axis.Comonadic Allocation
     let[@inline] externality t = t.externality
 
     let[@inline] create
@@ -909,6 +910,7 @@ module Jkind0 = struct
       let statefulness = modal statefulness in
       let visibility = modal visibility in
       let staticity = modal staticity in
+      let allocation = modal allocation in
       let externality =
         if mem max_axes (Nonmodal Externality)
         then Externality.max
@@ -919,7 +921,7 @@ module Jkind0 = struct
       in
       let comonadic =
         Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
-          ~forkable ~statefulness
+          ~forkable ~statefulness ~allocation
       in
       let crossing : Mode.Crossing.t = { monadic; comonadic } in
       {
@@ -946,6 +948,7 @@ module Jkind0 = struct
       let statefulness = modal statefulness in
       let visibility = modal visibility in
       let staticity = modal staticity in
+      let allocation = modal allocation in
       let externality =
         if mem min_axes (Nonmodal Externality)
         then Externality.min
@@ -956,7 +959,7 @@ module Jkind0 = struct
       in
       let comonadic =
         Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
-          ~forkable ~statefulness
+          ~forkable ~statefulness ~allocation
       in
       let crossing : Mode.Crossing.t = { monadic; comonadic } in
       {
@@ -994,7 +997,7 @@ module Jkind0 = struct
       let crossing =
         Crossing.create ~linearity:false ~regionality:false ~uniqueness:true
           ~portability:false ~contention:true ~forkable:false ~yielding:false
-          ~statefulness:false ~visibility:true ~staticity:false
+          ~statefulness:false ~visibility:true ~staticity:false ~allocation:(failwith "allocation axis: todo")
       in
       create crossing ~externality:Externality.max
 
@@ -1387,7 +1390,7 @@ module Jkind0 = struct
         let crossing =
           Crossing.create ~regionality:false ~linearity:true ~portability:true
             ~forkable:true ~yielding:true ~uniqueness:false ~contention:true
-            ~statefulness:true ~visibility:true ~staticity:false
+            ~statefulness:true ~visibility:true ~staticity:false ~allocation:(failwith "allocation axis: todo")
         in
         create crossing ~externality:Externality.max
 
@@ -1430,7 +1433,7 @@ module Jkind0 = struct
                    Crossing.create ~regionality:false ~linearity:false
                      ~portability:true ~forkable:false ~yielding:false
                      ~uniqueness:false ~contention:true ~statefulness:true
-                     ~visibility:true ~staticity:false
+                     ~visibility:true ~staticity:false ~allocation:(failwith "allocation axis: todo")
                  in
                  create crossing ~externality:Externality.max);
               with_bounds = No_with_bounds
@@ -1443,7 +1446,7 @@ module Jkind0 = struct
         let crossing =
           Crossing.create ~regionality:false ~linearity:true ~portability:true
             ~forkable:true ~yielding:true ~uniqueness:false ~contention:true
-            ~statefulness:true ~visibility:false ~staticity:false
+            ~statefulness:true ~visibility:false ~staticity:false ~allocation:(failwith "allocation axis: todo")
         in
         create crossing ~externality:Externality.max
 
@@ -1478,7 +1481,7 @@ module Jkind0 = struct
         let crossing =
           Crossing.create ~regionality:false ~linearity:true ~portability:true
             ~forkable:true ~yielding:true ~contention:false ~uniqueness:false
-            ~statefulness:true ~visibility:false ~staticity:false
+            ~statefulness:true ~visibility:false ~staticity:false ~allocation:(failwith "allocation axis: todo")
         in
         create crossing ~externality:Externality.max
 
@@ -1575,6 +1578,8 @@ module Jkind0 = struct
          * Contention: This is fine, because contention matters only for
          types with mutable fields, and an immediate64 does not have immutable
          fields.
+
+         * Allocation: CR-soon shsong: check whether it needs to be discussed here
 
          In practice, the functor that creates immediate64s,
          [Stdlib.Sys.Immediate64.Make], will require these conditions on its
@@ -2472,7 +2477,7 @@ module Jkind0 = struct
       let crossing =
         Mode.Crossing.create ~regionality:false ~linearity:true
           ~portability:true ~forkable:true ~yielding:true ~uniqueness:false
-          ~contention:true ~statefulness:true ~visibility:true ~staticity:false
+          ~contention:true ~statefulness:true ~visibility:true ~staticity:false ~allocation:(failwith "allocation axis: todo")
       in
       let mod_bounds =
         Mod_bounds.create crossing ~externality:Mod_bounds.Externality.max

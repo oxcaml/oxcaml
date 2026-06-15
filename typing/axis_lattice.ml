@@ -29,7 +29,8 @@
    7. Statefulness: Stateless -> Writing / Reading -> Stateful
    8. Visibility (monadic): Immutable -> Read / Write -> Read_write
    9. Staticity (monadic): Dynamic -> Static
-   10. Externality: External -> External64 -> Internal
+   10. Allocation: Alloc -> Noalloc -> Noalloc_strict
+   11. Externality: External -> External64 -> Internal
 
    Axes 0-9 are modal axes (affect mode-crossing).
    Axis 10 is the only non-modal axis (externality).
@@ -72,6 +73,7 @@ let axis_shapes =
       | Modal (Comonadic Statefulness) -> Diamond4
       | Modal (Monadic Visibility) -> Diamond4
       | Modal (Monadic Staticity) -> Chain2
+      | Modal (Comonadic Allocation) -> Chain3
       | Nonmodal Externality -> Chain3)
     axis_by_number
 
@@ -348,6 +350,12 @@ module Levels = struct
     | 1 -> Mode.Staticity.Static
     | _ -> invalid_arg "Axis_lattice.staticity_of_level_monadic"
 
+  let allocation_of_level = function
+    | 0 -> Mode.Allocation.Const.Alloc
+    | 1 -> Mode.Allocation.Const.Noalloc
+    | 2 -> Mode.Allocation.Const.Noalloc_strict
+    | _ -> invalid_arg "Axis_lattice.allocation_of_level"
+
   let externality_of_level = function
     | 0 -> Jkind_axis.Externality.External
     | 1 -> Jkind_axis.Externality.External64
@@ -385,8 +393,11 @@ let visibility (x : t) : Mode.Visibility.Const.t =
 let staticity (x : t) : Mode.Staticity.const =
   Levels.staticity_of_level_monadic (get_axis x ~axis:9)
 
+let allocation (x : t) : Mode.Allocation.Const.t =
+  Levels.allocation_of_level (get_axis x ~axis:10)
+
 let externality (x : t) : Jkind_axis.Externality.t =
-  Levels.externality_of_level (get_axis x ~axis:10)
+  Levels.externality_of_level (get_axis x ~axis:11)
 
 let set_areality (a : Mode.Regionality.Const.t) (x : t) : t =
   set_axis x ~axis:0 ~level:(Levels.level_of_areality a)
@@ -468,6 +479,7 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
         (Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const
               (statefulness x)))
+      ~allocation:(Comonadic.Atom.Modality (Mode.Modality.Comonadic.Atom.Meet_const (allocation x)))
   in
   { monadic; comonadic }
 

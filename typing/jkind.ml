@@ -1257,6 +1257,8 @@ module Base_and_axes = struct
                   ~yielding:(value_for_axis ~axis:(Modal (Comonadic Yielding)))
                   ~statefulness:
                     (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
+                  ~allocation:
+                    (value_for_axis ~axis:(Modal (Comonadic Allocation)))
               in
               let crossing : Mod_bounds.Crossing.t = { monadic; comonadic } in
               Mod_bounds.create crossing
