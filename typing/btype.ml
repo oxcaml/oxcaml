@@ -167,8 +167,8 @@ let newty3 ~level ~scope desc =
 let newty2 ~level desc =
   newty3 ~level ~scope:Ident.lowest_scope desc
 
-<<<<<<< HEAD
-let newgenty desc = newty2 ~level:generic_level desc
+let newgenty desc      = newty2 ~level:generic_level desc
+let newgenmono desc    = newgenty (Tpoly(desc, []))
 let newgenvar ?name jkind = newgenty (Tvar { name; jkind })
 let newgenstub ~scope jkind =
   newty3 ~level:generic_level ~scope (Tvar { name=None; jkind })
@@ -177,16 +177,6 @@ let new_splice_ty t = newty2 ~level:(get_level t) (Tsplice t)
 let new_quote_ty t = newty2 ~level:(get_level t) (Tquote t)
 let new_quote_eval_ty t = newty2 ~level:(get_level t) (Tquote_eval t)
 let new_box_ty t = newty2 ~level:(get_level t) (Tbox t)
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-let newgenty desc      = newty2 ~level:generic_level desc
-let newgenvar ?name () = newgenty (Tvar name)
-let newgenstub ~scope  = newty3 ~level:generic_level ~scope (Tvar None)
-=======
-let newgenty desc      = newty2 ~level:generic_level desc
-let newgenmono desc    = newgenty (Tpoly(desc, []))
-let newgenvar ?name () = newgenty (Tvar name)
-let newgenstub ~scope  = newty3 ~level:generic_level ~scope (Tvar None)
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 (**** Check some types ****)
 
@@ -914,26 +904,6 @@ let instance_variable_type label sign =
   match Vars.find label sign.csig_vars with
   | (_, _, ty) -> ty
   | exception Not_found -> assert false
-
-                  (********************************)
-                  (*  Utilities for poly types    *)
-                  (********************************)
-
-let tpoly_is_mono ty =
-  match get_desc ty with
-  | Tpoly(_, []) -> true
-  | Tpoly(_, _ :: _) -> false
-  | _ -> assert false
-
-let tpoly_get_poly ty =
-  match get_desc ty with
-  | Tpoly(ty, vars) -> (ty, vars)
-  | _ -> assert false
-
-let tpoly_get_mono ty =
-  match get_desc ty with
-  | Tpoly(ty, []) -> ty
-  | _ -> assert false
 
                   (*******************************)
                   (*  Utilities for box types    *)

@@ -2720,14 +2720,8 @@ fun_seq_expr:
 seq_expr:
   | or_function(fun_seq_expr) { $1 }
 ;
-<<<<<<< HEAD
 
-labeled_simple_pattern:
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-labeled_simple_pattern:
-=======
 simple_param_pattern:
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
     QUESTION LPAREN label_let_pattern opt_default RPAREN
       { (Optional (fst $3), $4, snd $3) }
   | QUESTION label_var
@@ -2744,10 +2738,6 @@ simple_param_pattern:
       { (Labelled $1, None, $2) }
   | simple_pattern_extend_modes_or_poly
       { (Nolabel, None, $1) }
-  | LABEL LPAREN poly_pattern RPAREN
-      { (Labelled $1, None, $3) }
-  | LPAREN poly_pattern RPAREN
-      { (Nolabel, None, $2) }
 ;
 
 pattern_var:
@@ -2773,18 +2763,8 @@ optional_poly_type_and_modes:
 ;
 
 label_let_pattern:
-<<<<<<< HEAD
     modes0 = optional_mode_expr_legacy x = label_var
     cty_modes1 = optional_poly_type_and_modes
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-    x = label_var
-      { x }
-  | x = label_var COLON cty = core_type
-=======
-    x = label_var
-      { x }
-  | x = label_var COLON cty = possibly_poly_type
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
       { let lab, pat = x in
         let cty, modes1 = cty_modes1 in
         let modes = modes0 @ modes1 in
@@ -2798,7 +2778,6 @@ label_let_pattern:
       { ($1.Location.txt, mkpat ~loc:$sloc (Ppat_var $1)) }
 ;
 let_pattern:
-<<<<<<< HEAD
     modes0 = optional_mode_expr_legacy pat = pattern
     cty_modes1 = optional_poly_type_and_modes
     {
@@ -2807,27 +2786,6 @@ let_pattern:
       let loc = $startpos(modes0), $endpos(cty_modes1) in
       mkpat_with_modes ~loc ~pat ~cty ~modes
     }
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-    pattern
-      { $1 }
-  | mkpat(pattern COLON core_type
-      { Ppat_constraint($1, $3) })
-      { $1 }
-=======
-    pattern
-      { $1 }
-  | mkpat(pattern COLON possibly_poly_type
-      { Ppat_constraint($1, $3) })
-      { $1 }
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-;
-%inline poly_pattern:
-    mkpat(
-      pat = pattern
-      COLON
-      cty = poly_type
-        { Ppat_constraint(pat, cty) })
-      { $1 }
 ;
 
 (* simple_pattern extended with poly_type and modes *)
@@ -3525,19 +3483,13 @@ fun_param_as_list:
              })
           ty_params
       }
-<<<<<<< HEAD
   | LPAREN TYPE mkrhs(LIDENT) COLON jkind_annotation RPAREN
       { [ { pparam_loc = make_loc $sloc;
             pparam_desc = Pparam_newtype ($3, Some $5)
           }
         ]
       }
-  | labeled_simple_pattern
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-  | labeled_simple_pattern
-=======
   | simple_param_pattern
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
       { let a, b, c = $1 in
         [ { pparam_loc = make_loc $sloc;
             pparam_desc = Pparam_val (a, b, c)
@@ -4603,7 +4555,7 @@ possibly_poly(X):
     { $1 }
 ;
 %inline poly_type:
-  mktyp(poly(core_type))
+  possibly_poly(core_type)
     { $1 }
 ;
 %inline possibly_poly_type:
@@ -4708,13 +4660,7 @@ function_type:
 strict_function_or_labeled_tuple_type:
   | mktyp(
       label = arg_label
-<<<<<<< HEAD
       domain_with_modes = with_optional_mode_expr(extra_rhs(param_type))
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-      domain = extra_rhs(tuple_type)
-=======
-      domain = extra_rhs(param_type)
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
       MINUSGREATER
       codomain = strict_function_or_labeled_tuple_type
         { let (domain, (_ : Lexing.position * Lexing.position)), arg_modes = domain_with_modes in
@@ -4799,7 +4745,6 @@ strict_function_or_labeled_tuple_type:
   | /* empty */
       { Nolabel }
 ;
-<<<<<<< HEAD
 /* Legacy mode annotations */
 %inline mode_legacy:
    | LOCAL
@@ -4870,34 +4815,12 @@ optional_atat_modalities_expr:
   | stack(expr) { $1 }
 
 %inline param_type:
-  | mktyp(
-    LPAREN bound_vars = typevar_list DOT inner_type = core_type RPAREN
-      { Ptyp_poly (bound_vars, inner_type) }
-    )
-    { $1 }
-  | mktyp(
-    LPAREN bound_vars = typevar_repr_list DOT inner_type = core_type RPAREN
-      { Ptyp_repr (bound_vars, inner_type) }
-    )
-    { $1 }
-  | mktyp(
-    LPAREN LAYOUT bound_vars = newlayouts DOT inner_type = core_type RPAREN
-      { Ptyp_newlayout (bound_vars, inner_type) }
-    )
-    { $1 }
+  | LPAREN ty = strictly_poly_type RPAREN
+    { reloc_typ ~loc:$sloc ty }
   | ty = tuple_type
     { ty }
 ;
 
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-=======
-%inline param_type:
-  | LPAREN poly_type RPAREN
-    { reloc_typ ~loc:$sloc $2 }
-  | ty = tuple_type
-    { ty }
-;
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 (* Tuple types include:
    - atomic types (see below);
    - proper tuple types:                  int * int * int list

@@ -107,15 +107,10 @@ type error =
   | No_overriding of string * string
   | Duplicate of string * string
   | Closing_self_type of class_signature
-<<<<<<< HEAD
   | Polymorphic_class_parameter
   | Non_value_binding of string * Jkind.Violation.t
   | Non_value_let_binding of string * Jkind.sort
   | Nonoptional_call_pos_label of string
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-=======
-  | Polymorphic_class_parameter
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -201,17 +196,10 @@ let rec constructor_type constr cty =
   | Cty_signature _ ->
       constr
   | Cty_arrow (l, ty, cty) ->
-<<<<<<< HEAD
       let arrow_desc = l, Mode.Alloc.legacy, Mode.Alloc.legacy in
       let ty = Ctype.newmono ty in
       Ctype.newty
         (Tarrow (arrow_desc, ty, constructor_type constr cty, commu_ok))
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-      Ctype.newty (Tarrow (l, ty, constructor_type constr cty, commu_ok))
-=======
-      let ty = Ctype.newmono ty in
-      Ctype.newty (Tarrow (l, ty, constructor_type constr cty, commu_ok))
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
                 (***********************************)
                 (*  Primitives for typing classes  *)
@@ -837,32 +825,14 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
              try
                match get_desc ty with
                | Tvar _ ->
-<<<<<<< HEAD
                    let ty' =
                      Ctype.newvar (Jkind.Builtin.value ~why:Object_field)
                    in
                    Ctype.unify val_env (Ctype.newmono ty') ty;
                    Typecore.type_approx val_env sbody ty'
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-                   let ty' = Ctype.newvar () in
-                   Ctype.unify val_env (Ctype.newty (Tpoly (ty', []))) ty;
-                   type_approx val_env sbody ty'
-=======
-                   let ty' = Ctype.newvar () in
-                   Ctype.unify val_env (Ctype.newmono ty') ty;
-                   type_approx val_env sbody ty'
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
                | Tpoly (ty1, tl) ->
-<<<<<<< HEAD
                    let ty1' = Ctype.instance_poly tl ty1 in
                    Typecore.type_approx val_env sbody ty1'
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-                   let _, ty1' = Ctype.instance_poly ~fixed:false tl ty1 in
-                   type_approx val_env sbody ty1'
-=======
-                   let ty1' = Ctype.instance_poly tl ty1 in
-                   type_approx val_env sbody ty1'
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
                | _ -> assert false
              with Ctype.Unify err ->
                raise(Error(loc, val_env,
@@ -991,26 +961,11 @@ and class_field_second_pass cl_num sign met_env field =
       Warnings.with_state warning_state
         (fun () ->
            let ty = Btype.method_type label.txt sign in
-<<<<<<< HEAD
-           let self_type = sign.Types.csig_self in
            let arrow_desc = Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy in
-           let self_param_type = Btype.newgenty (Tpoly(self_type, [])) in
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-           let self_type = sign.Types.csig_self in
-=======
            let self_param_type = Btype.newgenmono sign.Types.csig_self in
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
            let meth_type =
-<<<<<<< HEAD
              Typecore.mk_expected (Btype.newgenty
                 (Tarrow(arrow_desc, self_param_type, ty, commu_ok)))
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-             mk_expected
-               (Btype.newgenty (Tarrow(Nolabel, self_type, ty, commu_ok)))
-=======
-             mk_expected
-               (Btype.newgenty (Tarrow(Nolabel, self_param_type, ty, commu_ok)))
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
            in
            let texp =
              Ctype.with_raised_nongen_level
@@ -1025,25 +980,11 @@ and class_field_second_pass cl_num sign met_env field =
       Warnings.with_state warning_state
         (fun () ->
            let unit_type = Ctype.instance Predef.type_unit in
-<<<<<<< HEAD
            let self_param_type = Ctype.newmono sign.Types.csig_self in
            let arrow_desc = Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy in
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-           let self_type = sign.Types.csig_self in
-=======
-           let self_param_type = Ctype.newmono sign.Types.csig_self in
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
            let meth_type =
-<<<<<<< HEAD
              Typecore.mk_expected (Ctype.newty
                (Tarrow (arrow_desc, self_param_type, unit_type, commu_ok)))
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-             mk_expected
-               (Ctype.newty (Tarrow (Nolabel, self_type, unit_type, commu_ok)))
-=======
-             mk_expected (Ctype.newty
-              (Tarrow (Nolabel, self_param_type, unit_type, commu_ok)))
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
            in
            let texp =
              Ctype.with_raised_nongen_level
@@ -1256,14 +1197,8 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
           cl_attributes = scl.pcl_attributes;
          }
   | Pcl_fun (l, Some default, spat, sbody) ->
-<<<<<<< HEAD
       if Typecore.has_poly_constraint spat then
         raise(Error(spat.ppat_loc, val_env, Polymorphic_class_parameter));
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-=======
-      if has_poly_constraint spat then
-        raise(Error(spat.ppat_loc, val_env, Polymorphic_class_parameter));
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
       let loc = default.pexp_loc in
       let open Ast_helper in
       let scases = [
@@ -1304,15 +1239,9 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       in
       class_expr cl_num val_env met_env virt self_scope sfun
   | Pcl_fun (l, None, spat, scl') ->
-<<<<<<< HEAD
       let l, spat = Typetexp.transl_label_from_pat l spat in
       if Typecore.has_poly_constraint spat then
         raise(Error(spat.ppat_loc, val_env, Polymorphic_class_parameter));
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-=======
-      if has_poly_constraint spat then
-        raise(Error(spat.ppat_loc, val_env, Polymorphic_class_parameter));
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
       let (pat, pv, val_env', met_env) =
         Ctype.with_local_level_generalize_structure_if_principal
           (fun () ->
@@ -1650,7 +1579,6 @@ let rec approx_declaration cl =
     Pcl_fun (l, _, pat, cl) ->
       let l, _ = Typetexp.transl_label_from_pat l pat in
       let arg =
-<<<<<<< HEAD
         match l with
         | Optional _ -> Ctype.instance var_option
         | Position _ -> Ctype.instance Predef.type_lexing_position
@@ -1663,16 +1591,6 @@ let rec approx_declaration cl =
       let arrow_desc = l, Mode.Alloc.legacy, Mode.Alloc.legacy in
       Ctype.newty
         (Tarrow (arrow_desc, arg, approx_declaration cl, commu_ok))
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-        if Btype.is_optional l then Ctype.instance var_option
-        else Ctype.newvar () in
-      Ctype.newty (Tarrow (l, arg, approx_declaration cl, commu_ok))
-=======
-        if Btype.is_optional l then Ctype.instance var_option
-        else Ctype.newvar () in
-      let arg = Ctype.newmono arg in
-      Ctype.newty (Tarrow (l, arg, approx_declaration cl, commu_ok))
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
   | Pcl_let (_, _, cl) ->
       approx_declaration cl
   | Pcl_constraint (cl, _) ->
@@ -1685,7 +1603,6 @@ let rec approx_description ct =
       let l = transl_label l (Some core_type) in
       let arg =
         if Btype.is_optional l then Ctype.instance var_option
-<<<<<<< HEAD
         else Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
         (* CR layouts: use of value here may be relaxed when we
            relax jkinds in classes *)
@@ -1695,16 +1612,6 @@ let rec approx_description ct =
       Ctype.newty
         (Tarrow (arrow_desc, arg, approx_description ct, commu_ok))
   | _ -> Ctype.newvar (Jkind.Builtin.value ~why:Object)
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-        else Ctype.newvar () in
-      Ctype.newty (Tarrow (l, arg, approx_description ct, commu_ok))
-  | _ -> Ctype.newvar ()
-=======
-        else Ctype.newvar () in
-      let arg = Ctype.newmono arg in
-      Ctype.newty (Tarrow (l, arg, approx_description ct, commu_ok))
-  | _ -> Ctype.newvar ()
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 (*******************************)
 
@@ -2493,10 +2400,9 @@ let report_error_doc env ppf =
        it has been unified with the self type of a class that is not yet@ \
        completely defined.@]"
       (Style.as_inline_code Printtyp.type_scheme) sign.csig_self
-<<<<<<< HEAD
   | Polymorphic_class_parameter ->
       fprintf ppf
-        "Class parameters cannot be polymorphic"
+        "Class parameters cannot be polymorphic."
   | Non_value_binding (nm, err) ->
     fprintf ppf
       "@[Variables bound in a class must have layout value.@ %a@]"
@@ -2513,12 +2419,6 @@ let report_error_doc env ppf =
     fprintf ppf
       "@[the argument labeled '%s' is a [%%call_pos] argument, filled in @ \
          automatically if ommitted. It cannot be passed with '?'.@]" label
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-=======
-  | Polymorphic_class_parameter ->
-      fprintf ppf
-        "Class parameters cannot be polymorphic."
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 let report_error_doc env ppf err =
   Printtyp.wrap_printing_env ~error:true

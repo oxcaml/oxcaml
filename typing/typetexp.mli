@@ -182,9 +182,8 @@ type error =
   | Opened_object of Path.t option
   | Not_an_object of type_expr
   | Repeated_tuple_label of string
-<<<<<<< HEAD
   | Unsupported_extension : _ Language_extension.t -> error
-  | Polymorphic_optional_param
+  | Polymorphic_optional_param of string
   | Non_value of
       {vloc : value_loc; typ : type_expr; err : Jkind.Violation.t}
   | Non_sort of
@@ -200,10 +199,6 @@ type error =
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
   | Val_poly_and_layout
-||||||| parent of 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
-=======
-  | Polymorphic_optional_param of string
->>>>>>> 5405464682 (Merge pull request #13806 from voodoos/upstream-polymorphic-parameters)
 
 exception Error of Location.t * Env.t * error
 
