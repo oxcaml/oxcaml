@@ -236,6 +236,8 @@ let compute_static_size lam =
     | Lifused _ -> Constant
     | Lregion (e, _) ->
       compute_expression_size env e
+    | Lregion_close_return (e, _) ->
+      compute_expression_size env e
     | Lexclave _ ->
       (* Lexclave should only occur in tail position of a function.
          Since we only compute sizes for let-bound definitions, we should never
@@ -792,6 +794,10 @@ let rec split_static_function lfun block_var local_idents lam :
     (* The new expression returns the closure block instead of the function *)
     ignore layout_fun;
     Lregion (lam, layout_block)
+  | Lregion_close_return (lam, layout_fun) ->
+    let+ lam = split_static_function lfun block_var local_idents lam in
+    ignore layout_fun;
+    Lregion_close_return (lam, layout_block)
   | Lmutvar _
   | Lconst _
   | Lapply _

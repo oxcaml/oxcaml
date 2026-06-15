@@ -4728,6 +4728,8 @@ let rec map_return f = function
     | Lwhile _ | Lfor _ | Lassign _ | Lifused _ ) as l ->
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
+  | Lregion_close_return (l, layout) ->
+      Lregion_close_return (map_return f l, layout)
   | Lexclave l -> Lexclave (map_return f l)
   | Lsplice _ as lam ->
       fatal_error_invalid_constructor lam
