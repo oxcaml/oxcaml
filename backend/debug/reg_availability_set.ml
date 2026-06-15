@@ -102,9 +102,10 @@ let canonicalise availability =
         | None -> ()
         | Some debug_info -> (
           match RD.Debug_info.holds_value_of debug_info with
-          | Const_int _ | Const_naked_float _ | Const_symbol _ ->
-            (* Constants are tracked for call site information only; they do not
-               give rise to canonical locations for variables. *)
+          | Const_int _ | Const_naked_float _ | Const_symbol _ | Projection _ ->
+            (* Constants and projections are tracked for call site information
+               only; they do not give rise to canonical locations for
+               variables. *)
             ()
           | Var name -> (
             if not (V.is_global_or_predef name)

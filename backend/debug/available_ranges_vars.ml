@@ -166,9 +166,9 @@ module Vars = struct
       | None -> None
       | Some debug_info -> (
         match RD.Debug_info.holds_value_of debug_info with
-        | Const_int _ | Const_naked_float _ | Const_symbol _ ->
-          (* Constants are tracked for call site information only; they do not
-             give rise to available ranges for variables. *)
+        | Const_int _ | Const_naked_float _ | Const_symbol _ | Projection _ ->
+          (* Constants and projections are tracked for call site information
+             only; they do not give rise to available ranges for variables. *)
           None
         | Var var ->
           let provenance = RD.Debug_info.provenance debug_info in

@@ -27,6 +27,14 @@ module Holds_value_of : sig
     | Const_int of nativeint
     | Const_naked_float of Int64.t
     | Const_symbol of Cmm.symbol
+    | Projection of
+        { base : t;
+          field : int
+              (* Field index, in words, of an immutable load from [base] (e.g. a
+                 closure value slot): the value can be described to a debugger,
+                 in the context of a caller, as a projection from whatever
+                 caller-evaluable description applies to [base]. *)
+        }
 
   val compare : t -> t -> int
 

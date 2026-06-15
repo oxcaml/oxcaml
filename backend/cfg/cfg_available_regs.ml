@@ -388,6 +388,40 @@ module Transfer = struct
             | Op (Const_int i) -> Some (Const_int i)
             | Op (Const_float f) -> Some (Const_naked_float f)
             | Op (Const_symbol sym) -> Some (Const_symbol sym)
+            | Op
+                (Load
+                   { memory_chunk = Word_val | Word_int;
+                     addressing_mode;
+                     mutability = Immutable;
+                     is_atomic = false
+                   })
+              when Array.length instr.arg >= 1 -> (
+              (* An immutable, full-word load at a constant displacement from a
+                 register whose held value we can describe (e.g. a closure value
+                 slot loaded from [my_closure]) is a projection: the loaded
+                 value can be recomputed by the debugger, in a caller's context,
+                 as a field of whatever description applies to the base. CR
+                 mshinwell: only full-word value fields are handled here; flat
+                 and unboxed fields (Single/Double, unboxed products, etc.)
+                 require matching the field's machine representation -- TODO. *)
+              match Arch.addressing_displacement_in_bytes addressing_mode with
+              | Some offset when offset >= 0 && offset mod Arch.size_addr = 0
+                -> (
+                match
+                  RD_quotient_set.find_reg_with_same_location_exn avail_before
+                    instr.arg.(0)
+                with
+                | exception Not_found -> None
+                | base_rd -> (
+                  match RD.debug_info base_rd with
+                  | None -> None
+                  | Some base_di ->
+                    Some
+                      (RD.Holds_value_of.Projection
+                         { base = RD.Debug_info.holds_value_of base_di;
+                           field = offset / Arch.size_addr
+                         })))
+              | Some _ | None -> None)
             | _ -> None
           in
           common ~avail_before ~destroyed_at:Proc.destroyed_at_basic

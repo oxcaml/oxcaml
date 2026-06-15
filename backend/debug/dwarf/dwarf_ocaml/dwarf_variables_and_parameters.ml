@@ -443,7 +443,8 @@ let vars_at_entry (fundecl : L.fundecl) =
         | Some debug_info -> (
           match RD.Debug_info.holds_value_of debug_info with
           | Var var -> V.Set.add var acc
-          | Const_int _ | Const_naked_float _ | Const_symbol _ -> acc))
+          | Const_int _ | Const_naked_float _ | Const_symbol _ | Projection _ ->
+            acc))
       avail V.Set.empty
 
 (* Determine whether a variable is a parameter of the current function whose

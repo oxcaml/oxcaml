@@ -145,3 +145,7 @@ val addressing_offset_in_bytes
   -> 'a array
   -> 'a array
   -> int option
+
+(* If the addressing mode is a single base register plus a constant
+   displacement, return that displacement in bytes; otherwise [None]. *)
+val addressing_displacement_in_bytes : addressing_mode -> int option

@@ -76,7 +76,7 @@ let spilled_copy_rvalue ~(reg : Reg.t) ~avail ~stack_offset ~fun_contains_calls
     | None -> None
     | Some debug_info -> (
       match RD.Debug_info.holds_value_of debug_info with
-      | Const_int _ | Const_naked_float _ | Const_symbol _ ->
+      | Const_int _ | Const_naked_float _ | Const_symbol _ | Projection _ ->
         (* CR mshinwell: is it useful to return [Some] here instead? *)
         None
       | Var var -> (
@@ -103,7 +103,7 @@ let spilled_copy_rvalue ~(reg : Reg.t) ~avail ~stack_offset ~fun_contains_calls
                         ->
                         Some rd'
                       | Var _ | Const_int _ | Const_naked_float _
-                      | Const_symbol _ ->
+                      | Const_symbol _ | Projection _ ->
                         None)))
               avail None
           in
@@ -167,27 +167,78 @@ let entry_value_rvalue ~(entry_available : Reg_availability_set.t) var :
                   (SLDL.Rvalue.entry_value_of_register ~dwarf_reg_number
                      (dwarf_version ()))
               | Stack _ | Unknown -> None)
-            | Var _ | Const_int _ | Const_naked_float _ | Const_symbol _ -> None
-            )))
+            | Var _ | Const_int _ | Const_naked_float _ | Const_symbol _
+            | Projection _ ->
+              None)))
       entry_avail None
 
-(* The [DW_AT_call_value] (GNU: [DW_AT_GNU_call_site_value]) attribute of a call
-   site parameter DIE describes how to compute the value passed for the
-   parameter, as an expression to be evaluated in the context of the _caller_
-   (typically after the debugger has virtually unwound to it). As such only the
-   following may be specified:
+(* Compute, where possible, a description of the value denoted by
+   [holds_value_of] that is evaluable in the context of the _caller_ of a call
+   (typically after the debugger has virtually unwound to it). The following may
+   be described:
 
    - constants;
 
    - spilled copies of the relevant value, at CFA-relative stack locations (such
    slots, unlike registers and the domainstate area, are preserved during the
-   call);
+   call), when [reg_for_spilled] gives a register currently holding the value;
 
-   - entry values (see [entry_value_rvalue] above), when the value passed is a
-   parameter of the calling function.
+   - entry values (see [entry_value_rvalue] above), when the value is a
+   parameter of the calling function;
+
+   - and, recursively, a projection of any of the above: the field of an
+   immutable block (e.g. a closure value slot) whose base is itself describable.
+   This is what makes the arguments of a partial-application wrapper, loaded
+   from its closure and forwarded by a tail call, recoverable: each is a field
+   of the wrapper's closure, which is itself a parameter (hence an entry value).
 
    For tail calls the caller's frame no longer exists by the time the callee
-   executes, so only constants and entry values may be quoted. *)
+   executes, so spilled copies may not be used; only constants, entry values and
+   projections thereof. *)
+let rec rvalue_of_holds_value_of (holds_value_of : RD.Holds_value_of.t)
+    ~reg_for_spilled ~avail ~entry_available ~is_tail ~stack_offset
+    ~fun_contains_calls ~fun_num_stack_slots : _ SLDL.Rvalue.t option =
+  match holds_value_of with
+  | Const_int i ->
+    Some
+      (SLDL.Rvalue.signed_int_const (Targetint.of_int64 (Int64.of_nativeint i)))
+  | Const_naked_float f -> Some (SLDL.Rvalue.float_const f)
+  | Const_symbol sym ->
+    Some (Dwarf_reg_locations.address_of_cmm_symbol_rvalue sym)
+  | Var var -> (
+    (* Spilled copies are preferred to entry values: the debugger can read them
+       directly, without chaining through further call site information. They
+       cannot however be used at tail call sites (the frame containing the
+       spilled copy no longer exists when the callee executes). *)
+    let spilled_copy =
+      match reg_for_spilled with
+      | Some reg when not is_tail ->
+        spilled_copy_rvalue ~reg ~avail ~stack_offset ~fun_contains_calls
+          ~fun_num_stack_slots
+      | Some _ | None -> None
+    in
+    match spilled_copy with
+    | Some _ -> spilled_copy
+    | None -> entry_value_rvalue ~entry_available var)
+  | Projection { base; field } -> (
+    (* The base is described from scratch; there is no single register holding
+       it at the call (and at a tail call a spilled copy would be unusable
+       anyway), so [reg_for_spilled] is dropped. *)
+    match
+      rvalue_of_holds_value_of base ~reg_for_spilled:None ~avail
+        ~entry_available ~is_tail ~stack_offset ~fun_contains_calls
+        ~fun_num_stack_slots
+    with
+    | None -> None
+    | Some base_rvalue ->
+      Some
+        (SLDL.Rvalue.read_field_unguarded ~block:base_rvalue
+           ~field:(Targetint.of_int_exn field)))
+
+(* The [DW_AT_call_value] (GNU: [DW_AT_GNU_call_site_value]) attribute of a call
+   site parameter DIE describes how to compute the value passed for the
+   parameter, as an expression to be evaluated in the context of the _caller_;
+   see [rvalue_of_holds_value_of]. *)
 let call_site_value_attribute ~(arg : Reg.t)
     ~(available_before : Reg_availability_set.t) ~entry_available ~is_tail
     ~stack_offset ~fun_contains_calls ~fun_num_stack_slots =
@@ -203,44 +254,15 @@ let call_site_value_attribute ~(arg : Reg.t)
       match RD.debug_info rd with
       | None -> []
       | Some debug_info -> (
-        match RD.Debug_info.holds_value_of debug_info with
-        | Const_int i ->
-          single_call_value_attribute
-            (SLDL.compile
-               (SLDL.of_rvalue
-                  (SLDL.Rvalue.signed_int_const
-                     (Targetint.of_int64 (Int64.of_nativeint i)))))
-        | Const_naked_float f ->
-          single_call_value_attribute
-            (SLDL.compile (SLDL.of_rvalue (SLDL.Rvalue.float_const f)))
-        | Const_symbol sym ->
-          single_call_value_attribute
-            (SLDL.compile
-               (SLDL.of_rvalue
-                  (Dwarf_reg_locations.address_of_cmm_symbol_rvalue sym)))
-        | Var var -> (
-          let rvalue =
-            (* Spilled copies are preferred to entry values: the debugger can
-               read them directly, without chaining through further call site
-               information. They cannot however be used at tail call sites (the
-               frame containing the spilled copy no longer exists when the
-               callee executes). *)
-            let spilled_copy =
-              if is_tail
-              then None
-              else
-                spilled_copy_rvalue ~reg:arg ~avail ~stack_offset
-                  ~fun_contains_calls ~fun_num_stack_slots
-            in
-            match spilled_copy with
-            | Some _ -> spilled_copy
-            | None -> entry_value_rvalue ~entry_available var
-          in
-          match rvalue with
-          | None -> []
-          | Some rvalue ->
-            single_call_value_attribute (SLDL.compile (SLDL.of_rvalue rvalue))))
-      ))
+        match
+          rvalue_of_holds_value_of
+            (RD.Debug_info.holds_value_of debug_info)
+            ~reg_for_spilled:(Some arg) ~avail ~entry_available ~is_tail
+            ~stack_offset ~fun_contains_calls ~fun_num_stack_slots
+        with
+        | None -> []
+        | Some rvalue ->
+          single_call_value_attribute (SLDL.compile (SLDL.of_rvalue rvalue)))))
 
 let add_call_site_parameter ~call_site_die ~arg_index ~(arg : Reg.t)
     ~available_before ~entry_available ~is_tail ~stack_offset
@@ -400,22 +422,15 @@ let indirect_callee_attributes ~(callee : Reg.t) ~(args : Reg.t array)
           | rd -> (
             match RD.debug_info rd with
             | None -> None
-            | Some debug_info -> (
-              match RD.Debug_info.holds_value_of debug_info with
-              | Const_symbol sym ->
-                Some (Dwarf_reg_locations.address_of_cmm_symbol_rvalue sym)
-              | Var var -> (
-                let spilled_copy =
-                  if is_tail
-                  then None
-                  else
-                    spilled_copy_rvalue ~reg:closure ~avail ~stack_offset
-                      ~fun_contains_calls ~fun_num_stack_slots
-                in
-                match spilled_copy with
-                | Some _ -> spilled_copy
-                | None -> entry_value_rvalue ~entry_available var)
-              | Const_int _ | Const_naked_float _ -> None))))
+            | Some debug_info ->
+              (* In particular this describes the function slot of a partial
+                 application invoked by a tail call: it is itself a projection
+                 (a field of the wrapper's closure), and so the callee can be
+                 identified rather than left "clobbered". *)
+              rvalue_of_holds_value_of
+                (RD.Debug_info.holds_value_of debug_info)
+                ~reg_for_spilled:(Some closure) ~avail ~entry_available ~is_tail
+                ~stack_offset ~fun_contains_calls ~fun_num_stack_slots)))
   in
   match closure_rvalue with
   | Some closure ->
