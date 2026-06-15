@@ -1049,13 +1049,15 @@ module Jkind0 = struct
 
     let staticity_const t = extract_monadic staticity t
 
+    let allocation_const t = extract_comonadic allocation t
+
     let to_axis_lattice (t : t) : Axis_lattice.t =
       Axis_lattice.create ~areality:(areality_const t)
         ~linearity:(linearity_const t) ~uniqueness:(uniqueness_const t)
         ~portability:(portability_const t) ~contention:(contention_const t)
         ~forkable:(forkable_const t) ~yielding:(yielding_const t)
         ~statefulness:(statefulness_const t) ~visibility:(visibility_const t)
-        ~staticity:(staticity_const t) ~externality:(externality t)
+        ~staticity:(staticity_const t) ~allocation:(allocation_const t) ~externality:(externality t)
 
     let of_axis_lattice (x : Axis_lattice.t) : t =
       let crossing = Axis_lattice.to_mode_crossing x in

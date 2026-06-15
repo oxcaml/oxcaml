@@ -15,7 +15,7 @@
 (* Axis lattice: efficient bitfield encoding of jkind axes.
 
    This module packs 11 axes into an OCaml immediate-sized integer. The axes
-   are indexed 0-10 and their values are ordered from most restrictive (0) to
+   are indexed 0-11 and their values are ordered from most restrictive (0) to
    least restrictive (max).
 
    Axis layout (index, name, values from level 0 to max):
@@ -32,8 +32,8 @@
    10. Allocation: Alloc -> Noalloc -> Noalloc_strict
    11. Externality: External -> External64 -> Internal
 
-   Axes 0-9 are modal axes (affect mode-crossing).
-   Axis 10 is the only non-modal axis (externality).
+   Axes 0-10 are modal axes (affect mode-crossing).
+   Axis 11 is the only non-modal axis (externality).
 
    Each 2-valued axis uses 1 bit. The 3-valued chain axes and 4-valued diamond
    axes use 2 bits.
@@ -169,6 +169,8 @@ let pp (v : t) : string =
 
 let to_string = pp
 
+(* CR-soon shsong: I think the 10 here is the binary encoding on the axis
+    instead of decimal 10. Double check! *)
 (* Axis-wise residual:
     r = a & ~b zeroes axes where b >= a.
     On chain-3 axes, the only invalid per-axis result is 10 (from 11 - 01),
@@ -287,6 +289,12 @@ module Levels = struct
 
   let level_of_staticity_monadic (x : Mode.Staticity.const) : int =
     match x with Mode.Staticity.Dynamic -> 0 | Mode.Staticity.Static -> 1
+
+  let level_of_allocation (x: Mode.Allocation.Const.t) : int =
+    match x with
+    | Mode.Allocation.Const.Alloc -> 0
+    | Mode.Allocation.Const.Noalloc -> 1
+    | Mode.Allocation.Const.Noalloc_strict -> 2
 
   let level_of_externality (x : Jkind_axis.Externality.t) : int =
     match x with External -> 0 | External64 -> 1 | Internal -> 2
@@ -429,8 +437,11 @@ let set_visibility (v : Mode.Visibility.Const.t) (x : t) : t =
 let set_staticity (s : Mode.Staticity.const) (x : t) : t =
   set_axis x ~axis:9 ~level:(Levels.level_of_staticity_monadic s)
 
+let set_allocation (a : Mode.Allocation.Const.t) (x: t) : t =
+  set_axis x ~axis:10 ~level:(Levels.level_of_allocation a)
+
 let set_externality (e : Jkind_axis.Externality.t) (x : t) : t =
-  set_axis x ~axis:10 ~level:(Levels.level_of_externality e)
+  set_axis x ~axis:11 ~level:(Levels.level_of_externality e)
 
 let to_mode_crossing (x : t) : Mode.Crossing.t =
   let open Mode.Crossing in
@@ -484,7 +495,7 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
   { monadic; comonadic }
 
 let create ~areality ~linearity ~uniqueness ~portability ~contention
-    ~forkable ~yielding ~statefulness ~visibility ~staticity ~externality =
+    ~forkable ~yielding ~statefulness ~visibility ~staticity ~allocation ~externality =
   bot
   |> set_areality areality
   |> set_uniqueness uniqueness
@@ -496,6 +507,7 @@ let create ~areality ~linearity ~uniqueness ~portability ~contention
   |> set_statefulness statefulness
   |> set_visibility visibility
   |> set_staticity staticity
+  |> set_allocation allocation
   |> set_externality externality
 
 (* Canonical lattice constants used by ikinds. *)
@@ -508,6 +520,7 @@ let nonfloat_value : t =
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
+    ~allocation:(failwith "allocation axis: todo")
 
 let immutable_data : t =
   create ~areality:Mode.Regionality.Const.max
@@ -517,6 +530,7 @@ let immutable_data : t =
     ~forkable:Mode.Forkable.Const.min ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
+    ~allocation:(failwith "allocation axis: todo")
     ~externality:Jkind_axis.Externality.max
 
 let mutable_data : t =
@@ -527,6 +541,7 @@ let mutable_data : t =
     ~forkable:Mode.Forkable.Const.min ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Read_write
+    ~allocation:(failwith "allocation axis: todo")
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
 
 let sync_data : t =
@@ -537,6 +552,7 @@ let sync_data : t =
     ~forkable:Mode.Forkable.Const.min ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Read_write
+    ~allocation:(failwith "allocation axis: todo")
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
 
 let value : t =
@@ -547,6 +563,7 @@ let value : t =
     ~forkable:Mode.Forkable.Const.min ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
+    ~allocation:(failwith "allocation axis: todo")
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
 
 let arrow : t =
@@ -558,6 +575,7 @@ let arrow : t =
     ~forkable:Mode.Forkable.Const.max ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
+    ~allocation:(failwith "allocation axis: todo")
     ~externality:Jkind_axis.Externality.max
 
 let immediate : t =
@@ -569,6 +587,7 @@ let immediate : t =
     ~forkable:Mode.Forkable.Const.min ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
+    ~allocation:(failwith "allocation axis: todo")
     ~externality:Jkind_axis.Externality.min
 
 let object_legacy : t =
@@ -580,6 +599,7 @@ let object_legacy : t =
     ~uniqueness:Mode.Uniqueness.Const.Aliased
     ~portability ~contention:Mode.Contention.Const.Uncontended ~forkable
     ~yielding ~statefulness ~visibility:Mode.Visibility.Const.Read_write
+    ~allocation:(failwith "allocation axis: todo")
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
 
 let axis_number_to_axis_packed (axis_number : int) : Jkind_axis.Axis.packed =

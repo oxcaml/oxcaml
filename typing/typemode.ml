@@ -98,6 +98,9 @@ module Mode_axis_pair = struct
     | "read_write" -> monadic Visibility Read_write
     | "static" -> monadic Staticity Static
     | "dynamic" -> monadic Staticity Dynamic
+    | "noalloc_strict" -> comonadic Allocation Noalloc_strict
+    | "noalloc" -> comonadic Allocation Noalloc
+    | "alloc" -> comonadic Allocation Alloc
     | _ -> raise Not_found
 end
 
@@ -490,6 +493,7 @@ let untransl_modality =
    3. legacy modalities for all monadic axes. This will stay in the future.
 
    Implied modalities can be overriden. *)
+(* CR-soon shsong: consider the relation between mutable and Allocation mode *)
 (* CR zqian: remove [1] and [2] *)
 let[@warning "-18"] mutable_implied_modalities ~for_mutable_variable mut =
   let comonadic : Modality.atom list =
@@ -531,6 +535,7 @@ let idx_expected_modalities ~(mut : bool) =
   let expected2 =
     if mut
     then
+      (* CR-soon shsong: consider the relation this and Allocation mode *)
       (* If this list is updated, the external bindings in the [Idx_imm] and
          [Idx_mut] modules in [Stdlib_beta] may also have to be updated. *)
       modality_of_list
