@@ -2238,8 +2238,12 @@ let apply ?(use_current_level = false) env params body args =
     Cannot_subst -> raise Cannot_apply
 
 let instance_declaration_components_for_application env args decl =
+  (* [apply] already copies each component it substitutes, so there is no need
+     to first [instance_declaration decl]. Doing so deep-copies the whole
+     declaration graph (including the recursive unboxed-version chain) on every
+     type constructor, which is the dominant time and memory cost of
+     [Typeopt.value_kind] on declaration-heavy modules. *)
   let args = instance_list args in
-  let decl = instance_declaration decl in
   let apply ty = apply env decl.type_params ty args in
   ( ~kind:(map_kind apply decl.type_kind),
     ~jkind:(Jkind.map_type_expr apply decl.type_jkind),
