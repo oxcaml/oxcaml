@@ -36,11 +36,10 @@ let cfa_offset_for_stack_reg (reg : Reg.t) ~stack_offset ~fun_contains_calls
   match reg.loc with
   | Reg _ | Unknown -> None
   | Stack loc -> (
-    let stack_offset =
-      stack_offset
-      + Proc.initial_stack_offset ~contains_calls:fun_contains_calls
-          ~num_stack_slots:fun_num_stack_slots
-    in
+    (* [stack_offset] is the dynamic stack adjustment at the call point;
+       [Proc.frame_size] and [Proc.slot_offset] add [Proc.initial_stack_offset]
+       themselves, so it must not be added here as well (see
+       [Available_ranges_vars.Subrange_info.create]). *)
     let frame_size =
       Proc.frame_size ~stack_offset ~contains_calls:fun_contains_calls
         ~num_stack_slots:fun_num_stack_slots
