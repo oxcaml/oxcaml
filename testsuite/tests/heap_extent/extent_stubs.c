@@ -1,4 +1,4 @@
-/* Stubs for testing heap extents (caml_add_extent). */
+/* Stubs for testing heap extents (caml_add_blocks_to_heap). */
 
 #define CAML_INTERNALS
 
@@ -68,7 +68,7 @@ CAMLprim value heap_extent_make(value sizes)
     p += Whsize_wosize(wo);
   }
 
-  caml_add_extent(base, wsize * sizeof(value), extent_free_callback);
+  caml_add_blocks_to_heap(base, wsize * sizeof(value), extent_free_callback);
 
   p = base;
   for (mlsize_t i = 0; i < n; i++) {
@@ -133,7 +133,7 @@ CAMLprim value heap_extent_make_custom(value vn)
     p += block_whsize;
   }
 
-  caml_add_extent(base, wsize * sizeof(value), extent_free_callback);
+  caml_add_blocks_to_heap(base, wsize * sizeof(value), extent_free_callback);
 
   p = base;
   for (mlsize_t i = 0; i < n; i++) {

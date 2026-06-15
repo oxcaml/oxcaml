@@ -738,8 +738,8 @@ static void add_extent(struct caml_heap_state *local,
   local->stats.extent_blocks += blocks;
 }
 
-void caml_add_extent(void *base, size_t size,
-                     void (*free_callback)(void *, size_t))
+void caml_add_blocks_to_heap(void *base, size_t size,
+                             void (*free_callback)(void *, size_t))
 {
   struct caml_heap_state *local = Caml_state->shared_heap;
   add_extent(local, base, size, free_callback);
