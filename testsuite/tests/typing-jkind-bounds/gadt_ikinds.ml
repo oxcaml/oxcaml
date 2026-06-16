@@ -529,10 +529,10 @@ let foo (x : int box @ contended) = use_uncontended x
 val foo : int box @ contended -> unit = <fun>
 |}]
 
-let accepts_ref_payload (x : int ref box @ contended) = use_uncontended x
+let rejects_ref_payload (x : int ref box @ contended) = use_uncontended x
 [%%expect{|
 Line 1, characters 72-73:
-1 | let accepts_ref_payload (x : int ref box @ contended) = use_uncontended x
+1 | let rejects_ref_payload (x : int ref box @ contended) = use_uncontended x
                                                                             ^
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
@@ -548,7 +548,7 @@ let foo (x : (int, int) box2 @ contended) = use_uncontended x
 val foo : (int, int) box2 @ contended -> unit = <fun>
 |}]
 
-let accepts_both_ref_payloads
+let rejects_both_ref_payloads
     (x : (int ref, int ref) box2 @ contended) =
   use_uncontended x
 [%%expect{|
@@ -596,7 +596,7 @@ let crosses (x : (int, int ref) box2 @ contended) = use_uncontended x
 val crosses : (int, int ref) box2 @ contended -> unit = <fun>
 |}]
 
-let ref_payload_is_uic (x : (int ref, int) box2 @ contended) =
+let ref_payload_is_not_uic (x : (int ref, int) box2 @ contended) =
   use_uncontended x
 [%%expect{|
 Line 2, characters 18-19:

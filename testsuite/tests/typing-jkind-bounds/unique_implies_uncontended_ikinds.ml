@@ -151,6 +151,37 @@ Line 3, characters 18-19:
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
+type aliased_many_ref_field = { x : int ref @@ aliased many }
+[%%expect{|
+type aliased_many_ref_field = { x : int ref @@ many aliased; }
+|}]
+
+let aliased_many_field_does_not_imply_uncontended
+    (x : aliased_many_ref_field @ unique contended) =
+  use_uncontended x
+[%%expect{|
+Line 3, characters 18-19:
+3 |   use_uncontended x
+                      ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+type aliased_many_contention_crossing_field =
+  { x : int option @@ aliased many }
+[%%expect{|
+type aliased_many_contention_crossing_field = {
+  x : int option @@ many aliased;
+}
+|}]
+
+let aliased_many_field_with_contention_crossing_payload
+    (x : aliased_many_contention_crossing_field @ unique contended) =
+  use_uncontended x
+[%%expect{|
+val aliased_many_field_with_contention_crossing_payload :
+  aliased_many_contention_crossing_field @ unique contended -> unit = <fun>
+|}]
+
 (*************************************************************)
 (* A contention modality allows UIC regardless of its payload. *)
 

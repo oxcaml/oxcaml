@@ -952,8 +952,8 @@ module Jkind0 = struct
 
     let crosses_contention crossing =
       Crossing.Per_axis.le contention
-        (Crossing.Per_axis.min contention)
         (Crossing.proj contention crossing)
+        (Crossing.Per_axis.min contention)
 
     let uic_after_setting_axes
         t crossing ~axes_set_to_constant =

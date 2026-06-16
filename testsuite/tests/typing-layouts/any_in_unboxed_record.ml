@@ -13,7 +13,7 @@ type ('a : any) t = { fst : 'a; mutable snd : 'a; }
 
 let fst t = t.#fst
 [%%expect{|
-val fst : ('a : value_or_null). 'a t# -> 'a = <fun>
+val fst : 'a t# -> 'a = <fun>
 |}]
 
 let fst (type a : any) (t : a t#) = t.#fst
@@ -64,7 +64,7 @@ val fst : ('a : bits64). 'a t# -> 'a = <fun>
 
 let make fst snd = #{ fst; snd }
 [%%expect{|
-val make : ('a : value_or_null). 'a -> 'a -> 'a t# = <fun>
+val make : 'a -> 'a -> 'a t# = <fun>
 |}]
 
 let make (fst : int) snd = #{ fst; snd }

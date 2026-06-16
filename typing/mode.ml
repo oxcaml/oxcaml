@@ -3482,14 +3482,17 @@ module Lattices_mono = struct
         -> ('p, 's, 'l * disallowed) morph
         (** Composition of a morphism and combining an axis with the minima
             along other axes. *)
-    | Compose : ('b, 'c, 'd) morph * ('a, 'b, 'd) morph -> ('a, 'c, 'd) morph
-        (** Composition of two morphisms. Generated morph enumerations do not
-            include compositions, but the solver can construct them. *)
+    | Compose :
+        ('b, 'c, neither) morph * ('a, 'b, neither) morph
+        -> ('a, 'c, neither) morph
+        (** Compoistion of two morphisms. We don't allow compositions to appear
+            on either side to ensure that there are a finite number of morphisms
+            we can encounter in practice. *)
 
   include Magic_allow_disallow (struct
     type ('a, 'b, 'd) sided = ('a, 'b, 'd) morph constraint 'd = _ * _
 
-    let rec allow_left : type a b l r.
+    let allow_left : type a b l r.
         (a, b, allowed * r) morph -> (a, b, l * r) morph = function
       | Simple m -> Simple (Simple_morph.allow_left m)
       | Simple_proj (m, ax, src) ->
@@ -3497,12 +3500,8 @@ module Lattices_mono = struct
       | Min_with_simple (ax, m) ->
         Min_with_simple (ax, Simple_morph.allow_left m)
       | Const_min src -> Const_min src
-      | Compose (mb, ma) ->
-        let mb = allow_left mb in
-        let ma = allow_left ma in
-        Compose (mb, ma)
 
-    let rec allow_right : type a b l r.
+    let allow_right : type a b l r.
         (a, b, l * allowed) morph -> (a, b, l * r) morph = function
       | Simple m -> Simple (Simple_morph.allow_right m)
       | Simple_proj (m, ax, src) ->
@@ -3510,10 +3509,6 @@ module Lattices_mono = struct
       | Max_with_simple (ax, m) ->
         Max_with_simple (ax, Simple_morph.allow_right m)
       | Const_max src -> Const_max src
-      | Compose (mb, ma) ->
-        let mb = allow_right mb in
-        let ma = allow_right ma in
-        Compose (mb, ma)
 
     let rec disallow_left : type a b l r.
         (a, b, l * r) morph -> (a, b, disallowed * r) morph = function
@@ -3621,6 +3616,8 @@ module Lattices_mono = struct
       else
         let Refl = equal_morph dst mb1 mb2 |> Misc.get_eq_exn in
         compare_morph (src dst mb1) ma1 ma2
+    | Compose _, _ -> .
+    | _, Compose _ -> .
 
   and equal_morph : type a1 d1 a2 b d2.
       b obj -> (a1, b, d1) morph -> (a2, b, d2) morph -> (a1, a2) Misc.is_eq =
@@ -3709,7 +3706,7 @@ module Lattices_mono = struct
       let mid = src dst mb in
       apply dst mb (apply mid ma a)
 
-  let rec right_adjoint : type a b r.
+  let right_adjoint : type a b r.
       b obj -> (a, b, allowed * r) morph -> (b, a, disallowed * allowed) morph =
    fun dst f ->
     match f with
@@ -3720,11 +3717,8 @@ module Lattices_mono = struct
       let mid = proj_obj ax dst in
       Simple_proj (Simple_morph.right_adjoint mid m, ax, dst)
     | Const_min _ -> Const_max dst
-    | Compose (mb, ma) ->
-      let mid = src dst mb in
-      Compose (right_adjoint mid ma, right_adjoint dst mb)
 
-  and left_adjoint : type a b l.
+  let left_adjoint : type a b l.
       b obj -> (a, b, l * allowed) morph -> (b, a, allowed * disallowed) morph =
    fun dst f ->
     match f with
@@ -3735,9 +3729,6 @@ module Lattices_mono = struct
       let mid = proj_obj ax dst in
       Simple_proj (Simple_morph.left_adjoint mid m, ax, dst)
     | Const_max _ -> Const_min dst
-    | Compose (mb, ma) ->
-      let mid = src dst mb in
-      Compose (left_adjoint mid ma, left_adjoint dst mb)
 
   let const_max_or_apply : type a c p r.
       c obj ->
@@ -4469,13 +4460,19 @@ module Report = struct
          the ordering in the [join] list is preserved. *)
       match b with
       | Meet ->
-        let x_satisfies = C.le a_obj other x in
-        let _y_satisfies = C.le a_obj other y in
-        if x_satisfies then `Second else `First
+        if C.le a_obj other x
+        then begin
+          assert (not (C.le a_obj other y));
+          `Second
+        end
+        else `First
       | Join ->
-        let x_satisfies = C.le a_obj x other in
-        let _y_satisfies = C.le a_obj y other in
-        if x_satisfies then `Second else `First
+        if C.le a_obj x other
+        then begin
+          assert (not (C.le a_obj y other));
+          `Second
+        end
+        else `First
 
     type 'd side =
       | Left : left_only side
@@ -4951,7 +4948,7 @@ module Report = struct
       (l * r) morph ->
       ((Fmt.formatter -> unit) * pinpoint) option =
    fun ~fixpoint pp -> function
-    | Skip -> None
+    | Skip -> Misc.fatal_error "Skip hint should not be printed"
     | Allocation _ ->
       Some
         ( print_bug
