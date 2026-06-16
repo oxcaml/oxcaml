@@ -171,7 +171,7 @@ let split_direct_over_application apply ~callee's_code_id
       ~args:remaining_args ~args_arity:remaining_arity
       ~return_arity:(Apply.return_arity apply)
       ~call_kind:Call_kind.indirect_function_call_unknown_arity
-      ~alloc_mode:outer_apply_alloc_mode (Apply.dbg apply)
+      ~return_mode:outer_apply_alloc_mode (Apply.dbg apply)
       ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)
@@ -294,7 +294,7 @@ let split_direct_over_application apply ~callee's_code_id
       ~args:first_args ~args_arity:callee's_params_arity
       ~return_arity:(Code_metadata.result_arity callee's_code_metadata)
       ~call_kind:(Call_kind.direct_function_call callee's_code_id)
-      ~alloc_mode:inner_apply_alloc_mode (Apply.dbg apply)
+      ~return_mode:inner_apply_alloc_mode (Apply.dbg apply)
       ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)

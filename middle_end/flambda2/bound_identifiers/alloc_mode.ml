@@ -72,11 +72,12 @@ module For_applications = struct
   let print ppf t =
     match t with
     | Not_alloc_stack { alloc_region } ->
-      Format.fprintf ppf "@[<hov 1>(Heap (alloc@ %a))@]" Variable.print
-        alloc_region
+      Format.fprintf ppf "@[<hov 1>(Not_alloc_stack (alloc@ %a))@]"
+        Variable.print alloc_region
     | Maybe_alloc_stack { region; ghost_region; alloc_region } ->
       Format.fprintf ppf
-        "@[<hov 1>(Local (region@ %a)@ (ghost_region@ %a)@ (alloc@ %a))@]"
+        "@[<hov 1>(Maybe_alloc_stack (region@ %a)@ (ghost_region@ %a)@ (alloc@ \
+         %a))@]"
         Variable.print region Variable.print ghost_region Variable.print
         alloc_region
 

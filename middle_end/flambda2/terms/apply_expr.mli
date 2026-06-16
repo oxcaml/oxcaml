@@ -54,7 +54,7 @@ val create :
   args_arity:[`Complex] Flambda_arity.t ->
   return_arity:[`Unarized] Flambda_arity.t ->
   call_kind:Call_kind.t ->
-  alloc_mode:Alloc_mode.For_applications.t ->
+  return_mode:Alloc_mode.For_applications.t ->
   Debuginfo.t ->
   inlined:Inlined_attribute.t ->
   inlining_state:Inlining_state.t ->
