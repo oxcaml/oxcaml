@@ -341,7 +341,8 @@ let transl_mod_bounds annots =
             visibility =
               Some { txt = Per_axis.min (Modal (Monadic Visibility)); loc };
             staticity = None;
-            allocation = failwith "allocation axis: todo";
+            allocation =
+              Some { txt = Per_axis.min (Modal (Comonadic Allocation)); loc };
             nullability = bounds_so_far.nullability;
             separability = bounds_so_far.separability
           }
@@ -493,7 +494,8 @@ let untransl_modality =
    3. legacy modalities for all monadic axes. This will stay in the future.
 
    Implied modalities can be overriden. *)
-(* CR shsong: consider the relation between mutable and Allocation mode *)
+(* Conservative: the Allocation axis is intentionally not part of the
+   mutable-implied modalities. *)
 (* CR zqian: remove [1] and [2] *)
 let[@warning "-18"] mutable_implied_modalities ~for_mutable_variable mut =
   let comonadic : Modality.atom list =
@@ -535,7 +537,7 @@ let idx_expected_modalities ~(mut : bool) =
   let expected2 =
     if mut
     then
-      (* CR shsong: consider the relation this and Allocation mode *)
+      (* Conservative: the Allocation axis is intentionally excluded here. *)
       (* If this list is updated, the external bindings in the [Idx_imm] and
          [Idx_mut] modules in [Stdlib_beta] may also have to be updated. *)
       modality_of_list

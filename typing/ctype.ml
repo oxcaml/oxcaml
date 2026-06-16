@@ -6025,7 +6025,8 @@ let mode_crossing_structure_memaddr =
     ~yielding:true
     ~statefulness:true
     ~staticity:false
-    ~allocation:(failwith "allocation axis: todo")
+    (* Conservative: axis does not cross. *)
+    ~allocation:false
 
 (** The mode crossing of a functor. *)
 let mode_crossing_functor =
@@ -6040,7 +6041,8 @@ let mode_crossing_functor =
     ~yielding:false
     ~statefulness:false
     ~staticity:false
-    ~allocation:(failwith "allocation axis: todo")
+    (* Conservative: axis does not cross. *)
+    ~allocation:false
 
 (** The mode crossing of any module. *)
 let mode_crossing_module = Mode.Crossing.max

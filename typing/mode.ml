@@ -2370,7 +2370,7 @@ module Lattices_mono = struct
       let forkable = Forkable.min in
       let yielding = Yielding.min in
       let statefulness = visibility_op_to_statefulness m.visibility in
-      let allocation = failwith "allocation axis: todo" in
+      let allocation = Allocation.min in
       { areality;
         linearity;
         portability;
@@ -2402,7 +2402,7 @@ module Lattices_mono = struct
       let forkable = Forkable.max in
       let yielding = Yielding.max in
       let statefulness = visibility_op_to_statefulness m.visibility in
-      let allocation = failwith "allocation axis: todo" in
+      let allocation = Allocation.max in
       { areality;
         linearity;
         portability;
@@ -2640,7 +2640,7 @@ module Lattices_mono = struct
         Proj_core (Visibility_op_to_statefulness, Visibility, Monadic_op)
       | Monadic_to_comonadic_min, Portability ->
         Proj_core (Contention_op_to_portability, Contention, Monadic_op)
-      | Monadic_to_comonadic_min, Allocation -> failwith "allocation axis: todo"
+      | Monadic_to_comonadic_min, Allocation -> Proj_const_min Monadic_op
       | Comonadic_to_monadic_min areality, Uniqueness ->
         Proj_core
           ( Linearity_to_uniqueness_op,
@@ -2667,7 +2667,7 @@ module Lattices_mono = struct
         Proj_core (Visibility_op_to_statefulness, Visibility, Monadic_op)
       | Monadic_to_comonadic_max, Portability ->
         Proj_core (Contention_op_to_portability, Contention, Monadic_op)
-      | Monadic_to_comonadic_max, Allocation -> failwith "allocation axis: todo"
+      | Monadic_to_comonadic_max, Allocation -> Proj_const_max Monadic_op
       | Comonadic_to_monadic_max areality, Uniqueness ->
         Proj_core
           ( Linearity_to_uniqueness_op,
@@ -2740,7 +2740,13 @@ module Lattices_mono = struct
         | Regional_to_local | Locality_as_regionality | Regional_to_global
         | Regional_to_local_regionality | Regional_to_global_regionality ->
           And_max_id Portability)
-      | Allocation -> failwith "allocation axis: todo"
+      | Allocation -> (
+        match lm1 with
+        | Local_to_regional -> Disallowed
+        | Local_to_regional_regionality -> Disallowed
+        | Regional_to_local | Locality_as_regionality | Regional_to_global
+        | Regional_to_local_regionality | Regional_to_global_regionality ->
+          And_max_id Allocation)
       | Areality -> And_max_core (Areality, Locality_restricted lm1)
 
     let compose_core_max_with : type b c q r.
@@ -2758,8 +2764,7 @@ module Lattices_mono = struct
       | Comonadic_to_monadic_max _, Yielding -> Const_max_core
       | Comonadic_to_monadic_max _, Forkable -> Const_max_core
       | Comonadic_to_monadic_max _, Areality -> Const_max_core
-      | Comonadic_to_monadic_max _, Allocation ->
-        failwith "allocation axis: todo"
+      | Comonadic_to_monadic_max _, Allocation -> Const_max_core
       | Monadic_to_comonadic_max, Staticity -> Const_max_core
       | Monadic_to_comonadic_max, Contention ->
         And_max_core (Portability, Contention_op_to_portability)
@@ -2794,7 +2799,7 @@ module Lattices_mono = struct
       | Linearity -> And_min_id Linearity
       | Statefulness -> And_min_id Statefulness
       | Portability -> And_min_id Portability
-      | Allocation -> failwith "allocation axis: todo"
+      | Allocation -> And_min_id Allocation
       | Areality -> And_min_core (Areality, Locality_restricted lm1)
 
     let compose_core_min_with : type b c q l.
@@ -2811,8 +2816,7 @@ module Lattices_mono = struct
         And_min_core (Uniqueness, Linearity_to_uniqueness_op)
       | Comonadic_to_monadic_min _, Yielding -> Const_min_core
       | Comonadic_to_monadic_min _, Forkable -> Const_min_core
-      | Comonadic_to_monadic_min _, Allocation ->
-        failwith "allocation axis: todo"
+      | Comonadic_to_monadic_min _, Allocation -> Const_min_core
       | Comonadic_to_monadic_min _, Areality -> Const_min_core
       | Monadic_to_comonadic_min, Staticity -> Const_min_core
       | Monadic_to_comonadic_min, Contention ->
@@ -2936,7 +2940,7 @@ module Lattices_mono = struct
       | Contention_op -> [To Portability_to_contention_op]
       | Visibility_op -> [To Statefulness_to_visibility_op]
       | Staticity_op -> []
-      | Allocation -> failwith "allocation axis: todo"
+      | Allocation -> []
       | Monadic_op ->
         [ To (Comonadic_to_monadic_min Locality);
           To (Comonadic_to_monadic_min Regionality) ]
@@ -2965,7 +2969,7 @@ module Lattices_mono = struct
       | Contention_op -> [To Portability_to_contention_op]
       | Visibility_op -> [To Statefulness_to_visibility_op]
       | Staticity_op -> []
-      | Allocation -> failwith "allocation axis: todo"
+      | Allocation -> []
       | Monadic_op ->
         [ To (Comonadic_to_monadic_max Locality);
           To (Comonadic_to_monadic_max Regionality) ]
@@ -4359,7 +4363,7 @@ module Lattices_mono = struct
       | Monadic_to_comonadic_min, Linearity -> Axis Uniqueness
       | Monadic_to_comonadic_min, Statefulness -> Axis Visibility
       | Monadic_to_comonadic_min, Portability -> Axis Contention
-      | Monadic_to_comonadic_min, Allocation -> failwith "allocation axis: todo"
+      | Monadic_to_comonadic_min, Allocation -> None_responsible
       | Comonadic_to_monadic_min _, Uniqueness -> Axis Linearity
       | Comonadic_to_monadic_min _, Visibility -> Axis Statefulness
       | Comonadic_to_monadic_min _, Contention -> Axis Portability
@@ -4370,7 +4374,7 @@ module Lattices_mono = struct
       | Monadic_to_comonadic_max, Linearity -> Axis Uniqueness
       | Monadic_to_comonadic_max, Statefulness -> Axis Visibility
       | Monadic_to_comonadic_max, Portability -> Axis Contention
-      | Monadic_to_comonadic_max, Allocation -> failwith "allocation axis: todo"
+      | Monadic_to_comonadic_max, Allocation -> None_responsible
       | Comonadic_to_monadic_max _, Uniqueness -> Axis Linearity
       | Comonadic_to_monadic_max _, Visibility -> Axis Statefulness
       | Comonadic_to_monadic_max _, Contention -> Axis Portability
@@ -5890,7 +5894,7 @@ module Allocation = struct
 
   let legacy = of_const Const.legacy
 
-  (*= let zap_to_legacy = zap_to_floor *)
+  let zap_to_legacy = zap_to_floor
 end
 
 module type Areality = sig
@@ -6023,7 +6027,7 @@ module Comonadic_with (Areality : Areality) = struct
     let global = Areality.Const.equal areality Areality.Const.legacy in
     let forkable = proj Forkable m |> Forkable.zap_to_legacy ~global in
     let yielding = proj Yielding m |> Yielding.zap_to_legacy ~global in
-    let allocation = failwith "allocation axis: todo" in
+    let allocation = proj Allocation m |> Allocation.zap_to_legacy in
     { areality;
       linearity;
       portability;
