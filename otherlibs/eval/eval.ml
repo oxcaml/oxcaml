@@ -137,7 +137,7 @@ let eval (expr : 'a expr) =
   (* We need this in case the quote contains unused module aliases that point to
      modules we don't have the CMI for. It's weird but it would compile if the
      initial compile also had this set, and setting this doesn't hurt. *)
-  Clflags.transparent_modules := true;
+  Clflags.no_alias_deps := true;
   (* ensure Stdlib is linked during eval *)
   Clflags.nopervasives := false;
   Clflags.no_std_include := false;

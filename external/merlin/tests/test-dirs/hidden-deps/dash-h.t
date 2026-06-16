@@ -186,10 +186,22 @@ reference.  With no liba, we also can't see Libb.t is int.
         },
         "end": {
           "line": 4,
-          "col": 16
+          "col": 12
         },
         "type": "typer",
-        "sub": [],
+        "sub": [
+          {
+            "start": {
+              "line": 4,
+              "col": 8
+            },
+            "end": {
+              "line": 4,
+              "col": 12
+            },
+            "message": "Hint:    Did you mean Libb?"
+          }
+        ],
         "valid": true,
         "message": "Unbound module Liba"
       }
@@ -214,8 +226,7 @@ reference.  With no liba, we also can't see Libb.t is int.
         "type": "typer",
         "sub": [],
         "valid": true,
-        "message": "This expression has type t = Liba.t but an expression was expected of type
-    int"
+        "message": "The value x has type t = Liba.t but an expression was expected of type int"
       },
       {
         "start": {
@@ -224,10 +235,22 @@ reference.  With no liba, we also can't see Libb.t is int.
         },
         "end": {
           "line": 4,
-          "col": 16
+          "col": 12
         },
         "type": "typer",
-        "sub": [],
+        "sub": [
+          {
+            "start": {
+              "line": 4,
+              "col": 8
+            },
+            "end": {
+              "line": 4,
+              "col": 12
+            },
+            "message": "Hint:    Did you mean Libb?"
+          }
+        ],
         "valid": true,
         "message": "Unbound module Liba"
       }

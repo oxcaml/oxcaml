@@ -33,7 +33,7 @@ open Ident
 open Compat
 
 (* Dummy - utils *)
-let dummy_type_expr = newty2 ~level:0 (mkTvar (Some "a"))
+let dummy_type_expr = Btype.newty2 ~level:0 (mkTvar (Some "a"))
 
 let dummy_core_type =
   { ctyp_desc = mkTtyp_any;
@@ -45,7 +45,7 @@ let dummy_core_type =
 
 let a_typ =
   { ctyp_desc = mkTtyp_var "a";
-    ctyp_type = newty2 ~level:0 (mkTvar (Some "a"));
+    ctyp_type = Btype.newty2 ~level:0 (mkTvar (Some "a"));
     ctyp_env = Env.empty;
     ctyp_loc = Location.none;
     ctyp_attributes = []
@@ -57,7 +57,7 @@ let unit_typ =
         ( Path.Pident (create_scoped ~scope:0 "unit"),
           { txt = Lident "unit"; loc = Location.none },
           [] );
-    ctyp_type = newty2 ~level:0 (Ttuple []);
+    ctyp_type = Btype.newty2 ~level:0 (Ttuple []);
     ctyp_env = Env.empty;
     ctyp_loc = Location.none;
     ctyp_attributes = []
@@ -68,7 +68,7 @@ let default_mode = Typemode.transl_alloc_mode []
 let a_to_unit =
   { ctyp_desc = Ttyp_arrow (Nolabel, a_typ, default_mode, unit_typ, default_mode);
     ctyp_type =
-      newty2 ~level:0
+      Btype.newty2 ~level:0
         (mkTarrow (Nolabel, a_typ.ctyp_type, unit_typ.ctyp_type, commu_ok));
     ctyp_env = Env.empty;
     ctyp_loc = Location.none;
@@ -78,7 +78,7 @@ let a_to_unit =
 let unit_to_a =
   { ctyp_desc = Ttyp_arrow (Nolabel, unit_typ, default_mode, a_typ, default_mode);
     ctyp_type =
-      newty2 ~level:0
+      Btype.newty2 ~level:0
         (mkTarrow (Nolabel, unit_typ.ctyp_type, a_typ.ctyp_type, commu_ok));
     ctyp_env = Env.empty;
     ctyp_loc = Location.none;
@@ -153,6 +153,7 @@ let dummy1_str_it_desc =
                          Param texp_function_param_identifier_defaults;
                        cases =
                          [ { c_lhs = any_pat;
+                             c_cont = None;
                              c_guard = None;
                              c_rhs =
                                exp_desc_to_exp
@@ -258,6 +259,7 @@ let empty_value_case =
   { c_lhs =
       mkpattern_data ~pat_desc:Tpat_any ~pat_loc:Location.none ~pat_extra:[]
         ~pat_type:dummy_type_expr ~pat_env:Env.empty ~pat_attributes:[];
+    c_cont = None;
     c_guard = None;
     c_rhs =
       { exp_desc = apply_dummy2.exp_desc;
@@ -274,6 +276,7 @@ let empty_computation_case =
       as_computation_pattern
         (mkpattern_data ~pat_desc:Tpat_any ~pat_loc:Location.none ~pat_extra:[]
            ~pat_type:dummy_type_expr ~pat_env:Env.empty ~pat_attributes:[]);
+    c_cont = None;
     c_guard = None;
     c_rhs =
       { exp_desc = apply_dummy2.exp_desc;

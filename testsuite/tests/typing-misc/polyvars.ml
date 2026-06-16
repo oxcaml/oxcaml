@@ -75,16 +75,15 @@ Line 9, characters 0-41:
 9 | function (`A|`B), _ -> 0 | _,(`A|`B) -> 1;;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-(`AnyOtherTag, `AnyOtherTag)
+  Here is an example of a case that is not matched:
+    "(`AnyOtherTag, `AnyOtherTag)"
 
 - : [> `A | `B ] * [> `A | `B ] -> int = <fun>
 Line 10, characters 0-29:
 10 | function `B,1 -> 1 | _,1 -> 2;;
      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-(_, 0)
+  Here is an example of a case that is not matched: "(_, 0)"
 
 Line 10, characters 21-24:
 10 | function `B,1 -> 1 | _,1 -> 2;;
@@ -96,8 +95,7 @@ Line 11, characters 0-29:
 11 | function 1,`B -> 1 | 1,_ -> 2;;
      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-(0, _)
+  Here is an example of a case that is not matched: "(0, _)"
 
 Line 11, characters 21-24:
 11 | function 1,`B -> 1 | 1,_ -> 2;;
@@ -126,7 +124,7 @@ let f (x : [`A | `B] as 'a) (y : [> 'a]) = ();;
 Line 1, characters 61-63:
 1 | let f : ([`A | `B ] as 'a) -> [> 'a] -> unit = fun x (y : [> 'a]) -> ();;
                                                                  ^^
-Error: The type "'a" does not expand to a polymorphic variant type
+Error:    The type "'a" does not expand to a polymorphic variant type
 Hint: Did you mean "`a"?
 |}]
 
@@ -148,8 +146,7 @@ Line 2, characters 0-24:
 2 | function (`A x : t) -> x;;
     ^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-`<some private tag>
+  Here is an example of a case that is not matched: "`<some private tag>"
 
 - : t -> string = <fun>
 |}]
@@ -160,8 +157,8 @@ Line 1, characters 8-76:
 1 | let f = function `AnyOtherTag, _ -> 1 | _, (`AnyOtherTag|`AnyOtherTag') -> 2;;
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-(`AnyOtherTag', `AnyOtherTag'')
+  Here is an example of a case that is not matched:
+    "(`AnyOtherTag', `AnyOtherTag'')"
 
 val f : [> `AnyOtherTag ] * [> `AnyOtherTag | `AnyOtherTag' ] -> int = <fun>
 |}]
@@ -183,8 +180,7 @@ type t = private [< `A ]
 Line 2, characters 30-31:
 2 | let f: t -> [ `A ] = fun x -> x
                                   ^
-Error: This expression has type "t" but an expression was expected of type
-         "[ `A ]"
+Error: The value "x" has type "t" but an expression was expected of type "[ `A ]"
        The first variant type is private, it may not allow the tag(s) "`A"
 |}]
 
@@ -245,7 +241,7 @@ let f (x:[`X of int]) = (x:[`X])
 Line 5, characters 25-26:
 5 | let f (x:[`X of int]) = (x:[`X])
                              ^
-Error: This expression has type "[ `X of int ]"
+Error: The value "x" has type "[ `X of int ]"
        but an expression was expected of type "[ `X ]"
        Types for tag "`X" are incompatible
 |}]
@@ -256,7 +252,7 @@ let f (x:[`X of int]) = (x:[<`X of & int])
 Line 1, characters 25-26:
 1 | let f (x:[`X of int]) = (x:[<`X of & int])
                              ^
-Error: This expression has type "[ `X of int ]"
+Error: The value "x" has type "[ `X of int ]"
        but an expression was expected of type "[< `X of & int ]"
        Types for tag "`X" are incompatible
 |}]
@@ -268,7 +264,7 @@ let f (x:[<`X of & int & float]) = (x:[`X])
 Line 3, characters 36-37:
 3 | let f (x:[<`X of & int & float]) = (x:[`X])
                                         ^
-Error: This expression has type "[< `X of & int & float ]"
+Error: The value "x" has type "[< `X of & int & float ]"
        but an expression was expected of type "[ `X ]"
        Types for tag "`X" are incompatible
 |}]
@@ -285,9 +281,32 @@ val f : ([< `A | `B of string | `R of 'a ] as 'a) -> int = <fun>
 Line 4, characters 30-31:
 4 | let g (x:[`A | `R of rt]) = f x
                                   ^
-Error: This expression has type "[ `A | `R of rt ]"
+Error: The value "x" has type "[ `A | `R of rt ]"
        but an expression was expected of type "[< `A | `R of 'a ] as 'a"
        Type "rt" = "[ `A | `B of string | `R of rt ]" is not compatible with type
          "[< `A | `R of 'a ] as 'a"
        The second variant type does not allow tag(s) "`B"
+|}]
+
+
+(** [subtype_row] errors *)
+
+(* #13706 *)
+let f x = (x : [ `Foo of int ] :> [ `Foo | `Bar ])
+[%%expect{|
+Line 4, characters 10-50:
+4 | let f x = (x : [ `Foo of int ] :> [ `Foo | `Bar ])
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "[ `Foo of int ]" is not a subtype of "[ `Bar | `Foo ]"
+       Types for tag "`Foo" are incompatible
+|}]
+
+let f x = (x : [ `Foo of int ] list :> [ `Foo | `Bar ] list)
+[%%expect{|
+Line 1, characters 10-60:
+1 | let f x = (x : [ `Foo of int ] list :> [ `Foo | `Bar ] list)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "[ `Foo of int ] list" is not a subtype of "[ `Bar | `Foo ] list"
+       Type "[ `Foo of int ]" is not a subtype of "[ `Bar | `Foo ]"
+       Types for tag "`Foo" are incompatible
 |}]

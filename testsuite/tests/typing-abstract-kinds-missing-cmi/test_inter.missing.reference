@@ -1,7 +1,7 @@
 File "c_inter.ml", line 2, characters 21-23:
 2 | type ('a : B.k3) s = 'a t
                          ^^
-Error: This type "('a : B.k3)" should be an instance of type "('b : B.k1)"
+Error: This type ('a : B.k3) should be an instance of type ('b : B.k1)
        The kind of 'a is A2.k3
          because of the annotation on 'a in the declaration of the type s.
        But the kind of 'a must overlap with A1.k1 mod portable

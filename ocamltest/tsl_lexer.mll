@@ -144,6 +144,11 @@ and comment = parse
       Lexing.new_line lexbuf;
       comment lexbuf
     }
+  | newline
+    {
+      Lexing.new_line lexbuf;
+      comment lexbuf
+    }
   | _
     {
       comment lexbuf

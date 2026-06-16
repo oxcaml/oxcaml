@@ -24,7 +24,7 @@ let rec flatten_arrow ret_ty =
           | Tconstr (path, [ ty ], _) when Path.same path Predef.path_option ->
             ty
           | Tpoly (ty, vars) ->
-            Types.newty3 ~level:(Types.get_level ty) ~scope:(Types.get_scope ty)
+            Btype.newty3 ~level:(Types.get_level ty) ~scope:(Types.get_scope ty)
               (Tpoly (strip_option ty, vars))
           | _ -> ty
         in

@@ -26,7 +26,7 @@ let f (x : <[int]> eval) : string = x
 Line 1, characters 36-37:
 1 | let f (x : <[int]> eval) : string = x
                                         ^
-Error: This expression has type "<[int]> eval" = "int"
+Error: The value "x" has type "<[int]> eval" = "int"
        but an expression was expected of type "string"
 |}]
 
@@ -148,7 +148,7 @@ let f (x : <[#($('a) * $('b) * $('c))]> expr)
 Line 2, characters 44-45:
 2 |     : #('a eval * 'b eval * 'c eval) = eval x
                                                 ^
-Error: This expression has type "<[#($('a) * $('b) * $('c))]> expr"
+Error: The value "x" has type "<[#($('a) * $('b) * $('c))]> expr"
        but an expression was expected of type "'d expr"
        The layout of <[#($('a) * $('b) * $('c))]> is any & any & any
          because it is an unboxed tuple.
@@ -422,7 +422,7 @@ let f (x : <[ $('a) eval ]> expr) : 'a eval expr = x
 Line 4, characters 51-52:
 4 | let f (x : <[ $('a) eval ]> expr) : 'a eval expr = x
                                                        ^
-Error: This expression has type "<[$('a) eval]> expr"
+Error: The value "x" has type "<[$('a) eval]> expr"
        but an expression was expected of type "'a eval expr"
        Type "<[$('a) eval]>" is not compatible with type "'a eval"
 |}]
@@ -433,7 +433,7 @@ let f (x : <[ <[int]> ]> eval expr) : <[int]> expr = x
 Line 1, characters 53-54:
 1 | let f (x : <[ <[int]> ]> eval expr) : <[int]> expr = x
                                                          ^
-Error: This expression has type "<[<[int]>]> eval expr"
+Error: The value "x" has type "<[<[int]>]> eval expr"
        but an expression was expected of type "<[int]> expr"
        Type "<[<[int]>]> eval" is not compatible with type "<[int]>"
 |}]
@@ -442,7 +442,7 @@ let f (x : <[<[int]>]> eval eval) : int = x
 Line 1, characters 42-43:
 1 | let f (x : <[<[int]>]> eval eval) : int = x
                                               ^
-Error: This expression has type "<[<[int]>]> eval eval"
+Error: The value "x" has type "<[<[int]>]> eval eval"
        but an expression was expected of type "int"
 |}]
 let f (x : <[ <[ <[int]> ]> ]> eval eval eval) : int = x
@@ -450,7 +450,7 @@ let f (x : <[ <[ <[int]> ]> ]> eval eval eval) : int = x
 Line 1, characters 55-56:
 1 | let f (x : <[ <[ <[int]> ]> ]> eval eval eval) : int = x
                                                            ^
-Error: This expression has type "<[<[<[int]>]>]> eval eval eval"
+Error: The value "x" has type "<[<[<[int]>]>]> eval eval eval"
        but an expression was expected of type "int"
 |}]
 let f (x : <[ <[ <[int]> ]> ]> eval eval expr) : <[int]> expr = x
@@ -458,7 +458,7 @@ let f (x : <[ <[ <[int]> ]> ]> eval eval expr) : <[int]> expr = x
 Line 1, characters 64-65:
 1 | let f (x : <[ <[ <[int]> ]> ]> eval eval expr) : <[int]> expr = x
                                                                     ^
-Error: This expression has type "<[<[<[int]>]>]> eval eval expr"
+Error: The value "x" has type "<[<[<[int]>]>]> eval eval expr"
        but an expression was expected of type "<[int]> expr"
        Type "<[<[<[int]>]>]> eval eval" is not compatible with type "<[int]>"
 |}]
@@ -529,7 +529,7 @@ let f (x : <['a eval]> eval) : <['a]> eval eval = x
 Line 1, characters 50-51:
 1 | let f (x : <['a eval]> eval) : <['a]> eval eval = x
                                                       ^
-Error: This expression has type "<['a eval]> eval"
+Error: The value "x" has type "<['a eval]> eval"
        but an expression was expected of type "<['a]> eval eval"
        Type "'a eval" is not compatible with type "$(<['a]> eval)"
 |}]
@@ -543,7 +543,7 @@ let f (x : <[<[int]> eval]> eval) : <[<[int]>]> eval eval = x
 Line 1, characters 60-61:
 1 | let f (x : <[<[int]> eval]> eval) : <[<[int]>]> eval eval = x
                                                                 ^
-Error: This expression has type "<[<[int]> eval]> eval" = "int"
+Error: The value "x" has type "<[<[int]> eval]> eval" = "int"
        but an expression was expected of type "<[<[int]>]> eval eval"
 |}]
 (* This one should definitely succeed *)

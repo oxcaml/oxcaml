@@ -25,7 +25,7 @@ let f (x : t_void): 'a A.t = x
 Line 1, characters 29-30:
 1 | let f (x : t_void): 'a A.t = x
                                  ^
-Error: This expression has type "t_void" but an expression was expected of type
+Error: The value "x" has type "t_void" but an expression was expected of type
          "'a A.t" = "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 2, characters 0-18.
@@ -53,7 +53,7 @@ let f (x : t_void): 'a B.t = x
 Line 1, characters 29-30:
 1 | let f (x : t_void): 'a B.t = x
                                  ^
-Error: This expression has type "t_void" but an expression was expected of type
+Error: The value "x" has type "t_void" but an expression was expected of type
          "'a B.t" = "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 2, characters 0-18.
@@ -80,7 +80,7 @@ let f (x : t_void): ('a, 'b) A.t2 = x
 Line 1, characters 36-37:
 1 | let f (x : t_void): ('a, 'b) A.t2 = x
                                         ^
-Error: This expression has type "t_void" but an expression was expected of type
+Error: The value "x" has type "t_void" but an expression was expected of type
          "('a, 'b) A.t2" = "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 2, characters 0-18.
@@ -160,8 +160,7 @@ let f (x: t_void) = A.f x
 Line 1, characters 24-25:
 1 | let f (x: t_void) = A.f x
                             ^
-Error: This expression has type "t_void" but an expression was expected of type
-         "int"
+Error: The value "x" has type "t_void" but an expression was expected of type "int"
 |}]
 
 let f2 (x: t_void) = A.f2 x
@@ -170,7 +169,7 @@ let f2 (x: t_void) = A.f2 x
 Line 1, characters 26-27:
 1 | let f2 (x: t_void) = A.f2 x
                               ^
-Error: This expression has type "t_void" but an expression was expected of type
+Error: The value "x" has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 2, characters 0-18.

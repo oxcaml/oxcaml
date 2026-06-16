@@ -103,12 +103,6 @@
     "doc": null
   }
   {
-    "name": "Seq.map",
-    "type": "('a -> 'b) -> 'a Stdlib__Seq.t -> 'b Stdlib__Seq.t",
-    "cost": 10,
-    "doc": null
-  }
-  {
     "name": "List.concat_map",
     "type": "('a -> 'b list) -> 'a list -> 'b list",
     "cost": 10,
@@ -126,6 +120,12 @@
     "cost": 10,
     "doc": null
   }
+  {
+    "name": "ListLabels.filter_map",
+    "type": "f:('a -> 'b option) -> 'a list -> 'b list",
+    "cost": 10,
+    "doc": null
+  }
 
   $ $MERLIN single search-by-type -filename ./context.ml \
   > -position 5:25 -limit 10 \
@@ -136,113 +136,79 @@
       {
         "file": "hashtbl.mli",
         "start": {
-          "line": 121,
+          "line": 122,
           "col": 0
         },
         "end": {
-          "line": 121,
+          "line": 122,
           "col": 40
         },
         "name": "Hashtbl.add",
-        "type": "('a, 'b) Stdlib__Hashtbl.t -> 'a -> 'b -> unit",
-        "cost": 1,
+        "type": "('a, 'b) Hashtbl.t -> 'a -> 'b -> unit",
+        "cost": 33,
         "doc": null,
         "constructible": "Hashtbl.add _ _ _"
       },
       {
         "file": "hashtbl.mli",
         "start": {
-          "line": 156,
+          "line": 157,
           "col": 0
         },
         "end": {
-          "line": 156,
+          "line": 157,
           "col": 44
         },
         "name": "Hashtbl.replace",
-        "type": "('a, 'b) Stdlib__Hashtbl.t -> 'a -> 'b -> unit",
-        "cost": 2,
+        "type": "('a, 'b) Hashtbl.t -> 'a -> 'b -> unit",
+        "cost": 34,
         "doc": null,
         "constructible": "Hashtbl.replace _ _ _"
       },
       {
         "file": "hashtbl.mli",
         "start": {
-          "line": 306,
+          "line": 307,
           "col": 0
         },
         "end": {
-          "line": 306,
+          "line": 307,
           "col": 50
         },
         "name": "Hashtbl.add_seq",
-        "type": "('a, 'b) Stdlib__Hashtbl.t -> ('a * 'b) Seq.t -> unit",
-        "cost": 24,
+        "type": "('a, 'b) Hashtbl.t -> ('a * 'b) Seq.t -> unit",
+        "cost": 46,
         "doc": null,
         "constructible": "Hashtbl.add_seq _ _"
       },
       {
         "file": "hashtbl.mli",
         "start": {
-          "line": 310,
+          "line": 311,
           "col": 0
         },
         "end": {
-          "line": 310,
+          "line": 311,
           "col": 54
         },
         "name": "Hashtbl.replace_seq",
-        "type": "('a, 'b) Stdlib__Hashtbl.t -> ('a * 'b) Seq.t -> unit",
-        "cost": 25,
+        "type": "('a, 'b) Hashtbl.t -> ('a * 'b) Seq.t -> unit",
+        "cost": 47,
         "doc": null,
         "constructible": "Hashtbl.replace_seq _ _"
       },
       {
-        "file": "stdlib/either.mli",
-        "start": {
-          "line": 98,
-          "col": 0
-        },
-        "end": {
-          "line": 100,
-          "col": 75
-        },
-        "name": "Either.map",
-        "type": "left:('a1 -> 'a2) ->
-  right:('b1 -> 'b2) ->
-  ('a1, 'b1) Stdlib__Either.t -> ('a2, 'b2) Stdlib__Either.t",
-        "cost": 44,
-        "doc": null,
-        "constructible": "Either.map ~left:_ ~right:_ _"
-      },
-      {
         "file": "moreLabels.mli",
         "start": {
-          "line": 140,
+          "line": 326,
           "col": 2
         },
         "end": {
-          "line": 140,
-          "col": 51
-        },
-        "name": "MoreLabels.Hashtbl.add",
-        "type": "('a, 'b) Stdlib__MoreLabels.Hashtbl.t -> key:'a -> data:'b -> unit",
-        "cost": 47,
-        "doc": null,
-        "constructible": "MoreLabels.Hashtbl.add _ ~key:_ ~data:_"
-      },
-      {
-        "file": "moreLabels.mli",
-        "start": {
-          "line": 325,
-          "col": 2
-        },
-        "end": {
-          "line": 325,
+          "line": 326,
           "col": 52
         },
         "name": "MoreLabels.Hashtbl.add_seq",
-        "type": "('a, 'b) Stdlib__MoreLabels.Hashtbl.t -> ('a * 'b) Seq.t -> unit",
+        "type": "('a, 'b) MoreLabels.Hashtbl.t -> ('a * 'b) Seq.t -> unit",
         "cost": 48,
         "doc": null,
         "constructible": "MoreLabels.Hashtbl.add_seq _ _"
@@ -250,50 +216,82 @@
       {
         "file": "moreLabels.mli",
         "start": {
-          "line": 175,
+          "line": 330,
           "col": 2
         },
         "end": {
-          "line": 175,
-          "col": 55
-        },
-        "name": "MoreLabels.Hashtbl.replace",
-        "type": "('a, 'b) Stdlib__MoreLabels.Hashtbl.t -> key:'a -> data:'b -> unit",
-        "cost": 48,
-        "doc": null,
-        "constructible": "MoreLabels.Hashtbl.replace _ ~key:_ ~data:_"
-      },
-      {
-        "file": "moreLabels.mli",
-        "start": {
-          "line": 329,
-          "col": 2
-        },
-        "end": {
-          "line": 329,
+          "line": 330,
           "col": 56
         },
         "name": "MoreLabels.Hashtbl.replace_seq",
-        "type": "('a, 'b) Stdlib__MoreLabels.Hashtbl.t -> ('a * 'b) Seq.t -> unit",
+        "type": "('a, 'b) MoreLabels.Hashtbl.t -> ('a * 'b) Seq.t -> unit",
         "cost": 49,
         "doc": null,
         "constructible": "MoreLabels.Hashtbl.replace_seq _ _"
       },
       {
-        "file": "ephemeron.mli",
+        "file": "result.mli",
         "start": {
-          "line": 218,
+          "line": 64,
+          "col": 0
+        },
+        "end": {
+          "line": 65,
+          "col": 63
+        },
+        "name": "Result.bind",
+        "type": "('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result",
+        "cost": 61,
+        "doc": null,
+        "constructible": "Result.bind _ _"
+      },
+      {
+        "file": "result.mli",
+        "start": {
+          "line": 76,
+          "col": 0
+        },
+        "end": {
+          "line": 77,
+          "col": 60
+        },
+        "name": "Result.product",
+        "type": "('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e) result",
+        "cost": 61,
+        "doc": null,
+        "constructible": "Result.product _ _"
+      },
+      {
+        "file": "result.mli",
+        "start": {
+          "line": 158,
           "col": 2
         },
         "end": {
-          "line": 218,
-          "col": 55
+          "line": 158,
+          "col": 75
         },
-        "name": "Ephemeron.K2.query",
-        "type": "('k1, 'k2, 'd) Stdlib__Ephemeron.K2.t -> 'k1 -> 'k2 -> 'd option",
-        "cost": 53,
+        "name": "Result.Syntax.and*",
+        "type": "('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e) result",
+        "cost": 62,
         "doc": null,
-        "constructible": "Ephemeron.K2.query _ _ _"
+        "constructible": "Result.Syntax.and* _ _"
+      },
+      {
+        "file": "result.mli",
+        "start": {
+          "line": 164,
+          "col": 2
+        },
+        "end": {
+          "line": 164,
+          "col": 75
+        },
+        "name": "Result.Syntax.and+",
+        "type": "('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e) result",
+        "cost": 62,
+        "doc": null,
+        "constructible": "Result.Syntax.and+ _ _"
       }
     ],
     "notifications": []

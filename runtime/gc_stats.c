@@ -149,6 +149,16 @@ void caml_init_gc_stats (uintnat max_domains)
     caml_fatal_error("Failed to allocate sampled_gc_stats");
 }
 
+void caml_free_gc_stats(void)
+{
+  if (sampled_gc_stats != NULL)
+    caml_stat_free(sampled_gc_stats);
+  sampled_gc_stats = NULL;
+  if (sampled_gc_stats_nonzero != NULL)
+    caml_stat_free(sampled_gc_stats_nonzero);
+  sampled_gc_stats_nonzero = NULL;
+}
+
 static void update_nonzero_bitmap(caml_domain_state* domain, uint8_t val)
 {
   uintnat id = (uintnat)domain->id;
@@ -190,7 +200,6 @@ void caml_collect_gc_stats_sample_stw(caml_domain_state* domain)
 /* Compute global stats for the whole runtime. */
 void caml_compute_gc_stats(struct gc_stats* buf)
 {
-  int i;
   intnat pool_max = 0, large_max = 0;
   int my_id = Caml_state->id;
   memset(buf, 0, sizeof(*buf));
@@ -212,7 +221,7 @@ void caml_compute_gc_stats(struct gc_stats* buf)
 
   uintnat nonzero_max = sampled_gc_stats_nonzero_max;
   if (nonzero_max < my_id) nonzero_max = my_id;
-  for (i=0; i<=nonzero_max; i++) {
+  for (int i = 0; i <= nonzero_max; i++) {
     /* For allocation stats, we use the live stats of the current domain
        and the sampled stats of other domains.
 

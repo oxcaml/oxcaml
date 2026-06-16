@@ -15,11 +15,17 @@
                 pattern 
                   Ppat_or
                   pattern 
-                    Ppat_constant PConst_int (0,None)
+                    Ppat_constant
+                    constant 
+                      PConst_int (0,None)
                   pattern 
-                    Ppat_constant PConst_int (1,None)
+                    Ppat_constant
+                    constant 
+                      PConst_int (1,None)
                 expression 
-                  Pexp_constant PConst_int (1,None)
+                  Pexp_constant
+                  constant 
+                    PConst_int (1,None)
               <case>
                 pattern 
                   Ppat_var "n" 
@@ -49,7 +55,9 @@
                                 <arg>
                                 Nolabel
                                   expression 
-                                    Pexp_constant PConst_int (1,None)
+                                    Pexp_constant
+                                    constant 
+                                      PConst_int (1,None)
                               ]
                         ]
                     <arg>
@@ -73,7 +81,9 @@
                                 <arg>
                                 Nolabel
                                   expression 
-                                    Pexp_constant PConst_int (2,None)
+                                    Pexp_constant
+                                    constant 
+                                      PConst_int (2,None)
                               ]
                         ]
                   ]
@@ -98,8 +108,8 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
           []
           []
           Tfunction_cases 
-          alloc_mode global,many,nonportable,forkable,unyielding,stateful;aliased,uncontended,read_write,dynamic
-          value
+            alloc_mode global,many,nonportable,forkable,unyielding,stateful;aliased,uncontended,read_write,dynamic
+            value
             [
               <case>
                 pattern 

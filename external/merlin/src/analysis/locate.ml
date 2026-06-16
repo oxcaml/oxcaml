@@ -526,7 +526,23 @@ module Utils = struct
     | CMS _ | CMSI _ -> Mconfig.cmt_path config
 end
 
-let move_to filename artifact =
+let reroot_build_dir ~root path =
+  let sep =
+    try String.get Filename.dir_sep 0 with Invalid_argument _ -> '/'
+  in
+  let segments = path |> String.split_on_char ~sep in
+  let rec strip_prefix = function
+    | [] -> []
+    | "_build" :: _ as l -> l
+    | _ :: tl -> strip_prefix tl
+  in
+  match strip_prefix segments with
+  | [] -> path
+  | l ->
+    let sep = Printf.sprintf "%c" sep in
+    Filename.concat root (String.concat ~sep l)
+
+let move_to (config : Mconfig.t) filename artifact =
   let digest =
     (* [None] only for packs, and we wouldn't have a trie if the cmt was for a
        pack. *)
@@ -534,6 +550,14 @@ let move_to filename artifact =
       Filename.concat
         (Artifact.builddir artifact)
         (Option.get (Artifact.sourcefile artifact))
+    in
+    let sourcefile_in_builddir =
+      (* This workaround is meant to fix issues with Dune's BUILD_PREFIX_MAP. It
+         will not work when the [_build] folder is not located at the source
+         root. See [#1934](https://github.com/ocaml/merlin/issues/1934). *)
+      match config.merlin.source_root with
+      | None -> sourcefile_in_builddir
+      | Some root -> reroot_build_dir ~root sourcefile_in_builddir
     in
     match
       sourcefile_in_builddir |> String.split_on_char ~sep:'.' |> List.rev
@@ -565,7 +589,7 @@ let load_cmt ~config ?with_fallback:(_ = true) comp_unit =
     let artifact = Artifact.read path in
     let source_file = Artifact.sourcefile artifact in
     let source_file = Option.value ~default:"*pack*" source_file in
-    move_to path artifact;
+    move_to config.mconfig path artifact;
     Ok (source_file, artifact)
   | None -> Error ()
 
@@ -917,7 +941,7 @@ let find_definition_uid ~config ~env ~(decl : Env_lookup.item) path =
           ~with_fallback:false unit_name
       with
       | Ok (filename, artifact) ->
-        move_to filename artifact;
+        move_to config.mconfig filename artifact;
         log ~title:"read_unit_shape" "shapes loaded for %s" unit_name;
         Artifact.impl_shape artifact
       | Error () ->
@@ -982,15 +1006,26 @@ let from_path ~config ~env ~local_defs ~decl ?ident:_ path =
     match config.ml_or_mli with
     | `MLI -> (decl.uid, false)
     | `ML | `Smart -> (
-      let traverse_aliases = config.traverse_aliases in
-      let result = find_definition_uid ~config ~env ~decl path in
-      match uid_of_result ~traverse_aliases result with
-      | Some uid, approx -> (uid, approx)
-      | None, _approx ->
-        log ~title "No definition uid, falling back to the declaration uid: %a"
-          Logger.fmt
-          (Fun.flip Shape.Uid.print decl.uid);
-        (decl.uid, true))
+      match decl.uid with
+      | Predef _ | Internal -> (decl.uid, false)
+      | _ -> (
+        let traverse_aliases = config.traverse_aliases in
+        match find_definition_uid ~config ~env ~decl path with
+        | exception Not_found ->
+          log ~title
+            "No shape for path, falling back to the declaration uid: %a"
+            Logger.fmt
+            (Fun.flip Shape.Uid.print decl.uid);
+          (decl.uid, true)
+        | result -> (
+          match uid_of_result ~traverse_aliases result with
+          | Some uid, approx -> (uid, approx)
+          | None, _approx ->
+            log ~title
+              "No definition uid, falling back to the declaration uid: %a"
+              Logger.fmt
+              (Fun.flip Shape.Uid.print decl.uid);
+            (decl.uid, true))))
   in
   (* Step 1': Try refine Uid *)
   let impl_uid =

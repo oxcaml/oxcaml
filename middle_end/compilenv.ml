@@ -72,7 +72,7 @@ let reset unit_info =
   let compilation_unit = Unit_info.modname unit_info in
   Infos_table.clear global_infos_table;
   Zero_alloc_info.reset cached_zero_alloc_info;
-  Env.set_unit_name (Some unit_info);
+  Env.set_current_unit unit_info;
   current_unit.ui_unit <- compilation_unit;
   current_unit.ui_defines <- [compilation_unit];
   current_unit.ui_arg_descr <- None;
@@ -341,7 +341,7 @@ let report_error_doc ppf = function
         Location.Doc.quoted_filename filename
   | Corrupted_unit_info filename ->
       fprintf ppf "Corrupted compilation unit description@ %a"
-        Location.Doc.quoted_filename filename
+       Location.Doc.quoted_filename filename
   | Illegal_renaming(name, modname, filename) ->
       fprintf ppf "%a@ contains the description for unit\
                    @ %a when %a was expected"
