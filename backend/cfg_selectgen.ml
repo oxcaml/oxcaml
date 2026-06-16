@@ -52,17 +52,23 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     ref V.Map.empty
 
   let accumulate_phantom_let var defining_expr =
-    match defining_expr with
-    | None -> ()
-    | Some defining_expr ->
-      if V.Map.mem (VP.var var) !accumulated_phantom_lets
-      then
-        Misc.fatal_errorf "Duplicate phantom let for variable %a" V.print
-          (VP.var var);
-      accumulated_phantom_lets
-        := V.Map.add (VP.var var)
-             (VP.provenance var, Cfg.phantom_defining_expr_of_cmm defining_expr)
-             !accumulated_phantom_lets
+    (* A [None] defining expression means the variable has been optimised out;
+       it is still recorded (as [Cphantom_optimised_out]) so that it remains
+       consistent with [phantom_available_before] and other phantom lets may
+       refer to it. *)
+    let cfg_defining_expr : Cfg.phantom_defining_expr =
+      match defining_expr with
+      | None -> Cfg.phantom_optimised_out
+      | Some defining_expr -> Cfg.phantom_defining_expr_of_cmm defining_expr
+    in
+    if V.Map.mem (VP.var var) !accumulated_phantom_lets
+    then
+      Misc.fatal_errorf "Duplicate phantom let for variable %a" V.print
+        (VP.var var);
+    accumulated_phantom_lets
+      := V.Map.add (VP.var var)
+           (VP.provenance var, cfg_defining_expr)
+           !accumulated_phantom_lets
 
   (* A syntactic criterion used in addition to judgements about (co)effects as
      to whether the evaluation of a given expression may be deferred by

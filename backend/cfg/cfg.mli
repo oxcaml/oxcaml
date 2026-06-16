@@ -85,9 +85,12 @@ type phantom_defining_expr = private
       { tag : int;
         fields : Backend_var.t list
       }
+  | Cphantom_optimised_out
 
 val phantom_defining_expr_of_cmm :
   Cmm.phantom_defining_expr -> phantom_defining_expr
+
+val phantom_optimised_out : phantom_defining_expr
 
 (* Subset of Cmm.codegen_option. *)
 type codegen_option =

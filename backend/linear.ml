@@ -41,6 +41,7 @@ type phantom_defining_expr =
       { tag : int;
         fields : Backend_var.t list
       }
+  | Lphantom_optimised_out
 
 let lphantom_const_int i = Lphantom_const_int i
 
@@ -57,6 +58,8 @@ let lphantom_read_symbol_field ~sym ~field =
   Lphantom_read_symbol_field { sym; field }
 
 let lphantom_block ~tag ~fields = Lphantom_block { tag; fields }
+
+let lphantom_optimised_out = Lphantom_optimised_out
 
 (* N.B. [Branch_relaxation] relies on physical equality being precise on values
    of this type. *)

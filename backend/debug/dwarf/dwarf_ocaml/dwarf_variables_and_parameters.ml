@@ -143,6 +143,9 @@ let rec phantom_var_location_description state
   in
   let rvalue rvalue = Some (Simple (SLDL.compile (SLDL.of_rvalue rvalue))) in
   match defining_expr with
+  | Lphantom_optimised_out ->
+    (* The variable has been optimised out: there is no location to describe. *)
+    None
   | Lphantom_const_int i ->
     let i = SLDL.Rvalue.signed_int_const i in
     if need_rvalue
@@ -553,7 +556,7 @@ let variable_referenced_by_phantom_defining_expr
   | Lphantom_read_field { var; field = _ }
   | Lphantom_offset_var { var; offset_in_words = _ } ->
     Some var
-  | Lphantom_const_int _ | Lphantom_const_symbol _
+  | Lphantom_optimised_out | Lphantom_const_int _ | Lphantom_const_symbol _
   | Lphantom_read_symbol_field _ ->
     None
   | Lphantom_block _ ->

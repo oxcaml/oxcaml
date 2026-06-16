@@ -41,8 +41,11 @@ type phantom_defining_expr = private
       { tag : int;
         fields : Backend_var.t list
       }
+  | Lphantom_optimised_out
 
 val lphantom_const_int : Targetint.t -> phantom_defining_expr
+
+val lphantom_optimised_out : phantom_defining_expr
 
 val lphantom_const_symbol : Cmm.symbol -> phantom_defining_expr
 

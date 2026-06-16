@@ -41,6 +41,7 @@ let phantom_defining_expr_to_linear (expr : Cfg.phantom_defining_expr) =
   | Cphantom_read_symbol_field { sym; field } ->
     L.lphantom_read_symbol_field ~sym ~field
   | Cphantom_block { tag; fields } -> L.lphantom_block ~tag ~fields
+  | Cphantom_optimised_out -> L.lphantom_optimised_out
 
 let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
     L.instruction =

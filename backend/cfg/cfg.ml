@@ -105,6 +105,7 @@ type phantom_defining_expr =
       { tag : int;
         fields : Backend_var.t list
       }
+  | Cphantom_optimised_out
 
 let phantom_defining_expr_of_cmm (expr : Cmm.phantom_defining_expr) =
   match expr with
@@ -117,6 +118,8 @@ let phantom_defining_expr_of_cmm (expr : Cmm.phantom_defining_expr) =
   | Cphantom_read_symbol_field { sym; field } ->
     Cphantom_read_symbol_field { sym; field }
   | Cphantom_block { tag; fields } -> Cphantom_block { tag; fields }
+
+let phantom_optimised_out = Cphantom_optimised_out
 
 type t =
   { blocks : basic_block Label.Tbl.t;

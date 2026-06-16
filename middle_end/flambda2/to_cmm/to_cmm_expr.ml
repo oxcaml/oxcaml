@@ -19,6 +19,7 @@ module Env = To_cmm_env
 module Ece = Effects_and_coeffects
 module K = Flambda_kind
 module P = Flambda_primitive
+module EO = Exported_offsets
 
 module C = struct
   include Cmm_helpers
@@ -893,7 +894,7 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
      delayed binding rather than a [Cvar].) [make_phantom_let] needs to flush in
      any case, so this does not introduce additional flushing on the paths that
      emit a phantom let. *)
-  let make_phantom_let env res ~wrap bound_var defining_expr
+  let make_phantom_let_gen env res ~wrap bound_var defining_expr
       ~free_vars_of_defining_expr ~body =
     let var = Bound_var.var bound_var in
     let debug_uid = Bound_var.debug_uid bound_var in
@@ -905,7 +906,7 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
     in
     let body_cmm, free_vars, symbol_inits, res = expr env res body in
     let cmm =
-      C.make_phantom_let backend_var_with_prov (Some defining_expr) body_cmm
+      C.make_phantom_let backend_var_with_prov defining_expr body_cmm
     in
     (* The free variables passed to [wrap] must include those referenced by the
        phantom defining expression, to prevent the (just-flushed) bindings of
@@ -924,6 +925,13 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
     let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
     cmm, free_vars, symbol_inits, res
   in
+  (* [make_phantom_let] binds [bound_var] to a present phantom defining
+     expression. *)
+  let make_phantom_let env res ~wrap bound_var defining_expr
+      ~free_vars_of_defining_expr ~body =
+    make_phantom_let_gen env res ~wrap bound_var (Some defining_expr)
+      ~free_vars_of_defining_expr ~body
+  in
   (* For use after flushing only (at which point no delayed bindings remain).
      Note that the variable may not be bound at all, for example if its only
      uses are phantom (meaning that its defining expression was never
@@ -941,6 +949,16 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
     let body_cmm, free_vars, symbol_inits, res = expr env res body in
     let cmm, free_vars, symbol_inits = wrap body_cmm free_vars symbol_inits in
     cmm, free_vars, symbol_inits, res
+  in
+  (* As [drop_phantom_let], but keep the binding with no defining expression,
+     i.e. optimised out. This gives [bound_var] a DIE (reported as "optimised
+     out" in the debugger) and materialises a backend variable that later
+     phantom lets may read from. Used when a [Project_value_slot] /
+     [Project_function_slot] cannot be expressed, e.g. because the slot has been
+     removed from the (optimised-out) closure. *)
+  let optimised_out_phantom_let env res ~wrap bound_var ~body =
+    make_phantom_let_gen env res ~wrap bound_var None
+      ~free_vars_of_defining_expr:Backend_var.Set.empty ~body
   in
   match[@warning "-4"] bound_pattern, Let.defining_expr let_expr with
   | Singleton bound_var, Simple simple ->
@@ -1051,6 +1069,63 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
           ~body
       | None -> drop_phantom_let env res ~wrap ~body)
     | None -> expr env res body)
+  | ( Singleton bound_var,
+      Prim (Unary (Project_value_slot { project_from; value_slot }, arg), _dbg) )
+    -> (
+    match Simple.must_be_var arg with
+    | Some (var, _coercion) -> (
+      let wrap, env, res =
+        Env.flush_delayed_lets ~mode:Flush_everything env res
+      in
+      match backend_var_for env res var with
+      | Some backend_var -> (
+        match
+          ( EO.value_slot_offset (Env.exported_offsets env) value_slot,
+            EO.function_slot_offset (Env.exported_offsets env) project_from )
+        with
+        | ( Some (EO.Live_value_slot { offset; _ }),
+            Some (EO.Live_function_slot { offset = base; _ }) ) ->
+          make_phantom_let env res ~wrap bound_var
+            (Cmm.Cphantom_read_field
+               { var = backend_var; field = offset - base })
+            ~free_vars_of_defining_expr:(Backend_var.Set.singleton backend_var)
+            ~body
+        | _ -> optimised_out_phantom_let env res ~wrap bound_var ~body)
+      | None -> optimised_out_phantom_let env res ~wrap bound_var ~body)
+    | None -> expr env res body)
+  | ( Singleton bound_var,
+      Prim (Unary (Project_function_slot { move_from; move_to }, arg), _dbg) )
+    -> (
+    match Simple.must_be_var arg with
+    | Some (var, _coercion) -> (
+      let wrap, env, res =
+        Env.flush_delayed_lets ~mode:Flush_everything env res
+      in
+      match backend_var_for env res var with
+      | Some backend_var -> (
+        match
+          ( EO.function_slot_offset (Env.exported_offsets env) move_from,
+            EO.function_slot_offset (Env.exported_offsets env) move_to )
+        with
+        | ( Some (EO.Live_function_slot { offset = c1; _ }),
+            Some (EO.Live_function_slot { offset = c2; _ }) ) ->
+          make_phantom_let env res ~wrap bound_var
+            (Cmm.Cphantom_offset_var
+               { var = backend_var; offset_in_words = c2 - c1 })
+            ~free_vars_of_defining_expr:(Backend_var.Set.singleton backend_var)
+            ~body
+        | _ -> optimised_out_phantom_let env res ~wrap bound_var ~body)
+      | None -> optimised_out_phantom_let env res ~wrap bound_var ~body)
+    | None -> expr env res body)
+  | Singleton bound_var, Prim (Nullary (Optimised_out _), _dbg) ->
+    (* Bind the variable to a phantom let with no defining expression: it has
+       been optimised out. This still materialises a backend variable for it, so
+       that any subsequent phantom lets reading from it -- for example a
+       [Project_value_slot] or [Project_function_slot] from an optimised-out
+       [my_closure] -- can refer to it rather than being dropped. *)
+    let wrap, env, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
+    make_phantom_let_gen env res ~wrap bound_var None
+      ~free_vars_of_defining_expr:Backend_var.Set.empty ~body
   | _ -> expr env res body
 
 and let_expr env res let_expr =
