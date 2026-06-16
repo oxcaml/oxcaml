@@ -11,7 +11,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(out_0)
       out_0_1 (_x)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
-        : imm tagged local =
+        : imm tagged stack =
   let Popaque = %opaque (0) in
   cont k (Popaque)
 in
@@ -20,7 +20,7 @@ let code loopify(never) size(50) newer_version_of(emit_instr_1)
       emit_instr_1_1 (param : [ 0 |1 | 0 of imm tagged |1 of imm tagged ])
         my_closure my_region my_ghost_region my_depth
         -> k * k1
-        : imm tagged local =
+        : imm tagged stack =
   (let prim = %is_int (param) in
    switch prim
      | 0 -> k6

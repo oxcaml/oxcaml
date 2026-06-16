@@ -843,7 +843,7 @@ and code_binding ppf
     ret_arity
     (match result_mode with
     | Not_alloc_stack -> ""
-    | Maybe_alloc_stack -> " local")
+    | Maybe_alloc_stack -> " stack")
     (expr Outer) body
 
 let flambda_unit ppf ({ body } : flambda_unit) =
