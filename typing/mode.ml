@@ -7559,6 +7559,11 @@ module Value_with (Areality : Areality) = struct
       let* comonadic = Comonadic.Guts.check_const comonadic in
       Some (merge { comonadic; monadic })
 
+    let get_floor { monadic; comonadic } =
+      let monadic = Monadic.Guts.get_floor monadic in
+      let comonadic = Comonadic.Guts.get_floor comonadic in
+      merge { monadic; comonadic }
+
     let get_ceil { monadic; comonadic } =
       let monadic = Monadic.Guts.get_ceil monadic in
       let comonadic = Comonadic.Guts.get_ceil comonadic in
@@ -7569,6 +7574,22 @@ module Value_with (Areality : Areality) = struct
       let monadic = Monadic.Guts.in_bounds c.monadic monadic in
       let comonadic = Comonadic.Guts.in_bounds c.comonadic comonadic in
       monadic && comonadic
+
+    let zap_towards_floor_of a1 ~towards:a2 =
+      if check_generic a1
+      then None
+      else
+        let a2_floor = get_floor a2 in
+        zap_to_ceil_force (meet [a1; of_const a2_floor]) |> ignore;
+        Some (zap_to_floor_force a1)
+
+    let zap_towards_ceil_of a1 ~towards:a2 =
+      if check_generic a1
+      then None
+      else
+        let a2_ceil = get_ceil a2 in
+        zap_to_floor_force (join [a1; of_const a2_ceil]) |> ignore;
+        Some (zap_to_ceil_force a1)
   end
 end
 [@@inline]

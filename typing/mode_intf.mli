@@ -1067,6 +1067,17 @@ module type S = sig
       (** Checks that a constant is within the precise bounds of a mode. see
           notes on [get_floor] in [solver_intf.mli] for cautions. *)
       val in_bounds : Const.t -> (allowed * allowed) t -> bool
+
+      (** Zap a mode toward the floor of [towards]. Axes that are either
+          strictly above or below [towards] end up as close as possible to the
+          semantic lower bound of [towards]. Returns [None] if the mode is
+          generic. *)
+      val zap_towards_floor_of : lr -> towards:lr -> Const.t option
+
+      (** Zap a mode toward the ceil of [towards]. Axes that are either strictly
+          above or below [towards] end up as close as possible to the semantic
+          upper bound of [towards]. Returns [None] if the mode is generic. *)
+      val zap_towards_ceil_of : lr -> towards:lr -> Const.t option
     end
   end
 
