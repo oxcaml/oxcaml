@@ -16,9 +16,22 @@ external register_named_value : string -> 'a -> unit
   = "caml_register_named_value"
 
 type 'a t = ..
+
 external perform : 'a t -> 'a = "%perform"
+
+module Handler = struct
+  type t : void mod external_ many stateless
+  external make : unit -> t @ local yielding = "%unbox_unit"
+end
+
+module Safe = struct
+  let[@inline never] perform (_ : Handler.t @ local yielding) eff = perform eff
+end
+
 exception Out_of_fibers = Out_of_fibers
+
 type exn += Unhandled: 'a t -> exn
+
 exception Continuation_already_resumed
 
 let () =
@@ -141,6 +154,20 @@ module Deep = struct
     in
     with_stack (fun x -> x) (fun e -> raise e) effc' comp arg
 
+  module Safe = struct
+    let match_with comp arg handler =
+      match_with
+        (fun arg -> comp (Handler.make ()) arg [@nontail])
+        arg
+        handler
+
+    let try_with comp arg handler =
+      try_with
+        (fun arg -> comp (Handler.make ()) arg [@nontail])
+        arg
+        handler
+  end
+
   module Preemptible = struct
     type ('a,'b) handler =
       { retc: 'a -> 'b;
@@ -168,6 +195,20 @@ module Deep = struct
         ; tickc = on_tick
         };
     ;;
+
+    module Safe = struct
+      let match_with comp arg handler =
+        match_with
+          (fun arg -> comp (Handler.make ()) arg [@nontail])
+          arg
+          handler
+
+      let try_with ~on_tick comp arg handler =
+        try_with ~on_tick
+          (fun arg -> comp (Handler.make ()) arg [@nontail])
+          arg
+          handler
+    end
   end
 
   external get_callstack :
@@ -227,6 +268,11 @@ module Shallow = struct
 
   let discontinue_with_backtrace k v bt handler =
     continue_gen k (fun e -> Printexc.raise_with_backtrace e bt) v handler
+
+  module Safe = struct
+    let fiber f =
+      fiber (fun arg -> f (Handler.make ()) arg [@nontail])
+  end
 
   module Preemptible = struct
     type ('a,'b) handler =

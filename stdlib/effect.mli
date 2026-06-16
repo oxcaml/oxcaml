@@ -43,9 +43,19 @@ type _ t +=
      finished *)
 
 external perform : 'a t -> 'a = "%perform"
+[@@alert unsafe_effects "Use [Effect.Safe.perform]"]
 (** [perform e] performs an effect [e].
 
     @raise Unhandled if there is no handler for [e]. *)
+
+module Handler : sig
+  type t : void mod external_ many stateless
+end
+
+
+module Safe : sig
+  val perform : Handler.t @ local yielding -> 'a t -> 'a
+end
 
 type tick_outcome =
   | Preempt
@@ -104,6 +114,21 @@ module Deep : sig
 
       @raise Out_of_fibers if unable to allocate a fiber. *)
 
+  module Safe : sig
+    val match_with
+      :  (Handler.t @ local -> 'c -> 'a) @ unyielding
+      -> 'c
+      -> ('a,'b) handler
+      -> 'b
+
+    val try_with
+      :  (Handler.t @ local -> 'b -> 'a) @ unyielding
+      -> 'b
+      -> 'a effect_handler
+      -> 'a
+  end
+
+
   module Preemptible : sig
     (** Preemptible handlers
 
@@ -140,6 +165,21 @@ module Deep : sig
           performed.
 
         @raise Out_of_fibers if unable to allocate a fiber. *)
+
+    module Safe : sig
+      val match_with
+        :  (Handler.t @ local -> 'c -> 'a) @ unyielding
+        -> 'c
+        -> ('a,'b) handler
+        -> 'b
+
+      val try_with
+        :  on_tick:(unit -> tick_outcome)
+        -> (Handler.t @ local -> 'b -> 'a) @ unyielding
+        -> 'b
+        -> 'a effect_handler
+        -> 'a
+    end
   end
 
   external get_callstack :
@@ -195,6 +235,11 @@ module Shallow : sig
       @raise Continuation_already_resumed if the continuation has already been
       resumed.
    *)
+
+  module Safe : sig
+    val fiber
+      : (Handler.t @ local -> 'a -> 'b) @ unyielding -> ('a, 'b) continuation
+  end
 
   module Preemptible : sig
     (** Preemptible handlers
