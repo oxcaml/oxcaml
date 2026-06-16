@@ -1811,18 +1811,10 @@ module F :
 module _ = F (struct kind_ ka = value_or_null end)
 module M = F (struct kind_ ka = any end)
 [%%expect{|
-module M : sig val mk : 'a id -> 'a id end
+module M : sig val mk : ('a : any). 'a id -> 'a id end
 |}]
 
 let foo : ('a : any). 'a id -> 'a id = M.mk
 [%%expect{|
-Line 1, characters 39-43:
-1 | let foo : ('a : any). 'a id -> 'a id = M.mk
-                                           ^^^^
-Error: This definition has type "'b id -> 'b id" which is less general than
-         "('a : any). 'a id -> 'a id"
-       The layout of 'a is any
-         because of the annotation on the universal variable 'a.
-       But the layout of 'a must be a value layout
-         because of the definition of mk at line 4, characters 2-38.
+val foo : ('a : any). 'a id -> 'a id = <fun>
 |}]
