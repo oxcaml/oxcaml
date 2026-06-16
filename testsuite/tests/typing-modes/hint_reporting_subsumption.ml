@@ -37,7 +37,7 @@ Error: Signature mismatch:
          val with_ : f:('a -> 'a) @ local -> unit
        The type "f:('a -> 'a) @ local unyielding -> unit"
        is not compatible with the type "f:('a -> 'a) @ local -> unit"
-       The mode of argument f in the interface is "yielding" (line 2, characters 29-34)
+       The mode of argument f in the interface is "yielding"
        but the implementation expects it to be "unyielding".
 |}]
 
@@ -89,7 +89,7 @@ Error: Signature mismatch:
          val with_ : ('a -> 'a) @ local -> unit
        The type "('a -> 'a) @ local unyielding -> unit"
        is not compatible with the type "('a -> 'a) @ local -> unit"
-       The mode of the argument in the interface is "yielding" (line 2, characters 27-32)
+       The mode of the argument in the interface is "yielding"
        but the implementation expects it to be "unyielding".
 |}]
 
