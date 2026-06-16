@@ -269,9 +269,6 @@ let record_representation i ppf = let open Types in function
       (if flatten_floats then " [@@flatten_floats]" else "")
   | Record_variable ->
     line i ppf "Record_variable\n"
-  | Record_inlined_variable (t, v) ->
-    line i ppf "Record_inlined_variable (%a, %a)\n"
-      tag t (variant_representation i) v
 
 let record_unboxed_product_representation i ppf = let open Types in function
   | Record_unboxed_product ->

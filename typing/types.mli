@@ -963,8 +963,6 @@ and record_representation =
   (* Used after [update_decls_jkind] for non-inlined records whose
      representation cannot be determined because at least one field has layout
      [any]. The actual representation is decided at construction sites. *)
-  | Record_inlined_variable of tag * variant_representation
-  (* Counterpart of [Record_variable] for inlined records *)
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
@@ -1011,6 +1009,9 @@ and constructor_representation =
   *)
   | Constructor_mixed of mixed_product_shape
   (* A constructor that has some non-value fields. *)
+  | Constructor_variable
+  (* The constructor has an inlined record argument with a field of layout
+     [any], so its shape cannot be determined at typedecl time. *)
 
 and label_declaration =
   {

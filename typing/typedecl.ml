@@ -1308,8 +1308,7 @@ let shape_has_float_boxed shape =
 
 let record_has_float_boxed = function
   | Record_mixed shape -> shape_has_float_boxed shape
-  | Record_unboxed | Record_inlined _ | Record_inlined_variable _
-  | Record_boxed
+  | Record_unboxed | Record_inlined _ | Record_boxed
   | Record_float | Record_ufloat -> false
   | Record_dummy _ ->
     fatal_error "record_has_float_boxed: unexpected dummy representation"
@@ -1324,7 +1323,7 @@ let record_has_atomic_field lbls =
 let record_gets_unboxed_version lbls repr =
   not (record_has_atomic_field lbls) &&
   match repr with
-  | Record_unboxed | Record_inlined _ | Record_inlined_variable _
+  | Record_unboxed | Record_inlined _
   | Record_float | Record_ufloat -> false
   | Record_boxed | Record_variable -> true
   | Record_dummy { represent_as_float_array; flatten_floats } ->
@@ -2343,8 +2342,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     in
     sorts, rep, jkind
   | Legacy, _,
-    (Record_boxed | Record_inlined _ | Record_inlined_variable _
-          | Record_float | Record_mixed _
+    (Record_boxed | Record_inlined _ | Record_float | Record_mixed _
           | Record_ufloat | Record_unboxed | Record_variable)
     ->
     (* These are never created by [transl_declaration], so they will only
@@ -2409,7 +2407,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
       | Error _ -> ()
       end;
       rep
-    | Legacy, Record_inlined_variable (tag, vrep) ->
+    | Legacy, Record_inlined (tag, Constructor_variable, vrep) ->
       update_record_inlined_kind env loc lbls jkinds tag vrep
     | Unboxed_product, _ ->
       (match repr_summary.first_any with

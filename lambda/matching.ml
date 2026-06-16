@@ -2155,6 +2155,8 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
       let shape = transl_mixed_product_shape shape in
       let e, layout = lambda_void_of_el shape.(pos) in
       { arg = e; binding_kind; mut = compose_mut mut Immutable; sort; layout; }
+    | Constructor_variable ->
+      fatal_error "Matching.get_exr_args_constr: variable representation"
   in
   let make_field_access binding_kind sort ~field:_ ~pos =
     if cstr.cstr_constant then
@@ -2174,6 +2176,8 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
                 shape
             in
             Pmixedfield ([pos], shape, sem)
+        | Constructor_variable ->
+            fatal_error "Matching.get_exr_args_constr: variable representation"
       in
       let layout = Typeopt.layout_of_sort head.pat_loc sort in
       {
@@ -2585,6 +2589,8 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
             Lprim (Pfield (lbl.lbl_pos, ptr, sem), [ arg ], loc),
             lbl_sort, lbl_layout
+        | Record_inlined (_, Constructor_variable, _) ->
+          fatal_error "get_expr_args_record: unexpected variable representation"
         | Record_unboxed
         | Record_inlined (_, _, Variant_unboxed) -> arg, sort, layout
         | Record_float ->
@@ -2618,7 +2624,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
           fatal_error "get_expr_args_record: unexpected dummy representation"
-        | Record_variable | Record_inlined_variable _ ->
+        | Record_variable ->
           fatal_error "get_expr_args_record: unexpected variable representation"
       in
       let binding_kind =

@@ -55,6 +55,8 @@ let field_offset_for_label lbl repres =
       lbl.lbl_pos
   | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
       lbl.lbl_pos + 1
+  | Record_inlined (_, Constructor_variable, _) ->
+      fatal_error "field_offset_for_label: variable record representation"
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
     (* CR layouts 5.1: For unboxed records, no offset calculation needed in
        regular field access *)
@@ -71,7 +73,7 @@ let field_offset_for_label lbl repres =
       lbl.lbl_pos
   | Record_dummy _ ->
       fatal_error "field_offset_for_label: dummy record representation"
-  | Record_variable | Record_inlined_variable _ ->
+  | Record_variable ->
       fatal_error "field_offset_for_label: variable record representation"
 
 (* Forward declaration -- to be filled in by Translmod.transl_module *)
@@ -612,7 +614,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                     *)
                     None
               | Constructor_uniform_value ->
-                  Some (Const_block(runtime_tag, constants)))
+                  Some (Const_block(runtime_tag, constants))
+              | Constructor_variable ->
+                  fatal_error
+                    "transl_exp: variable constructor representation")
           in
           begin match constant with
           | Some constant -> Lconst constant
@@ -635,6 +640,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                        stored as immediates *)
                     let shape = Lambda.transl_mixed_product_shape shape in
                     Pmakeblock(runtime_tag, Immutable, Shape shape, alloc_mode)
+                | Constructor_variable ->
+                    fatal_error
+                      "transl_exp: variable constructor representation"
               in
               Lprim (makeblock, ll, of_location ~scopes e.exp_loc)
           end
@@ -678,7 +686,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                     Array.append [| Lambda.Value Lambda.generic_value |] shape
                   in
                   Pmakeblock(0, Immutable, Shape shape, alloc_mode)
-              | None ->
+              | None | Some Constructor_variable ->
                   fatal_error "Unexpected indeterminate representation in \
                                extensible variant"
             in
@@ -721,7 +729,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let repres =
         match lbl.lbl_repres with
-        | Record_variable | Record_inlined_variable _ ->
+        | Record_variable | Record_inlined (_, Constructor_variable, _) ->
             Misc.fatal_errorf "Texp_atomic_loc on record with [any] field %s"
               lbl.lbl_name
         | repres -> repres
@@ -753,6 +761,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   field_offset_for_label lbl record_repres)))])
           else
             Some (Pfield (lbl.lbl_pos, immediate_or_pointer, sem), [targ])
+        | Record_inlined (_, Constructor_variable, _) ->
+          fatal_error "transl_exp0: variable record representation"
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> None
         | Record_float ->
           let alloc_mode =
@@ -807,7 +817,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
           fatal_error "transl_exp0: dummy record representation"
-        | Record_variable | Record_inlined_variable _ ->
+        | Record_variable ->
           fatal_error "transl_exp0: variable record representation"
       in
       begin match prim_and_args with
@@ -877,6 +887,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           else
             Psetfield(lbl.lbl_pos, immediate_or_pointer, mode),
             [arg_lambda; newval_lambda]
+        | Record_inlined (_, Constructor_variable, _) ->
+          fatal_error "transl_exp0: unexpected unknown representation"
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
           assert false
         | Record_float ->
@@ -913,7 +925,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
             fatal_error "transl_exp0: unexpected dummy representation"
-        | Record_variable | Record_inlined_variable _ ->
+        | Record_variable ->
             fatal_error "transl_exp0: unexpected unknown representation"
       in
       Lprim(prim, args, of_location ~scopes e.exp_loc)
@@ -2182,6 +2194,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
                 let ptr, _ = maybe_pointer expr in
                 Psetfield(lbl.lbl_pos, ptr, Assignment modify_heap)
+            | Record_inlined (_, Constructor_variable, _) ->
+                fatal_error "transl_record: unexpected variable representation"
             | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
                 assert false
             | Record_float ->
@@ -2213,7 +2227,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             | Record_inlined (_, _, Variant_with_null) -> assert false
             | Record_dummy _ ->
               fatal_error "transl_record: unexpected dummy representation"
-            | Record_variable | Record_inlined_variable _ ->
+            | Record_variable ->
               fatal_error "transl_record: unexpected variable representation"
           in
           Lsequence(Lprim(upd, [Lvar copy_id;
@@ -2257,6 +2271,9 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                  | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
                    let ptr, _ = maybe_pointer_type env typ in
                    Pfield (i, ptr, sem)
+                 | Record_inlined (_, Constructor_variable, _) ->
+                   fatal_error
+                     "transl_record: unexpected variable representation"
                  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
                    assert false
                  | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
@@ -2299,7 +2316,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                  | Record_dummy _ ->
                    fatal_error
                      "transl_record: unexpected dummy representation"
-                 | Record_variable | Record_inlined_variable _ ->
+                 | Record_variable ->
                    fatal_error
                      "transl_record: unexpected variable representation"
                in
@@ -2325,6 +2342,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         | Record_inlined (Ordinary {runtime_tag},
                           Constructor_uniform_value, Variant_boxed _) ->
             Lconst(Const_block(runtime_tag, cl))
+        | Record_inlined (_, Constructor_variable, _) ->
+            fatal_error "transl_record: unexpected variable representation"
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
             Lconst(match cl with [v] -> v | _ -> assert false)
         | Record_float ->
@@ -2363,7 +2382,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             raise Not_constant
         | Record_dummy _ ->
           fatal_error "transl_record: unexpected dummy representation"
-        | Record_variable | Record_inlined_variable _ ->
+        | Record_variable ->
           fatal_error "transl_record: unexpected variable representation"
       with Not_constant ->
         let loc = of_location ~scopes loc in
@@ -2379,6 +2398,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             Lprim(Pmakeblock(runtime_tag, mut,
                              Lambda.block_shape_of_value_kinds (Some shape),
                              Option.get mode), ll, loc)
+        | Record_inlined (_, Constructor_variable, _) ->
+            fatal_error "transl_record: unexpected variable representation"
         | Record_unboxed | Record_inlined (Ordinary _, _, Variant_unboxed) ->
             (match ll with [v] -> v | _ -> assert false)
         | Record_float ->
@@ -2418,7 +2439,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         | Record_inlined (Null, _, _) -> assert false
         | Record_dummy _ ->
           fatal_error "transl_record: unexpected dummy representation"
-        | Record_variable | Record_inlined_variable _ ->
+        | Record_variable ->
           fatal_error "transl_record: unexpected variable representation"
     in
     begin match opt_init_expr with
@@ -2534,7 +2555,7 @@ and transl_idx ~scopes loc env ba uas =
              (of_location ~scopes loc))
     | Record_dummy _ ->
       fatal_error "transl_idx: unexpected dummy representation"
-    | Record_variable | Record_inlined_variable _ ->
+    | Record_variable ->
       fatal_error "transl_idx: unexpected unknown representation"
     end
   end
@@ -2544,7 +2565,7 @@ and transl_atomic_loc ~scopes arg arg_sort lbl repres =
   begin match repres with
   | Record_dummy _ ->
     Misc.fatal_error "transl_atomic_loc: unexpected dummy representation"
-  | Record_variable | Record_inlined_variable _ ->
+  | Record_variable | Record_inlined (_, Constructor_variable, _) ->
     Misc.fatal_error "transl_atomic_loc: unexpected variable representation"
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
   | Record_float | Record_ufloat

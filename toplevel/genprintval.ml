@@ -706,7 +706,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         | None ->
             let rep =
               match rep with
-              | (Record_variable | Record_inlined_variable _) as old_repres ->
+              | (Record_variable | Record_inlined (_, Constructor_variable, _))
+                as old_repres ->
                   let label_params_and_types, record_params =
                     Ctype.instance_label_declarations ~fixed:false
                       (lbl_list |> Array.of_list) ~params:type_params
@@ -752,7 +753,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                     else Outval_record_boxed
               | Record_dummy _ ->
                   Misc.fatal_error "dummy record representation"
-              | Record_variable | Record_inlined_variable _ ->
+              | Record_variable | Record_inlined (_, Constructor_variable, _) ->
                   Misc.fatal_error "variable record representation"
             in
             tree_of_record_fields depth

@@ -481,6 +481,9 @@ module Type_decl_shape = struct
               args
           in
           Array.of_list lys
+        | Constructor_variable ->
+          Misc.fatal_error
+            "Type_shape: unexpected variable constructor representation"
       in
       Some
         { Shape.name;
@@ -620,7 +623,7 @@ module Type_decl_shape = struct
                  [match e with Foo r -> ...]."
             else unknown_shape ()
           | Record_dummy _ -> Misc.fatal_error "unexpected dummy representation"
-          | Record_variable | Record_inlined_variable _ -> unknown_shape ())
+          | Record_variable -> unknown_shape ())
         | Type_abstract _ -> unknown_shape ()
         | Type_open -> unknown_shape ()
         | Type_record_unboxed_product (lbl_list, _, _) ->

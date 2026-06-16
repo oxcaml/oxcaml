@@ -242,9 +242,12 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     in
     let cstr_existentials, cstr_args, cstr_inlined =
       let record_repr =
-        match cstr_shape with
-        | None -> Record_inlined_variable (cstr_tag, rep)
-        | Some shape -> Record_inlined (cstr_tag, shape, rep)
+        let shape =
+          match cstr_shape with
+          | None -> Constructor_variable
+          | Some shape -> shape
+        in
+        Record_inlined (cstr_tag, shape, rep)
       in
       constructor_args ~current_unit decl.type_private cd_args cd_res
         Path.(Pextra_ty (ty_path, Pcstr_ty cstr_name)) record_repr
