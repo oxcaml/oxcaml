@@ -82,7 +82,7 @@ module Lvalue = struct
     @ [O.DW_op_dup]
     @ OB.conditional ~if_zero:[]
         ~if_nonzero:
-          ([O.DW_op_swap; O.DW_op_drop] @ OB.add_unsigned_const offset_in_bytes)
+          ([O.DW_op_swap; O.DW_op_drop] @ OB.add_signed_const offset_in_bytes)
         ~at_join:[] ()
 
   let read_field_unguarded ~block ~field =
@@ -95,7 +95,7 @@ module Lvalue = struct
     let offset_in_bytes =
       Targetint.mul offset_in_words Targetint.size_in_bytes_as_targetint
     in
-    t @ OB.add_unsigned_const offset_in_bytes
+    t @ OB.add_signed_const offset_in_bytes
 
   let location_from_another_die ~die_label ~compilation_unit_header_label =
     [OB.call ~die_label ~compilation_unit_header_label]

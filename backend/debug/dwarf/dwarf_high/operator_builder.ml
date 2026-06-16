@@ -132,6 +132,13 @@ let add_unsigned_const i : O.t list =
   then []
   else [DW_op_plus_uconst (Targetint.nonnegative_to_uint64_exn i)]
 
+let add_signed_const i : O.t list =
+  if Targetint.compare i Targetint.zero = 0
+  then []
+  else if Targetint.compare i Targetint.zero > 0
+  then add_unsigned_const i
+  else [O.DW_op_consts (Targetint.to_int64 i); O.DW_op_plus]
+
 let float_const f : O.t = DW_op_const8s f
 
 let implicit_pointer ~offset_in_bytes ~die_label dwarf_version : O.t =
