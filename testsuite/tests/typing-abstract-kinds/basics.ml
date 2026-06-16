@@ -1769,3 +1769,32 @@ Error: This type "Branch_kinds_extra.t2'" should be an instance of type
            Branch_kinds_extra.k1
          because of the definition of branch_needs_k1_extra at line 1, characters 0-55.
 |}]
+
+(***************************************************)
+(* Test: Include and open bring kinds into scope *)
+
+module K = struct
+  kind_ k_open = any
+end
+[%%expect{|
+module K : sig kind_ k_open = any end
+|}]
+
+module Include_abstract_kind = struct
+  include K
+  type ('a : k_open) t
+end
+[%%expect{|
+module Include_abstract_kind : sig kind_ k_open = any type ('a : any) t end
+|}]
+
+module Open_abstract_kind_test = struct
+  open K
+  type ('a : k_open) t
+end
+[%%expect{|
+Line 3, characters 13-19:
+3 |   type ('a : k_open) t
+                 ^^^^^^
+Error: Unbound kind "k_open"
+|}]
