@@ -30,12 +30,6 @@
 
 (** OCaml symbol demangler - supports multiple mangling schemes *)
 
-(* CR shym Replace helper functions in this module with the equivalent versions
-   in [Char.Ascii] when the transition to 5.4 is complete *)
-
-(* Helper functions *)
-let is_digit = function '0' .. '9' -> true | _ -> false
-
 (** Structured name demangler
 
     Parsing the mangled symbol into a {!Structured_mangling.path} is delegated
@@ -97,20 +91,6 @@ module FlatCommon = struct
     | None -> try_prefix alternate_caml_prefix
 
   let starts_with_prefix str = matched_prefix_len str <> None
-
-  let is_xdigit (c : char) =
-    if is_digit c
-    then true
-    else if Char.code c >= Char.code 'a' && Char.code c <= Char.code 'f'
-    then true
-    else Char.code c >= Char.code 'A' && Char.code c <= Char.code 'F'
-
-  let hex c =
-    match c with
-    | '0' .. '9' -> Char.code c - Char.code '0'
-    | 'a' .. 'f' -> Char.code c - Char.code 'a' + 10
-    | 'A' .. 'F' -> Char.code c - Char.code 'A' + 10
-    | _ -> invalid_arg (Printf.sprintf "Cannot decode hexadecimal digit: %c" c)
 end
 
 (** OCaml 5.3+ flat demangling. Trunk emits one of two styles per binary,
@@ -142,8 +122,10 @@ module Flat1 = struct
         | '.' -> Linux_like
         | '_' when i + 1 < len && Char.equal str.[i + 1] '_' -> Linux_like
         | '$' when i + 1 < len && Char.equal str.[i + 1] '$' -> Macosx
-        | '$' when i + 2 < len && is_xdigit str.[i + 1] && is_xdigit str.[i + 2]
-          ->
+        | '$'
+          when i + 2 < len
+               && Char.Ascii.is_hex_digit str.[i + 1]
+               && Char.Ascii.is_hex_digit str.[i + 2] ->
           scan (i + 3) true
         | '$' -> Macosx
         | _ -> scan (i + 1) saw_dollar_hex_pair
@@ -165,10 +147,13 @@ module Flat1 = struct
           | Macosx, '$'
             when i + 3 < len
                  && Char.equal str.[i + 1] '$'
-                 && is_xdigit str.[i + 2]
-                 && is_xdigit str.[i + 3] ->
+                 && Char.Ascii.is_hex_digit str.[i + 2]
+                 && Char.Ascii.is_hex_digit str.[i + 3] ->
             (* "$$xx" -> hex-encoded character *)
-            let a = (hex str.[i + 2] lsl 4) lor hex str.[i + 3] in
+            let a =
+              (Char.Ascii.hex_digit_to_int str.[i + 2] lsl 4)
+              lor Char.Ascii.hex_digit_to_int str.[i + 3]
+            in
             Bytes.set result j (Char.chr a);
             loop (i + 4) (j + 1)
           | Macosx, '$' ->
@@ -176,10 +161,14 @@ module Flat1 = struct
             Bytes.set result j '.';
             loop (i + 1) (j + 1)
           | Linux_like, '$'
-            when i + 2 < len && is_xdigit str.[i + 1] && is_xdigit str.[i + 2]
-            ->
+            when i + 2 < len
+                 && Char.Ascii.is_hex_digit str.[i + 1]
+                 && Char.Ascii.is_hex_digit str.[i + 2] ->
             (* "$xx" -> hex-encoded character *)
-            let a = (hex str.[i + 1] lsl 4) lor hex str.[i + 2] in
+            let a =
+              (Char.Ascii.hex_digit_to_int str.[i + 1] lsl 4)
+              lor Char.Ascii.hex_digit_to_int str.[i + 2]
+            in
             Bytes.set result j (Char.chr a);
             loop (i + 3) (j + 1)
           | Linux_like, '_' when i + 1 < len && Char.equal str.[i + 1] '_' ->
@@ -213,10 +202,15 @@ module Flat0 = struct
             Bytes.set result j '.';
             loop (i + 2) (j + 1)
           | '$'
-            when i + 2 < len && is_xdigit str.[i + 1] && is_xdigit str.[i + 2]
-            ->
+            when i + 2 < len
+                 && Char.Ascii.is_hex_digit str.[i + 1]
+                 && Char.Ascii.is_hex_digit str.[i + 2] ->
             (* "$xx" is a hex-encoded character *)
-            let a = Char.chr ((hex str.[i + 1] lsl 4) lor hex str.[i + 2]) in
+            let a =
+              Char.chr
+                ((Char.Ascii.hex_digit_to_int str.[i + 1] lsl 4)
+                lor Char.Ascii.hex_digit_to_int str.[i + 2])
+            in
             Bytes.set result j a;
             loop (i + 3) (j + 1)
           | c ->
@@ -254,7 +248,9 @@ let demangle_with_format format str =
   | Flat1 -> Flat1.unmangle str
   | Structured -> Structured.unmangle str
 
-type codecops = Encode | Decode
+type codecops =
+  | Encode
+  | Decode
 
 let encode s =
   let b = Buffer.create (String.length s) in

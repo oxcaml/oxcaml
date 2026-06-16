@@ -243,10 +243,6 @@ let mangle_ident (cu : Compilation_unit.t) (path : Compilation_unit.t path) =
   Buffer.contents b
 
 module Parse = struct
-  let is_digit = function '0' .. '9' -> true | _ -> false
-  (* CR shym Replace with Char.Ascii.is_digit when the transition to 5.4 is
-     complete *)
-
   let incr_n r n = r := !r + n
 
   (** Inverse of {!base26}. *)
@@ -291,7 +287,7 @@ module Parse = struct
   (** Read a decimal integer from [str] at [pos]. Returns [(value, length)]. *)
   let undecimal str pos =
     let rec len pos' =
-      if pos' < String.length str && is_digit str.[pos']
+      if pos' < String.length str && Char.Ascii.is_digit str.[pos']
       then len (pos' + 1)
       else pos' - pos
     in
