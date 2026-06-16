@@ -132,7 +132,7 @@ let builtin_attrs =
   ; "implicit_kind"
   ; "flatten_floats"
   ; "represent_as_float_array"
-  ; "all_void_constructor"
+  ; "immediate_all_void_constructor"
   ]
 
 let builtin_attrs =
@@ -531,8 +531,8 @@ let has_flatten_floats attrs = has_attribute "flatten_floats" attrs
 let has_represent_as_float_array attrs =
   has_attribute "represent_as_float_array" attrs
 
-let has_all_void_constructor attrs =
-  has_attribute "all_void_constructor" attrs
+let has_immediate_all_void_constructor attrs =
+  has_attribute "immediate_all_void_constructor" attrs
 
 let has_unsafe_allow_any_mode_crossing attrs =
   has_attribute "unsafe_allow_any_mode_crossing" attrs

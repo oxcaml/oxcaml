@@ -158,8 +158,8 @@ type error =
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
-  | Missing_all_void_constructor_attribute of string
-  | Misplaced_all_void_constructor_attribute of string
+  | Missing_immediate_all_void_constructor_attribute of string
+  | Misplaced_immediate_all_void_constructor_attribute of string
 
 open Typedtree
 
@@ -2426,9 +2426,10 @@ let update_record_representation
 
 let check_misplaced_all_void_constructor_attribute
       (cstr : Types.constructor_declaration) =
-  if Builtin_attributes.has_all_void_constructor cstr.cd_attributes then
+  if Builtin_attributes.has_immediate_all_void_constructor cstr.cd_attributes
+  then
     raise (Error (cstr.cd_loc,
-                  Misplaced_all_void_constructor_attribute
+                  Misplaced_immediate_all_void_constructor_attribute
                     (Ident.name cstr.cd_id)))
 
 (* This function updates jkind stored in kinds with more accurate jkinds.
@@ -2527,7 +2528,7 @@ let rec update_decl_jkind env dpath decl =
               cstr.Types.cd_args
           in
           let has_attr =
-            Builtin_attributes.has_all_void_constructor
+            Builtin_attributes.has_immediate_all_void_constructor
               cstr.Types.cd_attributes
           in
           let is_nonempty_all_void =
@@ -2538,8 +2539,9 @@ let rec update_decl_jkind env dpath decl =
           in
           let name = Ident.name cstr.Types.cd_id in
           if is_nonempty_all_void && not has_attr then
-            raise (Error (cstr.Types.cd_loc,
-                          Missing_all_void_constructor_attribute name));
+            raise
+              (Error (cstr.Types.cd_loc,
+                      Missing_immediate_all_void_constructor_attribute name));
           if not is_nonempty_all_void then
             check_misplaced_all_void_constructor_attribute cstr;
           let cstr_repr =
@@ -5904,18 +5906,18 @@ let report_error ~loc = function
       "%a can only be used on records whose fields \
        are all float64."
       Style.inline_code "[@@represent_as_float_array]"
-  | Missing_all_void_constructor_attribute name ->
+  | Missing_immediate_all_void_constructor_attribute name ->
     Location.errorf ~loc
       "All arguments of the constructor %a are void, so it must be@ \
        annotated with %a."
       Style.inline_code name
-      Style.inline_code "[@all_void_constructor]"
-  | Misplaced_all_void_constructor_attribute name ->
+      Style.inline_code "[@immediate_all_void_constructor]"
+  | Misplaced_immediate_all_void_constructor_attribute name ->
     Location.errorf ~loc
       "The %a attribute on constructor %a is not allowed:@ it may only be \
        placed on constructors of boxed variants@ with at least one argument, \
        all of which are void."
-      Style.inline_code "[@all_void_constructor]"
+      Style.inline_code "[@immediate_all_void_constructor]"
       Style.inline_code name
 
 let () =

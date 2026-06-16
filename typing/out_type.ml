@@ -1893,8 +1893,8 @@ let tree_of_single_constructor ~all_void cd =
       ocstr_all_void = all_void;
   }
 
-(* A constructor takes [@all_void_constructor] iff it belongs to a boxed
-   variant and has at least one argument, all of which are void. *)
+(* A constructor takes [@immediate_all_void_constructor] iff it belongs to a
+   boxed variant and has at least one argument, all of which are void. *)
 let constructor_is_all_void rep cd =
   match (rep : Types.variant_representation) with
   | Variant_boxed _ -> begin

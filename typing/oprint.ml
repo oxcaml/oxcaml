@@ -1067,7 +1067,8 @@ and print_out_constr ppf constr =
     | s -> s
   in
   let print_all_void ppf =
-    if ocstr_all_void then pp_print_string ppf " [@all_void_constructor]"
+    if ocstr_all_void
+    then pp_print_string ppf " [@immediate_all_void_constructor]"
   in
   match return_type with
   | None ->

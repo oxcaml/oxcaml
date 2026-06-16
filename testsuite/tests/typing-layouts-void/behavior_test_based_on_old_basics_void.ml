@@ -95,8 +95,8 @@ let _ =
 (* Test 2: evaluation order of variants with voids *)
 type void_variant =
     A of t_void * void_rec * int * void_rec * int * void_rec * t_void
-  | B of t_void [@all_void_constructor]
-  | C of void_rec * t_void [@all_void_constructor]
+  | B of t_void [@immediate_all_void_constructor]
+  | C of void_rec * t_void [@immediate_all_void_constructor]
   | D of { a1 : t_void;
            a2 : void_rec;
            x : int;
@@ -179,8 +179,8 @@ let _ =
 ;;
 
 type all_void_variant =
-  | C2 of void_rec * t_void [@all_void_constructor]
-  | D2 of t_void [@all_void_constructor]
+  | C2 of void_rec * t_void [@immediate_all_void_constructor]
+  | D2 of t_void [@immediate_all_void_constructor]
 
 let all_void_id = function
   | C2 (vr,v) -> cons_r 1; C2 ({v = (cons_r 3; vr).v}, (cons_r 2; v))
@@ -215,7 +215,7 @@ let _ = assert (List.for_all2 (=) !r [2;1]);;
 (* Test 4: Void to left of semicolon *)
 let () = r := []
 
-type void_holder = V of t_void [@all_void_constructor]
+type void_holder = V of t_void [@immediate_all_void_constructor]
 let vh : void_holder = V (t_void ())
 
 let [@warning "-10"] f4 (V v) =

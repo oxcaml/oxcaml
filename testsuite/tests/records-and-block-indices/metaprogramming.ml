@@ -932,7 +932,9 @@ module Type_naming = struct
                         )
                       in
                       let attr =
-                        if all_void then " [@all_void_constructor]" else ""
+                        if all_void
+                        then " [@immediate_all_void_constructor]"
+                        else ""
                       in
                       sprintf "%s of %s%s" c.name
                         (String.concat ~sep:" * " (List.map args ~f:Type.code))

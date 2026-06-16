@@ -248,8 +248,8 @@ type error =
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
-  | Missing_all_void_constructor_attribute of string
-  | Misplaced_all_void_constructor_attribute of string
+  | Missing_immediate_all_void_constructor_attribute of string
+  | Misplaced_immediate_all_void_constructor_attribute of string
 
 exception Error of Location.t * error
 
