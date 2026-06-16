@@ -100,9 +100,7 @@ let mod_bounds_of_sample sample =
            (Mode.Modality.Comonadic.Atom.Meet_const sample.statefulness))
   in
   Btype.Jkind0.Mod_bounds.create
-    { crossing = { monadic; comonadic };
-      unique_implies_uncontended = false
-    }
+    { crossing = { monadic; comonadic }; unique_implies_uncontended = false }
     ~externality:sample.externality
 
 let check_mod_bounds_roundtrip label sample =

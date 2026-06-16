@@ -3482,9 +3482,7 @@ module Lattices_mono = struct
         -> ('p, 's, 'l * disallowed) morph
         (** Composition of a morphism and combining an axis with the minima
             along other axes. *)
-    | Compose :
-        ('b, 'c, 'd) morph * ('a, 'b, 'd) morph
-        -> ('a, 'c, 'd) morph
+    | Compose : ('b, 'c, 'd) morph * ('a, 'b, 'd) morph -> ('a, 'c, 'd) morph
         (** Composition of two morphisms. Generated morph enumerations do not
             include compositions, but the solver can construct them. *)
 
@@ -4473,13 +4471,11 @@ module Report = struct
       | Meet ->
         let x_satisfies = C.le a_obj other x in
         let _y_satisfies = C.le a_obj other y in
-        if x_satisfies then `Second
-        else `First
+        if x_satisfies then `Second else `First
       | Join ->
         let x_satisfies = C.le a_obj x other in
         let _y_satisfies = C.le a_obj y other in
-        if x_satisfies then `Second
-        else `First
+        if x_satisfies then `Second else `First
 
     type 'd side =
       | Left : left_only side
@@ -7834,8 +7830,7 @@ module Crossing = struct
 
   let apply_left t m =
     let input = Value.disallow_right m in
-    Value.hint ~monadic:Crossing ~comonadic:Crossing
-      (apply_left_unhint t input)
+    Value.hint ~monadic:Crossing ~comonadic:Crossing (apply_left_unhint t input)
 
   let apply_right_unhint { crossing; _ } { monadic; comonadic } =
     let monadic =
@@ -7905,14 +7900,14 @@ module Crossing = struct
     { monadic; comonadic }
 
   let apply_left_right_alloc t m =
-    Alloc.unhint m |> apply_left_right_alloc_unhint t
+    Alloc.unhint m
+    |> apply_left_right_alloc_unhint t
     |> Alloc.hint ~monadic:Crossing ~comonadic:Crossing
 
   let le t1 t2 =
     Monadic.le t1.crossing.monadic t2.crossing.monadic
     && Comonadic.le t1.crossing.comonadic t2.crossing.comonadic
-    && (t1.unique_implies_uncontended
-       || not t2.unique_implies_uncontended)
+    && (t1.unique_implies_uncontended || not t2.unique_implies_uncontended)
 
   let max =
     { crossing = { monadic = Monadic.max; comonadic = Comonadic.max };
@@ -7927,8 +7922,7 @@ module Crossing = struct
   let join t1 t2 =
     { crossing =
         { monadic = Monadic.join t1.crossing.monadic t2.crossing.monadic;
-          comonadic =
-            Comonadic.join t1.crossing.comonadic t2.crossing.comonadic
+          comonadic = Comonadic.join t1.crossing.comonadic t2.crossing.comonadic
         };
       unique_implies_uncontended =
         t1.unique_implies_uncontended && t2.unique_implies_uncontended
@@ -7937,8 +7931,7 @@ module Crossing = struct
   let meet t1 t2 =
     { crossing =
         { monadic = Monadic.meet t1.crossing.monadic t2.crossing.monadic;
-          comonadic =
-            Comonadic.meet t1.crossing.comonadic t2.crossing.comonadic
+          comonadic = Comonadic.meet t1.crossing.comonadic t2.crossing.comonadic
         };
       unique_implies_uncontended =
         t1.unique_implies_uncontended || t2.unique_implies_uncontended
@@ -7992,9 +7985,7 @@ module Crossing = struct
       Comonadic.create ~regionality ~linearity ~portability ~yielding ~forkable
         ~statefulness
     in
-    { crossing = { monadic; comonadic };
-      unique_implies_uncontended = false
-    }
+    { crossing = { monadic; comonadic }; unique_implies_uncontended = false }
 
   let print ppf t =
     let l =

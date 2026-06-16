@@ -1171,8 +1171,8 @@ module type S = sig
     (** Convenience for creating a mode crossing capability on all axes, using a
         boolean for each axis where [true] means full crossing and [false] means
         no crossing. Alternatively, call [Monadic.create] and [Comonadic.create]
-        and pack the results into the [crossing] field of a record of type
-        [t]. *)
+        and pack the results into the [crossing] field of a record of type [t].
+    *)
     val create :
       regionality:bool ->
       linearity:bool ->
