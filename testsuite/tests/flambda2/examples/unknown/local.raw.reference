@@ -5,7 +5,7 @@
        return_local_0 (param : imm tagged)
          my_closure my_region my_ghost_region my_depth
          -> k1 * k2
-         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] local =
+         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] stack =
    let next_depth = rec_info (succ my_depth) in
    cont k1 ($camlLocal__const_block15)
  in
@@ -13,7 +13,7 @@
        map_local_1 (f : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
          my_closure my_region my_ghost_region my_depth
          -> k1 * k2
-         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] local =
+         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] stack =
    let next_depth = rec_info (succ my_depth) in
    (let prim = %is_int (l) in
     let Pisint = %tag_imm (prim) in
@@ -79,7 +79,7 @@
           l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
          my_closure my_region my_ghost_region my_depth
          -> k1 * k2
-         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] local =
+         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] stack =
    let next_depth = rec_info (succ my_depth) in
    (let prim = %is_int (l1) in
     let Pisint = %tag_imm (prim) in
@@ -106,7 +106,7 @@
           acc : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
          my_closure my_region my_ghost_region my_depth
          -> k1 * k2
-         : [ 0 of [ 0 | 0 of val * val ] * [ 0 | 0 of val * val ] ] local =
+         : [ 0 of [ 0 | 0 of val * val ] * [ 0 | 0 of val * val ] ] stack =
    let next_depth = rec_info (succ my_depth) in
    let rev_app = %project_value_slot.[find_span].[rev_app] (my_closure) in
    let spans = %project_function_slot.[find_span].[spans] (my_closure) in
@@ -154,7 +154,7 @@
          (break_here : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
          my_closure my_region my_ghost_region my_depth
          -> k1 * k2
-         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] local =
+         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] stack =
    let next_depth = rec_info (succ my_depth) in
    let rev_app = %project_value_slot.[spans].[rev_app] (my_closure) in
    let find_span = %project_function_slot.[spans].[find_span] (my_closure) in

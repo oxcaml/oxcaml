@@ -378,8 +378,8 @@ let [@ocamlformat "disable"] print ppf
     Flambda_colours.pop
     (Or_unknown_or_bottom.print Result_types.print) result_types
     (match result_mode with
-    | Not_alloc_stack -> "Heap"
-    | Maybe_alloc_stack -> "Stack")
+    | Not_alloc_stack -> "Not_alloc_stack"
+    | Maybe_alloc_stack -> "Maybe_alloc_stack")
     (match recursive with
     | Non_recursive -> Flambda_colours.elide
     | Recursive -> Flambda_colours.none)

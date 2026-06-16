@@ -885,7 +885,7 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
         Apply.create ~callee:(Some callee)
           ~continuation:(Return return_continuation) exn_continuation ~args
           ~args_arity:param_arity ~return_arity ~call_kind
-          ~alloc_mode:alloc_mode_app dbg ~inlined:Default_inlined
+          ~return_mode:alloc_mode_app dbg ~inlined:Default_inlined
           ~inlining_state:(Inlining_state.default ~round:0)
           ~probe:None ~position:Normal
           ~relative_history:(Env.relative_history_from_scoped ~loc env)
@@ -1119,7 +1119,7 @@ let close_effect_primitive acc env ~dbg exn_continuation
         ~return_arity:
           (Flambda_arity.create_singletons
              [Flambda_kind.With_subkind.any_value])
-        ~call_kind ~alloc_mode:Alloc_mode.For_applications.not_alloc_stack dbg
+        ~call_kind ~return_mode:Alloc_mode.For_applications.not_alloc_stack dbg
         ~inlined:Never_inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal
@@ -1868,7 +1868,7 @@ let close_exact_or_unknown_apply acc env
     Apply.create
       ~callee:(if can_erase_callee then None else Some callee)
       ~continuation:(Return continuation) apply_exn_continuation ~args
-      ~args_arity ~return_arity ~call_kind ~alloc_mode:mode dbg
+      ~args_arity ~return_arity ~call_kind ~return_mode:mode dbg
       ~inlined:inlined_call
       ~inlining_state:(Inlining_state.default ~round:0)
       ~probe ~position
@@ -2375,7 +2375,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
         (Exn_continuation.create ~exn_handler:exn_continuation ~extra_args:[])
         ~args ~args_arity ~return_arity:result_arity_main_code
         ~call_kind:(Call_kind.direct_function_call main_code_id)
-        ~alloc_mode:
+        ~return_mode:
           (Alloc_mode.For_applications.from_lambda
              (Function_decl.result_mode decl)
              ~current_region:my_region ~current_ghost_region:my_ghost_region)
@@ -3531,7 +3531,7 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
       | Rc_normal | Rc_close_at_apply -> Apply.Position.Normal
       | Rc_nontail -> Apply.Position.Nontail
     in
-    let alloc_mode =
+    let return_mode =
       Alloc_mode.For_applications.from_lambda apply.mode
         ~current_region:apply_region ~current_ghost_region:apply_ghost_region
     in
@@ -3545,7 +3545,7 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
         ~callee:(Some (Simple.var returned_func))
         ~continuation apply_exn_continuation ~args:remaining
         ~args_arity:remaining_arity ~return_arity:apply.return_arity
-        ~call_kind:Call_kind.indirect_function_call_unknown_arity ~alloc_mode
+        ~call_kind:Call_kind.indirect_function_call_unknown_arity ~return_mode
         apply_dbg ~inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe ~position

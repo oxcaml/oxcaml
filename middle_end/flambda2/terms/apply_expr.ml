@@ -76,7 +76,7 @@ type t =
     args_arity : [`Complex] Flambda_arity.t;
     return_arity : [`Unarized] Flambda_arity.t;
     call_kind : Call_kind.t;
-    alloc_mode : Alloc_mode.For_applications.t;
+    return_mode : Alloc_mode.For_applications.t;
     dbg : Debuginfo.t;
     inlined : Inlined_attribute.t;
     inlining_state : Inlining_state.t;
@@ -92,7 +92,7 @@ let [@ocamlformat "disable"] print_inlining_paths ppf relative_history =
 
 let [@ocamlformat "disable"] print_normal ppf
     { callee; continuation; exn_continuation; args; args_arity;
-      return_arity; call_kind; alloc_mode; dbg; inlined; inlining_state; probe;
+      return_arity; call_kind; return_mode; dbg; inlined; inlining_state; probe;
       position; relative_history } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(%a\u{3008}%a\u{3009}\u{300a}%a\u{300b}\
@@ -100,7 +100,7 @@ let [@ocamlformat "disable"] print_normal ppf
       @[<hov 1>(args_arity@ %a)@]@ \
       @[<hov 1>(return_arity@ %a)@]@ \
       @[<hov 1>(call_kind@ %a)@]@ \
-      @[<hov 1>(alloc_mode@ %a)@]@ \
+      @[<hov 1>(return_mode@ %a)@]@ \
       @[<hov 1>%t(dbg@ %a)%t@]@ \
       @[<hov 1>(inline@ %a)@]@ \
       @[<hov 1>(inlining_state@ %a)@]@ \
@@ -115,7 +115,7 @@ let [@ocamlformat "disable"] print_normal ppf
     Flambda_arity.print args_arity
     Flambda_arity.print return_arity
     Call_kind.print call_kind
-    Alloc_mode.For_applications.print alloc_mode
+    Alloc_mode.For_applications.print return_mode
     Flambda_colours.debuginfo
     Debuginfo.print_compact dbg
     Flambda_colours.pop
@@ -131,17 +131,17 @@ let [@ocamlformat "disable"] print_normal ppf
 
 let [@ocamlformat "disable"] print_effect ppf
     { callee = _; continuation; exn_continuation; args = _; args_arity = _;
-      return_arity = _; call_kind; alloc_mode; dbg; inlined = _; inlining_state = _;
+      return_arity = _; call_kind; return_mode; dbg; inlined = _; inlining_state = _;
       probe = _; position; relative_history = _ } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>%a@]@ \
-      @[<hov 1>(alloc_mode %a)@]@ \
+      @[<hov 1>(return_mode %a)@]@ \
       @[<hov 1>\u{3008}%a\u{3009}\u{300a}%a\u{300b}@]@ \
       @[<hov 1>%t(dbg@ %a)%t@]@ \
       @[<hov 1>(position@ %a)@]\
       )@]"
     Call_kind.print call_kind
-    Alloc_mode.For_applications.print alloc_mode
+    Alloc_mode.For_applications.print return_mode
     Result_continuation.print continuation
     Exn_continuation.print exn_continuation
     Flambda_colours.debuginfo
@@ -166,7 +166,7 @@ let invariant
        args_arity;
        return_arity;
        call_kind;
-       alloc_mode = _;
+       return_mode = _;
        dbg = _;
        inlined = _;
        inlining_state = _;
@@ -213,7 +213,7 @@ let invariant
       "Length of argument and arity lists disagree in [Apply]:@ %a" print t
 
 let create ~callee ~continuation exn_continuation ~args ~args_arity
-    ~return_arity ~(call_kind : Call_kind.t) ~alloc_mode dbg ~inlined
+    ~return_arity ~(call_kind : Call_kind.t) ~return_mode dbg ~inlined
     ~inlining_state ~probe ~position ~relative_history =
   let t =
     { callee;
@@ -223,7 +223,7 @@ let create ~callee ~continuation exn_continuation ~args ~args_arity
       args_arity;
       return_arity;
       call_kind;
-      alloc_mode;
+      return_mode;
       dbg;
       inlined;
       inlining_state;
@@ -245,7 +245,7 @@ let args t = t.args
 
 let call_kind t = t.call_kind
 
-let return_mode t = t.alloc_mode
+let return_mode t = t.return_mode
 
 let dbg t = t.dbg
 
@@ -265,7 +265,7 @@ let free_names_without_exn_continuation
       args_arity = _;
       return_arity = _;
       call_kind;
-      alloc_mode;
+      return_mode;
       dbg = _;
       inlined = _;
       inlining_state = _;
@@ -280,7 +280,7 @@ let free_names_without_exn_continuation
       Result_continuation.free_names continuation;
       Simple.List.free_names args;
       Call_kind.free_names call_kind;
-      Alloc_mode.For_applications.free_names alloc_mode ]
+      Alloc_mode.For_applications.free_names return_mode ]
 
 let free_names_except_callee
     { callee = _;
@@ -290,7 +290,7 @@ let free_names_except_callee
       args_arity = _;
       return_arity = _;
       call_kind;
-      alloc_mode;
+      return_mode;
       dbg = _;
       inlined = _;
       inlining_state = _;
@@ -303,7 +303,7 @@ let free_names_except_callee
       Exn_continuation.free_names exn_continuation;
       Simple.List.free_names args;
       Call_kind.free_names call_kind;
-      Alloc_mode.For_applications.free_names alloc_mode ]
+      Alloc_mode.For_applications.free_names return_mode ]
 
 let free_names t =
   Name_occurrences.union
@@ -320,7 +320,7 @@ let apply_renaming
        args_arity;
        return_arity;
        call_kind;
-       alloc_mode;
+       return_mode;
        dbg;
        inlined;
        inlining_state;
@@ -343,14 +343,14 @@ let apply_renaming
   in
   let args' = Simple.List.apply_renaming args renaming in
   let call_kind' = Call_kind.apply_renaming call_kind renaming in
-  let alloc_mode' =
-    Alloc_mode.For_applications.apply_renaming alloc_mode renaming
+  let return_mode' =
+    Alloc_mode.For_applications.apply_renaming return_mode renaming
   in
   if
     continuation == continuation'
     && exn_continuation == exn_continuation'
     && callee == callee' && args == args' && call_kind == call_kind'
-    && alloc_mode == alloc_mode'
+    && return_mode == return_mode'
   then t
   else
     { callee = callee';
@@ -360,7 +360,7 @@ let apply_renaming
       args_arity;
       return_arity;
       call_kind = call_kind';
-      alloc_mode = alloc_mode';
+      return_mode = return_mode';
       dbg;
       inlined;
       inlining_state;
@@ -377,7 +377,7 @@ let ids_for_export
       args_arity = _;
       return_arity = _;
       call_kind;
-      alloc_mode;
+      return_mode;
       dbg = _;
       inlined = _;
       inlining_state = _;
@@ -396,7 +396,7 @@ let ids_for_export
       callee_ids args
   in
   let call_kind_ids = Call_kind.ids_for_export call_kind in
-  let alloc_mode_ids = Alloc_mode.For_applications.ids_for_export alloc_mode in
+  let alloc_mode_ids = Alloc_mode.For_applications.ids_for_export return_mode in
   let result_continuation_ids =
     Result_continuation.ids_for_export continuation
   in

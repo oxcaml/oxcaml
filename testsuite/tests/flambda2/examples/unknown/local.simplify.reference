@@ -36,7 +36,7 @@ let code loopify(never) size(1) newer_version_of(return_local_0)
       return_local_0_1 (param : imm tagged)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
-        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] local =
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] stack =
   cont k ($camlLocal__const_block15)
 in
 let $camlLocal__return_local_8 = closure return_local_0_1 @return_local in
@@ -46,7 +46,7 @@ and code rec loopify(never) size(31) newer_version_of(map_local_1)
       map_local_1_1 (f : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure my_region my_ghost_region my_depth
         -> k * k1
-        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] local =
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] stack =
   let prim = %is_int (l) in
   switch prim
     | 0 -> k2
@@ -151,7 +151,7 @@ apply direct(length_2_1)
                        l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                       my_closure my_region my_ghost_region my_depth
                       -> k * k1
-                      : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] local =
+                      : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] stack =
                 cont `self` (l1, l2)
                   where rec `self`
                               (l1_1 :
@@ -183,7 +183,7 @@ apply direct(length_2_1)
                       my_closure my_region my_ghost_region my_depth
                       -> k * k1
                       : [ 0 of [ 0 | 0 of val * val ] *
-                            [ 0 | 0 of val * val ] ] local =
+                            [ 0 | 0 of val * val ] ] stack =
                 let prim = %is_int (l) in
                 switch prim
                   | 0 -> k2
@@ -227,7 +227,7 @@ apply direct(length_2_1)
                        l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                       my_closure my_region my_ghost_region my_depth
                       -> k * k1
-                      : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] local =
+                      : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] stack =
                 let prim = %is_int (l) in
                 switch prim
                   | 0 -> k2
