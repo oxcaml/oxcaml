@@ -183,9 +183,9 @@ module Instruction : sig
       [false] for debug-info markers. *)
   val has_side_effect : 'g t -> bool
 
-  (** Number of uses of the instruction's results. Instructions that are not
-      [removable_when_unused] carry one extra synthetic use (marking their
-      existence), so their count is real uses + 1 and in particular never 0. *)
+  (** Number of uses of the instruction's results. A finished op that survives
+      pruning but has no result uses (e.g. one kept for its side effects)
+      reports [0]. *)
   val usage_count : finished op_data -> int
 
   val print : Format.formatter -> 'g t -> unit
@@ -194,7 +194,7 @@ end
 module Value : sig
   type 'g t = 'g Instruction.value
 
-  (** The [Undefined] value, see the constructor above for mor info. *)
+  (** The [Undefined] value, see the constructor above for more info. *)
   val undefined : 'g t
 
   val equal : 'g t -> 'g t -> bool
@@ -210,12 +210,21 @@ module Value : sig
 
   val name : 'g t -> string option
 
-  (** Usage count of the underlying block parameter or operation. Note that this
-      does not distinguish between the different results of an operation,
-      instead adding them all together in a single count. For results of
-      operations that are not [Instruction.removable_when_unused], the count
-      includes the synthetic existence use (see [Instruction.usage_count]). *)
+  (** Usage count of the underlying block parameter or operation, [0] if it has
+      no uses (or is scheduled for removal; see {!scheduled_for_removal}). Does
+      not distinguish the different results of an operation, adding them all
+      together into a single count. *)
   val usage_count : finished t -> int
+
+  (** Whether the metadata pass scheduled this value for removal, so its
+      incoming args were not counted. For a block param this means it has no
+      uses AND every predecessor feeds it through a positional
+      [Continue (Goto _)] arg (so that arg can be dropped too) — a param reached
+      at a runtime-fixed position (a call/invalid result or an exception bucket)
+      is kept even when unused. For an [Op] result it never holds in a finished
+      graph (such ops are pruned). {!Ssa_reducer} uses it to decide which block
+      params to drop. *)
+  val scheduled_for_removal : finished t -> bool
 
   val print : Format.formatter -> 'g t -> unit
 end

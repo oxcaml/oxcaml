@@ -27,8 +27,7 @@
 
 (** Tail-call detection.
 
-    Replaces [Call]+[Return] sequences with [Tailcall_self] or [Tailcall_func].
-*)
+    Replaces [Call]+[Return] sequences with tail calls when possible. *)
 
 val run :
   keep_unused_ops:bool -> Ssa.finished Ssa.graph -> Ssa.finished Ssa.graph

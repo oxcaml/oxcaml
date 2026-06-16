@@ -58,16 +58,17 @@ open! Int_replace_polymorphic_compare
       reachable block gets its [block_end_trap_stack] populated; unreachable
       blocks are pruned.
     - [compute_dominators]: iterative meet-over-predecessors fixpoint.
-    - [increment_uses_in_block]: refcount over op args and block params; the
-      latter propagate to predecessors' [Continue] args, so a
-      transitively-unused arg keeps its defining op count at zero.
+    - [increment_uses_in_block]: refcount over op args and block params, leaving
+      anything dead at the [-1] "scheduled for removal" sentinel (its inputs are
+      not counted, so a transitively-dead chain stays at [-1]). Block-param
+      liveness propagates to predecessors' [Continue] args.
     - [finalize_block]: materialise [body] from [pending_body]. Always drops
       Push_trap/Pop_trap pairs whose handler is unreachable. When
-      [keep_unused_ops] is false, also drops dead [Op]s and replaces
-      [Continue (Goto _)] args going to unused target params with the
+      [keep_unused_ops] is false, also drops dead [Op]s ([-1]) and replaces
+      [Continue (Goto _)] args going to params scheduled for removal with the
       [Undefined] value.
     - [check_value_invariants]: every use is dominated by its definition, and
-      [Undefined] only feeds unused block params. *)
+      [Undefined] only feeds block params scheduled for removal. *)
 
 module Block_id = Oxcaml_utils.Id_counter.Make ()
 module Instruction_id = Oxcaml_utils.Id_counter.Make ()
@@ -79,6 +80,17 @@ type finished
 type under_construction = finished
 
 type usage_count = int
+
+(* [usage_count] sentinel set by the metadata pass on a value that is unused and
+   whose inputs it therefore did not count: the value is scheduled for removal
+   (an [Op] is pruned; a block param is dropped by [Ssa_reducer]). A count of
+   [0] means kept with no remaining uses (a side-effecting / existence-only op,
+   or a forced-kept param); [n > 0] means live with [n] counted uses. *)
+let removal_sentinel = -1
+
+(* Hide [removal_sentinel] behind the public count of [0]. *)
+let visible_usage_count (c : usage_count) : int =
+  if c = removal_sentinel then 0 else c
 
 type op = Operation.t
 
@@ -228,14 +240,18 @@ module Block = struct
       under_construction t =
     create_block ~block_id_gen:graph.block_id_gen
       ~params:
-        (params |> Array.map (fun typ -> { typ; name = None; usage_count = 0 }))
+        (params
+        |> Array.map (fun typ ->
+            { typ; name = None; usage_count = removal_sentinel }))
 
   let create_with_names (graph : under_construction graph)
       ~(params : (Cmm.machtype_component * string option) array) :
       under_construction t =
     create_block ~block_id_gen:graph.block_id_gen
       ~params:
-        (params |> Array.map (fun (typ, name) -> { typ; name; usage_count = 0 }))
+        (params
+        |> Array.map (fun (typ, name) ->
+            { typ; name; usage_count = removal_sentinel }))
 
   let param (block : 'g t) index : 'g value =
     if index < 0 || index >= Array.length block.params
@@ -319,24 +335,35 @@ module Block = struct
     | None -> structural
     | Some h -> h :: structural
 
-  let rec dominates (a : finished t) (b : finished t) =
-    equal a b
-    || b.dominator_info.depth > a.dominator_info.depth
-       && dominates a b.dominator_info.dominator
+  let dominates (a : finished t) (b : finished t) =
+    let rec loop a b =
+      equal a b
+      || b.dominator_info.depth > a.dominator_info.depth
+         && loop a b.dominator_info.dominator
+    in
+    assert (a.dominator_info.depth >= 0 && b.dominator_info.depth >= 0);
+    loop a b
 
-  let rec common_dominator (a : finished t) (b : finished t) : finished t =
-    if equal a b
-    then a
-    else if a.dominator_info.depth > b.dominator_info.depth
-    then common_dominator a.dominator_info.dominator b
-    else if b.dominator_info.depth > a.dominator_info.depth
-    then common_dominator a b.dominator_info.dominator
-    else common_dominator a.dominator_info.dominator b.dominator_info.dominator
+  let common_dominator (a : finished t) (b : finished t) : finished t =
+    let rec loop a b =
+      if equal a b
+      then a
+      else if a.dominator_info.depth > b.dominator_info.depth
+      then loop a.dominator_info.dominator b
+      else if b.dominator_info.depth > a.dominator_info.depth
+      then loop a b.dominator_info.dominator
+      else loop a.dominator_info.dominator b.dominator_info.dominator
+    in
+    assert (a.dominator_info.depth >= 0 && b.dominator_info.depth >= 0);
+    loop a b
 
   let immediate_dominator (block : finished t) : finished t =
+    assert (block.dominator_info.depth >= 0);
     block.dominator_info.dominator
 
-  let dominator_depth (block : finished t) : int = block.dominator_info.depth
+  let dominator_depth (block : finished t) : int =
+    assert (block.dominator_info.depth >= 0);
+    block.dominator_info.depth
 
   let body (block : finished t) : finished instruction array = block.body
 
@@ -412,9 +439,15 @@ module Value = struct
 
   let usage_count (value : finished t) : int =
     match value with
-    | Res ({ usage_count; _ }, _) -> usage_count
-    | Block_param (block, i) -> block.params.(i).usage_count
+    | Res ({ usage_count; _ }, _) -> visible_usage_count usage_count
+    | Block_param (block, i) -> visible_usage_count block.params.(i).usage_count
     | Undefined -> 0
+
+  let scheduled_for_removal (value : finished t) : bool =
+    match value with
+    | Res ({ usage_count; _ }, _) -> usage_count = removal_sentinel
+    | Block_param (block, i) -> block.params.(i).usage_count = removal_sentinel
+    | Undefined -> false
 end
 
 module Instruction = struct
@@ -493,7 +526,8 @@ module Instruction = struct
       | Alloc _ -> true)
     | Push_trap _ | Pop_trap _ -> true
 
-  let usage_count (op : finished op_data) : int = op.usage_count
+  let usage_count (op : finished op_data) : int =
+    visible_usage_count op.usage_count
 
   let print ppf (instr : 'g t) =
     match instr with
@@ -658,7 +692,7 @@ module Cursor = struct
         typ;
         args;
         dbg;
-        usage_count = 0;
+        usage_count = removal_sentinel;
         name = None
       }
     in
@@ -700,7 +734,7 @@ let create_graph (function_info : Function_info.t) ~keep_unused_ops :
       ~params:
         (Function_info.flattened_parameters function_info
         |> Array.map (fun typ : block_param ->
-            { typ; name = None; usage_count = 0 }))
+            { typ; name = None; usage_count = removal_sentinel }))
   in
   (* Initialize names from the function's argument names; each parameter covers
      one flattened entry param per machtype component. *)
@@ -856,106 +890,133 @@ let compute_dominators (graph : finished graph)
       reachable_blocks
   done
 
-(* Reference-counting walks over each reachable block's body and terminator. An
-   unused operation does not increase the use counts of its inputs.
-   [Block_param] increments propagate to predecessors' [Continue] args when the
-   parameter becomes used. *)
+(* Reference-counting walks over each reachable block's body and terminator.
+   Counts start at [removal_sentinel]; marking a value live ([removal_sentinel]
+   -> [0]) counts its inputs exactly once, then each use adds [1]. A value left
+   at [removal_sentinel] is dead: its inputs were never counted, so a
+   transitively-dead chain stays scheduled for removal. A [Block_param] becoming
+   live propagates to its predecessors' [Continue (Goto _)] args. *)
 
-let rec increment_use ~keep_unused_ops (value : finished value) =
+let rec increment_use (value : finished value) =
   match value with
-  | Res (op, _) -> increment_operation_use ~keep_unused_ops op
+  | Res (op, _) ->
+    mark_op_live op;
+    op.usage_count <- op.usage_count + 1
   | Undefined -> ()
   | Block_param (block, i) ->
+    mark_param_live block i;
     let p = block.params.(i) in
-    let old = p.usage_count in
-    p.usage_count <- old + 1;
-    if (not keep_unused_ops) && old = 0
-    then
-      block.predecessors
-      |> List.iter (fun (pred : finished block) ->
-          match pred.terminator with
-          | Continue { continuation = Goto _; args } ->
-            increment_use ~keep_unused_ops args.(i)
-          | Continue { continuation = Return | Raise _ | Unreachable; _ }
-          | Switch _ | Call _ | Invalid _ ->
-            (* The arg feeding this param arrives through an edge whose position
-               is fixed (call results, exception bucket), so it is counted
-               unconditionally where that terminator is visited. *)
-            ())
+    p.usage_count <- p.usage_count + 1
 
-and increment_operation_use ~keep_unused_ops (r : finished op_data) =
-  r.usage_count <- r.usage_count + 1;
-  (* With keep_unused_ops, we count arguments unconditionally. Without, we count
-     the moment the operation first gets a non-zero use count.*)
-  if (not keep_unused_ops) && r.usage_count = 1
-  then Array.iter (increment_use ~keep_unused_ops) r.args
+and mark_op_live (op : finished op_data) =
+  (* Transition a dead op to kept ([0]), counting its inputs once; the guard
+     also breaks cycles. *)
+  if op.usage_count = removal_sentinel
+  then begin
+    op.usage_count <- 0;
+    Array.iter increment_use op.args
+  end
 
-let increment_uses_in_terminator ~keep_unused_ops (term : finished terminator) =
-  match term with
-  (* An ordinary [Continue]'s args are counted through block-param use. With
-     keep_unused_ops, that doesn't happen and we count them here. *)
-  | Continue { continuation = Goto _; args = _ } when not keep_unused_ops -> ()
-  | Continue { continuation = Goto _ | Return | Raise _ | Unreachable; args } ->
-    Array.iter (increment_use ~keep_unused_ops) args
-  | Switch { index; _ } -> increment_use ~keep_unused_ops index
-  | Call { args; _ } | Invalid { args; _ } ->
-    Array.iter (increment_use ~keep_unused_ops) args
+and mark_param_live (block : finished block) i =
+  let p = block.params.(i) in
+  if p.usage_count = removal_sentinel
+  then begin
+    p.usage_count <- 0;
+    block.predecessors
+    |> List.iter (fun (pred : finished block) ->
+        match pred.terminator with
+        | Continue { continuation = Goto _; args } -> increment_use args.(i)
+        | Continue { continuation = Return | Raise _ | Unreachable; _ }
+        | Switch _ | Call _ | Invalid _ ->
+          (* The arg feeding this param arrives through an edge whose position
+             is fixed (call results, exception bucket), so it is counted
+             unconditionally where that terminator is visited. *)
+          ())
+  end
 
-(* For each block, count uses originating from its body's must-keep operations
-   and from its terminator. Operations that not [removable_when_unused] get an
-   extra use increment just for existing. *)
+let increment_uses_in_terminator (block : finished block) =
+  (* A successor reached by anything other than a positional [Continue (Goto _)]
+     gets its params at a runtime-fixed position — a [Call]/[Invalid] result, or
+     the exception bucket of the handler entered by a [Call] or [Raise] — so
+     those params cannot be dropped; force-keep them. *)
+  let keep_successor_params (succ : finished block) =
+    Array.iteri (fun i _ -> mark_param_live succ i) succ.params
+  in
+  match block.terminator with
+  (* A [Goto]'s args feed the target's params and are counted lazily, when the
+     corresponding param is marked live (see [mark_param_live]). *)
+  | Continue { continuation = Goto _; args = _ } -> ()
+  | Continue { continuation = Return | Unreachable; args } ->
+    Array.iter increment_use args
+  | Continue { continuation = Raise _; args } ->
+    Array.iter increment_use args;
+    Block.exn_successor block |> Option.iter keep_successor_params
+  | Switch { index; _ } -> increment_use index
+  | Call { args; continuation; _ } ->
+    Array.iter increment_use args;
+    (match continuation with
+    | Goto cont -> keep_successor_params cont
+    | Return | Raise _ | Unreachable -> ());
+    Block.exn_successor block |> Option.iter keep_successor_params
+  | Invalid { args; continuation; _ } ->
+    Array.iter increment_use args;
+    Option.iter keep_successor_params continuation
+
+(** Mark live the values a block must keep — every op that is not
+    [removable_when_unused], plus terminator args; this can lead to transitive
+    marking through [increment_use] and [mark_param_live]/[mark_op_live]. With
+    [keep_unused_ops], mark every op and param live so nothing is pruned. *)
 let increment_uses_in_block ~keep_unused_ops (block : finished block) =
   block.pending_body
   |> List.iter (fun (instr : finished instruction) ->
       match instr with
-      | Op ({ args; _ } as operation) ->
-        (* With keep_unused_ops, we count arguments unconditionally. Without, we
-           count the moment the operation gets a non-zero use count.*)
-        if keep_unused_ops then Array.iter (increment_use ~keep_unused_ops) args;
-        if not (Instruction.removable_when_unused instr)
-        then increment_operation_use ~keep_unused_ops operation
+      | Op operation ->
+        if keep_unused_ops || not (Instruction.removable_when_unused instr)
+        then mark_op_live operation
       | Push_trap _ | Pop_trap _ -> ());
-  increment_uses_in_terminator ~keep_unused_ops block.terminator
+  if keep_unused_ops
+  then Array.iteri (fun i _ -> mark_param_live block i) block.params;
+  increment_uses_in_terminator block
 
 (** Materialise [body] from [pending_body], with two pieces of cleanup:
-    - filter out [Op]s with [usage_count = 0] (skipped when [keep_unused_ops]);
+    - filter out [Op]s scheduled for removal (count is [removal_sentinel]);
     - drop [Push_trap]/[Pop_trap] whose handler has no predecessors (i.e. is
       never raised into) — the matching push/pop reference the same handler and
       are dropped together, preserving trap-stack balance; the same handlers are
       filtered out of [block_end_trap_stack] so it stays consistent with the
-      finalized body; and, when [keep_unused_ops] is false, replace
-      [Continue (Goto _)] args going to unused target params with [Undefined].
-      (The entry params are pre-marked as used, so a self-tail call's args are
-      never dropped here.) *)
-let finalize_block ~keep_unused_ops (block : finished block) =
+      finalized body; and replace [Continue (Goto _)] args going to params
+      scheduled for removal with [Undefined]. (With [keep_unused_ops] nothing is
+      scheduled for removal, so both rewrites are no-ops; entry params are kept,
+      so a self-tail call's args are never dropped here.) *)
+let finalize_block (block : finished block) =
   let handler_reachable handler = not (List.is_empty handler.predecessors) in
   block.body
     <- block.pending_body
        |> List.filter (fun (instr : finished instruction) : bool ->
            match instr with
-           | Op { usage_count; _ } -> keep_unused_ops || usage_count > 0
+           | Op { usage_count; _ } -> usage_count <> removal_sentinel
            | Push_trap { handler } | Pop_trap { handler } ->
              handler_reachable handler)
        |> Array.of_list;
   block.pending_body <- [];
   block.block_end_trap_stack
     <- List.filter handler_reachable block.block_end_trap_stack;
-  if not keep_unused_ops
-  then
-    match block.terminator with
-    | Continue { continuation = Goto goto; args } ->
-      let args =
-        args
-        |> Array.mapi (fun i arg ->
-            (* Arguments passed to unused block parameters could themselves be
-               unused and already be dropped from the graph. So we replace such
-               arguments with Undefined, to avoid dangling uses.*)
-            if goto.params.(i).usage_count = 0 then Undefined else arg)
-      in
-      block.terminator <- Continue { continuation = Goto goto; args }
-    | Continue { continuation = Return | Raise _ | Unreachable; _ }
-    | Switch _ | Call _ | Invalid _ ->
-      ()
+  match block.terminator with
+  | Continue { continuation = Goto goto; args } ->
+    let args =
+      args
+      |> Array.mapi (fun i arg ->
+          (* Args feeding a param scheduled for removal may themselves be dead
+             (already pruned from the graph), so replace them with Undefined to
+             avoid dangling uses. *)
+          if goto.params.(i).usage_count = removal_sentinel
+          then Undefined
+          else arg)
+    in
+    block.terminator <- Continue { continuation = Goto goto; args }
+  | Continue { continuation = Return | Raise _ | Unreachable; _ }
+  | Switch _ | Call _ | Invalid _ ->
+    ()
 
 (* Walk [blocks] in the input order, but when first visiting a block emit its
    dominator chain ahead of it. The result has every block preceded by its
@@ -1032,7 +1093,7 @@ let check_value_invariants (graph : finished graph)
       |> Array.iteri (fun i (arg : finished value) ->
           match arg with
           | Undefined ->
-            if goto.params.(i).usage_count <> 0
+            if goto.params.(i).usage_count <> removal_sentinel
             then
               fail "block %a: Undefined passed to live parameter %d of %a"
                 Block.print_id block i Block.print_id goto
@@ -1093,13 +1154,14 @@ let compute_metadata (graph : finished graph) : finished block list =
   let keep_unused_ops = graph.keep_unused_ops in
   let reachable_blocks = compute_reachability_and_trap_stacks graph in
   compute_dominators graph ~reachable_blocks;
-  (* The function's entry parameters come from the ABI: count them as used, so
-     they are never dropped. *)
+  (* Entry params are ABI-fixed and never dropped: force-keep them (they would
+     otherwise be left scheduled for removal) and, in doing so, count the args
+     feeding them on any back-edge, e.g. a self-recursive tail call. *)
   for i = 0 to Array.length graph.entry.params - 1 do
-    increment_use ~keep_unused_ops (Block.param graph.entry i)
+    mark_param_live graph.entry i
   done;
   reachable_blocks |> List.iter (increment_uses_in_block ~keep_unused_ops);
-  reachable_blocks |> List.iter (finalize_block ~keep_unused_ops);
+  reachable_blocks |> List.iter finalize_block;
   let ordered_blocks = order_blocks_dominators_first reachable_blocks in
   check_value_invariants graph ordered_blocks;
   ordered_blocks

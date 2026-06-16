@@ -1957,11 +1957,11 @@ module Oxcaml_options_impl = struct
     set' Oxcaml_flags.caml_apply_inline_fast_path
 
   let use_ssa = set' Oxcaml_flags.use_ssa
-  let no_use_ssa () = Oxcaml_flags.use_ssa := false
+  let no_use_ssa = clear' Oxcaml_flags.use_ssa
   let ssa_simplify = set' Oxcaml_flags.ssa_simplify
-  let no_ssa_simplify () = Oxcaml_flags.ssa_simplify := false
+  let no_ssa_simplify = clear' Oxcaml_flags.ssa_simplify
   let ssa_validate = set' Oxcaml_flags.ssa_validate
-  let no_ssa_validate () = Oxcaml_flags.ssa_validate := false
+  let no_ssa_validate = clear' Oxcaml_flags.ssa_validate
   let internal_assembler = set' Oxcaml_flags.internal_assembler
   let verify_binary_emitter = set' Oxcaml_flags.verify_binary_emitter
   let dissector = set' Clflags.dissector

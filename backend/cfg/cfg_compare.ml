@@ -256,17 +256,31 @@ let compare_instruction_fields ~ppf_m ~kind ~old_label ~new_label
     report_with "stack_offset" Format.pp_print_int old_stack_offset
       new_stack_offset;
   if not (Fdo_info.equal old_fdo new_fdo) then report "fdo";
-  if not (Reg.Set.equal old_live new_live)
-  then report_with "live" Printreg.regset old_live new_live;
-  let check_avail field old_avail new_avail =
-    if not (Reg_availability_set.equal old_avail new_avail)
+  (* [live] and the availability sets are not populated at this pipeline stage:
+     [live] is empty and the availability sets are [Unreachable]. Comparing old
+     against new would be misleading, since a populated value is unexpected
+     regardless of whether the two sides happen to agree; flag it instead. *)
+  let report_nonempty field pp_value old_value new_value =
+    Format.fprintf ppf_m
+      "%s %s expected to be empty at old=%a(id:%a) new=%a(id:%a): %a vs %a@."
+      kind field Label.format old_label InstructionId.print old_id Label.format
+      new_label InstructionId.print new_id pp_value old_value pp_value new_value
+  in
+  if not (Reg.Set.is_empty old_live && Reg.Set.is_empty new_live)
+  then report_nonempty "live" Printreg.regset old_live new_live;
+  let check_available_field field old_avail new_avail =
+    let is_unreachable : Reg_availability_set.t -> bool = function
+      | Unreachable -> true
+      | Ok _ -> false
+    in
+    if not (is_unreachable old_avail && is_unreachable new_avail)
     then
-      report_with field
+      report_nonempty field
         (Reg_availability_set.print ~print_reg:Printreg.reg)
         old_avail new_avail
   in
-  check_avail "available_before" old_avail_before new_avail_before;
-  check_avail "available_across" old_avail_across new_avail_across
+  check_available_field "available_before" old_avail_before new_avail_before;
+  check_available_field "available_across" old_avail_across new_avail_across
 
 let compare_body ~ppf_m ~map_label ~old_label ~new_label old_body new_body =
   let rec skip_moves cell =
@@ -300,7 +314,7 @@ let compare_body ~ppf_m ~map_label ~old_label ~new_label old_body new_body =
 let terminator_structure_match ~map_label (old_term : Cfg.terminator)
     (new_term : Cfg.terminator) =
   match old_term, new_term with
-  | Never, Never -> true
+  | Never, Never -> assert false
   | Always old_label, Always new_label ->
     map_label old_label new_label;
     true
@@ -720,8 +734,8 @@ let verify_register_equivalence ~ppf_m ~old_cfg ~new_cfg ~new_to_old =
     | Some old_block, Some new_block ->
       let eqs = Label.Tbl.find block_eqs new_label in
       let start_eqs = process_block_backward ~ppf_m eqs ~old_block ~new_block in
-      Label.Set.iter
-        (fun new_pred_label ->
+      new_block.predecessors
+      |> Label.Set.iter (fun new_pred_label ->
           match Label.Tbl.find_opt block_eqs new_pred_label with
           | None -> ()
           | Some prev ->
@@ -729,20 +743,17 @@ let verify_register_equivalence ~ppf_m ~old_cfg ~new_cfg ~new_to_old =
             if not (Equations.equal prev merged)
             then (
               Label.Tbl.replace block_eqs new_pred_label merged;
-              Queue.add new_pred_label worklist))
-        (Label.Set.filter (Label.Tbl.mem new_to_old) new_block.predecessors)
-  done;
-  (* Check entry equations are empty *)
-  let new_entry = Cfg.entry_label new_cfg in
-  match Label.Tbl.find_opt block_eqs new_entry with
-  | None -> ()
-  | Some entry_eqs ->
-    if not (Equations.equal entry_eqs Equations.empty)
-    then (
-      Format.fprintf ppf_m "Undischarged equations at entry:@.";
-      Equations.iter_old_to_new entry_eqs ~f:(fun old_reg new_reg ->
-          Format.fprintf ppf_m "  %a -> %a@." Printreg.reg old_reg Printreg.reg
-            new_reg))
+              Queue.add new_pred_label worklist));
+      (* Check entry equations are empty *)
+      if
+        Label.Set.is_empty new_block.predecessors
+        && not (Equations.equal start_eqs Equations.empty)
+      then (
+        Format.fprintf ppf_m "Undischarged equations at entry:@.";
+        Equations.iter_old_to_new start_eqs ~f:(fun old_reg new_reg ->
+            Format.fprintf ppf_m "  %a -> %a@." Printreg.reg old_reg
+              Printreg.reg new_reg))
+  done
 
 (* === Entry point === *)
 

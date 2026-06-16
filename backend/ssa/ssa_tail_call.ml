@@ -59,18 +59,7 @@ module Tail_call_reducer (C : Context) = struct
       Array.for_all
         (fun instr -> not (Instruction.has_side_effect instr))
         (Block.body block)
-      && Array.length args = Array.length (Block.params block)
-      &&
-      let n = Array.length args in
-      let rec loop i =
-        i >= n
-        ||
-        match args.(i) with
-        | Block_param (param_block, param_index) ->
-          Block.equal param_block block && param_index = i && loop (i + 1)
-        | Res _ | Undefined -> false
-      in
-      loop 0
+      && Array.equal Value.equal args (Block.params block)
     | _ -> false
 
   let stack_offsets_zero (call_op : Ssa.call_op) (args : finished Value.t array)
@@ -96,23 +85,21 @@ module Tail_call_reducer (C : Context) = struct
          } as operation)
       when List.is_empty (Block.block_end_trap_stack block)
            && returns_args_unchanged cont -> (
-      let mapped_args = Array.map (map_value ctx) args in
       let dbg = Block.terminator_dbg block in
       match call_op with
       | Direct func
         when String.equal func.sym_name
                (Ssa.function_info (in_graph ctx)).sym_name ->
-        (* A self-recursive tail call is a back-edge to the entry block. *)
+        (* A self-recursive tail call is a back-edge to the entry block. Build
+           it over input values/blocks and let [map_terminator] translate it. *)
         Cursor.finish_block ctx c ~dbg
-          (Continue
-             { continuation = Goto (map_block ctx (Ssa.entry (in_graph ctx)));
-               args = mapped_args
-             });
+          (map_terminator ctx
+             (Continue { continuation = Goto (Ssa.entry (in_graph ctx)); args }));
         Emitted_replacement ()
       | (Direct _ | Indirect _)
         when stack_offsets_zero call_op args (Block.params_machtype cont) ->
         Cursor.finish_block ctx c ~dbg
-          (Call { operation with args = mapped_args; continuation = Return });
+          (map_terminator ctx (Call { operation with continuation = Return }));
         Emitted_replacement ()
       | Direct _ | Indirect _ -> For_next_reducer
       | External _ | Probe _ -> assert false)

@@ -56,11 +56,12 @@ open! Int_replace_polymorphic_compare
       reducer-driven ones go through here.
 
     Default translation, applied when [visit_*] returns [For_next_reducer]:
-    - Args (op args, block-param uses, terminator args) and blocks are mapped
-      from the input to the output via [map_value] and [map_block].
-    - Block params with [usage_count = 0] are dropped from both the block
-      parameter list and from [Continue]s.
-    - Other terminators are reconstructed with their args mapped through.
+    - Op args and block-param uses are mapped from the input to the output via
+      [map_value]; block references via [map_block].
+    - The terminator is translated by [map_terminator] (exposed on the
+      [Context]): its values and blocks are mapped, and a [Continue (Goto _)]'s
+      args feeding params that were dropped from the target block's parameter
+      list are dropped to match.
 
     Unused instruction and unreachable block or exception handler cleanup
     happens in [Ssa.finish_graph], not here.
@@ -73,12 +74,6 @@ open! Ssa.Export
 type 'a did_emit =
   | For_next_reducer
   | Emitted_replacement of 'a
-
-(* A param can be dropped only if every incoming edge passes its arg through a
-   [Continue (Goto _)] (the only terminator with positional per-param args). Any
-   other predecessor supplies the parameter's value through a runtime-fixed
-   mechanism, so the parameter's position must be preserved. *)
-let dropped_param_sentinel = -1
 
 module type Context = sig
   type t
@@ -123,6 +118,8 @@ module type Context = sig
   val map_value : t -> finished Value.t -> out Value.t
 
   val map_block : t -> finished Block.t -> out Block.t
+
+  val map_terminator : t -> finished Terminator.t -> out Terminator.t
 end
 
 module type S = sig
@@ -227,10 +224,13 @@ functor
 
 module Make_run (R : Reducer) = struct
   (** [Context] is a plain (non-recursive) module so that the reducer's calls
-      into it are inlined. The reducer's [emit_op] and [finish_block] hooks
-      (with the run's analysis already captured) live in [t], so that
-      [Cursor.emit_op] / [Cursor.finish_block] route emissions back through the
-      reducer; only that (uncommon) indirect call is left un-inlined. *)
+      into it are inlined. The [emit_op] / [finish_block] closures in [t] are
+      the whole emission step: the reducer's hook plus, when it defers, the
+      default emission into the output graph. [run] builds them with the
+      analysis already captured. The main walk calls these closures directly;
+      [Cursor.emit_op] / [Cursor.finish_block] are thin wrappers onto them for
+      the reducer to call, the only place that indirect call is left un-inlined.
+  *)
   module Context = struct
     type out = under_construction
 
@@ -241,9 +241,9 @@ module Make_run (R : Reducer) = struct
         (* Output value(s) for each input [Op], indexed by its id. *)
         op_map :
           (finished, under_construction Value.t array) Instruction.Id.Tbl.t;
-        (* Old param index -> new param index (or [dropped_param_sentinel]). *)
-        block_param_map : int array Block.Tbl.t;
-        (* Output [Block_param] values, in the compressed (post-drop) order. *)
+        (* Per input block, indexed by the original param index: the output
+           value of a kept param, or [Value.undefined] for a param dropped from
+           the output block. *)
         block_param_values : under_construction Value.t array Block.Tbl.t;
         emit_op :
           t ->
@@ -252,13 +252,13 @@ module Make_run (R : Reducer) = struct
           dbg:Debuginfo.t ->
           typ:Cmm.machtype ->
           args:under_construction Value.t array ->
-          under_construction Value.t array did_emit;
+          under_construction Value.t array;
         finish_block :
           t ->
           Ssa.Cursor.t ->
           dbg:Debuginfo.t ->
           under_construction Terminator.t ->
-          unit did_emit
+          unit
       }
 
     type context = t
@@ -267,23 +267,18 @@ module Make_run (R : Reducer) = struct
       include Ssa.Cursor
 
       let emit_op (ctx : context) c op dbg typ args =
-        match ctx.emit_op ctx c ~op ~dbg ~typ ~args with
-        | For_next_reducer -> Ssa.Cursor.emit_op ctx.out_graph c op dbg typ args
-        | Emitted_replacement vs -> vs
+        ctx.emit_op ctx c ~op ~dbg ~typ ~args
 
       let finish_block (ctx : context) c ~dbg term =
-        match ctx.finish_block ctx c ~dbg term with
-        | For_next_reducer -> Ssa.Cursor.finish_block ctx.out_graph c ~dbg term
-        | Emitted_replacement () -> ()
+        ctx.finish_block ctx c ~dbg term
     end
 
-    let create ~in_graph ~out_graph ~block_map ~op_map ~block_param_map
-        ~block_param_values ~emit_op ~finish_block =
+    let create ~in_graph ~out_graph ~block_map ~op_map ~block_param_values
+        ~emit_op ~finish_block =
       { in_graph;
         out_graph;
         block_map;
         op_map;
-        block_param_map;
         block_param_values;
         emit_op;
         finish_block
@@ -300,10 +295,59 @@ module Make_run (R : Reducer) = struct
       match value with
       | Res ({ id; _ }, i) -> (Instruction.Id.Tbl.find t.op_map id).(i)
       | Block_param (block, i) ->
-        let new_index = (Block.Tbl.find t.block_param_map block).(i) in
-        assert (new_index <> dropped_param_sentinel);
-        (Block.Tbl.find t.block_param_values block).(new_index)
+        (Block.Tbl.find t.block_param_values block).(i)
       | Undefined -> Value.undefined
+
+    let map_values t (args : finished Value.t array) : out Value.t array =
+      Array.map (map_value t) args
+
+    let map_continuation t (cont : finished Ssa.continuation) :
+        out Ssa.continuation =
+      match cont with
+      | Goto b -> Goto (map_block t b)
+      | Return -> Return
+      | Raise k -> Raise k
+      | Unreachable -> Unreachable
+
+    let map_terminator t (term : finished Terminator.t) : out Terminator.t =
+      match term with
+      | Continue { continuation = Goto goto; args } ->
+        (* Drop the args going to dropped target params. *)
+        let param_values = Block.Tbl.find t.block_param_values goto in
+        let mapped_args =
+          args
+          |> Misc.Stdlib.Array.filteri (fun i _ ->
+              not (Value.equal param_values.(i) Value.undefined))
+          |> Array.map (map_value t)
+        in
+        Continue { continuation = Goto (map_block t goto); args = mapped_args }
+      | Continue
+          { continuation = (Return | Raise _ | Unreachable) as continuation;
+            args
+          } ->
+        Continue
+          { continuation = map_continuation t continuation;
+            args = map_values t args
+          }
+      | Switch { index; targets } ->
+        Switch
+          { index = map_value t index;
+            targets = Array.map (map_block t) targets
+          }
+      | Call { op; args; continuation; may_raise; nontail } ->
+        Call
+          { op;
+            args = map_values t args;
+            continuation = map_continuation t continuation;
+            may_raise;
+            nontail
+          }
+      | Invalid { message; args; continuation } ->
+        Invalid
+          { message;
+            args = map_values t args;
+            continuation = Option.map (map_block t) continuation
+          }
   end
 
   module Red = R (Context)
@@ -322,77 +366,63 @@ module Make_run (R : Reducer) = struct
         (finished, under_construction Value.t array) Instruction.Id.Tbl.t =
       Instruction.Id.Tbl.create 256
     in
-    let block_param_map : int array Block.Tbl.t = Block.Tbl.create 64 in
     let block_param_values : under_construction Value.t array Block.Tbl.t =
       Block.Tbl.create 64
     in
-    let compute_block_param_map (block : finished Block.t) : int array =
-      let params = Block.params block in
-      let n = Array.length params in
-      (* A param can only be dropped if every predecessor feeds it via a
-         positional [Continue (Goto _)] arg, which we can then drop too. Any
-         other edge (call results, exception bucket) supplies it at a
-         runtime-fixed position. *)
-      let any_non_continue_pred () =
-        List.exists
-          (fun (pred : finished Block.t) ->
-            match Block.terminator pred with
-            | Continue { continuation = Goto _; _ } -> false
-            | Continue { continuation = Return | Raise _ | Unreachable; _ }
-            | Call _ | Switch _ | Invalid _ ->
-              true)
-          (Block.predecessors block)
-      in
-      if
-        keep_unused_ops || any_non_continue_pred ()
-        || Array.for_all (fun param -> Value.usage_count param > 0) params
-      then Array.init n Fun.id
-      else
-        let to_new = Array.make n dropped_param_sentinel in
-        let j = ref 0 in
-        for i = 0 to n - 1 do
-          if Value.usage_count params.(i) > 0
-          then begin
-            to_new.(i) <- !j;
-            incr j
-          end
-        done;
-        to_new
-    in
     (* Step 1: create an output block for each input block. The entry's params
-       come from the function ABI and are kept verbatim; other blocks may drop
-       unused params per [compute_block_param_map]. *)
-    let in_entry = Ssa.entry in_graph in
-    Block.Tbl.replace block_map in_entry (Ssa.entry out_graph);
-    Block.Tbl.replace block_param_map in_entry
-      (Array.init (Array.length (Block.params in_entry)) Fun.id);
-    Block.Tbl.replace block_param_values in_entry
-      (Block.params (Ssa.entry out_graph));
+       come from the function ABI and are kept verbatim; other blocks drop the
+       params [Ssa] scheduled for removal (unused, and droppable given their
+       predecessors). *)
     List.iter
       (fun (block : finished Block.t) ->
-        if not (Block.equal block in_entry)
-        then begin
-          let param_map = compute_block_param_map block in
-          Block.Tbl.replace block_param_map block param_map;
-          let params =
-            Block.params block |> Array.to_list
-            |> List.filteri (fun i _ -> param_map.(i) <> dropped_param_sentinel)
-            |> List.map (fun param -> Value.typ param, Value.name param)
-            |> Array.of_list
-          in
-          let out_block = Block.create_with_names out_graph ~params in
-          Block.Tbl.replace block_map block out_block;
-          Block.Tbl.replace block_param_values block (Block.params out_block)
-        end)
+        let in_params = Block.params block in
+        let params =
+          in_params |> Array.to_list
+          |> List.filter (fun param -> not (Value.scheduled_for_removal param))
+          |> List.map (fun param -> Value.typ param, Value.name param)
+          |> Array.of_list
+        in
+        let out_block =
+          if Block.equal block (Ssa.entry in_graph)
+          then Ssa.entry out_graph
+          else Block.create_with_names out_graph ~params
+        in
+        Block.Tbl.replace block_map block out_block;
+        (* Index the output values by the original param index, with
+           [Value.undefined] in the dropped slots; the kept output params line
+           up with the kept input params in order. *)
+        let out_params = Block.params out_block in
+        let next = ref 0 in
+        let param_values =
+          Array.map
+            (fun param ->
+              if Value.scheduled_for_removal param
+              then Value.undefined
+              else
+                let v = out_params.(!next) in
+                incr next;
+                v)
+            in_params
+        in
+        Block.Tbl.replace block_param_values block param_values)
       (Ssa.blocks in_graph);
-    let ctx =
-      Context.create ~in_graph ~out_graph ~block_map ~op_map ~block_param_map
-        ~block_param_values ~emit_op:(Red.emit_op analysis)
-        ~finish_block:(Red.finish_block analysis)
+    (* The whole emission step for an op / a terminator: the reducer's hook, and
+       when it defers, the default emission into the output graph. These are the
+       closures stored in [Context.t]; the main walk calls them directly, while
+       [Context.Cursor.*] are thin wrappers onto them for the reducer. *)
+    let emit_op ctx c ~op ~dbg ~typ ~args =
+      match Red.emit_op analysis ctx c ~op ~dbg ~typ ~args with
+      | For_next_reducer -> Ssa.Cursor.emit_op out_graph c op dbg typ args
+      | Emitted_replacement vs -> vs
     in
-    let map_values (args : finished Value.t array) :
-        under_construction Value.t array =
-      Array.map (Context.map_value ctx) args
+    let finish_block ctx c ~dbg term =
+      match Red.finish_block analysis ctx c ~dbg term with
+      | For_next_reducer -> Ssa.Cursor.finish_block out_graph c ~dbg term
+      | Emitted_replacement () -> ()
+    in
+    let ctx =
+      Context.create ~in_graph ~out_graph ~block_map ~op_map ~block_param_values
+        ~emit_op ~finish_block
     in
     (* Default translation of one body instruction, returning the value(s) its
        results map to ([||] for a trap instruction). *)
@@ -400,69 +430,19 @@ module Make_run (R : Reducer) = struct
         (c : Cursor.t) : under_construction Value.t array =
       match instr with
       | Op { op; typ; args; dbg; name; _ } ->
-        let vs = Context.Cursor.emit_op ctx c op dbg typ (map_values args) in
+        let vs =
+          emit_op ctx c ~op ~dbg ~typ ~args:(Context.map_values ctx args)
+        in
         (match name with
         | Some name when Array.length vs > 0 -> Value.set_name vs.(0) name
         | Some _ | None -> ());
         vs
       | Push_trap { handler } ->
-        Context.Cursor.emit_push_trap c ~handler:(Context.map_block ctx handler);
+        Cursor.emit_push_trap c ~handler:(Context.map_block ctx handler);
         [||]
       | Pop_trap { handler } ->
-        Context.Cursor.emit_pop_trap c ~handler:(Context.map_block ctx handler);
+        Cursor.emit_pop_trap c ~handler:(Context.map_block ctx handler);
         [||]
-    in
-    let map_continuation (cont : finished Ssa.continuation) :
-        under_construction Ssa.continuation =
-      match cont with
-      | Goto b -> Goto (Context.map_block ctx b)
-      | Return -> Return
-      | Raise k -> Raise k
-      | Unreachable -> Unreachable
-    in
-    let map_terminator (t : finished Terminator.t) :
-        under_construction Terminator.t =
-      match t with
-      | Continue { continuation = Goto goto; args } ->
-        (* Drop the args going to dropped target params. *)
-        let param_map = Block.Tbl.find block_param_map goto in
-        let mapped_args =
-          args
-          |> Misc.Stdlib.Array.filteri (fun i _ ->
-              param_map.(i) <> dropped_param_sentinel)
-          |> Array.map (Context.map_value ctx)
-        in
-        Continue
-          { continuation = Goto (Context.map_block ctx goto);
-            args = mapped_args
-          }
-      | Continue
-          { continuation = (Return | Raise _ | Unreachable) as continuation;
-            args
-          } ->
-        Continue
-          { continuation = map_continuation continuation;
-            args = map_values args
-          }
-      | Switch { index; targets } ->
-        Switch
-          { index = Context.map_value ctx index;
-            targets = Array.map (Context.map_block ctx) targets
-          }
-      | Call { op; args; continuation; may_raise; nontail } ->
-        Call
-          { op;
-            args = map_values args;
-            continuation = map_continuation continuation;
-            may_raise;
-            nontail
-          }
-      | Invalid { message; args; continuation } ->
-        Invalid
-          { message;
-            args = map_values args;
-            continuation = Option.map (Context.map_block ctx) continuation
-          }
     in
     let visit_instruction (block : finished Block.t) ~instr_index c =
       let instr = Array.get (Block.body block) instr_index in
@@ -492,8 +472,8 @@ module Make_run (R : Reducer) = struct
             "The reducer promised to have replaced the block terminator, but \
              did not actually finish the block."
       | For_next_reducer ->
-        let term = map_terminator (Block.terminator block) in
-        Context.Cursor.finish_block ctx c ~dbg:(Block.terminator_dbg block) term
+        let term = Context.map_terminator ctx (Block.terminator block) in
+        finish_block ctx c ~dbg:(Block.terminator_dbg block) term
     in
     (* Step 2: walk the input graph in [blocks] order, which already guarantees
        each block's dominators come before it. *)

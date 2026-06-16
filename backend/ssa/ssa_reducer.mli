@@ -129,6 +129,11 @@ module type Context = sig
 
   (** Resolve an input-graph block reference to its output-graph counterpart. *)
   val map_block : t -> finished Block.t -> out Block.t
+
+  (** Translate an input-graph terminator into the output graph: map its values
+      and blocks, and drop the [Continue (Goto _)] args that feed parameters the
+      framework removed from the target block. *)
+  val map_terminator : t -> finished Terminator.t -> out Terminator.t
 end
 
 type 'a did_emit =
