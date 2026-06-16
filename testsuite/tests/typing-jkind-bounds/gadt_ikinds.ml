@@ -529,12 +529,9 @@ let foo (x : int box @ contended) = use_uncontended x
 val foo : int box @ contended -> unit = <fun>
 |}]
 
-let should_reject (x : int ref box @ contended) = use_uncontended x
+let accepts_ref_payload (x : int ref box @ contended) = use_uncontended x
 [%%expect{|
-Line 1, characters 66-67:
-1 | let should_reject (x : int ref box @ contended) = use_uncontended x
-                                                                      ^
-Error: This value is "contended" but is expected to be "uncontended".
+val accepts_ref_payload : int ref box @ contended -> unit = <fun>
 |}]
 
 
@@ -548,12 +545,12 @@ let foo (x : (int, int) box2 @ contended) = use_uncontended x
 val foo : (int, int) box2 @ contended -> unit = <fun>
 |}]
 
-let should_reject (x : (int ref, int ref) box2 @ contended) = use_uncontended x
+let accepts_both_ref_payloads
+    (x : (int ref, int ref) box2 @ contended) =
+  use_uncontended x
 [%%expect{|
-Line 1, characters 78-79:
-1 | let should_reject (x : (int ref, int ref) box2 @ contended) = use_uncontended x
-                                                                                  ^
-Error: This value is "contended" but is expected to be "uncontended".
+val accepts_both_ref_payloads : (int ref, int ref) box2 @ contended -> unit =
+  <fun>
 |}]
 
 type show_me_the_kind : immediate = (int ref, int ref) box2
@@ -594,14 +591,10 @@ let crosses (x : (int, int ref) box2 @ contended) = use_uncontended x
 val crosses : (int, int ref) box2 @ contended -> unit = <fun>
 |}]
 
-let doesn't_cross (x : (int ref, int) box2 @ contended) = use_uncontended x
-(* CR layouts v2.8: arguably this should be accepted if [crosses] is accepted (even though
-   x is uninhabited). Internal ticket 4973. *)
+let ref_payload_is_uic (x : (int ref, int) box2 @ contended) =
+  use_uncontended x
 [%%expect{|
-Line 1, characters 74-75:
-1 | let doesn't_cross (x : (int ref, int) box2 @ contended) = use_uncontended x
-                                                                              ^
-Error: This value is "contended" but is expected to be "uncontended".
+val ref_payload_is_uic : (int ref, int) box2 @ contended -> unit = <fun>
 |}]
 
 (* Constraints and existentials *)
@@ -664,10 +657,7 @@ Error: This value is "nonportable" but is expected to be "portable".
 
 let foo (x : exist_row1 @ contended) = use_uncontended x
 [%%expect{|
-Line 1, characters 55-56:
-1 | let foo (x : exist_row1 @ contended) = use_uncontended x
-                                                           ^
-Error: This value is "contended" but is expected to be "uncontended".
+val foo : exist_row1 @ contended -> unit = <fun>
 |}]
 
 type exist_row2 = Mk : ([> `A | `B of int ref] as 'a) -> exist_row2
@@ -700,10 +690,7 @@ Error: This value is "nonportable" but is expected to be "portable".
 
 let foo (x : exist_row2 @ contended) = use_uncontended x
 [%%expect{|
-Line 1, characters 55-56:
-1 | let foo (x : exist_row2 @ contended) = use_uncontended x
-                                                           ^
-Error: This value is "contended" but is expected to be "uncontended".
+val foo : exist_row2 @ contended -> unit = <fun>
 |}]
 
 type 'a exist_row3 = Mk : ([> `A | `B of int ref] as 'a) -> 'a option exist_row3
@@ -729,10 +716,8 @@ Error: The layout of type "'a option exist_row3" is value non_float
 
 let foo (x : [`A | `B of int ref] option exist_row3 @ contended) = use_uncontended x
 [%%expect{|
-Line 1, characters 83-84:
-1 | let foo (x : [`A | `B of int ref] option exist_row3 @ contended) = use_uncontended x
-                                                                                       ^
-Error: This value is "contended" but is expected to be "uncontended".
+val foo : [ `A | `B of int ref ] option exist_row3 @ contended -> unit =
+  <fun>
 |}]
 
 (* This would be lovely to accept, but it seems beyond the

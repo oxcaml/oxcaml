@@ -107,14 +107,14 @@ let hi_mask =
 
 let axis_mask = Array.map2 (fun lo hi -> lo lor hi) lo_mask hi_mask
 
-let unique_implies_uncontended_disabled_mask = 1 lsl 20
+let uic_disabled_mask = 1 lsl 20
 
 type t = int
 
 let bot : t = 0
 
 let top : t =
-  Array.fold_left ( lor ) unique_implies_uncontended_disabled_mask axis_mask
+  Array.fold_left ( lor ) uic_disabled_mask axis_mask
 
 let join (a : t) (b : t) : t = a lor b
 
@@ -229,7 +229,7 @@ let relevant_axes_of_modality (modality : Mode.Modality.Const.t) :
 let mask_of_modality (modality : Mode.Modality.Const.t) : t =
   relevant_axes_of_modality modality |> of_axis_set
 
-let modality_crosses_axis :
+let modality_makes_axis_constant :
     type a. a Mode.Crossing.Axis.t -> Mode.Modality.Const.t -> bool =
  fun axis modality ->
   let (Mode.Modality.Axis.P axis_for_modality) =
@@ -238,17 +238,27 @@ let modality_crosses_axis :
   let modality_on_axis =
     Mode.Modality.Const.proj axis_for_modality modality
   in
-  not
-    (Mode.Modality.Per_axis.is_constant axis_for_modality
-       modality_on_axis)
+  Mode.Modality.Per_axis.is_constant axis_for_modality modality_on_axis
 
-let modality_crosses_uniqueness modality =
+let modality_makes_uniqueness_constant modality =
   let open Mode.Crossing.Axis in
-  modality_crosses_axis (Monadic Uniqueness) modality
+  modality_makes_axis_constant (Monadic Uniqueness) modality
 
-let modality_crosses_contention modality =
+let modality_makes_contention_constant modality =
   let open Mode.Crossing.Axis in
-  modality_crosses_axis (Monadic Contention) modality
+  modality_makes_axis_constant (Monadic Contention) modality
+
+let modality_has_contended_contention modality =
+  let open Mode in
+  let axis_for_modality =
+    Modality.Axis.Monadic Axis.Contention
+  in
+  let (Modality.Monadic.Atom.Join_const contention) =
+    Modality.Const.proj axis_for_modality modality
+  in
+  match contention with
+  | Contention.Const.Contended -> true
+  | Uncontended | Corrupted | Shared -> false
 
 (* Helpers to translate between axis enumerations and packed levels. *)
 module Levels = struct
@@ -411,17 +421,17 @@ let staticity (x : t) : Mode.Staticity.const =
 let externality (x : t) : Jkind_axis.Externality.t =
   Levels.externality_of_level (get_axis x ~axis:10)
 
-let unique_implies_uncontended_disabled : t =
-  unique_implies_uncontended_disabled_mask
+let uic_disabled : t =
+  uic_disabled_mask
 
-let with_unique_implies_uncontended_disabled (x : t) : t =
-  x lor unique_implies_uncontended_disabled_mask
+let disable_uic (x : t) : t =
+  x lor uic_disabled_mask
 
-let without_unique_implies_uncontended_disabled (x : t) : t =
-  x land lnot unique_implies_uncontended_disabled_mask
+let allow_uic (x : t) : t =
+  x land lnot uic_disabled_mask
 
-let allows_unique_implies_uncontended (x : t) : bool =
-  x land unique_implies_uncontended_disabled_mask = 0
+let uic_allowed (x : t) : bool =
+  x land uic_disabled_mask = 0
 
 let set_areality (a : Mode.Regionality.Const.t) (x : t) : t =
   set_axis x ~axis:0 ~level:(Levels.level_of_areality a)
@@ -495,7 +505,7 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
            (Mode.Modality.Comonadic.Atom.Meet_const (statefulness x)))
   in
   { crossing = { monadic; comonadic };
-    unique_implies_uncontended = allows_unique_implies_uncontended x
+    unique_implies_uncontended = uic_allowed x
   }
 
 let create ~areality ~linearity ~uniqueness ~portability ~contention ~forkable
@@ -528,6 +538,7 @@ let immutable_data : t =
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
+  |> disable_uic
 
 let mutable_data : t =
   create ~areality:Mode.Regionality.Const.max
@@ -538,6 +549,7 @@ let mutable_data : t =
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
+  |> disable_uic
 
 let sync_data : t =
   create ~areality:Mode.Regionality.Const.max
@@ -548,6 +560,7 @@ let sync_data : t =
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
+  |> disable_uic
 
 let value : t =
   create ~areality:Mode.Regionality.Const.max
@@ -558,6 +571,7 @@ let value : t =
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
+  |> disable_uic
 
 let arrow : t =
   create ~areality:Mode.Regionality.Const.max
@@ -590,7 +604,7 @@ let object_legacy : t =
     ~portability ~contention:Mode.Contention.Const.Uncontended ~forkable
     ~yielding ~statefulness ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
-  |> with_unique_implies_uncontended_disabled
+  |> disable_uic
 
 let axis_number_to_axis_packed (axis_number : int) : Jkind_axis.Axis.packed =
   if axis_number < 0 || axis_number >= Array.length axis_by_number

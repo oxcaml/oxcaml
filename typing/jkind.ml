@@ -1254,8 +1254,21 @@ module Base_and_axes = struct
                     (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
               in
               let crossing : Mod_bounds.Crossing.t =
+                let unique_implies_uncontended =
+                  if
+                    Axis_set.mem relevant_axes (Modal (Monadic Contention))
+                    || Axis_set.mem relevant_axes (Modal (Monadic Uniqueness))
+                  then
+                    Mod_bounds.Crossing.unique_implies_uncontended
+                      (Mod_bounds.crossing b1)
+                    && Mod_bounds.Crossing.unique_implies_uncontended
+                         (Mod_bounds.crossing b2)
+                  else
+                    Mod_bounds.Crossing.unique_implies_uncontended
+                      (Mod_bounds.crossing b1)
+                in
                 { crossing = { monadic; comonadic };
-                  unique_implies_uncontended = false
+                  unique_implies_uncontended
                 }
               in
               Mod_bounds.create crossing
