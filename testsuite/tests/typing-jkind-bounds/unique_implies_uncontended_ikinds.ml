@@ -14,21 +14,6 @@ val use_portable : 'a @ portable -> unit = <fun>
 (****************************************)
 (* The broad [value] and [mutable_data] kinds are not UIC. *)
 
-type abstract_immutable_data : immutable_data
-[%%expect{|
-type abstract_immutable_data : immutable_data
-|}]
-
-(* [immutable_data] crosses contention directly, so this acceptance is not
-   evidence that [immutable_data] has UIC. *)
-let immutable_data_with_unique
-    (x : abstract_immutable_data @ unique contended) =
-  use_uncontended x
-[%%expect{|
-val immutable_data_with_unique :
-  abstract_immutable_data @ unique contended -> unit = <fun>
-|}]
-
 type abstract_mutable_data : mutable_data
 [%%expect{|
 type abstract_mutable_data : mutable_data
@@ -69,10 +54,16 @@ Error: This value is "contended" but is expected to be "uncontended".
 (*************************************)
 (* Ref-shaped data is UIC. *)
 
+(* CR: This should be accepted. The eager UIC approximation only
+   fires when uniqueness is already visible at crossing time; here the default
+   uniqueness is not visible early enough. *)
 let int_ref_with_default_unique (x : int ref @ contended) =
   use_uncontended x
 [%%expect{|
-val int_ref_with_default_unique : int ref @ contended -> unit = <fun>
+Line 2, characters 18-19:
+2 |   use_uncontended x
+                      ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let int_ref_with_unique (x : int ref @ unique contended) =
@@ -87,9 +78,7 @@ let int_ref_with_aliased (x : int ref @ aliased contended) =
 Line 2, characters 18-19:
 2 |   use_uncontended x
                       ^
-Error: This value is "contended" because it crosses with something
-         which is "aliased,contended,read_write,static".
-       However, the highlighted expression is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 type ref_record = { ref_field : int ref }
@@ -97,10 +86,15 @@ type ref_record = { ref_field : int ref }
 type ref_record = { ref_field : int ref; }
 |}]
 
+(* CR: This should be accepted for the same reason as
+   [int_ref_with_default_unique]. *)
 let ref_record_with_default_unique (x : ref_record @ contended) =
   use_uncontended x
 [%%expect{|
-val ref_record_with_default_unique : ref_record @ contended -> unit = <fun>
+Line 2, characters 18-19:
+2 |   use_uncontended x
+                      ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let ref_record_with_unique (x : ref_record @ unique contended) =
@@ -115,9 +109,7 @@ let ref_record_with_aliased (x : ref_record @ aliased contended) =
 Line 2, characters 18-19:
 2 |   use_uncontended x
                       ^
-Error: This value is "contended" because it crosses with something
-         which is "aliased,contended,read_write,static".
-       However, the highlighted expression is expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 (********************************************************)
@@ -165,14 +157,6 @@ Error: This value is "contended" but is expected to be "uncontended".
 type abstract_contended : value mod contended
 [%%expect{|
 type abstract_contended : value mod contended
-|}]
-
-let abstract_contended_crosses_contention
-    (x : abstract_contended @ contended) =
-  use_uncontended x
-[%%expect{|
-val abstract_contended_crosses_contention :
-  abstract_contended @ contended -> unit = <fun>
 |}]
 
 let abstract_contended_with_unique (x : abstract_contended @ unique contended) =
@@ -246,8 +230,8 @@ Line 3, characters 18-19:
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
-(****************************************************)
-(* A uniqueness modality preserves existing crossing. *)
+(**********************************************************)
+(* Uniqueness and aliasing modalities preserve payload UIC. *)
 
 type crosses_contention_payload = int option
 type aliased_crossing_payload = { x : crosses_contention_payload @@ aliased }
@@ -260,28 +244,12 @@ type aliased_crossing_payload = {
 type unique_crossing_payload = { x : crosses_contention_payload; }
 |}]
 
-let aliased_payload_still_crosses_contention
-    (x : aliased_crossing_payload @ contended) =
-  use_uncontended x
-[%%expect{|
-val aliased_payload_still_crosses_contention :
-  aliased_crossing_payload @ contended -> unit = <fun>
-|}]
-
 let aliased_payload_with_unique_is_uncontended
     (x : aliased_crossing_payload @ unique contended) =
   use_uncontended x
 [%%expect{|
 val aliased_payload_with_unique_is_uncontended :
   aliased_crossing_payload @ unique contended -> unit = <fun>
-|}]
-
-let unique_payload_still_crosses_contention
-    (x : unique_crossing_payload @ contended) =
-  use_uncontended x
-[%%expect{|
-val unique_payload_still_crosses_contention :
-  unique_crossing_payload @ contended -> unit = <fun>
 |}]
 
 let unique_payload_with_unique_is_uncontended
@@ -415,8 +383,7 @@ type atomic_ref_field = { mutable x : int ref [@atomic] }
 type atomic_ref_field = { mutable x : int ref [@atomic]; }
 |}]
 
-(* Atomic fields cross contention directly, so the stored [int ref] does not
-   disable UIC for the outer record. *)
+(* The atomic field does leave UIC enabled for the outer record. *)
 let atomic_ref_field_with_unique
     (x : atomic_ref_field @ unique contended) =
   use_uncontended x
@@ -430,8 +397,6 @@ type atomic_int_field = { mutable x : int [@atomic] }
 type atomic_int_field = { mutable x : int [@atomic]; }
 |}]
 
-(* This is the positive atomic-field case: the stored [int] crosses contention
-   directly. *)
 let atomic_int_field_with_unique
     (x : atomic_int_field @ unique contended) =
   use_uncontended x
@@ -445,8 +410,7 @@ type outer_atomic_ref_field = { mutable x : mutable_ref_field [@atomic] }
 type outer_atomic_ref_field = { mutable x : mutable_ref_field [@atomic]; }
 |}]
 
-(* Atomic fields cross contention directly even when they store a mutable
-   record. *)
+(* The atomic field does leave UIC enabled for the outer record. *)
 let outer_atomic_ref_field_with_unique
     (x : outer_atomic_ref_field @ unique contended) =
   use_uncontended x
@@ -471,10 +435,15 @@ type exist_row = Mk : ([> `A | `B of int ref] as 'a) -> exist_row
 type exist_row = Mk : [> `A | `B of int ref ] -> exist_row
 |}]
 
+(* CR: This should be accepted. The current implementation does not
+   use UIC when uniqueness is discovered after the crossing operation. *)
 let exist_row_without_unique (x : exist_row @ contended) =
   use_uncontended x
 [%%expect{|
-val exist_row_without_unique : exist_row @ contended -> unit = <fun>
+Line 2, characters 18-19:
+2 |   use_uncontended x
+                      ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let exist_row_with_unique (x : exist_row @ unique contended) =

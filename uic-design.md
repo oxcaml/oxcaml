@@ -1,20 +1,177 @@
 # Unique Implies Uncontended
 
-`unique_implies_uncontended` is conceptually part of contention crossing. It
-is not an independent ordinary axis, because full contention crossing already
-implies it.
+This note describes the desired `unique_implies_uncontended` feature, without
+choosing a particular approximation strategy. It then records the implementation
+attempt on this branch and the solver problem we ran into.
 
-This note uses the ikind restriction order. In this order, adding a bit means
-adding a restriction, not adding a crossing capability.
+## Goal
 
-## Combined Contention/UIC Restrictions
+The desired feature is:
 
-Use three restriction bits:
+```text
+for types that have UIC:
+  a value at mode unique may be used at mode uncontended
+```
+
+The intended reasoning is ordinary semantic reasoning about references:
+
+```text
+if there is only one reference to a value, then there are no cross-thread
+references to that value
+```
+
+This is a type-specific mode crossing property. It should not apply to every
+type. In particular, it should not apply when the only reason a value appears to
+cross uniqueness is an artificial uniqueness crossing introduced by a modality
+such as `@@ aliased`.
+
+## Axes
+
+There are three concepts that must stay separate:
+
+```text
+uniqueness:
+  whether the value is unique or aliased
+
+contention:
+  whether the value is uncontended or contended
+
+UIC:
+  whether uniqueness is valid evidence for uncontendedness for this type
+```
+
+UIC is not the same thing as uniqueness. UIC says whether this implication is a
+valid crossing step:
+
+```text
+unique => uncontended
+```
+
+UIC is also not the same thing as contention crossing. Full contention crossing
+already makes UIC unnecessary: if a type already crosses contention directly,
+then a `contended` value can become `uncontended` without using uniqueness.
+
+## Desired Behavior
+
+For a type crossing operation, UIC should behave like this:
+
+```text
+if the type has UIC and the value is unique:
+  strengthen the contention mode to uncontended
+
+otherwise:
+  do not use uniqueness to strengthen contention
+```
+
+This should be a forward use of uniqueness evidence. It should not make the
+type checker silently infer hidden uniqueness merely because a context requires
+`uncontended`.
+
+For example, this is the desired positive shape:
+
+```ocaml
+let use_uncontended : 'a @ uncontended -> unit = fun _ -> ()
+
+let ok (x : t @ unique contended) =
+  use_uncontended x
+```
+
+when `t` has UIC.
+
+This is the shape we do not want:
+
+```ocaml
+let f (x : t @ contended) =
+  use_uncontended x
+```
+
+being accepted by silently strengthening `x` to `unique` in a way that is not
+visible in the inferred type.
+
+## Artificial Uniqueness
+
+The `@@ aliased` modality creates an artificial uniqueness crossing. It makes a
+type cross the uniqueness axis even when that does not mean the runtime value is
+actually uniquely referenced.
+
+Therefore:
+
+```text
+artificial uniqueness must not justify UIC
+```
+
+The desired rule for a payload behind `@@ aliased` is:
+
+```text
+payload @@ aliased has UIC iff payload crosses contention directly
+```
+
+Equivalently:
+
+```text
+@@ aliased:
+  uniqueness crossing: fully crosses
+  contention crossing: same as the payload
+  UIC: enabled only if the payload already crosses contention
+```
+
+This is the critical separation:
+
+```text
+the type can cross uniqueness,
+but that crossing is not valid evidence for uncontendedness
+```
+
+## Other Modalities
+
+The intended modality rules are:
+
+```text
+@@ contended:
+  enables UIC, because the type now crosses contention directly
+
+@@ aliased contended:
+  enables UIC, because the explicit contention modality gives direct contention
+  crossing
+
+@@ aliased:
+  enables UIC only when the inner type already crosses contention
+
+modalities on other axes:
+  preserve UIC
+```
+
+The important direction issue is that `@@ uncontended` is effectively the
+identity for this purpose, while `@@ contended` is the non-identity contention
+modality that gives contention crossing.
+
+## Mutable Data
+
+Mutable payloads have an implicit `@@ aliased` boundary.
+
+Therefore, for mutable data:
+
+```text
+'a ref has UIC iff 'a crosses contention directly
+
+mutable record fields behave the same way:
+  the record may have UIC through a mutable field only if the field payload
+  crosses contention directly
+```
+
+Atomic mutable fields are different when the atomic field itself gives direct
+contention crossing. In that case, the payload does not disable UIC for the
+outer value merely by being behind a mutable field.
+
+## Restriction View
+
+In the ikind restriction order, join adds restrictions. Higher values are more
+restrictive. For the combined contention/UIC part, use these restriction bits:
 
 ```text
 s = shared-side contention crossing is restricted
 k = corrupted-side contention crossing is restricted
-u = unique-to-uncontended crossing is restricted
+u = UIC is restricted
 ```
 
 The semantic invariant is:
@@ -23,10 +180,9 @@ The semantic invariant is:
 u => s or k
 ```
 
-Equivalently, if both sides of contention crossing are unrestricted, then UIC
-is unrestricted too. The raw point `{u}` is not semantic: it says that full
-contention crossing is allowed, but unique-to-uncontended crossing is still
-restricted.
+The raw point `{u}` is not semantic. It says full contention crossing is
+allowed, but UIC is restricted. If full contention crossing is allowed, UIC is
+irrelevant and should also be allowed.
 
 The semantic points are:
 
@@ -40,74 +196,38 @@ The semantic points are:
 {s,k,u}   contention restricted, UIC restricted
 ```
 
-The normalization operation removes the unsupported `u` restriction:
+The normalization operation is:
 
 ```text
 norm(s,k,u) = (s, k, u && (s || k))
 ```
 
-So:
+so:
 
 ```text
 norm({u}) = {}
 ```
 
-## Joins, Meets, and the Extra Point
-
-In the restriction view, ikind join adds restrictions. On the raw 8-point
-representation:
-
-```text
-join = union
-meet = intersection
-```
-
-Semantic points are closed under join:
-
-```text
-if u is present in x union y, then it came from x or y,
-and that input already had s or k
-```
-
-Semantic points are not closed under raw meet:
+The semantic points are closed under raw join, but not under raw meet:
 
 ```text
 {s,u} meet {k,u} = {u}
 norm({u}) = {}
 ```
 
-This is the same issue as the capability-view statement that full contention
-crossing implies UIC, but expressed in ikind order.
-
 A literal 7-point semantic lattice would use normalized meet. That lattice is
-not distributive. For example:
+not distributive. The current LDD machinery relies on a distributive coefficient
+lattice, so replacing the coefficient lattice with that 7-point lattice is not a
+small local change.
 
-```text
-{s,u} meet ({s} join {k,u}) = {s,u}
-({s,u} meet {s}) join ({s,u} meet {k,u}) = {s}
-```
+Using the raw 8-point lattice is conservative if `{u}` is treated as a real
+restriction internally. It can lose precision, but should not accept an unsafe
+program solely because of this extra raw point.
 
-The current LDD machinery relies on a distributive coefficient lattice, so the
-implementation cannot simply replace the coefficient lattice with this 7-point
-semantic lattice.
+## Artificial-Uniqueness Function
 
-Keeping the raw 8-point lattice is conservative if the extra point is treated
-as a real restriction internally:
-
-```text
-raw {u} is more restrictive than semantic norm({u}) = {}
-```
-
-That can cause false failures, but not false successes. The precision loss
-happens when raw meet creates `{u}` and no later normalization removes it.
-
-## The Artificial-Uniqueness Boundary
-
-The `@@ aliased` modality makes uniqueness crossing artificial. It should not
-let direct uniqueness evidence justify UIC. However, it should preserve the
-fact that full contention crossing implies UIC.
-
-In restriction form, the operation for this boundary is:
+For an artificial uniqueness boundary such as `@@ aliased`, the desired function
+on restriction points is:
 
 ```text
 f(x) = norm(x union {u})
@@ -135,68 +255,216 @@ f({s,k,u})   = {s,k,u}
 
 This says:
 
-- if the contents fully cross contention, `@@ aliased` does not restrict UIC;
-- if the contents have any contention restriction, `@@ aliased` restricts UIC;
-- direct UIC of the contents does not pass through `@@ aliased`.
-
-This is the restriction-order version of "drop artificial UIC, then recover it
-when full contention crossing justifies it".
-
-## Separate `x` and `f(x)` Variables
-
-The current ikind LDDs express terms using joins, meets, constants, and
-variables. The operation `f` is not just a constant mask on `x`: it computes the
-output `u` bit from the input `s` and `k` bits.
-
-One way to preserve precision is to keep two views of a type variable:
-
 ```text
-x     = the ordinary view
-f(x)  = the artificial-uniqueness view
+if the payload fully crosses contention:
+  artificial uniqueness does not restrict UIC
+
+if the payload has a contention restriction:
+  artificial uniqueness restricts UIC
+
+direct UIC of the payload does not pass through artificial uniqueness
 ```
 
-These are not independent semantic variables. Assigning a semantic value to
-`x` determines the value of `f(x)` by:
+The `f` operation cannot be expressed as just meeting or joining with a constant
+in the existing ikind-shaped LDD terms. It computes the output UIC bit from the
+input contention bits.
 
-```text
-f(x) = norm(x union {u})
+## What This Branch Did
+
+This branch adds a UIC bit to the ikind/axis-lattice path and carries it into
+`Mode.Crossing.t` as:
+
+```ocaml
+unique_implies_uncontended : bool
 ```
 
-A paired LDD normal form could keep `x` and `f(x)` adjacent and enforce the
-local dependency. In restriction order, the useful equations are:
+An earlier implementation modeled UIC as a generic mode solver morph:
 
-```text
-x <= f(x)
-x join f(x) = f(x)
-x meet f(x) = x
+```ocaml
+Value.Monadic.unique_implies_uncontended_unhint
 ```
 
-but with the important non-equation:
+That morph is represented in the mode solver as:
 
 ```text
-u(f(x)) is not u(x)
+unique_implies_uncontended_right
 ```
 
-For example, `{s}` has no `u` restriction, but `f({s}) = {s,u}`. So UIC
-being unrestricted for `x` does not imply that UIC is unrestricted for `f(x)`.
+That morph's forward action was:
 
-The point of the separate variable is to avoid pretending that `f` is a simple
-meet-with-mask or join-with-constant operation in the coefficient lattice.
-The representation can stay distributive while entailment or normalization
-remembers that `f(x)` is the dependent artificial-uniqueness view of `x`.
+```text
+contention := meet contention
+  (if uniqueness is Unique then Uncontended else Contended)
+```
 
-## Mutable Data
+So, forward:
 
-Mutable fields contain an implicit `@@ aliased` modality on their payloads.
-Therefore the payload dependency should be viewed through `f`.
+```text
+unique contended => unique uncontended
+aliased contended => aliased contended
+```
 
-That means:
+That operation was removed from the generic solver morph language. There are no
+`unique_implies_uncontended_left` or `unique_implies_uncontended_right` morphs
+now.
 
-- the mutable cell itself may still have UIC;
-- direct UIC of the payload does not pass through the mutable field;
-- payloads that fully cross contention still support UIC through the mutable
-  field.
+The current first-pass implementation keeps UIC as a crossing bit only. In
+`Crossing.apply_left`, it:
 
-This is why the distinction matters for mutable data. Mutable data is exactly
-where unique-to-uncontended is useful, but mutable payloads also introduce the
-artificial-uniqueness boundary that prevents direct UIC from passing through.
+```text
+1. applies ordinary mode crossing
+2. checks whether the crossed value is already definitely unique
+3. if so, strengthens contention to uncontended
+```
+
+This uses an existing valid solver operation for the final contention
+strengthening. It does not add a UIC-specific adjoint to the generic solver.
+
+This is safe but not precise. It only fires when uniqueness is visible at the
+crossing operation. It still misses cases where default uniqueness is discovered
+later, such as:
+
+```ocaml
+let int_ref_with_default_unique (x : int ref @ contended) =
+  use_uncontended x
+```
+
+The test file records those missed positive cases with CRs.
+
+## Problem Encountered
+
+The existing mode solver treats morphs as adjoint-based rewrites. For a
+constraint of this form:
+
+```text
+a <= f(v)
+```
+
+`submode_cmv` first checks:
+
+```text
+a <= f(v.upper)
+```
+
+If that succeeds, it assumes `a` is in the downward closure of `f`'s image and
+rewrites the constraint using the left adjoint:
+
+```text
+left_adjoint(f)(a) <= v
+```
+
+This assumption is built into the solver. The solver calls `Result.get_ok` after
+the rewrite because failure is supposed to be impossible when the adjoint is
+valid.
+
+We tried making the UIC left-adjoint behave like an identity-like backward
+approximation. That crashed on this example:
+
+```ocaml
+let use_uncontended : 'a @ uncontended -> unit = fun _ -> ()
+
+let int_ref_with_default_unique (x : int ref @ contended) =
+  use_uncontended x
+```
+
+The internal failing shape was:
+
+```text
+a <= f(v)
+```
+
+with:
+
+```text
+a =
+  aliased,uncontended,read_write,dynamic
+
+f =
+  unique_implies_uncontended_right
+  . imply(unique,uncontended,read_write,static)
+  . unique_implies_uncontended_right
+  . imply(unique,uncontended,read_write,static)
+  . unique_implies_uncontended_right
+  . imply(unique,uncontended,read_write,static)
+  . id
+
+f(v).upper =
+  unique,uncontended,read_write,static
+
+v.upper =
+  unique,contended,read_write,static
+```
+
+The image check passed:
+
+```text
+a <= f(v.upper)
+```
+
+because applying UIC to `v.upper` made the target uncontended.
+
+Then the fake identity-like left adjoint produced:
+
+```text
+left_adjoint(f)(a) =
+  aliased,uncontended,read_write,dynamic
+```
+
+and the solver tried to require:
+
+```text
+aliased,uncontended,read_write,dynamic <= v
+```
+
+But `v.upper` was only:
+
+```text
+unique,contended,read_write,static
+```
+
+So the source-side update failed, contradicting the solver invariant, and the
+solver raised:
+
+```text
+Invalid_argument("result is Error _")
+```
+
+The important lesson is:
+
+```text
+an approximate backward operation is not the same thing as a solver adjoint
+```
+
+The `morph` API assumes adjoint-style equivalence strong enough to
+rewrite constraints and mutate variable bounds. A forward-only or
+backward-approximate UIC operation needs either a different solver concept or an
+implementation that does not put the approximate operation into the generic
+adjoint-based morph path.
+
+## Desired Next Implementation
+
+The desired implementation shape is a crossing-aware submode check rather than a
+mode expression:
+
+```text
+ordinary crossed actual <= expected
+```
+
+or, if the only failing part is contention:
+
+```text
+UIC is enabled
+and actual is already definitely unique
+and uncontended satisfies the expected contention mode
+```
+
+The important property is:
+
+```text
+UIC may discharge a contention obligation using already-known uniqueness.
+UIC must not create a new uniqueness obligation.
+```
+
+That check belongs above `Lattices_mono.morph`, near the existing places that
+combine mode crossing with submode checks. It should not be represented as a
+generic solver morph.

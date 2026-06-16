@@ -3487,10 +3487,6 @@ module Lattices_mono = struct
         -> ('a, 'c, 'd) morph
         (** Composition of two morphisms. Generated morph enumerations do not
             include compositions, but the solver can construct them. *)
-    | Unique_implies_uncontended_left :
-        (Monadic_op.t, Monadic_op.t, 'l * disallowed) morph
-    | Unique_implies_uncontended_right :
-        (Monadic_op.t, Monadic_op.t, disallowed * 'r) morph
 
   include Magic_allow_disallow (struct
     type ('a, 'b, 'd) sided = ('a, 'b, 'd) morph constraint 'd = _ * _
@@ -3503,7 +3499,6 @@ module Lattices_mono = struct
       | Min_with_simple (ax, m) ->
         Min_with_simple (ax, Simple_morph.allow_left m)
       | Const_min src -> Const_min src
-      | Unique_implies_uncontended_left -> Unique_implies_uncontended_left
       | Compose (mb, ma) ->
         let mb = allow_left mb in
         let ma = allow_left ma in
@@ -3517,7 +3512,6 @@ module Lattices_mono = struct
       | Max_with_simple (ax, m) ->
         Max_with_simple (ax, Simple_morph.allow_right m)
       | Const_max src -> Const_max src
-      | Unique_implies_uncontended_right -> Unique_implies_uncontended_right
       | Compose (mb, ma) ->
         let mb = allow_right mb in
         let ma = allow_right ma in
@@ -3539,8 +3533,6 @@ module Lattices_mono = struct
         let mb = disallow_left mb in
         let ma = disallow_left ma in
         Compose (mb, ma)
-      | Unique_implies_uncontended_left -> Unique_implies_uncontended_left
-      | Unique_implies_uncontended_right -> Unique_implies_uncontended_right
 
     let rec disallow_right : type a b l r.
         (a, b, l * r) morph -> (a, b, l * disallowed) morph = function
@@ -3558,23 +3550,7 @@ module Lattices_mono = struct
         let mb = disallow_right mb in
         let ma = disallow_right ma in
         Compose (mb, ma)
-      | Unique_implies_uncontended_left -> Unique_implies_uncontended_left
-      | Unique_implies_uncontended_right -> Unique_implies_uncontended_right
   end)
-
-  let unique_implies_uncontended_contention = function
-    | Uniqueness.Unique -> Contention.Uncontended
-    | Uniqueness.Aliased -> Contention.Contended
-
-  let apply_unique_implies_uncontended_left m =
-    { m with contention = Contention.Contended }
-
-  let apply_unique_implies_uncontended_right m =
-    let contention =
-      Contention.meet m.contention
-        (unique_implies_uncontended_contention m.uniqueness)
-    in
-    { m with contention }
 
   let rec src : type a b d. b obj -> (a, b, d) morph -> a obj =
    fun dst f ->
@@ -3586,8 +3562,6 @@ module Lattices_mono = struct
     | Const_min src -> src
     | Const_max src -> src
     | Const (src, _) -> src
-    | Unique_implies_uncontended_left -> Monadic_op
-    | Unique_implies_uncontended_right -> Monadic_op
     | Compose (mb, ma) ->
       let mid = src dst mb in
       src mid ma
@@ -3642,12 +3616,6 @@ module Lattices_mono = struct
         Simple_morph.compare_total (proj_obj ax1 dst) m1 m2
     | Min_with_simple _, _ -> -1
     | _, Min_with_simple _ -> 1
-    | Unique_implies_uncontended_left, Unique_implies_uncontended_left -> 0
-    | Unique_implies_uncontended_left, _ -> -1
-    | _, Unique_implies_uncontended_left -> 1
-    | Unique_implies_uncontended_right, Unique_implies_uncontended_right -> 0
-    | Unique_implies_uncontended_right, _ -> -1
-    | _, Unique_implies_uncontended_right -> 1
     | Compose (mb1, ma1), Compose (mb2, ma2) ->
       let c = compare_morph dst mb1 mb2 in
       if c <> 0
@@ -3685,20 +3653,12 @@ module Lattices_mono = struct
       match Axis.equal ax1 ax2 with
       | Misc.Is_not_eq -> Misc.Is_not_eq
       | Misc.Is_eq -> Simple_morph.equal (proj_obj ax1 dst) m1 m2)
-    | ( Unique_implies_uncontended_left,
-        Unique_implies_uncontended_left ) ->
-      Misc.Is_eq
-    | ( Unique_implies_uncontended_right,
-        Unique_implies_uncontended_right ) ->
-      Misc.Is_eq
     | Compose (mb1, ma1), Compose (mb2, ma2) -> (
       match equal_morph dst mb1 mb2 with
       | Misc.Is_not_eq -> Misc.Is_not_eq
       | Misc.Is_eq -> equal_morph (src dst mb1) ma1 ma2)
     | ( ( Simple _ | Const_max _ | Const_min _ | Const _ | Simple_proj _
-        | Max_with_simple _ | Min_with_simple _
-        | Unique_implies_uncontended_left
-        | Unique_implies_uncontended_right | Compose _ ),
+        | Max_with_simple _ | Min_with_simple _ | Compose _ ),
         _ ) ->
       Misc.Is_not_eq
 
@@ -3726,10 +3686,6 @@ module Lattices_mono = struct
     | Const_max _ -> Fmt.fprintf ppf "const_%a" (print dst) (max dst)
     | Const_min _ -> Fmt.fprintf ppf "const_%a" (print dst) (min dst)
     | Const (_, c) -> Fmt.fprintf ppf "const_%a" (print dst) c
-    | Unique_implies_uncontended_left ->
-      Fmt.fprintf ppf "unique_implies_uncontended_left"
-    | Unique_implies_uncontended_right ->
-      Fmt.fprintf ppf "unique_implies_uncontended_right"
     | Compose (mb, ma) ->
       let mid = src dst mb in
       Fmt.fprintf ppf "%a . %a" (print_morph dst) mb (print_morph mid) ma
@@ -3751,10 +3707,6 @@ module Lattices_mono = struct
     | Const_max _ -> max dst
     | Const_min _ -> min dst
     | Const (_, c) -> c
-    | Unique_implies_uncontended_left ->
-      apply_unique_implies_uncontended_left a
-    | Unique_implies_uncontended_right ->
-      apply_unique_implies_uncontended_right a
     | Compose (mb, ma) ->
       let mid = src dst mb in
       apply dst mb (apply mid ma a)
@@ -3770,7 +3722,6 @@ module Lattices_mono = struct
       let mid = proj_obj ax dst in
       Simple_proj (Simple_morph.right_adjoint mid m, ax, dst)
     | Const_min _ -> Const_max dst
-    | Unique_implies_uncontended_left -> Unique_implies_uncontended_right
     | Compose (mb, ma) ->
       let mid = src dst mb in
       Compose (right_adjoint mid ma, right_adjoint dst mb)
@@ -3786,7 +3737,6 @@ module Lattices_mono = struct
       let mid = proj_obj ax dst in
       Simple_proj (Simple_morph.left_adjoint mid m, ax, dst)
     | Const_max _ -> Const_min dst
-    | Unique_implies_uncontended_right -> Unique_implies_uncontended_left
     | Compose (mb, ma) ->
       let mid = src dst mb in
       Compose (left_adjoint mid ma, left_adjoint dst mb)
@@ -3995,20 +3945,6 @@ module Lattices_mono = struct
    fun dst m0 m1 ->
     match m0, m1 with
     | Simple m0, Simple m1 -> Simple (Simple_morph.compose dst m0 m1)
-    | Simple Id, Unique_implies_uncontended_left ->
-      Unique_implies_uncontended_left
-    | Unique_implies_uncontended_left, Simple Id ->
-      Unique_implies_uncontended_left
-    | Simple Id, Unique_implies_uncontended_right ->
-      Unique_implies_uncontended_right
-    | Unique_implies_uncontended_right, Simple Id ->
-      Unique_implies_uncontended_right
-    | ( Unique_implies_uncontended_left,
-        Unique_implies_uncontended_left ) ->
-      Unique_implies_uncontended_left
-    | ( Unique_implies_uncontended_right,
-        Unique_implies_uncontended_right ) ->
-      Unique_implies_uncontended_right
     | Const_max b_obj, _ -> Const_max (src b_obj m1)
     | Const_min b_obj, _ -> Const_min (src b_obj m1)
     | Const (b_obj, c), _ -> Const (src b_obj m1, c)
@@ -4097,10 +4033,6 @@ module Lattices_mono = struct
     | (_ as m0), Const (obj1, c1) -> Const (obj1, apply dst m0 c1)
     | (_ as m0), Compose (m1, m2) -> Compose (Compose (m0, m1), m2)
     | Compose (m0, m1), (_ as m2) -> Compose (Compose (m0, m1), m2)
-    | Unique_implies_uncontended_left, _ -> Compose (m0, m1)
-    | _, Unique_implies_uncontended_left -> Compose (m0, m1)
-    | Unique_implies_uncontended_right, _ -> Compose (m0, m1)
-    | _, Unique_implies_uncontended_right -> Compose (m0, m1)
     (* The remaining cases are unreachable by looking at the axes and objects *)
     | _, Simple_proj (Core (Locality_restricted _), _, _) -> .
     | _, Simple_proj (Meet_const_core (_, Locality_restricted _), _, _) -> .
@@ -4334,18 +4266,6 @@ module Lattices_mono = struct
         | Misc.Is_not_eq -> None_responsible
         | Misc.Is_eq -> All_responsible
         end
-      | Unique_implies_uncontended_left -> (
-        match ax with
-        | Uniqueness -> All_responsible
-        | Contention -> Axis Contention
-        | Visibility -> Axis Visibility
-        | Staticity -> Axis Staticity)
-      | Unique_implies_uncontended_right -> (
-        match ax with
-        | Uniqueness -> Axis Uniqueness
-        | Contention -> All_responsible
-        | Visibility -> Axis Visibility
-        | Staticity -> Axis Staticity)
       | Const_max _ | Const_min _ | Const _ -> None_responsible
       | Compose (mb, ma) ->
         begin match find_responsible_axis_proj mb ax with
@@ -4361,9 +4281,6 @@ module Lattices_mono = struct
       | Simple _ -> All_responsible
       | Simple_proj (_, ax, _) -> Axis ax
       | Max_with_simple _ | Min_with_simple _ -> All_responsible
-      | Unique_implies_uncontended_left
-      | Unique_implies_uncontended_right ->
-        All_responsible
       | Const_max _ | Const_min _ | Const _ -> None_responsible
       | Compose (mb, ma) -> (
         match find_responsible_axis_all mb with
@@ -5658,6 +5575,8 @@ module Monadic_gen (Obj : Obj) = struct
 
   module Guts = struct
     let get_ceil m = S.get_floor obj m
+
+    let get_loose_ceil m = S.get_loose_floor obj m
   end
 end
 [@@inline]
@@ -6179,8 +6098,16 @@ module Monadic = struct
   let min_with ax m =
     S.apply ~hint:Skip Obj.obj (Max_with_simple (ax, Id)) (S.disallow_left m)
 
+  let definitely_unique m =
+    match (Guts.get_loose_ceil m).uniqueness with
+    | Unique -> true
+    | Aliased -> false
+
+  let definitely_unique_unhint m = m |> hint ~hint:Skip |> definitely_unique
+
   let unique_implies_uncontended_unhint m =
-    S.Unhint.apply Obj.obj Unique_implies_uncontended_right m
+    let c : Const.t = { Const.min with contention = Contended } in
+    subtract_const_unhint c m
 
   let zap_to_legacy m : Const.t =
     let uniqueness = proj Uniqueness m |> Uniqueness.zap_to_legacy in
@@ -7894,7 +7821,9 @@ module Crossing = struct
       { monadic; comonadic } =
     let monadic = Monadic.apply_left crossing.monadic monadic in
     let monadic =
-      if unique_implies_uncontended
+      if
+        unique_implies_uncontended
+        && Value.Monadic.definitely_unique_unhint monadic
       then Value.Monadic.unique_implies_uncontended_unhint monadic
       else monadic
     in
