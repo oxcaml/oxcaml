@@ -1793,8 +1793,5 @@ module Open_abstract_kind_test = struct
   type ('a : k_open) t
 end
 [%%expect{|
-Line 3, characters 13-19:
-3 |   type ('a : k_open) t
-                 ^^^^^^
-Error: Unbound kind "k_open"
+module Open_abstract_kind_test : sig type ('a : any) t end
 |}]
