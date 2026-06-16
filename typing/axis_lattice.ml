@@ -157,13 +157,7 @@ let decode (v : t) : int array =
 let non_bot_axes (v : t) : int list =
   let rec loop i acc =
     if i = num_axes
-    then
-      let acc =
-        if v land uic_disabled_mask = 0 || List.mem 3 acc
-        then acc
-        else 3 :: acc
-      in
-      List.rev acc
+    then List.rev acc
     else
       let acc' = if v land axis_mask.(i) <> 0 then i :: acc else acc in
       loop (i + 1) acc'
