@@ -444,7 +444,8 @@ let report_mode_sub_error ~pp got expected ppf e =
   let reopen_box = dprintf "@]@ %t" open_box in
   fprintf ppf "%t%s " open_box (String.capitalize_ascii got);
   begin match left ppf with
-  | Mode -> fprintf ppf "%tbut %s " reopen_box expected
+  | Mode | Mode_with_inline_hint ->
+    fprintf ppf "%tbut %s " reopen_box expected
   | Mode_with_hint -> fprintf ppf ".%tHowever, %s " reopen_box expected
   end;
   ignore (right ppf);

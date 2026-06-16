@@ -13153,7 +13153,8 @@ let report_error ~loc env =
     | Mode_with_hint ->
       fprintf ppf
         ".%tHowever, the highlighted expression is expected to be " reopen_box
-    | Mode -> fprintf ppf "%tbut is expected to be " reopen_box);
+    | Mode | Mode_with_inline_hint ->
+      fprintf ppf "%tbut is expected to be " reopen_box);
     ignore (right ppf);
     fprintf ppf ".@]"
       ) e

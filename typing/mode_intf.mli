@@ -83,6 +83,7 @@ type loosening =
 
 type print_error_result =
   | Mode  (** A mode constant is printed *)
+  | Mode_with_inline_hint  (** A mode constant with an inline hint is printed *)
   | Mode_with_hint  (** A mode constant with hints is printed *)
 
 type print_error = (Fmt.formatter -> print_error_result) simple_error
@@ -94,10 +95,11 @@ module type Common = sig
 
   (** Takes a submode [error] accompanied by a [pinpoint] of the original
       submode, returns an explaining printer for each side. Each printer prints
-      either a mode constant name, or "[mode] because ...". The function assumes
-      [pinpoint] is already printed, which allows simplifying its own printing.
-      The caller is responsible for printing [pinpoint] and placing the result
-      of this function in a suitable linguistic context. *)
+      either a mode constant name, a mode constant name and an inlined hint
+      "[mode] (hint)", or "[mode] because ...". The function assumes [pinpoint]
+      is already printed, which allows simplifying its own printing. The caller
+      is responsible for printing [pinpoint] and placing the result of this
+      function in a suitable linguistic context. *)
   val print_error : Mode_hint.pinpoint -> error -> print_error
 
   type equate_error = equate_step * error

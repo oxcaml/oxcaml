@@ -5128,6 +5128,13 @@ module Report = struct
           "the current mode is not responsible for the error, so must be \
            inside a responsible morphism";
       None
+    | Const (Annotation loc) when not sub ->
+      Fmt.fprintf ppf "%a (%a)"
+        (print_mode_with_side ~sub side obj)
+        a
+        (Location.Doc.loc ~capitalize_first:false)
+        loc;
+      Some Mode_with_inline_hint
     | Const c ->
       Fmt.fprintf ppf "%a@ because %a"
         (print_mode_with_side ~sub side obj)
@@ -5246,7 +5253,8 @@ module Error = struct
               (print_desc ~definite:true ~capitalize:false)
         in
         fprintf ppf ".%tHowever, %t is expected to be " reopen_box print_desc
-      | Mode -> fprintf ppf "%tbut is expected to be " reopen_box);
+      | Mode | Mode_with_inline_hint ->
+        fprintf ppf "%tbut is expected to be " reopen_box);
       ignore (right ppf);
       fprintf ppf ".@]"
     in
