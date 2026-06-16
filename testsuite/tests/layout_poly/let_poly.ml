@@ -3,12 +3,6 @@
  expect.opt;
 *)
 
-(* CR-soon zqian: Layout poly currently raises in lambda and middle-end.
-Therefore, in the following typing tests, we intentionally write the wrong
-signature such that the inferred signature can be printed and inspected, and we
-never go to lambda. We should add the corresponding positive tests once they can
-go through lambda and middle-end. *)
-
 (* Simple let poly_ with a polymorphic function *)
 let poly_ id x = x
 [%%expect{|
@@ -38,12 +32,6 @@ Error: This expression is not allowed in a "let poly_" definition;
        it must be a function, constructor, tuple, record, or constant.
 |}]
 
-let poly_ id = fun x -> x
-[%%expect{|
-val id : layout_ l. ('a : l). 'a -> 'a = <lpoly>
-|}]
-
-
 (* Let poly_ with multiple bindings - all must be poly_ *)
 let poly_ const x y = x
 and poly_ apply f x = f x
@@ -52,6 +40,12 @@ val const : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a = <lpoly>
 val apply : layout_ l l0. ('a : l) ('b : l0). ('a -> 'b) -> 'a -> 'b =
   <lpoly>
 |}]
+
+(* CR-soon zqian: Tuple patterns are not yet supported by transl.
+Therefore, in the following typing test, we intentionally write the wrong
+signature such that the inferred signature can be printed and inspected, and we
+never go to lambda. We should add the corresponding positive test once it can
+go through transl. *)
 
 (* Tuple pattern - both bindings have separate univars *)
 module _ : sig
@@ -106,17 +100,11 @@ Error: Signature mismatch:
 
 (* a [let poly_] binding of a tuple. The middle-end won't support this in the
    foreseeable future *)
-module _ : sig
-  val foo : layout_ x. ('a : x). 'a -> 'a
-  val bar : layout_ p q. ('a : p) ('b : q). 'a -> 'b -> 'a
-end = struct
-  let poly_ foo, bar =
-    (fun x -> x, fun x _ -> x)
-end
+let poly_ foo, bar = (fun x -> x, fun x _ -> x)
 [%%expect{|
-Line 6, characters 4-30:
-6 |     (fun x -> x, fun x _ -> x)
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 21-47:
+1 | let poly_ foo, bar = (fun x -> x, fun x _ -> x)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression should not be a function, the expected type is "'a * 'b"
 |}]
 

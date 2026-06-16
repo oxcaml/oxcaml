@@ -43,7 +43,10 @@ let create_local name =
 
 let of_ident ident = Ident ident
 
-let of_sort_var var = Sort_var (Jkind_types.Sort.Var.get_id var)
+let of_sort_var var =
+  if not (Jkind_types.Sort.Var.is_root var)
+  then Misc.fatal_error "Slambdaident.of_sort_var: not a root";
+  Sort_var (Jkind_types.Sort.Var.get_id var)
 
 let equal i1 i2 =
   match i1, i2 with

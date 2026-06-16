@@ -302,6 +302,8 @@ module Sort = struct
 
     let for_class = scannable
 
+    let for_template_env = scannable
+
     (* Pre-allocated [Some]-wrappings of the base sort constants, evaluated
        once at module initialization and shared by [some] /
        [some_of_base] to avoid allocating a fresh [Some] block per
@@ -358,6 +360,8 @@ module Sort = struct
     let get_id { id; _ } = id
 
     let is_cmi_var { id; _ } = id < 0
+
+    let is_root { contents; _ } = Option.is_none contents
 
     (* Map var ids to smaller numbers for more consistent printing. *)
     let next_id = ref 1

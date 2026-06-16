@@ -166,6 +166,8 @@ module type Sort = sig
 
     val for_class : t
 
+    val for_template_env : t
+
     (** Wrap [t] in [Some], reusing a pre-allocated [Some] block when [t] is a
         base sort. Use this when constructing [_sort : Const.t option] fields
         (e.g. [ld_sort], [ca_sort], [lbl_sort]) so each record/constructor load
@@ -180,6 +182,9 @@ module type Sort = sig
     (** Checks whether a [var] satisfies the properties that hold for variables
         saved to a cmi. *)
     val is_cmi_var : var -> bool
+
+    (** Checks whether a [var] is "repr'd" - that is, it has no contents. *)
+    val is_root : var -> bool
 
     (** Extract the unique id for a [var]. Outside of a cmi, equal [id]s imply
         physical equality of [var]s. *)

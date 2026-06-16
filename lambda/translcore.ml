@@ -394,7 +394,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         e.exp_env e.exp_type path desc kind
   | Texp_apply_layout (func, args) ->
       Lkindinstantiate {
-        kinst_func = (transl_exp ~scopes Jkind.Sort.Const.for_function func);
+        kinst_func =
+          (transl_exp ~scopes Jkind.Sort.Const.for_template_env func);
         kinst_args = List.map
           (fun var ->
             let layout = Jkind.Sort.var_default_to_scannable_and_get var in
