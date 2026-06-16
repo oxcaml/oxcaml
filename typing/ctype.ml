@@ -6323,6 +6323,13 @@ let moregen_alloc_mode env ~label ~is_ret ty v a1 a2 =
     | Ok () -> Ok ()
     | Error error -> Error Errortrace.{ context; left_pos; error }
   in
+  let tighten () =
+    match v with
+    | Covariant -> Alloc.Guts.zap_towards_floor_of a1 ~towards:a2 |> ignore
+    | Contravariant ->
+      Alloc.Guts.zap_towards_ceil_of a1 ~towards:a2 |> ignore
+    | Invariant | Bivariant -> ()
+  in
   match
     match v with
     | Invariant ->
@@ -6333,6 +6340,7 @@ let moregen_alloc_mode env ~label ~is_ret ty v a1 a2 =
   with
   | Ok () -> ()
   | Error mode_mismatch ->
+    tighten ();
     raise_trace_for Moregen [Mode_mismatch mode_mismatch]
 
 let may_instantiate inst_nongen t1 =

@@ -5516,6 +5516,8 @@ module Monadic_gen (Obj : Obj) = struct
   let subtract_const c m = m |> disallow_right |> wrap (subtract_const_unhint c)
 
   module Guts = struct
+    let get_floor m = S.get_ceil obj m
+
     let get_ceil m = S.get_floor obj m
   end
 end
@@ -6681,6 +6683,28 @@ module Value_with (Areality : Areality) = struct
     let monadic = Monadic.zap_to_legacy monadic in
     let comonadic = Comonadic.zap_to_legacy comonadic in
     merge { monadic; comonadic }
+
+  module Guts = struct
+    let get_floor { comonadic; monadic } =
+      let monadic = Monadic.Guts.get_floor monadic in
+      let comonadic = Comonadic.Guts.get_floor comonadic in
+      merge { monadic; comonadic }
+
+    let get_ceil { comonadic; monadic } =
+      let monadic = Monadic.Guts.get_ceil monadic in
+      let comonadic = Comonadic.Guts.get_ceil comonadic in
+      merge { monadic; comonadic }
+
+    let zap_towards_floor_of a1 ~towards:a2 =
+      let a2_floor = get_floor a2 in
+      zap_to_ceil (meet [a1; of_const a2_floor]) |> ignore;
+      zap_to_floor a1
+
+    let zap_towards_ceil_of a1 ~towards:a2 =
+      let a2_ceil = get_ceil a2 in
+      zap_to_floor (join [a1; of_const a2_ceil]) |> ignore;
+      zap_to_ceil a1
+  end
 
   (** This is about partially applying [A -> B -> C] to [A] and getting
       [B -> C]. [comonadic] and [monadic] constutute the mode of [A], and we
