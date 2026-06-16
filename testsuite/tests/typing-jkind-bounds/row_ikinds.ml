@@ -193,7 +193,10 @@ let f (x : [< `A of int | `B of string] @ contended) =
   use_uncontended x
 (* CR layouts v2.8: This should be accepted. Internal ticket 6481  *)
 [%%expect{|
-val f : [< `A of int | `B of string ] @ contended -> unit = <fun>
+Line 2, characters 18-19:
+2 |   use_uncontended x
+                      ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 (* CR layouts v2.8: This should also be accepted, but not with a best quality. Internal ticket 6481 *)
