@@ -646,7 +646,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           let full_application =
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
-              ~return_arity:result_arity ~call_kind ~alloc_mode:my_alloc_mode
+              ~return_arity:result_arity ~call_kind ~return_mode:my_alloc_mode
               dbg ~inlined:Default_inlined
               ~inlining_state:(Apply.inlining_state apply)
               ~position:Normal ~probe:None
@@ -1246,7 +1246,8 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         (Apply.exn_continuation apply)
         ~args ~args_arity:(Apply.args_arity apply)
         ~return_arity:(Apply.return_arity apply)
-        ~call_kind:(Apply.call_kind apply) ~alloc_mode:(Apply.return_mode apply)
+        ~call_kind:(Apply.call_kind apply)
+        ~return_mode:(Apply.return_mode apply)
         (DE.add_inlined_debuginfo (DA.denv dacc) (Apply.dbg apply))
         ~inlined:(Apply.inlined apply) ~inlining_state
         ~probe:(Apply.probe apply) ~position:(Apply.position apply)

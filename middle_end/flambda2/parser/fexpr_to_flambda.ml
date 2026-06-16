@@ -840,7 +840,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         arities
       } ->
     let continuation = find_result_cont env continuation in
-    let alloc_mode = alloc_mode_for_applications env alloc_mode in
+    let return_mode = alloc_mode_for_applications env alloc_mode in
     let call_kind, args_arity, return_arity =
       match call_kind with
       | Function (Direct { code_id; function_slot = _ }) ->
@@ -937,8 +937,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         ~callee:(Option.map (simple env) func)
         ~continuation exn_continuation
         ~args:((List.map (simple env)) args)
-        ~args_arity ~return_arity ~call_kind ~alloc_mode Debuginfo.none ~inlined
-        ~inlining_state ~probe:None ~position:Normal
+        ~args_arity ~return_arity ~call_kind ~return_mode Debuginfo.none
+        ~inlined ~inlining_state ~probe:None ~position:Normal
         ~relative_history:Inlining_history.Relative.empty
     in
     acc, Flambda.Expr.create_apply apply
