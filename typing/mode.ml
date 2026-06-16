@@ -767,11 +767,11 @@ module Lattices = struct
     include Total (struct
       type nonrec t = t
 
-      let min = Alloc
+      let min = Noalloc_strict
 
-      let max = Noalloc_strict
+      let max = Alloc
 
-      let ord = function Alloc -> 0 | Noalloc -> 1 | Noalloc_strict -> 2
+      let ord = function Noalloc_strict -> 0 | Noalloc -> 1 | Alloc -> 2
     end)
 
     let legacy = Alloc
@@ -5894,7 +5894,7 @@ module Allocation = struct
 
   let legacy = of_const Const.legacy
 
-  let zap_to_legacy = zap_to_floor
+  let zap_to_legacy = zap_to_ceil
 end
 
 module type Areality = sig
@@ -5939,7 +5939,8 @@ module Comonadic_with (Areality : Areality) = struct
         P Portability;
         P Forkable;
         P Yielding;
-        P Statefulness ]
+        P Statefulness;
+        P Allocation ]
       |> List.sort (fun (P ax1) (P ax2) -> compare ax1 ax2)
   end
 

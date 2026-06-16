@@ -29,7 +29,7 @@
    7. Statefulness: Stateless -> Writing / Reading -> Stateful
    8. Visibility (monadic): Immutable -> Read / Write -> Read_write
    9. Staticity (monadic): Dynamic -> Static
-   10. Allocation: Alloc -> Noalloc -> Noalloc_strict
+   10. Allocation: Noalloc_strict -> Noalloc -> Alloc
    11. Externality: External -> External64 -> Internal
 
    Axes 0-10 are modal axes (affect mode-crossing).
@@ -292,9 +292,9 @@ module Levels = struct
 
   let level_of_allocation (x: Mode.Allocation.Const.t) : int =
     match x with
-    | Mode.Allocation.Const.Alloc -> 0
+    | Mode.Allocation.Const.Noalloc_strict -> 0
     | Mode.Allocation.Const.Noalloc -> 1
-    | Mode.Allocation.Const.Noalloc_strict -> 2
+    | Mode.Allocation.Const.Alloc -> 2
 
   let level_of_externality (x : Jkind_axis.Externality.t) : int =
     match x with External -> 0 | External64 -> 1 | Internal -> 2
@@ -359,9 +359,9 @@ module Levels = struct
     | _ -> invalid_arg "Axis_lattice.staticity_of_level_monadic"
 
   let allocation_of_level = function
-    | 0 -> Mode.Allocation.Const.Alloc
+    | 0 -> Mode.Allocation.Const.Noalloc_strict
     | 1 -> Mode.Allocation.Const.Noalloc
-    | 2 -> Mode.Allocation.Const.Noalloc_strict
+    | 2 -> Mode.Allocation.Const.Alloc
     | _ -> invalid_arg "Axis_lattice.allocation_of_level"
 
   let externality_of_level = function
