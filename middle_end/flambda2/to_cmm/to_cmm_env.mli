@@ -300,7 +300,10 @@ val inline_variable :
     has been flushed, or is bound to a splittable primitive that has not yet
     been materialised as a single Cmm expression), or if the bound defining
     expression is not pure (i.e. has any effects or coeffects). Aliases (as
-    recorded by [add_alias]) are resolved before the lookup. *)
+    recorded by [add_alias]) are resolved before the lookup.
+
+    Note that using this function can throw off other assumptions made in
+    To_cmm, so should be used with caution. *)
 val find_pure_bound_cmm_expr : t -> Variable.t -> Cmm.expression option
 
 type flush_mode =
