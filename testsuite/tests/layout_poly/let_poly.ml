@@ -125,7 +125,7 @@ let poly_ f = 42
 Line 1, characters 10-11:
 1 | let poly_ f = 42
               ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 
 val f : int = 42
 |}]
@@ -187,7 +187,7 @@ let poly_ f = `A
 Line 1, characters 10-11:
 1 | let poly_ f = `A
               ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 
 val f : [> `A ] = `A
 |}]
@@ -258,7 +258,7 @@ type r = { a : int; b : int -> int; }
 Line 2, characters 10-11:
 2 | let poly_ f = { a = 42; b = fun x -> x }
               ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 
 val f : r = {a = 42; b = <fun>}
 |}]
@@ -281,7 +281,7 @@ type ur = #{ a : int; b : int; }
 Line 2, characters 10-11:
 2 | let poly_ f = #{ a = 42; b = 0 }
               ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 
 val f : ur = <abstr>
 |}]
@@ -314,7 +314,7 @@ let poly_ f x = (x : (_ : value))
 Line 1, characters 10-11:
 1 | let poly_ f x = (x : (_ : value))
               ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 
 val f : 'a -> 'a = <fun>
 |}]
@@ -354,7 +354,7 @@ let rec poly_ f x = x
 Line 1, characters 14-15:
 1 | let rec poly_ f x = x
                   ^
-Warning 218: "poly_" has no effect in recursive bindings, which do not support layout polymorphism. Consider using a regular "let rec" instead.
+Warning 218: poly_ has no effect in recursive bindings, which do not support layout polymorphism. Consider using a regular let rec instead.
 
 val f : 'a -> 'a = <fun>
 |}]
@@ -407,7 +407,7 @@ let _bar (x @ local) =
 Line 2, characters 12-13:
 2 |   let poly_ f = x in
                 ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 
 Line 3, characters 2-3:
 3 |   f
@@ -429,17 +429,17 @@ let f (x @ local) =
 Line 3, characters 12-13:
 3 |   and poly_ g = () in
                 ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 
 Line 2, characters 12-13:
 2 |   let poly_ f = x
                 ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
+Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
 
 Line 2, characters 12-13:
 2 |   let poly_ f = x
                 ^
-Warning 26 [unused-var]: unused variable f.
+Warning 26 [unused-var]: unused variable "f".
 
 val f : 'a @ local -> unit = <fun>
 |}]

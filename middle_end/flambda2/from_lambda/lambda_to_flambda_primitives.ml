@@ -2809,16 +2809,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
                   - 1))) ]
       | Ostype_unix ->
         [ Simple
-            (Simple.const_bool machine_width (String.equal Sys.os_type "Unix"))
-        ]
+            (Simple.const_bool machine_width
+               (String.equal Config.target_os_type "Unix")) ]
       | Ostype_win32 ->
         [ Simple
-            (Simple.const_bool machine_width (String.equal Sys.os_type "Win32"))
-        ]
+            (Simple.const_bool machine_width
+               (String.equal Config.target_os_type "Win32")) ]
       | Ostype_cygwin ->
         [ Simple
             (Simple.const_bool machine_width
-               (String.equal Sys.os_type "Cygwin")) ]
+               (String.equal Config.target_os_type "Cygwin")) ]
       (* CR-someday gyorsh: replace string comparisons with dedicated types for
          [arch] and [os_type]. *)
       | Arch_amd64 ->

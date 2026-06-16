@@ -1,6 +1,5 @@
 (* TEST
- runtime5;
- multidomain;
+ multicore;
  include systhreads;
  hassysthreads;
  {

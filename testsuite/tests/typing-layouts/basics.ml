@@ -1,11 +1,7 @@
 (* TEST
  include stdlib_upstream_compatible;
- {
-   expect;
- }{
-   flags = "-extension layouts_beta";
-   expect;
- }
+ flags = "-extension layouts_beta";
+ expect;
 *)
 
 type t_value : value
@@ -253,7 +249,7 @@ end;;
 Line 4, characters 72-73:
 4 |   let f1 () = A {a = (fun x y -> Stdlib_upstream_compatible.Float_u.abs x)}
                                                                             ^
-Error: This expression has type "('a : value)"
+Error: The value "x" has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
@@ -288,7 +284,7 @@ end;;
 Line 4, characters 67-68:
 4 |   let f1 () = A (fun x y -> Stdlib_upstream_compatible.Float_u.abs x)
                                                                        ^
-Error: This expression has type "('a : value)"
+Error: The value "x" has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
@@ -307,7 +303,7 @@ end;;
 Line 4, characters 74-75:
 4 |   let f6 () = A {a = (fun x y -> Stdlib_upstream_compatible.Float_u.add x y)}
                                                                               ^
-Error: This expression has type "('a : value)"
+Error: The value "y" has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
@@ -326,7 +322,7 @@ end;;
 Line 4, characters 69-70:
 4 |   let f6 () = A (fun x y -> Stdlib_upstream_compatible.Float_u.add x y)
                                                                          ^
-Error: This expression has type "('a : value)"
+Error: The value "y" has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
@@ -517,7 +513,7 @@ let not_helloworld = id_for_imms "hello world";;
 Line 1, characters 33-46:
 1 | let not_helloworld = id_for_imms "hello world";;
                                      ^^^^^^^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "'a imm_id" = "('a : immediate)"
        The layout of string is value non_float
          because it is the primitive type string.
@@ -731,7 +727,7 @@ end;;
 Line 5, characters 16-17:
 5 |     | `Bar v -> v
                     ^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "v" has type "('a : value_or_null)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
@@ -829,7 +825,7 @@ end;;
 Line 6, characters 21-22:
 6 |     | (a, _) -> f_id a
                          ^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "a" has type "('a : value_or_null)"
        but an expression was expected of type "float#"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
@@ -1020,7 +1016,7 @@ end;;
 Line 4, characters 19-33:
 4 |   let foo x = f_id (x # getfloat)
                        ^^^^^^^^^^^^^^
-Error: This expression has type "('a : value)"
+Error: The method call "x#getfloat" has type "('a : value)"
        but an expression was expected of type "'b t" = "('b : float64)"
        The layout of 'a t is float64
          because of the definition of t at line 2, characters 2-28.
@@ -1242,8 +1238,8 @@ let x13f (v : t_float64) = lazy v;;
 Line 1, characters 32-33:
 1 | let x13f (v : t_float64) = lazy v;;
                                     ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value)"
+Error: The value "v" has type "t_float64" but an expression was expected of type
+         "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
        But the layout of t_float64 must be a value layout
@@ -1259,7 +1255,7 @@ val f_id : t_float64 -> t_float64 = <fun>
 Line 4, characters 19-20:
 4 |   | lazy v -> f_id v
                        ^
-Error: This expression has type "('a : value)"
+Error: The value "v" has type "('a : value)"
        but an expression was expected of type "t_float64"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
@@ -1286,8 +1282,8 @@ let x13f (v : t_float64) = Some v;;
 Line 1, characters 32-33:
 1 | let x13f (v : t_float64) = Some v;;
                                     ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "v" has type "t_float64" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
        But the layout of t_float64 must be a value layout
@@ -1302,7 +1298,7 @@ let x13f v =
 Line 3, characters 19-20:
 3 |   | Some v -> f_id v
                        ^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "v" has type "('a : value_or_null)"
        but an expression was expected of type "t_float64"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
@@ -1328,8 +1324,8 @@ let x13 (v : t_float64) = [v];;
 Line 1, characters 27-28:
 1 | let x13 (v : t_float64) = [v];;
                                ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "v" has type "t_float64" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
        But the layout of t_float64 must be a value layout
@@ -1344,7 +1340,7 @@ let x13 v =
 Line 3, characters 16-17:
 3 |   | [v] -> f_id v
                     ^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "v" has type "('a : value_or_null)"
        but an expression was expected of type "t_float64"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
@@ -1574,8 +1570,8 @@ let f (x : t_float64) =
 Line 2, characters 15-16:
 2 |   let g ?(x2 = x) () = () in
                    ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_float64" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
        But the layout of t_float64 must be a value layout
@@ -1767,8 +1763,8 @@ module M : sig val f : 'a -> 'a end
 Line 7, characters 28-29:
 7 | let g (x : t_float64) = M.f x
                                 ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value)"
+Error: The value "x" has type "t_float64" but an expression was expected of type
+         "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
        But the layout of t_float64 must be a value layout
@@ -2302,7 +2298,7 @@ type ('a : any) bar
 Line 5, characters 32-33:
 5 |   : < foo : 'a . 'a foo bar > = x
                                     ^
-Error: This expression has type "< foo : ('a : float64). 'a foo bar >"
+Error: The value "x" has type "< foo : ('a : float64). 'a foo bar >"
        but an expression was expected of type "< foo : 'a. 'a foo bar >"
        Type "'a foo" = "'a" is not compatible with type "'a0 foo" = "'a0"
        The method "foo" has type "('a : float64). 'a foo bar",
@@ -2361,8 +2357,8 @@ type 'a t40 = 'a
 Line 2, characters 33-34:
 2 | let f40 (x: t_float64): 'a t40 = x
                                      ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "'a t40" = "('a : value)"
+Error: The value "x" has type "t_float64" but an expression was expected of type
+         "'a t40" = "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
        But the layout of t_float64 must be a value layout
@@ -2882,7 +2878,7 @@ let three =
 Line 2, characters 14-18:
 2 |   let rec x = #3.4 in
                   ^^^^
-Error: This expression has type "float#" but an expression was expected of type
+Error: This constant has type "float#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.

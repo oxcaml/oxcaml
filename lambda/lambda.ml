@@ -145,6 +145,10 @@ type lazy_block_tag =
   | Lazy_tag
   | Forward_tag
 
+let tag_of_lazy_tag = function
+  | Lazy_tag -> Config.lazy_tag
+  | Forward_tag -> Obj.forward_tag
+
 type primitive =
   | Pbytes_to_string
   | Pbytes_of_string
@@ -1674,6 +1678,10 @@ let shallow_iter ~tail ~non_tail:f = function
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
 
+let is_evaluated = function
+  | Lconst _ | Lvar _ | Lfunction _ -> true
+  | _ -> false
+
 let rec free_variables = function
   | Lvar id
   | Lmutvar id -> Ident.Set.singleton id
@@ -1929,14 +1937,20 @@ let transl_extension_path loc env path =
 let transl_class_path loc env path =
   transl_path Env.find_class_address loc env path
 
-let transl_prim mod_name name =
-  let pers = Ident.create_persistent mod_name in
-  let env = Env.add_persistent_structure pers Env.empty in
-  let lid = Longident.Ldot (Longident.Lident mod_name, name) in
-  match Env.find_value_by_name_lazy lid env with
-  | path, _ -> transl_value_path Loc_unknown env path
+let transl_prim modname field =
+  let mod_ident = Ident.create_persistent modname in
+  let env = Env.add_persistent_structure mod_ident (Lazy.force Env.initial) in
+  match Env.open_pers_signature modname env with
   | exception Not_found ->
-      fatal_error ("Primitive " ^ name ^ " not found.")
+      fatal_errorf "Module %s unavailable." modname
+    | _path, _mode, env -> (
+      match Env.find_value_by_name_lazy (Longident.Lident field) env with
+      | exception Not_found ->
+          fatal_errorf "Primitive %s.%s not found." modname field
+        (* Loc_unknown is appropriate here: this references a compiler-internal
+            primitive with no corresponding user source location. *)
+      | path, _ -> transl_value_path Loc_unknown env path
+    )
 
 (* Compile a sequence of expressions *)
 

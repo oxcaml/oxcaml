@@ -13,7 +13,7 @@ end
 [%%expect{|
 { c = (missing)
 ; r =
-  ⟪(apply (field_imm 1 (global Toploop!)) "M/291"
+  ⟪(apply (field_imm 1 (global Toploop!)) "M/295"
      $(let
         (bool = { c = (missing); r = ⟪1⟫ }
          #body =

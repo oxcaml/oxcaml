@@ -44,13 +44,6 @@ let index_magic_number = "Merl2023I578"
 let interface_suffix = ref ".mli"
 
 let max_tag = 245
-
-type name_mangling_scheme =
-  | Flat
-  | Structured
-
-let name_mangling_scheme = Flat
-
 let flat_float_array = false
 
 let reserved_header_bits = 8
@@ -58,6 +51,16 @@ let runtime5 = true
 let syntax_quotations = true
 
 let merlin = true
+
+let default_keyword_edition = None, []
+
+type name_mangling_scheme =
+  | Flat
+  | Structured
+
+exception Invalid_name_mangling_scheme of string
+
+let name_mangling_scheme = Flat
 
 module Magic_numbers = struct
   type t =

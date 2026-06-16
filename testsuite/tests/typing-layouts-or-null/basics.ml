@@ -1,5 +1,5 @@
 (* TEST
- flags += "-extension comprehensions";
+ flags += "-extension comprehensions -extension layouts_beta";
  expect;
 *)
 
@@ -45,11 +45,11 @@ let f t = t.x
 Line 1, characters 10-13:
 1 | let f t = t.x
               ^^^
-Error: Fields being projected must be representable.
+Error: Record element types must have a representable layout.
        The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
        But the layout of t_any_mod_separable must be representable
-         because it's the type of a field being projected.
+         because it's the type of a field in a record being projected from.
 |}]
 
 module type S1 = sig
@@ -482,7 +482,7 @@ let u () =
 Line 2, characters 10-11:
 2 |   let rec x : t_value_or_null = assert false in
               ^
-Warning 26 [unused-var]: unused variable x.
+Warning 26 [unused-var]: unused variable "x".
 
 val u : unit -> unit = <fun>
 |}]

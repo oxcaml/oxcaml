@@ -9,9 +9,9 @@ external foo : int -> (int8 [@untagged]) = "" "foo"
 Line 1, characters 23-27:
 1 | external foo : int -> (int8 [@untagged]) = "" "foo"
                            ^^^^
-Warning 182 [untagged-external-small-int-return]: Using (int8[@untagged]) or (int16[@untagged]) on C stub returns is not
-recommended since [@untagged] does not perform a sign-extension. Use
-(int8[@unboxed]) or (int16[@unboxed]) instead.
+Warning 182 [untagged-external-small-int-return]: Using "(int8[@untagged])" or "(int16[@untagged])" on C stub returns is not
+  recommended since "[@untagged]" does not perform a sign-extension. Use
+  "(int8[@unboxed])" or "(int16[@unboxed])" instead.
 
 external foo : int -> (int8 [@untagged]) = "" "foo"
 |}]
@@ -21,9 +21,9 @@ external foo : int -> (int16 [@untagged]) = "" "foo"
 Line 1, characters 23-28:
 1 | external foo : int -> (int16 [@untagged]) = "" "foo"
                            ^^^^^
-Warning 182 [untagged-external-small-int-return]: Using (int8[@untagged]) or (int16[@untagged]) on C stub returns is not
-recommended since [@untagged] does not perform a sign-extension. Use
-(int8[@unboxed]) or (int16[@unboxed]) instead.
+Warning 182 [untagged-external-small-int-return]: Using "(int8[@untagged])" or "(int16[@untagged])" on C stub returns is not
+  recommended since "[@untagged]" does not perform a sign-extension. Use
+  "(int8[@unboxed])" or "(int16[@unboxed])" instead.
 
 external foo : int -> (int16 [@untagged]) = "" "foo"
 |}]

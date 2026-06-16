@@ -1,7 +1,6 @@
 (* TEST
  include unix;
- runtime5;
- multidomain;
+ multicore;
  libunix;
  {
    bytecode;

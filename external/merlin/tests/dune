@@ -7,17 +7,21 @@
  (action (copy %{deps} %{target})))
 
 (env (_
- (binaries merlin-wrapper ocamlc-wrapper revert-newlines)
+ (binaries merlin-wrapper ocamlc-wrapper dune-wrapper revert-newlines)
  (env-vars
   (MERLIN merlin-wrapper)
-  (OCAMLC ocamlc-wrapper))))
+  (OCAMLC ocamlc-wrapper)
+  (DUNE dune-wrapper))))
 
 (cram
  (package merlin)
  (applies_to :whole_subtree)
  (deps
+  (env_var MERLIN_TEST_OCAML_PATH)
   %{bin:merlin-wrapper}
   %{bin:ocamlc-wrapper}
+  %{bin:dune-wrapper}
+  %{bin:ocaml-index}
   %{bin:ocamlmerlin-server}
   %{bin:ocamlmerlin}
   %{bin:dot-merlin-reader}
@@ -25,4 +29,5 @@
 
 (cram
  (applies_to with-ppx)
- (deps (package ppxlib)))
+ (deps
+  (package ppxlib)))

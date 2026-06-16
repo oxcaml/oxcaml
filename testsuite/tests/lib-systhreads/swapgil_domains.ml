@@ -3,8 +3,7 @@
  modules = "swapgil_stubs.c";
  include systhreads;
  hassysthreads;
- multidomain;
- runtime5;
+ multicore;
  hasunix;
  native;
 *)

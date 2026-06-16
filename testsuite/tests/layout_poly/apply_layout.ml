@@ -186,7 +186,7 @@ end
 Line 7, characters 9-11:
 7 |     (x', y')
              ^^
-Error: This expression has type "float#" but an expression was expected of type
+Error: The value "y'" has type "float#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.

@@ -302,6 +302,10 @@ module Sort = struct
 
     let for_class = scannable
 
+    let for_effect = scannable
+
+    let for_continuation = scannable
+
     let for_template_env = scannable
 
     (* Pre-allocated [Some]-wrappings of the base sort constants, evaluated

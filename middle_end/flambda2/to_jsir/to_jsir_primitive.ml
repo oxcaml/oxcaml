@@ -304,7 +304,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
   | Project_value_slot { project_from = _; value_slot } ->
     check_my_closure ~env x;
     Some (To_jsir_env.get_value_slot_exn env value_slot), env, res
-  | Is_boxed_float -> check_tag ~env ~res x ~tag:Obj.double_tag
+  | Is_boxed_float -> use_prim' (Extern "caml_is_boxed_float")
   | Is_flat_float_array -> check_tag ~env ~res x ~tag:Obj.double_array_tag
   | End_region _ | End_try_region _ -> no_op ~env ~res
   | Get_header ->

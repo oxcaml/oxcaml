@@ -15,10 +15,19 @@
 #ifndef CAML_TSAN_H
 #define CAML_TSAN_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Macro used to deactivate thread sanitizer on some functions. */
 #define CAMLno_tsan
-/* __has_feature is Clang-specific, but GCC defines __SANITIZE_ADDRESS__ and
- * __SANITIZE_THREAD__. */
+/* `__has_feature` is present in Clang and recent GCCs (14 and later). Older
+   GCCs define `__SANITIZE_THREAD__`. In addition, starting from version 14
+   GCC supports the Clang-originating syntax `no_sanitize("thread")`.
+   With Clang, `no_sanitize("thread")` does not seem to disable instrumentation
+   entirely, so we need to use the stronger, Clang-specific attribute
+   `disable_sanitizer_instrumentation`.
+   This should select the right attribute in all circumstances. */
 #if defined(__has_feature)
 #  if __has_feature(thread_sanitizer)
 #    undef CAMLno_tsan
@@ -67,10 +76,13 @@ extern void AnnotateHappensAfter(const char *f, int l, void *addr);
 #  define CAMLno_tsan_for_perf CAMLno_tsan
 #endif
 
+#ifdef __cplusplus
+}
+#endif
 
 #ifdef CAML_INTERNALS
 
-#include "caml/mlvalues.h"
+#include "mlvalues.h"
 
 struct stack_info;
 
@@ -84,7 +96,6 @@ CAMLextern void caml_tsan_entry_on_resume(uintnat pc, char* sp,
 extern void __tsan_func_exit(void*);
 extern void __tsan_func_entry(void*);
 void __tsan_write8(void *location);
-
 
 #endif /* CAML_INTERNALS */
 

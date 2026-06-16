@@ -27,14 +27,14 @@
    )* }}} *)
 
 type t =
-  | Constructor of Types.constructor_description * Location.t
+  | Constructor of Data_types.constructor_description * Location.t
     (* We attach the constructor description here so in the case of
        disambiguated constructors we actually directly look for the type
        path (cf. #486, #794). *)
   | Unknown_constructor
   | Expr
   | Label :
-      'rep Types.gen_label_description * 'rep Types.record_form
+      'rep Data_types.gen_label_description * 'rep Data_types.record_form
       -> t (* Similar to constructors. *)
   | Unknown_label
   | Module_path

@@ -2461,6 +2461,12 @@ let for_array_element_sort ~level =
   ( fresh_jkind jkind ~annotation:None ~why:(Concrete_creation Array_element),
     sort )
 
+let for_effect_arg ident =
+  let why : History.value_creation_reason =
+    Type_argument { parent_path = Path.Pident ident; position = 1; arity = 1 }
+  in
+  Builtin.value ~why
+
 (******************************)
 (* elimination and defaulting *)
 
@@ -2829,7 +2835,8 @@ module Format_history = struct
       fprintf ppf "it's the record type used in an assignment"
     | Record_functional_update ->
       fprintf ppf "it's the record type used in a functional update"
-    | Field_projection -> fprintf ppf "it's the type of a field being projected"
+    | Field_projection ->
+      fprintf ppf "it's the type of a field in a record being projected from"
     | Field_assignment ->
       fprintf ppf "it's the type of a field being assigned a value"
     | Field_functional_update ->
@@ -2866,7 +2873,11 @@ module Format_history = struct
     | Idx_element ->
       fprintf ppf
         "it's the element type (the second type parameter) for a@ block index \
-         (idx or mut_idx)"
+         (idx_imm or idx_mut)"
+    | Field_in_indexed_record ->
+      fprintf ppf
+        "it's the type of a field in a record type into which a@ block index \
+         (idx_imm or idx_mut) is being created"
     | Structure_item ->
       fprintf ppf "it's the type of something stored in a module"
     | Signature_item -> fprintf ppf "it's the type of something in a signature"
@@ -3927,6 +3938,7 @@ module Debug_printers = struct
     | Peek_or_poke -> fprintf ppf "Peek_or_poke"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
+    | Field_in_indexed_record -> fprintf ppf "Field_in_indexed_record"
     | Structure_item -> fprintf ppf "Structure_item"
     | Signature_item -> fprintf ppf "Signature_item"
     | Layout_poly -> fprintf ppf "Layout_poly"

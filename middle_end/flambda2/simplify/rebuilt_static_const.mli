@@ -191,6 +191,8 @@ module Group : sig
 
   val free_names : t -> Name_occurrences.t
 
+  val cost_metrics : t -> Cost_metrics.t
+
   (** This function may only be used when rebuilding terms (a fatal error will
       be produced otherwise). *)
   val to_named : t -> Named.t
