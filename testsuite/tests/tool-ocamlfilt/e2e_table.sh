@@ -85,8 +85,9 @@ done
 } | sed -E \
     -e 's/_[0-9]+_[0-9]+_code/_N_N_code/g' \
     -e 's/_[0-9]+_code/_N_code/g' \
+    -e "s/_[0-9]+_[0-9]+(${TAB}|$)/_N_N\\1/g" \
+    -e "s/_[0-9]+(${TAB}|$)/_N\\1/g" \
     -e 's/Pmakeblock[0-9]+/PmakeblockN/g' \
     -e 's/const_block[0-9]+/const_blockN/g' \
     -e 's/iarr[0-9]+/iarrN/g' \
-    -e "s/_[0-9]+(${TAB}|$)/_N\\1/g" \
   | column -t -s "${TAB}"

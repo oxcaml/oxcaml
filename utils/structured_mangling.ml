@@ -407,6 +407,9 @@ module Parse = struct
         then None
         else
           let suffix =
+            let len =
+              if String.ends_with ~suffix:"_code" sym then len - 5 else len
+            in
             if pos < len then String.sub sym pos (len - pos) else ""
           in
           Some (List.rev path, suffix)
