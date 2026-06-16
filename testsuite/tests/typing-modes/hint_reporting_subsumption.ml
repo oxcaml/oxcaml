@@ -35,8 +35,8 @@ Error: Signature mismatch:
          val with_ : f:('a -> 'b) @ local unyielding -> unit
        is not included in
          val with_ : f:('a -> 'a) @ local -> unit
-       The type "f:('a -> 'a) -> unit" is not compatible with the type
-         "f:('a -> 'a) @ local -> unit"
+       The type "f:('a -> 'a) @ local unyielding -> unit"
+       is not compatible with the type "f:('a -> 'a) @ local -> unit"
 |}]
 
 (* Putting an unyielding annotation in the signature fixes the inclusion error *)
@@ -85,8 +85,8 @@ Error: Signature mismatch:
          val with_ : ('a -> 'b) @ local unyielding -> unit
        is not included in
          val with_ : ('a -> 'a) @ local -> unit
-       The type "('a -> 'a) -> unit" is not compatible with the type
-         "('a -> 'a) @ local -> unit"
+       The type "('a -> 'a) @ local unyielding -> unit"
+       is not compatible with the type "('a -> 'a) @ local -> unit"
 |}]
 
 module M : sig

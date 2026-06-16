@@ -68,15 +68,15 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : unit -> int @ local end
+         sig val f : unit -> int @ local forkable unyielding end
        is not included in
          sig val f : unit -> int end
        Values do not match:
-         val f : unit -> int @ local
+         val f : unit -> int @ local forkable unyielding
        is not included in
          val f : unit -> int
-       The type "unit -> int @ local" is not compatible with the type
-         "unit -> int"
+       The type "unit -> int @ local forkable unyielding"
+       is not compatible with the type "unit -> int"
 |}]
 
 module M : sig
