@@ -490,12 +490,16 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
         (Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const
               (statefulness x)))
-      ~allocation:(Comonadic.Atom.Modality (Mode.Modality.Comonadic.Atom.Meet_const (allocation x)))
+      ~allocation:
+        (Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const
+              (allocation x)))
   in
   { monadic; comonadic }
 
 let create ~areality ~linearity ~uniqueness ~portability ~contention
-    ~forkable ~yielding ~statefulness ~visibility ~staticity ~allocation ~externality =
+    ~forkable ~yielding ~statefulness ~visibility ~staticity ~allocation
+    ~externality =
   bot
   |> set_areality areality
   |> set_uniqueness uniqueness
@@ -592,12 +596,18 @@ let immediate : t =
     ~externality:Jkind_axis.Externality.min
 
 let object_legacy : t =
-  let ({ linearity; areality; portability; forkable; yielding; statefulness; allocation }
+  let ({ linearity;
+         areality;
+         portability;
+         forkable;
+         yielding;
+         statefulness;
+         allocation
+       }
         : Mode.Value.Comonadic.Const.t) =
     Mode.Value.Comonadic.Const.legacy
   in
-  create ~linearity ~areality
-    ~uniqueness:Mode.Uniqueness.Const.Aliased
+  create ~linearity ~areality ~uniqueness:Mode.Uniqueness.Const.Aliased
     ~portability ~contention:Mode.Contention.Const.Uncontended ~forkable
     ~yielding ~statefulness ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~allocation
