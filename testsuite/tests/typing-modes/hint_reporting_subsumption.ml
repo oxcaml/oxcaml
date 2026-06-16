@@ -28,11 +28,11 @@ Lines 4-11, characters 6-3:
 11 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val with_ : f:('a -> 'b) -> unit end
+         sig val with_ : f:('a -> 'b) @ local unyielding -> unit end
        is not included in
          sig val with_ : f:('a -> 'a) @ local -> unit end
        Values do not match:
-         val with_ : f:('a -> 'b) -> unit
+         val with_ : f:('a -> 'b) @ local unyielding -> unit
        is not included in
          val with_ : f:('a -> 'a) @ local -> unit
        The type "f:('a -> 'a) -> unit" is not compatible with the type
@@ -78,11 +78,11 @@ Lines 4-11, characters 6-3:
 11 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val with_ : ('a -> 'b) -> unit end
+         sig val with_ : ('a -> 'b) @ local unyielding -> unit end
        is not included in
          sig val with_ : ('a -> 'a) @ local -> unit end
        Values do not match:
-         val with_ : ('a -> 'b) -> unit
+         val with_ : ('a -> 'b) @ local unyielding -> unit
        is not included in
          val with_ : ('a -> 'a) @ local -> unit
        The type "('a -> 'a) -> unit" is not compatible with the type

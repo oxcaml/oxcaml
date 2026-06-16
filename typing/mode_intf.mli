@@ -805,6 +805,18 @@ module type S = sig
 
     val zap_to_legacy : lr -> Const.t
 
+    module Guts : sig
+      (** Zap a mode toward the floor of [towards]. Axes that are either
+          strictly above or below [towards] end up as close as possible to the
+          semantic lower bound of [towards] *)
+      val zap_towards_floor_of : lr -> towards:lr -> Const.t
+
+      (** Zap a mode toward the ceil of [towards]. Axes that are either strictly
+          above or below [towards] end up as close as possible to the semantic
+          upper bound of [towards] *)
+      val zap_towards_ceil_of : lr -> towards:lr -> Const.t
+    end
+
     val comonadic_to_monadic_min :
       ?hint:('r * disallowed) neg Hint.morph ->
       ('l * 'r) Comonadic.t ->
