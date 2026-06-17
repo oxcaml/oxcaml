@@ -375,6 +375,10 @@ module Jkind0 : sig
     (** [is_max_within_set bounds axes] returns whether or not all the axes in
         [axes] are [max] within [bounds] *)
     val is_max_within_set : t -> Jkind_axis.Axis_set.t -> bool
+
+    (** Get all axes that are set to max. *)
+    val get_max_axes : t -> Jkind_axis.Axis_set.t
+
     val is_max : t -> bool
 
     val min : t
@@ -389,6 +393,20 @@ module Jkind0 : sig
 
     val relevant_axes_of_modality :
       modality:Mode.Modality.Const.t -> Jkind_axis.Axis_set.t
+
+    val mask_of_modality :
+      modality:Mode.Modality.Const.t -> With_bounds_type_info.Mask.t
+
+    val to_mask : t -> With_bounds_type_info.Mask.t
+
+    val cap_by_mask_l : t -> With_bounds_type_info.Mask.t -> t
+
+    val relax_by_mask_r : t -> With_bounds_type_info.Mask.t -> t
+
+    val saturated_mask : t -> With_bounds_type_info.Mask.t ->
+      With_bounds_type_info.Mask.t
+
+    val is_max_within_mask : t -> With_bounds_type_info.Mask.t -> bool
 
     val debug_print : Format.formatter -> t -> unit
   end
