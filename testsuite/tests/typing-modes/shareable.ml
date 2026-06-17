@@ -131,3 +131,65 @@ type t
 type s = { v : t @@ shareable; } [@@unboxed]
 type u = { v : t @@ corruptible; } [@@unboxed]
 |}]
+
+let s_from_corruptible (x : s @ corruptible) : s @ portable = x
+
+let s_from_nonportable (x : s @ nonportable) : s @ shareable = x
+
+[%%expect{|
+val s_from_corruptible : s @ corruptible -> s @ portable = <fun>
+val s_from_nonportable : s -> s @ shareable = <fun>
+|}]
+
+let s_no_self_cross (x : s @ shareable) : s @ portable = x
+
+[%%expect{|
+Line 1, characters 57-58:
+1 | let s_no_self_cross (x : s @ shareable) : s @ portable = x
+                                                             ^
+Error: This value is "shareable"
+       but is expected to be "corruptible" because it crosses with something
+         which is expected to be "portable".
+|}]
+
+let s_no_overcross (x : s @ nonportable) : s @ portable = x
+
+[%%expect{|
+Line 1, characters 58-59:
+1 | let s_no_overcross (x : s @ nonportable) : s @ portable = x
+                                                              ^
+Error: This value is "shareable" because it crosses with something
+         which is "nonportable".
+       However, the highlighted expression is expected to be "corruptible"
+         because it crosses with something which is expected to be "portable".
+|}]
+
+let u_from_shareable (x : u @ shareable) : u @ portable = x
+
+let u_from_nonportable (x : u @ nonportable) : u @ corruptible = x
+
+[%%expect{|
+val u_from_shareable : u @ shareable -> u @ portable = <fun>
+val u_from_nonportable : u -> u @ corruptible = <fun>
+|}]
+
+let u_no_self_cross (x : u @ corruptible) : u @ shareable = x
+
+[%%expect{|
+Line 1, characters 60-61:
+1 | let u_no_self_cross (x : u @ corruptible) : u @ shareable = x
+                                                                ^
+Error: This value is "corruptible" but is expected to be "shareable".
+|}]
+
+let u_no_overcross (x : u @ nonportable) : u @ portable = x
+
+[%%expect{|
+Line 1, characters 58-59:
+1 | let u_no_overcross (x : u @ nonportable) : u @ portable = x
+                                                              ^
+Error: This value is "corruptible" because it crosses with something
+         which is "nonportable".
+       However, the highlighted expression is expected to be "shareable"
+         because it crosses with something which is expected to be "portable".
+|}]

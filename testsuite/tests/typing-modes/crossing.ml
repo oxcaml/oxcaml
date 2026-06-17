@@ -306,6 +306,8 @@ type s : value mod shared = { v : t @@ shared } [@@unboxed]
 type s : value mod corrupted = { v : t @@ corrupted } [@@unboxed]
 type s : value mod shared = { f : (int -> int) @@ shared } [@@unboxed]
 type s : value mod corrupted = { f : (int -> int) @@ corrupted } [@@unboxed]
+type concrete_shared : value mod shared = { v : t @@ shared } [@@unboxed]
+type concrete_corrupted : value mod corrupted = { v : t @@ corrupted } [@@unboxed]
 [%%expect{|
 type s = { v : t @@ shared; } [@@unboxed]
 type s = { v : t @@ corrupted; } [@@unboxed]
@@ -313,4 +315,88 @@ type s = { v : t @@ shared; } [@@unboxed]
 type s = { v : t @@ corrupted; } [@@unboxed]
 type s = { f : int -> int @@ shared; } [@@unboxed]
 type s = { f : int -> int @@ corrupted; } [@@unboxed]
+type concrete_shared = { v : t @@ shared; } [@@unboxed]
+type concrete_corrupted = { v : t @@ corrupted; } [@@unboxed]
+|}]
+
+let concrete_shared_from_shared
+    (x : concrete_shared @ shared) : concrete_shared @ uncontended =
+  x
+
+let concrete_shared_from_contended
+    (x : concrete_shared @ contended) : concrete_shared @ corrupted =
+  x
+
+[%%expect{|
+val concrete_shared_from_shared : concrete_shared @ shared -> concrete_shared =
+  <fun>
+val concrete_shared_from_contended :
+  concrete_shared @ contended -> concrete_shared @ corrupted = <fun>
+|}]
+
+let concrete_shared_no_cross
+    (x : concrete_shared @ contended) : concrete_shared @ shared =
+  x
+[%%expect{|
+Line 3, characters 2-3:
+3 |   x
+      ^
+Error: This value is "corrupted" because it crosses with something
+         which is "contended".
+       However, the highlighted expression is expected to be "shared" or "uncontended".
+|}]
+
+let concrete_shared_no_overcross
+    (x : concrete_shared @ contended) : concrete_shared @ uncontended =
+  x
+[%%expect{|
+Line 3, characters 2-3:
+3 |   x
+      ^
+Error: This value is "corrupted" because it crosses with something
+         which is "contended".
+       However, the highlighted expression is expected to be "shared" or "uncontended"
+         because it crosses with something
+         which is expected to be "uncontended".
+|}]
+
+let concrete_corrupted_from_corrupted
+    (x : concrete_corrupted @ corrupted) : concrete_corrupted @ uncontended =
+  x
+
+let concrete_corrupted_from_contended
+    (x : concrete_corrupted @ contended) : concrete_corrupted @ shared =
+  x
+
+[%%expect{|
+val concrete_corrupted_from_corrupted :
+  concrete_corrupted @ corrupted -> concrete_corrupted = <fun>
+val concrete_corrupted_from_contended :
+  concrete_corrupted @ contended -> concrete_corrupted @ shared = <fun>
+|}]
+
+let concrete_corrupted_no_cross
+    (x : concrete_corrupted @ contended) : concrete_corrupted @ corrupted =
+  x
+[%%expect{|
+Line 3, characters 2-3:
+3 |   x
+      ^
+Error: This value is "shared" because it crosses with something
+         which is "contended".
+       However, the highlighted expression is expected to be "corrupted" or "uncontended".
+|}]
+
+let concrete_corrupted_no_overcross
+    (x : concrete_corrupted @ contended) : concrete_corrupted @ uncontended =
+  x
+[%%expect{|
+Line 3, characters 2-3:
+3 |   x
+      ^
+Error: This value is "shared" because it crosses with something
+         which is "contended".
+       However, the highlighted expression is expected to be "corrupted" or "uncontended"
+         because it crosses with something
+         which is expected to be "uncontended".
 |}]
