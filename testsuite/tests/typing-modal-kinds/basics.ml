@@ -886,10 +886,13 @@ Line 1, characters 10-15:
               ^^^^^
 Error: This type "int t" should be an instance of type
          "('a : value mod contended)"
-       The kind of int t is immutable_data with int
+       The kind of int t is immutable_data with int @@ shared
          because of the definition of t at line 1, characters 0-32.
        But the kind of int t must be a subkind of value mod contended
          because of the definition of require_contended at line 1, characters 0-49.
+
+       The first mode-crosses less than the second along:
+         contention: mod contended with int ≰ mod contended
 |}]
 (* CR layouts v2.8: fix principal mode. Internal ticket 5111 *)
 
@@ -911,10 +914,13 @@ Line 1, characters 10-19:
               ^^^^^^^^^
 Error: This type "int ref t" should be an instance of type
          "('a : value mod contended)"
-       The kind of int ref t is immutable_data with int ref
+       The kind of int ref t is immutable_data with int ref @@ shared
          because of the definition of t at line 1, characters 0-32.
        But the kind of int ref t must be a subkind of value mod contended
          because of the definition of require_contended at line 1, characters 0-49.
+
+       The first mode-crosses less than the second along:
+         contention: mod contended with int ref ≰ mod contended
 |}]
 
 type t2 = int t ref require_contended
