@@ -215,9 +215,7 @@ let mask_of_axis : type a. a Jkind_axis.Axis.t -> t =
   | Modal (Monadic Staticity) ->
     lattice_of_sample { sample with staticity = Mode.Staticity.Static }
   | Modal (Comonadic Allocation) ->
-    (* CR shsong: check this *)
-    lattice_of_sample
-      { sample with allocation = Mode.Allocation.Const.Noalloc_strict }
+    lattice_of_sample { sample with allocation = Mode.Allocation.Const.Alloc }
   | Nonmodal Externality ->
     lattice_of_sample
       { sample with externality = Jkind_axis.Externality.Internal }

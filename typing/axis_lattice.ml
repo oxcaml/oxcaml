@@ -207,7 +207,7 @@ let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
     lor ((set land 0x600) lsl 5)
     lor ((set land 0x1800) lsl 6)
   in
-  lo lor ((lo land 0x49451) lsl 1)
+  lo lor ((lo land 0x29451) lsl 1)
 
 (* IK-only: compute relevant axes of a constant modality, mirroring
    Jkind.relevant_axes_of_modality. *)
