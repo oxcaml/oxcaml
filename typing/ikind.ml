@@ -34,14 +34,10 @@ let mask_of_modality ~modality =
        (Btype.Jkind0.Mod_bounds.relevant_axes_of_modality ~modality))
 
 let saturated_mask mod_bounds mask =
-  let direct_mask = Btype.Jkind0.Mod_bounds.to_axis_lattice mod_bounds in
-  let max_axis_mask =
-    Btype.Jkind0.Mod_bounds.get_max_axes mod_bounds
-    |> Axis_lattice.of_axis_set
-  in
-  Axis_lattice.join
-    (Axis_lattice.meet max_axis_mask mask)
-    (Axis_lattice.meet direct_mask mask)
+  Axis_lattice.meet
+    (Btype.Jkind0.Mod_bounds.get_max_axes mod_bounds
+     |> Axis_lattice.of_axis_set)
+    mask
 
 let instance_poly_for_jkind' =
   ref (fun _univars _ty -> Misc.fatal_error "instance_poly_for_jkind")
