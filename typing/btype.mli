@@ -394,20 +394,6 @@ module Jkind0 : sig
     val relevant_axes_of_modality :
       modality:Mode.Modality.Const.t -> Jkind_axis.Axis_set.t
 
-    val mask_of_modality :
-      modality:Mode.Modality.Const.t -> With_bounds_type_info.Mask.t
-
-    val to_mask : t -> With_bounds_type_info.Mask.t
-
-    val cap_by_mask_l : t -> With_bounds_type_info.Mask.t -> t
-
-    val relax_by_mask_r : t -> With_bounds_type_info.Mask.t -> t
-
-    val saturated_mask : t -> With_bounds_type_info.Mask.t ->
-      With_bounds_type_info.Mask.t
-
-    val is_max_within_mask : t -> With_bounds_type_info.Mask.t -> bool
-
     val debug_print : Format.formatter -> t -> unit
   end
 
