@@ -47,6 +47,8 @@ module Bounds_mask = struct
 
   let of_axis_set = Axis_lattice.of_axis_set
 
+  let equal = Axis_lattice.equal
+
   let is_empty t = Axis_lattice.equal t Axis_lattice.bot
 
   let print ppf t = Format.pp_print_string ppf (Axis_lattice.to_string t)
@@ -574,7 +576,7 @@ module With_bounds = struct
       fprintf ppf "@[{ relevant_bounds = %a }@]" Bounds_mask.print
         relevant_bounds
 
-    let axes_ignored_by_modalities ~mod_bounds
+    let printable_relevant_bounds ~mod_bounds
         ~type_info:{ relevant_bounds = explicit_relevant_bounds } =
       (* Axes that are max are implicitly relevant. ie, including or excluding an
          axis from the set of relevant axes is semantically equivalent if the mod-
@@ -587,13 +589,18 @@ module With_bounds = struct
       let implicit_relevant_bounds =
         Mod_bounds.get_max_axes mod_bounds |> Bounds_mask.of_axis_set
       in
-      let relevant_bounds =
-        Bounds_mask.join explicit_relevant_bounds implicit_relevant_bounds
-      in
-      Axis_set.create ~f:(fun ~axis:(Pack axis) ->
-          Bounds_mask.is_empty
-            (Bounds_mask.meet relevant_bounds
-               (Bounds_mask.of_axis_set (Axis_set.singleton axis))))
+      Bounds_mask.join explicit_relevant_bounds implicit_relevant_bounds
+
+    let has_non_id_modalities ~mod_bounds ~type_info =
+      let relevant_bounds = printable_relevant_bounds ~mod_bounds ~type_info in
+      List.exists
+        (fun (Axis.Pack axis) ->
+          let axis_mask = Bounds_mask.of_axis_set (Axis_set.singleton axis) in
+          not
+            (Bounds_mask.equal
+               (Bounds_mask.meet relevant_bounds axis_mask)
+               axis_mask))
+        Axis.all
   end
 
   let to_best_eff_map = function
@@ -1731,20 +1738,29 @@ module Const = struct
       | Some base, Some actual ->
         Scannable_axes.to_string_list_diff ~base actual
 
-    let modalities_of_ignored_axes axes_to_ignore =
-      (* The modality is constant along axes to ignore and id along others *)
+    let modalities_of_relevant_bounds relevant_bounds =
       List.fold_left
         (fun (modal_modality, nonmodal_axes) (Axis.Pack axis) ->
-          match axis with
-          | Modal axis -> (
-            match axis, Crossing.Per_axis.min axis with
-            | Monadic ax, Modality t ->
-              Modality.Const.set (Monadic ax) t modal_modality, nonmodal_axes
-            | Comonadic ax, Modality t ->
-              Modality.Const.set (Comonadic ax) t modal_modality, nonmodal_axes)
-          | Nonmodal _ -> modal_modality, Axis.Pack axis :: nonmodal_axes)
+          let axis_mask = Bounds_mask.of_axis_set (Axis_set.singleton axis) in
+          let axis_bounds = Bounds_mask.meet relevant_bounds axis_mask in
+          if Bounds_mask.equal axis_bounds axis_mask
+          then modal_modality, nonmodal_axes
+          else
+            match axis with
+            | Modal axis -> (
+              let crossing =
+                if Bounds_mask.is_empty axis_bounds
+                then Crossing.Per_axis.min axis
+                else Crossing.proj axis (Axis_lattice.to_mode_crossing axis_bounds)
+              in
+              match axis, crossing with
+              | Monadic ax, Modality t ->
+                Modality.Const.set (Monadic ax) t modal_modality, nonmodal_axes
+              | Comonadic ax, Modality t ->
+                Modality.Const.set (Comonadic ax) t modal_modality, nonmodal_axes)
+            | Nonmodal _ -> modal_modality, Axis.Pack axis :: nonmodal_axes)
         (Modality.Const.id, [])
-        (Axis_set.to_list axes_to_ignore)
+        Axis.all
 
     (** Write [actual] in terms of [base] *)
     let convert_with_base (type l r) env ~verbosity ~(base : Builtin.t)
@@ -1792,12 +1808,12 @@ module Const = struct
           let otys = !outcometrees_of_types (List.map fst with_bounds) in
           List.map2
             (fun (_, type_info) out_type ->
-              let axes_ignored_by_modalities =
-                With_bounds.Type_info.axes_ignored_by_modalities
+              let relevant_bounds =
+                With_bounds.Type_info.printable_relevant_bounds
                   ~mod_bounds:actual.mod_bounds ~type_info
               in
               let modal_modality, nonmodal_axes =
-                modalities_of_ignored_axes axes_ignored_by_modalities
+                modalities_of_relevant_bounds relevant_bounds
               in
               let modal =
                 !outcometree_of_modalities Types.Immutable modal_modality
@@ -3254,11 +3270,8 @@ module Violation = struct
         let jkind_has_modalities jkind =
           List.exists
             (fun (_, type_info) ->
-              let axes_ignored_by_modalities =
-                With_bounds.Type_info.axes_ignored_by_modalities
-                  ~mod_bounds:jkind.jkind.mod_bounds ~type_info
-              in
-              not (Axis_set.is_empty axes_ignored_by_modalities))
+              With_bounds.Type_info.has_non_id_modalities
+                ~mod_bounds:jkind.jkind.mod_bounds ~type_info)
             (With_bounds.to_list jkind.jkind.with_bounds)
         in
         jkind_has_modalities sub || jkind_has_modalities super
