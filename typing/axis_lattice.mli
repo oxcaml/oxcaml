@@ -43,8 +43,6 @@ val mask_of_modality : Mode.Modality.Const.t -> t
 
 val modality_makes_uniqueness_constant : Mode.Modality.Const.t -> bool
 
-val modality_makes_contention_constant : Mode.Modality.Const.t -> bool
-
 val modality_has_contended_contention : Mode.Modality.Const.t -> bool
 
 val uic_disabled : t

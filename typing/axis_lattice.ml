@@ -244,10 +244,6 @@ let modality_makes_uniqueness_constant modality =
   let open Mode.Crossing.Axis in
   modality_makes_axis_constant (Monadic Uniqueness) modality
 
-let modality_makes_contention_constant modality =
-  let open Mode.Crossing.Axis in
-  modality_makes_axis_constant (Monadic Contention) modality
-
 let modality_has_contended_contention modality =
   let open Mode in
   let axis_for_modality =

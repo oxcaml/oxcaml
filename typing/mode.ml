@@ -7801,9 +7801,6 @@ module Crossing = struct
 
   let unique_implies_uncontended t = t.unique_implies_uncontended
 
-  let with_unique_implies_uncontended unique_implies_uncontended t =
-    { t with unique_implies_uncontended }
-
   let modality m
       { crossing = { monadic; comonadic }; unique_implies_uncontended } =
     let monadic = Monadic.modality m.monadic monadic in

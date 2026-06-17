@@ -1188,8 +1188,6 @@ module type S = sig
 
     val unique_implies_uncontended : t -> bool
 
-    val with_unique_implies_uncontended : bool -> t -> t
-
     (** Project a mode crossing (of all axes) onto the specified axis. *)
     val proj : 'a Axis.t -> t -> 'a
 
