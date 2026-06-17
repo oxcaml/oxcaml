@@ -480,16 +480,10 @@ let mask_of_modality (modality : Mode.Modality.Const.t) : t =
       t =
    fun axis set_axis mask ->
     let modality_axis = Modality.Axis.Monadic axis in
-    let (Modality.Monadic.Atom.Join_const c as modality_on_axis) =
+    let (Modality.Monadic.Atom.Join_const c) =
       Modality.Const.proj modality_axis modality
     in
-    let max = Value.Monadic.Const.Per_axis.max axis in
-    let min = Value.Monadic.Const.Per_axis.min axis in
-    if Modality.Per_axis.is_constant modality_axis modality_on_axis
-    then set_axis min mask
-    else if Modality.Per_axis.is_id modality_axis modality_on_axis
-    then set_axis max mask
-    else set_axis c mask
+    set_axis c mask
   in
   let set_comonadic :
       type a.

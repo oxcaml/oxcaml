@@ -548,21 +548,15 @@ module Mod_bounds = struct
       (Bounds_mask.of_axis_set (relevant_axes_of_modality ~modality))
 
   let saturated_mask t mask =
-    let direct_mask = to_axis_lattice t in
     let max_axis_mask = get_max_axes t |> Bounds_mask.of_axis_set in
-    Bounds_mask.join
-      (Bounds_mask.meet max_axis_mask mask)
-      (Bounds_mask.meet direct_mask mask)
+    Bounds_mask.meet max_axis_mask mask
 
-  let cap_by_mask_l t mask = saturated_mask t mask |> of_axis_lattice
+  let cap_by_mask_l t mask =
+    Bounds_mask.meet (to_axis_lattice t) mask |> of_axis_lattice
 
   let relax_by_mask_r t mask =
-    let expected =
-      Bounds_mask.join
-        (get_max_axes t |> Bounds_mask.of_axis_set)
-        (to_axis_lattice t)
-    in
-    Axis_lattice.meet_right_adjoint ~expected ~mask |> of_axis_lattice
+    Axis_lattice.meet_right_adjoint ~expected:(to_axis_lattice t) ~mask
+    |> of_axis_lattice
 
   let is_max_within_mask t mask = Bounds_mask.le mask (saturated_mask t mask)
 

@@ -1176,17 +1176,8 @@ module Jkind0 = struct
         (Axis_lattice.mask_of_modality modality)
         (Axis_lattice.of_axis_set (relevant_axes_of_modality ~modality))
 
-    let saturated_mask t mask =
-      let direct_mask = to_axis_lattice t in
-      let max_axis_mask =
-        get_max_axes t |> Axis_lattice.of_axis_set
-      in
-      Axis_lattice.join
-        (Axis_lattice.meet max_axis_mask mask)
-        (Axis_lattice.meet direct_mask mask)
-
     let cap_by_mask_l t mask =
-      saturated_mask t mask |> of_axis_lattice
+      Axis_lattice.meet (to_axis_lattice t) mask |> of_axis_lattice
   end
 
   module Quality = struct
