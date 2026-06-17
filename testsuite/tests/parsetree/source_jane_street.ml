@@ -887,6 +887,29 @@ Line 4, characters 17-22:
 Error: This expression is not an allocation site.
 |}]
 
+(* Let operators *)
+
+(* Mode annotation on a binding at the operator use site. *)
+let ( let* ) (f @ local once) (x @ local) = f x [@nontail]
+let ( and* ) (a @ local once) (b @ local once) = exclave_ (a, b)
+[%%expect{|
+val ( let* ) : ('a @ local -> 'b) @ local once -> 'a @ local -> 'b = <fun>
+val ( and* ) : 'a @ local once -> 'b @ local once -> 'a * 'b @ local once =
+  <fun>
+|}]
+
+let f () =
+  let* (x @ local) = 1
+  and* (y @ local) = 2 in
+  ignore (x, y)
+(* CR aspsmith: Support modes on binding operators in typing *)
+[%%expect{|
+>> Fatal error: Not yet implemented: Modes on binding operators
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+
 (**********)
 (* unique *)
 
