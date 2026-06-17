@@ -18,6 +18,24 @@ type 'a myref = { mutable a : 'a; b : 'a }
 type 'a myref = { mutable a : 'a; b : 'a; }
 |}]
 
+type middle_payload
+type s : value mod read = { v : middle_payload @@ read } [@@unboxed]
+type t : value mod write = { v : middle_payload @@ write } [@@unboxed]
+type u : value mod reading = { v : middle_payload @@ reading } [@@unboxed]
+type v : value mod writing = { v : middle_payload @@ writing } [@@unboxed]
+type s_arrow : value mod read = { f : (int -> int) @@ read } [@@unboxed]
+type t_arrow : value mod write = { f : (int -> int) @@ write } [@@unboxed]
+
+[%%expect{|
+type middle_payload
+type s = { v : middle_payload @@ read; } [@@unboxed]
+type t = { v : middle_payload @@ write; } [@@unboxed]
+type u = { v : middle_payload @@ reading; } [@@unboxed]
+type v = { v : middle_payload @@ writing; } [@@unboxed]
+type s_arrow = { f : int -> int @@ read; } [@@unboxed]
+type t_arrow = { f : int -> int @@ write; } [@@unboxed]
+|}]
+
 let foo x a = x.a <- a
 [%%expect{|
 val foo : 'a myref -> 'a -> unit = <fun>

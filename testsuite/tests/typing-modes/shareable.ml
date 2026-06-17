@@ -92,7 +92,9 @@ Line 1, characters 43-46:
 1 | let get : 'a t -> 'a @ portable = fun t -> t.x
                                                ^^^
 Error: This value is "shareable"
-         because it is the field "x" (with some modality) of the record at line 1, characters 43-44.
+         because it is the field "x" of the record at line 1, characters 43-44
+         which is "shareable" because it crosses with something
+         which is "nonportable".
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -121,16 +123,11 @@ val cross_shareable2 : cross_shareable -> cross_shareable @ shareable = <fun>
 
 type t
 
-(* Doesn't work yet. *)
 type s : value mod shareable = { v : t @@ shareable } [@@unboxed]
+type u : value mod corruptible = { v : t @@ corruptible } [@@unboxed]
 
 [%%expect{|
 type t
-Line 4, characters 0-65:
-4 | type s : value mod shareable = { v : t @@ shareable } [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "s" is value
-         because of the definition of t at line 1, characters 0-6.
-       But the kind of type "s" must be a subkind of value mod shareable
-         because of the annotation on the declaration of the type s.
+type s = { v : t @@ shareable; } [@@unboxed]
+type u = { v : t @@ corruptible; } [@@unboxed]
 |}]

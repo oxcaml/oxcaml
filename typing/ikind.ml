@@ -339,13 +339,18 @@ module Solver = struct
         let atom = rigid_name ctx (Ldd.Name.katom path) in
         Ldd.meet base_mod_bounds atom
     in
-    (* For each with-bound (ty, axes), contribute
-       modality(axes_mask, kind ty). *)
+    (* For each with-bound (ty, mask), contribute the masked kind of [ty]. *)
     Jkind.With_bounds.to_seq with_bounds
     |> Seq.fold_left
          (fun acc (ty, bound_info) ->
-           let axes = bound_info.Types.With_bounds_type_info.relevant_axes in
-           let mask = Axis_lattice.of_axis_set axes in
+           let original_mask =
+             bound_info.Types.With_bounds_type_info.relevant_bounds
+           in
+           let mask =
+             Types.With_bounds_type_info.Mask.residual original_mask
+               (Btype.Jkind0.Mod_bounds.saturated_mask mod_bounds
+                  original_mask)
+           in
            let ty_kind = kind ~use_tables:true ctx ty in
            Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
          base
@@ -827,9 +832,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
               | Types.Cstr_tuple args ->
                 Ldd.sum args ~base:Ldd.bot
                   ~f:(fun (arg : Types.constructor_argument) ->
-                    let mask =
-                      Axis_lattice.mask_of_modality arg.ca_modalities
-                    in
+                    let mask = Axis_lattice.mask_of_modality arg.ca_modalities in
                     Ldd.meet (Ldd.const mask) (payload_kind arg.ca_type))
               | Types.Cstr_record lbls ->
                 sum_record_label_contributions ~base:Ldd.bot ~payload_kind

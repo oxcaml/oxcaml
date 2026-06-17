@@ -302,10 +302,15 @@ type s = { v : t @@ contended; } [@@unboxed]
 |}]
 type s : value = { v : t @@ shared } [@@unboxed]
 type s : value = { v : t @@ corrupted } [@@unboxed]
-(* CR layouts: Ideally, these should have better jkinds than [value], but we
-   don't yet support the interaction between middle modes (like [shared] and
-   [poisoned]) and modal kinds. *)
+type s : value mod shared = { v : t @@ shared } [@@unboxed]
+type s : value mod corrupted = { v : t @@ corrupted } [@@unboxed]
+type s : value mod shared = { f : (int -> int) @@ shared } [@@unboxed]
+type s : value mod corrupted = { f : (int -> int) @@ corrupted } [@@unboxed]
 [%%expect{|
 type s = { v : t @@ shared; } [@@unboxed]
 type s = { v : t @@ corrupted; } [@@unboxed]
+type s = { v : t @@ shared; } [@@unboxed]
+type s = { v : t @@ corrupted; } [@@unboxed]
+type s = { f : int -> int @@ shared; } [@@unboxed]
+type s = { f : int -> int @@ corrupted; } [@@unboxed]
 |}]

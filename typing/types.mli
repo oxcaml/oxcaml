@@ -85,8 +85,24 @@ val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
 (** Information tracked about an individual type within the with-bounds for a jkind *)
 module With_bounds_type_info : sig
-  (** The axes that the with-bound applies to *)
-  type t = { relevant_axes : Jkind_axis.Axis_set.t } [@@unboxed]
+  module Mask : sig
+    type t = Axis_lattice.t
+
+    val bot : t
+    val top : t
+    val join : t -> t -> t
+    val meet : t -> t -> t
+    val residual : t -> t -> t
+    val le : t -> t -> bool
+    val equal : t -> t -> bool
+    val is_empty : t -> bool
+    val of_axis_set : Jkind_axis.Axis_set.t -> t
+    val to_axis_set : t -> Jkind_axis.Axis_set.t
+    val print : Format.formatter -> t -> unit
+  end
+
+  (** The bounds of the axes that the with-bound applies to. *)
+  type t = { relevant_bounds : Mask.t } [@@unboxed]
 
   val join : t -> t -> t
 end
