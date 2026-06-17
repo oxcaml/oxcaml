@@ -794,7 +794,7 @@ let rec expression : Typedtree.expression -> term_judg =
                 (match mixed_shape.(i) with
                  | Scannable _ | Float_boxed -> Guard
                  | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
+                 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
                  | Void | Product _ ->
                    Dereference))
       in
@@ -822,7 +822,7 @@ let rec expression : Typedtree.expression -> term_judg =
             (match mixed_shape.(i) with
              | Scannable _ | Float_boxed -> Guard
              | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-             | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
+             | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
              | Void | Product _ ->
                Dereference)
           | Record_dummy _ ->

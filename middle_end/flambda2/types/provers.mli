@@ -88,6 +88,11 @@ val meet_naked_vec512s :
   Type_grammar.t ->
   Vector_types.Vec512.Bit_pattern.Set.t meet_shortcut
 
+val meet_naked_masks :
+  Typing_env.t ->
+  Type_grammar.t ->
+  Vector_types.Mask.Bit_pattern.Set.t meet_shortcut
+
 type variant_like_proof = private
   { const_ctors : Target_ocaml_int.Set.t Or_unknown.t;
     non_const_ctors_with_sizes :

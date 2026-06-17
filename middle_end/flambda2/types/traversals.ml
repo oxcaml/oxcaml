@@ -188,8 +188,8 @@ let rec destructure_expanded_head ~machine_width discriminant accessor expanded
   | Ok
       ( Naked_immediate _ | Naked_float32 _ | Naked_float _ | Naked_int8 _
       | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-      | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _
-        ) ->
+      | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _
+      | Rec_info _ | Region _ ) ->
     Misc.fatal_error "Cannot destructure non-value kinds"
 
 and destructure_head_of_kind_value ~machine_width discriminant accessor head =
@@ -762,6 +762,9 @@ struct
       | Ok (Naked_vec512 head) ->
         let>+ head = rewrite_head_of_kind_naked_vec512 head in
         ET.create_naked_vec512 head
+      | Ok (Naked_mask head) ->
+        let>+ head = rewrite_head_of_kind_naked_mask head in
+        ET.create_naked_mask head
       | Ok (Rec_info head) ->
         let>+ head = rewrite_head_of_kind_rec_info head in
         ET.create_rec_info head
@@ -1074,6 +1077,9 @@ struct
     Or_unknown.Known head
 
   and rewrite_head_of_kind_naked_vec512 head : _ Or_unknown.t =
+    Or_unknown.Known head
+
+  and rewrite_head_of_kind_naked_mask head : _ Or_unknown.t =
     Or_unknown.Known head
 
   and rewrite_head_of_kind_rec_info head : _ Or_unknown.t =

@@ -80,6 +80,7 @@ type abstract_non_value_type_constr = [
   | `Float16x32
   | `Float32x16
   | `Float64x8
+  | `Mask
 ]
 type data_type_constr = [
   | `Bool
@@ -154,6 +155,7 @@ let simd_alpha_extension_type_constrs : type_constr list = [
   `Float16x32;
   `Float32x16;
   `Float64x8;
+  `Mask;
 ]
 
 let small_number_extension_type_constrs : type_constr list = [
@@ -232,6 +234,7 @@ and ident_int64x8 = ident_create "int64x8"
 and ident_float16x32 = ident_create "float16x32"
 and ident_float32x16 = ident_create "float32x16"
 and ident_float64x8 = ident_create "float64x8"
+and ident_mask = ident_create "mask"
 
 let ident_of_type_constr : type_constr -> Ident.t = function
   | `Int -> ident_int
@@ -284,6 +287,7 @@ let ident_of_type_constr : type_constr -> Ident.t = function
   | `Float16x32 -> ident_float16x32
   | `Float32x16 -> ident_float32x16
   | `Float64x8 -> ident_float64x8
+  | `Mask -> ident_mask
   | `Or_null -> ident_or_null
 
 let path_int = Pident ident_int
@@ -339,6 +343,7 @@ and path_int64x8 = Pident ident_int64x8
 and path_float16x32 = Pident ident_float16x32
 and path_float32x16 = Pident ident_float32x16
 and path_float64x8 = Pident ident_float64x8
+and path_mask = Pident ident_mask
 
 let path_unboxed_float = Path.unboxed_version path_float
 and path_unboxed_unit = Path.unboxed_version path_unit
@@ -373,6 +378,7 @@ and path_unboxed_int64x8 = Path.unboxed_version path_int64x8
 and path_unboxed_float16x32 = Path.unboxed_version path_float16x32
 and path_unboxed_float32x16 = Path.unboxed_version path_float32x16
 and path_unboxed_float64x8 = Path.unboxed_version path_float64x8
+and path_unboxed_mask = Path.unboxed_version path_mask
 
 let path_of_type_constr typ =
   Pident (ident_of_type_constr typ)
@@ -441,6 +447,7 @@ and type_int64x8 = tconstr path_int64x8 []
 and type_float16x32 = tconstr path_float16x32 []
 and type_float32x16 = tconstr path_float32x16 []
 and type_float64x8 = tconstr path_float64x8 []
+and type_mask = tconstr path_mask []
 
 and type_unboxed_int8x16 = tconstr path_unboxed_int8x16 []
 and type_unboxed_int16x8 = tconstr path_unboxed_int16x8 []
@@ -463,6 +470,7 @@ and type_unboxed_int64x8 = tconstr path_unboxed_int64x8 []
 and type_unboxed_float16x32 = tconstr path_unboxed_float16x32 []
 and type_unboxed_float32x16 = tconstr path_unboxed_float32x16 []
 and type_unboxed_float64x8 = tconstr path_unboxed_float64x8 []
+and type_unboxed_mask = tconstr path_unboxed_mask []
 
 let find_type_constr =
   let all_predef_paths =
@@ -1005,6 +1013,9 @@ let decl_of_type_constr tconstr =
   | `Float64x8 ->
     decl0 ~jkind:(builtin Jkind.Const.Builtin.immutable_data)
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_512bit_vectors ()
+  | `Mask ->
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.immutable_data)
+      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_mask ()
   | `Float32 ->
     decl0 ~jkind:(builtin Jkind.Const.Builtin.immutable_data)
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_float32 ()
@@ -1051,7 +1062,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
         match (sort : Jkind_types.Sort.Const.t) with
         | Base Scannable -> ()
         | Base (Void | Untagged_immediate | Float32 | Float64 | Word | Bits8 |
-              Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
+              Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask)
         | Univar _ | Genvar _ | Product _ -> raise_error ())
       l;
     add_extension id

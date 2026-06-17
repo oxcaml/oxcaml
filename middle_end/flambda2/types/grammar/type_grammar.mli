@@ -46,6 +46,7 @@ type t = private
   | Naked_vec128 of head_of_kind_naked_vec128 Type_descr.t
   | Naked_vec256 of head_of_kind_naked_vec256 Type_descr.t
   | Naked_vec512 of head_of_kind_naked_vec512 Type_descr.t
+  | Naked_mask of head_of_kind_naked_mask Type_descr.t
   | Rec_info of head_of_kind_rec_info Type_descr.t
   | Region of head_of_kind_region Type_descr.t
 
@@ -117,6 +118,8 @@ and head_of_kind_naked_vec128 = private Vector_types.Vec128.Bit_pattern.Set.t
 and head_of_kind_naked_vec256 = private Vector_types.Vec256.Bit_pattern.Set.t
 
 and head_of_kind_naked_vec512 = private Vector_types.Vec512.Bit_pattern.Set.t
+
+and head_of_kind_naked_mask = private Vector_types.Mask.Bit_pattern.Set.t
 
 and head_of_kind_rec_info = Rec_info_expr.t
 
@@ -244,6 +247,8 @@ val bottom_naked_vec256 : t
 
 val bottom_naked_vec512 : t
 
+val bottom_naked_mask : t
+
 val bottom_rec_info : t
 
 val bottom_region : t
@@ -271,6 +276,8 @@ val any_naked_vec128 : t
 val any_naked_vec256 : t
 
 val any_naked_vec512 : t
+
+val any_naked_mask : t
 
 val any_region : t
 
@@ -306,6 +313,8 @@ val this_naked_vec256 : Vector_types.Vec256.Bit_pattern.t -> t
 
 val this_naked_vec512 : Vector_types.Vec512.Bit_pattern.t -> t
 
+val this_naked_mask : Vector_types.Mask.Bit_pattern.t -> t
+
 val these_naked_immediates : Target_ocaml_int.Set.t -> t
 
 val these_naked_float32s : Numeric_types.Float32_by_bit_pattern.Set.t -> t
@@ -327,6 +336,8 @@ val these_naked_vec128s : Vector_types.Vec128.Bit_pattern.Set.t -> t
 val these_naked_vec256s : Vector_types.Vec256.Bit_pattern.Set.t -> t
 
 val these_naked_vec512s : Vector_types.Vec512.Bit_pattern.Set.t -> t
+
+val these_naked_masks : Vector_types.Mask.Bit_pattern.Set.t -> t
 
 val boxed_float32_alias_to :
   naked_float32:Variable.t -> Alloc_mode.For_types.t -> t
@@ -690,6 +701,8 @@ module Descr : sig
         head_of_kind_naked_vec256 Type_descr.Descr.t Or_unknown_or_bottom.t
     | Naked_vec512 of
         head_of_kind_naked_vec512 Type_descr.Descr.t Or_unknown_or_bottom.t
+    | Naked_mask of
+        head_of_kind_naked_mask Type_descr.Descr.t Or_unknown_or_bottom.t
     | Rec_info of
         head_of_kind_rec_info Type_descr.Descr.t Or_unknown_or_bottom.t
     | Region of head_of_kind_region Type_descr.Descr.t Or_unknown_or_bottom.t
@@ -720,6 +733,8 @@ val create_from_head_naked_vec128 : head_of_kind_naked_vec128 -> t
 val create_from_head_naked_vec256 : head_of_kind_naked_vec256 -> t
 
 val create_from_head_naked_vec512 : head_of_kind_naked_vec512 -> t
+
+val create_from_head_naked_mask : head_of_kind_naked_mask -> t
 
 val create_from_head_rec_info : head_of_kind_rec_info -> t
 
@@ -772,6 +787,11 @@ val apply_coercion_head_of_kind_naked_vec512 :
   head_of_kind_naked_vec512 ->
   Coercion.t ->
   head_of_kind_naked_vec512 Or_bottom.t
+
+val apply_coercion_head_of_kind_naked_mask :
+  head_of_kind_naked_mask ->
+  Coercion.t ->
+  head_of_kind_naked_mask Or_bottom.t
 
 val apply_coercion_head_of_kind_rec_info :
   head_of_kind_rec_info -> Coercion.t -> head_of_kind_rec_info Or_bottom.t
@@ -964,6 +984,12 @@ module Head_of_kind_naked_vec512 :
     with type t = head_of_kind_naked_vec512
     with type n = Vector_types.Vec512.Bit_pattern.t
     with type n_set = Vector_types.Vec512.Bit_pattern.Set.t
+
+module Head_of_kind_naked_mask :
+  Head_of_kind_naked_number_intf
+    with type t = head_of_kind_naked_mask
+    with type n = Vector_types.Mask.Bit_pattern.t
+    with type n_set = Vector_types.Mask.Bit_pattern.Set.t
 
 val must_be_singleton :
   t -> machine_width:Target_system.Machine_width.t -> Reg_width_const.t option

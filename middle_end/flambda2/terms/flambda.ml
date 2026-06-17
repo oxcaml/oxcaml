@@ -1456,6 +1456,9 @@ module Named = struct
       | Naked_number Naked_vec512 ->
         Simple.const
           (Reg_width_const.naked_vec512 Vector_types.Vec512.Bit_pattern.zero)
+      | Naked_number Naked_mask ->
+        Simple.const
+          (Reg_width_const.naked_mask Vector_types.Mask.Bit_pattern.zero)
       | Region -> Misc.fatal_error "[Region] kind not expected here"
       | Rec_info -> Misc.fatal_error "[Rec_info] kind not expected here"
     in

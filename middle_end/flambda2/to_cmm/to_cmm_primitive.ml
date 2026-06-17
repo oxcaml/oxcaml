@@ -110,6 +110,7 @@ let mixed_block_kinds shape =
         | Naked_vec128 -> KS.naked_vec128
         | Naked_vec256 -> KS.naked_vec256
         | Naked_vec512 -> KS.naked_vec512
+        | Naked_mask -> KS.naked_mask
         | Naked_nativeint -> KS.naked_nativeint
         | Naked_immediate -> KS.naked_immediate)
       (Array.to_list (K.Mixed_block_shape.flat_suffix shape))
@@ -144,6 +145,7 @@ let memory_chunk_of_flat_suffix_element :
   | Naked_vec128 -> Onetwentyeight_unaligned
   | Naked_vec256 -> Twofiftysix_unaligned
   | Naked_vec512 -> Fivetwelve_unaligned
+  | Naked_mask -> Word_int
   | Naked_int64 | Naked_nativeint | Naked_immediate -> Word_int
 
 let block_load ~dbg (kind : P.Block_access_kind.t) (mutability : Mutability.t)
@@ -296,6 +298,7 @@ let array_load_vector ~(vec_kind : Vector_types.Kind.t) ~dbg ~element_width_log2
   | Vec128 -> C.unaligned_load_128 arr index dbg
   | Vec256 -> C.unaligned_load_256 arr index dbg
   | Vec512 -> C.unaligned_load_512 arr index dbg
+  | Mask -> Misc.fatal_error "Mask array loads are not supported"
 
 let array_load_128 = array_load_vector ~vec_kind:Vec128
 
@@ -312,6 +315,7 @@ let array_set_vector ~(vec_kind : Vector_types.Kind.t) ~dbg ~element_width_log2
   | Vec128 -> C.unaligned_set_128 arr index new_value dbg
   | Vec256 -> C.unaligned_set_256 arr index new_value dbg
   | Vec512 -> C.unaligned_set_512 arr index new_value dbg
+  | Mask -> Misc.fatal_error "Mask array stores are not supported"
 
 let array_set_128 = array_set_vector ~vec_kind:Vec128
 

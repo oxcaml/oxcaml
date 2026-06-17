@@ -131,7 +131,7 @@ let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
       | Product elts -> Array.fold_left collect_value_fields acc elts
       | Float_boxed ()
       | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
-      | Vec512 | Word | Untagged_immediate | Splice_variable _ ->
+      | Vec512 | Mask | Word | Untagged_immediate | Splice_variable _ ->
         Misc.fatal_error "convert_block_shape: non-uniform shape"
     in
     let fields = Array.fold_left collect_value_fields [] shape |> List.rev in
@@ -1080,7 +1080,11 @@ let array_vector_access_validity_condition array ~machine_width
          array, which is not yet supported."
   in
   let size_of_access =
-    match vec_kind with Vec128 -> 16 | Vec256 -> 32 | Vec512 -> 64
+    match vec_kind with
+    | Vec128 -> 16
+    | Vec256 -> 32
+    | Vec512 -> 64
+    | Mask -> Misc.fatal_error "Mask array accesses are not supported"
   in
   let num_consecutive_elements_being_accessed =
     (size_of_access + (size_of_element - 1)) / size_of_element
@@ -1105,6 +1109,7 @@ let array_like_load_vec ~dbg ~machine_width ~unsafe ~mode ~boxed ~current_region
     | Vec128 -> P.Array_load_kind.Naked_vec128s, box_vec128
     | Vec256 -> P.Array_load_kind.Naked_vec256s, box_vec256
     | Vec512 -> P.Array_load_kind.Naked_vec512s, box_vec512
+    | Mask -> Misc.fatal_error "Mask array loads are not supported"
   in
   let primitive =
     H.Binary (Array_load (array_kind, load_kind, Mutable), array, index)
@@ -1127,6 +1132,7 @@ let array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
     | Vec128 -> P.Array_set_kind.Naked_vec128s, unbox_vec128
     | Vec256 -> P.Array_set_kind.Naked_vec256s, unbox_vec256
     | Vec512 -> P.Array_set_kind.Naked_vec512s, unbox_vec512
+    | Mask -> Misc.fatal_error "Mask array stores are not supported"
   in
   let new_value = if boxed then unbox new_value else new_value in
   let primitive =
@@ -1169,6 +1175,7 @@ let bigarray_box_or_tag_raw_value_to_read kind alloc_mode =
     fun arg -> H.Unary (Box_number (Naked_vec256, alloc_mode), Prim arg)
   | Naked_number Naked_vec512 ->
     fun arg -> H.Unary (Box_number (Naked_vec512, alloc_mode), Prim arg)
+  | Naked_number Naked_mask -> error "a mask"
   | Region -> error "a region expression"
   | Rec_info -> error "recursion info"
 
@@ -1205,6 +1212,7 @@ let bigarray_unbox_or_untag_value_to_store kind =
     fun arg -> H.Prim (Unary (Unbox_number Naked_vec256, arg))
   | Naked_number Naked_vec512 ->
     fun arg -> H.Prim (Unary (Unbox_number Naked_vec512, arg))
+  | Naked_number Naked_mask -> error "a mask"
   | Region -> error "a region expression"
   | Rec_info -> error "recursion info"
 
@@ -1718,7 +1726,7 @@ let block_index_access_offsets ~machine_width layout idx =
           H.simple_i64 (Int64.of_int (BC.on_64_bit_arch to_left.value))
         (* Flats are gap + (all values) + (flats to left) beyond the offset *)
         | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-        | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate ->
+        | Word | Vec128 | Vec256 | Vec512 | Mask | Untagged_immediate ->
           Prim
             (add gap
                (H.simple_i64
@@ -1828,7 +1836,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           (fun new_index arg ->
             match flattened_reordered_shape.(new_index) with
             | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-            | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+            | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
               arg
             | Float_boxed _ -> unbox_float arg)
           args
@@ -2618,7 +2626,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Float_boxed (mode : Lambda.locality_mode) ->
           box_float mode prim ~current_region
         | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-        | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+        | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
           prim)
       new_indexes
   | ( Psetfield (index, immediate_or_pointer, initialization_or_assignment),
@@ -2693,7 +2701,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           let value : H.simple_or_prim =
             match field_elt with
             | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-            | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+            | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
               value
             | Float_boxed _ -> unbox_float value
           in

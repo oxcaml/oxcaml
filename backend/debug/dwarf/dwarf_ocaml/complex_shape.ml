@@ -189,6 +189,7 @@ let translate_unboxed : S.Predef.unboxed -> RS.unboxed = function
   | Unboxed_int32 -> Unboxed_int32
   | Unboxed_int16 -> Unboxed_int16
   | Unboxed_int8 -> Unboxed_int8
+  | Unboxed_mask -> Unboxed_mask
   | Unboxed_simd svs -> Unboxed_simd (translate_simd_vec_split svs)
 
 exception Layout_missing
@@ -223,6 +224,7 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
     | Vec128 -> Vec128
     | Vec256 -> Vec256
     | Vec512 -> Vec512
+    | Mask -> Mask
     | Word -> Word
     | Untagged_immediate -> Untagged_immediate
     | Void -> Product [||])
@@ -244,6 +246,7 @@ let to_runtime_layout (e : _ Mixed_block_shape.Singleton_mixed_block_element.t)
   | Vec128 -> Vec128
   | Vec256 -> Vec256
   | Vec512 -> Vec512
+  | Mask -> Mask
   | Word -> Word
   | Untagged_immediate -> Untagged_immediate
 
@@ -781,13 +784,14 @@ and predef_to_complex_shape_exn ~cache ~rec_env (predef : S.Predef.t) ~args :
     in
     Lazy_t elem_shape
   | Nativeint, [] -> Nativeint
+  | Mask, [] -> Mask
   | String, [] -> String
   | Simd vec_split, [] -> Simd (translate_simd_vec_split vec_split)
   | Exception, [] -> Exception
   | Unboxed unb, [] -> Unboxed (translate_unboxed unb)
   | ( ( Bytes | Char | Extension_constructor | Float | Float32 | Floatarray
-      | Int | Int8 | Int16 | Int32 | Int64 | Nativeint | String | Simd _
-      | Exception | Unboxed _ ),
+      | Int | Int8 | Int16 | Int32 | Int64 | Mask | Nativeint | String
+      | Simd _ | Exception | Unboxed _ ),
       arg :: args ) ->
     err_exn (fun f ->
         f "predefined type %a does not take arguments, but got arguments %a"

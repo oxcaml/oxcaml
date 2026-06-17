@@ -21,6 +21,7 @@ module Kind : sig
     | Vec128
     | Vec256
     | Vec512
+    | Mask
 end
 
 module Vec128 : sig
@@ -84,6 +85,23 @@ module Vec512 : sig
         word6 : int64;
         word7 : int64
       }
+
+    val to_bits : t -> bits
+
+    val of_bits : bits -> t
+  end
+end
+
+module Mask : sig
+  module Bit_pattern : sig
+    (** 64-bit AVX512 mask value whose comparison and equality relations are
+        lexicographically ordered by bit pattern. *)
+
+    include Container_types.S
+
+    val zero : t
+
+    type bits = { word0 : int64 }
 
     val to_bits : t -> bits
 

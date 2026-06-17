@@ -1308,7 +1308,7 @@ end = struct
             else value_unknown))
       | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
       | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-      | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ ->
+      | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Naked_nativeint _ ->
         Unknown (TG.kind ty)
       | Rec_info _ | Region _ -> assert false
     in

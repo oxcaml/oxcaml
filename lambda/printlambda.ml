@@ -173,6 +173,7 @@ let rec mixed_block_element print_value_kind ppf el =
   | Vec128 -> fprintf ppf "vec128"
   | Vec256 -> fprintf ppf "vec256"
   | Vec512 -> fprintf ppf "vec512"
+  | Mask -> fprintf ppf "mask"
   | Word -> fprintf ppf "word"
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
   | Product shape ->
@@ -239,6 +240,7 @@ let rec layout ppf lay_ =
   | Punboxed_or_untagged_integer bi ->
     fprintf ppf "%s" (unboxed_integer_layout bi)
   | Punboxed_vector bv -> fprintf ppf "%s" (unboxed_vector_layout bv)
+  | Punboxed_mask -> fprintf ppf "mask"
   | Punboxed_product layouts ->
     fprintf ppf "@[<hov 1>#(%a)@]"
       (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") layout)
@@ -280,6 +282,7 @@ let return_kind ppf (mode, kind) =
   | Punboxed_float bf -> fprintf ppf ": %s@ " (unboxed_float bf)
   | Punboxed_or_untagged_integer bi -> fprintf ppf ": %s@ " (unboxed_integer bi)
   | Punboxed_vector bv -> fprintf ppf ": %s@ " (unboxed_vector bv)
+  | Punboxed_mask -> fprintf ppf ": unboxed_mask@ "
   | Punboxed_product _ -> fprintf ppf ": %a@ " layout kind
   | Ptop -> fprintf ppf ": top@ "
   | Pbottom -> fprintf ppf ": bottom@ "
@@ -338,6 +341,7 @@ let rec mixed_block_element
   | Vec128 -> fprintf ppf "vec128"
   | Vec256 -> fprintf ppf "vec256"
   | Vec512 -> fprintf ppf "vec512"
+  | Mask -> fprintf ppf "mask"
   | Word -> fprintf ppf "word"
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
   | Product shape ->

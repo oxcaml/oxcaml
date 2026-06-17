@@ -27,6 +27,7 @@ module Sort = struct
     | Vec128
     | Vec256
     | Vec512
+    | Mask
 
   type univar = { name : string option }
 
@@ -97,10 +98,12 @@ module Sort = struct
     | Bits64, Bits64
     | Vec128, Vec128
     | Vec256, Vec256
-    | Vec512, Vec512 ->
+    | Vec512, Vec512
+    | Mask, Mask ->
       true
     | ( ( Void | Scannable | Untagged_immediate | Float64 | Float32 | Word
-        | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ),
+        | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
+        | Mask ),
         _ ) ->
       false
 
@@ -118,6 +121,7 @@ module Sort = struct
     | Vec128 -> "vec128"
     | Vec256 -> "vec256"
     | Vec512 -> "vec512"
+    | Mask -> "mask"
 
   (* Global association list mapping poly vars to names for printing *)
   let sort_poly_var_names : (var * string) list ref = ref []
@@ -187,7 +191,7 @@ module Sort = struct
       | Base Void -> true
       | Base
           ( Scannable | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
-          | Bits32 | Bits64 | Word | Vec128 | Vec256 | Vec512 ) ->
+          | Bits32 | Bits64 | Word | Vec128 | Vec256 | Vec512 | Mask ) ->
         false
       | Univar _ -> Misc.fatal_error "Sort.Const.all_void: Univar"
       | Genvar _ -> Misc.fatal_error "Sort.Const.all_void: Genvar"
@@ -219,6 +223,8 @@ module Sort = struct
 
     let vec512 = Base Vec512
 
+    let mask = Base Mask
+
     module Debug_printers = struct
       let t ppf c =
         let rec pp_element ~nested ppf = function
@@ -237,7 +243,8 @@ module Sort = struct
               | Bits64 -> "Bits64"
               | Vec128 -> "Vec128"
               | Vec256 -> "Vec256"
-              | Vec512 -> "Vec512")
+              | Vec512 -> "Vec512"
+              | Mask -> "Mask")
           | Product cs ->
             let pp_sep ppf () = Format.fprintf ppf "@ , " in
             Format.fprintf ppf "Product [%a]"
@@ -336,6 +343,8 @@ module Sort = struct
 
     let some_vec512 = Some vec512
 
+    let some_mask = Some mask
+
     let[@inline] some_of_base = function
       | Scannable -> some_scannable
       | Void -> some_void
@@ -350,6 +359,7 @@ module Sort = struct
       | Vec128 -> some_vec128
       | Vec256 -> some_vec256
       | Vec512 -> some_vec512
+      | Mask -> some_mask
 
     let[@inline] some : t -> t option = function
       | Base b -> some_of_base b
@@ -400,7 +410,8 @@ module Sort = struct
         | Bits64 -> "Bits64"
         | Vec128 -> "Vec128"
         | Vec256 -> "Vec256"
-        | Vec512 -> "Vec512")
+        | Vec512 -> "Vec512"
+        | Mask -> "Mask")
 
     let rec t ppf = function
       | Var v -> fprintf ppf "Var %a" var v
@@ -507,6 +518,8 @@ module Sort = struct
 
       let vec512 = Base Vec512
 
+      let mask = Base Mask
+
       let of_base = function
         | Void -> void
         | Scannable -> scannable
@@ -521,6 +534,7 @@ module Sort = struct
         | Vec128 -> vec128
         | Vec256 -> vec256
         | Vec512 -> vec512
+        | Mask -> mask
 
       let rec of_const : Const.t -> t = function
         | Base b -> of_base b
@@ -556,6 +570,8 @@ module Sort = struct
 
       let vec512 = Some T.vec512
 
+      let mask = Some T.mask
+
       let of_base = function
         | Void -> void
         | Scannable -> scannable
@@ -570,6 +586,7 @@ module Sort = struct
         | Vec128 -> vec128
         | Vec256 -> vec256
         | Vec512 -> vec512
+        | Mask -> mask
 
       let rec of_const : Const.t -> t option = function
         | Base b -> of_base b
@@ -610,6 +627,8 @@ module Sort = struct
 
       let vec512 = Base Vec512
 
+      let mask = Base Mask
+
       let of_base : base -> Const.t = function
         | Scannable -> scannable
         | Void -> void
@@ -624,6 +643,7 @@ module Sort = struct
         | Vec128 -> vec128
         | Vec256 -> vec256
         | Vec512 -> vec512
+        | Mask -> mask
     end
   end
 
@@ -1127,6 +1147,8 @@ module Layout = struct
 
       let vec512 = Base (Sort.Vec512, Scannable_axes.max)
 
+      let mask = Base (Sort.Mask, Scannable_axes.max)
+
       let of_base (b : Sort.base) (sa : Scannable_axes.t) =
         match b, sa with
         | Scannable, sa -> (
@@ -1183,6 +1205,7 @@ module Layout = struct
         | Vec128, _ -> vec128
         | Vec256, _ -> vec256
         | Vec512, _ -> vec512
+        | Mask, _ -> mask
     end
 
     let of_sort s sa =

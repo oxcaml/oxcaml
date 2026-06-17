@@ -481,6 +481,8 @@ val this_naked_vec256 : Vector_types.Vec256.Bit_pattern.t -> t
 
 val this_naked_vec512 : Vector_types.Vec512.Bit_pattern.t -> t
 
+val this_naked_mask : Vector_types.Mask.Bit_pattern.t -> t
+
 val this_rec_info : Rec_info_expr.t -> t
 
 val these_naked_immediates : Target_ocaml_int.Set.t -> t

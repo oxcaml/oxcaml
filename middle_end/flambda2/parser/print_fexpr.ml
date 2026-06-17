@@ -206,6 +206,7 @@ let naked_number_kind ppf (nnk : Flambda_kind.Naked_number_kind.t) =
   | Naked_vec128 -> "vec128"
   | Naked_vec256 -> "vec256"
   | Naked_vec512 -> "vec512"
+  | Naked_mask -> "mask"
 
 let rec subkind ppf (k : subkind) =
   let str s = Format.pp_print_string ppf s in

@@ -25,6 +25,7 @@ type machtype_component = Cmx_format.machtype_component =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Float32
   | Valx2
 
@@ -75,6 +76,8 @@ val typ_vec128 : machtype
 val typ_vec256 : machtype
 
 val typ_vec512 : machtype
+
+val typ_mask : machtype
 
 val typ_int128 : machtype
 

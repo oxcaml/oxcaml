@@ -46,7 +46,8 @@ let static_field res field field_kind =
             } ]
       | Naked_number
           ( Naked_immediate | Naked_float32 | Naked_float | Naked_int8
-          | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint )
+          | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
+          | Naked_mask )
       | Value ->
         [C.cint 1n]
       | Region | Rec_info ->
@@ -389,6 +390,7 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
               | Naked_vec128 -> UK.naked_vec128_fields
               | Naked_vec256 -> UK.naked_vec256_fields
               | Naked_vec512 -> UK.naked_vec512_fields
+              | Naked_mask -> UK.naked_mask_fields
               | Naked_int64 | Naked_nativeint | Naked_immediate ->
                 UK.naked_int64s)
             (Flambda_kind.Mixed_block_shape.flat_suffix shape |> Array.to_list)

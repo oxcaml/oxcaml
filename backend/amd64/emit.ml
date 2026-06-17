@@ -201,6 +201,8 @@ let register_name typ phys_reg : X86_ast.arg =
   | Vec512 ->
     I.require_vec512 ();
     Regf zmm_reg_name.(reg_index)
+  | Mask ->
+    Misc.fatal_error "avx512 mask instructions not yet implemented"
 
 let phys_rax = phys_reg Int (P RAX)
 
@@ -461,7 +463,7 @@ let x86_data_type_for_stack_slot : Cmm.machtype_component -> X86_ast.data_type =
     I.require_vec512 ();
     VEC512
   | Valx2 -> VEC128
-  | Int | Addr | Val -> QWORD
+  | Int | Addr | Val | Mask -> QWORD
   | Float32 -> REAL4
 
 let reg : Reg.t -> X86_ast.arg =
@@ -570,7 +572,7 @@ let must_save_simd_regs live : Regs.Save_simd_regs.t =
         | Vec256 -> v256 := true
         | Vec512 -> v512 := true
         | Float | Vec128 | Float32 | Valx2 -> v128 := true
-        | Val | Addr | Int -> ())
+        | Val | Addr | Int | Mask -> ())
     live;
   if !v512
   then (
@@ -614,7 +616,8 @@ let record_frame_label live dbg =
         Misc.fatal_errorf "bad GC root %a" Printreg.reg r
       | { typ = Val | Valx2; loc = Unknown; _ } as r ->
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
-      | { typ = Int | Float | Float32 | Vec128 | Vec256 | Vec512; _ } -> ())
+      | { typ = Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask; _ } ->
+        ())
     live;
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of Linear labels. *)
@@ -1181,6 +1184,8 @@ let move (src : Reg.t) (dst : Reg.t) =
   | Vec512, _, Vec512, _ ->
     (* CR-soon mslater: avx512 *)
     Misc.fatal_error "avx512 instructions not yet implemented"
+  | Mask, _, Mask, _ ->
+    Misc.fatal_error "avx512 mask instructions not yet implemented"
   | Float, (Reg _ | Stack _), Float, (Reg _ | Stack _) ->
     if distinct then movsd (reg src) (reg dst)
   | Float32, (Reg _ | Stack _), Float32, (Reg _ | Stack _) ->
@@ -1193,7 +1198,8 @@ let move (src : Reg.t) (dst : Reg.t) =
     Misc.fatal_errorf
       "Illegal move with an unknown register location (%a to %a)\n" Printreg.reg
       src Printreg.reg dst
-  | ( (Float | Float32 | Vec128 | Vec256 | Vec512 | Int | Val | Addr | Valx2),
+  | ( ( Float | Float32 | Vec128 | Vec256 | Vec512 | Mask | Int | Val | Addr
+      | Valx2 ),
       (Reg _ | Stack _),
       _,
       _ ) ->
@@ -1210,7 +1216,7 @@ let stack_to_stack_move (src : Reg.t) (dst : Reg.t) =
       (* Not calling move because r15 is not in int_reg_name. *)
       I.mov (reg src) r15;
       I.mov r15 (reg dst)
-    | Float | Addr | Vec128 | Vec256 | Vec512 | Valx2 | Float32 ->
+    | Float | Addr | Vec128 | Vec256 | Vec512 | Mask | Valx2 | Float32 ->
       Misc.fatal_errorf
         "Unexpected register type for stack to stack move: from %a to %a\n"
         Printreg.reg src Printreg.reg dst
@@ -2928,7 +2934,8 @@ let size_of_regs regs =
         acc + size_float
       | Vec128 | Valx2 -> acc + size_vec128
       | Vec256 -> acc + size_vec256
-      | Vec512 -> acc + size_vec512)
+      | Vec512 -> acc + size_vec512
+      | Mask -> acc + size_int)
     regs 0
 
 let stack_locations ~offset regs =
@@ -2946,6 +2953,7 @@ let stack_locations ~offset regs =
           | Vec128 | Valx2 -> size_vec128
           | Vec256 -> size_vec256
           | Vec512 -> size_vec512
+          | Mask -> size_int
         in
         next, make_stack_loc n r ~offset :: offsets)
       regs (0, [])
@@ -3040,7 +3048,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
         | Stack (Outgoing k) -> (
           match r.typ with
           | Val -> k :: acc
-          | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> acc
+          | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 -> acc
           | Valx2 -> k :: (k + Arch.size_addr) :: acc
           | Addr -> Misc.fatal_errorf "bad GC root %a" Printreg.reg r)
         | Stack (Incoming _ | Reg.Local _ | Domainstate _) | Reg _ | Unknown ->

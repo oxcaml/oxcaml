@@ -225,7 +225,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
               | Naked_immediate _ | Naked_float32 _ | Naked_float _
               | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
               | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _
-              | Naked_vec512 _ ->
+              | Naked_vec512 _ | Naked_mask _ ->
                 Misc.fatal_errorf
                   "Unboxed constants are not allowed inside of Const_block: %a"
                   Printlambda.structured_constant const);
@@ -282,7 +282,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
         (fun new_index arg ->
           match flattened_reordered_shape.(new_index) with
           | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-          | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+          | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
             arg
           | Float_boxed _ -> unbox_float_constant arg)
         args
@@ -628,6 +628,11 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
         } ]
     | Vec512 ->
       [ { kind = K.naked_vec512;
+          arg_transformer = None;
+          return_transformer = None
+        } ]
+    | Mask ->
+      [ { kind = K.naked_mask;
           arg_transformer = None;
           return_transformer = None
         } ])
@@ -1564,6 +1569,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                           | Naked_float32 _ | Naked_int8 _ | Naked_int16 _
                           | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
                           | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
+                          | Naked_mask _
                           | Null ->
                             Misc.fatal_errorf
                               "Binding of %a to %a contains the constant %a \

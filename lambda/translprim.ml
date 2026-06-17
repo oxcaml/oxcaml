@@ -1634,6 +1634,7 @@ let peek_or_poke_layout_from_type ~prim_name error_loc env ty
     | Ptop
     | Pvalue _
     | Punboxed_vector _
+    | Punboxed_mask
     | Punboxed_product _
     | Pbottom
     | Psplicevar _ ->

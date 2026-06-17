@@ -737,8 +737,8 @@ let record_frame_label env live dbg =
       | { typ = Val; loc = Unknown; _ } as r ->
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
       | { typ = Int | Float | Float32 | Vec128; _ } -> ()
-      | { typ = Vec256 | Vec512; _ } ->
-        Misc.fatal_error "arm64: got 256/512 bit vector")
+      | { typ = Vec256 | Vec512 | Mask; _ } ->
+        Misc.fatal_error "arm64: got 256/512 bit vector or mask")
     live;
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of linear labels. *)
@@ -1198,7 +1198,7 @@ let emit_load_literal dst lbl =
   | Float32 -> A.ins2 LDR_simd_and_fp (H.reg_s dst) addr
   | Val | Int | Addr -> A.ins2 LDR (H.reg_x dst) addr
   | Vec128 | Valx2 -> A.ins2 LDR_simd_and_fp (H.reg_q dst) addr
-  | Vec256 | Vec512 ->
+  | Vec256 | Vec512 | Mask ->
     Misc.fatal_errorf "emit_load_literal: unexpected vector register %a"
       Printreg.reg dst
 
@@ -1208,8 +1208,8 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
   | Float32, Reg _, Float32, Reg _ -> A.ins2 FMOV_fp (H.reg_s dst) (H.reg_s src)
   | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Reg _ ->
     A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
-  | (Vec256 | Vec512), _, _, _ | _, _, (Vec256 | Vec512), _ ->
-    Misc.fatal_error "arm64: got 256/512 bit vector"
+  | (Vec256 | Vec512 | Mask), _, _, _ | _, _, (Vec256 | Vec512 | Mask), _ ->
+    Misc.fatal_error "arm64: got 256/512 bit vector or mask"
   | (Int | Val | Addr), Reg _, (Int | Val | Addr), Reg _ ->
     A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
   | Float, Reg _, Float, Stack _ ->
@@ -1236,7 +1236,7 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     Misc.fatal_errorf
       "Illegal move with an unknown register location (%a to %a)\n" Printreg.reg
       src Printreg.reg dst
-  | ( (Float | Float32 | Vec128 | Int | Val | Addr | Valx2),
+  | ( (Float | Float32 | Vec128 | Int | Val | Addr | Mask | Valx2),
       (Reg _ | Stack _),
       _,
       _ ) ->

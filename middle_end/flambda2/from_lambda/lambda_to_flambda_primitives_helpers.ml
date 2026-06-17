@@ -512,7 +512,7 @@ let mixed_block_access_field_kind
   | Value value_kind ->
     Value_prefix (convert_block_access_field_kind_from_value_kind value_kind)
   | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
-    | Vec512 | Word | Untagged_immediate ) as mixed_block_element ->
+    | Vec512 | Mask | Word | Untagged_immediate ) as mixed_block_element ->
     Flat_suffix
       (K.Flat_suffix_element.from_singleton_mixed_block_element
          mixed_block_element)

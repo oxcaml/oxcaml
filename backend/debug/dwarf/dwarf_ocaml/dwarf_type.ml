@@ -1072,7 +1072,7 @@ let unboxed_base_type_to_simd_vec_split (x : RS.unboxed) =
   match x with
   | Unboxed_simd s -> Some s
   | Unboxed_float | Unboxed_float32 | Unboxed_nativeint | Unboxed_int64
-  | Unboxed_int32 | Unboxed_int16 | Unboxed_int8 ->
+  | Unboxed_int32 | Unboxed_int16 | Unboxed_int8 | Unboxed_mask ->
     None
 
 type vec_split_properties =
@@ -1154,7 +1154,7 @@ let create_runtime_layout_type ?(simd_vec_split = None) ~reference (sort : RL.t)
   | Float32 | Float64 ->
     create_unboxed_base_layout_die ~reference ~parent_proto_die ?name ~byte_size
       Encoding_attribute.float
-  | Bits8 | Bits16 | Bits32 | Bits64 | Word | Untagged_immediate ->
+  | Bits8 | Bits16 | Bits32 | Bits64 | Mask | Word | Untagged_immediate ->
     create_unboxed_base_layout_die ~reference ~parent_proto_die ?name ~byte_size
       Encoding_attribute.signed
   | Vec128 | Vec256 | Vec512 ->
@@ -1451,7 +1451,7 @@ and predef_to_dwarf_die ~reference ?name (t : RS.predef) ~parent_proto_die
     create_exception_die ~reference ~fallback_value_die ~parent_proto_die ?name
       ()
   | Bytes | Extension_constructor | Float | Float32 | Floatarray | Int | Int8
-  | Int16 | Int32 | Int64 | Lazy_t _ | Nativeint | String ->
+  | Int16 | Int32 | Int64 | Lazy_t _ | Mask | Nativeint | String ->
     create_runtime_layout_type ~reference Value ?name ~parent_proto_die
       ~fallback_value_die ()
 (* CR sspies: Create a separate block for lazy values. We now have type

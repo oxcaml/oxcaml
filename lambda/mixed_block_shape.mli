@@ -46,6 +46,7 @@ module Singleton_mixed_block_element : sig
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Word
     | Untagged_immediate
 

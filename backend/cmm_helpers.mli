@@ -357,6 +357,7 @@ module Extended_machtype_component : sig
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Float32
 end
 
@@ -380,6 +381,8 @@ module Extended_machtype : sig
   val typ_vec256 : t
 
   val typ_vec512 : t
+
+  val typ_mask : t
 
   (** Conversion from a normal Cmm machtype. *)
   val of_machtype : machtype -> t

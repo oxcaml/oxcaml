@@ -486,6 +486,7 @@ let kind =
            "vec128", K.naked_vec128;
            "vec256", K.naked_vec256;
            "vec512", K.naked_vec512;
+           "mask", K.naked_mask;
            "region", K.region;
            "rec_info", K.rec_info ])
 
@@ -611,6 +612,7 @@ let kind_with_subkind =
       let| naked_vec128 = flag_case "vec128" K.With_subkind.naked_vec128 in
       let| naked_vec256 = flag_case "vec256" K.With_subkind.naked_vec256 in
       let| naked_vec512 = flag_case "vec512" K.With_subkind.naked_vec512 in
+      let| naked_mask = flag_case "mask" K.With_subkind.naked_mask in
       let| value =
         param2_case non_null_value_subkind nullable ~decode:(fun _ sk n ->
             K.With_subkind.create K.value sk n)
@@ -632,6 +634,7 @@ let kind_with_subkind =
           | Naked_number K.Naked_number_kind.Naked_vec128 -> naked_vec128 ()
           | Naked_number K.Naked_number_kind.Naked_vec256 -> naked_vec256 ()
           | Naked_number K.Naked_number_kind.Naked_vec512 -> naked_vec512 ()
+          | Naked_number K.Naked_number_kind.Naked_mask -> naked_mask ()
           | Value ->
             value
               ( K.With_subkind.non_null_value_subkind full_kind,

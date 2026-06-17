@@ -90,3 +90,4 @@ let rec filter_non_beneficial_decisions decision : U.decision =
     if is_unboxing_beneficial_for_epa epa
     then decision
     else Do_not_unbox Not_beneficial
+  | Unbox (Number (Naked_mask, _)) -> Do_not_unbox Not_beneficial

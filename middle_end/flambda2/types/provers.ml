@@ -72,7 +72,8 @@ let gen_value_to_gen prove_gen env t : _ generic_proof =
   | Value (Ok { is_null = Not_null; non_null = Ok head }) -> prove_gen env head
   | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _
+  | Rec_info _ | Region _ ->
     wrong_kind "Value" t (Invalid : _ generic_proof)
 
 let gen_value_to_proof prove_gen env t : _ proof_of_property =
@@ -85,7 +86,8 @@ let gen_value_to_proof prove_gen env t : _ proof_of_property =
     as_property (prove_gen env head)
   | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _
+  | Rec_info _ | Region _ ->
     wrong_kind "Value" t (Unknown : _ proof_of_property)
 
 let gen_value_to_meet prove_gen env t : _ meet_shortcut =
@@ -96,7 +98,8 @@ let gen_value_to_meet prove_gen env t : _ meet_shortcut =
     as_meet_shortcut (prove_gen env head)
   | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _
+  | Rec_info _ | Region _ ->
     wrong_kind "Value" t (Invalid : _ meet_shortcut)
 
 let prove_equals_to_simple_of_kind env t kind : Simple.t proof_of_property =
@@ -222,7 +225,8 @@ let prove_is_null_generic env t : _ generic_proof =
   | Value (Ok { non_null = Unknown | Ok _; is_null = Maybe_null _ }) -> Unknown
   | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _
+  | Rec_info _ | Region _ ->
     wrong_kind "Value" t (Invalid : _ generic_proof)
 
 let meet_is_null env t = as_meet_shortcut (prove_is_null_generic env t)
@@ -275,7 +279,7 @@ let prove_naked_immediates_generic env t : Target_ocaml_int.Set.t generic_proof
   | Naked_immediate Bottom -> Invalid
   | Value _ | Naked_float _ | Naked_float32 _ | Naked_int8 _ | Naked_int16 _
   | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _ | Naked_vec128 _
-  | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
+  | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Rec_info _ | Region _ ->
     wrong_kind "Naked_immediate" t (Invalid : _ generic_proof)
 
 let meet_naked_immediates env t =
@@ -358,6 +362,7 @@ type _ meet_naked_number_kind =
   | Vec128 : Vector_types.Vec128.Bit_pattern.Set.t meet_naked_number_kind
   | Vec256 : Vector_types.Vec256.Bit_pattern.Set.t meet_naked_number_kind
   | Vec512 : Vector_types.Vec512.Bit_pattern.Set.t meet_naked_number_kind
+  | Mask : Vector_types.Mask.Bit_pattern.Set.t meet_naked_number_kind
 
 let[@inline] meet_naked_number (type a) (kind : a meet_naked_number_kind) env t
     : a meet_shortcut =
@@ -383,6 +388,7 @@ let[@inline] meet_naked_number (type a) (kind : a meet_naked_number_kind) env t
       | Vec128 -> "Naked_vec128"
       | Vec256 -> "Naked_vec256"
       | Vec512 -> "Naked_vec512"
+      | Mask -> "Naked_mask"
     in
     wrong_kind kind_string t (Invalid : _ meet_shortcut)
   in
@@ -391,6 +397,14 @@ let[@inline] meet_naked_number (type a) (kind : a meet_naked_number_kind) env t
   | Naked_immediate _ -> wrong_kind ()
   | Rec_info _ -> wrong_kind ()
   | Region _ -> wrong_kind ()
+  | Naked_mask vs -> (
+    match kind with
+    | Mask ->
+      head_to_proof vs
+        (fun (fs : TG.head_of_kind_naked_mask) ->
+          (fs :> Vector_types.Mask.Bit_pattern.Set.t))
+        ~is_empty:Vector_types.Mask.Bit_pattern.Set.is_empty
+    | _ -> wrong_kind ())
   | Naked_float32 fs -> (
     match kind with
     | Float32 ->
@@ -485,6 +499,8 @@ let meet_naked_vec128s = meet_naked_number Vec128
 let meet_naked_vec256s = meet_naked_number Vec256
 
 let meet_naked_vec512s = meet_naked_number Vec512
+
+let meet_naked_masks = meet_naked_number Mask
 
 type variant_like_proof =
   { const_ctors : Target_ocaml_int.Set.t Or_unknown.t;
@@ -928,8 +944,8 @@ let[@inline always] meet_boxed_number_containing_simple
   | Value (Ok { is_null = _; non_null = Bottom }) | Value Bottom -> Invalid
   | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-  | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _ | Region _
-    ->
+  | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Naked_mask _
+  | Rec_info _ | Region _ ->
     wrong_kind "Value" t (Invalid : _ meet_shortcut)
 
 let meet_boxed_float32_containing_simple =
@@ -1128,7 +1144,8 @@ let meet_rec_info env t : Rec_info_expr.t meet_shortcut =
   | Rec_info Bottom -> Invalid
   | Value _ | Naked_immediate _ | Naked_float _ | Naked_int8 _ | Naked_int16 _
   | Naked_float32 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-  | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Region _ ->
+  | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Naked_nativeint _
+  | Region _ ->
     wrong_kind "Rec_info" t (Invalid : _ meet_shortcut)
 
 let prove_alloc_mode_of_boxed_number_value _env
@@ -1183,8 +1200,8 @@ let never_holds_locally_allocated_values env var : _ proof_of_property =
     | String _ -> Proved ())
   | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-  | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _ | Region _
-    ->
+  | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Naked_mask _
+  | Rec_info _ | Region _ ->
     Proved ()
 
 let prove_physical_equality env t1 t2 =
@@ -1220,10 +1237,13 @@ let prove_physical_equality env t1 t2 =
     | Naked_vec512 (Ok s1), Naked_vec512 (Ok s2) ->
       let module IS = Vector_types.Vec512.Bit_pattern.Set in
       IS.is_empty (IS.inter (s1 :> IS.t) (s2 :> IS.t))
+    | Naked_mask (Ok s1), Naked_mask (Ok s2) ->
+      let module IS = Vector_types.Mask.Bit_pattern.Set in
+      IS.is_empty (IS.inter (s1 :> IS.t) (s2 :> IS.t))
     | ( ( Naked_float _ | Naked_float32 _ | Naked_int8 _ | Naked_int16 _
         | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _ | Naked_vec128 _
-        | Naked_vec256 _ | Naked_vec512 _ | Value _ | Naked_immediate _
-        | Region _ | Rec_info _ ),
+        | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Value _
+        | Naked_immediate _ | Region _ | Rec_info _ ),
         _ ) ->
       false
   in
@@ -1231,15 +1251,15 @@ let prove_physical_equality env t1 t2 =
     match expand_head env t1, expand_head env t2 with
     | ( ( Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
         | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-        | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _
-        | Region _ ),
+        | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Naked_mask _
+        | Rec_info _ | Region _ ),
         _ ) ->
       wrong_kind "Value" t1 (Unknown : _ proof_of_property)
     | ( _,
         ( Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
         | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-        | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _
-        | Region _ ) ) ->
+        | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Naked_mask _
+        | Rec_info _ | Region _ ) ) ->
       wrong_kind "Value" t2 (Unknown : _ proof_of_property)
     | Value (Unknown | Bottom), _ | _, Value (Unknown | Bottom) -> Unknown
     | Value (Ok head1), Value (Ok head2) -> (

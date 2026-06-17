@@ -25,6 +25,7 @@ module TEL = Typing_env_level
 module Vec128 = Vector_types.Vec128.Bit_pattern
 module Vec256 = Vector_types.Vec256.Bit_pattern
 module Vec512 = Vector_types.Vec512.Bit_pattern
+module Mask = Vector_types.Mask.Bit_pattern
 
 type 'a meet_return_value = 'a ME.meet_return_value =
   | Left_input
@@ -676,6 +677,9 @@ and meet_expanded_head0 env (descr1 : ET.descr) (descr2 : ET.descr) :
   | Naked_vec512 head1, Naked_vec512 head2 ->
     map_result ~f:ET.create_naked_vec512
       (meet_head_of_kind_naked_vec512 env head1 head2)
+  | Naked_mask head1, Naked_mask head2 ->
+    map_result ~f:ET.create_naked_mask
+      (meet_head_of_kind_naked_mask env head1 head2)
   | Rec_info head1, Rec_info head2 ->
     map_result ~f:ET.create_rec_info
       (meet_head_of_kind_rec_info env head1 head2)
@@ -683,8 +687,8 @@ and meet_expanded_head0 env (descr1 : ET.descr) (descr2 : ET.descr) :
     map_result ~f:ET.create_region (meet_head_of_kind_region env head1 head2)
   | ( ( Value _ | Naked_immediate _ | Naked_float _ | Naked_float32 _
       | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_vec128 _
-      | Naked_vec256 _ | Naked_vec512 _ | Naked_int64 _ | Naked_nativeint _
-      | Rec_info _ | Region _ ),
+      | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Naked_int64 _
+      | Naked_nativeint _ | Rec_info _ | Region _ ),
       _ ) ->
     assert false
 
@@ -1240,6 +1244,14 @@ and meet_head_of_kind_naked_vec512 env t1 t2 =
     (t1 : TG.head_of_kind_naked_vec512 :> Vec512.Set.t)
     (t2 : TG.head_of_kind_naked_vec512 :> Vec512.Set.t)
     ~of_set:TG.Head_of_kind_naked_vec512.create_non_empty_set
+
+and meet_head_of_kind_naked_mask env t1 t2 =
+  set_meet
+    (module Mask.Set)
+    env
+    (t1 : TG.head_of_kind_naked_mask :> Mask.Set.t)
+    (t2 : TG.head_of_kind_naked_mask :> Mask.Set.t)
+    ~of_set:TG.Head_of_kind_naked_mask.create_non_empty_set
 
 and meet_head_of_kind_rec_info env _t1 _t2 =
   (* CR-someday lmaurer: This could be doing things like discovering two depth
@@ -1918,6 +1930,17 @@ and n_way_join_expanded_head env kind (expandeds : ET.t Join_env.join_arg list)
               n_way_join_head_of_kind_naked_vec512 env (head1, id1) heads
             in
             ET.create_naked_vec512 head
+          | Naked_mask head1 ->
+            let heads =
+              extract_head_exn
+                (function[@warning "-fragile-match"]
+                  | Naked_mask head -> head | _ -> assert false)
+                expandeds
+            in
+            let>>+ head =
+              n_way_join_head_of_kind_naked_mask env (head1, id1) heads
+            in
+            ET.create_naked_mask head
           | Rec_info head1 ->
             let heads =
               extract_head_exn
@@ -2498,6 +2521,10 @@ and n_way_join_head_of_kind_naked_vec256 env t1 ts : _ n_way_join_result =
 
 and n_way_join_head_of_kind_naked_vec512 env t1 ts : _ n_way_join_result =
   n_way_join_head_of_kind_naked_number ~union:TG.Head_of_kind_naked_vec512.union
+    env t1 ts
+
+and n_way_join_head_of_kind_naked_mask env t1 ts : _ n_way_join_result =
+  n_way_join_head_of_kind_naked_number ~union:TG.Head_of_kind_naked_mask.union
     env t1 ts
 
 and n_way_join_head_of_kind_rec_info env (t1, _) ts : _ n_way_join_result =

@@ -49,6 +49,8 @@ module Expanded_type : sig
 
   val create_naked_vec512 : Type_grammar.head_of_kind_naked_vec512 -> t
 
+  val create_naked_mask : Type_grammar.head_of_kind_naked_mask -> t
+
   val create_rec_info : Type_grammar.head_of_kind_rec_info -> t
 
   val create_region : Type_grammar.head_of_kind_region -> t
@@ -86,6 +88,7 @@ module Expanded_type : sig
     | Naked_vec128 of Type_grammar.head_of_kind_naked_vec128
     | Naked_vec256 of Type_grammar.head_of_kind_naked_vec256
     | Naked_vec512 of Type_grammar.head_of_kind_naked_vec512
+    | Naked_mask of Type_grammar.head_of_kind_naked_mask
     | Rec_info of Type_grammar.head_of_kind_rec_info
     | Region of Type_grammar.head_of_kind_region
 
@@ -114,6 +117,8 @@ module Expanded_type : sig
         Type_grammar.head_of_kind_naked_vec256 Or_unknown_or_bottom.t
     | Naked_vec512 of
         Type_grammar.head_of_kind_naked_vec512 Or_unknown_or_bottom.t
+    | Naked_mask of
+        Type_grammar.head_of_kind_naked_mask Or_unknown_or_bottom.t
     | Rec_info of Type_grammar.head_of_kind_rec_info Or_unknown_or_bottom.t
     | Region of Type_grammar.head_of_kind_region Or_unknown_or_bottom.t
 
@@ -132,6 +137,7 @@ end = struct
     | Naked_vec128 of TG.head_of_kind_naked_vec128
     | Naked_vec256 of TG.head_of_kind_naked_vec256
     | Naked_vec512 of TG.head_of_kind_naked_vec512
+    | Naked_mask of TG.head_of_kind_naked_mask
     | Rec_info of TG.head_of_kind_rec_info
     | Region of TG.head_of_kind_region
 
@@ -179,6 +185,9 @@ end = struct
   let create_naked_vec512 head =
     { kind = K.naked_vec512; descr = Ok (Naked_vec512 head) }
 
+  let create_naked_mask head =
+    { kind = K.naked_mask; descr = Ok (Naked_mask head) }
+
   let create_rec_info head = { kind = K.rec_info; descr = Ok (Rec_info head) }
 
   let create_region head = { kind = K.region; descr = Ok (Region head) }
@@ -209,6 +218,8 @@ end = struct
       create_naked_vec256 (TG.Head_of_kind_naked_vec256.create i)
     | Naked_vec512 i ->
       create_naked_vec512 (TG.Head_of_kind_naked_vec512.create i)
+    | Naked_mask i ->
+      create_naked_mask (TG.Head_of_kind_naked_mask.create i)
     | Null -> create_value TG.Head_of_kind_value.null
 
   let bottom_like t = create_bottom t.kind
@@ -229,7 +240,7 @@ end = struct
         ( Value _ | Naked_immediate _ | Naked_float32 _ | Naked_float _
         | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
         | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
-        | Rec_info _ | Region _ ) ->
+        | Naked_mask _ | Rec_info _ | Region _ ) ->
       false
 
   let of_non_alias_type ?coercion ty : t =
@@ -297,6 +308,15 @@ end = struct
         match TG.apply_coercion_head_of_kind_naked_vec512 head coercion with
         | Bottom -> create_bottom K.naked_vec512
         | Ok head -> create_naked_vec512 head))
+    | Naked_mask Unknown -> create_unknown K.naked_mask
+    | Naked_mask Bottom -> create_bottom K.naked_mask
+    | Naked_mask (Ok (No_alias head)) -> (
+      match coercion with
+      | None -> create_naked_mask head
+      | Some coercion -> (
+        match TG.apply_coercion_head_of_kind_naked_mask head coercion with
+        | Bottom -> create_bottom K.naked_mask
+        | Ok head -> create_naked_mask head))
     | Naked_int8 Unknown -> create_unknown K.naked_int8
     | Naked_int8 Bottom -> create_bottom K.naked_int8
     | Naked_int8 (Ok (No_alias head)) -> (
@@ -367,6 +387,7 @@ end = struct
     | Naked_vec128 (Ok (Equals _))
     | Naked_vec256 (Ok (Equals _))
     | Naked_vec512 (Ok (Equals _))
+    | Naked_mask (Ok (Equals _))
     | Naked_int8 (Ok (Equals _))
     | Naked_int16 (Ok (Equals _))
     | Naked_int32 (Ok (Equals _))
@@ -394,6 +415,7 @@ end = struct
       | Naked_vec128 head -> TG.create_from_head_naked_vec128 head
       | Naked_vec256 head -> TG.create_from_head_naked_vec256 head
       | Naked_vec512 head -> TG.create_from_head_naked_vec512 head
+      | Naked_mask head -> TG.create_from_head_naked_mask head
       | Rec_info head -> TG.create_from_head_rec_info head
       | Region head -> TG.create_from_head_region head)
 
@@ -420,6 +442,8 @@ end = struct
         Type_grammar.head_of_kind_naked_vec256 Or_unknown_or_bottom.t
     | Naked_vec512 of
         Type_grammar.head_of_kind_naked_vec512 Or_unknown_or_bottom.t
+    | Naked_mask of
+        Type_grammar.head_of_kind_naked_mask Or_unknown_or_bottom.t
     | Rec_info of Type_grammar.head_of_kind_rec_info Or_unknown_or_bottom.t
     | Region of Type_grammar.head_of_kind_region Or_unknown_or_bottom.t
 
@@ -439,6 +463,7 @@ end = struct
       | Naked_number Naked_vec128 -> Naked_vec128 Unknown
       | Naked_number Naked_vec256 -> Naked_vec256 Unknown
       | Naked_number Naked_vec512 -> Naked_vec512 Unknown
+      | Naked_number Naked_mask -> Naked_mask Unknown
       | Rec_info -> Rec_info Unknown
       | Region -> Region Unknown)
     | Bottom -> (
@@ -455,6 +480,7 @@ end = struct
       | Naked_number Naked_vec128 -> Naked_vec128 Bottom
       | Naked_number Naked_vec256 -> Naked_vec256 Bottom
       | Naked_number Naked_vec512 -> Naked_vec512 Bottom
+      | Naked_number Naked_mask -> Naked_mask Bottom
       | Rec_info -> Rec_info Bottom
       | Region -> Region Bottom)
     | Ok (Value head) -> Value (Ok head)
@@ -469,6 +495,7 @@ end = struct
     | Ok (Naked_vec128 head) -> Naked_vec128 (Ok head)
     | Ok (Naked_vec256 head) -> Naked_vec256 (Ok head)
     | Ok (Naked_vec512 head) -> Naked_vec512 (Ok head)
+    | Ok (Naked_mask head) -> Naked_mask (Ok head)
     | Ok (Rec_info head) -> Rec_info (Ok head)
     | Ok (Region head) -> Region (Ok head)
 end

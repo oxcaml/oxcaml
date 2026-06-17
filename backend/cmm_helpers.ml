@@ -2140,6 +2140,7 @@ module Extended_machtype_component = struct
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Float32
 
   let of_machtype_component (component : machtype_component) =
@@ -2151,6 +2152,7 @@ module Extended_machtype_component = struct
     | Vec128 -> Vec128
     | Vec256 -> Vec256
     | Vec512 -> Vec512
+    | Mask -> Mask
     | Float32 -> Float32
     | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
 
@@ -2163,6 +2165,7 @@ module Extended_machtype_component = struct
     | Vec128 -> Vec128
     | Vec256 -> Vec256
     | Vec512 -> Vec512
+    | Mask -> Mask
     | Float32 -> Float32
 
   let change_tagged_int_to_val t : machtype_component =
@@ -2175,6 +2178,7 @@ module Extended_machtype_component = struct
     | Vec128 -> Vec128
     | Vec256 -> Vec256
     | Vec512 -> Vec512
+    | Mask -> Mask
     | Float32 -> Float32
 end
 
@@ -2196,6 +2200,8 @@ module Extended_machtype = struct
   let typ_vec256 = [| Extended_machtype_component.Vec256 |]
 
   let typ_vec512 = [| Extended_machtype_component.Vec512 |]
+
+  let typ_mask = [| Extended_machtype_component.Mask |]
 
   let typ_void = [||]
 
@@ -2219,6 +2225,7 @@ module Extended_machtype = struct
     | Punboxed_vector Unboxed_vec128 -> typ_vec128
     | Punboxed_vector Unboxed_vec256 -> typ_vec256
     | Punboxed_vector Unboxed_vec512 -> typ_vec512
+    | Punboxed_mask -> typ_mask
     | Punboxed_or_untagged_integer _ ->
       (* Only 64-bit architectures, so this is always [typ_int] *)
       typ_any_int
@@ -2243,6 +2250,7 @@ let machtype_identifier t =
     | Vec128 -> 'X'
     | Vec256 -> 'Y'
     | Vec512 -> 'Z'
+    | Mask -> 'K'
     | Float32 -> 'S'
     | Addr ->
       Misc.fatal_error "[Addr] is forbidden inside arity for generic functions"
@@ -3814,7 +3822,8 @@ let machtype_stored_size t =
         cur + 1
       | Vec128 -> cur + ints_per_vec128
       | Vec256 -> cur + ints_per_vec256
-      | Vec512 -> cur + ints_per_vec512)
+      | Vec512 -> cur + ints_per_vec512
+      | Mask -> cur + 1)
     0 t
 
 let machtype_non_scanned_size t =
@@ -3831,7 +3840,8 @@ let machtype_non_scanned_size t =
         cur + 1
       | Vec128 -> cur + ints_per_vec128
       | Vec256 -> cur + ints_per_vec256
-      | Vec512 -> cur + ints_per_vec512)
+      | Vec512 -> cur + ints_per_vec512
+      | Mask -> cur + 1)
     0 t
 
 let make_tuple l = match l with [e] -> e | _ -> Ctuple l
@@ -3844,7 +3854,7 @@ let value_slot_given_machtype vs =
     List.partition
       (fun (_, c) ->
         match (c : machtype_component) with
-        | Int | Float | Float32 | Vec128 | Vec256 | Vec512 -> true
+        | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask -> true
         | Val -> false
         | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
         | Addr -> assert false)
@@ -3879,6 +3889,9 @@ let read_from_closure_given_machtype t clos base_offset dbg =
         | Vec512 ->
           ( (non_scanned_pos + ints_per_vec512, scanned_pos),
             load Fivetwelve_unaligned non_scanned_pos )
+        | Mask ->
+          ( (non_scanned_pos + 1, scanned_pos),
+            load Word_int non_scanned_pos )
         | Val -> (non_scanned_pos, scanned_pos + 1), load Word_val scanned_pos
         | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
         | Addr -> Misc.fatal_error "[Addr] cannot be read")

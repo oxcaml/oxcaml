@@ -32,6 +32,7 @@ module Naked_number_kind : sig
     | Naked_vec128
     | Naked_vec256
     | Naked_vec512
+    | Naked_mask
 
   val print : Format.formatter -> t -> unit
 
@@ -79,6 +80,8 @@ val naked_vec256 : t
 
 val naked_vec512 : t
 
+val naked_mask : t
+
 val region : t
 
 val rec_info : t
@@ -101,6 +104,7 @@ type flat_suffix_element =
   | Naked_vec128
   | Naked_vec256
   | Naked_vec512
+  | Naked_mask
 
 module Mixed_block_lambda_shape = Mixed_block_shape
 
@@ -291,6 +295,8 @@ module With_subkind : sig
   val naked_vec256 : t
 
   val naked_vec512 : t
+
+  val naked_mask : t
 
   val region : t
 

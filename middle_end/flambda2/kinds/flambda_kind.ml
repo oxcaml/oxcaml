@@ -29,6 +29,7 @@ module Naked_number_kind = struct
     | Naked_vec128
     | Naked_vec256
     | Naked_vec512
+    | Naked_mask
 
   let print ppf t =
     match t with
@@ -43,11 +44,12 @@ module Naked_number_kind = struct
     | Naked_vec128 -> Format.pp_print_string ppf "Naked_vec128"
     | Naked_vec256 -> Format.pp_print_string ppf "Naked_vec256"
     | Naked_vec512 -> Format.pp_print_string ppf "Naked_vec512"
+    | Naked_mask -> Format.pp_print_string ppf "Naked_mask"
 
   let equal
       (( Naked_immediate | Naked_float32 | Naked_float | Naked_int8
        | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
-       | Naked_vec128 | Naked_vec256 | Naked_vec512 ) as x) y =
+       | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_mask ) as x) y =
     (* polymorphic equality is valid, simpler, and faster than a huge pattern
        match as long as all of ths constructors are constant *)
     Stdlib.( = ) x y
@@ -86,6 +88,8 @@ let naked_vec128 = Naked_number Naked_vec128
 let naked_vec256 = Naked_number Naked_vec256
 
 let naked_vec512 = Naked_number Naked_vec512
+
+let naked_mask = Naked_number Naked_mask
 
 let region = Region
 
@@ -144,6 +148,9 @@ include Container_types.Make (struct
         | Naked_vec512 ->
           Format.fprintf ppf "%t@<1>\u{2115}@<1>\u{1d54d}512%t" colour
             Flambda_colours.pop
+        | Naked_mask ->
+          Format.fprintf ppf "%t@<1>\u{2115}@<1>mask%t" colour
+            Flambda_colours.pop
       else
         Format.fprintf ppf "(Naked_number %a)" Naked_number_kind.print
           naked_number_kind
@@ -171,7 +178,7 @@ let is_naked_float t =
   | Naked_number
       ( Naked_immediate | Naked_float32 | Naked_int8 | Naked_int16 | Naked_int32
       | Naked_int64 | Naked_nativeint | Naked_vec128 | Naked_vec256
-      | Naked_vec512 )
+      | Naked_vec512 | Naked_mask )
   | Region | Rec_info ->
     false
 
@@ -190,6 +197,7 @@ type flat_suffix_element =
   | Naked_vec128
   | Naked_vec256
   | Naked_vec512
+  | Naked_mask
 
 module Flat_suffix_element0 = struct
   type t = flat_suffix_element
@@ -207,6 +215,7 @@ module Flat_suffix_element0 = struct
     | Naked_vec128 -> naked_vec128
     | Naked_vec256 -> naked_vec256
     | Naked_vec512 -> naked_vec512
+    | Naked_mask -> naked_mask
 
   let naked_float = Naked_float
 
@@ -221,6 +230,7 @@ module Flat_suffix_element0 = struct
     | Naked_vec128 -> 2
     | Naked_vec256 -> 4
     | Naked_vec512 -> 8
+    | Naked_mask -> 1
 
   let print ppf t =
     match t with
@@ -235,6 +245,7 @@ module Flat_suffix_element0 = struct
     | Naked_vec128 -> Format.pp_print_string ppf "Naked_vec128"
     | Naked_vec256 -> Format.pp_print_string ppf "Naked_vec256"
     | Naked_vec512 -> Format.pp_print_string ppf "Naked_vec512"
+    | Naked_mask -> Format.pp_print_string ppf "Naked_mask"
 
   let from_singleton_mixed_block_element
       (elt : _ Mixed_block_lambda_shape.Singleton_mixed_block_element.t) =
@@ -248,6 +259,7 @@ module Flat_suffix_element0 = struct
     | Vec128 -> Naked_vec128
     | Vec256 -> Naked_vec256
     | Vec512 -> Naked_vec512
+    | Mask -> Naked_mask
     | Word -> Naked_nativeint
     | Untagged_immediate -> Naked_immediate
     | Value _ ->
@@ -889,6 +901,8 @@ module With_subkind = struct
 
   let naked_vec512 = anything naked_vec512
 
+  let naked_mask = anything naked_mask
+
   let region = anything region
 
   let boxed_float32 = create value Boxed_float32 Non_nullable
@@ -961,6 +975,7 @@ module With_subkind = struct
     | Naked_vec128 -> naked_vec128
     | Naked_vec256 -> naked_vec256
     | Naked_vec512 -> naked_vec512
+    | Naked_mask -> naked_mask
 
   let naked_of_boxable_number (boxable_number : Boxable_number.t) =
     match boxable_number with
@@ -1053,6 +1068,7 @@ module With_subkind = struct
                         | Vec128 -> naked_vec128
                         | Vec256 -> naked_vec256
                         | Vec512 -> naked_vec512
+                        | Mask -> naked_mask
                         | Word -> naked_nativeint
                         | Untagged_immediate -> naked_immediate
                       in
@@ -1125,6 +1141,7 @@ module With_subkind = struct
     | Punboxed_vector Unboxed_vec128 -> naked_vec128
     | Punboxed_vector Unboxed_vec256 -> naked_vec256
     | Punboxed_vector Unboxed_vec512 -> naked_vec512
+    | Punboxed_mask -> naked_mask
     | Punboxed_product _ | Ptop | Pbottom ->
       Misc.fatal_errorf
         "Flambda_kind.from_lambda_values_and_unboxed_numbers_only: cannot \
@@ -1235,6 +1252,7 @@ module Flat_suffix_element = struct
     | Naked_vec128 -> With_subkind.naked_vec128
     | Naked_vec256 -> With_subkind.naked_vec256
     | Naked_vec512 -> With_subkind.naked_vec512
+    | Naked_mask -> With_subkind.naked_mask
 end
 
 module Standard_int_or_float = struct

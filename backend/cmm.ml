@@ -25,6 +25,7 @@ type machtype_component = Cmx_format.machtype_component =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Float32
   | Valx2
 
@@ -52,12 +53,14 @@ let typ_vec256 = [| Vec256 |]
 
 let typ_vec512 = [| Vec512 |]
 
+let typ_mask = [| Mask |]
+
 let typ_int128 = [| Int; Int |]
 
 (** [machtype_component]s are partially ordered as follows:
 
     {v
-      Addr     Float32     Float     Vec128     Vec256     Vec512   Valx2
+      Addr     Float32     Float     Vec128     Vec256     Vec512   Mask   Valx2
        ^
        |
       Val
@@ -89,10 +92,13 @@ let lub_component comp1 comp2 =
   | Vec128, Vec128 -> Vec128
   | Vec256, Vec256 -> Vec256
   | Vec512, Vec512 -> Vec512
-  | (Int | Addr | Val), (Float | Float32 | Vec128 | Vec256 | Vec512)
-  | (Float | Float32 | Vec128 | Vec256 | Vec512), (Int | Addr | Val)
-  | (Float | Float32 | Vec256 | Vec512), (Vec128 | Vec256 | Vec512)
-  | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512)
+  | Mask, Mask -> Mask
+  | (Int | Addr | Val), (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask)
+  | (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask), (Int | Addr | Val)
+  | (Float | Float32 | Vec256 | Vec512 | Mask), (Vec128 | Vec256 | Vec512)
+  | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512 | Mask)
+  | Mask, (Float | Float32)
+  | (Float | Float32), Mask
   | Float32, Float
   | Float, Float32 ->
     Printf.eprintf "%d %d\n%!" (Obj.magic comp1) (Obj.magic comp2);
@@ -117,10 +123,13 @@ let ge_component comp1 comp2 =
   | Vec128, Vec128 -> true
   | Vec256, Vec256 -> true
   | Vec512, Vec512 -> true
-  | (Int | Addr | Val), (Float | Float32 | Vec128 | Vec256 | Vec512)
-  | (Float | Float32 | Vec128 | Vec256 | Vec512), (Int | Addr | Val)
-  | (Float | Float32 | Vec256 | Vec512), (Vec128 | Vec256 | Vec512)
-  | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512)
+  | Mask, Mask -> true
+  | (Int | Addr | Val), (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask)
+  | (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask), (Int | Addr | Val)
+  | (Float | Float32 | Vec256 | Vec512 | Mask), (Vec128 | Vec256 | Vec512)
+  | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512 | Mask)
+  | Mask, (Float | Float32)
+  | (Float | Float32), Mask
   | Float32, Float
   | Float, Float32 ->
     Printf.eprintf "GE: %d %d\n%!" (Obj.magic comp1) (Obj.magic comp2);
@@ -882,18 +891,19 @@ let rank_machtype_component : machtype_component -> int = function
   | Vec128 -> 4
   | Vec256 -> 5
   | Vec512 -> 6
-  | Float32 -> 7
-  | Valx2 -> 8
+  | Mask -> 7
+  | Float32 -> 8
+  | Valx2 -> 9
 
 let compare_machtype_component
-    ((Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2) as
-     left :
+    (( Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32
+     | Valx2 ) as left :
       machtype_component) (right : machtype_component) =
   rank_machtype_component left - rank_machtype_component right
 
 let equal_machtype_component
-    ((Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2) as
-     left :
+    (( Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32
+     | Valx2 ) as left :
       machtype_component) (right : machtype_component) =
   rank_machtype_component left = rank_machtype_component right
 
@@ -1141,17 +1151,20 @@ let caml_flambda2_invalid = "caml_flambda2_invalid"
 let is_val (m : machtype_component) =
   match m with
   | Val -> true
-  | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 -> false
+  | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
+    false
 
 let is_int (m : machtype_component) =
   match m with
   | Int -> true
-  | Addr | Val | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 -> false
+  | Addr | Val | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
+    false
 
 let is_addr (m : machtype_component) =
   match m with
   | Addr -> true
-  | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 -> false
+  | Val | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
+    false
 
 let is_exn_handler (flag : ccatch_flag) =
   match flag with Exn_handler -> true | Normal | Recursive -> false

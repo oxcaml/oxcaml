@@ -88,8 +88,10 @@ let types_are_compatible (left : Reg.t)  (right : Reg.t) =
     true
   | Vec512, Vec512 ->
     true
+  | Mask, Mask ->
+    true
   | (Int | Val | Addr | Float | Float32 |
-     Vec128 | Vec256 | Vec512 | Valx2), _ -> false
+     Vec128 | Vec256 | Vec512 | Mask | Valx2), _ -> false
 
 (* Representation of hard registers by pseudo-registers *)
 
@@ -111,6 +113,10 @@ let hard_vec512_reg =
   Array.map (Reg.create_alias ~typ:Vec512) hard_float_reg
 let hard_float32_reg =
   Array.map (Reg.create_alias ~typ:Float32) hard_float_reg
+let hard_mask_reg =
+  Regs.phys_mask_regs
+  |> Array.map (fun phys_mask_reg ->
+     Reg.create_at_location Mask (Reg phys_mask_reg))
 
 let add_hard_vec256_regs list ~f =
   if Arch.Extension.enabled_vec256 ()
@@ -120,10 +126,15 @@ let add_hard_vec512_regs list ~f =
   if Arch.Extension.enabled_vec512 ()
   then f hard_vec512_reg :: list else list
 
+let add_hard_mask_regs list ~f =
+  if Arch.Extension.enabled_vec512 ()
+  then f hard_mask_reg :: list else list
+
 let all_phys_regs =
   [hard_int_reg; hard_float_reg; hard_float32_reg; hard_vec128_reg]
   |> add_hard_vec256_regs ~f:(fun regs -> regs)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
+  |> add_hard_mask_regs ~f:(fun regs -> regs)
   |> Array.concat
 
 let phys_reg ty (phys_reg : Regs.Phys_reg.t) =
@@ -143,6 +154,7 @@ let phys_reg ty (phys_reg : Regs.Phys_reg.t) =
   | Vec128 | Valx2 -> hard_vec128_reg.(index_in_class)
   | Vec256 -> hard_vec256_reg.(index_in_class)
   | Vec512 -> hard_vec512_reg.(index_in_class)
+  | Mask -> hard_mask_reg.(index_in_class)
 
 let rax = phys_reg Int (P RAX)
 let rdi = phys_reg Int (P RDI)
@@ -177,12 +189,14 @@ let size_domainstate_args = 64 * size_int
 let calling_conventions
       ~int_registers
       ~float_registers
+      ~mask_registers
       ~make_stack
       ~first_stack
       arg =
   let loc = Array.make (Array.length arg) Reg.dummy in
   let int_registers = ref int_registers in
   let float_registers = ref float_registers in
+  let mask_registers = ref mask_registers in
   let ofs = ref first_stack in
   let max_size = ref 0 in
   (* A negative offset indicates a domainstate slot, which will
@@ -201,6 +215,7 @@ let calling_conventions
       | Vec128 -> float_registers, size_vec128
       | Vec256 -> float_registers, size_vec256
       | Vec512 -> float_registers, size_vec512
+      | Mask -> mask_registers, size_int
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
     in
     match !registers with
@@ -236,11 +251,15 @@ let ocaml_int_registers = Regs.[RAX; RBX; RDI; RSI; RDX; RCX; R8; R9; R12; R13]
 let ocaml_float_registers =
   Regs.[MM0; MM1; MM2; MM3; MM4; MM5; MM6; MM7; MM8; MM9]
 
+let ocaml_mask_registers =
+  Regs.[K1; K2; K3; K4; K5; K6; K7]
+
 let loc_arguments arg =
   let (loc, ofs, _align) =
     calling_conventions
         ~int_registers:ocaml_int_registers
         ~float_registers:ocaml_float_registers
+        ~mask_registers:ocaml_mask_registers
         ~make_stack:outgoing
         ~first_stack:(- size_domainstate_args)
         arg
@@ -252,6 +271,7 @@ let loc_parameters arg =
     calling_conventions
       ~int_registers:ocaml_int_registers
       ~float_registers:ocaml_float_registers
+      ~mask_registers:ocaml_mask_registers
       ~make_stack:incoming
       ~first_stack:(- size_domainstate_args)
       arg
@@ -263,6 +283,7 @@ let loc_results_call res =
     calling_conventions
       ~int_registers:ocaml_int_registers
       ~float_registers:ocaml_float_registers
+      ~mask_registers:ocaml_mask_registers
       ~make_stack:outgoing
       ~first_stack:(- size_domainstate_args)
       res
@@ -274,6 +295,7 @@ let loc_results_return res =
     calling_conventions
       ~int_registers:ocaml_int_registers
       ~float_registers:ocaml_float_registers
+      ~mask_registers:ocaml_mask_registers
       ~make_stack:incoming
       ~first_stack:(- size_domainstate_args)
       res
@@ -301,6 +323,7 @@ let loc_external_results res =
     calling_conventions
       ~int_registers:[RAX; RDX]
       ~float_registers:[MM0; MM1]
+      ~mask_registers:[K1; K2]
       ~make_stack:not_supported
       ~first_stack:0
       res
@@ -310,6 +333,7 @@ let unix_loc_external_arguments arg =
   calling_conventions
     ~int_registers:[RDI; RSI; RDX; RCX; R8; R9]
     ~float_registers:[MM0; MM1; MM2; MM3; MM4; MM5; MM6; MM7]
+    ~mask_registers:[K1; K2; K3; K4; K5; K6; K7]
     ~make_stack:outgoing
     ~first_stack:0
     arg
@@ -330,6 +354,8 @@ let win64_loc_external_arguments arg =
       | Vec128 | Vec256 | Vec512 ->
         (* CR mslater: (SIMD) win64 calling convention requires pass by reference *)
         Misc.fatal_error "SIMD external arguments are not supported on Win64"
+      | Mask ->
+        Misc.fatal_error "Mask external arguments are not supported on Win64"
       | Valx2 ->
         Misc.fatal_error "Unexpected machtype_component Valx2"
     in
@@ -378,6 +404,7 @@ let destroyed_at_c_call_win64 =
     Array.sub hard_vec128_reg 0 6 ]
   |> add_hard_vec256_regs ~f:(fun regs -> Array.sub regs 0 6)
   |> add_hard_vec512_regs ~f:(fun regs -> Array.sub regs 0 6)
+  |> add_hard_mask_regs ~f:(fun regs -> regs)
   |> Array.concat
 
 let destroyed_at_c_call_unix =
@@ -388,6 +415,7 @@ let destroyed_at_c_call_unix =
     hard_vec128_reg ]
   |> add_hard_vec256_regs ~f:(fun regs -> regs)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
+  |> add_hard_mask_regs ~f:(fun regs -> regs)
   |> Array.concat
 
 let destroyed_at_c_call =

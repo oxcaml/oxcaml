@@ -895,6 +895,7 @@ end = struct
           | Naked_number Naked_vec128 -> 2, true
           | Naked_number Naked_vec256 -> 4, true
           | Naked_number Naked_vec512 -> 8, true
+          | Naked_number Naked_mask -> 1, true
           | Value -> 1, Value_slot.is_always_immediate value_slot
         in
         if is_unboxed

@@ -506,6 +506,7 @@ and mixed_block_element =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Word
   | Product of mixed_product_shape
   | Void
@@ -871,13 +872,14 @@ let rec equal_mixed_block_element_up_to_scannable_axes e1 e2 =
   | Bits8, Bits8 | Bits16, Bits16
   | Bits32, Bits32 | Bits64, Bits64
   | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
+  | Mask, Mask
   | Void, Void
     -> true
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal
          equal_mixed_block_element_up_to_scannable_axes es1 es2
   | ( Scannable _ | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
-    | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
+    | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask
     | Product _ | Void ), _
     -> false
 
@@ -893,6 +895,7 @@ let rec compare_mixed_block_element e1 e2 =
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
   | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
+  | Mask, Mask
   | Void, Void
     -> 0
   | Product es1, Product es2
@@ -923,6 +926,8 @@ let rec compare_mixed_block_element e1 e2 =
   | _, Vec256 -> 1
   | Vec512, _ -> -1
   | _, Vec512 -> 1
+  | Mask, _ -> -1
+  | _, Mask -> 1
   | Void, _ -> -1
   | _, Void -> 1
 
@@ -1007,6 +1012,7 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Base Vec128 -> Vec128
   | Base Vec256 -> Vec256
   | Base Vec512 -> Vec512
+  | Base Mask -> Mask
   | Base Word -> Word
   | Product sorts ->
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
@@ -1089,6 +1095,7 @@ let rec mixed_block_element_to_string = function
   | Vec128 -> "Vec128"
   | Vec256 -> "Vec256"
   | Vec512 -> "Vec512"
+  | Mask -> "Mask"
   | Word -> "Word"
   | Untagged_immediate -> "Untagged_immediate"
   | Product es ->
@@ -1110,6 +1117,7 @@ let mixed_block_element_to_lowercase_string = function
   | Vec128 -> "vec128"
   | Vec256 -> "vec256"
   | Vec512 -> "vec512"
+  | Mask -> "mask"
   | Word -> "word"
   | Untagged_immediate -> "untagged_immediate"
   | Product es ->

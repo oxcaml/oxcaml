@@ -185,7 +185,8 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
               else maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
           | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
           | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-          | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Null ->
+          | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Naked_nativeint _
+          | Null ->
             maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
         in
         Simple.pattern_match arg ~const ~name:(fun _ ~coercion:_ ->
@@ -359,7 +360,8 @@ let recognize_switch_with_single_arg_to_same_destination0 dbg machine_width
         | Naked_nativeint -> single_kind Naked_nativeints Naked_nativeints
         | Naked_vec128 -> single_kind Naked_vec128s Naked_vec128s
         | Naked_vec256 -> single_kind Naked_vec256s Naked_vec256s
-        | Naked_vec512 -> single_kind Naked_vec512s Naked_vec512s)
+        | Naked_vec512 -> single_kind Naked_vec512s Naked_vec512s
+        | Naked_mask -> None)
       | Region | Rec_info -> None)
 
 let recognize_switch_with_single_arg_to_same_destination dbg machine_width ~arms

@@ -32,6 +32,7 @@ let unknown (kind : K.t) =
   | Naked_number Naked_vec128 -> TG.any_naked_vec128
   | Naked_number Naked_vec256 -> TG.any_naked_vec256
   | Naked_number Naked_vec512 -> TG.any_naked_vec512
+  | Naked_number Naked_mask -> TG.any_naked_mask
   | Rec_info -> TG.any_rec_info
   | Region -> TG.any_region
 
@@ -54,6 +55,7 @@ let bottom (kind : K.t) =
   | Naked_number Naked_vec128 -> TG.bottom_naked_vec128
   | Naked_number Naked_vec256 -> TG.bottom_naked_vec256
   | Naked_number Naked_vec512 -> TG.bottom_naked_vec512
+  | Naked_number Naked_mask -> TG.bottom_naked_mask
   | Rec_info -> TG.bottom_rec_info
   | Region -> TG.bottom_region
 
@@ -80,6 +82,8 @@ let these_naked_vec128s vs = TG.these_naked_vec128s vs
 let these_naked_vec256s vs = TG.these_naked_vec256s vs
 
 let these_naked_vec512s vs = TG.these_naked_vec512s vs
+
+let these_naked_masks vs = TG.these_naked_masks vs
 
 let any_tagged_immediate =
   TG.create_variant ~is_unique:false ~immediates:Unknown
@@ -443,6 +447,7 @@ let type_for_const const =
   | Naked_vec128 n -> TG.this_naked_vec128 n
   | Naked_vec256 n -> TG.this_naked_vec256 n
   | Naked_vec512 n -> TG.this_naked_vec512 n
+  | Naked_mask n -> TG.this_naked_mask n
   | Null -> TG.null
 
 let kind_for_const const = TG.kind (type_for_const const)
@@ -486,6 +491,7 @@ let rec unknown_with_subkind ?(alloc_mode = Alloc_mode.For_types.unknown ())
   | Naked_number Naked_vec128 -> TG.any_naked_vec128
   | Naked_number Naked_vec256 -> TG.any_naked_vec256
   | Naked_number Naked_vec512 -> TG.any_naked_vec512
+  | Naked_number Naked_mask -> TG.any_naked_mask
   | Rec_info -> TG.any_rec_info
   | Region -> TG.any_region
   | Value ->

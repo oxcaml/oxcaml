@@ -59,9 +59,9 @@ let of_element_kind t =
   | Naked_number Naked_vec128 -> Naked_vec128s
   | Naked_number Naked_vec256 -> Naked_vec256s
   | Naked_number Naked_vec512 -> Naked_vec512s
-  | Region | Rec_info ->
+  | Naked_number Naked_mask | Region | Rec_info ->
     Misc.fatal_errorf
-      "Arrays cannot contain elements of kind region or rec_info"
+      "Arrays cannot contain elements of kind mask, region or rec_info"
 
 let of_lambda array_kind =
   match (array_kind : Lambda.array_kind) with

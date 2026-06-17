@@ -457,6 +457,7 @@ and layout =
   | Punboxed_float of unboxed_float
   | Punboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Punboxed_vector of unboxed_vector
+  | Punboxed_mask
   | Punboxed_product of layout list
   | Pbottom
   | Psplicevar of Ident.t
@@ -477,6 +478,7 @@ and 'a mixed_block_element =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Word
   | Untagged_immediate
   | Product of 'a mixed_block_element array
@@ -672,6 +674,7 @@ and equal_mixed_block_element :
   | Vec128, Vec128
   | Vec256, Vec256
   | Vec512, Vec512
+  | Mask, Mask
   | Word, Word
   | Untagged_immediate, Untagged_immediate -> true
   | Product es1, Product es2 ->
@@ -680,7 +683,7 @@ and equal_mixed_block_element :
   | Splice_variable id1, Splice_variable id2 -> Ident.equal id1 id2
   | (Value _ | Float_boxed _ | Float64 | Float32
      | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-     | Vec256 | Vec512 | Word | Untagged_immediate | Product _
+     | Vec256 | Vec512 | Mask | Word | Untagged_immediate | Product _
      | Splice_variable _), _ -> false
 
 and equal_mixed_block_shape shape1 shape2 =
@@ -707,7 +710,7 @@ let rec is_value_or_void_element : _ mixed_block_element -> bool = function
   | Product elts -> Array.for_all is_value_or_void_element elts
   | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
   | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-  | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+  | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     false
 (* CR layout poly: This function probably shouldn't exist at all and we should
    merge mixed_block_shape and block_shape. *)
@@ -1370,6 +1373,7 @@ let layout_unboxed_int8 = Punboxed_or_untagged_integer Untagged_int8
 let layout_string = non_null_value Pgenval
 let layout_unboxed_int ubi = Punboxed_or_untagged_integer ubi
 let layout_boxed_int bi = non_null_value (Pboxedintval bi)
+let layout_unboxed_mask = Punboxed_mask
 
 let layout_unboxed_vector v =
   match v with
@@ -1794,6 +1798,7 @@ let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
     then Product [|Vec128; Vec128|]
     else Vec256
   | Vec512 -> Vec512
+  | Mask -> Mask
   | Word -> Word
   | Untagged_immediate -> Untagged_immediate
   | Product shapes ->
@@ -1824,6 +1829,7 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
       then Product [|Vec128; Vec128|]
       else Vec256
     | Vec512 -> Vec512
+    | Mask -> Mask
     | Word -> Word
     | Untagged_immediate -> Untagged_immediate
     | Product shapes ->
@@ -1855,7 +1861,7 @@ let transl_module_representation repr =
     match elt with
     | Scannable _ -> true
     | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
-    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
+    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
     | Product _ | Void -> false
   in
   if Array.for_all is_value shape
@@ -2406,7 +2412,8 @@ let project_from_mixed_block_shape
         | Value _
         | Float_boxed _
         | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
-        | Untagged_immediate | Vec128 | Vec256 | Vec512 | Splice_variable _ ->
+        | Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask
+        | Splice_variable _ ->
           Misc.fatal_error "project_from_mixed_block_element: path too long \
             for mixed block shape")
     in
@@ -2417,7 +2424,7 @@ let mixed_block_projection_may_allocate shape ~path =
     match element with
     | Float_boxed mode -> Some mode
     | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
-    | Untagged_immediate | Vec128 | Vec256 | Vec512 -> None
+    | Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask -> None
     | Product shape ->
       Array.fold_left (fun alloc_mode element ->
           let alloc_mode' = allocates element in
@@ -2821,6 +2828,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Base Vec128 -> layout_unboxed_vector Unboxed_vec128
   | Base Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Base Vec512 -> layout_unboxed_vector Unboxed_vec512
+  | Base Mask -> layout_unboxed_mask
   | Base Void -> layout_unboxed_product []
   | Product sorts ->
     layout_unboxed_product (List.map layout_of_const_sort sorts)
@@ -2899,6 +2907,7 @@ let rec layout_of_mixed_block_element element =
   | Vec128 -> layout_unboxed_vector Unboxed_vec128
   | Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Vec512 -> layout_unboxed_vector Unboxed_vec512
+  | Mask -> layout_unboxed_mask
   | Product shape ->
     Punboxed_product
       (Array.to_list (Array.map layout_of_mixed_block_element shape))
@@ -2934,6 +2943,7 @@ let rec mixed_block_element_of_layout (layout : layout) :
     assert (not split_vectors);
     Vec256
   | Punboxed_vector Unboxed_vec512 -> Vec512
+  | Punboxed_mask -> Mask
   | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
   | Psplicevar id -> Splice_variable id
 
@@ -2966,6 +2976,7 @@ let rec layout_of_mixed_block_element_for_idx_set
   | Vec128 -> layout_unboxed_vector Unboxed_vec128
   | Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Vec512 -> layout_unboxed_vector Unboxed_vec512
+  | Mask -> layout_unboxed_mask
   | Untagged_immediate -> Punboxed_or_untagged_integer Untagged_int
   | Splice_variable id -> Psplicevar id
 
@@ -2975,7 +2986,7 @@ let rec mixed_block_element_leaves (el : _ mixed_block_element)
   | Product els ->
     List.concat_map mixed_block_element_leaves (Array.to_list els)
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate
+  | Bits64 | Word | Vec128 | Vec256 | Vec512 | Mask | Untagged_immediate
   | Splice_variable _ ->
     [el]
 
@@ -2992,7 +3003,7 @@ let will_be_reordered (mbe : _ mixed_block_element) =
           { seen_flat = true; last_value_after_flat = acc.seen_flat }
         | Value _ -> { acc with last_value_after_flat = acc.seen_flat }
         | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-        | Word | Vec128 |  Vec256 | Vec512 | Untagged_immediate ->
+        | Word | Vec128 |  Vec256 | Vec512 | Mask | Untagged_immediate ->
           { acc with seen_flat = true })
       { seen_flat = false; last_value_after_flat = false }
       (mixed_block_element_leaves mbe)

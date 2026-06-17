@@ -1900,6 +1900,7 @@ module Element_repr = struct
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Word
     | Untagged_immediate
     | Product of t array
@@ -1933,6 +1934,7 @@ module Element_repr = struct
       | Vec128 -> Vec128
       | Vec256 -> Vec256
       | Vec512 -> Vec512
+      | Mask -> Mask
       | Word -> Word
       | Untagged_immediate -> Untagged_immediate
       | Product l -> Product (Array.map of_t l)
@@ -1959,6 +1961,7 @@ module Element_repr = struct
       | Base (Vec128, _) -> Some (Unboxed_element Vec128)
       | Base (Vec256, _) -> Some (Unboxed_element Vec256)
       | Base (Vec512, _) -> Some (Unboxed_element Vec512)
+      | Base (Mask, _) -> Some (Unboxed_element Mask)
       | Base (Void, _) -> Some Void
       | Product l ->
         (* CR rtjoa: changed this bc of scannable axes *)
@@ -2125,7 +2128,7 @@ let compute_record_repr
             | Some Void -> Void
             | Some (Unboxed_element (Float32
                                     | Bits8 | Bits16 | Bits32 | Bits64
-                                    | Vec128 | Vec256 | Vec512 | Word
+                                    | Vec128 | Vec256 | Vec512 | Mask | Word
                                     | Untagged_immediate | Product _))
             | Some Value_element _ | None ->
                 Misc.fatal_error "Expected only floats and float64s")
@@ -2244,7 +2247,7 @@ let compute_repr_summary env lbls jkinds =
               then repr_summary.atomic_floats <- true;
           | Unboxed_element Float64 -> repr_summary.float64s <- true
           | Unboxed_element ( Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                            | Vec128 | Vec256 | Vec512 | Word
+                            | Vec128 | Vec256 | Vec512 | Mask | Word
                             | Untagged_immediate | Product _ ) ->
               repr_summary.non_float64_unboxed_fields <- true
           | Value_element _ -> repr_summary.values <- true

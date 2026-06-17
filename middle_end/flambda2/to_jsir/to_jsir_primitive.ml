@@ -141,7 +141,7 @@ let block_access_kind_exn (kind : Flambda_primitive.Block_access_kind.t) :
       { field_kind =
           Flat_suffix
             ( Naked_int8 | Naked_int16 | Naked_vec128 | Naked_vec256
-            | Naked_vec512 );
+            | Naked_vec512 | Naked_mask );
         _
       } ->
     raise Primitive_not_supported

@@ -536,6 +536,7 @@ and layout =
   | Punboxed_float of unboxed_float
   | Punboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Punboxed_vector of unboxed_vector
+  | Punboxed_mask
   | Punboxed_product of layout list
   | Pbottom
   | Psplicevar of Ident.t
@@ -559,6 +560,7 @@ and 'a mixed_block_element =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Word
   | Untagged_immediate
   | Product of 'a mixed_block_element array
@@ -1178,6 +1180,7 @@ val layout_unboxed_float : unboxed_float -> layout
 val layout_boxed_int : boxed_integer -> layout
 val layout_boxed_vector : boxed_vector -> layout
 val layout_tupled_vector : boxed_vector -> layout
+val layout_unboxed_mask : layout
 val layout_unboxed_vector : unboxed_vector -> layout
 val layout_unboxed_tupled_vector : unboxed_vector -> layout
 (* A layout that is Pgenval because it is the field of a tuple *)

@@ -61,6 +61,8 @@ let exttype_of_kind (k : Flambda_kind.t) : Cmm.exttype =
   | Naked_number Naked_vec128 -> XVec128
   | Naked_number Naked_vec256 -> XVec256
   | Naked_number Naked_vec512 -> XVec512
+  | Naked_number Naked_mask ->
+    Misc.fatal_error "[Naked_mask] kind not expected in external calls"
   | Region -> Misc.fatal_error "[Region] kind not expected here"
   | Rec_info -> Misc.fatal_error "[Rec_info] kind not expected here"
 
@@ -82,6 +84,7 @@ let machtype_of_kind (kind : Flambda_kind.With_subkind.t) =
   | Naked_number Naked_vec128 -> Cmm.typ_vec128
   | Naked_number Naked_vec256 -> Cmm.typ_vec256
   | Naked_number Naked_vec512 -> Cmm.typ_vec512
+  | Naked_number Naked_mask -> Cmm.typ_mask
   | Naked_number
       ( Naked_immediate | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64
       | Naked_nativeint ) ->
@@ -107,6 +110,7 @@ let extended_machtype_of_kind (kind : Flambda_kind.With_subkind.t) =
   | Naked_number Naked_vec128 -> Extended_machtype.typ_vec128
   | Naked_number Naked_vec256 -> Extended_machtype.typ_vec256
   | Naked_number Naked_vec512 -> Extended_machtype.typ_vec512
+  | Naked_number Naked_mask -> Extended_machtype.typ_mask
   | Naked_number
       ( Naked_immediate | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64
       | Naked_nativeint ) ->
@@ -141,6 +145,7 @@ let memory_chunk_of_kind (kind : Flambda_kind.With_subkind.t) : Cmm.memory_chunk
   | Naked_number Naked_vec128 -> Onetwentyeight_unaligned
   | Naked_number Naked_vec256 -> Twofiftysix_unaligned
   | Naked_number Naked_vec512 -> Fivetwelve_unaligned
+  | Naked_number Naked_mask -> Word_int
   | Region | Rec_info ->
     Misc.fatal_errorf "Bad kind %a for [memory_chunk_of_kind]"
       Flambda_kind.With_subkind.print kind
@@ -223,6 +228,8 @@ let const ~dbg cst =
       Vector_types.Vec512.Bit_pattern.to_bits i
     in
     vec512 ~dbg { word0; word1; word2; word3; word4; word5; word6; word7 }
+  | Naked_mask _ ->
+    Misc.fatal_error "Mask constants are not yet supported"
   | Naked_nativeint t -> targetint ~dbg t
   | Null -> targetint ~dbg (Targetint_32_64.zero Sixty_four)
 
@@ -299,6 +306,8 @@ let const_static cst : Cmm.data_item list =
       Vector_types.Vec512.Bit_pattern.to_bits v
     in
     [cvec512 { word0; word1; word2; word3; word4; word5; word6; word7 }]
+  | Naked_mask _ ->
+    Misc.fatal_error "Mask constants are not yet supported"
   | Null -> [cint 0n]
 
 let simple_static res s =
@@ -376,6 +385,7 @@ module Update_kind = struct
     | Naked_vec128
     | Naked_vec256
     | Naked_vec512
+    | Naked_mask
 
   (* The [stride] is the number of bytes by which an [index] supplied to
      [make_update], below, needs to be multiplied to get the byte offset into
@@ -400,6 +410,7 @@ module Update_kind = struct
     | Naked_vec128 -> 2
     | Naked_vec256 -> 4
     | Naked_vec512 -> 8
+    | Naked_mask -> 1
 
   let pointers = { kind = Pointer; stride = Arch.size_addr }
 
@@ -436,6 +447,8 @@ module Update_kind = struct
   let naked_vec256_fields = { kind = Naked_vec256; stride = Arch.size_addr }
 
   let naked_vec512_fields = { kind = Naked_vec512; stride = Arch.size_addr }
+
+  let naked_mask_fields = { kind = Naked_mask; stride = Arch.size_addr }
 end
 
 let make_update env res dbg ({ kind; stride } : Update_kind.t) ~symbol var
@@ -456,7 +469,8 @@ let make_update env res dbg ({ kind; stride } : Update_kind.t) ~symbol var
           (* See [caml_initialize]; we can avoid this function in this case. *)
           None
         | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64 | Naked_float
-        | Naked_float32 | Naked_vec128 | Naked_vec256 | Naked_vec512 ->
+        | Naked_float32 | Naked_vec128 | Naked_vec256 | Naked_vec512
+        | Naked_mask ->
           (* The GC never sees these fields, so we can avoid using
              [caml_initialize]. This is important as it significantly reduces
              the complexity of the statically-allocated inconstant unboxed int32
@@ -495,6 +509,7 @@ let make_update env res dbg ({ kind; stride } : Update_kind.t) ~symbol var
         | Naked_vec128 -> Onetwentyeight_unaligned
         | Naked_vec256 -> Twofiftysix_unaligned
         | Naked_vec512 -> Fivetwelve_unaligned
+        | Naked_mask -> Word_int
       in
       let addr = strided_field_address symbol ~stride ~index dbg in
       store ~dbg memory_chunk Initialization ~addr ~new_value:field_value

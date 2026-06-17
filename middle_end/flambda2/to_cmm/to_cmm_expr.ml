@@ -134,7 +134,8 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
       | Naked_number Naked_int32 -> C.sign_extend ~bits:32 ~dbg cmm
       | Naked_number
           ( Naked_float | Naked_immediate | Naked_int64 | Naked_nativeint
-          | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_float32 )
+          | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_mask
+          | Naked_float32 )
       | Value | Rec_info | Region ->
         cmm
   in
@@ -176,7 +177,7 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
               Misc.fatal_error "Only x86-64 and arm64 are supported")
           | Naked_number
               ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_vec256
-              | Naked_vec512 )
+              | Naked_vec512 | Naked_mask )
           | Region | Rec_info ->
             Misc.fatal_errorf
               "Cannot compile unboxed product return from external C call with \

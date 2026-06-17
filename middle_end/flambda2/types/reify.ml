@@ -520,6 +520,13 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
       with
       | None -> try_canonical_simple ()
       | Some n -> Simple (Simple.const (Reg_width_const.naked_vec512 n)))
+    | Naked_mask (Ok ns) -> (
+      match
+        Vector_types.Mask.Bit_pattern.Set.get_singleton
+          (ns :> Vector_types.Mask.Bit_pattern.Set.t)
+      with
+      | None -> try_canonical_simple ()
+      | Some n -> Simple (Simple.const (Reg_width_const.naked_mask n)))
     (* CR-someday mshinwell: These could lift at toplevel when [ty_naked_float]
        is an alias type. That would require checking the alloc mode. *)
     | Value
@@ -721,6 +728,11 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
             Lift_array_of_naked_vec256s.lift env ~fields ~try_canonical_simple
           | Naked_number Naked_vec512 ->
             Lift_array_of_naked_vec512s.lift env ~fields ~try_canonical_simple
+          | Naked_number Naked_mask ->
+            Misc.fatal_errorf
+              "Unexpected mask kind in immutable array case when reifying \
+               type:@ %a@ in env:@ %a"
+              TG.print t TE.print env
           | Region | Rec_info ->
             Misc.fatal_errorf
               "Unexpected kind %a in immutable array case when reifying type:@ \
@@ -738,6 +750,7 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
     | Naked_vec128 Bottom
     | Naked_vec256 Bottom
     | Naked_vec512 Bottom
+    | Naked_mask Bottom
     | Rec_info Bottom
     | Region Bottom ->
       Invalid
@@ -753,6 +766,7 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
     | Naked_vec128 Unknown
     | Naked_vec256 Unknown
     | Naked_vec512 Unknown
+    | Naked_mask Unknown
     | Naked_nativeint Unknown
     | Rec_info Unknown
     | Region (Unknown | Ok _)

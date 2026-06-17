@@ -160,6 +160,9 @@ module Update_kind : sig
   (** Tightly packed (eight words each); the byte offset is [index * 64]. *)
   val naked_vec512s : t
 
+  (** Assumes each field is a word; the byte offset is [index * size_addr]. *)
+  val naked_mask_fields : t
+
   (** Assumes each field is a word; the byte offset is [index * size_addr]. Note
       that in this case the index is still based on word-width fields! *)
   val naked_vec128_fields : t

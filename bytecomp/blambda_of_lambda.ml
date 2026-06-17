@@ -228,7 +228,7 @@ let copy_unboxed_product shape ~path expr =
       in
       Let { id; arg = expr; body = Prim (Makeblock { tag = 0 }, copied_fields) }
     | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-    | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+    | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
       expr
     | Splice_variable var -> Lambda.fatal_error_unevaluated_splice_var var
   in
