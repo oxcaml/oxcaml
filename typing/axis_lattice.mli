@@ -46,7 +46,7 @@ val to_axis_set : t -> Jkind_axis.Axis_set.t
 
     This does not apply jkind with-bound relevance filtering for constant
     modalities. Callers that need a with-bound relevance mask should usually use
-    [Btype.Jkind0.Mod_bounds.mask_of_modality]. *)
+    this together with [Btype.Jkind0.Mod_bounds.relevant_axes_of_modality]. *)
 val mask_of_modality : Mode.Modality.Const.t -> t
 
 val create :

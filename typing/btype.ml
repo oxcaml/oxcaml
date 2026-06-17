@@ -1151,8 +1151,6 @@ module Jkind0 = struct
       let externality = Externality.meet (externality t1) (externality t2) in
       create crossing ~externality
 
-    let to_mask = to_axis_lattice
-
     (* Returns the set of axes that is relevant under a given modality. For
        example, under the [global] modality, the areality axis is *not*
        relevant. *)
@@ -1174,34 +1172,21 @@ module Jkind0 = struct
         | Nonmodal Externality -> true)
 
     let mask_of_modality ~modality =
-      With_bounds_type_info.Mask.meet
+      Axis_lattice.meet
         (Axis_lattice.mask_of_modality modality)
-        (With_bounds_type_info.Mask.of_axis_set
-           (relevant_axes_of_modality ~modality))
+        (Axis_lattice.of_axis_set (relevant_axes_of_modality ~modality))
 
     let saturated_mask t mask =
-      let direct_mask = to_mask t in
+      let direct_mask = to_axis_lattice t in
       let max_axis_mask =
-        get_max_axes t |> With_bounds_type_info.Mask.of_axis_set
+        get_max_axes t |> Axis_lattice.of_axis_set
       in
-      With_bounds_type_info.Mask.join
-        (With_bounds_type_info.Mask.meet max_axis_mask mask)
+      Axis_lattice.join
+        (Axis_lattice.meet max_axis_mask mask)
         (Axis_lattice.meet direct_mask mask)
 
     let cap_by_mask_l t mask =
       saturated_mask t mask |> of_axis_lattice
-
-    let relax_by_mask_r t mask =
-      let expected =
-        With_bounds_type_info.Mask.join
-          (get_max_axes t |> With_bounds_type_info.Mask.of_axis_set)
-          (to_mask t)
-      in
-      Axis_lattice.meet_right_adjoint ~expected ~mask
-      |> of_axis_lattice
-
-    let is_max_within_mask t mask =
-      With_bounds_type_info.Mask.le mask (saturated_mask t mask)
   end
 
   module Quality = struct

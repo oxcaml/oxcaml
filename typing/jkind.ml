@@ -32,6 +32,22 @@ let set_raw_type_expr p = raw_type_expr := p
 
 module Nonempty_list = Misc.Nonempty_list
 
+module Bounds_mask = struct
+  type t = Axis_lattice.t
+
+  let bot = Axis_lattice.bot
+  let join = Axis_lattice.join
+  let meet = Axis_lattice.meet
+  let residual = Axis_lattice.co_sub
+  let le = Axis_lattice.leq
+  let of_axis_set = Axis_lattice.of_axis_set
+  let to_axis_set = Axis_lattice.to_axis_set
+  let is_empty t = Axis_lattice.equal t Axis_lattice.bot
+
+  let print ppf t =
+    Format.pp_print_string ppf (Axis_lattice.to_string t)
+end
+
 (* A *sort* is the information the middle/back ends need to be able to
    compile a manipulation (storing, passing, etc) of a runtime value. *)
 module Sort = Jkind_types.Sort
@@ -522,6 +538,32 @@ module Mod_bounds = struct
     | Modal ax -> t |> crossing |> (Crossing.proj [@inlined hint]) ax
     | Nonmodal Externality -> externality t
 
+  let mask_of_modality ~modality =
+    Bounds_mask.meet
+      (Axis_lattice.mask_of_modality modality)
+      (Bounds_mask.of_axis_set (relevant_axes_of_modality ~modality))
+
+  let saturated_mask t mask =
+    let direct_mask = to_axis_lattice t in
+    let max_axis_mask = get_max_axes t |> Bounds_mask.of_axis_set in
+    Bounds_mask.join
+      (Bounds_mask.meet max_axis_mask mask)
+      (Bounds_mask.meet direct_mask mask)
+
+  let cap_by_mask_l t mask =
+    saturated_mask t mask |> of_axis_lattice
+
+  let relax_by_mask_r t mask =
+    let expected =
+      Bounds_mask.join
+        (get_max_axes t |> Bounds_mask.of_axis_set)
+        (to_axis_lattice t)
+    in
+    Axis_lattice.meet_right_adjoint ~expected ~mask |> of_axis_lattice
+
+  let is_max_within_mask t mask =
+    Bounds_mask.le mask (saturated_mask t mask)
+
   let to_mode_crossing t = crossing t
 end
 
@@ -533,7 +575,7 @@ module With_bounds = struct
 
     let print ppf { relevant_bounds } =
       let open Format in
-      fprintf ppf "@[{ relevant_bounds = %a }@]" Mask.print
+      fprintf ppf "@[{ relevant_bounds = %a }@]" Bounds_mask.print
         relevant_bounds
 
     let axes_ignored_by_modalities ~mod_bounds
@@ -547,12 +589,12 @@ module With_bounds = struct
          print constant modalities for those axes!
       *)
       let implicit_relevant_bounds =
-        Mod_bounds.get_max_axes mod_bounds |> Mask.of_axis_set
+        Mod_bounds.get_max_axes mod_bounds |> Bounds_mask.of_axis_set
       in
       let relevant_bounds =
-        Mask.join explicit_relevant_bounds implicit_relevant_bounds
+        Bounds_mask.join explicit_relevant_bounds implicit_relevant_bounds
       in
-      Axis_set.complement (Mask.to_axis_set relevant_bounds)
+      Axis_set.complement (Bounds_mask.to_axis_set relevant_bounds)
   end
 
   let to_best_eff_map = function
@@ -899,7 +941,7 @@ module Base_and_axes = struct
     | _
       when (not t_has_abstract_base)
            && Mod_bounds.is_max_within_mask t.mod_bounds
-                (With_bounds_type_info.Mask.of_axis_set
+                (Bounds_mask.of_axis_set
                    (Axis_set.complement skip_axes)) ->
       { t with with_bounds = No_with_bounds }, Sufficient_fuel
     | _ ->
@@ -947,13 +989,13 @@ module Base_and_axes = struct
             seen_args : type_expr list;
                 (** The arguments the type constructor was most recently seen
                     with. *)
-            relevant_bounds_when_seen : With_bounds_type_info.Mask.t
+            relevant_bounds_when_seen : Bounds_mask.t
                 (** The bounds that were relevant when the type constructor was
                     most recently seen. *)
           }
 
         type seen_row_var =
-          { relevant_bounds_when_seen : With_bounds_type_info.Mask.t
+          { relevant_bounds_when_seen : Bounds_mask.t
                 (** The bounds that were relevant when the row var was seen. *)
           }
         [@@unboxed]
@@ -970,7 +1012,7 @@ module Base_and_axes = struct
           | Skip  (** skip reducing this type, but otherwise continue *)
           | Continue of
               { ctl : t;
-                skippable_bounds : With_bounds_type_info.Mask.t
+                skippable_bounds : Bounds_mask.t
               }  (** continue, with a new [t] *)
 
         let initial_fuel_per_ty =
@@ -1052,7 +1094,7 @@ module Base_and_axes = struct
             then
               Continue
                 { ctl = { t with tuple_fuel = tuple_fuel - 1 };
-                  skippable_bounds = With_bounds_type_info.Mask.bot
+                  skippable_bounds = Bounds_mask.bot
                 }
             else Stop { t with fuel_status = Ran_out_of_fuel }
           | Tconstr (p, args, _) -> (
@@ -1069,7 +1111,7 @@ module Base_and_axes = struct
                           }
                           seen_constrs
                     };
-                  skippable_bounds = With_bounds_type_info.Mask.bot
+                  skippable_bounds = Bounds_mask.bot
                 }
             | Some { fuel; seen_args; relevant_bounds_when_seen } ->
               let args_equal =
@@ -1082,9 +1124,9 @@ module Base_and_axes = struct
               let skippable_bounds =
                 if args_equal && not (context.is_abstract p)
                 then relevant_bounds_when_seen
-                else With_bounds_type_info.Mask.bot
+                else Bounds_mask.bot
               in
-              if With_bounds_type_info.Mask.le relevant_bounds skippable_bounds
+              if Bounds_mask.le relevant_bounds skippable_bounds
               then Skip
               else if fuel > 0
               then
@@ -1103,7 +1145,7 @@ module Base_and_axes = struct
                                    under all of these bounds. *)
                                 (if args_equal
                                  then
-                                   With_bounds_type_info.Mask.join
+                                   Bounds_mask.join
                                      relevant_bounds
                                      relevant_bounds_when_seen
                                  else relevant_bounds)
@@ -1120,13 +1162,13 @@ module Base_and_axes = struct
               |> Option.value
                    ~default:
                      { relevant_bounds_when_seen =
-                         With_bounds_type_info.Mask.bot
+                         Bounds_mask.bot
                      }
             in
             (* For our purposes, row variables are like constructors with no arguments,
                so if we saw one already, we don't need to expand it again. *)
             if
-              With_bounds_type_info.Mask.le relevant_bounds
+              Bounds_mask.le relevant_bounds
                 relevant_bounds_when_seen
             then Skip
             else
@@ -1136,7 +1178,7 @@ module Base_and_axes = struct
                       seen_row_vars =
                         Numbers.Int.Map.add row_var_id
                           { relevant_bounds_when_seen =
-                              With_bounds_type_info.Mask.join
+                              Bounds_mask.join
                                 relevant_bounds_when_seen relevant_bounds
                           }
                           seen_row_vars
@@ -1154,7 +1196,7 @@ module Base_and_axes = struct
             (* CR layouts v2.8: Some of these might get with-bounds someday. We
                should double-check before we're done that they haven't. *)
             Continue
-              { ctl = t; skippable_bounds = With_bounds_type_info.Mask.bot }
+              { ctl = t; skippable_bounds = Bounds_mask.bot }
           | Tlink _ | Tsubst _ ->
             Misc.fatal_error "Tlink or Tsubst in normalize"
       end in
@@ -1189,13 +1231,13 @@ module Base_and_axes = struct
               if t_has_abstract_base
               then ti.relevant_bounds
               else
-                With_bounds_type_info.Mask.residual ti.relevant_bounds
+                Bounds_mask.residual ti.relevant_bounds
                   (Mod_bounds.saturated_mask bounds_so_far
                      ti.relevant_bounds)
             in
-            With_bounds_type_info.Mask.meet from_ti relevant_bounds
+            Bounds_mask.meet from_ti relevant_bounds
           in
-          match With_bounds_type_info.Mask.is_empty relevant_bounds_for_ty with
+          match Bounds_mask.is_empty relevant_bounds_for_ty with
           | true ->
             (* If [ty] is not relevant to any axes, then we can safely drop it and
                thereby avoid doing the work of expanding it. *)
@@ -1205,7 +1247,7 @@ module Base_and_axes = struct
                 skippable_bounds :
                 Mod_bounds.t * (l * disallowed) with_bounds * Loop_control.t =
               let relevant_bounds_for_ty =
-                With_bounds_type_info.Mask.residual relevant_bounds_for_ty
+                Bounds_mask.residual relevant_bounds_for_ty
                   skippable_bounds
               in
               match quality, mode, t_has_abstract_base with
@@ -1262,7 +1304,7 @@ module Base_and_axes = struct
               | Ignore_best ->
                 (* out of fuel, so assume [ty] has the worst possible bounds. *)
                 found_jkind_for_ty ctl Mod_bounds.max No_with_bounds Not_best
-                  With_bounds_type_info.Mask.bot [@nontail]
+                  Bounds_mask.bot [@nontail]
               | Require_best ->
                 (* See Note [Ran out of fuel when requiring best]. *)
                 Mod_bounds.max, No_with_bounds, ctl)
@@ -1290,7 +1332,7 @@ module Base_and_axes = struct
         | No_with_bounds -> mod_bounds, No_with_bounds, Loop_control.starting
         | With_bounds _ ->
           (loop Loop_control.starting mod_bounds
-             (With_bounds_type_info.Mask.of_axis_set
+             (Bounds_mask.of_axis_set
                 (Axis_set.complement skip_axes))
              (With_bounds.to_list t.with_bounds)
             : _ * (_ * r) with_bounds * _)
@@ -2089,8 +2131,8 @@ module Const = struct
             if is_top
             then bounds
             else
-              With_bounds_type_info.Mask.residual bounds
-                (With_bounds_type_info.Mask.of_axis_set
+              Bounds_mask.residual bounds
+                (Bounds_mask.of_axis_set
                    (Axis_set.singleton (Nonmodal Externality)))
         in
         { base = base.base;
@@ -2612,7 +2654,7 @@ let apply_modality_l modality jk =
     With_bounds.map
       (fun ti ->
         { relevant_bounds =
-            With_bounds_type_info.Mask.meet ti.relevant_bounds relevant_bounds
+            Bounds_mask.meet ti.relevant_bounds relevant_bounds
         })
       jk.jkind.with_bounds
   in
@@ -3253,7 +3295,7 @@ module Violation = struct
                   []
                 | false ->
                   let axis_mask =
-                    With_bounds_type_info.Mask.of_axis_set
+                    Bounds_mask.of_axis_set
                       (Axis_set.singleton axis)
                   in
                   With_bounds.to_list jkind.with_bounds
@@ -3261,8 +3303,8 @@ module Violation = struct
                        (fun
                          (ty, ({ relevant_bounds } : With_bounds_type_info.t)) ->
                          if
-                           With_bounds_type_info.Mask.is_empty
-                             (With_bounds_type_info.Mask.meet relevant_bounds
+                           Bounds_mask.is_empty
+                             (Bounds_mask.meet relevant_bounds
                                 axis_mask)
                          then None
                          else Some (!outcometrees_of_types [ty]))
@@ -3823,17 +3865,17 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) env sub super
                  (fun acc (ty2, ti) ->
                    match type_equal ty ty2 with
                    | true ->
-                     With_bounds_type_info.Mask.join acc
+                     Bounds_mask.join acc
                        ti.With_bounds_type_info.relevant_bounds
                    | false -> acc)
-                 With_bounds_type_info.Mask.bot
+                 Bounds_mask.bot
           in
           let saturated_by_right_direct_bounds =
             Mod_bounds.saturated_mask best_super.mod_bounds left_relevant_bounds
           in
           let remaining_relevant_bounds =
-            With_bounds_type_info.Mask.residual left_relevant_bounds
-              (With_bounds_type_info.Mask.join right_relevant_bounds
+            Bounds_mask.residual left_relevant_bounds
+              (Bounds_mask.join right_relevant_bounds
                  saturated_by_right_direct_bounds)
           in
           (* MB_WITH : drop types from the left that appear on the right *)
