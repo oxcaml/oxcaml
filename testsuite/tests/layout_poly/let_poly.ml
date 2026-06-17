@@ -524,15 +524,16 @@ val y : float = 1.
 |}]
 
 (* Nested lpoly functions *)
-let #(x, y) =
+let x, y =
   let poly_ f x =
     let poly_ g y = #(x, y) in
     g x
   in
-  f #1.0
+  let #(x, y) = f #1.0 in
+  to_float x, to_float y
 [%%expect {|
-File "_none_", line 1:
-Error: Static computation and layout polymorphism are not yet supported in mixed blocks.
+val x : float = 1.
+val y : float = 1.
 |}]
 
 (* Module containing lpoly function *)

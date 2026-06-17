@@ -1543,10 +1543,5 @@ val static_cast
   -> loc:scoped_location
   -> lambda
 
-type error =
-  | Slambda_unsupported of string
-
-val error : ?loc:Location.t -> error -> 'a
-
 val fatal_error_unevaluated_splice_var : Slambdaident.t -> 'a
 val fatal_error_invalid_constructor : lambda -> 'a

@@ -16,13 +16,6 @@
 open Misc
 open Asttypes
 
-type error =
-  | Slambda_unsupported of string
-
-exception Error of Location.t option * error
-
-let error ?loc err = raise (Error (loc, err))
-
 type constant = Typedtree.constant
 
 type mutable_flag = Immutable | Immutable_unique | Mutable
@@ -610,6 +603,11 @@ let equal_raise_kind left right =
   | Raise_notrace, Raise_notrace -> true
   | (Raise_regular | Raise_reraise | Raise_notrace), _ -> false
 
+let fatal_error_unevaluated_splice_var ident =
+  Misc.fatal_errorf
+    "Splice variable %a should have been evaluated"
+    Slambdaident.print ident
+
 let generic_value =
   { raw_kind = Pgenval;
     nullable = Nullable;
@@ -705,7 +703,7 @@ let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
 let rec is_value_or_void_element : _ mixed_block_element -> bool = function
   | Value _ -> true
   | Product elts -> Array.for_all is_value_or_void_element elts
-  | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
+  | Splice_variable var -> fatal_error_unevaluated_splice_var var
   | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
   | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
     false
@@ -1132,11 +1130,6 @@ let rec try_to_find_location lam =
 
 let try_to_find_debuginfo lam =
   Debuginfo.from_location (try_to_find_location lam)
-
-let fatal_error_unevaluated_splice_var ident =
-  Misc.fatal_errorf
-    "Splice variable %a should have been evaluated"
-    Slambdaident.print ident
 
 let fatal_error_invalid_constructor lambda =
   let loc =
@@ -3521,16 +3514,3 @@ let icmp cmp size x y ~loc = binary (Icmp (size, cmp)) x y ~loc
 let phys_equal x y ~loc = Lprim (Pphys_equal Eq, [x;y], loc)
 
 let static_cast ~src ~dst arg ~loc = unary (Static_cast {src; dst}) arg ~loc
-
-let report_error ppf = function
-  | Slambda_unsupported where ->
-    Format_doc.fprintf ppf
-      "Static computation and layout polymorphism are not yet supported in %s."
-      where
-
-let () =
-  Location.register_error_of_exn (function
-    | Error (Some loc, err) ->
-      Some (Location.error_of_printer ~loc report_error err)
-    | Error (None, err) -> Some (Location.error_of_printer report_error err)
-    | _ -> None)

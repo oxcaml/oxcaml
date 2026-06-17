@@ -350,12 +350,6 @@ let rec fracture_lam lambda : slambda =
         (fun (_, (_, layout)) -> Lambda.mixed_block_element_of_layout layout)
         env
     in
-    let get_free_var_prim =
-      match Lambda.is_uniform_block_shape (Shape free_vars_shape_unit) with
-      | true -> fun i -> Pfield (i, Pointer, Reads_agree)
-      | false ->
-        fun i -> Pmixedfield ([i], free_vars_shape_locality_mode, Reads_agree)
-    in
     let templated_function_body =
       slet_local "body" ktmpl_body (fun body_c body_r ->
           let closure_id = Ident.create_local "closure" in
@@ -376,7 +370,11 @@ let rec fracture_lam lambda : slambda =
                       layout,
                       ident,
                       debug_uid_none,
-                      Lprim (get_free_var_prim i, [Lvar closure_id], ktmpl_loc),
+                      Lprim
+                        ( Pmixedfield
+                            ([i], free_vars_shape_locality_mode, Reads_agree),
+                          [Lvar closure_id],
+                          ktmpl_loc ),
                       lam ) ))
               (0, body_r) env
           in
