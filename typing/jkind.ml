@@ -1751,16 +1751,17 @@ module Const = struct
               let crossing =
                 if Bounds_mask.is_empty axis_bounds
                 then Crossing.Per_axis.min axis
-                else Crossing.proj axis (Axis_lattice.to_mode_crossing axis_bounds)
+                else
+                  Crossing.proj axis (Axis_lattice.to_mode_crossing axis_bounds)
               in
               match axis, crossing with
               | Monadic ax, Modality t ->
                 Modality.Const.set (Monadic ax) t modal_modality, nonmodal_axes
               | Comonadic ax, Modality t ->
-                Modality.Const.set (Comonadic ax) t modal_modality, nonmodal_axes)
+                ( Modality.Const.set (Comonadic ax) t modal_modality,
+                  nonmodal_axes ))
             | Nonmodal _ -> modal_modality, Axis.Pack axis :: nonmodal_axes)
-        (Modality.Const.id, [])
-        Axis.all
+        (Modality.Const.id, []) Axis.all
 
     (** Write [actual] in terms of [base] *)
     let convert_with_base (type l r) env ~verbosity ~(base : Builtin.t)
