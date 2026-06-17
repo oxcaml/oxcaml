@@ -3,21 +3,32 @@
  expect.opt;
 *)
 
+external to_int64 : int64# -> int64 = "%box_int64"
+external to_float : float# -> float = "%box_float"
+external to_int8 : int8# -> int8 = "%tag_int8"
+external to_nativeint : nativeint# -> nativeint = "%box_nativeint"
+[%%expect{|
+external to_int64 : int64# -> int64 = "%box_int64"
+external to_float : float# -> float = "%box_float"
+external to_int8 : int8# -> int8 = "%tag_int8"
+external to_nativeint : nativeint# -> nativeint = "%box_nativeint"
+|}]
+
 (* Simple let poly_ with a polymorphic function *)
 let poly_ id x = x
 [%%expect{|
 val id : layout_ l. ('a : l). 'a -> 'a = <lpoly>
 |}]
 
-let #(a, b, c, d) =
+let (a, b, c, d) =
   let poly_ tuple x y = #(x, y) in
   let #(a, b) = tuple "a" #1L in
   let #(c, d) = tuple #42.0 "d" in
-  #(a, b, c, d)
+  (a, to_int64 b, to_float c, d)
 [%%expect{|
 val a : string = "a"
-val b : int64# = <abstr>
-val c : float# = <abstr>
+val b : int64 = 1L
+val c : float = 42.
 val d : string = "d"
 |}]
 
@@ -209,19 +220,19 @@ Error: This expression is not allowed in a "let poly_" definition;
 |}]
 
 (* tuple: passing when all components are syntactic values *)
-let #(x, f, a, y, g, b) =
+let (x, f, a, y, g, b) =
   let poly_ p = (42, fun x -> x) in
   let (x, f) = p in
   let (y, g) = p in
   let #(a, b) = #(f #1.0, g #3L) in
-  #(x, f, a, y, g, b)
+  (x, f, to_float a, y, g, to_int64 b)
 [%%expect{|
 val x : int = 42
 val f : '_weak1 -> '_weak1 = <fun>
-val a : float# = <abstr>
+val a : float = 1.
 val y : int = 42
 val g : '_weak2 -> '_weak2 = <fun>
-val b : int64# = <abstr>
+val b : int64 = 3L
 |}]
 
 (* tuple: failing when a component is not a syntactic value *)
@@ -445,23 +456,23 @@ val f : 'a @ local -> unit = <fun>
 |}]
 
 (* let poly_ instantiation *)
-let #(a, b) =
+let (a, b) =
   let poly_ id x = x in
-  #(id 42, id #43.0)
+  (id 42, id #43.0 |> to_float)
 [%%expect{|
 val a : int = 42
-val b : float# = <abstr>
+val b : float = 43.
 |}]
 
 (* let poly_ instantiation with multiple variables *)
-let #(a, b, c, d) =
+let (a, b, c, d) =
   let poly_ tuple x y = #(x, y) in
-  let #(a, b) = tuple 42s #43.0 in
-  let #(c, d) = tuple 44L 45n in
-  #(a, b, c, d)
+  let #(a, b) = tuple #42s #43.0 in
+  let #(c, d) = tuple #44L #45n in
+  (to_int8 a, to_float b, to_int64 c, to_nativeint d)
 [%%expect{|
 val a : int8 = 42s
-val b : float# = <abstr>
+val b : float = 43.
 val c : int64 = 44L
 val d : nativeint = 45n
 |}]
@@ -481,30 +492,35 @@ val b : string = "second"
 |}]
 
 (* closure conversion - mixed block *)
-let #(a, b) =
+let a, b, c, d =
   let x = true in
   let y = #1s in
   let poly_ f z = if x then #(y, z) else #(#2s, z) in
-  #(f 1, f #2L)
+  let #(a, b) = f 1 in
+  let #(c, d) = f #2L in
+  to_int8 a, b, to_int8 c, to_int64 d
 
 [%%expect{|
-val a : #(int8# * int) = <abstr>
-val b : #(int8# * int64#) = <abstr>
+val a : int8 = 1s
+val b : int = 1
+val c : int8 = 1s
+val d : int64 = 2L
 |}]
 
 (* closure-conversion - capture lpoly function *)
-let #(a, b, y) =
+let a, b, y =
   let a = #2n in
   let poly_ f x = #(a, x) in
   let poly_ g x =
     let #(b, y) = f x in
     #(a, b, y)
   in
-  g #1.0
+  let #(a, b, y) = g #1.0 in
+  to_nativeint a, to_nativeint b, to_float y
 [%%expect {|
-val a : nativeint# = <abstr>
-val b : nativeint# = <abstr>
-val y : float# = <abstr>
+val a : nativeint = 2n
+val b : nativeint = 2n
+val y : float = 1.
 |}]
 
 (* Nested lpoly functions *)
@@ -524,7 +540,7 @@ let x =
   let module M = struct
     let poly_ id x = x
   end in
-  M.id 1s
+  M.id #1s |> to_int8
 [%%expect {|
 val x : int8 = 1s
 |}]
