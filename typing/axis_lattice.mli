@@ -40,13 +40,11 @@ val non_bot_axes : t -> int list
 (** Build a mask from a set of relevant axes. *)
 val of_axis_set : Jkind_axis.Axis_set.t -> t
 
-val to_axis_set : t -> Jkind_axis.Axis_set.t
-
 (** Raw per-axis bounds selected by a constant modality.
 
     This does not apply jkind with-bound relevance filtering for constant
-    modalities. Callers that need a with-bound relevance mask should usually use
-    this together with [Btype.Jkind0.Mod_bounds.relevant_axes_of_modality]. *)
+    modalities. Callers that need a with-bound relevance mask should intersect
+    this with the modality's relevant axes. *)
 val mask_of_modality : Mode.Modality.Const.t -> t
 
 val create :

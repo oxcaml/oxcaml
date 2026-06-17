@@ -225,14 +225,6 @@ let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
   in
   lo lor ((lo land 0x49451) lsl 1)
 
-let to_axis_set (mask : t) : Jkind_axis.Axis_set.t =
-  non_bot_axes mask
-  |> List.fold_left
-       (fun axes axis_number ->
-         let (Jkind_axis.Axis.Pack axis) = axis_by_number.(axis_number) in
-         Jkind_axis.Axis_set.add axes axis)
-       Jkind_axis.Axis_set.empty
-
 (* Helpers to translate between axis enumerations and packed levels. *)
 module Levels = struct
   let level_of_areality (a : Mode.Regionality.Const.t) : int =

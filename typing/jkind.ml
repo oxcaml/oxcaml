@@ -41,7 +41,6 @@ module Bounds_mask = struct
   let residual = Axis_lattice.co_sub
   let le = Axis_lattice.leq
   let of_axis_set = Axis_lattice.of_axis_set
-  let to_axis_set = Axis_lattice.to_axis_set
   let is_empty t = Axis_lattice.equal t Axis_lattice.bot
 
   let print ppf t =
@@ -594,7 +593,10 @@ module With_bounds = struct
       let relevant_bounds =
         Bounds_mask.join explicit_relevant_bounds implicit_relevant_bounds
       in
-      Axis_set.complement (Bounds_mask.to_axis_set relevant_bounds)
+      Axis_set.create ~f:(fun ~axis:(Pack axis) ->
+          Bounds_mask.is_empty
+            (Bounds_mask.meet relevant_bounds
+               (Bounds_mask.of_axis_set (Axis_set.singleton axis))))
   end
 
   let to_best_eff_map = function
