@@ -998,7 +998,6 @@ module Jkind0 = struct
         Crossing.create ~linearity:false ~regionality:false ~uniqueness:true
           ~portability:false ~contention:true ~forkable:false ~yielding:false
           ~statefulness:false ~visibility:true ~staticity:false
-          (* Conservative: axis does not cross. *)
           ~allocation:false
       in
       create crossing ~externality:Externality.max
@@ -1398,8 +1397,7 @@ module Jkind0 = struct
           Crossing.create ~regionality:false ~linearity:true ~portability:true
             ~forkable:true ~yielding:true ~uniqueness:false ~contention:true
             ~statefulness:true ~visibility:true ~staticity:false
-            (* Conservative: axis does not cross. *)
-            ~allocation:false
+            ~allocation:true
         in
         create crossing ~externality:Externality.max
 
@@ -1443,8 +1441,7 @@ module Jkind0 = struct
                      ~portability:true ~forkable:false ~yielding:false
                      ~uniqueness:false ~contention:true ~statefulness:true
                      ~visibility:true ~staticity:false
-                     (* Conservative: axis does not cross. *)
-                     ~allocation:false
+                     ~allocation:true
                  in
                  create crossing ~externality:Externality.max);
               with_bounds = No_with_bounds
@@ -1458,8 +1455,7 @@ module Jkind0 = struct
           Crossing.create ~regionality:false ~linearity:true ~portability:true
             ~forkable:true ~yielding:true ~uniqueness:false ~contention:true
             ~statefulness:true ~visibility:false ~staticity:false
-            (* Conservative: axis does not cross. *)
-            ~allocation:false
+            ~allocation:true
         in
         create crossing ~externality:Externality.max
 
@@ -1495,8 +1491,7 @@ module Jkind0 = struct
           Crossing.create ~regionality:false ~linearity:true ~portability:true
             ~forkable:true ~yielding:true ~contention:false ~uniqueness:false
             ~statefulness:true ~visibility:false ~staticity:false
-            (* Conservative: axis does not cross. *)
-            ~allocation:false
+            ~allocation:true
         in
         create crossing ~externality:Externality.max
 
@@ -2494,8 +2489,7 @@ module Jkind0 = struct
         Mode.Crossing.create ~regionality:false ~linearity:true
           ~portability:true ~forkable:true ~yielding:true ~uniqueness:false
           ~contention:true ~statefulness:true ~visibility:true ~staticity:false
-          (* Conservative: axis does not cross. *)
-          ~allocation:false
+          ~allocation:true
       in
       let mod_bounds =
         Mod_bounds.create crossing ~externality:Mod_bounds.Externality.max

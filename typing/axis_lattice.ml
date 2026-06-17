@@ -524,7 +524,7 @@ let nonfloat_value : t =
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static
-    ~allocation:Mode.Allocation.Const.Noalloc_strict
+    ~allocation:Mode.Allocation.Const.max
     ~externality:Jkind_axis.Externality.max
 
 let immutable_data : t =
@@ -535,7 +535,7 @@ let immutable_data : t =
     ~forkable:Mode.Forkable.Const.min ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
-    ~allocation:Mode.Allocation.Const.Noalloc_strict
+    ~allocation:Mode.Allocation.Const.min
     ~externality:Jkind_axis.Externality.max
 
 let mutable_data : t =
@@ -546,7 +546,7 @@ let mutable_data : t =
     ~forkable:Mode.Forkable.Const.min ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Read_write
-    ~allocation:Mode.Allocation.Const.Noalloc_strict
+    ~allocation:Mode.Allocation.Const.min
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
 
 let sync_data : t =
@@ -557,7 +557,7 @@ let sync_data : t =
     ~forkable:Mode.Forkable.Const.min ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Read_write
-    ~allocation:Mode.Allocation.Const.Noalloc_strict
+    ~allocation:Mode.Allocation.Const.min
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
 
 let value : t =
@@ -568,7 +568,7 @@ let value : t =
     ~forkable:Mode.Forkable.Const.min ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
-    ~allocation:Mode.Allocation.Const.Noalloc_strict
+    ~allocation:Mode.Allocation.Const.max
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
 
 let arrow : t =
@@ -580,7 +580,7 @@ let arrow : t =
     ~forkable:Mode.Forkable.Const.max ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
-    ~allocation:Mode.Allocation.Const.Alloc
+    ~allocation:Mode.Allocation.Const.max
     ~externality:Jkind_axis.Externality.max
 
 let immediate : t =
@@ -592,7 +592,7 @@ let immediate : t =
     ~forkable:Mode.Forkable.Const.min ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
-    ~allocation:Mode.Allocation.Const.Noalloc_strict
+    ~allocation:Mode.Allocation.Const.min
     ~externality:Jkind_axis.Externality.min
 
 let object_legacy : t =

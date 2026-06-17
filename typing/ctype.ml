@@ -6025,8 +6025,7 @@ let mode_crossing_structure_memaddr =
     ~yielding:true
     ~statefulness:true
     ~staticity:false
-    (* Conservative: axis does not cross. *)
-    ~allocation:false
+    ~allocation:true
 
 (** The mode crossing of a functor. *)
 let mode_crossing_functor =
@@ -6041,7 +6040,6 @@ let mode_crossing_functor =
     ~yielding:false
     ~statefulness:false
     ~staticity:false
-    (* Conservative: axis does not cross. *)
     ~allocation:false
 
 (** The mode crossing of any module. *)
