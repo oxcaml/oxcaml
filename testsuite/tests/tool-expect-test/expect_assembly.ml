@@ -55,7 +55,7 @@ f:
   subq  $8, %rsp
   movq  %rax, %rbx
   movq  <hidden PC-relative offset>(%rip), %rax
-  call  camlStdlib__List__map_15_113_code@PLT
+  call  camlStdlib__List__map_16_124_code@PLT
 .L0:
   movq  %rax, %rbx
   movq  <hidden PC-relative offset>(%rip), %rax
