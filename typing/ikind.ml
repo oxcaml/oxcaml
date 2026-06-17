@@ -33,12 +33,6 @@ let mask_of_modality ~modality =
     (Axis_lattice.of_axis_set
        (Btype.Jkind0.Mod_bounds.relevant_axes_of_modality ~modality))
 
-let saturated_mask mod_bounds mask =
-  Axis_lattice.meet
-    (Btype.Jkind0.Mod_bounds.get_max_axes mod_bounds
-     |> Axis_lattice.of_axis_set)
-    mask
-
 let instance_poly_for_jkind' =
   ref (fun _univars _ty -> Misc.fatal_error "instance_poly_for_jkind")
 
@@ -355,12 +349,8 @@ module Solver = struct
     Jkind.With_bounds.to_seq with_bounds
     |> Seq.fold_left
          (fun acc (ty, bound_info) ->
-           let original_mask =
-             bound_info.Types.With_bounds_type_info.relevant_bounds
-           in
            let mask =
-             Axis_lattice.co_sub original_mask
-               (saturated_mask mod_bounds original_mask)
+             bound_info.Types.With_bounds_type_info.relevant_bounds
            in
            let ty_kind = kind ~use_tables:true ctx ty in
            Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
