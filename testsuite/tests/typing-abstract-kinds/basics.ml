@@ -1826,3 +1826,36 @@ let foo : ('a : any). 'a id -> 'a id = M.mk
 [%%expect{|
 val foo : ('a : any). 'a id -> 'a id = <fun>
 |}]
+
+(************************************************************)
+(* Test: Sharing a mutable cell across functor applications *)
+
+let cell = ref (None : (_ : any) id option)
+
+(* When G is applied to an anonymous argument, nondep will copy the weak type
+   variable in its output, but this test confirms that the subsequent inclusion
+   check unifies it back with the original. *)
+module G (X : sig kind_ ka end) = struct
+  let c = (cell : (_ : X.ka) id option ref)
+end
+
+module A = G (struct kind_ ka = value end)
+module B = G (struct kind_ ka = value end)
+[%%expect{|
+val cell : '_weak1 id option ref = {contents = None}
+module G :
+  functor (X : sig kind_ ka end) -> sig val c : '_weak1 id option ref end
+module A : sig val c : '_weak1 id option ref end
+module B : sig val c : '_weak1 id option ref end
+|}]
+
+let () = A.c := (None : int id option)
+let () = B.c := (None : bool id option)
+[%%expect{|
+Line 2, characters 16-39:
+2 | let () = B.c := (None : bool id option)
+                    ^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "bool id option"
+       but an expression was expected of type "int id option"
+       Type "bool" is not compatible with type "int"
+|}]
