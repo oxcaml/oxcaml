@@ -4419,7 +4419,7 @@ module Report = struct
         a ->
         a ->
         other:a ->
-        [`First | `Second] =
+        [`First | `Second | `Failure] =
      fun b a_obj x y ~other ->
       (* CR-someday zqian: in the case where each of [x] and [y] can be
          responsible independently, for not satisfying [~other], we currently
@@ -4430,17 +4430,15 @@ module Report = struct
       match b with
       | Meet ->
         if C.le a_obj other x
-        then begin
-          assert (not (C.le a_obj other y));
-          `Second
-        end
+        then
+          begin if C.le a_obj other y then `Failure else `Second
+          end
         else `First
       | Join ->
         if C.le a_obj x other
-        then begin
-          assert (not (C.le a_obj y other));
-          `Second
-        end
+        then
+          begin if C.le a_obj y other then `Failure else `Second
+          end
         else `First
 
     type 'd side =
@@ -4470,26 +4468,30 @@ module Report = struct
         other:a ->
         (b, l * r) S.ahint ->
         b C.For_hint.responsible_axis ->
-        (a, l * r) ahint =
+        (a, l * r) ahint option =
      fun obj side a morph_hint morph ~other ahint res ->
       let src = C.src obj morph in
       match res with
-      | None_responsible -> a, Irrelevant
+      | None_responsible -> Some (a, Irrelevant)
       | All_responsible ->
         let morph' = adjoint obj side morph in
         let other = C.apply src morph' other in
-        let ahint = hint_all src side ~other ahint in
-        let ma = C.apply obj morph (fst ahint) in
-        ma, Apply (morph_hint, src, ahint)
+        Option.map
+          (fun ahint ->
+            let ma = C.apply obj morph (fst ahint) in
+            ma, Apply (morph_hint, src, ahint))
+          (hint_all src side ~other ahint)
       | Axis ax ->
         let b, hint = ahint in
         let morph' = adjoint obj side morph in
         let other = C.apply src morph' other in
-        let x, hint = hint_proj src side ax ~other (b, hint) in
-        let b = C.Axis.set ax x b in
-        let a = C.apply obj morph b in
-        let src = C.proj_obj ax src in
-        a, Apply (morph_hint, src, (x, hint))
+        Option.map
+          (fun (x, hint) ->
+            let b = C.Axis.set ax x b in
+            let a = C.apply obj morph b in
+            let src = C.proj_obj ax src in
+            a, Apply (morph_hint, src, (x, hint)))
+          (hint_proj src side ax ~other (b, hint))
 
     and hint_proj : type t a l r.
         t C.obj ->
@@ -4497,27 +4499,26 @@ module Report = struct
         (t, a) Axis.t ->
         other:t ->
         (t, l * r) S.ahint ->
-        (a, l * r) ahint =
+        (a, l * r) ahint option =
      fun obj side ax ~other (a, hint) ->
       match hint with
       | Apply (morph_hint, morph, ahint) ->
-        let t, hint =
-          hint_apply obj side a morph_hint morph ~other ahint
-            (C.For_hint.find_responsible_axis_proj morph ax)
-        in
-        Axis.proj ax t, hint
-      | Const c -> Axis.proj ax a, Const c
-      | Branch (b, (a1, hint1), (a2, hint2)) ->
-        let chosen_ahint =
-          let other = Axis.proj ax other in
-          let proj1 = Axis.proj ax a1 in
-          let proj2 = Axis.proj ax a2 in
-          let obj = C.proj_obj ax obj in
-          match choose_branch_axis b obj proj1 proj2 ~other with
-          | `First -> a1, hint1
-          | `Second -> a2, hint2
-        in
-        hint_proj obj side ax ~other chosen_ahint
+        Option.map
+          (fun (t, hint) -> Axis.proj ax t, hint)
+          (hint_apply obj side a morph_hint morph ~other ahint
+             (C.For_hint.find_responsible_axis_proj morph ax))
+      | Const c -> Some (Axis.proj ax a, Const c)
+      | Branch (b, (a1, hint1), (a2, hint2)) -> (
+        let other_on_axis = Axis.proj ax other in
+        let proj1 = Axis.proj ax a1 in
+        let proj2 = Axis.proj ax a2 in
+        let axis_obj = C.proj_obj ax obj in
+        match
+          choose_branch_axis b axis_obj proj1 proj2 ~other:other_on_axis
+        with
+        | `Failure -> None
+        | `First -> hint_proj obj side ax ~other (a1, hint1)
+        | `Second -> hint_proj obj side ax ~other (a2, hint2))
 
     (** Given a solver hint on a single axis lattice, returns a human-readible
         hint. *)
@@ -4526,20 +4527,18 @@ module Report = struct
         (l * r) side ->
         other:a ->
         (a, l * r) S.ahint ->
-        (a, l * r) ahint =
+        (a, l * r) ahint option =
      fun obj side ~other (a, hint) ->
       match hint with
       | Apply (morph_hint, morph, ahint) ->
         hint_apply obj side a morph_hint morph ~other ahint
           (C.For_hint.find_responsible_axis_all morph)
-      | Const c -> a, Const c
-      | Branch (b, (a1, hint1), (a2, hint2)) ->
-        let chosen_ahint =
-          match choose_branch_axis b obj a1 a2 ~other with
-          | `First -> a1, hint1
-          | `Second -> a2, hint2
-        in
-        hint_all obj side ~other chosen_ahint
+      | Const c -> Some (a, Const c)
+      | Branch (b, (a1, hint1), (a2, hint2)) -> (
+        match choose_branch_axis b obj a1 a2 ~other with
+        | `Failure -> None
+        | `First -> hint_all obj side ~other (a1, hint1)
+        | `Second -> hint_all obj side ~other (a2, hint2))
 
     let hint_proj_loosening : type t a l r.
         t C.obj ->
@@ -4547,47 +4546,56 @@ module Report = struct
         (t, a) Axis.t ->
         other:t ->
         (t, l * r) S.ahint ->
-        loosening * (a, l * r) ahint =
+        (loosening * (a, l * r) ahint) option =
      fun obj side ax ~other ((t, _) as ahint) ->
       let axis_obj = C.proj_obj ax obj in
-      let a, hint = hint_proj obj side ax ~other ahint in
-      let loosening =
-        if Misc.Le_result.equal ~le:(C.le axis_obj) a (Axis.proj ax t)
-        then Not_loosened
-        else Loosened
-      in
-      loosening, (a, hint)
+      Option.map
+        (fun (a, hint) ->
+          let loosening =
+            if Misc.Le_result.equal ~le:(C.le axis_obj) a (Axis.proj ax t)
+            then Not_loosened
+            else Loosened
+          in
+          loosening, (a, hint))
+        (hint_proj obj side ax ~other ahint)
 
     let hint_all_loosening : type a l r.
         a C.obj ->
         (l * r) side ->
         other:a ->
         (a, l * r) S.ahint ->
-        loosening * (a, l * r) ahint =
+        (loosening * (a, l * r) ahint) option =
      fun obj side ~other ((original, _) as ahint) ->
-      let a, hint = hint_all obj side ~other ahint in
-      let loosening =
-        if Misc.Le_result.equal ~le:(C.le obj) a original
-        then Not_loosened
-        else Loosened
-      in
-      loosening, (a, hint)
+      Option.map
+        (fun (a, hint) ->
+          let loosening =
+            if Misc.Le_result.equal ~le:(C.le obj) a original
+            then Not_loosened
+            else Loosened
+          in
+          loosening, (a, hint))
+        (hint_all obj side ~other ahint)
 
-    let error_proj : type r a. r C.obj -> (r, a) Axis.t -> r S.error -> a t =
+    let error_proj : type r a.
+        r C.obj -> (r, a) Axis.t -> r S.error -> a t option =
      fun obj axis { left; right } ->
       let left = hint_proj_loosening obj Left axis ~other:(fst right) left in
-      let right =
-        hint_proj_loosening obj Right axis
-          ~other:(Axis.set axis (fst (snd left)) (fst right))
-          right
-      in
-      { left; right }
+      Option.bind left (fun left ->
+          let right =
+            hint_proj_loosening obj Right axis
+              ~other:(Axis.set axis (fst (snd left)) (fst right))
+              right
+          in
+          Option.map (fun right -> { left; right }) right)
 
-    let error_all : type a. a C.obj -> a S.error -> a t =
+    let error_all : type a. a C.obj -> a S.error -> a t option =
      fun obj { left; right } ->
       let left = hint_all_loosening obj Left ~other:(fst right) left in
-      let right = hint_all_loosening obj Right ~other:(fst (snd left)) right in
-      { left; right }
+      Option.bind left (fun left ->
+          let right =
+            hint_all_loosening obj Right ~other:(fst (snd left)) right
+          in
+          Option.map (fun right -> { left; right }) right)
   end
 
   [@@@warning "-4"]
@@ -4822,6 +4830,19 @@ module Report = struct
         (Location.Doc.loc ~capitalize_first:false)
         container
 
+  let print_error_reporting_bug ?explanation () ppf =
+    let print_explanation ppf = function
+      | None -> ()
+      | Some explanation ->
+        Fmt.fprintf ppf " (%a)" Fmt.pp_print_text explanation
+    in
+    Fmt.pp_force_newline ppf ();
+    Fmt.fprintf ppf
+      "@{<error>@[<hov 2>Note: mode error hint reporting went wrong%a, and the \
+       current mode error message might be inaccurate.@ If you hit this case, \
+       report it to the Jane Street compilers team.@]@}"
+      print_explanation explanation
+
   let print_is_contained_by :
       fixpoint:bool -> is_contained_by -> (Fmt.formatter -> unit) * pinpoint =
    fun ~fixpoint { containing; container } ->
@@ -4836,7 +4857,9 @@ module Report = struct
       prints the const to explain the mode on the pinpoint. *)
   let print_const (type l r) ((_, pp_desc) : pinpoint) ppf :
       (l * r) const -> unit = function
-    | Unknown -> Misc.fatal_error "Unknown hint should not be printed"
+    | Unknown ->
+      print_error_reporting_bug
+        ~explanation:"Unknown hint should not be printed" () ppf
     | Lazy_allocated_on_heap ->
       (match pp_desc with
       | Lazy ->
@@ -4885,10 +4908,12 @@ module Report = struct
         Fmt.pp_print_string ppf "modules always need"
       | _ -> Fmt.pp_print_string ppf "it is a module and thus needs");
       Fmt.pp_print_string ppf " to be allocated on the heap"
-    | Is_used_in pp ->
-      let print_pp = print_pinpoint pp |> Option.get in
-      Fmt.fprintf ppf "it is used in %t"
-        (print_pp ~definite:false ~capitalize:false)
+    | Is_used_in pp -> (
+      match print_pinpoint pp with
+      | Some print_pp ->
+        Fmt.fprintf ppf "it is used in %t"
+          (print_pp ~definite:false ~capitalize:false)
+      | None -> print_error_reporting_bug () ppf)
     | Always_dynamic x ->
       Fmt.fprintf ppf "%t are always dynamic" (print_always_dynamic x)
     | Branching -> Fmt.fprintf ppf "it has branches"
@@ -4914,11 +4939,19 @@ module Report = struct
       (l * r) morph ->
       ((Fmt.formatter -> unit) * pinpoint) option =
    fun ~fixpoint pp -> function
-    | Skip -> Misc.fatal_error "Skip hint should not be printed"
+    | Skip ->
+      Some
+        ( print_error_reporting_bug
+            ~explanation:"Skip hint should not be printed" (),
+          pp )
     | Allocation _ ->
-      Misc.fatal_error
-        "This hint is from turning an allocation mode into a value mode, and \
-         should never be printed"
+      Some
+        ( print_error_reporting_bug
+            ~explanation:
+              "This hint is from turning an allocation mode into a value mode, \
+               and should never be printed"
+            (),
+          pp )
     | Unknown -> None
     | Close_over (Comonadic, { closed = pp; _ }) ->
       print_pinpoint pp
@@ -5048,16 +5081,17 @@ module Report = struct
       have slightly different skip conditions. An [Allocation] hint should
       always be skipped, while [Allocation_l] and [Allocation_r] hints are
       skipped when they change a regionality mode to a different locality mode.
-      In each case, we assert that the hint was applied to their expected
-      associated morphism. *)
+      In each case, we report an error if the hint was not applied to its
+      expected associated morphism. *)
   let should_skip : type l r a b.
+      Fmt.formatter ->
       (l * r) morph ->
       src:a C.obj ->
       obj:b C.obj ->
       a ->
       b ->
       (is_skip:bool * fixpoint:bool) =
-   fun hint ~src ~obj a b ->
+   fun ppf hint ~src ~obj a b ->
     let fixpoint = equal_mode src obj a b in
     match hint with
     | Unknown | Close_over _ | Is_closed_by _ | Contains_l _ | Contains_r _
@@ -5068,21 +5102,24 @@ module Report = struct
       (* We only skip when the morphism changes the mode *)
       ~is_skip:fixpoint, ~fixpoint
     | Allocation_r _ ->
-      (* We assert that the morphism is value_to_alloc_r2g *)
-      assert (implements_value_to_alloc Regional_to_global src obj a b);
+      (* We check that the morphism is value_to_alloc_r2g *)
+      if not (implements_value_to_alloc Regional_to_global src obj a b)
+      then print_error_reporting_bug () ppf;
       (* We only skip when the morphism changes the mode, but allow for axis changes *)
       ( ~is_skip:(implements_alloc_to_value Locality_as_regionality obj src b a),
         ~fixpoint )
     | Allocation_l _ ->
-      (* We assert that the morphism is value_to_alloc_r2l *)
-      assert (implements_value_to_alloc Regional_to_local src obj a b);
+      (* We check that the morphism is value_to_alloc_r2l *)
+      if not (implements_value_to_alloc Regional_to_local src obj a b)
+      then print_error_reporting_bug () ppf;
       (* We only skip when the morphism changes the mode, but allow for axis changes *)
       ( ~is_skip:(implements_alloc_to_value Locality_as_regionality obj src b a),
         ~fixpoint )
     | Allocation _ ->
-      (* We always want to skip an Allocation hint. All we need is to assert that the
-         hint was indeed applied to an alloc_as_value morphism *)
-      assert (implements_alloc_to_value Locality_as_regionality src obj a b);
+      (* We always want to skip an Allocation hint. Report if the hint was not
+         applied to an alloc_as_value morphism. *)
+      if not (implements_alloc_to_value Locality_as_regionality src obj a b)
+      then print_error_reporting_bug () ppf;
       ~is_skip:true, ~fixpoint
 
   let rec print_ahint : type a l r.
@@ -5097,7 +5134,7 @@ module Report = struct
     match hint with
     | Apply (morph_hint, src, ahint) ->
       let ~is_skip, ~fixpoint =
-        should_skip morph_hint ~src ~obj (fst ahint) a
+        should_skip ppf morph_hint ~src ~obj (fst ahint) a
       in
       if is_skip
       then print_ahint ~sub side pp src ppf ahint
@@ -5116,9 +5153,11 @@ module Report = struct
     | Irrelevant ->
       if not sub
       then
-        Misc.fatal_error
-          "the current mode is not responsible for the error, so must be \
-           inside a responsible morphism";
+        print_error_reporting_bug
+          ~explanation:
+            "the current mode is not responsible for the error, so must be \
+             inside a responsible morphism"
+          () ppf;
       None
     | Const c ->
       Fmt.fprintf ppf "%a@ because %a"
@@ -5162,16 +5201,28 @@ module Report = struct
     | Right (loosening, ahint) ->
       print_ahint_loosening `Right pp obj ppf loosening ahint
 
-  let print : type a. pinpoint -> a C.obj -> a t -> print_error =
-   fun pp obj { left; right } ->
-    let actual, expected =
-      if C.is_opposite obj
-      then Right right, Left left
-      else Left left, Right right
-    in
-    let left ppf = Option.get (print_ahint_sided pp obj ppf actual) in
-    let right ppf = Option.get (print_ahint_sided pp obj ppf expected) in
-    { left; right }
+  let report_failure : Fmt.formatter -> print_error_result =
+   fun ppf ->
+    print_error_reporting_bug () ppf;
+    Mode
+
+  let print : type a. pinpoint -> a C.obj -> a t option -> print_error =
+   fun pp obj report ->
+    match report with
+    | None -> { left = report_failure; right = report_failure }
+    | Some { left; right } ->
+      let actual, expected =
+        if C.is_opposite obj
+        then Right right, Left left
+        else Left left, Right right
+      in
+      let left ppf =
+        print_ahint_sided pp obj ppf actual |> Option.value ~default:Mode
+      in
+      let right ppf =
+        print_ahint_sided pp obj ppf expected |> Option.value ~default:Mode
+      in
+      { left; right }
 end
 
 let print_pinpoint = Report.print_pinpoint
