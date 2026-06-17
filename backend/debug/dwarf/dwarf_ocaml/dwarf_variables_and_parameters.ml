@@ -210,10 +210,10 @@ let rec phantom_var_location_description state
       | None -> None
       | Some l -> lvalue l)
   | Lphantom_read_field { var; field } -> (
-    (* The unguarded forms suffice here: location list entries for phantom
-       variables whose defining expressions consult another variable's location
-       are restricted to program counter ranges where the consulted variable's
-       location list has a covering entry (see [phantom_subrange_pieces] below).
+    (* The guarded forms are used so that if [var]'s location is unavailable at
+       the current program counter (for example it was an inlined [my_closure]
+       aliasing an optimised-out callee) the result is left empty -- reported as
+       "not available" -- rather than reading a junk field from a junk base.
 
        Note that if the location of [var] is an implicit pointer (e.g. [var] was
        bound to a phantom block construction) then this will fail to evaluate in
@@ -224,17 +224,21 @@ let rec phantom_var_location_description state
     | Some block ->
       let field = Targetint.of_int field in
       if need_rvalue
-      then rvalue (SLDL.Rvalue.read_field_unguarded ~block ~field)
-      else lvalue (SLDL.Lvalue.read_field_unguarded ~block ~field))
+      then rvalue (SLDL.Rvalue.read_field ~block ~field)
+      else lvalue (SLDL.Lvalue.read_field ~block ~field))
   | Lphantom_offset_var { var; offset_in_words } -> (
-    match die_location_of_variable_lvalue state var ~proto_dies_for_vars with
+    (* [var] holds an (infix) pointer; the projected pointer is that value plus
+       [offset_in_words] words, with no dereference. We therefore consult [var]'s
+       value (rvalue), not the place where it is stored, and present the result
+       directly as a value rather than an address to be dereferenced. *)
+    match die_location_of_variable_rvalue state var ~proto_dies_for_vars with
     | None -> None
-    | Some location ->
+    | Some block ->
       let offset_in_words = Targetint.of_int_exn offset_in_words in
+      let offset = SLDL.Rvalue.offset_pointer block ~offset_in_words in
       if need_rvalue
-      then None
-      else
-        lvalue (SLDL.Lvalue.offset_pointer_unguarded location ~offset_in_words))
+      then rvalue offset
+      else lvalue_without_address (SLDL.Lvalue_without_address.of_rvalue offset))
   | Lphantom_block { tag; fields } ->
     (* A phantom block construction: instead of the block existing in the target
        program's address space, it is going to be conjured up in the debugger's

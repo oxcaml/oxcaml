@@ -205,12 +205,13 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
               let has_uses =
                 Name_mode.Or_absent.is_present greatest_name_mode
               in
-              let can_phantomise =
-                (not is_depth)
-                && Bound_pattern.exists_all_bound_vars bound_vars
-                     ~f:(fun bound_var ->
-                       Variable.user_visible (VB.var bound_var))
-              in
+              (* Phantomise even non-user-visible variables: they may be
+                 intermediates (for example the [my_closure] introduced when
+                 inlining, or temporaries) that are referenced by user-visible
+                 phantom lets -- e.g. [Project_value_slot] / [Project_function_slot]
+                 projections -- which would otherwise resolve to a deleted
+                 binding and display garbage. *)
+              let can_phantomise = not is_depth in
               let will_delete_binding =
                 if is_end_region_for_unused_region
                 then true

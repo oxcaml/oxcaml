@@ -162,6 +162,11 @@ module Rvalue : sig
       evaluation of [block]; see [Lvalue.read_field_unguarded]. *)
   val read_field_unguarded : block:normal t -> field:Targetint.t -> normal t
 
+  (** V is the supplied pointer value plus [offset_in_words] words, with no
+      dereference. Used to describe infix pointers (e.g. function-slot
+      projections within a closure block). *)
+  val offset_pointer : normal t -> offset_in_words:Targetint.t -> normal t
+
   (** V will be the contents of the given field of the given symbol at time T.
   *)
   val read_symbol_field : Asm_symbol.t -> field:Targetint.t -> normal t

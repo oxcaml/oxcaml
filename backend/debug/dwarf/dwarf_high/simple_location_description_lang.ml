@@ -158,6 +158,21 @@ module Rvalue = struct
     in
     block @ OB.add_unsigned_const offset_in_bytes @ [O.DW_op_deref]
 
+  let offset_pointer t ~offset_in_words =
+    let offset_in_bytes =
+      Targetint.mul offset_in_words Targetint.size_in_bytes_as_targetint
+    in
+    (* Guarded like [read_field] above: if evaluation of [t] fails (e.g. the
+       base pointer is unavailable, so the [DW_OP_call*] does nothing to the
+       stack) the result is left empty rather than underflowing the stack or
+       offsetting a junk value. *)
+    (OB.signed_int_const Targetint.zero :: t)
+    @ [O.DW_op_dup]
+    @ OB.conditional ~if_zero:[]
+        ~if_nonzero:
+          ([O.DW_op_swap; O.DW_op_drop] @ OB.add_signed_const offset_in_bytes)
+        ~at_join:[] ()
+
   let read_symbol_field symbol ~field =
     read_field ~block:(const_symbol symbol) ~field
 

@@ -352,25 +352,35 @@ let gen_variable t ~debug_uid ~dbg ~bv_is_parameter v =
   let name = Variable.name v in
   let v = Backend_var.create_local name in
   let provenance =
-    match (bv_is_parameter : Bound_var.Is_parameter.t) with
-    | Implicit_parameter -> None
-    | Local_var | Parameter _ ->
-      if not (!Clflags.debug && not !Dwarf_flags.restrict_to_upstream_dwarf)
-      then None
-      else if not user_visible
-      then None
-      else
-        (* CR mshinwell: it's not clear [module_path] is necessary, since we can
-           use the [Debuginfo.t] to extract it *)
+    if not (!Clflags.debug && not !Dwarf_flags.restrict_to_upstream_dwarf)
+    then None
+    else
+      match (bv_is_parameter : Bound_var.Is_parameter.t) with
+      | Implicit_parameter ->
+        (* [my_closure] (and similar implicit parameters) are never user-visible,
+           but value-slot / function-slot projections need a located DIE to key
+           off, so we still emit provenance. The OCaml type is irrelevant here,
+           hence [Flambda_debug_uid.none]. *)
         let dbg = add_inlined_debuginfo t dbg in
-        let is_parameter =
-          match (bv_is_parameter : Bound_var.Is_parameter.t) with
-          | Implicit_parameter | Local_var -> Is_parameter.local
-          | Parameter { index } -> Is_parameter.parameter ~index
-        in
         Some
           (Backend_var.Provenance.create ~module_path:(Path.Pident v)
-             ~location:dbg ~original_ident:v ~debug_uid ~is_parameter)
+             ~location:dbg ~original_ident:v ~debug_uid:Flambda_debug_uid.none
+             ~is_parameter:Is_parameter.local)
+      | Local_var | Parameter _ ->
+        if not user_visible
+        then None
+        else
+          (* CR mshinwell: it's not clear [module_path] is necessary, since we
+             can use the [Debuginfo.t] to extract it *)
+          let dbg = add_inlined_debuginfo t dbg in
+          let is_parameter =
+            match (bv_is_parameter : Bound_var.Is_parameter.t) with
+            | Implicit_parameter | Local_var -> Is_parameter.local
+            | Parameter { index } -> Is_parameter.parameter ~index
+          in
+          Some
+            (Backend_var.Provenance.create ~module_path:(Path.Pident v)
+               ~location:dbg ~original_ident:v ~debug_uid ~is_parameter)
   in
   Backend_var.With_provenance.create ?provenance v
 
