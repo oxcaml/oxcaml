@@ -20,6 +20,7 @@ type t
           unyielding
           many
           stateless
+          noalloc_strict
           immutable
           portable
           contended
@@ -36,6 +37,7 @@ type t
       mod global
           many
           stateless
+          noalloc_strict
           immutable
           forkable
           unyielding
@@ -57,6 +59,7 @@ type t
           once
           stateful
           nonportable
+          alloc
           unique
           read_write
           uncontended
@@ -73,6 +76,7 @@ type t
           once
           stateful
           nonportable
+          alloc
           unique
           read_write
           uncontended
@@ -90,6 +94,7 @@ type t
           yielding
           once
           stateful
+          alloc
           unique
           read_write
           uncontended
@@ -107,6 +112,7 @@ type t
           unforkable
           yielding
           once
+          alloc
           unique
           read_write
           uncontended
@@ -122,6 +128,7 @@ type 'a t
           unyielding
           many
           stateless
+          noalloc_strict
           immutable
           portable
           contended
@@ -140,6 +147,7 @@ type ('a
              unyielding
              many
              stateless
+             noalloc_strict
              immutable
              portable
              contended
@@ -160,6 +168,7 @@ type ('a
              unforkable
              yielding
              once
+             alloc
              unique
              read_write
              uncontended
@@ -179,6 +188,7 @@ type 'a t
           yielding
           once
           stateful
+          alloc
           unique
           read_write
           uncontended
@@ -197,6 +207,7 @@ type 'a t
           once
           stateful
           nonportable
+          alloc
           unique
           read_write
           uncontended
@@ -211,6 +222,7 @@ type 'a t
           unyielding
           many
           stateless
+          noalloc_strict
           immutable
           portable
           contended

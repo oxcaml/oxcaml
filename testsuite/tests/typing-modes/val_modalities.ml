@@ -38,7 +38,7 @@ module M = struct
   let foo = {x = "hello"}
 end
 [%%expect{|
-module M : sig val foo : r end @@ stateless
+module M : sig val foo : r end @@ stateless noalloc_strict
 |}]
 
 module type S = sig
@@ -108,7 +108,7 @@ module (M @ uncontended) = struct
     let x @ contended = "hello"
 end
 [%%expect{|
-module M : sig val x : string @@ contended end @@ stateless
+module M : sig val x : string @@ contended end @@ stateless noalloc_strict
 |}]
 
 (* Testing the defaulting behaviour.
@@ -130,8 +130,8 @@ end
 [%%expect{|
 module Module_type_of_comonadic :
   sig
-    module M : sig val x : 'a -> 'a @@ stateless end
-    module type S = sig val x : 'a -> 'a @@ stateless end
+    module M : sig val x : 'a -> 'a @@ stateless noalloc_strict end
+    module type S = sig val x : 'a -> 'a @@ stateless noalloc_strict end
     module M' = M
   end
 |}]
@@ -161,20 +161,20 @@ Lines 8-12, characters 33-5:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           val y : int ref @@ stateless
+           val y : int ref @@ stateless noalloc_strict
            val z : 'a -> 'a
            val x : 'a -> 'a
          end @ stateful
        is not included in
          sig
-           val y : int ref @@ stateless
+           val y : int ref @@ stateless noalloc_strict
            val z : 'a -> 'a
-           val x : 'a -> 'a @@ stateless
+           val x : 'a -> 'a @@ stateless noalloc_strict
          end @ stateful
        Values do not match:
          val x : 'a -> 'a (* in a structure at stateful *)
        is not included in
-         val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
+         val x : 'a -> 'a @@ stateless noalloc_strict (* in a structure at stateful *)
        The first is "stateful"
          because it contains a usage (of the value "y" at line 11, characters 29-30)
          which is expected to be "read_write".
@@ -193,12 +193,12 @@ Error: Signature mismatch:
          sig
            val y : int ref
            val z : 'a -> 'a
-           val x : 'a -> 'a @@ stateless
+           val x : 'a -> 'a @@ stateless noalloc_strict
          end @ stateful
        Values do not match:
          val x : 'a -> 'a (* in a structure at stateful *)
        is not included in
-         val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
+         val x : 'a -> 'a @@ stateless noalloc_strict (* in a structure at stateful *)
        The first is "stateful"
          because it contains a usage (of the value "y" at line 11, characters 29-30)
          which is expected to be "read_write".
@@ -246,28 +246,28 @@ module Module_type_nested :
   sig
     module M :
       sig
-        val x : 'a -> 'a @@ stateless
-        module N : sig val y : string ref @@ stateless end
+        val x : 'a -> 'a @@ stateless noalloc_strict
+        module N : sig val y : string ref @@ stateless noalloc_strict end
       end
     module M' :
       sig
-        val x : 'a -> 'a @@ stateless
-        module N : sig val y : string ref @@ stateless end
-      end @@ stateless contended
+        val x : 'a -> 'a @@ stateless noalloc_strict
+        module N : sig val y : string ref @@ stateless noalloc_strict end
+      end @@ stateless noalloc_strict contended
   end
 |}, Principal{|
 module Module_type_nested :
   sig
     module M :
       sig
-        val x : 'a -> 'a @@ stateless
+        val x : 'a -> 'a @@ stateless noalloc_strict
         module N : sig val y : string ref end
       end
     module M' :
       sig
-        val x : 'a -> 'a @@ stateless
+        val x : 'a -> 'a @@ stateless noalloc_strict
         module N : sig val y : string ref end
-      end @@ stateless contended
+      end @@ stateless noalloc_strict contended
   end
 |}]
 
@@ -286,7 +286,7 @@ end
 [%%expect{|
 module Without_inclusion :
   sig module M : sig val x : 'a -> 'a @@ portable val y : 'a -> 'a end end @@
-  stateless nonportable
+  stateless nonportable noalloc_strict
 |}]
 
 module Without_inclusion = struct
@@ -314,6 +314,7 @@ end
 [%%expect{|
 module Inclusion_fail :
   sig module M : sig val x : string ref end @@ contended end @@ stateless
+  noalloc_strict
 |}]
 
 module Inclusion_fail = struct
@@ -331,11 +332,11 @@ Lines 4-6, characters 22-5:
 6 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig val x : string ref @@ stateless contended end @ uncontended
+         sig val x : string ref @@ stateless noalloc_strict contended end @ uncontended
        is not included in
          sig val x : string ref end @ uncontended
        Values do not match:
-         val x : string ref @@ stateless contended (* in a structure at uncontended *)
+         val x : string ref @@ stateless noalloc_strict contended (* in a structure at uncontended *)
        is not included in
          val x : string ref (* in a structure at uncontended *)
        The first is "contended"
@@ -384,7 +385,7 @@ end
 (* [M] is inferred to be [portable] in order to type check *)
 [%%expect{|
 module Inclusion_weakens_comonadic :
-  sig module M : sig val x : 'a -> 'a end end @@ stateless
+  sig module M : sig val x : 'a -> 'a end end @@ stateless noalloc_strict
 |}]
 
 module Inclusion_weakens_comonadic = struct
@@ -413,7 +414,7 @@ end
 (* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 module Inclusion_match : sig module M : sig val x : int ref end end @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 (* [foo] closes over [M.x] instead of [M]. This is better ergonomics. *)
@@ -428,7 +429,7 @@ end
 [%%expect{|
 module Close_over_value :
   sig module M : sig val x : 'a -> 'a end val foo : unit -> unit end @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 (* CR mode-crossing: This is used for the below test in place of a mutable record. *)
@@ -440,7 +441,7 @@ end = struct
   let mk = ()
 end
 [%%expect {|
-module M : sig type t val mk : t @@ portable end @@ stateless
+module M : sig type t val mk : t @@ portable end @@ stateless noalloc_strict
 |}]
 
 module Close_over_value_monadic = struct
@@ -497,7 +498,7 @@ Lines 3-6, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           val x : 'a -> 'a @@ stateless nonportable
+           val x : 'a -> 'a @@ stateless nonportable noalloc_strict
            external length : string -> int = "%string_length"
          end @ nonportable
        is not included in
@@ -654,6 +655,7 @@ end = struct
 end
 [%%expect{|
 module M : sig val foo : 'a -> 'a @@ global many end @@ stateless
+  noalloc_strict
 |}]
 
 (* module declaration inclusion check looks at the mode of the enclosing
@@ -665,7 +667,7 @@ end = struct
 end
 [%%expect{|
 module M : sig module N : sig val foo : 'a -> 'a @@ global many end end @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 (* inclusion check should cross modes, if we are comparing modes (instead of
@@ -676,7 +678,7 @@ end = struct
   let foo @ nonportable contended = 42
 end
 [%%expect{|
-module M : sig val foo : int @@ portable end @@ stateless
+module M : sig val foo : int @@ portable end @@ stateless noalloc_strict
 |}]
 
 (* The RHS type (expected type) is used for mode crossing. The following still
@@ -689,7 +691,7 @@ end = struct
   let t @ nonportable contended = 42
 end
 [%%expect{|
-module M : sig type t val t : t @@ portable end @@ stateless
+module M : sig type t val t : t @@ portable end @@ stateless noalloc_strict
 |}]
 
 (* LHS type is a subtype of RHS type, which means more type-level information.
@@ -703,6 +705,7 @@ end = struct
 end
 [%%expect{|
 module M : sig val t : [ `Bar | `Foo ] @@ portable end @@ stateless
+  noalloc_strict
 |}]
 
 module M : sig
@@ -717,14 +720,14 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val t : [> `Foo ] @@ stateless nonportable end @ nonportable
+         sig val t : [> `Foo ] @@ stateless nonportable noalloc_strict end @ nonportable
        is not included in
          sig
            val t : [ `Bar of 'a -> 'a | `Baz of string ref | `Foo ] @@
              portable
          end @ nonportable
        Values do not match:
-         val t : [> `Foo ] @@ stateless nonportable (* in a structure at nonportable *)
+         val t : [> `Foo ] @@ stateless nonportable noalloc_strict (* in a structure at nonportable *)
        is not included in
          val t : [ `Bar of 'a -> 'a | `Baz of string ref | `Foo ] @@ portable (* in a structure at nonportable *)
        The first is "nonportable"
@@ -739,7 +742,7 @@ end
 module F :
   functor (M : sig val foo : 'a -> 'a end) ->
     sig module M' : sig val foo : 'a -> 'a @@ global many end end
-  @@ stateless
+  @@ stateless noalloc_strict
 |}]
 
 (* Similiar for recursive modules *)
@@ -759,12 +762,13 @@ module F (M : sig val f : 'a -> 'a @@ global many end) = struct
 end
 [%%expect{|
 module F : functor (M : sig val f : 'a -> 'a @@ global many end) -> sig end
-  @@ stateless
+  @@ stateless noalloc_strict
 |}]
 
 module G (M : sig val f : 'a -> 'a end) = F(M)
 [%%expect{|
 module G : functor (M : sig val f : 'a -> 'a end) -> sig end @@ stateless
+  noalloc_strict
 |}]
 
 (* Similiar for [include_functor] *)
@@ -774,7 +778,7 @@ module G (M : sig val f : 'a -> 'a end) = struct
 end
 [%%expect{|
 module G : functor (M : sig val f : 'a -> 'a end) -> sig val f : 'a -> 'a end
-  @@ stateless
+  @@ stateless noalloc_strict
 |}]
 
 (* functor declaration inclusion check  looks at the modes of parameter and
@@ -784,7 +788,7 @@ functor (M : sig val foo : 'a -> 'a @@ global many end) -> struct let bar = M.fo
 [%%expect{|
 module F :
   sig val foo : 'a -> 'a end -> sig val bar : 'a -> 'a @@ global many end @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 (* CR zqian: package subtyping doesn't look at the package mode for simplicity.
@@ -977,7 +981,7 @@ end
 [%%expect{|
 module M :
   sig module type F = sig val foo : 'a @@ global many end -> sig end end @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 module M : sig
@@ -989,7 +993,7 @@ end = struct
 end
 [%%expect{|
 module M : sig module type F = sig end -> sig val foo : 'a end end @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 module type T = sig @@ portable
@@ -1036,7 +1040,7 @@ module F (X : SL) : SR = X
 [%%expect{|
 module type SR = sig end
 module type SL = sig end
-module F : functor (X : SL) -> SR @@ stateless
+module F : functor (X : SL) -> SR @@ stateless noalloc_strict
 |}]
 
 
@@ -1050,7 +1054,8 @@ module M_portable = struct
     end
 [%%expect{|
 module M_nonportable : sig val f : unit -> unit end @@ stateless nonportable
-module M_portable : sig val f : unit -> unit end @@ stateless
+  noalloc_strict
+module M_portable : sig val f : unit -> unit end @@ stateless noalloc_strict
 |}]
 
 let (foo @ portable) () =
@@ -1379,6 +1384,7 @@ let (bar @ portable) () =
 [%%expect{|
 module type F = sig end -> sig end
 module F : functor (X : sig end) -> sig end @@ stateless nonportable
+  noalloc_strict
 Line 4, characters 18-19:
 4 |   let k = (module F : F) in
                       ^
@@ -1396,7 +1402,7 @@ let (bar @ portable) () =
   k
 [%%expect{|
 module type F = sig end -> sig end
-module F : functor (X : sig end) -> sig end @@ stateless
+module F : functor (X : sig end) -> sig end @@ stateless noalloc_strict
 val bar : unit -> (module F) = <fun>
 |}]
 
@@ -1462,7 +1468,8 @@ let (f @ portable) () =
   ()
 [%%expect{|
 module F : functor (X : sig end) -> sig type t = string end @@ stateless
-module X : sig end @@ stateless
+  noalloc_strict
+module X : sig end @@ stateless noalloc_strict
 val f : unit -> unit = <fun>
 |}]
 
@@ -1547,6 +1554,7 @@ end = struct
 end
 [%%expect{|
 module M : sig module type S = sig module N : sig end end end @@ stateless
+  noalloc_strict
 |}]
 
 (* class makes a structure to be nonportable *)

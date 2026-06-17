@@ -528,7 +528,9 @@ end
 
 [%%expect{|
 module type S28 =
-  sig module type Evil = sig val x : 'w -> 'w @@ stateless end end
+  sig
+    module type Evil = sig val x : 'w -> 'w @@ stateless noalloc_strict end
+  end
 |}]
 
 (* [module type of struct] and unification. *)
@@ -734,7 +736,8 @@ end
 [%%expect{|
 module type S37 =
   sig
-    module type Inner = sig val id : 't -> unit @@ stateless end
+    module type Inner =
+      sig val id : 't -> unit @@ stateless noalloc_strict end
     val f : ('t : word). 't -> 't
   end
 |}]

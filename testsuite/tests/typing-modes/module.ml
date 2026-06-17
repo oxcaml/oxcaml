@@ -24,6 +24,7 @@ val portable_use : 'a @ portable -> unit = <fun>
 module type S = sig val x : 'a -> unit end
 module type SL = sig type 'a t end
 module M : sig type 'a t = int val x : 'a -> unit end @@ stateless
+  noalloc_strict
 val foo : unit -> unit = <fun>
 module F : functor (X : S) -> sig type t = int val x : 'a -> unit end
 |}]
@@ -161,7 +162,7 @@ module M : S = struct
 end
 [%%expect{|
 module type S = sig val foo : 'a -> 'a val baz : 'a -> 'a @@ portable end
-module M : S @@ stateless nonportable
+module M : S @@ stateless nonportable noalloc_strict
 |}]
 
 let (bar @ portable) () =
@@ -243,7 +244,7 @@ Error: The module "M" is "nonportable"
 module F (X : S @ portable) = struct
 end
 [%%expect{|
-module F : functor (X : S @ portable) -> sig end @@ stateless
+module F : functor (X : S @ portable) -> sig end @@ stateless noalloc_strict
 |}]
 
 module type S = functor () (M : S @ portable) (_ : S @ portable) -> S
@@ -260,8 +261,10 @@ module F () = struct
     let (foo @ once) () = ()
 end
 [%%expect{|
-module F : functor () -> sig val foo : unit -> unit @@ stateless end @ once
-  @@ stateless
+module F :
+  functor () ->
+    sig val foo : unit -> unit @@ stateless noalloc_strict end @ once
+  @@ stateless noalloc_strict
 |}]
 
 module type Empty = sig end
@@ -326,13 +329,13 @@ end
 [%%expect{|
 module Test_incl :
   sig
-    module M : sig val foo : 'a -> 'a @@ stateless end
-    module type S = sig val foo : 'a -> 'a @@ stateless end
+    module M : sig val foo : 'a -> 'a @@ stateless noalloc_strict end
+    module type S = sig val foo : 'a -> 'a @@ stateless noalloc_strict end
     module N :
       sig
-        val x : int ref @@ stateless
+        val x : int ref @@ stateless noalloc_strict
         val f : unit -> unit
-        val foo : 'a -> 'a @@ stateless
+        val foo : 'a -> 'a @@ stateless noalloc_strict
       end
   end
 |}]
@@ -387,13 +390,14 @@ Error: The module is "nonportable"
        However, the module highlighted is expected to be "portable".
 |}]
 
+(* CR-soon shsong: check noalloc_strict here *)
 module (F @ portable) (X : sig val x : int -> int end) = struct
     let bar = X.x
 end
 [%%expect{|
 module F :
   functor (X : sig val x : int -> int end) -> sig val bar : int -> int end @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 

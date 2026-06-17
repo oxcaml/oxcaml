@@ -511,7 +511,9 @@ module A1 : sig end
 module A2 : sig end
 module L1 : sig module X = A1 end
 module L2 : sig module X = A2 end
-module F : functor (L : sig module X : sig end @@ stateless end) -> sig end
+module F :
+  functor (L : sig module X : sig end @@ stateless noalloc_strict end) ->
+    sig end
 module F1 : sig end
 module F2 : sig end
 |}];;
@@ -640,7 +642,7 @@ module type S =
     module P : sig module I = N.I @@ portable end
     module Q :
       sig type wrap' = wrap = W of (Set.Make(Int).t, Set.Make(P.I).t) eq end
-      @@ stateless
+      @@ stateless noalloc_strict
   end
 |}];;
 
@@ -670,7 +672,7 @@ module type S =
       end
     module Q :
       sig type wrap' = wrap = W of (Set.Make(Int).t, Set.Make(N.I).t) eq end
-      @@ stateless
+      @@ stateless noalloc_strict
   end
 |}];;
 
@@ -832,11 +834,13 @@ Lines 4-6, characters 6-3:
 6 | end..
 Error: Signature mismatch:
        Modules do not match:
-         sig module type S = sig module N = X.N @@ stateless end end
+         sig
+           module type S = sig module N = X.N @@ stateless noalloc_strict end
+         end
        is not included in
          sig module type S = sig module N = X.N end end
        Module type declarations do not match:
-         module type S = sig module N = X.N @@ stateless end
+         module type S = sig module N = X.N @@ stateless noalloc_strict end
        does not match
          module type S = sig module N = X.N end
        The second module type is not included in the first
@@ -844,7 +848,7 @@ Error: Signature mismatch:
        Module types do not match:
          sig module N = X.N end
        is not equal to
-         sig module N = X.N @@ stateless end
+         sig module N = X.N @@ stateless noalloc_strict end
        At position "module type S = <here>"
        Modalities on N do not match:
        The second is stateless and the first is not.

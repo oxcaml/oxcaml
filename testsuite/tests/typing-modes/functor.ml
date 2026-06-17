@@ -70,19 +70,21 @@ module F : S -> T = functor (M : S) -> struct
   let g = M.f
 end
 [%%expect{|
-module F : S -> T @@ stateless
+module F : S -> T @@ stateless noalloc_strict
 |}]
 
 module F (M : S @ portable) (M' : S) = struct
 end
 [%%expect{|
 module F : functor (M : S @ portable) (M' : S) -> sig end @@ stateless
+  noalloc_strict
 |}]
 
 module F (M : S) (M' : S @ portable) @ portable = struct
 end
 [%%expect{|
 module F : functor (M : S) (M' : S @ portable) -> sig end @@ stateless
+  noalloc_strict
 |}]
 
 module F (M : S @ portable) (M' : S @ portable) : T @ portable = struct
@@ -90,6 +92,7 @@ module F (M : S @ portable) (M' : S @ portable) : T @ portable = struct
 end
 [%%expect{|
 module F : functor (M : S @ portable) (M' : S @ portable) -> T @@ stateless
+  noalloc_strict
 |}]
 
 (* In REPL (called "toplevel" in the compiler source code), functors, just like
@@ -110,7 +113,7 @@ module M = struct
     let f () = ()
 end
 [%%expect{|
-module M : sig val f : unit -> unit end @@ stateless
+module M : sig val f : unit -> unit end @@ stateless noalloc_strict
 |}]
 
 module _ @ portable = F(M)
@@ -149,7 +152,7 @@ module Workaround :
   sig
     module F :
       functor (M : S @ portable) -> sig val g : unit -> unit end @ portable
-      @@ stateless nonportable
+      @@ stateless nonportable noalloc_strict
     module M' : sig val g : unit -> unit end
   end @@ portable
 |}]
@@ -165,7 +168,11 @@ module M = struct
     let f' = let r = ref 42 in fun () -> r := 24; ()
 end
 [%%expect{|
-module M : sig val f : unit -> unit @@ stateless val f' : unit -> unit end
+module M :
+  sig
+    val f : unit -> unit @@ stateless noalloc_strict
+    val f' : unit -> unit
+  end
 |}]
 
 (* Note that M is a nonportable module containing both portable and nonportable items.
@@ -307,7 +314,7 @@ end
 [%%expect{|
 module M :
   sig
-    val f : unit -> unit @@ stateless
+    val f : unit -> unit @@ stateless noalloc_strict
     val f' : unit -> unit
     val g : unit -> unit @@ portable
   end
@@ -412,7 +419,7 @@ val f_local : 'a @ local -> unit -> unit = <fun>
 module F (M : S @ local) () = struct end
 [%%expect{|
 module F : functor (M : S @ local) -> (functor () -> sig end) @ local @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 (* Demonstration. *)
@@ -421,7 +428,7 @@ let f_stateful (x @ stateful) () = ()
 module F (M : S @ stateful) () = struct end
 [%%expect{|
 val f_stateful : 'a -> unit -> unit = <fun>
-module F : functor (M : S) () -> sig end @@ stateless
+module F : functor (M : S) () -> sig end @@ stateless noalloc_strict
 |}]
 
 let f_stateful_app (x @ stateful) =
@@ -503,7 +510,7 @@ val f_read_write : 'a -> unit -> unit = <fun>
 
 module F (M : S @ read_write) () = struct end
 [%%expect{|
-module F : functor (M : S) () -> sig end @@ stateless
+module F : functor (M : S) () -> sig end @@ stateless noalloc_strict
 |}]
 
 let f_read_write_app (x @ read_write) =
@@ -588,7 +595,7 @@ val f_read_write_ret : 'a -> unit -> unit = <fun>
 module F (M : S @ read_write) =
   ((functor () -> struct end) : (functor () -> sig end) @ stateless)
 [%%expect{|
-module F : functor (M : S) () -> sig end @@ stateless
+module F : functor (M : S) () -> sig end @@ stateless noalloc_strict
 |}]
 
 let f1 (x1 @ stateful) (x2 @ stateless) (x3 @ stateless) =
@@ -607,7 +614,7 @@ end
 [%%expect{|
 module F1 :
   functor (M1 : S) (M2 : S @ stateless) (M3 : S @ stateless) -> sig end @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 let f1_flip (x2 @ stateless) (x1 @ stateful) = f1 x1 x2
@@ -621,7 +628,7 @@ module F1_flip (M2 : S @ stateless) (M1 : S @ read_write) = F1 (M1) (M2)
 [%%expect{|
 module F1_flip :
   functor (M2 : S @ stateless) (M1 : S) (M3 : S @ stateless) -> sig end @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 (* This example explains why we need the stricter partial application
@@ -666,7 +673,7 @@ end
 [%%expect{|
 module F2 :
   functor (M1 : S @ stateless) (M2 : S) (M3 : S @ stateless) -> sig end @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 let f3 (x1 @ stateless) (x2 @ stateless) (x3 @ stateful) =
@@ -685,7 +692,7 @@ end
 [%%expect{|
 module F3 :
   functor (M1 : S @ stateless) (M2 : S @ stateless) (M3 : S) -> sig end @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 let test1 (_x @ stateful) : (unit -> unit) @ stateless = fun () -> ()
@@ -696,7 +703,7 @@ val test1 : 'a -> (unit -> unit) @ stateless = <fun>
 module F1 (M1 : S @ stateful) : (functor () -> sig end) @ stateless =
   functor () -> struct end
 [%%expect{|
-module F1 : functor (M1 : S) () -> sig end @@ stateless
+module F1 : functor (M1 : S) () -> sig end @@ stateless noalloc_strict
 |}]
 
 let test2 (x @ stateful) : (unit -> unit) @ stateless =
@@ -750,7 +757,7 @@ module type Nonportable_Nonportable = sig module F : functor (M : S) -> T end
 module F (M : Nonportable_Portable) = (M : Portable_Portable)
 [%%expect{|
 module F : functor (M : Nonportable_Portable) -> Portable_Portable @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 module F (M : Portable_Portable) = (M : Nonportable_Portable)
@@ -819,7 +826,7 @@ Error: Signature mismatch:
 module F (M : Portable_Portable) = (M : Portable_Nonportable)
 [%%expect{|
 module F : functor (M : Portable_Portable) -> Portable_Nonportable @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 module F (M : S @ shareable -> S) = (M : S -> S)
@@ -847,11 +854,13 @@ Error: Signature mismatch:
 module F (M : S -> S) = (M : S @ shareable -> S)
 [%%expect{|
 module F : functor (M : S -> S) -> S @ shareable -> S @@ stateless
+  noalloc_strict
 |}]
 
 module F (M : S -> S @ shareable) = (M : S -> S)
 [%%expect{|
 module F : functor (M : S -> S @ shareable) -> S -> S @@ stateless
+  noalloc_strict
 |}]
 
 module F (M : S -> S) = (M : S -> S @ shareable)
@@ -904,11 +913,13 @@ Error: Signature mismatch:
 module F (M : T @ immutable -> S) = (M : T -> S)
 [%%expect{|
 module F : functor (M : T @ immutable -> S) -> T -> S @@ stateless
+  noalloc_strict
 |}]
 
 module F (M : S -> T) = (M : S -> T @ immutable)
 [%%expect{|
 module F : functor (M : S -> T) -> S -> T @ immutable @@ stateless
+  noalloc_strict
 |}]
 
 module F (M : S -> T @ immutable) = (M : S -> T)
@@ -943,6 +954,7 @@ end
 type t' = F(M).t
 [%%expect{|
 module F : functor (X : S @ portable) -> sig type t = int end @@ stateless
+  noalloc_strict
 module M : sig val f : unit -> unit end
 type t' = F(M).t
 |}]
@@ -955,7 +967,7 @@ let (foo @ portable) () =
   let _ : F(M).t = 42 in
   ()
 [%%expect{|
-module F = F @@ stateless nonportable
+module F = F @@ stateless nonportable noalloc_strict
 module M = M
 val foo : unit -> unit = <fun>
 |}]
@@ -983,7 +995,7 @@ end
 [%%expect{|
 module F :
   functor (G : S -> S @ portable) -> sig module H : S -> S @ portable end @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 module F(G : S -> S) = struct
@@ -1037,13 +1049,13 @@ module F(G : S -> S) = struct
 end
 [%%expect{|
 module F : functor (G : S -> S) -> sig module H : S @ portable -> S end @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 module F (M : (S @ portable -> S) -> S) = (M : (S -> S) -> S)
 [%%expect{|
 module F : functor (M : (S @ portable -> S) -> S) -> (S -> S) -> S @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 module F (M : (S -> S) -> S) = (M : (S @ portable -> S) -> S)
@@ -1102,5 +1114,5 @@ Error: Signature mismatch:
 module F (M : (S -> S) -> S) = (M : (S -> S @ portable) -> S)
 [%%expect{|
 module F : functor (M : (S -> S) -> S) -> (S -> S @ portable) -> S @@
-  stateless
+  stateless noalloc_strict
 |}]

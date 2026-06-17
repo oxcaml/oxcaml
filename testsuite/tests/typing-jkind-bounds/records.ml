@@ -165,6 +165,7 @@ Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
          portability: mod portable with 'a ≰ mod portable
          statefulness: mod stateless with 'a ≰ mod stateless
          visibility: mod read_write ≰ mod immutable
+         allocation: mod noalloc_strict with 'a ≰ mod noalloc_strict
 |}]
 
 type t : immutable_data = { x : int ref }
