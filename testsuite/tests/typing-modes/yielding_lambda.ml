@@ -595,3 +595,156 @@ module N : sig val n : int end
     (apply[unyielding] F N)))
 module R : sig val m : int end
 |}]
+
+
+(* Can OO user code close over a yielding value? These tests document the mode
+   in each context, which determines the [ap_yielding] for [new], method
+   calls, and class compilation. *)
+
+(* An [initializer] block: *)
+let () =
+  Yielding.with_ (fun y ->
+    let _o = object
+      initializer yield y
+    end in
+    ())
+[%%expect{|
+Line 4, characters 24-25:
+4 |       initializer yield y
+                            ^
+Error: The value "y" is "yielding"
+       but is expected to be "unyielding"
+         because it is used in an object (at lines 3-5, characters 13-7).
+|}]
+
+(* An instance-variable initializer: *)
+let () =
+  Yielding.with_ (fun y ->
+    let _o = object
+      val _x : int = (yield y; 0)
+    end in
+    ())
+[%%expect{|
+Line 4, characters 28-29:
+4 |       val _x : int = (yield y; 0)
+                                ^
+Error: The value "y" is "yielding"
+       but is expected to be "unyielding"
+         because it is used in an object (at lines 3-5, characters 13-7).
+|}]
+
+(* A method body: *)
+let _ =
+  Yielding.with_ (fun y ->
+    object
+      method m = yield y
+    end)
+[%%expect{|
+Line 4, characters 23-24:
+4 |       method m = yield y
+                           ^
+Error: The value "y" is "yielding"
+       but is expected to be "unyielding"
+         because it is used in an object (at lines 3-5, characters 4-7).
+|}]
+
+(* An ancestor method, called through [inherit ... as super]: *)
+let _ =
+  Yielding.with_ (fun y ->
+    let module M = struct
+      class c = object method m = yield y end
+    end in
+    object
+      inherit M.c as super
+      method n = super#m
+    end)
+[%%expect{|
+Line 4, characters 40-41:
+4 |       class c = object method m = yield y end
+                                            ^
+Error: The value "y" is "yielding"
+       but is expected to be "unyielding"
+         because it is used in a class (at line 4, characters 16-45).
+|}]
+
+(* Since object code can never yield, [new] and ancestor-method calls are
+   [unyielding]. (Look for [apply[unyielding]] on [field_mut 0 c] -- the [new]
+   call -- and on [m self] -- the [super#m] call.) *)
+class c = object method m = 0 end
+let mk () = new c
+class d = object inherit c as super method n = super#m end
+[%%expect{|
+(let
+  (c =?
+     (let
+       (c_init =
+          (function {nlocal = 0} class?
+            (let
+              (m =?
+                 (opaque
+                   (apply[unyielding] (field_imm 6 (global CamlinternalOO!))
+                     class #"m")))
+              (seq
+                (opaque
+                  (apply[unyielding] (field_imm 10 (global CamlinternalOO!))
+                    class (opaque (makeblock 0 m 0 0))))
+                (function {nlocal = 0} env self?
+                  (opaque
+                    (apply[unyielding]
+                      (field_imm 23 (global CamlinternalOO!)) self class)))))))
+       (opaque
+         (apply[unyielding] (field_imm 18 (global CamlinternalOO!))
+           (opaque [0: #"m"]) c_init))))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "c/719" c))
+class c : object method m : int end
+(let
+  (c =? (apply[unyielding] (field_imm 0 (global Toploop!)) "c/719")
+   mk =
+     (function {nlocal = 0} param[value<int>]
+       (apply[unyielding] (field_mut 0 c) 0)))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "mk" mk))
+val mk : unit -> c = <fun>
+(let
+  (c =? (apply[unyielding] (field_imm 0 (global Toploop!)) "c/719")
+   shared =a (opaque [0: #"m"])
+   shared =a (opaque [0: #"n" #"m"])
+   d =?
+     (let
+       (d_init =
+          (function {nlocal = 0} class?
+            (let
+              (ids =?
+                 (opaque
+                   (apply[unyielding] (field_imm 7 (global CamlinternalOO!))
+                     class shared))
+               n =o? (field_mut 0 ids)
+               inh =[value<genarray>]
+                 (opaque
+                   (apply[unyielding] (field_imm 17 (global CamlinternalOO!))
+                     class 0 0 shared c 1))
+               obj_init =o? (field_mut 0 inh)
+               m =o? (field_mut 1 inh))
+              (seq
+                (opaque
+                  (apply[unyielding] (field_imm 9 (global CamlinternalOO!))
+                    class n
+                    (function {nlocal = 0} self-7 : int
+                      (apply[unyielding] m self-7))))
+                (function {nlocal = 0} env self?
+                  (let
+                    (self =?
+                       (opaque
+                         (apply[unyielding]
+                           (field_imm 23 (global CamlinternalOO!)) self
+                           class)))
+                    (seq (opaque (apply[unyielding] obj_init self))
+                      (opaque
+                        (apply[unyielding]
+                          (field_imm 25 (global CamlinternalOO!)) self self
+                          class)))))))))
+       (opaque
+         (apply[unyielding] (field_imm 18 (global CamlinternalOO!))
+           (opaque [0: #"m" #"n"]) d_init))))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "d/747" d))
+class d : object method m : int method n : int end
+|}]

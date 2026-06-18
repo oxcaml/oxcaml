@@ -251,7 +251,8 @@ let mkappl (func, args, layout) =
          ap_args=args;
          ap_region_close=Rc_normal;
          ap_mode=alloc_heap;
-         ap_yielding=May_yield;
+         (* All OO prims are builtins which do not yield *)
+         ap_yielding=Unyielding;
          ap_tailcall=Default_tailcall;
          ap_inlined=Default_inlined;
          ap_specialised=Default_specialise;
@@ -898,7 +899,9 @@ let transl_class_rebind ~scopes cl vf =
         ap_result_layout=layout_obj;
         ap_region_close=Rc_normal;
         ap_mode=alloc_heap;
-        ap_yielding=May_yield;
+        (* obj_init is a builtin function which does not yield, and does not
+           execute user code. *)
+        ap_yielding=Unyielding;
         ap_tailcall=Default_tailcall;
         ap_inlined=Default_inlined;
         ap_specialised=Default_specialise;

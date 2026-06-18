@@ -1137,7 +1137,10 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                     ap_args = [self];
                     ap_result_layout = layout;
                     ap_mode = mode;
-                    ap_yielding = May_yield;
+                    (* Object code can never close over a yielding value (see
+                       the OO tests in yielding_lambda.ml), so calling an
+                       ancestor method cannot yield *)
+                    ap_yielding = Unyielding;
                     ap_region_close = pos;
                     ap_probe = None;
                     ap_tailcall = Default_tailcall;
@@ -1157,7 +1160,10 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         ap_result_layout=layout;
         ap_region_close=pos;
         ap_mode=alloc_heap;
-        ap_yielding=May_yield;
+        (* [new] runs the object's initialization, but object code can never
+           close over a yielding value (see the OO tests in
+           yielding_lambda.ml), so it cannot yield *)
+        ap_yielding=Unyielding;
         ap_tailcall=Default_tailcall;
         ap_inlined=Default_inlined;
         ap_specialised=Default_specialise;
