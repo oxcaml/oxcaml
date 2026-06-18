@@ -648,18 +648,33 @@ and transl_module ~scopes cc rootpath mexp =
         compile_functor ~scopes mexp cc rootpath loc) ()
   | Tmod_apply(funct, arg, ccarg) ->
       let translated_arg = transl_module ~scopes ccarg None arg in
-      transl_apply ~scopes ~loc ~cc mexp.mod_env funct translated_arg
+      transl_apply ~scopes ~loc ~cc mexp.mod_env funct
+        ~arg_mode:(Some (fst arg.mod_mode)) translated_arg
   | Tmod_apply_unit funct ->
-      transl_apply ~scopes ~loc ~cc mexp.mod_env funct lambda_unit
+      transl_apply ~scopes ~loc ~cc mexp.mod_env funct ~arg_mode:None
+        lambda_unit
   | Tmod_constraint(arg, _, _, ccarg) ->
       transl_module ~scopes (compose_coercions cc ccarg) rootpath arg
   | Tmod_unpack(arg, _) ->
       apply_coercion loc Strict cc
         (Translcore.transl_exp ~scopes Lambda.layout_module arg)
 
-and transl_apply ~scopes ~loc ~cc mod_env funct translated_arg =
+and transl_apply ~scopes ~loc ~cc mod_env funct ~arg_mode translated_arg =
   let inlined_attribute =
     Translattribute.get_inlined_attribute_on_module funct
+  in
+  (* Applying a functor runs its body, which can perform a free effect if the
+     functor closes over a yielding value (the functor's own mode) or uses a
+     yielding argument it is given (the argument's mode). *)
+  let ap_yielding =
+    let open Mode in
+    let yieldings =
+      Value.proj_comonadic Yielding (fst funct.mod_mode)
+      :: (match arg_mode with
+          | None -> []
+          | Some am -> [Value.proj_comonadic Yielding am])
+    in
+    Translmode.transl_yielding_mode_l (Yielding.join yieldings)
   in
   oo_wrap mod_env true
     (apply_coercion loc Strict cc)
@@ -670,7 +685,7 @@ and transl_apply ~scopes ~loc ~cc mod_env funct translated_arg =
        ap_result_layout = Lambda.layout_module;
        ap_region_close=Rc_normal;
        ap_mode=alloc_heap;
-       ap_yielding=May_yield;
+       ap_yielding;
        ap_tailcall=Default_tailcall;
        ap_inlined=inlined_attribute;
        ap_specialised=Default_specialise;
