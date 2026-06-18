@@ -35,14 +35,17 @@ module M :
 |}]
 #mark_toplevel_in_quotations;;
 
-(** Splicing non-legacy expressions **)
+(** Quote captures via splices **)
 
-(* We require the spliced expression to be at legacy.
-   Thus, local/once/contended fail, as they are
-   above legacy (global/many/uncontended).
-   The other cases pass. *)
+(* CR quoted-modes jbachurski: Splicing a value should
+   bound the mode of the quote with the value's mode -- not via capture. *)
 
-(* Local spliced expression -- should error! *)
+fun e -> <[ $e ]>
+[%%expect{|
+- : 'a expr -> 'a expr @ once = <fun>
+|}];;
+
+(* Local spliced expression *)
 fun (x @ local) -> <[ $x ]>
 [%%expect{|
 - : 'a expr @ local -> 'a expr @ local once = <fun>
@@ -80,6 +83,9 @@ fun x -> <[ $x ]>
 - : 'a expr -> 'a expr @ once = <fun>
 |}];;
 
+(* CR quoted-modes jbachurski: The following examples will be allowed with
+   mode-indexed [expr]. *)
+
 (* Non-unique result of splicing *)
 fun x -> <[ M.free $x ]>
 [%%expect{|
@@ -100,6 +106,29 @@ Line 1, characters 19-21:
 Error: This value is "nonportable"
          because it is a quoted expression's result and thus always at the legacy modes.
        However, the highlighted expression is expected to be "portable".
+|}];;
+
+
+(** Quotes capture spliced values, not computations **)
+
+(* CR quoted-modes: Incomplete -- the quote should be [global] like [f]'s return,
+   and not [local] like [f]. *)
+let foo (f : (_ -> _ @ global) @ local) = <[ $(f 42) + 1 ]>
+[%%expect{|
+val foo : (int -> <[int]> expr) @ local -> <[int]> expr @ local once = <fun>
+|}];;
+
+(* CR quoted-modes: Unsound -- the quote should be [local] like [f]'s return. *)
+let foo (f : (_ -> _ @ local) @ global) = <[ $(f 42) + 1 ]>
+[%%expect{|
+val foo : (int -> <[int]> expr @ local) -> <[int]> expr @ once = <fun>
+|}];;
+
+(* CR quoted-modes: Unsound -- the quote should be [once] like [f]'s return.
+   This one is a bit more annoying since that's probably not what we want with [once]. *)
+let foo (f : (_ -> _ @ once) @ global) = <[ fun () -> $(f 42) + 1 ]>
+[%%expect{|
+val foo : (int -> <[int]> expr @ once) -> <[unit -> int]> expr = <fun>
 |}];;
 
 (** Quoting expressions with non-legacy results **)
@@ -193,18 +222,17 @@ Line 3, characters 7-8:
 (* Once in closure *)
 (* The quote <[x (); 2]> is once, as it references x @ once -- should error! *)
 <[let x @ once = fun () -> () in
-  $(let y = <[x (); 2]> in
-    <[$y + $y]>)]>
+  $(let y = <[fun () -> x (); 2]> in
+    <[$(y ()) + $(y ())]>)]>
 [%%expect{|
-Line 3, characters 12-13:
-3 |     <[$y + $y]>)]>
-                ^
-Error: This value is used here,
-       but it is defined as once and is also being used at:
-Line 3, characters 7-8:
-3 |     <[$y + $y]>)]>
-           ^
-
+Line 2, characters 24-25:
+2 |   $(let y = <[fun () -> x (); 2]> in
+                            ^
+Error: The value "x" is "once"
+       but is expected to be "many"
+         because it is used inside the function at line 2, characters 14-31
+         which is expected to be "many"
+         because it is a quoted expression's result and thus always at the legacy modes.
 |}];;
 
 (* Uncontended in closure *)
@@ -360,9 +388,98 @@ let x () = <[1 + 1]> in <[$(x ()) + $(x ())]>
 ]>
 |}];;
 
+(* We associate that quotes are [once] iff they are syntactic values.
+   Here, we can exploit this mode-based reasoning concluding the quote is once iff [e] is. *)
+
+(* CR quoted-modes jbachurski: The result should be [many] --
+   the quote is a syntactic value iff [e] is. *)
+fun (e @ many) -> <[ Some $e ]>
+[%%expect{|
+- : 'a expr -> <[$('a) option]> expr @ once = <fun>
+|}];;
+
+fun (e @ once) -> <[ Some $e ]>
+[%%expect{|
+- : 'a expr @ once -> <[$('a) option]> expr @ once = <fun>
+|}];;
+
 (** Duplication of [once] quotes *)
 
 let x = <[1 + 1]> in let x, y = Quote.duplicate x in <[$x + $y]>
 [%%expect{|
 - : <[int]> expr = <[(1 + 1) + (1 + 1)]>
+|}];;
+
+(** Quote captures with inner closure captures **)
+
+fun e -> <[ fun () -> $e ]>
+[%%expect{|
+- : 'a expr -> <[unit -> $('a)]> expr = <fun>
+|}];;
+
+(* CR quoted-modes jbachurski: the [local] and [once] examples should be accepted.
+   The closure does not actually capture $e, as it is at a negative stage offset.
+   On the other hand, the quote does capture [e] with different results in either case. *)
+
+(* This quote should be [local], as it is a syntax tree pointing to a [local] syntax tree. *)
+fun (e @ local) -> <[ fun () -> $e ]>
+[%%expect{|
+Line 1, characters 33-34:
+1 | fun (e @ local) -> <[ fun () -> $e ]>
+                                     ^
+Error: The value "e" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the function at line 1, characters 22-34
+         which is expected to be "global"
+         because it is a quoted expression's result and thus always at the legacy modes.
+|}];;
+
+(* Quotes of syntactic values observably cross [once]ness, so this should be [many]. *)
+fun (e @ once) -> <[ fun () -> $e ]>
+[%%expect{|
+Line 1, characters 32-33:
+1 | fun (e @ once) -> <[ fun () -> $e ]>
+                                    ^
+Error: The value "e" is "once"
+       but is expected to be "many"
+         because it is used inside the function at line 1, characters 21-33
+         which is expected to be "many"
+         because it is a quoted expression's result and thus always at the legacy modes.
+|}];;
+
+fun (e @ unique) -> <[ fun () -> $e ]>
+[%%expect{|
+- : 'a expr @ unique -> <[unit -> $('a)]> expr = <fun>
+|}];;
+
+fun (e @ portable) -> <[ fun () -> $e ]>
+[%%expect{|
+- : 'a expr @ portable -> <[unit -> $('a)]> expr = <fun>
+|}];;
+
+fun (e @ shared) -> <[ fun () -> $e ]>
+[%%expect{|
+- : 'a expr @ shared -> <[unit -> $('a)]> expr = <fun>
+|}];;
+
+fun (e @ uncontended) -> <[ fun () -> $e ]>
+[%%expect{|
+- : 'a expr -> <[unit -> $('a)]> expr = <fun>
+|}];;
+
+(* CR quoted-modes jbachurski: This should be accepted. *)
+module M : sig
+  val quote_thunk : 'a expr @ once -> <[unit -> $'a]> expr
+end = struct
+  let quote_thunk (e @ once) = <[ fun () -> $e ]>
+end
+[%%expect{|
+Line 4, characters 45-46:
+4 |   let quote_thunk (e @ once) = <[ fun () -> $e ]>
+                                                 ^
+Error: The value "e" is "once"
+       but is expected to be "many"
+         because it is used inside the function at line 4, characters 34-46
+         which is expected to be "many"
+         because it is a quoted expression's result and thus always at the legacy modes.
 |}];;
