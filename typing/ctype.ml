@@ -4648,9 +4648,9 @@ let add_jkind_equation ~reason uenv destination jkind1 =
     intersect_type_jkind ~reason env destination jkind1
   with
   | Jkind.No_intersection err -> raise_for Unify (Bad_jkind (destination,err))
-  | Jkind.Unknown -> ()
+  | Jkind.Unknown -> None
   | Jkind.Intersection jkind -> begin
-      match get_desc destination with
+      (match get_desc destination with
       | Tconstr (p, _, _)
         when is_instantiable ~for_jkind_eqn:true env p ->
         begin
@@ -4671,7 +4671,9 @@ let add_jkind_equation ~reason uenv destination jkind1 =
           with
             Not_found -> ()
         end
-      | _ -> ()
+      | _ -> ());
+      (* Return the refined jkind so the equation's [source] can record it. *)
+      Some jkind
     end
 
 (* This function can be called only in [Pattern] mode. *)
@@ -4701,8 +4703,14 @@ let add_gadt_equation uenv source destination =
                   jkind
       | Some jkind -> jkind
     in
-    add_jkind_equation ~reason:(Gadt_equation source)
-      uenv destination jkind;
+    let jkind =
+      match
+        add_jkind_equation ~reason:(Gadt_equation source)
+          uenv destination jkind
+      with
+      | Some refined_jkind -> refined_jkind
+      | None -> jkind
+    in
     (* Adding a jkind equation may change the uenv. *)
     let env = get_env uenv in
     let decl =

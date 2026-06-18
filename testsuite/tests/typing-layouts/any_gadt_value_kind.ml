@@ -16,13 +16,5 @@ let f : type (a : any). a w -> unit = function
 [%%expect{|
 type 'a t = A of 'a | B
 type (_ : any) w = W : 'a w
-Line 6, characters 14-15:
-6 |   | W -> (fun _ -> ()) (B : a t)
-                  ^
-Error: Non-value detected in [value_kind].
-       Please report this error to the Jane Street compilers team.
-       The layout of a is any
-         because of the annotation on the abstract type declaration for a.
-       But the layout of a must be a value layout
-         because it has to be value for the V1 safety check.
+val f : ('a : any). 'a w -> unit = <fun>
 |}]
