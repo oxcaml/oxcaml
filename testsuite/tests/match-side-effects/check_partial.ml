@@ -43,11 +43,13 @@ type _ t = Int : int -> int t | True : bool t | False : bool t
                 (let (tag/0 =a[value<int>] (caml_obj_tag *match*/0))
                   (if (%int_equal tag/0 250) (field_mut 0 *match*/0)
                     (if (|| (%int_equal tag/0 246) (%int_equal tag/0 244))
-                      (apply (field_imm 1 (global CamlinternalLazy!))
+                      (apply[unyielding]
+                        (field_imm 1 (global CamlinternalLazy!))
                         (opaque *match*/0) never_inline)
                       *match*/0))))
              12)))))
-  (apply (field_imm 1 (global Toploop!)) "lazy_total" lazy_total/0))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "lazy_total"
+    lazy_total/0))
 val lazy_total : unit lazy_t ref * bool t -> int = <fun>
 |}];;
 
@@ -73,14 +75,15 @@ let lazy_needs_partial : _ * bool t ref -> int = function
                   (let (tag/1 =a[value<int>] (caml_obj_tag *match*/2))
                     (if (%int_equal tag/1 250) (field_mut 0 *match*/2)
                       (if (|| (%int_equal tag/1 246) (%int_equal tag/1 244))
-                        (apply (field_imm 1 (global CamlinternalLazy!))
+                        (apply[unyielding]
+                          (field_imm 1 (global CamlinternalLazy!))
                           (opaque *match*/2) never_inline)
                         *match*/2)))
                 *match*/5 =o? (field_mut 0 (field_imm 1 param/1)))
                (if (isint *match*/5) (if *match*/5 12 (exit 3)) (exit 3)))))
         with (3)
          (raise (makeblock 0 (getpredef Match_failure/0!!) [0: "" 1 49])))))
-  (apply (field_imm 1 (global Toploop!)) "lazy_needs_partial"
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "lazy_needs_partial"
     lazy_needs_partial/0))
 val lazy_needs_partial : unit lazy_t * bool t ref -> int = <fun>
 |}];;
@@ -99,7 +102,8 @@ let guard_total : bool t ref -> int = function
          (let (*match*/6 =o? (field_mut 0 param/2))
            (if (isint *match*/6) (if *match*/6 12 0)
              (raise (makeblock 0 (getpredef Match_failure/0!!) [0: "" 1 38])))))))
-  (apply (field_imm 1 (global Toploop!)) "guard_total" guard_total/0))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "guard_total"
+    guard_total/0))
 val guard_total : bool t ref -> int = <fun>
 |}];;
 
@@ -120,7 +124,7 @@ let guard_needs_partial : bool t ref -> int = function
              (if (isint *match*/7) 12
                (raise
                  (makeblock 0 (getpredef Match_failure/0!!) [0: "" 1 46]))))))))
-  (apply (field_imm 1 (global Toploop!)) "guard_needs_partial"
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "guard_needs_partial"
     guard_needs_partial/0))
 val guard_needs_partial : bool t ref -> int = <fun>
 |}];;

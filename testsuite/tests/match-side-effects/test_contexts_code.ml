@@ -58,7 +58,7 @@ let example_1 () =
                            [0: "contexts_1.ml" 17 2])))))
                 case tag 1: [1: 2]))
              [1: 1])))))
-  (apply (field_imm 1 (global Toploop!)) "example_1" example_1/0))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "example_1" example_1/0))
 val example_1 : unit -> (bool, int) Result.t = <fun>
 |}]
 
@@ -118,7 +118,7 @@ let example_2 () =
                            [0: "contexts_2.ml" 11 2])))))
                 case tag 1: [1: 2]))
              [1: 1])))))
-  (apply (field_imm 1 (global Toploop!)) "example_2" example_2/0))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "example_2" example_2/0))
 val example_2 : unit -> (bool, int) Result.t = <fun>
 |}]
 
@@ -166,6 +166,6 @@ let example_3 () =
                    (field_imm 0 (field_imm 1 *match*/4))))
               case tag 1: [1: 2])
              [1: 1])))))
-  (apply (field_imm 1 (global Toploop!)) "example_3" example_3/0))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "example_3" example_3/0))
 val example_3 : unit -> (bool, int) Result.t = <fun>
 |}]
