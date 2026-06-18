@@ -100,6 +100,7 @@ module type Core_options = sig
   val _dlambda : unit -> unit
   val _dblambda : unit -> unit
   val _dletreclambda : unit -> unit
+  val _dvariable_availability : unit -> unit
 
 end
 

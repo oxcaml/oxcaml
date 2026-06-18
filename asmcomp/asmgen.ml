@@ -684,7 +684,9 @@ let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
             then None
             else Some (Cmm.global_symbol (Primitive.native_name prim)))
           !Translmod.primitive_declarations));
-  emit_end_assembly ~sourcefile ()
+  emit_end_assembly ~sourcefile ();
+  if !Clflags.dump_variable_availability
+  then Type_shape.Variable_availability.print_report ppf_dump
 
 type direct_to_cmm =
   ppf_dump:Format.formatter ->

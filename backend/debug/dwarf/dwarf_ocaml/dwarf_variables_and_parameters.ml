@@ -265,8 +265,26 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
       ~attribute_values:(type_and_name_attributes @ location_attribute_value)
       ()
 
+module VA = Type_shape.Variable_availability
+
+let observed_id_of_provenance p : VA.observed_id =
+  match V.Provenance.debug_uid p with
+  | Uid u -> Source_uid u
+  | Proj { uid; unboxed_field } ->
+    Projected_source_uid { source_uid = uid; field = unboxed_field }
+
+let record_va_observations_for_range range =
+  if !Clflags.dump_variable_availability
+  then
+    match ARV.Range_info.provenance (ARV.Range.info range) with
+    | None -> ()
+    | Some p ->
+      let id = observed_id_of_provenance p in
+      VA.record_observation ~checkpoint:Debug_info id
+
 let iterate_over_variable_like_things state ~available_ranges_vars ~f =
   ARV.iter available_ranges_vars ~f:(fun var range ->
+      record_va_observations_for_range range;
       let ident_for_type = Some (Compilation_unit.get_current_exn (), var) in
       f var ~ident_for_type ~range)
 

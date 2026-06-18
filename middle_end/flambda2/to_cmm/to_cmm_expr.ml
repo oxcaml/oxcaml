@@ -887,7 +887,19 @@ and let_expr env res let_expr =
       | Normal ->
         let_expr0 env res let_expr bound_pattern
           ~num_normal_occurrences_of_bound_vars ~body
-      | Phantom -> expr env res body
+      | Phantom ->
+        if Type_shape.Variable_availability.is_enabled ()
+        then
+          Bound_pattern.fold_all_bound_vars bound_pattern ~init:()
+            ~f:(fun () bv ->
+              let source_uid =
+                match Bound_var.debug_uid bv with
+                | Uid u -> u
+                | Proj { uid; _ } -> uid
+              in
+              Type_shape.Variable_availability.register_gap ~uid:source_uid
+                ~cause:Phantom_let_dropped_in_to_cmm);
+        expr env res body
       | In_types ->
         Misc.fatal_errorf "Cannot bind In_types variables in terms:@ %a"
           Let.print let_expr)

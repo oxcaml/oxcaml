@@ -1,0 +1,30 @@
+(include_subdirs unqualified)
+
+(library
+ (name flambda2_debug)
+ (wrapped true)
+ (instrumentation
+  (backend bisect_ppx))
+ (flags
+  (:standard
+   -open
+   Flambda2_bound_identifiers
+   -open
+   Flambda2_cmx
+   -open
+   Flambda2_identifiers
+   -open
+   Flambda2_terms))
+ (ocamlopt_flags
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)
+   -O3
+   -open
+   Int_replace_polymorphic_compare))
+ (libraries
+  ocamlcommon
+  ocamloptcomp
+  flambda2_bound_identifiers
+  flambda2_cmx
+  flambda2_identifiers
+  flambda2_terms))

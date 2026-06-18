@@ -1149,6 +1149,39 @@ let add_to_type_shapes var_uid type_expr type_layout ~name:type_name uid_of_path
   let type_shape = Type_shape.of_type_expr type_expr uid_of_path in
   Uid.Tbl.add all_type_shapes var_uid { type_shape; type_name; type_layout }
 
+module Variable_availability =
+  Variable_availability.Make
+    (struct
+      type t = Shape.Uid.t
+
+      let equal = Shape.Uid.equal
+
+      let hash = Hashtbl.hash
+
+      let print = Shape.Uid.print
+
+      let no_uid = Shape.Uid.internal_not_actually_unique
+    end)
+    (struct
+      type t = Location.t
+
+      let print_compact ppf (loc : Location.t) =
+        let s = loc.loc_start and e = loc.loc_end in
+        if s.pos_cnum < 0
+        then Format.fprintf ppf "%d" s.pos_lnum
+        else
+          let col p = p.Lexing.pos_cnum - p.Lexing.pos_bol in
+          if s.pos_lnum = e.pos_lnum
+          then Format.fprintf ppf "%d:%d-%d" s.pos_lnum (col s) (col e)
+          else
+            Format.fprintf ppf "%d-%d:%d-%d" s.pos_lnum e.pos_lnum (col s)
+              (col e)
+
+      let print_with_file ppf (loc : Location.t) =
+        Format.fprintf ppf "%s:%a" loc.loc_start.Lexing.pos_fname print_compact
+          loc
+    end)
+
 let print_table_all_type_decls ppf =
   let entries = Uid.Tbl.to_list all_type_decls in
   let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in

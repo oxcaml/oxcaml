@@ -190,6 +190,8 @@ end
 
 val make_stack_offset : int -> Cfg.basic
 
+val record_cmm_observation_for_var : Backend_var.With_provenance.t -> unit
+
 val make_name_for_debugger :
   ident:Ident.t ->
   which_parameter:int option ->

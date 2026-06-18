@@ -663,14 +663,20 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
       end
   | Llet(Alias, kind, v, duid, l1, l2) ->
       begin match count_var v with
-        0 -> simplif l2
+        0 ->
+          Type_shape.Variable_availability.register_ok_drop
+            ~uid:duid ~reason:Ignored_variable;
+          simplif l2
       | 1 when optimize_except_alias_bindings ->
           Hashtbl.add subst v (simplif l1); simplif l2
       | _ -> Llet(Alias, kind, v, duid, simplif l1, simplif l2)
       end
   | Llet(StrictOpt, kind, v, duid, l1, l2) ->
       begin match count_var v with
-        0 -> simplif l2
+        0 ->
+          Type_shape.Variable_availability.register_ok_drop
+            ~uid:duid ~reason:Ignored_variable;
+          simplif l2
       | _ -> mklet StrictOpt kind v duid (simplif l1) (simplif l2)
       end
   | Llet(str, kind, v, duid, l1, l2) ->
@@ -1122,7 +1128,9 @@ let simplify_local_functions lam =
   let rec rewrite lam0 =
     let lam =
       match lam0 with
-      | Llet (_, _, id, _duid, _, cont) when Hashtbl.mem static_id id ->
+      | Llet (_, _, id, duid, _, cont) when Hashtbl.mem static_id id ->
+          Type_shape.Variable_availability.register_ok_drop
+            ~uid:duid ~reason:Function_became_catch;
           rewrite cont
       | Lapply {ap_func = Lvar id; ap_args; _} when Hashtbl.mem static_id id ->
          let st = Hashtbl.find static_id id in

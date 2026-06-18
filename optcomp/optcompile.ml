@@ -54,6 +54,28 @@ module type S = sig
     ppf_dump:Format.formatter -> Env.t -> string list -> string -> unit
 end
 
+(* Register [Compiler_hooks] callbacks for the [Variable_availability]
+   diagnostic. The caller is expected to gate this on
+   [Clflags.dump_variable_availability] so that no hooks are installed when the
+   diagnostic is off. Only the Typedtree- and Lambda-level checkpoints are
+   registered here. The Flambda 2 checkpoints are recorded by direct
+   [Debug_variable_availability.observe] calls inside
+   [Flambda2.flambda_to_flambda0], because [ocamloptcomp] cannot reference the
+   Flambda 2 lib directly. *)
+let register_debug_variable_availability_hooks_without_flambda2 () =
+  let module CH = Compiler_hooks in
+  CH.register CH.Typed_tree_impl (fun impl ->
+      let unit_name =
+        Compilation_unit.full_path_as_string
+          (Compilation_unit.get_current_exn ())
+      in
+      Type_shape.Variable_availability.reset ();
+      Debug_variable_availability.collect_from_typedtree ~unit_name impl);
+  CH.register CH.Raw_lambda
+    (Debug_variable_availability.observe_lambda_program ~checkpoint:Raw_lambda);
+  CH.register CH.Lambda
+    (Debug_variable_availability.observe_lambda_program ~checkpoint:Lambda)
+
 module Make (Backend : Optcomp_intf.Backend) : S = struct
   let tool_name = "ocamlopt"
 
