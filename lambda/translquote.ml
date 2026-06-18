@@ -361,6 +361,7 @@ let apply modname field loc args =
        { ap_func = Lazy.force comb;
          ap_args = args;
          ap_probe = None;
+         ap_yielding = May_yield;
          ap_loc = loc;
          ap_result_layout =
            Pvalue { raw_kind = Pgenval; nullable = Non_nullable };

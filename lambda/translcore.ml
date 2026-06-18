@@ -1133,6 +1133,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                     ap_args = [self];
                     ap_result_layout = layout;
                     ap_mode = mode;
+                    ap_yielding = May_yield;
                     ap_region_close = pos;
                     ap_probe = None;
                     ap_tailcall = Default_tailcall;
@@ -1152,6 +1153,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         ap_result_layout=layout;
         ap_region_close=pos;
         ap_mode=alloc_heap;
+        ap_yielding=May_yield;
         ap_tailcall=Default_tailcall;
         ap_inlined=Default_inlined;
         ap_specialised=Default_specialise;
@@ -1185,6 +1187,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
              ap_result_layout=Lambda.layout_object;
              ap_region_close=Rc_normal;
              ap_mode=alloc_heap;
+             ap_yielding=May_yield;
              ap_tailcall=Default_tailcall;
              ap_inlined=Default_inlined;
              ap_specialised=Default_specialise;
@@ -1434,6 +1437,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           ap_result_layout = return_layout;
           ap_region_close = Rc_normal;
           ap_mode = alloc_local;
+          ap_yielding = May_yield;
           ap_loc;
           ap_tailcall = Default_tailcall;
           ap_inlined = Never_inlined;
@@ -1625,6 +1629,7 @@ and transl_apply ~scopes
           ap_result_layout=result_layout;
           ap_region_close=pos;
           ap_mode=mode;
+          ap_yielding=May_yield;
           ap_tailcall=tailcall;
           ap_inlined=inlined;
           ap_specialised=specialised;
@@ -2949,6 +2954,7 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
                ap_result_layout = result_layout;
                ap_region_close=Rc_normal;
                ap_mode=alloc_heap;
+               ap_yielding=May_yield;
                ap_tailcall = Default_tailcall;
                ap_inlined = Default_inlined;
                ap_specialised = Default_specialise;
@@ -3007,6 +3013,7 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
         let_.bop_op_type;
     ap_region_close=Rc_normal;
     ap_mode=alloc_heap;
+    ap_yielding=May_yield;
     ap_tailcall = Default_tailcall;
     ap_inlined = Default_inlined;
     ap_specialised = Default_specialise;
