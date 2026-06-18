@@ -50,7 +50,7 @@ let zero = { value = 0; flat = 0 }
 let add { value; flat } { value = value'; flat = flat' } =
   { value = value + value'; flat = flat + flat' }
 
-let rec count (el : _ Lambda.mixed_block_element) : t =
+let rec count (el : _ Lambda.block_element) : t =
   match el with
   | Value _ -> { value = 8; flat = 0 }
   | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
@@ -103,7 +103,7 @@ module Wrt_path = struct
   let add { here; left; right } { here = here'; left = left'; right = right' } =
     { here = add here here'; left = add left left'; right = add right right' }
 
-  let rec count_wrt_path (el : _ Lambda.mixed_block_element) path =
+  let rec count_wrt_path (el : _ Lambda.block_element) path =
     match path with
     | [] -> { zero with here = count el }
     | i :: path_rest -> (
@@ -116,7 +116,7 @@ module Wrt_path = struct
         Misc.fatal_error
           "Mixed_product_bytes_wrt_path: layout poly not supported")
 
-  and count_shape_wrt_path (shape : Lambda.mixed_block_shape) pos path =
+  and count_shape_wrt_path (shape : Lambda.block_shape) pos path =
     let _, totals =
       Array.fold_left
         (fun (i, totals) el ->

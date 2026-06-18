@@ -1057,7 +1057,7 @@ let mkexp exp_desc exp_type exp_loc exp_env =
 let type_option_none env ty loc =
   let lid = Longident.Lident "None" in
   let cnone = Env.find_ident_constructor Predef.ident_none env in
-  let repres = Types.Constructor_uniform_value in
+  let repres = [||] in
   mkexp (Texp_construct (mknoloc lid, cnone, repres, [], None)) ty loc env
 
 let extract_option_type env ty =
@@ -2797,8 +2797,8 @@ module Label = NameChoice (struct
     Env.lookup_all_labels_from_type ~record_form:Legacy ~loc usage path env
   let in_env lbl =
     match lbl.lbl_repres with
-    | Record_boxed | Record_float | Record_ufloat | Record_unboxed
-    | Record_mixed _ | Record_dummy _ | Record_variable -> true
+    | Record_boxed _ | Record_float | Record_ufloat | Record_unboxed
+    | Record_dummy _ | Record_variable -> true
     | Record_inlined _ -> false
 end)
 
@@ -6563,7 +6563,7 @@ and type_expect_
           | Record_unboxed
           | Record_inlined (_, _, (Variant_unboxed | Variant_with_null))
             -> false
-          | Record_boxed | Record_float | Record_ufloat | Record_mixed _
+          | Record_boxed _ | Record_float | Record_ufloat
           | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
           | Record_variable
             -> true
@@ -7433,8 +7433,8 @@ and type_expect_
         let is_float_boxing =
           match record_repres with
           | Record_float -> true
-          | Record_mixed mixed -> begin
-            match mixed.(label.lbl_pos) with
+          | Record_boxed shape -> begin
+            match shape.(label.lbl_pos) with
             | Float_boxed -> true
             | Float64 | Float32 | Scannable _ | Bits8 | Bits16 | Bits32 | Bits64
             | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate | Void
@@ -8700,8 +8700,8 @@ and type_block_access env expected_base_ty principal
       raise (Error (lid.loc, env, Block_access_bad_record reason))
     in
     (match label.lbl_repres with
-     | Record_boxed | Record_variable -> ()
-     | Record_mixed shape ->
+     | Record_variable -> ()
+     | Record_boxed shape ->
        if Array.exists (function Float_boxed -> true | _ -> false) shape then
          bad_record_error "[@@flatten_floats]"
        else
@@ -9814,7 +9814,7 @@ and type_option_some env expected_mode sarg ty ty0 =
   let lid = Longident.Lident "Some" in
   let csome = Env.find_ident_constructor Predef.ident_some env in
   let sort = Jkind.Sort.scannable in
-  let repres = Types.Constructor_uniform_value in
+  let repres = [| Scannable Jkind_types.Scannable_axes.max |] in
   mkexp (Texp_construct(mknoloc lid , csome, repres, [sort, arg],
                         Some alloc_mode))
     (type_option arg.exp_type) arg.exp_loc arg.exp_env
@@ -10475,7 +10475,7 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
           let dummy_repres =
             (* This shouldn't be used anywhere, so make it highly unlikely to be
                accidentally correct *)
-            Types.Constructor_mixed [| Float32 |]
+            [| Float32 |]
           in
           let texp =
             re {

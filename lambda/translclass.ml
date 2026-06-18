@@ -262,14 +262,16 @@ let lsequence l1 l2 =
   if l2 = lambda_unit then l1 else Lsequence(l1, l2)
 
 let lfield v i =
-  Lprim(Pfield (i, Pointer, Reads_vary), [Lvar v], Loc_unknown)
+  Lprim(Pfield ([i], All_value Pointer, Reads_vary), [Lvar v], Loc_unknown)
 
 let transl_label l = share (Const_immstring l)
 
 let transl_meth_list lst =
   if lst = [] then Lconst const_unit else
-  share (Const_block
-            (0, List.map (fun lab -> Const_immstring lab) lst))
+  let fields = List.map (fun lab -> Const_immstring lab) lst in
+  share (Const_block (0,
+                      block_shape_of_generic_values (List.length fields),
+                      fields))
 
 let set_inst_var ~scopes obj id expr =
   let ptr_or_imm, _ = Typeopt.maybe_pointer expr in
@@ -392,7 +394,8 @@ let rec build_object_init ~scopes cl_table obj params inh_init obj_init cl =
       let env =
         match envs with None -> []
         | Some envs ->
-            [Lprim(Pfield (List.length inh_init + 1, Pointer, Reads_vary),
+            let i = List.length inh_init + 1 in
+            [Lprim(Pfield ([i], All_value Pointer, Reads_vary),
                    [Lvar envs],
                    Loc_unknown)]
       in
@@ -565,7 +568,9 @@ let output_methods tbl methods lam =
       lsequence (mkappl(oo_prim "set_method", [Lvar tbl; lab; code], layout_unit)) lam
   | _ ->
       let methods =
-        Lprim (Pmakeblock (0, Immutable, All_value, alloc_heap),
+        Lprim (Pmakeblock (0, Immutable,
+                           block_shape_of_generic_values (List.length methods),
+                           alloc_heap),
                methods, Loc_unknown)
       in
       lsequence (mkappl(oo_prim "set_methods",
@@ -586,7 +591,7 @@ let rec index a = function
 
 let bind_id_as_val (id, _) = ("", id)
 
-let class_field i = Pfield (i, Pointer, Reads_vary)
+let class_field i = Pfield ([i], All_value Pointer, Reads_vary)
 
 (** Build the class initialisation code.
     Parameters:
@@ -923,7 +928,8 @@ let transl_class_rebind ~scopes cl vf =
             [lparam obj_init obj_init_duid layout_function] obj_init',
     Llet(
     Alias, layout_block, cla, cla_duid, path_lam,
-    Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
+    Lprim(Pmakeblock
+            (0, Immutable, block_shape_of_generic_values 3, alloc_heap),
           [mkappl(Lvar new_init, [lfield cla 0], layout_function);
            lfunction layout_function [lparam table table_duid layout_table]
              (Llet(Strict, layout_function, env_init, env_init_duid,
@@ -954,7 +960,7 @@ let rec builtin_meths self env env2 body =
     | p when const_path p -> "const", [p]
     | Lprim(Parrayrefu _, [Lvar s; Lvar n], _) when List.mem s self ->
         "var", [Lvar n]
-    | Lprim(Pfield(n, _, _), [Lvar e], _) when Ident.same e env ->
+    | Lprim(Pfield([n], _, _), [Lvar e], _) when Ident.same e env ->
         "env", [Lvar env2; (tagged_immediate n)]
     | Lsend(Self, met, Lvar s, [], _, _, _, _) when List.mem s self ->
         "meth", [met]
@@ -1259,7 +1265,8 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
       mkappl (Lvar class_init, [Lvar table], layout_function),
       Lsequence(
       mkappl (oo_prim "init_class", [Lvar table], layout_unit),
-      Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
+      Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 3,
+                       alloc_heap),
             [mkappl (Lvar env_init, [lambda_unit], layout_obj);
              Lvar class_init; lambda_unit],
             Loc_unknown)))),
@@ -1267,7 +1274,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
   and lbody_virt lenvs =
     (* Virtual classes only need to provide the [class_init] and [env]
        fields. [obj_init] is filled with a dummy [lambda_unit] value. *)
-    Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
+    Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 3, alloc_heap),
           [lambda_unit; Lambda.lfunction
                           ~kind:(Curried {nlocal=0})
                           ~attr:default_function_attribute
@@ -1297,11 +1304,17 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
   let lenv =
     let menv =
       if !new_ids_meths = [] then lambda_unit else
-      Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
+      Lprim(Pmakeblock(0, Immutable,
+                       block_shape_of_generic_values
+                         (List.length !new_ids_meths),
+                       alloc_heap),
             List.map (fun id -> Lvar id) !new_ids_meths,
             Loc_unknown) in
     if !new_ids_init = [] then menv else
-    Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
+    Lprim(Pmakeblock(0, Immutable,
+                     block_shape_of_generic_values
+                       (1 + List.length !new_ids_init),
+                     alloc_heap),
           menv :: List.map (fun id -> Lvar id) !new_ids_init,
           Loc_unknown)
   and linh_envs =
@@ -1313,7 +1326,10 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
   let make_envs (lam, rkind) =
     Llet(StrictOpt, layout_block, envs, envs_duid,
          (if linh_envs = [] then lenv else
-         Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
+         Lprim(Pmakeblock(0, Immutable,
+                          block_shape_of_generic_values
+                            (1 + List.length linh_envs),
+                          alloc_heap),
                lenv :: linh_envs, Loc_unknown)),
          lam),
     rkind
@@ -1344,7 +1360,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
                    ~ret_mode:alloc_heap
                    ~body:(def_ids cla cl_init), lam)
   and lset cached i lam =
-    Lprim(Psetfield(i, Pointer, Assignment modify_heap),
+    Lprim(Psetfield([i], All_value Pointer, Assignment modify_heap),
           [Lvar cached; lam], Loc_unknown)
   in
   let ldirect () =
@@ -1399,7 +1415,8 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
   if ids = []
   then mkappl (lfield cached 0, [lenvs], layout_obj), Dynamic
   else
-    Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
+    Lprim(Pmakeblock(0, Immutable, block_shape_of_generic_values 3,
+                     alloc_heap),
         (if concrete then
           [mkappl (lfield cached 0, [lenvs], layout_obj);
            lfield cached 1;

@@ -964,8 +964,7 @@ end
 
 let fake_sort_const : Jkind.Sort.Const.t = Base Bits16
 
-let fake_cstr_repr : constructor_representation =
-  Constructor_mixed [| Float32 |]
+let fake_cstr_repr : mixed_product_shape = [| Float32 |]
 
 let fake_record_repr : record_representation =
   Record_dummy { represent_as_float_array = false; flatten_floats = false }

@@ -59,7 +59,7 @@ module Simple = struct
     | `Tuple of (string option * pattern) list
     | `Unboxed_tuple of (string option * pattern * Jkind.sort) list
     | `Construct of
-        Longident.t loc * constructor_description * constructor_representation
+        Longident.t loc * constructor_description * mixed_product_shape
         * (Jkind.sort * pattern) list
     | `Variant of label * pattern option * row_desc ref
     | `Record of
@@ -178,7 +178,7 @@ module Head : sig
   type desc =
     | Any
     | Construct of
-        constructor_description * constructor_representation * Jkind.sort list
+        constructor_description * mixed_product_shape * Jkind.sort list
     | Constant of constant
     | Unboxed_unit
     | Unboxed_bool of bool
@@ -211,7 +211,7 @@ end = struct
   type desc =
     | Any
     | Construct of
-        constructor_description * constructor_representation * Jkind.sort list
+        constructor_description * mixed_product_shape * Jkind.sort list
     | Constant of constant
     | Unboxed_unit
     | Unboxed_bool of bool

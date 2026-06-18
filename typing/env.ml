@@ -5338,8 +5338,8 @@ let report_lookup_error_doc loc env = function
         | Type_record (_, (Record_float | Record_ufloat), _) ->
           [Location.msg
             "@{<hint>Hint@}: Float records don't get unboxed versions."]
-        | Type_record (_, Record_mixed _, _) ->
-          (* A [Record_mixed] only lacks an unboxed version when its shape
+        | Type_record (_, Record_boxed _, _) ->
+          (* A [Record_boxed] only lacks an unboxed version when its shape
              contains a [Float_boxed] element, which only happens via
              [@@flatten_floats]. *)
           [Location.msg

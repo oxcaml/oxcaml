@@ -152,7 +152,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
      (function {nlocal = 0} r/0 : int
        (region
          (let
-           (*match*/5 =[value<(consts (0)) (non_consts ([0: ?]))>]
+           (*match*/5 =[value<(consts (0)) (non_consts ([0: (?)]))>]
               (makelocalblock 0 (*) r/0))
            (catch
              (if *match*/5
@@ -191,8 +191,9 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
   (test/0 =
      (function {nlocal = 0}
-       param/0[value<(consts (0)) (non_consts ([0: ?]))>] : int
-       (if param/0 (field_imm 0 (field_imm 0 param/0)) 0)))
+       param/0[value<(consts (0)) (non_consts ([0: (?)]))>] : int
+       (if param/0 (field_imm 0 (value_or_null<int>) (field_imm 0 param/0))
+         0)))
   (apply (field_imm 1 (global Toploop!)) "test" test/0))
 val test : int t option -> int = <fun>
 |}]
@@ -214,7 +215,8 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
   (test/1 =
      (function {nlocal = 0} param/1 : int
        (let (*match*/8 =o? (field_mut 0 param/1))
-         (if *match*/8 (field_imm 0 (field_imm 0 *match*/8)) 0))))
+         (if *match*/8
+           (field_imm 0 (value_or_null<int>) (field_imm 0 *match*/8)) 0))))
   (apply (field_imm 1 (global Toploop!)) "test" test/1))
 val test : int t option ref -> int = <fun>
 |}]
@@ -240,26 +242,32 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
      (function {nlocal = 0} n/0? : int
        (region
          (let
-           (*match*/9 =[value<(consts (0)) (non_consts ([0: ?]))>]
+           (*match*/9 =[value<(consts (0)) (non_consts ([0: (?)]))>]
               (makelocalblock 0 (value<
                                   (consts ())
-                                   (non_consts ([0: *,
-                                                 value<
-                                                  (consts ())
-                                                   (non_consts ([1:
-                                                                 value<int>]
-                                                   [0: value<int>]))>]))>)
+                                   (non_consts ([0:
+                                                 (*,value<
+                                                     (consts ())
+                                                      (non_consts ([1:
+                                                                    (
+                                                                    value<
+                                                                    int>)]
+                                                      [0: (value<int>)]))>)]))>)
                 (makelocalblock 0 (*,value<
                                       (consts ())
-                                       (non_consts ([1: value<int>]
-                                       [0: value<int>]))>)
-                  (makelocalmutable 0 (value<int>) 1) [0: 42])))
+                                       (non_consts ([1: (value<int>)]
+                                       [0: (value<int>)]))>)
+                  (makelocalmutable 0 (value<int>) 1)
+                  [0: (shape (value<int>)) 42])))
            (if *match*/9
              (let
                (*match*/10 =a? (field_imm 0 *match*/9)
                 *match*/11 =o? (field_mut 0 (field_imm 0 *match*/10)))
-               (if *match*/11 (field_imm 0 (field_imm 1 *match*/10))
-                 (%int_neg (field_imm 0 (field_imm 1 *match*/10)))))
+               (if *match*/11
+                 (field_imm 0 (value_or_null<int>) (field_imm 1 *match*/10))
+                 (%int_neg
+                   (field_imm 0 (value_or_null<int>)
+                     (field_imm 1 *match*/10)))))
              3)))))
   (apply (field_imm 1 (global Toploop!)) "test" test/2))
 val test : 'a -> int = <fun>
@@ -301,7 +309,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
      (function {nlocal = 0} r/1 : int
        (region
          (let
-           (*match*/12 =[value<(consts (0)) (non_consts ([0: ?]))>]
+           (*match*/12 =[value<(consts (0)) (non_consts ([0: (?)]))>]
               (makelocalblock 0 (*) r/1))
            (catch
              (if *match*/12
@@ -309,7 +317,14 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
                  (if (field_imm 1 *match*/13) (exit 21) 0))
                (exit 21))
             with (21)
-             (if (seq (setfield_ptr 0 r/1 [0: 0 0]) 0) 1
+             (if
+               (seq
+                 (setfield_ptr 0 r/1
+                   [0: (shape
+                    (value<int>,value<(consts (0)) (non_consts ([0: (?)]))>))
+                    0 0])
+                 0)
+               1
                (if *match*/12
                  (let
                    (*match*/14 =o? (field_mut 0 (field_imm 0 *match*/12))
@@ -348,7 +363,7 @@ type _ t = Bool : bool t | Int : int t | Char : char t
 (let
   (test/3 =
      (function {nlocal = 0}
-       param/2[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+       param/2[value<(consts ()) (non_consts ([0: (value<int>,value<int>)]))>]
        : int
        (catch
          (if (%int_greaterequal (field_imm 0 param/2) 2) (exit 24)
@@ -380,9 +395,10 @@ type t = A | B | C of nothing
      (function {nlocal = 0}
        param/3[value<
                 (consts ())
-                 (non_consts ([0: value<int>,
-                               value<
-                                (consts (1 0)) (non_consts ([0: value<int>]))>]))>]
+                 (non_consts ([0:
+                               (value<int>,value<
+                                            (consts (1 0))
+                                             (non_consts ([0: (value<int>)]))>)]))>]
        : int
        (catch
          (if (field_imm 0 param/3)
@@ -428,17 +444,20 @@ type t = A of int | B of string | C of string | D of string
   (compare/0 =
      (function {nlocal = 0}
        t1/0[value<
-             (consts ()) (non_consts ([3: *] [2: *] [1: *] [0: value<int>]))>]
+             (consts ()) (non_consts ([3: (*)] [2: (*)] [1: (*)]
+              [0: (value<int>)]))>]
        t2/0[value<
-             (consts ()) (non_consts ([3: *] [2: *] [1: *] [0: value<int>]))>]
+             (consts ()) (non_consts ([3: (*)] [2: (*)] [1: (*)]
+              [0: (value<int>)]))>]
        : int
        (catch
          (switch* t1/0
           case tag 0:
            (switch t2/0
             case tag 0:
-             (apply (field_imm 8 (global Stdlib__Int!)) (field_imm 0 t1/0)
-               (field_imm 0 t2/0))
+             (apply (field_imm 8 (global Stdlib__Int!))
+               (field_imm 0 (value_or_null<int>) t1/0)
+               (field_imm 0 (value_or_null<int>) t2/0))
             default: -1)
           case tag 1:
            (catch
@@ -518,17 +537,17 @@ let check_results r1 r2 =
 (let
   (check_results/0 =
      (function {nlocal = 0} r1/0 r2/0?
-       : (consts ()) (non_consts ([1: ?] [0: ?]))
+       : (consts ()) (non_consts ([1: (?)] [0: (?)]))
        (let
          (*match*/16 =[value<
                         (consts ())
                          (non_consts ([0:
-                                       value<
-                                        (consts ()) (non_consts ([1: ?]
-                                         [0: ?]))>,
-                                       value<
-                                        (consts ()) (non_consts ([1: ?]
-                                         [0: ?]))>]))>]
+                                       (value<
+                                         (consts ()) (non_consts ([1: (?)]
+                                          [0: (?)]))>,value<
+                                                       (consts ())
+                                                        (non_consts (
+                                                        [1: (?)] [0: (?)]))>)]))>]
             (apply r1/0 r2/0))
          (catch
            (catch
@@ -553,9 +572,10 @@ let check_results r1 r2 =
                         case tag 1: (exit 51 r/2)))
                     with (53) (exit 51 (field_imm 1 *match*/16))))
                 with (52) (exit 50 (field_imm 1 *match*/16))))
-            with (50 r/3[value<(consts ()) (non_consts ([1: ?] [0: ?]))>])
+            with (50 r/3[value<(consts ()) (non_consts ([1: (?)] [0: (?)]))>])
              r/3)
-          with (51 r/4[value<(consts ()) (non_consts ([1: ?] [0: ?]))>]) r/4))))
+          with (51 r/4[value<(consts ()) (non_consts ([1: (?)] [0: (?)]))>])
+           r/4))))
   (apply (field_imm 1 (global Toploop!)) "check_results" check_results/0))
 val check_results :
   ('a -> ('b, [< `A | `B ]) result * ('b, [< `A | `B ]) result) ->

@@ -1124,7 +1124,9 @@ let transl_declaration env sdecl (id, uid) =
                      | Cstr_record _ -> [| Jkind.Sort.Const.scannable |]
                    in
                    Cstr_layout_known
-                     { shape = Constructor_uniform_value; sorts })
+                     { shape =
+                        Array.map Types.mixed_block_element_of_const_sort sorts;
+                       sorts })
                 (Array.of_list cstrs)
             ),
           Jkind.for_non_float ~why:Boxed_variant
@@ -1307,8 +1309,8 @@ let shape_has_float_boxed shape =
     shape
 
 let record_has_float_boxed = function
-  | Record_mixed shape -> shape_has_float_boxed shape
-  | Record_unboxed | Record_inlined _ | Record_boxed
+  | Record_boxed shape -> shape_has_float_boxed shape
+  | Record_unboxed | Record_inlined _
   | Record_float | Record_ufloat -> false
   | Record_dummy _ ->
     fatal_error "record_has_float_boxed: unexpected dummy representation"
@@ -1324,10 +1326,10 @@ let record_gets_unboxed_version lbls repr =
   not (record_has_atomic_field lbls) &&
   match repr with
   | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
-  | Record_boxed | Record_variable -> true
+  | Record_boxed shape -> not (shape_has_float_boxed shape)
+  | Record_variable -> true
   | Record_dummy { represent_as_float_array; flatten_floats } ->
     not represent_as_float_array && not flatten_floats
-  | Record_mixed shape -> not (shape_has_float_boxed shape)
 
 let gets_unboxed_version decl =
   (* This must be kept in sync with the match in [derive_unboxed_version] *)
@@ -1971,24 +1973,18 @@ module Element_repr = struct
       Option.bind layout layout_to_t
 
   let mixed_product_shape_known loc ts kind =
-    let mixed =
-      List.exists
-        (function ((Unboxed_element _ | Void), _) -> true | _ -> false) ts
+    let shape =
+      List.map (fun (t,_) -> to_shape_element t) ts |> Array.of_list
     in
-    if not mixed then `Not_mixed else begin
-      let shape =
-        List.map (fun (t,_) -> to_shape_element t) ts |> Array.of_list
-      in
-      (* All-value/void shapes will compile to uniform blocks, so the
-         scannable prefix length limit doesn't apply. *)
-      let mpb = Mixed_product_bytes.count_types_shape shape in
-      if not (Mixed_product_bytes.all_value mpb)
-      then
-        assert_mixed_product_support loc kind
-          ~value_prefix_len:
-            (Mixed_product_bytes.value_prefix_len mpb);
-      `Mixed shape
-    end
+    (* All-value/void shapes will compile to uniform blocks, so the
+        scannable prefix length limit doesn't apply. *)
+    let mpb = Mixed_product_bytes.count_types_shape shape in
+    if not (Mixed_product_bytes.all_value mpb)
+    then
+      assert_mixed_product_support loc kind
+        ~value_prefix_len:
+          (Mixed_product_bytes.value_prefix_len mpb);
+    shape
 
   type unrepresentable_element =
     Unrepresentable_element of int
@@ -2041,7 +2037,7 @@ let update_constructor_representation
     env (cd_args : Types.constructor_arguments) arg_jkinds ~loc
     ~is_extension_constructor
   =
-  let flat_suffix =
+  let shape =
     match cd_args with
     | Cstr_tuple arg_types_and_modes ->
         let arg_reprs =
@@ -2066,16 +2062,17 @@ let update_constructor_representation
              let bad_field = List.nth fields i in
              Unrepresentable_argument_field (Ident.name bad_field.ld_id))
   in
-  match flat_suffix with
+  match shape with
   | Error e -> Result.Error e
-  | Ok `Not_mixed -> Ok Constructor_uniform_value
-  | Ok (`Mixed shape) ->
+  | Ok shape ->
       (* CR layouts v5.9: Enable extension constructors in the flambda2
          middle-end so that we can permit them in the source language.
       *)
-      if is_extension_constructor then
+      if is_extension_constructor &&
+        not (Types.mixed_product_shape_is_flat_all_value shape)
+      then
         raise (Error (loc, Illegal_mixed_product Extension_constructor));
-      Ok (Constructor_mixed shape)
+      Ok shape
 
 type unrepresentable_record =
   | Unrepresentable_field of string
@@ -2097,10 +2094,10 @@ let compute_record_repr
     in
     let shape =
       match shape with
-      | Ok (`Mixed x) -> x
-      | Ok `Not_mixed | Error _ -> Misc.fatal_error "expected mixed block"
+      | Ok x -> x
+      | Error _ -> Misc.fatal_error "expected mixed block"
     in
-    Ok (Record_mixed shape)
+    Ok (Record_boxed shape)
   in
   (* Important: If [refining_block_with_any] is true, we must use a plain
       value block or mixed block. *)
@@ -2133,7 +2130,7 @@ let compute_record_repr
         |> Array.of_list
       in
       assert_mixed_product_support loc Record ~value_prefix_len:0;
-      Ok (Record_mixed shape)
+      Ok (Record_boxed shape)
     else
       mixed_record ()
   (* Any record with a field of kind [any] can't be represented. *)
@@ -2168,7 +2165,7 @@ let compute_record_repr
       ~voids:false, ..
   | ~refining_block_with_any:true, ~float64s:false,
       ~non_float64_unboxed_fields:false, ~voids:false, .. ->
-    Ok Record_boxed
+    mixed_record ()
   (* All-nonatomic-float and all-nonatomic-float64 records are stored as
       flat float records.
   *)
@@ -2180,7 +2177,7 @@ let compute_record_repr
   | ~atomic_floats:true, ~first_any:None, .. ->
     if warn && floats && not values
     then Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
-    Ok Record_boxed
+    mixed_record ()
   (* Any remaining atomic-bearing shape should have been rejected by
      [check_atomic_fields] above. *)
   | ~atomic_fields:true, .. ->
@@ -2341,7 +2338,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     in
     sorts, rep, jkind
   | Legacy, _,
-    (Record_boxed | Record_inlined _ | Record_float | Record_mixed _
+    (Record_boxed _ | Record_inlined _ | Record_float
           | Record_ufloat | Record_unboxed | Record_variable)
     ->
     (* These are never created by [transl_declaration], so they will only
@@ -2374,7 +2371,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
           ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
       in
       begin match rep with
-      | Ok (Record_boxed | Record_mixed _) -> ()
+      | Ok (Record_boxed _) -> ()
       | Ok _ ->
         Misc.fatal_error "none became something other than mixed"
       | Error _ -> ()

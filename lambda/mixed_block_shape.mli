@@ -55,9 +55,9 @@ end
 
 val print : Format.formatter -> _ t -> unit
 
-val of_mixed_block_elements :
+val of_block_elements :
   print_locality:(Format.formatter -> 'a -> unit) ->
-  'a Lambda.mixed_block_element array ->
+  'a Lambda.block_element array ->
   'a t
 
 val value_prefix : 'a t -> 'a Singleton_mixed_block_element.t array

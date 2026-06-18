@@ -391,7 +391,7 @@ type private_object_mismatch =
   | Types of Errortrace.equality_error
 
 type variant_change =
-  (Types.constructor_declaration * Types.constructor_representation option
+  (Types.constructor_declaration * Types.mixed_product_shape option
      as 'cd,
    'cd, constructor_mismatch)
     Diffing_with_keys.change
@@ -1086,19 +1086,13 @@ module Record_diffing = struct
         | _, Record_ufloat ->
            Some (Record_mismatch (Ufloat_representation Second))
 
-        | Record_mixed m1, Record_mixed m2 ->
+        | Record_boxed m1, Record_boxed m2 ->
             begin match
               find_mismatch_in_mixed_record_representations m1 m2
             with
             | None -> None
             | Some mismatch -> Some (Record_mismatch mismatch)
             end
-        | Record_mixed _, _ ->
-           Some (Record_mismatch (Mixed_representation First))
-        | _, Record_mixed _ ->
-           Some (Record_mismatch (Mixed_representation Second))
-
-        | Record_boxed, Record_boxed -> None
 
         | Record_dummy _, _ | _, Record_dummy _ ->
           Misc.fatal_error
@@ -1162,8 +1156,8 @@ module Variant_diffing = struct
 
   let compare_constructor_shapes
         ~loc:_ _env
-        (shape1 : constructor_representation option)
-        (shape2 : constructor_representation option)
+        (shape1 : mixed_product_shape option)
+        (shape2 : mixed_product_shape option)
       : constructor_mismatch option =
     match shape1, shape2 with
     | None, None -> None
@@ -1223,7 +1217,7 @@ module Variant_diffing = struct
 
   module Defs = struct
     type left =
-      Types.constructor_declaration * constructor_representation option
+      Types.constructor_declaration * mixed_product_shape option
     type right = left
     type diff = constructor_mismatch
     type state = type_expr list * type_expr list

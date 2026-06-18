@@ -932,20 +932,16 @@ and module_representation = Jkind_types.Sort.t array
 
 and record_representation =
   | Record_unboxed
-  | Record_inlined of tag * constructor_representation * variant_representation
+  | Record_inlined of tag * mixed_product_shape * variant_representation
   (* For an inlined record, we record the representation of the variant that
      contains it and the tag/representation of the relevant constructor of that
      variant. *)
-  | Record_boxed
+  | Record_boxed of mixed_product_shape
   | Record_float (* All fields are floats *)
   | Record_ufloat
   (* All fields are [float#]s.  Same runtime representation as [Record_float],
      but operations on these (e.g., projection, update) work with unboxed floats
      rather than boxed floats. *)
-  | Record_mixed of mixed_product_shape
-  (* The record contains a mix of values and unboxed elements. The block
-     is tagged such that polymorphic operations will not work.
-  *)
   | Record_dummy of { represent_as_float_array : bool; flatten_floats : bool }
   (* Note [Record_dummy]:
      We typecheck type declarations before updating their kinds, yet some record
@@ -980,7 +976,7 @@ and variant_representation =
 
 and cstr_layout =
   | Cstr_layout_known of
-      { shape : constructor_representation;
+      { shape : mixed_product_shape;
         sorts : Jkind_types.Sort.Const.t array;
         (* [sorts] has a jkind for each argument of the corresponding
            constructor.
@@ -1000,15 +996,6 @@ and cstr_layout =
      Eventually, it should likely be merged into [Variant_unboxed], with
      [Variant_unboxed] allowing either one ordinary constructor, or one
      ordinary non-null and one [Null] constructor. *)
-
-and constructor_representation =
-  | Constructor_uniform_value
-  (* A constant constructor or a constructor all of whose fields are values.
-     This is named 'uniform_value' to distinguish from the 'Constructor_uniform'
-     of [lambda.mli], which can also represent all-flat-float records.
-  *)
-  | Constructor_mixed of mixed_product_shape
-  (* A constructor that has some non-value fields. *)
 
 and label_declaration =
   {
@@ -1055,7 +1042,7 @@ type extension_constructor =
     ext_type_path: Path.t;
     ext_type_params: type_expr list;
     ext_args: constructor_arguments;
-    ext_shape: constructor_representation;
+    ext_shape: mixed_product_shape;
     ext_constant: bool;
     ext_ret_type: type_expr option;
     ext_private: private_flag;
@@ -1329,6 +1316,8 @@ val mixed_block_element_to_lowercase_string : mixed_block_element -> string
 
 val equal_mixed_product_shape_up_to_scannable_axes :
   mixed_product_shape -> mixed_product_shape -> bool
+
+val mixed_product_shape_is_flat_all_value : mixed_product_shape -> bool
 
 val equal_unsafe_mode_crossing :
   type_equal:(type_expr -> type_expr -> bool) ->
