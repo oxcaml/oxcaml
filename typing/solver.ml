@@ -719,7 +719,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         v.vupper
         |> find_error (fun mu ->
             let r = submode_cmv ~log pp obj a' a'_hint mu in
-            (if Result.is_ok r && VarMap.is_empty v.vlower
+            (if Result.is_ok r
              then
                (* Optimization: update [v.upper] based on [mupper u].*)
                let mu_upper = mupper obj mu in
@@ -785,7 +785,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         v.vlower
         |> find_error (fun mu ->
             let r = submode_mvc ~log pp obj mu a' a'_hint in
-            (if Result.is_ok r && VarMap.is_empty v.vupper
+            (if Result.is_ok r
              then
                (* Optimization: update [v.lower] based on [mlower u].*)
                let mu_lower = mlower obj mu in
