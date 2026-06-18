@@ -1190,7 +1190,9 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
              ap_result_layout=Lambda.layout_object;
              ap_region_close=Rc_normal;
              ap_mode=alloc_heap;
-             ap_yielding=May_yield;
+             (* [copy] shallow-copies the object block; it never runs user
+                code, so it can't yield *)
+             ap_yielding=Unyielding;
              ap_tailcall=Default_tailcall;
              ap_inlined=Default_inlined;
              ap_specialised=Default_specialise;

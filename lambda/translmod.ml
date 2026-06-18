@@ -462,7 +462,9 @@ let eval_rec_bindings bindings cont =
              ap_args=[loc; shape];
              ap_region_close=Rc_normal;
              ap_mode=alloc_heap;
-             ap_yielding=May_yield;
+             (* [init_mod] just allocates a placeholder module; it never runs
+                user code, so it can't yield *)
+             ap_yielding=Unyielding;
              ap_tailcall=Default_tailcall;
              ap_inlined=Default_inlined;
              ap_specialised=Default_specialise;
@@ -493,7 +495,9 @@ let eval_rec_bindings bindings cont =
           ap_args=[shape; Lvar id; rhs];
           ap_region_close=Rc_normal;
           ap_mode=alloc_heap;
-          ap_yielding=May_yield;
+          (* [update_mod] backpatches the placeholder's fields without calling
+             them, so it can't yield *)
+          ap_yielding=Unyielding;
           ap_tailcall=Default_tailcall;
           ap_inlined=Default_inlined;
           ap_specialised=Default_specialise;
@@ -1215,7 +1219,9 @@ let toploop_getvalue id =
     ap_result_layout = Lambda.layout_any_value;
     ap_region_close=Rc_normal;
     ap_mode=alloc_heap;
-    ap_yielding=May_yield;
+    (* [Toploop.getvalue] is a table lookup; it never runs user code, so it
+       can't yield *)
+    ap_yielding=Unyielding;
     ap_tailcall=Default_tailcall;
     ap_inlined=Default_inlined;
     ap_specialised=Default_specialise;
@@ -1238,7 +1244,9 @@ let toploop_setvalue id lam =
     ap_result_layout = Lambda.layout_unit;
     ap_region_close=Rc_normal;
     ap_mode=alloc_heap;
-    ap_yielding=May_yield;
+    (* [Toploop.setvalue] stores [lam] in a table without calling it, so it
+       can't yield *)
+    ap_yielding=Unyielding;
     ap_tailcall=Default_tailcall;
     ap_inlined=Default_inlined;
     ap_specialised=Default_specialise;

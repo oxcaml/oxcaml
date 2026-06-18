@@ -305,3 +305,111 @@ let () =
          (raise (makeblock 0 (getpredef Assert_failure!!) [0: "" 4 14])))))
   0)
 |}]
+
+
+(* Recursive modules: the [CamlinternalMod] calls that allocate the module
+   placeholder ([init_mod], field 0) and backpatch it ([update_mod], field 1)
+   never run user code, so they are unyielding *)
+module rec A : sig val f : int -> int end = struct
+  let f n = if n <= 0 then 0 else B.g (n - 1)
+end
+and B : sig val g : int -> int end = struct
+  let g n = A.f n
+end
+[%%expect{|
+(let
+  (A =
+     (apply[unyielding] (field_imm 0 (global CamlinternalMod!)) [0: "" 1 44]
+       [0: [0: 0]])
+   B =
+     (apply[unyielding] (field_imm 0 (global CamlinternalMod!)) [0: "" 4 37]
+       [0: [0: 0]]))
+  (seq
+    (apply[unyielding] (field_imm 1 (global CamlinternalMod!)) [0: [0: 0]] A
+      (let
+        (f =
+           (function {nlocal = 0} n[value<int>] : int
+             (if (%int_lessequal n 0) 0
+               (apply[unyielding] (field_imm 0 B) (%int_sub n 1)))))
+        (makeblock 0 f)))
+    (apply[unyielding] (field_imm 1 (global CamlinternalMod!)) [0: [0: 0]] B
+      (let
+        (g =
+           (function {nlocal = 0} n[value<int>] : int
+             (apply[unyielding] (field_imm 0 A) n)))
+        (makeblock 0 g)))
+    (apply[unyielding] (field_imm 1 (global Toploop!)) "A" A)
+    (apply[unyielding] (field_imm 1 (global Toploop!)) "B" B)))
+module rec A : sig val f : int -> int end
+and B : sig val g : int -> int end
+|}]
+
+
+(* A [let rec] bound to a lazy value that isn't a literal [lazy ...] is
+   backpatched through [CamlinternalLazy.indirect] (field 3), which only
+   allocates a forwarding block and so is unyielding *)
+let f x =
+  let rec l = (let v = lazy x in v) in
+  l
+[%%expect{|
+(let
+  (f =
+     (function {nlocal = 0} x
+       (let (l =? (caml_alloc_dummy_lazy 0))
+         (seq
+           (caml_update_dummy_lazy l
+             (apply[unyielding] (field_imm 3 (global CamlinternalLazy!))
+               (makeforwardblock x)))
+           l))))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "f" f))
+val f : 'a -> 'a lazy_t = <fun>
+|}]
+
+
+(* Functional object update [{< ... >}] copies the object block via
+   [CamlinternalOO.copy], which never runs user code and so is unyielding *)
+let o = object
+  val x = 1
+  method with_x n = {< x = n >}
+end
+[%%expect{|
+(let
+  (shared =a (opaque [0: #"with_x"])
+   o =
+     (let
+       (class =?
+          (opaque
+            (apply[unyielding] (field_imm 15 (global CamlinternalOO!))
+              shared))
+        obj_init =
+          (let
+            (ids =?
+               (opaque
+                 (apply[unyielding] (field_imm 3 (global CamlinternalOO!))
+                   class shared (opaque [0: #"x"])))
+             with_x =o? (field_mut 0 ids)
+             x =o? (field_mut 1 ids))
+            (seq
+              (opaque
+                (apply[unyielding] (field_imm 9 (global CamlinternalOO!))
+                  class with_x
+                  (function {nlocal = 0} self-1 n[value<int>]
+                    (let
+                      (copy =
+                         (apply[unyielding]
+                           (field_imm 21 (global CamlinternalOO!)) self-1))
+                      (seq (setfield_imm_computed copy x n) copy)))))
+              (function {nlocal = 0} env
+                (let
+                  (self =?
+                     (opaque
+                       (apply[unyielding]
+                         (field_imm 23 (global CamlinternalOO!)) 0 class)))
+                  (seq (setfield_imm_computed self x 1) self))))))
+       (seq
+         (opaque
+           (apply[unyielding] (field_imm 16 (global CamlinternalOO!)) class))
+         (opaque (apply[unyielding] obj_init 0)))))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "o" o))
+val o : < with_x : int -> 'a > as 'a = <obj>
+|}]
