@@ -902,6 +902,7 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
             ap_loc = loc;
             ap_region_close = Rc_normal;
             ap_mode = alloc_heap;
+            ap_yielding = May_yield;
             ap_tailcall = Default_tailcall;
             ap_inlined = Default_inlined;
             ap_specialised = Default_specialise;

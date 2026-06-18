@@ -75,6 +75,7 @@ module Lambda_utils = struct
         ap_args = args;
         ap_region_close = region_close;
         ap_mode = mode;
+        ap_yielding = May_yield;
         ap_tailcall = tailcall;
         ap_inlined = inlined;
         ap_specialised = specialised;
