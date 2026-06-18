@@ -1991,7 +1991,7 @@ let report_error_doc loc env = function
         "Layout polymorphism is not supported in term-level type \
          annotations"
   | Val_poly_and_layout ->
-      fprintf ppf
+      Location.errorf ~loc
         "@[The %a keyword is not supported inside layout-polymorphic@ \
          value descriptions introduced using %a.@]"
         Style.inline_code "layout_"

@@ -1499,7 +1499,7 @@ let message = function
       msg "poly_ has no effect in recursive bindings, which do not support \
            layout polymorphism. Consider using a regular let rec instead."
   | Useless_valpoly ->
-      "This value description has no layout-polymorphic type variables, so\n\
+      msg "This value description has no layout-polymorphic type variables, so\n\
        \"poly_\" has no effect. Consider using a regular \"val\" instead."
 ;;
 
