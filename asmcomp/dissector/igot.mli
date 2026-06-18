@@ -31,8 +31,8 @@
 
     The intermediate GOT provides local GOT entries that are within range of
     PC-relative addressing from the code in a partition. Each entry holds the
-    absolute address of an external symbol, filled in by an R_X86_64_64
-    relocation at final link time. *)
+    absolute address of an external symbol, filled in by an absolute 64-bit
+    relocation (R_X86_64_64 or R_AARCH64_ABS64) at final link time. *)
 
 (** Size of each IGOT entry in bytes. *)
 val entry_size : int
@@ -91,10 +91,13 @@ module Relocation : sig
   (** Returns the original external symbol to relocate to. *)
   val symbol : t -> string
 
+  (** Returns the relocation type (R_X86_64_64 or R_AARCH64_ABS64). *)
+  val reloc_type : t -> Compiler_owee.Owee_elf_relocation.Reloc_type.t
+
   (** Returns the relocation addend (always 0 for IGOT). *)
   val addend : t -> int64
 end
 
-(** [relocations t] returns the list of R_X86_64_64 relocations needed to fill
-    the IGOT entries with the addresses of the original symbols. *)
+(** [relocations t] returns the list of absolute 64-bit relocations needed to
+    fill the IGOT entries with the addresses of the original symbols. *)
 val relocations : t -> Relocation.t list

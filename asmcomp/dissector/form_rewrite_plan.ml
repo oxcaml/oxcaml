@@ -266,42 +266,97 @@ let build_symbol_rewrite_map ~igot_and_iplt ~relocations =
     (Extract_relocations.convert_to_got relocations);
   plt_map, got_map
 
-(* Rewrite a single .rela.text* section. Looks up each relocation's target
-   symbol and rewrites PLT32/GOTPCRELX relocations to PC32 relocations targeting
-   the synthetic IPLT/IGOT symbols.
+(* Determine the new relocation type when rewriting a PLT relocation (function
+   call) to target an IPLT symbol. *)
+let rewrite_plt_reloc_type r_type =
+  match Target_system.architecture () with
+  | X86_64 ->
+    assert (Rela.Reloc_type.equal r_type Rela.Reloc_type.plt32);
+    Rela.Reloc_type.pc32
+  | AArch64 ->
+    (* CALL26/JUMP26 stay the same type, just retargeted *)
+    r_type
+  | _ -> Misc.fatal_error "Dissector: unsupported architecture"
 
-   - PLT32: function calls -> PC32 to IPLT entry - GOTPCRELX: GOT references ->
-   PC32 to IGOT entry *)
+(* Determine the new relocation type when rewriting a GOT relocation to target
+   an IGOT symbol. *)
+let rewrite_got_reloc_type r_type =
+  match Target_system.architecture () with
+  | X86_64 ->
+    assert (Rela.Reloc_type.equal r_type Rela.Reloc_type.rex_gotpcrelx);
+    Rela.Reloc_type.pc32
+  | AArch64 ->
+    (* GOT-relative → PC-relative addressing *)
+    if Rela.Reloc_type.equal r_type Rela.Reloc_type.aarch64_adr_got_page
+    then Rela.Reloc_type.aarch64_adr_prel_pg_hi21
+    else if
+      Rela.Reloc_type.equal r_type Rela.Reloc_type.aarch64_ld64_got_lo12_nc
+    then Rela.Reloc_type.aarch64_ldst64_abs_lo12_nc
+    else
+      Misc.fatal_errorf "Dissector: unexpected AArch64 GOT relocation type %s"
+        (Rela.Reloc_type.name r_type)
+  | _ -> Misc.fatal_error "Dissector: unsupported architecture"
+
+(* Architecture-specific relocation classification. *)
+
+let is_plt_reloc r_type =
+  match Target_system.architecture () with
+  | X86_64 -> Rela.Reloc_type.equal r_type Rela.Reloc_type.plt32
+  | AArch64 ->
+    Rela.Reloc_type.equal r_type Rela.Reloc_type.aarch64_call26
+    || Rela.Reloc_type.equal r_type Rela.Reloc_type.aarch64_jump26
+  | _ -> Misc.fatal_error "Dissector: unsupported architecture"
+
+let is_got_reloc r_type =
+  match Target_system.architecture () with
+  | X86_64 -> Rela.Reloc_type.equal r_type Rela.Reloc_type.rex_gotpcrelx
+  | AArch64 ->
+    Rela.Reloc_type.equal r_type Rela.Reloc_type.aarch64_adr_got_page
+    || Rela.Reloc_type.equal r_type Rela.Reloc_type.aarch64_ld64_got_lo12_nc
+  | _ -> Misc.fatal_error "Dissector: unsupported architecture"
+
+(* Rewrite a single .rela.text* section. Looks up each relocation's target
+   symbol and rewrites function-call and GOT relocations to target the synthetic
+   IPLT/IGOT symbols.
+
+   On x86-64: - PLT32 → PC32 to IPLT entry - REX_GOTPCRELX → PC32 to IGOT entry
+
+   On AArch64: - CALL26/JUMP26 → same type to IPLT entry - ADR_GOT_PAGE →
+   ADR_PREL_PG_HI21 to IGOT entry - LD64_GOT_LO12_NC → LDST64_ABS_LO12_NC to
+   IGOT entry *)
 let rewrite_rela_section ~rela_body ~symtab_body ~strtab_body ~symbol_to_index
     ~plt_rewrite_map ~got_rewrite_map =
   let entries = ref [] in
   Rela.iter_rela_entries ~rela_body ~f:(fun entry ->
       let new_entry =
-        (* Look up the original symbol name for this relocation *)
         let sym_name_opt =
           Rela.read_symbol_name ~symtab_body ~strtab_body ~sym_index:entry.r_sym
         in
         match sym_name_opt with
         | None -> entry
         | Some sym_name -> (
-          (* Check if this relocation type/symbol should be rewritten *)
-          let rewrite_to =
-            if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
-            then String.Tbl.find_opt plt_rewrite_map sym_name
-            else if
-              Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.rex_gotpcrelx
-            then String.Tbl.find_opt got_rewrite_map sym_name
-            else None
+          let rewrite_to, new_r_type =
+            if is_plt_reloc entry.r_type
+            then
+              ( String.Tbl.find_opt plt_rewrite_map sym_name,
+                Some (rewrite_plt_reloc_type entry.r_type) )
+            else if is_got_reloc entry.r_type
+            then
+              ( String.Tbl.find_opt got_rewrite_map sym_name,
+                Some (rewrite_got_reloc_type entry.r_type) )
+            else None, None
           in
-          match rewrite_to with
-          | Some new_sym_name -> (
+          match rewrite_to, new_r_type with
+          | Some new_sym_name, Some new_type -> (
             match String.Tbl.find_opt symbol_to_index new_sym_name with
             | Some idx ->
-              log_verbose "  rewrite reloc at 0x%Lx: %s %s -> PC32 to %s"
+              log_verbose "  rewrite reloc at 0x%Lx: %s %s -> %s to %s"
                 entry.r_offset
                 (Rela.Reloc_type.name entry.r_type)
-                sym_name new_sym_name;
-              { entry with r_sym = idx; r_type = Rela.Reloc_type.pc32 }
+                sym_name
+                (Rela.Reloc_type.name new_type)
+                new_sym_name;
+              { entry with r_sym = idx; r_type = new_type }
             | None ->
               log_verbose
                 "  rewrite reloc at 0x%Lx: %s -> %s NOT FOUND in symtab"
@@ -309,7 +364,7 @@ let rewrite_rela_section ~rela_body ~symtab_body ~strtab_body ~symbol_to_index
                 (Rela.Reloc_type.name entry.r_type)
                 new_sym_name;
               entry)
-          | None -> entry)
+          | _ -> entry)
       in
       entries := new_entry :: !entries);
   List.rev !entries

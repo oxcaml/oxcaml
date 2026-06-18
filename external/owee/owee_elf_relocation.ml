@@ -44,7 +44,7 @@ module Section_index = struct
   let needs_extended t = t >= shn_loreserve
 end
 
-(* x86-64 relocation types *)
+(* Relocation types *)
 module Reloc_type = struct
   type t = int64
 
@@ -52,16 +52,42 @@ module Reloc_type = struct
   let to_int64 t = t
   let of_int64 t = t
 
+  (* x86-64 relocation types *)
   let plt32 = 4L
   let rex_gotpcrelx = 42L
   let r64 = 1L
   let pc32 = 2L
+
+  (* AArch64 relocation types *)
+  let aarch64_abs64 = 257L
+  let aarch64_prel32 = 261L
+  let aarch64_call26 = 283L
+  let aarch64_jump26 = 282L
+  let aarch64_adr_prel_pg_hi21 = 275L
+  let aarch64_add_abs_lo12_nc = 277L
+  let aarch64_ldst64_abs_lo12_nc = 286L
+  let aarch64_adr_got_page = 311L
+  let aarch64_ld64_got_lo12_nc = 312L
 
   let name t =
     if Int64.equal t plt32 then "PLT32"
     else if Int64.equal t rex_gotpcrelx then "REX_GOTPCRELX"
     else if Int64.equal t pc32 then "PC32"
     else if Int64.equal t r64 then "64"
+    else if Int64.equal t aarch64_abs64 then "AARCH64_ABS64"
+    else if Int64.equal t aarch64_prel32 then "AARCH64_PREL32"
+    else if Int64.equal t aarch64_call26 then "AARCH64_CALL26"
+    else if Int64.equal t aarch64_jump26 then "AARCH64_JUMP26"
+    else if Int64.equal t aarch64_adr_prel_pg_hi21
+    then "AARCH64_ADR_PREL_PG_HI21"
+    else if Int64.equal t aarch64_add_abs_lo12_nc
+    then "AARCH64_ADD_ABS_LO12_NC"
+    else if Int64.equal t aarch64_ldst64_abs_lo12_nc
+    then "AARCH64_LDST64_ABS_LO12_NC"
+    else if Int64.equal t aarch64_adr_got_page
+    then "AARCH64_ADR_GOT_PAGE"
+    else if Int64.equal t aarch64_ld64_got_lo12_nc
+    then "AARCH64_LD64_GOT_LO12_NC"
     else Printf.sprintf "type=%Ld" t
 end
 
