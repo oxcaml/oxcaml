@@ -5437,6 +5437,8 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let generic_level = S.generic_level
 
+  let rigid_level = S.rigid_level
+
   let newvar_above level m =
     let level = choose_level level in
     S.newvar_above obj level m
@@ -5643,6 +5645,8 @@ module Monadic_gen (Obj : Obj) = struct
     | Error e -> raise (Submode_error_simple_context (pp, All (obj, e)))
 
   let generic_level = S.generic_level
+
+  let rigid_level = S.rigid_level
 
   let update_level i a = with_log (S.update_level i obj a)
 
@@ -6868,6 +6872,8 @@ module Value_with (Areality : Areality) = struct
   let max = { comonadic = Comonadic.max; monadic = Monadic.max }
 
   let generic_level = Comonadic.generic_level
+
+  let rigid_level = Comonadic.rigid_level
 
   include Magic_allow_disallow (struct
     type (_, _, 'd) sided = 'd t
