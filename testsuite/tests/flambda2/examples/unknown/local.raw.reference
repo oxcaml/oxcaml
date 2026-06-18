@@ -99,7 +99,7 @@
            (Pfield_1, Pmakeblock)
            -> k1 * k2
  in
- let code rec size(66)
+ let code rec loopify(default tailrec) size(64)
        find_span_6
          (break_here : val,
           l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
@@ -108,8 +108,6 @@
          -> k1 * k2
          : [ 0 of [ 0 | 0 of val * val ] * [ 0 | 0 of val * val ] ] local =
    let next_depth = rec_info (succ my_depth) in
-   let rev_app = %project_value_slot.[find_span].[rev_app] (my_closure) in
-   let spans = %project_function_slot.[find_span].[spans] (my_closure) in
    (let prim = %is_int (l) in
     let Pisint = %tag_imm (prim) in
     (let untagged = %untag_imm (Pisint) in
@@ -157,7 +155,7 @@
          : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] local =
    let next_depth = rec_info (succ my_depth) in
    let rev_app = %project_value_slot.[spans].[rev_app] (my_closure) in
-   let find_span = %project_function_slot.[spans].[find_span] (my_closure) in
+   let find_span = %project_value_slot.[spans].[find_span] (my_closure) in
    (let prim = %is_int (l) in
     let Pisint = %tag_imm (prim) in
     (let untagged = %untag_imm (Pisint) in
@@ -168,7 +166,7 @@
         cont k3)
      where k3 =
        (apply direct(find_span_6 &my_region &my_ghost_region)
-          (find_span ~ depth my_depth -> next_depth
+          (find_span
            : _ -> [ 0 of [ 0 | 0 of val * val ] * [ 0 | 0 of val * val ] ])
             (break_here, l, 0)
             -> k3 * k2
@@ -220,15 +218,15 @@
        cont k1 (eq)
  in
  let $camlLocal__immstring52 = "local.ml" in
- let $camlLocal__const_block183 = Block 0 ($camlLocal__immstring52, 58, 2) in
- let $camlLocal__Pmakeblock186 =
-   Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block183)
+ let $camlLocal__const_block181 = Block 0 ($camlLocal__immstring52, 58, 2) in
+ let $camlLocal__Pmakeblock184 =
+   Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block181)
  in
- let $camlLocal__const_block168 = Block 0 (4, 0) in
- let $camlLocal__const_block170 = Block 0 (3, $camlLocal__const_block168) in
- let $camlLocal__const_block172 = Block 0 (2, $camlLocal__const_block170) in
- let $camlLocal__const_block174 = Block 0 (1, $camlLocal__const_block172) in
- let $camlLocal__const_block176 = Block 0 (0, $camlLocal__const_block174) in
+ let $camlLocal__const_block166 = Block 0 (4, 0) in
+ let $camlLocal__const_block168 = Block 0 (3, $camlLocal__const_block166) in
+ let $camlLocal__const_block170 = Block 0 (2, $camlLocal__const_block168) in
+ let $camlLocal__const_block172 = Block 0 (1, $camlLocal__const_block170) in
+ let $camlLocal__const_block174 = Block 0 (0, $camlLocal__const_block172) in
  let $camlLocal__const_block93 = Block 0 ($camlLocal__immstring52, 33, 2) in
  let $camlLocal__Pmakeblock96 =
    Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block93)
@@ -322,16 +320,16 @@
                 cont k1 (region_return))
              where k1 (`*match*_2` : imm tagged) =
                let rev_app = closure rev_app_4 @rev_app in
+               let find_span = closure find_span_6 @find_span in
                let spans = closure spans_5 @spans
-               and find_span = closure find_span_6 @find_span
-               with { rev_app = rev_app }
+               with { rev_app = rev_app; find_span = find_span }
                in
                let is_even = closure is_even_7 @is_even in
                ((let `region` = %begin_region () in
                  let ghost_region = %begin_ghost_region () in
                  apply direct(spans_5 &`region` &ghost_region)
                    (spans : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
-                     (is_even, $camlLocal__const_block176)
+                     (is_even, $camlLocal__const_block174)
                      -> k3 * error
                    where k3
                            (even_spans :
@@ -350,7 +348,7 @@
                         where k3 =
                           cont error
                                  pop(regular error)
-                                 ($camlLocal__Pmakeblock186))
+                                 ($camlLocal__Pmakeblock184))
                    where k2 (region_return : imm tagged) =
                      let `unit` = %end_region (`region`) in
                      let unit_1 = %end_ghost_region (ghost_region) in

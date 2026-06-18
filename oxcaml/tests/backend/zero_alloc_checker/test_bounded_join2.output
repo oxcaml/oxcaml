@@ -7,3 +7,18 @@ Hint: for more precise results, recompile this function with
 "-function-layout topological" or "-zero-alloc-checker-join 0" flags.
 The "-zero-alloc-checker-join 0" flag may substantially increase compilation time.
 (widening applied in function camlTest_bounded_join2.foo_HIDE_STAMP)
+
+File "test_bounded_join2.ml", lines 14-15, characters 24-61:
+Error: allocation of 40 bytes for closure
+
+File "test_bounded_join2.ml", lines 16-17, characters 20-61:
+Error: allocation of 40 bytes for closure
+
+File "test_bounded_join2.ml", lines 18-19, characters 20-61:
+Error: allocation of 40 bytes for closure
+
+File "test_bounded_join2.ml", lines 20-21, characters 20-61:
+Error: allocation of 40 bytes for closure
+
+File "test_bounded_join2.ml", lines 22-23, characters 20-61:
+Error: allocation of 40 bytes for closure

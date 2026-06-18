@@ -12,7 +12,7 @@ let code loopify(never) size(35) newer_version_of(f_0)
   (let prim = %get_tag (r) in
    switch prim
      | 0 -> k2
-     | 1 -> k1 pop(reraise k1) ($Stdlib.camlStdlib__Exit1434))
+     | 1 -> k1 pop(reraise k1) ($Stdlib.camlStdlib__Exit1433))
     where k2 =
       ((let Popaque = %opaque (0) in
         let untagged = %untag_imm (Popaque) in

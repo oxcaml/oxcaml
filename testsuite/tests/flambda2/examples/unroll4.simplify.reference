@@ -1,23 +1,7 @@
-let code odd_2 deleted and code even_1 deleted in
+let code even_1 deleted and code odd_2 deleted in
 let code parity_is_0 deleted in
 let code k_3 deleted in
-let code rec loopify(never) size(26) newer_version_of(odd_2)
-      odd_2_1 (n : imm tagged)
-        my_closure _region _ghost_region my_depth
-        -> k * k1 =
-  let k = %project_value_slot.[odd].[k] (my_closure) in
-  let even = %project_function_slot.[odd].[even] (my_closure) in
-  let prim = %phys_eq (n, 0) in
-  switch prim
-    | 0 -> k2
-    | 1 -> k3
-    where k3 =
-      apply inlined(hint) k (0) -> k * k1
-    where k2 =
-      let int_sub = %int_barith.sub (n, 1) in
-      apply direct(even_1_1)
-        even ~ depth my_depth -> succ my_depth (int_sub) -> k * k1
-and code rec loopify(never) size(26) newer_version_of(even_1)
+let code rec loopify(never) size(26) newer_version_of(even_1)
       even_1_1 (n : imm tagged)
         my_closure _region _ghost_region my_depth
         -> k * k1 =
@@ -33,13 +17,29 @@ and code rec loopify(never) size(26) newer_version_of(even_1)
       let int_sub = %int_barith.sub (n, 1) in
       apply direct(odd_2_1)
         odd ~ depth my_depth -> succ my_depth (int_sub) -> k * k1
+and code rec loopify(never) size(26) newer_version_of(odd_2)
+      odd_2_1 (n : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  let k = %project_value_slot.[odd].[k] (my_closure) in
+  let even = %project_function_slot.[odd].[even] (my_closure) in
+  let prim = %phys_eq (n, 0) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      apply inlined(hint) k (0) -> k * k1
+    where k2 =
+      let int_sub = %int_barith.sub (n, 1) in
+      apply direct(even_1_1)
+        even ~ depth my_depth -> succ my_depth (int_sub) -> k * k1
 in
 let code inline(always) loopify(never) size(221) newer_version_of(parity_is_0)
       parity_is_0_1 (p : imm tagged, n : imm tagged, k : val)
         my_closure _region _ghost_region my_depth
         -> k * k1 =
-  let even = closure even_1_1 @even
-  and odd = closure odd_2_1 @odd
+  let odd = closure odd_2_1 @odd
+  and even = closure even_1_1 @even
   with { k = k }
   in
   (let untagged = %untag_imm (p) in
@@ -121,24 +121,10 @@ let $camlUnroll4__k_5 = closure k_3_1 @k in
 apply direct(k_3_1) inlined(hint) inlining_state(depth(21))
   $camlUnroll4__k_5 (0) -> k * error
   where k (one_is_even : imm tagged) =
-    ((let $camlUnroll4__even_8 =
-        closure even_1_2 @even
-      and $camlUnroll4__odd_9 =
+    ((let $camlUnroll4__odd_8 =
         closure odd_2_2 @odd
-      and code rec loopify(never) size(18) newer_version_of(odd_2_1)
-            odd_2_2 (n : imm tagged)
-              my_closure _region _ghost_region my_depth
-              -> k1 * k2 =
-        let prim = %phys_eq (n, 0) in
-        switch prim
-          | 0 -> k3
-          | 1 -> k1 (0)
-          where k3 =
-            let int_sub = %int_barith.sub (n, 1) in
-            apply direct(even_1_2) inlining_state(depth(1))
-              $camlUnroll4__even_8 ~ depth my_depth -> succ my_depth
-                (int_sub)
-                -> k1 * k2
+      and $camlUnroll4__even_9 =
+        closure even_1_2 @even
       and code rec loopify(never) size(18) newer_version_of(even_1_1)
             even_1_2 (n : imm tagged)
               my_closure _region _ghost_region my_depth
@@ -150,13 +136,27 @@ apply direct(k_3_1) inlined(hint) inlining_state(depth(21))
           where k3 =
             let int_sub = %int_barith.sub (n, 1) in
             apply direct(odd_2_2) inlining_state(depth(1))
-              $camlUnroll4__odd_9 ~ depth my_depth -> succ my_depth
+              $camlUnroll4__odd_8 ~ depth my_depth -> succ my_depth
+                (int_sub)
+                -> k1 * k2
+      and code rec loopify(never) size(18) newer_version_of(odd_2_1)
+            odd_2_2 (n : imm tagged)
+              my_closure _region _ghost_region my_depth
+              -> k1 * k2 =
+        let prim = %phys_eq (n, 0) in
+        switch prim
+          | 0 -> k3
+          | 1 -> k1 (0)
+          where k3 =
+            let int_sub = %int_barith.sub (n, 1) in
+            apply direct(even_1_2) inlining_state(depth(1))
+              $camlUnroll4__even_9 ~ depth my_depth -> succ my_depth
                 (int_sub)
                 -> k1 * k2
         with { k = $camlUnroll4__k_5 }
       in
       apply direct(odd_2_2) inlining_state(depth(41))
-        $camlUnroll4__odd_9 ~ depth 0 -> unroll 0 4 (0) -> k * error)
+        $camlUnroll4__odd_8 ~ depth 0 -> unroll 0 4 (0) -> k * error)
        where k (four_is_odd : imm tagged) =
          let $camlUnroll4 =
            Block 0 ($camlUnroll4__parity_is_4,

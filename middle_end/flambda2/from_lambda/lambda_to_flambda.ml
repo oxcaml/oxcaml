@@ -570,7 +570,9 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     ->
     (* This case is here to get function names right. *)
     let bindings =
-      cps_function_bindings env [L.{ id = fun_id; debug_uid = duid; def = func }]
+      List.concat
+        (cps_function_bindings env
+           [L.{ id = fun_id; debug_uid = duid; def = func }])
     in
     let body acc ccenv = cps acc env ccenv body k k_exn in
     let let_expr =
@@ -723,11 +725,18 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
    * in
    * cps_non_tail_simple acc env ccenv defining_expr k k_exn *)
   | Lletrec (bindings, body) ->
-    let function_declarations = cps_function_bindings env bindings in
+    let groups = cps_function_bindings env bindings in
     let body acc ccenv = cps acc env ccenv body k k_exn in
-    CC.close_let_rec acc ccenv ~function_declarations ~body
-      ~current_region:
-        (Env.current_region env |> Option.map Env.Region_stack_element.region)
+    let let_expr =
+      List.fold_left
+        (fun body function_declarations acc ccenv ->
+          CC.close_let_rec acc ccenv ~function_declarations ~body
+            ~current_region:
+              (Env.current_region env
+              |> Option.map Env.Region_stack_element.region))
+        body groups
+    in
+    let_expr acc ccenv
   | Lprim (prim, args, loc) -> (
     match[@ocaml.warning "-fragile-match"] prim with
     | Praise raise_kind -> (
@@ -1306,7 +1315,7 @@ and cps_non_tail_list_core acc env ccenv (lams : L.lambda list)
 
 and cps_function_bindings env (bindings : Lambda.rec_binding list) =
   let bindings_with_wrappers =
-    List.map
+    List.concat_map
       (fun L.
              { id = fun_id;
                debug_uid = fun_duid;
@@ -1337,45 +1346,73 @@ and cps_function_bindings env (bindings : Lambda.rec_binding list) =
             Ident.print fun_id)
       bindings
   in
-  let free_idents, directed_graph =
-    let fun_ids =
-      Ident.Set.of_list (List.map (fun { L.id; _ } -> id) bindings)
-    in
-    List.fold_left
-      (fun (free_ids, graph) (fun_id, _fun_uid, ({ body; _ } : L.lfunction)) ->
-        let free_ids_of_body = Lambda.free_variables body in
-        let free_ids = Ident.Map.add fun_id free_ids_of_body free_ids in
-        let free_fun_ids = Ident.Set.inter fun_ids free_ids_of_body in
-        let graph = Ident.Map.add fun_id free_fun_ids graph in
-        free_ids, graph)
-      (Ident.Map.empty, Ident.Map.empty)
-      (List.flatten bindings_with_wrappers)
+  let module SCC = Strongly_connected_components.Make (Ident) in
+  let fun_ids =
+    Ident.Set.of_list
+      (List.map (fun (fun_id, _, _) -> fun_id) bindings_with_wrappers)
   in
+  let free_idents =
+    List.fold_left
+      (fun free_idents (fun_id, _fun_uid, ({ body; _ } : L.lfunction)) ->
+        Ident.Map.add fun_id (Lambda.free_variables body) free_idents)
+      Ident.Map.empty bindings_with_wrappers
+  in
+  (* Decompose the incoming [let rec] into the strongly connected components of
+     the dependency graph between its function declarations. Mutually recursive
+     functions stay in the same component, whereas functions written in a single
+     [let rec ... and ...] that are not actually mutually recursive end up in
+     separate components. Each component is closed below as its own set of
+     closures. (A function with optional arguments has been turned into two
+     declarations above, a wrapper and an inner function, but those need no
+     special treatment here: they are ordinary nodes of the graph, forming a
+     cycle exactly when the original function was recursive.) *)
+  let graph =
+    List.fold_left
+      (fun graph (fun_id, _, _) ->
+        Ident.Map.add fun_id
+          (Ident.Set.inter (Ident.Map.find fun_id free_idents) fun_ids)
+          graph)
+      Ident.Map.empty bindings_with_wrappers
+  in
+  let components = SCC.connected_components_sorted_from_roots_to_leaf graph in
+  (* A function is recursive iff its component is a genuine cycle: either a set
+     of more than one mutually recursive function, or a single function that
+     calls itself. *)
   let recursive_functions =
-    let module SCC = Strongly_connected_components.Make (Ident) in
-    let connected_components =
-      SCC.connected_components_sorted_from_roots_to_leaf directed_graph
-    in
     Array.fold_left
       (fun rec_ids component ->
-        match component with
-        | SCC.No_loop _ -> rec_ids
-        | SCC.Has_loop elts -> List.fold_right Ident.Set.add elts rec_ids)
-      Ident.Set.empty connected_components
+        match (component : SCC.component) with
+        | No_loop _ -> rec_ids
+        | Has_loop elts -> List.fold_right Ident.Set.add elts rec_ids)
+      Ident.Set.empty components
   in
   let recursive fun_id : Recursive.t =
     if Ident.Set.mem fun_id recursive_functions
     then Recursive
     else Non_recursive
   in
-  let bindings_with_wrappers = List.flatten bindings_with_wrappers in
-  List.map
-    (fun (fun_id, fun_uid, def) ->
-      let fuid = Flambda_debug_uid.of_lambda_debug_uid fun_uid in
-      cps_function env ~fid:fun_id ~fuid ~recursive:(recursive fun_id)
-        ~precomputed_free_idents:(Ident.Map.find fun_id free_idents)
-        def)
-    bindings_with_wrappers
+  let decls =
+    List.fold_left
+      (fun decls (fun_id, fun_uid, def) ->
+        let fuid = Flambda_debug_uid.of_lambda_debug_uid fun_uid in
+        Ident.Map.add fun_id
+          (cps_function env ~fid:fun_id ~fuid ~recursive:(recursive fun_id)
+             ~precomputed_free_idents:(Ident.Map.find fun_id free_idents)
+             def)
+          decls)
+      Ident.Map.empty bindings_with_wrappers
+  in
+  (* Return one group of declarations per component, ordered from roots to
+     leaves so that closing the groups with a left fold (see the [Lletrec] case)
+     binds each component's dependencies in an enclosing scope. *)
+  Array.to_list components
+  |> List.map (fun component ->
+      let ids =
+        match (component : SCC.component) with
+        | No_loop id -> [id]
+        | Has_loop ids -> ids
+      in
+      List.map (fun id -> Ident.Map.find id decls) ids)
 
 and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     ?precomputed_free_idents
