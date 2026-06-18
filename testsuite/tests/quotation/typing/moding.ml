@@ -35,15 +35,15 @@ module M :
 |}]
 #mark_toplevel_in_quotations;;
 
-(** Splicing non-legacy expressions **)
-
-(* We require the spliced expression to be at legacy.
-   Thus, local/once/contended fail, as they are
-   above legacy (global/many/uncontended).
-   The other cases pass. *)
+(** Quote captures via splices **)
 
 (* CR quoted-modes jbachurski: Splicing a value should
    bound the mode of the quote with the value's mode -- not via capture. *)
+
+fun e -> <[ $e ]>
+[%%expect{|
+- : 'a expr -> 'a expr @ once = <fun>
+|}];;
 
 (* Local spliced expression *)
 fun (x @ local) -> <[ $x ]>
@@ -408,43 +408,6 @@ fun (e @ once) -> <[ Some $e ]>
 let x = <[1 + 1]> in let x, y = Quote.duplicate x in <[$x + $y]>
 [%%expect{|
 - : <[int]> expr = <[(1 + 1) + (1 + 1)]>
-|}];;
-
-(** Quote captures **)
-
-fun e -> <[ $e ]>
-[%%expect{|
-- : 'a expr -> 'a expr @ once = <fun>
-|}];;
-
-fun (e @ local) -> <[ $e ]>
-[%%expect{|
-- : 'a expr @ local -> 'a expr @ local once = <fun>
-|}];;
-
-fun (e @ once) -> <[ $e ]>
-[%%expect{|
-- : 'a expr @ once -> 'a expr @ once = <fun>
-|}];;
-
-fun (e @ unique) -> <[ $e ]>
-[%%expect{|
-- : 'a expr @ unique -> 'a expr @ once = <fun>
-|}];;
-
-fun (e @ portable) -> <[ $e ]>
-[%%expect{|
-- : 'a expr @ portable -> 'a expr @ once = <fun>
-|}];;
-
-fun (e @ shared) -> <[ $e ]>
-[%%expect{|
-- : 'a expr @ shared -> 'a expr @ once = <fun>
-|}];;
-
-fun (e @ uncontended) -> <[ $e ]>
-[%%expect{|
-- : 'a expr -> 'a expr @ once = <fun>
 |}];;
 
 (** Quote captures with inner closure captures **)
