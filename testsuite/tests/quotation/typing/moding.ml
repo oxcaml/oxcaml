@@ -388,6 +388,21 @@ let x () = <[1 + 1]> in <[$(x ()) + $(x ())]>
 ]>
 |}];;
 
+(* We associate that quotes are [once] iff they are syntactic values.
+   Here, we can exploit this mode-based reasoning concluding the quote is once iff [e] is. *)
+
+(* CR quoted-modes jbachurski: The result should be [many] --
+   the quote is a syntactic value iff [e] is. *)
+fun (e @ many) -> <[ Some $e ]>
+[%%expect{|
+- : 'a expr -> <[$('a) option]> expr @ once = <fun>
+|}];;
+
+fun (e @ once) -> <[ Some $e ]>
+[%%expect{|
+- : 'a expr @ once -> <[$('a) option]> expr @ once = <fun>
+|}];;
+
 (** Duplication of [once] quotes *)
 
 let x = <[1 + 1]> in let x, y = Quote.duplicate x in <[$x + $y]>
@@ -395,18 +410,68 @@ let x = <[1 + 1]> in let x, y = Quote.duplicate x in <[$x + $y]>
 - : <[int]> expr = <[(1 + 1) + (1 + 1)]>
 |}];;
 
-(** [once] captures **)
+(** Quote captures **)
+
+fun e -> <[ $e ]>
+[%%expect{|
+- : 'a expr -> 'a expr @ once = <fun>
+|}];;
+
+fun (e @ local) -> <[ $e ]>
+[%%expect{|
+- : 'a expr @ local -> 'a expr @ local once = <fun>
+|}];;
 
 fun (e @ once) -> <[ $e ]>
 [%%expect{|
 - : 'a expr @ once -> 'a expr @ once = <fun>
 |}];;
 
-fun (e @ unique) -> <[ fun () -> $e ]>
+fun (e @ unique) -> <[ $e ]>
 [%%expect{|
 - : 'a expr @ unique -> 'a expr @ once = <fun>
 |}];;
 
+fun (e @ portable) -> <[ $e ]>
+[%%expect{|
+- : 'a expr @ portable -> 'a expr @ once = <fun>
+|}];;
+
+fun (e @ shared) -> <[ $e ]>
+[%%expect{|
+- : 'a expr @ shared -> 'a expr @ once = <fun>
+|}];;
+
+fun (e @ uncontended) -> <[ $e ]>
+[%%expect{|
+- : 'a expr -> 'a expr @ once = <fun>
+|}];;
+
+(** Quote captures with inner closure captures **)
+
+fun e -> <[ fun () -> $e ]>
+[%%expect{|
+- : 'a expr -> <[unit -> $('a)]> expr = <fun>
+|}];;
+
+(* CR quoted-modes jbachurski: the [local] and [once] examples should be accepted.
+   The closure does not actually capture $e, as it is at a negative stage offset.
+   On the other hand, the quote does capture [e] with different results in either case. *)
+
+(* This quote should be [local], as it is a syntax tree pointing to a [local] syntax tree. *)
+fun (e @ local) -> <[ fun () -> $e ]>
+[%%expect{|
+Line 1, characters 33-34:
+1 | fun (e @ local) -> <[ fun () -> $e ]>
+                                     ^
+Error: The value "e" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the function at line 1, characters 22-34
+         which is expected to be "global"
+         because it is a quoted expression's result and thus always at the legacy modes.
+|}];;
+
+(* Quotes of syntactic values observably cross [once]ness, so this should be [many]. *)
 fun (e @ once) -> <[ fun () -> $e ]>
 [%%expect{|
 Line 1, characters 32-33:
@@ -415,6 +480,43 @@ Line 1, characters 32-33:
 Error: The value "e" is "once"
        but is expected to be "many"
          because it is used inside the function at line 1, characters 21-33
+         which is expected to be "many"
+         because it is a quoted expression's result and thus always at the legacy modes.
+|}];;
+
+fun (e @ unique) -> <[ fun () -> $e ]>
+[%%expect{|
+- : 'a expr @ unique -> <[unit -> $('a)]> expr = <fun>
+|}];;
+
+fun (e @ portable) -> <[ fun () -> $e ]>
+[%%expect{|
+- : 'a expr @ portable -> <[unit -> $('a)]> expr = <fun>
+|}];;
+
+fun (e @ shared) -> <[ fun () -> $e ]>
+[%%expect{|
+- : 'a expr @ shared -> <[unit -> $('a)]> expr = <fun>
+|}];;
+
+fun (e @ uncontended) -> <[ fun () -> $e ]>
+[%%expect{|
+- : 'a expr -> <[unit -> $('a)]> expr = <fun>
+|}];;
+
+(* CR quoted-modes jbachurski: This should be accepted. *)
+module M : sig
+  val quote_thunk : 'a expr @ once -> <[unit -> $'a]> expr
+end = struct
+  let quote_thunk (e @ once) = <[ fun () -> $e ]>
+end
+[%%expect{|
+Line 4, characters 45-46:
+4 |   let quote_thunk (e @ once) = <[ fun () -> $e ]>
+                                                 ^
+Error: The value "e" is "once"
+       but is expected to be "many"
+         because it is used inside the function at line 4, characters 34-46
          which is expected to be "many"
          because it is a quoted expression's result and thus always at the legacy modes.
 |}];;
