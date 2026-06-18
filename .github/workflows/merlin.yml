@@ -35,7 +35,6 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            flambda-backend-config: --enable-middle-end=flambda2 --disable-naked-pointers
             name: flambda2
 
     env:
@@ -105,8 +104,7 @@ jobs:
         autoconf
         ./configure \
           --prefix=$GITHUB_WORKSPACE/flambda-backend/_install \
-          --with-dune=$(which dune) \
-          ${{ matrix.flambda-backend-config }}
+          --with-dune=$(which dune)
         make install
         opam pin remove oxcaml-dev
 
