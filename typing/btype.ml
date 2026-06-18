@@ -1433,9 +1433,9 @@ module Jkind0 = struct
                   (Base
                     (Scannable,
                       { nullability = Non_null; separability = Non_float }));
-              (* CR-soon shsong: Exceptions should not cross allocation. We may need to
-                  let them cross -- for now let's keep the conservative option and check
-                  this when we start to handle exceptions *)
+              (* CR-soon shsong: Exceptions should not cross allocation. We may
+                  need to let them cross -- for now let's keep the conservative
+                  option and check this when we start to handle exceptions *)
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:false
