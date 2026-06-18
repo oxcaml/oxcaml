@@ -5358,95 +5358,76 @@ let maybe_expansive e = not (is_nonexpansive e)
     Potentially expensive or side-effectful computations should return [true],
     and only syntactic values should return [false]. **)
 let rec maybe_computation exp =
-  match exp.exp_desc with
+  match exp.pexp_desc with
   (* Return [false] for syntactic values *)
-  | Texp_ident _ ->
+  | Pexp_ident _ ->
     false
-  | Texp_constant _ ->
+  | Pexp_constant _ ->
     false
-  | Texp_function _ ->
+  | Pexp_function _ ->
     false
-  | Texp_unboxed_unit ->
+  | Pexp_unboxed_unit ->
     false
-  | Texp_unboxed_bool _ ->
+  | Pexp_unboxed_bool _ ->
     false
-  | Texp_tuple (exps, _) ->
+  | Pexp_tuple exps ->
     List.exists (fun (_, exp) -> maybe_computation exp) exps
-  | Texp_unboxed_tuple exps ->
-    List.exists (fun (_, exp, _) -> maybe_computation exp) exps
-  | Texp_construct (_, _, _, exps, _) ->
+  | Pexp_unboxed_tuple exps ->
     List.exists (fun (_, exp) -> maybe_computation exp) exps
-  | Texp_variant (_, Some (exp, _)) ->
+  | Pexp_construct (_, Some exp) | Pexp_variant (_, Some exp) ->
     maybe_computation exp
-  | Texp_variant (_, None) ->
+  | Pexp_construct (_, None) | Pexp_variant (_, None) ->
     false
-  | Texp_record { fields; extended_expression = None; _ } ->
-    Array.exists
-      (function
-      | (_, _, Overridden (_, exp)) -> maybe_computation exp
-      | (_, _, Kept _) -> false)
-      fields
-  | Texp_record { extended_expression = Some _; _ } ->
+  | Pexp_record (fields, None) | Pexp_record_unboxed_product (fields, None) ->
+    List.exists (fun (_, exp) -> maybe_computation exp) fields
+  | Pexp_record (_, Some _) | Pexp_record_unboxed_product (_, Some _) ->
     true
-  | Texp_record_unboxed_product { fields; extended_expression = None; _ } ->
-    Array.exists
-      (function
-      | (_, _, Overridden (_, exp)) -> maybe_computation exp
-      | (_, _, Kept _) -> false)
-      fields
-  | Texp_record_unboxed_product { extended_expression = Some _; _ } ->
-    true
-  | Texp_field { record = exp; _ } ->
+  | Pexp_field (exp, _) ->
     maybe_computation exp
-  | Texp_unboxed_field { record = exp; _ } ->
+  | Pexp_unboxed_field (exp, _) ->
     maybe_computation exp
-  | Texp_array (_, _, exps, _) ->
+  | Pexp_array (_, exps) ->
     List.exists maybe_computation exps
-  | Texp_hole _ ->
+  | Pexp_hole ->
     false
-  | Texp_quotation exp ->
+  | Pexp_constraint (e, _, _) | Pexp_coerce (e, _, _) ->
+    maybe_computation e
+  | Pexp_quote exp ->
     (* Approximate quote values as quotes of values.
        Note that splices are always considered computations. *)
     maybe_computation exp
   (* it is always safe to approximate [maybe_computation] as [true]. *)
-  | Texp_let _
-  | Texp_letmutable _
-  | Texp_apply _
-  | Texp_match _
-  | Texp_try _
-  | Texp_atomic_loc _
-  | Texp_setfield _
-  | Texp_idx _
-  | Texp_list_comprehension _
-  | Texp_array_comprehension _
-  | Texp_ifthenelse _
-  | Texp_sequence _
-  | Texp_while _
-  | Texp_for _
-  | Texp_send _
-  | Texp_new _
-  | Texp_instvar _
-  | Texp_mutvar _
-  | Texp_setinstvar _
-  | Texp_setmutvar _
-  | Texp_override _
-  | Texp_letmodule _
-  | Texp_letexception _
-  | Texp_assert _
-  | Texp_lazy _
-  | Texp_object _
-  | Texp_pack _
-  | Texp_letop _
-  | Texp_unreachable
-  | Texp_extension_constructor _
-  | Texp_open _
-  | Texp_probe _
-  | Texp_probe_is_enabled _
-  | Texp_exclave _
-  | Texp_src_pos
-  | Texp_overwrite _
-  | Texp_antiquotation _
-  | Texp_apply_layout _
+  | Pexp_let _
+  | Pexp_apply _
+  | Pexp_match _
+  | Pexp_try _
+  | Pexp_setfield _
+  | Pexp_idx _
+  | Pexp_comprehension _
+  | Pexp_ifthenelse _
+  | Pexp_sequence _
+  | Pexp_while _
+  | Pexp_for _
+  | Pexp_send _
+  | Pexp_new _
+  | Pexp_setvar _
+  | Pexp_override _
+  | Pexp_letmodule _
+  | Pexp_letexception _
+  | Pexp_assert _
+  | Pexp_lazy _
+  | Pexp_object _
+  | Pexp_pack _
+  | Pexp_letop _
+  | Pexp_unreachable
+  | Pexp_extension _
+  | Pexp_open _
+  | Pexp_overwrite _
+  | Pexp_newtype _
+  | Pexp_poly _
+  | Pexp_stack _
+  | Pexp_borrow _
+  | Pexp_splice _
     -> true
 
 (* Returns true if, for every [Texp_ident x] occurring in the expression,
@@ -8720,7 +8701,7 @@ and type_expect_
         else mode_quoted
       in
       let arg = type_expect new_env mode_quoted exp (mk_expected ty) in
-      if maybe_computation arg then
+      if maybe_computation exp then
         submode ~loc ~env ~reason:Other mode_computation_quoted expected_mode;
       re {
         exp_desc = Texp_quotation arg;
