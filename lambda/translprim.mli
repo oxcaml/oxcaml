@@ -44,7 +44,8 @@ val transl_primitive_application :
   Lambda.scoped_location -> Primitive.description -> Env.t ->
   Types.type_expr ->
   poly_mode:Mode.Locality.l option -> stack:bool ->
-  poly_sort:Jkind.Sort.t option -> Path.t ->
+  poly_sort:Jkind.Sort.t option ->
+  yielding:Lambda.yielding_kind -> Path.t ->
   Typedtree.expression option ->
   Lambda.lambda list -> Typedtree.expression list ->
   Lambda.region_close -> Lambda.lambda
