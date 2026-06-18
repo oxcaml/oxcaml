@@ -390,7 +390,8 @@ Error: The module is "nonportable"
        However, the module highlighted is expected to be "portable".
 |}]
 
-(* CR-soon shsong: check noalloc_strict here *)
+(* CR-soon shsong: construction of functor calls register_allocation,
+    will be fixed after that *)
 module (F @ portable) (X : sig val x : int -> int end) = struct
     let bar = X.x
 end
