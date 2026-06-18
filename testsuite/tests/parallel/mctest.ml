@@ -1,7 +1,7 @@
 (* TEST
- runtime5;
- multidomain;
+ multicore;
  include unix;
+ multicore;
  hasunix;
  {
    bytecode;

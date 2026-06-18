@@ -31,7 +31,7 @@ Line 3, characters 0-52:
 3 | type packed = P : 'a non_float -> packed [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
-and would not be accepted by upstream OCaml.
+  and would not be accepted by upstream OCaml.
 
 type packed = P : 'a non_float -> packed [@@unboxed]
 |}]
@@ -72,7 +72,7 @@ Line 1, characters 0-71:
 1 | type exists = E : ('a : value mod non_float) . 'a -> exists [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
-and would not be accepted by upstream OCaml.
+  and would not be accepted by upstream OCaml.
 
 type exists = E : ('a : value non_float). 'a -> exists [@@unboxed]
 |}]
@@ -90,7 +90,7 @@ Lines 3-4, characters 0-68:
 3 | type packed_void_not_external =
 4 |     P : 'a void_not_external -> packed_void_not_external [@@unboxed]
 Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
-and would not be accepted by upstream OCaml.
+  and would not be accepted by upstream OCaml.
 
 type packed_void_not_external =
     P : 'a void_not_external -> packed_void_not_external [@@unboxed]
@@ -103,7 +103,7 @@ Line 1, characters 0-66:
 1 | type exists_word = W : ('a : word) . 'a -> exists_word [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
-and would not be accepted by upstream OCaml.
+  and would not be accepted by upstream OCaml.
 
 type exists_word = W : ('a : word). 'a -> exists_word [@@unboxed]
 |}]

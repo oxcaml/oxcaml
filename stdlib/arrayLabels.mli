@@ -178,6 +178,24 @@ val of_list : ('a : value_or_null mod separable). 'a list -> 'a array
    @raise Invalid_argument if the length of [l] is greater than
    [Sys.max_array_length]. *)
 
+(** {1:comparison Comparison} *)
+
+val equal : ('a : value_or_null mod separable).
+   eq:('a -> 'a -> bool) -> 'a array -> 'a array -> bool
+(** [equal eq a b] is [true] if and only if [a] and [b] have the
+    same length [n] and for all [i] in \[[0];[n-1]\], [eq a.(i) b.(i)]
+    is [true].
+
+    @since 5.4 *)
+
+val compare : ('a : value_or_null mod separable).
+   cmp:('a -> 'a -> int) -> 'a array -> 'a array -> int
+(** [compare cmp a b] compares [a] and [b] according to the shortlex order,
+    that is, shorter arrays are smaller and equal-sized arrays are compared
+    in lexicographic order using [cmp] to compare elements.
+
+    @since 5.4 *)
+
 (** {1 Iterators} *)
 
 val iter : ('a : value_or_null mod separable).
@@ -364,7 +382,7 @@ val sort : ('a : value_or_null mod separable).
 
    When [sort] returns, [a] contains the same elements as before,
    reordered in such a way that for all i and j valid indices of [a] :
--   [cmp a.(i) a.(j)] >= 0 if and only if i >= j
+-   [cmp a.(i) a.(j)] >= 0 if i >= j
 *)
 
 val stable_sort : ('a : value_or_null mod separable).

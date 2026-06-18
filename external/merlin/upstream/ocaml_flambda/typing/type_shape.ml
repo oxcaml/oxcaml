@@ -324,8 +324,8 @@ module Type_shape = struct
                 | Tvariant _ | Tunivar _
                 | Tpoly (_, _)
                 | Trepr (_, _)
-                | Tpackage (_, _)
-                | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ ->
+                | Tpackage _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _
+                  ->
                   assert false
               in
               Misc.fatal_errorf
@@ -409,86 +409,78 @@ module Type_decl_shape = struct
         (Array.to_list (Array.map mixed_block_shape_to_layout args))
 
   let of_complex_constructor type_subst name
-      (cstr_args : Types.constructor_declaration) arg_layout shape_for_constr =
+      (cstr_args : Types.constructor_declaration)
+      ((constructor_repr, _) : Types.constructor_representation * _)
+      shape_for_constr =
     let args =
       match cstr_args.cd_args with
       | Cstr_tuple list ->
-        Misc.Stdlib.List.map_option
+        List.map
           (fun ({ ca_type = type_expr; ca_sort = type_layout; _ } :
                  Types.constructor_argument) ->
-            Option.map
-              (fun type_layout ->
-                { Shape.field_name = None;
-                  field_uid = None;
-                  field_value =
-                    ( Type_shape.of_type_expr_with_type_subst type_expr
-                        shape_for_constr type_subst,
-                      type_layout )
-                })
-              type_layout)
+            { Shape.field_name = None;
+              field_uid = None;
+              field_value =
+                ( Type_shape.of_type_expr_with_type_subst type_expr
+                    shape_for_constr type_subst,
+                  type_layout )
+            })
           list
       | Cstr_record list ->
-        Misc.Stdlib.List.map_option
+        List.map
           (fun (lbl : Types.label_declaration) ->
-            Option.map
-              (fun sort ->
-                { Shape.field_name = Some (Ident.name lbl.ld_id);
-                  field_uid = Some lbl.ld_uid;
-                  field_value =
-                    ( Type_shape.of_type_expr_with_type_subst lbl.ld_type
-                        shape_for_constr type_subst,
-                      sort )
-                })
-              lbl.ld_sort)
+            { Shape.field_name = Some (Ident.name lbl.ld_id);
+              field_uid = Some lbl.ld_uid;
+              field_value =
+                ( Type_shape.of_type_expr_with_type_subst lbl.ld_type
+                    shape_for_constr type_subst,
+                  lbl.ld_sort )
+            })
           list
     in
-    match (arg_layout : Types.cstr_layout), args with
-    | Cstr_layout_known { shape = constructor_repr; _ }, Some args ->
-      let constructor_repr =
-        match (constructor_repr : Types.constructor_representation) with
-        | Constructor_mixed shapes ->
-          List.iter2
-            (fun mix_shape { Shape.field_name = _; field_value = _, ly } ->
-              let ly2 = mixed_block_shape_to_layout mix_shape in
-              if not (Layout.equal ly ly2)
+    let constructor_repr =
+      match constructor_repr with
+      | Constructor_mixed shapes ->
+        List.iter2
+          (fun mix_shape { Shape.field_name = _; field_value = _, ly } ->
+            let ly2 = mixed_block_shape_to_layout mix_shape in
+            if not (Layout.equal ly ly2)
+            then
+              if !Clflags.dwarf_pedantic
+              then
+                Misc.fatal_errorf_doc
+                  "Type_shape: variant constructor with mismatched layout, has \
+                   %a but expected %a"
+                  Layout.format ly Layout.format ly2
+              else ())
+          (Array.to_list shapes) args;
+        Array.map mixed_block_shape_to_layout shapes
+      | Constructor_uniform_value ->
+        let lys =
+          List.map
+            (fun { Shape.field_name = _; field_value = _, ly } ->
+              if
+                not
+                  (Layout.equal ly (Layout.Base Scannable)
+                  || Layout.equal ly (Layout.Base Void))
               then
                 if !Clflags.dwarf_pedantic
                 then
                   Misc.fatal_errorf_doc
                     "Type_shape: variant constructor with mismatched layout, \
-                     has %a but expected %a"
-                    Layout.format ly Layout.format ly2
-                else ())
-            (Array.to_list shapes) args;
-          Array.map mixed_block_shape_to_layout shapes
-        | Constructor_uniform_value ->
-          let lys =
-            List.map
-              (fun { Shape.field_name = _; field_value = _, ly } ->
-                if
-                  not
-                    (Layout.equal ly (Layout.Base Scannable)
-                    || Layout.equal ly (Layout.Base Void))
-                then
-                  if !Clflags.dwarf_pedantic
-                  then
-                    Misc.fatal_errorf_doc
-                      "Type_shape: variant constructor with mismatched layout, \
-                       has %a but expected value or void."
-                      Layout.format ly
-                  else Layout.Base Scannable
-                else ly)
-              args
-          in
-          Array.of_list lys
-      in
-      Some
-        { Shape.name;
-          constr_uid = Some cstr_args.cd_uid;
-          kind = constructor_repr;
-          args
-        }
-    | Cstr_layout_known _, None | Cstr_layout_variable, _ -> None
+                     has %a but expected value or void."
+                    Layout.format ly
+                else Layout.Base Scannable
+              else ly)
+            args
+        in
+        Array.of_list lys
+    in
+    { Shape.name;
+      constr_uid = Some cstr_args.cd_uid;
+      kind = constructor_repr;
+      args
+    }
 
   let is_empty_constructor_list (cstr_args : Types.constructor_declaration) =
     match cstr_args.cd_args with
@@ -499,22 +491,15 @@ module Type_decl_shape = struct
       false
 
   let record_of_labels ~shape_for_constr ~type_subst kind labels =
-    let label_shapes =
-      Misc.Stdlib.List.map_option
-        (fun (lbl : Types.label_declaration) ->
-          Option.map
-            (fun sort ->
-              ( Ident.name lbl.ld_id,
-                Some lbl.ld_uid,
-                Type_shape.of_type_expr_with_type_subst lbl.ld_type
-                  shape_for_constr type_subst,
-                sort ))
-            lbl.ld_sort)
-        labels
-    in
-    match label_shapes with
-    | Some shapes -> Shape.record kind shapes
-    | None -> Shape.unknown_type ()
+    Shape.record kind
+      (List.map
+         (fun (lbl : Types.label_declaration) ->
+           ( Ident.name lbl.ld_id,
+             Some lbl.ld_uid,
+             Type_shape.of_type_expr_with_type_subst lbl.ld_type
+               shape_for_constr type_subst,
+             lbl.ld_sort ))
+         labels)
 
   let type_var_count = ref 0
 
@@ -542,17 +527,14 @@ module Type_decl_shape = struct
             List.combine cstr_list (Array.to_list layouts)
           in
           let constructors =
-            Misc.Stdlib.List.map_option
+            List.map
               (fun ((cstr, arg_layouts) : Types.constructor_declaration * _) ->
                 let name = Ident.name cstr.cd_id in
                 of_complex_constructor type_subst name cstr arg_layouts
                   shape_for_constr)
               cstrs_with_layouts
           in
-          begin match constructors with
-          | Some constructors -> Shape.variant constructors
-          | None -> Shape.unknown_type ()
-          end
+          Shape.variant constructors
         | Type_variant ([cstr], Variant_unboxed, _unsafe_mode_crossing)
           when not (is_empty_constructor_list cstr) ->
           let name = Ident.name cstr.cd_id in
@@ -565,15 +547,11 @@ module Type_decl_shape = struct
             | Cstr_tuple _ | Cstr_record _ ->
               Misc.fatal_error "Unboxed variant must have exactly one argument."
           in
-          begin match layout with
-          | Some layout ->
-            Shape.variant_unboxed ~variant_uid:(Some cstr_uid)
-              ~arg_uid:field_uid name field_name
-              (Type_shape.of_type_expr_with_type_subst type_expr
-                 shape_for_constr type_subst)
-              layout
-          | None -> Shape.unknown_type ()
-          end
+          Shape.variant_unboxed ~variant_uid:(Some cstr_uid) ~arg_uid:field_uid
+            name field_name
+            (Type_shape.of_type_expr_with_type_subst type_expr shape_for_constr
+               type_subst)
+            layout
         | Type_variant ([_], Variant_unboxed, _unsafe_mode_crossing) ->
           Misc.fatal_error "Unboxed variant must have constructor arguments."
         | Type_variant (([] | _ :: _ :: _), Variant_unboxed, _) ->
@@ -599,7 +577,7 @@ module Type_decl_shape = struct
               List.map
                 (fun (lbl : Types.label_declaration) ->
                   { lbl with
-                    ld_sort = Jkind_types.Sort.Const.(some float64);
+                    ld_sort = Base Float64;
                     ld_type = Types_predef.type_unboxed_float
                   })
                   (* CR sspies: We are changing the type and the layout here.
@@ -620,7 +598,7 @@ module Type_decl_shape = struct
                  [match e with Foo r -> ...]."
             else unknown_shape ()
           | Record_dummy _ -> Misc.fatal_error "unexpected dummy representation"
-          | Record_variable -> unknown_shape ())
+          )
         | Type_abstract _ -> unknown_shape ()
         | Type_open -> unknown_shape ()
         | Type_record_unboxed_product (lbl_list, _, _) ->

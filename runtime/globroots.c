@@ -140,6 +140,7 @@ CAMLexport void caml_remove_generational_global_root(value *r)
       caml_delete_global_root(&caml_global_roots_old, r);
       /* Fallthrough: the root can be in the young list while actually
          being in the major heap. */
+      fallthrough;
     case YOUNG:
       caml_delete_global_root(&caml_global_roots_young, r);
       break;
@@ -200,9 +201,8 @@ static void caml_register_dyn_global(void *v) {
 }
 
 void caml_register_dyn_globals(void **globals, int nglobals) {
-  int i;
   caml_plat_lock_blocking(&roots_mutex);
-  for (i = 0; i < nglobals; i++)
+  for (int i = 0; i < nglobals; i++)
     caml_register_dyn_global(globals[i]);
   caml_plat_unlock(&roots_mutex);
 }
@@ -247,17 +247,13 @@ static void compute_index_for_global_root_scan(value* glob_block, int* start,
 
 static void scan_native_globals(scanning_action f, void* fdata)
 {
-  int i, j;
-  value* glob;
-  value glob_block;
-  int start, stop;
-
   /* The global roots */
-  for (i = 0; caml_globals[i] != 0; i++) {
-    for(glob = caml_globals[i]; *glob != 0; glob++) {
-      glob_block = *glob;
+  for (int i = 0; caml_globals[i] != 0; i++) {
+    for(value *glob = caml_globals[i]; *glob != 0; glob++) {
+      value glob_block = *glob;
+      int start, stop;
       compute_index_for_global_root_scan(&glob_block, &start, &stop);
-      for (j = start; j < stop; j++) {
+      for (int j = start; j < stop; j++) {
         f(fdata, Field(glob_block, j), &Field(glob_block, j));
       }
     }
@@ -265,11 +261,12 @@ static void scan_native_globals(scanning_action f, void* fdata)
 
   /* Dynamic global roots (natdynlink and manual module init) */
   caml_plat_lock_blocking(&roots_mutex);
+  int start, stop;
   FOREACH_SKIPLIST_ELEMENT(e, &caml_dyn_globals, {
-    for(glob = (value *) (e->key); *glob != 0; glob++) {
-      glob_block = *glob;
+    for(value *glob = (value *) (e->key); *glob != 0; glob++) {
+      value glob_block = *glob;
       compute_index_for_global_root_scan(&glob_block, &start, &stop);
-      for (j = start; j < stop; j++) {
+      for (int j = start; j < stop; j++) {
         f(fdata, Field(glob_block, j), &Field(glob_block, j));
       }
     }
@@ -281,7 +278,8 @@ static void scan_native_globals(scanning_action f, void* fdata)
 
 /* Iterate a GC scanning action over a global root list */
 Caml_inline void caml_iterate_global_roots(scanning_action f,
-                                      struct skiplist * rootlist, void* fdata)
+                                           struct skiplist * rootlist,
+                                           void* fdata)
 {
   CAMLassert(iterating_roots > 0);
   FOREACH_SKIPLIST_ELEMENT(e, rootlist, {

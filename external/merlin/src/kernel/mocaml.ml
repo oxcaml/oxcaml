@@ -53,7 +53,7 @@ let setup_reader_config config =
     Unit_info.make_with_known_compilation_unit
       ~source_file:config.query.filename guessed_file_type "" compilation_unit
   in
-  Env.set_unit_name (Some unit_info);
+  Env.set_current_unit unit_info;
   Location.input_name := config.query.filename;
   fast := ocaml.unsafe;
   classic := ocaml.classic;

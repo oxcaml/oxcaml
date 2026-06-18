@@ -31,8 +31,8 @@
 #include <netdb.h>
 #endif
 
-extern int caml_unix_socket_domain_table[]; /* from socket.c */
-extern int caml_unix_socket_type_table[];   /* from socket.c */
+extern const int caml_unix_socket_domain_table[]; /* from socket.c */
+extern const int caml_unix_socket_type_table[];   /* from socket.c */
 
 static value convert_addrinfo(struct addrinfo * a)
 {
@@ -63,7 +63,7 @@ CAMLprim value caml_unix_getaddrinfo(value vnode, value vserv, value vopts)
   CAMLlocal3(vres, v, e);
   char * node, * serv;
   struct addrinfo hints;
-  struct addrinfo * res, * r;
+  struct addrinfo * res;
   int retcode;
 
   if (! (caml_string_is_c_safe(vnode) && caml_string_is_c_safe(vserv)))
@@ -117,7 +117,7 @@ CAMLprim value caml_unix_getaddrinfo(value vnode, value vserv, value vopts)
   /* Convert result */
   vres = Val_emptylist;
   if (retcode == 0) {
-    for (r = res; r != NULL; r = r->ai_next) {
+    for (struct addrinfo *r = res; r != NULL; r = r->ai_next) {
       e = convert_addrinfo(r);
       v = caml_alloc_small(2, Tag_cons);
       Field(v, 0) = e;

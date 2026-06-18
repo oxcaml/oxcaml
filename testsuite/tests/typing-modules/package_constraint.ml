@@ -53,9 +53,9 @@ type m2 = (module S with type t = t_value);;
 [%%expect{|
 module type S = sig type t : immediate end
 type m1 = (module S with type t = int)
-Line 6, characters 10-42:
+Line 6, characters 18-41:
 6 | type m2 = (module S with type t = t_value);;
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      ^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this "with" constraint, the new definition of "t"
        does not match its original definition in the constrained signature:
        Type declarations do not match:
@@ -77,9 +77,9 @@ end
 type m = (module S with type t = t_value);;
 [%%expect{|
 module type S = sig type t = int end
-Line 5, characters 9-41:
+Line 5, characters 17-40:
 5 | type m = (module S with type t = t_value);;
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     ^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the constrained signature, type "t" is defined to be "int".
        Package "with" constraints may only be used on abstract types.
 |}];;
@@ -93,9 +93,9 @@ end
 type m = (module S with type t = int);;
 [%%expect{|
 module type S = sig type t = int end
-Line 5, characters 9-37:
+Line 5, characters 17-36:
 5 | type m = (module S with type t = int);;
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     ^^^^^^^^^^^^^^^^^^^
 Error: In the constrained signature, type "t" is defined to be "int".
        Package "with" constraints may only be used on abstract types.
 |}];;
@@ -113,9 +113,9 @@ type m = (module S with type P.t = int);;
 [%%expect{|
 module M : sig type t end
 module type S = sig module P = M end
-Line 9, characters 9-39:
+Line 9, characters 17-38:
 9 | type m = (module S with type P.t = int);;
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     ^^^^^^^^^^^^^^^^^^^^^
 Error: In the constrained signature, type "P.t" is defined to be "M.t".
        Package "with" constraints may only be used on abstract types.
 |}];;
@@ -268,9 +268,9 @@ module type Private_row =
   sig type a and t = private [< `A | `B ] and b and d = private [< `C ] end
 module type Test =
   sig type a and t = [ `A ] and b and d = private [< `C ] end
-Line 13, characters 12-54:
+Line 13, characters 20-52:
 13 | type fail = (module Private_row with type t = [ `A ] )
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the constrained signature, type "t" is defined to be "[< `A | `B ]".
        Package "with" constraints may only be used on abstract types.
 |}]
@@ -284,36 +284,36 @@ end
 type t1 = (module Private_row with type t = [ `A ])
 [%%expect{|
 module type Private_row = sig type t = private [< `A ] end
-Line 5, characters 10-51:
+Line 5, characters 18-50:
 5 | type t1 = (module Private_row with type t = [ `A ])
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the constrained signature, type "t" is defined to be "[< `A ]".
        Package "with" constraints may only be used on abstract types.
 |}]
 
 type t2 = (module Private_row with type t = [< `A ])
 [%%expect{|
-Line 1, characters 10-52:
+Line 1, characters 18-51:
 1 | type t2 = (module Private_row with type t = [< `A ])
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the constrained signature, type "t" is defined to be "[< `A ]".
        Package "with" constraints may only be used on abstract types.
 |}]
 
 type 'a t3 = (module Private_row with type t = [< `A ]) as 'a
 [%%expect{|
-Line 1, characters 13-55:
+Line 1, characters 21-54:
 1 | type 'a t3 = (module Private_row with type t = [< `A ]) as 'a
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the constrained signature, type "t" is defined to be "[< `A ]".
        Package "with" constraints may only be used on abstract types.
 |}]
 
 type 'a t4 = (module Private_row with type t = [< `A ] as 'a)
 [%%expect{|
-Line 1, characters 13-61:
+Line 1, characters 21-60:
 1 | type 'a t4 = (module Private_row with type t = [< `A ] as 'a)
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the constrained signature, type "t" is defined to be "[< `A ]".
        Package "with" constraints may only be used on abstract types.
 |}]
@@ -343,3 +343,14 @@ Error: This type "t_value" should be an instance of type "('a : immediate)"
          because of the definition of t at line 5, characters 0-39.
        Note: The layout of immediate is value non_pointer.
 |}];;
+
+(** Issue 13778: constraining a type should count as using it *)
+module X: sig
+  type t
+end = struct
+  module type S = sig type s end
+  type t = (module S with type s = int)
+end
+[%%expect {|
+module X : sig type t end
+|}]

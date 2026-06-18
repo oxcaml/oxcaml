@@ -84,7 +84,11 @@ let rec stub_function_body expr =
       | Function_body body_expr -> Function_body (stub_function_body body_expr)
       | Function_cases fc_cases ->
         let cases =
-          [{ c_lhs = any_pat; c_guard = None; c_rhs = apply_dummy2 }]
+          [ { c_lhs = any_pat;
+              c_cont = None;
+              c_guard = None;
+              c_rhs = apply_dummy2
+            } ]
         in
         Function_cases { fc_cases with cases }
     in

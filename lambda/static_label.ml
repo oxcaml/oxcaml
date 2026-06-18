@@ -23,3 +23,5 @@ let get_and_incr seq =
   res
 
 let of_int_unsafe i = i
+
+let min = Int.min
