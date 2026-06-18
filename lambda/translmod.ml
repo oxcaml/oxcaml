@@ -195,6 +195,9 @@ and apply_coercion_result loc strict funct params args cc_res =
                       ap_result_layout=Lambda.layout_module;
                       ap_region_close=Rc_normal;
                       ap_mode=alloc_heap;
+                      (* Functor-coercion stub: [funct] is already lowered to
+                         lambda here, so its yielding mode is unavailable;
+                         conservatively may yield *)
                       ap_yielding=May_yield;
                       ap_tailcall=Default_tailcall;
                       ap_inlined=Default_inlined;
@@ -1013,6 +1016,8 @@ and transl_include_functor ~generative ~input_repr modl params scopes loc =
     ap_result_layout = Lambda.layout_module;
     ap_region_close=Rc_normal;
     ap_mode = alloc_heap;
+    (* [include functor]: the functor is applied to the enclosing structure,
+       whose yielding mode we don't have here, so conservatively may yield *)
     ap_yielding = May_yield;
     ap_tailcall = Default_tailcall;
     ap_inlined = inlined_attribute;
@@ -1492,6 +1497,8 @@ let transl_instance_impl
       ap_tailcall = Default_tailcall;
       ap_specialised = Default_specialise;
       ap_mode = alloc_heap;
+      (* Runtime instantiation of a parameterised functor; always inlined, so
+         this is conservative *)
       ap_yielding = May_yield;
       ap_region_close = Rc_normal;
       ap_probe = None;

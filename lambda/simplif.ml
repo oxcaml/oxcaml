@@ -902,6 +902,10 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
             ap_loc = loc;
             ap_region_close = Rc_normal;
             ap_mode = alloc_heap;
+            (* CR-someday aspsmith: We could be more precise here (the wrapper
+               tail-calls a known inner function), but it doesn't currently
+               matter: this function is only called during lambda-to-flambda,
+               which ignores [ap_yielding]. *)
             ap_yielding = May_yield;
             ap_tailcall = Default_tailcall;
             ap_inlined = Default_inlined;

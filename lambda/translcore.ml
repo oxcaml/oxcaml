@@ -1449,6 +1449,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           ap_result_layout = return_layout;
           ap_region_close = Rc_normal;
           ap_mode = alloc_local;
+          (* The probe handler is the user's [%probe] body, so may yield *)
           ap_yielding = May_yield;
           ap_loc;
           ap_tailcall = Default_tailcall;
@@ -2973,6 +2974,8 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
                ap_result_layout = result_layout;
                ap_region_close=Rc_normal;
                ap_mode=alloc_heap;
+               (* The let-operator (e.g. [and+]) is a user-defined function,
+                  and is forced to legacy mode for now, so may yield *)
                ap_yielding=May_yield;
                ap_tailcall = Default_tailcall;
                ap_inlined = Default_inlined;
@@ -3032,6 +3035,8 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
         let_.bop_op_type;
     ap_region_close=Rc_normal;
     ap_mode=alloc_heap;
+    (* The let-operator (e.g. [let*]) is a user-defined function, and is
+       forced to legacy mode for now, so may yield *)
     ap_yielding=May_yield;
     ap_tailcall = Default_tailcall;
     ap_inlined = Default_inlined;
