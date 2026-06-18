@@ -28,16 +28,7 @@
         packages = {
           inherit oxcaml;
           oxcaml-fp = oxcaml.override { framePointers = true; };
-          oxcaml-r5 = oxcaml.override { runtime5 = true; };
-          oxcaml-fp-r5 = oxcaml.override {
-            framePointers = true;
-            runtime5 = true;
-          };
           oxcaml-asan = oxcaml.override { addressSanitizer = true; };
-          oxcaml-asan-r5 = oxcaml.override {
-            addressSanitizer = true;
-            runtime5 = true;
-          };
           default = oxcaml;
         };
 
@@ -45,10 +36,7 @@
           inherit (self.packages.${system})
             oxcaml
             oxcaml-fp
-            oxcaml-r5
-            oxcaml-fp-r5
             oxcaml-asan
-            oxcaml-asan-r5
             ;
         };
 

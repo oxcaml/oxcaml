@@ -314,7 +314,11 @@ let print_general_infos print_name name crc defines arg_descr mbf
 
 let print_global_table table =
   printf "Globals defined:\n";
-  Symtable.iter_global_map (fun id _ -> print_line (Symtable.Global.name id))
+  Symtable.iter_global_map
+    (fun global _ ->
+       let desc = Format_doc.compat Symtable.Global.description in
+       print_line (Format.asprintf "%a" desc global)
+    )
     table
 
 open Cmx_format
@@ -609,9 +613,17 @@ let dump_obj filename =
   then dump_cmxs ic
   else exit_magic_error ~expected_kind:None (Parse_error head_error)
 
+let print_version () =
+  Format.printf "ocamlobjinfo, version %s@." Sys.ocaml_version;
+  exit 0
+
+let print_version_num () =
+  Format.printf "%s@." Sys.ocaml_version;
+  exit 0
+
 let arg_list = [
   "-quiet", Arg.Set quiet,
-    " Only print explicitely required information";
+    " Only print explicitly required information";
   "-no-approx", Arg.Set no_approx,
     " Do not print module approximation information";
   "-no-code", Arg.Set no_code,
@@ -625,6 +637,8 @@ let arg_list = [
   "-uid-deps", Arg.Set uid_deps,
     " Print the declarations' uids dependencies of the module";
   "-null-crc", Arg.Set no_crc, " Print a null CRC for imported interfaces";
+  "-version", Arg.Unit print_version, " Print version and exit";
+  "-vnum", Arg.Unit print_version_num, " Print version number and exit";
   "-args", Arg.Expand Arg.read_arg,
      "<file> Read additional newline separated command line arguments \n\
      \      from <file>";

@@ -268,7 +268,7 @@ L149:
   %64 = load i64, ptr %18
   store i64 %64, ptr %4
   %65 = load i64, ptr %ds
-  %66 = add i64 %65, 240
+  %66 = add i64 %65, 272
   %67 = inttoptr i64 %66 to ptr
   store i64 0, ptr %67
   %68 = load i64, ptr %4
@@ -363,7 +363,7 @@ L174:
   %52 = load i64, ptr %17
   store i64 %52, ptr %4
   %53 = load i64, ptr %ds
-  %54 = add i64 %53, 240
+  %54 = add i64 %53, 272
   %55 = inttoptr i64 %54 to ptr
   store i64 0, ptr %55
   %56 = load i64, ptr %4

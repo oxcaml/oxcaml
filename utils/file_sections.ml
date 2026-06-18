@@ -144,11 +144,15 @@ module Builder = struct
 
   let add_all t sections =
     let offset = Dynarray.length t in
-    let num_new_sections = length sections in
-    Dynarray.ensure_extra_capacity t num_new_sections;
-    for i = 0 to num_new_sections - 1 do
-      Dynarray.add_last t (unsafe_get sections i)
-    done;
+    (match sections with
+    | From_file { sections; channel } ->
+      let num_new_sections = Array.length sections in
+      Dynarray.ensure_extra_capacity t num_new_sections;
+      for i = 0 to num_new_sections - 1 do
+        Dynarray.add_last t (read_section sections channel i)
+      done;
+    | In_memory sections ->
+      Dynarray.append_array t sections);
     (fun i -> i + offset)
 
   let build t = In_memory (Dynarray.to_array t)

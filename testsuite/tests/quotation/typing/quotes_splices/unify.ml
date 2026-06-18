@@ -119,7 +119,7 @@ let _ = <[ fun (Equal : ($Inst1.t, int NonInst0.t) Type.eq)
 Line 8, characters 38-39:
 8 |                (x : Inst1.t expr) -> (x : <[int NonInst0.t]> expr) ]>
                                           ^
-Error: This expression has type "Inst1.t expr"
+Error: The value "x" has type "Inst1.t expr"
        but an expression was expected of type "<[int NonInst0.t]> expr"
        Type "Inst1.t" is not compatible with type "<[int NonInst0.t]>"
 |}]
@@ -130,7 +130,7 @@ let _ = <[ fun (Equal : (int NonInst0.t, $Inst1.t) Type.eq)
 Line 2, characters 38-39:
 2 |                (x : Inst1.t expr) -> (x : <[int NonInst0.t]> expr) ]>
                                           ^
-Error: This expression has type "Inst1.t expr"
+Error: The value "x" has type "Inst1.t expr"
        but an expression was expected of type "<[int NonInst0.t]> expr"
        Type "Inst1.t" is not compatible with type "<[int NonInst0.t]>"
 |}]
@@ -233,7 +233,7 @@ let _ = <[ fun (Equal : ($Inst1.t, $Inst1.t') Type.eq) ->
 Line 2, characters 39-40:
 2 |         $( (fun (x : Inst1.t expr) -> (x : Inst1.t' expr))
                                            ^
-Error: This expression has type "Inst1.t expr"
+Error: The value "x" has type "Inst1.t expr"
        but an expression was expected of type "Inst1.t' expr"
        Type "Inst1.t" is not compatible with type "Inst1.t'"
 |}]

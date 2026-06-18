@@ -293,6 +293,10 @@ let reg_stack_arg_begin = H.reg_x (phys_reg Int X20)
 
 let reg_stack_arg_end = H.reg_x (phys_reg Int X21)
 
+(* Callee-saved register used to store the OCaml stack pointer around a noalloc
+   external call. *)
+let reg_x_extcall_saved_sp = H.reg_x (phys_reg Int X19)
+
 (** Turn a Linear label into an assembly label. The section is checked against
     the section tracked by [D] when emitting label definitions. *)
 let label_to_asm_label (l : label) ~(section : Asm_targets.Asm_section.t) : L.t
@@ -1450,18 +1454,21 @@ let emit_instr env i =
       A.ins1 BL (runtime_function S.Predef.caml_c_call);
       record_frame env i.live (Dbg_other i.dbg))
     else (
-      (* Store OCaml stack pointer in the frame pointer register. No need to
-         store previous x29 because OCaml doesn't maintain frame pointers. *)
+      (* Store OCaml stack pointer in x19, a callee-save register that the C
+         call will preserve. We used to use x29 (frame pointer) here, but
+         caml_start_program leaves it pointing to its C stack for the unwinder,
+         so it can't be clobbered here. *)
       if Config.runtime5
       then (
-        A.ins_mov_from_sp ~dst:O.fp;
+        A.ins_mov_from_sp ~dst:reg_x_extcall_saved_sp;
         D.cfi_remember_state ();
-        D.cfi_def_cfa_register ~reg:(Int.to_string (R.gp_encoding R.fp));
+        D.cfi_def_cfa_register
+          ~reg:(Int.to_string (H.gp_x_dwarf_encoding reg_x_extcall_saved_sp));
         A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_c_stack);
         A.ins_mov_to_sp ~src:reg_x_tmp1)
       else D.cfi_remember_state ();
       A.ins1 BL (symbol (Needs_reloc CALL26) (S.create_global func));
-      if Config.runtime5 then A.ins_mov_to_sp ~src:O.fp;
+      if Config.runtime5 then A.ins_mov_to_sp ~src:reg_x_extcall_saved_sp;
       D.cfi_restore_state ())
   | Lop (Stackoffset n) ->
     assert (n mod 16 = 0);
@@ -2182,12 +2189,19 @@ let end_assembly () =
   global_maybe_protected data_end_sym;
   D.define_symbol_label ~section:Data data_end_sym;
   D.int64 0L;
+  let frametable_section : Asm_targets.Asm_section.t =
+    (* This is inconsistent with x86, where the non-rodata section is [Text]
+       instead of [Data]. Now that [frametables_in_rodata] is the default, it's
+       unclear how much this matters. *)
+    if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Data
+  in
+  D.switch_to_section frametable_section;
   D.align ~fill:Zero ~bytes:8;
   (* #7887 *)
   let frametable = Cmm_helpers.make_symbol "frametable" in
   let frametable_sym = S.create_global frametable in
   global_maybe_protected frametable_sym;
-  D.define_symbol_label ~section:Data frametable_sym;
+  D.define_symbol_label ~section:frametable_section frametable_sym;
   (* CR sspies: Share the [emit_frames] code with the x86 backend. *)
   emit_frames
     { efa_code_label =
@@ -2210,15 +2224,12 @@ let end_assembly () =
       efa_align = (fun n -> D.align ~fill:Zero ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
-          let lbl = label_to_asm_label ~section:Data lbl in
+          let lbl = label_to_asm_label ~section:frametable_section lbl in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:(Targetint.of_int32 ofs));
       efa_def_label =
         (fun lbl ->
-          (* CR sspies: The frametable lives in the [.data] section on Arm, but
-             in the [.text] section on x86. The frametable should move to the
-             text section on Arm as well. *)
-          let lbl = label_to_asm_label ~section:Data lbl in
+          let lbl = label_to_asm_label ~section:frametable_section lbl in
           D.define_label lbl);
       efa_string = (fun s -> D.string (s ^ "\000"))
     };

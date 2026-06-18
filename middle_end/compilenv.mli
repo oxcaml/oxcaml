@@ -28,10 +28,13 @@ val reset : Unit_info.t -> unit
 val reset_info_tables: unit -> unit
 
 val current_zero_alloc_info : unit -> Zero_alloc_info.t
+        (* Return the zero-alloc info for the unit being compiled. *)
 
 val current_generic_fns : unit -> generic_fns
+        (* Return the generic functions for the unit being compiled. *)
 
 val current_sections : unit -> Oxcaml_utils.File_sections.Builder.t
+        (* Return the file sections builder for the unit being compiled. *)
 
 val get_global_export_info : Compilation_unit.t
   -> Flambda2_cmx.Flambda_cmx_format.t option
@@ -75,6 +78,7 @@ val build_unit_info:
   arg_descr:Lambda.arg_descr option ->
   static_data:Slambdaeval.value Slambdaeval.Or_missing.t ->
   unit_infos
+        (* Build the infos for the current unit. *)
 val save_unit_info:
   string -> main_module_block_format:Lambda.main_module_block_format ->
   arg_descr:Lambda.arg_descr option ->

@@ -406,7 +406,7 @@ Error: Signature mismatch:
          module type x = functor (X : s) -> s
        At position "module type x = <here>"
        Illegal permutation of runtime components in a module type.
-         For example, at position "functor (X : <here>) -> ...",
+         For example, at position "(X : <here>) -> ...",
          the class "two" and the value "one" are not in the same order
          in the expected and actual module types.
 |}]
@@ -431,7 +431,7 @@ Error: Signature mismatch:
          module type x = functor (X : s) -> s
        At position "module type x = <here>"
        Illegal permutation of runtime components in a module type.
-         For example, at position "functor (X) -> <here>",
+         For example, at position "(X) -> <here>",
          the class "two" and the value "one" are not in the same order
          in the expected and actual module types.
 |}]

@@ -543,7 +543,7 @@ Check that [basic.ml] no longer compiles:
       "type": "typer",
       "sub": [],
       "valid": true,
-      "message": "This expression has type unit but an expression was expected of type int"
+      "message": "The constructor () has type unit but an expression was expected of type int"
     }
   ]
 
@@ -557,6 +557,8 @@ back to actually being a module alias.
   > EOF
   $ $OCAMLC -bin-annot-cms -c canary.mli -parameter P && \
   > echo "Delete this test and follow instructions in reexport.mli"
-  File "canary.mli", line 1:
-  Error: In module M: Module P cannot be aliased
+  File "canary.mli", line 1, characters 0-12:
+  1 | module M = P
+      ^^^^^^^^^^^^
+  Error: Functor arguments, such as P, cannot be aliased
   [2]

@@ -38,7 +38,7 @@ module Id = struct
     T (module struct type t = a type _ id += Id : t id end)
 
   let[@inline] uid (type a : value_or_null) (T (module A) : a t) =
-    Obj.Extension_constructor.id (Obj.Extension_constructor.of_val A.Id)
+    Obj.Extension_constructor.id [%extension_constructor A.Id]
 
   let provably_equal
       (type a : value_or_null) (type b : value_or_null)

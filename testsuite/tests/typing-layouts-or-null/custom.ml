@@ -69,7 +69,7 @@ let bad = Yep (Yep 5)
 Line 1, characters 14-21:
 1 | let bad = Yep (Yep 5)
                   ^^^^^^^
-Error: This expression has type "'a t" but an expression was expected of type
+Error: This constructor has type "'a t" but an expression was expected of type
          "('b : value)"
        The layout of 'a t is value_or_null
          because of the definition of t at lines 1-4, characters 0-11.

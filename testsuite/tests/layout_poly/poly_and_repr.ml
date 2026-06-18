@@ -15,8 +15,8 @@ exception Force_type
 Line 6, characters 17-18:
 6 |   let f x = 1 in f
                      ^
-Error: This expression has type "'b -> int"
-       but an expression was expected of type "(repr_ 'a). 'a -> int"
+Error: The value "f" has type "'b -> int" but an expression was expected of type
+         "(repr_ 'a). 'a -> int"
 |}];;
 
 (** [(repr_ 'a). t] and [t] do not unify. *)
@@ -39,8 +39,8 @@ let ident : (repr_ 'a). 'a -> 'a =
 Line 2, characters 17-18:
 2 |   let f x = x in f
                      ^
-Error: This expression has type "'b -> 'b"
-       but an expression was expected of type "(repr_ 'a). 'a -> 'a"
+Error: The value "f" has type "'b -> 'b" but an expression was expected of type
+         "(repr_ 'a). 'a -> 'a"
 |}];;
 
 (** Polymorphic identity, fails with [fun x -> x]. *)

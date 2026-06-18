@@ -1607,19 +1607,13 @@ let get_header_masked ptr dbg =
 let tag_offset = if big_endian then -1 else -size_int
 
 let get_tag ptr dbg =
-  if Proc.word_addressed
-  then
-    (* If byte loads are slow *)
-    Cop (Cand, [get_header ptr dbg; Cconst_int (255, dbg)], dbg)
-  else
-    (* If byte loads are efficient *)
-    (* Same comment as [get_header] above *)
-    Cop
-      ( (if Config.runtime5
-         then mk_load_immut Byte_unsigned
-         else mk_load_mut Byte_unsigned),
-        [Cop (Cadda, [ptr; Cconst_int (tag_offset, dbg)], dbg)],
-        dbg )
+  (* Same comment as [get_header] above *)
+  Cop
+    ( (if Config.runtime5
+       then mk_load_immut Byte_unsigned
+       else mk_load_mut Byte_unsigned),
+      [Cop (Cadda, [ptr; Cconst_int (tag_offset, dbg)], dbg)],
+      dbg )
 
 let get_size ptr dbg = lsr_const (get_header_masked ptr dbg) 10 dbg
 

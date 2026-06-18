@@ -4,6 +4,29 @@
  ld_library_path += "${test_build_directory}";
  shared-libraries;
  {
+   setup-ocamlc.byte-build-env;
+   compile_only = "true";
+   all_modules = "lib.ml lib2.ml test.c dyn.ml";
+   ocamlc.byte;
+   program = "lib";
+   modules = "lib.cmo test.${objext}";
+   compile_only = "false";
+   ocamlmklib;
+   program = "lib2.cma";
+   libraries = "";
+   all_modules = "lib2.cmo";
+   compile_only = "false";
+   flags = "-a";
+   ocamlc.byte;
+   libraries += "dynlink";
+   program = "${test_build_directory}/main.exe";
+   all_modules = "dyn.cmo";
+   flags = "";
+   ocamlc.byte;
+   output = "main.output";
+   run;
+   check-program-output;
+ }{
    native-dynlink;
    setup-ocamlopt.byte-build-env;
    compile_only = "true";

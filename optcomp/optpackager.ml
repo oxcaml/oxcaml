@@ -190,6 +190,7 @@ end) : S = struct
               units))
     in
     let ui =
+      (* [arg_descr] is None because we don't allow packs to be arguments. *)
       Compilenv.build_unit_info ~main_module_block_format ~arg_descr:None
         ~static_data
     in

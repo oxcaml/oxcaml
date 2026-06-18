@@ -1,5 +1,7 @@
   $ $MERLIN server stop-server
 
+  $ MERLIN_TEST_OCAMLLIB_PATH="$MERLIN_TEST_OCAML_PATH/lib/ocaml"
+
   $ mkdir test
 
   $ cleanup_output () {

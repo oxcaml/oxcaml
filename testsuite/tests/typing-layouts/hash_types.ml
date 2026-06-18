@@ -225,7 +225,7 @@ Line 2, characters 11-13:
 2 | type bad = r#
                ^^
 Error: The type "r" has no unboxed version.
-Hint: Float records don't get unboxed versions.
+Hint: Records with [@@flatten_floats] don't get unboxed versions.
 |}]
 type r = { i : int } [@@unboxed]
 type bad = r#
@@ -269,7 +269,7 @@ type r2 = { i : int; s : string; }
 Line 3, characters 34-35:
 3 | let bad_id : r# -> r2# = fun x -> x
                                       ^
-Error: This expression has type "r#" but an expression was expected of type "r2#"
+Error: The value "x" has type "r#" but an expression was expected of type "r2#"
 |}]
 
 (* Mutable fields imply modalities *)
@@ -326,7 +326,7 @@ let bad : itu -> int32# = fun x -> x
 Line 1, characters 35-36:
 1 | let bad : itu -> int32# = fun x -> x
                                        ^
-Error: This expression has type "itu" = "float/2#"
+Error: The value "x" has type "itu" = "float/2#"
        but an expression was expected of type "int32#"
        Line 1, characters 0-20:
          Definition of type "float/1"
@@ -1085,8 +1085,8 @@ module F : functor (M : sig type t = float end) -> sig type u = M.t# end
 Line 4, characters 13-23:
 4 | module Bad = F(FloatId)
                  ^^^^^^^^^^
-Error: In the signature of this functor application:
-       The type "FloatId.t" has no unboxed version.
+Error: In the signature of this functor application: The type "FloatId.t"
+       has no unboxed version.
 |}]
 
 (* ..and module substitution... *)
@@ -1104,8 +1104,8 @@ Lines 1-6, characters 18-32:
 4 |   end
 5 |   type u = Float.t#
 6 | end with module Float := FloatId
-Error: In this instantiated signature:
-       The type "FloatId.t" has no unboxed version.
+Error: In this instantiated signature: The type "FloatId.t"
+       has no unboxed version.
 |}]
 
 (* ..and module type substitution. *)
@@ -1213,8 +1213,8 @@ module G :
 Line 10, characters 13-44:
 10 | module Bad = G(struct type t = float id end)
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: In the signature of this functor application:
-       The type "N.t" has no unboxed version.
+Error: In the signature of this functor application: The type "N.t"
+       has no unboxed version.
 |}]
 
 (* Chain of two aliases that lose unboxed versions *)
@@ -1230,8 +1230,8 @@ module F :
 Line 5, characters 13-23:
 5 | module Bad = F(FloatId)
                  ^^^^^^^^^^
-Error: In the signature of this functor application:
-       The type "s" has no unboxed version.
+Error: In the signature of this functor application: The type "s"
+       has no unboxed version.
 |}]
 
 (* Mutually recursive aliases that lose unboxed versions *)
@@ -1247,8 +1247,8 @@ module F :
 Line 5, characters 13-23:
 5 | module Bad = F(FloatId)
                  ^^^^^^^^^^
-Error: In the signature of this functor application:
-       The type "s" has no unboxed version.
+Error: In the signature of this functor application: The type "s"
+       has no unboxed version.
 |}]
 
 (* Make sure our check isn't too restrictive. We allow a module with a

@@ -161,7 +161,7 @@ Lines 1-5, characters 0-15:
 3 |    for y = -3 downto -2 and m = 2 downto -1 and i = 2 downto -2
 4 |    for f = -3 downto 2 and h in [1; 1; 2] and y = -1 to 1
 5 |    when k <> 0]..
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * int * int * int) list = []
 |}];;
@@ -178,7 +178,7 @@ Lines 1-5, characters 0-17:
 3 |     for y = -3 downto -2 and m = 2 downto -1 and i = 2 downto -2
 4 |     for f = -3 downto 2 and h in [|1; 1; 2|] and y = -1 to 1
 5 |     when k <> 0|]..
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * int * int * int) array = [||]
 |}];;
@@ -195,7 +195,7 @@ Lines 1-5, characters 0-17:
 3 |     for y = -3 downto -2 and m = 2 downto -1 and i = 2 downto -2
 4 |     for f = -3 downto 2 and h in [:1; 1; 2:] and y = -1 to 1
 5 |     when k <> 0:]..
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -212,7 +212,7 @@ Lines 1-5, characters 0-24:
 3 |    for r in [-2; -3] and d = 0 downto 1 and j = 0 downto w
 4 |    for s = -3 to j
 5 |    when abs r mod 2 = 1]..
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * int * int * int) list = []
 |}];;
@@ -229,7 +229,7 @@ Lines 1-5, characters 0-26:
 3 |     for r in [|-2; -3|] and d = 0 downto 1 and j = 0 downto w
 4 |     for s = -3 to j
 5 |     when abs r mod 2 = 1|]..
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * int * int * int) array = [||]
 |}];;
@@ -246,7 +246,7 @@ Lines 1-5, characters 0-26:
 3 |     for r in [:-2; -3:] and d = 0 downto 1 and j = 0 downto w
 4 |     for s = -3 to j
 5 |     when abs r mod 2 = 1:]..
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * int * int * int) iarray = [::]
 |}];;
@@ -260,12 +260,12 @@ Warning 26 [unused-var]: unused variable r.
 Line 2, characters 7-8:
 2 |    for i in [2; 2; -2; 1; 2] and r in [] and k in [-1]
            ^
-Warning 26 [unused-var]: unused variable i.
+Warning 26 [unused-var]: unused variable "i".
 
 Line 2, characters 45-46:
 2 |    for i in [2; 2; -2; 1; 2] and r in [] and k in [-1]
                                                  ^
-Warning 26 [unused-var]: unused variable k.
+Warning 26 [unused-var]: unused variable "k".
 
 - : (int * 'a * int * int) list = []
 |}];;
@@ -279,12 +279,12 @@ Warning 26 [unused-var]: unused variable k.
 Line 2, characters 8-9:
 2 |     for i in [|2; 2; -2; 1; 2|] and r in [||] and k in [|-1|]
             ^
-Warning 26 [unused-var]: unused variable i.
+Warning 26 [unused-var]: unused variable "i".
 
 Line 2, characters 50-51:
 2 |     for i in [|2; 2; -2; 1; 2|] and r in [||] and k in [|-1|]
                                                       ^
-Warning 26 [unused-var]: unused variable k.
+Warning 26 [unused-var]: unused variable "k".
 
 - : (int * '_weak2 * int * int) array = [||]
 |}];;
@@ -298,12 +298,12 @@ Warning 26 [unused-var]: unused variable k.
 Line 2, characters 8-9:
 2 |     for i in [:2; 2; -2; 1; 2:] and r in [::] and k in [:-1:]
             ^
-Warning 26 [unused-var]: unused variable i.
+Warning 26 [unused-var]: unused variable "i".
 
 Line 2, characters 50-51:
 2 |     for i in [:2; 2; -2; 1; 2:] and r in [::] and k in [:-1:]
                                                       ^
-Warning 26 [unused-var]: unused variable k.
+Warning 26 [unused-var]: unused variable "k".
 
 - : (int * 'a * int * int) iarray = [::]
 |}];;
@@ -520,7 +520,7 @@ Lines 1-6, characters 0-19:
 4 |    for g = 1 downto 1
 5 |    when z < 0
 6 |    for w in [3; 3]]..
-Warning 26 [unused-var]: unused variable z.
+Warning 26 [unused-var]: unused variable "z".
 
 - : (int * int * int * int) list = []
 |}];;
@@ -539,7 +539,7 @@ Lines 1-6, characters 0-23:
 4 |     for g = 1 downto 1
 5 |     when z < 0
 6 |     for w in [|3; 3|]|]..
-Warning 26 [unused-var]: unused variable z.
+Warning 26 [unused-var]: unused variable "z".
 
 - : (int * int * int * int) array = [||]
 |}];;
@@ -558,7 +558,7 @@ Lines 1-6, characters 0-23:
 4 |     for g = 1 downto 1
 5 |     when z < 0
 6 |     for w in [:3; 3:]:]..
-Warning 26 [unused-var]: unused variable z.
+Warning 26 [unused-var]: unused variable "z".
 
 - : (int * int * int * int) iarray = [::]
 |}];;
@@ -669,7 +669,7 @@ Warning 26 [unused-var]: unused variable z.
 Line 2, characters 7-8:
 2 |    for w in [2; 3; 1] and p = -2 to 3
            ^
-Warning 26 [unused-var]: unused variable w.
+Warning 26 [unused-var]: unused variable "w".
 
 - : (int * int * int * int * int * int * int * int) list = []
 |}];;
@@ -684,7 +684,7 @@ Warning 26 [unused-var]: unused variable w.
 Line 2, characters 8-9:
 2 |     for w in [|2; 3; 1|] and p = -2 to 3
             ^
-Warning 26 [unused-var]: unused variable w.
+Warning 26 [unused-var]: unused variable "w".
 
 - : (int * int * int * int * int * int * int * int) array = [||]
 |}];;
@@ -699,7 +699,7 @@ Warning 26 [unused-var]: unused variable w.
 Line 2, characters 8-9:
 2 |     for w in [:2; 3; 1:] and p = -2 to 3
             ^
-Warning 26 [unused-var]: unused variable w.
+Warning 26 [unused-var]: unused variable "w".
 
 - : (int * int * int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -712,7 +712,7 @@ Warning 26 [unused-var]: unused variable w.
 Line 2, characters 7-8:
 2 |    for p in [-1; 2] and o = 1 downto 0
            ^
-Warning 26 [unused-var]: unused variable p.
+Warning 26 [unused-var]: unused variable "p".
 
 - : (int * int * int * int * int * int) list = []
 |}];;
@@ -725,7 +725,7 @@ Warning 26 [unused-var]: unused variable p.
 Line 2, characters 8-9:
 2 |     for p in [|-1; 2|] and o = 1 downto 0
             ^
-Warning 26 [unused-var]: unused variable p.
+Warning 26 [unused-var]: unused variable "p".
 
 - : (int * int * int * int * int * int) array = [||]
 |}];;
@@ -738,7 +738,7 @@ Warning 26 [unused-var]: unused variable p.
 Line 2, characters 8-9:
 2 |     for p in [:-1; 2:] and o = 1 downto 0
             ^
-Warning 26 [unused-var]: unused variable p.
+Warning 26 [unused-var]: unused variable "p".
 
 - : (int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -937,7 +937,7 @@ Lines 1-6, characters 0-15:
 4 |    for e = 0 to 2
 5 |    for e in [] and x in [0; 2]
 6 |    when u <> 0]..
-Warning 26 [unused-var]: unused variable x.
+Warning 26 [unused-var]: unused variable "x".
 
 Lines 1-6, characters 0-15:
 1 | [(d, e, k, u, x)
@@ -946,7 +946,7 @@ Lines 1-6, characters 0-15:
 4 |    for e = 0 to 2
 5 |    for e in [] and x in [0; 2]
 6 |    when u <> 0]..
-Warning 26 [unused-var]: unused variable e.
+Warning 26 [unused-var]: unused variable "e".
 
 - : (int * 'a * int * int * int) list = []
 |}];;
@@ -965,7 +965,7 @@ Lines 1-6, characters 0-17:
 4 |     for e = 0 to 2
 5 |     for e in [||] and x in [|0; 2|]
 6 |     when u <> 0|]..
-Warning 26 [unused-var]: unused variable x.
+Warning 26 [unused-var]: unused variable "x".
 
 Lines 1-6, characters 0-17:
 1 | [|(d, e, k, u, x)
@@ -974,7 +974,7 @@ Lines 1-6, characters 0-17:
 4 |     for e = 0 to 2
 5 |     for e in [||] and x in [|0; 2|]
 6 |     when u <> 0|]..
-Warning 26 [unused-var]: unused variable e.
+Warning 26 [unused-var]: unused variable "e".
 
 - : (int * '_weak8 * int * int * int) array = [||]
 |}];;
@@ -993,7 +993,7 @@ Lines 1-6, characters 0-17:
 4 |     for e = 0 to 2
 5 |     for e in [::] and x in [:0; 2:]
 6 |     when u <> 0:]..
-Warning 26 [unused-var]: unused variable x.
+Warning 26 [unused-var]: unused variable "x".
 
 Lines 1-6, characters 0-17:
 1 | [:(d, e, k, u, x)
@@ -1002,7 +1002,7 @@ Lines 1-6, characters 0-17:
 4 |     for e = 0 to 2
 5 |     for e in [::] and x in [:0; 2:]
 6 |     when u <> 0:]..
-Warning 26 [unused-var]: unused variable e.
+Warning 26 [unused-var]: unused variable "e".
 
 - : (int * 'a * int * int * int) iarray = [::]
 |}];;
@@ -1405,7 +1405,7 @@ Warning 26 [unused-var]: unused variable e.
 Line 2, characters 28-29:
 2 |    for w = -1 downto -1 and z in [0; -1; -2; 2; -3; 1]
                                 ^
-Warning 26 [unused-var]: unused variable z.
+Warning 26 [unused-var]: unused variable "z".
 
 - : (int * int * int) list = []
 |}];;
@@ -1418,7 +1418,7 @@ Warning 26 [unused-var]: unused variable z.
 Line 2, characters 29-30:
 2 |     for w = -1 downto -1 and z in [|0; -1; -2; 2; -3; 1|]
                                  ^
-Warning 26 [unused-var]: unused variable z.
+Warning 26 [unused-var]: unused variable "z".
 
 - : (int * int * int) array = [||]
 |}];;
@@ -1431,7 +1431,7 @@ Warning 26 [unused-var]: unused variable z.
 Line 2, characters 29-30:
 2 |     for w = -1 downto -1 and z in [:0; -1; -2; 2; -3; 1:]
                                  ^
-Warning 26 [unused-var]: unused variable z.
+Warning 26 [unused-var]: unused variable "z".
 
 - : (int * int * int) iarray = [::]
 |}];;
@@ -1698,7 +1698,7 @@ Warning 26 [unused-var]: unused variable z.
 Line 2, characters 7-8:
 2 |    for t in [2; 1; 1; 3; 3; -2] and p in [0; 3]
            ^
-Warning 26 [unused-var]: unused variable t.
+Warning 26 [unused-var]: unused variable "t".
 
 - : (int * int * int * int * int) list = []
 |}];;
@@ -1713,7 +1713,7 @@ Warning 26 [unused-var]: unused variable t.
 Line 2, characters 8-9:
 2 |     for t in [|2; 1; 1; 3; 3; -2|] and p in [|0; 3|]
             ^
-Warning 26 [unused-var]: unused variable t.
+Warning 26 [unused-var]: unused variable "t".
 
 - : (int * int * int * int * int) array = [||]
 |}];;
@@ -1728,7 +1728,7 @@ Warning 26 [unused-var]: unused variable t.
 Line 2, characters 8-9:
 2 |     for t in [:2; 1; 1; 3; 3; -2:] and p in [:0; 3:]
             ^
-Warning 26 [unused-var]: unused variable t.
+Warning 26 [unused-var]: unused variable "t".
 
 - : (int * int * int * int * int) iarray = [::]
 |}];;
@@ -1996,7 +1996,7 @@ Lines 1-6, characters 0-32:
 4 |    for q in [3; -2; 3; -3]
 5 |    for i = 2 downto q
 6 |    for k in [2] and t = 3 to -3]..
-Warning 26 [unused-var]: unused variable p.
+Warning 26 [unused-var]: unused variable "p".
 
 - : (int * int * int * int * int * int) list = []
 |}];;
@@ -2015,7 +2015,7 @@ Lines 1-6, characters 0-36:
 4 |     for q in [|3; -2; 3; -3|]
 5 |     for i = 2 downto q
 6 |     for k in [|2|] and t = 3 to -3|]..
-Warning 26 [unused-var]: unused variable p.
+Warning 26 [unused-var]: unused variable "p".
 
 - : (int * int * int * int * int * int) array = [||]
 |}];;
@@ -2034,7 +2034,7 @@ Lines 1-6, characters 0-36:
 4 |     for q in [:3; -2; 3; -3:]
 5 |     for i = 2 downto q
 6 |     for k in [:2:] and t = 3 to -3:]..
-Warning 26 [unused-var]: unused variable p.
+Warning 26 [unused-var]: unused variable "p".
 
 - : (int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -3224,7 +3224,7 @@ Lines 1-5, characters 0-75:
 3 |     for p = -3 downto -1 and _ in [|0; 1; o; 1; -2|] and g in [|2; -3; -3; 3|]
 4 |     for a in [|2; o; 1; 3|]
 5 |     for v = 3 downto 2 and c in [|2; 1; 1; 1|] and p in [|-1; 1; -2; -2|]|]..
-Warning 26 [unused-var]: unused variable p.
+Warning 26 [unused-var]: unused variable "p".
 
 - : (int * int * int * int * int * int) array = [||]
 |}];;
@@ -3241,7 +3241,7 @@ Lines 1-5, characters 0-75:
 3 |     for p = -3 downto -1 and _ in [:0; 1; o; 1; -2:] and g in [:2; -3; -3; 3:]
 4 |     for a in [:2; o; 1; 3:]
 5 |     for v = 3 downto 2 and c in [:2; 1; 1; 1:] and p in [:-1; 1; -2; -2:]:]..
-Warning 26 [unused-var]: unused variable p.
+Warning 26 [unused-var]: unused variable "p".
 
 - : (int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -3343,7 +3343,7 @@ Warning 26 [unused-var]: unused variable p.
 Line 3, characters 44-45:
 3 |    for _ in [3; -1; 3] and a = -2 to -3 and u in [-1; 1; -3; 2; 1; 1; -3]
                                                 ^
-Warning 26 [unused-var]: unused variable u.
+Warning 26 [unused-var]: unused variable "u".
 
 - : (int * int * int * int * int) list = []
 |}];;
@@ -3356,7 +3356,7 @@ Warning 26 [unused-var]: unused variable u.
 Line 3, characters 47-48:
 3 |     for _ in [|3; -1; 3|] and a = -2 to -3 and u in [|-1; 1; -3; 2; 1; 1; -3|]
                                                    ^
-Warning 26 [unused-var]: unused variable u.
+Warning 26 [unused-var]: unused variable "u".
 
 - : (int * int * int * int * int) array = [||]
 |}];;
@@ -3369,7 +3369,7 @@ Warning 26 [unused-var]: unused variable u.
 Line 3, characters 47-48:
 3 |     for _ in [:3; -1; 3:] and a = -2 to -3 and u in [:-1; 1; -3; 2; 1; 1; -3:]
                                                    ^
-Warning 26 [unused-var]: unused variable u.
+Warning 26 [unused-var]: unused variable "u".
 
 - : (int * int * int * int * int) iarray = [::]
 |}];;
@@ -3413,7 +3413,7 @@ Warning 26 [unused-var]: unused variable u.
 Line 6, characters 7-8:
 6 |    and c in [1]
            ^
-Warning 26 [unused-var]: unused variable c.
+Warning 26 [unused-var]: unused variable "c".
 
 - : (int * int * int * int * int) list = []
 |}];;
@@ -3430,7 +3430,7 @@ Warning 26 [unused-var]: unused variable c.
 Line 6, characters 8-9:
 6 |     and c in [|1|]
             ^
-Warning 26 [unused-var]: unused variable c.
+Warning 26 [unused-var]: unused variable "c".
 
 - : (int * int * int * int * int) array = [||]
 |}];;
@@ -3447,7 +3447,7 @@ Warning 26 [unused-var]: unused variable c.
 Line 6, characters 8-9:
 6 |     and c in [:1:]
             ^
-Warning 26 [unused-var]: unused variable c.
+Warning 26 [unused-var]: unused variable "c".
 
 - : (int * int * int * int * int) iarray = [::]
 |}];;
@@ -3662,7 +3662,7 @@ Warning 26 [unused-var]: unused variable c.
 Line 2, characters 7-8:
 2 |    for f in [0; 0] and e in [-2; 2; -1; 0; 0]
            ^
-Warning 26 [unused-var]: unused variable f.
+Warning 26 [unused-var]: unused variable "f".
 
 - : ('a * int * int * int) list = []
 |}];;
@@ -3676,7 +3676,7 @@ Warning 26 [unused-var]: unused variable f.
 Line 2, characters 8-9:
 2 |     for f in [|0; 0|] and e in [|-2; 2; -1; 0; 0|]
             ^
-Warning 26 [unused-var]: unused variable f.
+Warning 26 [unused-var]: unused variable "f".
 
 - : ('_weak24 * int * int * int) array = [||]
 |}];;
@@ -3690,7 +3690,7 @@ Warning 26 [unused-var]: unused variable f.
 Line 2, characters 8-9:
 2 |     for f in [:0; 0:] and e in [:-2; 2; -1; 0; 0:]
             ^
-Warning 26 [unused-var]: unused variable f.
+Warning 26 [unused-var]: unused variable "f".
 
 - : ('a * int * int * int) iarray = [::]
 |}];;
@@ -3783,7 +3783,7 @@ Warning 26 [unused-var]: unused variable f.
 Line 2, characters 36-37:
 2 |    for x in [0; 0; 3; 0; 1; -3] and i in [3; 1; 0; -2; -1; 0; 3]
                                         ^
-Warning 26 [unused-var]: unused variable i.
+Warning 26 [unused-var]: unused variable "i".
 
 - : (int * int * int) list = []
 |}];;
@@ -3798,7 +3798,7 @@ Warning 26 [unused-var]: unused variable i.
 Line 2, characters 39-40:
 2 |     for x in [|0; 0; 3; 0; 1; -3|] and i in [|3; 1; 0; -2; -1; 0; 3|]
                                            ^
-Warning 26 [unused-var]: unused variable i.
+Warning 26 [unused-var]: unused variable "i".
 
 - : (int * int * int) array = [||]
 |}];;
@@ -3813,7 +3813,7 @@ Warning 26 [unused-var]: unused variable i.
 Line 2, characters 39-40:
 2 |     for x in [:0; 0; 3; 0; 1; -3:] and i in [:3; 1; 0; -2; -1; 0; 3:]
                                            ^
-Warning 26 [unused-var]: unused variable i.
+Warning 26 [unused-var]: unused variable "i".
 
 - : (int * int * int) iarray = [::]
 |}];;
@@ -3998,7 +3998,7 @@ Warning 26 [unused-var]: unused variable i.
 Line 3, characters 45-46:
 3 |    for q in [2; -1] and e in [-1; 2; -2] and y in [1; q]
                                                  ^
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * int * int * int * int * int * int) list = []
 |}];;
@@ -4012,7 +4012,7 @@ Warning 26 [unused-var]: unused variable y.
 Line 3, characters 50-51:
 3 |     for q in [|2; -1|] and e in [|-1; 2; -2|] and y in [|1; q|]
                                                       ^
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * int * int * int * int * int * int) array = [||]
 |}];;
@@ -4026,7 +4026,7 @@ Warning 26 [unused-var]: unused variable y.
 Line 3, characters 50-51:
 3 |     for q in [:2; -1:] and e in [:-1; 2; -2:] and y in [:1; q:]
                                                       ^
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -4228,7 +4228,7 @@ Lines 1-4, characters 0-65:
 2 |    for m in [0; 1; -3; 2; 1] and e = 0 downto -1
 3 |    for h = 0 to -3 and a in [1; 0; 0; 3; 2]
 4 |    for n = -1 to -3 and e in [1; -3; -1; -3] and j = 2 downto -2]..
-Warning 26 [unused-var]: unused variable e.
+Warning 26 [unused-var]: unused variable "e".
 
 - : (int * int * int * int * int * int) list = []
 |}];;
@@ -4243,7 +4243,7 @@ Lines 1-4, characters 0-69:
 2 |     for m in [|0; 1; -3; 2; 1|] and e = 0 downto -1
 3 |     for h = 0 to -3 and a in [|1; 0; 0; 3; 2|]
 4 |     for n = -1 to -3 and e in [|1; -3; -1; -3|] and j = 2 downto -2|]..
-Warning 26 [unused-var]: unused variable e.
+Warning 26 [unused-var]: unused variable "e".
 
 - : (int * int * int * int * int * int) array = [||]
 |}];;
@@ -4258,7 +4258,7 @@ Lines 1-4, characters 0-69:
 2 |     for m in [:0; 1; -3; 2; 1:] and e = 0 downto -1
 3 |     for h = 0 to -3 and a in [:1; 0; 0; 3; 2:]
 4 |     for n = -1 to -3 and e in [:1; -3; -1; -3:] and j = 2 downto -2:]..
-Warning 26 [unused-var]: unused variable e.
+Warning 26 [unused-var]: unused variable "e".
 
 - : (int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -4455,7 +4455,7 @@ Lines 1-6, characters 0-38:
 4 |    for _ in [2; -2; p; 2; 3] and m = p downto -1
 5 |    for l = 0 to -2 and u = 1 downto 1
 6 |    for _ = p to 0 and y = -2 downto 2]..
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * int * int * int) list = []
 |}];;
@@ -4474,7 +4474,7 @@ Lines 1-6, characters 0-40:
 4 |     for _ in [|2; -2; p; 2; 3|] and m = p downto -1
 5 |     for l = 0 to -2 and u = 1 downto 1
 6 |     for _ = p to 0 and y = -2 downto 2|]..
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * int * int * int) array = [||]
 |}];;
@@ -4493,7 +4493,7 @@ Lines 1-6, characters 0-40:
 4 |     for _ in [:2; -2; p; 2; 3:] and m = p downto -1
 5 |     for l = 0 to -2 and u = 1 downto 1
 6 |     for _ = p to 0 and y = -2 downto 2:]..
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -4557,7 +4557,7 @@ Lines 1-6, characters 0-23:
 4 |    for r = -3 downto 0
 5 |    when abs b mod 2 = 1
 6 |    for r = 2 downto -2]..
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * 'a * int * int) list = []
 |}];;
@@ -4576,7 +4576,7 @@ Lines 1-6, characters 0-25:
 4 |     for r = -3 downto 0
 5 |     when abs b mod 2 = 1
 6 |     for r = 2 downto -2|]..
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * '_weak25 * int * int) array = [||]
 |}];;
@@ -4595,7 +4595,7 @@ Lines 1-6, characters 0-25:
 4 |     for r = -3 downto 0
 5 |     when abs b mod 2 = 1
 6 |     for r = 2 downto -2:]..
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * 'a * int * int) iarray = [::]
 |}];;
@@ -4612,7 +4612,7 @@ Lines 1-5, characters 0-59:
 3 |    for f in [0; -3; 2; 3; v; w; v] and n = -2 downto 0 and r = -3 to -3
 4 |    for u in [3; 2; 3; 3; -1; -3] and n in [-3; 3; 1; f] and w in [-1; f]
 5 |    for v in [0; -1; -3] and l = -2 to f and t = 0 downto f]..
-Warning 26 [unused-var]: unused variable n.
+Warning 26 [unused-var]: unused variable "n".
 
 - : (int * int * int * int * int * int * int * int * int) list = []
 |}];;
@@ -4629,7 +4629,7 @@ Lines 1-5, characters 0-63:
 3 |     for f in [|0; -3; 2; 3; v; w; v|] and n = -2 downto 0 and r = -3 to -3
 4 |     for u in [|3; 2; 3; 3; -1; -3|] and n in [|-3; 3; 1; f|] and w in [|-1; f|]
 5 |     for v in [|0; -1; -3|] and l = -2 to f and t = 0 downto f|]..
-Warning 26 [unused-var]: unused variable n.
+Warning 26 [unused-var]: unused variable "n".
 
 - : (int * int * int * int * int * int * int * int * int) array = [||]
 |}];;
@@ -4646,7 +4646,7 @@ Lines 1-5, characters 0-63:
 3 |     for f in [:0; -3; 2; 3; v; w; v:] and n = -2 downto 0 and r = -3 to -3
 4 |     for u in [:3; 2; 3; 3; -1; -3:] and n in [:-3; 3; 1; f:] and w in [:-1; f:]
 5 |     for v in [:0; -1; -3:] and l = -2 to f and t = 0 downto f:]..
-Warning 26 [unused-var]: unused variable n.
+Warning 26 [unused-var]: unused variable "n".
 
 - : (int * int * int * int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -4900,7 +4900,7 @@ Lines 1-3, characters 0-77:
 1 | [(i, m, o, x)
 2 |    for i = -3 to 2
 3 |    for x = -3 to -2 and m = -1 downto 0 and i in [3; -1; -2] and o = 1 to -1]..
-Warning 26 [unused-var]: unused variable i.
+Warning 26 [unused-var]: unused variable "i".
 
 - : (int * int * int * int) list = []
 |}];;
@@ -4936,7 +4936,7 @@ Warning 26 [unused-var]: unused variable i.
 Line 3, characters 23-24:
 3 |    for d = -2 to 1 and a in [0; 2; -3; -2; 3; -1; 1] and y = 1 to w
                            ^
-Warning 26 [unused-var]: unused variable a.
+Warning 26 [unused-var]: unused variable "a".
 
 - : (int * int * int * int * int) list = []
 |}];;
@@ -4950,7 +4950,7 @@ Warning 26 [unused-var]: unused variable a.
 Line 3, characters 24-25:
 3 |     for d = -2 to 1 and a in [|0; 2; -3; -2; 3; -1; 1|] and y = 1 to w
                             ^
-Warning 26 [unused-var]: unused variable a.
+Warning 26 [unused-var]: unused variable "a".
 
 - : (int * int * int * int * int) array = [||]
 |}];;
@@ -4964,7 +4964,7 @@ Warning 26 [unused-var]: unused variable a.
 Line 3, characters 24-25:
 3 |     for d = -2 to 1 and a in [:0; 2; -3; -2; 3; -1; 1:] and y = 1 to w
                             ^
-Warning 26 [unused-var]: unused variable a.
+Warning 26 [unused-var]: unused variable "a".
 
 - : (int * int * int * int * int) iarray = [::]
 |}];;
@@ -5211,7 +5211,7 @@ Lines 1-5, characters 0-55:
 3 |    when m < 0
 4 |    for _ in [0] and s = 1 to 2
 5 |    for s = 2 downto -3 and m = 3 to -1 and b = -3 to 3]..
-Warning 26 [unused-var]: unused variable s.
+Warning 26 [unused-var]: unused variable "s".
 
 - : (int * int * int) list = []
 |}];;
@@ -5228,7 +5228,7 @@ Lines 1-5, characters 0-57:
 3 |     when m < 0
 4 |     for _ in [|0|] and s = 1 to 2
 5 |     for s = 2 downto -3 and m = 3 to -1 and b = -3 to 3|]..
-Warning 26 [unused-var]: unused variable s.
+Warning 26 [unused-var]: unused variable "s".
 
 - : (int * int * int) array = [||]
 |}];;
@@ -5245,7 +5245,7 @@ Lines 1-5, characters 0-57:
 3 |     when m < 0
 4 |     for _ in [:0:] and s = 1 to 2
 5 |     for s = 2 downto -3 and m = 3 to -1 and b = -3 to 3:]..
-Warning 26 [unused-var]: unused variable s.
+Warning 26 [unused-var]: unused variable "s".
 
 - : (int * int * int) iarray = [::]
 |}];;
@@ -5260,7 +5260,7 @@ Warning 26 [unused-var]: unused variable s.
 Line 2, characters 7-8:
 2 |    for j in [-3; 0; -1; -3; 3; 2; -3] and t in [3]
            ^
-Warning 26 [unused-var]: unused variable j.
+Warning 26 [unused-var]: unused variable "j".
 
 Lines 1-6, characters 0-19:
 1 | [(c, g, j, t, x, y)
@@ -5269,7 +5269,7 @@ Lines 1-6, characters 0-19:
 4 |    for x = -2 to 2 and y = -1 downto -2
 5 |    for j in [2; -2; -3; 1; x; 0] and g = -3 to -2
 6 |    for y in [c; 1]]..
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 Lines 1-6, characters 0-19:
 1 | [(c, g, j, t, x, y)
@@ -5278,7 +5278,7 @@ Lines 1-6, characters 0-19:
 4 |    for x = -2 to 2 and y = -1 downto -2
 5 |    for j in [2; -2; -3; 1; x; 0] and g = -3 to -2
 6 |    for y in [c; 1]]..
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * int * int * int) list = []
 |}];;
@@ -5293,7 +5293,7 @@ Warning 26 [unused-var]: unused variable y.
 Line 2, characters 8-9:
 2 |     for j in [|-3; 0; -1; -3; 3; 2; -3|] and t in [|3|]
             ^
-Warning 26 [unused-var]: unused variable j.
+Warning 26 [unused-var]: unused variable "j".
 
 Lines 1-6, characters 0-23:
 1 | [|(c, g, j, t, x, y)
@@ -5302,7 +5302,7 @@ Lines 1-6, characters 0-23:
 4 |     for x = -2 to 2 and y = -1 downto -2
 5 |     for j in [|2; -2; -3; 1; x; 0|] and g = -3 to -2
 6 |     for y in [|c; 1|]|]..
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 Lines 1-6, characters 0-23:
 1 | [|(c, g, j, t, x, y)
@@ -5311,7 +5311,7 @@ Lines 1-6, characters 0-23:
 4 |     for x = -2 to 2 and y = -1 downto -2
 5 |     for j in [|2; -2; -3; 1; x; 0|] and g = -3 to -2
 6 |     for y in [|c; 1|]|]..
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * int * int * int) array = [||]
 |}];;
@@ -5326,7 +5326,7 @@ Warning 26 [unused-var]: unused variable y.
 Line 2, characters 8-9:
 2 |     for j in [:-3; 0; -1; -3; 3; 2; -3:] and t in [:3:]
             ^
-Warning 26 [unused-var]: unused variable j.
+Warning 26 [unused-var]: unused variable "j".
 
 Lines 1-6, characters 0-23:
 1 | [:(c, g, j, t, x, y)
@@ -5335,7 +5335,7 @@ Lines 1-6, characters 0-23:
 4 |     for x = -2 to 2 and y = -1 downto -2
 5 |     for j in [:2; -2; -3; 1; x; 0:] and g = -3 to -2
 6 |     for y in [:c; 1:]:]..
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 Lines 1-6, characters 0-23:
 1 | [:(c, g, j, t, x, y)
@@ -5344,7 +5344,7 @@ Lines 1-6, characters 0-23:
 4 |     for x = -2 to 2 and y = -1 downto -2
 5 |     for j in [:2; -2; -3; 1; x; 0:] and g = -3 to -2
 6 |     for y in [:c; 1:]:]..
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -5441,7 +5441,7 @@ Warning 26 [unused-var]: unused variable y.
 Line 3, characters 7-8:
 3 |    for r in [3; 0; -2; 2; 1; 3] and x in [] and p = -1 to -3 and c in []
            ^
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * 'a * int * int * int * 'b) list = []
 |}];;
@@ -5454,7 +5454,7 @@ Warning 26 [unused-var]: unused variable r.
 Line 3, characters 8-9:
 3 |     for r in [|3; 0; -2; 2; 1; 3|] and x in [||] and p = -1 to -3 and c in [||]
             ^
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * '_weak31 * int * int * int * '_weak32) array = [||]
 |}];;
@@ -5467,7 +5467,7 @@ Warning 26 [unused-var]: unused variable r.
 Line 3, characters 8-9:
 3 |     for r in [:3; 0; -2; 2; 1; 3:] and x in [::] and p = -1 to -3 and c in [::]
             ^
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * 'a * int * int * int * 'b) iarray = [::]
 |}];;
@@ -5520,7 +5520,7 @@ Lines 1-5, characters 0-36:
 3 |    for q in [3] and w = 1 downto z
 4 |    for o = -1 downto 2 and n = 0 to 0
 5 |    for t = -2 to -3 and o = -3 to 1]..
-Warning 26 [unused-var]: unused variable q.
+Warning 26 [unused-var]: unused variable "q".
 
 Lines 1-5, characters 0-36:
 1 | [(n, o, q, t, w, z)
@@ -5528,7 +5528,7 @@ Lines 1-5, characters 0-36:
 3 |    for q in [3] and w = 1 downto z
 4 |    for o = -1 downto 2 and n = 0 to 0
 5 |    for t = -2 to -3 and o = -3 to 1]..
-Warning 26 [unused-var]: unused variable o.
+Warning 26 [unused-var]: unused variable "o".
 
 - : (int * int * int * int * int * int) list = []
 |}];;
@@ -5545,7 +5545,7 @@ Lines 1-5, characters 0-38:
 3 |     for q in [|3|] and w = 1 downto z
 4 |     for o = -1 downto 2 and n = 0 to 0
 5 |     for t = -2 to -3 and o = -3 to 1|]..
-Warning 26 [unused-var]: unused variable q.
+Warning 26 [unused-var]: unused variable "q".
 
 Lines 1-5, characters 0-38:
 1 | [|(n, o, q, t, w, z)
@@ -5553,7 +5553,7 @@ Lines 1-5, characters 0-38:
 3 |     for q in [|3|] and w = 1 downto z
 4 |     for o = -1 downto 2 and n = 0 to 0
 5 |     for t = -2 to -3 and o = -3 to 1|]..
-Warning 26 [unused-var]: unused variable o.
+Warning 26 [unused-var]: unused variable "o".
 
 - : (int * int * int * int * int * int) array = [||]
 |}];;
@@ -5570,7 +5570,7 @@ Lines 1-5, characters 0-38:
 3 |     for q in [:3:] and w = 1 downto z
 4 |     for o = -1 downto 2 and n = 0 to 0
 5 |     for t = -2 to -3 and o = -3 to 1:]..
-Warning 26 [unused-var]: unused variable q.
+Warning 26 [unused-var]: unused variable "q".
 
 Lines 1-5, characters 0-38:
 1 | [:(n, o, q, t, w, z)
@@ -5578,7 +5578,7 @@ Lines 1-5, characters 0-38:
 3 |     for q in [:3:] and w = 1 downto z
 4 |     for o = -1 downto 2 and n = 0 to 0
 5 |     for t = -2 to -3 and o = -3 to 1:]..
-Warning 26 [unused-var]: unused variable o.
+Warning 26 [unused-var]: unused variable "o".
 
 - : (int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -6083,7 +6083,7 @@ Lines 1-6, characters 0-56:
 4 |    for j = 0 downto -2
 5 |    for j in [0; 0; 2; n] and f = 3 to 2
 6 |    for y in [-2; 1; -1; -2; -1; 0] and z in [0; -1; -3]]..
-Warning 26 [unused-var]: unused variable j.
+Warning 26 [unused-var]: unused variable "j".
 
 - : (int * int * int * int * int * int * int) list = []
 |}];;
@@ -6102,7 +6102,7 @@ Lines 1-6, characters 0-62:
 4 |     for j = 0 downto -2
 5 |     for j in [|0; 0; 2; n|] and f = 3 to 2
 6 |     for y in [|-2; 1; -1; -2; -1; 0|] and z in [|0; -1; -3|]|]..
-Warning 26 [unused-var]: unused variable j.
+Warning 26 [unused-var]: unused variable "j".
 
 - : (int * int * int * int * int * int * int) array = [||]
 |}];;
@@ -6121,7 +6121,7 @@ Lines 1-6, characters 0-62:
 4 |     for j = 0 downto -2
 5 |     for j in [:0; 0; 2; n:] and f = 3 to 2
 6 |     for y in [:-2; 1; -1; -2; -1; 0:] and z in [:0; -1; -3:]:]..
-Warning 26 [unused-var]: unused variable j.
+Warning 26 [unused-var]: unused variable "j".
 
 - : (int * int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -6325,7 +6325,7 @@ Lines 1-6, characters 0-22:
 4 |    for u = -1 to 2
 5 |    for c in [2; 2; 1; -2; -1; -1; -3]
 6 |    for z = 1 downto 1]..
-Warning 26 [unused-var]: unused variable c.
+Warning 26 [unused-var]: unused variable "c".
 
 - : (int * int * int * int) list = []
 |}];;
@@ -6344,7 +6344,7 @@ Lines 1-6, characters 0-24:
 4 |     for u = -1 to 2
 5 |     for c in [|2; 2; 1; -2; -1; -1; -3|]
 6 |     for z = 1 downto 1|]..
-Warning 26 [unused-var]: unused variable c.
+Warning 26 [unused-var]: unused variable "c".
 
 - : (int * int * int * int) array = [||]
 |}];;
@@ -6363,7 +6363,7 @@ Lines 1-6, characters 0-24:
 4 |     for u = -1 to 2
 5 |     for c in [:2; 2; 1; -2; -1; -1; -3:]
 6 |     for z = 1 downto 1:]..
-Warning 26 [unused-var]: unused variable c.
+Warning 26 [unused-var]: unused variable "c".
 
 - : (int * int * int * int) iarray = [::]
 |}];;
@@ -6382,7 +6382,7 @@ Warning 26 [unused-var]: unused variable c.
 Line 5, characters 7-8:
 5 |    and r in [-1; -1; 0; 0]
            ^
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * int * int * int * int * int * int) list = []
 |}];;
@@ -6401,7 +6401,7 @@ Warning 26 [unused-var]: unused variable r.
 Line 5, characters 8-9:
 5 |     and r in [|-1; -1; 0; 0|]
             ^
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * int * int * int * int * int * int) array = [||]
 |}];;
@@ -6420,7 +6420,7 @@ Warning 26 [unused-var]: unused variable r.
 Line 5, characters 8-9:
 5 |     and r in [:-1; -1; 0; 0:]
             ^
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -6435,7 +6435,7 @@ Warning 26 [unused-var]: unused variable r.
 Line 2, characters 23-24:
 2 |    for _ in [1; 3] and x in [2]
                            ^
-Warning 26 [unused-var]: unused variable x.
+Warning 26 [unused-var]: unused variable "x".
 
 - : (int * int * int) list = []
 |}];;
@@ -6450,7 +6450,7 @@ Warning 26 [unused-var]: unused variable x.
 Line 2, characters 26-27:
 2 |     for _ in [|1; 3|] and x in [|2|]
                               ^
-Warning 26 [unused-var]: unused variable x.
+Warning 26 [unused-var]: unused variable "x".
 
 - : (int * int * int) array = [||]
 |}];;
@@ -6465,7 +6465,7 @@ Warning 26 [unused-var]: unused variable x.
 Line 2, characters 26-27:
 2 |     for _ in [:1; 3:] and x in [:2:]
                               ^
-Warning 26 [unused-var]: unused variable x.
+Warning 26 [unused-var]: unused variable "x".
 
 - : (int * int * int) iarray = [::]
 |}];;
@@ -6512,7 +6512,7 @@ Lines 1-5, characters 0-22:
 3 |    for m in [2; -3; -3] and g = 1 downto 3 and j = 0 downto 2
 4 |    for j in [-2; 1; -3] and z in [t; 2; -3; -2]
 5 |    for y = 3 downto 0]..
-Warning 26 [unused-var]: unused variable j.
+Warning 26 [unused-var]: unused variable "j".
 
 - : (int * int * int * int * int * int * int * int) list = []
 |}];;
@@ -6529,7 +6529,7 @@ Lines 1-5, characters 0-24:
 3 |     for m in [|2; -3; -3|] and g = 1 downto 3 and j = 0 downto 2
 4 |     for j in [|-2; 1; -3|] and z in [|t; 2; -3; -2|]
 5 |     for y = 3 downto 0|]..
-Warning 26 [unused-var]: unused variable j.
+Warning 26 [unused-var]: unused variable "j".
 
 - : (int * int * int * int * int * int * int * int) array = [||]
 |}];;
@@ -6546,7 +6546,7 @@ Lines 1-5, characters 0-24:
 3 |     for m in [:2; -3; -3:] and g = 1 downto 3 and j = 0 downto 2
 4 |     for j in [:-2; 1; -3:] and z in [:t; 2; -3; -2:]
 5 |     for y = 3 downto 0:]..
-Warning 26 [unused-var]: unused variable j.
+Warning 26 [unused-var]: unused variable "j".
 
 - : (int * int * int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -6764,7 +6764,7 @@ Warning 26 [unused-var]: unused variable j.
 Line 2, characters 7-8:
 2 |    for o in [3] and y in [-2; 3]
            ^
-Warning 26 [unused-var]: unused variable o.
+Warning 26 [unused-var]: unused variable "o".
 
 - : (int * int * int * int * int * int) list = []
 |}];;
@@ -6779,7 +6779,7 @@ Warning 26 [unused-var]: unused variable o.
 Line 2, characters 8-9:
 2 |     for o in [|3|] and y in [|-2; 3|]
             ^
-Warning 26 [unused-var]: unused variable o.
+Warning 26 [unused-var]: unused variable "o".
 
 - : (int * int * int * int * int * int) array = [||]
 |}];;
@@ -6794,7 +6794,7 @@ Warning 26 [unused-var]: unused variable o.
 Line 2, characters 8-9:
 2 |     for o in [:3:] and y in [:-2; 3:]
             ^
-Warning 26 [unused-var]: unused variable o.
+Warning 26 [unused-var]: unused variable "o".
 
 - : (int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -6914,7 +6914,7 @@ Warning 26 [unused-var]: unused variable o.
 Line 3, characters 7-8:
 3 |    for y in [1; 2; 0; -3]
            ^
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * 'a * int) list = []
 |}];;
@@ -6929,7 +6929,7 @@ Warning 26 [unused-var]: unused variable y.
 Line 3, characters 8-9:
 3 |     for y in [|1; 2; 0; -3|]
             ^
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * '_weak42 * int) array = [||]
 |}];;
@@ -6944,7 +6944,7 @@ Warning 26 [unused-var]: unused variable y.
 Line 3, characters 8-9:
 3 |     for y in [:1; 2; 0; -3:]
             ^
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * 'a * int) iarray = [::]
 |}];;
@@ -7128,7 +7128,7 @@ Lines 1-6, characters 0-32:
 4 |    when abs z mod 2 = 0
 5 |    for j = 0 downto 2 and f in [-2; z; 2; -2; 2; -3; -2]
 6 |    for r = -3 to -2 and j in []]..
-Warning 26 [unused-var]: unused variable j.
+Warning 26 [unused-var]: unused variable "j".
 
 - : (int * int * 'a * int * int * int) list = []
 |}];;
@@ -7147,7 +7147,7 @@ Lines 1-6, characters 0-36:
 4 |     when abs z mod 2 = 0
 5 |     for j = 0 downto 2 and f in [|-2; z; 2; -2; 2; -3; -2|]
 6 |     for r = -3 to -2 and j in [||]|]..
-Warning 26 [unused-var]: unused variable j.
+Warning 26 [unused-var]: unused variable "j".
 
 - : (int * int * '_weak43 * int * int * int) array = [||]
 |}];;
@@ -7166,7 +7166,7 @@ Lines 1-6, characters 0-36:
 4 |     when abs z mod 2 = 0
 5 |     for j = 0 downto 2 and f in [:-2; z; 2; -2; 2; -3; -2:]
 6 |     for r = -3 to -2 and j in [::]:]..
-Warning 26 [unused-var]: unused variable j.
+Warning 26 [unused-var]: unused variable "j".
 
 - : (int * int * 'a * int * int * int) iarray = [::]
 |}];;
@@ -7252,7 +7252,7 @@ Warning 26 [unused-var]: unused variable j.
 Line 2, characters 7-8:
 2 |    for l in [-1; 0; -2; 3; 0; 0; 1]
            ^
-Warning 26 [unused-var]: unused variable l.
+Warning 26 [unused-var]: unused variable "l".
 
 - : (int * int * int * int * int * int) list = []
 |}];;
@@ -7266,7 +7266,7 @@ Warning 26 [unused-var]: unused variable l.
 Line 2, characters 8-9:
 2 |     for l in [|-1; 0; -2; 3; 0; 0; 1|]
             ^
-Warning 26 [unused-var]: unused variable l.
+Warning 26 [unused-var]: unused variable "l".
 
 - : (int * int * int * int * int * int) array = [||]
 |}];;
@@ -7280,7 +7280,7 @@ Warning 26 [unused-var]: unused variable l.
 Line 2, characters 8-9:
 2 |     for l in [:-1; 0; -2; 3; 0; 0; 1:]
             ^
-Warning 26 [unused-var]: unused variable l.
+Warning 26 [unused-var]: unused variable "l".
 
 - : (int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -7339,7 +7339,7 @@ Warning 26 [unused-var]: unused variable l.
 Line 2, characters 7-8:
 2 |    for c in [3; 0; 1]
            ^
-Warning 26 [unused-var]: unused variable c.
+Warning 26 [unused-var]: unused variable "c".
 
 Lines 1-5, characters 0-24:
 1 | [(c, s)
@@ -7347,7 +7347,7 @@ Lines 1-5, characters 0-24:
 3 |    for s = 0 to 3
 4 |    for s in [3; 1; 0; 2; 0] and c = 0 downto -2
 5 |    when abs s mod 2 = 1]..
-Warning 26 [unused-var]: unused variable s.
+Warning 26 [unused-var]: unused variable "s".
 
 - : (int * int) list =
 [(0, 3); (-1, 3); (-2, 3); (0, 1); (-1, 1); (-2, 1); (0, 3); (-1, 3);
@@ -7370,7 +7370,7 @@ Warning 26 [unused-var]: unused variable s.
 Line 2, characters 8-9:
 2 |     for c in [|3; 0; 1|]
             ^
-Warning 26 [unused-var]: unused variable c.
+Warning 26 [unused-var]: unused variable "c".
 
 Lines 1-5, characters 0-26:
 1 | [|(c, s)
@@ -7378,7 +7378,7 @@ Lines 1-5, characters 0-26:
 3 |     for s = 0 to 3
 4 |     for s in [|3; 1; 0; 2; 0|] and c = 0 downto -2
 5 |     when abs s mod 2 = 1|]..
-Warning 26 [unused-var]: unused variable s.
+Warning 26 [unused-var]: unused variable "s".
 
 - : (int * int) array =
 [|(0, 3); (-1, 3); (-2, 3); (0, 1); (-1, 1); (-2, 1); (0, 3); (-1, 3);
@@ -7401,7 +7401,7 @@ Warning 26 [unused-var]: unused variable s.
 Line 2, characters 8-9:
 2 |     for c in [:3; 0; 1:]
             ^
-Warning 26 [unused-var]: unused variable c.
+Warning 26 [unused-var]: unused variable "c".
 
 Lines 1-5, characters 0-26:
 1 | [:(c, s)
@@ -7409,7 +7409,7 @@ Lines 1-5, characters 0-26:
 3 |     for s = 0 to 3
 4 |     for s in [:3; 1; 0; 2; 0:] and c = 0 downto -2
 5 |     when abs s mod 2 = 1:]..
-Warning 26 [unused-var]: unused variable s.
+Warning 26 [unused-var]: unused variable "s".
 
 - : (int * int) iarray =
 [:(0, 3); (-1, 3); (-2, 3); (0, 1); (-1, 1); (-2, 1); (0, 3); (-1, 3);
@@ -7459,7 +7459,7 @@ Lines 1-5, characters 0-53:
 3 |    for l in [] and _ in [-2; -1; j; k]
 4 |    for v in [k; -1; 1; 1]
 5 |    for v in [v; -1; 0] and r in [-3; 2; 3; 3; 1; -1]]..
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * 'a * int * int) list = []
 |}];;
@@ -7476,7 +7476,7 @@ Lines 1-5, characters 0-59:
 3 |     for l in [||] and _ in [|-2; -1; j; k|]
 4 |     for v in [|k; -1; 1; 1|]
 5 |     for v in [|v; -1; 0|] and r in [|-3; 2; 3; 3; 1; -1|]|]..
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * '_weak44 * int * int) array = [||]
 |}];;
@@ -7493,7 +7493,7 @@ Lines 1-5, characters 0-59:
 3 |     for l in [::] and _ in [:-2; -1; j; k:]
 4 |     for v in [:k; -1; 1; 1:]
 5 |     for v in [:v; -1; 0:] and r in [:-3; 2; 3; 3; 1; -1:]:]..
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * 'a * int * int) iarray = [::]
 |}];;
@@ -7695,17 +7695,17 @@ Lines 1-6, characters 0-18:
 4 |    for u in [] and x in [3; 0; -1; 0; 2; -3]
 5 |    for d in [2; -3; 0; -3; 0; 3; -2] and x in [0; -1; -2; 3; 1; 3]
 6 |    for w = 0 to 1]..
-Warning 26 [unused-var]: unused variable d.
+Warning 26 [unused-var]: unused variable "d".
 
 Line 2, characters 23-24:
 2 |    for d = -2 to 1 and l in [2; -3; 0; -3; 0; 0; 1]
                            ^
-Warning 26 [unused-var]: unused variable l.
+Warning 26 [unused-var]: unused variable "l".
 
 Line 4, characters 19-20:
 4 |    for u in [] and x in [3; 0; -1; 0; 2; -3]
                        ^
-Warning 26 [unused-var]: unused variable x.
+Warning 26 [unused-var]: unused variable "x".
 
 - : (int * int * int * 'a * int * int) list = []
 |}];;
@@ -7724,17 +7724,17 @@ Lines 1-6, characters 0-20:
 4 |     for u in [||] and x in [|3; 0; -1; 0; 2; -3|]
 5 |     for d in [|2; -3; 0; -3; 0; 3; -2|] and x in [|0; -1; -2; 3; 1; 3|]
 6 |     for w = 0 to 1|]..
-Warning 26 [unused-var]: unused variable d.
+Warning 26 [unused-var]: unused variable "d".
 
 Line 2, characters 24-25:
 2 |     for d = -2 to 1 and l in [|2; -3; 0; -3; 0; 0; 1|]
                             ^
-Warning 26 [unused-var]: unused variable l.
+Warning 26 [unused-var]: unused variable "l".
 
 Line 4, characters 22-23:
 4 |     for u in [||] and x in [|3; 0; -1; 0; 2; -3|]
                           ^
-Warning 26 [unused-var]: unused variable x.
+Warning 26 [unused-var]: unused variable "x".
 
 - : (int * int * int * '_weak45 * int * int) array = [||]
 |}];;
@@ -7753,17 +7753,17 @@ Lines 1-6, characters 0-20:
 4 |     for u in [::] and x in [:3; 0; -1; 0; 2; -3:]
 5 |     for d in [:2; -3; 0; -3; 0; 3; -2:] and x in [:0; -1; -2; 3; 1; 3:]
 6 |     for w = 0 to 1:]..
-Warning 26 [unused-var]: unused variable d.
+Warning 26 [unused-var]: unused variable "d".
 
 Line 2, characters 24-25:
 2 |     for d = -2 to 1 and l in [:2; -3; 0; -3; 0; 0; 1:]
                             ^
-Warning 26 [unused-var]: unused variable l.
+Warning 26 [unused-var]: unused variable "l".
 
 Line 4, characters 22-23:
 4 |     for u in [::] and x in [:3; 0; -1; 0; 2; -3:]
                           ^
-Warning 26 [unused-var]: unused variable x.
+Warning 26 [unused-var]: unused variable "x".
 
 - : (int * int * int * 'a * int * int) iarray = [::]
 |}];;
@@ -7852,7 +7852,7 @@ Warning 26 [unused-var]: unused variable x.
 Line 3, characters 26-27:
 3 |    for h = u downto 1 and z in [0; -1; -2; 3]
                               ^
-Warning 26 [unused-var]: unused variable z.
+Warning 26 [unused-var]: unused variable "z".
 
 - : (int * int * 'a) list = []
 |}];;
@@ -7866,7 +7866,7 @@ Warning 26 [unused-var]: unused variable z.
 Line 3, characters 27-28:
 3 |     for h = u downto 1 and z in [|0; -1; -2; 3|]
                                ^
-Warning 26 [unused-var]: unused variable z.
+Warning 26 [unused-var]: unused variable "z".
 
 - : (int * int * '_weak46) array = [||]
 |}];;
@@ -7880,7 +7880,7 @@ Warning 26 [unused-var]: unused variable z.
 Line 3, characters 27-28:
 3 |     for h = u downto 1 and z in [:0; -1; -2; 3:]
                                ^
-Warning 26 [unused-var]: unused variable z.
+Warning 26 [unused-var]: unused variable "z".
 
 - : (int * int * 'a) iarray = [::]
 |}];;
@@ -8081,7 +8081,7 @@ Warning 26 [unused-var]: unused variable z.
 Line 3, characters 22-23:
 3 |    for b = y to 1 and m in [0; 0; 3; 2; 2; -3]
                           ^
-Warning 26 [unused-var]: unused variable m.
+Warning 26 [unused-var]: unused variable "m".
 
 - : (int * int * int * int) list = []
 |}];;
@@ -8096,7 +8096,7 @@ Warning 26 [unused-var]: unused variable m.
 Line 3, characters 23-24:
 3 |     for b = y to 1 and m in [|0; 0; 3; 2; 2; -3|]
                            ^
-Warning 26 [unused-var]: unused variable m.
+Warning 26 [unused-var]: unused variable "m".
 
 - : (int * int * int * int) array = [||]
 |}];;
@@ -8111,7 +8111,7 @@ Warning 26 [unused-var]: unused variable m.
 Line 3, characters 23-24:
 3 |     for b = y to 1 and m in [:0; 0; 3; 2; 2; -3:]
                            ^
-Warning 26 [unused-var]: unused variable m.
+Warning 26 [unused-var]: unused variable "m".
 
 - : (int * int * int * int) iarray = [::]
 |}];;
@@ -8318,7 +8318,7 @@ Warning 26 [unused-var]: unused variable m.
 Line 4, characters 7-8:
 4 |    for r in []
            ^
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * int * int) list = []
 |}];;
@@ -8333,7 +8333,7 @@ Warning 26 [unused-var]: unused variable r.
 Line 4, characters 8-9:
 4 |     for r in [||]
             ^
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * int * int) array = [||]
 |}];;
@@ -8348,7 +8348,7 @@ Warning 26 [unused-var]: unused variable r.
 Line 4, characters 8-9:
 4 |     for r in [::]
             ^
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * int * int) iarray = [::]
 |}];;
@@ -8442,7 +8442,7 @@ Warning 26 [unused-var]: unused variable r.
 Line 1, characters 0-76:
 1 | [(c, s) for _ = 3 to -1 and c = 1 to -1 and s = -3 to -1 for c = 0 downto 0];;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 26 [unused-var]: unused variable c.
+Warning 26 [unused-var]: unused variable "c".
 
 - : (int * int) list = []
 |}];;
@@ -8452,7 +8452,7 @@ Warning 26 [unused-var]: unused variable c.
 Line 1, characters 0-78:
 1 | [|(c, s) for _ = 3 to -1 and c = 1 to -1 and s = -3 to -1 for c = 0 downto 0|];;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 26 [unused-var]: unused variable c.
+Warning 26 [unused-var]: unused variable "c".
 
 - : (int * int) array = [||]
 |}];;
@@ -8462,7 +8462,7 @@ Warning 26 [unused-var]: unused variable c.
 Line 1, characters 0-78:
 1 | [:(c, s) for _ = 3 to -1 and c = 1 to -1 and s = -3 to -1 for c = 0 downto 0:];;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 26 [unused-var]: unused variable c.
+Warning 26 [unused-var]: unused variable "c".
 
 - : (int * int) iarray = [::]
 |}];;
@@ -8517,7 +8517,7 @@ Lines 1-6, characters 0-22:
 4 |    for l = 2 to v
 5 |    for s in [-3; -2; v; 3]
 6 |    for m in [2; 2; 2]]..
-Warning 26 [unused-var]: unused variable m.
+Warning 26 [unused-var]: unused variable "m".
 
 - : (int * int * int * int) list = []
 |}];;
@@ -8536,7 +8536,7 @@ Lines 1-6, characters 0-26:
 4 |     for l = 2 to v
 5 |     for s in [|-3; -2; v; 3|]
 6 |     for m in [|2; 2; 2|]|]..
-Warning 26 [unused-var]: unused variable m.
+Warning 26 [unused-var]: unused variable "m".
 
 - : (int * int * int * int) array = [||]
 |}];;
@@ -8555,7 +8555,7 @@ Lines 1-6, characters 0-26:
 4 |     for l = 2 to v
 5 |     for s in [:-3; -2; v; 3:]
 6 |     for m in [:2; 2; 2:]:]..
-Warning 26 [unused-var]: unused variable m.
+Warning 26 [unused-var]: unused variable "m".
 
 - : (int * int * int * int) iarray = [::]
 |}];;
@@ -8569,7 +8569,7 @@ Warning 26 [unused-var]: unused variable m.
 Line 4, characters 27-28:
 4 |    for k = 1 downto -2 and y in [2; 3; k; 3; 3; 3]
                                ^
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * int) list = []
 |}];;
@@ -8583,7 +8583,7 @@ Warning 26 [unused-var]: unused variable y.
 Line 4, characters 28-29:
 4 |     for k = 1 downto -2 and y in [|2; 3; k; 3; 3; 3|]
                                 ^
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * int) array = [||]
 |}];;
@@ -8597,7 +8597,7 @@ Warning 26 [unused-var]: unused variable y.
 Line 4, characters 28-29:
 4 |     for k = 1 downto -2 and y in [:2; 3; k; 3; 3; 3:]
                                 ^
-Warning 26 [unused-var]: unused variable y.
+Warning 26 [unused-var]: unused variable "y".
 
 - : (int * int * int * int) iarray = [::]
 |}];;
@@ -8631,7 +8631,7 @@ Lines 1-6, characters 0-34:
 4 |    when abs o mod 2 = 0
 5 |    for y in [-3; 1; -3; -1] and q = 0 downto 0
 6 |    for q = 0 to 3 and v = -2 to y]..
-Warning 26 [unused-var]: unused variable q.
+Warning 26 [unused-var]: unused variable "q".
 
 - : (int * int * int * int) list = []
 |}];;
@@ -8650,7 +8650,7 @@ Lines 1-6, characters 0-36:
 4 |     when abs o mod 2 = 0
 5 |     for y in [|-3; 1; -3; -1|] and q = 0 downto 0
 6 |     for q = 0 to 3 and v = -2 to y|]..
-Warning 26 [unused-var]: unused variable q.
+Warning 26 [unused-var]: unused variable "q".
 
 - : (int * int * int * int) array = [||]
 |}];;
@@ -8669,7 +8669,7 @@ Lines 1-6, characters 0-36:
 4 |     when abs o mod 2 = 0
 5 |     for y in [:-3; 1; -3; -1:] and q = 0 downto 0
 6 |     for q = 0 to 3 and v = -2 to y:]..
-Warning 26 [unused-var]: unused variable q.
+Warning 26 [unused-var]: unused variable "q".
 
 - : (int * int * int * int) iarray = [::]
 |}];;
@@ -8830,7 +8830,7 @@ Lines 1-5, characters 0-50:
 3 |    when abs w mod 2 = 0
 4 |    for o = 3 to -2
 5 |    for o in [-3; -2; -3; -3; 1; 3] and t = 3 to 3]..
-Warning 26 [unused-var]: unused variable o.
+Warning 26 [unused-var]: unused variable "o".
 
 - : (int * int * int) list = []
 |}];;
@@ -8847,7 +8847,7 @@ Lines 1-5, characters 0-54:
 3 |     when abs w mod 2 = 0
 4 |     for o = 3 to -2
 5 |     for o in [|-3; -2; -3; -3; 1; 3|] and t = 3 to 3|]..
-Warning 26 [unused-var]: unused variable o.
+Warning 26 [unused-var]: unused variable "o".
 
 - : (int * int * int) array = [||]
 |}];;
@@ -8864,7 +8864,7 @@ Lines 1-5, characters 0-54:
 3 |     when abs w mod 2 = 0
 4 |     for o = 3 to -2
 5 |     for o in [:-3; -2; -3; -3; 1; 3:] and t = 3 to 3:]..
-Warning 26 [unused-var]: unused variable o.
+Warning 26 [unused-var]: unused variable "o".
 
 - : (int * int * int) iarray = [::]
 |}];;
@@ -9446,7 +9446,7 @@ Lines 1-5, characters 0-22:
 3 |    when abs s mod 2 = 0
 4 |    for n in [] and l = -3 downto 0 and _ = 1 downto -3
 5 |    for l = 2 downto 1]..
-Warning 26 [unused-var]: unused variable l.
+Warning 26 [unused-var]: unused variable "l".
 
 - : (int * 'a * int) list = []
 |}];;
@@ -9463,7 +9463,7 @@ Lines 1-5, characters 0-24:
 3 |     when abs s mod 2 = 0
 4 |     for n in [||] and l = -3 downto 0 and _ = 1 downto -3
 5 |     for l = 2 downto 1|]..
-Warning 26 [unused-var]: unused variable l.
+Warning 26 [unused-var]: unused variable "l".
 
 - : (int * '_weak55 * int) array = [||]
 |}];;
@@ -9480,7 +9480,7 @@ Lines 1-5, characters 0-24:
 3 |     when abs s mod 2 = 0
 4 |     for n in [::] and l = -3 downto 0 and _ = 1 downto -3
 5 |     for l = 2 downto 1:]..
-Warning 26 [unused-var]: unused variable l.
+Warning 26 [unused-var]: unused variable "l".
 
 - : (int * 'a * int) iarray = [::]
 |}];;
@@ -9609,7 +9609,7 @@ Lines 1-3, characters 0-66:
 1 | [(b, j, l, o, r)
 2 |    for b in [0; -1; -1] and r = 1 downto 0 and o = 2 downto 1
 3 |    for l = -2 downto b and o in [2; -1; 0; -1; 2] and j = 2 to -1]..
-Warning 26 [unused-var]: unused variable o.
+Warning 26 [unused-var]: unused variable "o".
 
 - : (int * int * int * int * int) list = []
 |}];;
@@ -9622,7 +9622,7 @@ Lines 1-3, characters 0-70:
 1 | [|(b, j, l, o, r)
 2 |     for b in [|0; -1; -1|] and r = 1 downto 0 and o = 2 downto 1
 3 |     for l = -2 downto b and o in [|2; -1; 0; -1; 2|] and j = 2 to -1|]..
-Warning 26 [unused-var]: unused variable o.
+Warning 26 [unused-var]: unused variable "o".
 
 - : (int * int * int * int * int) array = [||]
 |}];;
@@ -9635,7 +9635,7 @@ Lines 1-3, characters 0-70:
 1 | [:(b, j, l, o, r)
 2 |     for b in [:0; -1; -1:] and r = 1 downto 0 and o = 2 downto 1
 3 |     for l = -2 downto b and o in [:2; -1; 0; -1; 2:] and j = 2 to -1:]..
-Warning 26 [unused-var]: unused variable o.
+Warning 26 [unused-var]: unused variable "o".
 
 - : (int * int * int * int * int) iarray = [::]
 |}];;
@@ -9750,7 +9750,7 @@ Lines 1-6, characters 0-24:
 4 |    for d in [1]
 5 |    for k in [2; -3; 2; 2; 0; 0]
 6 |    when abs d mod 2 = 0]..
-Warning 26 [unused-var]: unused variable d.
+Warning 26 [unused-var]: unused variable "d".
 
 - : (int * int * int) list = []
 |}];;
@@ -9769,7 +9769,7 @@ Lines 1-6, characters 0-26:
 4 |     for d in [|1|]
 5 |     for k in [|2; -3; 2; 2; 0; 0|]
 6 |     when abs d mod 2 = 0|]..
-Warning 26 [unused-var]: unused variable d.
+Warning 26 [unused-var]: unused variable "d".
 
 - : (int * int * int) array = [||]
 |}];;
@@ -9788,7 +9788,7 @@ Lines 1-6, characters 0-26:
 4 |     for d in [:1:]
 5 |     for k in [:2; -3; 2; 2; 0; 0:]
 6 |     when abs d mod 2 = 0:]..
-Warning 26 [unused-var]: unused variable d.
+Warning 26 [unused-var]: unused variable "d".
 
 - : (int * int * int) iarray = [::]
 |}];;
@@ -9803,7 +9803,7 @@ Warning 26 [unused-var]: unused variable d.
 Line 2, characters 36-37:
 2 |    for k in [3; 3; 3; 1; -3; 2] and w in [1]
                                         ^
-Warning 26 [unused-var]: unused variable w.
+Warning 26 [unused-var]: unused variable "w".
 
 Lines 1-6, characters 0-46:
 1 | [(e, i, j, k, w, z)
@@ -9812,7 +9812,7 @@ Lines 1-6, characters 0-46:
 4 |    for z in [-2; -2; 2]
 5 |    for i = -3 downto 0 and w in [3; -2; 0; 3; 0]
 6 |    for j in [3; z; -1; 0; -1] and i = -1 to 0]..
-Warning 26 [unused-var]: unused variable i.
+Warning 26 [unused-var]: unused variable "i".
 
 - : (int * int * int * int * int * int) list = []
 |}];;
@@ -9827,7 +9827,7 @@ Warning 26 [unused-var]: unused variable i.
 Line 2, characters 39-40:
 2 |     for k in [|3; 3; 3; 1; -3; 2|] and w in [|1|]
                                            ^
-Warning 26 [unused-var]: unused variable w.
+Warning 26 [unused-var]: unused variable "w".
 
 Lines 1-6, characters 0-50:
 1 | [|(e, i, j, k, w, z)
@@ -9836,7 +9836,7 @@ Lines 1-6, characters 0-50:
 4 |     for z in [|-2; -2; 2|]
 5 |     for i = -3 downto 0 and w in [|3; -2; 0; 3; 0|]
 6 |     for j in [|3; z; -1; 0; -1|] and i = -1 to 0|]..
-Warning 26 [unused-var]: unused variable i.
+Warning 26 [unused-var]: unused variable "i".
 
 - : (int * int * int * int * int * int) array = [||]
 |}];;
@@ -9851,7 +9851,7 @@ Warning 26 [unused-var]: unused variable i.
 Line 2, characters 39-40:
 2 |     for k in [:3; 3; 3; 1; -3; 2:] and w in [:1:]
                                            ^
-Warning 26 [unused-var]: unused variable w.
+Warning 26 [unused-var]: unused variable "w".
 
 Lines 1-6, characters 0-50:
 1 | [:(e, i, j, k, w, z)
@@ -9860,7 +9860,7 @@ Lines 1-6, characters 0-50:
 4 |     for z in [:-2; -2; 2:]
 5 |     for i = -3 downto 0 and w in [:3; -2; 0; 3; 0:]
 6 |     for j in [:3; z; -1; 0; -1:] and i = -1 to 0:]..
-Warning 26 [unused-var]: unused variable i.
+Warning 26 [unused-var]: unused variable "i".
 
 - : (int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -9942,7 +9942,7 @@ Lines 1-6, characters 0-29:
 4 |    for p in [-1; 0; 0]
 5 |    for a = 3 downto 1 and e = -3 to -3
 6 |    for a in [-1] and h in []]..
-Warning 26 [unused-var]: unused variable a.
+Warning 26 [unused-var]: unused variable "a".
 
 - : (int * int * 'a * int * int * int) list = []
 |}];;
@@ -9961,7 +9961,7 @@ Lines 1-6, characters 0-35:
 4 |     for p in [|-1; 0; 0|]
 5 |     for a = 3 downto 1 and e = -3 to -3
 6 |     for a in [|-1|] and h in [||]|]..
-Warning 26 [unused-var]: unused variable a.
+Warning 26 [unused-var]: unused variable "a".
 
 - : (int * int * '_weak56 * int * int * int) array = [||]
 |}];;
@@ -9980,7 +9980,7 @@ Lines 1-6, characters 0-35:
 4 |     for p in [:-1; 0; 0:]
 5 |     for a = 3 downto 1 and e = -3 to -3
 6 |     for a in [:-1:] and h in [::]:]..
-Warning 26 [unused-var]: unused variable a.
+Warning 26 [unused-var]: unused variable "a".
 
 - : (int * int * 'a * int * int * int) iarray = [::]
 |}];;
@@ -10273,12 +10273,12 @@ Warning 26 [unused-var]: unused variable a.
 Line 4, characters 7-8:
 4 |    for z in [2] and j in [] and k in [3; 1; -2]
            ^
-Warning 26 [unused-var]: unused variable z.
+Warning 26 [unused-var]: unused variable "z".
 
 Line 4, characters 32-33:
 4 |    for z in [2] and j in [] and k in [3; 1; -2]
                                     ^
-Warning 26 [unused-var]: unused variable k.
+Warning 26 [unused-var]: unused variable "k".
 
 - : (int * int * 'a * 'b * int * int * int * int) list = []
 |}];;
@@ -10292,12 +10292,12 @@ Warning 26 [unused-var]: unused variable k.
 Line 4, characters 8-9:
 4 |     for z in [|2|] and j in [||] and k in [|3; 1; -2|]
             ^
-Warning 26 [unused-var]: unused variable z.
+Warning 26 [unused-var]: unused variable "z".
 
 Line 4, characters 37-38:
 4 |     for z in [|2|] and j in [||] and k in [|3; 1; -2|]
                                          ^
-Warning 26 [unused-var]: unused variable k.
+Warning 26 [unused-var]: unused variable "k".
 
 - : (int * int * '_weak58 * '_weak59 * int * int * int * int) array = [||]
 |}];;
@@ -10311,12 +10311,12 @@ Warning 26 [unused-var]: unused variable k.
 Line 4, characters 8-9:
 4 |     for z in [:2:] and j in [::] and k in [:3; 1; -2:]
             ^
-Warning 26 [unused-var]: unused variable z.
+Warning 26 [unused-var]: unused variable "z".
 
 Line 4, characters 37-38:
 4 |     for z in [:2:] and j in [::] and k in [:3; 1; -2:]
                                          ^
-Warning 26 [unused-var]: unused variable k.
+Warning 26 [unused-var]: unused variable "k".
 
 - : (int * int * 'a * 'b * int * int * int * int) iarray = [::]
 |}];;
@@ -10450,7 +10450,7 @@ Lines 1-6, characters 0-24:
 4 |    for r = 0 to -2
 5 |    for e in [-2; -3; 3; 1] and t = -1 to -1
 6 |    when abs o mod 2 = 0]..
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * int * int * int * int) list = []
 |}];;
@@ -10469,7 +10469,7 @@ Lines 1-6, characters 0-26:
 4 |     for r = 0 to -2
 5 |     for e in [|-2; -3; 3; 1|] and t = -1 to -1
 6 |     when abs o mod 2 = 0|]..
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * int * int * int * int) array = [||]
 |}];;
@@ -10488,7 +10488,7 @@ Lines 1-6, characters 0-26:
 4 |     for r = 0 to -2
 5 |     for e in [:-2; -3; 3; 1:] and t = -1 to -1
 6 |     when abs o mod 2 = 0:]..
-Warning 26 [unused-var]: unused variable r.
+Warning 26 [unused-var]: unused variable "r".
 
 - : (int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -10666,7 +10666,7 @@ Lines 1-6, characters 0-35:
 4 |    when q < 0
 5 |    for w in [3; 2; 1; 3; -2]
 6 |    for x = 3 to q and u = -3 to -2]..
-Warning 26 [unused-var]: unused variable m.
+Warning 26 [unused-var]: unused variable "m".
 
 - : (int * int * int * int * int * int) list = []
 |}];;
@@ -10685,7 +10685,7 @@ Lines 1-6, characters 0-37:
 4 |     when q < 0
 5 |     for w in [|3; 2; 1; 3; -2|]
 6 |     for x = 3 to q and u = -3 to -2|]..
-Warning 26 [unused-var]: unused variable m.
+Warning 26 [unused-var]: unused variable "m".
 
 - : (int * int * int * int * int * int) array = [||]
 |}];;
@@ -10704,7 +10704,7 @@ Lines 1-6, characters 0-37:
 4 |     when q < 0
 5 |     for w in [:3; 2; 1; 3; -2:]
 6 |     for x = 3 to q and u = -3 to -2:]..
-Warning 26 [unused-var]: unused variable m.
+Warning 26 [unused-var]: unused variable "m".
 
 - : (int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -10746,12 +10746,12 @@ Warning 26 [unused-var]: unused variable m.
 Line 3, characters 7-8:
 3 |    for m in [2] and n in [z; -3; 0; 1; 3]
            ^
-Warning 26 [unused-var]: unused variable m.
+Warning 26 [unused-var]: unused variable "m".
 
 Line 3, characters 20-21:
 3 |    for m in [2] and n in [z; -3; 0; 1; 3]
                         ^
-Warning 26 [unused-var]: unused variable n.
+Warning 26 [unused-var]: unused variable "n".
 
 - : (int * 'a * int * int * int * int * int) list = []
 |}];;
@@ -10766,12 +10766,12 @@ Warning 26 [unused-var]: unused variable n.
 Line 3, characters 8-9:
 3 |     for m in [|2|] and n in [|z; -3; 0; 1; 3|]
             ^
-Warning 26 [unused-var]: unused variable m.
+Warning 26 [unused-var]: unused variable "m".
 
 Line 3, characters 23-24:
 3 |     for m in [|2|] and n in [|z; -3; 0; 1; 3|]
                            ^
-Warning 26 [unused-var]: unused variable n.
+Warning 26 [unused-var]: unused variable "n".
 
 - : (int * '_weak60 * int * int * int * int * int) array = [||]
 |}];;
@@ -10786,12 +10786,12 @@ Warning 26 [unused-var]: unused variable n.
 Line 3, characters 8-9:
 3 |     for m in [:2:] and n in [:z; -3; 0; 1; 3:]
             ^
-Warning 26 [unused-var]: unused variable m.
+Warning 26 [unused-var]: unused variable "m".
 
 Line 3, characters 23-24:
 3 |     for m in [:2:] and n in [:z; -3; 0; 1; 3:]
                            ^
-Warning 26 [unused-var]: unused variable n.
+Warning 26 [unused-var]: unused variable "n".
 
 - : (int * 'a * int * int * int * int * int) iarray = [::]
 |}];;
@@ -10823,7 +10823,7 @@ Lines 1-5, characters 0-71:
 3 |    for y = -3 downto -2 and m = -2 to -2 and v = 0 to 0
 4 |    for c in [0; 3] and m = 2 to -1 and w = 0 downto 0
 5 |    for a in [0; 2; -2; 0; 2] and f in [1; 2; 1; -3] and s = 1 downto 0]..
-Warning 26 [unused-var]: unused variable m.
+Warning 26 [unused-var]: unused variable "m".
 
 - : (int * int * int * int * int * int * int * int * int) list = []
 |}];;
@@ -10840,7 +10840,7 @@ Lines 1-5, characters 0-77:
 3 |     for y = -3 downto -2 and m = -2 to -2 and v = 0 to 0
 4 |     for c in [|0; 3|] and m = 2 to -1 and w = 0 downto 0
 5 |     for a in [|0; 2; -2; 0; 2|] and f in [|1; 2; 1; -3|] and s = 1 downto 0|]..
-Warning 26 [unused-var]: unused variable m.
+Warning 26 [unused-var]: unused variable "m".
 
 - : (int * int * int * int * int * int * int * int * int) array = [||]
 |}];;
@@ -10857,7 +10857,7 @@ Lines 1-5, characters 0-77:
 3 |     for y = -3 downto -2 and m = -2 to -2 and v = 0 to 0
 4 |     for c in [:0; 3:] and m = 2 to -1 and w = 0 downto 0
 5 |     for a in [:0; 2; -2; 0; 2:] and f in [:1; 2; 1; -3:] and s = 1 downto 0:]..
-Warning 26 [unused-var]: unused variable m.
+Warning 26 [unused-var]: unused variable "m".
 
 - : (int * int * int * int * int * int * int * int * int) iarray = [::]
 |}];;
@@ -11026,14 +11026,14 @@ Lines 1-4, characters 0-55:
 2 |    for d = 2 downto 1
 3 |    for g = 2 to -1 and v in [-2] and d in [-1; -3] and a in [2; 2; 1; 0; 2]
 4 |    for e in [2; 3] and z = 1 downto 3 and g = -2 to -2]..
-Warning 26 [unused-var]: unused variable d.
+Warning 26 [unused-var]: unused variable "d".
 
 Lines 1-4, characters 0-55:
 1 | [(a, d, e, g, v, z)
 2 |    for d = 2 downto 1
 3 |    for g = 2 to -1 and v in [-2] and d in [-1; -3] and a in [2; 2; 1; 0; 2]
 4 |    for e in [2; 3] and z = 1 downto 3 and g = -2 to -2]..
-Warning 26 [unused-var]: unused variable g.
+Warning 26 [unused-var]: unused variable "g".
 
 - : (int * int * int * int * int * int) list = []
 |}];;
@@ -11113,7 +11113,7 @@ Warning 26 [unused-var]: unused variable g.
 Line 2, characters 7-8:
 2 |    for v in [2; 0; 2; 0; -3; 2]
            ^
-Warning 26 [unused-var]: unused variable v.
+Warning 26 [unused-var]: unused variable "v".
 
 - : (int * int * int * int * 'a * int) list = []
 |}];;
@@ -11127,7 +11127,7 @@ Warning 26 [unused-var]: unused variable v.
 Line 2, characters 8-9:
 2 |     for v in [|2; 0; 2; 0; -3; 2|]
             ^
-Warning 26 [unused-var]: unused variable v.
+Warning 26 [unused-var]: unused variable "v".
 
 - : (int * int * int * int * '_weak62 * int) array = [||]
 |}];;
@@ -11141,7 +11141,7 @@ Warning 26 [unused-var]: unused variable v.
 Line 2, characters 8-9:
 2 |     for v in [:2; 0; 2; 0; -3; 2:]
             ^
-Warning 26 [unused-var]: unused variable v.
+Warning 26 [unused-var]: unused variable "v".
 
 - : (int * int * int * int * 'a * int) iarray = [::]
 |}];;
@@ -11374,7 +11374,7 @@ Lines 1-5, characters 0-58:
 3 |    when n < 0
 4 |    when d > 0
 5 |    for e in [3; 2] and l = 0 downto 2 and u = 3 downto -3]..
-Warning 26 [unused-var]: unused variable u.
+Warning 26 [unused-var]: unused variable "u".
 
 - : (int * int * int * int * int) list = []
 |}];;
@@ -11391,7 +11391,7 @@ Lines 1-5, characters 0-62:
 3 |     when n < 0
 4 |     when d > 0
 5 |     for e in [|3; 2|] and l = 0 downto 2 and u = 3 downto -3|]..
-Warning 26 [unused-var]: unused variable u.
+Warning 26 [unused-var]: unused variable "u".
 
 - : (int * int * int * int * int) array = [||]
 |}];;
@@ -11408,7 +11408,7 @@ Lines 1-5, characters 0-62:
 3 |     when n < 0
 4 |     when d > 0
 5 |     for e in [:3; 2:] and l = 0 downto 2 and u = 3 downto -3:]..
-Warning 26 [unused-var]: unused variable u.
+Warning 26 [unused-var]: unused variable "u".
 
 - : (int * int * int * int * int) iarray = [::]
 |}];;
@@ -11464,7 +11464,7 @@ Warning 26 [unused-var]: unused variable u.
 Line 4, characters 19-20:
 4 |    for m in [] and h in [-3; 2; -3; 2; 2; 1]
                        ^
-Warning 26 [unused-var]: unused variable h.
+Warning 26 [unused-var]: unused variable "h".
 
 - : (int * int * int * 'a * int * int * int * int) list = []
 |}];;
@@ -11478,7 +11478,7 @@ Warning 26 [unused-var]: unused variable h.
 Line 4, characters 22-23:
 4 |     for m in [||] and h in [|-3; 2; -3; 2; 2; 1|]
                           ^
-Warning 26 [unused-var]: unused variable h.
+Warning 26 [unused-var]: unused variable "h".
 
 - : (int * int * int * '_weak63 * int * int * int * int) array = [||]
 |}];;
@@ -11492,7 +11492,7 @@ Warning 26 [unused-var]: unused variable h.
 Line 4, characters 22-23:
 4 |     for m in [::] and h in [:-3; 2; -3; 2; 2; 1:]
                           ^
-Warning 26 [unused-var]: unused variable h.
+Warning 26 [unused-var]: unused variable "h".
 
 - : (int * int * int * 'a * int * int * int * int) iarray = [::]
 |}];;

@@ -310,6 +310,8 @@ module Builtin : sig
   (** Value of types of this jkind are not retained at all at runtime *)
   val void : why:History.void_creation_reason -> ('l * disallowed) Types.jkind
 
+  val scannable : why:History.scannable_creation_reason -> 'd Types.jkind
+
   val value_or_null :
     why:History.value_or_null_creation_reason -> 'd Types.jkind
 
@@ -526,6 +528,9 @@ val for_abbreviation :
 
 (** The jkind for array elements, creating a new sort variable. *)
 val for_array_element_sort : level:int -> Types.jkind_lr * sort
+
+(** The jkind of the parameter of the [effect] type. *)
+val for_effect_arg : Ident.t -> 'd Types.jkind
 
 (******************************)
 (* elimination and defaulting *)

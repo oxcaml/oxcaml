@@ -166,6 +166,10 @@ module type Sort = sig
 
     val for_class : t
 
+    val for_effect : t
+
+    val for_continuation : t
+
     (** Wrap [t] in [Some], reusing a pre-allocated [Some] block when [t] is a
         base sort. Use this when constructing [_sort : Const.t option] fields
         (e.g. [ld_sort], [ca_sort], [lbl_sort]) so each record/constructor load
@@ -340,6 +344,7 @@ module History = struct
     | Peek_or_poke
     | Array_element
     | Idx_element
+    | Field_in_indexed_record
     | Structure_item
     | Signature_item
     | Layout_poly
