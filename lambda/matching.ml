@@ -2344,7 +2344,9 @@ let call_force_lazy_block ?(inlined = Default_inlined) varg loc ~pos =
       ap_result_layout = Lambda.layout_lazy_contents;
       ap_region_close = pos;
       ap_mode = alloc_heap;
-      ap_yielding = May_yield;
+      (* Lazy thunks may never be at the yielding mode, so forcing a lazy value
+         never yields *)
+      ap_yielding = Unyielding;
       ap_inlined = inlined;
       ap_specialised = Default_specialise;
       ap_probe = None;
@@ -2431,7 +2433,9 @@ let inline_lazy_force arg pos loc =
         ap_result_layout = Lambda.layout_lazy_contents;
         ap_region_close = pos;
         ap_mode = alloc_heap;
-        ap_yielding = May_yield;
+        (* Lazy thunks may never be at the yielding mode, so forcing a lazy
+           value never yields *)
+        ap_yielding = Unyielding;
         ap_inlined = Never_inlined;
         ap_specialised = Default_specialise;
         ap_probe=None;

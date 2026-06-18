@@ -557,13 +557,13 @@ let expr sub x =
         let ret_mode = sub.modes sub ret_mode in
         Texp_function { params; body; alloc_mode; ret_mode; ret_sort;
                         zero_alloc }
-    | Texp_apply (exp, list, pos, am, za) ->
+    | Texp_apply (exp, list, pos, am, ym, za) ->
         Texp_apply (
           sub.expr sub exp,
           List.map
             (tuple2 id (Typedtree.map_apply_arg (tuple2 (sub.expr sub) id)))
             list,
-          pos, am, za
+          pos, am, ym, za
         )
     | Texp_match (exp, sort, cases, eff_cases, p) ->
         Texp_match (

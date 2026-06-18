@@ -649,6 +649,10 @@ and locality_mode i ppf m =
   line i ppf "locality_mode %a\n"
     (Format_doc.compat (Mode.Locality.print ())) m
 
+and yielding_mode i ppf m =
+  line i ppf "yielding_mode %a\n"
+    (Format_doc.compat (Mode.Yielding.print ())) m
+
 and value_mode i ppf m =
   line i ppf "value_mode %a\n" (Format_doc.compat (Mode.Value.print ())) m
 
@@ -687,7 +691,7 @@ and expression i ppf x =
       alloc_modes_var i ppf ret_mode;
       list i function_param ppf params;
       function_body i ppf body;
-  | Texp_apply (e, l, m, am, za) ->
+  | Texp_apply (e, l, m, am, ym, za) ->
       line i ppf "Texp_apply\n";
       line i ppf "apply_mode %s\n"
         (match m with
@@ -695,6 +699,7 @@ and expression i ppf x =
          | Nontail -> "Nontail"
          | Default -> "Default");
       locality_mode i ppf am;
+      yielding_mode i ppf ym;
       Option.iter (zero_alloc_assume i ppf) za;
       expression i ppf e;
       list i label_x_apply_arg ppf l;
