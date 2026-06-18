@@ -39,6 +39,12 @@ else
 ENV_VARS :=
 endif
 
+ifeq ($(main_build_profile),dev)
+main_ocamlopt_optimization_flags :=
+else
+main_ocamlopt_optimization_flags := -O3
+endif
+
 define dune_runtime_stdlib_context
 (lang dune 2.8)
 (context (default
@@ -63,7 +69,7 @@ define dune_main_context
   (env (_
     (flags (:standard -directory compiler-distro -warn-error +A -alert -unsafe_multidomain))
     ; We never want to build the compiler itself with AddressSanitizer enabled.
-    (ocamlopt_flags (:standard -O3 -fno-asan))
+    (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
     $(ENV_VARS)))))
 endef
 
