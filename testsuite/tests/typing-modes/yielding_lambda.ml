@@ -572,3 +572,26 @@ let (_ : int) =
             (apply f 5)))))))
 - : int = 0
 |}]
+
+
+(* Functor application runs the functor body. It is unyielding when the
+   functor closes over nothing yielding (its own mode) and is given no
+   yielding argument (the argument's mode) -- as here. *)
+module F (X : sig val n : int end) = struct let m = X.n + 1 end
+module N = struct let n = 41 end
+module R = F(N)
+[%%expect{|
+(apply[unyielding] (field_imm 1 (global Toploop!)) "F/680"
+  (function {nlocal = 0} X is_a_functor never_loop
+    (let (m =[value<int>] (%int_add (field_imm 0 X) 1)) (makeblock 0 m))))
+module F : functor (X : sig val n : int end) -> sig val m : int end
+(apply[unyielding] (field_imm 1 (global Toploop!)) "N/685"
+  (let (n =[value<int>] 41) (makeblock 0 n)))
+module N : sig val n : int end
+(let
+  (N =? (apply[unyielding] (field_imm 0 (global Toploop!)) "N/685")
+   F =? (apply[unyielding] (field_imm 0 (global Toploop!)) "F/680"))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "R/687"
+    (apply[unyielding] F N)))
+module R : sig val m : int end
+|}]
