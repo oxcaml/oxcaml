@@ -396,10 +396,11 @@ type output_pos = asm_line DLL.cell option (* None means the beginning *)
 
 let current_output_pos () = DLL.last_cell asm_code
 
-let output_from pos =
-  match pos with
-  | None -> DLL.to_list asm_code
-  | Some start_excl -> DLL.suffix start_excl
+let next_pos pos =
+  match pos with None -> DLL.hd_cell asm_code | Some cell -> DLL.next cell
+
+let output_range ~from_pos ~to_pos =
+  DLL.range_to_list ~left_incl:(next_pos from_pos) ~right_excl:(next_pos to_pos)
 
 let peephole_optimize_from pos =
   if !Oxcaml_flags.x86_peephole_optimize

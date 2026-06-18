@@ -492,7 +492,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
              alloc mode is [Local]: direct partial application:@ %a"
             Apply.print apply));
       let result_mode = Code_metadata.result_mode callee's_code_metadata in
-      let wrapper_taking_remaining_args, dacc, code_id, code =
+      let wrapper_taking_remaining_args, wrapper_alloc_mode, dacc, code_id, code
+          =
         let return_continuation = Continuation.create () in
         let remaining_params =
           List.map
@@ -724,8 +725,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           | Local { region; ghost_region = _ } ->
             Alloc_mode.For_allocations.local ~region
         in
-        ( Set_of_closures.create ~value_slots new_closure_alloc_mode
-            function_decls,
+        ( Set_of_closures.create ~value_slots function_decls,
+          new_closure_alloc_mode,
           dacc,
           code_id,
           code )
@@ -741,7 +742,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         let bound = Bound_pattern.set_of_closures bound_vars in
         let body =
           Let.create bound
-            (Named.create_set_of_closures wrapper_taking_remaining_args)
+            (Named.create_set_of_closures ~alloc_mode:wrapper_alloc_mode
+               wrapper_taking_remaining_args)
             ~body:(Expr.create_apply_cont apply_cont)
             ~free_names_of_body:Unknown
           |> Expr.create_let
@@ -831,10 +833,10 @@ let arity_mismatch ~(params_arity : [`Complex] Flambda_arity.t)
   has_mismatch params args
 
 let simplify_direct_function_call ~simplify_expr dacc apply
-    ~callee's_code_id_from_type ~callee's_code_ids_from_call_kind
-    ~callee's_function_slot ~coming_from_indirect ~result_arity ~result_types
-    ~recursive ~must_be_detupled ~closure_alloc_mode_from_type function_decl
-    ~down_to_up =
+    ~callee's_code_id_from_type ~callee's_code_metadata_from_type
+    ~callee's_code_ids_from_call_kind ~callee's_function_slot
+    ~coming_from_indirect ~result_arity ~result_types ~recursive
+    ~must_be_detupled ~closure_alloc_mode_from_type function_decl ~down_to_up =
   (match Apply.probe apply, Apply.inlined apply with
   | None, _ | Some _, Never_inlined -> ()
   | Some _, (Hint_inlined | Unroll _ | Default_inlined | Always_inlined _) ->
@@ -857,24 +859,29 @@ let simplify_direct_function_call ~simplify_expr dacc apply
   | Bottom ->
     replace_apply_by_invalid dacc ~down_to_up (Closure_type_was_invalid apply)
   | Ok callee's_code_ids ->
-    let callee's_code_id =
+    let callee's_code_id, callee's_code_metadata =
       (* XXX: go to indirect_known_arity if there are multiple code ids even
          with the types.
 
          bclement: We need to be careful not to prevent inlining by doing
          this. *)
       match Code_id.Set.get_singleton callee's_code_ids with
-      | Some callee's_code_id -> callee's_code_id
-      | None -> callee's_code_id_from_type
+      | None -> callee's_code_id_from_type, callee's_code_metadata_from_type
+      | Some callee's_code_id -> (
+        match DE.find_code_exn (DA.denv dacc) callee's_code_id with
+        | exception Not_found ->
+          (* This can happen if we have a more precise code id from the call
+             kind, but we don't have the metadata for it. This should be rare
+             (and will trigger warning 58 when we try to load the metadata for
+             this code id); in that case, we use the metadata that we do have
+             available for the code id from the type. *)
+          callee's_code_id_from_type, callee's_code_metadata_from_type
+        | callee's_code_or_metadata ->
+          ( callee's_code_id,
+            Code_or_metadata.code_metadata callee's_code_or_metadata ))
     in
     let call_kind = Call_kind.direct_function_call callee's_code_id in
     let apply = Apply.with_call_kind apply call_kind in
-    let callee's_code_or_metadata =
-      DE.find_code_exn (DA.denv dacc) callee's_code_id
-    in
-    let callee's_code_metadata =
-      Code_or_metadata.code_metadata callee's_code_or_metadata
-    in
     let params_arity = Code_metadata.params_arity callee's_code_metadata in
     (* A function declaration with [is_tupled = true] must be treated specially:
 
@@ -1095,16 +1102,18 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
   match callee_ty with
   | None -> (
     match call with
-    | Direct callee's_code_id ->
-      let callee's_code_or_metadata = DE.find_code_exn denv callee's_code_id in
-      let callee's_code_metadata =
-        Code_or_metadata.code_metadata callee's_code_or_metadata
-      in
-      simplify_direct_full_application ~simplify_expr dacc apply None
-        ~params_arity:(Code_metadata.params_arity callee's_code_metadata)
-        ~result_arity:(Code_metadata.result_arity callee's_code_metadata)
-        ~result_types:(Code_metadata.result_types callee's_code_metadata)
-        ~down_to_up ~coming_from_indirect:false ~callee's_code_metadata
+    | Direct callee's_code_id -> (
+      match DE.find_code_exn denv callee's_code_id with
+      | exception Not_found -> type_unavailable ()
+      | callee's_code_or_metadata ->
+        let callee's_code_metadata =
+          Code_or_metadata.code_metadata callee's_code_or_metadata
+        in
+        simplify_direct_full_application ~simplify_expr dacc apply None
+          ~params_arity:(Code_metadata.params_arity callee's_code_metadata)
+          ~result_arity:(Code_metadata.result_arity callee's_code_metadata)
+          ~result_types:(Code_metadata.result_types callee's_code_metadata)
+          ~down_to_up ~coming_from_indirect:false ~callee's_code_metadata)
     | Indirect_known_arity _ | Indirect_unknown_arity ->
       Misc.fatal_errorf
         "No callee provided for non-direct OCaml function call:@ %a" Apply.print
@@ -1115,7 +1124,7 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
         ( callee's_function_slot,
           closure_alloc_mode_from_type,
           _closures_entry,
-          func_decl_type ) ->
+          func_decl_type ) -> (
       let callee's_code_ids_from_call_kind : _ Or_unknown.t =
         match call with
         | Direct code_id -> Known (Code_id.Set.singleton code_id)
@@ -1128,23 +1137,27 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
         | Indirect_known_arity _ | Indirect_unknown_arity -> true
       in
       let callee's_code_id_from_type = T.Function_type.code_id func_decl_type in
-      let callee's_code_or_metadata =
-        DE.find_code_exn denv callee's_code_id_from_type
-      in
-      let callee's_code_metadata =
-        Code_or_metadata.code_metadata callee's_code_or_metadata
-      in
-      let must_be_detupled =
-        call_must_be_detupled (Code_metadata.is_tupled callee's_code_metadata)
-      in
-      simplify_direct_function_call ~simplify_expr dacc apply
-        ~callee's_code_id_from_type ~callee's_code_ids_from_call_kind
-        ~callee's_function_slot ~coming_from_indirect
-        ~result_arity:(Code_metadata.result_arity callee's_code_metadata)
-        ~result_types:(Code_metadata.result_types callee's_code_metadata)
-        ~recursive:(Code_metadata.recursive callee's_code_metadata)
-        ~must_be_detupled ~closure_alloc_mode_from_type func_decl_type
-        ~down_to_up
+      match DE.find_code_exn denv callee's_code_id_from_type with
+      | exception Not_found -> type_unavailable ()
+      | callee's_code_or_metadata ->
+        let callee's_code_metadata_from_type =
+          Code_or_metadata.code_metadata callee's_code_or_metadata
+        in
+        let must_be_detupled =
+          call_must_be_detupled
+            (Code_metadata.is_tupled callee's_code_metadata_from_type)
+        in
+        simplify_direct_function_call ~simplify_expr dacc apply
+          ~callee's_code_id_from_type ~callee's_code_metadata_from_type
+          ~callee's_code_ids_from_call_kind ~callee's_function_slot
+          ~coming_from_indirect
+          ~result_arity:
+            (Code_metadata.result_arity callee's_code_metadata_from_type)
+          ~result_types:
+            (Code_metadata.result_types callee's_code_metadata_from_type)
+          ~recursive:(Code_metadata.recursive callee's_code_metadata_from_type)
+          ~must_be_detupled ~closure_alloc_mode_from_type func_decl_type
+          ~down_to_up)
     | Need_meet -> type_unavailable ()
     | Invalid ->
       let rebuild uacc ~after_rebuild =
@@ -1353,6 +1366,18 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
     | With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg } ->
       E.with_stack_bind ~valuec:(simplify_simple valuec)
         ~exnc:(simplify_simple exnc) ~effc:(simplify_simple effc)
+        ~dyn:(simplify_simple dyn) ~bind:(simplify_simple bind)
+        ~f:(simplify_simple f) ~arg:(simplify_simple arg)
+    | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
+      E.with_stack_preemptible ~valuec:(simplify_simple valuec)
+        ~exnc:(simplify_simple exnc) ~effc:(simplify_simple effc)
+        ~handle_tick:(simplify_simple handle_tick)
+        ~f:(simplify_simple f) ~arg:(simplify_simple arg)
+    | With_stack_bind_preemptible
+        { valuec; exnc; effc; handle_tick; dyn; bind; f; arg } ->
+      E.with_stack_bind_preemptible ~valuec:(simplify_simple valuec)
+        ~exnc:(simplify_simple exnc) ~effc:(simplify_simple effc)
+        ~handle_tick:(simplify_simple handle_tick)
         ~dyn:(simplify_simple dyn) ~bind:(simplify_simple bind)
         ~f:(simplify_simple f) ~arg:(simplify_simple arg)
     | Resume { cont; f; arg } ->

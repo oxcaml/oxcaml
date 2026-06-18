@@ -29,8 +29,14 @@ type error =
   | Unterminated_string_in_comment of Location.t * Location.t
   | Empty_character_literal
   | Keyword_as_label of string
+  | Capitalized_label of string
   | Invalid_literal of string
   | Invalid_directive of string * string option
+  | Invalid_encoding of string
+  | Invalid_char_in_ident of Uchar.t
+  | Non_lowercase_delimiter of string
+  | Capitalized_raw_identifier of string
+  | Unknown_keyword of string
 
 exception Error of error * Location.t
 
@@ -91,6 +97,7 @@ let keyword_table : keywords =
     "do", DO;
     "done", DONE;
     "downto", DOWNTO;
+    "effect", EFFECT;
     "else", ELSE;
     "end", END;
     "exception", EXCEPTION;
@@ -122,7 +129,6 @@ let keyword_table : keywords =
     "nonrec", NONREC;
     "object", OBJECT;
     "of", OF;
-    "once_", ONCE;
     "open", OPEN;
     "or", OR;
     "overwrite_", OVERWRITE;
@@ -140,7 +146,6 @@ let keyword_table : keywords =
     "true", TRUE;
     "try", TRY;
     "type", TYPE;
-    "unique_", UNIQUE;
     "val", VAL;
     "virtual", VIRTUAL;
     "when", WHEN;
@@ -544,6 +549,10 @@ let prepare_error loc = function
   | Keyword_as_label kwd ->
       Location.errorf ~loc
         "%a is a keyword, it cannot be used as label name" Style.inline_code kwd
+  | Capitalized_label lbl ->
+      Location.errorf ~loc
+        "%a cannot be used as label name, \
+         it must start with a lowercase letter" Style.inline_code lbl
   | Invalid_literal s ->
       Location.errorf ~loc "Invalid literal %s" s
   | Invalid_directive (dir, explanation) ->
@@ -551,6 +560,25 @@ let prepare_error loc = function
         (fun ppf -> match explanation with
            | None -> ()
            | Some expl -> fprintf ppf ": %s" expl)
+  | Invalid_encoding s ->
+    Location.errorf ~loc "Invalid encoding of identifier %s." s
+  | Invalid_char_in_ident u ->
+      Location.errorf ~loc "Invalid character U+%04X in identifier"
+         (Uchar.to_int u)
+  | Capitalized_raw_identifier lbl ->
+      Location.errorf ~loc
+        "%a cannot be used as a raw identifier, \
+         it must start with a lowercase letter" Style.inline_code lbl
+  | Non_lowercase_delimiter name ->
+      Location.errorf ~loc
+        "%a cannot be used as a quoted string delimiter,@ \
+         it must contain only lowercase letters."
+         Style.inline_code name
+  | Unknown_keyword name ->
+      Location.errorf ~loc
+      "%a has been defined as an additional keyword.@ \
+       This version of OCaml does not support this keyword."
+      Style.inline_code name
 
 let () =
   Location.register_error_of_exn

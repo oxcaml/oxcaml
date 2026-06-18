@@ -40,10 +40,6 @@
 #include <wtypes.h>
 #else
 #include <sys/mman.h>
-#endif
-
-
-#if defined(HAS_UNISTD)
 #include <unistd.h>
 #endif
 
@@ -242,11 +238,11 @@ void caml_runtime_events_destroy(void) {
 static void runtime_events_create_from_stw_single(void) {
   /* Don't initialise runtime_events twice */
   if (!atomic_load_acquire(&runtime_events_enabled)) {
-    int ret, ring_headers_length, ring_data_length;
+    int ring_headers_length, ring_data_length;
 #ifdef _WIN32
     DWORD pid = GetCurrentProcessId();
 #else
-    int ring_fd;
+    int ring_fd, ret;
     long int pid = getpid();
 #endif
 
@@ -487,24 +483,17 @@ CAMLprim value caml_ml_runtime_events_resume(value vunit) {
   caml_runtime_events_resume(); return Val_unit;
 }
 
-CAMLprim value caml_ml_runtime_events_path(value vunit)
-{
+CAMLprim value caml_ml_runtime_events_path(value vunit) {
   CAMLparam0();
-  CAMLlocal2(res, str);
-
+  CAMLlocal2 (res, str);
+  res = Val_none;
   if (atomic_load_acquire(&runtime_events_enabled)) {
     /* The allocation might GC, which could allow another domain to
      * nuke current_ring_loc, so we snapshot it first. */
-
-    char_os* current_ring_loc_str = caml_stat_strdup_os(current_ring_loc);
-
-    res = caml_alloc(1, Tag_some);
+    char_os *current_ring_loc_str = caml_stat_strdup_os(current_ring_loc);
     str = caml_copy_string_of_os(current_ring_loc_str);
-    Store_field(res, 0, str);
-
     caml_stat_free(current_ring_loc_str);
-  } else {
-    res = Val_none;
+    res = caml_alloc_some(str);
   }
 
   CAMLreturn(res);
@@ -603,11 +592,12 @@ static void write_to_ring(ev_category category, ev_message_type type,
      of event headers.
   */
 
-  ring_ptr[ring_tail_offset++] = RUNTIME_EVENTS_HEADER(
-                                  length_with_header_ts,
-                                  category == EV_RUNTIME,
-                                  (type.runtime | type.user),
-                                  event_id);
+  ring_ptr[ring_tail_offset++] =
+    RUNTIME_EVENTS_HEADER(
+      length_with_header_ts,
+      category == EV_RUNTIME,
+      (category == EV_RUNTIME ? type.runtime : type.user),
+      event_id);
 
   ring_ptr[ring_tail_offset++] = timestamp;
   if (content != NULL) {
@@ -668,15 +658,13 @@ void caml_ev_alloc(uint64_t sz) {
 }
 
 void caml_ev_alloc_flush(void) {
-  int i;
-
   if ( !ring_is_active() )
     return;
 
   write_to_ring(EV_RUNTIME, (ev_message_type){.runtime=EV_ALLOC}, 0,
                   RUNTIME_EVENTS_NUM_ALLOC_BUCKETS, alloc_buckets, 0);
 
-  for (i = 1; i < RUNTIME_EVENTS_NUM_ALLOC_BUCKETS; i++) {
+  for (int i = 1; i < RUNTIME_EVENTS_NUM_ALLOC_BUCKETS; i++) {
     alloc_buckets[i] = 0;
   }
 }
@@ -730,7 +718,7 @@ CAMLprim value caml_runtime_events_user_register(value event_name,
 
 
   /* Pre-allocate to avoid STW while holding [user_events_lock]. */
-  list_item = caml_alloc(2, 0);
+  list_item = caml_alloc_small(2, 0);
 
   /* [user_events_lock] can be acquired during STW, so we must use
      caml_plat_lock_blocking and be careful to avoid triggering any
@@ -745,8 +733,8 @@ CAMLprim value caml_runtime_events_user_register(value event_name,
   }
 
   // event is added to the list of known events
-  Store_field(list_item, 0, event);
-  Store_field(list_item, 1, user_events);
+  Field(list_item, 0) = event;
+  Field(list_item, 1) = user_events;
   caml_modify_generational_global_root(&user_events, list_item);
   // end critical section
   caml_plat_unlock(&user_events_lock);
@@ -788,12 +776,7 @@ CAMLprim value caml_runtime_events_user_write(
     value record = Field(event_type, 0);
     value serializer = Field(record, 0);
 
-    res = caml_callback2_exn(serializer, write_buffer, event_content);
-
-    if (Is_exception_result(res)) {
-      res = Extract_exception(res);
-      caml_raise(res);
-    }
+    res = caml_callback2(serializer, write_buffer, event_content);
 
     /* Need to check whether the ring is active again as the ring might
      * potentially have been destroyed during the callback. */

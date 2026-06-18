@@ -67,7 +67,7 @@ let code loopify(never) size(62) newer_version_of(i_3)
           | 0 -> k3
           | 1 -> k2 (0))
          where k3 =
-           ((let prim = %array_length (if_then_else_result) in
+           ((let prim = %array_length.`imm` (if_then_else_result) in
              let prim_1 = %int_comp.unsigned.lt (0, prim) in
              switch prim_1
                | 0 -> k3

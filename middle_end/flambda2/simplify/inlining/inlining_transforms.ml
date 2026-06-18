@@ -117,9 +117,14 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
   let apply_exn_continuation = Apply.exn_continuation apply in
   (* CR-someday mshinwell: Add meet constraint to the return continuation *)
   let denv = DA.denv dacc in
-  let code =
-    Code_or_metadata.get_code (DE.find_code_exn denv (FT.code_id function_decl))
+  let code_or_metadata =
+    try DE.find_code_exn denv (FT.code_id function_decl)
+    with Not_found ->
+      Misc.fatal_errorf
+        "Trying to inline %a but could not find its code or metadata"
+        Code_id.print (FT.code_id function_decl)
   in
+  let code = Code_or_metadata.get_code code_or_metadata in
   let rec_info =
     match T.meet_rec_info (DE.typing_env denv) (FT.rec_info function_decl) with
     | Known_result rec_info -> rec_info

@@ -22,7 +22,8 @@ module type Common_options = sig
   val _locs : unit -> unit
   val _no_locs : unit -> unit
   val _alert : string -> unit
-  val _ikinds : unit -> unit
+  val _i_variance : unit -> unit
+  val _no_ikinds : unit -> unit
   val _ikinds_debug : unit -> unit
   val _I : string -> unit
   val _Ix : string -> unit
@@ -47,6 +48,7 @@ module type Common_options = sig
   val _nocwd : unit -> unit
   val _open : string -> unit
   val _ppx : string -> unit
+  val _keywords: string -> unit
   val _principal : unit -> unit
   val _no_principal : unit -> unit
   val _rectypes : unit -> unit
@@ -82,14 +84,18 @@ module type Core_options = sig
 
   val _dno_unique_ids : unit -> unit
   val _dunique_ids : unit -> unit
+  val _dno_canonical_ids : unit -> unit
+  val _dcanonical_ids : unit -> unit
   val _dno_locations : unit -> unit
   val _dlocations : unit -> unit
   val _dsource : unit -> unit
   val _dparsetree : unit -> unit
+  val _dparsetree_loc_ghost_invariants : unit -> unit
   val _dtypedtree : unit -> unit
   val _dshape : unit -> unit
   val _dtlambda : unit -> unit
   val _dslambda : unit -> unit
+  val _dmatchcomp : unit -> unit
   val _drawlambda : unit -> unit
   val _dlambda : unit -> unit
   val _dblambda : unit -> unit
@@ -118,6 +124,7 @@ module type Compiler_options = sig
   val _no_g : unit -> unit
   val _stop_after : string -> unit
   val _i : unit -> unit
+  val _i_variance : unit -> unit
   val _impl : string -> unit
   val _instantiate : unit -> unit
   val _intf : string -> unit

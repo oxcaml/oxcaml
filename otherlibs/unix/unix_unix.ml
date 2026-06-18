@@ -510,6 +510,7 @@ external sigprocmask:
 external sigpending: unit -> int list @@ portable = "caml_unix_sigpending"
 external sigsuspend:
   int list @ local -> unit @@ portable = "caml_unix_sigsuspend"
+external sigwait: int list @ local -> int @@ portable = "caml_unix_sigwait"
 
 let pause() =
   let sigs = sigprocmask SIG_BLOCK [] in sigsuspend sigs

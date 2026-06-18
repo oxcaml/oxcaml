@@ -320,6 +320,8 @@ let record_rep ppf r = match r with
   | Record_float -> fprintf ppf "float"
   | Record_ufloat -> fprintf ppf "ufloat"
   | Record_mixed _ -> fprintf ppf "mixed"
+  | Record_dummy _ -> fprintf ppf "dummy"
+  | Record_variable -> fprintf ppf "variable"
 
 let rec mixed_block_element
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element -> _ =
@@ -520,6 +522,8 @@ let primitive ppf = function
   | Pduprecord (rep, size) -> fprintf ppf "duprecord %a %i" record_rep rep size
   | Pwith_stack -> fprintf ppf "with_stack"
   | Pwith_stack_bind -> fprintf ppf "with_stack_bind"
+  | Pwith_stack_preemptible -> fprintf ppf "with_stack_preemptible"
+  | Pwith_stack_bind_preemptible -> fprintf ppf "with_stack_bind_preemptible"
   | Pperform -> fprintf ppf "perform"
   | Presume -> fprintf ppf "resume"
   | Preperform -> fprintf ppf "reperform"
@@ -870,9 +874,9 @@ let primitive ppf = function
   | Patomic_lxor_field -> fprintf ppf "atomic_lxor_field"
   | Popaque _ -> fprintf ppf "opaque"
   | Pdls_get -> fprintf ppf "dls_get"
+  | Ppoll -> fprintf ppf "poll"
   | Ptls_get -> fprintf ppf "tls_get"
   | Pdomain_index -> fprintf ppf "domain_index"
-  | Ppoll -> fprintf ppf "poll"
   | Pcpu_relax -> fprintf ppf "cpu_relax"
   | Pprobe_is_enabled {name} -> fprintf ppf "probe_is_enabled[%s]" name
   | Pobj_dup -> fprintf ppf "obj_dup"
@@ -1068,13 +1072,15 @@ let name_of_primitive = function
   | Popaque _ -> "Popaque"
   | Pwith_stack -> "Pwith_stack"
   | Pwith_stack_bind -> "Pwith_stack_bind"
+  | Pwith_stack_preemptible -> "Pwith_stack_preemptible"
+  | Pwith_stack_bind_preemptible -> "Pwith_stack_bind_preemptible"
   | Presume -> "Presume"
   | Pperform -> "Pperform"
   | Preperform -> "Preperform"
   | Pdls_get -> "Pdls_get"
+  | Ppoll -> "Ppoll"
   | Ptls_get -> "Ptls_get"
   | Pdomain_index -> "Pdomain_index"
-  | Ppoll -> "Ppoll"
   | Pprobe_is_enabled _ -> "Pprobe_is_enabled"
   | Pobj_dup -> "Pobj_dup"
   | Pobj_magic _ -> "Pobj_magic"

@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-no-ikinds";
  expect;
 *)
 
@@ -20,7 +21,7 @@ Error: Signature mismatch:
          type t : value_or_null
        is not included in
          type t
-       The layout of the first is value maybe_separable maybe_null
+       The layout of the first is value_or_null
          because of the definition of t at line 2, characters 2-24.
        But the layout of the first must be a sublayout of value
          because of the definition of t at line 1, characters 16-30.
@@ -63,7 +64,7 @@ Error: Signature mismatch:
        is not included in
          sig type t end
        Type declarations do not match: type t = X.t is not included in type t
-       The layout of the first is value maybe_separable maybe_null
+       The layout of the first is value_or_null
          because of the definition of t at line 1, characters 19-41.
        But the layout of the first must be a sublayout of value
          because of the definition of t at line 1, characters 53-67.

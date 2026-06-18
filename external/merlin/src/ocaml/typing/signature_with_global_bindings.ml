@@ -1,16 +1,17 @@
 [@@@ocaml.warning "+a-9-40-41-42"]
 
 type t = {
-  sign : Subst.Lazy.signature;
+  sign : Subst.Lazy.persistent_signature;
   bound_globals : Global_module.With_precision.t array;
 }
 
 let read_from_cmi (cmi : Cmi_format.cmi_infos_lazy) =
+  let cmi_sign, staticity = cmi.cmi_sign in
   let sign =
     (* Freshen identifiers bound by signature *)
-    Subst.Lazy.signature Make_local Subst.identity cmi.cmi_sign in
+    Subst.Lazy.signature Make_local (Subst.for_loading_cmi ()) cmi_sign in
   let bound_globals = cmi.cmi_globals in
-  { sign; bound_globals }
+  { sign = (sign, staticity); bound_globals }
 
 let array_fold_left_filter_map f init array =
   let ans, new_array = Array.fold_left_map f init array in
@@ -30,7 +31,7 @@ let name_in_subst (name : Global_module.Name.t) subst =
   | _ -> false
 
 let subst t (args : (Global_module.Parameter_name.t * Global_module.t) list) =
-  let { sign; bound_globals } = t in
+  let { sign = (sign, staticity); bound_globals } = t in
   match args with
   | [] -> t
   | _ ->
@@ -87,4 +88,4 @@ let subst t (args : (Global_module.Parameter_name.t * Global_module.t) list) =
       in
       let subst = List.fold_left add_arg subst args in
       let sign = Subst.Lazy.signature Keep subst sign in
-      { sign; bound_globals }
+      { sign = (sign, staticity); bound_globals }

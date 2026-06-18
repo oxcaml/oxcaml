@@ -53,17 +53,20 @@ type t =
     mutable cmx_required : CU.t list;
     interfaces : unit CU.Name.Tbl.t;
     implementations_defined : string CU.Tbl.t;
-    mutable quoted_globals : CU.Name.Set.t;
+    mutable quoted_cmi : CU.Name.Set.t;
+    mutable quoted_cmx : CU.Set.t;
     mutable lib_ccobjs : filepath list;
     mutable lib_ccopts : string list;
     missing_globals : (CU.t, (string * CU.Name.t option) list ref) Hashtbl.t
   }
 
 let create () =
-  let quoted_globals =
+  let quoted_cmi, quoted_cmx =
     if !Clflags.nopervasives
-    then CU.Name.Set.empty
-    else CU.Name.Set.singleton (CU.Name.of_string "Stdlib")
+    then CU.Name.Set.empty, CU.Set.empty
+    else
+      ( CU.Name.Set.singleton (CU.Name.of_string "Stdlib"),
+        CU.Set.singleton (CU.of_string "Stdlib") )
   in
   { crc_interfaces = Cmi_consistbl.create ();
     crc_implementations = Cmx_consistbl.create ();
@@ -71,7 +74,8 @@ let create () =
     cmx_required = [];
     interfaces = CU.Name.Tbl.create 100;
     implementations_defined = CU.Tbl.create 100;
-    quoted_globals;
+    quoted_cmi;
+    quoted_cmx;
     lib_ccobjs = [];
     lib_ccopts = [];
     missing_globals = Hashtbl.create 17
@@ -79,13 +83,17 @@ let create () =
 
 (* Globals for quotations *)
 
-let add_quoted_globals t globals =
-  t.quoted_globals
-    <- List.fold_left
-         (fun globals global -> CU.Name.Set.add global globals)
-         t.quoted_globals globals
+let add_quoted_cmi t cus =
+  t.quoted_cmi
+    <- List.fold_left (fun cus cu -> CU.Name.Set.add cu cus) t.quoted_cmi cus
 
-let get_quoted_globals t = t.quoted_globals
+let add_quoted_cmx t cus =
+  t.quoted_cmx
+    <- List.fold_left (fun cus cu -> CU.Set.add cu cus) t.quoted_cmx cus
+
+let get_quoted_cmi t = t.quoted_cmi
+
+let get_quoted_cmx t = t.quoted_cmx
 
 (* Consistency check between interfaces and implementations: *)
 
@@ -229,10 +237,11 @@ let lib_ccopts t = t.lib_ccopts
 open Format_doc
 
 let report_error ppf = function
-  | File_not_found name -> fprintf ppf "Cannot find file %s" name
+  | File_not_found name ->
+    fprintf ppf "Cannot find file %a" Location.Doc.quoted_filename name
   | Not_an_object_file name ->
     fprintf ppf "The file %a is not a compilation unit description"
-      Location.Doc.filename name
+      Location.Doc.quoted_filename name
   | Missing_implementations l ->
     let print_references ppf = function
       | [] -> ()
@@ -252,25 +261,25 @@ let report_error ppf = function
     fprintf ppf
       "@[<hov>Files %a@ and %a@ make inconsistent assumptions over interface \
        %a@]"
-      Location.Doc.filename file1 Location.Doc.filename file2
+      Location.Doc.quoted_filename file1 Location.Doc.quoted_filename file2
       CU.Name.print_as_inline_code intf
   | Inconsistent_implementation (intf, file1, file2) ->
     fprintf ppf
       "@[<hov>Files %a@ and %a@ make inconsistent assumptions over \
        implementation %a@]"
-      Location.Doc.filename file1 Location.Doc.filename file2
+      Location.Doc.quoted_filename file1 Location.Doc.quoted_filename file2
       CU.print_as_inline_code intf
   | Multiple_definition (modname, file1, file2) ->
     fprintf ppf "@[<hov>Files %a@ and %a@ both define a module named %a@]"
-      Location.Doc.filename file1 Location.Doc.filename file2
+      Location.Doc.quoted_filename file1 Location.Doc.quoted_filename file2
       CU.Name.print_as_inline_code modname
   | Missing_cmx (filename, name) ->
     fprintf ppf
       "@[<hov>File %a@ was compiled without access@ to the .cmx file@ for \
        module %a,@ which was produced by `ocamlopt -for-pack'.@ Please \
        recompile %a@ with the correct `-I' option@ so that %a.cmx@ is found.@]"
-      Location.Doc.filename filename CU.print_as_inline_code name
-      Location.Doc.filename filename CU.print_as_inline_code name
+      Location.Doc.quoted_filename filename CU.print_as_inline_code name
+      Location.Doc.quoted_filename filename CU.print_as_inline_code name
   | Linking_error exitcode ->
     fprintf ppf "Error during linking (exit code %d)" exitcode
   | Archiver_error name ->
@@ -279,12 +288,12 @@ let report_error ppf = function
     fprintf ppf
       "@[<hov>The file %a@ can only be compiled with a backend with support \
        for metaprogramming@]"
-      Location.Doc.filename filename
+      Location.Doc.quoted_filename filename
   | Requires_metaprogramming_without_flag filename ->
     fprintf ppf
       "@[<hov>The library %a@ requires metaprogramming support@ but \
        -uses-metaprogramming was not passed@]"
-      Location.Doc.filename filename
+      Location.Doc.quoted_filename filename
 
 let () =
   Location.register_error_of_exn (function

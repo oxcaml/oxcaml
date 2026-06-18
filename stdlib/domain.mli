@@ -17,10 +17,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-[@@@alert unstable
-    "The Domain interface may change in incompatible ways in the future."
-]
-
 (** Domains.
 
     See 'Parallel programming' chapter in the manual.
@@ -59,6 +55,33 @@ val get_id : 'a t -> id @@ portable
 val self : unit -> id @@ portable
 (** [self ()] is the identifier of the currently running domain *)
 
+val before_first_spawn : (unit -> unit) -> unit @@ nonportable
+(** [before_first_spawn f] registers [f] to be called before the first domain
+    is spawned by the program. The functions registered with
+    [before_first_spawn] are called on the main (initial) domain. The functions
+    registered with [before_first_spawn] are called in 'first in, first out'
+    order: the oldest function added with [before_first_spawn] is called first.
+
+    @raise Invalid_argument if the program has already spawned a domain. *)
+
+val at_exit : (unit -> unit) -> unit @@ nonportable
+(** [at_exit f] registers [f] to be called when the current domain exits. Note
+    that [at_exit] callbacks are domain-local and only apply to the calling
+    domain. The registered functions are called in 'last in, first out' order:
+    the function most recently added with [at_exit] is called first. An example:
+
+    {[
+let temp_file_key = Domain.DLS.new_key (fun _ ->
+  let tmp = snd (Filename.open_temp_file "" "") in
+  Domain.at_exit (fun () -> close_out_noerr tmp);
+  tmp)
+    ]}
+
+    The snippet above creates a key that when retrieved for the first
+    time will open a temporary file and register an [at_exit] callback
+    to close it, thus guaranteeing the descriptor is not leaked in
+    case the current domain exits. *)
+
 external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
 (** If busy-waiting, calling cpu_relax () between iterations
     will improve performance on some CPU architectures *)
@@ -88,35 +111,8 @@ val self_index : unit -> int @@ portable
     @since 5.3
 *)
 
-val before_first_spawn : (unit -> unit) -> unit @@ nonportable
-(** [before_first_spawn f] registers [f] to be called before the first domain
-    is spawned by the program. The functions registered with
-    [before_first_spawn] are called on the main (initial) domain. The functions
-    registered with [before_first_spawn] are called in 'first in, first out'
-    order: the oldest function added with [before_first_spawn] is called first.
-
-    @raise Invalid_argument if the program has already spawned a domain. *)
-
-val at_exit : (unit -> unit) -> unit @@ nonportable
-(** [at_exit f] registers [f] to be called when the current domain exits. Note
-    that [at_exit] callbacks are domain-local and only apply to the calling
-    domain. The registered functions are called in 'last in, first out' order:
-    the function most recently added with [at_exit] is called first. An example:
-
-    {[
-let temp_file_key = Domain.DLS.new_key (fun _ ->
-  let tmp = snd (Filename.open_temp_file "" "") in
-  Domain.at_exit (fun () -> close_out_noerr tmp);
-  tmp)
-    ]}
-
-    The snippet above creates a key that when retrieved for the first
-    time will open a temporary file and register an [at_exit] callback
-    to close it, thus guaranteeing the descriptor is not leaked in
-    case the current domain exits. *)
-
-(** Domain-local Storage *)
 module DLS : sig
+(** Domain-local Storage *)
 
     type 'a key : value mod portable contended
     (** Type of a DLS key *)
@@ -125,7 +121,7 @@ module DLS : sig
       @@ nonportable
     [@@alert unsafe_multidomain "Use [Domain.Safe.DLS.new_key]."]
     (** [new_key f] returns a new key bound to initialiser [f] for accessing
-,        domain-local variables.
+        domain-local variables.
 
         If [split_from_parent] is not provided, the value for a new
         domain will be computed on-demand by the new domain: the first
@@ -214,10 +210,10 @@ module Tick : sig @@ portable
 
       In between calling [acquire] and calling [release], the tick thread will
       tick {i at least as frequently} as the provided [interval_usec]. *)
-  type t : mutable_data mod external_ global
+  type t : mutable_data mod external_ global non_float
 
   (** Request that the tick thread tick at least as frequently as
-      [tick_interval] until [release] is called on the returned handle. *)
+      [interval_usec] until [release] is called on the returned handle. *)
   val acquire : interval_usec:int -> t @ unique
 
   (** Release a handle to a tick request.
@@ -227,6 +223,14 @@ module Tick : sig @@ portable
      domain).
   *)
   val release : t @ unique -> unit
+
+  (** [with_ ~interval_usec f] runs [f] with the tick thread ticking at least as
+      frequently as [interval_usec] *)
+  val with_
+    : ('r : value_or_null).
+       interval_usec:int
+    -> (t @ local -> 'r) @ local once
+    -> 'r
 
   (** Returns the interval at which the tick thread will tick, or [Null]
       if no domain has any active tick requests. This is the global minimum

@@ -39,7 +39,9 @@ type compile_time_constant =
 
 type immediate_or_pointer =
   | Immediate
+  (* The value must be immediate. *)
   | Pointer
+  (* The value may be a pointer or an immediate. *)
 
 type locality_mode = private
   | Alloc_heap
@@ -168,6 +170,8 @@ type primitive =
   (* Context switches *)
   | Pwith_stack
   | Pwith_stack_bind
+  | Pwith_stack_preemptible
+  | Pwith_stack_bind_preemptible
   | Pperform
   | Presume
   | Preperform
@@ -1262,9 +1266,13 @@ val transl_prim: string -> string -> lambda
 (** Translate a value from a persistent module. For instance:
 
     {[
-      transl_internal_value "CamlinternalLazy" "force"
+      transl_prim "CamlinternalLazy" "force"
     ]}
 *)
+
+val is_evaluated : lambda -> bool
+(** [is_evaluated lam] returns [true] if [lam] is either a constant, a variable
+    or a function abstract. *)
 
 val free_variables: lambda -> Ident.Set.t
 
@@ -1355,6 +1363,8 @@ val max_arity : unit -> int
       maximal length of the [params] list of a [lfunction] record.
       This is unlimited ([max_int]) for bytecode, but limited
       (currently to 126) for native code. *)
+
+val tag_of_lazy_tag : lazy_block_tag -> int
 
 val join_locality_mode : locality_mode -> locality_mode -> locality_mode
 val sub_locality_mode : locality_mode -> locality_mode -> bool

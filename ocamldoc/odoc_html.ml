@@ -29,7 +29,7 @@ let css_style = ref None
 let index_only = ref false
 let colorize_code = ref false
 let html_short_functors = ref false
-let charset = ref "iso-8859-1"
+let charset = ref "UTF-8"
 let show_navbar = ref true
 
 
@@ -552,7 +552,7 @@ class virtual text =
              let (html, _) = Naming.html_files m.m_name in
              bp b "<a href=\"%s\">%s</a></td>" html m.m_name;
              bs b "<td>";
-             self#html_of_info_first_sentence b m.m_info;
+             self#html_of_info_first_sentence ~with_p:false b m.m_info;
            with
              Not_found ->
                Odoc_global.pwarning (Odoc_messages.cross_module_not_found name);
@@ -786,7 +786,7 @@ class virtual info =
 
     (** Print html code for the first sentence of a description.
        The titles and lists in this first sentence has been removed.*)
-    method html_of_info_first_sentence b info_opt =
+    method html_of_info_first_sentence ~with_p b info_opt =
       match info_opt with
         None -> ()
       | Some info ->
@@ -799,7 +799,7 @@ class virtual info =
              None -> ()
            | Some d when d = [Odoc_info.Raw ""] -> ()
            | Some d ->
-               self#html_of_text ~with_p:true b
+               self#html_of_text ~with_p b
                  (Odoc_info.text_no_title_no_list
                     (Odoc_info.first_sentence_of_text d));
                bs b "\n"
@@ -1707,6 +1707,7 @@ class html =
         if r.rf_mutable then bs b (self#keyword "mutable&nbsp;") ;
         bp b "<span id=\"%s\">%s</span>&nbsp;: " (gen_name r) r.rf_name;
         self#html_of_type_expr b father r.rf_type;
+        if r.rf_atomic then bs b (self#keyword " [@atomic]") ;
         bs b ";</code></td>\n";
         (
           match r.rf_text with
@@ -2076,7 +2077,7 @@ class html =
          if complete then
            self#html_of_info ~cls: "module top" ~indent: true
          else
-           self#html_of_info_first_sentence
+           self#html_of_info_first_sentence ~with_p:true
         ) b m.m_info
       else
         ()
@@ -2107,7 +2108,7 @@ class html =
          if complete then
            self#html_of_info ~cls: "modtype top" ~indent: true
          else
-           self#html_of_info_first_sentence
+           self#html_of_info_first_sentence ~with_p:true
         ) b mt.mt_info
       else
         ()
@@ -2262,7 +2263,7 @@ class html =
        if complete then
          self#html_of_info ~cls: "class top" ~indent: true
        else
-         self#html_of_info_first_sentence
+         self#html_of_info_first_sentence ~with_p:true
       ) b c.cl_info
 
     (** Print html code for a class type. *)
@@ -2305,7 +2306,7 @@ class html =
        if complete then
          self#html_of_info ~cls: "classtype top" ~indent: true
        else
-         self#html_of_info_first_sentence
+         self#html_of_info_first_sentence ~with_p:true
       ) b ct.clt_info
 
     (** Return html code to represent a dag, represented as in Odoc_dag2html. *)
@@ -2439,7 +2440,7 @@ class html =
           if simple_name <> father_name && father_name <> "" then
             bp b "[<a href=\"%s\">%s</a>]" (fst (Naming.html_files father_name)) father_name;
           bs b "</td>\n<td>";
-          self#html_of_info_first_sentence b (info e);
+          self#html_of_info_first_sentence ~with_p:false b (info e);
           bs b "</td></tr>\n"
         end
         in

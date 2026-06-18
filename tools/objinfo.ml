@@ -82,8 +82,11 @@ let print_impl_import import =
   let crco = Import_info.crc import in
   print_cu_crc name crco
 
-let print_quoted_global global =
+let print_quoted_intf global =
   printf "\t%a\n" Compilation_unit.Name.output global
+
+let print_quoted_impl global =
+  printf "\t%a\n" Compilation_unit.output global
 
 let print_global_name_binding global =
   printf "\t%a\n" Global_module.With_precision.output global
@@ -293,7 +296,7 @@ let print_cms_infos cms =
     (match cms.cms_sourcefile with None -> "(none)" | Some f -> f)
 
 let print_general_infos print_name name crc defines arg_descr mbf
-    iter_cmi iter_cmx iter_qglobals =
+    iter_cmi iter_cmx iter_qcmi iter_qcmx =
   printf "Name: %a\n" print_name name;
   printf "CRC of implementation: %s\n" (string_of_crc crc);
   printf "Globals defined:\n";
@@ -303,13 +306,19 @@ let print_general_infos print_name name crc defines arg_descr mbf
   iter_cmi print_intf_import;
   printf "Implementations imported:\n";
   iter_cmx print_impl_import;
-  printf "Globals used in quotations:\n";
-  iter_qglobals print_quoted_global;
+  printf "Interfaces used in quotations:\n";
+  iter_qcmi print_quoted_intf;
+  printf "Implementations used in quotations:\n";
+  iter_qcmx print_quoted_impl;
   Option.iter print_main_module_block_format mbf
 
 let print_global_table table =
   printf "Globals defined:\n";
-  Symtable.iter_global_map (fun id _ -> print_line (Symtable.Global.name id))
+  Symtable.iter_global_map
+    (fun global _ ->
+       let desc = Format_doc.compat Symtable.Global.description in
+       print_line (Format.asprintf "%a" desc global)
+    )
     table
 
 open Cmx_format
@@ -354,7 +363,8 @@ let print_cmx_infos (uir, sections, crc) =
     uir.uir_arg_descr (Some uir.uir_format)
     (fun f -> Array.iter f uir.uir_imports_cmi)
     (fun f -> Array.iter f uir.uir_imports_cmx)
-    (fun f -> Array.iter f uir.uir_quoted_globals);
+    (fun f -> Array.iter f uir.uir_quoted_cmi)
+    (fun f -> Array.iter f uir.uir_quoted_cmx);
   begin
     match uir.uir_export_info with
     | None ->
@@ -392,8 +402,8 @@ let print_cmxa_infos (lib : Cmx_format.library_infos) =
             B.iter (fun i -> f lib.lib_imports_cmi.(i)) u.li_imports_cmi)
           (fun f ->
             B.iter (fun i -> f lib.lib_imports_cmx.(i)) u.li_imports_cmx)
-          (fun f ->
-            B.iter(fun i -> f lib.lib_quoted_globals.(i)) u.li_quoted_globals);
+          (fun f -> B.iter (fun i -> f lib.lib_quoted_cmi.(i)) u.li_quoted_cmi)
+          (fun f -> B.iter (fun i -> f lib.lib_quoted_cmx.(i)) u.li_quoted_cmx);
         printf "Force link: %s\n" (if u.li_force_link then "YES" else "no"))
 
 let print_cmxs_infos header =
@@ -407,7 +417,8 @@ let print_cmxs_infos header =
          None
          (fun f -> Array.iter f ui.dynu_imports_cmi)
          (fun f -> Array.iter f ui.dynu_imports_cmx)
-         (fun f -> Array.iter f ui.dynu_quoted_globals);)
+         (fun f -> Array.iter f ui.dynu_quoted_cmi)
+         (fun f -> Array.iter f ui.dynu_quoted_cmx);)
     header.dynu_units
 
 let p_title title = printf "%s:\n" title
@@ -599,9 +610,17 @@ let dump_obj filename =
   then dump_cmxs ic
   else exit_magic_error ~expected_kind:None (Parse_error head_error)
 
+let print_version () =
+  Format.printf "ocamlobjinfo, version %s@." Sys.ocaml_version;
+  exit 0
+
+let print_version_num () =
+  Format.printf "%s@." Sys.ocaml_version;
+  exit 0
+
 let arg_list = [
   "-quiet", Arg.Set quiet,
-    " Only print explicitely required information";
+    " Only print explicitly required information";
   "-no-approx", Arg.Set no_approx,
     " Do not print module approximation information";
   "-no-code", Arg.Set no_code,
@@ -615,6 +634,8 @@ let arg_list = [
   "-uid-deps", Arg.Set uid_deps,
     " Print the declarations' uids dependencies of the module";
   "-null-crc", Arg.Set no_crc, " Print a null CRC for imported interfaces";
+  "-version", Arg.Unit print_version, " Print version and exit";
+  "-vnum", Arg.Unit print_version_num, " Print version number and exit";
   "-args", Arg.Expand Arg.read_arg,
      "<file> Read additional newline separated command line arguments \n\
      \      from <file>";

@@ -1,84 +1,84 @@
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_start
+(lldb) b Test_datatypes_dwarf.f_start
 (lldb) run
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_simple_variant
+(lldb) b Test_datatypes_dwarf.f_simple_variant
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_complex_variant
+(lldb) b Test_datatypes_dwarf.f_complex_variant
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_complex_variant_second
+(lldb) b Test_datatypes_dwarf.f_complex_variant_second
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_complex_variant_third
+(lldb) b Test_datatypes_dwarf.f_complex_variant_third
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_basic_record
+(lldb) b Test_datatypes_dwarf.f_basic_record
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_mixed_record
+(lldb) b Test_datatypes_dwarf.f_mixed_record
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_unboxed_variant_float
+(lldb) b Test_datatypes_dwarf.f_unboxed_variant_float
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_unboxed_variant_int
+(lldb) b Test_datatypes_dwarf.f_unboxed_variant_int
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_unboxed_variant_value_int
+(lldb) b Test_datatypes_dwarf.f_unboxed_variant_value_int
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_unboxed_variant_value_string
+(lldb) b Test_datatypes_dwarf.f_unboxed_variant_value_string
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_unboxed_variant_value_bool
+(lldb) b Test_datatypes_dwarf.f_unboxed_variant_value_bool
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_unboxed_record_simple
+(lldb) b Test_datatypes_dwarf.f_unboxed_record_simple
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_unboxed_record_complex
+(lldb) b Test_datatypes_dwarf.f_unboxed_record_complex
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_poly_variant
+(lldb) b Test_datatypes_dwarf.f_poly_variant
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_open_poly_variant
+(lldb) b Test_datatypes_dwarf.f_open_poly_variant
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_nested_variant
+(lldb) b Test_datatypes_dwarf.f_nested_variant
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_mixed_combo
+(lldb) b Test_datatypes_dwarf.f_mixed_combo
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_option_variant
+(lldb) b Test_datatypes_dwarf.f_option_variant
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_either
+(lldb) b Test_datatypes_dwarf.f_either
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_poly_float64
+(lldb) b Test_datatypes_dwarf.f_poly_float64
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_poly_bits32
+(lldb) b Test_datatypes_dwarf.f_poly_bits32
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_unboxed_tuple_field
+(lldb) b Test_datatypes_dwarf.f_unboxed_tuple_field
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_exception_specific
+(lldb) b Test_datatypes_dwarf.f_exception_specific
 (lldb) c
 (lldb) c
 (lldb) c
@@ -87,7 +87,7 @@
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_exception_poly
+(lldb) b Test_datatypes_dwarf.f_exception_poly
 (lldb) c
 (lldb) c
 (lldb) c
@@ -95,53 +95,53 @@
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_exception_with_record
+(lldb) b Test_datatypes_dwarf.f_exception_with_record
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_exception_with_unboxed
+(lldb) b Test_datatypes_dwarf.f_exception_with_unboxed
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_tree
+(lldb) b Test_datatypes_dwarf.f_tree
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_forest
+(lldb) b Test_datatypes_dwarf.f_forest
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_tuple_int_int
+(lldb) b Test_datatypes_dwarf.f_tuple_int_int
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_tuple_mixed_two
+(lldb) b Test_datatypes_dwarf.f_tuple_mixed_two
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_tuple_three
+(lldb) b Test_datatypes_dwarf.f_tuple_three
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_tuple_nested
+(lldb) b Test_datatypes_dwarf.f_tuple_nested
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_tuple_with_complex
+(lldb) b Test_datatypes_dwarf.f_tuple_with_complex
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_tuple_large
+(lldb) b Test_datatypes_dwarf.f_tuple_large
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_poly_tuple
+(lldb) b Test_datatypes_dwarf.f_poly_tuple
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_bigarray1_int
+(lldb) b Test_datatypes_dwarf.f_bigarray1_int
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_bigarray1_float
+(lldb) b Test_datatypes_dwarf.f_bigarray1_float
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_bigarray2_int
+(lldb) b Test_datatypes_dwarf.f_bigarray2_int
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_bigarray2_float
+(lldb) b Test_datatypes_dwarf.f_bigarray2_float
 (lldb) c
-(lldb) breakpoint set -b Test_datatypes_dwarf.f_bigarray3_int32
+(lldb) b Test_datatypes_dwarf.f_bigarray3_int32
 (lldb) c
 (lldb) quit

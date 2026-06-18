@@ -60,58 +60,60 @@ let scrape_ty env ty =
   match get_desc ty with
   | Tconstr _
   | Tquote _ | Tsplice _ | Tquote_eval _ ->
-      let ty = Ctype.correct_levels ty in
-      let ty' = Ctype.expand_head_opt env ty in
-      begin match get_desc ty' with
+      let ty = Ctype.expand_head_opt env ty in
+      begin match get_desc ty with
       | Tconstr (p, _, _) ->
           begin match find_unboxed_type (Env.find_type p env) with
           | Some _ -> begin
-            match (Ctype.get_unboxed_type_approximation env ty') with
+            match (Ctype.get_unboxed_type_approximation env ty) with
             | { ty; or_null = None; modality = _ } ->
-              ty
-            | _ -> ty' end
-          | None -> ty'
-          | exception Not_found -> ty (* missing cmi file *)
+              Some ty
+            | _ -> Some ty end
+          | None -> Some ty
+          | exception Not_found -> None
           end
       | _ ->
-          ty'
+          Some ty
       end
-  | _ -> ty
+  | _ -> Some ty
 
 (* See [scrape_ty]; this returns the [type_desc] of a scraped [type_expr]. *)
 let scrape env ty =
-  get_desc (scrape_ty env ty)
+  Option.map get_desc (scrape_ty env ty)
 
 let scrape_poly env ty =
   let ty = scrape_ty env ty in
-  match get_desc ty with
-  | Tpoly (ty, _) -> get_desc ty
-  | d -> d
+  Option.map (fun ty ->
+      match get_desc ty with
+      | Tpoly (ty, _) -> get_desc ty
+      | d -> d)
+    ty
 
 let is_function_type env ty =
   match scrape env ty with
-  | Tarrow (_, lhs, rhs, _) -> Some (lhs, rhs)
+  | Some (Tarrow (_, lhs, rhs, _)) -> Some (lhs, rhs)
   | _ -> None
 
 let is_base_type env ty base_ty_path =
   match scrape env ty with
-  | Tconstr(p, _, _) -> Path.same p base_ty_path
+  | Some (Tconstr(p, _, _)) -> Path.same p base_ty_path
   | _ -> false
 
 let maybe_pointer_type env ty =
-  let ty = scrape_ty env ty in
-  (* CR layouts: calling [check_type_jkind] three times (indirectly) is sad *)
-  let immediate_or_pointer =
-    match Ctype.is_always_gc_ignorable env ty with
-    | true -> Immediate
-    | false -> Pointer
-  in
-  let nullable =
-    match Ctype.check_type_nullability env ty Non_null with
-    | true -> Non_nullable
-    | false -> Nullable
-  in
-  immediate_or_pointer, nullable
+  match scrape_ty env ty with
+  | Some ty ->
+    let immediate_or_pointer =
+      match Ctype.is_always_gc_ignorable env ty with
+      | true -> Immediate
+      | false -> Pointer
+    in
+    let nullable =
+      match Ctype.check_type_nullability env ty Non_null with
+      | true -> Non_nullable
+      | false -> Nullable
+    in
+    immediate_or_pointer, nullable
+  | None -> Pointer, Nullable
 
 let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 
@@ -193,53 +195,61 @@ type 'a classification =
    [scrape_ty].  Returning [Any] is safe, though may skip some optimizations.
    See comment on [classification] above to understand [classify_product]. *)
 let classify ~classify_product env ty layout : _ classification =
-  let ty = scrape_ty env ty in
   match (layout : Jkind.Layout.Const.t) with
   | Any _ -> Misc.fatal_error "classify called with non-representable layout"
   | Base (Scannable, _sa) -> begin
   (* CR layouts-scannable: Consider using the scannable axes here to avoid
      these calls. *)
+  match scrape_ty env ty with
+  | None -> Any
+  | Some ty ->
   if Ctype.is_always_gc_ignorable env ty
   then
     if Ctype.check_type_nullability env ty Non_null
     then Immediate else Immediate_or_null
   else match get_desc ty with
-  | Tvar _ | Tunivar _ ->
+  | Tvar _ | Tunivar _ | Tof_kind _ ->
       Any
   | Tconstr (p, _args, _abbrev) ->
-      if Path.same p Predef.path_float then Float
-      else if Path.same p Predef.path_lazy_t then Lazy
-      else if Path.same p Predef.path_string
-           || Path.same p Predef.path_bytes
-           || Path.same p Predef.path_array
-           || Path.same p Predef.path_iarray
-           || Path.same p Predef.path_nativeint
-           || Path.same p Predef.path_float32
-           || Path.same p Predef.path_int32
-           || Path.same p Predef.path_int64
-           || Path.same p Predef.path_int8x16
-           || Path.same p Predef.path_int16x8
-           || Path.same p Predef.path_int32x4
-           || Path.same p Predef.path_int64x2
-           || Path.same p Predef.path_float16x8
-           || Path.same p Predef.path_float32x4
-           || Path.same p Predef.path_float64x2
-           || Path.same p Predef.path_int8x32
-           || Path.same p Predef.path_int16x16
-           || Path.same p Predef.path_int32x8
-           || Path.same p Predef.path_int64x4
-           || Path.same p Predef.path_float16x16
-           || Path.same p Predef.path_float32x8
-           || Path.same p Predef.path_float64x4
-           || Path.same p Predef.path_int8x64
-           || Path.same p Predef.path_int16x32
-           || Path.same p Predef.path_int32x16
-           || Path.same p Predef.path_int64x8
-           || Path.same p Predef.path_float16x32
-           || Path.same p Predef.path_float32x16
-           || Path.same p Predef.path_float64x8
-           then Addr
-      else begin
+      begin match Predef.find_type_constr p with
+      | Some `Float -> Float
+      | Some `Lazy_t -> Lazy
+      | Some (`Int | `Char | `Int8 | `Int16) ->
+        (* This should be unreachable anyway because we check
+           [is_always_gc_ignorable] above *)
+        Immediate
+      | Some (`String | `Bytes
+             | `Int32 | `Int64 | `Nativeint
+             | `Extension_constructor | `Continuation
+             | `Array | `Floatarray | `Iarray
+             | `Atomic_loc
+             | `Float32
+             | `Int8x16
+             | `Int16x8
+             | `Int32x4
+             | `Int64x2
+             | `Float16x8
+             | `Float32x4
+             | `Float64x2
+             | `Int8x32
+             | `Int16x16
+             | `Int32x8
+             | `Int64x4
+             | `Float16x16
+             | `Float32x8
+             | `Float64x4
+             | `Int8x64
+             | `Int16x32
+             | `Int32x16
+             | `Int64x8
+             | `Float16x32
+             | `Float32x16
+             | `Float64x8
+             )
+        -> Addr
+      | Some (`Lexing_position | `Code | `Eval)
+      | Some (#Predef.data_type_constr | #Predef.abstract_non_value_type_constr)
+      | None ->
         try
           match (Env.find_type p env).type_kind with
           | Type_abstract _ ->
@@ -261,7 +271,7 @@ let classify ~classify_product env ty layout : _ classification =
   | Tquote _ | Tsplice _ | Tquote_eval _ ->
       Any
   | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _
-  | Tof_kind _ | Trepr _ ->
+  | Trepr _ ->
       assert false
   end
   | Base (Float64, _) -> Unboxed_float Unboxed_float64
@@ -345,7 +355,7 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Genvar"
 
 let array_kind_of_elt env loc ty =
-  let ty = scrape_ty env ty in
+  let ty = match scrape_ty env ty with Some ty -> ty | None -> ty in
   let elt_layout = type_representable_layout ~why:Array_element env loc ty in
   let elt_ty_for_error = ty in (* report the un-scraped ty in errors *)
   let classify_product ty sorts =
@@ -382,10 +392,10 @@ let array_kind_of_elt env loc ty =
 
 let array_type_kind ~elt_ty env loc ty =
   match scrape_poly env ty with
-  | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_array
-                              || Path.same p Predef.path_iarray ->
+  | Some (Tconstr(p, [elt_ty], _))
+    when Path.same p Predef.path_array || Path.same p Predef.path_iarray ->
       array_kind_of_elt env loc elt_ty
-  | Tconstr(p, [], _) when Path.same p Predef.path_floatarray ->
+  | Some (Tconstr(p, [], _)) when Path.same p Predef.path_floatarray ->
       Pfloatarray
   | _ ->
     begin match elt_ty with
@@ -423,7 +433,7 @@ let array_type_kind ~elt_ty env loc ty =
 
 let array_type_mut env ty =
   match scrape_poly env ty with
-  | Tconstr(p, [_], _) when Path.same p Predef.path_iarray -> Immutable
+  | Some (Tconstr(p, [_], _)) when Path.same p Predef.path_iarray -> Immutable
   | _ -> Mutable
 
 let array_kind exp =
@@ -434,7 +444,7 @@ let array_pattern_kind pat =
 
 let bigarray_decode_type env ty tbl dfl =
   match scrape env ty with
-  | Tconstr(Pdot(Pident mod_id, type_name), [], _)
+  | Some (Tconstr(Pdot(Pident mod_id, type_name), [], _))
     when Ident.name mod_id = "Stdlib__Bigarray" ->
       begin try List.assoc type_name tbl with Not_found -> dfl end
   | _ ->
@@ -461,7 +471,7 @@ let layout_table =
 
 let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
   match scrape env typ with
-  | Tconstr(_p, [_caml_type; elt_type; layout_type], _abbrev) ->
+  | Some (Tconstr(_p, [_caml_type; elt_type; layout_type], _abbrev)) ->
       let kind =
         match kind with
         | Pbigarray_unknown ->
@@ -590,14 +600,16 @@ let fallback_if_missing_cmi ~default f =
    check the sorts of the relevant types.  Ideally this wouldn't involve
    expensive layout computation, because the sorts are stored somewhere (e.g.,
    [record_representation]).  But that's not currently the case for tuples. *)
-let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
+let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
   : int * value_kind =
   let[@inline] cannot_proceed () =
     Numbers.Int.Set.mem (get_id ty) visited
     || depth >= 2
     || num_nodes_visited >= 30
   in
-  let scty = scrape_ty env ty in
+  match scrape_ty env ty with
+  | None -> num_nodes_visited, non_nullable Pgenval
+  | Some scty ->
   begin
     (* CR layouts: We want to avoid correcting levels twice, and scrape_ty will
        correct levels for us.  But it may be the case that we could do the
@@ -621,8 +633,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     | Ok _ -> ()
     | Error _ ->
       match
-        Ctype.(check_type_jkind env
-                 (correct_levels ty) (Jkind.Builtin.value_or_null ~why:V1_safety_check))
+        Ctype.check_type_jkind env ty
+                 (Jkind.Builtin.value_or_null ~why:V1_safety_check)
       with
       | Ok _ -> ()
       | Error violation ->
@@ -725,20 +737,26 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_variant env ~loc ~visited ~depth
                          ~num_nodes_visited cstrs rep)
+        | Type_record (_, Record_variable, _) ->
+          num_nodes_visited, non_nullable Pgenval
         | Type_record (labels, rep, _) ->
           let depth = depth + 1 in
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_record env ~loc ~visited ~depth
                          ~num_nodes_visited labels rep)
-        | Type_record_unboxed_product ([{ld_type}], Record_unboxed_product, _) ->
+        | Type_record_unboxed_product (_, Record_unboxed_product_variable, _) ->
+          num_nodes_visited, nullable Pgenval
+        | Type_record_unboxed_product ([{ld_type}],
+                                       Record_unboxed_product, _) ->
           let depth = depth + 1 in
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () ->
                value_kind env ~loc ~visited ~depth ~num_nodes_visited ld_type)
         | Type_record_unboxed_product (([] | _::_::_),
-                                       Record_unboxed_product, _) ->
+                                       Record_unboxed_product,
+                                       _) ->
           Misc.fatal_error
             "Typeopt.value_kind: non-unary unboxed record can't have kind value"
         | Type_abstract _ ->
@@ -815,7 +833,9 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       match ty with
       | None -> unknown ()
       | Some ty ->
-        let ty = scrape_ty env ty in
+        begin match scrape_ty env ty with
+        | None -> unknown ()
+        | Some ty ->
         match get_desc ty with
         | Tunboxed_tuple fields ->
           Misc.Stdlib.Array.of_list_map (fun (_, field) -> Some field) fields
@@ -825,9 +845,6 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
           | { type_kind = Type_record_unboxed_product (lbls, _, _);
               type_params; _ } ->
             let type_of_ld { Types.ld_type } =
-              let ld_type = Ctype.correct_levels ld_type in
-              let type_params = List.map Ctype.correct_levels type_params in
-              (* [args] is already corrected by [scrape_ty] *)
               try Some (Ctype.apply env type_params ld_type args)
               with Ctype.Cannot_apply -> None
             in
@@ -843,6 +860,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
         | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Tpackage _
         | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ -> unknown ()
         | Trepr _ -> Misc.fatal_error "value_kind_mixed_block_field: Trepr"
+        end
     in
     let (_, num_nodes_visited), kinds =
       Array.fold_left_map (fun (i, num_nodes_visited) field ->
@@ -893,7 +911,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       | _ -> assert false
     end
-  | Variant_boxed cstrs_and_sorts ->
+  | Variant_boxed cstr_layouts ->
     let depth = depth + 1 in
     let for_one_uniform_value_constructor fields ~field_to_type ~depth
           ~num_nodes_visited =
@@ -945,12 +963,17 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
         (is_mutable, num_nodes_visited), fields
     in
     let is_constant (cstr: Types.constructor_declaration) =
+      let all_void_opt sort =
+        match sort with
+        | Some sort -> Jkind.Sort.Const.all_void sort
+        | None -> (* TODO Nicely handle [any] things resolving to void *) false
+      in
       match cstr.cd_args with
       | Cstr_tuple [] -> true
       | Cstr_tuple args ->
-        List.for_all (fun ca -> Jkind.Sort.Const.all_void ca.ca_sort) args
+        List.for_all (fun ca -> all_void_opt ca.ca_sort) args
       | Cstr_record lbls ->
-        List.for_all (fun lbl -> Jkind.Sort.Const.all_void lbl.ld_sort) lbls
+        List.for_all (fun lbl -> all_void_opt lbl.ld_sort) lbls
     in
     let rec mixed_block_shape_is_empty shape =
       Array.for_all mixed_block_element_is_empty shape
@@ -970,27 +993,31 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | None -> None
           | Some (num_nodes_visited,
                   next_const, consts, next_tag, non_consts) ->
-            let cstr_shape, _ = cstrs_and_sorts.(idx) in
-            let (is_mutable, num_nodes_visited), fields =
-              for_one_constructor constructor ~depth ~num_nodes_visited
-                ~cstr_shape
-            in
-            if is_mutable then None
-            else match fields with
-            | Constructor_uniform xs when List.compare_length_with xs 0 = 0 ->
-              let consts = next_const :: consts in
-              Some (num_nodes_visited,
-                    next_const + 1, consts, next_tag, non_consts)
-            | Constructor_mixed shape when mixed_block_shape_is_empty shape ->
-              let consts = next_const :: consts in
-              Some (num_nodes_visited,
-                    next_const + 1, consts, next_tag, non_consts)
-            | Constructor_mixed _ | Constructor_uniform _ ->
-              let non_consts =
-                (next_tag, fields) :: non_consts
-              in
-              Some (num_nodes_visited,
-                    next_const, consts, next_tag + 1, non_consts))
+            match cstr_layouts.(idx) with
+            | Cstr_layout_variable -> None
+            | Cstr_layout_known { shape = cstr_shape; _ } ->
+                let (is_mutable, num_nodes_visited), fields =
+                  for_one_constructor constructor ~depth ~num_nodes_visited
+                    ~cstr_shape
+                in
+                if is_mutable then None
+                else match fields with
+                | Constructor_uniform xs
+                    when List.compare_length_with xs 0 = 0 ->
+                  let consts = next_const :: consts in
+                  Some (num_nodes_visited,
+                        next_const + 1, consts, next_tag, non_consts)
+                | Constructor_mixed shape
+                    when mixed_block_shape_is_empty shape ->
+                  let consts = next_const :: consts in
+                  Some (num_nodes_visited,
+                        next_const + 1, consts, next_tag, non_consts)
+                | Constructor_mixed _ | Constructor_uniform _ ->
+                  let non_consts =
+                    (next_tag, fields) :: non_consts
+                  in
+                  Some (num_nodes_visited,
+                        next_const, consts, next_tag + 1, non_consts))
           (0, Some (num_nodes_visited, 0, [], 0, []))
           cstrs
       in
@@ -1017,6 +1044,12 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ld_type
       | [] | _ :: _ :: _ -> assert false
     end
+  | Record_dummy _ ->
+    Misc.fatal_error
+      "Typeopt.value_kind_record: unexpected dummy representation"
+  | Record_variable ->
+    Misc.fatal_error
+      "Typeopt.value_kind_record: unexpected variable representation"
   | Record_inlined (_, _, Variant_with_null) -> assert false
   | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
   | Record_boxed | Record_float | Record_ufloat | Record_mixed _ -> begin
@@ -1029,7 +1062,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
       else
         let num_nodes_visited, fields =
           match rep with
-          | Record_unboxed ->
+          | Record_unboxed | Record_dummy _ | Record_variable ->
               (* The outer match guards against this *)
               assert false
           | Record_inlined (_, Constructor_uniform_value, _)
@@ -1050,7 +1083,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                       | Record_inlined _ | Record_boxed ->
                           value_kind env ~loc ~visited ~depth ~num_nodes_visited
                             label.ld_type
-                      | Record_mixed _ | Record_unboxed ->
+                      | Record_mixed _ | Record_unboxed | Record_dummy _
+                      | Record_variable ->
                           (* The outer match guards against this *)
                           assert false
                     in
@@ -1078,6 +1112,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
             [0, fields]
           | Record_unboxed -> assert false
           | Record_inlined (Null, _, _) -> assert false
+          | Record_dummy _ -> assert false
+          | Record_variable -> assert false
         in
         (num_nodes_visited,
          non_nullable (Pvariant { consts = []; non_consts }))
@@ -1264,7 +1300,7 @@ let classify_lazy_argument : Typedtree.expression ->
         | Const_float32 _ (* There is no float32 array optimization *)
         | Const_int32 _ | Const_int64 _ | Const_nativeint _ )
     | Texp_function _
-    | Texp_construct (_, {cstr_arity = 0}, _, _) ->
+    | Texp_construct (_, {cstr_arity = 0}, _, _, _) ->
        `Constant_or_function
     | Texp_constant(Const_float _) ->
        if Config.flat_float_array
@@ -1287,18 +1323,18 @@ let report_error ppf = function
          the Jane Street compilers team.";
       begin match err with
       | None ->
-        fprintf ppf "@ Could not find cmi for: %a" Printtyp.type_expr ty
+        fprintf ppf "@ Could not find cmi for: %a" Printtyp.Doc.type_expr ty
       | Some err ->
         fprintf ppf "@ %a"
         (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           ~offender:(fun ppf -> Printtyp.Doc.type_expr ppf ty)
            env) err
       end
   | Sort_without_extension (sort, maturity, ty) ->
       fprintf ppf "Non-value layout %a detected" Jkind.Sort.format sort;
       begin match ty with
       | None -> ()
-      | Some ty -> fprintf ppf " as sort for type@ %a" Printtyp.type_expr ty
+      | Some ty -> fprintf ppf " as sort for type@ %a" Printtyp.Doc.type_expr ty
       end;
       fprintf ppf
         ",@ but this requires extension %s, which is not enabled.@ \
@@ -1310,7 +1346,7 @@ let report_error ppf = function
       fprintf ppf "Non-value layout %a detected" Jkind.Sort.format sort;
       begin match ty with
       | None -> ()
-      | Some ty -> fprintf ppf " as sort for type@ %a" Printtyp.type_expr ty
+      | Some ty -> fprintf ppf " as sort for type@ %a" Printtyp.Doc.type_expr ty
       end;
       let extension, verb, flags =
         match Language_extension.(is_at_least Layouts Stable),
@@ -1330,7 +1366,7 @@ let report_error ppf = function
       fprintf ppf "Non-value layout %a detected" Jkind.Sort.format sort;
       begin match ty with
       | None -> ()
-      | Some ty -> fprintf ppf " as sort for type@ %a" Printtyp.type_expr ty
+      | Some ty -> fprintf ppf " as sort for type@ %a" Printtyp.Doc.type_expr ty
       end;
       let extension, verb, flags =
         match Language_extension.(is_at_least Layouts Stable),
@@ -1349,7 +1385,7 @@ let report_error ppf = function
   | Not_a_sort (env, ty, err) ->
       fprintf ppf "A representable layout is required here.@ %a"
         (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           ~offender:(fun ppf -> Printtyp.Doc.type_expr ppf ty)
            env) err
   | Unsupported_product_in_lazy const ->
       fprintf ppf
@@ -1373,7 +1409,7 @@ let report_error ppf = function
          layout %s.@ \
          @[Hint: if the array contents should not be scanned, annotating@ \
          contained abstract types as [mod external] may resolve this error.@]"
-        Printtyp.type_expr elt_ty
+        Printtyp.Doc.type_expr elt_ty
         (Jkind.Layout.Const.to_string const)
   | Opaque_array_non_value { array_type; elt_kinding_failure }  ->
       begin match elt_kinding_failure with
@@ -1382,16 +1418,16 @@ let report_error ppf = function
         "This array operation cannot tell whether %a is an array type,@ \
          possibly because it is abstract. In this case, the element type@ \
          %a must be a value:@ @\n@[%a@]"
-          Printtyp.type_expr array_type
-          Printtyp.type_expr ty
+          Printtyp.Doc.type_expr array_type
+          Printtyp.Doc.type_expr ty
           (Jkind.Violation.report_with_offender
-             ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+             ~offender:(fun ppf -> Printtyp.Doc.type_expr ppf ty)
              env) err
       | None ->
         fprintf ppf
           "This array operation expects an array type, but %a does not appear@ \
            to be one.@ (Hint: it is abstract?)"
-          Printtyp.type_expr array_type;
+          Printtyp.Doc.type_expr array_type;
       end
 
 let () =

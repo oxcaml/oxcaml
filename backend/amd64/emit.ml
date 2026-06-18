@@ -69,7 +69,8 @@ let invoke_expect_asm_callbacks () =
   asm_collected_for_expect_asm := [];
   List.iter (fun f -> f output) callbacks
 
-let record_for_expect_asm ~name ~debug_info ~asm_start =
+let record_for_expect_asm ~name ~debug_info ~fun_body_start ~fun_body_end
+    ~gc_jump_pads_start ~gc_jump_pads_end =
   if
     (not (List.is_empty !expect_asm_callbacks))
     && (not (String.ends_with ~suffix:"__entry" name))
@@ -89,7 +90,11 @@ let record_for_expect_asm ~name ~debug_info ~asm_start =
     in
     let output =
       X86_gas.format_asm_for_expect_asm ~name
-        ~body:(X86_proc.output_from asm_start)
+        ~body:
+          (X86_proc.output_range ~from_pos:fun_body_start ~to_pos:fun_body_end)
+        ~hidden_gc_jump_pads:
+          (X86_proc.output_range ~from_pos:gc_jump_pads_start
+             ~to_pos:gc_jump_pads_end)
     in
     asm_collected_for_expect_asm := output :: !asm_collected_for_expect_asm
 
@@ -779,7 +784,7 @@ let emit_jump_table t =
   done
 
 let emit_jump_tables () =
-  D.align ~fill:Zero ~bytes:4;
+  D.align ~fill:Nop ~bytes:4;
   List.iter emit_jump_table !jump_tables;
   jump_tables := []
 
@@ -1074,8 +1079,18 @@ let movq src dst =
   match Arch.Extension.enabled AVX, is_regf src with
   | false, false -> I.simd movq_X_r64m64 [| src; dst |]
   | false, true -> I.simd movq_r64m64_X [| src; dst |]
-  | true, false -> I.simd vmovq_X_r64m64 [| src; dst |]
-  | true, true -> I.simd vmovq_r64m64_X [| src; dst |]
+  | true, false ->
+    (* Prefer the shorter XMM/m64 form when the source is memory: it allows the
+       2-byte VEX prefix (VEX.W=0, F3.0F.7E) instead of forcing the 3-byte form
+       (VEX.W=1, 66.0F.6E). *)
+    if is_mem src
+    then I.simd vmovq_X_Xm64 [| src; dst |]
+    else I.simd vmovq_X_r64m64 [| src; dst |]
+  | true, true ->
+    (* Symmetric shortening for stores to memory. *)
+    if is_mem dst
+    then I.simd vmovq_Xm64_X [| src; dst |]
+    else I.simd vmovq_r64m64_X [| src; dst |]
 
 let movss src dst =
   let open Simd_instrs in
@@ -1097,6 +1112,28 @@ let movsd src dst =
   | true, false, true -> I.simd vmovsd_m64_X [| src; dst |]
   | true, true, false -> I.simd vmovsd_X_m64 [| src; dst |]
 
+(* For an XMM-to-XMM register move, prefer the "load" form (reg operand is the
+   destination) when only the destination is a high vector register
+   (XMM8-XMM15). The load form encodes the high register in the VEX-compatible
+   REX.R bit, allowing a 2-byte VEX prefix; the store form would need REX.B and
+   force a 3-byte VEX. Both forms are semantically identical for reg-reg
+   moves. *)
+let regf_index = function X86_ast.XMM n | X86_ast.YMM n | X86_ast.ZMM n -> n
+
+let prefer_load_form (src : X86_ast.arg) (dst : X86_ast.arg) =
+  match src, dst with
+  | Regf s, Regf d ->
+    (* otherwise store form is already 2-byte *)
+    regf_index d > 7
+    (* otherwise EVEX is needed regardless *)
+    && regf_index d <= 15
+    (* otherwise load form needs 3-byte VEX *)
+    && regf_index s <= 7
+  | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
+      | Mem _ | Mem64_RIP _ ),
+      _ ) ->
+    false
+
 let movpd ~unaligned src dst =
   let open Simd_instrs in
   match Arch.Extension.enabled AVX, is_mem src, unaligned with
@@ -1104,8 +1141,14 @@ let movpd ~unaligned src dst =
   | false, true, true -> I.simd movupd_X_Xm128 [| src; dst |]
   | false, false, false -> I.simd movapd_Xm128_X [| src; dst |]
   | false, false, true -> I.simd movupd_Xm128_X [| src; dst |]
-  | true, false, false -> I.simd vmovapd_Xm128_X [| src; dst |]
-  | true, false, true -> I.simd vmovupd_Xm128_X [| src; dst |]
+  | true, false, false ->
+    if prefer_load_form src dst
+    then I.simd vmovapd_X_Xm128 [| src; dst |]
+    else I.simd vmovapd_Xm128_X [| src; dst |]
+  | true, false, true ->
+    if prefer_load_form src dst
+    then I.simd vmovupd_X_Xm128 [| src; dst |]
+    else I.simd vmovupd_Xm128_X [| src; dst |]
   | true, true, false -> I.simd vmovapd_X_Xm128 [| src; dst |]
   | true, true, true -> I.simd vmovupd_X_Xm128 [| src; dst |]
 
@@ -1122,7 +1165,14 @@ let move (src : Reg.t) (dst : Reg.t) =
     (* Vec128 stack slots are aligned, domainstate slots are not. *)
     let unaligned = Reg.is_domainstate src || Reg.is_domainstate dst in
     if distinct then movpd ~unaligned (reg src) (reg dst)
-  | Vec256, Reg _, Vec256, (Reg _ | Stack _) ->
+  | Vec256, Reg _, Vec256, Reg _ ->
+    (* CR-soon mslater: align vec256/512 stack slots *)
+    if distinct
+    then
+      if prefer_load_form (reg src) (reg dst)
+      then I.simd vmovupd_Y_Ym256 [| reg src; reg dst |]
+      else I.simd vmovupd_Ym256_Y [| reg src; reg dst |]
+  | Vec256, Reg _, Vec256, Stack _ ->
     (* CR-soon mslater: align vec256/512 stack slots *)
     if distinct then I.simd vmovupd_Ym256_Y [| reg src; reg dst |]
   | Vec256, Stack _, Vec256, Reg _ ->
@@ -1610,7 +1660,7 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
     (* CR-soon mslater: align vec256/512 stack slots *)
     if distinct
     then
-      if Reg.is_stack i.arg.(0)
+      if Reg.is_stack i.arg.(0) || prefer_load_form (arg i 0) (res i 0)
       then I.simd vmovupd_Y_Ym256 [| arg i 0; res i 0 |]
       else I.simd vmovupd_Ym256_Y [| arg i 0; res i 0 |]
   | V128_of_vec Vec512 | V256_of_vec Vec512 | V512_of_vec _ ->
@@ -2061,7 +2111,7 @@ let emit_instr ~first ~last ~fallthrough i =
         D.cfi_def_cfa_register ~reg:"r13";
         (* NB: gdb has asserts on contiguous stacks that mean it will not unwind
            through this unless we were to tag this calling frame with
-           cfi_signal_frame in it's definition. *)
+           cfi_signal_frame in its definition. *)
         I.mov (domain_field Domainstate.Domain_c_stack) rsp);
       emit_call (Cmm.global_symbol func);
       if switch_stacks
@@ -2682,10 +2732,12 @@ let fundecl fundecl =
   let fun_body_start = current_output_pos () in
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
   X86_proc.peephole_optimize_from fun_body_start;
-  record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
-    ~asm_start:fun_body_start;
+  let fun_body_end = current_output_pos () in
   List.iter emit_call_gc !call_gc_sites;
   List.iter emit_local_realloc !local_realloc_sites;
+  record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
+    ~fun_body_start ~fun_body_end ~gc_jump_pads_start:fun_body_end
+    ~gc_jump_pads_end:(current_output_pos ());
   emit_call_safety_errors ();
   emit_stack_realloc ();
   (if !frame_required
@@ -3076,18 +3128,15 @@ let end_assembly () =
   (* PR#6329 *)
   emit_global_label ~section:Data "data_end";
   D.int64 0L;
-  D.text ();
-  (* We align to 8 bytes before the frame table. Perhaps somewhat
-     counterintuitively, we use [~fill:Zero] even though we are now in the text
-     section. The reason is that the additional padding will never be executed,
-     so there is no need to pad it with nops in the X86 binary emitter. *)
-  (* CR sspies: We should just determine the filling based on the current
-     section for the binary emitter and then remove the argument [fill]. This is
-     the only place, where it does not seem to match the current section, and it
-     seems it does not matter whether we pad with zeros or nops here. *)
-  D.align ~fill:Zero ~bytes:8;
+  let frametable_section : Asm_targets.Asm_section.t =
+    if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Text
+  in
+  D.switch_to_section frametable_section;
+  D.align
+    ~fill:(if !Oxcaml_flags.frametables_in_rodata then Zero else Nop)
+    ~bytes:8;
   (* PR#7591 *)
-  emit_global_label ~section:Text "frametable";
+  emit_global_label ~section:frametable_section "frametable";
   (* CR sspies: Share the [emit_frames] code with the Arm backend. *)
   emit_frames
     { efa_code_label =
@@ -3105,16 +3154,16 @@ let end_assembly () =
       efa_u16 = (fun n -> D.uint16 n);
       efa_u32 = (fun n -> D.uint32 n);
       efa_word = (fun n -> D.targetint (Targetint.of_int_exn n));
-      efa_align = (fun n -> D.align ~fill:Zero ~bytes:n);
+      efa_align = (fun n -> D.align ~fill:Nop ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
-          let lbl = label_to_asm_label ~section:Text lbl in
+          let lbl = label_to_asm_label ~section:frametable_section lbl in
           let ofs = Targetint.of_int32 ofs in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:ofs);
       efa_def_label =
         (fun l ->
-          let lbl = label_to_asm_label ~section:Text l in
+          let lbl = label_to_asm_label ~section:frametable_section l in
           D.define_label lbl);
       efa_string = (fun s -> D.string (s ^ "\000"))
     };

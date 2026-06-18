@@ -126,7 +126,26 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
   let cost_metrics_of_lifted_constants =
     if Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
     then
+      (* If we are not at toplevel, there might still be lifted constants to be
+         placed in the accumulator whose size must be taken into account for
+         speculative inlining. *)
       let lifted_constants = UA.lifted_constants uacc in
+      (* CR-someday bclement: Ideally we would simply call
+         [place_lifted_constants] in [after_rebuild] above so that we can share
+         the code with the non-speculative inlining code path; however, that
+         function expects to be called at toplevel and there could be unintended
+         consequences -- notably regarding the validity of the used value slots.
+
+         At the time of writing, this means that we incorrectly:
+
+         - Ignore the size of the symbol projections created during speculative
+         inlining;
+
+         - Count the size of unused value slots of lifted sets of closures
+         created during speculative inlining (but again, it is not clear that it
+         is always possible to compute a correct set of "used value slots" at
+         the time we are doing speculative inlining, because some value slots
+         could be used later in the compilation unit). *)
       Lifted_constant_state.fold lifted_constants ~init:Cost_metrics.zero
         ~f:(fun cost_metrics lifted_constant ->
           List.fold_left
@@ -274,14 +293,15 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
     fail_if_must_inline ();
     Never_inlined_attribute
   | Default_inlined | Unroll _ | Always_inlined _ | Hint_inlined -> (
-    let code_or_metadata =
-      DE.find_code_exn (DA.denv dacc) (FT.code_id function_type)
-    in
-    if not (Code_or_metadata.code_present code_or_metadata)
-    then (
+    match DE.find_code_exn (DA.denv dacc) (FT.code_id function_type) with
+    | exception Not_found ->
       fail_if_must_inline ();
-      Missing_code)
-    else
+      Missing_code
+    | code_or_metadata when not (Code_or_metadata.code_present code_or_metadata)
+      ->
+      fail_if_must_inline ();
+      Missing_code
+    | code_or_metadata -> (
       (* The unrolling process is rather subtle, but it boils down to two steps:
 
          1. We see an [@unrolled n] annotation (with n > 0) on an apply
@@ -380,7 +400,7 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
             else (
               fail_if_must_inline ();
               Unrolling_depth_exceeded)
-          | `Always -> Attribute_always))
+          | `Always -> Attribute_always)))
 
 let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
     Call_site_inlining_decision_type.t =

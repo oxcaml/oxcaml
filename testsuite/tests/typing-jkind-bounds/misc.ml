@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-no-ikinds";
  expect;
 *)
 
@@ -62,7 +63,7 @@ external f : unit -> t @ contended = "%identity"
 Line 3, characters 20-21:
 3 | let _ : unit -> t = f
                         ^
-Error: This expression has type "unit -> t @ contended"
+Error: The value "f" has type "unit -> t @ contended"
        but an expression was expected of type "unit -> t"
 |}]
 

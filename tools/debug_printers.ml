@@ -1,7 +1,7 @@
-let type_expr : _ Format_doc.format_printer = Format_doc.compat Printtyp.raw_type_expr
+let type_expr : _ Format_doc.format_printer = Rawprinttyp.type_expr
 let type_set : _ Format_doc.format_printer = Btype.TypeSet.debug_print
-let row_field : _ Format_doc.format_printer = Format_doc.compat Printtyp.raw_field
-let row_desc : _ Format_doc.format_printer = Format_doc.compat Printtyp.raw_row_desc
+let row_field : _ Format_doc.format_printer = Rawprinttyp.row_field
+let row_desc : _ Format_doc.format_printer = Rawprinttyp.row_desc
 let ident : _ Format_doc.format_printer = Format_doc.compat Ident.print_with_scope
 let path : _ Format_doc.format_printer = Format_doc.compat Path.print
 let ctype_global_state : _ Format_doc.format_printer = Ctype.print_global_state

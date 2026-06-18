@@ -7,7 +7,7 @@ module Namespace = struct
   let to_string = Shape.Sig_component_kind.to_string
 
   type packed_label_description =
-    | P : 'rep Types.gen_label_description -> packed_label_description
+    | P : 'rep Data_types.gen_label_description -> packed_label_description
 
   type under_type = [ `Constr | `Labels ]
 
@@ -18,7 +18,7 @@ module Namespace = struct
   type inferred =
     [ inferred_basic
     | `This_label of packed_label_description
-    | `This_cstr of Types.constructor_description ]
+    | `This_cstr of Data_types.constructor_description ]
 
   let from_context : Context.t -> inferred list = function
     | Type -> [ `Type; `Mod; `Modtype; `Constr; `Labels; `Vals ]
@@ -71,7 +71,7 @@ let by_path path (namespace : Namespace.t) env =
 exception
   Found of (Path.t * Shape.Sig_component_kind.t * Shape.Uid.t * Location.t)
 
-let path_and_loc_of_cstr desc _ =
+let path_and_loc_of_cstr (desc : Data_types.constructor_description) _ =
   let open Types in
   match desc.cstr_tag with
   | Extension path -> (path, desc.cstr_loc)
@@ -80,7 +80,7 @@ let path_and_loc_of_cstr desc _ =
     | Tconstr (path, _, _) -> (path, desc.cstr_loc)
     | _ -> assert false)
 
-let path_and_loc_from_label desc env =
+let path_and_loc_from_label (desc : _ Data_types.gen_label_description) env =
   let open Types in
   match get_desc desc.lbl_res with
   | Tconstr (path, _, _) ->
@@ -94,7 +94,7 @@ let by_longident (nss : Namespace.inferred list) ident env =
     List.iter nss ~f:(fun namespace ->
         try
           match namespace with
-          | `This_cstr ({ Types.cstr_tag = Extension _; _ } as cd) ->
+          | `This_cstr ({ Data_types.cstr_tag = Extension _; _ } as cd) ->
             log ~title:"lookup" "got extension constructor";
             let path, loc = path_and_loc_of_cstr cd env in
             (* TODO: Use [`Constr] here instead of [`Type] *)
@@ -140,7 +140,7 @@ let by_longident (nss : Namespace.inferred list) ident env =
             raise (Found (path, Label, lbl.lbl_uid, loc))
           | `Labels ->
             log ~title:"lookup" "lookup in label namespace";
-            let (P (type rep) (lbl : rep Types.gen_label_description)) :
+            let (P (type rep) (lbl : rep Data_types.gen_label_description)) :
                 Namespace.packed_label_description =
               (* Try looking up in boxed namespace, and then fallback to unboxed if that
                  fails *)

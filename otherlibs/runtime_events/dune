@@ -49,3 +49,7 @@
   )
   (section lib)
   (package ocaml))
+
+(alias
+ (name C-only)
+ (deps libruntime_events_stubs.a dllruntime_events_stubs.so))

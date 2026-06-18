@@ -114,6 +114,14 @@ module Separability = struct
     | Maybe_separable -> "maybe_separable"
 
   let print ppf t = Fmt.fprintf ppf "%s" (to_string t)
+
+  let upper_bound_if_is_always_gc_ignorable () =
+    (* We check that we're compiling to (64-bit) native code before counting
+        Non_pointer64 types as gc_ignorable, because bytecode is intended to be
+        platform independent. *)
+    if !Clflags.native_code && Sys.word_size = 64
+    then Non_pointer64
+    else Non_pointer
 end
 
 module Axis = struct
@@ -175,8 +183,11 @@ module Per_axis = struct
     let print : type a. a t -> Fmt.formatter -> a -> unit = function
       | Externality -> Externality.print
 
-    let compare_obj : type a b. a t -> b t -> (a, b) Misc.comparison =
-     fun a b -> match a, b with Externality, Externality -> Equal
+    let compare_obj : type a b. a t -> b t -> int =
+     fun a b -> match a, b with Externality, Externality -> 0
+
+    let equal_obj : type a b. a t -> b t -> (a, b) Misc.is_eq =
+     fun a b -> match a, b with Externality, Externality -> Misc.Is_eq
   end
 
   let min : type a. a t -> a = function[@inline available]
@@ -215,13 +226,21 @@ module Per_axis = struct
     | Modal ax -> Mode.Crossing.Per_axis.print ax
     | Nonmodal ax -> Nonmodal.print ax
 
-  let compare_obj : type a b. a t -> b t -> (a, b) Misc.comparison =
+  let compare_obj : type a b. a t -> b t -> int =
    fun a b ->
     match a, b with
     | Modal ax0, Modal ax1 -> Mode.Crossing.Per_axis.compare_obj ax0 ax1
-    | Modal _, _ -> Less_than
-    | _, Modal _ -> Greater_than
+    | Modal _, _ -> -1
+    | _, Modal _ -> 1
     | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.compare_obj ax0 ax1
+
+  let equal_obj : type a b. a t -> b t -> (a, b) Misc.is_eq =
+   fun a b ->
+    match a, b with
+    | Modal ax0, Modal ax1 -> Mode.Crossing.Per_axis.equal_obj ax0 ax1
+    | Modal _, _ -> Misc.Is_not_eq
+    | _, Modal _ -> Misc.Is_not_eq
+    | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.equal_obj ax0 ax1
 
   let print_obj : type a. Fmt.formatter -> a t -> unit =
    fun ppf ax -> Fmt.pp_print_string ppf (name ax)

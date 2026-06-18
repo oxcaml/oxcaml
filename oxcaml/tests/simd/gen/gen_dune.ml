@@ -203,6 +203,7 @@ let () =
       "test_callee_save_neon_regs", enabled_if_main;
       "probes", enabled_if_main;
       "probes256", enabled_if_main;
+      "preemption256", enabled_if_main_amd64_not_macos;
       "arrays256", enabled_if_main;
       "arrays256_u", enabled_if_main;
       "consts256", enabled_if_main_amd64_not_macos;
@@ -226,5 +227,4 @@ let () =
     (* disable on macos and arm64 *)
     List.map (fun (name, _) -> name, enabled_if_main_amd64_not_macos) tests
   in
-  List.iter (print_test ~extra_flag:"-internal-assembler") tests;
-  ()
+  List.iter (print_test ~extra_flag:"-internal-assembler") tests

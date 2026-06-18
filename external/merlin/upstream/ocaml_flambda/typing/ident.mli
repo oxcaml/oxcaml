@@ -59,7 +59,11 @@ val same: t -> t -> bool
             [create_*], or if they are both persistent and have the same
             name. *)
 
+val compare_stamp: t -> t -> int
+        (** Compare only the internal stamps, 0 if absent *)
+
 val compare: t -> t -> int
+        (** Compare identifiers structurally, including the name *)
 
 val is_global: t -> bool
 val is_global_or_predef: t -> bool

@@ -47,9 +47,14 @@ module type Lattices = sig
 
   val print : 'a obj -> Fmt.formatter -> 'a elt -> unit
 
-  (** Compares two objects. Used for deduplication only; it is sound (but not
-      recommended) to return a nonzero value for equal objects. *)
-  val compare_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.comparison
+  (** Total ordering on objects, used for internal map keys. This is not a
+      lattice ordering or semantic equality check. If this returns [0], then
+      [equal_obj] must return [Misc.Is_eq]. *)
+  val compare_obj : 'a obj -> 'b obj -> int
+
+  (** Equality on objects recognized by the solver. This is the only object
+      comparison that carries type equality evidence. *)
+  val equal_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.is_eq
 
   val print_obj : Fmt.formatter -> 'a obj -> unit
 end
@@ -151,13 +156,20 @@ module type Lattices_mono = sig
   (** Apply morphism on constant *)
   val apply : 'b obj -> ('a, 'b, 'd) morph -> 'a -> 'b
 
-  (** Compares two morphisms. Used for deduplication only; it is fine (but not
-      recommended) to return a nonzero value for equal morphisms. *)
+  (** Total ordering on morphisms with a shared target object, used for internal
+      map keys. This is not a lattice ordering or semantic equality check. If
+      this returns [0], then [equal_morph] must return [Misc.Is_eq]. *)
   val compare_morph :
+    'b obj -> ('a0, 'b, 'd0) morph -> ('a1, 'b, 'd1) morph -> int
+
+  (** Equality on morphisms with a shared target object recognized by the
+      solver. This is the only morphism comparison that carries source type
+      equality evidence. *)
+  val equal_morph :
     'b obj ->
     ('a0, 'b, 'd0) morph ->
     ('a1, 'b, 'd1) morph ->
-    ('a0, 'a1) Misc.comparison
+    ('a0, 'a1) Misc.is_eq
 
   (** Print morphism *)
   val print_morph : 'b obj -> Fmt.formatter -> ('a, 'b, 'd) morph -> unit

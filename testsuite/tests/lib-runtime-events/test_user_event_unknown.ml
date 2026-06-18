@@ -7,7 +7,8 @@
    include unix;
    set OCAML_RUNTIME_EVENTS_PRESERVE = "1";
    runtime5;
-   libunix;
+   hasunix;
+   not-target-windows;
    {
      bytecode;
    }{

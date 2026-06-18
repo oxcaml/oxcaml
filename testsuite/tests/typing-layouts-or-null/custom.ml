@@ -69,9 +69,9 @@ let bad = Yep (Yep 5)
 Line 1, characters 14-21:
 1 | let bad = Yep (Yep 5)
                   ^^^^^^^
-Error: This expression has type "'a t" but an expression was expected of type
+Error: This constructor has type "'a t" but an expression was expected of type
          "('b : value)"
-       The layout of 'a t is value maybe_separable maybe_null
+       The layout of 'a t is value_or_null
          because of the definition of t at lines 1-4, characters 0-11.
        But the layout of 'a t must be a sublayout of value
          because of the definition of t at lines 1-4, characters 0-11.
@@ -99,7 +99,7 @@ Line 1, characters 13-20:
 1 | type fails = float t accepts_sep
                  ^^^^^^^
 Error: This type "float t" should be an instance of type "('a : any separable)"
-       The layout of float t is value maybe_separable maybe_null
+       The layout of float t is value_or_null
          because of the definition of t at lines 1-4, characters 0-11.
        But the layout of float t must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
@@ -113,10 +113,10 @@ Line 1, characters 13-20:
                  ^^^^^^^
 Error: This type "float t" should be an instance of type
          "('a : value_or_null non_float)"
-       The layout of float t is value maybe_separable maybe_null
+       The layout of float t is value_or_null
          because of the definition of t at lines 1-4, characters 0-11.
        But the layout of float t must be a sublayout of
-           value non_float maybe_null
+           value_or_null non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-56.
 |}]
 
@@ -225,6 +225,14 @@ Error: Invalid [@or_null] declaration:
        GADT constructors are not supported with [@@or_null].
 |}]
 
+type ('a : any) widened_bad_jkind =
+  | A
+  | B of 'a
+[@@or_null]
+[%%expect{|
+type ('a : value_maybe_separable) widened_bad_jkind = A | B of 'a [@@or_null]
+|}]
+
 type ('a : value_or_null) widened_bad_jkind =
   | A
   | B of 'a
@@ -281,8 +289,7 @@ Lines 1-4, characters 0-11:
 2 |   | A
 3 |   | B of 'a
 4 | [@@or_null]
-Error: The layout of type "wrong_result_kind" is
-           value maybe_separable maybe_null
+Error: The layout of type "wrong_result_kind" is value_or_null
          because of the annotation on 'a in the declaration of the type
                                       wrong_result_kind.
        But the layout of type "wrong_result_kind" must be a sublayout of value
@@ -331,7 +338,7 @@ Error: Signature mismatch:
          type 'a t = Nope | Yep of 'a [@@or_null]
        is not included in
          type 'a t
-       The layout of the first is value maybe_separable maybe_null
+       The layout of the first is value_or_null
          because of the definition of t at lines 4-7, characters 2-13.
        But the layout of the first must be a sublayout of value
          because of the definition of t at line 2, characters 2-11.

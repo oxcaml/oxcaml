@@ -15,21 +15,21 @@ let unwrap_twice o = Option.value ~default:7 o + Option.value ~default:7 o
 [%%expect_asm X86_64{|
 unwrap_twice:
   testb $1, %al
-  je    .L108
+  je    .L0
   movl  $15, %ebx
   testb $1, %al
-  je    .L119
-  jmp   .L117
-.L108:
+  je    .L2
+  jmp   .L1
+.L0:
   movq  (%rax), %rbx
   testb $1, %al
-  je    .L119
-.L117:
+  je    .L2
+.L1:
   movl  $15, %eax
-  jmp   .L123
-.L119:
+  jmp   .L3
+.L2:
   movq  (%rax), %rax
-.L123:
+.L3:
   leaq  -1(%rax,%rbx), %rax
   ret
 |}]
@@ -52,27 +52,27 @@ arr_sum:
   orq   $1, %rdi
   leaq  -2(%rdi), %rsi
   cmpq  $1, %rsi
-  jl    .L137
+  jl    .L2
   sarq  $1, %rsi
   movl  $1, %eax
   xorl  %edx, %edx
-.L114:
+.L0:
   leaq  1(%rdx,%rdx), %rcx
   cmpq  %rdi, %rcx
-  jae   .L133
+  jae   .L1
   movq  -4(%rbx,%rcx,4), %rcx
   leaq  -1(%rax,%rcx), %rax
   incq  %rdx
   cmpq  %rsi, %rdx
-  jle   .L114
+  jle   .L0
   ret
-.L133:
+.L1:
   movq  camlTOP2__block101@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L137:
+.L2:
   movl  $1, %eax
   ret
 |}]
@@ -96,32 +96,32 @@ let search ~target (start : int list) =
 search:
   movq  %rax, %rdi
   testb $1, %bl
-  je    .L116
-.L114:
+  je    .L1
+.L0:
   xorl  %esi, %esi
   movq  %rbx, %rax
-  jmp   .L131
-.L116:
+  jmp   .L4
+.L1:
   movq  (%rbx), %rax
   xorl  %esi, %esi
   cmpq  %rax, %rdi
   setl  %sil
   testq %rsi, %rsi
-  je    .L123
+  je    .L2
   movq  8(%rbx), %rax
   testq %rsi, %rsi
-  jne   .L129
-  jmp   .L131
-.L123:
+  jne   .L3
+  jmp   .L4
+.L2:
   movq  %rbx, %rax
   testq %rsi, %rsi
-  je    .L131
-.L129:
+  je    .L4
+.L3:
   movq  %rax, %rbx
   testb $1, %bl
-  je    .L116
-  jmp   .L114
-.L131:
+  je    .L1
+  jmp   .L0
+.L4:
   ret
 |}]
 
@@ -130,12 +130,12 @@ let redundant_compare (x: int) = if x > 0 && x > 5 then 100 else 200
 [%%expect_asm X86_64{|
 redundant_compare:
   cmpq  $1, %rax
-  jle   .L110
+  jle   .L0
   cmpq  $11, %rax
-  jle   .L110
+  jle   .L0
   movl  $201, %eax
   ret
-.L110:
+.L0:
   movl  $401, %eax
   ret
 |}]
@@ -148,10 +148,10 @@ let learn_from_branch (x : int) : int =
 [%%expect_asm X86_64{|
 learn_from_branch:
   cmpq  $7, %rax
-  je    .L105
+  je    .L0
   movl  $201, %eax
   ret
-.L105:
+.L0:
   leaq  -1(%rax,%rax), %rax
   ret
 |}]

@@ -19,13 +19,14 @@ open! Flambda.Import
 type simplified_named =
   | Simple of Simple.t
   | Prim of Flambda_primitive.t * Debuginfo.t
-  | Set_of_closures of Set_of_closures.t
+  | Set_of_closures of Set_of_closures.t * Alloc_mode.For_allocations.t
   | Rec_info of Rec_info_expr.t
 
 let to_named = function
   | Simple simple -> Named.create_simple simple
   | Prim (prim, dbg) -> Named.create_prim prim dbg
-  | Set_of_closures set -> Named.create_set_of_closures set
+  | Set_of_closures (set, alloc_mode) ->
+    Named.create_set_of_closures ~alloc_mode set
   | Rec_info rec_info_expr -> Named.create_rec_info rec_info_expr
 
 type t =
@@ -68,8 +69,8 @@ let create_with_known_free_names ~machine_width ~find_code_characteristics
     | Prim (prim, dbg) ->
       ( Prim (prim, dbg),
         Cost_metrics.from_size (Code_size.prim ~machine_width prim) )
-    | Set_of_closures set ->
-      ( Set_of_closures set,
+    | Set_of_closures (set, alloc_mode) ->
+      ( Set_of_closures (set, alloc_mode),
         Cost_metrics.set_of_closures ~find_code_characteristics set )
     | Static_consts _ ->
       Misc.fatal_errorf

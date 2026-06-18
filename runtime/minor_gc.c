@@ -382,13 +382,19 @@ tail_call:
 
     if (result) {
       if (tag == Cont_tag) {
+        value *gc_regs = 0;
         CAMLassert(infix_offset == 0);
-        CAMLassert(sz == 2);
+        CAMLassert(sz == 2 || sz == 3);
         struct stack_info* stk = Ptr_val(field0);
         Field(result, 0) = field0;
         Field(result, 1) = Field(v, 1);
+        if (sz == 3) {
+          Field(result, 2) = Field(v, 2);
+          gc_regs = (value *)(Field(result, 2));
+        }
         if (stk != NULL) {
-          caml_scan_stack(&oldify_one, oldify_scanning_flags, st, stk, 0);
+          caml_scan_stack(&oldify_one, oldify_scanning_flags, st,
+                          stk, gc_regs);
         }
       } else if (!Scannable_tag(tag)) {
         CAMLassert (infix_offset == 0);
@@ -592,7 +598,7 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
                               int participating_count,
                               caml_domain_state** participating)
 {
-  struct caml_minor_tables *self_minor_tables = domain->minor_tables;
+  const struct caml_minor_tables *self_minor_tables = domain->minor_tables;
   value* young_ptr = domain->young_ptr;
   value* young_end = domain->young_end;
   uintnat minor_allocated_bytes = (uintnat)young_end - (uintnat)young_ptr;
@@ -603,6 +609,11 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   int remembered_roots = 0;
   scan_roots_hook scan_roots_hook;
   promote_result_s result = { .locked_ephemerons = false, };
+
+  /* We should only have a block in domain->preemption if we've just allocated
+     it and are about to return back to ocaml; once it's initialized it should
+     be reset back to Val_unit, and we should not GC in the meantime. */
+  CAMLassert(!Is_block(domain->preemption));
 
   st.domain = domain;
   st.domain_alone = caml_domain_alone();
@@ -869,9 +880,9 @@ static void ephe_clean_minor (caml_domain_state* domain)
    code, but they cannot have any pointers into our minor heap. */
 static void custom_finalize_minor (caml_domain_state * domain)
 {
-  struct caml_custom_elt *elt;
-  for (elt = domain->minor_tables->custom.base;
-       elt < domain->minor_tables->custom.ptr; elt++) {
+  for (struct caml_custom_elt *elt = domain->minor_tables->custom.base;
+       elt < domain->minor_tables->custom.ptr;
+       elt++) {
     value *v = &elt->block;
     if (Is_block(*v) && Is_young(*v)) {
       if (!Is_promoted_hd(Hd_val(*v))) { /* value not copied to major heap */
@@ -1034,7 +1045,7 @@ caml_stw_empty_minor_heap_no_major_slice(caml_domain_state* domain,
 
 #ifdef DEBUG
   {
-    for (uintnat* p = initial_young_ptr; p < (uintnat*)domain->young_end; ++p)
+    for (uintnat *p = initial_young_ptr; p < (uintnat*)domain->young_end; ++p)
       *p = Debug_free_minor;
   }
 #endif
@@ -1101,12 +1112,16 @@ void caml_empty_minor_heaps_once (void)
   CAMLassert(!caml_domain_is_in_stw());
   #endif
 
+  CAML_EV_BEGIN(EV_EMPTY_MINOR);
+
   /* To handle the case where multiple domains try to execute a minor gc
      STW section */
   do {
     caml_try_empty_minor_heap_on_all_domains();
   } while (saved_minor_cycle ==
            atomic_load_relaxed(&caml_minor_cycles_started));
+
+  CAML_EV_END(EV_EMPTY_MINOR);
 }
 
 /* Called by minor allocations when [Caml_state->young_ptr] reaches
@@ -1127,12 +1142,24 @@ void caml_alloc_small_dispatch (caml_domain_state * dom_st,
     if (flags & CAML_FROM_CAML)
       /* In the case of allocations performed from OCaml, execute
          asynchronous callbacks. */
-      (void) caml_raise_async_if_exception(caml_do_pending_actions_exn(),
-        "minor GC");
+      (void) caml_get_value_or_raise_async(
+               caml_do_pending_actions_flags_res(flags), "minor GC");
     else {
       /* In the case of allocations performed from C, only perform
          non-delayable actions. */
       caml_handle_gc_interrupt();
+    }
+
+    /* If a preemption continuation has just been allocated, we must not enter
+       the GC again, as the continuation mustn't be scanned (and potentially
+       promoted) by the GC before it is initialized. Fortunately, we do not need
+       to maintain the invariant that there is enough room in the minor heap to
+       re-do the allocation in this case, since we are about to preempt anyway,
+       so we can just return. */
+    if (Is_block(Caml_state->preemption)) {
+      /* We should only see this case if we allocated from ocaml */
+      CAMLassert(flags & CAML_FROM_CAML);
+      return;
     }
 
     /* Now, there might be enough room in the minor heap to do our
@@ -1140,8 +1167,7 @@ void caml_alloc_small_dispatch (caml_domain_state * dom_st,
     if (dom_st->young_ptr - whsize >= dom_st->young_start)
       break;
 
-    /* If not, then empty the minor heap, and check again for async
-       callbacks. */
+    /* Otherwise, empty the minor heap, and check again for async callbacks. */
     CAML_EV_COUNTER(EV_C_FORCE_MINOR_ALLOC_SMALL, 1);
     caml_poll_gc_work();
   }
@@ -1191,7 +1217,7 @@ CAMLexport value caml_check_urgent_gc (value extra_root)
 static void realloc_generic_table
 (struct generic_table *tbl, asize_t element_size,
  ev_runtime_counter ev_counter_name,
- char *msg_threshold, char *msg_growing, char *msg_error)
+ const char *msg_threshold, const char *msg_growing, const char *msg_error)
 {
   CAMLassert (tbl->ptr == tbl->limit);
   CAMLassert (tbl->limit <= tbl->end);
