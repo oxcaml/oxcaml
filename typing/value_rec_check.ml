@@ -232,10 +232,10 @@ let classify_expression : Typedtree.expression -> sd =
         Static
 
     | Texp_apply ({exp_desc = Texp_ident { desc = vd; kind = Id_prim _; _ }},
-        _, _, _, _)
+        _, _, _, _, _)
       when is_ref vd ->
         Static
-    | Texp_apply (_, args, _, _, _)
+    | Texp_apply (_, args, _, _, _, _)
       when List.exists is_abstracted_arg args ->
         Static
     | Texp_apply _ ->
@@ -719,7 +719,7 @@ let rec expression : Typedtree.expression -> term_judg =
         single id.txt << Dereference
     | Texp_apply
         ({exp_desc = Texp_ident { desc = vd; kind = Id_prim _; _ }},
-         [_, Arg (arg, _)], _, _, _)
+         [_, Arg (arg, _)], _, _, _, _)
       when is_ref vd ->
       (*
         G |- e: m[Guard]
@@ -727,7 +727,7 @@ let rec expression : Typedtree.expression -> term_judg =
         G |- ref e: m
       *)
       expression arg << Guard
-    | Texp_apply (e, args, _, _, _)  ->
+    | Texp_apply (e, args, _, _, _, _)  ->
         (* [args] may contain omitted arguments, corresponding to labels in
            the function's type that were not passed in the actual application.
            The arguments before the first omitted argument are passed to the
