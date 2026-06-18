@@ -413,3 +413,162 @@ end
   (apply[unyielding] (field_imm 1 (global Toploop!)) "o" o))
 val o : < with_x : int -> 'a > as 'a = <obj>
 |}]
+
+
+(* A recursive binding whose definition isn't a literal [fun] -- here
+   [let g = fun ... in g] -- is compiled by [Value_rec_compiler] through an
+   eta-expanding wrapper [fun x -> <lifted f> x]. The wrapper forwards to [f],
+   so its call is [unyielding] exactly when [f] is; here [f] is unyielding,
+   so we get [apply[unyielding]]. (This relies on threading the closure's
+   yielding mode through [Lambda.lfunction].) *)
+let rec f =
+  let g = fun x -> if x <= 0 then 0 else f (x - 1) in
+  g
+[%%expect{|
+(let (letrec_function_context =? (caml_alloc_dummy 1))
+  (letrec
+    (f
+       (function {nlocal = 0} x[value<int>] stub : int
+         (apply[unyielding] (field_imm 0 letrec_function_context) x)))
+    (seq
+      (caml_update_dummy letrec_function_context
+        (let
+          (g =
+             (function {nlocal = 0} x[value<int>] : int
+               (if (%int_lessequal x 0) 0
+                 (apply[unyielding] f (%int_sub x 1)))))
+          (makeblock 0 g)))
+      (apply[unyielding] (field_imm 1 (global Toploop!)) "f" f))))
+val f : int -> int = <fun>
+|}]
+
+(* With mutual recursion this time *)
+let (_ : int) =
+  let rec f =
+    let g = fun x ->
+      if x <= 0
+      then 0
+      else begin match h with
+        | `Foo f -> f (x - 1)
+      end in
+    g
+  and h =
+    `Foo (fun x -> f x)
+  in
+  f 5
+[%%expect{|
+(let
+  (letrec_function_context =? (caml_alloc_dummy 1) h =? (caml_alloc_dummy 2))
+  (letrec
+    (f
+       (function {nlocal = 0} x[value<int>] stub : int
+         (apply[unyielding] (field_imm 0 letrec_function_context) x)))
+    (seq
+      (caml_update_dummy letrec_function_context
+        (let
+          (g =
+             (function {nlocal = 0} x[value<int>] : int
+               (if (%int_lessequal x 0) 0
+                 (apply[unyielding] (field_imm 1 h) (%int_sub x 1)))))
+          (makeblock 0 g)))
+      (caml_update_dummy h
+        (makeblock 0 3505894
+          (function {nlocal = 0} x[value<int>] : int (apply[unyielding] f x))))
+      (apply[unyielding] f 5))))
+- : int = 0
+|}]
+
+(* Mutually recursive functions which are not themselves yielding, but take a
+   yielding argument *)
+let (_ : int) =
+  Yielding.with_ begin fun y ->
+    let rec f =
+      let g = fun y x ->
+        if x <= 0
+        then 0
+        else begin match h with
+          | `Foo f -> f y (x - 1)
+        end in
+      g
+    and h =
+      `Foo (fun y x -> f y x)
+    in
+    f y 5
+  end
+;;
+[%%expect{|
+(let
+  (Yielding =?
+     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295"))
+  (apply[unyielding] (field_imm 0 Yielding)
+    (function {nlocal = 0} y : int
+      (let
+        (letrec_function_context =? (caml_alloc_dummy 1)
+         h =? (caml_alloc_dummy 2))
+        (letrec
+          (f
+             (function {nlocal = 2} y? x[value<int>] stub : int
+               (apply (field_imm 0 letrec_function_context) y x)))
+          (seq
+            (caml_update_dummy letrec_function_context
+              (let
+                (g =
+                   (function {nlocal = 2} y? x[value<int>] : int
+                     (if (%int_lessequal x 0) 0
+                       (apply (field_imm 1 h) y (%int_sub x 1)))))
+                (makeblock 0 g)))
+            (caml_update_dummy h
+              (makeblock 0 3505894
+                (function {nlocal = 2} y? x[value<int>] : int (apply f y x))))
+            (apply f y 5)))))))
+- : int = 0
+|}]
+
+
+(* The same wrapper, but for a recursive function that's yielding. The
+   forwarding call correctly stays a plain [apply] (may-yield) *)
+let (_ : int) =
+  Yielding.with_ (fun y ->
+    let rec f =
+      let g = fun x ->
+        yield y;
+        if x <= 0
+        then 0
+        else begin match h with
+          | `Foo f -> f (x - 1)
+        end in
+      g
+    and h =
+      `Foo (fun x -> yield y; f x)
+    in
+    f 5)
+[%%expect{|
+(let
+  (yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
+   Yielding =?
+     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295"))
+  (apply[unyielding] (field_imm 0 Yielding)
+    (function {nlocal = 0} y : int
+      (let
+        (letrec_function_context =? (caml_alloc_dummy 1)
+         h =? (caml_alloc_dummy 2))
+        (letrec
+          (f
+             (function {nlocal = 0} x[value<int>] stub : int
+               (apply (field_imm 0 letrec_function_context) x)))
+          (seq
+            (caml_update_dummy letrec_function_context
+              (let
+                (g =
+                   (function {nlocal = 0} x[value<int>] : int
+                     (seq (apply yield y)
+                       (if (%int_lessequal x 0) 0
+                         (apply (field_imm 1 h) (%int_sub x 1))))))
+                (makeblock 0 g)))
+            (caml_update_dummy h
+              (makeblock 0 3505894
+                (function {nlocal = 0} x[value<int>] : int
+                  (seq (apply yield y) (apply f x)))))
+            (apply f 5)))))))
+- : int = 0
+|}]

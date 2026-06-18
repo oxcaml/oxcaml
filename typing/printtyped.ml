@@ -685,9 +685,10 @@ and expression i ppf x =
       line i ppf "Texp_letmutable\n";
       value_binding Nonrecursive i ppf vb;
       expression i ppf e
-  | Texp_function { params; body; alloc_mode = am; ret_mode } ->
+  | Texp_function { params; body; alloc_mode = am; ret_mode; yielding = ym } ->
       line i ppf "Texp_function\n";
       alloc_mode i ppf am;
+      yielding_mode i ppf ym;
       alloc_modes_var i ppf ret_mode;
       list i function_param ppf params;
       function_body i ppf body;

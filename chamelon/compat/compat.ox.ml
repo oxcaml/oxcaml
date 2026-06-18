@@ -231,6 +231,7 @@ let mkTexp_function ?(id = texp_function_defaults)
       alloc_mode = id.alloc_mode;
       ret_sort = id.ret_sort;
       ret_mode = { mode_modes = id.ret_mode; mode_desc = [] };
+      yielding = Yielding.disallow_right Yielding.yielding;
       zero_alloc = id.zero_alloc
     }
 

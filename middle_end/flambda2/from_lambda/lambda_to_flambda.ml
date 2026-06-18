@@ -1396,7 +1396,7 @@ and cps_function_bindings env (bindings : Lambda.rec_binding list) =
 
 and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     ?precomputed_free_idents
-    ({ kind; params; return; body; attr; loc; mode; ret_mode } :
+    ({ kind; params; return; body; attr; loc; mode; ret_mode; yielding = _ } :
       L.lfunction) : Function_decl.t =
   let contains_no_escaping_local_allocs =
     match ret_mode with Alloc_heap -> true | Alloc_local -> false
