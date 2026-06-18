@@ -1023,6 +1023,11 @@ and lfunction = private
     ret_mode: locality_mode;
     (** alloc mode of the returned value. Also indicates if the function might
         allocate in the caller's region. *)
+    yielding: yielding_kind;
+    (** [Unyielding] if fully applying the closure can never perform a free
+        effect (it neither closes over nor is passed any yielding value).
+        Only set precisely by [Translcore]; other construction sites
+        conservatively default to [May_yield]. *)
   }
 
 and lkindtemplate =
@@ -1302,6 +1307,10 @@ val lfunction' :
   mode:locality_mode ->
   ret_mode:locality_mode ->
   lfunction
+
+(* Set the yielding mode of a closure (defaults to [May_yield] from the
+   smart constructors). [Translcore] uses this to record the precise mode. *)
+val lfunction_with_yielding : yielding_kind -> lfunction -> lfunction
 
 
 val iter_head_constructor: (lambda -> unit) -> lambda -> unit

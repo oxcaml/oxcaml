@@ -441,10 +441,11 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       transl_letmutable ~scopes ~return_layout:layout pat_expr
         (event_before ~scopes body (transl_exp ~scopes layout body))
   | Texp_function { params; body; ret_sort; ret_mode; alloc_mode;
-                    zero_alloc } ->
+                    yielding; zero_alloc } ->
       let ret_sort = Jkind.Sort.default_for_transl_and_get ret_sort in
       transl_function ~in_new_scope ~scopes e params body
         ~alloc_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
+        ~yielding:(transl_yielding_mode_l yielding)
   | Texp_apply({ exp_desc = Texp_ident { path;
                                         desc = {val_kind = Val_prim p};
                                         kind = Id_prim (pmode, psort); _ };
@@ -2098,7 +2099,7 @@ and transl_curried_function ~scopes loc repr params body
 
 and transl_function ~in_new_scope ~scopes e params body
       ~alloc_mode ~ret_mode:sreturn_mode ~ret_sort:sreturn_sort ~region:sregion
-      ~zero_alloc =
+      ~zero_alloc ~yielding =
   let attrs = e.exp_attributes in
   let mode = transl_alloc_mode alloc_mode in
   let zero_alloc = Zero_alloc.get zero_alloc in
@@ -2161,7 +2162,8 @@ and transl_function ~in_new_scope ~scopes e params body
   in
   let loc = of_location ~scopes e.exp_loc in
   let body = if region then maybe_region_layout return body else body in
-  let lam = lfunction ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode in
+  let lf = lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode in
+  let lam = Lfunction (lfunction_with_yielding yielding lf) in
   Translattribute.add_function_attributes lam e.exp_loc attrs
 
 (* Like transl_exp, but used when a new scope was just introduced. *)

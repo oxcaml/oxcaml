@@ -294,6 +294,7 @@ and expression_desc =
         ret_mode : Mode.Alloc.l modes;
         ret_sort : Jkind.sort;
         alloc_mode : alloc_mode;
+        yielding : Mode.Yielding.l;
         zero_alloc : Zero_alloc.t;
       }
   | Texp_apply of

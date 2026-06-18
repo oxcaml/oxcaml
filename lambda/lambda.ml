@@ -1146,6 +1146,11 @@ and lfunction =
     loc: scoped_location;
     mode: locality_mode;
     ret_mode: locality_mode;
+    yielding: yielding_kind;
+    (* [Unyielding] if fully applying the closure can never perform a free
+       effect (it neither closes over nor is passed any yielding value).
+       Only set precisely by [Translcore]; other construction sites
+       conservatively default to [May_yield]. *)
   }
 
 and lkindtemplate =
@@ -1444,10 +1449,13 @@ let lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
      if is_local_mode ret_mode then assert (nlocal >= 1);
      if is_local_mode mode then assert (nlocal = nparams)
   end;
-  { kind; params; return; body; attr; loc; mode; ret_mode }
+  { kind; params; return; body; attr; loc; mode; ret_mode;
+    yielding = May_yield }
 
 let lfunction ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
   Lfunction (lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode)
+
+let lfunction_with_yielding yielding (lf : lfunction) = { lf with yielding }
 
 let lambda_unit = Lconst const_unit
 
@@ -2283,11 +2291,12 @@ let duplicate_function =
      Ident.Map.empty).subst_lfunction
 
 let map_lfunction f ({ kind; params; return; body = old_body; attr; loc;
-                      mode; ret_mode } as lfunction) =
+                      mode; ret_mode; yielding } as lfunction) =
   let new_body = f old_body in
   if old_body == new_body
   then lfunction
-  else { kind; params; return; body = new_body; attr; loc; mode; ret_mode }
+  else { kind; params; return; body = new_body; attr; loc; mode; ret_mode;
+         yielding }
 
 let shallow_map ~tail ~non_tail:f lam =
   match lam with

@@ -623,20 +623,24 @@ let rec split_static_function lfun block_var local_idents lam :
         ap_result_layout = lfun.return;
         ap_region_close = Rc_normal;
         ap_mode = lfun.ret_mode;
-        ap_yielding = May_yield;
+        (* This wrapper fully applies [lfun], so the call yields exactly when
+           fully applying [lfun] does -- which is what [lfun.yielding]
+           records (closure mode joined with all parameter modes). *)
+        ap_yielding = lfun.yielding;
         ap_probe = None;
       }
     in
     let wrapper =
-      lfunction'
-        ~kind:lfun.kind
-        ~params
-        ~return:lfun.return
-        ~body
-        ~attr:default_stub_attribute
-        ~loc:no_loc
-        ~mode:lfun.mode
-        ~ret_mode:lfun.ret_mode
+      lfunction_with_yielding lfun.yielding
+        (lfunction'
+           ~kind:lfun.kind
+           ~params
+           ~return:lfun.return
+           ~body
+           ~attr:default_stub_attribute
+           ~loc:no_loc
+           ~mode:lfun.mode
+           ~ret_mode:lfun.ret_mode)
     in
     let lifted = { lfun = wrapper; free_vars_block_size = 1 } in
     Reachable (lifted,

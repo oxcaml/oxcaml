@@ -10186,6 +10186,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
                 { mode_modes = Alloc.disallow_right mret; mode_desc = [] };
               ret_sort;
               alloc_mode;
+              yielding = Yielding.disallow_right Yielding.yielding;
               zero_alloc = Zero_alloc.default
             }
         }
@@ -11828,11 +11829,25 @@ and type_n_ary_function
         Zero_alloc.create_const zero_alloc
     in
     let alloc_mode = Mode.Alloc.disallow_left fun_alloc_mode in
+    (* [yielding] records whether *fully applying* this function can perform a
+       free effect: the closure may yield if it closes over a yielding value
+       (its own mode), or if any argument it is given is yielding (the
+       parameter modes). [Value_rec_compiler]'s eta-expanding wrapper uses
+       this, since the wrapper is exactly a full application. *)
+    let yielding =
+      Yielding.join
+        (Yielding.disallow_right (Alloc.proj_comonadic Yielding fun_alloc_mode)
+         :: List.map
+              (fun (p : function_param) ->
+                Yielding.disallow_right
+                  (Alloc.proj_comonadic Yielding p.fp_mode.mode_modes))
+              params)
+    in
     re
       { exp_desc =
           Texp_function
             { params; body; ret_sort;
-              alloc_mode; ret_mode;
+              alloc_mode; ret_mode; yielding;
               zero_alloc
             };
         exp_loc = loc;

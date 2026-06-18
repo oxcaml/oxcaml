@@ -495,6 +495,12 @@ and expression_desc =
         ret_sort : Jkind.sort;
         alloc_mode : alloc_mode;
         (* Mode at which the closure is allocated *)
+        yielding : Mode.Yielding.l;
+        (* [Unyielding] if *fully applying* this function can never perform a
+           free effect: it neither closes over a yielding value (its own mode)
+           nor is given any yielding argument (its parameter modes). Consumed
+           by [Value_rec_compiler]'s eta-expanding wrapper, which is exactly a
+           full application. *)
         zero_alloc : Zero_alloc.t;
         (* zero-alloc attributes *)
       }
