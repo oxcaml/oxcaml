@@ -1,0 +1,7 @@
+Raised at Stdlib.failwith in file "stdlib.ml" (inlined), line 39, characters 17-33
+Called from Backtrace.foo in file "backtrace.ml", line 15, characters 11-27
+Called from Backtrace.bar in file "backtrace.ml", line 23, characters 4-9
+Called from Backtrace.task1 in file "backtrace.ml", line 32, characters 4-10
+Called from Stdlib__Effect.Safe.perform in file "stdlib/effect.ml", line 25, characters 68-79
+Called from Backtrace.task2 in file "backtrace.ml", line 39, characters 4-30
+Called from Stdlib__Effect.Deep.Safe.match_with.(fun) in file "stdlib/effect.ml", line 193, characters 29-62
