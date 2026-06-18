@@ -5881,7 +5881,7 @@ module Allocation = struct
   module Obj = struct
     type const = Const.t
 
-    let obj : _ C.obj = C.Allocation
+    let obj = C.Allocation
   end
 
   include Comonadic_gen (Obj)

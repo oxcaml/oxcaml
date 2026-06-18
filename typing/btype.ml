@@ -1295,8 +1295,6 @@ module Jkind0 = struct
           name : string
         }
 
-      (* CR-soon shsong: check whether I need to do similar conservative
-          thing for Allocation mode*)
       (* Mode crossing that crosses everything except staticity *)
       let cross_all_except_staticity =
         let ax : _ Mode.Crossing.Axis.t = Monadic Staticity in
@@ -1435,13 +1433,16 @@ module Jkind0 = struct
                   (Base
                     (Scannable,
                       { nullability = Non_null; separability = Non_float }));
+              (* CR-soon shsong: Exceptions should not cross allocation. We may need to
+                  let them cross -- for now let's keep the conservative option and check
+                  this when we start to handle exceptions *)
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:false
                      ~portability:true ~forkable:false ~yielding:false
                      ~uniqueness:false ~contention:true ~statefulness:true
                      ~visibility:true ~staticity:false
-                     ~allocation:true
+                     ~allocation:false
                  in
                  create crossing ~externality:Externality.max);
               with_bounds = No_with_bounds
@@ -1589,8 +1590,8 @@ module Jkind0 = struct
          types with mutable fields, and an immediate64 does not have immutable
          fields.
 
-         * Allocation: This axis does not cross here (it is conservatively
-         excluded), so no soundness argument is required.
+         * Allocation: This is fine, because "crosses everything" is used for
+         plain data like immediates or unboxed numbers, which cross allocation
 
          In practice, the functor that creates immediate64s,
          [Stdlib.Sys.Immediate64.Make], will require these conditions on its
