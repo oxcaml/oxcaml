@@ -821,7 +821,10 @@ let register_allocation_value_mode ~loc
    parameter function needs to be made global if its partial application
    to one argument must be global. As a result, a function gets an
    [Alloc.lr] allocation mode that can be further constrained. *)
-let register_closure_allocation (mode : Value.r) ~loc : Alloc.lr * Value.r =
+(* CR shsong: rebase conflict - kept main's [Hint.allocation] naming and added
+   this commit's [~env] param + [walk_locks_for_allocation] call. *)
+let register_closure_allocation ~env (mode : Value.r) ~loc : Alloc.lr * Value.r =
+  Env.walk_locks_for_allocation ~env (loc, Hint.Allocation);
   let allocation : Hint.allocation = {loc; txt = Unknown} in
   let (alloc_mode : Alloc.lr), _ =
     Alloc.newvar_below (value_to_alloc_r2g ~allocation mode)
@@ -835,7 +838,8 @@ let register_closure_allocation (mode : Value.r) ~loc : Alloc.lr * Value.r =
 (** Register as allocation the expression constrained by the given
     [expected_mode]. Returns the mode of the allocation, and the expected mode
     of potential subcomponents. *)
-let register_allocation ~loc ?desc (expected_mode : expected_mode) =
+let register_allocation ~env ~loc ?desc (expected_mode : expected_mode) =
+  Env.walk_locks_for_allocation ~env (loc, Hint.Allocation);
   let alloc_mode, mode =
     register_allocation_value_mode ~loc ?desc (as_single_mode expected_mode)
   in
@@ -6201,7 +6205,7 @@ let split_function_ty
     ~mode_annots ~ret_mode_annots ~in_function ~is_first_val_param ~is_final_val_param
   =
   let alloc_mode, closed_over_mode =
-    register_closure_allocation ~loc (as_single_mode expected_mode)
+    register_closure_allocation ~env ~loc (as_single_mode expected_mode)
   in
   if expected_mode.strictly_local then
     Locality.submode_exn ~pp:(loc, Function) Locality.local
@@ -6383,7 +6387,7 @@ let vb_pat_constraint
   in
   vb.pvb_attributes, spat
 
-let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
+let pat_modes ~env ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
   let pat_mode, exp_mode =
     if force_toplevel
     then simple_pat_mode Value.legacy, mode_legacy
@@ -6408,7 +6412,7 @@ let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
          can conservatively use the RHS's comonadic mode as the captured
          environment's mode. *)
       let env_alloc_mode, env_mode =
-        register_allocation ~loc:spat.ppat_loc
+        register_allocation ~env ~loc:spat.ppat_loc
           ~desc:Lpoly_captured_environment exp_mode
       in
       let exp_mode =
@@ -6609,7 +6613,7 @@ and type_expect_
       let alloc_mode, record_mode =
         if is_boxed then
           let alloc_mode, record_mode =
-            register_allocation ~loc expected_mode
+            register_allocation ~env ~loc expected_mode
           in
           Some alloc_mode, record_mode
         else
@@ -7384,7 +7388,7 @@ and type_expect_
           with
             Rpresent (Some ty), Rpresent (Some ty0) ->
               let alloc_mode, argument_mode =
-                register_allocation ~loc expected_mode
+                register_allocation ~env ~loc expected_mode
               in
               let arg =
                 type_argument ~overwrite:No_overwrite env argument_mode sarg ty ty0
@@ -7405,7 +7409,7 @@ and type_expect_
               newvar (Jkind.Builtin.value_or_null ~why:Polymorphic_variant_field)
             in
             let alloc_mode, argument_mode =
-              register_allocation ~loc expected_mode
+              register_allocation ~env ~loc expected_mode
             in
             let arg =
               type_expect env argument_mode sarg (mk_expected ty_expected)
@@ -7466,7 +7470,7 @@ and type_expect_
         match is_float_boxing with
         | true ->
           let alloc_mode, argument_mode =
-            register_allocation ~loc ~desc:Float_projection expected_mode
+            register_allocation ~env ~loc ~desc:Float_projection expected_mode
           in
           let mode = cross_left env Predef.type_unboxed_float mode in
           submode ~loc ~env mode argument_mode;
@@ -7631,7 +7635,9 @@ and type_expect_
         }
         | Immutable -> Immutable
       in
-      let alloc_mode, array_mode = register_allocation ~loc expected_mode in
+      (* CR shsong: rebase - threading [~env] into [register_allocation] here, the
+         site main inlined from the deleted [type_generic_array]. *)
+      let alloc_mode, array_mode = register_allocation ~env ~loc expected_mode in
       let modalities = Typemode.mutable_modalities mutability in
       let is_contained_by : Mode.Hint.is_contained_by =
         {containing = Array Modality; container = (loc, Expression)}
@@ -8471,7 +8477,7 @@ and type_expect_
           if (not (Types.is_atomic label.lbl_mut))
           then raise (Error (loc, env, Label_not_atomic lid.txt));
           let alloc_mode, argument_mode =
-            register_allocation ~loc expected_mode
+            register_allocation ~env ~loc expected_mode
           in
           begin match Mode.Modality.Const.equate label.lbl_modalities
                         (Typemode.atomic_mutable_modalities)
@@ -9828,7 +9834,7 @@ and type_option_some env expected_mode sarg ty ty0 =
   let ty' = extract_option_type env ty in
   let ty0' = extract_option_type env ty0 in
   let alloc_mode, argument_mode =
-    register_allocation ~loc:sarg.pexp_loc ~desc:Optional_argument expected_mode
+    register_allocation ~env ~loc:sarg.pexp_loc ~desc:Optional_argument expected_mode
   in
   let arg = type_argument ~overwrite:No_overwrite env argument_mode sarg ty' ty0' in
   let lid = Longident.Lident "Some" in
@@ -10006,7 +10012,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       unify_exp ~sexp:sarg env {texp with exp_type = ty_fun} ty_expected;
       if args = [] then texp else begin
       let alloc_mode, mode_subcomponent =
-        register_allocation ~loc:sarg.pexp_loc ~desc:Function_coercion mode
+        register_allocation ~env ~loc:sarg.pexp_loc ~desc:Function_coercion mode
       in
       submode ~loc:sarg.pexp_loc ~env ~reason:Other
         exp_mode mode_subcomponent;
@@ -10557,8 +10563,10 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
     | Variant_unboxed | Variant_with_null -> expected_mode, None
     | Variant_boxed _ when constr.cstr_constant -> expected_mode, None
     | Variant_boxed _ | Variant_extensible ->
+       (* CR shsong: rebase conflict - kept main's [~loc:sexp.pexp_loc] and added
+          this commit's [~env]. *)
        let alloc_mode, argument_mode =
-         register_allocation ~loc:sexp.pexp_loc expected_mode
+         register_allocation ~env ~loc:sexp.pexp_loc expected_mode
        in
        argument_mode, Some alloc_mode
   in
@@ -11146,7 +11154,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   in
   let spatl = List.map vb_pat_constraint spat_sexp_list in
   let spatl =
-    List.map (pat_modes ~force_toplevel rec_mode_var ~is_lpoly) spatl
+    List.map (pat_modes ~env ~force_toplevel rec_mode_var ~is_lpoly) spatl
   in
   let attrs_list = List.map (fun (attrs, _, _, _, _) -> attrs) spatl in
   let is_recursive = (rec_flag = Recursive) in
@@ -11584,6 +11592,10 @@ and type_andops env sarg sands expected_sort expected_ty =
   in
   let_arg, sort_let_arg, List.rev rev_ands
 
+(* CR shsong: rebase conflict - main deleted [type_generic_array] (inlined into
+   the [Pexp_array] case in [type_expect_]). Dropped this commit's copy here; this
+   commit's only change to it was threading [~env] into [register_allocation],
+   which is now applied at that inlined call site instead. *)
 and type_expect_mode ~loc ~env ~(modes : Alloc.Const.Option.t) expected_mode =
     let min = Alloc.Const.Option.value ~default:Alloc.Const.min modes |> Const.alloc_as_value in
     let max = Alloc.Const.Option.value ~default:Alloc.Const.max modes |> Const.alloc_as_value in

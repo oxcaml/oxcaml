@@ -319,12 +319,19 @@ val walk_locks : env:t -> loc:Location.t -> Longident.t ->
   item:Mode.Hint.lock_item ->
   type_expr option -> mode_with_locks -> Mode.Value.l
 
+(* CR shsong: rebase conflict - kept both main's [walk_locks_for_legacy_construct]
+   and this commit's [walk_locks_for_allocation]. *)
 (** Registers a use of a construct that is at legacy comonadic modes,
     constraining every enclosing closure lock as if a legacy value defined at
     toplevel were used at the pinpoint's location. Used for constructs (e.g.
     effect handlers) that force enclosing functions to be nonportable and
     stateful. *)
 val walk_locks_for_legacy_construct : env:t -> Mode.Hint.pinpoint -> unit
+
+(** Registers a use of an allocation, constraining every enclosing closure lock.
+    Used for constructs with allocations that force enclosing functions to be
+    alloc (rather than noalloc_strict) *)
+val walk_locks_for_allocation : env:t -> Mode.Hint.pinpoint -> unit
 
 val lookup_value:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->

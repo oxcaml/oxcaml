@@ -3732,6 +3732,7 @@ let closure_mode pp {Mode.monadic; comonadic} closure_context comonadic0 =
   in
   {Mode.monadic; comonadic}
 
+(* CR shsong: rebase conflict was formatting-only here; kept main's wrapping. *)
 let const_closure_mode pp {Mode.monadic; comonadic}
   closure_context comonadic0 =
   Mode.Value.Comonadic.(submode_err pp comonadic
@@ -3801,6 +3802,8 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
           vmode
     ) mode locks
 
+(* CR shsong: rebase conflict - main added [walk_locks_for_legacy_construct] at
+   the same spot this commit added [walk_locks_for_allocation]; kept both. *)
 (** Registers a use of a construct that is at legacy comonadic modes,
     constraining every enclosing closure lock as if a legacy value defined at
     toplevel were used at the pinpoint's location. Used for constructs (e.g.
@@ -3812,6 +3815,20 @@ let walk_locks_for_legacy_construct ~env pp =
   ignore
     (walk_locks ~errors:true ~env ~pp
        (Mode.Value.disallow_right Mode.Value.legacy) None locks
+      : Mode.Value.l)
+
+(** Registers a use of an allocation, constraining every enclosing closure lock.
+    Used for constructs with allocations that force enclosing functions to be
+    alloc (rather than noalloc_strict) *)
+(* CR shsong: currently it only considers noalloc_strict and alloc,
+    need to customize this to support noalloc later *)
+let walk_locks_for_allocation ~env pp =
+  let locks = IdTbl.get_all_locks env.values in
+  let _stage_locks, locks = partition_locks locks in
+  ignore
+    (walk_locks ~errors:true ~env ~pp
+      (Mode.Value.disallow_right
+        (Mode.Value.min_with_comonadic Allocation Mode.Allocation.alloc)) None locks
       : Mode.Value.l)
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
@@ -5107,6 +5124,8 @@ let extract_settable_variables env =
 let print_pinpoint_desc ppf desc =
   (Mode.print_pinpoint_desc desc |> Option.get)
     ~definite:true ~capitalize:true ppf
+(* CR shsong: rebase conflict - dropped this commit's [module Style = Misc.Style]
+   as main already binds [Style] (used below); verify no shadowing was intended. *)
 
 let print_stage ppf stage =
   if stage = 0 then fprintf ppf "outside any quotations"
@@ -5388,6 +5407,9 @@ let report_lookup_error_doc loc env = function
         "The module %a is an alias for module %a, which %s"
         quoted_longident lid
         (Style.as_inline_code pp_path) p cause
+  (* CR shsong: rebase conflict - adopted main's new error API
+     ([Location.errorf]/[pp_path]); this commit's [print_pinpoint_desc] change is
+     preserved below. *)
   | Local_value_used_in_exclave desc ->
       Location.errorf ~loc
         "%a is local, so it cannot be used inside an exclave_"
