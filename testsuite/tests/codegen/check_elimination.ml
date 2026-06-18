@@ -67,7 +67,7 @@ arr_sum:
   jle   .L0
   ret
 .L1:
-  movq  camlTOP2__block101@GOTPCREL(%rip), %rax
+  movq  <hidden PC-relative offset>(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -154,4 +154,41 @@ learn_from_branch:
 .L0:
   leaq  -1(%rax,%rax), %rax
   ret
+|}]
+
+
+(* CR ttebbi: We shouldn't materialize the boolean and some branches are
+   imposssible to take. *)
+let complex_branching_on_two_comparisons (x: int) (y: int) c1 c2 c3 =
+ match x = 2, y = 2 with
+ | true, true -> c1 ()
+ | _, false -> c2 ()
+ | false, _ -> c3 ()
+[%%expect_asm X86_64{|
+complex_branching_on_two_comparisons:
+  movq  %rax, %rcx
+  movq  %rbx, %rax
+  movq  %rsi, %rbx
+  cmpq  $5, %rax
+  sete  %al
+  movzbq %al, %rax
+  cmpq  $5, %rcx
+  jne   .L0
+  testq %rax, %rax
+  je    .L0
+  movl  $1, %eax
+  movq  (%rdi), %rsi
+  movq  %rdi, %rbx
+  jmp   *%rsi
+.L0:
+  testq %rax, %rax
+  je    .L1
+  movl  $1, %eax
+  movq  (%rdx), %rdi
+  movq  %rdx, %rbx
+  jmp   *%rdi
+.L1:
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
 |}]
