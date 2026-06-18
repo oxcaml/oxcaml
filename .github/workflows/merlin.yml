@@ -15,7 +15,7 @@ on:
 
 # Overall approach to running the tests:
 #  - Install OCaml 5.4, as this is the version of dependencies our merlin expects.
-#  - Build OxCaml (which requires installing OCaml 4.14).
+#  - Build OxCaml (which also requires installing OCaml 5.4).
 #  - Build merlin using OCaml 5.4, and then run the tests while pointing merlin at
 #    OxCaml's stdlib and ocamlc.
 #
