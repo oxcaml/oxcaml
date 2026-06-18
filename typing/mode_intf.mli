@@ -786,6 +786,9 @@ module type S = sig
     val meet_const_with :
       'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * disallowed) t
 
+    val imply_const_with :
+      'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> (disallowed * 'r) t
+
     val join_const_with :
       'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> (disallowed * 'r) t
 
