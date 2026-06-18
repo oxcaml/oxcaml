@@ -2401,19 +2401,21 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
     match repr_args, repr_res with
     | [], (_, res_repr) ->
       let res_sort = sort_of_native_repr res_repr ~poly_sort in
-      [], Typeopt.layout env error_loc res_sort ty
+      [], Typeopt.layout env error_loc res_sort ty, []
     | (((_, arg_repr) as arg) :: repr_args), _ ->
-      match Typeopt.is_function_type env ty with
+      match Typeopt.is_function_type_with_arg_mode env ty with
       | None ->
           Misc.fatal_errorf "Primitive %s type does not correspond to arity"
             (Primitive.byte_name p)
-      | Some (arg_ty, ret_ty) ->
+      | Some (arg_ty, ret_ty, arg_alloc_mode) ->
           let arg_sort = sort_of_native_repr arg_repr ~poly_sort in
           let arg_layout =
             Typeopt.layout env error_loc arg_sort arg_ty
           in
           let arg_mode = to_locality arg in
-          let params, return = make_params ret_ty repr_args repr_res in
+          let params, return, arg_modes =
+            make_params ret_ty repr_args repr_res
+          in
           { name = Ident.create_local "prim";
             debug_uid = Lambda.debug_uid_none;
             (* The eta expansion is not actually visible at the source level,
@@ -2421,14 +2423,30 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
             layout = arg_layout;
             attributes = Lambda.default_param_attribute;
             mode = arg_mode }
-          :: params, return
+          :: params, return, arg_alloc_mode :: arg_modes
   in
-  let params, return =
+  let params, return, arg_modes =
     make_params ty p.prim_native_repr_args p.prim_native_repr_res
   in
   let args = List.map (fun p -> Lvar p.name) params in
+  (* For the standalone closures of [%apply] / [%revapply], the synthesized
+     application [f x] yields iff [f] or [x] does, i.e. iff any of the
+     primitive's parameters is yielding. (Other primitives lower to a [Lprim],
+     which ignores [~yielding].) *)
+  let yielding =
+    match arg_modes with
+    | [] -> May_yield
+    | _ :: _ ->
+      let open Mode in
+      transl_yielding_mode_l
+        (Yielding.join
+           (List.map
+              (fun m ->
+                Yielding.disallow_right (Alloc.proj_comonadic Yielding m))
+              arg_modes))
+  in
   match params with
-  | [] -> lambda_of_prim p.prim_name prim ~yielding:May_yield loc args None
+  | [] -> lambda_of_prim p.prim_name prim ~yielding loc args None
   | _ ->
      let loc =
        Debuginfo.Scoped_location.map_scopes
@@ -2436,7 +2454,7 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
          loc
      in
      let body =
-       lambda_of_prim p.prim_name prim ~yielding:May_yield loc args None
+       lambda_of_prim p.prim_name prim ~yielding loc args None
      in
      let locality_mode = to_locality p.prim_native_repr_res in
      let () =
@@ -2646,7 +2664,9 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
         end
     | _ -> raise (Error (to_location loc, Invalid_stack_primitive Not_primitive))
   end;
-  let lam = lambda_of_prim p.prim_name prim ~yielding loc args (Some arg_exps) in
+  let lam =
+    lambda_of_prim p.prim_name prim ~yielding loc args (Some arg_exps)
+  in
   let lam =
     if primitive_needs_event_after prim then begin
       match exp with

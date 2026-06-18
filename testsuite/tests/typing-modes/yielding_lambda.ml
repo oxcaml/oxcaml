@@ -748,3 +748,32 @@ val mk : unit -> c = <fun>
   (apply[unyielding] (field_imm 1 (global Toploop!)) "d/747" d))
 class d : object method m : int method n : int end
 |}]
+
+
+(* Used as a first-class value (not directly applied), [%revapply]/[%apply]
+   become a closure [fun x f -> f x]. Its synthesized application is unyielding
+   when the operator's parameter modes are unyielding (the default). *)
+external ( |> ) : 'a -> ('a -> 'b) -> 'b = "%revapply"
+let std_pipe = ( |> )
+[%%expect{|
+0
+external ( |> ) : 'a -> ('a -> 'b) -> 'b = "%revapply"
+(let
+  (std_pipe =
+     (function {nlocal = 0} prim prim stub (apply[unyielding] prim prim)))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "std_pipe" std_pipe))
+val std_pipe : 'a -> ('a -> 'b) -> 'b = <fun>
+|}]
+
+(* It may yield when the operator is declared with yielding parameters. *)
+external pipe_y : 'a @ yielding -> ('a -> 'b) @ yielding -> 'b = "%revapply"
+let yielding_pipe = pipe_y
+[%%expect{|
+0
+external pipe_y : 'a @ yielding -> ('a -> 'b) @ yielding -> 'b = "%revapply"
+(let
+  (yielding_pipe = (function {nlocal = 0} prim prim stub (apply prim prim)))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "yielding_pipe"
+    yielding_pipe))
+val yielding_pipe : 'a @ yielding -> ('a -> 'b) @ yielding -> 'b = <fun>
+|}]
