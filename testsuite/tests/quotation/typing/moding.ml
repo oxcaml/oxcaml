@@ -10,9 +10,9 @@ module M : sig
   val x : t
   val x_unique : unit -> t @ unique
 
-  val save : 'a @ global -> unit
-  val free : 'a @ unique -> unit
-  val send : 'a @ portable -> unit
+  val save : 'a @ once global -> unit
+  val free : 'a @ once unique -> unit
+  val send : 'a @ once portable -> unit
 end = struct
   type t = string
   let x = "default"
@@ -28,9 +28,9 @@ module M :
     type t
     val x : t
     val x_unique : unit -> t @ unique
-    val save : 'a -> unit
-    val free : 'a @ unique -> unit
-    val send : 'a @ portable -> unit
+    val save : 'a @ once -> unit
+    val free : 'a @ unique once -> unit
+    val send : 'a @ once portable -> unit
   end
 |}]
 #mark_toplevel_in_quotations;;
@@ -388,8 +388,9 @@ let x () = <[1 + 1]> in <[$(x ()) + $(x ())]>
 ]>
 |}];;
 
-(* We associate that quotes are [once] iff they are syntactic values.
-   Here, we can exploit this mode-based reasoning concluding the quote is once iff [e] is. *)
+(* We associate that quotes are [once] if they are syntactic computations.
+   Here, the quote is a syntactic computation if [e] is a syntactic computation,
+   so if it is a syntactic computation then [e] is [once].  *)
 
 (* CR quoted-modes jbachurski: The result should be [many] --
    the quote is a syntactic value iff [e] is. *)

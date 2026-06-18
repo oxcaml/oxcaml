@@ -1288,8 +1288,7 @@ let mode_quoted : expected_mode = mode_default mode_in_quotes
     Note: we must have that [mode_quoted <= mode_splice] for soundness. *)
 and mode_splice : Value.l = Value.disallow_right mode_in_quotes
 
-(** Lower bound for the mode of a quoted expression that
-    might have side-effects. *)
+(** Lower bound for the mode of a quoted expression that is a computation. *)
 let mode_computation_quoted : Value.l =
   let open Mode_hint in
   { Value.Const.min with linearity = Once }
@@ -8681,6 +8680,15 @@ and type_expect_
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         raise (Typetexp.Error (loc, env,
                                Unsupported_extension Runtime_metaprogramming));
+      let expected_mode =
+        if not (maybe_computation exp) then
+          mode_morph
+            (fun mode ->
+              Value.imply_const_with Linearity Linearity.Const.Many mode)
+            expected_mode
+        else
+          expected_mode
+      in
       let expected_comonadic_mode = (as_single_mode expected_mode).comonadic in
       let new_env =
         env
