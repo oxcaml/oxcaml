@@ -42,7 +42,10 @@ module M :
    above legacy (global/many/uncontended).
    The other cases pass. *)
 
-(* Local spliced expression -- should error! *)
+(* CR quoted-modes jbachurski: Splicing a value should
+   bound the mode of the quote with the value's mode -- not via capture. *)
+
+(* Local spliced expression *)
 fun (x @ local) -> <[ $x ]>
 [%%expect{|
 - : 'a expr @ local -> 'a expr @ local once = <fun>
@@ -80,6 +83,9 @@ fun x -> <[ $x ]>
 - : 'a expr -> 'a expr @ once = <fun>
 |}];;
 
+(* CR quoted-modes jbachurski: The following examples will be allowed with
+   mode-indexed [expr]. *)
+
 (* Non-unique result of splicing *)
 fun x -> <[ M.free $x ]>
 [%%expect{|
@@ -100,6 +106,29 @@ Line 1, characters 19-21:
 Error: This value is "nonportable"
          because it is a quoted expression's result and thus always at the legacy modes.
        However, the highlighted expression is expected to be "portable".
+|}];;
+
+
+(** Quotes capture spliced values, not computations **)
+
+(* CR quoted-modes: Incomplete -- the quote should be [global] like [f]'s return,
+   and not [local] like [f]. *)
+let foo (f : (_ -> _ @ global) @ local) = <[ $(f 42) + 1 ]>
+[%%expect{|
+val foo : (int -> <[int]> expr) @ local -> <[int]> expr @ local once = <fun>
+|}];;
+
+(* CR quoted-modes: Unsound -- the quote should be [local] like [f]'s return. *)
+let foo (f : (_ -> _ @ local) @ global) = <[ $(f 42) + 1 ]>
+[%%expect{|
+val foo : (int -> <[int]> expr @ local) -> <[int]> expr @ once = <fun>
+|}];;
+
+(* CR quoted-modes: Unsound -- the quote should be [once] like [f]'s return.
+   This one is a bit more annoying since that's probably not what we want with [once]. *)
+let foo (f : (_ -> _ @ once) @ global) = <[ fun () -> $(f 42) + 1 ]>
+[%%expect{|
+val foo : (int -> <[int]> expr @ once) -> <[unit -> int]> expr = <fun>
 |}];;
 
 (** Quoting expressions with non-legacy results **)
@@ -193,18 +222,17 @@ Line 3, characters 7-8:
 (* Once in closure *)
 (* The quote <[x (); 2]> is once, as it references x @ once -- should error! *)
 <[let x @ once = fun () -> () in
-  $(let y = <[x (); 2]> in
-    <[$y + $y]>)]>
+  $(let y = <[fun () -> x (); 2]> in
+    <[$(y ()) + $(y ())]>)]>
 [%%expect{|
-Line 3, characters 12-13:
-3 |     <[$y + $y]>)]>
-                ^
-Error: This value is used here,
-       but it is defined as once and is also being used at:
-Line 3, characters 7-8:
-3 |     <[$y + $y]>)]>
-           ^
-
+Line 2, characters 24-25:
+2 |   $(let y = <[fun () -> x (); 2]> in
+                            ^
+Error: The value "x" is "once"
+       but is expected to be "many"
+         because it is used inside the function at line 2, characters 14-31
+         which is expected to be "many"
+         because it is a quoted expression's result and thus always at the legacy modes.
 |}];;
 
 (* Uncontended in closure *)
@@ -365,4 +393,28 @@ let x () = <[1 + 1]> in <[$(x ()) + $(x ())]>
 let x = <[1 + 1]> in let x, y = Quote.duplicate x in <[$x + $y]>
 [%%expect{|
 - : <[int]> expr = <[(1 + 1) + (1 + 1)]>
+|}];;
+
+(** [once] captures **)
+
+fun (e @ once) -> <[ $e ]>
+[%%expect{|
+- : 'a expr @ once -> 'a expr @ once = <fun>
+|}];;
+
+fun (e @ unique) -> <[ fun () -> $e ]>
+[%%expect{|
+- : 'a expr @ unique -> 'a expr @ once = <fun>
+|}];;
+
+fun (e @ once) -> <[ fun () -> $e ]>
+[%%expect{|
+Line 1, characters 32-33:
+1 | fun (e @ once) -> <[ fun () -> $e ]>
+                                    ^
+Error: The value "e" is "once"
+       but is expected to be "many"
+         because it is used inside the function at line 1, characters 21-33
+         which is expected to be "many"
+         because it is a quoted expression's result and thus always at the legacy modes.
 |}];;
