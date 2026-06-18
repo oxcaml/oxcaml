@@ -488,7 +488,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         in
         Translprim.transl_primitive_application
           loc p e.exp_env prim_type
-          ~poly_mode:pmode ~poly_sort:psort ~stack
+          ~poly_mode:pmode ~poly_sort:psort ~stack ~yielding
           path prim_exp args (List.map fst arg_exps) position
       in
       if extra_args = [] then lam
