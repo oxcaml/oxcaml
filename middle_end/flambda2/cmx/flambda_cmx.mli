@@ -30,10 +30,7 @@ val load_cmx_file_contents :
   Flambda2_types.Typing_env.Serializable.t option
 
 val load_symbol_approx :
-  loader ->
-  Symbol.t ->
-  machine_width:Target_system.Machine_width.t ->
-  Code_or_metadata.t Value_approximation.t
+  loader -> Symbol.t -> Code_or_metadata.t Value_approximation.t
 
 val prepare_cmx_file_contents :
   final_typing_env:Flambda2_types.Typing_env.t option ->

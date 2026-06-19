@@ -56,8 +56,8 @@ let load_cmx_file_contents loader comp_unit =
                  loader.imported_units;
           Some typing_env))
 
-let load_symbol_approx loader symbol ~machine_width :
-    Code_or_metadata.t Value_approximation.t =
+let load_symbol_approx loader symbol : Code_or_metadata.t Value_approximation.t
+    =
   let comp_unit = Symbol.compilation_unit symbol in
   match load_cmx_file_contents loader comp_unit with
   | None -> Unknown Flambda_kind.value
@@ -71,7 +71,6 @@ let load_symbol_approx loader symbol ~machine_width :
           code_id
     in
     T.Typing_env.Serializable.extract_symbol_approx typing_env symbol find_code
-      ~machine_width
 
 let all_predefined_exception_symbols () =
   let symbol_for_global id =

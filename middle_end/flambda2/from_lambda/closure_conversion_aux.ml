@@ -398,15 +398,13 @@ module Acc = struct
 
   let with_seen_a_function t seen_a_function = { t with seen_a_function }
 
-  let approximation_loader loader ~machine_width =
+  let approximation_loader loader =
     let externals = ref Symbol.Map.empty in
     fun symbol ->
       match Symbol.Map.find symbol !externals with
       | approx -> approx
       | exception Not_found ->
-        let approx =
-          Flambda_cmx.load_symbol_approx loader symbol ~machine_width
-        in
+        let approx = Flambda_cmx.load_symbol_approx loader symbol in
         (if Flambda_features.check_invariants ()
          then
            match approx with
@@ -465,7 +463,7 @@ module Acc = struct
       symbol_approximations = Symbol.Map.empty;
       approximation_for_external_symbol =
         (if Flambda_features.classic_mode ()
-         then approximation_loader cmx_loader ~machine_width
+         then approximation_loader cmx_loader
          else fun _symbol -> Value_approximation.Unknown Flambda_kind.value);
       code_in_reverse_order = [];
       code_map = Code_id.Map.empty;
