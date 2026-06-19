@@ -382,21 +382,17 @@ val multidomain : bool
 val tsan : bool
 (** Whether ThreadSanitizer instrumentation is enabled *)
 
-<<<<<<< OxCaml
+val shebangscripts : bool
+(** Whether the target supports shebang scripts
+
+    @since 5.5 *)
+
 val parameterised_modules : bool
 (** Whether parameterised modules are supported *)
 
 val syntax_quotations : bool
 (** Whether runtime quotations syntax is enabled. *)
 
-||||||| Upstream OCaml
-=======
-val shebangscripts : bool
-(** Whether the target supports shebang scripts
-
-    @since 5.5 *)
-
->>>>>>> ocaml/ocaml#14014
 (** Access to configuration values *)
 val print_config : out_channel -> unit
 
