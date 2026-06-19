@@ -1,4 +1,4 @@
 (env
  (_ (flags (:standard -no-principal -w -69-70))))
 
-(vendored_dirs gc-timings js_of_ocaml memtrace ocaml-jit owee)
+(vendored_dirs csexp gc-timings js_of_ocaml memtrace ocaml-jit owee yojson)
