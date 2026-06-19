@@ -71,16 +71,10 @@ Error: This value is "local" to the parent region
 [%%expect{|
 - : <[$('a) @ local -> unit]> expr = <[fun (x : _ @ local) -> ()]>
 |}];;
-(* however, the mode checks on the capture of [x] remain *)
+(* including the mode checks on the capture of [x] *)
 <[ fun (x @ local) -> $(M.of_global (<[ x ]> [@magic_staged_modes])) ]>
 [%%expect{|
-Line 1, characters 40-41:
-1 | <[ fun (x @ local) -> $(M.of_global (<[ x ]> [@magic_staged_modes])) ]>
-                                            ^
-Error: The value "x" is "local" to the parent region
-       but is expected to be "global"
-         because it is used inside the quoted expression at line 1, characters 36-67
-         which is expected to be "global".
+- : <[$('a) @ local -> unit]> expr = <[fun (x : _ @ local) -> ()]>
 |}];;
 
 (* The attribute is quoted appropriately *)

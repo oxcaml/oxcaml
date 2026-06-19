@@ -9639,12 +9639,10 @@ and type_expect_
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         Typetexp.Error.log_or_raise loc env
           (Unsupported_extension Runtime_metaprogramming);
-      let expected_comonadic_mode = (as_single_mode expected_mode).comonadic in
-      let new_env =
-        env
-        |> Env.enter_quote
-        |> Env.add_closure_lock (loc, Quote) expected_comonadic_mode
+      let check_modes =
+        not (Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes)
       in
+      let expected_comonadic_mode = (as_single_mode expected_mode).comonadic in
       let ty = newgenvar (Jkind.Builtin.any ~why:Inside_quote) in
       let expr_ty = Predef.type_expr (newgenty (Tquote ty)) in
       with_explanation (fun () ->
@@ -9654,11 +9652,17 @@ and type_expect_
          Otherwise, we are delaying checking modes until program generation
          (with magic_staged_modes), and we do not constrain the mode. *)
       let mode_quoted =
-        if Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes
-        then mode_default With_regionality.max
-        else mode_quoted
+        if check_modes
+        then mode_quoted
+        else mode_default With_regionality.max
       in
-      let arg = type_expect new_env mode_quoted exp (mk_expected ty) in
+      let quote_env = Env.enter_quote env in
+      let quote_env =
+        if check_modes
+        then Env.add_closure_lock (loc, Quote) expected_comonadic_mode quote_env
+        else quote_env
+      in
+      let arg = type_expect quote_env mode_quoted exp (mk_expected ty) in
       if maybe_computation arg then
         submode ~loc ~env ~reason:Other mode_computation_quoted expected_mode;
       re {
