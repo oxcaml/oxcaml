@@ -499,11 +499,11 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlData_decl__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlData_decl = global i64 4864, section ".data", align 8
-@camlData_decl = global { ptr, ptr, ptr, ptr } { ptr @camlData_decl__float4, ptr @camlData_decl__float327, ptr @camlData_decl__f_2, ptr @camlData_decl__g_3 }, section ".data", align 8
-@header.camlData_decl__g_3 = global i64 7159, section ".data", align 8
-@camlData_decl__g_3 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 144115188075855885, ptr @camlData_decl__g_HIDE_STAMP }, section ".data", align 8
-@header.camlData_decl__f_2 = global i64 4345, section ".data", align 8
-@camlData_decl__f_2 = global { ptr, i64 } { ptr @camlData_decl__f_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlData_decl = global { ptr, ptr, ptr, ptr } { ptr @camlData_decl__float4, ptr @camlData_decl__float327, ptr @camlData_decl__f_3, ptr @camlData_decl__g_2 }, section ".data", align 8
+@header.camlData_decl__g_2 = global i64 7159, section ".data", align 8
+@camlData_decl__g_2 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 144115188075855885, ptr @camlData_decl__g_HIDE_STAMP }, section ".data", align 8
+@header.camlData_decl__f_3 = global i64 4345, section ".data", align 8
+@camlData_decl__f_3 = global { ptr, i64 } { ptr @camlData_decl__f_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlData_decl__float4 = global i64 2045, section ".data", align 8
 @camlData_decl__float4 = global { double } { double 0x400921fb54442d18 }, section ".data", align 8
 @header.camlData_decl__float327 = global i64 3071, section ".data", align 8

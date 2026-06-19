@@ -1,28 +1,5 @@
 let $camlUnroll4__first_const = Block 0 () in
 (let code rec size(31)
-       even_1 (n : imm tagged)
-         my_closure _region _ghost_region my_depth
-         -> k1 * k2 =
-   let next_depth = rec_info (succ my_depth) in
-   let k = %project_value_slot.[even].[k] (my_closure) in
-   let odd = %project_function_slot.[even].[odd] (my_closure) in
-   (let prim = %phys_eq (n, 0) in
-    let eq = %tag_imm (prim) in
-    (let untagged = %untag_imm (eq) in
-     switch untagged
-       | 0 -> k5
-       | 1 -> k6)
-      where k6 =
-        cont k3
-      where k5 =
-        cont k4)
-     where k4 =
-       let int_sub = %int_barith.sub (n, 1) in
-       apply direct(odd_2)
-         odd ~ depth my_depth -> next_depth (int_sub) -> k1 * k2
-     where k3 =
-       apply inlined(hint) k (1) -> k1 * k2
- and code rec size(31)
        odd_2 (n : imm tagged)
          my_closure _region _ghost_region my_depth
          -> k1 * k2 =
@@ -45,14 +22,37 @@ let $camlUnroll4__first_const = Block 0 () in
          even ~ depth my_depth -> next_depth (int_sub) -> k1 * k2
      where k3 =
        apply inlined(hint) k (0) -> k1 * k2
+ and code rec size(31)
+       even_1 (n : imm tagged)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2 =
+   let next_depth = rec_info (succ my_depth) in
+   let k = %project_value_slot.[even].[k] (my_closure) in
+   let odd = %project_function_slot.[even].[odd] (my_closure) in
+   (let prim = %phys_eq (n, 0) in
+    let eq = %tag_imm (prim) in
+    (let untagged = %untag_imm (eq) in
+     switch untagged
+       | 0 -> k5
+       | 1 -> k6)
+      where k6 =
+        cont k3
+      where k5 =
+        cont k4)
+     where k4 =
+       let int_sub = %int_barith.sub (n, 1) in
+       apply direct(odd_2)
+         odd ~ depth my_depth -> next_depth (int_sub) -> k1 * k2
+     where k3 =
+       apply inlined(hint) k (1) -> k1 * k2
  in
  let code inline(always) size(93)
        parity_is_0 (p : imm tagged, n : imm tagged, k : val)
          my_closure _region _ghost_region my_depth
          -> k1 * k2 =
    let next_depth = rec_info (succ my_depth) in
-   let even = closure even_1 @even
-   and odd = closure odd_2 @odd
+   let odd = closure odd_2 @odd
+   and even = closure even_1 @even
    with { k = k }
    in
    (let untagged = %untag_imm (p) in
