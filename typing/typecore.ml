@@ -2855,13 +2855,24 @@ let representation_for_tuple_constructor env constr ty_args ~loc ~types
       | None -> Misc.fatal_error "representable constructor missing a sort"
       end
   | None ->
-      begin match
-        Misc.Stdlib.List.mapi_result
-          (fun _ (ty, loc) ->
-             type_jkind_and_sort env ty ~why ~fixed:false
-             |> Result.map_error
-                  (fun err -> Unrepresentable_arg (loc, ty, err)))
-          types
+      (* Determining the sort of a constructor argument can expand GADT
+         equations (e.g. when the argument's type is a locally abstract type
+         [msg] with an equation [msg = a] in scope). Expansion bumps the
+         [scope] of the expanded type, marking it as tied to the local
+         equation. That is the right behaviour during unification, but here it
+         is a spurious side effect of what is morally a read-only query: it
+         would make an otherwise-sound constructor result type escape its
+         branch. We therefore save the argument types' scopes and restore them
+         once the sorts have been computed. *)
+      let saved_scopes = List.map (fun (ty, _) -> ty, get_scope ty) types in
+      let result : _ Result.t =
+        match
+          Misc.Stdlib.List.mapi_result
+            (fun _ (ty, loc) ->
+               type_jkind_and_sort env ty ~why ~fixed:false
+               |> Result.map_error
+                    (fun err -> Unrepresentable_arg (loc, ty, err)))
+            types
         with
         | Ok jkinds_and_sorts ->
             let jkinds, sorts = List.split jkinds_and_sorts in
@@ -2881,7 +2892,14 @@ let representation_for_tuple_constructor env constr ty_args ~loc ~types
                   "Unrepresentable_argument_field with Cstr_tuple"
             end
         | Error err -> Error err
-      end
+      in
+      (* Undo any [scope] bumps that expanding GADT equations performed on the
+         argument types while we computed their sorts (see comment above). *)
+      List.iter
+        (fun (ty, scope) ->
+           if get_scope ty > scope then set_scope ty scope)
+        saved_scopes;
+      result
 
 (* Typing of patterns *)
 
