@@ -208,7 +208,7 @@ let eval (expr : 'a expr) =
         -> 'b eval
      }] *)
   let lambda =
-    let { Slambda.slv_comptime = _; slv_runtime = raw_lambda } =
+    let _static_data, raw_lambda =
       Slambda.eval ~cu_static_data:Compilenv.get_static_data Fun.id
         tlambda_program.code
     in

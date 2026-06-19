@@ -230,9 +230,11 @@ let get_static_data comp_unit =
       "Compilenv.get_static_data: requested data of the current unit (%a)"
       CU.print comp_unit
   else begin
-    match get_unit comp_unit with
-    | Some ui -> ui.ui_static_data
-    | None -> Slambdaeval.Or_missing.Missing
+    Option.map
+      (fun ui ->
+        Slambdaeval.CU_data.read
+          ui.ui_static_data ~sections:ui.ui_file_sections)
+      (get_unit comp_unit)
   end
 
 let which_cmx_file comp_unit =
@@ -330,6 +332,11 @@ let write_unit_info info filename =
 let build_unit_info ~main_module_block_format ~arg_descr ~static_data =
   let quoted_intfs = Env.quoted_intfs () in
   let quoted_intfs_and_deps = Env.loaded_transitive_dependencies quoted_intfs in
+  let static_data =
+    Slambdaeval.CU_data.write
+      ~sections:current_unit.uib_file_sections
+      static_data
+  in
   (* We could have [set_main_module_block_format] and [set_arg_descr] instead
      of passing these in as arguments but, unlike most of the state that this
      module keeps track of, they're not values that get accumulated over time,

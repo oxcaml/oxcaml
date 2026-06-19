@@ -49,8 +49,8 @@ let tlambda_to_jsir i tlambda ~as_arg_for =
          |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
          |> Slambda.eval ~cu_static_data:Compilenv.get_static_data
               (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
-         |> fun { Slambda.slv_comptime; slv_runtime } ->
-         slv_runtime
+         |> fun (static_data, lambda) ->
+         lambda
          |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
          |> Simplif.simplify_lambda ~restrict_to_upstream_dwarf:true
               ~gdwarf_may_alter_codegen:false
@@ -79,7 +79,7 @@ let tlambda_to_jsir i tlambda ~as_arg_for =
                     (fun _ _ -> "")
                     jsir.program)
          in
-         (jsir, program.main_module_block_format, arg_descr, slv_comptime))
+         (jsir, program.main_module_block_format, arg_descr, static_data))
 
 let emit_jsir i
     ({ program; imported_compilation_units } :

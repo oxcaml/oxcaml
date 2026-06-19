@@ -133,7 +133,21 @@ and print_value_or_missing ppf = function
 
 let print = print_value_or_missing
 
-type ctx = { cu_static_data : Compilation_unit.t -> value Or_missing.t }
+module CU_data = struct
+  type t = value Or_missing.t
+
+  type raw = File_sections.Idx.t
+
+  let read raw ~sections = Obj.obj (File_sections.get sections raw)
+
+  let write t ~sections = File_sections.Builder.add sections (Obj.repr t)
+
+  let package ts = Or_missing.Present (SLVrecord ts)
+
+  let print = print
+end
+
+type ctx = { cu_static_data : Compilation_unit.t -> CU_data.t option }
 
 let errf fmt = Misc.fatal_errorf ("slambda eval: " ^^ fmt)
 
@@ -188,7 +202,9 @@ let rec eval_slam ctx env slam : value Or_missing.t =
     let slv_runtime = eval_lam ctx env sval_runtime in
     Present (SLVhalves { slv_comptime; slv_runtime })
   | SLlayout layout -> Present (SLVlayout layout)
-  | SLglobal cu -> ctx.cu_static_data cu
+  | SLglobal cu ->
+    begin match ctx.cu_static_data cu with Some v -> v | None -> Missing
+    end
   | SLvar id -> eval_var env id
   | SLlet { slet_name; slet_value; slet_body } ->
     let value = eval_slam ctx env slet_value in
@@ -626,9 +642,9 @@ let do_eval ctx slam =
 
 let eval ~cu_static_data slam =
   Profile.record_call "static_eval" (fun () ->
-      let halves = do_eval { cu_static_data } slam in
-      (try assert_no_splices halves.slv_runtime
+      let { slv_comptime; slv_runtime } = do_eval { cu_static_data } slam in
+      (try assert_no_splices slv_runtime
        with Found_a_splice ->
          Misc.fatal_error
            "Encountered a splice in the program after slambda eval");
-      halves)
+      slv_comptime, slv_runtime)

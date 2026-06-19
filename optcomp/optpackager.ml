@@ -183,11 +183,12 @@ end) : S = struct
         members []
     in
     let static_data =
-      Slambdaeval.Or_missing.Present
-        (Slambdaeval.SLVrecord
-           (Misc.Stdlib.Array.of_list_map
-              (fun info -> info.ui_static_data)
-              units))
+      Slambdaeval.CU_data.package
+        (Misc.Stdlib.Array.of_list_map
+           (fun info ->
+             Slambdaeval.CU_data.read ~sections:info.ui_file_sections
+               info.ui_static_data)
+           units)
     in
     let ui =
       (* [arg_descr] is None because we don't allow packs to be arguments. *)
@@ -244,7 +245,7 @@ end) : S = struct
         ui_zero_alloc_info;
         ui_external_symbols =
           union (List.map (fun info -> info.ui_external_symbols) units);
-        ui_static_data = Slambdaeval.Or_missing.Missing;
+        ui_static_data = ui.ui_static_data;
         ui_file_sections = File_sections.Builder.build file_sections
       }
     in

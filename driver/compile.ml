@@ -55,10 +55,10 @@ let tlambda_to_bytecode i tlambda ~as_arg_for =
               Misc.fatal_errorf
                 "Cross-module static evaluation not implemented in bytecode")
             (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
-       |> fun { Slambda.slv_comptime = _; slv_runtime } ->
+       |> fun (_static_data, lambda) ->
           (* CR layout poly: Drop the comptime part until top-level modules can
              be static. *)
-          slv_runtime
+          lambda
        |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
           (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
        |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
