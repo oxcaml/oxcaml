@@ -29,7 +29,7 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 open! Int_replace_polymorphic_compare
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 let is_nontail_call : Cfg.terminator -> bool =
  fun term_desc ->

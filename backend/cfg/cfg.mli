@@ -31,8 +31,7 @@ include module type of struct
   include Cfg_intf.S
 end
 
-type basic_instruction_list =
-  basic instruction Oxcaml_utils.Doubly_linked_list.t
+type basic_instruction_list = basic instruction Doubly_linked_list.t
 
 type basic_block =
   { mutable start : Label.t;

@@ -329,7 +329,7 @@ let fold_right t ~f ~init =
 let fold_right_range ~right_incl ~left_excl ~f ~init =
   match right_incl with
   | None -> init
-  | Some { node = start; t } ->
+  | Some { node = start; t = _ } ->
     let rec aux f curr ~stop acc =
       if curr == stop
       then acc

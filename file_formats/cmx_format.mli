@@ -81,7 +81,7 @@ type unit_infos =
                                   (* Compile-time (comptime) value of the unit's
                                      main module block, as produced by
                                      [Slambda.eval]. *)
-    ui_file_sections: Oxcaml_utils.File_sections.t;
+    ui_file_sections: File_sections.t;
   }
 
 type unit_infos_raw =

@@ -2,7 +2,7 @@
 
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 open! Regalloc_utils
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 let live_before : type a.
     a Cfg.instruction -> Cfg_with_infos.liveness -> Reg.Set.t =

@@ -22,7 +22,7 @@ open! Int_replace_polymorphic_compare
 
 [@@@ocaml.warning "+a-4-9-40-41-42"]
 
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module Or_never_returns = Select_utils.Or_never_returns
 module SU = Select_utils
 module V = Backend_var

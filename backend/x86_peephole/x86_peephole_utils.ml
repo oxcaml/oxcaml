@@ -2,7 +2,7 @@
 
 open! Int_replace_polymorphic_compare
 open X86_ast
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 open X86_ast_utils
 
 type rule_result =

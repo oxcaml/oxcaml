@@ -6,7 +6,7 @@ open! Int_replace_polymorphic_compare
    use vector operations if possible *)
 (* CR gyorsh: how does the info from [reg_map] flow between blocks? *)
 
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 module State : sig
   type t

@@ -33,7 +33,7 @@ val current_zero_alloc_info : unit -> Zero_alloc_info.t
 val current_generic_fns : unit -> generic_fns
         (* Return the generic functions for the unit being compiled. *)
 
-val current_sections : unit -> Oxcaml_utils.File_sections.Builder.t
+val current_sections : unit -> File_sections.Builder.t
         (* Return the file sections builder for the unit being compiled. *)
 
 val get_global_export_info : Compilation_unit.t

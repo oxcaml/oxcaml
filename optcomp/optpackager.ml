@@ -195,13 +195,12 @@ end) : S = struct
         ~static_data
     in
     let file_sections =
-      Oxcaml_utils.File_sections.Builder.of_file_sections ui.ui_file_sections
+      File_sections.Builder.of_file_sections ui.ui_file_sections
     in
     let section_id_mapping =
       List.map
         (fun info ->
-          Oxcaml_utils.File_sections.Builder.add_all file_sections
-            info.ui_file_sections)
+          File_sections.Builder.add_all file_sections info.ui_file_sections)
         units
     in
     let ui_export_info =
@@ -246,8 +245,7 @@ end) : S = struct
         ui_external_symbols =
           union (List.map (fun info -> info.ui_external_symbols) units);
         ui_static_data = Slambdaeval.Or_missing.Missing;
-        ui_file_sections =
-          Oxcaml_utils.File_sections.Builder.build file_sections
+        ui_file_sections = File_sections.Builder.build file_sections
       }
     in
     Compilenv.write_unit_info pkg_infos cmxfile
