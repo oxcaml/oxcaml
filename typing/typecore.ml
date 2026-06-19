@@ -8690,11 +8690,6 @@ and type_expect_
           expected_mode
       in
       let expected_comonadic_mode = (as_single_mode expected_mode).comonadic in
-      let new_env =
-        env
-        |> Env.enter_quotation
-        |> Env.add_closure_lock (loc, Quote) expected_comonadic_mode
-      in
       let ty = newgenvar (Jkind.Builtin.any ~why:Inside_quote) in
       let expr_ty = Predef.type_code (newgenty (Tquote ty)) in
       with_explanation (fun () ->
@@ -8708,7 +8703,14 @@ and type_expect_
         then mode_default Value.max
         else mode_quoted
       in
-      let arg = type_expect new_env mode_quoted exp (mk_expected ty) in
+      let quote_env = Env.enter_quotation env in
+      let quote_env = begin
+          if Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes
+          then quote_env
+          else Env.add_closure_lock (loc, Quote) expected_comonadic_mode quote_env
+        end
+      in
+      let arg = type_expect quote_env mode_quoted exp (mk_expected ty) in
       if maybe_computation exp then
         submode ~loc ~env ~reason:Other mode_computation_quoted expected_mode;
       re {
