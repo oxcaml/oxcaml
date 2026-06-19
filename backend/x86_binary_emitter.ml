@@ -1639,7 +1639,7 @@ let assemble_line b loc ins =
     | Directive (D.Reloc _)
     | Directive (D.Sleb128 _)
     | Directive (D.Uleb128 _) ->
-      let dll = Oxcaml_utils.Doubly_linked_list.make_single ins in
+      let dll = Doubly_linked_list.make_single ins in
       X86_gas.generate_asm Out_channel.stderr dll;
       Misc.fatal_errorf "x86_binary_emitter: unsupported instruction"
   with e ->
@@ -1662,8 +1662,7 @@ let rec assemble_section arch section =
       "\nContext is: x86 binary emission of section %s:\n%!"
       (Section_name.to_string section.sec_name);
     let dll =
-      Oxcaml_utils.Doubly_linked_list.of_list
-        (Array.to_list section.sec_instrs)
+      Doubly_linked_list.of_list (Array.to_list section.sec_instrs)
     in
     X86_gas.generate_asm Out_channel.stderr dll;
     Printexc.raise_with_backtrace Misc.Fatal_error bt

@@ -1,7 +1,7 @@
 [@@@ocaml.warning "+a-29-40-41-42"]
 
 open X86_ast
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 (** Statistics for peephole optimizations *)
 type peephole_stats
