@@ -151,7 +151,11 @@ module Typing_env : sig
     val merge : t -> t -> t
 
     val extract_symbol_approx :
-      t -> Symbol.t -> (Code_id.t -> 'code) -> 'code Value_approximation.t
+      t ->
+      Symbol.t ->
+      (Code_id.t -> 'code) ->
+      machine_width:Target_system.Machine_width.t ->
+      'code Value_approximation.t
   end
 
   val print : Format.formatter -> t -> unit

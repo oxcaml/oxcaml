@@ -1101,7 +1101,11 @@ module Serializable : sig
   val merge : t -> t -> t
 
   val extract_symbol_approx :
-    t -> Symbol.t -> (Code_id.t -> 'code) -> 'code Value_approximation.t
+    t ->
+    Symbol.t ->
+    (Code_id.t -> 'code) ->
+    machine_width:Target_system.Machine_width.t ->
+    'code Value_approximation.t
 end = struct
   type t = serializable
 
@@ -1216,7 +1220,7 @@ end = struct
     in
     { defined_symbols_without_equations; code_age_relation; just_after_level }
 
-  let extract_symbol_approx env symbol find_code =
+  let extract_symbol_approx env symbol find_code ~machine_width =
     let rec type_to_approx (ty : Type_grammar.t) : _ Value_approximation.t =
       let module VA = Value_approximation in
       match ty with
@@ -1305,6 +1309,20 @@ end = struct
                 Block_approximation
                   (tag, shape, Array.of_list fields, alloc_mode)
               | Some (_, Float_record, _, _, _) -> value_unknown
+            else if TG.Row_like_for_blocks.is_bottom blocks
+            then (
+              match TG.must_be_singleton imms ~machine_width with
+              | None -> value_unknown
+              | Some const ->
+                let const_kind = Reg_width_const.kind const in
+                if not (K.equal const_kind K.value)
+                then
+                  Misc.fatal_errorf
+                    "Kind of constant %a arising from type %a is %a but \
+                     expected Value (for a tagged immediate), env:@ %a"
+                    Reg_width_const.print const TG.print ty K.print const_kind
+                    print env;
+                VA.Value_const const)
             else value_unknown))
       | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
       | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
