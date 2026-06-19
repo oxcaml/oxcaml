@@ -117,7 +117,8 @@ let no_stack_checks = "@enable_stack_checks@" <> "yes"
 let multidomain = "@enable_multidomain@" = "yes"
 
 let tsan = @tsan@
-<<<<<<< OxCaml
+
+let shebangscripts = @shebangscripts@
 
 let has_popcnt = "@has_popcnt@" = "yes"
 
@@ -153,8 +154,3 @@ let objcopy = {@QS@|@objcopy@|@QS@}
 let oxcaml_dwarf = "@enable_oxcaml_dwarf@" = "yes"
 
 let default_keyword_edition = @default_keyword_edition@
-||||||| Upstream OCaml
-=======
-
-let shebangscripts = @shebangscripts@
->>>>>>> ocaml/ocaml#14014

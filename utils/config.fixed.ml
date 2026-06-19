@@ -89,14 +89,10 @@ let target = host
 let systhread_supported = false
 let flexdll_dirs = []
 let ar_supports_response_files = true
-<<<<<<< OxCaml
+let shebangscripts = false
 
 let runtime5 = true
 let no_stack_checks = false
 (* This setting is only for bootstrap, does not affect dune-built compilers: *)
 let naked_pointers = false
 let parameterised_modules = true
-||||||| Upstream OCaml
-=======
-let shebangscripts = false
->>>>>>> ocaml/ocaml#14014

@@ -334,7 +334,8 @@ module Stdlib : sig
     val print : Format.formatter -> t -> unit
 
     val for_all : (char -> bool) -> t -> bool
-<<<<<<< OxCaml
+
+    val to_utf_8_seq : t -> Uchar.t Seq.t
 
     val begins_with : ?from:int -> string -> prefix:string -> bool
 
@@ -359,11 +360,6 @@ module Stdlib : sig
 
     val min : t -> t -> t
     val max : t -> t -> t
-||||||| Upstream OCaml
-=======
-
-    val to_utf_8_seq : t -> Uchar.t Seq.t
->>>>>>> ocaml/ocaml#14014
   end
 
   external compare : 'a -> 'a -> int = "%compare"
