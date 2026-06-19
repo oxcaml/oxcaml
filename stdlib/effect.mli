@@ -50,8 +50,8 @@ external perform : 'a t -> 'a = "%perform"
     @raise Unhandled if there is no handler for [e]. *)
 
 module Handler : sig
-  (** A value of type [Effect.Handler.t] at modes [local yielding] is proof that
-      the current function is running within an effect handler, and hence may
+  (** A value of type [Effect.Handler.t] at mode [local] is proof that the
+      current function is running within an effect handler, and hence may
       perform effects.
 
       It is also necessary to ensure that effect handlers are compiled correctly
@@ -60,10 +60,9 @@ module Handler : sig
 end
 
 module Safe : sig
-  (** OxCaml-compatible version of [perform]. Takes a [Handler.t @ local
-      unyielding] to prove that the current function is running in an effect
-      handler. *)
-  val perform : Handler.t @ local yielding -> 'a t -> 'a
+  (** OxCaml-compatible version of [perform]. Takes a [Handler.t @ local] to
+      prove that the current function is running in an effect handler. *)
+  val perform : Handler.t @ local -> 'a t -> 'a
 end
 
 type tick_outcome =

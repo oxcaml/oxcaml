@@ -18,11 +18,11 @@ external perform : 'a t -> 'a = "%perform"
 
 module Handler = struct
   type t : void mod external_ many stateless immutable
-  external unsafe_make : unit -> t @ local yielding = "%unbox_unit"
+  external unsafe_make : unit -> t @ local = "%unbox_unit"
 end
 
 module Safe = struct
-  let[@inline never] perform (_ : Handler.t @ local yielding) eff = perform eff
+  let[@inline never] perform (_ : Handler.t @ local) eff = perform eff
 end
 
 exception Out_of_fibers = Out_of_fibers
