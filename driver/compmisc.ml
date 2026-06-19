@@ -50,46 +50,25 @@ let init_path ?(standard_library=Config.standard_library)
        !Compenv.first_include_dirs]
   in
   let visible =
-<<<<<<< OxCaml
     List.map (fun (e : Clflags.include_dir) : Clflags.include_dir ->
-      { path = Misc.expand_directory Config.standard_library e.path;
+      { path = Misc.expand_directory standard_library e.path;
         cmx_guaranteed = e.cmx_guaranteed })
       visible
-||||||| Upstream OCaml
-    List.map (Misc.expand_directory Config.standard_library) visible
-=======
-    List.map (Misc.expand_directory standard_library) visible
->>>>>>> ocaml/ocaml#14014
   in
   let visible =
-<<<<<<< OxCaml
+    let std_include =
+      if !Clflags.no_std_include then [] else [standard_library]
+    in
     (if !Clflags.no_cwd then []
      else [{ Clflags.path = dir; cmx_guaranteed = false }])
     @ List.rev_append visible
         (List.map
-           (fun path -> { Clflags.path; cmx_guaranteed = true })
-           (Clflags.std_include_dir ()))
-||||||| Upstream OCaml
-    (if !Clflags.no_cwd then [] else [dir])
-    @ List.rev_append visible (Clflags.std_include_dir ())
-=======
-    let std_include =
-      if !Clflags.no_std_include then [] else [standard_library]
-    in
-    (if !Clflags.no_cwd then [] else [dir])
-    @ List.rev_append visible std_include
->>>>>>> ocaml/ocaml#14014
+           (fun path -> { Clflags.path; cmx_guaranteed = true }) std_include)
   in
   let hidden =
-<<<<<<< OxCaml
     List.rev_map (fun (e : Clflags.include_dir) : Clflags.include_dir ->
-      { path = Misc.expand_directory Config.standard_library e.path;
+      { path = Misc.expand_directory standard_library e.path;
         cmx_guaranteed = e.cmx_guaranteed })
-||||||| Upstream OCaml
-    List.rev_map (Misc.expand_directory Config.standard_library)
-=======
-    List.rev_map (Misc.expand_directory standard_library)
->>>>>>> ocaml/ocaml#14014
       !Clflags.hidden_include_dirs
   in
   Load_path.init ~auto_include ~visible ~hidden;
