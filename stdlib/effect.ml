@@ -18,11 +18,11 @@ external perform : 'a t -> 'a = "%perform"
 
 module Handler = struct
   type t : void mod external_ many stateless immutable
-  external unsafe_make : unit -> t @ local = "%unbox_unit"
+  external unsafe_make : unit -> t @ yielding = "%unbox_unit"
 end
 
 module Safe = struct
-  let[@inline never] perform (_ : Handler.t @ local) eff = perform eff
+  let[@inline never] perform (_ : Handler.t @ yielding) eff = perform eff
 end
 
 exception Out_of_fibers = Out_of_fibers
@@ -168,7 +168,7 @@ module Deep = struct
   let match_with comp arg handler =
     let effc eff k last_fiber =
       match handler.effc eff with
-      | Some f -> to_continuation f (Cont k)
+      | Some f -> to_continuation f (Cont k) [@nontail]
       | None -> Prim.reperform eff k last_fiber
     in
     Prim.with_stack handler.retc handler.exnc effc comp arg
@@ -179,7 +179,7 @@ module Deep = struct
   let try_with comp arg handler =
     let effc' eff k last_fiber =
       match handler.effc eff with
-      | Some f -> to_continuation f (Cont k)
+      | Some f -> to_continuation f (Cont k) [@nontail]
       | None -> Prim.reperform eff k last_fiber
     in
     Prim.with_stack (fun x -> x) (fun e -> raise e) effc' comp arg
@@ -191,11 +191,11 @@ module Deep = struct
 
   module Safe = struct
     let match_with comp arg handler =
-      match_with (fun arg -> comp (Handler.unsafe_make ()) arg [@nontail]) arg
+      match_with (fun arg -> comp (Handler.unsafe_make ()) arg) arg
         handler
 
     let try_with comp arg handler =
-      try_with (fun arg -> comp (Handler.unsafe_make ()) arg [@nontail]) arg
+      try_with (fun arg -> comp (Handler.unsafe_make ()) arg) arg
         handler
 
     module With_handler = struct
@@ -209,7 +209,7 @@ module Deep = struct
         { effc: 'b. Handler.t @ local -> 'b t
                 -> (('b,'a) continuation -> 'a) option @ local }
 
-      let match_with (_h : Handler.t @ local) comp arg
+      let match_with (_h : Handler.t @ yielding) comp arg
             (handler : (_, _) handler) =
         let effc eff k last_fiber =
           match handler.effc (Handler.unsafe_make ()) eff with
@@ -217,10 +217,10 @@ module Deep = struct
           | None -> Prim.reperform eff k last_fiber
         in
         Prim.with_stack
-          (fun x -> handler.retc (Handler.unsafe_make ()) x [@nontail])
-          (fun e -> handler.exnc (Handler.unsafe_make ()) e [@nontail])
+          (fun x -> handler.retc (Handler.unsafe_make ()) x)
+          (fun e -> handler.exnc (Handler.unsafe_make ()) e)
           effc
-          (fun arg -> comp (Handler.unsafe_make ()) arg [@nontail])
+          (fun arg -> comp (Handler.unsafe_make ()) arg)
           arg
 
       let try_with (_h : Handler.t @ local) comp arg
@@ -231,7 +231,7 @@ module Deep = struct
           | None -> Prim.reperform eff k last_fiber
         in
         Prim.with_stack (fun x -> x) (fun e -> raise e) effc'
-          (fun arg -> comp (Handler.unsafe_make ()) arg [@nontail])
+          (fun arg -> comp (Handler.unsafe_make ()) arg)
           arg
     end
   end
@@ -248,7 +248,7 @@ module Deep = struct
         match handler.effc eff with
         | Some f ->
           Prim.cont_set_last_fiber k last_fiber;
-          to_continuation f (Cont k)
+          to_continuation f (Cont k) [@nontail]
         | None -> Prim.reperform eff k last_fiber
       in
       Prim.with_stack_preemptible
@@ -266,12 +266,12 @@ module Deep = struct
 
     module Safe = struct
       let match_with comp arg handler =
-        match_with (fun arg -> comp (Handler.unsafe_make ()) arg [@nontail])
+        match_with (fun arg -> comp (Handler.unsafe_make ()) arg)
           arg handler
 
       let try_with ~on_tick comp arg handler =
         try_with ~on_tick
-          (fun arg -> comp (Handler.unsafe_make ()) arg [@nontail])
+          (fun arg -> comp (Handler.unsafe_make ()) arg)
           arg handler
 
       module With_handler = struct
@@ -292,10 +292,10 @@ module Deep = struct
             | None -> Prim.reperform eff k last_fiber
           in
           Prim.with_stack_preemptible
-            (fun x -> handler.retc (Handler.unsafe_make ()) x [@nontail])
-            (fun e -> handler.exnc (Handler.unsafe_make ()) e [@nontail])
+            (fun x -> handler.retc (Handler.unsafe_make ()) x)
+            (fun e -> handler.exnc (Handler.unsafe_make ()) e)
             effc handler.tickc
-            (fun arg -> comp (Handler.unsafe_make ()) arg [@nontail])
+            (fun arg -> comp (Handler.unsafe_make ()) arg)
             arg
 
         let try_with (h @ local) ~on_tick comp arg
@@ -370,7 +370,7 @@ module Shallow = struct
 
   module Safe = struct
     let fiber f =
-      fiber (fun arg -> f (Handler.unsafe_make ()) arg [@nontail])
+      fiber (fun arg -> f (Handler.unsafe_make ()) arg)
 
     module With_handler = struct
       type ('a,'b) handler =
@@ -387,8 +387,8 @@ module Shallow = struct
           | None -> Prim.reperform eff k last_fiber
         in
         continue_with_handler k
-          (fun x -> handler.retc (Handler.unsafe_make ()) x [@nontail])
-          (fun e -> handler.exnc (Handler.unsafe_make ()) e [@nontail])
+          (fun x -> handler.retc (Handler.unsafe_make ()) x)
+          (fun e -> handler.exnc (Handler.unsafe_make ()) e)
           effc Null v
 
       let discontinue_with (_h : Handler.t @ local) (Cont k) e
@@ -399,8 +399,8 @@ module Shallow = struct
           | None -> Prim.reperform eff k last_fiber
         in
         discontinue_with_handler k
-          (fun x -> handler.retc (Handler.unsafe_make ()) x [@nontail])
-          (fun e -> handler.exnc (Handler.unsafe_make ()) e [@nontail])
+          (fun x -> handler.retc (Handler.unsafe_make ()) x)
+          (fun e -> handler.exnc (Handler.unsafe_make ()) e)
           effc Null e
 
       let discontinue_with_backtrace (_h : Handler.t @ local) (Cont k) e bt
@@ -411,8 +411,8 @@ module Shallow = struct
           | None -> Prim.reperform eff k last_fiber
         in
         discontinue_with_handler_with_backtrace k
-          (fun x -> handler.retc (Handler.unsafe_make ()) x [@nontail])
-          (fun e -> handler.exnc (Handler.unsafe_make ()) e [@nontail])
+          (fun x -> handler.retc (Handler.unsafe_make ()) x)
+          (fun e -> handler.exnc (Handler.unsafe_make ()) e)
           effc Null e bt
     end
   end
@@ -476,8 +476,8 @@ module Shallow = struct
             | None -> Prim.reperform eff k last_fiber
           in
           continue_with_handler k
-            (fun x -> handler.retc (Handler.unsafe_make ()) x [@nontail])
-            (fun e -> handler.exnc (Handler.unsafe_make ()) e [@nontail])
+            (fun x -> handler.retc (Handler.unsafe_make ()) x)
+            (fun e -> handler.exnc (Handler.unsafe_make ()) e)
             effc (This handler.tickc) v
 
         let discontinue_with (_h : Handler.t @ local) (Cont k) e
@@ -490,8 +490,8 @@ module Shallow = struct
             | None -> Prim.reperform eff k last_fiber
           in
           discontinue_with_handler k
-            (fun x -> handler.retc (Handler.unsafe_make ()) x [@nontail])
-            (fun e -> handler.exnc (Handler.unsafe_make ()) e [@nontail])
+            (fun x -> handler.retc (Handler.unsafe_make ()) x)
+            (fun e -> handler.exnc (Handler.unsafe_make ()) e)
             effc (This handler.tickc) e
 
         let discontinue_with_backtrace (_h : Handler.t @ local) (Cont k) e bt
@@ -504,8 +504,8 @@ module Shallow = struct
             | None -> Prim.reperform eff k last_fiber
           in
           discontinue_with_handler_with_backtrace k
-            (fun x -> handler.retc (Handler.unsafe_make ()) x [@nontail])
-            (fun e -> handler.exnc (Handler.unsafe_make ()) e [@nontail])
+            (fun x -> handler.retc (Handler.unsafe_make ()) x)
+            (fun e -> handler.exnc (Handler.unsafe_make ()) e)
             effc (This handler.tickc) e bt
       end
     end
