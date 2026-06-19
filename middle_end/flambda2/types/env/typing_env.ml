@@ -1305,6 +1305,20 @@ end = struct
                 Block_approximation
                   (tag, shape, Array.of_list fields, alloc_mode)
               | Some (_, Float_record, _, _, _) -> value_unknown
+            else if TG.Row_like_for_blocks.is_bottom blocks
+            then (
+              match TG.must_be_singleton imms with
+              | None -> value_unknown
+              | Some const ->
+                let const_kind = Reg_width_const.kind const in
+                if not (K.equal const_kind K.value)
+                then
+                  Misc.fatal_errorf
+                    "Kind of constant %a arising from type %a is %a but \
+                     expected Value (for a tagged immediate), env:@ %a"
+                    Reg_width_const.print const TG.print ty K.print const_kind
+                    print env;
+                VA.Value_const const)
             else value_unknown))
       | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
       | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
