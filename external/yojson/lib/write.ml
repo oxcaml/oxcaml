@@ -188,9 +188,9 @@ let write_float_prec significant_figures ob x =
 
 let write_std_float_prec = write_float_prec
 
-let write_intlit = Buffer.add_string
-let write_floatlit = Buffer.add_string
-let write_stringlit = Buffer.add_string
+let write_intlit b s = Buffer.add_string b s
+let write_floatlit b s = Buffer.add_string b s
+let write_stringlit b s = Buffer.add_string b s
 
 let rec iter2_aux f_elt f_sep x = function
     [] -> ()
