@@ -493,7 +493,7 @@ let compile_test usr_bin_sh config env test test_program description =
             ["-output-obj"]
       | Output_obj(C_ocamlopt, Static) ->
           f ~mode:Native
-            ~clibs:[(*"-lcomprmarsh";*) "-L"; unix_dir; "-lunix_stubs";
+            ~clibs:["-lcomprmarsh"; "-L"; unix_dir; "-lunix_stubs";
                     Config.compression_c_libraries]
             ["-output-obj"]
       | Output_obj(C_ocamlopt, Shared) ->
@@ -504,7 +504,7 @@ let compile_test usr_bin_sh config env test test_program description =
              Cygwin *)
           let linker_exit_code = fails_if (Sys.win32 || Sys.cygwin) in
           f ~mode:Native ~use_shared_runtime:true ~may_segfault
-            ~clibs:[(*"-lcomprmarsh";*) "-L"; unix_dir; "-lunix_stubs";
+            ~clibs:["-lcomprmarsh"; "-L"; unix_dir; "-lunix_stubs";
                     Config.compression_c_libraries]
             ~linker_exit_code ["-output-obj"]
       | Output_complete_obj(C_ocamlc, Static) ->
@@ -537,15 +537,15 @@ let compile_test usr_bin_sh config env test test_program description =
              manually, using -noautolink. *)
           f ~mode:Native ~clibs:[Config.compression_c_libraries]
             ~linker_exit_code
-            ["-output-complete-obj"; "-noautolink"; "-cclib"; "-lunix_stubs";(*
-                                                    "-cclib"; "-lcomprmarsh"*)]
+            ["-output-complete-obj"; "-noautolink"; "-cclib"; "-lunix_stubs";
+                                                    "-cclib"; "-lcomprmarsh"]
       | Output_complete_obj(C_ocamlopt, Shared) ->
           (* ocamlopt doesn't correctly implement -runtime-variant _shared *)
           let compilation_exit_code = fails_if true in
           f ~mode:Native ~use_shared_runtime:true
             ~compilation_exit_code ~clibs:[Config.compression_c_libraries]
-            ["-output-complete-obj"; "-noautolink"; "-cclib"; "-lunix_stubs";(*
-                                                    "-cclib"; "-lcomprmarsh"*)]
+            ["-output-complete-obj"; "-noautolink"; "-cclib"; "-lunix_stubs";
+                                                    "-cclib"; "-lcomprmarsh"]
       | Output_complete_exe Static ->
           f ~calls_linker:true ["-output-complete-exe"]
       | Output_complete_exe Shared ->
