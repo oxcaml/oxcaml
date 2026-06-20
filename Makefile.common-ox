@@ -441,6 +441,9 @@ bool_to_with = --with$(if $(filter false,$(2)),out)-$(strip $(1))
 test-in-prefix: install
 	$(MAKE) test-in-prefix-no-rebuild
 
+# TODO eval is filtered out of $(OTHERLIBRARIES) because it's completely broken
+#      w.r.t. dynamic loading, but it's not clear whether that should even be
+#      possible!
 .PHONY: test-in-prefix-no-rebuild
 test-in-prefix-no-rebuild:
 	RUNTIME_DIR=$(RUNTIME_DIR) \
@@ -454,7 +457,8 @@ test-in-prefix-no-rebuild:
 	    --bindir "$(BINDIR)" --libdir "$(LIBDIR)" \
 	    $(call bool_to_with, ocamlnat, $(INSTALL_OCAMLNAT)) \
 	    $(call bool_to_with, ocamlopt, $(NATIVE_COMPILER)) \
-	    $(OTHERLIBRARIES) --pwd "$(SRCDIR_ABS)/$(boot_build)/testsuite/in_prefix"
+	    $(filter-out eval, $(OTHERLIBRARIES)) \
+	    --pwd "$(SRCDIR_ABS)/$(boot_build)/testsuite/in_prefix"
 
 test-one: install_for_test
 	$(MAKE) test-one-no-rebuild
