@@ -457,6 +457,8 @@ test-in-prefix-no-rebuild:
 	    --bindir "$(BINDIR)" --libdir "$(LIBDIR)" \
 	    $(call bool_to_with, ocamlnat, $(INSTALL_OCAMLNAT)) \
 	    $(call bool_to_with, ocamlopt, $(NATIVE_COMPILER)) \
+	    $(call bool_to_with, cross-module-inlining, \
+	           $(if $(filter dev,$(main_build_profile)),false,true)) \
 	    $(filter-out eval, $(OTHERLIBRARIES)) \
 	    --pwd "$(SRCDIR_ABS)/$(boot_build)/testsuite/in_prefix"
 
