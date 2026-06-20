@@ -21,6 +21,19 @@ module LocationSet = Set.Make(struct
   let compare = Stdlib.compare
 end)
 
+(* OxCaml is built with dune, which sets BUILD_PATH_PREFIX_MAP so that the
+   compiler rewrites each build-context directory to the sentinel
+   "/workspace_root". Consequently no compiled artefact embeds the real build
+   directory (it only ever appears as the sentinel): the real build path
+   survives solely in the standard-library load path baked into linked
+   executables compiled with -g (the Makefile-created
+   _build/runtime_stdlib_install OCAMLLIB, which is not a dune context directory
+   and so is not mapped). dune also links bytecode with -g and does not strip
+   it, unlike upstream. This all differs from upstream's in-tree make build,
+   which embeds the real build path, so the rulesets below are adjusted when
+   this is set. *)
+let dune_maps_build_paths = true
+
 (* Augment toolchain properties with information from the configuration (this
    essentially goes from "is foo capable of doing bar" to "foo does bar in this
    context". *)
@@ -56,6 +69,18 @@ let bindir_rules config file =
       Filename.chop_suffix_opt ~suffix:".exe" basename
       |> Option.value ~default:basename in
     let classification = Environment.classify_executable file in
+    (* OxCaml ships some tools (e.g. ocamlcp, ocamlprof) as #!/bin/sh stubs that
+       embed no paths. classify_executable reports these as Vanilla (they have
+       no bytecode trailer); a leading "#!" distinguishes a script from a real
+       binary. *)
+    let is_script_stub =
+      dune_maps_build_paths && classification = Vanilla
+      && In_channel.with_open_bin file (fun ic ->
+           try really_input_string ic 2 = "#!" with End_of_file -> false)
+    in
+    if is_script_stub then
+      LocationSet.empty
+    else
     (* Determine if the installation prefix should be found in this file *)
     let prefix =
       let code_embeds_stdlib_location =
@@ -97,10 +122,11 @@ let bindir_rules config file =
         (* All native executable are linked with -g apart from flexlink.opt *)
         `Native_ocaml, (basename <> "flexlink.opt")
       else if classification <> Vanilla then
-        (* Only ocamlc.byte, ocamlopt.byte and ocaml are linked with -g, but the
-           debugging information in ocamlc.byte and ocamlopt.byte is
-           stripped. *)
-        `Bytecode_ocaml, (basename = "ocaml")
+        (* Upstream only links ocaml (the toplevel) with -g and strips
+           ocamlc.byte and ocamlopt.byte. OxCaml's dune links all bytecode with
+           -g and does not strip it, so every bytecode executable retains debug
+           information (which leaks the unmapped stdlib load path). *)
+        `Bytecode_ocaml, (dune_maps_build_paths || basename = "ocaml")
       else
         (* Bytecode runtimes and ocamlyacc of which only ocamlrund is linked
            with -g *)
@@ -166,17 +192,35 @@ let libdir_rules config file =
         (* These files all embed the Standard Library location *)
         (~stdlib:true, ~ocaml_debug:false, ~c_debug:false, ~s:false)
       else if basename = "config.cmx" then
-        (* config.cmx contains Config.standard_library for inlining *)
-        (~stdlib:true, ~ocaml_debug:false, ~c_debug:false, ~s:false)
+        (* config.cmx inlines Config.standard_library as a string constant only
+           when the native compiler exports cross-module inlining information,
+           i.e. an optimising build. OxCaml's dev profile disables this (so its
+           config.cmx carries no path); its main profile and upstream do not. *)
+        (~stdlib:config.cross_module_inlining,
+         ~ocaml_debug:false, ~c_debug:false, ~s:false)
       else if List.mem ext [".cma"; ".cmo"; ".cmt"; ".cmti"] then
         let stdlib = (* via Config.standard_library *)
           List.mem basename ["config.cmt"; "config_main.cmt";
-                             "ocamlcommon.cma"] in
+                             "ocamlcommon.cma"]
+          (* OxCaml's dynlink still bundles Dynlink_compilerlibs, a full copy of
+             Config (so it embeds Config.bindir and Config.standard_library).
+             Upstream replaced this with a lean Dynlink_config that drops those;
+             OxCaml has not yet taken that change. *)
+          || dune_maps_build_paths && basename = "dynlink.cma" in
         (~stdlib, ~ocaml_debug:true, ~c_debug:false, ~s:false)
       else if ext = ".cmxs" then
-        (* All the .cmxs files built by the distribution at present include C
-           objects and obviously contain assembled objects. *)
-        (~stdlib:false, ~ocaml_debug:false, ~c_debug:true, ~s:true)
+        (* A .cmxs statically links its library's C stubs (if any) and always
+           contains assembled objects. Upstream's .cmxs all have C stubs; in
+           OxCaml the pure-OCaml libraries (e.g. the stdlib_* variants) have
+           none, so their .cmxs are build-path clean. Detect C stubs by the
+           lib<name>_stubs archive installed alongside. *)
+        let has_c_stubs =
+          not dune_maps_build_paths
+          || Sys.file_exists
+               (Filename.concat (Filename.dirname file)
+                  ("lib" ^ Filename.remove_extension basename ^ "_stubs"
+                   ^ Config.ext_lib)) in
+        (~stdlib:false, ~ocaml_debug:false, ~c_debug:has_c_stubs, ~s:true)
       else if ext = Config.ext_obj then
         (* Any object produced by ocamlopt will have a .cmx file with it *)
         let is_ocaml =
@@ -206,6 +250,10 @@ let libdir_rules config file =
           let stdlib =
             is_camlrun
             || Filename.remove_extension basename = "ocamlcommon"
+            (* See dynlink.cma above: OxCaml's dynlink bundles a full copy of
+               Config and so embeds the stdlib location. *)
+            || dune_maps_build_paths
+               && Filename.remove_extension basename = "dynlink"
           in
           (~stdlib, ~ocaml_debug:false, ~c_debug:(not is_ocaml), ~s:is_ocaml)
         else
@@ -228,6 +276,14 @@ let libdir_rules config file =
          && (not Toolchain.linker_propagates_debug_information
              || Toolchain.linker_embeds_build_path) then
         Toolchain.linker_embeds_build_path
+      else if dune_maps_build_paths then
+        (* dune maps OCaml-compiled debug information (and ocamlopt's assembled
+           objects) to the /workspace_root sentinel, so they no longer carry the
+           real build directory. C debug information is not mapped (gcc ignores
+           BUILD_PATH_PREFIX_MAP) and .cmt/.cmti record the build directory
+           directly, so those still do. *)
+        ext = ".cmt" || ext = ".cmti"
+        || has_c_debug_info && c_compiler_debug_paths_are_absolute
       else
         has_ocaml_debug_info
         || has_c_debug_info && c_compiler_debug_paths_are_absolute

@@ -40,6 +40,7 @@ module Import = struct
     launcher_searches_for_ocamlrun: bool;
     target_launcher_searches_for_ocamlrun: bool;
     bytecode_shebangs_by_default: bool;
+    cross_module_inlining : bool;
     libraries: string list list
   }
 
