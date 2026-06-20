@@ -545,7 +545,7 @@ let read_content file ic =
     Harness.fail_because "Error reading %s" file;
   content, len
 
-let output_compunit ic oc (compunit : Cmo_format.compilation_unit) =
+let output_compunit ic oc (compunit : Cmo_format.compilation_unit_descr) =
   seek_in ic compunit.cu_pos;
   Misc.copy_file_chunk ic oc compunit.cu_codesize;
   if compunit.cu_debug > 0 then begin
@@ -564,7 +564,7 @@ let with_decompressed_ocaml_artefact ic file f =
       output_value oc (Cmt_format.read file)
     else if magic = Config.cmo_magic_number then begin
       seek_in ic (input_binary_int ic);
-      let compunit = (input_value ic : Cmo_format.compilation_unit) in
+      let compunit = (input_value ic : Cmo_format.compilation_unit_descr) in
       output_compunit ic oc compunit
     end else if magic = Config.cma_magic_number then begin
       seek_in ic (input_binary_int ic);
@@ -581,7 +581,7 @@ let with_decompressed_ocaml_artefact ic file f =
 let input_artefact_from_file env file =
   In_channel.with_open_bin file @@ fun ic ->
     match Filename.extension file with
-    | ".cma" | ".cmi" | ".cmo" | ".cmti" | ".cmt" ->
+    | ".cma" | ".cmi" | ".cmo" | ".cmti" | ".cmt" when not Config.oxcaml ->
         with_decompressed_ocaml_artefact ic file read_content
     | ext when (ext = Config.ext_lib || ext = Config.ext_obj)
                && Sys.os_type = "Unix" && Config.system <> "macosx" ->
