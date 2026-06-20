@@ -434,6 +434,28 @@ promote-failed:
 
 runtest-upstream: test
 
+# Generates --without-X if the second argument is "false", else --with-X
+bool_to_with = --with$(if $(filter false,$(2)),out)-$(strip $(1))
+
+.PHONY: test-in-prefix
+test-in-prefix: install
+	$(MAKE) test-in-prefix-no-rebuild
+
+.PHONY: test-in-prefix-no-rebuild
+test-in-prefix-no-rebuild:
+	RUNTIME_DIR=$(RUNTIME_DIR) \
+	  $(dune) build $(ws_boot) \
+	    testsuite/tools/test_in_prefix.exe testsuite/tools/main_in_c.o
+	# The harness runs from this scratch directory, but dune does not create it
+	# because nothing is built there, so ensure it exists in a fresh tree.
+	mkdir -p $(boot_build)/testsuite/in_prefix
+	cd $(boot_build)/testsuite/in_prefix && \
+	  ../tools/test_in_prefix.exe \
+	    --bindir "$(BINDIR)" --libdir "$(LIBDIR)" \
+	    $(call bool_to_with, ocamlnat, $(INSTALL_OCAMLNAT)) \
+	    $(call bool_to_with, ocamlopt, $(NATIVE_COMPILER)) \
+	    $(OTHERLIBRARIES) --pwd "$(SRCDIR_ABS)/$(boot_build)/testsuite/in_prefix"
+
 test-one: install_for_test
 	$(MAKE) test-one-no-rebuild
 
