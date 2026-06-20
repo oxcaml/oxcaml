@@ -26,6 +26,9 @@ type [@warning "-unused-constructor"] extern_flags =
 external to_channel: out_channel -> 'a -> extern_flags list -> unit
                    = "caml_output_value"
 
-let output_value ch v = to_channel ch v [Compression]
+(* The Compression flag cannot be specified without agreement between the
+   system compiler and OxCaml on compressed marshalling (or the system compiler
+   may produce artefacts that the OxCaml compiler will not be able to read) *)
+let output_value ch v = to_channel ch v [(*Compression*)]
 
 let input_value = Stdlib.input_value
