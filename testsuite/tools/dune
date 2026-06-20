@@ -17,7 +17,7 @@
  (modes native)
  (enabled_if (= %{context_name} "default"))
  (modules
-  toolchain harness compression environment cmdline testBytecodeBinaries
+  toolchain harness environment cmdline testBytecodeBinaries
   testDynlink testLinkModes testRelocation testToplevel test_ld_conf
   test_in_prefix)
  (libraries ocamlbytecomp ocamlcommon)
