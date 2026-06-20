@@ -152,7 +152,8 @@ let () =
        be relocatable! *)
     && (not config.has_ocamlopt
         || not Toolchain.assembler_embeds_build_path
-        || Config.as_has_debug_prefix_map && Config.architecture <> "riscv")
+        || Config.as_debug_prefix_map_flag <> ""
+           && Config.architecture <> "riscv")
     && not Toolchain.linker_embeds_build_path
     && (not Toolchain.c_compiler_always_embeds_build_path
         || not Toolchain.c_compiler_debug_paths_can_be_absolute)

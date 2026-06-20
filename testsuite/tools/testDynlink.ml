@@ -69,7 +69,11 @@ let () =
   let test_libraries_in_prog ?expected_exit_code env libraries =
     (* For simplicity, the test for whether libraries have C stubs is based on
        the names, rather than inspecting the library metadata *)
-    let has_c_stubs library = (mode = Bytecode && library <> "dynlink") in
+    let has_c_stubs library =
+      (mode = Bytecode
+       && library <> "dynlink"
+       && not (String.starts_with ~prefix:"stdlib_" library))
+    in
     let has_c_stubs = List.exists has_c_stubs libraries in
     (* In the Renamed phase, the test driver will need to be launched with
        ocamlrun, unless executables produced by the compiler are capable of
