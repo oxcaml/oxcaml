@@ -315,6 +315,10 @@ let run ~reproducible config env =
     grandparent (Environment.test_root env) in
   let build_root_logical =
     Option.map grandparent (Environment.test_root_logical env) in
+  (* The OxCaml build_root will include the context, which varies depending on
+     exactly what we're looking at - the directory above is better - _build *)
+  let build_root = Filename.dirname build_root in
+  let build_root_logical = Option.map Filename.dirname build_root_logical in
   (* There are four possible directories:
      - The relative libdir
      - The build path (potentially in both physical and logical forms)
@@ -613,6 +617,11 @@ let run ~reproducible config env =
     Format.printf "@[<hov 4>  %a@]@." pp_results results
   in
   if failed then
-    Harness.fail_because "Installed files don't match expectation"
+    Harness.fail_because {|Installed files don't match expectation
+If you are seeing this when working locally, verify that main passes this test.
+If it does, Claude et al are extremely good at analysing this test in the
+context of your changes. In extremis, this test can be disabled by commenting
+out the call to TestRelocation.run in testsuite/tools/test_in_prefix.ml; in
+ultima hora, @dra27 (dallsopp) can help.|}
   else
   List.iter display sections

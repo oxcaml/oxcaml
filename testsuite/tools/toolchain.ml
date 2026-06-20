@@ -12,6 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Harness.Import
+
 (* cf. OCAML_CC_VENDOR in aclocal.m4 and utils.config.mli *)
 let is_clang =
   List.mem "clang" (String.split_on_char '-' Config.c_compiler_vendor)

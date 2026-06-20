@@ -1107,7 +1107,7 @@ AS_CASE([$target],
   ocamltest_libunix="Some true"
   ocamlyacc_wstr_module=""])
 
-otherlibraries="dynlink runtime_events"
+otherlibraries="dynlink runtime_events eval stdlib_alpha stdlib_beta stdlib_stable stdlib_upstream_compatible"
 otherlibs="runtime_events"
 optional_libraries="$optional_libraries otherlibs/dynlink/dynlink"
 
