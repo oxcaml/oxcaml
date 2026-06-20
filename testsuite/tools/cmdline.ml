@@ -106,7 +106,8 @@ let parse argv =
     ref {has_ocamlnat = false; has_ocamlopt = false; has_relative_libdir = None;
          has_runtime_search = None; launcher_searches_for_ocamlrun = false;
          target_launcher_searches_for_ocamlrun = false;
-         bytecode_shebangs_by_default = false; libraries = []}
+         bytecode_shebangs_by_default = false; cross_module_inlining = true;
+         libraries = []}
   in
   let error fmt = Printf.ksprintf (fun s -> raise (Arg.Bad s)) fmt in
   let check_tree () =
@@ -159,6 +160,8 @@ let parse argv =
   in
   let has_ocamlnat has_ocamlnat () = config := {!config with has_ocamlnat} in
   let has_ocamlopt has_ocamlopt () = config := {!config with has_ocamlopt} in
+  let cross_module_inlining cross_module_inlining () =
+    config := {!config with cross_module_inlining} in
   let parse_search = function
   | "enable" -> true
   | "always" -> false
@@ -186,6 +189,12 @@ let parse argv =
     "--with-ocamlopt", Arg.Unit (has_ocamlopt true), "\
 \tNative compiler (ocamlopt) is installed in the directory given in --bindir";
     "--without-ocamlopt", Arg.Unit (has_ocamlopt false), "";
+    "--with-cross-module-inlining",
+      Arg.Unit (cross_module_inlining true), "\
+\tThe native compiler exports cross-module inlining information, so config.cmx \
+inlines Config.standard_library";
+    "--without-cross-module-inlining",
+      Arg.Unit (cross_module_inlining false), "";
     "--with-runtime-search",
       Arg.String (fun s -> has_runtime_search (Some s)), "\
 \tCompiler bytecode binaries can search for their runtimes";
