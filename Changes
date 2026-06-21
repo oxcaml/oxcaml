@@ -1,16 +1,3 @@
-<<<<<<< OxCaml
-OCaml 5.4.1
------------
-||||||| Upstream OCaml
-### Bug fixes:
-
-- #14574, #14577, #14589: Fix wrong assembly code generated for ARM64
-  with frame pointer support.
-  (Xavier Leroy, review by Vincent Laviron, report by Richard Jones)
-
-OCaml 5.4.1 (17 February 2026)
-------------------------------
-=======
 OCaml 5.4 maintenance version
 -----------------------------
 
@@ -47,9 +34,8 @@ OCaml 5.4 maintenance version
   with frame pointer support.
   (Xavier Leroy, review by Vincent Laviron, report by Richard Jones)
 
-OCaml 5.4.1 (17 February 2026)
-------------------------------
->>>>>>> ocaml/ocaml#14243
+OCaml 5.4.1
+-----------
 
 ### Bug fixes:
 
