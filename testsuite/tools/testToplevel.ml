@@ -97,13 +97,6 @@ let run config env mode =
       Environment.run_process
         ~fails:(expected_exit_code <> 0)
         ~runtime:(mode = Bytecode && not config.launcher_searches_for_ocamlrun)
-<<<<<<< OxCaml
-        (* ocaml is linked against dllflambda2_floats_stubs.so *)
-        ~stubs:(mode = Bytecode)
-||||||| Upstream OCaml
-        ~stubs:(mode = Bytecode && has_c_stubs)
-=======
->>>>>>> ocaml/ocaml#14243
         ~stdlib:true env toplevel args
     in
     Environment.display_output output;
