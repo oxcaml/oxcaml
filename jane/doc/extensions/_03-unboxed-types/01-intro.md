@@ -382,10 +382,7 @@ end
 ```
 We plan on lifting this restriction in the future.
 
-<!-- This heading is referred to by name in a link to an HTML anchor below.
-     If you rename it, please also update that link.
--->
-# `[@layout_poly]` attribute
+# `[@layout_poly]` attribute {#layout_poly-attribute}
 
 The attribute enables support for **limited layout polymorphism on external
 `%`-primitives**. This is possible because these primitives are always inlined at every
