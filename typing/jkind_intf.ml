@@ -400,6 +400,7 @@ module History = struct
           position : int;
           arity : int
         }
+    | Or_null_payload of Path.t
     | Recmod_fun_arg
     | Array_comprehension_element
     | Array_comprehension_iterator_element
@@ -422,6 +423,7 @@ module History = struct
           arity : int
         }
     (* [position] is 1-indexed *)
+    | Or_null_payload of Path.t
     | Tuple
     | Row_variable
     | Polymorphic_variant
