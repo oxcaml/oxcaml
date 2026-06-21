@@ -24,6 +24,20 @@ else
 main_ocamlopt_optimization_flags := -O3
 endif
 
+# Makefile.common upstream; but used in Makefile.build_config
+QUOTE_SINGLE = '$(subst ','\'',$(1))'
+
+# cf. similar setup in Makefile.common
+ifeq "$(TARGET_LIBDIR_IS_RELATIVE)" "true"
+  HASH := \#
+  bppm = $(subst =,%+,$(subst :,%.,$(subst %,%$(HASH),$(1))))
+  BUILD_PATH_PREFIX_MAP ?=
+  export BUILD_PATH_PREFIX_MAP := \
+    $(BUILD_PATH_PREFIX_MAP)$\
+      :/boot=$(call bppm,$(CURDIR)/_build/_bootinstall)$\
+      :/stdlib=$(call bppm,$(CURDIR)/_build/default/stdlib/build)
+endif
+
 define dune_main_context
 (lang dune 3.23)
 (using oxcaml 0.1)
@@ -39,6 +53,8 @@ define dune_main_context
     (flags (:standard -directory compiler-distro -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
     ; We never want to build the compiler itself with AddressSanitizer enabled.
     (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
+    (link_flags (:standard -set-runtime-default
+                           "standard_library_default=$(TARGET_LIBDIR)"))
     $(ENV_VARS)))))
 endef
 
@@ -151,6 +167,7 @@ _build/_bootinstall: Makefile.config Makefile.common-ox $(dune_config_targets)
 	echo '( $(OC_CFLAGS) )' > oc_cflags.sexp
 	echo '( $(subst -I $(ROOTDIR)/,-I $(CURDIR)/,$(OC_CPPFLAGS)) )' > oc_cppflags.sexp
 	echo '( $(SHAREDLIB_CFLAGS) )' > sharedlib_cflags.sexp
+	echo '( $(BUILD_MAP_CFLAGS) )' > build_map_cflags.sexp
 
 # _build/_bootinstall: a minimal install directory for the boot compiler,
 # which is placed on PATH for subsequent builds
@@ -185,6 +202,8 @@ _install: compiler
 	$(cpl) _build/install/main/bin/* _install/bin/
 	( cd _install/bin; for i in *.opt; do ln -s $$i $${i%.opt}; done )
 	$(cpl) -R _build/default/stdlib/build/* _install/lib/ocaml/
+	mv _install/lib/ocaml/target_runtime-launch-info \
+	   _install/lib/ocaml/runtime-launch-info
 	rm -f _install/lib/ocaml/{META,dune-package,dynlink.cmxa,dynlink/dynlink.cmxa}
 	rm -f _install/lib/ocaml/{stdlib,camlinternal}*.{o,cmo}
 	$(cpl) -R _build/install/main/lib/ocaml/* _install/lib/ocaml/
@@ -413,7 +432,7 @@ test-in-prefix-no-rebuild:
 	mkdir -p $(boot_build)/testsuite/in_prefix
 	cd $(boot_build)/testsuite/in_prefix && \
 	  ../tools/test_in_prefix.exe \
-	    --bindir "$(BINDIR)" --libdir "$(LIBDIR)" \
+	    --bindir "$(BINDIR)" --libdir "$(TARGET_LIBDIR)" \
 	    $(call bool_to_with, ocamlnat, $(INSTALL_OCAMLNAT)) \
 	    $(call bool_to_with, ocamlopt, $(NATIVE_COMPILER)) \
 	    $(call bool_to_with, cross-module-inlining, \

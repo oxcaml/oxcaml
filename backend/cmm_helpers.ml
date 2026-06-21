@@ -5093,7 +5093,7 @@ let predef_exception i name =
   Cdata data_items
 
 let emit_global_string_constant name value =
-  Cdata (emit_string_constant (name, Global) value [])
+  Cdata (emit_string_constant { sym_name = name; sym_global = Global } value [])
 
 (* Header for a plugin *)
 

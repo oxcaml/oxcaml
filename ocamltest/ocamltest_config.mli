@@ -160,13 +160,9 @@ val naked_pointers : bool
 
 val tsan : bool
 (** Whether ThreadSanitizer support has been enabled at configure time *)
-<<<<<<< OxCaml
 
 val address_sanitizer : bool
 (** Whether AddressSanitizer support has been enabled at configure time *)
-||||||| Upstream OCaml
-=======
 
 val has_relative_libdir : bool
 (** Whether the compiler has been configured using --with-relative-libdir *)
->>>>>>> ocaml/ocaml#14244

@@ -23,14 +23,6 @@ AC_INIT([OxCaml],
         [oxcaml],
         [http://github.com/oxcaml/oxcaml])
 
-<<<<<<< OxCaml
-||||||| Upstream OCaml
-AC_MSG_NOTICE([Configuring OCaml version AC_PACKAGE_VERSION])
-
-# Configuration variables
-=======
-AC_MSG_NOTICE([Configuring OCaml version AC_PACKAGE_VERSION])
-
 # It's important for the setting up of defaults and the checking of the
 # --with-relative-libdir option to know whether the user specified --libdir.
 # Unfortunately, autoconf doesn't provide an easy way to determine this, so we
@@ -50,9 +42,6 @@ do
       libdir_given=yes;;
   esac
 done
-
-# Configuration variables
->>>>>>> ocaml/ocaml#14244
 
 ## Command-line arguments passed to configure
 # This must be set very soon after AC_INIT to avoid other macros from clobbering
@@ -427,14 +416,8 @@ AC_SUBST([ocamltest_libunix])
 AC_SUBST([unix_library])
 AC_SUBST([unix_directory])
 AC_SUBST([cc_has_debug_prefix_map])
-<<<<<<< OxCaml
 AC_SUBST([as_debug_prefix_map_flag])
-||||||| Upstream OCaml
-AC_SUBST([as_has_debug_prefix_map])
-=======
-AC_SUBST([as_has_debug_prefix_map])
 AC_SUBST([as_is_cc])
->>>>>>> ocaml/ocaml#14244
 AC_SUBST([with_debugger]) # TODO: rename this variable
 AC_SUBST([build_ocamldebug])
 AC_SUBST([build_ocamltex])
@@ -494,7 +477,7 @@ AC_SUBST([flexdll_chain])
 AC_SUBST([PACKLD])
 AC_SUBST([build_libraries_manpages])
 AC_SUBST([compute_deps])
-<<<<<<< OxCaml
+AC_SUBST([ocaml_prefix])
 AC_SUBST([intel_jcc_bug_cflags])
 AC_SUBST([stack_allocation])
 AC_SUBST([poll_insertion])
@@ -504,26 +487,19 @@ AC_SUBST([opam])
 AC_SUBST([opam_switch])
 AC_SUBST([opam_exec])
 AC_SUBST([objcopy])
-||||||| Upstream OCaml
-=======
-AC_SUBST([ocaml_prefix])
->>>>>>> ocaml/ocaml#14244
 AC_SUBST([ocaml_bindir])
 AC_SUBST([ocaml_libdir])
+AC_SUBST([ocaml_libdir_boot])
 AC_SUBST([TARGET_LIBDIR])
 AC_SUBST([QS])
 AC_SUBST([ar_supports_response_files])
-<<<<<<< OxCaml
 AC_SUBST([target_bindir])
-AC_SUBST([cc_extra_warnings])
-AC_SUBST([cxx_extra_warnings])
-||||||| Upstream OCaml
-=======
 AC_SUBST([target_libdir_is_relative])
 AC_SUBST([srcdir_abs])
 AC_SUBST([srcdir_abs_real])
 AC_SUBST([build_map_flags])
->>>>>>> ocaml/ocaml#14244
+AC_SUBST([cc_extra_warnings])
+AC_SUBST([cxx_extra_warnings])
 
 ## Generated files
 
@@ -536,6 +512,7 @@ AC_CONFIG_FILES([ocamltest/ocamltest_config.ml])
 AC_CONFIG_FILES([otherlibs/dynlink/dynlink_config.ml])
 AC_CONFIG_FILES([utils/config.common.ml])
 AC_CONFIG_FILES([utils/config.generated.ml])
+AC_CONFIG_FILES([utils/config.fixed_libdir.ml])
 AC_CONFIG_HEADERS([runtime/caml/m.h])
 AC_CONFIG_HEADERS([runtime/caml/s.h])
 AC_CONFIG_HEADERS([runtime/caml/exec.h])
@@ -3801,6 +3778,9 @@ AC_CONFIG_COMMANDS_PRE([
       [TARGET_BINDIR="$HOST_BINDIR"],
       [TARGET_BINDIR='.'])])
   eval "ocaml_libdir=\"$ocaml_libdir\""
+  # Boot compiler can't ever be relocatable - use an expanded and absolute form
+  # of libdir.
+  eval "ocaml_libdir_boot=\"$libdir\""
   AS_IF([test x"$TARGET_LIBDIR" = 'x'],
     [AS_IF([test "x$bindir_to_libdir" = 'x'],
       [TARGET_LIBDIR="$ocaml_libdir"],

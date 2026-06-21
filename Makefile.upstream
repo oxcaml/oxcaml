@@ -1386,20 +1386,6 @@ runtime/sak.$(O): runtime/sak.c runtime/caml/misc.h runtime/caml/config.h
 
 C_LITERAL = $(shell $(SAK) $(ENCODE_C_LITERAL) '$(1)')
 
-<<<<<<< OxCaml
-runtime/build_config.h: $(ROOTDIR)/Makefile.config $(SAK)
-	$(V_GEN)echo '/* This file is generated from $(ROOTDIR)/Makefile.config */' > $@ && \
-	echo '#define OCAML_STDLIB_DIR $(call C_LITERAL,$(LIBDIR))' >> $@ && \
-	echo '#define HOST "$(HOST)"' >> $@
-||||||| Upstream OCaml
-runtime/build_config.h: $(ROOTDIR)/Makefile.config $(SAK)
-	$(V_GEN){ \
-	  echo '/* This file is generated from $(ROOTDIR)/Makefile.config */'; \
-	  printf '#define OCAML_STDLIB_DIR %s\n' \
-	         '$(call C_LITERAL,$(TARGET_LIBDIR))'; \
-	  echo '#define HOST "$(HOST)"'; \
-	} > $@
-=======
 runtime/build_config.h: $(ROOTDIR)/Makefile.config \
                         $(ROOTDIR)/Makefile.build_config $(SAK)
 	$(V_GEN){ \
@@ -1408,7 +1394,6 @@ runtime/build_config.h: $(ROOTDIR)/Makefile.config \
 	         '$(call C_LITERAL,$(TARGET_LIBDIR))'; \
 	  echo '#define HOST "$(HOST)"'; \
 	} > $@
->>>>>>> ocaml/ocaml#14244
 
 runtime/prims.$(O): runtime/build_config.h
 
