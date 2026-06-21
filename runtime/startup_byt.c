@@ -490,15 +490,6 @@ CAMLexport void caml_main(char_os const * const * argv)
   /* Determine position of bytecode file */
   pos = 0;
 
-<<<<<<< OxCaml
-  /* First, try argv[0] (when ocamlrun is called by a bytecode program) */
-  exe_name = (char_os *) argv[0];
-  fd = caml_attempt_open(&exe_name, &trail, 0);
-||||||| Upstream OCaml
-  /* First, try argv[0] (when ocamlrun is called by a bytecode program) */
-  exe_name = argv[0];
-  fd = caml_attempt_open(&exe_name, &trail, 0);
-=======
   argv0 = proc_self_exe = caml_executable_name();
 
   /* In APPENDED mode (i.e. with -custom), we always want to load the bytecode
@@ -511,10 +502,9 @@ CAMLexport void caml_main(char_os const * const * argv)
      originally executed by the user. */
   CAMLassert(caml_byte_program_mode != EMBEDDED);
   if (caml_byte_program_mode != APPENDED || proc_self_exe == NULL) {
-    exe_name = argv[0];
+    exe_name = (char_os *) argv[0];
     fd = caml_attempt_open(&exe_name, &trail, 0);
   }
->>>>>>> ocaml/ocaml#14244
 
   /* Little grasshopper wonders why we do that at all, since
      "The current executable is ocamlrun itself, it's never a bytecode
@@ -522,19 +512,6 @@ CAMLexport void caml_main(char_os const * const * argv)
      With -custom, we have an executable that is ocamlrun itself
      concatenated with the bytecode.  So, if the attempt with argv[0]
      failed, it is worth trying again with executable_name. */
-<<<<<<< OxCaml
-  if (fd < 0 && (proc_self_exe = caml_executable_name()) != NULL) {
-    exe_name = proc_self_exe;
-    fd = caml_attempt_open(&exe_name, &trail, 0);
-    /* On success, caml_attempt_open has replaced exe_name with its own copy;
-       on failure, exe_name is reassigned below. Either way proc_self_exe is
-       no longer needed. */
-    caml_stat_free(proc_self_exe);
-||||||| Upstream OCaml
-  if (fd < 0 && (proc_self_exe = caml_executable_name()) != NULL) {
-    exe_name = proc_self_exe;
-    fd = caml_attempt_open(&exe_name, &trail, 0);
-=======
   if (caml_byte_program_mode == APPENDED || fd < 0) {
     if (proc_self_exe != NULL) {
       exe_name = proc_self_exe;
@@ -542,7 +519,6 @@ CAMLexport void caml_main(char_os const * const * argv)
     }
     if (fd < 0 && caml_byte_program_mode == APPENDED)
       error("unable to open file '%s'", caml_stat_strdup_of_os(exe_name));
->>>>>>> ocaml/ocaml#14244
   }
 
   if (argv0 == NULL)
@@ -590,8 +566,12 @@ CAMLexport void caml_main(char_os const * const * argv)
   caml_runtime_standard_library_effective =
     caml_locate_standard_library(argv0,
                                  caml_runtime_standard_library_default, NULL);
+  /* Neither argv0 nor proc_self_exe (which argv0 may alias) is needed any
+     further: on success, caml_attempt_open replaced exe_name with its own copy
+     and caml_sys_init is not passed proc_self_exe. */
   if (argv0 != proc_self_exe)
     caml_stat_free(argv0);
+  caml_stat_free(proc_self_exe);
 
   /* Load the embedded overridden caml_standard_library_default value, if one is
      available. Note that although -custom executables come through this

@@ -377,7 +377,8 @@ module Acc = struct
       seen_a_function : bool;
       slot_offsets : Slot_offsets.t;
       code_slot_offsets : Slot_offsets.t Code_id.Map.t;
-      closure_infos : closure_info list
+      closure_infos : closure_info list;
+      needs_standard_library_default : bool
     }
 
   let cost_metrics t = t.cost_metrics
@@ -392,6 +393,11 @@ module Acc = struct
   let seen_a_function t = t.seen_a_function
 
   let with_seen_a_function t seen_a_function = { t with seen_a_function }
+
+  let needs_standard_library_default t = t.needs_standard_library_default
+
+  let mark_needs_standard_library_default t =
+    { t with needs_standard_library_default = true }
 
   let approximation_loader loader =
     let externals = ref Symbol.Map.empty in
@@ -468,7 +474,8 @@ module Acc = struct
       seen_a_function = false;
       slot_offsets = Slot_offsets.empty;
       code_slot_offsets = Code_id.Map.empty;
-      closure_infos = []
+      closure_infos = [];
+      needs_standard_library_default = false
     }
 
   let declared_symbols t = t.declared_symbols

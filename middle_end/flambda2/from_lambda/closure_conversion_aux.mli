@@ -255,6 +255,10 @@ module Acc : sig
 
   val with_seen_a_function : t -> bool -> t
 
+  val needs_standard_library_default : t -> bool
+
+  val mark_needs_standard_library_default : t -> t
+
   val add_declared_symbol : symbol:Symbol.t -> constant:Static_const.t -> t -> t
 
   val add_lifted_set_of_closures :
