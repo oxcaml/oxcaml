@@ -31,3 +31,4 @@ Static data:
                 (field_imm 0 (global static Cross_module_static_lib!))
                 $layout_2)
               x/318))))))
+Requires caml_standard_library_nat: no

@@ -14,100 +14,6 @@ on:
 permissions: {}
 jobs:
   build:
-<<<<<<< OxCaml
-||||||| Upstream OCaml
-    runs-on: ubuntu-latest
-    outputs:
-      manual_changed: ${{ steps.manual.outputs.manual_changed }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          persist-credentials: false
-      - name: Check for manual changes
-        id: manual
-        run: >-
-         tools/ci/actions/check-manual-modified.sh
-         '${{ github.ref }}'
-         '${{ github.event_name }}'
-         '${{ github.event.pull_request.base.ref }}'
-         '${{ github.event.pull_request.base.sha }}'
-         '${{ github.event.pull_request.head.ref }}'
-         '${{ github.event.pull_request.head.sha }}'
-         '${{ github.event.ref }}'
-         '${{ github.event.before }}'
-         '${{ github.event.ref }}'
-         '${{ github.event.after }}'
-         '${{ github.event.repository.full_name }}'
-      - name: Configure tree
-        run: |
-          MAKE_ARG=-j CONFIG_ARG='--enable-flambda --enable-cmm-invariants --enable-codegen-invariants --enable-dependency-generation --enable-native-toplevel' OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh configure
-      - name: Build
-        run: |
-          MAKE_ARG=-j bash -xe tools/ci/actions/runner.sh build
-      - name: Prepare Artifact
-        run: tar --zstd -cf /tmp/sources.tar.zstd .
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: compiler
-          path: /tmp/sources.tar.zstd
-          retention-days: 1
-
-# Full testsuite run, and other sanity checks
-# "extra" testsuite runs, reusing the previously built compiler tree.
-# debug: running the full testsuite with the
-#        debug runtime and minor heap verification.
-# debug-s4096: select testsuite run with the debug runtime and a small
-#              minor heap.
-  normal:
-=======
-    runs-on: ubuntu-latest
-    outputs:
-      manual_changed: ${{ steps.manual.outputs.manual_changed }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          persist-credentials: false
-      - name: Check for manual changes
-        id: manual
-        run: >-
-         tools/ci/actions/check-manual-modified.sh
-         '${{ github.ref }}'
-         '${{ github.event_name }}'
-         '${{ github.event.pull_request.base.ref }}'
-         '${{ github.event.pull_request.base.sha }}'
-         '${{ github.event.pull_request.head.ref }}'
-         '${{ github.event.pull_request.head.sha }}'
-         '${{ github.event.ref }}'
-         '${{ github.event.before }}'
-         '${{ github.event.ref }}'
-         '${{ github.event.after }}'
-         '${{ github.event.repository.full_name }}'
-      - name: Configure tree
-        run: |
-          MAKE_ARG=-j CONFIG_ARG='--enable-flambda --enable-cmm-invariants --enable-codegen-invariants --enable-dependency-generation --enable-native-toplevel --with-relative-libdir' OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh configure
-      - name: Build
-        run: |
-          MAKE_ARG=-j bash -xe tools/ci/actions/runner.sh build
-      - name: Prepare Artifact
-        run: tar --zstd -cf /tmp/sources.tar.zstd .
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: compiler
-          path: /tmp/sources.tar.zstd
-          retention-days: 1
-
-# Full testsuite run, and other sanity checks
-# "extra" testsuite runs, reusing the previously built compiler tree.
-# debug: running the full testsuite with the
-#        debug runtime and minor heap verification.
-# debug-s4096: select testsuite run with the debug runtime and a small
-#              minor heap.
-  normal:
->>>>>>> ocaml/ocaml#14244
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     permissions:
@@ -118,146 +24,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-<<<<<<< OxCaml
           - name: default (x86_64-linux)
+            config: --with-relative-libdir
             os: warp-ubuntu-latest-x64-8x
             build_debug: true
             build_ast_dependent_libs: true
             check_installed: true
+            relative_libdir: true
             sysdeps: gdb
-||||||| Upstream OCaml
-          - id: normal
-            name: normal
-            dependencies: texlive-latex-extra texlive-fonts-recommended texlive-luatex hevea sass gdb lldb
-          - id: debug
-            name: extra (debug)
-          - id: debug-s4096
-            name: extra (debug-s4096)
-      fail-fast: true
-    steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: compiler
-      - name: Unpack Artifact
-        run: |
-          tar --zstd -xf sources.tar.zstd
-          rm -f sources.tar.zstd
-      - name: Packages
-        if: matrix.dependencies != ''
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y ${{ matrix.dependencies }}
-      - name: Run the testsuite
-        if: ${{ matrix.id == 'normal' && needs.config.outputs.skip-testsuite != 'true' }}
-        run: |
-          MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh test
-      - name: Run the testsuite (debug runtime)
-        if: ${{ matrix.id == 'debug' && needs.config.outputs.skip-testsuite != 'true' }}
-        env:
-          OCAMLRUNPARAM: v=0,V=1
-          USE_RUNTIME: d
-        run: |
-          bash -cxe "SHOW_TIMINGS=1 tools/ci/actions/runner.sh test"
-      - name: Run the testsuite (s=4096, debug runtime)
-        if: ${{ matrix.id == 'debug-s4096' && needs.config.outputs.skip-testsuite != 'true' }}
-        env:
-          OCAMLRUNPARAM: s=4096,v=0
-          USE_RUNTIME: d
-        run: |
-          for dir in $PARALLEL_TESTS; do \
-            bash -cxe "SHOW_TIMINGS=1 tools/ci/actions/runner.sh test_prefix $dir"; \
-          done
-      - name: Build API Documentation
-        if: matrix.id == 'normal'
-        run: |
-          MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh api-docs
-      - name: Install
-        if: matrix.id == 'normal'
-        run: |
-         MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh install
-      - name: Test in prefix
-        if: matrix.id == 'normal'
-        run: |
-         MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh test-in-prefix
-      - name: Build the manual
-        if: matrix.id == 'normal' && needs.build.outputs.manual_changed == 'true'
-        run: |
-          MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh manual
-      - name: Other checks
-        if: matrix.id == 'normal'
-        run: |
-          MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh other-checks
-=======
-          - id: normal
-            name: normal
-            dependencies: texlive-latex-extra texlive-fonts-recommended texlive-luatex hevea sass gdb lldb
-          - id: debug
-            name: extra (debug)
-          - id: debug-s4096
-            name: extra (debug-s4096)
-      fail-fast: true
-    steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: compiler
-      - name: Unpack Artifact
-        run: |
-          tar --zstd -xf sources.tar.zstd
-          rm -f sources.tar.zstd
-      - name: Packages
-        if: matrix.dependencies != ''
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y ${{ matrix.dependencies }}
-      - name: Run the testsuite
-        if: ${{ matrix.id == 'normal' && needs.config.outputs.skip-testsuite != 'true' }}
-        run: |
-          MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh test
-      - name: Run the testsuite (debug runtime)
-        if: ${{ matrix.id == 'debug' && needs.config.outputs.skip-testsuite != 'true' }}
-        env:
-          OCAMLRUNPARAM: v=0,V=1
-          USE_RUNTIME: d
-        run: |
-          bash -cxe "SHOW_TIMINGS=1 tools/ci/actions/runner.sh test"
-      - name: Run the testsuite (s=4096, debug runtime)
-        if: ${{ matrix.id == 'debug-s4096' && needs.config.outputs.skip-testsuite != 'true' }}
-        env:
-          OCAMLRUNPARAM: s=4096,v=0
-          USE_RUNTIME: d
-        run: |
-          for dir in $PARALLEL_TESTS; do \
-            bash -cxe "SHOW_TIMINGS=1 tools/ci/actions/runner.sh test_prefix $dir"; \
-          done
-      - name: Build API Documentation
-        if: matrix.id == 'normal'
-        run: |
-          MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh api-docs
-      - name: Install
-        if: matrix.id == 'normal'
-        run: |
-         MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh install
-      - name: Test in prefix
-        if: matrix.id == 'normal'
-        run: |
-         MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh test-in-prefix
-      - name: Test in prefix (alternate configuration)
-        if: matrix.id == 'normal' && needs.config.outputs.full-matrix == 'true'
-        run: |
-         MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh re-test-in-prefix
-      - name: Build the manual
-        if: matrix.id == 'normal' && needs.build.outputs.manual_changed == 'true'
-        run: |
-          MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh manual
-      - name: Other checks
-        if: matrix.id == 'normal'
-        run: |
-          MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh other-checks
->>>>>>> ocaml/ocaml#14244
 
-<<<<<<< OxCaml
           - name: dissector-assembler (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
             oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
@@ -331,11 +106,12 @@ jobs:
             disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/backtrace/backtrace_effects_nested.ml testsuite/tests/backtrace/print_location.ml testsuite/tests/effects/preemptible_fibers.ml testsuite/tests/effects/preemption/basic.ml testsuite/tests/effects/preemption/basic2.ml testsuite/tests/effects/preemption/gc_in_handler.ml testsuite/tests/effects/preemption/lazy_values.ml testsuite/tests/effects/preemption/live_across_preemption1.ml testsuite/tests/effects/preemption/live_across_preemption2.ml testsuite/tests/effects/preemption/multiple_live_continuations.ml testsuite/tests/effects/preemption/resume_after_alloc.ml testsuite/tests/effects/preemption/shallow_handlers.ml testsuite/tests/effects/preemption/stored_continuation.ml testsuite/tests/effects/preemption/weak_references.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml testsuite/tests/reaper/* testsuite/tests/flambda2/n_way_join_null.ml testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/issue5721.ml testsuite/tests/flambda2/stdlib_functor_inlining.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/flambda2/gadt_simplified_switch.ml testsuite/tests/flambda2/simplify/* testsuite/tests/frame-pointers/c_call.ml testsuite/tests/frame-pointers/effects.ml testsuite/tests/frame-pointers/exceptions.ml testsuite/tests/frame-pointers/reperform.ml testsuite/tests/frame-pointers/stack_realloc.ml testsuite/tests/frame-pointers/stack_realloc2.ml testsuite/tests/quotation/eval/current_unit/eval_before_init_ok.ml testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/array_element_kind_meet.ml testsuite/tests/tool-ocamlfilt/e2e_[ios]*.ml testsuite/tests/flambda2/rec_info_alias/*.ml'
 
           - name: regalloc (aarch64-darwin)
-            config: --disable-warn-error
+            config: --disable-warn-error --with-relative-libdir
             os: warp-macos-15-arm64-6x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
             run_regalloc_tool: true
+            relative_libdir: true
             sysdeps: gdb
 
           - name: debug regalloc (aarch64-darwin)
@@ -349,11 +125,12 @@ jobs:
             sysdeps: gdb
 
           - name: regalloc (aarch64-linux)
-            config: --disable-warn-error
+            config: --disable-warn-error --with-relative-libdir
             os: warp-ubuntu-latest-arm64-8x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
             run_regalloc_tool: true
+            relative_libdir: true
             sysdeps: gdb
 
           - name: regalloc multidomain (aarch64-linux)
@@ -471,230 +248,12 @@ jobs:
     env:
       J: "8"
       run_testsuite: "true"
-||||||| Upstream OCaml
-# macOS build+testsuite run, and other Linux configurations (-O0, etc.)
-  config:
-    runs-on: ubuntu-latest
-    outputs:
-      jobs: ${{ steps.jobs.outputs.result }}
-      skip-testsuite: ${{ steps.skip.outputs.result }}
-    steps:
-      - name: Compute matrix for the "others" job
-        id: jobs
-        uses: actions/github-script@v7
-        with:
-          script: |
-            // # Default jobs: Linux -O0, Linux arm64 & macOS
-            let jobs = [
-              {name: 'linux-O0', os: 'ubuntu-latest',
-               config_arg: "CFLAGS='-O0'"},
-              {name: 'linux-arm64', os: 'ubuntu-24.04-arm',
-               'test-in-prefix': true},
-              {name: 'macos-x86_64', os: 'macos-15-intel',
-               'test-in-prefix': true},
-              {name: 'macos-arm64', os: 'macos-latest',
-               'test-in-prefix': true}];
-            // # If this is a pull request, see if the PR has the
-            // # 'CI: Full matrix' label. This is done using an API request,
-            // # rather than from context.payload.pull_request.labels, since we
-            // # want the _current_ list of labels. This allows the labelling to
-            // # be changed, and then forcing a re-run of the workflow, rather
-            // # than having labelling triggering a fresh workflow event (which
-            // # is wasteful).
-            if (context.payload.pull_request) {
-              const { data: labels } =
-                await github.rest.issues.listLabelsOnIssue({...context.repo, issue_number: context.payload.pull_request.number});
-              if (labels.some(label => label.name === 'CI: Full matrix')) {
-                console.log('Full matrix requested');
-                // # Add "static" and "minimal" jobs
-                jobs = jobs.concat([
-                  {name: 'static', os: 'ubuntu-latest',
-                   config_arg: '--disable-native-toplevel --disable-shared',
-                   'test-in-prefix': true},
-                  {name: 'minimal', os: 'ubuntu-latest',
-                   config_arg: '--disable-native-toplevel --disable-native-compiler --disable-shared --disable-debug-runtime --disable-instrumented-runtime --disable-systhreads --disable-str-lib --disable-unix-lib --disable-ocamldoc'}]);
-              }
-            }
-            return jobs;
-      - name: Determine if the testsuite should be skipped
-        id: skip
-        uses: actions/github-script@v7
-        with:
-          script: |
-            let skip_testsuite = false;
-            if (context.payload.pull_request) {
-              const { data: labels } =
-                await github.rest.issues.listLabelsOnIssue({...context.repo, issue_number: context.payload.pull_request.number});
-              skip_testsuite = labels.some(label => label.name === 'CI: Skip testsuite');
-            }
-            console.log('Skip testsuite: ' + skip_testsuite);
-            return skip_testsuite;
-=======
-# macOS build+testsuite run, and other Linux configurations (-O0, etc.)
-  config:
-    runs-on: ubuntu-latest
-    outputs:
-      full-matrix: ${{ steps.full.outputs.result }}
-      jobs: ${{ steps.jobs.outputs.result }}
-      skip-testsuite: ${{ steps.skip.outputs.result }}
-    steps:
-      - name: Record if the build matrix is expanded
-        id: full
-        uses: actions/github-script@v7
-        with:
-          script: |
-            let full_matrix = false;
-            if (context.payload.pull_request) {
-              const { data: labels } =
-                await github.rest.issues.listLabelsOnIssue({...context.repo, issue_number: context.payload.pull_request.number});
-              full_matrix = labels.some(label => label.name === 'CI: Full matrix');
-            }
-            console.log('Full matrix: ' + full_matrix);
-            return full_matrix;
-      - name: Compute matrix for the "others" job
-        id: jobs
-        uses: actions/github-script@v7
-        with:
-          script: |
-            // # Default jobs: Linux -O0, Linux arm64 & macOS
-            let jobs = [
-              {name: 'linux-O0', os: 'ubuntu-latest',
-               config_arg: "CFLAGS='-O0'"},
-              {name: 'linux-arm64', os: 'ubuntu-24.04-arm',
-               'test-in-prefix': true},
-              {name: 'macos-x86_64', os: 'macos-15-intel',
-               'test-in-prefix': true},
-              {name: 'macos-arm64', os: 'macos-latest',
-               config_arg: '--with-relative-libdir',
-               'test-in-prefix': true}];
-            // # If this is a pull request, see if the PR has the
-            // # 'CI: Full matrix' label. This is done using an API request,
-            // # rather than from context.payload.pull_request.labels, since we
-            // # want the _current_ list of labels. This allows the labelling to
-            // # be changed, and then forcing a re-run of the workflow, rather
-            // # than having labelling triggering a fresh workflow event (which
-            // # is wasteful).
-            if (context.payload.pull_request) {
-              const { data: labels } =
-                await github.rest.issues.listLabelsOnIssue({...context.repo, issue_number: context.payload.pull_request.number});
-              if (labels.some(label => label.name === 'CI: Full matrix')) {
-                console.log('Full matrix requested');
-                // # Add "static" and "minimal" jobs
-                jobs = jobs.concat([
-                  {name: 'static', os: 'ubuntu-latest',
-                   config_arg: '--disable-native-toplevel --disable-shared',
-                   'test-in-prefix': true},
-                  {name: 'minimal', os: 'ubuntu-latest',
-                   config_arg: '--disable-native-toplevel --disable-native-compiler --disable-shared --disable-debug-runtime --disable-instrumented-runtime --disable-systhreads --disable-str-lib --disable-unix-lib --disable-ocamldoc'}]);
-              }
-            }
-            return jobs;
-      - name: Determine if the testsuite should be skipped
-        id: skip
-        uses: actions/github-script@v7
-        with:
-          script: |
-            let skip_testsuite = false;
-            if (context.payload.pull_request) {
-              const { data: labels } =
-                await github.rest.issues.listLabelsOnIssue({...context.repo, issue_number: context.payload.pull_request.number});
-              skip_testsuite = labels.some(label => label.name === 'CI: Skip testsuite');
-            }
-            console.log('Skip testsuite: ' + skip_testsuite);
-            return skip_testsuite;
->>>>>>> ocaml/ocaml#14244
 
     steps:
       - name: Checkout the OxCaml repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-<<<<<<< OxCaml
-||||||| Upstream OCaml
-      - name: macOS Dependencies
-        if: startsWith(matrix.os, 'macos-')
-        run: |
-          brew install parallel
-          # Allows starting up lldb from a remote terminal
-          #   Note: in order to start lldb, the user must also be in
-          #   one of these groups: "admin" or "_developer".
-          sudo DevToolsSecurity --enable
-          spctl developer-mode enable-terminal
-          # Select latest supported version
-          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-          lldb --version
-      - name: configure tree
-        run: |
-          CONFIG_ARG='--enable-codegen-invariants ${{ matrix.config_arg }}' MAKE_ARG=-j bash -xe tools/ci/actions/runner.sh configure
-      - name: Build
-        run: |
-          MAKE_ARG=-j bash -xe tools/ci/actions/runner.sh build
-      - name: Run the testsuite
-        if: ${{ matrix.name != 'linux-O0' && needs.config.outputs.skip-testsuite != 'true' }}
-        run: |
-          bash -c 'SHOW_TIMINGS=1 tools/ci/actions/runner.sh test'
-      - name: Run the testsuite (linux-O0)
-        if: ${{ matrix.name == 'linux-O0' && needs.config.outputs.skip-testsuite != 'true' }}
-        env:
-          OCAMLRUNPARAM: v=0,V=1
-          USE_RUNTIME: d
-        run: |
-          for dir in $PARALLEL_TESTS; do \
-           bash -cxe "SHOW_TIMINGS=1 tools/ci/actions/runner.sh test_prefix $dir"; \
-          done
-      - name: Install
-        if: ${{ matrix.test-in-prefix }}
-        run: |
-          MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh install
-      - name: Test in prefix
-        if: ${{ matrix.test-in-prefix }}
-        run: |
-          MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh test-in-prefix
-=======
-      - name: macOS Dependencies
-        if: startsWith(matrix.os, 'macos-')
-        run: |
-          brew install parallel
-          # Allows starting up lldb from a remote terminal
-          #   Note: in order to start lldb, the user must also be in
-          #   one of these groups: "admin" or "_developer".
-          sudo DevToolsSecurity --enable
-          spctl developer-mode enable-terminal
-          # Select latest supported version
-          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-          lldb --version
-      - name: configure tree
-        run: |
-          CONFIG_ARG='--enable-codegen-invariants ${{ matrix.config_arg }}' MAKE_ARG=-j bash -xe tools/ci/actions/runner.sh configure
-      - name: Build
-        run: |
-          MAKE_ARG=-j bash -xe tools/ci/actions/runner.sh build
-      - name: Run the testsuite
-        if: ${{ matrix.name != 'linux-O0' && needs.config.outputs.skip-testsuite != 'true' }}
-        run: |
-          bash -c 'SHOW_TIMINGS=1 tools/ci/actions/runner.sh test'
-      - name: Run the testsuite (linux-O0)
-        if: ${{ matrix.name == 'linux-O0' && needs.config.outputs.skip-testsuite != 'true' }}
-        env:
-          OCAMLRUNPARAM: v=0,V=1
-          USE_RUNTIME: d
-        run: |
-          for dir in $PARALLEL_TESTS; do \
-           bash -cxe "SHOW_TIMINGS=1 tools/ci/actions/runner.sh test_prefix $dir"; \
-          done
-      - name: Install
-        if: ${{ matrix.test-in-prefix }}
-        run: |
-          MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh install
-      - name: Test in prefix
-        if: ${{ matrix.test-in-prefix }}
-        run: |
-          MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh test-in-prefix
-      - name: Test in prefix (alternate configuration)
-        if: ${{ matrix.test-in-prefix && needs.config.outputs.full-matrix == 'true' }}
-        run: |
-          MAKE_ARG=-j OCAMLRUNPARAM=b,v=0 bash -xe tools/ci/actions/runner.sh re-test-in-prefix
->>>>>>> ocaml/ocaml#14244
 
       - name: Runner information
         if: runner.os == 'Linux'
@@ -793,7 +352,6 @@ jobs:
           DISSECTOR_ASSEMBLER: ${{ matrix.dissector_assembler }}
           MATRIX_CONFIG: ${{ matrix.config }}
         run: |
-<<<<<<< OxCaml
           if [[ -n "$MATRIX_CC" ]]; then
             export CC="$MATRIX_CC"
           fi
@@ -889,6 +447,20 @@ jobs:
           OCAMLPARAM: ${{ matrix.ocamlparam }}
           OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
+
+      - name: Check compilers use their own libdir under another runtime
+        if: matrix.relative_libdir == true && steps.build.conclusion == 'success' && always()
+        env:
+          INSTALL_PATH: ${{ matrix.install_path }}
+        run: |
+          prefix="$GITHUB_WORKSPACE/${INSTALL_PATH:-_install}"
+          cp -a "$prefix" "$prefix.new"
+          lib1="$("$prefix.new/bin/ocamlrun" "$prefix/bin/ocamlc.byte" -where)"
+          lib2="$("$prefix/bin/ocamlrun" "$prefix.new/bin/ocamlc.byte" -where)"
+          rm -rf "$prefix.new"
+          echo "$lib1"
+          echo "$lib2"
+          [ "$lib1" = "$prefix/lib/ocaml" ] && [ "$lib2" = "$prefix.new/lib/ocaml" ]
 
       - name: Run upstream test-in-prefix harness
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
@@ -1139,12 +711,3 @@ jobs:
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
-||||||| Upstream OCaml
-          su ocaml -c "bash -xe tools/ci/actions/runner.sh test-in-prefix"
-=======
-          MAKE_ARG=-j su ocaml -c "bash -xe tools/ci/actions/runner.sh test-in-prefix"
-      - name: Test in prefix (alternate configuration)
-        if: ${{ needs.config.outputs.full-matrix == 'true' }}
-        run: |
-          MAKE_ARG=-j su ocaml -c "bash -xe tools/ci/actions/runner.sh re-test-in-prefix"
->>>>>>> ocaml/ocaml#14244

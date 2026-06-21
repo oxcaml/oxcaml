@@ -36,6 +36,7 @@ type unit_link_info = Linkenv.unit_link_info =
     file_name : string;
     crc : Digest.t;
     imports_cmx : Import_info.t list;
+    need_stdlib : bool;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
@@ -74,12 +75,15 @@ let emit_ocamlrunparam ~ppf_dump =
 
 let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     cached_gen =
+  let need_stdlib =
+    let needs_stdlib { need_stdlib; _ } = need_stdlib in
+    List.exists needs_stdlib units
+  in
   Location.input_name := "caml_startup";
   (* set name of "current" input *)
   let startup_comp_unit =
     CU.create CU.Prefix.empty (CU.Name.of_string "_startup")
   in
-<<<<<<< OxCaml
   let startup_unit_info =
     Unit_info.make_dummy ~input_name:"caml_startup" startup_comp_unit
   in
@@ -90,23 +94,6 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
   if !Clflags.llvm_backend
   then Llvmize.begin_assembly ~is_startup:true ~sourcefile:sourcefile_for_dwarf
   else Emit.begin_assembly unix;
-||||||| Upstream OCaml
-  String.Tbl.fold (fun name intf acc ->
-      (name, intf, None, []) :: acc)
-    crc_interfaces defined
-
-let make_startup_file ~ppf_dump units_list ~crc_interfaces =
-=======
-  String.Tbl.fold (fun name intf acc ->
-      (name, intf, None, []) :: acc)
-    crc_interfaces defined
-
-let make_startup_file ~ppf_dump units_list ~crc_interfaces =
-  let need_stdlib =
-    let needs_stdlib ({ui_need_stdlib; _}, _, _) = ui_need_stdlib in
-    List.exists needs_stdlib units_list
-  in
->>>>>>> ocaml/ocaml#14244
   let compile_phrase p = Asmgen.compile_phrase ~ppf_dump p in
   let name_list = List.flatten (List.map (fun u -> u.defines) units) in
   (* In manual module init mode, entry_point and global_table should be empty *)
@@ -122,24 +109,18 @@ let make_startup_file ~ppf_dump units_list ~crc_interfaces =
   Array.iteri
     (fun i name -> compile_phrase (Cmm_helpers.predef_exception i name))
     Runtimedef.builtin_exceptions;
-<<<<<<< OxCaml
-  compile_phrase (Cmm_helpers.global_table init_name_list);
-  let globals_map = Linkenv.make_globals_map linkenv units in
-||||||| Upstream OCaml
-  compile_phrase (Cmm_helpers.global_table name_list);
-  let globals_map = make_globals_map units_list ~crc_interfaces in
-=======
-  if need_stdlib then begin
+  if need_stdlib
+  then begin
     let standard_library_default =
       Option.value ~default:Config.standard_library_default
-                   !Clflags.standard_library_default in
+        !Clflags.standard_library_default
+    in
     compile_phrase
-      (Cmm_helpers.emit_global_string_constant
-        "caml_standard_library_nat" standard_library_default)
+      (Cmm_helpers.emit_global_string_constant "caml_standard_library_nat"
+         standard_library_default)
   end;
-  compile_phrase (Cmm_helpers.global_table name_list);
-  let globals_map = make_globals_map units_list ~crc_interfaces in
->>>>>>> ocaml/ocaml#14244
+  compile_phrase (Cmm_helpers.global_table init_name_list);
+  let globals_map = Linkenv.make_globals_map linkenv units in
   compile_phrase (Cmm_helpers.globals_map globals_map);
   compile_phrase
     (Cmm_helpers.data_segment_table (startup_comp_unit :: name_list));

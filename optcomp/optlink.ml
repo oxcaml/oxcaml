@@ -44,6 +44,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       file_name : string;
       crc : Digest.t;
       imports_cmx : Import_info.t list;
+      need_stdlib : bool;
       (* for shared libs *)
       dynunit : Cmxs_format.dynunit option
     }
@@ -168,6 +169,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           defines = info.ui_defines;
           file_name = resolved_pathname;
           imports_cmx = info.ui_imports_cmx;
+          need_stdlib = info.ui_need_stdlib;
           dynunit
         }
       in
@@ -316,6 +318,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                   defines = info.li_defines;
                   file_name = resolved_pathname;
                   imports_cmx;
+                  need_stdlib = info.li_need_stdlib;
                   dynunit
                 }
               in
@@ -513,6 +516,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         defines = u.ui_defines;
         crc;
         imports_cmx = u.ui_imports_cmx;
+        need_stdlib = u.ui_need_stdlib;
         dynunit = None
       }
     in

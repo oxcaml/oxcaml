@@ -24,6 +24,7 @@ type unit_link_info =
     file_name : string;
     crc : Digest.t;
     imports_cmx : Import_info.t list;
+    need_stdlib : bool;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
