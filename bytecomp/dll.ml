@@ -138,7 +138,68 @@ let synchronize_primitive num symb =
     assert (actual_num = num)
   end
 
+(*
 external ld_conf_contents : string -> string list = "caml_dynlink_parse_ld_conf"
+*)
+
+(* The code below replaces the external above while we have a system OCaml which
+   doesn't have the caml_dynlink_parse_ld_conf primitive *)
+
+let ld_conf_contents stdlib =
+  let is_separator c = c = '/' || (Sys.win32 && c = '\\') in
+  (* Drop the trailing characters of [s] which satisfy [p] *)
+  let rec rstrip p s =
+    let n = String.length s in
+    if n > 0 && p s.[n - 1] then rstrip p (String.sub s 0 (n - 1)) else s
+  in
+  (* Split file contents into lines as the runtime does: the contents are first
+     truncated at any embedded NUL (the runtime handles them as C strings);
+     lines are then separated by '\n', with the CRs immediately preceding a '\n'
+     removed (so that CR* LF is treated as LF); a trailing newline does not
+     yield a final empty entry, but a final line with no terminating newline is
+     kept verbatim (including any trailing CR). *)
+  let lines contents =
+    let contents =
+      match String.index_opt contents '\000' with
+      | Some i -> String.sub contents 0 i
+      | None -> contents
+    in
+    let rec split = function
+      | [] -> []
+      | [last] -> if last = "" then [] else [last]
+      | line :: rest -> rstrip (Char.equal '\r') line :: split rest
+    in
+    split (String.split_on_char '\n' contents)
+  in
+  (* Resolve [path] relative to [root] when it explicitly refers to the current
+     or parent directory (".", "..", or a path beginning "./" or "../"); any
+     other entry (absolute or implicit) is returned unchanged. This mirrors
+     make_relative_path_absolute in runtime/dynlink.c. *)
+  let make_relative_path_absolute root path =
+    if path = Filename.current_dir_name then
+      root
+    else if path = Filename.parent_dir_name then
+      Filename.concat root path
+    else if Filename.is_relative path && not (Filename.is_implicit path) then
+      if String.starts_with ~prefix:Filename.parent_dir_name path then
+        Filename.concat root path
+      else
+        Filename.concat root (String.sub path 2 (String.length path - 2))
+    else
+      path
+  in
+  let parse_one_file location =
+    let root = rstrip is_separator location in
+    let ldconfname = root ^ Filename.dir_sep ^ "ld.conf" in
+    if not (Sys.file_exists ldconfname) then []
+    else
+      In_channel.with_open_bin ldconfname In_channel.input_all
+      |> lines
+      |> List.map (make_relative_path_absolute root)
+  in
+  List.filter_map Fun.id
+    [Sys.getenv_opt "OCAMLLIB"; Sys.getenv_opt "CAMLLIB"; Some stdlib]
+  |> List.concat_map parse_one_file
 
 (* Split the CAML_LD_LIBRARY_PATH environment variable and return
    the corresponding list of directories.  *)
