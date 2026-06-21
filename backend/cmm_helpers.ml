@@ -5226,7 +5226,8 @@ let predef_exception i name =
   Cdata data_items
 
 let emit_global_string_constant name value =
-  Cdata (emit_string_constant (name, Global) value [])
+  let symbol = global_symbol ~ty:typ_static_block name in
+  Cdata (emit_string_constant symbol value [])
 
 (* Header for a plugin *)
 

@@ -67,6 +67,7 @@ DISTCLEAN_FILES = \
   ocamltest/ocamltest_unix.ml \
   utils/config.common.ml \
   utils/config.generated.ml \
+  utils/config.fixed_libdir.ml \
   compilerlibs/META \
   external/ocaml-jit/lib/META \
   otherlibs/dynlink/dynlink_cmo_format.mli \

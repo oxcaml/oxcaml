@@ -81,7 +81,6 @@ val dllibs : string list ref
 val cmi_file : string option ref
 val compile_only : bool ref
 val output_name : string option ref
-<<<<<<< OxCaml
 val include_dirs : include_dir list ref
 val hidden_include_dirs : include_dir list ref
 val include_manifests : string list ref
@@ -96,14 +95,7 @@ type hidden_include_file =
 val hidden_include_files : hidden_include_file list ref
 val parse_hidden_include_file :
   cmx_guaranteed:bool -> string -> (hidden_include_file, string) result
-||||||| Upstream OCaml
-val include_dirs : string list ref
-val hidden_include_dirs : string list ref
-=======
-val include_dirs : string list ref
-val hidden_include_dirs : string list ref
 val standard_library_default : string option ref
->>>>>>> ocaml/ocaml#14244
 val no_std_include : bool ref
 val no_cwd : bool ref
 val print_types : bool ref

@@ -1,12 +1,7 @@
 (* TEST
-<<<<<<< OxCaml
-   set BUILD_PATH_PREFIX_MAP = "";
+   unset BUILD_PATH_PREFIX_MAP;
    file = "${test_source_directory}/sanitize.awk";
    file-exists;
-||||||| Upstream OCaml
-=======
-   unset BUILD_PATH_PREFIX_MAP;
->>>>>>> ocaml/ocaml#14244
    native-compiler;
    no-tsan; (* Skip, TSan inserts extra frames into backtraces *)
    linux;

@@ -45,14 +45,7 @@ let bytecode =
     run;
     check_program_output;
   ] @
-<<<<<<< OxCaml
   (if false && Ocamltest_config.native_compiler then
-    opt_build @ [compare_bytecode_programs]
-||||||| Upstream OCaml
-  (if not Sys.win32 && Ocamltest_config.native_compiler then
-    opt_build @ [compare_bytecode_programs]
-=======
-  (if not Sys.win32 && Ocamltest_config.native_compiler then
     (* If the compiler is configured using --with-relative-libdir then at
        present we can't compare the bytecode programs because ocamlc.opt and
        ocamlrun are at different levels in the build tree, but they're both
@@ -63,7 +56,6 @@ let bytecode =
       opt_build
     else
       opt_build @ [compare_bytecode_programs]
->>>>>>> ocaml/ocaml#14244
   else
     []
   )
