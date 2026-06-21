@@ -46,8 +46,6 @@ Error: The value "t" has type "int list list list t"
 
        The first mode-crosses less than the second along:
          portability: mod portable with int list list list ≰ mod portable
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
 |}]
 
 (* Test the same scenario, except it requires remembering that we ran out of
@@ -81,6 +79,4 @@ Error: The value "t" has type "int list list list Foo.t"
 
        The first mode-crosses less than the second along:
          portability: mod portable with int list list list ≰ mod portable
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
 |}]
