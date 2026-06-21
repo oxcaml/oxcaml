@@ -179,7 +179,7 @@ let write_stdlib_dune ppf =
   copy_files ~ppf "../../runtime/lib{asm,caml}run*.{a,so}";
   copy_files ~ppf "../../runtime/libcomprmarsh.a";
   copy_files ~ppf "../../Makefile.config";
-  copy_files ~ppf "../dune_rules/ld.conf"; 
+  copy_files ~ppf "../../runtime/ld.conf"; 
   fprintf ppf "%s\n" {|
   (rule (target runtime-launch-info) (action (copy ../runtime.info %{target})))
   (alias
