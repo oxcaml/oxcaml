@@ -58,6 +58,7 @@
 #include "caml/osdeps.h"
 #include "caml/signals.h"
 #include "caml/sys.h"
+#include "caml/startup.h"
 #include "caml/callback.h"
 #include "caml/startup_aux.h"
 #include "caml/major_gc.h"
@@ -681,28 +682,6 @@ CAMLprim value caml_sys_const_backend_type(value unit)
 {
   return Val_int(1); /* Bytecode backed */
 }
-<<<<<<< OxCaml
-
-CAMLprim value caml_sys_const_arch_amd64(value unit)
-{
-#if defined(__x86_64__)
-  return Val_true;
-#else
-  return Val_false;
-#endif
-}
-
-CAMLprim value caml_sys_const_arch_arm64(value unit)
-{
-#if defined(__aarch64__)
-  return Val_true;
-#else
-  return Val_false;
-#endif
-}
-
-||||||| Upstream OCaml
-=======
 
 /* The native code linker doesn't synthesise calls to this primitive, instead
    putting the required string statically in caml_standard_library_nat if any of
@@ -744,7 +723,24 @@ CAMLprim value caml_sys_get_stdlib_dirs(value vstdlib_default)
   CAMLreturn(result);
 }
 
->>>>>>> ocaml/ocaml#14244
+CAMLprim value caml_sys_const_arch_amd64(value unit)
+{
+#if defined(__x86_64__)
+  return Val_true;
+#else
+  return Val_false;
+#endif
+}
+
+CAMLprim value caml_sys_const_arch_arm64(value unit)
+{
+#if defined(__aarch64__)
+  return Val_true;
+#else
+  return Val_false;
+#endif
+}
+
 CAMLprim value caml_sys_get_config(value unit)
 {
   CAMLparam0 ();   /* unit is unused */

@@ -43,7 +43,9 @@ type 'a close_program_metadata =
 type 'a close_program_result =
   { unit : Flambda_unit.t;
     metadata : 'a close_program_metadata;
-    code_slot_offsets : Slot_offsets.t Code_id.Map.t
+    code_slot_offsets : Slot_offsets.t Code_id.Map.t;
+    needs_standard_library_default: bool
+        (* Whether some unit references [%standard_library_default]. *)
   }
 
 type close_functions_result =
@@ -1278,6 +1280,16 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
     List.fold_left_map (fun acc arg -> find_simples acc env arg) acc args
   in
   let dbg = Debuginfo.from_location loc in
+  (* [%standard_library_default] is converted to a reference to the
+     [caml_standard_library_nat] symbol, which the native linker only emits when
+     a linked unit needs it. Record the dependency here, where the primitive is
+     seen, so it can later be reported to [Compilenv] (see {!Flambda2}). *)
+  let acc =
+    match prim with
+    | Pctconst Standard_library_default ->
+      Acc.mark_needs_standard_library_default acc
+    | _ -> acc
+  in
   match prim, args with
   | Pccall prim, args ->
     let exn_continuation =
@@ -4410,7 +4422,11 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation
         ~toplevel_my_alloc_region ~body ~module_symbol
     in
-    { unit; code_slot_offsets; metadata = Normal }
+    { unit;
+      code_slot_offsets;
+      metadata = Normal;
+      needs_standard_library_default = Acc.needs_standard_library_default acc
+    }
   | Classic ->
     let all_code =
       Exported_code.add_code (Acc.code_map acc)
@@ -4429,5 +4445,6 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
           ( all_code,
             symbols_approximations,
             Acc.free_names acc,
-            Acc.slot_offsets acc )
+            Acc.slot_offsets acc );
+      needs_standard_library_default = Acc.needs_standard_library_default acc
     }

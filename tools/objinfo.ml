@@ -162,7 +162,7 @@ let print_cmi_infos name crcs kind params global_name_bindings =
       | Normal _ -> false
       | Parameter -> true
     in
-    printf "Is parameter: %s\n" (if is_param then "YES" else "no");
+    printf "Is parameter: %a\n" yesno_of_bool is_param;
     print_string "Parameters:\n";
     List.iter print_parameter_name_line params;
     begin
@@ -378,40 +378,16 @@ let print_cmx_infos (uir, sections, crc) =
       let cmx = Flambda2_cmx.Flambda_cmx_format.from_raw cmx ~sections in
       Format.printf "%a\n%!" (Flambda2_cmx.Flambda_cmx_format.print ~print_typing_env ~print_code ~print_offsets) cmx
   end;
-<<<<<<< OxCaml
   print_generic_fns uir.uir_generic_fns;
-  printf "Force link: %s\n" (if uir.uir_force_link then "YES" else "no");
+  printf "Force link: %a\n" yesno_of_bool uir.uir_force_link;
   Format.printf "@[<hv 2>Static data:@ %a@]@\n%!"
     (Format_doc.compat Slambdaeval.CU_data.print)
     (Slambdaeval.CU_data.read uir.uir_static_data ~sections);
   if not (!no_code || !no_approx) then begin
     Zero_alloc_info.Raw.print uir.uir_zero_alloc_info
-  end
-||||||| Upstream OCaml
-  let pr_funs _ fns =
-    List.iter (fun arity -> printf " %d" arity) fns in
-  printf "Currying functions:%a\n" pr_funs ui.ui_curry_fun;
-  printf "Apply functions:%a\n" pr_funs ui.ui_apply_fun;
-  printf "Send functions:%a\n" pr_funs ui.ui_send_fun;
-  printf "Force link: %s\n" (if ui.ui_force_link then "YES" else "no");
-  printf "For pack: %s\n"
-    (match ui.ui_for_pack with
-     | None -> "no"
-     | Some pack -> "YES: " ^ pack)
-=======
-  let pr_funs _ fns =
-    List.iter (fun arity -> printf " %d" arity) fns in
-  printf "Currying functions:%a\n" pr_funs ui.ui_curry_fun;
-  printf "Apply functions:%a\n" pr_funs ui.ui_apply_fun;
-  printf "Send functions:%a\n" pr_funs ui.ui_send_fun;
-  printf "Force link: %a\n" yesno_of_bool ui.ui_force_link;
-  printf "For pack: %s\n"
-    (match ui.ui_for_pack with
-     | None -> "no"
-     | Some pack -> "YES: " ^ pack);
+  end;
   printf
-    "Requires caml_standard_library_nat: %a\n" yesno_of_bool ui.ui_need_stdlib
->>>>>>> ocaml/ocaml#14244
+    "Requires caml_standard_library_nat: %a\n" yesno_of_bool uir.uir_need_stdlib
 
 let print_cmxa_infos (lib : Cmx_format.library_infos) =
   printf "Extra C object files:";
@@ -431,7 +407,7 @@ let print_cmxa_infos (lib : Cmx_format.library_infos) =
             B.iter (fun i -> f lib.lib_imports_cmx.(i)) u.li_imports_cmx)
           (fun f -> B.iter (fun i -> f lib.lib_quoted_cmi.(i)) u.li_quoted_cmi)
           (fun f -> B.iter (fun i -> f lib.lib_quoted_cmx.(i)) u.li_quoted_cmx);
-        printf "Force link: %s\n" (if u.li_force_link then "YES" else "no"))
+        printf "Force link: %a\n" yesno_of_bool u.li_force_link)
 
 let print_cmxs_infos header =
   List.iter

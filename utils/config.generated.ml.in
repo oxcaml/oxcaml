@@ -25,14 +25,8 @@ let c_compiler = {@QS@|@CC@|@QS@}
 let c_compiler_vendor = {@QS@|@ocaml_cc_vendor@|@QS@}
 let c_output_obj = {@QS@|@outputobj@|@QS@}
 let c_has_debug_prefix_map = @cc_has_debug_prefix_map@
-<<<<<<< OxCaml
 let as_debug_prefix_map_flag = {@QS@|@as_debug_prefix_map_flag@|@QS@}
-||||||| Upstream OCaml
-let as_has_debug_prefix_map = @as_has_debug_prefix_map@
-=======
-let as_has_debug_prefix_map = @as_has_debug_prefix_map@
 let as_is_cc = @as_is_cc@
->>>>>>> ocaml/ocaml#14244
 let bytecode_cflags = {@QS@|@bytecode_cflags@|@QS@}
 let bytecode_cppflags = {@QS@|@bytecode_cppflags@|@QS@}
 let native_cflags = {@QS@|@native_cflags@|@QS@}

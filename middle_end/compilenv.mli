@@ -62,7 +62,6 @@ val need_send_fun:
         (* Record the need of a currying (resp. application,
            message sending) function with the given arity *)
 
-<<<<<<< OxCaml
 val cached_zero_alloc_info : Zero_alloc_info.t
         (* Return cached information about functions
            (from other complication units) that satisfy certain properties. *)
@@ -70,17 +69,10 @@ val cached_zero_alloc_info : Zero_alloc_info.t
 val cache_zero_alloc_info : Zero_alloc_info.t -> unit
         (* [cache_zero_alloc_info c] adds [c] to [cached_zero_alloc_info] *)
 
-||||||| Upstream OCaml
-=======
 val need_stdlib_location: unit -> unit
         (* Record that caml_standard_library_nat needs to be initialised if this
            unit is linked. *)
 
-val stdlib_symbol_name: Ident.t
-        (* The name of the symbol defined globally for
-           %standard_library_default *)
-
->>>>>>> ocaml/ocaml#14244
 val new_const_symbol : unit -> string
 
 val read_unit_info: string -> unit_infos * Digest.t

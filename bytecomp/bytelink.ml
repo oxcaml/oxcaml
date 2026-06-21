@@ -19,14 +19,8 @@ open Misc
 open Config
 open Cmo_format
 
-<<<<<<< OxCaml
-module CU = Compilation_unit
-||||||| Upstream OCaml
-module Compunit = Symtable.Compunit
-=======
 module String = Misc.Stdlib.String
-module Compunit = Symtable.Compunit
->>>>>>> ocaml/ocaml#14244
+module CU = Compilation_unit
 
 module Dep = struct
   type t = CU.t * CU.t
@@ -256,31 +250,13 @@ let link_object accu output_fun currpos_fun file_name compunit =
 
 (* Link in a .cma file *)
 
-<<<<<<< OxCaml
-let link_archive output_fun currpos_fun file_name units_required =
-  let inchan = open_in_bin file_name in
-  try
-    List.iter
-      (fun cu ->
-         let name =
-           file_name ^ "(" ^ (CU.full_path_as_string cu.cu_name) ^ ")"
-         in
-||||||| Upstream OCaml
-let link_archive output_fun currpos_fun file_name units_required =
-  let inchan = open_in_bin file_name in
-  try
-    List.iter
-      (fun cu ->
-         let n = Compunit.name cu.cu_name in
-         let name = file_name ^ "(" ^ n ^ ")" in
-=======
 let link_archive accu output_fun currpos_fun file_name units_required =
   In_channel.with_open_bin file_name @@ fun inchan ->
     List.fold_left
       (fun accu cu ->
-         let n = Compunit.name cu.cu_name in
-         let name = file_name ^ "(" ^ n ^ ")" in
->>>>>>> ocaml/ocaml#14244
+         let name =
+           file_name ^ "(" ^ (CU.full_path_as_string cu.cu_name) ^ ")"
+         in
          try
            link_compunit accu output_fun currpos_fun inchan name cu
          with Symtable.Error msg ->

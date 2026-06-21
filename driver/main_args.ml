@@ -201,7 +201,6 @@ let mk_H f =
   "<dir>  Add <dir> to the list of \"hidden\" include directories\n\
  \     (Like -I, but the program can not directly reference these dependencies)"
 
-<<<<<<< OxCaml
 let mk_I_manifest f =
   "-I-manifest", Arg.String f, "<file>  Get paths that the compiler can\n\
   \    reference from a given manifest file. This option is an alternative\n\
@@ -235,13 +234,10 @@ let mk_Hx_file f =
   \    but indicates that the cmx file for the module is always available\n\
   \    (like -Ix)"
 
-||||||| Upstream OCaml
-=======
 let mk_set_runtime_default f =
   "-set-runtime-default", Arg.String f, "<param>=<value>  Set the default for \
       runtime parameter <param> to <value> (see the manual for further details)"
 
->>>>>>> ocaml/ocaml#14244
 let mk_impl f =
   "-impl", Arg.String f, "<file>  Compile <file> as a .ml file"
 
@@ -2535,12 +2531,9 @@ module Default = struct
     let _plugin _p = plugin := true
     let _pp s = preprocessor := (Some s)
     let _runtime_variant s = runtime_variant := s
-<<<<<<< OxCaml
     let _ocamlrunparam s = ocamlrunparam := s
-||||||| Upstream OCaml
-=======
+    (* TODO -set-runtime-default and -ocamlrunparam should be unified *)
     let _set_runtime_default s = Compenv.parse_runtime_parameter s
->>>>>>> ocaml/ocaml#14244
     let _stop_after pass =
       let module P = Compiler_pass in
         match P.of_string pass with
