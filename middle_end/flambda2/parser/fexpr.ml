@@ -236,14 +236,12 @@ type function_call =
 (* Will translate to indirect_known_arity or indirect_unknown_arity depending on
    whether the apply record's arities field has a value *)
 
-type method_kind =
-  | Self
-  | Public
-  | Cached
-
 type call_kind =
   | Function of function_call
-  (* | Method of { kind : method_kind; obj : simple; } *)
+  | Method of
+      { kind : Call_kind.Method_kind.t;
+        obj : simple
+      }
   | C_call of { alloc : bool }
 
 type function_arities =

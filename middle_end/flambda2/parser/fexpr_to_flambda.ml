@@ -844,6 +844,21 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             return_arity )
         | None | Some { params_arity = None; ret_arity = _ } ->
           Misc.fatal_errorf "Must specify arities for C call")
+      | Method { kind; obj } ->
+        let params_arity =
+          (* CR mshinwell: This needs fixing to cope with the fact that the
+             arities have moved onto [Apply_expr] *)
+          Flambda_arity.create_singletons
+            (List.map (fun _ -> Flambda_kind.With_subkind.any_value) args)
+        in
+        let return_arity =
+          (* CR mshinwell: This needs fixing to cope with the fact that the
+             arities have moved onto [Apply_expr] *)
+          Flambda_arity.create_singletons [Flambda_kind.With_subkind.any_value]
+        in
+        ( Call_kind.method_call kind ~obj:(simple env obj),
+          params_arity,
+          return_arity )
     in
     let inlined : Inlined_attribute.t =
       match inlined with
