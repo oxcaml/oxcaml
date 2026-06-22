@@ -4,8 +4,8 @@ let code loopify(never) size(35) newer_version_of(foo_12)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  cont self (0, 0)
-    where rec self (acc, s : val) =
+  cont `self` (0, 0)
+    where rec `self` (acc, s : val) =
       (cont self_1 (s)
          where rec self_1 (s_1 : val) =
            let prim = %int_comp.gt (s_1, 11) in
@@ -23,7 +23,7 @@ let code loopify(never) size(35) newer_version_of(foo_12)
            let s_2 = s_1 in
            let int_mul = %int_barith.mul (s_2, s_2) in
            let int_add_2 = %int_barith.add (acc, int_mul) in
-           cont self (int_add_2, int_add_1))
+           cont `self` (int_add_2, int_add_1))
 in
 let $camlMatch_in_match_seq__foo_22 = closure foo_12_1 @foo in
 let $camlMatch_in_match_seq__Pmakeblock899 =

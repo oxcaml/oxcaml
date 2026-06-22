@@ -369,6 +369,15 @@ in
         Btype.newgenvar ?name jkind)
       sdecl.ptype_params
   in
+  (* These temporary declarations can be consulted before the final
+     declaration exists, for example by early alias annotation checks on a
+     variant payload. Give them an ikind derived from the declaration jkind so
+     those checks see the same declaration-level bound information as jkind
+     checks. *)
+  let type_ikind =
+    Ikind.type_declaration_ikind_of_jkind ~env:(Some env) ~params:type_params
+      type_jkind
+  in
   (* In the temporary environment, all types get an unboxed version.
      See Note [Typechecking unboxed versions of types]. *)
   let type_unboxed_version =
@@ -376,7 +385,7 @@ in
       type_arity = arity;
       type_kind = Type_abstract abstract_source;
       type_jkind;
-      type_ikind = Types.ikinds_todo "transl_declaration initial unboxed";
+      type_ikind;
       type_private = sdecl.ptype_private;
       type_manifest = unboxed_type_manifest;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -395,7 +404,7 @@ in
       type_arity = arity;
       type_kind = Type_abstract abstract_source;
       type_jkind;
-      type_ikind = Types.ikinds_todo "transl_declaration initial";
+      type_ikind;
       type_private = sdecl.ptype_private;
       type_manifest;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
@@ -1341,12 +1350,12 @@ let gets_unboxed_version decl =
        (you'll want to consult [update_record_kind]). *)
     true
   | Type_record (lbls, repr, _) -> record_gets_unboxed_version lbls repr
+
 let derive_unboxed_version env path_in_group_has_unboxed_version decl =
   (* This must be kept in sync with the match in [gets_unboxed_version] *)
   match decl.type_kind with
   | Type_abstract _ | Type_open | Type_record_unboxed_product _
-  | Type_variant _ ->
-    None
+  | Type_variant _ -> None
   | Type_record (lbls, repr, _)
     when not (record_gets_unboxed_version lbls repr) ->
     None

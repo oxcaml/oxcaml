@@ -1907,7 +1907,7 @@ let transl_prim modname field =
   match Env.open_pers_signature modname env with
   | exception Not_found ->
       fatal_errorf "Module %s unavailable." modname
-    | _path, _mode, env -> (
+    | _path, env -> (
       match Env.find_value_by_name_lazy (Longident.Lident field) env with
       | exception Not_found ->
           fatal_errorf "Primitive %s.%s not found." modname field

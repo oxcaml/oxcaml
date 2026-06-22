@@ -115,14 +115,16 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   Value.submode_exn mode (max |> Alloc.of_const |> alloc_as_value);
   mode
 
-let register_allocation () : Alloc.lr * Value.lr =
+let register_allocation loc : Alloc.lr * Value.lr =
   let upper_bound =
     Alloc.of_const
       ~hint_comonadic:Module_allocated_on_heap
       { Alloc.Const.max with areality = Global }
   in
   let alloc_mode, _ = Alloc.newvar_below upper_bound in
-  let closed_over_mode = alloc_as_value ~hint:Skip alloc_mode in
+  let closed_over_mode =
+    alloc_as_value ~allocation:({loc; txt = Unknown}) alloc_mode
+  in
   alloc_mode, closed_over_mode
 
 open Typedtree
@@ -317,8 +319,7 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode =
 let type_open_ ?(used_slot=ref false) ?(toplevel=false) ovf env loc lid =
   Env.open_signature ~loc ~used_slot ~toplevel ovf lid env
 
-let initial_env ~loc ~initially_opened_module
-    ~open_implicit_modules =
+let initial_env ~loc ~initially_opened_module ~open_implicit_args =
   let env = Lazy.force Env.initial in
   let open_module env m =
     let open Asttypes in
@@ -329,6 +330,13 @@ let initial_env ~loc ~initially_opened_module
     in
     let _, _, env = type_open_ Override env loc {txt;loc} in
     env
+  in
+  let process_open_arg env (arg : Clflags.open_arg) =
+    match arg with
+    | Open m -> open_module env m
+    | Open_cmi cmi ->
+        let _, env = Env.open_pers_signature_cmi cmi env in
+        env
   in
   let add_units env units =
     String.Set.fold
@@ -373,7 +381,10 @@ let initial_env ~loc ~initially_opened_module
   let units_from_filenames =
     Env.persistent_structures_of_basenames basenames in
   let env = add_units env units_from_filenames in
-  List.fold_left open_module env open_implicit_modules
+  (* Process [-open] and [-open-cmi] in command-line order, so an [-open]
+     can refer to a module brought into scope by an earlier [-open-cmi]
+     (and vice-versa: a later [-open-cmi] shadows an earlier [-open]). *)
+  List.fold_left process_open_arg env open_implicit_args
 
 let type_open_descr ?used_slot ?toplevel env sod =
   let (path, _, newenv) =
@@ -3172,7 +3183,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
       let alloc_mode, closed_over_mode =
-        register_allocation ()
+        register_allocation sbody.pmod_loc
       in
       let newenv =
         Env.add_closure_lock
@@ -3634,8 +3645,8 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
   (* CR implicit-types: implement implicit variable jkinds in structures. *)
   let env = Env.clear_implicit_jkinds env in
   let names = Signature_names.create () in
-  let _, md_mode = register_allocation () in
   let loc_md = location_of_structure sstr in
+  let _, md_mode = register_allocation loc_md in
 
   let type_str_include ~loc env shape_map sincl sig_acc =
     let smodl = sincl.pincl_mod in
@@ -4297,7 +4308,7 @@ let type_package env m pack =
         let lid = Longident.unflatten n |> Option.get in
         raise (Error(modl.mod_loc, env, Scoping_pack (lid,ty))))
     fl';
-  let _, mode = register_allocation () in
+  let _, mode = register_allocation modl.mod_loc in
   let modl =
     wrap_constraint_package env true modl mty mode Tmodtype_implicit
   in

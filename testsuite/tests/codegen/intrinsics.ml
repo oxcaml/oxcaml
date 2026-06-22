@@ -661,6 +661,15 @@ module Int8_u = struct
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 end
 
+
+module Uint8_u = struct
+
+  type t = int8#
+
+  let to_int (t: t) : int = Int8_u.to_int t land 255
+end
+
+
 module Bytes = struct
   external unsafe_get : (bytes[@local_opt]) -> int -> int
     @@ portable = "%bytes_unsafe_get"

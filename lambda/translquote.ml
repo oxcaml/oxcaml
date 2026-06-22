@@ -41,7 +41,7 @@ let camlinternalQuote =
      with
     | exception Not_found ->
       fatal_errorf "Module CamlinternalQuote unavailable."
-    | path, _, env -> path, env)
+    | path, env -> path, env)
 
 let use modname field =
   lazy
@@ -2845,6 +2845,9 @@ let type_for_annotation ~env ~loc typ =
           in
           Ttyp_variant (fields, (if closed then Closed else Open), tags)
         | Tquote ty -> Ttyp_quote (go ty)
+        | Tbox ty ->
+          let lident = Untypeast.lident_of_path Predef.path_box in
+          Ttyp_constr (Predef.path_box, mkloc lident loc, [go ty])
         | Tsplice _ ->
           fatal_errorf
             "Translquote [at %a]:@ Explicitly quantified type variables@ \

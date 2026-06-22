@@ -1489,12 +1489,42 @@ let join_aliases_into_bindings ~joined_envs ~bindings equations_to_join =
       match get_types_in_joined_envs join_entry with
       | Bottom -> Misc.fatal_error "Unexpected bottom during join"
       | Ok (No_alias_in_some_env types) ->
-        let equations_to_join =
-          Name_in_target_env.Map.add
-            (Name_in_target_env.from_source_env name)
-            types equations_to_join
-        in
-        equations_to_join, bindings
+        (* If [name] is that of a lifted constant symbol generated during one of
+           the levels, then ignore it. [Simplify_expr] will already have made
+           its type suitable for the [source_env] and inserted it into that
+           environment.
+
+           This should not be necessary, but if we don't ignore the join of
+           types for lifted constants, and one of them happen to be a moderately
+           large mutually recursive set of closures, we end up computing a
+           potentially very expensive but useless meet of closure types (between
+           the type from [make_suitable_for_environment] and the one we are
+           computing during the join).
+
+           It's quite brittle to depend on the set of known lifted constants,
+           however, so we just never propagate types on symbols for now. This is
+           fine, because if [name] is a symbol that is not a lifted constant, it
+           was defined before the fork and already has an equation in the
+           [source_env]. While it is possible that its type could be refined by
+           all of the branches, it is unlikely, so we are fine with dropping the
+           equation.
+
+           CR bclement and vlaviron: This is OK (and is already what we were
+           doing with the previous join implementation); however, the n-way join
+           actually computes the same type as the one from
+           [make_suitable_for_environment] -- it would be better to simply
+           compute the type of symbols here and drop the call to
+           [make_suitable_for_environment] in [lifted_constant_state], resolving
+           at the same time the two CRs there. *)
+        if Name.is_symbol (name : Name_in_source_env.t :> Name.t)
+        then equations_to_join, bindings
+        else
+          let equations_to_join =
+            Name_in_target_env.Map.add
+              (Name_in_target_env.from_source_env name)
+              types equations_to_join
+          in
+          equations_to_join, bindings
       | Ok (Equals_in_all_envs (canonicals, kind)) -> (
         match get_canonical_in_target_env ~bindings ~joined_envs canonicals with
         | Canonical_in_source_env canonical ->
