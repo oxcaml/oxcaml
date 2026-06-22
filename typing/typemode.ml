@@ -98,6 +98,9 @@ module Mode_axis_pair = struct
     | "read_write" -> monadic Visibility Read_write
     | "static" -> monadic Staticity Static
     | "dynamic" -> monadic Staticity Dynamic
+    | "noalloc_strict" -> comonadic Allocation Noalloc_strict
+    | "noalloc" -> comonadic Allocation Noalloc
+    | "alloc" -> comonadic Allocation Alloc
     | _ -> raise Not_found
 end
 
@@ -147,6 +150,7 @@ module Transled_modifiers = struct
         Mode.Statefulness.Const.t Comonadic.Atom.t Location.loc option;
       visibility : Mode.Visibility.Const.t Monadic.Atom.t Location.loc option;
       staticity : Mode.Staticity.Const.t Monadic.Atom.t Location.loc option;
+      allocation : Mode.Allocation.Const.t Comonadic.Atom.t Location.loc option;
       (* CR-soon zqian: Create a functor [Mode.Value.Const.Make] to generate
          different type operators applied on mode constants. *)
       externality : Jkind_axis.Externality.t Location.loc option;
@@ -169,7 +173,8 @@ module Transled_modifiers = struct
       externality = None;
       nullability = None;
       separability = None;
-      staticity = None
+      staticity = None;
+      allocation = None
     }
 
   let get (type a) ~(axis : a Axis.t) (t : t) : a Location.loc option =
@@ -184,6 +189,7 @@ module Transled_modifiers = struct
     | Modal (Comonadic Statefulness) -> t.statefulness
     | Modal (Monadic Visibility) -> t.visibility
     | Modal (Monadic Staticity) -> t.staticity
+    | Modal (Comonadic Allocation) -> t.allocation
     | Nonmodal Externality -> t.externality
 
   let set (type a) ~(axis : a Axis.t) (t : t) (value : a Location.loc option) :
@@ -199,6 +205,7 @@ module Transled_modifiers = struct
     | Modal (Comonadic Statefulness) -> { t with statefulness = value }
     | Modal (Monadic Visibility) -> { t with visibility = value }
     | Modal (Monadic Staticity) -> { t with staticity = value }
+    | Modal (Comonadic Allocation) -> { t with allocation = value }
     | Nonmodal Externality -> { t with externality = value }
 
   let meet_nullability t (nullability : Nullability.t loc) =
@@ -334,6 +341,8 @@ let transl_mod_bounds annots =
             visibility =
               Some { txt = Per_axis.min (Modal (Monadic Visibility)); loc };
             staticity = None;
+            allocation =
+              Some { txt = Per_axis.min (Modal (Comonadic Allocation)); loc };
             nullability = bounds_so_far.nullability;
             separability = bounds_so_far.separability
           }
