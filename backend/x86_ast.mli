@@ -101,6 +101,24 @@ type addr =
 
 type prefetch_temporal_locality_hint = Nta | T1 | T2 | T0
 
+(* AVX512 EVEX embedded rounding / suppress-all-exceptions control. The rounding
+   modes imply SAE. *)
+type evex_rounding =
+  | Round_nearest_sae
+  | Round_down_sae
+  | Round_up_sae
+  | Round_zero_sae
+  | Sae
+
+(* AVX512 EVEX per-instruction modifiers (resolved after register allocation).
+   [mask] is the opmask register: 0 means no masking (k0), 1-7 select k1-k7.
+   [zeroing] is EVEX.z. [rounding] selects embedded rounding / SAE. *)
+type evex =
+  { mask : int;
+    zeroing : bool;
+    rounding : evex_rounding option
+  }
+
 type arg =
   | Imm of int64
   (** Operand is an immediate constant integer *)
@@ -176,6 +194,10 @@ type instruction =
   | XCHG of arg * arg
   | XOR of arg * arg
   | SIMD of Amd64_simd_instrs.instr * arg array
+  | SIMD_evex of Amd64_simd_instrs.instr * arg array * evex
+    (* An EVEX-encoded SIMD instruction with non-default modifiers (writemask,
+       zeroing, and/or embedded rounding). Instructions without such modifiers
+       (all legacy/VEX, and unmasked EVEX) use [SIMD]. *)
 
 (* ELF specific *)
 type reloc_type =

@@ -728,13 +728,58 @@ let emit_vex_rm_reg b ops rm reg ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p =
   emit_prefix_modrm b ops rm reg ~prefix:(vex_prefix_adaptor (fun b ~rexr ~rexx ~rexb ->
     emit_vex b ~rexr ~rexx ~rexb ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p))
 
+(* EVEX is a 4-byte prefix (0x62 followed by P0, P1, P2). The backend only uses
+   16 vector registers (0-15), so the register-number extensions beyond bit 3
+   (EVEX.R' for the reg field and EVEX.V' for the vvvv field) are always zero;
+   they are stored inverted, hence the constant 1 bits below. [ll] is the 2-bit
+   EVEX.L'L field (vector length, or rounding mode when broadcast/rounding is
+   selected). [p2] carries the rest of the P2 byte: the zeroing bit, the
+   broadcast/rounding-control bit, and the opmask register (aaa). *)
+let emit_evex buf ~rexr ~rexx ~rexb ~evex_m ~evex_w ~vex_v ~ll ~vex_p ~p2 =
+  buf_int8 buf 0x62;
+  (* P0: R X B R' 0 0 m m *)
+  buf_int8 buf (((rexr lxor 1) lsl 7) lor
+                ((rexx lxor 1) lsl 6) lor
+                ((rexb lxor 1) lsl 5) lor
+                (1 lsl 4) lor
+                evex_m);
+  (* P1: W vvvv 1 p p *)
+  buf_int8 buf ((evex_w lsl 7) lor
+                ((vex_v lxor 15) lsl 3) lor
+                (1 lsl 2) lor
+                vex_p);
+  (* P2: z L'L b V' a a a *)
+  buf_int8 buf ((ll lsl 5) lor (1 lsl 3) lor p2)
+
+let emit_evex_rm_reg b ops rm reg ~evex_m ~evex_w ~vex_v ~ll ~vex_p ~p2 =
+  let evex_w = Bool.to_int evex_w in
+  let prefix =
+    vex_prefix_adaptor (fun b ~rexr ~rexx ~rexb ->
+        emit_evex b ~rexr ~rexx ~rexb ~evex_m ~evex_w ~vex_v ~ll ~vex_p ~p2)
+  in
+  emit_prefix_modrm b ops rm reg ~prefix
+
 let rd_of_reg = function
   | Regf reg -> rd_of_regf reg
   | Reg16 reg | Reg32 reg | Reg64 reg -> rd_of_reg64 reg
   | _ -> assert false
 
-let emit_simd b (instr : Amd64_simd_instrs.instr) args =
+let emit_simd b (instr : Amd64_simd_instrs.instr) args (evex : evex) =
   let open Amd64_simd_defs in
+  (* Resolve the EVEX P2 byte modifiers (zeroing, broadcast/rounding bit, and
+     opmask) and the rounding-mode override of L'L. *)
+  let evex_b, evex_rc_ll =
+    match evex.rounding with
+    | None -> 0, None
+    | Some Sae -> 1, None
+    | Some Round_nearest_sae -> 1, Some 0
+    | Some Round_down_sae -> 1, Some 1
+    | Some Round_up_sae -> 1, Some 2
+    | Some Round_zero_sae -> 1, Some 3
+  in
+  let evex_p2 =
+    ((if evex.zeroing then 1 else 0) lsl 7) lor (evex_b lsl 4) lor evex.mask
+  in
   let imm, args =
     let n = Array.length args in
     match instr.imm with
@@ -830,6 +875,11 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
     | Prx_F3 -> 2
     | Prx_F2 -> 3
   in
+  let evex_length = function
+    | L128 -> 0
+    | L256 -> 1
+    | L512 -> 2
+  in
   (match instr.enc.rm_reg, instr.enc.prefix with
   | Spec rmod, Legacy { prefix; rex; escape; operand_size_override } ->
     let rm = rm_only () in
@@ -846,7 +896,19 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
   | Spec rmod, Vex { vex_m; vex_w; vex_l; vex_p } ->
     let rm, vex_v = rm_vexv () in
     emit_vex_rm_reg b [instr.enc.opcode] rm rmod
-      ~vex_m:(vex_map vex_m) ~vex_w ~vex_v ~vex_l ~vex_p:(vex_prefix vex_p));
+      ~vex_m:(vex_map vex_m) ~vex_w ~vex_v ~vex_l ~vex_p:(vex_prefix vex_p)
+  | Reg, Evex { evex_m; evex_w; evex_l; evex_p } ->
+    let rm, vex_v, reg = rm_vexv_reg () in
+    let ll = match evex_rc_ll with Some rc -> rc | None -> evex_length evex_l in
+    emit_evex_rm_reg b [instr.enc.opcode] rm reg
+      ~evex_m:(vex_map evex_m) ~evex_w ~vex_v ~ll
+      ~vex_p:(vex_prefix evex_p) ~p2:evex_p2
+  | Spec rmod, Evex { evex_m; evex_w; evex_l; evex_p } ->
+    let rm, vex_v = rm_vexv () in
+    let ll = match evex_rc_ll with Some rc -> rc | None -> evex_length evex_l in
+    emit_evex_rm_reg b [instr.enc.opcode] rm rmod
+      ~evex_m:(vex_map evex_m) ~evex_w ~vex_v ~ll
+      ~vex_p:(vex_prefix evex_p) ~p2:evex_p2);
   match imm with
   | Some (Imm imm) -> buf_int8 b (Int64.to_int imm)
   | Some (Regf (XMM n | YMM n | ZMM n)) -> buf_int8 b (n lsl 4)
@@ -1497,7 +1559,9 @@ let assemble_instr b loc = function
   | TEST (src, dst) -> emit_test b dst src
   | XCHG (src, dst) -> emit_XCHG b dst src
   | XOR (src, dst) -> emit_XOR b dst src
-  | SIMD (instr, args) -> emit_simd b instr args
+  | SIMD (instr, args) ->
+    emit_simd b instr args { mask = 0; zeroing = false; rounding = None }
+  | SIMD_evex (instr, args, evex) -> emit_simd b instr args evex
 
 
 let[@warning "+4"] constant b cst

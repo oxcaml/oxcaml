@@ -1123,27 +1123,27 @@ MONITOR,0F 01 C8,,NA,NA,NA,NA
 "VMOVDQU8 xmm1 {k1}{z},xmm2/m128",EVEX.128.F2.0F.W0 6F /r,AVX512VL AVX512BW,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVDQU8 ymm1 {k1}{z},ymm2/m256",EVEX.256.F2.0F.W0 6F /r,AVX512VL AVX512BW,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVDQU8 zmm1 {k1}{z},zmm2/m512",EVEX.512.F2.0F.W0 6F /r,AVX512BW,ModRM:reg (w),ModRM:r/m (r),NA,NA
-"VMOVDQU8 xmm2/m128 {k1}{z},xmm1",EVEX.128.F2.0F.W0 7F /r,AVX512VL AVX512BW,ModRM:r/m (r),ModRM:reg (w),NA,NA
-"VMOVDQU8 ymm2/m256 {k1}{z},ymm1",EVEX.256.F2.0F.W0 7F /r,AVX512VL AVX512BW,ModRM:r/m (r),ModRM:reg (w),NA,NA
-"VMOVDQU8 zmm2/m512 {k1}{z},zmm1",EVEX.512.F2.0F.W0 7F /r,AVX512BW,ModRM:r/m (r),ModRM:reg (w),NA,NA
+"VMOVDQU8 xmm2/m128 {k1}{z},xmm1",EVEX.128.F2.0F.W0 7F /r,AVX512VL AVX512BW,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"VMOVDQU8 ymm2/m256 {k1}{z},ymm1",EVEX.256.F2.0F.W0 7F /r,AVX512VL AVX512BW,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"VMOVDQU8 zmm2/m512 {k1}{z},zmm1",EVEX.512.F2.0F.W0 7F /r,AVX512BW,ModRM:r/m (w),ModRM:reg (r),NA,NA
 "VMOVDQU16 xmm1 {k1}{z},xmm2/m128",EVEX.128.F2.0F.W1 6F /r,AVX512VL AVX512BW,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVDQU16 ymm1 {k1}{z},ymm2/m256",EVEX.256.F2.0F.W1 6F /r,AVX512VL AVX512BW,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVDQU16 zmm1 {k1}{z},zmm2/m512",EVEX.512.F2.0F.W1 6F /r,AVX512BW,ModRM:reg (w),ModRM:r/m (r),NA,NA
-"VMOVDQU16 xmm2/m128 {k1}{z},xmm1",EVEX.128.F2.0F.W1 7F /r,AVX512VL AVX512BW,ModRM:r/m (r),ModRM:reg (w),NA,NA
-"VMOVDQU16 ymm2/m256 {k1}{z},ymm1",EVEX.256.F2.0F.W1 7F /r,AVX512VL AVX512BW,ModRM:r/m (r),ModRM:reg (w),NA,NA
-"VMOVDQU16 zmm2/m512 {k1}{z},zmm1",EVEX.512.F2.0F.W1 7F /r,AVX512BW,ModRM:r/m (r),ModRM:reg (w),NA,NA
+"VMOVDQU16 xmm2/m128 {k1}{z},xmm1",EVEX.128.F2.0F.W1 7F /r,AVX512VL AVX512BW,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"VMOVDQU16 ymm2/m256 {k1}{z},ymm1",EVEX.256.F2.0F.W1 7F /r,AVX512VL AVX512BW,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"VMOVDQU16 zmm2/m512 {k1}{z},zmm1",EVEX.512.F2.0F.W1 7F /r,AVX512BW,ModRM:r/m (w),ModRM:reg (r),NA,NA
 "VMOVDQU32 xmm1 {k1}{z},xmm2/m128",EVEX.128.F3.0F.W0 6F /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVDQU32 ymm1 {k1}{z},ymm2/m256",EVEX.256.F3.0F.W0 6F /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVDQU32 zmm1 {k1}{z},zmm2/m512",EVEX.512.F3.0F.W0 6F /r,AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
-"VMOVDQU32 xmm2/m128 {k1}{z},xmm1",EVEX.128.F3.0F.W0 7F /r,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (w),NA,NA
-"VMOVDQU32 ymm2/m256 {k1}{z},ymm1",EVEX.256.F3.0F.W0 7F /r,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (w),NA,NA
-"VMOVDQU32 zmm2/m512 {k1}{z},zmm1",EVEX.512.F3.0F.W0 7F /r,AVX512F,ModRM:r/m (r),ModRM:reg (w),NA,NA
+"VMOVDQU32 xmm2/m128 {k1}{z},xmm1",EVEX.128.F3.0F.W0 7F /r,AVX512VL AVX512F,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"VMOVDQU32 ymm2/m256 {k1}{z},ymm1",EVEX.256.F3.0F.W0 7F /r,AVX512VL AVX512F,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"VMOVDQU32 zmm2/m512 {k1}{z},zmm1",EVEX.512.F3.0F.W0 7F /r,AVX512F,ModRM:r/m (w),ModRM:reg (r),NA,NA
 "VMOVDQU64 xmm1 {k1}{z},xmm2/m128",EVEX.128.F3.0F.W1 6F /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVDQU64 ymm1 {k1}{z},ymm2/m256",EVEX.256.F3.0F.W1 6F /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVDQU64 zmm1 {k1}{z},zmm2/m512",EVEX.512.F3.0F.W1 6F /r,AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
-"VMOVDQU64 xmm2/m128 {k1}{z},xmm1",EVEX.128.F3.0F.W1 7F /r,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (w),NA,NA
-"VMOVDQU64 ymm2/m256 {k1}{z},ymm1",EVEX.256.F3.0F.W1 7F /r,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (w),NA,NA
-"VMOVDQU64 zmm2/m512 {k1}{z},zmm1",EVEX.512.F3.0F.W1 7F /r,AVX512F,ModRM:r/m (r),ModRM:reg (w),NA,NA
+"VMOVDQU64 xmm2/m128 {k1}{z},xmm1",EVEX.128.F3.0F.W1 7F /r,AVX512VL AVX512F,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"VMOVDQU64 ymm2/m256 {k1}{z},ymm1",EVEX.256.F3.0F.W1 7F /r,AVX512VL AVX512F,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"VMOVDQU64 zmm2/m512 {k1}{z},zmm1",EVEX.512.F3.0F.W1 7F /r,AVX512F,ModRM:r/m (w),ModRM:reg (r),NA,NA
 "MOVHLPS xmm1, xmm2",NP 0F 12 /r,SSE,"ModRM:reg (r, w)",ModRM:r/m (r),NA,NA
 "VMOVHLPS xmm1, xmm2, xmm3",VEX.NDS.128.0F.WIG 12 /r,AVX,"ModRM:reg (w)",VEX.vvvv (r),ModRM:r/m (r),NA
 "VMOVHLPS xmm1, xmm2, xmm3",EVEX.NDS.128.0F.W0 12 /r,AVX512F,"ModRM:reg (w)",VEX.vvvv (r),ModRM:r/m (r),NA
@@ -2683,7 +2683,7 @@ UD2,0F 0B,,NA,NA,NA,NA
 "VCVTTPD2QQ ymm1 {k1}{z}, ymm2/m256/m64bcst",EVEX.256.66.0F.W1 7A /r,AVX512VL AVX512DQ,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VCVTTPD2QQ zmm1 {k1}{z}, zmm2/m512/m64bcst{sae}",EVEX.512.66.0F.W1 7A /r,AVX512DQ,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VCVTTPD2UDQ xmm1 {k1}{z}, xmm2/m128/m64bcst",EVEX.128.0F.W1 78 /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
-"VCVTTPD2UDQ xmm1 {k1}{z}, ymm2/m256/m64bcst",EVEX.256.0F.W1 78 02 /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
+"VCVTTPD2UDQ xmm1 {k1}{z}, ymm2/m256/m64bcst",EVEX.256.0F.W1 78 /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VCVTTPD2UDQ ymm1 {k1}{z}, zmm2/m512/m64bcst{sae}",EVEX.512.0F.W1 78 /r,AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VCVTTPD2UQQ xmm1 {k1}{z}, xmm2/m128/m64bcst",EVEX.128.66.0F.W1 78 /r,AVX512VL AVX512DQ,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VCVTTPD2UQQ ymm1 {k1}{z}, ymm2/m256/m64bcst",EVEX.256.66.0F.W1 78 /r,AVX512VL AVX512DQ,ModRM:reg (w),ModRM:r/m (r),NA,NA
@@ -2984,12 +2984,12 @@ VERW r/m16,0F 00 /5,,,,,
 "VGATHERQPD xmm1, vm64x, xmm2",VEX.DDS.128.66.0F38.W1 93 /r,AVX2,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index","VEX.vvvv (r, w)",NA
 "VGATHERDPD ymm1, vm32x, ymm2",VEX.DDS.256.66.0F38.W1 92 /r,AVX2,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index","VEX.vvvv (r, w)",NA
 "VGATHERQPD ymm1, vm64y, ymm2",VEX.DDS.256.66.0F38.W1 93 /r,AVX2,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index","VEX.vvvv (r, w)",NA
-"VGATHERDPS xmm1 {k1}, vm32x",EVEX.128.66.0F38.W0 92 /vsib,AVX512VL AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VGATHERDPS ymm1 {k1}, vm32y",EVEX.256.66.0F38.W0 92 /vsib,AVX512VL AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VGATHERDPS zmm1 {k1}, vm32z",EVEX.512.66.0F38.W0 92 /vsib,AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VGATHERDPD xmm1 {k1}, vm32x",EVEX.128.66.0F38.W1 92 /vsib,AVX512VL AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VGATHERDPD ymm1 {k1}, vm32x",EVEX.256.66.0F38.W1 92 /vsib,AVX512VL AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VGATHERDPD zmm1 {k1}, vm32y",EVEX.512.66.0F38.W1 92 /vsib,AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VGATHERDPS xmm1 {k1}, vm32x",EVEX.128.66.0F38.W0 92 /vsib,AVX512VL AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VGATHERDPS ymm1 {k1}, vm32y",EVEX.256.66.0F38.W0 92 /vsib,AVX512VL AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VGATHERDPS zmm1 {k1}, vm32z",EVEX.512.66.0F38.W0 92 /vsib,AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VGATHERDPD xmm1 {k1}, vm32x",EVEX.128.66.0F38.W1 92 /vsib,AVX512VL AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VGATHERDPD ymm1 {k1}, vm32x",EVEX.256.66.0F38.W1 92 /vsib,AVX512VL AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VGATHERDPD zmm1 {k1}, vm32y",EVEX.512.66.0F38.W1 92 /vsib,AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
 "VGATHERDPS xmm1, vm32x, xmm2",VEX.DDS.128.66.0F38.W0 92 /r,AVX2,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index","VEX.vvvv (r, w)",NA
 "VGATHERQPS xmm1, vm64x, xmm2",VEX.DDS.128.66.0F38.W0 93 /r,AVX2,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index","VEX.vvvv (r, w)",NA
 "VGATHERDPS ymm1, vm32y, ymm2",VEX.DDS.256.66.0F38.W0 92 /r,AVX2,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index","VEX.vvvv (r, w)",NA
@@ -3002,12 +3002,12 @@ VGATHERPF1DPS vm32z {k1},EVEX.512.66.0F38.W0 C6 /2 /vsib,AVX512PF,"BaseReg (R): 
 VGATHERPF1QPS vm64z {k1},EVEX.512.66.0F38.W0 C7 /2 /vsib,AVX512PF,"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA,NA
 VGATHERPF1DPD vm32y {k1},EVEX.512.66.0F38.W1 C6 /2 /vsib,AVX512PF,"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA,NA
 VGATHERPF1QPD vm64z {k1},EVEX.512.66.0F38.W1 C7 /2 /vsib,AVX512PF,"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA,NA
-"VGATHERQPS xmm1 {k1}, vm64x",EVEX.128.66.0F38.W0 93 /vsib,AVX512VL AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VGATHERQPS xmm1 {k1}, vm64y",EVEX.256.66.0F38.W0 93 /vsib,AVX512VL AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VGATHERQPS ymm1 {k1}, vm64z",EVEX.512.66.0F38.W0 93 /vsib,AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VGATHERQPD xmm1 {k1}, vm64x",EVEX.128.66.0F38.W1 93 /vsib,AVX512VL AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VGATHERQPD ymm1 {k1}, vm64y",EVEX.256.66.0F38.W1 93 /vsib,AVX512VL AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VGATHERQPD zmm1 {k1}, vm64z",EVEX.512.66.0F38.W1 93 /vsib,AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VGATHERQPS xmm1 {k1}, vm64x",EVEX.128.66.0F38.W0 93 /vsib,AVX512VL AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VGATHERQPS xmm1 {k1}, vm64y",EVEX.256.66.0F38.W0 93 /vsib,AVX512VL AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VGATHERQPS ymm1 {k1}, vm64z",EVEX.512.66.0F38.W0 93 /vsib,AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VGATHERQPD xmm1 {k1}, vm64x",EVEX.128.66.0F38.W1 93 /vsib,AVX512VL AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VGATHERQPD ymm1 {k1}, vm64y",EVEX.256.66.0F38.W1 93 /vsib,AVX512VL AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VGATHERQPD zmm1 {k1}, vm64z",EVEX.512.66.0F38.W1 93 /vsib,AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
 "VGETEXPPD xmm1 {k1}{z}, xmm2/m128/m64bcst",EVEX.128.66.0F38.W1 42 /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VGETEXPPD ymm1 {k1}{z}, ymm2/m256/m64bcst",EVEX.256.66.0F38.W1 42 /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VGETEXPPD zmm1 {k1}{z}, zmm2/m512/m64bcst{sae}",EVEX.512.66.0F38.W1 42 /r,AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
@@ -3209,12 +3209,12 @@ VGATHERPF1QPD vm64z {k1},EVEX.512.66.0F38.W1 C7 /2 /vsib,AVX512PF,"BaseReg (R): 
 "VPEXPANDQ xmm1 {k1}{z}, xmm2/m128",EVEX.128.66.0F38.W1 89 /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VPEXPANDQ ymm1 {k1}{z}, ymm2/m256",EVEX.256.66.0F38.W1 89 /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VPEXPANDQ zmm1 {k1}{z}, zmm2/m512",EVEX.512.66.0F38.W1 89 /r,AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
-"VPGATHERDD xmm1 {k1}, vm32x",EVEX.128.66.0F38.W0 90 /vsib,AVX512VL AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VPGATHERDD ymm1 {k1}, vm32y",EVEX.256.66.0F38.W0 90 /vsib,AVX512VL AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VPGATHERDD zmm1 {k1}, vm32z",EVEX.512.66.0F38.W0 90 /vsib,AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VPGATHERDQ xmm1 {k1}, vm32x",EVEX.128.66.0F38.W1 90 /vsib,AVX512VL AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VPGATHERDQ ymm1 {k1}, vm32x",EVEX.256.66.0F38.W1 90 /vsib,AVX512VL AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VPGATHERDQ zmm1 {k1}, vm32y",EVEX.512.66.0F38.W1 90 /vsib,AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VPGATHERDD xmm1 {k1}, vm32x",EVEX.128.66.0F38.W0 90 /vsib,AVX512VL AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VPGATHERDD ymm1 {k1}, vm32y",EVEX.256.66.0F38.W0 90 /vsib,AVX512VL AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VPGATHERDD zmm1 {k1}, vm32z",EVEX.512.66.0F38.W0 90 /vsib,AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VPGATHERDQ xmm1 {k1}, vm32x",EVEX.128.66.0F38.W1 90 /vsib,AVX512VL AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VPGATHERDQ ymm1 {k1}, vm32x",EVEX.256.66.0F38.W1 90 /vsib,AVX512VL AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VPGATHERDQ zmm1 {k1}, vm32y",EVEX.512.66.0F38.W1 90 /vsib,AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
 "VPGATHERDD xmm1, vm32x, xmm2",VEX.DDS.128.66.0F38.W0 90 /r,AVX2,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index","VEX.vvvv (r, w)",NA
 "VPGATHERQD xmm1, vm64x, xmm2",VEX.DDS.128.66.0F38.W0 91 /r,AVX2,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index","VEX.vvvv (r, w)",NA
 "VPGATHERDD ymm1, vm32y, ymm2",VEX.DDS.256.66.0F38.W0 90 /r,AVX2,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index","VEX.vvvv (r, w)",NA
@@ -3223,12 +3223,12 @@ VGATHERPF1QPD vm64z {k1},EVEX.512.66.0F38.W1 C7 /2 /vsib,AVX512PF,"BaseReg (R): 
 "VPGATHERQQ xmm1, vm64x, xmm2",VEX.DDS.128.66.0F38.W1 91 /r,AVX2,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index","VEX.vvvv (r, w)",NA
 "VPGATHERDQ ymm1, vm32x, ymm2",VEX.DDS.256.66.0F38.W1 90 /r,AVX2,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index","VEX.vvvv (r, w)",NA
 "VPGATHERQQ ymm1, vm64y, ymm2",VEX.DDS.256.66.0F38.W1 91 /r,AVX2,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index","VEX.vvvv (r, w)",NA
-"VPGATHERQD xmm1 {k1}, vm64x",EVEX.128.66.0F38.W0 91 /vsib,AVX512VL AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VPGATHERQD xmm1 {k1}, vm64y",EVEX.256.66.0F38.W0 91 /vsib,AVX512VL AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VPGATHERQD ymm1 {k1}, vm64z",EVEX.512.66.0F38.W0 91 /vsib,AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VPGATHERQQ xmm1 {k1}, vm64x",EVEX.128.66.0F38.W1 91 /vsib,AVX512VL AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VPGATHERQQ ymm1 {k1}, vm64y",EVEX.256.66.0F38.W1 91 /vsib,AVX512VL AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
-"VPGATHERQQ zmm1 {k1}, vm64z",EVEX.512.66.0F38.W1 91 /vsib,AVX512F,ModRM:reg (w),"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VPGATHERQD xmm1 {k1}, vm64x",EVEX.128.66.0F38.W0 91 /vsib,AVX512VL AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VPGATHERQD xmm1 {k1}, vm64y",EVEX.256.66.0F38.W0 91 /vsib,AVX512VL AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VPGATHERQD ymm1 {k1}, vm64z",EVEX.512.66.0F38.W0 91 /vsib,AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VPGATHERQQ xmm1 {k1}, vm64x",EVEX.128.66.0F38.W1 91 /vsib,AVX512VL AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VPGATHERQQ ymm1 {k1}, vm64y",EVEX.256.66.0F38.W1 91 /vsib,AVX512VL AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
+"VPGATHERQQ zmm1 {k1}, vm64z",EVEX.512.66.0F38.W1 91 /vsib,AVX512F,"ModRM:reg (r,w)","BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA
 "VPLZCNTD xmm1 {k1}{z}, xmm2/m128/m32bcst",EVEX.128.66.0F38.W0 44 /r,AVX512VL AVX512CD,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VPLZCNTD ymm1 {k1}{z}, ymm2/m256/m32bcst",EVEX.256.66.0F38.W0 44 /r,AVX512VL AVX512CD,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VPLZCNTD zmm1 {k1}{z}, zmm2/m512/m32bcst",EVEX.512.66.0F38.W0 44 /r,AVX512CD,ModRM:reg (w),ModRM:r/m (r),NA,NA
@@ -3345,18 +3345,18 @@ VGATHERPF1QPD vm64z {k1},EVEX.512.66.0F38.W1 C7 /2 /vsib,AVX512PF,"BaseReg (R): 
 "VPRORD zmm1 {k1}{z}, zmm2/m512/m32bcst, imm8",EVEX.NDD.512.66.0F.W0 72 /0 ib,AVX512F,VEX.vvvv (w),ModRM:r/m (R),Imm8,NA
 "VPRORVQ zmm1 {k1}{z}, zmm2, zmm3/m512/m64bcst",EVEX.NDS.512.66.0F38.W1 14 /r,AVX512F,ModRM:reg (w),EVEX.vvvv (r),ModRM:r/m (r),NA
 "VPRORQ zmm1 {k1}{z}, zmm2/m512/m64bcst, imm8",EVEX.NDD.512.66.0F.W1 72 /0 ib,AVX512F,VEX.vvvv (w),ModRM:r/m (R),Imm8,NA
-"VPSCATTERDD vm32x {k1}, xmm1",EVEX.128.66.0F38.W0 A0 /vsib,AVX512VL AVX512F,,,,
-"VPSCATTERDD vm32y {k1}, ymm1",EVEX.256.66.0F38.W0 A0 /vsib,AVX512VL AVX512F,,,,
-"VPSCATTERDD vm32z {k1}, zmm1",EVEX.512.66.0F38.W0 A0 /vsib,AVX512F,,,,
-"VPSCATTERDQ vm32x {k1}, xmm1",EVEX.128.66.0F38.W1 A0 /vsib,AVX512VL AVX512F,,,,
-"VPSCATTERDQ vm32x {k1}, ymm1",EVEX.256.66.0F38.W1 A0 /vsib,AVX512VL AVX512F,,,,
-"VPSCATTERDQ vm32y {k1}, zmm1",EVEX.512.66.0F38.W1 A0 /vsib,AVX512F,,,,
-"VPSCATTERQD vm64x {k1}, xmm1",EVEX.128.66.0F38.W0 A1 /vsib,AVX512VL AVX512F,,,,
-"VPSCATTERQD vm64y {k1}, xmm1",EVEX.256.66.0F38.W0 A1 /vsib,AVX512VL AVX512F,,,,
-"VPSCATTERQD vm64z {k1}, ymm1",EVEX.512.66.0F38.W0 A1 /vsib,AVX512F,,,,
-"VPSCATTERQQ vm64x {k1}, xmm1",EVEX.128.66.0F38.W1 A1 /vsib,AVX512VL AVX512F,,,,
-"VPSCATTERQQ vm64y {k1}, ymm1",EVEX.256.66.0F38.W1 A1 /vsib,AVX512VL AVX512F,,,,
-"VPSCATTERQQ vm64z {k1}, zmm1",EVEX.512.66.0F38.W1 A1 /vsib,AVX512F,,,,
+"VPSCATTERDD vm32x {k1}, xmm1",EVEX.128.66.0F38.W0 A0 /vsib,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VPSCATTERDD vm32y {k1}, ymm1",EVEX.256.66.0F38.W0 A0 /vsib,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VPSCATTERDD vm32z {k1}, zmm1",EVEX.512.66.0F38.W0 A0 /vsib,AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VPSCATTERDQ vm32x {k1}, xmm1",EVEX.128.66.0F38.W1 A0 /vsib,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VPSCATTERDQ vm32x {k1}, ymm1",EVEX.256.66.0F38.W1 A0 /vsib,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VPSCATTERDQ vm32y {k1}, zmm1",EVEX.512.66.0F38.W1 A0 /vsib,AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VPSCATTERQD vm64x {k1}, xmm1",EVEX.128.66.0F38.W0 A1 /vsib,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VPSCATTERQD vm64y {k1}, xmm1",EVEX.256.66.0F38.W0 A1 /vsib,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VPSCATTERQD vm64z {k1}, ymm1",EVEX.512.66.0F38.W0 A1 /vsib,AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VPSCATTERQQ vm64x {k1}, xmm1",EVEX.128.66.0F38.W1 A1 /vsib,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VPSCATTERQQ vm64y {k1}, ymm1",EVEX.256.66.0F38.W1 A1 /vsib,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VPSCATTERQQ vm64z {k1}, zmm1",EVEX.512.66.0F38.W1 A1 /vsib,AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
 "VPSLLVD xmm1, xmm2, xmm3/m128",VEX.NDS.128.66.0F38.W0 47 /r,AVX2,ModRM:reg (w),VEX.vvvv (r),ModRM:r/m (r),NA
 "VPSLLVQ xmm1, xmm2, xmm3/m128",VEX.NDS.128.66.0F38.W1 47 /r,AVX2,ModRM:reg (w),VEX.vvvv (r),ModRM:r/m (r),NA
 "VPSLLVD ymm1, ymm2, ymm3/m256",VEX.NDS.256.66.0F38.W0 47 /r,AVX2,ModRM:reg (w),VEX.vvvv (r),ModRM:r/m (r),NA
@@ -3480,18 +3480,18 @@ VGATHERPF1QPD vm64z {k1},EVEX.512.66.0F38.W1 C7 /2 /vsib,AVX512PF,"BaseReg (R): 
 "VSCALEFPS zmm1 {k1}{z}, zmm2, zmm3/m512/m32bcst{er}",EVEX.NDS.512.66.0F38.W0 2C /r,AVX512F,ModRM:reg (w),EVEX.vvvv (r),ModRM:r/m (r),NA
 "VSCALEFSD xmm1 {k1}{z}, xmm2, xmm3/m64{er}",EVEX.NDS.LIG.66.0F38.W1 2D /r,AVX512F,ModRM:reg (w),EVEX.vvvv (r),ModRM:r/m (r),NA
 "VSCALEFSS xmm1 {k1}{z}, xmm2, xmm3/m32{er}",EVEX.NDS.LIG.66.0F38.W0 2D /r,AVX512F,ModRM:reg (w),EVEX.vvvv (r),ModRM:r/m (r),NA
-"VSCATTERDPS vm32x {k1}, xmm1",EVEX.128.66.0F38.W0 A2 /vsib,AVX512VL AVX512F,,,,
-"VSCATTERDPS vm32y {k1}, ymm1",EVEX.256.66.0F38.W0 A2 /vsib,AVX512VL AVX512F,,,,
-"VSCATTERDPS vm32z {k1}, zmm1",EVEX.512.66.0F38.W0 A2 /vsib,AVX512F,,,,
-"VSCATTERDPD vm32x {k1}, xmm1",EVEX.128.66.0F38.W1 A2 /vsib,AVX512VL AVX512F,,,,
-"VSCATTERDPD vm32x {k1}, ymm1",EVEX.256.66.0F38.W1 A2 /vsib,AVX512VL AVX512F,,,,
-"VSCATTERDPD vm32y {k1}, zmm1",EVEX.512.66.0F38.W1 A2 /vsib,AVX512F,,,,
-"VSCATTERQPS vm64x {k1}, xmm1",EVEX.128.66.0F38.W0 A3 /vsib,AVX512VL AVX512F,,,,
-"VSCATTERQPS vm64y {k1}, xmm1",EVEX.256.66.0F38.W0 A3 /vsib,AVX512VL AVX512F,,,,
-"VSCATTERQPS vm64z {k1}, ymm1",EVEX.512.66.0F38.W0 A3 /vsib,AVX512F,,,,
-"VSCATTERQPD vm64x {k1}, xmm1",EVEX.128.66.0F38.W1 A3 /vsib,AVX512VL AVX512F,,,,
-"VSCATTERQPD vm64y {k1}, ymm1",EVEX.256.66.0F38.W1 A3 /vsib,AVX512VL AVX512F,,,,
-"VSCATTERQPD vm64z {k1}, zmm1",EVEX.512.66.0F38.W1 A3 /vsib,AVX512F,,,,
+"VSCATTERDPS vm32x {k1}, xmm1",EVEX.128.66.0F38.W0 A2 /vsib,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VSCATTERDPS vm32y {k1}, ymm1",EVEX.256.66.0F38.W0 A2 /vsib,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VSCATTERDPS vm32z {k1}, zmm1",EVEX.512.66.0F38.W0 A2 /vsib,AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VSCATTERDPD vm32x {k1}, xmm1",EVEX.128.66.0F38.W1 A2 /vsib,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VSCATTERDPD vm32x {k1}, ymm1",EVEX.256.66.0F38.W1 A2 /vsib,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VSCATTERDPD vm32y {k1}, zmm1",EVEX.512.66.0F38.W1 A2 /vsib,AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VSCATTERQPS vm64x {k1}, xmm1",EVEX.128.66.0F38.W0 A3 /vsib,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VSCATTERQPS vm64y {k1}, xmm1",EVEX.256.66.0F38.W0 A3 /vsib,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VSCATTERQPS vm64z {k1}, ymm1",EVEX.512.66.0F38.W0 A3 /vsib,AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VSCATTERQPD vm64x {k1}, xmm1",EVEX.128.66.0F38.W1 A3 /vsib,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VSCATTERQPD vm64y {k1}, ymm1",EVEX.256.66.0F38.W1 A3 /vsib,AVX512VL AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
+"VSCATTERQPD vm64z {k1}, zmm1",EVEX.512.66.0F38.W1 A3 /vsib,AVX512F,ModRM:r/m (r),ModRM:reg (r),NA,NA
 VSCATTERPF0DPS vm32z {k1},EVEX.512.66.0F38.W0 C6 /5 /vsib,AVX512PF,"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA,NA
 VSCATTERPF0QPS vm64z {k1},EVEX.512.66.0F38.W0 C7 /5 /vsib,AVX512PF,"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA,NA
 VSCATTERPF0DPD vm32y {k1},EVEX.512.66.0F38.W1 C6 /5 /vsib,AVX512PF,"BaseReg (R): VSIB:base, VectorReg(R): VSIB:index",NA,NA,NA

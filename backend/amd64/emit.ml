@@ -128,7 +128,7 @@ module I = struct
                enabled."
               !function_name))
 
-  let simd (simd : Simd_instrs.instr) args =
+  let check_enabled (simd : Simd_instrs.instr) =
     if not (Arch.Extension.enabled_instruction simd)
     then
       raise
@@ -136,8 +136,15 @@ module I = struct
            (Printf.sprintf
               "found '%s' whilst emitting %s, but %s is not enabled."
               simd.mnemonic !function_name
-              (Amd64_simd_defs.exts_to_string simd.ext)));
+              (Amd64_simd_defs.exts_to_string simd.ext)))
+
+  let simd (simd : Simd_instrs.instr) args =
+    check_enabled simd;
     I.simd simd args
+
+  let simd_evex evex (simd : Simd_instrs.instr) args =
+    check_enabled simd;
+    I.simd_evex evex simd args
 end
 
 (** Turn a Linear label into an assembly label. The section is checked against
@@ -1795,14 +1802,14 @@ let to_arg_with_width loc instr i =
   | Some R8 -> arg8 instr i
   | Some R16 -> arg16 instr i
   | Some R32 -> arg32 instr i
-  | Some (R64 | R128 | R256) | None -> arg instr i
+  | Some (R64 | R128 | R256 | R512) | None -> arg instr i
 
 let to_res_with_width loc instr i =
   match Simd.loc_register_width loc with
   | Some R8 -> res8 instr i
   | Some R16 -> res16 instr i
   | Some R32 -> res32 instr i
-  | Some (R64 | R128 | R256) | None -> res instr i
+  | Some (R64 | R128 | R256 | R512) | None -> res instr i
 
 let to_addr_width loc : X86_ast.data_type =
   match Simd.loc_memory_width loc with
@@ -1812,7 +1819,8 @@ let to_addr_width loc : X86_ast.data_type =
   | M64 -> QWORD
   | M128 -> VEC128
   | M256 -> VEC256
-  | M32X | M32Y | M64X | M64Y ->
+  | M512 -> VEC512
+  | M32X | M32Y | M32Z | M64X | M64Y | M64Z ->
     (* Will not be used by the assembler. *)
     NONE
 
@@ -1828,8 +1836,9 @@ let emit_simd_sanitize ~address ~instr ~loc ~kind =
       (* Conservatively assumes unaligned memory; generates slower checks. *)
       | M128 -> Some Onetwentyeight_unaligned
       | M256 -> Some Twofiftysix_unaligned
+      | M512 -> Some Fivetwelve_unaligned
       (* We do not sanitize gather/scatter instructions. *)
-      | M32X | M32Y | M64X | M64Y -> None
+      | M32X | M32Y | M32Z | M64X | M64Y | M64Z -> None
     in
     match chunk with
     | None -> ()
@@ -1841,22 +1850,38 @@ let emit_simd_sanitize ~address ~instr ~loc ~kind =
       Address_sanitizer.emit_sanitize ~dependencies ~instr ~address chunk kind
   else ()
 
+(* The opmask register operand contributes EVEX.aaa (1-7 for k1-k7); k0 means no
+   masking. The OCaml mask register class is k1..k7, so its index 0..6 maps to
+   k1..k7. *)
+let mask_number_of_reg (r : Reg.t) =
+  match r.loc with
+  | Reg.Reg phys -> Regs.index_in_class phys + 1
+  | Reg.Unknown | Reg.Stack _ ->
+    Misc.fatal_error "AVX512 writemask operand must be a hard register"
+
 let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
   check_simd_instr ?mode simd imm instr;
+  let evex = ref X86_dsl.no_evex in
   let args =
     Array.fold_left
       (fun (idx, args) (arg : Simd.arg) ->
         if Simd.arg_is_implicit arg
         then idx + 1, args
         else
-          match Simd.loc_allows_mem arg.loc, mode with
-          | true, Some (mode, kind) ->
-            let n = num_args_addressing mode in
-            let typ = to_addr_width arg.loc in
-            let address = addressing mode typ instr idx in
-            emit_simd_sanitize ~address ~instr ~loc:arg.loc ~kind;
-            idx + n, address :: args
-          | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args)
+          match arg.enc with
+          | Mask ->
+            (* Not a positional ModRM/vvvv operand; folded into EVEX.aaa. *)
+            evex := { !evex with mask = mask_number_of_reg instr.arg.(idx) };
+            idx + 1, args
+          | RM_r | RM_rm | Vex_v | Immediate | Implicit -> (
+            match Simd.loc_allows_mem arg.loc, mode with
+            | true, Some (mode, kind) ->
+              let n = num_args_addressing mode in
+              let typ = to_addr_width arg.loc in
+              let address = addressing mode typ instr idx in
+              emit_simd_sanitize ~address ~instr ~loc:arg.loc ~kind;
+              idx + n, address :: args
+            | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args))
       (0, []) simd.args
     |> fun (_, args) -> List.rev args
   in
@@ -1867,7 +1892,7 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
       Array.fold_left
         (fun (idx, acc) ({ loc; enc } : Simd.arg) ->
           match enc with
-          | Implicit | Immediate -> idx, acc
+          | Implicit | Immediate | Mask -> idx, acc
           | RM_r | RM_rm | Vex_v ->
             idx + 1, to_res_with_width loc instr idx :: acc)
         (0, args) rr
@@ -1878,7 +1903,13 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
     | None -> List.rev args
     | Some imm -> X86_dsl.int imm :: List.rev args
   in
-  I.simd simd (Array.of_list args)
+  let args = Array.of_list args in
+  (* Only EVEX instructions with an actual writemask / zeroing / rounding need
+     the [SIMD_evex] form; everything else (legacy, VEX, unmasked EVEX) uses
+     [SIMD]. *)
+  match !evex with
+  | { mask = 0; zeroing = false; rounding = None } -> I.simd simd args
+  | evex -> I.simd_evex evex simd args
 
 (* Only used for instructions that have an implicit memory operand. Explicit
    load/store operations are sanitized automatically by [emit_simd_instr]. *)

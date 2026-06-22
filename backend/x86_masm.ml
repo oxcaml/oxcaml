@@ -198,6 +198,33 @@ let print_instr b = function
   | TEST (arg1, arg2) -> i2 b "test" arg1 arg2
   | XCHG (arg1, arg2) -> i2 b "xchg" arg1 arg2
   | XOR (arg1, arg2) -> i2 b "xor" arg1 arg2
+  | SIMD_evex (instr, args, evex) ->
+    (* Intel syntax: operands are in reverse order from the [args] array, so the
+       destination (last array element) prints first and carries the writemask /
+       zeroing; static rounding/SAE is a trailing operand. *)
+    let rounding =
+      match evex.rounding with
+      | None -> ""
+      | Some Round_nearest_sae -> ", {rn-sae}"
+      | Some Round_down_sae -> ", {rd-sae}"
+      | Some Round_up_sae -> ", {ru-sae}"
+      | Some Round_zero_sae -> ", {rz-sae}"
+      | Some Sae -> ", {sae}"
+    in
+    let mask =
+      (if evex.mask <> 0 then Printf.sprintf "{k%d}" evex.mask else "")
+      ^ if evex.zeroing then "{z}" else ""
+    in
+    bprintf b "\t%s\t" instr.mnemonic;
+    let n = Array.length args in
+    Array.iteri
+      (fun j _ ->
+        let i = n - 1 - j in
+        if j > 0 then Buffer.add_string b ", ";
+        arg b args.(i);
+        if i = n - 1 then Buffer.add_string b mask)
+      args;
+    Buffer.add_string b rounding
   | SIMD (instr, args) -> (
     match instr.id, args with
     (* The assembler won't accept these mnemonics directly. *)

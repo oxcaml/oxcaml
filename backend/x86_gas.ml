@@ -188,6 +188,31 @@ let print_instr b = function
   | TEST (arg1, arg2) -> i2_s b "test" arg1 arg2
   | XCHG (arg1, arg2) -> i2 b "xchg" arg1 arg2
   | XOR (arg1, arg2) -> i2_s b "xor" arg1 arg2
+  | SIMD_evex (instr, args, evex) ->
+    (* AT&T syntax: static rounding/SAE is a leading operand ([{rn-sae}, ...]);
+       the writemask and zeroing decorate the destination, which is the last
+       operand. *)
+    let rounding =
+      match evex.rounding with
+      | None -> ""
+      | Some Round_nearest_sae -> "{rn-sae}, "
+      | Some Round_down_sae -> "{rd-sae}, "
+      | Some Round_up_sae -> "{ru-sae}, "
+      | Some Round_zero_sae -> "{rz-sae}, "
+      | Some Sae -> "{sae}, "
+    in
+    let mask =
+      (if evex.mask <> 0 then Printf.sprintf "{%%k%d}" evex.mask else "")
+      ^ if evex.zeroing then "{z}" else ""
+    in
+    bprintf b "\t%s\t%s" instr.mnemonic rounding;
+    let n = Array.length args in
+    Array.iteri
+      (fun i a ->
+        if i > 0 then Buffer.add_string b ", ";
+        arg b a;
+        if i = n - 1 then Buffer.add_string b mask)
+      args
   | SIMD (instr, args) -> (
     match[@warning "-4"] instr.id, args with
     (* The assembler won't accept these mnemonics directly. *)
@@ -278,6 +303,8 @@ let map_arg (f : arg -> arg) (instr : instruction) : instruction =
   | XCHG (a, b) -> XCHG (f a, f b)
   | XOR (a, b) -> XOR (f a, f b)
   | SIMD (simd_instr, args) -> SIMD (simd_instr, Array.map f args)
+  | SIMD_evex (simd_instr, args, evex) ->
+    SIMD_evex (simd_instr, Array.map f args, evex)
 
 let generate_asm oc lines =
   let b = Buffer.create 10000 in

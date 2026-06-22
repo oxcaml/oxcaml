@@ -17,7 +17,7 @@ let is_control_flow = function
   | CMOV _ | BSF _ | BSR _ | BSWAP _ | XCHG _ | LOCK_CMPXCHG _ | LOCK_XADD _
   | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _
   | PREFETCH _ | NOP | PAUSE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _
-  | ADC _ | SBB _ ->
+  | SIMD_evex _ | ADC _ | SBB _ ->
     false
 
 let is_hard_barrier = function
@@ -136,7 +136,7 @@ let writes_to_reg64 target = function
   | CMP _ | TEST _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE | LFENCE | SFENCE
   | MFENCE ->
     false
-  | SIMD _ ->
+  | SIMD _ | SIMD_evex _ ->
     (* Conservative: assume any SIMD instruction may write to target. *)
     true
 
@@ -201,7 +201,7 @@ let reads_from_reg64 target = function
     true
   | NOP | PAUSE | LFENCE | SFENCE | MFENCE -> false
   (* Conservative: assume SIMD instructions may read from target. *)
-  | SIMD _ -> true
+  | SIMD _ | SIMD_evex _ -> true
 
 let reg64_is_never_read target start_cell =
   let rec loop cell_opt =
@@ -234,7 +234,7 @@ let writes_flags = function
     (* These are all control flow operations, there is no point in assuming
        anything. *)
     true
-  | SIMD _ ->
+  | SIMD _ | SIMD_evex _ ->
     (* Conservative: some SIMD instructions (e.g. comisd, ucomiss) write
        flags. *)
     true
