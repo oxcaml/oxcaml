@@ -968,39 +968,52 @@ let simplify_direct_function_call ~simplify_expr dacc apply
             (Some function_decl) ~params_arity ~result_arity ~result_types
             ~down_to_up ~coming_from_indirect ~callee's_code_metadata
       else if provided_num_args > num_params
-      then (
-        (* See comment above. *)
+      then
         if
-          Flambda_features.kind_checks ()
-          && not (Flambda_arity.is_one_param_of_kind_value result_arity)
+          (* See comment above. *)
+          not (Flambda_arity.is_one_param_of_kind_value result_arity)
         then
-          Misc.fatal_errorf
-            "Non-singleton-value return arity for overapplied OCaml function:@ \
-             %a"
-            Apply.print apply;
-        simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
-          ~coming_from_indirect ~callee's_code_id ~callee's_code_metadata)
+          if Flambda_features.kind_checks ()
+          then
+            Misc.fatal_errorf
+              "Non-singleton-value return arity for overapplied OCaml \
+               function:@ %a"
+              Apply.print apply
+          else
+            replace_apply_by_invalid dacc ~down_to_up
+              (Application_result_kind_mismatch (result_arity, apply))
+        else
+          simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
+            ~coming_from_indirect ~callee's_code_id ~callee's_code_metadata
       else if provided_num_args > 0 && provided_num_args < num_params
-      then (
-        (* See comment above. *)
+      then
         if
-          Flambda_features.kind_checks ()
-          && not
-               (Flambda_arity.is_one_param_of_kind_value
-                  result_arity_of_application)
+          (* See comment above. *)
+          not
+            (Flambda_arity.is_one_param_of_kind_value
+               result_arity_of_application)
         then
-          Misc.fatal_errorf
-            "Non-singleton-value return arity for partially-applied OCaml \
-             function:@ %a"
-            Apply.print apply;
-        simplify_direct_partial_application ~simplify_expr dacc apply
-          ~callee's_code_id ~callee's_code_metadata ~callee's_function_slot
-          ~param_arity:params_arity
-          ~param_modes:(Code_metadata.param_modes callee's_code_metadata)
-          ~args_arity ~result_arity ~recursive ~down_to_up ~coming_from_indirect
-          ~closure_alloc_mode_from_type
-          ~first_complex_local_param:
-            (Code_metadata.first_complex_local_param callee's_code_metadata))
+          if Flambda_features.kind_checks ()
+          then
+            Misc.fatal_errorf
+              "Non-singleton-value return arity for partially-applied OCaml \
+               function:@ %a"
+              Apply.print apply
+          else
+            replace_apply_by_invalid dacc ~down_to_up
+              (Application_result_kind_mismatch
+                 ( Flambda_arity.create_singletons
+                     [Flambda_kind.With_subkind.any_value],
+                   apply ))
+        else
+          simplify_direct_partial_application ~simplify_expr dacc apply
+            ~callee's_code_id ~callee's_code_metadata ~callee's_function_slot
+            ~param_arity:params_arity
+            ~param_modes:(Code_metadata.param_modes callee's_code_metadata)
+            ~args_arity ~result_arity ~recursive ~down_to_up
+            ~coming_from_indirect ~closure_alloc_mode_from_type
+            ~first_complex_local_param:
+              (Code_metadata.first_complex_local_param callee's_code_metadata)
       else
         Misc.fatal_errorf
           "Function with %d params when simplifying direct OCaml function call \

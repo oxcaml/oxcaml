@@ -4,12 +4,12 @@ let code loopify(never) size(0) newer_version_of(test_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  invalid "(Application_result_kind_mismatch\n (result_arity \226\132\149\240\157\159\158\240\157\159\156) (apply_expr\n  (((Some Over_app_kind_check_simplify.camlOver_app_kind_check_simplify__f_3)\227\128\136k21\227\128\137\227\128\138k13\227\128\139(0))\n   (args_arity \240\157\149\141?) (return_arity \240\157\149\141?)\n   (call_kind\n    (Function\n     (function_call (Direct camlOver_app_kind_check_simplify__f_1_3_code))))\n   (alloc_mode (Heap (alloc my_alloc_region/25N)))\n   (dbg over_app_kind_check_simplify.ml:16,2--16) (inline Default_inlined)\n   (inlining_state (depth 0, arguments O3)) (probe ()) (position Normal))))"
+  invalid "(Application_result_kind_mismatch\n (result_arity \226\132\149\240\157\159\158\240\157\159\156) (apply_expr\n  (((Some Over_app_kind_check_simplify.camlOver_app_kind_check_simplify__f_5)\227\128\136k32\227\128\137\227\128\138k31\227\128\139(0\n    0)) (args_arity \240\157\149\141=tagged_\226\132\149\240\157\149\154 \226\168\175 \240\157\149\141=tagged_\226\132\149\240\157\149\154) (return_arity \240\157\149\141=tagged_\226\132\149\240\157\149\154)\n   (call_kind\n    (Function\n     (function_call (Direct camlOver_app_kind_check_simplify__f_2_5_code))))\n   (alloc_mode (Heap (alloc my_alloc_region/82N)))\n   (dbg over_app_kind_check_simplify.ml:16,2--16) (inline Default_inlined)\n   (inlining_state (depth 0, arguments O3)) (probe ()) (position Normal))))"
 in
-let $camlOver_app_kind_check_simplify__test_2 =
+let $camlOver_app_kind_check_simplify__test_3 =
   closure test_0_1 @test &toplevel.alloc_region
 in
 let $camlOver_app_kind_check_simplify =
-  Block 0 ($camlOver_app_kind_check_simplify__test_2)
+  Block 0 ($camlOver_app_kind_check_simplify__test_3)
 in
 cont done ($camlOver_app_kind_check_simplify)
