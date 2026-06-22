@@ -143,6 +143,14 @@ Caml_inline char caml_gc_phase_char(int may_access_gc_phase) {
   }
 }
 
+static bool is_complete_phase_sweep_and_mark_main (void);
+static bool is_complete_phase_mark_final (void);
+static bool is_complete_phase_sweep_ephe (void);
+
+static bool is_complete_last_phase (void) {
+  return is_complete_phase_sweep_ephe();
+}
+
 /*******************************************************************************
  * Prefetching
  ******************************************************************************/
@@ -729,14 +737,16 @@ static int no_orphaned_work (void)
     atomic_load_acquire(&orph_structs.final_info) == NULL;
 }
 
-static void adopt_orphaned_work (int expected_status)
+static void adopt_orphaned_work (void)
 {
   caml_domain_state* domain_state = Caml_state;
   value orph_ephe_list_live;
   struct caml_final_info *f, *myf, *temp;
 
 #ifdef DEBUG
-  orph_ephe_list_verify_status(expected_status);
+  /* We mark ephemerons before orphaning them,
+     and always re-adopt them during the same cycle. */
+  orph_ephe_list_verify_status(caml_global_heap_state.MARKED);
 #endif
 
   if (no_orphaned_work())
@@ -1758,6 +1768,7 @@ void caml_mark_roots_stw (int participant_count, caml_domain_state** barrier_par
 
   Caml_global_barrier_if_final(participant_count) {
     caml_gc_phase = Phase_sweep_and_mark_main;
+<<<<<<< OxCaml
     latest_sweep_work =
       diffmod (atomic_load (&total_work_completed), work_completed_at_sweep_start);
     atomic_store_relaxed(&global_roots_scanned, WORK_UNSTARTED);
@@ -1778,6 +1789,35 @@ void caml_mark_roots_stw (int participant_count, caml_domain_state** barrier_par
     if (total_work_completed < definitely_done)
       total_work_completed = definitely_done;
     total_work_incurred_at_mark_start = total_work_incurred;
+||||||| Upstream OCaml
+    caml_gc_log ("work_counter: %" CAML_PRIuNAT " at root marking",
+                 work_counter);
+    atomic_store_relaxed(&global_roots_status, WAITING);
+
+    latest_sweep_allocs = diffmod (work_counter, work_counter_at_sweep_start);
+
+    /* Adopt orphaned work from domains that were spawned and terminated in the
+       previous cycle. There must be no orphaned work remaining when this phase
+       change takes place because orphaned work contains roots.
+
+       [adopt_orphaned_work] also verifies that the ephemerons to be adopted
+       all have status [UNMARKED] in this cycle.
+
+       Note that ephemerons are not orphaned in [Phase_sweep_main]. When
+       orphaned, ephemerons and their data are [MARKED]. Any unadopted
+       ephemerons must come from last cycle. Due to the GC cycling, the
+       [MARKED] ephemerons must have status [UNMARKED] now. */
+    adopt_orphaned_work (caml_global_heap_state.UNMARKED);
+=======
+    caml_gc_log ("work_counter: %" CAML_PRIuNAT " at root marking",
+                 work_counter);
+    atomic_store_relaxed(&global_roots_status, WAITING);
+
+    latest_sweep_allocs = diffmod (work_counter, work_counter_at_sweep_start);
+
+    /* Orphaned work may contain roots so we adopt them first. */
+    adopt_orphaned_work();
+>>>>>>> ocaml/ocaml#14813
 
     global_prepare_for_ephe_marking(participant_count);
   }
@@ -2023,7 +2063,9 @@ struct cycle_callback_params {
   int compaction_mode;
 };
 
-static void stw_cycle_all_domains(
+static atomic_bool can_cycle_all_domains;
+
+static void stw_try_cycle_all_domains(
   caml_domain_state* domain, void* args,
   int participating_count,
   caml_domain_state** participating)
@@ -2031,6 +2073,23 @@ static void stw_cycle_all_domains(
   /* We copy params because the stw leader may leave early. No barrier needed
      because there's one in the minor gc and after. */
   struct cycle_callback_params params = *((struct cycle_callback_params*)args);
+
+  /* It is possible that a domain invalidated the end-of-phase
+     condition while we were waiting for the STW section to start.
+     In this case we return immediately without actually ending the cycle. */
+  Caml_global_barrier_if_final(participating_count) {
+    /* We check [is_complete_last_phase] from within the STW section.
+       Otherwise a domain could make the last phase incomplete before joining
+       the STW section, invalidating the previous checks of other domains.
+
+       We check inside a barrier. Otherwise a domain could see an incomplete
+       phase, leave the STW section, and then make the last phase
+       complete. This would result in inconsistent behaviors with respects to
+       domains that have not reached the check yet -- some domains would exit
+       and some would stay and complete the cycle, which is incorrect. */
+    can_cycle_all_domains = is_complete_last_phase();
+  }
+  if (!can_cycle_all_domains) return;
 
   /* TODO: Not clear this memprof work is really part of the "cycle"
    * operation. It's more like ephemeron-cleaning really. An earlier
@@ -2130,7 +2189,7 @@ static void stw_cycle_all_domains(
  * Major GC phases
  ******************************************************************************/
 
-static int is_complete_phase_sweep_and_mark_main (void)
+static bool is_complete_phase_sweep_and_mark_main (void)
 {
   return
     /* Marking is done */
@@ -2149,7 +2208,7 @@ static int is_complete_phase_sweep_and_mark_main (void)
     no_orphaned_work();
 }
 
-static int is_complete_phase_mark_final (void)
+static bool is_complete_phase_mark_final (void)
 {
   return
     /* updated finalise first values */
@@ -2167,7 +2226,7 @@ static int is_complete_phase_mark_final (void)
     no_orphaned_work();
 }
 
-static int is_complete_phase_sweep_ephe (void)
+static bool is_complete_phase_sweep_ephe (void)
 {
   return
     /* All domains have swept their ephemerons */
@@ -2407,7 +2466,7 @@ mark_again:
     }
 
     if (!caml_domain_is_terminating()){
-      adopt_orphaned_work(caml_global_heap_state.MARKED);
+      adopt_orphaned_work();
     }
 
     /* Ephemerons */
@@ -2519,23 +2578,29 @@ mark_again:
 
   domain_state->stat_major_work_done += total_work;
 
-  if (mode != Slice_opportunistic && is_complete_phase_sweep_ephe()) {
+  if (mode != Slice_opportunistic && is_complete_last_phase()) {
     /* To handle the case where multiple domains try to finish the major cycle
        simultaneously, we loop until the current cycle has ended, ignoring
-       whether [caml_try_run_on_all_domains] succeeds. */
+       whether [caml_try_run_on_all_domains] succeeds.
+
+       If the phase becomes incomplete again (for example if a domain
+       adds orphaned work), we give up on finishing the cycle now. */
+
     saved_major_cycle = caml_major_cycles_completed;
 
     struct cycle_callback_params params;
     params.compaction_mode = compaction_mode;
 
-    while (saved_major_cycle == caml_major_cycles_completed) {
+    while (saved_major_cycle == caml_major_cycles_completed
+           && is_complete_last_phase())
+    {
       if (barrier_participants) {
-        stw_cycle_all_domains
+        stw_try_cycle_all_domains
               (domain_state, (void*)&params,
                 participant_count, barrier_participants);
       } else {
         caml_try_run_on_all_domains
-              (&stw_cycle_all_domains, (void*)&params, 0);
+              (&stw_try_cycle_all_domains, (void*)&params, 0);
       }
     }
   }
