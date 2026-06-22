@@ -74,7 +74,7 @@ let x =
   let _ @ uncontended = foo  (ref 41 : _ @ uncontended) in
   foo
 [%%expect{|
-val x : '_weak1 -> '_weak1 @ [> aliased stateful dynamic] = <fun>
+val x : '_weak1 -> '_weak1 @ [> aliased stateful dynamic alloc] = <fun>
 |}]
 
 type ('a,'b) mytype = { x : 'a; y : 'b }
@@ -116,7 +116,7 @@ let create a = { x = a }
 [%%expect{|
 val create :
   'a @ [< 'm mod aliased dynamic & global many] ->
-  'a myref @ [> 'm | stateful] = <fun>
+  'a myref @ [> 'm | stateful alloc] = <fun>
 |}]
 
 let read r = r.x
@@ -211,14 +211,14 @@ let foo x y = ref x
 [%%expect{|
 val foo :
   'a @ [< global many read_write] ->
-  'b @ 'm -> 'a ref @ [> aliased stateful dynamic] = <fun>
+  'b @ 'm -> 'a ref @ [> aliased stateful dynamic alloc] = <fun>
 |}]
 
 let foo (x @ aliased) y = ref x
 [%%expect{|
 val foo :
   'a @ [< global many read_write > aliased] ->
-  'b @ 'm -> 'a ref @ [> aliased stateful dynamic] = <fun>
+  'b @ 'm -> 'a ref @ [> aliased stateful dynamic alloc] = <fun>
 |}]
 
 let foo (x @ contended) y = x
@@ -326,19 +326,19 @@ val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
 let map f l = List.map f l
 [%%expect{|
 val map :
-  ('a @ [> past('m) | aliased stateful dynamic] ->
+  ('a @ [> past('m) | aliased stateful dynamic alloc] ->
    'b @ [< global many read_write]) @ [< past('n) & past('m) & global many] ->
   'a list @ [< global many read_write] ->
-  'b list @ [> past('n) | aliased stateful dynamic] = <fun>
+  'b list @ [> past('n) | aliased stateful dynamic alloc] = <fun>
 |}]
 
 let map_eta f = fun l -> List.map f l
 [%%expect{|
 val map_eta :
-  ('a @ [> past('m) | aliased stateful dynamic] ->
+  ('a @ [> past('m) | aliased stateful dynamic alloc] ->
    'b @ [< global many read_write]) @ [< past('n) & past('m) & global many] ->
   'a list @ [< global many read_write] ->
-  'b list @ [> past('n) | aliased stateful dynamic] = <fun>
+  'b list @ [> past('n) | aliased stateful dynamic alloc] = <fun>
 |}]
 
 (* modules *)
@@ -364,7 +364,7 @@ let incr n = Counter.incr n
 [%%expect{|
 val incr :
   Counter.t @ [< global many read_write] ->
-  Counter.t @ [> aliased stateful dynamic] = <fun>
+  Counter.t @ [> aliased stateful dynamic alloc] = <fun>
 |}]
 
 let incr = Counter.incr
@@ -438,7 +438,8 @@ Error: Signature mismatch:
        is not included in
          val illegal : t -> t @ portable
        The type
-         "t @ [< 'm > stateful dynamic] -> t @ [> 'm | stateful dynamic]"
+         "t @ [< 'm > stateful dynamic alloc] ->
+         t @ [> 'm | stateful dynamic alloc]"
        is not compatible with the type "t -> t @ portable"
 |}]
 

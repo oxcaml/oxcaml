@@ -113,7 +113,7 @@ module type S = sig @@ portable
   module M' = M
 end
 [%%expect{|
-module M : T @@ stateless nonportable
+module M : T @@ stateless nonportable noalloc_strict
 module type S = sig module M' = M @@ portable end
 |}]
 
@@ -135,7 +135,7 @@ Lines 1-3, characters 15-3:
 3 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig module M' = M @@ stateless nonportable end
+         sig module M' = M @@ stateless nonportable noalloc_strict end
        is not included in
          S
        In module "M'":
