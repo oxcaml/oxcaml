@@ -8689,7 +8689,6 @@ and type_expect_
         else
           expected_mode
       in
-      let expected_comonadic_mode = (as_single_mode expected_mode).comonadic in
       let ty = newgenvar (Jkind.Builtin.any ~why:Inside_quote) in
       let expr_ty = Predef.type_code (newgenty (Tquote ty)) in
       with_explanation (fun () ->
@@ -8707,7 +8706,9 @@ and type_expect_
       let quote_env = begin
           if Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes
           then quote_env
-          else Env.add_closure_lock (loc, Quote) expected_comonadic_mode quote_env
+          else
+            let { comonadic; _ } = as_single_mode expected_mode in
+            Env.add_closure_lock (loc, Quote) comonadic quote_env
         end
       in
       let arg = type_expect quote_env mode_quoted exp (mk_expected ty) in

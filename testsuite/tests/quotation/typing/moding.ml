@@ -5,11 +5,14 @@
 
 #syntax quotations on
 
+let ignore_quote _ = <[()]>
 module M : sig
   type t
   val x : t
   val x_unique : unit -> t @ unique
 
+  (* CR quoted-modes jbachurski: These modes should all be quoted for
+     corresponding tests to be valuable. *)
   val save : 'a @ once global -> unit
   val free : 'a @ once unique -> unit
   val send : 'a @ once portable -> unit
@@ -23,6 +26,7 @@ end = struct
   let send _ = ()
 end
 [%%expect{|
+val ignore_quote : 'a -> <[unit]> expr = <fun>
 module M :
   sig
     type t
@@ -45,10 +49,10 @@ fun e -> <[ $e ]>
 - : 'a expr -> 'a expr @ once = <fun>
 |}];;
 
-(* Local spliced expression *)
+(* Local spliced expression -- the result should be [local]! *)
 fun (x @ local) -> <[ $x ]>
 [%%expect{|
-- : 'a expr @ local -> 'a expr @ local once = <fun>
+- : 'a expr @ local -> 'a expr @ once = <fun>
 |}];;
 
 (* Unique spliced expression *)
@@ -57,7 +61,7 @@ fun (x @ unique) -> <[ $x ]>
 - : 'a expr @ unique -> 'a expr @ once = <fun>
 |}];;
 
-(* Once spliced expression *)
+(* Once spliced expression -- the result should be [once]! *)
 fun (x @ once) -> <[ $x ]>
 [%%expect{|
 - : 'a expr @ once -> 'a expr @ once = <fun>
@@ -111,11 +115,9 @@ Error: This value is "nonportable"
 
 (** Quotes capture spliced values, not computations **)
 
-(* CR quoted-modes: Incomplete -- the quote should be [global] like [f]'s return,
-   and not [local] like [f]. *)
 let foo (f : (_ -> _ @ global) @ local) = <[ $(f 42) + 1 ]>
 [%%expect{|
-val foo : (int -> <[int]> expr) @ local -> <[int]> expr @ local once = <fun>
+val foo : (int -> <[int]> expr) @ local -> <[int]> expr @ once = <fun>
 |}];;
 
 (* CR quoted-modes: Unsound -- the quote should be [local] like [f]'s return. *)
@@ -184,21 +186,23 @@ Error: This value is "contended"
 
 (** Quoting expressions with non-legacy closures **)
 
-(* All of the following examples should error.
-   Quotes in them capture values at non-legacy modes in their closure,
-   and should be given a mode accordingly. *)
+(* CR quoted-modes jbachurski: Without quoted modes, quotes can only capture
+   non-present-stage values at legacy modes.
+   These tests fail as they want to capture a non-legacy mode.
+   For axes that can be quoted the captures will be allowed,
+   and functions in [M] will be amended to include a quoted mode. *)
 
 (* Local in closure *)
 (* The quote <[f x]> is local, as it references x @ local -- should error! *)
 <[let x = stack_ (Some 42) in
   $(M.save <[let _ = x in ()]>; <[()]>)]>
 [%%expect{|
-Line 10, characters 21-22:
-10 |   $(M.save <[let _ = x in ()]>; <[()]>)]>
+Line 12, characters 21-22:
+12 |   $(M.save <[let _ = x in ()]>; <[()]>)]>
                           ^
 Error: The value "x" is "local" because it is "stack_"-allocated.
        However, the value "x" highlighted is expected to be "global"
-         because it is used inside the quoted expression at line 10, characters 11-30
+         because it is used inside the quoted expression at line 12, characters 11-30
          which is expected to be "global".
 |}];;
 
@@ -411,7 +415,7 @@ let x = <[1 + 1]> in let x, y = Quote.duplicate x in <[$x + $y]>
 - : <[int]> expr = <[(1 + 1) + (1 + 1)]>
 |}];;
 
-(** Quote captures with inner closure captures **)
+(** Quotes with inner closure captures of splices **)
 
 fun e -> <[ fun () -> $e ]>
 [%%expect{|
@@ -422,30 +426,17 @@ fun e -> <[ fun () -> $e ]>
    The closure does not actually capture $e, as it is at a negative stage offset.
    On the other hand, the quote does capture [e] with different results in either case. *)
 
-(* This quote should be [local], as it is a syntax tree pointing to a [local] syntax tree. *)
+(* This quote should be [local], as it is a syntax tree with a [local] subtree. *)
 fun (e @ local) -> <[ fun () -> $e ]>
 [%%expect{|
-Line 1, characters 33-34:
-1 | fun (e @ local) -> <[ fun () -> $e ]>
-                                     ^
-Error: The value "e" is "local" to the parent region
-       but is expected to be "global"
-         because it is used inside the function at line 1, characters 22-34
-         which is expected to be "global"
-         because it is a quoted expression's result and thus always at the legacy modes.
+- : 'a expr @ local -> <[unit -> $('a)]> expr = <fun>
 |}];;
 
-(* Quotes of syntactic values observably cross [once]ness, so this should be [many]. *)
+(* Quotes of syntactic values should observably cross [once]ness,
+   so this should be [many] even though it captures [e @ once]. *)
 fun (e @ once) -> <[ fun () -> $e ]>
 [%%expect{|
-Line 1, characters 32-33:
-1 | fun (e @ once) -> <[ fun () -> $e ]>
-                                    ^
-Error: The value "e" is "once"
-       but is expected to be "many"
-         because it is used inside the function at line 1, characters 21-33
-         which is expected to be "many"
-         because it is a quoted expression's result and thus always at the legacy modes.
+- : 'a expr @ once -> <[unit -> $('a)]> expr = <fun>
 |}];;
 
 fun (e @ unique) -> <[ fun () -> $e ]>
@@ -475,12 +466,54 @@ end = struct
   let quote_thunk (e @ once) = <[ fun () -> $e ]>
 end
 [%%expect{|
-Line 4, characters 45-46:
-4 |   let quote_thunk (e @ once) = <[ fun () -> $e ]>
-                                                 ^
+module M : sig val quote_thunk : 'a expr @ once -> <[unit -> $('a)]> expr end
+|}];;
+
+(** Splices with inner closure captures of quotes **)
+
+<[ fun e -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
+[%%expect{|
+- : <[$('a) -> unit]> expr = <[fun e -> ()]>
+|}];;
+
+<[ fun (e @ local) -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
+[%%expect{|
+Line 1, characters 58-59:
+1 | <[ fun (e @ local) -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
+                                                              ^
+Error: The value "e" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the function at line 1, characters 32-61
+         which is expected to be "global".
+|}];;
+
+<[ fun (e @ once) -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
+[%%expect{|
+Line 1, characters 57-58:
+1 | <[ fun (e @ once) -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
+                                                             ^
 Error: The value "e" is "once"
        but is expected to be "many"
-         because it is used inside the function at line 4, characters 34-46
-         which is expected to be "many"
-         because it is a quoted expression's result and thus always at the legacy modes.
+         because it is used inside the function at line 1, characters 31-60
+         which is expected to be "many".
+|}];;
+<[ fun (e @ unique) -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
+
+[%%expect{|
+- : <[$('a) @ unique -> unit]> expr = <[fun (e : _ @ unique) -> ()]>
+|}];;
+<[ fun (e @ portable) -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
+
+[%%expect{|
+- : <[$('a) @ portable -> unit]> expr = <[fun (e : _ @ portable) -> ()]>
+|}];;
+
+<[ fun (e @ shared) -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
+[%%expect{|
+- : <[$('a) @ shared -> unit]> expr = <[fun (e : _ @ shared) -> ()]>
+|}];;
+
+<[ fun (e @ uncontended) -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
+[%%expect{|
+- : <[$('a) -> unit]> expr = <[fun (e : _ @ uncontended) -> ()]>
 |}];;

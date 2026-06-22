@@ -647,6 +647,10 @@ module type S = sig
       end
 
       val max_with : 'a Axis.t -> ('a, 'l * 'r) mode -> (disallowed * 'r) t
+
+      val offset_stage_r : int -> r -> r
+
+      val const_offset_stage_r : int -> Const.t -> Const.t
     end
 
     module Axis : sig
