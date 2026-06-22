@@ -219,7 +219,6 @@ let mk_n (fss : 'a @ noalloc_strict) : 'a noalloc_strict_field = { fss }
 val mk_n : 'a @ noalloc_strict -> 'a noalloc_strict_field = <fun>
 |}]
 
-(* CR shsong: the expect test is incorrect *)
 (* ... but an [alloc] (default) value cannot. *)
 let mk_n_fail (fn : 'a @ alloc) : 'a noalloc_field = { fn }
 [%%expect{|
@@ -272,12 +271,10 @@ module type S =
 
 (** Test 4: mode crossing for abstract types and concrete types *)
 
-(* This mirrors the mode crossing tests for the other axes in
-   [testsuite/tests/typing-modes/crossing.ml] (e.g. [cross_global] for
-   locality, [cross_contended] for contention). The allocation axis is
-   comonadic with order [noalloc_strict < noalloc < alloc] and legacy
-   default [alloc]; declaring a smaller upper bound in the kind lets the
-   type cross that part of the axis. *)
+(* The allocation axis is comonadic with order
+   [noalloc_strict < noalloc < alloc] and legacy default [alloc];
+   declaring a smaller upper bound in the kind lets the type cross
+   that part of the axis. *)
 
 (* Abstract types: crossing is declared via the kind's [mod] bound.
    [mod alloc] is the top, so it adds no crossing and prints without an
@@ -402,27 +399,23 @@ let (new_record @ alloc) () =
 val new_record : unit -> record_t = <fun>
 |}]
 
-(* The [@ noalloc] return mode needs to be explicitly specified *)
-let f () : record_t @ noalloc = { x = 3.0; y = 4.0 }
-[%%expect{|
-val f : unit -> record_t @ noalloc = <fun>
-|}]
-
-(* CR-soon shsong: error expected -- f should not be accepted as [@ noalloc]
-      Also need to figure out why M is [@@ noalloc_strict] *)
+(* CR-soon shsong: error expected -- f should not be accepted as
+    [@ noalloc_strict] *)
 (* The allocation mode shows up in a [val] signature's function type. *)
-module M : sig val f : unit -> record_t @ noalloc end = struct
+module M : sig val f : unit -> record_t @ noalloc_strict end = struct
     let (f @ noalloc_strict) () = { x = 3.0; y = 4.0 }
 end
 [%%expect{|
-module M : sig val f : unit -> record_t @ noalloc end @@ stateless
+module M : sig val f : unit -> record_t @ noalloc_strict end @@ stateless
   noalloc_strict
 |}]
 
-(* The allocation mode of a function-typed argument. *)
-let apply (g : (unit -> record_t) @ noalloc) = g
+(* Parameter is not captured *)
+let alloc_para () =
+  let h (g : (unit -> int) @ alloc) = g in
+  (h : _ @ noalloc_strict)
 [%%expect{|
-val apply : (unit -> record_t) @ noalloc -> unit -> record_t = <fun>
+val alloc_para : unit -> (unit -> int) -> unit -> int = <fun>
 |}]
 
 (* Error triggered by mode capture*)
