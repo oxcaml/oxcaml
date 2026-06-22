@@ -228,8 +228,7 @@ let const ~dbg cst =
       Vector_types.Vec512.Bit_pattern.to_bits i
     in
     vec512 ~dbg { word0; word1; word2; word3; word4; word5; word6; word7 }
-  | Naked_mask _ ->
-    Misc.fatal_error "Mask constants are not yet supported"
+  | Naked_mask _ -> Misc.fatal_error "Mask constants are not yet supported"
   | Naked_nativeint t -> targetint ~dbg t
   | Null -> targetint ~dbg (Targetint_32_64.zero Sixty_four)
 
@@ -306,8 +305,7 @@ let const_static cst : Cmm.data_item list =
       Vector_types.Vec512.Bit_pattern.to_bits v
     in
     [cvec512 { word0; word1; word2; word3; word4; word5; word6; word7 }]
-  | Naked_mask _ ->
-    Misc.fatal_error "Mask constants are not yet supported"
+  | Naked_mask _ -> Misc.fatal_error "Mask constants are not yet supported"
   | Null -> [cint 0n]
 
 let simple_static res s =

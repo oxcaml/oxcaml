@@ -147,8 +147,8 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
                 | Number
                     ( ( Naked_float | Naked_float32 | Naked_int8 | Naked_int16
                       | Naked_int32 | Naked_int64 | Naked_nativeint
-                      | Naked_vec128 | Naked_vec256 | Naked_vec512
-                      | Naked_mask ),
+                      | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_mask
+                        ),
                       _ ) );
             is_int = _
           } ->

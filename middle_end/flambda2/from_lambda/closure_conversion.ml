@@ -1569,8 +1569,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                           | Naked_float32 _ | Naked_int8 _ | Naked_int16 _
                           | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
                           | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
-                          | Naked_mask _
-                          | Null ->
+                          | Naked_mask _ | Null ->
                             Misc.fatal_errorf
                               "Binding of %a to %a contains the constant %a \
                                inside a float record, whereas only naked \

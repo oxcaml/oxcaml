@@ -1199,7 +1199,7 @@ let emit_load_literal dst lbl =
   | Val | Int | Addr -> A.ins2 LDR (H.reg_x dst) addr
   | Vec128 | Valx2 -> A.ins2 LDR_simd_and_fp (H.reg_q dst) addr
   | Vec256 | Vec512 | Mask ->
-    Misc.fatal_errorf "emit_load_literal: unexpected vector register %a"
+    Misc.fatal_errorf "emit_load_literal: unexpected vector or mask register %a"
       Printreg.reg dst
 
 let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =

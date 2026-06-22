@@ -114,8 +114,7 @@ module Expanded_type : sig
         Type_grammar.head_of_kind_naked_vec256 Or_unknown_or_bottom.t
     | Naked_vec512 of
         Type_grammar.head_of_kind_naked_vec512 Or_unknown_or_bottom.t
-    | Naked_mask of
-        Type_grammar.head_of_kind_naked_mask Or_unknown_or_bottom.t
+    | Naked_mask of Type_grammar.head_of_kind_naked_mask Or_unknown_or_bottom.t
     | Rec_info of Type_grammar.head_of_kind_rec_info Or_unknown_or_bottom.t
     | Region of Type_grammar.head_of_kind_region Or_unknown_or_bottom.t
 

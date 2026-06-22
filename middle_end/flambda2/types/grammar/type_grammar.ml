@@ -4056,8 +4056,8 @@ let tag_int8 (t : t) ~machine_width : t =
            }))
   | Value _ | Naked_immediate _ | Naked_float32 _ | Naked_float _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _
-  | Rec_info _ | Region _ ->
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Rec_info _
+  | Region _ ->
     Misc.fatal_errorf "Type of wrong kind for [tag_int8]: %a" print t
 
 let tag_int16 (t : t) ~machine_width : t =
@@ -4277,8 +4277,7 @@ module Descr = struct
         head_of_kind_naked_vec256 TD.Descr.t Or_unknown_or_bottom.t
     | Naked_vec512 of
         head_of_kind_naked_vec512 TD.Descr.t Or_unknown_or_bottom.t
-    | Naked_mask of
-        head_of_kind_naked_mask TD.Descr.t Or_unknown_or_bottom.t
+    | Naked_mask of head_of_kind_naked_mask TD.Descr.t Or_unknown_or_bottom.t
     | Rec_info of head_of_kind_rec_info TD.Descr.t Or_unknown_or_bottom.t
     | Region of head_of_kind_region TD.Descr.t Or_unknown_or_bottom.t
 end
@@ -4521,7 +4520,6 @@ module Head_of_kind_naked_vec256 =
   Make_head_of_kind_naked_number (Vector_types.Vec256.Bit_pattern)
 module Head_of_kind_naked_vec512 =
   Make_head_of_kind_naked_number (Vector_types.Vec512.Bit_pattern)
-
 module Head_of_kind_naked_mask =
   Make_head_of_kind_naked_number (Vector_types.Mask.Bit_pattern)
 

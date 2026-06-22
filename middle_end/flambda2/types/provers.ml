@@ -72,8 +72,8 @@ let gen_value_to_gen prove_gen env t : _ generic_proof =
   | Value (Ok { is_null = Not_null; non_null = Ok head }) -> prove_gen env head
   | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _
-  | Rec_info _ | Region _ ->
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Rec_info _
+  | Region _ ->
     wrong_kind "Value" t (Invalid : _ generic_proof)
 
 let gen_value_to_proof prove_gen env t : _ proof_of_property =
@@ -86,8 +86,8 @@ let gen_value_to_proof prove_gen env t : _ proof_of_property =
     as_property (prove_gen env head)
   | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _
-  | Rec_info _ | Region _ ->
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Rec_info _
+  | Region _ ->
     wrong_kind "Value" t (Unknown : _ proof_of_property)
 
 let gen_value_to_meet prove_gen env t : _ meet_shortcut =
@@ -98,8 +98,8 @@ let gen_value_to_meet prove_gen env t : _ meet_shortcut =
     as_meet_shortcut (prove_gen env head)
   | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _
-  | Rec_info _ | Region _ ->
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Rec_info _
+  | Region _ ->
     wrong_kind "Value" t (Invalid : _ meet_shortcut)
 
 let prove_equals_to_simple_of_kind env t kind : Simple.t proof_of_property =
@@ -225,8 +225,8 @@ let prove_is_null_generic env t : _ generic_proof =
   | Value (Ok { non_null = Unknown | Ok _; is_null = Maybe_null _ }) -> Unknown
   | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _
-  | Rec_info _ | Region _ ->
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Rec_info _
+  | Region _ ->
     wrong_kind "Value" t (Invalid : _ generic_proof)
 
 let meet_is_null env t = as_meet_shortcut (prove_is_null_generic env t)

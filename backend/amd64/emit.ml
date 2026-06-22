@@ -201,8 +201,7 @@ let register_name typ phys_reg : X86_ast.arg =
   | Vec512 ->
     I.require_vec512 ();
     Regf zmm_reg_name.(reg_index)
-  | Mask ->
-    Misc.fatal_error "avx512 mask instructions not yet implemented"
+  | Mask -> Misc.fatal_error "avx512 masks not yet implemented"
 
 let phys_rax = phys_reg Int (P RAX)
 
@@ -572,7 +571,8 @@ let must_save_simd_regs live : Regs.Save_simd_regs.t =
         | Vec256 -> v256 := true
         | Vec512 -> v512 := true
         | Float | Vec128 | Float32 | Valx2 -> v128 := true
-        | Val | Addr | Int | Mask -> ())
+        | Val | Addr | Int -> ()
+        | Mask -> Misc.fatal_error "avx512 masks not yet implemented")
     live;
   if !v512
   then (
@@ -1184,8 +1184,7 @@ let move (src : Reg.t) (dst : Reg.t) =
   | Vec512, _, Vec512, _ ->
     (* CR-soon mslater: avx512 *)
     Misc.fatal_error "avx512 instructions not yet implemented"
-  | Mask, _, Mask, _ ->
-    Misc.fatal_error "avx512 mask instructions not yet implemented"
+  | Mask, _, Mask, _ -> Misc.fatal_error "avx512 masks not yet implemented"
   | Float, (Reg _ | Stack _), Float, (Reg _ | Stack _) ->
     if distinct then movsd (reg src) (reg dst)
   | Float32, (Reg _ | Stack _), Float32, (Reg _ | Stack _) ->

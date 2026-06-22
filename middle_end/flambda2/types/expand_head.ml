@@ -117,8 +117,7 @@ module Expanded_type : sig
         Type_grammar.head_of_kind_naked_vec256 Or_unknown_or_bottom.t
     | Naked_vec512 of
         Type_grammar.head_of_kind_naked_vec512 Or_unknown_or_bottom.t
-    | Naked_mask of
-        Type_grammar.head_of_kind_naked_mask Or_unknown_or_bottom.t
+    | Naked_mask of Type_grammar.head_of_kind_naked_mask Or_unknown_or_bottom.t
     | Rec_info of Type_grammar.head_of_kind_rec_info Or_unknown_or_bottom.t
     | Region of Type_grammar.head_of_kind_region Or_unknown_or_bottom.t
 
@@ -218,8 +217,7 @@ end = struct
       create_naked_vec256 (TG.Head_of_kind_naked_vec256.create i)
     | Naked_vec512 i ->
       create_naked_vec512 (TG.Head_of_kind_naked_vec512.create i)
-    | Naked_mask i ->
-      create_naked_mask (TG.Head_of_kind_naked_mask.create i)
+    | Naked_mask i -> create_naked_mask (TG.Head_of_kind_naked_mask.create i)
     | Null -> create_value TG.Head_of_kind_value.null
 
   let bottom_like t = create_bottom t.kind
@@ -442,8 +440,7 @@ end = struct
         Type_grammar.head_of_kind_naked_vec256 Or_unknown_or_bottom.t
     | Naked_vec512 of
         Type_grammar.head_of_kind_naked_vec512 Or_unknown_or_bottom.t
-    | Naked_mask of
-        Type_grammar.head_of_kind_naked_mask Or_unknown_or_bottom.t
+    | Naked_mask of Type_grammar.head_of_kind_naked_mask Or_unknown_or_bottom.t
     | Rec_info of Type_grammar.head_of_kind_rec_info Or_unknown_or_bottom.t
     | Region of Type_grammar.head_of_kind_region Or_unknown_or_bottom.t
 

@@ -789,9 +789,7 @@ val apply_coercion_head_of_kind_naked_vec512 :
   head_of_kind_naked_vec512 Or_bottom.t
 
 val apply_coercion_head_of_kind_naked_mask :
-  head_of_kind_naked_mask ->
-  Coercion.t ->
-  head_of_kind_naked_mask Or_bottom.t
+  head_of_kind_naked_mask -> Coercion.t -> head_of_kind_naked_mask Or_bottom.t
 
 val apply_coercion_head_of_kind_rec_info :
   head_of_kind_rec_info -> Coercion.t -> head_of_kind_rec_info Or_bottom.t

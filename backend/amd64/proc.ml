@@ -113,6 +113,7 @@ let hard_vec512_reg =
   Array.map (Reg.create_alias ~typ:Vec512) hard_float_reg
 let hard_float32_reg =
   Array.map (Reg.create_alias ~typ:Float32) hard_float_reg
+
 let hard_mask_reg =
   Regs.phys_mask_regs
   |> Array.map (fun phys_mask_reg ->
@@ -196,7 +197,7 @@ let calling_conventions
   let loc = Array.make (Array.length arg) Reg.dummy in
   let int_registers = ref int_registers in
   let float_registers = ref float_registers in
-  let mask_registers = ref mask_registers in
+  let mask_registers = Option.map ref mask_registers in
   let ofs = ref first_stack in
   let max_size = ref 0 in
   (* A negative offset indicates a domainstate slot, which will
@@ -215,7 +216,10 @@ let calling_conventions
       | Vec128 -> float_registers, size_vec128
       | Vec256 -> float_registers, size_vec256
       | Vec512 -> float_registers, size_vec512
-      | Mask -> mask_registers, size_int
+      | Mask ->
+        (match mask_registers with
+        | Some mask_registers -> mask_registers
+        | None -> int_registers), size_int
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
     in
     match !registers with
@@ -259,7 +263,7 @@ let loc_arguments arg =
     calling_conventions
         ~int_registers:ocaml_int_registers
         ~float_registers:ocaml_float_registers
-        ~mask_registers:ocaml_mask_registers
+        ~mask_registers:(Some ocaml_mask_registers)
         ~make_stack:outgoing
         ~first_stack:(- size_domainstate_args)
         arg
@@ -271,7 +275,7 @@ let loc_parameters arg =
     calling_conventions
       ~int_registers:ocaml_int_registers
       ~float_registers:ocaml_float_registers
-      ~mask_registers:ocaml_mask_registers
+      ~mask_registers:(Some ocaml_mask_registers)
       ~make_stack:incoming
       ~first_stack:(- size_domainstate_args)
       arg
@@ -283,7 +287,7 @@ let loc_results_call res =
     calling_conventions
       ~int_registers:ocaml_int_registers
       ~float_registers:ocaml_float_registers
-      ~mask_registers:ocaml_mask_registers
+      ~mask_registers:(Some ocaml_mask_registers)
       ~make_stack:outgoing
       ~first_stack:(- size_domainstate_args)
       res
@@ -295,7 +299,7 @@ let loc_results_return res =
     calling_conventions
       ~int_registers:ocaml_int_registers
       ~float_registers:ocaml_float_registers
-      ~mask_registers:ocaml_mask_registers
+      ~mask_registers:(Some ocaml_mask_registers)
       ~make_stack:incoming
       ~first_stack:(- size_domainstate_args)
       res
@@ -323,7 +327,7 @@ let loc_external_results res =
     calling_conventions
       ~int_registers:[RAX; RDX]
       ~float_registers:[MM0; MM1]
-      ~mask_registers:[K1; K2]
+      ~mask_registers:None
       ~make_stack:not_supported
       ~first_stack:0
       res
@@ -333,7 +337,7 @@ let unix_loc_external_arguments arg =
   calling_conventions
     ~int_registers:[RDI; RSI; RDX; RCX; R8; R9]
     ~float_registers:[MM0; MM1; MM2; MM3; MM4; MM5; MM6; MM7]
-    ~mask_registers:[K1; K2; K3; K4; K5; K6; K7]
+    ~mask_registers:None
     ~make_stack:outgoing
     ~first_stack:0
     arg
@@ -351,11 +355,9 @@ let win64_loc_external_arguments arg =
       match ty with
       | Val | Int | Addr -> win64_int_external_arguments, size_int
       | Float | Float32 -> win64_float_external_arguments, size_float
-      | Vec128 | Vec256 | Vec512 ->
+      | Vec128 | Vec256 | Vec512 | Mask ->
         (* CR mslater: (SIMD) win64 calling convention requires pass by reference *)
         Misc.fatal_error "SIMD external arguments are not supported on Win64"
-      | Mask ->
-        Misc.fatal_error "Mask external arguments are not supported on Win64"
       | Valx2 ->
         Misc.fatal_error "Unexpected machtype_component Valx2"
     in

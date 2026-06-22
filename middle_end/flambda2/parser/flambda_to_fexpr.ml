@@ -48,8 +48,7 @@ let const c : Fexpr.const =
     Naked_vec256 (Vector_types.Vec256.Bit_pattern.to_bits bits)
   | Naked_vec512 bits ->
     Naked_vec512 (Vector_types.Vec512.Bit_pattern.to_bits bits)
-  | Naked_mask _ ->
-    Misc.fatal_error "Mask constants are not supported in fexpr"
+  | Naked_mask _ -> Misc.fatal_error "Mask constants are not supported in fexpr"
   | Naked_nativeint i -> Naked_nativeint (i |> targetint)
   | Null -> Null
 

@@ -128,8 +128,7 @@ let vectorizable_machtypes (r1 : Reg.t) (r2 : Reg.t) =
        [Addr], we could generalize [machtype], but for simplicity do not
        vectorize [Addr]. *)
     false
-  | Mask, _ | _, Mask ->
-    false
+  | Mask, _ | _, Mask -> false
   | ( (Vec128 | Vec256 | Vec512 | Valx2),
       (Val | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Valx2) )
   | (Val | Int | Float | Float32), (Vec128 | Vec256 | Vec512 | Valx2) ->

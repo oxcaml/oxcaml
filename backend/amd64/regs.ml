@@ -60,8 +60,7 @@ module T = struct
     [| MM0;  MM1;  MM2;  MM3;  MM4;  MM5;  MM6;  MM7;
        MM8;  MM9;  MM10; MM11; MM12; MM13; MM14; MM15 |]
 
-  let[@ocamlformat "disable"] phys_mask_regs_classed =
-    [| K1; K2; K3; K4; K5; K6; K7 |]
+  let phys_mask_regs_classed = [| K1; K2; K3; K4; K5; K6; K7 |]
 
   module Reg_class = struct
     type t = reg_class
@@ -73,10 +72,7 @@ module T = struct
 
     let all = [GPR; SIMD; MASK]
 
-    let[@inline] to_int : t -> int = function
-      | GPR -> 0
-      | SIMD -> 1
-      | MASK -> 2
+    let[@inline] to_int : t -> int = function GPR -> 0 | SIMD -> 1 | MASK -> 2
 
     let hash = to_int
 
@@ -142,8 +138,7 @@ module T = struct
           ( MM0 | MM1 | MM2 | MM3 | MM4 | MM5 | MM6 | MM7 | MM8 | MM9 | MM10
           | MM11 | MM12 | MM13 | MM14 | MM15 ) ->
         SIMD
-      | P ( K1 | K2 | K3 | K4 | K5 | K6 | K7 ) ->
-        MASK
+      | P (K1 | K2 | K3 | K4 | K5 | K6 | K7) -> MASK
   end
 
   let phys_gpr_regs_sans_frame_pointer =
@@ -250,7 +245,7 @@ module T = struct
     let index = index_in_class phys_reg in
     match reg_class with
     | GPR -> index
-    | MASK -> Misc.fatal_error "Mask registers are not saved by the runtime"
+    | MASK -> Misc.fatal_error "avx512 masks not yet implemented"
     | SIMD ->
       let slot_size_in_vals =
         match simd with

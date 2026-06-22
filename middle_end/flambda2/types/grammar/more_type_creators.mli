@@ -51,8 +51,7 @@ val these_naked_vec256s :
 val these_naked_vec512s :
   Vector_types.Vec512.Bit_pattern.Set.t -> Type_grammar.t
 
-val these_naked_masks :
-  Vector_types.Mask.Bit_pattern.Set.t -> Type_grammar.t
+val these_naked_masks : Vector_types.Mask.Bit_pattern.Set.t -> Type_grammar.t
 
 val any_tagged_immediate : Type_grammar.t
 

@@ -3890,8 +3890,7 @@ let read_from_closure_given_machtype t clos base_offset dbg =
           ( (non_scanned_pos + ints_per_vec512, scanned_pos),
             load Fivetwelve_unaligned non_scanned_pos )
         | Mask ->
-          ( (non_scanned_pos + 1, scanned_pos),
-            load Word_int non_scanned_pos )
+          (non_scanned_pos + 1, scanned_pos), load Word_int non_scanned_pos
         | Val -> (non_scanned_pos, scanned_pos + 1), load Word_val scanned_pos
         | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
         | Addr -> Misc.fatal_error "[Addr] cannot be read")

@@ -790,8 +790,8 @@ and predef_to_complex_shape_exn ~cache ~rec_env (predef : S.Predef.t) ~args :
   | Exception, [] -> Exception
   | Unboxed unb, [] -> Unboxed (translate_unboxed unb)
   | ( ( Bytes | Char | Extension_constructor | Float | Float32 | Floatarray
-      | Int | Int8 | Int16 | Int32 | Int64 | Mask | Nativeint | String
-      | Simd _ | Exception | Unboxed _ ),
+      | Int | Int8 | Int16 | Int32 | Int64 | Mask | Nativeint | String | Simd _
+      | Exception | Unboxed _ ),
       arg :: args ) ->
     err_exn (fun f ->
         f "predefined type %a does not take arguments, but got arguments %a"
