@@ -74,7 +74,7 @@ Line 1, characters 0-65:
 1 | type bad : immediate = A of key [@immediate_all_void_constructor]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation immediate,
-       because key is not mod global many stateless immutable.
+       because key is not mod global many stateless immutable noalloc_strict.
 |}]
 type bad : immediate = A of #(unit_u * key r) [@immediate_all_void_constructor]
 [%%expect{|
@@ -82,7 +82,7 @@ Line 1, characters 0-79:
 1 | type bad : immediate = A of #(unit_u * key r) [@immediate_all_void_constructor]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation immediate,
-       because key is not mod global many stateless immutable.
+       because key is not mod global many stateless immutable noalloc_strict.
 |}]
 
 
@@ -119,7 +119,7 @@ Lines 1-3, characters 0-59:
 3 |   | B of #(unit_u * v2 r) [@immediate_all_void_constructor]
 Error: This type definition does not satisfy its kind annotation
          immediate with v1,
-       because v2 is not mod global many stateless immutable.
+       because v2 is not mod global many stateless immutable noalloc_strict.
 |}]
 
 type vme : void

@@ -26,7 +26,7 @@ let foo =
   let _ = foo y in
   foo
 [%%expect{|
-val foo : '_weak1 -> '_weak1 @ [> aliased stateful dynamic] = <fun>
+val foo : '_weak1 -> '_weak1 @ [> aliased stateful dynamic alloc] = <fun>
 |}]
 
 let id x = x
@@ -124,14 +124,17 @@ let which = function
 [%%expect{|
 val f :
   string @ [< 'm mod contended immutable] ->
-  string @ [> 'm mod many portable forkable unyielding stateless] = <fun>
+  string @ [> 'm mod many portable forkable unyielding stateless noalloc_strict] =
+  <fun>
 val g :
   string @ [< 'm mod contended immutable & portable] ->
-  string @ [> 'm mod many portable forkable unyielding stateless] = <fun>
+  string @ [> 'm mod many portable forkable unyielding stateless noalloc_strict] =
+  <fun>
 val which :
   bool @ 'n ->
   string @ [< 'm mod contended immutable & portable] ->
-  string @ [> 'm mod many portable forkable unyielding stateless] = <fun>
+  string @ [> 'm mod many portable forkable unyielding stateless noalloc_strict] =
+  <fun>
 |}]
 
 (* The least upper bound between portable and nonportable is nonportable *)
