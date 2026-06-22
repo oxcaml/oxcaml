@@ -361,7 +361,7 @@ let recognize_switch_with_single_arg_to_same_destination0 dbg machine_width
         | Naked_vec128 -> single_kind Naked_vec128s Naked_vec128s
         | Naked_vec256 -> single_kind Naked_vec256s Naked_vec256s
         | Naked_vec512 -> single_kind Naked_vec512s Naked_vec512s
-        | Naked_mask -> None)
+        | Naked_mask -> single_kind Naked_masks Naked_masks)
       | Region | Rec_info -> None)
 
 let recognize_switch_with_single_arg_to_same_destination dbg machine_width ~arms
@@ -458,6 +458,8 @@ let create_lookup_table_array_const dbg (array_kind : P.Array_kind.t) rebuilding
     naked_number_array RSC.create_immutable_vec256_array RWC.is_naked_vec256
   | Naked_vec512s ->
     naked_number_array RSC.create_immutable_vec512_array RWC.is_naked_vec512
+  | Naked_masks ->
+    naked_number_array RSC.create_immutable_mask_array RWC.is_naked_mask
   | Immediates | Gc_ignorable_values | Unboxed_product _ ->
     Misc.fatal_errorf
       "Unexpected array kind %a when rebuilding switch lookup table at %a"
@@ -720,7 +722,7 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
               | Immediates | Gc_ignorable_values | Values | Naked_floats
               | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s
               | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-              | Naked_vec512s | Unboxed_product _ ->
+              | Naked_vec512s | Naked_masks | Unboxed_product _ ->
                 None)
           in
           match affine with

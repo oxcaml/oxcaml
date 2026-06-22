@@ -132,6 +132,7 @@ module Array_kind = struct
     | Naked_vec128s
     | Naked_vec256s
     | Naked_vec512s
+    | Naked_masks
     | Unboxed_product of t list
 
   let rec print ppf t =
@@ -150,6 +151,7 @@ module Array_kind = struct
     | Naked_vec128s -> Format.pp_print_string ppf "Naked_vec128s"
     | Naked_vec256s -> Format.pp_print_string ppf "Naked_vec256s"
     | Naked_vec512s -> Format.pp_print_string ppf "Naked_vec512s"
+    | Naked_masks -> Format.pp_print_string ppf "Naked_masks"
     | Unboxed_product fields ->
       Format.fprintf ppf "@[<hov 1>(Unboxed_product@ @[<hov 1>(%a)@])@]"
         (Format.pp_print_list ~pp_sep:Format.pp_print_space print)
@@ -172,6 +174,7 @@ module Array_kind = struct
     | Naked_vec128s -> [K.With_subkind.naked_vec128]
     | Naked_vec256s -> [K.With_subkind.naked_vec256]
     | Naked_vec512s -> [K.With_subkind.naked_vec512]
+    | Naked_masks -> [K.With_subkind.naked_mask]
     | Unboxed_product kinds -> List.concat_map element_kinds kinds
 
   let element_kinds_for_primitive t =
@@ -193,6 +196,7 @@ module Array_kind = struct
     | Naked_vec128s -> false, false
     | Naked_vec256s -> false, false
     | Naked_vec512s -> false, false
+    | Naked_masks -> false, false
     | Unboxed_product kinds ->
       let must_any, all_may =
         List.fold_left
@@ -217,7 +221,8 @@ module Array_kind = struct
     match t with
     | Immediates | Gc_ignorable_values | Values | Naked_floats | Naked_float32s
     | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
-    | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
+    | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
+    | Naked_masks ->
       1
     | Unboxed_product kinds ->
       List.fold_left
@@ -241,6 +246,7 @@ module Array_load_kind = struct
     | Naked_vec128s
     | Naked_vec256s
     | Naked_vec512s
+    | Naked_masks
 
   let print ppf t =
     match t with
@@ -258,6 +264,7 @@ module Array_load_kind = struct
     | Naked_vec128s -> Format.pp_print_string ppf "Naked_vec128s"
     | Naked_vec256s -> Format.pp_print_string ppf "Naked_vec256s"
     | Naked_vec512s -> Format.pp_print_string ppf "Naked_vec512s"
+    | Naked_masks -> Format.pp_print_string ppf "Naked_masks"
 
   let compare = Stdlib.compare
 
@@ -277,6 +284,7 @@ module Array_load_kind = struct
     | Naked_vec128s -> Flambda_kind.With_subkind.naked_vec128
     | Naked_vec256s -> Flambda_kind.With_subkind.naked_vec256
     | Naked_vec512s -> Flambda_kind.With_subkind.naked_vec512
+    | Naked_masks -> Flambda_kind.With_subkind.naked_mask
 end
 
 module Array_set_kind = struct
@@ -295,6 +303,7 @@ module Array_set_kind = struct
     | Naked_vec128s
     | Naked_vec256s
     | Naked_vec512s
+    | Naked_masks
 
   let print ppf t =
     match t with
@@ -314,6 +323,7 @@ module Array_set_kind = struct
     | Naked_vec128s -> Format.pp_print_string ppf "Naked_vec128s"
     | Naked_vec256s -> Format.pp_print_string ppf "Naked_vec256s"
     | Naked_vec512s -> Format.pp_print_string ppf "Naked_vec512s"
+    | Naked_masks -> Format.pp_print_string ppf "Naked_masks"
 
   let compare = Stdlib.compare
 
@@ -333,6 +343,7 @@ module Array_set_kind = struct
     | Naked_vec128s -> Flambda_kind.With_subkind.naked_vec128
     | Naked_vec256s -> Flambda_kind.With_subkind.naked_vec256
     | Naked_vec512s -> Flambda_kind.With_subkind.naked_vec512
+    | Naked_masks -> Flambda_kind.With_subkind.naked_mask
 end
 
 module Array_kind_for_length = struct
@@ -418,6 +429,7 @@ module Duplicate_array_kind = struct
     | Naked_vec128s of { length : Target_ocaml_int.t option }
     | Naked_vec256s of { length : Target_ocaml_int.t option }
     | Naked_vec512s of { length : Target_ocaml_int.t option }
+    | Naked_masks of { length : Target_ocaml_int.t option }
 
   let [@ocamlformat "disable"] print ppf t =
     match t with
@@ -489,6 +501,12 @@ module Duplicate_array_kind = struct
           @[<hov 1>(length@ %a)@]\
           )@]"
         (Misc.Stdlib.Option.print Target_ocaml_int.print) length
+    | Naked_masks { length; } ->
+      Format.fprintf ppf
+        "@[<hov 1>(Naked_masks@ \
+          @[<hov 1>(length@ %a)@]\
+          )@]"
+        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
 
   let compare t1 t2 =
     match t1, t2 with
@@ -504,7 +522,8 @@ module Duplicate_array_kind = struct
         Naked_nativeints { length = length2 } )
     | Naked_vec128s { length = length1 }, Naked_vec128s { length = length2 }
     | Naked_vec256s { length = length1 }, Naked_vec256s { length = length2 }
-    | Naked_vec512s { length = length1 }, Naked_vec512s { length = length2 } ->
+    | Naked_vec512s { length = length1 }, Naked_vec512s { length = length2 }
+    | Naked_masks { length = length1 }, Naked_masks { length = length2 } ->
       Option.compare Target_ocaml_int.compare length1 length2
     | Immediates, _ -> -1
     | _, Immediates -> 1
@@ -530,6 +549,8 @@ module Duplicate_array_kind = struct
     | _, Naked_vec256s _ -> 1
     | Naked_vec512s _, _ -> -1
     | _, Naked_vec512s _ -> 1
+    | Naked_masks _, _ -> -1
+    | _, Naked_masks _ -> 1
 end
 
 module Block_access_field_kind = struct
@@ -742,7 +763,7 @@ let reading_from_an_array (array_kind : Array_kind.t)
     | Immediates | Values | Gc_ignorable_values | Naked_floats | Naked_float32s
     | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
     | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
-    | Unboxed_product _ ->
+    | Naked_masks | Unboxed_product _ ->
       No_effects
   in
   let coeffects =

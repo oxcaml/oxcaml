@@ -284,6 +284,8 @@ let equal_head_of_kind_value_non_null ~equal_type env
     equal_type env t1 t2 && equal_alloc_mode env a1 a2
   | Boxed_vec512 (t1, a1), Boxed_vec512 (t2, a2) ->
     equal_type env t1 t2 && equal_alloc_mode env a1 a2
+  | Boxed_mask (t1, a1), Boxed_mask (t2, a2) ->
+    equal_type env t1 t2 && equal_alloc_mode env a1 a2
   | Closures c1, Closures c2 ->
     equal_row_like_for_closures ~equal_type env c1.by_function_slot
       c2.by_function_slot
@@ -299,7 +301,8 @@ let equal_head_of_kind_value_non_null ~equal_type env
     && equal_alloc_mode env t1.alloc_mode t2.alloc_mode
   | ( ( Variant _ | Mutable_block _ | Boxed_float _ | Boxed_float32 _
       | Boxed_int32 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-      | Boxed_int64 _ | Boxed_nativeint _ | Closures _ | String _ | Array _ ),
+      | Boxed_mask _ | Boxed_int64 _ | Boxed_nativeint _ | Closures _ | String _
+      | Array _ ),
       _ ) ->
     false
 

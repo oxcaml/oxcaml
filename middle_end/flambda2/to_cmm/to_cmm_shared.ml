@@ -61,8 +61,7 @@ let exttype_of_kind (k : Flambda_kind.t) : Cmm.exttype =
   | Naked_number Naked_vec128 -> XVec128
   | Naked_number Naked_vec256 -> XVec256
   | Naked_number Naked_vec512 -> XVec512
-  | Naked_number Naked_mask ->
-    Misc.fatal_error "[Naked_mask] kind not expected in external calls"
+  | Naked_number Naked_mask -> XInt64
   | Region -> Misc.fatal_error "[Region] kind not expected here"
   | Rec_info -> Misc.fatal_error "[Rec_info] kind not expected here"
 
@@ -72,12 +71,13 @@ let machtype_of_kind (kind : Flambda_kind.With_subkind.t) =
     match Flambda_kind.With_subkind.non_null_value_subkind kind with
     | Tagged_immediate -> Cmm.typ_int
     | Anything | Boxed_float32 | Boxed_float | Boxed_int32 | Boxed_int64
-    | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512 | Variant _
-    | Float_block _ | Float_array | Immediate_array | Unboxed_float32_array
-    | Untagged_int_array | Untagged_int8_array | Untagged_int16_array
-    | Unboxed_int32_array | Unboxed_int64_array | Unboxed_nativeint_array
-    | Unboxed_vec128_array | Unboxed_vec256_array | Unboxed_vec512_array
-    | Value_array | Generic_array | Unboxed_product_array ->
+    | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512 | Boxed_mask
+    | Variant _ | Float_block _ | Float_array | Immediate_array
+    | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
+    | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
+    | Unboxed_nativeint_array | Unboxed_vec128_array | Unboxed_vec256_array
+    | Unboxed_vec512_array | Unboxed_mask_array | Value_array | Generic_array
+    | Unboxed_product_array ->
       Cmm.typ_val)
   | Naked_number Naked_float -> Cmm.typ_float
   | Naked_number Naked_float32 -> Cmm.typ_float32
@@ -98,12 +98,13 @@ let extended_machtype_of_kind (kind : Flambda_kind.With_subkind.t) =
     match Flambda_kind.With_subkind.non_null_value_subkind kind with
     | Tagged_immediate -> Extended_machtype.typ_tagged_int
     | Anything | Boxed_float | Boxed_float32 | Boxed_int32 | Boxed_int64
-    | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512 | Variant _
-    | Float_block _ | Float_array | Immediate_array | Unboxed_float32_array
-    | Untagged_int_array | Untagged_int8_array | Untagged_int16_array
-    | Unboxed_int32_array | Unboxed_int64_array | Unboxed_nativeint_array
-    | Unboxed_vec128_array | Unboxed_vec256_array | Unboxed_vec512_array
-    | Value_array | Generic_array | Unboxed_product_array ->
+    | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512 | Boxed_mask
+    | Variant _ | Float_block _ | Float_array | Immediate_array
+    | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
+    | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
+    | Unboxed_nativeint_array | Unboxed_vec128_array | Unboxed_vec256_array
+    | Unboxed_vec512_array | Unboxed_mask_array | Value_array | Generic_array
+    | Unboxed_product_array ->
       Extended_machtype.typ_val)
   | Naked_number Naked_float -> Extended_machtype.typ_float
   | Naked_number Naked_float32 -> Extended_machtype.typ_float32
@@ -125,12 +126,13 @@ let memory_chunk_of_kind (kind : Flambda_kind.With_subkind.t) : Cmm.memory_chunk
     match Flambda_kind.With_subkind.non_null_value_subkind kind with
     | Tagged_immediate -> Word_int
     | Anything | Boxed_float | Boxed_float32 | Boxed_int32 | Boxed_int64
-    | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512 | Variant _
-    | Float_block _ | Float_array | Immediate_array | Unboxed_float32_array
-    | Untagged_int_array | Untagged_int8_array | Untagged_int16_array
-    | Unboxed_int32_array | Unboxed_int64_array | Unboxed_nativeint_array
-    | Unboxed_vec128_array | Unboxed_vec256_array | Unboxed_vec512_array
-    | Value_array | Generic_array | Unboxed_product_array ->
+    | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512 | Boxed_mask
+    | Variant _ | Float_block _ | Float_array | Immediate_array
+    | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
+    | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
+    | Unboxed_nativeint_array | Unboxed_vec128_array | Unboxed_vec256_array
+    | Unboxed_vec512_array | Unboxed_mask_array | Value_array | Generic_array
+    | Unboxed_product_array ->
       Word_val)
   | Naked_number (Naked_int64 | Naked_nativeint | Naked_immediate) -> Word_int
   | Naked_number Naked_int32 ->
@@ -228,7 +230,11 @@ let const ~dbg cst =
       Vector_types.Vec512.Bit_pattern.to_bits i
     in
     vec512 ~dbg { word0; word1; word2; word3; word4; word5; word6; word7 }
-  | Naked_mask _ -> Misc.fatal_error "Mask constants are not yet supported"
+  | Naked_mask v ->
+    let { Vector_types.Mask.Bit_pattern.word0 } =
+      Vector_types.Mask.Bit_pattern.to_bits v
+    in
+    int64 ~dbg word0
   | Naked_nativeint t -> targetint ~dbg t
   | Null -> targetint ~dbg (Targetint_32_64.zero Sixty_four)
 
@@ -305,7 +311,11 @@ let const_static cst : Cmm.data_item list =
       Vector_types.Vec512.Bit_pattern.to_bits v
     in
     [cvec512 { word0; word1; word2; word3; word4; word5; word6; word7 }]
-  | Naked_mask _ -> Misc.fatal_error "Mask constants are not yet supported"
+  | Naked_mask v ->
+    let { Vector_types.Mask.Bit_pattern.word0 } =
+      Vector_types.Mask.Bit_pattern.to_bits v
+    in
+    [cint (Int64.to_nativeint word0)]
   | Null -> [cint 0n]
 
 let simple_static res s =
@@ -403,12 +413,11 @@ module Update_kind = struct
   let field_size_in_words t =
     match t.kind with
     | Pointer | Immediate | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64
-    | Naked_float | Naked_float32 ->
+    | Naked_float | Naked_float32 | Naked_mask ->
       1
     | Naked_vec128 -> 2
     | Naked_vec256 -> 4
     | Naked_vec512 -> 8
-    | Naked_mask -> 1
 
   let pointers = { kind = Pointer; stride = Arch.size_addr }
 

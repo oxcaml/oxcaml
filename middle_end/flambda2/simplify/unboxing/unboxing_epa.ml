@@ -291,7 +291,9 @@ and compute_extra_args_for_one_decision_and_use_aux ~(pass : U.pass) rewrite_id
   | Unbox (Number (Naked_vec512, epa)) ->
     compute_extra_arg_for_number Naked_vec512 Unboxers.Vec512.unboxer epa
       rewrite_id ~typing_env_at_use ~machine_width arg_being_unboxed
-  | Unbox (Number (Naked_mask, _)) -> U.Do_not_unbox U.Not_beneficial
+  | Unbox (Number (Naked_mask, epa)) ->
+    compute_extra_arg_for_number Naked_mask Unboxers.Mask.unboxer epa rewrite_id
+      ~typing_env_at_use ~machine_width arg_being_unboxed
 
 and compute_extra_args_for_block ~pass rewrite_id ~typing_env_at_use
     ~machine_width arg_being_unboxed tag (shape : K.Block_shape.t) fields :

@@ -281,5 +281,11 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
     in
     denv_of_number_decision K.naked_vec512 shape param_var param_debug_uid
       naked_vec512 denv
-  | Unbox (Number (Naked_mask, _)) ->
-    Misc.fatal_error "Cannot build unboxing denv for masks"
+  | Unbox
+      (Number (Naked_mask, { param = naked_mask; param_debug_uid; args = _ }))
+    ->
+    let shape =
+      T.boxed_mask_alias_to ~naked_mask (Alloc_mode.For_types.unknown ())
+    in
+    denv_of_number_decision K.naked_mask shape param_var param_debug_uid
+      naked_mask denv

@@ -203,6 +203,24 @@ module Vec512 = struct
     }
 end
 
+module Mask = struct
+  let decider =
+    { param_name = "unboxed_mask";
+      kind = K.Naked_number_kind.Naked_mask;
+      prove_is_a_boxed_number = T.prove_is_a_boxed_mask
+    }
+
+  let unboxing_prim simple = P.(Unary (Unbox_number Naked_mask, simple))
+
+  let unboxer _machine_width =
+    { var_name = "unboxed_mask";
+      var_kind = K.naked_mask;
+      poison_const = Const.naked_mask Vector_types.Mask.Bit_pattern.zero;
+      unboxing_prim;
+      prove_simple = T.meet_boxed_mask_containing_simple
+    }
+end
+
 module Field = struct
   let unboxing_prim bak ~block ~index =
     P.Unary (Block_load { kind = bak; mut = Immutable; field = index }, block)

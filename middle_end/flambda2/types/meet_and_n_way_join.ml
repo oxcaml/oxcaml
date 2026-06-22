@@ -859,6 +859,11 @@ and meet_head_of_kind_value_non_null env
       ~rebuild:TG.Head_of_kind_value_non_null.create_boxed_vec512 ~meet_a:meet
       ~meet_b:meet_alloc_mode ~left_a:n1 ~right_a:n2 ~left_b:alloc_mode1
       ~right_b:alloc_mode2
+  | Boxed_mask (n1, alloc_mode1), Boxed_mask (n2, alloc_mode2) ->
+    combine_results2 env
+      ~rebuild:TG.Head_of_kind_value_non_null.create_boxed_mask ~meet_a:meet
+      ~meet_b:meet_alloc_mode ~left_a:n1 ~right_a:n2 ~left_b:alloc_mode1
+      ~right_b:alloc_mode2
   | ( Closures { by_function_slot = by_function_slot1; alloc_mode = alloc_mode1 },
       Closures
         { by_function_slot = by_function_slot2; alloc_mode = alloc_mode2 } ) ->
@@ -886,7 +891,8 @@ and meet_head_of_kind_value_non_null env
       (element_kind2, length2, contents2, alloc_mode2)
   | ( ( Variant _ | Mutable_block _ | Boxed_float _ | Boxed_float32 _
       | Boxed_int32 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-      | Boxed_int64 _ | Boxed_nativeint _ | Closures _ | String _ | Array _ ),
+      | Boxed_mask _ | Boxed_int64 _ | Boxed_nativeint _ | Closures _ | String _
+      | Array _ ),
       _ ) ->
     (* This assumes that all the different constructors are incompatible. This
        could break very hard for dubious uses of Obj. *)
@@ -2272,6 +2278,22 @@ and n_way_join_head_of_kind_value_non_null env
         in
         let>>+ n = n_way_join env ns in
         TG.Head_of_kind_value_non_null.create_boxed_vec512 n alloc_mode
+      | Boxed_mask (n, alloc_mode) ->
+        let ns, alloc_mode =
+          List.fold_right
+            (fun (other_id, other_head) (ns, alloc_mode) ->
+              match[@warning "-fragile-match"]
+                (other_head : TG.head_of_kind_value_non_null)
+              with
+              | Boxed_mask (other_n, other_alloc_mode) ->
+                ( (other_id, other_n) :: ns,
+                  join_alloc_mode alloc_mode other_alloc_mode )
+              | _ -> raise Unknown_result)
+            other_heads
+            ([first_id, n], alloc_mode)
+        in
+        let>>+ n = n_way_join env ns in
+        TG.Head_of_kind_value_non_null.create_boxed_mask n alloc_mode
       | Closures { by_function_slot; alloc_mode } ->
         let function_slots, alloc_mode =
           List.fold_right

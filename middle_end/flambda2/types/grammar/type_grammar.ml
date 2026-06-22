@@ -92,6 +92,7 @@ and head_of_kind_value_non_null =
   | Boxed_vec128 of t * Alloc_mode.For_types.t
   | Boxed_vec256 of t * Alloc_mode.For_types.t
   | Boxed_vec512 of t * Alloc_mode.For_types.t
+  | Boxed_mask of t * Alloc_mode.For_types.t
   | Closures of
       { by_function_slot : row_like_for_closures;
         alloc_mode : Alloc_mode.For_types.t
@@ -406,6 +407,7 @@ and free_names_head_of_kind_value_non_null ~follow_value_slots head =
   | Boxed_vec128 (ty, _alloc_mode) -> free_names0 ~follow_value_slots ty
   | Boxed_vec256 (ty, _alloc_mode) -> free_names0 ~follow_value_slots ty
   | Boxed_vec512 (ty, _alloc_mode) -> free_names0 ~follow_value_slots ty
+  | Boxed_mask (ty, _alloc_mode) -> free_names0 ~follow_value_slots ty
   | Closures { by_function_slot; alloc_mode = _ } ->
     free_names_row_like_for_closures ~follow_value_slots by_function_slot
   | String _ -> Name_occurrences.empty
@@ -800,6 +802,9 @@ and apply_renaming_head_of_kind_value_non_null head renaming =
   | Boxed_vec512 (ty, alloc_mode) ->
     let ty' = apply_renaming ty renaming in
     if ty == ty' then head else Boxed_vec512 (ty', alloc_mode)
+  | Boxed_mask (ty, alloc_mode) ->
+    let ty' = apply_renaming ty renaming in
+    if ty == ty' then head else Boxed_mask (ty', alloc_mode)
   | Closures { by_function_slot; alloc_mode } ->
     let by_function_slot' =
       apply_renaming_row_like_for_closures by_function_slot renaming
@@ -1223,6 +1228,9 @@ and print_head_of_kind_value_non_null ppf head =
   | Boxed_vec512 (ty, alloc_mode) ->
     Format.fprintf ppf "@[<hov 1>(Boxed_vec512@ %a@ %a)@]"
       Alloc_mode.For_types.print alloc_mode print ty
+  | Boxed_mask (ty, alloc_mode) ->
+    Format.fprintf ppf "@[<hov 1>(Boxed_mask@ %a@ %a)@]"
+      Alloc_mode.For_types.print alloc_mode print ty
   | Closures { by_function_slot; alloc_mode } ->
     print_row_like_for_closures alloc_mode ppf by_function_slot
   | String str_infos ->
@@ -1511,6 +1519,7 @@ and ids_for_export_head_of_kind_value_non_null head =
   | Boxed_vec128 (t, _alloc_mode) -> ids_for_export t
   | Boxed_vec256 (t, _alloc_mode) -> ids_for_export t
   | Boxed_vec512 (t, _alloc_mode) -> ids_for_export t
+  | Boxed_mask (t, _alloc_mode) -> ids_for_export t
   | Closures { by_function_slot; alloc_mode = _ } ->
     ids_for_export_row_like_for_closures by_function_slot
   | String _ -> Ids_for_export.empty
@@ -1816,7 +1825,7 @@ and apply_coercion_head_of_kind_value_non_null head coercion : _ Or_bottom.t =
        value coercion. *)
     if Coercion.is_id coercion then Ok head else Bottom
   | Boxed_int32 _ | Boxed_int64 _ | Boxed_nativeint _ | Boxed_vec128 _
-  | Boxed_vec256 _ | Boxed_vec512 _ | String _ ->
+  | Boxed_vec256 _ | Boxed_vec512 _ | Boxed_mask _ | String _ ->
     (* Similarly, we don't have lifted coercions for these. *)
     if Coercion.is_id coercion then Ok head else Bottom
   | Array
@@ -2324,6 +2333,12 @@ and remove_unused_value_slots_and_shortcut_aliases_head_of_kind_value_non_null
         ~canonicalise
     in
     if ty == ty' then head else Boxed_vec512 (ty', alloc_mode)
+  | Boxed_mask (ty, alloc_mode) ->
+    let ty' =
+      remove_unused_value_slots_and_shortcut_aliases ty ~used_value_slots
+        ~canonicalise
+    in
+    if ty == ty' then head else Boxed_mask (ty', alloc_mode)
   | Closures { by_function_slot; alloc_mode } ->
     let by_function_slot' =
       remove_unused_value_slots_and_shortcut_aliases_row_like_for_closures
@@ -3071,6 +3086,9 @@ and project_head_of_kind_value_non_null ~to_project ~expand head =
   | Boxed_vec512 (ty, alloc_mode) ->
     let ty' = project_variables_out ~to_project ~expand ty in
     if ty == ty' then head else Boxed_vec512 (ty', alloc_mode)
+  | Boxed_mask (ty, alloc_mode) ->
+    let ty' = project_variables_out ~to_project ~expand ty in
+    if ty == ty' then head else Boxed_mask (ty', alloc_mode)
   | Closures { by_function_slot; alloc_mode } ->
     let by_function_slot' =
       project_row_like_for_closures ~to_project ~expand by_function_slot
@@ -4146,6 +4164,14 @@ let box_vec512 (t : t) alloc_mode : t =
   | Naked_vec128 _ | Naked_vec256 _ | Naked_mask _ | Rec_info _ | Region _ ->
     Misc.fatal_errorf "Type of wrong kind for [box_vec512]: %a" print t
 
+let box_mask (t : t) alloc_mode : t =
+  match t with
+  | Naked_mask _ -> non_null_value (Boxed_mask (t, alloc_mode))
+  | Value _ | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
+  | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
+    Misc.fatal_errorf "Type of wrong kind for [box_mask]: %a" print t
+
 let null : t =
   Value
     (TD.create { non_null = Bottom; is_null = Maybe_null { is_null = None } })
@@ -4216,6 +4242,9 @@ let boxed_vec256_alias_to ~naked_vec256 =
 
 let boxed_vec512_alias_to ~naked_vec512 =
   box_vec512 (Naked_vec512 (TD.create_equals (Simple.var naked_vec512)))
+
+let boxed_mask_alias_to ~naked_mask =
+  box_mask (Naked_mask (TD.create_equals (Simple.var naked_mask)))
 
 let this_immutable_string str ~machine_width =
   let size = Target_ocaml_int.of_int machine_width (String.length str) in
@@ -4375,6 +4404,9 @@ module Head_of_kind_value = struct
   let create_boxed_vec512 ty alloc_mode =
     mk_non_null (Boxed_vec512 (ty, alloc_mode))
 
+  let create_boxed_mask ty alloc_mode =
+    mk_non_null (Boxed_mask (ty, alloc_mode))
+
   let create_tagged_immediate imm : t =
     mk_non_null
       (Variant
@@ -4419,6 +4451,8 @@ module Head_of_kind_value_non_null = struct
   let create_boxed_vec256 ty alloc_mode = Boxed_vec256 (ty, alloc_mode)
 
   let create_boxed_vec512 ty alloc_mode = Boxed_vec512 (ty, alloc_mode)
+
+  let create_boxed_mask ty alloc_mode = Boxed_mask (ty, alloc_mode)
 
   let create_tagged_immediate imm : t =
     Variant
@@ -4538,8 +4572,8 @@ let rec must_be_singleton t ~machine_width : RWC.t option =
                | Ok
                    ( Mutable_block _ | Boxed_float _ | Boxed_float32 _
                    | Boxed_int32 _ | Boxed_int64 _ | Boxed_vec128 _
-                   | Boxed_vec256 _ | Boxed_vec512 _ | Boxed_nativeint _
-                   | String _ | Closures _ | Array _ ) )
+                   | Boxed_vec256 _ | Boxed_vec512 _ | Boxed_mask _
+                   | Boxed_nativeint _ | String _ | Closures _ | Array _ ) )
            }) ->
       None
     | Ok (Equals simple) -> Simple.must_be_const simple

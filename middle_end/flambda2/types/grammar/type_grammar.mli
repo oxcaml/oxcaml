@@ -74,6 +74,7 @@ and head_of_kind_value_non_null = private
   | Boxed_vec128 of t * Alloc_mode.For_types.t
   | Boxed_vec256 of t * Alloc_mode.For_types.t
   | Boxed_vec512 of t * Alloc_mode.For_types.t
+  | Boxed_mask of t * Alloc_mode.For_types.t
   | Closures of
       { by_function_slot : row_like_for_closures;
         alloc_mode : Alloc_mode.For_types.t
@@ -366,6 +367,8 @@ val boxed_vec256_alias_to :
 val boxed_vec512_alias_to :
   naked_vec512:Variable.t -> Alloc_mode.For_types.t -> t
 
+val boxed_mask_alias_to : naked_mask:Variable.t -> Alloc_mode.For_types.t -> t
+
 (** This function checks the kind of its argument. *)
 val box_float32 : t -> Alloc_mode.For_types.t -> t
 
@@ -395,6 +398,9 @@ val box_vec256 : t -> Alloc_mode.For_types.t -> t
 
 (** This function checks the kind of its argument. *)
 val box_vec512 : t -> Alloc_mode.For_types.t -> t
+
+(** This function checks the kind of its argument. *)
+val box_mask : t -> Alloc_mode.For_types.t -> t
 
 val tagged_immediate_alias_to : naked_immediate:Variable.t -> t
 
@@ -827,6 +833,8 @@ module Head_of_kind_value : sig
 
   val create_boxed_vec512 : flambda_type -> Alloc_mode.For_types.t -> t
 
+  val create_boxed_mask : flambda_type -> Alloc_mode.For_types.t -> t
+
   val create_tagged_immediate : Target_ocaml_int.t -> t
 
   val create_closures : Row_like_for_closures.t -> Alloc_mode.For_types.t -> t
@@ -874,6 +882,8 @@ module Head_of_kind_value_non_null : sig
   val create_boxed_vec256 : flambda_type -> Alloc_mode.For_types.t -> t
 
   val create_boxed_vec512 : flambda_type -> Alloc_mode.For_types.t -> t
+
+  val create_boxed_mask : flambda_type -> Alloc_mode.For_types.t -> t
 
   val create_tagged_immediate : Target_ocaml_int.t -> t
 

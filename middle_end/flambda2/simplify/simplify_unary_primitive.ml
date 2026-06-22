@@ -128,6 +128,10 @@ let simplify_unbox_number (boxable_number_kind : K.Boxable_number.t) dacc
       ( T.boxed_vec512_alias_to ~naked_vec512:result_var'
           (Alloc_mode.For_types.unknown ()),
         K.naked_vec512 )
+    | Naked_mask ->
+      ( T.boxed_mask_alias_to ~naked_mask:result_var'
+          (Alloc_mode.For_types.unknown ()),
+        K.naked_mask )
   in
   let alloc_mode =
     T.prove_alloc_mode_of_boxed_number (DA.typing_env dacc) boxed_number_ty
@@ -186,6 +190,7 @@ let simplify_box_number (boxable_number_kind : K.Boxable_number.t) alloc_mode
     | Naked_vec128 -> T.box_vec128 naked_number_ty alloc_mode
     | Naked_vec256 -> T.box_vec256 naked_number_ty alloc_mode
     | Naked_vec512 -> T.box_vec512 naked_number_ty alloc_mode
+    | Naked_mask -> T.box_mask naked_number_ty alloc_mode
   in
   let dacc = DA.add_variable dacc result_var ty in
   SPR.create original_term ~try_reify:true dacc
@@ -806,6 +811,7 @@ let simplify_obj_dup dbg dacc ~original_term ~arg ~arg_ty ~result_var =
         | Naked_vec128 -> T.box_vec128
         | Naked_vec256 -> T.box_vec256
         | Naked_vec512 -> T.box_vec512
+        | Naked_mask -> T.box_mask
       in
       let ty = boxer contents_ty Alloc_mode.For_types.heap in
       let dacc = DA.add_variable dacc result_var ty in

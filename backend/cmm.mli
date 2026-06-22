@@ -364,6 +364,7 @@ type alloc_block_kind =
   | Alloc_block_kind_vec128
   | Alloc_block_kind_vec256
   | Alloc_block_kind_vec512
+  | Alloc_block_kind_mask
   | Alloc_block_kind_boxed_int of Primitive.boxed_integer
   | Alloc_block_kind_float_array
   | Alloc_block_kind_float32_u_array
@@ -375,6 +376,7 @@ type alloc_block_kind =
   | Alloc_block_kind_vec128_u_array
   | Alloc_block_kind_vec256_u_array
   | Alloc_block_kind_vec512_u_array
+  | Alloc_block_kind_mask_u_array
 
 val equal_alloc_block_kind : alloc_block_kind -> alloc_block_kind -> bool
 

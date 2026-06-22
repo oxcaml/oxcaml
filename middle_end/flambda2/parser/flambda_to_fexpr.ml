@@ -18,6 +18,8 @@ let vec256 v = v |> Vector_types.Vec256.Bit_pattern.to_bits
 
 let vec512 v = v |> Vector_types.Vec512.Bit_pattern.to_bits
 
+let mask v = v |> Vector_types.Mask.Bit_pattern.to_bits
+
 let targetint i = i |> Targetint_32_64.to_int64
 
 let const c : Fexpr.const =
@@ -48,7 +50,7 @@ let const c : Fexpr.const =
     Naked_vec256 (Vector_types.Vec256.Bit_pattern.to_bits bits)
   | Naked_vec512 bits ->
     Naked_vec512 (Vector_types.Vec512.Bit_pattern.to_bits bits)
-  | Naked_mask _ -> Misc.fatal_error "Mask constants are not supported in fexpr"
+  | Naked_mask bits -> Naked_mask (Vector_types.Mask.Bit_pattern.to_bits bits)
   | Naked_nativeint i -> Naked_nativeint (i |> targetint)
   | Null -> Null
 
@@ -109,6 +111,7 @@ let rec subkind (k : Flambda_kind.With_subkind.Non_null_value_subkind.t) :
   | Boxed_vec128 -> Boxed_vec128
   | Boxed_vec256 -> Boxed_vec256
   | Boxed_vec512 -> Boxed_vec512
+  | Boxed_mask -> Boxed_mask
   | Tagged_immediate -> Tagged_immediate
   | Variant { consts; non_consts } -> variant_subkind consts non_consts
   | Float_array -> Float_array
@@ -119,7 +122,7 @@ let rec subkind (k : Flambda_kind.With_subkind.Non_null_value_subkind.t) :
   | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
   | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
   | Unboxed_nativeint_array | Unboxed_vec128_array | Unboxed_vec256_array
-  | Unboxed_vec512_array | Unboxed_product_array ->
+  | Unboxed_vec512_array | Unboxed_mask_array | Unboxed_product_array ->
     Misc.fatal_error
       "fexpr support for arrays of unboxed elements not yet implemented"
 
@@ -264,6 +267,7 @@ let static_const env (sc : Static_const.t) : Fexpr.static_data =
   | Boxed_vec128 i -> Boxed_vec128 (or_variable vec128 env i)
   | Boxed_vec256 i -> Boxed_vec256 (or_variable vec256 env i)
   | Boxed_vec512 i -> Boxed_vec512 (or_variable vec512 env i)
+  | Boxed_mask i -> Boxed_mask (or_variable mask env i)
   | Immutable_float_block elements ->
     Immutable_float_block (List.map (or_variable float env) elements)
   | Immutable_float_array elements ->
@@ -290,6 +294,8 @@ let static_const env (sc : Static_const.t) : Fexpr.static_data =
     Immutable_vec256_array (List.map (or_variable vec256 env) elements)
   | Immutable_vec512_array elements ->
     Immutable_vec512_array (List.map (or_variable vec512 env) elements)
+  | Immutable_mask_array elements ->
+    Immutable_mask_array (List.map (or_variable mask env) elements)
   | Empty_array array_kind -> Empty_array array_kind
   | Mutable_string { initial_value } -> Mutable_string { initial_value }
   | Immutable_string s -> Immutable_string s

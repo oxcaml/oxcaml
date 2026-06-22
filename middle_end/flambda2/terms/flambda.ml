@@ -1499,14 +1499,15 @@ module Named = struct
              | Static_const
                  ( Block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
                  | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _
-                 | Boxed_vec512 _ | Boxed_nativeint _ | Immutable_float_block _
-                 | Immutable_float_array _ | Immutable_float32_array _
-                 | Mutable_string _ | Immutable_string _ | Empty_array _
-                 | Immutable_value_array _ | Immutable_int_array _
-                 | Immutable_int8_array _ | Immutable_int16_array _
-                 | Immutable_int32_array _ | Immutable_int64_array _
-                 | Immutable_nativeint_array _ | Immutable_vec128_array _
-                 | Immutable_vec256_array _ | Immutable_vec512_array _ ) ->
+                 | Boxed_vec512 _ | Boxed_mask _ | Boxed_nativeint _
+                 | Immutable_float_block _ | Immutable_float_array _
+                 | Immutable_float32_array _ | Mutable_string _
+                 | Immutable_string _ | Empty_array _ | Immutable_value_array _
+                 | Immutable_int_array _ | Immutable_int8_array _
+                 | Immutable_int16_array _ | Immutable_int32_array _
+                 | Immutable_int64_array _ | Immutable_nativeint_array _
+                 | Immutable_vec128_array _ | Immutable_vec256_array _
+                 | Immutable_vec512_array _ | Immutable_mask_array _ ) ->
                acc)
            init
 end

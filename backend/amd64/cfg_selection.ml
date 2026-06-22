@@ -328,9 +328,14 @@ let is_offset_out_of_range _byte_offset :
     Cfg_selectgen_target_intf.is_store_out_of_range_result =
   Within_range
 
-let insert_move_extcall_arg _exttype _src _dst :
+let insert_move_extcall_arg _exttype src dst :
     Cfg_selectgen_target_intf.insert_move_extcall_arg_result =
-  Use_default
+  let is_mask_reg (reg : Reg.t) =
+    Cmm.equal_machtype_component reg.typ Cmm.Mask
+  in
+  if Array.exists is_mask_reg src || Array.exists is_mask_reg dst
+  then Misc.fatal_error "avx512 masks not yet implemented"
+  else Use_default
 
 (* Recognize float arithmetic with mem *)
 

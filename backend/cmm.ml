@@ -439,6 +439,7 @@ type alloc_block_kind =
   | Alloc_block_kind_vec128
   | Alloc_block_kind_vec256
   | Alloc_block_kind_vec512
+  | Alloc_block_kind_mask
   | Alloc_block_kind_boxed_int of Primitive.boxed_integer
   | Alloc_block_kind_float_array
   | Alloc_block_kind_float32_u_array
@@ -450,6 +451,7 @@ type alloc_block_kind =
   | Alloc_block_kind_vec128_u_array
   | Alloc_block_kind_vec256_u_array
   | Alloc_block_kind_vec512_u_array
+  | Alloc_block_kind_mask_u_array
 
 let equal_alloc_block_kind left right =
   match left, right with
@@ -460,6 +462,7 @@ let equal_alloc_block_kind left right =
   | Alloc_block_kind_vec128, Alloc_block_kind_vec128
   | Alloc_block_kind_vec256, Alloc_block_kind_vec256
   | Alloc_block_kind_vec512, Alloc_block_kind_vec512
+  | Alloc_block_kind_mask, Alloc_block_kind_mask
   | Alloc_block_kind_float_array, Alloc_block_kind_float_array
   | Alloc_block_kind_float32_u_array, Alloc_block_kind_float32_u_array
   | Alloc_block_kind_int_u_array, Alloc_block_kind_int_u_array
@@ -469,19 +472,21 @@ let equal_alloc_block_kind left right =
   | Alloc_block_kind_int64_u_array, Alloc_block_kind_int64_u_array
   | Alloc_block_kind_vec128_u_array, Alloc_block_kind_vec128_u_array
   | Alloc_block_kind_vec256_u_array, Alloc_block_kind_vec256_u_array
-  | Alloc_block_kind_vec512_u_array, Alloc_block_kind_vec512_u_array ->
+  | Alloc_block_kind_vec512_u_array, Alloc_block_kind_vec512_u_array
+  | Alloc_block_kind_mask_u_array, Alloc_block_kind_mask_u_array ->
     true
   | Alloc_block_kind_boxed_int left_bi, Alloc_block_kind_boxed_int right_bi ->
     Primitive.equal_boxed_integer left_bi right_bi
   | ( ( Alloc_block_kind_other | Alloc_block_kind_closure
       | Alloc_block_kind_float | Alloc_block_kind_float32
       | Alloc_block_kind_vec128 | Alloc_block_kind_vec256
-      | Alloc_block_kind_vec512 | Alloc_block_kind_boxed_int _
-      | Alloc_block_kind_float_array | Alloc_block_kind_float32_u_array
-      | Alloc_block_kind_int_u_array | Alloc_block_kind_int8_u_array
-      | Alloc_block_kind_int16_u_array | Alloc_block_kind_int32_u_array
-      | Alloc_block_kind_int64_u_array | Alloc_block_kind_vec128_u_array
-      | Alloc_block_kind_vec256_u_array | Alloc_block_kind_vec512_u_array ),
+      | Alloc_block_kind_vec512 | Alloc_block_kind_mask
+      | Alloc_block_kind_boxed_int _ | Alloc_block_kind_float_array
+      | Alloc_block_kind_float32_u_array | Alloc_block_kind_int_u_array
+      | Alloc_block_kind_int8_u_array | Alloc_block_kind_int16_u_array
+      | Alloc_block_kind_int32_u_array | Alloc_block_kind_int64_u_array
+      | Alloc_block_kind_vec128_u_array | Alloc_block_kind_vec256_u_array
+      | Alloc_block_kind_vec512_u_array | Alloc_block_kind_mask_u_array ),
       _ ) ->
     false
 

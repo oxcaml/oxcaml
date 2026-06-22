@@ -216,10 +216,10 @@ let calling_conventions
       | Vec128 -> float_registers, size_vec128
       | Vec256 -> float_registers, size_vec256
       | Vec512 -> float_registers, size_vec512
-      | Mask ->
-        (match mask_registers with
-        | Some mask_registers -> mask_registers
-        | None -> int_registers), size_int
+      | Mask -> (
+        match mask_registers with
+        | Some mask_registers -> mask_registers, size_int
+        | None -> Misc.fatal_error "Unsupported machtype_component Mask")
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
     in
     match !registers with

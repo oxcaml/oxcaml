@@ -1065,7 +1065,7 @@ let array_vector_access_validity_condition array ~machine_width
     | Naked_vec256s -> 32
     | Naked_vec512s -> 64
     | Naked_floats | Immediates | Naked_ints | Naked_int64s | Naked_nativeints
-      ->
+    | Naked_masks ->
       8
     | Naked_int32s | Naked_float32s -> 4
     | Naked_int16s -> 2
@@ -1080,11 +1080,7 @@ let array_vector_access_validity_condition array ~machine_width
          array, which is not yet supported."
   in
   let size_of_access =
-    match vec_kind with
-    | Vec128 -> 16
-    | Vec256 -> 32
-    | Vec512 -> 64
-    | Mask -> Misc.fatal_error "Mask array accesses are not supported"
+    match vec_kind with Vec128 -> 16 | Vec256 -> 32 | Vec512 -> 64
   in
   let num_consecutive_elements_being_accessed =
     (size_of_access + (size_of_element - 1)) / size_of_element
@@ -1109,7 +1105,6 @@ let array_like_load_vec ~dbg ~machine_width ~unsafe ~mode ~boxed ~current_region
     | Vec128 -> P.Array_load_kind.Naked_vec128s, box_vec128
     | Vec256 -> P.Array_load_kind.Naked_vec256s, box_vec256
     | Vec512 -> P.Array_load_kind.Naked_vec512s, box_vec512
-    | Mask -> Misc.fatal_error "Mask array loads are not supported"
   in
   let primitive =
     H.Binary (Array_load (array_kind, load_kind, Mutable), array, index)
@@ -1132,7 +1127,6 @@ let array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
     | Vec128 -> P.Array_set_kind.Naked_vec128s, unbox_vec128
     | Vec256 -> P.Array_set_kind.Naked_vec256s, unbox_vec256
     | Vec512 -> P.Array_set_kind.Naked_vec512s, unbox_vec512
-    | Mask -> Misc.fatal_error "Mask array stores are not supported"
   in
   let new_value = if boxed then unbox new_value else new_value in
   let primitive =
@@ -2384,7 +2378,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ( Immediates | Gc_ignorable_values | Values | Naked_floats
         | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
         | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-        | Naked_vec256s | Naked_vec512s )
+        | Naked_vec256s | Naked_vec512s | Naked_masks )
     | Float_array_opt_dynamic ->
       [prim]
     | Array_kind (Unboxed_product _ as array_kind) ->

@@ -143,6 +143,8 @@ let this_boxed_vec256 i alloc_mode =
 let this_boxed_vec512 i alloc_mode =
   TG.box_vec512 (TG.this_naked_vec512 i) alloc_mode
 
+let this_boxed_mask i alloc_mode = TG.box_mask (TG.this_naked_mask i) alloc_mode
+
 let these_boxed_float32s fs alloc_mode =
   TG.box_float32 (these_naked_float32s fs) alloc_mode
 
@@ -203,6 +205,10 @@ let any_boxed_vec256_non_null =
 
 let any_boxed_vec512_non_null =
   TG.Head_of_kind_value_non_null.create_boxed_vec512 TG.any_naked_vec512
+    (Alloc_mode.For_types.unknown ())
+
+let any_boxed_mask_non_null =
+  TG.Head_of_kind_value_non_null.create_boxed_mask TG.any_naked_mask
     (Alloc_mode.For_types.unknown ())
 
 let any_block =
@@ -506,6 +512,7 @@ let rec unknown_with_subkind ?(alloc_mode = Alloc_mode.For_types.unknown ())
       | Boxed_vec128 -> Ok any_boxed_vec128_non_null
       | Boxed_vec256 -> Ok any_boxed_vec256_non_null
       | Boxed_vec512 -> Ok any_boxed_vec512_non_null
+      | Boxed_mask -> Ok any_boxed_mask_non_null
       | Tagged_immediate -> Ok any_tagged_immediate_non_null
       | Variant { consts; non_consts } ->
         let const_ctors = these_naked_immediates consts in
@@ -581,6 +588,11 @@ let rec unknown_with_subkind ?(alloc_mode = Alloc_mode.For_types.unknown ())
         Ok
           (mutable_array_non_null
              ~element_kind:(Ok Flambda_kind.With_subkind.naked_vec512)
+             ~length:any_tagged_immediate alloc_mode)
+      | Unboxed_mask_array ->
+        Ok
+          (mutable_array_non_null
+             ~element_kind:(Ok Flambda_kind.With_subkind.naked_mask)
              ~length:any_tagged_immediate alloc_mode)
       | Unboxed_product_array ->
         Ok

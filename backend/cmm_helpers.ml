@@ -49,7 +49,7 @@ module Unboxed_or_untagged_array_tags = struct
 
   let untagged_int_array_tag = 10
 
-  (* Tag 11 is currently unassigned to align the int16 and int8 tags *)
+  let unboxed_mask_array_tag = 11
 
   let untagged_int16_array_zero_tag = 12
 
@@ -308,6 +308,9 @@ let boxedvec512_header =
   block_header 0 (size_vec512 / size_addr)
     ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
+let boxedmask_header =
+  block_header 0 1 ~block_kind:(Mixed_block { scannable_prefix = 0 })
+
 let boxedvec128_local_header =
   local_block_header 0 (size_vec128 / size_addr)
     ~block_kind:(Mixed_block { scannable_prefix = 0 })
@@ -319,6 +322,9 @@ let boxedvec256_local_header =
 let boxedvec512_local_header =
   local_block_header 0 (size_vec512 / size_addr)
     ~block_kind:(Mixed_block { scannable_prefix = 0 })
+
+let boxedmask_local_header =
+  local_block_header 0 1 ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
 let floatarray_header len =
   (* Zero-sized float arrays have tag zero for consistency with
@@ -406,6 +412,11 @@ let alloc_boxedvec512_header (mode : Cmm.Alloc_mode.t) dbg =
   match mode with
   | Heap -> Cconst_natint (boxedvec512_header, dbg)
   | Local -> Cconst_natint (boxedvec512_local_header, dbg)
+
+let alloc_boxedmask_header (mode : Cmm.Alloc_mode.t) dbg =
+  match mode with
+  | Heap -> Cconst_natint (boxedmask_header, dbg)
+  | Local -> Cconst_natint (boxedmask_local_header, dbg)
 
 let alloc_floatarray_header len dbg = Cconst_natint (floatarray_header len, dbg)
 
@@ -1496,6 +1507,20 @@ let unbox_vec512 =
              ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
       | _ -> None)
 
+let box_mask dbg mode c =
+  Cop
+    ( Calloc (mode, Alloc_block_kind_mask),
+      [alloc_boxedmask_header mode dbg; c],
+      dbg )
+
+let unbox_mask dbg =
+  map_tail (function
+    | Cop (Calloc _, [Cconst_natint (hdr, _); c], _)
+      when Nativeint.equal hdr boxedmask_header
+           || Nativeint.equal hdr boxedmask_local_header ->
+      c
+    | cmm -> Cop (mk_load_immut Word_mask, [cmm], dbg))
+
 (* Conversions for 16-bit floats *)
 
 let float_of_float16 dbg c =
@@ -1707,6 +1732,9 @@ let unboxed_float32_array_length =
 
 let unboxed_or_untagged_int_or_int64_or_nativeint_array_length arr dbg =
   bind "arr" arr (fun arr -> tag_int (get_size arr dbg) dbg)
+
+let unboxed_mask_array_length =
+  unboxed_or_untagged_int_or_int64_or_nativeint_array_length
 
 let unboxed_vector_array_length ~log2_ints_per_vec arr dbg =
   bind "arr" arr (fun arr ->
@@ -1995,6 +2023,14 @@ let unboxed_or_untagged_int_or_int64_or_nativeint_array_ref arr ~array_index dbg
   bind "arr" arr (fun arr ->
       bind "index" array_index (fun index -> int_array_ref arr index dbg))
 
+let unboxed_mask_array_ref arr ~array_index dbg =
+  bind "arr" arr (fun arr ->
+      bind "index" array_index (fun index ->
+          Cop
+            ( mk_load_mut Word_mask,
+              [array_indexing log2_size_addr arr index dbg],
+              dbg )))
+
 let unboxed_or_untagged_packed_array_set arr ~index ~new_value dbg
     ~log2_size_addr ~memory_chunk =
   bind "arr" arr (fun arr ->
@@ -2027,6 +2063,15 @@ let unboxed_or_untagged_int_or_int64_or_nativeint_array_set arr ~index
       bind "index" index (fun index ->
           bind "new_value" new_value (fun new_value ->
               int_array_set arr index new_value dbg)))
+
+let unboxed_mask_array_set arr ~index ~new_value dbg =
+  bind "arr" arr (fun arr ->
+      bind "index" index (fun index ->
+          bind "new_value" new_value (fun new_value ->
+              Cop
+                ( Cstore (Word_mask, Assignment),
+                  [array_indexing log2_size_addr arr index dbg; new_value],
+                  dbg ))))
 
 let get_field_unboxed ~dbg memory_chunk mutability block ~index_in_words =
   if Arch.big_endian && memory_chunk_width_in_bytes memory_chunk <> size_addr
@@ -4284,6 +4329,9 @@ let emit_vec256_constant symb bits cont =
 let emit_vec512_constant symb bits cont =
   emit_block symb boxedvec512_header (Cvec512 bits :: cont)
 
+let emit_mask_constant symb bits cont =
+  emit_block symb boxedmask_header (Cint (Int64.to_nativeint bits) :: cont)
+
 let emit_float_array_constant symb fields cont =
   emit_block symb
     (floatarray_header (List.length fields))
@@ -5343,6 +5391,14 @@ let allocate_unboxed_nativeint_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
     ~alloc_kind:Alloc_block_kind_int64_u_array
     ~tag_of_length:(fun _ ->
       Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag)
+    ~elements mode dbg
+
+let allocate_unboxed_mask_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
+  allocate_array
+    ~make_payload:(fun _ l -> l)
+    ~alloc_kind:Alloc_block_kind_mask_u_array
+    ~tag_of_length:(fun _ ->
+      Unboxed_or_untagged_array_tags.unboxed_mask_array_tag)
     ~elements mode dbg
 
 let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind ~tag ~elements

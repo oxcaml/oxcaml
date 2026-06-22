@@ -289,7 +289,8 @@ and destructure_head_of_kind_value_non_null ~machine_width discriminant accessor
       | Value_slot _ | Function_slot _ | Rec_info _ ),
       ( Variant _ | Mutable_block _ | Boxed_float32 _ | Boxed_float _
       | Boxed_int32 _ | Boxed_int64 _ | Boxed_nativeint _ | Boxed_vec128 _
-      | Boxed_vec256 _ | Boxed_vec512 _ | Closures _ | String _ | Array _ ) ) ->
+      | Boxed_vec256 _ | Boxed_vec512 _ | Boxed_mask _ | Closures _ | String _
+      | Array _ ) ) ->
     bottom_accessor ~machine_width accessor
 
 and destructure_block_field_row_like_for_blocks ~machine_width tag index kind
@@ -1017,6 +1018,9 @@ struct
     | Boxed_vec512 (ty, alloc_mode) ->
       let ty, acc = rewrite_arbitrary_type env acc metadata ty in
       TG.Head_of_kind_value_non_null.create_boxed_vec512 ty alloc_mode, acc
+    | Boxed_mask (ty, alloc_mode) ->
+      let ty, acc = rewrite_arbitrary_type env acc metadata ty in
+      TG.Head_of_kind_value_non_null.create_boxed_mask ty alloc_mode, acc
     | Closures { by_function_slot; alloc_mode } ->
       let by_function_slot, acc =
         rewrite_row_like_for_closures env acc metadata by_function_slot

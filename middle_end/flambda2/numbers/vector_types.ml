@@ -19,7 +19,6 @@ module Kind = struct
     | Vec128
     | Vec256
     | Vec512
-    | Mask
 end
 
 module type Vector_width = sig

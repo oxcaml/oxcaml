@@ -428,6 +428,7 @@ let specialise_array_kind dacc (array_kind : P.Array_kind.t) ~array_ty :
   | Naked_vec128s -> for_naked_number Naked_vec128
   | Naked_vec256s -> for_naked_number Naked_vec256
   | Naked_vec512s -> for_naked_number Naked_vec512
+  | Naked_masks -> for_naked_number Naked_mask
   | Immediates -> (
     (* The only thing worth checking is for float arrays, as that would allow us
        to remove the branch *)

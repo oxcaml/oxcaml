@@ -1012,6 +1012,7 @@ let simplify_array_load (array_kind : P.Array_kind.t)
     | Naked_vec128s -> K.naked_vec128
     | Naked_vec256s -> K.naked_vec256
     | Naked_vec512s -> K.naked_vec512
+    | Naked_masks -> K.naked_mask
   in
   let array_kind =
     Simplify_common.specialise_array_kind dacc array_kind ~array_ty

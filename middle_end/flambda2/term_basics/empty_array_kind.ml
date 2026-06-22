@@ -26,6 +26,7 @@ type t =
   | Naked_vec128s
   | Naked_vec256s
   | Naked_vec512s
+  | Naked_masks
 
 let print ppf t =
   match t with
@@ -41,6 +42,7 @@ let print ppf t =
   | Naked_vec128s -> Format.pp_print_string ppf "Naked_vec128s"
   | Naked_vec256s -> Format.pp_print_string ppf "Naked_vec256s"
   | Naked_vec512s -> Format.pp_print_string ppf "Naked_vec512s"
+  | Naked_masks -> Format.pp_print_string ppf "Naked_masks"
 
 let compare = Stdlib.compare
 
@@ -59,9 +61,10 @@ let of_element_kind t =
   | Naked_number Naked_vec128 -> Naked_vec128s
   | Naked_number Naked_vec256 -> Naked_vec256s
   | Naked_number Naked_vec512 -> Naked_vec512s
-  | Naked_number Naked_mask | Region | Rec_info ->
+  | Naked_number Naked_mask -> Naked_masks
+  | Region | Rec_info ->
     Misc.fatal_errorf
-      "Arrays cannot contain elements of kind mask, region or rec_info"
+      "Arrays cannot contain elements of kind region or rec_info"
 
 let of_lambda array_kind =
   match (array_kind : Lambda.array_kind) with

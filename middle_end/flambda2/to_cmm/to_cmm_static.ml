@@ -340,6 +340,16 @@ let immutable_unboxed_vec512_array =
     ~update_kind:UK.naked_vec512s ~tag:Tags.unboxed_vec512_array_tag
     ~words_per_element:8
 
+let immutable_unboxed_mask_array =
+  immutable_unboxed_vector_array ~default:(Cmm.Cint 0n)
+    ~to_cmm:(fun v ->
+      let Vector_types.Mask.Bit_pattern.{ word0 } =
+        Vector_types.Mask.Bit_pattern.to_bits v
+      in
+      Cmm.Cint (Int64.to_nativeint word0))
+    ~update_kind:UK.naked_mask_fields ~tag:Tags.unboxed_mask_array_tag
+    ~words_per_element:1
+
 let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
     (static_const : Static_const.t) =
   match bound_static, static_const with
@@ -514,6 +524,20 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
         ~emit:C.emit_vec512_constant ~transl ~structured v res updates
     in
     env, res, updates
+  | Block_like symbol, Boxed_mask v ->
+    let default = Vector_types.Mask.Bit_pattern.zero in
+    let transl v =
+      let { Vector_types.Mask.Bit_pattern.word0 } =
+        Vector_types.Mask.Bit_pattern.to_bits v
+      in
+      word0
+    in
+    let structured i = Cmmgen_state.Const_int64 i in
+    let res, env, updates =
+      static_boxed_number ~kind:UK.naked_mask_fields ~env ~symbol ~default
+        ~emit:C.emit_mask_constant ~transl ~structured v res updates
+    in
+    env, res, updates
   | Block_like s, (Immutable_float_block fields | Immutable_float_array fields)
     ->
     let aux =
@@ -557,6 +581,8 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
     immutable_unboxed_vec256_array env res updates ~symbol ~elts
   | Block_like symbol, Immutable_vec512_array elts ->
     immutable_unboxed_vec512_array env res updates ~symbol ~elts
+  | Block_like symbol, Immutable_mask_array elts ->
+    immutable_unboxed_mask_array env res updates ~symbol ~elts
   | Block_like s, Immutable_value_array fields ->
     let sym = R.symbol res s in
     let header = C.black_block_header 0 (List.length fields) in
@@ -631,6 +657,11 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
     let header = C.black_block_header 0 0 in
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
+  | Block_like s, Empty_array Naked_masks ->
+    let sym = R.symbol res s in
+    let header = C.black_block_header 0 0 in
+    let block = C.emit_block sym header [] in
+    env, R.set_data res block, updates
   | Block_like s, Mutable_string { initial_value = str }
   | Block_like s, Immutable_string str ->
     let data = C.emit_string_constant (R.symbol res s) str in
@@ -642,14 +673,14 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
   | ( (Code _ | Set_of_closures _),
       ( Block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
       | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-      | Boxed_nativeint _ | Immutable_float_block _ | Immutable_float_array _
-      | Immutable_float32_array _ | Immutable_int_array _
-      | Immutable_int8_array _ | Immutable_int16_array _
+      | Boxed_mask _ | Boxed_nativeint _ | Immutable_float_block _
+      | Immutable_float_array _ | Immutable_float32_array _
+      | Immutable_int_array _ | Immutable_int8_array _ | Immutable_int16_array _
       | Immutable_int32_array _ | Immutable_int64_array _
       | Immutable_nativeint_array _ | Immutable_vec128_array _
       | Immutable_vec256_array _ | Immutable_vec512_array _
-      | Immutable_value_array _ | Empty_array _ | Mutable_string _
-      | Immutable_string _ ) ) ->
+      | Immutable_mask_array _ | Immutable_value_array _ | Empty_array _
+      | Mutable_string _ | Immutable_string _ ) ) ->
     Misc.fatal_errorf
       "Block-like constants cannot be bound by [Code] or [Set_of_closures] \
        bindings:@ %a"

@@ -93,6 +93,9 @@ val this_boxed_vec256 :
 val this_boxed_vec512 :
   Vector_types.Vec512.Bit_pattern.t -> Alloc_mode.For_types.t -> Type_grammar.t
 
+val this_boxed_mask :
+  Vector_types.Mask.Bit_pattern.t -> Alloc_mode.For_types.t -> Type_grammar.t
+
 val these_boxed_float32s :
   Numeric_types.Float32_by_bit_pattern.Set.t ->
   Alloc_mode.For_types.t ->

@@ -888,14 +888,14 @@ end = struct
               Value_slot.print value_slot
           | Naked_number
               ( Naked_immediate | Naked_float | Naked_float32 | Naked_int32
-              | Naked_int16 | Naked_int8 | Naked_int64 | Naked_nativeint ) ->
+              | Naked_int16 | Naked_int8 | Naked_int64 | Naked_nativeint
+              | Naked_mask ) ->
             1, true
           (* flambda2 only supports 64-bit targets for now, so naked numbers can
              only be of size 1 *)
           | Naked_number Naked_vec128 -> 2, true
           | Naked_number Naked_vec256 -> 4, true
           | Naked_number Naked_vec512 -> 8, true
-          | Naked_number Naked_mask -> 1, true
           | Value -> 1, Value_slot.is_always_immediate value_slot
         in
         if is_unboxed

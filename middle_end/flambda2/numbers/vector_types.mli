@@ -21,7 +21,6 @@ module Kind : sig
     | Vec128
     | Vec256
     | Vec512
-    | Mask
 end
 
 module Vec128 : sig

@@ -1236,7 +1236,7 @@ end = struct
           match head with
           | Mutable_block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
           | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-          | Boxed_nativeint _ | String _ | Array _ ->
+          | Boxed_mask _ | Boxed_nativeint _ | String _ | Array _ ->
             value_unknown
           | Closures { by_function_slot; alloc_mode = _ } -> (
             let approx_of_closures_entry ~exact function_slot closures_entry :
