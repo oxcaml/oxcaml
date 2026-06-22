@@ -37,22 +37,15 @@ type error =
 
 exception Error of Location.t * error
 
-(* Filled by [Typecore]. Given the *instantiated* arguments of a constructor
-   whose layout was [Cstr_layout_variable] at typedecl time (i.e. it has an
-   argument of kind [any]), recompute its [constructor_representation]. Returns
-   [None] (conservative) on any failure; must not raise, since it runs at
-   lambda-translation time. See [Typeopt.value_kind_variant]. *)
+(* Filled by [Typecore]: [Typeopt] precedes [Typedecl] in the link order, so the
+   representation-recomputation logic lives there. These run during lambda
+   translation, so they return [None] rather than raise. See
+   [value_kind_variant] and [value_kind_record_variable] *)
 let constructor_representation_for_value_kind :
   (Env.t -> Location.t -> Types.constructor_arguments ->
    Types.constructor_representation option) ref =
   ref (fun _ _ _ -> None)
 
-(* Filled by [Typecore]. The record counterpart of the above: given a boxed
-   record's labels paired with their *instantiated* field types (the record's
-   representation was [Record_variable] at typedecl time because it has a field
-   of kind [any]), recompute its [record_representation]. Returns [None]
-   (conservative) on any failure; must not raise. See
-   [Typeopt.value_kind_record_variable]. *)
 let record_representation_for_value_kind :
   (Env.t -> Location.t ->
    (Types.label_declaration * Types.type_expr) list ->
@@ -943,11 +936,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
     end
   | Variant_boxed cstr_layouts ->
     let depth = depth + 1 in
-    (* Substitute the instantiated [args] for the declaration's [params] in a
-       constructor's argument types, so that a [Cstr_layout_variable]
-       constructor (one with an argument of kind [any]) can have its
-       representation recomputed.  Mirrors the unboxed-product instantiation
-       above; [args] is already level-corrected by [scrape_ty]. *)
+    (* [args] is already level-corrected by [scrape_ty] *)
     let instantiate_cd_args (cd_args : Types.constructor_arguments) =
       let instantiate ty = Ctype.apply env params ty args in
       match cd_args with
@@ -1051,10 +1040,8 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
               match cstr_layouts.(idx) with
               | Cstr_layout_known { shape; _ } -> Some shape, constructor
               | Cstr_layout_variable ->
-                (* The constructor has an argument of kind [any], so its shape
-                   was undetermined at typedecl time.  Now that the type is
-                   instantiated, recompute it from the instantiated arguments,
-                   which we also use below when recurring into the fields. *)
+                (* The instantiated [cd_args] give both the recomputed shape and
+                   the fields [for_one_constructor] recurs into below *)
                 (match instantiate_cd_args constructor.cd_args with
                  | exception Ctype.Cannot_apply -> None, constructor
                  | cd_args ->
@@ -1094,11 +1081,9 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       | Some (num_nodes_visited, _, consts, _, non_consts) ->
         match non_consts with
         | [] ->
-          (* Every constructor turned out to be constant.  For
-             [Cstr_layout_known] constructors this is caught by
-             [List.for_all is_constant] above, but a [Cstr_layout_variable]
-             constructor whose [any] argument resolves to a void type also lands
-             here. *)
+          (* Reachable when a [Cstr_layout_variable] constructor's [any] arg
+             resolves to void: every constructor is then constant, but
+             [is_constant] above couldn't tell *)
           (num_nodes_visited, Pintval)
         | _::_ ->
           (num_nodes_visited, Pvariant { consts; non_consts })
@@ -1196,13 +1181,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
 
 and value_kind_record_variable env ~loc ~visited ~depth ~num_nodes_visited
       ~params ~args (labels : Types.label_declaration list) =
-  (* The record's representation was [Record_variable] because it has a field
-     of kind [any].  Now that the type is instantiated, substitute the
-     instantiated [args] for the declaration's [params] in the field types,
-     recompute a concrete [record_representation], and feed it (with the
-     instantiated labels) through [value_kind_record].  Any failure falls back
-     to the conservative [Pgenval].  [args] is already level-corrected by
-     [scrape_ty], mirroring [value_kind_variant]. *)
+  (* Recompute the representation from the instantiated fields, then reuse
+     [value_kind_record]. [args] is already level-corrected by [scrape_ty] *)
   let instantiate ty = Ctype.apply env params ty args in
   match
     List.map

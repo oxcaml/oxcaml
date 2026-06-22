@@ -77,18 +77,14 @@ val function_arg_layout :
 
 val value_kind : Env.t -> Location.t -> Types.type_expr -> Lambda.value_kind
 
-(* Filled by [Typecore]. Given the *instantiated* arguments of a constructor
-   whose layout was [Cstr_layout_variable] at typedecl time, recompute its
-   [constructor_representation]. Returns [None] (conservative) on any failure
-   and must not raise, since it runs at lambda-translation time. *)
+(* Recompute a [Cstr_layout_variable] constructor's representation from its
+   instantiated arguments. Filled by [Typecore]; [None] (conservative) on
+   failure, never raises. See the [.ml] *)
 val constructor_representation_for_value_kind :
   (Env.t -> Location.t -> Types.constructor_arguments ->
    Types.constructor_representation option) ref
 
-(* The record counterpart of [constructor_representation_for_value_kind]: filled
-   by [Typecore], recomputes a [Record_variable] boxed record's representation
-   from its instantiated field types. Returns [None] (conservative) on any
-   failure and must not raise. *)
+(* The record counterpart, for a [Record_variable] boxed record *)
 val record_representation_for_value_kind :
   (Env.t -> Location.t ->
    (Types.label_declaration * Types.type_expr) list ->

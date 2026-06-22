@@ -3,12 +3,9 @@
  expect;
 *)
 
-(* Regression test for the value_kind of a boxed record whose type parameter has
-   kind [any].  At typedecl time its representation is [Record_variable], but once
-   the type is instantiated [Typeopt.value_kind] recomputes it (via the
-   [record_representation_for_value_kind] forward reference) so the [r] bindings
-   below get a precise [Pvariant] shape rather than the conservative [Pgenval]
-   (mirroring [value_kind_any_variant.ml]). *)
+(* A boxed record whose parameter has kind [any] gets a precise [Pvariant]
+   value_kind once instantiated, rather than the conservative [Pgenval]: see the
+   [r] bindings below. Counterpart of [value_kind_any_variant.ml] *)
 
 type ('a : any) t = { x : 'a; y : int }
 [%%expect{|
@@ -16,7 +13,6 @@ type ('a : any) t = { x : 'a; y : int }
 type ('a : any) t = { x : 'a; y : int; }
 |}]
 
-(* all-value instance: [r]'s value_kind is a [Pvariant] with instantiated fields *)
 let f (x : int) =
   let r = { x; y = 1 } in
   r.x + r.y
@@ -40,7 +36,6 @@ external box_float : float# -> float = "%box_float"
 external box_float : float# -> float = "%box_float"
 |}]
 
-(* [float#] field instance: [r]'s value_kind is a mixed-block [Pvariant] *)
 let g (x : float#) =
   let r = { x; y = 1 } in
   r.y
@@ -58,10 +53,9 @@ let g (x : float#) =
 val g : float# -> int = <fun>
 |}]
 
-(* Polymorphic instance: the field's sort is undetermined, so [value_kind] must
-   stay conservative ([value], i.e. [Pgenval]) without crashing or mutating the
-   type variable -- the record counterpart of [let nope = Nope] in
-   [value_kind_any_variant.ml]. *)
+(* When the field's sort is undetermined, [value_kind] must stay conservative
+   without crashing or mutating the type variable (note the preserved
+   [('a : any)]) *)
 let opaque (type a : any) (r : a t) = r
 [%%expect{|
 (let (opaque/315 = (function {nlocal = 0} r/318 r/318))

@@ -3093,12 +3093,9 @@ let representation_for_tuple_constructor env constr ty_args ~loc ~types
         | Error err -> Error err
       end
 
-(* Fill the forward reference used by [Typeopt.value_kind] to recompute the
-   representation of a [Cstr_layout_variable] constructor (one with an argument
-   of kind [any]) once the variant type is instantiated.  This reuses the same
-   machinery as [representation_for_tuple_constructor], but runs at
-   lambda-translation time, so it must never raise: any failure maps to [None],
-   which makes [value_kind] fall back to its conservative result. *)
+(* Fill [Typeopt]'s forward ref, reusing
+   [representation_for_tuple_constructor]'s machinery. Runs during lambda
+   translation, so it must never raise *)
 let () =
   Typeopt.constructor_representation_for_value_kind :=
     (fun env loc cd_args ->
@@ -3112,9 +3109,9 @@ let () =
        match
          Misc.Stdlib.List.map_option
            (fun ty ->
-              (* [fixed:true] so we never mutate the jkind of a type variable:
-                 an uninstantiated argument of kind [any] simply yields [Error],
-                 and hence the conservative [value_kind]. *)
+              (* [fixed:true]: never mutate a type variable's jkind. An
+                 uninstantiated [any] argument yields [Error], hence the
+                 conservative [value_kind] *)
               match
                 Ctype.type_jkind_and_sort env ty
                   ~why:Constructor_arg_assignment ~fixed:true
@@ -3134,16 +3131,14 @@ let () =
          | exception Typedecl.Error _ -> None
          end)
 
-(* The record counterpart of the above, for a [Record_variable] boxed record. *)
+(* The record counterpart of the above, for a [Record_variable] boxed record *)
 let () =
   Typeopt.record_representation_for_value_kind :=
     (fun env loc labels_and_tys ->
-       (* [fixed:true] so we never mutate the jkind of a type variable: a record
-          with an uninstantiated field of kind [any] yields [None], and hence
-          the conservative [value_kind].  Only once every field has a determined
-          sort do we recompute the representation; the snapshot/backtrack guards
-          against any mutation from the representability check inside
-          [update_record_representation]. *)
+       (* Gate on [fixed:true] (never mutate a type variable's jkind): an
+          uninstantiated [any] field yields [None], the conservative result.
+          The snapshot/backtrack then undoes any mutation from
+          [update_record_representation]'s own representability check *)
        if
          List.for_all
            (fun (_lbl, ty) ->
