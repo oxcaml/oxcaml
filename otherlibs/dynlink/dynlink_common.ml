@@ -74,11 +74,11 @@ module Make (P : Dynlink_platform_intf.S) = struct
       mutable inited:bool;
       mutable unsafe_allowed:bool;
     }
-    val lock: Mutex.t option
+    val lock: Mutex.t
     val with_lock: (t->'a) -> 'a
   end
   = struct
-    let lock = Some (Mutex.create ())
+    let lock = Mutex.create ()
 
     type t = {
       mutable state:State.t;
@@ -91,15 +91,7 @@ module Make (P : Dynlink_platform_intf.S) = struct
       unsafe_allowed = false;
     }
 
-    let with_lock0 f =
-      match lock with
-      | None -> f ()
-      | Some lock ->
-        Mutex.lock lock;
-        Fun.protect f
-          ~finally:(fun () -> Mutex.unlock lock)
-
-    let with_lock f = with_lock0 (fun () -> f state)
+    let with_lock f = Mutex.protect lock (fun () -> f state)
   end
   open Global
 
