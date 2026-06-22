@@ -85,6 +85,15 @@ val constructor_representation_for_value_kind :
   (Env.t -> Location.t -> Types.constructor_arguments ->
    Types.constructor_representation option) ref
 
+(* The record counterpart of [constructor_representation_for_value_kind]: filled
+   by [Typecore], recomputes a [Record_variable] boxed record's representation
+   from its instantiated field types. Returns [None] (conservative) on any
+   failure and must not raise. *)
+val record_representation_for_value_kind :
+  (Env.t -> Location.t ->
+   (Types.label_declaration * Types.type_expr) list ->
+   Types.record_representation option) ref
+
 val transl_mixed_block_element :
   Env.t -> Location.t -> Types.type_expr -> Types.mixed_block_element
   -> unit Lambda.mixed_block_element

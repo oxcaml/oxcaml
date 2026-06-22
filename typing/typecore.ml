@@ -3134,6 +3134,42 @@ let () =
          | exception Typedecl.Error _ -> None
          end)
 
+(* The record counterpart of the above, for a [Record_variable] boxed record. *)
+let () =
+  Typeopt.record_representation_for_value_kind :=
+    (fun env loc labels_and_tys ->
+       (* [fixed:true] so we never mutate the jkind of a type variable: a record
+          with an uninstantiated field of kind [any] yields [None], and hence
+          the conservative [value_kind].  Only once every field has a determined
+          sort do we recompute the representation; the snapshot/backtrack guards
+          against any mutation from the representability check inside
+          [update_record_representation]. *)
+       if
+         List.for_all
+           (fun (_lbl, ty) ->
+              match
+                Ctype.type_jkind_and_sort env ty
+                  ~why:Record_assignment ~fixed:true
+              with
+              | Ok _ -> true
+              | Error _ -> false)
+           labels_and_tys
+       then begin
+         let snap = Btype.snapshot () in
+         let result =
+           match
+             Typedecl.update_record_representation ~why:Record_assignment env
+               loc Legacy ~old_repres:Types.Record_variable labels_and_tys
+           with
+           | Ok (_sorts, rep) -> Some rep
+           | Error _ -> None
+           | exception Typedecl.Error _ -> None
+         in
+         Btype.backtrack snap;
+         result
+       end
+       else None)
+
 (* Typing of patterns *)
 
 (* "untyped" cases are prior to checking the pattern. *)

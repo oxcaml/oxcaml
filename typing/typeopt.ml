@@ -47,6 +47,18 @@ let constructor_representation_for_value_kind :
    Types.constructor_representation option) ref =
   ref (fun _ _ _ -> None)
 
+(* Filled by [Typecore]. The record counterpart of the above: given a boxed
+   record's labels paired with their *instantiated* field types (the record's
+   representation was [Record_variable] at typedecl time because it has a field
+   of kind [any]), recompute its [record_representation]. Returns [None]
+   (conservative) on any failure; must not raise. See
+   [Typeopt.value_kind_record_variable]. *)
+let record_representation_for_value_kind :
+  (Env.t -> Location.t ->
+   (Types.label_declaration * Types.type_expr) list ->
+   Types.record_representation option) ref =
+  ref (fun _ _ _ -> None)
+
 (* Expand a type, looking through ordinary synonyms, private synonyms, links,
    and [@@unboxed] types. The returned type will be therefore be none of these
    cases (except in case of missing cmis).
@@ -748,9 +760,14 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
             (fun () -> value_kind_variant env ~loc ~visited ~depth
                          ~num_nodes_visited ~params:decl.type_params ~args
                          cstrs rep)
-        | Type_record
-            (_, (Record_variable | Record_inlined (_, Constructor_variable, _)),
-             _) ->
+        | Type_record (labels, Record_variable, _) ->
+          let depth = depth + 1 in
+          fallback_if_missing_cmi
+            ~default:(num_nodes_visited, nullable Pgenval)
+            (fun () -> value_kind_record_variable env ~loc ~visited ~depth
+                         ~num_nodes_visited ~params:decl.type_params ~args
+                         labels)
+        | Type_record (_, Record_inlined (_, Constructor_variable, _), _) ->
           num_nodes_visited, non_nullable Pgenval
         | Type_record (labels, rep, _) ->
           let depth = depth + 1 in
@@ -1176,6 +1193,33 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
         (num_nodes_visited,
          non_nullable (Pvariant { consts = []; non_consts }))
     end
+
+and value_kind_record_variable env ~loc ~visited ~depth ~num_nodes_visited
+      ~params ~args (labels : Types.label_declaration list) =
+  (* The record's representation was [Record_variable] because it has a field
+     of kind [any].  Now that the type is instantiated, substitute the
+     instantiated [args] for the declaration's [params] in the field types,
+     recompute a concrete [record_representation], and feed it (with the
+     instantiated labels) through [value_kind_record].  Any failure falls back
+     to the conservative [Pgenval].  [args] is already level-corrected by
+     [scrape_ty], mirroring [value_kind_variant]. *)
+  let instantiate ty = Ctype.apply env params ty args in
+  match
+    List.map
+      (fun (ld : Types.label_declaration) -> ld, instantiate ld.ld_type)
+      labels
+  with
+  | exception Ctype.Cannot_apply -> num_nodes_visited, non_nullable Pgenval
+  | labels_and_tys ->
+    match !record_representation_for_value_kind env loc labels_and_tys with
+    | None -> num_nodes_visited, non_nullable Pgenval
+    | Some rep ->
+      let labels =
+        List.map
+          (fun ((ld : Types.label_declaration), ty) -> { ld with ld_type = ty })
+          labels_and_tys
+      in
+      value_kind_record env ~loc ~visited ~depth ~num_nodes_visited labels rep
 
 let value_kind env loc ty =
   try
