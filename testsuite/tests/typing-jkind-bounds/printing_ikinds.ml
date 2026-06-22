@@ -26,7 +26,8 @@ Line 1, characters 0-36:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          immutable_data,
-       because 'a is not mod forkable unyielding many stateless immutable.
+       because 'a is not mod forkable unyielding many stateless immutable
+                 noalloc_strict.
 |}]
 
 type ('a, 'b) t : immutable_data with 'a = { a : 'a; b : 'b }
@@ -36,7 +37,8 @@ Line 1, characters 0-61:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          immutable_data with 'a,
-       because 'b is not mod forkable unyielding many stateless immutable.
+       because 'b is not mod forkable unyielding many stateless immutable
+                 noalloc_strict.
 |}]
 
 type 'a t : immutable_data = Foo of 'a @@ portable
@@ -46,7 +48,8 @@ Line 1, characters 0-50:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          immutable_data,
-       because 'a is not mod forkable unyielding many stateless immutable.
+       because 'a is not mod forkable unyielding many stateless immutable
+                 noalloc_strict.
 |}]
 
 type 'a shared_direct : value mod shared with 'a
@@ -133,6 +136,7 @@ Error: Signature mismatch:
          yielding: mod unyielding with 'a ≰ mod unyielding
          statefulness: mod stateless with 'a ≰ mod stateless
          visibility: mod immutable with 'a ≰ mod immutable
+         allocation: mod noalloc_strict with 'a ≰ mod noalloc_strict
 |}]
 
 module M : sig
@@ -216,6 +220,7 @@ Error: This type "a" = "int ref" should be an instance of type
          portability: mod portable with int ≰ mod portable
          statefulness: mod stateless with int ≰ mod stateless
          visibility: mod read_write ≰ mod immutable
+         allocation: mod noalloc_strict with int ≰ mod noalloc_strict
 |}]
 
 type 'a u = Foo of 'a @@ portable
@@ -254,6 +259,7 @@ Error: This type "(int -> int) u" should be an instance of type
          yielding: mod unyielding with int -> int ≰ mod unyielding
          statefulness: mod stateless with int -> int ≰ mod stateless
          visibility: mod immutable with int -> int ≰ mod immutable
+         allocation: mod noalloc_strict with int -> int ≰ mod noalloc_strict
 |}]
 
 module M : sig

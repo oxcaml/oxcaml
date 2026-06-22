@@ -6,19 +6,7 @@ Error: Signature mismatch:
          Bundle2.Intf(P_int).S
        is not included in
          Bundle2.Intf(P_int_alt).S
-       In module Basic_transparent:
-       Modules do not match:
-         sig
-           type t = P_int.t
-           val create : t -> t @@ stateless
-           val to_string : P_int.t -> string
-         end
-       is not included in
-         sig
-           type t = P_int_alt.t
-           val create : t -> t @@ stateless
-           val to_string : P_int_alt.t -> string
-         end
+       ...
        In module Basic_transparent:
        Type declarations do not match:
          type t = P_int.t

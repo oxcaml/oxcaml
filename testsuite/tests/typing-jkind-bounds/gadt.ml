@@ -263,6 +263,10 @@ Error: The kind of type "cell" is
          statefulness:
            mod stateless with ('a @@ portable) with ('a @@ portable) cell ≰
            mod stateless with 'a
+         allocation:
+           mod noalloc_strict
+             with ('a @@ portable)
+             with ('a @@ portable) cell ≰ mod noalloc_strict with 'a
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]
