@@ -8282,19 +8282,25 @@ let rec nondep_type_rec ?(expand_private=false) env ids ty =
     if expand_private then try_expand_safe_opt env t
     else try_expand_safe env t
   in
-  match get_desc ty with
-    Tvar { name; jkind } ->
-    let jkind' = nondep_jkind_base env ids jkind in
-    if not (jkind' == jkind) then
-      set_type_desc ty (Tvar { name; jkind = jkind' });
-    ty
-  | Tunivar { name; jkind } ->
-    let jkind' = nondep_jkind_base env ids jkind in
-    if not (jkind' == jkind) then
-      set_type_desc ty (Tvar { name; jkind = jkind' });
-    ty
-  | _ -> try TypeHash.find nondep_hash ty
+  try TypeHash.find nondep_hash ty
   with Not_found ->
+  match get_desc ty with
+  | (Tvar {name; jkind} | Tunivar {name; jkind}) as desc ->
+    let jkind' = nondep_jkind_base env ids jkind in
+    if jkind' == jkind then ty
+    else
+      let desc =
+        match desc with
+        | Tvar _ -> Tvar {name; jkind = jkind'}
+        | Tunivar _ -> Tunivar {name; jkind = jkind'}
+        | _ -> assert false
+      in
+      let ty' =
+        newty3 ~level:(get_level ty) ~scope:(get_scope ty) desc
+      in
+      TypeHash.add nondep_hash ty ty';
+      ty'
+  | _ ->
     let ty' = newgenstub ~scope:(get_scope ty)
                 (Jkind.Builtin.any ~why:Dummy_jkind) in
     TypeHash.add nondep_hash ty ty';
