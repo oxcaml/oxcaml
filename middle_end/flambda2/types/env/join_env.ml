@@ -1553,7 +1553,8 @@ let rec add_inverse_relation_to_env_extension ?(seen = Name.Set.empty)
   let empty_descr : TG.Head_of_kind_naked_immediate.descr =
     { naked_immediates = Unknown; inverse_relations = TG.Relation.Map.empty }
   in
-  let[@inline] type_from_descr (descr : TG.Head_of_kind_naked_immediate.descr) =
+  let[@inline] updated_type_from_descr
+      (descr : TG.Head_of_kind_naked_immediate.descr) =
     let inverse_relations =
       TG.Relation.Map.update relation
         (function
@@ -1567,7 +1568,8 @@ let rec add_inverse_relation_to_env_extension ?(seen = Name.Set.empty)
   in
   match Name.Map.find_opt name (TEE.to_map env_extension) with
   | None ->
-    TEE.add_or_replace_equation env_extension name (type_from_descr empty_descr)
+    TEE.add_or_replace_equation env_extension name
+      (updated_type_from_descr empty_descr)
   | Some existing_ty -> (
     match TG.descr existing_ty with
     | Naked_immediate Bottom ->
@@ -1578,12 +1580,13 @@ let rec add_inverse_relation_to_env_extension ?(seen = Name.Set.empty)
       (* This should not happen, as we would usually only only store non-obvious
          types in extensions -- but it's also harmless. *)
       TEE.add_or_replace_equation env_extension name
-        (type_from_descr empty_descr)
+        (updated_type_from_descr empty_descr)
     | Naked_immediate (Ok (No_alias head)) ->
       (* There is a concrete type for this name in the extension; augment it
          with the reverse relation. *)
       let descr = TG.Head_of_kind_naked_immediate.descr head in
-      TEE.add_or_replace_equation env_extension name (type_from_descr descr)
+      TEE.add_or_replace_equation env_extension name
+        (updated_type_from_descr descr)
     | Naked_immediate (Ok (Equals simple)) ->
       (* Usually we expect that the name we are adding an alias for would be
          canonical in the env extension, but it could (rarely) happen that it is
@@ -1598,7 +1601,7 @@ let rec add_inverse_relation_to_env_extension ?(seen = Name.Set.empty)
                break the loop to store the non-alias type anywhere, so we might
                as well do it when we detect the loop. *)
             TEE.add_or_replace_equation env_extension name
-              (type_from_descr empty_descr)
+              (updated_type_from_descr empty_descr)
           else
             add_inverse_relation_to_env_extension ~seen:(Name.Set.add name seen)
               env_extension name' relation ~scrutinee)
