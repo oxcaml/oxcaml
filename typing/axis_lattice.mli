@@ -52,6 +52,7 @@ val create :
   statefulness:Mode.Statefulness.Const.t ->
   visibility:Mode.Visibility.Const.t ->
   staticity:Mode.Staticity.const ->
+  allocation:Mode.Allocation.Const.t ->
   externality:Jkind_axis.Externality.t ->
   t
 
@@ -74,6 +75,8 @@ val statefulness : t -> Mode.Statefulness.Const.t
 val visibility : t -> Mode.Visibility.Const.t
 
 val staticity : t -> Mode.Staticity.const
+
+val allocation : t -> Mode.Allocation.Const.t
 
 val externality : t -> Jkind_axis.Externality.t
 
