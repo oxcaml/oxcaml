@@ -19,7 +19,7 @@ type t = A of (int -> int) | B of (int -> int)
    as an indirect call.
  *)
 
-let r b =
+let r =
   let f x = x in
   let g x = x in
   let k x y =
@@ -28,46 +28,43 @@ let r b =
       begin match x, y with
       | A ax, A ay -> ax (ay 0)
       | B bx, B by -> by (bx 0)
+      | _ -> assert false
       end
+    | _ -> assert false
   in
-  let x = if b then A f else B g in
-  let y = if b then A g else B f in
+  let x = if Sys.opaque_identity true then A f else B g in
+  let y = if Sys.opaque_identity true then A g else B f in
   (k[@inlined]) x y
 [%%expect_fexpr Simplify{|
-let $camlTOP3__immstring68 = "" in
-let $camlTOP3__const_block76 = Block 0 ($camlTOP3__immstring68, 19, 4) in
-let $camlTOP3__Pmakeblock79 =
-  Block 0 ($`*predef*`.caml_exn_Match_failure, $camlTOP3__const_block76)
+let $camlTOP3__immstring54 = "" in
+let $camlTOP3__const_block56 = Block 0 ($camlTOP3__immstring54, 27, 11) in
+let $camlTOP3__Pmakeblock59 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTOP3__const_block56)
 in
-let code r_0 deleted in
-let code loopify(never) size(52) newer_version_of(r_0)
-      r_0_1 (b : imm tagged)
-        my_closure _region _ghost_region my_depth
-        -> k * k1
-        : imm tagged =
-  (let untagged = %untag_imm (b) in
-   switch untagged
-     | 0 -> k2 (1i)
-     | 1 -> k2 (0i))
-    where k2 (tag : imm) =
-      ((let untagged = %untag_imm (b) in
-        switch untagged
-          | 0 -> k2 (1i)
-          | 1 -> k2 (0i))
-         where k2 (tag_1 : imm) =
-           (switch tag
-              | 0 -> k2
-              | 1 -> k3
-              where k3 =
-                switch tag_1
-                  | 0 -> k1 pop(regular k1) ($camlTOP3__Pmakeblock79)
-                  | 1 -> k (0)
-              where k2 =
-                switch tag_1
-                  | 0 -> k (0)
-                  | 1 -> k1 pop(regular k1) ($camlTOP3__Pmakeblock79)))
-in
-let $camlTOP3__r_3 = closure r_0_1 @r in
-let $camlTOP3 = Block 0 ($camlTOP3__r_3) in
-cont done ($camlTOP3)
+(let Popaque = %opaque (1) in
+ let untagged = %untag_imm (Popaque) in
+ switch untagged
+   | 0 -> k1 (1i)
+   | 1 -> k1 (0i))
+  where k1 (tag : imm) =
+    ((let Popaque = %opaque (1) in
+      let untagged = %untag_imm (Popaque) in
+      switch untagged
+        | 0 -> k1 (1i)
+        | 1 -> k1 (0i))
+       where k1 (tag_1 : imm) =
+         (switch tag
+            | 0 -> k1
+            | 1 -> k2
+            where k2 =
+              switch tag_1
+                | 0 -> error pop(regular error) ($camlTOP3__Pmakeblock59)
+                | 1 -> k
+            where k1 =
+              switch tag_1
+                | 0 -> k
+                | 1 -> error pop(regular error) ($camlTOP3__Pmakeblock59)))
+  where k =
+    let $camlTOP3 = Block 0 (0) in
+    cont done ($camlTOP3)
 |}]
