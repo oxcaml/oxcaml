@@ -495,9 +495,9 @@ let rec map_tail1 e ~f =
   | Cphantom_let (id, exp, body) -> Cphantom_let (id, exp, map_tail1 body ~f)
   | Csequence (e1, e2) -> Csequence (e1, map_tail1 e2 ~f)
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-  | Cvar _ | Ctuple _ | Cop _ | Cifthenelse _ | Cexit _ | Ccatch _ | Cswitch _
-  | Cinvalid _ ->
+  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+  | Cconst_symbol _ | Cvar _ | Ctuple _ | Cop _ | Cifthenelse _ | Cexit _
+  | Ccatch _ | Cswitch _ | Cinvalid _ ->
     f e
 
 let map_tail2 x y ~f = map_tail1 y ~f:(fun y -> map_tail1 x ~f:(fun x -> f x y))
@@ -1534,6 +1534,10 @@ let unbox_mask dbg =
       when Nativeint.equal hdr boxedmask_header
            || Nativeint.equal hdr boxedmask_local_header ->
       c
+    | Cconst_symbol (s, _dbg) as cmm -> (
+      match Cmmgen_state.structured_constant_of_sym s.sym_name with
+      | Some (Const_mask n) -> Cconst_mask (n, dbg)
+      | _ -> Cop (mk_load_immut Word_mask, [cmm], dbg))
     | cmm -> Cop (mk_load_immut Word_mask, [cmm], dbg))
 
 (* Conversions for 16-bit floats *)
@@ -4732,6 +4736,8 @@ let vec256 ~dbg bits = Cconst_vec256 (bits, dbg)
 
 let vec512 ~dbg bits = Cconst_vec512 (bits, dbg)
 
+let mask ~dbg bits = Cconst_mask (bits, dbg)
+
 let nativeint ~dbg i = natint_const_untagged dbg i
 
 let letin v ~defining_expr ~body =
@@ -4740,8 +4746,8 @@ let letin v ~defining_expr ~body =
     defining_expr
   | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-  | Clet _ | Cphantom_let _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _
-  | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
+  | Cconst_mask _ | Clet _ | Cphantom_let _ | Ctuple _ | Cop _ | Csequence _
+  | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
     Clet (v, defining_expr, body)
 
 let sequence x y =
@@ -5092,7 +5098,7 @@ let cmm_arith_size (e : Cmm.expression) =
   match e with
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_symbol _ | Cvar _ | Cconst_vec128 _ | Cconst_vec256 _
-  | Cconst_vec512 _ ->
+  | Cconst_vec512 _ | Cconst_mask _ ->
     Some 0
   | Cop _ -> Some (cmm_arith_size0 e)
   | Clet _ | Cphantom_let _ | Ctuple _ | Csequence _ | Cifthenelse _ | Cswitch _

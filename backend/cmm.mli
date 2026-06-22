@@ -563,6 +563,7 @@ and expression =
   | Cconst_vec128 of vec128_bits * Debuginfo.t
   | Cconst_vec256 of vec256_bits * Debuginfo.t
   | Cconst_vec512 of vec512_bits * Debuginfo.t
+  | Cconst_mask of int64 * Debuginfo.t
   | Cconst_symbol of symbol * Debuginfo.t
   | Cvar of Backend_var.t
   | Clet of Backend_var.With_provenance.t * expression * expression

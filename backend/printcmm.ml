@@ -350,6 +350,7 @@ let rec expr ppf = function
       ({ word0; word1; word2; word3; word4; word5; word6; word7 }, _dbg) ->
     fprintf ppf "%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx" word7
       word6 word5 word4 word3 word2 word1 word0
+  | Cconst_mask (n, _dbg) -> fprintf ppf "mask:%016Lx" n
   | Cconst_float32 (n, _dbg) -> fprintf ppf "%Fs" n
   | Cconst_float (n, _dbg) -> fprintf ppf "%F" n
   | Cconst_symbol (s, _dbg) ->

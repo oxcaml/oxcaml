@@ -51,6 +51,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_vec128 _ -> true
     | Cconst_vec256 _ -> true
     | Cconst_vec512 _ -> true
+    | Cconst_mask _ -> true
     | Cvar _ -> true
     | Ctuple el -> List.for_all is_simple_expr el
     | Clet (_id, arg, body) -> is_simple_expr arg && is_simple_expr body
@@ -101,7 +102,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     match exp with
     | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-    | Cvar _ ->
+    | Cconst_mask _ | Cvar _ ->
       EC.none
     | Ctuple el -> EC.join_list_map el effects_of
     | Clet (_id, arg, body) -> EC.join (effects_of arg) (effects_of body)
@@ -737,6 +738,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_vec512 (bits, _dbg) ->
       let r = Reg.createv Cmm.typ_vec512 in
       Ok (insert_op env sub_cfg (Operation.Const_vec512 bits) [||] r)
+    | Cconst_mask (_bits, _dbg) ->
+      Misc.fatal_error "avx512 masks not yet implemented"
     | Cconst_symbol (n, _dbg) ->
       (* Cconst_symbol _ evaluates to a statically-allocated address, so its
          value fits in a typ_int register and is never changed by the GC.
@@ -827,7 +830,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       insert_return env sub_cfg ok (SU.pop_all_traps env)
     | Cop _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-    | Cvar _ | Ctuple _ | Cexit _ ->
+    | Cconst_mask _ | Cvar _ | Ctuple _ | Cexit _ ->
       emit_return env sub_cfg exp (SU.pop_all_traps env)
 
   and emit_invalid env sub_cfg message symbol =

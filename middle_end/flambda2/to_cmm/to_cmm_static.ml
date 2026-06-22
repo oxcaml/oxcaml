@@ -532,7 +532,7 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
       in
       word0
     in
-    let structured i = Cmmgen_state.Const_int64 i in
+    let structured i = Cmmgen_state.Const_mask i in
     let res, env, updates =
       static_boxed_number ~kind:UK.naked_mask_fields ~env ~symbol ~default
         ~emit:C.emit_mask_constant ~transl ~structured v res updates

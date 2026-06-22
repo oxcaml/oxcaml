@@ -663,6 +663,7 @@ and expression =
   | Cconst_vec128 of vec128_bits * Debuginfo.t
   | Cconst_vec256 of vec256_bits * Debuginfo.t
   | Cconst_vec512 of vec512_bits * Debuginfo.t
+  | Cconst_mask of int64 * Debuginfo.t
   | Cconst_symbol of symbol * Debuginfo.t
   | Cvar of Backend_var.t
   | Clet of Backend_var.With_provenance.t * expression * expression
@@ -773,8 +774,8 @@ let iter_shallow_tail f = function
     true
   | Cexit _ | Cop (Craise _, _, _) | Cinvalid _ -> true
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-  | Cvar _ | Ctuple _
+  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+  | Cconst_symbol _ | Cvar _ | Ctuple _
   | Cop
       ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Caddi128 | Csubi128
         | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cpopcnt | Caddv
@@ -807,8 +808,8 @@ let map_shallow_tail f = function
     Ccatch (flag, List.map map_h handlers, f body)
   | (Cexit _ | Cop (Craise _, _, _) | Cinvalid _) as cmm -> cmm
   | ( Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-    | Cvar _ | Ctuple _
+    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+    | Cconst_symbol _ | Cvar _ | Ctuple _
     | Cop
         ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Caddi128
           | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
@@ -830,7 +831,7 @@ let map_tail f =
   let rec loop = function
     | ( Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
       | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-      | Cvar _ | Ctuple _ | Cop _ ) as c ->
+      | Cconst_mask _ | Cvar _ | Ctuple _ | Cop _ ) as c ->
       f c
     | ( Cexit _ | Cinvalid _
       | Clet (_, _, _)
@@ -864,8 +865,8 @@ let iter_shallow f = function
     f body
   | Cexit (_n, el, _traps) -> List.iter f el
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-  | Cvar _ | Cinvalid _ ->
+  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+  | Cconst_symbol _ | Cvar _ | Cinvalid _ ->
     ()
 
 let map_shallow f = function
@@ -885,8 +886,8 @@ let map_shallow f = function
     Ccatch (flag, List.map map_h hl, f body)
   | Cexit (n, el, traps) -> Cexit (n, List.map f el, traps)
   | ( Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-    | Cvar _ | Cinvalid _ ) as c ->
+    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+    | Cconst_symbol _ | Cvar _ | Cinvalid _ ) as c ->
     c
 
 let rank_machtype_component : machtype_component -> int = function

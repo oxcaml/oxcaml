@@ -306,6 +306,7 @@ let size_expr env exp =
     | Cconst_vec128 _ -> Arch.size_vec128
     | Cconst_vec256 _ -> Arch.size_vec256
     | Cconst_vec512 _ -> Arch.size_vec512
+    | Cconst_mask _ -> Arch.size_int
     | Cvar id -> (
       try V.Map.find id localenv
       with Not_found -> (

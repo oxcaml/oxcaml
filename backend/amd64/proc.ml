@@ -768,6 +768,7 @@ let expression_supported = function
   | Cexit _ | Cinvalid _ -> true
   | Cconst_vec256 _ -> Arch.Extension.enabled_vec256 ()
   | Cconst_vec512 _ -> Arch.Extension.enabled_vec512 ()
+  | Cconst_mask _ -> Arch.Extension.enabled_vec512 ()
 
 let trap_size_in_bytes () =
   if !Clflags.llvm_backend then 32 else 16

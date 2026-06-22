@@ -822,6 +822,9 @@ val vec256 : dbg:Debuginfo.t -> Cmm.vec256_bits -> expression
 (** Create a constant vec512 expression from eight int64s. *)
 val vec512 : dbg:Debuginfo.t -> Cmm.vec512_bits -> expression
 
+(** Create a constant mask expression from its int64 bit pattern. *)
+val mask : dbg:Debuginfo.t -> int64 -> expression
+
 (** Create a constant int expression from a nativeint. *)
 val nativeint : dbg:Debuginfo.t -> Nativeint.t -> expression
 

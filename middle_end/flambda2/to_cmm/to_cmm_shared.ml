@@ -234,7 +234,7 @@ let const ~dbg cst =
     let { Vector_types.Mask.Bit_pattern.word0 } =
       Vector_types.Mask.Bit_pattern.to_bits v
     in
-    int64 ~dbg word0
+    mask ~dbg word0
   | Naked_nativeint t -> targetint ~dbg t
   | Null -> targetint ~dbg (Targetint_32_64.zero Sixty_four)
 
