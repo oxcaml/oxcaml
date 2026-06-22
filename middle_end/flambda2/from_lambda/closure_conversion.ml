@@ -228,6 +228,10 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
               | Naked_vec512 _ ->
                 Misc.fatal_errorf
                   "Unboxed constants are not allowed inside of Const_block: %a"
+                  Printlambda.structured_constant const
+              | Poison _ ->
+                Misc.fatal_errorf
+                  "[declare_const] returned a poison constant for %a"
                   Printlambda.structured_constant const);
           acc, field)
         acc consts
@@ -1560,11 +1564,28 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                         ~const:(fun cst ->
                           match Reg_width_const.descr cst with
                           | Naked_float f -> Or_variable.Const f
+                          | Poison (Naked_number Naked_float, _name) ->
+                            (* Unfortunately, we can't put poison in the static
+                               block. Use a signaling NaN instead, to cause
+                               traps if the value is ever used. *)
+                            Or_variable.Const
+                              (Numeric_types.Float_by_bit_pattern.of_bits
+                                 0x7FF0DEAD_DEADDEAD_L)
                           | Tagged_immediate _ | Naked_immediate _
                           | Naked_float32 _ | Naked_int8 _ | Naked_int16 _
                           | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
                           | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
-                          | Null ->
+                          | Null
+                          | Poison
+                              ( ( Value
+                                | Naked_number
+                                    ( Naked_immediate | Naked_float32
+                                    | Naked_int8 | Naked_int16 | Naked_int32
+                                    | Naked_int64 | Naked_nativeint
+                                    | Naked_vec128 | Naked_vec256 | Naked_vec512
+                                      )
+                                | Region | Rec_info ),
+                                _ ) ->
                             Misc.fatal_errorf
                               "Binding of %a to %a contains the constant %a \
                                inside a float record, whereas only naked \

@@ -4471,10 +4471,20 @@ let rec must_be_singleton t : RWC.t option =
             | Some const -> (
               match RWC.descr const with
               | Naked_immediate i -> Some (RWC.tagged_immediate i)
+              | Poison (Naked_number Naked_immediate, name) ->
+                Some (RWC.const_poison Flambda_kind.value name)
               | Tagged_immediate _ | Naked_float _ | Naked_float32 _
               | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
               | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _
-              | Naked_vec512 _ | Null ->
+              | Naked_vec512 _ | Null
+              | Poison
+                  ( ( Value
+                    | Naked_number
+                        ( Naked_float | Naked_float32 | Naked_int8 | Naked_int16
+                        | Naked_int32 | Naked_int64 | Naked_nativeint
+                        | Naked_vec128 | Naked_vec256 | Naked_vec512 )
+                    | Region | Rec_info ),
+                    _ ) ->
                 Misc.fatal_errorf
                   "Immediates case returned wrong kind of constant:@ %a"
                   Reg_width_const.print const)))))

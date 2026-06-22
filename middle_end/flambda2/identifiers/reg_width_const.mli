@@ -48,6 +48,8 @@ val is_naked_vec256 : t -> Vector_types.Vec256.Bit_pattern.t option
 
 val is_naked_vec512 : t -> Vector_types.Vec512.Bit_pattern.t option
 
+val is_poison : t -> (Flambda_kind.t * string) option
+
 (** Create a numeric constant of the given kind ([Region] and [Rec_info] are
     forbidden). *)
 val of_int_of_kind : Target_system.Machine_width.t -> Flambda_kind.t -> int -> t

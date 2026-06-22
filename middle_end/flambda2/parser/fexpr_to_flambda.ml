@@ -98,6 +98,9 @@ let const (c : Fexpr.const) : Reg_width_const.t =
   | Naked_vec256 bits -> Reg_width_const.naked_vec256 (bits |> vec256)
   | Naked_vec512 bits -> Reg_width_const.naked_vec512 (bits |> vec512)
   | Null -> Reg_width_const.const_null
+  | Poison (kind, name) ->
+    let kind = Flambda_kind.With_subkind.kind (value_kind_with_subkind kind) in
+    Reg_width_const.const_poison kind name
 
 let rec rec_info env (ri : Fexpr.rec_info) : Rec_info_expr.t =
   let module US = Rec_info_expr.Unrolling_state in
