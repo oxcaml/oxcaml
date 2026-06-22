@@ -41,7 +41,7 @@ Line 3, characters 12-13:
 
 |}]
 
-(* you are not allowed to use x uniquely inside the module *)
+(* you can use env vars uniquely inside a module *)
 let texp_letmodule () =
   let x = "foo" in
   let module Bar = struct
@@ -57,7 +57,8 @@ Error: This value is aliased but used as unique.
 Hint: This value comes from outside the current module or class.
 |}]
 
-(* you can use x as aliased and many, but it might collide with external uses. *)
+(* binding [y = x] inside the module merely aliases x; since Bar.y is never
+   used, this does not collide with the unique use of x. *)
 let texp_letmodule () =
   let x = "foo" in
   unique_id x;
@@ -110,7 +111,7 @@ module type bar = sig val y : string end
 let texp_pack () =
   let x = "foo" in
   let z = (module struct let y = (x : @ unique) end : bar) in
-  ()
+  ignore z
 [%%expect{|
 module type bar = sig val y : string end
 Line 5, characters 33-47:
