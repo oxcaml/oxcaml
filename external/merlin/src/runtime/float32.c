@@ -34,12 +34,21 @@
 #include "caml/intext.h"
 #include "caml/mlvalues.h"
 
+/* If the OCaml runtime already provides the float32 primitives (detected via
+   the presence of the runtime's <caml/float32.h>, which defines the include
+   guard CAML_FLOAT32_H), this compatibility shim must define nothing:
+   redefining caml_format_float32 would cause duplicate-symbol errors at link
+   time. */
+#if defined(__has_include)
+#  if __has_include("caml/float32.h")
+#    include "caml/float32.h"
+#  endif
+#endif
+
 #ifndef CAML_FLOAT32_H
 #define CAML_FLOAT32_H
 
 #define Float32_val(v) (*((float *)Data_custom_val(v)))
-
-#endif /* CAML_FLOAT32_H */
 
 #if defined(HAS_LOCALE) || defined(__MINGW32__)
 
@@ -112,3 +121,5 @@ CAMLprim value caml_format_float32(value fmt, value arg)
 #endif
   return res;
 }
+
+#endif /* CAML_FLOAT32_H */

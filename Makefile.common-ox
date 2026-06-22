@@ -5,6 +5,7 @@
 ws_boot   = --root=. --workspace=duneconf/boot.ws
 ws_runstd = --root=. --workspace=duneconf/runtime_stdlib.ws
 ws_main   = --root=. --workspace=duneconf/main.ws
+ws_merlin = --root=. --workspace=duneconf/merlin_install.ws
 
 ifeq ($(coverage),yes)
   coverage_dune_flags=--instrument-with bisect_ppx
@@ -65,6 +66,26 @@ define dune_main_context
     ; We never want to build the compiler itself with AddressSanitizer enabled.
     (ocamlopt_flags (:standard -fno-asan))
     $(ENV_VARS)))))
+endef
+
+# Workspace for building the Merlin that gets shipped in the install. Its
+# compiler is the freshly installed OxCaml compiler in _install so that Merlin
+# is built with OxCaml. This is analogous to how the main workspace uses the
+# bootstrapped compiler in _build/_bootinstall, except that here we also have
+# access to unix/str and the runtime headers that Merlin needs. Note that this
+# is a separate workspace from the boot one used by `make merlin-build` /
+# `make merlin-test`, which deliberately keep using the opam compiler.
+define dune_merlin_install_context
+(lang dune 2.8)
+(context (default
+  (name merlin_install)
+  (profile dev)
+  (paths
+    (PATH ("$(CURDIR)/_install/bin" :standard))
+    (OCAMLLIB ("$(CURDIR)/_install/lib/ocaml")))
+  (env (_
+    (flags (:standard -alert -unsafe_multidomain))
+    (env-vars ("OCAMLPARAM" ""))))))
 endef
 
 
@@ -172,6 +193,7 @@ runtest-dwarf: compiler
 duneconf/boot.ws: export contents = $(dune_boot_context)
 duneconf/runtime_stdlib.ws: export contents = $(dune_runtime_stdlib_context)
 duneconf/main.ws: export contents = $(dune_main_context)
+duneconf/merlin_install.ws: export contents = $(dune_merlin_install_context)
 duneconf/%.ws:
 	echo "$$contents" > $@
 
@@ -246,7 +268,7 @@ cpl=$(if $(filter linux,$(SYSTEM)),cp -l,cp -L)
 # the final install path may be on a different filesystem (and hence be
 # slow and/or unable to make hardlinks)
 .PHONY: _install install install_for_opam
-_install: compiler
+_install: compiler duneconf/merlin_install.ws
 	rm -rf _install
 	mkdir -p _install/{bin,lib/ocaml}
 	$(cpl) _build/runtime_stdlib_install/bin/* _install/bin/
@@ -278,6 +300,42 @@ _install: compiler
 	# This only copies part of the files, mainly meant for metrics. It only covers
 	# about half of the files which we would want to copy over.
 	find _build/runtime_stdlib/stdlib/ -name '*.cms' -exec cp -f {} _install/lib/ocaml/ \;
+	# Build Merlin with the OxCaml compiler (against the _install we just
+	# assembled) and fold it into the install.
+	$(dune) build $(ws_merlin) \
+          --only-packages=merlin,merlin-lib,dot-merlin-reader,ocaml-index \
+		  @install external/csexp/src/csexp.cma external/csexp/src/csexp.cmxa
+	$(cpl) _build/install/merlin_install/bin/* _install/bin/
+	mkdir -p _install/lib/ocaml/stublibs
+	$(cpl) _build/install/merlin_install/lib/stublibs/* \
+          _install/lib/ocaml/stublibs/
+	mkdir -p _install/lib/ocaml/merlin
+	$(cpl) -R _build/install/merlin_install/lib/merlin-lib/* \
+          _install/lib/ocaml/merlin/
+	rm -f _install/lib/ocaml/merlin/META _install/lib/ocaml/merlin/dune-package \
+          _install/lib/ocaml/merlin/opam
+	# Publish the findlib package as lib/ocaml/META.merlin-lib, keeping the
+	# canonical name "merlin-lib"; directory = "merlin" points findlib at the
+	# files in lib/ocaml/merlin/. Point the csexp dependency at the bundled
+	# subpackage merlin-lib.csexp.
+	echo 'directory = "merlin"' > _install/lib/ocaml/META.merlin-lib
+	sed -e 's/\bcsexp\b/merlin-lib.csexp/g' \
+          _build/install/merlin_install/lib/merlin-lib/META \
+          >> _install/lib/ocaml/META.merlin-lib
+	# Bundle csexp in with Merlin since it is a dependency. (Although yojson is
+	# a Merlin dependency as well, it is only depended on by the statically
+	# linked binaries and not any of the libraries, so it does not need to be
+	# included.)
+	mkdir -p _install/lib/ocaml/merlin/csexp
+	$(cpl) _build/merlin_install/external/csexp/src/csexp.cma \
+          _build/merlin_install/external/csexp/src/csexp.cmxa \
+          _build/merlin_install/external/csexp/src/csexp.a \
+          _build/merlin_install/external/csexp/src/.csexp.objs/byte/csexp.cmi \
+          _build/merlin_install/external/csexp/src/.csexp.objs/byte/csexp.cmti \
+          _build/merlin_install/external/csexp/src/.csexp.objs/native/csexp.cmx \
+          _install/lib/ocaml/merlin/csexp/
+	printf '\npackage "csexp" (\n  directory = "csexp"\n  description = "Bundled csexp (intended for use only by Merlin)"\n  archive(byte) = "csexp.cma"\n  archive(native) = "csexp.cmxa"\n)\n' \
+          >> _install/lib/ocaml/META.merlin-lib
 
 # Copy _install to the final install directory (no-op if they are the same)
 install: _install
@@ -389,7 +447,7 @@ install_for_test: install
 	  parsing typing; do ln -s utils _runtest/$$dir; done
 	# stublibs
 	mkdir -p _runtest/lib/ocaml/stublibs/
-	cp $(main_prefix)/lib/ocaml/stublibs/*.so _runtest/lib/ocaml/stublibs
+	cp _install/lib/ocaml/stublibs/*.so _runtest/lib/ocaml/stublibs
 	# ocamldebug
 	mkdir _runtest/debugger$(RUNTIME_SUFFIX)
 	ln -s ../ocamldebug _runtest/debugger$(RUNTIME_SUFFIX)
