@@ -967,7 +967,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   let vars = ref (0, [])
 
-  let debug_modes = ref false
+  let debug_modes = Sys.getenv_opt "OXCAML_DEBUG_MODES" = Some "1"
+
+  let level_cnt = ref 0
+
+  let faa () =
+    let r = !level_cnt in
+    level_cnt := r + 1;
+    r mod 5
 
   let fresh ?upper ?upper_hint ?lower ?lower_hint ?vlower ?vupper ~level obj =
     let id, l = !vars in
@@ -987,7 +994,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     in
     let vlower = Option.value vlower ~default:VarMap.empty in
     let vupper = Option.value vupper ~default:VarMap.empty in
-    let level = if !debug_modes then id mod 5 else level in
     let var =
       { level; upper; upper_hint; lower; lower_hint; vlower; vupper; id }
     in
@@ -1368,11 +1374,13 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     else print_raw ?verbose obj ppf m
 
   let newvar obj level =
+    let level = if debug_modes then faa () else level in
     let u = fresh ~level obj in
     Amodevar (Amorphvar (u, C.id, Id))
 
   let newvar_above (type a r) (obj : a C.obj) (level : int)
       (m : (a, allowed * r) mode) =
+    let level = if debug_modes then faa () else level in
     match disallow_right m with
     | Amode (a, a_hint_lower, _a_hint_upper) ->
       if C.le obj (C.max obj) a
@@ -1429,6 +1437,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   let newvar_below (type a l) (obj : a C.obj) (level : int)
       (m : (a, l * allowed) mode) =
+    let level = if debug_modes then faa () else level in
     match disallow_left m with
     | Amode (a, _a_hint_lower, a_hint_upper) ->
       if C.le obj a (C.min obj)
