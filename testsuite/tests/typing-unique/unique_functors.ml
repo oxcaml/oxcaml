@@ -43,7 +43,14 @@ let apply_unique_twice () =
   let module B = F(M) in
   ()
 [%%expect{|
-val apply_unique_twice : unit -> unit = <fun>
+Line 5, characters 19-20:
+5 |   let module B = F(M) in
+                       ^
+Error: This value is used here, but it has already been used as unique at:
+Line 4, characters 19-20:
+4 |   let module A = F(M) in
+                       ^
+
 |}]
 
 (* The argument's components cannot be consumed uniquely after the argument
@@ -57,8 +64,12 @@ let arg_used_after_apply () =
 Line 5, characters 12-15:
 5 |   unique_id M.x
                 ^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from another module or class.
+Error: This value is read from here,
+       but it has already been used as unique at:
+Line 4, characters 19-20:
+4 |   let module A = F(M) in
+                       ^
+
 |}]
 
 (* The components of a module returned by a (generative) functor are fresh
@@ -68,11 +79,7 @@ let functor_returns_unique () =
   let module A = F () in
   unique_id A.x
 [%%expect{|
-Line 4, characters 12-15:
-4 |   unique_id A.x
-                ^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from another module or class.
+val functor_returns_unique : unit -> unit = <fun>
 |}]
 
 (* But not twice. *)
@@ -82,11 +89,14 @@ let functor_returns_unique_twice () =
   unique_id A.x;
   unique_id A.x
 [%%expect{|
+Line 5, characters 12-15:
+5 |   unique_id A.x
+                ^^^
+Error: This value is used here, but it has already been used as unique at:
 Line 4, characters 12-15:
 4 |   unique_id A.x;
                 ^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from another module or class.
+
 |}]
 
 (* Components included from an application of a functor with an aliased
@@ -111,11 +121,7 @@ let functor_body_unique () =
   let module A = F () in
   ()
 [%%expect{|
-Line 3, characters 45-46:
-3 |   let module F () = struct let y = unique_id x end in
-                                                 ^
-Error: This value is aliased but used as unique.
-Hint: This value comes from outside the current module or class.
+val functor_body_unique : unit -> unit = <fun>
 |}]
 
 (* But not twice, since each application would consume the free variable. *)
@@ -126,11 +132,15 @@ let functor_body_unique_twice () =
   let module B = F () in
   ()
 [%%expect{|
-Line 3, characters 45-46:
-3 |   let module F () = struct let y = unique_id x end in
-                                                 ^
-Error: This value is aliased but used as unique.
-Hint: This value comes from outside the current module or class.
+Line 5, characters 17-18:
+5 |   let module B = F () in
+                     ^
+Error: This value is used here,
+       but it is defined as once and has already been used at:
+Line 4, characters 17-18:
+4 |   let module A = F () in
+                     ^
+
 |}]
 
 (* A component of a functor result that aliases a captured free variable
@@ -144,13 +154,13 @@ let functor_result_captures () =
   unique_id x;
   ignore r
 [%%expect{|
+Line 7, characters 9-10:
+7 |   ignore r
+             ^
+Error: This value is used here, but it has already been used as unique at:
 Line 6, characters 12-13:
 6 |   unique_id x;
                 ^
-Error: This value is used here as unique, but it has already been used at:
-Line 3, characters 35-36:
-3 |   let module F () = struct let y = x end in
-                                       ^
 
 |}]
 
@@ -163,10 +173,14 @@ let functor_result_siblings_alias () =
   unique_id A.y;
   ignore A.z
 [%%expect{|
+Line 6, characters 9-12:
+6 |   ignore A.z
+             ^^^
+Error: This value is used here, but it has already been used as unique at:
 Line 5, characters 12-15:
 5 |   unique_id A.y;
                 ^^^
-Error: This value is "aliased" but is expected to be "unique".
+
 |}]
 
 (* Each application of a generative functor creates a fresh structure, so the
@@ -178,11 +192,7 @@ let generative_results_independent () =
   unique_id A.x;
   unique_id B.x
 [%%expect{|
-Line 5, characters 12-15:
-5 |   unique_id A.x;
-                ^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from another module or class.
+val generative_results_independent : unit -> unit = <fun>
 |}]
 
 (* Applications to different arguments yield independent results. *)
@@ -195,10 +205,7 @@ let apply_results_independent () =
   unique_id A.y;
   unique_id B.y
 [%%expect{|
-Line 7, characters 12-15:
-7 |   unique_id A.y;
-                ^^^
-Error: This value is "aliased" but is expected to be "unique".
+val apply_results_independent : unit -> unit = <fun>
 |}]
 
 (* The same holds for each application of a partially-applied curried
@@ -214,10 +221,7 @@ let curried_results_independent () =
   unique_id A.y;
   unique_id B.y
 [%%expect{|
-Line 9, characters 12-15:
-9 |   unique_id A.y;
-                ^^^
-Error: This value is "aliased" but is expected to be "unique".
+val curried_results_independent : unit -> unit = <fun>
 |}]
 
 (* A component aliasing a captured free variable shares that variable's paths
@@ -231,13 +235,13 @@ let curried_result_captures () =
   unique_id x;
   ignore r
 [%%expect{|
+Line 8, characters 9-10:
+8 |   ignore r
+             ^
+Error: This value is used here, but it has already been used as unique at:
 Line 7, characters 12-13:
 7 |   unique_id x;
                 ^
-Error: This value is used here as unique, but it has already been used at:
-Line 3, characters 38-39:
-3 |   let module F () () = struct let y = x end in
-                                          ^
 
 |}]
 
@@ -254,11 +258,14 @@ let unique_arg_struct_literal () =
   let module _ = F (struct let x = x end) in
   ()
 [%%expect{|
-Line 3, characters 59-62:
-3 |   let module F (X : s @ unique) = struct let _ = unique_id X.x end in
-                                                               ^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from another module or class.
+Line 5, characters 20-40:
+5 |   let module _ = F (struct let x = x end) in
+                        ^^^^^^^^^^^^^^^^^^^^
+Error: This value is used here, but it has already been used as unique at:
+Line 4, characters 20-40:
+4 |   let module _ = F (struct let x = x end) in
+                        ^^^^^^^^^^^^^^^^^^^^
+
 |}]
 
 (* The same, shown as a use-after-consume: [F] consumes the outer [x] uniquely
@@ -270,9 +277,12 @@ let read_after_unique_arg_struct_literal () =
   let module _ = F (struct let x = x end) in
   ignore x
 [%%expect{|
-Line 3, characters 59-62:
-3 |   let module F (X : s @ unique) = struct let _ = unique_id X.x end in
-                                                               ^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from another module or class.
+Line 5, characters 9-10:
+5 |   ignore x
+             ^
+Error: This value is used here, but it has already been used as unique at:
+Line 4, characters 20-40:
+4 |   let module _ = F (struct let x = x end) in
+                        ^^^^^^^^^^^^^^^^^^^^
+
 |}]

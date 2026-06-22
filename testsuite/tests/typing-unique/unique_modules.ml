@@ -23,11 +23,7 @@ let proj_two_components () =
   unique_id M.x;
   unique_id M.y
 [%%expect{|
-Line 6, characters 12-15:
-6 |   unique_id M.x;
-                ^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from another module or class.
+val proj_two_components : unit -> unit = <fun>
 |}]
 
 (* The same component cannot be consumed uniquely twice. *)
@@ -38,11 +34,14 @@ let proj_twice () =
   unique_id M.x;
   unique_id M.x
 [%%expect{|
+Line 6, characters 12-15:
+6 |   unique_id M.x
+                ^^^
+Error: This value is used here, but it has already been used as unique at:
 Line 5, characters 12-15:
 5 |   unique_id M.x;
                 ^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from another module or class.
+
 |}]
 
 (* Using a component as aliased is fine, many times. *)
@@ -65,11 +64,14 @@ let alias_conflict () =
   unique_id N.x;
   unique_id M.x
 [%%expect{|
+Line 7, characters 12-15:
+7 |   unique_id M.x
+                ^^^
+Error: This value is used here, but it has already been used as unique at:
 Line 6, characters 12-15:
 6 |   unique_id N.x;
                 ^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from another module or class.
+
 |}]
 
 (* A binding inside a module aliases the bound value: consuming the component
@@ -82,10 +84,14 @@ let module_binding_aliases () =
   unique_id M.y;
   unique_id x
 [%%expect{|
+Line 7, characters 12-13:
+7 |   unique_id x
+                ^
+Error: This value is used here, but it has already been used as unique at:
 Line 6, characters 12-15:
 6 |   unique_id M.y;
                 ^^^
-Error: This value is "aliased" but is expected to be "unique".
+
 |}]
 
 (* Opened components are tracked like ordinary projections. *)
@@ -97,11 +103,14 @@ let open_conflict () =
   unique_id x;
   unique_id M.x
 [%%expect{|
+Line 7, characters 12-15:
+7 |   unique_id M.x
+                ^^^
+Error: This value is used here, but it has already been used as unique at:
 Line 6, characters 12-13:
 6 |   unique_id x;
                 ^
-Error: This value is aliased but used as unique.
-Hint: This value comes from another module or class.
+
 |}]
 
 (* [open struct ... end] binds the structure's components. *)
@@ -111,10 +120,14 @@ let open_struct_conflict () =
   unique_id x;
   unique_id y
 [%%expect{|
+Line 5, characters 12-13:
+5 |   unique_id y
+                ^
+Error: This value is used here, but it has already been used as unique at:
 Line 4, characters 12-13:
 4 |   unique_id x;
                 ^
-Error: This value is "aliased" but is expected to be "unique".
+
 |}]
 
 (* Included components share the components of the included module. *)
@@ -126,11 +139,14 @@ let include_conflict () =
   unique_id N.x;
   unique_id M.x
 [%%expect{|
+Line 7, characters 12-15:
+7 |   unique_id M.x
+                ^^^
+Error: This value is used here, but it has already been used as unique at:
 Line 6, characters 12-15:
 6 |   unique_id N.x;
                 ^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from another module or class.
+
 |}]
 
 (* Packing and unpacking a module preserves the tracking of its components. *)
@@ -139,10 +155,7 @@ let pack_unpack () =
   let (module M) = z in
   unique_id M.x
 [%%expect{|
-Line 4, characters 12-15:
-4 |   unique_id M.x
-                ^^^
-Error: This value is "aliased" but is expected to be "unique".
+val pack_unpack : unit -> unit = <fun>
 |}]
 
 (* A module cannot be packed uniquely twice. *)
@@ -153,7 +166,14 @@ let pack_twice () =
   unique_id (module M : s);
   unique_id (module M : s)
 [%%expect{|
-val pack_twice : unit -> unit = <fun>
+Line 6, characters 20-21:
+6 |   unique_id (module M : s)
+                        ^
+Error: This value is used here, but it has already been used as unique at:
+Line 5, characters 20-21:
+5 |   unique_id (module M : s);
+                        ^
+
 |}]
 
 (* A component cannot be used after the module is consumed uniquely. *)
@@ -164,7 +184,15 @@ let proj_after_pack () =
   unique_id (module M : s);
   ignore M.x
 [%%expect{|
-val proj_after_pack : unit -> unit = <fun>
+Line 6, characters 9-12:
+6 |   ignore M.x
+             ^^^
+Error: This value is read from here,
+       but it has already been used as unique at:
+Line 5, characters 20-21:
+5 |   unique_id (module M : s);
+                        ^
+
 |}]
 
 (* Packing a module uses its components: the values they alias cannot be
@@ -181,9 +209,9 @@ Line 7, characters 12-13:
 7 |   unique_id y
                 ^
 Error: This value is used here as unique, but it has already been used at:
-Line 4, characters 12-13:
-4 |     let x = y
-                ^
+Line 6, characters 17-18:
+6 |   ignore (module M : s);
+                     ^
 
 |}]
 
@@ -220,11 +248,7 @@ module type t_ok = module type of struct
   let () = unique_id x
 end
 [%%expect{|
-Line 3, characters 21-22:
-3 |   let () = unique_id x
-                         ^
-Error: This value is aliased but used as unique.
-Hint: This value comes from outside the current module or class.
+module type t_ok = sig val x : string @@ stateless end
 |}]
 
 module type t_bad = module type of struct
@@ -233,11 +257,14 @@ module type t_bad = module type of struct
   let () = unique_id x
 end
 [%%expect{|
+Line 4, characters 21-22:
+4 |   let () = unique_id x
+                         ^
+Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 21-22:
 3 |   let () = unique_id x
                          ^
-Error: This value is aliased but used as unique.
-Hint: This value comes from outside the current module or class.
+
 |}]
 
 (* Recursive modules are not tracked: their components are conservatively
@@ -267,13 +294,13 @@ let recmodule_binding_aliases () =
   unique_id s;
   alias
 [%%expect{|
+Line 8, characters 2-7:
+8 |   alias
+      ^^^^^
+Error: This value is used here, but it has already been used as unique at:
 Line 7, characters 12-13:
 7 |   unique_id s;
                 ^
-Error: This value is used here as unique, but it has already been used at:
-Line 4, characters 38-39:
-4 |     module rec R : s = struct let x = s end
-                                          ^
 
 |}]
 
@@ -285,10 +312,14 @@ let consume_unique_then_read_alias () =
   unique_id (module M : s);
   ignore y
 [%%expect{|
-Line 4, characters 12-26:
+Line 5, characters 9-10:
+5 |   ignore y
+             ^
+Error: This value is used here, but it has already been used as unique at:
+Line 4, characters 20-21:
 4 |   unique_id (module M : s);
-                ^^^^^^^^^^^^^^
-Error: This value is "aliased" but is expected to be "unique".
+                        ^
+
 |}]
 
 (* Items bound by [open struct ... end] are hidden, not addressable
@@ -304,10 +335,14 @@ let open_struct_shadow () =
   unique_id M.x;
   unique_id s
 [%%expect{|
+Line 8, characters 12-13:
+8 |   unique_id s
+                ^
+Error: This value is used here, but it has already been used as unique at:
 Line 7, characters 12-15:
 7 |   unique_id M.x;
                 ^^^
-Error: This value is "aliased" but is expected to be "unique".
+
 |}]
 
 (* A module bound by aliasing shares the aliased module's entry, so the
@@ -320,11 +355,14 @@ let shared_alias () =
   unique_id B.P.x;
   unique_id B.Q.x
 [%%expect{|
+Line 5, characters 12-17:
+5 |   unique_id B.Q.x
+                ^^^^^
+Error: This value is used here, but it has already been used as unique at:
 Line 4, characters 12-17:
 4 |   unique_id B.P.x;
                 ^^^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from another module or class.
+
 |}]
 
 (* The same shared structure at the top level, which exercises the export
@@ -349,9 +387,15 @@ open struct
   let () = unique_id consumed
 end
 [%%expect{|
+Lines 1-4, characters 0-3:
+1 | open struct
+2 |   let consumed = "foo"
+3 |   let () = unique_id consumed
+4 | end
+Error: This value is exported, and hence usable by other code here,
+       but it has already been used as unique at:
 Line 3, characters 21-29:
 3 |   let () = unique_id consumed
                          ^^^^^^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from outside the current module or class.
+
 |}]

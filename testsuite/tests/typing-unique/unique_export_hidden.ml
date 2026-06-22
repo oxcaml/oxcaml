@@ -4,7 +4,6 @@
  module = "unique_export_hidden.mli";
  ocamlc.byte;
  module = "unique_export_hidden.ml";
- ocamlc_byte_exit_status = "2";
  ocamlc.byte;
  check-ocamlc.byte-output;
 *)

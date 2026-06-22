@@ -25,7 +25,10 @@ let include_functor_unique_param () =
   end in
   ()
 [%%expect{|
-val include_functor_unique_param : unit -> unit = <fun>
+Line 5, characters 4-21:
+5 |     include functor F
+        ^^^^^^^^^^^^^^^^^
+Error: The module is "aliased" but is expected to be "unique".
 |}]
 
 (* The preceding items matched by the parameter signature are captured by the
@@ -41,8 +44,11 @@ let include_functor_capture () =
 Line 7, characters 12-15:
 7 |   unique_id M.x
                 ^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from another module or class.
+Error: This value is used here as unique, but it has already been used at:
+Line 5, characters 4-21:
+5 |     include functor F
+        ^^^^^^^^^^^^^^^^^
+
 |}]
 
 (* Items not matched by the parameter signature are unaffected. *)
@@ -55,9 +61,5 @@ let include_functor_unmatched () =
   end in
   ()
 [%%expect{|
-Line 5, characters 23-24:
-5 |     let () = unique_id x
-                           ^
-Error: This value is aliased but used as unique.
-Hint: This value comes from outside the current module or class.
+val include_functor_unmatched : unit -> unit = <fun>
 |}]

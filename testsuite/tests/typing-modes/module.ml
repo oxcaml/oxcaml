@@ -351,11 +351,7 @@ let foo (x @ unique) =
   ()
 [%%expect{|
 val use_unique : 'a @ unique -> unit = <fun>
-Line 9, characters 24-25:
-9 |     let () = use_unique x
-                            ^
-Error: This value is aliased but used as unique.
-Hint: This value comes from outside the current module or class.
+val foo : 'a @ unique -> unit = <fun>
 |}]
 
 let foo (x @ unique) =
@@ -365,11 +361,7 @@ let foo (x @ unique) =
   let module _ = Foo() in
   ()
 [%%expect{|
-Line 3, characters 24-25:
-3 |     let () = use_unique x
-                            ^
-Error: This value is aliased but used as unique.
-Hint: This value comes from outside the current module or class.
+val foo : 'a @ unique -> unit = <fun>
 |}]
 
 let (foo @ nonportable) () = ()

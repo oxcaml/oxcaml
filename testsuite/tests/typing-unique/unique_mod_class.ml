@@ -50,11 +50,7 @@ let texp_letmodule () =
   in
   ()
 [%%expect{|
-Line 4, characters 12-26:
-4 |     let y = (x : @ unique)
-                ^^^^^^^^^^^^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from outside the current module or class.
+val texp_letmodule : unit -> unit = <fun>
 |}]
 
 (* binding [y = x] inside the module merely aliases x; since Bar.y is never
@@ -68,14 +64,7 @@ let texp_letmodule () =
   in
   ()
 [%%expect{|
-Line 5, characters 12-13:
-5 |     let y = x
-                ^
-Error: This value is used here, but it has already been used as unique at:
-Line 3, characters 12-13:
-3 |   unique_id x;
-                ^
-
+val texp_letmodule : unit -> unit = <fun>
 |}]
 
 let texp_open () =
@@ -83,11 +72,7 @@ let texp_open () =
   let open (struct let y = (x : @ unique) end) in
   ()
 [%%expect{|
-Line 3, characters 27-41:
-3 |   let open (struct let y = (x : @ unique) end) in
-                               ^^^^^^^^^^^^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from outside the current module or class.
+val texp_open : unit -> unit = <fun>
 |}]
 
 let texp_open () =
@@ -96,14 +81,7 @@ let texp_open () =
   let open (struct let y = x end) in
   ()
 [%%expect{|
-Line 4, characters 27-28:
-4 |   let open (struct let y = x end) in
-                               ^
-Error: This value is used here, but it has already been used as unique at:
-Line 3, characters 12-13:
-3 |   unique_id x;
-                ^
-
+val texp_open : unit -> unit = <fun>
 |}]
 
 module type bar = sig val y : string end
@@ -114,11 +92,7 @@ let texp_pack () =
   ignore z
 [%%expect{|
 module type bar = sig val y : string end
-Line 5, characters 33-47:
-5 |   let z = (module struct let y = (x : @ unique) end : bar) in
-                                     ^^^^^^^^^^^^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from outside the current module or class.
+val texp_pack : unit -> unit = <fun>
 |}]
 
 let texp_pack () =
@@ -127,9 +101,9 @@ let texp_pack () =
   let z = (module struct let y = x end : bar) in
   ()
 [%%expect{|
-Line 4, characters 33-34:
+Line 4, characters 18-38:
 4 |   let z = (module struct let y = x end : bar) in
-                                     ^
+                      ^^^^^^^^^^^^^^^^^^^^
 Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 12-13:
 3 |   unique_id x;

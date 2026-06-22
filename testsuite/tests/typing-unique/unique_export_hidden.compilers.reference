@@ -1,5 +1,0 @@
-File "unique_export_hidden.ml", line 19, characters 19-25:
-19 | let () = unique_id hidden
-                        ^^^^^^
-Error: This value is aliased but used as unique.
-Hint: This value comes from outside the current module or class.
