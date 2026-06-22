@@ -162,6 +162,13 @@ jobs:
             check_arch: true
             sysdeps: gdb
 
+          - name: experimental-optimizations (x86_64-linux)
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: "_,w=-46,experimental-optimizations-optimize=1"
+            ocamlparam: "_,w=-46,experimental-optimizations-optimize=1"
+            check_arch: true
+            sysdeps: gdb
+
           - name: address-sanitizer (x86_64-linux)
             config: --enable-address-sanitizer
             os: warp-ubuntu-latest-x64-8x
