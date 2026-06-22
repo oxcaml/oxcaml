@@ -147,6 +147,7 @@ type prim =
   | Poke of Lambda.peek_or_poke option
     (* For [Peek] and [Poke] the [option] is [None] until the primitive
        specialization code (below) has been run. *)
+  | Unsupported of Lambda.primitive
 
 let units_with_used_primitives = Hashtbl.create 7
 let add_used_primitive loc env path =
@@ -2287,6 +2288,21 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       Lprim (Ppeek layout, [ptr], loc)
   | Poke (Some layout), [ptr; new_value] ->
       Lprim (Ppoke layout, [ptr; new_value], loc)
+  | Unsupported prim, _ ->
+      let exn =
+        transl_extension_path loc (Lazy.force Env.initial)
+          Predef.path_invalid_argument
+      in
+      let msg =
+        Format.asprintf "Unsupported primitive %a" Printlambda.primitive prim
+      in
+      Lprim (
+        Praise Raise_regular,
+        [Lprim (
+          Pmakeblock (0, Immutable, All_value, alloc_heap),
+          [exn; Lconst (Const_immstring msg)],
+          loc)],
+        loc)
   | Atomic (op, kind, imm_or_ptr), args ->
       lambda_of_atomic prim_name loc op kind imm_or_ptr args
   | (Raise _ | Raise_with_backtrace
@@ -2328,6 +2344,7 @@ let check_primitive_arity loc p =
     | Identity | Peek _ -> p.prim_arity = 1
     | Apply _ | Revapply _ | Poke _ -> p.prim_arity = 2
     | Atomic (op, kind, _) -> p.prim_arity = atomic_arity op kind
+    | Unsupported _ -> true
   in
   if not ok then raise(Error(loc, Wrong_arity_builtin_primitive p.prim_name))
 
@@ -2578,7 +2595,7 @@ let primitive_needs_event_after = function
   | Lazy_force _ | Send _ | Send_self _ | Send_cache _
   | Apply _ | Revapply _ -> true
   | Raise _ | Raise_with_backtrace | Loc _ | Frame_pointers | Identity
-  | Peek _ | Poke _ | Atomic _ -> false
+  | Peek _ | Poke _ | Atomic _ | Unsupported _ -> false
 
 let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
     path exp args arg_exps pos =
