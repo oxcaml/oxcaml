@@ -6,7 +6,6 @@
  native;
 *)
 
-
 let f () = raise
   Exit [@@inline never]
 
