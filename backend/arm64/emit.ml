@@ -1236,7 +1236,7 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     Misc.fatal_errorf
       "Illegal move with an unknown register location (%a to %a)\n" Printreg.reg
       src Printreg.reg dst
-  | ( (Float | Float32 | Vec128 | Int | Val | Addr | Mask | Valx2),
+  | ( (Float | Float32 | Vec128 | Int | Val | Addr | Valx2),
       (Reg _ | Stack _),
       _,
       _ ) ->
