@@ -45,7 +45,7 @@ type unbound_variable_reason = | Upstream_compatibility
 type jkind_initialization_choice = Sort | Any
 
 type value_loc =
-    Tuple | Poly_variant | Object_field
+    Tuple | Poly_variant | Object_field | Optional_arg
 
 type sort_loc =
     Fun_arg | Fun_ret
@@ -917,8 +917,17 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             else begin
               if not (Btype.tpoly_is_mono arg_ty) then
                 raise (Error (arg.ptyp_loc, env, Polymorphic_optional_param));
-              newmono
-                (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
+              let arg_content_ty = Btype.tpoly_get_mono arg_ty in
+              (match
+                 constrain_type_jkind env arg_content_ty
+                   Predef.option_argument_jkind
+               with
+               | Ok _ -> ()
+               | Error err ->
+                 raise (Error (arg.ptyp_loc, env,
+                               Non_value {vloc = Optional_arg;
+                                          typ = arg_content_ty; err})));
+              newmono (newconstr Predef.path_option [arg_content_ty])
             end
           in
           let arg_mode_desc = Alloc.of_const arg_mode.mode_modes in
@@ -1924,6 +1933,7 @@ let report_error_doc loc env = function
       | Tuple -> "Tuple element"
       | Poly_variant -> "Polymorphic variant constructor argument"
       | Object_field -> "Object field"
+      | Optional_arg -> "Optional argument"
     in
     Location.errorf ~loc "%s types must have layout value.@ %a"
       s (Jkind.Violation.report_with_offender
