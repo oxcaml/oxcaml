@@ -79,9 +79,9 @@ let map_fold_on_children { children; dummy_toplevel_cont; _ } f acc =
   let rec aux k acc =
     let acc, to_add = f k acc in
     let map = Continuation.Map.singleton k to_add in
-    match Continuation.Map.find k children with
-    | exception Not_found -> map
-    | s ->
+    match Continuation.Map.find_or_null k children with
+    | Null -> map
+    | This s ->
       Continuation.Set.fold
         (fun child map -> Continuation.Map.disjoint_union map (aux child acc))
         s map
@@ -93,9 +93,9 @@ let compute_available_variables ~(source_info : T.Acc.t) t =
     (fun k acc ->
       let elt = Continuation.Map.find k source_info.map in
       let extra_vars =
-        match Continuation.Map.find k source_info.extra with
-        | exception Not_found -> Variable.Set.empty
-        | epa ->
+        match Continuation.Map.find_or_null k source_info.extra with
+        | Null -> Variable.Set.empty
+        | This epa ->
           Bound_parameters.var_set
             (Continuation_extra_params_and_args.extra_params epa)
       in
@@ -121,9 +121,9 @@ let fixpoint t ~init ~eq ~f =
       (fun res component ->
         match component with
         | G.No_loop callee -> (
-          match Continuation.Map.find callee res with
-          | exception Not_found -> res
-          | callee_set ->
+          match Continuation.Map.find_or_null callee res with
+          | Null -> res
+          | This callee_set ->
             Continuation.Set.fold
               (fun caller res ->
                 let caller_set = Continuation.Map.find caller res in
@@ -196,14 +196,14 @@ let extra_args_for_aliases_overapproximation ~required_names
         let s =
           List.fold_left
             (fun acc param ->
-              match Variable.Map.find param doms with
-              | exception Not_found ->
+              match Variable.Map.find_or_null param doms with
+              | Null ->
                 if Name.Set.mem (Name.var param) required_names
                 then
                   Misc.fatal_errorf "Dom not found for: %a@." Variable.print
                     param
                 else acc
-              | dom ->
+              | This dom ->
                 (* Parameters whose dominator/canonical alias is a symbol or a
                    constant do not require extra args to access the value of
                    that dominator. *)
@@ -259,9 +259,9 @@ let minimize_extra_args_for_one_continuation ~(source_info : T.Acc.t)
     match exception_handler_first_param with
     | None -> extra_args_for_aliases, Not_aliased
     | Some exception_param -> (
-      match Variable.Map.find exception_param doms with
-      | exception Not_found -> extra_args_for_aliases, Not_aliased
-      | alias ->
+      match Variable.Map.find_or_null exception_param doms with
+      | Null -> extra_args_for_aliases, Not_aliased
+      | This alias ->
         Simple.pattern_match' alias
           ~var:(fun alias_var ~coercion:_ ->
             if Variable.equal exception_param alias_var
@@ -297,9 +297,9 @@ let minimize_extra_args_for_one_continuation ~(source_info : T.Acc.t)
           in
           removed, lets_to_introduce
         in
-        match Variable.Map.find param doms with
-        | exception Not_found -> removed, lets_to_introduce
-        | alias -> (
+        match Variable.Map.find_or_null param doms with
+        | Null -> removed, lets_to_introduce
+        | This alias -> (
           if Simple.equal (Simple.var param) alias
           then removed, lets_to_introduce
           else
@@ -387,9 +387,9 @@ module Dot = struct
   let node ?(extra_args = Variable.Set.empty) ?(info = "") ~df ~pp_node ~ctx ()
       ppf cont =
     let params, shape =
-      match Continuation.Map.find cont df.T.Acc.map with
-      | exception Not_found -> "[ none ]", ""
-      | elt ->
+      match Continuation.Map.find_or_null cont df.T.Acc.map with
+      | Null -> "[ none ]", ""
+      | This elt ->
         let params =
           Format.asprintf "[%a]"
             (Format.pp_print_list

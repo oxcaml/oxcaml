@@ -331,12 +331,13 @@ let binding_time_resolver resolver name =
   | None -> raise Binding_time_resolver_failure
   | Some t -> (
     match
-      Name.Map.find name (Cached_level.names_to_types t.just_after_level)
+      Name.Map.find_or_null name
+        (Cached_level.names_to_types t.just_after_level)
     with
-    | exception Not_found ->
+    | Null ->
       Misc.fatal_errorf "Binding time resolver cannot find name %a in:@ %a"
         Name.print name print_serializable t
-    | _, binding_time_and_mode -> binding_time_and_mode)
+    | This (_, binding_time_and_mode) -> binding_time_and_mode)
 
 let resolver t = t.resolver
 
@@ -412,8 +413,8 @@ let check_optional_kind_matches name ty kind_opt =
 let find_with_binding_time_and_mode' t name kind =
   (* Note that [Pre_serializable] (below) assumes this function only looks up
      types of names in the cache for the current level. *)
-  match Name.Map.find name (names_to_types t) with
-  | exception Not_found -> (
+  match Name.Map.find_or_null name (names_to_types t) with
+  | Null -> (
     let comp_unit = Name.compilation_unit name in
     if Compilation_unit.equal comp_unit (Compilation_unit.get_current_exn ())
     then
@@ -472,7 +473,7 @@ let find_with_binding_time_and_mode' t name kind =
           (* All variables in exported maps already have the right name mode
              (see [Cached_level.clean_for_export]) *)
           type_and_binding_time))
-  | found ->
+  | This found ->
     let ty, binding_time_and_mode = found in
     check_optional_kind_matches name ty kind;
     if t.is_bottom then MTC.bottom_like ty, binding_time_and_mode else found
@@ -532,12 +533,12 @@ let mem ?min_name_mode t name =
   Name.pattern_match name
     ~var:(fun _var ->
       let name_mode =
-        match Name.Map.find name (names_to_types t) with
-        | exception Not_found ->
+        match Name.Map.find_or_null name (names_to_types t) with
+        | Null ->
           if Compilation_unit.is_current (Name.compilation_unit name)
           then None
           else Some Name_mode.in_types
-        | _ty, binding_time_and_mode ->
+        | This (_ty, binding_time_and_mode) ->
           let scoped_name_mode =
             Binding_time.With_name_mode.scoped_name_mode binding_time_and_mode
               ~min_binding_time:t.min_binding_time
