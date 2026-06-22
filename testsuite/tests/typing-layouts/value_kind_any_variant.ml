@@ -24,14 +24,14 @@ let f (b : bool) (x : int) =
   match opt with B -> 1 | A x -> x
 [%%expect{|
 (let
-  (f/288 =
-     (function {nlocal = 0} b/290[value<int>] x/291[value<int>] : int
+  (f/292 =
+     (function {nlocal = 0} b/294[value<int>] x/295[value<int>] : int
        (region
          (let
-           (opt/292 =[value<(consts (0)) (non_consts ([0: value<int>]))>]
-              (if b/290 0 (makelocalblock 0 (value<int>) x/291)))
-           (if opt/292 (field_imm 0 opt/292) 1)))))
-  (apply (field_imm 1 (global Toploop!)) "f" f/288))
+           (opt/296 =[value<(consts (0)) (non_consts ([0: value<int>]))>]
+              (if b/294 0 (makelocalblock 0 (value<int>) x/295)))
+           (if opt/296 (field_imm 0 opt/296) 1)))))
+  (apply (field_imm 1 (global Toploop!)) "f" f/292))
 val f : bool -> int -> int = <fun>
 |}]
 
@@ -48,14 +48,14 @@ let g (b : bool) (x : float#) =
   match opt with B -> 0.0 | A x -> box_float x
 [%%expect{|
 (let
-  (g/295 =
-     (function {nlocal = 0} b/297[value<int>] x/298[float] : float
+  (g/299 =
+     (function {nlocal = 0} b/301[value<int>] x/302[float] : float
        (region
          (let
-           (opt/299 =[value<(consts (0)) (non_consts ([0: float64]))>]
-              (if b/297 0 (makelocalblock 0 (float64) x/298)))
-           (if opt/299 (%float_of_float# (mixedfield 0  (float64) opt/299))
+           (opt/303 =[value<(consts (0)) (non_consts ([0: float64]))>]
+              (if b/301 0 (makelocalblock 0 (float64) x/302)))
+           (if opt/303 (%float_of_float# (mixedfield 0  (float64) opt/303))
              0.0)))))
-  (apply (field_imm 1 (global Toploop!)) "g" g/295))
+  (apply (field_imm 1 (global Toploop!)) "g" g/299))
 val g : bool -> float# -> float = <fun>
 |}]
