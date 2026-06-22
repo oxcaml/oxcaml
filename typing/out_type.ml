@@ -1361,7 +1361,8 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
     ; print_to_string_opt Mode.Forkable.Const.print diff.forkable
     ; print_to_string_opt Mode.Yielding.Const.print diff.yielding
     ; print_to_string_opt Mode.Statefulness.Const.print diff.statefulness
-    ; print_to_string_opt Mode.Visibility.Const.print diff.visibility ]
+    ; print_to_string_opt Mode.Visibility.Const.print diff.visibility
+    ; print_to_string_opt Mode.Allocation.Const.print diff.allocation ]
   in
   List.filter_map (fun x -> x) modes
 

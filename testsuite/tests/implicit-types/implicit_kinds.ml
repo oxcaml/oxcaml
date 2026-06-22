@@ -136,7 +136,10 @@ end
 [%%expect{|
 module Mto_struct :
   sig
-    module type T = sig val id : ('mto : word). 'mto -> 'mto @@ stateless end
+    module type T =
+      sig
+        val id : ('mto : word). 'mto -> 'mto @@ stateless noalloc_strict
+      end
   end
 |}]
 
@@ -168,7 +171,7 @@ Error: Signature mismatch:
              sig
                val pack :
                  ('from_sig : value_maybe_null). 'from_sig -> 'from_sig array
-                 @@ stateless
+                 @@ stateless noalloc_strict
              end
          end
        is not included in
@@ -183,7 +186,7 @@ Error: Signature mismatch:
            sig
              val pack :
                ('from_sig : value_maybe_null). 'from_sig -> 'from_sig array
-               @@ stateless
+               @@ stateless noalloc_strict
            end
        does not match
          module type T =
@@ -195,7 +198,7 @@ Error: Signature mismatch:
          sig
            val pack :
              ('from_sig : value_maybe_null). 'from_sig -> 'from_sig array @@
-             stateless
+             stateless noalloc_strict
          end
        is not equal to
          sig
@@ -205,7 +208,7 @@ Error: Signature mismatch:
        Values do not match:
          val pack :
            ('from_sig : value_maybe_null). 'from_sig -> 'from_sig array @@
-           stateless
+           stateless noalloc_strict
        is not included in
          val pack : ('from_sig : bits64). 'from_sig -> 'from_sig array
        The type "'a -> 'a array" is not compatible with the type "'b -> 'b array"
@@ -233,7 +236,7 @@ module type Sig_default_defines_struct =
         val pack :
           ('from_defined_sig : bits64).
             'from_defined_sig -> 'from_defined_sig array
-          @@ stateless
+          @@ stateless noalloc_strict
       end
   end
 |}]
@@ -830,7 +833,8 @@ end
 [%%expect{|
 module type S28 =
   sig
-    module type Evil = sig val x : ('w : word). 'w -> 'w @@ stateless end
+    module type Evil =
+      sig val x : ('w : word). 'w -> 'w @@ stateless noalloc_strict end
   end
 |}]
 
@@ -1037,7 +1041,8 @@ end
 [%%expect{|
 module type S37 =
   sig
-    module type Inner = sig val id : ('t : word). 't -> unit @@ stateless end
+    module type Inner =
+      sig val id : ('t : word). 't -> unit @@ stateless noalloc_strict end
     val f : ('t : word). 't -> 't
   end
 |}]
