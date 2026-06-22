@@ -509,7 +509,7 @@ let fallback_if_missing_cmi ~default f =
    check the sorts of the relevant types.  Ideally this wouldn't involve
    expensive layout computation, because the sorts are stored somewhere (e.g.,
    [record_representation]).  But that's not currently the case for tuples. *)
-let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
+let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
   : int * value_kind =
   let[@inline] cannot_proceed () =
     Numbers.Int.Set.mem (get_id ty) visited
@@ -646,20 +646,26 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_variant env ~loc ~visited ~depth
                          ~num_nodes_visited cstrs rep)
+        | Type_record (_, Record_variable, _) ->
+          num_nodes_visited, non_nullable Pgenval
         | Type_record (labels, rep, _) ->
           let depth = depth + 1 in
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_record env ~loc ~visited ~depth
                          ~num_nodes_visited labels rep)
-        | Type_record_unboxed_product ([{ld_type}], Record_unboxed_product, _) ->
+        | Type_record_unboxed_product (_, Record_unboxed_product_variable, _) ->
+          num_nodes_visited, nullable Pgenval
+        | Type_record_unboxed_product ([{ld_type}],
+                                       Record_unboxed_product, _) ->
           let depth = depth + 1 in
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () ->
                value_kind env ~loc ~visited ~depth ~num_nodes_visited ld_type)
         | Type_record_unboxed_product (([] | _::_::_),
-                                       Record_unboxed_product, _) ->
+                                       Record_unboxed_product,
+                                       _) ->
           Misc.fatal_error
             "Typeopt.value_kind: non-unary unboxed record can't have kind value"
         | Type_abstract _ ->
@@ -814,7 +820,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       | _ -> assert false
     end
-  | Variant_boxed cstrs_and_sorts ->
+  | Variant_boxed cstr_layouts ->
     let depth = depth + 1 in
     let for_one_uniform_value_constructor fields ~field_to_type ~depth
           ~num_nodes_visited =
@@ -866,12 +872,17 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
         (is_mutable, num_nodes_visited), fields
     in
     let is_constant (cstr: Types.constructor_declaration) =
+      let all_void_opt sort =
+        match sort with
+        | Some sort -> Jkind.Sort.Const.all_void sort
+        | None -> (* TODO Nicely handle [any] things resolving to void *) false
+      in
       match cstr.cd_args with
       | Cstr_tuple [] -> true
       | Cstr_tuple args ->
-        List.for_all (fun ca -> Jkind.Sort.Const.all_void ca.ca_sort) args
+        List.for_all (fun ca -> all_void_opt ca.ca_sort) args
       | Cstr_record lbls ->
-        List.for_all (fun lbl -> Jkind.Sort.Const.all_void lbl.ld_sort) lbls
+        List.for_all (fun lbl -> all_void_opt lbl.ld_sort) lbls
     in
     let rec mixed_block_shape_is_empty shape =
       Array.for_all mixed_block_element_is_empty shape
@@ -891,27 +902,31 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | None -> None
           | Some (num_nodes_visited,
                   next_const, consts, next_tag, non_consts) ->
-            let cstr_shape, _ = cstrs_and_sorts.(idx) in
-            let (is_mutable, num_nodes_visited), fields =
-              for_one_constructor constructor ~depth ~num_nodes_visited
-                ~cstr_shape
-            in
-            if is_mutable then None
-            else match fields with
-            | Constructor_uniform xs when List.compare_length_with xs 0 = 0 ->
-              let consts = next_const :: consts in
-              Some (num_nodes_visited,
-                    next_const + 1, consts, next_tag, non_consts)
-            | Constructor_mixed shape when mixed_block_shape_is_empty shape ->
-              let consts = next_const :: consts in
-              Some (num_nodes_visited,
-                    next_const + 1, consts, next_tag, non_consts)
-            | Constructor_mixed _ | Constructor_uniform _ ->
-              let non_consts =
-                (next_tag, fields) :: non_consts
-              in
-              Some (num_nodes_visited,
-                    next_const, consts, next_tag + 1, non_consts))
+            match cstr_layouts.(idx) with
+            | Cstr_layout_variable -> None
+            | Cstr_layout_known { shape = cstr_shape; _ } ->
+                let (is_mutable, num_nodes_visited), fields =
+                  for_one_constructor constructor ~depth ~num_nodes_visited
+                    ~cstr_shape
+                in
+                if is_mutable then None
+                else match fields with
+                | Constructor_uniform xs
+                    when List.compare_length_with xs 0 = 0 ->
+                  let consts = next_const :: consts in
+                  Some (num_nodes_visited,
+                        next_const + 1, consts, next_tag, non_consts)
+                | Constructor_mixed shape
+                    when mixed_block_shape_is_empty shape ->
+                  let consts = next_const :: consts in
+                  Some (num_nodes_visited,
+                        next_const + 1, consts, next_tag, non_consts)
+                | Constructor_mixed _ | Constructor_uniform _ ->
+                  let non_consts =
+                    (next_tag, fields) :: non_consts
+                  in
+                  Some (num_nodes_visited,
+                        next_const, consts, next_tag + 1, non_consts))
           (0, Some (num_nodes_visited, 0, [], 0, []))
           cstrs
       in
@@ -941,6 +956,9 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
   | Record_dummy _ ->
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected dummy representation"
+  | Record_variable ->
+    Misc.fatal_error
+      "Typeopt.value_kind_record: unexpected variable representation"
   | Record_inlined (_, _, Variant_with_null) -> assert false
   | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
   | Record_boxed | Record_float | Record_ufloat | Record_mixed _ -> begin
@@ -953,7 +971,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
       else
         let num_nodes_visited, fields =
           match rep with
-          | Record_unboxed | Record_dummy _ ->
+          | Record_unboxed | Record_dummy _ | Record_variable ->
               (* The outer match guards against this *)
               assert false
           | Record_inlined (_, Constructor_uniform_value, _)
@@ -974,7 +992,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                       | Record_inlined _ | Record_boxed ->
                           value_kind env ~loc ~visited ~depth ~num_nodes_visited
                             label.ld_type
-                      | Record_mixed _ | Record_unboxed | Record_dummy _ ->
+                      | Record_mixed _ | Record_unboxed | Record_dummy _
+                      | Record_variable ->
                           (* The outer match guards against this *)
                           assert false
                     in
@@ -1003,6 +1022,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
           | Record_unboxed -> assert false
           | Record_inlined (Null, _, _) -> assert false
           | Record_dummy _ -> assert false
+          | Record_variable -> assert false
         in
         (num_nodes_visited,
          non_nullable (Pvariant { consts = []; non_consts }))
@@ -1190,7 +1210,7 @@ let classify_lazy_argument : Typedtree.expression ->
         | Const_float32 _ (* There is no float32 array optimization *)
         | Const_int32 _ | Const_int64 _ | Const_nativeint _ )
     | Texp_function _
-    | Texp_construct (_, {cstr_arity = 0}, _, _) ->
+    | Texp_construct (_, {cstr_arity = 0}, _, _, _) ->
        `Constant_or_function
     | Texp_constant(Const_float _) ->
       if Config.flat_float_array

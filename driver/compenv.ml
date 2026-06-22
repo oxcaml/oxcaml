@@ -330,7 +330,13 @@ let read_one_param ppf position name v =
   | "runtime-variant" -> runtime_variant := v
   | "with-runtime" -> set "with-runtime" [ with_runtime ] v
   | "open" ->
-      open_modules := List.rev_append (String.split_on_char ',' v) !open_modules
+      let names = String.split_on_char ',' v in
+      open_args :=
+        List.rev_append (List.map (fun n -> Open n) names) !open_args
+  | "open-cmi" ->
+      let names = String.split_on_char ',' v in
+      open_args :=
+        List.rev_append (List.map (fun n -> Open_cmi n) names) !open_args
   | "cc" -> c_compiler := Some v
 
   | "clambda-checks" -> set "clambda-checks" [ clambda_checks ] v
@@ -799,9 +805,15 @@ let deferred_actions = ref []
 let defer action =
   deferred_actions := action :: !deferred_actions
 
-let anonymous filename = defer (action_of_file filename)
-let impl filename = defer (ProcessImplementation filename)
-let intf filename = defer (ProcessInterface filename)
+let anonymous filename =
+  Opt_fuel.add_arg filename;
+  defer (action_of_file filename)
+let impl filename =
+  Opt_fuel.add_arg filename;
+  defer (ProcessImplementation filename)
+let intf filename =
+  Opt_fuel.add_arg filename;
+  defer (ProcessInterface filename)
 
 let process_deferred_actions env =
   let final_output_name = !output_name in

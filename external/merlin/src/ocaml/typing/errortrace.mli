@@ -117,6 +117,8 @@ val map_types :
   (type_expr -> type_expr) ->
   (expanded_type, 'variety) t -> (expanded_type, 'variety) t
 
+val map_elt : ('a -> 'b) -> ('a, 'variety) elt -> ('b, 'variety) elt
+
 val map : ('a -> 'b) -> ('a, 'variety) t -> ('b, 'variety) t
 
 val incompatible_fields :

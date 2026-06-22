@@ -853,7 +853,8 @@ type type_declaration =
     type_unboxed_version : type_declaration option;
     (* stores the unboxed version of that this type introduces: this is [Some]
        for predefined types with unboxed versions (e.g. [float]) and boxed
-       records, but [None] for aliases of these types
+       records (besides records that flattens floats or have with atomic
+       fields), but [None] for aliases of these types
 
        invariants:
        1. there are no "twice-unboxed" types: the [type_declaration] stored here
@@ -871,7 +872,8 @@ and unsafe_mode_crossing =
 
 and ('lbl, 'lbl_flat, 'cstr) type_kind =
     Type_abstract of type_origin
-  | Type_record of 'lbl list * record_representation * unsafe_mode_crossing option
+  | Type_record of
+      'lbl list * record_representation * unsafe_mode_crossing option
   | Type_record_unboxed_product of
       'lbl_flat list *
       record_unboxed_product_representation *
@@ -944,7 +946,7 @@ and record_representation =
   (* The record contains a mix of values and unboxed elements. The block
      is tagged such that polymorphic operations will not work.
   *)
-  | Record_dummy of { represent_as_float_array : bool }
+  | Record_dummy of { represent_as_float_array : bool; flatten_floats : bool }
   (* Note [Record_dummy]:
      We typecheck type declarations before updating their kinds, yet some record
      representations are kind-dependent. In particular, we don't choose between
@@ -952,33 +954,48 @@ and record_representation =
      type declaration jkinds are updated in [update_decls_jkind].
 
      Until then, we use [Record_dummy], which also tracks whether the
-     declaration has the attribute [@@represent_as_float_array], as we can't
-     check whether the attribute is valid until we know the kinds of the fields
-     (which must all be [float64]).
+     declaration has the attributes [@@represent_as_float_array] or
+     [@@flatten_floats], as we can't check whether either attribute is valid
+     until we know the kinds of the fields.
 
      After [update_decls_jkind], no record should have this representation. *)
+  | Record_variable
+  (* Used after [update_decls_jkind] for records whose representation cannot be
+     determined because at least one field has layout [any]. The actual
+     representation is decided at construction sites. *)
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
-  (* We give all unboxed records the same representation, as their layouts are
-     encapsulated by their label's jkinds. We keep this variant for uniformity with boxed
-     records, and to make it easier to support different representations in the future. *)
+  | Record_unboxed_product_variable
+  (* Counterpart of [Record_variable] for unboxed product records that have at
+     least one field of layout [any]. *)
 
 and variant_representation =
   | Variant_unboxed
-  | Variant_boxed of (constructor_representation *
-                      Jkind_types.Sort.Const.t array) array
-  (* The outer array has an element for each constructor. Each inner array
-     has a jkind for each argument of the corresponding constructor.
-
-     A constructor with an inlined record argument has a length-1 inner array.
-     Its single element is the jkind of the record itself. (It doesn't have a
-     jkind for each field.) However, the constructor representation is about the
-     fields of the record, not the record itself; that is, it will be
-     [Constructor_mixed] if the inlined record has any unboxed fields.
+  | Variant_boxed of cstr_layout array
+  (* The array has an element for each constructor. See [cstr_layout].
   *)
   | Variant_extensible
   | Variant_with_null
+
+and cstr_layout =
+  | Cstr_layout_known of
+      { shape : constructor_representation;
+        sorts : Jkind_types.Sort.Const.t array;
+        (* [sorts] has a jkind for each argument of the corresponding
+           constructor.
+
+           A constructor with an inlined record argument has a length-1 inner
+           array. Its single element is the jkind of the record itself. (It
+           doesn't have a jkind for each field.) However, [shape] is about the
+           fields of the record, not the record itself; that is, it will be
+           [Constructor_mixed] if the inlined record has any unboxed fields.
+        *)
+      }
+  | Cstr_layout_variable
+  (* The constructor's payload contains a field of layout [any], so neither
+     its [shape] nor the [sorts] of its arguments can be determined at
+     typedecl time. Counterpart of [Record_variable] for variants. *)
   (* CR layouts v3.5: A custom variant representation for ['a or_null].
      Eventually, it should likely be merged into [Variant_unboxed], with
      [Variant_unboxed] allowing either one ordinary constructor, or one
@@ -999,7 +1016,7 @@ and label_declaration =
     ld_mutable: mutability;
     ld_modalities: Mode.Modality.Const.t;
     ld_type: type_expr;
-    ld_sort: Jkind_types.Sort.Const.t;
+    ld_sort: Jkind_types.Sort.Const.t option;
     ld_loc: Location.t;
     ld_attributes: Parsetree.attributes;
     ld_uid: Uid.t;
@@ -1019,7 +1036,7 @@ and constructor_argument =
   {
     ca_modalities: Mode.Modality.Const.t;
     ca_type: type_expr;
-    ca_sort: Jkind_types.Sort.Const.t;
+    ca_sort: Jkind_types.Sort.Const.t option;
     ca_loc: Location.t;
   }
 

@@ -528,7 +528,7 @@ let option_argument_jkind = Jkind.Builtin.value_or_null ~why:(
 let unrestricted tvar ca_sort =
   {
     ca_type=tvar;
-    ca_sort;
+    ca_sort=Jkind_types.Sort.Const.some ca_sort;
     ca_modalities=Mode.Modality.Const.id;
     ca_loc=Location.none
   }
@@ -692,14 +692,20 @@ let decl_of_type_constr tconstr =
     }
   in
   let variant constrs =
+    let array_of_list_map_option f l =
+      Misc.Stdlib.List.map_option f l |> Option.map Array.of_list
+    in
     let mk_elt { cd_args } =
       let sorts = match cd_args with
         | Cstr_tuple args ->
-          Misc.Stdlib.Array.of_list_map (fun { ca_sort } -> ca_sort) args
+          array_of_list_map_option (fun { ca_sort } -> ca_sort) args
         | Cstr_record lbls ->
-          Misc.Stdlib.Array.of_list_map (fun { ld_sort } -> ld_sort) lbls
+          array_of_list_map_option (fun { ld_sort } -> ld_sort) lbls
       in
-      Constructor_uniform_value, sorts
+      match sorts with
+      | Some sorts ->
+        Cstr_layout_known { shape = Constructor_uniform_value; sorts }
+      | None -> Cstr_layout_variable
     in
     Type_variant (
       constrs,
@@ -881,7 +887,7 @@ let decl_of_type_constr tconstr =
                ld_mutable=Immutable;
                ld_modalities=Mode.Modality.Const.id;
                ld_type=field_type;
-               ld_sort=Jkind_types.Sort.Const.scannable;
+               ld_sort=Jkind_types.Sort.Const.(some scannable);
                ld_loc=Location.none;
                ld_attributes=[];
                ld_uid=Uid.of_predef_id id;
@@ -1054,10 +1060,12 @@ let build_initial_env add_type add_extension add_jkind empty_env =
         ext_args =
           Cstr_tuple
             (List.map
-              (fun (ca_type, ca_sort) ->
+              (fun (ca_type, _ca_sort) ->
+                (* The check above restricts [_ca_sort] to
+                   [Sort.Const.scannable] so reuse the shared [Some] box. *)
                 {
                   ca_type;
-                  ca_sort;
+                  ca_sort = Jkind_types.Sort.Const.(some scannable);
                   ca_modalities=Mode.Modality.Const.id;
                   ca_loc=Location.none
                 })

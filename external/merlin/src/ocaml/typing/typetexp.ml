@@ -1877,7 +1877,7 @@ let report_error_doc loc env = function
         explanation reason
   | Bad_univar_jkind { name; jkind_info; inferred_jkind } ->
       Location.errorf ~loc
-        "@[<hov>The universal type variable %a was %s to have kind %a.@;%a@]"
+        "The universal type variable %a was %s to have kind %a.@;%a"
         Pprintast.Doc.tyvar name
         (if jkind_info.defaulted then "defaulted" else "declared")
         (Jkind.format env) jkind_info.original_jkind
@@ -1898,9 +1898,9 @@ let report_error_doc loc env = function
         inferred_jkind
   | Mismatched_jkind_annotation { name; explicit_jkind; implicit_jkind } ->
       Location.errorf ~loc
-        "@[<hov>The type variable %a has conflicting kind annotations.@;\
+        "The type variable %a has conflicting kind annotations.@;\
          It has an explicit annotation %a@ \
-         but was already implicitly annotated with %a@]"
+         but was already implicitly annotated with %a"
         Pprintast.Doc.tyvar name
         (Jkind.format env) explicit_jkind
         (Jkind.format env) implicit_jkind
@@ -1920,10 +1920,10 @@ let report_error_doc loc env = function
              Some p -> fprintf ppf "@ %a" (Style.as_inline_code path) p
            | None -> fprintf ppf "") nm
   | Not_an_object ty ->
-      Location.errorf ~loc "@[The type %a@ is not an object type@]"
+      Location.errorf ~loc "The type %a@ is not an object type"
         pp_type ty
   | Repeated_tuple_label l ->
-      Location.errorf ~loc "@[This tuple type has two labels named %a@]"
+      Location.errorf ~loc "This tuple type has two labels named %a"
         Style.inline_code l
   | Unsupported_extension ext ->
       let ext = Language_extension.to_string ext in
@@ -1931,7 +1931,7 @@ let report_error_doc loc env = function
         "The %s extension is disabled@ \
          To enable it, pass the '-extension %s' flag@]" ext ext
   | Polymorphic_optional_param ->
-      Location.errorf ~loc "@[Optional parameters cannot be polymorphic@]"
+      Location.errorf ~loc "Optional parameters cannot be polymorphic"
   | Non_value {vloc; typ; err} ->
     let s =
       match vloc with

@@ -305,6 +305,55 @@ module Sort = struct
     let for_effect = scannable
 
     let for_continuation = scannable
+
+    (* Pre-allocated [Some]-wrappings of the base sort constants, evaluated
+       once at module initialization and shared by [some] /
+       [some_of_base] to avoid allocating a fresh [Some] block per
+       call. Not exposed: callers go through [some]. *)
+    let some_scannable = Some scannable
+
+    let some_void = Some void
+
+    let some_untagged_immediate = Some untagged_immediate
+
+    let some_float64 = Some float64
+
+    let some_float32 = Some float32
+
+    let some_word = Some word
+
+    let some_bits8 = Some bits8
+
+    let some_bits16 = Some bits16
+
+    let some_bits32 = Some bits32
+
+    let some_bits64 = Some bits64
+
+    let some_vec128 = Some vec128
+
+    let some_vec256 = Some vec256
+
+    let some_vec512 = Some vec512
+
+    let[@inline] some_of_base = function
+      | Scannable -> some_scannable
+      | Void -> some_void
+      | Untagged_immediate -> some_untagged_immediate
+      | Float64 -> some_float64
+      | Float32 -> some_float32
+      | Word -> some_word
+      | Bits8 -> some_bits8
+      | Bits16 -> some_bits16
+      | Bits32 -> some_bits32
+      | Bits64 -> some_bits64
+      | Vec128 -> some_vec128
+      | Vec256 -> some_vec256
+      | Vec512 -> some_vec512
+
+    let[@inline] some : t -> t option = function
+      | Base b -> some_of_base b
+      | (Product _ | Univar _ | Genvar _) as t -> Some t
   end
 
   module Var = struct
@@ -761,6 +810,12 @@ module Sort = struct
       (* path compression *)
       result
 
+  (* Like [default_to_scannable_and_get], but returns a [Some] wrapping. Reuses
+     pre-allocated [Some] boxes when the result is one of the known base
+     constants, to avoid an allocation per call site. *)
+  let default_to_scannable_and_get_some s =
+    Const.some (default_to_scannable_and_get s)
+
   (* CR layouts v12: Default to void instead. *)
   let default_for_transl_and_get s = default_to_scannable_and_get s
 
@@ -988,7 +1043,7 @@ module Layout = struct
 
     let rec get_sort : t -> Sort.Const.t option = function
       | Any _ -> None
-      | Base (b, _) -> Some (Base b)
+      | Base (b, _) -> Sort.Const.some (Base b)
       | Product ts ->
         Option.map
           (fun x -> Sort.Const.Product x)
