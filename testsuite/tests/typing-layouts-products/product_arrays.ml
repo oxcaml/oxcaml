@@ -227,9 +227,9 @@ val f_ignorable : #(float# * int * int64# * bool) array -> int = <fun>
 (* But not on the bad ones. *)
 let f_bad (x : #(string * float#) array) = len x
 [%%expect{|
-Line 1, characters 43-48:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = len x
-                                               ^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -260,9 +260,9 @@ external len_bad : #(string * float#) array -> int = "%array_length"
 let len_bad_app x = len_bad x
 [%%expect{|
 external len_bad : #(string * float#) array -> int = "%array_length"
-Line 2, characters 20-29:
+Line 2, characters 28-29:
 2 | let len_bad_app x = len_bad x
-                        ^^^^^^^^^
+                                ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -276,9 +276,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) = len x
 [%%expect{|
-Line 1, characters 42-47:
+Line 1, characters 46-47:
 1 | let f_bad (x : #(int * int32x4#) array) = len x
-                                              ^^^^^
+                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -289,9 +289,9 @@ let len_ignorable_with_vec_app x = len_ignorable_with_vec x
 [%%expect{|
 external len_ignorable_with_vec : #(int * int32x4#) array -> int
   = "%array_length"
-Line 3, characters 35-59:
+Line 3, characters 58-59:
 3 | let len_ignorable_with_vec_app x = len_ignorable_with_vec x
-                                       ^^^^^^^^^^^^^^^^^^^^^^^^
+                                                              ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -318,9 +318,9 @@ val f_ignorable :
 (* But not on the bad ones. *)
 let f_bad (x : #(string * float#) array) = get x 42
 [%%expect{|
-Line 1, characters 43-51:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = get x 42
-                                               ^^^^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -362,9 +362,9 @@ let get_bad_app a i = get_bad a i
 [%%expect{|
 external get_bad : #(string * float#) array -> int -> #(string * float#)
   = "%array_safe_get"
-Line 3, characters 22-33:
+Line 3, characters 30-31:
 3 | let get_bad_app a i = get_bad a i
-                          ^^^^^^^^^^^
+                                  ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -378,9 +378,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) = get x 42
 [%%expect{|
-Line 1, characters 42-50:
+Line 1, characters 46-47:
 1 | let f_bad (x : #(int * int32x4#) array) = get x 42
-                                              ^^^^^^^^
+                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -391,9 +391,9 @@ let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
 [%%expect{|
 external get_ignorable_with_vec :
   #(int * int32x4#) array -> int -> #(int * int32x4#) = "%array_safe_get"
-Line 3, characters 37-63:
+Line 3, characters 60-61:
 3 | let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
-                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -418,9 +418,9 @@ val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
 
 let f_bad (x : #(string * float#) array) = set x 42 #("1", #2.0)
 [%%expect{|
-Line 1, characters 43-64:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = set x 42 #("1", #2.0)
-                                               ^^^^^^^^^^^^^^^^^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -465,9 +465,9 @@ let set_bad_app a i x = set_bad a i x
 external set_bad :
   #(string * float#) array -> int -> #(string * float#) -> unit
   = "%array_safe_set"
-Line 4, characters 24-37:
+Line 4, characters 32-33:
 4 | let set_bad_app a i x = set_bad a i x
-                            ^^^^^^^^^^^^^
+                                    ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -481,9 +481,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) v = set x 42 #(1, v)
 [%%expect{|
-Line 1, characters 44-60:
+Line 1, characters 48-49:
 1 | let f_bad (x : #(int * int32x4#) array) v = set x 42 #(1, v)
-                                                ^^^^^^^^^^^^^^^^
+                                                    ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -496,9 +496,9 @@ let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
 external set_ignorable_with_vec :
   #(int * int32x4#) array -> int -> #(int * int32x4#) -> unit
   = "%array_safe_set"
-Line 4, characters 39-73:
+Line 4, characters 62-63:
 4 | let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
-                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -525,9 +525,9 @@ val f_ignorable :
 (* But not on the bad ones. *)
 let f_bad (x : #(string * float#) array) = get x 42
 [%%expect{|
-Line 1, characters 43-51:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = get x 42
-                                               ^^^^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -569,9 +569,9 @@ let get_bad_app a i = get_bad a i
 [%%expect{|
 external get_bad : #(string * float#) array -> int -> #(string * float#)
   = "%array_unsafe_get"
-Line 3, characters 22-33:
+Line 3, characters 30-31:
 3 | let get_bad_app a i = get_bad a i
-                          ^^^^^^^^^^^
+                                  ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -585,9 +585,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) = get x 42
 [%%expect{|
-Line 1, characters 42-50:
+Line 1, characters 46-47:
 1 | let f_bad (x : #(int * int32x4#) array) = get x 42
-                                              ^^^^^^^^
+                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -599,9 +599,9 @@ let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
 [%%expect{|
 external get_ignorable_with_vec :
   #(int * int32x4#) array -> int -> #(int * int32x4#) = "%array_unsafe_get"
-Line 4, characters 37-63:
+Line 4, characters 60-61:
 4 | let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
-                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -626,9 +626,9 @@ val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
 
 let f_bad (x : #(string * float#) array) = set x 42 #("1", #2.0)
 [%%expect{|
-Line 1, characters 43-64:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = set x 42 #("1", #2.0)
-                                               ^^^^^^^^^^^^^^^^^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -673,9 +673,9 @@ let set_bad_app a i x = set_bad a i x
 external set_bad :
   #(string * float#) array -> int -> #(string * float#) -> unit
   = "%array_unsafe_set"
-Line 4, characters 24-37:
+Line 4, characters 32-33:
 4 | let set_bad_app a i x = set_bad a i x
-                            ^^^^^^^^^^^^^
+                                    ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -689,9 +689,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) v = set x 42 #(1, v)
 [%%expect{|
-Line 1, characters 44-60:
+Line 1, characters 48-49:
 1 | let f_bad (x : #(int * int32x4#) array) v = set x 42 #(1, v)
-                                                ^^^^^^^^^^^^^^^^
+                                                    ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -704,9 +704,9 @@ let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
 external set_ignorable_with_vec :
   #(int * int32x4#) array -> int -> #(int * int32x4#) -> unit
   = "%array_unsafe_set"
-Line 4, characters 39-73:
+Line 4, characters 62-63:
 4 | let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
-                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -733,9 +733,9 @@ val f_ignorable :
 (* But not on the bad ones. *)
 let f_bad (x : #(string * float#) array) = get x #42L
 [%%expect{|
-Line 1, characters 43-53:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = get x #42L
-                                               ^^^^^^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -778,9 +778,9 @@ let get_bad_app a i = get_bad a i
 [%%expect{|
 external get_bad : #(string * float#) array -> int64# -> #(string * float#)
   = "%array_safe_get_indexed_by_int64#"
-Line 3, characters 22-33:
+Line 3, characters 30-31:
 3 | let get_bad_app a i = get_bad a i
-                          ^^^^^^^^^^^
+                                  ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -794,9 +794,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) = get x #42L
 [%%expect{|
-Line 1, characters 42-52:
+Line 1, characters 46-47:
 1 | let f_bad (x : #(int * int32x4#) array) = get x #42L
-                                              ^^^^^^^^^^
+                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -809,9 +809,9 @@ let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
 external get_ignorable_with_vec :
   #(int * int32x4#) array -> int64# -> #(int * int32x4#)
   = "%array_safe_get_indexed_by_int64#"
-Line 4, characters 37-63:
+Line 4, characters 60-61:
 4 | let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
-                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -838,9 +838,9 @@ val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
 (* But not on the bad ones. *)
 let f_bad (x : #(string * float#) array) = set x #42L #("1", #2.0)
 [%%expect{|
-Line 1, characters 43-66:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = set x #42L #("1", #2.0)
-                                               ^^^^^^^^^^^^^^^^^^^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -886,9 +886,9 @@ let set_bad_app a i x = set_bad a i x
 external set_bad :
   #(string * float#) array -> int64# -> #(string * float#) -> unit
   = "%array_safe_set_indexed_by_int64#"
-Line 4, characters 24-37:
+Line 4, characters 32-33:
 4 | let set_bad_app a i x = set_bad a i x
-                            ^^^^^^^^^^^^^
+                                    ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -902,9 +902,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) v = set x #42L #(1, v)
 [%%expect{|
-Line 1, characters 44-62:
+Line 1, characters 48-49:
 1 | let f_bad (x : #(int * int32x4#) array) v = set x #42L #(1, v)
-                                                ^^^^^^^^^^^^^^^^^^
+                                                    ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -917,9 +917,9 @@ let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
 external set_ignorable_with_vec :
   #(int * int32x4#) array -> int64# -> #(int * int32x4#) -> unit
   = "%array_safe_set_indexed_by_int64#"
-Line 4, characters 39-73:
+Line 4, characters 62-63:
 4 | let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
-                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -946,9 +946,9 @@ val f_ignorable :
 (* But not on the bad ones. *)
 let f_bad (x : #(string * float#) array) = get x #42L
 [%%expect{|
-Line 1, characters 43-53:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = get x #42L
-                                               ^^^^^^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -991,9 +991,9 @@ let get_bad_app a i = get_bad a i
 [%%expect{|
 external get_bad : #(string * float#) array -> int64# -> #(string * float#)
   = "%array_unsafe_get_indexed_by_int64#"
-Line 3, characters 22-33:
+Line 3, characters 30-31:
 3 | let get_bad_app a i = get_bad a i
-                          ^^^^^^^^^^^
+                                  ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1007,9 +1007,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) = get x #42L
 [%%expect{|
-Line 1, characters 42-52:
+Line 1, characters 46-47:
 1 | let f_bad (x : #(int * int32x4#) array) = get x #42L
-                                              ^^^^^^^^^^
+                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1022,9 +1022,9 @@ let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
 external get_ignorable_with_vec :
   #(int * int32x4#) array -> int64# -> #(int * int32x4#)
   = "%array_unsafe_get_indexed_by_int64#"
-Line 4, characters 37-63:
+Line 4, characters 60-61:
 4 | let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
-                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1050,9 +1050,9 @@ val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
 (* But not on the bad ones. *)
 let f_bad (x : #(string * float#) array) = set x #42L #("1", #2.0)
 [%%expect{|
-Line 1, characters 43-66:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = set x #42L #("1", #2.0)
-                                               ^^^^^^^^^^^^^^^^^^^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1098,9 +1098,9 @@ let set_bad_app a i x = set_bad a i x
 external set_bad :
   #(string * float#) array -> int64# -> #(string * float#) -> unit
   = "%array_unsafe_set_indexed_by_int64#"
-Line 4, characters 24-37:
+Line 4, characters 32-33:
 4 | let set_bad_app a i x = set_bad a i x
-                            ^^^^^^^^^^^^^
+                                    ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1114,9 +1114,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) v = set x #42L #(1, v)
 [%%expect{|
-Line 1, characters 44-62:
+Line 1, characters 48-49:
 1 | let f_bad (x : #(int * int32x4#) array) v = set x #42L #(1, v)
-                                                ^^^^^^^^^^^^^^^^^^
+                                                    ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1129,9 +1129,9 @@ let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
 external set_ignorable_with_vec :
   #(int * int32x4#) array -> int64# -> #(int * int32x4#) -> unit
   = "%array_unsafe_set_indexed_by_int64#"
-Line 4, characters 39-73:
+Line 4, characters 62-63:
 4 | let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
-                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1158,9 +1158,9 @@ val f_ignorable :
 (* But not on the bad ones. *)
 let f_bad (x : #(string * float#) array) = get x #42l
 [%%expect{|
-Line 1, characters 43-53:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = get x #42l
-                                               ^^^^^^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1203,9 +1203,9 @@ let get_bad_app a i = get_bad a i
 [%%expect{|
 external get_bad : #(string * float#) array -> int32# -> #(string * float#)
   = "%array_safe_get_indexed_by_int32#"
-Line 3, characters 22-33:
+Line 3, characters 30-31:
 3 | let get_bad_app a i = get_bad a i
-                          ^^^^^^^^^^^
+                                  ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1219,9 +1219,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) = get x #42l
 [%%expect{|
-Line 1, characters 42-52:
+Line 1, characters 46-47:
 1 | let f_bad (x : #(int * int32x4#) array) = get x #42l
-                                              ^^^^^^^^^^
+                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1234,9 +1234,9 @@ let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
 external get_ignorable_with_vec :
   #(int * int32x4#) array -> int32# -> #(int * int32x4#)
   = "%array_safe_get_indexed_by_int32#"
-Line 4, characters 37-63:
+Line 4, characters 60-61:
 4 | let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
-                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1263,9 +1263,9 @@ val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
 (* But not on the bad ones. *)
 let f_bad (x : #(string * float#) array) = set x #42l #("1", #2.0)
 [%%expect{|
-Line 1, characters 43-66:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = set x #42l #("1", #2.0)
-                                               ^^^^^^^^^^^^^^^^^^^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1311,9 +1311,9 @@ let set_bad_app a i x = set_bad a i x
 external set_bad :
   #(string * float#) array -> int32# -> #(string * float#) -> unit
   = "%array_safe_set_indexed_by_int32#"
-Line 4, characters 24-37:
+Line 4, characters 32-33:
 4 | let set_bad_app a i x = set_bad a i x
-                            ^^^^^^^^^^^^^
+                                    ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1327,9 +1327,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) v = set x #42l #(1, v)
 [%%expect{|
-Line 1, characters 44-62:
+Line 1, characters 48-49:
 1 | let f_bad (x : #(int * int32x4#) array) v = set x #42l #(1, v)
-                                                ^^^^^^^^^^^^^^^^^^
+                                                    ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1342,9 +1342,9 @@ let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
 external set_ignorable_with_vec :
   #(int * int32x4#) array -> int32# -> #(int * int32x4#) -> unit
   = "%array_safe_set_indexed_by_int32#"
-Line 4, characters 39-73:
+Line 4, characters 62-63:
 4 | let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
-                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1371,9 +1371,9 @@ val f_ignorable :
 (* But not on the bad ones. *)
 let f_bad (x : #(string * float#) array) = get x #42l
 [%%expect{|
-Line 1, characters 43-53:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = get x #42l
-                                               ^^^^^^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1416,9 +1416,9 @@ let get_bad_app a i = get_bad a i
 [%%expect{|
 external get_bad : #(string * float#) array -> int32# -> #(string * float#)
   = "%array_unsafe_get_indexed_by_int32#"
-Line 3, characters 22-33:
+Line 3, characters 30-31:
 3 | let get_bad_app a i = get_bad a i
-                          ^^^^^^^^^^^
+                                  ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1432,9 +1432,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) = get x #42l
 [%%expect{|
-Line 1, characters 42-52:
+Line 1, characters 46-47:
 1 | let f_bad (x : #(int * int32x4#) array) = get x #42l
-                                              ^^^^^^^^^^
+                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1447,9 +1447,9 @@ let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
 external get_ignorable_with_vec :
   #(int * int32x4#) array -> int32# -> #(int * int32x4#)
   = "%array_unsafe_get_indexed_by_int32#"
-Line 4, characters 37-63:
+Line 4, characters 60-61:
 4 | let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
-                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1476,9 +1476,9 @@ val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
 (* But not on the bad ones. *)
 let f_bad (x : #(string * float#) array) = set x #42l #("1", #2.0)
 [%%expect{|
-Line 1, characters 43-66:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = set x #42l #("1", #2.0)
-                                               ^^^^^^^^^^^^^^^^^^^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1524,9 +1524,9 @@ let set_bad_app a i x = set_bad a i x
 external set_bad :
   #(string * float#) array -> int32# -> #(string * float#) -> unit
   = "%array_unsafe_set_indexed_by_int32#"
-Line 4, characters 24-37:
+Line 4, characters 32-33:
 4 | let set_bad_app a i x = set_bad a i x
-                            ^^^^^^^^^^^^^
+                                    ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1540,9 +1540,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) v = set x #42l #(1, v)
 [%%expect{|
-Line 1, characters 44-62:
+Line 1, characters 48-49:
 1 | let f_bad (x : #(int * int32x4#) array) v = set x #42l #(1, v)
-                                                ^^^^^^^^^^^^^^^^^^
+                                                    ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1555,9 +1555,9 @@ let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
 external set_ignorable_with_vec :
   #(int * int32x4#) array -> int32# -> #(int * int32x4#) -> unit
   = "%array_unsafe_set_indexed_by_int32#"
-Line 4, characters 39-73:
+Line 4, characters 62-63:
 4 | let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
-                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1585,9 +1585,9 @@ val f_ignorable :
 (* But not on the bad ones. *)
 let f_bad (x : #(string * float#) array) = get x #42n
 [%%expect{|
-Line 1, characters 43-53:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = get x #42n
-                                               ^^^^^^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1633,9 +1633,9 @@ let get_bad_app a i = get_bad a i
 external get_bad :
   #(string * float#) array -> nativeint# -> #(string * float#)
   = "%array_safe_get_indexed_by_nativeint#"
-Line 4, characters 22-33:
+Line 4, characters 30-31:
 4 | let get_bad_app a i = get_bad a i
-                          ^^^^^^^^^^^
+                                  ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1649,9 +1649,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) = get x #42n
 [%%expect{|
-Line 1, characters 42-52:
+Line 1, characters 46-47:
 1 | let f_bad (x : #(int * int32x4#) array) = get x #42n
-                                              ^^^^^^^^^^
+                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1664,9 +1664,9 @@ let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
 external get_ignorable_with_vec :
   #(int * int32x4#) array -> nativeint# -> #(int * int32x4#)
   = "%array_safe_get_indexed_by_nativeint#"
-Line 4, characters 37-63:
+Line 4, characters 60-61:
 4 | let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
-                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1693,9 +1693,9 @@ val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
 (* But not on the bad ones. *)
 let f_bad (x : #(string * float#) array) = set x #42n #("1", #2.0)
 [%%expect{|
-Line 1, characters 43-66:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = set x #42n #("1", #2.0)
-                                               ^^^^^^^^^^^^^^^^^^^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1743,9 +1743,9 @@ let set_bad_app a i x = set_bad a i x
 external set_bad :
   #(string * float#) array -> nativeint# -> #(string * float#) -> unit
   = "%array_safe_set_indexed_by_nativeint#"
-Line 4, characters 24-37:
+Line 4, characters 32-33:
 4 | let set_bad_app a i x = set_bad a i x
-                            ^^^^^^^^^^^^^
+                                    ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1759,9 +1759,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) v = set x #42n #(1, v)
 [%%expect{|
-Line 1, characters 44-62:
+Line 1, characters 48-49:
 1 | let f_bad (x : #(int * int32x4#) array) v = set x #42n #(1, v)
-                                                ^^^^^^^^^^^^^^^^^^
+                                                    ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1774,9 +1774,9 @@ let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
 external set_ignorable_with_vec :
   #(int * int32x4#) array -> nativeint# -> #(int * int32x4#) -> unit
   = "%array_safe_set_indexed_by_nativeint#"
-Line 4, characters 39-73:
+Line 4, characters 62-63:
 4 | let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
-                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1804,9 +1804,9 @@ val f_ignorable :
 (* But not on the bad ones. *)
 let f_bad (x : #(string * float#) array) = get x #42n
 [%%expect{|
-Line 1, characters 43-53:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = get x #42n
-                                               ^^^^^^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1852,9 +1852,9 @@ let get_bad_app a i = get_bad a i
 external get_bad :
   #(string * float#) array -> nativeint# -> #(string * float#)
   = "%array_unsafe_get_indexed_by_nativeint#"
-Line 4, characters 22-33:
+Line 4, characters 30-31:
 4 | let get_bad_app a i = get_bad a i
-                          ^^^^^^^^^^^
+                                  ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1868,9 +1868,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) = get x #42n
 [%%expect{|
-Line 1, characters 42-52:
+Line 1, characters 46-47:
 1 | let f_bad (x : #(int * int32x4#) array) = get x #42n
-                                              ^^^^^^^^^^
+                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1883,9 +1883,9 @@ let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
 external get_ignorable_with_vec :
   #(int * int32x4#) array -> nativeint# -> #(int * int32x4#)
   = "%array_unsafe_get_indexed_by_nativeint#"
-Line 4, characters 37-63:
+Line 4, characters 60-61:
 4 | let get_ignorable_with_vec_app x i = get_ignorable_with_vec x i
-                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1912,9 +1912,9 @@ val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
 (* But not on the bad ones. *)
 let f_bad (x : #(string * float#) array) = set x #42n #("1", #2.0)
 [%%expect{|
-Line 1, characters 43-66:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(string * float#) array) = set x #42n #("1", #2.0)
-                                               ^^^^^^^^^^^^^^^^^^^^^^^
+                                                   ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1962,9 +1962,9 @@ let set_bad_app a i x = set_bad a i x
 external set_bad :
   #(string * float#) array -> nativeint# -> #(string * float#) -> unit
   = "%array_unsafe_set_indexed_by_nativeint#"
-Line 4, characters 24-37:
+Line 4, characters 32-33:
 4 | let set_bad_app a i x = set_bad a i x
-                            ^^^^^^^^^^^^^
+                                    ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -1978,9 +1978,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) v = set x #42n #(1, v)
 [%%expect{|
-Line 1, characters 44-62:
+Line 1, characters 48-49:
 1 | let f_bad (x : #(int * int32x4#) array) v = set x #42n #(1, v)
-                                                ^^^^^^^^^^^^^^^^^^
+                                                    ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -1993,9 +1993,9 @@ let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
 external set_ignorable_with_vec :
   #(int * int32x4#) array -> nativeint# -> #(int * int32x4#) -> unit
   = "%array_unsafe_set_indexed_by_nativeint#"
-Line 4, characters 39-73:
+Line 4, characters 62-63:
 4 | let set_ignorable_with_vec_app x i v = set_ignorable_with_vec x i #(1, v)
-                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                  ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -2022,9 +2022,9 @@ val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
 (* But not on the bad ones. *)
 let f_bad (x : #(string * float#) array) = blit x 0 x 2 3
 [%%expect{|
-Line 1, characters 43-57:
+Line 1, characters 48-49:
 1 | let f_bad (x : #(string * float#) array) = blit x 0 x 2 3
-                                               ^^^^^^^^^^^^^^
+                                                    ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -2072,9 +2072,9 @@ let blit_bad_app a1 i1 a2 i2 len = blit_bad a1 i1 a2 i2 len
 external blit_bad :
   #(string * float#) array ->
   int -> #(string * float#) array -> int -> int -> unit = "%arrayblit"
-Line 5, characters 35-59:
+Line 5, characters 44-46:
 5 | let blit_bad_app a1 i1 a2 i2 len = blit_bad a1 i1 a2 i2 len
-                                       ^^^^^^^^^^^^^^^^^^^^^^^^
+                                                ^^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -2088,9 +2088,9 @@ Error: An unboxed product array element must be formed from all
 (* Unboxed vectors are also rejected. *)
 let f_bad (x : #(int * int32x4#) array) = blit x 0 x 2 3
 [%%expect{|
-Line 1, characters 42-56:
+Line 1, characters 47-48:
 1 | let f_bad (x : #(int * int32x4#) array) = blit x 0 x 2 3
-                                              ^^^^^^^^^^^^^^
+                                                   ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]
@@ -2104,9 +2104,9 @@ let blit_ignorable_with_vec_app x = blit_ignorable_with_vec x 0 x 2 3
 external blit_ignorable_with_vec :
   #(int * int32x4#) array ->
   int -> #(int * int32x4#) array -> int -> int -> unit = "%arrayblit"
-Line 5, characters 36-69:
+Line 5, characters 60-61:
 5 | let blit_ignorable_with_vec_app x = blit_ignorable_with_vec x 0 x 2 3
-                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                                                ^
 Error: Unboxed vector types are not yet supported in arrays of unboxed
        products.
 |}]

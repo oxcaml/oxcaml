@@ -52,6 +52,7 @@ type abstract_type_constr = [
   | `Lexing_position
   | `Code
   | `Eval
+  | `Box
   | `Float32
   | `Int8
   | `Int16
@@ -120,6 +121,7 @@ let base_type_constrs : type_constr list = [
   `Iarray;
   `Atomic_loc;
   `Lexing_position;
+  `Box;
   `Idx_imm;
   `Idx_mut;
 ]
@@ -208,6 +210,7 @@ and ident_lexing_position = ident_create "lexing_position"
    keep `expr` for now instead of `code` *)
 and ident_code = ident_create "expr"
 and ident_eval = ident_create "eval"
+and ident_box = ident_create "box"
 
 and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
@@ -261,6 +264,7 @@ let ident_of_type_constr : type_constr -> Ident.t = function
   | `Lexing_position -> ident_lexing_position
   | `Code -> ident_code
   | `Eval -> ident_eval
+  | `Box -> ident_box
   | `Float32 -> ident_float32
   | `Int8 -> ident_int8
   | `Int16 -> ident_int16
@@ -319,6 +323,7 @@ and path_idx_imm = Pident ident_idx_imm
 and path_idx_mut = Pident ident_idx_mut
 and path_code = Pident ident_code
 and path_eval = Pident ident_eval
+and path_box = Pident ident_box
 
 and path_or_null = Pident ident_or_null
 
@@ -946,6 +951,19 @@ let decl_of_type_constr tconstr =
        ~param_jkind:(
          Jkind.Builtin.any ~why:(Type_argument {
            parent_path = Path.Pident ident_eval;
+           position = 1;
+           arity = 1;
+         }))
+       ()
+  | `Box ->
+    decl1
+       ~variance:Variance.covariant
+       ~separability:Separability.Ind
+       ~manifest:(fun param -> newgenty (Tbox param))
+       ~jkind:(fun _ -> Jkind.Builtin.value ~why:Boxed)
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_box;
            position = 1;
            arity = 1;
          }))

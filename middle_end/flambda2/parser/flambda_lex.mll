@@ -37,6 +37,10 @@ let keyword_table =
     "available", KWD_AVAILABLE;
     "boxed", KWD_BOXED;
     "ccall", KWD_CCALL;
+    "mcall", KWD_MCALL;
+    "self", KWD_SELF;
+    "public", KWD_PUBLIC;
+    "cached", KWD_CACHED;
     "closure", KWD_CLOSURE;
     "code", KWD_CODE;
     "cont", KWD_CONT;

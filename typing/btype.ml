@@ -175,6 +175,7 @@ let newgenstub ~scope jkind =
 let new_splice_ty t = newty2 ~level:(get_level t) (Tsplice t)
 let new_quote_ty t = newty2 ~level:(get_level t) (Tquote t)
 let new_quote_eval_ty t = newty2 ~level:(get_level t) (Tquote_eval t)
+let new_box_ty t = newty2 ~level:(get_level t) (Tbox t)
 
 (**** Check some types ****)
 
@@ -376,6 +377,7 @@ let fold_type_expr f init ty =
   | Tpackage pack ->
     List.fold_left (fun result (_n, ty) -> f result ty) init pack.pack_cstrs
   | Tof_kind _ -> init
+  | Tbox ty -> f init ty
 
 let iter_type_expr f ty =
   fold_type_expr (fun () v -> f v) () ty
@@ -617,6 +619,7 @@ let rec copy_type_desc ?(keep_names=false) f = function
       Tpackage {pack with
         pack_cstrs = List.map (fun (n, ty) -> (n, f ty)) pack.pack_cstrs}
   | Tof_kind jk -> Tof_kind jk
+  | Tbox ty -> Tbox (f ty)
 
 (* TODO: rename to [module Copy_scope] *)
 module For_copy : sig
@@ -892,6 +895,16 @@ let tpoly_get_mono ty =
   match get_desc ty with
   | Tpoly(ty, []) -> ty
   | _ -> assert false
+
+                  (*******************************)
+                  (*  Utilities for box types    *)
+                  (*******************************)
+
+let simple_unbox_ty ty =
+  match get_desc ty with
+  | Ttuple tys -> Some (newty2 ~level:(get_level ty) (Tunboxed_tuple tys))
+  | Tbox ty -> Some ty
+  | _ -> None
 
                   (************)
                   (*  Jkinds  *)
@@ -2577,11 +2590,7 @@ module Jkind0 = struct
         }
         ~annotation:None ~why:(Any_creation Array_type_argument)
 
-    let for_or_null_argument ident =
-      let why : Jkind_intf.History.value_creation_reason =
-        Type_argument
-          { parent_path = Path.Pident ident; position = 1; arity = 1 }
-      in
+    let for_or_null_payload_with_history why =
       let mod_bounds =
         Mod_bounds.create Mode.Crossing.max
           ~externality:Mod_bounds.Externality.max
@@ -2598,6 +2607,16 @@ module Jkind0 = struct
         }
         ~annotation:None ~why:(Value_creation why)
 
+    let for_or_null_argument ident =
+      let why : Jkind_intf.History.value_creation_reason =
+        Type_argument
+          { parent_path = Path.Pident ident; position = 1; arity = 1 }
+      in
+      for_or_null_payload_with_history why
+
+    let for_or_null_payload path =
+      for_or_null_payload_with_history (Or_null_payload path)
+
     let for_effect_arg ident =
       let why : Jkind_intf.History.value_creation_reason =
         Type_argument
@@ -2605,13 +2624,12 @@ module Jkind0 = struct
       in
       Builtin.value ~why
 
-    let for_variant_with_null_result path param =
+    let for_variant_with_null_result path ~modality payload_ty =
       let why : Jkind_intf.History.value_or_null_creation_reason =
-        Type_argument
-          { parent_path = path; position = 1; arity = 1 }
+        Or_null_payload path
       in
       Builtin.value_or_null ~why
-      |> add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:param
+      |> add_with_bounds ~modality ~type_expr:payload_ty
       |> mark_best
   end
 

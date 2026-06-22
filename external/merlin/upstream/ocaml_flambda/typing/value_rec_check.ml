@@ -174,13 +174,13 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_exclave e ->
         classify_expression env e
 
-    | Texp_construct (_, {cstr_repr = Variant_unboxed}, [e], _) ->
+    | Texp_construct (_, {cstr_repr = Variant_unboxed}, _, [_, e], _) ->
         classify_expression env e
     | Texp_construct _ ->
         Static
 
     | Texp_record { representation = Record_unboxed;
-                    fields = [| _, Overridden (_,e) |] } ->
+                    fields = [| _, _, Overridden (_,e) |] } ->
         classify_expression env e
     | Texp_record { representation = Record_ufloat; _ } ->
         Dynamic
@@ -205,7 +205,7 @@ let classify_expression : Typedtree.expression -> sd =
         Static
 
     | Texp_record_unboxed_product { representation = Record_unboxed_product;
-                                    fields = [| _, Overridden (_,e) |] } ->
+                                    fields = [| _, _, Overridden (_,e) |] } ->
         classify_expression env e
     | Texp_record_unboxed_product _ ->
         Dynamic
@@ -777,7 +777,7 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_array_comprehension (_, _, { comp_body; comp_clauses }) ->
       join ((expression comp_body << array_mode exp) ::
             comprehension_clauses comp_clauses)
-    | Texp_construct (_, desc, exprs, _) ->
+    | Texp_construct (_, desc, shape, exprs, _) ->
       let access_constructor =
         match desc.cstr_tag with
         | Extension pth ->
@@ -788,7 +788,7 @@ let rec expression : Typedtree.expression -> term_judg =
         | Variant_unboxed | Variant_with_null ->
           Return
         | Variant_boxed _ | Variant_extensible ->
-           (match desc.cstr_shape with
+           (match shape with
             | Constructor_uniform_value -> Guard
             | Constructor_mixed mixed_shape ->
                 (match mixed_shape.(i) with
@@ -798,7 +798,7 @@ let rec expression : Typedtree.expression -> term_judg =
                  | Void | Product _ ->
                    Dereference))
       in
-      let arg i e = expression e << arg_mode i in
+      let arg i (_sort, e) = expression e << arg_mode i in
       join [
         access_constructor;
         listi arg exprs;
@@ -827,8 +827,11 @@ let rec expression : Typedtree.expression -> term_judg =
                Dereference)
           | Record_dummy _ ->
             Misc.fatal_error "value_rec_check: unexpected dummy representation"
+          | Record_variable ->
+            Misc.fatal_error
+              "value_rec_check: unexpected unknown representation"
         in
-        let field ((label : Data_types.label_description), field_def) =
+        let field ((label : Data_types.label_description), _sort, field_def) =
           let env =
             match field_def with
             | Kept _ -> empty
@@ -844,7 +847,7 @@ let rec expression : Typedtree.expression -> term_judg =
                                     representation = rep } ->
       begin match rep with
       | Record_unboxed_product ->
-        let field (_, field_def) =
+        let field (_, _, field_def) =
           let env =
             match field_def with
             | Kept _ -> empty
@@ -856,6 +859,9 @@ let rec expression : Typedtree.expression -> term_judg =
           array field es;
           option expression (Option.map fst eo) << Dereference
         ]
+      | Record_unboxed_product_variable ->
+        Misc.fatal_error
+          "value_rec_check: unexpected unknown unboxed-product representation"
       end
     | Texp_ifthenelse (cond, ifso, ifnot) ->
       (*
@@ -873,7 +879,7 @@ let rec expression : Typedtree.expression -> term_judg =
         expression ifso;
         option expression ifnot;
       ]
-    | Texp_setfield (e1, _, _, _, e2) ->
+    | Texp_setfield { record = e1; newval = e2 } ->
       (*
         G1 |- e1: m[Dereference]
         G2 |- e2: m[Dereference]
@@ -921,14 +927,14 @@ let rec expression : Typedtree.expression -> term_judg =
       join [
         expression e1 << Dereference
       ]
-    | Texp_field (e, _, _, _, _, _) ->
+    | Texp_field { record = e; _ } ->
       (*
         G |- e: m[Dereference]
         -----------------------
         G |- e.x: m
       *)
       expression e << Dereference
-    | Texp_unboxed_field (e, _, _, _, _) ->
+    | Texp_unboxed_field { record = e; _ } ->
       expression e << Dereference
     | Texp_setinstvar (pth,_,_,e) ->
       (*
@@ -1541,8 +1547,8 @@ and is_destructuring_pattern : type k . k general_pattern -> bool =
     | Tpat_unboxed_tuple _ -> true
     | Tpat_construct _ -> true
     | Tpat_variant _ -> true
-    | Tpat_record (_, _) -> true
-    | Tpat_record_unboxed_product (_, _) -> true
+    | Tpat_record _ -> true
+    | Tpat_record_unboxed_product _ -> true
     | Tpat_array _ -> true
     | Tpat_lazy _ -> true
     | Tpat_value pat -> is_destructuring_pattern (pat :> pattern)

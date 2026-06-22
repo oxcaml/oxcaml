@@ -36,6 +36,7 @@ type abstract_type_constr = [
   | `Lexing_position
   | `Code
   | `Eval
+  | `Box
   | `Float32
   | `Int8
   | `Int16
@@ -197,6 +198,7 @@ val path_continuation: Path.t
 val path_lexing_position: Path.t
 val path_code: Path.t
 val path_eval: Path.t
+val path_box: Path.t
 
 val path_unboxed_unit : Path.t
 val path_unboxed_bool : Path.t

@@ -925,7 +925,15 @@ let batch_mode_printer : report_printer =
   in
   let pp_submsg self report ppf { loc; txt } =
     if loc.loc_ghost then
-      Format.fprintf ppf "@[%a@]" (self.pp_submsg_txt self report) txt
+      (* FIXME This change from ocaml/ocaml#13838 results in some very sad error
+               messages from some of our ppxes. We've tweaked it for now, but
+               intend to coordinate with upstream as to a more proper fix. *)
+      if is_none loc then
+        Format.fprintf ppf "@[%a@]" (self.pp_submsg_txt self report) txt
+      else
+        Format.fprintf ppf "%a@[%a@]"
+          (self.pp_submsg_loc self report) loc
+          (self.pp_submsg_txt self report) txt
     else
       Format.fprintf ppf "%a  @[%a@]"
         (self.pp_submsg_loc self report) loc

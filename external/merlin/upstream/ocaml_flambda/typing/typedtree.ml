@@ -155,6 +155,10 @@ and _ poly_param =
   | Arrow : (arg_label * type_expr option) list -> [`exp] poly_param
   | Method : string loc * type_expr -> [`exp] poly_param
 
+type record_sorts =
+  | Fixed
+  | Variable of Jkind.Sort.Const.t array
+
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
 
@@ -212,7 +216,8 @@ and 'k pattern_desc =
       value pattern_desc
   | Tpat_construct :
       Longident.t loc * constructor_description *
-        value general_pattern list *
+        Types.constructor_representation *
+        (Jkind.sort * value general_pattern) list *
         ((Ident.t loc * Parsetree.jkind_annotation option) list * core_type)
           option ->
       value pattern_desc
@@ -221,10 +226,13 @@ and 'k pattern_desc =
       value pattern_desc
   | Tpat_record :
       (Longident.t loc * label_description * value general_pattern) list *
-        closed_flag ->
+        record_sorts * Types.record_representation * closed_flag ->
       value pattern_desc
   | Tpat_record_unboxed_product :
-      (Longident.t loc * unboxed_label_description * value general_pattern) list
+      (Longident.t loc * unboxed_label_description *
+        value general_pattern) list
+      * record_sorts
+      * Types.record_unboxed_product_representation
       * closed_flag ->
       value pattern_desc
   | Tpat_array :
@@ -299,31 +307,54 @@ and expression_desc =
   | Texp_tuple of (string option * expression) list * alloc_mode
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
   | Texp_construct of
-      Longident.t loc * constructor_description * expression list * alloc_mode option
+      Longident.t loc * constructor_description * constructor_representation *
+      (Jkind.sort * expression) list * alloc_mode option
   | Texp_variant of label * (expression * alloc_mode) option
   | Texp_record of {
-      fields : ( Data_types.label_description * record_label_definition ) array;
+      fields :
+        ( Data_types.label_description * Jkind.sort * record_label_definition )
+          array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
       alloc_mode : alloc_mode option
     }
   | Texp_record_unboxed_product of {
       fields :
-        ( unboxed_label_description * record_label_definition ) array;
+        ( unboxed_label_description * Jkind.sort *
+          record_label_definition ) array;
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
     }
   | Texp_atomic_loc of
       expression * Jkind.sort * Longident.t loc * label_description *
       alloc_mode
-  | Texp_field of
-      expression * Jkind.sort * Longident.t loc * label_description *
-        texp_field_boxing * Unique_barrier.t
-  | Texp_unboxed_field of
-      expression * Jkind.sort * Longident.t loc * unboxed_label_description *
-        unique_use
-  | Texp_setfield of
-      expression * Mode.Locality.l * Longident.t loc * label_description * expression
+  | Texp_field of {
+      record : expression;
+      record_sort : Jkind.sort;
+      record_repres : Types.record_representation;
+      lid : Longident.t loc;
+      label : Data_types.label_description;
+      boxing : texp_field_boxing;
+      unique_barrier : Unique_barrier.t;
+    }
+  | Texp_unboxed_field of {
+      record : expression;
+      record_sort : Jkind.sort;
+      record_sorts : record_sorts;
+      record_repres : Types.record_unboxed_product_representation;
+      lid : Longident.t loc;
+      label : unboxed_label_description;
+      unique_use : unique_use;
+    }
+  | Texp_setfield of {
+      record : expression;
+      record_repres : Types.record_representation;
+      record_sorts : record_sorts;
+      modality : Mode.Locality.l;
+      lid : Longident.t loc;
+      label : Data_types.label_description;
+      newval : expression;
+    }
   | Texp_array of mutability * Jkind.Sort.t * expression list * alloc_mode
   | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
@@ -393,11 +424,13 @@ and meth =
   | Tmeth_ancestor of Ident.t * Path.t
 
 and block_access =
-  | Baccess_field of Longident.t loc * label_description
+  | Baccess_field of
+      Longident.t loc * label_description * Types.record_representation
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =
-  | Uaccess_unboxed_field of Longident.t loc * unboxed_label_description
+  | Uaccess_unboxed_field of
+      Longident.t loc * unboxed_label_description * record_sorts
 
 and comprehension =
   {
@@ -1122,11 +1155,11 @@ let shallow_iter_pattern_desc
   | Tpat_fun_layout _ -> ()
   | Tpat_tuple patl -> List.iter (fun (_, p) -> f.f p) patl
   | Tpat_unboxed_tuple patl -> List.iter (fun (_, p, _) -> f.f p) patl
-  | Tpat_construct(_, _, patl, _) -> List.iter f.f patl
+  | Tpat_construct(_, _, _, patl, _) -> List.iter (fun (_, p) -> f.f p) patl
   | Tpat_variant(_, pat, _) -> Option.iter f.f pat
-  | Tpat_record (lbl_pat_list, _) ->
+  | Tpat_record (lbl_pat_list, _, _, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
-  | Tpat_record_unboxed_product (lbl_pat_list, _) ->
+  | Tpat_record_unboxed_product (lbl_pat_list, _, _, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
   | Tpat_array (_, _, patl) -> List.iter f.f patl
   | Tpat_lazy p -> f.f p
@@ -1153,13 +1186,14 @@ let shallow_map_pattern_desc
   | Tpat_unboxed_tuple pats ->
       Tpat_unboxed_tuple
         (List.map (fun (label, pat, sort) -> label, f.f pat, sort) pats)
-  | Tpat_record (lpats, closed) ->
-      Tpat_record (List.map (fun (lid, l,p) -> lid, l, f.f p) lpats, closed)
-  | Tpat_record_unboxed_product (lpats, closed) ->
+  | Tpat_record (lpats, sorts, repr, closed) ->
+      Tpat_record (List.map (fun (lid, l, p) -> lid, l, f.f p) lpats,
+                   sorts, repr, closed)
+  | Tpat_record_unboxed_product (lpats, sorts, repr, closed) ->
       Tpat_record_unboxed_product
-        (List.map (fun (lid, l,p) -> lid, l, f.f p) lpats, closed)
-  | Tpat_construct (lid, c, pats, ty) ->
-      Tpat_construct (lid, c, List.map f.f pats, ty)
+        (List.map (fun (lid, l, p) -> lid, l, f.f p) lpats, sorts, repr, closed)
+  | Tpat_construct (lid, c, r, pats, ty) ->
+      Tpat_construct (lid, c, r, List.map (fun (s, p) -> s, f.f p) pats, ty)
   | Tpat_array (am, arg_sort, pats) ->
       Tpat_array (am, arg_sort, List.map f.f pats)
   | Tpat_lazy p1 -> Tpat_lazy (f.f p1)
@@ -1268,12 +1302,14 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
         if both_sides_of_or then (loop f p1; loop f p2)
         else loop f p1
       | Tpat_value p -> loop f p
-      | Tpat_construct(_, _, patl, _) ->
-          List.iter (loop f) patl
-      | Tpat_record (lbl_pat_list, _) ->
-          List.iter (fun (_, _, pat) -> (loop f) pat) lbl_pat_list
-      | Tpat_record_unboxed_product (lbl_pat_list, _) ->
-          List.iter (fun (_, _, pat) -> (loop f) pat) lbl_pat_list
+      | Tpat_construct(_, _, _, patl, _) ->
+          List.iter (fun (_, pat) -> loop f pat) patl
+      | Tpat_record (lbl_pat_list, _, _, _) ->
+          List.iter (fun (_, _, pat) -> loop f pat)
+            lbl_pat_list
+      | Tpat_record_unboxed_product (lbl_pat_list, _, _, _) ->
+          List.iter (fun (_, _, pat) -> loop f pat)
+            lbl_pat_list
       | Tpat_variant (_, pat, _) -> Option.iter (loop f) pat
       | Tpat_tuple patl ->
         List.iter (fun (_, pat) -> loop f pat) patl
@@ -1500,8 +1536,8 @@ let rec fold_antiquote_exp f  acc exp =
       List.fold_left (fun acc (_, e) -> fold_antiquote_exp f acc e) acc list
   | Texp_unboxed_tuple list ->
       List.fold_left (fun acc (_, e, _) -> fold_antiquote_exp f acc e) acc list
-  | Texp_construct (_, _, args, _) ->
-      fold_antiquote_exps f acc args
+  | Texp_construct (_, _, _, args, _) ->
+      fold_antiquote_exps f acc (List.map snd args)
   | Texp_variant (_, expo) ->
       Option.fold
         ~none:acc
@@ -1519,11 +1555,11 @@ let rec fold_antiquote_exp f  acc exp =
         ~none:acc
         ~some:(fun (e, _) -> fold_antiquote_exp f acc e)
         extended_expression
-  | Texp_field (exp, _, _, _, _, _) ->
+  | Texp_field { record = exp; _ } ->
       fold_antiquote_exp f acc exp
-  | Texp_unboxed_field (exp, _, _, _, _) ->
+  | Texp_unboxed_field { record = exp; } ->
       fold_antiquote_exp f acc exp
-  | Texp_setfield (exp1, _, _, _, exp2) ->
+  | Texp_setfield { record = exp1; newval = exp2; _ } ->
       let acc = fold_antiquote_exp f acc exp1 in
       fold_antiquote_exp f acc exp2
   | Texp_array (_, _, list, _) ->
@@ -1621,10 +1657,10 @@ and fold_antiquote_arg f acc (_, arg) =
 and fold_antiquote_args f acc args =
   List.fold_left (fold_antiquote_arg f) acc args
 
-and fold_antiquote_field : 'l. _ -> _ -> 'l * _ -> _ =
+and fold_antiquote_field : 'l. _ -> _ -> 'l * _ * _ -> _ =
   fun f acc -> function
-  | _, Kept _ -> acc
-  | _, Overridden (_, exp) -> fold_antiquote_exp f acc exp
+  | _, _, Kept _ -> acc
+  | _, _, Overridden (_, exp) -> fold_antiquote_exp f acc exp
 
 and fold_antiquote_comprehension_clause f acc = function
   | Texp_comp_for bindings ->
@@ -1645,3 +1681,25 @@ and fold_antiquote_comprehension_clauses f acc ccs =
 
 and fold_antiquote_binding_op f acc op =
   fold_antiquote_exp f acc op.bop_exp
+
+let label_sort (type rep)
+      (record_form : rep record_form)
+      (label : rep gen_label_description) record_sorts =
+  match record_form, label.lbl_repres with
+  | Legacy, Record_unboxed -> `Same_as_record_sort
+  | _ ->
+    begin match record_sorts, label.lbl_sort with
+    | Variable sorts, _ -> `Sort sorts.(label.lbl_pos)
+    | Fixed, Some sort -> `Sort sort
+    | Fixed, None ->
+      Misc.fatal_errorf "no sort for label %s in fixed-sort record"
+        label.lbl_name
+    end
+
+let unboxed_label_sort label record_sorts =
+  match label_sort Unboxed_product label record_sorts with
+  | `Same_as_record_sort -> assert false
+  | `Sort s -> s
+
+let unboxed_label_all_sorts label record_sorts =
+  Array.map (fun lbl -> unboxed_label_sort lbl record_sorts) label.lbl_all

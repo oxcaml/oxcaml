@@ -4557,7 +4557,7 @@ module Head_of_kind_naked_vec512 =
 module Head_of_kind_naked_mask =
   Make_head_of_kind_naked_number (Vector_types.Mask.Bit_pattern)
 
-let rec must_be_singleton t ~machine_width : RWC.t option =
+let rec must_be_singleton t : RWC.t option =
   match t with
   | Value ty -> (
     match TD.descr ty with
@@ -4600,7 +4600,7 @@ let rec must_be_singleton t ~machine_width : RWC.t option =
           match immediates with
           | Unknown -> None
           | Known immediates -> (
-            match must_be_singleton immediates ~machine_width with
+            match must_be_singleton immediates with
             | None -> None
             | Some const -> (
               match RWC.descr const with
