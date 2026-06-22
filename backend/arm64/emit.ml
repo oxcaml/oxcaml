@@ -1164,6 +1164,36 @@ let assembly_code_for_poll env i ~far ~return_label =
   let gc_lbl, gc_return_lbl = assembly_code_for_poll0 ~far ~return_label in
   Env.add_call_gc_site env { gc_lbl; gc_return_lbl; gc_frame_lbl }
 
+(* Output the assembly code for a stack check. *)
+
+let assembly_code_for_stack_check0 ~far ~max_frame_size_bytes =
+  (* This must not use [env], as it is called from [emit_relaxed_instruction] *)
+  let sc_label = L.create Text and sc_return = L.create Text in
+  let threshold_offset =
+    (Domainstate.stack_ctx_words * 8) + Stack_check.stack_threshold_size
+  in
+  let f = max_frame_size_bytes + threshold_offset in
+  A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_current_stack);
+  emit_addimm reg_x_tmp1 reg_x_tmp1 f;
+  A.ins_cmp_reg O.sp reg_x_tmp1 O.optional_none;
+  if not far
+  then A.ins1 (B_cond (Branch_cond.Int CC)) (local_label sc_label)
+  else (
+    (* Invert the condition and branch over an unconditional branch, so the
+       out-of-line reallocation block is reached via [B] (whose range we treat
+       as unbounded) rather than the limited range of [B_cond]. *)
+    A.ins1 (B_cond (Branch_cond.Int CS)) (local_label sc_return);
+    A.ins1 B (local_label sc_label));
+  D.define_label sc_return;
+  sc_label, sc_return
+
+let assembly_code_for_stack_check env ~far ~max_frame_size_bytes =
+  let sc_label, sc_return =
+    assembly_code_for_stack_check0 ~far ~max_frame_size_bytes
+  in
+  Env.set_stack_realloc env
+    { sc_label; sc_return; sc_max_frame_size_in_bytes = max_frame_size_bytes }
+
 (* Output .text section directive, or named .text.caml.<name> if enabled. *)
 
 let emit_named_text_section func_name =
@@ -1909,19 +1939,10 @@ let emit_instr env i =
       A.ins3 (LDP X) reg_x_trap_ptr reg_x_tmp1
         (O.mem_post_pair ~base:R.sp ~offset:16);
       A.ins1 BR reg_x_tmp1)
-  | Lstackcheck { max_frame_size_bytes = sc_max_frame_size_in_bytes } ->
-    let sc_label = L.create Text and sc_return = L.create Text in
-    let threshold_offset =
-      (Domainstate.stack_ctx_words * 8) + Stack_check.stack_threshold_size
-    in
-    let f = sc_max_frame_size_in_bytes + threshold_offset in
-    A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_current_stack);
-    emit_addimm reg_x_tmp1 reg_x_tmp1 f;
-    A.ins_cmp_reg O.sp reg_x_tmp1 O.optional_none;
-    A.ins1 (B_cond (Branch_cond.Int CC)) (local_label sc_label);
-    D.define_label sc_return;
-    Env.set_stack_realloc env
-      { sc_label; sc_return; sc_max_frame_size_in_bytes }
+  | Lstackcheck { max_frame_size_bytes } ->
+    assembly_code_for_stack_check env ~far:false ~max_frame_size_bytes
+  | Lop (Specific (Ifar_stackcheck { max_frame_size_bytes })) ->
+    assembly_code_for_stack_check env ~far:true ~max_frame_size_bytes
   | Lop (Specific (Illvm_intrinsic intr)) ->
     Misc.fatal_errorf
       "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
@@ -1981,6 +2002,7 @@ type relaxed_instruction =
         dbginfo : Cmm.alloc_dbginfo;
         res : Reg.t
       }
+  | Far_stackcheck of { max_frame_size_bytes : int }
   | Condbranch of
       { test : Operation.test;
         lbl : Cmm.label;
@@ -1999,6 +2021,11 @@ let emit_relaxed_instruction (relaxed : relaxed_instruction) =
     let _gc_lbl, _gc_return_lbl =
       assembly_code_for_fast_heap_allocation0 ~n:num_bytes ~far:true
         ~res_reg:(H.reg_x res)
+    in
+    ()
+  | Far_stackcheck { max_frame_size_bytes } ->
+    let _sc_label, _sc_return =
+      assembly_code_for_stack_check0 ~far:true ~max_frame_size_bytes
     in
     ()
   | Condbranch { test; lbl; arg } -> emit_condbranch arg test lbl
@@ -2035,6 +2062,8 @@ let relax_branches env body =
       | Far_poll -> Lop (Specific Ifar_poll)
       | Far_alloc { num_bytes; dbginfo; res = _ } ->
         Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
+      | Far_stackcheck { max_frame_size_bytes } ->
+        Lop (Specific (Ifar_stackcheck { max_frame_size_bytes }))
       | Condbranch { test; lbl; arg = _ } -> Lcondbranch (test, lbl)
       | Branch lbl -> Lbranch lbl
 
@@ -2042,6 +2071,9 @@ let relax_branches env body =
 
     let relax_allocation ~num_bytes ~dbginfo ~res =
       Far_alloc { num_bytes; dbginfo; res }
+
+    let relax_stackcheck ~max_frame_size_bytes =
+      Far_stackcheck { max_frame_size_bytes }
 
     let relax_condbranch test lbl ~arg = Condbranch { test; lbl; arg }
 

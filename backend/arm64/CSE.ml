@@ -31,6 +31,7 @@ let class_of_operation (op : Operation.t)
       match spec with
       | Ifar_poll
       | Ifar_alloc _
+      | Ifar_stackcheck _
       | Ishiftarith _
       | Imuladd
       | Imulsub

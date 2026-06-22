@@ -53,6 +53,8 @@ module type S = sig
     res:Reg.t ->
     relaxed_instruction
 
+  val relax_stackcheck : max_frame_size_bytes:int -> relaxed_instruction
+
   val relax_condbranch :
     Operation.test -> Cmm.label -> arg:Reg.t array -> relaxed_instruction
 
