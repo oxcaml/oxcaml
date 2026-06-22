@@ -57,3 +57,14 @@ let g (x : float#) =
   (apply (field_imm 1 (global Toploop!)) "g" g/306))
 val g : float# -> int = <fun>
 |}]
+
+(* Polymorphic instance: the field's sort is undetermined, so [value_kind] must
+   stay conservative ([value], i.e. [Pgenval]) without crashing or mutating the
+   type variable -- the record counterpart of [let nope = Nope] in
+   [value_kind_any_variant.ml]. *)
+let opaque (type a : any) (r : a t) = r
+[%%expect{|
+(let (opaque/315 = (function {nlocal = 0} r/318 r/318))
+  (apply (field_imm 1 (global Toploop!)) "opaque" opaque/315))
+val opaque : ('a : any). 'a t -> 'a t = <fun>
+|}]
