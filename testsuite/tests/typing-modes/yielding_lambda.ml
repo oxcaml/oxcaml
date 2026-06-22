@@ -766,6 +766,8 @@ val std_pipe : 'a -> ('a -> 'b) -> 'b = <fun>
 |}]
 
 (* It may yield when the operator is declared with yielding parameters. *)
+(* CR dkalinichenko: I know that's not the point of the test, but shouldn't
+   it be [('a @ yielding -> 'b) @ yielding]? *)
 external pipe_y : 'a @ yielding -> ('a -> 'b) @ yielding -> 'b = "%revapply"
 let yielding_pipe = pipe_y
 [%%expect{|
@@ -776,4 +778,17 @@ external pipe_y : 'a @ yielding -> ('a -> 'b) @ yielding -> 'b = "%revapply"
   (apply[unyielding] (field_imm 1 (global Toploop!)) "yielding_pipe"
     yielding_pipe))
 val yielding_pipe : 'a @ yielding -> ('a -> 'b) @ yielding -> 'b = <fun>
+|}]
+
+(* CR dkalinichenko: soundness issue: should be yielding. *)
+let demo () : 'a @ yielding -> ('a @ yielding -> unit) -> unit = function
+    | a -> fun f -> f a
+
+[%%expect{|
+(let
+  (demo =
+     (function {nlocal = 0} param[value<int>] a?
+       (function {nlocal = 0} f : int (apply f a))))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "demo" demo))
+val demo : unit -> 'a @ yielding -> ('a @ yielding -> unit) -> unit = <fun>
 |}]
