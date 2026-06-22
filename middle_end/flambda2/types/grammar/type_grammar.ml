@@ -107,6 +107,9 @@ end = struct
     match descr t with
     | Is_null -> Ok (Target_ocaml_int.bool machine_width (RWC.is_null const))
     | Is_int ->
+      (* Constants can never be blocks, so the result of [%is_int] on a constant
+         is either [1] if the constant is not null, or [0] if the constant is
+         null. *)
       Ok (Target_ocaml_int.bool machine_width (not (RWC.is_null const)))
     | Get_tag -> Bottom
 
