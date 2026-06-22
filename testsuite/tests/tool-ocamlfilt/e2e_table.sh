@@ -6,12 +6,15 @@
 #
 # <exclude-pattern> is an extended regex; nm lines matching it are
 # dropped before symbol extraction. Tests typically pass
-# [camlStdlib|camlCamlinternal] to drop references to stdlib --
+# [(caml|U[0-9]+)(Stdlib|Camlinternal)] to drop references to stdlib --
 # their names belong to other compilation units and would make
-# this reference fragile to unrelated compiler changes. Non-
-# excluded undefined references are kept because that's how
-# cross-module inlining shows up: the caller's object holds a stub
-# for a closure that lives in the inlined callee's unit.
+# this reference fragile to unrelated compiler changes. The pattern
+# matches both mangling schemes: the flat prefix [caml] and the
+# structured per-unit length prefix [U<len>], since stdlib may be
+# built with either scheme. Non-excluded undefined references are
+# kept because that's how cross-module inlining shows up: the
+# caller's object holds a stub for a closure that lives in the
+# inlined callee's unit.
 #
 # The table has four columns: the raw linker symbol followed by
 # its demangling under [--format flat1], [--format structured], and
@@ -28,10 +31,11 @@ set -eu
 export LC_ALL=C
 
 OBJ=${1:?"missing object file argument"}
-# The pattern only needs the flat (lowercase [caml]) prefix: stdlib
-# is built with the flat scheme, so its symbol names show up
-# flat-mangled in the relocation table regardless of the scheme used
-# to compile this test.
+# The pattern matches stdlib symbols under both mangling schemes:
+# the flat (lowercase [caml]) prefix and the structured per-unit
+# length prefix ([U<len>]). Stdlib may be built with either scheme,
+# so its symbol names can show up flat- or structured-mangled in the
+# relocation table regardless of the scheme used to compile this test.
 EXCLUDE=${2:?"missing exclude-pattern argument"}
 
 OCAMLFILT="${ocamlsrcdir}/tools/ocamlfilt"

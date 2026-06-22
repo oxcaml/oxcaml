@@ -8,7 +8,7 @@
  output = "e2e_suboptimal.table";
  script = "sh ${test_source_directory}/e2e_table.sh \
            ${test_build_directory}/e2e_suboptimal.o \
-           'camlStdlib|camlCamlinternal'";
+           '(caml|U[0-9]+)(Stdlib|Camlinternal)'";
  script;
  reference = "${test_source_directory}/e2e_suboptimal.reference";
  check-program-output;
