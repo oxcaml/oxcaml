@@ -5879,6 +5879,11 @@ module Comonadic_with (Areality : Areality) = struct
 
     let proj = Axis.proj
 
+    let offset_stage_r k c =
+      if k < 0 then legacy
+      else if k > 0 then max
+      else c
+
     module Per_axis = struct
       let print ax ppf a =
         let obj = proj_obj ax in
@@ -5960,6 +5965,13 @@ module Comonadic_with (Areality : Areality) = struct
     { areality; linearity; portability; forkable; yielding; statefulness }
 
   let legacy = of_const Const.legacy
+
+  let offset_stage_r k m =
+    if k < 0 then of_const Const.legacy
+    else if k > 0 then of_const Const.max
+    else m
+
+  let const_offset_stage_r = Const.offset_stage_r
 
   type simple_error =
     | Error : 'a Axis.t * 'a Mode_intf.simple_error -> simple_error

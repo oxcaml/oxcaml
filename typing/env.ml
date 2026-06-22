@@ -190,7 +190,7 @@ let partition_locks locks =
     (function | Stage_lock lock -> Left lock | Nonstage_lock lock -> Right lock)
     locks
 
-type locks = lock list
+type locks = lock_or_stage list
 
 type summary =
     Env_empty
@@ -3547,9 +3547,8 @@ let assert_does_not_cross_quotation ~loc_use ~loc_def env path locks =
         (Location.Doc.loc ~capitalize_first:false) loc_use
 
 let locks_for_pers_mod ~loc_use ~loc_def env path =
-  let stage_locks, locks =
-    partition_locks (IdTbl.get_all_locks env.modules)
-  in
+  let locks = IdTbl.get_all_locks env.modules in
+  let stage_locks, _nonstage_locks = partition_locks locks in
   (* Tripwire: persistent paths are toplevel-scoped, so this should never
      fire. *)
   assert_does_not_cross_quotation env ~loc_use ~loc_def path stage_locks;
@@ -3693,7 +3692,7 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   let path, locks, data =
     match find_name_module ~mark:use ~stage:env.stage s env.modules with
     | path, locks, data -> begin
-        let stage_locks, locks = partition_locks locks in
+        let stage_locks, _nonstage_locks = partition_locks locks in
         check_cross_quotation ~errors ~loc_use:loc ~loc_def:Location.none env
           path (Lident s) stage_locks;
         path, locks, data
@@ -3804,19 +3803,39 @@ let unboxed_type ~errors ~env ~loc ty_and_lid =
     [pp] is the pinpoint used in errors. *)
 let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
   List.fold_left
-    (fun vmode lock ->
-      match lock with
-      | Region_lock -> region_mode vmode
-      | Const_closure_lock (_, closure_context, comonadic) ->
-          const_closure_mode pp vmode closure_context comonadic
-      | Closure_lock (closure_context, comonadic) ->
-          closure_mode pp vmode closure_context comonadic
-      | Exclave_lock ->
-          exclave_mode ~errors ~env ~pp vmode
-      | Unboxed_lock ->
-          unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
-          vmode
-    ) mode locks
+    (fun (vmode, stage_offset) -> function
+    (* We walk in direction from the introduction of a value towards its use.
+       Since the introduction and use are at the same stage, we know both the
+       stage offset from the current lock to the introduction ([stage_offset])
+       and to the use ([-stage_offset]). *)
+    | Stage_lock Quotation_lock ->
+      vmode, stage_offset + 1
+    | Stage_lock Splice_lock ->
+      vmode, stage_offset - 1
+    | Nonstage_lock lock ->
+      let vmode =
+        match lock with
+        | Region_lock ->
+            region_mode vmode
+        (* We want to offset the stage of [vmode] by [-stage_offset].
+           It's easier to apply the right-adjoint to the [comonadic] bound,
+           which is [offset_stage_r stage_offset]. *)
+        | Const_closure_lock (_, closure_context, comonadic) ->
+            const_closure_mode pp vmode closure_context
+              (Mode.Value.Comonadic.const_offset_stage_r
+                stage_offset comonadic)
+        | Closure_lock (closure_context, comonadic) ->
+            closure_mode pp vmode closure_context
+              (Mode.Value.Comonadic.offset_stage_r
+                stage_offset comonadic)
+        | Exclave_lock ->
+            exclave_mode ~errors ~env ~pp vmode
+        | Unboxed_lock ->
+            unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
+            vmode
+        in
+      vmode, stage_offset
+    ) (mode, 0) locks |> fst
 
 (** Registers a use of a construct that is at legacy comonadic modes,
     constraining every enclosing closure lock as if a legacy value defined at
@@ -3825,7 +3844,6 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
     stateful. *)
 let walk_locks_for_legacy_construct ~env pp =
   let locks = IdTbl.get_all_locks env.values in
-  let _stage_locks, locks = partition_locks locks in
   ignore
     (walk_locks ~errors:true ~env ~pp
        (Mode.Value.disallow_right Mode.Value.legacy) None locks
@@ -3871,13 +3889,15 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
 let lookup_ident_value ~errors ~use ~loc name env =
   match IdTbl.find_name_and_locks wrap_value ~mark:use name env.values with
   | Ok (path, locks, Val_bound vda) ->
-      let stage_locks, locks = partition_locks locks in
+      let stage_locks, nonstage_locks = partition_locks locks in
       begin match vda with
       | {vda_description={val_kind=Val_mut (m0, _); _}; _} ->
           m0
-          |> walk_locks_for_mutable_mode ~errors ~loc ~env locks
+          |> walk_locks_for_mutable_mode ~errors ~loc ~env nonstage_locks
           |> ignore
       | _ -> () end;
+      (* CR quoted-modes jbachurski: It might be worth to get rid of
+         [partition_locks] and to move this check to [walk_locks]. *)
       check_cross_quotation ~errors ~loc_use:loc
         ~loc_def:vda.vda_description.val_loc env path (Lident name) stage_locks;
       use_value ~use ~loc path vda;
@@ -3910,7 +3930,7 @@ let lookup_ident_modtype ~errors ~use ~loc s env =
 let lookup_ident_class ~errors ~use ~loc s env =
   match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.classes with
   | Ok (path, locks, clda) ->
-      let stage_locks, locks = partition_locks locks in
+      let stage_locks, _nonstage_locks = partition_locks locks in
       check_cross_quotation ~errors ~loc_def:loc
         ~loc_use:clda.clda_declaration.cty_loc env path (Lident s) stage_locks;
       use_class ~use ~loc path clda;
@@ -3978,7 +3998,7 @@ let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
   let cstrs_filtered =
     List.filter_map
       (fun (path, cda, (locks, use_fn)) ->
-         let stage_locks, locks = partition_locks locks in
+         let stage_locks, _nonstage_locks = partition_locks locks in
          does_not_cross_quotation env path stage_locks
          |> Result.map (fun () -> (path, cda, (locks, use_fn)))
          |> Result.to_option)
@@ -4246,15 +4266,14 @@ let lookup_all_dot_constructors ~errors ~use ~loc usage l s env =
 (* Open a signature path *)
 
 let add_components slot root env0 comps (locks : locks) =
-  let locks' = List.map (fun lock -> Nonstage_lock lock) locks in
   let add_l w comps env0 =
     TycompTbl.add_open slot w root comps ([] : stage_lock list) env0
   in
   let add_c w comps env0 =
-    TycompTbl.add_open slot w root comps locks' env0
+    TycompTbl.add_open slot w root comps locks env0
   in
   let add_v w comps env0 =
-    IdTbl.add_open slot w root comps locks' env0
+    IdTbl.add_open slot w root comps locks env0
   in
   let add_s w comps env0 =
     IdTbl.add_open slot w root comps ([] : stage_lock list) env0
