@@ -440,7 +440,7 @@ module Self :
 module Self_check :
   sig
     val f : 'a @ local unyielding -> unit
-    val g : 'a -> (unit -> 'a) @ local @@ stateless
+    val g : 'a -> (unit -> 'a) @ local @@ stateless noalloc_strict
   end
 |}]
 
@@ -529,8 +529,9 @@ end
 [%%expect{|
 module Zap_clamp_accepts_shared :
   sig
-    module M : sig val f : 'a @ read -> unit @@ stateless end
-    module type S = sig val f : 'a @ read -> unit @@ stateless end
+    module M : sig val f : 'a @ read -> unit @@ stateless noalloc_strict end
+    module type S =
+      sig val f : 'a @ read -> unit @@ stateless noalloc_strict end
     val g : 'a @ read -> unit
   end
 |}]

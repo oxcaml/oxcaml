@@ -1051,8 +1051,8 @@ module type S = module type of M_infer2
 [%%expect{|
 module type S =
   sig
-    val f : 'a -> 'a @@ stateless [@@zero_alloc strict]
-    val g : 'a -> 'a @@ stateless [@@zero_alloc]
+    val f : 'a -> 'a @@ stateless noalloc_strict [@@zero_alloc strict]
+    val g : 'a -> 'a @@ stateless noalloc_strict [@@zero_alloc]
   end
 |}]
 
@@ -1133,7 +1133,7 @@ module M_explicit_arity_2 : sig type t = int -> int val f : int -> t end
 module type S =
   sig
     type t = int -> int
-    val f : int -> t @@ stateless [@@zero_alloc arity 2]
+    val f : int -> t @@ stateless noalloc_strict [@@zero_alloc arity 2]
   end
 |}]
 

@@ -429,6 +429,7 @@ module IntOrder = struct
   let compare t1 t2 = t1 - t2
 end
 
+(* CR-soon shsong: balance_left balance_right set_black should not be noalloc_strict *)
 let () =
   let module Ord = IntOrder in
   let module M1 = Make_Okasaki(Ord) in
@@ -501,9 +502,12 @@ module Make_Okasaki :
       type 'a t = (Ord.t, 'a) tree
       val fold : ('a -> 'b -> 'c -> 'c) -> 'c -> ('a, 'b) tree -> 'c
       val balance_left : ('a, 'b) tree -> ('a, 'b) tree @@ stateless
+        noalloc_strict
       val balance_right : ('a, 'b) tree -> ('a, 'b) tree @@ stateless
+        noalloc_strict
       val ins : Ord.t -> 'a -> (Ord.t, 'a) tree -> (Ord.t, 'a) tree
       val set_black : ('a, 'b) tree -> ('a, 'b) tree @@ stateless
+        noalloc_strict
       val insert : Ord.t -> 'a -> (Ord.t, 'a) tree -> (Ord.t, 'a) tree
     end
 Line 110, characters 16-52:

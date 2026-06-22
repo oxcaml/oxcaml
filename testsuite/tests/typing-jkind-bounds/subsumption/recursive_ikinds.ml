@@ -73,7 +73,7 @@ Line 2, characters 2-70:
 Error: This type definition does not satisfy its kind annotation
          immutable_data with 'a,
        because My_list.t is not mod forkable unyielding many stateless
-                 immutable.
+                 immutable noalloc_strict.
 |}]
 
 module rec My_list : sig
