@@ -2,14 +2,12 @@
        f_1 (param) my_closure &my_alloc_region my_depth -> k1 * k2 : int64 =
    cont k1 (0L)
  in
- let code inline(never) size(10)
+ let code inline(never) size(0)
        test_0 (u : imm tagged, a, b)
          my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
-   apply direct(f_1 &my_alloc_region)  (0) -> k3 * k2
-     where k3 (func) =
-       apply &my_alloc_region func (0) -> k1 * k2
+   invalid "(Application_result_kind_mismatch_in_lambda\n (dbg over_app_kind_check_classic.ml:16,2--16))"
  in
  let $camlOver_app_kind_check_classic__s0 =
    closure test_0 @test &toplevel.alloc_region

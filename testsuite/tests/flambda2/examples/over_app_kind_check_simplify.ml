@@ -2,7 +2,7 @@
  compile_only = "true";
  flambda2;
  setup-ocamlopt.byte-build-env;
- ocamlopt.byte with dump-simplify;
+ ocamlopt.byte with dump-raw, dump-simplify;
  check-fexpr-dump;
 *)
 
@@ -11,6 +11,6 @@
 type (_,_) eq = Eq : ('a,'a) eq
 
 let test (u : (int -> int64#, int -> int -> int) eq) a b =
-  let[@local always] cast : type a b. (a,b) eq -> a -> b = fun Eq x -> x in
+  let[@inline always][@local never] cast : type a b. (a,b) eq -> a -> b = fun Eq x -> x in
   let[@inline never][@local never] f _ = #0L in
   (cast u f) 0 0

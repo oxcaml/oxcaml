@@ -1,0 +1,33 @@
+let code f_0 deleted in
+let code g_1 deleted in
+let code h_2 deleted in
+let code loopify(never) size(1) newer_version_of(f_0)
+      f_0_1 (x) my_closure &my_alloc_region my_depth -> k * k1 : imm tagged =
+  cont k (x)
+in
+let $camlApp_unarized_to_single_kind__f_1 =
+  closure f_0_1 @f &toplevel.alloc_region
+in
+let code loopify(never) size(6) newer_version_of(g_1)
+      g_1_1 (f : val, x)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply &my_alloc_region f (x) -> k * k1
+in
+let $camlApp_unarized_to_single_kind__g_2 =
+  closure g_1_1 @g &toplevel.alloc_region
+in
+let code loopify(never) size(1) newer_version_of(h_2)
+      h_2_1 (x) my_closure &my_alloc_region my_depth -> k * k1 : imm tagged =
+  cont k (x)
+in
+let $camlApp_unarized_to_single_kind__h_3 =
+  closure h_2_1 @h &toplevel.alloc_region
+in
+let $camlApp_unarized_to_single_kind =
+  Block 0 ($camlApp_unarized_to_single_kind__f_1,
+           $camlApp_unarized_to_single_kind__g_2,
+           $camlApp_unarized_to_single_kind__h_3)
+in
+cont done ($camlApp_unarized_to_single_kind)
