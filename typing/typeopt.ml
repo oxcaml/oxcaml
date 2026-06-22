@@ -402,7 +402,7 @@ let array_type_kind ~elt_ty env loc ty =
     | Some elt_ty ->
       let rhs = Jkind.Builtin.value ~why:Array_type_kind in
       begin match Ctype.constrain_type_jkind env elt_ty rhs with
-      | Ok _ -> Pgenarray
+      | Ok _ -> if Config.flat_float_array then Pgenarray else Paddrarray
       | Error e ->
         (* CR layouts v4: rather than constraining [elt_ty]'s jkind to be value,
            we could instead use its jkind to determine a non-value array kind.
