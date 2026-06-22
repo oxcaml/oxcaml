@@ -637,7 +637,7 @@ let array_mode exp =
     (* non-generic, non-float arrays act as constructors *)
     Guard
   | Lambda.Punboxedfloatarray _ | Lambda.Punboxedoruntaggedintarray _
-  | Lambda.Punboxedvectorarray _
+  | Lambda.Punboxedvectorarray _ | Lambda.Punboxedmaskarray
   | Lambda.Pgcscannableproductarray _ | Lambda.Pgcignorableproductarray _ ->
     Dereference
 

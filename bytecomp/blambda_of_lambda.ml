@@ -438,6 +438,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         | Pfloatarray | Punboxedfloatarray Unboxed_float64 ->
           variadic Makefloatblock
         | Punboxedvectorarray _ -> simd_is_not_supported ()
+        | Punboxedmaskarray -> simd_is_not_supported ()
         | Pgenarray -> (
           let block = variadic (Makeblock { tag = 0 }) in
           match args with
@@ -480,6 +481,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           | Punboxedoruntaggedintarray Unboxed_nativeint ->
             Lconst (Const_base (Const_nativeint 0n))
           | Punboxedvectorarray _ -> raise Not_found
+          | Punboxedmaskarray -> raise Not_found
           | Pgcignorableproductarray ignorables ->
             let rec convert_ignorable
                 (ign : Lambda.ignorable_product_element_kind) : Lambda.lambda =
@@ -775,7 +777,11 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Parrayrefs (Punboxedvectorarray_ref _, _, _)
     | Parraysets (Punboxedvectorarray_set _, _)
     | Parrayrefu (Punboxedvectorarray_ref _, _, _)
-    | Parraysetu (Punboxedvectorarray_set _, _) ->
+    | Parraysetu (Punboxedvectorarray_set _, _)
+    | Parrayrefs (Punboxedmaskarray_ref, _, _)
+    | Parraysets (Punboxedmaskarray_set, _)
+    | Parrayrefu (Punboxedmaskarray_ref, _, _)
+    | Parraysetu (Punboxedmaskarray_set, _) ->
       simd_is_not_supported ()
     | Pctconst c -> unary (caml_sys_const c)
     | Pisint _ -> unary Isint
@@ -878,6 +884,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
          arrays epic for out plan to deal with it. *)
       match kind with
       | Punboxedvectorarray _ -> simd_is_not_supported ()
+      | Punboxedmaskarray -> simd_is_not_supported ()
       | Pgenarray | Pintarray | Paddrarray | Pgcignorableaddrarray
       | Punboxedoruntaggedintarray _ | Pfloatarray | Punboxedfloatarray _
       | Pgcscannableproductarray _ | Pgcignorableproductarray _ -> (
@@ -887,6 +894,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Parrayblit { src_mutability = _; dst_array_set_kind } -> (
       match dst_array_set_kind with
       | Punboxedvectorarray_set _ -> simd_is_not_supported ()
+      | Punboxedmaskarray_set -> simd_is_not_supported ()
       | Pgenarray_set _ | Pintarray_set | Paddrarray_set _
       | Pgcignorableaddrarray_set | Punboxedoruntaggedintarray_set _
       | Pfloatarray_set | Punboxedfloatarray_set _

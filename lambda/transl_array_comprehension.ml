@@ -740,12 +740,6 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       Immutable StrictOpt, make_unboxed_int64_vect ~loc array_size.var
     | Fixed_size, Punboxedoruntaggedintarray Unboxed_nativeint ->
       Immutable StrictOpt, make_unboxed_nativeint_vect ~loc array_size.var
-    | Fixed_size, Punboxedvectorarray Unboxed_vec128 ->
-      Immutable StrictOpt, make_unboxed_vec128_vect ~loc array_size.var
-    | Fixed_size, Punboxedvectorarray Unboxed_vec256 ->
-      Immutable StrictOpt, make_unboxed_vec128_vect ~loc array_size.var
-    | Fixed_size, Punboxedvectorarray Unboxed_vec512 ->
-      Immutable StrictOpt, make_unboxed_vec128_vect ~loc array_size.var
     (* Case 3: Unknown size, known array kind *)
     | Dynamic_size, (Pintarray | Paddrarray | Pgcignorableaddrarray) ->
       Mutable, Resizable_array.make ~loc array_kind (int 0)
@@ -769,9 +763,9 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       ( Mutable,
         Resizable_array.make ~loc array_kind (unboxed_nativeint Targetint.zero)
       )
-    | Dynamic_size, Punboxedvectorarray Unboxed_vec128
-    | Dynamic_size, Punboxedvectorarray Unboxed_vec256
-    | Dynamic_size, Punboxedvectorarray Unboxed_vec512 ->
+    | ( (Fixed_size | Dynamic_size),
+        ( Punboxedvectorarray (Unboxed_vec128 | Unboxed_vec256 | Unboxed_vec512)
+        | Punboxedmaskarray ) ) ->
       (* The above cases are not actually allowed/tested yet. *)
       Misc.fatal_error
         "Comprehensions on arrays of unboxed vectors are not yet supported."
@@ -866,7 +860,8 @@ let body ~loc ~array_kind ~array_size ~array_sizing ~array ~index ~body =
              layout_unit ))
     | Pintarray | Paddrarray | Pgcignorableaddrarray | Pfloatarray
     | Punboxedfloatarray (Unboxed_float64 | Unboxed_float32)
-    | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ ->
+    | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ | Punboxedmaskarray
+      ->
       set_element_in_bounds body
     | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
       Misc.fatal_error "Transl_array_comprehension.body: unboxed product array"
@@ -880,7 +875,7 @@ let comprehension ~transl_exp ~scopes ~loc ~(array_kind : Lambda.array_kind)
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray ->
     ()
   | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
-    ->
+  | Punboxedmaskarray ->
     if not !Clflags.native_code
     then
       Misc.fatal_errorf

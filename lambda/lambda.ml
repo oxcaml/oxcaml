@@ -425,6 +425,7 @@ and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
+  | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
 
 and external_call_description = extern_repr Primitive.description_gen
@@ -450,6 +451,7 @@ and value_kind_non_null =
     }
   | Parrayval of array_kind
   | Pboxedvectorval of boxed_vector
+  | Pboxedmaskval
 
 and layout =
   | Ptop
@@ -498,6 +500,7 @@ and array_kind =
   | Punboxedfloatarray of unboxed_float
   | Punboxedoruntaggedintarray of unboxed_or_untagged_integer
   | Punboxedvectorarray of unboxed_vector
+  | Punboxedmaskarray
   | Pgcscannableproductarray of scannable_product_element_kind list
   | Pgcignorableproductarray of ignorable_product_element_kind list
 
@@ -510,6 +513,7 @@ and array_ref_kind =
   | Punboxedfloatarray_ref of unboxed_float
   | Punboxedoruntaggedintarray_ref of unboxed_or_untagged_integer
   | Punboxedvectorarray_ref of unboxed_vector
+  | Punboxedmaskarray_ref
   | Pgcscannableproductarray_ref of scannable_product_element_kind list
   | Pgcignorableproductarray_ref of ignorable_product_element_kind list
 
@@ -522,6 +526,7 @@ and array_set_kind =
   | Punboxedfloatarray_set of unboxed_float
   | Punboxedoruntaggedintarray_set of unboxed_or_untagged_integer
   | Punboxedvectorarray_set of unboxed_vector
+  | Punboxedmaskarray_set
   | Pgcscannableproductarray_set of
       modify_mode * scannable_product_element_kind list
   | Pgcignorableproductarray_set of ignorable_product_element_kind list
@@ -636,6 +641,7 @@ let rec equal_value_kind_non_null x y =
   | Pboxedfloatval f1, Pboxedfloatval f2 -> Primitive.equal_boxed_float f1 f2
   | Pboxedintval bi1, Pboxedintval bi2 -> Primitive.equal_boxed_integer bi1 bi2
   | Pboxedvectorval v1, Pboxedvectorval v2 -> Primitive.equal_boxed_vector v1 v2
+  | Pboxedmaskval, Pboxedmaskval -> true
   | Pintval, Pintval -> true
   | Parrayval elt_kind1, Parrayval elt_kind2 -> elt_kind1 = elt_kind2
   | Pvariant { consts = consts1; non_consts = non_consts1; },
@@ -651,7 +657,7 @@ let rec equal_value_kind_non_null x y =
              && equal_constructor_shape cstr1 cstr2)
            non_consts1 non_consts2
   | (Pgenval | Pboxedfloatval _ | Pboxedintval _ | Pintval | Pvariant _
-      | Parrayval _ | Pboxedvectorval _), _ -> false
+      | Parrayval _ | Pboxedvectorval _ | Pboxedmaskval), _ -> false
 
 and equal_value_kind x y =
   equal_value_kind_non_null x.raw_kind y.raw_kind
@@ -1389,6 +1395,7 @@ let layout_unboxed_vector v =
   | Unboxed_vec512 -> Punboxed_vector Unboxed_vec512
 
 let layout_boxed_vector v =  non_null_value (Pboxedvectorval v)
+let layout_boxed_mask = non_null_value Pboxedmaskval
 
 let layout_tupled_vector v =
   let fields =
@@ -2492,12 +2499,12 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Parraysetu _ | Parraysets _
   | Parrayrefu ((Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
       | Punboxedfloatarray_ref _ | Punboxedoruntaggedintarray_ref _
-      | Punboxedvectorarray_ref _
+      | Punboxedvectorarray_ref _ | Punboxedmaskarray_ref
       | Pgcscannableproductarray_ref _
       | Pgcignorableproductarray_ref _), _, _)
   | Parrayrefs ((Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
       | Punboxedfloatarray_ref _ | Punboxedoruntaggedintarray_ref _
-      | Punboxedvectorarray_ref _
+      | Punboxedvectorarray_ref _ | Punboxedmaskarray_ref
       | Pgcscannableproductarray_ref _
       | Pgcignorableproductarray_ref _), _, _) -> None
   | Parrayrefu ((Pgenarray_ref m | Pfloatarray_ref m), _, _)
@@ -2848,6 +2855,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
 
 let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
+  | Unboxed_mask -> layout_boxed_mask
   | Unboxed_float bf -> layout_boxed_float bf
   | Unboxed_or_untagged_integer
       (Untagged_int | Untagged_int8 | Untagged_int16) ->
@@ -2864,7 +2872,7 @@ let extern_repr_involves_unboxed_products extern_repr =
   match extern_repr with
   | Same_as_ocaml_repr (Product _)
   | Same_as_ocaml_repr (Base _)
-  | Unboxed_vector _ | Unboxed_float _
+  | Unboxed_vector _ | Unboxed_mask | Unboxed_float _
   | Unboxed_or_untagged_integer _ ->
     false
   | Same_as_ocaml_repr (Univar _) ->
@@ -2898,6 +2906,7 @@ let array_ref_kind_result_layout = function
     layout_value_field
   | Punboxedoruntaggedintarray_ref i -> layout_unboxed_int i
   | Punboxedvectorarray_ref bv -> layout_unboxed_vector bv
+  | Punboxedmaskarray_ref -> layout_unboxed_mask
   | Pgcscannableproductarray_ref kinds -> layout_of_scannable_kinds kinds
   | Pgcignorableproductarray_ref kinds -> layout_of_ignorable_kinds kinds
 
@@ -3256,6 +3265,7 @@ let array_ref_kind mode = function
     Punboxedoruntaggedintarray_ref int_kind
   | Punboxedfloatarray float_kind -> Punboxedfloatarray_ref float_kind
   | Punboxedvectorarray vec_kind -> Punboxedvectorarray_ref vec_kind
+  | Punboxedmaskarray -> Punboxedmaskarray_ref
   | Pgcscannableproductarray kinds -> Pgcscannableproductarray_ref kinds
   | Pgcignorableproductarray kinds -> Pgcignorableproductarray_ref kinds
 
@@ -3269,6 +3279,7 @@ let array_set_kind mode = function
     Punboxedoruntaggedintarray_set int_kind
   | Punboxedfloatarray float_kind -> Punboxedfloatarray_set float_kind
   | Punboxedvectorarray vec_kind -> Punboxedvectorarray_set vec_kind
+  | Punboxedmaskarray -> Punboxedmaskarray_set
   | Pgcscannableproductarray kinds -> Pgcscannableproductarray_set (mode, kinds)
   | Pgcignorableproductarray kinds -> Pgcignorableproductarray_set kinds
 
@@ -3279,6 +3290,7 @@ let array_ref_kind_of_array_set_kind (kind : array_set_kind) mode
   | Punboxedfloatarray_set uf -> Punboxedfloatarray_ref uf
   | Punboxedoruntaggedintarray_set ui -> Punboxedoruntaggedintarray_ref ui
   | Punboxedvectorarray_set uv -> Punboxedvectorarray_ref uv
+  | Punboxedmaskarray_set -> Punboxedmaskarray_ref
   | Pgcscannableproductarray_set (_, scannables) ->
     Pgcscannableproductarray_ref scannables
   | Pgcignorableproductarray_set ignorables ->
@@ -3381,7 +3393,8 @@ let count_initializers_array_kind (lambda_array_kind : array_kind) =
   match lambda_array_kind with
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Punboxedfloatarray _
-  | Punboxedoruntaggedintarray _  -> 1
+  | Punboxedoruntaggedintarray _
+  | Punboxedmaskarray -> 1
   | Punboxedvectorarray Unboxed_vec128 -> 2
   | Punboxedvectorarray Unboxed_vec256 -> 4
   | Punboxedvectorarray Unboxed_vec512 -> 8
@@ -3419,6 +3432,7 @@ let array_element_size_in_bytes (array_kind : array_kind) =
   | Punboxedvectorarray Unboxed_vec128 -> 16
   | Punboxedvectorarray Unboxed_vec256 -> 32
   | Punboxedvectorarray Unboxed_vec512 -> 64
+  | Punboxedmaskarray -> 8
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     (* All elements of unboxed product arrays are currently 8 bytes wide. *)
     count_initializers_array_kind array_kind * 8

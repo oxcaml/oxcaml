@@ -1421,7 +1421,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
             | Pboxedfloatval Boxed_float64 -> true
             | Pboxedfloatval Boxed_float32
             | Pgenval | Pintval | Pboxedintval _ | Pvariant _ | Parrayval _
-            | Pboxedvectorval _ ->
+            | Pboxedvectorval _ | Pboxedmaskval ->
               false)
           field_kinds);
       Some (Unboxed_float_record (List.length field_kinds))
@@ -1447,6 +1447,8 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
         | Boxed_vec512 -> Naked_vec512
       in
       Some (Unboxed_number bn)
+    | Pvalue { nullable = Non_nullable; raw_kind = Pboxedmaskval } ->
+      Some (Unboxed_number Naked_mask)
     | Pvalue
         { nullable = Non_nullable;
           raw_kind = Pgenval | Pintval | Pvariant _ | Parrayval _

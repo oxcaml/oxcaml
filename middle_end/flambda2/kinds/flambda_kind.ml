@@ -1032,6 +1032,7 @@ module With_subkind = struct
       | Pboxedvectorval Boxed_vec128 -> Boxed_vec128
       | Pboxedvectorval Boxed_vec256 -> Boxed_vec256
       | Pboxedvectorval Boxed_vec512 -> Boxed_vec512
+      | Pboxedmaskval -> Boxed_mask
       | Pintval -> Tagged_immediate
       | Pvariant { consts; non_consts } -> (
         match consts, non_consts with
@@ -1137,6 +1138,7 @@ module With_subkind = struct
       | Parrayval (Punboxedvectorarray Unboxed_vec128) -> Unboxed_vec128_array
       | Parrayval (Punboxedvectorarray Unboxed_vec256) -> Unboxed_vec256_array
       | Parrayval (Punboxedvectorarray Unboxed_vec512) -> Unboxed_vec512_array
+      | Parrayval Punboxedmaskarray -> Unboxed_mask_array
       | Parrayval (Pgcscannableproductarray _ | Pgcignorableproductarray _) ->
         Unboxed_product_array
     in

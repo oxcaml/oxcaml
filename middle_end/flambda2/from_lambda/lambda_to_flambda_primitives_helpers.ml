@@ -500,7 +500,7 @@ let convert_block_access_field_kind_from_value_kind
   | Pvariant { consts = _; non_consts } -> (
     match non_consts with [] -> Immediate | _ :: _ -> Any_value)
   | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Parrayval _
-  | Pboxedvectorval _ ->
+  | Pboxedvectorval _ | Pboxedmaskval ->
     Any_value
 
 (* This function shouldn't be used directly since lambda mixed blocks with an

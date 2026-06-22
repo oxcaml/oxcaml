@@ -712,6 +712,11 @@ let unarize_extern_repr ~machine_width alloc_mode
         arg_transformer = Some (P.Unbox_number Naked_vec512);
         return_transformer = Some (P.Box_number (Naked_vec512, alloc_mode))
       } ]
+  | Unboxed_mask ->
+    [ { kind = K.naked_mask;
+        arg_transformer = Some (P.Unbox_number Naked_mask);
+        return_transformer = Some (P.Box_number (Naked_mask, alloc_mode))
+      } ]
   | Unboxed_or_untagged_integer Untagged_int ->
     [ { kind = K.naked_immediate;
         arg_transformer = Some P.Untag_immediate;

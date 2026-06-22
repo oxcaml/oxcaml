@@ -4248,6 +4248,8 @@ let native_repr_of_type ~loc env kind ty sort_or_poly ~is_return =
     Some (Unboxed_vector Boxed_vec512)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float64x8 ->
     Some (Unboxed_vector Boxed_vec512)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_mask ->
+    Some Unboxed_mask
   | _ ->
     None
 

@@ -92,6 +92,7 @@ let array_kind = function
   | Punboxedfloatarray f -> unboxed_float f
   | Punboxedoruntaggedintarray i -> unboxed_integer i
   | Punboxedvectorarray v -> unboxed_vector v
+  | Punboxedmaskarray -> "unboxed_mask"
   | Pgcscannableproductarray kinds ->
     "scannableproduct " ^ scannable_product_element_kinds kinds
   | Pgcignorableproductarray kinds ->
@@ -118,6 +119,7 @@ let array_ref_kind ppf k =
   | Punboxedvectorarray_ref Unboxed_vec128 -> fprintf ppf "unboxed_vec128"
   | Punboxedvectorarray_ref Unboxed_vec256 -> fprintf ppf "unboxed_vec256"
   | Punboxedvectorarray_ref Unboxed_vec512 -> fprintf ppf "unboxed_vec512"
+  | Punboxedmaskarray_ref -> fprintf ppf "unboxed_mask"
   | Pgcscannableproductarray_ref kinds ->
     fprintf ppf "scannableproduct %s" (scannable_product_element_kinds kinds)
   | Pgcignorableproductarray_ref kinds ->
@@ -146,6 +148,7 @@ let array_set_kind ppf k =
   | Punboxedvectorarray_set Unboxed_vec128 -> fprintf ppf "unboxed_vec128"
   | Punboxedvectorarray_set Unboxed_vec256 -> fprintf ppf "unboxed_vec256"
   | Punboxedvectorarray_set Unboxed_vec512 -> fprintf ppf "unboxed_vec512"
+  | Punboxedmaskarray_set -> fprintf ppf "unboxed_mask"
   | Pgcscannableproductarray_set (mode, kinds) ->
     fprintf ppf "scannableproduct%a %s" pp_mode mode
       (scannable_product_element_kinds kinds)
@@ -219,6 +222,7 @@ let rec raw_value_kind ppf rk =
   | Parrayval elt_kind -> fprintf ppf "%sarray" (array_kind elt_kind)
   | Pboxedintval bi -> fprintf ppf "%s" (boxed_integer bi)
   | Pboxedvectorval bv -> fprintf ppf "%s" (boxed_vector bv)
+  | Pboxedmaskval -> fprintf ppf "mask"
   | Pvariant { consts; non_consts; } ->
     variant_kind value_kind ppf ~consts ~non_consts
 
@@ -275,6 +279,8 @@ let return_kind ppf (mode, kind) =
       fprintf ppf ": %s%s%s@ " smode (boxed_integer bi) or_null_suffix
     | Pboxedvectorval bv ->
       fprintf ppf ": %s%s%s@ " smode (boxed_vector bv) or_null_suffix
+    | Pboxedmaskval ->
+      fprintf ppf ": %smask%s@ " smode or_null_suffix
     | Pvariant { consts; non_consts; } ->
       fprintf ppf ": %a@ "
         (fun ppf () -> variant_kind value_kind ppf ~consts ~non_consts) ()

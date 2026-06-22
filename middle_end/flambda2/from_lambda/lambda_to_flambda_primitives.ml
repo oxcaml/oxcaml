@@ -174,6 +174,7 @@ let convert_array_kind dbg (kind : L.array_kind) : converted_array_kind =
   | Punboxedvectorarray Unboxed_vec128 -> Array_kind Naked_vec128s
   | Punboxedvectorarray Unboxed_vec256 -> Array_kind Naked_vec256s
   | Punboxedvectorarray Unboxed_vec512 -> Array_kind Naked_vec512s
+  | Punboxedmaskarray -> Array_kind Naked_masks
   | Pgcscannableproductarray kinds ->
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         P.Array_kind.t =
@@ -228,6 +229,7 @@ module Array_ref_kind = struct
     | Naked_vec128s
     | Naked_vec256s
     | Naked_vec512s
+    | Naked_masks
     | Unboxed_product of no_float_array_opt list
 
   type t =
@@ -272,6 +274,7 @@ let convert_array_ref_kind dbg (kind : L.array_ref_kind) :
     Array_ref_kind (No_float_array_opt Naked_vec256s)
   | Punboxedvectorarray_ref Unboxed_vec512 ->
     Array_ref_kind (No_float_array_opt Naked_vec512s)
+  | Punboxedmaskarray_ref -> Array_ref_kind (No_float_array_opt Naked_masks)
   | Pgcscannableproductarray_ref kinds ->
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         Array_ref_kind.no_float_array_opt =
@@ -320,8 +323,9 @@ let rec convert_unboxed_product_array_ref_kind
   | Naked_int64s -> Naked_int64s
   | Naked_nativeints -> Naked_nativeints
   | Naked_vec128s -> Naked_vec128s
-  | Naked_vec256s | Naked_vec512s ->
-    Misc.fatal_error "Arrays of products of wide vectors is not implemented"
+  | Naked_vec256s | Naked_vec512s | Naked_masks ->
+    Misc.fatal_error
+      "Arrays of products of wide vectors or masks are not implemented"
   | Unboxed_product kinds ->
     Unboxed_product (List.map convert_unboxed_product_array_ref_kind kinds)
 
@@ -345,6 +349,7 @@ let convert_array_ref_kind_to_array_kind (array_ref_kind : Array_ref_kind.t) :
     | Naked_vec128s -> Naked_vec128s
     | Naked_vec256s -> Naked_vec256s
     | Naked_vec512s -> Naked_vec512s
+    | Naked_masks -> Naked_masks
     | Unboxed_product kinds ->
       Unboxed_product (List.map convert_unboxed_product_array_ref_kind kinds))
 
@@ -371,6 +376,7 @@ let convert_array_ref_kind_for_length dbg array_ref_kind :
       | Naked_vec128s -> Array_kind Naked_vec128s
       | Naked_vec256s -> Array_kind Naked_vec256s
       | Naked_vec512s -> Array_kind Naked_vec512s
+      | Naked_masks -> Array_kind Naked_masks
       | Unboxed_product kinds ->
         Array_kind
           (Unboxed_product
@@ -392,6 +398,7 @@ module Array_set_kind = struct
     | Naked_vec128s
     | Naked_vec256s
     | Naked_vec512s
+    | Naked_masks
     | Unboxed_product of no_float_array_opt list
 
   type t =
@@ -439,6 +446,7 @@ let convert_array_set_kind dbg (kind : L.array_set_kind) :
     Array_set_kind (No_float_array_opt Naked_vec256s)
   | Punboxedvectorarray_set Unboxed_vec512 ->
     Array_set_kind (No_float_array_opt Naked_vec512s)
+  | Punboxedmaskarray_set -> Array_set_kind (No_float_array_opt Naked_masks)
   | Pgcscannableproductarray_set (mode, kinds) ->
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         Array_set_kind.no_float_array_opt =
@@ -488,8 +496,9 @@ let rec convert_unboxed_product_array_set_kind
   | Naked_int64s -> Naked_int64s
   | Naked_nativeints -> Naked_nativeints
   | Naked_vec128s -> Naked_vec128s
-  | Naked_vec256s | Naked_vec512s ->
-    Misc.fatal_error "Arrays of products of wide vectors is not implemented"
+  | Naked_vec256s | Naked_vec512s | Naked_masks ->
+    Misc.fatal_error
+      "Arrays of products of wide vectors or masks are not implemented"
   | Unboxed_product kinds ->
     Unboxed_product (List.map convert_unboxed_product_array_set_kind kinds)
 
@@ -513,6 +522,7 @@ let convert_array_set_kind_to_array_kind (array_set_kind : Array_set_kind.t) :
     | Naked_vec128s -> Naked_vec128s
     | Naked_vec256s -> Naked_vec256s
     | Naked_vec512s -> Naked_vec512s
+    | Naked_masks -> Naked_masks
     | Unboxed_product kinds ->
       Unboxed_product (List.map convert_unboxed_product_array_set_kind kinds))
 
@@ -537,6 +547,7 @@ let convert_array_set_kind_for_length dbg array_set_kind :
     | Naked_vec128s -> Array_kind Naked_vec128s
     | Naked_vec256s -> Array_kind Naked_vec256s
     | Naked_vec512s -> Array_kind Naked_vec512s
+    | Naked_masks -> Array_kind Naked_masks
     | Unboxed_product kinds ->
       Array_kind
         (Unboxed_product (List.map convert_unboxed_product_array_set_kind kinds))
@@ -577,6 +588,7 @@ let convert_array_kind_to_duplicate_array_kind dbg (kind : L.array_kind) :
     Duplicate_array_kind (Naked_vec256s { length = None })
   | Punboxedvectorarray Unboxed_vec512 ->
     Duplicate_array_kind (Naked_vec512s { length = None })
+  | Punboxedmaskarray -> Duplicate_array_kind (Naked_masks { length = None })
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     Misc.fatal_error
       "Lambda_to_flambda_primitives.convert_array_kind_to_duplicate_array_kind: \
@@ -1342,6 +1354,7 @@ let rec array_load_unsafe ~machine_width ~array ~index
       | Naked_vec128s -> [Array_ref_kind.No_float_array_opt Naked_vec128s]
       | Naked_vec256s -> [Array_ref_kind.No_float_array_opt Naked_vec256s]
       | Naked_vec512s -> [Array_ref_kind.No_float_array_opt Naked_vec512s]
+      | Naked_masks -> [Array_ref_kind.No_float_array_opt Naked_masks]
       | Unboxed_product kinds -> List.concat_map unarize_kind kinds
     in
     let unarized = List.concat_map unarize_kind array_ref_kinds in
@@ -1367,7 +1380,7 @@ let rec array_load_unsafe ~machine_width ~array ~index
       (( Immediates | Gc_ignorable_values | Values | Naked_floats
        | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
        | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-       | Naked_vec512s ) as nfo) ->
+       | Naked_vec512s | Naked_masks ) as nfo) ->
     let array_load_kind : P.Array_load_kind.t =
       match nfo with
       | Immediates -> Immediates
@@ -1384,6 +1397,7 @@ let rec array_load_unsafe ~machine_width ~array ~index
       | Naked_vec128s -> Naked_vec128s
       | Naked_vec256s -> Naked_vec256s
       | Naked_vec512s -> Naked_vec512s
+      | Naked_masks -> Naked_masks
       | Unboxed_product _ -> assert false
     in
     [Binary (Array_load (array_kind, array_load_kind, mut'), array, index)]
@@ -1428,6 +1442,7 @@ let rec array_set_unsafe ~machine_width dbg ~array ~index array_kind
       | Naked_vec128s -> [Array_set_kind.No_float_array_opt Naked_vec128s]
       | Naked_vec256s -> [Array_set_kind.No_float_array_opt Naked_vec256s]
       | Naked_vec512s -> [Array_set_kind.No_float_array_opt Naked_vec512s]
+      | Naked_masks -> [Array_set_kind.No_float_array_opt Naked_masks]
       | Unboxed_product kinds -> List.concat_map unarize_kind kinds
     in
     let unarized = List.concat_map unarize_kind array_set_kinds in
@@ -1460,7 +1475,7 @@ let rec array_set_unsafe ~machine_width dbg ~array ~index array_kind
       (( Immediates | Gc_ignorable_values | Values _ | Naked_floats
        | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
        | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-       | Naked_vec512s ) as nfo) -> (
+       | Naked_vec512s | Naked_masks ) as nfo) -> (
     match nfo with
     | Immediates -> normal_case Immediates new_values
     | Values init_or_assign -> normal_case (Values init_or_assign) new_values
@@ -1476,6 +1491,7 @@ let rec array_set_unsafe ~machine_width dbg ~array ~index array_kind
     | Naked_vec128s -> normal_case Naked_vec128s new_values
     | Naked_vec256s -> normal_case Naked_vec256s new_values
     | Naked_vec512s -> normal_case Naked_vec512s new_values
+    | Naked_masks -> normal_case Naked_masks new_values
     | Unboxed_product _ -> assert false)
 
 let array_set_unsafe ~machine_width dbg ~array ~index array_kind array_set_kind
@@ -2048,7 +2064,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             ( Untagged_int | Untagged_int8 | Untagged_int16 | Unboxed_int32
             | Unboxed_int64 | Unboxed_nativeint )
         | Punboxedvectorarray (Unboxed_vec128 | Unboxed_vec256 | Unboxed_vec512)
-        | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
+        | Punboxedmaskarray | Pgcscannableproductarray _
+        | Pgcignorableproductarray _ ->
           args
         | Pfloatarray -> List.map unbox_float args
       in
@@ -3260,14 +3277,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
             | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _
             | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
-            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
+            | Punboxedmaskarray_ref | Pgcscannableproductarray_ref _
+            | Pgcignorableproductarray_ref _ ),
             _,
             _ )
       | Parrayrefs
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
             | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _
             | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
-            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
+            | Punboxedmaskarray_ref | Pgcscannableproductarray_ref _
+            | Pgcignorableproductarray_ref _ ),
             _,
             _ )
       | Patomic_load_field _ | Ppoke _ | Pphys_equal _
@@ -3287,13 +3306,15 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           ( ( Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
             | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
-            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
+            | Punboxedmaskarray_set | Pgcscannableproductarray_set _
+            | Pgcignorableproductarray_set _ ),
             _ )
       | Parraysets
           ( ( Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
             | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
-            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
+            | Punboxedmaskarray_set | Pgcscannableproductarray_set _
+            | Pgcignorableproductarray_set _ ),
             _ )
       | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
       | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_set_8 _

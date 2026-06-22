@@ -389,12 +389,7 @@ let array_kind_of_elt env loc ty =
   | Unboxed_int Untagged_int16 -> Punboxedoruntaggedintarray Untagged_int16
   | Unboxed_int Untagged_int8 -> Punboxedoruntaggedintarray Untagged_int8
   | Unboxed_vector v -> Punboxedvectorarray v
-  | Unboxed_mask ->
-    raise
-      (Error
-         ( loc,
-           Mixed_product_array
-             (Base (Mask, Jkind_types.Scannable_axes.max), ty) ))
+  | Unboxed_mask -> Punboxedmaskarray
   | Product c -> c
   | Void ->
     raise (Error (loc, Unsupported_void_in_array))
@@ -714,6 +709,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
   | Tconstr(p, _, _) when Path.same p Predef.path_float64x8 ->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
+  | Tconstr(p, _, _) when Path.same p Predef.path_mask ->
+    num_nodes_visited, non_nullable Pboxedmaskval
   | Tconstr(p, [arg], _)
     when (Path.same p Predef.path_array
           || Path.same p Predef.path_iarray) ->
