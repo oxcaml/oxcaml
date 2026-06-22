@@ -1353,7 +1353,7 @@ end = struct
       | Byte_unsigned | Byte_signed -> I8
       | Sixteen_unsigned | Sixteen_signed -> I16
       | Thirtytwo_unsigned | Thirtytwo_signed | Single _ -> I32
-      | Word_int | Word_val | Double -> I64
+      | Word_int | Word_mask | Word_val | Double -> I64
       | Onetwentyeight_unaligned | Onetwentyeight_aligned -> I128
       | Twofiftysix_unaligned | Twofiftysix_aligned -> I256
       | Fivetwelve_unaligned | Fivetwelve_aligned -> I512
@@ -1587,8 +1587,8 @@ end = struct
         in
         match memory_chunk with
         | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-        | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int | Word_val
-        | Double | Onetwentyeight_aligned ->
+        | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int
+        | Word_mask | Word_val | Double | Onetwentyeight_aligned ->
           emit_shadow_check ?dependencies ~address ~report memory_chunk
         | Onetwentyeight_unaligned ->
           emit_shadow_check ?dependencies ~address ~report Byte_unsigned;
@@ -2132,6 +2132,7 @@ let emit_instr ~first ~last ~fallthrough i =
     in
     match memory_chunk with
     | Word_int | Word_val -> load ~dest:(res i 0) QWORD I.mov
+    | Word_mask -> Misc.fatal_error "avx512 masks not yet implemented"
     | Byte_unsigned -> load ~dest:(res i 0) BYTE I.movzx
     | Byte_signed -> load ~dest:(res i 0) BYTE I.movsx
     | Sixteen_unsigned -> load ~dest:(res i 0) WORD I.movzx
@@ -2168,6 +2169,7 @@ let emit_instr ~first ~last ~fallthrough i =
     in
     match chunk with
     | Word_int | Word_val -> store QWORD arg I.mov
+    | Word_mask -> Misc.fatal_error "avx512 masks not yet implemented"
     | Byte_unsigned | Byte_signed -> store BYTE arg8 I.mov
     | Sixteen_unsigned | Sixteen_signed -> store WORD arg16 I.mov
     | Thirtytwo_signed | Thirtytwo_unsigned -> store DWORD arg32 I.mov

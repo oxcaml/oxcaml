@@ -18,7 +18,7 @@ module Width_in_bits = struct
     | Byte_unsigned | Byte_signed -> W8
     | Sixteen_unsigned | Sixteen_signed -> W16
     | Thirtytwo_unsigned | Thirtytwo_signed | Single _ -> W32
-    | Word_int | Word_val | Double -> W64
+    | Word_int | Word_mask | Word_val | Double -> W64
     | Onetwentyeight_unaligned | Onetwentyeight_aligned -> W128
     | Twofiftysix_unaligned | Twofiftysix_aligned -> W256
     | Fivetwelve_unaligned | Fivetwelve_aligned -> W512

@@ -1531,9 +1531,9 @@ let emit_instr env i =
           (symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s)
           O.optional_none);
       A.ins2 LDR_simd_and_fp (H.reg_q dst) (H.mem reg_tmp1_base)
-    | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
-    | Fivetwelve_unaligned ->
-      Misc.fatal_error "arm64: got 256/512 bit vector")
+    | Word_mask | Twofiftysix_aligned | Twofiftysix_unaligned
+    | Fivetwelve_aligned | Fivetwelve_unaligned ->
+      Misc.fatal_error "arm64: got 256/512 bit vector or mask")
   | Lop (Store (size, addr, assignment)) -> (
     (* NB: assignments other than Word_int and Word_val do not follow the
        Multicore OCaml memory model and so do not emit a barrier *)
@@ -1581,9 +1581,9 @@ let emit_instr env i =
           (symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s)
           O.optional_none;
         A.ins2 STR_simd_and_fp (H.reg_q src) (H.mem reg_tmp1_base))
-    | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
-    | Fivetwelve_unaligned ->
-      Misc.fatal_error "arm64: got 256/512 bit vector")
+    | Word_mask | Twofiftysix_aligned | Twofiftysix_unaligned
+    | Fivetwelve_aligned | Fivetwelve_unaligned ->
+      Misc.fatal_error "arm64: got 256/512 bit vector or mask")
   | Lop (Alloc { bytes = n; dbginfo; mode = Heap }) ->
     assembly_code_for_allocation env i ~n ~local:false ~far:false ~dbginfo
   | Lop (Specific (Ifar_alloc { bytes = n; dbginfo })) ->

@@ -145,7 +145,7 @@ let memory_chunk_of_kind (kind : Flambda_kind.With_subkind.t) : Cmm.memory_chunk
   | Naked_number Naked_vec128 -> Onetwentyeight_unaligned
   | Naked_number Naked_vec256 -> Twofiftysix_unaligned
   | Naked_number Naked_vec512 -> Fivetwelve_unaligned
-  | Naked_number Naked_mask -> Word_int
+  | Naked_number Naked_mask -> Word_mask
   | Region | Rec_info ->
     Misc.fatal_errorf "Bad kind %a for [memory_chunk_of_kind]"
       Flambda_kind.With_subkind.print kind
@@ -507,7 +507,7 @@ let make_update env res dbg ({ kind; stride } : Update_kind.t) ~symbol var
         | Naked_vec128 -> Onetwentyeight_unaligned
         | Naked_vec256 -> Twofiftysix_unaligned
         | Naked_vec512 -> Fivetwelve_unaligned
-        | Naked_mask -> Word_int
+        | Naked_mask -> Word_mask
       in
       let addr = strided_field_address symbol ~stride ~index dbg in
       store ~dbg memory_chunk Initialization ~addr ~new_value:field_value

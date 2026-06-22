@@ -145,7 +145,7 @@ let memory_chunk_of_flat_suffix_element :
   | Naked_vec128 -> Onetwentyeight_unaligned
   | Naked_vec256 -> Twofiftysix_unaligned
   | Naked_vec512 -> Fivetwelve_unaligned
-  | Naked_mask -> Word_int
+  | Naked_mask -> Word_mask
   | Naked_int64 | Naked_nativeint | Naked_immediate -> Word_int
 
 let block_load ~dbg (kind : P.Block_access_kind.t) (mutability : Mutability.t)
