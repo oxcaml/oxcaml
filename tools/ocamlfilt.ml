@@ -321,7 +321,8 @@ let specs =
                | "flat0" -> Flat0
                | "flat1" -> Flat1
                | "structured" -> Structured
-               | _ -> raise (Arg.Bad (Printf.sprintf "unknown format: '%s'" s))),
+               | _ ->
+                 raise (Arg.Bad (Printf.sprintf "unknown format: '%s'" s))),
       "<format>  Set mangling format: auto, flat0 (<= 5.2.1), flat1 (>= 5.3), \
        structured  (default: auto)" );
     ( "--encode",

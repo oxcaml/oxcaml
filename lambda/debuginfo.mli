@@ -31,7 +31,8 @@ module Scoped_location : sig
     | Empty
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
                assume_zero_alloc: ZA.Assume_info.t;
-               mangling_item: Compilation_unit.t Structured_mangling.path_item option}
+               mangling_item:
+                 Compilation_unit.t Structured_mangling.path_item option}
 
   val string_of_scopes : include_zero_alloc:bool -> scopes -> string
 
