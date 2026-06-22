@@ -131,8 +131,10 @@ type module_patterns_restriction =
   | Modules_rejected
   | Modules_ignored
 
+(* CR dkalinichenko: explain this. *)
 val type_binding:
         Env.t -> mutable_flag -> rec_flag ->
+          ?check_uniqueness:bool ->
           ?force_toplevel:bool ->
           Parsetree.value_binding list ->
           Typedtree.value_binding list * Env.t
@@ -144,6 +146,7 @@ val type_expression:
         Env.t -> Parsetree.expression -> Typedtree.expression
 val type_representable_expression:
         why:Jkind.History.concrete_creation_reason ->
+        ?check_uniqueness:bool ->
         Env.t -> Parsetree.expression -> Typedtree.expression * Jkind.sort
 val type_class_arg_pattern:
         string -> Env.t -> Env.t -> arg_label -> Parsetree.pattern ->
@@ -160,8 +163,8 @@ val type_expect:
         Env.t -> ?mode:Mode.Value.r -> Parsetree.expression -> type_expected ->
           Typedtree.expression
 val type_exp:
-        Env.t -> ?mode: Mode.Value.r -> Parsetree.expression ->
-          Typedtree.expression
+        Env.t -> ?mode: Mode.Value.r -> ?check_uniqueness:bool ->
+          Parsetree.expression -> Typedtree.expression
 val type_approx:
         Env.t -> Parsetree.expression -> type_expr -> unit
 val type_argument:

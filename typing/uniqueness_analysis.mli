@@ -27,6 +27,24 @@ val check_uniqueness_exp : expression -> unit
    unique. *)
 val check_uniqueness_value_bindings : value_binding list -> unit
 
+(* CR dkalinichenko: explain this. *)
+val check_uniqueness_module_expr : module_expr -> unit
+
+(* CR dkalinichenko: explain this. *)
+val mk_unique_use :
+  submode:(Mode.Value.l -> Mode.Value.r -> unit) ->
+  Mode.Value.l ->
+  Mode.Value.r ->
+  unique_use
+
+type export =
+  | Export_all
+  | Export_signature of Types.signature
+
+(** Check the structure items of a compilation unit (or toplevel phrase), and
+    mark the exported components as aliased. *)
+val check_structure : structure_item list -> exported:export -> unit
+
 (* These definitions are just to allow printing in the debugger *)
 module type P := sig
   type t

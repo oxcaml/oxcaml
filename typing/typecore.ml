@@ -6100,27 +6100,11 @@ let with_explanation explanation f =
 let may_lower_contravariant env exp =
   if maybe_expansive exp then lower_contravariant env exp.exp_type
 
-let unique_use ~loc ~env mode_l mode_r  =
-  if not (Language_extension.is_at_least Unique
-            Language_extension.maturity_of_unique_for_drf) then begin
-    (* if unique extension is not enabled, we will not run uniqueness analysis;
-       instead, we force all uses to be aliased and many. This is equivalent to
-       running a UA which forces everything *)
-    submode ~loc ~env Value.(of_const {Const.min with uniqueness = Aliased})
-      (mode_default mode_r);
-    submode ~loc ~env mode_l (mode_default Value.(of_const
-      {Const.max with linearity = Many}));
-    (Uniqueness.disallow_left Uniqueness.aliased,
-     Linearity.disallow_right Linearity.many)
-  end
-  else
-    let uniqueness =
-      Uniqueness.disallow_left (Value.proj_monadic Uniqueness mode_r)
-    in
-    let linearity =
-      Linearity.disallow_right (Value.proj_comonadic Linearity mode_l)
-    in
-    (uniqueness, linearity)
+let unique_use ~loc ~env mode_l mode_r =
+  Uniqueness_analysis.mk_unique_use
+    ~submode:(fun mode expected ->
+      submode ~loc ~env mode (mode_default expected))
+    (Value.disallow_right mode_l) (Value.disallow_left mode_r)
 
 let is_really_poly ~env ty =
   let snap = Btype.snapshot () in
@@ -12099,7 +12083,8 @@ let maybe_check_uniqueness_value_bindings vbl =
 
 (* Typing of toplevel bindings *)
 
-let type_binding env mutable_flag rec_flag ?force_toplevel spat_sexp_list =
+let type_binding env mutable_flag rec_flag ?(check_uniqueness = true)
+    ?force_toplevel spat_sexp_list =
   let (pat_exp_list, new_env) =
     type_let
       ~check:(fun s _ -> Warnings.Unused_value_declaration s)
@@ -12108,7 +12093,8 @@ let type_binding env mutable_flag rec_flag ?force_toplevel spat_sexp_list =
       At_toplevel
       env mutable_flag rec_flag spat_sexp_list Modules_rejected
   in
-  maybe_check_uniqueness_value_bindings pat_exp_list;
+  if check_uniqueness then
+    maybe_check_uniqueness_value_bindings pat_exp_list;
   (pat_exp_list, new_env)
 
 let type_let existential_ctx env mutable_flag rec_flag spat_sexp_list =
@@ -12121,7 +12107,7 @@ let type_let existential_ctx env mutable_flag rec_flag spat_sexp_list =
 
 (* Typing of toplevel expressions *)
 
-let type_expression env jkind sexp =
+let type_expression env ?(check_uniqueness = true) jkind sexp =
   let exp =
     with_local_level_generalize begin fun () ->
       Typetexp.TyVarEnv.reset ();
@@ -12143,13 +12129,14 @@ let type_expression env jkind sexp =
         {exp with exp_type = desc.val_type}
     | _ -> exp
   in
-  maybe_check_uniqueness_exp exp; exp
+  if check_uniqueness then maybe_check_uniqueness_exp exp;
+  exp
 
-let type_representable_expression ~why env sexp =
+let type_representable_expression ~why ?check_uniqueness env sexp =
   let jkind, sort =
     Jkind.of_new_sort_var ~why ~level:(Ctype.get_current_level ())
   in
-  let exp = type_expression env jkind sexp in
+  let exp = type_expression env ?check_uniqueness jkind sexp in
   exp, sort
 
 let type_expression env sexp =
@@ -13379,10 +13366,11 @@ let type_expect env ?mode e ty =
   let exp = type_expect env expected_mode e ty in
   maybe_check_uniqueness_exp exp; exp
 
-let type_exp env ?mode e =
+let type_exp env ?mode ?(check_uniqueness = true) e =
   let expected_mode = mode_default_opt mode in
   let exp = type_exp env expected_mode e in
-  maybe_check_uniqueness_exp exp; exp
+  if check_uniqueness then maybe_check_uniqueness_exp exp;
+  exp
 
 let type_argument env e t1 t2 =
   let exp = type_argument ~overwrite:No_overwrite env mode_legacy e t1 t2 in
