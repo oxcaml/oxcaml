@@ -315,10 +315,6 @@ _install: compiler duneconf/merlin_install.ws
           _install/lib/ocaml/merlin/
 	rm -f _install/lib/ocaml/merlin/META _install/lib/ocaml/merlin/dune-package \
           _install/lib/ocaml/merlin/opam
-	# Publish the findlib package as lib/ocaml/META.merlin-lib, keeping the
-	# canonical name "merlin-lib"; directory = "merlin" points findlib at the
-	# files in lib/ocaml/merlin/. Point the csexp dependency at the bundled
-	# subpackage merlin-lib.merlin_csexp.
 	echo 'directory = "merlin"' > _install/lib/ocaml/META.merlin-lib
 	sed -e 's/\bcsexp\b/merlin-lib.merlin_csexp/g' \
           _build/install/merlin_install/lib/merlin-lib/META \
