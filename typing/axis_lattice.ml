@@ -113,8 +113,7 @@ type t = int
 
 let bot : t = 0
 
-let top : t =
-  Array.fold_left ( lor ) uic_disabled_mask axis_mask
+let top : t = Array.fold_left ( lor ) uic_disabled_mask axis_mask
 
 let join (a : t) (b : t) : t = a lor b
 
@@ -229,15 +228,13 @@ let relevant_axes_of_modality (modality : Mode.Modality.Const.t) :
 let mask_of_modality (modality : Mode.Modality.Const.t) : t =
   relevant_axes_of_modality modality |> of_axis_set
 
-let modality_makes_axis_constant :
-    type a. a Mode.Crossing.Axis.t -> Mode.Modality.Const.t -> bool =
+let modality_makes_axis_constant : type a.
+    a Mode.Crossing.Axis.t -> Mode.Modality.Const.t -> bool =
  fun axis modality ->
   let (Mode.Modality.Axis.P axis_for_modality) =
     Mode.Crossing.Axis.(P axis |> to_modality)
   in
-  let modality_on_axis =
-    Mode.Modality.Const.proj axis_for_modality modality
-  in
+  let modality_on_axis = Mode.Modality.Const.proj axis_for_modality modality in
   Mode.Modality.Per_axis.is_constant axis_for_modality modality_on_axis
 
 let modality_makes_uniqueness_constant modality =
@@ -246,9 +243,7 @@ let modality_makes_uniqueness_constant modality =
 
 let modality_has_contended_contention modality =
   let open Mode in
-  let axis_for_modality =
-    Modality.Axis.Monadic Axis.Contention
-  in
+  let axis_for_modality = Modality.Axis.Monadic Axis.Contention in
   let (Modality.Monadic.Atom.Join_const contention) =
     Modality.Const.proj axis_for_modality modality
   in
@@ -417,17 +412,13 @@ let staticity (x : t) : Mode.Staticity.const =
 let externality (x : t) : Jkind_axis.Externality.t =
   Levels.externality_of_level (get_axis x ~axis:10)
 
-let uic_disabled : t =
-  uic_disabled_mask
+let uic_disabled : t = uic_disabled_mask
 
-let disable_uic (x : t) : t =
-  x lor uic_disabled_mask
+let disable_uic (x : t) : t = x lor uic_disabled_mask
 
-let allow_uic (x : t) : t =
-  x land lnot uic_disabled_mask
+let allow_uic (x : t) : t = x land lnot uic_disabled_mask
 
-let uic_allowed (x : t) : bool =
-  x land uic_disabled_mask = 0
+let uic_allowed (x : t) : bool = x land uic_disabled_mask = 0
 
 let set_areality (a : Mode.Regionality.Const.t) (x : t) : t =
   set_axis x ~axis:0 ~level:(Levels.level_of_areality a)
