@@ -222,5 +222,5 @@ module I : sig
 
   (* SIMD instructions *)
 
-  val simd : ?evex:evex -> Amd64_simd_instrs.instr -> arg array -> unit
+  val simd : Amd64_simd_instrs.instr -> arg array -> unit
 end

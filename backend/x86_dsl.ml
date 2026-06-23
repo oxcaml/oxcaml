@@ -220,5 +220,5 @@ module I = struct
 
   let xor x y = emit (XOR (x, y))
 
-  let simd ?evex instr args = emit (SIMD (instr, args, evex))
+  let simd instr args = emit (SIMD (instr, args))
 end

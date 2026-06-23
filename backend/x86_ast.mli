@@ -101,13 +101,6 @@ type addr =
 
 type prefetch_temporal_locality_hint = Nta | T1 | T2 | T0
 
-type evex =
-  { mask : int;
-    zeroing : bool;
-    (** [Some RoundCurrent] suppresses exceptions *)
-    rounding : rounding option
-  }
-
 type arg =
   | Imm of int64
   (** Operand is an immediate constant integer *)
@@ -122,6 +115,7 @@ type arg =
   | Reg32 of reg64
   | Reg64 of reg64
   | Regf of regf
+  | Regmask of int
 
   | Mem of addr
   | Mem64_RIP of data_type * string * int
@@ -182,7 +176,7 @@ type instruction =
   | TEST of arg * arg
   | XCHG of arg * arg
   | XOR of arg * arg
-  | SIMD of Amd64_simd_instrs.instr * arg array * evex option
+  | SIMD of Amd64_simd_instrs.instr * arg array
 
 (* ELF specific *)
 type reloc_type =

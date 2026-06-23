@@ -2479,8 +2479,8 @@ SMSW r64/m16,REX.W + 0F 01 /4,,,,,
 "SQRTPD xmm1, xmm2/m128",66 0F 51 /r,SSE2,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VSQRTPD xmm1, xmm2/m128",VEX.128.66.0F.WIG 51 /r,AVX,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VSQRTPD ymm1, ymm2/m256",VEX.256.66.0F.WIG 51 /r,AVX,ModRM:reg (w),ModRM:r/m (r),NA,NA
-"VSQRTPD xmm1 {k1}{z}, xmm2/m128/m32bcst",EVEX.128.66.0F.W1 51 /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
-"VSQRTPD ymm1 {k1}{z}, ymm2/m256/m32bcst",EVEX.256.66.0F.W1 51 /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
+"VSQRTPD xmm1 {k1}{z}, xmm2/m128/m64bcst",EVEX.128.66.0F.W1 51 /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
+"VSQRTPD ymm1 {k1}{z}, ymm2/m256/m64bcst",EVEX.256.66.0F.W1 51 /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VSQRTPD zmm1 {k1}{z}, zmm2/m512/m64bcst{er}",EVEX.512.66.0F.W1 51 /r,AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "SQRTPS xmm1, xmm2/m128",NP 0F 51 /r,SSE,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VSQRTPS xmm1, xmm2/m128",VEX.128.0F.WIG 51 /r,AVX,ModRM:reg (w),ModRM:r/m (r),NA,NA

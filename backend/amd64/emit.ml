@@ -128,7 +128,7 @@ module I = struct
                enabled."
               !function_name))
 
-  let check_enabled (simd : Simd_instrs.instr) =
+  let simd (simd : Simd_instrs.instr) args =
     if not (Arch.Extension.enabled_instruction simd)
     then
       raise
@@ -136,11 +136,8 @@ module I = struct
            (Printf.sprintf
               "found '%s' whilst emitting %s, but %s is not enabled."
               simd.mnemonic !function_name
-              (Amd64_simd_defs.exts_to_string simd.ext)))
-
-  let simd ?evex (simd : Simd_instrs.instr) args =
-    check_enabled simd;
-    I.simd ?evex simd args
+              (Amd64_simd_defs.exts_to_string simd.ext)));
+    I.simd simd args
 end
 
 (** Turn a Linear label into an assembly label. The section is checked against
@@ -204,7 +201,9 @@ let register_name typ phys_reg : X86_ast.arg =
   | Vec512 ->
     I.require_vec512 ();
     Regf zmm_reg_name.(reg_index)
-  | Mask -> Misc.fatal_error "avx512 masks not yet implemented"
+  | Mask ->
+    (* Indices [0..6] correspond to [k1..7]. *)
+    Regmask (reg_index + 1)
 
 let phys_rax = phys_reg Int (P RAX)
 
@@ -524,15 +523,15 @@ let narrow_to_xmm : X86_ast.arg -> X86_ast.arg = function
   | Regf (YMM r | ZMM r) -> Regf (XMM r)
   | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
     | Regf (XMM _)
-    | Mem _ | Mem64_RIP _ ) as res ->
+    | Regmask _ | Mem _ | Mem64_RIP _ ) as res ->
     res
 
 let arg_idx i n : X86_ast.reg_idx =
   match arg i n with
   | Reg64 reg -> Scalar reg
   | Regf reg -> Vector reg
-  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Mem _ | Mem64_RIP _
-    ->
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Regmask _ | Mem _
+  | Mem64_RIP _ ->
     assert false
 
 let argX i n = narrow_to_xmm (reg i.arg.(n))
@@ -833,27 +832,27 @@ let instr_for_intop = function
 let instr_for_floatop (width : Cmm.float_width) op =
   let open Simd_instrs in
   match width, op with
-  | Float64, Iaddf -> sse_or_avx3 addsd vaddsd
-  | Float64, Isubf -> sse_or_avx3 subsd vsubsd
-  | Float64, Imulf -> sse_or_avx3 mulsd vmulsd
-  | Float64, Idivf -> sse_or_avx3 divsd vdivsd
-  | Float32, Iaddf -> sse_or_avx3 addss vaddss
-  | Float32, Isubf -> sse_or_avx3 subss vsubss
-  | Float32, Imulf -> sse_or_avx3 mulss vmulss
-  | Float32, Idivf -> sse_or_avx3 divss vdivss
+  | Float64, Iaddf -> sse_or_avx3 addsd vaddsd_X_X_Xm64
+  | Float64, Isubf -> sse_or_avx3 subsd vsubsd_X_X_Xm64
+  | Float64, Imulf -> sse_or_avx3 mulsd vmulsd_X_X_Xm64
+  | Float64, Idivf -> sse_or_avx3 divsd vdivsd_X_X_Xm64
+  | Float32, Iaddf -> sse_or_avx3 addss vaddss_X_X_Xm32
+  | Float32, Isubf -> sse_or_avx3 subss vsubss_X_X_Xm32
+  | Float32, Imulf -> sse_or_avx3 mulss vmulss_X_X_Xm32
+  | Float32, Idivf -> sse_or_avx3 divss vdivss_X_X_Xm32
   | (Float32 | Float64), (Inegf | Iabsf | Icompf _) -> assert false
 
 let instr_for_floatarithmem (width : Cmm.float_width) op =
   let open Simd_instrs in
   match width, op with
-  | Float64, Ifloatadd -> sse_or_avx3 addsd vaddsd
-  | Float64, Ifloatsub -> sse_or_avx3 subsd vsubsd
-  | Float64, Ifloatmul -> sse_or_avx3 mulsd vmulsd
-  | Float64, Ifloatdiv -> sse_or_avx3 divsd vdivsd
-  | Float32, Ifloatadd -> sse_or_avx3 addss vaddss
-  | Float32, Ifloatsub -> sse_or_avx3 subss vsubss
-  | Float32, Ifloatmul -> sse_or_avx3 mulss vmulss
-  | Float32, Ifloatdiv -> sse_or_avx3 divss vdivss
+  | Float64, Ifloatadd -> sse_or_avx3 addsd vaddsd_X_X_Xm64
+  | Float64, Ifloatsub -> sse_or_avx3 subsd vsubsd_X_X_Xm64
+  | Float64, Ifloatmul -> sse_or_avx3 mulsd vmulsd_X_X_Xm64
+  | Float64, Ifloatdiv -> sse_or_avx3 divsd vdivsd_X_X_Xm64
+  | Float32, Ifloatadd -> sse_or_avx3 addss vaddss_X_X_Xm32
+  | Float32, Ifloatsub -> sse_or_avx3 subss vsubss_X_X_Xm32
+  | Float32, Ifloatmul -> sse_or_avx3 mulss vmulss_X_X_Xm32
+  | Float32, Ifloatdiv -> sse_or_avx3 divss vdivss_X_X_Xm32
 
 let cond : Operation.integer_comparison -> X86_ast.condition = function
   | Ceq -> E
@@ -893,8 +892,10 @@ let emit_float_test (width : Cmm.float_width) (cmp : Cmm.float_comparison) i
   let open Simd_instrs in
   let ucomi, comi =
     match width with
-    | Float64 -> sse_or_avx ucomisd vucomisd, sse_or_avx comisd vcomisd
-    | Float32 -> sse_or_avx ucomiss vucomiss, sse_or_avx comiss vcomiss
+    | Float64 ->
+      sse_or_avx ucomisd vucomisd_X_Xm64, sse_or_avx comisd vcomisd_X_Xm64
+    | Float32 ->
+      sse_or_avx ucomiss vucomiss_X_Xm32, sse_or_avx comiss vcomiss_X_Xm32
   in
   match cmp with
   | CFeq when equal_arg (arg i 1) (arg i 0) ->
@@ -1136,7 +1137,7 @@ let prefer_load_form (src : X86_ast.arg) (dst : X86_ast.arg) =
     (* otherwise load form needs 3-byte VEX *)
     && regf_index s <= 7
   | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
-      | Mem _ | Mem64_RIP _ ),
+      | Regmask _ | Mem _ | Mem64_RIP _ ),
       _ ) ->
     false
 
@@ -1390,7 +1391,7 @@ end = struct
     | Mem64_RIP (ty, sym, displ), offset ->
       I.lea (Mem64_RIP (ty, sym, displ + offset)) dest
     | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
-        | Regf _ ),
+        | Regf _ | Regmask _ ),
         offset ) ->
       I.lea src dest;
       if offset <> 0 then I.add (int offset) dest
@@ -1480,7 +1481,7 @@ end = struct
     | Mem { idx = Scalar register'; base = Some register''; _ } ->
       equal_reg64 register register' || equal_reg64 register register''
     | Mem { idx = Vector _; _ }
-    | Regf _ | Imm _ | Sym _ | Reg8H _
+    | Regf _ | Regmask _ | Imm _ | Sym _ | Reg8H _
     | Mem64_RIP (_, _, _) ->
       false
 
@@ -1690,8 +1691,10 @@ let emit_static_cast (cast : Cmm.static_cast) i =
     sse_or_avx_dst cvtsi2ss_X_r64m64 vcvtsi2ss_X_X_r64m64 (arg i 0) (res i 0)
   | Int_of_float Float32 ->
     sse_or_avx cvttss2si_r64_Xm32 vcvttss2si_r64_Xm32 (arg i 0) (res i 0)
-  | Float_of_float32 -> sse_or_avx_dst cvtss2sd vcvtss2sd (arg i 0) (res i 0)
-  | Float32_of_float -> sse_or_avx_dst cvtsd2ss vcvtsd2ss (arg i 0) (res i 0)
+  | Float_of_float32 ->
+    sse_or_avx_dst cvtss2sd vcvtss2sd_X_X_Xm32 (arg i 0) (res i 0)
+  | Float32_of_float ->
+    sse_or_avx_dst cvtsd2ss vcvtsd2ss_X_X_Xm64 (arg i 0) (res i 0)
   | Scalar_of_v128 Float64x2 | Scalar_of_v256 Float64x4 ->
     if distinct then movsd (argX i 0) (res i 0)
   | V128_of_scalar Float64x2 | V256_of_scalar Float64x4 ->
@@ -1846,26 +1849,14 @@ let emit_simd_sanitize ~address ~instr ~loc ~kind =
       Address_sanitizer.emit_sanitize ~dependencies ~instr ~address chunk kind
   else ()
 
-let mask_index (r : Reg.t) =
-  match r.loc with
-  | Reg.Reg phys ->
-    (* Masks [0..6] correspond to [k1..7] *)
-    Regs.index_in_class phys + 1
-  | Reg.Unknown | Reg.Stack _ ->
-    Misc.fatal_error "AVX512 mask operand must be a register"
-
 let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
   check_simd_instr ?mode simd imm instr;
-  let mask = ref 0 in
   let args =
     Array.fold_left
       (fun (idx, args) (arg : Simd.arg) ->
-        match arg.enc with
-        | Implicit -> idx + 1, args
-        | Mask ->
-          mask := mask_index instr.arg.(idx);
-          idx + 1, args
-        | RM_r | RM_rm | Vex_v | Immediate -> (
+        if Amd64_simd_defs.arg_is_implicit arg
+        then idx + 1, args
+        else
           match Simd.loc_allows_mem arg.loc, mode with
           | true, Some (mode, kind) ->
             let n = num_args_addressing mode in
@@ -1873,7 +1864,7 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
             let address = addressing mode typ instr idx in
             emit_simd_sanitize ~address ~instr ~loc:arg.loc ~kind;
             idx + n, address :: args
-          | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args))
+          | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args)
       (0, []) simd.args
     |> fun (_, args) -> List.rev args
   in
@@ -1895,13 +1886,7 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
     | None -> List.rev args
     | Some imm -> X86_dsl.int imm :: List.rev args
   in
-  let args = Array.of_list args in
-  let evex : X86_ast.evex option =
-    if !mask = 0
-    then None
-    else Some { mask = !mask; zeroing = false; rounding = None }
-  in
-  I.simd ?evex simd args
+  I.simd simd (Array.of_list args)
 
 (* Only used for instructions that have an implicit memory operand. Explicit
    load/store operations are sanitized automatically by [emit_simd_instr]. *)
@@ -2176,7 +2161,7 @@ let emit_instr ~first ~last ~fallthrough i =
       (* CR-soon mslater: avx512 *)
       Misc.fatal_error "avx512 instructions not yet implemented"
     | Single { reg = Float64 } ->
-      load ~dest:(res i 0) REAL4 (sse_or_avx_dst cvtss2sd vcvtss2sd)
+      load ~dest:(res i 0) REAL4 (sse_or_avx_dst cvtss2sd vcvtss2sd_X_X_Xm32)
     | Single { reg = Float32 } -> load ~dest:(res i 0) REAL4 movss
     | Double -> load ~dest:(res i 0) REAL8 movsd)
   | Lop (Store (chunk, addr, is_modify)) -> (
@@ -2207,7 +2192,7 @@ let emit_instr ~first ~last ~fallthrough i =
       Misc.fatal_error "avx512 instructions not yet implemented"
     | Single { reg = Float64 } ->
       let src = arg i 0 in
-      sse_or_avx_dst cvtsd2ss vcvtsd2ss src xmm15;
+      sse_or_avx_dst cvtsd2ss vcvtsd2ss_X_X_Xm64 src xmm15;
       let address = addressing addr REAL4 i 1 in
       Address_sanitizer.emit_sanitize ~dependencies:[| src; xmm15 |] ~instr:i
         ~address chunk memory_access;
@@ -2367,14 +2352,14 @@ let emit_instr ~first ~last ~fallthrough i =
     let cond, need_swap = float_cond_and_need_swap cmp in
     let r0, r1 = res i 0, res i 1 in
     let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-    cmp_sse_or_avx cmpsd vcmpsd cond a1 a0 r1;
+    cmp_sse_or_avx cmpsd vcmpsd_X_X_Xm64 cond a1 a0 r1;
     movq r1 r0;
     I.neg r0
   | Lop (Floatop (Float32, Icompf cmp)) ->
     let cond, need_swap = float_cond_and_need_swap cmp in
     let r0, r0_32, r1 = res i 0, res32 i 0, res i 1 in
     let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-    cmp_sse_or_avx cmpss vcmpss cond a1 a0 r1;
+    cmp_sse_or_avx cmpss vcmpss_X_X_Xm32 cond a1 a0 r1;
     movd r1 r0_32;
     (* CMPSS only sets the bottom 32 bits of the result, so we sign-extend to
        copy the result to the top 32 bits. *)

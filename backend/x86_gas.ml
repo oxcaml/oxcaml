@@ -63,6 +63,7 @@ let arg b = function
   | Reg32 x -> print_reg b string_of_reg32 x
   | Reg64 x -> print_reg b string_of_reg64 x
   | Regf x -> print_reg b string_of_regf x
+  | Regmask k -> bprintf b "%%k%d" k
   | Mem addr -> arg_mem b addr
   | Mem64_RIP (_, s, displ) -> bprintf b "%s%a(%%rip)" s opt_displ displ
 
@@ -73,7 +74,7 @@ let typeof = function
   | Reg32 _ -> DWORD
   | Reg64 _ -> QWORD
   | Imm _ | Sym _ -> NONE
-  | Regf _ -> assert false
+  | Regf _ | Regmask _ -> assert false
 
 let suf arg =
   match typeof arg with
@@ -103,27 +104,37 @@ let i3 b s x y z = bprintf b "\t%s\t%a, %a, %a" s arg x arg y arg z
 
 let i4 b s x y z w = bprintf b "\t%s\t%a, %a, %a, %a" s arg x arg y arg z arg w
 
-let evex_rounding (evex : X86_ast.evex) =
-  match evex.rounding with
-  | None -> ""
-  | Some RoundCurrent -> "{sae}, "
-  | Some RoundNearest -> "{rn-sae}, "
-  | Some RoundDown -> "{rd-sae}, "
-  | Some RoundUp -> "{ru-sae}, "
-  | Some RoundTruncate -> "{rz-sae}, "
+let evex_rounding : Amd64_simd_defs.evex_bll -> string = function
+  | Bll_length _ | Bll_broadcast _ -> ""
+  | Bll_sae -> "{sae}, "
+  | Bll_round Rnd_near -> "{rn-sae}, "
+  | Bll_round Rnd_down -> "{rd-sae}, "
+  | Bll_round Rnd_up -> "{ru-sae}, "
+  | Bll_round Rnd_zero -> "{rz-sae}, "
 
-let evex_mask (evex : X86_ast.evex) =
-  (if evex.mask <> 0 then Printf.sprintf "{%%k%d}" evex.mask else "")
-  ^ if evex.zeroing then "{z}" else ""
-
-let ievex b s args evex =
-  bprintf b "\t%s\t%s" s (evex_rounding evex);
-  let n = Array.length args in
+let ievex b (instr : Amd64_simd_instrs.instr) args =
+  let zeroing, rounding =
+    match instr.enc.prefix with
+    | Evex { evex_z; evex_bll; _ } ->
+      (if evex_z then "{z}" else ""), evex_rounding evex_bll
+    | Legacy _ | Vex _ -> Misc.fatal_error "expected EVEX encoding"
+  in
+  let mask b = function None -> () | Some m -> bprintf b "{%a}" arg m in
+  let writemask = Array.find_opt X86_ast_utils.is_regmask args in
+  let last = ref 0 in
+  Array.iteri
+    (fun i a -> if not (X86_ast_utils.is_regmask a) then last := i)
+    args;
+  bprintf b "\t%s\t%s" instr.mnemonic rounding;
+  let printed = ref false in
   Array.iteri
     (fun i a ->
-      if i > 0 then Buffer.add_string b ", ";
-      arg b a;
-      if i = n - 1 then Buffer.add_string b (evex_mask evex))
+      if not (X86_ast_utils.is_regmask a)
+      then (
+        if !printed then Buffer.add_string b ", ";
+        printed := true;
+        arg b a;
+        if i = !last then bprintf b "%a%s" mask writemask zeroing))
     args
 
 let i1_call_jmp b s = function
@@ -133,7 +144,7 @@ let i1_call_jmp b s = function
   | (Reg32 _ | Reg64 _ | Mem { arch = X64 | X86; _ } | Mem64_RIP _) as x ->
     bprintf b "\t%s\t*%a" s arg x
   | Sym x -> bprintf b "\t%s\t%s" s x
-  | Imm _ | Reg8L _ | Reg8H _ | Reg16 _ | Regf _ -> assert false
+  | Imm _ | Reg8L _ | Reg8H _ | Reg16 _ | Regf _ | Regmask _ -> assert false
 
 let print_instr b = function
   | ADD (arg1, arg2) -> i2_s b "add" arg1 arg2
@@ -175,10 +186,10 @@ let print_instr b = function
     i2 b "movabsq" arg1 arg2
   | MOV
       ( (( Reg8L _ | Imm _ | Sym _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
-         | Regf _ | Mem _
+         | Regf _ | Regmask _ | Mem _
          | Mem64_RIP (_, _, _) ) as arg1),
         (( Reg8L _ | Imm _ | Sym _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
-         | Regf _ | Mem _
+         | Regf _ | Regmask _ | Mem _
          | Mem64_RIP (_, _, _) ) as arg2) ) ->
     i2_s b "mov" arg1 arg2
   | MOVSX (arg1, arg2) -> i2_ss b "movs" arg1 arg2
@@ -211,8 +222,9 @@ let print_instr b = function
   | TEST (arg1, arg2) -> i2_s b "test" arg1 arg2
   | XCHG (arg1, arg2) -> i2 b "xchg" arg1 arg2
   | XOR (arg1, arg2) -> i2_s b "xor" arg1 arg2
-  | SIMD (instr, args, Some evex) -> ievex b instr.mnemonic args evex
-  | SIMD (instr, args, None) -> (
+  | SIMD (instr, args) when Amd64_simd_defs.instr_is_evex instr ->
+    ievex b instr args
+  | SIMD (instr, args) -> (
     match[@warning "-4"] instr.id, args with
     (* The assembler won't accept these mnemonics directly. *)
     | Cmpps, [| imm; arg1; arg2 |] ->
@@ -301,7 +313,7 @@ let map_arg (f : arg -> arg) (instr : instruction) : instruction =
   | TEST (a, b) -> TEST (f a, f b)
   | XCHG (a, b) -> XCHG (f a, f b)
   | XOR (a, b) -> XOR (f a, f b)
-  | SIMD (simd_instr, args, evex) -> SIMD (simd_instr, Array.map f args, evex)
+  | SIMD (simd_instr, args) -> SIMD (simd_instr, Array.map f args)
 
 let generate_asm oc lines =
   let b = Buffer.create 10000 in
@@ -382,7 +394,8 @@ let format_asm_for_expect_asm ~name ~body ~hidden_gc_jump_pads =
         else rewrite_str s
       in
       Mem64_RIP (typ, s, displ)
-    | (Imm _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _) as a ->
+    | ( Imm _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
+      | Regmask _ ) as a ->
       a
   in
   let body =

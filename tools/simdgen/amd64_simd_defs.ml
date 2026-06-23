@@ -62,7 +62,7 @@ type temp =
   | XMM
   | YMM
   | ZMM
-  | K     (* AVX512 mask register (k0-k7) *)
+  | K (* AVX512 mask register (k0-k7) *)
   | VM32X (* R64 base + i32x4 offset *)
   | VM32Y (* R64 base + i32x8 offset *)
   | VM32Z (* R64 base + i32x16 offset *)
@@ -121,6 +121,18 @@ type evex_length =
   | L256
   | L512
 
+type evex_rounding =
+  | Rnd_near
+  | Rnd_down
+  | Rnd_up
+  | Rnd_zero
+
+type evex_bll =
+  | Bll_length of evex_length
+  | Bll_broadcast of evex_length
+  | Bll_sae
+  | Bll_round of evex_rounding
+
 type prefix =
   | Legacy of
       { prefix : legacy_prefix;
@@ -137,8 +149,9 @@ type prefix =
   | Evex of
       { evex_m : vex_map;
         evex_w : bool;
-        evex_l : evex_length;
-        evex_p : legacy_prefix
+        evex_bll : evex_bll;
+        evex_p : legacy_prefix;
+        evex_z : bool
       }
 
 type rm_reg =
@@ -167,6 +180,17 @@ type 'id instr =
     mnemonic : string;
     enc : enc
   }
+
+let instr_expects_mask instr =
+  Array.exists
+    (fun (arg : arg) ->
+      match arg.enc with
+      | Mask -> true
+      | RM_r | RM_rm | Vex_v | Implicit | Immediate -> false)
+    instr.args
+
+let instr_is_evex (instr : _ instr) =
+  match instr.enc.prefix with Evex _ -> true | Legacy _ | Vex _ -> false
 
 let equal_reg reg0 reg1 =
   match reg0, reg1 with
