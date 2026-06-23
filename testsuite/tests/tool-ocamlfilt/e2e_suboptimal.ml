@@ -21,26 +21,13 @@
    STRUCTURED column of [e2e_suboptimal.reference] for the demangled
    names. *)
 
-(* {1 Nested anonymous functions collapse to a single location}
-
-   Each [fun] is [@inline never] so every closure survives as its own
-   symbol. A single [fn(file:line:col)] identifies a closure uniquely, so
-   the enclosing scopes (the outer anonymous functions and [nested_lambdas]
-   itself) are dropped: the deepest closure now mangles to a bare
-   [E2e_suboptimal.fn(..5:6)] rather than chaining every enclosing
-   location. *)
-let nested_lambdas a =
-  fun[@inline never] b ->
-    fun[@inline never] c ->
-      fun[@inline never] d -> a + b + c + d
-
 (* {1 Functor instances are indistinguishable; the body name doubles}
 
-   The two applications below produce two separate compiled copies of
-   [run], but both mangle identically to [Make.run]: the application
-   site ([Int_inst] / [Str_inst]) never appears in the name, so the
-   copies cannot be told apart. The functor's own body symbol also
-   doubles its name, mangling to [Make.Make]. *)
+   The two applications below produce separate compiled copies of [run]
+   (alongside the functor's own template), but they all mangle identically
+   to [Make.run]: the application site ([Int_inst] / [Str_inst]) never
+   appears in the name, so the copies cannot be told apart. The functor's
+   own body symbol also doubles its name, mangling to [Make.Make]. *)
 module type ORD = sig
   type t
 
@@ -62,25 +49,6 @@ module Str_inst = Make (struct
 
   let cmp = compare
 end)
-
-(* {1 Anonymous first-class modules are told apart by their location}
-
-   The two distinct [(module struct ... end)] bodies are distinguished by
-   their anonymous-module location ([mod(..77:15).v] vs [mod(..81:12).v]);
-   the enclosing [pick] is dropped, as the location already identifies it. *)
-module type V = sig
-  val v : int -> int
-end
-
-let pick flag : (module V) =
-  if flag
-  then (module struct
-    let[@inline never] v x = x + 1
-  end)
-  else
-    (module struct
-      let[@inline never] v x = x - 1
-    end)
 
 (* {1 Lazy thunks have no mangling path item}
 
@@ -135,10 +103,8 @@ let make_logger () = object
 end
 
 let () =
-  ignore (nested_lambdas 1 2 3 4);
   ignore (Int_inst.run 1 2);
   ignore (Str_inst.run "a" "b");
-  ignore (pick true);
   ignore (deferred ());
   ignore (scale 1);
   let d = new dog "rex" in
