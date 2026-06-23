@@ -467,42 +467,37 @@ let rec path_of_debug_info_scopes acc (scopes : Scoped_location.scopes) =
 
 let to_structured_mangling_path ~name dbg :
     Compilation_unit.t Structured_mangling.path =
-  (* We drop the suffix of partial applications and the innermost named
-     function: that function should effectively be [name], and seeding the path
-     with [name] preserves all the stamps that [name] includes. An innermost
-     anonymous function is instead kept as is ([`Anonymous]): its position
-     information precisely identifies it and would be lost if it were replaced
-     by the locationless [name]. *)
-  let rec drop_partials_and_last_function
-      (path : Compilation_unit.t Structured_mangling.path) =
-    match path with
-    | Partial_function _ :: path -> drop_partials_and_last_function path
-    | Function _ :: path -> `Named path
-    | (Anonymous_function _ as a) :: path -> `Anonymous (a, path)
-    | path -> `Named path
-  in
   (* An anonymous function or module is precisely located by its own position
-     information, so the scopes enclosing it (up to the compilation unit) are
-     not needed to locate it. We therefore keep the innermost anonymous entry,
-     the scopes nested inside it and the compilation unit(s), and drop the
-     enclosing scopes in between. (The inlining marker is not present here; it
-     is inserted later by [mangle_ident].) Both functions below assume the input
-     path is in reverse order. *)
-  let rec rev_keep_compilation_units acc
+     information, so the scopes enclosing it (its ancestors, up to the
+     compilation unit) are redundant. [located_by_child] becomes true once we
+     have passed such an item; while it is set we drop every enclosing item
+     except compilation units, which keep it and reset the flag. (There is no
+     need to worry about the inlining marker, since it is inserted later by
+     [mangle_ident].) *)
+  let rec collapse_anonymous ~located_by_child
       (path : Compilation_unit.t Structured_mangling.path) =
     match path with
-    | [] -> acc
+    | [] -> []
     | (Compilation_unit _ as cu) :: path ->
-      rev_keep_compilation_units (cu :: acc) path
-    | _ :: path -> rev_keep_compilation_units acc path
+      cu :: collapse_anonymous ~located_by_child:false path
+    | _ :: path when located_by_child ->
+      collapse_anonymous ~located_by_child path
+    | ((Anonymous_function _ | Anonymous_module _) as item) :: path ->
+      item :: collapse_anonymous ~located_by_child:true path
+    | item :: path -> item :: collapse_anonymous ~located_by_child:false path
   in
-  let rec rev_drop_scopes_above_anonymous acc
-      (path : Compilation_unit.t Structured_mangling.path) =
+  (* Drop the suffix of partial applications and the innermost named function
+     (if any), then end the path with [name]. Using [name] preserves the stamps
+     it includes for uniqueness; we append it even after an innermost anonymous
+     function (which is kept for its position) so the stamps are not lost. *)
+  let rec drop_partials_and_adjust_function_name ~name
+      (path : Compilation_unit.t Structured_mangling.path)
+      =
     match path with
-    | [] -> acc
-    | ((Anonymous_function _ | Anonymous_module _) as a) :: path ->
-      rev_keep_compilation_units (a :: acc) path
-    | pi :: path -> rev_drop_scopes_above_anonymous (pi :: acc) path
+    | Partial_function _ :: path ->
+      drop_partials_and_adjust_function_name ~name path
+    | Function _ :: path -> Structured_mangling.Function name :: path
+    | path -> Structured_mangling.Function name :: path
   in
   let path_from_debug =
     match to_items dbg with
@@ -514,9 +509,7 @@ let to_structured_mangling_path ~name dbg :
          the function. See #5099. *)
       path_of_debug_info_scopes [] item.dinfo_scopes
   in
-  match drop_partials_and_last_function (List.rev path_from_debug) with
-  | `Anonymous (a, path_above) -> rev_keep_compilation_units [a] path_above
-  | `Named path_above ->
-    rev_drop_scopes_above_anonymous
-      [Structured_mangling.Function name]
-      path_above
+  List.rev path_from_debug
+  |> collapse_anonymous ~located_by_child:false
+  |> drop_partials_and_adjust_function_name ~name
+  |> List.rev
