@@ -46,7 +46,8 @@ module Scoped_location = struct
     | Empty
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
                assume_zero_alloc: ZA.Assume_info.t;
-               mangling_item: Structured_mangling.path_item option}
+               mangling_item:
+                 Compilation_unit.t Structured_mangling.path_item option}
 
   let str = function
     | Empty -> ""
@@ -83,7 +84,7 @@ module Scoped_location = struct
     let str = str_fun scopes in
     let (file, line, col) = Location.get_pos_info loc.loc_start in
     let file = Filename.basename file in
-    let mangling_item : Structured_mangling.path_item option =
+    let mangling_item : _ Structured_mangling.path_item option =
       Some (Anonymous_function (line, col, Some file))
     in
     Cons {item = Sc_anonymous_function; str; str_fun = str; name = ""; prev = scopes;
@@ -93,7 +94,7 @@ module Scoped_location = struct
     let str = str scopes in
     let (file, line, col) = Location.get_pos_info loc.loc_start in
     let file = Filename.basename file in
-    let mangling_item : Structured_mangling.path_item option =
+    let mangling_item : _ Structured_mangling.path_item option =
       Some (Anonymous_module (line, col, Some file))
     in
     Cons {item = Sc_module_definition; str; str_fun = str ^ ".(fun)"; name = "";
@@ -130,8 +131,14 @@ module Scoped_location = struct
     cons scopes Sc_method_definition str s
       ~assume_zero_alloc:ZA.Assume_info.none (Some (Function s))
 
-  let enter_lazy ~scopes = cons scopes Sc_lazy (str scopes) ""
-                             ~assume_zero_alloc:ZA.Assume_info.none None
+  let enter_lazy ~scopes ~loc =
+    let (file, line, col) = Location.get_pos_info loc.loc_start in
+    let file = Filename.basename file in
+    let mangling_item : _ Structured_mangling.path_item option =
+      Some (Lazy (line, col, Some file))
+    in
+    cons scopes Sc_lazy (str scopes) "" ~assume_zero_alloc:ZA.Assume_info.none
+      mangling_item
 
   let enter_partial_or_eta_wrapper ~scopes ~loc =
     let (file, line, col) = Location.get_pos_info loc.loc_start in
@@ -464,17 +471,44 @@ let rec path_of_debug_info_scopes acc (scopes : Scoped_location.scopes) =
   | Cons { prev; mangling_item = Some mangling_item; _ } ->
     path_of_debug_info_scopes (mangling_item :: acc) prev
 
-let to_structured_mangling_path ~name dbg : Structured_mangling.path =
-  (* We ensure the path ends with [name] to preserve all stamps that the name
-     includes. To do so, we drop the suffix of partial applications if there is
-     any and, additionally, the last function or anonymous function if there is
-     any. It should effectively be the same function as [name]. *)
-  let rec drop_partials_and_last_function (path : Structured_mangling.path) =
+let to_structured_mangling_path ~name dbg :
+    Compilation_unit.t Structured_mangling.path =
+  (* We drop the suffix of partial applications and the innermost named
+     function: that function should effectively be [name], and seeding the path
+     with [name] preserves all the stamps that [name] includes. An innermost
+     anonymous function is instead kept as is ([`Anonymous]): its position
+     information precisely identifies it and would be lost if it were replaced
+     by the locationless [name]. *)
+  let rec drop_partials_and_last_function
+      (path : Compilation_unit.t Structured_mangling.path) =
     match path with
     | Partial_function _ :: path -> drop_partials_and_last_function path
-    | Function _ :: path -> path
-    | Anonymous_function _ :: path -> path
-    | path -> path
+    | Function _ :: path -> `Named path
+    | (Anonymous_function _ as a) :: path -> `Anonymous (a, path)
+    | path -> `Named path
+  in
+  (* An anonymous function or module is precisely located by its own position
+     information, so the scopes enclosing it (up to the compilation unit) are
+     not needed to locate it. We therefore keep the innermost anonymous entry,
+     the scopes nested inside it and the compilation unit(s), and drop the
+     enclosing scopes in between. (The inlining marker is not present here; it
+     is inserted later by [mangle_ident].) Both functions below assume the input
+     path is in reverse order. *)
+  let rec rev_keep_compilation_units acc
+      (path : Compilation_unit.t Structured_mangling.path) =
+    match path with
+    | [] -> acc
+    | (Compilation_unit _ as cu) :: path ->
+      rev_keep_compilation_units (cu :: acc) path
+    | _ :: path -> rev_keep_compilation_units acc path
+  in
+  let rec rev_drop_scopes_above_anonymous acc
+      (path : Compilation_unit.t Structured_mangling.path) =
+    match path with
+    | [] -> acc
+    | ((Anonymous_function _ | Anonymous_module _ | Lazy _) as a) :: path ->
+      rev_keep_compilation_units (a :: acc) path
+    | pi :: path -> rev_drop_scopes_above_anonymous (pi :: acc) path
   in
   let path_from_debug =
     match to_items dbg with
@@ -486,6 +520,9 @@ let to_structured_mangling_path ~name dbg : Structured_mangling.path =
          the function. See #5099. *)
       path_of_debug_info_scopes [] item.dinfo_scopes
   in
-  Structured_mangling.Function name
-  :: drop_partials_and_last_function (List.rev path_from_debug)
-  |> List.rev
+  match drop_partials_and_last_function (List.rev path_from_debug) with
+  | `Anonymous (a, path_above) -> rev_keep_compilation_units [a] path_above
+  | `Named path_above ->
+    rev_drop_scopes_above_anonymous
+      [Structured_mangling.Function name]
+      path_above

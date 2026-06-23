@@ -31,7 +31,8 @@ module Scoped_location : sig
     | Empty
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
                assume_zero_alloc: ZA.Assume_info.t;
-               mangling_item: Structured_mangling.path_item option}
+               mangling_item:
+                 Compilation_unit.t Structured_mangling.path_item option}
 
   val string_of_scopes : include_zero_alloc:bool -> scopes -> string
 
@@ -53,7 +54,7 @@ module Scoped_location : sig
   val enter_module_definition : scopes:scopes -> Ident.t -> scopes
   val enter_class_definition : scopes:scopes -> Ident.t -> scopes
   val enter_method_definition : scopes:scopes -> Asttypes.label -> scopes
-  val enter_lazy : scopes:scopes -> scopes
+  val enter_lazy : scopes:scopes -> loc:Location.t -> scopes
   val enter_partial_or_eta_wrapper : scopes:scopes -> loc:Location.t -> scopes
   val update_assume_zero_alloc :
     scopes:scopes -> assume_zero_alloc:ZA.Assume_info.t -> scopes
@@ -130,7 +131,8 @@ val assume_zero_alloc : t -> ZA.Assume_info.t
 (** [to_structured_mangling_path] converts the debug info into a mangling path.
     In all cases, the [name] is used to populate the last element of the path.
 *)
-val to_structured_mangling_path : name:string -> t -> Structured_mangling.path
+val to_structured_mangling_path :
+  name:string -> t -> Compilation_unit.t Structured_mangling.path
 
 module Dbg : sig
   type t

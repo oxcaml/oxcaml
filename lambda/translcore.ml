@@ -1166,7 +1166,8 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
            transl_extension_constructor ~scopes e.exp_env None cd,
            transl_exp ~scopes layout body)
   | Texp_pack modl ->
-      !transl_module ~scopes Tcoerce_none None modl
+      let mod_scopes = enter_anonymous_module ~scopes ~loc:modl.mod_loc in
+      !transl_module ~scopes:mod_scopes Tcoerce_none None modl
   | Texp_assert ({exp_desc=Texp_construct(_, {cstr_name="false"}, _, _, _)},
                  loc) ->
       assert_failed loc ~scopes e
@@ -1199,7 +1200,7 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
       | `Other ->
          (* other cases compile to a lazy block holding a function.  The
             typechecker enforces that e has jkind value.  *)
-         let scopes = enter_lazy ~scopes in
+         let scopes = enter_lazy ~scopes ~loc:e.exp_loc in
          let fn = lfunction ~kind:(Curried {nlocal=0})
                             ~params:[{ name = Ident.create_local "param";
                                        debug_uid = Lambda.debug_uid_none;
