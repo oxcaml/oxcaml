@@ -66,7 +66,11 @@ type bswap_bitwidth = Sixteen | Thirtytwo | Sixtyfour
 (* Specific operations, including [Simd], must not raise. *)
 type specific_operation =
   | Ifar_poll
-  | Ifar_alloc of { bytes : int; dbginfo : Cmm.alloc_dbginfo }
+  | Ifar_alloc of
+      { bytes : int;
+        dbginfo : Cmm.alloc_dbginfo;
+        mode : Cmm.Alloc_mode.t
+      }
   | Ifar_stackcheck of { max_frame_size_bytes : int }
       (* stack check whose branch to the out-of-line reallocation block has been
          relaxed to reach further (see [Branch_relaxation]) *)
@@ -176,8 +180,10 @@ let print_specific_operation printreg op ppf arg =
   match op with
   | Ifar_poll ->
     fprintf ppf "(far) poll"
-  | Ifar_alloc { bytes; dbginfo = _ } ->
+  | Ifar_alloc { bytes; dbginfo = _; mode = Heap } ->
     fprintf ppf "(far) alloc %i" bytes
+  | Ifar_alloc { bytes; dbginfo = _; mode = Local } ->
+    fprintf ppf "(far) local alloc %i" bytes
   | Ifar_stackcheck { max_frame_size_bytes } ->
     fprintf ppf "(far) stackcheck %i" max_frame_size_bytes
   | Ishiftarith(op, shift) ->
@@ -245,8 +251,10 @@ let print_specific_operation printreg op ppf arg =
 let specific_operation_name : specific_operation -> string = fun op ->
   match op with
   | Ifar_poll -> "far poll"
-  | Ifar_alloc { bytes; dbginfo = _ } ->
+  | Ifar_alloc { bytes; dbginfo = _; mode = Heap } ->
       Printf.sprintf "far alloc of %d bytes" bytes
+  | Ifar_alloc { bytes; dbginfo = _; mode = Local } ->
+      Printf.sprintf "far local alloc of %d bytes" bytes
   | Ifar_stackcheck { max_frame_size_bytes } ->
       Printf.sprintf "far stackcheck of max frame size %d bytes"
         max_frame_size_bytes
@@ -290,9 +298,10 @@ let equal_arith_operation left right =
 
 let equal_specific_operation left right =
   match left, right with
-  | Ifar_alloc { bytes = left_bytes; dbginfo = _; },
-    Ifar_alloc { bytes = right_bytes; dbginfo = _; } ->
+  | Ifar_alloc { bytes = left_bytes; dbginfo = _; mode = left_mode },
+    Ifar_alloc { bytes = right_bytes; dbginfo = _; mode = right_mode } ->
     Int.equal left_bytes right_bytes
+    && Cmm.Alloc_mode.equal left_mode right_mode
   | Ifar_stackcheck { max_frame_size_bytes = left },
     Ifar_stackcheck { max_frame_size_bytes = right } ->
     Int.equal left right

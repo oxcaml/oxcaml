@@ -1063,20 +1063,34 @@ let cond_for_cset_for_float_comparison : Cmm.float_comparison -> Cond.t =
 
 (* Output the assembly code for an allocation. *)
 
-let assembly_code_for_local_allocation env i ~n =
-  let r = H.reg_x i.res.(0) in
+let assembly_code_for_local_allocation0 ~n ~far ~res_reg =
+  (* This must not use [env], as it is called from [emit_relaxed_instruction] *)
+  let r = res_reg in
   A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_local_limit);
   A.ins2 LDR r (H.domainstate_field Domain_local_sp);
   emit_subimm r r n;
   A.ins2 STR r (H.domainstate_field Domain_local_sp);
   A.ins_cmp_reg r reg_x_tmp1 O.optional_none;
   let lr_lbl = L.create Text in
-  A.ins1 (B_cond (Branch_cond.Int LT)) (local_label lr_lbl);
   let lr_return_lbl = L.create Text in
+  if not far
+  then A.ins1 (B_cond (Branch_cond.Int LT)) (local_label lr_lbl)
+  else (
+    (* Invert the condition and branch over an unconditional branch, so the
+       out-of-line reallocation block is reached via [B] (whose range we treat
+       as unbounded) rather than the limited range of [B_cond]. *)
+    A.ins1 (B_cond (Branch_cond.Int GE)) (local_label lr_return_lbl);
+    A.ins1 B (local_label lr_lbl));
   D.define_label lr_return_lbl;
   A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_local_top);
   A.ins4 ADD_shifted_register r r reg_x_tmp1 O.optional_none;
   A.ins4 ADD_immediate r r (O.imm 8) O.optional_none;
+  lr_lbl, lr_return_lbl
+
+let assembly_code_for_local_allocation env i ~n ~far =
+  let lr_lbl, lr_return_lbl =
+    assembly_code_for_local_allocation0 ~n ~far ~res_reg:(H.reg_x i.res.(0))
+  in
   Env.add_local_realloc_site env { lr_lbl; lr_dbg = i.dbg; lr_return_lbl }
 
 let assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg =
@@ -1122,7 +1136,7 @@ let assembly_code_for_slow_heap_allocation env i ~n ~dbginfo =
 
 let assembly_code_for_allocation env i ~local ~n ~far ~dbginfo =
   if local
-  then assembly_code_for_local_allocation env i ~n
+  then assembly_code_for_local_allocation env i ~n ~far
   else if Env.fastcode_flag env
   then assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo
   else assembly_code_for_slow_heap_allocation env i ~n ~dbginfo
@@ -1616,8 +1630,10 @@ let emit_instr env i =
       Misc.fatal_error "arm64: got 256/512 bit vector")
   | Lop (Alloc { bytes = n; dbginfo; mode = Heap }) ->
     assembly_code_for_allocation env i ~n ~local:false ~far:false ~dbginfo
-  | Lop (Specific (Ifar_alloc { bytes = n; dbginfo })) ->
-    assembly_code_for_allocation env i ~n ~local:false ~far:true ~dbginfo
+  | Lop (Specific (Ifar_alloc { bytes = n; dbginfo; mode })) ->
+    assembly_code_for_allocation env i ~n
+      ~local:(Cmm.Alloc_mode.is_local mode)
+      ~far:true ~dbginfo
   | Lop (Alloc { bytes = n; dbginfo; mode = Local }) ->
     assembly_code_for_allocation env i ~n ~local:true ~far:false ~dbginfo
   | Lop Begin_region ->
@@ -2000,7 +2016,8 @@ type relaxed_instruction =
   | Far_alloc of
       { num_bytes : int;
         dbginfo : Cmm.alloc_dbginfo;
-        res : Reg.t
+        res : Reg.t;
+        mode : Cmm.Alloc_mode.t
       }
   | Far_stackcheck of { max_frame_size_bytes : int }
   | Condbranch of
@@ -2017,9 +2034,15 @@ let emit_relaxed_instruction (relaxed : relaxed_instruction) =
       assembly_code_for_poll0 ~far:true ~return_label:None
     in
     ()
-  | Far_alloc { num_bytes; res; dbginfo = _ } ->
+  | Far_alloc { num_bytes; res; dbginfo = _; mode = Heap } ->
     let _gc_lbl, _gc_return_lbl =
       assembly_code_for_fast_heap_allocation0 ~n:num_bytes ~far:true
+        ~res_reg:(H.reg_x res)
+    in
+    ()
+  | Far_alloc { num_bytes; res; dbginfo = _; mode = Local } ->
+    let _lr_lbl, _lr_return_lbl =
+      assembly_code_for_local_allocation0 ~n:num_bytes ~far:true
         ~res_reg:(H.reg_x res)
     in
     ()
@@ -2060,8 +2083,8 @@ let relax_branches env body =
     let relaxed_instruction_desc ri : Linear.instruction_desc =
       match ri with
       | Far_poll -> Lop (Specific Ifar_poll)
-      | Far_alloc { num_bytes; dbginfo; res = _ } ->
-        Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
+      | Far_alloc { num_bytes; dbginfo; res = _; mode } ->
+        Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo; mode }))
       | Far_stackcheck { max_frame_size_bytes } ->
         Lop (Specific (Ifar_stackcheck { max_frame_size_bytes }))
       | Condbranch { test; lbl; arg = _ } -> Lcondbranch (test, lbl)
@@ -2069,8 +2092,8 @@ let relax_branches env body =
 
     let relax_poll () = Far_poll
 
-    let relax_allocation ~num_bytes ~dbginfo ~res =
-      Far_alloc { num_bytes; dbginfo; res }
+    let relax_allocation ~num_bytes ~dbginfo ~res ~mode =
+      Far_alloc { num_bytes; dbginfo; res; mode }
 
     let relax_stackcheck ~max_frame_size_bytes =
       Far_stackcheck { max_frame_size_bytes }
@@ -2126,7 +2149,16 @@ let fundecl fundecl =
   List.iter emit_call_gc (Env.call_gc_sites env);
   List.iter emit_local_realloc (Env.local_realloc_sites env);
   emit_stack_realloc env;
-  assert (List.length (Env.call_gc_sites env) = num_call_gc_sites);
+  let num_call_gc_sites_after_relaxation =
+    List.length (Env.call_gc_sites env)
+  in
+  if num_call_gc_sites_after_relaxation <> num_call_gc_sites
+  then
+    Misc.fatal_errorf
+      "Branch relaxation changed the number of calls to the GC in function %s: \
+       there were %d before relaxation but %d afterwards"
+      (Env.function_name env) num_call_gc_sites
+      num_call_gc_sites_after_relaxation;
   (match fun_end_label with
   | None -> ()
   | Some fun_end_label ->
