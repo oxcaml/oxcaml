@@ -1,22 +1,91 @@
-unreleased
+merlin 5.6
 ==========
+Sat Oct 04 15:10:42 CEST 2025
 
   + merlin binary
-    - Fix occurrences not working when the definition comes from a hidden source
-      file (#1865)
+    - Add `locate-types` command (#1951)
+  + merlin library
+    - Fix `merlin_reader` for OpenBSD (#1956)
+    - Improve recovery of mutually recursive definitions (#1962, #1963, fixes #1953)
+    - Support for OCaml 5.4 (#1974)
+  + vim plugin
+    - Fix error when `:MerlinOccurrencesProjectWide` fails to gather code previews (#1970)
+    - Add more short-paths tests cases (#1904)
+
+merlin 5.5
+==========
+Tue Jun 24 16:10:42 CEST 2025
+
+  + merlin library
+    - Expose utilities to manipulate typed-holes in `Merlin_analysis.Typed_hole`
+      (#1888)
+    - `locate` can now disambiguate between files with identical names and contents
+      (#1882)
+    - `occurrences` now reports stale files (#1885)
+    - `inlay-hints` fix inlay hints on function parameters (#1923)
+    - Fix issues with ident validation and Lid comparison for occurrences (#1924)
+    - Handle class type in outline (#1932)
+    - Handle locally defined value in outline (#1936)
+    - Fix a typer issue triggering assertions in the short-paths graph (#1935,
+      fixes #1913)
+    - Downstreamed a typer fix from 5.3.X that would trigger assertions linked
+      to scopes bit masks when backtracking the typer cache (#1935)
+    - Add a new selection field to outline results that contains the location of
+      the symbol itself. (#1942)
+    - Fix destruct hanging when printing patterns with (::). (#1944, fixes
+      ocaml/ocaml-lsp#1489)
+    - Reproduce and fix a handful of jump-to-definition (locate) issues  (#1930,
+      fixes #1580 and #1588, workaround for #1934)
+  + ocaml-index
+    - Improve the granularity of index reading by segmenting the marshalization
+      of the involved data-structures. (#1889)
+  + test suite
+    - Add a test case illustrating wrong open order proposed in issue #1900. (#1901)
+
+merlin 5.4.1
+============
+Mon Jan 13 10:55:42 CET 2025
+
+  + ocaml-index
+    - Bump magic number after index file format change (#1886)
+
+merlin 5.4
+==========
+Fri Jan 10 17:55:42 CET 2025
+
+  + merlin binary
+    - Support for OCaml 5.3
     - Use new 5.3 features to improve locate behavior in some cases. Merlin no
       longer confuses uids from interfaces and implementations. (#1857)
     - Perform less merges in the indexer (#1881)
     - Add initial support for project-wide renaming: occurrences can now return
       all usages of all related definitions. (#1877)
-    - Fix issues with ident validation and Lid comparison for occurrences (#1924)
-    - Fix record field autocompletion (https://github.com/ocaml/merlin/pull/2028)
-  + ocaml-index
-    - Bump magic number after index file format change. Index can now be read lazilly (#1886)
+    - Stale occurrences are flagged as such
+  + vim plugin
+    - Added support for search-by-type (#1846)
+      This is exposed through the existing `:MerlinSearch` command, that
+      switches between search-by-type and polarity search depending on the
+      first character of the query.
 
-merlin 5.2
+merlin 5.3
 ==========
-Thu Sep 26 18:48:42 CEST 2024
+Tue Nov 26 17:30:42 CET 2024
+
+  + merlin binary
+    - Respect the `EXCLUDE_QUERY_DIR` configuration directive when looking for cmt
+      files (#1854)
+    - Fix occurrences bug in which relative paths in index files are resolved against the
+      PWD rather than the SOURCE_ROOT (#1855)
+    - Fix exception in polarity search (#1858 fixes #1113)
+    - Fix jump to `fun` targets not working (#1863, fixes #1862)
+    - Fix type-enclosing results instability. This reverts some overly
+      aggressive deduplication that should be done on the client side. (#1864)
+    - Fix occurrences not working when the definition comes from a hidden source
+      file (#1865)
+
+merlin 5.2.1
+============
+Fri Sep 27 12:02:42 CEST 2024
 
   + merlin binary
     - A new `WRAPPING_PREFIX` configuration directive that can be used to tell Merlin

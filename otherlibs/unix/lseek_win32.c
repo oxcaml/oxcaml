@@ -18,7 +18,7 @@
 #include <caml/signals.h>
 #include "caml/unixsupport.h"
 
-#ifdef HAS_UNISTD
+#ifndef _WIN32
 #include <unistd.h>
 #else
 #define SEEK_SET 0
@@ -26,7 +26,7 @@
 #define SEEK_END 2
 #endif
 
-static DWORD seek_command_table[] = {
+static const DWORD seek_command_table[] = {
   FILE_BEGIN, FILE_CURRENT, FILE_END
 };
 

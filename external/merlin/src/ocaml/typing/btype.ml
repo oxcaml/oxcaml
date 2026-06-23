@@ -106,13 +106,66 @@ module TypePairs = struct
         f (type_expr t1, type_expr t2))
 end
 
-
 (**** Type level management ****)
 
 let generic_level = Ident.highest_scope
 let lowest_level = Ident.lowest_scope
 
+(**** leveled type pool ****)
+(* This defines a stack of pools of type nodes indexed by the level
+   we will try to generalize them in [Ctype.with_local_level_gen].
+   [pool_of_level] returns the pool in which types at level [level]
+   should be kept, which is the topmost pool whose level is lower or
+   equal to [level].
+   [Ctype.with_local_level_gen] shall call [with_new_pool] to create
+   a new pool at a given level. On return it shall process all nodes
+   that were added to the pool.
+   Remark: the only function adding to a pool is [add_to_pool], and
+   the only function returning the contents of a pool is [with_new_pool],
+   so that the initial pool can be added to, but never read from. *)
+
+type pool = {level: int; mutable pool: transient_expr list; next: pool}
+(* To avoid an indirection we choose to add a dummy level at the end of
+   the list. It will never be accessed, as [pool_of_level] is always called
+   with [level >= 0]. *)
+let rec dummy = {level = max_int; pool = []; next = dummy}
+let pool_stack = s_table (fun () -> {level = 0; pool = []; next = dummy}) ()
+
+(* Lookup in the stack is linear, but the depth is the number of nested
+   generalization points (e.g. lhs of let-definitions), which in ML is known
+   to be generally low. In most cases we are allocating in the topmost pool.
+   In [Ctype.with_local_gen], we move non-generalizable type nodes from the
+   topmost pool to one deeper in the stack, so that for each type node the
+   accumulated depth of lookups over its life is bounded by the depth of
+   the stack when it was allocated.
+   In case this linear search turns out to be costly, we could switch to
+   binary search, exploiting the fact that the levels of pools in the stack
+   are expected to grow. *)
+let rec pool_of_level level pool =
+  if level >= pool.level then pool else pool_of_level level pool.next
+
+(* Create a new pool at given level, and use it locally. *)
+let with_new_pool ~level f =
+  let pool = {level; pool = []; next = !pool_stack} in
+  let r =
+    Misc.protect_refs [ R(pool_stack, pool) ] f
+  in
+  (r, pool.pool)
+
+let add_to_pool ~level ty =
+  if level >= generic_level || level <= lowest_level then () else
+  let pool = pool_of_level level !pool_stack in
+  pool.pool <- ty :: pool.pool
+
 (**** Some type creators ****)
+
+let newty3 ~level ~scope desc =
+  let ty = proto_newty3 ~level ~scope desc in
+  add_to_pool ~level ty;
+  Transient_expr.type_expr ty
+
+let newty2 ~level desc =
+  newty3 ~level ~scope:Ident.lowest_scope desc
 
 let newgenty desc = newty2 ~level:generic_level desc
 let newgenvar ?name jkind = newgenty (Tvar { name; jkind })
@@ -129,6 +182,8 @@ let is_Tvar ty = match get_desc ty with Tvar _ -> true | _ -> false
 let is_Tunivar ty = match get_desc ty with Tunivar _ -> true | _ -> false
 let is_Tconstr ty = match get_desc ty with Tconstr _ -> true | _ -> false
 let is_Tpoly ty = match get_desc ty with Tpoly _ -> true | _ -> false
+let is_poly_Tpoly ty =
+  match get_desc ty with Tpoly (_, _ :: _) -> true | _ -> false
 let type_kind_is_abstract decl =
   match decl.type_kind with Type_abstract _ -> true | _ -> false
 let type_origin decl =
@@ -293,8 +348,8 @@ let fold_type_expr f init ty =
   | Tarrow (_, ty1, ty2, _) ->
       let result = f init ty1 in
       f result ty2
-  | Ttuple l            -> List.fold_left f init (List.map snd l)
-  | Tunboxed_tuple l    -> List.fold_left f init (List.map snd l)
+  | Ttuple l            -> List.fold_left (fun acc (_, t) -> f acc t) init l
+  | Tunboxed_tuple l    -> List.fold_left (fun acc (_, t) -> f acc t) init l
   | Tconstr (_, l, _)   -> List.fold_left f init l
   | Tobject(ty, {contents = Some (_, p)}) ->
       let result = f init ty in
@@ -318,8 +373,8 @@ let fold_type_expr f init ty =
     List.fold_left f result tyl
   | Trepr (ty, _sort_vars) ->
     f init ty
-  | Tpackage (_, fl)  ->
-    List.fold_left (fun result (_n, ty) -> f result ty) init fl
+  | Tpackage pack ->
+    List.fold_left (fun result (_n, ty) -> f result ty) init pack.pack_cstrs
   | Tof_kind _ -> init
 
 let iter_type_expr f ty =
@@ -483,7 +538,7 @@ let type_iterators mark =
     match get_desc ty with
       Tconstr (p, _, _)
     | Tobject (_, {contents=Some (p, _)})
-    | Tpackage (p, _) ->
+    | Tpackage {pack_path = p} ->
         it.it_path p
     | Tvariant row ->
         Option.iter (fun (p,_) -> it.it_path p) (row_name row)
@@ -559,7 +614,9 @@ let rec copy_type_desc ?(keep_names=false) f = function
       Tpoly (f ty, tyl)
   | Trepr (ty, sort_vars) ->
       Trepr (f ty, sort_vars)
-  | Tpackage (p, fl)  -> Tpackage (p, List.map (fun (n, ty) -> (n, f ty)) fl)
+  | Tpackage pack       ->
+      Tpackage {pack with
+        pack_cstrs = List.map (fun (n, ty) -> (n, f ty)) pack.pack_cstrs}
   | Tof_kind jk -> Tof_kind jk
 
 (* TODO: rename to [module Copy_scope] *)
@@ -835,17 +892,6 @@ let tpoly_get_poly ty =
 let tpoly_get_mono ty =
   match get_desc ty with
   | Tpoly(ty, []) -> ty
-  | _ -> assert false
-
-                  (**********)
-                  (*  Misc  *)
-                  (**********)
-
-(**** Type information getter ****)
-
-let cstr_type_path cstr =
-  match get_desc cstr.cstr_res with
-  | Tconstr (p, _, _) -> p
   | _ -> assert false
 
                   (************)
@@ -2534,6 +2580,13 @@ module Jkind0 = struct
           with_bounds = No_with_bounds
         }
         ~annotation:None ~why:(Value_creation why)
+
+    let for_effect_arg ident =
+      let why : Jkind_intf.History.value_creation_reason =
+        Type_argument
+          { parent_path = Path.Pident ident; position = 1; arity = 1 }
+      in
+      Builtin.value ~why
 
     let for_variant_with_null_result path param =
       let why : Jkind_intf.History.value_or_null_creation_reason =

@@ -18,3 +18,5 @@ priority_queue.ml
 priority_queue.mli
 structured_mangling.ml
 structured_mangling.mli
+opt_fuel.ml
+opt_fuel.mli

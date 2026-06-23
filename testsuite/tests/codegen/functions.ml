@@ -16,7 +16,7 @@ let f_unboxed_unit #() : unit# = inline_never(); #()
 [%%expect_asm X86_64{|
 f_unboxed_unit:
   subq  $8, %rsp
-  movq  camlTOP2__f_unboxed_unit_3@GOTPCREL(%rip), %rax
+  movq  <hidden PC-relative offset>(%rip), %rax
   movq  16(%rax), %rbx
   movl  $1, %eax
   movq  (%rbx), %rdi
@@ -42,12 +42,12 @@ mutual_recursion:
 .L0:
   leaq  8(%r15), %rdi
   movq  $6391, -8(%rdi)
-  movq  camlTOP3__g_6_9_code@GOTPCREL(%rip), %rsi
+  movq  <hidden PC-relative offset>(%rip), %rsi
   movq  %rsi, (%rdi)
   movabsq $72057594037927949, %rsi
   movq  %rsi, 8(%rdi)
   movq  $3321, 16(%rdi)
-  movq  camlTOP3__f_5_8_code@GOTPCREL(%rip), %rsi
+  movq  <hidden PC-relative offset>(%rip), %rsi
   movq  %rsi, 24(%rdi)
   movabsq $108086391056891911, %rsi
   movq  %rsi, 32(%rdi)
@@ -101,7 +101,7 @@ f:
 .L0:
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)
-  leaq  .LcamlTOP4__fn$5b$3a1$2c29$2d$2d50$5d_10_15_code(%rip), %rdi
+  leaq  <hidden PC-relative offset>(%rip), %rdi
   movq  %rdi, (%rbx)
   movabsq $108086391056891911, %rdi
   movq  %rdi, 8(%rbx)
@@ -114,7 +114,7 @@ f:
 .L2:
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)
-  leaq  .LcamlTOP4__fn$5b$3a1$2c56$2d$2d69$5d_9_14_code(%rip), %rdi
+  leaq  <hidden PC-relative offset>(%rip), %rdi
   movq  %rdi, (%rbx)
   movabsq $108086391056891911, %rdi
   movq  %rdi, 8(%rbx)
@@ -139,5 +139,23 @@ inline_identical:
   ret
 .L0:
   addq  $2, %rax
+  ret
+|}]
+
+
+(* CR ttebbi: The rsp adjustment could be done in the GC trampoline. *)
+let just_one_allocation (x: int) : int option = Some x
+[%%expect_asm X86_64{|
+just_one_allocation:
+  subq  $8, %rsp
+  movq  %rax, %rbx
+  subq  $16, %r15
+  cmpq  (%r14), %r15
+  jb    <hidden GC jump pad>
+.L0:
+  leaq  8(%r15), %rax
+  movq  $1024, -8(%rax)
+  movq  %rbx, (%rax)
+  addq  $8, %rsp
   ret
 |}]

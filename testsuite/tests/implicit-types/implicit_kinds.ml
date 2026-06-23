@@ -14,12 +14,8 @@ end
 module type S0 = sig val f : ('elt : bits64). 'elt -> 'elt array end
 |}]
 
-(* CR implicit-variables: implicit kinds don't work in structures. *)
+(* Implicit kinds in structures. *)
 
-(* This doesn't raise an unused attribute warning because expect tests
-   are run at toplevel.
-
-   See [implicit_kinds_unused.ml] for the unused attribute test. *)
 module M = struct
   [@@@implicit_kind: ('elt : bits64)]
 
@@ -27,7 +23,313 @@ module M = struct
 end
 
 [%%expect{|
-module M : sig val f : ('elt : value_maybe_null). 'elt -> 'elt array end
+module M : sig val f : ('elt : bits64). 'elt -> 'elt array end
+|}]
+
+(* File-level structure attributes affect later declarations only. *)
+
+let file_before (x : 'file_before) = x
+let file_before_after_name (x : 'file_after) = x
+external file_before_ext : 'file_ext -> unit = "%ignore"
+
+[@@@implicit_kind: ('file_after : bits64) * ('file_ext : word)]
+
+let file_after (x : 'file_after) = [| x |]
+external file_ignore : 'file_ext -> unit = "%ignore"
+
+[%%expect{|
+val file_before : 'file_before -> 'file_before = <fun>
+val file_before_after_name : 'file_after -> 'file_after = <fun>
+external file_before_ext : 'file_ext -> unit = "%ignore"
+val file_after : ('file_after : bits64). 'file_after -> 'file_after array =
+  <fun>
+external file_ignore : ('file_ext : word). 'file_ext -> unit = "%ignore"
+|}]
+
+(* Module structure attributes affect later declarations only. *)
+
+module Structure_order = struct
+  let before (x : 'before) = x
+  let before_after_name (x : 'after) = x
+  type 'box before_box
+  type 'box before_later_box
+  external before_ignore : 'ext -> unit = "%ignore"
+  external before_later_ignore : 'ext -> unit = "%ignore"
+
+  [@@@implicit_kind: ('after : bits64) * ('box : word) * ('ext : word)]
+
+  let after (x : 'after) = [| x |]
+  type 'box after_box
+  external after_ignore : 'ext -> unit = "%ignore"
+end
+
+[%%expect{|
+module Structure_order :
+  sig
+    val before : 'before -> 'before
+    val before_after_name : 'after -> 'after
+    type 'box before_box
+    type 'box before_later_box
+    external before_ignore : 'ext -> unit = "%ignore"
+    external before_later_ignore : 'ext -> unit = "%ignore"
+    val after : ('after : bits64). 'after -> 'after array
+    type ('box : word) after_box
+    external after_ignore : ('ext : word). 'ext -> unit = "%ignore"
+  end
+|}]
+
+(* Layout-polymorphic external declarations use structure implicit kinds. *)
+
+module Structure_external = struct
+  [@@@implicit_kind: ('ext_any : any)]
+
+  external[@layout_poly] ignore_any : 'ext_any -> unit = "%ignore"
+end
+
+[%%expect{|
+module Structure_external :
+  sig
+    external ignore_any : ('ext_any : any). 'ext_any -> unit = "%ignore"
+      [@@layout_poly]
+  end
+|}]
+
+(* Nested structures inherit and can shadow implicit kinds. *)
+
+module Nested_structures = struct
+  [@@@implicit_kind: ('nested : bits64)]
+
+  module Inherits = struct
+    let inherited (x : 'nested) = [| x |]
+  end
+
+  module Shadows = struct
+    [@@@implicit_kind: ('nested : immediate)]
+
+    let shadowed (x : 'nested) = x
+  end
+
+  let outer_after (x : 'nested) = [| x |]
+end
+
+[%%expect{|
+module Nested_structures :
+  sig
+    module Inherits :
+      sig val inherited : ('nested : bits64). 'nested -> 'nested array end
+    module Shadows :
+      sig val shadowed : ('nested : immediate). 'nested -> 'nested end
+    val outer_after : ('nested : bits64). 'nested -> 'nested array
+  end
+|}]
+
+(* [module type of struct] inherits the incoming implicit-kind environment. *)
+
+module Mto_struct = struct
+  [@@@implicit_kind: ('mto : word)]
+
+  module type T = module type of struct
+    let id (x : 'mto) = x
+  end
+end
+
+[%%expect{|
+module Mto_struct :
+  sig
+    module type T = sig val id : ('mto : word). 'mto -> 'mto @@ stateless end
+  end
+|}]
+
+(* Signature implicit kinds do not affect an ascribed structure's environment. *)
+
+module Sig_default_used_by_struct : sig
+  [@@@implicit_kind: ('from_sig : bits64)]
+
+  module type T = sig
+    val pack : 'from_sig -> 'from_sig array
+  end
+end = struct
+  module type T = module type of struct
+    let pack (x : 'from_sig) = [| x |]
+  end
+end
+
+[%%expect{|
+Lines 7-11, characters 6-3:
+ 7 | ......struct
+ 8 |   module type T = module type of struct
+ 9 |     let pack (x : 'from_sig) = [| x |]
+10 |   end
+11 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           module type T =
+             sig
+               val pack :
+                 ('from_sig : value_maybe_null). 'from_sig -> 'from_sig array
+                 @@ stateless
+             end
+         end
+       is not included in
+         sig
+           module type T =
+             sig
+               val pack : ('from_sig : bits64). 'from_sig -> 'from_sig array
+             end
+         end
+       Module type declarations do not match:
+         module type T =
+           sig
+             val pack :
+               ('from_sig : value_maybe_null). 'from_sig -> 'from_sig array
+               @@ stateless
+           end
+       does not match
+         module type T =
+           sig
+             val pack : ('from_sig : bits64). 'from_sig -> 'from_sig array
+           end
+       At position "module type T = <here>"
+       Module types do not match:
+         sig
+           val pack :
+             ('from_sig : value_maybe_null). 'from_sig -> 'from_sig array @@
+             stateless
+         end
+       is not equal to
+         sig
+           val pack : ('from_sig : bits64). 'from_sig -> 'from_sig array
+         end
+       At position "module type T = <here>"
+       Values do not match:
+         val pack :
+           ('from_sig : value_maybe_null). 'from_sig -> 'from_sig array @@
+           stateless
+       is not included in
+         val pack : ('from_sig : bits64). 'from_sig -> 'from_sig array
+       The type "'a -> 'a array" is not compatible with the type "'b -> 'b array"
+       The layout of 'a is bits64
+         because of the definition of pack at line 5, characters 4-43.
+       But the layout of 'a must be a value layout
+         because of the definition of pack at line 9, characters 13-38.
+|}]
+
+(* Signature implicit kinds affect structures defined in that signature. *)
+
+module type Sig_default_defines_struct = sig
+  [@@@implicit_kind: ('from_defined_sig : bits64)]
+
+  module type T = module type of struct
+    let pack (x : 'from_defined_sig) = [| x |]
+  end
+end
+
+[%%expect{|
+module type Sig_default_defines_struct =
+  sig
+    module type T =
+      sig
+        val pack :
+          ('from_defined_sig : bits64).
+            'from_defined_sig -> 'from_defined_sig array
+          @@ stateless
+      end
+  end
+|}]
+
+(* Structure implicit kinds can be used by a signature. *)
+
+module Struct_default_used_by_sig = struct
+  [@@@implicit_kind: ('from_struct : bits64)]
+
+  module type S = sig
+    val pack : 'from_struct -> 'from_struct array
+  end
+end
+
+[%%expect{|
+module Struct_default_used_by_sig :
+  sig
+    module type S =
+      sig
+        val pack :
+          ('from_struct : bits64). 'from_struct -> 'from_struct array
+      end
+  end
+|}]
+
+(* Local modules inherit the surrounding implicit-kind environment. *)
+
+module Local_module = struct
+  [@@@implicit_kind: ('local : word)]
+
+  module type S = sig
+    val id : 'local -> 'local
+  end
+
+  let f () =
+    let module M = struct
+      let id (x : 'local) = x
+    end
+    in
+    (module M : S)
+end
+
+[%%expect{|
+module Local_module :
+  sig
+    module type S = sig val id : ('local : word). 'local -> 'local end
+    val f : unit -> (module S)
+  end
+|}]
+
+(* Conflicting explicit annotations in structures fail like signatures. *)
+
+module Structure_conflict = struct
+  [@@@implicit_kind: ('conflict : word)]
+
+  let bad (x : ('conflict : value_or_null)) = x
+end
+
+[%%expect{|
+Line 4, characters 28-41:
+4 |   let bad (x : ('conflict : value_or_null)) = x
+                                ^^^^^^^^^^^^^
+Error: Bad layout annotation:
+         The layout of "'conflict" is word
+           because of the annotation on the implicit kind of type variables named conflict.
+         But the layout of "'conflict" must be a value layout
+           because of the annotation on the type variable 'conflict.
+|}]
+
+(* Lexical defaults do not cross module boundaries as ambient defaults. *)
+
+module Boundary = struct
+  module Source = struct
+    [@@@implicit_kind: ('boundary : word)]
+
+    let baked (x : 'boundary) = x
+  end
+
+  module Consumer = struct
+    include Source
+
+    let fresh (x : 'boundary) = x
+  end
+end
+
+[%%expect{|
+module Boundary :
+  sig
+    module Source :
+      sig val baked : ('boundary : word). 'boundary -> 'boundary end
+    module Consumer :
+      sig
+        val baked : ('boundary : word). 'boundary -> 'boundary
+        val fresh : 'boundary -> 'boundary
+      end
+  end
 |}]
 
 (* Implicit kind without jkind annotation fails. *)
@@ -40,8 +342,8 @@ end
 Line 2, characters 2-24:
 2 |   [@@@implicit_kind: 'a]
       ^^^^^^^^^^^^^^^^^^^^^^
-Warning 47 [attribute-payload]: illegal payload for attribute 'implicit_kind'.
-implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...
+Warning 47 [attribute-payload]: illegal payload for attribute "implicit_kind".
+  implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...
 
 module type S1 = sig end
 |}]
@@ -57,8 +359,8 @@ end
 Line 2, characters 2-25:
 2 |   [@@@implicit_kind: int]
       ^^^^^^^^^^^^^^^^^^^^^^^
-Warning 47 [attribute-payload]: illegal payload for attribute 'implicit_kind'.
-implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...
+Warning 47 [attribute-payload]: illegal payload for attribute "implicit_kind".
+  implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...
 
 module type S2 = sig end
 |}]
@@ -88,8 +390,8 @@ end
 Line 2, characters 2-34:
 2 |   [@@@implicit_kind: (_ : bits32)]
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 47 [attribute-payload]: illegal payload for attribute 'implicit_kind'.
-implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...
+Warning 47 [attribute-payload]: illegal payload for attribute "implicit_kind".
+  implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...
 
 module type S4 = sig val a : 'a -> 'b end
 |}]
@@ -515,7 +817,6 @@ end
 module type S27 = sig val f : (('w : word). 'w -> 'w) -> unit end
 |}]
 
-(* CR implicit-variables: inherit the annotation here? *)
 (* [module type of struct]. *)
 
 module type S28 = sig
@@ -528,7 +829,9 @@ end
 
 [%%expect{|
 module type S28 =
-  sig module type Evil = sig val x : 'w -> 'w @@ stateless end end
+  sig
+    module type Evil = sig val x : ('w : word). 'w -> 'w @@ stateless end
+  end
 |}]
 
 (* [module type of struct] and unification. *)
@@ -721,7 +1024,7 @@ Error: The type variable 'a has conflicting kind annotations.
        but was already implicitly annotated with any
 |}]
 
-(* Clearing the env inside of a struct. *)
+(* Keeping the env inside of a struct. *)
 
 module type S37 = sig
   [@@@implicit_kind: ('t : word)]
@@ -734,7 +1037,7 @@ end
 [%%expect{|
 module type S37 =
   sig
-    module type Inner = sig val id : 't -> unit @@ stateless end
+    module type Inner = sig val id : ('t : word). 't -> unit @@ stateless end
     val f : ('t : word). 't -> 't
   end
 |}]

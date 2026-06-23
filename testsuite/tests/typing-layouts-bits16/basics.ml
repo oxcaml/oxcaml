@@ -91,8 +91,8 @@ let f4_1 (x : t_bits16) = x, false;;
 Line 1, characters 26-27:
 1 | let f4_1 (x : t_bits16) = x, false;;
                               ^
-Error: This expression has type "t_bits16"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits16" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits16 is bits16
          because of the definition of t_bits16 at line 1, characters 0-22.
        But the layout of t_bits16 must be a value layout
@@ -104,7 +104,7 @@ let f4_2 (x : 'a t_bits16_id) = x, false;;
 Line 1, characters 32-33:
 1 | let f4_2 (x : 'a t_bits16_id) = x, false;;
                                     ^
-Error: This expression has type "'a t_bits16_id" = "('a : bits16)"
+Error: The value "x" has type "'a t_bits16_id" = "('a : bits16)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_bits16_id is bits16
          because of the definition of t_bits16_id at line 2, characters 0-35.
@@ -117,7 +117,7 @@ let f4_3 (x : int16#) = x, false;;
 Line 1, characters 24-25:
 1 | let f4_3 (x : int16#) = x, false;;
                             ^
-Error: This expression has type "int16#" but an expression was expected of type
+Error: The value "x" has type "int16#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int16# is bits16
          because it is the unboxed version of the primitive type int16.
@@ -261,8 +261,8 @@ let f7_1 (x : t_bits16) = `A x;;
 Line 1, characters 29-30:
 1 | let f7_1 (x : t_bits16) = `A x;;
                                  ^
-Error: This expression has type "t_bits16"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits16" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits16 is bits16
          because of the definition of t_bits16 at line 1, characters 0-22.
        But the layout of t_bits16 must be a value layout
@@ -274,7 +274,7 @@ let f7_2 (x : 'a t_bits16_id) = `A x;;
 Line 1, characters 35-36:
 1 | let f7_2 (x : 'a t_bits16_id) = `A x;;
                                        ^
-Error: This expression has type "'a t_bits16_id" = "('a : bits16)"
+Error: The value "x" has type "'a t_bits16_id" = "('a : bits16)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_bits16_id is bits16
          because of the definition of t_bits16_id at line 2, characters 0-35.
@@ -287,7 +287,7 @@ let f7_3 (x : int16#) = `A x;;
 Line 1, characters 27-28:
 1 | let f7_3 (x : int16#) = `A x;;
                                ^
-Error: This expression has type "int16#" but an expression was expected of type
+Error: The value "x" has type "int16#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int16# is bits16
          because it is the unboxed version of the primitive type int16.
@@ -440,7 +440,7 @@ external f10_9 : (int16#[@untagged]) -> bool -> string  = "foo" "bar";;
 Line 1, characters 18-24:
 1 | external f10_9 : (int16#[@untagged]) -> bool -> string  = "foo" "bar";;
                       ^^^^^^
-Error: Don't know how to untag this type. Only "int" and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
@@ -449,7 +449,7 @@ external f10_10 : string -> (int16#[@untagged])  = "foo" "bar";;
 Line 1, characters 29-35:
 1 | external f10_10 : string -> (int16#[@untagged])  = "foo" "bar";;
                                  ^^^^^^
-Error: Don't know how to untag this type. Only "int" and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
@@ -640,7 +640,7 @@ end;;
 Line 3, characters 17-19:
 3 |     let _ = f1_1 m1 in
                      ^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "m1" has type "('a : value_or_null)"
        but an expression was expected of type "t_bits16"
        The layout of t_bits16 is bits16
          because of the definition of t_bits16 at line 1, characters 0-22.
@@ -676,8 +676,8 @@ let f13_1 (x : t_bits16) = x = x;;
 Line 1, characters 27-28:
 1 | let f13_1 (x : t_bits16) = x = x;;
                                ^
-Error: This expression has type "t_bits16"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits16" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits16 is bits16
          because of the definition of t_bits16 at line 1, characters 0-22.
        But the layout of t_bits16 must be a value layout.
@@ -688,8 +688,8 @@ let f13_2 (x : t_bits16) = compare x x;;
 Line 1, characters 35-36:
 1 | let f13_2 (x : t_bits16) = compare x x;;
                                        ^
-Error: This expression has type "t_bits16"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits16" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits16 is bits16
          because of the definition of t_bits16 at line 1, characters 0-22.
        But the layout of t_bits16 must be a value layout.
@@ -700,8 +700,8 @@ let f13_3 (x : t_bits16) = Marshal.to_bytes x;;
 Line 1, characters 44-45:
 1 | let f13_3 (x : t_bits16) = Marshal.to_bytes x;;
                                                 ^
-Error: This expression has type "t_bits16"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits16" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits16 is bits16
          because of the definition of t_bits16 at line 1, characters 0-22.
        But the layout of t_bits16 must be a value layout.
@@ -712,8 +712,8 @@ let f13_4 (x : t_bits16) = Hashtbl.hash x;;
 Line 1, characters 40-41:
 1 | let f13_4 (x : t_bits16) = Hashtbl.hash x;;
                                             ^
-Error: This expression has type "t_bits16"
-       but an expression was expected of type "('a : value)"
+Error: The value "x" has type "t_bits16" but an expression was expected of type
+         "('a : value)"
        The layout of t_bits16 is bits16
          because of the definition of t_bits16 at line 1, characters 0-22.
        But the layout of t_bits16 must be a value layout.

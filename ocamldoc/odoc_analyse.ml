@@ -28,11 +28,7 @@ let init_path () = Compmisc.init_path ()
 
 (** Return the initial environment in which compilation proceeds. *)
 let initial_env () =
-  let current =
-    match Env.get_unit_name () with
-    | Some cu -> Unit_info.modname cu |> Compilation_unit.full_path_as_string
-    | None -> ""
-  in
+  let current = Env.get_current_unit_name () in
   let initial = !Odoc_global.initially_opened_module in
   let initially_opened_module =
     if initial = current then
@@ -40,13 +36,14 @@ let initial_env () =
     else
       Some initial
   in
-  let open_implicit_modules =
+  let open_implicit_args =
     let ln = !Odoc_global.library_namespace in
     let ln = if current = ln || ln = initial || ln = "" then [] else [ln] in
-    ln @ List.rev !Clflags.open_modules in
+    List.map (fun s -> Clflags.Open s) ln @ List.rev !Clflags.open_args
+  in
   Typemod.initial_env
     ~loc:(Location.in_file "ocamldoc command line")
-    ~open_implicit_modules
+    ~open_implicit_args
     ~initially_opened_module
 
 (** Optionally preprocess a source file *)
@@ -84,7 +81,7 @@ let process_implementation_file sourcefile =
   init_path ();
   let source = unit_from_source sourcefile Unit_info.Impl in
   let compilation_unit = Unit_info.modname source in
-  Env.set_unit_name (Some source);
+  Env.set_current_unit source;
   let inputfile = preprocess sourcefile in
   let env = initial_env () in
   try
@@ -118,7 +115,7 @@ let process_interface_file sourcefile =
   init_path ();
   let unit = unit_from_source sourcefile Unit_info.Intf in
   let compilation_unit = Unit_info.modname unit in
-  Env.set_unit_name (Some unit);
+  Env.set_current_unit unit;
   let inputfile = preprocess sourcefile in
   let ast =
     Pparse.file ~tool_name inputfile
@@ -223,7 +220,7 @@ let process_file sourcefile =
   | Odoc_global.Text_file file ->
       Location.input_name := file;
       try
-        let mod_name = Unit_info.modname_from_source file in
+        let mod_name = Unit_info.lax_modname_from_source file in
         let txt =
           try Odoc_text.Texter.text_of_string (Odoc_misc.input_file_as_string file)
           with Odoc_text.Text_syntax (l, c, s) ->

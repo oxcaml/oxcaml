@@ -83,9 +83,9 @@ let remove_duplicates (type a) compare (li : a list) =
 let rec string_of_longident li =
   match li with
   | Longident.Lident s -> s
-  | Longident.Ldot(li, s) -> string_of_longident li ^ "." ^ s
+  | Longident.Ldot(li, s) -> string_of_longident li.txt ^ "." ^ s.txt
   | Longident.Lapply(l1, l2) ->
-      string_of_longident l1 ^ "(" ^ string_of_longident l2 ^ ")"
+      string_of_longident l1.txt ^ "(" ^ string_of_longident l2.txt ^ ")"
 
 let rec string_of_text t =
   let rec iter t_ele =
@@ -511,7 +511,8 @@ let remove_option typ =
     | Tnil
     | Tvariant _
     | Tpackage _
-    | Tof_kind _ -> t
+    | Tof_kind _
+    | Tbox _ -> t
     | Tlink t2 -> trim (get_desc t2)
     | Tsubst _ -> assert false
   in

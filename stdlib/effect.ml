@@ -15,7 +15,7 @@
 external register_named_value : string -> 'a -> unit
   = "caml_register_named_value"
 
-type 'a t = ..
+type 'a t = 'a eff = ..
 external perform : 'a t -> 'a = "%perform"
 exception Out_of_fibers = Out_of_fibers
 type exn += Unhandled: 'a t -> exn
@@ -100,14 +100,17 @@ let with_handler cont valuec exnc (effc : 'a. ('a, _, _) effc) tickc f x =
     (update_cont_handler_noexc cont valuec exnc effc tickc) f x
 
 module Deep = struct
-  type ('a,'b) continuation =
-    | Cont : ('a,'x,'b) cont -> ('a, 'b) continuation [@@unboxed]
 
-  let continue (Cont k) v = resume k (fun x-> x) v
+  type nonrec ('a,'b) continuation = ('a,'b) continuation
 
-  let discontinue (Cont k) e = resume k (fun e -> raise e) e
+  type ('a,'b) continuation_ =
+    | Cont : ('a,'x,'b) cont -> ('a, 'b) continuation_ [@@unboxed]
 
-  let discontinue_with_backtrace (Cont k) e bt =
+  let[@inline] continue (Cont k) v = resume k (fun x-> x) v
+
+  let[@inline] discontinue (Cont k) e = resume k (fun e -> raise e) e
+
+  let[@inline] discontinue_with_backtrace (Cont k) e bt =
     resume k (fun e -> Printexc.raise_with_backtrace e bt) e
 
   type ('a,'b) handler =
@@ -118,12 +121,20 @@ module Deep = struct
   external reperform :
     'a t -> ('a, _, 'b) cont -> last_fiber -> 'b = "%reperform"
 
+  (* FIXME Upstream the 3-parameter version of continuation and use it to
+           maintain type safety here. *)
+  let[@inline] to_continuation (f : _ continuation -> 'a) (k : _ continuation_)
+      =
+    f (Obj.magic k)
+
+  let[@inline] of_continuation (f : _ continuation_ -> 'a) (k : _ continuation)
+      =
+    f (Obj.magic k)
+
   let match_with comp arg handler =
     let effc eff k last_fiber =
       match handler.effc eff with
-      | Some f ->
-          cont_set_last_fiber k last_fiber;
-          f (Cont k)
+      | Some f -> to_continuation f (Cont k)
       | None -> reperform eff k last_fiber
     in
     with_stack handler.retc handler.exnc effc comp arg
@@ -134,12 +145,15 @@ module Deep = struct
   let try_with comp arg handler =
     let effc' eff k last_fiber =
       match handler.effc eff with
-      | Some f ->
-          cont_set_last_fiber k last_fiber;
-          f (Cont k)
+      | Some f -> to_continuation f (Cont k)
       | None -> reperform eff k last_fiber
     in
     with_stack (fun x -> x) (fun e -> raise e) effc' comp arg
+
+  let[@inline] continue k = of_continuation continue k
+  let[@inline] discontinue k = of_continuation discontinue k
+  let[@inline] discontinue_with_backtrace k =
+    of_continuation discontinue_with_backtrace k
 
   module Preemptible = struct
     type ('a,'b) handler =
@@ -153,7 +167,7 @@ module Deep = struct
         match handler.effc eff with
         | Some f ->
           cont_set_last_fiber k last_fiber;
-          f (Cont k)
+          to_continuation f (Cont k)
         | None -> reperform eff k last_fiber
       in
       with_stack_preemptible
@@ -185,15 +199,12 @@ module Shallow = struct
     let exception E of (a,b) continuation in
     let f' () = f (perform M.Initial_setup__) in
     let error _ = failwith "impossible" in
-    let effc (type a2) (eff : a2 t) (k : (a2,b,_) cont) last_fiber =
+    let effc (type a2) (eff : a2 t) (k : (a2,b,_) cont) _last_fiber =
       match eff with
-      | M.Initial_setup__ ->
-          cont_set_last_fiber k last_fiber;
-          raise_notrace (E (Cont k))
+      | M.Initial_setup__ -> raise_notrace (E (Cont k))
       (* We need to handle [Preemption] here since it's triggered automatically
          on a timer, and might arrive while we're setting up the fiber *)
       | Preemption ->
-          cont_set_last_fiber k last_fiber;
           resume k (fun x -> x) ()
       | _ -> error ()
     in
@@ -212,9 +223,7 @@ module Shallow = struct
   let continue_gen (Cont k) resume_fun v handler =
     let effc eff k last_fiber =
       match handler.effc eff with
-      | Some f ->
-          cont_set_last_fiber k last_fiber;
-          f (Cont k)
+      | Some f -> f (Cont k)
       | None -> reperform eff k last_fiber
     in
     with_handler k handler.retc handler.exnc effc Null resume_fun v
