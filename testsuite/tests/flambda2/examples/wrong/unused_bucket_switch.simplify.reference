@@ -22,9 +22,7 @@ let ghost_region = %begin_ghost_region () in
              -> k3 * k4
              : imm tagged =
        apply direct(opaque_0_1)
-         ($camlUnused_bucket_switch__opaque_2 : _ -> imm tagged)
-           (1)
-           -> k6 * k4
+         ($camlUnused_bucket_switch__opaque_2 : _ -> [ 0 |1 ]) (1) -> k6 * k4
          where k6 (param_1) =
            let unboxed_field = %untag_imm (param_1) in
            cont k5 (unboxed_field)

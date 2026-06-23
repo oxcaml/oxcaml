@@ -82,7 +82,7 @@ val package_units:
 val initial_env:
   loc:Location.t ->
   initially_opened_module:string option ->
-  open_implicit_modules:string list -> Env.t
+  open_implicit_args:Clflags.open_arg list -> Env.t
 
 module Sig_component_kind : sig
   type t =

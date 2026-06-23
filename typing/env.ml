@@ -966,9 +966,10 @@ let check_shadowing env = function
   | `Module_type (Some _) -> Some "module type"
   | `Class (Some _) -> Some "class"
   | `Class_type (Some _) -> Some "class type"
+  | `Jkind (Some _) -> Some "kind"
   | `Constructor _ | `Label _ | `Unboxed_label _
   | `Value None | `Type None | `Module None | `Module_type None
-  | `Class None | `Class_type None | `Component None ->
+  | `Class None | `Class_type None | `Component None | `Jkind None ->
       None
 
 let empty = {
@@ -1523,6 +1524,7 @@ let type_of_cstr path = function
 type unboxed_version_step =
   | Lacks_unboxed_version
   | Aliases of Path.t * type_expr list
+  | Boxes of type_expr
   | Has_unboxed_version of type_declaration
 let step_find_unboxed_version decl =
   match decl.type_unboxed_version with
@@ -1540,9 +1542,12 @@ let step_find_unboxed_version decl =
       match decl.type_manifest with
       | None -> Lacks_unboxed_version
       | Some ty ->
-        match get_desc ty with
-        | Tconstr (path, args, _) -> Aliases (path, args)
-        | _ -> Lacks_unboxed_version
+        match Btype.simple_unbox_ty ty with
+        | Some ty -> Boxes ty
+        | None ->
+          match get_desc ty with
+          | Tconstr (path, args, _) -> Aliases (path, args)
+          | _ -> Lacks_unboxed_version
 
 let rec find_type_data path env seen =
   match
@@ -1590,11 +1595,44 @@ and find_type_unboxed_version path env seen =
   match step_find_unboxed_version decl with
   | Has_unboxed_version ud -> ud
   | Lacks_unboxed_version -> raise Not_found
+  | Boxes inner ->
+    {
+      type_params = decl.type_params;
+      type_arity = decl.type_arity;
+      type_kind = Type_abstract Definition;
+      type_jkind = Jkind.Builtin.any ~why:Dummy_jkind;
+      type_ikind =
+        Types.ikinds_todo
+          (Format_doc.asprintf
+             "env unboxed Tbox manifest path=%a" Path.print path);
+      type_private = decl.type_private;
+      type_manifest = Some inner;
+      type_variance = decl.type_variance;
+      type_separability =
+        Types.Separability.default_signature ~arity:decl.type_arity;
+      type_is_newtype = false;
+      type_expansion_scope = Btype.lowest_level;
+      type_loc = decl.type_loc;
+      type_attributes = decl.type_attributes;
+      type_unboxed_default = false;
+      type_uid = Uid.unboxed_version decl.type_uid;
+      type_unboxed_version = None;
+    }
   | Aliases (path, args) ->
+    (* CR box rtjoa: Here, we are approximate. Say we have [type 'a id = 'a],
+       and we try to find the unboxed version of [type t = float id]. We'll step
+       to [Aliases (id, [float])], and then mistakenly assume here that [id]
+       doesn't have an unboxed version, because we look up its path - even
+       though it could, depending on the arguments.
+
+       Nested boxed types fail for the same reason, as [box#] is like [id] (the
+       unboxed version of ['a box] is ['a]).
+    *)
     let ud = find_type_unboxed_version path env seen in
     let man =
       Btype.newgenty
-        (Tconstr (Path.unboxed_version path, args, ref Mnil)) in
+        (Tconstr (Path.unboxed_version path, args, ref Mnil))
+    in
     let jkind = ud.type_jkind in
     (* CR layouts v7.2: compute the exact separability *)
     (* As this unboxed version aliases [ud], its params' separabilities can
@@ -3490,6 +3528,15 @@ let assert_does_not_cross_quotation ~loc_use ~loc_def env path locks =
         (Location.Doc.loc ~capitalize_first:false) loc_def
         (Location.Doc.loc ~capitalize_first:false) loc_use
 
+let locks_for_pers_mod ~loc_use ~loc_def env path =
+  let stage_locks, locks =
+    partition_locks (IdTbl.get_all_locks env.modules)
+  in
+  (* Tripwire: persistent paths are toplevel-scoped, so this should never
+     fire. *)
+  assert_does_not_cross_quotation env ~loc_use ~loc_def path stage_locks;
+  locks
+
 let report_module_unbound ~errors ~loc env reason =
   match reason with
   | Mod_unbound_illegal_recursion { container; unbound } ->
@@ -4209,20 +4256,29 @@ let add_components slot root env0 comps (locks : locks) =
   let cltypes =
     add (fun x -> `Class_type x) comps.comp_cltypes env0.cltypes
   in
+  let jkinds =
+    add (fun x -> `Jkind x) comps.comp_jkinds env0.jkinds
+  in
   let modules =
     add_v (fun x -> `Module x) comps.comp_modules env0.modules
   in
-  { env0 with
-    summary = Env_open(env0.summary, root);
+  { values;
     constrs;
     labels;
     unboxed_labels;
-    values;
     types;
+    modules;
     modtypes;
     classes;
     cltypes;
-    modules;
+    functor_args = env0.functor_args;
+    jkinds;
+    summary = Env_open(env0.summary, root);
+    local_constraints = env0.local_constraints;
+    implicit_jkinds = env0.implicit_jkinds;
+    flags = env0.flags;
+    stage = env0.stage;
+    toplevel_scope = env0.toplevel_scope;
   }
 
 let open_signature_by_path path env0 =
@@ -4278,7 +4334,27 @@ let remove_last_open root env0 =
 (* Open a signature from a file *)
 
 let open_pers_signature name env =
-  open_signature ~errors:false None (Location.mknoloc (Lident name)) env
+  let path, _, env =
+    open_signature ~errors:false None (Location.mknoloc (Lident name)) env
+  in
+  path, env
+
+let open_pers_signature_cmi filename env =
+  let global_name, _sign =
+    Persistent_env.read_cmi_file !persistent_env filename
+  in
+  let mda =
+    find_pers_mod ~allow_hidden:true global_name ~allow_excess_args:false
+  in
+  let path = Pident (Ident.create_global global_name) in
+  use_module ~use:true ~loc:Location.none path mda;
+  let comps = find_structure_components path env in
+  let locks =
+    locks_for_pers_mod ~loc_use:Location.none
+      ~loc_def:Location.none env path
+  in
+  let env = add_components None path env comps locks in
+  path, env
 
 let open_signature
     ~used_slot
@@ -4356,7 +4432,6 @@ let lookup_module_path ~errors ~use ~loc ~load lid env =
 let lookup_module_instance_path ~errors ~use ~loc ~load name env =
   (* The locks are whatever locks we would find if we went through
      [lookup_module_path] on a module not found in the environment *)
-  let locks = IdTbl.get_all_locks env.modules in
   let path, loc_def, mode =
     if !Clflags.no_alias_deps && not load then
       let path, () =
@@ -4373,8 +4448,9 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
       in
       path, mda.mda_declaration.md_loc, mda.mda_mode
   in
-  let stage_locks, locks = partition_locks locks in
-  assert_does_not_cross_quotation env ~loc_use:loc ~loc_def path stage_locks;
+  let locks =
+    locks_for_pers_mod ~loc_use:loc ~loc_def env path
+  in
   path, (mode, locks)
 
 let lookup_value_lazy ~errors ~use ~loc lid env =

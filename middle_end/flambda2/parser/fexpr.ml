@@ -51,6 +51,35 @@ type region =
   | Named of variable
   | Toplevel
 
+type tag_scannable = int
+
+type subkind =
+  | Anything
+  | Boxed_float32
+  | Boxed_float
+  | Boxed_int32
+  | Boxed_int64
+  | Boxed_nativeint
+  | Boxed_vec128
+  | Boxed_vec256
+  | Boxed_vec512
+  | Tagged_immediate
+  | Variant of
+      { consts : targetint list;
+        non_consts : (tag_scannable * kind_with_subkind list) list
+      }
+  | Float_block of { num_fields : int }
+  | Float_array
+  | Immediate_array
+  | Value_array
+  | Generic_array
+
+and kind_with_subkind =
+  | Value of subkind
+  | Naked_number of Flambda_kind.Naked_number_kind.t
+  | Region
+  | Rec_info
+
 type const =
   | Naked_immediate of immediate
   | Tagged_immediate of immediate
@@ -66,6 +95,7 @@ type const =
   | Naked_vec512 of Vector_types.Vec512.Bit_pattern.bits
   | Naked_nativeint of targetint
   | Null
+  | Poison of kind_with_subkind * string
 
 type field_of_block =
   | Symbol of symbol
@@ -75,8 +105,6 @@ type field_of_block =
 type is_recursive =
   | Nonrecursive
   | Recursive
-
-type tag_scannable = int
 
 type mutability = Mutability.t =
   | Mutable
@@ -122,33 +150,6 @@ type static_data =
   | Empty_array of empty_array_kind
   | Mutable_string of { initial_value : string }
   | Immutable_string of string
-
-type subkind =
-  | Anything
-  | Boxed_float32
-  | Boxed_float
-  | Boxed_int32
-  | Boxed_int64
-  | Boxed_nativeint
-  | Boxed_vec128
-  | Boxed_vec256
-  | Boxed_vec512
-  | Tagged_immediate
-  | Variant of
-      { consts : targetint list;
-        non_consts : (tag_scannable * kind_with_subkind list) list
-      }
-  | Float_block of { num_fields : int }
-  | Float_array
-  | Immediate_array
-  | Value_array
-  | Generic_array
-
-and kind_with_subkind =
-  | Value of subkind
-  | Naked_number of Flambda_kind.Naked_number_kind.t
-  | Region
-  | Rec_info
 
 type static_data_binding =
   { symbol : symbol;
@@ -236,14 +237,12 @@ type function_call =
 (* Will translate to indirect_known_arity or indirect_unknown_arity depending on
    whether the apply record's arities field has a value *)
 
-type method_kind =
-  | Self
-  | Public
-  | Cached
-
 type call_kind =
   | Function of function_call
-  (* | Method of { kind : method_kind; obj : simple; } *)
+  | Method of
+      { kind : Call_kind.Method_kind.t;
+        obj : simple
+      }
   | C_call of { alloc : bool }
 
 type function_arities =
