@@ -298,6 +298,7 @@ module Flambda2 = struct
       let max_function_simplify_run = 2
       let shorten_symbol_names = false
       let cont_lifting_budget = 0
+      let cont_spec_budget = 0
       let cont_spec_threshold = -1.
     end
 
@@ -312,6 +313,7 @@ module Flambda2 = struct
       max_function_simplify_run : int;
       shorten_symbol_names : bool;
       cont_lifting_budget : int;
+      cont_spec_budget : int;
       cont_spec_threshold : float;
     }
 
@@ -326,6 +328,7 @@ module Flambda2 = struct
       max_function_simplify_run = Default.max_function_simplify_run;
       shorten_symbol_names = Default.shorten_symbol_names;
       cont_lifting_budget = Default.cont_lifting_budget;
+      cont_spec_budget = Default.cont_spec_budget;
       cont_spec_threshold = Default.cont_spec_threshold;
     }
 
@@ -339,6 +342,11 @@ module Flambda2 = struct
       default with
       fallback_inlining_heuristic = false;
       cont_lifting_budget = 100;
+      cont_spec_budget = 100;
+      (* the cont_spec budget is here to make it possible to manually fix things
+         when compilation times grow uncontrollably. It's therefore
+         intentionally high by default, and can be lowered manually if
+         necessary *)
       cont_spec_threshold = 0.;
     }
 
@@ -346,12 +354,14 @@ module Flambda2 = struct
       default with
       cont_lifting_budget = 1_000;
       (* in the worst case : 1_000 budget -> ~+18% compilation time *)
+      cont_spec_budget = 1_000;
       cont_spec_threshold = 0.;
     }
 
     let o4 = {
       o3 with
       cont_lifting_budget = 3_000;
+      cont_spec_budget = 3_000;
       cont_spec_threshold = 0.;
     }
 
@@ -368,6 +378,7 @@ module Flambda2 = struct
     let max_function_simplify_run = ref Default
     let shorten_symbol_names = ref Default
     let cont_lifting_budget = ref Default
+    let cont_spec_budget = ref Default
     let cont_spec_threshold = ref Default
   end
 
