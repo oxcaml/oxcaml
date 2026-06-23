@@ -21,14 +21,14 @@
    STRUCTURED column of [e2e_suboptimal.reference] for the demangled
    names. *)
 
-(* {1 Nested anonymous functions accumulate a redundant location chain}
+(* {1 Nested anonymous functions collapse to a single location}
 
    Each [fun] is [@inline never] so every closure survives as its own
-   symbol. The structured name records one [fn(file:line:col)] per
-   enclosing anonymous function, even though a single location already
-   identifies a closure uniquely. The deepest closure mangles to
-   [...nested_lambdas.fn(..3:2).fn(..4:4).fn], and note that the leaf
-   [fn] is the only one that drops its own location. *)
+   symbol. A single [fn(file:line:col)] identifies a closure uniquely, so
+   the enclosing scopes (the outer anonymous functions and [nested_lambdas]
+   itself) are dropped: the deepest closure now mangles to a bare
+   [E2e_suboptimal.fn(..5:6)] rather than chaining every enclosing
+   location. *)
 let nested_lambdas a =
   fun[@inline never] b ->
     fun[@inline never] c ->
@@ -63,11 +63,11 @@ module Str_inst = Make (struct
   let cmp = compare
 end)
 
-(* {1 Anonymous first-class modules collapse to one name}
+(* {1 Anonymous first-class modules are told apart by their location}
 
-   The two distinct [(module struct ... end)] bodies both mangle to
-   [pick.v]: the anonymous-module location that would tell them apart
-   is not recorded for first-class modules. *)
+   The two distinct [(module struct ... end)] bodies are distinguished by
+   their anonymous-module location ([mod(..77:15).v] vs [mod(..81:12).v]);
+   the enclosing [pick] is dropped, as the location already identifies it. *)
 module type V = sig
   val v : int -> int
 end
