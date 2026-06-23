@@ -319,6 +319,7 @@ type error =
   | Let_poly_not_yet_implemented
   | Let_poly_not_syntactic_value
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
+  | Useless_lpoly
 
 and invalid_layout_poly_inst_context =
   | Binding_op
@@ -11301,7 +11302,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
                 Jkind_types.Sort.generalize_with (fun () -> generalize ty)
               in
               if List.is_empty univars then
-                Location.prerr_warning loc Warnings.Useless_lpoly;
+                raise (Error (loc, env, Useless_lpoly));
               univars)
             pv_lpoly)
         ~f_mut:(unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)))
@@ -13336,6 +13337,12 @@ let report_error ~loc env =
       Location.errorf ~loc
         "Instantiation of layout-polymorphic values is not yet supported \
          for %s." ctx_str
+  | Useless_lpoly ->
+      Location.errorf ~loc
+        "This binding has no layout variables, so %a has no effect.@ \
+         Consider using a regular %a instead."
+        Style.inline_code "poly_"
+        Style.inline_code "let"
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

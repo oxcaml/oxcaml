@@ -249,7 +249,7 @@ and 'k pattern_desc =
       lpoly: Types.Lpoly.t;
       (** The sort variables abstracted over by this compile-time function, and
       the allocation mode of the captured environment. [pending] during
-      type-checking; guaranteed [determined] of (potentially empty) generic sort
+      type-checking; guaranteed [determined] of a non-empty list of generic sort
       variables after [type_let] returns. *)
       env_alloc_mode: alloc_mode;
       (** The allocation mode of the environment captured by the layout
