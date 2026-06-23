@@ -34,35 +34,6 @@ let nested_lambdas a =
     fun[@inline never] c ->
       fun[@inline never] d -> a + b + c + d
 
-(* {1 Functor instances are indistinguishable; the body name doubles}
-
-   The two applications below produce two separate compiled copies of
-   [run], but both mangle identically to [Make.run]: the application
-   site ([Int_inst] / [Str_inst]) never appears in the name, so the
-   copies cannot be told apart. The functor's own body symbol also
-   doubles its name, mangling to [Make.Make]. *)
-module type ORD = sig
-  type t
-
-  val cmp : t -> t -> int
-end
-
-module Make (O : ORD) = struct
-  let[@inline never] run a b = O.cmp a b + O.cmp b a
-end
-
-module Int_inst = Make (struct
-  type t = int
-
-  let cmp = compare
-end)
-
-module Str_inst = Make (struct
-  type t = string
-
-  let cmp = compare
-end)
-
 (* {1 Anonymous first-class modules are told apart by their location}
 
    The two distinct [(module struct ... end)] bodies are distinguished by
@@ -136,8 +107,6 @@ end
 
 let () =
   ignore (nested_lambdas 1 2 3 4);
-  ignore (Int_inst.run 1 2);
-  ignore (Str_inst.run "a" "b");
   ignore (pick true);
   ignore (deferred ());
   ignore (scale 1);

@@ -248,9 +248,16 @@ module Code_id : sig
 
   val name : t -> string
 
+  val debug : t -> Debuginfo.t
+
   (* The [rename] function, in addition to changing the stamp of the code ID,
      changes the compilation unit to the current one. *)
   val rename : t -> t
+
+  (* Like [rename] but overrides the debuginfo of the new code ID. Used when
+     specialising code, to record the specialisation context (e.g. the functor
+     instance a copy was produced for) in the structured symbol. *)
+  val rename_with_debug : t -> debug:Debuginfo.t -> t
 
   val invert_map : t Map.t -> t Map.t
 

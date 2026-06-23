@@ -878,6 +878,9 @@ module Code_id = struct
   let rename t =
     create ~name:(name t) ~debug:(debug t) (Compilation_unit.get_current_exn ())
 
+  let rename_with_debug t ~debug =
+    create ~name:(name t) ~debug (Compilation_unit.get_current_exn ())
+
   let in_compilation_unit t comp_unit =
     Compilation_unit.equal (get_compilation_unit t) comp_unit
 

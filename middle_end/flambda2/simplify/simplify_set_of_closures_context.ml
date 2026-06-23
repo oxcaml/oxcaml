@@ -220,7 +220,15 @@ let compute_old_to_new_code_ids_all_sets denv ~all_sets_of_closures =
               Code_or_metadata.code_present code
               && not (Code_metadata.stub (Code_or_metadata.code_metadata code))
             then
-              let new_code_id = Code_id.rename old_code_id in
+              (* Record the specialisation context (e.g. the functor instance
+                 this copy is produced for) in the new code ID's debuginfo, by
+                 folding in the current inlining/specialisation frames. Outside
+                 an inlined context this is the identity, so the symbol is
+                 unchanged. *)
+              let debug =
+                DE.add_inlined_debuginfo denv (Code_id.debug old_code_id)
+              in
+              let new_code_id = Code_id.rename_with_debug old_code_id ~debug in
               Code_id.Map.add old_code_id new_code_id old_to_new_code_ids
             else old_to_new_code_ids)
         (Function_declarations.funs function_decls)
