@@ -14,7 +14,7 @@ let immutable_load l = (List.hd l) + (List.hd l)
 immutable_load:
   testb $1, %al
   je    .L0
-  movq  camlStdlib__List__Pmakeblock2305@GOTPCREL(%rip), %rax
+  movq  camlStdlib__List__Pmakeblock2453@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11

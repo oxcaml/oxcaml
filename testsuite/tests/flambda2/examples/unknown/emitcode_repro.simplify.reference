@@ -62,8 +62,8 @@ let code loopify(done) size(121) newer_version_of(emit_2)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  cont self (param)
-    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+  cont `self` (param)
+    where rec `self` (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
       let `region` = %begin_region () in
       let ghost_region = %begin_ghost_region () in
       ((let prim = %is_int (param_1) in
@@ -97,7 +97,7 @@ let code loopify(done) size(121) newer_version_of(emit_2)
                       let Pfield = %block_load.[`1`] (param_1) in
                       let `unit` = %end_region (`region`) in
                       let unit_1 = %end_ghost_region (ghost_region) in
-                      cont self (Pfield))
+                      cont `self` (Pfield))
                where k4 =
                  let `*match*` = %block_load.[`1`] (param_1) in
                  let prim_1 = %is_int (`*match*`) in
@@ -139,7 +139,7 @@ let code loopify(done) size(121) newer_version_of(emit_2)
                                      let unit_1 =
                                        %end_ghost_region (ghost_region)
                                      in
-                                     cont self (Pfield_1)))))
+                                     cont `self` (Pfield_1)))))
                where k3 =
                  (apply direct(emit_instr_1_1 &`region` &ghost_region)
                     ($camlEmitcode_repro__emit_instr_4 : _ -> imm tagged)
@@ -151,7 +151,7 @@ let code loopify(done) size(121) newer_version_of(emit_2)
                       let Pfield = %block_load.[`1`] (param_1) in
                       let `unit` = %end_region (`region`) in
                       let unit_1 = %end_ghost_region (ghost_region) in
-                      cont self (Pfield))))
+                      cont `self` (Pfield))))
          where k2 =
            let `unit` = %end_region (`region`) in
            let unit_1 = %end_ghost_region (ghost_region) in

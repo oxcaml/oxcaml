@@ -31,10 +31,10 @@ let code loopify(never) size(40) newer_version_of(bar_1)
         : imm tagged =
   (let prim = %int_comp.lt (x, 0) in
    switch prim
-     | 0 -> k2 (1i, x, 0)
-     | 1 -> k2 (0i, 0, x))
+     | 0 -> k2 (1i, x, poison.val.variant_unboxing_field)
+     | 1 -> k2 (0i, poison.val.variant_unboxing_field, x))
     where k2 (tag : imm, unboxed_field_1_0, unboxed_field_0_0) =
-      let unboxed_field_2_0 = 0 in
+      let unboxed_field_2_0 = poison.val.variant_unboxing_field in
       (switch tag
          | 0 -> k2
          | 1 -> k3

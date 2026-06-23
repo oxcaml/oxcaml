@@ -34,6 +34,10 @@ ocamlc.byte;
 flags = "-I liba -I libb -nocwd";
 module = "libb/b.ml";
 ocamlc.byte;
+
+flags = "-nocwd";
+module = "libb/with_sub.ml";
+ocamlc.byte;
 {
   (* Test hiding A completely. You can't do much with types from it because
      their layouts are unknown. *)
@@ -98,7 +102,7 @@ ocamlc.byte;
   ocamlc.byte;
 }
 {
-  not-windows;
+  not-target-windows;
   flags = "-H liba -I liba_alt -I libb -nocwd";
   module = "libc/c1.ml";
   setup-ocamlc.byte-build-env;
@@ -109,7 +113,7 @@ ocamlc.byte;
   check-ocamlc.byte-output;
 }
 {
-  not-windows;
+  not-target-windows;
   flags = "-I liba_alt -H liba -I libb -nocwd";
   module = "libc/c1.ml";
   setup-ocamlc.byte-build-env;
@@ -122,7 +126,7 @@ ocamlc.byte;
 
 (* The next two tests show that earlier -Hs take priority over later -Hs *)
 {
-  not-windows;
+  not-target-windows;
   flags = "-H liba_alt -H liba -I libb -nocwd";
   module = "libc/c1.ml";
   setup-ocamlc.byte-build-env;
@@ -169,6 +173,65 @@ ocamlc.byte;
 {
   flags = "-H liba -I libb -nocwd";
   module = "libc/c5.ml";
+  setup-ocamlc.byte-build-env;
+  ocamlc.byte;
+}
+
+(* Test that [-open-cmi] reads the cmi from the given path without
+   consulting the include path. *)
+{
+  flags = "-nocwd -open-cmi liba/a.cmi";
+  module = "libb/b_open.ml";
+  setup-ocamlc.byte-build-env;
+  ocamlc.byte;
+}
+
+(* Test that [-open-cmi] works alongside -H. *)
+{
+  flags = "-H liba -I libb -nocwd -open-cmi liba/a.cmi";
+  module = "libb/b_open.ml";
+  setup-ocamlc.byte-build-env;
+  ocamlc.byte;
+}
+
+(* Test that [-open-cmi] of a hidden module does not make user-code
+   references to that module legal. *)
+{
+  flags = "-H liba -I libb -nocwd -open-cmi liba/a.cmi";
+  module = "libc/c3.ml";
+  setup-ocamlc.byte-build-env;
+  ocamlc_byte_exit_status = "2";
+  ocamlc.byte;
+  compiler_reference =
+    "${test_source_directory}/cant_reference_hidden.ocamlc.reference";
+  check-ocamlc.byte-output;
+}
+
+(* Test that an [-open] following an earlier [-open-cmi] can refer to a
+   module brought into scope by it: command-line order is preserved. *)
+{
+  flags = "-nocwd -open-cmi libb/with_sub.cmi -open A";
+  module = "libb/uses_float.ml";
+  setup-ocamlc.byte-build-env;
+  ocamlc.byte;
+}
+
+(* Test that [-open-cmi] loads the cmi at the given path and ignores any
+   in-scope module of the same name: the sub-module [A] brought into scope
+   by [-open-cmi libb/with_sub.cmi] does not shadow the subsequent
+   [-open-cmi liba/a.cmi]. *)
+{
+  flags = "-nocwd -open-cmi libb/with_sub.cmi -open-cmi liba/a.cmi";
+  module = "libb/uses_int.ml";
+  setup-ocamlc.byte-build-env;
+  ocamlc.byte;
+}
+
+(* Test that a trailing [-open-cmi] overrides an earlier [-open]:
+   command-line order is preserved across the two flag kinds. *)
+{
+  flags = "-I liba -nocwd -open A -open-cmi libb/with_sub.cmi";
+  module = "libb/uses_string.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;
 }

@@ -16,6 +16,7 @@
 (* Environment handling *)
 
 open Types
+open Data_types
 open Misc
 module Jkind = Btype.Jkind0
 
@@ -446,7 +447,7 @@ val add_value:
     ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
     Ident.t -> Types.value_description -> t -> t
 val add_type:
-    check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
+  check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
 val add_extension:
   check:bool -> ?shape:Shape.t -> rebind:bool -> Ident.t ->
   extension_constructor -> t -> t
@@ -590,9 +591,10 @@ val reset_cache: preserve_persistent_env:bool -> unit
 (* To be called before each toplevel phrase. *)
 val reset_cache_toplevel: unit -> unit
 
-(* Remember the name of the current compilation unit. *)
-val set_unit_name: Unit_info.t option -> unit
-val get_unit_name: unit -> Unit_info.t option
+(* Remember the current compilation unit. *)
+val set_current_unit: Unit_info.t -> unit
+val get_current_unit : unit -> Unit_info.t option
+val get_current_unit_name: unit -> string
 
 (* Read, save a signature to/from a file. *)
 val read_signature:
@@ -679,14 +681,6 @@ type error =
 
 exception Error of error
 
-
-val report_error: error Format_doc.format_printer
-val report_error_doc: error Format_doc.printer
-
-val report_lookup_error:
-    Location.t -> t -> lookup_error Format_doc.format_printer
-val report_lookup_error_doc:
-    Location.t -> t -> lookup_error Format_doc.printer
 val in_signature: bool -> t -> t
 
 val is_in_signature: t -> bool
@@ -719,8 +713,6 @@ val same_constr: (t -> type_expr -> type_expr -> bool) ref
 (* Forward declaration to break mutual recursion with Ctype. *)
 val constrain_type_jkind:
   (t -> type_expr -> jkind_r -> (unit, Jkind.Violation.t) result) ref
-(* Forward declaration to break mutual recursion with Printtyp. *)
-val print_longident: Longident.t Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
 val print_path: Path.t Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Printtyp. *)

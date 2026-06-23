@@ -1,22 +1,22 @@
 <ppx-context>
 tool_name: "ocamlc"
-open_modules: ["List"]
+open_args: [Open("List")]
 for_package: "None"
 use_debug: false
 use_threads: true
 recursive_types: true
 principal: true
-transparent_modules: false
+no_alias_deps: false
 unboxed_types: true
 </ppx-context>
 <ppx-context>
 tool_name: "ocamlc"
-open_modules: []
+open_args: []
 for_package: "None"
 use_debug: true
 use_threads: false
 recursive_types: false
 principal: false
-transparent_modules: true
+no_alias_deps: true
 unboxed_types: false
 </ppx-context>

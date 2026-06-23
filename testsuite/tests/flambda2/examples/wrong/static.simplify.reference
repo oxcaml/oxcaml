@@ -31,8 +31,8 @@ let code loopify(never) size(58) newer_version_of(f_0)
         : imm tagged =
   let g = closure g_1_1 @g with { x = x } in
   let h = closure h_2_1 @h with { g = g } in
-  cont self (0, l)
-    where rec self (accu, l_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+  cont `self` (0, l)
+    where rec `self` (accu, l_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
       let prim = %is_int (l_1) in
       (switch prim
          | 0 -> k2
@@ -43,7 +43,7 @@ let code loopify(never) size(58) newer_version_of(f_0)
              apply direct(h_2_1) inlining_state(depth(10))
                h (accu, Pfield_1) -> k2 * k1)
               where k2 (apply_result) =
-                cont self (apply_result, Pfield)))
+                cont `self` (apply_result, Pfield)))
 in
 let $camlStatic__f_3 = closure f_0_1 @f in
 let $camlStatic = Block 0 ($camlStatic__f_3) in

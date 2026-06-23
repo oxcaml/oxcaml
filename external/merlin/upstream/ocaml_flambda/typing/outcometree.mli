@@ -63,6 +63,7 @@ type out_value =
   | Oval_variant of string * out_value option
   | Oval_lazy of out_value
   | Oval_code of CamlinternalQuote.Code.t
+  | Oval_floatarray of floatarray
 
 type out_modality = string
 
@@ -73,8 +74,6 @@ type out_atomicity =
 type out_mutability =
   | Om_immutable
   | Om_mutable of string option * out_atomicity
-
-
 
 (** This definition avoids a cyclic dependency between Outcometree and Types. *)
 type arg_label =
@@ -134,11 +133,8 @@ and out_type =
   | Otyp_constr of out_ident * out_type list
   | Otyp_manifest of out_type * out_type
   | Otyp_object of { fields: (string * out_type) list; open_row:bool}
-  | Otyp_record of (string * out_mutability * out_type * out_modality list) list
-  | Otyp_record_unboxed_product of
-      (string * out_mutability * out_type * out_modality list) list
-  (* INVARIANT: [out_mutability] is included for uniformity with [Otyp_record],
-     but it is always [Omm_immutable] *)
+  | Otyp_record of out_label list
+  | Otyp_record_unboxed_product of out_label list
   | Otyp_stuff of string
   | Otyp_sum of out_constructor list
   | Otyp_tuple of (string option * out_type) list
@@ -150,7 +146,7 @@ and out_type =
   | Otyp_poly of out_vars_jkinds * out_type
   | Otyp_repr of string list * out_type
   | Otyp_newlayout of out_sort_genvar list * out_type
-  | Otyp_module of out_ident * (string * out_type) list
+  | Otyp_module of out_package
   | Otyp_attribute of out_type * out_attribute
   | Otyp_jkind_annot of out_type * out_jkind
       (* Currently only introduced with very explicit code in [Printtyp] and not
@@ -159,10 +155,22 @@ and out_type =
   | Otyp_ret of out_ret_mode * out_type
   (** INVARIANT: See [out_ret_mode]. *)
 
+and out_label = {
+  olab_name: string;
+  olab_mut: out_mutability;
+  olab_type: out_type;
+  olab_modalities: out_modality list;
+}
+
 and out_constructor = {
   ocstr_name: string;
   ocstr_args: (out_type * out_modality list) list;
   ocstr_return_type: (out_vars_jkinds * out_type) option;
+}
+
+and out_package = {
+  opack_path: out_ident;
+  opack_cstrs: (string * out_type) list;
 }
 
 and out_variant =

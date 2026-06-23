@@ -291,12 +291,13 @@ end = struct
         None) t.files
 
   let find_normalized t fn =
-    let fn = Misc.normalized_unit_filename fn in
+    match Misc.normalized_unit_filename fn with
+    | Error _ -> None
+    | Ok fn ->
     let search { basename; path } =
-      if Misc.normalized_unit_filename basename = fn then
-        Some path
-      else
-        None
+      match Misc.normalized_unit_filename basename with
+      | Ok basename -> if String.equal basename fn then Some path else None
+      | Error _ -> None
     in
     List.find_map search t.files
 
@@ -329,8 +330,12 @@ module Path_cache : sig
   val prepend_add_single : hidden:bool -> cmx_guaranteed:bool ->
     string -> string -> unit
 
-  (* Search for a basename in cache. Ignore case if [uncap] is true *)
-  val find : uncap:bool -> string -> string * visibility
+  (* Search for a basename in cache by exact name. *)
+  val find : string -> string * visibility
+
+  (* Search in the uncapitalized tables. [fn_already_uncapped] should have
+     already been through [Misc.normalized_unit_filename]. *)
+  val find_uncap : fn_already_uncapped:string -> string * visibility
 end = struct
   module STbl = Misc.Stdlib.String.Tbl
 
@@ -351,14 +356,17 @@ end = struct
     STbl.clear !visible_files_uncap
 
   let prepend_add_single ~hidden ~cmx_guaranteed base fn =
-    if hidden then begin
-      STbl.replace !hidden_files base fn;
-      STbl.replace !hidden_files_uncap (Misc.normalized_unit_filename base) fn
-    end else begin
-      STbl.replace !visible_files base { Clflags.path = fn; cmx_guaranteed };
-      STbl.replace !visible_files_uncap (String.uncapitalize_ascii base)
-        { Clflags.path = fn; cmx_guaranteed }
-    end
+    Result.iter (fun ubase ->
+        if hidden then begin
+          STbl.replace !hidden_files base fn;
+          STbl.replace !hidden_files_uncap ubase fn
+        end else begin
+          STbl.replace !visible_files base
+            { Clflags.path = fn; cmx_guaranteed };
+          STbl.replace !visible_files_uncap ubase
+            { Clflags.path = fn; cmx_guaranteed }
+        end)
+      (Misc.normalized_unit_filename base)
 
   let prepend_add dir =
     let hidden, cmx_guaranteed =
@@ -383,23 +391,24 @@ end = struct
     in
     List.iter
       (fun ({ basename = base; path = fn } : Dir.entry) ->
-         update base fn visible_files hidden_files;
-         let ubase = Misc.normalized_unit_filename base in
-         update ubase fn visible_files_uncap hidden_files_uncap)
+         Result.iter (fun ubase ->
+             update base fn visible_files hidden_files;
+             update ubase fn visible_files_uncap hidden_files_uncap)
+           (Misc.normalized_unit_filename base))
       (Dir.files dir)
 
-  let find fn visible_files hidden_files =
+  let find_in fn visible_files hidden_files =
     try
       let { Clflags.path; cmx_guaranteed } = STbl.find !visible_files fn in
       (path, Visible { cmx_guaranteed })
     with
     | Not_found -> (STbl.find !hidden_files fn, Hidden)
 
-  let find ~uncap fn =
-    if uncap then
-      find (String.uncapitalize_ascii fn) visible_files_uncap hidden_files_uncap
-    else
-      find fn visible_files hidden_files
+  let find fn =
+    find_in fn visible_files hidden_files
+
+  let find_uncap ~fn_already_uncapped =
+    find_in fn_already_uncapped visible_files_uncap hidden_files_uncap
 end
 
 type auto_include_callback =
@@ -598,7 +607,7 @@ let find fn =
   assert (not Config.merlin || Local_store.is_bound ());
   try
     if is_basename fn && not !Sys.interactive then
-      fst (Path_cache.find ~uncap:false fn)
+      fst (Path_cache.find fn)
     else
       Misc.find_in_path (get_path_list ()) fn
   with Not_found ->
@@ -614,9 +623,12 @@ let search_dirs dirs fn =
 
 let find_normalized_with_visibility fn =
   assert (not Config.merlin || Local_store.is_bound ());
+  match Misc.normalized_unit_filename fn with
+  | Error _ -> raise Not_found
+  | Ok fn_uncap ->
   try
     if is_basename fn && not !Sys.interactive then
-      Path_cache.find ~uncap:true fn
+      Path_cache.find_uncap ~fn_already_uncapped:fn_uncap
     else
       match search_dirs (List.rev !visible_dirs) fn with
       | Some result -> result
@@ -625,7 +637,6 @@ let find_normalized_with_visibility fn =
         | Some result -> result
         | None -> raise Not_found
   with Not_found ->
-    let fn_uncap = String.uncapitalize_ascii fn in
     (!auto_include_callback Dir.find_normalized fn_uncap,
      Visible { cmx_guaranteed = false })
 

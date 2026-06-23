@@ -36,7 +36,7 @@ open Extend_protocol.Reader
 let { Logger.log } = Logger.for_section "Completion"
 
 type raw_info =
-  [ `Constructor of Types.constructor_description
+  [ `Constructor of Data_types.constructor_description
   | `Modtype of Subst.Lazy.module_type
   | `Modtype_declaration of Ident.t * Subst.Lazy.modtype_declaration
   | `None
@@ -49,22 +49,22 @@ let raw_info_printer : raw_info -> _ = function
   | `Constructor c -> `Print (Out_type (Browse_misc.print_constructor c))
   | `Modtype mt ->
     let mt = Subst.Lazy.force_modtype mt in
-    `Print (Out_module_type (Printtyp.tree_of_modtype mt))
+    `Print (Out_module_type (Out_type.tree_of_modtype mt))
   | `Modtype_declaration (id, mtd) ->
     let mtd = Subst.Lazy.force_modtype_decl mtd in
-    `Print (Out_sig_item (Printtyp.tree_of_modtype_declaration id mtd))
+    `Print (Out_sig_item (Out_type.tree_of_modtype_declaration id mtd))
   | `None -> `String ""
   | `String s -> `String s
   | `Type_declaration (id, tdecl) ->
     `Print
       (Out_sig_item
-         (Printtyp.tree_of_type_declaration id tdecl Types.Trec_first))
-  | `Type_scheme te -> `Print (Out_type (Printtyp.tree_of_type_scheme te))
+         (Out_type.tree_of_type_declaration id tdecl Types.Trec_first))
+  | `Type_scheme te -> `Print (Out_type (Out_type.tree_of_type_scheme te))
   | `Variant (label, arg) ->
     begin match arg with
     | None -> `String label
     | Some te ->
-      `Concat (label ^ " of ", Out_type (Printtyp.tree_of_type_scheme te))
+      `Concat (label ^ " of ", Out_type (Out_type.tree_of_type_scheme te))
     end
 
 (* List methods of an object.
@@ -169,7 +169,7 @@ let make_candidate ~get_doc ~attrs ~exact ~prefix_path name ?loc ?path ty =
       let v = Subst.Lazy.force_value_description v in
       (`Value, `Type_scheme v.Types.val_type)
     | `Cons c -> (`Constructor, `Constructor c)
-    | `Label label_descr ->
+    | `Label (label_descr : _ Data_types.gen_label_description) ->
       let desc =
         Types.(
           Tarrow
@@ -312,10 +312,10 @@ let fold_sumtype_constructors ~env ~init ~f t =
 
 let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
     branch =
-  let cstr_attributes c = c.Types.cstr_attributes in
+  let cstr_attributes c = c.Data_types.cstr_attributes in
   let val_attributes v = v.Subst.Lazy.val_attributes in
   let type_attributes t = t.Types.type_attributes in
-  let lbl_attributes l = l.Types.lbl_attributes in
+  let lbl_attributes l = l.Data_types.lbl_attributes in
   let mtd_attributes t = t.Subst.Lazy.mtd_attributes in
   let md_attributes t = t.Subst.Lazy.md_attributes in
   let make_candidate ~attrs ~exact name ?loc ?path ty =
@@ -429,9 +429,9 @@ let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
               :: candidates)
           prefix_path env []
       | `Constructor ->
-        let type_check { Types.cstr_res; _ } = type_check cstr_res in
+        let type_check { Data_types.cstr_res; _ } = type_check cstr_res in
         let consider_constr constr candidates =
-          let name = constr.Types.cstr_name in
+          let name = constr.Data_types.cstr_name in
           if not @@ validate `Lident `Cons name then candidates
           else
             let priority = if is_internal name then 0 else type_check constr in
@@ -479,7 +479,7 @@ let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
               :: candidates)
           prefix_path env []
       | `Labels ->
-        let step ({ Types.lbl_name = name; _ } as l) candidates =
+        let step ({ Data_types.lbl_name = name; _ } as l) candidates =
           if not (validate `Lident `Label name) then candidates
           else
             make_weighted_candidate ~exact:(name = prefix) name (`Label l)
@@ -554,7 +554,7 @@ let complete_methods ~env ~prefix obj =
 type is_label =
   | No
   | Maybe
-  | Description : 'rep Types.gen_label_description list -> is_label
+  | Description : 'rep Data_types.gen_label_description list -> is_label
   | Declaration of Types.type_expr * Types.label_declaration list
 
 let complete_prefix ?get_doc ?target_type ?(kinds = []) ~keywords ~prefix
@@ -591,7 +591,8 @@ let complete_prefix ?get_doc ?target_type ?(kinds = []) ~keywords ~prefix
        else name <> "_")
       && valid tag name
     in
-    let add_label_description ({ Types.lbl_name = name; _ } as l) candidates =
+    let add_label_description ({ Data_types.lbl_name = name; _ } as l)
+        candidates =
       if not (valid `Label name) then candidates
       else
         make_candidate ~prefix_path ~exact:(name = prefix) name (`Label l)
@@ -636,7 +637,8 @@ let complete_prefix ?get_doc ?target_type ?(kinds = []) ~keywords ~prefix
   in
   try
     match prefix with
-    | Longident.Ldot (prefix_path, prefix) -> find ~prefix_path ~is_label prefix
+    | Longident.Ldot (prefix_path, prefix) ->
+      find ~prefix_path:prefix_path.txt ~is_label prefix.txt
     | Longident.Lident prefix ->
       (* Regular completion *)
       let compl = find ~is_label prefix in
@@ -712,7 +714,7 @@ let branch_complete buffer ?get_doc ?target_type ?kinds ~keywords prefix :
       let prefix, _is_label = Longident.(keep_suffix @@ parse prefix) in
       let snap = Btype.snapshot () in
       let is_label =
-        match lbl.Types.lbl_all with
+        match lbl.Data_types.lbl_all with
         | [||] ->
           begin match
             let ty =
@@ -737,7 +739,7 @@ let branch_complete buffer ?get_doc ?target_type ?kinds ~keywords prefix :
                       (* FIXME: the two subst can lose some sharing between types *)
                       let lbl_res = Subst.type_expr Subst.identity lbl_res in
                       let lbl_arg = Subst.type_expr Subst.identity lbl_arg in
-                      { lbl with Types.lbl_res; lbl_arg }
+                      { lbl with Data_types.lbl_res; lbl_arg }
                     with _ -> lbl)
               in
               Description labels
@@ -866,7 +868,7 @@ let application_context ~prefix path =
          type, but not across different invocations.
          [reset] followed by calls to [mark_loops] and [type_sch] provide
          that *)
-      Printtyp.reset ();
+      Out_type.reset ();
       let pr t =
         let ppf, to_string = Format.to_string () in
         Printtyp.Compat.shared_type_scheme ppf t;

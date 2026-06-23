@@ -19,8 +19,8 @@ The entire buffer is indexed:
   }
 
   $ cat log | grep "Found"
-  Found () (File "$TESTCASE_ROOT/main.ml", line 1, characters 8-10) wiht uid <predef:()>
-  Found x (File "$TESTCASE_ROOT/main.ml", line 2, characters 8-9) wiht uid Main.0
+  Found () (File "$TESTCASE_ROOT/main.ml", line 1, characters 8-10) with uid <predef:()>
+  Found x (File "$TESTCASE_ROOT/main.ml", line 2, characters 8-9) with uid Main.0
 
 No changes, no indexation:
   $ $MERLIN server occurrences -identifier-at 2:8 \
@@ -67,8 +67,8 @@ Only the new item is indexed
   }
 
   $ cat log | grep "Found"
-  Found x (File "$TESTCASE_ROOT/main.ml", line 3, characters 8-9) wiht uid Main.0
-  Found x (File "$TESTCASE_ROOT/main.ml", line 4, characters 8-9) wiht uid Main.0
+  Found x (File "$TESTCASE_ROOT/main.ml", line 3, characters 8-9) with uid Main.0
+  Found x (File "$TESTCASE_ROOT/main.ml", line 4, characters 8-9) with uid Main.0
 
   $ cat >main.ml <<'EOF'
   > let x = ()
@@ -95,7 +95,7 @@ Only the line after the removed one are re-indexed
   }
 
   $ cat log | grep "Found"
-  Found x (File "$TESTCASE_ROOT/main.ml", line 4, characters 8-9) wiht uid Main.0
+  Found x (File "$TESTCASE_ROOT/main.ml", line 4, characters 8-9) with uid Main.0
 
 The edited line is reindexed with the rest of the buffer
   $ cat >main.ml <<'EOF'
@@ -126,7 +126,7 @@ The edited line is reindexed with the rest of the buffer
   }
 
   $ cat log | grep "Found"
-  Found x (File "$TESTCASE_ROOT/main.ml", line 4, characters 8-9) wiht uid Main.0
-  Found x (File "$TESTCASE_ROOT/main.ml", line 4, characters 11-12) wiht uid Main.0
+  Found x (File "$TESTCASE_ROOT/main.ml", line 4, characters 8-9) with uid Main.0
+  Found x (File "$TESTCASE_ROOT/main.ml", line 4, characters 11-12) with uid Main.0
 
   $ $MERLIN server stop-server

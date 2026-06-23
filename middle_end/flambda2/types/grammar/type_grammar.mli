@@ -965,5 +965,4 @@ module Head_of_kind_naked_vec512 :
     with type n = Vector_types.Vec512.Bit_pattern.t
     with type n_set = Vector_types.Vec512.Bit_pattern.Set.t
 
-val must_be_singleton :
-  t -> machine_width:Target_system.Machine_width.t -> Reg_width_const.t option
+val must_be_singleton : t -> Reg_width_const.t option
