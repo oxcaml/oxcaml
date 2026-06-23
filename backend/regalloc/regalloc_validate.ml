@@ -1216,9 +1216,10 @@ module Transfer (Desc_val : Description_value) :
       | Op (Spill | Reload | Move) ->
         Result.ok @@ rename_location t ~loc_instr:instr
       | _ ->
-        Misc.fatal_error
-          "Regalloc_validate.basic: added instruction must be Spill, Reload, \
-           or Move")
+        Regalloc_utils.fatal
+          "Regalloc_validate.basic: added instruction no. %a must be Spill, \
+           Reload, or Move: %a"
+          InstructionId.format instr.id Printcfg.basic instr)
     | Some instr_before -> (
       match instr.desc with
       | Op Move
