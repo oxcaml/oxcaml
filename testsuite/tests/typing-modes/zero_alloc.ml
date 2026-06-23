@@ -695,14 +695,39 @@ val alloc_tuple : unit -> int * int @ local = <fun>
 let (alloc_partial_app @ noalloc_strict)
       (f : (int -> int -> int -> int) @ noalloc_strict) = f 1 2
 [%%expect{|
-val alloc_partial_app :
-  (int -> int -> int -> int) @ noalloc_strict -> int -> int = <fun>
+Line 2, characters 58-63:
+2 |       (f : (int -> int -> int -> int) @ noalloc_strict) = f 1 2
+                                                              ^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 2, characters 6-63
+         which is expected to be "noalloc_strict".
 |}]
 let (alloc_partial_app @ noalloc)
       (f : (int -> int -> int -> int) @ noalloc) = f 1 2
 [%%expect{|
-val alloc_partial_app : (int -> int -> int -> int) @ noalloc -> int -> int =
-  <fun>
+Line 2, characters 51-56:
+2 |       (f : (int -> int -> int -> int) @ noalloc) = f 1 2
+                                                       ^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 2, characters 6-56
+         which is expected to be "noalloc".
+|}]
+
+(* [stack_] on a partial application is rejected: it is an application, not a
+   recognized allocation form. [f] is received as a parameter to avoid the
+   currying closures of a multi-argument definition. *)
+let (stack_partial_app @ noalloc_strict)
+      (f : (int -> int -> int -> int) @ noalloc_strict) = exclave_ stack_ (f 1 2)
+[%%expect{|
+Line 2, characters 74-81:
+2 |       (f : (int -> int -> int -> int) @ noalloc_strict) = exclave_ stack_ (f 1 2)
+                                                                              ^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 2, characters 6-81
+         which is expected to be "noalloc_strict".
 |}]
 
 (* CR shsong: a lazy block allocates on the heap, but no allocation is
@@ -949,18 +974,6 @@ let (stack_non_alloc @ noalloc_strict) (a : int) = exclave_ stack_ a
 Line 5, characters 67-68:
 5 | let (stack_non_alloc @ noalloc_strict) (a : int) = exclave_ stack_ a
                                                                        ^
-Error: This expression is not an allocation site.
-|}]
-
-(* [stack_] on a partial application is rejected: it is an application, not a
-   recognized allocation form. [f] is received as a parameter to avoid the
-   currying closures of a multi-argument definition. *)
-let (stack_partial_app @ noalloc_strict)
-      (f : (int -> int -> int -> int) @ noalloc_strict) = exclave_ stack_ (f 1 2)
-[%%expect{|
-Line 2, characters 74-81:
-2 |       (f : (int -> int -> int -> int) @ noalloc_strict) = exclave_ stack_ (f 1 2)
-                                                                              ^^^^^^^
 Error: This expression is not an allocation site.
 |}]
 

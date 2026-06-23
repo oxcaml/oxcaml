@@ -10299,11 +10299,22 @@ and type_application env app_loc expected_mode position_and_mode
             collect_apply_args env funct ignore_labels ty (instance ty)
               (value_to_alloc_r2l funct_mode) sargs ret_tvar
           in
+          (* CR shsong: rebase conflict - kept both main's example comment and
+             this commit's arrow-check allocation registration. *)
           (* example: [collect_apply_args] returns
              [ty_ret = unit] and
              [args = [(Label "a", Omitted bar);
                       (Optional "opt", Arg (Eliminated_optional_arg baz));
                       (Nolabel, Arg (Known_arg n))]] *)
+          let ty_ret_is_arrow =
+            match get_desc (expand_head env ty_ret) with
+            | Tarrow _ -> true
+            | _ -> false
+          in
+          (* CR shsong: Alternative design: only register_allocation_mode if
+              partial_app is false, since if partial_app is true, there are
+              Omitted args and the code walks the locks already *)
+          if ty_ret_is_arrow then register_allocation_mode ~env ~loc:app_loc mode_ret;
           let partial_app = is_partial_apply untyped_args in
           let position_and_mode =
             if partial_app then position_and_mode_default else position_and_mode
