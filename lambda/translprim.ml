@@ -147,7 +147,7 @@ type prim =
   | Poke of Lambda.peek_or_poke option
     (* For [Peek] and [Poke] the [option] is [None] until the primitive
        specialization code (below) has been run. *)
-  | Unsupported of Lambda.primitive
+  | Unsupported of Lambda.primitive [@warning "-unused-constructor"]
 
 let units_with_used_primitives = Hashtbl.create 7
 let add_used_primitive loc env path =
