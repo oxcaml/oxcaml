@@ -38,7 +38,8 @@ let x86_peephole_combine_add_rsp = ref true
 let cfg_stack_checks = ref true         (* -[no-]cfg-stack-check *)
 let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
 
-let cfg_eliminate_dead_trap_handlers = ref true  (* -cfg-eliminate-dead-trap-handlers *)
+let cfg_eliminate_dead_trap_handlers = ref true
+                                       (* -cfg-eliminate-dead-trap-handlers *)
 
 let cfg_prologue_validate = ref true     (* -[no-]cfg-prologue-validate *)
 let cfg_prologue_shrink_wrap = ref true     (* -[no-]cfg-prologue-shrink-wrap *)
