@@ -235,10 +235,11 @@ let domainstate_ptr_dwarf_register_number = 28
 
 let destroyed_at_c_noalloc_call =
   (* x19-x28, d8-d15 preserved.
-     x19 is also clobbered when [runtime5 && fp], as it then holds the OCaml
-     stack pointer across noalloc C calls. See emit.ml. *)
+     x19 is also clobbered when it holds the OCaml stack pointer across noalloc
+     C calls, i.e. when [runtime5 && (fp || macosx)] (see [extcall_sp_uses_x19]
+     in emit.ml). *)
   let int_regs_destroyed_at_c_noalloc_call =
-    if Config.runtime5 && fp
+    if Config.runtime5 && (fp || macosx)
     then Regs.[| X0;X1;X2;X3;X4;X5;X6;X7;X8;X9;X10;X11;X12;X13;X14;X15;X19 |]
     else Regs.[| X0;X1;X2;X3;X4;X5;X6;X7;X8;X9;X10;X11;X12;X13;X14;X15 |]
   in

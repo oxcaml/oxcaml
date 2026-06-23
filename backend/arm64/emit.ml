@@ -1490,19 +1490,23 @@ let emit_instr env i =
       A.ins1 BL (runtime_function S.Predef.caml_c_call);
       record_frame env i.live (Dbg_other i.dbg))
     else (
-      (* Save the OCaml stack pointer across the C call.  When frame pointers
-         are enabled we use the callee-saved x19, leaving x29 free as a valid
-         frame pointer for the unwinder (caml_start_program leaves x29 pointing
-         to its C stack); otherwise we use x29 as before. *)
+      (* Save the OCaml stack pointer across the C call in the callee-saved x19
+         when x29 must stay a valid frame pointer: when frame pointers are
+         enabled, and always on macOS, whose AAPCS variant requires x29 to be
+         preserved as the frame pointer (the debugger and C unwinder rely on it
+         across the OCaml/C boundary).  Only when frame pointers are disabled on
+         non-macOS targets do we reuse x29 itself, avoiding the cost of
+         reserving x19. *)
+      let extcall_sp_uses_x19 = fp || macosx in
       if Config.runtime5
       then (
-        if fp
+        if extcall_sp_uses_x19
         then A.ins_mov_from_sp ~dst:reg_x_extcall_saved_sp
         else A.ins_mov_from_sp ~dst:O.fp;
         D.cfi_remember_state ();
         D.cfi_def_cfa_register
           ~reg:(Int.to_string
-                  (if fp
+                  (if extcall_sp_uses_x19
                    then H.gp_x_dwarf_encoding reg_x_extcall_saved_sp
                    else R.gp_encoding R.fp));
         A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_c_stack);
@@ -1511,7 +1515,7 @@ let emit_instr env i =
       A.ins1 BL (symbol (Needs_reloc CALL26) (S.create_global func));
       if Config.runtime5
       then
-        if fp
+        if extcall_sp_uses_x19
         then A.ins_mov_to_sp ~src:reg_x_extcall_saved_sp
         else A.ins_mov_to_sp ~src:O.fp;
       D.cfi_restore_state ())
