@@ -362,6 +362,8 @@ let compute_static_size lam =
         | Punboxedvectorarray _ | Pgcscannableproductarray _
         | Pgcignorableproductarray _ ->
             Misc.fatal_error "size_of_primitive"
+        | Punspecializedarray ->
+            Misc.fatal_error "size_of_primitive: Punspecializedarray"
         end
     | Pmakearray_dynamic _ -> Misc.fatal_error "size_of_primitive"
     | Parrayblit _ -> Constant
@@ -461,7 +463,6 @@ let compute_static_size lam =
     | Pbytes_set_vec _
     | Pbigstring_set_vec _
     | Pfloatarray_set_vec _
-    | Pfloat_array_set_vec _
     | Pint_array_set_vec _
     | Punboxed_float_array_set_vec _
     | Punboxed_float32_array_set_vec _
@@ -490,7 +491,6 @@ let compute_static_size lam =
     | Pbytes_load_vec _
     | Pbigstring_load_vec _
     | Pfloatarray_load_vec _
-    | Pfloat_array_load_vec _
     | Pint_array_load_vec _
     | Punboxed_float_array_load_vec _
     | Punboxed_float32_array_load_vec _

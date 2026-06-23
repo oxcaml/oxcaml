@@ -135,7 +135,7 @@ f:
 .L0:
   leaq  8(%r15), %rbx
   movq  $3319, -8(%rbx)
-  movq  camlTOP5__do_work_11_15_code@GOTPCREL(%rip), %rdi
+  movq  <hidden PC-relative offset>(%rip), %rdi
   movq  %rdi, (%rbx)
   movabsq $108086391056891911, %rdi
   movq  %rdi, 8(%rbx)
@@ -297,4 +297,21 @@ loop_invariant_code:
   movl  $1, %eax
   addq  $24, %rsp
   ret
+|}]
+
+(* CR ttebbi: The loop should have a fall-through check. *)
+type t = { mutable next : t or_null }
+let rec match_loop t = match t.next with
+ | Null -> t
+ | This l -> match_loop l
+[%%expect_asm X86_64{|
+match_loop:
+.L0:
+  movq  (%rax), %rbx
+  testq %rbx, %rbx
+  jne   .L1
+  ret
+.L1:
+  movq  %rbx, %rax
+  jmp   .L0
 |}]

@@ -2051,7 +2051,10 @@ let tree_of_type_decl id decl =
         (match rep with Record_unboxed -> true | _ -> false),
         None,
         (Option.is_some umc)
-    | Type_record_unboxed_product(lbls, Record_unboxed_product, umc) ->
+    | Type_record_unboxed_product(lbls,
+                                  (Record_unboxed_product
+                                  | Record_unboxed_product_variable),
+                                  umc) ->
         tree_of_manifest
           (Otyp_record_unboxed_product (List.map tree_of_label lbls)),
         decl.type_private,

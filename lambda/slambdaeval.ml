@@ -478,22 +478,21 @@ and eval_prim env prim =
   | Pbigstring_load_f32 _ | Pbigstring_load_64 _ | Pbigstring_load_vec _
   | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
   | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
-  | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pint_array_load_vec _
+  | Pfloatarray_load_vec _ | Pint_array_load_vec _
   | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
   | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
   | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
   | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
-  | Pfloat_array_set_vec _ | Pint_array_set_vec _
-  | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
-  | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
-  | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
-  | Punboxed_nativeint_array_set_vec _ | Pctconst _ | Pint_as_pointer _
-  | Patomic_load_field _ | Patomic_set_field _ | Patomic_exchange_field _
-  | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
-  | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
-  | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
-  | Pprobe_is_enabled _ | Pobj_dup | Punbox_unit | Punbox_vector _
-  | Pbox_vector _ | Pjoin_vec256 | Psplit_vec256
+  | Pint_array_set_vec _ | Punboxed_float_array_set_vec _
+  | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
+  | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
+  | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
+  | Pctconst _ | Pint_as_pointer _ | Patomic_load_field _ | Patomic_set_field _
+  | Patomic_exchange_field _ | Patomic_compare_exchange_field _
+  | Patomic_compare_set_field _ | Patomic_fetch_add_field | Patomic_add_field
+  | Patomic_sub_field | Patomic_land_field | Patomic_lor_field
+  | Patomic_lxor_field | Pprobe_is_enabled _ | Pobj_dup | Punbox_unit
+  | Punbox_vector _ | Pbox_vector _ | Pjoin_vec256 | Psplit_vec256
   | Preinterpret_boxed_vector_as_tuple _ | Preinterpret_tuple_as_boxed_vector _
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64 | Parray_to_iarray

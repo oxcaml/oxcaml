@@ -120,6 +120,10 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_AVAILABLE [@symbol "available"]
 %token KWD_BOXED [@symbol "boxed"]
 %token KWD_CCALL  [@symbol "ccall"]
+%token KWD_MCALL  [@symbol "mcall"]
+%token KWD_SELF  [@symbol "self"]
+%token KWD_PUBLIC  [@symbol "public"]
+%token KWD_CACHED  [@symbol "cached"]
 %token KWD_CLOSURE  [@symbol "closure"]
 %token KWD_CODE  [@symbol "code"]
 %token KWD_CONT  [@symbol "cont"]
@@ -160,6 +164,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_NOTRACE [@symbol "notrace"]
 %token KWD_NULL [@symbol "null"]
 %token KWD_OF     [@symbol "of"]
+%token KWD_POISON [@symbol "poison"]
 %token KWD_POP    [@symbol "pop"]
 %token KWD_PUSH   [@symbol "push"]
 %token KWD_REC    [@symbol "rec"]
@@ -585,6 +590,11 @@ apply_expr:
      } }
 ;
 
+method_kind:
+  | KWD_SELF { Call_kind.Method_kind.Self }
+  | KWD_PUBLIC { Call_kind.Method_kind.Public }
+  | KWD_CACHED { Call_kind.Method_kind.Cached }
+
 call_kind:
   | alloc = alloc_mode_for_applications_opt; { (Function Indirect, alloc) }
   | KWD_DIRECT; LPAREN;
@@ -595,6 +605,8 @@ call_kind:
     { (Function (Direct { code_id; function_slot; }), alloc) }
   | KWD_CCALL; noalloc = boption(KWD_NOALLOC)
     { (C_call { alloc = not noalloc }, (Heap : alloc_mode_for_applications)) }
+  | KWD_MCALL LPAREN; kind = method_kind; obj = simple; RPAREN
+    { (Method { kind; obj }, (Heap : alloc_mode_for_applications)) }
 ;
 
 inline:
@@ -801,6 +813,7 @@ const:
     | Some 's' -> Naked_float32 (fst f)
     | Some c -> Misc.fatal_errorf "Invalid float modifier '%c'" c }
   | KWD_NULL { Null }
+  | KWD_POISON; DOT; k = kind_with_subkind; DOT; s = STRING { Poison (k, s) }
 ;
 
 %inline func_name_with_optional_arities:

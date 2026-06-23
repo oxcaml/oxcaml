@@ -27,11 +27,9 @@ type constructor_description =
     cstr_arity: int;                    (* Number of arguments *)
     cstr_tag: tag;                      (* Tag for heap blocks *)
     cstr_repr: variant_representation;  (* Repr of the outer variant *)
-    cstr_shape: constructor_representation; (* Repr of the constructor itself *)
-    cstr_constant: bool;
-    (* True if it's the constructor of a non-[@@unboxed] variant with 0 bits of
-       payload. (Or equivalently, if it's represented as either a tagged int or
-       the null pointer) *)
+    cstr_shape: constructor_representation option;
+                                        (* Repr of the constructor itself *)
+    cstr_constant: bool;                (* True if all args are void *)
     cstr_consts: int;                   (* Number of constant constructors *)
     cstr_nonconsts: int;                (* Number of non-const constructors *)
     cstr_generalized: bool;             (* Constrained return type? *)
@@ -62,7 +60,7 @@ type 'a gen_label_description =
     lbl_mut: mutability;                (* Is this a mutable field? *)
     lbl_modalities: Mode.Modality.Const.t;
                                         (* Modalities on the field *)
-    lbl_sort: Jkind_types.Sort.Const.t; (* Sort of the argument *)
+    lbl_sort: Jkind_types.Sort.Const.t option; (* Sort of the argument *)
     lbl_pos: int;                       (* Position in type *)
     lbl_all: 'a gen_label_description array;   (* All the labels in this type *)
     lbl_repres: 'a;  (* Representation for outer record *)
@@ -76,6 +74,9 @@ type label_description = record_representation gen_label_description
 
 type unboxed_label_description =
   record_unboxed_product_representation gen_label_description
+
+val label_declaration_of_label_description :
+  'a gen_label_description -> label_declaration
 
 (** This type tracks the distinction between legacy records ([{ field }]) and
     unboxed records ([#{ field }]). Note that [Legacy] includes normal boxed

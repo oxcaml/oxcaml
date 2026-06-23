@@ -680,7 +680,6 @@ let prim_has_valid_reprs ~loc prim =
         ("512", "#", C.vec512);
       ] in
       let array_types = [
-        "float_array";
         "floatarray";
         "unboxed_float_array";
         "unboxed_float32_array";
