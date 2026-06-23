@@ -1288,8 +1288,11 @@ let mode_quoted : expected_mode = mode_default mode_in_quotes
     Note: we must have that [mode_quoted <= mode_splice] for soundness. *)
 and mode_splice : Value.l = Value.disallow_right mode_in_quotes
 
-(** Lower bound for the mode of a quoted expression that is a computation. *)
-let mode_computation_quoted : Value.l =
+(** Lower bound for the mode of a quoted value. *)
+let mode_value_quote : Value.l = Value.of_const Value.Const.min
+
+(** Lower bound for the mode of a quoted computation. *)
+let mode_computation_quote : Value.l =
   let open Mode_hint in
   { Value.Const.min with linearity = Once }
   |> Value.of_const ~hint_comonadic:Quoted_computation
@@ -8680,14 +8683,15 @@ and type_expect_
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         raise (Typetexp.Error (loc, env,
                                Unsupported_extension Runtime_metaprogramming));
-      let expected_mode =
-        if not (maybe_computation exp) then
+      let mode_quote, expected_mode =
+        if maybe_computation exp then
+          mode_computation_quote, expected_mode
+        else
+          mode_value_quote,
           mode_morph
             (fun mode ->
               Value.imply_const_with Linearity Linearity.Const.Many mode)
             expected_mode
-        else
-          expected_mode
       in
       let ty = newgenvar (Jkind.Builtin.any ~why:Inside_quote) in
       let expr_ty = Predef.type_code (newgenty (Tquote ty)) in
@@ -8702,18 +8706,16 @@ and type_expect_
         then mode_default Value.max
         else mode_quoted
       in
-      let quote_env = Env.enter_quotation env in
       let quote_env = begin
           if Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes
-          then quote_env
+          then Env.enter_quotation env
           else
             let { comonadic; _ } = as_single_mode expected_mode in
-            Env.add_closure_lock (loc, Quote) comonadic quote_env
+            Env.add_quotation_lock ~loc comonadic env
         end
       in
       let arg = type_expect quote_env mode_quoted exp (mk_expected ty) in
-      if maybe_computation exp then
-        submode ~loc ~env ~reason:Other mode_computation_quoted expected_mode;
+      submode ~loc ~env mode_quote expected_mode;
       re {
         exp_desc = Texp_quotation arg;
         exp_loc = loc; exp_extra = [];
@@ -8731,11 +8733,14 @@ and type_expect_
       let magic_staged_modes =
         Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes
       in
-      if not magic_staged_modes then
+      let mode, _ = Value.newvar_below (as_single_mode mode_spliced) in
+      if not magic_staged_modes then begin
         submode ~loc ~env ~reason:Other mode_splice expected_mode;
+        Env.splice_closure_mode mode.comonadic env
+      end;
       let new_env = Env.enter_splice ~loc env in
       let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
-      let arg = type_expect new_env mode_spliced exp (mk_expected ty) in
+      let arg = type_expect new_env (mode_default mode) exp (mk_expected ty) in
       re {
         exp_desc = Texp_antiquotation arg;
         exp_loc = loc; exp_extra = [];

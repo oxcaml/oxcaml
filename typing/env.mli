@@ -592,6 +592,10 @@ val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
 val enter_quotation : t -> t
 val enter_splice : loc:Location.t -> t -> t
+val add_quotation_lock : loc:Location.t ->
+  ('l * Mode.allowed) Mode.Value.Comonadic.t -> t -> t
+val splice_closure_mode :
+  (Mode.allowed * 'r) Mode.Value.Comonadic.t -> t -> unit
 
 (** Set the environment's stage to a fixed one in the far future.
     Should only be used in cases where the stage is unknown. *)

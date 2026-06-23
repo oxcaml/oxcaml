@@ -680,6 +680,7 @@ type t = {
   implicit_jkinds: jkind_lr loc String.Map.t;
   flags: int;
   stage: stage;
+  last_quote_lock : Location.t * Mode.Value.Comonadic.r;
   toplevel_scope: int
 }
 
@@ -985,6 +986,7 @@ let empty = {
   functor_args = Ident.empty;
   jkinds = IdTbl.empty;
   stage = 0;
+  last_quote_lock = Location.none, Mode.Value.Comonadic.newvar ();
   toplevel_scope = Ident.lowest_scope
  }
 
@@ -3154,6 +3156,26 @@ let enter_splice ~loc env =
   if env.stage = 0 then
     raise (Error (Toplevel_splice loc));
   add_stage_lock Splice_lock {env with stage = env.stage - 1}
+
+let add_quotation_lock ~loc comonadic env =
+  let comonadic = Mode.Value.Comonadic.disallow_left comonadic in
+  let env =
+    enter_quotation env
+    |> add_lock (Closure_lock ((loc, Quote), comonadic))
+  in
+  { env with last_quote_lock = (loc, comonadic) }
+
+let splice_closure_mode comonadic env =
+  (* This logic mimics [closure_mode], pretending [last_quote_lock] is the
+     containing closure.
+     Monadic modes are ignored here, as expressions cross monadic modes
+     (like functions). *)
+  let (loc, comonadic0) = env.last_quote_lock in
+  let hint_comonadic : _ Mode.Hint.morph =
+    Is_closed_by (Comonadic, {closure = (loc, Quote); closed = (loc, Splice)})
+  in
+  Mode.Value.Comonadic.submode_err (loc, Splice)
+    comonadic (Mode.Value.Comonadic.apply_hint hint_comonadic comonadic0)
 
 let enter_future env =
   (* Reuse a very large number *)

@@ -41,9 +41,6 @@ module M :
 
 (** Quote captures via splices **)
 
-(* CR quoted-modes jbachurski: Splicing a value should
-   bound the mode of the quote with the value's mode -- not via capture. *)
-
 fun e -> <[ $e ]>
 [%%expect{|
 - : 'a expr -> 'a expr @ once = <fun>
@@ -52,7 +49,12 @@ fun e -> <[ $e ]>
 (* Local spliced expression -- the result should be [local]! *)
 fun (x @ local) -> <[ $x ]>
 [%%expect{|
-- : 'a expr @ local -> 'a expr @ once = <fun>
+- : 'a expr @ local -> 'a expr @ local once = <fun>
+|}];;
+
+fun (x @ local) -> <[ Some $x ]>
+[%%expect{|
+- : 'a expr @ local -> <[$('a) option]> expr @ local once = <fun>
 |}];;
 
 (* Unique spliced expression *)
@@ -120,17 +122,72 @@ let foo (f : (_ -> _ @ global) @ local) = <[ $(f 42) + 1 ]>
 val foo : (int -> <[int]> expr) @ local -> <[int]> expr @ once = <fun>
 |}];;
 
-(* CR quoted-modes: Unsound -- the quote should be [local] like [f]'s return. *)
-let foo (f : (_ -> _ @ local) @ global) = <[ $(f 42) + 1 ]>
+let foo (f : (_ -> _ @ local) @ global) = exclave_ <[ $(f 42) + 1 ]>
 [%%expect{|
-val foo : (int -> <[int]> expr @ local) -> <[int]> expr @ once = <fun>
+val foo : (int -> <[int]> expr @ local) -> <[int]> expr @ local once = <fun>
 |}];;
 
-(* CR quoted-modes: Unsound -- the quote should be [once] like [f]'s return.
-   This one is a bit more annoying since that's probably not what we want with [once]. *)
 let foo (f : (_ -> _ @ once) @ global) = <[ fun () -> $(f 42) + 1 ]>
 [%%expect{|
 val foo : (int -> <[int]> expr @ once) -> <[unit -> int]> expr = <fun>
+|}];;
+
+(** Quotes and exclaves **)
+
+fun (f : _ -> _ @ local) -> <[ fun () -> $(f ()) ]>
+[%%expect{|
+Line 3, characters 42-48:
+3 | fun (f : _ -> _ @ local) -> <[ fun () -> $(f ()) ]>
+                                              ^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is used inside the quoted expression at line 3, characters 28-51
+         which is expected to be "local" to the parent region or "global".
+|}];;
+fun (f : _ -> _ @ local) -> exclave_ <[ fun () -> $(f ()) ]>
+[%%expect{|
+- : (unit -> 'a expr @ local) -> <[unit -> $('a)]> expr @ local = <fun>
+|}];;
+
+fun (f : _ -> _ @ local) -> <[ Some $(f ()) ]>
+[%%expect{|
+Line 1, characters 37-43:
+1 | fun (f : _ -> _ @ local) -> <[ Some $(f ()) ]>
+                                         ^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is used inside the quoted expression at line 1, characters 28-46
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}];;
+fun (f : _ -> _ @ local) -> exclave_ <[ Some $(f ()) ]>
+[%%expect{|
+- : (unit -> 'a expr @ local) -> <[$('a) option]> expr @ local once = <fun>
+|}];;
+
+(* This is not an identity, but akin to [fun (x @ local) -> Some x],
+   so it should error. *)
+fun (e @ local) -> <[ fun () -> $e ]>
+[%%expect{|
+- : 'a expr @ local -> <[unit -> $('a)]> expr @ local = <fun>
+|}];;
+fun (e @ local) -> exclave_ <[ fun () -> $e ]>
+[%%expect{|
+- : 'a expr @ local -> <[unit -> $('a)]> expr @ local = <fun>
+|}];;
+fun (x @ local) -> Some x
+[%%expect{|
+Line 1, characters 24-25:
+1 | fun (x @ local) -> Some x
+                            ^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is contained (via constructor "Some") in the value at line 1, characters 19-25
+         which is expected to be "global" because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}];;
 
 (** Quoting expressions with non-legacy results **)
@@ -422,14 +479,10 @@ fun e -> <[ fun () -> $e ]>
 - : 'a expr -> <[unit -> $('a)]> expr = <fun>
 |}];;
 
-(* CR quoted-modes jbachurski: the [local] and [once] examples should be accepted.
-   The closure does not actually capture $e, as it is at a negative stage offset.
-   On the other hand, the quote does capture [e] with different results in either case. *)
-
 (* This quote should be [local], as it is a syntax tree with a [local] subtree. *)
 fun (e @ local) -> <[ fun () -> $e ]>
 [%%expect{|
-- : 'a expr @ local -> <[unit -> $('a)]> expr = <fun>
+- : 'a expr @ local -> <[unit -> $('a)]> expr @ local = <fun>
 |}];;
 
 (* Quotes of syntactic values should observably cross [once]ness,
