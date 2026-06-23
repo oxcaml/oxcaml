@@ -472,12 +472,7 @@ let create ~areality ~linearity ~uniqueness ~portability ~contention ~forkable
 let mask_of_modality (modality : Mode.Modality.Const.t) : t =
   let module Modality = Mode.Modality in
   let module Value = Mode.Value in
-  let set_monadic :
-      type a.
-      a Value.Monadic.Axis.t ->
-      (a -> t -> t) ->
-      t ->
-      t =
+  let set_monadic : type a. a Value.Monadic.Axis.t -> (a -> t -> t) -> t -> t =
    fun axis set_axis mask ->
     let modality_axis = Modality.Axis.Monadic axis in
     let (Modality.Monadic.Atom.Join_const c) =
@@ -485,12 +480,8 @@ let mask_of_modality (modality : Mode.Modality.Const.t) : t =
     in
     set_axis c mask
   in
-  let set_comonadic :
-      type a.
-      a Value.Comonadic.Axis.t ->
-      (a -> t -> t) ->
-      t ->
-      t =
+  let set_comonadic : type a.
+      a Value.Comonadic.Axis.t -> (a -> t -> t) -> t -> t =
    fun axis set_axis mask ->
     let modality_axis = Modality.Axis.Comonadic axis in
     let (Modality.Comonadic.Atom.Meet_const c as modality_on_axis) =

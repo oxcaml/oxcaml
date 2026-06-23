@@ -349,9 +349,7 @@ module Solver = struct
     Jkind.With_bounds.to_seq with_bounds
     |> Seq.fold_left
          (fun acc (ty, bound_info) ->
-           let mask =
-             bound_info.Types.With_bounds_type_info.relevant_bounds
-           in
+           let mask = bound_info.Types.With_bounds_type_info.relevant_bounds in
            let ty_kind = kind ~use_tables:true ctx ty in
            Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
          base
@@ -834,9 +832,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
                 Ldd.sum args ~base:Ldd.bot
                   ~f:(fun (arg : Types.constructor_argument) ->
                     let mask = mask_of_modality ~modality:arg.ca_modalities in
-                    Ldd.meet
-                      (Ldd.const mask)
-                      (payload_kind arg.ca_type))
+                    Ldd.meet (Ldd.const mask) (payload_kind arg.ca_type))
               | Types.Cstr_record lbls ->
                 sum_record_label_contributions ~base:Ldd.bot ~payload_kind
                   ~validate_label:no_validation lbls
