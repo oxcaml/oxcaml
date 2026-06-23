@@ -543,7 +543,7 @@ let everything_modality =
         | Modality value -> Modality.Const.set (Monadic axis) value acc))
     Modality.Const.id Value.Axis.all
 
-let transl_mod_bounds annots =
+let transl_mod_bounds ?(warn = true) annots =
   let bounds_loc =
     match List.map (fun { loc; _ } -> loc) annots with
     | [] -> Location.none
@@ -567,7 +567,8 @@ let transl_mod_bounds annots =
     | P (type a) ((ax, mode) : a Axis.Nonmodal.t * a) ->
       let axis = Axis.Nonmodal ax in
       let is_top = Per_axis.(le axis (max axis) mode) in
-      if is_top then Location.prerr_warning loc Warnings.Redundant_modifier;
+      if is_top && warn
+      then Location.prerr_warning loc Warnings.Redundant_modifier;
       if Option.is_some (Nonmodal_bounds.get ax nonmodal)
       then raise (Error (loc, Duplicated_axis (Modifier, axis)));
       Nonmodal_bounds.set ax (Some { txt = mode; loc }) nonmodal
@@ -641,7 +642,7 @@ let transl_mod_bounds annots =
     nm, base, sort_dedup_modalities_with_locs (List.rev atoms)
   in
   let warn_redundant loc (_ : Modality.atom) =
-    Location.prerr_warning loc Warnings.Redundant_modifier
+    if warn then Location.prerr_warning loc Warnings.Redundant_modifier
   in
   let modality =
     transl_modality_atoms ~warn_redundant ~default:base_modality ~loc:bounds_loc
