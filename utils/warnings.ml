@@ -158,6 +158,7 @@ type t =
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
   | Use_during_borrowing                    (* 216 *)
   | Lpoly_in_letrec                         (* 218 *)
+  | Useless_valpoly                         (* 219 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -258,6 +259,7 @@ let number = function
   | Implied_attribute _ -> 215
   | Use_during_borrowing -> 216
   | Lpoly_in_letrec -> 218
+  | Useless_valpoly -> 219
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -1491,6 +1493,9 @@ let message = function
   | Lpoly_in_letrec ->
       msg "poly_ has no effect in recursive bindings, which do not support \
            layout polymorphism. Consider using a regular let rec instead."
+  | Useless_valpoly ->
+      msg "This value description has no layout-polymorphic type variables,@ \
+      so \"poly_\" has no effect. Consider using a regular \"val\" instead."
 ;;
 
 let nerrors = ref 0
