@@ -1195,7 +1195,7 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
       | `Other ->
          (* other cases compile to a lazy block holding a function.  The
             typechecker enforces that e has jkind value.  *)
-         let scopes = enter_lazy ~scopes in
+         let scopes = enter_lazy ~scopes ~loc:e.exp_loc in
          let fn = lfunction ~kind:(Curried {nlocal=0})
                             ~params:[{ name = Ident.create_local "param";
                                        debug_uid = Lambda.debug_uid_none;

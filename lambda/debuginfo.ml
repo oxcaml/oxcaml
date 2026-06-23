@@ -131,8 +131,14 @@ module Scoped_location = struct
     cons scopes Sc_method_definition str s
       ~assume_zero_alloc:ZA.Assume_info.none (Some (Function s))
 
-  let enter_lazy ~scopes = cons scopes Sc_lazy (str scopes) ""
-                             ~assume_zero_alloc:ZA.Assume_info.none None
+  let enter_lazy ~scopes ~loc =
+    let (file, line, col) = Location.get_pos_info loc.loc_start in
+    let file = Filename.basename file in
+    let mangling_item : _ Structured_mangling.path_item option =
+      Some (Lazy (line, col, Some file))
+    in
+    cons scopes Sc_lazy (str scopes) "" ~assume_zero_alloc:ZA.Assume_info.none
+      mangling_item
 
   let enter_partial_or_eta_wrapper ~scopes ~loc =
     let (file, line, col) = Location.get_pos_info loc.loc_start in
@@ -500,7 +506,7 @@ let to_structured_mangling_path ~name dbg :
       (path : Compilation_unit.t Structured_mangling.path) =
     match path with
     | [] -> acc
-    | ((Anonymous_function _ | Anonymous_module _) as a) :: path ->
+    | ((Anonymous_function _ | Anonymous_module _ | Lazy _) as a) :: path ->
       rev_keep_compilation_units (a :: acc) path
     | pi :: path -> rev_drop_scopes_above_anonymous (pi :: acc) path
   in

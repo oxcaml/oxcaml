@@ -50,17 +50,6 @@ module Str_inst = Make (struct
   let cmp = compare
 end)
 
-(* {1 Lazy thunks have no mangling path item}
-
-   The body of a [lazy (...)] is lifted to its own closure but the
-   scheme records no [lazy] path item for it, so it mangles to a bare
-   top-level [fn] with no location: indistinguishable from any other
-   anonymous function and giving no hint that it is a lazy thunk or
-   where it came from. *)
-let deferred () =
-  let t = lazy (Sys.opaque_identity 41 + 1) in
-  Lazy.force t
-
 (* {1 Classes and objects get poor symbols across the board}
 
    OxCaml emits no DWARF for the OOP fragment of OCaml and the linker
@@ -105,7 +94,6 @@ end
 let () =
   ignore (Int_inst.run 1 2);
   ignore (Str_inst.run "a" "b");
-  ignore (deferred ());
   ignore (scale 1);
   let d = new dog "rex" in
   ignore d#sound;

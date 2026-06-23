@@ -48,6 +48,7 @@
     - [F] - Function
     - [L] - anonymous function (L for lambda)
     - [P] - Partial application
+    - [Z] - laZy thunk
 
     For example, [Foo.Bar.baz] in compilation unit [Foo] mangles to
     [_CamlU3FooM3BarF3baz]. *)
@@ -66,11 +67,11 @@ type 'cu path_item =
       (** [fun ... -> ...] at (line, col, file) *)
   | Partial_function of int * int * string option
       (** A partial application at (line, col, file) *)
+  | Lazy of int * int * string option
+      (** The closure of a [lazy ...] thunk at (line, col, file) *)
 
-(* CR sspies: Support for lazy expressions (they do not appear in the mangling
-   path at all) and object methods (they appear as regular functions) is still
-   missing; adding a construct for lazy expressions would allow us to make sure
-   there is always a mangling path item for every [Debuginfo] scope *)
+(* CR sspies: Support for object methods (they appear as regular functions) is
+   still missing. *)
 
 (** A mangling path is a list of path items representing the full lexical
     context of an identifier. *)
