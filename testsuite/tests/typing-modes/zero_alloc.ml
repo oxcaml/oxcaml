@@ -653,9 +653,7 @@ let (alloc_float_boxing @ noalloc) (r : record_t5) = exclave_ stack_ r.x
 val alloc_float_boxing : record_t5 -> float @ local = <fun>
 |}]
 
-(* CR shsong: tuple construction allocates a boxed block, but the allocation
-   is registered via [register_allocation_value_mode], which does not walk
-   locks, so this is wrongly accepted. (We use a unit argument and constant
+(* Tuple construction allocates a boxed block. (We use a unit argument and constant
    elements to avoid an inner currying closure, which would otherwise be the
    real cause of an error.) *)
 let (alloc_tuple @ noalloc_strict) () = (1, 2)
@@ -679,8 +677,7 @@ Error: The allocation is "alloc"
          which is expected to be "noalloc".
 |}]
 
-(* CR shsong: the same tuple, but [stack_]-marked. Tuples are a gap, so this
-   is accepted regardless of [stack_]. *)
+(* The same tuple, but [stack_]-marked. *)
 let (alloc_tuple @ noalloc_strict) () = exclave_ stack_ (1, 2)
 [%%expect{|
 val alloc_tuple : unit -> int * int @ local = <fun>
@@ -1011,10 +1008,7 @@ Error: Stack allocating list comprehensions is unsupported yet.
 
 (** Test 5b: [stack_] nested cases. *)
 (* Nested: an inner allocation that is not itself [stack_]-marked still
-   allocates on the heap, even when an enclosing allocation is [stack_]-marked.
-   (Currently the outer [stack_] is not recognized either, so both contribute;
-   once [stack_] is recognized, only the inner allocation should remain and the
-   function should still be rejected.) *)
+   allocates on the heap, even when an enclosing allocation is [stack_]-marked. *)
 let (stack_nested @ noalloc_strict) (a : int) = exclave_ stack_ (Just (Just a))
 [%%expect{|
 Line 1, characters 70-78:
