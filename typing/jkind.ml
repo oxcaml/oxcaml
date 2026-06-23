@@ -2092,7 +2092,7 @@ module Const = struct
       (* for each mode, lower the corresponding modal bound to be that
          mode *)
       let mod_bounds, (nullability, separability) =
-        Typemode.transl_mod_bounds modifiers
+        Typemode.transl_mod_bounds ~warn modifiers
       in
       let mod_bounds = Mod_bounds.meet base.mod_bounds mod_bounds in
       { base = base.base; mod_bounds; with_bounds = No_with_bounds }
@@ -2372,11 +2372,11 @@ let of_type_decl ?use_abstract_jkinds ?warn ~context ~transl_type env decl =
 
 let of_type_decl_overapproximate_unknown ~context env
     (decl : Parsetree.type_declaration) =
-  (* CR with-kinds: any warnings we get while parsing here will
-     be raised again when doing the non-approximated jkind computation. *)
-  Warnings.without_warnings (fun () ->
-      of_type_decl_gen ~use_abstract_jkinds:false ~warn:false ~context
-        ~transl:Context_with_transl.Overapproximate_to_top env decl)
+  (* Suppress redundant-modifier/-kind-modifier warnings here: this is an
+     approximation pass, and the same annotation is parsed again (with
+     [~warn:true]) during the non-approximated jkind computation. *)
+  of_type_decl_gen ~use_abstract_jkinds:false ~warn:false ~context
+    ~transl:Context_with_transl.Overapproximate_to_top env decl
   |> Option.map fst
 
 let for_unboxed_record_with_updates lbls =
