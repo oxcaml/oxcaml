@@ -875,7 +875,7 @@ type spec_decision =
   | Specialized of
       { cont : Continuation.t;
         lifting_cost : int;
-        num_specialized : int
+        spec_budget_cost : int
       }
 
 let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
@@ -985,10 +985,14 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
           | `Not_enough_join_info -> Not_enough_join_info
           | `Spec (join_analysis, specialized, generic) ->
             let spec_budget = DA.get_continuation_spec_budget dacc in
-            let num_specialized =
-              Apply_cont_rewrite_id.Set.cardinal specialized
+            let spec_budget_cost =
+              let n_spec = Apply_cont_rewrite_id.Set.cardinal specialized in
+              let n_generic =
+                if Apply_cont_rewrite_id.Set.cardinal generic > 0 then 1 else 0
+              in
+              n_spec + n_generic
             in
-            if not (spec_budget > 0 && num_specialized <= spec_budget)
+            if not (spec_budget > 0 && spec_budget_cost <= spec_budget)
             then Insufficient_spec_budget
             else
               (* Specialization benefit estimation: we use heuristics similar to
@@ -1011,7 +1015,7 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
                 Float.compare threshold 0. < 0
                 || Float.compare final_cost threshold > 0
               then Too_costly
-              else Specialized { cont; lifting_cost; num_specialized }))
+              else Specialized { cont; lifting_cost; spec_budget_cost }))
 
 let decide_continuation_specialization ~dacc ~switch ~scrutinee =
   Profile.record_with_counters ~accumulate:true "continuation_specialization"
@@ -1062,9 +1066,9 @@ let simplify_switch dacc switch ~down_to_up =
   in
   let dacc =
     match decide_continuation_specialization ~dacc ~switch ~scrutinee with
-    | Specialized { cont; lifting_cost; num_specialized } ->
+    | Specialized { cont; lifting_cost; spec_budget_cost } ->
       let dacc = DA.decrease_continuation_lifting_budget dacc lifting_cost in
-      let dacc = DA.decrease_continuation_spec_budget dacc num_specialized in
+      let dacc = DA.decrease_continuation_spec_budget dacc spec_budget_cost in
       let dacc =
         DA.with_are_lifting_conts dacc
           (Are_lifting_conts.lift_continuations_out_of cont)
