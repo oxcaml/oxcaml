@@ -36,7 +36,10 @@
      (run awk -f %{dep:expand_module_aliases.awk} %{input-file}))
     stdlib))))
 
-(copy_files ../Makefile.config)
+(rule
+ (target Makefile.config)
+ (action
+  (copy ../Makefile.config Makefile.config)))
 
 (install
  (files
