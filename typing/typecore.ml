@@ -8168,6 +8168,10 @@ and type_expect_
       let to_unify = Predef.type_lazy_t ty in
       with_explanation (fun () ->
         unify_exp_types loc env to_unify (generic_instance ty_expected));
+      (* Allocation axis check: constructing a lazy block allocates, but
+         register_allocation_mode is not called, so we manually
+         walk locks here *)
+      Env.walk_locks_for_allocation ~env (loc, Hint.Allocation);
       let env = Env.add_closure_lock (loc, Lazy) closure_mode.comonadic env in
       let arg = type_expect env expected_mode e (mk_expected ty) in
       re {
@@ -8180,6 +8184,10 @@ and type_expect_
   | Pexp_object s ->
       Env.check_no_open_quotations loc env Object_qt;
       submode ~loc ~env Value.legacy expected_mode;
+      (* Allocation axis check: constructing an object block allocates,
+         but register_allocation_mode is not called, so we manually
+         walk locks here *)
+      Env.walk_locks_for_allocation ~env (loc, Hint.Allocation);
       let desc, meths = !type_object env loc s in
       rue {
         exp_desc = Texp_object (desc, meths);
@@ -8250,6 +8258,10 @@ and type_expect_
              loc, sexp.pexp_attributes) :: body.exp_extra
           }
   | Pexp_pack (m, optyp) ->
+      (* CR shsong: rebase conflict - main rewrote this [Pexp_pack] case; took
+         main's version and preserved the design note below. *)
+      (* CR shsong: Design choice: I do not walk locks here but in
+         the module-level [register_allocation] in [typemod.ml] *)
       begin match optyp with
       | Some ptyp ->
         let t = Ast_helper.Typ.package ~loc:ptyp.ppt_loc ptyp in
@@ -10314,7 +10326,8 @@ and type_application env app_loc expected_mode position_and_mode
           (* CR shsong: Alternative design: only register_allocation_mode if
               partial_app is false, since if partial_app is true, there are
               Omitted args and the code walks the locks already *)
-          if ty_ret_is_arrow then register_allocation_mode ~env ~loc:app_loc mode_ret;
+          if ty_ret_is_arrow then
+            Env.walk_locks_for_allocation ~env (app_loc, Hint.Allocation);
           let partial_app = is_partial_apply untyped_args in
           let position_and_mode =
             if partial_app then position_and_mode_default else position_and_mode
@@ -11916,6 +11929,10 @@ and type_comprehension_expr ~loc ~env ~ty_expected ~attributes cexpr =
        "What modes should comprehensions use?", above *)
     type_expect new_env mode_legacy sbody (mk_expected element_ty)
   in
+  (* Allocation axis check: comprehension expr allocates, but
+    register_allocation_mode is not called, so we manually
+    walk locks here *)
+  Env.walk_locks_for_allocation ~env (loc, Hint.Allocation);
   re { exp_desc       = make_texp { comp_body ; comp_clauses }
      ; exp_loc        = loc
      ; exp_extra      = []

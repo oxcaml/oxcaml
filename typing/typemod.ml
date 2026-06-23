@@ -115,7 +115,11 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   Value.submode_exn mode (max |> Alloc.of_const |> alloc_as_value);
   mode
 
-let register_allocation loc : Alloc.lr * Value.lr =
+(* CR shsong: rebase conflict - main also added a [loc] param here; took this
+   commit's labeled [~env ~loc] signature plus the lock-walk (a superset of
+   main's), and used labeled callers below. *)
+let register_allocation ~env ~loc : Alloc.lr * Value.lr =
+  Env.walk_locks_for_allocation ~env (loc, Hint.Allocation);
   let upper_bound =
     Alloc.of_const
       ~hint_comonadic:Module_allocated_on_heap
@@ -3184,7 +3188,9 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
       let alloc_mode, closed_over_mode =
-        register_allocation sbody.pmod_loc
+        (* CR shsong: rebase conflict - used this commit's [~env ~loc:smod.pmod_loc];
+           main passed [sbody.pmod_loc] instead - confirm which loc is wanted. *)
+        register_allocation ~env ~loc:smod.pmod_loc
       in
       let newenv =
         Env.add_closure_lock
@@ -3645,7 +3651,8 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
 and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
   let names = Signature_names.create () in
   let loc_md = location_of_structure sstr in
-  let _, md_mode = register_allocation loc_md in
+  (* CR shsong: rebase conflict - same [loc_md]; took this commit's [~env ~loc]. *)
+  let _, md_mode = register_allocation ~env ~loc:loc_md in
 
   let type_str_include ~loc env shape_map sincl sig_acc =
     let smodl = sincl.pincl_mod in
@@ -4311,7 +4318,8 @@ let type_package env m pack =
         let lid = Longident.unflatten n |> Option.get in
         raise (Error(modl.mod_loc, env, Scoping_pack (lid,ty))))
     fl';
-  let _, mode = register_allocation modl.mod_loc in
+  (* CR shsong: rebase conflict - same [modl.mod_loc]; took this commit's [~env ~loc]. *)
+  let _, mode = register_allocation ~env ~loc:modl.mod_loc in
   let modl =
     wrap_constraint_package env true modl mty mode Tmodtype_implicit
   in

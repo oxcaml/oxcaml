@@ -382,6 +382,24 @@ Line 1, characters 66-67:
 Error: This value is "alloc" but is expected to be "noalloc_strict".
 |}]
 
+(* Does an object type cross the Allocation axis? I.e. can an [alloc] object be
+   used where [noalloc] / [noalloc_strict] is expected? (cf. Test 4: functions do
+   NOT cross, immediates and records of immediates do.) *)
+let cross_object (x : < get : int > @ alloc) : _ @ noalloc = x
+[%%expect{|
+Line 1, characters 61-62:
+1 | let cross_object (x : < get : int > @ alloc) : _ @ noalloc = x
+                                                                 ^
+Error: This value is "alloc" but is expected to be "noalloc".
+|}]
+let cross_object_ss (x : < get : int > @ alloc) : _ @ noalloc_strict = x
+[%%expect{|
+Line 1, characters 71-72:
+1 | let cross_object_ss (x : < get : int > @ alloc) : _ @ noalloc_strict = x
+                                                                           ^
+Error: This value is "alloc" but is expected to be "noalloc_strict".
+|}]
+
 
 (** Test 5: Allocation mode identifies all allocations and forces the proper
     mode. For each kind of allocation the typechecker can see, we test a
@@ -687,10 +705,9 @@ let (alloc_tuple @ noalloc) () = exclave_ stack_ (1, 2)
 val alloc_tuple : unit -> int * int @ local = <fun>
 |}]
 
-(* CR shsong: partial application allocates a closure, but it is registered
-   via [register_allocation_mode], which does not walk locks, so this is
-   wrongly accepted. We receive [f] as a parameter (rather than defining a
-   multi-argument function, whose curried closures would themselves be flagged)
+(* Partial application allocates a closure.
+   We receive [f] as a parameter (rather than defining a multi-argument
+   function, whose curried closures would themselves be flagged)
    so the only allocation here is the partial-application closure. *)
 let (alloc_partial_app @ noalloc_strict)
       (f : (int -> int -> int -> int) @ noalloc_strict) = f 1 2
@@ -730,24 +747,82 @@ Error: The allocation is "alloc"
          which is expected to be "noalloc_strict".
 |}]
 
-(* CR shsong: a lazy block allocates on the heap, but no allocation is
-   registered for it, so this is wrongly accepted. We use [lazy a] with
-   [a : int] so the thunk body has no [alloc] reference. *)
+(* A function [f] with mixed arguments: optional [a], mandatory [b], optional
+   [c], mandatory [d], optional [e], mandatory [g]. It ends in a mandatory
+   argument [g], so it can be fully applied. It is received as a parameter so
+   referencing it (in function position) does not itself trigger the capture
+   rule; the only allocations come from how it is called. *)
+
+(* Case 1: call with all mandatory args ([b], [d], [g]); all optionals are
+   omitted, so they default to [None] (constant constructors, no [Some]
+   wrapping). The call is fully applied (not partial), so it allocates nothing
+   and is accepted. *)
+let (call_all_mandatory @ noalloc_strict)
+      (f : (?a:int -> int -> ?c:int -> int -> ?e:int -> int -> int)) =
+  f 1 2 3
+[%%expect{|
+val call_all_mandatory :
+  (?a:int -> int -> ?c:int -> int -> ?e:int -> int -> int) -> int = <fun>
+|}]
+
+(* Case 2: call with one optional ([~a:1]) and one mandatory ([b]). The mandatory
+   args [d] and [g] are still missing, so this is a partial application, which
+   allocates a closure and is rejected. (The provided [~a:1] would additionally
+   be wrapped in [Some], but the partial-application check fires first.) *)
+let (call_one_opt_one_mand @ noalloc_strict)
+      (f : (?a:int -> int -> ?c:int -> int -> ?e:int -> int -> int)) =
+  f ~a:1 2
+[%%expect{|
+Line 3, characters 2-10:
+3 |   f ~a:1 2
+      ^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 2-3, characters 6-10
+         which is expected to be "noalloc_strict".
+|}]
+
+(* A lazy block allocates on the heap *)
 let (alloc_lazy @ noalloc_strict) (a : int) = lazy a
 [%%expect{|
-val alloc_lazy : int -> int lazy_t = <fun>
+Line 1, characters 46-52:
+1 | let (alloc_lazy @ noalloc_strict) (a : int) = lazy a
+                                                  ^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 34-52
+         which is expected to be "noalloc_strict".
 |}]
 let (alloc_lazy @ noalloc) (a : int) = lazy a
 [%%expect{|
-val alloc_lazy : int -> int lazy_t = <fun>
+Line 1, characters 39-45:
+1 | let (alloc_lazy @ noalloc) (a : int) = lazy a
+                                           ^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 1, characters 27-45
+         which is expected to be "noalloc".
 |}]
+
+(* [stack_] does not support lazy expressions. *)
+let (stack_lazy @ noalloc_strict) (a : int) = exclave_ stack_ (lazy a)
+[%%expect{|
+Line 1, characters 62-70:
+1 | let (stack_lazy @ noalloc_strict) (a : int) = exclave_ stack_ (lazy a)
+                                                                  ^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 34-70
+         which is expected to be "noalloc_strict".
+|}]
+
 
 (* An object allocates. *)
 let (alloc_object @ noalloc_strict) () = object method m = 1 end
 [%%expect{|
-Line 1, characters 59-60:
+Line 1, characters 41-64:
 1 | let (alloc_object @ noalloc_strict) () = object method m = 1 end
-                                                               ^
+                                             ^^^^^^^^^^^^^^^^^^^^^^^
 Error: The allocation is "alloc"
        but is expected to be "noalloc_strict"
          because it is used inside the function at line 1, characters 36-64
@@ -755,19 +830,45 @@ Error: The allocation is "alloc"
 |}]
 let (alloc_object @ noalloc) () = object method m = 1 end
 [%%expect{|
-Line 1, characters 52-53:
+Line 1, characters 34-57:
 1 | let (alloc_object @ noalloc) () = object method m = 1 end
-                                                        ^
+                                      ^^^^^^^^^^^^^^^^^^^^^^^
 Error: The allocation is "alloc"
        but is expected to be "noalloc"
          because it is used inside the function at line 1, characters 29-57
          which is expected to be "noalloc".
 |}]
 
-(* CR shsong: packing a first-class module [(module M)] allocates, but no
-   allocation is registered for it ([Pexp_pack] in [type_expect] only submodes;
-   the module-level [register_allocation] in [typemod.ml] does not walk locks),
-   so this is wrongly accepted. *)
+(* [stack_] does not support objects; here the object's method closure is
+   itself a detected allocation, so the allocation-axis error fires on the
+   method body before the unsupported-[stack_] check is reached. *)
+let (stack_object @ noalloc_strict) () = exclave_ stack_ (object method m = 1 end)
+[%%expect{|
+Line 1, characters 57-82:
+1 | let (stack_object @ noalloc_strict) () = exclave_ stack_ (object method m = 1 end)
+                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 36-82
+         which is expected to be "noalloc_strict".
+|}]
+
+(* An object with no allocating method (here only a value field) still
+   allocates the object block itself, which the [Pexp_object] walk detects,
+   so it is rejected even though [get] does not allocate. *)
+let (obj_no_alloc_method @ noalloc_strict) () = object val x = 0 end
+[%%expect{|
+Line 1, characters 48-68:
+1 | let (obj_no_alloc_method @ noalloc_strict) () = object val x = 0 end
+                                                    ^^^^^^^^^^^^^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 43-68
+         which is expected to be "noalloc_strict".
+|}]
+
+
+(* Packing a first-class module [(module M)] allocates *)
 module type S = sig end
 module Empty : S = struct end
 [%%expect{|
@@ -776,12 +877,37 @@ module Empty : S @@ stateless noalloc_strict
 |}]
 let (alloc_first_class_module @ noalloc_strict) () = (module Empty : S)
 [%%expect{|
-val alloc_first_class_module : unit -> (module S) = <fun>
+Line 1, characters 61-66:
+1 | let (alloc_first_class_module @ noalloc_strict) () = (module Empty : S)
+                                                                 ^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 48-71
+         which is expected to be "noalloc_strict".
 |}]
 let (alloc_first_class_module @ noalloc) () = (module Empty : S)
 [%%expect{|
-val alloc_first_class_module : unit -> (module S) = <fun>
+Line 1, characters 54-59:
+1 | let (alloc_first_class_module @ noalloc) () = (module Empty : S)
+                                                          ^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 1, characters 41-64
+         which is expected to be "noalloc".
 |}]
+
+(* [stack_] does not support first-class modules. *)
+let (stack_first_class_module @ noalloc_strict) () = exclave_ stack_ (module Empty : S)
+[%%expect{|
+Line 1, characters 77-82:
+1 | let (stack_first_class_module @ noalloc_strict) () = exclave_ stack_ (module Empty : S)
+                                                                                 ^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 48-87
+         which is expected to be "noalloc_strict".
+|}]
+
 
 (* An external/primitive is [alloc] by default, so referencing one is rejected:
    primitives are treated as allocating conservatively. *)
@@ -952,16 +1078,119 @@ Error: The allocation is "alloc"
          which is expected to be "noalloc".
 |}]
 
-(* CR shsong: a list/array comprehension allocates its result, but no
-   allocation is registered for it (the comprehension result block is built
-   directly at [Value.legacy]), so this is wrongly accepted. *)
+(* A list/array comprehension allocates its result *)
 let (alloc_list_comprehension @ noalloc_strict) () = [ x for x = 1 to 10 ]
 [%%expect{|
-val alloc_list_comprehension : unit -> int list = <fun>
+Line 1, characters 53-74:
+1 | let (alloc_list_comprehension @ noalloc_strict) () = [ x for x = 1 to 10 ]
+                                                         ^^^^^^^^^^^^^^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 48-74
+         which is expected to be "noalloc_strict".
 |}]
 let (alloc_list_comprehension @ noalloc) () = [ x for x = 1 to 10 ]
 [%%expect{|
-val alloc_list_comprehension : unit -> int list = <fun>
+Line 1, characters 46-67:
+1 | let (alloc_list_comprehension @ noalloc) () = [ x for x = 1 to 10 ]
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 1, characters 41-67
+         which is expected to be "noalloc".
+|}]
+
+(* [stack_] does not support comprehensions. *)
+let (stack_comprehension @ noalloc_strict) () = exclave_ stack_ [ x for x = 1 to 10 ]
+[%%expect{|
+Line 1, characters 64-85:
+1 | let (stack_comprehension @ noalloc_strict) () = exclave_ stack_ [ x for x = 1 to 10 ]
+                                                                    ^^^^^^^^^^^^^^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 43-85
+         which is expected to be "noalloc_strict".
+|}]
+
+(* Only the first case below is a genuine bug introduced by routing the
+   lock-walk through [register_allocation_mode]. The others turned out NOT to be
+   problems and are kept for contrast. *)
+
+(* CR shsong (false positive): array indexing uses the [%array_safe_get]
+   primitive, whose result is [@local_opt] (Prim_poly). It does NOT allocate, but
+   the Prim_poly registration in [type_ident] goes through
+   [register_allocation_mode], which now walks locks, so it is wrongly rejected
+   -- note the error is "The allocation is alloc". It should be accepted once the
+   Prim_poly site is exempted from walking. *)
+let (array_get_prim_poly @ noalloc_strict) (a : int array) (i : int) = a.(i)
+[%%expect{|
+Line 1, characters 59-76:
+1 | let (array_get_prim_poly @ noalloc_strict) (a : int array) (i : int) = a.(i)
+                                                               ^^^^^^^^^^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 43-76
+         which is expected to be "noalloc_strict".
+|}]
+
+(* NOT the Prim_poly bug: referencing a primitive/operator as a value is rejected
+   by the pre-existing capture rule (primitives are [alloc] by default) -- note
+   "The value ... is alloc", not "The allocation is alloc". Same conservative
+   behavior as the external/arithmetic tests above; independent of Prim_poly.
+   ([my_id]/[!] do not allocate, but referencing the value is conservatively
+   treated as [alloc].) *)
+external my_id : ('a[@local_opt]) -> ('a[@local_opt]) = "%identity"
+let (prim_value_captured @ noalloc_strict) (x : int) = my_id x
+[%%expect{|
+external my_id : ('a [@local_opt]) -> ('a [@local_opt]) = "%identity"
+Line 2, characters 55-60:
+2 | let (prim_value_captured @ noalloc_strict) (x : int) = my_id x
+                                                           ^^^^^
+Error: The value "my_id" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 2, characters 43-62
+         which is expected to be "noalloc_strict".
+|}]
+let (deref_value_captured @ noalloc_strict) (r : int ref) = !r
+[%%expect{|
+Line 1, characters 60-61:
+1 | let (deref_value_captured @ noalloc_strict) (r : int ref) = !r
+                                                                ^
+Error: The value "(!)" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 44-62
+         which is expected to be "noalloc_strict".
+|}]
+
+(* NOT a gap: [new] does not register the object allocation, but a class is
+   always at the legacy ([alloc]) mode and the lock walk propagates that, so the
+   instantiation is still (conservatively) rejected. *)
+class cls = object method m = 1 end
+let (alloc_new @ noalloc_strict) () = new cls
+[%%expect{|
+class cls : object method m : int end
+Line 2, characters 42-45:
+2 | let (alloc_new @ noalloc_strict) () = new cls
+                                              ^^^
+Error: The class "cls" is "alloc" because classes are always at the legacy modes.
+       However, the class "cls" highlighted is expected to be "noalloc_strict"
+         because it is used inside the function at line 2, characters 33-45
+         which is expected to be "noalloc_strict".
+|}]
+
+(* A format string literal used at [format] type is built into a
+   [CamlinternalFormatBasics] value, which allocates. This IS detected (the
+   format is built as a constructor application that registers an allocation),
+   so the enclosing function is correctly rejected. *)
+let (use_format @ noalloc_strict) () : (_, _, _) format = "%d"
+[%%expect{|
+Line 1, characters 58-62:
+1 | let (use_format @ noalloc_strict) () : (_, _, _) format = "%d"
+                                                              ^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 34-62
+         which is expected to be "noalloc_strict".
 |}]
 
 
@@ -977,49 +1206,7 @@ Line 5, characters 67-68:
 Error: This expression is not an allocation site.
 |}]
 
-(* [stack_] does not support lazy expressions. *)
-let (stack_lazy @ noalloc_strict) (a : int) = exclave_ stack_ (lazy a)
-[%%expect{|
-Line 1, characters 62-70:
-1 | let (stack_lazy @ noalloc_strict) (a : int) = exclave_ stack_ (lazy a)
-                                                                  ^^^^^^^^
-Error: Stack allocating lazy expressions is unsupported yet.
-|}]
-
-(* [stack_] does not support objects; here the object's method closure is
-   itself a detected allocation, so the allocation-axis error fires on the
-   method body before the unsupported-[stack_] check is reached. *)
-let (stack_object @ noalloc_strict) () = exclave_ stack_ (object method m = 1 end)
-[%%expect{|
-Line 1, characters 76-77:
-1 | let (stack_object @ noalloc_strict) () = exclave_ stack_ (object method m = 1 end)
-                                                                                ^
-Error: The allocation is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 1, characters 36-82
-         which is expected to be "noalloc_strict".
-|}]
-
-(* [stack_] does not support first-class modules ([Empty]/[S] from Test 5). *)
-let (stack_first_class_module @ noalloc_strict) () = exclave_ stack_ (module Empty : S)
-[%%expect{|
-Line 1, characters 69-87:
-1 | let (stack_first_class_module @ noalloc_strict) () = exclave_ stack_ (module Empty : S)
-                                                                         ^^^^^^^^^^^^^^^^^^
-Error: Stack allocating modules is unsupported yet.
-|}]
-
-(* [stack_] does not support comprehensions. *)
-let (stack_comprehension @ noalloc_strict) () = exclave_ stack_ [ x for x = 1 to 10 ]
-[%%expect{|
-Line 1, characters 64-85:
-1 | let (stack_comprehension @ noalloc_strict) () = exclave_ stack_ [ x for x = 1 to 10 ]
-                                                                    ^^^^^^^^^^^^^^^^^^^^^
-Error: Stack allocating list comprehensions is unsupported yet.
-|}]
-
-
-(** Test 5b: [stack_] nested cases. *)
+(** Test 5c: [stack_] nested cases. *)
 (* Nested: an inner allocation that is not itself [stack_]-marked still
    allocates on the heap, even when an enclosing allocation is [stack_]-marked. *)
 let (stack_nested @ noalloc_strict) (a : int) = exclave_ stack_ (Just (Just a))
@@ -1034,7 +1221,7 @@ Error: The allocation is "alloc"
 |}]
 
 
-(** Test 6: Other tests *)
+(** Test 6: Misc *)
 
 type record_t = { x : float; y : float }
 [%%expect{|
@@ -1127,6 +1314,17 @@ Error: The module is "alloc"
        However, the module highlighted is expected to be "noalloc".
 |}]
 
+(* An object is always constructed at the legacy ([alloc]) mode, so it cannot be
+   created at [noalloc_strict]: the binding annotation requires the object value
+   to be [noalloc_strict], but its construction forces it to [alloc]. *)
+let (o @ noalloc_strict) = object method get = 0 end
+[%%expect{|
+Line 1, characters 27-52:
+1 | let (o @ noalloc_strict) = object method get = 0 end
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "alloc" but is expected to be "noalloc_strict".
+|}]
+
 (* CR-soon shsong: error expected -- cannot call [whitewashed ()] *)
 let (secretly_allocates @ noalloc) () =
   let (whitewashed @ alloc) = fun () -> { x = 1.; y = 2. } in
@@ -1173,4 +1371,38 @@ Error: The allocation is "alloc"
        but is expected to be "noalloc"
          because it is used inside the function at lines 1-6, characters 35-17
          which is expected to be "noalloc".
+|}]
+
+(* [Pexp_lazy] (typecore.ml) must call [walk_locks_for_allocation] for the lazy
+   *cell* BEFORE adding the [Lazy] closure lock for the thunk:
+
+     Env.walk_locks_for_allocation ~env (loc, Hint.Allocation);       (* correct *)
+     let env = Env.add_closure_lock (loc, Lazy) ... env in
+
+   The cell is allocated in the *enclosing* scope, not inside the thunk, so the
+   walk must use the enclosing env. If the walk is placed AFTER [add_closure_lock]
+   (using the env that already contains the thunk's own [Lazy] lock), the cell
+   allocation is wrongly attributed to the thunk.
+
+   This top-level binding distinguishes the two placements:
+   - correct placement: there is no enclosing closure to force, so it is
+     accepted;
+   - wrong placement: the walk traverses the thunk's [Lazy] lock and reports
+     "...because it is used inside the lazy expression...". *)
+let (lz_toplevel @ noalloc_strict) = lazy 1
+[%%expect{|
+val lz_toplevel : int lazy_t = lazy 1
+|}]
+
+(* For contrast: inside a function the two placements agree, because the cell
+   walk reaches the enclosing function either way. *)
+let (lz_in_fn @ noalloc_strict) (x : int) = lazy x
+[%%expect{|
+Line 1, characters 44-50:
+1 | let (lz_in_fn @ noalloc_strict) (x : int) = lazy x
+                                                ^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 32-50
+         which is expected to be "noalloc_strict".
 |}]
