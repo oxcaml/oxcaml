@@ -206,8 +206,6 @@ WITH_FRAME_POINTERS=@frame_pointers@
 WITH_ADDRESS_SANITIZER=@address_sanitizer@
 WITH_CPP_MANGLING=@cpp_mangling@
 NAME_MANGLING_SCHEME=@name_mangling_scheme@
-WITH_PROFINFO=@profinfo@
-PROFINFO_WIDTH=@profinfo_width@
 HEADER_RESERVED_BITS=@reserved_header_bits@
 CUSTOM_OPS_STRUCT_SIZE=@custom_ops_struct_size@
 NO_PARTIAL_INLINING_CFLAGS=@no_partial_inlining_cflags@
@@ -241,10 +239,6 @@ DUNE=@dune@
 OPAM=@opam@
 OPAM_SWITCH=@opam_switch@
 OPAM_EXEC=@opam_exec@
-
-# Selection of OCaml 4.x or 5.x runtime
-RUNTIME_SUFFIX=@runtime_suffix@
-RUNTIME_DIR=runtime$(RUNTIME_SUFFIX)
 
 # Deprecated variables
 

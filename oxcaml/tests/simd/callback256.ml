@@ -239,23 +239,18 @@ let eff6 () =
     callback ();
     callback ()
 
-external runtime5 : unit -> bool = "%runtime5"
-
 let () =
-  if runtime5 ()
-  then (
-    eff0 ();
-    eff1 ();
-    eff2 ();
-    eff3 ();
-    eff4 ();
-    eff5 ();
-    eff6 ();
-    run_callback eff0;
-    run_callback eff1;
-    run_callback eff2;
-    run_callback eff3;
-    run_callback eff4;
-    run_callback eff5;
-    run_callback eff6)
-  else ()
+  eff0 ();
+  eff1 ();
+  eff2 ();
+  eff3 ();
+  eff4 ();
+  eff5 ();
+  eff6 ();
+  run_callback eff0;
+  run_callback eff1;
+  run_callback eff2;
+  run_callback eff3;
+  run_callback eff4;
+  run_callback eff5;
+  run_callback eff6

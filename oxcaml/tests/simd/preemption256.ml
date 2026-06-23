@@ -164,8 +164,6 @@ let test_gc_stress () =
       ())
     (fun () -> run_spin_and_check preempted)
 
-external runtime5 : unit -> bool = "%runtime5"
-
 (* Dune has no poll-insertion condition available in [enabled_if] on this dune
    lang version, so [make runtest] passes the configure-time value through
    the environment and we gate the body on it here. The tight SIMD loop has
@@ -177,7 +175,7 @@ let poll_insertion_enabled () =
   | _ -> false
 
 let () =
-  if runtime5 () && poll_insertion_enabled ()
+  if poll_insertion_enabled ()
   then (
     test_ymm_preservation ();
     test_multiple_preemptions ();

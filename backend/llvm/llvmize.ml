@@ -1886,7 +1886,6 @@ let define_auxiliary_functions t =
 
 let init ~output_prefix ~ppf_dump =
   fail_if_not ~msg:"stack checks not supported" "init" Config.no_stack_checks;
-  fail_if_not ~msg:"runtime5 required" "init" Config.runtime5;
   let llvmir_filename = output_prefix ^ ".ll" in
   current_compilation_unit := Some (create ~llvmir_filename ~ppf_dump)
 
