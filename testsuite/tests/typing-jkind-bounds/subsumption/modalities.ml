@@ -3,6 +3,11 @@
     expect;
 *)
 
+(* Some tests below use deliberately redundant modifiers; silence the warning. *)
+[@@@warning "-211"]
+[%%expect{|
+|}]
+
 module M : sig
   type ('a, 'b) t : immutable_data with 'a
 end = struct
