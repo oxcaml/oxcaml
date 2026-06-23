@@ -144,12 +144,14 @@ end = struct
             (not (Label.Tbl.mem components label))
             && Label.Set.is_empty block.predecessors
           then raise (Found label));
-      (* CR-someday aide for xclerc: this fatals on an isolated unreachable
+      (* CR-someday xclerc for xclerc: this fatals on an isolated unreachable
          cycle (a dead strongly-connected component in which every block has a
          predecessor inside the component), so no unvisited block then has an
          empty predecessor set. Cfg_reducibility tolerates the analogous case;
          consider a clearer diagnostic, or falling back to an arbitrary
-         unvisited block as the component root. Not known to occur today. *)
+         unvisited block as the component root. Not known to occur today. Note
+         however, that if all dead block are deleted, this should not happen,
+         and we are guaranteed to have a tree rather than a forest. *)
       Misc.fatal_error "did not find a block with no predecessors"
     with Found label -> label
 
@@ -243,8 +245,8 @@ let compute_doms : Cfg.t -> doms =
   Cfg.iter_blocks cfg ~f:(fun label block ->
       if Label.Set.is_empty block.predecessors
       then Label.Tbl.replace doms label label);
-  (* CR-someday aide for xclerc: the entry is seeded as self-dominating only via
-     the no-predecessor rule above, so the assertion below also requires the
+  (* CR-someday xclerc for xclerc: the entry is seeded as self-dominating only
+     via the no-predecessor rule above, so the assertion below also requires the
      entry block to have no predecessors. Per the dominance definition the entry
      is always its own immediate dominator; consider seeding it unconditionally
      (Label.Tbl.replace doms cfg.entry_label cfg.entry_label) and dropping the
