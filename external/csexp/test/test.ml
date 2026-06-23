@@ -4,7 +4,7 @@ module Sexp = struct
     | List of t list
 end
 
-module Csexp = Csexp.Make (Sexp)
+module Csexp = Merlin_csexp.Make (Sexp)
 open Csexp
 
 let roundtrip x =
