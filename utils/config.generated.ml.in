@@ -105,6 +105,8 @@ let flexdll_dirs = [@flexdll_dir@]
 
 let ar_supports_response_files = @ar_supports_response_files@
 
+let runtime5 = true
+
 let syntax_quotations = "@enable_syntax_quotations@" = "yes"
 
 let reserved_header_bits = @reserved_header_bits@

@@ -345,6 +345,10 @@ val poll_insertion : bool
 val ar_supports_response_files: bool
 (** Whether ar supports @FILE arguments. *)
 
+val runtime5 : bool
+(** Always [true], Previously:[false] when using the
+    OCaml 4.14 runtime. *)
+
 val no_stack_checks : bool
 (** [true] if stack checks are disabled. *)
 

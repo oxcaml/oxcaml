@@ -89,6 +89,7 @@ let systhread_supported = false
 let flexdll_dirs = []
 let ar_supports_response_files = true
 
+let runtime5 = true
 let no_stack_checks = false
 (* This setting is only for bootstrap, does not affect dune-built compilers: *)
 let naked_pointers = false
