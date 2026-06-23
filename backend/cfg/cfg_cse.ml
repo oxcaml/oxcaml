@@ -302,15 +302,15 @@ let insert_move :
 
 module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
   let class_of_operation0 : Operation.t -> op_class = function
-    | Move | Spill | Reload ->
-      Misc.fatal_error
-        "Cfg_cse.class_of_operation0: Move/Spill/Reload are handled specially"
+    | (Move | Spill | Reload) as op ->
+      Misc.fatal_errorf "Cfg_cse.class_of_operation0: %a is handled specially"
+        Operation.dump op
     | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
     | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ->
       Op_pure
-    | Opaque | Pause ->
-      Misc.fatal_error
-        "Cfg_cse.class_of_operation0: Opaque/Pause are handled specially"
+    | (Opaque | Pause) as op ->
+      Misc.fatal_errorf "Cfg_cse.class_of_operation0: %a is handled specially"
+        Operation.dump op
     | Stackoffset _ -> Op_other
     | Load { mutability; is_atomic; memory_chunk = _; addressing_mode = _ } ->
       (* #12173: disable CSE for atomic loads. *)
@@ -320,9 +320,9 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
         Op_load
           (match mutability with Mutable -> Mutable | Immutable -> Immutable)
     | Store (_, _, asg) -> Op_store asg
-    | Alloc _ | Poll ->
-      Misc.fatal_error
-        "Cfg_cse.class_of_operation0: Alloc/Poll are handled specially"
+    | (Alloc _ | Poll) as op ->
+      Misc.fatal_errorf "Cfg_cse.class_of_operation0: %a is handled specially"
+        Operation.dump op
     | Intop _ -> Op_pure
     | Int128op _ -> Op_pure
     | Intop_imm (_, _) -> Op_pure

@@ -360,8 +360,11 @@ let select_floatarith commutative width (regular_op : Operation.float_operation)
   | _, [arg1; arg2] ->
     Rewritten (Basic (Op (Floatop (width, regular_op))), [arg1; arg2])
   | _ ->
-    Misc.fatal_error
-      "Cfg_selection.select_floatarith: unexpected width/args combination"
+    Misc.fatal_errorf
+      "Cfg_selection.select_floatarith: unexpected combination of width %s and \
+       %d argument(s)"
+      (match width with Float64 -> "Float64" | Float32 -> "Float32")
+      (List.length args)
 
 let select_operation'
     ~(generic_select_condition :
