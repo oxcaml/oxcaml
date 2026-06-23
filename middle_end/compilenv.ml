@@ -143,12 +143,16 @@ let read_unit_info filename =
 
 let read_library_info filename =
   let ic = open_in_bin filename in
-  let buffer = really_input_string ic (String.length cmxa_magic_number) in
-  if buffer <> cmxa_magic_number then
-    raise(Error(Not_a_unit_info filename));
-  let infos = (input_value ic : library_infos) in
-  close_in ic;
-  infos
+  try
+    let buffer = really_input_string ic (String.length cmxa_magic_number) in
+    if buffer <> cmxa_magic_number then
+      raise(Error(Not_a_unit_info filename));
+    let infos = (input_value ic : library_infos) in
+    close_in ic;
+    infos
+  with End_of_file | Failure _ ->
+    close_in ic;
+    raise(Error(Corrupted_unit_info(filename)))
 
 
 (* Read and cache info on global identifiers *)

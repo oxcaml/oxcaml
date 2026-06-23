@@ -247,7 +247,7 @@ let classify ~classify_product env ty layout : _ classification =
              | `Float64x8
              )
         -> Addr
-      | Some (`Lexing_position | `Code | `Eval)
+      | Some (`Lexing_position | `Code | `Eval | `Box)
       | Some (#Predef.data_type_constr | #Predef.abstract_non_value_type_constr)
       | None ->
         try
@@ -268,7 +268,7 @@ let classify ~classify_product env ty layout : _ classification =
       Addr
   (* Quotes are not representable, but it's safe to say they are [Any].
      Unreduced splices and evals might stand for anything. *)
-  | Tquote _ | Tsplice _ | Tquote_eval _ ->
+  | Tquote _ | Tsplice _ | Tquote_eval _ | Tbox _ ->
       Any
   | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _
   | Trepr _ ->
@@ -402,7 +402,7 @@ let array_type_kind ~elt_ty env loc ty =
     | Some elt_ty ->
       let rhs = Jkind.Builtin.value ~why:Array_type_kind in
       begin match Ctype.constrain_type_jkind env elt_ty rhs with
-      | Ok _ -> Pgenarray
+      | Ok _ -> if Config.flat_float_array then Pgenarray else Paddrarray
       | Error e ->
         (* CR layouts v4: rather than constraining [elt_ty]'s jkind to be value,
            we could instead use its jkind to determine a non-value array kind.
@@ -858,7 +858,8 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
           end
         | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
         | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Tpackage _
-        | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ -> unknown ()
+        | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ | Tbox _ ->
+          unknown ()
         | Trepr _ -> Misc.fatal_error "value_kind_mixed_block_field: Trepr"
         end
     in

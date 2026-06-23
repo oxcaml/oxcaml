@@ -1005,10 +1005,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         add_naming_op_for_bound_name sub_cfg rd;
         Ok (insert_op_debug env sub_cfg op dbg r1 rd)
       | Basic basic ->
-        Misc.fatal_errorf "unexpected basic (%a)" Cfg.dump_basic basic
+        Misc.fatal_errorf "unexpected basic (%a)" Printcfg.basic_desc basic
       | Terminator term ->
         Misc.fatal_errorf "unexpected terminator (%a)"
-          (Cfg.dump_terminator ~sep:"")
+          (Printcfg.terminator_desc ~sep:"")
           term)
 
   and emit_expr_ifthenelse env sub_cfg bound_name econd _ifso_dbg eif

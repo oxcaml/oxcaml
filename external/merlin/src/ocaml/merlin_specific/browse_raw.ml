@@ -396,17 +396,20 @@ let of_pattern_desc (type k) (desc : k pattern_desc) =
   | Tpat_value p -> of_pattern (p :> value general_pattern)
   | Tpat_tuple ps -> list_fold (fun (_lbl, p) -> of_pattern p) ps
   | Tpat_unboxed_tuple ps -> list_fold (fun (_lbl, p, _sort) -> of_pattern p) ps
-  | Tpat_construct (_, _, ps, None) | Tpat_array (_, _, ps) ->
-    list_fold of_pattern ps
-  | Tpat_construct (_, _, ps, Some (jkinds, ct)) ->
-    list_fold of_pattern ps ** of_core_type ct
-    ** list_fold (fun (_, jkind) -> of_jkind_annotation_opt jkind) jkinds
-  | Tpat_record (ls, _) ->
+  | Tpat_construct (_, _, _, ps, t) ->
+    list_fold (fun (_, p) -> of_pattern p) ps
+    ** option_fold
+         (fun (jkinds, ct) ->
+           of_core_type ct
+           ** list_fold (fun (_, jkind) -> of_jkind_annotation_opt jkind) jkinds)
+         t
+  | Tpat_array (_, _, ps) -> list_fold of_pattern ps
+  | Tpat_record (ls, _, _, _) ->
     list_fold
       (fun (lid_loc, desc, p) ->
         of_pat_record_field p lid_loc desc Legacy ** of_pattern p)
       ls
-  | Tpat_record_unboxed_product (ls, _) ->
+  | Tpat_record_unboxed_product (ls, _, _, _) ->
     list_fold
       (fun (lid_loc, desc, p) ->
         of_pat_record_field p lid_loc desc Unboxed_product ** of_pattern p)
@@ -420,11 +423,11 @@ let of_method_call obj meth loc env (f : _ f0) acc =
   app (Method_call (obj, meth, loc)) env f acc
 
 let of_block_access = function
-  | Baccess_field (_, _) -> id_fold
+  | Baccess_field (_, _, _) -> id_fold
   | Baccess_block (_, exp) -> of_expression exp
 
 let of_unboxed_access = function
-  | Uaccess_unboxed_field (_, _) -> id_fold
+  | Uaccess_unboxed_field (_, _, _) -> id_fold
 
 let rec of_expression_desc loc = function
   | Texp_ident _ | Texp_constant _ | Texp_instvar _ | Texp_mutvar _
@@ -453,8 +456,9 @@ let rec of_expression_desc loc = function
   | Texp_tuple (es, _) -> list_fold (fun (_lbl, e) -> of_expression e) es
   | Texp_unboxed_tuple es ->
     list_fold (fun (_lbl, e, _sort) -> of_expression e) es
-  | Texp_construct (_, _, es, _) | Texp_array (_, _, es, _) ->
-    list_fold of_expression es
+  | Texp_construct (_, _, _, es, _) ->
+    list_fold (fun (_, e) -> of_expression e) es
+  | Texp_array (_, _, es, _) -> list_fold of_expression es
   | Texp_variant (_, Some (e, _))
   | Texp_assert (e, _)
   | Texp_lazy e
@@ -464,8 +468,8 @@ let rec of_expression_desc loc = function
     option_fold (fun (e, _, _) -> of_expression e) extended_expression
     **
     let fold_field = function
-      | _, Typedtree.Kept _ -> id_fold
-      | desc, Typedtree.Overridden (lid_loc, e) ->
+      | _, _, Typedtree.Kept _ -> id_fold
+      | desc, _, Typedtree.Overridden (lid_loc, e) ->
         of_exp_record_field e lid_loc desc Legacy ** of_expression e
     in
     array_fold fold_field fields
@@ -473,16 +477,37 @@ let rec of_expression_desc loc = function
     option_fold (fun (e, _) -> of_expression e) extended_expression
     **
     let fold_field = function
-      | _, Typedtree.Kept _ -> id_fold
-      | desc, Typedtree.Overridden (lid_loc, e) ->
+      | _, _, Typedtree.Kept _ -> id_fold
+      | desc, _, Typedtree.Overridden (lid_loc, e) ->
         of_exp_record_field e lid_loc desc Unboxed_product ** of_expression e
     in
     array_fold fold_field fields
-  | Texp_field (e, _, lid_loc, lbl, _, _) ->
-    of_expression e ** of_exp_record_field e lid_loc lbl Legacy
-  | Texp_unboxed_field (e, _, lid_loc, lbl, _) ->
-    of_expression e ** of_exp_record_field e lid_loc lbl Unboxed_product
-  | Texp_setfield (e1, _, lid_loc, lbl, e2) ->
+  | Texp_field
+      { record = e;
+        lid = lid_loc;
+        label = lbl;
+        record_sort = _;
+        record_repres = _;
+        boxing = _;
+        unique_barrier = _
+      } -> of_expression e ** of_exp_record_field e lid_loc lbl Legacy
+  | Texp_unboxed_field
+      { record = e;
+        lid = lid_loc;
+        label = lbl;
+        record_sort = _;
+        record_repres = _;
+        unique_use = _
+      } -> of_expression e ** of_exp_record_field e lid_loc lbl Unboxed_product
+  | Texp_setfield
+      { record = e1;
+        lid = lid_loc;
+        label = lbl;
+        newval = e2;
+        record_repres = _;
+        record_sorts = _;
+        modality = _
+      } ->
     of_expression e1 ** of_expression e2
     ** of_exp_record_field e1 lid_loc lbl Legacy
   | Texp_ifthenelse (e1, e2, None)
@@ -978,8 +1003,8 @@ let fake_path { Location.loc; txt = lid } typ name =
 let pattern_paths (type k) { Typedtree.pat_desc; pat_extra; _ } =
   let init =
     match (pat_desc : k pattern_desc) with
-    | Tpat_construct (lid_loc, { Data_types.cstr_name; cstr_res; _ }, _, _) ->
-      fake_path lid_loc cstr_res cstr_name
+    | Tpat_construct (lid_loc, { Data_types.cstr_name; cstr_res; _ }, _, _, _)
+      -> fake_path lid_loc cstr_res cstr_name
     | Tpat_var { id; name = { loc; txt }; _ } ->
       [ (mkloc (Path.Pident id) loc, Some (Longident.Lident txt)) ]
     | Tpat_alias { id; name; _ } ->
@@ -1030,8 +1055,8 @@ let expression_paths { Typedtree.exp_desc; exp_extra; _ } =
         | _ -> assert false
       in
       [ (mkloc (Path.Pident id) loc, lid) ]
-    | Texp_construct (lid_loc, { Data_types.cstr_name; cstr_res; _ }, _, _) ->
-      fake_path lid_loc cstr_res cstr_name
+    | Texp_construct (lid_loc, { Data_types.cstr_name; cstr_res; _ }, _, _, _)
+      -> fake_path lid_loc cstr_res cstr_name
     | Texp_open (od, _) -> module_expr_paths od.open_expr
     (* Normally, [expression_paths] just works at top-level, without
        going deep into an expression. But freshly bound newtypes are
@@ -1156,9 +1181,9 @@ let node_paths_and_longident t =
 let node_is_constructor = function
   | Constructor_declaration decl ->
     Some { decl.cd_name with Location.txt = `Declaration decl }
-  | Expression { exp_desc = Texp_construct (loc, desc, _, _) } ->
+  | Expression { exp_desc = Texp_construct (loc, desc, _, _, _) } ->
     Some { loc with Location.txt = `Description desc }
-  | Pattern { pat_desc = Tpat_construct (loc, desc, _, _) } ->
+  | Pattern { pat_desc = Tpat_construct (loc, desc, _, _, _) } ->
     Some { loc with Location.txt = `Description desc }
   | Extension_constructor ext_cons ->
     Some

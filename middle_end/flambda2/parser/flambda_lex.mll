@@ -37,6 +37,10 @@ let keyword_table =
     "available", KWD_AVAILABLE;
     "boxed", KWD_BOXED;
     "ccall", KWD_CCALL;
+    "mcall", KWD_MCALL;
+    "self", KWD_SELF;
+    "public", KWD_PUBLIC;
+    "cached", KWD_CACHED;
     "closure", KWD_CLOSURE;
     "code", KWD_CODE;
     "cont", KWD_CONT;
@@ -76,6 +80,7 @@ let keyword_table =
     "notrace", KWD_NOTRACE;
     "null", KWD_NULL;
     "of", KWD_OF;
+    "poison", KWD_POISON;
     "pop", KWD_POP;
     "push", KWD_PUSH;
     "rec", KWD_REC;

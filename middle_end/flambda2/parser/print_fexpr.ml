@@ -171,26 +171,6 @@ let vec512 ppf
     "vec512[%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx]" word0
     word1 word2 word3 word4 word5 word6 word7
 
-let const ppf (c : Fexpr.const) =
-  match c with
-  | Naked_immediate i ->
-    Format.fprintf ppf "%t%si%t" Flambda_colours.naked_number i
-      Flambda_colours.pop
-  | Tagged_immediate i ->
-    Format.fprintf ppf "%t%s%t" Flambda_colours.tagged_immediate i
-      Flambda_colours.pop
-  | Naked_float f -> float ppf f
-  | Naked_float32 f -> float32 ppf f
-  | Naked_int8 i -> int8 ppf i
-  | Naked_int16 i -> int16 ppf i
-  | Naked_int32 i -> int32 ppf i
-  | Naked_int64 i -> int64 ppf i
-  | Naked_nativeint i -> nativeint ppf i
-  | Naked_vec128 v -> vec128 ppf v
-  | Naked_vec256 v -> vec256 ppf v
-  | Naked_vec512 v -> vec512 ppf v
-  | Null -> Format.fprintf ppf "null"
-
 let naked_number_kind ppf (nnk : Flambda_kind.Naked_number_kind.t) =
   Format.pp_print_string ppf
   @@
@@ -258,6 +238,29 @@ and kind_with_subkind ppf (k : kind_with_subkind) =
 
 let kind_with_subkind ppf k =
   directive Flambda_colours.kind kind_with_subkind ppf k
+
+let const ppf (c : Fexpr.const) =
+  match c with
+  | Naked_immediate i ->
+    Format.fprintf ppf "%t%si%t" Flambda_colours.naked_number i
+      Flambda_colours.pop
+  | Tagged_immediate i ->
+    Format.fprintf ppf "%t%s%t" Flambda_colours.tagged_immediate i
+      Flambda_colours.pop
+  | Naked_float f -> float ppf f
+  | Naked_float32 f -> float32 ppf f
+  | Naked_int8 i -> int8 ppf i
+  | Naked_int16 i -> int16 ppf i
+  | Naked_int32 i -> int32 ppf i
+  | Naked_int64 i -> int64 ppf i
+  | Naked_nativeint i -> nativeint ppf i
+  | Naked_vec128 v -> vec128 ppf v
+  | Naked_vec256 v -> vec256 ppf v
+  | Naked_vec512 v -> vec512 ppf v
+  | Null -> Format.fprintf ppf "null"
+  | Poison (kind, name) ->
+    Format.fprintf ppf "%tpoison.%a.%s%t" Flambda_colours.invalid_keyword
+      kind_with_subkind kind name Flambda_colours.pop
 
 let arity ppf (a : arity) =
   match a with
@@ -543,6 +546,12 @@ let static_closure_binding ppf (scb : static_closure_binding) =
     (fun_decl Flambda_colours.static_keyword)
     scb.fun_decl
 
+let method_kind ppf mk =
+  match (mk : Call_kind.Method_kind.t) with
+  | Self -> Format.pp_print_string ppf "self"
+  | Public -> Format.pp_print_string ppf "public"
+  | Cached -> Format.pp_print_string ppf "cached"
+
 let call_kind_and_alloc_mode ~space ppf (ck, alloc_mode) =
   match ck with
   | Function Indirect -> alloc_mode_for_applications_opt ppf alloc_mode ~space
@@ -557,6 +566,10 @@ let call_kind_and_alloc_mode ~space ppf (ck, alloc_mode) =
     pp_spaced ~space ppf "ccall%a"
       (pp_option ~space:Before Format.pp_print_string)
       noalloc_kwd
+  | Method { kind; obj } ->
+    pp_spaced ~space ppf "mcall(%a%a)" method_kind kind
+      (fun ppf -> pp_spaced ~space:Before ppf "%a" simple)
+      obj
 
 let inline_attribute ~space ppf (i : Inline_attribute.t) =
   let str =

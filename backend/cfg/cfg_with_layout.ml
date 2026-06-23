@@ -163,10 +163,9 @@ let with_escape_ppf f ppf =
   Buffer.to_bytes buffer |> Bytes.to_string |> print_escaped ppf;
   ()
 
-let print_dot ?(show_instr = true) ?(show_exn = true)
-    ?(annotate_instr = [Cfg.print_instruction]) ?annotate_block
-    ?annotate_block_end ?(annotate_succ : (Label.t -> Label.t -> string) option)
-    ppf t =
+let print_dot ?(show_instr = true) ?(show_exn = true) ?(annotate_instr = [])
+    ?annotate_block ?annotate_block_end
+    ?(annotate_succ : (Label.t -> Label.t -> string) option) ppf t =
   let ppf =
     (* Change space indent into tabs because spaces are rendered by [dot]
        command and tabs not. *)

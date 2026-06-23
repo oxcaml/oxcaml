@@ -231,6 +231,7 @@ Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize, int64_t id)
     return NULL;
   }
 
+#ifdef DEBUG /* Avoid unnecessary syscalls in release builds */
 #ifdef __linux__
   /* On Linux, give names to the various mappings */
   caml_mem_name_map(stack, page_size,
@@ -244,7 +245,8 @@ Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize, int64_t id)
   caml_mem_name_map(Stack_base(stack), len - 2*page_size,
                     "stack (original fiber id %ld, tid %ld)",
                     id, (long)syscall(SYS_gettid));
-#endif
+#endif /* __linux__ */
+#endif /* DEBUG */
 
   // Assert that the guard page does not impinge on the actual stack area.
   CAMLassert((char*) stack + len - (trailer_size + Bsize_wsize(wosize))
