@@ -1,14 +1,7 @@
-(* TEST
- modules = "backtrace_c_exn_.c";
- flags = "-g";
- ocamlrunparam += ",b=1";
- {
-   {
-     bytecode;
-   }{
-     native;
-   }
- }
+(* TEST_BELOW
+(* Blank lines added here to preserve locations. *)
+
+
 *)
 
 (* CR mshinwell: it isn't clear to me why the 5 reference output here
@@ -30,3 +23,9 @@ let () =
   | exn ->
     Printexc.to_string exn |> print_endline;
     Printexc.print_backtrace stdout
+
+(* TEST
+ modules = "backtrace_c_exn_.c";
+ flags = "-g";
+ ocamlrunparam += ",b=1";
+*)
