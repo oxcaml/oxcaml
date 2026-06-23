@@ -20,7 +20,9 @@ let f (b : bool) (x : int) =
   (f =
      (function {nlocal = 0} b[value<int>] x[value<int>] : int
        (region
-         (let (opt = (if b 0 (makelocalblock 0 (value<int>) x)))
+         (let
+           (opt =[value<(consts (0)) (non_consts ([0: value<int>]))>]
+              (if b 0 (makelocalblock 0 (value<int>) x)))
            (if opt (field_imm 0 opt) 1)))))
   (apply (field_imm 1 (global Toploop!)) "f" f))
 val f : bool -> int -> int = <fun>
@@ -40,7 +42,9 @@ let g (b : bool) (x : float#) =
   (g =
      (function {nlocal = 0} b[value<int>] x[float] : float
        (region
-         (let (opt = (if b 0 (makelocalblock 0 (float64) x)))
+         (let
+           (opt =[value<(consts (0)) (non_consts ([0: float64]))>]
+              (if b 0 (makelocalblock 0 (float64) x)))
            (if opt (%float_of_float# (mixedfield 0  (float64) opt)) 0.0)))))
   (apply (field_imm 1 (global Toploop!)) "g" g))
 val g : bool -> float# -> float = <fun>
