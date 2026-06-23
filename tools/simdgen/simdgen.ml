@@ -32,10 +32,6 @@ let all_instructions = Hashtbl.create 1024
 let is_evex instr =
   match instr.enc.prefix with Evex _ -> true | Legacy _ | Vex _ -> false
 
-(* The name used for binding generation. EVEX instructions get an [e] prefix
-   (e.g. [evaddps]) so they live in a distinct namespace from the VEX form
-   ([vaddps]); legacy and VEX already differ by mnemonic ([addsd] vs
-   [vaddsd]). *)
 let effective_mnemonic instr =
   if is_evex instr then "e" ^ instr.mnemonic else instr.mnemonic
 
@@ -82,10 +78,6 @@ let parse in_ =
   in
   csv []
 
-(* Strip AVX512 operand decorators that we do not model: opmask/zeroing
-   ([{k1}{z}]), rounding/exception control ([{er}], [{sae}]), and broadcast
-   memory forms ([/m64bcst]). Instructions are emitted unmasked, without
-   broadcast or rounding control. *)
 let clean_arg arg =
   let no_braces =
     let b = Buffer.create (String.length arg) in
@@ -128,9 +120,7 @@ let rec parse_args mnemonic acc encs args imm res =
   | arg :: args, enc :: encs -> (
     let loc : loc option =
       match clean_arg arg with
-      | "" ->
-        (* Operand consisting only of decorators we drop (e.g. a writemask). *)
-        raise Unsupported
+      | "" -> raise Unsupported
       | "<RAX>" -> Some (Pin RAX)
       | "<RDI>" -> Some (Pin RDI)
       | "<RCX>" -> Some (Pin RCX)
@@ -213,9 +203,7 @@ let rec parse_args mnemonic acc encs args imm res =
     let enc, rw = first_word enc in
     let enc =
       match String.trim enc with
-      | "" ->
-        (* Operand with no encoding spec (e.g. EVEX scatter [/vsib] forms). *)
-        raise Unsupported
+      | "" -> raise Unsupported
       | "ModRM:reg" -> RM_r
       | "ModRM:r/m" -> RM_rm
       | "BaseReg" ->
@@ -243,7 +231,7 @@ let rec parse_args mnemonic acc encs args imm res =
       then (
         set_res_arg ();
         parse_args mnemonic ({ loc; enc } :: acc) encs args imm res)
-      else if starts "(w" (* "(w)" or "(w, ...)" *)
+      else if starts "(w"
       then (
         set_res loc enc;
         parse_args mnemonic acc encs args imm res)
@@ -261,9 +249,6 @@ let parse_args mnemonic enc args =
   let imm = ref Imm_none in
   let res = ref Res_none in
   let parsed = parse_args mnemonic [] enc args imm res in
-  (* The AVX512 writemask decorator ([{k1}]) adds an opmask operand. Zeroing
-     ([{z}]) and rounding/exception control ([{er}]/[{sae}]) are supplied at
-     emit time, not recorded in the instruction. *)
   let has_mask = List.exists (fun a -> contains a "{k") args in
   let parsed =
     if has_mask then parsed @ [{ loc = Temp [| K |]; enc = Mask }] else parsed
@@ -290,8 +275,6 @@ let parse_enc mnemonic enc ~operand_size_override =
       | "/5" -> Spec 5
       | "/6" -> Spec 6
       | "/7" -> Spec 7
-      (* [/vsib] is like [/r] (ModRM.reg holds the register operand) but the r/m
-         operand uses VSIB (vector SIB) addressing. *)
       | "/R" | "/VSIB" | "" -> Reg
       | _ -> fail mnemonic enc
     in
@@ -643,11 +626,6 @@ let %s = {
 
 let print_all () =
   let module Map = Map.Make (String) in
-  (* A few mnemonics have multiple functionally-equivalent encodings with the
-     same operand types (e.g. reg-reg MOVSS via opcode 0x10 and 0x11); they
-     share a binding and one is kept. The [e] prefix on EVEX names ensures such
-     collisions are always within one encoding family, so no distinct
-     instruction is dropped. *)
   let all =
     Hashtbl.to_seq_keys all_instructions
     |> Seq.map (fun instr -> binding instr, instr)
@@ -658,8 +636,6 @@ let print_all () =
   print_endline "\ntype nonrec instr = id instr";
   Map.iter (fun bind instr -> print_one bind instr) all
 
-(* Map a single extension token to its [ext]. Tokens not handled here cause the
-   whole instruction to be skipped (its extension is unsupported). *)
 let parse_ext_token = function
   | "SSE" -> Some SSE
   | "SSE2" -> Some SSE2
@@ -683,7 +659,6 @@ let parse_ext_token = function
   | "AVX512VL" -> Some AVX512VL
   | _ -> None
 
-(* An instruction is supported iff every extension it requires is. *)
 let parse_ext ext =
   let toks =
     String.split_on_char ' ' ext

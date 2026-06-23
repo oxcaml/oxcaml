@@ -62,7 +62,7 @@ type temp =
   | XMM
   | YMM
   | ZMM
-  | K (* AVX512 opmask register k0-k7 *)
+  | K     (* AVX512 mask register (k0-k7) *)
   | VM32X (* R64 base + i32x4 offset *)
   | VM32Y (* R64 base + i32x8 offset *)
   | VM32Z (* R64 base + i32x16 offset *)
@@ -80,7 +80,7 @@ type loc_enc =
   | RM_r
   | RM_rm
   | Vex_v
-  | Mask (* AVX512 writemask operand, encoded in EVEX.aaa *)
+  | Mask
   | Implicit
   | Immediate
 
@@ -116,7 +116,6 @@ type vex_map =
   | Vexm_0F38
   | Vexm_0F3A
 
-(* EVEX vector length (EVEX.L'L field) *)
 type evex_length =
   | L128
   | L256

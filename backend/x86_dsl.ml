@@ -25,8 +25,6 @@ open! Int_replace_polymorphic_compare
 open X86_ast
 open X86_proc
 
-let no_evex : evex = { mask = 0; zeroing = false; rounding = None }
-
 let sym s = Sym s
 
 let nat n = Imm (Int64.of_nativeint n)
@@ -222,7 +220,5 @@ module I = struct
 
   let xor x y = emit (XOR (x, y))
 
-  let simd instr args = emit (SIMD (instr, args))
-
-  let simd_evex evex instr args = emit (SIMD_evex (instr, args, evex))
+  let simd ?evex instr args = emit (SIMD (instr, args, evex))
 end

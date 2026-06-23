@@ -138,13 +138,9 @@ module I = struct
               simd.mnemonic !function_name
               (Amd64_simd_defs.exts_to_string simd.ext)))
 
-  let simd (simd : Simd_instrs.instr) args =
+  let simd ?evex (simd : Simd_instrs.instr) args =
     check_enabled simd;
-    I.simd simd args
-
-  let simd_evex evex (simd : Simd_instrs.instr) args =
-    check_enabled simd;
-    I.simd_evex evex simd args
+    I.simd ?evex simd args
 end
 
 (** Turn a Linear label into an assembly label. The section is checked against
@@ -1850,38 +1846,34 @@ let emit_simd_sanitize ~address ~instr ~loc ~kind =
       Address_sanitizer.emit_sanitize ~dependencies ~instr ~address chunk kind
   else ()
 
-(* The opmask register operand contributes EVEX.aaa (1-7 for k1-k7); k0 means no
-   masking. The OCaml mask register class is k1..k7, so its index 0..6 maps to
-   k1..k7. *)
-let mask_number_of_reg (r : Reg.t) =
+let mask_index (r : Reg.t) =
   match r.loc with
-  | Reg.Reg phys -> Regs.index_in_class phys + 1
+  | Reg.Reg phys ->
+    (* Masks [0..6] correspond to [k1..7] *)
+    Regs.index_in_class phys + 1
   | Reg.Unknown | Reg.Stack _ ->
-    Misc.fatal_error "AVX512 writemask operand must be a hard register"
+    Misc.fatal_error "AVX512 mask operand must be a register"
 
 let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
   check_simd_instr ?mode simd imm instr;
-  let evex = ref X86_dsl.no_evex in
+  let mask = ref 0 in
   let args =
     Array.fold_left
       (fun (idx, args) (arg : Simd.arg) ->
-        if Simd.arg_is_implicit arg
-        then idx + 1, args
-        else
-          match arg.enc with
-          | Mask ->
-            (* Not a positional ModRM/vvvv operand; folded into EVEX.aaa. *)
-            evex := { !evex with mask = mask_number_of_reg instr.arg.(idx) };
-            idx + 1, args
-          | RM_r | RM_rm | Vex_v | Immediate | Implicit -> (
-            match Simd.loc_allows_mem arg.loc, mode with
-            | true, Some (mode, kind) ->
-              let n = num_args_addressing mode in
-              let typ = to_addr_width arg.loc in
-              let address = addressing mode typ instr idx in
-              emit_simd_sanitize ~address ~instr ~loc:arg.loc ~kind;
-              idx + n, address :: args
-            | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args))
+        match arg.enc with
+        | Implicit -> idx + 1, args
+        | Mask ->
+          mask := mask_index instr.arg.(idx);
+          idx + 1, args
+        | RM_r | RM_rm | Vex_v | Immediate -> (
+          match Simd.loc_allows_mem arg.loc, mode with
+          | true, Some (mode, kind) ->
+            let n = num_args_addressing mode in
+            let typ = to_addr_width arg.loc in
+            let address = addressing mode typ instr idx in
+            emit_simd_sanitize ~address ~instr ~loc:arg.loc ~kind;
+            idx + n, address :: args
+          | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args))
       (0, []) simd.args
     |> fun (_, args) -> List.rev args
   in
@@ -1904,12 +1896,12 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
     | Some imm -> X86_dsl.int imm :: List.rev args
   in
   let args = Array.of_list args in
-  (* Only EVEX instructions with an actual writemask / zeroing / rounding need
-     the [SIMD_evex] form; everything else (legacy, VEX, unmasked EVEX) uses
-     [SIMD]. *)
-  match !evex with
-  | { mask = 0; zeroing = false; rounding = None } -> I.simd simd args
-  | evex -> I.simd_evex evex simd args
+  let evex : X86_ast.evex option =
+    if !mask = 0
+    then None
+    else Some { mask = !mask; zeroing = false; rounding = None }
+  in
+  I.simd ?evex simd args
 
 (* Only used for instructions that have an implicit memory operand. Explicit
    load/store operations are sanitized automatically by [emit_simd_instr]. *)

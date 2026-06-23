@@ -103,6 +103,29 @@ let i3 b s x y z = bprintf b "\t%s\t%a, %a, %a" s arg x arg y arg z
 
 let i4 b s x y z w = bprintf b "\t%s\t%a, %a, %a, %a" s arg x arg y arg z arg w
 
+let evex_rounding (evex : X86_ast.evex) =
+  match evex.rounding with
+  | None -> ""
+  | Some RoundCurrent -> "{sae}, "
+  | Some RoundNearest -> "{rn-sae}, "
+  | Some RoundDown -> "{rd-sae}, "
+  | Some RoundUp -> "{ru-sae}, "
+  | Some RoundTruncate -> "{rz-sae}, "
+
+let evex_mask (evex : X86_ast.evex) =
+  (if evex.mask <> 0 then Printf.sprintf "{%%k%d}" evex.mask else "")
+  ^ if evex.zeroing then "{z}" else ""
+
+let ievex b s args evex =
+  bprintf b "\t%s\t%s" s (evex_rounding evex);
+  let n = Array.length args in
+  Array.iteri
+    (fun i a ->
+      if i > 0 then Buffer.add_string b ", ";
+      arg b a;
+      if i = n - 1 then Buffer.add_string b (evex_mask evex))
+    args
+
 let i1_call_jmp b s = function
   (* this is the encoding of jump labels: don't use * *)
   | Mem { arch = X86; idx = _; scale = 0; base = None; sym = Some _; _ } as x ->
@@ -188,32 +211,8 @@ let print_instr b = function
   | TEST (arg1, arg2) -> i2_s b "test" arg1 arg2
   | XCHG (arg1, arg2) -> i2 b "xchg" arg1 arg2
   | XOR (arg1, arg2) -> i2_s b "xor" arg1 arg2
-  | SIMD_evex (instr, args, evex) ->
-    (* AT&T syntax: static rounding/SAE is a leading operand ([{rn-sae}, ...]);
-       the writemask and zeroing decorate the destination, which is the last
-       operand. *)
-    let rounding =
-      match evex.rounding with
-      | None -> ""
-      | Some Round_nearest_sae -> "{rn-sae}, "
-      | Some Round_down_sae -> "{rd-sae}, "
-      | Some Round_up_sae -> "{ru-sae}, "
-      | Some Round_zero_sae -> "{rz-sae}, "
-      | Some Sae -> "{sae}, "
-    in
-    let mask =
-      (if evex.mask <> 0 then Printf.sprintf "{%%k%d}" evex.mask else "")
-      ^ if evex.zeroing then "{z}" else ""
-    in
-    bprintf b "\t%s\t%s" instr.mnemonic rounding;
-    let n = Array.length args in
-    Array.iteri
-      (fun i a ->
-        if i > 0 then Buffer.add_string b ", ";
-        arg b a;
-        if i = n - 1 then Buffer.add_string b mask)
-      args
-  | SIMD (instr, args) -> (
+  | SIMD (instr, args, Some evex) -> ievex b instr.mnemonic args evex
+  | SIMD (instr, args, None) -> (
     match[@warning "-4"] instr.id, args with
     (* The assembler won't accept these mnemonics directly. *)
     | Cmpps, [| imm; arg1; arg2 |] ->
@@ -302,9 +301,7 @@ let map_arg (f : arg -> arg) (instr : instruction) : instruction =
   | TEST (a, b) -> TEST (f a, f b)
   | XCHG (a, b) -> XCHG (f a, f b)
   | XOR (a, b) -> XOR (f a, f b)
-  | SIMD (simd_instr, args) -> SIMD (simd_instr, Array.map f args)
-  | SIMD_evex (simd_instr, args, evex) ->
-    SIMD_evex (simd_instr, Array.map f args, evex)
+  | SIMD (simd_instr, args, evex) -> SIMD (simd_instr, Array.map f args, evex)
 
 let generate_asm oc lines =
   let b = Buffer.create 10000 in

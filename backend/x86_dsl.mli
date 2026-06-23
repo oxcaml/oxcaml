@@ -25,10 +25,6 @@
 
 open X86_ast
 
-(* EVEX modifiers for an unmasked instruction (no writemask, merge, no
-   rounding). *)
-val no_evex : evex
-
 val sym : string -> arg
 
 val nat : nativeint -> arg
@@ -226,7 +222,5 @@ module I : sig
 
   (* SIMD instructions *)
 
-  val simd : Amd64_simd_instrs.instr -> arg array -> unit
-
-  val simd_evex : evex -> Amd64_simd_instrs.instr -> arg array -> unit
+  val simd : ?evex:evex -> Amd64_simd_instrs.instr -> arg array -> unit
 end
