@@ -62,6 +62,7 @@
   libeval_stubs.a
   eval.cmxs
   eval.cma
+  eval.mli
   (.eval.objs/byte/eval.cmi as eval.cmi)
   (.eval.objs/byte/eval.cmt as eval.cmt)
   (.eval.objs/byte/eval.cmti as eval.cmti))
