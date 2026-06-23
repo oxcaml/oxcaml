@@ -500,6 +500,9 @@ let makearray_dynamic_scannable_unboxed_product env
       Misc.fatal_errorf
         "%s: should have been sent to [makearray_dynamic_singleton]"
         (Printlambda.array_kind lambda_array_kind)
+    | Punspecializedarray ->
+      Misc.fatal_error
+        "makearray_dynamic_scannable_unboxed_product: Punspecializedarray"
   in
   if must_be_scanned
   then
@@ -537,7 +540,10 @@ let makearray_dynamic0 env (lambda_array_kind : L.array_kind)
           "Cannot compile Pmakearray_dynamic at layout %s without an \
            initializer:@ %a"
           (Printlambda.array_kind lambda_array_kind)
-          Debuginfo.print_compact dbg)
+          Debuginfo.print_compact dbg
+      | Punspecializedarray ->
+        Misc.fatal_error
+          "makearray_dynamic0: Pmakearray_dynamic on Punspecializedarray")
   in
   match lambda_array_kind with
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray ->
@@ -633,6 +639,8 @@ let makearray_dynamic0 env (lambda_array_kind : L.array_kind)
     in
     makearray_dynamic_non_scannable_unboxed_product env lambda_array_kind mode
       ~length ~init loc
+  | Punspecializedarray ->
+    Misc.fatal_error "makearray_dynamic0: Punspecializedarray"
 
 let makearray_dynamic env (lambda_array_kind : L.array_kind)
     (mode : L.locality_mode) (has_init : L.has_initializer) args loc :
@@ -824,6 +832,8 @@ let arrayblit env ~src_mutability ~(dst_array_set_kind : L.array_set_kind) args
   | Punboxedmaskarray_set | Pgcscannableproductarray_set _
   | Pgcignorableproductarray_set _ ->
     arrayblit_expanded env ~src_mutability ~dst_array_set_kind args loc
+  | Punspecializedarray_set _ ->
+    Misc.fatal_error "arrayblit: Punspecializedarray_set"
 
 (* Only used on amd64. *)
 let cast_vec128_to_vec256 =
@@ -1151,13 +1161,6 @@ let transform_primitive0 env (prim : L.primitive) args loc =
     split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:8
       ~load:(fun _ ->
         L.Pfloatarray_load_vec { desc with size = Boxed_vec128; boxed = false })
-  | ( Pfloat_array_load_vec
-        ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
-      [arr; idx] )
-    when L.split_vectors ->
-    split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride:8
-      ~load:(fun _ ->
-        L.Pfloat_array_load_vec { desc with size = Boxed_vec128; boxed = false })
   | ( Pint_array_load_vec
         ({ size = Boxed_vec256; mode; index_kind; boxed; _ } as desc),
       [arr; idx] )
@@ -1247,13 +1250,6 @@ let transform_primitive0 env (prim : L.primitive) args loc =
     split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:8
       ~store:(fun _ ->
         L.Pfloatarray_set_vec { desc with size = Boxed_vec128; boxed = false })
-  | ( Pfloat_array_set_vec
-        ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
-      [arr; idx; value] )
-    when L.split_vectors ->
-    split_vec256_store ~loc ~index_kind ~boxed ~arr ~value ~idx ~stride:8
-      ~store:(fun _ ->
-        L.Pfloat_array_set_vec { desc with size = Boxed_vec128; boxed = false })
   | ( Pint_array_set_vec ({ size = Boxed_vec256; index_kind; boxed; _ } as desc),
       [arr; idx; value] )
     when L.split_vectors ->

@@ -966,9 +966,10 @@ let check_shadowing env = function
   | `Module_type (Some _) -> Some "module type"
   | `Class (Some _) -> Some "class"
   | `Class_type (Some _) -> Some "class type"
+  | `Jkind (Some _) -> Some "kind"
   | `Constructor _ | `Label _ | `Unboxed_label _
   | `Value None | `Type None | `Module None | `Module_type None
-  | `Class None | `Class_type None | `Component None ->
+  | `Class None | `Class_type None | `Component None | `Jkind None ->
       None
 
 let empty = {
@@ -4255,20 +4256,29 @@ let add_components slot root env0 comps (locks : locks) =
   let cltypes =
     add (fun x -> `Class_type x) comps.comp_cltypes env0.cltypes
   in
+  let jkinds =
+    add (fun x -> `Jkind x) comps.comp_jkinds env0.jkinds
+  in
   let modules =
     add_v (fun x -> `Module x) comps.comp_modules env0.modules
   in
-  { env0 with
-    summary = Env_open(env0.summary, root);
+  { values;
     constrs;
     labels;
     unboxed_labels;
-    values;
     types;
+    modules;
     modtypes;
     classes;
     cltypes;
-    modules;
+    functor_args = env0.functor_args;
+    jkinds;
+    summary = Env_open(env0.summary, root);
+    local_constraints = env0.local_constraints;
+    implicit_jkinds = env0.implicit_jkinds;
+    flags = env0.flags;
+    stage = env0.stage;
+    toplevel_scope = env0.toplevel_scope;
   }
 
 let open_signature_by_path path env0 =

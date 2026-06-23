@@ -80,6 +80,7 @@ let keyword_table =
     "notrace", KWD_NOTRACE;
     "null", KWD_NULL;
     "of", KWD_OF;
+    "poison", KWD_POISON;
     "pop", KWD_POP;
     "push", KWD_PUSH;
     "rec", KWD_REC;

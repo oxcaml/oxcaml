@@ -194,7 +194,7 @@ let name0 ?consider_inlining_effectful_expressions env res name =
 
 let name env name = name0 env name
 
-let const ~dbg cst =
+let rec const ~dbg cst =
   match Reg_width_const.descr cst with
   | Naked_immediate i ->
     targetint ~dbg (Target_ocaml_int.to_targetint Sixty_four i)
@@ -237,6 +237,9 @@ let const ~dbg cst =
     mask ~dbg word0
   | Naked_nativeint t -> targetint ~dbg t
   | Null -> targetint ~dbg (Targetint_32_64.zero Sixty_four)
+  | Poison (kind, name) ->
+    const ~dbg
+      (Reg_width_const.of_int_of_kind Sixty_four kind (String.hash name))
 
 let simple ?consider_inlining_effectful_expressions ~dbg env res s =
   Simple.pattern_match s
@@ -259,7 +262,7 @@ let name_static res name =
     ~symbol:(fun s ->
       `Static_data [symbol_address (To_cmm_result.symbol res s)])
 
-let const_static cst : Cmm.data_item list =
+let rec const_static cst : Cmm.data_item list =
   match Reg_width_const.descr cst with
   | Naked_immediate i ->
     [cint (nativeint_of_targetint (Target_ocaml_int.to_targetint Sixty_four i))]
@@ -317,6 +320,9 @@ let const_static cst : Cmm.data_item list =
     in
     [cint (Int64.to_nativeint word0)]
   | Null -> [cint 0n]
+  | Poison (kind, name) ->
+    const_static
+      (Reg_width_const.of_int_of_kind Sixty_four kind (String.hash name))
 
 let simple_static res s =
   Simple.pattern_match s

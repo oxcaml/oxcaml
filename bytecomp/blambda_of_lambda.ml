@@ -445,7 +445,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           | [] -> block
           | _ :: _ ->
             (* for the floatarray hack *)
-            Prim (Ccall "caml_array_of_uniform_array", [block])))
+            Prim (Ccall "caml_array_of_uniform_array", [block]))
+        | Punspecializedarray ->
+          Misc.fatal_error "Blambda_of_lambda: Pmakearray Punspecializedarray")
     | Presume -> context_switch Resume ~arity:3
     | Pwith_stack -> context_switch With_stack ~arity:5
     | Pwith_stack_bind -> context_switch With_stack_bind ~arity:7
@@ -464,6 +466,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
               "Array kind %s should have been ruled out by the frontend for \
                %%makearray_dynamic_uninit"
               (Printlambda.array_kind kind)
+          | Punspecializedarray ->
+            Misc.fatal_error
+              "Blambda_of_lambda: Pmakearray_dynamic Punspecializedarray"
           | Punboxedfloatarray Unboxed_float32 ->
             Lconst (Const_base (Const_float32 "0.0"))
           | Punboxedfloatarray Unboxed_float64 ->
@@ -783,6 +788,12 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Parrayrefu (Punboxedmaskarray_ref, _, _)
     | Parraysetu (Punboxedmaskarray_set, _) ->
       simd_is_not_supported ()
+    | Parrayrefs (Punspecializedarray_ref _, _, _)
+    | Parraysets (Punspecializedarray_set _, _)
+    | Parrayrefu (Punspecializedarray_ref _, _, _)
+    | Parraysetu (Punspecializedarray_set _, _) ->
+      Misc.fatal_error
+        "Blambda_of_lambda: array primitive on Punspecializedarray"
     | Pctconst c -> unary (caml_sys_const c)
     | Pisint _ -> unary Isint
     | Pisout -> binary (Intcomp Ultint)
@@ -845,12 +856,11 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pisnull -> unary (Ccall "caml_is_null")
     | Pstring_load_vec _ | Pbytes_load_vec _ | Pbytes_set_vec _
     | Pbigstring_load_vec _ | Pbigstring_set_vec _ | Pfloatarray_load_vec _
-    | Pfloat_array_load_vec _ | Pint_array_load_vec _
-    | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
-    | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
-    | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
-    | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
-    | Pfloat_array_set_vec _ | Pint_array_set_vec _
+    | Pint_array_load_vec _ | Punboxed_float_array_load_vec _
+    | Punboxed_float32_array_load_vec _ | Puntagged_int8_array_load_vec _
+    | Puntagged_int16_array_load_vec _ | Punboxed_int32_array_load_vec _
+    | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
+    | Pfloatarray_set_vec _ | Pint_array_set_vec _
     | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
     | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
     | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
@@ -890,7 +900,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Pgcscannableproductarray _ | Pgcignorableproductarray _ -> (
         match locality with
         | Alloc_heap -> binary (Ccall "caml_array_make")
-        | Alloc_local -> binary (Ccall "caml_array_make_local")))
+        | Alloc_local -> binary (Ccall "caml_array_make_local"))
+      | Punspecializedarray ->
+        Misc.fatal_error
+          "Blambda_of_lambda: Pmakearray_dynamic Punspecializedarray")
     | Parrayblit { src_mutability = _; dst_array_set_kind } -> (
       match dst_array_set_kind with
       | Punboxedvectorarray_set _ -> simd_is_not_supported ()
@@ -899,7 +912,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Pgcignorableaddrarray_set | Punboxedoruntaggedintarray_set _
       | Pfloatarray_set | Punboxedfloatarray_set _
       | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ->
-        n_ary (Ccall "caml_array_blit") ~arity:5)
+        n_ary (Ccall "caml_array_blit") ~arity:5
+      | Punspecializedarray_set _ ->
+        Misc.fatal_error "Blambda_of_lambda: Parrayblit Punspecializedarray_set"
+      )
     | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ | Pget_ptr _ | Pset_ptr _ ->
       Misc.fatal_errorf "Blambda_of_lambda: %a is not supported in bytecode"
         Printlambda.primitive primitive
