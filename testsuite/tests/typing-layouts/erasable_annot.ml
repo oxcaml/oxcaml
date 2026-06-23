@@ -239,8 +239,9 @@ external f_1 : int -> bool -> int64# = "foo" "bar";;
 Line 1, characters 30-36:
 1 | external f_1 : int -> bool -> int64# = "foo" "bar";;
                                   ^^^^^^
-Warning 187 [incompatible-with-upstream]: [@unboxed] attribute must be added to external declaration
-argument type with layout bits64 for upstream compatibility.
+Warning 187 [incompatible-with-upstream]: "[@unboxed]" attribute must be added
+  to external declaration
+  argument type with layout bits64 for upstream compatibility.
 
 external f_1 : int -> bool -> (int64# [@unboxed]) = "foo" "bar"
 |}];;
@@ -250,8 +251,9 @@ external f_2 : int32# -> bool -> int = "foo" "bar";;
 Line 1, characters 15-21:
 1 | external f_2 : int32# -> bool -> int = "foo" "bar";;
                    ^^^^^^
-Warning 187 [incompatible-with-upstream]: [@unboxed] attribute must be added to external declaration
-argument type with layout bits32 for upstream compatibility.
+Warning 187 [incompatible-with-upstream]: "[@unboxed]" attribute must be added
+  to external declaration
+  argument type with layout bits32 for upstream compatibility.
 
 external f_2 : (int32# [@unboxed]) -> bool -> int = "foo" "bar"
 |}];;
@@ -276,7 +278,7 @@ external f_6 : (int32#[@untagged]) -> bool -> string  = "foo" "bar";;
 Line 1, characters 16-22:
 1 | external f_6 : (int32#[@untagged]) -> bool -> string  = "foo" "bar";;
                     ^^^^^^
-Error: Don't know how to untag this type. Only "int" and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
@@ -285,7 +287,7 @@ external f_7 : string -> (int64#[@untagged])  = "foo" "bar";;
 Line 1, characters 26-32:
 1 | external f_7 : string -> (int64#[@untagged])  = "foo" "bar";;
                               ^^^^^^
-Error: Don't know how to untag this type. Only "int" and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
@@ -309,8 +311,9 @@ external f_1 : int -> bool -> int int64'# = "foo" "bar";;
 Line 1, characters 30-41:
 1 | external f_1 : int -> bool -> int int64'# = "foo" "bar";;
                                   ^^^^^^^^^^^
-Warning 187 [incompatible-with-upstream]: [@unboxed] attribute must be added to external declaration
-argument type with layout bits64 for upstream compatibility.
+Warning 187 [incompatible-with-upstream]: "[@unboxed]" attribute must be added
+  to external declaration
+  argument type with layout bits64 for upstream compatibility.
 
 external f_1 : int -> bool -> (int int64'# [@unboxed]) = "foo" "bar"
 |}];;
@@ -320,8 +323,9 @@ external f_2 : int32'# -> bool -> int = "foo" "bar";;
 Line 1, characters 15-22:
 1 | external f_2 : int32'# -> bool -> int = "foo" "bar";;
                    ^^^^^^^
-Warning 187 [incompatible-with-upstream]: [@unboxed] attribute must be added to external declaration
-argument type with layout bits32 for upstream compatibility.
+Warning 187 [incompatible-with-upstream]: "[@unboxed]" attribute must be added
+  to external declaration
+  argument type with layout bits32 for upstream compatibility.
 
 external f_2 : (int32'# [@unboxed]) -> bool -> int = "foo" "bar"
 |}];;
@@ -356,7 +360,7 @@ external f_6 : (int32'[@untagged]) -> bool -> string  = "foo" "bar";;
 Line 1, characters 16-22:
 1 | external f_6 : (int32'[@untagged]) -> bool -> string  = "foo" "bar";;
                     ^^^^^^
-Error: Don't know how to untag this type. Only "int" and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
@@ -365,7 +369,7 @@ external f_7 : string -> (int64# int64'#[@untagged])  = "foo" "bar";;
 Line 1, characters 26-40:
 1 | external f_7 : string -> (int64# int64'#[@untagged])  = "foo" "bar";;
                               ^^^^^^^^^^^^^^
-Error: Don't know how to untag this type. Only "int" and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
@@ -411,14 +415,16 @@ module M : sig type t : float64 end
 Line 7, characters 15-18:
 7 | external f_1 : M.t -> M.t = "%identity";;
                    ^^^
-Warning 187 [incompatible-with-upstream]: [@unboxed] attribute must be added to external declaration
-argument type with layout float64 for upstream compatibility.
+Warning 187 [incompatible-with-upstream]: "[@unboxed]" attribute must be added
+  to external declaration
+  argument type with layout float64 for upstream compatibility.
 
 Line 7, characters 22-25:
 7 | external f_1 : M.t -> M.t = "%identity";;
                           ^^^
-Warning 187 [incompatible-with-upstream]: [@unboxed] attribute must be added to external declaration
-argument type with layout float64 for upstream compatibility.
+Warning 187 [incompatible-with-upstream]: "[@unboxed]" attribute must be added
+  to external declaration
+  argument type with layout float64 for upstream compatibility.
 
 external f_1 : M.t -> M.t = "%identity" [@@unboxed]
 |}];;
@@ -429,17 +435,17 @@ Line 1, characters 15-18:
 1 | external f_2 : M.t -> M.t = "%identity" [@@unboxed];;
                    ^^^
 Warning 187 [incompatible-with-upstream]: External declaration here is not upstream compatible.
-The only types with non-value layouts allowed are float#,
-int32#, int64#, and nativeint#. Unknown type with layout
-float64 encountered.
+  The only types with non-value layouts allowed are
+  float#, int32#, int64#, and nativeint#. Unknown type with layout
+  float64 encountered.
 
 Line 1, characters 22-25:
 1 | external f_2 : M.t -> M.t = "%identity" [@@unboxed];;
                           ^^^
 Warning 187 [incompatible-with-upstream]: External declaration here is not upstream compatible.
-The only types with non-value layouts allowed are float#,
-int32#, int64#, and nativeint#. Unknown type with layout
-float64 encountered.
+  The only types with non-value layouts allowed are
+  float#, int32#, int64#, and nativeint#. Unknown type with layout
+  float64 encountered.
 
 external f_2 : M.t -> M.t = "%identity" [@@unboxed]
 |}];;

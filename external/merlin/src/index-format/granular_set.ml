@@ -240,12 +240,7 @@ module Make (Ord : Set.OrderedType) = struct
     | Empty -> acc
     | Node { l; v; r; _ } -> fold f (f (fold f acc r) v) l
 
-  let rec elements_aux accu t =
-    match fetch t with
-    | Empty -> accu
-    | Node { l; v; r; _ } -> elements_aux (v :: elements_aux accu r) l
-
-  let elements s = elements_aux [] s
+  let elements s = fold (fun acc v -> v :: acc) [] s
 
   let try_join l v r =
     if

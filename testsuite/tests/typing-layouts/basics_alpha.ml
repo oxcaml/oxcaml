@@ -259,7 +259,7 @@ let not_helloworld = id_for_imms "hello world";;
 Line 1, characters 33-46:
 1 | let not_helloworld = id_for_imms "hello world";;
                                      ^^^^^^^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "'a imm_id" = "('a : immediate)"
        The layout of string is value non_float
          because it is the primitive type string.
@@ -406,7 +406,7 @@ let h5' (x : int) = Void5 x
 Line 1, characters 26-27:
 1 | let h5' (x : int) = Void5 x
                               ^
-Error: This expression has type "int" but an expression was expected of type
+Error: The value "x" has type "int" but an expression was expected of type
          "('a : void)"
        The layout of int is value non_pointer
          because it is the primitive type int.
@@ -621,7 +621,7 @@ end;;
 Line 7, characters 13-14:
 7 |     | V t -> t, 27
                  ^
-Error: This expression has type "void_unboxed_record"
+Error: The value "t" has type "void_unboxed_record"
        but an expression was expected of type "('a : value_or_null)"
        The layout of void_unboxed_record is void
          because of the definition of void_unboxed_record at line 12, characters 0-60.
@@ -704,8 +704,8 @@ end;;
 Line 5, characters 11-23:
 5 |   match 3, X.vr.vr_void with
                ^^^^^^^^^^^^
-Error: This expression has type "t_void" but an expression was expected of type
-         "('a : value_or_null)"
+Error: The field access "X.vr.vr_void" has type "t_void"
+       but an expression was expected of type "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
        But the layout of t_void must be a value layout
@@ -828,7 +828,7 @@ end;;
 Line 2, characters 17-30:
 2 |   let foo x = VV (x # getvoid)
                      ^^^^^^^^^^^^^
-Error: This expression has type "('a : value)"
+Error: The method call "x#getvoid" has type "('a : value)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
@@ -1044,7 +1044,7 @@ let x13 (VV v) = lazy v;;
 Line 1, characters 22-23:
 1 | let x13 (VV v) = lazy v;;
                           ^
-Error: This expression has type "t_void" but an expression was expected of type
+Error: The value "v" has type "t_void" but an expression was expected of type
          "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
@@ -1059,7 +1059,7 @@ let x13 v =
 Line 3, characters 17-18:
 3 |   | lazy v -> VV v
                      ^
-Error: This expression has type "('a : value)"
+Error: The value "v" has type "('a : value)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
@@ -1086,7 +1086,7 @@ let x13 v =
 Line 3, characters 17-18:
 3 |   | Some v -> VV v
                      ^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "v" has type "('a : value_or_null)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
@@ -1113,7 +1113,7 @@ let x13 v =
 Line 3, characters 14-15:
 3 |   | [v] -> VV v
                   ^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "v" has type "('a : value_or_null)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
@@ -1324,7 +1324,7 @@ let f (x : t_void) =
 Line 2, characters 16-17:
 2 |   let _g ?(x2 = x) () = () in
                     ^
-Error: This expression has type "t_void" but an expression was expected of type
+Error: The value "x" has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.
@@ -1630,7 +1630,7 @@ end
 Line 8, characters 27-28:
 8 |   let g (x : t_void) = M.f x
                                ^
-Error: This expression has type "t_void" but an expression was expected of type
+Error: The value "x" has type "t_void" but an expression was expected of type
          "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.

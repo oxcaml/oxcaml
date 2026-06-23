@@ -21,14 +21,14 @@ apply ccall noalloc
       cont k3 push(k2)
         where k3 =
           (cont k3 (x)
-             where rec k3 (r_290_unboxed0 : imm tagged) =
-               let prim = %int_comp.lt (r_290_unboxed0, 42) in
+             where rec k3 (r_294_unboxed0 : imm tagged) =
+               let prim = %int_comp.lt (r_294_unboxed0, 42) in
                (switch prim
                   | 0 -> k pop(k2) (0)
                   | 1 -> k4
                   where k4 =
-                    (apply g (r_290_unboxed0) -> k6 * k2
-                       where k6 (param : imm tagged) =
+                    (apply g (r_294_unboxed0) -> k6 * k2
+                       where k6 (param : [ 0 |1 ]) =
                          let unboxed_field = %untag_imm (param) in
                          cont k5 (unboxed_field)
                        where k5 (unboxed_field : imm) =
@@ -40,7 +40,7 @@ apply ccall noalloc
                                pop(regular k2)
                                ($camlLocal_exns_to_jumps__Exit209)
                        where k4 =
-                         let int_add = %int_barith.add (r_290_unboxed0, 1) in
+                         let int_add = %int_barith.add (r_294_unboxed0, 1) in
                          cont k3 (int_add))))
         where k2 exn (`exn` : val) =
           let `unit` = %end_try_region (try_region) in
@@ -59,8 +59,8 @@ apply ccall noalloc
       let try_region = %begin_try_region () in
       let try_ghost_region = %begin_try_ghost_region () in
       cont k3 (x)
-        where rec k3 (r_295_unboxed0 : imm tagged) =
-          let prim = %int_comp.lt (r_295_unboxed0, 42) in
+        where rec k3 (r_299_unboxed0 : imm tagged) =
+          let prim = %int_comp.lt (r_299_unboxed0, 42) in
           (switch prim
              | 0 -> k (0)
              | 1 -> k4
@@ -69,28 +69,28 @@ apply ccall noalloc
                  let try_ghost_region_1 = %begin_try_ghost_region () in
                  cont k7 push(k6)
                    where k7 =
-                     let r_295_unboxed0_1 = r_295_unboxed0 in
-                     (apply g (r_295_unboxed0) -> k8 * k6
-                        where k8 (param : imm tagged) =
+                     let r_299_unboxed0_1 = r_299_unboxed0 in
+                     (apply g (r_299_unboxed0) -> k8 * k6
+                        where k8 (param : [ 0 |1 ]) =
                           let unboxed_field = %untag_imm (param) in
                           cont k7 (unboxed_field)
                         where k7 (unboxed_field : imm) =
                           let naked_immediate = unboxed_field in
                           cont k5 pop(k6) (naked_immediate))
                    where k6 exn (`exn` : val) =
-                     let r_295_unboxed0_1 = r_295_unboxed0 in
+                     let r_299_unboxed0_1 = r_299_unboxed0 in
                      let `unit` = %end_try_region (try_region_1) in
                      let unit_1 = %end_try_ghost_region (try_ghost_region_1)
                      in
                      cont k5 (0i)
                    where k5 (naked_immediate : imm) =
-                     let r_295_unboxed0_1 = r_295_unboxed0 in
+                     let r_299_unboxed0_1 = r_299_unboxed0 in
                      switch naked_immediate
                        | 0 -> k4
                        | 1 -> k2)
                   where k4 =
-                    let r_295_unboxed0_1 = r_295_unboxed0 in
-                    let int_add = %int_barith.add (r_295_unboxed0_1, 1) in
+                    let r_299_unboxed0_1 = r_299_unboxed0 in
+                    let int_add = %int_barith.add (r_299_unboxed0_1, 1) in
                     cont k3 (int_add)))
         where k2 =
           let `unit` = %end_try_region (try_region) in
@@ -106,8 +106,8 @@ apply ccall noalloc
       let try_region = %begin_try_region () in
       let try_ghost_region = %begin_try_ghost_region () in
       cont k3 (x)
-        where rec k3 (r_300_unboxed0 : imm tagged) =
-          let prim = %int_comp.lt (r_300_unboxed0, 42) in
+        where rec k3 (r_304_unboxed0 : imm tagged) =
+          let prim = %int_comp.lt (r_304_unboxed0, 42) in
           (switch prim
              | 0 -> k (0)
              | 1 -> k4
@@ -116,28 +116,28 @@ apply ccall noalloc
                  let try_ghost_region_1 = %begin_try_ghost_region () in
                  cont k7 push(k6)
                    where k7 =
-                     let r_300_unboxed0_1 = r_300_unboxed0 in
-                     (apply g (r_300_unboxed0) -> k8 * k6
-                        where k8 (param : imm tagged) =
+                     let r_304_unboxed0_1 = r_304_unboxed0 in
+                     (apply g (r_304_unboxed0) -> k8 * k6
+                        where k8 (param : [ 0 |1 ]) =
                           let unboxed_field = %untag_imm (param) in
                           cont k7 (unboxed_field)
                         where k7 (unboxed_field : imm) =
                           let naked_immediate = unboxed_field in
                           cont k5 pop(k6) (naked_immediate))
                    where k6 exn (`exn` : val) =
-                     let r_300_unboxed0_1 = r_300_unboxed0 in
+                     let r_304_unboxed0_1 = r_304_unboxed0 in
                      let `unit` = %end_try_region (try_region_1) in
                      let unit_1 = %end_try_ghost_region (try_ghost_region_1)
                      in
                      cont k5 (0i)
                    where k5 (naked_immediate : imm) =
-                     let r_300_unboxed0_1 = r_300_unboxed0 in
+                     let r_304_unboxed0_1 = r_304_unboxed0 in
                      switch naked_immediate
                        | 0 -> k4
                        | 1 -> k2)
                   where k4 =
-                    let r_300_unboxed0_1 = r_300_unboxed0 in
-                    let int_add = %int_barith.add (r_300_unboxed0_1, 1) in
+                    let r_304_unboxed0_1 = r_304_unboxed0 in
+                    let int_add = %int_barith.add (r_304_unboxed0_1, 1) in
                     cont k3 (int_add)))
         where k2 =
           let `unit` = %end_try_region (try_region) in
@@ -160,8 +160,8 @@ apply ccall noalloc
            let try_region = %begin_try_region () in
            let try_ghost_region = %begin_try_ghost_region () in
            cont k3 (x)
-             where rec k3 (r_306_unboxed0 : imm tagged) =
-               let prim = %int_comp.lt (r_306_unboxed0, 42) in
+             where rec k3 (r_310_unboxed0 : imm tagged) =
+               let prim = %int_comp.lt (r_310_unboxed0, 42) in
                (switch prim
                   | 0 -> k (0)
                   | 1 -> k4
@@ -170,37 +170,37 @@ apply ccall noalloc
                       let try_ghost_region_1 = %begin_try_ghost_region () in
                       cont k7 push(k6)
                         where k7 =
-                          let r_306_unboxed0_1 = r_306_unboxed0 in
-                          (apply g (r_306_unboxed0) -> k8 * k6
-                             where k8 (param : imm tagged) =
+                          let r_310_unboxed0_1 = r_310_unboxed0 in
+                          (apply g (r_310_unboxed0) -> k8 * k6
+                             where k8 (param : [ 0 |1 ]) =
                                let unboxed_field = %untag_imm (param) in
                                cont k7 (unboxed_field)
                              where k7 (unboxed_field : imm) =
                                let naked_immediate = unboxed_field in
                                cont k5 pop(k6) (naked_immediate))
                         where k6 exn (`exn` : val) =
-                          let r_306_unboxed0_1 = r_306_unboxed0 in
+                          let r_310_unboxed0_1 = r_310_unboxed0 in
                           let `unit` = %end_try_region (try_region_1) in
                           let unit_1 =
                             %end_try_ghost_region (try_ghost_region_1)
                           in
                           cont k5 (0i)
                         where k5 (naked_immediate : imm) =
-                          let r_306_unboxed0_1 = r_306_unboxed0 in
+                          let r_310_unboxed0_1 = r_310_unboxed0 in
                           (switch naked_immediate
                              | 0 -> k4
                              | 1 -> k5
                              where k5 =
                                let int_add =
-                                 %int_barith.add (r_306_unboxed0_1, 3)
+                                 %int_barith.add (r_310_unboxed0_1, 3)
                                in
                                let int_add_1 =
-                                 %int_barith.add (r_306_unboxed0_1, 2)
+                                 %int_barith.add (r_310_unboxed0_1, 2)
                                in
                                cont k2 (int_add_1, int_add)))
                        where k4 =
-                         let r_306_unboxed0_1 = r_306_unboxed0 in
-                         let int_add = %int_barith.add (r_306_unboxed0_1, 1)
+                         let r_310_unboxed0_1 = r_310_unboxed0 in
+                         let int_add = %int_barith.add (r_310_unboxed0_1, 1)
                          in
                          cont k3 (int_add)))
              where k2 (int_add, int_add_1) =

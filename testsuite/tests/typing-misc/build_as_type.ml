@@ -75,8 +75,7 @@ Lines 5-7, characters 4-7:
 6 |     | `A -> ()
 7 |     end
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-`B
+  Here is an example of a case that is not matched: "`B"
 
 val f : t -> unit = <fun>
 |}]
@@ -132,8 +131,7 @@ Lines 5-7, characters 4-7:
 6 |     | `A -> ()
 7 |     end
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-`B
+  Here is an example of a case that is not matched: "`B"
 
 val f : t -> unit = <fun>
 |}]
@@ -153,8 +151,7 @@ Lines 5-7, characters 4-7:
 6 |     | `A -> ()
 7 |     end
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-`B
+  Here is an example of a case that is not matched: "`B"
 
 val f : t -> unit = <fun>
 |}]

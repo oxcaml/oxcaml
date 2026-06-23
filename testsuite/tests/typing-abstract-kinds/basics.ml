@@ -1262,8 +1262,7 @@ Lines 13-14, characters 24-19:
 13 | ........................match x with
 14 |   | M1.Int -> "int"
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-K
+  Here is an example of a case that is not matched: "K"
 
 val f1 : int M1.t -> string = <fun>
 |}]
@@ -1769,4 +1768,94 @@ Error: This type "Branch_kinds_extra.t2'" should be an instance of type
        But the kind of Branch_kinds_extra.t2' must be a subkind of
            Branch_kinds_extra.k1
          because of the definition of branch_needs_k1_extra at line 1, characters 0-55.
+|}]
+
+(***************************************************)
+(* Test: Include and open bring kinds into scope *)
+
+module K = struct
+  kind_ k_open = any
+end
+[%%expect{|
+module K : sig kind_ k_open = any end
+|}]
+
+module Include_abstract_kind = struct
+  include K
+  type ('a : k_open) t
+end
+[%%expect{|
+module Include_abstract_kind : sig kind_ k_open = any type ('a : any) t end
+|}]
+
+module Open_abstract_kind_test = struct
+  open K
+  type ('a : k_open) t
+end
+[%%expect{|
+module Open_abstract_kind_test : sig type ('a : any) t end
+|}]
+
+(*******************************************)
+(* Test: Regression test for bug in nondep *)
+
+(* Multiple applications of a functor whose result mentions the parameter's
+   abstract kind shouldn't affect each other. *)
+
+type ('a : any) id : value
+
+module F (X : sig kind_ ka end) : sig
+  val mk : ('a : X.ka). 'a id -> 'a id
+end = struct
+  let mk x = x
+end
+[%%expect{|
+type ('a : any) id
+module F :
+  functor (X : sig kind_ ka end) ->
+    sig val mk : ('a : X.ka). 'a id -> 'a id end
+|}]
+
+module _ = F (struct kind_ ka = value_or_null end)
+module M = F (struct kind_ ka = any end)
+[%%expect{|
+module M : sig val mk : ('a : any). 'a id -> 'a id end
+|}]
+
+let foo : ('a : any). 'a id -> 'a id = M.mk
+[%%expect{|
+val foo : ('a : any). 'a id -> 'a id = <fun>
+|}]
+
+(************************************************************)
+(* Test: Sharing a mutable cell across functor applications *)
+
+let cell = ref (None : (_ : any) id option)
+
+(* When G is applied to an anonymous argument, nondep will copy the weak type
+   variable in its output, but this test confirms that the subsequent inclusion
+   check unifies it back with the original. *)
+module G (X : sig kind_ ka end) = struct
+  let c = (cell : (_ : X.ka) id option ref)
+end
+
+module A = G (struct kind_ ka = value end)
+module B = G (struct kind_ ka = value end)
+[%%expect{|
+val cell : '_weak1 id option ref = {contents = None}
+module G :
+  functor (X : sig kind_ ka end) -> sig val c : '_weak1 id option ref end
+module A : sig val c : '_weak1 id option ref end
+module B : sig val c : '_weak1 id option ref end
+|}]
+
+let () = A.c := (None : int id option)
+let () = B.c := (None : bool id option)
+[%%expect{|
+Line 2, characters 16-39:
+2 | let () = B.c := (None : bool id option)
+                    ^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "bool id option"
+       but an expression was expected of type "int id option"
+       Type "bool" is not compatible with type "int"
 |}]

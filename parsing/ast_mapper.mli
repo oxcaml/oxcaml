@@ -105,6 +105,7 @@ type mapper = {
                            -> module_type_declaration;
   open_declaration: mapper -> open_declaration -> open_declaration;
   open_description: mapper -> open_description -> open_description;
+  package_type: mapper -> package_type -> package_type;
   pat: mapper -> pattern -> pattern;
   payload: mapper -> payload -> payload;
   signature: mapper -> signature -> signature;
@@ -138,7 +139,7 @@ val tool_name: unit -> string
     ["ocaml"], ...  Some global variables that reflect command-line
     options are automatically synchronized between the calling tool
     and the ppx preprocessor: {!Clflags.include_dirs},
-    {!Clflags.hidden_include_dirs}, {!Load_path}, {!Clflags.open_modules},
+    {!Clflags.hidden_include_dirs}, {!Load_path}, {!Clflags.open_args},
     {!Clflags.for_package}, {!Clflags.debug}. *)
 
 

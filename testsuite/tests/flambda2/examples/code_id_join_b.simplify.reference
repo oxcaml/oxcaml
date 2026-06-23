@@ -5,8 +5,8 @@ in
 let $camlCode_id_join_b__const_block338 =
   Block 0 (0, $camlCode_id_join_b__const_block336)
 in
-cont self ($camlCode_id_join_b__const_block338)
-  where rec self (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+cont `self` ($camlCode_id_join_b__const_block338)
+  where rec `self` (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
     let prim = %is_int (param) in
     (switch prim
        | 0 -> k1
@@ -34,7 +34,7 @@ cont self ($camlCode_id_join_b__const_block338)
                    cont k1
                  where k1 =
                    let Pfield_1 = %block_load.[`1`] (param) in
-                   cont self (Pfield_1))))
+                   cont `self` (Pfield_1))))
   where k =
     let $camlCode_id_join_b = Block 0 () in
     cont done ($camlCode_id_join_b)

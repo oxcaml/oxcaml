@@ -1,4 +1,4 @@
 File "parsing_idx_bad_ident.ml", line 8, characters 13-14:
 8 | let _ = (.foo(0))
                  ^
-Error: Syntax error: A parenthesis here can only follow ".idx_imm" or ".idx_mut".
+Error: Syntax error: A parenthesis here can only follow .idx_imm or .idx_mut.

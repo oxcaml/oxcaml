@@ -170,28 +170,30 @@ let iter_on_occurrences
   let path_in_type typ name =
     match Types.get_desc typ with
     | Tconstr (type_path, _, _) ->
-      Some (Path.Pdot (type_path,  name))
+      Some (Path.Pextra_ty (type_path, Pcstr_ty name))
     | _ -> None
   in
   let add_constructor_description env lid =
     function
-    | { Types.cstr_tag = Extension path; _ } ->
+    | { Data_types.cstr_tag = Extension path; _ } ->
         f ~namespace:Extension_constructor env path lid
-    | { Types.cstr_uid = Predef name; _} ->
+    | { Data_types.cstr_uid = Predef name; _} ->
         let id = List.assoc name Predef.builtin_idents in
         f ~namespace:Constructor env (Pident id) lid
-    | { Types.cstr_res; cstr_name; _ } ->
+    | { Data_types.cstr_res; cstr_name; _ } ->
         let path = path_in_type cstr_res cstr_name in
         Option.iter ~f:(fun path -> f ~namespace:Constructor env path lid) path
   in
-  let add_label ~namespace env lid { Types.lbl_name; lbl_res; _ } =
+  let add_label ~namespace env lid { Data_types.lbl_name; lbl_res; _ } =
     let path = path_in_type lbl_res lbl_name in
     Option.iter ~f:(fun path -> f ~namespace env path lid) path
   in
   let iter_field_exps ~namespace exp_env fields =
     Array.iter (fun (label_descr, _, record_label_definition) ->
       match record_label_definition with
-      | Overridden ({ Location.txt; loc}, {exp_loc; _})
+      | Overridden (
+          { Location.txt; loc},
+          {exp_loc; _})
           when not exp_loc.loc_ghost
             && loc.loc_start = exp_loc.loc_start
             && loc.loc_end = exp_loc.loc_end ->
@@ -294,8 +296,8 @@ let iter_on_occurrences
       (match ctyp_desc with
       | Ttyp_constr (path, lid, _ctyps) ->
           f ~namespace:Type ctyp_env path lid
-      | Ttyp_package {pack_path; pack_txt} ->
-          f ~namespace:Module_type ctyp_env pack_path pack_txt
+      | Ttyp_package {tpt_path; tpt_txt} ->
+          f ~namespace:Module_type ctyp_env tpt_path tpt_txt
       | Ttyp_class (path, lid, _typs) ->
           (* Deprecated syntax to extend a polymorphic variant *)
           f ~namespace:Type ctyp_env path lid
@@ -318,9 +320,9 @@ let iter_on_occurrences
         iter_field_pats ~namespace:Label pat_env fields
       | Tpat_record_unboxed_product (fields, _, _, _) ->
         iter_field_pats ~namespace:Unboxed_label pat_env fields
-      | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _
+      | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ | Tpat_tuple _
       | Tpat_fun_layout _
-      | Tpat_unboxed_unit | Tpat_unboxed_bool _ | Tpat_tuple _
+      | Tpat_unboxed_unit | Tpat_unboxed_bool _
       | Tpat_unboxed_tuple _ | Tpat_variant _ | Tpat_array _ | Tpat_lazy _
       | Tpat_value _ | Tpat_exception _ | Tpat_or _ -> ());
       List.iter ~f:(fun (pat_extra, _, _) ->
@@ -422,32 +424,47 @@ let index_occurrences binary_annots =
   let index : (Longident.t Location.loc * Shape_reduce.result) list ref =
     ref []
   in
-  let f ~namespace env path (lid : _ Location.loc) =
-    if not (Location.is_none lid.loc) then
+  let f ~namespace env path lid =
+    (* Unlike upstream (which uses [not loc_ghost]), we only filter the [_none_]
+       sentinel location, to avoid filtering useful ghost locations;
+       see #3137. *)
+    let not_none { Location.loc; _ } = not (Location.is_none loc) in
+    let reduce_and_store ~namespace lid path = if not_none lid then
       match Env.shape_of_path ~namespace env path with
       | exception Not_found -> ()
       | { uid = Some (Predef _); _ } -> ()
       | path_shape ->
         let result = Shape_reduce.local_reduce_for_uid env path_shape in
         index := (lid, result) :: !index
+    in
+    (* Shape reduction can be expensive, but the persistent memoization tables
+       should make these successive reductions fast. *)
+    let rec index_components namespace lid path =
+      let module_ = Shape.Sig_component_kind.Module in
+      let scraped_path = Path.scrape_extra_ty path in
+      match lid.Location.txt, scraped_path with
+      | Longident.Ldot (lid', _), Path.Pdot (path', _) ->
+        reduce_and_store ~namespace lid path;
+        index_components module_ lid' path'
+      | Longident.Lapply (lid', lid''), Path.Papply (path', path'') ->
+        index_components module_ lid'' path'';
+        index_components module_ lid' path'
+      | Longident.Lident _, _ ->
+        reduce_and_store ~namespace lid path;
+      | _, _ -> ()
+    in
+    index_components namespace lid path
   in
   iter_on_annots (iter_on_occurrences ~f) binary_annots;
   Array.of_list !index
 
 exception Error of error
 
-let input_cmt ic : cmt_infos =
-  (* CR ocaml 5 compressed-marshal mshinwell:
-     (Compression.input_value ic : cmt_infos)
-  *)
-  Marshal.from_channel ic
+let input_cmt ic = (Compression.input_value ic : cmt_infos)
 
 let output_cmt oc cmt =
-  ignore (oc, cmt)
-  (*
   output_string oc Config.cmt_magic_number;
-  Marshal.(to_channel oc (cmt : cmt_infos) [Compression])
-  *)
+  Compression.output_value oc (cmt : cmt_infos)
 
 let read filename =
 (*  Printf.fprintf stderr "Cmt_format.read %s\n%!" filename; *)
@@ -539,12 +556,16 @@ let save_cmt target cu binary_annots initial_env cmi shape =
            Array.sort compare_imports imports;
            imports
          in
+         let cmt_args =
+           let cmt_args = Array.copy Sys.argv in
+           cmt_args.(0) <- Location.rewrite_absolute_path Sys.argv.(0);
+           cmt_args in
          let cmt = {
            cmt_modname = cu;
            cmt_annots;
            cmt_declaration_dependencies = !uids_deps;
            cmt_comments = [];
-           cmt_args = Sys.argv;
+           cmt_args;
            cmt_sourcefile = sourcefile;
            cmt_builddir = Location.rewrite_absolute_path (Sys.getcwd ());
            cmt_loadpath = Load_path.get_paths ();

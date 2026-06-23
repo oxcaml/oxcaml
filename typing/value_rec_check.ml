@@ -158,7 +158,7 @@ let classify_expression : Typedtree.expression -> sd =
         (* Note on module presence:
            For absent modules (i.e. module aliases), the module being bound
            does not have a physical representation, but its size can still be
-           derived from the alias itself, so we can re-use the same code as
+           derived from the alias itself, so we can reuse the same code as
            for modules that are present. *)
         let size = classify_module_expression env mexp in
         let env = Ident.add mid size env in
@@ -187,17 +187,29 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_record _ ->
         Static
 
+    | Texp_variant _
+    | Texp_tuple _
+    | Texp_atomic_loc _
+    | Texp_extension_constructor _
+    | Texp_constant _ ->
+        Static
+
+    | Texp_for _
+    | Texp_setfield _
+    | Texp_while _
+    | Texp_setinstvar _ ->
+        (* Unit-returning expressions *)
+        Static
+
+    | Texp_unreachable ->
+        Static
+
     | Texp_record_unboxed_product { representation = Record_unboxed_product;
                                     fields = [| _, _, Overridden (_,e) |] } ->
         classify_expression env e
     | Texp_record_unboxed_product _ ->
         Dynamic
 
-    | Texp_variant _
-    | Texp_tuple _
-    | Texp_atomic_loc _
-    | Texp_extension_constructor _
-    | Texp_constant _
     | Texp_unboxed_unit
     | Texp_unboxed_bool _
     | Texp_src_pos ->
@@ -210,18 +222,8 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_hole _ ->
       Dynamic (* Disallowed for now *)
 
-    | Texp_for _
-    | Texp_setfield _
-    | Texp_while _
-    | Texp_setinstvar _ ->
-        (* Unit-returning expressions *)
-        Static
-
     | Texp_mutvar _
     | Texp_setmutvar _ ->
-        Static
-
-    | Texp_unreachable ->
         Static
 
     | Texp_probe _
@@ -356,6 +358,8 @@ let classify_expression : Typedtree.expression -> sd =
             Misc.fatal_error "letrec: primitive coercion on a module"
         | Tcoerce_alias _ ->
             Misc.fatal_error "letrec: alias coercion on a module"
+        | Tcoerce_invalid ->
+            Misc.fatal_error "letrec: invalid coercion on a module"
         end
     | Tmod_unpack (e, _) ->
         classify_expression env e
@@ -636,6 +640,8 @@ let array_mode exp =
   | Lambda.Punboxedvectorarray _
   | Lambda.Pgcscannableproductarray _ | Lambda.Pgcignorableproductarray _ ->
     Dereference
+  | Lambda.Punspecializedarray ->
+    Misc.fatal_error "Value_rec_check.array_mode: Punspecializedarray"
 
 (* Expression judgment:
      G |- e : m
@@ -665,8 +671,8 @@ let rec expression : Typedtree.expression -> term_judg =
       value_bindings Nonrecursive [binding] >> expression body
     | Texp_letmodule (x, _, _, mexp, e) ->
       module_binding (x, mexp) >> expression e
-    | Texp_match (e, _, cases, _) ->
-      (*
+    | Texp_match (e, _, cases, eff_cases, _) ->
+      (* TODO: update comment below for eff_cases
          (Gi; mi |- pi -> ei : m)^i
          G |- e : sum(mi)^i
          ----------------------------------------------
@@ -676,7 +682,11 @@ let rec expression : Typedtree.expression -> term_judg =
         let pat_envs, pat_modes =
           List.split (List.map (fun c -> case c mode) cases) in
         let env_e = expression e (List.fold_left Mode.join Ignore pat_modes) in
-        Env.join_list (env_e :: pat_envs))
+        let eff_envs, eff_modes =
+          List.split (List.map (fun c -> case c mode) eff_cases) in
+        let eff_e = expression e (List.fold_left Mode.join Ignore eff_modes) in
+        Env.join_list
+          ((Env.join_list (env_e :: pat_envs)) :: (eff_e :: eff_envs)))
     | Texp_for tf ->
       (*
         G1 |- low: m[Dereference]
@@ -823,7 +833,7 @@ let rec expression : Typedtree.expression -> term_judg =
             Misc.fatal_error
               "value_rec_check: unexpected unknown representation"
         in
-        let field (label, _sort, field_def) =
+        let field ((label : Data_types.label_description), _sort, field_def) =
           let env =
             match field_def with
             | Kept _ -> empty
@@ -969,7 +979,7 @@ let rec expression : Typedtree.expression -> term_judg =
       modexp mexp
     | Texp_object (clsstrct, _) ->
       class_structure clsstrct
-    | Texp_try (e, cases) ->
+    | Texp_try (e, cases, eff_cases) ->
       (*
         G |- e: m      (Gi; _ |- pi -> ei : m)^i
         --------------------------------------------
@@ -983,6 +993,7 @@ let rec expression : Typedtree.expression -> term_judg =
       join [
         expression e;
         list case_env cases;
+        list case_env eff_cases;
       ]
     | Texp_override (pth, fields) ->
       (*
@@ -1209,6 +1220,8 @@ and modexp : Typedtree.module_expr -> term_judg =
           (* Alias coercions ignore their arguments, but they evaluate
              their alias module 'pth' under another coercion. *)
           coercion coe (fun m -> path pth << m)
+        | Tcoerce_invalid ->
+          Misc.fatal_error "Value_rec_check.modexp: invalid coercion"
       in
       coercion coe (fun m -> modexp mexp << m)
     | Tmod_unpack (e, _) ->

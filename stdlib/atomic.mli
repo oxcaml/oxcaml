@@ -120,6 +120,12 @@ module Loc : sig
       see the documentation above for more information. *)
   type ('a : value_or_null) t : sync_data with 'a = 'a atomic_loc
 
+  (* exposing 'external' primitives directly helps reasoning about
+     performance: it guarantees that all versions of the compiler
+     (including bytecode) remove the pair construction on direct
+     calls:
+       Atomic.Loc.foo [%atomic.loc r.x] ...  *)
+
   external get : ('a : value_or_null). 'a t @ local -> 'a = "%atomic_load_loc"
 
   external get_contended : ('a : value_or_null).

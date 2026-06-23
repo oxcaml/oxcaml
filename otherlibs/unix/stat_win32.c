@@ -75,8 +75,8 @@ static const int file_kind_table[] = {
 static double stat_timestamp(__time64_t tm)
 {
   /* Split the timestamp into seconds and remaining 100ns units */
-  __int64 sec = tm / 10000000;  /* 10^7 */
-  int n100sec = tm % 10000000;
+  __int64 sec = tm / (NSEC_PER_SEC / 100);  /* 10^7 */
+  int n100sec = tm % (NSEC_PER_SEC / 100);
   /* The conversion of sec to FP is exact for the foreseeable future.
      (It starts rounding when sec > 2^53, i.e. in 285 million years.) */
   double s = (double) sec;
@@ -166,7 +166,6 @@ static int safe_do_stat(int do_lstat, int use_64, wchar_t* path, HANDLE fstat, _
 {
   BY_HANDLE_FILE_INFORMATION info;
   wchar_t* ptr;
-  char c;
   HANDLE h;
   unsigned short mode;
   int is_symlink = 0;
@@ -391,7 +390,6 @@ CAMLprim value caml_unix_lstat_64(value path)
 
 static value do_fstat(value handle, int use_64)
 {
-  int ret;
   struct _stat64 buf;
   __int64 st_ino;
   HANDLE h;

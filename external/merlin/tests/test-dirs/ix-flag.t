@@ -26,7 +26,7 @@ path.
       },
       "end": {
         "line": 1,
-        "col": 15
+        "col": 11
       },
       "type": "typer",
       "sub": [],

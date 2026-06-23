@@ -33,6 +33,14 @@ let is_right = function
 | Left _ -> false
 | Right _ -> true
 
+let get_left = function
+| Left v -> v
+| _ -> invalid_arg "Either.t is Right _"
+
+let get_right = function
+| Right v -> v
+| _ -> invalid_arg "Either.t is Left _"
+
 let find_left = function
 | Left v -> Some v
 | _ -> None
@@ -56,6 +64,10 @@ let map ~left ~right = function
 let fold ~left ~right = function
 | Left v -> left v
 | Right v -> right v
+
+let retract = function
+| Left v -> v
+| Right v -> v
 
 let iter = fold
 

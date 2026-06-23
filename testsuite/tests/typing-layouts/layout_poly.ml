@@ -77,7 +77,7 @@ end
 Line 4, characters 63-68:
 4 |   let () = Format.printf "%f %s\n" (F.to_float (id' #1.)) (id' "abc")
                                                                    ^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : float64)"
        The layout of string is value non_float
          because it is the primitive type string.
@@ -303,7 +303,7 @@ let () = Format.printf "%s\n" (S.id "abc")
 Line 1, characters 36-41:
 1 | let () = Format.printf "%s\n" (S.id "abc")
                                         ^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : float64)"
        The layout of string is value non_float
          because it is the primitive type string.
@@ -570,7 +570,7 @@ external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity" [@@untagged]
 Line 1, characters 40-42:
 1 | external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity" [@@untagged]
                                             ^^
-Error: Don't know how to untag this type. Only "int" and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}]
 
