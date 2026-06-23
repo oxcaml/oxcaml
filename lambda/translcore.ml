@@ -662,7 +662,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                value kind for the poly variant hash? *)
             let makeblock =
               match cstr.cstr_shape with
-              | Some Constructor_uniform_value ->
+              | Constructor_uniform_value ->
                   let shape =
                     List.map (fun (e, sort) ->
                         Lambda.must_be_value (layout_exp sort e))
@@ -672,7 +672,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                              Lambda.block_shape_of_value_kinds
                                (Some (Lambda.generic_value :: shape)),
                              alloc_mode)
-              | Some (Constructor_mixed shape) ->
+              | Constructor_mixed shape ->
                   (* CR layouts v5: once all-void records are allowed, handle
                      constructors with all-void inline records, which are stored
                      as immediates *)
@@ -685,7 +685,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                     Array.append [| Lambda.Value Lambda.generic_value |] shape
                   in
                   Pmakeblock(0, Immutable, Shape shape, alloc_mode)
-              | None | Some Constructor_variable ->
+              | Constructor_variable ->
                   fatal_error "Unexpected indeterminate representation in \
                                extensible variant"
             in

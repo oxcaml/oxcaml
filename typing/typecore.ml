@@ -3055,7 +3055,7 @@ type unrepresentable_arg =
 let representation_for_tuple_constructor env constr ty_args ~loc ~types
       ~containing_type ~why : _ Result.t =
   match constr.cstr_shape with
-  | Some shape ->
+  | (Constructor_uniform_value | Constructor_mixed _) as shape ->
       begin match
         Misc.Stdlib.List.map_option
           (fun arg -> arg.ca_sort |> Option.map Jkind.Sort.of_const)
@@ -3064,7 +3064,7 @@ let representation_for_tuple_constructor env constr ty_args ~loc ~types
       | Some sorts -> Ok (shape, sorts)
       | None -> Misc.fatal_error "representable constructor missing a sort"
       end
-  | None ->
+  | Constructor_variable ->
       begin match
         Misc.Stdlib.List.mapi_result
           (fun _ (ty, loc) ->

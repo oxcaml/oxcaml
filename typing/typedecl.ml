@@ -3955,15 +3955,7 @@ let transl_extension_constructor ~scope env type_path type_params
               in
               Types.Cstr_record lbls
         in
-        let shape =
-          match cdescr.cstr_shape with
-          | Some shape -> shape
-          | None ->
-              Misc.fatal_errorf
-                "unexpected non-constant representation for ext ctor %a"
-                (Format_doc.compat Path.print) type_path
-        in
-        args, shape,
+        args, cdescr.cstr_shape,
         cdescr.cstr_constant, ret_type,
         Text_rebind(path, lid)
   in
