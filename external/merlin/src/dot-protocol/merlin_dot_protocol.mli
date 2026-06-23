@@ -76,12 +76,7 @@ module Directive : sig
   end
 
   module Raw : sig
-    type t =
-      [ Processed.acceptable_in_input
-      | `PKG of string list
-      | `FINDLIB of string
-      | `FINDLIB_PATH of string
-      | `FINDLIB_TOOLCHAIN of string ]
+    type t = Processed.acceptable_in_input
   end
 end
 
@@ -124,9 +119,9 @@ end) (Chan : sig
   type in_chan
   type out_chan
 
-  val read : in_chan -> (Csexp.t, string) result IO.t
+  val read : in_chan -> (Merlin_csexp.t, string) result IO.t
 
-  val write : out_chan -> Csexp.t -> unit IO.t
+  val write : out_chan -> Merlin_csexp.t -> unit IO.t
 end) :
   S
     with type 'a io = 'a IO.t

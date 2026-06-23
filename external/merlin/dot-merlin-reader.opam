@@ -14,7 +14,6 @@ depends: [
   "ocaml" {>= "5.4" }
   "dune" {>= "2.9.0"}
   "merlin-lib" {>= "5.0"}
-  "ocamlfind" {>= "1.6.0"}
 ]
 description:
   "Helper process: reads .merlin files and outputs the normalized content to

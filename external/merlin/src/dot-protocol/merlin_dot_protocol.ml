@@ -28,6 +28,7 @@
 
 open Merlin_utils.Std
 open Merlin_utils.Std.Result
+module Csexp = Merlin_csexp
 
 module Directive = struct
   type include_path =
@@ -63,12 +64,7 @@ module Directive = struct
   end
 
   module Raw = struct
-    type t =
-      [ Processed.acceptable_in_input
-      | `PKG of string list
-      | `FINDLIB of string
-      | `FINDLIB_PATH of string
-      | `FINDLIB_TOOLCHAIN of string ]
+    type t = Processed.acceptable_in_input
   end
 end
 

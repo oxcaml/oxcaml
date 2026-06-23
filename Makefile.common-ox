@@ -5,6 +5,7 @@
 ws_boot   = --root=. --workspace=duneconf/boot.ws
 ws_runstd = --root=. --workspace=duneconf/runtime_stdlib.ws
 ws_main   = --root=. --workspace=duneconf/main.ws
+ws_merlin = --root=. --workspace=duneconf/merlin_install.ws
 
 ifeq ($(coverage),yes)
   coverage_dune_flags=--instrument-with bisect_ppx
@@ -67,6 +68,26 @@ define dune_main_context
     $(ENV_VARS)))))
 endef
 
+# Workspace for building the Merlin that gets shipped in the install. Its
+# compiler is the freshly installed OxCaml compiler in _install so that Merlin
+# is built with OxCaml. This is analogous to how the main workspace uses the
+# bootstrapped compiler in _build/_bootinstall, except that here we also have
+# access to unix/str and the runtime headers that Merlin needs. Note that this
+# is a separate workspace from the boot one used by `make merlin-build` /
+# `make merlin-test`, which deliberately keep using the opam compiler.
+define dune_merlin_install_context
+(lang dune 2.8)
+(context (default
+  (name merlin_install)
+  (profile dev)
+  (paths
+    (PATH ("$(CURDIR)/_install/bin" :standard))
+    (OCAMLLIB ("$(CURDIR)/_install/lib/ocaml")))
+  (env (_
+    (flags (:standard -alert -unsafe_multidomain))
+    (env-vars ("OCAMLPARAM" ""))))))
+endef
+
 
 .DEFAULT_GOAL := compiler
 .PHONY: boot-compiler boot-runtest runtime-stdlib compiler runtest runtest-llvmize runtest-dwarf
@@ -84,7 +105,7 @@ boot-compiler: _build/_bootinstall
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) $(coverage_dune_flags) $(boot_targets)
 
 boot-runtest: boot-compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) runtest $(ws_boot) $(coverage_dune_flags) --force
+	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) $(coverage_dune_flags) --force $(runtest_targets)
 
 runtime-stdlib: boot-compiler
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_runstd) --only-package=ocaml_runtime_stdlib @install
@@ -141,12 +162,25 @@ minimize-stdlib: boot-minimizer boot-compiler
           $(ws_runstd) \
           --only-packages=ocaml_runtime_stdlib @install
 
+# Directories that should be excluded from the dune workspace
+inactive_dirs := $(if $(filter runtime4,$(RUNTIME_DIR)),runtime debugger,runtime4 debugger4)
+
+# We want to be able to build the @runtest dune alias, but exclude
+# external/merlin from that (since Merlin only builds in the boot workspace).
+# Dune doesn't offer a native way to do this, so instead we list all directories
+# and build @runtest in each directory, excluding external/merlin and any
+# directories not in the dune workspace. (We can exclude external/ as a whole
+# since all the non-merlin directories in that folder are vendored anyways.)
+runtest_subdirs := $(filter-out external $(inactive_dirs), \
+  $(shell find . -mindepth 1 -maxdepth 1 -type d -not -name '_*' -not -name '.*' | sed 's|^\./||'))
+runtest_targets := $(addprefix @,$(addsuffix /runtest,$(runtest_subdirs)))
+
 # CR dkalinichenko: [runtest] is built using the main profile,
 # which uses the boot compiler. Use the final compiler for [runtest],
 # and implement [runtest-upstream-boot] for testing when the final compiler
 # itself is miscompiled.
 runtest: compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(POLL_INSERTION) $(dune) runtest $(ws_main)
+	RUNTIME_DIR=$(RUNTIME_DIR) OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(POLL_INSERTION) $(dune) build $(ws_main) $(runtest_targets)
 
 runtest-llvmize: compiler
 	RUNTIME_DIR=$(RUNTIME_DIR) OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-llvmize $(ws_main)
@@ -159,6 +193,7 @@ runtest-dwarf: compiler
 duneconf/boot.ws: export contents = $(dune_boot_context)
 duneconf/runtime_stdlib.ws: export contents = $(dune_runtime_stdlib_context)
 duneconf/main.ws: export contents = $(dune_main_context)
+duneconf/merlin_install.ws: export contents = $(dune_merlin_install_context)
 duneconf/%.ws:
 	echo "$$contents" > $@
 
@@ -192,11 +227,7 @@ $(ocamldir)/otherlibs/dune:
 	fi
 
 $(ocamldir)/dune.runtime_selection:
-	if [ "$(RUNTIME_DIR)" = "runtime4" ]; then \
-          echo "(dirs (:standard \ runtime debugger))" > $@; \
-	else \
-          echo "(dirs (:standard \ runtime4 debugger4))" > $@; \
-	fi
+	echo "(dirs (:standard \ $(inactive_dirs)))" > $@
 
 _build/_bootinstall: Makefile.config $(dune_config_targets)
 	echo -n '$(NATDYNLINKOPTS)' > $(ocamldir)/natdynlinkops
@@ -237,7 +268,7 @@ cpl=$(if $(filter linux,$(SYSTEM)),cp -l,cp -L)
 # the final install path may be on a different filesystem (and hence be
 # slow and/or unable to make hardlinks)
 .PHONY: _install install install_for_opam
-_install: compiler
+_install: compiler duneconf/merlin_install.ws
 	rm -rf _install
 	mkdir -p _install/{bin,lib/ocaml}
 	$(cpl) _build/runtime_stdlib_install/bin/* _install/bin/
@@ -269,6 +300,39 @@ _install: compiler
 	# This only copies part of the files, mainly meant for metrics. It only covers
 	# about half of the files which we would want to copy over.
 	find _build/runtime_stdlib/stdlib/ -name '*.cms' -exec cp -f {} _install/lib/ocaml/ \;
+	# Build Merlin with the OxCaml compiler (against the _install we just
+	# assembled) and fold it into the install.
+	$(dune) build $(ws_merlin) \
+          --only-packages=merlin,merlin-lib,dot-merlin-reader,ocaml-index \
+		  @install external/csexp/src/merlin_csexp.cma \
+          external/csexp/src/merlin_csexp.cmxa
+	$(cpl) _build/install/merlin_install/bin/* _install/bin/
+	mkdir -p _install/lib/ocaml/stublibs
+	$(cpl) _build/install/merlin_install/lib/stublibs/* \
+          _install/lib/ocaml/stublibs/
+	mkdir -p _install/lib/ocaml/merlin
+	$(cpl) -R _build/install/merlin_install/lib/merlin-lib/* \
+          _install/lib/ocaml/merlin/
+	rm -f _install/lib/ocaml/merlin/META _install/lib/ocaml/merlin/dune-package \
+          _install/lib/ocaml/merlin/opam
+	echo 'directory = "merlin"' > _install/lib/ocaml/META.merlin-lib
+	sed -e 's/\bcsexp\b/merlin-lib.merlin_csexp/g' \
+          _build/install/merlin_install/lib/merlin-lib/META \
+          >> _install/lib/ocaml/META.merlin-lib
+	# Bundle csexp in with Merlin since it is a dependency. (Although yojson is
+	# a Merlin dependency as well, it is only depended on by the statically
+	# linked binaries and not any of the libraries, so it does not need to be
+	# included.)
+	mkdir -p _install/lib/ocaml/merlin/merlin_csexp
+	$(cpl) _build/merlin_install/external/csexp/src/merlin_csexp.cma \
+          _build/merlin_install/external/csexp/src/merlin_csexp.cmxa \
+          _build/merlin_install/external/csexp/src/merlin_csexp.a \
+          _build/merlin_install/external/csexp/src/.merlin_csexp.objs/byte/merlin_csexp.cmi \
+          _build/merlin_install/external/csexp/src/.merlin_csexp.objs/byte/merlin_csexp.cmti \
+          _build/merlin_install/external/csexp/src/.merlin_csexp.objs/native/merlin_csexp.cmx \
+          _install/lib/ocaml/merlin/merlin_csexp/
+	printf '\npackage "merlin_csexp" (\n  directory = "merlin_csexp"\n  description = ""\n  archive(byte) = "merlin_csexp.cma"\n  archive(native) = "merlin_csexp.cmxa"\n)\n' \
+          >> _install/lib/ocaml/META.merlin-lib
 
 # Copy _install to the final install directory (no-op if they are the same)
 install: _install
@@ -380,7 +444,7 @@ install_for_test: install
 	  parsing typing; do ln -s utils _runtest/$$dir; done
 	# stublibs
 	mkdir -p _runtest/lib/ocaml/stublibs/
-	cp $(main_prefix)/lib/ocaml/stublibs/*.so _runtest/lib/ocaml/stublibs
+	cp _install/lib/ocaml/stublibs/*.so _runtest/lib/ocaml/stublibs
 	# ocamldebug
 	mkdir _runtest/debugger$(RUNTIME_SUFFIX)
 	ln -s ../ocamldebug _runtest/debugger$(RUNTIME_SUFFIX)

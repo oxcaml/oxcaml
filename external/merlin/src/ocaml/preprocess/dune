@@ -8,13 +8,13 @@
 
 (menhir
  (modules parser_raw)
- (enabled_if (<> %{profile} "release"))
+ (enabled_if (and (<> %{profile} "release") (= %{context_name} "default")))
  (mode    (promote (only parser_raw.ml parser_raw.mli)))
  (flags :standard --inspection --table --cmly --lalr))
 
 (rule
   (targets parser_recover.ml)
-  (enabled_if (<> %{profile} "release"))
+  (enabled_if (and (<> %{profile} "release") (= %{context_name} "default")))
   (deps    parser_raw.cmly)
   (mode    promote)
   (action
@@ -23,7 +23,7 @@
 
 (rule
   (targets parser_explain.ml)
-  (enabled_if (<> %{profile} "release"))
+  (enabled_if (and (<> %{profile} "release") (= %{context_name} "default")))
   (deps    parser_raw.cmly)
   (mode    promote)
   (action
@@ -32,7 +32,7 @@
 
 (rule
   (targets parser_printer.ml)
-  (enabled_if (<> %{profile} "release"))
+  (enabled_if (and (<> %{profile} "release") (= %{context_name} "default")))
   (deps    parser_raw.cmly)
   (mode    promote)
   (action
@@ -41,6 +41,7 @@
 
 (rule
  (targets menhirLib.ml menhirLib.mli)
+ (enabled_if (and (<> %{profile} "release") (= %{context_name} "default")))
  (mode promote)
  (action
   (progn
