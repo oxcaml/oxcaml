@@ -95,9 +95,10 @@ let lub_component comp1 comp2 =
   | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512)
   | Float32, Float
   | Float, Float32 ->
-    Printf.eprintf "%d %d\n%!" (Obj.magic comp1) (Obj.magic comp2);
     (* Float unboxing code must be sure to avoid this case. *)
-    assert false
+    Misc.fatal_errorf
+      "Cmm.lub_component: unexpected machtype_component combination (%d, %d)"
+      (Obj.magic comp1) (Obj.magic comp2)
   | Valx2, _ | _, Valx2 ->
     Misc.fatal_errorf "Unexpected machtype_component Valx2"
 
@@ -123,8 +124,9 @@ let ge_component comp1 comp2 =
   | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512)
   | Float32, Float
   | Float, Float32 ->
-    Printf.eprintf "GE: %d %d\n%!" (Obj.magic comp1) (Obj.magic comp2);
-    assert false
+    Misc.fatal_errorf
+      "Cmm.ge_component: unexpected machtype_component combination (%d, %d)"
+      (Obj.magic comp1) (Obj.magic comp2)
   | Valx2, _ | _, Valx2 ->
     Misc.fatal_error "Unexpected machtype_component Valx2"
 

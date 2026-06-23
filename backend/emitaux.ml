@@ -574,7 +574,8 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
       loop i.next fs max_fs nontail_flag
     | Lstackcheck _ ->
       (* should not be already present *)
-      assert false
+      Misc.fatal_error
+        "Emitaux.preproc_stack_check: Lstackcheck already present"
   in
   loop fun_body frame_size frame_size false
 

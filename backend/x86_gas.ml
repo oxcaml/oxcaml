@@ -83,7 +83,7 @@ let suf arg =
   | QWORD -> "q"
   | REAL4 -> "s"
   | VEC128 | VEC256 | VEC512 | NONE -> ""
-  | NEAR | PROC -> assert false
+  | NEAR | PROC -> Misc.fatal_error "X86_gas.suf: unexpected datatype NEAR/PROC"
 
 let i0 b s = bprintf b "\t%s" s
 
@@ -110,7 +110,8 @@ let i1_call_jmp b s = function
   | (Reg32 _ | Reg64 _ | Mem { arch = X64 | X86; _ } | Mem64_RIP _) as x ->
     bprintf b "\t%s\t*%a" s arg x
   | Sym x -> bprintf b "\t%s\t%s" s x
-  | Imm _ | Reg8L _ | Reg8H _ | Reg16 _ | Regf _ -> assert false
+  | Imm _ | Reg8L _ | Reg8H _ | Reg16 _ | Regf _ ->
+    Misc.fatal_error "X86_gas.i1_call_jmp: invalid operand"
 
 let print_instr b = function
   | ADD (arg1, arg2) -> i2_s b "add" arg1 arg2

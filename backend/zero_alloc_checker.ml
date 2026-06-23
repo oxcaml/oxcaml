@@ -1117,7 +1117,10 @@ end = struct
     match t with
     | Top w -> w
     | Bot | Safe -> Witnesses.empty
-    | Var _ | Transform _ | Join _ -> assert false
+    | Var _ | Transform _ | Join _ ->
+      Misc.fatal_error
+        "Zero_alloc_checker.get_witnesses: unresolved value \
+         (Var/Transform/Join)"
 
   (* structural *)
   let compare t1 t2 =
@@ -1291,7 +1294,9 @@ end = struct
     | Safe, Bot -> Witnesses.empty
     | Top w, (Bot | Safe) -> w
     | (Var _ | Join _ | Transform _), _ | _, (Var _ | Join _ | Transform _) ->
-      assert false
+      Misc.fatal_error
+        "Zero_alloc_checker.diff_witnesses: unresolved value \
+         (Var/Transform/Join)"
 
   let meet t1 t2 =
     match t1, t2 with
@@ -2055,7 +2060,9 @@ end = struct
     V.match_with v
       ~top:(fun _ -> 0)
       ~safe:1 ~bot:2
-      ~unresolved:(fun () -> assert false)
+      ~unresolved:(fun () ->
+        Misc.fatal_error
+          "Zero_alloc_checker.encode: unexpected unresolved value")
 
   (* Witnesses are not used across functions and not stored in cmx. Witnesses
      that appear in a function's summary are only used for error messages about
@@ -2667,7 +2674,9 @@ end = struct
       let terminator next ~exn (i : Cfg.terminator Cfg.instruction) t =
         let dbg = i.dbg in
         match i.desc with
-        | Never -> assert false
+        | Never ->
+          Misc.fatal_error
+            "Zero_alloc_checker.terminator: unexpected Never terminator"
         | Return -> Value.normal_return
         | Raise Raise_notrace ->
           (* [raise_notrace] is typically used for control flow, not for

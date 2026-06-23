@@ -359,7 +359,9 @@ let select_floatarith commutative width (regular_op : Operation.float_operation)
     Rewritten (specific (Ifloatarithmem (width, mem_op, addr)), [arg2; arg1])
   | _, [arg1; arg2] ->
     Rewritten (Basic (Op (Floatop (width, regular_op))), [arg1; arg2])
-  | _ -> assert false
+  | _ ->
+    Misc.fatal_error
+      "Cfg_selection.select_floatarith: unexpected width/args combination"
 
 let select_operation'
     ~(generic_select_condition :
