@@ -9,6 +9,12 @@
  }
 *)
 
+(* These tests enumerate modifiers, including redundant ones, so silence the
+   redundant-modifier warning throughout. *)
+[@@@warning "-211"]
+[%%expect{|
+|}]
+
 type t_value : value
 type t_imm : immediate
 type t_imm64 : immediate64

@@ -3,6 +3,11 @@
  expect;
 *)
 
+(* Many tests below use deliberately redundant modifiers; silence the warning. *)
+[@@@warning "-211"]
+[%%expect{|
+|}]
+
 (******************)
 (* Test 1: Syntax *)
 
@@ -200,9 +205,9 @@ type a : value mod global
 type b : float32 = a
 [%%expect{|
 type a : value mod global
-Line 2, characters 0-30:
-2 | type b : float32 mod local = a
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 0-20:
+2 | type b : float32 = a
+    ^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "a" is value
          because of the definition of a at line 1, characters 0-25.
        But the layout of type "a" must be a sublayout of float32
@@ -220,9 +225,9 @@ type a : value mod global contended portable external_
 type b : value mod many contended = a
 [%%expect{|
 type a : value mod global portable contended external_
-Line 2, characters 0-71:
-2 | type b : value mod local unique many contended nonportable internal = a
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 0-37:
+2 | type b : value mod many contended = a
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "a" is value mod global portable contended external_
          because of the definition of a at line 1, characters 0-54.
        But the kind of type "a" must be a subkind of value mod many contended
