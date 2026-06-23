@@ -153,7 +153,7 @@ type t =
   | Zero_alloc_all_hidden_arrow of string   (* 198 *)
   | Unchecked_zero_alloc_attribute          (* 199 *)
   | Unboxing_impossible                     (* 210 *)
-  | Mod_by_top of string                    (* 211 *)
+  | Redundant_modifier                      (* 211 *)
   (* 212 taken *)
   (* 213 was [Modal_axis_specified_twice], now subsumed by
      [Redundant_modality] (220) *)
@@ -258,7 +258,7 @@ let number = function
   | Zero_alloc_all_hidden_arrow _ -> 198
   | Unchecked_zero_alloc_attribute -> 199
   | Unboxing_impossible -> 210
-  | Mod_by_top _ -> 211
+  | Redundant_modifier -> 211
   | Atomic_float_record_boxed -> 214
   | Implied_attribute _ -> 215
   | Use_during_borrowing -> 216
@@ -681,8 +681,8 @@ let descriptions = [
     description = "The parameter or return value corresponding @unboxed attribute cannot be unboxed.";
     since = since 4 14 };
   { number = 211;
-    names = ["mod-by-top"];
-    description = "Including the top-most element of an axis in a kind's modifiers is a no-op.";
+    names = ["redundant-modifier"];
+    description = "Modifier is redundant with the default.";
     since = since 4 14 };
   { number = 214;
     names = ["atomic-float-record-boxed"];
@@ -1493,9 +1493,8 @@ let message = function
       msg "This %a attribute cannot be used.@ \
            The type of this value does not allow unboxing."
         Style.inline_code "[@unboxed]"
-  | Mod_by_top modifier ->
-      msg "%s is the top-most modifier.@ \
-           Modifying by a top element is a no-op." modifier
+  | Redundant_modifier ->
+      msg "This modifier is redundant."
   (* 213 was [Modal_axis_specified_twice] *)
   | Atomic_float_record_boxed ->
       msg "This record contains atomic float fields,@ \

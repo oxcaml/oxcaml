@@ -2372,9 +2372,11 @@ let of_type_decl ?use_abstract_jkinds ?warn ~context ~transl_type env decl =
 
 let of_type_decl_overapproximate_unknown ~context env
     (decl : Parsetree.type_declaration) =
-  (* Warnings are emitted in [of_type_decl] rather than here *)
-  of_type_decl_gen ~use_abstract_jkinds:false ~warn:false ~context
-    ~transl:Context_with_transl.Overapproximate_to_top env decl
+  (* CR with-kinds: any warnings we get while parsing here will
+     be raised again when doing the non-approximated jkind computation. *)
+  Warnings.without_warnings (fun () ->
+      of_type_decl_gen ~use_abstract_jkinds:false ~warn:false ~context
+        ~transl:Context_with_transl.Overapproximate_to_top env decl)
   |> Option.map fst
 
 let for_unboxed_record_with_updates lbls =

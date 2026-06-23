@@ -157,7 +157,7 @@ type t =
   | Zero_alloc_all_hidden_arrow of string   (* 198 *)
   | Unchecked_zero_alloc_attribute          (* 199 *)
   | Unboxing_impossible                     (* 210 *)
-  | Mod_by_top of string                    (* 211 *)
+  | Redundant_modifier                      (* 211 *)
   (* 213 was [Modal_axis_specified_twice], now subsumed by
      [Redundant_modality] (220) *)
   | Atomic_float_record_boxed               (* 214 *)
