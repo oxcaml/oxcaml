@@ -55,11 +55,8 @@ let rec find_next_allocation : cell option -> allocation option =
    pass may only continue across instructions that are neither GC safepoints nor
    able to raise. That holds here because: the pass runs after [Cfg_polling] so
    every safepoint is an explicit [Poll] (stopped at below); basic instructions
-   never raise (see [Cfg_invariants.check_can_raise]: only terminators raise,
-   and they end the block); and no [Specific], [Intop_atomic], or [Store] op
-   allocates or polls. A new operation that can allocate, poll, or raise must be
-   a terminator or be added to the stop list above, never to this "continue"
-   list. *)
+   never raise; and no [Specific], [Intop_atomic], or [Store] op allocates or
+   polls. *)
 let find_compatible_allocations :
     cell option ->
     curr_mode:Cmm.Alloc_mode.t ->
