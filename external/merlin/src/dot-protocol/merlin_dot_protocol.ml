@@ -27,6 +27,7 @@
    )* }}} *)
 
 open Merlin_utils.Std
+module Csexp = Merlin_csexp
 
 module Directive = struct
   type include_path =
