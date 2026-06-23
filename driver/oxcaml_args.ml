@@ -388,6 +388,11 @@ let mk_debug_long_frames_threshold f =
     Arg.Int f,
     "n debug only: set long frames threshold" )
 
+let mk_dbranch_relaxation_max_displacement f =
+  ( "-dbranch-relaxation-max-displacement",
+    Arg.Int f,
+    "n debug only: lower the branch relaxation displacement threshold" )
+
 let mk_caml_apply_inline_fast_path f =
   ( "-caml-apply-inline-fast-path",
     Arg.Unit f,
@@ -1327,6 +1332,7 @@ module type Oxcaml_options = sig
   val long_frames : unit -> unit
   val no_long_frames : unit -> unit
   val long_frames_threshold : int -> unit
+  val dbranch_relaxation_max_displacement : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
   val internal_assembler : unit -> unit
   val verify_binary_emitter : unit -> unit
@@ -1514,6 +1520,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_long_frames F.long_frames;
       mk_no_long_frames F.no_long_frames;
       mk_debug_long_frames_threshold F.long_frames_threshold;
+      mk_dbranch_relaxation_max_displacement
+        F.dbranch_relaxation_max_displacement;
       mk_caml_apply_inline_fast_path F.caml_apply_inline_fast_path;
       mk_internal_assembler F.internal_assembler;
       mk_verify_binary_emitter F.verify_binary_emitter;
@@ -1914,6 +1922,9 @@ module Oxcaml_options_impl = struct
   let long_frames = set' Oxcaml_flags.allow_long_frames
   let no_long_frames = clear' Oxcaml_flags.allow_long_frames
   let long_frames_threshold n = set_long_frames_threshold n
+
+  let dbranch_relaxation_max_displacement n =
+    Oxcaml_flags.branch_relaxation_max_displacement := n
 
   let caml_apply_inline_fast_path =
     set' Oxcaml_flags.caml_apply_inline_fast_path
@@ -2358,6 +2369,8 @@ module Extra_params = struct
                     possible_values)))
     | "regalloc-linscan-threshold" ->
         set_int' Oxcaml_flags.regalloc_linscan_threshold
+    | "dbranch-relaxation-max-displacement" ->
+        set_int' Oxcaml_flags.branch_relaxation_max_displacement
     | "regalloc-param" -> add_string Oxcaml_flags.regalloc_params
     | "regalloc-validate" -> set' Oxcaml_flags.regalloc_validate
     | "vectorize" -> set' Oxcaml_flags.vectorize

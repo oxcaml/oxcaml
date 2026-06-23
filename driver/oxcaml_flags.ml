@@ -118,6 +118,12 @@ let allow_long_frames = ref true        (* -no-long-frames *)
 let max_long_frames_threshold = 0x7FFF
 let long_frames_threshold = ref max_long_frames_threshold (* -debug-long-frames-threshold n *)
 
+(* Test-only override that lowers the maximum branch displacement used by the
+   branch relaxation pass, so that small functions exercise the relaxation
+   logic.  [max_int] means "use the real per-instruction displacements". *)
+let branch_relaxation_max_displacement =
+  ref max_int (* -dbranch-relaxation-max-displacement n *)
+
 let caml_apply_inline_fast_path = ref false  (* -caml-apply-inline-fast-path *)
 
 type function_result_types = Never | Functors_only | All_functions

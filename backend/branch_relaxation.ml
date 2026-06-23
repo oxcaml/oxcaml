@@ -43,6 +43,14 @@ module Make (T : Branch_relaxation_intf.S) = struct
     in
     fill_map 0 code sizes
 
+  (* A test-only override (see
+     [Oxcaml_flags.branch_relaxation_max_displacement]) can lower the
+     displacement at which branches are considered to overflow, so that small
+     functions exercise the relaxation logic. [max_int] (the default) leaves the
+     real per-instruction displacements untouched. *)
+  let effective_displacement displacement =
+    min displacement !Oxcaml_flags.branch_relaxation_max_displacement
+
   let branch_overflows map pc_branch lbl_dest max_branch_offset =
     let pc_dest = Hashtbl.find map lbl_dest in
     let delta = pc_dest - (pc_branch + T.offset_pc_at_branch) in
@@ -62,7 +70,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
         (* Remember to cut some slack for multi-word instructions (in the
            [Linear] sense of the word) where the branch can be anywhere in the
            middle. 12 words of slack is plenty. *)
-        displacement - 12
+        effective_displacement displacement - 12
       in
       match instr.desc with
       | Lop (Alloc _) | Lop Poll | Lstackcheck _ ->
@@ -253,7 +261,10 @@ module Make (T : Branch_relaxation_intf.S) = struct
       List.fold_left
         (fun acc
              ({ max_displacement; _ } : Branch_relaxation_intf.instruction_size)
-           -> match max_displacement with None -> acc | Some d -> min acc d)
+           ->
+          match max_displacement with
+          | None -> acc
+          | Some d -> min acc (effective_displacement d))
         max_int initial_sizes
     in
     let rec loop sizes =
