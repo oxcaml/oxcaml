@@ -263,130 +263,6 @@ let enforce_forbidden_modalities ~loc annot_type m =
     raise (Error (loc, Forbidden_modality (annot_type, Global_and_unique)))
   | _ -> ()
 
-let transl_mod_bounds annots =
-  let bounds_loc =
-    match List.map (fun { loc; _ } -> loc) annots with
-    | [] -> Location.none
-    | _ :: _ as locs -> Location.merge locs
-  in
-  let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
-    match Modifier_axis_pair.of_string txt with
-    | P (type a) ((axis, mode) : a Axis.t * a) ->
-      let is_top = Per_axis.(le axis (max axis) mode) in
-      if is_top
-      then
-        (* CR layouts v2.8: This warning is disabled for now because transl_type_decl
-           results in 3 calls to transl_annots per user-written annotation. This results
-           in the warning being reported 3 times. Internal ticket 2801. *)
-        (* Location.prerr_warning new_raw.loc (Warnings.Mod_by_top new_raw.txt) *)
-        ();
-      let is_dup =
-        Option.is_some (Transled_modifiers.get ~axis bounds_so_far)
-      in
-      if is_dup then raise (Error (loc, Duplicated_axis (Modifier, axis)));
-      Transled_modifiers.set ~axis bounds_so_far (Some { txt = mode; loc })
-    | exception Not_found -> (
-      match txt with
-      (* CR layouts-scannable: This should be removed once the new syntax for
-         separability is adopted. There is no warning raised currently for dupes
-         because the warnings would be reported 3 times. If this is fixed before
-         the syntax is deprecated, dupes really should raise warnings! *)
-      | "non_pointer" ->
-        Transled_modifiers.meet_separability bounds_so_far
-          { txt = Non_pointer; loc }
-      | "non_pointer64" ->
-        Transled_modifiers.meet_separability bounds_so_far
-          { txt = Non_pointer64; loc }
-      | "non_float" ->
-        Transled_modifiers.meet_separability bounds_so_far
-          { txt = Non_float; loc }
-      | "separable" ->
-        Transled_modifiers.meet_separability bounds_so_far
-          { txt = Separable; loc }
-      | "maybe_separable" ->
-        Transled_modifiers.meet_separability bounds_so_far
-          { txt = Maybe_separable; loc }
-      | "non_null" ->
-        Transled_modifiers.meet_nullability bounds_so_far
-          { txt = Non_null; loc }
-      | "maybe_null" ->
-        Transled_modifiers.meet_nullability bounds_so_far
-          { txt = Maybe_null; loc }
-      | "everything" ->
-        Transled_modifiers.
-          { areality =
-              Some { txt = Per_axis.min (Modal (Comonadic Areality)); loc };
-            linearity =
-              Some { txt = Per_axis.min (Modal (Comonadic Linearity)); loc };
-            uniqueness =
-              Some { txt = Per_axis.min (Modal (Monadic Uniqueness)); loc };
-            portability =
-              Some { txt = Per_axis.min (Modal (Comonadic Portability)); loc };
-            contention =
-              Some { txt = Per_axis.min (Modal (Monadic Contention)); loc };
-            forkable =
-              Some { txt = Per_axis.min (Modal (Comonadic Forkable)); loc };
-            yielding =
-              Some { txt = Per_axis.min (Modal (Comonadic Yielding)); loc };
-            externality = Some { txt = Externality.min; loc };
-            statefulness =
-              Some { txt = Per_axis.min (Modal (Comonadic Statefulness)); loc };
-            visibility =
-              Some { txt = Per_axis.min (Modal (Monadic Visibility)); loc };
-            staticity = None;
-            nullability = bounds_so_far.nullability;
-            separability = bounds_so_far.separability
-          }
-      | _ -> raise (Error (loc, Unrecognized_modifier (Modifier, txt))))
-  in
-  let raw_modifiers = List.fold_left step Transled_modifiers.empty annots in
-  let modality =
-    let open Modality in
-    let has_explicit axis =
-      let (P axis) = Crossing.Axis.of_modality (P axis) in
-      Option.is_some (Transled_modifiers.get ~axis:(Modal axis) raw_modifiers)
-    in
-    let add_implied axis value acc =
-      List.fold_left
-        (fun acc (Atom (axis', value')) ->
-          if has_explicit axis' then acc else Const.set axis' value' acc)
-        acc
-        (implied_modalities (Atom (axis, value)))
-    in
-    let add_comonadic acc axis =
-      match
-        Transled_modifiers.get ~axis:(Modal (Comonadic axis)) raw_modifiers
-      with
-      | None -> acc
-      | Some { txt = Modality value; _ } ->
-        let acc = Const.set (Comonadic axis) value acc in
-        add_implied (Comonadic axis) value acc
-    in
-    let add_monadic acc axis =
-      match
-        Transled_modifiers.get ~axis:(Modal (Monadic axis)) raw_modifiers
-      with
-      | None -> acc
-      | Some { txt = Modality value; _ } ->
-        let acc = Const.set (Monadic axis) value acc in
-        add_implied (Monadic axis) value acc
-    in
-    let add acc = function
-      | Value.Axis.P (Comonadic axis) -> add_comonadic acc axis
-      | Value.Axis.P (Monadic axis) -> add_monadic acc axis
-    in
-    List.fold_left add Const.id Value.Axis.all
-  in
-  enforce_forbidden_modalities Modifier ~loc:bounds_loc modality;
-  let open Jkind.Mod_bounds in
-  let externality =
-    Option.fold ~some:Location.get_txt ~none:Externality.max
-      raw_modifiers.externality
-  in
-  let crossing = Crossing.modality modality Crossing.max in
-  ( create crossing ~externality,
-    (raw_modifiers.nullability, raw_modifiers.separability) )
-
 let default_mode_annots (annots : Alloc.Const.Option.t) =
   (* [forkable] has a different default depending on whether [areality]
      is [global] or [local]. *)
@@ -568,62 +444,6 @@ let least_modalities ~include_implied ~mut (t : Modality.Const.t) =
   in
   exclude_implied @ overridden
 
-let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
-    Parsetree.modes =
-  let crossing = Jkind.Mod_bounds.crossing bounds in
-  let modality = Crossing.to_modality crossing in
-  let least_modalities =
-    least_modalities ~include_implied:verbose ~mut:Immutable modality
-  in
-  let modality_annots =
-    List.map
-      (fun (Atom (ax, m) : Modality.atom) ->
-        let s = Format_doc.asprintf "%a" (Modality.Per_axis.print ax) m in
-        { Location.txt = Parsetree.Mode s; loc = Location.none })
-      least_modalities
-  in
-  (* These mod-bounds are top ones, which are redundant to print. But we
-     include them when printing verbosely. *)
-  let top_modality_annots () =
-    List.filter_map
-      (fun ax ->
-        let (P ax) = Modality.Axis.of_value ax in
-        let included_in_nonverbose =
-          List.exists
-            (fun (Atom (ax2, _) : Modality.atom) ->
-              Modality.Axis.P ax = Modality.Axis.P ax2)
-            least_modalities
-        in
-        match included_in_nonverbose with
-        | true -> None
-        | false ->
-          let s =
-            Format_doc.asprintf "%a"
-              (Modality.Per_axis.print ax)
-              (Modality.Const.proj ax modality)
-          in
-          Some { Location.txt = Parsetree.Mode s; loc = Location.none })
-      Value.Axis.all
-  in
-  let nonmodal_annots, top_nonmodal_annots =
-    let open Jkind.Mod_bounds in
-    let mk_annot top print value =
-      let only_when_verbose = value = top in
-      let s = Format_doc.asprintf "%a" print value in
-      ( { Location.txt = Parsetree.Mode s; loc = Location.none },
-        only_when_verbose )
-    in
-    [mk_annot Externality.max Externality.print (externality bounds)]
-    |> List.partition_map (fun (annot, only_when_verbose) ->
-        match only_when_verbose with false -> Left annot | true -> Right annot)
-  in
-  let verbose_annots =
-    match verbose with
-    | true -> top_modality_annots () @ top_nonmodal_annots
-    | false -> []
-  in
-  modality_annots @ nonmodal_annots @ verbose_annots
-
 let sort_dedup_modalities l =
   let open Modality in
   let compare { txt = Atom (ax0, _); loc = _ } { txt = Atom (ax1, _); loc = _ }
@@ -746,6 +566,186 @@ let transl_alloc_mode annots =
   in
   let modes = Alloc.Const.Option.value opt_modes ~default:Alloc.Const.legacy in
   { mode_modes = modes; mode_desc = annots }
+
+let transl_mod_bounds annots =
+  let bounds_loc =
+    match List.map (fun { loc; _ } -> loc) annots with
+    | [] -> Location.none
+    | _ :: _ as locs -> Location.merge locs
+  in
+  let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
+    match Modifier_axis_pair.of_string txt with
+    | P (type a) ((axis, mode) : a Axis.t * a) ->
+      let is_top = Per_axis.(le axis (max axis) mode) in
+      if is_top
+      then
+        (* CR layouts v2.8: This warning is disabled for now because transl_type_decl
+           results in 3 calls to transl_annots per user-written annotation. This results
+           in the warning being reported 3 times. Internal ticket 2801. *)
+        (* Location.prerr_warning new_raw.loc (Warnings.Mod_by_top new_raw.txt) *)
+        ();
+      let is_dup =
+        Option.is_some (Transled_modifiers.get ~axis bounds_so_far)
+      in
+      if is_dup then raise (Error (loc, Duplicated_axis (Modifier, axis)));
+      Transled_modifiers.set ~axis bounds_so_far (Some { txt = mode; loc })
+    | exception Not_found -> (
+      match txt with
+      (* CR layouts-scannable: This should be removed once the new syntax for
+         separability is adopted. There is no warning raised currently for dupes
+         because the warnings would be reported 3 times. If this is fixed before
+         the syntax is deprecated, dupes really should raise warnings! *)
+      | "non_pointer" ->
+        Transled_modifiers.meet_separability bounds_so_far
+          { txt = Non_pointer; loc }
+      | "non_pointer64" ->
+        Transled_modifiers.meet_separability bounds_so_far
+          { txt = Non_pointer64; loc }
+      | "non_float" ->
+        Transled_modifiers.meet_separability bounds_so_far
+          { txt = Non_float; loc }
+      | "separable" ->
+        Transled_modifiers.meet_separability bounds_so_far
+          { txt = Separable; loc }
+      | "maybe_separable" ->
+        Transled_modifiers.meet_separability bounds_so_far
+          { txt = Maybe_separable; loc }
+      | "non_null" ->
+        Transled_modifiers.meet_nullability bounds_so_far
+          { txt = Non_null; loc }
+      | "maybe_null" ->
+        Transled_modifiers.meet_nullability bounds_so_far
+          { txt = Maybe_null; loc }
+      | "everything" ->
+        Transled_modifiers.
+          { areality =
+              Some { txt = Per_axis.min (Modal (Comonadic Areality)); loc };
+            linearity =
+              Some { txt = Per_axis.min (Modal (Comonadic Linearity)); loc };
+            uniqueness =
+              Some { txt = Per_axis.min (Modal (Monadic Uniqueness)); loc };
+            portability =
+              Some { txt = Per_axis.min (Modal (Comonadic Portability)); loc };
+            contention =
+              Some { txt = Per_axis.min (Modal (Monadic Contention)); loc };
+            forkable =
+              Some { txt = Per_axis.min (Modal (Comonadic Forkable)); loc };
+            yielding =
+              Some { txt = Per_axis.min (Modal (Comonadic Yielding)); loc };
+            externality = Some { txt = Externality.min; loc };
+            statefulness =
+              Some { txt = Per_axis.min (Modal (Comonadic Statefulness)); loc };
+            visibility =
+              Some { txt = Per_axis.min (Modal (Monadic Visibility)); loc };
+            staticity = None;
+            nullability = bounds_so_far.nullability;
+            separability = bounds_so_far.separability
+          }
+      | _ -> raise (Error (loc, Unrecognized_modifier (Modifier, txt))))
+  in
+  let raw_modifiers = List.fold_left step Transled_modifiers.empty annots in
+  let modality =
+    let open Modality in
+    let has_explicit axis =
+      let (P axis) = Crossing.Axis.of_modality (P axis) in
+      Option.is_some (Transled_modifiers.get ~axis:(Modal axis) raw_modifiers)
+    in
+    let add_implied axis value acc =
+      List.fold_left
+        (fun acc (Atom (axis', value')) ->
+          if has_explicit axis' then acc else Const.set axis' value' acc)
+        acc
+        (implied_modalities (Atom (axis, value)))
+    in
+    let add_comonadic acc axis =
+      match
+        Transled_modifiers.get ~axis:(Modal (Comonadic axis)) raw_modifiers
+      with
+      | None -> acc
+      | Some { txt = Modality value; _ } ->
+        let acc = Const.set (Comonadic axis) value acc in
+        add_implied (Comonadic axis) value acc
+    in
+    let add_monadic acc axis =
+      match
+        Transled_modifiers.get ~axis:(Modal (Monadic axis)) raw_modifiers
+      with
+      | None -> acc
+      | Some { txt = Modality value; _ } ->
+        let acc = Const.set (Monadic axis) value acc in
+        add_implied (Monadic axis) value acc
+    in
+    let add acc = function
+      | Value.Axis.P (Comonadic axis) -> add_comonadic acc axis
+      | Value.Axis.P (Monadic axis) -> add_monadic acc axis
+    in
+    List.fold_left add Const.id Value.Axis.all
+  in
+  enforce_forbidden_modalities Modifier ~loc:bounds_loc modality;
+  let open Jkind.Mod_bounds in
+  let externality =
+    Option.fold ~some:Location.get_txt ~none:Externality.max
+      raw_modifiers.externality
+  in
+  let crossing = Crossing.modality modality Crossing.max in
+  ( create crossing ~externality,
+    (raw_modifiers.nullability, raw_modifiers.separability) )
+
+let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
+    Parsetree.modes =
+  let crossing = Jkind.Mod_bounds.crossing bounds in
+  let modality = Crossing.to_modality crossing in
+  let least_modalities =
+    least_modalities ~include_implied:verbose ~mut:Immutable modality
+  in
+  let modality_annots =
+    List.map
+      (fun (Atom (ax, m) : Modality.atom) ->
+        let s = Format_doc.asprintf "%a" (Modality.Per_axis.print ax) m in
+        { Location.txt = Parsetree.Mode s; loc = Location.none })
+      least_modalities
+  in
+  (* These mod-bounds are top ones, which are redundant to print. But we
+     include them when printing verbosely. *)
+  let top_modality_annots () =
+    List.filter_map
+      (fun ax ->
+        let (P ax) = Modality.Axis.of_value ax in
+        let included_in_nonverbose =
+          List.exists
+            (fun (Atom (ax2, _) : Modality.atom) ->
+              Modality.Axis.P ax = Modality.Axis.P ax2)
+            least_modalities
+        in
+        match included_in_nonverbose with
+        | true -> None
+        | false ->
+          let s =
+            Format_doc.asprintf "%a"
+              (Modality.Per_axis.print ax)
+              (Modality.Const.proj ax modality)
+          in
+          Some { Location.txt = Parsetree.Mode s; loc = Location.none })
+      Value.Axis.all
+  in
+  let nonmodal_annots, top_nonmodal_annots =
+    let open Jkind.Mod_bounds in
+    let mk_annot top print value =
+      let only_when_verbose = value = top in
+      let s = Format_doc.asprintf "%a" print value in
+      ( { Location.txt = Parsetree.Mode s; loc = Location.none },
+        only_when_verbose )
+    in
+    [mk_annot Externality.max Externality.print (externality bounds)]
+    |> List.partition_map (fun (annot, only_when_verbose) ->
+        match only_when_verbose with false -> Left annot | true -> Right annot)
+  in
+  let verbose_annots =
+    match verbose with
+    | true -> top_modality_annots () @ top_nonmodal_annots
+    | false -> []
+  in
+  modality_annots @ nonmodal_annots @ verbose_annots
 
 (* Error reporting *)
 
