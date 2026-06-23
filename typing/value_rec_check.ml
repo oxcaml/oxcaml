@@ -817,9 +817,6 @@ let rec expression : Typedtree.expression -> term_judg =
                     representation = rep } ->
         let field_mode i = match rep with
           | Record_float | Record_ufloat -> Dereference
-          | Record_inlined (_, Constructor_variable, _) ->
-              Misc.fatal_error
-                "value_rec_check: unexpected unknown representation"
           | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> Return
           | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) ->
               Guard
@@ -833,6 +830,7 @@ let rec expression : Typedtree.expression -> term_judg =
                Dereference)
           | Record_dummy _ ->
             Misc.fatal_error "value_rec_check: unexpected dummy representation"
+          | Record_inlined (_, Constructor_variable, _)
           | Record_variable ->
             Misc.fatal_error
               "value_rec_check: unexpected unknown representation"
