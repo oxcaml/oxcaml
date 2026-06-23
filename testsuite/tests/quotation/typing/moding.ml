@@ -49,12 +49,24 @@ fun e -> <[ $e ]>
 (* Local spliced expression -- the result should be [local]! *)
 fun (x @ local) -> <[ $x ]>
 [%%expect{|
-- : 'a expr @ local -> 'a expr @ local once = <fun>
+Line 1, characters 23-24:
+1 | fun (x @ local) -> <[ $x ]>
+                           ^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the quoted expression at line 1, characters 19-27
+         which is expected to be "global".
 |}];;
 
 fun (x @ local) -> <[ Some $x ]>
 [%%expect{|
-- : 'a expr @ local -> <[$('a) option]> expr @ local once = <fun>
+Line 1, characters 28-29:
+1 | fun (x @ local) -> <[ Some $x ]>
+                                ^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the quoted expression at line 1, characters 19-32
+         which is expected to be "global".
 |}];;
 
 (* Unique spliced expression *)
@@ -124,7 +136,13 @@ val foo : (int -> <[int]> expr) @ local -> <[int]> expr @ once = <fun>
 
 let foo (f : (_ -> _ @ local) @ global) = exclave_ <[ $(f 42) + 1 ]>
 [%%expect{|
-val foo : (int -> <[int]> expr @ local) -> <[int]> expr @ local once = <fun>
+Line 1, characters 55-61:
+1 | let foo (f : (_ -> _ @ local) @ global) = exclave_ <[ $(f 42) + 1 ]>
+                                                           ^^^^^^
+Error: This value is "local"
+       but is expected to be "global"
+         because it is used inside the quoted expression at line 1, characters 51-68
+         which is expected to be "global".
 |}];;
 
 let foo (f : (_ -> _ @ once) @ global) = <[ fun () -> $(f 42) + 1 ]>
@@ -140,13 +158,19 @@ Line 3, characters 42-48:
 3 | fun (f : _ -> _ @ local) -> <[ fun () -> $(f ()) ]>
                                               ^^^^^^
 Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+       but is expected to be "global"
          because it is used inside the quoted expression at line 3, characters 28-51
-         which is expected to be "local" to the parent region or "global".
+         which is expected to be "global".
 |}];;
 fun (f : _ -> _ @ local) -> exclave_ <[ fun () -> $(f ()) ]>
 [%%expect{|
-- : (unit -> 'a expr @ local) -> <[unit -> $('a)]> expr @ local = <fun>
+Line 1, characters 51-57:
+1 | fun (f : _ -> _ @ local) -> exclave_ <[ fun () -> $(f ()) ]>
+                                                       ^^^^^^
+Error: This value is "local"
+       but is expected to be "global"
+         because it is used inside the quoted expression at line 1, characters 37-60
+         which is expected to be "global".
 |}];;
 
 fun (f : _ -> _ @ local) -> <[ Some $(f ()) ]>
@@ -155,26 +179,42 @@ Line 1, characters 37-43:
 1 | fun (f : _ -> _ @ local) -> <[ Some $(f ()) ]>
                                          ^^^^^^
 Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+       but is expected to be "global"
          because it is used inside the quoted expression at line 1, characters 28-46
-         which is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+         which is expected to be "global".
 |}];;
 fun (f : _ -> _ @ local) -> exclave_ <[ Some $(f ()) ]>
 [%%expect{|
-- : (unit -> 'a expr @ local) -> <[$('a) option]> expr @ local once = <fun>
+Line 1, characters 46-52:
+1 | fun (f : _ -> _ @ local) -> exclave_ <[ Some $(f ()) ]>
+                                                  ^^^^^^
+Error: This value is "local"
+       but is expected to be "global"
+         because it is used inside the quoted expression at line 1, characters 37-55
+         which is expected to be "global".
 |}];;
 
 (* This is not an identity, but akin to [fun (x @ local) -> Some x],
    so it should error. *)
 fun (e @ local) -> <[ fun () -> $e ]>
 [%%expect{|
-- : 'a expr @ local -> <[unit -> $('a)]> expr @ local = <fun>
+Line 1, characters 33-34:
+1 | fun (e @ local) -> <[ fun () -> $e ]>
+                                     ^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the quoted expression at line 1, characters 19-37
+         which is expected to be "global".
 |}];;
 fun (e @ local) -> exclave_ <[ fun () -> $e ]>
 [%%expect{|
-- : 'a expr @ local -> <[unit -> $('a)]> expr @ local = <fun>
+Line 1, characters 42-43:
+1 | fun (e @ local) -> exclave_ <[ fun () -> $e ]>
+                                              ^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the quoted expression at line 1, characters 28-46
+         which is expected to be "global".
 |}];;
 fun (x @ local) -> Some x
 [%%expect{|
@@ -482,7 +522,13 @@ fun e -> <[ fun () -> $e ]>
 (* This quote should be [local], as it is a syntax tree with a [local] subtree. *)
 fun (e @ local) -> <[ fun () -> $e ]>
 [%%expect{|
-- : 'a expr @ local -> <[unit -> $('a)]> expr @ local = <fun>
+Line 1, characters 33-34:
+1 | fun (e @ local) -> <[ fun () -> $e ]>
+                                     ^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the quoted expression at line 1, characters 19-37
+         which is expected to be "global".
 |}];;
 
 (* Quotes of syntactic values should observably cross [once]ness,

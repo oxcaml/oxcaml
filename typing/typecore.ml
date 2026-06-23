@@ -1297,6 +1297,14 @@ let mode_computation_quote : Value.l =
   { Value.Const.min with linearity = Once }
   |> Value.of_const ~hint_comonadic:Quoted_computation
 
+(** Upper bound for the mode of values captured by a quote.
+    Quotes are always heap-allocated, so they must only capture globals. **)
+(* CR quoted-modes jbachurski: If we are confident, we can make quotes cross
+   locality. Since quotes ([expr]s) can only same-stage-capture other quotes,
+   this would mean this upper bound never really matters. *)
+let mode_quote_max : Value.r =
+  { Value.Const.max with areality = Global } |> Value.of_const
+
 (** The [expected_mode] of a quoted expression value when it is spliced. *)
 let mode_spliced =
   let open Mode_hint in
@@ -8692,6 +8700,11 @@ and type_expect_
             (fun mode ->
               Value.imply_const_with Linearity Linearity.Const.Many mode)
             expected_mode
+      in
+      let expected_mode =
+        mode_morph
+          (fun mode -> Mode.Value.meet [mode; mode_quote_max])
+          expected_mode
       in
       let ty = newgenvar (Jkind.Builtin.any ~why:Inside_quote) in
       let expr_ty = Predef.type_code (newgenty (Tquote ty)) in
