@@ -2,7 +2,7 @@
  (name ocaml_index)
  (public_name ocaml-index)
  (package ocaml-index)
- (libraries lib ocaml_typing ocaml_utils merlin_index_format merlin_utils yojson)
+ (libraries merlin_ocaml_index ocaml_typing ocaml_utils merlin_index_format merlin_utils yojson)
  (flags
   :standard
   -open Ocaml_typing
