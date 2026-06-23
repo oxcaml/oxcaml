@@ -304,7 +304,8 @@ _install: compiler duneconf/merlin_install.ws
 	# assembled) and fold it into the install.
 	$(dune) build $(ws_merlin) \
           --only-packages=merlin,merlin-lib,dot-merlin-reader,ocaml-index \
-		  @install external/csexp/src/csexp.cma external/csexp/src/csexp.cmxa
+		  @install external/csexp/src/merlin_csexp.cma \
+          external/csexp/src/merlin_csexp.cmxa
 	$(cpl) _build/install/merlin_install/bin/* _install/bin/
 	mkdir -p _install/lib/ocaml/stublibs
 	$(cpl) _build/install/merlin_install/lib/stublibs/* \
@@ -317,24 +318,24 @@ _install: compiler duneconf/merlin_install.ws
 	# Publish the findlib package as lib/ocaml/META.merlin-lib, keeping the
 	# canonical name "merlin-lib"; directory = "merlin" points findlib at the
 	# files in lib/ocaml/merlin/. Point the csexp dependency at the bundled
-	# subpackage merlin-lib.csexp.
+	# subpackage merlin-lib.merlin_csexp.
 	echo 'directory = "merlin"' > _install/lib/ocaml/META.merlin-lib
-	sed -e 's/\bcsexp\b/merlin-lib.csexp/g' \
+	sed -e 's/\bcsexp\b/merlin-lib.merlin_csexp/g' \
           _build/install/merlin_install/lib/merlin-lib/META \
           >> _install/lib/ocaml/META.merlin-lib
 	# Bundle csexp in with Merlin since it is a dependency. (Although yojson is
 	# a Merlin dependency as well, it is only depended on by the statically
 	# linked binaries and not any of the libraries, so it does not need to be
 	# included.)
-	mkdir -p _install/lib/ocaml/merlin/csexp
-	$(cpl) _build/merlin_install/external/csexp/src/csexp.cma \
-          _build/merlin_install/external/csexp/src/csexp.cmxa \
-          _build/merlin_install/external/csexp/src/csexp.a \
-          _build/merlin_install/external/csexp/src/.csexp.objs/byte/csexp.cmi \
-          _build/merlin_install/external/csexp/src/.csexp.objs/byte/csexp.cmti \
-          _build/merlin_install/external/csexp/src/.csexp.objs/native/csexp.cmx \
-          _install/lib/ocaml/merlin/csexp/
-	printf '\npackage "csexp" (\n  directory = "csexp"\n  description = "Bundled csexp (intended for use only by Merlin)"\n  archive(byte) = "csexp.cma"\n  archive(native) = "csexp.cmxa"\n)\n' \
+	mkdir -p _install/lib/ocaml/merlin/merlin_csexp
+	$(cpl) _build/merlin_install/external/csexp/src/merlin_csexp.cma \
+          _build/merlin_install/external/csexp/src/merlin_csexp.cmxa \
+          _build/merlin_install/external/csexp/src/merlin_csexp.a \
+          _build/merlin_install/external/csexp/src/.merlin_csexp.objs/byte/merlin_csexp.cmi \
+          _build/merlin_install/external/csexp/src/.merlin_csexp.objs/byte/merlin_csexp.cmti \
+          _build/merlin_install/external/csexp/src/.merlin_csexp.objs/native/merlin_csexp.cmx \
+          _install/lib/ocaml/merlin/merlin_csexp/
+	printf '\npackage "merlin_csexp" (\n  directory = "merlin_csexp"\n  description = ""\n  archive(byte) = "merlin_csexp.cma"\n  archive(native) = "merlin_csexp.cmxa"\n)\n' \
           >> _install/lib/ocaml/META.merlin-lib
 
 # Copy _install to the final install directory (no-op if they are the same)

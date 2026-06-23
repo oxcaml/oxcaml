@@ -119,9 +119,9 @@ end) (Chan : sig
   type in_chan
   type out_chan
 
-  val read : in_chan -> (Csexp.t, string) result IO.t
+  val read : in_chan -> (Merlin_csexp.t, string) result IO.t
 
-  val write : out_chan -> Csexp.t -> unit IO.t
+  val write : out_chan -> Merlin_csexp.t -> unit IO.t
 end) :
   S
     with type 'a io = 'a IO.t
