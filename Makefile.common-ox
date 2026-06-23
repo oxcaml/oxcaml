@@ -46,27 +46,33 @@ main_ocamlopt_optimization_flags := -O3
 endif
 
 define dune_runtime_stdlib_context
-(lang dune 2.8)
+(lang dune 3.22)
+(using oxcaml 0.1)
 (context (default
   (name runtime_stdlib)
   (profile main)
+  (cms_cmt_dependency cms)
   (paths
     (PATH ("$(CURDIR)/_build/_bootinstall/bin" :standard))
     (OCAMLLIB ("$(CURDIR)/_build/_bootinstall/lib/ocaml")))
   (env (_
+    (bin_annot_cms true)
     (flags (:standard -directory stdlib -warn-error +A -alert -unsafe_multidomain))
     $(ENV_VARS)))))
 endef
 
 define dune_main_context
-(lang dune 2.8)
+(lang dune 3.22)
+(using oxcaml 0.1)
 (context (default
   (name main)
   (profile $(main_build_profile))
+  (cms_cmt_dependency cms)
   (paths
     (PATH ("$(CURDIR)/_build/_bootinstall/bin" :standard))
     (OCAMLLIB ("$(CURDIR)/_build/runtime_stdlib_install/lib/ocaml_runtime_stdlib")))
   (env (_
+    (bin_annot_cms true)
     (flags (:standard -directory compiler-distro -warn-error +A -alert -unsafe_multidomain))
     ; We never want to build the compiler itself with AddressSanitizer enabled.
     (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
@@ -194,7 +200,7 @@ _build/_bootinstall: Makefile.config $(dune_config_targets)
 # Do not include :standard as it is ignored
 # See: https://github.com/ocaml/dune/issues/13225
 	echo '($(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_upstream_flags.sexp
-	echo '($(OXCAML_DWARF_FLAGS_FOR_COMPILER) -bin-annot-cms $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_oxcaml_flags.sexp
+	echo '($(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_oxcaml_flags.sexp
 	echo '( )' > boot_oc_cflags.sexp
 	echo '( $(OC_CFLAGS) )' > oc_cflags.sexp
 	echo '( $(subst -I $(ROOTDIR)/,-I $(CURDIR)/,$(OC_CPPFLAGS)) )' > oc_cppflags.sexp
@@ -250,14 +256,11 @@ _install: compiler
 	done
 	mkdir _install/lib/stublibs
 	cp _build/main/parser.cmly _install/lib/ocaml/compiler-libs/
-	find _build/main/ \( -name "flambda2*.cmi" -or -name "flambda2*.cms" \
+	find _build/main/ \( -name "flambda2*.cmi" \
+          -or -name "flambda2*.cmsi" -or -name "flambda2*.cms" \
           -or -name "flambda2*.cmti" -or -name "flambda2*.cmt" \) \
           -exec cp -f {} _install/lib/ocaml/compiler-libs \;
-	# CR-sspies: Hack to copy the .cms files into the install directory.
-	# Fix this once the upstream dune has support for -bin-annot-cms.
-	# This only copies part of the files, mainly meant for metrics. It only covers
-	# about half of the files which we would want to copy over.
-	find _build/runtime_stdlib/stdlib/ -name '*.cms' -exec cp -f {} _install/lib/ocaml/ \;
+
 
 # Copy _install to the final install directory (no-op if they are the same)
 install: _install
