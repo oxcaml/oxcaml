@@ -1007,7 +1007,10 @@ let decide_continuation_specialization ~dacc ~switch ~scrutinee =
       | `Too_many_unknown_uses ->
         Profile.Counters.incr "too_much_unknown" counters
       | `Too_costly -> Profile.Counters.incr "not_beneficial" counters
-      | `Specialized _ -> Profile.Counters.incr "specialized" counters)
+      | `Specialized { spec_budget_cost; _ } ->
+        counters
+        |> Profile.Counters.incr "specialized"
+        |> Profile.Counters.add "generated" spec_budget_cost)
 
 let simplify_switch dacc switch ~down_to_up =
   let scrutinee = Switch.scrutinee switch in
