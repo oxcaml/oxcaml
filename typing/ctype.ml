@@ -1039,7 +1039,8 @@ let rec copy_spine copy_scope ty =
   | Tquote _
   | Tsplice _
   | Tquote_eval _
-  | Tof_kind _ -> ty
+  | Tof_kind _
+  | Tbox _ -> ty
   | ( Tarrow _ | Tpoly _ | Trepr _ | Ttuple _ | Tunboxed_tuple _ | Tpackage _
     | Tconstr _ ) as desc ->
       let level = get_level ty in
@@ -1500,7 +1501,8 @@ let rec copy ?partial ?keep_names copy_scope ty =
                   Tsubst (ty, None) -> ty
                   (* TODO: is this case possible?
                      possibly an interaction with (copy more) below? *)
-                | Tconstr _ | Tquote _ | Tsplice _ | Tnil | Tof_kind _ ->
+                | Tconstr _ | Tquote _ | Tsplice _ | Tnil | Tof_kind _
+                | Tbox _ ->
                     copy more
                 | Tvar _ | Tunivar _ ->
                     if keep then more else newty mored
@@ -2356,7 +2358,28 @@ let rec try_expand_once_gen expand_abbrev env ty =
       try_expand_once_gen expand_abbrev (decr_stage env) t |> new_splice_ty
   | Tquote_eval t ->
       try_expand_once_gen expand_abbrev (incr_stage env) t |> new_quote_eval_ty
+  | Tbox t ->
+      try_expand_once_gen expand_abbrev env t |> new_box_ty
   | _ -> raise Cannot_expand
+
+let unbox_ty env ty =
+  match get_desc ty with
+  | Tconstr (p, args, _) ->
+    let pu = Path.unboxed_version p in
+    begin match Env.find_type pu env with
+    | _ -> Some (newty2 ~level:(get_level ty) (Tconstr (pu, args, ref Mnil)))
+    | exception Not_found -> None
+    end
+  | _ ->
+    simple_unbox_ty ty
+
+let is_unboxable_ty env ty = unbox_ty env ty |> Option.is_some
+
+(* Only valid on types that pass [is_unboxable_ty] *)
+let unbox_ty_exn env ty =
+  match unbox_ty env ty with
+  | Some ty -> ty
+  | None -> invalid_arg "not unboxable"
 
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
@@ -2401,110 +2424,14 @@ let try_expand_safe env ty =
 
 (* Perform one of the following head-position beta reductions via rewrites:
    * Reduce a quoted-eval through a concrete (top-level) type constructor.
-   * Cancel a quote-splice pair. *)
+   * Cancel a quote-splice pair.
+   * Simplify a [Tbox] over a type with a unboxed version. *)
 let rec try_reduce_once env t =
-  let path_must_be_toplevel env path =
-    if not (Env.path_is_toplevel_in_quotations env path) then
-      raise Cannot_expand
-  in
-  let try_reduce_poly env t = if is_Tpoly t then try_reduce_once env t else t in
   match get_desc t with
-  | Tquote_eval t -> begin
-    match get_desc t with
-    | Tvar _ | Tunivar _ -> raise Cannot_expand
-    (* [<[t1 -> t2]> eval]  ==>  [<[t1]> eval -> <[t2]> eval] *)
-    | Tarrow (a, t1, t2, c) ->
-      (* Reduce the parameter type's [Tpoly] immediately *)
-      let t1' = new_quote_eval_ty t1 |> try_reduce_once env in
-      let t2' = new_quote_eval_ty t2 in
-      Tarrow (a, t1', t2', c)
-    (* [<[t1 * t2]> eval]  ==>  [<[t1]> eval * <[t2]> eval] *)
-    | Ttuple tl ->
-      Ttuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
-    (* [<[#(t1 * t2)]> eval]  ==>  [#(<[t1]> eval * <[t2]> eval)] *)
-    | Tunboxed_tuple tl ->
-      Tunboxed_tuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
-    (* [<[(t1, t2) typ]> eval]  ==>  [(<[t1]> eval, <[t2]> eval) typ] *)
-    | Tconstr (p, tl, a) ->
-      path_must_be_toplevel env p;
-      Tconstr (p, List.map new_quote_eval_ty tl, a)
-    (* [<[ < .. > ]> eval]  ==>  [< <[..]> eval >] *)
-    | Tobject (t, ct) ->
-      (* Attempt to reduce the field list immediately:
-         - If the object type is open, then its tail ([Tvar] or [Tunivar])
-           will [raise Cannot_expand]. [Cannot_expand] propagates to here
-           so the [Tobject] does not reduce at all.
-           Alternatively, the object type has a private row type given by
-           a [Tconstr], in which case we will reduce if it is top-level.
-         - If the object type is closed, its final element is a [Tnil] and
-           the entire [Tobject] will reduce just fine. *)
-      (* CR metaprogramming jbachurski: As for [Tvariant], it would be nicer
-         to support open object types here. *)
-      Tobject (
-        try_reduce_once env (new_quote_eval_ty t),
-        ref (
-          Option.map
-            (fun (p, tl) ->
-              path_must_be_toplevel env p;
-              p, List.map new_quote_eval_ty tl)
-            !ct))
-    (* [<[ < a: t, .. > ]> eval] ==> [<a : <[t]> eval, <[..]> eval >] *)
-    | Tfield (s, k, t_method, t_rest) ->
-      Tfield (
-        s, k,
-        (* If the method type's [Tpoly] is present, we reduce it. *)
-        try_reduce_poly env (new_quote_eval_ty t_method),
-        (* Immediately reduce other fields to make sure we don't get stuck. *)
-        try_reduce_once env (new_quote_eval_ty t_rest))
-    | Tnil -> Tnil
-    (* reduce in subterm *)
-    | Tquote _ | Tsplice _ | Tquote_eval _ ->
-      Tquote_eval (try_reduce_once (incr_stage env) t)
-    (* [<[ < > ]> eval] ==> [< >] *)
-    (* [<[ [ `A of t ... ] | ]> eval] ==> [ [ `A of <[t]> eval | ... ] ] *)
-    | Tvariant row ->
-      (* Immediately beta-reduce [more] -- only reduces closed variant types *)
-      (* CR metaprogramming jbachurski: We should not need a restriction to
-         closed row types, and allow having [Tquote_eval] on row variables.
-         As is, this is incomplete and order-dependent. Same for [Tobject]. *)
-      let more = row_more row |> new_quote_eval_ty |> try_reduce_once env in
-      Tvariant (copy_row new_quote_eval_ty true row false more)
-    (* [<['a. t]> eval] ==> ['b. (<[{$'b/'a} t]> eval)],
-        where {t/x} is a substitution of t for x. *)
-    | Tpoly (t, tl) ->
-      (* We quantify again, but with the univars [tl'] at an outer stage.
-          This means all instances of univars [tl] have to be replaced
-          by a corresponding instance in [tl'] spliced. *)
-      let copy tv =
-        newty3 ~level:(get_level tv) ~scope:(get_scope tv) (get_desc tv)
-        |> new_splice_ty
-      in
-      let tl', t' =
-        For_copy.with_scope (fun copy_scope ->
-          instance_poly' copy_scope ~keep_names:true
-            ~fixed:false ~partial:true ~copy_var:(Some copy) tl t)
-      in
-      let tl' =
-        List.map
-          (fun t -> match get_desc t with Tsplice uv -> uv | _ -> assert false)
-          tl'
-      in
-      Tpoly (new_quote_eval_ty t', tl')
-    (* [<[(sort 'a). t]> eval] ==> [(sort 'a). <[t]> eval] *)
-    | Trepr (t, sl) ->
-      Trepr (new_quote_eval_ty t, sl)
-    (*     [<[ module S with type typ = t ]> eval]
-        ==> [module S with type typ = <[t]> eval] *)
-    | Tpackage { pack_path; pack_cstrs } ->
-      path_must_be_toplevel env pack_path;
-      Tpackage { pack_path;
-                 pack_cstrs =
-                   List.map (fun (n, t) -> n, new_quote_eval_ty t)
-                     pack_cstrs }
-    (* It is safe not to expand [Tof_kind], and we do not need to currently *)
-    | Tof_kind _ -> raise Cannot_expand
-    | Tlink _ | Tsubst _ -> assert false
-    end |> newty2 ~level:(get_level t)
+  | Tquote_eval t ->
+    try_reduce_quote_eval env t |> newty2 ~level:(get_level t)
+  | Tbox t ->
+    try_reduce_box t |> newty2 ~level:(get_level t)
   | Tsplice t -> begin
     match get_desc t with
     (* [$<[ t ]>] ==> [t] ]>] *)
@@ -2527,21 +2454,139 @@ let rec try_reduce_once env t =
     end
   | _ -> raise Cannot_expand
 
+and try_reduce_quote_eval env t =
+  let path_must_be_toplevel env path =
+    if not (Env.path_is_toplevel_in_quotations env path) then
+      raise Cannot_expand
+  in
+  let try_reduce_poly env t = if is_Tpoly t then try_reduce_once env t else t in
+  match get_desc t with
+  | Tvar _ | Tunivar _ -> raise Cannot_expand
+  (* [<[t1 -> t2]> eval]  ==>  [<[t1]> eval -> <[t2]> eval] *)
+  | Tarrow (a, t1, t2, c) ->
+    (* Reduce the parameter type's [Tpoly] immediately *)
+    let t1' = new_quote_eval_ty t1 |> try_reduce_once env in
+    let t2' = new_quote_eval_ty t2 in
+    Tarrow (a, t1', t2', c)
+  (* [<[t1 * t2]> eval]  ==>  [<[t1]> eval * <[t2]> eval] *)
+  | Ttuple tl ->
+    Ttuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
+  (* [<[t box]> eval]  ==>  [<[t]> eval box] *)
+  | Tbox t ->
+    Tbox (new_quote_eval_ty t)
+  (* [<[#(t1 * t2)]> eval]  ==>  [#(<[t1]> eval * <[t2]> eval)] *)
+  | Tunboxed_tuple tl ->
+    Tunboxed_tuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
+  (* [<[(t1, t2) typ]> eval]  ==>  [(<[t1]> eval, <[t2]> eval) typ] *)
+  | Tconstr (p, tl, a) ->
+    path_must_be_toplevel env p;
+    Tconstr (p, List.map new_quote_eval_ty tl, a)
+  (* [<[ < .. > ]> eval]  ==>  [< <[..]> eval >] *)
+  | Tobject (t, ct) ->
+    (* Attempt to reduce the field list immediately:
+       - If the object type is open, then its tail ([Tvar] or [Tunivar])
+         will [raise Cannot_expand]. [Cannot_expand] propagates to here
+         so the [Tobject] does not reduce at all.
+         Alternatively, the object type has a private row type given by
+         a [Tconstr], in which case we will reduce if it is top-level.
+       - If the object type is closed, its final element is a [Tnil] and
+         the entire [Tobject] will reduce just fine. *)
+    (* CR metaprogramming jbachurski: As for [Tvariant], it would be nicer
+       to support open object types here. *)
+    Tobject (
+      try_reduce_once env (new_quote_eval_ty t),
+      ref (
+        Option.map
+          (fun (p, tl) ->
+            path_must_be_toplevel env p;
+            p, List.map new_quote_eval_ty tl)
+          !ct))
+  (* [<[ < a: t, .. > ]> eval] ==> [<a : <[t]> eval, <[..]> eval >] *)
+  | Tfield (s, k, t_method, t_rest) ->
+    Tfield (
+      s, k,
+      (* If the method type's [Tpoly] is present, we reduce it. *)
+      try_reduce_poly env (new_quote_eval_ty t_method),
+      (* Immediately reduce other fields to make sure we don't get stuck. *)
+      try_reduce_once env (new_quote_eval_ty t_rest))
+  | Tnil -> Tnil
+  (* reduce in subterm *)
+  | Tquote _ | Tsplice _ | Tquote_eval _ ->
+    Tquote_eval (try_reduce_once (incr_stage env) t)
+  (* [<[ < > ]> eval] ==> [< >] *)
+  (* [<[ [ `A of t ... ] | ]> eval] ==> [ [ `A of <[t]> eval | ... ] ] *)
+  | Tvariant row ->
+    (* Immediately beta-reduce [more] -- only reduces closed variant types *)
+    (* CR metaprogramming jbachurski: We should not need a restriction to
+       closed row types, and allow having [Tquote_eval] on row variables.
+       As is, this is incomplete and order-dependent. Same for [Tobject]. *)
+    let more = row_more row |> new_quote_eval_ty |> try_reduce_once env in
+    Tvariant (copy_row new_quote_eval_ty true row false more)
+  (* [<['a. t]> eval] ==> ['b. (<[{$'b/'a} t]> eval)],
+      where {t/x} is a substitution of t for x. *)
+  | Tpoly (t, tl) ->
+    (* We quantify again, but with the univars [tl'] at an outer stage.
+        This means all instances of univars [tl] have to be replaced
+        by a corresponding instance in [tl'] spliced. *)
+    let copy tv =
+      newty3 ~level:(get_level tv) ~scope:(get_scope tv) (get_desc tv)
+      |> new_splice_ty
+    in
+    let tl', t' =
+      For_copy.with_scope (fun copy_scope ->
+        instance_poly' copy_scope ~keep_names:true
+          ~fixed:false ~partial:true ~copy_var:(Some copy) tl t)
+    in
+    let tl' =
+      List.map
+        (fun t -> match get_desc t with Tsplice uv -> uv | _ -> assert false)
+        tl'
+    in
+    Tpoly (new_quote_eval_ty t', tl')
+  (* [<[(sort 'a). t]> eval] ==> [(sort 'a). <[t]> eval] *)
+  | Trepr (t, sl) ->
+    Trepr (new_quote_eval_ty t, sl)
+  (*  [<[ module S with type typ = t ]> eval]
+      ==> [module S with type typ = <[t]> eval] *)
+  | Tpackage { pack_path; pack_cstrs } ->
+    path_must_be_toplevel env pack_path;
+    Tpackage { pack_path;
+               pack_cstrs =
+                 List.map (fun (n, t) -> n, new_quote_eval_ty t) pack_cstrs }
+  (* It is safe not to expand [Tof_kind], and we do not need to currently *)
+  | Tof_kind _ -> raise Cannot_expand
+  | Tlink _ | Tsubst _ -> assert false
+
+and try_reduce_box t =
+  match get_desc t with
+  (* [t# box] ==> [t] *)
+  | Tconstr (p, args, _) ->
+    begin match Path.boxed_version p with
+    | Some boxed_p -> Tconstr (boxed_p, args, ref Mnil)
+    | None -> raise Cannot_expand
+    end
+  (* [#(t1 * t2) box] ==> [t1 * t2] *)
+  | Tunboxed_tuple tys -> Ttuple tys
+  | _ -> raise Cannot_expand
+
 (* Perform head-position reductions exhaustively til the normal form. *)
 let rec try_reduce env ty =
   let ty' = try_reduce_once env ty in
   try try_reduce env ty'
   with Cannot_expand -> ty'
 
-(* [Predef]'s [eval] is special -- we want to always expand it in [reduce_head],
-   so we special-case its abbreviation expansion there. *)
-let expand_eval_abbrev env ty =
+(* [Predef]'s [eval] and [box] are special -- we want to always expand it in
+   [reduce_head], so we special-case its abbreviation expansion there. *)
+let expand_reducible_abbrevs env ty =
   match get_desc ty with
-  | Tconstr (path, [_], _) when Path.same path Predef.path_eval ->
+  | Tconstr (path, [_], _) when Path.same path Predef.path_eval
+                             || Path.same path Predef.path_box ->
     try_expand_once env ty
   | _ -> raise Cannot_expand
 
-let try_expand_eval_once = try_expand_once_gen expand_eval_abbrev
+
+let try_expand_reducible_abbrevs_once =
+   try_expand_once_gen expand_reducible_abbrevs
 
 (* Fully expand the head of a type. *)
 let try_expand_head
@@ -2556,10 +2601,10 @@ let try_expand_head
   try loop try_once env ty
   with Cannot_expand -> try_reduce env ty
 
-let reduce_head ~expand_eval env ty =
+let reduce_head ~expand_reducible_abbrevs env ty =
   let try_once =
-    if expand_eval
-    then try_expand_eval_once
+    if expand_reducible_abbrevs
+    then try_expand_reducible_abbrevs_once
     else (fun _env _ty -> raise Cannot_expand)
   in
   try try_expand_head try_once env ty
@@ -2613,6 +2658,7 @@ let rec extract_concrete_typedecl env ty =
   | Tquote ty -> extract_concrete_typedecl (incr_stage env) ty
   | Tsplice ty -> extract_concrete_typedecl (decr_stage env) ty
   | Tquote_eval ty -> extract_concrete_typedecl (incr_stage env) ty
+  | Tbox ty -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
   | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
@@ -2652,7 +2698,13 @@ let is_principal ty =
 type unwrapped_type_expr =
   { ty : type_expr
   ; modality : Mode.Modality.Const.t
-  ; or_null : (type_declaration * unwrapped_type_expr) option;
+  ; or_null : unwrapped_or_null option;
+  }
+
+and unwrapped_or_null =
+  { decl : type_declaration
+  ; args : type_expr list
+  ; prev : unwrapped_type_expr
   }
 
 let mk_unwrapped_type_expr ty =
@@ -2735,7 +2787,7 @@ let unbox_once env ty =
             Stepped
               { ty = apply ca_type ~extra_substs:[];
                 modality;
-                or_null = Some (decl, ty) }
+                or_null = Some { decl; args; prev = ty } }
           | None ->
             Misc.fatal_error "Invalid constructor for Variant_with_null"
           end
@@ -2765,7 +2817,7 @@ let contained_without_boxing env ty =
   | Tpoly (ty, _) -> [ty]
   | Trepr (_, _) ->  Misc.fatal_error "Ctype.contained_without_boxing: repr"
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
-  | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
+  | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _ | Tbox _
   | Tquote _ | Tsplice _ | Tquote_eval _ -> []
 
 (* We use ty_prev to track the last type for which we found a definition,
@@ -2844,7 +2896,7 @@ let apply_layout_wrapping_l ~env
     | Error _ -> Jkind_types.Layout.Any Jkind_types.Scannable_axes.max
   in
   match or_null with
-  | Some (_, prev) ->
+  | Some { prev; _ } ->
     (* The layout on ['a or_null] is imprecise - it's always [scannable]. But
         when ['a] is [non_float]/[non_pointer64]/[non_pointer], we can give
         ['a or_null] the same separability (per [Jkind.apply_or_null_l]). So
@@ -2860,17 +2912,19 @@ let apply_jkind_wrapping_l ~env ~level
           ~unwrapped_ty:{ ty; or_null; modality } jkind =
   begin
     match or_null with
-    | Some (decl, _) ->
-      (* We get the mode crossing behavior of the wrapped jkind from the
-          declaration of the [or_null]-like type. *)
-      let instance_jkind =
-        jkind_subst env level decl.type_params [ty] decl.type_jkind
-      in
+    | Some { decl; args; _ } ->
+      (* The declaration supplies the mode crossing behavior of the
+         [or_null]-like type. The stored arguments instantiate that behavior
+         for the wrapper that was unwrapped. *)
       begin match
         apply_layout_wrapping_l ~env
           ~unwrapped_ty:{ ty; modality; or_null } jkind
       with
-      | Ok layout -> Ok (Jkind.set_layout instance_jkind layout)
+      | Ok layout ->
+        let instance_jkind =
+          jkind_subst env level decl.type_params args decl.type_jkind
+        in
+        Ok (Jkind.set_layout instance_jkind layout)
       | Error _ as e -> e
       end
     | None -> Ok jkind
@@ -2994,6 +3048,7 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
     estimate_type_jkind ~expand_components ~ignore_mod_bounds (incr_stage env)
       ty
     |> Jkind.map_type_expr new_quote_ty
+  | Tbox _ -> Jkind.Builtin.value ~why:Boxed
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
@@ -4313,14 +4368,20 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp_fields type_pairs env fi1 fi2
         | (Tfield _, Tfield _, _, _) ->       (* Actually unused *)
             mcomp_fields type_pairs env t1' t2'
+        | (Tnil, Tnil, _, _) ->
+            ()
         | (Tquote t1, Tquote t2, _, _) ->
             mcomp type_pairs (incr_stage env) t1 t2
         | (Tsplice t1, Tsplice t2, _, _) ->
             mcomp type_pairs (decr_stage env) t1 t2
         | (Tquote_eval t1, Tquote_eval t2, _, _) ->
             mcomp type_pairs (incr_stage env) t1 t2
-        | (Tnil, Tnil, _, _) ->
-            ()
+        | (Tbox t1, Tbox t2, _, _) ->
+            mcomp type_pairs env t1 t2
+        | (Tbox t, _, _, _) when is_unboxable_ty env t2' ->
+          mcomp type_pairs env t (unbox_ty_exn env t2')
+        | (_, Tbox t, _, _) when is_unboxable_ty env t1' ->
+          mcomp type_pairs env (unbox_ty_exn env t1') t
         | (Tpoly (t1, []), Tpoly (t2, []), _, _) ->
             mcomp type_pairs env t1 t2
         | (Tpoly (t1, tl1), Tpoly (t2, tl2), _, _) ->
@@ -4974,6 +5035,12 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_with_decr_stage uenv (fun uenv -> unify uenv (new_quote_ty t1') s2)
   | (_, Tquote s2) when is_flexible_ty s2 ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv (new_splice_ty t1') s2)
+  | (Tbox t1, Tbox t2) ->
+      unify uenv t1 t2
+  | (_, Tbox t2) when is_unboxable_ty (get_env uenv) t1' ->
+      unify uenv (unbox_ty_exn (get_env uenv) t1') t2
+  | (Tbox t1, _) when is_unboxable_ty (get_env uenv) t2' ->
+      unify uenv t1 (unbox_ty_exn (get_env uenv) t2)
   | (Tfield _, Tfield _) -> (* special case for GADTs *)
       unify_fields uenv t1' t2'
   | _ ->
@@ -6261,7 +6328,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           TypePairs.add pairs (t1', t2');
           match (get_desc t1', get_desc t2') with
             (Tvar { jkind }, _) when may_instantiate inst_nongen t1' ->
-              let t2 = reduce_head ~expand_eval:false env t2 in
+              let t2 = reduce_head ~expand_reducible_abbrevs:false env t2 in
               moregen_occur env (get_level t1') t2;
               update_scope_for Moregen (get_scope t1') t2;
               (* use [check], not [constrain], here because [constrain] would be like
@@ -6338,6 +6405,14 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tquote_eval t1, Tquote_eval t2) ->
               moregen inst_nongen variance type_pairs
                 (incr_stage env) t1 t2
+          | (Tbox t1, Tbox t2) ->
+              moregen inst_nongen variance type_pairs env t1 t2
+          | (Tbox t, _) when is_unboxable_ty env t2' ->
+              moregen inst_nongen variance type_pairs
+                env t (unbox_ty_exn env t2')
+          | (_, Tbox t) when is_unboxable_ty env t1' ->
+              moregen inst_nongen variance type_pairs
+                env (unbox_ty_exn env t1') t
           | (_, _) ->
               raise_unexplained_for Moregen
         end
@@ -6843,6 +6918,8 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           | (Tquote_eval t1, Tquote_eval t2) ->
               eqtype rename type_pairs subst
                 (incr_stage env) ~do_jkind_check t1 t2
+          | (Tbox t1, Tbox t2) ->
+              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (_, _) ->
               raise_unexplained_for Equality
         end
@@ -7574,6 +7651,10 @@ let rec build_subtype env (visited : transient_expr list)
       in
       if c > Unchanged then (newty (Tquote_eval t1'), c)
       else (t, Unchanged)
+  | Tbox t1 ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Tbox t1'), c)
+      else (t, Unchanged)
   | Tnil ->
       if posi then
         let v = newvar (Jkind.Builtin.value ~why:Tnil) in
@@ -7762,6 +7843,12 @@ let rec subtype_rec env trace t1 t2 cstrs =
          subtype_rec (decr_stage env) trace t1 t2 cstrs
     | (Tquote_eval t1, Tquote_eval t2) ->
          subtype_rec (incr_stage env) trace t1 t2 cstrs
+    | (Tbox t1, Tbox t2) ->
+         subtype_rec
+           env
+           (Subtype.Diff {got = t1; expected = t2} :: trace)
+           t1 t2
+           cstrs
     | (_, _) ->
         (trace, t1, t2, !univar_pairs)::cstrs
   end
@@ -8195,19 +8282,25 @@ let rec nondep_type_rec ?(expand_private=false) env ids ty =
     if expand_private then try_expand_safe_opt env t
     else try_expand_safe env t
   in
-  match get_desc ty with
-    Tvar { name; jkind } ->
-    let jkind' = nondep_jkind_base env ids jkind in
-    if not (jkind' == jkind) then
-      set_type_desc ty (Tvar { name; jkind = jkind' });
-    ty
-  | Tunivar { name; jkind } ->
-    let jkind' = nondep_jkind_base env ids jkind in
-    if not (jkind' == jkind) then
-      set_type_desc ty (Tvar { name; jkind = jkind' });
-    ty
-  | _ -> try TypeHash.find nondep_hash ty
+  try TypeHash.find nondep_hash ty
   with Not_found ->
+  match get_desc ty with
+  | (Tvar {name; jkind} | Tunivar {name; jkind}) as desc ->
+    let jkind' = nondep_jkind_base env ids jkind in
+    if jkind' == jkind then ty
+    else
+      let desc =
+        match desc with
+        | Tvar _ -> Tvar {name; jkind = jkind'}
+        | Tunivar _ -> Tunivar {name; jkind = jkind'}
+        | _ -> assert false
+      in
+      let ty' =
+        newty3 ~level:(get_level ty) ~scope:(get_scope ty) desc
+      in
+      TypeHash.add nondep_hash ty ty';
+      ty'
+  | _ ->
     let ty' = newgenstub ~scope:(get_scope ty)
                 (Jkind.Builtin.any ~why:Dummy_jkind) in
     TypeHash.add nondep_hash ty ty';

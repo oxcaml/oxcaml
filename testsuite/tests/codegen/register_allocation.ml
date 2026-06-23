@@ -85,7 +85,7 @@ let useless_movs x y = sink (x - y) x
 [%%expect_asm X86_64{|
 useless_movs:
   movq  %rax, %rsi
-  movq  camlTOP6__useless_movs_9@GOTPCREL(%rip), %rax
+  movq  <hidden PC-relative offset>(%rip), %rax
   movq  24(%rax), %rdi
   movq  %rsi, %rax
   subq  %rbx, %rax
@@ -249,7 +249,7 @@ spill_xmm_on_caml_modify:
   movq  %rax, %r12
   vmovsd (%r12), %xmm0
   vmovsd %xmm0, (%rsp)
-  vmovsd .L113(%rip), %xmm0
+  vmovsd <hidden PC-relative offset>(%rip), %xmm0
   vmovsd (%rsp), %xmm1
   vaddsd %xmm0, %xmm1, %xmm0
   vmovsd %xmm0, 8(%rsp)
@@ -362,7 +362,7 @@ double_loop_no_definition_at_beginning:
   addq  72(%r14), %rbx
   addq  $8, %rbx
   movq  $5111, -8(%rbx)
-  movq  camlTOP15__f_33_37_code@GOTPCREL(%rip), %rcx
+  movq  <hidden PC-relative offset>(%rip), %rcx
   movq  %rcx, (%rbx)
   movabsq $108086391056891911, %rcx
   movq  %rcx, 8(%rbx)
@@ -413,7 +413,7 @@ double_loop_no_definition_at_beginning.f:
   movl  $1, %eax
   ret
 .L0:
-  movq  camlTOP15__block741@GOTPCREL(%rip), %rax
+  movq  <hidden PC-relative offset>(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -550,7 +550,7 @@ spill_slot_lifetime:
   ret
 
 spill_slot_lifetime.get_one:
-  vmovsd .L158(%rip), %xmm0
+  vmovsd <hidden PC-relative offset>(%rip), %xmm0
   ret
 |}]
 
@@ -563,10 +563,10 @@ f:
   movq  %rbx, %rdi
   imulq %rax, %rdi
   movq  %rbx, %rax
-  subq  %rdi, %rax
+  imulq %rdi, %rbx
+  subq  %rbx, %rax
   ret
 |}]
-
 
 let[@inline never] register_pressure (x : int) =
   let a = (x, x+1, x+2) in
@@ -584,7 +584,7 @@ let[@inline never] register_pressure (x : int) =
   (a, b, c, d, e, f, g, h, i, j, u, v)
 [%%expect_asm X86_64{|
 register_pressure:
-  subq  $24, %rsp
+  subq  $8, %rsp
   subq  $488, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
@@ -630,15 +630,11 @@ register_pressure:
   leaq  28(%rax), %r8
   movq  %r8, 16(%rcx)
   leaq  -32(%rcx), %r8
-  movq  %r8, 8(%rsp)
   movq  $3072, -8(%r8)
-  movq  8(%rsp), %r8
   movq  %rbx, (%r8)
-  movq  8(%rsp), %r8
   movq  %rdx, 8(%r8)
-  movq  8(%rsp), %r8
   movq  %rcx, 16(%r8)
-  movq  8(%rsp), %r8
+  movq  %r8, (%rsp)
   addq  $-32, %r8
   movq  $3072, -8(%r8)
   movq  %rbx, (%r8)
@@ -679,10 +675,8 @@ register_pressure:
   leaq  -32(%r10), %r11
   movq  $3072, -8(%r11)
   leaq  30(%rax), %rbp
-  movq  %rbp, (%rsp)
   movq  %rbp, (%r11)
   leaq  32(%rax), %rbp
-  movq  %rbp, (%rsp)
   movq  %rbp, 8(%r11)
   addq  $34, %rax
   movq  %rax, 16(%r11)
@@ -699,8 +693,8 @@ register_pressure:
   movq  %r12, 64(%rax)
   movq  %r9, 72(%rax)
   movq  %r8, 80(%rax)
-  movq  8(%rsp), %rbx
+  movq  (%rsp), %rbx
   movq  %rbx, 88(%rax)
-  addq  $24, %rsp
+  addq  $8, %rsp
   ret
 |}]

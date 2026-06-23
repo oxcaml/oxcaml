@@ -503,7 +503,13 @@ val add_signature_lazy: Subst.Lazy.signature_item list -> t -> t
 
 (* Insertion of all fields of a signature, relative to the given path.
    Used to implement open. Returns None if the path refers to a functor,
-   not a structure. *)
+   not a structure.
+
+   Soundness of type checking does not depend on the returned
+   [mode_with_locks]: the locks crossed to reach the opened module have
+   already been threaded into the resulting environment so that later
+   lookups of items brought into scope walk them. The value is returned
+   only so callers can record it on the typedtree's [mod_mode]. *)
 val open_signature:
     used_slot:bool ref ->
     loc:Location.t -> toplevel:bool ->
@@ -512,7 +518,12 @@ val open_signature:
 
 val open_signature_by_path: Path.t -> t -> t
 
-val open_pers_signature: string -> t -> Path.t * mode_with_locks * t
+val open_pers_signature: string -> t -> Path.t * t
+
+(* Like [open_pers_signature], but takes a [.cmi] file path and loads it
+   directly (bypassing the include path) and ignores any in-scope module of
+   the same name. Used to implement [-open-cmi]. *)
+val open_pers_signature_cmi: string -> t -> Path.t * t
 
 val remove_last_open: Path.t -> t -> t option
 

@@ -39,7 +39,7 @@ jobs:
           autoconf
           ./configure -C \
             --prefix $PWD/_install \
-            --enable-runtime5 --enable-dev --enable-multidomain --enable-poll-insertion
+            --enable-dev --enable-multidomain --enable-poll-insertion
           make boot-compiler || true
           test -e .github/workflows/boot-files.txt && cp .github/workflows/boot-files.txt .
           cat boot-files.txt | cut -f2 | RUNTIME_DIR=runtime xargs dune build --root=. --workspace=duneconf/boot.ws || true
@@ -59,7 +59,7 @@ jobs:
           autoconf
           ./configure -C \
             --prefix $PWD/_install \
-            --enable-runtime5 --enable-dev --enable-multidomain --enable-poll-insertion
+            --enable-dev --enable-multidomain --enable-poll-insertion
           make boot-compiler || true
           test -e .github/workflows/boot-files.txt && cp .github/workflows/boot-files.txt .
           cat boot-files.txt | cut -f2 | RUNTIME_DIR=runtime xargs dune build --root=. --workspace=duneconf/boot.ws || true

@@ -45,11 +45,10 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Skip -> pp, Skip
       | Is_closed_by (Monadic, co) -> co.closure, Close_over (Monadic, co)
       | Is_closed_by (Comonadic, co) -> co.closure, Close_over (Comonadic, co)
-      | Captured_by_partial_application ->
-        (Location.none, Expression), Adj_captured_by_partial_application
       | Crossing -> pp, Crossing
       | Unknown -> (Location.none, Unknown), Unknown
-      | Allocation_r loc -> pp, Allocation_l loc
+      | Allocation_r loc -> pp, Allocation loc
+      | Allocation loc -> pp, Allocation_l loc
       | Contains_r (Comonadic, { containing; contained }) ->
         contained, Is_contained_by (Comonadic, { containing; container = pp })
       | Contains_l (Monadic, { containing; contained }) ->
@@ -68,11 +67,10 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Skip -> pp, Skip
       | Close_over (Monadic, co) -> co.closed, Is_closed_by (Monadic, co)
       | Close_over (Comonadic, co) -> co.closed, Is_closed_by (Comonadic, co)
-      | Adj_captured_by_partial_application ->
-        (Location.none, Expression), Captured_by_partial_application
       | Crossing -> pp, Crossing
       | Unknown -> (Location.none, Unknown), Unknown
-      | Allocation_l loc -> pp, Allocation_r loc
+      | Allocation_l loc -> pp, Allocation loc
+      | Allocation loc -> pp, Allocation_r loc
       | Contains_l (Comonadic, { containing; contained }) ->
         contained, Is_contained_by (Comonadic, { containing; container = pp })
       | Contains_r (Monadic, { containing; contained }) ->
@@ -92,10 +90,9 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Unknown -> Unknown
         | Close_over (Monadic, x) -> Close_over (Monadic, x)
         | Close_over (Comonadic, x) -> Close_over (Comonadic, x)
-        | Adj_captured_by_partial_application ->
-          Adj_captured_by_partial_application
         | Crossing -> Crossing
         | Allocation_l loc -> Allocation_l loc
+        | Allocation loc -> Allocation loc
         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
         | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
         | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
@@ -108,9 +105,9 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Unknown -> Unknown
         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
-        | Captured_by_partial_application -> Captured_by_partial_application
         | Crossing -> Crossing
         | Allocation_r loc -> Allocation_r loc
+        | Allocation loc -> Allocation loc
         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
         | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
         | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
@@ -125,12 +122,10 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Close_over (Comonadic, x) -> Close_over (Comonadic, x)
         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
-        | Captured_by_partial_application -> Captured_by_partial_application
-        | Adj_captured_by_partial_application ->
-          Adj_captured_by_partial_application
         | Crossing -> Crossing
         | Allocation_r loc -> Allocation_r loc
         | Allocation_l loc -> Allocation_l loc
+        | Allocation loc -> Allocation loc
         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
         | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
         | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
@@ -147,12 +142,10 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Close_over (Comonadic, x) -> Close_over (Comonadic, x)
         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
-        | Captured_by_partial_application -> Captured_by_partial_application
-        | Adj_captured_by_partial_application ->
-          Adj_captured_by_partial_application
         | Crossing -> Crossing
         | Allocation_l loc -> Allocation_l loc
         | Allocation_r loc -> Allocation_r loc
+        | Allocation loc -> Allocation loc
         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
         | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
         | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
@@ -4737,6 +4730,8 @@ module Report = struct
       Fmt.dprintf "is defined by a layout-polymorphic expression (at %a)"
         (Location.Doc.loc ~capitalize_first:false)
         loc
+    | Captured_by_partial_application ->
+      Fmt.dprintf "has a partial application capturing a value"
 
   let print_allocation_r : allocation -> Fmt.formatter -> unit =
    fun { txt; _ } ->
@@ -4754,6 +4749,8 @@ module Report = struct
     | Lpoly_captured_environment ->
       (* currently not testable *)
       Fmt.dprintf "is a layout-polymorphic expression"
+    | Captured_by_partial_application ->
+      Fmt.dprintf "is captured by a partial application"
 
   let modality_if_relevant ~fixpoint pp =
     if
@@ -4918,6 +4915,10 @@ module Report = struct
       ((Fmt.formatter -> unit) * pinpoint) option =
    fun ~fixpoint pp -> function
     | Skip -> Misc.fatal_error "Skip hint should not be printed"
+    | Allocation _ ->
+      Misc.fatal_error
+        "This hint is from turning an allocation mode into a value mode, and \
+         should never be printed"
     | Unknown -> None
     | Close_over (Comonadic, { closed = pp; _ }) ->
       print_pinpoint pp
@@ -4937,14 +4938,6 @@ module Report = struct
           ( Fmt.dprintf "is used inside %t"
               (print_pp ~definite:true ~capitalize:false),
             pp ))
-    | Captured_by_partial_application ->
-      Some
-        ( Fmt.dprintf "is captured by a partial application",
-          (Location.none, Expression) )
-    | Adj_captured_by_partial_application ->
-      Some
-        ( Fmt.dprintf "has a partial application capturing a value",
-          (Location.none, Expression) )
     | Crossing -> Some (Fmt.dprintf "crosses with something", pp)
     | Allocation_r alloc -> Some (print_allocation_r alloc, pp)
     | Allocation_l alloc -> Some (print_allocation_l alloc, pp)
@@ -5002,34 +4995,95 @@ module Report = struct
       | `Expected -> Fmt.pp_print_string ppf "is expected to be ");
     print_mode side obj ppf a
 
-  (** Some morph hints are said to be "non-rigid", because they should be
-      printed only when they change modes. *)
-  let is_rigid : type l r. (l * r) morph -> bool = function
-    | Unknown -> true
-    | Close_over _ | Is_closed_by _ | Captured_by_partial_application
-    | Contains_l _ | Contains_r _ | Is_contained_by _
-    | Adj_captured_by_partial_application ->
-      true
-    | Allocation_r _ | Allocation_l _ | Skip | Crossing -> false
+  let implements_morph : type a b d.
+      b C.obj -> (a, b, d) C.morph -> a -> b -> bool =
+   fun obj morph a b ->
+    Misc.Le_result.equal ~le:(C.le obj) (C.apply obj morph a) b
+
+  let implements_identity : type a b. a C.obj -> b C.obj -> a -> b -> bool =
+   fun src obj a b ->
+    match C.equal_obj src obj with
+    | Misc.Is_eq -> implements_morph obj (Simple Id) a b
+    | Misc.Is_not_eq -> false
+
+  let implements_value_to_alloc : type l r a b.
+      (C.Regionality.t, C.Locality.t, l * r) C.Locality_morph.t ->
+      a C.obj ->
+      b C.obj ->
+      a ->
+      b ->
+      bool =
+   fun locality_morph src obj a b ->
+    match src, obj with
+    | Regionality, Locality ->
+      implements_morph obj (Simple (Core (Locality_restricted locality_morph)))
+        a b
+    | Comonadic_with_regionality, Comonadic_with_locality ->
+      implements_morph obj (Simple (Core (Locality_full locality_morph))) a b
+    | _, _ -> implements_identity src obj a b
+
+  let implements_alloc_to_value : type l r a b.
+      (C.Locality.t, C.Regionality.t, l * r) C.Locality_morph.t ->
+      a C.obj ->
+      b C.obj ->
+      a ->
+      b ->
+      bool =
+   fun locality_morph src obj a b ->
+    match src, obj with
+    | Locality, Regionality ->
+      implements_morph obj (Simple (Core (Locality_restricted locality_morph)))
+        a b
+    | Comonadic_with_locality, Comonadic_with_regionality ->
+      implements_morph obj (Simple (Core (Locality_full locality_morph))) a b
+    | _, _ -> implements_identity src obj a b
 
   let equal_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
    fun a_obj b_obj a b ->
     match C.equal_obj a_obj b_obj with
     | Misc.Is_eq -> Misc.Le_result.equal ~le:(C.le a_obj) a b
-    | Misc.Is_not_eq -> (
-      (* CR-someday ageorges: Strictly speaking, these are not in fact equal. Here we
-         are doing a hack so that we in fact skip the Skip hint of an alloc_as_value
-         morphism. However, a proper solution is to instead define a specific hint for
-         this morphism. *)
-      match a_obj, b_obj with
-      | Locality, Regionality ->
-        Misc.Le_result.equal ~le:(C.le b_obj)
-          (C.Locality_morph.apply Locality_as_regionality a)
-          b
-      | Regionality, Locality ->
-        Misc.Le_result.equal ~le:(C.le a_obj) a
-          (C.Locality_morph.apply Locality_as_regionality b)
-      | _, _ -> false)
+    | Misc.Is_not_eq -> false
+
+  (** The [Allocation], [Allocation_l] and [Allocation_r] hints are special, and
+      have slightly different skip conditions. An [Allocation] hint should
+      always be skipped, while [Allocation_l] and [Allocation_r] hints are
+      skipped when they change a regionality mode to a different locality mode.
+      In each case, we assert that the hint was applied to their expected
+      associated morphism. *)
+  let should_skip : type l r a b.
+      (l * r) morph ->
+      src:a C.obj ->
+      obj:b C.obj ->
+      a ->
+      b ->
+      (is_skip:bool * fixpoint:bool) =
+   fun hint ~src ~obj a b ->
+    let fixpoint = equal_mode src obj a b in
+    match hint with
+    | Unknown | Close_over _ | Is_closed_by _ | Contains_l _ | Contains_r _
+    | Is_contained_by _ ->
+      (* These morphisms should never be skipped *)
+      ~is_skip:false, ~fixpoint
+    | Skip | Crossing ->
+      (* We only skip when the morphism changes the mode *)
+      ~is_skip:fixpoint, ~fixpoint
+    | Allocation_r _ ->
+      (* We assert that the morphism is value_to_alloc_r2g *)
+      assert (implements_value_to_alloc Regional_to_global src obj a b);
+      (* We only skip when the morphism changes the mode, but allow for axis changes *)
+      ( ~is_skip:(implements_alloc_to_value Locality_as_regionality obj src b a),
+        ~fixpoint )
+    | Allocation_l _ ->
+      (* We assert that the morphism is value_to_alloc_r2l *)
+      assert (implements_value_to_alloc Regional_to_local src obj a b);
+      (* We only skip when the morphism changes the mode, but allow for axis changes *)
+      ( ~is_skip:(implements_alloc_to_value Locality_as_regionality obj src b a),
+        ~fixpoint )
+    | Allocation _ ->
+      (* We always want to skip an Allocation hint. All we need is to assert that the
+         hint was indeed applied to an alloc_as_value morphism *)
+      assert (implements_alloc_to_value Locality_as_regionality src obj a b);
+      ~is_skip:true, ~fixpoint
 
   let rec print_ahint : type a l r.
       ?sub:bool ->
@@ -5042,8 +5096,10 @@ module Report = struct
    fun ?(sub = false) side pp (obj : a C.obj) ppf (a, hint) ->
     match hint with
     | Apply (morph_hint, src, ahint) ->
-      let fixpoint = equal_mode obj src a (fst ahint) in
-      if (not (is_rigid morph_hint)) && fixpoint
+      let ~is_skip, ~fixpoint =
+        should_skip morph_hint ~src ~obj (fst ahint) a
+      in
+      if is_skip
       then print_ahint ~sub side pp src ppf ahint
       else (
         print_mode_with_side ~sub side obj ppf a;
@@ -6150,9 +6206,6 @@ module Value_with (Areality : Areality) = struct
     let monadic = Monadic.hint ?hint:monadic t.monadic in
     { monadic; comonadic }
 
-  let wrap ?monadic ?comonadic f t =
-    t |> unhint |> f |> hint ?monadic ?comonadic
-
   module Const = struct
     (* CR-soon zqian: make a functor [Mode.Value.Const.Make] to generalize over any type
        operator applied on each mode constants. *)
@@ -6714,76 +6767,41 @@ module Const = struct
   end
 end
 
-(* CR-someday zqian: all the function that converts between [Alloc] and [Value] should
-   operate on [Unhint] so they can be composed and assigned hint as a whole. *)
-
-let comonadic_locality_as_regionality comonadic =
-  S.Unhint.apply Value.Comonadic.Obj.obj
-    (Simple (Core (Locality_full Locality_as_regionality))) comonadic
-
-let comonadic_regional_to_local comonadic =
-  S.Unhint.apply Alloc.Comonadic.Obj.obj
-    (Simple (Core (Locality_full Regional_to_local))) comonadic
-
-let locality_as_regionality_unhint l =
-  S.Unhint.apply C.Regionality
-    (Simple (Core (Locality_restricted Locality_as_regionality))) l
-
 let locality_as_regionality m =
-  m |> Locality.unhint |> locality_as_regionality_unhint |> Regionality.hint
+  S.apply C.Regionality
+    (Simple (Core (Locality_restricted Locality_as_regionality))) m
 
-let alloc_as_value_unhint m =
-  let { comonadic; monadic } = m in
-  let comonadic =
-    S.Unhint.apply Value.Comonadic.Obj.obj
-      (Simple (Core (Locality_full Locality_as_regionality))) comonadic
-  in
-  { comonadic; monadic }
-
-let alloc_as_value ?hint m =
-  m |> Alloc.unhint |> alloc_as_value_unhint
-  |> Value.hint ~monadic:Skip ?comonadic:hint
-
-let alloc_to_value_l2r_unhint m =
-  let { comonadic; monadic } = m in
-  let comonadic =
-    S.Unhint.apply Value.Comonadic.Obj.obj
-      (Simple (Core (Locality_full Local_to_regional))) comonadic
-  in
-  { comonadic; monadic }
+let alloc_as_value ?allocation { comonadic; monadic } =
+  let hint = Option.map (fun a -> Hint.Allocation a) allocation in
+  { comonadic =
+      S.apply Value.Comonadic.Obj.obj ?hint
+        (Simple (Core (Locality_full Locality_as_regionality))) comonadic;
+    monadic = Value.Monadic.apply_hint Skip monadic
+  }
 
 let alloc_to_value_l2r m =
-  m |> Alloc.disallow_right |> Alloc.unhint |> alloc_to_value_l2r_unhint
-  |> Value.hint ~monadic:Skip
+  let { comonadic; monadic } = Alloc.disallow_right m in
+  { comonadic =
+      S.apply Value.Comonadic.Obj.obj
+        (Simple (Core (Locality_full Local_to_regional))) comonadic;
+    monadic = Value.Monadic.apply_hint Skip monadic
+  }
 
-let value_to_alloc_r2g_unhint m =
-  let { comonadic; monadic } = m in
-  let comonadic =
-    S.Unhint.apply Alloc.Comonadic.Obj.obj
-      (Simple (Core (Locality_full Regional_to_global))) comonadic
-  in
-  { comonadic; monadic }
+let value_to_alloc_r2g ?allocation m =
+  let hint = Option.map (fun a -> Hint.Allocation_r a) allocation in
+  let { comonadic; monadic } = Value.disallow_left m in
+  { comonadic =
+      S.apply Alloc.Comonadic.Obj.obj ?hint
+        (Simple (Core (Locality_full Regional_to_global))) comonadic;
+    monadic = Alloc.Monadic.apply_hint Skip monadic
+  }
 
-let value_to_alloc_r2g ?hint m =
-  m |> Value.disallow_left |> Value.unhint |> value_to_alloc_r2g_unhint
-  |> Alloc.hint ~monadic:Skip ?comonadic:hint
-
-let value_r2g ?hint m =
-  Value.wrap ~monadic:Skip ?comonadic:hint
-    (fun m -> m |> value_to_alloc_r2g_unhint |> alloc_as_value_unhint)
-    (Value.disallow_left m)
-
-let value_to_alloc_r2l_unhint m =
-  let { comonadic; monadic } = m in
-  let comonadic =
-    S.Unhint.apply Alloc.Comonadic.Obj.obj
-      (Simple (Core (Locality_full Regional_to_local))) comonadic
-  in
-  { comonadic; monadic }
-
-let value_to_alloc_r2l ?hint m =
-  m |> Value.unhint |> value_to_alloc_r2l_unhint
-  |> Alloc.hint ~monadic:Skip ?comonadic:hint
+let value_to_alloc_r2l { comonadic; monadic } =
+  { comonadic =
+      S.apply Alloc.Comonadic.Obj.obj
+        (Simple (Core (Locality_full Regional_to_local))) comonadic;
+    monadic = Alloc.Monadic.apply_hint Skip monadic
+  }
 
 module Modality = struct
   (* Inferred modalities
@@ -7733,6 +7751,30 @@ module Crossing = struct
      - [ regional_to_local ∘ fl ∘ f ∘ alloc_as_value m1 <= m2 ]
      where [regional_to_global] is the right adjoint of [alloc_as_value], and
      [regional_to_local] the left adjoint. *)
+
+  let value_to_alloc_r2l_unhint m =
+    let { comonadic; monadic } = m in
+    let comonadic =
+      S.Unhint.apply Alloc.Comonadic.Obj.obj
+        (Simple (Core (Locality_full Regional_to_local))) comonadic
+    in
+    { comonadic; monadic }
+
+  let value_to_alloc_r2g_unhint m =
+    let { comonadic; monadic } = m in
+    let comonadic =
+      S.Unhint.apply Alloc.Comonadic.Obj.obj
+        (Simple (Core (Locality_full Regional_to_global))) comonadic
+    in
+    { comonadic; monadic }
+
+  let comonadic_locality_as_regionality comonadic =
+    S.Unhint.apply Value.Comonadic.Obj.obj
+      (Simple (Core (Locality_full Locality_as_regionality))) comonadic
+
+  let comonadic_regional_to_local comonadic =
+    S.Unhint.apply Alloc.Comonadic.Obj.obj
+      (Simple (Core (Locality_full Regional_to_local))) comonadic
 
   let apply_left_alloc t m =
     m |> alloc_as_value |> apply_left_unhint t |> value_to_alloc_r2l_unhint

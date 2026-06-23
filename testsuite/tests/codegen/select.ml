@@ -152,3 +152,36 @@ repeated_select_repeated:
   cmovne %rdx, %rbx
   ret
 |}]
+
+
+(* CR ttebbi: select blocks automatic unboxing. *)
+let unboxing_through_select b x y =
+  Builtins.select b (Int64_u.to_int64 x) (Int64_u.to_int64 y) |> Int64_u.of_int64
+[%%expect_asm X86_64{|
+unboxing_through_select:
+  subq  $8, %rsp
+  movq  64(%r14), %rsi
+  movq  64(%r14), %rdx
+  subq  $48, %rdx
+  movq  %rdx, 64(%r14)
+  cmpq  80(%r14), %rdx
+  jl    <hidden GC jump pad>
+.L0:
+  addq  72(%r14), %rdx
+  addq  $8, %rdx
+  addq  $24, %rdx
+  movq  $3071, -8(%rdx)
+  movq  caml_int64_ops@GOTPCREL(%rip), %rcx
+  movq  %rcx, (%rdx)
+  movq  %rdi, 8(%rdx)
+  leaq  -24(%rdx), %rdi
+  movq  $3071, -8(%rdi)
+  movq  %rcx, (%rdi)
+  movq  %rbx, 8(%rdi)
+  cmpq  $1, %rax
+  cmovne %rdi, %rdx
+  movq  8(%rdx), %rax
+  movq  %rsi, 64(%r14)
+  addq  $8, %rsp
+  ret
+|}]
