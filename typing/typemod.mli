@@ -60,10 +60,11 @@ val staticity_of_modalities:
 val check_nongen_signature:
         Env.t -> Types.signature -> unit
 
-(* Transform that drops from [cmi_globals] any global named by the [-nondep]
-   flag. Paired with the signature erasure done in [type_interface] /
-   [type_implementation]; applied as a [save_signature] transform. *)
-val remove_nondep_globals:
+(* Transform that drops from [cmi_globals] and [cmi_crcs] any module named by
+   the [-nondep] flag. Paired with the signature erasure done in
+   [type_interface] / [type_implementation]; applied as a [save_signature]
+   transform. *)
+val remove_nondep_from_cmi:
         Cmi_format.cmi_infos_lazy -> Cmi_format.cmi_infos_lazy
         (*
 val type_open_:

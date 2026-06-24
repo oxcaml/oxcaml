@@ -131,26 +131,37 @@ let remove_nondep_dependencies env ~sourcefile sg =
            (Error (Location.in_file sourcefile, env,
                    Cannot_remove_nondep_dependency (Ident.name id))))
 
-(* Drop from [cmi.cmi_globals] any incomplete global named by [-nondep]: once
-   its references have been erased from the signature (see above) the unit no
-   longer needs to remember it for substitution. Applied as a transform at save
-   time so that the live [penv] used by code generation is left untouched. *)
-let remove_nondep_globals (cmi : Cmi_format.cmi_infos_lazy)
+(* Drop from [cmi] any reference to a module named by [-nondep]: once its
+   references have been erased from the signature (see above) the unit no longer
+   needs to remember it, either as an incomplete global in [cmi_globals] (used
+   for substitution) or as an import in [cmi_crcs] (used for consistency
+   checking). Applied as a transform at save time so that the live [penv] used
+   by code generation is left untouched. *)
+let remove_nondep_from_cmi (cmi : Cmi_format.cmi_infos_lazy)
   : Cmi_format.cmi_infos_lazy =
   match !Clflags.nondep_globals with
   | [] -> cmi
   | names ->
       let nondep = List.map Global_module.Name.create_no_args names in
-      let keep (global, _precision) =
+      let keep_global (global, _precision) =
         not (List.exists
                (fun name ->
                   Global_module.Name.equal name (Global_module.to_name global))
                nondep)
       in
       let cmi_globals =
-        Array.of_list (List.filter keep (Array.to_list cmi.cmi_globals))
+        Array.of_list (List.filter keep_global (Array.to_list cmi.cmi_globals))
       in
-      { cmi with cmi_globals }
+      let import_names = List.map Compilation_unit.Name.of_string names in
+      let keep_import import =
+        not (List.exists
+               (fun name -> Import_info.has_name import ~name)
+               import_names)
+      in
+      let cmi_crcs =
+        Array.of_list (List.filter keep_import (Array.to_list cmi.cmi_crcs))
+      in
+      { cmi with cmi_globals; cmi_crcs }
 
 let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   let mode = Mode.Value.newvar () in
@@ -4666,7 +4677,7 @@ let type_implementation target modulename initial_env ast =
             in
             let cmi =
               Profile.record_call "save_cmi" (fun () ->
-                Env.save_signature_with_transform remove_nondep_globals
+                Env.save_signature_with_transform remove_nondep_from_cmi
                   ~alerts (cmi_sg, Staticity.Dynamic)
                   name kind (Unit_info.cmi target))
             in
