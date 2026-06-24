@@ -407,14 +407,8 @@ Error: This value is "alloc" but is expected to be "noalloc_strict".
     the allocations that [stack_] supports -- a [stack_]-marked pair as well. An
     allocation currently forces the enclosing function to [alloc], which is
     above both [noalloc] and [noalloc_strict], so the detected cases error for
-    both; the gaps (marked [CR shsong]) are accepted for both.
-
-    CR shsong: [stack_] handling for the allocation axis is not yet implemented,
-    so a [stack_]-marked allocation still forces [alloc] and errors just like a
-    heap allocation. Once [stack_] is recognized, the [stack_]-marked cases
-    below should be accepted -- a stack allocation does not count towards the
-    allocation axis. (Allocations that [stack_] does not support, and [stack_]
-    on non-allocations, are covered in the negative tests after this section.) *)
+    both. For allocations that are moved to the stack by [stack_], no error
+    is expected. *)
 
 type record_t5 = { x : float; y : float }
 type 'a variant_t5 = Nothing | Just of 'a
@@ -754,16 +748,12 @@ Error: The allocation is "alloc"
          which is expected to be "noalloc_strict".
 |}]
 
-(* CR shsong: rare partial application whose result is a function hidden behind a
+(* Partial application whose result is a function hidden behind a
    type abbreviation ([myfun = int -> int]). Here [f 1 2] is a partial
    application returning [myfun], so it allocates a closure. The detection uses
    [get_desc (expand_head env ty_ret)]: [expand_head] unfolds [myfun] to
-   [int -> int] and the [Tarrow] is seen, so the allocation IS currently caught.
-
-   This case is exactly the one that the simpler [get_desc ty_ret] (without
-   [expand_head], proposed to avoid the GADT scope-escape side effect) would
-   MISS: [get_desc myfun] is a [Tconstr], not a [Tarrow], so the partial
-   application would be wrongly accepted as [noalloc_strict]. *)
+   [int -> int] and the [Tarrow] is seen, so the allocation IS currently
+   caught. *)
 type myfun = int -> int
 let (alloc_partial_app_abbrev @ noalloc_strict)
       (f : (int -> int -> myfun) @ noalloc_strict) = f 1 2
