@@ -743,6 +743,9 @@ static void adopt_orphaned_work (void)
   value orph_ephe_list_live;
   struct caml_final_info *f, *myf, *temp;
 
+  if (caml_domain_is_terminating())
+    return;
+
 #ifdef DEBUG
   /* We mark ephemerons before orphaning them,
      and always re-adopt them during the same cycle. */
@@ -770,11 +773,7 @@ static void adopt_orphaned_work (void)
 
   while (f != NULL) {
     myf = domain_state->final_info;
-    CAMLassert (caml_gc_phase == Phase_sweep_and_mark_main);
 
-    /* updated_first/last may be true if the current domain is terminating
-       and has orphaned some finalisers but now has to adopt back (the same
-       or other) finalisers. */
     if (myf->updated_first){
       (void)caml_atomic_counter_incr(&num_domains_to_final_update_first);
       myf->updated_first = 0;
@@ -1815,16 +1814,35 @@ void caml_mark_roots_stw (int participant_count, caml_domain_state** barrier_par
 
     latest_sweep_allocs = diffmod (work_counter, work_counter_at_sweep_start);
 
+<<<<<<< OxCaml
     /* Orphaned work may contain roots so we adopt them first. */
     adopt_orphaned_work();
 >>>>>>> ocaml/ocaml#14813
 
+||||||| Upstream OCaml
+    /* Orphaned work may contain roots so we adopt them first. */
+    adopt_orphaned_work();
+
+=======
+>>>>>>> ocaml/ocaml#14877
     global_prepare_for_ephe_marking(participant_count);
   }
 
   caml_domain_state* domain = Caml_state;
 
   prepare_for_ephe_marking(domain);
+
+  /* Orphaned work may contain roots so we adopt them first.
+
+     Note: we do not adopt inside the barrier because terminating
+     domains do not adopt, so we must try to adopt on each domain to
+     ensure that at least one does.
+
+     Note: we adopt after [prepare_for_ephe_marking] so that the adoption
+     code observes the ephe-marking state correctly set up, same as when
+     it is called from a major slice.
+  */
+  adopt_orphaned_work();
 
   CAML_EV_BEGIN(EV_MAJOR_MARK_ROOTS);
   {
@@ -2348,10 +2366,20 @@ static uintnat major_collection_slice(intnat howmuch,
 
   call_timing_hook(&caml_major_slice_begin_hook);
 
+<<<<<<< OxCaml
   if (!domain_state->sweeping_done &&
       get_major_slice_sweepwork(mode) > 0) {
     slice_events_begin(mode, &events_begun, &counters);
     if (events_begun) CAML_EV_BEGIN(EV_MAJOR_SWEEP);
+||||||| Upstream OCaml
+  if (!domain_state->sweeping_done) {
+    if (log_events) CAML_EV_BEGIN(EV_MAJOR_SWEEP);
+=======
+  adopt_orphaned_work();
+
+  if (!domain_state->sweeping_done) {
+    if (log_events) CAML_EV_BEGIN(EV_MAJOR_SWEEP);
+>>>>>>> ocaml/ocaml#14877
 
     while (!domain_state->sweeping_done &&
            (budget = get_major_slice_sweepwork(mode)) > 0) {
@@ -2415,6 +2443,11 @@ static uintnat major_collection_slice(intnat howmuch,
   }
 
 mark_again:
+  /* We adopt a second time here so that if a domain goes back to
+     marking several times, it has a chance to adopt on each
+     iteration. */
+  adopt_orphaned_work();
+
   if (caml_marking_started() &&
       !domain_state->marking_done &&
       get_major_slice_markwork(mode) > 0) {
@@ -2463,10 +2496,6 @@ mark_again:
       /* This domain has updated finalise last values */
       (void)caml_atomic_counter_decr(&num_domains_to_final_update_last);
       /* Nothing has been marked while updating last */
-    }
-
-    if (!caml_domain_is_terminating()){
-      adopt_orphaned_work();
     }
 
     /* Ephemerons */
