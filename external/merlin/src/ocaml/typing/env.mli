@@ -450,8 +450,6 @@ val add_value:
     Ident.t -> value_description -> t -> t
 val add_type:
     check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
-val add_type_long_path:
-    check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
 val add_extension:
   check:bool -> ?shape:Shape.t -> rebind:bool -> Ident.t ->
   extension_constructor -> t -> t
@@ -547,9 +545,7 @@ val remove_last_open: Path.t -> t -> t option
 val enter_value:
     ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
     string -> value_description -> t -> Ident.t * t
-val enter_type:
-  ?long_path:bool -> scope:int ->
-  string -> type_declaration -> t -> Ident.t * t
+val enter_type: scope:int -> string -> type_declaration -> t -> Ident.t * t
 val enter_extension:
   scope:int -> rebind:bool -> string ->
   extension_constructor -> t -> Ident.t * t
@@ -705,12 +701,6 @@ val summary: t -> summary
 val keep_only_summary : t -> t
 val env_of_only_summary : (summary -> Subst.t -> t) -> t -> t
 
-(* Update the short paths table *)
-val update_short_paths : t -> t
-
-(* Return the short paths table *)
-val short_paths : t -> Short_paths.t
-
 (* Error report *)
 
 type error =
@@ -771,9 +761,6 @@ val report_jkind_violation_with_offender:
    Format_doc.formatter -> Jkind.Violation.t -> unit) ref
 
 
-(* Forward declaration to break mutual recursion with Printtyp *)
-val shorten_module_path : (t -> Path.t -> Path.t) ref
-
 (** Folds *)
 
 (** Folding over all identifiers (for analysis purpose) *)
@@ -820,8 +807,6 @@ val address_head : address -> address_head
 
 val print_stage : Format_doc.formatter -> stage -> unit
 
-val unbound_class : Path.t
-
 (** merlin: manage internal state *)
 
 val check_state_consistency: unit -> bool
@@ -832,7 +817,7 @@ val with_cmis : (unit -> 'a) -> 'a
 
 val add_merlin_extension_module: Ident.t -> module_type -> t -> t
 val cleanup_functor_caches : stamp:int -> unit
-val scrape_lazy: (t -> Subst.Lazy.module_type -> Subst.Lazy.module_type) ref
+(* val scrape_lazy: (t -> Subst.Lazy.module_type -> Subst.Lazy.module_type) ref *)
 val cleanup_usage_tables : stamp:int -> unit
 
 (** This value should be filled in with [Msupport.raise_error]. [Env] cannot use this

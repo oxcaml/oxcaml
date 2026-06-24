@@ -84,8 +84,6 @@ type 'a t
 
 val empty : unit -> 'a t
 
-val short_paths_basis : 'a t -> Short_paths.Basis.t
-
 val clear : 'a t -> unit
 val clear_missing : 'a t -> unit
 
@@ -134,13 +132,11 @@ val find_import :
   * Global_module.Parameter_name.t list
   * Signature_with_global_bindings.t
 val find : allow_hidden:bool -> 'a t -> 'a sig_reader
-  -> (Global_module.Name.t -> 'a -> Short_paths.Desc.Module.components Lazy.t)
   -> Global_module.Name.t -> allow_excess_args:bool -> 'a
 
 val find_in_cache : 'a t -> Global_module.Name.t -> 'a option
 
 val check : allow_hidden:bool -> 'a t -> 'a sig_reader
-  -> (Global_module.Name.t -> 'a -> Short_paths.Desc.Module.components Lazy.t)
   -> loc:Location.t -> Global_module.Name.t -> unit
 
 (* Lets it be known that the given module is a parameter to this module and thus is

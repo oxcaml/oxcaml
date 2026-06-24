@@ -132,7 +132,7 @@ let ctyp desc typ env loc =
    (its constructor is not available).
 *)
 let unbound_class =
-  Env.unbound_class
+  Path.Pident (Ident.create_local "*undef*")
 
 
                 (************************************)
@@ -495,7 +495,8 @@ let enter_ancestor_met ~loc name ~sign ~meths ~cl_num ~ty ~attrs met_env =
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
       Types.val_loc = loc;
-      val_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) }
+      val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+      val_discourse = Discourse_types.empty; }
   in
   Env.enter_value ~check ~mode:Mode.Value.legacy name desc met_env
 
@@ -512,7 +513,8 @@ let add_self_met loc id sign self_var_kind vars cl_num
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
       Types.val_loc = loc;
-      val_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) }
+      val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+      val_discourse = Discourse_types.empty; }
   in
   Env.add_value ~check ~mode:Mode.Value.legacy id desc met_env
 
@@ -529,7 +531,8 @@ let add_instance_var_met loc label id sign cl_num attrs met_env =
       val_attributes = attrs;
       Types.val_loc = loc;
       val_zero_alloc = Zero_alloc.default;
-      val_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) }
+      val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+      val_discourse = Discourse_types.empty; }
   in
   Env.add_value ~mode:Mode.Value.legacy id desc met_env
 
@@ -1493,6 +1496,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                 val_zero_alloc = Zero_alloc.default;
                 Types.val_loc = vd.val_loc;
                 val_uid = vd.val_uid;
+                val_discourse = Discourse_types.empty;
                }
              in
              let id' = Ident.create_local (Ident.name id) in
@@ -1645,6 +1649,7 @@ let temp_abbrev loc id arity uid =
        type_unboxed_default = false;
        type_uid = uid;
        type_unboxed_version = None;
+       type_discourse = Discourse_types.empty;
       }
   in
   (!params, ty, ty_td)
@@ -1676,6 +1681,7 @@ let initial_env define_class approx
      cty_loc = Location.none;
      cty_attributes = [];
      cty_uid = uid;
+     cty_discourse = Discourse_types.empty;
     }
   in
   let env =
@@ -1688,6 +1694,7 @@ let initial_env define_class approx
        clty_loc = Location.none;
        clty_attributes = [];
        clty_uid = uid;
+       clty_discourse = Discourse_types.empty;
       }
       (
         if define_class then
@@ -1819,6 +1826,7 @@ let class_infos define_class kind
      clty_loc = cl.pci_loc;
      clty_attributes = cl.pci_attributes;
      clty_uid = dummy_class.cty_uid;
+     clty_discourse = Discourse_types.empty;
     }
   and clty =
     {cty_params = params; cty_type = typ;
@@ -1832,6 +1840,7 @@ let class_infos define_class kind
      cty_loc = cl.pci_loc;
      cty_attributes = cl.pci_attributes;
      cty_uid = dummy_class.cty_uid;
+     cty_discourse = Discourse_types.empty;
     }
   in
   dummy_class.cty_type <- typ;
@@ -1858,6 +1867,7 @@ let class_infos define_class kind
      cty_loc = cl.pci_loc;
      cty_attributes = cl.pci_attributes;
      cty_uid = dummy_class.cty_uid;
+     cty_discourse = Discourse_types.empty;
     }
   in
   let obj_abbr =
@@ -1879,6 +1889,7 @@ let class_infos define_class kind
      type_unboxed_default = false;
      type_uid = dummy_class.cty_uid;
      type_unboxed_version = None;
+     type_discourse = Discourse_types.empty;
     }
   in
   let (cl_params, cl_ty) =
@@ -1899,6 +1910,7 @@ let class_infos define_class kind
      clty_loc = cl.pci_loc;
      clty_attributes = cl.pci_attributes;
      clty_uid = dummy_class.cty_uid;
+     clty_discourse = Discourse_types.empty;
     }
   in
   ((cl, id, clty, ty_id, cltydef, obj_id, obj_abbr, ci_params,

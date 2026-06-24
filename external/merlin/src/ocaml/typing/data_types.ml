@@ -41,6 +41,7 @@ type constructor_description =
     cstr_attributes: Parsetree.attributes;
     cstr_inlined: type_declaration option;
     cstr_uid: Uid.t;
+    cstr_discourse: Discourse_types.t;
    }
 
 let equal_constr c1 c2 =
@@ -74,6 +75,7 @@ type 'a gen_label_description =
     lbl_loc: Location.t;
     lbl_attributes: Parsetree.attributes;
     lbl_uid: Uid.t;
+    lbl_discourse: Discourse_types.t;
   }
 
 type label_description = record_representation gen_label_description

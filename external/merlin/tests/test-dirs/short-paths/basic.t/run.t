@@ -309,7 +309,7 @@
         "type": "typer",
         "sub": [],
         "valid": true,
-        "message": "The value x has type N.O.t but an expression was expected of type unit"
+        "message": "The value x has type t but an expression was expected of type unit"
       },
       {
         "start": {

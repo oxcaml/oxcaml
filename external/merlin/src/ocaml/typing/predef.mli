@@ -395,3 +395,5 @@ val all_predef_exns : Ident.t list
 
 (** All predefined jkinds, for the jkind cache in [subst.ml]. *)
 val all_predef_jkinds : Ident.t list
+
+val discourse : unit -> Discourse_types.t
