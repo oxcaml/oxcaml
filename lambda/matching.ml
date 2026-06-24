@@ -261,9 +261,9 @@ end = struct
       | `Var (id, s, uid, sort, mode) ->
         continue p (`Alias (Patterns.omega, id, s, uid, sort, mode, p.pat_type))
       | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
-      | `Alias (p, id, _, duid, sort, _, _) ->
+      | `Alias (sub_p, id, _, duid, sort, _, _) ->
           aux
-            ( (General.view p, patl),
+            ( (General.view sub_p, patl),
               bind_alias p id duid ~arg
                 ~arg_sort:(Jkind.Sort.default_for_transl_and_get sort) ~action )
       | `Record ([], _, _, _) as view -> stop p view
