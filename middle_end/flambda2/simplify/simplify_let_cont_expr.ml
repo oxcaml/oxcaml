@@ -16,6 +16,11 @@
 
 open! Simplify_import
 
+let flambda2_profile_mim =
+  Oxcaml_args.Extra_options.bool __LOC__
+    "flambda2-profile-mim"
+
+
 (* High-level view of the workflow for simplification of let cont:
  *
  * +--------------------+           +--------------------+
@@ -65,6 +70,7 @@ type handler_after_downwards_traversal =
   { original : one_original_handler;
     params : Bound_parameters.t;
     rebuild_handler : expr_to_rebuild;
+    time_spent : float;
     is_exn_handler : bool;
     is_cold : bool;
     (* continuations_used is the set of which continuations from this block of
@@ -1073,6 +1079,7 @@ let rec compute_specialized_continuation ~replay ~simplify_expr ~original_cont
     Misc.fatal_errorf "Cannot specialize recursive continuation: %a"
       One_recursive_handler.print one_rec_handler
   | Non_rec original ->
+    let start_time = Profile.cpu_time () in
     let original = Non_recursive_handler.rename_params original in
     let is_recursive = false in
     let params = original.params in
@@ -1112,11 +1119,13 @@ let rec compute_specialized_continuation ~replay ~simplify_expr ~original_cont
         let cont_uses_env =
           CUE.union data.cont_uses_env cont_uses_env_in_handler
         in
+        let stop_time = Profile.cpu_time () in
         (* create the new handler *)
         let rebuild =
           { original = Non_rec original;
             params;
             rebuild_handler;
+            time_spent = stop_time -. start_time;
             is_exn_handler;
             is_cold = handler.is_cold;
             continuations_used = Continuation.Set.empty;
@@ -1150,7 +1159,21 @@ let rec compute_specialized_continuation ~replay ~simplify_expr ~original_cont
 and compute_specialized_continuation_handlers ~replay ~simplify_expr
     ~original_cont ~handler dacc data uses k =
   match uses with
-  | [] -> k dacc data
+  | [] ->
+    if flambda2_profile_mim () then begin
+      let spec_times =
+        Continuation.Map.fold (fun _ { time_spent; _ } l ->
+            time_spent :: l
+          ) data.handlers []
+      in
+      let total_spec_time = List.fold_left (+.) 0. spec_times in
+      Format.eprintf "SPEC %a(%d) / generic: %f / total_spec: %f / @[<h>times: %a@]@."
+        Continuation.print original_cont
+        (Continuation.Map.cardinal data.handlers)
+        handler.time_spent total_spec_time
+        (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_float) spec_times
+    end;
+    k dacc data
   | use :: other_uses ->
     compute_specialized_continuation ~replay ~simplify_expr ~original_cont
       ~handler dacc data use (fun dacc data ->
@@ -1415,6 +1438,7 @@ and simplify_single_recursive_handler ~simplify_expr cont_uses_env_so_far
     ~invariant_params ~consts_lifted_after_fork all_handlers_set denv_to_reset
     dacc cont
     ({ params; handler; is_cold } as original : One_recursive_handler.t) k =
+  let start_time = Profile.cpu_time () in
   (* Here we perform the downwards traversal on a single handler.
 
      We also make unboxing decisions at this step, which are necessary to
@@ -1451,10 +1475,12 @@ and simplify_single_recursive_handler ~simplify_expr cont_uses_env_so_far
         Continuation.Set.inter all_handlers_set
           (CUE.all_continuations_used cont_uses_env_in_handler)
       in
+      let stop_time = Profile.cpu_time () in
       k dacc
         { original = Rec original;
           params;
           rebuild_handler;
+          time_spent = stop_time -. start_time;
           is_exn_handler = false;
           is_cold;
           continuations_used;
@@ -1532,6 +1558,7 @@ and simplify_recursive_handlers ~down_to_up ~data ~rebuild_body ~dacc_after_body
 
 and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
     (data : after_downwards_traversal_of_body_data) dacc =
+  let start_time = Profile.cpu_time () in
   (* In this case we have decided not to lift the continuation being let-bound
      outside of its context. So the remaining thing to do is setup the dacc, and
      later decide whether to lift the continuations defined inside the
@@ -1618,10 +1645,12 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
             CUE.union body_continuation_uses_env cont_uses_env_in_handler
           in
           let continuations_used = Continuation.Set.empty in
+          let stop_time = Profile.cpu_time () in
           let rebuild =
             { original = Non_rec original;
               params;
               rebuild_handler;
+              time_spent = stop_time -. start_time;
               is_exn_handler;
               is_cold;
               continuations_used;
