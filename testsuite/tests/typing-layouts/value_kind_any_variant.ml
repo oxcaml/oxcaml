@@ -57,3 +57,12 @@ let opaque (type a : any) (r : a t) = r
   (apply (field_imm 1 (global Toploop!)) "opaque" opaque))
 val opaque : ('a : any). 'a t -> 'a t = <fun>
 |}]
+
+(* It is important that this is NOT Pintval or Pvariant with all-"constant"
+   args, as any-refined-to-void is represented as a block rather than an
+   immediate. *)
+let containing_void (r : unit# t) = r
+[%%expect{|
+Uncaught exception: File "typing/typeopt.ml", line 1064, characters 16-22: Assertion failed
+
+|}]
