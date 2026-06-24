@@ -552,6 +552,13 @@ let (alloc_array @ noalloc) (a : int) = exclave_ stack_ [| a |]
 val alloc_array : int -> int array @ local = <fun>
 |}]
 
+
+(* A polymorphic variant with no argument does not allocate. *)
+let (noalloc_polyvariant @ noalloc_strict) () = `Tag
+[%%expect{|
+val noalloc_polyvariant : unit -> [> `Tag ] = <fun>
+|}]
+
 (* A polymorphic variant with an argument allocates. *)
 let (alloc_polyvariant @ noalloc_strict) (a : int) = `Tag a
 [%%expect{|
@@ -747,6 +754,30 @@ Error: The allocation is "alloc"
          which is expected to be "noalloc_strict".
 |}]
 
+(* CR shsong: rare partial application whose result is a function hidden behind a
+   type abbreviation ([myfun = int -> int]). Here [f 1 2] is a partial
+   application returning [myfun], so it allocates a closure. The detection uses
+   [get_desc (expand_head env ty_ret)]: [expand_head] unfolds [myfun] to
+   [int -> int] and the [Tarrow] is seen, so the allocation IS currently caught.
+
+   This case is exactly the one that the simpler [get_desc ty_ret] (without
+   [expand_head], proposed to avoid the GADT scope-escape side effect) would
+   MISS: [get_desc myfun] is a [Tconstr], not a [Tarrow], so the partial
+   application would be wrongly accepted as [noalloc_strict]. *)
+type myfun = int -> int
+let (alloc_partial_app_abbrev @ noalloc_strict)
+      (f : (int -> int -> myfun) @ noalloc_strict) = f 1 2
+[%%expect{|
+type myfun = int -> int
+Line 3, characters 53-58:
+3 |       (f : (int -> int -> myfun) @ noalloc_strict) = f 1 2
+                                                         ^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 3, characters 6-58
+         which is expected to be "noalloc_strict".
+|}]
+
 (* A function [f] with mixed arguments: optional [a], mandatory [b], optional
    [c], mandatory [d], optional [e], mandatory [g]. It ends in a mandatory
    argument [g], so it can be fully applied. It is received as a parameter so
@@ -781,6 +812,23 @@ Error: The allocation is "alloc"
          because it is used inside the function at lines 2-3, characters 6-10
          which is expected to be "noalloc_strict".
 |}]
+
+(* Case 3: call a function whose last agument is optional argument and
+   all mandatory arguments are applied. Since the last argument is optional
+   the result still allocates. *)
+let (call_one_opt_one_mand @ noalloc_strict)
+      (f : (?a:int -> int -> ?c:int -> int -> ?e:int -> int)) =
+  f ~a:1 2
+[%%expect{|
+Line 3, characters 2-10:
+3 |   f ~a:1 2
+      ^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 2-3, characters 6-10
+         which is expected to be "noalloc_strict".
+|}]
+
 
 (* A lazy block allocates on the heap *)
 let (alloc_lazy @ noalloc_strict) (a : int) = lazy a

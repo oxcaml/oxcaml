@@ -674,13 +674,13 @@ module M : sig end @@ stateless noalloc_strict
 module F (X : S @ portable) = struct
 end
 [%%expect{|
-module F : functor (X : S @ portable) -> sig end @@ stateless noalloc_strict
+module F : functor (X : S @ portable) -> sig end @@ stateless
 |}]
 
 module F (_ : S @ portable) = struct
 end
 [%%expect{|
-module F : S @ portable -> sig end @@ stateless noalloc_strict
+module F : S @ portable -> sig end @@ stateless
 |}]
 
 module M' = (M : S @ portable)
@@ -691,13 +691,13 @@ module M' : S @@ stateless noalloc_strict
 module F (M : S @ portable) : S @ portable = struct
 end
 [%%expect{|
-module F : functor (M : S @ portable) -> S @@ stateless noalloc_strict
+module F : functor (M : S @ portable) -> S @@ stateless
 |}]
 
 module F (M : S @ portable) @ portable = struct
 end
 [%%expect{|
-module F : functor (M : S @ portable) -> sig end @@ stateless noalloc_strict
+module F : functor (M : S @ portable) -> sig end @@ stateless
 |}]
 
 
@@ -747,26 +747,25 @@ module type S'' = S @ local -> S -> S
 
 module (F @ portable) () = struct end
 [%%expect{|
-module F : functor () -> sig end @@ stateless noalloc_strict
+module F : functor () -> sig end @@ stateless
 |}]
 
 module (G @ portable) () = F
 
 [%%expect{|
 module G : functor () -> (functor () -> sig end) @ contended @@ portable
-  noalloc_strict
 |}]
 
 module (G @ portable) (F : (S @ unique -> S @ once) @ local) @ contended = struct end
 [%%expect{|
 module G :
   functor (F : (S @ unique -> S @ once) @ local) -> sig end @ contended @@
-  stateless noalloc_strict
+  stateless
 |}]
 
 module (G' @ portable) = F
 [%%expect{|
-module G' = F @@ stateless noalloc_strict
+module G' = F @@ stateless
 |}]
 
 module rec (F @ portable) () = struct end
@@ -911,7 +910,7 @@ module type S = sig
 end;;
 
 [%%expect{|
-module F_struct : sig end -> sig end @@ stateless noalloc_strict
+module F_struct : sig end -> sig end @@ stateless
 module type F_sig = sig end -> sig end
 module T : sig end @@ stateless noalloc_strict
 module type S = sig end
@@ -982,7 +981,7 @@ module M :
   sig
     val f : (x:int * string) -> x:int * string
     val mk : unit -> x:bool * y:string
-  end @@ stateless noalloc_strict
+  end @@ stateless
 module X_int_int : sig type t = x:int * int end @@ stateless noalloc_strict
 |}]
 
@@ -1530,11 +1529,11 @@ module _ = Base(Name1)(Value1)(Name2)(Value2(Name2_1)(Value2_1)) [@jane.non_eras
 
 [%%expect{|
 module Base : sig end -> sig end -> sig end -> sig end -> sig end @@
-  stateless noalloc_strict
+  stateless
 module Name1 : sig end @@ stateless noalloc_strict
 module Name2 : sig end @@ stateless noalloc_strict
 module Value1 : sig end @@ stateless noalloc_strict
-module Value2 : sig end -> sig end -> sig end @@ stateless noalloc_strict
+module Value2 : sig end -> sig end -> sig end @@ stateless
 module Name2_1 : sig end @@ stateless noalloc_strict
 module Name2_1 : sig end @@ stateless noalloc_strict
 Line 9, characters 11-95:

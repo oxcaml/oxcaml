@@ -4939,13 +4939,30 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
   loop ty_fun0 mode_fun rev_args sargs
 
 (* See Note [Type-checking applications] for an overview *)
-let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs
+(* CR shsong: rebase conflict - main refactored [collect_apply_args] to the
+   [lopt]/[arrow_kind]/[may_warn] structure; kept that and re-applied this
+   commit's [loc] param plus the partial-application allocation check in the
+   [sargs = []] branch. *)
+let collect_apply_args env loc funct ignore_labels ty_fun ty_fun0 mode_fun sargs
       ret_tvar =
   let warned = ref false in
   let rec loop ty_fun ty_fun0 mode_fun rev_args sargs =
-    if sargs = [] then
+    if sargs = [] then begin
+      (* Allocation axis check: partial application of a function returns
+         an arrow type and allocates *)
+      let ty_fun' = expand_head env ty_fun in
+      let ty_fun_is_arrow =
+        match get_desc ty_fun' with Tarrow _ -> true | _ -> false
+      in
+      (* CR shsong: Alternative design: only register_allocation_mode if
+          partial_app = is_partial_apply untyped_args (where untyped_args
+          are in the return value) is false, since if partial_app is true,
+          there are Omitted args and the code walks the locks already *)
+      if ty_fun_is_arrow then
+        Env.walk_locks_for_allocation ~env (loc, Hint.Allocation);
       collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
         ret_tvar
+    end
     else
     let ty_fun' = expand_head env ty_fun in
     let lv = get_level ty_fun' in
@@ -8545,7 +8562,8 @@ and type_expect_
            exp_attributes = sexp.pexp_attributes;
            exp_env = env }
   | Pexp_stack e ->
-      (* Allocation axis: suppress the axis lock-walk at the registration site *)
+      (* Allocation axis: suppress the axis lock-walk at the registration
+          site *)
       let expected_stack_mode = mode_strictly_stack expected_mode in
       let exp = type_expect env expected_stack_mode e ty_expected_explained in
       let unsupported category =
@@ -9869,7 +9887,8 @@ and type_option_some env expected_mode sarg ty ty0 =
   let ty' = extract_option_type env ty in
   let ty0' = extract_option_type env ty0 in
   let alloc_mode, argument_mode =
-    register_allocation ~env ~loc:sarg.pexp_loc ~desc:Optional_argument expected_mode
+    register_allocation ~env ~loc:sarg.pexp_loc ~desc:Optional_argument
+      expected_mode
   in
   let arg = type_argument ~overwrite:No_overwrite env argument_mode sarg ty' ty0' in
   let lid = Longident.Lident "Some" in
@@ -10308,26 +10327,17 @@ and type_application env app_loc expected_mode position_and_mode
             (fun (label, e) -> Typetexp.transl_label_from_expr label e) sargs
           in
           let ty_ret, mode_ret, untyped_args =
-            collect_apply_args env funct ignore_labels ty (instance ty)
+            collect_apply_args env app_loc funct ignore_labels ty (instance ty)
               (value_to_alloc_r2l funct_mode) sargs ret_tvar
           in
-          (* CR shsong: rebase conflict - kept both main's example comment and
-             this commit's arrow-check allocation registration. *)
+          (* CR shsong: rebase conflict - this commit moved the partial-app
+             allocation check into [collect_apply_args]; removed the duplicate
+             here and kept main's example comment. *)
           (* example: [collect_apply_args] returns
              [ty_ret = unit] and
              [args = [(Label "a", Omitted bar);
                       (Optional "opt", Arg (Eliminated_optional_arg baz));
                       (Nolabel, Arg (Known_arg n))]] *)
-          let ty_ret_is_arrow =
-            match get_desc (expand_head env ty_ret) with
-            | Tarrow _ -> true
-            | _ -> false
-          in
-          (* CR shsong: Alternative design: only register_allocation_mode if
-              partial_app is false, since if partial_app is true, there are
-              Omitted args and the code walks the locks already *)
-          if ty_ret_is_arrow then
-            Env.walk_locks_for_allocation ~env (app_loc, Hint.Allocation);
           let partial_app = is_partial_apply untyped_args in
           let position_and_mode =
             if partial_app then position_and_mode_default else position_and_mode
@@ -10612,8 +10622,9 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
     | Variant_unboxed | Variant_with_null -> expected_mode, None
     | Variant_boxed _ when constr.cstr_constant -> expected_mode, None
     | Variant_boxed _ | Variant_extensible ->
-       (* CR shsong: rebase conflict - kept main's [~loc:sexp.pexp_loc] and added
-          this commit's [~env]. *)
+       (* CR shsong: rebase conflict - kept [~loc:sexp.pexp_loc]; main removed the
+          [loc] param from [type_construct] (now takes [~sexp]), so this commit's
+          plain [~loc] would be unbound. This commit only reformatted here. *)
        let alloc_mode, argument_mode =
          register_allocation ~env ~loc:sexp.pexp_loc expected_mode
        in

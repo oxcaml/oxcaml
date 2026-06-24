@@ -1133,7 +1133,7 @@ module M_explicit_arity_2 : sig type t = int -> int val f : int -> t end
 module type S =
   sig
     type t = int -> int
-    val f : int -> t @@ stateless noalloc_strict [@@zero_alloc arity 2]
+    val f : int -> t @@ stateless [@@zero_alloc arity 2]
   end
 |}]
 

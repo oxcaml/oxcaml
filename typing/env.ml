@@ -3828,7 +3828,8 @@ let walk_locks_for_allocation ~env pp =
   ignore
     (walk_locks ~errors:true ~env ~pp
       (Mode.Value.disallow_right
-        (Mode.Value.min_with_comonadic Allocation Mode.Allocation.alloc)) None locks
+        (Mode.Value.min_with_comonadic Allocation Mode.Allocation.alloc))
+      None locks
       : Mode.Value.l)
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
