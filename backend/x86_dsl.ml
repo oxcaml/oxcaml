@@ -216,6 +216,8 @@ module I = struct
 
   let test x y = emit (TEST (x, y))
 
+  let ud2 () = emit UD2
+
   let xchg x y = emit (XCHG (x, y))
 
   let xor x y = emit (XOR (x, y))

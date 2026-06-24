@@ -191,6 +191,7 @@ let print_instr b = function
   | SUB (arg1, arg2) -> i2_s b "sub" arg1 arg2
   | SBB (arg1, arg2) -> i2_s b "sbb" arg1 arg2
   | TEST (arg1, arg2) -> i2_s b "test" arg1 arg2
+  | UD2 -> i0 b "ud2"
   | XCHG (arg1, arg2) -> i2 b "xchg" arg1 arg2
   | XOR (arg1, arg2) -> i2_s b "xor" arg1 arg2
   | SIMD (instr, args) -> (
@@ -280,6 +281,7 @@ let map_arg (f : arg -> arg) (instr : instruction) : instruction =
   | SUB (a, b) -> SUB (f a, f b)
   | SBB (a, b) -> SBB (f a, f b)
   | TEST (a, b) -> TEST (f a, f b)
+  | UD2 -> UD2
   | XCHG (a, b) -> XCHG (f a, f b)
   | XOR (a, b) -> XOR (f a, f b)
   | SIMD (simd_instr, args) -> SIMD (simd_instr, Array.map f args)
