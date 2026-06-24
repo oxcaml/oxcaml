@@ -179,6 +179,26 @@ let simplify_function_body context ~outer_dacc function_slot_opt
       ~exn_continuation ~loopify_state (Code.code_metadata code)
   in
   let dacc = dacc_at_function_entry in
+  let dacc =
+    DA.map_denv dacc ~f:(fun denv ->
+        DE.map_typing_env denv ~f:(fun typing_env ->
+            let typing_env, _ =
+              List.fold_left
+                (fun (typing_env, i) bp ->
+                  Format.eprintf "[name_info] entry param %d = %a@." i
+                    Name.print (Bound_parameter.name bp);
+                  let typing_env =
+                    Typing_env.add_param_projection typing_env
+                      (Bound_parameter.name bp)
+                      (Param_projection.param i)
+                  in
+                  typing_env, i + 1)
+                (typing_env, 0)
+                (Bound_parameters.to_list params)
+            in
+            Typing_env.add_param_projection typing_env (Name.var my_closure)
+              Param_projection.my_closure))
+  in
   if not (DA.no_lifted_constants dacc)
   then
     Misc.fatal_errorf "Did not expect lifted constants in [dacc]:@ %a" DA.print

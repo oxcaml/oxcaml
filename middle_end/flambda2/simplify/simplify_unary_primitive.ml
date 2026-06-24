@@ -155,6 +155,9 @@ let simplify_unbox_number (boxable_number_kind : K.Boxable_number.t) dacc
 
 let simplify_untag_immediate dacc ~original_term ~arg ~arg_ty:boxed_number_ty
     ~result_var =
+  let dacc =
+    DA.chain_param_projection dacc ~result_var arg Param_projection.untag
+  in
   let result_var' = Bound_var.var result_var in
   let shape, result_kind =
     T.tagged_immediate_alias_to ~naked_immediate:result_var', K.naked_immediate
@@ -223,6 +226,10 @@ let simplify_is_int ~variant_only dacc ~original_term ~arg:scrutinee
     ~arg_ty:scrutinee_ty ~result_var =
   if variant_only
   then
+    let dacc =
+      DA.chain_param_projection dacc ~result_var scrutinee
+        Param_projection.is_int
+    in
     simplify_relational_primitive dacc ~original_term ~scrutinee ~scrutinee_ty
       ~result_var ~add_relation:TE.add_is_int_relation
   else
@@ -237,6 +244,10 @@ let simplify_is_int ~variant_only dacc ~original_term ~arg:scrutinee
 
 let simplify_get_tag dacc ~original_term ~arg:scrutinee ~arg_ty:scrutinee_ty
     ~result_var =
+  let dacc =
+    DA.chain_param_projection dacc ~result_var scrutinee
+      Param_projection.get_tag
+  in
   simplify_relational_primitive dacc ~original_term ~scrutinee ~scrutinee_ty
     ~result_var ~add_relation:TE.add_get_tag_relation
 
@@ -932,6 +943,10 @@ let[@inline always] simplify_immutable_block_load0
 
 let simplify_immutable_block_load access_kind ~field ~min_name_mode dacc
     ~original_term ~dbg ~arg ~arg_ty ~result_var =
+  let dacc =
+    DA.chain_param_projection dacc ~result_var arg
+      (Param_projection.block_load field)
+  in
   let result =
     simplify_immutable_block_load0 access_kind ~field ~min_name_mode dacc
       ~original_term dbg ~arg ~arg_ty ~result_var
