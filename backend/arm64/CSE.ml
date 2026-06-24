@@ -30,14 +30,12 @@ let class_of_operation (op : Operation.t)
     let op_class : Cfg_cse_target_intf.op_class =
       match spec with
       | Ifar_poll | Ifar_alloc _ | Ifar_stackcheck _ ->
-        (* Produced only by branch relaxation, which runs after CSE,
-           so this arm is currently unreachable.  These are classified
-           as [Op_other] -- as the generic default does for any
-           [Specific], and as [Arch.operation_is_pure] reports -- rather
-           than [Op_pure], so these effectful operations (poll,
-           allocation, stack reallocation) are never eliminated or
-           merged as if pure by any future pass run over relaxed code. *)
-        Op_other
+        (* These far forms are introduced by branch relaxation, during [emit]
+           and after CSE, so they must never reach this pass. *)
+        Misc.fatal_errorf
+          "CSE.class_of_operation: unexpected %s; it comes from branch \
+           relaxation (after CSE) and must never reach this pass"
+          (Arch.specific_operation_name spec)
       | Ishiftarith _
       | Imuladd
       | Imulsub
