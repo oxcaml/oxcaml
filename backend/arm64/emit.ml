@@ -1384,7 +1384,9 @@ let emit_instr env i =
       | Reg _, Reg _ -> A.ins_mov_reg_w (H.reg_w dst) (H.reg_w src)
       | Reg _, Stack _ -> emit_stack_str env (H.reg_w src) dst
       | Stack _, Reg _ -> emit_stack_ldr env (H.reg_w dst) src
-      | Stack _, Stack _ | _, Unknown | Unknown, _ -> assert false)
+      | Stack _, Stack _ | _, Unknown | Unknown, _ ->
+        Misc.fatal_errorf "Emit.emit_instr: illegal Imove32 (%a to %a)"
+          Printreg.reg src Printreg.reg dst)
   | Lop (Const_int n) -> emit_intconst (H.reg_x i.res.(0)) n
   | Lop (Const_float32 f) ->
     if Int32.equal f 0l
