@@ -546,6 +546,26 @@ let check_for_unset_parameters penv global =
            }))
     global.Global_module.hidden_args
 
+(* The mode of a compilation unit: legacy on every axis, with the given
+   staticity. *)
+(* CR-soon zqian: all persistent modules should always be [Static], at which
+   point the [staticity] parameter can be removed. *)
+let mode_pers_mod staticity =
+  let hint : _ Mode.Hint.const = Legacy Compilation_unit in
+  Mode.Value.of_const
+    { areality = Global;
+      linearity = Many;
+      uniqueness = Aliased;
+      portability = Nonportable;
+      contention = Uncontended;
+      forkable = Forkable;
+      yielding = Unyielding;
+      statefulness = Stateful;
+      visibility = Read_write;
+      staticity;
+    }
+    ~hint_monadic:hint ~hint_comonadic:hint
+
 let rec global_of_global_name penv ~check name ~allow_excess_args =
   let load () =
     let pn =
@@ -686,9 +706,31 @@ and acknowledge_new_pers_name penv check global_name global import =
        remember_global penv bound_global ~precision
          ~mentioned_by:(Other global_name))
     sign.bound_globals;
+  let pn_sign =
+    let signature, staticity = sign.sign in
+    let mode = Mode.Value.disallow_right (mode_pers_mod staticity) in
+    let mode =
+      match import.imp_visibility with
+      | Visible { cmx_guaranteed = true } ->
+        (* A [.cmx] is guaranteed, so the unit keeps the staticity recorded in
+           its [.cmi]. *)
+        mode
+      | Visible { cmx_guaranteed = false } | Hidden ->
+        (* Without a guaranteed [.cmx], the unit is not available for
+           compile-time evaluation, so its staticity is forced to [Dynamic]
+           regardless of what the [.cmi] claims. The [Cmx_not_guaranteed] hint
+           explains why in any resulting error. *)
+        Mode.Value.join
+          [ mode;
+            Mode.Value.min_with_monadic Staticity
+              (Mode.Staticity.of_const ~hint:Cmx_not_guaranteed
+                 Mode.Staticity.Dynamic) ]
+    in
+    signature, mode
+  in
   let pn = { pn_import = import;
              pn_global = global;
-             pn_sign = sign.sign;
+             pn_sign;
            } in
   if check then check_consistency penv import;
   Hashtbl.add persistent_names global_name pn;

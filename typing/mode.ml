@@ -197,6 +197,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Module_allocated_on_heap -> Module_allocated_on_heap
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
+        | Cmx_not_guaranteed -> Cmx_not_guaranteed
         | Branching -> Branching
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
@@ -222,6 +223,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Module_allocated_on_heap -> Module_allocated_on_heap
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
+        | Cmx_not_guaranteed -> Cmx_not_guaranteed
         | Branching -> Branching
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
@@ -249,6 +251,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Module_allocated_on_heap -> Module_allocated_on_heap
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
+        | Cmx_not_guaranteed -> Cmx_not_guaranteed
         | Branching -> Branching
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
@@ -4925,6 +4928,12 @@ module Report = struct
       | None -> print_bug () ppf)
     | Always_dynamic x ->
       Fmt.fprintf ppf "%t are always dynamic" (print_always_dynamic x)
+    | Cmx_not_guaranteed ->
+      (* CR-someday zqian: this message is specific to the Jane Street build
+         setup and should be made more general. *)
+      Fmt.fprintf ppf
+        "only modules from core libraries and the current library can \
+         currently be static"
     | Branching -> Fmt.fprintf ppf "it has branches"
     | Borrowed _ -> Fmt.fprintf ppf "it is borrowed"
     | Escape_region reg ->

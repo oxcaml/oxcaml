@@ -1214,7 +1214,7 @@ module type Wrapped = sig
 
   and signature = signature_item list wrapped
 
-  and persistent_signature = signature * Mode.Staticity.Const.t
+  and persistent_signature = signature * Mode.Value.l
 
   and signature_item =
     Sig_value of Ident.t * value_description * visibility
