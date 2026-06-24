@@ -655,10 +655,8 @@ let print_one bind instr =
     | Evex { evex_m; evex_w; evex_ll; evex_p; evex_b; evex_z } ->
       let ll, b =
         match instr.flags.r with
-        | Rnd_er ->
-          ( sprintf "(evex_ll_for_rnd (%s) rnd)" (print_evex_ll evex_ll),
-            "(evex_b_for_rnd rnd)" )
-        | Rnd_sae -> print_evex_ll evex_ll, "sae"
+        | Rnd_er -> "Ll_round rnd", "true"
+        | Rnd_sae -> print_evex_ll evex_ll, "true"
         | _ -> print_evex_ll evex_ll, Bool.to_string evex_b
       in
       let z = if instr.flags.z then "z" else Bool.to_string evex_z in
