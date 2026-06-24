@@ -375,7 +375,8 @@ let add_param_projection t name param_projection =
   { t with name_info = Name.Map.add name { param_projection } t.name_info }
 
 let is_param_projection t name =
-  Option.map (fun (x:name_info) -> x.param_projection)
+  Option.map
+    (fun (x : name_info) -> x.param_projection)
     (Name.Map.find_opt name t.name_info)
 
 let machine_width t = t.machine_width
@@ -867,9 +868,6 @@ let add_alias t ~canonical_element1 ~canonical_element2 :
       match Name.Map.find_opt demoted_name t.name_info with
       | None -> t.name_info
       | Some prev_info ->
-        Format.eprintf "[name_info] add_alias demote %a -> %a (move %a)@."
-          Name.print demoted_name Simple.print canonical_element
-          Param_projection.print prev_info.param_projection;
         let name_info = Name.Map.remove demoted_name t.name_info in
         Simple.pattern_match canonical_element
           ~name:(fun canonical ~coercion:_ ->

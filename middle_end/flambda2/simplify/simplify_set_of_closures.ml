@@ -163,6 +163,21 @@ type simplify_function_body_result =
     uacc_after_upwards_traversal : UA.t
   }
 
+let add_param_projections typing_env ~my_closure params =
+  let typing_env, _ =
+    List.fold_left
+      (fun (typing_env, i) bp ->
+        let typing_env =
+          Typing_env.add_param_projection typing_env (Bound_parameter.name bp)
+            (Param_projection.param i)
+        in
+        typing_env, i + 1)
+      (typing_env, 0)
+      (Bound_parameters.to_list params)
+  in
+  Typing_env.add_param_projection typing_env (Name.var my_closure)
+    Param_projection.my_closure
+
 let simplify_function_body context ~outer_dacc function_slot_opt
     ~closure_bound_names_inside_function ~inlining_arguments ~absolute_history
     code_id code ~return_continuation ~exn_continuation params ~body ~my_closure
@@ -182,22 +197,7 @@ let simplify_function_body context ~outer_dacc function_slot_opt
   let dacc =
     DA.map_denv dacc ~f:(fun denv ->
         DE.map_typing_env denv ~f:(fun typing_env ->
-            let typing_env, _ =
-              List.fold_left
-                (fun (typing_env, i) bp ->
-                  Format.eprintf "[name_info] entry param %d = %a@." i
-                    Name.print (Bound_parameter.name bp);
-                  let typing_env =
-                    Typing_env.add_param_projection typing_env
-                      (Bound_parameter.name bp)
-                      (Param_projection.param i)
-                  in
-                  typing_env, i + 1)
-                (typing_env, 0)
-                (Bound_parameters.to_list params)
-            in
-            Typing_env.add_param_projection typing_env (Name.var my_closure)
-              Param_projection.my_closure))
+            add_param_projections typing_env ~my_closure params))
   in
   if not (DA.no_lifted_constants dacc)
   then
