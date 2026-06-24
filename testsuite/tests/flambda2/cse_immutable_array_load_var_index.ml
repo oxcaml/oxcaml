@@ -7,6 +7,8 @@
  check-fexpr-dump;
 *)
 
+[@@@ocaml.flambda_o3]
+
 (* As [cse_immutable_array_load.ml], but with a non-constant index: the two
    [Iarray.unsafe_get] calls read the same element [arr.(i)], so CSE should
    replace the second load by the result of the first. *)

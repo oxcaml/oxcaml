@@ -7,6 +7,8 @@
  check-fexpr-dump;
 *)
 
+[@@@ocaml.flambda_o3]
+
 (* This checks that loads from immutable arrays are eligible for CSE: the two
    [Iarray.unsafe_get] calls below read the same element, so the second load
    should be replaced by the result of the first. *)
