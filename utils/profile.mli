@@ -35,6 +35,9 @@ module Counters : sig
   val to_string : t -> string
 end
 
+val cpu_time : unit -> float
+(** current cpu time, including time spent in children *)
+
 val reset : unit -> unit
 (** erase all recorded profile information *)
 
