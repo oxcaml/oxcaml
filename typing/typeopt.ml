@@ -988,7 +988,12 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       let all_void_opt sort =
         match sort with
         | Some sort -> Jkind.Sort.Const.all_void sort
-        | None -> (* TODO Nicely handle [any] things resolving to void *) false
+        | None ->
+          (* CR rtjoa: It's important to NOT treat constructors with
+             any-args-refined-to-void as constant, as those are represented as
+             blocks rather than immediates. This footgun should no longer exist
+             once we make all-void constructors no longer immediate. *)
+          false
       in
       match cstr.cd_args with
       | Cstr_tuple [] -> true
@@ -1016,18 +1021,20 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | None -> None
           | Some (num_nodes_visited,
                   next_const, consts, next_tag, non_consts) ->
-            let cstr_shape_opt, constructor =
+            let ~variable_repr, cstr_shape_opt, constructor =
               match cstr_layouts.(idx) with
-              | Cstr_layout_known { shape; _ } -> Some shape, constructor
+              | Cstr_layout_known { shape; _ } ->
+                ~variable_repr:false, Some shape, constructor
               | Cstr_layout_variable ->
                 (match instantiate_cd_args constructor.cd_args with
-                 | exception Ctype.Cannot_apply -> None, constructor
+                 | exception Ctype.Cannot_apply ->
+                   ~variable_repr:true, None, constructor
                  | cd_args ->
                    let cd_args, _all_void, repr, _arg_sorts =
                      Typedecl.update_constructor_representation_and_arg_sorts
                        env loc cd_args ~is_extension_constructor:false
                    in
-                   Result.to_option repr,
+                   ~variable_repr:true, Result.to_option repr,
                    { constructor with cd_args })
             in
             match cstr_shape_opt with
@@ -1045,7 +1052,13 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
                   Some (num_nodes_visited,
                         next_const + 1, consts, next_tag, non_consts)
                 | Constructor_mixed shape
-                    when mixed_block_shape_is_empty shape ->
+                    when mixed_block_shape_is_empty shape
+                         && not variable_repr ->
+                  (* CR rtjoa: We gate on [variable_repr] because it's important
+                     to NOT treat constructors with any-args-refined-to-void as
+                     constant, as those are represented as blocks rather than
+                     immediates. This footgun should no longer exist once we
+                     make all-void constructors no longer immediate. *)
                   let consts = next_const :: consts in
                   Some (num_nodes_visited,
                         next_const + 1, consts, next_tag, non_consts)
@@ -1062,7 +1075,11 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       | None -> (num_nodes_visited, Pgenval)
       | Some (num_nodes_visited, _, consts, _, non_consts) ->
         match non_consts with
-        | [] -> assert false  (* See [List.for_all is_constant], above *)
+        | [] ->
+          (* CR rtjoa: An refined any-constructor shouldn't become constant.
+             This footgun should no longer exist once we make all-void
+             constructors no longer immediate. *)
+          Misc.fatal_error "Typeopt.value_kind_variant: became all-constant"
         | _::_ ->
           (num_nodes_visited, Pvariant { consts; non_consts })
       end
