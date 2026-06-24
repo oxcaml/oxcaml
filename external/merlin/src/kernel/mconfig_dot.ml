@@ -346,7 +346,7 @@ let get_config { workdir; process_dir; configurator } path_abs =
      project configuration. We detect this case and give a useful error
      message. *)
   let in_jane_context_but_detected_dune =
-    match (Config.Jane_context.current, configurator) with
+    match (Jane_context.current, configurator) with
     | Vanilla, _ | Jane_street, Dot_merlin -> false
     | Jane_street, Dune -> true
   in
@@ -501,8 +501,45 @@ let find_project_context start_dir =
       Some
         (List.find_map [ ".merlin"; "dune-project"; "dune-workspace" ]
            ~f:(fun f ->
-             let fname = Filename.concat dir f in
-             if Sys.file_exists fname && not (Sys.is_directory fname) then
+             let raw_fname = Filename.concat dir f in
+             let fname =
+               match Jane_context.current with
+               | Vanilla ->
+                 if
+                   Sys.file_exists raw_fname && not (Sys.is_directory raw_fname)
+                 then Some raw_fname
+                 else None
+               | Jane_street -> (
+                 (* Also check for .merlin files in the _build directory.
+                    Reading from _build removes the need for dune to promote the .merlin
+                    files.
+
+                    We set the cwd to the source dir path regardless of whether the .merlin
+                    file was found in the _build dir. That's because the dot-merlin-reader is
+                    directed where to look solely based on its cwd. If we set the cwd to the
+                    _build dir path, it will be able to find the .merlin files, but it will
+                    incorrectly resolve file paths against the _build dir path, when it should
+                    instead resolve against the source dir path. Instead of changing the cwd
+                    to the _build dir, we teach dot-merlin-reader will look in the _build
+                    directory if there is no .merlin in the cwd.
+
+                    You could instead envision modifying the merlin_dot_protocol to allow
+                    ocamlmerlin to tell dot-merlin-reader which directory to resolve paths
+                    against. This would likely work, but lstevenson is unsure if modifying the
+                    merlin_dot_protocol might cause unforeseen issues. Also, the strategy of
+                    having merlin-dot-reader also look in the _build dir makes it easier to
+                    handle .merlin files that reference other .merlin files. *)
+                 match String.equal f ".merlin" with
+                 | true -> Dot_merlin_finder.find_in_src_or_build_dir raw_fname
+                 | false ->
+                   if
+                     Sys.file_exists raw_fname
+                     && not (Sys.is_directory raw_fname)
+                   then Some raw_fname
+                   else None)
+             in
+             match fname with
+             | Some fname ->
                (* When starting [dot-merlin-reader] from [dir]
                   the workdir is always [dir] *)
                let workdir = if f = ".merlin" then None else workdir in
@@ -513,7 +550,7 @@ let find_project_context start_dir =
                      configurator = Option.get (Configurator.of_string_opt f)
                    },
                    fname )
-             else None))
+             | None -> None))
     with Not_found ->
       let parent = Filename.dirname dir in
       if parent <> dir then

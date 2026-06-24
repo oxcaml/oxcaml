@@ -117,12 +117,17 @@ module Cache = File_cache.Make (struct
   let cache_name = "Mconfig_dot"
 end)
 
+let file_exists path =
+  match Jane_context.current with
+  | Vanilla -> Sys.file_exists path && not (Sys.is_directory path)
+  | Jane_street -> Dot_merlin_finder.exists_in_src_or_build_dir path
+
 let find fname =
-  if Sys.file_exists fname && not (Sys.is_directory fname) then Some fname
+  if file_exists fname then Some fname
   else
     let rec loop dir =
       let fname = Filename.concat dir ".merlin" in
-      if Sys.file_exists fname && not (Sys.is_directory fname) then Some fname
+      if file_exists fname then Some fname
       else
         let parent = Filename.dirname dir in
         if parent <> dir then loop parent else None
@@ -135,7 +140,26 @@ let directives_of_files filenames =
     | x :: rest when Hashtbl.mem marked x -> process acc rest
     | x :: rest ->
       Hashtbl.add marked x ();
-      let file = Cache.read x in
+      let file_path =
+        match Jane_context.current with
+        | Vanilla -> x
+        | Jane_street -> (
+          (* Also check for .merlin files in the _build directory. Reading from
+             _build prevents dune from needing to promote the .merlin files. *)
+          match Dot_merlin_finder.find_in_src_or_build_dir x with
+          | Some file_path -> file_path
+          | None ->
+            (* Let Cache.read error if the file doesn't exist in either
+               location. *)
+            x)
+      in
+      (* We set the path of the read file back to x because relative paths in
+         the .merlin files are resolved against file.path, and we want relative
+         paths resolved against the source directory rather than the _build
+         directory.
+
+         See the comment in Mconfig_dot.find_project_context for more info. *)
+      let file = { (Cache.read file_path) with path = x } in
       let dir = Filename.dirname file.path in
       let rest =
         List.map ~f:(canonicalize_filename ~cwd:dir) file.includes @ rest
