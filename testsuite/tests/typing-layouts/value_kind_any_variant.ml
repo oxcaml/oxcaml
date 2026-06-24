@@ -63,6 +63,11 @@ val opaque : ('a : any). 'a t -> 'a t = <fun>
    immediate. *)
 let containing_void (r : unit# t) = r
 [%%expect{|
-Uncaught exception: File "typing/typeopt.ml", line 1064, characters 16-22: Assertion failed
-
+(let
+  (containing_void =
+     (function {nlocal = 0}
+       r[value<(consts (0)) (non_consts ([0: product ]))>]
+       : (consts (0)) (non_consts ([0: product ])) r))
+  (apply (field_imm 1 (global Toploop!)) "containing_void" containing_void))
+val containing_void : unit# t -> unit# t = <fun>
 |}]
