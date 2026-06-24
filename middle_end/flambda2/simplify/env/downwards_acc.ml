@@ -332,3 +332,22 @@ let add_specialization t id ~old ~specialized =
   { t with specialization_map }
 
 let specialization_map t = t.specialization_map
+
+let chain_param_projection t ~result_var s p =
+  Simple.pattern_match s
+    ~const:(fun _ -> t)
+    ~name:(fun name ~coercion:_ ->
+      let typing_env = typing_env t in
+      match TE.is_param_projection typing_env name with
+      | None -> t
+      | Some prev_projection ->
+        let new_proj = p prev_projection in
+        Format.eprintf "[name_info] chain %a := %a (from %a = %a)@." Name.print
+          (Bound_var.name result_var)
+          Param_projection.print new_proj Name.print name Param_projection.print
+          prev_projection;
+        with_denv t
+          (DE.with_typing_env (denv t)
+             (TE.add_param_projection typing_env
+                (Bound_var.name result_var)
+                new_proj)))
