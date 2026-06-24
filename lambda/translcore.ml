@@ -2974,8 +2974,8 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
                ap_result_layout = result_layout;
                ap_region_close=Rc_normal;
                ap_mode=alloc_heap;
-               (* The let-operator (e.g. [and+]) is a user-defined function,
-                  and is forced to legacy mode for now, so may yield *)
+               (* CR aspsmith: More precise inference for yielding once
+                  let-operators have mode inference *)
                ap_yielding=May_yield;
                ap_tailcall = Default_tailcall;
                ap_inlined = Default_inlined;
@@ -3035,8 +3035,8 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
         let_.bop_op_type;
     ap_region_close=Rc_normal;
     ap_mode=alloc_heap;
-    (* The let-operator (e.g. [let*]) is a user-defined function, and is
-       forced to legacy mode for now, so may yield *)
+    (* CR aspsmith: More precise inference for yielding once
+       let-operators have mode inference *)
     ap_yielding=May_yield;
     ap_tailcall = Default_tailcall;
     ap_inlined = Default_inlined;
