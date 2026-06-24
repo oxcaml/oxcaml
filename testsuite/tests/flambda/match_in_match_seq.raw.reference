@@ -167,7 +167,7 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
        `fn[match_in_match_seq.ml:55,11--63]_9` (i : imm tagged)
          my_closure _region _ghost_region my_depth
          -> k1 * k2
-         : [ 0 | 0 of val * val ] =
+         : [ 0 | 0 of imm tagged * imm tagged ] =
    let next_depth = rec_info (succ my_depth) in
    let hi =
      %project_value_slot.[`fn[match_in_match_seq.ml:55,11--63]`].[hi]
