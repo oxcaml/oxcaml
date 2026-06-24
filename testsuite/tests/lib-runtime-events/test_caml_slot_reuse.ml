@@ -4,8 +4,7 @@
    skip;
  }{
    include runtime_events;
-   runtime5;
-   multidomain;
+   multicore;
    { bytecode; }
    { native; }
  }

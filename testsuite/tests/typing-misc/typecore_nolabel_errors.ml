@@ -39,7 +39,7 @@ Line 2, characters 13-17:
 Error: The function applied to this argument has type
          ?x:'a -> a:'b -> ?y:'c -> z:'d -> unit -> unit
 This argument cannot be applied with label "?y"
-  Since OCaml 4.11, optional arguments do not commute when -nolabels is given
+Since OCaml 4.11, optional arguments do not commute when -nolabels is given
 |}]
 
 let f (g: ?x:_ -> _) = g ~y:None ?x:None; g ?x:None ()
@@ -50,7 +50,7 @@ Line 1, characters 28-32:
                                 ^^^^
 Error: The function applied to this argument has type ?x:'a -> 'b
 This argument cannot be applied with label "~y"
-  Since OCaml 4.11, optional arguments do not commute when -nolabels is given
+Since OCaml 4.11, optional arguments do not commute when -nolabels is given
 |}]
 
 (** Show that optional arguments can be commuted, to some degree. *)
@@ -73,7 +73,7 @@ Line 1, characters 7-8:
 Error: The function applied to this argument has type
          ?a:int -> ?b:int -> ?c:int -> x:int -> int -> int
 This argument cannot be applied with label "~c"
-  Since OCaml 4.11, optional arguments do not commute when -nolabels is given
+Since OCaml 4.11, optional arguments do not commute when -nolabels is given
 |}]
 ;;
 
@@ -88,7 +88,7 @@ Line 1, characters 14-15:
 Error: The function applied to this argument has type
          ?c:int -> x:int -> int -> int
 This argument cannot be applied without label
-  Since OCaml 4.11, optional arguments do not commute when -nolabels is given
+Since OCaml 4.11, optional arguments do not commute when -nolabels is given
 |}]
 ;;
 
@@ -100,7 +100,7 @@ Line 1, characters 12-13:
 Error: The function applied to this argument has type
          ?b:int -> ?c:int -> x:int -> int -> int
 This argument cannot be applied with label "~c"
-  Since OCaml 4.11, optional arguments do not commute when -nolabels is given
+Since OCaml 4.11, optional arguments do not commute when -nolabels is given
 |}]
 ;;
 
@@ -112,7 +112,7 @@ Line 1, characters 7-8:
 Error: The function applied to this argument has type
          ?a:int -> ?b:int -> ?c:int -> x:int -> int -> int
 This argument cannot be applied with label "~b"
-  Since OCaml 4.11, optional arguments do not commute when -nolabels is given
+Since OCaml 4.11, optional arguments do not commute when -nolabels is given
 |}]
 ;;
 
@@ -133,6 +133,6 @@ Line 1, characters 5-6:
 Error: The function applied to this argument has type
          ?x:'a -> ?y:'b -> unit -> unit
 This argument cannot be applied with label "~y"
-  Since OCaml 4.11, optional arguments do not commute when -nolabels is given
+Since OCaml 4.11, optional arguments do not commute when -nolabels is given
 |}]
 ;;

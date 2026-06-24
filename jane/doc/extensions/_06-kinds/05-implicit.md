@@ -6,7 +6,7 @@ title: Implicit Kind Declarations
 
 # Implicit Kind Declarations
 
-In signatures, type variable names can be declared to have *implicit kinds*.
+Type variable names can be declared to have *implicit kinds*.
 A type variable with a name that has an implicit kind will be instantiated
 with that kind. Here's an example:
 
@@ -87,10 +87,19 @@ module type Outer = sig
 end
 ```
 
-Implicit kinds can't be declared in structures, though we plan to support that.
+Implicit kind declarations can be made in structures (or at the module toplevel):
 
-Implicit kinds are syntactically limited to the signature
-they are declared in and won't be `include`d:
+```ocaml
+module M = struct
+  [@@@implicit_kind: ('elt : bits64)]
+
+  let f : 'elt -> 'elt array = fun x -> [| x |]
+end
+```
+
+Implicit kinds are lexical defaults, not a part of the module interface. They
+are syntactically limited to the signature or structure they are declared in and
+won't be `include`d:
 
 ```ocaml
 module type S = sig

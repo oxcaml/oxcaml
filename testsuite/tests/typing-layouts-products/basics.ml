@@ -600,7 +600,7 @@ end;;
 Line 3, characters 17-21:
 3 |     let #(x,y) = utup in
                      ^^^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "utup" has type "('a : value_or_null)"
        but an expression was expected of type "#('b * 'c)"
        The layout of #('a * 'b) is
            '_representable_layout_7 & '_representable_layout_8
@@ -773,7 +773,7 @@ type capture_record = #{ x : int; y : int; }
 Line 4, characters 20-24:
 4 |     let #{ x; y } = utup in
                         ^^^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "utup" has type "('a : value_or_null)"
        but an expression was expected of type "capture_record"
        The layout of capture_record is value non_pointer & value non_pointer
          because of the definition of capture_record at line 1, characters 0-43.
@@ -1163,7 +1163,7 @@ external ext_tuple_arg_with_attr_t : (#(int * bool) [@untagged]) -> int = "foo"
 Line 1, characters 38-51:
 1 | external ext_tuple_arg_with_attr_t : (#(int * bool) [@untagged]) -> int = "foo"
                                           ^^^^^^^^^^^^^
-Error: Don't know how to untag this type. Only "int" and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}]
 
@@ -1204,7 +1204,7 @@ external ext_product_arg_with_attr_t : (t_product [@untagged]) -> int = "foo"
 Line 1, characters 40-49:
 1 | external ext_product_arg_with_attr_t : (t_product [@untagged]) -> int = "foo"
                                             ^^^^^^^^^
-Error: Don't know how to untag this type. Only "int" and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}]
 
@@ -1250,7 +1250,7 @@ external ext_tuple_return_with_attr_t :
 Line 2, characters 10-23:
 2 |   int -> (#(int * bool) [@untagged]) = "foo"
               ^^^^^^^^^^^^^
-Error: Don't know how to untag this type. Only "int" and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}]
 
@@ -1285,7 +1285,7 @@ external ext_product_return_with_attr_t : int -> (t_product [@untagged]) = "foo"
 Line 1, characters 50-59:
 1 | external ext_product_return_with_attr_t : int -> (t_product [@untagged]) = "foo"
                                                       ^^^^^^^^^
-Error: Don't know how to untag this type. Only "int" and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}]
 
@@ -1353,7 +1353,7 @@ external ext_record_arg_with_attr_t :
 Line 2, characters 3-29:
 2 |   (ext_record_arg_attr_record [@untagged]) -> int = "foo"
        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Don't know how to untag this type. Only "int" and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}]
 
@@ -1419,7 +1419,7 @@ external ext_record_return_with_attr_t : int -> (t [@untagged]) = "foo"
 Line 1, characters 49-50:
 1 | external ext_record_return_with_attr_t : int -> (t [@untagged]) = "foo"
                                                      ^
-Error: Don't know how to untag this type. Only "int" and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}]
 
@@ -1836,7 +1836,7 @@ class product_instance_variable x =
 Line 2, characters 25-26:
 2 |   let sum = let #(a,b) = x in a + b in
                              ^
-Error: This expression has type "('a : value)"
+Error: The value "x" has type "('a : value)"
        but an expression was expected of type "#('b * 'c)"
        The layout of #('a * 'b) is
            '_representable_layout_15 & '_representable_layout_16
@@ -1856,7 +1856,7 @@ type class_arg_record = #{ a : int; b : int; }
 Line 3, characters 28-29:
 3 |   let sum = let #{ a; b } = x in a + b in
                                 ^
-Error: This expression has type "('a : value)"
+Error: The value "x" has type "('a : value)"
        but an expression was expected of type "class_arg_record"
        The layout of class_arg_record is
            value non_pointer & value non_pointer
@@ -2174,7 +2174,7 @@ val f : ('a : any separable & value). unit -> 'a -> 'a = <fun>
 Line 3, characters 30-31:
 3 | let g (type a) (x : a) = f () x
                                   ^
-Error: This expression has type "a" but an expression was expected of type
+Error: The value "x" has type "a" but an expression was expected of type
          "('a : '_representable_layout_19 separable & value)"
        The layout of a is value
          because it is or unifies with an unannotated universal variable.

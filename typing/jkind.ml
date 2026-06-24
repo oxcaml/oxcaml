@@ -1176,7 +1176,7 @@ module Base_and_axes = struct
              belong in the next case. What is the right behaviour here? *)
           | Tquote _ | Tsplice _ | Tquote_eval _ -> Skip
           | Tvar _ | Tarrow _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
-          | Tunivar _ | Tpackage _ | Tof_kind _ ->
+          | Tunivar _ | Tpackage _ | Tof_kind _ | Tbox _ ->
             (* these cases either cannot be infinitely recursive or their jkinds
                do not have with_bounds *)
             (* CR layouts v2.8: Some of these might get with-bounds someday. We
@@ -2461,6 +2461,12 @@ let for_array_element_sort ~level =
   ( fresh_jkind jkind ~annotation:None ~why:(Concrete_creation Array_element),
     sort )
 
+let for_effect_arg ident =
+  let why : History.value_creation_reason =
+    Type_argument { parent_path = Path.Pident ident; position = 1; arity = 1 }
+  in
+  Builtin.value ~why
+
 (******************************)
 (* elimination and defaulting *)
 
@@ -2996,6 +3002,11 @@ module Format_history = struct
       fprintf ppf "the %stype argument of %a has %s value_or_null"
         (format_position ~arity position)
         !printtyp_path parent_path layout_or_kind
+    | Or_null_payload _parent_path ->
+      fprintf ppf
+        "an [@@@@or_null] type gets its %s by applying or_null to its@ payload \
+         %s"
+        layout_or_kind layout_or_kind
     | Recmod_fun_arg ->
       fprintf ppf
         "it's the type of the first argument to a function in a recursive \
@@ -3021,6 +3032,7 @@ module Format_history = struct
     | Class_field -> fprintf ppf "it's the type of a class field"
     | Boxed_record -> fprintf ppf "it's a boxed record type"
     | Boxed_variant -> fprintf ppf "it's a boxed variant type"
+    | Boxed -> fprintf ppf "it's a boxed type"
     | Extensible_variant -> fprintf ppf "it's an extensible variant type"
     | Primitive id ->
       fprintf ppf "it is the primitive value type %s" (Ident.name id)
@@ -3028,6 +3040,9 @@ module Format_history = struct
       fprintf ppf "the %stype argument of %a has %s value"
         (format_position ~arity position)
         !printtyp_path parent_path layout_or_kind
+    | Or_null_payload parent_path ->
+      fprintf ppf "the payload of %a has %s value" !printtyp_path parent_path
+        layout_or_kind
     | Tuple -> fprintf ppf "it's a tuple type"
     | Row_variable -> format_with_notify_js ppf "it's a row variable"
     | Polymorphic_variant -> fprintf ppf "it's a polymorphic variant type"
@@ -3560,7 +3575,7 @@ module Violation = struct
     report_reason ppf t.violation;
     (* otherwise, we get notes for layout abbreviations that get omitted. *)
     report_layout_notes env ppf t.violation mismatch_type ~print_as_value_layout;
-    report_fuel ppf t.violation
+    if not !Clflags.ikinds then report_fuel ppf t.violation
 
   let pp_t ppf x = fprintf ppf "%t" x
 
@@ -4021,6 +4036,10 @@ module Debug_printers = struct
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
         (Fmt.compat !printtyp_path)
         parent_path
+    | Or_null_payload parent_path ->
+      fprintf ppf "Or_null_payload of %a"
+        (Fmt.compat !printtyp_path)
+        parent_path
     | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
     | Array_comprehension_element -> fprintf ppf "Array_comprehension_element"
     | Array_comprehension_iterator_element ->
@@ -4035,10 +4054,15 @@ module Debug_printers = struct
     | Class_field -> fprintf ppf "Class_field"
     | Boxed_record -> fprintf ppf "Boxed_record"
     | Boxed_variant -> fprintf ppf "Boxed_variant"
+    | Boxed -> fprintf ppf "Boxed"
     | Extensible_variant -> fprintf ppf "Extensible_variant"
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
+        (Fmt.compat !printtyp_path)
+        parent_path
+    | Or_null_payload parent_path ->
+      fprintf ppf "Or_null_payload of %a"
         (Fmt.compat !printtyp_path)
         parent_path
     | Tuple -> fprintf ppf "Tuple"

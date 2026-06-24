@@ -23,9 +23,8 @@ Unlike intrinsics, SIMD loads and stores are represented as flambda2-visible pri
   The prefix `u` indicates an unaligned operation (`MOVUPD`), and the suffix `u` omits bounds checking.
   Aligned load/store is available because bigstrings are allocated by `malloc`.
 
-- `float array`, `floatarray`, `float# array`: the corresponding primitives take an index in `float`s and are required to operate on `float64x2`s.
+- `floatarray`, `float# array`: the corresponding primitives take an index in `float`s and are required to operate on `float64x2`s.
   The address is computed as `array + index * 8`; the safe primitives bounds-check against `0, length - 1`.
-  The primitives on `float array` are only available when the float array optimization is enabled.
   Aligned load/store is not available because these values may be moved by the GC.
 
 - `nativeint# array`, `int64# array`: the corresponding primitives take an index in `nativeint`s/`int64`s and are required to operate on `int64x2`s.

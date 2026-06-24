@@ -101,11 +101,7 @@ module Uid = struct
 
   let internal_not_actually_unique = Internal
 
-  let unboxed_version t =
-    match t with
-    | Unboxed_version _ ->
-      Misc.fatal_error "Shape.unboxed_version"
-    | _ -> Unboxed_version t
+  let unboxed_version t = Unboxed_version t
 
   let for_actual_declaration = function
     | Item _ -> true
@@ -854,7 +850,6 @@ let rec print fmt t =
   | At_layout (shape, layout) ->
     Format.fprintf fmt "(%a : %a)" print_nested shape
       (Format_doc.compat Layout.format) layout
-
   in
   if t.approximated then
     Format.fprintf fmt "@[(approx)@ %a@]@;" aux t
@@ -1104,7 +1099,6 @@ let at_layout ?uid shape layout =
     hash = Hashtbl.hash (hash_at_layout, uid, shape.hash, layout);
     approximated = false }
 
-
 let decompose_abs t =
   match t.desc with
   | Abs (x, t) -> Some (x, t)
@@ -1115,36 +1109,29 @@ let dummy_mod = str Item.Map.empty
 let of_path ~find_shape ~namespace path =
   (* We need to handle the following cases:
     Path of constructor:
-      M.t.C
+      M.t.C [Pextra_ty("M.t", "C")]
     Path of label:
-      M.t.lbl
+      M.t.lbl [Pextra_ty("M.t", "lbl")]
     Path of label of inline record:
-      M.t.C.lbl
+      M.t.C.lbl [Pextra_ty(Pextra_ty("M.t", "C"), "lbl")]
     Path of label of implicit unboxed record:
-      M.t#.lbl
-  *)
+      M.t#.lbl [Pextra_ty(Pextra_ty("M.t", Punboxed_ty), "lbl")] *)
   let rec aux : Sig_component_kind.t -> Path.t -> t = fun ns -> function
     | Pident id -> find_shape ns id
-    | Pdot (Pextra_ty (path, Punboxed_ty), name) ->
-      (match ns with
-       Unboxed_label -> ()
-       | _ -> Misc.fatal_error "Shape.of_path");
-      proj (aux Type path) (name, Label)
-    | Pdot (path, name) ->
-      let namespace :  Sig_component_kind.t =
-        match (ns : Sig_component_kind.t) with
-        | Constructor -> Type
-        | Label -> Type
-        | Unboxed_label -> Type
-        | _ -> Module
-      in
-      proj (aux namespace path) (name, ns)
+    | Pdot (path, name) -> proj (aux Module path) (name, ns)
     | Papply (p1, p2) -> app (aux Module p1) ~arg:(aux Module p2)
     | Pextra_ty (path, extra) -> begin
-        match extra with
-          Pcstr_ty name -> proj (aux Type path) (name, Constructor)
-        | Pext_ty -> aux Extension_constructor path
-        | Punboxed_ty -> aux ns path
+        match extra, ns, path with
+        | Pcstr_ty name, Label, Pextra_ty _ ->
+            (* Handle the M.t.C.lbl case *)
+            proj (aux Constructor path) (name, ns)
+        | Pcstr_ty name, Unboxed_label, Pextra_ty (path', Punboxed_ty) ->
+            (* Implicit-unboxed view of a boxed record: labels are stored in
+               the underlying boxed type's shape under the Label namespace. *)
+            proj (aux Type path') (name, Label)
+        | Pcstr_ty name, _, _ -> proj (aux Type path) (name, ns)
+        | Pext_ty, _, _ -> aux Extension_constructor path
+        | Punboxed_ty, _, _ -> aux ns path
       end
   in
   aux namespace path

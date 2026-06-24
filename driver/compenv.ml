@@ -220,6 +220,31 @@ let set_flambda_invariants ppf ~name v flag =
   | None -> ()
   | Some checks -> flag := checks
 
+let handle_dump_option ppf v =
+  let module D = Clflags.Dump_option in
+  let value, key =
+    (* "foo"  => true, "foo"
+       "-foo" => false, "foo"
+       "+foo" => true, "foo" *)
+    let tail () = String.sub v 1 (String.length v - 1) in
+    if String.starts_with ~prefix:"-" v
+    then false, tail ()
+    else if String.starts_with ~prefix:"+" v
+    then true, tail ()
+    else true, v
+  in
+  match D.of_string key with
+  | None ->
+      Printf.ksprintf (print_error ppf)
+        "bad value %s for option \"dump\"." key
+  | Some option ->
+  match D.available option with
+  | Error msg ->
+      Printf.ksprintf (print_error ppf)
+        "dump=%s: %s." key msg
+  | Ok () ->
+      D.flag option := value
+
 (* 'can-discard=' specifies which arguments can be discarded without warning
    because they are not understood by some versions of OCaml. *)
 let can_discard = ref []
@@ -298,14 +323,20 @@ let read_one_param ppf position name v =
   | "no-app-funct" -> clear "no-app-funct" [ applicative_functors ] v
   | "nodynlink" -> clear "nodynlink" [ dlcode ] v
   | "short-paths" -> clear "short-paths" [ real_paths ] v
-  | "trans-mod" -> set "trans-mod" [ transparent_modules ] v
+  | "no-alias-deps" -> set "no-alias-deps" [ no_alias_deps ] v
   | "opaque" -> set "opaque" [ opaque ] v
 
   | "pp" -> preprocessor := Some v
   | "runtime-variant" -> runtime_variant := v
   | "with-runtime" -> set "with-runtime" [ with_runtime ] v
   | "open" ->
-      open_modules := List.rev_append (String.split_on_char ',' v) !open_modules
+      let names = String.split_on_char ',' v in
+      open_args :=
+        List.rev_append (List.map (fun n -> Open n) names) !open_args
+  | "open-cmi" ->
+      let names = String.split_on_char ',' v in
+      open_args :=
+        List.rev_append (List.map (fun n -> Open_cmi n) names) !open_args
   | "cc" -> c_compiler := Some v
 
   | "clambda-checks" -> set "clambda-checks" [ clambda_checks ] v
@@ -553,6 +584,11 @@ let read_one_param ppf position name v =
     if check_bool ppf name v then
       Language_extension.set_universe_and_enable_all No_extensions
 
+  | "dump" ->
+      handle_dump_option ppf v
+
+  |  "keywords"  -> Clflags.keyword_edition := Some v
+
   | _ ->
     if !warnings_for_discarded_params &&
        not (List.mem name !can_discard) then begin
@@ -769,9 +805,15 @@ let deferred_actions = ref []
 let defer action =
   deferred_actions := action :: !deferred_actions
 
-let anonymous filename = defer (action_of_file filename)
-let impl filename = defer (ProcessImplementation filename)
-let intf filename = defer (ProcessInterface filename)
+let anonymous filename =
+  Opt_fuel.add_arg filename;
+  defer (action_of_file filename)
+let impl filename =
+  Opt_fuel.add_arg filename;
+  defer (ProcessImplementation filename)
+let intf filename =
+  Opt_fuel.add_arg filename;
+  defer (ProcessInterface filename)
 
 let process_deferred_actions env =
   let final_output_name = !output_name in

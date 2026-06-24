@@ -43,7 +43,9 @@ let init_path ?(auto_include=auto_include) ?(dir="") () =
        List.map
          (fun path : Clflags.visible_include ->
             { path; cmx_guaranteed = false })
-         Config.flexdll_dirs;
+         (* Config.flexdll_dirs is either [] or ["+flexdll"]: don't include a
+            reference to the Standard Library when -nostdlib was specified. *)
+         (if !Clflags.no_std_include then [] else Config.flexdll_dirs);
        !Compenv.first_include_dirs]
   in
   let visible =
@@ -95,7 +97,7 @@ let initial_env () =
   Typemod.initial_env
     ~loc:(Location.in_file "command line")
     ~initially_opened_module
-    ~open_implicit_modules:(List.rev !Clflags.open_modules)
+    ~open_implicit_args:(List.rev !Clflags.open_args)
 
 let set_from_env flag Clflags.{ parse; usage; env_var } =
   try

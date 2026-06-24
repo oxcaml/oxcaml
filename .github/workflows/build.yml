@@ -20,100 +20,88 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: runtime5 (x86_64-linux)
-            config: --enable-runtime5
+          - name: default (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
             build_debug: true
             sysdeps: gdb
 
-          - name: runtime5 dissector-assembler (x86_64-linux)
-            config: --enable-runtime5
+          - name: dissector-assembler (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
             oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
             oxcaml_llvm_source_branch: llvmize-oxcaml
             dissector_assembler: true
             sysdeps: gdb
 
-          - name: runtime5 stack-checks (x86_64-linux)
-            config: --enable-runtime5 --enable-stack-checks
+          - name: stack-checks (x86_64-linux)
+            config: --enable-stack-checks
             os: warp-ubuntu-latest-x64-8x
             sysdeps: gdb
 
-          - name: runtime5 poll-insertion (x86_64-linux)
-            config: --enable-runtime5 --enable-poll-insertion
+          - name: poll-insertion (x86_64-linux)
+            config: --enable-poll-insertion
             os: warp-ubuntu-latest-x64-8x
             sysdeps: gdb
 
-          - name: runtime5 multidomain (x86_64-linux)
-            config: --enable-runtime5 --enable-stack-checks --enable-poll-insertion --enable-multidomain
+          - name: multidomain (x86_64-linux)
+            config: --enable-stack-checks --enable-poll-insertion --enable-multidomain
             os: warp-ubuntu-latest-x64-8x
             sysdeps: gdb
-
-          - name: runtime4 dev (x86_64-linux)
-            config: --disable-runtime5 --enable-dev
-            os: warp-ubuntu-latest-x64-8x
 
           # We use a custom install prefix for this workflow.
           # Consider renaming it to indicate as such when convenient.
-          - name: runtime5 dev (x86_64-linux)
-            config: --enable-runtime5 --enable-dev
+          - name: dev (x86_64-linux)
+            config: --enable-dev --enable-keyword-edition=5.2
             os: warp-ubuntu-latest-x64-8x
             install_path: _custom_install
             sysdeps: gdb
 
-          - name: runtime5 debug stack-checks (x86_64-linux)
-            config: --enable-runtime5 --enable-stack-checks
+          - name: debug stack-checks (x86_64-linux)
+            config: --enable-stack-checks --enable-keyword-edition=5.4
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
             sysdeps: gdb
 
-          - name: runtime5 debug (x86_64-linux)
-            config: --enable-runtime5
+          - name: debug (x86_64-linux)
+            config: --enable-keyword-edition=5.2+effect
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
             sysdeps: gdb
 
-          - name: runtime4 O3 (x86_64-linux)
-            config: --disable-runtime5
-            os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: ''
-            ocamlparam: '_,O3=1'
-            disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l'
-
-
-          - name: runtime4 O3 metrics (x86_64-linux)
-            config: --disable-runtime5
+          - name: O3 metrics (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_'
             ocamlparam: '_,O3=1'
             collect_metrics: true
             disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l'
 
-          - name: runtime4 Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
-            config: --disable-runtime5 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
+          - name: Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
+            config: --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             ocamlparam: '_,Oclassic=1'
-            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml testsuite/tests/reaper/* testsuite/tests/flambda2/n_way_join_null.ml testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/issue5721.ml testsuite/tests/flambda2/stdlib_functor_inlining.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/flambda2/gadt_simplified_switch.ml testsuite/tests/flambda2/simplify/* testsuite/tests/quotation/eval/current_unit/eval_before_init_ok.ml'
+            # CR-someday dallsopp: various failures, descending from this
+            # previously being a runtime4-only check:
+            #   backtrace/print_location.ml
+            #   backtrace/backtrace_effects_nested.ml
+            #   effects/preemptible_fibers.ml
+            #   effects/preemption/*
+            #   frame-pointers/* (apart from exceptions.ml which was new in 5.4, but is sensitive to inlining)
+            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/backtrace/backtrace_effects_nested.ml testsuite/tests/backtrace/print_location.ml testsuite/tests/effects/preemptible_fibers.ml testsuite/tests/effects/preemption/basic.ml testsuite/tests/effects/preemption/basic2.ml testsuite/tests/effects/preemption/gc_in_handler.ml testsuite/tests/effects/preemption/lazy_values.ml testsuite/tests/effects/preemption/live_across_preemption1.ml testsuite/tests/effects/preemption/live_across_preemption2.ml testsuite/tests/effects/preemption/multiple_live_continuations.ml testsuite/tests/effects/preemption/resume_after_alloc.ml testsuite/tests/effects/preemption/shallow_handlers.ml testsuite/tests/effects/preemption/stored_continuation.ml testsuite/tests/effects/preemption/weak_references.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml testsuite/tests/reaper/* testsuite/tests/flambda2/n_way_join_null.ml testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/issue5721.ml testsuite/tests/flambda2/stdlib_functor_inlining.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/flambda2/gadt_simplified_switch.ml testsuite/tests/flambda2/simplify/* testsuite/tests/frame-pointers/c_call.ml testsuite/tests/frame-pointers/effects.ml testsuite/tests/frame-pointers/exceptions.ml testsuite/tests/frame-pointers/reperform.ml testsuite/tests/frame-pointers/stack_realloc.ml testsuite/tests/frame-pointers/stack_realloc2.ml testsuite/tests/quotation/eval/current_unit/eval_before_init_ok.ml testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/array_element_kind_meet.ml'
 
-          - name: runtime4 (aarch64-darwin)
-            config: --disable-runtime5 --disable-warn-error
-            os: warp-macos-15-arm64-6x
-
-          - name: runtime5 regalloc (aarch64-darwin)
-            config: --enable-runtime5 --disable-warn-error
+          - name: regalloc (aarch64-darwin)
+            config: --disable-warn-error
             os: warp-macos-15-arm64-6x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
             run_regalloc_tool: true
             sysdeps: gdb
 
-          - name: runtime5 debug regalloc (aarch64-darwin)
-            config: --enable-runtime5 --disable-warn-error
+          - name: debug regalloc (aarch64-darwin)
+            config: --disable-warn-error
             os: warp-macos-15-arm64-6x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
@@ -122,78 +110,60 @@ jobs:
             run_regalloc_tool: true
             sysdeps: gdb
 
-          - name: runtime5 regalloc (aarch64-linux)
-            config: --enable-runtime5 --disable-warn-error
+          - name: regalloc (aarch64-linux)
+            config: --disable-warn-error
             os: warp-ubuntu-latest-arm64-8x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
             run_regalloc_tool: true
             sysdeps: gdb
 
-          - name: runtime5 regalloc multidomain (aarch64-linux)
-            config: --enable-runtime5 --enable-poll-insertion --enable-multidomain --disable-warn-error
+          - name: regalloc multidomain (aarch64-linux)
+            config: --enable-poll-insertion --enable-multidomain --disable-warn-error
             os: warp-ubuntu-latest-arm64-8x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             run_regalloc_tool: true
             sysdeps: gdb
 
-          - name: runtime4 regalloc (x86_64-linux)
-            config: --disable-runtime5
-            os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
-            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
-            check_arch: true
-            run_regalloc_tool: true
-
-          - name: runtime5 frame-pointers irc (x86_64-linux)
-            config: --enable-runtime5 --enable-frame-pointers
+          - name: frame-pointers irc (x86_64-linux)
+            config: --enable-frame-pointers
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_,w=-46,regalloc=irc'
             ocamlparam: '_,w=-46,regalloc=irc'
             check_arch: true
             sysdeps: gdb
 
-          - name: runtime5 cfg-invariants (x86_64-linux)
-            config: --enable-runtime5
+          - name: cfg-invariants (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
             ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
             check_arch: true
             sysdeps: gdb
 
-          - name: runtime5 cfg-invariants (aarch64-linux)
-            config: --enable-runtime5
+          - name: cfg-invariants (aarch64-linux)
             os: warp-ubuntu-latest-arm64-8x
             build_ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1"
             ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1"
             check_arch: true
             sysdeps: gdb
 
-          - name: runtime5 vectorizer (x86_64-linux)
-            config: --enable-runtime5
+          - name: vectorizer (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
             ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
             check_arch: true
             sysdeps: gdb
 
-          - name: runtime5 x86-peephole (x86_64-linux)
-            config: --enable-runtime5
+          - name: x86-peephole (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_,w=-46,x86-peephole-optimize=1'
             ocamlparam: '_,w=-46,x86-peephole-optimize=1'
             check_arch: true
             sysdeps: gdb
 
-          - name: runtime4 address-sanitizer (x86_64-linux)
-            config: --disable-runtime5 --enable-address-sanitizer
-            os: warp-ubuntu-latest-x64-8x
-            cc: clang
-            sysdeps: clang
-
-          - name: runtime5 address-sanitizer (x86_64-linux)
-            config: --enable-runtime5 --enable-address-sanitizer
+          - name: address-sanitizer (x86_64-linux)
+            config: --enable-address-sanitizer
             os: warp-ubuntu-latest-x64-8x
             cc: clang
             sysdeps: clang
@@ -205,24 +175,23 @@ jobs:
           # CR sspies: We should enable --enable-oxcaml-dwarf-on-compiler in
           # at least one CI build to test that the compiler itself can be built
           # with DWARF enabled under function sections.
-          - name: runtime5 dwarf-tests (x86_64-linux)
-            config: --enable-runtime5 --enable-function-sections
+          - name: dwarf-tests (x86_64-linux)
+            config: --enable-function-sections
             os: warp-ubuntu-latest-x64-8x
             dwarf_tests_only: true
             oxcaml_llvm_tag: oxcaml-lldb-21.1.0+oxcaml0
             oxcaml_llvm_source_branch: oxcaml-llvm-plugin
             sysdeps: gdb
 
-          - name: runtime5 frame-pointers llvmize-tests (x86_64-linux)
-            config: --enable-runtime5 --enable-frame-pointers
+          - name: frame-pointers llvmize-tests (x86_64-linux)
+            config: --enable-frame-pointers
             os: warp-ubuntu-latest-x64-8x
             llvmize_tests_only: true
             oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
             oxcaml_llvm_source_branch: llvmize-oxcaml
             sysdeps: gdb
 
-          - name: runtime5 musl (x86_64-linux)
-            config: --enable-runtime5
+          - name: musl (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
             cc: musl-gcc
             sysdeps: musl musl-tools
@@ -230,16 +199,14 @@ jobs:
           # Here and below, we put 'reaper=1,_' instead of '_,reaper=1', as
           # some tests rely on explicitely controlling whether the reaper is
           # enabled.
-          - name: runtime5 reaper
-            config: --enable-runtime5
+          - name: reaper
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'reaper=1,_'
             ocamlparam: 'reaper=1,_'
             disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml'
             sysdeps: gdb
 
-          - name: runtime5 reaper with local value slots
-            config: --enable-runtime5
+          - name: reaper with local value slots
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'reaper=1,reaper-local-fields=1,_'
             ocamlparam: 'reaper=1,reaper-local-fields=1,_'
@@ -249,8 +216,7 @@ jobs:
           # Same as for the reaper, some tests rely on being able to enable or disable
           # lifting and specialization, also it's pointless to test match-in-match without O3 (or more)
           # because it requires join points.
-          - name: runtime5 match-in-match
-            config: --enable-runtime5
+          - name: match-in-match
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'O3=1,flambda2-match-in-match=1,_'
             ocamlparam: 'O3=1,flambda2-match-in-match=1,_'
@@ -359,14 +325,6 @@ jobs:
           if [[ "${{matrix.dissector_assembler}}" == "true" ]]; then
             dissector_config="--enable-assembler-suitable-for-dissector=$GITHUB_WORKSPACE/oxcaml-llvm/bin/llvm-mc"
           fi
-          if [[ "${{ runner.os }}" == "macOS" \
-                && "${{ matrix.config }}" == *--disable-runtime5* ]]; then
-            # Homebrew's autoconf (2.72+) probes for C23 and appends
-            # -std=gnu23 to CC, which breaks the runtime4 aarch64-darwin
-            # build. Pin CFLAGS to gnu11 so the later -std= wins at compile
-            # time. Scoped to runtime4 since it will be deleted soon.
-            export CFLAGS="-std=gnu11"
-          fi
           autoconf
           ./configure \
             --prefix=$GITHUB_WORKSPACE/$install_path \
@@ -392,28 +350,77 @@ jobs:
           codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlc.opt
           codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlopt.opt
 
-      - name: Build, install and test OxCaml
+      - name: Build OxCaml
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
+        id: build
         run: |
           if [ "${{ matrix.collect_metrics }}" = "true" ]; then
             mkdir $GITHUB_WORKSPACE/_profile_csv
-            ORIG_BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM"
-            ORIG_OCAMLPARAM="$OCAMLPARAM"
             BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
             OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
           fi
-          if [ "$run_testsuite" = true ]; then target=ci; else target=compiler; fi
           ulimit -c unlimited
-          make $target \
+          make compiler \
             || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+        env:
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
 
-          # Install the compiler for metrics_collection configuration to populate _install directory
-          # This is needed for the metrics collection step to analyze installed artifacts
+      - name: Run OxCaml testsuite
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
+        run: |
           if [ "${{ matrix.collect_metrics }}" = "true" ]; then
-            BUILD_OCAMLPARAM="$ORIG_BUILD_OCAMLPARAM"
-            OCAMLPARAM="$ORIG_OCAMLPARAM"
-            make install
+            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
           fi
+          ulimit -c unlimited
+          make runtest \
+            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+        env:
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
+
+      - name: Run upstream testsuite
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
+        run: |
+          if [ "${{ matrix.collect_metrics }}" = "true" ]; then
+            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+          fi
+          ulimit -c unlimited
+          make runtest-upstream \
+            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+        env:
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
+
+      - name: Run minimizer
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
+        run: |
+          if [ "${{ matrix.collect_metrics }}" = "true" ]; then
+            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+          fi
+          ulimit -c unlimited
+          make minimizer \
+            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+        env:
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
+
+        # Install the compiler for metrics_collection configuration to populate _install directory
+        # This is needed for the metrics collection step to analyze installed artifacts
+      - name: Reinstall the compiler for metrics collection
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && matrix.collect_metrics == true
+        run: make install
         env:
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
@@ -422,7 +429,7 @@ jobs:
 
       - name: Promote failed tests and capture diffs
         # Compute the diff for an arbitrary job, we expect all to have the same diff
-        if: failure() && matrix.name == 'runtime5 (x86_64-linux)'
+        if: failure() && matrix.name == 'default (x86_64-linux)'
         continue-on-error: true
         run: |
           export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH

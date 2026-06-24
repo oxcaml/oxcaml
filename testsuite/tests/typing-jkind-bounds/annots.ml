@@ -654,7 +654,7 @@ let f { field } = field "hello"
 Line 1, characters 24-31:
 1 | let f { field } = field "hello"
                             ^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : immediate)"
        The layout of string is value non_float
          because it is the primitive type string.
@@ -671,7 +671,7 @@ let f { fieldg } = fieldg "hello"
 Line 1, characters 26-33:
 1 | let f { fieldg } = fieldg "hello"
                               ^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : value mod global)"
        The kind of string is immutable_data
          because it is the primitive type string.
@@ -685,7 +685,7 @@ let f { fieldc } = fieldc "hello"
 Line 1, characters 26-33:
 1 | let f { fieldc } = fieldc "hello"
                               ^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : word mod many aliased)"
        The layout of string is value non_float
          because it is the primitive type string.
@@ -1071,7 +1071,7 @@ let f (x : ('a : immediate). 'a -> 'a) = x "string"
 Line 1, characters 43-51:
 1 | let f (x : ('a : immediate). 'a -> 'a) = x "string"
                                                ^^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : immediate)"
        The layout of string is value non_float
          because it is the primitive type string.
@@ -1088,7 +1088,7 @@ let f (x : ('a : value mod global). 'a -> 'a) = x "string"
 Line 1, characters 50-58:
 1 | let f (x : ('a : value mod global). 'a -> 'a) = x "string"
                                                       ^^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : value mod global)"
        The kind of string is immutable_data
          because it is the primitive type string.
@@ -1751,6 +1751,6 @@ let bad p =
 Line 3, characters 43-44:
 3 |   | T (type (a : float64)) (x : a) -> Some x
                                                ^
-Error: This expression has type "a" but an expression was expected of type "'a"
+Error: The value "x" has type "a" but an expression was expected of type "'a"
        The type constructor "a" would escape its scope
 |}]

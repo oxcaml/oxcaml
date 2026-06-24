@@ -93,7 +93,7 @@ let adding_equation_for_name t name ~f =
     { t' with adding_equations_for_names = t.adding_equations_for_names }
 
 let replace_concrete_equation t name ty =
-  match TG.must_be_singleton ty ~machine_width:(TE.machine_width t) with
+  match TG.must_be_singleton ty with
   | None ->
     (* [ty] must be a concrete type. *)
     (match TG.get_alias_opt ty with

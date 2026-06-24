@@ -157,7 +157,7 @@ let read ~file =
          let _ = Cmi_format.input_cmi ic in
          file_magic_number := Cms_format.read_magic_number ic);
       if String.equal !file_magic_number cmt_magic_number then
-        Cmt (input_value ic : Cmt_format.cmt_infos)
+        Cmt (Compression.input_value ic : Cmt_format.cmt_infos)
       else if String.equal !file_magic_number cms_magic_number then
         Cms (input_value ic : Cms_format.cms_infos)
       else if String.equal !file_magic_number magic_number then

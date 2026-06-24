@@ -39,7 +39,9 @@ type compile_time_constant =
 
 type immediate_or_pointer =
   | Immediate
+  (* The value must be immediate. *)
   | Pointer
+  (* The value may be a pointer or an immediate. *)
 
 type locality_mode = private
   | Alloc_heap
@@ -307,9 +309,6 @@ type primitive =
   | Pfloatarray_load_vec of { size : boxed_vector; unsafe : bool;
                               index_kind : array_index_kind;
                               mode : locality_mode; boxed : bool }
-  | Pfloat_array_load_vec of { size : boxed_vector; unsafe : bool;
-                               index_kind : array_index_kind;
-                               mode : locality_mode; boxed : bool }
   | Pint_array_load_vec of { size : boxed_vector; unsafe : bool;
                              index_kind : array_index_kind;
                              mode : locality_mode; boxed : bool }
@@ -336,8 +335,6 @@ type primitive =
                                            mode : locality_mode; boxed : bool }
   | Pfloatarray_set_vec of { size : boxed_vector; unsafe : bool;
                              index_kind : array_index_kind; boxed : bool }
-  | Pfloat_array_set_vec of { size : boxed_vector; unsafe : bool;
-                              index_kind : array_index_kind; boxed : bool }
   | Pint_array_set_vec of { size : boxed_vector; unsafe : bool;
                             index_kind : array_index_kind; boxed : bool }
   | Punboxed_float_array_set_vec of { size : boxed_vector; unsafe : bool;
@@ -449,6 +446,19 @@ and array_kind =
   | Pgcscannableproductarray of scannable_product_element_kind list
   | Pgcignorableproductarray of ignorable_product_element_kind list
   (* Invariant: the product element kind lists have length >= 2 *)
+  | Punspecializedarray
+  (* Used only in the definition of primitives, to represent primitives that
+     have not yet been specialized. Note that [Punspecializedarray] and
+     [Pgenarray] are not the same thing:
+
+     - [Pgenarray] represent arrays that can be either [Paddrarray] or
+       [Pfloatarray]
+     - [Punspecializedarray] is for arrays that can be of any kind, including
+       [Pgenarray].
+
+     When [Config.flat_float_array] is [false], then [Pgenarray] must not be
+     used, but [Punspecializedarray] always is. After specialization, no value
+     of this kind should remain. *)
 
 (** When accessing a flat float array, we need to know the mode which we should
     box the resulting float at. *)
@@ -464,6 +474,8 @@ and array_ref_kind =
   | Pgcscannableproductarray_ref of scannable_product_element_kind list
   | Pgcignorableproductarray_ref of ignorable_product_element_kind list
   (* Invariant: the product element kind lists have length >= 2 *)
+  | Punspecializedarray_ref of locality_mode
+    (* See [Punspecializedarray]. *)
 
 (** When updating an array that might contain pointers, we need to know what
     mode they're at; otherwise, access is uniform. *)
@@ -480,6 +492,8 @@ and array_set_kind =
       modify_mode * scannable_product_element_kind list
   | Pgcignorableproductarray_set of ignorable_product_element_kind list
   (* Invariant: the product element kind lists have length >= 2 *)
+  | Punspecializedarray_set of modify_mode
+    (* See [Punspecializedarray]. *)
 
 and ignorable_product_element_kind =
   | Pint_ignorable
@@ -1159,6 +1173,7 @@ val of_bool : bool -> lambda
 val split_vectors : bool
 
 val layout_unit : layout
+val layout_bool : layout
 val layout_unboxed_unit : layout
 val layout_int : layout
 val layout_array : array_kind -> layout
@@ -1167,6 +1182,7 @@ val layout_list : layout
 val layout_exception : layout
 val layout_function : layout
 val layout_object : layout
+val layout_poly_variant : layout
 val layout_class : layout
 val layout_module : layout
 val layout_functor : layout
@@ -1194,8 +1210,14 @@ val layout_lazy_contents : layout
 val layout_any_value : layout
 (* A layout that is Pgenval because it is bound by a letrec *)
 val layout_letrec : layout
+val layout_instance_var : layout
+val layout_method : layout
+val layout_initializer : layout
+val layout_array_comprehension_element : layout
+val layout_list_element : layout
 (* The probe hack: Free vars in probes must have layout value. *)
 val layout_probe_arg : layout
+val layout_block_idx : layout
 
 val layout_unboxed_product : layout list -> layout
 
@@ -1262,9 +1284,13 @@ val transl_prim: string -> string -> lambda
 (** Translate a value from a persistent module. For instance:
 
     {[
-      transl_internal_value "CamlinternalLazy" "force"
+      transl_prim "CamlinternalLazy" "force"
     ]}
 *)
+
+val is_evaluated : lambda -> bool
+(** [is_evaluated lam] returns [true] if [lam] is either a constant, a variable
+    or a function abstract. *)
 
 val free_variables: lambda -> Ident.Set.t
 
@@ -1355,6 +1381,8 @@ val max_arity : unit -> int
       maximal length of the [params] list of a [lfunction] record.
       This is unlimited ([max_int]) for bytecode, but limited
       (currently to 126) for native code. *)
+
+val tag_of_lazy_tag : lazy_block_tag -> int
 
 val join_locality_mode : locality_mode -> locality_mode -> locality_mode
 val sub_locality_mode : locality_mode -> locality_mode -> bool

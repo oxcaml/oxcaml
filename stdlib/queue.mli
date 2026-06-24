@@ -77,6 +77,11 @@ val peek_opt : ('a : value_or_null) . 'a t @ local -> 'a option
 val top : ('a : value_or_null) . 'a t @ local -> 'a
 (** [top] is a synonym for [peek]. *)
 
+val drop : ('a : value_or_null) . 'a t @ local -> unit
+(** [drop q] removes the first element in queue [q], or raises {!Empty}
+   if the queue is empty.
+   @since 5.3 *)
+
 val clear : ('a : value_or_null) . 'a t @ local -> unit
 (** Discard all elements from a queue. *)
 
