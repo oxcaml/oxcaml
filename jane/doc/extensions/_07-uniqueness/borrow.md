@@ -218,3 +218,27 @@ let foo () =
   local_aliased_use z1       (* safe: x's borrow region still alive *)
 ```
 
+## Interactions with stack allocation
+
+A borrow region only allows `global` values to escape; anything `local` to
+it is trapped inside. A value can also be `local` because it was
+stack-allocated, and the compiler does not distinguish these two reasons
+for being `local`. As a result, a stack-allocated value cannot escape a
+borrow region, even when no borrowed value is involved:
+
+```ocaml
+let bar (x @ local) =
+  let _ = x in
+  exclave_ (42, 24)
+
+let foo x =
+  let _ = bar (borrow_ x) in   (* Error: bar's result escapes the borrow region *)
+  ()
+```
+
+Here `bar`'s result is `local` because it is stack-allocated via `exclave_`,
+not because it is borrowed. But the compiler treats both kinds of `local`
+uniformly, so the result is forbidden from escaping the borrow region.
+
+We plan to split the locality axis into two — one for stack allocation, one
+for borrowing — at which point the example above will typecheck.

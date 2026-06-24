@@ -29,7 +29,7 @@ let match_tagged_immediate (t : t) : int =
   | D -> 7
 [%%expect_asm X86_64{|
 match_tagged_immediate:
-  leaq  .LcamlTOP2__switch_block27(%rip), %rbx
+  leaq  <hidden PC-relative offset>(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
@@ -61,7 +61,7 @@ let match_naked_immediate (t : t) : int# =
   | D -> untag_int 7
 [%%expect_asm X86_64{|
 match_naked_immediate:
-  leaq  .LcamlTOP4__switch_block79(%rip), %rbx
+  leaq  <hidden PC-relative offset>(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
@@ -91,7 +91,7 @@ let match_naked_float (t : t) : float# =
   | D -> #7.0
 [%%expect_asm X86_64{|
 match_naked_float:
-  leaq  .LcamlTOP5__switch_block115(%rip), %rbx
+  leaq  <hidden PC-relative offset>(%rip), %rbx
   vmovsd -4(%rbx,%rax,4), %xmm0
   ret
 |}]
@@ -126,7 +126,7 @@ let match_naked_float32 (t : t) : float32# =
   | D -> #7.0s
 [%%expect_asm X86_64{|
 match_naked_float32:
-  leaq  .LcamlTOP6__switch_block151(%rip), %rbx
+  leaq  <hidden PC-relative offset>(%rip), %rbx
   vmovss -2(%rbx,%rax,2), %xmm0
   ret
 |}]
@@ -161,7 +161,7 @@ let match_naked_int32 (t : t) : int32# =
   | D -> #7l
 [%%expect_asm X86_64{|
 match_naked_int32:
-  leaq  .LcamlTOP7__switch_block187(%rip), %rbx
+  leaq  <hidden PC-relative offset>(%rip), %rbx
   movslq -2(%rbx,%rax,2), %rax
   ret
 |}]
@@ -191,7 +191,7 @@ let match_naked_int64 (t : t) : int64# =
   | D -> #7L
 [%%expect_asm X86_64{|
 match_naked_int64:
-  leaq  .LcamlTOP8__switch_block223(%rip), %rbx
+  leaq  <hidden PC-relative offset>(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
@@ -221,7 +221,7 @@ let match_naked_nativeint (t : t) : nativeint# =
   | D -> #7n
 [%%expect_asm X86_64{|
 match_naked_nativeint:
-  leaq  .LcamlTOP9__switch_block259(%rip), %rbx
+  leaq  <hidden PC-relative offset>(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
@@ -252,7 +252,7 @@ let match_naked_int8 (t : t) : int8# =
 [%%expect_asm X86_64{|
 match_naked_int8:
   sarq  $1, %rax
-  leaq  .LcamlTOP10__switch_block295(%rip), %rbx
+  leaq  <hidden PC-relative offset>(%rip), %rbx
   movsbq (%rbx,%rax), %rax
   ret
 |}]
@@ -282,7 +282,7 @@ let match_naked_int16 (t : t) : int16# =
   | D -> #7S
 [%%expect_asm X86_64{|
 match_naked_int16:
-  leaq  .LcamlTOP11__switch_block331(%rip), %rbx
+  leaq  <hidden PC-relative offset>(%rip), %rbx
   movswq -1(%rbx,%rax), %rax
   ret
 |}]
@@ -312,7 +312,7 @@ let match_symbol (t : t) : string =
   | D -> "delta"
 [%%expect_asm X86_64{|
 match_symbol:
-  leaq  .LcamlTOP12__switch_block375(%rip), %rbx
+  leaq  <hidden PC-relative offset>(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
@@ -355,7 +355,7 @@ let match_symbol_or_tagged_immediate (t : t) : foo =
   | D -> P
 [%%expect_asm X86_64{|
 match_symbol_or_tagged_immediate:
-  leaq  .LcamlTOP14__switch_block425(%rip), %rbx
+  leaq  <hidden PC-relative offset>(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
@@ -398,7 +398,7 @@ let match_symbol_tagged_or_null (t : t) : foo or_null =
   | D -> This P
 [%%expect_asm X86_64{|
 match_symbol_tagged_or_null:
-  leaq  .LcamlTOP15__switch_block467(%rip), %rbx
+  leaq  <hidden PC-relative offset>(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]

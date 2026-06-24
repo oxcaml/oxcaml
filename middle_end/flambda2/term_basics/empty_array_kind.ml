@@ -79,3 +79,5 @@ let of_lambda array_kind =
   | Punboxedvectorarray Unboxed_vec256 -> Naked_vec256s
   | Punboxedvectorarray Unboxed_vec512 -> Naked_vec512s
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ -> Unboxed_products
+  | Punspecializedarray ->
+    Misc.fatal_error "Empty_array_kind.of_lambda: Punspecializedarray"

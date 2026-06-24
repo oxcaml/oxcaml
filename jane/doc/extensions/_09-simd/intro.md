@@ -69,11 +69,11 @@ provided by the intrinsics libraries rather than Base or Core.
 module Int8x16 = Ocaml_simd_sse.Int8x16
 
 let text = "abcdefghijklmnopqrstuvwxyz"
-let floats = [| 1.0; 2.0 |]
+let floats = Float_array.of_array [| 1.0; 2.0 |]
 let ints = [| 1; 2 |]
 
 let _ = Int8x16.String.get text ~byte:0
-let _ = Float64x2.Float_array.get floats ~idx:0 (* Float array optimization required *)
+let _ = Float64x2.Floatarray.get floats ~idx:0
 let _ = Int64x2.Immediate_array.get_tagged ints ~idx:0
 ```
 
