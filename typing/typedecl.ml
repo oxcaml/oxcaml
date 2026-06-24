@@ -2078,6 +2078,17 @@ let update_constructor_representation
         raise (Error (loc, Illegal_mixed_product Extension_constructor));
       Ok (Constructor_mixed shape)
 
+let update_constructor_representation_and_arg_sorts env loc args
+      ~is_extension_constructor =
+  let args, constant, jkinds, arg_sorts =
+    update_constructor_arguments_sorts env loc args
+  in
+  let constructor_shape =
+    update_constructor_representation env args jkinds ~loc
+      ~is_extension_constructor
+  in
+  args, constant, constructor_shape, arg_sorts
+
 type unrepresentable_record =
   | Unrepresentable_field of string
 
@@ -2548,14 +2559,10 @@ let rec update_decl_jkind env dpath decl =
     | cstrs, Variant_boxed cstr_layouts ->
       let cstrs =
         List.mapi (fun idx cstr ->
-          let cd_args, _all_void, jkinds, arg_sorts =
-            update_constructor_arguments_sorts env cstr.Types.cd_loc
-              cstr.Types.cd_args
-          in
-          let cstr_repr =
-            update_constructor_representation env cd_args jkinds
+          let cd_args, _constant, cstr_repr, arg_sorts =
+            update_constructor_representation_and_arg_sorts env
+              cstr.Types.cd_loc cstr.Types.cd_args
               ~is_extension_constructor:false
-              ~loc:cstr.Types.cd_loc
           in
           let () =
             match cstr_repr, arg_sorts with
@@ -3832,11 +3839,8 @@ let transl_extension_constructor_decl
       ~cstr_path:(Pident id) ~type_path ~unboxed:false ~extension:true
       typext_params svars sargs sret_type
   in
-  let args, constant, jkinds, _arg_sorts =
-    update_constructor_arguments_sorts env loc args
-  in
-  let constructor_shape =
-    update_constructor_representation env args jkinds ~loc
+  let args, constant, constructor_shape, _arg_sorts =
+    update_constructor_representation_and_arg_sorts env loc args
       ~is_extension_constructor:true
   in
   let constructor_shape =
