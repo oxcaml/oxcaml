@@ -688,6 +688,14 @@ module Lpoly = struct
     | Determined _ -> on_determined ()
 end
 
+type refinement_spec =
+  { refn_args : refinement_clause list;
+    refn_result : refinement_clause }
+
+and refinement_clause =
+  { refc_binder : string option;
+    refc_predicate : Parsetree.expression option }
+
 module type Wrapped = sig
   type 'a wrapped
 
@@ -699,6 +707,7 @@ module type Wrapped = sig
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
+      val_refinement_spec: refinement_spec option;
       val_uid: Uid.t;
     }
 

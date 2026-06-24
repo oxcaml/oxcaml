@@ -4722,6 +4722,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
         Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = zero_alloc;
+        val_refinement_spec = None;
         val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
       }
   | [] ->
@@ -4767,6 +4768,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
         Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = Zero_alloc.default;
+        val_refinement_spec = None;
         val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
       }
   in

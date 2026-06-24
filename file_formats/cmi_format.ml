@@ -116,6 +116,7 @@ let deserialize data =
       val_kind = vd.val_kind;
       val_zero_alloc = vd.val_zero_alloc;
       val_attributes = vd.val_attributes;
+      val_refinement_spec = vd.val_refinement_spec;
       val_loc = vd.val_loc;
       val_uid = vd.val_uid;
     }
@@ -151,6 +152,7 @@ let serialize oc base =
       val_kind = vd.val_kind;
       val_zero_alloc = vd.val_zero_alloc;
       val_attributes = vd.val_attributes;
+      val_refinement_spec = vd.val_refinement_spec;
       val_loc = vd.val_loc;
       val_uid = vd.val_uid;
     }

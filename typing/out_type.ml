@@ -2307,7 +2307,8 @@ let tree_of_value_description id decl =
       oval_type = Otyp_newlayout(qsvs, Otyp_poly(qtvs, ty));
       oval_modalities = tree_of_modalities Immutable moda;
       oval_prims = [];
-      oval_attributes = attrs
+      oval_attributes = attrs;
+      oval_theorem = Option.is_some decl.val_refinement_spec
     }
   in
   let vd =

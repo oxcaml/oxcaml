@@ -2282,9 +2282,136 @@ and transl_signature ?(interface_toplevel = false) env
         mksig (Tsig_value tdesc) env loc,
         [Sig_value(tdesc.val_id, tdesc.val_val, Exported)],
         newenv
-    | Psig_theorem _ ->
-        Location.raise_errorf ~loc
-          "Theorem declarations are not yet supported"
+    | Psig_theorem thm ->
+        Language_extension.assert_enabled ~loc Refinements ();
+        let erased, arg_positions, result_position =
+          Typetexp.erase_theorem_spec thm.pthm_type
+        in
+        (* The erased (refinement-free) type is the proof value's type. *)
+        let _lpoly, cty =
+          Typetexp.transl_type_scheme env erased Typetexp.Lmono
+        in
+        let ty = cty.ctyp_type in
+        let sort =
+          match
+            Ctype.type_sort ~why:Signature_item ~fixed:false env ty
+          with
+          | Ok sort -> sort
+          | Error _ -> Jkind.Sort.scannable
+        in
+        (* Typecheck each present predicate, threading binders left to right. *)
+        let add_binder pred_env binder base_styp =
+          match binder with
+          | None -> pred_env
+          | Some name ->
+            let bcty =
+              Typetexp.transl_simple_type pred_env ~new_var_jkind:Any
+                ~closed:false Mode.Alloc.Const.legacy base_styp
+            in
+            let bty = bcty.ctyp_type in
+            let bsort =
+              match
+                Ctype.type_sort ~why:Signature_item ~fixed:false pred_env bty
+              with
+              | Ok s -> s
+              | Error _ -> Jkind.Sort.scannable
+            in
+            let bvd =
+              { val_type = bty;
+                val_modalities = Mode.Modality.undefined;
+                val_kind = Val_reg bsort;
+                val_lpoly = Lpoly.determined [];
+                Types.val_loc = base_styp.ptyp_loc;
+                val_zero_alloc = Zero_alloc.default;
+                val_attributes = [];
+                val_refinement_spec = None;
+                val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+              }
+            in
+            let _id, pred_env =
+              Env.enter_value ~mode:md_mode name bvd pred_env
+            in
+            pred_env
+        in
+        let check_predicate pred_env pred =
+          match pred with
+          | None -> ()
+          | Some e ->
+            ignore
+              (Typecore.type_expect pred_env e
+                 (Typecore.mk_expected Predef.type_bool)
+               : Typedtree.expression)
+        in
+        (* Pair each argument refinement with its erased base type from the
+           spine, so binders can be added with the right type. *)
+        let rec walk_args pred_env styp positions =
+          match positions, styp.ptyp_desc with
+          | pos :: rest, Ptyp_arrow (_, arg, ret, _, _) ->
+            (* Bind the argument refinement's binder before checking its
+               predicate, so [(x : T | p)] sees [x] in [p] (and in later
+               predicates), matching the result-position rule below. *)
+            let pred_env = add_binder pred_env pos.Typetexp.rp_binder arg in
+            check_predicate pred_env pos.Typetexp.rp_predicate;
+            walk_args pred_env ret rest
+          | _, _ -> pred_env
+        in
+        let pred_env = walk_args env erased arg_positions in
+        (* Result position: bind [(y:R|q)]'s [y], then check [q]. *)
+        let result_base =
+          let rec result_of styp =
+            match styp.ptyp_desc with
+            | Ptyp_arrow (_, _, ret, _, _) -> result_of ret
+            | _ -> styp
+          in
+          result_of erased
+        in
+        let pred_env =
+          add_binder pred_env result_position.Typetexp.rp_binder result_base
+        in
+        check_predicate pred_env result_position.Typetexp.rp_predicate;
+        (* Build the refinement spec from the source binders + untyped
+           predicates (decision 3). *)
+        let to_clause (pos : Typetexp.refinement_position) =
+          { refc_binder = pos.rp_binder;
+            refc_predicate = pos.rp_predicate }
+        in
+        let spec =
+          { refn_args = List.map to_clause arg_positions;
+            refn_result = to_clause result_position }
+        in
+        let vd =
+          { val_type = ty;
+            val_modalities =
+              Mode.Modality.of_const sig_modalities.moda_modalities;
+            val_kind = Val_reg sort;
+            val_lpoly = Lpoly.determined [];
+            Types.val_loc = loc;
+            val_zero_alloc = Zero_alloc.default;
+            val_attributes = thm.pthm_attributes;
+            val_refinement_spec = Some spec;
+            val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+          }
+        in
+        let id, newenv =
+          Env.enter_value ~mode:md_mode thm.pthm_name.txt vd env
+            ~check:(fun s -> Warnings.Unused_value_declaration s)
+        in
+        Ctype.check_and_update_generalized_ty_jkind ~name:id ~loc ty;
+        let tdesc =
+          { Typedtree.val_id = id;
+            val_name = thm.pthm_name;
+            val_desc = cty;
+            val_val = vd;
+            val_modal_info = Valmi_sig_value sig_modalities;
+            val_prim = [];
+            val_loc = thm.pthm_loc;
+            val_attributes = thm.pthm_attributes;
+          }
+        in
+        Signature_names.check_value names tdesc.val_loc tdesc.val_id;
+        mksig (Tsig_value tdesc) env loc,
+        [Sig_value (id, vd, Exported)],
+        newenv
     | Psig_type (rec_flag, sdecls) ->
         let (decls, newenv, _shapes) =
           Typedecl.transl_type_decl env rec_flag sdecls

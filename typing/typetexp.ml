@@ -1245,7 +1245,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       ctyp (Ttyp_splice cty) (newty (Tsplice cty.ctyp_type))
   | Ptyp_refinement _ ->
       Location.raise_errorf ~loc
-        "Refinement types are not yet supported"
+        "Refinements are only allowed at theorem argument/result positions"
   | Ptyp_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
@@ -1767,6 +1767,42 @@ let transl_type_scheme env styp valdecl_flag =
       styp.ptyp_loc vars st
   | _, Lpoly -> transl_type_scheme_poly_val env styp
   | _, Lmono -> [], transl_type_scheme_lmono env styp
+
+(* Refinement / theorem spec erasure.
+
+   Given a theorem spec [core_type], walk the arrow spine only (decision 8),
+   peel an optional refinement at each argument position and at the result,
+   and return:
+   - the erased, refinement-free [core_type] (to feed [transl_type]); and
+   - the per-position [(binder, predicate)] data.
+
+   Peeled base types are NOT recursed into: any [Ptyp_refinement] nested in a
+   base type is left in place, so the normal [transl_type] hits the existing
+   error arm. *)
+
+type refinement_position =
+  { rp_binder : string option;
+    rp_predicate : Parsetree.expression option }
+
+let peel_refinement (styp : Parsetree.core_type) =
+  match styp.ptyp_desc with
+  | Ptyp_refinement (binder, base, pred) ->
+    base, { rp_binder = binder; rp_predicate = Some pred }
+  | _ -> styp, { rp_binder = None; rp_predicate = None }
+
+let erase_theorem_spec (styp : Parsetree.core_type) =
+  let rec loop styp =
+    match styp.ptyp_desc with
+    | Ptyp_arrow (lbl, arg, ret, m1, m2) ->
+      let arg_base, arg_pos = peel_refinement arg in
+      let ret_erased, ret_args, ret_result = loop ret in
+      let desc = Ptyp_arrow (lbl, arg_base, ret_erased, m1, m2) in
+      { styp with ptyp_desc = desc }, arg_pos :: ret_args, ret_result
+    | _ ->
+      let base, result_pos = peel_refinement styp in
+      base, [], result_pos
+  in
+  loop styp
 
 (* Error report *)
 
