@@ -11,7 +11,7 @@ let code loopify(never) size(22) newer_version_of(f_0)
       f_0_1 (arr : val array)
         my_closure _region _ghost_region my_depth
         -> k * k1
-        : [ 0 | 0 of val ] =
+        : [ 0 | 0 of imm tagged ] =
   (let prim = %array_length.generic (arr) in
    let prim_1 = %int_comp.unsigned.lt (0, prim) in
    switch prim_1
@@ -25,10 +25,10 @@ let code loopify(never) size(22) newer_version_of(f_0)
 in
 let $camlArray_specialisation_examples__f_4 = closure f_0_1 @f in
 let code loopify(never) size(8) newer_version_of(g_1)
-      g_1_1 (x : [ 0 | 0 of val ])
+      g_1_1 (x : [ 0 | 0 of imm tagged ])
         my_closure _region _ghost_region my_depth
         -> k * k1
-        : [ 0 | 0 of val ] =
+        : [ 0 | 0 of imm tagged ] =
   let a = %array.mut (x) in
   let ifnot_result = %array_load.mut (a, 0) in
   cont k (ifnot_result)
