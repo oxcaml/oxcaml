@@ -953,7 +953,19 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
               Float.compare threshold 0. < 0
               || Float.compare final_cost threshold > 0
             then `Too_costly
-            else `Specialized (continuation, lifting_cost)))
+            else begin
+              if Specialization_cost.flambda2_profile_mim ()
+              then
+                Format.eprintf
+                  "DECISION: %a / estimated cost: %f / non_liftable_conts: %a@."
+                  Continuation.print continuation final_cost
+                  (Specialization_cost.print_cont_sizes
+                     ~machine_width:
+                       (Typing_env.machine_width (DE.typing_env denv))
+                     ~inlining_arguments:(DE.inlining_arguments denv))
+                  spec_cost;
+              `Specialized (continuation, lifting_cost)
+            end))
 
 let decide_continuation_specialization ~dacc ~switch ~scrutinee =
   Profile.record_with_counters ~accumulate:true "continuation_specialization"

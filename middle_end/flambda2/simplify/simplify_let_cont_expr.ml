@@ -16,11 +16,6 @@
 
 open! Simplify_import
 
-let flambda2_profile_mim =
-  Oxcaml_args.Extra_options.bool __LOC__
-    "flambda2-profile-mim"
-
-
 (* High-level view of the workflow for simplification of let cont:
  *
  * +--------------------+           +--------------------+
@@ -1160,18 +1155,22 @@ and compute_specialized_continuation_handlers ~replay ~simplify_expr
     ~original_cont ~handler dacc data uses k =
   match uses with
   | [] ->
-    if flambda2_profile_mim () then begin
+    if Specialization_cost.flambda2_profile_mim ()
+    then begin
       let spec_times =
-        Continuation.Map.fold (fun _ { time_spent; _ } l ->
-            time_spent :: l
-          ) data.handlers []
+        Continuation.Map.fold
+          (fun _ { time_spent; _ } l -> time_spent :: l)
+          data.handlers []
       in
-      let total_spec_time = List.fold_left (+.) 0. spec_times in
-      Format.eprintf "SPEC %a(%d) / generic: %f / total_spec: %f / @[<h>times: %a@]@."
+      let total_spec_time = List.fold_left ( +. ) 0. spec_times in
+      Format.eprintf
+        "SPEC %a(%d) / generic: %f / total_spec: %f / @[<h>times: %a@]@."
         Continuation.print original_cont
         (Continuation.Map.cardinal data.handlers)
         handler.time_spent total_spec_time
-        (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_float) spec_times
+        (Format.pp_print_list ~pp_sep:Format.pp_print_space
+           Format.pp_print_float)
+        spec_times
     end;
     k dacc data
   | use :: other_uses ->

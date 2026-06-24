@@ -58,8 +58,18 @@ type t = private
   | Cannot_specialize of { reason : reason }
 (**)
 
+(** Internal flag to print stats about specialization cost and time spent. *)
+val flambda2_profile_mim : unit -> bool
+
 (** Printing function. *)
 val print : Format.formatter -> t -> unit
+
+val print_cont_sizes :
+  machine_width:Target_system.Machine_width.t ->
+  inlining_arguments:Inlining_arguments.t ->
+  Format.formatter ->
+  cost ->
+  unit
 
 (** {2 Creation} *)
 

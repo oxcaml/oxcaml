@@ -28,6 +28,9 @@ type t =
   | Can_specialize of cost
   | Cannot_specialize of { reason : reason }
 
+let flambda2_profile_mim =
+  Oxcaml_args.Extra_options.bool __LOC__ "flambda2-profile-mim"
+
 let [@ocamlformat "disable"] print_reason ppf reason =
   match reason with
   | Specialization_disabled ->
@@ -94,6 +97,90 @@ let add_continuations ~can_be_lifted handlers t =
     update_cost t ~f:(fun ({ non_lifted_continuations; _ } as cost) ->
         let non_lifted_continuations = handlers :: non_lifted_continuations in
         { cost with non_lifted_continuations })
+
+(* Computing cost and benefits *)
+
+let rec expr_size ~machine_width acc e =
+  let open! Code_size in
+  match Flambda.Expr.descr e with
+  | Flambda.Let l ->
+    let defining_expr_size =
+      let defining_expr = Flambda.Let_expr.defining_expr l in
+      match defining_expr with
+      | Flambda.Simple s -> simple s
+      | Flambda.Prim (p, _) -> prim ~machine_width p
+      | Flambda.Set_of_closures (_, _) -> assert false
+      | Flambda.Static_consts group ->
+        List.fold_left
+          (fun acc const_or_code ->
+            match (const_or_code : Flambda.static_const_or_code) with
+            | Code code0 ->
+              let params_and_body = Code0.params_and_body code0 in
+              Flambda.Function_params_and_body.pattern_match params_and_body
+                ~f:(fun
+                    ~return_continuation:_
+                    ~exn_continuation:_
+                    _params
+                    ~body
+                    ~my_closure:_
+                    ~is_my_closure_used:_
+                    ~my_alloc_mode:_
+                    ~my_depth:_
+                    ~free_names_of_body:_
+                  -> expr_size ~machine_width acc body)
+            | Deleted_code -> acc
+            | Static_const _c ->
+              (* CR gbury: better represent the size of the static_const, since
+                 this function is mostly interested in the size of an expr as it
+                 relates to the amount of work we might spend on simplifying
+                 it *)
+              acc + static_consts ())
+          zero
+          (Flambda.Static_const_group.to_list group)
+      | Flambda.Rec_info _ -> zero
+    in
+    let acc = acc + defining_expr_size in
+    Flambda.Let_expr.pattern_match l ~f:(fun _ ~body ->
+        expr_size ~machine_width acc body)
+  | Flambda.Let_cont _ -> assert false
+  | Flambda.Apply a -> acc + apply a
+  | Flambda.Apply_cont ac -> acc + apply_cont ac
+  | Flambda.Switch s -> acc + switch s
+  | Flambda.Invalid _ -> acc + invalid
+
+let print_cont_sizes ~machine_width ~inlining_arguments ppf t =
+  let l = t.non_lifted_continuations in
+  let n = List.length l in
+  let pp_dash ppf () = Format.fprintf ppf "-" in
+  let pp_comma ppf () = Format.fprintf ppf ", " in
+  let pp_handlers_sizes ~can_be_lifted ppf l =
+    let pp ppf handler =
+      let size = expr_size ~machine_width Code_size.zero handler in
+      let float_size = Code_size.evaluate ~args:inlining_arguments size in
+      Format.fprintf ppf "%f" float_size
+    in
+    Format.fprintf ppf "%s%a"
+      (if can_be_lifted then "!" else "")
+      (Format.pp_print_list ~pp_sep:pp_dash pp)
+      l
+  in
+  let pp ppf handlers =
+    match (handlers : Original_handlers.t) with
+    | Original_handlers.Recursive { continuation_handlers; can_be_lifted; _ } ->
+      let l = Continuation.Lmap.data continuation_handlers in
+      let l =
+        List.map (fun { One_recursive_handler.handler; _ } -> handler) l
+      in
+      pp_handlers_sizes ~can_be_lifted ppf l
+    | Original_handlers.Non_recursive { handler; can_be_lifted; _ } ->
+      pp_handlers_sizes ~can_be_lifted ppf [handler]
+  in
+  if n = 0
+  then Format.fprintf ppf "N/A"
+  else
+    Format.fprintf ppf "n=%d, sizes: %a" n
+      (Format.pp_print_list ~pp_sep:pp_comma pp)
+      l
 
 (* Computing cost and benefits *)
 
