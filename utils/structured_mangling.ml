@@ -386,16 +386,6 @@ module Parse = struct
 
   let starts_with_prefix sym = Option.is_some (matched_prefix_len sym)
 
-  (* The symbols of closures get a [_<number>_code] suffix appended; the length
-     prefix of the preceding identifier marks where it begins, so the whole
-     suffix is dropped when demangling: [foo_N_M_code] becomes [foo_N]. *)
-  let is_code_suffix s =
-    let n = String.length s in
-    n > 6
-    && s.[0] = '_'
-    && String.ends_with ~suffix:"_code" s
-    && String.for_all Char.Ascii.is_digit (String.sub s 1 (n - 6))
-
   let parse sym =
     let parse_loc pos tag_constructor =
       Option.bind (decode sym pos) @@ fun (decoded, l) ->
@@ -419,7 +409,6 @@ module Parse = struct
           let suffix =
             if pos < len then String.sub sym pos (len - pos) else ""
           in
-          let suffix = if is_code_suffix suffix then "" else suffix in
           Some (List.rev path, suffix)
       in
       if pos < len
