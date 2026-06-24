@@ -4,7 +4,7 @@ export PATH=$(dirname dot-merlin-reader):$PATH
 
 # If no dune-project of .merlin file are present in the test we write a default
 # `.merlin` file to force the use of dot-merlin-reader
-if [ ! -f dune-project ]; then
+if [ ! -f dune-project ] && [ -z "$DONT_MAKE_DUMMY_DOT_MERLIN" ]; then
   touch .merlin
 fi
 
