@@ -1243,6 +1243,9 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let new_env = Env.enter_splice ~loc env in
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_splice cty) (newty (Tsplice cty.ctyp_type))
+  | Ptyp_refinement _ ->
+      Location.raise_errorf ~loc
+        "Refinement types are not yet supported"
   | Ptyp_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 

@@ -224,6 +224,9 @@ and core_type_desc =
   | Ptyp_splice of core_type (** [$T] *)
   | Ptyp_of_kind of jkind_annotation (** [(type : k)] *)
   | Ptyp_repr of string loc list * core_type
+  | Ptyp_refinement of string option * core_type * expression
+      (** [(x : T | p)] when binder is [Some "x"]; [(T | p)] when [None].
+          [[[ p ]]] is sugar producing [Ptyp_refinement (None, unit, p)]. *)
   | Ptyp_extension of extension  (** [[%id]]. *)
 
 and arg_label = Asttypes.arg_label =

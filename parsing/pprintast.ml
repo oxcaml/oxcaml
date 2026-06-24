@@ -686,6 +686,16 @@ and core_type1 ctxt f x =
     | Ptyp_splice t ->
         pp f "@[<hov2>$(%a)@]" (core_type ctxt) t
     | Ptyp_extension e -> extension ctxt f e
+    | Ptyp_refinement (name, ct, pred) ->
+        (match name, ct.ptyp_desc with
+         | None, Ptyp_constr ({ txt = Lident "unit"; _ }, []) ->
+             pp f "@[<2>{[@ %a@ ]}@]" (expression ctxt) pred
+         | None, _ ->
+             pp f "@[<2>(%a@ |@ %a)@]" (core_type ctxt) ct
+               (expression ctxt) pred
+         | Some name, _ ->
+             pp f "@[<2>(%s@ :@ %a@ |@ %a)@]" name (core_type1 ctxt) ct
+               (expression ctxt) pred)
     | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_repr _
       | Ptyp_newlayout _ | Ptyp_of_kind _) ->
        paren true (core_type ctxt) f x

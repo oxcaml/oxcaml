@@ -173,6 +173,7 @@ module T = struct
     | Ptyp_of_kind jkind ->
         sub.jkind_annotation sub jkind
     | Ptyp_repr (_, t) -> sub.typ sub t
+    | Ptyp_refinement (_, t, pred) -> sub.typ sub t; sub.expr sub pred
     | Ptyp_newlayout (_, t) -> sub.typ sub t
     | Ptyp_extension x -> sub.extension sub x
 

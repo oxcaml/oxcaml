@@ -85,6 +85,8 @@ module Typ = struct
   let repr ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_repr (a, b))
   let newlayout ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_newlayout (a, b))
   let of_kind ?loc ?attrs a = mk ?loc ?attrs (Ptyp_of_kind a)
+  let refinement ?loc ?attrs a b c =
+    mk ?loc ?attrs (Ptyp_refinement (a, b, c))
 
   let force_poly t =
     match t.ptyp_desc with
@@ -151,6 +153,8 @@ module Typ = struct
             Ptyp_of_kind (loop_jkind jkind)
         | Ptyp_repr (var_lst, core_type) ->
             Ptyp_repr (var_lst, loop core_type)
+        | Ptyp_refinement (name, core_type, pred) ->
+            Ptyp_refinement (name, loop core_type, pred)
         | Ptyp_newlayout (var_lst, core_type) ->
             Ptyp_newlayout (var_lst, loop core_type)
         | Ptyp_extension (s, arg) ->

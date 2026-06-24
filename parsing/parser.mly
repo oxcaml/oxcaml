@@ -4912,6 +4912,15 @@ tuple_type:
 delimited_type_supporting_local_open:
   | LPAREN type_ = core_type RPAREN
       { type_ }
+  | LPAREN name = LIDENT COLON type_ = atomic_type BAR pred = seq_expr RPAREN
+      { mktyp ~loc:$sloc (Ptyp_refinement (Some name, type_, pred)) }
+  | LPAREN type_ = core_type BAR pred = seq_expr RPAREN
+      { mktyp ~loc:$sloc (Ptyp_refinement (None, type_, pred)) }
+  | LBRACE LBRACKET pred = seq_expr RBRACKET RBRACE
+      { let unit_ty =
+          ghtyp ~loc:$sloc (Ptyp_constr (ghloc ~loc:$sloc (Lident "unit"), []))
+        in
+        mktyp ~loc:$sloc (Ptyp_refinement (None, unit_ty, pred)) }
   | LPAREN MODULE ext_attrs = ext_attributes package_type = package_type_ RPAREN
       { mktyp_attrs ~loc:$sloc (Ptyp_package package_type) ext_attrs }
   | mktyp(
