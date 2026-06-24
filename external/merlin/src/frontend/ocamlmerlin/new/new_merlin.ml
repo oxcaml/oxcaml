@@ -2,6 +2,12 @@
 
 let { Logger.log } = Logger.for_section "New_merlin"
 
+let request_id =
+  let counter = ref 0 in
+  fun () ->
+    incr counter;
+    !counter
+
 let usage () =
   prerr_endline
     "Usage: ocamlmerlin command [options] -- [compiler flags]\n\
@@ -152,15 +158,54 @@ let run =
               `String (Printf.sprintf "%s: %s" section msg)
             in
             let format_timing (k, v) = (k, `Int (int_of_float (0.5 +. v))) in
+            let ppx =
+              match Jane_context.current with
+              | Vanilla -> []
+              | Jane_street -> (
+                (* Unless there are special build rules configured, we expect 0
+                   pp entries and 1 ppx entry, which should be a call to a
+                   .ppx/*/ppx.exe binary. For the purposes of Merlin telemetry
+                   this is a fine assumption to make. *)
+                match config.ocaml.ppx with
+                | [] -> []
+                | { workdir = _; workval } :: _ -> (
+                  match Std.String.split_on_char ~sep:' ' workval with
+                  | [] -> []
+                  | binary :: args -> (
+                    let binary =
+                      (* Normalize the relative path for logs. *)
+                      Std.String.split_on_char ~sep:'/' binary
+                      |> Std.List.drop_while ~f:(function
+                        | ".." -> true
+                        | _ -> false)
+                      |> function
+                      | "_build" :: _ :: binary -> binary
+                      | binary -> binary
+                    in
+                    match binary with
+                    | [ ".ppx"; _; "ppx.exe" ] ->
+                      let ppx =
+                        `Assoc
+                          [ ( "binary",
+                              `String (Std.String.concat binary ~sep:"/") );
+                            ("args", Std.Json.(list string) args)
+                          ]
+                      in
+                      [ ("ppx", ppx) ]
+                    | _ -> [])))
+            in
             `Assoc
-              [ ("class", `String class_);
-                ("value", message);
-                ("notifications", `List (List.rev_map notify !notifications));
-                ("timing", `Assoc (List.map format_timing timing));
-                ("heap_mbytes", `Int heap_mbytes);
-                ("cache", Mpipeline.cache_information pipeline);
-                ("query_num", `Int !query_num)
-              ]
+              ([ ("class", `String class_);
+                 ("value", message);
+                 ("notifications", `List (List.rev_map notify !notifications));
+                 ("timing", `Assoc (List.map format_timing timing));
+                 ("heap_mbytes", `Int heap_mbytes);
+                 ("cache", Mpipeline.cache_information pipeline)
+               ]
+              @ (match Jane_context.current with
+                | Vanilla -> []
+                | Jane_street -> [ ("request_id", `Int (request_id ())) ])
+              @ ppx)
           in
           log ~title:"run(result)" "%a" Logger.json (fun () -> json);
           begin match Mconfig.(config.merlin.protocol) with
