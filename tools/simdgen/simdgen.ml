@@ -21,16 +21,20 @@
 open Amd64_simd_defs
 open Printf
 
-type evex_b =
-  | B_none
-  | B_32
-  | B_64
-  | B_rnd
-  | B_sae
+type evex_rnd =
+  | Rnd_none
+  | Rnd_er
+  | Rnd_sae
+
+type evex_bcst =
+  | Bcst_none
+  | Bcst_32
+  | Bcst_64
 
 type evex_flags =
   { mutable z : bool; (* Supports zeroing *)
-    mutable b : evex_b; (* Supports broadcasting or rounding *)
+    mutable b : evex_bcst; (* Supports broadcasting *)
+    mutable r : evex_rnd; (* Supports rounding *)
     mutable k : bool (* Expects write mask *)
   }
 
@@ -143,8 +147,8 @@ let rec parse_args mnemonic acc encs args imm flags res =
         (function
           | "z" -> flags.z <- true
           | "k1" | "k2" -> flags.k <- true
-          | "er" -> flags.b <- B_rnd
-          | "sae" -> flags.b <- B_sae
+          | "er" -> flags.r <- Rnd_er
+          | "sae" -> flags.r <- Rnd_sae
           | _ -> ())
         mods;
       match arg with
@@ -197,17 +201,17 @@ let rec parse_args mnemonic acc encs args imm flags res =
         Some (Temp [| XMM; M64 |])
       | "xmm0/m64/m32bcst" | "xmm1/m64/m32bcst" | "xmm2/m64/m32bcst"
       | "xmm3/m64/m32bcst" ->
-        flags.b <- B_32;
+        flags.b <- Bcst_32;
         Some (Temp [| XMM; M64 |])
       | "xmm0/m128" | "xmm1/m128" | "xmm2/m128" | "xmm3/m128" ->
         Some (Temp [| XMM; M128 |])
       | "xmm0/m128/m64bcst" | "xmm1/m128/m64bcst" | "xmm2/m128/m64bcst"
       | "xmm3/m128/m64bcst" ->
-        flags.b <- B_64;
+        flags.b <- Bcst_64;
         Some (Temp [| XMM; M128 |])
       | "xmm0/m128/m32bcst" | "xmm1/m128/m32bcst" | "xmm2/m128/m32bcst"
       | "xmm3/m128/m32bcst" ->
-        flags.b <- B_32;
+        flags.b <- Bcst_32;
         Some (Temp [| XMM; M128 |])
       | "vm32x" -> Some (Temp [| VM32X |])
       | "vm64x" -> Some (Temp [| VM64X |])
@@ -221,11 +225,11 @@ let rec parse_args mnemonic acc encs args imm flags res =
         Some (Temp [| YMM; M256 |])
       | "ymm0/m256/m64bcst" | "ymm1/m256/m64bcst" | "ymm2/m256/m64bcst"
       | "ymm3/m256/m64bcst" ->
-        flags.b <- B_64;
+        flags.b <- Bcst_64;
         Some (Temp [| YMM; M256 |])
       | "ymm0/m256/m32bcst" | "ymm1/m256/m32bcst" | "ymm2/m256/m32bcst"
       | "ymm3/m256/m32bcst" ->
-        flags.b <- B_32;
+        flags.b <- Bcst_32;
         Some (Temp [| YMM; M256 |])
       | "zmm" | "zmm0" | "zmm1" | "zmm2" | "zmm3" | "zmm4" ->
         Some (Temp [| ZMM |])
@@ -233,11 +237,11 @@ let rec parse_args mnemonic acc encs args imm flags res =
         Some (Temp [| ZMM; M512 |])
       | "zmm0/m512/m64bcst" | "zmm1/m512/m64bcst" | "zmm2/m512/m64bcst"
       | "zmm3/m512/m64bcst" ->
-        flags.b <- B_64;
+        flags.b <- Bcst_64;
         Some (Temp [| ZMM; M512 |])
       | "zmm0/m512/m32bcst" | "zmm1/m512/m32bcst" | "zmm2/m512/m32bcst"
       | "zmm3/m512/m32bcst" ->
-        flags.b <- B_32;
+        flags.b <- Bcst_32;
         Some (Temp [| ZMM; M512 |])
       | "k0" | "k1" | "k2" | "k3" | "k4" | "k5" | "k6" | "k7" ->
         Some (Temp [| K |])
@@ -293,7 +297,7 @@ let rec parse_args mnemonic acc encs args imm flags res =
 let parse_args mnemonic enc args =
   let imm = ref Imm_none in
   let res = ref Res_none in
-  let flags = { z = false; b = B_none; k = false } in
+  let flags = { z = false; b = Bcst_none; r = Rnd_none; k = false } in
   let parsed = parse_args mnemonic [] enc args imm flags res in
   let parsed =
     if flags.k then parsed @ [{ loc = Temp [| K |]; enc = Mask }] else parsed
@@ -654,9 +658,11 @@ let print_one bind instr =
         (print_legacy_prefix vex_p)
     | Evex { evex_m; evex_w; evex_ll; evex_p; evex_b; evex_z } ->
       let ll, b =
-        match instr.flags.b with
-        | B_rnd -> "(evex_ll_of_rounding rnd)", "(evex_b_of_rounding rnd)"
-        | B_sae -> print_evex_ll evex_ll, "sae"
+        match instr.flags.r with
+        | Rnd_er ->
+          ( sprintf "(evex_ll_for_rnd (%s) rnd)" (print_evex_ll evex_ll),
+            "(evex_b_for_rnd rnd)" )
+        | Rnd_sae -> print_evex_ll evex_ll, "sae"
         | _ -> print_evex_ll evex_ll, Bool.to_string evex_b
       in
       let z = if instr.flags.z then "z" else Bool.to_string evex_z in
@@ -686,7 +692,7 @@ let print_one bind instr =
   let fun_ =
     let z = if instr.flags.z then "~z" else "" in
     let b =
-      match instr.flags.b with B_rnd -> "~rnd" | B_sae -> "~sae" | _ -> ""
+      match instr.flags.r with Rnd_er -> "~rnd" | Rnd_sae -> "~sae" | _ -> ""
     in
     (List.filter (fun s -> String.length s > 0)) [bind; b; z]
     |> String.concat " "
@@ -783,14 +789,14 @@ let expand_broadcast instr bcst =
     }
   in
   match bcst with
-  | B_none | B_rnd | B_sae -> [instr]
-  | B_32 ->
+  | Bcst_none -> [instr]
+  | Bcst_32 ->
     [ instr;
       { instr with
         args = replace_mem M32 instr.args;
         enc = replace_bcst instr.enc
       } ]
-  | B_64 ->
+  | Bcst_64 ->
     [ instr;
       { instr with
         args = replace_mem M64 instr.args;
@@ -816,7 +822,9 @@ let amd64 () =
               parse_enc mnemonic enc
                 ~operand_size_override:(Array.exists arg_has_int16 args)
             in
-            expand_broadcast { ext; args; res; imm; mnemonic; enc; flags } flags.b
+            expand_broadcast
+              { ext; args; res; imm; mnemonic; enc; flags }
+              flags.b
         with Unsupported -> [])
       | _ -> [])
   in

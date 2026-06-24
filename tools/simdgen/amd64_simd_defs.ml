@@ -180,11 +180,9 @@ type 'id instr =
     enc : enc
   }
 
-let evex_ll_of_rounding = function
-  | Some rnd -> Ll_round rnd
-  | None -> Ll_len L512
+let evex_ll_for_rnd ll = function Some rnd -> Ll_round rnd | None -> ll
 
-let evex_b_of_rounding = function Some _ -> true | None -> false
+let evex_b_for_rnd = function Some _ -> true | None -> false
 
 let instr_expects_mask instr =
   Array.exists

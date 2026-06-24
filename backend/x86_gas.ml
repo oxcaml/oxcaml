@@ -104,8 +104,42 @@ let i3 b s x y z = bprintf b "\t%s\t%a, %a, %a" s arg x arg y arg z
 
 let i4 b s x y z w = bprintf b "\t%s\t%a, %a, %a, %a" s arg x arg y arg z arg w
 
+let evex_rounding : Amd64_simd_defs.evex_rounding -> string = function
+  | Rnd_near -> "{rn-sae}, "
+  | Rnd_down -> "{rd-sae}, "
+  | Rnd_up -> "{ru-sae}, "
+  | Rnd_zero -> "{rz-sae}, "
+
 let ievex b (instr : Amd64_simd_instrs.instr) args =
-  assert false
+  let has_mem = Array.exists X86_ast_utils.is_mem args in
+  let zeroing, rounding =
+    match instr.enc.prefix with
+    | Evex { evex_z; evex_b; evex_ll; _ } ->
+      let rounding =
+        match evex_ll with
+        | Ll_round rnd -> evex_rounding rnd
+        | Ll_len _ -> if evex_b && not has_mem then "{sae}, " else ""
+      in
+      (if evex_z then "{z}" else ""), rounding
+    | Legacy _ | Vex _ -> Misc.fatal_error "expected EVEX encoding"
+  in
+  let mask b = function None -> () | Some m -> bprintf b "{%a}" arg m in
+  let writemask = Array.find_opt X86_ast_utils.is_regmask args in
+  let last = ref 0 in
+  Array.iteri
+    (fun i a -> if not (X86_ast_utils.is_regmask a) then last := i)
+    args;
+  bprintf b "\t%s\t%s" instr.mnemonic rounding;
+  let printed = ref false in
+  Array.iteri
+    (fun i a ->
+      if not (X86_ast_utils.is_regmask a)
+      then (
+        if !printed then Buffer.add_string b ", ";
+        printed := true;
+        arg b a;
+        if i = !last then bprintf b "%a%s" mask writemask zeroing))
+    args
 
 let i1_call_jmp b s = function
   (* this is the encoding of jump labels: don't use * *)
