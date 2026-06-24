@@ -39,35 +39,35 @@
 (data int 768 "camlInvalid__empty_array41":)
 (data int 2044 "camlInvalid__immstring17": string "lengths" skip 0 byte 0)
 (function{invalid.ml:15,25-96} camlInvalid__check_0_3_code
-     (t1/380: val t2/381: val) : int
+     (t1/366: val t2/367: val) : int
  (if
-   (!= (or (>>u (<< (load_mut int (+a t1/380 -8)) 8) 17) 1)
-     (or (>>u (<< (load_mut int (+a t2/381 -8)) 8) 17) 1))
+   (!= (or (>>u (<< (load_mut int (+a t1/366 -8)) 8) 17) 1)
+     (or (>>u (<< (load_mut int (+a t2/367 -8)) 8) 17) 1))
    (raise_notrace{invalid.ml:16,45-63;stdlib.ml:39,17-33}
      L:"camlInvalid__Pmakeblock71")
    1) )
 
 (function{invalid.ml:18,17-68} camlInvalid__bar_1_4_code
-     (t1/385: val t2/386: val) : int
+     (t1/371: val t2/372: val) : int
  (let
-   param/387
-     (app{invalid.ml:19,2-13} G:"camlInvalid__check_0_3_code" t1/385 t2/386
+   param/373
+     (app{invalid.ml:19,2-13} G:"camlInvalid__check_0_3_code" t1/371 t2/372
        int)
-   (+ (<< (==f (load_mut float64 t2/386) 0.) 1) 1)) )
+   (+ (<< (==f (load_mut float64 t2/372) 0.) 1) 1)) )
 
 (function{invalid.ml:22,8-30} camlInvalid__foo_2_5_code
-     (param/391: int) : int
+     (param/377: int) : int
  (let
-   (Pmakearray/392 (alloc{invalid.ml:22,17-25} 1278 1.)
-    param/393
+   (Pmakearray/378 (alloc{invalid.ml:22,17-25} 1278 1.)
+    param/379
       (app{invalid.ml:22,13-30;invalid.ml:19,2-13}
-        G:"camlInvalid__check_0_3_code" Pmakearray/392
+        G:"camlInvalid__check_0_3_code" Pmakearray/378
         L:"camlInvalid__empty_array41" int))
    (invalid
      "(Defining_expr_of_let (bound_pattern prim/110N)\n (defining_expr\n  (((Array_load Naked_floats Naked_floats Mutable) t2/106UV 0)\n   invalid.ml:20,2--23)))"
      L:"camlInvalid__invalid177")) )
 
 (function no_cse reduce_code_size linscan camlInvalid__entry () : val
- (catch (exit 7 G:"camlInvalid") with(7 *ret*/378: val) 1) )
+ (catch (exit 7 G:"camlInvalid") with(7 *ret*/364: val) 1) )
 
 (data)
