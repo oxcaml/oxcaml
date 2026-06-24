@@ -71,6 +71,7 @@ let field_offset_for_label lbl repres =
       lbl.lbl_pos
   | Record_dummy _ ->
       fatal_error "field_offset_for_label: dummy record representation"
+  | Record_inlined (_, Constructor_variable, _)
   | Record_variable ->
       fatal_error "field_offset_for_label: variable record representation"
 
@@ -612,7 +613,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                     *)
                     None
               | Constructor_uniform_value ->
-                  Some (Const_block(runtime_tag, constants)))
+                  Some (Const_block(runtime_tag, constants))
+              | Constructor_variable ->
+                  fatal_error
+                    "transl_exp: variable constructor representation")
           in
           begin match constant with
           | Some constant -> Lconst constant
@@ -635,6 +639,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                        stored as immediates *)
                     let shape = Lambda.transl_mixed_product_shape shape in
                     Pmakeblock(runtime_tag, Immutable, Shape shape, alloc_mode)
+                | Constructor_variable ->
+                    fatal_error
+                      "transl_exp: variable constructor representation"
               in
               Lprim (makeblock, ll, of_location ~scopes e.exp_loc)
           end
@@ -655,7 +662,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                value kind for the poly variant hash? *)
             let makeblock =
               match cstr.cstr_shape with
-              | Some Constructor_uniform_value ->
+              | Constructor_uniform_value ->
                   let shape =
                     List.map (fun (e, sort) ->
                         Lambda.must_be_value (layout_exp sort e))
@@ -665,7 +672,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                              Lambda.block_shape_of_value_kinds
                                (Some (Lambda.generic_value :: shape)),
                              alloc_mode)
-              | Some (Constructor_mixed shape) ->
+              | Constructor_mixed shape ->
                   (* CR layouts v5: once all-void records are allowed, handle
                      constructors with all-void inline records, which are stored
                      as immediates *)
@@ -678,7 +685,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                     Array.append [| Lambda.Value Lambda.generic_value |] shape
                   in
                   Pmakeblock(0, Immutable, Shape shape, alloc_mode)
-              | None ->
+              | Constructor_variable ->
                   fatal_error "Unexpected indeterminate representation in \
                                extensible variant"
             in
@@ -721,7 +728,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let repres =
         match lbl.lbl_repres with
-        | Record_variable ->
+        | Record_variable | Record_inlined (_, Constructor_variable, _) ->
             Misc.fatal_errorf "Texp_atomic_loc on record with [any] field %s"
               lbl.lbl_name
         | repres -> repres
@@ -807,6 +814,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
           fatal_error "transl_exp0: dummy record representation"
+        | Record_inlined (_, Constructor_variable, _)
         | Record_variable ->
           fatal_error "transl_exp0: variable record representation"
       in
@@ -877,6 +885,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           else
             Psetfield(lbl.lbl_pos, immediate_or_pointer, mode),
             [arg_lambda; newval_lambda]
+        | Record_inlined (_, Constructor_variable, _) ->
+          fatal_error "transl_exp0: unexpected unknown representation"
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
           assert false
         | Record_float ->
@@ -2213,6 +2223,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             | Record_inlined (_, _, Variant_with_null) -> assert false
             | Record_dummy _ ->
               fatal_error "transl_record: unexpected dummy representation"
+            | Record_inlined (_, Constructor_variable, _)
             | Record_variable ->
               fatal_error "transl_record: unexpected variable representation"
           in
@@ -2299,6 +2310,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                  | Record_dummy _ ->
                    fatal_error
                      "transl_record: unexpected dummy representation"
+                 | Record_inlined (_, Constructor_variable, _)
                  | Record_variable ->
                    fatal_error
                      "transl_record: unexpected variable representation"
@@ -2363,6 +2375,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             raise Not_constant
         | Record_dummy _ ->
           fatal_error "transl_record: unexpected dummy representation"
+        | Record_inlined (_, Constructor_variable, _)
         | Record_variable ->
           fatal_error "transl_record: unexpected variable representation"
       with Not_constant ->
@@ -2418,6 +2431,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         | Record_inlined (Null, _, _) -> assert false
         | Record_dummy _ ->
           fatal_error "transl_record: unexpected dummy representation"
+        | Record_inlined (_, Constructor_variable, _)
         | Record_variable ->
           fatal_error "transl_record: unexpected variable representation"
     in
@@ -2544,7 +2558,7 @@ and transl_atomic_loc ~scopes arg arg_sort lbl repres =
   begin match repres with
   | Record_dummy _ ->
     Misc.fatal_error "transl_atomic_loc: unexpected dummy representation"
-  | Record_variable ->
+  | Record_variable | Record_inlined (_, Constructor_variable, _) ->
     Misc.fatal_error "transl_atomic_loc: unexpected variable representation"
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
   | Record_float | Record_ufloat
