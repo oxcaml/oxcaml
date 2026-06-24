@@ -155,7 +155,7 @@ val add_specialization :
   specialized:Continuation.t ->
   t
 
-val chain_param_projection :
+val compose_param_projection :
   t ->
   result_var:Bound_var.t ->
   Simple.t ->
