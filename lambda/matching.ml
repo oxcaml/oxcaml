@@ -5016,6 +5016,7 @@ let for_optional_arg_default
               makes it impossible to overwrite and safe to use [Reads_agree]
               here. It would be slightly safer to use [Reads_vary] here, but
               that could degrade performance of programs not using uniqueness *)
+           (* XXX Does not work for non-value options! *)
            (Pfield (0, Pointer, Reads_agree),
             [ Lvar param ],
             sloc))

@@ -3016,6 +3016,7 @@ module Format_history = struct
       fprintf ppf
         "it's the base type (the first type parameter) for a@ block index (idx \
          or mut_idx)"
+    | Optional_argument -> fprintf ppf "it's the type of an optional argument"
 
   let format_value_creation_reason ppf ~layout_or_kind :
       History.value_creation_reason -> _ = function
@@ -4033,6 +4034,7 @@ module Debug_printers = struct
     | Array_comprehension_iterator_element ->
       fprintf ppf "Array_comprehension_iterator_element"
     | Idx_base -> fprintf ppf "Idx_base"
+    | Optional_argument -> fprintf ppf "Optional_argument"
 
   let value_creation_reason ppf : History.value_creation_reason -> _ = function
     | Class_let_binding -> fprintf ppf "Class_let_binding"

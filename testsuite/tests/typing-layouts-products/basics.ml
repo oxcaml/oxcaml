@@ -1997,8 +1997,8 @@ Line 6, characters 28-52:
 Error: Type "coerce_record" is not a subtype of "coerce_int_record"
 |}]
 
-(************************************************)
-(* Test 16: Not allowed as an optional argument *)
+(********************************************)
+(* Test 16: Allowed as an optional argument *)
 
 let f_optional_utuple ?(x = #(1,2)) () = x
 [%%expect{|
@@ -2011,7 +2011,7 @@ Error: This expression has type "#('a * 'b)"
            '_representable_layout_19 & '_representable_layout_20
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a value layout
-         because the type argument of option has layout value_or_null.
+         because it's the type of an optional argument.
 |}]
 
 type optional_record = #{ i1 : int; i2 : int }
@@ -2026,7 +2026,7 @@ Error: This expression has type "optional_record"
        The layout of optional_record is value non_pointer & value non_pointer
          because of the definition of optional_record at line 1, characters 0-46.
        But the layout of optional_record must be a value layout
-         because the type argument of option has layout value_or_null.
+         because it's the type of an optional argument.
        Note: The layout of immediate is value non_pointer.
 |}]
 
