@@ -1,7 +1,7 @@
 (* TEST
  compile_only = "true";
  flambda2;
- ocamlopt_flags = "-dlambda -dcmm";
+ ocamlopt_flags = "-dlambda -dno-unique-ids -dcmm";
  setup-ocamlopt.byte-build-env;
  ocamlopt.byte;
  check-ocamlopt.byte-output;
