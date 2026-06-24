@@ -262,7 +262,6 @@ let rec parse_args mnemonic acc encs args imm flags res =
     let enc, rw = first_word enc in
     let enc =
       match String.trim enc with
-      | "" -> raise Unsupported
       | "ModRM:reg" -> RM_r
       | "ModRM:r/m" -> RM_rm
       | "BaseReg" ->
