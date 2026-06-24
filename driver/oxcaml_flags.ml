@@ -120,7 +120,14 @@ let long_frames_threshold = ref max_long_frames_threshold (* -debug-long-frames-
 
 (* Test-only override that lowers the maximum branch displacement used by the
    branch relaxation pass, so that small functions exercise the relaxation
-   logic.  [max_int] means "use the real per-instruction displacements". *)
+   logic.  [max_int] means "use the real per-instruction displacements".
+
+   The value must stay well above the slack [Branch_relaxation] allows per
+   instruction: relaxing an over-long conditional branch emits an inverted
+   conditional branch that jumps over an unconditional branch, and that
+   inverted branch has a small, fixed displacement.  Too small a value would
+   treat even that displacement as overflowing, so the pass would relax the
+   same branch forever and never reach a fixpoint (non-termination). *)
 let branch_relaxation_max_displacement =
   ref max_int (* -dbranch-relaxation-max-displacement n *)
 
