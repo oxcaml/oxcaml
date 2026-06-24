@@ -10,7 +10,7 @@ let build n =
   <[ fun () ->
      let knocked_out = ref 0 in
      let _ : _ =
-       $(let rec loop acc n =
+       $(let rec (loop @ global) : _ @ global -> _ @ local once = fun #(acc, n) ->
            if n <= 0
            then <[ [] ]>
            else
@@ -20,11 +20,11 @@ let build n =
                 in
                 let date = knocked_out_date in
                 knocked_out := date;
-                $(loop acc (n - 1)) ]>
+                $(loop #(acc, n - 1)) ]>
          in
-         loop <[ [] ]> n)
+         loop #(<[ [] ]>, n))
      in
      20130322 ]>
 ;;
 
-let _ = Sys.opaque_identity (build 10000)
+let _ : _ = Sys.opaque_identity (build 10000)
