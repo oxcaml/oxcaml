@@ -1102,7 +1102,11 @@ module PpxContext = struct
     }
 
   let make ~tool_name () =
-    let Load_path.{ visible; hidden } = Load_path.get_paths () in
+    let Load_path.{ visible; hidden } =
+      match Jane_context.current with
+      | Vanilla -> Load_path.get_paths ()
+      | Jane_street -> { Load_path.visible = []; hidden = [] }
+    in
     let visible_load_dir_pairs dirs =
       List.map
         (fun (e : Clflags.visible_include) -> (e.path, e.cmx_guaranteed))
@@ -1111,17 +1115,28 @@ module PpxContext = struct
     let fields =
       [
         lid "tool_name",    make_string tool_name;
+        (* Jane street only: do not add the include directories (whether hidden
+           or visible) or the load path in the context. Jane Street's ppxes do
+           not need them, and they slow down ppx processing. *)
         lid "include_dirs",
           make_list
             (make_pair make_string make_bool)
-            (visible_load_dir_pairs !Clflags.include_dirs);
+            (match Jane_context.current with
+             | Vanilla -> visible_load_dir_pairs !Clflags.include_dirs
+             | Jane_street -> []);
         lid "hidden_include_dirs",
-          make_list make_string (!Clflags.hidden_include_dirs);
+          make_list
+            make_string
+            (match Jane_context.current with
+             | Vanilla -> !Clflags.hidden_include_dirs
+             | Jane_street -> []);
         lid "load_path",
           make_pair
             (make_list (make_pair make_string make_bool))
             (make_list make_string)
-            (visible_load_dir_pairs visible, hidden);
+            (match Jane_context.current with
+             | Vanilla -> (visible_load_dir_pairs visible, hidden)
+             | Jane_street -> ([], []));
         lid "open_modules", make_list make_string !Clflags.open_modules;
         lid "for_package",  make_option make_string !Clflags.for_package;
         lid "debug",        make_bool !Clflags.debug;
