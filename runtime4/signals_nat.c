@@ -99,62 +99,6 @@ void caml_garbage_collection(void)
   }
 }
 
-DECLARE_SIGNAL_HANDLER(handle_signal)
-{
-  int saved_errno;
-  /* Save the value of errno (PR#5982). */
-  saved_errno = errno;
-#if !defined(POSIX_SIGNALS) && !defined(BSD_SIGNALS)
-  signal(sig, handle_signal);
-#endif
-  if (sig < 0 || sig >= NSIG) return;
-  caml_record_signal(sig);
-  errno = saved_errno;
-}
-
-int caml_set_signal_action(int signo, int action)
-{
-  signal_handler oldact;
-#ifdef POSIX_SIGNALS
-  struct sigaction sigact, oldsigact;
-#else
-  signal_handler act;
-#endif
-
-#ifdef POSIX_SIGNALS
-  switch(action) {
-  case 0:
-    sigact.sa_handler = SIG_DFL;
-    sigact.sa_flags = 0;
-    break;
-  case 1:
-    sigact.sa_handler = SIG_IGN;
-    sigact.sa_flags = 0;
-    break;
-  default:
-    SET_SIGACT(sigact, handle_signal);
-    break;
-  }
-  sigemptyset(&sigact.sa_mask);
-  if (sigaction(signo, &sigact, &oldsigact) == -1) return -1;
-  oldact = oldsigact.sa_handler;
-#else
-  switch(action) {
-  case 0:  act = SIG_DFL; break;
-  case 1:  act = SIG_IGN; break;
-  default: act = handle_signal; break;
-  }
-  oldact = signal(signo, act);
-  if (oldact == SIG_ERR) return -1;
-#endif
-  if (oldact == (signal_handler) handle_signal)
-    return 2;
-  else if (oldact == SIG_IGN)
-    return 1;
-  else
-    return 0;
-}
-
 /* Machine- and OS-dependent handling of bound check trap */
 
 #if defined(TARGET_power) \
