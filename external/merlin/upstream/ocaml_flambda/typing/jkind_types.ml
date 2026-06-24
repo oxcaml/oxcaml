@@ -302,6 +302,10 @@ module Sort = struct
 
     let for_class = scannable
 
+    let for_effect = scannable
+
+    let for_continuation = scannable
+
     (* Pre-allocated [Some]-wrappings of the base sort constants, evaluated
        once at module initialization and shared by [some] /
        [some_of_base] to avoid allocating a fresh [Some] block per

@@ -34,8 +34,6 @@ CLEAN_FILES = \
   $(CLEAN_DUNE_WORKSPACES) \
   duneconf/dirs-to-ignore.inc \
   duneconf/ox-extra.inc \
-  dune.runtime_selection \
-  otherlibs/dune \
   natdynlinkops \
   otherlibs/dynlink/natdynlinkops \
   ocamlopt_upstream_flags.sexp \
@@ -68,10 +66,13 @@ DISTCLEAN_FILES = \
   manual/src/html_processing/src/common.ml \
   ocamltest/ocamltest_config.ml \
   ocamltest/ocamltest_unix.ml \
-  tools/eventlog_metadata \
   utils/config.common.ml \
   utils/config.generated.ml \
   compilerlibs/META \
+  otherlibs/dynlink/dynlink_cmo_format.mli \
+  otherlibs/dynlink/dynlink_cmxs_format.mli \
+  otherlibs/dynlink/dynlink_config.ml \
+  otherlibs/dynlink/dynlink_platform_intf.mli \
   otherlibs/unix/unix.ml \
   stdlib/META \
   stdlib/runtime.info \
@@ -81,10 +82,6 @@ DISTCLEAN_FILES = \
   runtime/caml/m.h \
   runtime/caml/s.h \
   runtime/caml/version.h \
-  runtime4/caml/exec.h \
-  runtime4/caml/m.h \
-  runtime4/caml/s.h \
-  runtime4/caml/version.h \
   $(wildcard otherlibs/*/META)
 
 ifdef dune
@@ -147,38 +144,38 @@ ci-coverage: boot-runtest coverage
 # .PHONY: minimizer-upstream
 # minimizer-upstream:
 # 	cp chamelon/compat/dune.upstream chamelon/compat/dune
-# 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_main) @chamelon/all
+# 	$(dune) build $(ws_main) @chamelon/all
 
 .PHONY: boot-minimizer
 boot-minimizer:
 	cp chamelon/compat/dune.ox chamelon/compat/dune
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) @chamelon/all
+	$(dune) build $(ws_boot) @chamelon/all
 
 .PHONY: minimizer
 minimizer: runtime-stdlib
 	cp chamelon/compat/dune.ox chamelon/compat/dune
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_main) @chamelon/all
+	$(dune) build $(ws_main) @chamelon/all
 
 .PHONY: hacking-externals
 hacking-externals: _build/_bootinstall
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) $(coverage_dune_flags) -w "extract_externals/extract_externals.exe"
+	$(dune) build $(ws_boot) $(coverage_dune_flags) -w "extract_externals/extract_externals.exe"
 
 
 .PHONY: hacking-runtest
 hacking-runtest: _build/_bootinstall
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) $(coverage_dune_flags) -w $(boot_targets) @runtest
+	$(dune) build $(ws_boot) $(coverage_dune_flags) -w $(boot_targets) @runtest
 
 # Only needed for running the test tools by hand; runtest will take care of
 # building them using Dune
 .PHONY: test-tools
 test-tools: runtime-stdlib
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_main) @middle_end/flambda2/tests/tools/all
+	$(dune) build $(ws_main) @middle_end/flambda2/tests/tools/all
 
 ARCHES=amd64 arm64
 .PHONY: check_all_arches
 check_all_arches: _build/_bootinstall
 	for arch in $(ARCHES); do \
-	  ARCH=$$arch RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) ocamloptcomp.cma; \
+	  ARCH=$$arch $(dune) build $(ws_boot) ocamloptcomp.cma; \
 	done
 
 # Compare the OxCaml installation tree against the upstream one.
@@ -208,7 +205,7 @@ _compare/config.status: ocaml/config.status
 
 .PHONY: promote
 promote:
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) promote $(ws_main)
+	$(dune) promote $(ws_main)
 
 .PHONY: fmt
 fmt: $(dune_config_targets)
@@ -221,21 +218,17 @@ check-fmt: $(dune_config_targets)
 
 .PHONY: regen-flambda2-parser-messages
 regen-flambda2-parser-messages: $(dune_config_targets)
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) @middle_end/flambda2/parser/regen-messages --auto-promote || true
+	$(dune) build $(ws_boot) @middle_end/flambda2/parser/regen-messages --auto-promote || true
 
 .PHONY: regen-flambda2-tests
 regen-flambda2-tests: boot-compiler regen-flambda2-test-dune-rules
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_runstd) \
-	  @middle_end/flambda2/tests/regen --auto-promote || true
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_runstd) \
-	  @middle_end/flambda2/tests/regen
+	$(dune) build $(ws_runstd) @middle_end/flambda2/tests/regen --auto-promote || true
+	$(dune) build $(ws_runstd) @middle_end/flambda2/tests/regen
 
 .PHONY: regen-flambda2-test-dune-rules
 regen-flambda2-test-dune-rules: $(dune_config_targets)
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) \
-	  @middle_end/flambda2/tests/regen-dune-rules --auto-promote || true
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) \
-	  @middle_end/flambda2/tests/regen-dune-rules
+	$(dune) build $(ws_boot) @middle_end/flambda2/tests/regen-dune-rules --auto-promote || true
+	$(dune) build $(ws_boot) @middle_end/flambda2/tests/regen-dune-rules
 
 ## Build upstream compiler.
 .PHONY: build_upstream

@@ -1,6 +1,6 @@
 File "inclusion.ml", line 1:
-Error: The implementation "inclusion.ml"
-       does not match the interface "inclusion.cmi": 
+Error: The implementation inclusion.ml
+       does not match the interface inclusion.cmi: 
        Type declarations do not match:
          type ('a, 'b, 'c) t
            : value

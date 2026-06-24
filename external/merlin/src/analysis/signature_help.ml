@@ -23,8 +23,10 @@ let extract_ident (exp_desc : Typedtree.expression_desc) =
   let rec longident ppf : Longident.t -> unit = function
     | Lident s -> Format.fprintf ppf "%s" (Misc_utils.parenthesize_name s)
     | Ldot (p, s) ->
-      Format.fprintf ppf "%a.%s" longident p (Misc_utils.parenthesize_name s)
-    | Lapply (p1, p2) -> Format.fprintf ppf "%a(%a)" longident p1 longident p2
+      Format.fprintf ppf "%a.%s" longident p.txt
+        (Misc_utils.parenthesize_name s.txt)
+    | Lapply (p1, p2) ->
+      Format.fprintf ppf "%a(%a)" longident p1.txt longident p2.txt
   in
   match exp_desc with
   | Texp_ident { lid = { txt = li; _ }; _ } ->
@@ -93,7 +95,7 @@ let omitted : Typedtree.omitted_parameter =
    arguments to the corresponding parameter. (They should always be in the correct
    order in the typedtree, even if they are not in order in the source file.) *)
 let separate_function_signature ~args (e : Typedtree.expression) =
-  Type_utils.Printtyp.reset ();
+  Out_type.reset ();
   let buffer = Buffer.create 16 in
   let ppf = Format.formatter_of_buffer buffer in
   let rec separate ?(parameters = []) args ty =

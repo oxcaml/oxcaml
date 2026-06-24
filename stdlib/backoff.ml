@@ -23,20 +23,7 @@
 
 type t = int
 
-external is_runtime5 : unit -> bool @@ portable = "%runtime5"
-external poll : unit -> unit @@ portable = "%poll"
-
-let cpu_relax =
-  if is_runtime5 ()
-  then Domain.cpu_relax
-  else poll
-
-let recommended_domain_count =
-  if is_runtime5 ()
-  then Domain.recommended_domain_count
-  else fun () -> 1
-
-let single_mask = Bool.to_int (recommended_domain_count () = 1) - 1
+let single_mask = Bool.to_int (Domain.recommended_domain_count () = 1) - 1
 let bits = 5
 let max_wait_log = 30 (* [Random.bits] returns 30 random bits. *)
 let mask = (1 lsl bits) - 1
@@ -69,7 +56,7 @@ let[@inline never] once backoff =
      not allocate with native compiler. *)
   let t = ref (t land wait_mask land single_mask) in
   while 0 <= !t do
-    cpu_relax ();
+    Domain.cpu_relax ();
     t := !t - 1
   done;
   let upper_wait_log = get_upper_wait_log backoff in

@@ -1,4 +1,4 @@
 File "use_mli_static_default_bad_usage.ml", line 18, characters 20-47:
 18 | let () = use_static Mli_with_static_default.bar
                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "dynamic" but is expected to be "static".
+Error: This value is dynamic but is expected to be static.

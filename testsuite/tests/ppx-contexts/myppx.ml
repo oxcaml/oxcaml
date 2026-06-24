@@ -3,8 +3,6 @@
 open Ast_mapper
 
 let () =
-  let quote_strings li =
-    List.map (Printf.sprintf "%S") li |> String.concat " " in
   let quote_option = function
     | None -> "None"
     | Some s -> Printf.sprintf "Some(%S)" s in
@@ -20,8 +18,12 @@ let () =
       Printf.eprintf "load_path: [%s]\n"
         (quote_strings !Config.load_path);
       *)
-      Printf.eprintf "open_modules: [%s]\n"
-        (quote_strings !Clflags.open_modules);
+      let quote_open_arg : Clflags.open_arg -> string = function
+        | Open s -> Printf.sprintf "Open(%S)" s
+        | Open_cmi s -> Printf.sprintf "Open_cmi(%S)" s
+      in
+      Printf.eprintf "open_args: [%s]\n"
+        (List.map quote_open_arg !Clflags.open_args |> String.concat " ");
       Printf.eprintf "for_package: %S\n"
         (quote_option !Clflags.for_package);
       Printf.eprintf "use_debug: %B\n"
@@ -32,8 +34,8 @@ let () =
         !Clflags.recursive_types;
       Printf.eprintf "principal: %B\n"
         !Clflags.principal;
-      Printf.eprintf "transparent_modules: %B\n"
-        !Clflags.transparent_modules;
+      Printf.eprintf "no_alias_deps: %B\n"
+        !Clflags.no_alias_deps;
       Printf.eprintf "unboxed_types: %B\n"
         !Clflags.unboxed_types;
       Printf.eprintf "</ppx-context>\n";

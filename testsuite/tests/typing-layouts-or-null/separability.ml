@@ -883,7 +883,7 @@ let fails = make_vect 3 (This 5.)
 Line 1, characters 30-32:
 1 | let fails = make_vect 3 (This 5.)
                                   ^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The constant "5." has type "float" but an expression was expected of type
          "('a : value non_float)"
        The layout of float is value
          because it is the primitive type float.

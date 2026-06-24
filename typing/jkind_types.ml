@@ -256,10 +256,6 @@ module Sort = struct
 
     let for_block_element = scannable
 
-    let for_probe_body = scannable
-
-    let for_poly_variant = scannable
-
     let for_boxed_record = scannable
 
     let for_object = scannable
@@ -274,21 +270,13 @@ module Sort = struct
 
     let for_class_arg = scannable
 
-    let for_method = scannable
-
-    let for_initializer = scannable
-
     let for_module = scannable
 
     let for_tuple = scannable
 
-    let for_array_get_result = scannable
-
     let for_array_comprehension_element = scannable
 
     let for_list_element = scannable
-
-    let for_idx = bits64
 
     let for_loop_index = scannable
 
@@ -301,6 +289,10 @@ module Sort = struct
     let for_type_extension = scannable
 
     let for_class = scannable
+
+    let for_effect = scannable
+
+    let for_continuation = scannable
 
     (* Pre-allocated [Some]-wrappings of the base sort constants, evaluated
        once at module initialization and shared by [some] /

@@ -89,7 +89,7 @@ let match_expect_extension (ext : Parsetree.extension) =
     then invalid_payload ~msg:"expect_fexpr is only supported by expect.opt" ();
     let string_constant (e : Parsetree.expression) =
       match e.pexp_desc with
-      | Pexp_constant (Pconst_string (str, _, Some tag)) ->
+      | Pexp_constant {pconst_desc = Pconst_string (str, _, Some tag); _} ->
         { str; tag }
       | _ -> invalid_payload ~loc:e.pexp_loc ()
     in
@@ -103,7 +103,7 @@ let match_expect_extension (ext : Parsetree.extension) =
     let parse_element (e : Parsetree.expression) =
       let filters, txt =
         match e.pexp_desc with
-        | Pexp_constant (Pconst_string _) ->
+        | Pexp_constant {pconst_desc = Pconst_string _; _} ->
             (* Bare string constant - no filter *)
             ([], string_constant e)
         | Pexp_construct ({txt = Lident filter; }, Some txt) ->
@@ -372,6 +372,13 @@ function
   | (Ptop_dir _  | Ptop_def []) :: l -> min_line_number l
   | Ptop_def (st :: _) :: _ -> Some st.pstr_loc.loc_start.pos_lnum
 
+
+let visible_inline_code () =
+  let open Misc.Style in
+  let default = get_styles () in
+  let inline_code = { ansi = []; text_open = {|"|}; text_close={|"|} } in
+  set_styles { default with inline_code }
+
 let eval_expect_file fname ~file_contents ~execute_phrase =
   Warnings.reset_fatal ();
   let chunks, trailing_code =
@@ -379,7 +386,9 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
   in
   let buf = Buffer.create 1024 in
   let ppf = Format.formatter_of_buffer buf in
-  let () = Misc.Style.set_tag_handling ppf in
+  let () =
+    visible_inline_code ();
+    Misc.Style.set_tag_handling ppf in
   let exec_phrases phrases =
     let last_asm = ref None in
     let last_unit = ref None in
@@ -412,7 +421,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
         Btype.backtrack snap;
         false
     in
-    let (_ : bool) =
+    let (success : bool) =
       List.fold_left phrases ~init:true ~f:(fun acc phrase ->
           if acc then exec_one phrase else acc)
     in
@@ -423,7 +432,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
       Buffer.add_char buf '\n';
     let s = Buffer.contents buf in
     Buffer.clear buf;
-    (Misc.delete_eol_spaces s, !last_asm, !last_unit)
+    (success, Misc.delete_eol_spaces s, !last_asm, !last_unit)
   in
   let fexpr_outputs unit filters =
     let read_dump_file pass =
@@ -463,20 +472,25 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
             in
             let keep_asm = !Clflags.keep_asm_file in
             if has_fexpr then Clflags.keep_asm_file := true;
-        let (toplevel_output, asm_output, last_unit) =
+        let (success, toplevel_output, asm_output, last_unit) =
           exec_phrases chunk.phrases
         in
         Clflags.keep_asm_file := keep_asm;
         List.filter_map chunk.expectations ~f:(fun expectation ->
           let output = match expectation.kind with
             | Expect_toplevel -> toplevel_output
-            | Expect_asm -> Option.value asm_output
-                              ~default:"\nNo assembly: compilation failed\n"
+            | Expect_asm ->
+                if success then
+                  Option.value asm_output
+                    ~default:"\nNo assembly: compilation failed\n"
+                else toplevel_output
             | Expect_fexpr ->
-                let filters =
-                  List.concat_map ~f:fst expectation.expected_output
-                in
-                fexpr_outputs last_unit filters
+                if success then
+                  let filters =
+                    List.concat_map ~f:fst expectation.expected_output
+                  in
+                  fexpr_outputs last_unit filters
+                else toplevel_output
           in
           eval_expectation expectation ~output)))
   in
@@ -485,7 +499,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
     | None -> ""
     | Some phrases ->
       capture_everything buf ppf
-        ~f:(fun () -> let (r, _, _) = exec_phrases phrases in r)
+        ~f:(fun () -> let (_, r, _, _) = exec_phrases phrases in r)
   in
   { corrected_expectations; trailing_output }
 

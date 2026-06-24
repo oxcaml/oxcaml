@@ -19,12 +19,16 @@
 #define CAML_WEAK_H
 
 #include "mlvalues.h"
-#include "memory.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 extern value caml_ephe_none, caml_ephe_locked;
+
+#ifdef __cplusplus
+}
+#endif
 
 #ifdef CAML_INTERNALS
 
@@ -32,13 +36,13 @@ struct caml_ephe_info {
   value todo;
   /* These are ephemerons which need to be marked and swept in the current
      cycle. If the ephemeron is alive, after marking, they go into the live
-     list after cleaning them off the unreachable keys and releasing the data
+     list after cleaning off the unreachable keys and releasing the data
      if any of the keys are unreachable. */
 
   value live;
-  /* These are ephemerons are alive (marked). The keys of these ephemerons may
-     be unmarked if these ephemerons were the target of a blit operation. The
-     data field is never unmarked. */
+  /* These are ephemerons which are alive (marked). The keys of these ephemerons
+     may be unmarked if these ephemerons were the target of a blit operation.
+     The data field is never unmarked. */
 
   int must_sweep_ephe;
   /* At the beginning of [Phase_sweep_ephe] the [live] list is moved to the
@@ -48,10 +52,10 @@ struct caml_ephe_info {
      exactly once per major cycle per domain. This field keeps track of whether
      this move has been done for the current cycle. */
 
-  uintnat cycle;
+  uintnat round;
   struct {
     value* todop;
-    uintnat cycle;
+    uintnat round;
   } cursor;
 };
 
@@ -87,9 +91,5 @@ struct caml_ephe_info* caml_alloc_ephe_info (void);
 void caml_ephe_clean(value e);
 
 #endif /* CAML_INTERNALS */
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* CAML_WEAK_H */

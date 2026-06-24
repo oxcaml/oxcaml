@@ -23,6 +23,9 @@ type t = bool = false | true
 external not : bool -> bool @@ portable = "%boolnot"
 external ( && ) : bool -> bool -> bool @@ portable = "%sequand"
 external ( || ) : bool -> bool -> bool @@ portable = "%sequor"
+external logand : bool -> bool -> bool @@ portable = "%andint"
+external logor : bool -> bool -> bool @@ portable = "%orint"
+external logxor : bool -> bool -> bool @@ portable = "%xorint"
 let equal : bool -> bool -> bool = ( = )
 let compare : bool -> bool -> int = Stdlib.compare
 external to_int : bool -> int @@ portable = "%identity"

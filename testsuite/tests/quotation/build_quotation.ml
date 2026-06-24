@@ -416,8 +416,7 @@ Line 1, characters 3-31:
 1 | <[ let Some x = Some "foo" in x ]>;;
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-None
+  Here is an example of a case that is not matched: "None"
 
 - : <[string]> expr = <[match Some "foo" with | Some (x) -> x]>
 |}];;
@@ -428,8 +427,7 @@ Line 1, characters 3-29:
 1 | <[ let x::xs = [1; 2; 3] in x ]>;;
        ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-[]
+  Here is an example of a case that is not matched: "[]"
 
 - : <[int]> expr = <[match [1; 2; 3] with | x::xs -> x]>
 |}];;
@@ -440,8 +438,7 @@ Line 1, characters 3-30:
 1 | <[ let x::xs = [1; 2; 3] in xs ]>;;
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-[]
+  Here is an example of a case that is not matched: "[]"
 
 - : <[int list]> expr = <[match [1; 2; 3] with | x::xs -> xs]>
 |}];;
@@ -893,10 +890,10 @@ Error: Using class type annotations
 
 <[ Mod.mk 42 ]>;;
 [%%expect {|
-Line 1, characters 3-9:
+Line 1, characters 3-6:
 1 | <[ Mod.mk 42 ]>;;
-       ^^^^^^
-Error: Identifier "Mod" is used at line 1, characters 3-9,
+       ^^^
+Error: Identifier "Mod" is used at line 1, characters 3-6,
        inside a quotation (<[ ... ]>);
        it is introduced at file "_none_", line 1, outside any quotations.
 |}];;

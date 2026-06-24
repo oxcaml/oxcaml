@@ -150,8 +150,7 @@ let bind_list name args fn =
 
 let caml_black = Nativeint.shift_left (Nativeint.of_int 3) 8
 
-let caml_local =
-  Nativeint.shift_left (Nativeint.of_int (if Config.runtime5 then 3 else 2)) 8
+let caml_local = Nativeint.shift_left (Nativeint.of_int 3) 8
 
 (* cf. runtime/caml/gc.h *)
 
@@ -683,17 +682,21 @@ let max_signed_bit_length =
   check_equal_int_1 "max_signed_bit_length" max_signed_bit_length
     max_signed_bit_length'
 
-let ignore_low_bit_int = function
+let rec ignore_low_bit_int = function
   | Cop
       ( Caddi,
         [(Cop (Clsl, [_; Cconst_int (n, _)], _) as c); Cconst_int (1, _)],
         _ )
     when n > 0 && is_defined_shift n ->
-    c
-  | Cop (Cor, [c; Cconst_int (1, _)], _) -> c
+    ignore_low_bit_int c
+  | Cop (Cor, [c; Cconst_int (1, _)], _) -> ignore_low_bit_int c
+  | Cop (Clsl, [Cop (Clsr, [c; Cconst_int (1, _)], _); Cconst_int (1, _)], _) ->
+    ignore_low_bit_int c
+  | Cop (Clsl, [Cop (Casr, [c; Cconst_int (1, _)], _); Cconst_int (1, _)], _) ->
+    ignore_low_bit_int c
   | c -> c
 
-let ignore_low_bit_int' arg =
+let rec ignore_low_bit_int' arg =
   let open P.Default_variables in
   P.run arg
     [ ( Guarded
@@ -704,8 +707,13 @@ let ignore_low_bit_int' arg =
                   Const_int_fixed 1 );
             guard = (fun env -> env#.n > 0 && is_defined_shift env#.n)
           }
-      => fun env -> env#.c );
-      (Binop (Or, Any c, Const_int_fixed 1) => fun env -> env#.c) ]
+      => fun env -> ignore_low_bit_int' env#.c );
+      ( Binop (Or, Any c, Const_int_fixed 1) => fun env ->
+        ignore_low_bit_int' env#.c );
+      ( Binop (Lsl, Binop (Lsr, Any c, Const_int_fixed 1), Const_int_fixed 1)
+      => fun env -> ignore_low_bit_int' env#.c );
+      ( Binop (Lsl, Binop (Asr, Any c, Const_int_fixed 1), Const_int_fixed 1)
+      => fun env -> ignore_low_bit_int' env#.c ) ]
 
 let ignore_low_bit_int =
   check_equal_1 "ignore_low_bit_int" ignore_low_bit_int ignore_low_bit_int'
@@ -752,6 +760,9 @@ let rec or_const e n dbg =
   | n ->
     map_tail1 e ~f:(fun e ->
         let[@local] default () =
+          let e =
+            if Nativeint.logand n 1n = 1n then ignore_low_bit_int e else e
+          in
           (* prefer putting constants on the right *)
           Cop (Cor, [e; natint_const_untagged dbg n], dbg)
         in
@@ -775,6 +786,9 @@ let rec and_const e n dbg =
         | Some e -> natint_const_untagged dbg (Nativeint.logand e n)
         | None -> (
           let[@local] default () =
+            let e =
+              if Nativeint.logand n 1n = 0n then ignore_low_bit_int e else e
+            in
             (* prefer putting constants on the right *)
             Cop (Cand, [e; natint_const_untagged dbg n], dbg)
           in
@@ -1607,19 +1621,11 @@ let get_header_masked ptr dbg =
 let tag_offset = if big_endian then -1 else -size_int
 
 let get_tag ptr dbg =
-  if Proc.word_addressed
-  then
-    (* If byte loads are slow *)
-    Cop (Cand, [get_header ptr dbg; Cconst_int (255, dbg)], dbg)
-  else
-    (* If byte loads are efficient *)
-    (* Same comment as [get_header] above *)
-    Cop
-      ( (if Config.runtime5
-         then mk_load_immut Byte_unsigned
-         else mk_load_mut Byte_unsigned),
-        [Cop (Cadda, [ptr; Cconst_int (tag_offset, dbg)], dbg)],
-        dbg )
+  (* Same comment as [get_header] above *)
+  Cop
+    ( mk_load_immut Byte_unsigned,
+      [Cop (Cadda, [ptr; Cconst_int (tag_offset, dbg)], dbg)],
+      dbg )
 
 let get_size ptr dbg = lsr_const (get_header_masked ptr dbg) 10 dbg
 
@@ -4119,8 +4125,7 @@ let assignment_kind (ptr : Lambda.immediate_or_pointer)
     assert Config.stack_allocation;
     Caml_modify_local
   | Heap_initialization, Pointer -> Caml_initialize
-  | Root_initialization, Pointer ->
-    if Config.runtime5 then Caml_initialize else Simple Initialization
+  | Root_initialization, Pointer -> Caml_initialize
   | Assignment _, Immediate -> Simple Assignment
   | Heap_initialization, Immediate | Root_initialization, Immediate ->
     Simple Initialization
@@ -4729,11 +4734,9 @@ let float_of_float32 = unary (Cstatic_cast Float_of_float32)
 let lsl_int_caml_raw ~dbg arg1 arg2 =
   incr_int (lsl_int (decr_int arg1 dbg) arg2 dbg) dbg
 
-let lsr_int_caml_raw ~dbg arg1 arg2 =
-  Cop (Cor, [lsr_int arg1 arg2 dbg; Cconst_int (1, dbg)], dbg)
+let lsr_int_caml_raw ~dbg arg1 arg2 = or_const (lsr_int arg1 arg2 dbg) 1n dbg
 
-let asr_int_caml_raw ~dbg arg1 arg2 =
-  Cop (Cor, [asr_int arg1 arg2 dbg; Cconst_int (1, dbg)], dbg)
+let asr_int_caml_raw ~dbg arg1 arg2 = or_const (asr_int arg1 arg2 dbg) 1n dbg
 
 let eq ~dbg x y =
   match x, y with

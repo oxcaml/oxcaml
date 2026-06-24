@@ -36,7 +36,7 @@ provide better result.
           "line": 4,
           "col": 15
         },
-        "type": "'_k t",
+        "type": "'k t",
         "tail": "no"
       },
       {

@@ -16,9 +16,7 @@
 (** The functions to get a string from different kinds of elements (types, modules, ...). *)
 
 module Name = Odoc_name
-let () = Printtyp.Naming_context.enable false
-module Printtyp_main = Printtyp
-module Printtyp = Printtyp.Compat
+let () = Out_type.Ident_names.enable false
 
 let string_of_variance t v =
   if ( t.Odoc_type.ty_kind = Odoc_type.Type_abstract ||
@@ -45,7 +43,8 @@ let rec is_arrow_type t =
   | Types.Tunboxed_tuple _
   | Types.Tconstr _
   | Types.Tvar _ | Types.Tunivar _ | Types.Tobject _ | Types.Tpoly _
-  | Types.Tquote _ | Types.Tsplice _ | Types.Tquote_eval _ | Types.Trepr _
+  | Types.Tquote _ | Types.Tsplice _ | Types.Tquote_eval _ | Types.Tbox _
+  | Types.Trepr _
   | Types.Tfield _ | Types.Tnil | Types.Tvariant _ | Types.Tpackage _
   | Types.Tof_kind _ -> false
   | Types.Tsubst _ -> assert false
@@ -58,6 +57,7 @@ let rec need_parent t =
   | Types.Tconstr _
   | Types.Tvar _ | Types.Tunivar _ | Types.Tobject _ | Types.Tpoly _
   | Types.Tquote _ | Types.Tsplice _ | Types.Tquote_eval _ | Types.Trepr _
+  | Types.Tbox _
   | Types.Tfield _ | Types.Tnil | Types.Tvariant _ | Types.Tpackage _
   | Types.Tof_kind _ -> false
   | Types.Tsubst _ -> assert false
@@ -143,7 +143,7 @@ let string_of_class_params c =
           (
            match label with
              Types.Nolabel -> ""
-           | s -> Printtyp_main.string_of_label s ^":"
+           | s -> Printtyp.string_of_label s ^":"
           )
           (if parent then "(" else "")
           (Odoc_print.string_of_type_expr
@@ -175,9 +175,10 @@ let string_of_record l =
   P.sprintf "{\n%s\n}" (
     String.concat "\n" (
       List.map (fun field ->
-          P.sprintf "   %s%s : %s;%s"
+          P.sprintf "   %s%s : %s%s;%s"
             (if field.M.rf_mutable then "mutable " else "") field.M.rf_name
             (Odoc_print.string_of_type_expr field.M.rf_type)
+            (if field.M.rf_atomic then " [@atomic]" else "")
             (field_doc_str field.M.rf_text)
         ) l
     )

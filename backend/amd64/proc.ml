@@ -170,10 +170,6 @@ let destroyed_by_plt_stub_set = Reg.set_of_array destroyed_by_plt_stub
 
 let stack_slot slot ty = Reg.create_at_location ty (Stack slot)
 
-(* Instruction selection *)
-
-let word_addressed = false
-
 (* Calling conventions *)
 
 let size_domainstate_args = 64 * size_int
@@ -324,7 +320,7 @@ let win64_float_external_arguments = Regs.[| MM0; MM1; MM2; MM3 |]
 let win64_loc_external_arguments arg =
   let loc = Array.make (Array.length arg) Reg.dummy in
   let reg = ref 0
-  and ofs = ref (if Config.runtime5 then 0 else 32) in
+  and ofs = ref 0 in
   for i = 0 to Array.length arg - 1 do
     let ty : machtype_component = arg.(i) in
     let arguments, size =
@@ -364,12 +360,10 @@ let domainstate_ptr_dwarf_register_number = 14
 (* Registers destroyed by operations *)
 
 let int_regs_destroyed_at_c_call_win64 =
-  if Config.runtime5
-  then Regs.[|RAX; RBX; RDX; RCX; R8; R9; R10; R11; RBP|]
-  else Regs.[|RAX;      RDX; RCX; R8; R9; R10; R11     |]
+  Regs.[|RAX; RBX; RDX; RCX; R8; R9; R10; R11; RBP|]
 
 let int_regs_destroyed_at_c_call =
-  if Config.runtime5 && not Config.no_stack_checks
+  if not Config.no_stack_checks
   then (* Clobbers R13 to hold stack pointer. See emit.ml *)
        Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9; R13; R10; R11|]
   else Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9;      R10; R11|]
