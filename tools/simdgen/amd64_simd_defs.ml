@@ -127,11 +127,9 @@ type evex_rounding =
   | Rnd_up
   | Rnd_zero
 
-type evex_bll =
-  | Bll_length of evex_length
-  | Bll_broadcast of evex_length
-  | Bll_sae
-  | Bll_round of evex_rounding
+type evex_ll =
+  | Ll_len of evex_length
+  | Ll_round of evex_rounding
 
 type prefix =
   | Legacy of
@@ -149,7 +147,8 @@ type prefix =
   | Evex of
       { evex_m : vex_map;
         evex_w : bool;
-        evex_bll : evex_bll;
+        evex_b : bool;
+        evex_ll : evex_ll;
         evex_p : legacy_prefix;
         evex_z : bool
       }
@@ -180,6 +179,12 @@ type 'id instr =
     mnemonic : string;
     enc : enc
   }
+
+let evex_ll_of_rounding = function
+  | Some rnd -> Ll_round rnd
+  | None -> Ll_len L512
+
+let evex_b_of_rounding = function Some _ -> true | None -> false
 
 let instr_expects_mask instr =
   Array.exists

@@ -21,7 +21,28 @@
 open Amd64_simd_defs
 open Printf
 
-type id = Dummy
+type evex_b =
+  | B_none
+  | B_32
+  | B_64
+  | B_rnd
+  | B_sae
+
+type evex_flags =
+  { mutable z : bool; (* Supports zeroing *)
+    mutable b : evex_b; (* Supports broadcasting or rounding *)
+    mutable k : bool (* Expects write mask *)
+  }
+
+type instr_emit =
+  { ext : ext array; (* Multiple extensions may be required. *)
+    args : arg array;
+    res : res;
+    imm : imm;
+    mnemonic : string;
+    enc : enc;
+    flags : evex_flags
+  }
 
 exception Unsupported
 
@@ -74,26 +95,28 @@ let parse in_ =
   in
   csv []
 
-let strip_modifiers arg =
-  let no_braces =
-    let b = Buffer.create (String.length arg) in
-    let depth = ref 0 in
-    String.iter
-      (fun c ->
-        match c with
-        | '{' -> incr depth
-        | '}' -> if !depth > 0 then decr depth
-        | c -> if !depth = 0 then Buffer.add_char b c)
-      arg;
-    Buffer.contents b
-  in
-  String.split_on_char '/' no_braces
-  |> List.map String.trim
-  |> List.filter (fun seg ->
-      not (String.equal seg "" || Filename.check_suffix seg "bcst"))
-  |> String.concat "/"
+let extract_modifiers arg =
+  let res = Buffer.create (String.length arg) in
+  let mod_ = ref (Buffer.create 8) in
+  let mods = ref [] in
+  let depth = ref 0 in
+  String.iter
+    (fun c ->
+      match c with
+      | '{' -> incr depth
+      | '}' ->
+        if !depth > 0
+        then (
+          decr depth;
+          let m = Buffer.contents !mod_ in
+          if String.length m > 0 then mods := m :: !mods;
+          mod_ := Buffer.create 8)
+      | c ->
+        if !depth = 0 then Buffer.add_char res c else Buffer.add_char !mod_ c)
+    arg;
+  String.trim (Buffer.contents res), !mods
 
-let rec parse_args mnemonic acc encs args imm res =
+let rec parse_args mnemonic acc encs args imm flags res =
   let set_imm i =
     if !imm <> Imm_none then failwith mnemonic;
     imm := i
@@ -112,11 +135,19 @@ let rec parse_args mnemonic acc encs args imm res =
   in
   match args, encs with
   | [], _ -> List.rev acc
-  | "" :: args, encs -> parse_args mnemonic acc encs args imm res
+  | "" :: args, encs -> parse_args mnemonic acc encs args imm flags res
   | arg :: args, enc :: encs -> (
     let loc : loc option =
-      match strip_modifiers arg with
-      | "" -> raise Unsupported
+      let arg, mods = extract_modifiers arg in
+      List.iter
+        (function
+          | "z" -> flags.z <- true
+          | "k1" | "k2" -> flags.k <- true
+          | "er" -> flags.b <- B_rnd
+          | "sae" -> flags.b <- B_sae
+          | _ -> ())
+        mods;
+      match arg with
       | "<RAX>" -> Some (Pin RAX)
       | "<RDI>" -> Some (Pin RDI)
       | "<RCX>" -> Some (Pin RCX)
@@ -164,7 +195,19 @@ let rec parse_args mnemonic acc encs args imm res =
         Some (Temp [| XMM; M32 |])
       | "xmm0/m64" | "xmm1/m64" | "xmm2/m64" | "xmm3/m64" ->
         Some (Temp [| XMM; M64 |])
+      | "xmm0/m64/m32bcst" | "xmm1/m64/m32bcst" | "xmm2/m64/m32bcst"
+      | "xmm3/m64/m32bcst" ->
+        flags.b <- B_32;
+        Some (Temp [| XMM; M64 |])
       | "xmm0/m128" | "xmm1/m128" | "xmm2/m128" | "xmm3/m128" ->
+        Some (Temp [| XMM; M128 |])
+      | "xmm0/m128/m64bcst" | "xmm1/m128/m64bcst" | "xmm2/m128/m64bcst"
+      | "xmm3/m128/m64bcst" ->
+        flags.b <- B_64;
+        Some (Temp [| XMM; M128 |])
+      | "xmm0/m128/m32bcst" | "xmm1/m128/m32bcst" | "xmm2/m128/m32bcst"
+      | "xmm3/m128/m32bcst" ->
+        flags.b <- B_32;
         Some (Temp [| XMM; M128 |])
       | "vm32x" -> Some (Temp [| VM32X |])
       | "vm64x" -> Some (Temp [| VM64X |])
@@ -176,9 +219,25 @@ let rec parse_args mnemonic acc encs args imm res =
         Some (Temp [| YMM |])
       | "ymm0/m256" | "ymm1/m256" | "ymm2/m256" | "ymm3/m256" ->
         Some (Temp [| YMM; M256 |])
+      | "ymm0/m256/m64bcst" | "ymm1/m256/m64bcst" | "ymm2/m256/m64bcst"
+      | "ymm3/m256/m64bcst" ->
+        flags.b <- B_64;
+        Some (Temp [| YMM; M256 |])
+      | "ymm0/m256/m32bcst" | "ymm1/m256/m32bcst" | "ymm2/m256/m32bcst"
+      | "ymm3/m256/m32bcst" ->
+        flags.b <- B_32;
+        Some (Temp [| YMM; M256 |])
       | "zmm" | "zmm0" | "zmm1" | "zmm2" | "zmm3" | "zmm4" ->
         Some (Temp [| ZMM |])
       | "zmm0/m512" | "zmm1/m512" | "zmm2/m512" | "zmm3/m512" ->
+        Some (Temp [| ZMM; M512 |])
+      | "zmm0/m512/m64bcst" | "zmm1/m512/m64bcst" | "zmm2/m512/m64bcst"
+      | "zmm3/m512/m64bcst" ->
+        flags.b <- B_64;
+        Some (Temp [| ZMM; M512 |])
+      | "zmm0/m512/m32bcst" | "zmm1/m512/m32bcst" | "zmm2/m512/m32bcst"
+      | "zmm3/m512/m32bcst" ->
+        flags.b <- B_32;
         Some (Temp [| ZMM; M512 |])
       | "k0" | "k1" | "k2" | "k3" | "k4" | "k5" | "k6" | "k7" ->
         Some (Temp [| K |])
@@ -219,57 +278,27 @@ let rec parse_args mnemonic acc encs args imm res =
       | enc -> fail mnemonic enc
     in
     match loc with
-    | None -> parse_args mnemonic acc encs args imm res
-    | Some loc ->
-      let rw = String.trim rw in
-      let starts p = String.starts_with rw ~prefix:p in
-      if starts "(r,w)" || starts "(r, w)"
-      then (
+    | None -> parse_args mnemonic acc encs args imm flags res
+    | Some loc -> (
+      match String.trim rw with
+      | "(r,w)" | "(r, w)" ->
         set_res_arg ();
-        parse_args mnemonic ({ loc; enc } :: acc) encs args imm res)
-      else if starts "(w"
-      then (
+        parse_args mnemonic ({ loc; enc } :: acc) encs args imm flags res
+      | "(w)" ->
         set_res loc enc;
-        parse_args mnemonic acc encs args imm res)
-      else parse_args mnemonic ({ loc; enc } :: acc) encs args imm res)
+        parse_args mnemonic acc encs args imm flags res
+      | _ -> parse_args mnemonic ({ loc; enc } :: acc) encs args imm flags res))
   | _ -> failwith mnemonic
-
-let contains s sub =
-  let n = String.length sub and m = String.length s in
-  let rec go i =
-    i + n <= m && (String.equal (String.sub s i n) sub || go (i + 1))
-  in
-  go 0
-
-(* EVEX decorators detected on the operand strings, used to expand a single CSV
-   line into separate definitions per modifier / zeroing. *)
-type evex_info =
-  { broadcast : temp option; (* broadcast element width, if any *)
-    has_sae : bool;
-    has_er : bool;
-    evex_z : bool (* whether zeroing is permitted *)
-  }
 
 let parse_args mnemonic enc args =
   let imm = ref Imm_none in
   let res = ref Res_none in
-  let parsed = parse_args mnemonic [] enc args imm res in
-  let has_mask = List.exists (fun a -> contains a "{k") args in
+  let flags = { z = false; b = B_none; k = false } in
+  let parsed = parse_args mnemonic [] enc args imm flags res in
   let parsed =
-    if has_mask then parsed @ [{ loc = Temp [| K |]; enc = Mask }] else parsed
+    if flags.k then parsed @ [{ loc = Temp [| K |]; enc = Mask }] else parsed
   in
-  let any sub = List.exists (fun a -> contains a sub) args in
-  let broadcast =
-    if any "m32bcst" then Some M32 else if any "m64bcst" then Some M64 else None
-  in
-  let info =
-    { broadcast;
-      has_sae = any "{sae}";
-      has_er = any "{er}";
-      evex_z = any "{z}"
-    }
-  in
-  Array.of_list parsed, !imm, !res, info
+  Array.of_list parsed, !imm, flags, !res
 
 let parse_enc mnemonic enc ~operand_size_override =
   let enc = String.uppercase_ascii enc in
@@ -407,7 +436,13 @@ let parse_enc mnemonic enc ~operand_size_override =
         | _ -> fail mnemonic enc
       in
       Evex
-        { evex_m; evex_w; evex_bll = Bll_length evex_l; evex_p; evex_z = false }
+        { evex_m;
+          evex_w;
+          evex_ll = Ll_len evex_l;
+          evex_p;
+          evex_b = false;
+          evex_z = false
+        }
     in
     let opcode, rm_reg = parse_opcode_rm_reg rest in
     { prefix; rm_reg; opcode }
@@ -461,22 +496,6 @@ let mangle_loc (loc : loc) =
       temps
     |> Array.to_list |> String.concat ""
 
-let evex_suffix instr =
-  match instr.enc.prefix with
-  | Legacy _ | Vex _ -> ""
-  | Evex { evex_bll; evex_z; _ } ->
-    let m =
-      match evex_bll with
-      | Bll_length _ -> ""
-      | Bll_broadcast _ -> "_bcst"
-      | Bll_sae -> "_sae"
-      | Bll_round Rnd_near -> "_rne"
-      | Bll_round Rnd_down -> "_rd"
-      | Bll_round Rnd_up -> "_ru"
-      | Bll_round Rnd_zero -> "_rz"
-    in
-    m ^ if evex_z then "_z" else ""
-
 let binding instr =
   let base = instr.mnemonic in
   let mangled () =
@@ -490,7 +509,7 @@ let binding instr =
       | Res rr ->
         Array.fold_left (fun acc { loc; _ } -> acc ^ mangle_loc loc ^ "_") "" rr
     in
-    base ^ "_" ^ res ^ args ^ evex_suffix instr
+    base ^ "_" ^ res ^ args
   in
   let variants = Hashtbl.find all_mnemonics base in
   if variants > 1 then mangled () else base
@@ -605,19 +624,20 @@ let print_one bind instr =
     | Vexm_0F38 -> "Vexm_0F38"
     | Vexm_0F3A -> "Vexm_0F3A"
   in
-  let print_evex_length : evex_length -> string = function
+  let print_evex_len : evex_length -> string = function
     | L128 -> "L128"
     | L256 -> "L256"
     | L512 -> "L512"
   in
-  let print_evex_bll : evex_bll -> string = function
-    | Bll_length l -> sprintf "Bll_length %s" (print_evex_length l)
-    | Bll_broadcast l -> sprintf "Bll_broadcast %s" (print_evex_length l)
-    | Bll_sae -> "Bll_sae"
-    | Bll_round Rnd_near -> "Bll_round Rnd_near"
-    | Bll_round Rnd_down -> "Bll_round Rnd_down"
-    | Bll_round Rnd_up -> "Bll_round Rnd_up"
-    | Bll_round Rnd_zero -> "Bll_round Rnd_zero"
+  let print_evex_round : evex_rounding -> string = function
+    | Rnd_near -> "Rnd_near"
+    | Rnd_down -> "Rnd_down"
+    | Rnd_up -> "Rnd_up"
+    | Rnd_zero -> "Rnd_zero"
+  in
+  let print_evex_ll : evex_ll -> string = function
+    | Ll_len len -> "Ll_len " ^ print_evex_len len
+    | Ll_round rnd -> "Ll_round " ^ print_evex_round rnd
   in
   let print_prefix : prefix -> string = function
     | Legacy { prefix; rex; escape; operand_size_override } ->
@@ -632,13 +652,20 @@ let print_one bind instr =
       sprintf "Vex { vex_m = %s; vex_w = %b; vex_l = %b; vex_p = %s }"
         (print_vex_map vex_m) vex_w vex_l
         (print_legacy_prefix vex_p)
-    | Evex { evex_m; evex_w; evex_bll; evex_p; evex_z } ->
+    | Evex { evex_m; evex_w; evex_ll; evex_p; evex_b; evex_z } ->
+      let ll, b =
+        match instr.flags.b with
+        | B_rnd -> "(evex_ll_of_rounding rnd)", "(evex_b_of_rounding rnd)"
+        | B_sae -> print_evex_ll evex_ll, "sae"
+        | _ -> print_evex_ll evex_ll, Bool.to_string evex_b
+      in
+      let z = if instr.flags.z then "z" else Bool.to_string evex_z in
       sprintf
-        "Evex { evex_m = %s; evex_w = %b; evex_bll = %s; evex_p = %s; evex_z = \
-         %b }"
-        (print_vex_map evex_m) evex_w (print_evex_bll evex_bll)
+        "Evex { evex_m = %s; evex_w = %b; evex_ll = %s; evex_p = %s; evex_b = \
+         %s; evex_z = %s }"
+        (print_vex_map evex_m) evex_w ll
         (print_legacy_prefix evex_p)
-        evex_z
+        b z
   in
   let print_rm_reg : rm_reg -> string = function
     | Reg -> "Reg"
@@ -656,6 +683,14 @@ let print_one bind instr =
   let res = print_res instr.res in
   let imm = print_imm instr.imm in
   let enc = print_enc instr.enc in
+  let fun_ =
+    let z = if instr.flags.z then "~z" else "" in
+    let b =
+      match instr.flags.b with B_rnd -> "~rnd" | B_sae -> "~sae" | _ -> ""
+    in
+    (List.filter (fun s -> String.length s > 0)) [bind; b; z]
+    |> String.concat " "
+  in
   printf
     {|
 let %s = {
@@ -667,19 +702,17 @@ let %s = {
   ; mnemonic = "%s"
   ; enc = %s
 }|}
-    bind constructor ext args res imm instr.mnemonic enc
+    fun_ constructor ext args res imm instr.mnemonic enc
 
 let print_all () =
   let module Map = Map.Make (String) in
-  (* A plain unmasked EVEX form can share its binding with a VEX/legacy form
-     that does the same thing (e.g. [vmovlhps]); keep the non-EVEX one, which
-     has the shorter encoding. *)
   let all =
     Hashtbl.to_seq_keys all_instructions
     |> Seq.fold_left
          (fun acc instr ->
            Map.update (binding instr)
              (function
+               (* Prefer VEX over EVEX upon collisions. *)
                | Some other when is_evex instr && not (is_evex other) ->
                  Some other
                | Some _ | None -> Some instr)
@@ -691,7 +724,7 @@ let print_all () =
   print_endline "\ntype nonrec instr = id instr";
   Map.iter (fun bind instr -> print_one bind instr) all
 
-let parse_ext_token = function
+let parse_ext = function
   | "SSE" -> Some SSE
   | "SSE2" -> Some SSE2
   | "SSE3" -> Some SSE3
@@ -715,17 +748,10 @@ let parse_ext_token = function
   | _ -> None
 
 let parse_ext ext =
-  let toks =
-    String.split_on_char ' ' ext
-    |> List.filter (fun t -> not (String.equal t ""))
-  in
-  match toks with
-  | [] -> None
-  | _ ->
-    let parsed = List.map parse_ext_token toks in
-    if List.for_all Option.is_some parsed
-    then Some (Array.of_list (List.map Option.get parsed))
-    else None
+  String.split_on_char ' ' ext
+  |> List.map parse_ext
+  |> List.filter_map (fun tok -> tok)
+  |> Array.of_list
 
 let arg_has_int16 arg =
   match arg.loc with
@@ -739,62 +765,37 @@ let arg_has_int16 arg =
           false)
       temps
 
-let reg_only = function
-  | Pin _ as loc -> loc
-  | Temp temps ->
-    Temp (Array.of_list (List.filter temp_is_reg (Array.to_list temps)))
-
-let evex_variant base evex_bll source evex_z =
-  let prefix =
-    match base.enc.prefix with
-    | Evex e -> Evex { e with evex_bll; evex_z }
-    | (Legacy _ | Vex _) as p -> p
-  in
-  let args =
+let expand_broadcast instr bcst =
+  let replace_mem mem args =
     Array.map
-      (fun (arg : arg) ->
-        match arg.enc, source with
-        | RM_rm, `Broadcast elt -> { arg with loc = Temp [| elt |] }
-        | RM_rm, `Reg -> { arg with loc = reg_only arg.loc }
-        | _ -> arg)
-      base.args
+      (fun { loc; enc } ->
+        if loc_allows_mem loc
+        then { loc = Temp [| mem |]; enc }
+        else { loc; enc })
+      args
   in
-  { base with args; enc = { base.enc with prefix } }
-
-(* Expand an instruction into one definition per EVEX modifier / zeroing combo.
-   Non-EVEX instructions are left as-is. *)
-let expand_evex base info =
-  match base.enc.prefix with
-  | Legacy _ | Vex _ -> [base]
-  | Evex { evex_bll; _ } ->
-    let length =
-      match evex_bll with
-      | Bll_length l -> l
-      | Bll_broadcast _ | Bll_sae | Bll_round _ -> L128
-    in
-    let variants =
-      (Bll_length length, `Keep)
-      ::
-      (match info.broadcast with
-      | Some elt -> [Bll_broadcast length, `Broadcast elt]
-      | None -> [])
-      @ (if info.has_sae then [Bll_sae, `Reg] else [])
-      @
-      if info.has_er
-      then
-        [ Bll_round Rnd_near, `Reg;
-          Bll_round Rnd_down, `Reg;
-          Bll_round Rnd_up, `Reg;
-          Bll_round Rnd_zero, `Reg ]
-      else []
-    in
-    let zeroings = if info.evex_z then [false; true] else [false] in
-    List.concat_map
-      (fun (evex_bll, source) ->
-        List.map
-          (fun evex_z -> evex_variant base evex_bll source evex_z)
-          zeroings)
-      variants
+  let replace_bcst enc =
+    { enc with
+      prefix =
+        (match enc.prefix with
+        | Evex evex -> Evex { evex with evex_b = true }
+        | prefix -> prefix)
+    }
+  in
+  match bcst with
+  | B_none | B_rnd | B_sae -> [instr]
+  | B_32 ->
+    [ instr;
+      { instr with
+        args = replace_mem M32 instr.args;
+        enc = replace_bcst instr.enc
+      } ]
+  | B_64 ->
+    [ instr;
+      { instr with
+        args = replace_mem M64 instr.args;
+        enc = replace_bcst instr.enc
+      } ]
 
 let amd64 () =
   let csv = In_channel.with_open_text "amd64/amd64.csv" parse in
@@ -804,18 +805,18 @@ let amd64 () =
       | mnemonic :: enc :: ext :: encs -> (
         try
           match parse_ext ext with
-          | Some ext ->
+          | [||] -> []
+          | ext ->
             let mnemonic, args = first_word mnemonic in
             let mnemonic = String.lowercase_ascii mnemonic in
-            let args, imm, res, info =
+            let args, imm, flags, res =
               String.split_on_char ',' args |> parse_args mnemonic encs
             in
             let enc =
               parse_enc mnemonic enc
                 ~operand_size_override:(Array.exists arg_has_int16 args)
             in
-            expand_evex { id = Dummy; ext; args; res; imm; mnemonic; enc } info
-          | None -> []
+            expand_broadcast { ext; args; res; imm; mnemonic; enc; flags } flags.b
         with Unsupported -> [])
       | _ -> [])
   in

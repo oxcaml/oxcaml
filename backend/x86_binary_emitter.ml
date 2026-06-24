@@ -751,6 +751,7 @@ let emit_evex buf ~rexr ~rexx ~rexb ~evex_m ~evex_w ~evex_v ~evex_ll
 let emit_evex_rm_reg b ops rm reg ~evex_m ~evex_w ~evex_v ~evex_ll ~evex_p
     ~evex_z ~evex_b ~evex_a =
   let evex_w = Bool.to_int evex_w in
+  let evex_b = Bool.to_int evex_b in
   let evex_z = Bool.to_int evex_z in
   emit_prefix_modrm b ops rm reg
     ~prefix:(rex_prefix_adaptor (fun b ~rexr ~rexx ~rexb ->
@@ -872,14 +873,15 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
     | L256 -> 1
     | L512 -> 2
   in
-  let evex_bcst_len = function
-    | Bll_length l -> 0, evex_len l
-    | Bll_broadcast l -> 1, evex_len l
-    | Bll_sae -> 1, 0
-    | Bll_round Rnd_near -> 1, 0
-    | Bll_round Rnd_down -> 1, 1
-    | Bll_round Rnd_up -> 1, 2
-    | Bll_round Rnd_zero -> 1, 3
+  let evex_rnd = function
+    | Rnd_near -> 0
+    | Rnd_down -> 1
+    | Rnd_up -> 2
+    | Rnd_zero -> 3
+  in
+  let evex_len_rnd = function
+    | Ll_len len -> evex_len len
+    | Ll_round rnd -> evex_rnd rnd
   in
   (match instr.enc.rm_reg, instr.enc.prefix with
   | Spec rmod, Legacy { prefix; rex; escape; operand_size_override } ->
@@ -898,18 +900,16 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
     let rm, vex_v = rm_vexv () in
     emit_vex_rm_reg b [instr.enc.opcode] rm rmod
       ~vex_m:(vex_map vex_m) ~vex_w ~vex_v ~vex_l ~vex_p:(vex_prefix vex_p)
-  | Reg, Evex { evex_m; evex_w; evex_bll; evex_p; evex_z } ->
+  | Reg, Evex { evex_m; evex_w; evex_ll; evex_p; evex_b; evex_z } ->
     let rm, evex_v, reg = rm_vexv_reg () in
-    let evex_b, evex_ll = evex_bcst_len evex_bll in
     emit_evex_rm_reg b [instr.enc.opcode] rm reg ~evex_m:(vex_map evex_m)
-      ~evex_w ~evex_v ~evex_ll ~evex_p:(vex_prefix evex_p)
-      ~evex_z:evex_z ~evex_b ~evex_a
-  | Spec rmod, Evex { evex_m; evex_w; evex_bll; evex_p; evex_z } ->
+      ~evex_w ~evex_v ~evex_ll:(evex_len_rnd evex_ll)
+      ~evex_p:(vex_prefix evex_p) ~evex_z:evex_z ~evex_b ~evex_a
+  | Spec rmod, Evex { evex_m; evex_w; evex_ll; evex_p; evex_b; evex_z } ->
     let rm, evex_v = rm_vexv () in
-    let evex_b, evex_ll = evex_bcst_len evex_bll in
     emit_evex_rm_reg b [instr.enc.opcode] rm rmod ~evex_m:(vex_map evex_m)
-      ~evex_w ~evex_v ~evex_ll ~evex_p:(vex_prefix evex_p)
-      ~evex_z:evex_z ~evex_b ~evex_a);
+      ~evex_w ~evex_v ~evex_ll:(evex_len_rnd evex_ll)
+      ~evex_p:(vex_prefix evex_p) ~evex_z:evex_z ~evex_b ~evex_a);
   match imm with
   | Some (Imm imm) -> buf_int8 b (Int64.to_int imm)
   | Some (Regf (XMM n | YMM n | ZMM n)) -> buf_int8 b (n lsl 4)
