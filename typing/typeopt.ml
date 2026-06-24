@@ -710,7 +710,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
           || Path.same p Predef.path_iarray) ->
     let ak = array_type_kind ~elt_ty:(Some arg) env loc ty in
     num_nodes_visited, non_nullable (Parrayval ak)
-  | Tconstr(p, _, _) -> begin
+  | Tconstr(p, args, _) -> begin
       (* CR layouts v2.8: The uses of [decl.type_jkind] here are suspect:
          with with-kinds, [decl.type_jkind] will mention variables bound
          by the parameters of the declaration. The code below loses this
@@ -736,7 +736,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_variant env ~loc ~visited ~depth
-                         ~num_nodes_visited cstrs rep)
+                         ~num_nodes_visited ~params:decl.type_params ~args
+                         cstrs rep)
         | Type_record
             (_, (Record_variable | Record_inlined (_, Constructor_variable, _)),
              _) ->
@@ -892,7 +893,7 @@ and value_kind_mixed_block
   num_nodes_visited, Constructor_mixed (Array.of_list shape)
 
 and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
-      (cstrs : Types.constructor_declaration list) rep =
+      ~params ~args (cstrs : Types.constructor_declaration list) rep =
   match rep with
   | Variant_extensible -> assert false
   | Variant_with_null -> begin
@@ -916,6 +917,18 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
     end
   | Variant_boxed cstr_layouts ->
     let depth = depth + 1 in
+    let instantiate_cd_args (cd_args : Types.constructor_arguments) =
+      let instantiate ty = Ctype.apply env params ty args in
+      match cd_args with
+      | Types.Cstr_tuple cas ->
+        Types.Cstr_tuple
+          (List.map (fun (ca : Types.constructor_argument) ->
+             { ca with ca_type = instantiate ca.ca_type }) cas)
+      | Types.Cstr_record lds ->
+        Types.Cstr_record
+          (List.map (fun (ld : Types.label_declaration) ->
+             { ld with ld_type = instantiate ld.ld_type }) lds)
+    in
     let for_one_uniform_value_constructor fields ~field_to_type ~depth
           ~num_nodes_visited =
       let num_nodes_visited, shape =
@@ -996,15 +1009,30 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       (num_nodes_visited, Pintval)
     else
       let _idx, result =
-        List.fold_left (fun (idx, result) constructor ->
+        List.fold_left
+          (fun (idx, result) (constructor : Types.constructor_declaration) ->
           idx+1,
           match result with
           | None -> None
           | Some (num_nodes_visited,
                   next_const, consts, next_tag, non_consts) ->
-            match cstr_layouts.(idx) with
-            | Cstr_layout_variable -> None
-            | Cstr_layout_known { shape = cstr_shape; _ } ->
+            let cstr_shape_opt, constructor =
+              match cstr_layouts.(idx) with
+              | Cstr_layout_known { shape; _ } -> Some shape, constructor
+              | Cstr_layout_variable ->
+                (match instantiate_cd_args constructor.cd_args with
+                 | exception Ctype.Cannot_apply -> None, constructor
+                 | cd_args ->
+                   let cd_args, _all_void, repr, _arg_sorts =
+                     Typedecl.update_constructor_representation_and_arg_sorts
+                       env loc cd_args ~is_extension_constructor:false
+                   in
+                   Result.to_option repr,
+                   { constructor with cd_args })
+            in
+            match cstr_shape_opt with
+            | None -> None
+            | Some cstr_shape ->
                 let (is_mutable, num_nodes_visited), fields =
                   for_one_constructor constructor ~depth ~num_nodes_visited
                     ~cstr_shape
