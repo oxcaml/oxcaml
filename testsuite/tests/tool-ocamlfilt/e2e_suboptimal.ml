@@ -27,7 +27,7 @@
    symbol. A single [fn(file:line:col)] identifies a closure uniquely, so
    the enclosing scopes (the outer anonymous functions and [nested_lambdas]
    itself) are dropped: the deepest closure now mangles to a bare
-   [E2e_suboptimal.fn(..5:6)] rather than chaining every enclosing
+   [E2e_suboptimal.fn(..:35:6)] rather than chaining every enclosing
    location. *)
 let nested_lambdas a =
   fun[@inline never] b ->
