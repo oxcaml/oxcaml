@@ -465,8 +465,15 @@ let rec path_of_debug_info_scopes acc (scopes : Scoped_location.scopes) =
   | Cons { prev; mangling_item = Some mangling_item; _ } ->
     path_of_debug_info_scopes (mangling_item :: acc) prev
 
-let to_structured_mangling_path ~name dbg :
+let to_structured_mangling_path ~name ~is_a_functor dbg :
     Compilation_unit.t Structured_mangling.path =
+  (* A functor body is named after its own binding, which already appears as the
+     enclosing [Module] scope, so seeding it with [name] would repeat that name
+     ([Make.Make]). We instead seed it with the [Functor] marker, yielding
+     [Make.<functor>]. Outside a functor this is just [Function name]. *)
+  let leaf : Compilation_unit.t Structured_mangling.path_item =
+    if is_a_functor then Functor else Function name
+  in
   (* An anonymous function or module is precisely located by its own position
      information, so the scopes enclosing it (its ancestors, up to the
      compilation unit) are redundant. [located_by_child] becomes true once we
@@ -487,17 +494,18 @@ let to_structured_mangling_path ~name dbg :
     | item :: path -> item :: collapse_anonymous ~located_by_child:false path
   in
   (* Drop the suffix of partial applications and the innermost named function
-     (if any), then end the path with [name]. Using [name] preserves the stamps
-     it includes for uniqueness; we append it even after an innermost anonymous
-     function (which is kept for its position) so the stamps are not lost. *)
-  let rec drop_partials_and_adjust_function_name ~name
+     (if any), then end the path with [leaf] (the [name], or the [Functor]
+     marker for a functor body). Using [name] preserves the stamps it includes
+     for uniqueness; we append it even after an innermost anonymous function
+     (which is kept for its position) so the stamps are not lost. *)
+  let rec drop_partials_and_adjust_function_name
       (path : Compilation_unit.t Structured_mangling.path)
       =
     match path with
     | Partial_function _ :: path ->
-      drop_partials_and_adjust_function_name ~name path
-    | Function _ :: path -> Structured_mangling.Function name :: path
-    | path -> Structured_mangling.Function name :: path
+      drop_partials_and_adjust_function_name path
+    | Function _ :: path -> leaf :: path
+    | path -> leaf :: path
   in
   (* Build the path describing the function body itself, from a single
      debuginfo item's scopes, using the same collapse + name-adjustment as a
@@ -505,7 +513,7 @@ let to_structured_mangling_path ~name dbg :
   let body_path scopes =
     List.rev (path_of_debug_info_scopes [] scopes)
     |> collapse_anonymous ~located_by_child:false
-    |> drop_partials_and_adjust_function_name ~name
+    |> drop_partials_and_adjust_function_name
     |> List.rev
   in
   (* The list of debuginfo items holds the inlining/specialisation frames, from
@@ -540,7 +548,7 @@ let to_structured_mangling_path ~name dbg :
     aux ~cur_unit:None ~after_marker:false [] path
   in
   match List.rev (to_items dbg) with
-  | [] -> [Structured_mangling.Function name]
+  | [] -> [leaf]
   | body_item :: callsite_items_rev ->
     let callsite_context =
       List.rev callsite_items_rev

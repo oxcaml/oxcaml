@@ -49,6 +49,7 @@ module Structured = struct
     | Anonymous_function (l, c, f) -> format_anonymous_location "fn" l c f
     | Anonymous_module (l, c, f) -> format_anonymous_location "mod" l c f
     | Partial_function (l, c, f) -> format_anonymous_location "partial" l c f
+    | Functor -> "<functor>"
     (* Inline_marker: the function body was specialized (copied) into the
        current compilation unit, not inlined at a particular call site, so we
        print [<specialization_of>] rather than [<inlining>]. *)

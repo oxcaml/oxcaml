@@ -28,7 +28,13 @@
 
    The context comes from the [Module] scope the frontend records around the
    application in [module Foo = Make (...)], folded into the specialised
-   code's debuginfo when the simplifier copies it. *)
+   code's debuginfo when the simplifier copies it.
+
+   The functor's own body is named after its binding, which already appears
+   as its enclosing [Module] scope; rather than repeat it as [Make.Make], it
+   is marked with [<functor>]:
+
+   - [E2e_functor.Make.<functor>]                          (the functor body) *)
 module type ORD = sig
   type t
 

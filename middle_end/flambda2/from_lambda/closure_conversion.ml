@@ -3034,10 +3034,17 @@ let close_functions acc external_env ~current_region function_declarations =
       (fun map decl ->
         let function_slot = Function_decl.function_slot decl in
         let function_dbg = Debuginfo.from_location (Function_decl.loc decl) in
+        (* The code id's [name] is the function slot's name, which for a functor
+           is the functor's binding name (e.g. [Make]). That same name is also
+           the enclosing [Module] scope of the body, so the structured symbol
+           would otherwise read [Make.Make]. We pass [is_a_functor] so the
+           mangler can replace the repeated leaf with a [<functor>] marker. *)
         let code_id =
           Code_id.create
             ~name:(Function_slot.to_string function_slot)
-            ~debug:function_dbg compilation_unit
+            ~debug:function_dbg
+            ~is_a_functor:(Function_decl.is_a_functor decl)
+            compilation_unit
         in
         Function_slot.Map.add function_slot code_id map)
       Function_slot.Map.empty func_decl_list
