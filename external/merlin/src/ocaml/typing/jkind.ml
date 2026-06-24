@@ -70,12 +70,6 @@ end
 module Scannable_axes = struct
   include Jkind_types.Scannable_axes
 
-  let less_or_equal { nullability = n1; separability = s1 }
-      { nullability = n2; separability = s2 } =
-    Misc.Le_result.combine
-      (Nullability.less_or_equal n1 n2)
-      (Separability.less_or_equal s1 s2)
-
   let le sa1 sa2 = Misc.Le_result.is_le (less_or_equal sa1 sa2)
 
   let meet { nullability = n1; separability = s1 }
@@ -84,23 +78,29 @@ module Scannable_axes = struct
       separability = Separability.meet s1 s2
     }
 
+  (* A scannable axis annotation can only lower, so [base] is only a valid
+     prefix when [actual <= base] on every axis. If it's not, return [None]. *)
   let to_string_list_diff
       ~base:{ nullability = n_against; separability = s_against }
       { nullability; separability } =
-    let diff = [] in
-    let diff =
-      if Nullability.equal n_against nullability
-      then diff
-      else Nullability.to_string nullability :: diff
+    let nullability_diff =
+      match Nullability.less_or_equal nullability n_against with
+      | Equal -> Some []
+      | Less -> Some [Nullability.to_string nullability]
+      | Not_le -> None
     in
-    let diff =
-      if Separability.equal s_against separability
-      then diff
-      else Separability.to_string separability :: diff
+    let separability_diff =
+      match Separability.less_or_equal separability s_against with
+      | Equal -> Some []
+      | Less -> Some [Separability.to_string separability]
+      | Not_le -> None
     in
-    diff
+    Misc.Stdlib.List.some_if_all_elements_are_some
+      [separability_diff; nullability_diff]
+    |> Option.map List.concat
 
-  let to_string_list = to_string_list_diff ~base:max
+  let to_string_list sa =
+    Option.value (to_string_list_diff ~base:max sa) ~default:[]
 
   let debug_print ppf { nullability; separability } =
     Fmt.fprintf ppf "@[{ nullability = %a;@ separability = %a }@]"
@@ -175,17 +175,56 @@ module Layout = struct
       | Univar _ -> t
       | Genvar _ -> t
 
+    (* Compute how to print the layout [scannable sa] *)
+    let format_scannable_layout ~include_redundant_scannable_axes
+        (sa : Scannable_axes.t) =
+      let scannable_layout_abbrevs : (string * Scannable_axes.t) list =
+        (* CR-someday rtjoa: This somewhat-duplicative list exists because we
+           don't have a notion of layout abbreviations (and in general, conflate
+           layouts and kinds-with-max-crossing). *)
+        (* We pick the abbreviation requiring the fewest annotations, with ties
+           broken by order in this list. So when annotating separability anyway
+           we get [value_or_null non_float] rather than [value_maybe_null
+           non_float]. *)
+        [ "value", Scannable_axes.value_axes;
+          ( "value_or_null",
+            { nullability = Maybe_null; separability = Maybe_separable } );
+          ( "value_maybe_separable",
+            { nullability = Non_null; separability = Maybe_separable } );
+          ( "value_maybe_null",
+            { nullability = Maybe_null; separability = Separable } ) ]
+      in
+      let diff_against (_, base) =
+        Scannable_axes.to_string_list_diff ~base sa
+      in
+      let shorter_diff (_, d1) (_, d2) =
+        Int.compare (List.length d1) (List.length d2)
+      in
+      let sorted =
+        List.filter_map
+          (fun abbrev -> Option.map (fun d -> abbrev, d) (diff_against abbrev))
+          scannable_layout_abbrevs
+        |> List.stable_sort shorter_diff
+      in
+      match sorted with
+      | ((name, _), diff) :: _ ->
+        let axes =
+          if include_redundant_scannable_axes
+          then Scannable_axes.to_string_list sa
+          else diff
+        in
+        name :: axes
+      | [] ->
+        (* [value_or_null] is max on every axis, so at least it should work *)
+        Misc.fatal_error "Jkind.Layout.Const.format_scannable_layout"
+
     let to_string t ~include_redundant_scannable_axes =
       let rec to_string nested (t : t) =
         match t with
         | Any sa -> String.concat " " ("any" :: Scannable_axes.to_string_list sa)
         | Base (Scannable, sa) ->
-          let sa =
-            if include_redundant_scannable_axes
-            then Scannable_axes.to_string_list sa
-            else Scannable_axes.(to_string_list_diff ~base:value_axes) sa
-          in
-          String.concat " " ("value" :: sa)
+          String.concat " "
+            (format_scannable_layout ~include_redundant_scannable_axes sa)
         | Base (b, _) -> Sort.to_string_base b
         | Product ts ->
           String.concat ""
@@ -413,10 +452,9 @@ module Layout = struct
       | Sort (s, sa) -> (
         match Sort.get s with
         | Base Scannable ->
-          let value_axes_diff =
-            Scannable_axes.(to_string_list_diff ~base:value_axes sa)
-          in
-          pp_string_list ppf ("value" :: value_axes_diff)
+          pp_string_list ppf
+            (Const.format_scannable_layout
+               ~include_redundant_scannable_axes:false sa)
         | Var _ ->
           let sort_var_str = Fmt.asprintf "%a" Sort.format s in
           pp_string_list ppf (sort_var_str :: Scannable_axes.to_string_list sa)
@@ -1685,11 +1723,13 @@ module Const = struct
           |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s))
         bounds_to_print
 
+    (* Returns [None] if [actual] has any scannable axis strictly greater
+       than [base], and thus can't be printed in terms of [base] *)
     let get_scannable_axes_diff ~base actual =
       let base_sa = Layout.Const.get_root_scannable_axes base in
       let actual_sa = Layout.Const.get_root_scannable_axes actual in
       match base_sa, actual_sa with
-      | None, _ | _, None -> []
+      | None, _ | _, None -> Some []
       | Some base_sa, Some actual_sa ->
         Scannable_axes.to_string_list_diff ~base:base_sa actual_sa
 
@@ -1735,9 +1775,9 @@ module Const = struct
           then
             match base_jkind.base with
             | Layout base_l -> get_scannable_axes_diff ~base:base_l l
-            | Kconstr _ -> []
-          else []
-        | Kconstr _ -> []
+            | Kconstr _ -> Some []
+          else Some []
+        | Kconstr _ -> Some []
       in
       let modal_bounds =
         get_modal_bounds ~verbosity ~base:base_jkind.mod_bounds
@@ -1779,15 +1819,15 @@ module Const = struct
               out_type, modal @ nonmodal)
             with_bounds otys
       in
-      match matching_layouts, modal_bounds with
-      | true, Some modal_bounds ->
+      match matching_layouts, modal_bounds, scannable_axes with
+      | true, Some modal_bounds, Some scannable_axes ->
         Some
           { base = base.name;
             scannable_axes;
             modal_bounds;
             printable_with_bounds
           }
-      | false, _ | _, None -> None
+      | false, _, _ | _, None, _ | _, _, None -> None
 
     (** Select the out_jkind_const with the least number of modal bounds and
         scannable axes to print *)
@@ -1904,11 +1944,32 @@ module Const = struct
   (*******************************)
   (* converting user annotations *)
 
-  let apply_kind_modifier env t (modifier : 'a Location.loc option)
-      (f : Scannable_axes.t -> 'a -> Warnings.loc -> Scannable_axes.t) =
-    match modifier with
+  module Scannable_axis = struct
+    type t =
+      | Nullability of Nullability.t
+      | Separability of Separability.t
+
+    let lower_axes (sa : Scannable_axes.t) (axis : t) =
+      match axis with
+      | Nullability axis ->
+        { sa with nullability = Nullability.meet sa.nullability axis }
+      | Separability axis ->
+        { sa with separability = Separability.meet sa.separability axis }
+
+    let annot_of_nullability_annot :
+        Nullability.t Location.loc option -> t Location.loc option =
+      Option.map (Location.map (fun x -> Nullability x))
+
+    let annot_of_separability_annot :
+        Separability.t Location.loc option -> t Location.loc option =
+      Option.map (Location.map (fun x -> Separability x))
+  end
+
+  let apply_scannable_axis ?prior_annot env
+      (axis : Scannable_axis.t Location.loc option) t =
+    match axis with
     | None -> t
-    | Some { txt = modifier; loc } -> (
+    | Some { txt = axis; loc } -> (
       let t = Base_and_axes.fully_expand_aliases_const env t in
       match t.base with
       | Kconstr _ -> raise ~loc Abstract_kind_with_kind_modifier
@@ -1916,40 +1977,18 @@ module Const = struct
         match Layout.Const.get_root_scannable_axes layout with
         | None -> t
         | Some sa ->
+          let sa' = Scannable_axis.lower_axes sa axis in
+          (match prior_annot with
+          | Some (abbrev, rev_axes) when Scannable_axes.equal sa sa' ->
+            Location.prerr_warning loc
+              (Warnings.Redundant_kind_modifier
+                 (Format.asprintf "%a%s" Pprintast.longident abbrev
+                    (String.concat ""
+                       (List.rev_map (fun axis -> " " ^ axis) rev_axes))))
+          | _ -> ());
           { t with
-            base =
-              Layout
-                (Layout.Const.set_root_scannable_axes layout (f sa modifier loc))
+            base = Layout (Layout.Const.set_root_scannable_axes layout sa')
           }))
-
-  let set_nullability ~abbrev env (nul : Nullability.t Location.loc option) t =
-    apply_kind_modifier env t nul (fun sa nullability loc ->
-        if nullability = sa.nullability
-        then
-          Location.prerr_warning loc
-            (Warnings.Redundant_kind_modifier
-               (Format.asprintf "%a" Pprintast.longident abbrev));
-        { sa with nullability })
-
-  let set_separability ~abbrev env (sep : Separability.t Location.loc option) t
-      =
-    apply_kind_modifier env t sep (fun sa separability loc ->
-        if separability = sa.separability
-        then
-          Location.prerr_warning loc
-            (Warnings.Redundant_kind_modifier
-               (Format.asprintf "%a" Pprintast.longident abbrev));
-        { sa with separability })
-
-  let meet_nullability env (nul : Nullability.t Location.loc option) t =
-    apply_kind_modifier env t nul (fun sa nullability _loc ->
-        { sa with nullability = Nullability.meet sa.nullability nullability })
-
-  let meet_separability env (sep : Separability.t Location.loc option) t =
-    apply_kind_modifier env t sep (fun sa separability _loc ->
-        { sa with
-          separability = Separability.meet sa.separability separability
-        })
 
   let jkind_of_product_annotations (type l r) ~loc env (jkinds : (l * r) t list)
       =
@@ -1977,50 +2016,19 @@ module Const = struct
       with_bounds
     }
 
-  let transl_scannable_axes sa_annots =
-    let set_or_warn ~loc ~to_ ~to_string cur_axis =
-      match cur_axis with
-      | Some overridden_by ->
-        Location.prerr_warning loc
-          (Warnings.Overridden_kind_modifier
-             (to_string (Location.get_txt overridden_by)));
-        cur_axis
-      | None -> Some (Location.mkloc to_ loc)
-    in
-    (* This will compute and report errors from right-to-left, which enables
-       better error messages while traversing the list only once. It comes at
-       the cost of warnings being reported in a slightly weirder order. *)
-    List.fold_right
-      (fun ({ txt; loc } : string Location.loc) (nullability, separability) ->
-        match txt with
-        | "non_pointer" ->
-          ( nullability,
-            Separability.(
-              set_or_warn ~loc ~to_:Non_pointer ~to_string separability) )
-        | "non_pointer64" ->
-          ( nullability,
-            Separability.(
-              set_or_warn ~loc ~to_:Non_pointer64 ~to_string separability) )
-        | "non_float" ->
-          ( nullability,
-            Separability.(
-              set_or_warn ~loc ~to_:Non_float ~to_string separability) )
-        | "separable" ->
-          ( nullability,
-            Separability.(
-              set_or_warn ~loc ~to_:Separable ~to_string separability) )
-        | "maybe_separable" ->
-          ( nullability,
-            Separability.(
-              set_or_warn ~loc ~to_:Maybe_separable ~to_string separability) )
-        | "non_null" ->
-          ( Nullability.(set_or_warn ~loc ~to_:Non_null ~to_string nullability),
-            separability )
-        | "maybe_null" ->
-          ( Nullability.(set_or_warn ~loc ~to_:Maybe_null ~to_string nullability),
-            separability )
-        | _ -> raise ~loc (Unknown_kind_modifier txt))
-      sa_annots (None, None)
+  let transl_scannable_axis ({ txt; loc } : string Location.loc) =
+    match txt with
+    | "non_pointer" ->
+      Location.mkloc (Scannable_axis.Separability Non_pointer) loc
+    | "non_pointer64" ->
+      Location.mkloc (Scannable_axis.Separability Non_pointer64) loc
+    | "non_float" -> Location.mkloc (Scannable_axis.Separability Non_float) loc
+    | "separable" -> Location.mkloc (Scannable_axis.Separability Separable) loc
+    | "maybe_separable" ->
+      Location.mkloc (Scannable_axis.Separability Maybe_separable) loc
+    | "non_null" -> Location.mkloc (Scannable_axis.Nullability Non_null) loc
+    | "maybe_null" -> Location.mkloc (Scannable_axis.Nullability Maybe_null) loc
+    | _ -> raise ~loc (Unknown_kind_modifier txt)
 
   let rec of_user_written_annotation_unchecked_level : type l r.
       use_abstract_jkinds:bool ->
@@ -2034,7 +2042,6 @@ module Const = struct
     | Pjk_abbreviation (name, sa_annot) ->
       let p, _ = Env.lookup_jkind ~use:use_abstract_jkinds ~loc name.txt env in
       let jkind_without_sa = of_path p in
-      let nullability, separability = transl_scannable_axes sa_annot in
       if
         sa_annot <> []
         &&
@@ -2046,10 +2053,16 @@ module Const = struct
           (Warnings.Ignored_kind_modifier
              ( Format.asprintf "%a" Pprintast.longident name.txt,
                List.map Location.get_txt sa_annot ));
-      jkind_without_sa
-      |> set_nullability ~abbrev:name.txt env nullability
-      |> set_separability ~abbrev:name.txt env separability
-      |> allow_left |> allow_right
+      let jkind, _abbrev =
+        List.fold_left
+          (fun (jkind, rev_axes) axis ->
+            ( apply_scannable_axis ~prior_annot:(name.txt, rev_axes) env
+                (Some (transl_scannable_axis axis))
+                jkind,
+              axis.Location.txt :: rev_axes ))
+          (jkind_without_sa, []) sa_annot
+      in
+      allow_left jkind |> allow_right
     | Pjk_mod (base, modifiers) ->
       let base =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
@@ -2062,8 +2075,12 @@ module Const = struct
       in
       let mod_bounds = Mod_bounds.meet base.mod_bounds mod_bounds in
       { base = base.base; mod_bounds; with_bounds = No_with_bounds }
-      |> meet_nullability env nullability
-      |> meet_separability env separability
+      (* For scannable axes in mod bounds, we do not print redundancy warnings,
+         as scannable axes in mod bounds will be deprecated anyway *)
+      |> apply_scannable_axis env
+           (Scannable_axis.annot_of_nullability_annot nullability)
+      |> apply_scannable_axis env
+           (Scannable_axis.annot_of_separability_annot separability)
     | Pjk_product ts ->
       let jkinds =
         List.map
@@ -2316,11 +2333,12 @@ let of_type_decl_overapproximate_unknown ~context env
     of_type_decl ~use_abstract_jkinds:false ~context ~transl_type env decl
     |> Option.map fst
 
-let for_unboxed_record lbls layouts =
+let for_unboxed_record_with_updates lbls =
   let open Types in
   let tys_modalities =
-    List.map (fun lbl -> lbl.ld_type, lbl.ld_modalities) lbls
+    List.map (fun (lbl, ld_type, _) -> ld_type, lbl.ld_modalities) lbls
   in
+  let layouts = List.map (fun (_, _, layout) -> layout) lbls in
   Builtin.product ~why:Unboxed_record tys_modalities layouts
 
 let for_abbreviation ~type_jkind_purely ~modality ty =
@@ -2443,6 +2461,12 @@ let for_array_element_sort ~level =
   ( fresh_jkind jkind ~annotation:None ~why:(Concrete_creation Array_element),
     sort )
 
+let for_effect_arg ident =
+  let why : History.value_creation_reason =
+    Type_argument { parent_path = Path.Pident ident; position = 1; arity = 1 }
+  in
+  Builtin.value ~why
+
 (******************************)
 (* elimination and defaulting *)
 
@@ -2505,20 +2529,30 @@ let get t = Jkind_desc.get t.jkind
 
 (* CR layouts: this function is suspect; it seems likely to reisenberg
    that refactoring could get rid of it *)
-let sort_of_jkind env (t : jkind_l) : sort =
+let sort_option_of_jkind env (t : jkind_l) : sort option =
   let rec sort_of_layout (t : _ Layout.t) =
     match t with
-    | Any _ -> Misc.fatal_error "Jkind.sort_of_jkind: layout is any"
-    | Sort (s, _) -> s
-    | Product ls -> Sort.Product (List.map sort_of_layout ls)
+    | Any _ -> None
+    | Sort (s, _) -> Some s
+    | Product ls -> (
+      match Misc.Stdlib.List.map_option sort_of_layout ls with
+      | None -> None
+      | Some sorts -> Some (Sort.Product sorts))
   in
-  let layout =
-    match extract_layout env t with
-    | Ok l -> l
-    | Error _ ->
-      Misc.fatal_error "Jkind.sort_of_jkind: unable to expand jkind abbrev"
-  in
-  sort_of_layout layout
+  match extract_layout env t with
+  | Ok layout -> sort_of_layout layout
+  | Error _ ->
+    (* CR-someday lmaurer: This assumes that the only reason [extract_layout]
+       would return an [Error] is because of an abstract kind, which is not
+       true: there could be worse problems like a path missing from the
+       environment. Unfortunately, being more careful would require changing
+       [Env.find_jkind_expansion] (see comment there). *)
+    None
+
+let sort_of_jkind env (t : jkind_l) : sort =
+  match sort_option_of_jkind env t with
+  | Some sort -> sort
+  | None -> Misc.fatal_error "Jkind.sort_of_jkind: layout is any"
 
 let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
   let jk, _ =
@@ -2790,16 +2824,28 @@ module Format_history = struct
   let format_concrete_creation_reason ppf :
       History.concrete_creation_reason -> unit = function
     | Match -> fprintf ppf "a value of this type is matched against a pattern"
-    | Constructor_declaration _ ->
-      fprintf ppf "it's the type of a constructor field"
-    | Label_declaration lbl ->
-      fprintf ppf "it is the type of record field %s" (Ident.name lbl)
+    | Extension_constructor_declaration _ ->
+      fprintf ppf "it's the type of an argument to an extension constructor"
+    | Extension_label_declaration lbl ->
+      fprintf ppf "it is the type of field %s of an extension constructor"
+        (Ident.name lbl)
     | Record_projection ->
       fprintf ppf "it's the record type used in a projection"
     | Record_assignment ->
       fprintf ppf "it's the record type used in an assignment"
     | Record_functional_update ->
       fprintf ppf "it's the record type used in a functional update"
+    | Field_projection ->
+      fprintf ppf "it's the type of a field in a record being projected from"
+    | Field_assignment ->
+      fprintf ppf "it's the type of a field being assigned a value"
+    | Field_functional_update ->
+      fprintf ppf "it's the type of a field involved in a functional update"
+    | Constructor_arg_projection ->
+      fprintf ppf "it's the type of a constructor argument being projected"
+    | Constructor_arg_assignment ->
+      fprintf ppf
+        "it's the type of a constructor argument being assigned a value"
     | Let_binding -> fprintf ppf "it's the type of a variable bound by a `let`"
     | Function_argument ->
       fprintf ppf "we must know concretely how to pass a function argument"
@@ -2823,12 +2869,15 @@ module Format_history = struct
          representable at call sites)"
     | Peek_or_poke ->
       fprintf ppf "it's the type being used for a peek or poke primitive"
-    | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
     | Array_element -> fprintf ppf "it's the type of an array element"
     | Idx_element ->
       fprintf ppf
         "it's the element type (the second type parameter) for a@ block index \
-         (idx or mut_idx)"
+         (idx_imm or idx_mut)"
+    | Field_in_indexed_record ->
+      fprintf ppf
+        "it's the type of a field in a record type into which a@ block index \
+         (idx_imm or idx_mut) is being created"
     | Structure_item ->
       fprintf ppf "it's the type of something stored in a module"
     | Signature_item -> fprintf ppf "it's the type of something in a signature"
@@ -2908,6 +2957,7 @@ module Format_history = struct
     | Inside_quote ->
       fprintf ppf "it's the type of an expression inside of a quote"
     | Evaluated_quote -> fprintf ppf "it's the result of evaluating a quote"
+    | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
 
   let format_immediate_creation_reason ppf :
       History.immediate_creation_reason -> _ = function
@@ -2927,6 +2977,12 @@ module Format_history = struct
     | Primitive id ->
       fprintf ppf "it is the primitive immediate_or_null type %s"
         (Ident.name id)
+
+  let format_scannable_creation_reason ppf :
+      History.scannable_creation_reason -> _ = function
+    | Dummy_jkind ->
+      format_with_notify_js ppf
+        "it's assigned a dummy kind that should have been overwritten"
 
   let format_value_or_null_creation_reason ppf ~layout_or_kind :
       History.value_or_null_creation_reason -> _ = function
@@ -3041,6 +3097,8 @@ module Format_history = struct
       format_immediate_creation_reason ppf immediate
     | Immediate_or_null_creation immediate ->
       format_immediate_or_null_creation_reason ppf immediate
+    | Scannable_creation scannable ->
+      format_scannable_creation_reason ppf scannable
     | Void_creation _ -> .
     | Value_or_null_creation value ->
       format_value_or_null_creation_reason ppf value ~layout_or_kind
@@ -3870,13 +3928,18 @@ module Debug_printers = struct
   let concrete_creation_reason ppf : History.concrete_creation_reason -> unit =
     function
     | Match -> fprintf ppf "Match"
-    | Constructor_declaration idx ->
-      fprintf ppf "Constructor_declaration %d" idx
-    | Label_declaration lbl ->
-      fprintf ppf "Label_declaration %a" Ident.print lbl
+    | Extension_constructor_declaration idx ->
+      fprintf ppf "Extension_constructor_declaration %d" idx
+    | Extension_label_declaration lbl ->
+      fprintf ppf "Extension_label_declaration %a" Ident.print lbl
     | Record_projection -> fprintf ppf "Record_projection"
     | Record_assignment -> fprintf ppf "Record_assignment"
     | Record_functional_update -> fprintf ppf "Record_functional_update"
+    | Field_projection -> fprintf ppf "Field_projection"
+    | Field_assignment -> fprintf ppf "Field_assignment"
+    | Field_functional_update -> fprintf ppf "Field_functional_update"
+    | Constructor_arg_projection -> fprintf ppf "Constructor_arg_projection"
+    | Constructor_arg_assignment -> fprintf ppf "Constructor_arg_assignment"
     | Let_binding -> fprintf ppf "Let_binding"
     | Function_argument -> fprintf ppf "Function_argument"
     | Function_result -> fprintf ppf "Function_result"
@@ -3888,9 +3951,9 @@ module Debug_printers = struct
     | Layout_poly_in_external -> fprintf ppf "Layout_poly_in_external"
     | Unboxed_tuple_element -> fprintf ppf "Unboxed_tuple_element"
     | Peek_or_poke -> fprintf ppf "Peek_or_poke"
-    | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
+    | Field_in_indexed_record -> fprintf ppf "Field_in_indexed_record"
     | Structure_item -> fprintf ppf "Structure_item"
     | Signature_item -> fprintf ppf "Signature_item"
     | Layout_poly -> fprintf ppf "Layout_poly"
@@ -3948,6 +4011,7 @@ module Debug_printers = struct
       fprintf ppf "Overapproximation_of_with_bounds"
     | Inside_quote -> fprintf ppf "Inside_quote"
     | Evaluated_quote -> fprintf ppf "Evaluated_quote"
+    | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
 
   let immediate_creation_reason ppf : History.immediate_creation_reason -> _ =
     function
@@ -3960,6 +4024,10 @@ module Debug_printers = struct
   let immediate_or_null_creation_reason ppf :
       History.immediate_or_null_creation_reason -> _ = function
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
+
+  let scannable_creation_reason ppf : History.scannable_creation_reason -> _ =
+    function
+    | Dummy_jkind -> fprintf ppf "Dummy_jkind"
 
   let value_or_null_creation_reason ppf :
       History.value_or_null_creation_reason -> _ = function
@@ -4033,6 +4101,8 @@ module Debug_printers = struct
     | Immediate_or_null_creation immediate ->
       fprintf ppf "Immediate_or_null_creation %a"
         immediate_or_null_creation_reason immediate
+    | Scannable_creation scannable ->
+      fprintf ppf "Scannable_creation %a" scannable_creation_reason scannable
     | Value_or_null_creation value ->
       fprintf ppf "Value_or_null_creation %a" value_or_null_creation_reason
         value

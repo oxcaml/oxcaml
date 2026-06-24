@@ -41,7 +41,7 @@ let camlinternalQuote =
      with
     | exception Not_found ->
       fatal_errorf "Module CamlinternalQuote unavailable."
-    | path, _, env -> path, env)
+    | path, env -> path, env)
 
 let use modname field =
   lazy
@@ -49,7 +49,7 @@ let use modname field =
      let lid =
        match unflatten (String.split_on_char '.' modname) with
        | None -> Lident field
-       | Some lid -> Ldot (lid, field)
+       | Some lid -> Ldot (Location.mknoloc lid, Location.mknoloc field)
      in
      match Env.find_value_by_name_lazy lid env with
      | p, _ -> transl_value_path Loc_unknown env p
@@ -2041,6 +2041,9 @@ and Exp_desc : sig
     Case.t ->
     t'
 
+  val let_open :
+    Debuginfo.Scoped_location.t -> Identifier.Module.t -> Exp.t -> t'
+
   val exclave : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
   val list_comprehension : Debuginfo.Scoped_location.t -> Comprehension.t -> t'
@@ -2197,6 +2200,9 @@ end = struct
       (mk_list ~loc (List.map extract a1))
       (mk_list ~loc (List.map extract a2))
       (extract a3)
+
+  let let_open loc a1 a2 =
+    apply2 "Exp_desc" "let_open" loc (extract a1) (extract a2)
 
   let exclave loc a1 = apply1 "Exp_desc" "exclave" loc (extract a1)
 
@@ -2528,12 +2534,10 @@ let quote_value_ident_path_as_exp loc env path =
   Exp_desc.ident loc (quote_value_ident_path loc env path)
 
 let type_path env ty =
-  let desc =
-    Types.get_desc (Ctype.expand_head_opt env (Ctype.correct_levels ty))
-  in
+  let desc = Types.get_desc (Ctype.expand_head_opt env ty) in
   match desc with Tconstr (p, _, _) -> Some p | _ -> None
 
-let quote_record_field loc env lbl_desc =
+let quote_record_field loc env (lbl_desc : _ Data_types.gen_label_description) =
   match type_path env lbl_desc.lbl_res with
   | None ->
     fatal_errorf "Translquote [at %a]: no global path for record field"
@@ -2548,7 +2552,7 @@ let quote_record_field loc env lbl_desc =
     fatal_errorf "Translquote [at %a]: unsupported constructor type detected."
       Location.print_loc (to_location loc)
 
-let quote_constructor loc env constr =
+let quote_constructor loc env (constr : Data_types.constructor_description) =
   let exception Non_builtin of string in
   (try
      Identifier.Constructor.wrap
@@ -2602,7 +2606,7 @@ let quote_constructor loc env constr =
 
 let rec quote_modtype_path_of_lid loc = function
   | Lident id -> Modtype_path.name loc id |> Modtype_path.wrap
-  | Ldot (p, s) ->
+  | Ldot ({ txt = p; _ }, { txt = s; _ }) ->
     Modtype_path.dot loc (quote_modtype_path_of_lid loc p) s
     |> Modtype_path.wrap
   | _ ->
@@ -2633,11 +2637,11 @@ let rec with_new_idents_pat pat =
   | Tpat_unboxed_unit -> ()
   | Tpat_unboxed_bool _ -> ()
   | Tpat_tuple args -> List.iter (fun (_, pat) -> with_new_idents_pat pat) args
-  | Tpat_construct (_, _, args, _) ->
-    List.iter (fun pat -> with_new_idents_pat pat) args
+  | Tpat_construct (_, _, _, args, _) ->
+    List.iter (fun (_, pat) -> with_new_idents_pat pat) args
   | Tpat_variant (_, argo, _) -> (
     match argo with None -> () | Some pat -> with_new_idents_pat pat)
-  | Tpat_record (lbl_pats, _) ->
+  | Tpat_record (lbl_pats, _, _, _) ->
     List.iter (fun (_, _, pat) -> with_new_idents_pat pat) lbl_pats
   | Tpat_array (_, _, pats) ->
     List.iter (fun pat -> with_new_idents_pat pat) pats
@@ -2646,7 +2650,7 @@ let rec with_new_idents_pat pat =
     with_new_idents_pat pat2
   | Tpat_unboxed_tuple args ->
     List.iter (fun (_, pat, _) -> with_new_idents_pat pat) args
-  | Tpat_record_unboxed_product (lbl_pats, _) ->
+  | Tpat_record_unboxed_product (lbl_pats, _, _, _) ->
     List.iter (fun (_, _, pat) -> with_new_idents_pat pat) lbl_pats
   | Tpat_lazy pat -> with_new_idents_pat pat
   | Tpat_fun_layout { id; _ } -> with_new_idents_values [id]
@@ -2665,11 +2669,11 @@ let rec without_idents_pat pat =
   | Tpat_unboxed_unit -> ()
   | Tpat_unboxed_bool _ -> ()
   | Tpat_tuple args -> List.iter (fun (_, pat) -> without_idents_pat pat) args
-  | Tpat_construct (_, _, args, _) ->
-    List.iter (fun pat -> without_idents_pat pat) args
+  | Tpat_construct (_, _, _, args, _) ->
+    List.iter (fun pat -> without_idents_pat pat) (List.map snd args)
   | Tpat_variant (_, argo, _) -> (
     match argo with None -> () | Some pat -> without_idents_pat pat)
-  | Tpat_record (lbl_pats, _) ->
+  | Tpat_record (lbl_pats, _, _, _) ->
     List.iter (fun (_, _, pat) -> without_idents_pat pat) lbl_pats
   | Tpat_array (_, _, pats) ->
     List.iter (fun pat -> without_idents_pat pat) pats
@@ -2678,7 +2682,7 @@ let rec without_idents_pat pat =
     without_idents_pat pat2
   | Tpat_unboxed_tuple args ->
     List.iter (fun (_, pat, _) -> without_idents_pat pat) args
-  | Tpat_record_unboxed_product (lbl_pats, _) ->
+  | Tpat_record_unboxed_product (lbl_pats, _, _, _) ->
     List.iter (fun (_, _, pat) -> without_idents_pat pat) lbl_pats
   | Tpat_lazy pat -> without_idents_pat pat
   | Tpat_fun_layout { id; _ } -> without_idents_values [id]
@@ -2811,8 +2815,8 @@ let type_for_annotation ~env ~loc typ =
           Ttyp_constr
             (p, mkloc (Untypeast.lident_of_path p) loc, List.map go tyl)
         | Tobject (fields, _) ->
-          let Printtyp.{ fields; open_row } =
-            Printtyp.tree_of_typobject_repr fields
+          let Out_type.{ fields; open_row } =
+            Out_type.tree_of_typobject_repr fields
           in
           let fields =
             List.map
@@ -2825,10 +2829,10 @@ let type_for_annotation ~env ~loc typ =
           in
           Ttyp_object (fields, if open_row then Open else Closed)
         | Tvariant row ->
-          let Printtyp.
+          let Out_type.
                 { fields; name = _; closed; present = _; all_present = _; tags }
               =
-            Printtyp.tree_of_typvariant_repr row
+            Out_type.tree_of_typvariant_repr row
           in
           let fields =
             List.map
@@ -2841,6 +2845,9 @@ let type_for_annotation ~env ~loc typ =
           in
           Ttyp_variant (fields, (if closed then Closed else Open), tags)
         | Tquote ty -> Ttyp_quote (go ty)
+        | Tbox ty ->
+          let lident = Untypeast.lident_of_path Predef.path_box in
+          Ttyp_constr (Predef.path_box, mkloc lident loc, [go ty])
         | Tsplice _ ->
           fatal_errorf
             "Translquote [at %a]:@ Explicitly quantified type variables@ \
@@ -2850,15 +2857,16 @@ let type_for_annotation ~env ~loc typ =
           let lident = Untypeast.lident_of_path Predef.path_eval in
           Ttyp_constr
             (Predef.path_eval, mkloc lident loc, [go (Btype.new_quote_ty ty)])
-        | Tpackage (pack_path, pack_fields) ->
+        | Tpackage { pack_path; pack_cstrs } ->
           Ttyp_package
-            { pack_path;
-              pack_fields =
+            { tpt_path = pack_path;
+              tpt_cstrs =
                 List.map
-                  (fun (lident, ty) -> mkloc lident loc, go ty)
-                  pack_fields;
-              pack_type = Mty_ident pack_path;
-              pack_txt = mkloc (Untypeast.lident_of_path pack_path) loc
+                  (fun (parts, ty) ->
+                    mkloc (Longident.unflatten parts |> Option.get) loc, go ty)
+                  pack_cstrs;
+              tpt_type = Mty_ident pack_path;
+              tpt_txt = mkloc (Untypeast.lident_of_path pack_path) loc
             }
         | Tlink _ | Tsubst _ | Tfield _ | Tnil ->
           fatal_errorf
@@ -2898,9 +2906,7 @@ and quote_pat_extra ~env ~scopes loc pat_lam extra =
   | Tpat_type _ ->
     fatal_errorf "Translquote [at %a]: [#tconst] not implemented."
       Location.print_loc (to_location loc)
-  | Tpat_open _ ->
-    fatal_errorf "Translquote [at %a]: no support for open patterns."
-      Location.print_loc (to_location loc)
+  | Tpat_open _ -> pat_lam (* handled by path resolution  *)
   | Tpat_inspected_type (Label_disambiguation ambiguity) ->
     pat_lam
     |> maybe_constrain_pat_with_type loc
@@ -2942,13 +2948,15 @@ and quote_value_pattern ~scopes p =
           pats
       in
       Pat.tuple loc pats
-    | Tpat_construct (lid, constr, args, None) ->
+    | Tpat_construct (lid, constr, _, args, None) ->
       let constr = quote_constructor (of_location ~scopes lid.loc) env constr in
       let args =
         match args with
         | [] -> None
         | _ :: _ ->
-          let args = List.map (quote_value_pattern ~scopes) args in
+          let args =
+            List.map (fun (_sort, arg) -> quote_value_pattern ~scopes arg) args
+          in
           let with_labels =
             List.map
               (fun a -> Label.Nonoptional.no_label |> Label.Nonoptional.wrap, a)
@@ -2957,7 +2965,7 @@ and quote_value_pattern ~scopes p =
           Some (Pat.tuple loc with_labels |> Pat.wrap)
       in
       Pat.construct loc constr args
-    | Tpat_construct (_, _, _, Some _) ->
+    | Tpat_construct (_, _, _, _, Some _) ->
       fatal_errorf
         "Translquote [at %a]:@ Constructor patterns introducing locally \
          abstract types are not supported in quotes."
@@ -2965,7 +2973,7 @@ and quote_value_pattern ~scopes p =
     | Tpat_variant (variant, argo, _) ->
       let argo = Option.map (quote_value_pattern ~scopes) argo in
       Pat.variant loc (Variant.of_string loc variant |> Variant.wrap) argo
-    | Tpat_record (lbl_pats, closed) ->
+    | Tpat_record (lbl_pats, _, _, closed) ->
       let lbl_pats =
         List.map
           (fun (lid, lbl_desc, pat) ->
@@ -2996,7 +3004,7 @@ and quote_value_pattern ~scopes p =
           pats
       in
       Pat.unboxed_tuple loc pats
-    | Tpat_record_unboxed_product (lbl_pats, closed) ->
+    | Tpat_record_unboxed_product (lbl_pats, _, _, closed) ->
       let lbl_pats =
         List.map
           (fun (lid, lbl_desc, pat) ->
@@ -3159,8 +3167,8 @@ and quote_core_type ~scopes ty =
     without_idents_poly names;
     Type.poly loc (quote_loc loc) names_lam body |> Type.wrap
   | Ttyp_package package ->
-    let { pack_path; pack_fields; pack_type = _; pack_txt = _ } = package in
-    let mod_type = module_type_for_path loc env pack_path
+    let { tpt_path; tpt_cstrs; tpt_type = _; tpt_txt = _ } = package in
+    let mod_type = module_type_for_path loc env tpt_path
     and with_types =
       List.map
         (fun (lid, ty) ->
@@ -3168,7 +3176,7 @@ and quote_core_type ~scopes ty =
               (of_location ~scopes Asttypes.(lid.loc))
               lid.txt,
             quote_core_type ~scopes ty ))
-        pack_fields
+        tpt_cstrs
     in
     Type.package loc mod_type with_types |> Type.wrap
   | Ttyp_quote ty -> Type.quote loc (quote_core_type ~scopes ty) |> Type.wrap
@@ -3646,7 +3654,7 @@ and update_env_without_extra ~loc extra =
   | Texp_ghost_region -> ()
   | Texp_borrowed -> ()
 
-and quote_expression_desc ~scopes ~transl stage e =
+and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
   let env = e.exp_env in
   let loc' = e.exp_loc in
   let loc = of_location ~scopes loc' in
@@ -3772,11 +3780,11 @@ and quote_expression_desc ~scopes ~transl stage e =
           args
       in
       Exp_desc.apply loc fn args
-    | Texp_match (exp, _, cases, _) ->
+    | Texp_match (exp, _, cases, _, _) ->
       let exp = quote_expression ~scopes ~transl stage exp in
       let cases = List.map (quote_case ~scopes ~transl stage loc) cases in
       Exp_desc.match_ loc exp cases
-    | Texp_try (exp, cases) ->
+    | Texp_try (exp, cases, _) ->
       let exp = quote_expression ~transl ~scopes stage exp
       and cases =
         List.map (quote_value_pattern_case ~scopes ~transl stage loc) cases
@@ -3792,14 +3800,18 @@ and quote_expression_desc ~scopes ~transl stage e =
           exps
       in
       Exp_desc.tuple loc exps
-    | Texp_construct (lid, constr, args, _) ->
+    | Texp_construct (lid, constr, _, args, _) ->
       let constr = quote_constructor (of_location ~scopes lid.loc) env constr in
       let args =
         match args with
         | [] -> None
-        | [arg] -> Some (quote_expression ~scopes ~transl stage arg)
+        | [(_sort, arg)] -> Some (quote_expression ~scopes ~transl stage arg)
         | _ :: _ ->
-          let args = List.map (quote_expression ~scopes ~transl stage) args in
+          let args =
+            List.map
+              (fun (_, arg) -> quote_expression ~scopes ~transl stage arg)
+              args
+          in
           let with_labels =
             List.map
               (fun a -> Label.Nonoptional.wrap Label.Nonoptional.no_label, a)
@@ -3820,7 +3832,7 @@ and quote_expression_desc ~scopes ~transl stage e =
     | Texp_record { fields; extended_expression } ->
       let lbl_exps =
         Array.map
-          (fun (lbl, def) ->
+          (fun (lbl, _, def) ->
             let lbl = quote_record_field loc env lbl in
             let exp =
               match def with
@@ -3840,11 +3852,11 @@ and quote_expression_desc ~scopes ~transl stage e =
           extended_expression
       in
       Exp_desc.record loc (Array.to_list lbl_exps) base
-    | Texp_field (rcd, _, lid, lbl, _, _) ->
+    | Texp_field { record = rcd; lid; label = lbl; _ } ->
       let rcd = quote_expression ~scopes ~transl stage rcd in
       let lbl = quote_record_field (of_location ~scopes lid.loc) env lbl in
       Exp_desc.field loc rcd lbl
-    | Texp_setfield (rcd, _, lid, lbl, exp) ->
+    | Texp_setfield { record = rcd; lid; label = lbl; newval = exp; _ } ->
       let rcd = quote_expression ~scopes ~transl stage rcd in
       let lbl = quote_record_field (of_location ~scopes lid.loc) env lbl in
       let exp = quote_expression ~scopes ~transl stage exp in
@@ -3879,8 +3891,15 @@ and quote_expression_desc ~scopes ~transl stage e =
       let obj = quote_expression ~scopes ~transl stage obj in
       let meth = quote_method loc meth in
       Exp_desc.send loc obj meth
+    | Texp_open
+        ( { open_expr = { mod_desc = Tmod_ident (path, _) };
+            open_attributes = []
+          },
+          exp ) ->
+      let exp = quote_expression ~scopes ~transl stage exp in
+      Exp_desc.let_open loc (module_for_path loc env path) exp
     | Texp_open _ ->
-      fatal_errorf "Translquote [at %a]: Texp_open not implemented"
+      fatal_errorf "Translquote [at %a]: non-trivial Texp_open not implemented"
         Location.print_loc (to_location loc)
     | Texp_letmodule (ident, _, _, mod_exp, body) -> (
       let mod_exp = quote_module_exp ~transl stage loc env mod_exp in
@@ -3939,7 +3958,7 @@ and quote_expression_desc ~scopes ~transl stage e =
     | Texp_record_unboxed_product { fields; extended_expression } ->
       let lbl_exps =
         Array.map
-          (fun (lbl, def) ->
+          (fun (lbl, _, def) ->
             let lbl = quote_record_field loc env lbl in
             let exp =
               match def with
@@ -3958,7 +3977,7 @@ and quote_expression_desc ~scopes ~transl stage e =
           extended_expression
       in
       Exp_desc.unboxed_record_product loc (Array.to_list lbl_exps) base
-    | Texp_unboxed_field (rcd, _, lid, lbl, _) ->
+    | Texp_unboxed_field { record = rcd; lid; label = lbl; _ } ->
       let rcd = quote_expression ~scopes ~transl stage rcd in
       let lbl = quote_record_field (of_location ~scopes lid.loc) env lbl in
       Exp_desc.unboxed_field loc rcd lbl
@@ -4023,7 +4042,7 @@ and quote_expression_desc ~scopes ~transl stage e =
     (quote_expression_extra ~env ~scopes stage)
     e.exp_extra (Exp_desc.wrap body)
 
-and quote_expression ~scopes ~transl stage e =
+and quote_expression ~scopes ~transl stage e : Exp.t =
   let desc = quote_expression_desc ~scopes ~transl stage e
   and attributes = quote_attributes e
   and loc = of_location ~scopes e.exp_loc in

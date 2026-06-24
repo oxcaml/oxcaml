@@ -103,7 +103,7 @@ let last_loc_for_renaming (loc : Location.t) lid =
       | Longident.Lident _ -> loc
       | _ ->
         let last_segment = Longident.last lid in
-        let needs_parens = Pprintast.needs_parens last_segment in
+        let needs_parens = Pprintast.needs_parens ~kind:Other last_segment in
         if not needs_parens then
           let last_size = last_segment |> String.length in
           { loc with

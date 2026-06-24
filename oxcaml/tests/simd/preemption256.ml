@@ -3,8 +3,6 @@
 open Effect
 open Effect.Deep
 
-external preempt_self : unit -> unit = "caml_domain_preempt_self" [@@noalloc]
-
 external int64x4_of_int64s : int64 -> int64 -> int64 -> int64 -> int64x4#
   = "" "vec256_of_int64s"
 [@@noalloc] [@@unboxed]
@@ -39,30 +37,28 @@ let[@inline never] check_ymm_upper_3 name v b c d =
     exit 1
   end
 
-let with_preemption_setup ?(interval = 0.1) ?(repeating = false) f =
-  let it_interval = if repeating then interval else 0. in
-  let _ = Unix.setitimer ITIMER_REAL { it_interval; it_value = interval } in
-  let _ =
-    Sys.set_signal Sys.sigalrm (Signal_handle (fun _ -> preempt_self ()))
-  in
-  let result = f () in
-  let _ = Unix.setitimer ITIMER_REAL { it_interval = 0.; it_value = 0. } in
-  result
-
 let run_with_tick_handler ?(interval = 0.1) ?(repeating = false)
     ?(on_tick = fun () -> ()) computation =
-  with_preemption_setup ~interval ~repeating (fun () ->
-      try_with computation ()
-        { effc =
-            (fun (type a) (e : a t) ->
-              match e with
-              | Preemption ->
-                Some
-                  (fun (k : (a, _) continuation) ->
-                    on_tick ();
-                    continue k ())
-              | _ -> None)
-        })
+  let interval_usec = Int.of_float (interval *. 1_000_000.) in
+  Domain.Tick.with_ ~interval_usec (fun _ ->
+    let preempted_once = ref false in
+    Preemptible.try_with
+      ~on_tick:(fun () ->
+        if !preempted_once && not repeating
+        then Continue
+        else (preempted_once := true; Preempt))
+      computation
+      ()
+      { effc =
+          (fun (type a) (e : a t) ->
+            match e with
+            | Preemption ->
+              Some
+                (fun (k : (a, _) continuation) ->
+                  on_tick ();
+                  continue k ())
+            | _ -> None)
+      })
 
 (* Spins 16 unboxed int64x4 accumulators in a tail-recursive loop, then checks
    their upper lanes. The whole thing is one function because int64x4# can't

@@ -15,14 +15,38 @@ module C = Char
 - : char = 'B'
 module C' :
   sig
+    type t = char
     external code : char -> int @@ portable = "%identity"
     val chr : int -> char @@ portable
     val escaped : char -> string @@ portable
-    val lowercase_ascii : char -> char @@ portable
-    val uppercase_ascii : char -> char @@ portable
-    type t = char
     val compare : t -> t -> int @@ portable
     val equal : t -> t -> bool @@ portable
+    module Ascii :
+      sig
+        val min : char @@ portable
+        val max : char @@ portable
+        val is_valid : char -> bool @@ portable
+        val is_upper : char -> bool @@ portable
+        val is_lower : char -> bool @@ portable
+        val is_letter : char -> bool @@ portable
+        val is_alphanum : char -> bool @@ portable
+        val is_white : char -> bool @@ portable
+        val is_blank : char -> bool @@ portable
+        val is_graphic : char -> bool @@ portable
+        val is_print : char -> bool @@ portable
+        val is_control : char -> bool @@ portable
+        val is_digit : char -> bool @@ portable
+        val digit_to_int : char -> int @@ portable
+        val digit_of_int : int -> char @@ portable
+        val is_hex_digit : char -> bool @@ portable
+        val hex_digit_to_int : char -> int @@ portable
+        val lower_hex_digit_of_int : int -> char @@ portable
+        val upper_hex_digit_of_int : int -> char @@ portable
+        val uppercase : char -> char @@ portable
+        val lowercase : char -> char @@ portable
+      end
+    val lowercase_ascii : char -> char @@ portable
+    val uppercase_ascii : char -> char @@ portable
     val seeded_hash : int -> t -> int @@ portable
     val hash : t -> int @@ portable
     external unsafe_chr : int -> char @@ portable = "%identity"
@@ -30,14 +54,15 @@ module C' :
 - : char = 'B'
 module C3 :
   sig
+    type t = char
     external code : char -> int = "%identity"
     val chr : int -> char
     val escaped : char -> string
-    val lowercase_ascii : char -> char
-    val uppercase_ascii : char -> char
-    type t = char
     val compare : t -> t -> int
     val equal : t -> t -> bool
+    module Ascii = Char.Ascii
+    val lowercase_ascii : char -> char
+    val uppercase_ascii : char -> char
     val seeded_hash : int -> t -> int
     val hash : t -> int
     external unsafe_chr : int -> char = "%identity"
@@ -59,28 +84,30 @@ C4.chr 66;;
 module F :
   functor (X : sig end) ->
     sig
+      type t = char
       external code : char -> int @@ portable = "%identity"
       val chr : int -> char @@ portable
       val escaped : char -> string @@ portable
-      val lowercase_ascii : char -> char @@ portable
-      val uppercase_ascii : char -> char @@ portable
-      type t = char
       val compare : t -> t -> int @@ portable
       val equal : t -> t -> bool @@ portable
+      module Ascii = Char.Ascii
+      val lowercase_ascii : char -> char @@ portable
+      val uppercase_ascii : char -> char @@ portable
       val seeded_hash : int -> t -> int @@ portable
       val hash : t -> int @@ portable
       external unsafe_chr : int -> char @@ portable = "%identity"
     end
 module C4 :
   sig
+    type t = char
     external code : char -> int @@ portable = "%identity"
     val chr : int -> char @@ portable
     val escaped : char -> string @@ portable
-    val lowercase_ascii : char -> char @@ portable
-    val uppercase_ascii : char -> char @@ portable
-    type t = char
     val compare : t -> t -> int @@ portable
     val equal : t -> t -> bool @@ portable
+    module Ascii = Char.Ascii
+    val lowercase_ascii : char -> char @@ portable
+    val uppercase_ascii : char -> char @@ portable
     val seeded_hash : int -> t -> int @@ portable
     val hash : t -> int @@ portable
     external unsafe_chr : int -> char @@ portable = "%identity"

@@ -1,21 +1,21 @@
 generated program:
-(42 [@magic_staged_modes])
+((42) [@magic_staged_modes])
 
 generated program:
 stack_ (Some 42)
 
 File "//eval//", line 1, characters 4-8:
-Error: The expression is "local" because it is "stack_"-allocated.
-       However, the expression highlighted is expected to be "global"
-         because it is the value "eval" in the structure at file "//eval//", line 1, characters 0-29
-         which is expected to be "global"
+Error: The expression is local because it is stack_-allocated.
+       However, the expression highlighted is expected to be global
+         because it is the value eval in the structure at file "//eval//", line 1, characters 0-29
+         which is expected to be global
          because modules always need to be allocated on the heap.
 eval failed.
 
 generated program:
-((Stdlib.ref 0 : _ @ unique) [@magic_staged_modes])
+(((Stdlib.ref 0 : _ @ unique)) [@magic_staged_modes])
 
-File "//eval//", line 1, characters 14-26:
-Error: This value is "aliased" but is expected to be "unique".
+File "//eval//", line 1, characters 15-27:
+Error: This value is aliased but is expected to be unique.
 eval failed.
 

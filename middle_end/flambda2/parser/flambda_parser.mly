@@ -24,15 +24,40 @@ let make_targetint = function
   | _, Some _ ->
     Misc.fatal_errorf "No modifier expected here"
 
+let make_int8 = function
+  | s, Some 's' -> Numeric_types.Int8.of_int @@ int_of_string s
+  | _, _ ->
+    Misc.fatal_errorf "Expected int8 modifier"
+
+let make_int16 = function
+  | s, Some 'S' -> Numeric_types.Int16.of_int @@ int_of_string s
+  | _, _ ->
+    Misc.fatal_errorf "Expected int16 modifier"
+
+let make_int32 = function
+  | s, Some 'l' -> Int32.of_string s
+  | _, _ ->
+    Misc.fatal_errorf "Expected int32 modifier"
+
+let make_int64 = function
+  | s, Some 'L' -> Int64.of_string s
+  | _, _ ->
+    Misc.fatal_errorf "Expected int64 modifier"
+
+let make_nativeint = function
+  | s, Some 'n' -> Int64.of_string s
+  | _, _ ->
+    Misc.fatal_errorf "Expected nativeint modifier"
+
+let make_float = function
+  | s, None | s, Some 's' -> s
+  | _, _ ->
+    Misc.fatal_errorf "Expected float modifier"
+
 let make_tag ~loc:_ = function
   | s, None -> int_of_string s
   | _, Some _ ->
     Misc.fatal_errorf "No modifier allowed for tags"
-
-let make_tagged_immediate ~loc:_ = function
-  | s, None -> s
-  | _, _ ->
-    Misc.fatal_errorf "Must be a tagged immediate"
 
 let make_const_int (i, m) : const =
   let i' = int_of_string i in
@@ -95,6 +120,10 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_AVAILABLE [@symbol "available"]
 %token KWD_BOXED [@symbol "boxed"]
 %token KWD_CCALL  [@symbol "ccall"]
+%token KWD_MCALL  [@symbol "mcall"]
+%token KWD_SELF  [@symbol "self"]
+%token KWD_PUBLIC  [@symbol "public"]
+%token KWD_CACHED  [@symbol "cached"]
 %token KWD_CLOSURE  [@symbol "closure"]
 %token KWD_CODE  [@symbol "code"]
 %token KWD_CONT  [@symbol "cont"]
@@ -135,6 +164,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_NOTRACE [@symbol "notrace"]
 %token KWD_NULL [@symbol "null"]
 %token KWD_OF     [@symbol "of"]
+%token KWD_POISON [@symbol "poison"]
 %token KWD_POP    [@symbol "pop"]
 %token KWD_PUSH   [@symbol "push"]
 %token KWD_REC    [@symbol "rec"]
@@ -161,7 +191,14 @@ let make_boxed_const_int (i, m) : static_data =
 
 %token STATIC_CONST_BLOCK [@symbol "Block"]
 %token STATIC_CONST_VALUE_ARRAY [@symbol "Value_array"]
+%token STATIC_CONST_INT_ARRAY [@symbol "Int_array"]
+%token STATIC_CONST_INT8_ARRAY [@symbol "Int8_array"]
+%token STATIC_CONST_INT16_ARRAY [@symbol "Int16_array"]
+%token STATIC_CONST_INT32_ARRAY [@symbol "Int32_array"]
+%token STATIC_CONST_INT64_ARRAY [@symbol "Int64_array"]
+%token STATIC_CONST_NATIVEINT_ARRAY [@symbol "Nativeint_array"]
 %token STATIC_CONST_FLOAT_ARRAY [@symbol "Float_array"]
+%token STATIC_CONST_FLOAT32_ARRAY [@symbol "Float32_array"]
 %token STATIC_CONST_FLOAT_BLOCK [@symbol "Float_block"]
 %token STATIC_CONST_EMPTY_ARRAY [@symbol "Empty_array"]
 
@@ -174,7 +211,6 @@ let make_boxed_const_int (i, m) : static_data =
 %type <Fexpr.field_of_block> field_of_block
 %type <Fexpr.flambda_unit> flambda_unit
 %type <Fexpr.continuation_sort option> continuation_sort
-%type <float Fexpr.or_variable> float_or_variable
 %type <Fexpr.kind_with_subkind> kind_with_subkind
 %type <Fexpr.kind_with_subkind list> kinds_with_subkinds
 %type <Fexpr.loopify_attribute> loopify
@@ -554,6 +590,11 @@ apply_expr:
      } }
 ;
 
+method_kind:
+  | KWD_SELF { Call_kind.Method_kind.Self }
+  | KWD_PUBLIC { Call_kind.Method_kind.Public }
+  | KWD_CACHED { Call_kind.Method_kind.Cached }
+
 call_kind:
   | alloc = alloc_mode_for_applications_opt; { (Function Indirect, alloc) }
   | KWD_DIRECT; LPAREN;
@@ -564,6 +605,8 @@ call_kind:
     { (Function (Direct { code_id; function_slot; }), alloc) }
   | KWD_CCALL; noalloc = boption(KWD_NOALLOC)
     { (C_call { alloc = not noalloc }, (Heap : alloc_mode_for_applications)) }
+  | KWD_MCALL LPAREN; kind = method_kind; obj = simple; RPAREN
+    { (Method { kind; obj }, (Heap : alloc_mode_for_applications)) }
 ;
 
 inline:
@@ -660,6 +703,14 @@ static_data_binding:
     { { symbol = s; defining_expr = sp } }
 ;
 
+float: f = FLOAT { make_float f };
+int8: i = INT { make_int8 i };
+int16: i = INT { make_int16 i };
+int32: i = INT { make_int32 i };
+int64: i = INT { make_int64 i };
+nativeint: i = INT { make_nativeint i };
+targetint: i = INT { make_targetint i };
+
 static_data:
   | STATIC_CONST_BLOCK; m = mutability; tag = tag; LPAREN;
     elements = separated_list(COMMA, field_of_block); RPAREN
@@ -672,17 +723,45 @@ static_data:
   | i = INT { make_boxed_const_int i }
   | v = variable; COLON; k = static_data_kind { k v }
   | STATIC_CONST_FLOAT_BLOCK; LPAREN;
-    fs = separated_list(COMMA, float_or_variable);
+    fs = separated_list(COMMA, or_variable(float));
     RPAREN
     { Immutable_float_block fs }
   | STATIC_CONST_FLOAT_ARRAY; LBRACKPIPE;
-    fs = separated_list(SEMICOLON, float_or_variable);
+    fs = separated_list(SEMICOLON, or_variable(float));
     RBRACKPIPE
     { Immutable_float_array fs }
+  | STATIC_CONST_FLOAT32_ARRAY; LBRACKPIPE;
+    fs = separated_list(SEMICOLON, or_variable(float));
+    RBRACKPIPE
+    { Immutable_float32_array fs }
   | STATIC_CONST_VALUE_ARRAY; LBRACKPIPE;
     fs = separated_list(SEMICOLON, field_of_block);
     RBRACKPIPE
     { Immutable_value_array fs }
+  | STATIC_CONST_INT_ARRAY; LBRACKPIPE;
+    is = separated_list(SEMICOLON, or_variable(targetint));
+    RBRACKPIPE
+    { Immutable_int_array is }
+  | STATIC_CONST_INT8_ARRAY; LBRACKPIPE;
+    is = separated_list(SEMICOLON, or_variable(int8));
+    RBRACKPIPE
+    { Immutable_int8_array is }
+  | STATIC_CONST_INT16_ARRAY; LBRACKPIPE;
+    is = separated_list(SEMICOLON, or_variable(int16));
+    RBRACKPIPE
+    { Immutable_int16_array is }
+  | STATIC_CONST_INT32_ARRAY; LBRACKPIPE;
+    is = separated_list(SEMICOLON, or_variable(int32));
+    RBRACKPIPE
+    { Immutable_int32_array is }
+  | STATIC_CONST_INT64_ARRAY; LBRACKPIPE;
+    is = separated_list(SEMICOLON, or_variable(int64));
+    RBRACKPIPE
+    { Immutable_int64_array is }
+  | STATIC_CONST_NATIVEINT_ARRAY; LBRACKPIPE;
+    is = separated_list(SEMICOLON, or_variable(nativeint));
+    RBRACKPIPE
+    { Immutable_nativeint_array is }
   | STATIC_CONST_EMPTY_ARRAY kind=empty_array_kind { Empty_array kind }
   | KWD_MUTABLE; s = STRING { Mutable_string { initial_value = s } }
   | s = STRING { Immutable_string s }
@@ -695,16 +774,9 @@ static_data_kind:
   | KWD_INT64 KWD_BOXED { fun v -> Boxed_int64 (Var v) }
   | KWD_NATIVEINT KWD_BOXED { fun v -> Boxed_nativeint (Var v) }
 
-float_or_variable:
-  | f = FLOAT {
-     match snd f with
-     | None -> Const (fst f)
-     | Some 's' -> Misc.fatal_error "unsupported float32 blocks"
-     | Some c -> Misc.fatal_errorf "Invalid float modifier '%c'" c }
-  | v = variable { Var v }
-
-targetint:
-  i = INT { make_targetint i }
+or_variable(cst):
+  | c = cst { (Const c : _ Fexpr.or_variable) }
+  | v = variable { (Var v : _ Fexpr.or_variable) }
 
 tag:
   tag = INT { make_tag ~loc:(make_loc ($startpos, $endpos)) tag }
@@ -717,7 +789,7 @@ plain_int:
 field_of_block:
   | s = symbol { Symbol s }
   | v = variable { Dynamically_computed v }
-  | i = INT { Tagged_immediate ( make_tagged_immediate ~loc:($startpos, $endpos) i ) }
+  | c = const { Const c }
 ;
 
 kinded_variable:
@@ -741,6 +813,7 @@ const:
     | Some 's' -> Naked_float32 (fst f)
     | Some c -> Misc.fatal_errorf "Invalid float modifier '%c'" c }
   | KWD_NULL { Null }
+  | KWD_POISON; DOT; k = kind_with_subkind; DOT; s = STRING { Poison (k, s) }
 ;
 
 %inline func_name_with_optional_arities:

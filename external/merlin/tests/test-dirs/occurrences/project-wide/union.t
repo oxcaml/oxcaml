@@ -10,12 +10,8 @@ the marshal wouldn't be granular):
 
 A signature containing the same symbols:
 
-  $ echo "module type S = sig" >> sig.ml
-  $ cat test.mli >> sig.ml
-  $ echo "end" >> sig.ml
-  $ echo "module type S = sig" >> sig.mli
-  $ cat test.mli >> sig.mli
-  $ echo "end" >> sig.mli
+  $ echo "module type S = sig $(cat test.mli) end" >sig.ml
+  $ echo "module type S = sig $(cat test.mli) end" >sig.mli
   $ $OCAMLC -bin-annot -bin-annot-occurrences -c sig.mli sig.ml
 
 At this point `ŧest` and `sig` are unrelated. We'll later force their unification with:

@@ -1,10 +1,6 @@
 (* TEST
  flags += " -O3";
- flags += " -cfg-prologue-shrink-wrap";
- flags += " -x86-peephole-optimize";
- flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
- flags += " -regalloc-param AFFINITY:on -regalloc irc";
- flags += " -cfg-merge-blocks";
+ flags += " -experimental-optimizations";
  only-default-codegen;
  expect.opt;
 *)
@@ -67,7 +63,7 @@ arr_sum:
   jle   .L0
   ret
 .L1:
-  movq  camlTOP2__block101@GOTPCREL(%rip), %rax
+  movq  <hidden PC-relative offset>(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -77,9 +73,8 @@ arr_sum:
   ret
 |}]
 
-(* CR ttebbi: The generated control flow branches three (!) times on
-   should_continue. In block 123, we can even statically know that the bit is 1.
-   Additionally, we materialise the should_continue bit. *)
+(* CR ttebbi: The generated control flow branches two times on
+   should_continue. Additionally, we materialise the should_continue bit. *)
 let search ~target (start : int list) =
   let node = ref start in
   while
@@ -114,8 +109,7 @@ search:
   jmp   .L4
 .L2:
   movq  %rbx, %rax
-  testq %rsi, %rsi
-  je    .L4
+  jmp   .L4
 .L3:
   movq  %rax, %rbx
   testb $1, %bl
@@ -154,4 +148,41 @@ learn_from_branch:
 .L0:
   leaq  -1(%rax,%rax), %rax
   ret
+|}]
+
+
+(* CR ttebbi: We shouldn't materialize the boolean and some branches are
+   imposssible to take. *)
+let complex_branching_on_two_comparisons (x: int) (y: int) c1 c2 c3 =
+ match x = 2, y = 2 with
+ | true, true -> c1 ()
+ | _, false -> c2 ()
+ | false, _ -> c3 ()
+[%%expect_asm X86_64{|
+complex_branching_on_two_comparisons:
+  movq  %rax, %rcx
+  movq  %rbx, %rax
+  movq  %rsi, %rbx
+  cmpq  $5, %rax
+  sete  %al
+  movzbq %al, %rax
+  cmpq  $5, %rcx
+  jne   .L0
+  testq %rax, %rax
+  je    .L0
+  movl  $1, %eax
+  movq  (%rdi), %rsi
+  movq  %rdi, %rbx
+  jmp   *%rsi
+.L0:
+  testq %rax, %rax
+  je    .L1
+  movl  $1, %eax
+  movq  (%rdx), %rdi
+  movq  %rdx, %rbx
+  jmp   *%rdi
+.L1:
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
 |}]

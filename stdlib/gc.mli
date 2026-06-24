@@ -195,8 +195,7 @@ type control =
        (this setting is intended for testing purposes only).
        If [max_overhead >= 1000000], compaction is never triggered.
        On runtime4, if compaction is permanently disabled, it is strongly
-       suggested to set [allocation_policy] to 2.
-        Default: 500. *)
+       suggested to set [allocation_policy] to 2. Default: 500. *)
 
     stack_limit : int;
     (** The maximum size of the fiber stacks (in words).
@@ -261,9 +260,10 @@ type control =
         out variations in its workload. This is an integer between
         1 and 50.
         Default: 1.
-        This metric is currently not available in OCaml 5: the field value is
-        always [0].
-        @since 4.03 *)
+        @since 4.03
+
+        This field is currently not available in OCaml 5: the field value is
+        always [0]. *)
 
     custom_major_ratio : int;
     (** Target ratio of floating garbage to major heap size for
@@ -364,14 +364,20 @@ external get : unit -> control = "caml_gc_get"
 [@@alert unsynchronized_access
     "GC parameters are a mutable global state."
 ]
-(** Return the current values of the GC parameters in a [control] record. *)
+(** Return the current values of the GC parameters in a [control] record.
+
+    The [allocation_policy] and [window_size] fields are currently not available
+    in OCaml 5: their returned field values are therefore [0]. *)
 
 external set : control -> unit = "caml_gc_set"
 [@@alert unsynchronized_access
     "GC parameters are a mutable global state."
 ]
- (** [set r] changes the GC parameters according to the [control] record [r].
-   The normal usage is: [Gc.set { (Gc.get()) with Gc.verbose = 0x00d }] *)
+(** [set r] changes the GC parameters according to the [control] record [r].
+    The normal usage is: [Gc.set { (Gc.get()) with Gc.verbose = 0x00d }]
+
+    The [allocation_policy] and [window_size] fields are currently not available
+    in OCaml 5: setting them therefore has no effect. *)
 
 external minor : unit -> unit = "caml_gc_minor"
 (** Trigger a minor collection. *)
@@ -613,7 +619,9 @@ module (Memprof @@ nonportable) :
     type t
     (** the type of a profile *)
 
-    type allocation_source = Normal | Marshal | Custom
+    type allocation_source = Normal | Marshal | Custom | Map_file
+    val string_of_allocation_source : allocation_source -> string
+
     type allocation = private
       { n_samples : int;
         (** The number of samples in this block (>= 1). *)
@@ -667,7 +675,7 @@ module (Memprof @@ nonportable) :
        the sampling rate in samples per word (including headers).
        Usually, with cheap callbacks, a rate of 1e-4 has no visible
        effect on performance, and 1e-3 causes the program to run a few
-       percent slower.  0.0 <= sampling_rate <= 1.0
+       percent slower. 0.0 <= sampling_rate <= 1.0.
 
        The parameter [callstack_size] is the length of the callstack
        recorded at every sample. Its default is [max_int].
@@ -675,12 +683,12 @@ module (Memprof @@ nonportable) :
        The parameter [tracker] determines how to track sampled blocks
        over their lifetime in the minor and major heap.
 
-       Sampling is temporarily disabled on the current thread when
-       calling a callback, so callbacks do not need to be re-entrant
-       if the program is single-threaded and single-domain. However,
-       if threads or multiple domains are used, it is possible that
-       several callbacks will run in parallel. In this case, callback
-       functions must be re-entrant.
+       Sampling and running callbacks are temporarily disabled on the
+       current thread when calling a callback, so callbacks do not
+       need to be re-entrant if the program is single-threaded and
+       single-domain. However, if threads or multiple domains are
+       used, it is possible that several callbacks will run in
+       parallel. In this case, callback functions must be re-entrant.
 
        Note that a callback may be postponed slightly after the actual
        event. The callstack passed to an allocation callback always
@@ -688,30 +696,32 @@ module (Memprof @@ nonportable) :
        have evolved between the allocation and the call to the
        callback.
 
-       If a new thread or domain is created when profiling is active,
-       the child thread or domain joins that profile (using the same
-       [sampling_rate], [callstack_size], and [tracker] callbacks).
+       If a new thread or domain is created when the current domain is
+       sampling for a profile, the child thread or domain joins that
+       profile (using the same [sampling_rate], [callstack_size], and
+       [tracker] callbacks).
 
-       An allocation callback is generally run by the thread which
+       An allocation callback is always run by the thread which
        allocated the block. If the thread exits or the profile is
+       stopped before the callback is called, the allocation callback
+       is not called and the block is not tracked.
+
+       Each subsequent callback is generally run by the domain which
+       allocated the block. If the domain terminates or the profile is
        stopped before the callback is called, the callback may be run
-       by a different thread.
+       by a different domain.
 
-       Each callback is generally run by the domain which allocated
-       the block. If the domain terminates or the profile is stopped
-       before the callback is called, the callback may be run by a
-       different domain.
-
-       Different domains may run different profiles simultaneously.
-       *)
+       Different domains may sample for different profiles
+       simultaneously.  *)
 
     val stop : unit -> unit
     (** Stop sampling for the current profile. Fails if no profile is
        sampling in the current domain. Stops sampling in all threads
        and domains sharing the profile.
 
-       Callbacks from a profile may run after [stop] is called, until
-       [discard] is applied to the profile.
+       Promotion and deallocation callbacks from a profile may run
+       after [stop] is called, until [discard] is applied to the
+       profile.
 
        A profile is implicitly stopped (but not discarded) if all
        domains and threads sampling for it are terminated.
@@ -773,3 +783,54 @@ module (Tweak @@ nonportable) : sig
       have non-default values *)
   val list_active : unit -> (string * int) list
 end
+
+
+type suspended_collection_work
+
+external ramp_up : (unit -> 'a) -> 'a * suspended_collection_work
+  = "caml_ml_gc_ramp_up"
+(** In general, the OCaml GC assumes that the program runs in
+    a "steady state" where peak memory usage remains constant: for
+    each newly allocated work, it assumes that one work has become
+    unreachable and will try to collect it during the next GC slice.
+
+    This assumption is incorrect at the points during program
+    execution where the live memory increases instead of remaining
+    stable: the steady-state assumption will make the GC work harder
+    at no benefit as it will not find more memory to collect.
+
+    [ramp_up f] puts the current domain in a "ramp-up" phase for the
+    duration of the evaluation of [f ()], letting the GC know that the
+    steady-state assumption does not hold; it should be used when you
+    know that the live memory of the program will increase
+    significantly.
+
+    During a ramp-up phase, the GC will not try to work harder for new
+    allocations: the corresponding collection work is "suspended". The
+    total amount of suspended collection work is returned by [ramp_up]
+    along with the result of the function.
+
+    If the user discards this suspended work (by doing nothing
+    with it), the GC will never accelerate to recover the
+    corresponding amount of memory. This is appropriate if the ramp-up
+    work allocates long-lived memory that remains live until the end
+    of the program execution.
+
+    If the user knows that at a certain point in the program the live
+    memory consumption has been reduced by the corresponding amount --
+    typically, because the memory allocated during [ramp_up] has become
+    unused -- then they should call {!ramp_down} below to have the GC
+    "resume" this collection work.
+
+    If [f ()] raises an exception, the ramp-up phase terminates, the
+    collection work that was suspended is resumed, and the exception
+    is re-raised.
+
+    If [f ()] performs an effect, the effect is not handled and an
+    [Effect.Unhandled] exception is thrown instead.
+*)
+
+external ramp_down : suspended_collection_work -> unit
+  = "caml_ml_gc_ramp_down"
+(** Notify the GC about some amount of collection work that was
+    suspended during a ramp-up phase, to be resumed now. *)

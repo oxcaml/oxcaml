@@ -51,7 +51,7 @@ Line 3, characters 14-24:
 3 | module M2 = F(struct end);; (* accepted with a warning *)
                   ^^^^^^^^^^
 Warning 73 [generative-application-expects-unit]: A generative functor
-should be applied to '()'; using '(struct end)' is deprecated.
+  should be applied to "()"; using "(struct end)" is deprecated.
 
 module M2 : S
 |}];;
@@ -73,9 +73,9 @@ Line 2, characters 28-30:
                                 ^^
 Error: Signature mismatch:
        Modules do not match:
-         functor (X : sig end) -> ...
+         (X : sig end) -> ...
        is not included in
-         functor () -> ...
+         () -> ...
        The functor was expected to be generative at this position
 |}];;
 module F3 () = struct end;;
@@ -87,9 +87,9 @@ Line 2, characters 47-49:
                                                    ^^
 Error: Signature mismatch:
        Modules do not match:
-         functor () -> ...
+         () -> ...
        is not included in
-         functor (X : sig end) -> ...
+         (X : sig end) -> ...
        The functor was expected to be applicative at this position
 |}];;
 

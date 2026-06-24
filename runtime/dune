@@ -53,6 +53,7 @@
      runtime_events.c sync.c
    dynlink.c backtrace_byt.c backtrace.c afl.c bigarray.c prng.c float32.c
    simd.c
+   cpu.c
    blake2.c
    misc.c
    build_config.h sync_posix.h caml/jumptbl.h caml/domain_state.tbl)
@@ -124,3 +125,20 @@
   )
   (section lib)
   (package ocaml_runtime_stdlib))
+
+(alias
+ (name runtime-only)
+ (deps
+    ocamlrun
+    ocamlrund
+    ocamlruni
+    libcamlrun.a
+    libcamlrund.a
+    libcamlruni.a
+    libcamlrun_pic.a
+    libcamlrun_shared.so
+    libasmrun.a
+    libasmrund.a
+    libasmruni.a
+    libasmrun_pic.a
+    libasmrun_shared.so))

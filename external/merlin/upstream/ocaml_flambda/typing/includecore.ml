@@ -18,6 +18,7 @@
 open Asttypes
 open Path
 open Types
+open Data_types
 open Mode
 open Typedtree
 
@@ -64,7 +65,10 @@ type mmodes =
 let child_close_over_coercion_opt id c =
   match c with
   | None -> None
-  | Some (locks, lid, loc) -> Some (locks, Longident.Ldot (lid, id), loc)
+  | Some (locks, lid, loc) ->
+      Some (locks,
+            Longident.Ldot (Location.mkloc lid loc, Location.mknoloc id),
+            loc)
 
 let child_modes id = function
   | All -> All
@@ -89,8 +93,8 @@ let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
       (* For children, we only check modality inclusion *)
       Ok All
     | Some moda1 ->
-      let m0 = Mode.Modality.apply moda0 m0 in
-      let m1 = Mode.Modality.Const.apply moda1 m1 in
+      let m0 = Mode.Modality.apply_left moda0 m0 in
+      let m1 = Mode.Modality.Const.apply_right moda1 m1 in
       Ok (Specific ((m0, c), m1))
     end
 
@@ -149,6 +153,27 @@ let primitive_descriptions pd1 pd2 =
     Some Result_repr
   else
     native_repr_args pd1.prim_native_repr_args pd2.prim_native_repr_args
+
+(* A value description [vd1] is consistent with the value description [vd2] if
+   there is a context E such that [E |- vd1 <: vd2] for the ordinary subtyping.
+   For values, this is the case as soon as the kind of [vd1] is a subkind of the
+   [vd2] kind. *)
+let value_descriptions_consistency _env vd1 vd2 =
+  match (vd1.val_kind, vd2.val_kind) with
+  | (Val_prim p1, Val_prim p2) -> begin
+      match primitive_descriptions p1 p2 with
+      | None -> Tcoerce_none
+      | Some err -> raise (Dont_match (Primitive_mismatch err))
+    end
+  | (Val_prim _, _) ->
+      (* Here we can not compute a valid coercion, because it may depend on the
+         local environment of the module, which is not made available in the
+         consistency check. But the coercion computed by the [*_consistency]
+         functions is never used, so it's fine. We return [Tcoerce_invalid] so
+         that if someone ever started using this, they'd get a loud error. *)
+      Tcoerce_invalid
+  | (_, Val_prim _) -> raise (Dont_match Not_a_primitive)
+  | (_, _) -> Tcoerce_none
 
 let moregeneral_lpoly env pat_lpoly subj_lpoly ty1 ty2 =
   let pat_refs =
@@ -245,13 +270,15 @@ let value_descriptions ~loc env name
          | Some err -> raise (Dont_match (Primitive_mismatch err))
        end
      | _ ->
-        let ty1, mode_l1, _, sort1 = Ctype.instance_prim env p1 vd1.val_type in
+        let ty1, mode_l1, _, sort1 =
+          Ctype.instance_prim env p1 vd1.val_type
+        in
         (try moregeneral_lpoly env val_lpoly1 val_lpoly2 ty1 vd2.val_type
          with Ctype.Moregen err -> raise (Dont_match (Type err)));
         let pc =
           {pc_desc = p1; pc_type = vd2.Types.val_type;
            pc_poly_mode = Option.map Mode.Locality.disallow_right mode_l1;
-           pc_poly_sort=sort1;
+           pc_poly_sort = sort1;
            pc_env = env; pc_loc = vd1.Types.val_loc; } in
         Tcoerce_primitive pc
      end
@@ -334,6 +361,7 @@ type record_mismatch =
   | Ufloat_representation of position
   | Mixed_representation of position
   | Mixed_representation_with_flat_floats of position
+  | Representation_shape_mismatch
 
 type constructor_mismatch =
   | Type of Errortrace.equality_error
@@ -342,6 +370,7 @@ type constructor_mismatch =
   | Kind of position
   | Explicit_return_type of position
   | Modality of int * Modality.equate_error
+  | Fixed_representation of position
 
 type extension_constructor_mismatch =
   | Constructor_privacy
@@ -362,7 +391,9 @@ type private_object_mismatch =
   | Types of Errortrace.equality_error
 
 type variant_change =
-  (Types.constructor_declaration as 'l, 'l, constructor_mismatch)
+  (Types.constructor_declaration * Types.constructor_representation option
+     as 'cd,
+   'cd, constructor_mismatch)
     Diffing_with_keys.change
 
 type unsafe_mode_crossing_mismatch =
@@ -384,6 +415,7 @@ type type_mismatch =
   | Unboxed_representation of position * attributes
   | Extensible_representation of position
   | With_null_representation of position
+  | Fixed_representation of position
   | Jkind of Jkind.Violation.t
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
@@ -391,11 +423,13 @@ type jkind_mismatch =
   | Manifest_missing
   | Manifest_mismatch
 
+module Printtyp = Printtyp.Doc
+
 let report_modality_sub_error first second ppf e =
   let Modality.Error (ax, {left; right}) = e in
   let print_modality id ppf m =
     Printtyp.modality
-      ~id:(fun ppf -> Format_doc.pp_print_string ppf id) ax ppf m
+      ~id:(fun ppf () -> Format_doc.pp_print_string ppf id) ax ppf m
   in
   Format_doc.fprintf ppf "%s is %a and %s is %a."
     (String.capitalize_ascii second)
@@ -403,10 +437,8 @@ let report_modality_sub_error first second ppf e =
     first
     (print_modality "not") left
 
-let report_mode_sub_error got expected ppf e =
-  let {left; right} : _ Mode.simple_error =
-    Mode.Value.print_error (Location.none, Unknown) e
-  in
+let report_mode_sub_error ~pp got expected ppf e =
+  let ({ left; right } : _ Mode.simple_error) = Mode.Value.print_error pp e in
   let open Format_doc in
   let open_box = dprintf "@[<hov 2>" in
   let reopen_box = dprintf "@]@ %t" open_box in
@@ -456,7 +488,7 @@ let report_primitive_mismatch first second ppf err =
   | Layout_poly_attr ->
       pr "The two primitives have different [@@layout_poly] attributes"
 
-let report_value_mismatch first second env ppf err =
+let report_value_mismatch ~pp first second env ppf err =
   let pr fmt = Fmt.fprintf ppf fmt in
   pr "@ ";
   match (err : value_mismatch) with
@@ -466,7 +498,7 @@ let report_value_mismatch first second env ppf err =
       pr "The implementation is not a primitive."
   | Type trace ->
       let msg = Fmt.Doc.msg in
-      Printtyp.report_moregen_error ppf Type_scheme env trace
+      Errortrace_report.moregen ppf Type_scheme env trace
         (msg "The type")
         (msg "is not compatible with the type")
   | Zero_alloc e -> Zero_alloc.print_error ppf e
@@ -474,7 +506,7 @@ let report_value_mismatch first second env ppf err =
   | Mode e ->
       let got = first ^ " is" in
       let expected = second ^ " is" in
-      report_mode_sub_error got expected ppf e
+      report_mode_sub_error ~pp got expected ppf e
   | Layout_poly_coercion (Extra_lhs { extra }) ->
       pr "%s has %d more layout parameter%s that %s not used,@ \
           which is not supported yet."
@@ -505,7 +537,7 @@ let report_value_mismatch first second env ppf err =
 
 let report_type_inequality env ppf err =
   let msg = Fmt.Doc.msg in
-  Printtyp.report_equality_error ppf Type_scheme env err
+  Errortrace_report.equality ppf Type_scheme env err
     (msg "The type")
     (msg "is not equal to the type")
 
@@ -610,6 +642,9 @@ let report_record_mismatch first second decl env ppf err =
       pr "@[<hv>Their internal representations differ:@ %s %s %s.@]"
         (choose ord first second) decl
         "uses a mixed representation where boxed floats are stored flat"
+  | Representation_shape_mismatch ->
+    pr "@[<hv>Their internal representations differ:@;\
+        This is likely caused by a layout mismatch in a later definition.@]"
 
 let report_constructor_mismatch first second decl env ppf err =
   let pr fmt  = Fmt.fprintf ppf fmt in
@@ -630,16 +665,25 @@ let report_constructor_mismatch first second decl env ppf err =
       pr "Modality mismatch at argument position %i:@ %a"
         (i + 1) (report_modality_equate_error first second) err
         (* argument position is one-based; more intuitive *)
+  | Fixed_representation ord ->
+      (* CR rtjoa for lmaurer: Tweaked this wording *)
+      pr "%s has a fixed representation and %s doesn't."
+        (String.capitalize_ascii (choose ord first second))
+        (choose_other ord first second);
+      pr "@ @[<2>Hint: Is there a type that has a representable layout in %s@ \
+          but has layout any in %s?@]"
+        (choose ord first second)
+        (choose_other ord first second)
 
 let pp_variant_diff first second prefix decl env ppf (x : variant_change) =
   match x with
-  | Delete cd ->
+  | Delete { delete = { cd_id }, _ } ->
       Fmt.fprintf ppf  "%aAn extra constructor, %a, is provided in %s %s."
-        prefix x Style.inline_code (Ident.name cd.delete.cd_id) first decl
-  | Insert cd ->
+        prefix x Style.inline_code (Ident.name cd_id) first decl
+  | Insert { insert = { cd_id }, _ } ->
       Fmt.fprintf ppf "%aA constructor, %a, is missing in %s %s."
-        prefix x Style.inline_code (Ident.name cd.insert.cd_id) first decl
-  | Change Type {got; expected; reason} ->
+        prefix x Style.inline_code (Ident.name cd_id) first decl
+  | Change Type {got = got, _; expected = expected, _; reason} ->
     Printtyp.wrap_printing_env ~error:true env (fun () ->
       Fmt.fprintf ppf
         "@[<hv>%aConstructors do not match:@;<1 2>\
@@ -745,7 +789,6 @@ let report_unsafe_mode_crossing_mismatch first second ppf e =
 
 let report_type_mismatch first second decl env ppf err =
   let pr fmt = Fmt.fprintf ppf fmt in
-  pr "@ ";
   match err with
   | Arity ->
       pr "They have different arities."
@@ -792,6 +835,10 @@ let report_type_mismatch first second decl env ppf err =
          (choose ord first second) decl
          "has a constructor represented as a null pointer";
       pr "@ Hint: add [%@%@or_null] or [%@%@or_null_reexport]."
+  | Fixed_representation ord ->
+      pr "Their internal representations differ:@ %s %s %s."
+         (choose ord first second) decl
+         "has a fixed representation while the other varies"
   | Jkind v ->
       Jkind.Violation.report_with_name ~name:first
         env ppf v
@@ -928,14 +975,37 @@ module Record_diffing = struct
       | None -> Ok ()
 
   let weight: Diff.change -> _ = function
-    | Insert _ -> 10
-    | Delete _ -> 10
+    | Insert _ | Delete _ ->
+     (* Insertion and deletion are symmetrical for definitions *)
+        100
     | Keep _ -> 0
-    | Change (_,_,Diffing_with_keys.Name t ) ->
-        if t.types_match then 10 else 15
-    | Change _ -> 10
+     (* [Keep] must have the smallest weight. *)
+    | Change (_,_,c) ->
+        (* Constraints:
+           - [ Change < Insert + Delete ], otherwise [Change] are never optimal
 
+           - [ Swap < Move ] => [ 2 Change < Insert + Delete ] =>
+             [ Change < Delete ], in order to favour consecutive [Swap]s
+             over [Move]s.
 
+           - For some D and a large enough R,
+                 [Delete^D Keep^R Insert^D < Change^(D+R)]
+              => [ Change > (2 D)/(D+R) Delete ].
+             Note that the case [D=1,R=1] is incompatible with the inequation
+             above. If we choose [R = D + 1] for [D<5], we can specialize the
+             inequation to [ Change > 10 / 11 Delete ]. *)
+      match c with
+        (* With [Type<Name with type<Name], we pick constructor with the right
+           name over the one with the right type. *)
+        | Diffing_with_keys.Name t ->
+            if t.types_match then 98 else 99
+        | Diffing_with_keys.Type _ -> 50
+         (* With the uniqueness constraint on keys, the only relevant constraint
+            is [Type-only change < Name change]. Indeed, names can only match at
+            one position. In other words, if a [ Type ] patch is admissible, the
+            only admissible patches at this position are of the form [Delete^D
+            Name_change]. And with the constranit [Type_change < Name_change],
+            we have [Type_change Delete^D < Delete^D Name_change]. *)
 
   let key (x: Defs.left) = Ident.name x.ld_id
   let diffing loc env params1 params2 cstrs_1 cstrs_2 =
@@ -958,7 +1028,10 @@ module Record_diffing = struct
   let find_mismatch_in_mixed_record_representations
       (s1 : mixed_product_shape) (s2 : mixed_product_shape)
     =
-    if s1 = s2 then None
+    (* It's possible for [s1] to be higher than [s2] here: see
+       Note [Ignoring scannable axes in type declaration representations] *)
+    if Types.equal_mixed_product_shape_up_to_scannable_axes s1 s2
+    then None
     else
       let has_float_boxed_on_read fields =
         Array.exists (function
@@ -971,10 +1044,11 @@ module Record_diffing = struct
       else if has_float_boxed_on_read s2
       then Some (Mixed_representation_with_flat_floats Second)
       else
-        Misc.fatal_error
-          "Impossible: the only way for mixed blocks to differ in \
-           representation is if one is a flat float record with a boxed float \
-           field, and the other isn't."
+        (* Before, this case was thought to be impossible. We report the first
+           error when doing the inclusion check: the real culprit may be a
+           layout mismatch that is actually defined later defined mutually
+           recursively with this record. *)
+        Some Representation_shape_mismatch
 
   let compare_with_representation (type rep) ~loc
         (record_form : rep record_form) env params1 params2 l r
@@ -986,6 +1060,10 @@ module Record_diffing = struct
       match record_form with
       | Legacy ->
         begin match rep1, rep2 with
+        | Record_variable, Record_variable -> None
+        | Record_variable, _ -> Some (Fixed_representation Second)
+        | _, Record_variable -> Some (Fixed_representation First)
+
         | Record_unboxed, Record_unboxed -> None
         | Record_unboxed, _ -> Some (Unboxed_representation (First, []))
         | _, Record_unboxed -> Some (Unboxed_representation (Second, []))
@@ -1009,7 +1087,9 @@ module Record_diffing = struct
            Some (Record_mismatch (Ufloat_representation Second))
 
         | Record_mixed m1, Record_mixed m2 ->
-            begin match find_mismatch_in_mixed_record_representations m1 m2 with
+            begin match
+              find_mismatch_in_mixed_record_representations m1 m2
+            with
             | None -> None
             | Some mismatch -> Some (Record_mismatch mismatch)
             end
@@ -1018,11 +1098,21 @@ module Record_diffing = struct
         | _, Record_mixed _ ->
            Some (Record_mismatch (Mixed_representation Second))
 
-        | Record_boxed _, Record_boxed _ -> None
+        | Record_boxed, Record_boxed -> None
+
+        | Record_dummy _, _ | _, Record_dummy _ ->
+          Misc.fatal_error
+            "compare_with_representation: dummy record representation"
         end
       | Unboxed_product ->
         begin match rep1, rep2 with
-        | Record_unboxed_product, Record_unboxed_product -> None
+        | Record_unboxed_product_variable, Record_unboxed_product_variable
+        | Record_unboxed_product, Record_unboxed_product ->
+            None
+        | Record_unboxed_product, Record_unboxed_product_variable ->
+            Some (Fixed_representation First)
+        | Record_unboxed_product_variable, Record_unboxed_product ->
+            Some (Fixed_representation Second)
         end
 end
 
@@ -1070,7 +1160,32 @@ module Variant_diffing = struct
     | Types.Cstr_record _, _ -> Some (Kind First : constructor_mismatch)
     | _, Types.Cstr_record _ -> Some (Kind Second : constructor_mismatch)
 
-  let compare_constructors ~loc env params1 params2 res1 res2 args1 args2 =
+  let compare_constructor_shapes
+        ~loc:_ _env
+        (shape1 : constructor_representation option)
+        (shape2 : constructor_representation option)
+      : constructor_mismatch option =
+    match shape1, shape2 with
+    | None, None -> None
+    | Some _, None -> Some (Fixed_representation First)
+    | None, Some _ -> Some (Fixed_representation Second)
+    | Some _, Some _ ->
+        (* Currently the only way for the representations to be different but
+           the types the same is for the layout information to be different
+           between the two sides, which is only possible if the layout is
+           [any] on one side or the other. So if neither representation is
+           [None] then we must be okay. *)
+        None
+
+  let compare_constructors ~loc env params1 params2 res1 res2 args1 args2
+        shape1 shape2 =
+    let compare_args_and_shapes params1 params2 =
+      match
+        compare_constructor_arguments ~loc env params1 params2 args1 args2
+      with
+      | None -> compare_constructor_shapes ~loc env shape1 shape2
+      | Some err -> Some err
+    in
     match res1, res2 with
     | Some r1, Some r2 ->
         (* Allow renaming here: variables in GADT-syntax constructors are
@@ -1080,19 +1195,16 @@ module Variant_diffing = struct
               (* Pass the result types in this call to
                  [compare_constructor_arguments], so that the call to [Ctype.equal]
                  can see the entire scope of the variables *)
-        | () -> compare_constructor_arguments ~loc env [r1] [r2] args1 args2
-        end
+        | () -> compare_args_and_shapes [r1] [r2]
+      end
     | Some _, None -> Some (Explicit_return_type First)
     | None, Some _ -> Some (Explicit_return_type Second)
-    | None, None ->
-        compare_constructor_arguments ~loc env params1 params2 args1 args2
+    | None, None -> compare_args_and_shapes params1 params2
 
-  let equal ~loc env params1 params2
-      (cstrs1 : Types.constructor_declaration list)
-      (cstrs2 : Types.constructor_declaration list) =
+  let equal ~loc env params1 params2 cstrs1 cstrs2 =
     List.length cstrs1 = List.length cstrs2 &&
-    List.for_all2 (fun (cd1:Types.constructor_declaration)
-                    (cd2:Types.constructor_declaration) ->
+    List.for_all2 (fun ((cd1:Types.constructor_declaration), shape1)
+                    ((cd2:Types.constructor_declaration), shape2) ->
         Ident.name cd1.cd_id = Ident.name cd2.cd_id
         &&
         begin
@@ -1104,13 +1216,14 @@ module Variant_diffing = struct
             (Ident.name cd1.cd_id)
           ;
         match compare_constructors ~loc env params1 params2
-                cd1.cd_res cd2.cd_res cd1.cd_args cd2.cd_args with
+                cd1.cd_res cd2.cd_res cd1.cd_args cd2.cd_args shape1 shape2 with
         | Some _ -> false
         | None -> true
       end) cstrs1 cstrs2
 
   module Defs = struct
-    type left = Types.constructor_declaration
+    type left =
+      Types.constructor_declaration * constructor_representation option
     type right = left
     type diff = constructor_mismatch
     type state = type_expr list * type_expr list
@@ -1120,22 +1233,21 @@ module Variant_diffing = struct
   let update _ st = st
 
   let weight: D.change -> _ = function
-    | Insert _ -> 10
-    | Delete _ -> 10
+    | Insert _ | Delete _ -> 100
     | Keep _ -> 0
-    | Change (_,_,Diffing_with_keys.Name t) ->
-        if t.types_match then 10 else 15
-    | Change _ -> 10
-
+    | Change (_,_,Diffing_with_keys.Name c) ->
+        if c.types_match then 98 else 99
+    | Change (_,_,Diffing_with_keys.Type _) -> 50
+    (** See {!Variant_diffing.weight} for an explanation *)
 
   let test loc env (params1,params2)
-      ({pos; data=cd1}: D.left)
-      ({data=cd2; _}: D.right) =
+      ({pos; data=cd1, shape1}: D.left)
+      ({data=cd2, shape2; _}: D.right) =
     let name1, name2 = Ident.name cd1.cd_id, Ident.name cd2.cd_id in
     if  name1 <> name2 then
       let types_match =
         match compare_constructors ~loc env params1 params2
-                cd1.cd_res cd2.cd_res cd1.cd_args cd2.cd_args with
+                cd1.cd_res cd2.cd_res cd1.cd_args cd2.cd_args shape1 shape2 with
         | Some _ -> false
         | None -> true
       in
@@ -1143,13 +1255,14 @@ module Variant_diffing = struct
         (Diffing_with_keys.Name {types_match; pos; got=name1; expected=name2})
     else
       match compare_constructors ~loc env params1 params2
-              cd1.cd_res cd2.cd_res cd1.cd_args cd2.cd_args with
+              cd1.cd_res cd2.cd_res cd1.cd_args cd2.cd_args shape1 shape2 with
       | Some reason ->
-          Error (Diffing_with_keys.Type {pos; got=cd1; expected=cd2; reason})
+          Error (Diffing_with_keys.Type
+                   {pos; got=cd1, shape1; expected=cd2, shape2; reason})
       | None -> Ok ()
 
   let diffing loc env params1 params2 cstrs_1 cstrs_2 =
-    let key (x:Defs.left) = Ident.name x.cd_id in
+    let key ((x, _):Defs.left) = Ident.name x.cd_id in
     let module Compute = D.Simple(struct
         let key_left = key
         let key_right = key
@@ -1169,7 +1282,27 @@ module Variant_diffing = struct
   let compare_with_representation ~loc env params1 params2
       cstrs1 cstrs2 rep1 rep2
     =
-    let err = compare ~loc env params1 params2 cstrs1 cstrs2 in
+    let shape_of_layout = function
+      | Cstr_layout_known { shape; _ } -> Some shape
+      | Cstr_layout_variable -> None
+    in
+    let shapes1, shapes2 =
+      match rep1, rep2 with
+      | Variant_boxed cstr_layouts1, Variant_boxed cstr_layouts2 ->
+          Array.map shape_of_layout cstr_layouts1 |> Array.to_list,
+          Array.map shape_of_layout cstr_layouts2 |> Array.to_list
+      | _, _ ->
+          (* Only need to compare shapes in the boxed-versus-boxed case. In
+             other cases, either the comparison is doomed anyway due to
+             different representations or the shapes aren't relevant. *)
+          List.map (fun _ -> None) cstrs1,
+          List.map (fun _ -> None) cstrs2
+    in
+    let cstrs_and_shapes1 = List.combine cstrs1 shapes1 in
+    let cstrs_and_shapes2 = List.combine cstrs2 shapes2 in
+    let err =
+      compare ~loc env params1 params2 cstrs_and_shapes1 cstrs_and_shapes2
+    in
     let attrs_of_only cstrs =
       match cstrs with
       | [cstr] -> cstr.Types.cd_attributes
@@ -1449,6 +1582,17 @@ let type_manifest env ty1 ty2 priv2 kind2 =
    their jkinds changed during unification.
    *)
 
+(* A type declarations [td1] is consistent with the type declaration [td2] if
+   there is a context E such E |- td1 <: td2 for the ordinary subtyping. For
+   types, this is the case as soon as the two type declarations share the same
+   arity and the privacy of [td1] is less than the privacy of [td2] (consider a
+   context E where all type constructors are equal). *)
+let type_declarations_consistency env decl1 decl2 =
+  if decl1.type_arity <> decl2.type_arity then Some Arity
+  else match privacy_mismatch env decl1 decl2 with
+    | Some err -> Some (Privacy err)
+    | None -> None
+
 (* See Note [Contravariance of type parameter jkinds]. *)
 let type_declarations ?(equality = false) ~loc env ~mark name
       decl1 path decl2 =
@@ -1458,7 +1602,8 @@ let type_declarations ?(equality = false) ~loc env ~mark name
     loc
     decl1.type_attributes decl2.type_attributes
     name;
-  if decl1.type_arity <> decl2.type_arity then Some Arity else
+  let err = type_declarations_consistency env decl1 decl2 in
+  if err <> None then err else
   (* Step 1 from the Note *)
   let err =
     match Ctype.equal ~do_jkind_check:false env true
@@ -1488,18 +1633,11 @@ let type_declarations ?(equality = false) ~loc env ~mark name
                     "Unification in type_declarations failed, \
                      but not with Bad_jkind:@;<1 2>%t"
                     (fun ppf ->
-                       Printtyp.report_unification_error ppf env err
+                       Errortrace_report.unification ppf env err
                          (Fmt.doc_printf "The type")
                          (Fmt.doc_printf "does not unify with the type"))
         end
       | () -> None
-  in
-  if err <> None then err else
-  (* Step 5 from the Note *)
-  let err =
-    match privacy_mismatch env decl1 decl2 with
-    | Some err -> Some (Privacy err)
-    | None -> None
   in
   if err <> None then err else
   let err = match (decl1.type_manifest, decl2.type_manifest) with
@@ -1606,10 +1744,21 @@ let type_declarations ?(equality = false) ~loc env ~mark name
                                      []))))
   | All_good ->
   let abstr = Btype.type_kind_is_abstract decl2 && decl2.type_manifest = None in
+  (* We need to check coherence of internal and exported variance  either
+     * when the export type is abstract, as there is no manifest to get
+       the minimal variance from
+     * when the export type is private, as the private manifest may be
+       result of expansions within Ctype.equal_private, forgetting
+       an explicit variance annotation in the internal type
+     * when the internal type is private, but this is already included
+       in the above two cases (a private type can only be exported as
+       abstract or private)
+     * when the internal type is open, as we do not allow changing the
+       variance in that case  *)
+  let abstr' = abstr || decl2.type_private = Private in
   let need_variance =
-    abstr || decl1.type_private = Private || decl1.type_kind = Type_open in
+    abstr' || decl1.type_private = Private || decl1.type_kind = Type_open in
   if not need_variance then None else
-  let abstr = abstr || decl2.type_private = Private in
   let opn = decl2.type_kind = Type_open && decl2.type_manifest = None in
   let constrained ty = not (Btype.is_Tvar ty) in
   if List.for_all2
@@ -1617,10 +1766,13 @@ let type_declarations ?(equality = false) ~loc env ~mark name
         let open Variance in
         let imp a b = not a || b in
         let (co1,cn1) = get_upper v1 and (co2,cn2) = get_upper v2 in
-        (if abstr then (imp co1 co2 && imp cn1 cn2)
+        (if abstr' then (imp co1 co2 && imp cn1 cn2)
          else if opn || constrained ty then (co1 = co2 && cn1 = cn2)
          else true) &&
         let (p1,n1,j1) = get_lower v1 and (p2,n2,j2) = get_lower v2 in
+        (* Only check the lower bound for abstract types.
+           For private types, the lower bound can be inferred, and
+           the internal one may be wrong in the result of functors. *)
         imp abstr (imp p2 p1 && imp n2 n1 && imp j2 j1))
       decl2.type_params (List.combine decl1.type_variance decl2.type_variance)
   then None else Some Variance
@@ -1652,6 +1804,7 @@ let extension_constructors ~loc env ~mark id ext1 ext2 =
         ext1.ext_type_params ext2.ext_type_params
         ext1.ext_ret_type ext2.ext_ret_type
         ext1.ext_args ext2.ext_args
+        (Some ext1.ext_shape) (Some ext2.ext_shape)
     in
     match r with
     | Some r -> Some (Constructor_mismatch (id, ext1, ext2, r))

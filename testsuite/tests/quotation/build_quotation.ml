@@ -7,6 +7,31 @@
 
 (* Preamble types for use in tests *)
 
+module M = struct
+  let ( + ) = ( +. )
+  let foo = 42
+  type 'a record = { record_field : 'a }
+  type 'a variant = Variant_tag of 'a
+  type 'a my_option = None | Some of 'a
+end
+[%%expect {|
+module M :
+  sig
+    val ( + ) : float -> float -> float
+    val foo : int
+    type 'a record = { record_field : 'a; }
+    type 'a variant = Variant_tag of 'a
+    type 'a my_option = None | Some of 'a
+  end
+|}];;
+
+module type T = sig
+  val foo : int
+end
+[%%expect {|
+module type T = sig val foo : int end
+|}];;
+
 module E = struct
   type existential = Exists : 'a -> existential
 end
@@ -391,8 +416,7 @@ Line 1, characters 3-31:
 1 | <[ let Some x = Some "foo" in x ]>;;
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-None
+  Here is an example of a case that is not matched: "None"
 
 - : <[string]> expr = <[match Some "foo" with | Some (x) -> x]>
 |}];;
@@ -403,8 +427,7 @@ Line 1, characters 3-29:
 1 | <[ let x::xs = [1; 2; 3] in x ]>;;
        ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-[]
+  Here is an example of a case that is not matched: "[]"
 
 - : <[int]> expr = <[match [1; 2; 3] with | x::xs -> x]>
 |}];;
@@ -415,8 +438,7 @@ Line 1, characters 3-30:
 1 | <[ let x::xs = [1; 2; 3] in xs ]>;;
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-[]
+  Here is an example of a case that is not matched: "[]"
 
 - : <[int list]> expr = <[match [1; 2; 3] with | x::xs -> xs]>
 |}];;
@@ -868,10 +890,10 @@ Error: Using class type annotations
 
 <[ Mod.mk 42 ]>;;
 [%%expect {|
-Line 1, characters 3-9:
+Line 1, characters 3-6:
 1 | <[ Mod.mk 42 ]>;;
-       ^^^^^^
-Error: Identifier "Mod" is used at line 1, characters 3-9,
+       ^^^
+Error: Identifier "Mod" is used at line 1, characters 3-6,
        inside a quotation (<[ ... ]>);
        it is introduced at file "_none_", line 1, outside any quotations.
 |}];;
@@ -941,25 +963,24 @@ Error: Object definition using "object..end"
 
 <[ let open List in map ]>;;
 [%%expect {|
-Line 1, characters 3-23:
-1 | <[ let open List in map ]>;;
-       ^^^^^^^^^^^^^^^^^^^^
-Error: Opening modules is not supported inside quoted expressions,
-       as seen at line 1, characters 3-23.
+- : <[($('a) -> $('b)) -> $('a) list -> $('b) list]> expr =
+<[let open! Stdlib.List in Stdlib.List.map]>
 |}];;
-
-module M = struct
-  let foo = 42
-end;;
 
 <[ let open M in M.foo ]>;;
 [%%expect {|
-module M : sig val foo : int end
-Line 5, characters 3-22:
-5 | <[ let open M in M.foo ]>;;
-       ^^^^^^^^^^^^^^^^^^^
-Error: Opening modules is not supported inside quoted expressions,
-       as seen at line 5, characters 3-22.
+- : <[int]> expr = <[let open! M in M.foo]>
+|}]
+;;
+
+<[ let open struct let foo = 42 end in foo ]>;;
+[%%expect {|
+Line 1, characters 3-42:
+1 | <[ let open struct let foo = 42 end in foo ]>;;
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Opening a non-identifier module expression
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 3-42.
 |}]
 ;;
 
@@ -1096,7 +1117,7 @@ let x = <[<[42]>]> in <[ fun () -> <[ $($x) ]> ]>;;
 <[ fun f x -> (f [@inlined]) x [@nontail] ]>
 [%%expect {|
 - : <[($('a) -> $('b)) -> $('a) -> $('b)]> expr =
-<[fun f x -> ((f [@inlined]) x [@nontail])]>
+<[fun f x -> ((((f) [@inlined]) x) [@nontail])]>
 |}];;
 
 <[ fun x -> [ x ; x + 1 ] ]>
@@ -1614,4 +1635,108 @@ exception E
 <[ raise Exc.E ]>;;
 [%%expect {|
 - : 'a expr = <[Stdlib.raise Exc.E]>
+|}];;
+
+(** Opening modules in expressions **)
+
+<[ let open List in map length [[1]; [2; 3]] ]>
+[%%expect {|
+- : <[int list]> expr =
+<[let open! Stdlib.List in Stdlib.List.map Stdlib.List.length ([[1]; [2; 3]])
+]>
+|}];;
+
+<[ List.(map length [[1]; [2; 3]]) ]>
+[%%expect {|
+- : <[int list]> expr =
+<[let open! Stdlib.List in Stdlib.List.map Stdlib.List.length ([[1]; [2; 3]])
+]>
+|}];;
+
+<[ M.(0.1 + 0.2) ]>
+[%%expect {|
+- : <[float]> expr = <[let open! M in M.( + ) 0.1 0.2]>
+|}];;
+
+<[ M.{ record_field = "open" }, { M.record_field = "path" } ]>
+[%%expect {|
+- : <[string M.record * string M.record]> expr =
+<[
+  ((let open! M in { M.record_field = "open"; }),
+   { M.record_field = "path"; })
+]>
+|}];;
+
+<[ M.(Variant_tag "open"), M.Variant_tag "path" ]>
+[%%expect {|
+- : <[string M.variant * string M.variant]> expr =
+<[((let open! M in M.Variant_tag "open"), (M.Variant_tag "path"))]>
+|}];;
+
+(* Opening packed module *)
+
+<[ fun (module M : T) -> let open M in foo + 1 ]>
+[%%expect {|
+- : <[(module T) -> int]> expr =
+<[fun (module M : T) -> let open! M in M.foo + 1]>
+|}];;
+
+(* Cross-stage open *)
+
+<[ let open List in $(hd [ <[ 0 ]>; <[ 1 ]> ]) ]>
+[%%expect {|
+- : <[int]> expr = <[let open! Stdlib.List in 0]>
+|}];;
+
+let open List in <[ length [1; 2; 3] ]>
+[%%expect {|
+- : <[int]> expr = <[Stdlib.List.length ([1; 2; 3])]>
+|}];;
+
+module M1 = struct let foo1 = 42 end;;
+let open M1 in <[ foo1 ]>
+[%%expect {|
+module M1 : sig val foo1 : int end
+Line 2, characters 18-22:
+2 | let open M1 in <[ foo1 ]>
+                      ^^^^
+Error: Identifier "foo1" is used at line 2, characters 18-22,
+       inside a quotation (<[ ... ]>);
+       it is introduced at line 1, characters 23-27, outside any quotations.
+|}];;
+
+<[ fun (module M : T) -> let open M in $(Quote.Expr.int foo) ]>
+[%%expect {|
+Line 1, characters 56-59:
+1 | <[ fun (module M : T) -> let open M in $(Quote.Expr.int foo) ]>
+                                                            ^^^
+Error: Identifier "foo" is used at line 1, characters 56-59,
+       outside any quotations; it is introduced at line 2, characters 2-15,
+       inside a quotation (<[ ... ]>).
+|}];;
+
+(* Attributes on let-open *)
+
+<[ let open [@inline] M in foo ]>
+[%%expect {|
+- : <[int]> expr = <[((let open! M in M.foo) [@inline])]>
+|}];;
+
+<[ ((let open M in foo) [@inline]) ]>
+[%%expect {|
+- : <[int]> expr = <[((let open! M in M.foo) [@inline])]>
+|}];;
+
+(** Opening modules in patterns **)
+
+<[ function M.(Variant_tag 0) -> 1 | M.Variant_tag _ -> 0 ]>
+[%%expect {|
+- : <[int M.variant -> int]> expr =
+<[function | M.Variant_tag (0) -> 1 | M.Variant_tag (_) -> 0]>
+|}];;
+
+<[ function M.(Some x) -> x | M.(None) -> 0 ]>
+[%%expect {|
+- : <[int M.my_option -> int]> expr =
+<[function | M.Some (x) -> x | M.None -> 0]>
 |}];;

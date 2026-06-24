@@ -37,20 +37,20 @@ type t : value separable
 Line 1, characters 15-24:
 1 | type t : value separable
                    ^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value".
 
 Line 1, characters 15-24:
 1 | type t : value separable
                    ^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value".
 
 Line 1, characters 15-24:
 1 | type t : value separable
                    ^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value".
 
 type t
 |}]
@@ -60,38 +60,38 @@ type t : value_or_null maybe_null maybe_separable
 Line 1, characters 23-33:
 1 | type t : value_or_null maybe_null maybe_separable
                            ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value_or_null".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value_or_null".
 
 Line 1, characters 34-49:
 1 | type t : value_or_null maybe_null maybe_separable
                                       ^^^^^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value_or_null maybe_null".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value_or_null maybe_null".
 
 Line 1, characters 23-33:
 1 | type t : value_or_null maybe_null maybe_separable
                            ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value_or_null".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value_or_null".
 
 Line 1, characters 34-49:
 1 | type t : value_or_null maybe_null maybe_separable
                                       ^^^^^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value_or_null maybe_null".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value_or_null maybe_null".
 
 Line 1, characters 23-33:
 1 | type t : value_or_null maybe_null maybe_separable
                            ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value_or_null".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value_or_null".
 
 Line 1, characters 34-49:
 1 | type t : value_or_null maybe_null maybe_separable
                                       ^^^^^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value_or_null maybe_null".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value_or_null maybe_null".
 
 type t : value_or_null
 |}]
@@ -101,20 +101,20 @@ type t : immediate non_pointer
 Line 1, characters 19-30:
 1 | type t : immediate non_pointer
                        ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "immediate".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "immediate".
 
 Line 1, characters 19-30:
 1 | type t : immediate non_pointer
                        ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "immediate".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "immediate".
 
 Line 1, characters 19-30:
 1 | type t : immediate non_pointer
                        ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "immediate".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "immediate".
 
 type t : immediate
 |}]
@@ -124,38 +124,38 @@ type t : value non_null maybe_null
 Line 1, characters 15-23:
 1 | type t : value non_null maybe_null
                    ^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value".
 
 Line 1, characters 24-34:
 1 | type t : value non_null maybe_null
                             ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_null".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_null".
 
 Line 1, characters 15-23:
 1 | type t : value non_null maybe_null
                    ^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value".
 
 Line 1, characters 24-34:
 1 | type t : value non_null maybe_null
                             ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_null".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_null".
 
 Line 1, characters 15-23:
 1 | type t : value non_null maybe_null
                    ^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value".
 
 Line 1, characters 24-34:
 1 | type t : value non_null maybe_null
                             ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_null".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_null".
 
 type t
 |}]
@@ -165,20 +165,20 @@ type t : value maybe_separable non_pointer
 Line 1, characters 15-30:
 1 | type t : value maybe_separable non_pointer
                    ^^^^^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value".
 
 Line 1, characters 15-30:
 1 | type t : value maybe_separable non_pointer
                    ^^^^^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value".
 
 Line 1, characters 15-30:
 1 | type t : value maybe_separable non_pointer
                    ^^^^^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value".
 
 type t : value non_pointer
 |}]
@@ -188,20 +188,20 @@ type t : value non_pointer separable
 Line 1, characters 27-36:
 1 | type t : value non_pointer separable
                                ^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer".
 
 Line 1, characters 27-36:
 1 | type t : value non_pointer separable
                                ^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer".
 
 Line 1, characters 27-36:
 1 | type t : value non_pointer separable
                                ^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer".
 
 type t : value non_pointer
 |}]
@@ -211,20 +211,20 @@ type t : value non_pointer non_pointer
 Line 1, characters 27-38:
 1 | type t : value non_pointer non_pointer
                                ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer".
 
 Line 1, characters 27-38:
 1 | type t : value non_pointer non_pointer
                                ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer".
 
 Line 1, characters 27-38:
 1 | type t : value non_pointer non_pointer
                                ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer".
 
 type t : value non_pointer
 |}]
@@ -234,38 +234,38 @@ type t : value non_pointer maybe_separable non_pointer
 Line 1, characters 27-42:
 1 | type t : value non_pointer maybe_separable non_pointer
                                ^^^^^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer".
 
 Line 1, characters 43-54:
 1 | type t : value non_pointer maybe_separable non_pointer
                                                ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer maybe_separable".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer maybe_separable".
 
 Line 1, characters 27-42:
 1 | type t : value non_pointer maybe_separable non_pointer
                                ^^^^^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer".
 
 Line 1, characters 43-54:
 1 | type t : value non_pointer maybe_separable non_pointer
                                                ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer maybe_separable".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer maybe_separable".
 
 Line 1, characters 27-42:
 1 | type t : value non_pointer maybe_separable non_pointer
                                ^^^^^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer".
 
 Line 1, characters 43-54:
 1 | type t : value non_pointer maybe_separable non_pointer
                                                ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer maybe_separable".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer maybe_separable".
 
 type t : value non_pointer
 |}]
@@ -275,56 +275,56 @@ type t : value non_pointer maybe_null non_pointer maybe_null
 Line 1, characters 27-37:
 1 | type t : value non_pointer maybe_null non_pointer maybe_null
                                ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer".
 
 Line 1, characters 38-49:
 1 | type t : value non_pointer maybe_null non_pointer maybe_null
                                           ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer maybe_null".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer maybe_null".
 
 Line 1, characters 50-60:
 1 | type t : value non_pointer maybe_null non_pointer maybe_null
                                                       ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer maybe_null non_pointer".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer maybe_null non_pointer".
 
 Line 1, characters 27-37:
 1 | type t : value non_pointer maybe_null non_pointer maybe_null
                                ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer".
 
 Line 1, characters 38-49:
 1 | type t : value non_pointer maybe_null non_pointer maybe_null
                                           ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer maybe_null".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer maybe_null".
 
 Line 1, characters 50-60:
 1 | type t : value non_pointer maybe_null non_pointer maybe_null
                                                       ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer maybe_null non_pointer".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer maybe_null non_pointer".
 
 Line 1, characters 27-37:
 1 | type t : value non_pointer maybe_null non_pointer maybe_null
                                ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer".
 
 Line 1, characters 38-49:
 1 | type t : value non_pointer maybe_null non_pointer maybe_null
                                           ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer maybe_null".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer maybe_null".
 
 Line 1, characters 50-60:
 1 | type t : value non_pointer maybe_null non_pointer maybe_null
                                                       ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer maybe_null non_pointer".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer maybe_null non_pointer".
 
 type t : value non_pointer
 |}]
@@ -399,8 +399,8 @@ Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no 
 Line 1, characters 46-57:
 1 | type t : void non_pointer & value non_pointer non_pointer mod global with int
                                                   ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one, is
-already implied by the kind "value non_pointer".
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer".
 
 type t : void mod global & value non_pointer mod global
 |}]

@@ -39,6 +39,12 @@ else
 ENV_VARS :=
 endif
 
+ifeq ($(main_build_profile),dev)
+main_ocamlopt_optimization_flags :=
+else
+main_ocamlopt_optimization_flags := -O3
+endif
+
 define dune_runtime_stdlib_context
 (lang dune 2.8)
 (context (default
@@ -63,7 +69,7 @@ define dune_main_context
   (env (_
     (flags (:standard -directory compiler-distro -warn-error +A -alert -unsafe_multidomain))
     ; We never want to build the compiler itself with AddressSanitizer enabled.
-    (ocamlopt_flags (:standard -fno-asan))
+    (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
     $(ENV_VARS)))))
 endef
 
@@ -208,7 +214,7 @@ _build/_bootinstall: Makefile.config $(dune_config_targets)
 	echo '($(OXCAML_DWARF_FLAGS_FOR_COMPILER) -bin-annot-cms $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_oxcaml_flags.sexp
 	echo '( )' > boot_oc_cflags.sexp
 	echo '( $(OC_CFLAGS) )' > oc_cflags.sexp
-	echo '( $(OC_CPPFLAGS) )' > oc_cppflags.sexp
+	echo '( $(subst -I $(ROOTDIR)/,-I $(CURDIR)/,$(OC_CPPFLAGS)) )' > oc_cppflags.sexp
 	echo '( $(SHAREDLIB_CFLAGS) )' > sharedlib_cflags.sexp
 
 # _build/_bootinstall: a minimal install directory for the boot compiler,
@@ -397,6 +403,7 @@ install_for_test: install
 	ln -s ../_install/bin/ocamlmklib.byte _runtest/tools/ocamlmklib
 	ln -s ../_install/bin/ocamlobjinfo.byte _runtest/tools/ocamlobjinfo
 	ln -s ../_install/bin/dumpobj.byte _runtest/tools/dumpobj
+	ln -s ../_install/bin/ocamlfilt _runtest/tools/ocamlfilt
         # ocamldoc
 	# rm _runtest/ocamldoc
 	# mkdir _runtest/ocamldoc

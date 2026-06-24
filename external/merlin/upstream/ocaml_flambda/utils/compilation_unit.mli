@@ -305,6 +305,21 @@ val get_current_exn : unit -> t
 
 val is_current : t -> bool
 
+(** Set an override for the name mangling scheme used while compiling the
+    current unit. Typically called by the driver when the
+    [-name-mangling-scheme] command-line option is used. The override applies
+    for the lifetime of the [ocamlopt] invocation. *)
+val set_name_mangling_scheme_override : Config.name_mangling_scheme -> unit
+
+(** Returns the name mangling scheme to use for the unit currently being
+    compiled. If [set_name_mangling_scheme_override] has been called, that value
+    is returned; otherwise [Config.name_mangling_scheme] is returned.
+
+    There is no per-[t] equivalent: linkage names are baked in when each unit is
+    compiled and serialised with its [.cmx], so when reading another unit we
+    never need to know which scheme it was compiled under. *)
+val name_mangling_scheme_for_current_unit : unit -> Config.name_mangling_scheme
+
 module Private : sig
   val fwd_get_current : (unit -> t option) ref
 end

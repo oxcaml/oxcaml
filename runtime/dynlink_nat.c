@@ -75,7 +75,7 @@ CAMLprim value caml_natdynlink_open(value filename, value global)
 {
   CAMLparam2 (filename, global);
   CAMLlocal3 (res, handle, header);
-  void *sym;
+  const void *sym;
   void *dlhandle;
   char_os *p;
   int global_dup;
@@ -107,14 +107,13 @@ CAMLprim value caml_natdynlink_open(value filename, value global)
 
 CAMLprim value caml_natdynlink_register(value handle_v, value symbols) {
   CAMLparam2 (handle_v, symbols);
-  int i;
   int nsymbols = Wosize_val(symbols);
   void* handle = Handle_val(handle_v);
   void** table;
 
   table = caml_stat_alloc(sizeof(void*) * nsymbols);
 
-  for (i = 0; i < nsymbols; i++) {
+  for (int i = 0; i < nsymbols; i++) {
     const char* unit = String_val(Field(symbols, i));
     table[i] = getsym(handle, unit, "gc_roots");
     if (table[i] == NULL) {
@@ -127,7 +126,7 @@ CAMLprim value caml_natdynlink_register(value handle_v, value symbols) {
   /* [caml_register_dyn_global] can raise, so do it prior to registering
      frametables etc. */
 
-  for (i = 0; i < nsymbols; i++) {
+  for (int i = 0; i < nsymbols; i++) {
     const char* unit = String_val(Field(symbols, i));
     table[i] = getsym(handle, unit, "frametable");
     if (table[i] == NULL) {
@@ -138,7 +137,7 @@ CAMLprim value caml_natdynlink_register(value handle_v, value symbols) {
   }
   caml_register_frametables(table, nsymbols);
 
-  for (i = 0; i < nsymbols; i++) {
+  for (int i = 0; i < nsymbols; i++) {
     const char* unit = String_val(Field(symbols, i));
     void* sym = getsym(handle, unit, "code_begin");
     void* sym2 = getsym(handle, unit, "code_end");

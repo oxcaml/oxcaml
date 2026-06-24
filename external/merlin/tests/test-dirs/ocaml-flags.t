@@ -1,9 +1,9 @@
 Get a list of all flags that ocaml understands.
   $ OCAMLOPT="$MERLIN_TEST_OCAML_PATH/bin/ocamlopt.opt"
-  $ "$OCAMLOPT" --help | grep -oP '(?<=  )-[a-z\-_0-9]+(?= )' > ocamlopt-flags.txt
+  $ "$OCAMLOPT" --help | grep -oP '(?<=  )-[a-zA-Z\-_0-9]+(?= )' > ocamlopt-flags.txt
 
   $ OCAMLC="$MERLIN_TEST_OCAML_PATH/bin/ocamlc"
-  $ "$OCAMLC" --help | grep -oP '(?<=  )-[a-z\-_0-9]+(?= )' > ocamlc-flags.txt
+  $ "$OCAMLC" --help | grep -oP '(?<=  )-[a-zA-Z\-_0-9]+(?= )' > ocamlc-flags.txt
 
   $ OCAML_FLAGS=$(sort -u ocamlopt-flags.txt ocamlc-flags.txt)
 
@@ -50,6 +50,17 @@ logic.
   $ echo "$OCAML_FLAGS"
   --help
   --version
+  -H
+  -H-manifest
+  -I
+  -I-manifest
+  -Ix
+  -O2
+  -O3
+  -O4
+  -Oclassic
+  -S
+  -X
   -a
   -absname
   -afl-inst-ratio
@@ -95,6 +106,7 @@ logic.
   -davail
   -dblambda
   -dcamlprimc
+  -dcanonical-ids
   -dcfg
   -dcfg-invariants
   -dclambda
@@ -149,10 +161,13 @@ logic.
   -dllpath
   -dllvmir
   -dlocations
+  -dmatchcomp
   -dno-asm-comments
+  -dno-canonical-ids
   -dno-locations
   -dno-unique-ids
   -dparsetree
+  -dparsetree-loc-ghost-invariants
   -dprofile
   -dprofile-output
   -dranges
@@ -185,6 +200,7 @@ logic.
   -error-style
   -extension
   -extension-universe
+  -fPIC
   -favx
   -favx2
   -favx512f
@@ -203,7 +219,7 @@ logic.
   -flambda2-expert-can-inline-recursive-functions
   -flambda2-expert-cmm-safe-subst
   -flambda2-expert-cont-lifting-budget
-  -flambda2-expert-cont-specialization-budget
+  -flambda2-expert-cont-specialization-threshold
   -flambda2-expert-fallback-inlining-heuristic
   -flambda2-expert-inline-effects-in-cmm
   -flambda2-expert-max-block-size-for-projections
@@ -216,24 +232,29 @@ logic.
   -flambda2-inline-call-cost
   -flambda2-inline-indirect-cost
   -flambda2-inline-large-function-size
+  -flambda2-inline-large-functor-size
   -flambda2-inline-max-depth
   -flambda2-inline-max-rec-depth
   -flambda2-inline-poly-compare-cost
   -flambda2-inline-prim-cost
   -flambda2-inline-small-function-size
+  -flambda2-inline-small-functor-size
   -flambda2-inline-threshold
   -flambda2-inlining-report-bin
   -flambda2-join-algorithm
   -flambda2-join-depth
   -flambda2-join-points
   -flambda2-kind-checks
+  -flambda2-match-in-match
   -flambda2-reaper
   -flambda2-result-types-all-functions
   -flambda2-result-types-functors-only
   -flambda2-speculative-inlining-only-if-arguments-useful
+  -flambda2-speculative-inlining-track-lifted-constants
   -flambda2-unbox-along-intra-function-control-flow
   -flambda2-unicode
   -flzcnt
+  -fno-PIC
   -fno-asan
   -fno-avx
   -fno-avx2
@@ -256,6 +277,7 @@ logic.
   -fpopcnt
   -fprefetchw
   -fprefetchwt1
+  -frametables-in-rodata
   -fsse3
   -fsse41
   -fsse42
@@ -290,7 +312,7 @@ logic.
   -heap-reduction-threshold
   -help
   -i
-  -ikinds
+  -i-variance
   -ikinds-debug
   -impl
   -inline
@@ -314,6 +336,7 @@ logic.
   -keep-docs
   -keep-llvmir
   -keep-locs
+  -keywords
   -kind-verbosity
   -labels
   -linkall
@@ -329,6 +352,7 @@ logic.
   -match-context-rows
   -modern
   -module-entry-functions-section
+  -name-mangling-scheme
   -no-absname
   -no-alias-deps
   -no-app-funct
@@ -356,12 +380,16 @@ logic.
   -no-flambda2-expert-phantom-lets
   -no-flambda2-expert-shorten-symbol-names
   -no-flambda2-join-points
+  -no-flambda2-match-in-match
   -no-flambda2-reaper
   -no-flambda2-result-types
   -no-flambda2-speculative-inlining-only-if-arguments-useful
+  -no-flambda2-speculative-inlining-track-lifted-constants
   -no-flambda2-unbox-along-intra-function-control-flow
   -no-float-const-prop
+  -no-frametables-in-rodata
   -no-g
+  -no-ikinds
   -no-insn-sched
   -no-keep-docs
   -no-keep-locs

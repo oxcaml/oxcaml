@@ -66,11 +66,14 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_float : unit -> unit
   val cfg_value_propagation_flow : unit -> unit
   val no_cfg_value_propagation_flow : unit -> unit
+  val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
   val dasm_comments : unit -> unit
   val dno_asm_comments : unit -> unit
+  val frametables_in_rodata : unit -> unit
+  val no_frametables_in_rodata : unit -> unit
   val heap_reduction_threshold : int -> unit
   val zero_alloc_check : string -> unit
   val zero_alloc_assert : string -> unit
@@ -138,6 +141,8 @@ module type Oxcaml_options = sig
   val reaper_max_unbox_size : int -> unit
   val reaper_change_calling_conventions : unit -> unit
   val no_reaper_change_calling_conventions : unit -> unit
+  val flambda2_match_in_match : unit -> unit
+  val no_flambda2_match_in_match : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
@@ -154,7 +159,7 @@ module type Oxcaml_options = sig
   val flambda2_expert_shorten_symbol_names : unit -> unit
   val no_flambda2_expert_shorten_symbol_names : unit -> unit
   val flambda2_expert_cont_lifting_budget : int -> unit
-  val flambda2_expert_cont_spec_budget : int -> unit
+  val flambda2_expert_cont_spec_threshold : float -> unit
   val flambda2_debug_concrete_types_only_on_canonicals : unit -> unit
   val no_flambda2_debug_concrete_types_only_on_canonicals : unit -> unit
   val flambda2_debug_keep_invalid_handlers : unit -> unit

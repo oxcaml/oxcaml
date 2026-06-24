@@ -1,16 +1,12 @@
 (* TEST
-   modules = "preemption_util.ml";
-   include unix;
-   hasunix;
    runtime5;
    poll_insertion;
-   flags += "-alert -unsafe_multidomain -w -21";
+   flags += "-w -21";
    { native; }
 *)
 
 open Effect
 open Effect.Deep
-open Preemption_util
 
 type _ Effect.t += Inc : int -> int Effect.t
 type _ Effect.t += Dec : int -> int Effect.t
@@ -18,8 +14,9 @@ type _ Effect.t += Dec : int -> int Effect.t
 let () =
   let preempted = ref false in
 
-  let result = with_preemption_setup (fun () ->
-    try_with
+  let result = Domain.Tick.with_ ~interval_usec:100_000 (fun _ ->
+    Preemptible.try_with
+      ~on_tick:(fun () -> Preempt)
       (fun () ->
          let start_at = Sys.time () in
          let counter = ref 0 in

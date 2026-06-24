@@ -258,7 +258,22 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
         Inline (dacc, inlined))
   in
   match inlined with
-  | Inline (dacc, inlined) -> simplify_expr dacc inlined ~down_to_up
+  | Inline (dacc, inlined) ->
+    let down_to_up dacc ~rebuild =
+      let rebuild uacc ~after_rebuild =
+        let uacc =
+          if coming_from_indirect
+          then
+            UA.notify_removed
+              ~operation:Removed_operations.direct_call_of_indirect uacc
+          else uacc
+        in
+        let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
+        rebuild uacc ~after_rebuild
+      in
+      down_to_up dacc ~rebuild
+    in
+    simplify_expr dacc inlined ~down_to_up
   | Do_not_inline { erase_attribute } -> (
     let apply =
       let inlined : Inlined_attribute.t =
@@ -492,7 +507,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
              alloc mode is [Local]: direct partial application:@ %a"
             Apply.print apply));
       let result_mode = Code_metadata.result_mode callee's_code_metadata in
-      let wrapper_taking_remaining_args, dacc, code_id, code =
+      let wrapper_taking_remaining_args, wrapper_alloc_mode, dacc, code_id, code
+          =
         let return_continuation = Continuation.create () in
         let remaining_params =
           List.map
@@ -724,8 +740,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           | Local { region; ghost_region = _ } ->
             Alloc_mode.For_allocations.local ~region
         in
-        ( Set_of_closures.create ~value_slots new_closure_alloc_mode
-            function_decls,
+        ( Set_of_closures.create ~value_slots function_decls,
+          new_closure_alloc_mode,
           dacc,
           code_id,
           code )
@@ -741,7 +757,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         let bound = Bound_pattern.set_of_closures bound_vars in
         let body =
           Let.create bound
-            (Named.create_set_of_closures wrapper_taking_remaining_args)
+            (Named.create_set_of_closures ~alloc_mode:wrapper_alloc_mode
+               wrapper_taking_remaining_args)
             ~body:(Expr.create_apply_cont apply_cont)
             ~free_names_of_body:Unknown
           |> Expr.create_let
@@ -769,10 +786,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               ~operation:Removed_operations.direct_call_of_indirect uacc
           else uacc
         in
-        (* Increase the counter of calls as the original apply node was removed.
-           [simplify] is called over the two apply nodes that were created to
-           replace the original one so they will be taken into account in the
-           cost metrics, mainly by increasing the code size. *)
+        (* Increase the counter of calls as the apply has been replaced by an
+           allocation of the partial set of closures. *)
         let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
         rebuild uacc ~after_rebuild)
   in
@@ -787,8 +802,6 @@ let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
   in
   let down_to_up dacc ~rebuild =
     let rebuild uacc ~after_rebuild =
-      (* Remove one function call as this apply was removed and replaced by two
-         new ones. *)
       let uacc =
         if coming_from_indirect
         then
@@ -796,7 +809,6 @@ let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
             ~operation:Removed_operations.direct_call_of_indirect uacc
         else uacc
       in
-      let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
       rebuild uacc ~after_rebuild
     in
     down_to_up dacc ~rebuild
@@ -805,7 +817,6 @@ let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
 
 let replace_apply_by_invalid dacc ~down_to_up reason =
   down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
-      let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
       EB.rebuild_invalid uacc reason ~after_rebuild)
 
 let arity_mismatch ~(params_arity : [`Complex] Flambda_arity.t)
@@ -1159,7 +1170,6 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
     | Need_meet -> type_unavailable ()
     | Invalid ->
       let rebuild uacc ~after_rebuild =
-        let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
         EB.rebuild_invalid uacc (Closure_type_was_invalid apply) ~after_rebuild
       in
       down_to_up dacc ~rebuild)
@@ -1364,6 +1374,18 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
     | With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg } ->
       E.with_stack_bind ~valuec:(simplify_simple valuec)
         ~exnc:(simplify_simple exnc) ~effc:(simplify_simple effc)
+        ~dyn:(simplify_simple dyn) ~bind:(simplify_simple bind)
+        ~f:(simplify_simple f) ~arg:(simplify_simple arg)
+    | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
+      E.with_stack_preemptible ~valuec:(simplify_simple valuec)
+        ~exnc:(simplify_simple exnc) ~effc:(simplify_simple effc)
+        ~handle_tick:(simplify_simple handle_tick)
+        ~f:(simplify_simple f) ~arg:(simplify_simple arg)
+    | With_stack_bind_preemptible
+        { valuec; exnc; effc; handle_tick; dyn; bind; f; arg } ->
+      E.with_stack_bind_preemptible ~valuec:(simplify_simple valuec)
+        ~exnc:(simplify_simple exnc) ~effc:(simplify_simple effc)
+        ~handle_tick:(simplify_simple handle_tick)
         ~dyn:(simplify_simple dyn) ~bind:(simplify_simple bind)
         ~f:(simplify_simple f) ~arg:(simplify_simple arg)
     | Resume { cont; f; arg } ->

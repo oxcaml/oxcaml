@@ -76,6 +76,24 @@ module Effect = struct
           f : Simple.t;
           arg : Simple.t
         }
+    | With_stack_preemptible of
+        { valuec : Simple.t;
+          exnc : Simple.t;
+          effc : Simple.t;
+          handle_tick : Simple.t;
+          f : Simple.t;
+          arg : Simple.t
+        }
+    | With_stack_bind_preemptible of
+        { valuec : Simple.t;
+          exnc : Simple.t;
+          effc : Simple.t;
+          handle_tick : Simple.t;
+          dyn : Simple.t;
+          bind : Simple.t;
+          f : Simple.t;
+          arg : Simple.t
+        }
     | Resume of
         { cont : Simple.t;
           f : Simple.t;
@@ -105,6 +123,22 @@ module Effect = struct
         Flambda_colours.effect_ Flambda_colours.pop Simple.print valuec
         Simple.print exnc Simple.print effc Simple.print dyn Simple.print bind
         Simple.print f Simple.print arg
+    | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
+      fprintf ppf
+        "@[<hov 1>(%tWith_stack_preemptible%t (valuec@ %a)@ (exnc@ %a)@ (effc@ \
+         %a)@ (handle_tick@ %a)@ (f@ %a)@ (arg@ %a))@]"
+        Flambda_colours.effect_ Flambda_colours.pop Simple.print valuec
+        Simple.print exnc Simple.print effc Simple.print handle_tick
+        Simple.print f Simple.print arg
+    | With_stack_bind_preemptible
+        { valuec; exnc; effc; handle_tick; dyn; bind; f; arg } ->
+      fprintf ppf
+        "@[<hov 1>(%tWith_stack_bind_preemptible%t (valuec@ %a)@ (exnc@ %a)@ \
+         (effc@ %a)@ (handle_tick@ %a)@ (dyn@ %a)@ (bind@ %a)@ (f@ %a)@ (arg@ \
+         %a))@]"
+        Flambda_colours.effect_ Flambda_colours.pop Simple.print valuec
+        Simple.print exnc Simple.print effc Simple.print handle_tick
+        Simple.print dyn Simple.print bind Simple.print f Simple.print arg
     | Resume { cont; f; arg } ->
       fprintf ppf "@[<hov 1>(%tResume%t (cont@ %a)@ (f@ %a)@ (arg@ %a))@]"
         Flambda_colours.effect_ Flambda_colours.pop Simple.print cont
@@ -119,6 +153,14 @@ module Effect = struct
 
   let with_stack_bind ~valuec ~exnc ~effc ~dyn ~bind ~f ~arg =
     With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg }
+
+  let with_stack_preemptible ~valuec ~exnc ~effc ~handle_tick ~f ~arg =
+    With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg }
+
+  let with_stack_bind_preemptible ~valuec ~exnc ~effc ~handle_tick ~dyn ~bind ~f
+      ~arg =
+    With_stack_bind_preemptible
+      { valuec; exnc; effc; handle_tick; dyn; bind; f; arg }
 
   let resume ~cont ~f ~arg = Resume { cont; f; arg }
 
@@ -143,6 +185,25 @@ module Effect = struct
                  (Name_occurrences.union (Simple.free_names bind)
                     (Name_occurrences.union (Simple.free_names f)
                        (Simple.free_names arg))))))
+    | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
+      Name_occurrences.union (Simple.free_names valuec)
+        (Name_occurrences.union (Simple.free_names exnc)
+           (Name_occurrences.union (Simple.free_names effc)
+              (Name_occurrences.union
+                 (Simple.free_names handle_tick)
+                 (Name_occurrences.union (Simple.free_names f)
+                    (Simple.free_names arg)))))
+    | With_stack_bind_preemptible
+        { valuec; exnc; effc; handle_tick; dyn; bind; f; arg } ->
+      Name_occurrences.union (Simple.free_names valuec)
+        (Name_occurrences.union (Simple.free_names exnc)
+           (Name_occurrences.union (Simple.free_names effc)
+              (Name_occurrences.union
+                 (Simple.free_names handle_tick)
+                 (Name_occurrences.union (Simple.free_names dyn)
+                    (Name_occurrences.union (Simple.free_names bind)
+                       (Name_occurrences.union (Simple.free_names f)
+                          (Simple.free_names arg)))))))
     | Resume { cont; f; arg } ->
       Name_occurrences.union (Simple.free_names cont)
         (Name_occurrences.union (Simple.free_names f) (Simple.free_names arg))
@@ -194,6 +255,53 @@ module Effect = struct
             f = f';
             arg = arg'
           }
+    | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
+      let valuec' = Simple.apply_renaming valuec renaming in
+      let exnc' = Simple.apply_renaming exnc renaming in
+      let effc' = Simple.apply_renaming effc renaming in
+      let handle_tick' = Simple.apply_renaming handle_tick renaming in
+      let f' = Simple.apply_renaming f renaming in
+      let arg' = Simple.apply_renaming arg renaming in
+      if
+        valuec == valuec' && exnc == exnc' && effc == effc'
+        && handle_tick == handle_tick'
+        && f == f' && arg == arg'
+      then t
+      else
+        With_stack_preemptible
+          { valuec = valuec';
+            exnc = exnc';
+            effc = effc';
+            handle_tick = handle_tick';
+            f = f';
+            arg = arg'
+          }
+    | With_stack_bind_preemptible
+        { valuec; exnc; effc; handle_tick; dyn; bind; f; arg } ->
+      let valuec' = Simple.apply_renaming valuec renaming in
+      let exnc' = Simple.apply_renaming exnc renaming in
+      let effc' = Simple.apply_renaming effc renaming in
+      let handle_tick' = Simple.apply_renaming handle_tick renaming in
+      let dyn' = Simple.apply_renaming dyn renaming in
+      let bind' = Simple.apply_renaming bind renaming in
+      let f' = Simple.apply_renaming f renaming in
+      let arg' = Simple.apply_renaming arg renaming in
+      if
+        valuec == valuec' && exnc == exnc' && effc == effc'
+        && handle_tick == handle_tick'
+        && dyn == dyn' && bind == bind' && f == f' && arg == arg'
+      then t
+      else
+        With_stack_bind_preemptible
+          { valuec = valuec';
+            exnc = exnc';
+            effc = effc';
+            handle_tick = handle_tick';
+            dyn = dyn';
+            bind = bind';
+            f = f';
+            arg = arg'
+          }
     | Resume { cont; f; arg } ->
       let cont' = Simple.apply_renaming cont renaming in
       let f' = Simple.apply_renaming f renaming in
@@ -235,6 +343,35 @@ module Effect = struct
                     (Ids_for_export.union
                        (Ids_for_export.from_simple f)
                        (Ids_for_export.from_simple arg))))))
+    | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
+      Ids_for_export.union
+        (Ids_for_export.from_simple valuec)
+        (Ids_for_export.union
+           (Ids_for_export.from_simple exnc)
+           (Ids_for_export.union
+              (Ids_for_export.from_simple effc)
+              (Ids_for_export.union
+                 (Ids_for_export.from_simple handle_tick)
+                 (Ids_for_export.union
+                    (Ids_for_export.from_simple f)
+                    (Ids_for_export.from_simple arg)))))
+    | With_stack_bind_preemptible
+        { valuec; exnc; effc; handle_tick; dyn; bind; f; arg } ->
+      Ids_for_export.union
+        (Ids_for_export.from_simple valuec)
+        (Ids_for_export.union
+           (Ids_for_export.from_simple exnc)
+           (Ids_for_export.union
+              (Ids_for_export.from_simple effc)
+              (Ids_for_export.union
+                 (Ids_for_export.from_simple handle_tick)
+                 (Ids_for_export.union
+                    (Ids_for_export.from_simple dyn)
+                    (Ids_for_export.union
+                       (Ids_for_export.from_simple bind)
+                       (Ids_for_export.union
+                          (Ids_for_export.from_simple f)
+                          (Ids_for_export.from_simple arg)))))))
     | Resume { cont; f; arg } ->
       Ids_for_export.union
         (Ids_for_export.from_simple cont)

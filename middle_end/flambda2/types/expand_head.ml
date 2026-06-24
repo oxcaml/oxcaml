@@ -71,6 +71,8 @@ module Expanded_type : sig
 
   val to_type : t -> Type_grammar.t
 
+  val kind : t -> K.t
+
   type descr = private
     | Value of Type_grammar.head_of_kind_value
     | Naked_immediate of Type_grammar.head_of_kind_naked_immediate
@@ -137,6 +139,8 @@ end = struct
     { kind : K.t;
       descr : descr Or_unknown_or_bottom.t
     }
+
+  let kind t = t.kind
 
   let descr t = t.descr
 
@@ -206,6 +210,10 @@ end = struct
     | Naked_vec512 i ->
       create_naked_vec512 (TG.Head_of_kind_naked_vec512.create i)
     | Null -> create_value TG.Head_of_kind_value.null
+    | Poison (kind, _) ->
+      (* CR ncourant: for now [Poison] has the conservative type "unknown"; but
+         should be tracked more precisely in the future. *)
+      create_unknown kind
 
   let bottom_like t = create_bottom t.kind
 

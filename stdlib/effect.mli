@@ -12,17 +12,17 @@
 (*                                                                        *)
 (**************************************************************************)
 
-[@@@alert unstable
-    "The Effect interface may change in incompatible ways in the future."
-]
-
 (** Effects.
 
     See 'Language extensions/Effect handlers' section in the manual.
 
     @since 5.0 *)
 
-type _ t = ..
+[@@@alert unstable
+    "The Effect interface may change in incompatible ways in the future."
+]
+
+type 'a t = 'a eff = ..
 (** The type of effects. *)
 
 exception Unhandled : 'a t -> exn
@@ -47,10 +47,14 @@ external perform : 'a t -> 'a = "%perform"
 
     @raise Unhandled if there is no handler for [e]. *)
 
+type tick_outcome =
+  | Preempt
+  | Continue
+
 module Deep : sig
   (** Deep handlers *)
 
-  type ('a,'b) continuation
+  type nonrec ('a,'b) continuation = ('a,'b) continuation
   (** [('a,'b) continuation] is a delimited continuation that expects a ['a]
       value and returns a ['b] value. *)
 
@@ -99,6 +103,44 @@ module Deep : sig
   (** [try_with f x h] runs the computation [f x] under the handler [h].
 
       @raise Out_of_fibers if unable to allocate a fiber. *)
+
+  module Preemptible : sig
+    (** Preemptible handlers
+
+        Preemptible handlers are like normal handlers, except they also have
+        the ability to receive "ticks" from the runtime, and can decide to
+        preempt the current fiber on tick.
+
+        To set the tick interval, call [Domain.Tick.acquire] before running a
+        preemptible fiber. *)
+
+    type ('a,'b) handler =
+        { retc: 'a -> 'b;
+          exnc: exn -> 'b;
+          effc: 'c.'c t -> (('c,'b) continuation -> 'b) option;
+          tickc: unit -> tick_outcome }
+    (** [('a,'b) handler] is a handler record with four fields -- [retc]
+        is the value handler, [exnc] handles exceptions, [effc] handles the
+        effects performed by the computation enclosed by the handler, and
+        [tickc] handles ticks, deciding whether to preempt. [tickc] should be
+        signal-safe. If [tickc] returns [Preempt], a [Preemption] effect is
+        performed. *)
+
+    val match_with : ('c -> 'a) -> 'c -> ('a,'b) handler -> 'b
+    (** [match_with f x h] runs the computation [f x] in the handler [h].
+
+        @raise Out_of_fibers if unable to allocate a fiber. *)
+
+    val try_with :
+      on_tick:(unit -> tick_outcome) -> ('b -> 'a) -> 'b ->
+      'a effect_handler -> 'a
+      (** [try_with ~on_tick f x h] runs the computation [f x] under the handler
+          [h], calling [on_tick] whenever a tick occurs. [on_tick] should
+          be signal-safe. If it returns [Preempt], a [Preemption] effect is
+          performed.
+
+        @raise Out_of_fibers if unable to allocate a fiber. *)
+  end
 
   external get_callstack :
     ('a,'b) continuation -> int -> Printexc.raw_backtrace =
@@ -153,6 +195,55 @@ module Shallow : sig
       @raise Continuation_already_resumed if the continuation has already been
       resumed.
    *)
+
+  module Preemptible : sig
+    (** Preemptible handlers
+
+        Preemptible handlers are like normal handlers, except they also have
+        the ability to receive "ticks" from the runtime, and can decide to
+        preempt the current fiber on tick.
+
+        To set the tick interval, call [Domain.Tick.acquire] before running a
+        preemptible fiber. *)
+
+    type ('a,'b) handler =
+        { retc: 'a -> 'b;
+          exnc: exn -> 'b;
+          effc: 'c.'c t -> (('c,'a) continuation -> 'b) option;
+          tickc: unit -> tick_outcome }
+    (** [('a,'b) handler] is a handler record with four fields -- [retc]
+        is the value handler, [exnc] handles exceptions, [effc] handles the
+        effects performed by the computation enclosed by the handler, and
+        [tickc] handles ticks, deciding whether to preempt. [tickc] should be
+        signal-safe. If [tickc] returns [Preempt], a [Preemption] effect is
+        performed. *)
+
+    val continue_with : ('c,'a) continuation -> 'c -> ('a,'b) handler -> 'b
+    (** [continue_with k v h] resumes the continuation [k] with value [v] within
+        the handler [h].
+
+        @raise Continuation_already_resumed if the continuation has already been
+        resumed.
+    *)
+
+    val discontinue_with : ('c,'a) continuation -> exn -> ('a,'b) handler -> 'b
+    (** [discontinue_with k e h] resumes the continuation [k] by raising the
+        exception [e] within the handler [h].
+
+        @raise Continuation_already_resumed if the continuation has already been
+        resumed.
+    *)
+
+    val discontinue_with_backtrace : ('a,'b) continuation -> exn ->
+        Printexc.raw_backtrace -> ('b,'c) handler -> 'c
+    (** [discontinue_with k e bt h] resumes the continuation [k] by raising the
+        exception [e] with the handler [h] using the raw backtrace [bt] as the
+        origin of the exception.
+
+        @raise Continuation_already_resumed if the continuation has already been
+        resumed.
+    *)
+  end
 
   external get_callstack :
     ('a,'b) continuation -> int -> Printexc.raw_backtrace =

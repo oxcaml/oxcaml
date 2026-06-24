@@ -444,6 +444,10 @@ let type_for_const const =
   | Naked_vec256 n -> TG.this_naked_vec256 n
   | Naked_vec512 n -> TG.this_naked_vec512 n
   | Null -> TG.null
+  | Poison (kind, _) ->
+    (* CR ncourant: for now [Poison] has the conservative type "unknown"; but
+       should be tracked more precisely in the future. *)
+    unknown kind
 
 let kind_for_const const = TG.kind (type_for_const const)
 

@@ -463,7 +463,7 @@ let iterator ~transl_exp ~scopes ~loc :
       { ident; ident_debug_uid; pattern = _; start; stop; direction } ->
     let bound name debug_uid value =
       Let_binding.make (Immutable Strict) layout_int name debug_uid
-        (transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable value)
+        (transl_exp ~scopes Lambda.layout_int value)
     in
     let start = bound "start" Lambda.debug_uid_none start in
     let stop = bound "stop" Lambda.debug_uid_none stop in
@@ -480,14 +480,15 @@ let iterator ~transl_exp ~scopes ~loc :
     in
     mk_iterator, Range { start; stop; direction }
   | Texp_comp_in { pattern; sequence = iter_arr_exp } ->
-    let iter_arr =
-      Let_binding.make (Immutable Strict) layout_any_value "iter_arr"
-        Lambda.debug_uid_none
-        (transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable iter_arr_exp)
-    in
     let iter_arr_kind =
       Typeopt.array_type_kind ~elt_ty:(Some pattern.pat_type)
         iter_arr_exp.exp_env iter_arr_exp.exp_loc iter_arr_exp.exp_type
+    in
+    let iter_arr_layout = Lambda.layout_array iter_arr_kind in
+    let iter_arr =
+      Let_binding.make (Immutable Strict) iter_arr_layout "iter_arr"
+        Lambda.debug_uid_none
+        (transl_exp ~scopes iter_arr_layout iter_arr_exp)
     in
     let iter_arr_mut =
       Typeopt.array_type_mut iter_arr_exp.exp_env iter_arr_exp.exp_type
@@ -572,7 +573,7 @@ let clause ~transl_exp ~scopes ~loc = function
   | Texp_comp_when cond ->
     fun body ->
       Lifthenelse
-        ( transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable cond,
+        ( transl_exp ~scopes Lambda.layout_bool cond,
           body,
           lambda_unit,
           layout_unit )
@@ -777,6 +778,9 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
     | _, (Pgcscannableproductarray _ | Pgcignorableproductarray _) ->
       Misc.fatal_error
         "Transl_array_comprehension.initial_array: unboxed product array"
+    | _, Punspecializedarray ->
+      Misc.fatal_error
+        "Transl_array_comprehension.initial_array: Punspecializedarray"
   in
   Let_binding.make array_let_kind layout_any_value "array" Lambda.debug_uid_none
     array_value
@@ -869,6 +873,8 @@ let body ~loc ~array_kind ~array_size ~array_sizing ~array ~index ~body =
       set_element_in_bounds body
     | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
       Misc.fatal_error "Transl_array_comprehension.body: unboxed product array"
+    | Punspecializedarray ->
+      Misc.fatal_error "Transl_array_comprehension.body: Punspecializedarray"
   in
   Lsequence
     (set_element_known_kind_in_bounds, Lassign (index.id, index.var + l1))
@@ -893,7 +899,10 @@ let comprehension ~transl_exp ~scopes ~loc ~(array_kind : Lambda.array_kind)
         (Printlambda.array_kind array_kind)
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     Misc.fatal_error
-      "Transl_array_comprehension.comprehension: unboxed product array");
+      "Transl_array_comprehension.comprehension: unboxed product array"
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Transl_array_comprehension.comprehension: Punspecializedarray");
   let { array_sizing_info; array_size; make_comprehension } =
     clauses ~transl_exp ~scopes ~loc comp_clauses
   in
@@ -921,8 +930,8 @@ let comprehension ~transl_exp ~scopes ~loc ~(array_kind : Lambda.array_kind)
                   (* CR layouts v4: Ensure that the [transl_exp] here can cope
                      with non-values. *)
                 ~body:
-                  (transl_exp ~scopes
-                     Jkind.Sort.Const.for_array_comprehension_element comp_body)),
+                  (transl_exp ~scopes Lambda.layout_array_comprehension_element
+                     comp_body)),
            (* If it was dynamically grown, cut it down to size *)
            match array_sizing with
            | Fixed_size -> array.var

@@ -57,7 +57,7 @@ type header = {
     header_name : Compilation_unit.Name.t;
     header_kind : kind;
     header_globals : Global_module.With_precision.t array;
-    header_sign : Serialized.signature;
+    header_sign : Serialized.persistent_signature;
     header_params : Global_module.Parameter_name.t list;
 }
 
@@ -71,11 +71,12 @@ type 'sg cmi_infos_generic = {
     cmi_flags : flags;
 }
 
-type cmi_infos_lazy = Subst.Lazy.signature cmi_infos_generic
-type cmi_infos = Types.signature cmi_infos_generic
+type cmi_infos_lazy = Subst.Lazy.persistent_signature cmi_infos_generic
+type cmi_infos = Types.persistent_signature cmi_infos_generic
 
 let force_cmi_infos cmi =
-  { cmi with cmi_sign = Subst.Lazy.force_signature cmi.cmi_sign }
+  let sign, staticity = cmi.cmi_sign in
+  { cmi with cmi_sign = Subst.Lazy.force_signature sign, staticity }
 
 module Deserialize = Types.Map_wrapped(Serialized)(Subst.Lazy)
 
@@ -165,7 +166,7 @@ let input_cmi_lazy ic =
       header_name = name;
       header_kind = kind;
       header_globals = globals;
-      header_sign = sign;
+      header_sign = (sign, staticity);
       header_params = params;
     } = (input_value ic : header) in
   let crcs = (input_value ic : crcs) in
@@ -175,7 +176,7 @@ let input_cmi_lazy ic =
       cmi_name = name;
       cmi_kind = kind;
       cmi_globals = globals;
-      cmi_sign = deserialize data sign;
+      cmi_sign = (deserialize data sign, staticity);
       cmi_params = params;
       cmi_crcs = crcs;
       cmi_flags = flags;
@@ -224,7 +225,8 @@ let output_cmi filename oc cmi =
   let len_pos = Out_channel.pos oc in
   output_int64 oc Int64.zero;
   let data_pos = Int64.add len_pos (Int64.of_int 8) in
-  let sign = serialize oc data_pos cmi.cmi_sign in
+  let sign, staticity = cmi.cmi_sign in
+  let sign = serialize oc data_pos sign in
   let val_pos = Out_channel.pos oc in
   Out_channel.seek oc len_pos;
   let len = Int64.sub val_pos data_pos in
@@ -235,7 +237,7 @@ let output_cmi filename oc cmi =
       header_name = cmi.cmi_name;
       header_kind = cmi.cmi_kind;
       header_globals = cmi.cmi_globals;
-      header_sign = sign;
+      header_sign = (sign, staticity);
       header_params = cmi.cmi_params;
     };
   flush oc;

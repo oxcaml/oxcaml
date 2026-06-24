@@ -90,10 +90,12 @@ and item =
       | `Type
       | `Exn
       | `Class
+      | `ClassType
       | `Method ];
     outline_type : string option;
     deprecated : bool;
     location : Location_aux.t;
+    selection : Location_aux.t;
     children : outline
   }
 
@@ -309,7 +311,7 @@ type _ t =
       Msource.position * [ `None | `Local ] option * int option
       -> (Location.t * string list) t
   | Inlay_hints :
-      Msource.position * Msource.position * bool * bool * bool
+      Msource.position * Msource.position * bool * bool * bool * bool
       -> (Lexing.position * string) list t
   | Outline (* *) : { include_types : bool } -> outline t
   | Shape (* *) : Msource.position -> shape list t

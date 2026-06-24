@@ -46,7 +46,8 @@ module Scoped_location = struct
     | Empty
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
                assume_zero_alloc: ZA.Assume_info.t;
-               mangling_item: Structured_mangling.path_item option}
+               mangling_item:
+                 Compilation_unit.t Structured_mangling.path_item option}
 
   let str = function
     | Empty -> ""
@@ -83,7 +84,7 @@ module Scoped_location = struct
     let str = str_fun scopes in
     let (file, line, col) = Location.get_pos_info loc.loc_start in
     let file = Filename.basename file in
-    let mangling_item : Structured_mangling.path_item option =
+    let mangling_item : _ Structured_mangling.path_item option =
       Some (Anonymous_function (line, col, Some file))
     in
     Cons {item = Sc_anonymous_function; str; str_fun = str; name = ""; prev = scopes;
@@ -93,7 +94,7 @@ module Scoped_location = struct
     let str = str scopes in
     let (file, line, col) = Location.get_pos_info loc.loc_start in
     let file = Filename.basename file in
-    let mangling_item : Structured_mangling.path_item option =
+    let mangling_item : _ Structured_mangling.path_item option =
       Some (Anonymous_module (line, col, Some file))
     in
     Cons {item = Sc_module_definition; str; str_fun = str ^ ".(fun)"; name = "";
@@ -464,12 +465,14 @@ let rec path_of_debug_info_scopes acc (scopes : Scoped_location.scopes) =
   | Cons { prev; mangling_item = Some mangling_item; _ } ->
     path_of_debug_info_scopes (mangling_item :: acc) prev
 
-let to_structured_mangling_path ~name dbg : Structured_mangling.path =
+let to_structured_mangling_path ~name dbg
+    : Compilation_unit.t Structured_mangling.path =
   (* We ensure the path ends with [name] to preserve all stamps that the name
      includes. To do so, we drop the suffix of partial applications if there is
      any and, additionally, the last function or anonymous function if there is
      any. It should effectively be the same function as [name]. *)
-  let rec drop_partials_and_last_function (path : Structured_mangling.path) =
+  let rec drop_partials_and_last_function
+      (path : Compilation_unit.t Structured_mangling.path) =
     match path with
     | Partial_function _ :: path -> drop_partials_and_last_function path
     | Function _ :: path -> path

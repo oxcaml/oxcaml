@@ -4,7 +4,7 @@
    hasunix;
    runtime5;
    poll_insertion;
-   flags += "-alert -unsafe_multidomain -w -21";
+   flags += "-w -21";
    { native; }
 *)
 
@@ -21,7 +21,7 @@ let () =
   in
 
   let result = run_with_tick_handler
-    ~interval:0.02
+    ~interval_usec:20_000
     ~repeating:true
     ~on_preemption:(fun _resume ->
       incr count;

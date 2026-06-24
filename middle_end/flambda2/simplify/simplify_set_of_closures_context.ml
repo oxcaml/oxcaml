@@ -91,7 +91,7 @@ let compute_closure_types_inside_functions ~denv ~all_sets_of_closures
   in
   let closure_types_inside_functions =
     List.map2
-      (fun set_of_closures
+      (fun (set_of_closures, alloc_mode)
            (closure_types_via_aliases, value_slot_types_inside_function) ->
         let function_decls = Set_of_closures.function_decls set_of_closures in
         let all_function_slots_in_set =
@@ -148,8 +148,7 @@ let compute_closure_types_inside_functions ~denv ~all_sets_of_closures
             T.exactly_this_closure function_slot ~all_function_slots_in_set
               ~all_closure_types_in_set:closure_types_via_aliases
               ~all_value_slots_in_set:value_slot_types_inside_function
-              (Alloc_mode.For_allocations.as_type
-                 (Set_of_closures.alloc_mode set_of_closures)))
+              alloc_mode)
           all_function_slots_in_set)
       all_sets_of_closures
       (List.combine closure_types_via_aliases_all_sets
@@ -201,7 +200,7 @@ let bind_closure_types_inside_functions denv_inside_functions
 
 let compute_old_to_new_code_ids_all_sets denv ~all_sets_of_closures =
   List.fold_left
-    (fun old_to_new_code_ids_all_sets set_of_closures ->
+    (fun old_to_new_code_ids_all_sets (set_of_closures, _alloc_mode) ->
       let function_decls = Set_of_closures.function_decls set_of_closures in
       Function_slot.Map.fold
         (fun _

@@ -74,7 +74,9 @@ let rec env_from_summary ~allow_missing_modules sum subst =
           if allow_missing_modules then
             (try Env.open_signature_by_path path' env with
             | Not_found -> env)
-          else Env.open_signature_by_path path' env
+          else
+            (try Env.open_signature_by_path path' env with
+            | Not_found -> raise (Error (Module_not_found path')))
       | Env_functor_arg(Env_module(s, id, pres, desc, mode, locks), id')
             when Ident.same id id' ->
           let desc =
@@ -120,7 +122,7 @@ module Style = Misc.Style
 let report_error_doc ppf = function
   | Module_not_found p ->
       fprintf ppf "@[Cannot find module %a@].@."
-        (Style.as_inline_code Printtyp.path) p
+        (Style.as_inline_code Printtyp.Doc.path) p
 
 let () =
   Location.register_error_of_exn

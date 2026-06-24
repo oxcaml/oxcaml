@@ -30,18 +30,23 @@ let pp_concat pp ppf list =
   Fmt.pp_print_list ~pp_sep:Fmt.pp_print_cut pp ppf list
 
 type 'value duplicate =
-  | Duplicate of { name : Parameter_name.t; value1 : 'value; value2 : 'value }
+  | Duplicate of
+      { name : Parameter_name.t;
+        value1 : 'value;
+        value2 : 'value
+      }
 
 module Argument = struct
-  type 'value t = {
-    param : Parameter_name.t;
-    value : 'value;
-  }
+  type 'value t =
+    { param : Parameter_name.t;
+      value : 'value
+    }
 
-  let compare cmp_value
-        ({ param = param1; value = value1 } as t1)
-        ({ param = param2; value = value2 } as t2) =
-    if t1 == t2 then 0 else
+  let compare cmp_value ({ param = param1; value = value1 } as t1)
+      ({ param = param2; value = value2 } as t2) =
+    if t1 == t2
+    then 0
+    else
       match Parameter_name.compare param1 param2 with
       | 0 -> cmp_value value1 value2
       | c -> c
@@ -54,10 +59,9 @@ let check_uniqueness_of_sorted l =
     match (l : _ Argument.t list) with
     | [] -> Ok ()
     | { param = n2; value = v2 } :: l ->
-      if Parameter_name.compare n1 n2 = 0 then
-        Error (Duplicate { name = n1; value1 = v1; value2 = v2 })
-      else
-        loop n2 v2 l
+      if Parameter_name.compare n1 n2 = 0
+      then Error (Duplicate { name = n1; value1 = v1; value2 = v2 })
+      else loop n2 v2 l
   in
   match (l : _ Argument.t list) with
   | [] -> Ok ()
@@ -71,21 +75,20 @@ let check_uniqueness_of_merged (type v) l1 l2 =
   let open Argument in
   let exception Found_duplicate of v duplicate in
   match
-    Misc.Stdlib.List.merge_iter l1 l2
-      ~cmp:Argument.compare_by_param
-      ~left_only:ignore
-      ~right_only:ignore
+    Misc.Stdlib.List.merge_iter l1 l2 ~cmp:Argument.compare_by_param
+      ~left_only:ignore ~right_only:ignore
       ~both:(fun { param = name; value = value1 } { value = value2; _ } ->
-          raise (Found_duplicate (Duplicate { name; value1; value2 })))
+        raise (Found_duplicate (Duplicate { name; value1; value2 })))
   with
   | () -> Ok ()
   | exception Found_duplicate dup -> Error dup
 
 module Name : sig
-  type t = private {
-    head : string;
-    args : argument list;
-  }
+  type t = private
+    { head : string;
+      args : argument list
+    }
+
   and argument = t Argument.t
 
   val create : string -> argument list -> (t, t duplicate) Result.t
@@ -108,31 +111,31 @@ module Name : sig
 
   val print : Fmt.formatter -> t -> unit
 end = struct
-  type t = {
-    head : string;
-    args : argument list;
-  }
+  type t =
+    { head : string;
+      args : argument list
+    }
+
   and argument = t Argument.t
 
   let rec doc_print ppf ({ head; args } : t) =
     match args with
     | [] ->
-        (* Preserve simple non-wrapping behaviour in atomic case *)
-        Fmt.fprintf ppf "%s" head
+      (* Preserve simple non-wrapping behaviour in atomic case *)
+      Fmt.fprintf ppf "%s" head
     | _ ->
-        Fmt.fprintf ppf "@[<hov 1>%s%a@]"
-          head
-          (pp_concat print_arg_pair) args
+      Fmt.fprintf ppf "@[<hov 1>%s%a@]" head (pp_concat print_arg_pair) args
+
   and print_arg_pair ppf ({ param = name; value = arg } : argument) =
     Fmt.fprintf ppf "[%a:%a]" Parameter_name.print name doc_print arg
 
   include Identifiable.Make (struct
     type nonrec t = t
 
-    let rec compare
-        ({ head = head1; args = args1 } as t1)
+    let rec compare ({ head = head1; args = args1 } as t1)
         ({ head = head2; args = args2 } as t2) =
-      if t1 == t2 then 0
+      if t1 == t2
+      then 0
       else
         match String.compare head1 head2 with
         | 0 -> List.compare compare_arg args1 args2
@@ -152,8 +155,7 @@ end = struct
   let print = doc_print
 
   let create head args =
-    sort_and_check_uniqueness args
-    |> Result.map (fun args -> { head; args })
+    sort_and_check_uniqueness args |> Result.map (fun args -> { head; args })
 
   let create_exn head args =
     match create head args with
@@ -189,12 +191,12 @@ end = struct
 end
 
 module T0 : sig
-  type t = private {
-    head : string;
-    visible_args : argument list;
-    (* CR-someday lmaurer: Could just be the parameter names *)
-    hidden_args : argument list;
-  }
+  type t = private
+    { head : string;
+      visible_args : argument list;
+      (* CR-someday lmaurer: Could just be the parameter names *)
+      hidden_args : argument list
+    }
 
   and argument = t Argument.t
 
@@ -202,31 +204,26 @@ module T0 : sig
 
   val print : Fmt.formatter -> t -> unit
 
-  val create
-     : string
-    -> argument list
-    -> hidden_args:Parameter_name.t list
-    -> (t, t duplicate) Result.t
+  val create :
+    string ->
+    argument list ->
+    hidden_args:Parameter_name.t list ->
+    (t, t duplicate) Result.t
 
-  val create_exn
-     : string
-    -> argument list
-    -> hidden_args:Parameter_name.t list
-    -> t
+  val create_exn :
+    string -> argument list -> hidden_args:Parameter_name.t list -> t
 
   val to_name : t -> Name.t
 
-  val unsafe_create_unchecked
-     : string
-    -> argument list
-    -> hidden_args:argument list
-    -> t
+  val unsafe_create_unchecked :
+    string -> argument list -> hidden_args:argument list -> t
 end = struct
-  type t = {
-    head : string;
-    visible_args : argument list;
-    hidden_args : argument list;
-  }
+  type t =
+    { head : string;
+      visible_args : argument list;
+      hidden_args : argument list
+    }
+
   and argument = t Argument.t
 
   let rec doc_print ppf { head; visible_args; hidden_args } =
@@ -235,13 +232,17 @@ end = struct
       List.map (fun ({ param; value = _ } : argument) -> param) hidden_args
     in
     print_syntax ppf ~head ~visible_args ~hidden_args
+
   and print_syntax ppf ~head ~visible_args ~hidden_args =
-    Fmt.fprintf ppf "@[<hov 1>%s%a%a@]"
-      head
-      (pp_concat print_visible_pair) visible_args
-      (pp_concat print_hidden_pair) hidden_args
+    Fmt.fprintf ppf "@[<hov 1>%s%a%a@]" head
+      (pp_concat print_visible_pair)
+      visible_args
+      (pp_concat print_hidden_pair)
+      hidden_args
+
   and print_visible_pair ppf ({ param = name; value } : argument) =
     Fmt.fprintf ppf "[%a:%a]" Parameter_name.print name doc_print value
+
   and print_hidden_pair ppf name =
     Fmt.fprintf ppf "{%a}" Parameter_name.print name
 
@@ -249,15 +250,24 @@ end = struct
     type nonrec t = t
 
     let rec compare
-        ({ head = head1; visible_args = visible_args1; hidden_args = hidden_args1 } as t1)
-        ({ head = head2; visible_args = visible_args2; hidden_args = hidden_args2 } as t2) =
-      if t1 == t2 then 0
+        ({ head = head1;
+           visible_args = visible_args1;
+           hidden_args = hidden_args1
+         } as t1)
+        ({ head = head2;
+           visible_args = visible_args2;
+           hidden_args = hidden_args2
+         } as t2) =
+      if t1 == t2
+      then 0
       else
         match String.compare head1 head2 with
-        | 0 -> begin
-            match List.compare compare_pairs visible_args1 visible_args2 with
-            | 0 -> List.compare compare_pairs hidden_args1 hidden_args2
-            | c -> c
+        | 0 ->
+          begin match
+            List.compare compare_pairs visible_args1 visible_args2
+          with
+          | 0 -> List.compare compare_pairs hidden_args1 hidden_args2
+          | c -> c
           end
         | c -> c
 
@@ -274,7 +284,8 @@ end = struct
 
   let print = doc_print
 
-  let of_parameter_name param = { head = param; hidden_args = []; visible_args = [] }
+  let of_parameter_name param =
+    { head = param; hidden_args = []; visible_args = [] }
 
   let create head visible_args ~hidden_args =
     let hidden_args =
@@ -282,7 +293,7 @@ end = struct
         (fun param -> Argument.{ param; value = of_parameter_name param })
         hidden_args
     in
-    let (let*) = Result.bind in
+    let ( let* ) = Result.bind in
     let* visible_args = sort_and_check_uniqueness visible_args in
     let* hidden_args = sort_and_check_uniqueness hidden_args in
     let* () = check_uniqueness_of_merged visible_args hidden_args in
@@ -294,7 +305,8 @@ end = struct
     | Error (Duplicate _) ->
       Misc.fatal_errorf_doc
         "Names of arguments and parameters must be unique:@ %a"
-        (fun ppf () -> print_syntax ppf ~head ~visible_args ~hidden_args) ()
+        (fun ppf () -> print_syntax ppf ~head ~visible_args ~hidden_args)
+        ()
 
   let unsafe_create_unchecked head visible_args ~hidden_args =
     { head; visible_args; hidden_args }
@@ -302,9 +314,10 @@ end = struct
   (* CR-someday lmaurer: Should try and make this unnecessary or at least cheap.
      Could do it by making [Name.t] an unboxed existential so that converting from
      [t] is the identity. Or just have [Name.t] wrap [t] and ignore [hidden_args]. *)
-  let rec to_name ({ head; visible_args; hidden_args = _ }) : Name.t =
+  let rec to_name { head; visible_args; hidden_args = _ } : Name.t =
     (* Safe because we already checked the names in this exact argument list *)
     Name.unsafe_create_unchecked head (List.map arg_to_name visible_args)
+
   and arg_to_name ({ param = name; value } : argument) : Name.argument =
     { param = name; value = to_name value }
 end
@@ -314,27 +327,31 @@ include T0
 let to_string t = Fmt.asprintf "%a" print t
 
 module Subst = Parameter_name.Map
+
 type subst = t Subst.t
 
 let find_in_parameter_map t map =
   match t with
-  | { head; visible_args = []; hidden_args = []; } ->
+  | { head; visible_args = []; hidden_args = [] } ->
     Parameter_name.Map.find_opt head map
   | _ -> None
 
 let rec subst0 (t : t) (s : subst) ~changed =
   match find_in_parameter_map t s with
-  | Some rhs -> changed := true; rhs
+  | Some rhs ->
+    changed := true;
+    rhs
   | None -> subst0_inside t s ~changed
+
 and subst0_inside { head; visible_args; hidden_args } s ~changed =
   let matching_hidden_args, non_matching_hidden_args =
     List.partition_map
       (fun (({ param = name; value } : argument) as pair) ->
-          match find_in_parameter_map value s with
-          | Some rhs ->
-            changed := true;
-            Left ({ param = name; value = rhs } : argument)
-          | None -> Right pair)
+        match find_in_parameter_map value s with
+        | Some rhs ->
+          changed := true;
+          Left ({ param = name; value = rhs } : argument)
+        | None -> Right pair)
       hidden_args
   in
   let visible_args = subst0_alist visible_args s ~changed in
@@ -347,10 +364,11 @@ and subst0_inside { head; visible_args; hidden_args } s ~changed =
   in
   (* The [List.merge] preserved sorting so everything must still be valid *)
   unsafe_create_unchecked head visible_args ~hidden_args
+
 and subst0_alist l s ~changed =
   List.map
     (fun (arg : argument) -> { arg with value = subst0 arg.value s ~changed })
-  l
+    l
 
 let subst t s =
   let changed = ref false in
@@ -386,7 +404,9 @@ let has_arguments t =
 let print_t = print
 
 module Precision = struct
-  type t = Exact | Approximate
+  type t =
+    | Exact
+    | Approximate
 
   let print ppf = function
     | Exact -> Fmt.fprintf ppf "exact"
@@ -396,8 +416,7 @@ module Precision = struct
 
   let equal t1 t2 =
     match t1, t2 with
-    | Exact, Exact
-    | Approximate, Approximate -> true
+    | Exact, Exact | Approximate, Approximate -> true
     | (Exact | Approximate), _ -> false
 end
 
@@ -421,8 +440,7 @@ module With_precision = struct
     let rec meet glob1 glob2 =
       let visible_args_rev =
         Misc.Stdlib.List.merge_fold glob1.visible_args glob2.visible_args
-          ~cmp:Argument.compare_by_param
-          ~init:[]
+          ~cmp:Argument.compare_by_param ~init:[]
           ~left_only:(fun _ _ -> raise Inconsistent)
           ~right_only:(fun _ _ -> raise Inconsistent)
           ~both:(fun acc_rev arg1 arg2 -> meet_args arg1 arg2 :: acc_rev)
@@ -430,8 +448,7 @@ module With_precision = struct
       let hidden_args_rev =
         (* Keep only the hidden arguments that appear in both lists *)
         Misc.Stdlib.List.merge_fold glob1.hidden_args glob2.hidden_args
-          ~cmp:Argument.compare_by_param
-          ~init:[]
+          ~cmp:Argument.compare_by_param ~init:[]
           ~left_only:(fun acc_rev _ -> acc_rev)
           ~right_only:(fun acc_rev _ -> acc_rev)
           ~both:(fun acc_rev arg1 arg2 -> meet_args arg1 arg2 :: acc_rev)
@@ -450,20 +467,19 @@ module With_precision = struct
   let meet (t1 : t) (t2 : t) : t =
     match t1, t2 with
     | (glob1, Approximate), (glob2, Approximate) ->
-        (meet_approximate glob1 glob2, Approximate)
+      meet_approximate glob1 glob2, Approximate
     | (glob1, Exact), (glob2, Exact) ->
-        begin match equal glob1 glob2 with
-        | true -> t1
-        | false -> raise Inconsistent
-        end
+      begin match equal glob1 glob2 with
+      | true -> t1
+      | false -> raise Inconsistent
+      end
     | ((exact, Exact) as t_exact), (approx, Approximate)
     | (approx, Approximate), ((exact, Exact) as t_exact) ->
-        let exact' = meet_approximate exact approx in
-        begin match equal exact exact' with
-        | true -> t_exact
-        | false -> raise Inconsistent
-        end
+      let exact' = meet_approximate exact approx in
+      begin match equal exact exact' with
+      | true -> t_exact
+      | false -> raise Inconsistent
+      end
 
-  let equal (t1, prec1) (t2, prec2) =
-    equal t1 t2 && Precision.equal prec1 prec2
+  let equal (t1, prec1) (t2, prec2) = equal t1 t2 && Precision.equal prec1 prec2
 end
