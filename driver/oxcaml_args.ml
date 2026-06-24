@@ -386,12 +386,12 @@ let mk_no_long_frames f =
 let mk_debug_long_frames_threshold f =
   ( "-debug-long-frames-threshold",
     Arg.Int f,
-    "n debug only: set long frames threshold" )
+    "<n>  debug only: set long frames threshold" )
 
 let mk_dbranch_relaxation_max_displacement f =
   ( "-dbranch-relaxation-max-displacement",
     Arg.Int f,
-    "n debug only: lower the branch relaxation displacement threshold" )
+    "<n>  debug only: lower the branch relaxation displacement threshold" )
 
 let mk_caml_apply_inline_fast_path f =
   ( "-caml-apply-inline-fast-path",
