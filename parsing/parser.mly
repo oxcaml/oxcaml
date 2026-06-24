@@ -1125,6 +1125,7 @@ let maybe_pmod_constraint mode expr =
 %token SIG                    "sig"
 %token LAYOUT                 "layout_"
 %token STACK                  "stack_"
+%token THM                    "thm_"
 %token STAR                   "*"
 %token <string * Location.t * string option>
        STRING                 "\"hello\"" (* just an example *)
@@ -2135,7 +2136,9 @@ signature_item:
     )
     { $1 }
   | wrap_mksig_ext(
-      value_description
+      theorem_description
+        { (Psig_theorem $1, None) }
+    | value_description
         { psig_value $1 }
     | primitive_declaration
         { psig_value $1 }
@@ -3956,6 +3959,20 @@ value_description:
       let docs = symbol_docs $sloc in
       Val.mk id ty ~poly:poly_flag ~attrs ~modalities ~loc ~docs,
       ext }
+;
+
+/* Theorem declarations */
+
+theorem_description:
+  THM
+  QUESTION
+  id = mkrhs(val_ident)
+  COLON
+  ty = possibly_poly(core_type)
+  attrs = post_item_attributes
+    { let loc = make_loc $sloc in
+      let docs = symbol_docs $sloc in
+      Thm.mk id ty ~potential:true ~attrs ~loc ~docs }
 ;
 
 /* Primitive declarations */

@@ -741,6 +741,21 @@ and value_description =
             when {{!value_description.pval_prim}[pval_prim]} is [["s1";..."sn"]]
 *)
 
+(** {2 Theorem declarations} *)
+
+and theorem_description =
+    {
+     pthm_name: string loc;
+     pthm_type: core_type;
+     pthm_potential: bool;  (** the [?]: true for [thm_?] *)
+     pthm_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
+     pthm_loc: Location.t;
+    }
+(** Values of type {!theorem_description} represent a theorem signature item:
+    - [thm_? name : T], when {{!theorem_description.pthm_potential}
+      [pthm_potential]} is [true]
+*)
+
 (** {2 Type declarations} *)
 
 and type_declaration =
@@ -1149,6 +1164,8 @@ and signature_item_desc =
       (** - [val x: T]
             - [external x: T = "s1" ... "sn"]
          *)
+  | Psig_theorem of theorem_description
+      (** [thm_? name : T] *)
   | Psig_type of rec_flag * type_declaration list
       (** [type t1 = ... and ... and tn  = ...] *)
   | Psig_typesubst of type_declaration list

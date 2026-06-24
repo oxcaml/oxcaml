@@ -591,6 +591,7 @@ module Analyser =
         | Parsetree.Psig_class _
         | Parsetree.Psig_class_type _ as tp -> take_item tp
         | Parsetree.Psig_include ({pincl_kind=Functor;_}, _)
+        | Parsetree.Psig_theorem _
         | Parsetree.Psig_typesubst _ -> acc
         | Parsetree.Psig_type (rf, types) ->
           (match List.filter (fun td -> not (is_erased td.Parsetree.ptype_name.txt erased)) types with
@@ -1609,6 +1610,7 @@ module Analyser =
               f ~first: true 0 pos_start_ele class_type_declaration_list
             in
             (maybe_more, new_env, eles)
+        | Parsetree.Psig_theorem _
         | Parsetree.Psig_attribute _
         | Parsetree.Psig_extension _ ->
             (0, env, [])

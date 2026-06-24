@@ -1662,6 +1662,12 @@ and signature_item ctxt f x : unit =
         ident_of_name vd.pval_name.txt
         (value_description ctxt) vd
         (item_attributes ctxt) vd.pval_attributes
+  | Psig_theorem td ->
+      let intro = if td.pthm_potential then "thm_?" else "thm_" in
+      pp f "@[<2>%s@ %a@ :@ %a@]%a" intro
+        ident_of_name td.pthm_name.txt
+        (core_type ctxt) td.pthm_type
+        (item_attributes ctxt) td.pthm_attributes
   | Psig_typext te ->
       type_extension ctxt f te
   | Psig_exception ed ->

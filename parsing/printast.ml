@@ -648,6 +648,13 @@ and value_description i ppf x =
   modalities (i+1) ppf x.pval_modalities;
   list (i+1) string ppf x.pval_prim
 
+and theorem_description i ppf x =
+  line i ppf "theorem_description %a %a\n" fmt_string_loc
+       x.pthm_name fmt_location x.pthm_loc;
+  line (i+1) ppf "potential = %b\n" x.pthm_potential;
+  attributes i ppf x.pthm_attributes;
+  core_type (i+1) ppf x.pthm_type
+
 and type_parameter i ppf (x, _variance) = core_type i ppf x
 
 and type_declaration i ppf x =
@@ -966,6 +973,9 @@ and signature_item i ppf x =
   | Psig_value vd ->
       line i ppf "Psig_value\n";
       value_description i ppf vd;
+  | Psig_theorem td ->
+      line i ppf "Psig_theorem\n";
+      theorem_description i ppf td;
   | Psig_type (rf, l) ->
       line i ppf "Psig_type %a\n" fmt_rec_flag rf;
       list i type_declaration ppf l;

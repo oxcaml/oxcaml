@@ -256,6 +256,13 @@ module Val:
       value_description
   end
 
+(** Theorem declarations *)
+module Thm:
+  sig
+    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?potential:bool ->
+      str -> core_type -> theorem_description
+  end
+
 (** Type declarations *)
 module Type:
   sig
@@ -350,6 +357,7 @@ module Sig:
     val mk: ?loc:loc -> signature_item_desc -> signature_item
 
     val value: ?loc:loc -> value_description -> signature_item
+    val theorem: ?loc:loc -> theorem_description -> signature_item
     val type_: ?loc:loc -> rec_flag -> type_declaration list -> signature_item
     val type_subst: ?loc:loc -> type_declaration list -> signature_item
     val type_extension: ?loc:loc -> type_extension -> signature_item

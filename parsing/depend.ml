@@ -511,6 +511,8 @@ and add_sig_item (bv, m) item =
   match item.psig_desc with
     Psig_value vd ->
       add_type bv vd.pval_type; (bv, m)
+  | Psig_theorem td ->
+      add_type bv td.pthm_type; (bv, m)
   | Psig_type (_, dcls)
   | Psig_typesubst dcls->
       List.iter (add_type_declaration bv) dcls; (bv, m)
