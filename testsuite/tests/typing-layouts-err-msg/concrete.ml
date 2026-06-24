@@ -44,10 +44,12 @@ Error: Constructor arguments being projected must be representable.
 (* Constructor_arg_assignment *)
 let _ = A (assert false)
 [%%expect {|
-Line 1, characters 10-24:
+Line 1, characters 8-24:
 1 | let _ = A (assert false)
-              ^^^^^^^^^^^^^^
-Error: Constructor arguments must be representable.
+            ^^^^^^^^^^^^^^^^
+Error: The representation of the constructor "A"
+       depends on the layout of its argument,
+       which this instantiation of the type t does not determine.
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.
        But the layout of t_any must be representable

@@ -308,6 +308,12 @@ type error =
   | Constructor_arg_value_not_rep of type_expr * Jkind.Violation.t
   | Indeterminate_record_layout of type_expr * string
   | Indeterminate_constructor_layout of type_expr * string * int
+  | Constructor_representation_indeterminate of
+      { cstr_name : string;
+        containing_type : type_expr;
+        arg_cstr_name : string;
+        arg_type : type_expr;
+        violation : Jkind.Violation.t }
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
   | Unsupported_stack_allocation of unsupported_stack_allocation
@@ -3069,18 +3075,104 @@ end)
 type unrepresentable_arg =
   Unrepresentable_arg of Warnings.loc * type_expr * Jkind.Violation.t
 
-let representation_for_tuple_constructor env constr ty_args ~loc ~types
-      ~containing_type ~why : _ Result.t =
-  match constr.cstr_shape with
-  | Some shape ->
+(* Unify [ty_res], the result type of a constructor instance, with the
+   use-site type [containing_type] when that leaves [containing_type] alone,
+   as decided by inspecting its variables (cf. [Ctype.matches]). Otherwise
+   the unification is undone — the constructor cannot, or need not, occur at
+   this instantiation — and the variables of [containing_type] it would have
+   instantiated, on whose layouts the constructor's representation depends,
+   are returned. *)
+let refine_constructor_instance env ty_res ~containing_type =
+  let use_site_vars = free_variables containing_type in
+  let snap = Btype.snapshot () in
+  match unify env ty_res containing_type with
+  | exception Unify _ ->
+    Btype.backtrack snap;
+    []
+  | () ->
+    match List.filter (fun v -> not (is_Tvar v)) use_site_vars with
+    | [] -> []
+    | refined ->
+      Btype.backtrack snap;
+      refined
+
+(* The sorts of the arguments of [cstr], a constructor of the variant type
+   [containing_type], raising if the use of constructor [used_cstr_name]
+   does not determine them. *)
+let constructor_argument_sorts env (cstr : Types.constructor_description)
+      ~containing_type ~why ~loc ~used_cstr_name =
+  match cstr.cstr_shape with
+  | Some _ ->
+      (* Determined at declaration. *)
       begin match
         Misc.Stdlib.List.map_option
           (fun arg -> arg.ca_sort |> Option.map Jkind.Sort.of_const)
-          constr.cstr_args
+          cstr.cstr_args
       with
-      | Some sorts -> Ok (shape, sorts)
+      | Some sorts -> sorts
       | None -> Misc.fatal_error "representable constructor missing a sort"
       end
+  | None ->
+      let (ty_args, ty_res, existentials) =
+        instance_constructor Keep_existentials_flexible cstr
+      in
+      let require_sort ~fixed ty =
+        match type_sort ~why ~fixed env ty with
+        | Ok sort -> sort
+        | Error violation ->
+          raise (Error (loc, env,
+            Constructor_representation_indeterminate
+              { cstr_name = used_cstr_name;
+                containing_type;
+                arg_cstr_name = cstr.cstr_name;
+                arg_type = ty;
+                violation }))
+      in
+      (* An existential's layout is determined by no instantiation. *)
+      List.iter
+        (fun (ty, _jkind) ->
+           ignore (require_sort ~fixed:true ty : Jkind.sort))
+        existentials;
+      List.iter
+        (fun v -> ignore (require_sort ~fixed:false v : Jkind.sort))
+        (refine_constructor_instance env ty_res ~containing_type);
+      List.map
+        (fun (ca : Types.constructor_argument) ->
+           require_sort ~fixed:false ca.ca_type)
+        ty_args
+
+let representation_for_tuple_constructor env constr ty_args ~loc ~types
+      ~containing_type ~why : _ Result.t =
+  (* When some constructor of the variant has an argument of layout [any]
+     ([Cstr_layout_variable]), which constructors are constant — and hence
+     the runtime tags of all of them — can depend on the instantiation, so
+     using any constructor requires every constructor's representation to be
+     determined at [containing_type]. The siblings' sorts are discarded for
+     now; resolving the variant's representation will consume them. *)
+  begin match constr.cstr_repr with
+  | Variant_boxed layouts
+    when Array.exists
+           (function
+             | Cstr_layout_variable -> true
+             | Cstr_layout_known _ -> false)
+           layouts ->
+    List.iter
+      (fun sibling ->
+         ignore
+           (constructor_argument_sorts env sibling ~containing_type ~why
+              ~loc ~used_cstr_name:constr.cstr_name
+            : Jkind.sort list))
+      (Parmatch.get_variant_constructors env containing_type)
+  | Variant_boxed _ | Variant_unboxed | Variant_with_null
+  | Variant_extensible -> ()
+  end;
+  (* The used constructor's own shape and sorts come from the types of the
+     arguments it is applied to, which can further determine existentials. *)
+  match constr.cstr_shape with
+  | Some shape ->
+      Ok (shape,
+          constructor_argument_sorts env constr ~containing_type ~why ~loc
+            ~used_cstr_name:constr.cstr_name)
   | None ->
       begin match
         Misc.Stdlib.List.mapi_result
@@ -13282,6 +13374,29 @@ let report_error ~loc env =
         Printtyp.type_expr ty
         cstr_name
         i
+  | Constructor_representation_indeterminate
+      { cstr_name; containing_type; arg_cstr_name; arg_type; violation } ->
+      let report =
+        Jkind.Violation.report_with_offender
+          ~offender:(fun ppf -> Printtyp.type_expr ppf arg_type) env
+      in
+      if String.equal cstr_name arg_cstr_name then
+        Location.errorf ~loc
+          "@[The representation of the constructor %a@ depends on the \
+           layout of its argument,@ which this instantiation of the type \
+           %a does not determine.@]@ %a"
+          Style.inline_code cstr_name
+          Printtyp.type_expr containing_type
+          report violation
+      else
+        Location.errorf ~loc
+          "@[The representation of the constructor %a@ depends on the \
+           layout of the argument of constructor %a,@ which this \
+           instantiation of the type %a does not determine.@]@ %a"
+          Style.inline_code cstr_name
+          Style.inline_code arg_cstr_name
+          Printtyp.type_expr containing_type
+          report violation
   | Invalid_label_for_src_pos arg_label ->
       Location.errorf ~loc
         "A position argument must not be %s."
