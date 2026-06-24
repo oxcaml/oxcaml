@@ -206,7 +206,7 @@ let
 in
 stdenv.mkDerivation {
   pname = "oxcaml";
-  version = "5.2.0+ox";
+  version = "5.4.0+ox";
   inherit src configureFlags;
 
   OXCAML_LLDB = if oxcamlLldb then "${lldb}/bin/lldb" else null;
