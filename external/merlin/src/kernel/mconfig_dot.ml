@@ -339,111 +339,144 @@ type context =
 exception End_of_input
 
 let get_config { workdir; process_dir; configurator } path_abs =
-  let log_query path =
+  (* Jane Street specific logic: Unintuitively, when using Jane Street Dune,
+     Dot_merlin is the correct reader to use. Since there is a dune-workspace
+     file at the root of JS-dune projects, if the user does not generate .merlin
+     files by building the relevant targets, Merlin will try to use Dune to load
+     project configuration. We detect this case and give a useful error
+     message. *)
+  let in_jane_context_but_detected_dune =
+    match (Config.Jane_context.current, configurator) with
+    | Vanilla, _ | Jane_street, Dot_merlin -> false
+    | Jane_street, Dune -> true
+  in
+  if in_jane_context_but_detected_dune then begin
     log ~title:"get_config"
-      "Querying %s (inital cwd: %s) for file: %s.\nWorkdir: %s"
-      (Configurator.to_string configurator)
-      process_dir path workdir
-  in
-  let query path (p : Configurator.Process.t) =
-    let open Merlin_dot_protocol.Blocking in
-    log_query path;
-    Commands.send_file p.stdin path;
-    flush p.stdin;
-    read p.stdout
-  in
-  try
-    let p = Configurator.get_process_exn ~dir:process_dir configurator in
-    (* Both [p.initial_cwd] and [path_abs] have gone through
+      "Attempted to use Dune to load project configuration while running in a \
+       Jane Street context. Defaulting to empty configuration.";
+    let error_msg =
+      "Could not find `.merlin` file to load project configuration. To get \
+       full Merlin support for this file, build the relevant target using \
+       Dune. This is usually the default target for the directory containing \
+       this file."
+    in
+    (empty_config, [ error_msg ])
+  end
+  else
+    (* intentionally not indented to help with merge conflicts / keep a smaller diff *)
+    let log_query path =
+      log ~title:"get_config"
+        "Querying %s (inital cwd: %s) for file: %s.\nWorkdir: %s"
+        (Configurator.to_string configurator)
+        process_dir path workdir
+    in
+    let query path (p : Configurator.Process.t) =
+      let open Merlin_dot_protocol.Blocking in
+      log_query path;
+      Commands.send_file p.stdin path;
+      flush p.stdin;
+      read p.stdout
+    in
+    try
+      let p = Configurator.get_process_exn ~dir:process_dir configurator in
+      (* Both [p.initial_cwd] and [path_abs] have gone through
        [canonicalize_filename] *)
-    let path_rel =
-      String.chop_prefix ~prefix:p.initial_cwd path_abs
-      |> Option.map ~f:(fun path ->
-          (* We need to remove the leading path separator after chopping.
+      let path_rel =
+        String.chop_prefix ~prefix:p.initial_cwd path_abs
+        |> Option.map ~f:(fun path ->
+            (* We need to remove the leading path separator after chopping.
                 There is one case where no separator is left: when [initial_cwd]
                 was the root of the filesystem *)
-          if String.length path > 0 && path.[0] = Filename.dir_sep.[0] then
-            String.drop 1 path
-          else path)
-    in
+            if String.length path > 0 && path.[0] = Filename.dir_sep.[0] then
+              String.drop 1 path
+            else path)
+      in
 
-    let path =
-      match (p.kind, path_rel) with
-      | Dune, Some path_rel -> path_rel
-      | _, _ -> path_abs
-    in
+      let path =
+        match (p.kind, path_rel) with
+        | Dune, Some path_rel -> path_rel
+        | _, _ -> path_abs
+      in
 
-    (* Starting with Dune 2.8.3 relative paths are preferred. However to maintain
+      (* Starting with Dune 2.8.3 relative paths are preferred. However to maintain
        compatibility with 2.8 <= Dune <= 2.8.2  we always retry with an absolute
        path if using a relative one failed *)
-    let answer =
-      match query path p with
-      | Ok [ `ERROR_MSG _ ] when p.kind = Dune -> query path_abs p
-      | answer -> answer
-    in
-
-    match answer with
-    | Ok directives ->
-      let cfg, failures =
-        prepend_config ~dir:workdir configurator directives empty_config
+      let answer =
+        match query path p with
+        | Ok [ `ERROR_MSG _ ] when p.kind = Dune -> query path_abs p
+        | answer -> answer
       in
-      (postprocess_config cfg, failures)
-    | Error (Merlin_dot_protocol.Unexpected_output msg) ->
-      (empty_config, [ msg ])
-    | Error (Merlin_dot_protocol.Csexp_parse_error _) -> raise End_of_input
-  with
-  | Configurator.Process_exited ->
-    (* This can happen
+
+      match answer with
+      | Ok directives ->
+        let cfg, failures =
+          prepend_config ~dir:workdir configurator directives empty_config
+        in
+        (postprocess_config cfg, failures)
+      | Error (Merlin_dot_protocol.Unexpected_output msg) ->
+        (empty_config, [ msg ])
+      | Error (Merlin_dot_protocol.Csexp_parse_error _) -> raise End_of_input
+    with
+    | Configurator.Process_exited ->
+      (* This can happen
        - If `dot-merlin-reader` is not installed and the project use `.merlin`
          files
        - There was a bug in the external reader causing a crash *)
-    let program_name = Lib_config.program_name () in
-    let error =
-      Printf.sprintf
-        "A problem occurred with %s external configuration reader. %s If the \
-         problem persists, please file an issue on %s's tracker."
-        program_name
-        (match configurator with
-        | Dot_merlin -> "Check that `dot-merlin-reader` is installed."
-        | Dune -> "Check that `dune` is installed and up-to-date.")
-        program_name
-    in
-    (empty_config, [ error ])
-  | Unix.Unix_error (ENOENT, "create_process", "dune") ->
-    let error =
-      Printf.sprintf
-        "%s could not find `dune` in the PATH to get project configuration. If \
-         you do not rely on Dune, make sure `.merlin` files are present in the \
-         project's sources."
-        (Lib_config.program_name ())
-    in
-    (empty_config, [ error ])
-  | Unix.Unix_error (ENOENT, "create_process", "dot-merlin-reader") ->
-    let error =
-      Printf.sprintf
-        "%s could not find `dot-merlin-reader`. Please make sure that \
-         `dot-merlin-reader` is installed. `dot-merlin-reader` is expected to \
-         be in the same directory as the merlin executable or on the PATH. You \
-         may also specify the path to `dot-merlin-reader` via the \
-         `DOT_MERLIN_READER_EXE` environment variable."
-        (Lib_config.program_name ())
-    in
-    (empty_config, [ error ])
-  | End_of_input ->
-    (* This can happen
+      let program_name = Lib_config.program_name () in
+      let error =
+        Printf.sprintf
+          "A problem occurred with %s external configuration reader. %s If the \
+           problem persists, please file an issue on %s's tracker."
+          program_name
+          (match configurator with
+          | Dot_merlin -> "Check that `dot-merlin-reader` is installed."
+          | Dune -> "Check that `dune` is installed and up-to-date.")
+          program_name
+      in
+      (empty_config, [ error ])
+    | Unix.Unix_error (ENOENT, "create_process", "dune") ->
+      let error =
+        Printf.sprintf
+          "%s could not find `dune` in the PATH to get project configuration. \
+           If you do not rely on Dune, make sure `.merlin` files are present \
+           in the project's sources."
+          (Lib_config.program_name ())
+      in
+      (empty_config, [ error ])
+    | Unix.Unix_error (ENOENT, "create_process", "dot-merlin-reader") ->
+      let error =
+        Printf.sprintf
+          "%s could not find `dot-merlin-reader`. Please make sure that \
+           `dot-merlin-reader` is installed. `dot-merlin-reader` is expected \
+           to be in the same directory as the merlin executable or on the \
+           PATH. You may also specify the path to `dot-merlin-reader` via the \
+           `DOT_MERLIN_READER_EXE` environment variable."
+          (Lib_config.program_name ())
+      in
+      (empty_config, [ error ])
+    | End_of_input ->
+      (* This can happen
        - if a project using old-dune has not been built and Merlin wrongly tries to
          start `new-dune ocaml-merlin` in the absence of `.merlin` files
-       - the process stopped in the middle of its answer (which is very unlikely) *)
-    let program_name = Lib_config.program_name () in
-    let error =
-      Printf.sprintf
-        "%s could not load its configuration from the external reader. %s"
-        program_name
-        (match configurator with
-        | Dot_merlin -> "If the problem persists, please file an issue."
-        | Dune -> "Building your project with `dune` might solve this issue.")
-    in
-    (empty_config, [ error ])
+       - the process stopped in the middle of its answer (which is very unlikely)
+       - Jane Street dune was used rather than upstream dune *)
+      let program_name = Lib_config.program_name () in
+      let error =
+        Printf.sprintf
+          "%s could not load its configuration from the external reader. %s"
+          program_name
+          (match configurator with
+          | Dot_merlin -> "If the problem persists, please file an issue."
+          | Dune ->
+            Printf.sprintf
+              "Communicating with dune failed. For projects that use upstream \
+               dune, this likely happened for one of two reasons:\n\
+               1. Jane Street dune was in your PATH instead of upstream dune. \
+               Put upstream dune in your PATH and try again.\n\
+               2. You have not built your project with dune. Build with \
+               upstream dune and try again.")
+      in
+      (empty_config, [ error ])
 
 let find_project_context start_dir =
   (* The workdir is the first directory we find which contains a [dune] file.
