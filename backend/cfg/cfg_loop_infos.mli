@@ -27,7 +27,8 @@ val merge_loops : loop list -> loop list
 (* Merge the loops which are not nested but have blocks in common. *)
 
 type loop_depths = int Label.Map.t
-(* Maps labels to the number of nested loops it is part of. *)
+(* Maps each label to its loop-nesting depth: the number of loops containing it,
+   counting one loop per header. Used for heuristics. *)
 
 val compute_loop_depths : Cfg.t -> header_map -> loop_depths
 
