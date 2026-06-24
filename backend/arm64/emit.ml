@@ -772,21 +772,6 @@ let emit_local_realloc lr =
   A.ins1 BL (runtime_function S.Predef.caml_call_local_realloc);
   A.ins1 B (local_label lr.lr_return_lbl)
 
-(* Local stack reallocation *)
-
-let emit_stack_realloc env =
-  match Env.stack_realloc env with
-  | None -> ()
-  | Some { sc_label; sc_return; sc_max_frame_size_in_bytes } ->
-    D.define_label sc_label;
-    (* Pass the desired frame size on the stack, since all of the
-       argument-passing registers may be in use. *)
-    A.ins_mov_imm reg_x_tmp1 (O.imm_sixteen sc_max_frame_size_in_bytes);
-    A.ins3 (STP X) reg_x_tmp1 O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
-    A.ins1 BL (runtime_function S.Predef.caml_call_realloc_stack);
-    A.ins3 (LDP X) reg_x_tmp1 O.lr (O.mem_post_pair ~base:R.sp ~offset:16);
-    A.ins1 B (local_label sc_return)
-
 (* Names of various instructions *)
 
 let cond_for_comparison : integer_comparison -> Cond.t = function
@@ -847,6 +832,23 @@ let emit_intconst dst n =
           (O.imm_sixteen_of_nativeint nf)
           (O.optional_lsl_by_multiple_of_16_bits p);
         List.iter (emit_movk dst) l
+
+(* Local stack reallocation *)
+
+let emit_stack_realloc env =
+  match Env.stack_realloc env with
+  | None -> ()
+  | Some { sc_label; sc_return; sc_max_frame_size_in_bytes } ->
+    D.define_label sc_label;
+    (* Pass the desired frame size on the stack, since all of the
+       argument-passing registers may be in use. The frame size can exceed the
+       16-bit immediate of a single MOVZ, so use [emit_intconst] which
+       decomposes it into MOVZ/MOVK fragments as needed. *)
+    emit_intconst reg_x_tmp1 (Nativeint.of_int sc_max_frame_size_in_bytes);
+    A.ins3 (STP X) reg_x_tmp1 O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
+    A.ins1 BL (runtime_function S.Predef.caml_call_realloc_stack);
+    A.ins3 (LDP X) reg_x_tmp1 O.lr (O.mem_post_pair ~base:R.sp ~offset:16);
+    A.ins1 B (local_label sc_return)
 
 (* Recognize float constants appropriate for FMOV dst, #fpimm instruction: "a
    normalized binary floating point encoding with 1 sign bit, 4 bits of fraction
