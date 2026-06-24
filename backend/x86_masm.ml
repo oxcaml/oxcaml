@@ -132,17 +132,26 @@ let evex_rounding : Amd64_simd_defs.evex_rounding -> string = function
   | Rnd_up -> ", {ru-sae}"
   | Rnd_zero -> ", {rz-sae}"
 
+let evex_broadcast evex_w (len : Amd64_simd_defs.evex_length) =
+  let bits = match len with L128 -> 128 | L256 -> 256 | L512 -> 512 in
+  Printf.sprintf "{1to%d}" (bits / if evex_w then 64 else 32)
+
 let ievex b (instr : Amd64_simd_instrs.instr) args =
   let has_mem = Array.exists X86_ast_utils.is_mem args in
-  let zeroing, rounding =
+  let zeroing, rounding, broadcast =
     match instr.enc.prefix with
-    | Evex { evex_z; evex_b; evex_ll; _ } ->
-      let rounding =
+    | Evex { evex_z; evex_b; evex_ll; evex_w; _ } ->
+      let rounding, broadcast =
         match evex_ll with
-        | Ll_round rnd -> evex_rounding rnd
-        | Ll_len _ -> if evex_b && not has_mem then ", {sae}" else ""
+        | Ll_round rnd -> evex_rounding rnd, ""
+        | Ll_len len ->
+          if not evex_b
+          then "", ""
+          else if has_mem
+          then "", evex_broadcast evex_w len
+          else ", {sae}", ""
       in
-      (if evex_z then "{z}" else ""), rounding
+      (if evex_z then "{z}" else ""), rounding, broadcast
     | Legacy _ | Vex _ -> Misc.fatal_error "expected EVEX encoding"
   in
   let mask b = function None -> () | Some m -> bprintf b "{%a}" arg m in
@@ -158,6 +167,7 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
         let first = not !printed in
         if not first then Buffer.add_string b ", ";
         arg b a;
+        if X86_ast_utils.is_mem a then Buffer.add_string b broadcast;
         if first then bprintf b "%a%s" mask writemask zeroing;
         printed := true))
     args;

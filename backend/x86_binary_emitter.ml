@@ -476,6 +476,10 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
       prefix b ~rex:0 ~rexr:(rexr_reg reg) ~rexb:(rexb_rm rm) ~rexx:0;
       buf_opcodes b opcodes;
       buf_int8 b (mod_rm_reg 0b11 rm reg)
+  | Regmask rm ->
+      prefix b ~rex:0 ~rexr:(rexr_reg reg) ~rexb:(rexb_rm rm) ~rexx:0;
+      buf_opcodes b opcodes;
+      buf_int8 b (mod_rm_reg 0b11 rm reg)
   (* 64 bits memory access *)
   | Mem64_RIP (_, symbol, offset) ->
       prefix b ~rex:0 ~rexr:(rexr_reg reg) ~rexb:0 ~rexx:0;
@@ -590,7 +594,7 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
                 buf_int8 b (mod_rm_reg 0b10 0b100 reg);
                 buf_int8 b (sib scale idx base);
                 buf_sym b sym offset))
-  | Imm _ | Sym _ | Regmask _ -> assert false
+  | Imm _ | Sym _ -> assert false
 
 (** [rex_always] is combined with operand-derived REX bits. Passing [no_rex]
     here does not mean that no REX prefix will be emitted: [emit_prefix_modrm]
@@ -761,6 +765,7 @@ let emit_evex_rm_reg b ops rm reg ~evex_m ~evex_w ~evex_v ~evex_ll ~evex_p
 let rd_of_reg = function
   | Regf reg -> rd_of_regf reg
   | Reg16 reg | Reg32 reg | Reg64 reg -> rd_of_reg64 reg
+  | Regmask k -> k
   | _ -> assert false
 
 let emit_simd b (instr : Amd64_simd_instrs.instr) args =

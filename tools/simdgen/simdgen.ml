@@ -298,9 +298,6 @@ let parse_args mnemonic enc args =
   let res = ref Res_none in
   let flags = { z = false; b = Bcst_none; r = Rnd_none; k = false } in
   let parsed = parse_args mnemonic [] enc args imm flags res in
-  let parsed =
-    if flags.k then parsed @ [{ loc = Temp [| K |]; enc = Mask }] else parsed
-  in
   Array.of_list parsed, !imm, flags, !res
 
 let parse_enc mnemonic enc ~operand_size_override =
@@ -770,7 +767,25 @@ let arg_has_int16 arg =
           false)
       temps
 
-let expand_broadcast instr bcst =
+let arg_is_vm ({ loc; _ } : arg) =
+  match loc with Pin _ -> false | Temp temps -> Array.exists temp_is_vm temps
+
+let drop_mem_loc = function
+  | Pin _ as loc -> loc
+  | Temp temps -> (
+    match Array.to_list temps |> List.filter temp_is_reg with
+    | [] -> Temp temps
+    | regs -> Temp (Array.of_list regs))
+
+let drop_mem args =
+  Array.map (fun (arg : arg) -> { arg with loc = drop_mem_loc arg.loc }) args
+
+let bcst_mem = function
+  | Bcst_none -> assert false
+  | Bcst_32 -> M32
+  | Bcst_64 -> M64
+
+let expand_modifiers instr =
   let replace_mem mem args =
     Array.map
       (fun { loc; enc } ->
@@ -784,23 +799,48 @@ let expand_broadcast instr bcst =
       prefix =
         (match enc.prefix with
         | Evex evex -> Evex { evex with evex_b = true }
-        | prefix -> prefix)
+        | (Legacy _ | Vex _) as prefix -> prefix)
     }
   in
-  match bcst with
-  | Bcst_none -> [instr]
-  | Bcst_32 ->
-    [ instr;
-      { instr with
-        args = replace_mem M32 instr.args;
-        enc = replace_bcst instr.enc
-      } ]
-  | Bcst_64 ->
-    [ instr;
-      { instr with
-        args = replace_mem M64 instr.args;
-        enc = replace_bcst instr.enc
-      } ]
+  let expand_broadcast instr =
+    match instr.flags.b with
+    | Bcst_none -> [instr]
+    | bcst ->
+      [ instr;
+        { instr with
+          args = replace_mem (bcst_mem bcst) instr.args;
+          enc = replace_bcst instr.enc;
+          flags = { instr.flags with r = Rnd_none }
+        } ]
+  in
+  let expand_rounding instr =
+    match instr.flags.r with
+    | Rnd_none -> [instr]
+    | Rnd_er | Rnd_sae ->
+      if Array.exists (fun (arg : arg) -> loc_allows_mem arg.loc) instr.args
+      then
+        [ { instr with flags = { instr.flags with r = Rnd_none } };
+          { instr with args = drop_mem instr.args } ]
+      else [instr]
+  in
+  let expand_mask instr =
+    if not instr.flags.k
+    then [instr]
+    else
+      let masked =
+        { instr with
+          args =
+            Array.append instr.args [| { loc = Temp [| K |]; enc = Mask } |]
+        }
+      in
+      if Array.exists arg_is_vm instr.args
+      then [masked]
+      else [masked; { instr with flags = { instr.flags with z = false } }]
+  in
+  [instr]
+  |> List.concat_map expand_broadcast
+  |> List.concat_map expand_rounding
+  |> List.concat_map expand_mask
 
 let amd64 () =
   let csv = In_channel.with_open_text "amd64/amd64.csv" parse in
@@ -821,9 +861,7 @@ let amd64 () =
               parse_enc mnemonic enc
                 ~operand_size_override:(Array.exists arg_has_int16 args)
             in
-            expand_broadcast
-              { ext; args; res; imm; mnemonic; enc; flags }
-              flags.b
+            expand_modifiers { ext; args; res; imm; mnemonic; enc; flags }
         with Unsupported -> [])
       | _ -> [])
   in
