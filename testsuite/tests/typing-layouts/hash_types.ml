@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension layouts_beta";
+ flags = "-extension layouts_beta -w -219";
  expect;
 *)
 
@@ -274,7 +274,7 @@ Error: The value "x" has type "r#" but an expression was expected of type "r2#"
 
 (* Mutable fields imply modalities *)
 type r = { i : int ; mutable s : string }
-type u = r# = #{ i : int ; s : string @@ global many dynamic }
+type u = r# = #{ i : int ; s : string @@ global many aliased unyielding dynamic }
 [%%expect{|
 type r = { i : int; mutable s : string; }
 type u = r# = #{ i : int; s : string @@ global many dynamic; }

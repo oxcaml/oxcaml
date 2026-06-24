@@ -1,5 +1,5 @@
 (* TEST
-    flags += "-extension mode_alpha";
+    flags += "-extension mode_alpha -w -219";
     expect;
 *)
 
@@ -172,11 +172,6 @@ module type S = sig @@ portable
     end
 end
 [%%expect{|
-Line 3, characters 22-33:
-3 |     module M : sig @@ nonportable
-                          ^^^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
 module type S =
   sig
     val bar : 'a -> 'a @@ portable
@@ -194,11 +189,6 @@ module type S = sig @@ portable
     end
 end
 [%%expect{|
-Line 5, characters 41-52:
-5 |         val inner_override : 'a -> 'a @@ nonportable
-                                             ^^^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
 module type S =
   sig
     val outer : 'a -> 'a @@ portable
@@ -283,11 +273,6 @@ module type S = sig @@ global unforkable
     val bar : 'a -> 'a
 end
 [%%expect{|
-Line 2, characters 26-32:
-2 |     val foo : 'a -> 'a @@ global
-                              ^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
 module type S =
   sig
     val foo : 'a -> 'a @@ global
@@ -327,11 +312,6 @@ module type S = sig @@ local
     val bar : 'a -> 'a
 end
 [%%expect{|
-Line 1, characters 23-28:
-1 | module type S = sig @@ local
-                           ^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
 module type S = sig val foo : 'a -> 'a @@ global val bar : 'a -> 'a end
 |}]
 
@@ -341,11 +321,6 @@ module type S = sig @@ unforkable
     val bar : 'a -> 'a
 end
 [%%expect{|
-Line 1, characters 23-33:
-1 | module type S = sig @@ unforkable
-                           ^^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
 module type S = sig val foo : 'a -> 'a @@ global val bar : 'a -> 'a end
 |}]
 

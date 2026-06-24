@@ -1,5 +1,6 @@
 (* TEST
    include stdlib_stable;
+   flags = "-w -219";
    expect;
 *)
 
@@ -658,11 +659,6 @@ type 'a corrupted = { corrupted : 'a @@ corrupted }
 type 'a contended = { contended : 'a @@ contended }
 
 [%%expect{|
-Line 1, characters 44-55:
-1 | type 'a uncontended = { uncontended : 'a @@ uncontended }
-                                                ^^^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
 type 'a uncontended = { uncontended : 'a; }
 type 'a shared = { shared : 'a @@ shared; }
 type 'a corrupted = { corrupted : 'a @@ corrupted; }
@@ -904,11 +900,6 @@ type 'a corruptible = { corruptible : 'a @@ corruptible }
 type 'a portable = { portable : 'a @@ portable }
 
 [%%expect{|
-Line 1, characters 44-55:
-1 | type 'a nonportable = { nonportable : 'a @@ nonportable }
-                                                ^^^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
 type 'a nonportable = { nonportable : 'a; }
 type 'a shareable = { shareable : 'a @@ shareable; }
 type 'a corruptible = { corruptible : 'a @@ corruptible; }

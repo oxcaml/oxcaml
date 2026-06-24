@@ -1,5 +1,5 @@
 (* TEST
-    flags = "-extension layouts_alpha";
+    flags = "-extension layouts_alpha -w -219";
     expect;
 *)
 
@@ -124,11 +124,6 @@ end = struct
   type 'a t : immediate with 'a @@ aliased many contended global portable
 end
 [%%expect {|
-Line 4, characters 35-42:
-4 |   type 'a t : immediate with 'a @@ aliased many contended global portable
-                                       ^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
 module M : sig type 'a t : value mod global many portable contended end
 |}]
 

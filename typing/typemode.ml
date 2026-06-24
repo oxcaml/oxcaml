@@ -669,6 +669,8 @@ let transl_modalities_with_default ?(allow_redundant_staticity = false)
   (* axes listed in the order of implication. *)
   let modalities_with_loc = sort_dedup_modalities ~warn:true annots in
   let open Modality in
+  (* Don't warn on [@@ static] on interface toplevel,
+     even though [@@ static] is the identity modality.  *)
   let redundant_modality_allowed (Atom (ax, a)) =
     allow_redundant_staticity
     &&

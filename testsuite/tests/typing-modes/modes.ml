@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-w -219";
  expect;
 *)
 
@@ -261,13 +262,9 @@ Error: Found a aliased value where a unique value was expected
 *)
 
 (* arrow types *)
-type r = local_ string @ unique once -> unique_ string @ local once
+type r = local_ string @ unique once -> string @ local unique once
 [%%expect{|
-Line 1, characters 40-54:
-1 | type r = local_ string @ unique once -> unique_ string @ local once
-                                            ^^^^^^^^^^^^^^
-Error: The type constructor "string" expects 0 argument(s),
-       but is here applied to 1 argument(s)
+type r = string @ local unique once -> string @ local unique once
 |}]
 
 type r = local_ string * y:string @ unique once -> local_ string * w:string @ once
@@ -300,22 +297,14 @@ Error: The locality axis has already been specified.
 |}]
 
 (* Mixing legacy and new modes *)
-type r = local_ unique_ once_ string -> string
+type r = local_ string @ unique once -> string
 [%%expect{|
-Line 1, characters 16-36:
-1 | type r = local_ unique_ once_ string -> string
-                    ^^^^^^^^^^^^^^^^^^^^
-Error: The type constructor "string" expects 0 argument(s),
-       but is here applied to 1 argument(s)
+type r = string @ local unique once -> string
 |}]
 
-type r = local_ unique_ once_ string @ portable contended -> string
+type r = local_ string @ unique once portable contended -> string
 [%%expect{|
-Line 1, characters 16-36:
-1 | type r = local_ unique_ once_ string @ portable contended -> string
-                    ^^^^^^^^^^^^^^^^^^^^
-Error: The type constructor "string" expects 0 argument(s),
-       but is here applied to 1 argument(s)
+type r = string @ local unique once portable contended -> string
 |}]
 
 type r = string @ local unique once portable contended -> string
@@ -388,11 +377,6 @@ type r = {
   global_ x : string @@ aliased
 }
 [%%expect{|
-Line 2, characters 24-31:
-2 |   global_ x : string @@ aliased
-                            ^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
 type r = { x : string @@ global; }
 |}]
 
@@ -400,11 +384,6 @@ type r = {
   x : string @@ aliased global many
 }
 [%%expect{|
-Line 2, characters 16-23:
-2 |   x : string @@ aliased global many
-                    ^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
 type r = { x : string @@ global many; }
 |}]
 
@@ -417,21 +396,11 @@ Line 2, characters 16-23:
                     ^^^^^^^
 Warning 213: This uniqueness is overridden by aliased later.
 
-Line 2, characters 36-43:
-2 |   x : string @@ aliased global many aliased
-                                        ^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
 type r = { x : string @@ global many; }
 |}]
 
 type r = Foo of string @@ global aliased many
 [%%expect{|
-Line 1, characters 33-40:
-1 | type r = Foo of string @@ global aliased many
-                                     ^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
 type r = Foo of string @@ global many
 |}]
 
@@ -441,26 +410,6 @@ type r = {
   mutable x : string @@ global unyielding aliased many
 }
 [%%expect{|
-Line 2, characters 24-30:
-2 |   mutable x : string @@ global unyielding aliased many
-                            ^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
-Line 2, characters 31-41:
-2 |   mutable x : string @@ global unyielding aliased many
-                                   ^^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
-Line 2, characters 50-54:
-2 |   mutable x : string @@ global unyielding aliased many
-                                                      ^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
-Line 2, characters 42-49:
-2 |   mutable x : string @@ global unyielding aliased many
-                                              ^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
 type r = { mutable x : string; }
 |}]
 

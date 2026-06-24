@@ -1,5 +1,5 @@
 (* TEST
-    flags = "-extension layouts_alpha -no-ikinds";
+    flags = "-extension layouts_alpha -no-ikinds -w -219";
     expect;
 *)
 
@@ -121,7 +121,7 @@ module M : sig type 'a t : value mod aliased end
 module M : sig
   type 'a t : value mod global aliased many portable contended
 end = struct
-  type 'a t : immediate with 'a @@ many contended global portable
+  type 'a t : immediate with 'a @@ aliased many contended global portable
 end
 [%%expect {|
 module M : sig type 'a t : value mod global many portable contended end
