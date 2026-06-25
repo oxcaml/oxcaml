@@ -5,6 +5,9 @@
 
 #syntax quotations on
 
+(* This file contains some test-cases where we ended up with heap-to-stack
+   pointers when constructing [Lfunction]s for binders. *)
+
 (* Make sure nesting binder-generated closures behaves *)
 
 let _ = <[let a = 1 in a + 1]>
@@ -29,7 +32,9 @@ let _ =
   <[ fun () ->
      let knocked_out = ref 0 in
      let _ : _ =
-       $(let rec (loop @ global) : _ @ global -> _ @ local once = fun #(acc, n) ->
+      (* It is key that [loop] is stack-allocated, so this test might pass
+         with [loop @ global]. *)
+       $(let rec (loop @ local) : _ @ global -> _ @ local once = fun #(acc, n) ->
            if n <= 0
            then <[ [] ]>
            else
