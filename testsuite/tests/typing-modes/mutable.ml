@@ -1,5 +1,5 @@
 (* TEST
- flags = "-w +53-219";
+ flags = "-w +53-220";
  expect;
 *)
 

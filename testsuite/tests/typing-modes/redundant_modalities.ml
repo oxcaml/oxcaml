@@ -5,12 +5,12 @@
 
 (* This file tests the behavior of redundant or ambiguous modalities.
 
-   Warning 219 is triggered when a modality is redundant,
+   Warning 220 is triggered when a modality is redundant,
    i.e. removing it would not change the resolved modality.
 *)
 
 (**************************************************************************)
-(* Part 1: Two modalities on the same axis (Warning 219) *)
+(* Part 1: Two modalities on the same axis (Warning 220) *)
 (**************************************************************************)
 
 (* The same modality written twice: the first is kept and the later duplicate
@@ -22,7 +22,7 @@ end
 Line 2, characters 26-34:
 2 |   val x : int @@ portable portable
                               ^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : int @@ portable end
 |}]
@@ -35,7 +35,7 @@ end
 Line 2, characters 26-37:
 2 |   val x : int @@ portable nonportable
                               ^^^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : int end
 |}]
@@ -48,7 +48,7 @@ end
 Line 2, characters 27-38:
 2 |   val x : int @@ contended uncontended
                                ^^^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : int end
 |}]
@@ -61,12 +61,12 @@ end
 Line 2, characters 26-37:
 2 |   val x : int @@ portable nonportable shareable
                               ^^^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 Line 2, characters 38-47:
 2 |   val x : int @@ portable nonportable shareable
                                           ^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : int @@ shareable end
 |}]
@@ -79,12 +79,12 @@ end
 Line 2, characters 26-37:
 2 |   val x : int @@ portable nonportable contended uncontended
                               ^^^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 Line 2, characters 48-59:
 2 |   val x : int @@ portable nonportable contended uncontended
                                                     ^^^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : int end
 |}]
@@ -129,7 +129,7 @@ end
 Line 2, characters 17-25:
 2 |   val x : int @@ portable
                      ^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : int @@ portable end
 |}]
@@ -143,7 +143,7 @@ end
 Line 2, characters 25-31:
 2 |   module type T = sig @@ static
                              ^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 module type S = sig module type T = sig end end
 |}]
@@ -156,7 +156,7 @@ end
 Line 2, characters 17-26:
 2 |   val x : int @@ contended
                      ^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : int @@ contended end
 |}]
@@ -169,12 +169,12 @@ end
 Line 2, characters 17-25:
 2 |   val x : int @@ portable contended
                      ^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 Line 2, characters 26-35:
 2 |   val x : int @@ portable contended
                               ^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : int @@ portable contended end
 |}]
@@ -191,7 +191,7 @@ end
 Line 2, characters 17-25:
 2 |   val x : int @@ stateful
                      ^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : int end
 |}]
@@ -204,7 +204,7 @@ end
 Line 2, characters 17-25:
 2 |   val x : int @@ yielding
                      ^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : int end
 |}]
@@ -217,12 +217,12 @@ end
 Line 2, characters 17-25:
 2 |   val x : int @@ stateful yielding
                      ^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 Line 2, characters 26-34:
 2 |   val x : int @@ stateful yielding
                               ^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : int end
 |}]
@@ -237,7 +237,7 @@ type t = { x : int @@ portable nonportable }
 Line 1, characters 31-42:
 1 | type t = { x : int @@ portable nonportable }
                                    ^^^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 type t = { x : int; }
 |}]
@@ -248,7 +248,7 @@ type t = Foo of int @@ portable nonportable
 Line 1, characters 32-43:
 1 | type t = Foo of int @@ portable nonportable
                                     ^^^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 type t = Foo of int
 |}]
@@ -265,7 +265,7 @@ end
 Line 2, characters 24-31:
 2 |   val x : int @@ global aliased
                             ^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : int @@ global end
 |}]
@@ -278,7 +278,7 @@ end
 Line 2, characters 27-35:
 2 |   val x : int @@ stateless portable
                                ^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : int @@ stateless end
 |}]
@@ -291,12 +291,12 @@ end
 Line 2, characters 17-23:
 2 |   val x : int @@ global aliased
                      ^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 Line 2, characters 24-31:
 2 |   val x : int @@ global aliased
                             ^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : int @@ global end
 |}]
@@ -311,7 +311,7 @@ type 'a t : immediate with 'a @@ nonportable
 Line 1, characters 33-44:
 1 | type 'a t : immediate with 'a @@ nonportable
                                      ^^^^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 type 'a t : immediate with 'a
 |}]
@@ -322,7 +322,7 @@ type 'a t : immediate with 'a @@ global aliased
 Line 1, characters 40-47:
 1 | type 'a t : immediate with 'a @@ global aliased
                                             ^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 type 'a t : immediate with 'a @@ global
 |}]
@@ -333,7 +333,7 @@ type ('a, 'b) t : immediate with 'a @@ stateful with 'b @@ aliased
 Line 1, characters 39-47:
 1 | type ('a, 'b) t : immediate with 'a @@ stateful with 'b @@ aliased
                                            ^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
+Warning 220 [redundant-modality]: This modality is redundant.
 
 type ('a, 'b) t : immediate with 'a with 'b @@ aliased
 |}]
