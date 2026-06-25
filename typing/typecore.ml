@@ -821,8 +821,6 @@ let register_allocation_mode ~env ~loc ?(stack = false) alloc_mode =
 let register_allocation_value_mode ~env ~loc ?(stack = false)
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
   let alloc_mode = value_to_alloc_r2g mode in
-  (* CR shsong: rebase conflict - took this commit's [~env ~loc ~stack] call;
-     kept main's morphism comment below. *)
   register_allocation_mode ~env ~loc ~stack alloc_mode;
   (* We must apply each morphism separately so that their hints correspond to
      the correct morphism *)
@@ -838,10 +836,6 @@ let register_allocation_value_mode ~env ~loc ?(stack = false)
    parameter function needs to be made global if its partial application
    to one argument must be global. As a result, a function gets an
    [Alloc.lr] allocation mode that can be further constrained. *)
-(* CR shsong: rebase conflict - this commit centralized the lock-walk into
-   [register_allocation_mode], so dropped the [walk_locks_for_allocation] call
-   the earlier commit had added here; kept main's [let allocation] naming (used
-   below) and added this commit's [?(stack = false)]. *)
 let register_closure_allocation ~env ?(stack = false) (mode : Value.r) ~loc
     : Alloc.lr * Value.r =
   let allocation : Hint.allocation = {loc; txt = Unknown} in
@@ -4939,10 +4933,6 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
   loop ty_fun0 mode_fun rev_args sargs
 
 (* See Note [Type-checking applications] for an overview *)
-(* CR shsong: rebase conflict - main refactored [collect_apply_args] to the
-   [lopt]/[arrow_kind]/[may_warn] structure; kept that and re-applied this
-   commit's [loc] param plus the partial-application allocation check in the
-   [sargs = []] branch. *)
 let collect_apply_args env loc funct ignore_labels ty_fun ty_fun0 mode_fun sargs
       ret_tvar =
   let warned = ref false in
@@ -7672,8 +7662,6 @@ and type_expect_
         }
         | Immutable -> Immutable
       in
-      (* CR shsong: rebase - threading [~env] into [register_allocation] here, the
-         site main inlined from the deleted [type_generic_array]. *)
       let alloc_mode, array_mode = register_allocation ~env ~loc expected_mode in
       let modalities = Typemode.mutable_modalities mutability in
       let is_contained_by : Mode.Hint.is_contained_by =
@@ -8275,8 +8263,6 @@ and type_expect_
              loc, sexp.pexp_attributes) :: body.exp_extra
           }
   | Pexp_pack (m, optyp) ->
-      (* CR shsong: rebase conflict - main rewrote this [Pexp_pack] case; took
-         main's version and preserved the design note below. *)
       (* CR shsong: Design choice: I do not walk locks here but in
          the module-level [register_allocation] in [typemod.ml] *)
       begin match optyp with
@@ -10330,9 +10316,6 @@ and type_application env app_loc expected_mode position_and_mode
             collect_apply_args env app_loc funct ignore_labels ty (instance ty)
               (value_to_alloc_r2l funct_mode) sargs ret_tvar
           in
-          (* CR shsong: rebase conflict - this commit moved the partial-app
-             allocation check into [collect_apply_args]; removed the duplicate
-             here and kept main's example comment. *)
           (* example: [collect_apply_args] returns
              [ty_ret = unit] and
              [args = [(Label "a", Omitted bar);
@@ -10622,9 +10605,6 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
     | Variant_unboxed | Variant_with_null -> expected_mode, None
     | Variant_boxed _ when constr.cstr_constant -> expected_mode, None
     | Variant_boxed _ | Variant_extensible ->
-       (* CR shsong: rebase conflict - kept [~loc:sexp.pexp_loc]; main removed the
-          [loc] param from [type_construct] (now takes [~sexp]), so this commit's
-          plain [~loc] would be unbound. This commit only reformatted here. *)
        let alloc_mode, argument_mode =
          register_allocation ~env ~loc:sexp.pexp_loc expected_mode
        in
@@ -11652,10 +11632,6 @@ and type_andops env sarg sands expected_sort expected_ty =
   in
   let_arg, sort_let_arg, List.rev rev_ands
 
-(* CR shsong: rebase conflict - main deleted [type_generic_array] (inlined into
-   the [Pexp_array] case in [type_expect_]). Dropped this commit's copy here; this
-   commit's only change to it was threading [~env] into [register_allocation],
-   which is now applied at that inlined call site instead. *)
 and type_expect_mode ~loc ~env ~(modes : Alloc.Const.Option.t) expected_mode =
     let min = Alloc.Const.Option.value ~default:Alloc.Const.min modes |> Const.alloc_as_value in
     let max = Alloc.Const.Option.value ~default:Alloc.Const.max modes |> Const.alloc_as_value in
