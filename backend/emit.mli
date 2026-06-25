@@ -25,3 +25,7 @@ val end_assembly: unit -> unit
 (** Register a callback to receive filtered and formatted asm code, for expect
     tests. The callback is automatically cleared after being invoked once. *)
 val register_expect_asm_callback : (string -> unit) -> unit
+
+(* When set, the captured assembly for [%%expect_asm] includes each
+   function's cold trailers (e.g. the stack-realloc handler). *)
+val expect_asm_include_cold : bool ref

@@ -24,7 +24,7 @@ type string_constant =
 
 type expectation_filter = Principal | X86_64 | Raw | Simplify | Reaper
 
-type expectation_kind = Expect_toplevel | Expect_asm | Expect_fexpr
+type expectation_kind = Expect_toplevel | Expect_asm of bool | Expect_fexpr
 
 type expectation =
   { extid_loc       : Location.t (* Location of "expect" in "[%%expect ...]" *)
@@ -41,6 +41,10 @@ type chunk =
 
 let register_assembly_callback :
   ((string -> unit) -> unit) option ref = ref None
+
+(* Set before compiling a chunk to tell the backend whether to include the
+   functions' cold trailers in the [%%expect_asm] capture. *)
+let set_assembly_include_cold : (bool -> unit) option ref = ref None
 
 let register_compilation_unit_callback :
   ((Compilation_unit.t -> unit) -> unit) option ref = ref None
@@ -68,7 +72,9 @@ let string_of_filter = function
 let match_expect_extension (ext : Parsetree.extension) =
   let match_ext_name = function
     | "expect" | "ocaml.expect" -> Some Expect_toplevel
-    | "expect_asm" | "ocaml.expect_asm" -> Some Expect_asm
+    | "expect_asm" | "ocaml.expect_asm" -> Some (Expect_asm false)
+    | "expect_asm_with_cold" | "ocaml.expect_asm_with_cold" ->
+      Some (Expect_asm true)
     | "expect_fexpr" | "ocaml.expect_fexpr" -> Some Expect_fexpr
     | _ -> None
   in
@@ -83,7 +89,9 @@ let match_expect_extension (ext : Parsetree.extension) =
         () =
       Location.raise_errorf ~loc "%s" msg
     in
-    if Option.is_none !register_assembly_callback && kind = Expect_asm
+    if
+      Option.is_none !register_assembly_callback
+      && (match kind with Expect_asm _ -> true | _ -> false)
     then invalid_payload ~msg:"expect_asm is only supported by expect.opt" ();
     if Option.is_none !register_compilation_unit_callback && kind = Expect_fexpr
     then invalid_payload ~msg:"expect_fexpr is only supported by expect.opt" ();
@@ -197,7 +205,7 @@ let match_expect_extension (ext : Parsetree.extension) =
         let expected_output =
           match kind with
           | Expect_toplevel -> validate_expect_toplevel expected_output
-          | Expect_asm -> validate_expect_asm expected_output
+          | Expect_asm _ -> validate_expect_asm expected_output
           | Expect_fexpr -> validate_expect_fexpr expected_output
         in
         { extid_loc
@@ -214,7 +222,7 @@ let match_expect_extension (ext : Parsetree.extension) =
           ; expected_output = [([], { tag = ""; str = "" })]
           ; kind
           }
-        | Expect_asm | Expect_fexpr -> invalid_payload ())
+        | Expect_asm _ | Expect_fexpr -> invalid_payload ())
       | _ -> invalid_payload ()
     in
     Some expectation
@@ -327,7 +335,7 @@ let eval_expectation expectation ~output =
         then [([Principal], if_principal)]
         else [([], if_not_principal)]
       | _ -> Misc.fatal_error "impossible: already validated")
-  | Expect_asm ->
+  | Expect_asm _ ->
     List.filter
       ~f:(fun (f, _) ->
           match current_arch_filter () with
@@ -472,14 +480,22 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
             in
             let keep_asm = !Clflags.keep_asm_file in
             if has_fexpr then Clflags.keep_asm_file := true;
+            let include_cold =
+              List.exists ~f:(fun exp ->
+                  match exp.kind with Expect_asm true -> true | _ -> false)
+                chunk.expectations
+            in
+            Option.iter (fun set -> set include_cold)
+              !set_assembly_include_cold;
         let (success, toplevel_output, asm_output, last_unit) =
           exec_phrases chunk.phrases
         in
+        Option.iter (fun set -> set false) !set_assembly_include_cold;
         Clflags.keep_asm_file := keep_asm;
         List.filter_map chunk.expectations ~f:(fun expectation ->
           let output = match expectation.kind with
             | Expect_toplevel -> toplevel_output
-            | Expect_asm ->
+            | Expect_asm _ ->
                 if success then
                   Option.value asm_output
                     ~default:"\nNo assembly: compilation failed\n"

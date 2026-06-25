@@ -2231,6 +2231,8 @@ let begin_assembly _unix =
 (* Not implemented for arm64 *)
 let register_expect_asm_callback (_ : string -> unit) = ()
 
+let expect_asm_include_cold = ref false
+
 let end_assembly () =
   let code_end = Cmm_helpers.make_symbol "code_end" in
   let code_end_sym = S.create_global code_end in
