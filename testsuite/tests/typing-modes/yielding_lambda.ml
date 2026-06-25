@@ -904,17 +904,20 @@ external ( |> ) : 'a -> ('a -> 'b) -> 'b = "%revapply"
 val std_pipe : 'a -> ('a -> 'b) -> 'b = <fun>
 |}]
 
-(* It may yield when the operator is declared with yielding parameters. *)
-(* CR dkalinichenko: I know that's not the point of the test, but shouldn't
-   it be [('a @ yielding -> 'b) @ yielding]? *)
-external pipe_y : 'a @ yielding -> ('a -> 'b) @ yielding -> 'b = "%revapply"
+(* It may yield when the operator is declared with yielding parameters. The
+   value [x] is yielding and is passed to [f], so [f]'s parameter is yielding
+   too. *)
+external pipe_y :
+  'a @ yielding -> ('a @ yielding -> 'b) @ yielding -> 'b = "%revapply"
 let yielding_pipe = pipe_y
 [%%expect{|
 0
-external pipe_y : 'a @ yielding -> ('a -> 'b) @ yielding -> 'b = "%revapply"
+external pipe_y : 'a @ yielding -> ('a @ yielding -> 'b) @ yielding -> 'b
+  = "%revapply"
 (let
   (yielding_pipe = (function {nlocal = 0} prim prim stub (apply prim prim)))
   (apply[unyielding] (field_imm 1 (global Toploop!)) "yielding_pipe"
     yielding_pipe))
-val yielding_pipe : 'a @ yielding -> ('a -> 'b) @ yielding -> 'b = <fun>
+val yielding_pipe : 'a @ yielding -> ('a @ yielding -> 'b) @ yielding -> 'b =
+  <fun>
 |}]
