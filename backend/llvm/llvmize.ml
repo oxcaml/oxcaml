@@ -1231,7 +1231,7 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     store_into_reg t i.res.(0) (V.of_symbol sym_name)
   | Const_float32 bits -> store_into_reg t i.res.(0) (V.of_float32_bits bits)
   | Const_float bits -> store_into_reg t i.res.(0) (V.of_float64_bits bits)
-  | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ->
+  | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _ ->
     not_implemented_basic ~msg:"const_vec" i
   (* CR yusumez: What do we do with mutability / is_atomic / is_modify? *)
   | Load { memory_chunk; addressing_mode; mutability = _; is_atomic = _ } ->
@@ -1287,7 +1287,9 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
       in
       store_into_reg t i.res.(0) converted
     | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ->
-      not_implemented_basic ~msg:"vector reinterpret cast" i)
+      not_implemented_basic ~msg:"vector reinterpret cast" i
+    | Mask_of_int64 | Int64_of_mask ->
+      not_implemented_basic ~msg:"mask reinterpret cast" i)
   | Specific op -> specific t i op
   | Intop_atomic { op; size; addr } -> atomic t i op ~size ~addr
   | Pause -> call_llvm_intrinsic_no_res t "x86.sse2.pause" []

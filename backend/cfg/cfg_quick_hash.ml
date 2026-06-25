@@ -26,6 +26,7 @@ let operation : Operation.t -> int =
   | Const_vec128 _ -> 15
   | Const_vec256 _ -> 16
   | Const_vec512 _ -> 17
+  | Const_mask _ -> 33
   | Stackoffset _ -> 18
   | Load _ -> 19
   | Store _ -> 20

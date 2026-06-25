@@ -572,7 +572,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         intr
   | Op (Move | Spill | Reload | Const_int _
        | Const_float _ | Const_float32 _ | Const_symbol _
-       | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+       | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
        | Stackoffset _
        | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr
                | Iasr | Ipopcnt | Iclz | Ictz
@@ -589,7 +589,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Begin_region
        | End_region
        | Specific (Ilea _ | Ioffset_loc _ | Ibswap _
-                  | Isextend32 | Izextend32
+                  | Isextend32 | Izextend32 | Ikmovq
                   | Ilfence | Isfence | Imfence)
        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Pause)
   | Poptrap _ | Prologue | Epilogue ->
@@ -731,6 +731,9 @@ let operation_supported = function
   | Creinterpret_cast (V512_of_vec _ | V128_of_vec Vec512 | V256_of_vec Vec512)
   | Cstatic_cast (V512_of_scalar _ | Scalar_of_v512 _) ->
     Arch.Extension.enabled_vec512 ()
+  | Creinterpret_cast (Mask_of_int64 | Int64_of_mask) ->
+    (* The mask <-> integer moves use [kmovq], which requires AVX512BW. *)
+    Arch.Extension.enabled_vec512 () && Arch.Extension.enabled AVX512BW
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi

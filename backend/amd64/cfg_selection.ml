@@ -221,14 +221,14 @@ let pseudoregs_for_operation op arg res =
       ( (Iadd | Isub | Imulh _ | Idiv | Imod | Icomp _ | Ipopcnt | Iclz | Ictz),
         _ )
   | Specific
-      ( Isextend32 | Izextend32 | Ilea _
+      ( Isextend32 | Izextend32 | Ikmovq | Ilea _
       | Istore_int (_, _, _)
       | Ilfence | Isfence | Imfence
       | Ioffset_loc (_, _)
       | Irdtsc | Icldemote _ | Iprefetch _ )
   | Move | Spill | Reload | Reinterpret_cast _ | Static_cast _ | Const_int _
   | Const_float32 _ | Const_float _ | Const_vec128 _ | Const_vec256 _
-  | Const_vec512 _ | Const_symbol _ | Stackoffset _ | Load _
+  | Const_vec512 _ | Const_mask _ | Const_symbol _ | Stackoffset _ | Load _
   | Store (_, _, _)
   | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
   | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index ->
@@ -331,12 +331,13 @@ let is_offset_out_of_range _byte_offset :
 
 let insert_move_extcall_arg _exttype src dst :
     Cfg_selectgen_target_intf.insert_move_extcall_arg_result =
-  let is_mask_reg (reg : Reg.t) =
-    Cmm.equal_machtype_component reg.typ Cmm.Mask
-  in
-  if Array.exists is_mask_reg src || Array.exists is_mask_reg dst
-  then Misc.fatal_error "avx512 masks not yet implemented"
-  else Use_default
+  let is_mask (reg : Reg.t) = Cmm.equal_machtype_component reg.typ Cmm.Mask in
+  match src, dst with
+  | [| s |], [| d |] when is_mask s && not (is_mask d) ->
+    (* The C ABI passes an AVX512 mask as an integer, so move it from its mask
+       register into the general-purpose argument register. *)
+    Rewritten (Op (Specific Ikmovq), src, dst)
+  | _ -> Use_default
 
 (* Recognize float arithmetic with mem *)
 

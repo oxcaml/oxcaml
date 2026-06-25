@@ -89,6 +89,75 @@
    flags.sexp
    (echo "()"))))
 
+; AVX512 basic test. Compiled with AVX512 enabled (both the OCaml code and the
+; C stubs), and only run on amd64. Requires AVX512 hardware at runtime.
+
+(foreign_library
+ (archive_name stubs512)
+ (language c)
+ (names stubs512)
+ (flags
+  (:standard
+   (:include flags512.sexp)))
+ (include_dirs "../../../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}"))
+
+(rule
+ (targets flags512.sexp)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (action
+  (with-stdout-to
+   flags512.sexp
+   (echo "-mavx512f -mavx512vl -mavx512dq -mavx512bw"))))
+
+(rule
+ (targets flags512.sexp)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (<> %{architecture} "amd64")))
+ (action
+  (with-stdout-to
+   flags512.sexp
+   (echo "()"))))
+
+(executable
+ (name basic512)
+ (modules basic512)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs512))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   basic512.out
+   (run ./basic512.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (diff empty.expected basic512.out)))
+
 (include dune.inc)
 
 (rule

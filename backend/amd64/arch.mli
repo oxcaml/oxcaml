@@ -94,6 +94,8 @@ type specific_operation =
                                           extension *)
   | Izextend32                         (* 32 to 64 bit conversion with zero
                                           extension *)
+  | Ikmovq                             (* "kmovq" from an AVX512 mask register
+                                          to a GPR, to pass a mask as a C int *)
   | Irdtsc                             (* read timestamp *)
   | Irdpmc                             (* read performance counter *)
   | Ilfence                            (* load fence *)

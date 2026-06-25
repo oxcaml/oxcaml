@@ -222,6 +222,8 @@ let oper_result_type = function
   | Creinterpret_cast (Float32_of_int32 | Float32_of_float) -> typ_float32
   | Creinterpret_cast (Int_of_value | Int64_of_float | Int32_of_float32) ->
     typ_int
+  | Creinterpret_cast Mask_of_int64 -> typ_mask
+  | Creinterpret_cast Int64_of_mask -> typ_int
   | Cstatic_cast (Float_of_float32 | Float_of_int Float64) -> typ_float
   | Cstatic_cast (Float32_of_float | Float_of_int Float32) -> typ_float32
   | Cstatic_cast (Int_of_float (Float64 | Float32)) -> typ_int
@@ -553,11 +555,11 @@ module Stack_offset_and_exn = struct
     | Op
         ( Move | Spill | Reload | Const_int _ | Const_float _ | Const_float32 _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
-        | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
-        | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll | Pause
-        | Alloc _ )
+        | Const_mask _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
+        | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
+        | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
+        | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
+        | Domain_index | Poll | Pause | Alloc _ )
     | Reloadretaddr | Prologue | Epilogue ->
       stack_offset, traps
     | Stack_check _ ->
