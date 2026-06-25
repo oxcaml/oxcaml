@@ -961,9 +961,9 @@ and record_representation =
 
      After [update_decls_jkind], no record should have this representation. *)
   | Record_variable
-  (* Used after [update_decls_jkind] for records whose representation cannot be
-     determined because at least one field has layout [any]. The actual
-     representation is decided at construction sites. *)
+  (* Used after [update_decls_jkind] for non-inlined records whose
+     representation cannot be determined because at least one field has layout
+     [any]. The actual representation is decided at construction sites. *)
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
@@ -1010,6 +1010,9 @@ and constructor_representation =
   *)
   | Constructor_mixed of mixed_product_shape
   (* A constructor that has some non-value fields. *)
+  | Constructor_variable
+  (* The constructor has an inlined record argument with a field of layout
+     [any], so its shape cannot be determined at typedecl time. *)
 
 and label_declaration =
   {
