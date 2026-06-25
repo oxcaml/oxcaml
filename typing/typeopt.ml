@@ -917,17 +917,17 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
     end
   | Variant_boxed cstr_layouts ->
     let depth = depth + 1 in
-    let instantiate_cd_args (cd_args : Types.constructor_arguments) =
-      let instantiate ty = Ctype.apply env params ty args in
+    let substitute_cd_args (cd_args : Types.constructor_arguments) =
+      let substitute ty = Ctype.apply env params ty args in
       match cd_args with
       | Types.Cstr_tuple cas ->
         Types.Cstr_tuple
           (List.map (fun (ca : Types.constructor_argument) ->
-             { ca with ca_type = instantiate ca.ca_type }) cas)
+             { ca with ca_type = substitute ca.ca_type }) cas)
       | Types.Cstr_record lds ->
         Types.Cstr_record
           (List.map (fun (ld : Types.label_declaration) ->
-             { ld with ld_type = instantiate ld.ld_type }) lds)
+             { ld with ld_type = substitute ld.ld_type }) lds)
     in
     let for_one_uniform_value_constructor fields ~field_to_type ~depth
           ~num_nodes_visited =
@@ -1026,11 +1026,11 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
               | Cstr_layout_known { shape; _ } ->
                 ~variable_repr:false, Some shape, constructor
               | Cstr_layout_variable ->
-                (match instantiate_cd_args constructor.cd_args with
+                (match substitute_cd_args constructor.cd_args with
                  | exception Ctype.Cannot_apply ->
                    ~variable_repr:true, None, constructor
                  | cd_args ->
-                   let cd_args, _all_void, repr, _arg_sorts =
+                   let cd_args, ~constant:_, repr, _arg_sorts =
                      Typedecl.update_constructor_representation_and_arg_sorts
                        env loc cd_args ~is_extension_constructor:false
                    in

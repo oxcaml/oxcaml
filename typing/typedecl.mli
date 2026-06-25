@@ -110,7 +110,7 @@ val update_constructor_representation:
 val update_constructor_representation_and_arg_sorts :
   Env.t -> Location.t -> Types.constructor_arguments ->
   is_extension_constructor:bool ->
-  Types.constructor_arguments * bool *
+  Types.constructor_arguments * constant:bool *
   (Types.constructor_representation, unrepresentable_constructor) Result.t *
   Jkind.Sort.Const.t array option
 

@@ -2094,7 +2094,7 @@ let update_constructor_representation_and_arg_sorts env loc args
     update_constructor_representation env args jkinds ~loc
       ~is_extension_constructor
   in
-  args, constant, constructor_shape, arg_sorts
+  args, ~constant, constructor_shape, arg_sorts
 
 type unrepresentable_record =
   | Unrepresentable_field of string
@@ -2571,7 +2571,7 @@ let rec update_decl_jkind env dpath decl =
     | cstrs, Variant_boxed cstr_layouts ->
       let cstrs =
         List.mapi (fun idx cstr ->
-          let cd_args, _constant, cstr_repr, arg_sorts =
+          let cd_args, ~constant:_, cstr_repr, arg_sorts =
             update_constructor_representation_and_arg_sorts env
               cstr.Types.cd_loc cstr.Types.cd_args
               ~is_extension_constructor:false
@@ -3852,7 +3852,7 @@ let transl_extension_constructor_decl
       ~cstr_path:(Pident id) ~type_path ~unboxed:false ~extension:true
       typext_params svars sargs sret_type
   in
-  let args, constant, constructor_shape, _arg_sorts =
+  let args, ~constant, constructor_shape, _arg_sorts =
     update_constructor_representation_and_arg_sorts env loc args
       ~is_extension_constructor:true
   in
