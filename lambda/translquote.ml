@@ -241,11 +241,11 @@ end = struct
       }
     in
     lfunction
-      ~kind:(Curried { nlocal = 0 })
+      ~kind:(Curried { nlocal = 1 })
       ~params:[param_from_name id]
       ~return:(Pvalue { raw_kind = Pgenval; nullable = Non_nullable })
-      ~attr:default_function_attribute ~body ~loc ~mode:alloc_heap
-      ~ret_mode:alloc_heap
+      ~attr:default_function_attribute ~body ~loc ~mode:alloc_local
+      ~ret_mode:alloc_local
 
   let func ~loc arg_sort body_lam id body =
     func_ ~loc arg_sort id (body_lam body)
@@ -365,7 +365,7 @@ let apply modname field loc args =
          ap_result_layout =
            Pvalue { raw_kind = Pgenval; nullable = Non_nullable };
          ap_region_close = Rc_normal;
-         ap_mode = alloc_heap;
+         ap_mode = alloc_local;
          ap_tailcall = Default_tailcall;
          ap_inlined = Default_inlined;
          ap_specialised = Default_specialise
@@ -4065,4 +4065,4 @@ let transl_quote ~scopes ~loc ~transl exp =
       in
       Code.of_exp_with_type_vars loc (quote_loc loc) type_names quote_fun
   in
-  extract (Code.wrap code)
+  Lregion (extract (Code.wrap code), layout_any_value)
