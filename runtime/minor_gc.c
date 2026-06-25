@@ -312,7 +312,12 @@ Caml_inline value try_promote(value v, volatile value *p, header_t hd,
   }
 
   st->live_bytes += Bhsize_hd(hd);
-  *p = result + infix_offset;
+  /* Publish with a release store: a concurrent major-GC marker may scan
+     `p` (a remembered-set field) and dereference the promoted block's
+     header/infix-prefix relying only on an address dependency, so the
+     copy's header and unscannable-prefix writes above must be ordered
+     before this store. */
+  atomic_store_release((atomic_value *)p, result + infix_offset);
   return result;
 }
 
