@@ -10383,19 +10383,19 @@ and type_application env app_loc expected_mode position_and_mode
              mode of the intermediate partial-application closures, which is
              part of this join. *)
           let ap_yielding =
-            Yielding.join
-              (Alloc.proj_comonadic Yielding (value_to_alloc_r2l funct_mode)
-               :: List.concat_map
-                    (fun (_, arg) ->
-                       match arg with
-                       | Arg (Known_arg { mode_fun; mode_arg; _ }
-                             | Unknown_arg { mode_fun; mode_arg; _ }
-                             | Eliminated_optional_arg
-                                 { mode_fun; mode_arg; _ })
-                       | Omitted { mode_fun; mode_arg; _ } ->
-                         [ Alloc.proj_comonadic Yielding mode_fun;
-                           Alloc.proj_comonadic Yielding mode_arg ])
-                    untyped_args)
+            Alloc.proj_comonadic Yielding
+              (Alloc.join
+                 (value_to_alloc_r2l funct_mode
+                  :: List.concat_map
+                       (fun (_, arg) ->
+                          match arg with
+                          | Arg (Known_arg { mode_fun; mode_arg; _ }
+                                | Unknown_arg { mode_fun; mode_arg; _ }
+                                | Eliminated_optional_arg
+                                    { mode_fun; mode_arg; _ })
+                          | Omitted { mode_fun; mode_arg; _ } ->
+                            [ mode_fun; mode_arg ])
+                       untyped_args))
           in
           let partial_app = is_partial_apply untyped_args in
           let position_and_mode =
@@ -11834,26 +11834,19 @@ and type_n_ary_function
        (its own mode), or if any argument it is given is yielding (the
        parameter modes). [Value_rec_compiler]'s eta-expanding wrapper uses
        this, since the wrapper is exactly a full application. *)
-    let params_yielding =
-      List.map
-        (fun (p : function_param) ->
-          Yielding.disallow_right
-            (Alloc.proj_comonadic Yielding p.fp_mode.mode_modes))
-        params
+    let param_alloc_modes =
+      List.map (fun (p : function_param) -> p.fp_mode.mode_modes) params
     in
     (* A [function | ...] body takes an extra implicit parameter that is not in
        [params]; if that argument is yielding then the closure is yielding. *)
-    let params_yielding =
+    let param_alloc_modes =
       match body with
-      | Tfunction_body _ -> params_yielding
-      | Tfunction_cases fc ->
-        Yielding.disallow_right (Alloc.proj_comonadic Yielding fc.fc_arg_mode)
-        :: params_yielding
+      | Tfunction_body _ -> param_alloc_modes
+      | Tfunction_cases fc -> fc.fc_arg_mode :: param_alloc_modes
     in
     let yielding =
-      Yielding.join
-        (Yielding.disallow_right (Alloc.proj_comonadic Yielding fun_alloc_mode)
-         :: params_yielding)
+      Alloc.proj_comonadic Yielding
+        (Alloc.join (Alloc.disallow_right fun_alloc_mode :: param_alloc_modes))
     in
     re
       { exp_desc =
