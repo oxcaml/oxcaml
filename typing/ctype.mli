@@ -760,8 +760,8 @@ val check_type_externality :
 val is_always_gc_ignorable : Env.t -> type_expr -> bool
 
 (* Check whether a type's nullability is less than some target.
-   Uses get_nullability which is potentially cheaper than calling type_jkind
-   if all with-bounds are irrelevant. *)
+   Potentially cheaper than just calling [type_jkind], because this can stop
+   expansion once it succeeds. *)
 val check_type_nullability :
   Env.t -> type_expr -> Jkind_axis.Nullability.t -> bool
 

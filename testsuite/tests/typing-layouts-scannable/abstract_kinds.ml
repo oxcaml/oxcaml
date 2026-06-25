@@ -8,6 +8,11 @@ type ('a : any non_pointer) require_non_pointer
 type ('a : any non_pointer) require_non_pointer
 |}]
 
+type ('a : any non_null) require_non_null
+[%%expect{|
+type ('a : any non_null) require_non_null
+|}]
+
 (* [non_pointer] works on kind constructor when it's concrete *)
 kind_ k = value
 type t : k non_pointer
@@ -36,6 +41,36 @@ type check2 = t2 require_non_pointer
 kind_ k2
 type t2 : k2 non_pointer
 type check2 = t2 require_non_pointer
+|}]
+
+(* [non_null] works on kind constructor when it's concrete *)
+kind_ kn = value_or_null
+type tn : kn non_null
+type checkn = tn require_non_null
+[%%expect{|
+kind_ kn = value_or_null
+type tn : value_maybe_separable
+type checkn = tn require_non_null
+|}]
+
+(* As well as abstract *)
+kind_ kn
+type tn : kn non_null
+type checkn = tn require_non_null
+[%%expect{|
+kind_ kn
+type tn : kn non_null
+type checkn = tn require_non_null
+|}]
+
+(* [mod non_null] works the same *)
+kind_ kn2
+type tn2 : kn2 mod non_null
+type checkn2 = tn2 require_non_null
+[%%expect{|
+kind_ kn2
+type tn2 : kn2 non_null
+type checkn2 = tn2 require_non_null
 |}]
 
 (* Separate scannable axis and k constraints combine *)
