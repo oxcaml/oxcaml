@@ -3969,9 +3969,10 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
         Exp_desc.antiquote loc exp
       else
         let exp =
-          (* Local allocations are not expected to escape from this expression.
-             If they did, the [ret_mode] on the corresponding [lfunction] would
-             need to indicate local mode. *)
+          (* See Note [Generating functions when translating quotes].
+             The code within splices might contain stack-allocations,
+             which we can free since we only return an always-heap-allocated
+             quote to the parent. *)
           Lregion (transl exp, layout_any_value)
         in
         Exp_desc.splice loc (Code.inject exp)
@@ -4104,4 +4105,8 @@ let transl_quote ~scopes ~loc ~transl exp =
       in
       Code.of_exp_with_type_vars loc (quote_loc loc) type_names quote_fun
   in
+  (* See Note [Generating functions when translating quotes].
+     Quote translation needs to stack-allocate closures.
+     We can free these before we leave the quote, as they are applied within
+     this scope and never returned to the parent. *)
   Lregion (extract (Code.wrap code), layout_any_value)
