@@ -24,6 +24,8 @@ let () =
       | _ -> assert false
     in
     Buffer.clear buf;
+    (* Pin the optimization level to [-O3] so the DWARF output is stable
+       regardless of the dune build profile. *)
     Buffer.add_substitute buf subst
       {|
 (executable
@@ -34,7 +36,7 @@ let () =
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
    -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
-   -function-sections))
+   -function-sections -O3))
  (foreign_archives simd_stubs))
 
 (rule
