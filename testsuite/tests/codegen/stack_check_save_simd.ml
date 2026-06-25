@@ -4,15 +4,12 @@
  expect.opt;
 *)
 
-(* Reproduction of a [Cfg_stack_checks] codegen bug.
-
-   The float [x] is live (in an xmm register) across the non-tail recursive
+(* The float [x] is live (in an xmm register) across the non-tail recursive
    call, hence across the stack check inserted at the start of the block. The
-   stack-realloc handler should therefore preserve xmm registers. But
-   [Cfg_stack_checks] gives the inserted [Stack_check] an empty [live] set, so
-   [save_simd] sees no live SIMD register and the [.L9] trailer below calls the
-   plain [caml_call_realloc_stack] (which saves no xmm/ymm/zmm) instead of
-   [caml_call_realloc_stack_sse]. The realloc handler may then clobber [x].
+   stack-realloc handler must therefore preserve xmm registers: it must call
+   [caml_call_realloc_stack_sse], not the plain [caml_call_realloc_stack]. This
+   is a regression test for [Cfg_stack_checks] giving the inserted [Stack_check]
+   the correct [live] set (so that [save_simd] is computed correctly).
 
    [%%expect_asm_full] is used (rather than [%%expect_asm]) so that the
    captured assembly includes the cold stack-realloc handler. *)
@@ -70,7 +67,7 @@ f:
   jmp   .L0
 .L9:
   push  $34
-  call  caml_call_realloc_stack@PLT
+  call  caml_call_realloc_stack_sse@PLT
   addq  $8, %rsp
   jmp   .L2
 |}]
