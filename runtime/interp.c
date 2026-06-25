@@ -1352,7 +1352,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
       Setup_for_c_call;
       accu = caml_continuation_use_noexc(accu);
       Restore_after_c_call;
-      sp -= 2;
+      sp -= 3;
       sp[0] = Val_long(domain_state->trap_sp_off);
       sp[1] = Val_long(0);
       sp[2] = (value)pc;

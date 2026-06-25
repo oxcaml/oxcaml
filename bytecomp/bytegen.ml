@@ -525,8 +525,8 @@ and comp_expr stack_info env exp sz cont =
       comp_args stack_info env args sz
         (Kresumeterm (sz + nargs) :: discard_dead_code cont))
     else (
-      (* Resume itself only pushes 2 words, but perform adds another *)
-      check_stack stack_info (sz + nargs + 3);
+      (* Resume itself pushes 3 words, and perform adds another *)
+      check_stack stack_info (sz + nargs + 4);
       comp_args stack_info env args sz (Kresume :: cont))
   | Context_switch (With_stack, args) ->
     let nargs = List.length args in
