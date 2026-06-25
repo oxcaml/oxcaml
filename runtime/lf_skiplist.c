@@ -394,8 +394,32 @@ int caml_lf_skiplist_insert(struct lf_skiplist *sk, uintnat key, uintnat data) {
 
       for (int level = 1; level <= top_level; level++) {
         while (1) {
+          int cur_marked;
+          struct lf_skipcell *cur_succ;
+
           pred = preds[level];
           succ = succs[level];
+
+          /* Before publishing [new_cell] at [level] we must make sure its own
+             forward pointer at [level] points at the current successor [succ].
+             [succs] may have moved on since we built [new_cell] (a successor
+             may have been removed and garbage-listed). Publishing a stale
+             successor would leave a dangling pointer in a live cell once that
+             successor is freed at the next STW.
+
+             A concurrent remove of [key] may also have marked [new_cell] at
+             [level]. If so we must not link it in: bail out and let the final
+             [skiplist_find] below snip whatever we already linked. */
+          LF_SK_EXTRACT(new_cell->forward[level], cur_marked, cur_succ);
+          if (cur_marked) {
+            goto link_done;
+          }
+          if (cur_succ != succ &&
+              !atomic_compare_exchange_strong(&new_cell->forward[level],
+                                              &cur_succ, succ)) {
+            /* Lost to a concurrent mark of [new_cell]; re-extract. */
+            continue;
+          }
 
           /* If we were able to insert the node then we proceed to the next
              level */
@@ -408,6 +432,22 @@ int caml_lf_skiplist_insert(struct lf_skiplist *sk, uintnat key, uintnat data) {
              marked or because a new node was added between pred and succ nodes
              at level. In both cases we can fix things by calling
              [skiplist_find] and repopulating preds and succs */
+          skiplist_find(sk, key, preds, succs);
+        }
+      }
+
+    link_done:
+      /* If [new_cell] was removed by a concurrent remove while we were linking
+         it into the upper levels, it may now be both linked and marked. Run a
+         final [skiplist_find], which snips out any marked node it traverses.
+         This completes before we return (hence before this thread can reach a
+         safepoint and any STW free), so no marked-and-linked cell survives. */
+      {
+        int removed;
+        struct lf_skipcell *ignored;
+        LF_SK_EXTRACT(new_cell->forward[0], removed, ignored);
+        (void) ignored;  /* only the mark bit is needed here */
+        if (removed) {
           skiplist_find(sk, key, preds, succs);
         }
       }
