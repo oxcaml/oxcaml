@@ -581,15 +581,8 @@ let jkind_desc s jkind =
         { jkind with base = Kconstr (p', sa) }
     | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
-      let new_base =
-        match base with
-        | Kconstr (p', sa') ->
-          Kconstr (p', Jkind_types.Scannable_axes.meet sa sa')
-        | Layout l ->
-          Layout (Jkind_types.Layout.Const.meet_root_scannable_axes l sa)
-      in
       let const =
-        { base = new_base;
+        { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
           mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
           with_bounds = jkind.with_bounds }
       in
@@ -611,14 +604,7 @@ let jkind_const_desc s
         { jkind with base = Kconstr (p', sa) }
     | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
-      let new_base =
-        match base with
-        | Kconstr (p', sa') ->
-          Kconstr (p', Jkind_types.Scannable_axes.meet sa sa')
-        | Layout l ->
-          Layout (Jkind_types.Layout.Const.meet_root_scannable_axes l sa)
-      in
-      { base = new_base;
+      { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
         mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
         with_bounds = jkind.with_bounds }
     end

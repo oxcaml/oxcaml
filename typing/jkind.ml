@@ -735,11 +735,8 @@ module Base = struct
     | Kconstr (p, sa) -> (
       match Env.find_jkind p env with
       | (exception Not_found) | { jkind_manifest = None; _ } -> None
-      | { jkind_manifest = Some { base; _ }; _ } -> (
-        match base with
-        | Kconstr (p', sa') -> Some (Kconstr (p', Scannable_axes.meet sa sa'))
-        | Layout l -> Some (Layout (Layout.Const.meet_root_scannable_axes l sa))
-        ))
+      | { jkind_manifest = Some { base; _ }; _ } ->
+        Some (Jkind0.Base_and_axes.meet_scannable_axes base sa))
 
   let expand_pair env t1 t2 =
     let of_const = map_layout ~f:Layout.of_const in
@@ -835,12 +832,11 @@ module Base_and_axes = struct
              a new one. *)
           Expanded jkind
         else
-          let new_base =
-            match jkind.base with
-            | Kconstr (p', sa') -> Kconstr (p', Scannable_axes.meet sa sa')
-            | Layout l -> Layout (Layout.Const.meet_root_scannable_axes l sa)
-          in
-          Expanded { base = new_base; mod_bounds; with_bounds = t.with_bounds })
+          Expanded
+            { base = meet_scannable_axes jkind.base sa;
+              mod_bounds;
+              with_bounds = t.with_bounds
+            })
 
   let rec fully_expand_aliases_const env t : _ jkind_const_desc =
     match expand_base_once_const env t with
@@ -1667,13 +1663,7 @@ module Const = struct
       | jkind ->
         (* Propagate the scannable axes upper bound. *)
         let jkind =
-          match jkind.base with
-          | Layout l ->
-            { jkind with
-              base = Layout (Layout.Const.meet_root_scannable_axes l sa)
-            }
-          | Kconstr (p', sa') ->
-            { jkind with base = Kconstr (p', Scannable_axes.meet sa sa') }
+          { jkind with base = Base_and_axes.meet_scannable_axes jkind.base sa }
         in
         get_layout_result env jkind)
 

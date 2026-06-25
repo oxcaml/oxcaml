@@ -1257,6 +1257,13 @@ module Jkind0 = struct
       | Layout l -> (
         match f l with None -> None | Some l -> Some { t with base = Layout l })
 
+    let meet_scannable_axes (base : Jkind_types.Layout.Const.t jkind_base) sa :
+        Jkind_types.Layout.Const.t jkind_base =
+      match base with
+      | Kconstr (p, sa') -> Kconstr (p, Jkind_types.Scannable_axes.meet sa sa')
+      | Layout l ->
+        Layout (Jkind_types.Layout.Const.meet_root_scannable_axes l sa)
+
     let map_type_expr f t =
       { t with with_bounds = With_bounds.map_type_expr f t.with_bounds }
 
