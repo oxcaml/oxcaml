@@ -623,6 +623,14 @@ end
 let run : Cfg_with_infos.t -> Cfg_with_infos.t =
  fun cfg_with_infos ->
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
+  (* Shrink-wrapping uses [Reachable_epilogues], a memoised DFS that is only
+     correct on reducible CFGs: on an irreducible CFG it can under-approximate a
+     block's reachable epilogues and drop a needed epilogue. So we require
+     reducibility here, as [Cfg_loop_infos.build] does. *)
+  if cfg.Cfg.allowed_to_be_irreducible
+  then
+    Misc.fatal_error
+      "Cfg_prologue.run: the CFG is not guaranteed to be reducible";
   if !Oxcaml_flags.cfg_prologue_validate then validate_no_prologue cfg;
   (match !Oxcaml_flags.cfg_prologue_shrink_wrap with
   | true
