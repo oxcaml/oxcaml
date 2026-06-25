@@ -386,6 +386,8 @@ type primitive =
   | Punbox_unit
   | Punbox_vector of boxed_vector
   | Pbox_vector of boxed_vector * locality_mode
+  | Punbox_mask
+  | Pbox_mask of locality_mode
   | Pjoin_vec256
   | Psplit_vec256
   | Preinterpret_boxed_vector_as_tuple of boxed_vector

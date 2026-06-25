@@ -1049,6 +1049,10 @@ let prim_has_valid_reprs ~loc prim =
       exactly [Same_as_ocaml_repr C.vec512; Same_as_ocaml_repr C.scannable]
     | "%unbox_vec512" ->
       exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.vec512]
+    | "%box_mask" ->
+      exactly [Same_as_ocaml_repr C.mask; Same_as_ocaml_repr C.scannable]
+    | "%unbox_mask" ->
+      exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.mask]
 
     | "%reinterpret_tagged_int63_as_unboxed_int64" ->
       exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.bits64]

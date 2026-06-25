@@ -109,7 +109,15 @@ let print_test ?extra_flag name =
   diff_output name
 
 let () =
-  let tests = ["basic512"; "basic512_u"; "callback512"; "consts512"] in
+  let tests =
+    [ "basic512";
+      "basic512_u";
+      "callback512";
+      "consts512";
+      "arrays512";
+      "arrays512_u";
+      "arrays512_vec_mask" ]
+  in
   List.iter (print_test ?extra_flag:None) tests;
   List.iter (print_test ~extra_flag:"-nodynlink") tests;
   List.iter (print_test ~extra_flag:"-internal-assembler") tests

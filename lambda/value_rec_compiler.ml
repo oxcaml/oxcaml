@@ -501,6 +501,8 @@ let compute_static_size lam =
     | Pobj_magic _
     | Punbox_vector _
     | Pbox_vector (_, _)
+    | Punbox_mask
+    | Pbox_mask _
     | Pjoin_vec256
     | Psplit_vec256
     | Pget_header _
