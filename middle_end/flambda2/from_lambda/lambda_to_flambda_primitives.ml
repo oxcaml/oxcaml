@@ -3217,6 +3217,26 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       "Closure_convertion.convert_primitive: The first argument to Pset_ptr \
        should be an unboxed product of length 2"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
+  | Pget_ext_ptr (layout, mut), [[idx]] ->
+    needs_64_bit_target prim dbg;
+    let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
+    let offsets = block_index_access_offsets ~machine_width layout idx in
+    let kinds =
+      Flambda_arity.unarize
+        (Flambda_arity.from_lambda_list [layout] ~machine_width)
+    in
+    let reads =
+      List.map2
+        (fun kind offset ->
+          H.Binary (Read_offset (kind, mut), null_base, Prim offset))
+        kinds offsets
+    in
+    [H.maybe_create_unboxed_product reads]
+  | Pset_ext_ptr (layout, mode), [[idx]; new_values] ->
+    needs_64_bit_target prim dbg;
+    let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
+    write_offset Into_block_or_off_heap layout mode ~machine_width
+      ~ptr:null_base ~idx ~new_values
   | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Primitive %a (%a) shouldn't be \
@@ -3243,7 +3263,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Preinterpret_tuple_as_boxed_vector _ | Parray_element_size_in_bytes _
       | Pmake_idx_array _ | Pidx_deepen _ | Ppeek _ | Pmakelazyblock _
       | Pscalar (Unary _)
-      | Pget_ptr _ ),
+      | Pget_ptr _ | Pget_ext_ptr _ ),
       ([] | _ :: _ :: _ | [([] | _ :: _ :: _)]) ) ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Wrong arity for unary primitive \
@@ -3281,7 +3301,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             _ )
       | Patomic_load_field _ | Ppoke _ | Pphys_equal _
       | Pscalar (Binary _)
-      | Pget_idx _ | Pset_ptr _ ),
+      | Pget_idx _ | Pset_ptr _ | Pset_ext_ptr _ ),
       ( []
       | [_]
       | _ :: _ :: _ :: _
