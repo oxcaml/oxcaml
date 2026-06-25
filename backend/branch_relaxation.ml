@@ -213,7 +213,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
                   | Lcall_op _ | Llabel _ | Lbranch _ | Lcondbranch3 _
                   | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
                   | Lstackcheck _ ->
-                    assert false
+                    Misc.fatal_error
+                      "Branch_relaxation.measure_expanded: expected \
+                       Lcondbranch while measuring expansion"
                 in
                 let s = T.relaxed_instruction_size ri in
                 measure_expanded i.next (s :: sizes)
@@ -240,7 +242,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
             (* For every instruction reaching this point, [instr_overflows]
                above either raised a fatal error or returned [false], so
                [overflows] was never [true] and this branch is unreachable. *)
-            assert false)
+            Misc.fatal_error
+              "Branch_relaxation.fixup: instruction should have been rejected \
+               by instr_overflows")
     in
     fixup false 0 code sizes
 

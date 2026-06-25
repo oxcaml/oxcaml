@@ -231,10 +231,6 @@ let negate_integer_comparison = function
   | Ultint -> Ugeint
   | Ugeint -> Ultint
 
-let runtime5_only () =
-  if not Config.runtime5 then
-    Misc.fatal_error "Effect primitives are only supported on runtime5"
-
 let emit_instr = function
     Klabel lbl -> define_label lbl
   | Kacc n ->
@@ -341,15 +337,14 @@ let emit_instr = function
   | Kgetpubmet tag -> out opGETPUBMET; out_int tag; out_int 0
   | Kgetdynmet -> out opGETDYNMET
   | Kevent ev -> record_event ev
-  | Kperform -> runtime5_only (); out opPERFORM
-  | Kresume -> runtime5_only (); out opRESUME
-  | Kresumeterm n -> runtime5_only (); out opRESUMETERM; out_int n
-  | Kreperformterm n -> runtime5_only (); out opREPERFORMTERM; out_int n
-  | Kwith_stack -> runtime5_only (); out opWITH_STACK
-  | Kwith_stack_bind -> runtime5_only (); out opWITH_STACK_BIND
-  | Kwith_stack_preemptible -> runtime5_only (); out opWITH_STACK_PREEMPTIBLE
-  | Kwith_stack_bind_preemptible ->
-    runtime5_only (); out opWITH_STACK_BIND_PREEMPTIBLE
+  | Kperform -> out opPERFORM
+  | Kresume -> out opRESUME
+  | Kresumeterm n -> out opRESUMETERM; out_int n
+  | Kreperformterm n -> out opREPERFORMTERM; out_int n
+  | Kwith_stack -> out opWITH_STACK
+  | Kwith_stack_bind -> out opWITH_STACK_BIND
+  | Kwith_stack_preemptible -> out opWITH_STACK_PREEMPTIBLE
+  | Kwith_stack_bind_preemptible -> out opWITH_STACK_BIND_PREEMPTIBLE
   | Kstop -> out opSTOP
 
 (* Emission of a list of instructions. Include some peephole optimization. *)

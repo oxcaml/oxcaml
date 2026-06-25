@@ -204,6 +204,9 @@ let convert_array_kind dbg (kind : L.array_kind) : converted_array_kind =
         Unboxed_product (List.map convert_kind kinds)
     in
     Array_kind (Unboxed_product (List.map convert_kind kinds))
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Lambda_to_flambda_primitives.convert_array_kind: Punspecializedarray"
 
 let convert_array_kind_for_length dbg kind : P.Array_kind_for_length.t =
   match convert_array_kind dbg kind with
@@ -304,6 +307,10 @@ let convert_array_ref_kind dbg (kind : L.array_ref_kind) :
     in
     Array_ref_kind
       (No_float_array_opt (Unboxed_product (List.map convert_kind kinds)))
+  | Punspecializedarray_ref _ ->
+    Misc.fatal_error
+      "Lambda_to_flambda_primitives.convert_array_ref_kind: \
+       Punspecializedarray_ref"
 
 let rec convert_unboxed_product_array_ref_kind
     (kind : Array_ref_kind.no_float_array_opt) : P.Array_kind.t =
@@ -472,6 +479,10 @@ let convert_array_set_kind dbg (kind : L.array_set_kind) :
     in
     Array_set_kind
       (No_float_array_opt (Unboxed_product (List.map convert_kind kinds)))
+  | Punspecializedarray_set _ ->
+    Misc.fatal_error
+      "Lambda_to_flambda_primitives.convert_array_set_kind: \
+       Punspecializedarray_set"
 
 let rec convert_unboxed_product_array_set_kind
     (kind : Array_set_kind.no_float_array_opt) : P.Array_kind.t =
@@ -581,6 +592,10 @@ let convert_array_kind_to_duplicate_array_kind dbg (kind : L.array_kind) :
     Misc.fatal_error
       "Lambda_to_flambda_primitives.convert_array_kind_to_duplicate_array_kind: \
        unimplemented"
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Lambda_to_flambda_primitives.convert_array_kind_to_duplicate_array_kind: \
+       Punspecializedarray"
 
 let convert_field_read_semantics (sem : L.field_read_semantics) : Mutability.t =
   match sem with Reads_agree -> Immutable | Reads_vary -> Mutable
@@ -2049,6 +2064,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
           args
         | Pfloatarray -> List.map unbox_float args
+        | Punspecializedarray ->
+          Misc.fatal_error
+            "Lambda_to_flambda_primitives: Pmakearray Punspecializedarray"
       in
       [Variadic (Make_array (array_kind, mutability, mode), args)]
     | Float_array_opt_dynamic -> (
@@ -2832,7 +2850,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Backend_type ->
         [Simple (Simple.const_zero machine_width)]
         (* constructor 0 is the same as Native here *)
-      | Runtime5 -> [Simple (Simple.const_bool machine_width Config.runtime5)]))
+      | Runtime5 -> [Simple (Simple.const_bool machine_width true)]))
   | Pint_as_pointer mode, [[arg]] ->
     (* This is not a stack allocation, but nonetheless has a region
        constraint. *)
@@ -2985,11 +3003,6 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let access_size = vec_accessor_width ~aligned size in
     [ bytes_like_set ~checks ~dbg ~machine_width ~access_size Bigstring
         ~boxed_or_tagged:boxed bigstring ~index_kind index new_value ]
-  | ( Pfloat_array_load_vec { size; unsafe; index_kind; mode; boxed },
-      [[array]; [index]] ) ->
-    check_float_array_optimisation_enabled dbg "Pfloat_array_load_vec";
-    [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
-        ~boxed ~vec_kind:(vec_kind size) Naked_floats array ~index_kind index ]
   | ( Pfloatarray_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] )
   | ( Punboxed_float_array_load_vec { size; unsafe; index_kind; mode; boxed },
@@ -3035,12 +3048,6 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       [[array]; [index]] ) ->
     [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
         ~boxed ~vec_kind:(vec_kind size) Naked_int16s array ~index_kind index ]
-  | ( Pfloat_array_set_vec { size; unsafe; index_kind; boxed },
-      [[array]; [index]; [new_value]] ) ->
-    check_float_array_optimisation_enabled dbg "Pfloat_array_set_vec";
-    [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
-        ~vec_kind:(vec_kind size) Naked_floats array ~index_kind index new_value
-    ]
   | ( Pfloatarray_set_vec { size; unsafe; index_kind; boxed },
       [[array]; [index]; [new_value]] )
   | ( Punboxed_float_array_set_vec { size; unsafe; index_kind; boxed },
@@ -3249,23 +3256,25 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Psetfloatfield _ | Psetufloatfield _ | Psetmixedfield _
       | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
       | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
-      | Pbigstring_load_vec _ | Pfloatarray_load_vec _ | Pfloat_array_load_vec _
-      | Pint_array_load_vec _ | Punboxed_float_array_load_vec _
-      | Punboxed_float32_array_load_vec _ | Puntagged_int8_array_load_vec _
-      | Puntagged_int16_array_load_vec _ | Punboxed_int32_array_load_vec _
-      | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
+      | Pbigstring_load_vec _ | Pfloatarray_load_vec _ | Pint_array_load_vec _
+      | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
+      | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
+      | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
+      | Punboxed_nativeint_array_load_vec _
       | Parrayrefu
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
             | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _
             | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
-            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
+            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _
+            | Punspecializedarray_ref _ ),
             _,
             _ )
       | Parrayrefs
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
             | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _
             | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
-            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
+            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _
+            | Punspecializedarray_ref _ ),
             _,
             _ )
       | Patomic_load_field _ | Ppoke _ | Pphys_equal _
@@ -3285,26 +3294,27 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           ( ( Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
             | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
-            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
+            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _
+            | Punspecializedarray_set _ ),
             _ )
       | Parraysets
           ( ( Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
             | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
-            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
+            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _
+            | Punspecializedarray_set _ ),
             _ )
       | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
       | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_set_8 _
       | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
       | Pbigstring_set_64 _ | Pbigstring_set_vec _ | Pfloatarray_set_vec _
-      | Pfloat_array_set_vec _ | Pint_array_set_vec _
-      | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
-      | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
-      | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
-      | Punboxed_nativeint_array_set_vec _ | Patomic_set_field _
-      | Patomic_exchange_field _ | Patomic_fetch_add_field | Patomic_add_field
-      | Patomic_sub_field | Patomic_land_field | Patomic_lxor_field
-      | Patomic_lor_field | Pset_idx _ ),
+      | Pint_array_set_vec _ | Punboxed_float_array_set_vec _
+      | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
+      | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
+      | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
+      | Patomic_set_field _ | Patomic_exchange_field _ | Patomic_fetch_add_field
+      | Patomic_add_field | Patomic_sub_field | Patomic_land_field
+      | Patomic_lxor_field | Patomic_lor_field | Pset_idx _ ),
       ( []
       | [_]
       | [_; _]

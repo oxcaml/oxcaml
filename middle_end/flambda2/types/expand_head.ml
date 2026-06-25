@@ -210,6 +210,10 @@ end = struct
     | Naked_vec512 i ->
       create_naked_vec512 (TG.Head_of_kind_naked_vec512.create i)
     | Null -> create_value TG.Head_of_kind_value.null
+    | Poison (kind, _) ->
+      (* CR ncourant: for now [Poison] has the conservative type "unknown"; but
+         should be tracked more precisely in the future. *)
+      create_unknown kind
 
   let bottom_like t = create_bottom t.kind
 

@@ -258,7 +258,22 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
         Inline (dacc, inlined))
   in
   match inlined with
-  | Inline (dacc, inlined) -> simplify_expr dacc inlined ~down_to_up
+  | Inline (dacc, inlined) ->
+    let down_to_up dacc ~rebuild =
+      let rebuild uacc ~after_rebuild =
+        let uacc =
+          if coming_from_indirect
+          then
+            UA.notify_removed
+              ~operation:Removed_operations.direct_call_of_indirect uacc
+          else uacc
+        in
+        let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
+        rebuild uacc ~after_rebuild
+      in
+      down_to_up dacc ~rebuild
+    in
+    simplify_expr dacc inlined ~down_to_up
   | Do_not_inline { erase_attribute } -> (
     let apply =
       let inlined : Inlined_attribute.t =
@@ -771,10 +786,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
               ~operation:Removed_operations.direct_call_of_indirect uacc
           else uacc
         in
-        (* Increase the counter of calls as the original apply node was removed.
-           [simplify] is called over the two apply nodes that were created to
-           replace the original one so they will be taken into account in the
-           cost metrics, mainly by increasing the code size. *)
+        (* Increase the counter of calls as the apply has been replaced by an
+           allocation of the partial set of closures. *)
         let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
         rebuild uacc ~after_rebuild)
   in
@@ -789,8 +802,6 @@ let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
   in
   let down_to_up dacc ~rebuild =
     let rebuild uacc ~after_rebuild =
-      (* Remove one function call as this apply was removed and replaced by two
-         new ones. *)
       let uacc =
         if coming_from_indirect
         then
@@ -798,7 +809,6 @@ let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
             ~operation:Removed_operations.direct_call_of_indirect uacc
         else uacc
       in
-      let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
       rebuild uacc ~after_rebuild
     in
     down_to_up dacc ~rebuild
@@ -807,7 +817,6 @@ let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
 
 let replace_apply_by_invalid dacc ~down_to_up reason =
   down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
-      let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
       EB.rebuild_invalid uacc reason ~after_rebuild)
 
 let arity_mismatch ~(params_arity : [`Complex] Flambda_arity.t)
@@ -1161,7 +1170,6 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
     | Need_meet -> type_unavailable ()
     | Invalid ->
       let rebuild uacc ~after_rebuild =
-        let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
         EB.rebuild_invalid uacc (Closure_type_was_invalid apply) ~after_rebuild
       in
       down_to_up dacc ~rebuild)

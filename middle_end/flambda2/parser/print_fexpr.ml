@@ -171,26 +171,6 @@ let vec512 ppf
     "vec512[%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx]" word0
     word1 word2 word3 word4 word5 word6 word7
 
-let const ppf (c : Fexpr.const) =
-  match c with
-  | Naked_immediate i ->
-    Format.fprintf ppf "%t%si%t" Flambda_colours.naked_number i
-      Flambda_colours.pop
-  | Tagged_immediate i ->
-    Format.fprintf ppf "%t%s%t" Flambda_colours.tagged_immediate i
-      Flambda_colours.pop
-  | Naked_float f -> float ppf f
-  | Naked_float32 f -> float32 ppf f
-  | Naked_int8 i -> int8 ppf i
-  | Naked_int16 i -> int16 ppf i
-  | Naked_int32 i -> int32 ppf i
-  | Naked_int64 i -> int64 ppf i
-  | Naked_nativeint i -> nativeint ppf i
-  | Naked_vec128 v -> vec128 ppf v
-  | Naked_vec256 v -> vec256 ppf v
-  | Naked_vec512 v -> vec512 ppf v
-  | Null -> Format.fprintf ppf "null"
-
 let naked_number_kind ppf (nnk : Flambda_kind.Naked_number_kind.t) =
   Format.pp_print_string ppf
   @@
@@ -258,6 +238,29 @@ and kind_with_subkind ppf (k : kind_with_subkind) =
 
 let kind_with_subkind ppf k =
   directive Flambda_colours.kind kind_with_subkind ppf k
+
+let const ppf (c : Fexpr.const) =
+  match c with
+  | Naked_immediate i ->
+    Format.fprintf ppf "%t%si%t" Flambda_colours.naked_number i
+      Flambda_colours.pop
+  | Tagged_immediate i ->
+    Format.fprintf ppf "%t%s%t" Flambda_colours.tagged_immediate i
+      Flambda_colours.pop
+  | Naked_float f -> float ppf f
+  | Naked_float32 f -> float32 ppf f
+  | Naked_int8 i -> int8 ppf i
+  | Naked_int16 i -> int16 ppf i
+  | Naked_int32 i -> int32 ppf i
+  | Naked_int64 i -> int64 ppf i
+  | Naked_nativeint i -> nativeint ppf i
+  | Naked_vec128 v -> vec128 ppf v
+  | Naked_vec256 v -> vec256 ppf v
+  | Naked_vec512 v -> vec512 ppf v
+  | Null -> Format.fprintf ppf "null"
+  | Poison (kind, name) ->
+    Format.fprintf ppf "%tpoison.%a.%s%t" Flambda_colours.invalid_keyword
+      kind_with_subkind kind name Flambda_colours.pop
 
 let arity ppf (a : arity) =
   match a with

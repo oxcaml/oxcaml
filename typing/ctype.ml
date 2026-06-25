@@ -2698,7 +2698,13 @@ let is_principal ty =
 type unwrapped_type_expr =
   { ty : type_expr
   ; modality : Mode.Modality.Const.t
-  ; or_null : (type_declaration * unwrapped_type_expr) option;
+  ; or_null : unwrapped_or_null option;
+  }
+
+and unwrapped_or_null =
+  { decl : type_declaration
+  ; args : type_expr list
+  ; prev : unwrapped_type_expr
   }
 
 let mk_unwrapped_type_expr ty =
@@ -2781,7 +2787,7 @@ let unbox_once env ty =
             Stepped
               { ty = apply ca_type ~extra_substs:[];
                 modality;
-                or_null = Some (decl, ty) }
+                or_null = Some { decl; args; prev = ty } }
           | None ->
             Misc.fatal_error "Invalid constructor for Variant_with_null"
           end
@@ -2890,7 +2896,7 @@ let apply_layout_wrapping_l ~env
     | Error _ -> Jkind_types.Layout.Any Jkind_types.Scannable_axes.max
   in
   match or_null with
-  | Some (_, prev) ->
+  | Some { prev; _ } ->
     (* The layout on ['a or_null] is imprecise - it's always [scannable]. But
         when ['a] is [non_float]/[non_pointer64]/[non_pointer], we can give
         ['a or_null] the same separability (per [Jkind.apply_or_null_l]). So
@@ -2906,17 +2912,19 @@ let apply_jkind_wrapping_l ~env ~level
           ~unwrapped_ty:{ ty; or_null; modality } jkind =
   begin
     match or_null with
-    | Some (decl, _) ->
-      (* We get the mode crossing behavior of the wrapped jkind from the
-          declaration of the [or_null]-like type. *)
-      let instance_jkind =
-        jkind_subst env level decl.type_params [ty] decl.type_jkind
-      in
+    | Some { decl; args; _ } ->
+      (* The declaration supplies the mode crossing behavior of the
+         [or_null]-like type. The stored arguments instantiate that behavior
+         for the wrapper that was unwrapped. *)
       begin match
         apply_layout_wrapping_l ~env
           ~unwrapped_ty:{ ty; modality; or_null } jkind
       with
-      | Ok layout -> Ok (Jkind.set_layout instance_jkind layout)
+      | Ok layout ->
+        let instance_jkind =
+          jkind_subst env level decl.type_params args decl.type_jkind
+        in
+        Ok (Jkind.set_layout instance_jkind layout)
       | Error _ as e -> e
       end
     | None -> Ok jkind
@@ -8274,19 +8282,25 @@ let rec nondep_type_rec ?(expand_private=false) env ids ty =
     if expand_private then try_expand_safe_opt env t
     else try_expand_safe env t
   in
-  match get_desc ty with
-    Tvar { name; jkind } ->
-    let jkind' = nondep_jkind_base env ids jkind in
-    if not (jkind' == jkind) then
-      set_type_desc ty (Tvar { name; jkind = jkind' });
-    ty
-  | Tunivar { name; jkind } ->
-    let jkind' = nondep_jkind_base env ids jkind in
-    if not (jkind' == jkind) then
-      set_type_desc ty (Tvar { name; jkind = jkind' });
-    ty
-  | _ -> try TypeHash.find nondep_hash ty
+  try TypeHash.find nondep_hash ty
   with Not_found ->
+  match get_desc ty with
+  | (Tvar {name; jkind} | Tunivar {name; jkind}) as desc ->
+    let jkind' = nondep_jkind_base env ids jkind in
+    if jkind' == jkind then ty
+    else
+      let desc =
+        match desc with
+        | Tvar _ -> Tvar {name; jkind = jkind'}
+        | Tunivar _ -> Tunivar {name; jkind = jkind'}
+        | _ -> assert false
+      in
+      let ty' =
+        newty3 ~level:(get_level ty) ~scope:(get_scope ty) desc
+      in
+      TypeHash.add nondep_hash ty ty';
+      ty'
+  | _ ->
     let ty' = newgenstub ~scope:(get_scope ty)
                 (Jkind.Builtin.any ~why:Dummy_jkind) in
     TypeHash.add nondep_hash ty ty';

@@ -164,6 +164,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_NOTRACE [@symbol "notrace"]
 %token KWD_NULL [@symbol "null"]
 %token KWD_OF     [@symbol "of"]
+%token KWD_POISON [@symbol "poison"]
 %token KWD_POP    [@symbol "pop"]
 %token KWD_PUSH   [@symbol "push"]
 %token KWD_REC    [@symbol "rec"]
@@ -812,6 +813,7 @@ const:
     | Some 's' -> Naked_float32 (fst f)
     | Some c -> Misc.fatal_errorf "Invalid float modifier '%c'" c }
   | KWD_NULL { Null }
+  | KWD_POISON; DOT; k = kind_with_subkind; DOT; s = STRING { Poison (k, s) }
 ;
 
 %inline func_name_with_optional_arities:

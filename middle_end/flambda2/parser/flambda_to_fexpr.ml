@@ -20,37 +20,6 @@ let vec512 v = v |> Vector_types.Vec512.Bit_pattern.to_bits
 
 let targetint i = i |> Targetint_32_64.to_int64
 
-let const c : Fexpr.const =
-  match Reg_width_const.descr c with
-  | Naked_immediate imm ->
-    Naked_immediate
-      (* CR mshinwell: machine_width should be passed through properly here *)
-      (let machine_width = Target_system.Machine_width.Sixty_four in
-       imm
-       |> Target_ocaml_int.to_targetint machine_width
-       |> Targetint_32_64.to_string)
-  | Tagged_immediate imm ->
-    Tagged_immediate
-      (* CR mshinwell: machine_width should be passed through properly here *)
-      (let machine_width = Target_system.Machine_width.Sixty_four in
-       imm
-       |> Target_ocaml_int.to_targetint machine_width
-       |> Targetint_32_64.to_string)
-  | Naked_float f -> Naked_float (f |> float)
-  | Naked_float32 f -> Naked_float32 (f |> float32)
-  | Naked_int8 i -> Naked_int8 i
-  | Naked_int16 i -> Naked_int16 i
-  | Naked_int32 i -> Naked_int32 i
-  | Naked_int64 i -> Naked_int64 i
-  | Naked_vec128 bits ->
-    Naked_vec128 (Vector_types.Vec128.Bit_pattern.to_bits bits)
-  | Naked_vec256 bits ->
-    Naked_vec256 (Vector_types.Vec256.Bit_pattern.to_bits bits)
-  | Naked_vec512 bits ->
-    Naked_vec512 (Vector_types.Vec512.Bit_pattern.to_bits bits)
-  | Naked_nativeint i -> Naked_nativeint (i |> targetint)
-  | Null -> Null
-
 let depth_or_infinity (d : int Or_infinity.t) : Fexpr.rec_info =
   match d with Finite d -> Depth d | Infinity -> Infinity
 
@@ -78,19 +47,6 @@ let coercion env (co : Coercion.t) : Fexpr.coercion =
     let from = rec_info env from in
     let to_ = rec_info env to_ in
     Change_depth { from; to_ }
-
-let simple env s =
-  Simple.pattern_match s
-    ~name:(fun n ~coercion:co : Fexpr.simple ->
-      let s : Fexpr.simple =
-        match name env n with Var v -> Var v | Symbol s -> Symbol s
-      in
-      if Coercion.is_id co
-      then s
-      else
-        let co = coercion env co in
-        Coerce (s, co))
-    ~const:(fun c -> Fexpr.Const (const c))
 
 let is_default_kind_with_subkind (k : Flambda_kind.With_subkind.t) =
   Flambda_kind.is_value (Flambda_kind.With_subkind.kind k)
@@ -168,6 +124,53 @@ let kinded_parameter env (kp : Bound_parameter.t) :
   let k = Bound_parameter.kind kp |> kind_with_subkind_opt in
   let param, env = Env.bind_var env (Bound_parameter.var kp) in
   { param; kind = k }, env
+
+let const c : Fexpr.const =
+  match Reg_width_const.descr c with
+  | Naked_immediate imm ->
+    Naked_immediate
+      (* CR mshinwell: machine_width should be passed through properly here *)
+      (let machine_width = Target_system.Machine_width.Sixty_four in
+       imm
+       |> Target_ocaml_int.to_targetint machine_width
+       |> Targetint_32_64.to_string)
+  | Tagged_immediate imm ->
+    Tagged_immediate
+      (* CR mshinwell: machine_width should be passed through properly here *)
+      (let machine_width = Target_system.Machine_width.Sixty_four in
+       imm
+       |> Target_ocaml_int.to_targetint machine_width
+       |> Targetint_32_64.to_string)
+  | Naked_float f -> Naked_float (f |> float)
+  | Naked_float32 f -> Naked_float32 (f |> float32)
+  | Naked_int8 i -> Naked_int8 i
+  | Naked_int16 i -> Naked_int16 i
+  | Naked_int32 i -> Naked_int32 i
+  | Naked_int64 i -> Naked_int64 i
+  | Naked_vec128 bits ->
+    Naked_vec128 (Vector_types.Vec128.Bit_pattern.to_bits bits)
+  | Naked_vec256 bits ->
+    Naked_vec256 (Vector_types.Vec256.Bit_pattern.to_bits bits)
+  | Naked_vec512 bits ->
+    Naked_vec512 (Vector_types.Vec512.Bit_pattern.to_bits bits)
+  | Naked_nativeint i -> Naked_nativeint (i |> targetint)
+  | Null -> Null
+  | Poison (kind, name) ->
+    let kind = kind_with_subkind (Flambda_kind.With_subkind.anything kind) in
+    Poison (kind, name)
+
+let simple env s =
+  Simple.pattern_match s
+    ~name:(fun n ~coercion:co : Fexpr.simple ->
+      let s : Fexpr.simple =
+        match name env n with Var v -> Var v | Symbol s -> Symbol s
+      in
+      if Coercion.is_id co
+      then s
+      else
+        let co = coercion env co in
+        Coerce (s, co))
+    ~const:(fun c -> Fexpr.Const (const c))
 
 let recursive_flag (r : Recursive.t) : Fexpr.is_recursive =
   match r with Recursive -> Recursive | Non_recursive -> Nonrecursive

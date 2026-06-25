@@ -74,7 +74,7 @@ let int64_to_jsir_const int64 : Jsir.constant = Int64 int64
 let nativeint_to_jsir_const nativeint : Jsir.constant =
   Int32 (Targetint_32_64.to_int32 nativeint)
 
-let reg_width_const const : Jsir.constant =
+let rec reg_width_const const : Jsir.constant =
   match Reg_width_const.descr const with
   | Naked_immediate targetint | Tagged_immediate targetint ->
     target_ocaml_int_to_jsir_const targetint
@@ -84,6 +84,10 @@ let reg_width_const const : Jsir.constant =
   | Naked_int64 int64 -> int64_to_jsir_const int64
   | Naked_nativeint nativeint -> nativeint_to_jsir_const nativeint
   | Null -> Jsir.Null
+  | Poison (kind, name) ->
+    reg_width_const
+      (Reg_width_const.of_int_of_kind Thirty_two_no_gc_tag_bit kind
+         (String.hash name))
   | Naked_int8 _ | Naked_int16 _ | Naked_vec128 _ | Naked_vec256 _
   | Naked_vec512 _ ->
     (* CR selee: smallints and SIMD *)

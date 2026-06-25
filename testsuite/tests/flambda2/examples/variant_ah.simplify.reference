@@ -20,7 +20,7 @@ let code loopify(never) size(33) newer_version_of(shouldn't_alloc_1)
         -> k * k1 =
   (let untagged = %untag_imm (b) in
    switch untagged
-     | 0 -> k2 (1i, 0)
+     | 0 -> k2 (1i, poison.val.variant_unboxing_field)
      | 1 -> k2 (0i, x))
     where k2 (is_int : imm, unboxed_field_0_0) =
       (switch is_int
