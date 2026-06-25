@@ -210,8 +210,8 @@
   (diff empty.expected arrays512_u.out)))
 
 (executable
- (name arrays512_vec_mask)
- (modules arrays512_vec_mask)
+ (name arrays512_mask)
+ (modules arrays512_mask)
  (enabled_if
    (and
     (= %{context_name} "main")
@@ -231,8 +231,8 @@
     (<> %{system} macosx)))
  (action
   (with-outputs-to
-   arrays512_vec_mask.out
-   (run ./arrays512_vec_mask.exe))))
+   arrays512_mask.out
+   (run ./arrays512_mask.exe))))
 
 (rule
  (alias runtest)
@@ -242,7 +242,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
-  (diff empty.expected arrays512_vec_mask.out)))
+  (diff empty.expected arrays512_mask.out)))
 
 (rule
  (alias runtest)
@@ -522,11 +522,11 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
-  (copy arrays512_vec_mask.ml arrays512_vec_mask_nodynlink.ml)))
+  (copy arrays512_mask.ml arrays512_mask_nodynlink.ml)))
 
 (executable
- (name arrays512_vec_mask_nodynlink)
- (modules arrays512_vec_mask_nodynlink)
+ (name arrays512_mask_nodynlink)
+ (modules arrays512_mask_nodynlink)
  (enabled_if
    (and
     (= %{context_name} "main")
@@ -546,8 +546,8 @@
     (<> %{system} macosx)))
  (action
   (with-outputs-to
-   arrays512_vec_mask_nodynlink.out
-   (run ./arrays512_vec_mask_nodynlink.exe))))
+   arrays512_mask_nodynlink.out
+   (run ./arrays512_mask_nodynlink.exe))))
 
 (rule
  (alias runtest)
@@ -557,7 +557,7 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
-  (diff empty.expected arrays512_vec_mask_nodynlink.out)))
+  (diff empty.expected arrays512_mask_nodynlink.out)))
 
 (rule
  (alias runtest)
@@ -837,11 +837,11 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
-  (copy arrays512_vec_mask.ml arrays512_vec_mask_internal_assembler.ml)))
+  (copy arrays512_mask.ml arrays512_mask_internal_assembler.ml)))
 
 (executable
- (name arrays512_vec_mask_internal_assembler)
- (modules arrays512_vec_mask_internal_assembler)
+ (name arrays512_mask_internal_assembler)
+ (modules arrays512_mask_internal_assembler)
  (enabled_if
    (and
     (= %{context_name} "main")
@@ -861,8 +861,8 @@
     (<> %{system} macosx)))
  (action
   (with-outputs-to
-   arrays512_vec_mask_internal_assembler.out
-   (run ./arrays512_vec_mask_internal_assembler.exe))))
+   arrays512_mask_internal_assembler.out
+   (run ./arrays512_mask_internal_assembler.exe))))
 
 (rule
  (alias runtest)
@@ -872,4 +872,4 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
-  (diff empty.expected arrays512_vec_mask_internal_assembler.out)))
+  (diff empty.expected arrays512_mask_internal_assembler.out)))

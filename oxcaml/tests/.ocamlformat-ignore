@@ -6,7 +6,6 @@ backend/vectorizer/test_float32_unboxed.ml
 simd/int128.ml
 simd/*_u.ml
 simd/avx512/*_u.ml
-simd/avx512/*_mask.ml
 simd/let_mutable.ml
 simd/unbox_types.ml
 simd/consts.ml
@@ -17,7 +16,7 @@ simd/consts256_u.ml
 simd/arrays.ml
 simd/arrays256.ml
 simd/avx512/arrays512.ml
-simd/avx512/arrays512_vec_mask.ml
+simd/avx512/arrays512_mask.ml
 simd/amd64/int_ops.ml
 simd/amd64/load_store.ml
 simd/mixed_modules.ml
