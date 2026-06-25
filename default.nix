@@ -8,7 +8,6 @@
   multidomain ? false,
   ocamltest ? true,
   pollInsertion ? false,
-  runtime5 ? true,
   stackChecks ? false,
   warnError ? true,
   oxcamlClang ? false,
@@ -36,7 +35,6 @@ let
       (mkFlag framePointers "frame-pointers")
       (mkFlag multidomain "multidomain")
       (mkFlag pollInsertion "poll-insertion")
-      (mkFlag runtime5 "runtime5")
       (mkFlag stackChecks "stack-checks")
       (mkFlag warnError "warn-error")
       (mkFlag ocamltest "ocamltest")

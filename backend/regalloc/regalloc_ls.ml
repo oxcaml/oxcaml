@@ -209,7 +209,13 @@ let allocate_blocked_register : State.t -> Interval.t -> spilling_reg =
            (DLL.exists ~f:chk intervals.fixed_dll
            || DLL.exists ~f:chk intervals.inactive_dll)
     then (
-      (match hd.reg.loc with Reg _ -> () | Stack _ | Unknown -> assert false);
+      (match hd.reg.loc with
+      | Reg _ -> ()
+      | Stack _ | Unknown ->
+        fatal
+          "Regalloc_ls.allocate_blocked_register: active interval %a has no \
+           physical register"
+          Printreg.reg hd.reg);
       Reg.set_loc interval.reg hd.reg.loc;
       DLL.delete_curr hd_cell;
       Interval.DLL.insert_sorted intervals.active_dll interval;

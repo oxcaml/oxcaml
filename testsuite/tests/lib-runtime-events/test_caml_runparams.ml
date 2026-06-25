@@ -1,11 +1,7 @@
 (* TEST
  {
-   runtime4;
-   skip;
- }{
    include runtime_events;
    ocamlrunparam += ",e=4";
-   runtime5;
    { bytecode; }
    { native; }
  }

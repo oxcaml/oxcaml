@@ -325,6 +325,12 @@ module type S = sig
     Hint.pinpoint ->
     (definite:bool -> capitalize:bool -> Fmt.formatter -> unit) option
 
+  (** Same as [print_pinpoint], but prints only the description, without the
+      location. *)
+  val print_pinpoint_desc :
+    Hint.pinpoint_desc ->
+    (definite:bool -> capitalize:bool -> Fmt.formatter -> unit) option
+
   type nonrec 'a simple_error = 'a simple_error
 
   type changes

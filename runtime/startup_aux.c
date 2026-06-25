@@ -169,13 +169,13 @@ static void parse_ocamlrunparam(char_os* opt)
   if (opt != NULL){
     while (*opt != '\0'){
       switch (*opt++){
-      /* keep in sync with runtime4 and with caml_runtime_parameters() */
-      case 'a': break; /* Allocation policy in runtime 4 */
+      /* keep in sync with caml_runtime_parameters() */
+      case 'a': break; /* was OCaml 4 allocation policy */
       case 'b': scanmult (opt, &params.backtrace_enabled); break;
       case 'c': scanmult (opt, &params.cleanup_on_exit); break;
       case 'd': scanmult (opt, &params.max_domains); break;
       case 'e': scanmult (opt, &params.runtime_events_log_wsize); break;
-      case 'h': break; /* init heap size in runtime 4 */
+      case 'h': break; /* was OCaml 4 init heap size */
       case 'H': scanmult (opt, &params.use_hugetlb_pages); break;
       case 'i': scanmult (opt, &params.init_major_heap_increment); break;
       case 'l': scanmult (opt, &params.init_max_stack_wsz); break;
@@ -193,7 +193,7 @@ static void parse_ocamlrunparam(char_os* opt)
         atomic_store_relaxed(&caml_verb_gc, val);
         break;
       case 'V': scanmult (opt, &params.verify_heap); break;
-      case 'w': break; /* major window in runtime 4 */
+      case 'w': break; /* was OCaml 4 major window 4 */
       case 'W': scanmult (opt, &caml_runtime_warnings); break;
       case 'X': parse_gc_tweak(&opt); break;
       case ',': continue;

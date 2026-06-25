@@ -1384,7 +1384,9 @@ let emit_instr env i =
       | Reg _, Reg _ -> A.ins_mov_reg_w (H.reg_w dst) (H.reg_w src)
       | Reg _, Stack _ -> emit_stack_str env (H.reg_w src) dst
       | Stack _, Reg _ -> emit_stack_ldr env (H.reg_w dst) src
-      | Stack _, Stack _ | _, Unknown | Unknown, _ -> assert false)
+      | Stack _, Stack _ | _, Unknown | Unknown, _ ->
+        Misc.fatal_errorf "Emit.emit_instr: illegal Imove32 (%a to %a)"
+          Printreg.reg src Printreg.reg dst)
   | Lop (Const_int n) -> emit_intconst (H.reg_x i.res.(0)) n
   | Lop (Const_float32 f) ->
     if Int32.equal f 0l
@@ -1439,7 +1441,7 @@ let emit_instr env i =
       | Some tailrec_entry_point -> A.ins1 B (local_label tailrec_entry_point)
     else A.ins1 B (symbol (Needs_reloc JUMP26) (symbol_of_cmm_symbol func))
   | Lcall_op (Lextcall { func; alloc; stack_ofs; _ }) ->
-    if Config.runtime5 && stack_ofs > 0
+    if stack_ofs > 0
     then (
       A.ins_mov_from_sp ~dst:reg_stack_arg_begin;
       A.ins4 ADD_immediate reg_stack_arg_end O.sp
@@ -1458,17 +1460,14 @@ let emit_instr env i =
          call will preserve. We used to use x29 (frame pointer) here, but
          caml_start_program leaves it pointing to its C stack for the unwinder,
          so it can't be clobbered here. *)
-      if Config.runtime5
-      then (
-        A.ins_mov_from_sp ~dst:reg_x_extcall_saved_sp;
-        D.cfi_remember_state ();
-        D.cfi_def_cfa_register
-          ~reg:(Int.to_string (H.gp_x_dwarf_encoding reg_x_extcall_saved_sp));
-        A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_c_stack);
-        A.ins_mov_to_sp ~src:reg_x_tmp1)
-      else D.cfi_remember_state ();
+      A.ins_mov_from_sp ~dst:reg_x_extcall_saved_sp;
+      D.cfi_remember_state ();
+      D.cfi_def_cfa_register
+        ~reg:(Int.to_string (H.gp_x_dwarf_encoding reg_x_extcall_saved_sp));
+      A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_c_stack);
+      A.ins_mov_to_sp ~src:reg_x_tmp1;
       A.ins1 BL (symbol (Needs_reloc CALL26) (S.create_global func));
-      if Config.runtime5 then A.ins_mov_to_sp ~src:reg_x_extcall_saved_sp;
+      A.ins_mov_to_sp ~src:reg_x_extcall_saved_sp;
       D.cfi_restore_state ())
   | Lop (Stackoffset n) ->
     assert (n mod 16 = 0);
@@ -1788,16 +1787,12 @@ let emit_instr env i =
     (* Compare with 0 and set result to 1 if non-zero, 0 if zero *)
     A.ins_cmp (H.reg_w i.res.(0)) (O.imm 0) O.optional_none;
     A.ins_cset (H.reg_x i.res.(0)) Cond.NE
-  | Lop Dls_get when not Config.runtime5 ->
-    Misc.fatal_error "Dls is not supported in runtime4."
   | Lop Dls_get ->
     A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_dls_state)
   | Lop Tls_get ->
     A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_tls_state)
   | Lop Domain_index ->
-    if Config.runtime5
-    then A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_id)
-    else A.ins3 MOVZ (H.reg_x i.res.(0)) (O.imm_sixteen 0) O.optional_none
+    A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_id)
   | Lop (Csel tst) -> (
     let len = Array.length i.arg in
     let ifso = i.arg.(len - 2) in
@@ -1900,9 +1895,7 @@ let emit_instr env i =
       A.ins1 BL (runtime_function S.Predef.caml_raise_exn);
       record_frame env Reg.Set.empty (Dbg_raise i.dbg)
     | Raise_reraise ->
-      if Config.runtime5
-      then A.ins1 BL (runtime_function S.Predef.caml_reraise_exn)
-      else A.ins1 BL (runtime_function S.Predef.caml_raise_exn);
+      A.ins1 BL (runtime_function S.Predef.caml_reraise_exn);
       record_frame env Reg.Set.empty (Dbg_raise i.dbg)
     | Raise_notrace ->
       A.ins_mov_to_sp ~src:reg_x_trap_ptr;

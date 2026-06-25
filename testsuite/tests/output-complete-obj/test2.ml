@@ -5,7 +5,7 @@
  include unix;
  hasunix;
  setup-ocamlc.byte-build-env;
- flags = "-w -a -output-complete-exe puts.c -ccopt -I${ocamlsrcdir}/${runtime_dir}";
+ flags = "-w -a -output-complete-exe puts.c -ccopt -I${ocamlsrcdir}/runtime";
  program = "test2";
  ocamlc.byte;
  program = "./test2";
