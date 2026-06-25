@@ -131,9 +131,16 @@ module Scannable_axes : sig
 end
 
 module Layout : sig
-  (** Note that products have two possible encodings: as [Product ...] or as
+  (** Note that:
+
+      1. Products have two possible encodings: as [Product ...] or as
       [Sort (Product ...]. This duplication is hard to eliminate because of the
-      possibility that a sort variable may be instantiated by a product sort. *)
+      possibility that a sort variable may be instantiated by a product sort.
+
+      2. Scannable axes are meaningful only when the layout might be scannable
+      ([any], [scannable], a sort variable, or an abstract kind). On other
+      layouts they are ignored, so e.g. [float64 non_pointer] is equivalent to
+      [float64]. See [Layout.Const.get_root_scannable_axes]. *)
   type 'sort t =
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
