@@ -886,7 +886,7 @@ and print_let_expr ppf ({ let_abst = _; defining_expr } as t) : unit =
 
 and print_named ppf (t : named) =
   let print_or_elide_debuginfo ppf dbg =
-    if Debuginfo.is_none dbg
+    if Flambda_features.dump_compact () || Debuginfo.is_none dbg
     then Format.pp_print_string ppf ""
     else Format.fprintf ppf "@ %a" Debuginfo.print_compact dbg
   in

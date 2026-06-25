@@ -196,6 +196,7 @@ module type Oxcaml_options = sig
   val dflow : unit -> unit
   val dsimplify : unit -> unit
   val dreaper : unit -> unit
+  val dflambda_compact : unit -> unit
   val use_cached_generic_functions : unit -> unit
   val cached_generic_functions_path : string -> unit
   val x : string -> unit

@@ -217,6 +217,7 @@ module Flambda2 : sig
     val flow : bool ref
     val simplify : bool ref
     val reaper : bool ref
+    val compact : bool ref
   end
 
   module Expert : sig
