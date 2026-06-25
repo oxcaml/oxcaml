@@ -319,6 +319,7 @@ type error =
   | Let_poly_not_yet_implemented
   | Let_poly_not_syntactic_value
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
+  | Useless_lpoly
 
 and invalid_layout_poly_inst_context =
   | Binding_op
@@ -767,9 +768,10 @@ let tuple_pat_mode mode tuple_modes =
   let tuple_modes = Some (Value.List.disallow_right tuple_modes) in
   { mode; tuple_modes }
 
-let effect_handler_modes loc pinpoint env expected_mode =
+let effect_handler_modes pinpoint env expected_mode =
+  Env.walk_locks_for_legacy_construct ~env pinpoint;
   let env =
-    Env.add_const_closure_lock (loc, pinpoint) Value.Comonadic.Const.legacy env
+    Env.add_const_closure_lock pinpoint Value.Comonadic.Const.legacy env
   in
   env, simple_pat_mode Value.legacy, mode_effect_handler_body mode_legacy,
   mode_effect_handler_body expected_mode
@@ -7277,7 +7279,7 @@ and type_expect_
           in
           env, arg_pat_mode, arg_expected_mode, expected_mode
         | _ :: _ ->
-          effect_handler_modes loc Effect_match env expected_mode
+          effect_handler_modes (loc, Effect_match) env expected_mode
       in
       let arg, sort =
         with_local_level_generalize begin fun () ->
@@ -7331,7 +7333,7 @@ and type_expect_
           expected_mode
         | _ :: _ ->
           let env, arg_mode, _, expected_mode =
-            effect_handler_modes loc Effect_try env expected_mode
+            effect_handler_modes (loc, Effect_try) env expected_mode
           in
           env, arg_mode, expected_mode, expected_mode
       in
@@ -11301,7 +11303,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
                 Jkind_types.Sort.generalize_with (fun () -> generalize ty)
               in
               if List.is_empty univars then
-                Location.prerr_warning loc Warnings.Useless_lpoly;
+                raise (Error (loc, env, Useless_lpoly));
               univars)
             pv_lpoly)
         ~f_mut:(unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)))
@@ -13336,6 +13338,12 @@ let report_error ~loc env =
       Location.errorf ~loc
         "Instantiation of layout-polymorphic values is not yet supported \
          for %s." ctx_str
+  | Useless_lpoly ->
+      Location.errorf ~loc
+        "This binding has no layout variables, so %a has no effect.@ \
+         Consider using a regular %a instead."
+        Style.inline_code "poly_"
+        Style.inline_code "let"
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

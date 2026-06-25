@@ -109,7 +109,8 @@ module Vectorized_instruction = struct
       results : register array
     }
 
-  let print ppf t = Format.fprintf ppf "%a " Cfg.dump_basic (Cfg.Op t.operation)
+  let print ppf t =
+    Format.fprintf ppf "%a " Printcfg.basic_desc (Cfg.Op t.operation)
 
   let make_default ~arg_count ~res_count operation : t =
     { operation;

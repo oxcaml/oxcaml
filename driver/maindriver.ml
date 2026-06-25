@@ -19,7 +19,6 @@ open Clflags
 module Options = Main_args.Make_bytecomp_options (Main_args.Default.Main)
 
 let main argv ppf =
-  Symbol.this_is_ocamlc ();
   let program = "ocamlc" in
   Clflags.add_arguments __LOC__ Options.list;
   Clflags.add_arguments __LOC__

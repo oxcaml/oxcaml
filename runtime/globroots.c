@@ -218,16 +218,6 @@ static void compute_index_for_global_root_scan(value* glob_block, int* start,
   CAMLassert (Is_block(*glob_block));
 
   if (Scannable_val(*glob_block)) {
-    /* Note: if a [Closure_tag] block is registered as a global root
-       (possibly containing one or more [Infix_tag] blocks), then only one
-       out of the combined set of the [Closure_tag] and [Infix_tag] blocks
-       may be registered as a global root.  Multiple registrations can cause
-       the compactor to traverse the same fields of a block twice, which can
-       cause a failure. */
-    // CR mshinwell: This comment may not apply to runtime5, where the
-    // compactor has different behaviour.  (However we still need to cope
-    // with closures being registered as global roots, which flambda2 does
-    // but none of the upstream middle ends.)
     if (Tag_val(*glob_block) == Infix_tag)
       *glob_block -= Infix_offset_val(*glob_block);
 
