@@ -159,7 +159,6 @@ type error =
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
   | Missing_immediate_all_void_constructor_attribute of string
-  | Misplaced_immediate_all_void_constructor_attribute of string
 
 open Typedtree
 
@@ -2424,14 +2423,6 @@ let update_record_representation
     end
   | Error _ as e -> e
 
-let check_misplaced_all_void_constructor_attribute
-      (cstr : Types.constructor_declaration) =
-  if Builtin_attributes.has_immediate_all_void_constructor cstr.cd_attributes
-  then
-    raise (Error (cstr.cd_loc,
-                  Misplaced_immediate_all_void_constructor_attribute
-                    (Ident.name cstr.cd_id)))
-
 (* This function updates jkind stored in kinds with more accurate jkinds.
    It is called after the circularity checks and the delayed jkind checks
    have happened, so we can fully compute jkinds of types.
@@ -2455,7 +2446,6 @@ let rec update_decl_jkind env dpath decl =
     (* CR layouts: factor out duplication *)
     match cstrs, rep with
     | _, Variant_with_null ->
-      List.iter check_misplaced_all_void_constructor_attribute cstrs;
       begin match Datarepr.find_variant_with_null_payload cstrs with
       | Some
           { payload_cstr = { Types.cd_uid; _ };
@@ -2493,7 +2483,6 @@ let rec update_decl_jkind env dpath decl =
         Misc.fatal_error "Invalid constructor for Variant_with_null"
       end
     | [{Types.cd_args} as cstr], Variant_unboxed -> begin
-        check_misplaced_all_void_constructor_attribute cstr;
         match cd_args with
         | Cstr_tuple [{ca_type=ty; _} as arg] -> begin
             let jkind = Ctype.type_jkind env ty in
@@ -2527,23 +2516,20 @@ let rec update_decl_jkind env dpath decl =
             update_constructor_arguments_sorts env cstr.Types.cd_loc
               cstr.Types.cd_args
           in
-          let has_attr =
-            Builtin_attributes.has_immediate_all_void_constructor
-              cstr.Types.cd_attributes
-          in
           let is_nonempty_all_void =
             all_void
             && (match cd_args with
                 | Cstr_tuple (_ :: _) -> true
                 | Cstr_tuple [] | Cstr_record _ -> false)
           in
-          let name = Ident.name cstr.Types.cd_id in
-          if is_nonempty_all_void && not has_attr then
+          if is_nonempty_all_void
+          && not (Builtin_attributes.has_immediate_all_void_constructor
+                    cstr.Types.cd_attributes)
+          then
             raise
               (Error (cstr.Types.cd_loc,
-                      Missing_immediate_all_void_constructor_attribute name));
-          if not is_nonempty_all_void then
-            check_misplaced_all_void_constructor_attribute cstr;
+                      Missing_immediate_all_void_constructor_attribute
+                        (Ident.name cstr.Types.cd_id)));
           let cstr_repr =
             update_constructor_representation env cd_args jkinds
               ~is_extension_constructor:false
@@ -5912,13 +5898,6 @@ let report_error ~loc = function
        annotated with %a."
       Style.inline_code name
       Style.inline_code "[@immediate_all_void_constructor]"
-  | Misplaced_immediate_all_void_constructor_attribute name ->
-    Location.errorf ~loc
-      "The %a attribute on constructor %a is not allowed:@ it may only be \
-       placed on constructors of boxed variants@ with at least one argument, \
-       all of which are void."
-      Style.inline_code "[@immediate_all_void_constructor]"
-      Style.inline_code name
 
 let () =
   Location.register_error_of_exn

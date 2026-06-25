@@ -315,8 +315,8 @@ Line 1, characters 25-32:
 Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
 
-(* [@immediate_all_void_constructor] is required on constructors whose arguments are
-   all void, and rejected everywhere else. *)
+(* [@immediate_all_void_constructor] is required on constructors whose arguments
+   are all void, and optional elsewhere. *)
 
 type t = A of unit_u [@immediate_all_void_constructor]
 [%%expect{|
@@ -377,68 +377,13 @@ Error: All arguments of the constructor "A" are void, so it must be
        annotated with "[@immediate_all_void_constructor]".
 |}]
 
-(* Misplaced attribute *)
+(* A misplaced attribute is a warning, not an error, so the type is still
+   accepted. The warning (53) isn't reported here because expect tests run at
+   toplevel; see [immediate_all_void_constructor_unused.ml]. *)
 
 type t = A of int [@immediate_all_void_constructor]
 [%%expect{|
-Line 1, characters 9-51:
-1 | type t = A of int [@immediate_all_void_constructor]
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "[@immediate_all_void_constructor]" attribute on constructor "A" is not allowed:
-       it may only be placed on constructors of boxed variants
-       with at least one argument, all of which are void.
-|}]
-
-type t = A of unit_u * int [@immediate_all_void_constructor]
-[%%expect{|
-Line 1, characters 9-60:
-1 | type t = A of unit_u * int [@immediate_all_void_constructor]
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "[@immediate_all_void_constructor]" attribute on constructor "A" is not allowed:
-       it may only be placed on constructors of boxed variants
-       with at least one argument, all of which are void.
-|}]
-
-type t = A [@immediate_all_void_constructor]
-[%%expect{|
-Line 1, characters 9-44:
-1 | type t = A [@immediate_all_void_constructor]
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "[@immediate_all_void_constructor]" attribute on constructor "A" is not allowed:
-       it may only be placed on constructors of boxed variants
-       with at least one argument, all of which are void.
-|}]
-
-type t = A of { x : int } [@immediate_all_void_constructor]
-[%%expect{|
-Line 1, characters 9-59:
-1 | type t = A of { x : int } [@immediate_all_void_constructor]
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "[@immediate_all_void_constructor]" attribute on constructor "A" is not allowed:
-       it may only be placed on constructors of boxed variants
-       with at least one argument, all of which are void.
-|}]
-
-(* Unboxed variants never take the attribute *)
-
-type t = A of unit_u [@immediate_all_void_constructor] [@@unboxed]
-[%%expect{|
-Line 1, characters 9-54:
-1 | type t = A of unit_u [@immediate_all_void_constructor] [@@unboxed]
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "[@immediate_all_void_constructor]" attribute on constructor "A" is not allowed:
-       it may only be placed on constructors of boxed variants
-       with at least one argument, all of which are void.
-|}]
-
-type t = A of int [@immediate_all_void_constructor] [@@unboxed]
-[%%expect{|
-Line 1, characters 9-51:
-1 | type t = A of int [@immediate_all_void_constructor] [@@unboxed]
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "[@immediate_all_void_constructor]" attribute on constructor "A" is not allowed:
-       it may only be placed on constructors of boxed variants
-       with at least one argument, all of which are void.
+type t = A of int
 |}]
 
 type t = A of unit_u [@@unboxed]
