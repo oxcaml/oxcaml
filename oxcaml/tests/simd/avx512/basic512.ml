@@ -3,17 +3,31 @@ open Stdlib
 (* 512-bit vectors *)
 
 external int64x8_of_int64s :
-  int64 -> int64 -> int64 -> int64 -> int64 -> int64 -> int64 -> int64 -> int64x8
-  = "" "vec512_of_int64s"
+  int64 ->
+  int64 ->
+  int64 ->
+  int64 ->
+  int64 ->
+  int64 ->
+  int64 ->
+  int64 ->
+  int64x8 = "" "vec512_of_int64s"
 [@@noalloc] [@@unboxed]
 
 external int64x8_w0 : int64x8 -> int64 = "" "vec512_w0" [@@noalloc] [@@unboxed]
+
 external int64x8_w1 : int64x8 -> int64 = "" "vec512_w1" [@@noalloc] [@@unboxed]
+
 external int64x8_w2 : int64x8 -> int64 = "" "vec512_w2" [@@noalloc] [@@unboxed]
+
 external int64x8_w3 : int64x8 -> int64 = "" "vec512_w3" [@@noalloc] [@@unboxed]
+
 external int64x8_w4 : int64x8 -> int64 = "" "vec512_w4" [@@noalloc] [@@unboxed]
+
 external int64x8_w5 : int64x8 -> int64 = "" "vec512_w5" [@@noalloc] [@@unboxed]
+
 external int64x8_w6 : int64x8 -> int64 = "" "vec512_w6" [@@noalloc] [@@unboxed]
+
 external int64x8_w7 : int64x8 -> int64 = "" "vec512_w7" [@@noalloc] [@@unboxed]
 
 let eq l r = if l <> r then Printf.printf "%Ld <> %Ld\n" l r
@@ -115,7 +129,9 @@ type variant =
   | C of float
 
 let () =
-  (match Sys.opaque_identity (A (int64x8_of_int64s 1L 2L 3L 4L 5L 6L 7L 8L)) with
+  (match
+     Sys.opaque_identity (A (int64x8_of_int64s 1L 2L 3L 4L 5L 6L 7L 8L))
+   with
   | A v -> check v 1L 2L 3L 4L 5L 6L 7L 8L
   | B _ | C _ -> print_endline "fail");
   (match
@@ -212,6 +228,24 @@ let () =
   let f = Sys.opaque_identity f in
   eq (f ()) 0x55L
 
+(* Keep a mask in a k-register live across many minor collections. The inline
+   allocations below hit the GC entry point with the mask live, exercising the
+   k-register save/restore in [caml_call_gc_avx512] (as opposed to a plain stack
+   spill). *)
+let[@inline never] gc_stress bits =
+  let m = mask_of_int64 bits in
+  let acc = ref [] in
+  for i = 1 to 200_000 do
+    acc := i :: !acc
+  done;
+  ignore (Sys.opaque_identity !acc);
+  int64_of_mask m
+
+let () =
+  List.iter
+    (fun bits -> eq (gc_stress bits) bits)
+    [0x55L; 0xAAL; 0x1234L; 0xABCDL; 0xFFFFL; 0x8000L; 0x0L]
+
 (* Store in record *)
 type mrecord =
   { mutable m : mask;
@@ -220,9 +254,7 @@ type mrecord =
 
 let () =
   let r =
-    { m = mask_of_int64 0x0102L;
-      v = int64x8_of_int64s 1L 2L 3L 4L 5L 6L 7L 8L
-    }
+    { m = mask_of_int64 0x0102L; v = int64x8_of_int64s 1L 2L 3L 4L 5L 6L 7L 8L }
   in
   check_mask r.m 0x0102L;
   check r.v 1L 2L 3L 4L 5L 6L 7L 8L;
@@ -243,9 +275,10 @@ let () =
   | I i -> eq i 0x1234L
   | M _ -> print_endline "fail"
 
-(* Pass masks to an external: per the C ABI, masks are passed as integers
-   (this exercises the [kmovq] mask-to-GPR conversion). *)
-external mask_and : mask -> mask -> int64 = "" "mask_and" [@@noalloc] [@@unboxed]
+(* Pass masks to an external: per the C ABI, masks are passed as integers (this
+   exercises the [kmovq] mask-to-GPR conversion). *)
+external mask_and : mask -> mask -> int64 = "" "mask_and"
+[@@noalloc] [@@unboxed]
 
 let () =
   let m0 = mask_of_int64 0xF0L in

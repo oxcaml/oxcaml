@@ -322,8 +322,6 @@ type reinterpret_cast =
   | Int64_of_float
   | Float32_of_int32
   | Int32_of_float32
-  (* Reinterpret the bits of an integer as an AVX512 mask and vice versa. The
-     mask is at most 64 bits, so this is a lossless round-trip. *)
   | Mask_of_int64
   | Int64_of_mask
   (* When reinterpreting a smaller vector as a larger vector, the upper bits are

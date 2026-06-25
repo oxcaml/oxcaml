@@ -15,17 +15,31 @@ external run_callback_stack_args :
   unit = "" "vec512_run_callback_stack_args"
 
 external int64x8_of_int64s :
-  int64 -> int64 -> int64 -> int64 -> int64 -> int64 -> int64 -> int64 -> int64x8
-  = "" "vec512_of_int64s"
+  int64 ->
+  int64 ->
+  int64 ->
+  int64 ->
+  int64 ->
+  int64 ->
+  int64 ->
+  int64 ->
+  int64x8 = "" "vec512_of_int64s"
 [@@noalloc] [@@unboxed]
 
 external int64x8_w0 : int64x8 -> int64 = "" "vec512_w0" [@@noalloc] [@@unboxed]
+
 external int64x8_w1 : int64x8 -> int64 = "" "vec512_w1" [@@noalloc] [@@unboxed]
+
 external int64x8_w2 : int64x8 -> int64 = "" "vec512_w2" [@@noalloc] [@@unboxed]
+
 external int64x8_w3 : int64x8 -> int64 = "" "vec512_w3" [@@noalloc] [@@unboxed]
+
 external int64x8_w4 : int64x8 -> int64 = "" "vec512_w4" [@@noalloc] [@@unboxed]
+
 external int64x8_w5 : int64x8 -> int64 = "" "vec512_w5" [@@noalloc] [@@unboxed]
+
 external int64x8_w6 : int64x8 -> int64 = "" "vec512_w6" [@@noalloc] [@@unboxed]
+
 external int64x8_w7 : int64x8 -> int64 = "" "vec512_w7" [@@noalloc] [@@unboxed]
 
 external lots_of_vectors :

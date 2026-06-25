@@ -1277,8 +1277,8 @@ let emit_reinterpret_cast env (cast : Cmm.reinterpret_cast) i =
   | V128_of_vec Vec128 ->
     if distinct
     then A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
-  | V128_of_vec (Vec256 | Vec512) | V256_of_vec _ | V512_of_vec _
-  | Mask_of_int64 | Int64_of_mask ->
+  | V128_of_vec (Vec256 | Vec512)
+  | V256_of_vec _ | V512_of_vec _ | Mask_of_int64 | Int64_of_mask ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
   | Int_of_value | Value_of_int -> move env src dst
 

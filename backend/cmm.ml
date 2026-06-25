@@ -1016,8 +1016,8 @@ let equal_reinterpret_cast (left : reinterpret_cast) (right : reinterpret_cast)
     equal_vector_width w1 w2
   | ( ( Int_of_value | Value_of_int | Float_of_float32 | Float32_of_float
       | Float_of_int64 | Int64_of_float | Float32_of_int32 | Int32_of_float32
-      | Mask_of_int64 | Int64_of_mask
-      | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ),
+      | Mask_of_int64 | Int64_of_mask | V128_of_vec _ | V256_of_vec _
+      | V512_of_vec _ ),
       _ ) ->
     false
 

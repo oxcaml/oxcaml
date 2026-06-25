@@ -147,10 +147,15 @@ module Extension = struct
     | SSE4_2, AVX
     | AVX, AVX2
     | AVX2, AVX512F
-    | AVX512F, AVX512DQ
+    (* AVX512F, CD, VL, DQ and BW are mutually required. *)
     | AVX512F, AVX512CD
+    | AVX512CD, AVX512F
+    | AVX512F, AVX512DQ
+    | AVX512DQ, AVX512F
     | AVX512F, AVX512BW
+    | AVX512BW, AVX512F
     | AVX512F, AVX512VL
+    | AVX512VL, AVX512F
     | BMI, BMI2 -> true
     | (POPCNT | LZCNT | PREFETCHW | PREFETCHWT1 | SSE3 | SSSE3 | SSE4_1 |
        SSE4_2 | CLMUL | BMI | BMI2 | AVX | AVX2 | F16C | FMA | AVX512F |

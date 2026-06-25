@@ -219,7 +219,7 @@ DO_0_7(X) X(8) X(9) X(10) X(11) X(12) X(13) X(14) X(15)
 
 #define DO_0_31(X) \
 DO_0_15(X) \
-X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(27) X(29) X(30) X(31)
+X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(28) X(29) X(30) X(31)
 
 
 /******************************************************************************/
@@ -559,10 +559,30 @@ G(caml_system__code_begin):
 #define RESTORE_YMM_REGS DO_0_15(RESTORE_YMM)
 
 #define SAVE_ZMM(i) vmovupd %zmm##i, (i*64 + SIMD_REGS_OFFSET)(%r15);
-#define SAVE_ZMM_REGS DO_0_31(SAVE_ZMM)
-
 #define RESTORE_ZMM(i) vmovupd (i*64 + SIMD_REGS_OFFSET)(%r15), %zmm##i;
-#define RESTORE_ZMM_REGS DO_0_31(RESTORE_ZMM)
+
+#define K_REGS_OFFSET (SIMD_REGS_OFFSET + 32*64)
+
+#define SAVE_K_REGS                                  \
+        kmovq   %k1, (0*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k2, (1*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k3, (2*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k4, (3*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k5, (4*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k6, (5*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k7, (6*8 + K_REGS_OFFSET)(%r15);
+
+#define RESTORE_K_REGS                               \
+        kmovq   (0*8 + K_REGS_OFFSET)(%r15), %k1;    \
+        kmovq   (1*8 + K_REGS_OFFSET)(%r15), %k2;    \
+        kmovq   (2*8 + K_REGS_OFFSET)(%r15), %k3;    \
+        kmovq   (3*8 + K_REGS_OFFSET)(%r15), %k4;    \
+        kmovq   (4*8 + K_REGS_OFFSET)(%r15), %k5;    \
+        kmovq   (5*8 + K_REGS_OFFSET)(%r15), %k6;    \
+        kmovq   (6*8 + K_REGS_OFFSET)(%r15), %k7;
+
+#define SAVE_ZMM_REGS DO_0_31(SAVE_ZMM) SAVE_K_REGS
+#define RESTORE_ZMM_REGS DO_0_31(RESTORE_ZMM) RESTORE_K_REGS
 
 /* Save all of the registers that may be in use to a free gc_regs bucket.
    Returns: bucket in %r15. Clobbers %r11 (after saving it) */

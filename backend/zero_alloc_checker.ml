@@ -2636,8 +2636,8 @@ end = struct
         | Reinterpret_cast
             ( Float32_of_float | Float_of_float32 | Float_of_int64
             | Int64_of_float | Float32_of_int32 | Int32_of_float32
-            | Mask_of_int64 | Int64_of_mask
-            | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ )
+            | Mask_of_int64 | Int64_of_mask | V128_of_vec _ | V256_of_vec _
+            | V512_of_vec _ )
         | Static_cast _ | Csel _ ->
           if not (Operation.is_pure op)
           then

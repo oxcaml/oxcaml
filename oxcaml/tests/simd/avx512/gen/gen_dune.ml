@@ -93,8 +93,7 @@ let copy_file name new_name =
   (copy ${source} ${target})))
 |}
 
-let mangle flag =
-  String.map (function '-' -> '_' | c -> c) flag
+let mangle flag = String.map (function '-' -> '_' | c -> c) flag
 
 let print_test ?extra_flag name =
   let name, extra_flags =
@@ -110,7 +109,7 @@ let print_test ?extra_flag name =
   diff_output name
 
 let () =
-  let tests = [ "basic512"; "basic512_u"; "callback512"; "consts512" ] in
+  let tests = ["basic512"; "basic512_u"; "callback512"; "consts512"] in
   List.iter (print_test ?extra_flag:None) tests;
   List.iter (print_test ~extra_flag:"-nodynlink") tests;
   List.iter (print_test ~extra_flag:"-internal-assembler") tests

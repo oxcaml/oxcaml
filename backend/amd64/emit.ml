@@ -589,11 +589,11 @@ let must_save_simd_regs live : Regs.Save_simd_regs.t =
       else
         match r.typ with
         | Vec256 -> v256 := true
-        | Vec512 -> v512 := true
+        | Vec512 | Mask ->
+          (* Masks may be used with smaller vectors, but imply zmm support *)
+          v512 := true
         | Float | Vec128 | Float32 | Valx2 -> v128 := true
-        | Val | Addr | Int -> ()
-        (* CR-soon mslater: save/restore mask registers around GC calls *)
-        | Mask -> ())
+        | Val | Addr | Int -> ())
     live;
   if !v512
   then (
