@@ -835,7 +835,7 @@ static int caml_set_signal_action(int signo, int action)
 CAMLprim value caml_install_signal_handler(value signal_number, value action)
 {
   CAMLparam2 (signal_number, action);
-  CAMLlocal1 (res);
+  CAMLlocal2 (res, old);
   int sig, act, oldact;
 
   sig = caml_convert_signal_number(Int_val(signal_number));
@@ -854,6 +854,10 @@ CAMLprim value caml_install_signal_handler(value signal_number, value action)
   }
   caml_plat_lock_non_blocking(&signal_install_mutex);
   /* Note: no safepoint for calling signals in this critical section */
+  /* Add closure to table before installing the OS handler */
+  old = Field(caml_signal_handlers, sig);
+  if (Is_block(action))
+    caml_modify(&Field(caml_signal_handlers, sig), Field(action, 0));
   oldact = caml_set_signal_action(sig, act);
   switch (oldact) {
   case 0:                       /* was Signal_default */
@@ -864,22 +868,18 @@ CAMLprim value caml_install_signal_handler(value signal_number, value action)
     break;
   case 2:                       /* was Signal_handle */
     res = caml_alloc_small (1, 0);
-    Field(res, 0) = Field(caml_signal_handlers, sig);
+    Field(res, 0) = old;
     break;
   default:                      /* error in caml_set_signal_action */
     goto err;
-  }
-  if (Is_block(action)) {
-    if (caml_signal_handlers == 0) {
-      caml_signal_handlers = caml_alloc(NSIG, 0);
-      caml_register_global_root(&caml_signal_handlers);
-    }
-    caml_modify(&Field(caml_signal_handlers, sig), Field(action, 0));
   }
   caml_plat_unlock(&signal_install_mutex);
   caml_get_value_or_raise_async(caml_process_pending_signals_res(), "");
   CAMLreturn (res);
  err:
+  /* Restore the previous closure: the OS handler was not changed. */
+  if (Is_block(action))
+    caml_modify(&Field(caml_signal_handlers, sig), old);
   caml_plat_unlock(&signal_install_mutex);
   caml_sys_error(NO_ARG);
 }
