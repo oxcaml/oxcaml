@@ -386,21 +386,20 @@ and transl_exp1 ~scopes ~in_new_scope layout e =
   if eval_once then transl_exp0 ~scopes ~in_new_scope layout e else
   Translobj.oo_wrap e.exp_env true (transl_exp0 ~scopes ~in_new_scope layout) e
 
-and transl_exp0 ~in_new_scope ~scopes layout e =
+and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   match e.exp_desc with
   | Texp_ident { path; desc; kind; _ } ->
       transl_ident (of_location ~scopes e.exp_loc)
         e.exp_env e.exp_type path desc kind
   | Texp_apply_layout (func, args) ->
       Lkindinstantiate {
-        kinst_func =
-          (transl_exp ~scopes Jkind.Sort.Const.for_template_env func);
+        kinst_func = (transl_exp ~scopes Lambda.layout_block func);
         kinst_args = List.map
           (fun var ->
             let layout = Jkind.Sort.var_default_to_scannable_and_get var in
             Typeopt.layout_of_sort e.exp_loc layout)
           args;
-        kinst_result_layout = layout_exp sort e;
+        kinst_result_layout = layout;
         kinst_mode = alloc_local;
         kinst_loc = (of_location ~scopes e.exp_loc);
       }
