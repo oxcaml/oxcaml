@@ -574,6 +574,48 @@ let (_ : int) =
 |}]
 
 
+(* The same wrapper, but the function is yielding because it receives a
+   yielding value as the implicit parameter of a [function | ...] body (rather
+   than closing over one). The forwarding call must still be a plain [apply]. *)
+let () =
+  Yielding.with_ (fun y ->
+    let rec f =
+      let g = function
+        | yarg -> (match h with `Foo f -> f yarg)
+      in g
+    and h = `Foo (fun yarg -> yield yarg)
+    in
+    f y)
+[%%expect{|
+(let
+  (yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
+   Yielding =?
+     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295")
+   *match* =[value<int>]
+     (apply[unyielding] (field_imm 0 Yielding)
+       (function {nlocal = 0} y : int
+         (let
+           (letrec_function_context =? (caml_alloc_dummy 1)
+            h =? (caml_alloc_dummy 2))
+           (letrec
+             (f
+                (function {nlocal = 0} yarg stub : int
+                  (apply (field_imm 0 letrec_function_context) yarg)))
+             (seq
+               (caml_update_dummy letrec_function_context
+                 (let
+                   (g =
+                      (function {nlocal = 0} yarg : int
+                        (apply (field_imm 1 h) yarg)))
+                   (makeblock 0 g)))
+               (caml_update_dummy h
+                 (makeblock 0 3505894
+                   (function {nlocal = 0} yarg : int (apply yield yarg))))
+               (apply f y)))))))
+  0)
+|}]
+
+
 (* Functor application runs the functor body. It is unyielding when the
    functor closes over nothing yielding (its own mode) and is given no
    yielding argument (the argument's mode) -- as here. *)
@@ -581,17 +623,17 @@ module F (X : sig val n : int end) = struct let m = X.n + 1 end
 module N = struct let n = 41 end
 module R = F(N)
 [%%expect{|
-(apply[unyielding] (field_imm 1 (global Toploop!)) "F/680"
+(apply[unyielding] (field_imm 1 (global Toploop!)) "F/692"
   (function {nlocal = 0} X is_a_functor never_loop
     (let (m =[value<int>] (%int_add (field_imm 0 X) 1)) (makeblock 0 m))))
 module F : functor (X : sig val n : int end) -> sig val m : int end
-(apply[unyielding] (field_imm 1 (global Toploop!)) "N/685"
+(apply[unyielding] (field_imm 1 (global Toploop!)) "N/697"
   (let (n =[value<int>] 41) (makeblock 0 n)))
 module N : sig val n : int end
 (let
-  (N =? (apply[unyielding] (field_imm 0 (global Toploop!)) "N/685")
-   F =? (apply[unyielding] (field_imm 0 (global Toploop!)) "F/680"))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "R/687"
+  (N =? (apply[unyielding] (field_imm 0 (global Toploop!)) "N/697")
+   F =? (apply[unyielding] (field_imm 0 (global Toploop!)) "F/692"))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "R/699"
     (apply[unyielding] F N)))
 module R : sig val m : int end
 |}]
@@ -603,7 +645,7 @@ module Yf (X : sig val f : unit -> unit end @ yielding) = struct
   let g () = X.f ()
 end
 [%%expect{|
-(apply[unyielding] (field_imm 1 (global Toploop!)) "Yf/693"
+(apply[unyielding] (field_imm 1 (global Toploop!)) "Yf/705"
   (function {nlocal = 0} X is_a_functor never_loop
     (let
       (g =
@@ -621,7 +663,7 @@ let () =
 [%%expect{|
 (let
   (yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
-   Yf =? (apply[unyielding] (field_imm 0 (global Toploop!)) "Yf/693")
+   Yf =? (apply[unyielding] (field_imm 0 (global Toploop!)) "Yf/705")
    Yielding =?
      (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295")
    *match* =[value<int>]
@@ -648,7 +690,7 @@ let () =
     let module R = Uf (struct let f () = yield y end) in
     R.g ())
 [%%expect{|
-(apply[unyielding] (field_imm 1 (global Toploop!)) "Uf/709"
+(apply[unyielding] (field_imm 1 (global Toploop!)) "Uf/721"
   (function {nlocal = 0} X is_a_functor never_loop
     (let
       (g =
@@ -792,17 +834,17 @@ class d = object inherit c as super method n = super#m end
        (opaque
          (apply[unyielding] (field_imm 18 (global CamlinternalOO!))
            (opaque [0: #"m"]) c_init))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "c/757" c))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "c/769" c))
 class c : object method m : int end
 (let
-  (c =? (apply[unyielding] (field_imm 0 (global Toploop!)) "c/757")
+  (c =? (apply[unyielding] (field_imm 0 (global Toploop!)) "c/769")
    mk =
      (function {nlocal = 0} param[value<int>]
        (apply[unyielding] (field_mut 0 c) 0)))
   (apply[unyielding] (field_imm 1 (global Toploop!)) "mk" mk))
 val mk : unit -> c = <fun>
 (let
-  (c =? (apply[unyielding] (field_imm 0 (global Toploop!)) "c/757")
+  (c =? (apply[unyielding] (field_imm 0 (global Toploop!)) "c/769")
    shared =a (opaque [0: #"m"])
    shared =a (opaque [0: #"n" #"m"])
    d =?
@@ -842,7 +884,7 @@ val mk : unit -> c = <fun>
        (opaque
          (apply[unyielding] (field_imm 18 (global CamlinternalOO!))
            (opaque [0: #"m" #"n"]) d_init))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "d/785" d))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "d/797" d))
 class d : object method m : int method n : int end
 |}]
 
@@ -875,17 +917,4 @@ external pipe_y : 'a @ yielding -> ('a -> 'b) @ yielding -> 'b = "%revapply"
   (apply[unyielding] (field_imm 1 (global Toploop!)) "yielding_pipe"
     yielding_pipe))
 val yielding_pipe : 'a @ yielding -> ('a -> 'b) @ yielding -> 'b = <fun>
-|}]
-
-(* CR dkalinichenko: soundness issue: should be yielding. *)
-let demo () : 'a @ yielding -> ('a @ yielding -> unit) -> unit = function
-    | a -> fun f -> f a
-
-[%%expect{|
-(let
-  (demo =
-     (function {nlocal = 0} param[value<int>] a?
-       (function {nlocal = 0} f : int (apply f a))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "demo" demo))
-val demo : unit -> 'a @ yielding -> ('a @ yielding -> unit) -> unit = <fun>
 |}]
