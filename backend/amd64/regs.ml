@@ -255,26 +255,13 @@ module T = struct
         | Save_ymm -> 4
         | Save_zmm -> 8
       in
-      if Config.runtime5
-      then
-        (* simd slots are above regular slots based at [gc_regs_bucket] *)
-        let num_regular_slots =
-          (* rbp is always spilled even without frame pointers *)
-          Array.length phys_gpr_regs
-        in
-        let gc_regs_kind_slots = 1 in
-        num_regular_slots + gc_regs_kind_slots + (index * slot_size_in_vals)
-      else
-        (* simd slots are below [gc_regs] pointer *)
-        let num_simd_slots =
-          match simd with
-          | Save_none ->
-            Misc.fatal_error "reg_class=SIMD, but no simd regs are live"
-          | Save_xmm | Save_ymm -> 16
-          | Save_zmm -> 32
-        in
-        let offset = Int.neg (num_simd_slots * slot_size_in_vals) in
-        offset + (index * slot_size_in_vals)
+      (* simd slots are above regular slots based at [gc_regs_bucket] *)
+      let num_regular_slots =
+        (* rbp is always spilled even without frame pointers *)
+        Array.length phys_gpr_regs
+      in
+      let gc_regs_kind_slots = 1 in
+      num_regular_slots + gc_regs_kind_slots + (index * slot_size_in_vals)
 end
 
 include T

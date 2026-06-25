@@ -336,8 +336,8 @@ end = struct
 
   let print ppf t =
     match t with
-    | Basic i -> Cfg.print_basic ppf i
-    | Terminator i -> Cfg.print_terminator ppf i
+    | Basic i -> Printcfg.basic ppf i
+    | Terminator i -> Printcfg.terminator ppf i
 
   let print ppf t = Format.fprintf ppf "%a %a" Id.print (id t) print t
 

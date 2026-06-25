@@ -1,5 +1,4 @@
 (* TEST
- runtime5;
  multicore;
  { bytecode; }
  { native; } *)

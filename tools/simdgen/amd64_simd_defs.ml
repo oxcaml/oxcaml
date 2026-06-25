@@ -180,10 +180,6 @@ type 'id instr =
     enc : enc
   }
 
-let evex_ll_for_rnd ll = function Some rnd -> Ll_round rnd | None -> ll
-
-let evex_b_for_rnd = function Some _ -> true | None -> false
-
 let instr_expects_mask instr =
   Array.exists
     (fun (arg : arg) ->

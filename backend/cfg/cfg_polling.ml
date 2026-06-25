@@ -127,7 +127,9 @@ let is_safe_basic : Cfg.basic Cfg.instruction -> bool =
 let is_safe_terminator : Cfg.terminator Cfg.instruction -> bool =
  fun term ->
   match term.desc with
-  | Never -> assert false
+  | Never ->
+    Misc.fatal_error
+      "Cfg_polling.is_safe_terminator: unexpected Never terminator"
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ ->
     false
@@ -215,7 +217,8 @@ module Polls_before_prtc_transfer = struct
    fun dom ~exn term
        { future_funcnames; optimistic_prologue_poll_instr_id = _ } ->
     match term.desc with
-    | Never -> assert false
+    | Never ->
+      Misc.fatal_error "Cfg_polling.terminator: unexpected Never terminator"
     | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
     | Switch _ ->
       Ok dom
@@ -375,7 +378,9 @@ let add_calls_terminator :
     Cfg.terminator Cfg.instruction -> polling_points -> polling_points =
  fun term points ->
   match term.desc with
-  | Never -> assert false
+  | Never ->
+    Misc.fatal_error
+      "Cfg_polling.add_calls_terminator: unexpected Never terminator"
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Switch _ | Return | Raise _ ->
     points

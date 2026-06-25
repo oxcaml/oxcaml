@@ -1,0 +1,6 @@
+round-trip: Foo (encoded: 3Foo)
+round-trip: foo_bar (encoded: 7foo_bar)
+round-trip: let* (encoded: u7D2a_let)
+round-trip: @@ (encoded: u6A4040_)
+round-trip: file.ml:12:34 (encoded: u20E2eC3aC3a_fileml1234)
+round-trip: Naïveté (encoded: u16Cc3afDc3a9_Navet)

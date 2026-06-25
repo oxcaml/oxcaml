@@ -128,6 +128,7 @@ G(name):
 #define Stack_sp                 0
 #define Stack_exception          8
 #define Stack_handler            16
+#define Stack_id                 48
 #define Stack_local_sp           64
 #define Stack_local_top          72
 #define Stack_local_limit        80
@@ -1342,7 +1343,11 @@ LBL(do_perform):
         TSAN_RESTORE_CALLER_REGS
         LEAVE_FUNCTION
 #endif
-        movq    %rdi, 8(%rbx) /* Set the last fiber field in the continuation */
+    /* Record fiber id */
+        cmpb    $0, caml_cpu_ptwrite(%rip)
+        je      1f
+        ptwriteq Stack_id(%rsi)
+1:      movq    %rdi, 8(%rbx) /* Set the last fiber field in the continuation */
         movq    Stack_handler(%rsi), %r11  /* %r11 := old stack -> handler */
         movq    Handler_parent(%r11), %r10 /* %r10 := parent stack */
         cmpq    $0, %r10                   /* parent is NULL? */
@@ -1543,8 +1548,12 @@ CFI_STARTPROC
         TSAN_RESTORE_CALLER_REGS
         LEAVE_FUNCTION
 #endif
+    /* Record fiber id */
+        cmpb    $0, caml_cpu_ptwrite(%rip)
+        je      1f
+        ptwriteq Stack_id(%r10)
     /* Add current stack to the last fiber */
-        popq    %rdx; CFI_ADJUST(-8)
+1:      popq    %rdx; CFI_ADJUST(-8)
         movq    (Stack_handler-1)(%r13), %rdi
         movq    Caml_state(current_stack), %rsi
         movq    %rsi, Handler_parent(%rdi)

@@ -3,10 +3,13 @@
 open! Int_replace_polymorphic_compare
 open Format
 
-let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
+let result_prefix ?(print_reg = Printreg.reg) ppf res =
+  let regs = Printreg.regs' ~print_reg in
+  if Array.length res > 0 then fprintf ppf "%a := " regs res
+
+let operation_body ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf =
   let reg = print_reg in
   let regs = Printreg.regs' ~print_reg in
-  if Array.length res > 0 then fprintf ppf "%a := " regs res;
   match op with
   | Move -> regs ppf arg
   | Spill -> fprintf ppf "%a (spill)" regs arg
@@ -24,17 +27,15 @@ let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
   | Const_mask n -> fprintf ppf "%016Lx" n
   | Stackoffset n -> fprintf ppf "offset stack %i" n
   | Load { memory_chunk; addressing_mode; mutability = Immutable; is_atomic } ->
-    fprintf ppf "%s %a[%a]"
+    fprintf ppf "%s%s[%a]"
       (Printcmm.chunk memory_chunk)
-      (fun pp a -> if a then fprintf pp "atomic" else ())
-      is_atomic
+      (if is_atomic then " atomic" else "")
       (Arch.print_addressing reg addressing_mode)
       arg
   | Load { memory_chunk; addressing_mode; mutability = Mutable; is_atomic } ->
-    fprintf ppf "%s %a mut[%a]"
+    fprintf ppf "%s %smut[%a]"
       (Printcmm.chunk memory_chunk)
-      (fun pp a -> if a then fprintf pp "atomic" else ())
-      is_atomic
+      (if is_atomic then "atomic " else "")
       (Arch.print_addressing reg addressing_mode)
       arg
   | Store (chunk, addr, is_assign) ->
@@ -105,7 +106,7 @@ let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
   | Csel tst ->
     let len = Array.length arg in
     fprintf ppf "csel %a ? %a : %a"
-      (Operation.format_test ~print_reg:Printreg.reg tst)
+      (Operation.format_test ~print_reg tst)
       arg reg
       arg.(len - 2)
       reg
@@ -133,3 +134,7 @@ let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
       (match enabled_at_init with
       | None | Some false -> ""
       | Some true -> " enabled_at_init")
+
+let operation ?print_reg op arg ppf res =
+  result_prefix ?print_reg ppf res;
+  operation_body ?print_reg op arg ppf
