@@ -326,7 +326,9 @@ let instr_cfg_with_layout :
         let poll =
           { after.terminator with
             Cfg.id = next_instruction_id ();
-            Cfg.desc = Cfg.Op Poll
+            Cfg.desc = Cfg.Op Poll;
+            Cfg.arg = [||];
+            Cfg.res = [||]
           }
         in
         (match
