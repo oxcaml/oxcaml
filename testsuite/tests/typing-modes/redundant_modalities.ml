@@ -5,24 +5,33 @@
 
 (* This file tests the behavior of redundant or ambiguous modalities.
 
-   Warning 213 is triggered when multiple modalities on the same axis are
-   specified, with the later one overriding the earlier one.
+   Warning 219 is triggered when a modality is redundant,
+   i.e. removing it would not change the resolved modality.
 *)
 
 (**************************************************************************)
-(* Part 1: Two modalities on the same axis (Warning 213) *)
+(* Part 1: Two modalities on the same axis (Warning 219) *)
 (**************************************************************************)
+
+(* The same modality written twice: the first is kept and the later duplicate
+   is redundant. *)
+module type S = sig
+  val x : int @@ portable portable
+end
+[%%expect{|
+Line 2, characters 26-34:
+2 |   val x : int @@ portable portable
+                              ^^^^^^^^
+Warning 219 [redundant-modality]: This modality is redundant.
+
+module type S = sig val x : int @@ portable end
+|}]
 
 (* Two modalities on the portability axis *)
 module type S = sig
   val x : int @@ portable nonportable
 end
 [%%expect{|
-Line 2, characters 17-25:
-2 |   val x : int @@ portable nonportable
-                     ^^^^^^^^
-Warning 213: This portability is overridden by nonportable later.
-
 Line 2, characters 26-37:
 2 |   val x : int @@ portable nonportable
                               ^^^^^^^^^^^
@@ -36,11 +45,6 @@ module type S = sig
   val x : int @@ contended uncontended
 end
 [%%expect{|
-Line 2, characters 17-26:
-2 |   val x : int @@ contended uncontended
-                     ^^^^^^^^^
-Warning 213: This contention is overridden by uncontended later.
-
 Line 2, characters 27-38:
 2 |   val x : int @@ contended uncontended
                                ^^^^^^^^^^^
@@ -54,15 +58,15 @@ module type S = sig
   val x : int @@ portable nonportable shareable
 end
 [%%expect{|
-Line 2, characters 17-25:
-2 |   val x : int @@ portable nonportable shareable
-                     ^^^^^^^^
-Warning 213: This portability is overridden by nonportable later.
-
 Line 2, characters 26-37:
 2 |   val x : int @@ portable nonportable shareable
                               ^^^^^^^^^^^
-Warning 213: This portability is overridden by shareable later.
+Warning 219 [redundant-modality]: This modality is redundant.
+
+Line 2, characters 38-47:
+2 |   val x : int @@ portable nonportable shareable
+                                          ^^^^^^^^^
+Warning 219 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : int @@ shareable end
 |}]
@@ -72,16 +76,6 @@ module type S = sig
   val x : int @@ portable nonportable contended uncontended
 end
 [%%expect{|
-Line 2, characters 17-25:
-2 |   val x : int @@ portable nonportable contended uncontended
-                     ^^^^^^^^
-Warning 213: This portability is overridden by nonportable later.
-
-Line 2, characters 38-47:
-2 |   val x : int @@ portable nonportable contended uncontended
-                                          ^^^^^^^^^
-Warning 213: This contention is overridden by uncontended later.
-
 Line 2, characters 26-37:
 2 |   val x : int @@ portable nonportable contended uncontended
                               ^^^^^^^^^^^
@@ -220,14 +214,14 @@ module type S = sig
   val x : int @@ stateful yielding
 end
 [%%expect{|
-Line 2, characters 26-34:
-2 |   val x : int @@ stateful yielding
-                              ^^^^^^^^
-Warning 219 [redundant-modality]: This modality is redundant.
-
 Line 2, characters 17-25:
 2 |   val x : int @@ stateful yielding
                      ^^^^^^^^
+Warning 219 [redundant-modality]: This modality is redundant.
+
+Line 2, characters 26-34:
+2 |   val x : int @@ stateful yielding
+                              ^^^^^^^^
 Warning 219 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : int end
@@ -240,11 +234,6 @@ module type S = sig val x : int end
 (* Record field with two modalities on same axis *)
 type t = { x : int @@ portable nonportable }
 [%%expect{|
-Line 1, characters 22-30:
-1 | type t = { x : int @@ portable nonportable }
-                          ^^^^^^^^
-Warning 213: This portability is overridden by nonportable later.
-
 Line 1, characters 31-42:
 1 | type t = { x : int @@ portable nonportable }
                                    ^^^^^^^^^^^
@@ -256,11 +245,6 @@ type t = { x : int; }
 (* Constructor argument with two modalities on same axis *)
 type t = Foo of int @@ portable nonportable
 [%%expect{|
-Line 1, characters 23-31:
-1 | type t = Foo of int @@ portable nonportable
-                           ^^^^^^^^
-Warning 213: This portability is overridden by nonportable later.
-
 Line 1, characters 32-43:
 1 | type t = Foo of int @@ portable nonportable
                                     ^^^^^^^^^^^

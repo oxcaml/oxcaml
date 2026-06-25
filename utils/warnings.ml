@@ -150,10 +150,8 @@ type t =
   | Unboxing_impossible                     (* 210 *)
   | Mod_by_top of string                    (* 211 *)
   (* 212 taken *)
-  | Modal_axis_specified_twice of
-    { axis : string;
-      overriden_by : string;
-    }                                       (* 213 *)
+  (* 213 was [Modal_axis_specified_twice], now subsumed by
+     [Redundant_modality] (220) *)
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
   | Use_during_borrowing                    (* 216 *)
@@ -255,7 +253,6 @@ let number = function
   | Unchecked_zero_alloc_attribute -> 199
   | Unboxing_impossible -> 210
   | Mod_by_top _ -> 211
-  | Modal_axis_specified_twice _ -> 213
   | Atomic_float_record_boxed -> 214
   | Implied_attribute _ -> 215
   | Use_during_borrowing -> 216
@@ -1483,8 +1480,7 @@ let message = function
   | Mod_by_top modifier ->
       msg "%s is the top-most modifier.@ \
            Modifying by a top element is a no-op." modifier
-  | Modal_axis_specified_twice {axis; overriden_by} ->
-      msg "This %s is overridden by %s later." axis overriden_by
+  (* 213 was [Modal_axis_specified_twice] *)
   | Atomic_float_record_boxed ->
       msg "This record contains atomic float fields,@ \
            which prevents the float record optimization.@ \
