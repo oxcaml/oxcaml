@@ -7662,7 +7662,9 @@ and type_expect_
         }
         | Immutable -> Immutable
       in
-      let alloc_mode, array_mode = register_allocation ~env ~loc expected_mode in
+      let alloc_mode, array_mode =
+        register_allocation ~env ~loc expected_mode
+      in
       let modalities = Typemode.mutable_modalities mutability in
       let is_contained_by : Mode.Hint.is_contained_by =
         {containing = Array Modality; container = (loc, Expression)}
