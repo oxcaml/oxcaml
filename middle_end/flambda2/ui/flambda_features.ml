@@ -189,6 +189,8 @@ let dump_simplify () = !Oxcaml_flags.Flambda2.Dump.simplify
 
 let dump_reaper () = !Oxcaml_flags.Flambda2.Dump.reaper
 
+let dump_compact () = !Oxcaml_flags.Flambda2.Dump.compact
+
 let freshen_when_printing () = !Oxcaml_flags.Flambda2.Dump.freshen
 
 let erase_in_types_depth_variables =
