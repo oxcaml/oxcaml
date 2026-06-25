@@ -131,12 +131,12 @@ let add_hard_mask_regs list ~f =
   if Arch.Extension.enabled_vec512 ()
   then f hard_mask_reg :: list else list
 
-let all_phys_regs =
+let all_phys_regs = lazy ((* To be forced after flags are parsed. *)
   [hard_int_reg; hard_float_reg; hard_float32_reg; hard_vec128_reg]
   |> add_hard_vec256_regs ~f:(fun regs -> regs)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
   |> add_hard_mask_regs ~f:(fun regs -> regs)
-  |> Array.concat
+  |> Array.concat)
 
 let phys_reg ty (phys_reg : Regs.Phys_reg.t) =
   let index_in_class = Regs.index_in_class phys_reg in
@@ -427,7 +427,7 @@ let destroyed_at_c_call =
 let destroyed_at_alloc_or_poll =
   if X86_proc.use_plt then destroyed_by_plt_stub else [| r11 |]
 
-let destroyed_at_pushtrap = [| r11 |]
+let destroyed_at_pushtrap () = [| r11 |]
 
 let destroyed_at_large_memory_op =
   if Config.with_address_sanitizer then
@@ -510,9 +510,9 @@ let destroyed_by_simd_mem_op (instr : Simd.Mem.operation) =
   match instr with
   | Load op | Store op -> destroyed_by_simd_op op
 
-let destroyed_at_raise = all_phys_regs
+let destroyed_at_raise () = Lazy.force all_phys_regs
 
-let destroyed_at_reloadretaddr = [| |]
+let destroyed_at_reloadretaddr () = [| |]
 
 let destroyed_rax = [| rax |] (* CR-someday vkarvonen: Use [iarray] *)
 let destroyed_rax_rdx = [| rax; rdx |]
@@ -522,9 +522,9 @@ let destroyed_r10 = [| r10 |]
 let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   match basic with
   | Reloadretaddr ->
-    destroyed_at_reloadretaddr
+    destroyed_at_reloadretaddr ()
   | Pushtrap _ ->
-    destroyed_at_pushtrap
+    destroyed_at_pushtrap ()
   | Op (Intop (Idiv | Imod)) | Op (Intop_imm ((Idiv | Imod), _)) ->
     destroyed_rax_rdx
   | Op(Store(Single { reg = Float64 }, _, _)) ->
@@ -616,11 +616,13 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
                           stack_ofs; stack_align = _; effects = _; }; _} ->
     assert (stack_ofs >= 0);
-    if alloc || stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
+    if alloc || stack_ofs > 0
+    then Lazy.force all_phys_regs
+    else destroyed_at_c_call
   | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
     assert (stack_ofs >= 0);
-    if stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
-  | Call {op = Indirect _ | Direct _; _} -> all_phys_regs
+    if stack_ofs > 0 then Lazy.force all_phys_regs else destroyed_at_c_call
+  | Call {op = Indirect _ | Direct _; _} -> Lazy.force all_phys_regs
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
    We current return `true` when `destroyed_at_terminator` returns
@@ -720,7 +722,7 @@ let clear_pending_jit_run () = ()
 (* Precolored_regs is not always the same as [all_phys_regs], as some physical registers
    may not be allocatable (e.g. rbp when frame pointers are enabled). *)
 let precolored_regs () =
-  let phys_regs = Reg.set_of_array all_phys_regs in
+  let phys_regs = Reg.set_of_array (Lazy.force all_phys_regs) in
   if fp then Reg.Set.remove rbp phys_regs else phys_regs
 
 let has_three_operand_float_ops () = Arch.Extension.enabled AVX
