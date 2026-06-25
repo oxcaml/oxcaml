@@ -596,6 +596,103 @@ module N : sig val n : int end
 module R : sig val m : int end
 |}]
 
+(* A functor with a [@ yielding] parameter propagates yielding: a call to the
+   yielding argument in its body may yield, and applying it is itself a
+   yielding application (contrast the unyielding [F(N)] above). *)
+module Yf (X : sig val f : unit -> unit end @ yielding) = struct
+  let g () = X.f ()
+end
+[%%expect{|
+(apply[unyielding] (field_imm 1 (global Toploop!)) "Yf/693"
+  (function {nlocal = 0} X is_a_functor never_loop
+    (let
+      (g =
+         (function {nlocal = 0} param[value<int>] : int
+           (apply (field_imm 0 X) 0)))
+      (makeblock 0 g))))
+module Yf :
+  functor (X : sig val f : unit -> unit end @ yielding) ->
+    sig val g : unit -> unit end @ yielding
+|}]
+let () =
+  Yielding.with_ (fun y ->
+    let module R = Yf (struct let f () = yield y end) in
+    R.g ())
+[%%expect{|
+(let
+  (yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
+   Yf =? (apply[unyielding] (field_imm 0 (global Toploop!)) "Yf/693")
+   Yielding =?
+     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295")
+   *match* =[value<int>]
+     (apply[unyielding] (field_imm 0 Yielding)
+       (function {nlocal = 0} y : int
+         (let
+           (R =
+              (apply Yf
+                (let
+                  (f =
+                     (function {nlocal = 0} param[value<int>] : int
+                       (apply yield y)))
+                  (makeblock 0 f))))
+           (apply (field_imm 0 R) 0)))))
+  0)
+|}]
+
+(* A functor with a default (unyielding) parameter rejects a yielding argument. *)
+module Uf (X : sig val f : unit -> unit end) = struct
+  let g () = X.f ()
+end
+let () =
+  Yielding.with_ (fun y ->
+    let module R = Uf (struct let f () = yield y end) in
+    R.g ())
+[%%expect{|
+(apply[unyielding] (field_imm 1 (global Toploop!)) "Uf/709"
+  (function {nlocal = 0} X is_a_functor never_loop
+    (let
+      (g =
+         (function {nlocal = 0} param[value<int>] : int
+           (apply[unyielding] (field_imm 0 X) 0)))
+      (makeblock 0 g))))
+module Uf :
+  functor (X : sig val f : unit -> unit end) -> sig val g : unit -> unit end
+Line 6, characters 19-53:
+6 |     let module R = Uf (struct let f () = yield y end) in
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Modules do not match: sig val f : unit -> unit end @ yielding
+     is not included in sig val f : unit -> unit end @ unyielding
+     Values do not match:
+       val f : unit -> unit (* in a structure at yielding *)
+     is not included in
+       val f : unit -> unit (* in a structure at unyielding *)
+     The first is "yielding"
+       because it closes over the value "y" at line 6, characters 47-48
+       which is "yielding".
+     However, the second is "unyielding".
+|}]
+
+(* Unlike objects (below), a module may close over a yielding value; the inner
+   [yield] is correctly inferred as yielding. *)
+let () =
+  Yielding.with_ (fun y ->
+    let module M = struct let () = yield y end in
+    let module _ = M in
+    ())
+[%%expect{|
+(let
+  (yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
+   Yielding =?
+     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295")
+   *match* =[value<int>]
+     (apply[unyielding] (field_imm 0 Yielding)
+       (function {nlocal = 0} y : int
+         (let
+           (M = (let (*match* =[value<int>] (apply yield y)) (makeblock 0)))
+           0))))
+  0)
+|}]
+
 
 (* Can OO user code close over a yielding value? These tests document the mode
    in each context, which determines the [ap_yielding] for [new], method
@@ -695,17 +792,17 @@ class d = object inherit c as super method n = super#m end
        (opaque
          (apply[unyielding] (field_imm 18 (global CamlinternalOO!))
            (opaque [0: #"m"]) c_init))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "c/719" c))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "c/757" c))
 class c : object method m : int end
 (let
-  (c =? (apply[unyielding] (field_imm 0 (global Toploop!)) "c/719")
+  (c =? (apply[unyielding] (field_imm 0 (global Toploop!)) "c/757")
    mk =
      (function {nlocal = 0} param[value<int>]
        (apply[unyielding] (field_mut 0 c) 0)))
   (apply[unyielding] (field_imm 1 (global Toploop!)) "mk" mk))
 val mk : unit -> c = <fun>
 (let
-  (c =? (apply[unyielding] (field_imm 0 (global Toploop!)) "c/719")
+  (c =? (apply[unyielding] (field_imm 0 (global Toploop!)) "c/757")
    shared =a (opaque [0: #"m"])
    shared =a (opaque [0: #"n" #"m"])
    d =?
@@ -745,7 +842,7 @@ val mk : unit -> c = <fun>
        (opaque
          (apply[unyielding] (field_imm 18 (global CamlinternalOO!))
            (opaque [0: #"m" #"n"]) d_init))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "d/747" d))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "d/785" d))
 class d : object method m : int method n : int end
 |}]
 
