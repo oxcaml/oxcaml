@@ -2,14 +2,16 @@
  expect;
 *)
 
-(* Type-checking of [thm_?] theorem declarations is not yet implemented:
-   the type-checker raises a located "Theorem declarations are not yet
-   supported" error at the item level.  These expect-tests pin that
+(* [thm_?] theorem declarations are gated behind the [refinements] language
+   extension.  This file deliberately OMITS [-extension refinements] in its
+   TEST stanza, so every theorem declaration is rejected at the item level
+   with the "extension disabled" error.  These expect-tests pin that
    behaviour (and its location).
 
-   Note: the spec is *not* descended into, so even a refinement spec that
-   would otherwise raise the Part 1 "Refinement types are not yet
-   supported" error reports the theorem-level error instead.
+   The error fires before the spec is descended into, so even a spec that
+   would otherwise be a type error reports the extension-disabled error
+   instead.  (Positive typechecking and spec-level errors, all with the
+   extension enabled, live in [typecheck.ml] / [typecheck_error.ml].)
 
    (Syntax / keyword errors for [thm_] cannot be captured here because the
    expect toplevel aborts on a parse error rather than localising it to a
@@ -22,7 +24,7 @@ end
 Line 2, characters 2-35:
 2 |   thm_? sqrt_1 : {[ sqrt 1. = 1. ]}
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Theorem declarations are not yet supported
+Error: The extension "refinements" is disabled and cannot be used
 |}]
 
 module type T = sig
@@ -32,7 +34,7 @@ end
 Line 2, characters 2-56:
 2 |   thm_? small : (x : float | x < 1.) -> {[ sqrt x > x ]}
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Theorem declarations are not yet supported
+Error: The extension "refinements" is disabled and cannot be used
 |}]
 
 module type U = sig
@@ -42,5 +44,5 @@ end
 Line 2, characters 2-23:
 2 |   thm_? t1 : int -> int
       ^^^^^^^^^^^^^^^^^^^^^
-Error: Theorem declarations are not yet supported
+Error: The extension "refinements" is disabled and cannot be used
 |}]
