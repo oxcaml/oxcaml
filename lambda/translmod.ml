@@ -1497,9 +1497,8 @@ let transl_instance_impl
       ap_tailcall = Default_tailcall;
       ap_specialised = Default_specialise;
       ap_mode = alloc_heap;
-      (* Runtime instantiation of a parameterised functor; always inlined, so
-         this is conservative *)
-      ap_yielding = May_yield;
+      (* Instantiation of a parameterized module cannot perform effects *)
+      ap_yielding = Unyielding;
       ap_region_close = Rc_normal;
       ap_probe = None;
     }
