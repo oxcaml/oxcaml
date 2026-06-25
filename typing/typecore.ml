@@ -11834,14 +11834,26 @@ and type_n_ary_function
        (its own mode), or if any argument it is given is yielding (the
        parameter modes). [Value_rec_compiler]'s eta-expanding wrapper uses
        this, since the wrapper is exactly a full application. *)
+    let params_yielding =
+      List.map
+        (fun (p : function_param) ->
+          Yielding.disallow_right
+            (Alloc.proj_comonadic Yielding p.fp_mode.mode_modes))
+        params
+    in
+    (* A [function | ...] body takes an extra implicit parameter that is not in
+       [params]; if that argument is yielding then the closure is yielding. *)
+    let params_yielding =
+      match body with
+      | Tfunction_body _ -> params_yielding
+      | Tfunction_cases fc ->
+        Yielding.disallow_right (Alloc.proj_comonadic Yielding fc.fc_arg_mode)
+        :: params_yielding
+    in
     let yielding =
       Yielding.join
         (Yielding.disallow_right (Alloc.proj_comonadic Yielding fun_alloc_mode)
-         :: List.map
-              (fun (p : function_param) ->
-                Yielding.disallow_right
-                  (Alloc.proj_comonadic Yielding p.fp_mode.mode_modes))
-              params)
+         :: params_yielding)
     in
     re
       { exp_desc =
