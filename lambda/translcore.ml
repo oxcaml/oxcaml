@@ -318,7 +318,14 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
               Mode.Alloc.disallow_right Mode.Alloc.legacy }
         }
       in
-      let return_sort = Jkind.Sort.default_for_transl_and_get method_.ret_sort in
+      let return_sort =
+        Jkind.Sort.default_for_transl_and_get method_.ret_sort
+      in
+      (* We keep the outer function's yielding mode and drop [method_]'s: object
+         code can never close over a yielding value, so the inner method is
+         always unyielding and contributes nothing to the join. *)
+      (* CR: if we ever infer modes for methods, we should handle yielding
+         here. *)
       { params = self_param :: method_.params;
         body = method_.body;
         return_mode = transl_alloc_mode_l method_.ret_mode.mode_modes;
