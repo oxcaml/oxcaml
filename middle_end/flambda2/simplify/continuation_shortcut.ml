@@ -49,9 +49,9 @@ let apply { params; continuation; args } shortcut_args =
       (fun arg ->
         Simple.pattern_match' arg
           ~var:(fun var ~coercion ->
-            match Variable.Map.find var subst with
-            | exception Not_found -> arg
-            | simple -> Simple.apply_coercion_exn simple coercion)
+            match Variable.Map.find_or_null var subst with
+            | Null -> arg
+            | This simple -> Simple.apply_coercion_exn simple coercion)
           ~symbol:(fun _ ~coercion:_ -> arg)
           ~const:(fun _ -> arg))
       args )

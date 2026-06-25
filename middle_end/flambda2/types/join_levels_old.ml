@@ -284,9 +284,9 @@ let join ~env_at_fork envs_with_levels ~params ~extra_lifted_consts_in_use_envs
           let result =
             Name_occurrences.add_name result name Name_mode.in_types
           in
-          match Name.Map.find name joined_types with
-          | exception Not_found -> result
-          | typ -> free_names_transitive0 typ ~result)
+          match Name.Map.find_or_null name joined_types with
+          | Null -> result
+          | This typ -> free_names_transitive0 typ ~result)
     in
     free_names_transitive0 typ ~result:Name_occurrences.empty
   in
