@@ -3,4 +3,6 @@
  (modes native)
  (flags
   (:standard -w +a-30-40-41-42))
+ ; Relink on native-runtime change (RUNTIME_STAMP; see Makefile.common-ox).
+ (link_deps (env_var RUNTIME_STAMP))
  (libraries ocamloptcomp))

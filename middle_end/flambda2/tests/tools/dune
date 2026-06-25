@@ -1,6 +1,8 @@
 (executables
   (names fldiff fexprc roundtrip)
   (modes native)
+  ; Relink on native-runtime change (RUNTIME_STAMP; see Makefile.common-ox).
+  (link_deps (env_var RUNTIME_STAMP))
   (libraries
    ocamlcommon ocamloptcomp
    flambda2 flambda2_compare flambda2_parser flambda2_terms flambda2_cmx))

@@ -16,6 +16,8 @@
  (modes native)
  (libraries expectcommon ocamlopttoplevel)
  (flags (:standard -linkall))
+ ; Relink on native-runtime change (RUNTIME_STAMP; see Makefile.common-ox).
+ (link_deps (env_var RUNTIME_STAMP))
  (modules expectnat))
 
 (ocamllex
@@ -28,6 +30,8 @@
  (name codegen_main)
  (modes native)
  (libraries ocamlcommon ocamloptcomp unix)
+ ; Relink on native-runtime change (RUNTIME_STAMP; see Makefile.common-ox).
+ (link_deps (env_var RUNTIME_STAMP))
  (modules codegen_main lexcmm parsecmm parsecmmaux))
 
 (rule

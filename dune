@@ -404,6 +404,8 @@
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (libraries ocamlbytecomp ocamlcommon)
+ ; Relink on native-runtime change (RUNTIME_STAMP; see Makefile.common-ox).
+ (link_deps (env_var RUNTIME_STAMP))
  (modules main_native))
 
 (library
@@ -805,6 +807,12 @@
   (backend bisect_ppx))
  (ocamlopt_flags
   (:standard -runtime-variant nnp))
+ ; The native runtime archive (libasmrun.a) is built in a separate dune
+ ; workspace and supplied to the linker via Load_path/OCAMLLIB, so dune cannot
+ ; see it as a dependency and would not relink the compiler when the runtime C
+ ; changes. The Makefile's `compiler` target passes the archive's digest in
+ ; RUNTIME_STAMP; depending on that env var forces a relink when it changes.
+ (link_deps (env_var RUNTIME_STAMP))
  (libraries
   memtrace
   flambda2
