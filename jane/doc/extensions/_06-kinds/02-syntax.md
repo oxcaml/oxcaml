@@ -518,10 +518,15 @@ scannable_axis ::= `non_null`
 
 kind_abbreviation ::= `value`
                   |   `immediate`
+                  |   `immediate_or_null`
                   |   `immediate64`
+                  |   `immediate64_or_null`
                   |   `immutable_data`
+                  |   `immutable_data_or_null`
                   |   `sync_data`
+                  |   `sync_data_or_null`
                   |   `mutable_data`
+                  |   `mutable_data_or_null`
 
 mod-bounds ::= `everything`
            |   { mod-bound }+
