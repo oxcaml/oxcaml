@@ -1,0 +1,115 @@
+name: compiler-perf
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: Base ref to compare against
+        required: false
+        default: main
+      head_ref:
+        description: Head ref to benchmark
+        required: false
+        default: ""
+
+jobs:
+  compiler-perf:
+    name: compiler perf smoke (x86_64-linux)
+    runs-on: warp-ubuntu-latest-x64-8x
+    env:
+      J: "8"
+      BASE_REF: >-
+        ${{ github.event_name == 'pull_request' &&
+            github.event.pull_request.base.sha || inputs.base_ref }}
+      HEAD_REF: >-
+        ${{ github.event_name == 'pull_request' &&
+            github.event.pull_request.head.sha || inputs.head_ref || github.sha }}
+      BASE_REPO: >-
+        ${{ github.event_name == 'pull_request' &&
+            github.event.pull_request.base.repo.full_name || github.repository }}
+      HEAD_REPO: >-
+        ${{ github.event_name == 'pull_request' &&
+            github.event.pull_request.head.repo.full_name || github.repository }}
+
+    steps:
+      - name: Checkout base
+        uses: actions/checkout@master
+        with:
+          repository: ${{ env.BASE_REPO }}
+          ref: ${{ env.BASE_REF }}
+          path: base
+
+      - name: Checkout head
+        uses: actions/checkout@master
+        with:
+          repository: ${{ env.HEAD_REPO }}
+          ref: ${{ env.HEAD_REF }}
+          path: head
+
+      - name: Runner information
+        run: cat /etc/apt/apt-mirrors.txt
+
+      - name: Pretend we're running in a container
+        run: sudo touch /.dockerenv
+
+      - name: Set up Opam
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: oxcaml-ci-deps.5.2.0-with-ocaml.5.4.0-with-ocamlformat.0.29.0
+          opam-repositories: |
+            local: file://${{ github.workspace }}/head/tools/ci/local-opam
+            default: https://github.com/ocaml/opam-repository.git
+          opam-disable-sandboxing: true
+          opam-pin: false
+
+      - name: Set up Opam environment
+        run: |
+          opam env --set-root --set-switch --shell=cmd | sed -n 's/^set //p' | tee -a "$GITHUB_ENV"
+
+      - name: Build and install base compiler
+        working-directory: base
+        run: |
+          autoconf
+          ./configure \
+            --prefix="$GITHUB_WORKSPACE/base/_install" \
+            --disable-dependency-generation
+          make -j"$J" install
+
+      - name: Build and install head compiler
+        working-directory: head
+        run: |
+          autoconf
+          ./configure \
+            --prefix="$GITHUB_WORKSPACE/head/_install" \
+            --disable-dependency-generation
+          make -j"$J" install
+
+      - name: Benchmark compiler CPU time
+        run: |
+          python3 head/tools/ci/compiler_perf/benchmark.py \
+            --base-compiler "$GITHUB_WORKSPACE/base/_install/bin/ocamlopt.opt" \
+            --head-compiler "$GITHUB_WORKSPACE/head/_install/bin/ocamlopt.opt" \
+            --work-dir "$GITHUB_WORKSPACE/compiler-perf-work" \
+            --json-output "$GITHUB_WORKSPACE/compiler-perf-results.json" \
+            --markdown-output "$GITHUB_WORKSPACE/compiler-perf-results.md" \
+            --runs 5 \
+            --warmups 1 \
+            --fail-geomean 1.20 \
+            --fail-any 1.50
+
+      - name: Print benchmark summary
+        if: always()
+        run: |
+          if [ -f "$GITHUB_WORKSPACE/compiler-perf-results.md" ]; then
+            cat "$GITHUB_WORKSPACE/compiler-perf-results.md"
+          fi
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiler-perf-results-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            compiler-perf-results.json
+            compiler-perf-results.md
