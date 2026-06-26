@@ -7,5 +7,5 @@
 
 fun x -> x;;
 [%%expect{|
-- : 'a @ [< 'm & global] -> 'a @ [> 'm] = <fun>
+- : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
 |}]
