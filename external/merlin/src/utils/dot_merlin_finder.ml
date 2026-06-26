@@ -5,7 +5,7 @@ let split_path path =
   let abs_dir = Unix.realpath dir in
   let file_rel_to_dir = Filename.basename path in
   let rec loop ~abs_dir ~file_rel_to_dir =
-    if file_exists (Filename.concat abs_dir "dune-workspace") then
+    if file_exists (Filename.concat abs_dir "jenga.conf") then
       Some (~workspace_root:abs_dir, ~rel_path:file_rel_to_dir)
     else
       let parent = Filename.dirname abs_dir in

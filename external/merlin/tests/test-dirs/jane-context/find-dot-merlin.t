@@ -18,7 +18,8 @@ This file tests that Merlin finds its configuration properly when
   >   echo "Unit name: $unit_name"
   > }
 
-Setup a dune workspace where the build hasn't been run yet:
+Setup a jane street style dune workspace where the build hasn't been run yet:
+  $ touch jenga.conf
   $ touch dune-workspace
   $ mkdir src
   $ touch src/foo.ml

@@ -2,7 +2,7 @@ Test locating a definition in a file where the file has the same name and
 contents as another file.
 
   $ export MERLIN_JANE_CONTEXT=jane
-  $ touch dune-workspace
+  $ touch jenga.conf
 
 Use the physical (symlink-resolved) path of the test directory throughout.
 The compiler resolves symlinks when recording its build directory, and Dune
