@@ -1135,35 +1135,12 @@ type shape_with_layout =
     type_name : string
   }
 
-let (all_type_decls : Shape.t Uid.Tbl.t) = Uid.Tbl.create 16
-
 let (all_type_shapes : shape_with_layout Uid.Tbl.t) = Uid.Tbl.create 16
-
-let add_to_type_decls (decls : (Ident.t * Types.type_declaration) list)
-    shape_for_constr =
-  let type_decl_shapes =
-    Type_decl_shape.of_type_declarations decls shape_for_constr
-  in
-  List.iter
-    (fun ((_, decl), sh) -> Uid.Tbl.add all_type_decls decl.Types.type_uid sh)
-    (List.combine decls type_decl_shapes)
 
 let add_to_type_shapes var_uid type_expr type_layout ~name:type_name uid_of_path
     =
   let type_shape = Type_shape.of_type_expr type_expr uid_of_path in
   Uid.Tbl.add all_type_shapes var_uid { type_shape; type_name; type_layout }
-
-let print_table_all_type_decls ppf =
-  let entries = Uid.Tbl.to_list all_type_decls in
-  let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in
-  let entries =
-    List.map
-      (fun (k, v) ->
-        Format.asprintf "%a" Uid.print k, Format.asprintf "%a" Shape.print v)
-      entries
-  in
-  let uids, decls = List.split entries in
-  Misc.pp_table ppf ["UID", uids; "Type Declaration", decls]
 
 let print_table_all_type_shapes ppf =
   let entries = Uid.Tbl.to_list all_type_shapes in
@@ -1184,7 +1161,5 @@ let print_table_all_type_shapes ppf =
 
 (* Print debug uid tables when the command line flag [-ddebug-uids] is set. *)
 let print_debug_uid_tables ppf =
-  Format.fprintf ppf "\n";
-  print_table_all_type_decls ppf;
   Format.fprintf ppf "\n";
   print_table_all_type_shapes ppf

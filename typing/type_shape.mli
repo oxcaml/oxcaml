@@ -112,18 +112,11 @@ type shape_with_layout = private
     type_name : string
   }
 
-val all_type_decls : Shape.t Uid.Tbl.t
-
 val all_type_shapes : shape_with_layout Uid.Tbl.t
 
 (* Passing [Path.t -> Uid.t] instead of [Env.t] to avoid a dependency cycle. *)
-val add_to_type_decls :
-  (Ident.t * Types.type_declaration) list -> path_lookup -> unit
-
 val add_to_type_shapes :
   Uid.t -> Types.type_expr -> Layout.t -> name:string -> path_lookup -> unit
-
-val print_table_all_type_decls : Format.formatter -> unit
 
 val print_table_all_type_shapes : Format.formatter -> unit
 
