@@ -301,9 +301,9 @@ let with_additional_action =
         in
         (* CR-someday zqian: preserve the hints *)
         (* modes and modalities should have been zapped already *)
-        (* if a mode is generic variable we leave it as is *)
+        (* if a mode is generic we leave it as is *)
         let prepare_mode mode =
-          if Mode.Alloc.check_level_var mode generic_level
+          if Mode.Alloc.check_generic mode
           then mode
           else Mode.Alloc.(mode |> to_const_exn |> of_const)
         in
