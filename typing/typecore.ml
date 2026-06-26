@@ -10227,7 +10227,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
 and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
       (lbl, arg) =
   match arg with
-  | Arg (Unknown_arg { sarg; ty_arg_mono; mode_arg; sort_arg }) ->
+  | Arg (Unknown_arg { sarg; ty_arg_mono; mode_fun; mode_arg; sort_arg }) ->
       let expected_mode, mode_arg =
         mode_argument ~funct ~index ~position_and_mode ~partial_app mode_arg in
       let arg = type_expect env expected_mode sarg (mk_expected ty_arg_mono) in
@@ -10239,9 +10239,10 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
              (type_option(newvar Predef.option_argument_jkind))
        | Position _ ->
            unify_exp ~sexp:sarg env arg (instance Predef.type_lexing_position));
-      (lbl, Arg (arg, mode_arg, sort_arg), None)
+      (lbl, Arg (arg, mode_arg, sort_arg), None,
+       ~mode_fun:(Mode.alloc_as_value mode_fun))
   | Arg (Known_arg { sarg; ty_arg; ty_arg0;
-                     mode_arg; wrapped_in_some; sort_arg }) ->
+                     mode_fun; mode_arg; wrapped_in_some; sort_arg }) ->
       let expected_mode, mode_arg =
         mode_argument ~funct ~index ~position_and_mode ~partial_app mode_arg in
       let ty_arg', vars = tpoly_get_poly ty_arg in
@@ -10296,17 +10297,23 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
           {arg with exp_type = instance arg.exp_type}, sch
         end
       in
-      (lbl, Arg (arg, mode_arg, sort_arg), sch)
-  | Arg (Eliminated_optional_arg { ty_arg; sort_arg; expected_label; _ }) ->
+      ( lbl, Arg (arg, mode_arg, sort_arg), sch,
+        ~mode_fun:(Mode.alloc_as_value mode_fun))
+  | Arg (Eliminated_optional_arg { ty_arg; sort_arg; expected_label;
+                                   mode_fun; _ }) ->
       (match expected_label with
       | Optional _ ->
           let arg = type_option_none env (instance ty_arg) Location.none in
-          (lbl, Arg (arg, Mode.Value.legacy, sort_arg), None)
+          (lbl,
+           Arg (arg, Mode.Value.legacy, sort_arg),
+           None, ~mode_fun:(Mode.alloc_as_value mode_fun))
       | Position _ ->
           let arg = src_pos (Location.ghostify funct.exp_loc) [] env in
-          (lbl, Arg (arg, Mode.Value.legacy, sort_arg), None)
+          (lbl, Arg (arg, Mode.Value.legacy, sort_arg), None,
+           ~mode_fun:(Mode.alloc_as_value mode_fun))
       | Labelled _ | Nolabel -> assert false)
-  | Omitted _ as arg -> (lbl, arg, None)
+  | Omitted { mode_fun; _ } as arg ->
+      (lbl, arg, None, ~mode_fun:(Mode.alloc_as_value mode_fun))
 
 and type_application env app_loc expected_mode position_and_mode
       funct funct_mode sargs ret_tvar =
@@ -10376,27 +10383,6 @@ and type_application env app_loc expected_mode position_and_mode
              [args = [(Label "a", Omitted bar);
                       (Optional "opt", Arg (Eliminated_optional_arg baz));
                       (Nolabel, Arg (Known_arg n))]] *)
-          (* The application can never perform a free effect if the function
-             and all of its arguments are unyielding. We use [untyped_args]
-             rather than the typed [args] because [type_apply_arg] keeps only
-             [mode_arg] (as an adjusted value mode) and drops [mode_fun], the
-             mode of the intermediate partial-application closures, which is
-             part of this join. *)
-          let ap_yielding =
-            Alloc.proj_comonadic Yielding
-              (Alloc.join
-                 (value_to_alloc_r2l funct_mode
-                  :: List.concat_map
-                       (fun (_, arg) ->
-                          match arg with
-                          | Arg (Known_arg { mode_fun; mode_arg; _ }
-                                | Unknown_arg { mode_fun; mode_arg; _ }
-                                | Eliminated_optional_arg
-                                    { mode_fun; mode_arg; _ })
-                          | Omitted { mode_fun; mode_arg; _ } ->
-                            [ mode_fun; mode_arg ])
-                       untyped_args))
-          in
           let partial_app = is_partial_apply untyped_args in
           let position_and_mode =
             if partial_app then position_and_mode_default else position_and_mode
@@ -10406,6 +10392,25 @@ and type_application env app_loc expected_mode position_and_mode
                 type_apply_arg env ~app_loc ~funct ~index
                   ~position_and_mode ~partial_app arg)
               untyped_args
+          in
+          (* The application can never perform a free effect if the function and
+             all of its arguments are unyielding. *)
+          let ap_yielding =
+            Mode.Value.proj_comonadic Yielding
+              (Mode.Value.join
+                 (funct_mode
+                  :: List.concat_map
+                       (fun (_, arg, _, ~mode_fun) ->
+                          mode_fun ::
+                          (match arg with
+                            | Arg (_, mode_arg, _) -> [mode_arg]
+                            | Omitted _ -> [] ))
+                       args))
+          in
+          let args =
+            List.map (fun (lbl, arg, sch, ~mode_fun:_) ->
+              (lbl, arg, sch))
+              args
           in
           (* example: type-check [n] and generate [None] for [?opt].
              [args] becomes [(Label "a", Omitted bar);

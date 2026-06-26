@@ -53,6 +53,12 @@ let revapply_yielding x = pipe_yielding x (fun y -> y + 1) + 1
 let () =
   let _ = opaque (call_nontail ()) in
   let _ = opaque (loop 3) in
+  (* Call function that accepts a yielding argument with a yielding argument
+     (should have a plain ret debug event) *)
+  let _ = opaque (call_yielding_arg ((fun () -> 7) : _ @ yielding)) in
+  let _ = opaque (tail_yielding ((fun () -> 8) : _ @ yielding)) in
+  (* Call function that accepts a yielding argument with an unyielding
+     argument (should have an unyielding-call debug event) *)
   let _ = opaque (call_yielding_arg (fun () -> 7)) in
   let _ = opaque (tail_yielding (fun () -> 8)) in
   let _ = opaque (inc 5) in
