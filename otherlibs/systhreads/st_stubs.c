@@ -159,7 +159,7 @@ struct caml_thread_struct {
   void * signal_stack;       /* this thread's signal stack */
   size_t signal_stack_size;  /* size of this thread's signal stack in bytes */
   int is_main;               /* whether this is the main thread of its domain */
-  dynamic_thread_t dynamic;  /* dynamic value bindings */
+  dynamic_cache_t dynamic;   /* cached dynamic value bindings */
 
 #ifndef NATIVE_CODE
   intnat trap_sp_off;      /* saved value of Caml_state->trap_sp_off */
@@ -355,7 +355,7 @@ static void restore_runtime_state(caml_thread_t th)
   Caml_state->external_raise_async = th->external_raise_async;
 #endif
   caml_memprof_enter_thread(th->memprof);
-  caml_dynamic_enter_thread(th->dynamic);
+  caml_dynamic_cache_enter_thread(th->dynamic);
 }
 
 CAMLexport void caml_thread_restore_runtime_state(void)
@@ -435,7 +435,7 @@ static caml_thread_t caml_thread_new_info(caml_thread_t parent)
 
   th->memprof = caml_memprof_new_thread(domain_state);
   if (th->memprof == NULL) goto fail_memprof;
-  th->dynamic = caml_dynamic_new_thread(parent->dynamic);
+  th->dynamic = caml_dynamic_cache_new();
   if (th->dynamic == NULL) goto fail_dynamic;
 
   th->c_stack = NULL;
@@ -487,7 +487,7 @@ void caml_thread_free_info(caml_thread_t th)
      init_mask: stack-allocated
   */
   caml_memprof_delete_thread(th->memprof);
-  caml_dynamic_delete_thread(th->dynamic);
+  caml_dynamic_cache_delete(th->dynamic);
   caml_free_stack(th->current_stack);
   caml_free_backtrace_buffer(th->backtrace_buffer);
 
@@ -666,7 +666,7 @@ static void caml_thread_domain_initialize_hook(void)
   This_thread = new_thread;
   Active_thread = new_thread;
   caml_memprof_enter_thread(new_thread->memprof);
-  caml_dynamic_enter_thread(new_thread->dynamic);
+  caml_dynamic_cache_enter_thread(new_thread->dynamic);
 }
 
 static void thread_yield(void);
