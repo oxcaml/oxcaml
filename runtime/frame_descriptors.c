@@ -202,6 +202,9 @@ static void clean_frame_descriptors(caml_frame_descrs *table)
 /* Settable via GC tweak OCAMLRUNPARAM=Xmeasure_frametables */
 extern uintnat caml_measure_frametables;
 
+/* Settable via GC tweak OCAMLRUNPARAM=Xmeasure_all_frametables. */
+extern uintnat caml_measure_all_frametables;
+
 #define MAX_LOG 32
 #define SMALL_FRAMES 32
 #define REGS 64
@@ -760,6 +763,28 @@ static void report_frametables_stats(caml_frametable_list *new_frametables)
   report_stats(&stats);
 }
 
+/* The backend emits one pointer per linked unit into the caml_all_frametables
+ * section; the linker concatenates them and provides these bounds. Weak so the
+ * runtime still links where no such section exists (both NULL). */
+extern intnat *__start_caml_all_frametables[] __attribute__((weak));
+extern intnat *__stop_caml_all_frametables[] __attribute__((weak));
+
+/* Measure every frametable in the executable - including dynlink-available
+ * units that are never registered in caml_frametable[]. Reads only static data
+ * and read-only frame descriptors; runs no module initializers. */
+static void report_all_frametables_stats(void)
+{
+  struct frametable_stats stats;
+  clear_stats(&stats);
+  for (intnat **p = __start_caml_all_frametables;
+       p < __stop_caml_all_frametables; p++) {
+    add_frametable_to_stats(*p, &stats);
+    accumulate_frametable_stats(*p, &stats);
+    clear_per_frametable_stats(&stats);
+  }
+  report_stats(&stats);
+}
+
 static void add_frame_descriptors(
   caml_frame_descrs *table,
   caml_frametable_list *new_frametables)
@@ -853,6 +878,10 @@ void caml_init_frame_descriptors(void)
      any mutator can run. We can mutate [current_frame_descrs]
      at will. */
   add_frame_descriptors(&current_frame_descrs, frametables);
+
+  if (caml_measure_all_frametables) {
+    report_all_frametables_stats();
+  }
 }
 
 static void register_frametables_from_stw_single(
