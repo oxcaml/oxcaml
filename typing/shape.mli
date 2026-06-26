@@ -253,9 +253,7 @@ and desc =
   | Rec_var of DeBruijn_index.t
 
   (* constructors for type declarations *)
-  | Variant of (t * Layout.t) complex_constructors
-      (* CR sspies: Rename this just to constructor now that simple constructors
-         are no longer a thing. *)
+  | Variant of (t * Layout.t) constructors
   | Variant_unboxed of
     { name : string;
       variant_uid : Uid.t option;
@@ -267,7 +265,7 @@ and desc =
       arg_layout : Layout.t
     }
     (** An unboxed variant corresponds to the [@@unboxed] annotation.
-        It must have a single, complex constructor. *)
+        It must have a single constructor with a single argument. *)
   | Record of
       { fields : (string * Uid.t option * t * Layout.t) list;
         kind : record_kind
@@ -311,16 +309,16 @@ and record_kind =
       (** Basically the same as [Record_mixed], but we don't reorder the
           fields. *)
 
-and 'a complex_constructors = 'a complex_constructor list
+and 'a constructors = 'a constructor list
 
-and 'a complex_constructor =
+and 'a constructor =
   { name : string;
     constr_uid: Uid.t option;
     kind : constructor_representation;
-    args : 'a complex_constructor_argument list
+    args : 'a constructor_argument list
   }
 
-and 'a complex_constructor_argument =
+and 'a constructor_argument =
   { field_name : string option;
     field_uid: Uid.t option;
     field_value : 'a
@@ -342,8 +340,8 @@ val equal : t -> t -> bool
 
 val equal_record_kind : record_kind -> record_kind -> bool
 
-val equal_complex_constructor :
-  ('a -> 'a -> bool) -> 'a complex_constructor -> 'a complex_constructor -> bool
+val equal_constructor :
+  ('a -> 'a -> bool) -> 'a constructor -> 'a constructor -> bool
 
 (* Smart constructors *)
 
@@ -374,7 +372,7 @@ val rec_var : ?uid:Uid.t -> DeBruijn_index.t -> t
 
 (* constructors for type declarations *)
 val variant :
-  ?uid:Uid.t -> (t * Layout.t) complex_constructors -> t
+  ?uid:Uid.t -> (t * Layout.t) constructors -> t
 val variant_unboxed :
   ?uid:Uid.t -> variant_uid:Uid.t option -> arg_uid:Uid.t option ->
   string -> string option -> t -> Layout.t -> t
@@ -400,11 +398,11 @@ val leaf_for_unpack : t
 val poly_variant_constructors_map :
   ('a -> 'b) -> 'a poly_variant_constructors -> 'b poly_variant_constructors
 
-val complex_constructor_map :
-  ('a -> 'b) -> 'a complex_constructor -> 'b complex_constructor
+val constructor_map :
+  ('a -> 'b) -> 'a constructor -> 'b constructor
 
-val complex_constructors_map :
-  ('a -> 'b) -> 'a complex_constructors -> 'b complex_constructors
+val constructors_map :
+  ('a -> 'b) -> 'a constructors -> 'b constructors
 
 module Map : sig
   type shape = t

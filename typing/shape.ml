@@ -527,7 +527,7 @@ and desc =
   | Rec_var of int
 
   (* constructors for type declarations *)
-  | Variant of (t * Layout.t) complex_constructors
+  | Variant of (t * Layout.t) constructors
   | Variant_unboxed of
     { name : string;
       variant_uid : Uid.t option;
@@ -559,16 +559,16 @@ and record_kind =
   | Record_mixed of mixed_product_shape
   | Record_floats
 
-and 'a complex_constructors = 'a complex_constructor list
+and 'a constructors = 'a constructor list
 
-and 'a complex_constructor =
+and 'a constructor =
   { name : string;
     constr_uid: Uid.t option;
     kind : constructor_representation;
-    args : 'a complex_constructor_argument list
+    args : 'a constructor_argument list
   }
 
-and 'a complex_constructor_argument =
+and 'a constructor_argument =
   { field_name : string option;
     field_uid: Uid.t option;
     field_value : 'a
@@ -583,7 +583,7 @@ let poly_variant_constructors_map f pvs =
     (fun pv -> { pv with pv_constr_args = List.map f pv.pv_constr_args })
     pvs
 
-let complex_constructor_map f { name; constr_uid; kind; args } =
+let constructor_map f { name; constr_uid; kind; args } =
   let args =
     List.map
       (fun { field_name; field_uid; field_value } ->
@@ -592,20 +592,20 @@ let complex_constructor_map f { name; constr_uid; kind; args } =
   in
   { name; constr_uid; kind; args }
 
-let complex_constructors_map f = List.map (complex_constructor_map f)
+let constructors_map f = List.map (constructor_map f)
 
-let equal_complex_constructor_arguments eq
+let equal_constructor_arguments eq
     { field_name = field_name1; field_value = field_value1 }
     { field_name = field_name2; field_value = field_value2 } =
   Option.equal String.equal field_name1 field_name2 &&
   eq field_value1 field_value2
 
-let equal_complex_constructor eq
+let equal_constructor eq
     { name = name1; kind = kind1; args = args1 }
     { name = name2; kind = kind2; args = args2 } =
   String.equal name1 name2 &&
   Misc.Stdlib.Array.equal Layout.equal kind1 kind2 &&
-  List.equal (equal_complex_constructor_arguments eq) args1 args2
+  List.equal (equal_constructor_arguments eq) args1 args2
 
 let rec equal_desc0 d1 d2 =
   match d1, d2 with
@@ -647,7 +647,7 @@ let rec equal_desc0 d1 d2 =
     List.equal equal_poly_variant_constructor pvs1 pvs2
   | Variant c1, Variant c2 ->
     List.equal
-         (equal_complex_constructor (fun (t1, l1) (t2, l2) ->
+         (equal_constructor (fun (t1, l1) (t2, l2) ->
            equal t1 t2 && Layout.equal l1 l2))
          c1 c2
   | Variant_unboxed c1, Variant_unboxed c2 ->
@@ -1051,8 +1051,7 @@ let poly_variant ?uid t =
 let variant ?uid constructors =
   { uid; desc = Variant constructors;
     hash = Hashtbl.hash (hash_variant, uid,
-      complex_constructors_map
-        (fun (t, ly) -> (t.hash, ly)) constructors);
+      constructors_map (fun (t, ly) -> (t.hash, ly)) constructors);
     approximated = false }
 
 let variant_unboxed ?uid ~variant_uid ~arg_uid name arg_name arg_shape

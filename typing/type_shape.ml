@@ -91,7 +91,7 @@ end = struct
            fields)
     | Variant constructors ->
       Shape.variant ?uid:outer.uid
-        (Shape.complex_constructors_map
+        (Shape.constructors_map
            (fun (sh, layout) -> subst sh, layout)
            constructors)
     | Variant_unboxed
@@ -409,8 +409,8 @@ module Type_decl_shape = struct
       Layout.Product
         (Array.to_list (Array.map mixed_block_shape_to_layout args))
 
-  let of_complex_constructor type_subst name
-      (cstr_args : Types.constructor_declaration) arg_layout shape_for_constr =
+  let of_constructor type_subst name (cstr_args : Types.constructor_declaration)
+      arg_layout shape_for_constr =
     let args =
       match cstr_args.cd_args with
       | Cstr_tuple list ->
@@ -549,8 +549,7 @@ module Type_decl_shape = struct
             Misc.Stdlib.List.map_option
               (fun ((cstr, arg_layouts) : Types.constructor_declaration * _) ->
                 let name = Ident.name cstr.cd_id in
-                of_complex_constructor type_subst name cstr arg_layouts
-                  shape_for_constr)
+                of_constructor type_subst name cstr arg_layouts shape_for_constr)
               cstrs_with_layouts
           in
           begin match constructors with
@@ -1061,7 +1060,7 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
            since it's the default fallback. *)
       | Variant constructors ->
         let constructors =
-          Shape.complex_constructors_map
+          Shape.constructors_map
             (fun (sh, ly) -> unfold_and_eval sh, ly)
             constructors
         in

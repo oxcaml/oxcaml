@@ -151,7 +151,7 @@ end) = struct
     | NPredef of Predef.t * nf list
     | NArrow
     | NPoly_variant of nf poly_variant_constructors
-    | NVariant of  (delayed_nf * Layout.t) complex_constructors
+    | NVariant of  (delayed_nf * Layout.t) constructors
     | NVariant_unboxed of
       { name : string;
         variant_uid : Uid.t option;
@@ -250,7 +250,7 @@ end) = struct
       List.equal equal_pv_constructor constrs1 constrs2
     | NVariant cc1, NVariant cc2  ->
       List.equal
-        (Shape.equal_complex_constructor
+        (Shape.equal_constructor
           (fun (dnf1, ly1) (dnf2, ly2) ->
             Layout.equal ly1 ly2 && equal_delayed_nf dnf1 dnf2))
         cc1 cc2
@@ -589,7 +589,7 @@ end) = struct
           return (NPoly_variant dnf_constrs)
       | Variant constructors  ->
           let dnf_constructors =
-            complex_constructors_map (fun (t, ly) ->
+            constructors_map (fun (t, ly) ->
               (delay_reduce env t, ly)) constructors
           in
           return (NVariant dnf_constructors)
@@ -673,7 +673,7 @@ end) = struct
       poly_variant ?uid t_constrs
     | NVariant constructors ->
       let t_constructors =
-        complex_constructors_map
+        constructors_map
           (fun (dnf, ly) -> (read_back_force dnf, ly))
           constructors
       in
