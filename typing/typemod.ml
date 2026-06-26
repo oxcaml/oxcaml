@@ -3307,7 +3307,8 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
             List.iter
               (fun (_n, t) ->
                  Mode.Alloc.with_zap_scope
-                   Ctype.remove_mode_and_jkind_variables t)
+                   (fun ~zap_scope ->
+                      Ctype.remove_mode_and_jkind_variables ~zap_scope t))
               pack.pack_cstrs;
             check_package_closed ~loc:smod.pmod_loc ~env ~typ:exp.exp_type
               pack.pack_cstrs;
@@ -4153,7 +4154,8 @@ let remove_mode_and_jkind_variables_for_toplevel str =
      (* These types are printed by the toplevel,
         even though they do not appear in sg *)
      Mode.Alloc.with_zap_scope
-       Ctype.remove_mode_and_jkind_variables exp.exp_type
+       (fun ~zap_scope ->
+          Ctype.remove_mode_and_jkind_variables ~zap_scope exp.exp_type)
   | _ -> ()
 
 let type_toplevel_phrase env sig_acc s =
