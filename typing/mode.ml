@@ -5077,14 +5077,13 @@ module Report = struct
       In each case, we report an error if the hint was not applied to its
       expected associated morphism. *)
   let should_skip : type l r a b.
-      Fmt.formatter ->
       (l * r) morph ->
       src:a C.obj ->
       obj:b C.obj ->
       a ->
       b ->
       (is_skip:bool * fixpoint:bool) =
-   fun ppf hint ~src ~obj a b ->
+   fun hint ~src ~obj a b ->
     let fixpoint = equal_mode src obj a b in
     match hint with
     | Unknown | Close_over _ | Is_closed_by _ | Contains_l _ | Contains_r _
@@ -5097,14 +5096,14 @@ module Report = struct
     | Allocation_r _ ->
       (* We check that the morphism is value_to_alloc_r2g *)
       if not (implements_value_to_alloc Regional_to_global src obj a b)
-      then print_bug () ppf;
+      then print_bug_stderr ();
       (* We only skip when the morphism changes the mode, but allow for axis changes *)
       ( ~is_skip:(implements_alloc_to_value Locality_as_regionality obj src b a),
         ~fixpoint )
     | Allocation_l _ ->
       (* We check that the morphism is value_to_alloc_r2l *)
       if not (implements_value_to_alloc Regional_to_local src obj a b)
-      then print_bug () ppf;
+      then print_bug_stderr ();
       (* We only skip when the morphism changes the mode, but allow for axis changes *)
       ( ~is_skip:(implements_alloc_to_value Locality_as_regionality obj src b a),
         ~fixpoint )
@@ -5112,7 +5111,7 @@ module Report = struct
       (* We always want to skip an Allocation hint. Report if the hint was not
          applied to an alloc_as_value morphism. *)
       if not (implements_alloc_to_value Locality_as_regionality src obj a b)
-      then print_bug () ppf;
+      then print_bug_stderr ();
       ~is_skip:true, ~fixpoint
 
   let rec print_ahint : type a l r.
@@ -5127,7 +5126,7 @@ module Report = struct
     match hint with
     | Apply (morph_hint, src, ahint) ->
       let ~is_skip, ~fixpoint =
-        should_skip ppf morph_hint ~src ~obj (fst ahint) a
+        should_skip morph_hint ~src ~obj (fst ahint) a
       in
       if is_skip
       then print_ahint ~sub side pp src ppf ahint
