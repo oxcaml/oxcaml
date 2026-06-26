@@ -311,14 +311,14 @@ static debuginfo debuginfo_extract(frame_descr *d, ptrdiff_t alloc_idx)
     /* find debug info for this allocation */
     if (alloc_idx >= 0) {
       infoptr += alloc_idx * sizeof(uint32_t);
-      if (*(uint32_t*)infoptr == 0) {
+      if (caml_read_unaligned_uint32(infoptr) == 0) {
         /* No debug info for this particular allocation */
         return NULL;
       }
     } else {
       /* we know there's at least one valid debuginfo,
          but it may not be the one for the first alloc */
-      while (*(uint32_t*)infoptr == 0) {
+      while (caml_read_unaligned_uint32(infoptr) == 0) {
         infoptr += sizeof(uint32_t);
       }
     }
@@ -328,7 +328,7 @@ static debuginfo debuginfo_extract(frame_descr *d, ptrdiff_t alloc_idx)
     CAMLassert(alloc_idx == -1);
   }
   /* read offset to debuginfo */
-  debuginfo_offset = *(uint32_t*)infoptr;
+  debuginfo_offset = caml_read_unaligned_uint32(infoptr);
   return (debuginfo)(infoptr + debuginfo_offset);
 }
 
@@ -350,7 +350,7 @@ debuginfo caml_debuginfo_next(debuginfo dbg)
     return NULL;
 
   infoptr = dbg;
-  if ((infoptr[0] & 1) == 0)
+  if ((caml_read_unaligned_uint32(infoptr) & 1) == 0)
     /* No next debuginfo */
     return NULL;
   else
@@ -390,8 +390,8 @@ void caml_debuginfo_location(debuginfo dbg, /*out*/ struct caml_loc_info * li)
     return;
   }
   /* Recover debugging info */
-  info1 = ((uint32_t *)dbg)[0];
-  info2 = ((uint32_t *)dbg)[1];
+  info1 = caml_read_unaligned_uint32(dbg);
+  info2 = caml_read_unaligned_uint32((const uint32_t *)dbg + 1);
   /* Format of the two info words:
      Two possible formats based on value of bit 63:
      Partially packed format
@@ -423,18 +423,21 @@ void caml_debuginfo_location(debuginfo dbg, /*out*/ struct caml_loc_info * li)
       (struct name_and_loc_info*)((char *) dbg + (info1 & 0x3FFFFFC));
     li->loc_defname = name_and_loc_info->name;
     li->loc_filename =
-      (char *)name_and_loc_info + name_and_loc_info->filename_offs;
+      (char *)name_and_loc_info
+      + caml_read_unaligned_int32(&name_and_loc_info->filename_offs);
     li->loc_start_lnum = li->loc_end_lnum = (info2 >> 12) & 0x7FFFF;
     li->loc_end_lnum += ((info2 & 0xFFF) << 6) | (info1 >> 26);
-    li->loc_start_chr = name_and_loc_info->start_chr;
-    li->loc_end_chr = name_and_loc_info->end_chr;
-    li->loc_end_offset = name_and_loc_info->end_offset;
+    li->loc_start_chr = caml_read_unaligned_uint16(&name_and_loc_info->start_chr);
+    li->loc_end_chr = caml_read_unaligned_uint16(&name_and_loc_info->end_chr);
+    li->loc_end_offset =
+      caml_read_unaligned_int32(&name_and_loc_info->end_offset);
   } else {
     struct name_info * name_info =
       (struct name_info*)((char *) dbg + (info1 & 0x3FFFFFC));
     li->loc_defname = name_info->name;
     li->loc_filename =
-      (char *)name_info + name_info->filename_offs;
+      (char *)name_info
+      + caml_read_unaligned_int32(&name_info->filename_offs);
     li->loc_start_lnum = li->loc_end_lnum = info2 >> 19; /* l */
     li->loc_end_lnum += (info2 >> 16) & 0x7;             /* m */
     li->loc_start_chr = (info2 >> 10) & 0x3F;            /* a */
@@ -494,8 +497,8 @@ void caml_debuginfo_measure(debuginfo dbg)
   include_low((char*)dbg);
 
   do {
-    info1 = ((uint32_t *)dbg)[0];
-    info2 = ((uint32_t *)dbg)[1];
+    info1 = caml_read_unaligned_uint32(dbg);
+    info2 = caml_read_unaligned_uint32((const uint32_t *)dbg + 1);
     ++debuginfo_count;
 
     if (info2 & 0x80000000) {
@@ -504,14 +507,15 @@ void caml_debuginfo_measure(debuginfo dbg)
       include_low((char*)name_and_loc_info);
       include_string(name_and_loc_info->name);
       include_string((char *)name_and_loc_info
-                     + name_and_loc_info->filename_offs);
+                     + caml_read_unaligned_int32(
+                         &name_and_loc_info->filename_offs));
     } else {
       struct name_info * name_info =
         (struct name_info*)((char *) dbg + (info1 & 0x3FFFFFC));
       include_low((char*)name_info);
       include_string(name_info->name);
       include_string((char *)name_info
-                     + name_info->filename_offs);
+                     + caml_read_unaligned_int32(&name_info->filename_offs));
     }
     dbg = (debuginfo)((uint32_t*)dbg + 2);
   } while (info1 & 1);

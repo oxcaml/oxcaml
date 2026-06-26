@@ -23,6 +23,7 @@
 
 #include <stdbool.h>
 #include "config.h"
+#include "misc.h"
 
 /* The compiler generates a "frame descriptor" for every potential
  * return address. Each loaded module has a block of memory, the
@@ -97,12 +98,12 @@ typedef struct {
 } frame_descr_long;
 
 Caml_inline bool frame_return_to_C(frame_descr *d) {
-  return d->frame_data == FRAME_RETURN_TO_C;
+  return caml_read_unaligned_uint16(&d->frame_data) == FRAME_RETURN_TO_C;
 }
 
 Caml_inline bool frame_is_long(frame_descr *d) {
   CAMLassert(d && !frame_return_to_C(d));
-  return (d -> frame_data == FRAME_LONG_MARKER);
+  return (caml_read_unaligned_uint16(&d->frame_data) == FRAME_LONG_MARKER);
 }
 
 Caml_inline frame_descr_long *frame_as_long(frame_descr *d) {
@@ -113,18 +114,20 @@ Caml_inline frame_descr_long *frame_as_long(frame_descr *d) {
 Caml_inline uint32_t frame_data(frame_descr *d) {
   if (frame_is_long(d)) {
     frame_descr_long *dl = frame_as_long(d);
-    return (dl -> frame_data);
+    return caml_read_unaligned_uint32(&dl->frame_data);
   } else {
-    return (d -> frame_data);
+    return caml_read_unaligned_uint16(&d->frame_data);
   }
 }
 
 Caml_inline unsigned char *frame_end_of_live_ofs(frame_descr *d) {
   if (frame_is_long(d)) {
     frame_descr_long *dl = frame_as_long(d);
-    return ((unsigned char *)&dl->live_ofs[dl->num_live]);
+    uint32_t num_live = caml_read_unaligned_uint32(&dl->num_live);
+    return ((unsigned char *)&dl->live_ofs[num_live]);
   } else {
-    return ((unsigned char *)&d->live_ofs[d->num_live]);
+    uint16_t num_live = caml_read_unaligned_uint16(&d->num_live);
+    return ((unsigned char *)&d->live_ofs[num_live]);
   }
 }
 
@@ -155,7 +158,7 @@ Caml_inline bool frame_has_debug(frame_descr *d) {
 
 #define Retaddr_frame(d) \
   ((uintnat)&(d)->retaddr_rel + \
-   (uintnat)(intnat)((d)->retaddr_rel))
+   (uintnat)(intnat)caml_read_unaligned_int32(&(d)->retaddr_rel))
 
 void caml_init_frame_descriptors(void);
 
