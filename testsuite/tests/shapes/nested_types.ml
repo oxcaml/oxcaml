@@ -20,23 +20,12 @@ end
 [%%expect{|
 {
  "M"[module] ->
-   {<.41>
-    "Exn"[extension constructor] -> {<.1>
-                                     "lbl_exn"[label] -> <.0>;
-                                     };
-    "Ext"[extension constructor] -> {<.7>
-                                     "lbl_ext"[label] -> <.6>;
-                                     };
-    "ext"[type] -> <.5>;
-    "l"[type] -> {<.3>
-                  "lbl"[label] -> <.4>;
-                  };
-    "t"[type] ->
-      {<.9>
-       "C"[constructor] -> {<.11>
-                            "lbl_cstr"[label] -> <.10>;
-                            };
-       };
+   {<.55>
+    "Exn"[extension constructor] -> Record_boxed { lbl_exn<.6>: int  };
+    "Ext"[extension constructor] -> Record_boxed { lbl_ext<.14>: int  };
+    "ext"[type] -> ((? ) : value);
+    "l"[type] -> Record_boxed { lbl<.11>: int  };
+    "t"[type] -> Variant C<.20> of lbl_cstr<.19>=int ;
     };
  }
 module M :

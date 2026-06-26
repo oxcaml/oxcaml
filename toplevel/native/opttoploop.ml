@@ -351,7 +351,7 @@ let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
   let lam =
     Simplif.simplify_lambda rawlam
       ~restrict_to_upstream_dwarf:
-        !Dwarf_flags.restrict_to_upstream_dwarf
+        !Clflags.restrict_to_upstream_dwarf
       ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
   in
   if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda lam;

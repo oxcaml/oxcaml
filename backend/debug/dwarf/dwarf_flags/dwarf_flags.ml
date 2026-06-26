@@ -97,8 +97,6 @@ let use_g () =
   then use_g1 ()
   else current_debug_settings := bytecode_g
 
-let restrict_to_upstream_dwarf = ref (not Config.oxcaml_dwarf)
-
 (* Currently the maximum number of stack slots, see asmgen.ml *)
 let dwarf_max_function_complexity = ref 50
 
@@ -192,7 +190,7 @@ let ddwarf_metrics = ref false
 let ddwarf_metrics_output_file : string option ref = ref None
 
 let get_dwarf_compression_flag () =
-  if !dwarf_inlined_frames || not !restrict_to_upstream_dwarf
+  if !dwarf_inlined_frames || not !Clflags.restrict_to_upstream_dwarf
   then Some !gdwarf_compression
   else None
 
