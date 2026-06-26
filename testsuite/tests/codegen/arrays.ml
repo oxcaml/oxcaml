@@ -160,7 +160,7 @@ poly_unsafe_set:
   ret
 |}]
 
-let int32_unsafe_get (a : int32# array) (i : int) =
+let int32_unsafe_get (a : int32_u array) (i : int) =
   Array.unsafe_get a i
 [%%expect_asm X86_64{|
 int32_unsafe_get:
@@ -168,7 +168,7 @@ int32_unsafe_get:
   ret
 |}]
 
-let int32_unsafe_set (a : int32# array) (i : int) (v : int32#) =
+let int32_unsafe_set (a : int32_u array) (i : int) (v : int32_u) =
   Array.unsafe_set a i v
 [%%expect_asm X86_64{|
 int32_unsafe_set:
@@ -177,7 +177,7 @@ int32_unsafe_set:
   ret
 |}]
 
-let int64_unsafe_get (a : int64# array) (i : int) =
+let int64_unsafe_get (a : int64_u array) (i : int) =
   Array.unsafe_get a i
 [%%expect_asm X86_64{|
 int64_unsafe_get:
@@ -185,7 +185,7 @@ int64_unsafe_get:
   ret
 |}]
 
-let int64_unsafe_set (a : int64# array) (i : int) (v : int64#) =
+let int64_unsafe_set (a : int64_u array) (i : int) (v : int64_u) =
   Array.unsafe_set a i v
 [%%expect_asm X86_64{|
 int64_unsafe_set:
@@ -228,7 +228,7 @@ float_unsafe_set_plain:
   ret
 |}]
 
-let nativeint_unsafe_get (a : nativeint# array) (i : int) =
+let nativeint_unsafe_get (a : nativeint_u array) (i : int) =
   Array.unsafe_get a i
 [%%expect_asm X86_64{|
 nativeint_unsafe_get:
@@ -236,8 +236,8 @@ nativeint_unsafe_get:
   ret
 |}]
 
-let nativeint_unsafe_set (a : nativeint# array) (i : int)
-    (v : nativeint#) =
+let nativeint_unsafe_set (a : nativeint_u array) (i : int)
+    (v : nativeint_u) =
   Array.unsafe_set a i v
 [%%expect_asm X86_64{|
 nativeint_unsafe_set:
@@ -340,7 +340,7 @@ poly_length:
 
 (* CR ttebbi: The header is loaded twice. Also, extracting the bits can be done
     better. Also for other arrays with element size < 8 below. *)
-let int32_length (a : int32# array) = Array.length a
+let int32_length (a : int32_u array) = Array.length a
 [%%expect_asm X86_64{|
 int32_length:
   movzbq -8(%rax), %rbx
@@ -354,7 +354,7 @@ int32_length:
   ret
 |}]
 
-let int64_length (a : int64# array) = Array.length a
+let int64_length (a : int64_u array) = Array.length a
 [%%expect_asm X86_64{|
 int64_length:
   movq  -8(%rax), %rax
@@ -535,7 +535,7 @@ poly_safe_set:
 |}]
 
 (* CR ttebbi: shrq $18 followed by salq $1 could be shrq $17. *)
-let int64_safe_get (a : int64# array) (i : int) =
+let int64_safe_get (a : int64_u array) (i : int) =
   Array.get a i
 [%%expect_asm X86_64{|
 int64_safe_get:
@@ -593,7 +593,7 @@ float_safe_get_plain:
   jmp   *%r11
 |}]
 
-let int32_safe_get (a : int32# array) (i : int) =
+let int32_safe_get (a : int32_u array) (i : int) =
   Array.get a i
 [%%expect_asm X86_64{|
 int32_safe_get:

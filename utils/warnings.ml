@@ -1433,8 +1433,8 @@ let message = function
       msg "mutable variable %a was never mutated." Style.inline_code v
   | Incompatible_with_upstream (Non_value_sort layout) ->
       msg "External declaration here is not upstream compatible.@ \
-           @[The only types with non-value layouts allowed are@ \
-           float#, int32#, int64#, and nativeint#.@ \
+           @[The only type with a non-value layout allowed is@ \
+           float#.@ \
            Unknown type with layout@ %s encountered.@]" layout
   | Incompatible_with_upstream (Unboxed_attribute layout) ->
       msg "%a attribute must be added@ to@ external@ declaration@ \

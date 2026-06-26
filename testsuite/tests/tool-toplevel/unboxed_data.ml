@@ -17,7 +17,7 @@ let d = #0l;;
 let e = #0n;;
 
 (* Test 2: Unboxed products *)
-type t = #{ x : int; y : int64# };;
+type t = #{ x : int; y : int64_u };;
 let a = #(0, 0);;
 let b = #(#0.0, #0L);;
 let c = #{ contents = "foo" };;

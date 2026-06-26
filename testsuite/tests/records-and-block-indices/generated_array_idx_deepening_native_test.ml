@@ -68,58 +68,58 @@ let indices_in_deepening_tests = [0; 100_000]
 type packed = P : 'a -> packed
 let ref_to_force_heap_allocation : packed ref = ref (P 0)
 
-type t0 = #{ a0 : int; b0 : int; c0 : int32# } (* #{ int; int; int32# } *)
+type t0 = #{ a0 : int; b0 : int; c0 : int32_u } (* #{ int; int; int32_u } *)
 type t1 = #{ a1 : int; b1 : int64 } (* #{ int; int64 } *)
-type t2 = #{ a2 : int; b2 : int32# } (* #{ int; int32# } *)
+type t2 = #{ a2 : int; b2 : int32_u } (* #{ int; int32_u } *)
 type t3 = #{ a3 : int } (* #{ int } *)
 type t4 = #{ a4 : int; b4 : t3 } (* #{ int; #{ int } } *)
-type t5 = #{ a5 : int32# } (* #{ int32# } *)
-type t6 = #{ a6 : int; b6 : t5 } (* #{ int; #{ int32# } } *)
-type t7 = #{ a7 : int32#; b7 : int32# } (* #{ int32#; int32# } *)
-type t8 = #{ a8 : int; b8 : t7 } (* #{ int; #{ int32#; int32# } } *)
+type t5 = #{ a5 : int32_u } (* #{ int32_u } *)
+type t6 = #{ a6 : int; b6 : t5 } (* #{ int; #{ int32_u } } *)
+type t7 = #{ a7 : int32_u; b7 : int32_u } (* #{ int32_u; int32_u } *)
+type t8 = #{ a8 : int; b8 : t7 } (* #{ int; #{ int32_u; int32_u } } *)
 type t9 = #{ a9 : int64; b9 : int64 } (* #{ int64; int64 } *)
 type v10 = C10_0 of unit_u (* (| unit_u) *)
 type t11 = #{ a11 : int64; b11 : v10 } (* #{ int64; (| unit_u) } *)
-type t12 = #{ a12 : int64#; b12 : nativeint# } (* #{ int64#; nativeint# } *)
-type t13 = #{ a13 : int32#; b13 : int32#; c13 : int32# } (* #{ int32#; int32#; int32# } *)
-type t14 = #{ a14 : nativeint# } (* #{ nativeint# } *)
+type t12 = #{ a12 : int64_u; b12 : nativeint_u } (* #{ int64_u; nativeint_u } *)
+type t13 = #{ a13 : int32_u; b13 : int32_u; c13 : int32_u } (* #{ int32_u; int32_u; int32_u } *)
+type t14 = #{ a14 : nativeint_u } (* #{ nativeint_u } *)
 type t15 = #{ a15 : v10 } (* #{ (| unit_u) } *)
 type t16 = #{ a16 : t3; b16 : int } (* #{ #{ int }; int } *)
 type t17 = #{ a17 : string } (* #{ string } *)
 type t18 = #{ a18 : t17; b18 : string } (* #{ #{ string }; string } *)
 
 let to_run () =
-  (**************)
-  (*   int64#   *)
-  (**************)
+  (***************)
+  (*   int64_u   *)
+  (***************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (int64# array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (int64_u array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (int64# array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (int64_u array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 1;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 1 failed";
   );
 
-  (**************)
-  (*   int32#   *)
-  (**************)
+  (***************)
+  (*   int32_u   *)
+  (***************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (int32# array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (int32_u array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (int32# array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (int32_u array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 2;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 2 failed";
   );
 
-  (**********************************)
-  (*   t0 = #{ int; int; int32# }   *)
-  (**********************************)
+  (***********************************)
+  (*   t0 = #{ int; int; int32_u }   *)
+  (***********************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
     let unboxed_path : (t0 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
@@ -225,9 +225,9 @@ let to_run () =
     if not test then failwithf "test 14 failed";
   );
 
-  (*****************************)
-  (*   t2 = #{ int; int32# }   *)
-  (*****************************)
+  (******************************)
+  (*   t2 = #{ int; int32_u }   *)
+  (******************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
     let unboxed_path : (t2 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
@@ -339,9 +339,9 @@ let to_run () =
     if not test then failwithf "test 27 failed";
   );
 
-  (**********************************)
-  (*   t6 = #{ int; #{ int32# } }   *)
-  (**********************************)
+  (***********************************)
+  (*   t6 = #{ int; #{ int32_u } }   *)
+  (***********************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
     let unboxed_path : (t6 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
@@ -407,9 +407,9 @@ let to_run () =
     if not test then failwithf "test 35 failed";
   );
 
-  (******************************************)
-  (*   t8 = #{ int; #{ int32#; int32# } }   *)
-  (******************************************)
+  (********************************************)
+  (*   t8 = #{ int; #{ int32_u; int32_u } }   *)
+  (********************************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
     let unboxed_path : (t8 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
@@ -589,9 +589,9 @@ let to_run () =
     if not test then failwithf "test 56 failed";
   );
 
-  (*************************************)
-  (*   t12 = #{ int64#; nativeint# }   *)
-  (*************************************)
+  (***************************************)
+  (*   t12 = #{ int64_u; nativeint_u }   *)
+  (***************************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
     let unboxed_path : (t12 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
@@ -635,9 +635,9 @@ let to_run () =
     if not test then failwithf "test 61 failed";
   );
 
-  (********************************)
-  (*   t7 = #{ int32#; int32# }   *)
-  (********************************)
+  (**********************************)
+  (*   t7 = #{ int32_u; int32_u }   *)
+  (**********************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
     let unboxed_path : (t7 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
@@ -681,9 +681,9 @@ let to_run () =
     if not test then failwithf "test 66 failed";
   );
 
-  (*****************************************)
-  (*   t13 = #{ int32#; int32#; int32# }   *)
-  (*****************************************)
+  (********************************************)
+  (*   t13 = #{ int32_u; int32_u; int32_u }   *)
+  (********************************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
     let unboxed_path : (t13 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
@@ -743,9 +743,9 @@ let to_run () =
     if not test then failwithf "test 73 failed";
   );
 
-  (*****************************)
-  (*   t14 = #{ nativeint# }   *)
-  (*****************************)
+  (******************************)
+  (*   t14 = #{ nativeint_u }   *)
+  (******************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
     let unboxed_path : (t14 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in

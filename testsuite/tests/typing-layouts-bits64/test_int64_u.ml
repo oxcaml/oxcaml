@@ -3,8 +3,8 @@
 *)
 
 (* External declarations for unsigned comparison primitives *)
-external unsigned_lt : int64# -> int64# -> bool = "%int64#_unsigned_lessthan"
-external unsigned_gt : int64# -> int64# -> bool = "%int64#_unsigned_greaterthan"
+external unsigned_lt : int64_u -> int64_u -> bool = "%int64#_unsigned_lessthan"
+external unsigned_gt : int64_u -> int64_u -> bool = "%int64#_unsigned_greaterthan"
 
 module Int64_u = Stdlib_upstream_compatible.Int64_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u

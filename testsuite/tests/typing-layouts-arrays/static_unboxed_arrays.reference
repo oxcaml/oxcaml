@@ -2,26 +2,26 @@ Testing statically-allocated unboxed arrays
 ============================================
 
 Testing empty arrays:
-empty int64#: OK - no allocation
-empty int32#: OK - no allocation
+empty int64_u: OK - no allocation
+empty int32_u: OK - no allocation
 empty int16#: OK - no allocation
 empty int8#: OK - no allocation
 empty int#: OK - no allocation
 empty float32#: OK - no allocation
-empty nativeint#: OK - no allocation
+empty nativeint_u: OK - no allocation
 empty float#: OK - no allocation
 Empty array tests passed
 
-Testing int64# arrays:
-int64# [42L]: OK - no allocation
-int64# [1L; 2L; 3L]: OK - no allocation
-int64# array tests passed
+Testing int64_u arrays:
+int64_u [42L]: OK - no allocation
+int64_u [1L; 2L; 3L]: OK - no allocation
+int64_u array tests passed
 
-Testing int32# arrays:
-int32# [42l]: OK - no allocation
-int32# [1l; 2l]: OK - no allocation
-int32# [1l; 2l; 3l]: OK - no allocation
-int32# array tests passed
+Testing int32_u arrays:
+int32_u [42l]: OK - no allocation
+int32_u [1l; 2l]: OK - no allocation
+int32_u [1l; 2l; 3l]: OK - no allocation
+int32_u array tests passed
 
 Testing int16# arrays:
 int16# [42S]: OK - no allocation
@@ -55,10 +55,10 @@ float32# [1.0s; 2.0s]: OK - no allocation
 float32# [1.0s; 2.0s; 3.0s]: OK - no allocation
 float32# array tests passed
 
-Testing nativeint# arrays:
-nativeint# [42n]: OK - no allocation
-nativeint# [1n; 2n; 3n]: OK - no allocation
-nativeint# array tests passed
+Testing nativeint_u arrays:
+nativeint_u [42n]: OK - no allocation
+nativeint_u [1n; 2n; 3n]: OK - no allocation
+nativeint_u array tests passed
 
 Testing float# arrays:
 float# [42.0]: OK - no allocation

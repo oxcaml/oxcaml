@@ -28,9 +28,9 @@ end
 
 module Hidden_int64_u : sig
   type t : bits64 mod global many aliased
-  val hide : int64# -> t
+  val hide : int64_u -> t
 end = struct
-  type t = int64#
+  type t = int64_u
   let hide x = x
 end
 
@@ -40,7 +40,7 @@ module Hidden_int : sig type t : immediate val hide : int -> t end
 module Hidden_float_u :
   sig type t : float64 mod global many val hide : float# -> t end
 module Hidden_int64_u :
-  sig type t : bits64 mod global many val hide : int64# -> t end
+  sig type t : bits64 mod global many val hide : int64_u -> t end
 |}]
 
 module Immediate : sig
@@ -195,10 +195,10 @@ let float_u_escape () = let local_ x : float# = #3.14 in x
 val float_u_escape : unit -> float# = <fun>
 |}]
 
-let int64_u_escape () = let local_ x : int64# = #314L in x
+let int64_u_escape () = let local_ x : int64_u = #314L in x
 
 [%%expect{|
-val int64_u_escape : unit -> int64# = <fun>
+val int64_u_escape : unit -> int64_u = <fun>
 |}]
 
 let hidden_float_u_escape () =
@@ -340,10 +340,10 @@ let float_u_duplicate () = let (x @ once) : float# = #3.14 in Float_u.id x
 val float_u_duplicate : unit -> float# = <fun>
 |}]
 
-let int64_u_duplicate () = let (x @ once) : int64# = #314L in Int64_u.id x
+let int64_u_duplicate () = let (x @ once) : int64_u = #314L in Int64_u.id x
 
 [%%expect{|
-val int64_u_duplicate : unit -> int64# = <fun>
+val int64_u_duplicate : unit -> int64_u = <fun>
 |}]
 
 let hidden_float_u_duplicate () =
@@ -539,17 +539,17 @@ Line 1, characters 66-67:
 
 |}]
 
-let int64_u_unshare () = let x : int64# = #314L in Int64_u.ignore x; Int64_u.unique x
+let int64_u_unshare () = let x : int64_u = #314L in Int64_u.ignore x; Int64_u.unique x
 
 (* CR layouts v2.8: this should succeed in principal mode, too. Internal ticket 5124 *)
 [%%expect{|
-Line 1, characters 84-85:
-1 | let int64_u_unshare () = let x : int64# = #314L in Int64_u.ignore x; Int64_u.unique x
-                                                                                        ^
+Line 1, characters 85-86:
+1 | let int64_u_unshare () = let x : int64_u = #314L in Int64_u.ignore x; Int64_u.unique x
+                                                                                         ^
 Error: This value is used here as unique, but it has already been used at:
-Line 1, characters 66-67:
-1 | let int64_u_unshare () = let x : int64# = #314L in Int64_u.ignore x; Int64_u.unique x
-                                                                      ^
+Line 1, characters 67-68:
+1 | let int64_u_unshare () = let x : int64_u = #314L in Int64_u.ignore x; Int64_u.unique x
+                                                                       ^
 
 |}]
 

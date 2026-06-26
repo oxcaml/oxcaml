@@ -1,7 +1,7 @@
 module M :
   sig
     val foo : string
-    val unboxed_product : #(#(int * float#) * string * int64#)
+    val unboxed_product : #(#(int * float#) * string * int64_u)
     module N :
       sig
         val one : int
@@ -12,7 +12,7 @@ module M :
           end
         val two : int
       end
-    val bar : int64#
+    val bar : int64_u
     val baz : string
   end
 - : int = five

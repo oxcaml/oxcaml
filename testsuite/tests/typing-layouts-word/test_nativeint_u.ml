@@ -3,8 +3,8 @@
 *)
 
 (* External declarations for unsigned comparison primitives *)
-external unsigned_lt : nativeint# -> nativeint# -> bool = "%nativeint#_unsigned_lessthan"
-external unsigned_gt : nativeint# -> nativeint# -> bool = "%nativeint#_unsigned_greaterthan"
+external unsigned_lt : nativeint_u -> nativeint_u -> bool = "%nativeint#_unsigned_lessthan"
+external unsigned_gt : nativeint_u -> nativeint_u -> bool = "%nativeint#_unsigned_greaterthan"
 
 module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u

@@ -686,9 +686,9 @@ module M : sig
   type t
   (* Because [t := int] only via the substitution below, the compiler doesn't
      realize that [t] is [non_pointer] when computing the type declaration *)
-  type r = { t : t; i : int64# }
+  type r = { t : t; i : int64_u }
 end with type t := int = struct
-  type r = { t : int ; i : int64# }
+  type r = { t : int ; i : int64_u }
 end
 
 (* Then, for this check, the new record declaration technically has a more
@@ -699,8 +699,8 @@ end
    test with a "CR layouts-scannable" in
    testsuite/tests/typing-layouts-caml-modify/non_pointer.ml
 *)
-type r = M.r = { t : int ; i : int64# }
+type r = M.r = { t : int ; i : int64_u }
 [%%expect{|
-module M : sig type r = { t : int; i : int64#; } end
-type r = M.r = { t : int; i : int64#; }
+module M : sig type r = { t : int; i : int64_u; } end
+type r = M.r = { t : int; i : int64_u; }
 |}]
