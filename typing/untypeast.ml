@@ -1016,10 +1016,10 @@ let module_expr (sub : mapper) mexpr =
           | Tmod_functor (arg, mexpr) ->
               Pmod_functor
                 (functor_parameter sub arg, sub.module_expr sub mexpr)
-          | Tmod_apply (mexp1, mexp2, _) ->
+          | Tmod_apply (mexp1, mexp2, _, _) ->
               Pmod_apply (sub.module_expr sub mexp1,
                           sub.module_expr sub mexp2)
-          | Tmod_apply_unit mexp1 ->
+          | Tmod_apply_unit (mexp1, _) ->
               Pmod_apply_unit (sub.module_expr sub mexp1)
           | Tmod_constraint (mexpr, _, Tmodtype_explicit (mtype, modes), _) ->
               let modes = Typemode.untransl_mode modes in

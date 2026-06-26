@@ -2745,7 +2745,7 @@ exception Not_a_path
 let rec path_of_module mexp =
   match mexp.mod_desc with
   | Tmod_ident (p,_) -> p
-  | Tmod_apply(funct, arg, _coercion) when !Clflags.applicative_functors ->
+  | Tmod_apply(funct, arg, _coercion, _) when !Clflags.applicative_functors ->
       Papply(path_of_module funct, path_of_module arg)
   | Tmod_constraint (mexp, _, _, _) ->
       path_of_module mexp
@@ -3426,6 +3426,18 @@ and type_application loc ~strengthen ~funct_body env smod =
 
 and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
     funct_body env (funct, funct_shape) app_view =
+  (* Applying a functor runs its body, which can perform a free effect if the
+     functor closes over a yielding value (its own mode) or is given a yielding
+     argument (the argument's mode). [arg] is [None] for [F ()]. *)
+  let functor_application_yielding ~funct ~arg =
+    let yielding m = Value.proj_comonadic Yielding m in
+    Yielding.join
+      (yielding (mode_without_locks_exn funct.mod_mode)
+       ::
+       (match arg with
+        | None -> []
+        | Some arg -> [yielding (fst arg.mod_mode)]))
+  in
   (* CR modes: Apply currying constraints if the application is partial
      and returns a functor, similar to constraints for functions.
 
@@ -3467,7 +3479,9 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       check_curried_application_complete
         ~loc:app_view.loc ~mty_res ~mode_res:(alloc_as_value mm_res)
         ~mode_arg:None;
-      { mod_desc = Tmod_apply_unit funct;
+      { mod_desc =
+          Tmod_apply_unit
+            (funct, functor_application_yielding ~funct ~arg:None);
         mod_type = mty_res;
         mod_mode = alloc_as_value (Alloc.disallow_right mm_res), None;
         mod_env = env;
@@ -3556,7 +3570,10 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       check_curried_application_complete
         ~loc:app_loc ~mty_res:mty_appl ~mode_res:mm_res
         ~mode_arg:(Some mm_param);
-      { mod_desc = Tmod_apply(funct, arg, coercion);
+      { mod_desc =
+          Tmod_apply
+            (funct, arg, coercion,
+             functor_application_yielding ~funct ~arg:(Some arg));
         mod_type = mty_appl;
         mod_mode = Value.disallow_right mm_res, None;
         mod_env = env;
