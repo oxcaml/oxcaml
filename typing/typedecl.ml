@@ -3809,7 +3809,8 @@ let transl_type_decl env rec_flag sdecl_list =
   List.iter2
     (fun sdecl tdecl ->
       let decl = tdecl.typ_type in
-       match Mode.Alloc.with_zap_scope Ctype.closed_type_decl decl with
+       match Mode.Alloc.with_zap_scope (fun ~zap_scope ->
+          Ctype.closed_type_decl ~zap_scope decl) with
          Some ty -> raise(Error(sdecl.ptype_loc, Unbound_type_var(ty,decl)))
        | None   -> ())
     sdecl_list tdecls;
@@ -4106,9 +4107,9 @@ let transl_type_extension extend env loc styext =
   (* Check that all type variables are closed *)
   List.iter
     (fun (ext, _shape) ->
-       match Mode.Alloc.with_zap_scope
-               Ctype.closed_extension_constructor
-               ext.ext_type
+       match Mode.Alloc.with_zap_scope (fun ~zap_scope ->
+               Ctype.closed_extension_constructor ~zap_scope
+               ext.ext_type)
        with
          Some ty ->
            raise(Error(ext.ext_loc, Unbound_type_var_ext(ty, ext.ext_type)))
@@ -4166,8 +4167,8 @@ let transl_exception env sext =
   in
   (* Check that all type variables are closed *)
   begin match
-    Mode.Alloc.with_zap_scope
-      Ctype.closed_extension_constructor ext.ext_type
+    Mode.Alloc.with_zap_scope (fun ~zap_scope ->
+        Ctype.closed_extension_constructor ~zap_scope ext.ext_type)
   with
     Some ty ->
       raise (Error(ext.ext_loc, Unbound_type_var_ext(ty, ext.ext_type)))
@@ -4966,7 +4967,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
     fixed_row_path;
   begin match
     Mode.Alloc.with_zap_scope
-      Ctype.closed_type_decl new_sig_decl
+      (fun ~zap_scope -> Ctype.closed_type_decl ~zap_scope new_sig_decl)
   with None -> ()
   | Some ty -> raise(Error(loc, Unbound_type_var(ty, new_sig_decl)))
   end;
