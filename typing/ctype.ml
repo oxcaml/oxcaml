@@ -2995,21 +2995,26 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
           when expand_components ->
           (* This is an unboxed product with at least one [any] field, so we
              need to recompute the jkind if we want it to be precise *)
-          let label_params_and_tys, record_params =
-            instance_label_declarations ~fixed:false (Array.of_list lbls)
-              ~params:type_decl.type_params
+          let tys =
+            Misc.protect_refs [Misc.R (current_level, get_level ty)]
+              begin fun () ->
+                let label_params_and_tys, record_params =
+                  instance_label_declarations ~fixed:false (Array.of_list lbls)
+                    ~params:type_decl.type_params
+                in
+                let uenv = Expression { env; in_subst = false } in
+                begin try
+                  List.iter2 (!unify' uenv) record_params args
+                with
+                | Unify_trace _ ->
+                  (* Shouldn't happen, since [record_params] should just be
+                     type variables *)
+                  Misc.fatal_errorf "failed to unify %a"
+                    (Format_doc.compat Path.print) p
+                end;
+                Array.map snd label_params_and_tys |> Array.to_list
+              end
           in
-          let uenv = Expression { env; in_subst = false } in
-          begin try
-            List.iter2 (!unify' uenv) record_params args
-          with
-          | Unify_trace _ ->
-            (* Shouldn't happen, since [record_params] should just be type
-               variables *)
-            Misc.fatal_errorf "failed to unify %a"
-              (Format_doc.compat Path.print) p
-          end;
-          let tys = Array.map snd label_params_and_tys |> Array.to_list in
           estimate_unboxed_product_jkind ~expand_components ~ignore_mod_bounds
             env tys ~why:Jkind_intf.History.Unboxed_record
         | _ -> type_decl.type_jkind
