@@ -5635,7 +5635,7 @@ module Monadic_gen (Obj : Obj) = struct
 
   let generic_level = S.generic_level
 
-  let update_level i a = S.update_level ~log:None i obj a
+  let update_level i a = with_log (S.update_level i obj a)
 
   let generalize ~current_level a =
     if Language_extension.(is_at_least_mode_poly Alpha)
