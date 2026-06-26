@@ -1032,10 +1032,13 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       Amorphvar
         (u, C.disallow_right f, Comp_hint.Morph_hint.disallow_right f_hint)
     in
-    let key = get_key dst x in
-    if VarMap.mem key v.vlower
+    if C.le dst (mupper dst x) v.lower
     then ()
-    else set_vlower ~log v (VarMap.add key x v.vlower)
+    else
+      let key = get_key dst x in
+      if VarMap.mem key v.vlower
+      then ()
+      else set_vlower ~log v (VarMap.add key x v.vlower)
 
   let add_vupper_nocheck : type a b l.
       log:_ ->
@@ -1049,10 +1052,13 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let x =
       Amorphvar (u, C.disallow_left f, Comp_hint.Morph_hint.disallow_left f_hint)
     in
-    let key = get_key dst x in
-    if VarMap.mem key v.vupper
+    if C.le dst v.upper (mlower dst x)
     then ()
-    else set_vupper ~log v (VarMap.add key x v.vupper)
+    else
+      let key = get_key dst x in
+      if VarMap.mem key v.vupper
+      then ()
+      else set_vupper ~log v (VarMap.add key x v.vupper)
 
   (* Add a vlower entry for the relation [f u <= v], tighten the upper bound of [u],
   and recursively add relations to maintain invariant.
