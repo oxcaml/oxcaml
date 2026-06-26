@@ -3143,6 +3143,19 @@ let end_assembly () =
     };
   let frametable_sym = S.create_global (Cmm_helpers.make_symbol "frametable") in
   D.size frametable_sym;
+  (* Experimental: emit a pointer to this unit's frametable into a
+     linker-collected section, so the runtime can enumerate the frametable
+     of *every* linked unit, including ones that are not in
+     caml_frametable[]. The linker concatenates these per-unit entries and
+     bounds them with __start_/__stop_caml_all_frametables. ELF/GAS
+     targets only. *)
+  (match[@ocaml.warning "-4"] system with
+  | S_macosx | S_win32 | S_win64 | S_mingw | S_mingw64 | S_cygwin | S_unknown ->
+    ()
+  | _ ->
+    D.switch_to_section_raw ~names:["caml_all_frametables"] ~flags:(Some "aw")
+      ~args:["@progbits"] ~is_delayed:false;
+    D.symbol frametable_sym);
   D.data ();
   Probe_emission.emit_probe_notes ~add_def_symbol;
   emit_trap_notes ();
