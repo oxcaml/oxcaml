@@ -76,9 +76,9 @@ let blit_lens ~ofs1 ~ofs2 ~size1 ~size2 =
   List.filter candidates ~f:(fun len -> ofs1 + len <= size1 && ofs2 + len <= size2)
   |> List.sort_uniq ~cmp:Int.compare
 
-type ur1 = #{ a : int64#; b : float# }
-and ur2 = #{ a : int64#; b : int }
-and ur3 = #{ a : int64# }
+type ur1 = #{ a : int64_u; b : float# }
+and ur2 = #{ a : int64_u; b : int }
+and ur3 = #{ a : int64_u }
 and ur4 = #{ a : ur1; b : ur3 }
 and enum3 = A3_0 | A3_1 | A3_2
 
@@ -87,15 +87,15 @@ let () =
   (* Check types and constants *)
   let _ : float32# = #0.s in
   let _ : float# = #0. in
-  let _ : int32# = #0l in
-  let _ : int64# = #0L in
-  let _ : nativeint# = #0n in
+  let _ : int32_u = #0l in
+  let _ : int64_u = #0L in
+  let _ : nativeint_u = #0n in
   let _ : ur1 = (#{ a = #0L; b = #0. } : ur1) in
   let _ : ur3 = (#{ a = #0L } : ur3) in
   let _ : ur4 = (#{ a = (#{ a = #0L; b = #0. } : ur1); b = (#{ a = #0L } : ur3) } : ur4) in
-  let _ : #(float# * int32# * int64#) = #(#0., #0l, #0L) in
-  let _ : #(float# * #(int64# * int64#) * float32# * #(int32# * #(float32# * float#)) * int64#) = #(#0., #(#0L, #0L), #0.s, #(#0l, #(#0.s, #0.)), #0L) in
-  let _ : #(int64# * ur1) = #(#0L, (#{ a = #0L; b = #0. } : ur1)) in
+  let _ : #(float# * int32_u * int64_u) = #(#0., #0l, #0L) in
+  let _ : #(float# * #(int64_u * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int64_u) = #(#0., #(#0L, #0L), #0.s, #(#0l, #(#0.s, #0.)), #0L) in
+  let _ : #(int64_u * ur1) = #(#0L, (#{ a = #0L; b = #0. } : ur1)) in
   let _ : float32 = 0.s in
   let _ : float = 0. in
   let _ : int32 = 0l in
@@ -108,8 +108,8 @@ let () =
   let _ : #(int64 option * #(int * int32 * float) * float * #(float32 * (nativeint * nativeint) option) * int32) = #(None, #(0, 0l, 0.), 0., #(0.s, None), 0l) in
   let _ : #(float * float * float) = #(0., 0., 0.) in
   let _ : #(float * #(float * float) * #(float * #(float * float * float))) = #(0., #(0., 0.), #(0., #(0., 0., 0.))) in
-  let _ : #(float# * int * int64#) = #(#0., 0, #0L) in
-  let _ : #(float# * #(int * int64#) * float32# * #(int32# * #(float32# * float#)) * int) = #(#0., #(0, #0L), #0.s, #(#0l, #(#0.s, #0.)), 0) in
+  let _ : #(float# * int * int64_u) = #(#0., 0, #0L) in
+  let _ : #(float# * #(int * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int) = #(#0., #(0, #0L), #0.s, #(#0l, #(#0.s, #0.)), 0) in
   let _ : #(ur2 * ur1) = #((#{ a = #0L; b = 0 } : ur2), (#{ a = #0L; b = #0. } : ur1)) in
   (* Check equality and mk_value functions *)
   let eq : float32# @ local -> float32# @ local -> bool = (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) in
@@ -134,7 +134,7 @@ let () =
   mark_test_run 6;
   let test = not (eq #1. #2.) in
   if not test then failwithf "test 6 failed";
-  let eq : int32# @ local -> int32# @ local -> bool = (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) in
+  let eq : int32_u @ local -> int32_u @ local -> bool = (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) in
   let mk_value i = Int32_u.of_int i in
   mark_test_run 7;
   let test = eq (mk_value 1) #1l in
@@ -145,7 +145,7 @@ let () =
   mark_test_run 9;
   let test = not (eq #1l #2l) in
   if not test then failwithf "test 9 failed";
-  let eq : int64# @ local -> int64# @ local -> bool = (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) in
+  let eq : int64_u @ local -> int64_u @ local -> bool = (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) in
   let mk_value i = Int64_u.of_int i in
   mark_test_run 10;
   let test = eq (mk_value 1) #1L in
@@ -156,7 +156,7 @@ let () =
   mark_test_run 12;
   let test = not (eq #1L #2L) in
   if not test then failwithf "test 12 failed";
-  let eq : nativeint# @ local -> nativeint# @ local -> bool = (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) in
+  let eq : nativeint_u @ local -> nativeint_u @ local -> bool = (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) in
   let mk_value i = Nativeint_u.of_int i in
   mark_test_run 13;
   let test = eq (mk_value 1) #1n in
@@ -200,7 +200,7 @@ let () =
   mark_test_run 24;
   let test = not (eq (#{ a = (#{ a = #1L; b = #1. } : ur1); b = (#{ a = #1L } : ur3) } : ur4) (#{ a = (#{ a = #2L; b = #2. } : ur1); b = (#{ a = #2L } : ur3) } : ur4)) in
   if not test then failwithf "test 24 failed";
-  let eq : #(float# * int32# * int64#) @ local -> #(float# * int32# * int64#) @ local -> bool = (fun #(a0, a1, a2) #(b0, b1, b2) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a1 b1 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a2 b2) in
+  let eq : #(float# * int32_u * int64_u) @ local -> #(float# * int32_u * int64_u) @ local -> bool = (fun #(a0, a1, a2) #(b0, b1, b2) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a1 b1 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a2 b2) in
   let mk_value i = #(Float_u.of_int i, Int32_u.of_int i, Int64_u.of_int i) in
   mark_test_run 25;
   let test = eq (mk_value 1) #(#1., #1l, #1L) in
@@ -211,7 +211,7 @@ let () =
   mark_test_run 27;
   let test = not (eq #(#1., #1l, #1L) #(#2., #2l, #2L)) in
   if not test then failwithf "test 27 failed";
-  let eq : #(float# * #(int64# * int64#) * float32# * #(int32# * #(float32# * float#)) * int64#) @ local -> #(float# * #(int64# * int64#) * float32# * #(int32# * #(float32# * float#)) * int64#) @ local -> bool = (fun #(a0, a1, a2, a3, a4) #(b0, b1, b2, b3, b4) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a0 b0 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a1 b1) a1 b1 && (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a2 b2 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a0 b0 && (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a1 b1) a1 b1) a3 b3 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a4 b4) in
+  let eq : #(float# * #(int64_u * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int64_u) @ local -> #(float# * #(int64_u * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int64_u) @ local -> bool = (fun #(a0, a1, a2, a3, a4) #(b0, b1, b2, b3, b4) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a0 b0 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a1 b1) a1 b1 && (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a2 b2 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a0 b0 && (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a1 b1) a1 b1) a3 b3 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a4 b4) in
   let mk_value i = #(Float_u.of_int i, #(Int64_u.of_int i, Int64_u.of_int i), Float32_u.of_int i, #(Int32_u.of_int i, #(Float32_u.of_int i, Float_u.of_int i)), Int64_u.of_int i) in
   mark_test_run 28;
   let test = eq (mk_value 1) #(#1., #(#1L, #1L), #1.s, #(#1l, #(#1.s, #1.)), #1L) in
@@ -222,7 +222,7 @@ let () =
   mark_test_run 30;
   let test = not (eq #(#1., #(#1L, #1L), #1.s, #(#1l, #(#1.s, #1.)), #1L) #(#2., #(#2L, #2L), #2.s, #(#2l, #(#2.s, #2.)), #2L)) in
   if not test then failwithf "test 30 failed";
-  let eq : #(int64# * ur1) @ local -> #(int64# * ur1) @ local -> bool = (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a0 b0 && (fun (#{ a = a1; b = b1 } : ur1) (#{ a = a2; b = b2 } : ur1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a1 a2 && (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) b1 b2) a1 b1) in
+  let eq : #(int64_u * ur1) @ local -> #(int64_u * ur1) @ local -> bool = (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a0 b0 && (fun (#{ a = a1; b = b1 } : ur1) (#{ a = a2; b = b2 } : ur1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a1 a2 && (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) b1 b2) a1 b1) in
   let mk_value i = #(Int64_u.of_int i, (#{ a = Int64_u.of_int i; b = Float_u.of_int i } : ur1)) in
   mark_test_run 31;
   let test = eq (mk_value 1) #(#1L, (#{ a = #1L; b = #1. } : ur1)) in
@@ -365,7 +365,7 @@ let () =
   mark_test_run 69;
   let test = not (eq #(1., #(1., 1.), #(1., #(1., 1., 1.))) #(2., #(2., 2.), #(2., #(2., 2., 2.)))) in
   if not test then failwithf "test 69 failed";
-  let eq : #(float# * int * int64#) @ local -> #(float# * int * int64#) @ local -> bool = (fun #(a0, a1, a2) #(b0, b1, b2) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun a b -> Int.equal a b) a1 b1 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a2 b2) in
+  let eq : #(float# * int * int64_u) @ local -> #(float# * int * int64_u) @ local -> bool = (fun #(a0, a1, a2) #(b0, b1, b2) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun a b -> Int.equal a b) a1 b1 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a2 b2) in
   let mk_value i = #(Float_u.of_int i, i, Int64_u.of_int i) in
   mark_test_run 70;
   let test = eq (mk_value 1) #(#1., 1, #1L) in
@@ -376,7 +376,7 @@ let () =
   mark_test_run 72;
   let test = not (eq #(#1., 1, #1L) #(#2., 2, #2L)) in
   if not test then failwithf "test 72 failed";
-  let eq : #(float# * #(int * int64#) * float32# * #(int32# * #(float32# * float#)) * int) @ local -> #(float# * #(int * int64#) * float32# * #(int32# * #(float32# * float#)) * int) @ local -> bool = (fun #(a0, a1, a2, a3, a4) #(b0, b1, b2, b3, b4) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int.equal a b) a0 b0 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a1 b1) a1 b1 && (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a2 b2 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a0 b0 && (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a1 b1) a1 b1) a3 b3 && (fun a b -> Int.equal a b) a4 b4) in
+  let eq : #(float# * #(int * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int) @ local -> #(float# * #(int * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int) @ local -> bool = (fun #(a0, a1, a2, a3, a4) #(b0, b1, b2, b3, b4) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int.equal a b) a0 b0 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a1 b1) a1 b1 && (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a2 b2 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a0 b0 && (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a1 b1) a1 b1) a3 b3 && (fun a b -> Int.equal a b) a4 b4) in
   let mk_value i = #(Float_u.of_int i, #(i, Int64_u.of_int i), Float32_u.of_int i, #(Int32_u.of_int i, #(Float32_u.of_int i, Float_u.of_int i)), i) in
   mark_test_run 73;
   let test = eq (mk_value 1) #(#1., #(1, #1L), #1.s, #(#1l, #(#1.s, #1.)), 1) in
@@ -401,15 +401,15 @@ let () =
   (* Check always-GC-ignored types *)
   let _ = (makearray_dynamic_uninit 1 : float32# array) in
   let _ = (makearray_dynamic_uninit 1 : float# array) in
-  let _ = (makearray_dynamic_uninit 1 : int32# array) in
-  let _ = (makearray_dynamic_uninit 1 : int64# array) in
-  let _ = (makearray_dynamic_uninit 1 : nativeint# array) in
+  let _ = (makearray_dynamic_uninit 1 : int32_u array) in
+  let _ = (makearray_dynamic_uninit 1 : int64_u array) in
+  let _ = (makearray_dynamic_uninit 1 : nativeint_u array) in
   let _ = (makearray_dynamic_uninit 1 : ur1 array) in
   let _ = (makearray_dynamic_uninit 1 : ur3 array) in
   let _ = (makearray_dynamic_uninit 1 : ur4 array) in
-  let _ = (makearray_dynamic_uninit 1 : #(float# * int32# * int64#) array) in
-  let _ = (makearray_dynamic_uninit 1 : #(float# * #(int64# * int64#) * float32# * #(int32# * #(float32# * float#)) * int64#) array) in
-  let _ = (makearray_dynamic_uninit 1 : #(int64# * ur1) array) in
+  let _ = (makearray_dynamic_uninit 1 : #(float# * int32_u * int64_u) array) in
+  let _ = (makearray_dynamic_uninit 1 : #(float# * #(int64_u * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int64_u) array) in
+  let _ = (makearray_dynamic_uninit 1 : #(int64_u * ur1) array) in
   ()
 ;;
 
@@ -640,13 +640,13 @@ let test_makearray_dynamic size =
   ) [@nontail];
   Gc.compact ();
 
-  (**************)
-  (*   int32#   *)
-  (**************)
+  (***************)
+  (*   int32_u   *)
+  (***************)
   let eq = (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) in
   let mk_value i = Int32_u.of_int i in
   (* 1. Create an array of size [size] *)
-  let a : int32# array = makearray_dynamic size #0l in
+  let a : int32_u array = makearray_dynamic size #0l in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -753,13 +753,13 @@ let test_makearray_dynamic size =
   ) [@nontail];
   Gc.compact ();
 
-  (**************)
-  (*   int64#   *)
-  (**************)
+  (***************)
+  (*   int64_u   *)
+  (***************)
   let eq = (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) in
   let mk_value i = Int64_u.of_int i in
   (* 1. Create an array of size [size] *)
-  let a : int64# array = makearray_dynamic size #0L in
+  let a : int64_u array = makearray_dynamic size #0L in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -866,13 +866,13 @@ let test_makearray_dynamic size =
   ) [@nontail];
   Gc.compact ();
 
-  (******************)
-  (*   nativeint#   *)
-  (******************)
+  (*******************)
+  (*   nativeint_u   *)
+  (*******************)
   let eq = (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) in
   let mk_value i = Nativeint_u.of_int i in
   (* 1. Create an array of size [size] *)
-  let a : nativeint# array = makearray_dynamic size #0n in
+  let a : nativeint_u array = makearray_dynamic size #0n in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -1318,13 +1318,13 @@ let test_makearray_dynamic size =
   ) [@nontail];
   Gc.compact ();
 
-  (***********************************)
-  (*   #(float# * int32# * int64#)   *)
-  (***********************************)
+  (*************************************)
+  (*   #(float# * int32_u * int64_u)   *)
+  (*************************************)
   let eq = (fun #(a0, a1, a2) #(b0, b1, b2) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a1 b1 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a2 b2) in
   let mk_value i = #(Float_u.of_int i, Int32_u.of_int i, Int64_u.of_int i) in
   (* 1. Create an array of size [size] *)
-  let a : #(float# * int32# * int64#) array = makearray_dynamic size #(#0., #0l, #0L) in
+  let a : #(float# * int32_u * int64_u) array = makearray_dynamic size #(#0., #0l, #0L) in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -1431,13 +1431,13 @@ let test_makearray_dynamic size =
   ) [@nontail];
   Gc.compact ();
 
-  (*********************************************************************************************)
-  (*   #(float# * #(int64# * int64#) * float32# * #(int32# * #(float32# * float#)) * int64#)   *)
-  (*********************************************************************************************)
+  (*************************************************************************************************)
+  (*   #(float# * #(int64_u * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int64_u)   *)
+  (*************************************************************************************************)
   let eq = (fun #(a0, a1, a2, a3, a4) #(b0, b1, b2, b3, b4) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a0 b0 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a1 b1) a1 b1 && (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a2 b2 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a0 b0 && (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a1 b1) a1 b1) a3 b3 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a4 b4) in
   let mk_value i = #(Float_u.of_int i, #(Int64_u.of_int i, Int64_u.of_int i), Float32_u.of_int i, #(Int32_u.of_int i, #(Float32_u.of_int i, Float_u.of_int i)), Int64_u.of_int i) in
   (* 1. Create an array of size [size] *)
-  let a : #(float# * #(int64# * int64#) * float32# * #(int32# * #(float32# * float#)) * int64#) array = makearray_dynamic size #(#0., #(#0L, #0L), #0.s, #(#0l, #(#0.s, #0.)), #0L) in
+  let a : #(float# * #(int64_u * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int64_u) array = makearray_dynamic size #(#0., #(#0L, #0L), #0.s, #(#0l, #(#0.s, #0.)), #0L) in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -1544,13 +1544,13 @@ let test_makearray_dynamic size =
   ) [@nontail];
   Gc.compact ();
 
-  (***********************)
-  (*   #(int64# * ur1)   *)
-  (***********************)
+  (************************)
+  (*   #(int64_u * ur1)   *)
+  (************************)
   let eq = (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a0 b0 && (fun (#{ a = a1; b = b1 } : ur1) (#{ a = a2; b = b2 } : ur1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a1 a2 && (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) b1 b2) a1 b1) in
   let mk_value i = #(Int64_u.of_int i, (#{ a = Int64_u.of_int i; b = Float_u.of_int i } : ur1)) in
   (* 1. Create an array of size [size] *)
-  let a : #(int64# * ur1) array = makearray_dynamic size #(#0L, (#{ a = #0L; b = #0. } : ur1)) in
+  let a : #(int64_u * ur1) array = makearray_dynamic size #(#0L, (#{ a = #0L; b = #0. } : ur1)) in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -3013,13 +3013,13 @@ let test_makearray_dynamic size =
   ) [@nontail];
   Gc.compact ();
 
-  (********************************)
-  (*   #(float# * int * int64#)   *)
-  (********************************)
+  (*********************************)
+  (*   #(float# * int * int64_u)   *)
+  (*********************************)
   let eq = (fun #(a0, a1, a2) #(b0, b1, b2) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun a b -> Int.equal a b) a1 b1 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a2 b2) in
   let mk_value i = #(Float_u.of_int i, i, Int64_u.of_int i) in
   (* 1. Create an array of size [size] *)
-  let a : #(float# * int * int64#) array = makearray_dynamic size #(#0., 0, #0L) in
+  let a : #(float# * int * int64_u) array = makearray_dynamic size #(#0., 0, #0L) in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -3126,13 +3126,13 @@ let test_makearray_dynamic size =
   ) [@nontail];
   Gc.compact ();
 
-  (***************************************************************************************)
-  (*   #(float# * #(int * int64#) * float32# * #(int32# * #(float32# * float#)) * int)   *)
-  (***************************************************************************************)
+  (*****************************************************************************************)
+  (*   #(float# * #(int * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int)   *)
+  (*****************************************************************************************)
   let eq = (fun #(a0, a1, a2, a3, a4) #(b0, b1, b2, b3, b4) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int.equal a b) a0 b0 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a1 b1) a1 b1 && (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a2 b2 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a0 b0 && (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a1 b1) a1 b1) a3 b3 && (fun a b -> Int.equal a b) a4 b4) in
   let mk_value i = #(Float_u.of_int i, #(i, Int64_u.of_int i), Float32_u.of_int i, #(Int32_u.of_int i, #(Float32_u.of_int i, Float_u.of_int i)), i) in
   (* 1. Create an array of size [size] *)
-  let a : #(float# * #(int * int64#) * float32# * #(int32# * #(float32# * float#)) * int) array = makearray_dynamic size #(#0., #(0, #0L), #0.s, #(#0l, #(#0.s, #0.)), 0) in
+  let a : #(float# * #(int * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int) array = makearray_dynamic size #(#0., #(0, #0L), #0.s, #(#0l, #(#0.s, #0.)), 0) in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -3581,13 +3581,13 @@ let test_makearray_dynamic_local size =
   ) [@nontail];
   Gc.compact ();
 
-  (**************)
-  (*   int32#   *)
-  (**************)
+  (***************)
+  (*   int32_u   *)
+  (***************)
   let eq = (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) in
   let mk_value i = Int32_u.of_int i in
   (* 1. Create an array of size [size] *)
-  let a : int32# array = makearray_dynamic_local size #0l in
+  let a : int32_u array = makearray_dynamic_local size #0l in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -3694,13 +3694,13 @@ let test_makearray_dynamic_local size =
   ) [@nontail];
   Gc.compact ();
 
-  (**************)
-  (*   int64#   *)
-  (**************)
+  (***************)
+  (*   int64_u   *)
+  (***************)
   let eq = (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) in
   let mk_value i = Int64_u.of_int i in
   (* 1. Create an array of size [size] *)
-  let a : int64# array = makearray_dynamic_local size #0L in
+  let a : int64_u array = makearray_dynamic_local size #0L in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -3807,13 +3807,13 @@ let test_makearray_dynamic_local size =
   ) [@nontail];
   Gc.compact ();
 
-  (******************)
-  (*   nativeint#   *)
-  (******************)
+  (*******************)
+  (*   nativeint_u   *)
+  (*******************)
   let eq = (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) in
   let mk_value i = Nativeint_u.of_int i in
   (* 1. Create an array of size [size] *)
-  let a : nativeint# array = makearray_dynamic_local size #0n in
+  let a : nativeint_u array = makearray_dynamic_local size #0n in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -4259,13 +4259,13 @@ let test_makearray_dynamic_local size =
   ) [@nontail];
   Gc.compact ();
 
-  (***********************************)
-  (*   #(float# * int32# * int64#)   *)
-  (***********************************)
+  (*************************************)
+  (*   #(float# * int32_u * int64_u)   *)
+  (*************************************)
   let eq = (fun #(a0, a1, a2) #(b0, b1, b2) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a1 b1 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a2 b2) in
   let mk_value i = #(Float_u.of_int i, Int32_u.of_int i, Int64_u.of_int i) in
   (* 1. Create an array of size [size] *)
-  let a : #(float# * int32# * int64#) array = makearray_dynamic_local size #(#0., #0l, #0L) in
+  let a : #(float# * int32_u * int64_u) array = makearray_dynamic_local size #(#0., #0l, #0L) in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -4372,13 +4372,13 @@ let test_makearray_dynamic_local size =
   ) [@nontail];
   Gc.compact ();
 
-  (*********************************************************************************************)
-  (*   #(float# * #(int64# * int64#) * float32# * #(int32# * #(float32# * float#)) * int64#)   *)
-  (*********************************************************************************************)
+  (*************************************************************************************************)
+  (*   #(float# * #(int64_u * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int64_u)   *)
+  (*************************************************************************************************)
   let eq = (fun #(a0, a1, a2, a3, a4) #(b0, b1, b2, b3, b4) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a0 b0 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a1 b1) a1 b1 && (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a2 b2 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a0 b0 && (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a1 b1) a1 b1) a3 b3 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a4 b4) in
   let mk_value i = #(Float_u.of_int i, #(Int64_u.of_int i, Int64_u.of_int i), Float32_u.of_int i, #(Int32_u.of_int i, #(Float32_u.of_int i, Float_u.of_int i)), Int64_u.of_int i) in
   (* 1. Create an array of size [size] *)
-  let a : #(float# * #(int64# * int64#) * float32# * #(int32# * #(float32# * float#)) * int64#) array = makearray_dynamic_local size #(#0., #(#0L, #0L), #0.s, #(#0l, #(#0.s, #0.)), #0L) in
+  let a : #(float# * #(int64_u * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int64_u) array = makearray_dynamic_local size #(#0., #(#0L, #0L), #0.s, #(#0l, #(#0.s, #0.)), #0L) in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -4485,13 +4485,13 @@ let test_makearray_dynamic_local size =
   ) [@nontail];
   Gc.compact ();
 
-  (***********************)
-  (*   #(int64# * ur1)   *)
-  (***********************)
+  (************************)
+  (*   #(int64_u * ur1)   *)
+  (************************)
   let eq = (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a0 b0 && (fun (#{ a = a1; b = b1 } : ur1) (#{ a = a2; b = b2 } : ur1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a1 a2 && (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) b1 b2) a1 b1) in
   let mk_value i = #(Int64_u.of_int i, (#{ a = Int64_u.of_int i; b = Float_u.of_int i } : ur1)) in
   (* 1. Create an array of size [size] *)
-  let a : #(int64# * ur1) array = makearray_dynamic_local size #(#0L, (#{ a = #0L; b = #0. } : ur1)) in
+  let a : #(int64_u * ur1) array = makearray_dynamic_local size #(#0L, (#{ a = #0L; b = #0. } : ur1)) in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -5954,13 +5954,13 @@ let test_makearray_dynamic_local size =
   ) [@nontail];
   Gc.compact ();
 
-  (********************************)
-  (*   #(float# * int * int64#)   *)
-  (********************************)
+  (*********************************)
+  (*   #(float# * int * int64_u)   *)
+  (*********************************)
   let eq = (fun #(a0, a1, a2) #(b0, b1, b2) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun a b -> Int.equal a b) a1 b1 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a2 b2) in
   let mk_value i = #(Float_u.of_int i, i, Int64_u.of_int i) in
   (* 1. Create an array of size [size] *)
-  let a : #(float# * int * int64#) array = makearray_dynamic_local size #(#0., 0, #0L) in
+  let a : #(float# * int * int64_u) array = makearray_dynamic_local size #(#0., 0, #0L) in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -6067,13 +6067,13 @@ let test_makearray_dynamic_local size =
   ) [@nontail];
   Gc.compact ();
 
-  (***************************************************************************************)
-  (*   #(float# * #(int * int64#) * float32# * #(int32# * #(float32# * float#)) * int)   *)
-  (***************************************************************************************)
+  (*****************************************************************************************)
+  (*   #(float# * #(int * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int)   *)
+  (*****************************************************************************************)
   let eq = (fun #(a0, a1, a2, a3, a4) #(b0, b1, b2, b3, b4) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int.equal a b) a0 b0 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a1 b1) a1 b1 && (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a2 b2 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a0 b0 && (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a1 b1) a1 b1) a3 b3 && (fun a b -> Int.equal a b) a4 b4) in
   let mk_value i = #(Float_u.of_int i, #(i, Int64_u.of_int i), Float32_u.of_int i, #(Int32_u.of_int i, #(Float32_u.of_int i, Float_u.of_int i)), i) in
   (* 1. Create an array of size [size] *)
-  let a : #(float# * #(int * int64#) * float32# * #(int32# * #(float32# * float#)) * int) array = makearray_dynamic_local size #(#0., #(0, #0L), #0.s, #(#0l, #(#0.s, #0.)), 0) in
+  let a : #(float# * #(int * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int) array = makearray_dynamic_local size #(#0., #(0, #0L), #0.s, #(#0l, #(#0.s, #0.)), 0) in
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
     let el = get a i in
@@ -6520,13 +6520,13 @@ let test_makearray_dynamic_uninit size =
   ) [@nontail];
   Gc.compact ();
 
-  (**************)
-  (*   int32#   *)
-  (**************)
+  (***************)
+  (*   int32_u   *)
+  (***************)
   let eq = (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) in
   let mk_value i = Int32_u.of_int i in
   (* 1. Create an array of size [size] *)
-  let a : int32# array = makearray_dynamic_uninit size in
+  let a : int32_u array = makearray_dynamic_uninit size in
   (* 2. For uninitialized arrays, element values are unspecified *)
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
@@ -6632,13 +6632,13 @@ let test_makearray_dynamic_uninit size =
   ) [@nontail];
   Gc.compact ();
 
-  (**************)
-  (*   int64#   *)
-  (**************)
+  (***************)
+  (*   int64_u   *)
+  (***************)
   let eq = (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) in
   let mk_value i = Int64_u.of_int i in
   (* 1. Create an array of size [size] *)
-  let a : int64# array = makearray_dynamic_uninit size in
+  let a : int64_u array = makearray_dynamic_uninit size in
   (* 2. For uninitialized arrays, element values are unspecified *)
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
@@ -6744,13 +6744,13 @@ let test_makearray_dynamic_uninit size =
   ) [@nontail];
   Gc.compact ();
 
-  (******************)
-  (*   nativeint#   *)
-  (******************)
+  (*******************)
+  (*   nativeint_u   *)
+  (*******************)
   let eq = (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) in
   let mk_value i = Nativeint_u.of_int i in
   (* 1. Create an array of size [size] *)
-  let a : nativeint# array = makearray_dynamic_uninit size in
+  let a : nativeint_u array = makearray_dynamic_uninit size in
   (* 2. For uninitialized arrays, element values are unspecified *)
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
@@ -7192,13 +7192,13 @@ let test_makearray_dynamic_uninit size =
   ) [@nontail];
   Gc.compact ();
 
-  (***********************************)
-  (*   #(float# * int32# * int64#)   *)
-  (***********************************)
+  (*************************************)
+  (*   #(float# * int32_u * int64_u)   *)
+  (*************************************)
   let eq = (fun #(a0, a1, a2) #(b0, b1, b2) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a1 b1 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a2 b2) in
   let mk_value i = #(Float_u.of_int i, Int32_u.of_int i, Int64_u.of_int i) in
   (* 1. Create an array of size [size] *)
-  let a : #(float# * int32# * int64#) array = makearray_dynamic_uninit size in
+  let a : #(float# * int32_u * int64_u) array = makearray_dynamic_uninit size in
   (* 2. For uninitialized arrays, element values are unspecified *)
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
@@ -7304,13 +7304,13 @@ let test_makearray_dynamic_uninit size =
   ) [@nontail];
   Gc.compact ();
 
-  (*********************************************************************************************)
-  (*   #(float# * #(int64# * int64#) * float32# * #(int32# * #(float32# * float#)) * int64#)   *)
-  (*********************************************************************************************)
+  (*************************************************************************************************)
+  (*   #(float# * #(int64_u * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int64_u)   *)
+  (*************************************************************************************************)
   let eq = (fun #(a0, a1, a2, a3, a4) #(b0, b1, b2, b3, b4) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a0 b0 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a1 b1) a1 b1 && (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a2 b2 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a0 b0 && (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a1 b1) a1 b1) a3 b3 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a4 b4) in
   let mk_value i = #(Float_u.of_int i, #(Int64_u.of_int i, Int64_u.of_int i), Float32_u.of_int i, #(Int32_u.of_int i, #(Float32_u.of_int i, Float_u.of_int i)), Int64_u.of_int i) in
   (* 1. Create an array of size [size] *)
-  let a : #(float# * #(int64# * int64#) * float32# * #(int32# * #(float32# * float#)) * int64#) array = makearray_dynamic_uninit size in
+  let a : #(float# * #(int64_u * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int64_u) array = makearray_dynamic_uninit size in
   (* 2. For uninitialized arrays, element values are unspecified *)
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
@@ -7416,13 +7416,13 @@ let test_makearray_dynamic_uninit size =
   ) [@nontail];
   Gc.compact ();
 
-  (***********************)
-  (*   #(int64# * ur1)   *)
-  (***********************)
+  (************************)
+  (*   #(int64_u * ur1)   *)
+  (************************)
   let eq = (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a0 b0 && (fun (#{ a = a1; b = b1 } : ur1) (#{ a = a2; b = b2 } : ur1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a1 a2 && (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) b1 b2) a1 b1) in
   let mk_value i = #(Int64_u.of_int i, (#{ a = Int64_u.of_int i; b = Float_u.of_int i } : ur1)) in
   (* 1. Create an array of size [size] *)
-  let a : #(int64# * ur1) array = makearray_dynamic_uninit size in
+  let a : #(int64_u * ur1) array = makearray_dynamic_uninit size in
   (* 2. For uninitialized arrays, element values are unspecified *)
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
@@ -7755,13 +7755,13 @@ let test_makearray_dynamic_uninit_local size =
   ) [@nontail];
   Gc.compact ();
 
-  (**************)
-  (*   int32#   *)
-  (**************)
+  (***************)
+  (*   int32_u   *)
+  (***************)
   let eq = (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) in
   let mk_value i = Int32_u.of_int i in
   (* 1. Create an array of size [size] *)
-  let a : int32# array = makearray_dynamic_uninit_local size in
+  let a : int32_u array = makearray_dynamic_uninit_local size in
   (* 2. For uninitialized arrays, element values are unspecified *)
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
@@ -7867,13 +7867,13 @@ let test_makearray_dynamic_uninit_local size =
   ) [@nontail];
   Gc.compact ();
 
-  (**************)
-  (*   int64#   *)
-  (**************)
+  (***************)
+  (*   int64_u   *)
+  (***************)
   let eq = (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) in
   let mk_value i = Int64_u.of_int i in
   (* 1. Create an array of size [size] *)
-  let a : int64# array = makearray_dynamic_uninit_local size in
+  let a : int64_u array = makearray_dynamic_uninit_local size in
   (* 2. For uninitialized arrays, element values are unspecified *)
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
@@ -7979,13 +7979,13 @@ let test_makearray_dynamic_uninit_local size =
   ) [@nontail];
   Gc.compact ();
 
-  (******************)
-  (*   nativeint#   *)
-  (******************)
+  (*******************)
+  (*   nativeint_u   *)
+  (*******************)
   let eq = (fun a b -> Nativeint_u.(equal (add #0n a) (add #0n b))) in
   let mk_value i = Nativeint_u.of_int i in
   (* 1. Create an array of size [size] *)
-  let a : nativeint# array = makearray_dynamic_uninit_local size in
+  let a : nativeint_u array = makearray_dynamic_uninit_local size in
   (* 2. For uninitialized arrays, element values are unspecified *)
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
@@ -8427,13 +8427,13 @@ let test_makearray_dynamic_uninit_local size =
   ) [@nontail];
   Gc.compact ();
 
-  (***********************************)
-  (*   #(float# * int32# * int64#)   *)
-  (***********************************)
+  (*************************************)
+  (*   #(float# * int32_u * int64_u)   *)
+  (*************************************)
   let eq = (fun #(a0, a1, a2) #(b0, b1, b2) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a1 b1 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a2 b2) in
   let mk_value i = #(Float_u.of_int i, Int32_u.of_int i, Int64_u.of_int i) in
   (* 1. Create an array of size [size] *)
-  let a : #(float# * int32# * int64#) array = makearray_dynamic_uninit_local size in
+  let a : #(float# * int32_u * int64_u) array = makearray_dynamic_uninit_local size in
   (* 2. For uninitialized arrays, element values are unspecified *)
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
@@ -8539,13 +8539,13 @@ let test_makearray_dynamic_uninit_local size =
   ) [@nontail];
   Gc.compact ();
 
-  (*********************************************************************************************)
-  (*   #(float# * #(int64# * int64#) * float32# * #(int32# * #(float32# * float#)) * int64#)   *)
-  (*********************************************************************************************)
+  (*************************************************************************************************)
+  (*   #(float# * #(int64_u * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int64_u)   *)
+  (*************************************************************************************************)
   let eq = (fun #(a0, a1, a2, a3, a4) #(b0, b1, b2, b3, b4) -> (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a0 b0 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a1 b1) a1 b1 && (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a2 b2 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int32_u.(equal (add #0l a) (add #0l b))) a0 b0 && (fun #(a0, a1) #(b0, b1) -> (fun a b -> Float32_u.(equal (add #0.s a) (add #0.s b))) a0 b0 && (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) a1 b1) a1 b1) a3 b3 && (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a4 b4) in
   let mk_value i = #(Float_u.of_int i, #(Int64_u.of_int i, Int64_u.of_int i), Float32_u.of_int i, #(Int32_u.of_int i, #(Float32_u.of_int i, Float_u.of_int i)), Int64_u.of_int i) in
   (* 1. Create an array of size [size] *)
-  let a : #(float# * #(int64# * int64#) * float32# * #(int32# * #(float32# * float#)) * int64#) array = makearray_dynamic_uninit_local size in
+  let a : #(float# * #(int64_u * int64_u) * float32# * #(int32_u * #(float32# * float#)) * int64_u) array = makearray_dynamic_uninit_local size in
   (* 2. For uninitialized arrays, element values are unspecified *)
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do
@@ -8651,13 +8651,13 @@ let test_makearray_dynamic_uninit_local size =
   ) [@nontail];
   Gc.compact ();
 
-  (***********************)
-  (*   #(int64# * ur1)   *)
-  (***********************)
+  (************************)
+  (*   #(int64_u * ur1)   *)
+  (************************)
   let eq = (fun #(a0, a1) #(b0, b1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a0 b0 && (fun (#{ a = a1; b = b1 } : ur1) (#{ a = a2; b = b2 } : ur1) -> (fun a b -> Int64_u.(equal (add #0L a) (add #0L b))) a1 a2 && (fun a b -> Float_u.(equal (add #0. a) (add #0. b))) b1 b2) a1 b1) in
   let mk_value i = #(Int64_u.of_int i, (#{ a = Int64_u.of_int i; b = Float_u.of_int i } : ur1)) in
   (* 1. Create an array of size [size] *)
-  let a : #(int64# * ur1) array = makearray_dynamic_uninit_local size in
+  let a : #(int64_u * ur1) array = makearray_dynamic_uninit_local size in
   (* 2. For uninitialized arrays, element values are unspecified *)
   (* 2. For initialized arrays, check all elements have the correct value *)
   for i = 0 to size - 1 do

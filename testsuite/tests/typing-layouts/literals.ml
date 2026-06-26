@@ -233,7 +233,7 @@ let f x =
 
 f #4L;;
 [%%expect {|
-val f : int64# -> [> `Five | `Four | `Other ] = <fun>
+val f : int64_u -> [> `Five | `Four | `Other ] = <fun>
 - : [> `Five | `Four | `Other ] = `Four
 |}];;
 
@@ -246,7 +246,7 @@ let f x =
 
 test_int64 "result" (f #7L);;
 [%%expect {|
-val f : int64# -> int64# = <fun>
+val f : int64_u -> int64_u = <fun>
 result: 7
 - : unit = ()
 |}];;
@@ -273,7 +273,7 @@ Lines 2-7, characters 2-14:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: "#3L"
 
-val f : int64# -> int64# = <fun>
+val f : int64_u -> int64_u = <fun>
 Exception: Match_failure ("", 2, 2).
 |}];;
 
@@ -355,7 +355,7 @@ Exception: Match_failure ("", 2, 2).
 (* Lexing edge cases *)
 
 (* Unboxed literals at the beginning of the line aren't directives. *)
-let f1 (_ : float#) (_ : int64#) = ();;
+let f1 (_ : float#) (_ : int64_u) = ();;
 let f2 (_ : float#) (_ : float#) = ();;
 let () = f1
 #2.
@@ -367,7 +367,7 @@ let () = f2
 ;;
 
 [%%expect{|
-val f1 : float# -> int64# -> unit = <fun>
+val f1 : float# -> int64_u -> unit = <fun>
 val f2 : float# -> float# -> unit = <fun>
 |}];;
 

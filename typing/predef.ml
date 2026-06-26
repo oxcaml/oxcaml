@@ -364,13 +364,10 @@ let path_unboxed_float = Path.unboxed_version path_float
 and path_unboxed_unit = Path.unboxed_version path_unit
 and path_unboxed_bool = Path.unboxed_version path_bool
 and path_unboxed_float32 = Path.unboxed_version path_float32
-and path_unboxed_nativeint = Path.unboxed_version path_nativeint
 and path_unboxed_char = Path.unboxed_version path_char
 and path_unboxed_int = Path.unboxed_version path_int
 and path_unboxed_int8 = Path.unboxed_version path_int8
 and path_unboxed_int16 = Path.unboxed_version path_int16
-and path_unboxed_int32 = Path.unboxed_version path_int32
-and path_unboxed_int64 = Path.unboxed_version path_int64
 
 and path_unboxed_int8x16 = Path.unboxed_version path_int8x16
 and path_unboxed_int16x8 = Path.unboxed_version path_int16x8
@@ -429,9 +426,6 @@ and type_unboxed_unit = tconstr path_unboxed_unit []
 and type_unboxed_bool = tconstr path_unboxed_bool []
 and type_unboxed_float = tconstr path_unboxed_float []
 and type_unboxed_float32 = tconstr path_unboxed_float32 []
-and type_unboxed_nativeint = tconstr path_unboxed_nativeint []
-and type_unboxed_int32 = tconstr path_unboxed_int32 []
-and type_unboxed_int64 = tconstr path_unboxed_int64 []
 and type_unboxed_char = tconstr path_unboxed_char []
 and type_unboxed_int = tconstr path_unboxed_int []
 and type_unboxed_int8 = tconstr path_unboxed_int8 []
@@ -773,20 +767,11 @@ let decl_of_type_constr type_constr =
   | `Floatarray ->
     decl0 ~jkind:(builtin Jkind.Const.Builtin.mutable_data) ()
   | `Nativeint ->
-    decl0
-      ~jkind:(builtin Jkind.Const.Builtin.immutable_data)
-      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_nativeint
-      ()
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.immutable_data) ()
   | `Int32 ->
-    decl0
-      ~jkind:(builtin Jkind.Const.Builtin.immutable_data)
-      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int32
-      ()
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.immutable_data) ()
   | `Int64 ->
-    decl0
-      ~jkind:(builtin Jkind.Const.Builtin.immutable_data)
-      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_int64
-      ()
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.immutable_data) ()
   | `Extension_constructor ->
     decl0 ~jkind:(builtin Jkind.Const.Builtin.immutable_data) ()
   | `Bool ->
@@ -872,14 +857,11 @@ let decl_of_type_constr type_constr =
       ~jkind:(fun _ -> Jkind.for_non_float ~why:(Primitive ident_lazy_t))
       ()
   | `Nativeint_u ->
-    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_nativeint)
-      ~manifest:(tconstr (Path.unboxed_version path_nativeint) []) ()
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_nativeint) ()
   | `Int32_u ->
-    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int32)
-      ~manifest:(tconstr (Path.unboxed_version path_int32) []) ()
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int32) ()
   | `Int64_u ->
-    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int64)
-      ~manifest:(tconstr (Path.unboxed_version path_int64) []) ()
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int64) ()
   | `Idx_imm ->
     decl2 ~variance:(Variance.full, Variance.covariant)
        ~param_jkinds:(

@@ -23,9 +23,9 @@ module type S_value = sig
   type t
 
   val x : t
-  val unboxed_tuple : #(int64# * t)
+  val unboxed_tuple : #(int64_u * t)
   val to_string : t -> string
-  val unboxed_number : int64#
+  val unboxed_number : int64_u
   val boxed_string : string
   val boxed_number : int
 end
@@ -86,7 +86,7 @@ let () = print_endline "Test: abstract type : float64"
 module type S_float = sig
   type t : float64
 
-  val unboxed_number : int64#
+  val unboxed_number : int64_u
   val boxed_string : string
   val unboxed_tuple : #(string * t)
   val boxed_number : int
@@ -151,10 +151,10 @@ let () = print_endline "Test: abstract type : void"
 module type S_void = sig
   type t : void
 
-  val unboxed_number : int64#
+  val unboxed_number : int64_u
   val boxed_string : string
   val x : t
-  val unboxed_tuple : #(string * t * int64#)
+  val unboxed_tuple : #(string * t * int64_u)
 end
 
 module M_void_abstr : S_void = struct

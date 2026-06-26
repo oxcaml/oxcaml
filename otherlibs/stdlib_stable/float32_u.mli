@@ -136,10 +136,10 @@ val to_int : t -> int
     The result is unspecified if the argument is [nan] or falls outside the
     range of representable integers. *)
 
-val of_int64 : int64# -> t
+val of_int64 : int64_u -> t
 (** Convert the given 64-bit integer to the nearest representable 32-bit float. *)
 
-val to_int64 : t -> int64#
+val to_int64 : t -> int64_u
 (** Convert the given 32-bit float to a 64-bit integer,
     discarding the fractional part (truncate towards 0).
     If the truncated floating-point number is outside the range
@@ -152,12 +152,12 @@ val of_float : float# -> t
 val to_float : t -> float#
 (** Convert a 32-bit float to a 64-bit float. *)
 
-val of_bits : int32# -> t
+val of_bits : int32_u -> t
 (** Convert a 32-bit integer to a 32-bit float, preserving the value's
     bit pattern.
     The amd64 OxCaml compiler translates this call to MOVD. *)
 
-val to_bits : t -> int32#
+val to_bits : t -> int32_u
 (** Convert a 32-bit float to a 32-bit integer, preserving the value's
     bit pattern.
     The amd64 OxCaml compiler translates this call to MOVD. *)
@@ -392,8 +392,9 @@ val max_num : t -> t -> t
     missing values.  If both [x] and [y] are [nan] [nan] is returned.
     Moreover [max_num #-0.s #+0.s = #+0.s] *)
 
-val iround_current : t -> int64#
-(** Rounds a [float32#] to an [int64#] using the current rounding mode. The default
+val iround_current : t -> int64_u
+(** Rounds a [float32#] to an [int64_u] using the current rounding mode. The
+    default
     rounding mode on amd64 is "round half to even", and we expect that no
     program will change the mode. The default mode may differ on other platforms.
     If the argument is NaN or infinite or if the rounded value cannot be
