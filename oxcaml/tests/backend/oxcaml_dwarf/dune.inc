@@ -566,7 +566,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
    (= %{context_name} "main")
    (<> %{env:OXCAML_LLDB=} "")))
  (targets test_ocaml_and_c_dwarf.output.corrected)
- (deps test_ocaml_and_c_dwarf.exe test_ocaml_and_c_dwarf.lldb filter_for_function_call_only.sh)
+ (deps test_ocaml_and_c_dwarf.exe test_ocaml_and_c_dwarf.lldb filter_for_function_call_only.sh frames.py)
  (action
   (progn
    (bash

@@ -14,13 +14,16 @@ let () =
   in
   let buf = Buffer.create 1000 in
   (* Function to generate rules for executable tests that produce output *)
-  let print_dwarf_test name =
+  let print_dwarf_test ?(extra_deps = []) name =
+    (* Leading "" yields a space after [${filter}], or "" when empty. *)
+    let extra_deps = String.concat " " ("" :: extra_deps) in
     let subst = function
       | "enabled_if" -> enabled_if
       | "enabled_if_with_lldb" -> enabled_if_with_lldb
       | "enabled_if_without_lldb" -> enabled_if_without_lldb
       | "name" -> name
       | "filter" -> "filter_for_function_call_only.sh"
+      | "extra_deps" -> extra_deps
       | _ -> assert false
     in
     Buffer.clear buf;
@@ -42,7 +45,7 @@ let () =
 (rule
  ${enabled_if_with_lldb}
  (targets ${name}.output.corrected)
- (deps ${name}.exe ${name}.lldb ${filter})
+ (deps ${name}.exe ${name}.lldb ${filter}${extra_deps})
  (action
   (progn
    (bash
@@ -86,5 +89,5 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
   print_dwarf_test "test_closures_dwarf";
   print_dwarf_test "test_large_data_dwarf";
   print_dwarf_test "test_tailrec_dwarf";
-  print_dwarf_test "test_ocaml_and_c_dwarf";
+  print_dwarf_test "test_ocaml_and_c_dwarf" ~extra_deps:["frames.py"];
   ()
