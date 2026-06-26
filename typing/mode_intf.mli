@@ -197,11 +197,8 @@ module type Common = sig
 
   val print : ?verbose:bool -> unit -> Fmt.formatter -> ('l * 'r) t -> unit
 
-  (** If a mode is a variable, returns true iff it has the given level *)
-  val check_level : ('l * 'r) t -> int -> bool
-
-  (** Returns true iff the mode is a variable at the given level *)
-  val check_level_var : ('l * 'r) t -> int -> bool
+  (** Returns true if the mode includes a mode variable at generic level *)
+  val check_generic : ('l * 'r) t -> bool
 
   (** zaps non-generic variables to ceil, raises a [Cannot_zap_generic] excetion
       if variable is generic *)

@@ -576,31 +576,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let check_level_morphvar : type a l r. (a, l * r) morphvar -> int -> bool =
    fun (Amorphvar (v, _, _)) i -> v.level = i
 
-  let check_level : type a l r. (a, l * r) mode -> int -> bool =
-   fun m i ->
-    match m with
-    | Amode _ -> true
-    | Amodevar mv -> check_level_morphvar mv i
-    | Amodemeet (_, _, mvs) ->
-      VarMap.fold (fun _ mv acc -> acc && check_level_morphvar mv i) mvs true
-    | Amodejoin (_, _, mvs) ->
-      VarMap.fold (fun _ mv acc -> acc && check_level_morphvar mv i) mvs true
-
-  let check_level_var : type a l r. (a, l * r) mode -> int -> bool =
-   fun m i ->
+  let check_generic : type a l r. (a, l * r) mode -> bool =
+   fun m ->
     match m with
     | Amode _ -> false
-    | Amodevar mv -> check_level_morphvar mv i
+    | Amodevar mv -> check_level_morphvar mv generic_level
     | Amodemeet (_, _, mvs) ->
-      VarMap.fold
-        (fun _ mv acc -> acc && check_level_morphvar mv i)
-        mvs
-        (not (VarMap.is_empty mvs))
+      VarMap.exists (fun _ mv -> check_level_morphvar mv generic_level) mvs
     | Amodejoin (_, _, mvs) ->
-      VarMap.fold
-        (fun _ mv acc -> acc && check_level_morphvar mv i)
-        mvs
-        (not (VarMap.is_empty mvs))
+      VarMap.exists (fun _ mv -> check_level_morphvar mv generic_level) mvs
 
   type var_iterator =
     { iter : 'a. 'a C.obj -> ('a, allowed * allowed) mode -> unit }
