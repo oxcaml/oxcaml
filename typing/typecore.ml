@@ -6007,17 +6007,36 @@ let check_absent_variant env =
 
 (* To find reasonable names for let-bound and lambda-bound idents *)
 
-let rec name_pattern default = function
-    [] -> Ident.create_local default,
-          Shape.Uid.internal_not_actually_unique
+type binder_pattern_kind =
+  | Synthetic_eta_expansion
+  | Value_pattern_in_argument
+  | Value_pattern_in_match
+  | Exception_pattern
+  | Effect_pattern
+
+(* Only patterns for function arguments are interesting for the debugger, since
+   they show up in backtraces. The rest can usually be reconstructed from the
+   local variables or is explicitly ignored. Hence, we only create UIDs for
+   argument patterns. *)
+let create_uid_for_pattern_kind = function
+  | Value_pattern_in_argument ->
+      if !Clflags.debug && !Clflags.shape_format = Clflags.Debugging_shapes
+      then Uid.mk ~current_unit:(Env.get_current_unit ())
+      else Shape.Uid.internal_not_actually_unique
+  | Synthetic_eta_expansion | Value_pattern_in_match | Exception_pattern
+  | Effect_pattern -> Shape.Uid.internal_not_actually_unique
+
+let rec name_pattern ~pattern_kind default = function
+    [] ->
+      Ident.create_local default, create_uid_for_pattern_kind pattern_kind
   | p :: rem ->
     match p.pat_desc with
       Tpat_var { id; uid; _ } -> id, uid
     | Tpat_alias { id; uid; _ } -> id, uid
-    | _ -> name_pattern default rem
+    | _ -> name_pattern ~pattern_kind default rem
 
-let name_cases default lst =
-  name_pattern default (List.map (fun c -> c.c_lhs) lst)
+let name_cases ~pattern_kind default lst =
+  name_pattern ~pattern_kind default (List.map (fun c -> c.c_lhs) lst)
 
 (* Typing of expressions *)
 
@@ -8364,7 +8383,9 @@ and type_expect_
         | [case] -> case
         | _ -> assert false
       in
-      let param, param_debug_uid = name_cases "param" cases in
+      let param, param_debug_uid =
+        name_cases ~pattern_kind:Value_pattern_in_argument "param" cases
+      in
       let let_ =
         { bop_op_name = slet.pbop_op;
           bop_op_path = op_path;
@@ -9349,7 +9370,10 @@ and type_function
       let fp_kind, fp_param, fp_param_debug_uid =
         match default_arg with
         | None ->
-            let param, param_uid = name_pattern "param" [ pat ] in
+            let param, param_uid =
+              name_pattern ~pattern_kind:Value_pattern_in_argument "param"
+                [ pat ]
+            in
             Tparam_pat pat, param, param_uid
         | Some (default_arg, arg_label, default_arg_sort) ->
             let param = Ident.create_local ("*opt*" ^ arg_label) in
@@ -10069,7 +10093,9 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         let e = {texp with exp_type = ty_res; exp_desc = Texp_exclave e} in
         let cases = [ case eta_pat e ] in
         let cases_loc = { texp.exp_loc with loc_ghost = true } in
-        let param, param_uid = name_cases "param" cases in
+        let param, param_uid =
+          name_cases ~pattern_kind:Synthetic_eta_expansion "param" cases
+        in
         { texp with exp_type = ty_fun; exp_desc =
           Texp_function
             { params = [];
@@ -11046,7 +11072,9 @@ and type_function_cases_expect
            (Tarrow ((Nolabel, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok)))
     in
     unify_exp_types loc env ty_fun (instance ty_expected);
-    let param , param_uid = name_cases "param" cases in
+    let param , param_uid =
+      name_cases ~pattern_kind:Value_pattern_in_argument "param" cases
+    in
     let cases =
       { fc_cases = cases;
         fc_partial = partial;
