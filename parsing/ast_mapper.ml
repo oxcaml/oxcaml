@@ -1011,6 +1011,9 @@ let default_mapper =
         | Pjk_default -> Pjk_default
         | Pjk_abbreviation (lid, sa) ->
           Pjk_abbreviation (map_loc this lid, List.map (map_loc this) sa)
+        | Pjk_scannable_axes (t, sa) ->
+          Pjk_scannable_axes
+            (this.jkind_annotation this t, List.map (map_loc this) sa)
         | Pjk_mod (t, mode_list) ->
           Pjk_mod (this.jkind_annotation this t, this.modes this mode_list)
         | Pjk_with (t, ty, modalities) ->

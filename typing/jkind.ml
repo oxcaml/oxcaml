@@ -1979,10 +1979,10 @@ module Const = struct
         | Some sa ->
           let sa' = Scannable_axis.lower_axes sa axis in
           (match prior_annot with
-          | Some (abbrev, rev_axes) when Scannable_axes.equal sa sa' ->
+          | Some (base_desc, rev_axes) when Scannable_axes.equal sa sa' ->
             Location.prerr_warning loc
               (Warnings.Redundant_kind_modifier
-                 (Format.asprintf "%a%s" Pprintast.longident abbrev
+                 (Format.asprintf "%s%s" base_desc
                     (String.concat ""
                        (List.rev_map (fun axis -> " " ^ axis) rev_axes))))
           | _ -> ());
@@ -2030,6 +2030,31 @@ module Const = struct
     | "maybe_null" -> Location.mkloc (Scannable_axis.Nullability Maybe_null) loc
     | _ -> raise ~loc (Unknown_kind_modifier txt)
 
+  (* [base_desc] is how [base] is rendered in the [Ignored_kind_modifier] and
+     [Redundant_kind_modifier] warnings. *)
+  let apply_scannable_axes (type l r) ~loc env ~base_desc (base : (l * r) t)
+      sa_annot =
+    if
+      sa_annot <> []
+      &&
+      match get_layout_result env base with
+      | Ok layout -> not (Layout.Const.is_scannable_or_any layout)
+      | Error _ -> false
+    then
+      Location.prerr_warning loc
+        (Warnings.Ignored_kind_modifier
+           (base_desc, List.map Location.get_txt sa_annot));
+    let jkind, _ =
+      List.fold_left
+        (fun (jkind, rev_axes) axis ->
+          ( apply_scannable_axis ~prior_annot:(base_desc, rev_axes) env
+              (Some (transl_scannable_axis axis))
+              jkind,
+            axis.Location.txt :: rev_axes ))
+        (base, []) sa_annot
+    in
+    jkind
+
   let rec of_user_written_annotation_unchecked_level : type l r.
       use_abstract_jkinds:bool ->
       _ ->
@@ -2041,28 +2066,10 @@ module Const = struct
     match jkind.pjka_desc with
     | Pjk_abbreviation (name, sa_annot) ->
       let p, _ = Env.lookup_jkind ~use:use_abstract_jkinds ~loc name.txt env in
-      let jkind_without_sa = of_path p in
-      if
-        sa_annot <> []
-        &&
-        match get_layout_result env jkind_without_sa with
-        | Ok layout -> not (Layout.Const.is_scannable_or_any layout)
-        | Error _ -> false
-      then
-        Location.prerr_warning jkind.pjka_loc
-          (Warnings.Ignored_kind_modifier
-             ( Format.asprintf "%a" Pprintast.longident name.txt,
-               List.map Location.get_txt sa_annot ));
-      let jkind, _abbrev =
-        List.fold_left
-          (fun (jkind, rev_axes) axis ->
-            ( apply_scannable_axis ~prior_annot:(name.txt, rev_axes) env
-                (Some (transl_scannable_axis axis))
-                jkind,
-              axis.Location.txt :: rev_axes ))
-          (jkind_without_sa, []) sa_annot
-      in
-      allow_left jkind |> allow_right
+      let jkind_without_sa = allow_left (of_path p) |> allow_right in
+      apply_scannable_axes ~loc:jkind.pjka_loc env
+        ~base_desc:(Format.asprintf "%a" Pprintast.longident name.txt)
+        jkind_without_sa sa_annot
     | Pjk_mod (base, modifiers) ->
       let base =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
@@ -2081,6 +2088,14 @@ module Const = struct
            (Scannable_axis.annot_of_nullability_annot nullability)
       |> apply_scannable_axis env
            (Scannable_axis.annot_of_separability_annot separability)
+    | Pjk_scannable_axes (base, sa_annot) ->
+      let base_jkind =
+        of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
+          context base
+      in
+      apply_scannable_axes ~loc:jkind.pjka_loc env
+        ~base_desc:(Format.asprintf "%a" Pprintast.jkind_annotation base)
+        base_jkind sa_annot
     | Pjk_product ts ->
       let jkinds =
         List.map
@@ -2313,6 +2328,7 @@ let of_type_decl_overapproximate_unknown ~context env
     match jkind.pjka_desc with
     | Pjk_with _ -> true
     | Pjk_mod (base, _) -> has_with_bounds base
+    | Pjk_scannable_axes (base, _) -> has_with_bounds base
     | Pjk_product jkinds -> List.exists has_with_bounds jkinds
     | Pjk_abbreviation _ -> false
     | Pjk_default | Pjk_kind_of _ ->

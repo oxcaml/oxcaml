@@ -890,6 +890,9 @@ let default_iterator =
          | Pjk_abbreviation (lid, sa_annot) ->
            iter_loc this lid;
            List.iter (iter_loc this) sa_annot
+         | Pjk_scannable_axes (t, sa_annot) ->
+             this.jkind_annotation this t;
+             List.iter (iter_loc this) sa_annot
          | Pjk_mod (t, mode_list) ->
              this.jkind_annotation this t;
              this.modes this mode_list

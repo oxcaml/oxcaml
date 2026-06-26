@@ -4135,8 +4135,12 @@ jkind_desc_gen(self):
   | reverse_product_jkind_gen(self) %prec below_AMPERSAND {
       Pjk_product (List.rev $1)
     }
-  | LPAREN self RPAREN {
-      $2
+  | LPAREN inner = self RPAREN axes = mkrhs(LIDENT)* {
+      match axes with
+      | [] -> inner
+      | _ :: _ ->
+        Pjk_scannable_axes
+          ({ pjka_loc = make_loc $loc(inner); pjka_desc = inner }, axes)
     }
 ;
 
