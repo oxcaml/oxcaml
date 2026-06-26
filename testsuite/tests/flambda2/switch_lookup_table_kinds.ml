@@ -416,8 +416,7 @@ in
 let code loopify(never) size(2) newer_version_of(match_symbol_tagged_or_null_22)
       match_symbol_tagged_or_null_22_1 (t : imm tagged)
         my_closure _region _ghost_region my_depth
-        -> k * k1
-        : [ 0 |1 | 0 of imm tagged |1 of val ] =
+        -> k * k1 =
   let arg = %array_load ($camlTOP15__switch_block467, t) in
   cont k (arg)
 in
