@@ -1300,11 +1300,11 @@ and module_expr i ppf x =
       module_type i ppf mt;
       module_expr i ppf me;
       alloc_modes i ppf ma;
-  | Tmod_apply (me1, me2, _) ->
+  | Tmod_apply (me1, me2, _, _) ->
       line i ppf "Tmod_apply\n";
       module_expr i ppf me1;
       module_expr i ppf me2;
-  | Tmod_apply_unit me1 ->
+  | Tmod_apply_unit (me1, _) ->
       line i ppf "Tmod_apply_unit\n";
       module_expr i ppf me1;
   | Tmod_constraint (me, _, Tmodtype_explicit (mt, modes), _) ->

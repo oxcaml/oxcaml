@@ -655,11 +655,11 @@ let module_expr sub {mod_loc; mod_desc; mod_mode; mod_env; mod_attributes; _} =
   | Tmod_functor (arg, mexpr) ->
       functor_parameter sub arg;
       sub.module_expr sub mexpr
-  | Tmod_apply (mexp1, mexp2, c) ->
+  | Tmod_apply (mexp1, mexp2, c, _) ->
       sub.module_expr sub mexp1;
       sub.module_expr sub mexp2;
       sub.module_coercion sub c
-  | Tmod_apply_unit mexp1 ->
+  | Tmod_apply_unit (mexp1, _) ->
       sub.module_expr sub mexp1;
   | Tmod_constraint (mexpr, _, Tmodtype_implicit, c) ->
       sub.module_expr sub mexpr;

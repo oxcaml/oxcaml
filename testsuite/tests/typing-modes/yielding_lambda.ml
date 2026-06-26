@@ -681,6 +681,30 @@ let () =
   0)
 |}]
 
+(* Precision: the same [@ yielding]-parameter functor, applied to an
+   *unyielding* argument, is an [unyielding] application -- we use the
+   argument's actual mode, not the (yielding) parameter mode it is checked
+   against. (The body call [R.g ()] still may yield, since [R]'s result mode is
+   yielding.) *)
+module M = struct let f () = () end
+let h () =
+  let module R = Yf (M) in
+  R.g ()
+[%%expect{|
+(apply[unyielding] (field_imm 1 (global Toploop!)) "M/718"
+  (let (f = (function {nlocal = 0} param[value<int>] : int 0))
+    (makeblock 0 f)))
+module M : sig val f : unit -> unit end
+(let
+  (M =? (apply[unyielding] (field_imm 0 (global Toploop!)) "M/718")
+   Yf =? (apply[unyielding] (field_imm 0 (global Toploop!)) "Yf/705")
+   h =
+     (function {nlocal = 0} param[value<int>] : int
+       (let (R = (apply[unyielding] Yf M)) (apply (field_imm 0 R) 0))))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "h" h))
+val h : unit -> unit = <fun>
+|}]
+
 (* A functor with a default (unyielding) parameter rejects a yielding argument. *)
 module Uf (X : sig val f : unit -> unit end) = struct
   let g () = X.f ()
@@ -690,7 +714,7 @@ let () =
     let module R = Uf (struct let f () = yield y end) in
     R.g ())
 [%%expect{|
-(apply[unyielding] (field_imm 1 (global Toploop!)) "Uf/721"
+(apply[unyielding] (field_imm 1 (global Toploop!)) "Uf/729"
   (function {nlocal = 0} X is_a_functor never_loop
     (let
       (g =
@@ -834,17 +858,17 @@ class d = object inherit c as super method n = super#m end
        (opaque
          (apply[unyielding] (field_imm 18 (global CamlinternalOO!))
            (opaque [0: #"m"]) c_init))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "c/769" c))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "c/777" c))
 class c : object method m : int end
 (let
-  (c =? (apply[unyielding] (field_imm 0 (global Toploop!)) "c/769")
+  (c =? (apply[unyielding] (field_imm 0 (global Toploop!)) "c/777")
    mk =
      (function {nlocal = 0} param[value<int>]
        (apply[unyielding] (field_mut 0 c) 0)))
   (apply[unyielding] (field_imm 1 (global Toploop!)) "mk" mk))
 val mk : unit -> c = <fun>
 (let
-  (c =? (apply[unyielding] (field_imm 0 (global Toploop!)) "c/769")
+  (c =? (apply[unyielding] (field_imm 0 (global Toploop!)) "c/777")
    shared =a (opaque [0: #"m"])
    shared =a (opaque [0: #"n" #"m"])
    d =?
@@ -884,7 +908,7 @@ val mk : unit -> c = <fun>
        (opaque
          (apply[unyielding] (field_imm 18 (global CamlinternalOO!))
            (opaque [0: #"m" #"n"]) d_init))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "d/797" d))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "d/805" d))
 class d : object method m : int method n : int end
 |}]
 
