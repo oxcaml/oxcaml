@@ -580,12 +580,12 @@ and meet_or_unknown_or_bottom : type a b.
  fun meet_elt env (input1 : a Or_unknown_or_bottom.t)
      (input2 : a Or_unknown_or_bottom.t) ->
   match input1, input2 with
-  | Unknown, Unknown -> Ok (Both_inputs, env)
-  | _, Unknown -> Ok (Left_input, env)
-  | Unknown, _ -> Ok (Right_input, env)
   | Bottom, Bottom -> Bottom Both_inputs
   | Bottom, _ -> Bottom Left_input
   | _, Bottom -> Bottom Right_input
+  | Unknown, Unknown -> Ok (Both_inputs, env)
+  | _, Unknown -> Ok (Left_input, env)
+  | Unknown, _ -> Ok (Right_input, env)
   | Ok elt1, Ok elt2 -> meet_elt env elt1 elt2
 
 and meet_expanded_head env (expanded1 : ET.t) (expanded2 : ET.t) :
