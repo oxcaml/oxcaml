@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension layouts_alpha -w +183..184";
+ flags = "-extension layouts_alpha";
  expect;
 *)
 
@@ -27,9 +27,6 @@ Line 1, characters 0-46:
 Error: A type declaration's layout can be given at most once.
        This declaration has an layout annotation (value non_pointer) and a layout attribute ([@@immediate]).
 |}]
-
-(* These warnings are disabled by default but enabled locally in this test file
-   (see the [-w +183..184] flag above). *)
 
 type t : value separable
 [%%expect{|
