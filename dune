@@ -633,6 +633,8 @@
   x86_section
   x86_proc
   jit_backend
+  callee_regs_collector
+  callee_regs_info
   zero_alloc_checker
   zero_alloc_info
   ;; backend/cfg
