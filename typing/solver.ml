@@ -1478,24 +1478,26 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           let copy = fresh ~upper:v.upper ~lower:v.lower ~level:v.level obj in
           set_optcopy ~changes:copy_scope obj ~copy_to_level v (Some copy);
           let vupper =
-            VarMap.map
-              (fun (Amorphvar (u, f, f_hint)) ->
+            VarMap.fold
+              (fun _ (Amorphvar (u, f, f_hint)) acc ->
                 let src = C.src obj f in
                 let ucopy =
                   copy_v ~copy_scope ~copy_from_level ~copy_to_level src u
                 in
-                Amorphvar (ucopy, f, f_hint))
-              v.vupper
+                let x = Amorphvar (ucopy, f, f_hint) in
+                VarMap.add (get_key obj x) x acc)
+              v.vupper VarMap.empty
           in
           let vlower =
-            VarMap.map
-              (fun (Amorphvar (u, f, f_hint)) ->
+            VarMap.fold
+              (fun _ (Amorphvar (u, f, f_hint)) acc ->
                 let src = C.src obj f in
                 let ucopy =
                   copy_v ~copy_scope ~copy_from_level ~copy_to_level src u
                 in
-                Amorphvar (ucopy, f, f_hint))
-              v.vlower
+                let x = Amorphvar (ucopy, f, f_hint) in
+                VarMap.add (get_key obj x) x acc)
+              v.vlower VarMap.empty
           in
           copy.vupper <- vupper;
           copy.vlower <- vlower;
@@ -1513,26 +1515,28 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Amode _ -> a
     | Amodejoin (a, a_hint, mvs) ->
       let mvscopy =
-        VarMap.map
-          (fun (Amorphvar (v, f, f_hint)) ->
-            let obj = C.src obj f in
+        VarMap.fold
+          (fun _ (Amorphvar (v, f, f_hint)) acc ->
+            let src = C.src obj f in
             let vcopy =
-              copy_v ~copy_scope ~copy_from_level ~copy_to_level obj v
+              copy_v ~copy_scope ~copy_from_level ~copy_to_level src v
             in
-            Amorphvar (vcopy, f, f_hint))
-          mvs
+            let x = Amorphvar (vcopy, f, f_hint) in
+            VarMap.add (get_key obj x) x acc)
+          mvs VarMap.empty
       in
       Amodejoin (a, a_hint, mvscopy)
     | Amodemeet (a, a_hint, mvs) ->
       let mvscopy =
-        VarMap.map
-          (fun (Amorphvar (v, f, f_hint)) ->
-            let obj = C.src obj f in
+        VarMap.fold
+          (fun _ (Amorphvar (v, f, f_hint)) acc ->
+            let src = C.src obj f in
             let vcopy =
-              copy_v ~copy_scope ~copy_from_level ~copy_to_level obj v
+              copy_v ~copy_scope ~copy_from_level ~copy_to_level src v
             in
-            Amorphvar (vcopy, f, f_hint))
-          mvs
+            let x = Amorphvar (vcopy, f, f_hint) in
+            VarMap.add (get_key obj x) x acc)
+          mvs VarMap.empty
       in
       Amodemeet (a, a_hint, mvscopy)
 
