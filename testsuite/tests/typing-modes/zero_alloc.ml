@@ -1232,7 +1232,88 @@ Error: The allocation is "alloc"
 |}]
 
 
-(** Test 5b: [stack_] negative cases *)
+(** Test 5b: an allocation nested inside several enclosing functions forces
+    every enclosing layer. The functions [g] and [h] each capture the parameter
+    [a], so building each inner closure is itself an allocation in its parent;
+    together with the innermost [Just a] this makes every one of the three nested
+    functions an allocation site, so each is forced to [alloc]. *)
+
+(* All three layers annotated [noalloc_strict]: the capture chain reaches the
+   outermost function, so building the closure [g] (which transitively captures
+   [a]) is an allocation inside the outermost function and is reported there --
+   demonstrating that the deepest allocation forces every enclosing layer, not
+   just the immediately enclosing one. *)
+let (layers3_ss @ noalloc_strict) (a : int) =
+  let (g @ noalloc_strict) () =
+    let (h @ noalloc_strict) () = Just a in
+    h
+  in
+  g
+[%%expect{|
+Lines 13-15, characters 27-5:
+13 | ...........................() =
+14 |     let (h @ noalloc_strict) () = Just a in
+15 |     h
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 12-17, characters 34-3
+         which is expected to be "noalloc_strict".
+|}]
+
+(* The same nesting, all layers [noalloc]. *)
+let (layers3_n @ noalloc) (a : int) =
+  let (g @ noalloc) () =
+    let (h @ noalloc) () = Just a in
+    h
+  in
+  g
+[%%expect{|
+Lines 2-4, characters 20-5:
+2 | ....................() =
+3 |     let (h @ noalloc) () = Just a in
+4 |     h
+Error: The allocation is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at lines 1-6, characters 26-3
+         which is expected to be "noalloc".
+|}]
+
+(* Annotating only the middle layer still errors: building the closure [h]
+   inside [g] is an allocation that forces [g]. *)
+let layers_middle (a : int) =
+  let (g @ noalloc_strict) () =
+    let h () = Just a in
+    h
+  in
+  g
+[%%expect{|
+Line 3, characters 10-21:
+3 |     let h () = Just a in
+              ^^^^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 2-4, characters 27-5
+         which is expected to be "noalloc_strict".
+|}]
+
+(* Annotating only the innermost layer still errors: [Just a] forces [h]. *)
+let layers_inner (a : int) =
+  let g () =
+    let (h @ noalloc_strict) () = Just a in
+    h
+  in
+  g
+[%%expect{|
+Line 3, characters 34-40:
+3 |     let (h @ noalloc_strict) () = Just a in
+                                      ^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 3, characters 29-40
+         which is expected to be "noalloc_strict".
+|}]
+
+(** Test 5c: [stack_] negative cases *)
 
 (* [stack_] on a non-allocation (a plain value) is rejected: it is not an
    allocation. *)
@@ -1244,7 +1325,7 @@ Line 5, characters 67-68:
 Error: This expression is not an allocation site.
 |}]
 
-(** Test 5c: [stack_] nested cases. *)
+(** Test 5d: [stack_] nested cases. *)
 (* Nested: an inner allocation that is not itself [stack_]-marked still
    allocates on the heap, even when an enclosing allocation is [stack_]-marked. *)
 let (stack_nested @ noalloc_strict) (a : int) = exclave_ stack_ (Just (Just a))
@@ -1255,6 +1336,237 @@ Line 1, characters 70-78:
 Error: The allocation is "alloc"
        but is expected to be "noalloc_strict"
          because it is used inside the function at line 1, characters 36-79
+         which is expected to be "noalloc_strict".
+|}]
+
+(* A [@@ global] field forces its value onto the heap even when the enclosing
+   record is [stack_]-allocated: the record block is exempt, but the global
+   field value [Just a] is a genuine heap allocation and is still rejected. This
+   is another way (besides plain nesting above) for a heap allocation to sit
+   inside a [stack_] one. *)
+type 'a global_field_rec = { gf : 'a @@ global; rest : int }
+let (stack_global_field @ noalloc_strict) (a : int) =
+  exclave_ stack_ { gf = Just a; rest = a }
+[%%expect{|
+type 'a global_field_rec = { gf : 'a @@ global; rest : int; }
+Line 3, characters 25-31:
+3 |   exclave_ stack_ { gf = Just a; rest = a }
+                             ^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 2-3, characters 42-43
+         which is expected to be "noalloc_strict".
+|}]
+
+
+(** Test 5e: the allocation axis is exempted only by [stack_]
+    ([expected_mode.strictly_stack]), not by [local_]/[exclave_]
+    ([expected_mode.strictly_local]). The two flags are independent, so they are
+    NOT interchangeable:
+
+    - [strictly_stack] is set ONLY by the direct operand of [stack_], the
+      explicit, checked stack-allocation form. It can be [true] while
+      [strictly_local] is [false] -- e.g. a [stack_] in a plain [let] binding,
+      not under any [exclave_]/[local_]. Gating the walk on [strictly_local]
+      would WRONGLY REJECT such a legitimate [stack_] (see [stack_in_let]).
+    - [strictly_local] is set by [local_]/[exclave_], which only constrain the
+      *mode* to [local]. The current implementation does not treat them as
+      exempt (it conservatively requires the explicit, checked [stack_] marker),
+      so these still error (see [exclave_not_exempt]/[local_not_exempt]). *)
+
+(* [exclave_] alone (no [stack_]) does not exempt the allocation. *)
+let (exclave_not_exempt @ noalloc_strict) (a : int) = exclave_ (Just a)
+[%%expect{|
+Line 17, characters 63-71:
+17 | let (exclave_not_exempt @ noalloc_strict) (a : int) = exclave_ (Just a)
+                                                                    ^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 17, characters 42-71
+         which is expected to be "noalloc_strict".
+|}]
+
+(* [local_] alone (no [stack_]) does not exempt the allocation. *)
+let (local_not_exempt @ noalloc_strict) (a : int) =
+  let _x = local_ (Just a) in
+  ()
+[%%expect{|
+Line 2, characters 18-26:
+2 |   let _x = local_ (Just a) in
+                      ^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 1-3, characters 40-4
+         which is expected to be "noalloc_strict".
+|}]
+
+(* For contrast, the same allocation wrapped in [stack_] (sets [strictly_stack])
+   is exempt and accepted. *)
+let (stack_is_exempt @ noalloc_strict) (a : int) = exclave_ stack_ (Just a)
+[%%expect{|
+val stack_is_exempt : int -> int variant_t5 @ local = <fun>
+|}]
+
+(* The decisive case: a [stack_] in a plain [let] binding (no [exclave_]/[local_]
+   around it) has [strictly_stack = true] but [strictly_local = false]. It is
+   correctly accepted. Gating the walk on [strictly_local] would reject it, which
+   is why [strictly_stack] is required rather than reusing [strictly_local]. *)
+let (stack_in_let @ noalloc_strict) (a : int) =
+  let _x = stack_ (Just a) in
+  ()
+[%%expect{|
+val stack_in_let : int -> unit = <fun>
+|}]
+
+
+(** Test 5f: a transparent wrapper around the [stack_] operand can defeat the
+    [stack_] exemption.
+
+    [stack_] sets [strictly_stack] on its operand, but [mode_morph]/[mode_coerce]
+    reset [strictly_stack] for children (while keeping [strictly_local]). A
+    transparent re-typing layer -- one that wraps the SAME allocation rather than
+    introducing a new inner one -- therefore loses [strictly_stack], so the
+    underlying allocation is registered as if un-marked. The allocation is still
+    genuinely stack-allocated (the inferred result is [@ local]), so these are
+    conservative FALSE POSITIVES of the current implementation. *)
+
+(* CR shsong (false positive): a type annotation goes through [Pexp_constraint]
+   -> [type_expect_mode] -> [mode_coerce], which resets [strictly_stack] on the
+   inner allocation, so it is wrongly rejected. *)
+let (stack_through_type_annot @ noalloc_strict) (a : int) =
+  exclave_ stack_ ((Just a : int variant_t5))
+[%%expect{|
+Line 16, characters 20-26:
+16 |   exclave_ stack_ ((Just a : int variant_t5))
+                         ^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 15-16, characters 48-45
+         which is expected to be "noalloc_strict".
+|}]
+
+(* CR shsong (false positive): same via a mode annotation. *)
+let (stack_through_mode_annot @ noalloc_strict) (a : int) =
+  exclave_ stack_ ((Just a : _ @ local))
+[%%expect{|
+Line 2, characters 20-26:
+2 |   exclave_ stack_ ((Just a : _ @ local))
+                        ^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 1-2, characters 48-40
+         which is expected to be "noalloc_strict".
+|}]
+
+(* For contrast, a coercion [:>] does NOT reset [strictly_stack]: the [stack_]
+   operand stays exempt and is correctly accepted. *)
+let (stack_through_coercion @ noalloc_strict) (a : int) =
+  exclave_ stack_ ((Just a :> int variant_t5))
+[%%expect{|
+val stack_through_coercion : int -> int variant_t5 @ local = <fun>
+|}]
+
+(* For contrast, an attribute on the allocation is also fine. *)
+let (stack_through_attribute @ noalloc_strict) (a : int) =
+  exclave_ stack_ ((Just a)[@inline])
+[%%expect{|
+val stack_through_attribute : int -> int variant_t5 @ local = <fun>
+|}]
+
+(* CR shsong (different symptom): [let open ... in] is also transparent, but here
+   [stack_] fails to even recognize the allocation site -- the [Pexp_stack]
+   allocation-site detection does not see through [Pexp_open] (this is a
+   detection gap, not the [strictly_stack] reset above). *)
+let (stack_through_open @ noalloc_strict) (a : int) =
+  exclave_ stack_ (let open Stdlib in Just a)
+[%%expect{|
+Line 2, characters 18-45:
+2 |   exclave_ stack_ (let open Stdlib in Just a)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression is not an allocation site.
+|}]
+
+
+(** Test 5g: a genuinely NEW inner allocation under a [stack_] outer is still
+    flagged. Unlike a transparent wrapper (Test 5f), these inner expressions
+    introduce their own allocation, so the [stack_] exemption must NOT reach
+    them. It does not: [stack_] only marks its top operand, and every inner
+    allocation below is registered with [strictly_stack = false] -- either
+    because its mode is built by [mode_default] (constructor args, tuple
+    components, record fields, function bodies) or because [mode_morph] resets
+    [strictly_stack] for children (lazy thunk body, partial-application args).
+
+    NOTE (verified by experiment): deleting the [strictly_stack = false] line in
+    [mode_morph] does NOT change any case below -- they all still error -- so
+    that line is not what protects these. Its only observed effect across the
+    whole [typing-modes] suite is on the transparent constraint cases of Test 5f
+    (whose false positives it causes). *)
+
+(* lazy thunk body holds a new allocation *)
+let (stack_inner_lazy @ noalloc_strict) (a : int) =
+  exclave_ stack_ (lazy (Just a))
+[%%expect{|
+Line 18, characters 18-33:
+18 |   exclave_ stack_ (lazy (Just a))
+                       ^^^^^^^^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 17-18, characters 40-33
+         which is expected to be "noalloc_strict".
+|}]
+
+(* a new allocation captured as an argument of a partial application *)
+let (stack_inner_partial @ noalloc_strict)
+      (g : (int variant_t5 -> int -> int -> int) @ noalloc_strict) (a : int) =
+  exclave_ stack_ (g (Just a) 2)
+[%%expect{|
+Lines 2-3, characters 67-32:
+2 | ...................................................................(a : int) =
+3 |   exclave_ stack_ (g (Just a) 2)
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 2-3, characters 6-32
+         which is expected to be "noalloc_strict".
+|}]
+
+(* a tuple component is a new allocation *)
+let (stack_inner_tuple @ noalloc_strict) (a : int) =
+  exclave_ stack_ (Just a, Just a)
+[%%expect{|
+Line 2, characters 19-25:
+2 |   exclave_ stack_ (Just a, Just a)
+                       ^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 1-2, characters 41-34
+         which is expected to be "noalloc_strict".
+|}]
+
+(* a record field is a new allocation *)
+type stack_inner_rec = { sf1 : int variant_t5; sf2 : int }
+let (stack_inner_field @ noalloc_strict) (a : int) =
+  exclave_ stack_ { sf1 = Just a; sf2 = a }
+[%%expect{|
+type stack_inner_rec = { sf1 : int variant_t5; sf2 : int; }
+Line 3, characters 26-32:
+3 |   exclave_ stack_ { sf1 = Just a; sf2 = a }
+                              ^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 2-3, characters 41-43
+         which is expected to be "noalloc_strict".
+|}]
+
+(* a function body has a new allocation *)
+let (stack_inner_funbody @ noalloc_strict) (a : int) =
+  exclave_ stack_ (fun () -> Just a)
+[%%expect{|
+Line 2, characters 29-35:
+2 |   exclave_ stack_ (fun () -> Just a)
+                                 ^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 1-2, characters 43-36
          which is expected to be "noalloc_strict".
 |}]
 
