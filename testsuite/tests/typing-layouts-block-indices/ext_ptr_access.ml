@@ -248,3 +248,71 @@ let () =
   Printf.printf "  set: expected (10, (200.5, 300.5)), got (%d, (%.1f, %.1f))\n"
     pt.x (Float_u.to_float a) (Float_u.to_float b);
   ()
+
+(***********************************************************************)
+(* Test 9: embedded mixed product, exercising a NONZERO gap.          *)
+(*                                                                    *)
+(* A block index for a mixed (value + flat) product packs a "gap" in  *)
+(* its top 12 bits and a byte offset in its low 52 bits. When the     *)
+(* product is embedded in a larger block, its value and flat halves   *)
+(* are physically separated, so the gap is nonzero.                   *)
+(*                                                                    *)
+(* An ext pointer can still address such a field: a block index is    *)
+(* [bits64], so we reinterpret it to [int64#] and add the record's    *)
+(* base address. On conventional targets the address's top 12 bits    *)
+(* are zero, so the addition only changes the low 52 offset bits and  *)
+(* leaves the gap intact -- the codegen zeroes the gap to form the    *)
+(* value offset and re-adds it for the flat. The test asserts that    *)
+(* architectural assumption (and that the gap is genuinely nonzero).  *)
+
+type vf = #{ v : string; f : int64# }
+type pt_vf_pair = { mutable a : vf; mutable b : vf }
+
+external idx_to_int64 : (pt_vf_pair, vf) idx_mut -> int64# = "%obj_magic"
+
+(* Global (non-local) variants: the read value is a real heap object, so we can
+   return it globally and print the string field. *)
+external get_ext_ptr_g : ('a : any). int64# -> 'a = "%unsafe_get_ext_ptr"
+[@@layout_poly]
+
+external set_ext_ptr_g : ('a : any). int64# -> 'a -> unit = "%unsafe_set_ext_ptr"
+[@@layout_poly]
+
+let gap_of idx =
+  Int64.shift_right_logical (Int64_u.to_int64 (idx_to_int64 idx)) 52
+
+let[@inline never] get_vf_field pt idx =
+  let addr = Int64_u.add (addr_of_value pt) (idx_to_int64 idx) in
+  get_ext_ptr_g addr
+
+let[@inline never] set_vf_field pt idx (y : vf) =
+  let addr = Int64_u.add (addr_of_value pt) (idx_to_int64 idx) in
+  set_ext_ptr_g addr y
+
+let () =
+  print_endline "Test 9: embedded mixed product (nonzero gap)";
+  let pt = { a = #{ v = "a"; f = #1L }; b = #{ v = "b"; f = #2L } } in
+  (* The construction requires the record's address to fit in the low 52 bits,
+     i.e. its top 12 bits must be zero. *)
+  assert (
+    Int64.shift_right_logical (Int64_u.to_int64 (addr_of_value pt)) 52 = 0L);
+  (* Both fields genuinely have a nonzero gap. *)
+  assert (gap_of (.a) <> 0L);
+  assert (gap_of (.b) <> 0L);
+  let #{ v; f } : vf = get_vf_field pt (.b) in
+  Printf.printf "  get b: expected (b, 2), got (%s, %Ld)\n"
+    v (Int64_u.to_int64 f);
+  set_vf_field pt (.b) #{ v = "z"; f = #9L };
+  let pt = Sys.opaque_identity pt in
+  let #{ v; f } = pt.b in
+  Printf.printf "  set b: expected (z, 9), got (%s, %Ld)\n"
+    v (Int64_u.to_int64 f);
+  let #{ v; f } : vf = get_vf_field pt (.a) in
+  Printf.printf "  get a: expected (a, 1), got (%s, %Ld)\n"
+    v (Int64_u.to_int64 f);
+  set_vf_field pt (.a) #{ v = "y"; f = #8L };
+  let pt = Sys.opaque_identity pt in
+  let #{ v; f } = pt.a in
+  Printf.printf "  set a: expected (y, 8), got (%s, %Ld)\n"
+    v (Int64_u.to_int64 f);
+  ()
