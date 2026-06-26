@@ -450,6 +450,12 @@ type expected_mode =
     (** True iff this expression is the direct operand of [stack_].
     Suppresses the allocation-axis lock-walk for its top allocation. *)
 
+    (* CR shsong: An alternative design is to unify strictly_local and
+    strictly_stack. Specifically, we want to set strictly_local when
+    [stack_] keyword is used, so that we can use strictly_local and remove
+    strictly_stack. However, if we do that, there would be uncaught exception
+    in Test 5h in test typing-modes/zero_alloc.ml. We will review this later. *)
+
     tuple_modes : (Value.r * Location.t) list option;
     (** No invariant between this and [mode]. It is UNSOUND to ignore this
         field. If this is [Some [x0; x1; ..]]:
@@ -578,8 +584,7 @@ let mode_morph f expected_mode =
   let mode = as_single_mode expected_mode in
   let mode = f mode |> Mode.Value.disallow_left in
   let tuple_modes = None in
-  { expected_mode with mode; tuple_modes;
-    strictly_stack = false (* strictly_stack does not affect children *) }
+  { expected_mode with mode; tuple_modes }
 
 (** Similiar to [apply_left_is_contained_by] but for [expected_mode]. *)
 let mode_is_contained_by is_contained_by ?modalities expected_mode =

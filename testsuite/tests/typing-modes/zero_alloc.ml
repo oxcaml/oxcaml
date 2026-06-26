@@ -1419,46 +1419,31 @@ val stack_in_let : int -> unit = <fun>
 |}]
 
 
-(** Test 5f: a transparent wrapper around the [stack_] operand can defeat the
-    [stack_] exemption.
+(** Test 5f: a transparent wrapper around the [stack_] operand should not defeat
+    the [stack_] exemption.
 
-    [stack_] sets [strictly_stack] on its operand, but [mode_morph]/[mode_coerce]
-    reset [strictly_stack] for children (while keeping [strictly_local]). A
-    transparent re-typing layer -- one that wraps the SAME allocation rather than
-    introducing a new inner one -- therefore loses [strictly_stack], so the
-    underlying allocation is registered as if un-marked. The allocation is still
-    genuinely stack-allocated (the inferred result is [@ local]), so these are
-    conservative FALSE POSITIVES of the current implementation. *)
+    [stack_] sets [strictly_stack] on its operand.
+    Although we do not want [strictly_stack = true] for children allocations,
+    we should not use [mode_morph]/[mode_coerce] to reset [strictly_stack] for
+    children (while keeping [strictly_local]). *)
 
-(* CR shsong (false positive): a type annotation goes through [Pexp_constraint]
-   -> [type_expect_mode] -> [mode_coerce], which resets [strictly_stack] on the
-   inner allocation, so it is wrongly rejected. *)
+(* A type annotation goes through [Pexp_constraint] -> [type_expect_mode]
+   -> [mode_coerce], which should not resets [strictly_stack] on the
+   inner allocation, i.e., the inner allocation is still on stack. *)
 let (stack_through_type_annot @ noalloc_strict) (a : int) =
   exclave_ stack_ ((Just a : int variant_t5))
 [%%expect{|
-Line 16, characters 20-26:
-16 |   exclave_ stack_ ((Just a : int variant_t5))
-                         ^^^^^^
-Error: The allocation is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at lines 15-16, characters 48-45
-         which is expected to be "noalloc_strict".
+val stack_through_type_annot : int -> int variant_t5 @ local = <fun>
 |}]
 
-(* CR shsong (false positive): same via a mode annotation. *)
+(* Same via a mode annotation. *)
 let (stack_through_mode_annot @ noalloc_strict) (a : int) =
   exclave_ stack_ ((Just a : _ @ local))
 [%%expect{|
-Line 2, characters 20-26:
-2 |   exclave_ stack_ ((Just a : _ @ local))
-                        ^^^^^^
-Error: The allocation is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at lines 1-2, characters 48-40
-         which is expected to be "noalloc_strict".
+val stack_through_mode_annot : int -> int variant_t5 @ local = <fun>
 |}]
 
-(* For contrast, a coercion [:>] does NOT reset [strictly_stack]: the [stack_]
+(* A coercion [:>] does NOT reset [strictly_stack]: the [stack_]
    operand stays exempt and is correctly accepted. *)
 let (stack_through_coercion @ noalloc_strict) (a : int) =
   exclave_ stack_ ((Just a :> int variant_t5))
@@ -1466,17 +1451,17 @@ let (stack_through_coercion @ noalloc_strict) (a : int) =
 val stack_through_coercion : int -> int variant_t5 @ local = <fun>
 |}]
 
-(* For contrast, an attribute on the allocation is also fine. *)
+(* An attribute on the allocation is also fine. *)
 let (stack_through_attribute @ noalloc_strict) (a : int) =
   exclave_ stack_ ((Just a)[@inline])
 [%%expect{|
 val stack_through_attribute : int -> int variant_t5 @ local = <fun>
 |}]
 
-(* CR shsong (different symptom): [let open ... in] is also transparent, but here
-   [stack_] fails to even recognize the allocation site -- the [Pexp_stack]
+(* [let open ... in] is also transparent, but here [stack_]
+   fails to even recognize the allocation site -- the [Pexp_stack]
    allocation-site detection does not see through [Pexp_open] (this is a
-   detection gap, not the [strictly_stack] reset above). *)
+   detection gap, not the [strictly_stack] reset issue). *)
 let (stack_through_open @ noalloc_strict) (a : int) =
   exclave_ stack_ (let open Stdlib in Just a)
 [%%expect{|
@@ -1494,13 +1479,7 @@ Error: This expression is not an allocation site.
     allocation below is registered with [strictly_stack = false] -- either
     because its mode is built by [mode_default] (constructor args, tuple
     components, record fields, function bodies) or because [mode_morph] resets
-    [strictly_stack] for children (lazy thunk body, partial-application args).
-
-    NOTE (verified by experiment): deleting the [strictly_stack = false] line in
-    [mode_morph] does NOT change any case below -- they all still error -- so
-    that line is not what protects these. Its only observed effect across the
-    whole [typing-modes] suite is on the transparent constraint cases of Test 5f
-    (whose false positives it causes). *)
+    [strictly_stack] for children (lazy thunk body, partial-application args). *)
 
 (* lazy thunk body holds a new allocation *)
 let (stack_inner_lazy @ noalloc_strict) (a : int) =
@@ -1568,6 +1547,61 @@ Error: The allocation is "alloc"
        but is expected to be "noalloc_strict"
          because it is used inside the function at lines 1-2, characters 43-36
          which is expected to be "noalloc_strict".
+|}]
+
+
+(** Test 5h: regression guard for making [stack_] set [strictly_local].
+
+    A [stack_] closure placed where a [global] value is required must report a
+    clean locality error, NOT crash. If the [Pexp_stack] handler is changed to
+    [mode_strictly_stack expected_mode |> mode_strictly_local], then
+    [split_function_ty] forces the closure areality with [Locality.submode_exn]
+    (line ~6237). That submode genuinely fails here (the closure must be global),
+    and the [_exn] form raises [Invalid_argument "result is Error _"] -- a
+    compiler crash -- instead of the graceful error below. With the handler left
+    as [mode_strictly_stack] only, all four error cleanly. *)
+
+(* stack_ closure stored in a ref (ref contents must be global) *)
+let stack_clo_in_ref = ref (stack_ (fun x -> x))
+[%%expect{|
+Line 13, characters 27-48:
+13 | let stack_clo_in_ref = ref (stack_ (fun x -> x))
+                                ^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
+|}]
+
+(* stack_ closure as the function in a tail call *)
+let stack_clo_tailcall () = (stack_ (fun x -> x)) 42
+[%%expect{|
+Line 1, characters 28-49:
+1 | let stack_clo_tailcall () = (stack_ (fun x -> x)) 42
+                                ^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+         because it is the function in a tail call.
+|}]
+
+(* stack_ multi-argument closure stored in a ref *)
+let stack_clo_multiarg () = ref (stack_ (fun x y -> x : 'a -> 'a -> 'a))
+[%%expect{|
+Line 1, characters 32-72:
+1 | let stack_clo_multiarg () = ref (stack_ (fun x y -> x : 'a -> 'a -> 'a))
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
+|}]
+
+(* stack_ closure returned where a global function is expected *)
+let stack_clo_global_return () : int -> int = stack_ (fun x -> x)
+[%%expect{|
+Line 1, characters 46-65:
+1 | let stack_clo_global_return () : int -> int = stack_ (fun x -> x)
+                                                  ^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 
