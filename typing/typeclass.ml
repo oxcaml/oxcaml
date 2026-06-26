@@ -1937,8 +1937,8 @@ let final_decl env define_class
                  , Non_generalizable_class { id; clty; nongen_vars }));
     );
   begin match
-    Alloc.with_zap_scope Ctype.closed_class clty.cty_params
-      (Btype.signature_of_class_type clty.cty_type)
+    Alloc.with_zap_scope (fun ~zap_scope -> Ctype.closed_class ~zap_scope
+      clty.cty_params (Btype.signature_of_class_type clty.cty_type))
   with
     None        -> ()
   | Some reason ->

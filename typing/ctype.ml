@@ -867,7 +867,8 @@ let close_type ~zap_scope mark ty =
 let closed_parameterized_type params ty =
   with_type_mark begin fun mark ->
     List.iter (mark_type mark) params;
-    try Alloc.with_zap_scope close_type mark ty; true with Non_closed _ -> false
+    try Alloc.with_zap_scope (fun ~zap_scope -> close_type ~zap_scope mark ty);
+    true with Non_closed _ -> false
   end
 
 let closed_type_decl ~zap_scope decl =
@@ -8214,7 +8215,8 @@ let add_nongen_vars_in_schema =
     end
   in
   fun env acc ty ->
-    Alloc.with_zap_scope (remove_mode_and_jkind_variables ty);
+    Alloc.with_zap_scope (fun ~zap_scope ->
+      remove_mode_and_jkind_variables ~zap_scope ty);
     let _, result = loop env (TypeSet.empty, acc) ty in
     result
 
