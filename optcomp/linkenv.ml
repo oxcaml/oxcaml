@@ -157,12 +157,11 @@ let extract_crc_interfaces t =
     t.interfaces []
 
 let extract_crc_implementations t =
-  CU.Map.fold
-    (fun cu crc acc ->
+  Cmx_consistbl.fold_map t.implementations ~init:[]
+    ~f:(fun acc cu crc ->
       let crc = Option.map (fun ((), crc) -> crc) crc in
       Import_info.create_normal cu ~crc :: acc)
-    (Cmx_consistbl.extract_map t.implementations t.crc_implementations)
-    []
+    t.crc_implementations
 
 (* Add C objects and options and "custom" info from a library descriptor. See
    bytecomp/bytelink.ml for comments on the order of C objects. *)
