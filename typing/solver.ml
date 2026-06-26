@@ -50,6 +50,13 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         constraint 'd = _ * _
       [@@ocaml.warning "-62"]
 
+      (** Composes two hint morphisms [f] and [g]. If [f] is [Id] we return [g]
+          and vice-versa. Otherwise we return [Compose (f, g)]. *)
+      let compose : type a b c l r.
+          (b, c, l * r) t -> (a, b, l * r) t -> (a, c, l * r) t =
+       fun m1 m2 ->
+        match m1, m2 with Id, m -> m | m, Id -> m | _, _ -> Compose (m1, m2)
+
       let rec left_adjoint : type a b l.
           H.Pinpoint.t ->
           b C.obj ->
@@ -579,7 +586,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let apply_morphvar dst morph morph_hint (Amorphvar (var, morph', morph'_hint))
       =
     Amorphvar
-      (var, C.compose dst morph morph', Compose (morph_hint, morph'_hint))
+      ( var,
+        C.compose dst morph morph',
+        Comp_hint.Morph_hint.compose morph_hint morph'_hint )
 
   let apply : type a b l r.
       b C.obj ->
@@ -905,8 +914,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let _, src, g'_hint = Comp_hint.Morph_hint.left_adjoint pp dst g_hint in
     let g'f = C.compose src g' (C.disallow_right f) in
     let g'f_hint =
-      Comp_hint.Morph_hint.Compose
-        (g'_hint, Comp_hint.Morph_hint.disallow_right f_hint)
+      Comp_hint.Morph_hint.compose g'_hint
+        (Comp_hint.Morph_hint.disallow_right f_hint)
     in
     let x = Amorphvar (v, g'f, g'f_hint) in
     let key = get_key src x in
@@ -918,8 +927,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         (fun (Amorphvar (w, h, h_hint)) ->
           let gh = C.compose dst (C.disallow_left g) h in
           let gh_hint =
-            Comp_hint.Morph_hint.Compose
-              (Comp_hint.Morph_hint.disallow_left g_hint, h_hint)
+            Comp_hint.Morph_hint.compose
+              (Comp_hint.Morph_hint.disallow_left g_hint)
+              h_hint
           in
           let y = Amorphvar (w, gh, gh_hint) in
           submode_mvmv ~log pp dst mv y)
@@ -944,8 +954,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let _, src, f'_hint = Comp_hint.Morph_hint.right_adjoint pp dst f_hint in
     let f'g = C.compose src f' (C.disallow_left g) in
     let f'g_hint =
-      Comp_hint.Morph_hint.Compose
-        (f'_hint, Comp_hint.Morph_hint.disallow_left g_hint)
+      Comp_hint.Morph_hint.compose f'_hint
+        (Comp_hint.Morph_hint.disallow_left g_hint)
     in
     let x = Amorphvar (u, f'g, f'g_hint) in
     let key = get_key src x in
@@ -957,8 +967,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         (fun (Amorphvar (w, h, h_hint)) ->
           let fh = C.compose dst (C.disallow_right f) h in
           let fh_hint =
-            Comp_hint.Morph_hint.Compose
-              (Comp_hint.Morph_hint.disallow_right f_hint, h_hint)
+            Comp_hint.Morph_hint.compose
+              (Comp_hint.Morph_hint.disallow_right f_hint)
+              h_hint
           in
           let y = Amorphvar (w, fh, fh_hint) in
           submode_mvmv ~log pp dst y mu)
