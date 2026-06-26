@@ -390,11 +390,8 @@ module type Solver_mono = sig
   val print :
     ?verbose:bool -> 'a obj -> Fmt.formatter -> ('a, 'l * 'r) mode -> unit
 
-  (** Returns true iff the mode has the given level or is a constant *)
-  val check_level : ('a, 'l * 'r) mode -> int -> bool
-
-  (** Returns true iff the mode is a variable at the given level *)
-  val check_level_var : ('a, 'l * 'r) mode -> int -> bool
+  (** Returns true if the mode includes a mode variable at generic level *)
+  val check_generic : ('a, 'l * 'r) mode -> bool
 
   type var_iterator =
     { iter : 'a. 'a obj -> ('a, allowed * allowed) mode -> unit }

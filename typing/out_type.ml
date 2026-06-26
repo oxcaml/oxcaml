@@ -1000,7 +1000,7 @@ let curry_mode_const : Alloc.Const.t -> Alloc.lr -> Alloc.Const.t =
 
 let equate_with_const : Alloc.lr -> Alloc.Const.t -> bool =
   fun m c ->
-    if not (Alloc.check_level_var m generic_level)
+    if not (Alloc.check_generic m)
        || not (mode_polymorphism_printing_enabled ())
     then
       Result.is_ok (Alloc.equate m (Alloc.of_const c))
@@ -1243,7 +1243,7 @@ end = struct
 
   let add_named_modevar : Alloc.lr -> unit =
     fun ({ monadic; comonadic } as mode) ->
-      if Alloc.check_level_var mode generic_level then begin
+      if Alloc.check_generic mode then begin
         let monadic_desc = Alloc.get_monadic_desc monadic in
         let comonadic_desc = Alloc.get_comonadic_desc comonadic in
         let pair = { monadic = monadic_desc; comonadic = comonadic_desc } in
@@ -2347,7 +2347,7 @@ let tree_of_modes_const (modes : Mode.Alloc.Const.t) =
 
 let tree_of_modes : Alloc.lr -> zapped:Alloc.Const.t -> string list =
   fun modes ~zapped ->
-    if Alloc.check_level_var modes generic_level &&
+    if Alloc.check_generic modes &&
       mode_polymorphism_printing_enabled () then
       [ (Fmt.asprintf "%s"
             (Variable_names.name_of_mode modes))]

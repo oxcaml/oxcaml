@@ -5496,9 +5496,7 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let print ?verbose () ppf m = S.print ?verbose obj ppf m
 
-  let check_level a i = S.check_level a i
-
-  let check_level_var a i = S.check_level_var a i
+  let check_generic a = S.check_generic a
 
   let iter_covariant a iter = S.iter_covariant obj a iter
 
@@ -5515,27 +5513,24 @@ module Comonadic_gen (Obj : Obj) = struct
     else S.zap_to_floor ~log:None obj m
 
   let zap_to_ceil_exn m =
-    if check_level_var m generic_level then raise Cannot_zap_generic;
+    if check_generic m then raise Cannot_zap_generic;
     zap_to_ceil_force m
 
   let zap_to_floor_exn m =
-    if check_level_var m generic_level then raise Cannot_zap_generic;
+    if check_generic m then raise Cannot_zap_generic;
     zap_to_floor_force m
 
   let zap_to_ceil m =
-    if check_level_var m generic_level then None else Some (zap_to_ceil_force m)
+    if check_generic m then None else Some (zap_to_ceil_force m)
 
   let zap_to_floor m =
-    if check_level_var m generic_level
-    then None
-    else Some (zap_to_floor_force m)
+    if check_generic m then None else Some (zap_to_floor_force m)
 
   let of_const : type l r. ?hint:(l * r) pos Hint.const -> const -> (l * r) t =
    fun ?hint a -> S.of_const ?hint obj a
 
   let to_const_exn m =
-    if check_level_var m generic_level
-    then raise Cannot_get_constant_from_generic;
+    if check_generic m then raise Cannot_get_constant_from_generic;
     S.to_const_exn obj m
 
   let unhint = S.Unhint.unhint
@@ -5689,9 +5684,7 @@ module Monadic_gen (Obj : Obj) = struct
 
   let print ?verbose () ppf m = S.print ?verbose obj ppf m
 
-  let check_level a i = S.check_level a i
-
-  let check_level_var a i = S.check_level_var a i
+  let check_generic a = S.check_generic a
 
   let iter_covariant a iter = S.iter_contravariant obj a iter
 
@@ -5708,27 +5701,24 @@ module Monadic_gen (Obj : Obj) = struct
     else S.zap_to_ceil ~log:None obj m
 
   let zap_to_ceil_exn m =
-    if check_level_var m generic_level then raise Cannot_zap_generic;
+    if check_generic m then raise Cannot_zap_generic;
     zap_to_ceil_force m
 
   let zap_to_floor_exn m =
-    if check_level_var m generic_level then raise Cannot_zap_generic;
+    if check_generic m then raise Cannot_zap_generic;
     zap_to_floor_force m
 
   let zap_to_floor m =
-    if check_level_var m generic_level
-    then None
-    else Some (zap_to_floor_force m)
+    if check_generic m then None else Some (zap_to_floor_force m)
 
   let zap_to_ceil m =
-    if check_level_var m generic_level then None else Some (zap_to_ceil_force m)
+    if check_generic m then None else Some (zap_to_ceil_force m)
 
   let of_const : type l r. ?hint:(l * r) neg Hint.const -> const -> (l * r) t =
    fun ?hint a -> S.of_const ?hint obj a
 
   let to_const_exn m =
-    if check_level_var m generic_level
-    then raise Cannot_get_constant_from_generic;
+    if check_generic m then raise Cannot_get_constant_from_generic;
     S.to_const_exn obj m
 
   let unhint = S.Unhint.unhint
@@ -7057,11 +7047,8 @@ module Value_with (Areality : Areality) = struct
     then m
     else { monadic = monadic1; comonadic = comonadic1 }
 
-  let check_level { monadic = monadic0; comonadic = comonadic0 } i =
-    Monadic.check_level monadic0 i && Comonadic.check_level comonadic0 i
-
-  let check_level_var { monadic = monadic0; comonadic = comonadic0 } i =
-    Monadic.check_level_var monadic0 i || Comonadic.check_level_var comonadic0 i
+  let check_generic { monadic = monadic0; comonadic = comonadic0 } =
+    Monadic.check_generic monadic0 || Comonadic.check_generic comonadic0
 
   let equate a b = try_with_log (equate_from_submode (submode_log ?pp:None) a b)
 
@@ -7165,20 +7152,18 @@ module Value_with (Areality : Areality) = struct
     merge { monadic; comonadic }
 
   let zap_to_ceil_exn m =
-    if check_level_var m generic_level then raise Cannot_zap_generic;
+    if check_generic m then raise Cannot_zap_generic;
     zap_to_ceil_force m
 
   let zap_to_floor_exn m =
-    if check_level_var m generic_level then raise Cannot_zap_generic;
+    if check_generic m then raise Cannot_zap_generic;
     zap_to_floor_force m
 
   let zap_to_floor m =
-    if check_level_var m generic_level
-    then None
-    else Some (zap_to_floor_force m)
+    if check_generic m then None else Some (zap_to_floor_force m)
 
   let zap_to_ceil m =
-    if check_level_var m generic_level then None else Some (zap_to_ceil_force m)
+    if check_generic m then None else Some (zap_to_ceil_force m)
 
   let zap_to_legacy_force ?commit { comonadic; monadic } =
     let monadic = Monadic.zap_to_legacy_force ?commit monadic in
@@ -7186,13 +7171,11 @@ module Value_with (Areality : Areality) = struct
     merge { monadic; comonadic }
 
   let zap_to_legacy_exn m =
-    if check_level_var m generic_level then raise Cannot_zap_generic;
+    if check_generic m then raise Cannot_zap_generic;
     zap_to_legacy_force m
 
   let zap_to_legacy m =
-    if check_level_var m generic_level
-    then None
-    else Some (zap_to_legacy_force m)
+    if check_generic m then None else Some (zap_to_legacy_force m)
 
   type zap_scope =
     { variables : Z.zap_scope;
@@ -7293,7 +7276,7 @@ module Value_with (Areality : Areality) = struct
     3) if it appears as both, it is zapped to legacy *)
     List.iter
       (fun m ->
-        if check_level_var m generic_level
+        if check_generic m
         then begin
           add_covariant_to_zap_scope m variables;
           add_contravariant_to_zap_scope m variables
