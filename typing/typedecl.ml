@@ -1254,10 +1254,6 @@ let transl_declaration env sdecl (id, uid) =
       in
       set_private_row env sdecl.ptype_loc p decl
     end;
-    (* CR sspies: We used to compute shapes here, which were then added to
-       various typing environments. The computation of the shapes has moved
-       further down in the translation, so they are currently not added to the
-       intermediate environments. Find out whether that is an issue. *)
     let decl =
       {
         typ_id = id;
