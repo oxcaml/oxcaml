@@ -209,6 +209,7 @@ module Artifact : sig
   val impl_shape : t -> Shape.t option
   val declaration_dependencies :
     t -> (Cmt_format.dependency_kind * Shape.Uid.t * Shape.Uid.t) list
+  val modname : t -> Compilation_unit.t
   val uid_to_loc : Shape.Uid.t -> t -> string Location.loc option
 
   (** When we look for docstring in external compilation unit we can perform
@@ -247,6 +248,9 @@ end = struct
   let declaration_dependencies = function
     | Cmt cmt_infos -> cmt_infos.cmt_declaration_dependencies
     | Cms cms_infos -> cms_infos.cms_declaration_dependencies
+  let modname = function
+    | Cmt cmt_infos -> cmt_infos.cmt_modname
+    | Cms cms_infos -> cms_infos.cms_modname
 
   let uid_to_loc uid = function
     | Cmt cmt_infos ->
@@ -378,13 +382,20 @@ end
 module File_switching : sig
   val reset : unit -> unit
 
-  val move_to : digest:Digest.t -> string -> unit
+  val move_to : digest:Digest.t -> sourcefile:string option -> string -> unit
 
   val where_am_i : unit -> string option
 
   val source_digest : unit -> Digest.t option
+
+  (* [Some] if we already know the sourcefile corresponding to the current artifact. *)
+  val sourcefile : unit -> string option
 end = struct
-  type t = { last_file_visited : string; digest : Digest.t }
+  type t =
+    { last_file_visited : string;
+      digest : Digest.t;
+      sourcefile : string option
+    }
 
   let last_file_visited t = t.last_file_visited
   let digest t = t.digest
@@ -393,15 +404,18 @@ end = struct
 
   let reset () = state := None
 
-  let move_to ~digest file =
-    log ~title:"File_switching.move_to" "file: %s\ndigest: %s" file
-    @@ Digest.to_hex digest;
+  let move_to ~digest ~sourcefile file =
+    log ~title:"File_switching.move_to" "file: %s\ndigest: %s\nsourcefile: %s\n"
+      file (Digest.to_hex digest)
+      (Option.value sourcefile ~default:"unknown");
 
-    state := Some { last_file_visited = file; digest }
+    state := Some { last_file_visited = file; digest; sourcefile }
 
   let where_am_i () = Option.map !state ~f:last_file_visited
 
   let source_digest () = Option.map !state ~f:digest
+
+  let sourcefile () = Option.bind !state ~f:(fun t -> t.sourcefile)
 end
 
 module Utils = struct
@@ -526,34 +540,92 @@ module Utils = struct
     | CMS _ | CMSI _ -> Mconfig.cmt_path config
 end
 
-let move_to filename artifact =
-  let digest =
-    (* [None] only for packs, and we wouldn't have a trie if the cmt was for a
-       pack. *)
+let move_to ~config filename artifact =
+  let raw_builddir = Artifact.builddir artifact in
+  (* When using Jane Street dune, there is sufficient information in the cms file to
+     determine the full path, so we use that. If not, then we fall back to Merlin's
+     standard logic for finding the source file. *)
+  let builddirs_in_jenga_workspace =
+    let open Misc.Stdlib.Monad.Option.Syntax in
+    let* () =
+      match Jane_context.current with
+      | Vanilla -> None
+      | Jane_street -> Some ()
+    in
+    let* builddir_relative_to_jenga_root =
+      String.chop_prefix ~prefix:"/jenga-root" raw_builddir
+    in
+    let* source_root = config.mconfig.merlin.source_root in
+    Some
+      [ ( Filename.concat source_root builddir_relative_to_jenga_root,
+          `Jane_style );
+        ( Filename.concat
+            (Filename.concat source_root "_build/default")
+            builddir_relative_to_jenga_root,
+          `Jane_style )
+      ]
+  in
+  let builddirs =
+    Option.value builddirs_in_jenga_workspace
+      ~default:[ (raw_builddir, `Unknown_style) ]
+  in
+  let check_for_sourcefile (builddir, preference) =
     let sourcefile_in_builddir =
-      Filename.concat
-        (Artifact.builddir artifact)
-        (Option.get (Artifact.sourcefile artifact))
+      Filename.concat builddir (Option.get (Artifact.sourcefile artifact))
+    in
+    let sourcefile_in_builddir =
+      (* If the source file was a post-processed file (.pp.mli? or .mli?._.preprocess),
+         use the regular .mli? file for locate. *)
+      match
+        sourcefile_in_builddir |> String.split_on_char ~sep:'.' |> List.rev
+      with
+      | ext :: "pp" :: rev_path | "preprocess" :: "_" :: ext :: rev_path ->
+        ext :: rev_path |> List.rev |> String.concat ~sep:"."
+      | _ -> sourcefile_in_builddir
     in
     match
-      sourcefile_in_builddir |> String.split_on_char ~sep:'.' |> List.rev
+      Misc.exact_file_exists
+        ~dirname:(Filename.dirname sourcefile_in_builddir)
+        ~basename:(Filename.basename sourcefile_in_builddir)
     with
-    | ext :: "pp" :: rev_path -> (
-      (* If the source file was a post-processed file (.pp.mli?), use the
-         regular .mli? file for locate. *)
-      let sourcefile_in_builddir =
-        ext :: rev_path |> List.rev |> String.concat ~sep:"."
-      in
-      match
-        Misc.exact_file_exists
-          ~dirname:(Filename.dirname sourcefile_in_builddir)
-          ~basename:(Filename.basename sourcefile_in_builddir)
-      with
-      | true -> Digest.file sourcefile_in_builddir
-      | false -> Option.get (Artifact.source_digest artifact))
-    | _ -> Option.get (Artifact.source_digest artifact)
+    | true -> Some (sourcefile_in_builddir, preference)
+    | false -> None
   in
-  File_switching.move_to ~digest filename
+  let sourcefile_with_workspace_style =
+    List.find_map_opt builddirs ~f:check_for_sourcefile
+  in
+  let digest =
+    match sourcefile_with_workspace_style with
+    | Some (sourcefile, _) -> Digest.file sourcefile
+    | None ->
+      (* [None] only for packs, and we wouldn't have a trie if the cmt was for a
+          pack. *)
+      Option.get (Artifact.source_digest artifact)
+  in
+  let sourcefile =
+    (* Only explicitly set the sourcefile when in a JS-style dune workspace. If it's not
+       a JS-style workspace (this may occur with things like jane-script), fallback to
+       Merlin's standard logic for finding sources. This is because the sourcefile we
+       inferred from the cms/cmt file might actually be in the build dir rather than
+       source dir. But in a JS-style dune workspace, we're confident that we would've
+       found the source file if it existed. *)
+    match sourcefile_with_workspace_style with
+    | Some (sourcefile, `Jane_style) ->
+      log ~title:"move_to"
+        "Found explicit sourcefile in jenga-style workspace: %S" sourcefile;
+      (* If the artifact is for the current compilation unit, the artifact may disagree
+         on interface/implementation compared to the location that we're looking for (ie,
+         the artifact may be a .cms while we may be looking for an .mli). As a result, we
+         fallback to Merlin's standard logic in this case. *)
+      if Compilation_unit.is_current (Artifact.modname artifact) then (
+        log ~title:"move_to"
+          "Discarding explicit sourcefile since we are looking for the current \
+           compilation unit";
+        None)
+      else Some sourcefile
+    | Some (_, `Unknown_style) | None -> None
+  in
+  File_switching.move_to ~digest ~sourcefile filename
 
 let load_cmt ~config ?with_fallback:(_ = true) comp_unit =
   let title = "load_cmt" in
@@ -565,7 +637,7 @@ let load_cmt ~config ?with_fallback:(_ = true) comp_unit =
     let artifact = Artifact.read path in
     let source_file = Artifact.sourcefile artifact in
     let source_file = Option.value ~default:"*pack*" source_file in
-    move_to path artifact;
+    move_to ~config path artifact;
     Ok (source_file, artifact)
   | None -> Error ()
 
@@ -608,112 +680,120 @@ type find_source_result =
 let find_source ~config loc =
   log ~title:"find_source" "attempt to find %S"
     loc.Location.loc_start.Lexing.pos_fname;
-  let fname = loc.Location.loc_start.Lexing.pos_fname in
-  let with_fallback = loc.Location.loc_ghost in
-  let file =
-    match File.of_filename fname with
-    | Some file -> file
-    | None ->
-      (* no extension? we have to decide. *)
-      Preferences.src fname
-  in
-  let filename = File.name file in
-  let initial_path =
-    match File_switching.where_am_i () with
-    | None -> fname
-    | Some s -> s
-  in
-  log ~title:"find_source" "initial path: %S" initial_path;
-  let canonical_dir_for_file file =
-    let raw_dir = Filename.dirname file in
-    match config.Mconfig.query.directory with
-    | "" -> raw_dir
-    | cwd -> Misc.canonicalize_filename ~cwd raw_dir
-  in
-  let dir = canonical_dir_for_file initial_path in
-  match Utils.find_all_matches ~config ~with_fallback file with
-  | [] ->
-    log ~title:"find_source" "failed to find %S in source path (fallback = %b)"
-      filename with_fallback;
-    log ~title:"find_source" "looking for %S in %S" (File.name file) dir;
-    begin match
-      Utils.find_file_with_path ~config ~with_fallback file [ dir ]
-    with
-    | Some source -> Found source
-    | None -> (
-      log ~title:"find_source" "Trying to find %S in %S directly" fname dir;
-      try Found (Misc.find_in_path [ dir ] fname) with _ -> Not_found file)
-    end
-  | [ x ] -> Found x
-  | files -> (
-    log
-      ~title:(sprintf "find_source(%s)" filename)
-      "multiple matches in the source path : %s"
-      (String.concat ~sep:" , " files);
-    let files_matching_digest =
-      match File_switching.source_digest () with
+  match File_switching.sourcefile () with
+  | Some file ->
+    let file = Misc.canonicalize_filename file in
+    log ~title:"find_source" "already have sourcefile: %S" file;
+    Found file
+  | None -> begin
+    let fname = loc.Location.loc_start.Lexing.pos_fname in
+    let with_fallback = loc.Location.loc_ghost in
+    let file =
+      match File.of_filename fname with
+      | Some file -> file
       | None ->
-        log ~title:"find_source"
-          "... no source digest available to select the right one";
-        []
-      | Some digest ->
-        log ~title:"find_source"
-          "... trying to use source digest to find the right one";
-        log ~title:"find_source" "Source digest: %s" (Digest.to_hex digest);
-
-        List.filter files ~f:(fun f ->
-            let fdigest = Digest.file f in
-            log ~title:"find_source" "  %s (%s)" f (Digest.to_hex fdigest);
-            fdigest = digest)
+        (* no extension? we have to decide. *)
+        Preferences.src fname
     in
-    match files_matching_digest with
-    | [ file ] ->
-      log ~title:"find_source" "... found exactly one file with matching digest";
-      Found file
-    | [] -> (
-      log ~title:"find_source" "... found no files with matching digest";
-      log ~title:"find_source" "... using heuristic to select the right one";
-      log ~title:"find_source" "we are looking for a file named %s in %s" fname
-        dir;
-      let rev = String.reverse (Misc.canonicalize_filename ~cwd:dir fname) in
-      let lst =
-        List.map files ~f:(fun path ->
-            let path' = String.reverse path in
-            let priority =
-              (String.common_prefix_len rev path' * 2)
-              + if Preferences.is_preferred_source path then 1 else 0
-            in
-            (priority, path))
+    let filename = File.name file in
+    let initial_path =
+      match File_switching.where_am_i () with
+      | None -> fname
+      | Some s -> s
+    in
+    log ~title:"find_source" "initial path: %S" initial_path;
+    let canonical_dir_for_file file =
+      let raw_dir = Filename.dirname file in
+      match config.Mconfig.query.directory with
+      | "" -> raw_dir
+      | cwd -> Misc.canonicalize_filename ~cwd raw_dir
+    in
+    let dir = canonical_dir_for_file initial_path in
+    match Utils.find_all_matches ~config ~with_fallback file with
+    | [] ->
+      log ~title:"find_source"
+        "failed to find %S in source path (fallback = %b)" filename
+        with_fallback;
+      log ~title:"find_source" "looking for %S in %S" (File.name file) dir;
+      begin match
+        Utils.find_file_with_path ~config ~with_fallback file [ dir ]
+      with
+      | Some source -> Found source
+      | None -> (
+        log ~title:"find_source" "Trying to find %S in %S directly" fname dir;
+        try Found (Misc.find_in_path [ dir ] fname) with _ -> Not_found file)
+      end
+    | [ x ] -> Found x
+    | files -> (
+      log
+        ~title:(sprintf "find_source(%s)" filename)
+        "multiple matches in the source path : %s"
+        (String.concat ~sep:" , " files);
+      let files_matching_digest =
+        match File_switching.source_digest () with
+        | None ->
+          log ~title:"find_source"
+            "... no source digest available to select the right one";
+          []
+        | Some digest ->
+          log ~title:"find_source"
+            "... trying to use source digest to find the right one";
+          log ~title:"find_source" "Source digest: %s" (Digest.to_hex digest);
+
+          List.filter files ~f:(fun f ->
+              let fdigest = Digest.file f in
+              log ~title:"find_source" "  %s (%s)" f (Digest.to_hex fdigest);
+              fdigest = digest)
       in
-      let lst =
-        (* TODO: remove duplicates in [source_path] instead of using
+      match files_matching_digest with
+      | [ file ] ->
+        log ~title:"find_source"
+          "... found exactly one file with matching digest";
+        Found file
+      | [] -> (
+        log ~title:"find_source" "... found no files with matching digest";
+        log ~title:"find_source" "... using heuristic to select the right one";
+        log ~title:"find_source" "we are looking for a file named %s in %s"
+          fname dir;
+        let rev = String.reverse (Misc.canonicalize_filename ~cwd:dir fname) in
+        let lst =
+          List.map files ~f:(fun path ->
+              let path' = String.reverse path in
+              let priority =
+                (String.common_prefix_len rev path' * 2)
+                + if Preferences.is_preferred_source path then 1 else 0
+              in
+              (priority, path))
+        in
+        let lst =
+          (* TODO: remove duplicates in [source_path] instead of using
            [sort_uniq] here. *)
-        List.sort_uniq
-          ~cmp:(fun ((i : int), s) ((j : int), t) ->
-            let tmp = compare j i in
-            if tmp <> 0 then tmp
-            else
-              match compare s t with
-              | 0 -> 0
-              | n -> (
-                (* Check if we are referring to the same files.
+          List.sort_uniq
+            ~cmp:(fun ((i : int), s) ((j : int), t) ->
+              let tmp = compare j i in
+              if tmp <> 0 then tmp
+              else
+                match compare s t with
+                | 0 -> 0
+                | n -> (
+                  (* Check if we are referring to the same files.
                     Especially useful on OSX case-insensitive FS.
                     FIXME: May be able handle symlinks and non-existing files,
                     CHECK *)
-                match (File_id.get s, File_id.get t) with
-                | s', t' when File_id.check s' t' -> 0
-                | _ -> n))
-          lst
-      in
-      match lst with
-      | (i1, _) :: (i2, _) :: _ when i1 = i2 -> Multiple_matches files
-      | (_, s) :: _ -> Found s
-      | _ -> assert false)
-    | files_matching_digest ->
-      log ~title:"find_source" "... found multiple files with matching digest";
-      log ~title:"find_source"
-        "... using directory heuristic to choose the best one";
-      (* Give each source file a score that represents how close its path is to the
+                  match (File_id.get s, File_id.get t) with
+                  | s', t' when File_id.check s' t' -> 0
+                  | _ -> n))
+            lst
+        in
+        match lst with
+        | (i1, _) :: (i2, _) :: _ when i1 = i2 -> Multiple_matches files
+        | (_, s) :: _ -> Found s
+        | _ -> assert false)
+      | files_matching_digest ->
+        log ~title:"find_source" "... found multiple files with matching digest";
+        log ~title:"find_source"
+          "... using directory heuristic to choose the best one";
+        (* Give each source file a score that represents how close its path is to the
            target path (the path of the build artifact) and then choose the source file
            with the highest score.
 
@@ -729,45 +809,47 @@ let find_source ~config loc =
              target path: /a/b/c/_build/default/d/e/artifacts/f.cmi
              score: 2, because /a/b/c/d/e is the source file's directory, and d/e is
                     the longest tail of it that is a subpath of the target path. *)
-      let score_file source_file =
-        (* This is technically quadratic, but
+        let score_file source_file =
+          (* This is technically quadratic, but
              a) most file paths are short
              b) in the common case, this is linear because common_prefix_len
                 will usually fail on the first loop
              c) this isn't a hot path - this is only for the uncommon case where there are
                 two identical files
              So the stars would need to align for this to cause performance problems *)
-        let target_dir = dir in
-        let source_dir = canonical_dir_for_file source_file in
-        let target_dir_rev = target_dir |> Misc.split_path |> List.rev in
-        let source_dir_rev = source_dir |> Misc.split_path |> List.rev in
-        let rec common_prefix_len a b =
-          match (a, b) with
-          | [], _ | _, [] -> 0
-          | a_hd :: a_tl, b_hd :: b_tl ->
-            if String.equal a_hd b_hd then 1 + common_prefix_len a_tl b_tl
-            else 0
+          let target_dir = dir in
+          let source_dir = canonical_dir_for_file source_file in
+          let target_dir_rev = target_dir |> Misc.split_path |> List.rev in
+          let source_dir_rev = source_dir |> Misc.split_path |> List.rev in
+          let rec common_prefix_len a b =
+            match (a, b) with
+            | [], _ | _, [] -> 0
+            | a_hd :: a_tl, b_hd :: b_tl ->
+              if String.equal a_hd b_hd then 1 + common_prefix_len a_tl b_tl
+              else 0
+          in
+          let rec candidates = function
+            | [] -> []
+            | _ :: tl as curr -> curr :: candidates tl
+          in
+          candidates target_dir_rev
+          |> List.map ~f:(common_prefix_len source_dir_rev)
+          |> List.max_elt ~cmp:Int.compare
+          |> Option.value ~default:0
         in
-        let rec candidates = function
-          | [] -> []
-          | _ :: tl as curr -> curr :: candidates tl
+        let files_matching_digest_with_scores =
+          List.map files_matching_digest ~f:(fun file ->
+              (file, score_file file))
         in
-        candidates target_dir_rev
-        |> List.map ~f:(common_prefix_len source_dir_rev)
-        |> List.max_elt ~cmp:Int.compare
-        |> Option.value ~default:0
-      in
-      let files_matching_digest_with_scores =
-        List.map files_matching_digest ~f:(fun file -> (file, score_file file))
-      in
-      (* get the max *)
-      let best_file, _best_score =
-        List.max_elt files_matching_digest_with_scores
-          ~cmp:(fun (_, a) (_, b) -> Int.compare a b)
-        |> Option.get
-        (* theres at least one element, so this is never None *)
-      in
-      Found best_file)
+        (* get the max *)
+        let best_file, _best_score =
+          List.max_elt files_matching_digest_with_scores
+            ~cmp:(fun (_, a) (_, b) -> Int.compare a b)
+          |> Option.get
+          (* theres at least one element, so this is never None *)
+        in
+        Found best_file)
+    end
 
 (* Well, that's just another hack.
    [find_source] doesn't like the "-o" option of the compiler. This hack handles
@@ -917,7 +999,7 @@ let find_definition_uid ~config ~env ~(decl : Env_lookup.item) path =
           ~with_fallback:false unit_name
       with
       | Ok (filename, artifact) ->
-        move_to filename artifact;
+        move_to ~config filename artifact;
         log ~title:"read_unit_shape" "shapes loaded for %s" unit_name;
         Artifact.impl_shape artifact
       | Error () ->
