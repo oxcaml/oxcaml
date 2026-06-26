@@ -27,7 +27,7 @@
    )* }}} *)
 
 module Compl = struct
-  type 'desc raw_entry =
+  type 'desc raw_entry = 'desc Query_protocol_kernel.Compl.raw_entry =
     { name : string;
       kind :
         [ `Value
@@ -144,7 +144,7 @@ type occurrences_status =
 type occurrence = { loc : Location.t; is_stale : bool }
 
 module Locate_context = struct
-  type t =
+  type t = Query_protocol_kernel.Locate_context.t =
     | Expr
     | Module_path
     | Module_type
@@ -193,7 +193,7 @@ end
 
 module Locate_types_result = struct
   module Tree = struct
-    type node_data =
+    type node_data = Query_protocol_kernel.Locate_types_result.Tree.node_data =
       | Arrow
       | Tuple
       | Unboxed_tuple
@@ -210,10 +210,13 @@ module Locate_types_result = struct
           }
       | Other of string
 
-    type t = { data : node_data; children : t list }
+    type t = Query_protocol_kernel.Locate_types_result.Tree.t =
+      { data : node_data; children : t list }
   end
 
-  type t = Success of Tree.t | Invalid_context
+  type t = Query_protocol_kernel.Locate_types_result.t =
+    | Success of Tree.t
+    | Invalid_context
 end
 
 type _ t =
