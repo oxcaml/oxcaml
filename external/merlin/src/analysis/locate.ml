@@ -548,7 +548,7 @@ let move_to ~config filename artifact =
   let builddirs_in_jenga_workspace =
     let open Misc.Stdlib.Monad.Option.Syntax in
     let* () =
-      match Jane_context.current with
+      match Jane_context.get () with
       | Vanilla -> None
       | Jane_street -> Some ()
     in

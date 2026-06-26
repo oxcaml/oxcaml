@@ -118,7 +118,7 @@ module Cache = File_cache.Make (struct
 end)
 
 let file_exists path =
-  match Jane_context.current with
+  match Jane_context.get () with
   | Vanilla -> Sys.file_exists path && not (Sys.is_directory path)
   | Jane_street -> Dot_merlin_finder.exists_in_src_or_build_dir path
 
@@ -141,7 +141,7 @@ let directives_of_files filenames =
     | x :: rest ->
       Hashtbl.add marked x ();
       let file_path =
-        match Jane_context.current with
+        match Jane_context.get () with
         | Vanilla -> x
         | Jane_street -> (
           (* Also check for .merlin files in the _build directory. Reading from

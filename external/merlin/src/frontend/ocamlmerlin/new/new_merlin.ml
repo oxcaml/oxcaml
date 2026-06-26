@@ -159,7 +159,7 @@ let run =
             in
             let format_timing (k, v) = (k, `Int (int_of_float (0.5 +. v))) in
             let ppx =
-              match Jane_context.current with
+              match Jane_context.get () with
               | Vanilla -> []
               | Jane_street -> (
                 (* Unless there are special build rules configured, we expect 0
@@ -202,7 +202,7 @@ let run =
                  ("heap_mbytes", `Int heap_mbytes);
                  ("cache", Mpipeline.cache_information pipeline)
                ]
-              @ (match Jane_context.current with
+              @ (match Jane_context.get () with
                 | Vanilla -> []
                 | Jane_street -> [ ("request_id", `Int (request_id ())) ])
               @ ppx)

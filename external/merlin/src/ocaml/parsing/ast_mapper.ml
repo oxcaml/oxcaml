@@ -1103,7 +1103,7 @@ module PpxContext = struct
 
   let make ~tool_name () =
     let Load_path.{ visible; hidden } =
-      match Jane_context.current with
+      match Jane_context.get () with
       | Vanilla -> Load_path.get_paths ()
       | Jane_street -> { Load_path.visible = []; hidden = [] }
     in
@@ -1121,20 +1121,20 @@ module PpxContext = struct
         lid "include_dirs",
           make_list
             (make_pair make_string make_bool)
-            (match Jane_context.current with
+            (match Jane_context.get () with
              | Vanilla -> visible_load_dir_pairs !Clflags.include_dirs
              | Jane_street -> []);
         lid "hidden_include_dirs",
           make_list
             make_string
-            (match Jane_context.current with
+            (match Jane_context.get () with
              | Vanilla -> !Clflags.hidden_include_dirs
              | Jane_street -> []);
         lid "load_path",
           make_pair
             (make_list (make_pair make_string make_bool))
             (make_list make_string)
-            (match Jane_context.current with
+            (match Jane_context.get () with
              | Vanilla -> (visible_load_dir_pairs visible, hidden)
              | Jane_street -> ([], []));
         lid "open_modules", make_list make_string !Clflags.open_modules;

@@ -346,7 +346,7 @@ let get_config { workdir; process_dir; configurator } path_abs =
      project configuration. We detect this case and give a useful error
      message. *)
   let in_jane_context_but_detected_dune =
-    match (Jane_context.current, configurator) with
+    match (Jane_context.get (), configurator) with
     | Vanilla, _ | Jane_street, Dot_merlin -> false
     | Jane_street, Dune -> true
   in
@@ -503,7 +503,7 @@ let find_project_context start_dir =
            ~f:(fun f ->
              let raw_fname = Filename.concat dir f in
              let fname =
-               match Jane_context.current with
+               match Jane_context.get () with
                | Vanilla ->
                  if
                    Sys.file_exists raw_fname && not (Sys.is_directory raw_fname)
