@@ -5201,10 +5201,18 @@ module Report = struct
       else Left left, Right right
     in
     let left ppf =
-      print_ahint_sided pp obj ppf actual |> Option.value ~default:Mode
+      match print_ahint_sided pp obj ppf actual with
+      | None ->
+        print_bug_stderr ();
+        Mode
+      | Some hint -> hint
     in
     let right ppf =
-      print_ahint_sided pp obj ppf expected |> Option.value ~default:Mode
+      match print_ahint_sided pp obj ppf expected with
+      | None ->
+        print_bug_stderr ();
+        Mode
+      | Some hint -> hint
     in
     { left; right }
 end
