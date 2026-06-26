@@ -587,9 +587,8 @@ let must_save_simd_regs live : Regs.Save_simd_regs.t =
 (* CR sspies: Consider whether more of [record_frame_label] can be shared with
    the Arm backend. *)
 
-let record_frame_label live dbg =
+let compute_live_offset live =
   let encode_reg_offset n = (n lsl 1) + 1 in
-  let lbl = Cmm.new_label () in
   let live_offset = ref [] in
   let simd = must_save_simd_regs live in
   Reg.Set.iter
@@ -616,10 +615,14 @@ let record_frame_label live dbg =
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
       | { typ = Int | Float | Float32 | Vec128 | Vec256 | Vec512; _ } -> ())
     live;
+  !live_offset
+
+let record_frame_label live dbg =
+  let lbl = Cmm.new_label () in
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of Linear labels. *)
   record_frame_descr ~label:lbl ~frame_size:(frame_size ())
-    ~live_offset:!live_offset dbg;
+    ~live_offset:(compute_live_offset live) dbg;
   label_to_asm_label ~section:Text lbl
 
 let record_frame live dbg =
@@ -631,7 +634,14 @@ let record_frame live dbg =
 type gc_call =
   { gc_lbl : L.t; (* Entry label *)
     gc_return_lbl : L.t; (* Where to branch after GC *)
-    gc_frame : L.t; (* Label of frame descriptor *)
+    (* The frame descriptor is recorded (and its return-address label defined)
+       when the out-of-line GC stub is emitted, rather than at the allocation
+       site, so that frame descriptors are emitted in increasing
+       return-address order. *)
+    gc_frame_lbl : Label.t; (* Linear label of the frame descriptor *)
+    gc_frame_size : int;
+    gc_live_offset : int list;
+    gc_frame_dbg : frame_debuginfo; (* debuginfo for the frame descriptor *)
     gc_dbg : Debuginfo.t; (* Location of the original instruction *)
     gc_save_simd : Regs.Save_simd_regs.t
         (* What SIMD regs, if any, we need to save *)
@@ -649,7 +659,12 @@ let emit_call_gc gc =
   D.define_label gc.gc_lbl;
   emit_debug_info gc.gc_dbg;
   emit_call (call_gc_local_sym ~simd:gc.gc_save_simd);
-  D.define_label gc.gc_frame;
+  (* Record the frame descriptor here, where its return-address label is about
+     to be defined, so that frame descriptors are recorded (and hence emitted)
+     in increasing return-address order. *)
+  record_frame_descr ~label:gc.gc_frame_lbl ~frame_size:gc.gc_frame_size
+    ~live_offset:gc.gc_live_offset gc.gc_frame_dbg;
+  D.define_label (label_to_asm_label ~section:Text gc.gc_frame_lbl);
   I.jmp (emit_asm_label_arg gc.gc_return_lbl)
 
 (* Record calls to local stack reallocation *)
@@ -2189,7 +2204,7 @@ let emit_instr ~first ~last ~fallthrough i =
       I.sub (int n) r15;
       I.cmp (domain_field Domainstate.Domain_young_limit) r15;
       let lbl_call_gc = L.create Text in
-      let lbl_frame = record_frame_label i.live (Dbg_alloc dbginfo) in
+      let lbl_frame = Cmm.new_label () in
       I.jb (emit_asm_label_arg lbl_call_gc);
       let lbl_after_alloc = L.create Text in
       D.define_label lbl_after_alloc;
@@ -2198,7 +2213,10 @@ let emit_instr ~first ~last ~fallthrough i =
         := { gc_lbl = lbl_call_gc;
              gc_return_lbl = lbl_after_alloc;
              gc_dbg = i.dbg;
-             gc_frame = lbl_frame;
+             gc_frame_lbl = lbl_frame;
+             gc_frame_size = frame_size ();
+             gc_live_offset = compute_live_offset i.live;
+             gc_frame_dbg = Dbg_alloc dbginfo;
              gc_save_simd
            }
            :: !call_gc_sites)
@@ -2236,13 +2254,16 @@ let emit_instr ~first ~last ~fallthrough i =
     I.cmp (domain_field Domainstate.Domain_young_limit) r15;
     let gc_call_label = L.create Text in
     let lbl_after_poll = L.create Text in
-    let lbl_frame = record_frame_label i.live (Dbg_alloc []) in
+    let lbl_frame = Cmm.new_label () in
     I.jbe (emit_asm_label_arg gc_call_label);
     call_gc_sites
       := { gc_lbl = gc_call_label;
            gc_return_lbl = lbl_after_poll;
            gc_dbg = i.dbg;
-           gc_frame = lbl_frame;
+           gc_frame_lbl = lbl_frame;
+           gc_frame_size = frame_size ();
+           gc_live_offset = compute_live_offset i.live;
+           gc_frame_dbg = Dbg_alloc [];
            gc_save_simd = must_save_simd_regs i.live
          }
          :: !call_gc_sites;

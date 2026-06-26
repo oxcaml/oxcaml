@@ -333,8 +333,13 @@ let emit_frames a =
     in
     match rdbg with [] -> assert false | d :: rest -> emit rs d rest
   in
-  a.efa_word (List.length !frame_descriptors);
-  List.iter emit_frame !frame_descriptors;
+  (* Descriptors are recorded in increasing return-address order (calls inline
+     as they are emitted; allocations and polls when their out-of-line GC stub
+     is emitted), so the prepended list is in decreasing order. Reverse it to
+     emit the frame table in increasing return-address order. *)
+  let descrs = List.rev !frame_descriptors in
+  a.efa_word (List.length descrs);
+  List.iter emit_frame descrs;
   Label_table.iter emit_debuginfo debuginfos;
   Hashtbl.iter emit_filename filenames;
   Hashtbl.iter emit_defname defnames;
