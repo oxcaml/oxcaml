@@ -590,6 +590,13 @@ let add_nullability_from_ty env ty raw_kind =
 let fallback_if_missing_cmi ~default f =
   try f () with Missing_cmi_fallback -> default
 
+let instantiate_decl_field env type_params args =
+  match args with
+  | [] -> Fun.id
+  | _ :: _ ->
+    fun ty -> (try Ctype.apply env type_params ty args
+               with Ctype.Cannot_apply -> ty)
+
 (* CR layouts v2.5: It will be possible for subcomponents of types to be
    non-values for non-error reasons (e.g., [type t = { x : float# }
    [@@unboxed]).  And in later releases, this will also happen in normal
@@ -720,6 +727,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
       let decl =
         try Env.find_type p env with Not_found -> raise Missing_cmi_fallback
       in
+      let instantiate = instantiate_decl_field env decl.type_params args in
       if cannot_proceed () then
         num_nodes_visited,
         add_nullability_from_ty env scty
@@ -747,7 +755,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_record env ~loc ~visited ~depth
-                         ~num_nodes_visited labels rep)
+                         ~num_nodes_visited ~instantiate labels rep)
         | Type_record_unboxed_product (_, Record_unboxed_product_variable, _) ->
           num_nodes_visited, nullable Pgenval
         | Type_record_unboxed_product ([{ld_type}],
@@ -847,11 +855,9 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
           | exception Not_found -> unknown ()
           | { type_kind = Type_record_unboxed_product (lbls, _, _);
               type_params; _ } ->
-            let type_of_ld { Types.ld_type } =
-              try Some (Ctype.apply env type_params ld_type args)
-              with Ctype.Cannot_apply -> None
-            in
-            Misc.Stdlib.Array.of_list_map type_of_ld lbls
+            let instantiate = instantiate_decl_field env type_params args in
+            Misc.Stdlib.Array.of_list_map
+              (fun { Types.ld_type } -> Some (instantiate ld_type)) lbls
           | { type_kind =
                 Type_variant _ | Type_record _ | Type_abstract _ | Type_open;
               _ } ->
@@ -894,11 +900,13 @@ and value_kind_mixed_block
 
 and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       ~params ~args (cstrs : Types.constructor_declaration list) rep =
+  let instantiate = instantiate_decl_field env params args in
   match rep with
   | Variant_extensible -> assert false
   | Variant_with_null -> begin
     match Datarepr.find_variant_with_null_payload cstrs with
     | Some { payload_arg = { Types.ca_type = ty; _ }; _ } ->
+      let ty = instantiate ty in
       let num_nodes_visited, kind =
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
@@ -912,7 +920,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       match cstrs with
       | [{cd_args=Cstr_tuple [{ca_type=ty}]}]
       | [{cd_args=Cstr_record [{ld_type=ty}]}] ->
-        value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
+        value_kind env ~loc ~visited ~depth ~num_nodes_visited (instantiate ty)
       | _ -> assert false
     end
   | Variant_boxed cstr_layouts ->
@@ -948,7 +956,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       let num_nodes_visited = num_nodes_visited + 1 in
       match constructor.cd_args with
       | Cstr_tuple fields ->
-        let field_to_type { Types.ca_type } = ca_type in
+        let field_to_type { Types.ca_type } = instantiate ca_type in
         let num_nodes_visited, fields =
           match cstr_shape with
           | Constructor_uniform_value ->
@@ -963,7 +971,9 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
         in
         (false, num_nodes_visited), fields
       | Cstr_record labels ->
-        let field_to_type (lbl:Types.label_declaration) = lbl.ld_type in
+        let field_to_type (lbl:Types.label_declaration) =
+          instantiate lbl.ld_type
+        in
         let is_mutable =
           List.exists
             (fun (lbl:Types.label_declaration) ->
@@ -1086,7 +1096,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
     in
     num_nodes_visited, non_nullable raw_kind
 
-and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
+and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited ~instantiate
       (labels : Types.label_declaration list) rep =
   match rep with
   | (Record_unboxed | (Record_inlined (_, _, Variant_unboxed))) -> begin
@@ -1095,7 +1105,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
          needed when we deal with missing cmis. *)
       match labels with
       | [{ld_type}] ->
-        value_kind env ~loc ~visited ~depth ~num_nodes_visited ld_type
+        value_kind env ~loc ~visited ~depth ~num_nodes_visited
+          (instantiate ld_type)
       | [] | _ :: _ :: _ -> assert false
     end
   | Record_dummy _ ->
@@ -1137,7 +1148,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                         non_nullable (Pboxedfloatval Boxed_float64)
                       | Record_inlined _ | Record_boxed ->
                           value_kind env ~loc ~visited ~depth ~num_nodes_visited
-                            label.ld_type
+                            (instantiate label.ld_type)
                       | Record_mixed _ | Record_unboxed | Record_dummy _
                       | Record_variable ->
                           (* The outer match guards against this *)
@@ -1151,7 +1162,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
           | Record_mixed shape ->
             let types = List.map (fun label -> label.Types.ld_type) labels in
             value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
-              ~shape (List.map (fun t -> Some t) types)
+              ~shape (List.map (fun t -> Some (instantiate t)) types)
         in
         let non_consts =
           match rep with
