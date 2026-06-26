@@ -2237,18 +2237,6 @@ let apply ?(use_current_level = false) env params body args =
   with
     Cannot_subst -> raise Cannot_apply
 
-let instance_declaration_components_for_application env args decl =
-  (* [apply] already copies each component it substitutes, so there is no need
-     to first [instance_declaration decl]. Doing so deep-copies the whole
-     declaration graph (including the recursive unboxed-version chain) on every
-     type constructor, which is the dominant time and memory cost of
-     [Typeopt.value_kind] on declaration-heavy modules. *)
-  let args = instance_list args in
-  let apply ty = apply env decl.type_params ty args in
-  ( ~kind:(map_kind apply decl.type_kind),
-    ~jkind:(Jkind.map_type_expr apply decl.type_jkind),
-    ~manifest:(Option.map apply decl.type_manifest) )
-
                               (****************************)
                               (*  Abbreviation expansion  *)
                               (****************************)
@@ -4648,9 +4636,9 @@ let add_jkind_equation ~reason uenv destination jkind1 =
     intersect_type_jkind ~reason env destination jkind1
   with
   | Jkind.No_intersection err -> raise_for Unify (Bad_jkind (destination,err))
-  | Jkind.Unknown -> None
+  | Jkind.Unknown -> ()
   | Jkind.Intersection jkind -> begin
-      (match get_desc destination with
+      match get_desc destination with
       | Tconstr (p, _, _)
         when is_instantiable ~for_jkind_eqn:true env p ->
         begin
@@ -4671,9 +4659,7 @@ let add_jkind_equation ~reason uenv destination jkind1 =
           with
             Not_found -> ()
         end
-      | _ -> ());
-      (* Return the refined jkind so the equation's [source] can record it. *)
-      Some jkind
+      | _ -> ()
     end
 
 (* This function can be called only in [Pattern] mode. *)
@@ -4703,14 +4689,8 @@ let add_gadt_equation uenv source destination =
                   jkind
       | Some jkind -> jkind
     in
-    let jkind =
-      match
-        add_jkind_equation ~reason:(Gadt_equation source)
-          uenv destination jkind
-      with
-      | Some refined_jkind -> refined_jkind
-      | None -> jkind
-    in
+    add_jkind_equation ~reason:(Gadt_equation source)
+      uenv destination jkind;
     (* Adding a jkind equation may change the uenv. *)
     let env = get_env uenv in
     let decl =

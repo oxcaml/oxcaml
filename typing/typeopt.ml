@@ -488,6 +488,32 @@ let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
   | _ ->
       (kind, layout)
 
+let value_kind_of_scannable_jkind env jkind =
+  let layout = Jkind.get_layout_defaulting_to_scannable env jkind in
+  (* In other places, we use [Ctype.type_jkind_purely_if_principal]. Here, we omit
+     the principality check, as we're just trying to compute optimizations. *)
+  let context = Ctype.mk_jkind_context_always_principal env in
+  let externality_upper_bound =
+    Jkind.get_externality_upper_bound ~context env jkind
+  in
+  match layout with
+  | Some (Base (Scannable, { separability; _ })) -> (
+    (* use the better of the two [immediate_or_pointer]s *)
+    match pointerness_of_separability separability,
+          pointerness_of_scannable_with_externality externality_upper_bound with
+    | Immediate, Immediate | Immediate, Pointer | Pointer, Immediate -> Pintval
+    | Pointer, Pointer -> Pgenval)
+  | None
+  | Some ( Any _
+         | Product _
+         | Univar _
+         | Genvar _
+         | Base ( ( Void | Untagged_immediate | Float64 | Float32 | Word
+                  | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
+                  | Vec512 ),
+                  _ )) ->
+    Misc.fatal_error "expected a layout of scannable"
+
 (* [value_kind] has a pre-condition that it is only called on values.  With the
    current set of sort restrictions, there are two reasons this invariant may
    be violated:
@@ -553,12 +579,11 @@ let non_nullable raw_kind = { raw_kind; nullable = Non_nullable }
 
 let nullable raw_kind = { raw_kind; nullable = Nullable }
 
-let estimate_value_kind_from_jkind env ty =
-  let immediate_or_pointer, nullable = maybe_pointer_type env ty in
-  let raw_kind =
-    match immediate_or_pointer with
-    | Immediate -> Pintval
-    | Pointer -> Pgenval
+let add_nullability_from_ty env ty raw_kind =
+  let nullable =
+    match Ctype.check_type_nullability env ty Non_null with
+    | true -> Non_nullable
+    | false -> Nullable
   in
   { raw_kind; nullable }
 
@@ -603,8 +628,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
 
        This should be understood, but for now the simple fall back thing is
        sufficient.  *)
-    match Ctype.check_type_jkind env scty
-      (Jkind.Builtin.value_or_null ~why:V1_safety_check)
+    match Ctype.check_type_jkind env scty (Jkind.Builtin.value_or_null ~why:V1_safety_check)
     with
     | Ok _ -> ()
     | Error _ ->
@@ -686,18 +710,20 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
           || Path.same p Predef.path_iarray) ->
     let ak = array_type_kind ~elt_ty:(Some arg) env loc ty in
     num_nodes_visited, non_nullable (Parrayval ak)
-  | Tconstr(p, params, _) -> begin
-      let ~kind:type_kind, .. =
-        try
-          Env.find_type p env
-          |> Ctype.instance_declaration_components_for_application env params
-        with Ctype.Cannot_apply ->
-          Misc.fatal_error "Typeopt.value_kind: invalid type application"
-        | Not_found -> raise Missing_cmi_fallback
+  | Tconstr(p, _, _) -> begin
+      (* CR layouts v2.8: The uses of [decl.type_jkind] here are suspect:
+         with with-kinds, [decl.type_jkind] will mention variables bound
+         by the parameters of the declaration. The code below loses this
+         connection and will continue processing with e.g. ['a : value]
+         instead of [string] when looking at a [string list]. This should
+         probably just call a [type_jkind] function. Internal ticket 5101. *)
+      let decl =
+        try Env.find_type p env with Not_found -> raise Missing_cmi_fallback
       in
       if cannot_proceed () then
         num_nodes_visited,
-        estimate_value_kind_from_jkind env ty
+        add_nullability_from_ty env scty
+          (value_kind_of_scannable_jkind env decl.type_jkind)
       else
         let visited = Numbers.Int.Set.add (get_id ty) visited in
         (* Default of [Pgenval] is currently safe for the missing cmi fallback
@@ -705,7 +731,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
            of [value_kind]. Conservatively saying that types from missing
            cmis might be nullable, which is possible in the case of @@unboxed
            types. *)
-        match type_kind with
+        match decl.type_kind with
         | Type_variant (cstrs, rep, _) ->
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
@@ -735,7 +761,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
             "Typeopt.value_kind: non-unary unboxed record can't have kind value"
         | Type_abstract _ ->
           num_nodes_visited,
-          estimate_value_kind_from_jkind env ty
+          add_nullability_from_ty env scty
+            (value_kind_of_scannable_jkind env decl.type_jkind)
         | Type_open -> num_nodes_visited, non_nullable Pgenval
     end
   | Ttuple labeled_fields ->
@@ -767,7 +794,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
     else non_nullable Pintval
   | _ ->
     num_nodes_visited,
-    estimate_value_kind_from_jkind env ty
+    add_nullability_from_ty env scty Pgenval
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       (field : Types.mixed_block_element) ty
