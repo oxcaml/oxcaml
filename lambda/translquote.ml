@@ -2754,7 +2754,7 @@ let assert_no_jkinds jkind =
     (fun ({ pjka_loc; pjka_desc } : Parsetree.jkind_annotation) ->
       (* Naively check if the jkind annotation is trivial *)
       match pjka_desc with
-      | Pjk_abbreviation ({ loc = _; txt = Lident "value" }, []) -> ()
+      | Pjk_abbreviation { loc = _; txt = Lident "value" } -> ()
       | _ ->
         fatal_errorf
           "Translquote [at %a]: no support for jkind annotations in this \
