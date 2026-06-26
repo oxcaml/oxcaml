@@ -25,7 +25,9 @@ let code loopify(never) size(10) newer_version_of(h_2)
       cont k (int_add_1)
 in
 let code loopify(never) size(58) newer_version_of(f_0)
-      f_0_1 (x : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+      f_0_1
+        (x : imm tagged,
+         l : [ 0 | 0 of imm tagged * [ 0 | 0 of imm tagged * val ] ])
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
