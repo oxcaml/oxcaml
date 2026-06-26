@@ -425,7 +425,7 @@ let g () =
 Line 5, characters 52-54:
 5 |   let local_ f a b : (int -> int) @ once portable = 42 in
                                                         ^^
-Error: This expression has type "int" but an expression was expected of type
+Error: The constant "42" has type "int" but an expression was expected of type
          "int -> int"
 |}]
 
@@ -1492,7 +1492,7 @@ let f (x : bool) = (x : int)[@error_message "custom message"]
 Line 1, characters 20-21:
 1 | let f (x : bool) = (x : int)[@error_message "custom message"]
                         ^
-Error: This expression has type "bool" but an expression was expected of type
+Error: The value "x" has type "bool" but an expression was expected of type
          "int"
        custom message
 |}]
@@ -1503,7 +1503,7 @@ let f (v : float#) : ((_ : value)[@error_message "need a value"]) = v
 Line 1, characters 68-69:
 1 | let f (v : float#) : ((_ : value)[@error_message "need a value"]) = v
                                                                         ^
-Error: This expression has type "float#" but an expression was expected of type
+Error: The value "v" has type "float#" but an expression was expected of type
          "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
@@ -1695,10 +1695,8 @@ let poly_ id : 'a. 'a -> 'a = fun x -> x
 Line 1, characters 10-12:
 1 | let poly_ id : 'a. 'a -> 'a = fun x -> x
               ^^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
->> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
-Uncaught exception: Misc.Fatal_error
-
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
 |}]
 
 let poly_ id = fun x -> x
@@ -1713,21 +1711,28 @@ let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
 Line 1, characters 10-15:
 1 | let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
               ^^^^^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
->> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
-Uncaught exception: Misc.Fatal_error
-
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
 |}]
 
 module type S_poly = sig
   val poly_ f : 'a. 'a -> 'a
-  val poly_ g : 'a 'b. 'a -> 'b -> 'a
+  val poly_ g : 'a 'b. 'a -> 'b -> 'c -> 'a
+  val poly_ h : 'a -> 'b -> 'a
 end
 [%%expect{|
-Line 2, characters 2-28:
+Line 2, characters 16-28:
 2 |   val poly_ f : 'a. 'a -> 'a
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "val poly_" annotation is not yet implemented.
+                    ^^^^^^^^^^^^
+Warning 219: This value description has no layout-polymorphic type variables,
+  so "poly_" has no effect. Consider using a regular "val" instead.
+
+module type S_poly =
+  sig
+    val f : 'a -> 'a
+    val g : layout_ l. 'a 'b ('c : l). 'a -> 'b -> 'c -> 'a
+    val h : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
+  end
 |}]
 
 let poly_ f : 'a. 'a -> 'a = fun x -> x
@@ -1736,15 +1741,8 @@ and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
 Line 2, characters 10-11:
 2 | and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
               ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
-
-Line 1, characters 10-11:
-1 | let poly_ f : 'a. 'a -> 'a = fun x -> x
-              ^
-Warning 217: This binding has no layout variables, so "poly_" has no effect. Consider using a regular "let" instead.
->> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
-Uncaught exception: Misc.Fatal_error
-
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
 |}]
 
 (* Mixed poly and non-poly in mutually recursive bindings *)

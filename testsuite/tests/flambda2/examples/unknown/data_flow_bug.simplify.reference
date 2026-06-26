@@ -107,9 +107,9 @@ let Popaque = %opaque ($camlData_flow_bug__immstring19) in
                                                  let Pstringrefs =
                                                    %tag_imm (prim)
                                                  in
-                                                 (cont self
+                                                 (cont `self`
                                                          ($camlData_flow_bug__const_block14)
-                                                    where rec self
+                                                    where rec `self`
                                                                 (param :
                                                                    [ 0
                                                                    | 
@@ -156,7 +156,7 @@ let Popaque = %opaque ($camlData_flow_bug__immstring19) in
                                                                     (param)
                                                                     in
                                                                     cont 
-                                                                    self
+                                                                    `self`
                                                                     (Pfield_1)))))
                                                where k1 =
                                                  cont error

@@ -329,8 +329,8 @@ Line 2, characters 22-26:
 2 |   let (k' @ global) = k () in
                           ^^^^
 Error: This value is "local" but is expected to be "global".
-  Hint: This is a partial application
-        Adding 1 more argument will make the value non-local
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
 |}]
 
 (* However, for [f : (A -> (B -> C) @ mode1) @ mode2], we presume that [f]
@@ -769,9 +769,9 @@ Error: Signature mismatch:
          Nonportable_Portable
        In module "F":
        Modules do not match:
-         functor (M : S @ portable) -> ...
+         (M : S @ portable) -> ...
        is not included in
-         functor (M : S @ nonportable) -> ...
+         (M : S @ nonportable) -> ...
        Module types do not match:
          S @ portable
        does not include
@@ -829,9 +829,9 @@ Line 1, characters 37-38:
                                          ^
 Error: Signature mismatch:
        Modules do not match:
-         functor (Arg : S @ shareable) -> ...
+         (Arg : S @ shareable) -> ...
        is not included in
-         functor S @ nonportable -> ...
+         S @ nonportable -> ...
        Module types do not match:
          S @ shareable
        does not include
@@ -886,9 +886,9 @@ Line 3, characters 25-26:
                              ^
 Error: Signature mismatch:
        Modules do not match:
-         functor (Arg : T @ read_write) -> ...
+         (Arg : T @ read_write) -> ...
        is not included in
-         functor T @ immutable -> ...
+         T @ immutable -> ...
        Module types do not match:
          T @ read_write
        does not include
@@ -1052,18 +1052,15 @@ Line 1, characters 32-33:
 1 | module F (M : (S -> S) -> S) = (M : (S @ portable -> S) -> S)
                                     ^
 Error: Signature mismatch:
-       Modules do not match:
-         functor (Arg : $S1) -> ...
-       is not included in
-         functor $T1 -> ...
+       Modules do not match: (Arg : $S1) -> ... is not included in $T1 -> ...
        Module types do not match:
          $S1 = S -> S
        does not include
          $T1 = S @ portable -> S
        Modules do not match:
-         functor S @ portable -> ...
+         S @ portable -> ...
        is not included in
-         functor S @ nonportable -> ...
+         S @ nonportable -> ...
        Module types do not match:
          S @ portable
        does not include
@@ -1082,10 +1079,7 @@ Line 1, characters 43-44:
 1 | module F (M : (S -> S @ portable) -> S) = (M : (S -> S) -> S)
                                                ^
 Error: Signature mismatch:
-       Modules do not match:
-         functor (Arg : $S1) -> ...
-       is not included in
-         functor $T1 -> ...
+       Modules do not match: (Arg : $S1) -> ... is not included in $T1 -> ...
        Module types do not match:
          $S1 = S -> S @ portable
        does not include

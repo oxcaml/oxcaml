@@ -64,9 +64,9 @@ let not_implemented_aux pp_instr ?msg i =
        (fun ppf msg -> Format.fprintf ppf "(%s)" msg))
     msg
 
-let not_implemented_basic = not_implemented_aux Cfg.print_basic
+let not_implemented_basic = not_implemented_aux Printcfg.basic
 
-let not_implemented_terminator = not_implemented_aux Cfg.print_terminator
+let not_implemented_terminator = not_implemented_aux Printcfg.terminator
 
 type c_call_wrapper =
   { args : LL.Type.t list;
@@ -629,7 +629,10 @@ let extcall t (i : Cfg.terminator Cfg.instruction) ~func_symbol ~alloc
             in
             emit_ins_no_res t (I.store ~ptr:slot ~to_store:temp)
           | Stack (Local _ | Incoming _ | Domainstate _) | Unknown | Reg _ ->
-            assert false)
+            Misc.fatal_errorf
+              "Llvmize.extcall: unexpected non-Outgoing stack-argument \
+               location %a for call to %s"
+              Printreg.reg reg func_symbol)
         stack_arg_regs;
       (* Prepare direct args + special values for [caml_c_call_stack_args] *)
       let stack_args_begin =
@@ -1886,7 +1889,6 @@ let define_auxiliary_functions t =
 
 let init ~output_prefix ~ppf_dump =
   fail_if_not ~msg:"stack checks not supported" "init" Config.no_stack_checks;
-  fail_if_not ~msg:"runtime5 required" "init" Config.runtime5;
   let llvmir_filename = output_prefix ^ ".ll" in
   current_compilation_unit := Some (create ~llvmir_filename ~ppf_dump)
 

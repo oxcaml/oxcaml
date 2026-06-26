@@ -161,8 +161,11 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
           RegWorkList.Precolored);
       (match reg.Reg.loc, Reg.Tbl.find state.reg_color reg with
       | Reg color, Some color' -> assert (Regs.Phys_reg.equal color color')
-      | Reg _, None -> assert false
-      | (Unknown | Stack _), _ -> assert false);
+      | Reg _, None | (Unknown | Stack _), _ ->
+        fatal
+          "Regalloc_irc_state.reset: precolored register %a has unexpected \
+           location/color"
+          Printreg.reg reg);
       Reg.Tbl.replace state.reg_alias reg None;
       Regalloc_interf_graph.init_register_with_infinite_degree state.graph reg;
       assert (Regalloc_interf_graph.degree state.graph reg = Degree.infinite))

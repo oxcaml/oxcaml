@@ -1,7 +1,6 @@
 (* TEST
  modules = "test_c_thread_register_cstubs.c";
- runtime5;
- multidomain;
+ multicore;
  include systhreads;
  hassysthreads;
  {

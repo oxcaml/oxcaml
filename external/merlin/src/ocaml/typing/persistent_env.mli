@@ -107,7 +107,6 @@ type 'a sig_reader =
 
 val read : 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
   -> Subst.Lazy.persistent_signature
-
 val find : allow_hidden:bool -> 'a t -> 'a sig_reader
   -> (Global_module.Name.t -> 'a -> Short_paths.Desc.Module.components Lazy.t)
   -> Global_module.Name.t -> allow_excess_args:bool -> 'a

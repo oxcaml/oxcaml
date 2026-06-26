@@ -9,21 +9,14 @@
     flake = false;
   };
 
-  outputs =
-    {
-      self,
-      nixpkgs,
-      flake-utils,
-      menhir-repository,
-    }:
-    flake-utils.lib.eachDefaultSystem (
-      system:
+  outputs = { self, nixpkgs, flake-utils, menhir-repository }:
+    flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages."${system}";
 
         # Build with OCaml 5.4
-        ocamlPackages = pkgs.ocaml-ng.ocamlPackages_5_4.overrideScope (
-          _: osuper: {
+        ocamlPackages = pkgs.ocaml-ng.ocamlPackages_5_4.overrideScope
+          (_: osuper: {
             # Override menhirLib to the pinned version
             menhirLib = osuper.menhirLib.overrideAttrs (_: {
               version = "20231231";
@@ -31,8 +24,7 @@
             });
 
             inherit (packages) merlin-lib dot-merlin-reader merlin;
-          }
-        );
+          });
 
         inherit (ocamlPackages) buildDunePackage;
 
@@ -43,10 +35,8 @@
             version = "dev";
             src = self;
             duneVersion = "3";
-            propagatedBuildInputs = with ocamlPackages; [
-              csexp
-              alcotest
-            ];
+            propagatedBuildInputs = with ocamlPackages; [ csexp ];
+            checkInputs = with ocamlPackages; [ alcotest ];
             doCheck = true;
           };
 
@@ -72,37 +62,25 @@
               ocamlPackages.menhirSdk
               ocamlPackages.yojson
             ];
-            nativeBuildInputs = [
-              ocamlPackages.menhir
-              pkgs.jq
-            ];
+            nativeBuildInputs = [ ocamlPackages.menhir pkgs.jq ];
             nativeCheckInputs = [ dot-merlin-reader ];
             checkInputs = with ocamlPackages; [ ppxlib ];
-            doCheck = false; # Depends on a OxCaml
+            doCheck = true;
             checkPhase = ''
               runHook preCheck
-
               patchShebangs tests/merlin-wrapper
-              MERLIN_TEST_OCAML_PATH=${ocamlPackages.ocaml} \
-                dune build @check @runtest
-
+              dune build @check @runtest
               runHook postCheck
             '';
-            meta = with pkgs; {
-              mainProgram = "ocamlmerlin";
-            };
+            meta = with pkgs; { mainProgram = "ocamlmerlin"; };
           };
         };
-      in
-      {
+      in {
         inherit packages;
-
-        formatter = pkgs.nixfmt-tree;
 
         devShells.default = pkgs.mkShell {
           inputsFrom = pkgs.lib.attrValues packages;
           buildInputs = with ocamlPackages; [ merlin ];
         };
-      }
-    );
+      });
 }

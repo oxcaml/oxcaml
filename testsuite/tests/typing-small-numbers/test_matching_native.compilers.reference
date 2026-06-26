@@ -21,8 +21,7 @@ Lines 3-4, characters 2-21:
 3 | ..match #'m' with
 4 |   | #'a'..#'z' -> 500
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-#'A'
+  Here is an example of a case that is not matched: #'A'
 
 val five_hundred_partial : int = 500
 val seven_hundred : int = 700
@@ -46,8 +45,7 @@ Lines 3-4, characters 2-64:
 3 | ..match 6s with
 4 |   | 0s | 1s | 2s | 3s | 4s | 5s | 6s | 7s | 8s | 9s | 10s -> 500
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-11s
+  Here is an example of a case that is not matched: 11s
 
 val five_hundred_partial : int = 500
 val zero : int = 0
@@ -64,8 +62,7 @@ Lines 3-4, characters 2-75:
 3 | ..match #6s with
 4 |   | #0s | #1s | #2s | #3s | #4s | #5s | #6s | #7s | #8s | #9s | #10s -> 500
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-#11s
+  Here is an example of a case that is not matched: #11s
 
 val five_hundred_partial : int = 500
 val zero : int = 0
@@ -82,8 +79,7 @@ Lines 3-4, characters 2-64:
 3 | ..match 6S with
 4 |   | 0S | 1S | 2S | 3S | 4S | 5S | 6S | 7S | 8S | 9S | 10S -> 500
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-11S
+  Here is an example of a case that is not matched: 11S
 
 val five_hundred_partial : int = 500
 val zero : int = 0
@@ -100,8 +96,7 @@ Lines 3-4, characters 2-75:
 3 | ..match #6S with
 4 |   | #0S | #1S | #2S | #3S | #4S | #5S | #6S | #7S | #8S | #9S | #10S -> 500
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-#11S
+  Here is an example of a case that is not matched: #11S
 
 val five_hundred_partial : int = 500
 

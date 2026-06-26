@@ -97,13 +97,16 @@ module Error: sig
     (** One side is a functor but the other side is not *)
 
   and functor_params_diff =
-    (Types.functor_parameter list * Types.module_type,
-     functor_params_symptom) diff
+    (functor_params_info, functor_params_symptom) diff
     (** the return mode of the functor is intentionally omitted, since the diff
         is only about parameters. *)
 
+  and functor_params_info =
+    { params: functor_parameter list; res: module_type }
+
   and signature_symptom = {
     env: Env.t;
+    subst: Subst.t;
     missings: Types.signature_item list;
     incompatibles: (Ident.t * sigitem_symptom) list;
     (** signature items that could not be compared due to type divergence *)
@@ -176,11 +179,16 @@ val modtypes:
   loc:Location.t -> Env.t -> mark:bool -> modes:modes ->
   module_type -> module_type -> module_coercion
 
+val modtypes_consistency:
+  loc:Location.t -> Env.t -> module_type -> module_type -> unit
+
 (** [modtypes_constraint ~shape ~loc env ~mark exp_modtype constraint_modtype]
     checks that [exp_modtype] is a subtype of [constraint_modtype], and returns
     the module coercion and the shape of the constrained module.
+
     It also marks as used paired items in positive position in [exp_modtype],
     and also paired items in negative position in [constraint_modtype].
+
     This marking in negative position allows to raise an [unused item] warning
     whenever an item in a functor parameter in [constraint_modtype] does not
     exist in [exp_modtypes]. This behaviour differs from the one in
@@ -212,8 +220,8 @@ val signatures: Env.t -> mark:bool -> modes:modes ->
 val include_functor_signatures : Env.t -> mark:bool ->
   signature -> signature -> modes:modes -> (Ident.t * module_coercion) list
 
-val check_implementation: Env.t -> modes:modes -> signature -> signature -> unit
 (** Check an implementation against an interface *)
+val check_implementation: Env.t -> modes:modes -> signature -> signature -> unit
 
 val compunit:
       Env.t -> mark:bool -> string -> modes:modes ->
@@ -265,7 +273,8 @@ module Functor_inclusion_diff: sig
     type diff = (Types.functor_parameter, unit) Error.functor_param_symptom
     type state
   end
-  val diff: Env.t ->
+  type inclusion_env = { i_env:Env.t; i_subst:Subst.t }
+  val diff: inclusion_env ->
     Types.functor_parameter list * Types.module_type ->
     Types.functor_parameter list * Types.module_type ->
     Diffing.Define(Defs).patch

@@ -443,7 +443,7 @@ We try several places in the identifier to check the result stability
       [
         <def>
           pattern (under.ml[1,0+4]..under.ml[1,0+6])
-            Tpat_var \"aa/275\"
+            Tpat_var \"aa\"
             sort value
             value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#2[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#3[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (under.ml[1,0+9]..under.ml[1,0+12])
@@ -454,7 +454,7 @@ We try several places in the identifier to check the result stability
       [
         <def>
           pattern (under.ml[2,13+4]..under.ml[2,13+5])
-            Tpat_var \"f/276\"
+            Tpat_var \"f\"
             sort value
             value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#9[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#a[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (under.ml[2,13+6]..under.ml[5,70+17]) ghost
@@ -466,7 +466,7 @@ We try several places in the identifier to check the result stability
               Nolabel
               Param_pat
                 pattern (under.ml[2,13+6]..under.ml[2,13+9])
-                  Tpat_var \"x/278\"
+                  Tpat_var \"x\"
                   sort '_representable_layout_1
                   value_mode meet(local,once,nonportable,unforkable,yielding,stateful) . local_to_regional_full(modevar#d[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#e[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
                 id(modevar#d[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#e[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
@@ -481,9 +481,11 @@ We try several places in the identifier to check the result stability
                     structure_item (_none_[0,0+-1]..[0,0+-1]) ghost
                       Pstr_eval
                       expression (_none_[0,0+-1]..[0,0+-1]) ghost
-                        Pexp_constant PConst_int (1,None)
+                        Pexp_constant
+                        constant (_none_[0,0+-1]..[0,0+-1]) ghost
+                          PConst_int (1,None)
                   ]
-                Texp_ident \"*type-error*/281\"
+                Texp_ident \"*type-error*\"
       ]
   ]
   

@@ -796,7 +796,7 @@ let bad (x : float array) =
 Line 3, characters 16-17:
 3 |   Idx_mut.get x y
                     ^
-Error: This expression has type "('a array, 'a) idx_mut"
+Error: The value "y" has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
        The layout of float is value
          because it is the primitive type float.
@@ -887,7 +887,8 @@ val f : bool -> ('a r, int) idx_imm = <fun>
 Line 5, characters 6-7:
 5 |     (.u.#x)
           ^
-Warning 18 [not-principal]: this type-based field disambiguation is not principal.
+Warning 18 [not-principal]: this type-based field disambiguation is not
+  principal.
 
 val f : bool -> ('a r, int) idx_imm = <fun>
 |}]
@@ -904,7 +905,8 @@ val f : bool -> (u t, int) idx_imm = <fun>
 Line 5, characters 9-10:
 5 |     (.a.#x)
              ^
-Warning 18 [not-principal]: this type-based unboxed record field disambiguation is not principal.
+Warning 18 [not-principal]: this type-based unboxed record field disambiguation
+  is not principal.
 
 val f : bool -> (u t, int) idx_imm = <fun>
 |}]
@@ -921,7 +923,8 @@ val f : bool -> (u t# t, int) idx_imm = <fun>
 Line 5, characters 12-13:
 5 |     (.a.#a.#x)
                 ^
-Warning 18 [not-principal]: this type-based unboxed record field disambiguation is not principal.
+Warning 18 [not-principal]: this type-based unboxed record field disambiguation
+  is not principal.
 
 val f : bool -> (u t# t, int) idx_imm = <fun>
 |}]
@@ -940,7 +943,8 @@ val f : bool -> (u array, int) idx_mut = <fun>
 Line 6, characters 51-52:
 6 |     (.idx_mut(Idx_mut.unsafe_create_into_array 1).#x)
                                                        ^
-Warning 18 [not-principal]: this type-based unboxed record field disambiguation is not principal.
+Warning 18 [not-principal]: this type-based unboxed record field disambiguation
+  is not principal.
 
 val f : bool -> (u array, int) idx_mut = <fun>
 |}]
@@ -959,7 +963,8 @@ val f : bool -> (u t# array, int) idx_mut = <fun>
 Line 6, characters 54-55:
 6 |     (.idx_mut(Idx_mut.unsafe_create_into_array 1).#a.#x)
                                                           ^
-Warning 18 [not-principal]: this type-based unboxed record field disambiguation is not principal.
+Warning 18 [not-principal]: this type-based unboxed record field disambiguation
+  is not principal.
 
 val f : bool -> (u t# array, int) idx_mut = <fun>
 |}]

@@ -24,11 +24,28 @@ let code loopify(never) size(48) newer_version_of(foo_0)
     where k4 =
       let untagged = %untag_imm (b') in
       switch untagged
-        | 0 -> k2 (0i, 0x0p+0, 0, x1, x2)
-        | 1 -> k2 (0i, 0x0p+0, 0, x2, x1)
+        | 0 ->
+          k2
+            (0i,
+             poison.float.variant_unboxing_float,
+             poison.val.variant_unboxing_field,
+             x1,
+             x2)
+        | 1 ->
+          k2
+            (0i,
+             poison.float.variant_unboxing_float,
+             poison.val.variant_unboxing_field,
+             x2,
+             x1)
     where k3 =
       let unboxed_float = %unbox_num.`float` (y) in
-      cont k2 (1i, unboxed_float, x2, 0, 0)
+      cont k2
+             (1i,
+              unboxed_float,
+              x2,
+              poison.val.variant_unboxing_field,
+              poison.val.variant_unboxing_field)
     where k2
             (tag : imm,
              unboxed_float : float,

@@ -145,6 +145,10 @@ type lazy_block_tag =
   | Lazy_tag
   | Forward_tag
 
+let tag_of_lazy_tag = function
+  | Lazy_tag -> Config.lazy_tag
+  | Forward_tag -> Obj.forward_tag
+
 type primitive =
   | Pbytes_to_string
   | Pbytes_of_string
@@ -312,9 +316,6 @@ type primitive =
   | Pfloatarray_load_vec of { size : boxed_vector; unsafe : bool;
                               index_kind : array_index_kind;
                               mode : locality_mode; boxed : bool }
-  | Pfloat_array_load_vec of { size : boxed_vector; unsafe : bool;
-                               index_kind : array_index_kind;
-                               mode : locality_mode; boxed : bool }
   | Pint_array_load_vec of { size : boxed_vector; unsafe : bool;
                              index_kind : array_index_kind;
                              mode : locality_mode; boxed : bool }
@@ -341,8 +342,6 @@ type primitive =
                                            mode : locality_mode; boxed : bool }
   | Pfloatarray_set_vec of { size : boxed_vector; unsafe : bool;
                              index_kind : array_index_kind; boxed : bool }
-  | Pfloat_array_set_vec of { size : boxed_vector; unsafe : bool;
-                              index_kind : array_index_kind; boxed : bool }
   | Pint_array_set_vec of { size : boxed_vector; unsafe : bool;
                             index_kind : array_index_kind; boxed : bool }
   | Punboxed_float_array_set_vec of { size : boxed_vector; unsafe : bool;
@@ -494,6 +493,7 @@ and array_kind =
   | Punboxedvectorarray of unboxed_vector
   | Pgcscannableproductarray of scannable_product_element_kind list
   | Pgcignorableproductarray of ignorable_product_element_kind list
+  | Punspecializedarray
 
 and array_ref_kind =
   | Pgenarray_ref of locality_mode
@@ -506,6 +506,7 @@ and array_ref_kind =
   | Punboxedvectorarray_ref of unboxed_vector
   | Pgcscannableproductarray_ref of scannable_product_element_kind list
   | Pgcignorableproductarray_ref of ignorable_product_element_kind list
+  | Punspecializedarray_ref of locality_mode
 
 and array_set_kind =
   | Pgenarray_set of modify_mode
@@ -519,6 +520,7 @@ and array_set_kind =
   | Pgcscannableproductarray_set of
       modify_mode * scannable_product_element_kind list
   | Pgcignorableproductarray_set of ignorable_product_element_kind list
+  | Punspecializedarray_set of modify_mode
 
 and ignorable_product_element_kind =
   | Pint_ignorable
@@ -1331,6 +1333,7 @@ let split_vectors =
     Misc.fatal_error "Only x86-64 and arm64 are supported"
 
 let layout_unit = non_null_value Pintval
+let layout_bool = non_null_value (Pvariant { consts = [0; 1]; non_consts = []})
 let layout_unboxed_unit = Punboxed_product []
 let layout_int = non_null_value Pintval
 let layout_int_or_null = nullable_value Pintval
@@ -1353,6 +1356,7 @@ let layout_variant_arg = nullable_value Pgenval
 let layout_exception = non_null_value Pgenval
 let layout_function = non_null_value Pgenval
 let layout_object = non_null_value Pgenval
+let layout_poly_variant = non_null_value Pgenval
 let layout_class = non_null_value Pgenval
 let layout_module = non_null_value Pgenval
 let layout_functor = non_null_value Pgenval
@@ -1413,7 +1417,14 @@ let layout_lazy = nullable_value Pgenval
 let layout_lazy_contents = nullable_value Pgenval
 let layout_any_value = nullable_value Pgenval
 let layout_letrec = layout_any_value
+let layout_instance_var = nullable_value Pgenval
+let layout_method = nullable_value Pgenval
+let layout_initializer = nullable_value Pgenval
+let layout_array_comprehension_element = nullable_value Pgenval
+let layout_list_element = nullable_value Pgenval
 let layout_probe_arg = nullable_value Pgenval
+let layout_block_idx = layout_unboxed_nativeint
+
 let layout_unboxed_product layouts = Punboxed_product layouts
 
 let unboxed_vector_of_boxed_vector = function
@@ -1643,6 +1654,10 @@ let shallow_iter ~tail ~non_tail:f = function
 
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
+
+let is_evaluated = function
+  | Lconst _ | Lvar _ | Lfunction _ -> true
+  | _ -> false
 
 let rec free_variables = function
   | Lvar id
@@ -1893,14 +1908,20 @@ let transl_extension_path loc env path =
 let transl_class_path loc env path =
   transl_path Env.find_class_address loc env path
 
-let transl_prim mod_name name =
-  let pers = Ident.create_persistent mod_name in
-  let env = Env.add_persistent_structure pers Env.empty in
-  let lid = Longident.Ldot (Longident.Lident mod_name, name) in
-  match Env.find_value_by_name_lazy lid env with
-  | path, _ -> transl_value_path Loc_unknown env path
+let transl_prim modname field =
+  let mod_ident = Ident.create_persistent modname in
+  let env = Env.add_persistent_structure mod_ident (Lazy.force Env.initial) in
+  match Env.open_pers_signature modname env with
   | exception Not_found ->
-      fatal_error ("Primitive " ^ name ^ " not found.")
+      fatal_errorf "Module %s unavailable." modname
+    | _path, env -> (
+      match Env.find_value_by_name_lazy (Longident.Lident field) env with
+      | exception Not_found ->
+          fatal_errorf "Primitive %s.%s not found." modname field
+        (* Loc_unknown is appropriate here: this references a compiler-internal
+            primitive with no corresponding user source location. *)
+      | path, _ -> transl_value_path Loc_unknown env path
+    )
 
 (* Compile a sequence of expressions *)
 
@@ -2472,6 +2493,9 @@ let primitive_may_allocate : primitive -> locality_mode option = function
       | Pgcignorableproductarray_ref _), _, _) -> None
   | Parrayrefu ((Pgenarray_ref m | Pfloatarray_ref m), _, _)
   | Parrayrefs ((Pgenarray_ref m | Pfloatarray_ref m), _, _) -> Some m
+  | Parrayrefu (Punspecializedarray_ref _, _, _)
+  | Parrayrefs (Punspecializedarray_ref _, _, _) ->
+    Misc.fatal_error "Lambda.primitive_may_allocate: Punspecializedarray_ref"
   | Pisint _ | Pisnull | Pisout -> None
   | Pbigarrayset _ | Pbigarraydim _ -> None
   | Pbigarrayref (_, _, _, _) ->
@@ -2488,7 +2512,6 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pstring_load_vec { mode = m; boxed = true; _ }
   | Pbytes_load_vec { mode = m; boxed = true; _ }
   | Pfloatarray_load_vec { mode = m; boxed = true; _ }
-  | Pfloat_array_load_vec { mode = m; boxed = true; _ }
   | Pint_array_load_vec { mode = m; boxed = true; _ }
   | Punboxed_float_array_load_vec { mode = m; boxed = true; _ }
   | Punboxed_float32_array_load_vec { mode = m; boxed = true; _ }
@@ -2507,7 +2530,6 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pbytes_load_64 { boxed = false; _ }
   | Pbytes_load_vec { boxed = false; _ }
   | Pfloatarray_load_vec { boxed = false; _ }
-  | Pfloat_array_load_vec { boxed = false; _ }
   | Pint_array_load_vec { boxed = false; _ }
   | Punboxed_float_array_load_vec { boxed = false; _ }
   | Punboxed_float32_array_load_vec { boxed = false; _ }
@@ -2529,7 +2551,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pbigstring_load_vec { boxed = false; _ } -> None
   | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
   | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
-  | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
+  | Pfloatarray_set_vec _ | Pint_array_set_vec _
   | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
   | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
@@ -2627,7 +2649,6 @@ let primitive_can_raise prim =
   | Pbigstring_set_64 { unsafe = false; index_kind = _; boxed = _ }
   | Pbigstring_set_vec { checks = Some _; _ }
   | Pfloatarray_load_vec { unsafe = false; _ }
-  | Pfloat_array_load_vec { unsafe = false; _ }
   | Pint_array_load_vec { unsafe = false; _ }
   | Punboxed_float_array_load_vec { unsafe = false; _ }
   | Punboxed_float32_array_load_vec { unsafe = false; _ }
@@ -2637,7 +2658,6 @@ let primitive_can_raise prim =
   | Punboxed_int64_array_load_vec { unsafe = false; _ }
   | Punboxed_nativeint_array_load_vec { unsafe = false; _ }
   | Pfloatarray_set_vec { unsafe = false; _ }
-  | Pfloat_array_set_vec { unsafe = false; _ }
   | Pint_array_set_vec { unsafe = false; _ }
   | Punboxed_float_array_set_vec { unsafe = false; _ }
   | Punboxed_float32_array_set_vec { unsafe = false; _ }
@@ -2720,7 +2740,6 @@ let primitive_can_raise prim =
   | Pbigstring_set_64 { unsafe = true; index_kind = _; boxed = _ }
   | Pbigstring_set_vec { checks = None; _ }
   | Pfloatarray_load_vec { unsafe = true; _ }
-  | Pfloat_array_load_vec { unsafe = true; _ }
   | Pint_array_load_vec { unsafe = true; _ }
   | Punboxed_float_array_load_vec { unsafe = true; _ }
   | Punboxed_float32_array_load_vec { unsafe = true; _ }
@@ -2730,7 +2749,6 @@ let primitive_can_raise prim =
   | Punboxed_int64_array_load_vec { unsafe = true; _ }
   | Punboxed_nativeint_array_load_vec { unsafe = true; _ }
   | Pfloatarray_set_vec { unsafe = true; _ }
-  | Pfloat_array_set_vec { unsafe = true; _ }
   | Pint_array_set_vec { unsafe = true; _ }
   | Punboxed_float_array_set_vec { unsafe = true; _ }
   | Punboxed_float32_array_set_vec { unsafe = true; _ }
@@ -2869,6 +2887,9 @@ let array_ref_kind_result_layout = function
   | Punboxedvectorarray_ref bv -> layout_unboxed_vector bv
   | Pgcscannableproductarray_ref kinds -> layout_of_scannable_kinds kinds
   | Pgcignorableproductarray_ref kinds -> layout_of_ignorable_kinds kinds
+  | Punspecializedarray_ref _ ->
+    Misc.fatal_error
+      "Lambda.array_ref_kind_result_layout: Punspecializedarray_ref"
 
 let rec layout_of_mixed_block_element element =
   match element with
@@ -3026,7 +3047,7 @@ let primitive_result_layout (p : primitive) =
   | Pbytes_set_vec _
   | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
   | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
-  | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
+  | Pfloatarray_set_vec _ | Pint_array_set_vec _
   | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
   | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
@@ -3108,7 +3129,6 @@ let primitive_result_layout (p : primitive) =
   | Pbytes_load_vec { size; boxed = false; _ }
   | Pbigstring_load_vec { size; boxed = false; _ }
   | Pfloatarray_load_vec { size; boxed = false; _ }
-  | Pfloat_array_load_vec { size; boxed = false; _ }
   | Punboxed_float_array_load_vec { size; boxed = false; _ }
   | Punboxed_float32_array_load_vec { size; boxed = false; _ }
   | Pint_array_load_vec { size; boxed = false; _ }
@@ -3122,7 +3142,6 @@ let primitive_result_layout (p : primitive) =
   | Pbytes_load_vec { size; boxed = true; _ }
   | Pbigstring_load_vec { size; boxed = true; _ }
   | Pfloatarray_load_vec { size; boxed = true; _ }
-  | Pfloat_array_load_vec { size; boxed = true; _ }
   | Punboxed_float_array_load_vec { size; boxed = true; _ }
   | Punboxed_float32_array_load_vec { size; boxed = true; _ }
   | Pint_array_load_vec { size; boxed = true; _ }
@@ -3224,6 +3243,7 @@ let array_ref_kind mode = function
   | Punboxedvectorarray vec_kind -> Punboxedvectorarray_ref vec_kind
   | Pgcscannableproductarray kinds -> Pgcscannableproductarray_ref kinds
   | Pgcignorableproductarray kinds -> Pgcignorableproductarray_ref kinds
+  | Punspecializedarray -> Punspecializedarray_ref mode
 
 let array_set_kind mode = function
   | Pgenarray -> Pgenarray_set mode
@@ -3237,6 +3257,7 @@ let array_set_kind mode = function
   | Punboxedvectorarray vec_kind -> Punboxedvectorarray_set vec_kind
   | Pgcscannableproductarray kinds -> Pgcscannableproductarray_set (mode, kinds)
   | Pgcignorableproductarray kinds -> Pgcignorableproductarray_set kinds
+  | Punspecializedarray -> Punspecializedarray_set mode
 
 let array_ref_kind_of_array_set_kind (kind : array_set_kind) mode
       : array_ref_kind =
@@ -3253,6 +3274,7 @@ let array_ref_kind_of_array_set_kind (kind : array_set_kind) mode
   | Paddrarray_set _ -> Paddrarray_ref
   | Pgcignorableaddrarray_set -> Pgcignorableaddrarray_ref
   | Pfloatarray_set -> Pfloatarray_ref mode
+  | Punspecializedarray_set _ -> Punspecializedarray_ref mode
 
 let may_allocate_in_region lam =
   (* loop_region raises, if the lambda might allocate in parent region *)
@@ -3359,6 +3381,9 @@ let count_initializers_array_kind (lambda_array_kind : array_kind) =
     List.fold_left
       (fun acc ignorable -> acc + count_initializers_ignorable ignorable)
       0 ignorables
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Lambda.count_initializers_array_kind: Punspecializedarray"
 
 (* CR mshinwell: This function might need revisiting for JSIR and any
    Flambda 2 -> WASM backend *)
@@ -3388,6 +3413,9 @@ let array_element_size_in_bytes (array_kind : array_kind) =
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     (* All elements of unboxed product arrays are currently 8 bytes wide. *)
     count_initializers_array_kind array_kind * 8
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Lambda.array_element_size_in_bytes: Punspecializedarray"
 
 let element_layout_of_array_kind ak =
   (* [alloc_heap] is ignored by [array_ref_kind_result_layout]. *)

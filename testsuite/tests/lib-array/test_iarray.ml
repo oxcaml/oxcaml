@@ -9,7 +9,7 @@ external ( .:() ) : 'a iarray -> int -> 'a = "%array_safe_get";;
 
 (** Create some immutable and mutable arrays *)
 
-let iarray  : int   iarray = [:1;2;3;4;5:];;
+let iarray  : int   iarray = [|1;2;3;4;5|];;
 let iarray_local () = exclave_ Iarray.init_local 5 ~f:(fun x -> x + 1);;
 let ifarray : float iarray = [:1.5;2.5;3.5;4.5;5.5:];;
 let ifarray_local () =
@@ -85,7 +85,7 @@ Line 3, characters 4-5:
         ^
 Error: This pattern matches values of type "int"
        but a pattern was expected which matches values of type "float"
-  Hint: Did you mean "1."?
+Hint: Did you mean "1."?
 |}];;
 
 match marray with
@@ -102,14 +102,14 @@ Error: This pattern matches values of type "'a iarray"
 |}];;
 
 match iarray with
-| [||]          -> "empty"
-| [|1;2;3;4;5|] -> "1--5"
-| _             -> "who knows?"
+| ([||] : _ array) -> "empty"
+| [|1;2;3;4;5|]    -> "1--5"
+| _                -> "who knows?"
 ;;
 [%%expect{|
-Line 2, characters 2-6:
-2 | | [||]          -> "empty"
-      ^^^^
+Line 2, characters 2-18:
+2 | | ([||] : _ array) -> "empty"
+      ^^^^^^^^^^^^^^^^
 Error: This pattern matches values of type "'a array"
        but a pattern was expected which matches values of type "int iarray"
 |}];;
