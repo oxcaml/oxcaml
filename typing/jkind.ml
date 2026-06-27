@@ -549,8 +549,7 @@ module Mod_bounds = struct
       (Axis_lattice.mask_of_modality modality)
       (Bounds_mask.of_axis_set (relevant_axes_of_modality ~modality))
 
-  let saturated_mask t mask =
-    Bounds_mask.meet (to_axis_lattice t) mask
+  let saturated_mask t mask = Bounds_mask.meet (to_axis_lattice t) mask
 
   let mask_of_externality externality =
     to_axis_lattice (create Crossing.max ~externality)
@@ -604,7 +603,8 @@ module With_bounds = struct
                    (Bounds_mask.meet explicit_relevant_bounds axis_mask))
             in
             let is_max =
-              Bounds_mask.equal (Bounds_mask.meet max_axis_mask axis_mask)
+              Bounds_mask.equal
+                (Bounds_mask.meet max_axis_mask axis_mask)
                 axis_mask
             in
             if (not has_explicit_relevance) && is_max
