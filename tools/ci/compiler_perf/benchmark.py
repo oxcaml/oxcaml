@@ -210,9 +210,43 @@ def write_markdown(
     corpus: dict,
     runs: list[dict],
     files: list[dict],
+    thresholds: dict,
 ) -> None:
     lines = [
         "# Compiler performance benchmark",
+        "",
+        "## What this checks",
+        "",
+        (
+            "The main check is the corpus CPU-time check. For run `i`, let "
+            "`B_i` be total CPU seconds for the base compiler over the "
+            "benchmark files, let `H_i` be total CPU seconds for the head "
+            "compiler over the same files, and let `r_i = H_i / B_i`."
+        ),
+        "",
+        (
+            "The script computes the mean and sample standard deviation of "
+            "`log(r_i)`. If there are `n` runs, the reported 99% lower "
+            "confidence bound is:"
+        ),
+        "",
+        "`exp(mean(log(r_i)) - t_0.99,n-1 * sd(log(r_i)) / sqrt(n))`",
+        "",
+        (
+            "The main check fails when this lower confidence bound is greater "
+            f"than `{thresholds['fail_corpus_lower_bound']:.3f}`. In other "
+            "words, the check only fails when even the conservative estimate "
+            "says that the head compiler is slower than the base compiler by "
+            "more than the configured threshold."
+        ),
+        "",
+        (
+            "There are two secondary checks. The build check compares elapsed "
+            "time for building the base source tree with the head-built "
+            "compiler against building it with the base compiler. The "
+            "per-file check computes the median `H_i / B_i` for each "
+            "benchmark file and catches large localized slowdowns."
+        ),
         "",
     ]
 
@@ -392,6 +426,7 @@ def main() -> int:
             corpus=corpus,
             runs=runs,
             files=files,
+            thresholds=payload["thresholds"],
         )
 
     print("Compiler performance benchmark")
