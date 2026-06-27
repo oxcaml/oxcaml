@@ -21,6 +21,6 @@ let $camlOpt_flags__immstring26 = "foo" in
       | 0 -> k (99)
       | 1 -> k (-1)
   where k (y : imm tagged) =
-    let $camlOpt_flags__Pmakeblock138 = Block 0 (42, y, 1701) in
-    let $camlOpt_flags = Block 0 ($camlOpt_flags__Pmakeblock138) in
+    let $camlOpt_flags__Pmakeblock139 = Block 0 (42, y, 1701) in
+    let $camlOpt_flags = Block 0 ($camlOpt_flags__Pmakeblock139) in
     cont done ($camlOpt_flags)
