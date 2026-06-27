@@ -159,6 +159,7 @@ def corpus_statistics(runs: list[dict]) -> dict:
     sd_log_ratio = sample_standard_deviation(log_ratios)
     t_critical = t_critical_one_sided_99(len(log_ratios))
     if math.isinf(t_critical):
+        margin = 0.0
         lower_bound = runs[0]["ratio"]
     else:
         margin = t_critical * sd_log_ratio / math.sqrt(len(log_ratios))
@@ -166,6 +167,7 @@ def corpus_statistics(runs: list[dict]) -> dict:
     return {
         "ratio": math.exp(mean_log_ratio),
         "lower_bound_99": lower_bound,
+        "confidence_margin_log": margin,
         "mean_log_ratio": mean_log_ratio,
         "sd_log_ratio": sd_log_ratio,
         "t_critical_99": t_critical,
@@ -241,6 +243,14 @@ def write_markdown(
         ),
         "",
         (
+            "The benchmark starts with the minimum number of runs, then adds "
+            "more runs if the confidence margin is too wide to distinguish "
+            f"a `{thresholds['precision_target_slowdown']:.3f}` slowdown from "
+            "the failure threshold. This spends extra time only on noisy "
+            "measurements."
+        ),
+        "",
+        (
             "There are two secondary checks. The build check compares elapsed "
             "time for building the base source tree with the head-built "
             "compiler against building it with the base compiler. The "
@@ -293,6 +303,9 @@ def write_markdown(
             "99% lower confidence bound: "
             f"**{corpus['lower_bound_99']:.3f}**",
             "",
+            "Log-space confidence margin: "
+            f"**{corpus['confidence_margin_log']:.4f}**",
+            "",
             "## File diagnostics",
             "",
             "| File | Base median CPU s | Head median CPU s | Median head/base |",
@@ -316,10 +329,13 @@ def main() -> int:
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--work-dir", type=Path, required=True)
     parser.add_argument("--runs", type=int, default=20)
+    parser.add_argument("--max-runs", type=int, default=60)
+    parser.add_argument("--run-batch-size", type=int, default=5)
     parser.add_argument("--warmups", type=int, default=1)
     parser.add_argument("--fail-corpus-lower-bound", type=float, default=1.015)
     parser.add_argument("--fail-any-file-median", type=float, default=1.25)
     parser.add_argument("--fail-build-ratio", type=float, default=1.15)
+    parser.add_argument("--precision-target-slowdown", type=float, default=1.03)
     parser.add_argument("--build-results-json", type=Path)
     parser.add_argument("--json-output", type=Path)
     parser.add_argument("--markdown-output", type=Path)
@@ -330,6 +346,15 @@ def main() -> int:
         raise SystemExit("--runs must be at least 1")
     if args.warmups < 0:
         raise SystemExit("--warmups must not be negative")
+    if args.max_runs < args.runs:
+        raise SystemExit("--max-runs must be at least --runs")
+    if args.run_batch_size < 1:
+        raise SystemExit("--run-batch-size must be at least 1")
+    if args.precision_target_slowdown <= args.fail_corpus_lower_bound:
+        raise SystemExit(
+            "--precision-target-slowdown must be greater than "
+            "--fail-corpus-lower-bound"
+        )
 
     for compiler in [args.base_compiler, args.head_compiler]:
         if not compiler.exists():
@@ -361,8 +386,14 @@ def main() -> int:
             run_dir=args.work_dir / "warmup" / "head" / str(i),
         )
 
+    precision_gap = (
+        math.log(args.precision_target_slowdown)
+        - math.log(args.fail_corpus_lower_bound)
+    )
+
     runs = []
-    for i in range(args.runs):
+    while len(runs) < args.max_runs:
+        i = len(runs)
         if i % 2 == 0:
             base_total, base_files = run_suite(
                 compiler=args.base_compiler,
@@ -399,6 +430,21 @@ def main() -> int:
                 "head_files": head_files,
             }
         )
+        run_count = len(runs)
+        if run_count < args.runs:
+            continue
+        should_check = (
+            run_count == args.runs
+            or run_count == args.max_runs
+            or (run_count - args.runs) % args.run_batch_size == 0
+        )
+        if not should_check:
+            continue
+        corpus = corpus_statistics(runs)
+        if corpus["lower_bound_99"] > args.fail_corpus_lower_bound:
+            break
+        if corpus["confidence_margin_log"] <= precision_gap:
+            break
 
     corpus = corpus_statistics(runs)
     files = file_statistics(benchmark_files, runs)
@@ -413,6 +459,10 @@ def main() -> int:
             "fail_corpus_lower_bound": args.fail_corpus_lower_bound,
             "fail_any_file_median": args.fail_any_file_median,
             "fail_build_ratio": args.fail_build_ratio,
+            "precision_target_slowdown": args.precision_target_slowdown,
+            "min_runs": args.runs,
+            "max_runs": args.max_runs,
+            "run_batch_size": args.run_batch_size,
         },
     }
     if args.json_output is not None:
@@ -444,6 +494,7 @@ def main() -> int:
         )
     print(f"corpus ratio: {corpus['ratio']:.3f}")
     print(f"99% lower confidence bound: {corpus['lower_bound_99']:.3f}")
+    print(f"log-space confidence margin: {corpus['confidence_margin_log']:.4f}")
     for result in files:
         print(
             f"{result['path']}: base_median={result['base_median']:.3f}s "

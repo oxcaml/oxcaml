@@ -164,10 +164,13 @@ jobs:
             --json-output "$GITHUB_WORKSPACE/compiler-perf-results.json" \
             --markdown-output "$GITHUB_WORKSPACE/compiler-perf-results.md" \
             --runs 20 \
+            --max-runs 60 \
+            --run-batch-size 5 \
             --warmups 1 \
             --fail-corpus-lower-bound 1.015 \
             --fail-any-file-median 1.25 \
-            --fail-build-ratio 1.15
+            --fail-build-ratio 1.15 \
+            --precision-target-slowdown 1.03
 
       - name: Print benchmark summary
         if: always()
