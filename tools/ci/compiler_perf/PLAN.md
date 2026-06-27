@@ -9,4 +9,4 @@
 - [x] Keep failure rules conservative until calibrated.
 - [x] Validate locally with existing installed compilers.
 - [x] Push the implementation branch.
-- [ ] Update the synthetic #6113 test branches and check CI.
+- [x] Update the synthetic #6113 test branches and check CI.
