@@ -8,5 +8,5 @@
 - [x] Report build ratios, corpus ratios, and per-file diagnostics.
 - [x] Keep failure rules conservative until calibrated.
 - [x] Validate locally with existing installed compilers.
-- [ ] Push the implementation branch.
+- [x] Push the implementation branch.
 - [ ] Update the synthetic #6113 test branches and check CI.
