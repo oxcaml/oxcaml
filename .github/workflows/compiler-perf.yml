@@ -15,7 +15,7 @@ on:
 
 jobs:
   compiler-perf:
-    name: compiler perf smoke (x86_64-linux)
+    name: compiler perf (x86_64-linux)
     runs-on: warp-ubuntu-latest-x64-8x
     env:
       J: "8"
@@ -90,6 +90,8 @@ jobs:
           python3 head/tools/ci/compiler_perf/benchmark.py \
             --base-compiler "$GITHUB_WORKSPACE/base/_install/bin/ocamlopt.opt" \
             --head-compiler "$GITHUB_WORKSPACE/head/_install/bin/ocamlopt.opt" \
+            --base-source-root "$GITHUB_WORKSPACE/base" \
+            --head-source-root "$GITHUB_WORKSPACE/head" \
             --work-dir "$GITHUB_WORKSPACE/compiler-perf-work" \
             --json-output "$GITHUB_WORKSPACE/compiler-perf-results.json" \
             --markdown-output "$GITHUB_WORKSPACE/compiler-perf-results.md" \

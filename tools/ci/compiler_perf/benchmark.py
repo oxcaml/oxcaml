@@ -10,117 +10,20 @@ import sys
 from pathlib import Path
 
 
-def gen_pattern_matching(path: Path) -> None:
-    constructors = [f"C{i:04d}" for i in range(700)]
-    lines = ["type t ="]
-    lines.extend(f"  | {constructor}" for constructor in constructors)
-    lines.append("")
-    lines.append("let classify = function")
-    lines.extend(
-        f"  | {constructor} -> {i % 97}" for i, constructor in enumerate(constructors)
-    )
-    lines.append("")
-    lines.append("let all = [|")
-    lines.extend(f"  {constructor};" for constructor in constructors)
-    lines.append("|]")
-    lines.append("")
-    lines.append("let sum () =")
-    lines.append("  let total = ref 0 in")
-    lines.append("  for i = 0 to Array.length all - 1 do")
-    lines.append("    total := !total + classify all.(i)")
-    lines.append("  done;")
-    lines.append("  !total")
-    path.write_text("\n".join(lines) + "\n")
-
-
-def gen_modules(path: Path) -> None:
-    lines = ["module type S = sig"]
-    lines.extend(f"  val v{i:03d} : int -> int" for i in range(220))
-    lines.append("end")
-    lines.append("")
-    lines.append("module Base : S = struct")
-    lines.extend(f"  let v{i:03d} x = x + {i}" for i in range(220))
-    lines.append("end")
-    lines.append("")
-    for i in range(16):
-        previous = "Base" if i == 0 else f"M{i - 1:02d}"
-        lines.append(f"module F{i:02d} (X : S) : S = struct")
-        lines.append(f"  module Y = {previous}")
-        lines.extend(f"  let v{j:03d} x = X.v{j:03d} (Y.v{j:03d} x)" for j in range(220))
-        lines.append("end")
-        lines.append(f"module M{i:02d} = F{i:02d}({previous})")
-        lines.append("")
-    lines.append("module R = M15")
-    lines.append("let run x =")
-    lines.append("  x")
-    lines.extend(f"  |> R.v{i:03d}" for i in range(220))
-    path.write_text("\n".join(lines) + "\n")
-
-
-def gen_closures(path: Path) -> None:
-    lines = []
-    for i in range(900):
-        if i == 0:
-            lines.append("let[@inline never] f000 x = x + 1")
-        else:
-            lines.append(f"let[@inline never] f{i:03d} x = f{i - 1:03d} (x + {i % 11})")
-    lines.append("")
-    lines.append("let run n =")
-    lines.append("  let rec loop acc i =")
-    lines.append("    if i = 0 then acc")
-    lines.append("    else loop (f899 acc + i) (i - 1)")
-    lines.append("  in")
-    lines.append("  loop 0 n")
-    path.write_text("\n".join(lines) + "\n")
-
-
-def gen_gadts(path: Path) -> None:
-    lines = [
-        "type _ expr =",
-        "  | Int : int -> int expr",
-        "  | Bool : bool -> bool expr",
-        "  | Pair : 'a expr * 'b expr -> ('a * 'b) expr",
-        "  | Fun : ('a -> 'b) -> ('a -> 'b) expr",
-        "  | App : ('a -> 'b) expr * 'a expr -> 'b expr",
-        "",
-        "let rec eval : type a. a expr -> a = function",
-        "  | Int i -> i",
-        "  | Bool b -> b",
-        "  | Pair (a, b) -> eval a, eval b",
-        "  | Fun f -> f",
-        "  | App (f, x) -> eval f (eval x)",
-        "",
-    ]
-    for i in range(280):
-        lines.append(
-            f"let e{i:03d} = Pair (Int {i}, App (Fun (fun x -> x + {i % 17}), Int {i + 1}))"
-        )
-    lines.append("")
-    lines.append("let run () =")
-    lines.append("  let total = ref 0 in")
-    for i in range(280):
-        lines.append(f"  let (a, b) = eval e{i:03d} in")
-        lines.append("  total := !total + a + b;")
-    lines.append("  !total")
-    path.write_text("\n".join(lines) + "\n")
-
-
-CORPUS = [
-    ("pattern_matching", gen_pattern_matching),
-    ("modules", gen_modules),
-    ("closures", gen_closures),
-    ("gadts", gen_gadts),
+BENCHMARK_FILES = [
+    "typing/typeopt.ml",
+    "typing/typecore.ml",
+    "typing/ctype.ml",
+    "typing/typedecl.ml",
+    "typing/includemod.ml",
+    "lambda/translcore.ml",
+    "lambda/translmod.ml",
+    "lambda/matching.ml",
 ]
 
 
-def generate_corpus(corpus_dir: Path) -> list[Path]:
-    corpus_dir.mkdir(parents=True, exist_ok=True)
-    sources = []
-    for name, gen in CORPUS:
-        path = corpus_dir / f"{name}.ml"
-        gen(path)
-        sources.append(path)
-    return sources
+def benchmark_name(relative_path: Path) -> str:
+    return str(relative_path.with_suffix("")).replace("/", "__")
 
 
 def child_cpu_seconds() -> float:
@@ -128,12 +31,24 @@ def child_cpu_seconds() -> float:
     return usage.ru_utime + usage.ru_stime
 
 
-def run_compile(compiler: Path, source: Path, run_dir: Path) -> float:
+def compiler_libs_dir(compiler: Path) -> Path:
+    return compiler.parent.parent / "lib" / "ocaml" / "compiler-libs"
+
+
+def run_compile(
+    compiler: Path,
+    source: Path,
+    run_dir: Path,
+) -> float:
     if run_dir.exists():
         shutil.rmtree(run_dir)
     run_dir.mkdir(parents=True)
-    local_source = run_dir / source.name
-    shutil.copy2(source, local_source)
+
+    compiler_libs = compiler_libs_dir(compiler)
+    if not compiler_libs.exists():
+        raise SystemExit(
+            f"compiler-libs directory does not exist: {compiler_libs}"
+        )
 
     before = child_cpu_seconds()
     proc = subprocess.run(
@@ -143,7 +58,9 @@ def run_compile(compiler: Path, source: Path, run_dir: Path) -> float:
             "-a",
             "-S",
             "-c",
-            local_source.name,
+            "-I",
+            str(compiler_libs),
+            str(source),
         ],
         cwd=run_dir,
         text=True,
@@ -164,14 +81,25 @@ def benchmark_one(
     *,
     base_compiler: Path,
     head_compiler: Path,
-    source: Path,
+    base_source: Path,
+    head_source: Path,
+    relative_path: Path,
     runs: int,
     warmups: int,
     work_dir: Path,
 ) -> dict:
+    name = benchmark_name(relative_path)
     for i in range(warmups):
-        run_compile(base_compiler, source, work_dir / "warmup" / "base" / source.stem / str(i))
-        run_compile(head_compiler, source, work_dir / "warmup" / "head" / source.stem / str(i))
+        run_compile(
+            base_compiler,
+            base_source,
+            work_dir / "warmup" / "base" / name / str(i),
+        )
+        run_compile(
+            head_compiler,
+            head_source,
+            work_dir / "warmup" / "head" / name / str(i),
+        )
 
     base_times = []
     head_times = []
@@ -180,37 +108,38 @@ def benchmark_one(
             base_times.append(
                 run_compile(
                     base_compiler,
-                    source,
-                    work_dir / "runs" / "base" / source.stem / str(i),
+                    base_source,
+                    work_dir / "runs" / "base" / name / str(i),
                 )
             )
             head_times.append(
                 run_compile(
                     head_compiler,
-                    source,
-                    work_dir / "runs" / "head" / source.stem / str(i),
+                    head_source,
+                    work_dir / "runs" / "head" / name / str(i),
                 )
             )
         else:
             head_times.append(
                 run_compile(
                     head_compiler,
-                    source,
-                    work_dir / "runs" / "head" / source.stem / str(i),
+                    head_source,
+                    work_dir / "runs" / "head" / name / str(i),
                 )
             )
             base_times.append(
                 run_compile(
                     base_compiler,
-                    source,
-                    work_dir / "runs" / "base" / source.stem / str(i),
+                    base_source,
+                    work_dir / "runs" / "base" / name / str(i),
                 )
             )
 
     base_min = min(base_times)
     head_min = min(head_times)
     return {
-        "name": source.stem,
+        "name": name,
+        "path": str(relative_path),
         "base_times": base_times,
         "head_times": head_times,
         "base_min": base_min,
@@ -223,16 +152,20 @@ def geomean(values: list[float]) -> float:
     return math.exp(sum(math.log(value) for value in values) / len(values))
 
 
-def write_markdown(path: Path, results: list[dict], ratio_geomean: float) -> None:
+def write_markdown(
+    path: Path,
+    results: list[dict],
+    ratio_geomean: float,
+) -> None:
     lines = [
-        "# Compiler performance smoke benchmark",
+        "# Compiler performance benchmark",
         "",
-        "| Benchmark | Base min CPU s | Head min CPU s | Head/base |",
+        "| File | Base min CPU s | Head min CPU s | Head/base |",
         "| --- | ---: | ---: | ---: |",
     ]
     for result in results:
         lines.append(
-            f"| {result['name']} | {result['base_min']:.3f} | "
+            f"| `{result['path']}` | {result['base_min']:.3f} | "
             f"{result['head_min']:.3f} | {result['ratio']:.3f} |"
         )
     lines.extend(["", f"Geomean head/base: **{ratio_geomean:.3f}**", ""])
@@ -243,6 +176,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-compiler", type=Path, required=True)
     parser.add_argument("--head-compiler", type=Path, required=True)
+    parser.add_argument("--base-source-root", type=Path, required=True)
+    parser.add_argument("--head-source-root", type=Path, required=True)
     parser.add_argument("--work-dir", type=Path, required=True)
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--warmups", type=int, default=1)
@@ -262,21 +197,32 @@ def main() -> int:
         if not compiler.exists():
             raise SystemExit(f"compiler does not exist: {compiler}")
 
+    for source_root in [args.base_source_root, args.head_source_root]:
+        if not source_root.exists():
+            raise SystemExit(f"source root does not exist: {source_root}")
+
     if args.work_dir.exists():
         shutil.rmtree(args.work_dir)
-    corpus_dir = args.work_dir / "corpus"
-    sources = generate_corpus(corpus_dir)
+
+    benchmark_files = [Path(path) for path in BENCHMARK_FILES]
+    for relative_path in benchmark_files:
+        for source_root in [args.base_source_root, args.head_source_root]:
+            source = source_root / relative_path
+            if not source.exists():
+                raise SystemExit(f"benchmark source does not exist: {source}")
 
     results = [
         benchmark_one(
             base_compiler=args.base_compiler,
             head_compiler=args.head_compiler,
-            source=source,
+            base_source=args.base_source_root / relative_path,
+            head_source=args.head_source_root / relative_path,
+            relative_path=relative_path,
             runs=args.runs,
             warmups=args.warmups,
             work_dir=args.work_dir,
         )
-        for source in sources
+        for relative_path in benchmark_files
     ]
     ratio_geomean = geomean([result["ratio"] for result in results])
 
@@ -293,10 +239,10 @@ def main() -> int:
         args.markdown_output.parent.mkdir(parents=True, exist_ok=True)
         write_markdown(args.markdown_output, results, ratio_geomean)
 
-    print("Compiler performance smoke benchmark")
+    print("Compiler performance benchmark")
     for result in results:
         print(
-            f"{result['name']}: base={result['base_min']:.3f}s "
+            f"{result['path']}: base={result['base_min']:.3f}s "
             f"head={result['head_min']:.3f}s ratio={result['ratio']:.3f}"
         )
     print(f"geomean: {ratio_geomean:.3f}")
