@@ -177,6 +177,8 @@ jobs:
         run: |
           if [ -f "$GITHUB_WORKSPACE/compiler-perf-results.md" ]; then
             cat "$GITHUB_WORKSPACE/compiler-perf-results.md"
+            cat "$GITHUB_WORKSPACE/compiler-perf-results.md" \
+              >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload benchmark results

@@ -205,6 +205,14 @@ def load_build_results(path: Path | None) -> dict | None:
     return json.loads(path.read_text())
 
 
+def describe_change(ratio: float) -> str:
+    percent = 100.0 * (ratio - 1.0)
+    if abs(percent) < 0.05:
+        return "within 0.05% of base"
+    direction = "slower" if percent > 0.0 else "faster"
+    return f"{abs(percent):.1f}% {direction}"
+
+
 def write_markdown(
     path: Path,
     *,
@@ -279,6 +287,9 @@ def write_markdown(
                 "",
                 f"Build head/base ratio: **{build_results['ratio']:.3f}**",
                 "",
+                "Measured build change: "
+                f"**{describe_change(build_results['ratio'])}**",
+                "",
             ]
         )
 
@@ -300,6 +311,8 @@ def write_markdown(
             "",
             f"Corpus head/base ratio: **{corpus['ratio']:.3f}**",
             "",
+            f"Measured corpus change: **{describe_change(corpus['ratio'])}**",
+            "",
             "99% lower confidence bound: "
             f"**{corpus['lower_bound_99']:.3f}**",
             "",
@@ -308,15 +321,17 @@ def write_markdown(
             "",
             "## File diagnostics",
             "",
-            "| File | Base median CPU s | Head median CPU s | Median head/base |",
-            "| --- | ---: | ---: | ---: |",
+            "| File | Base median CPU s | Head median CPU s | "
+            "Median head/base | Median change |",
+            "| --- | ---: | ---: | ---: | ---: |",
         ]
     )
     for result in files:
         lines.append(
             f"| `{result['path']}` | {result['base_median']:.3f} | "
             f"{result['head_median']:.3f} | "
-            f"{result['ratio_median']:.3f} |"
+            f"{result['ratio_median']:.3f} | "
+            f"{describe_change(result['ratio_median'])} |"
         )
     lines.append("")
     path.write_text("\n".join(lines))
