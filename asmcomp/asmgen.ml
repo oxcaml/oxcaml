@@ -694,6 +694,14 @@ type direct_to_cmm =
 
 type pipeline = Direct_to_cmm of direct_to_cmm
 
+let synthetic_perf_ci_slowdown_counter = ref 0
+
+let add_synthetic_perf_ci_slowdown () =
+  for i = 1 to 75000000 do
+    synthetic_perf_ci_slowdown_counter
+      := Sys.opaque_identity (!synthetic_perf_ci_slowdown_counter + i)
+  done
+
 let asm_filename output_prefix =
   if !keep_asm_file || !Emitaux.binary_backend_available
   then output_prefix ^ ext_asm
@@ -705,6 +713,7 @@ let compile_implementation unix ?toplevel ~pipeline ~sourcefile ~prefixname
     ~asm_filename:(asm_filename prefixname) ~keep_asm:!keep_asm_file
     ~obj_filename:(prefixname ^ ext_obj)
     ~may_reduce_heap:(Option.is_none toplevel) (fun () ->
+      add_synthetic_perf_ci_slowdown ();
       Compilation_unit.Set.iter Compilenv.require_global
         program.required_globals;
       Compilenv.record_external_symbols ();
