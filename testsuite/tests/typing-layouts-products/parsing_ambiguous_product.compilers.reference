@@ -89,10 +89,10 @@
               ]
               mode "global" (parsing_ambiguous_product.ml[16,429+41]..[16,429+47])
     ]
-  structure_item (parsing_ambiguous_product.ml[20,557+0]..[20,557+37])
+  structure_item (parsing_ambiguous_product.ml[20,561+0]..[20,561+37])
     Pstr_type Rec
     [
-      type_declaration "t4" (parsing_ambiguous_product.ml[20,557+5]..[20,557+7]) (parsing_ambiguous_product.ml[20,557+0]..[20,557+37])
+      type_declaration "t4" (parsing_ambiguous_product.ml[20,561+5]..[20,561+7]) (parsing_ambiguous_product.ml[20,561+0]..[20,561+37])
         ptype_params =
           []
         ptype_cstrs =
@@ -104,22 +104,22 @@
           None
         ptype_jkind_annotation =
           Some
-            jkind (parsing_ambiguous_product.ml[20,557+10]..[20,557+37])
+            jkind (parsing_ambiguous_product.ml[20,561+10]..[20,561+37])
             Pjk_scannable_axes
-              jkind (parsing_ambiguous_product.ml[20,557+11]..[20,557+24])
+              jkind (parsing_ambiguous_product.ml[20,561+11]..[20,561+24])
               Pjk_product
               [
-                jkind (parsing_ambiguous_product.ml[20,557+11]..[20,557+16])
-                Pjk_abbreviation "value" (parsing_ambiguous_product.ml[20,557+11]..[20,557+16])
-                jkind (parsing_ambiguous_product.ml[20,557+19]..[20,557+24])
-                Pjk_abbreviation "value" (parsing_ambiguous_product.ml[20,557+19]..[20,557+24])
+                jkind (parsing_ambiguous_product.ml[20,561+11]..[20,561+16])
+                Pjk_abbreviation "value" (parsing_ambiguous_product.ml[20,561+11]..[20,561+16])
+                jkind (parsing_ambiguous_product.ml[20,561+19]..[20,561+24])
+                Pjk_abbreviation "value" (parsing_ambiguous_product.ml[20,561+19]..[20,561+24])
               ]
-              scannable_axis "non_pointer" (parsing_ambiguous_product.ml[20,557+26]..[20,557+37])
+              scannable_axis "non_pointer" (parsing_ambiguous_product.ml[20,561+26]..[20,561+37])
     ]
-  structure_item (parsing_ambiguous_product.ml[22,598+0]..[22,598+40])
+  structure_item (parsing_ambiguous_product.ml[22,602+0]..[22,602+40])
     Pstr_type Rec
     [
-      type_declaration "t5" (parsing_ambiguous_product.ml[22,598+5]..[22,598+7]) (parsing_ambiguous_product.ml[22,598+0]..[22,598+40])
+      type_declaration "t5" (parsing_ambiguous_product.ml[22,602+5]..[22,602+7]) (parsing_ambiguous_product.ml[22,602+0]..[22,602+40])
         ptype_params =
           []
         ptype_cstrs =
@@ -131,14 +131,14 @@
           None
         ptype_jkind_annotation =
           Some
-            jkind (parsing_ambiguous_product.ml[22,598+10]..[22,598+40])
+            jkind (parsing_ambiguous_product.ml[22,602+10]..[22,602+40])
             Pjk_scannable_axes
-              jkind (parsing_ambiguous_product.ml[22,598+11]..[22,598+27])
+              jkind (parsing_ambiguous_product.ml[22,602+11]..[22,602+27])
               Pjk_mod
-                jkind (parsing_ambiguous_product.ml[22,598+11]..[22,598+16])
-                Pjk_abbreviation "value" (parsing_ambiguous_product.ml[22,598+11]..[22,598+16])
-                mode "global" (parsing_ambiguous_product.ml[22,598+21]..[22,598+27])
-              scannable_axis "non_pointer" (parsing_ambiguous_product.ml[22,598+29]..[22,598+40])
+                jkind (parsing_ambiguous_product.ml[22,602+11]..[22,602+16])
+                Pjk_abbreviation "value" (parsing_ambiguous_product.ml[22,602+11]..[22,602+16])
+                mode "global" (parsing_ambiguous_product.ml[22,602+21]..[22,602+27])
+              scannable_axis "non_pointer" (parsing_ambiguous_product.ml[22,602+29]..[22,602+40])
     ]
 ]
 

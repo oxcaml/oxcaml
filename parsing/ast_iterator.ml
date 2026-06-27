@@ -887,9 +887,7 @@ let default_iterator =
          this.location this pjka_loc;
          match pjka_desc with
          | Pjk_default -> ()
-         | Pjk_abbreviation (lid, sa_annot) ->
-           iter_loc this lid;
-           List.iter (iter_loc this) sa_annot
+         | Pjk_abbreviation lid -> iter_loc this lid
          | Pjk_scannable_axes (t, sa_annot) ->
              this.jkind_annotation this t;
              List.iter (iter_loc this) sa_annot

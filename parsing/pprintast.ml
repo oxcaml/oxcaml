@@ -503,14 +503,10 @@ and type_with_label ctxt f (label, c, mode) =
 
 and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
   | Pjk_default -> pp f "_"
-  | Pjk_abbreviation (s, sa) ->
-    value_longident_loc f s;
-    List.iter (fun a -> pp f " %s" a.Location.txt) sa
+  | Pjk_abbreviation s -> value_longident_loc f s
   | Pjk_scannable_axes (t, sa) ->
-    Misc.pp_parens_if nested (fun f (t, sa) ->
-      jkind_annotation ~nested:true ctxt f t;
-      List.iter (fun a -> pp f " %s" a.Location.txt) sa
-    ) f (t, sa)
+    jkind_annotation ~nested:true ctxt f t;
+    List.iter (fun a -> pp f " %s" a.Location.txt) sa
   | Pjk_mod (t, modes) ->
     begin match modes with
     | [] -> Misc.fatal_error "malformed jkind annotation"

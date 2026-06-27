@@ -4123,8 +4123,13 @@ jkind_desc_gen(self):
       in
       Pjk_mod ($1, modes)
     }
-  | mkrhs(type_longident) mkrhs(LIDENT)* {
-      Pjk_abbreviation ($1, $2)
+  | name = mkrhs(type_longident) axes = mkrhs(LIDENT)* {
+      match axes with
+      | [] -> Pjk_abbreviation name
+      | _ :: _ ->
+        Pjk_scannable_axes
+          ({ pjka_loc = make_loc $loc(name);
+             pjka_desc = Pjk_abbreviation name }, axes)
     }
   | KIND_OF ty=core_type %prec below_LBRACKETAT {
       Pjk_kind_of ty

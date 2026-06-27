@@ -13,9 +13,9 @@ Error: Unknown kind modifier non_pointerrrrr
 
 type t : non_pointer value
 [%%expect{|
-Line 1, characters 9-26:
+Line 1, characters 9-20:
 1 | type t : non_pointer value
-             ^^^^^^^^^^^^^^^^^
+             ^^^^^^^^^^^
 Error: Unbound kind "non_pointer"
 |}]
 

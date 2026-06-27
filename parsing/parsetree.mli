@@ -1376,15 +1376,12 @@ and module_binding =
 
 and jkind_annotation_desc =
   | Pjk_default
-  | Pjk_abbreviation of Longident.t loc * string loc list
-  (** [Pjk_abbreviation(A, [SA1; ...; SAn])] represents the layout
-      [A SA1 ... SAn] where [A] is some abbreviation (like [value])
-      and each [SAi] is a scannable axis annotation (like [non_pointer]) *)
+  | Pjk_abbreviation of Longident.t loc
+  (** [Pjk_abbreviation A] represents an abbreviation [A] (like [value]) *)
   | Pjk_scannable_axes of jkind_annotation * string loc list
   (** [Pjk_scannable_axes(K, [SA1; ...; SAn])] represents the layout
       [K SA1 ... SAn] where [K] is an arbitrary kind and each [SAi] is a
-      scannable axis annotation (like [non_pointer]). Axes on a bare
-      abbreviation are represented by [Pjk_abbreviation] instead. *)
+      scannable axis annotation (like [non_pointer]). *)
   (* CR layouts v2.8: [mod] can have only layouts on the left, not
      full kind annotations. We may want to narrow this type some.
      Internal ticket 5085. *)

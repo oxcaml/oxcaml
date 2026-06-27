@@ -2064,12 +2064,9 @@ module Const = struct
    fun ~use_abstract_jkinds env context jkind ->
     let loc = jkind.pjka_loc in
     match jkind.pjka_desc with
-    | Pjk_abbreviation (name, sa_annot) ->
+    | Pjk_abbreviation name ->
       let p, _ = Env.lookup_jkind ~use:use_abstract_jkinds ~loc name.txt env in
-      let jkind_without_sa = allow_left (of_path p) |> allow_right in
-      apply_scannable_axes ~loc:jkind.pjka_loc env
-        ~base_desc:(Format.asprintf "%a" Pprintast.longident name.txt)
-        jkind_without_sa sa_annot
+      allow_left (of_path p) |> allow_right
     | Pjk_mod (base, modifiers) ->
       let base =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
