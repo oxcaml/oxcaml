@@ -14,9 +14,9 @@ external i8_equal : int8# -> int8# -> bool = "%int8#_equal"
 external i16_equal : int16# -> int16# -> bool = "%int16#_equal"
 external int_equal : int -> int -> bool = "%int_equal"
 external icaml_equal : int# -> int# -> bool = "%int#_equal"
-external i32_equal : int32# -> int32# -> bool = "%int32#_equal"
-external i64_equal : int64# -> int64# -> bool = "%int64#_equal"
-external isize_equal : nativeint# -> nativeint# -> bool = "%nativeint#_equal"
+external i32_equal : int32_u -> int32_u -> bool = "%int32#_equal"
+external i64_equal : int64_u -> int64_u -> bool = "%int64#_equal"
+external isize_equal : nativeint_u -> nativeint_u -> bool = "%nativeint#_equal"
 external f64_equal : float# -> float# -> bool = "%float#_ordered_and_equal"
 external f32_equal : float32# -> float32# -> bool = "%float32#_ordered_and_equal"
 external box_f64 : float# -> float = "%float_of_float#"
@@ -36,13 +36,13 @@ let f32_bits_equal x y =
   Int32.equal (float32_to_bits (box_f32 x)) (float32_to_bits (box_f32 y))
 ;;
 
-external ( + ) : nativeint# -> nativeint# -> nativeint# = "%nativeint#_add"
+external ( + ) : nativeint_u -> nativeint_u -> nativeint_u = "%nativeint#_add"
 
 (* The test itself starts here *)
 
 (* For the real API we don't plan to expose the type equality, but it
    makes it easier to write the test below. *)
-type ('a : any) t = nativeint#
+type ('a : any) t = nativeint_u
 
 external read : ('a : any mod external_). 'a t -> 'a = "%peek" [@@layout_poly]
 external write : ('a : any mod external_). 'a t -> 'a -> unit = "%poke" [@@layout_poly]
@@ -50,7 +50,7 @@ external write : ('a : any mod external_). 'a t -> 'a -> unit = "%poke" [@@layou
 external calloc
   :  count:(int[@untagged])
   -> size:(int[@untagged])
-  -> nativeint#
+  -> nativeint_u
   = "caml_no_bytecode_impl" "calloc"
 [@@noalloc]
 

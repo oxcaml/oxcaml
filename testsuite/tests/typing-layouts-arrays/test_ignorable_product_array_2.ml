@@ -23,7 +23,7 @@ open Stdlib_upstream_compatible
 type boxed_t =
   float * (int * int64) * float32 * (int32 * (float32 * float)) * int
 type unboxed_t =
-  #(float# * #(int * int64#) * float32# * #(int32# * #(float32# * float#))
+  #(float# * #(int * int64_u) * float32# * #(int32_u * #(float32# * float#))
     * int)
 
 let elem : boxed_t elem =

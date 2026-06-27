@@ -64,7 +64,7 @@ let test_float () =
   
 
 let test_int32 () =
-  Printf.printf "Testing int32#\n";
+  Printf.printf "Testing int32_u\n";
   let len = 5 in
   let arr_mut = make_mutable len (Int32_u.of_int32 0l) in
   for i = 0 to len - 1 do
@@ -92,7 +92,7 @@ let test_int32 () =
   
 
 let test_int64 () =
-  Printf.printf "Testing int64#\n";
+  Printf.printf "Testing int64_u\n";
   let len = 5 in
   let arr_mut = make_mutable len (Int64_u.of_int64 0L) in
   for i = 0 to len - 1 do
@@ -120,7 +120,7 @@ let test_int64 () =
   
 
 let test_nativeint () =
-  Printf.printf "Testing nativeint#\n";
+  Printf.printf "Testing nativeint_u\n";
   let len = 5 in
   let arr_mut = make_mutable len (Nativeint_u.of_nativeint 0n) in
   for i = 0 to len - 1 do

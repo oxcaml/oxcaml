@@ -1228,7 +1228,7 @@ result: 7.000000
 val f : float# -> float# = <fun>
 larger match result: 3.000000
 - : unit = ()
-val f : int64# -> [> `Five | `Four | `Other ] = <fun>
+val f : int64_u -> [> `Five | `Four | `Other ] = <fun>
 |}]
 
 let x =
@@ -1247,7 +1247,7 @@ test_int64 "result" (f #7L);;
 
 [%%expect{|
 val x : unit = ()
-val f : int64# -> int64# = <fun>
+val f : int64_u -> int64_u = <fun>
 result: 7
 - : unit = ()
 |}]

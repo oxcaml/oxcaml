@@ -916,9 +916,9 @@ let type_constant: Typedtree.constant -> type_expr = function
   | Const_untagged_int _ -> instance Predef.type_unboxed_int
   | Const_untagged_int8 _ -> instance Predef.type_unboxed_int8
   | Const_untagged_int16 _ -> instance Predef.type_unboxed_int16
-  | Const_unboxed_int32 _ -> instance Predef.type_unboxed_int32
-  | Const_unboxed_int64 _ -> instance Predef.type_unboxed_int64
-  | Const_unboxed_nativeint _ -> instance Predef.type_unboxed_nativeint
+  | Const_unboxed_int32 _ -> instance Predef.type_int32_u
+  | Const_unboxed_int64 _ -> instance Predef.type_int64_u
+  | Const_unboxed_nativeint _ -> instance Predef.type_nativeint_u
 
 type constant_integer_result =
   | Int8 of int
@@ -1032,9 +1032,9 @@ let constant_desc
         Error (Int16_literal (Misc.format_as_unboxed_literal i))
       | Error Int8_literal_overflow -> Error (Literal_overflow "int8#")
       | Error Int16_literal_overflow -> Error (Literal_overflow "int16#")
-      | Error Int32_literal_overflow -> Error (Literal_overflow "int32#")
-      | Error Int64_literal_overflow -> Error (Literal_overflow "int64#")
-      | Error Nativeint_literal_overflow -> Error (Literal_overflow "nativeint#")
+      | Error Int32_literal_overflow -> Error (Literal_overflow "int32_u")
+      | Error Int64_literal_overflow -> Error (Literal_overflow "int64_u")
+      | Error Nativeint_literal_overflow -> Error (Literal_overflow "nativeint_u")
       | Error Int_literal_overflow -> Error (Literal_overflow "int#")
       | Error Unknown_constant_literal suffix ->
           Error (Unknown_literal (Misc.format_as_unboxed_literal i, suffix))

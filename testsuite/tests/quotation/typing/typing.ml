@@ -115,19 +115,19 @@ type t_unboxed_float = <[float#]>;;
 type t_unboxed_float = <[float#]>
 |}];;
 
-type t_unboxed_nativeint = <[nativeint#]>;;
+type t_unboxed_nativeint = <[nativeint_u]>;;
 [%%expect {|
-type t_unboxed_nativeint = <[nativeint#]>
+type t_unboxed_nativeint = <[nativeint_u]>
 |}];;
 
-type t_unboxed_int32 = <[int32#]>;;
+type t_unboxed_int32 = <[int32_u]>;;
 [%%expect {|
-type t_unboxed_int32 = <[int32#]>
+type t_unboxed_int32 = <[int32_u]>
 |}];;
 
-type t_unboxed_int64 = <[int64#]>;;
+type t_unboxed_int64 = <[int64_u]>;;
 [%%expect {|
-type t_unboxed_int64 = <[int64#]>
+type t_unboxed_int64 = <[int64_u]>
 |}];;
 
 type t_int8x16 = <[int8x16]>;;
@@ -549,10 +549,10 @@ val both : 'a expr * 'b expr -> <[$('a) * $('b)]> expr @ once = <fun>
 
 let x = <[ #42L ]>
 [%%expect {|
-val x : <[int64#]> expr = <[#42L]>
+val x : <[int64_u]> expr = <[#42L]>
 |}]
 
 let x = <[ #("abc", #42L) ]>
 [%%expect {|
-val x : <[#(string * int64#)]> expr = <[#("abc", #42L)]>
+val x : <[#(string * int64_u)]> expr = <[#("abc", #42L)]>
 |}]

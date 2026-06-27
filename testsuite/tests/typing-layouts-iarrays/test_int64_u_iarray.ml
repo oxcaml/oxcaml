@@ -21,13 +21,13 @@ open Stdlib_stable
 open Stdlib_upstream_compatible
 
 module Int64_u_array0 :
-  Gen_u_iarray.S0 with type element_t = int64#
+  Gen_u_iarray.S0 with type element_t = int64_u
                    and type ('a : any) array_t = 'a iarray 
-                   and type mutable_t = int64# array = struct
-  type element_t = int64#
+                   and type mutable_t = int64_u array = struct
+  type element_t = int64_u
 
   type ('a : any) array_t = 'a iarray
-  type mutable_t = int64# array
+  type mutable_t = int64_u array
 
   type element_arg = unit -> element_t
   type t = element_t iarray
@@ -63,7 +63,7 @@ module Int64_u_array0 :
 
   external freeze : element_t array -> element_t iarray = "%array_to_iarray"
 
-  let empty () : int64# iarray = 
+  let empty () : int64_u iarray = 
     let m = unsafe_create_mutable 0 in
     freeze m
 

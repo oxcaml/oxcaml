@@ -19,7 +19,7 @@ module Int32 = struct
 end
 
 module Int32_u = struct
-  type t = int32#
+  type t = int32_u
 
   external to_int32 : t -> (int32[@local_opt]) @@ portable =
     "%box_int32" [@@warning "-187"]
@@ -104,7 +104,7 @@ module Nativeint = struct
 end
 
 module Nativeint_u = struct
-  type t = nativeint#
+  type t = nativeint_u
 
   external to_nativeint : t -> (nativeint[@local_opt]) @@ portable =
     "%box_nativeint" [@@warning "-187"]
@@ -344,7 +344,7 @@ module Int64 = struct
 end
 
 module Int64_u = struct
-  type t = int64#
+  type t = int64_u
 
   external to_int64 : t -> (int64[@local_opt]) @@ portable =
     "%box_int64" [@@warning "-187"]
@@ -522,14 +522,14 @@ module Int16_u = struct
   external of_int_u : int# -> t @@ portable = "%int16#_of_int#"
   external of_int16 : int16 -> t @@ portable = "%int16#_of_int16"
   external of_int32 : (int32[@local_opt]) -> t @@ portable = "%int16#_of_int32"
-  external of_int32_u : int32# -> t @@ portable = "%int16#_of_int32#"
+  external of_int32_u : int32_u -> t @@ portable = "%int16#_of_int32#"
   external of_int64 : (int64[@local_opt]) -> t @@ portable = "%int16#_of_int64"
-  external of_int64_u : int64# -> t @@ portable = "%int16#_of_int64#"
+  external of_int64_u : int64_u -> t @@ portable = "%int16#_of_int64#"
   external of_int8 : int8 -> t @@ portable = "%int16#_of_int8"
   external of_int8_u : int8# -> t @@ portable = "%int16#_of_int8#"
   external of_nativeint : (nativeint[@local_opt]) -> t @@ portable
     = "%int16#_of_nativeint"
-  external of_nativeint_u : nativeint# -> t @@ portable
+  external of_nativeint_u : nativeint_u -> t @@ portable
     = "%int16#_of_nativeint#"
   external to_float : t -> (float[@local_opt]) @@ portable = "%float_of_int16#"
   external to_float_u : t -> float# @@ portable = "%float#_of_int16#"
@@ -540,14 +540,14 @@ module Int16_u = struct
   external to_int_u : t -> int# @@ portable = "%int#_of_int16#"
   external to_int16 : t -> int16 @@ portable = "%int16_of_int16#"
   external to_int32 : t -> (int32[@local_opt]) @@ portable = "%int32_of_int16#"
-  external to_int32_u : t -> int32# @@ portable = "%int32#_of_int16#"
+  external to_int32_u : t -> int32_u @@ portable = "%int32#_of_int16#"
   external to_int64 : t -> (int64[@local_opt]) @@ portable = "%int64_of_int16#"
-  external to_int64_u : t -> int64# @@ portable = "%int64#_of_int16#"
+  external to_int64_u : t -> int64_u @@ portable = "%int64#_of_int16#"
   external to_int8 : t -> int8 @@ portable = "%int8_of_int16#"
   external to_int8_u : t -> int8# @@ portable = "%int8#_of_int16#"
   external to_nativeint : t -> (nativeint[@local_opt]) @@ portable
     = "%nativeint_of_int16#"
-  external to_nativeint_u : t -> nativeint# @@ portable
+  external to_nativeint_u : t -> nativeint_u @@ portable
     = "%nativeint#_of_int16#"
 
   external popcount : t -> t = "" "caml_popcnt_int16"
@@ -617,13 +617,13 @@ module Int8_u = struct
   external of_int16 : int16 -> t @@ portable = "%int8#_of_int16"
   external of_int16_u : int16# -> t @@ portable = "%int8#_of_int16#"
   external of_int32 : (int32[@local_opt]) -> t @@ portable = "%int8#_of_int32"
-  external of_int32_u : int32# -> t @@ portable = "%int8#_of_int32#"
+  external of_int32_u : int32_u -> t @@ portable = "%int8#_of_int32#"
   external of_int64 : (int64[@local_opt]) -> t @@ portable = "%int8#_of_int64"
-  external of_int64_u : int64# -> t @@ portable = "%int8#_of_int64#"
+  external of_int64_u : int64_u -> t @@ portable = "%int8#_of_int64#"
   external of_int8 : int8 -> t @@ portable = "%int8#_of_int8"
   external of_nativeint : (nativeint[@local_opt]) -> t @@ portable
     = "%int8#_of_nativeint"
-  external of_nativeint_u : nativeint# -> t @@ portable = "%int8#_of_nativeint#"
+  external of_nativeint_u : nativeint_u -> t @@ portable = "%int8#_of_nativeint#"
   external to_float : t -> (float[@local_opt]) @@ portable = "%float_of_int8#"
   external to_float_u : t -> float# @@ portable = "%float#_of_int8#"
   external to_float32 : t -> (float32[@local_opt]) @@ portable
@@ -634,13 +634,13 @@ module Int8_u = struct
   external to_int16 : t -> int16 @@ portable = "%int16_of_int8#"
   external to_int16_u : t -> int16# @@ portable = "%int16#_of_int8#"
   external to_int32 : t -> (int32[@local_opt]) @@ portable = "%int32_of_int8#"
-  external to_int32_u : t -> int32# @@ portable = "%int32#_of_int8#"
+  external to_int32_u : t -> int32_u @@ portable = "%int32#_of_int8#"
   external to_int64 : t -> (int64[@local_opt]) @@ portable = "%int64_of_int8#"
-  external to_int64_u : t -> int64# @@ portable = "%int64#_of_int8#"
+  external to_int64_u : t -> int64_u @@ portable = "%int64#_of_int8#"
   external to_int8 : t -> int8 @@ portable = "%int8_of_int8#"
   external to_nativeint : t -> (nativeint[@local_opt]) @@ portable
     = "%nativeint_of_int8#"
-  external to_nativeint_u : t -> nativeint# @@ portable = "%nativeint#_of_int8#"
+  external to_nativeint_u : t -> nativeint_u @@ portable = "%nativeint#_of_int8#"
 
   external popcount : t -> t = "" "caml_int8_popcnt_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
@@ -689,78 +689,78 @@ module Bytes = struct
   external unsafe_get_int16_ne : (bytes[@local_opt]) -> int -> int
     @@ portable = "%caml_bytes_geti16u"
 
-  external unsafe_get_int32_ne : (bytes[@local_opt]) -> int -> int32#
+  external unsafe_get_int32_ne : (bytes[@local_opt]) -> int -> int32_u
     @@ portable = "%caml_bytes_get32u#" [@@warning "-187"]
 
-  external unsafe_set_int32_ne : (bytes[@local_opt]) -> int -> int32# -> unit
+  external unsafe_set_int32_ne : (bytes[@local_opt]) -> int -> int32_u -> unit
     @@ portable = "%caml_bytes_set32u#" [@@warning "-187"]
 
-  external get_int32_ne : (bytes[@local_opt]) -> int -> int32#
+  external get_int32_ne : (bytes[@local_opt]) -> int -> int32_u
     @@ portable = "%caml_bytes_get32#" [@@warning "-187"]
 
-  external unsafe_get_int64_ne : (bytes[@local_opt]) -> int -> int64#
+  external unsafe_get_int64_ne : (bytes[@local_opt]) -> int -> int64_u
     @@ portable = "%caml_bytes_get64u#" [@@warning "-187"]
 
-  external unsafe_set_int64_ne : (bytes[@local_opt]) -> int -> int64# -> unit
+  external unsafe_set_int64_ne : (bytes[@local_opt]) -> int -> int64_u -> unit
     @@ portable = "%caml_bytes_set64u#" [@@warning "-187"]
 
   external unsafe_get_int64_ne_indexed_by_int64 :
-    (bytes[@local_opt]) -> int64# -> int64#
+    (bytes[@local_opt]) -> int64_u -> int64_u
     @@ portable = "%caml_bytes_get64u#_indexed_by_int64#"
     [@@warning "-187"]
 
   external unsafe_set_int64_ne_indexed_by_int64 :
-    (bytes[@local_opt]) -> int64# -> int64# -> unit
+    (bytes[@local_opt]) -> int64_u -> int64_u -> unit
     @@ portable = "%caml_bytes_set64u#_indexed_by_int64#"
     [@@warning "-187"]
 
   external unsafe_get_int8_indexed_by_int64 :
-    (bytes[@local_opt]) -> int64# -> int
+    (bytes[@local_opt]) -> int64_u -> int
     @@ portable = "%caml_bytes_geti8u_indexed_by_int64#"
     [@@warning "-187"]
 
   external unsafe_set_int8_indexed_by_int64 :
-    (bytes[@local_opt]) -> int64# -> int -> unit
+    (bytes[@local_opt]) -> int64_u -> int -> unit
     @@ portable = "%caml_bytes_set8u_indexed_by_int64#"
     [@@warning "-187"]
 
   external unsafe_get_int32_ne_indexed_by_int64 :
-    (bytes[@local_opt]) -> int64# -> int32#
+    (bytes[@local_opt]) -> int64_u -> int32_u
     @@ portable = "%caml_bytes_get32u#_indexed_by_int64#"
     [@@warning "-187"]
 
   external unsafe_set_int32_ne_indexed_by_int64 :
-    (bytes[@local_opt]) -> int64# -> int32# -> unit
+    (bytes[@local_opt]) -> int64_u -> int32_u -> unit
     @@ portable = "%caml_bytes_set32u#_indexed_by_int64#"
     [@@warning "-187"]
 
   external unsafe_get_int64_ne_indexed_by_int32 :
-    (bytes[@local_opt]) -> int32# -> int64#
+    (bytes[@local_opt]) -> int32_u -> int64_u
     @@ portable = "%caml_bytes_get64u#_indexed_by_int32#"
     [@@warning "-187"]
 
   external unsafe_set_int64_ne_indexed_by_int32 :
-    (bytes[@local_opt]) -> int32# -> int64# -> unit
+    (bytes[@local_opt]) -> int32_u -> int64_u -> unit
     @@ portable = "%caml_bytes_set64u#_indexed_by_int32#"
     [@@warning "-187"]
 
   external unsafe_get_int64_ne_indexed_by_int16 :
-    (bytes[@local_opt]) -> int16# -> int64#
+    (bytes[@local_opt]) -> int16# -> int64_u
     @@ portable = "%caml_bytes_get64u#_indexed_by_int16#"
     [@@warning "-187"]
 
   external unsafe_set_int64_ne_indexed_by_int16 :
-    (bytes[@local_opt]) -> int16# -> int64# -> unit
+    (bytes[@local_opt]) -> int16# -> int64_u -> unit
     @@ portable = "%caml_bytes_set64u#_indexed_by_int16#"
     [@@warning "-187"]
 
   external unsafe_get_int64_ne_indexed_by_int8 :
-    (bytes[@local_opt]) -> int8# -> int64#
+    (bytes[@local_opt]) -> int8# -> int64_u
     @@ portable = "%caml_bytes_get64u#_indexed_by_int8#"
     [@@warning "-187"]
 
   external unsafe_set_int64_ne_indexed_by_int8 :
-    (bytes[@local_opt]) -> int8# -> int64# -> unit
+    (bytes[@local_opt]) -> int8# -> int64_u -> unit
     @@ portable = "%caml_bytes_set64u#_indexed_by_int8#"
     [@@warning "-187"]
 
@@ -771,12 +771,12 @@ module Bytes = struct
     @@ portable = "%caml_bytes_setf32u#" [@@warning "-187"]
 
   external unsafe_get_float32_ne_indexed_by_int64 :
-    (bytes[@local_opt]) -> int64# -> float32#
+    (bytes[@local_opt]) -> int64_u -> float32#
     @@ portable = "%caml_bytes_getf32u#_indexed_by_int64#"
     [@@warning "-187"]
 
   external unsafe_set_float32_ne_indexed_by_int64 :
-    (bytes[@local_opt]) -> int64# -> float32# -> unit
+    (bytes[@local_opt]) -> int64_u -> float32# -> unit
     @@ portable = "%caml_bytes_setf32u#_indexed_by_int64#"
     [@@warning "-187"]
 
@@ -787,32 +787,32 @@ module String = struct
   external unsafe_get : (string[@local_opt]) -> int -> char
     @@ portable = "%string_unsafe_get"
 
-  external unsafe_get_int32_ne : (string[@local_opt]) -> int -> int32#
+  external unsafe_get_int32_ne : (string[@local_opt]) -> int -> int32_u
     @@ portable = "%caml_string_get32u#" [@@warning "-187"]
 
-  external unsafe_get_int64_ne : (string[@local_opt]) -> int -> int64#
+  external unsafe_get_int64_ne : (string[@local_opt]) -> int -> int64_u
     @@ portable = "%caml_string_get64u#" [@@warning "-187"]
 
   external unsafe_get_float32_ne : (string[@local_opt]) -> int -> float32#
     @@ portable = "%caml_string_getf32u#" [@@warning "-187"]
 
   external unsafe_get_int8_indexed_by_int64 :
-    (string[@local_opt]) -> int64# -> int
+    (string[@local_opt]) -> int64_u -> int
     @@ portable = "%caml_string_geti8u_indexed_by_int64#"
     [@@warning "-187"]
 
   external unsafe_get_int32_ne_indexed_by_int64 :
-    (string[@local_opt]) -> int64# -> int32#
+    (string[@local_opt]) -> int64_u -> int32_u
     @@ portable = "%caml_string_get32u#_indexed_by_int64#"
     [@@warning "-187"]
 
   external unsafe_get_int64_ne_indexed_by_int64 :
-    (string[@local_opt]) -> int64# -> int64#
+    (string[@local_opt]) -> int64_u -> int64_u
     @@ portable = "%caml_string_get64u#_indexed_by_int64#"
     [@@warning "-187"]
 
   external unsafe_get_float32_ne_indexed_by_int64 :
-    (string[@local_opt]) -> int64# -> float32#
+    (string[@local_opt]) -> int64_u -> float32#
     @@ portable = "%caml_string_getf32u#_indexed_by_int64#"
     [@@warning "-187"]
 
@@ -971,11 +971,11 @@ module Int = struct
 end
 
 external reinterpret_tagged_int63_as_unboxed_int64 :
-  int -> int64# @@ portable =
+  int -> int64_u @@ portable =
   "%reinterpret_tagged_int63_as_unboxed_int64" [@@warning "-187"]
 
 external reinterpret_unboxed_int64_as_tagged_int63 :
-  int64# -> int @@ portable =
+  int64_u -> int @@ portable =
   "%reinterpret_unboxed_int64_as_tagged_int63" [@@warning "-187"]
 
 external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
@@ -1033,22 +1033,22 @@ module Builtins = struct
     [@@noalloc] [@@no_effects] [@@no_coeffects] [@@builtin]
 
   external select_int32 :
-    bool -> (int32#[@unboxed]) -> (int32#[@unboxed])
-    -> (int32#[@unboxed]) @@ portable
+    bool -> (int32_u[@unboxed]) -> (int32_u[@unboxed])
+    -> (int32_u[@unboxed]) @@ portable
     = "caml_csel_value" "caml_csel_int32_unboxed"
     [@@noalloc] [@@no_effects] [@@no_coeffects] [@@builtin]
     [@@warning "-187"]
 
   external select_int64 :
-    bool -> (int64#[@unboxed]) -> (int64#[@unboxed])
-    -> (int64#[@unboxed]) @@ portable
+    bool -> (int64_u[@unboxed]) -> (int64_u[@unboxed])
+    -> (int64_u[@unboxed]) @@ portable
     = "caml_csel_value" "caml_csel_int64_unboxed"
     [@@noalloc] [@@no_effects] [@@no_coeffects] [@@builtin]
     [@@warning "-187"]
 
   external select_nativeint :
-    bool -> (nativeint#[@unboxed]) -> (nativeint#[@unboxed])
-    -> (nativeint#[@unboxed]) @@ portable
+    bool -> (nativeint_u[@unboxed]) -> (nativeint_u[@unboxed])
+    -> (nativeint_u[@unboxed]) @@ portable
     = "caml_csel_value" "caml_csel_nativeint_unboxed"
     [@@noalloc] [@@no_effects] [@@no_coeffects] [@@builtin]
     [@@warning "-187"]
@@ -1212,82 +1212,82 @@ module Builtins = struct
   (* Native pointer load/store *)
 
   external native_pointer_load_int64 :
-    nativeint# -> int64#
+    nativeint_u -> int64_u
     = "" "caml_native_pointer_load_unboxed_int64"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_store_int64 :
-    nativeint# -> int64# -> unit
+    nativeint_u -> int64_u -> unit
     = "" "caml_native_pointer_store_unboxed_int64"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_load_int32 :
-    nativeint# -> int32#
+    nativeint_u -> int32_u
     = "" "caml_native_pointer_load_unboxed_int32"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_store_int32 :
-    nativeint# -> int32# -> unit
+    nativeint_u -> int32_u -> unit
     = "" "caml_native_pointer_store_unboxed_int32"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_load_nativeint :
-    nativeint# -> nativeint#
+    nativeint_u -> nativeint_u
     = "" "caml_native_pointer_load_unboxed_nativeint"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_store_nativeint :
-    nativeint# -> nativeint# -> unit
+    nativeint_u -> nativeint_u -> unit
     = "" "caml_native_pointer_store_unboxed_nativeint"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_load_float :
-    nativeint# -> float#
+    nativeint_u -> float#
     = "" "caml_native_pointer_load_unboxed_float"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_store_float :
-    nativeint# -> float# -> unit
+    nativeint_u -> float# -> unit
     = "" "caml_native_pointer_store_unboxed_float"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_load_uint8 :
-    nativeint# -> int
+    nativeint_u -> int
     = "" "caml_native_pointer_load_unsigned_int8"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_store_uint8 :
-    nativeint# -> int -> unit
+    nativeint_u -> int -> unit
     = "" "caml_native_pointer_store_unsigned_int8"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_load_sint8 :
-    nativeint# -> int
+    nativeint_u -> int
     = "" "caml_native_pointer_load_signed_int8"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_store_sint8 :
-    nativeint# -> int -> unit
+    nativeint_u -> int -> unit
     = "" "caml_native_pointer_store_signed_int8"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_load_uint16 :
-    nativeint# -> int
+    nativeint_u -> int
     = "" "caml_native_pointer_load_unsigned_int16"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_store_uint16 :
-    nativeint# -> int -> unit
+    nativeint_u -> int -> unit
     = "" "caml_native_pointer_store_unsigned_int16"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_load_sint16 :
-    nativeint# -> int
+    nativeint_u -> int
     = "" "caml_native_pointer_load_signed_int16"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 
   external native_pointer_store_sint16 :
-    nativeint# -> int -> unit
+    nativeint_u -> int -> unit
     = "" "caml_native_pointer_store_signed_int16"
     [@@noalloc] [@@builtin] [@@warning "-187"]
 

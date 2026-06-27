@@ -23,14 +23,14 @@ external box_float : float# -> (float[@local_opt]) @@ portable = "%box_float"
 external unbox_float : (float[@local_opt]) -> float# @@ portable
   = "%unbox_float"
 
-external box_int32 : int32# -> (int32[@local_opt]) @@ portable = "%box_int32"
+external box_int32 : int32_u -> (int32[@local_opt]) @@ portable = "%box_int32"
 
-external unbox_int32 : (int32[@local_opt]) -> int32# @@ portable
+external unbox_int32 : (int32[@local_opt]) -> int32_u @@ portable
   = "%unbox_int32"
 
-external box_int64 : int64# -> (int64[@local_opt]) @@ portable = "%box_int64"
+external box_int64 : int64_u -> (int64[@local_opt]) @@ portable = "%box_int64"
 
-external unbox_int64 : (int64[@local_opt]) -> int64# @@ portable
+external unbox_int64 : (int64[@local_opt]) -> int64_u @@ portable
   = "%unbox_int64"
 
 external to_float32 : t -> (float32[@local_opt]) @@ portable = "%box_float32"
