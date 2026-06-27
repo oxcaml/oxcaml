@@ -7,6 +7,7 @@ import resource
 import shutil
 import subprocess
 import sys
+from statistics import median
 from pathlib import Path
 
 
@@ -20,6 +21,49 @@ BENCHMARK_FILES = [
     "lambda/translmod.ml",
     "lambda/matching.ml",
 ]
+
+
+T_CRITICAL_ONE_SIDED_99 = {
+    1: 31.821,
+    2: 6.965,
+    3: 4.541,
+    4: 3.747,
+    5: 3.365,
+    6: 3.143,
+    7: 2.998,
+    8: 2.896,
+    9: 2.821,
+    10: 2.764,
+    11: 2.718,
+    12: 2.681,
+    13: 2.650,
+    14: 2.624,
+    15: 2.602,
+    16: 2.583,
+    17: 2.567,
+    18: 2.552,
+    19: 2.539,
+    20: 2.528,
+    21: 2.518,
+    22: 2.508,
+    23: 2.500,
+    24: 2.492,
+    25: 2.485,
+    26: 2.479,
+    27: 2.473,
+    28: 2.467,
+    29: 2.462,
+    30: 2.457,
+}
+
+
+def t_critical_one_sided_99(samples: int) -> float:
+    if samples < 2:
+        return float("inf")
+    degrees_of_freedom = samples - 1
+    if degrees_of_freedom in T_CRITICAL_ONE_SIDED_99:
+        return T_CRITICAL_ONE_SIDED_99[degrees_of_freedom]
+    return 2.326
 
 
 def benchmark_name(relative_path: Path) -> str:
@@ -77,98 +121,157 @@ def run_compile(
     return after - before
 
 
-def benchmark_one(
+def run_suite(
     *,
-    base_compiler: Path,
-    head_compiler: Path,
-    base_source: Path,
-    head_source: Path,
-    relative_path: Path,
-    runs: int,
-    warmups: int,
-    work_dir: Path,
-) -> dict:
-    name = benchmark_name(relative_path)
-    for i in range(warmups):
-        run_compile(
-            base_compiler,
-            base_source,
-            work_dir / "warmup" / "base" / name / str(i),
+    compiler: Path,
+    source_root: Path,
+    relative_paths: list[Path],
+    run_dir: Path,
+) -> tuple[float, dict[str, float]]:
+    per_file = {}
+    for relative_path in relative_paths:
+        path = source_root / relative_path
+        time = run_compile(
+            compiler,
+            path,
+            run_dir / benchmark_name(relative_path),
         )
-        run_compile(
-            head_compiler,
-            head_source,
-            work_dir / "warmup" / "head" / name / str(i),
-        )
+        per_file[str(relative_path)] = time
+    return sum(per_file.values()), per_file
 
-    base_times = []
-    head_times = []
-    for i in range(runs):
-        if i % 2 == 0:
-            base_times.append(
-                run_compile(
-                    base_compiler,
-                    base_source,
-                    work_dir / "runs" / "base" / name / str(i),
-                )
-            )
-            head_times.append(
-                run_compile(
-                    head_compiler,
-                    head_source,
-                    work_dir / "runs" / "head" / name / str(i),
-                )
-            )
-        else:
-            head_times.append(
-                run_compile(
-                    head_compiler,
-                    head_source,
-                    work_dir / "runs" / "head" / name / str(i),
-                )
-            )
-            base_times.append(
-                run_compile(
-                    base_compiler,
-                    base_source,
-                    work_dir / "runs" / "base" / name / str(i),
-                )
-            )
 
-    base_min = min(base_times)
-    head_min = min(head_times)
+def mean(values: list[float]) -> float:
+    return sum(values) / len(values)
+
+
+def sample_standard_deviation(values: list[float]) -> float:
+    if len(values) < 2:
+        return 0.0
+    value_mean = mean(values)
+    variance = sum((value - value_mean) ** 2 for value in values)
+    variance /= len(values) - 1
+    return math.sqrt(variance)
+
+
+def corpus_statistics(runs: list[dict]) -> dict:
+    log_ratios = [math.log(run["ratio"]) for run in runs]
+    mean_log_ratio = mean(log_ratios)
+    sd_log_ratio = sample_standard_deviation(log_ratios)
+    t_critical = t_critical_one_sided_99(len(log_ratios))
+    if math.isinf(t_critical):
+        lower_bound = runs[0]["ratio"]
+    else:
+        margin = t_critical * sd_log_ratio / math.sqrt(len(log_ratios))
+        lower_bound = math.exp(mean_log_ratio - margin)
     return {
-        "name": name,
-        "path": str(relative_path),
-        "base_times": base_times,
-        "head_times": head_times,
-        "base_min": base_min,
-        "head_min": head_min,
-        "ratio": head_min / base_min,
+        "ratio": math.exp(mean_log_ratio),
+        "lower_bound_99": lower_bound,
+        "mean_log_ratio": mean_log_ratio,
+        "sd_log_ratio": sd_log_ratio,
+        "t_critical_99": t_critical,
     }
 
 
-def geomean(values: list[float]) -> float:
-    return math.exp(sum(math.log(value) for value in values) / len(values))
+def file_statistics(relative_paths: list[Path], runs: list[dict]) -> list[dict]:
+    results = []
+    for relative_path in relative_paths:
+        path = str(relative_path)
+        base_times = [run["base_files"][path] for run in runs]
+        head_times = [run["head_files"][path] for run in runs]
+        ratios = [
+            head_time / base_time
+            for base_time, head_time in zip(base_times, head_times)
+        ]
+        results.append(
+            {
+                "name": benchmark_name(relative_path),
+                "path": path,
+                "base_median": median(base_times),
+                "head_median": median(head_times),
+                "ratio_median": median(ratios),
+                "ratios": ratios,
+                "base_times": base_times,
+                "head_times": head_times,
+            }
+        )
+    return results
+
+
+def load_build_results(path: Path | None) -> dict | None:
+    if path is None:
+        return None
+    return json.loads(path.read_text())
 
 
 def write_markdown(
     path: Path,
-    results: list[dict],
-    ratio_geomean: float,
+    *,
+    build_results: dict | None,
+    corpus: dict,
+    runs: list[dict],
+    files: list[dict],
 ) -> None:
     lines = [
         "# Compiler performance benchmark",
         "",
-        "| File | Base min CPU s | Head min CPU s | Head/base |",
-        "| --- | ---: | ---: | ---: |",
     ]
-    for result in results:
-        lines.append(
-            f"| `{result['path']}` | {result['base_min']:.3f} | "
-            f"{result['head_min']:.3f} | {result['ratio']:.3f} |"
+
+    if build_results is not None:
+        builds = build_results["builds"]
+        lines.extend(
+            [
+                "## Compiler build time",
+                "",
+                "| Build | Elapsed s |",
+                "| --- | ---: |",
+            ]
         )
-    lines.extend(["", f"Geomean head/base: **{ratio_geomean:.3f}**", ""])
+        for build in builds:
+            lines.append(
+                f"| {build['name']} | {build['elapsed_seconds']:.0f} |"
+            )
+        lines.extend(
+            [
+                "",
+                f"Build head/base ratio: **{build_results['ratio']:.3f}**",
+                "",
+            ]
+        )
+
+    lines.extend(
+        [
+            "## Compiler file benchmark",
+            "",
+            "| Run | Base total CPU s | Head total CPU s | Head/base |",
+            "| ---: | ---: | ---: | ---: |",
+        ]
+    )
+    for run in runs:
+        lines.append(
+            f"| {run['run']} | {run['base_total']:.3f} | "
+            f"{run['head_total']:.3f} | {run['ratio']:.3f} |"
+        )
+    lines.extend(
+        [
+            "",
+            f"Corpus head/base ratio: **{corpus['ratio']:.3f}**",
+            "",
+            "99% lower confidence bound: "
+            f"**{corpus['lower_bound_99']:.3f}**",
+            "",
+            "## File diagnostics",
+            "",
+            "| File | Base median CPU s | Head median CPU s | Median head/base |",
+            "| --- | ---: | ---: | ---: |",
+        ]
+    )
+    for result in files:
+        lines.append(
+            f"| `{result['path']}` | {result['base_median']:.3f} | "
+            f"{result['head_median']:.3f} | "
+            f"{result['ratio_median']:.3f} |"
+        )
+    lines.append("")
     path.write_text("\n".join(lines))
 
 
@@ -176,13 +279,14 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-compiler", type=Path, required=True)
     parser.add_argument("--head-compiler", type=Path, required=True)
-    parser.add_argument("--base-source-root", type=Path, required=True)
-    parser.add_argument("--head-source-root", type=Path, required=True)
+    parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--work-dir", type=Path, required=True)
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--warmups", type=int, default=1)
-    parser.add_argument("--fail-geomean", type=float, default=1.20)
-    parser.add_argument("--fail-any", type=float, default=1.50)
+    parser.add_argument("--fail-corpus-lower-bound", type=float, default=1.03)
+    parser.add_argument("--fail-any-file-median", type=float, default=1.25)
+    parser.add_argument("--fail-build-ratio", type=float, default=1.15)
+    parser.add_argument("--build-results-json", type=Path)
     parser.add_argument("--json-output", type=Path)
     parser.add_argument("--markdown-output", type=Path)
     parser.add_argument("--keep-work-dir", action="store_true")
@@ -197,66 +301,141 @@ def main() -> int:
         if not compiler.exists():
             raise SystemExit(f"compiler does not exist: {compiler}")
 
-    for source_root in [args.base_source_root, args.head_source_root]:
-        if not source_root.exists():
-            raise SystemExit(f"source root does not exist: {source_root}")
+    if not args.source_root.exists():
+        raise SystemExit(f"source root does not exist: {args.source_root}")
 
     if args.work_dir.exists():
         shutil.rmtree(args.work_dir)
 
     benchmark_files = [Path(path) for path in BENCHMARK_FILES]
     for relative_path in benchmark_files:
-        for source_root in [args.base_source_root, args.head_source_root]:
-            source = source_root / relative_path
-            if not source.exists():
-                raise SystemExit(f"benchmark source does not exist: {source}")
+        source = args.source_root / relative_path
+        if not source.exists():
+            raise SystemExit(f"benchmark source does not exist: {source}")
 
-    results = [
-        benchmark_one(
-            base_compiler=args.base_compiler,
-            head_compiler=args.head_compiler,
-            base_source=args.base_source_root / relative_path,
-            head_source=args.head_source_root / relative_path,
-            relative_path=relative_path,
-            runs=args.runs,
-            warmups=args.warmups,
-            work_dir=args.work_dir,
+    for i in range(args.warmups):
+        run_suite(
+            compiler=args.base_compiler,
+            source_root=args.source_root,
+            relative_paths=benchmark_files,
+            run_dir=args.work_dir / "warmup" / "base" / str(i),
         )
-        for relative_path in benchmark_files
-    ]
-    ratio_geomean = geomean([result["ratio"] for result in results])
+        run_suite(
+            compiler=args.head_compiler,
+            source_root=args.source_root,
+            relative_paths=benchmark_files,
+            run_dir=args.work_dir / "warmup" / "head" / str(i),
+        )
+
+    runs = []
+    for i in range(args.runs):
+        if i % 2 == 0:
+            base_total, base_files = run_suite(
+                compiler=args.base_compiler,
+                source_root=args.source_root,
+                relative_paths=benchmark_files,
+                run_dir=args.work_dir / "runs" / str(i) / "base",
+            )
+            head_total, head_files = run_suite(
+                compiler=args.head_compiler,
+                source_root=args.source_root,
+                relative_paths=benchmark_files,
+                run_dir=args.work_dir / "runs" / str(i) / "head",
+            )
+        else:
+            head_total, head_files = run_suite(
+                compiler=args.head_compiler,
+                source_root=args.source_root,
+                relative_paths=benchmark_files,
+                run_dir=args.work_dir / "runs" / str(i) / "head",
+            )
+            base_total, base_files = run_suite(
+                compiler=args.base_compiler,
+                source_root=args.source_root,
+                relative_paths=benchmark_files,
+                run_dir=args.work_dir / "runs" / str(i) / "base",
+            )
+        runs.append(
+            {
+                "run": i,
+                "base_total": base_total,
+                "head_total": head_total,
+                "ratio": head_total / base_total,
+                "base_files": base_files,
+                "head_files": head_files,
+            }
+        )
+
+    corpus = corpus_statistics(runs)
+    files = file_statistics(benchmark_files, runs)
+    build_results = load_build_results(args.build_results_json)
 
     payload = {
-        "geomean": ratio_geomean,
-        "fail_geomean": args.fail_geomean,
-        "fail_any": args.fail_any,
-        "results": results,
+        "build": build_results,
+        "corpus": corpus,
+        "runs": runs,
+        "files": files,
+        "thresholds": {
+            "fail_corpus_lower_bound": args.fail_corpus_lower_bound,
+            "fail_any_file_median": args.fail_any_file_median,
+            "fail_build_ratio": args.fail_build_ratio,
+        },
     }
     if args.json_output is not None:
         args.json_output.parent.mkdir(parents=True, exist_ok=True)
         args.json_output.write_text(json.dumps(payload, indent=2) + "\n")
     if args.markdown_output is not None:
         args.markdown_output.parent.mkdir(parents=True, exist_ok=True)
-        write_markdown(args.markdown_output, results, ratio_geomean)
+        write_markdown(
+            args.markdown_output,
+            build_results=build_results,
+            corpus=corpus,
+            runs=runs,
+            files=files,
+        )
 
     print("Compiler performance benchmark")
-    for result in results:
+    if build_results is not None:
         print(
-            f"{result['path']}: base={result['base_min']:.3f}s "
-            f"head={result['head_min']:.3f}s ratio={result['ratio']:.3f}"
+            "build: "
+            f"base={build_results['base_elapsed_seconds']:.0f}s "
+            f"head={build_results['head_elapsed_seconds']:.0f}s "
+            f"ratio={build_results['ratio']:.3f}"
         )
-    print(f"geomean: {ratio_geomean:.3f}")
+    for run in runs:
+        print(
+            f"run {run['run']}: base={run['base_total']:.3f}s "
+            f"head={run['head_total']:.3f}s ratio={run['ratio']:.3f}"
+        )
+    print(f"corpus ratio: {corpus['ratio']:.3f}")
+    print(f"99% lower confidence bound: {corpus['lower_bound_99']:.3f}")
+    for result in files:
+        print(
+            f"{result['path']}: base_median={result['base_median']:.3f}s "
+            f"head_median={result['head_median']:.3f}s "
+            f"median_ratio={result['ratio_median']:.3f}"
+        )
 
     failures = []
-    if ratio_geomean > args.fail_geomean:
+    if (
+        build_results is not None
+        and build_results["ratio"] > args.fail_build_ratio
+    ):
         failures.append(
-            f"geomean ratio {ratio_geomean:.3f} exceeds {args.fail_geomean:.3f}"
+            f"build ratio {build_results['ratio']:.3f} exceeds "
+            f"{args.fail_build_ratio:.3f}"
         )
-    for result in results:
-        if result["ratio"] > args.fail_any:
+    if corpus["lower_bound_99"] > args.fail_corpus_lower_bound:
+        failures.append(
+            f"99% lower confidence bound {corpus['lower_bound_99']:.3f} "
+            f"exceeds {args.fail_corpus_lower_bound:.3f}"
+        )
+    for result in files:
+        if result["ratio_median"] > args.fail_any_file_median:
             failures.append(
-                f"{result['name']} ratio {result['ratio']:.3f} exceeds "
-                f"{args.fail_any:.3f}"
+                f"{result['name']} median ratio "
+                f"{result['ratio_median']:.3f} exceeds "
+                f"{args.fail_any_file_median:.3f}"
             )
 
     if not args.keep_work_dir:
