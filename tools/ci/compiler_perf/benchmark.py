@@ -229,9 +229,11 @@ def write_markdown(
         "",
         (
             "The main check is the corpus CPU-time check. For run `i`, let "
-            "`B_i` be total CPU seconds for the base compiler over the "
-            "benchmark files, let `H_i` be total CPU seconds for the head "
-            "compiler over the same files, and let `r_i = H_i / B_i`."
+            "`B_i` be total CPU seconds for the installed base compiler over "
+            "the benchmark files from the base source tree, let `H_i` be "
+            "total CPU seconds for the installed head compiler over the "
+            "benchmark files from the head source tree, and let "
+            "`r_i = H_i / B_i`."
         ),
         "",
         (
@@ -259,11 +261,11 @@ def write_markdown(
         ),
         "",
         (
-            "There are two secondary checks. The build check compares elapsed "
-            "time for building the base source tree with the head-built "
-            "compiler against building it with the base compiler. The "
-            "per-file check computes the median `H_i / B_i` for each "
-            "benchmark file and catches large localized slowdowns."
+            "There are two secondary checks. The build check compares the "
+            "elapsed time for building and installing the head compiler "
+            "against building and installing the base compiler. The per-file "
+            "check computes the median `H_i / B_i` for each benchmark file "
+            "and catches large localized slowdowns."
         ),
         "",
     ]
@@ -341,7 +343,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-compiler", type=Path, required=True)
     parser.add_argument("--head-compiler", type=Path, required=True)
-    parser.add_argument("--source-root", type=Path, required=True)
+    parser.add_argument("--base-source-root", type=Path)
+    parser.add_argument("--head-source-root", type=Path)
+    parser.add_argument("--source-root", type=Path)
     parser.add_argument("--work-dir", type=Path, required=True)
     parser.add_argument("--runs", type=int, default=20)
     parser.add_argument("--max-runs", type=int, default=60)
@@ -375,28 +379,51 @@ def main() -> int:
         if not compiler.exists():
             raise SystemExit(f"compiler does not exist: {compiler}")
 
-    if not args.source_root.exists():
-        raise SystemExit(f"source root does not exist: {args.source_root}")
+    if args.source_root is not None:
+        if args.base_source_root is not None or args.head_source_root is not None:
+            raise SystemExit(
+                "--source-root cannot be combined with --base-source-root "
+                "or --head-source-root"
+            )
+        args.base_source_root = args.source_root
+        args.head_source_root = args.source_root
+    if args.base_source_root is None:
+        raise SystemExit("--base-source-root is required")
+    if args.head_source_root is None:
+        raise SystemExit("--head-source-root is required")
+
+    for name, source_root in [
+        ("base source root", args.base_source_root),
+        ("head source root", args.head_source_root),
+    ]:
+        if not source_root.exists():
+            raise SystemExit(f"{name} does not exist: {source_root}")
 
     if args.work_dir.exists():
         shutil.rmtree(args.work_dir)
 
     benchmark_files = [Path(path) for path in BENCHMARK_FILES]
     for relative_path in benchmark_files:
-        source = args.source_root / relative_path
-        if not source.exists():
-            raise SystemExit(f"benchmark source does not exist: {source}")
+        for name, source_root in [
+            ("base", args.base_source_root),
+            ("head", args.head_source_root),
+        ]:
+            source = source_root / relative_path
+            if not source.exists():
+                raise SystemExit(
+                    f"{name} benchmark source does not exist: {source}"
+                )
 
     for i in range(args.warmups):
         run_suite(
             compiler=args.base_compiler,
-            source_root=args.source_root,
+            source_root=args.base_source_root,
             relative_paths=benchmark_files,
             run_dir=args.work_dir / "warmup" / "base" / str(i),
         )
         run_suite(
             compiler=args.head_compiler,
-            source_root=args.source_root,
+            source_root=args.head_source_root,
             relative_paths=benchmark_files,
             run_dir=args.work_dir / "warmup" / "head" / str(i),
         )
@@ -412,26 +439,26 @@ def main() -> int:
         if i % 2 == 0:
             base_total, base_files = run_suite(
                 compiler=args.base_compiler,
-                source_root=args.source_root,
+                source_root=args.base_source_root,
                 relative_paths=benchmark_files,
                 run_dir=args.work_dir / "runs" / str(i) / "base",
             )
             head_total, head_files = run_suite(
                 compiler=args.head_compiler,
-                source_root=args.source_root,
+                source_root=args.head_source_root,
                 relative_paths=benchmark_files,
                 run_dir=args.work_dir / "runs" / str(i) / "head",
             )
         else:
             head_total, head_files = run_suite(
                 compiler=args.head_compiler,
-                source_root=args.source_root,
+                source_root=args.head_source_root,
                 relative_paths=benchmark_files,
                 run_dir=args.work_dir / "runs" / str(i) / "head",
             )
             base_total, base_files = run_suite(
                 compiler=args.base_compiler,
-                source_root=args.source_root,
+                source_root=args.base_source_root,
                 relative_paths=benchmark_files,
                 run_dir=args.work_dir / "runs" / str(i) / "base",
             )
