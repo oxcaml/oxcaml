@@ -45,7 +45,12 @@ type instr_emit =
     imm : imm;
     mnemonic : string;
     enc : enc;
-    flags : evex_flags
+    flags : evex_flags;
+    merge : bool
+        (* A synthesized merge-masking variant: the (otherwise write-only)
+           destination is also read as the merge source, so [res = Arg [|0|]]
+           ties it to a leading read operand. Named with a [_merge] suffix to
+           distinguish it from the zeroing [_K] variant of the same form. *)
   }
 
 exception Unsupported
@@ -512,7 +517,8 @@ let binding instr =
     base ^ "_" ^ res ^ args
   in
   let variants = Hashtbl.find all_mnemonics base in
-  if variants > 1 then mangled () else base
+  let suffix = if instr.merge then "_merge" else "" in
+  (if variants > 1 then mangled () else base) ^ suffix
 
 let print_one bind instr =
   let print_ext : ext -> string = function
@@ -825,15 +831,44 @@ let expand_modifiers instr =
     if not instr.flags.k
     then [instr]
     else
+      let mask_arg = { loc = Temp [| K |]; enc = Mask } in
       let masked =
-        { instr with
-          args =
-            Array.append instr.args [| { loc = Temp [| K |]; enc = Mask } |]
-        }
+        { instr with args = Array.append instr.args [| mask_arg |] }
+      in
+      (* Merge-masking: when the destination is an otherwise write-only vector
+         register, synthesize a variant that reads it as the merge source (so
+         masked-out lanes are preserved). The result is tied to a leading read
+         operand via [Arg [|0|]], and zeroing is forced off. The destination is
+         encoded in ModRM:reg ([RM_r]), in EVEX.vvvv ([Vex_v], for imm-operand
+         forms whose ModRM:reg is an opcode extension -- shifts/rotates), or in
+         ModRM:r/m ([RM_rm], for narrowing converts / subvector extracts whose
+         output is memory-capable). The merge source reuses that same encoding
+         so the allocator ties it to the destination register; for an [RM_rm]
+         dst we restrict it to the register locations (EVEX merge needs a
+         register). *)
+      let vec_reg = function XMM | YMM | ZMM -> true | _ -> false in
+      let merge =
+        match instr.res with
+        | Res [| { loc = Temp temps; enc = (RM_r | Vex_v | RM_rm) as denc } |]
+          when Array.exists vec_reg temps ->
+          let regtemps =
+            Array.of_list (List.filter vec_reg (Array.to_list temps))
+          in
+          [ { instr with
+              args =
+                Array.append
+                  [| { loc = Temp regtemps; enc = denc } |]
+                  (Array.append instr.args [| mask_arg |]);
+              res = Arg [| 0 |];
+              flags = { instr.flags with z = false };
+              merge = true
+            } ]
+        | Res_none | Arg _ | Res _ -> []
       in
       if Array.exists arg_is_vm instr.args
-      then [masked]
-      else [masked; { instr with flags = { instr.flags with z = false } }]
+      then masked :: merge
+      else
+        masked :: { instr with flags = { instr.flags with z = false } } :: merge
   in
   [instr]
   |> List.concat_map expand_broadcast
@@ -859,7 +894,8 @@ let amd64 () =
               parse_enc mnemonic enc
                 ~operand_size_override:(Array.exists arg_has_int16 args)
             in
-            expand_modifiers { ext; args; res; imm; mnemonic; enc; flags }
+            expand_modifiers
+              { ext; args; res; imm; mnemonic; enc; flags; merge = false }
         with Unsupported -> [])
       | _ -> [])
   in

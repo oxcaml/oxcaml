@@ -1120,6 +1120,8691 @@ let select_operation_fma ~dbg:_ op args =
     | "caml_fma_float32_neg_mul_sub" -> instr vfnmsub213ss_X_X_Xm32 args
     | _ -> None
 
+(* AVX512 intrinsics. Unlike the SSE/AVX tiers these are EVEX-only (no legacy
+   fallback), so we always use the plain [instr] combinator with the generated
+   zmm/ymm/xmm bindings. The descriptive builtin names follow the same
+   [caml_avx512_<type>_<op>] convention as the other tiers; the OCaml external's
+   argument order mirrors the chosen binding's [args] array, so masked variants
+   take an extra [mask] operand last ([_maskz] selects the zeroing [~z:true]
+   form) and merge-masked variants ([_mask]) take a leading merge-source operand
+   (the [_K_merge] binding with [res = Arg [|0|]]).
+
+   The match arms between the GENERATED markers below are produced by the AVX512
+   intrinsic generator (tools/simdgen/avx512gen) from the Intel intrinsics XML;
+   do not edit them by hand -- regenerate instead. *)
+let select_operation_avx512 ~dbg:_ op args =
+  if not (Arch.Extension.enabled AVX512F)
+  then None
+  else
+    match op with
+    (* BEGIN GENERATED AVX512 *)
+    | "caml_avx512bw_int8x32_dbsad_unsigned" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vdbpsadbw_Y_Y_Ym256 ~i args
+    | "caml_avx512bw_int8x32_dbsad_unsigned_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vdbpsadbw_Y_Y_Ym256_K_merge ~i args
+    | "caml_avx512bw_int8x32_dbsad_unsigned_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vdbpsadbw_Y_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512bw_int8x16_dbsad_unsigned" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vdbpsadbw_X_X_Xm128 ~i args
+    | "caml_avx512bw_int8x16_dbsad_unsigned_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vdbpsadbw_X_X_Xm128_K_merge ~i args
+    | "caml_avx512bw_int8x16_dbsad_unsigned_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vdbpsadbw_X_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512bw_int8x32_align_right_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpalignr_Y_Y_Ym256_K_merge ~i args
+    | "caml_avx512bw_int8x32_align_right_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpalignr_Y_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512bw_int8x16_align_right_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpalignr_X_X_Xm128_K_merge ~i args
+    | "caml_avx512bw_int8x16_align_right_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpalignr_X_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512bw_int8x32_blend" ->
+      instr (vpblendmb_Y_Y_Ym256_K ~z:false) args
+    | "caml_avx512bw_int8x16_blend" ->
+      instr (vpblendmb_X_X_Xm128_K ~z:false) args
+    | "caml_avx512bw_int16x16_blend" ->
+      instr (vpblendmw_Y_Y_Ym256_K ~z:false) args
+    | "caml_avx512bw_int16x8_blend" ->
+      instr (vpblendmw_X_X_Xm128_K ~z:false) args
+    | "caml_avx512bw_int8x32_broadcast_mask" ->
+      instr vpbroadcastb_Y_Xm8_K_merge args
+    | "caml_avx512bw_int8x32_broadcast_maskz" ->
+      instr (vpbroadcastb_Y_Xm8_K ~z:true) args
+    | "caml_avx512bw_int8x16_broadcast_mask" ->
+      instr vpbroadcastb_X_Xm8_K_merge args
+    | "caml_avx512bw_int8x16_broadcast_maskz" ->
+      instr (vpbroadcastb_X_Xm8_K ~z:true) args
+    | "caml_avx512bw_int16x16_broadcast_mask" ->
+      instr vpbroadcastw_Y_Xm16_K_merge args
+    | "caml_avx512bw_int16x16_broadcast_maskz" ->
+      instr (vpbroadcastw_Y_Xm16_K ~z:true) args
+    | "caml_avx512bw_int16x8_broadcast_mask" ->
+      instr vpbroadcastw_X_Xm16_K_merge args
+    | "caml_avx512bw_int16x8_broadcast_maskz" ->
+      instr (vpbroadcastw_X_Xm16_K ~z:true) args
+    | "caml_avx512bw_int16x16_permutex2var_mask2" -> (
+      match args with
+      | a :: b :: rest -> instr (vpermi2w_Y_Y_Ym256_K ~z:false) (b :: a :: rest)
+      | _ -> None)
+    | "caml_avx512bw_int16x16_permutex2var_mask" ->
+      instr (vpermt2w_Y_Y_Ym256_K ~z:false) args
+    | "caml_avx512bw_int16x16_permutex2var_maskz" ->
+      instr (vpermt2w_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x16_permutex2var" -> instr vpermt2w_Y_Y_Ym256 args
+    | "caml_avx512bw_int16x8_permutex2var_mask2" -> (
+      match args with
+      | a :: b :: rest -> instr (vpermi2w_X_X_Xm128_K ~z:false) (b :: a :: rest)
+      | _ -> None)
+    | "caml_avx512bw_int16x8_permutex2var_mask" ->
+      instr (vpermt2w_X_X_Xm128_K ~z:false) args
+    | "caml_avx512bw_int16x8_permutex2var_maskz" ->
+      instr (vpermt2w_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x8_permutex2var" -> instr vpermt2w_X_X_Xm128 args
+    | "caml_avx512bw_int16x16_permutexvar_mask" ->
+      instr vpermw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_permutexvar_maskz" ->
+      instr (vpermw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x16_permutexvar" -> instr vpermw_Y_Y_Ym256 args
+    | "caml_avx512bw_int16x8_permutexvar_mask" ->
+      instr vpermw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_permutexvar_maskz" ->
+      instr (vpermw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x8_permutexvar" -> instr vpermw_X_X_Xm128 args
+    | "caml_avx512bw_int8x32_movepi_mask" -> instr vpmovb2m_K_Y args
+    | "caml_avx512bw_int8x16_movepi_mask" -> instr vpmovb2m_K_X args
+    | "caml_avx512bw_int8x32_movm" -> instr vpmovm2b_Y_K args
+    | "caml_avx512bw_int8x16_movm" -> instr vpmovm2b_X_K args
+    | "caml_avx512bw_int16x16_movm" -> instr vpmovm2w_Y_K args
+    | "caml_avx512bw_int16x8_movm" -> instr vpmovm2w_X_K args
+    | "caml_avx512bw_int16x16_movepi_mask" -> instr vpmovw2m_K_Y args
+    | "caml_avx512bw_int16x8_movepi_mask" -> instr vpmovw2m_K_X args
+    | "caml_avx512bw_int8x32_shuffle_mask" ->
+      instr vpshufb_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int8x32_shuffle_maskz" ->
+      instr (vpshufb_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_shuffle_mask" ->
+      instr vpshufb_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int8x16_shuffle_maskz" ->
+      instr (vpshufb_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_shuffle_high_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpshufhw_Y_Ym256_K_merge ~i args
+    | "caml_avx512bw_int16x16_shuffle_high_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpshufhw_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512bw_int16x8_shuffle_high_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpshufhw_X_Xm128_K_merge ~i args
+    | "caml_avx512bw_int16x8_shuffle_high_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpshufhw_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512bw_int16x16_shuffle_low_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpshuflw_Y_Ym256_K_merge ~i args
+    | "caml_avx512bw_int16x16_shuffle_low_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpshuflw_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512bw_int16x8_shuffle_low_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpshuflw_X_Xm128_K_merge ~i args
+    | "caml_avx512bw_int16x8_shuffle_low_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpshuflw_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512bw_int8x32_interleave_high_mask" ->
+      instr vpunpckhbw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int8x32_interleave_high_maskz" ->
+      instr (vpunpckhbw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_interleave_high_mask" ->
+      instr vpunpckhbw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int8x16_interleave_high_maskz" ->
+      instr (vpunpckhbw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_interleave_high_mask" ->
+      instr vpunpckhwd_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_interleave_high_maskz" ->
+      instr (vpunpckhwd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_interleave_high_mask" ->
+      instr vpunpckhwd_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_interleave_high_maskz" ->
+      instr (vpunpckhwd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int8x32_interleave_low_mask" ->
+      instr vpunpcklbw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int8x32_interleave_low_maskz" ->
+      instr (vpunpcklbw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_interleave_low_mask" ->
+      instr vpunpcklbw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int8x16_interleave_low_maskz" ->
+      instr (vpunpcklbw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_interleave_low_mask" ->
+      instr vpunpcklwd_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_interleave_low_maskz" ->
+      instr (vpunpcklwd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_interleave_low_mask" ->
+      instr vpunpcklwd_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_interleave_low_maskz" ->
+      instr (vpunpcklwd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_mov_mask" -> instr vmovdqu16_Y_Y_K_merge args
+    | "caml_avx512bw_int16x16_mov_maskz" ->
+      instr (vmovdqu16_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_mov_mask" -> instr vmovdqu16_X_X_K_merge args
+    | "caml_avx512bw_int16x8_mov_maskz" ->
+      instr (vmovdqu16_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int8x32_mov_mask" -> instr vmovdqu8_Y_Y_K_merge args
+    | "caml_avx512bw_int8x32_mov_maskz" ->
+      instr (vmovdqu8_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_mov_mask" -> instr vmovdqu8_X_X_K_merge args
+    | "caml_avx512bw_int8x16_mov_maskz" ->
+      instr (vmovdqu8_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int8x32_abs_mask" -> instr vpabsb_Y_Ym256_K_merge args
+    | "caml_avx512bw_int8x32_abs_maskz" -> instr (vpabsb_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_abs_mask" -> instr vpabsb_X_Xm128_K_merge args
+    | "caml_avx512bw_int8x16_abs_maskz" -> instr (vpabsb_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_abs_mask" -> instr vpabsw_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_abs_maskz" ->
+      instr (vpabsw_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_abs_mask" -> instr vpabsw_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_abs_maskz" -> instr (vpabsw_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int8x32_add_mask" -> instr vpaddb_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int8x32_add_maskz" ->
+      instr (vpaddb_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_add_mask" -> instr vpaddb_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int8x16_add_maskz" ->
+      instr (vpaddb_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int8x32_add_saturating_mask" ->
+      instr vpaddsb_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int8x32_add_saturating_maskz" ->
+      instr (vpaddsb_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_add_saturating_mask" ->
+      instr vpaddsb_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int8x16_add_saturating_maskz" ->
+      instr (vpaddsb_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_add_saturating_mask" ->
+      instr vpaddsw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_add_saturating_maskz" ->
+      instr (vpaddsw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_add_saturating_mask" ->
+      instr vpaddsw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_add_saturating_maskz" ->
+      instr (vpaddsw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int8x32_add_saturating_unsigned_mask" ->
+      instr vpaddusb_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int8x32_add_saturating_unsigned_maskz" ->
+      instr (vpaddusb_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_add_saturating_unsigned_mask" ->
+      instr vpaddusb_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int8x16_add_saturating_unsigned_maskz" ->
+      instr (vpaddusb_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_add_saturating_unsigned_mask" ->
+      instr vpaddusw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_add_saturating_unsigned_maskz" ->
+      instr (vpaddusw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_add_saturating_unsigned_mask" ->
+      instr vpaddusw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_add_saturating_unsigned_maskz" ->
+      instr (vpaddusw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_add_mask" -> instr vpaddw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_add_maskz" ->
+      instr (vpaddw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_add_mask" -> instr vpaddw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_add_maskz" ->
+      instr (vpaddw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int8x32_avg_unsigned_mask" ->
+      instr vpavgb_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int8x32_avg_unsigned_maskz" ->
+      instr (vpavgb_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_avg_unsigned_mask" ->
+      instr vpavgb_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int8x16_avg_unsigned_maskz" ->
+      instr (vpavgb_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_avg_unsigned_mask" ->
+      instr vpavgw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_avg_unsigned_maskz" ->
+      instr (vpavgw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_avg_unsigned_mask" ->
+      instr vpavgw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_avg_unsigned_maskz" ->
+      instr (vpavgw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int8x32_maddubs_mask" ->
+      instr vpmaddubsw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int8x32_maddubs_maskz" ->
+      instr (vpmaddubsw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_maddubs_mask" ->
+      instr vpmaddubsw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int8x16_maddubs_maskz" ->
+      instr (vpmaddubsw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_madd_mask" ->
+      instr vpmaddwd_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_madd_maskz" ->
+      instr (vpmaddwd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_madd_mask" -> instr vpmaddwd_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_madd_maskz" ->
+      instr (vpmaddwd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int8x32_max_mask" -> instr vpmaxsb_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int8x32_max_maskz" ->
+      instr (vpmaxsb_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_max_mask" -> instr vpmaxsb_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int8x16_max_maskz" ->
+      instr (vpmaxsb_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_max_mask" -> instr vpmaxsw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_max_maskz" ->
+      instr (vpmaxsw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_max_mask" -> instr vpmaxsw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_max_maskz" ->
+      instr (vpmaxsw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int8x32_max_unsigned_mask" ->
+      instr vpmaxub_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int8x32_max_unsigned_maskz" ->
+      instr (vpmaxub_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_max_unsigned_mask" ->
+      instr vpmaxub_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int8x16_max_unsigned_maskz" ->
+      instr (vpmaxub_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_max_unsigned_mask" ->
+      instr vpmaxuw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_max_unsigned_maskz" ->
+      instr (vpmaxuw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_max_unsigned_mask" ->
+      instr vpmaxuw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_max_unsigned_maskz" ->
+      instr (vpmaxuw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int8x32_min_mask" -> instr vpminsb_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int8x32_min_maskz" ->
+      instr (vpminsb_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_min_mask" -> instr vpminsb_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int8x16_min_maskz" ->
+      instr (vpminsb_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_min_mask" -> instr vpminsw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_min_maskz" ->
+      instr (vpminsw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_min_mask" -> instr vpminsw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_min_maskz" ->
+      instr (vpminsw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int8x32_min_unsigned_mask" ->
+      instr vpminub_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int8x32_min_unsigned_maskz" ->
+      instr (vpminub_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_min_unsigned_mask" ->
+      instr vpminub_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int8x16_min_unsigned_maskz" ->
+      instr (vpminub_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_min_unsigned_mask" ->
+      instr vpminuw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_min_unsigned_maskz" ->
+      instr (vpminuw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_min_unsigned_mask" ->
+      instr vpminuw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_min_unsigned_maskz" ->
+      instr (vpminuw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_mul_round_mask" ->
+      instr vpmulhrsw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_mul_round_maskz" ->
+      instr (vpmulhrsw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_mul_round_mask" ->
+      instr vpmulhrsw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_mul_round_maskz" ->
+      instr (vpmulhrsw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_mul_high_unsigned_mask" ->
+      instr vpmulhuw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_mul_high_unsigned_maskz" ->
+      instr (vpmulhuw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_mul_high_unsigned_mask" ->
+      instr vpmulhuw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_mul_high_unsigned_maskz" ->
+      instr (vpmulhuw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_mul_high_mask" ->
+      instr vpmulhw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_mul_high_maskz" ->
+      instr (vpmulhw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_mul_high_mask" ->
+      instr vpmulhw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_mul_high_maskz" ->
+      instr (vpmulhw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_mul_low_mask" ->
+      instr vpmullw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_mul_low_maskz" ->
+      instr (vpmullw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_mul_low_mask" ->
+      instr vpmullw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_mul_low_maskz" ->
+      instr (vpmullw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int8x32_sub_mask" -> instr vpsubb_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int8x32_sub_maskz" ->
+      instr (vpsubb_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_sub_mask" -> instr vpsubb_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int8x16_sub_maskz" ->
+      instr (vpsubb_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int8x32_sub_saturating_mask" ->
+      instr vpsubsb_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int8x32_sub_saturating_maskz" ->
+      instr (vpsubsb_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_sub_saturating_mask" ->
+      instr vpsubsb_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int8x16_sub_saturating_maskz" ->
+      instr (vpsubsb_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_sub_saturating_mask" ->
+      instr vpsubsw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_sub_saturating_maskz" ->
+      instr (vpsubsw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_sub_saturating_mask" ->
+      instr vpsubsw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_sub_saturating_maskz" ->
+      instr (vpsubsw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int8x32_sub_saturating_unsigned_mask" ->
+      instr vpsubusb_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int8x32_sub_saturating_unsigned_maskz" ->
+      instr (vpsubusb_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x16_sub_saturating_unsigned_mask" ->
+      instr vpsubusb_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int8x16_sub_saturating_unsigned_maskz" ->
+      instr (vpsubusb_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_sub_saturating_unsigned_mask" ->
+      instr vpsubusw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_sub_saturating_unsigned_maskz" ->
+      instr (vpsubusw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_sub_saturating_unsigned_mask" ->
+      instr vpsubusw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_sub_saturating_unsigned_maskz" ->
+      instr (vpsubusw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_sub_mask" -> instr vpsubw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_sub_maskz" ->
+      instr (vpsubw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x8_sub_mask" -> instr vpsubw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_sub_maskz" ->
+      instr (vpsubw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_cvt_int32x8_int16x16_saturating_mask" ->
+      instr vpackssdw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_cvt_int32x8_int16x16_saturating_maskz" ->
+      instr (vpackssdw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_cvt_int32x4_int16x8_saturating_mask" ->
+      instr vpackssdw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_cvt_int32x4_int16x8_saturating_maskz" ->
+      instr (vpackssdw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_cvt_int16x16_int8x32_saturating_mask" ->
+      instr vpacksswb_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_cvt_int16x16_int8x32_saturating_maskz" ->
+      instr (vpacksswb_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_cvt_int16x8_int8x16_saturating_mask" ->
+      instr vpacksswb_X_X_Xm128_K_merge args
+    | "caml_avx512bw_cvt_int16x8_int8x16_saturating_maskz" ->
+      instr (vpacksswb_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_cvt_int32x8_int16x16_saturating_unsigned_mask" ->
+      instr vpackusdw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_cvt_int32x8_int16x16_saturating_unsigned_maskz" ->
+      instr (vpackusdw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_cvt_int32x4_int16x8_saturating_unsigned_mask" ->
+      instr vpackusdw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_cvt_int32x4_int16x8_saturating_unsigned_maskz" ->
+      instr (vpackusdw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_cvt_int16x16_int8x32_saturating_unsigned_mask" ->
+      instr vpackuswb_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_cvt_int16x16_int8x32_saturating_unsigned_maskz" ->
+      instr (vpackuswb_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_cvt_int16x8_int8x16_saturating_unsigned_mask" ->
+      instr vpackuswb_X_X_Xm128_K_merge args
+    | "caml_avx512bw_cvt_int16x8_int8x16_saturating_unsigned_maskz" ->
+      instr (vpackuswb_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_cvt_int16x16_int8x16_saturating" ->
+      instr vpmovswb_Xm128_Y args
+    | "caml_avx512bw_cvt_int16x16_int8x16_saturating_mask" ->
+      instr vpmovswb_X_Y_K_merge args
+    | "caml_avx512bw_cvt_int16x16_int8x16_saturating_maskz" ->
+      instr (vpmovswb_Xm128_Y_K ~z:true) args
+    | "caml_avx512bw_cvtsx_int8x16_int16x16_mask" ->
+      instr vpmovsxbw_Y_Xm128_K_merge args
+    | "caml_avx512bw_cvtsx_int8x16_int16x16_maskz" ->
+      instr (vpmovsxbw_Y_Xm128_K ~z:true) args
+    | "caml_avx512bw_cvtsx_int8x16_int16x8_mask" ->
+      instr vpmovsxbw_X_Xm64_K_merge args
+    | "caml_avx512bw_cvtsx_int8x16_int16x8_maskz" ->
+      instr (vpmovsxbw_X_Xm64_K ~z:true) args
+    | "caml_avx512bw_cvt_int16x16_int8x16_saturating_unsigned" ->
+      instr vpmovuswb_Xm128_Y args
+    | "caml_avx512bw_cvt_int16x16_int8x16_saturating_unsigned_mask" ->
+      instr vpmovuswb_X_Y_K_merge args
+    | "caml_avx512bw_cvt_int16x16_int8x16_saturating_unsigned_maskz" ->
+      instr (vpmovuswb_Xm128_Y_K ~z:true) args
+    | "caml_avx512bw_cvt_int16x16_int8x16" -> instr vpmovwb_Xm128_Y args
+    | "caml_avx512bw_cvt_int16x16_int8x16_mask" ->
+      instr vpmovwb_X_Y_K_merge args
+    | "caml_avx512bw_cvt_int16x16_int8x16_maskz" ->
+      instr (vpmovwb_Xm128_Y_K ~z:true) args
+    | "caml_avx512bw_cvtzx_int8x16_int16x16_mask" ->
+      instr vpmovzxbw_Y_Xm128_K_merge args
+    | "caml_avx512bw_cvtzx_int8x16_int16x16_maskz" ->
+      instr (vpmovzxbw_Y_Xm128_K ~z:true) args
+    | "caml_avx512bw_cvtzx_int8x16_int16x8_mask" ->
+      instr vpmovzxbw_X_Xm64_K_merge args
+    | "caml_avx512bw_cvtzx_int8x16_int16x8_maskz" ->
+      instr (vpmovzxbw_X_Xm64_K ~z:true) args
+    | "caml_avx512bw_int8x32_set1_mask" -> instr vpbroadcastb_Y_r32_K_merge args
+    | "caml_avx512bw_int8x32_set1_maskz" ->
+      instr (vpbroadcastb_Y_r32_K ~z:true) args
+    | "caml_avx512bw_int8x16_set1_mask" -> instr vpbroadcastb_X_r32_K_merge args
+    | "caml_avx512bw_int8x16_set1_maskz" ->
+      instr (vpbroadcastb_X_r32_K ~z:true) args
+    | "caml_avx512bw_int16x16_set1_mask" ->
+      instr vpbroadcastw_Y_r32_K_merge args
+    | "caml_avx512bw_int16x16_set1_maskz" ->
+      instr (vpbroadcastw_Y_r32_K ~z:true) args
+    | "caml_avx512bw_int16x8_set1_mask" -> instr vpbroadcastw_X_r32_K_merge args
+    | "caml_avx512bw_int16x8_set1_maskz" ->
+      instr (vpbroadcastw_X_r32_K ~z:true) args
+    | "caml_avx512bw_int8x32_cmp" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpb_K_Y_Ym256 ~i args
+    | "caml_avx512bw_int8x32_cmpeq" -> instr vpcmpb_K_Y_Ym256 ~i:0 args
+    | "caml_avx512bw_int8x32_cmpge" -> instr vpcmpb_K_Y_Ym256 ~i:5 args
+    | "caml_avx512bw_int8x32_cmpgt" -> instr vpcmpb_K_Y_Ym256 ~i:6 args
+    | "caml_avx512bw_int8x32_cmple" -> instr vpcmpb_K_Y_Ym256 ~i:2 args
+    | "caml_avx512bw_int8x32_cmplt" -> instr vpcmpb_K_Y_Ym256 ~i:1 args
+    | "caml_avx512bw_int8x32_cmpneq" -> instr vpcmpb_K_Y_Ym256 ~i:4 args
+    | "caml_avx512bw_int8x32_cmp_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpb_K_Y_Ym256_K ~i args
+    | "caml_avx512bw_int8x32_cmpeq_mask" -> instr vpcmpb_K_Y_Ym256_K ~i:0 args
+    | "caml_avx512bw_int8x32_cmpge_mask" -> instr vpcmpb_K_Y_Ym256_K ~i:5 args
+    | "caml_avx512bw_int8x32_cmpgt_mask" -> instr vpcmpb_K_Y_Ym256_K ~i:6 args
+    | "caml_avx512bw_int8x32_cmple_mask" -> instr vpcmpb_K_Y_Ym256_K ~i:2 args
+    | "caml_avx512bw_int8x32_cmplt_mask" -> instr vpcmpb_K_Y_Ym256_K ~i:1 args
+    | "caml_avx512bw_int8x32_cmpneq_mask" -> instr vpcmpb_K_Y_Ym256_K ~i:4 args
+    | "caml_avx512bw_int8x16_cmp" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpb_K_X_Xm128 ~i args
+    | "caml_avx512bw_int8x16_cmpeq" -> instr vpcmpb_K_X_Xm128 ~i:0 args
+    | "caml_avx512bw_int8x16_cmpge" -> instr vpcmpb_K_X_Xm128 ~i:5 args
+    | "caml_avx512bw_int8x16_cmpgt" -> instr vpcmpb_K_X_Xm128 ~i:6 args
+    | "caml_avx512bw_int8x16_cmple" -> instr vpcmpb_K_X_Xm128 ~i:2 args
+    | "caml_avx512bw_int8x16_cmplt" -> instr vpcmpb_K_X_Xm128 ~i:1 args
+    | "caml_avx512bw_int8x16_cmpneq" -> instr vpcmpb_K_X_Xm128 ~i:4 args
+    | "caml_avx512bw_int8x16_cmp_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpb_K_X_Xm128_K ~i args
+    | "caml_avx512bw_int8x16_cmpeq_mask" -> instr vpcmpb_K_X_Xm128_K ~i:0 args
+    | "caml_avx512bw_int8x16_cmpge_mask" -> instr vpcmpb_K_X_Xm128_K ~i:5 args
+    | "caml_avx512bw_int8x16_cmpgt_mask" -> instr vpcmpb_K_X_Xm128_K ~i:6 args
+    | "caml_avx512bw_int8x16_cmple_mask" -> instr vpcmpb_K_X_Xm128_K ~i:2 args
+    | "caml_avx512bw_int8x16_cmplt_mask" -> instr vpcmpb_K_X_Xm128_K ~i:1 args
+    | "caml_avx512bw_int8x16_cmpneq_mask" -> instr vpcmpb_K_X_Xm128_K ~i:4 args
+    | "caml_avx512bw_int8x32_cmp_unsigned" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpub_K_Y_Ym256 ~i args
+    | "caml_avx512bw_int8x32_cmpeq_unsigned" ->
+      instr vpcmpub_K_Y_Ym256 ~i:0 args
+    | "caml_avx512bw_int8x32_cmpge_unsigned" ->
+      instr vpcmpub_K_Y_Ym256 ~i:5 args
+    | "caml_avx512bw_int8x32_cmpgt_unsigned" ->
+      instr vpcmpub_K_Y_Ym256 ~i:6 args
+    | "caml_avx512bw_int8x32_cmple_unsigned" ->
+      instr vpcmpub_K_Y_Ym256 ~i:2 args
+    | "caml_avx512bw_int8x32_cmplt_unsigned" ->
+      instr vpcmpub_K_Y_Ym256 ~i:1 args
+    | "caml_avx512bw_int8x32_cmpneq_unsigned" ->
+      instr vpcmpub_K_Y_Ym256 ~i:4 args
+    | "caml_avx512bw_int8x32_cmp_unsigned_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpub_K_Y_Ym256_K ~i args
+    | "caml_avx512bw_int8x32_cmpeq_unsigned_mask" ->
+      instr vpcmpub_K_Y_Ym256_K ~i:0 args
+    | "caml_avx512bw_int8x32_cmpge_unsigned_mask" ->
+      instr vpcmpub_K_Y_Ym256_K ~i:5 args
+    | "caml_avx512bw_int8x32_cmpgt_unsigned_mask" ->
+      instr vpcmpub_K_Y_Ym256_K ~i:6 args
+    | "caml_avx512bw_int8x32_cmple_unsigned_mask" ->
+      instr vpcmpub_K_Y_Ym256_K ~i:2 args
+    | "caml_avx512bw_int8x32_cmplt_unsigned_mask" ->
+      instr vpcmpub_K_Y_Ym256_K ~i:1 args
+    | "caml_avx512bw_int8x32_cmpneq_unsigned_mask" ->
+      instr vpcmpub_K_Y_Ym256_K ~i:4 args
+    | "caml_avx512bw_int8x16_cmp_unsigned" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpub_K_X_Xm128 ~i args
+    | "caml_avx512bw_int8x16_cmpeq_unsigned" ->
+      instr vpcmpub_K_X_Xm128 ~i:0 args
+    | "caml_avx512bw_int8x16_cmpge_unsigned" ->
+      instr vpcmpub_K_X_Xm128 ~i:5 args
+    | "caml_avx512bw_int8x16_cmpgt_unsigned" ->
+      instr vpcmpub_K_X_Xm128 ~i:6 args
+    | "caml_avx512bw_int8x16_cmple_unsigned" ->
+      instr vpcmpub_K_X_Xm128 ~i:2 args
+    | "caml_avx512bw_int8x16_cmplt_unsigned" ->
+      instr vpcmpub_K_X_Xm128 ~i:1 args
+    | "caml_avx512bw_int8x16_cmpneq_unsigned" ->
+      instr vpcmpub_K_X_Xm128 ~i:4 args
+    | "caml_avx512bw_int8x16_cmp_unsigned_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpub_K_X_Xm128_K ~i args
+    | "caml_avx512bw_int8x16_cmpeq_unsigned_mask" ->
+      instr vpcmpub_K_X_Xm128_K ~i:0 args
+    | "caml_avx512bw_int8x16_cmpge_unsigned_mask" ->
+      instr vpcmpub_K_X_Xm128_K ~i:5 args
+    | "caml_avx512bw_int8x16_cmpgt_unsigned_mask" ->
+      instr vpcmpub_K_X_Xm128_K ~i:6 args
+    | "caml_avx512bw_int8x16_cmple_unsigned_mask" ->
+      instr vpcmpub_K_X_Xm128_K ~i:2 args
+    | "caml_avx512bw_int8x16_cmplt_unsigned_mask" ->
+      instr vpcmpub_K_X_Xm128_K ~i:1 args
+    | "caml_avx512bw_int8x16_cmpneq_unsigned_mask" ->
+      instr vpcmpub_K_X_Xm128_K ~i:4 args
+    | "caml_avx512bw_int16x16_cmp_unsigned" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpuw_K_Y_Ym256 ~i args
+    | "caml_avx512bw_int16x16_cmpeq_unsigned" ->
+      instr vpcmpuw_K_Y_Ym256 ~i:0 args
+    | "caml_avx512bw_int16x16_cmpge_unsigned" ->
+      instr vpcmpuw_K_Y_Ym256 ~i:5 args
+    | "caml_avx512bw_int16x16_cmpgt_unsigned" ->
+      instr vpcmpuw_K_Y_Ym256 ~i:6 args
+    | "caml_avx512bw_int16x16_cmple_unsigned" ->
+      instr vpcmpuw_K_Y_Ym256 ~i:2 args
+    | "caml_avx512bw_int16x16_cmplt_unsigned" ->
+      instr vpcmpuw_K_Y_Ym256 ~i:1 args
+    | "caml_avx512bw_int16x16_cmpneq_unsigned" ->
+      instr vpcmpuw_K_Y_Ym256 ~i:4 args
+    | "caml_avx512bw_int16x16_cmp_unsigned_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpuw_K_Y_Ym256_K ~i args
+    | "caml_avx512bw_int16x16_cmpeq_unsigned_mask" ->
+      instr vpcmpuw_K_Y_Ym256_K ~i:0 args
+    | "caml_avx512bw_int16x16_cmpge_unsigned_mask" ->
+      instr vpcmpuw_K_Y_Ym256_K ~i:5 args
+    | "caml_avx512bw_int16x16_cmpgt_unsigned_mask" ->
+      instr vpcmpuw_K_Y_Ym256_K ~i:6 args
+    | "caml_avx512bw_int16x16_cmple_unsigned_mask" ->
+      instr vpcmpuw_K_Y_Ym256_K ~i:2 args
+    | "caml_avx512bw_int16x16_cmplt_unsigned_mask" ->
+      instr vpcmpuw_K_Y_Ym256_K ~i:1 args
+    | "caml_avx512bw_int16x16_cmpneq_unsigned_mask" ->
+      instr vpcmpuw_K_Y_Ym256_K ~i:4 args
+    | "caml_avx512bw_int16x8_cmp_unsigned" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpuw_K_X_Xm128 ~i args
+    | "caml_avx512bw_int16x8_cmpeq_unsigned" ->
+      instr vpcmpuw_K_X_Xm128 ~i:0 args
+    | "caml_avx512bw_int16x8_cmpge_unsigned" ->
+      instr vpcmpuw_K_X_Xm128 ~i:5 args
+    | "caml_avx512bw_int16x8_cmpgt_unsigned" ->
+      instr vpcmpuw_K_X_Xm128 ~i:6 args
+    | "caml_avx512bw_int16x8_cmple_unsigned" ->
+      instr vpcmpuw_K_X_Xm128 ~i:2 args
+    | "caml_avx512bw_int16x8_cmplt_unsigned" ->
+      instr vpcmpuw_K_X_Xm128 ~i:1 args
+    | "caml_avx512bw_int16x8_cmpneq_unsigned" ->
+      instr vpcmpuw_K_X_Xm128 ~i:4 args
+    | "caml_avx512bw_int16x8_cmp_unsigned_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpuw_K_X_Xm128_K ~i args
+    | "caml_avx512bw_int16x8_cmpeq_unsigned_mask" ->
+      instr vpcmpuw_K_X_Xm128_K ~i:0 args
+    | "caml_avx512bw_int16x8_cmpge_unsigned_mask" ->
+      instr vpcmpuw_K_X_Xm128_K ~i:5 args
+    | "caml_avx512bw_int16x8_cmpgt_unsigned_mask" ->
+      instr vpcmpuw_K_X_Xm128_K ~i:6 args
+    | "caml_avx512bw_int16x8_cmple_unsigned_mask" ->
+      instr vpcmpuw_K_X_Xm128_K ~i:2 args
+    | "caml_avx512bw_int16x8_cmplt_unsigned_mask" ->
+      instr vpcmpuw_K_X_Xm128_K ~i:1 args
+    | "caml_avx512bw_int16x8_cmpneq_unsigned_mask" ->
+      instr vpcmpuw_K_X_Xm128_K ~i:4 args
+    | "caml_avx512bw_int16x16_cmp" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpw_K_Y_Ym256 ~i args
+    | "caml_avx512bw_int16x16_cmpeq" -> instr vpcmpw_K_Y_Ym256 ~i:0 args
+    | "caml_avx512bw_int16x16_cmpge" -> instr vpcmpw_K_Y_Ym256 ~i:5 args
+    | "caml_avx512bw_int16x16_cmpgt" -> instr vpcmpw_K_Y_Ym256 ~i:6 args
+    | "caml_avx512bw_int16x16_cmple" -> instr vpcmpw_K_Y_Ym256 ~i:2 args
+    | "caml_avx512bw_int16x16_cmplt" -> instr vpcmpw_K_Y_Ym256 ~i:1 args
+    | "caml_avx512bw_int16x16_cmpneq" -> instr vpcmpw_K_Y_Ym256 ~i:4 args
+    | "caml_avx512bw_int16x16_cmp_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpw_K_Y_Ym256_K ~i args
+    | "caml_avx512bw_int16x16_cmpeq_mask" -> instr vpcmpw_K_Y_Ym256_K ~i:0 args
+    | "caml_avx512bw_int16x16_cmpge_mask" -> instr vpcmpw_K_Y_Ym256_K ~i:5 args
+    | "caml_avx512bw_int16x16_cmpgt_mask" -> instr vpcmpw_K_Y_Ym256_K ~i:6 args
+    | "caml_avx512bw_int16x16_cmple_mask" -> instr vpcmpw_K_Y_Ym256_K ~i:2 args
+    | "caml_avx512bw_int16x16_cmplt_mask" -> instr vpcmpw_K_Y_Ym256_K ~i:1 args
+    | "caml_avx512bw_int16x16_cmpneq_mask" -> instr vpcmpw_K_Y_Ym256_K ~i:4 args
+    | "caml_avx512bw_int16x8_cmp" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpw_K_X_Xm128 ~i args
+    | "caml_avx512bw_int16x8_cmpeq" -> instr vpcmpw_K_X_Xm128 ~i:0 args
+    | "caml_avx512bw_int16x8_cmpge" -> instr vpcmpw_K_X_Xm128 ~i:5 args
+    | "caml_avx512bw_int16x8_cmpgt" -> instr vpcmpw_K_X_Xm128 ~i:6 args
+    | "caml_avx512bw_int16x8_cmple" -> instr vpcmpw_K_X_Xm128 ~i:2 args
+    | "caml_avx512bw_int16x8_cmplt" -> instr vpcmpw_K_X_Xm128 ~i:1 args
+    | "caml_avx512bw_int16x8_cmpneq" -> instr vpcmpw_K_X_Xm128 ~i:4 args
+    | "caml_avx512bw_int16x8_cmp_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpw_K_X_Xm128_K ~i args
+    | "caml_avx512bw_int16x8_cmpeq_mask" -> instr vpcmpw_K_X_Xm128_K ~i:0 args
+    | "caml_avx512bw_int16x8_cmpge_mask" -> instr vpcmpw_K_X_Xm128_K ~i:5 args
+    | "caml_avx512bw_int16x8_cmpgt_mask" -> instr vpcmpw_K_X_Xm128_K ~i:6 args
+    | "caml_avx512bw_int16x8_cmple_mask" -> instr vpcmpw_K_X_Xm128_K ~i:2 args
+    | "caml_avx512bw_int16x8_cmplt_mask" -> instr vpcmpw_K_X_Xm128_K ~i:1 args
+    | "caml_avx512bw_int16x8_cmpneq_mask" -> instr vpcmpw_K_X_Xm128_K ~i:4 args
+    | "caml_avx512bw_int8x32_test_mask" -> instr vptestmb_K_Y_Ym256_K args
+    | "caml_avx512bw_int8x32_test" -> instr vptestmb_K_Y_Ym256 args
+    | "caml_avx512bw_int8x16_test_mask" -> instr vptestmb_K_X_Xm128_K args
+    | "caml_avx512bw_int8x16_test" -> instr vptestmb_K_X_Xm128 args
+    | "caml_avx512bw_int16x16_test_mask" -> instr vptestmw_K_Y_Ym256_K args
+    | "caml_avx512bw_int16x16_test" -> instr vptestmw_K_Y_Ym256 args
+    | "caml_avx512bw_int16x8_test_mask" -> instr vptestmw_K_X_Xm128_K args
+    | "caml_avx512bw_int16x8_test" -> instr vptestmw_K_X_Xm128 args
+    | "caml_avx512bw_int8x32_testn_mask" -> instr vptestnmb_K_Y_Ym256_K args
+    | "caml_avx512bw_int8x32_testn" -> instr vptestnmb_K_Y_Ym256 args
+    | "caml_avx512bw_int8x16_testn_mask" -> instr vptestnmb_K_X_Xm128_K args
+    | "caml_avx512bw_int8x16_testn" -> instr vptestnmb_K_X_Xm128 args
+    | "caml_avx512bw_int16x16_testn_mask" -> instr vptestnmw_K_Y_Ym256_K args
+    | "caml_avx512bw_int16x16_testn" -> instr vptestnmw_K_Y_Ym256 args
+    | "caml_avx512bw_int16x8_testn_mask" -> instr vptestnmw_K_X_Xm128_K args
+    | "caml_avx512bw_int16x8_testn" -> instr vptestnmw_K_X_Xm128 args
+    | "caml_avx512bw_int16x16_sllv_mask" -> instr vpsllvw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_sllv_maskz" ->
+      instr (vpsllvw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x16_sllv" -> instr vpsllvw_Y_Y_Ym256 args
+    | "caml_avx512bw_int16x8_sllv_mask" -> instr vpsllvw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_sllv_maskz" ->
+      instr (vpsllvw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x8_sllv" -> instr vpsllvw_X_X_Xm128 args
+    | "caml_avx512bw_int16x16_sll_mask" -> instr vpsllw_Y_Y_Xm128_K_merge args
+    | "caml_avx512bw_int16x16_slli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsllw_Y_Ym256_K_merge ~i args
+    | "caml_avx512bw_int16x16_sll_maskz" ->
+      instr (vpsllw_Y_Y_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_slli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsllw_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512bw_int16x8_sll_mask" -> instr vpsllw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_slli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsllw_X_Xm128_K_merge ~i args
+    | "caml_avx512bw_int16x8_sll_maskz" ->
+      instr (vpsllw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x8_slli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsllw_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512bw_int16x16_srav_mask" -> instr vpsravw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_srav_maskz" ->
+      instr (vpsravw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x16_srav" -> instr vpsravw_Y_Y_Ym256 args
+    | "caml_avx512bw_int16x8_srav_mask" -> instr vpsravw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_srav_maskz" ->
+      instr (vpsravw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x8_srav" -> instr vpsravw_X_X_Xm128 args
+    | "caml_avx512bw_int16x16_sra_mask" -> instr vpsraw_Y_Y_Xm128_K_merge args
+    | "caml_avx512bw_int16x16_srai_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsraw_Y_Ym256_K_merge ~i args
+    | "caml_avx512bw_int16x16_sra_maskz" ->
+      instr (vpsraw_Y_Y_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_srai_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsraw_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512bw_int16x8_sra_mask" -> instr vpsraw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_srai_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsraw_X_Xm128_K_merge ~i args
+    | "caml_avx512bw_int16x8_sra_maskz" ->
+      instr (vpsraw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x8_srai_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsraw_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512bw_int16x16_srlv_mask" -> instr vpsrlvw_Y_Y_Ym256_K_merge args
+    | "caml_avx512bw_int16x16_srlv_maskz" ->
+      instr (vpsrlvw_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512bw_int16x16_srlv" -> instr vpsrlvw_Y_Y_Ym256 args
+    | "caml_avx512bw_int16x8_srlv_mask" -> instr vpsrlvw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_srlv_maskz" ->
+      instr (vpsrlvw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x8_srlv" -> instr vpsrlvw_X_X_Xm128 args
+    | "caml_avx512bw_int16x16_srl_mask" -> instr vpsrlw_Y_Y_Xm128_K_merge args
+    | "caml_avx512bw_int16x16_srli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsrlw_Y_Ym256_K_merge ~i args
+    | "caml_avx512bw_int16x16_srl_maskz" ->
+      instr (vpsrlw_Y_Y_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x16_srli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsrlw_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512bw_int16x8_srl_mask" -> instr vpsrlw_X_X_Xm128_K_merge args
+    | "caml_avx512bw_int16x8_srli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsrlw_X_Xm128_K_merge ~i args
+    | "caml_avx512bw_int16x8_srl_maskz" ->
+      instr (vpsrlw_X_X_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x8_srli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsrlw_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512bw_mask64_unpack" -> instr kunpckdq args
+    | "caml_avx512bw_mask32_unpack" -> instr kunpckwd args
+    | "caml_avx512bw_int8x64_dbsad_unsigned" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vdbpsadbw_Z_Z_Zm512 ~i args
+    | "caml_avx512bw_int8x64_dbsad_unsigned_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vdbpsadbw_Z_Z_Zm512_K_merge ~i args
+    | "caml_avx512bw_int8x64_dbsad_unsigned_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vdbpsadbw_Z_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512bw_int8x64_align_right" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vpalignr_Z_Z_Zm512 ~i args
+    | "caml_avx512bw_int8x64_align_right_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpalignr_Z_Z_Zm512_K_merge ~i args
+    | "caml_avx512bw_int8x64_align_right_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpalignr_Z_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512bw_int8x64_blend" ->
+      instr (vpblendmb_Z_Z_Zm512_K ~z:false) args
+    | "caml_avx512bw_int16x32_blend" ->
+      instr (vpblendmw_Z_Z_Zm512_K ~z:false) args
+    | "caml_avx512bw_int8x64_broadcast" -> instr vpbroadcastb_Z_Xm8 args
+    | "caml_avx512bw_int8x64_broadcast_mask" ->
+      instr vpbroadcastb_Z_Xm8_K_merge args
+    | "caml_avx512bw_int8x64_broadcast_maskz" ->
+      instr (vpbroadcastb_Z_Xm8_K ~z:true) args
+    | "caml_avx512bw_int16x32_broadcast" -> instr vpbroadcastw_Z_Xm16 args
+    | "caml_avx512bw_int16x32_broadcast_mask" ->
+      instr vpbroadcastw_Z_Xm16_K_merge args
+    | "caml_avx512bw_int16x32_broadcast_maskz" ->
+      instr (vpbroadcastw_Z_Xm16_K ~z:true) args
+    | "caml_avx512bw_int16x32_permutex2var_mask2" -> (
+      match args with
+      | a :: b :: rest -> instr (vpermi2w_Z_Z_Zm512_K ~z:false) (b :: a :: rest)
+      | _ -> None)
+    | "caml_avx512bw_int16x32_permutex2var_mask" ->
+      instr (vpermt2w_Z_Z_Zm512_K ~z:false) args
+    | "caml_avx512bw_int16x32_permutex2var_maskz" ->
+      instr (vpermt2w_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_permutex2var" -> instr vpermt2w_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_permutexvar_mask" ->
+      instr vpermw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_permutexvar_maskz" ->
+      instr (vpermw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_permutexvar" -> instr vpermw_Z_Z_Zm512 args
+    | "caml_avx512bw_int8x64_movepi_mask" -> instr vpmovb2m_K_Z args
+    | "caml_avx512bw_int8x64_movm" -> instr vpmovm2b_Z_K args
+    | "caml_avx512bw_int16x32_movm" -> instr vpmovm2w_Z_K args
+    | "caml_avx512bw_int16x32_movepi_mask" -> instr vpmovw2m_K_Z args
+    | "caml_avx512bw_int8x64_sad" -> instr vpsadbw_Z_Z_Zm512 args
+    | "caml_avx512bw_int8x64_shuffle_mask" ->
+      instr vpshufb_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int8x64_shuffle_maskz" ->
+      instr (vpshufb_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_shuffle" -> instr vpshufb_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_shuffle_high_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpshufhw_Z_Zm512_K_merge ~i args
+    | "caml_avx512bw_int16x32_shuffle_high_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpshufhw_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512bw_int16x32_shuffle_high" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpshufhw_Z_Zm512 ~i args
+    | "caml_avx512bw_int16x32_shuffle_low_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpshuflw_Z_Zm512_K_merge ~i args
+    | "caml_avx512bw_int16x32_shuffle_low_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpshuflw_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512bw_int16x32_shuffle_low" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpshuflw_Z_Zm512 ~i args
+    | "caml_avx512bw_int8x64_interleave_high_mask" ->
+      instr vpunpckhbw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int8x64_interleave_high_maskz" ->
+      instr (vpunpckhbw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_interleave_high" -> instr vpunpckhbw_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_interleave_high_mask" ->
+      instr vpunpckhwd_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_interleave_high_maskz" ->
+      instr (vpunpckhwd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_interleave_high" ->
+      instr vpunpckhwd_Z_Z_Zm512 args
+    | "caml_avx512bw_int8x64_interleave_low_mask" ->
+      instr vpunpcklbw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int8x64_interleave_low_maskz" ->
+      instr (vpunpcklbw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_interleave_low" -> instr vpunpcklbw_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_interleave_low_mask" ->
+      instr vpunpcklwd_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_interleave_low_maskz" ->
+      instr (vpunpcklwd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_interleave_low" -> instr vpunpcklwd_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_mov_mask" -> instr vmovdqu16_Z_Z_K_merge args
+    | "caml_avx512bw_int16x32_mov_maskz" ->
+      instr (vmovdqu16_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_mov_mask" -> instr vmovdqu8_Z_Z_K_merge args
+    | "caml_avx512bw_int8x64_mov_maskz" ->
+      instr (vmovdqu8_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_abs" -> instr vpabsb_Z_Zm512 args
+    | "caml_avx512bw_int8x64_abs_mask" -> instr vpabsb_Z_Zm512_K_merge args
+    | "caml_avx512bw_int8x64_abs_maskz" -> instr (vpabsb_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_abs" -> instr vpabsw_Z_Zm512 args
+    | "caml_avx512bw_int16x32_abs_mask" -> instr vpabsw_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_abs_maskz" ->
+      instr (vpabsw_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_add" -> instr vpaddb_Z_Z_Zm512 args
+    | "caml_avx512bw_int8x64_add_mask" -> instr vpaddb_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int8x64_add_maskz" ->
+      instr (vpaddb_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_add_saturating" -> instr vpaddsb_Z_Z_Zm512 args
+    | "caml_avx512bw_int8x64_add_saturating_mask" ->
+      instr vpaddsb_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int8x64_add_saturating_maskz" ->
+      instr (vpaddsb_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_add_saturating" -> instr vpaddsw_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_add_saturating_mask" ->
+      instr vpaddsw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_add_saturating_maskz" ->
+      instr (vpaddsw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_add_saturating_unsigned" ->
+      instr vpaddusb_Z_Z_Zm512 args
+    | "caml_avx512bw_int8x64_add_saturating_unsigned_mask" ->
+      instr vpaddusb_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int8x64_add_saturating_unsigned_maskz" ->
+      instr (vpaddusb_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_add_saturating_unsigned" ->
+      instr vpaddusw_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_add_saturating_unsigned_mask" ->
+      instr vpaddusw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_add_saturating_unsigned_maskz" ->
+      instr (vpaddusw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_add" -> instr vpaddw_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_add_mask" -> instr vpaddw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_add_maskz" ->
+      instr (vpaddw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_avg_unsigned" -> instr vpavgb_Z_Z_Zm512 args
+    | "caml_avx512bw_int8x64_avg_unsigned_mask" ->
+      instr vpavgb_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int8x64_avg_unsigned_maskz" ->
+      instr (vpavgb_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_avg_unsigned" -> instr vpavgw_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_avg_unsigned_mask" ->
+      instr vpavgw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_avg_unsigned_maskz" ->
+      instr (vpavgw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_maddubs" -> instr vpmaddubsw_Z_Z_Zm512 args
+    | "caml_avx512bw_int8x64_maddubs_mask" ->
+      instr vpmaddubsw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int8x64_maddubs_maskz" ->
+      instr (vpmaddubsw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_madd" -> instr vpmaddwd_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_madd_mask" ->
+      instr vpmaddwd_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_madd_maskz" ->
+      instr (vpmaddwd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_max_mask" -> instr vpmaxsb_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int8x64_max_maskz" ->
+      instr (vpmaxsb_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_max" -> instr vpmaxsb_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_max_mask" -> instr vpmaxsw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_max_maskz" ->
+      instr (vpmaxsw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_max" -> instr vpmaxsw_Z_Z_Zm512 args
+    | "caml_avx512bw_int8x64_max_unsigned_mask" ->
+      instr vpmaxub_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int8x64_max_unsigned_maskz" ->
+      instr (vpmaxub_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_max_unsigned" -> instr vpmaxub_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_max_unsigned_mask" ->
+      instr vpmaxuw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_max_unsigned_maskz" ->
+      instr (vpmaxuw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_max_unsigned" -> instr vpmaxuw_Z_Z_Zm512 args
+    | "caml_avx512bw_int8x64_min_mask" -> instr vpminsb_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int8x64_min_maskz" ->
+      instr (vpminsb_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_min" -> instr vpminsb_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_min_mask" -> instr vpminsw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_min_maskz" ->
+      instr (vpminsw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_min" -> instr vpminsw_Z_Z_Zm512 args
+    | "caml_avx512bw_int8x64_min_unsigned_mask" ->
+      instr vpminub_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int8x64_min_unsigned_maskz" ->
+      instr (vpminub_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_min_unsigned" -> instr vpminub_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_min_unsigned_mask" ->
+      instr vpminuw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_min_unsigned_maskz" ->
+      instr (vpminuw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_min_unsigned" -> instr vpminuw_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_mul_round_mask" ->
+      instr vpmulhrsw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_mul_round_maskz" ->
+      instr (vpmulhrsw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_mul_round" -> instr vpmulhrsw_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_mul_high_unsigned_mask" ->
+      instr vpmulhuw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_mul_high_unsigned_maskz" ->
+      instr (vpmulhuw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_mul_high_unsigned" ->
+      instr vpmulhuw_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_mul_high_mask" ->
+      instr vpmulhw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_mul_high_maskz" ->
+      instr (vpmulhw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_mul_high" -> instr vpmulhw_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_mul_low_mask" ->
+      instr vpmullw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_mul_low_maskz" ->
+      instr (vpmullw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_mul_low" -> instr vpmullw_Z_Z_Zm512 args
+    | "caml_avx512bw_int8x64_sub_mask" -> instr vpsubb_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int8x64_sub_maskz" ->
+      instr (vpsubb_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_sub" -> instr vpsubb_Z_Z_Zm512 args
+    | "caml_avx512bw_int8x64_sub_saturating_mask" ->
+      instr vpsubsb_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int8x64_sub_saturating_maskz" ->
+      instr (vpsubsb_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_sub_saturating" -> instr vpsubsb_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_sub_saturating_mask" ->
+      instr vpsubsw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_sub_saturating_maskz" ->
+      instr (vpsubsw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_sub_saturating" -> instr vpsubsw_Z_Z_Zm512 args
+    | "caml_avx512bw_int8x64_sub_saturating_unsigned_mask" ->
+      instr vpsubusb_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int8x64_sub_saturating_unsigned_maskz" ->
+      instr (vpsubusb_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int8x64_sub_saturating_unsigned" ->
+      instr vpsubusb_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_sub_saturating_unsigned_mask" ->
+      instr vpsubusw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_sub_saturating_unsigned_maskz" ->
+      instr (vpsubusw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_sub_saturating_unsigned" ->
+      instr vpsubusw_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_sub_mask" -> instr vpsubw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_sub_maskz" ->
+      instr (vpsubw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_sub" -> instr vpsubw_Z_Z_Zm512 args
+    | "caml_avx512bw_cvt_int32x16_int16x32_saturating_mask" ->
+      instr vpackssdw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_cvt_int32x16_int16x32_saturating_maskz" ->
+      instr (vpackssdw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_cvt_int32x16_int16x32_saturating" ->
+      instr vpackssdw_Z_Z_Zm512 args
+    | "caml_avx512bw_cvt_int16x32_int8x64_saturating_mask" ->
+      instr vpacksswb_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_cvt_int16x32_int8x64_saturating_maskz" ->
+      instr (vpacksswb_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_cvt_int16x32_int8x64_saturating" ->
+      instr vpacksswb_Z_Z_Zm512 args
+    | "caml_avx512bw_cvt_int32x16_int16x32_saturating_unsigned_mask" ->
+      instr vpackusdw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_cvt_int32x16_int16x32_saturating_unsigned_maskz" ->
+      instr (vpackusdw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_cvt_int32x16_int16x32_saturating_unsigned" ->
+      instr vpackusdw_Z_Z_Zm512 args
+    | "caml_avx512bw_cvt_int16x32_int8x64_saturating_unsigned_mask" ->
+      instr vpackuswb_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_cvt_int16x32_int8x64_saturating_unsigned_maskz" ->
+      instr (vpackuswb_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_cvt_int16x32_int8x64_saturating_unsigned" ->
+      instr vpackuswb_Z_Z_Zm512 args
+    | "caml_avx512bw_cvt_int16x32_int8x32_saturating" ->
+      instr vpmovswb_Ym256_Z args
+    | "caml_avx512bw_cvt_int16x32_int8x32_saturating_mask" ->
+      instr vpmovswb_Y_Z_K_merge args
+    | "caml_avx512bw_cvt_int16x32_int8x32_saturating_maskz" ->
+      instr (vpmovswb_Ym256_Z_K ~z:true) args
+    | "caml_avx512bw_cvtsx_int8x32_int16x32" -> instr vpmovsxbw_Z_Ym256 args
+    | "caml_avx512bw_cvtsx_int8x32_int16x32_mask" ->
+      instr vpmovsxbw_Z_Ym256_K_merge args
+    | "caml_avx512bw_cvtsx_int8x32_int16x32_maskz" ->
+      instr (vpmovsxbw_Z_Ym256_K ~z:true) args
+    | "caml_avx512bw_cvt_int16x32_int8x32_saturating_unsigned" ->
+      instr vpmovuswb_Ym256_Z args
+    | "caml_avx512bw_cvt_int16x32_int8x32_saturating_unsigned_mask" ->
+      instr vpmovuswb_Y_Z_K_merge args
+    | "caml_avx512bw_cvt_int16x32_int8x32_saturating_unsigned_maskz" ->
+      instr (vpmovuswb_Ym256_Z_K ~z:true) args
+    | "caml_avx512bw_cvt_int16x32_int8x32" -> instr vpmovwb_Ym256_Z args
+    | "caml_avx512bw_cvt_int16x32_int8x32_mask" ->
+      instr vpmovwb_Y_Z_K_merge args
+    | "caml_avx512bw_cvt_int16x32_int8x32_maskz" ->
+      instr (vpmovwb_Ym256_Z_K ~z:true) args
+    | "caml_avx512bw_cvtzx_int8x32_int16x32" -> instr vpmovzxbw_Z_Ym256 args
+    | "caml_avx512bw_cvtzx_int8x32_int16x32_mask" ->
+      instr vpmovzxbw_Z_Ym256_K_merge args
+    | "caml_avx512bw_cvtzx_int8x32_int16x32_maskz" ->
+      instr (vpmovzxbw_Z_Ym256_K ~z:true) args
+    | "caml_avx512bw_int8x64_set1_mask" -> instr vpbroadcastb_Z_r32_K_merge args
+    | "caml_avx512bw_int8x64_set1_maskz" ->
+      instr (vpbroadcastb_Z_r32_K ~z:true) args
+    | "caml_avx512bw_int16x32_set1_mask" ->
+      instr vpbroadcastw_Z_r32_K_merge args
+    | "caml_avx512bw_int16x32_set1_maskz" ->
+      instr (vpbroadcastw_Z_r32_K ~z:true) args
+    | "caml_avx512bw_int8x64_cmp" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpb_K_Z_Zm512 ~i args
+    | "caml_avx512bw_int8x64_cmpeq" -> instr vpcmpb_K_Z_Zm512 ~i:0 args
+    | "caml_avx512bw_int8x64_cmpge" -> instr vpcmpb_K_Z_Zm512 ~i:5 args
+    | "caml_avx512bw_int8x64_cmpgt" -> instr vpcmpb_K_Z_Zm512 ~i:6 args
+    | "caml_avx512bw_int8x64_cmple" -> instr vpcmpb_K_Z_Zm512 ~i:2 args
+    | "caml_avx512bw_int8x64_cmplt" -> instr vpcmpb_K_Z_Zm512 ~i:1 args
+    | "caml_avx512bw_int8x64_cmpneq" -> instr vpcmpb_K_Z_Zm512 ~i:4 args
+    | "caml_avx512bw_int8x64_cmp_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpb_K_Z_Zm512_K ~i args
+    | "caml_avx512bw_int8x64_cmpeq_mask" -> instr vpcmpb_K_Z_Zm512_K ~i:0 args
+    | "caml_avx512bw_int8x64_cmpge_mask" -> instr vpcmpb_K_Z_Zm512_K ~i:5 args
+    | "caml_avx512bw_int8x64_cmpgt_mask" -> instr vpcmpb_K_Z_Zm512_K ~i:6 args
+    | "caml_avx512bw_int8x64_cmple_mask" -> instr vpcmpb_K_Z_Zm512_K ~i:2 args
+    | "caml_avx512bw_int8x64_cmplt_mask" -> instr vpcmpb_K_Z_Zm512_K ~i:1 args
+    | "caml_avx512bw_int8x64_cmpneq_mask" -> instr vpcmpb_K_Z_Zm512_K ~i:4 args
+    | "caml_avx512bw_int8x64_cmp_unsigned" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpub_K_Z_Zm512 ~i args
+    | "caml_avx512bw_int8x64_cmpeq_unsigned" ->
+      instr vpcmpub_K_Z_Zm512 ~i:0 args
+    | "caml_avx512bw_int8x64_cmpge_unsigned" ->
+      instr vpcmpub_K_Z_Zm512 ~i:5 args
+    | "caml_avx512bw_int8x64_cmpgt_unsigned" ->
+      instr vpcmpub_K_Z_Zm512 ~i:6 args
+    | "caml_avx512bw_int8x64_cmple_unsigned" ->
+      instr vpcmpub_K_Z_Zm512 ~i:2 args
+    | "caml_avx512bw_int8x64_cmplt_unsigned" ->
+      instr vpcmpub_K_Z_Zm512 ~i:1 args
+    | "caml_avx512bw_int8x64_cmpneq_unsigned" ->
+      instr vpcmpub_K_Z_Zm512 ~i:4 args
+    | "caml_avx512bw_int8x64_cmp_unsigned_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpub_K_Z_Zm512_K ~i args
+    | "caml_avx512bw_int8x64_cmpeq_unsigned_mask" ->
+      instr vpcmpub_K_Z_Zm512_K ~i:0 args
+    | "caml_avx512bw_int8x64_cmpge_unsigned_mask" ->
+      instr vpcmpub_K_Z_Zm512_K ~i:5 args
+    | "caml_avx512bw_int8x64_cmpgt_unsigned_mask" ->
+      instr vpcmpub_K_Z_Zm512_K ~i:6 args
+    | "caml_avx512bw_int8x64_cmple_unsigned_mask" ->
+      instr vpcmpub_K_Z_Zm512_K ~i:2 args
+    | "caml_avx512bw_int8x64_cmplt_unsigned_mask" ->
+      instr vpcmpub_K_Z_Zm512_K ~i:1 args
+    | "caml_avx512bw_int8x64_cmpneq_unsigned_mask" ->
+      instr vpcmpub_K_Z_Zm512_K ~i:4 args
+    | "caml_avx512bw_int16x32_cmp_unsigned" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpuw_K_Z_Zm512 ~i args
+    | "caml_avx512bw_int16x32_cmpeq_unsigned" ->
+      instr vpcmpuw_K_Z_Zm512 ~i:0 args
+    | "caml_avx512bw_int16x32_cmpge_unsigned" ->
+      instr vpcmpuw_K_Z_Zm512 ~i:5 args
+    | "caml_avx512bw_int16x32_cmpgt_unsigned" ->
+      instr vpcmpuw_K_Z_Zm512 ~i:6 args
+    | "caml_avx512bw_int16x32_cmple_unsigned" ->
+      instr vpcmpuw_K_Z_Zm512 ~i:2 args
+    | "caml_avx512bw_int16x32_cmplt_unsigned" ->
+      instr vpcmpuw_K_Z_Zm512 ~i:1 args
+    | "caml_avx512bw_int16x32_cmpneq_unsigned" ->
+      instr vpcmpuw_K_Z_Zm512 ~i:4 args
+    | "caml_avx512bw_int16x32_cmp_unsigned_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpuw_K_Z_Zm512_K ~i args
+    | "caml_avx512bw_int16x32_cmpeq_unsigned_mask" ->
+      instr vpcmpuw_K_Z_Zm512_K ~i:0 args
+    | "caml_avx512bw_int16x32_cmpge_unsigned_mask" ->
+      instr vpcmpuw_K_Z_Zm512_K ~i:5 args
+    | "caml_avx512bw_int16x32_cmpgt_unsigned_mask" ->
+      instr vpcmpuw_K_Z_Zm512_K ~i:6 args
+    | "caml_avx512bw_int16x32_cmple_unsigned_mask" ->
+      instr vpcmpuw_K_Z_Zm512_K ~i:2 args
+    | "caml_avx512bw_int16x32_cmplt_unsigned_mask" ->
+      instr vpcmpuw_K_Z_Zm512_K ~i:1 args
+    | "caml_avx512bw_int16x32_cmpneq_unsigned_mask" ->
+      instr vpcmpuw_K_Z_Zm512_K ~i:4 args
+    | "caml_avx512bw_int16x32_cmp" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpw_K_Z_Zm512 ~i args
+    | "caml_avx512bw_int16x32_cmpeq" -> instr vpcmpw_K_Z_Zm512 ~i:0 args
+    | "caml_avx512bw_int16x32_cmpge" -> instr vpcmpw_K_Z_Zm512 ~i:5 args
+    | "caml_avx512bw_int16x32_cmpgt" -> instr vpcmpw_K_Z_Zm512 ~i:6 args
+    | "caml_avx512bw_int16x32_cmple" -> instr vpcmpw_K_Z_Zm512 ~i:2 args
+    | "caml_avx512bw_int16x32_cmplt" -> instr vpcmpw_K_Z_Zm512 ~i:1 args
+    | "caml_avx512bw_int16x32_cmpneq" -> instr vpcmpw_K_Z_Zm512 ~i:4 args
+    | "caml_avx512bw_int16x32_cmp_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpw_K_Z_Zm512_K ~i args
+    | "caml_avx512bw_int16x32_cmpeq_mask" -> instr vpcmpw_K_Z_Zm512_K ~i:0 args
+    | "caml_avx512bw_int16x32_cmpge_mask" -> instr vpcmpw_K_Z_Zm512_K ~i:5 args
+    | "caml_avx512bw_int16x32_cmpgt_mask" -> instr vpcmpw_K_Z_Zm512_K ~i:6 args
+    | "caml_avx512bw_int16x32_cmple_mask" -> instr vpcmpw_K_Z_Zm512_K ~i:2 args
+    | "caml_avx512bw_int16x32_cmplt_mask" -> instr vpcmpw_K_Z_Zm512_K ~i:1 args
+    | "caml_avx512bw_int16x32_cmpneq_mask" -> instr vpcmpw_K_Z_Zm512_K ~i:4 args
+    | "caml_avx512bw_int8x64_test_mask" -> instr vptestmb_K_Z_Zm512_K args
+    | "caml_avx512bw_int8x64_test" -> instr vptestmb_K_Z_Zm512 args
+    | "caml_avx512bw_int16x32_test_mask" -> instr vptestmw_K_Z_Zm512_K args
+    | "caml_avx512bw_int16x32_test" -> instr vptestmw_K_Z_Zm512 args
+    | "caml_avx512bw_int8x64_testn_mask" -> instr vptestnmb_K_Z_Zm512_K args
+    | "caml_avx512bw_int8x64_testn" -> instr vptestnmb_K_Z_Zm512 args
+    | "caml_avx512bw_int16x32_testn_mask" -> instr vptestnmw_K_Z_Zm512_K args
+    | "caml_avx512bw_int16x32_testn" -> instr vptestnmw_K_Z_Zm512 args
+    | "caml_avx512bw_int16x32_sllv_mask" -> instr vpsllvw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_sllv_maskz" ->
+      instr (vpsllvw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_sllv" -> instr vpsllvw_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_sll_mask" -> instr vpsllw_Z_Z_Xm128_K_merge args
+    | "caml_avx512bw_int16x32_slli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsllw_Z_Zm512_K_merge ~i args
+    | "caml_avx512bw_int16x32_sll_maskz" ->
+      instr (vpsllw_Z_Z_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x32_slli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsllw_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512bw_int16x32_sll" -> instr vpsllw_Z_Z_Xm128 args
+    | "caml_avx512bw_int16x32_slli" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsllw_Z_Zm512 ~i args
+    | "caml_avx512bw_int16x32_srav_mask" -> instr vpsravw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_srav_maskz" ->
+      instr (vpsravw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_srav" -> instr vpsravw_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_sra_mask" -> instr vpsraw_Z_Z_Xm128_K_merge args
+    | "caml_avx512bw_int16x32_srai_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsraw_Z_Zm512_K_merge ~i args
+    | "caml_avx512bw_int16x32_sra_maskz" ->
+      instr (vpsraw_Z_Z_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x32_srai_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsraw_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512bw_int16x32_sra" -> instr vpsraw_Z_Z_Xm128 args
+    | "caml_avx512bw_int16x32_srai" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsraw_Z_Zm512 ~i args
+    | "caml_avx512bw_int16x32_srlv_mask" -> instr vpsrlvw_Z_Z_Zm512_K_merge args
+    | "caml_avx512bw_int16x32_srlv_maskz" ->
+      instr (vpsrlvw_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512bw_int16x32_srlv" -> instr vpsrlvw_Z_Z_Zm512 args
+    | "caml_avx512bw_int16x32_srl_mask" -> instr vpsrlw_Z_Z_Xm128_K_merge args
+    | "caml_avx512bw_int16x32_srli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsrlw_Z_Zm512_K_merge ~i args
+    | "caml_avx512bw_int16x32_srl_maskz" ->
+      instr (vpsrlw_Z_Z_Xm128_K ~z:true) args
+    | "caml_avx512bw_int16x32_srli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsrlw_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512bw_int16x32_srl" -> instr vpsrlw_Z_Z_Xm128 args
+    | "caml_avx512bw_int16x32_srli" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsrlw_Z_Zm512 ~i args
+    | "caml_avx512bw_mask32_add" -> instr kaddd args
+    | "caml_avx512bw_mask64_add" -> instr kaddq args
+    | "caml_avx512bw_mask32_and" -> instr kandd args
+    | "caml_avx512bw_mask64_and" -> instr kandq args
+    | "caml_avx512bw_mask32_andnot" -> instr kandnd args
+    | "caml_avx512bw_mask64_andnot" -> instr kandnq args
+    | "caml_avx512bw_mask32_not" -> instr knotd args
+    | "caml_avx512bw_mask64_not" -> instr knotq args
+    | "caml_avx512bw_mask32_or" -> instr kord args
+    | "caml_avx512bw_mask64_or" -> instr korq args
+    | "caml_avx512bw_mask32_xnor" -> instr kxnord args
+    | "caml_avx512bw_mask64_xnor" -> instr kxnorq args
+    | "caml_avx512bw_mask32_xor" -> instr kxord args
+    | "caml_avx512bw_mask64_xor" -> instr kxorq args
+    | "caml_avx512bw_mask32_shift_left" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr kshiftld ~i args
+    | "caml_avx512bw_mask64_shift_left" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr kshiftlq ~i args
+    | "caml_avx512bw_mask32_shift_right" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr kshiftrd ~i args
+    | "caml_avx512bw_mask64_shift_right" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr kshiftrq ~i args
+    | "caml_avx512bw_mask32_to_int32" -> instr kmovd_r32_K args
+    | "caml_avx512bw_mask64_to_int64" -> instr kmovq_r64_K args
+    | "caml_avx512bw_int32_to_mask32" -> instr kmovd_K_r32 args
+    | "caml_avx512bw_int64_to_mask64" -> instr kmovq_K_r64 args
+    | "caml_avx512cd_int64x4_broadcastmask" -> instr vpbroadcastmb2q_Y_K args
+    | "caml_avx512cd_int64x2_broadcastmask" -> instr vpbroadcastmb2q_X_K args
+    | "caml_avx512cd_int32x8_broadcastmask" -> instr vpbroadcastmw2d_Y_K args
+    | "caml_avx512cd_int32x4_broadcastmask" -> instr vpbroadcastmw2d_X_K args
+    | "caml_avx512cd_int32x8_conflict" -> instr vpconflictd_Y_Ym256 args
+    | "caml_avx512cd_int32x8_conflict_mask" ->
+      instr vpconflictd_Y_Ym256_K_merge args
+    | "caml_avx512cd_int32x8_conflict_maskz" ->
+      instr (vpconflictd_Y_Ym256_K ~z:true) args
+    | "caml_avx512cd_int32x4_conflict" -> instr vpconflictd_X_Xm128 args
+    | "caml_avx512cd_int32x4_conflict_mask" ->
+      instr vpconflictd_X_Xm128_K_merge args
+    | "caml_avx512cd_int32x4_conflict_maskz" ->
+      instr (vpconflictd_X_Xm128_K ~z:true) args
+    | "caml_avx512cd_int64x4_conflict" -> instr vpconflictq_Y_Ym256 args
+    | "caml_avx512cd_int64x4_conflict_mask" ->
+      instr vpconflictq_Y_Ym256_K_merge args
+    | "caml_avx512cd_int64x4_conflict_maskz" ->
+      instr (vpconflictq_Y_Ym256_K ~z:true) args
+    | "caml_avx512cd_int64x2_conflict" -> instr vpconflictq_X_Xm128 args
+    | "caml_avx512cd_int64x2_conflict_mask" ->
+      instr vpconflictq_X_Xm128_K_merge args
+    | "caml_avx512cd_int64x2_conflict_maskz" ->
+      instr (vpconflictq_X_Xm128_K ~z:true) args
+    | "caml_avx512cd_int32x8_lzcnt" -> instr vplzcntd_Y_Ym256 args
+    | "caml_avx512cd_int32x8_lzcnt_mask" -> instr vplzcntd_Y_Ym256_K_merge args
+    | "caml_avx512cd_int32x8_lzcnt_maskz" ->
+      instr (vplzcntd_Y_Ym256_K ~z:true) args
+    | "caml_avx512cd_int32x4_lzcnt" -> instr vplzcntd_X_Xm128 args
+    | "caml_avx512cd_int32x4_lzcnt_mask" -> instr vplzcntd_X_Xm128_K_merge args
+    | "caml_avx512cd_int32x4_lzcnt_maskz" ->
+      instr (vplzcntd_X_Xm128_K ~z:true) args
+    | "caml_avx512cd_int64x4_lzcnt" -> instr vplzcntq_Y_Ym256 args
+    | "caml_avx512cd_int64x4_lzcnt_mask" -> instr vplzcntq_Y_Ym256_K_merge args
+    | "caml_avx512cd_int64x4_lzcnt_maskz" ->
+      instr (vplzcntq_Y_Ym256_K ~z:true) args
+    | "caml_avx512cd_int64x2_lzcnt" -> instr vplzcntq_X_Xm128 args
+    | "caml_avx512cd_int64x2_lzcnt_mask" -> instr vplzcntq_X_Xm128_K_merge args
+    | "caml_avx512cd_int64x2_lzcnt_maskz" ->
+      instr (vplzcntq_X_Xm128_K ~z:true) args
+    | "caml_avx512cd_int64x8_broadcastmask" -> instr vpbroadcastmb2q_Z_K args
+    | "caml_avx512cd_int32x16_broadcastmask" -> instr vpbroadcastmw2d_Z_K args
+    | "caml_avx512cd_int32x16_conflict" -> instr vpconflictd_Z_Zm512 args
+    | "caml_avx512cd_int32x16_conflict_mask" ->
+      instr vpconflictd_Z_Zm512_K_merge args
+    | "caml_avx512cd_int32x16_conflict_maskz" ->
+      instr (vpconflictd_Z_Zm512_K ~z:true) args
+    | "caml_avx512cd_int64x8_conflict" -> instr vpconflictq_Z_Zm512 args
+    | "caml_avx512cd_int64x8_conflict_mask" ->
+      instr vpconflictq_Z_Zm512_K_merge args
+    | "caml_avx512cd_int64x8_conflict_maskz" ->
+      instr (vpconflictq_Z_Zm512_K ~z:true) args
+    | "caml_avx512cd_int32x16_lzcnt" -> instr vplzcntd_Z_Zm512 args
+    | "caml_avx512cd_int32x16_lzcnt_mask" -> instr vplzcntd_Z_Zm512_K_merge args
+    | "caml_avx512cd_int32x16_lzcnt_maskz" ->
+      instr (vplzcntd_Z_Zm512_K ~z:true) args
+    | "caml_avx512cd_int64x8_lzcnt" -> instr vplzcntq_Z_Zm512 args
+    | "caml_avx512cd_int64x8_lzcnt_mask" -> instr vplzcntq_Z_Zm512_K_merge args
+    | "caml_avx512cd_int64x8_lzcnt_maskz" ->
+      instr (vplzcntq_Z_Zm512_K ~z:true) args
+    | "caml_avx512dq_float64x4_andnot_mask" ->
+      instr vandnpd_Y_Y_Ym256_K_merge args
+    | "caml_avx512dq_float64x4_andnot_maskz" ->
+      instr (vandnpd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512dq_float64x2_andnot_mask" ->
+      instr vandnpd_X_X_Xm128_K_merge args
+    | "caml_avx512dq_float64x2_andnot_maskz" ->
+      instr (vandnpd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512dq_float32x8_andnot_mask" ->
+      instr vandnps_Y_Y_Ym256_K_merge args
+    | "caml_avx512dq_float32x8_andnot_maskz" ->
+      instr (vandnps_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512dq_float32x4_andnot_mask" ->
+      instr vandnps_X_X_Xm128_K_merge args
+    | "caml_avx512dq_float32x4_andnot_maskz" ->
+      instr (vandnps_X_X_Xm128_K ~z:true) args
+    | "caml_avx512dq_float64x4_and_mask" -> instr vandpd_Y_Y_Ym256_K_merge args
+    | "caml_avx512dq_float64x4_and_maskz" ->
+      instr (vandpd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512dq_float64x2_and_mask" -> instr vandpd_X_X_Xm128_K_merge args
+    | "caml_avx512dq_float64x2_and_maskz" ->
+      instr (vandpd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512dq_float32x8_and_mask" -> instr vandps_Y_Y_Ym256_K_merge args
+    | "caml_avx512dq_float32x8_and_maskz" ->
+      instr (vandps_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512dq_float32x4_and_mask" -> instr vandps_X_X_Xm128_K_merge args
+    | "caml_avx512dq_float32x4_and_maskz" ->
+      instr (vandps_X_X_Xm128_K ~z:true) args
+    | "caml_avx512dq_float64x4_or_mask" -> instr vorpd_Y_Y_Ym256_K_merge args
+    | "caml_avx512dq_float64x4_or_maskz" ->
+      instr (vorpd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512dq_float64x2_or_mask" -> instr vorpd_X_X_Xm128_K_merge args
+    | "caml_avx512dq_float64x2_or_maskz" ->
+      instr (vorpd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512dq_float32x8_or_mask" -> instr vorps_Y_Y_Ym256_K_merge args
+    | "caml_avx512dq_float32x8_or_maskz" ->
+      instr (vorps_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512dq_float32x4_or_mask" -> instr vorps_X_X_Xm128_K_merge args
+    | "caml_avx512dq_float32x4_or_maskz" ->
+      instr (vorps_X_X_Xm128_K ~z:true) args
+    | "caml_avx512dq_float64x4_xor_mask" -> instr vxorpd_Y_Y_Ym256_K_merge args
+    | "caml_avx512dq_float64x4_xor_maskz" ->
+      instr (vxorpd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512dq_float64x2_xor_mask" -> instr vxorpd_X_X_Xm128_K_merge args
+    | "caml_avx512dq_float64x2_xor_maskz" ->
+      instr (vxorpd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512dq_float32x8_xor_mask" -> instr vxorps_Y_Y_Ym256_K_merge args
+    | "caml_avx512dq_float32x8_xor_maskz" ->
+      instr (vxorps_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512dq_float32x4_xor_mask" -> instr vxorps_X_X_Xm128_K_merge args
+    | "caml_avx512dq_float32x4_xor_maskz" ->
+      instr (vxorps_X_X_Xm128_K ~z:true) args
+    | "caml_avx512dq_float32x8_broadcast_f32x2" ->
+      instr vbroadcastf32x2_Y_Xm64 args
+    | "caml_avx512dq_float32x8_broadcast_f32x2_mask" ->
+      instr vbroadcastf32x2_Y_Xm64_K_merge args
+    | "caml_avx512dq_float32x8_broadcast_f32x2_maskz" ->
+      instr (vbroadcastf32x2_Y_Xm64_K ~z:true) args
+    | "caml_avx512dq_int32x8_broadcast_i32x2" ->
+      instr vbroadcasti32x2_Y_Xm64 args
+    | "caml_avx512dq_int32x8_broadcast_i32x2_mask" ->
+      instr vbroadcasti32x2_Y_Xm64_K_merge args
+    | "caml_avx512dq_int32x8_broadcast_i32x2_maskz" ->
+      instr (vbroadcasti32x2_Y_Xm64_K ~z:true) args
+    | "caml_avx512dq_int32x4_broadcast_i32x2" ->
+      instr vbroadcasti32x2_X_Xm64 args
+    | "caml_avx512dq_int32x4_broadcast_i32x2_mask" ->
+      instr vbroadcasti32x2_X_Xm64_K_merge args
+    | "caml_avx512dq_int32x4_broadcast_i32x2_maskz" ->
+      instr (vbroadcasti32x2_X_Xm64_K ~z:true) args
+    | "caml_avx512dq_float64x4_extract_float64x2" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextractf64x2_Xm128_Y ~i args
+    | "caml_avx512dq_float64x4_extract_float64x2_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextractf64x2_X_Y_K_merge ~i args
+    | "caml_avx512dq_float64x4_extract_float64x2_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (vextractf64x2_Xm128_Y_K ~z:true) ~i args
+    | "caml_avx512dq_int64x4_extract_int64x2" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextracti64x2_Xm128_Y ~i args
+    | "caml_avx512dq_int64x4_extract_int64x2_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextracti64x2_X_Y_K_merge ~i args
+    | "caml_avx512dq_int64x4_extract_int64x2_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (vextracti64x2_Xm128_Y_K ~z:true) ~i args
+    | "caml_avx512dq_float64x4_fpclass" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfpclasspd_K_Ym256 ~i args
+    | "caml_avx512dq_float64x4_fpclass_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfpclasspd_K_Ym256_K ~i args
+    | "caml_avx512dq_float64x2_fpclass" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfpclasspd_K_Xm128 ~i args
+    | "caml_avx512dq_float64x2_fpclass_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfpclasspd_K_Xm128_K ~i args
+    | "caml_avx512dq_float32x8_fpclass" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfpclassps_K_Ym256 ~i args
+    | "caml_avx512dq_float32x8_fpclass_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfpclassps_K_Ym256_K ~i args
+    | "caml_avx512dq_float32x4_fpclass" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfpclassps_K_Xm128 ~i args
+    | "caml_avx512dq_float32x4_fpclass_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfpclassps_K_Xm128_K ~i args
+    | "caml_avx512dq_float64x4_insert_float64x2" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinsertf64x2_Y_Y_Xm128 ~i args
+    | "caml_avx512dq_float64x4_insert_float64x2_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinsertf64x2_Y_Y_Xm128_K_merge ~i args
+    | "caml_avx512dq_float64x4_insert_float64x2_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (vinsertf64x2_Y_Y_Xm128_K ~z:true) ~i args
+    | "caml_avx512dq_int64x4_insert_int64x2" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinserti64x2_Y_Y_Xm128 ~i args
+    | "caml_avx512dq_int64x4_insert_int64x2_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinserti64x2_Y_Y_Xm128_K_merge ~i args
+    | "caml_avx512dq_int64x4_insert_int64x2_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (vinserti64x2_Y_Y_Xm128_K ~z:true) ~i args
+    | "caml_avx512dq_int32x8_movepi_mask" -> instr vpmovd2m_K_Y args
+    | "caml_avx512dq_int32x4_movepi_mask" -> instr vpmovd2m_K_X args
+    | "caml_avx512dq_int32x8_movm" -> instr vpmovm2d_Y_K args
+    | "caml_avx512dq_int32x4_movm" -> instr vpmovm2d_X_K args
+    | "caml_avx512dq_int64x4_movm" -> instr vpmovm2q_Y_K args
+    | "caml_avx512dq_int64x2_movm" -> instr vpmovm2q_X_K args
+    | "caml_avx512dq_int64x4_movepi_mask" -> instr vpmovq2m_K_Y args
+    | "caml_avx512dq_int64x2_movepi_mask" -> instr vpmovq2m_K_X args
+    | "caml_avx512dq_float64x4_range_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vrangepd_Y_Y_Ym256_K_merge ~i args
+    | "caml_avx512dq_float64x4_range_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangepd_Y_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512dq_float64x4_range" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vrangepd_Y_Y_Ym256 ~i args
+    | "caml_avx512dq_float64x2_range_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vrangepd_X_X_Xm128_K_merge ~i args
+    | "caml_avx512dq_float64x2_range_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangepd_X_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512dq_float64x2_range" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vrangepd_X_X_Xm128 ~i args
+    | "caml_avx512dq_float32x8_range_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vrangeps_Y_Y_Ym256_K_merge ~i args
+    | "caml_avx512dq_float32x8_range_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangeps_Y_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512dq_float32x8_range" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vrangeps_Y_Y_Ym256 ~i args
+    | "caml_avx512dq_float32x4_range_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vrangeps_X_X_Xm128_K_merge ~i args
+    | "caml_avx512dq_float32x4_range_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangeps_X_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512dq_float32x4_range" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vrangeps_X_X_Xm128 ~i args
+    | "caml_avx512dq_float64x4_reduce_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vreducepd_Y_Ym256_K_merge ~i args
+    | "caml_avx512dq_float64x4_reduce_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreducepd_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512dq_float64x4_reduce" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vreducepd_Y_Ym256 ~i args
+    | "caml_avx512dq_float64x2_reduce_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vreducepd_X_Xm128_K_merge ~i args
+    | "caml_avx512dq_float64x2_reduce_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreducepd_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512dq_float64x2_reduce" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vreducepd_X_Xm128 ~i args
+    | "caml_avx512dq_float32x8_reduce_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vreduceps_Y_Ym256_K_merge ~i args
+    | "caml_avx512dq_float32x8_reduce_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreduceps_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512dq_float32x8_reduce" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vreduceps_Y_Ym256 ~i args
+    | "caml_avx512dq_float32x4_reduce_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vreduceps_X_Xm128_K_merge ~i args
+    | "caml_avx512dq_float32x4_reduce_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreduceps_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512dq_float32x4_reduce" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vreduceps_X_Xm128 ~i args
+    | "caml_avx512dq_cvt_float64x4_int64x4" -> instr vcvtpd2qq_Y_Ym256 args
+    | "caml_avx512dq_cvt_float64x4_int64x4_mask" ->
+      instr vcvtpd2qq_Y_Ym256_K_merge args
+    | "caml_avx512dq_cvt_float64x4_int64x4_maskz" ->
+      instr (vcvtpd2qq_Y_Ym256_K ~z:true) args
+    | "caml_avx512dq_cvt_float64x2_int64x2" -> instr vcvtpd2qq_X_Xm128 args
+    | "caml_avx512dq_cvt_float64x2_int64x2_mask" ->
+      instr vcvtpd2qq_X_Xm128_K_merge args
+    | "caml_avx512dq_cvt_float64x2_int64x2_maskz" ->
+      instr (vcvtpd2qq_X_Xm128_K ~z:true) args
+    | "caml_avx512dq_cvt_float64x4_int64x4_unsigned" ->
+      instr vcvtpd2uqq_Y_Ym256 args
+    | "caml_avx512dq_cvt_float64x4_int64x4_unsigned_mask" ->
+      instr vcvtpd2uqq_Y_Ym256_K_merge args
+    | "caml_avx512dq_cvt_float64x4_int64x4_unsigned_maskz" ->
+      instr (vcvtpd2uqq_Y_Ym256_K ~z:true) args
+    | "caml_avx512dq_cvt_float64x2_int64x2_unsigned" ->
+      instr vcvtpd2uqq_X_Xm128 args
+    | "caml_avx512dq_cvt_float64x2_int64x2_unsigned_mask" ->
+      instr vcvtpd2uqq_X_Xm128_K_merge args
+    | "caml_avx512dq_cvt_float64x2_int64x2_unsigned_maskz" ->
+      instr (vcvtpd2uqq_X_Xm128_K ~z:true) args
+    | "caml_avx512dq_cvt_float32x4_int64x4" -> instr vcvtps2qq_Y_Xm128 args
+    | "caml_avx512dq_cvt_float32x4_int64x4_mask" ->
+      instr vcvtps2qq_Y_Xm128_K_merge args
+    | "caml_avx512dq_cvt_float32x4_int64x4_maskz" ->
+      instr (vcvtps2qq_Y_Xm128_K ~z:true) args
+    | "caml_avx512dq_cvt_float32x4_int64x2" -> instr vcvtps2qq_X_Xm64 args
+    | "caml_avx512dq_cvt_float32x4_int64x2_mask" ->
+      instr vcvtps2qq_X_Xm64_K_merge args
+    | "caml_avx512dq_cvt_float32x4_int64x2_maskz" ->
+      instr (vcvtps2qq_X_Xm64_K ~z:true) args
+    | "caml_avx512dq_cvt_float32x4_int64x4_unsigned" ->
+      instr vcvtps2uqq_Y_Xm128 args
+    | "caml_avx512dq_cvt_float32x4_int64x4_unsigned_mask" ->
+      instr vcvtps2uqq_Y_Xm128_K_merge args
+    | "caml_avx512dq_cvt_float32x4_int64x4_unsigned_maskz" ->
+      instr (vcvtps2uqq_Y_Xm128_K ~z:true) args
+    | "caml_avx512dq_cvt_float32x4_int64x2_unsigned" ->
+      instr vcvtps2uqq_X_Xm64 args
+    | "caml_avx512dq_cvt_float32x4_int64x2_unsigned_mask" ->
+      instr vcvtps2uqq_X_Xm64_K_merge args
+    | "caml_avx512dq_cvt_float32x4_int64x2_unsigned_maskz" ->
+      instr (vcvtps2uqq_X_Xm64_K ~z:true) args
+    | "caml_avx512dq_cvt_int64x4_float64x4" -> instr vcvtqq2pd_Y_Ym256 args
+    | "caml_avx512dq_cvt_int64x4_float64x4_mask" ->
+      instr vcvtqq2pd_Y_Ym256_K_merge args
+    | "caml_avx512dq_cvt_int64x4_float64x4_maskz" ->
+      instr (vcvtqq2pd_Y_Ym256_K ~z:true) args
+    | "caml_avx512dq_cvt_int64x2_float64x2" -> instr vcvtqq2pd_X_Xm128 args
+    | "caml_avx512dq_cvt_int64x2_float64x2_mask" ->
+      instr vcvtqq2pd_X_Xm128_K_merge args
+    | "caml_avx512dq_cvt_int64x2_float64x2_maskz" ->
+      instr (vcvtqq2pd_X_Xm128_K ~z:true) args
+    | "caml_avx512dq_cvt_int64x4_float32x4" -> instr vcvtqq2ps_X_Ym256 args
+    | "caml_avx512dq_cvt_int64x4_float32x4_mask" ->
+      instr vcvtqq2ps_X_Ym256_K_merge args
+    | "caml_avx512dq_cvt_int64x4_float32x4_maskz" ->
+      instr (vcvtqq2ps_X_Ym256_K ~z:true) args
+    | "caml_avx512dq_cvtt_float64x4_int64x4" -> instr vcvttpd2qq_Y_Ym256 args
+    | "caml_avx512dq_cvtt_float64x4_int64x4_mask" ->
+      instr vcvttpd2qq_Y_Ym256_K_merge args
+    | "caml_avx512dq_cvtt_float64x4_int64x4_maskz" ->
+      instr (vcvttpd2qq_Y_Ym256_K ~z:true) args
+    | "caml_avx512dq_cvtt_float64x2_int64x2" -> instr vcvttpd2qq_X_Xm128 args
+    | "caml_avx512dq_cvtt_float64x2_int64x2_mask" ->
+      instr vcvttpd2qq_X_Xm128_K_merge args
+    | "caml_avx512dq_cvtt_float64x2_int64x2_maskz" ->
+      instr (vcvttpd2qq_X_Xm128_K ~z:true) args
+    | "caml_avx512dq_cvtt_float64x4_int64x4_unsigned" ->
+      instr vcvttpd2uqq_Y_Ym256 args
+    | "caml_avx512dq_cvtt_float64x4_int64x4_unsigned_mask" ->
+      instr vcvttpd2uqq_Y_Ym256_K_merge args
+    | "caml_avx512dq_cvtt_float64x4_int64x4_unsigned_maskz" ->
+      instr (vcvttpd2uqq_Y_Ym256_K ~z:true) args
+    | "caml_avx512dq_cvtt_float64x2_int64x2_unsigned" ->
+      instr vcvttpd2uqq_X_Xm128 args
+    | "caml_avx512dq_cvtt_float64x2_int64x2_unsigned_mask" ->
+      instr vcvttpd2uqq_X_Xm128_K_merge args
+    | "caml_avx512dq_cvtt_float64x2_int64x2_unsigned_maskz" ->
+      instr (vcvttpd2uqq_X_Xm128_K ~z:true) args
+    | "caml_avx512dq_cvtt_float32x4_int64x4" -> instr vcvttps2qq_Y_Xm128 args
+    | "caml_avx512dq_cvtt_float32x4_int64x4_mask" ->
+      instr vcvttps2qq_Y_Xm128_K_merge args
+    | "caml_avx512dq_cvtt_float32x4_int64x4_maskz" ->
+      instr (vcvttps2qq_Y_Xm128_K ~z:true) args
+    | "caml_avx512dq_cvtt_float32x4_int64x2" -> instr vcvttps2qq_X_Xm64 args
+    | "caml_avx512dq_cvtt_float32x4_int64x2_mask" ->
+      instr vcvttps2qq_X_Xm64_K_merge args
+    | "caml_avx512dq_cvtt_float32x4_int64x2_maskz" ->
+      instr (vcvttps2qq_X_Xm64_K ~z:true) args
+    | "caml_avx512dq_cvtt_float32x4_int64x4_unsigned" ->
+      instr vcvttps2uqq_Y_Xm128 args
+    | "caml_avx512dq_cvtt_float32x4_int64x4_unsigned_mask" ->
+      instr vcvttps2uqq_Y_Xm128_K_merge args
+    | "caml_avx512dq_cvtt_float32x4_int64x4_unsigned_maskz" ->
+      instr (vcvttps2uqq_Y_Xm128_K ~z:true) args
+    | "caml_avx512dq_cvtt_float32x4_int64x2_unsigned" ->
+      instr vcvttps2uqq_X_Xm64 args
+    | "caml_avx512dq_cvtt_float32x4_int64x2_unsigned_mask" ->
+      instr vcvttps2uqq_X_Xm64_K_merge args
+    | "caml_avx512dq_cvtt_float32x4_int64x2_unsigned_maskz" ->
+      instr (vcvttps2uqq_X_Xm64_K ~z:true) args
+    | "caml_avx512dq_cvt_int64x4_float64x4_unsigned" ->
+      instr vcvtuqq2pd_Y_Ym256 args
+    | "caml_avx512dq_cvt_int64x4_float64x4_unsigned_mask" ->
+      instr vcvtuqq2pd_Y_Ym256_K_merge args
+    | "caml_avx512dq_cvt_int64x4_float64x4_unsigned_maskz" ->
+      instr (vcvtuqq2pd_Y_Ym256_K ~z:true) args
+    | "caml_avx512dq_cvt_int64x2_float64x2_unsigned" ->
+      instr vcvtuqq2pd_X_Xm128 args
+    | "caml_avx512dq_cvt_int64x2_float64x2_unsigned_mask" ->
+      instr vcvtuqq2pd_X_Xm128_K_merge args
+    | "caml_avx512dq_cvt_int64x2_float64x2_unsigned_maskz" ->
+      instr (vcvtuqq2pd_X_Xm128_K ~z:true) args
+    | "caml_avx512dq_cvt_int64x4_float32x4_unsigned" ->
+      instr vcvtuqq2ps_X_Ym256 args
+    | "caml_avx512dq_cvt_int64x4_float32x4_unsigned_mask" ->
+      instr vcvtuqq2ps_X_Ym256_K_merge args
+    | "caml_avx512dq_cvt_int64x4_float32x4_unsigned_maskz" ->
+      instr (vcvtuqq2ps_X_Ym256_K ~z:true) args
+    | "caml_avx512dq_int64x4_mul_low_mask" ->
+      instr vpmullq_Y_Y_Ym256_K_merge args
+    | "caml_avx512dq_int64x4_mul_low_maskz" ->
+      instr (vpmullq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512dq_int64x4_mul_low" -> instr vpmullq_Y_Y_Ym256 args
+    | "caml_avx512dq_int64x2_mul_low_mask" ->
+      instr vpmullq_X_X_Xm128_K_merge args
+    | "caml_avx512dq_int64x2_mul_low_maskz" ->
+      instr (vpmullq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512dq_int64x2_mul_low" -> instr vpmullq_X_X_Xm128 args
+    | "caml_avx512dq_float64x8_andnot" -> instr vandnpd_Z_Z_Zm512 args
+    | "caml_avx512dq_float64x8_andnot_mask" ->
+      instr vandnpd_Z_Z_Zm512_K_merge args
+    | "caml_avx512dq_float64x8_andnot_maskz" ->
+      instr (vandnpd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512dq_float32x16_andnot" -> instr vandnps_Z_Z_Zm512 args
+    | "caml_avx512dq_float32x16_andnot_mask" ->
+      instr vandnps_Z_Z_Zm512_K_merge args
+    | "caml_avx512dq_float32x16_andnot_maskz" ->
+      instr (vandnps_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512dq_float64x8_and" -> instr vandpd_Z_Z_Zm512 args
+    | "caml_avx512dq_float64x8_and_mask" -> instr vandpd_Z_Z_Zm512_K_merge args
+    | "caml_avx512dq_float64x8_and_maskz" ->
+      instr (vandpd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512dq_float32x16_and" -> instr vandps_Z_Z_Zm512 args
+    | "caml_avx512dq_float32x16_and_mask" -> instr vandps_Z_Z_Zm512_K_merge args
+    | "caml_avx512dq_float32x16_and_maskz" ->
+      instr (vandps_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512dq_float64x8_or_mask" -> instr vorpd_Z_Z_Zm512_K_merge args
+    | "caml_avx512dq_float64x8_or_maskz" ->
+      instr (vorpd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512dq_float64x8_or" -> instr vorpd_Z_Z_Zm512 args
+    | "caml_avx512dq_float32x16_or_mask" -> instr vorps_Z_Z_Zm512_K_merge args
+    | "caml_avx512dq_float32x16_or_maskz" ->
+      instr (vorps_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512dq_float32x16_or" -> instr vorps_Z_Z_Zm512 args
+    | "caml_avx512dq_float64x8_xor_mask" -> instr vxorpd_Z_Z_Zm512_K_merge args
+    | "caml_avx512dq_float64x8_xor_maskz" ->
+      instr (vxorpd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512dq_float64x8_xor" -> instr vxorpd_Z_Z_Zm512 args
+    | "caml_avx512dq_float32x16_xor_mask" -> instr vxorps_Z_Z_Zm512_K_merge args
+    | "caml_avx512dq_float32x16_xor_maskz" ->
+      instr (vxorps_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512dq_float32x16_xor" -> instr vxorps_Z_Z_Zm512 args
+    | "caml_avx512dq_float32x16_broadcast_f32x2" ->
+      instr vbroadcastf32x2_Z_Xm64 args
+    | "caml_avx512dq_float32x16_broadcast_f32x2_mask" ->
+      instr vbroadcastf32x2_Z_Xm64_K_merge args
+    | "caml_avx512dq_float32x16_broadcast_f32x2_maskz" ->
+      instr (vbroadcastf32x2_Z_Xm64_K ~z:true) args
+    | "caml_avx512dq_int32x16_broadcast_i32x2" ->
+      instr vbroadcasti32x2_Z_Xm64 args
+    | "caml_avx512dq_int32x16_broadcast_i32x2_mask" ->
+      instr vbroadcasti32x2_Z_Xm64_K_merge args
+    | "caml_avx512dq_int32x16_broadcast_i32x2_maskz" ->
+      instr (vbroadcasti32x2_Z_Xm64_K ~z:true) args
+    | "caml_avx512dq_float32x16_extract_float32x8" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextractf32x8_Ym256_Z ~i args
+    | "caml_avx512dq_float32x16_extract_float32x8_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextractf32x8_Y_Z_K_merge ~i args
+    | "caml_avx512dq_float32x16_extract_float32x8_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (vextractf32x8_Ym256_Z_K ~z:true) ~i args
+    | "caml_avx512dq_float64x8_extract_float64x2" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vextractf64x2_Xm128_Z ~i args
+    | "caml_avx512dq_float64x8_extract_float64x2_mask" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vextractf64x2_X_Z_K_merge ~i args
+    | "caml_avx512dq_float64x8_extract_float64x2_maskz" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr (vextractf64x2_Xm128_Z_K ~z:true) ~i args
+    | "caml_avx512dq_int32x16_extract_int32x8" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextracti32x8_Ym256_Z ~i args
+    | "caml_avx512dq_int32x16_extract_int32x8_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextracti32x8_Y_Z_K_merge ~i args
+    | "caml_avx512dq_int32x16_extract_int32x8_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (vextracti32x8_Ym256_Z_K ~z:true) ~i args
+    | "caml_avx512dq_int64x8_extract_int64x2" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vextracti64x2_Xm128_Z ~i args
+    | "caml_avx512dq_int64x8_extract_int64x2_mask" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vextracti64x2_X_Z_K_merge ~i args
+    | "caml_avx512dq_int64x8_extract_int64x2_maskz" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr (vextracti64x2_Xm128_Z_K ~z:true) ~i args
+    | "caml_avx512dq_float64x8_fpclass" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfpclasspd_K_Zm512 ~i args
+    | "caml_avx512dq_float64x8_fpclass_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfpclasspd_K_Zm512_K ~i args
+    | "caml_avx512dq_float32x16_fpclass" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfpclassps_K_Zm512 ~i args
+    | "caml_avx512dq_float32x16_fpclass_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfpclassps_K_Zm512_K ~i args
+    | "caml_avx512dq_float64_fpclass" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfpclasssd_K_Xm64 ~i args
+    | "caml_avx512dq_float64_fpclass_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfpclasssd_K_Xm64_K ~i args
+    | "caml_avx512dq_float32_fpclass" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfpclassss_K_Xm32 ~i args
+    | "caml_avx512dq_float32_fpclass_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfpclassss_K_Xm32_K ~i args
+    | "caml_avx512dq_float32x16_insert_float32x8" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinsertf32x8_Z_Z_Ym256 ~i args
+    | "caml_avx512dq_float32x16_insert_float32x8_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinsertf32x8_Z_Z_Ym256_K_merge ~i args
+    | "caml_avx512dq_float32x16_insert_float32x8_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (vinsertf32x8_Z_Z_Ym256_K ~z:true) ~i args
+    | "caml_avx512dq_float64x8_insert_float64x2" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vinsertf64x2_Z_Z_Xm128 ~i args
+    | "caml_avx512dq_float64x8_insert_float64x2_mask" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vinsertf64x2_Z_Z_Xm128_K_merge ~i args
+    | "caml_avx512dq_float64x8_insert_float64x2_maskz" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr (vinsertf64x2_Z_Z_Xm128_K ~z:true) ~i args
+    | "caml_avx512dq_int32x16_insert_int32x8" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinserti32x8_Z_Z_Ym256 ~i args
+    | "caml_avx512dq_int32x16_insert_int32x8_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinserti32x8_Z_Z_Ym256_K_merge ~i args
+    | "caml_avx512dq_int32x16_insert_int32x8_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (vinserti32x8_Z_Z_Ym256_K ~z:true) ~i args
+    | "caml_avx512dq_int64x8_insert_int64x2" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vinserti64x2_Z_Z_Xm128 ~i args
+    | "caml_avx512dq_int64x8_insert_int64x2_mask" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vinserti64x2_Z_Z_Xm128_K_merge ~i args
+    | "caml_avx512dq_int64x8_insert_int64x2_maskz" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr (vinserti64x2_Z_Z_Xm128_K ~z:true) ~i args
+    | "caml_avx512dq_int32x16_movepi_mask" -> instr vpmovd2m_K_Z args
+    | "caml_avx512dq_int32x16_movm" -> instr vpmovm2d_Z_K args
+    | "caml_avx512dq_int64x8_movm" -> instr vpmovm2q_Z_K args
+    | "caml_avx512dq_int64x8_movepi_mask" -> instr vpmovq2m_K_Z args
+    | "caml_avx512dq_float64x8_range_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vrangepd_Z_Z_Zm512_K_merge ~i args
+    | "caml_avx512dq_float64x8_range_round_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangepd_Z_Z_Z_K_merge ~sae:true) ~i args
+    | "caml_avx512dq_float64x8_range_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangepd_Z_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512dq_float64x8_range_round_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangepd_Z_Z_Z_K ~sae:true ~z:true) ~i args
+    | "caml_avx512dq_float64x8_range" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vrangepd_Z_Z_Zm512 ~i args
+    | "caml_avx512dq_float64x8_range_round" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangepd_Z_Z_Z ~sae:true) ~i args
+    | "caml_avx512dq_float32x16_range_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vrangeps_Z_Z_Zm512_K_merge ~i args
+    | "caml_avx512dq_float32x16_range_round_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangeps_Z_Z_Z_K_merge ~sae:true) ~i args
+    | "caml_avx512dq_float32x16_range_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangeps_Z_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512dq_float32x16_range_round_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangeps_Z_Z_Z_K ~sae:true ~z:true) ~i args
+    | "caml_avx512dq_float32x16_range" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vrangeps_Z_Z_Zm512 ~i args
+    | "caml_avx512dq_float32x16_range_round" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangeps_Z_Z_Z ~sae:true) ~i args
+    | "caml_avx512dq_float64_range_round_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangesd_X_X_X_K_merge ~sae:true) ~i args
+    | "caml_avx512dq_float64_range_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vrangesd_X_X_Xm64_K_merge ~i args
+    | "caml_avx512dq_float64_range_round_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangesd_X_X_X_K ~sae:true ~z:true) ~i args
+    | "caml_avx512dq_float64_range_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangesd_X_X_Xm64_K ~z:true) ~i args
+    | "caml_avx512dq_float64_range_round" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangesd_X_X_X ~sae:true) ~i args
+    | "caml_avx512dq_float32_range_round_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangess_X_X_X_K_merge ~sae:true) ~i args
+    | "caml_avx512dq_float32_range_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vrangess_X_X_Xm32_K_merge ~i args
+    | "caml_avx512dq_float32_range_round_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangess_X_X_X_K ~sae:true ~z:true) ~i args
+    | "caml_avx512dq_float32_range_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangess_X_X_Xm32_K ~z:true) ~i args
+    | "caml_avx512dq_float32_range_round" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vrangess_X_X_X ~sae:true) ~i args
+    | "caml_avx512dq_float64x8_reduce_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vreducepd_Z_Zm512_K_merge ~i args
+    | "caml_avx512dq_float64x8_reduce_round_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreducepd_Z_Z_K_merge ~sae:true) ~i args
+    | "caml_avx512dq_float64x8_reduce_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreducepd_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512dq_float64x8_reduce_round_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreducepd_Z_Z_K ~sae:true ~z:true) ~i args
+    | "caml_avx512dq_float64x8_reduce" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vreducepd_Z_Zm512 ~i args
+    | "caml_avx512dq_float64x8_reduce_round" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreducepd_Z_Z ~sae:true) ~i args
+    | "caml_avx512dq_float32x16_reduce_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vreduceps_Z_Zm512_K_merge ~i args
+    | "caml_avx512dq_float32x16_reduce_round_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreduceps_Z_Z_K_merge ~sae:true) ~i args
+    | "caml_avx512dq_float32x16_reduce_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreduceps_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512dq_float32x16_reduce_round_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreduceps_Z_Z_K ~sae:true ~z:true) ~i args
+    | "caml_avx512dq_float32x16_reduce" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vreduceps_Z_Zm512 ~i args
+    | "caml_avx512dq_float32x16_reduce_round" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreduceps_Z_Z ~sae:true) ~i args
+    | "caml_avx512dq_float64_reduce_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vreducesd_X_X_Xm64_K_merge ~i args
+    | "caml_avx512dq_float64_reduce_round_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreducesd_X_X_X_K_merge ~sae:true) ~i args
+    | "caml_avx512dq_float64_reduce_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreducesd_X_X_Xm64_K ~z:true) ~i args
+    | "caml_avx512dq_float64_reduce_round_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreducesd_X_X_X_K ~sae:true ~z:true) ~i args
+    | "caml_avx512dq_float64_reduce" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vreducesd_X_X_Xm64 ~i args
+    | "caml_avx512dq_float64_reduce_round" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreducesd_X_X_X ~sae:true) ~i args
+    | "caml_avx512dq_float32_reduce_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vreducess_X_X_Xm32_K_merge ~i args
+    | "caml_avx512dq_float32_reduce_round_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreducess_X_X_X_K_merge ~sae:true) ~i args
+    | "caml_avx512dq_float32_reduce_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreducess_X_X_Xm32_K ~z:true) ~i args
+    | "caml_avx512dq_float32_reduce_round_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreducess_X_X_X_K ~sae:true ~z:true) ~i args
+    | "caml_avx512dq_float32_reduce" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vreducess_X_X_Xm32 ~i args
+    | "caml_avx512dq_float32_reduce_round" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vreducess_X_X_X ~sae:true) ~i args
+    | "caml_avx512dq_cvt_float64x8_int64x8_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtpd2qq_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtpd2qq_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtpd2qq_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtpd2qq_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_float64x8_int64x8" -> instr vcvtpd2qq_Z_Zm512 args
+    | "caml_avx512dq_cvt_float64x8_int64x8_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtpd2qq_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtpd2qq_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtpd2qq_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtpd2qq_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_float64x8_int64x8_mask" ->
+      instr vcvtpd2qq_Z_Zm512_K_merge args
+    | "caml_avx512dq_cvt_float64x8_int64x8_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtpd2qq_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vcvtpd2qq_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vcvtpd2qq_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vcvtpd2qq_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_float64x8_int64x8_maskz" ->
+      instr (vcvtpd2qq_Z_Zm512_K ~z:true) args
+    | "caml_avx512dq_cvt_float64x8_int64x8_unsigned_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtpd2uqq_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtpd2uqq_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtpd2uqq_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtpd2uqq_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_float64x8_int64x8_unsigned" ->
+      instr vcvtpd2uqq_Z_Zm512 args
+    | "caml_avx512dq_cvt_float64x8_int64x8_unsigned_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtpd2uqq_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtpd2uqq_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtpd2uqq_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtpd2uqq_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_float64x8_int64x8_unsigned_mask" ->
+      instr vcvtpd2uqq_Z_Zm512_K_merge args
+    | "caml_avx512dq_cvt_float64x8_int64x8_unsigned_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtpd2uqq_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vcvtpd2uqq_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vcvtpd2uqq_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vcvtpd2uqq_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_float64x8_int64x8_unsigned_maskz" ->
+      instr (vcvtpd2uqq_Z_Zm512_K ~z:true) args
+    | "caml_avx512dq_cvt_float32x8_int64x8_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtps2qq_Z_Y ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtps2qq_Z_Y ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtps2qq_Z_Y ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtps2qq_Z_Y ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_float32x8_int64x8" -> instr vcvtps2qq_Z_Ym256 args
+    | "caml_avx512dq_cvt_float32x8_int64x8_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtps2qq_Z_Y_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtps2qq_Z_Y_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtps2qq_Z_Y_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtps2qq_Z_Y_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_float32x8_int64x8_mask" ->
+      instr vcvtps2qq_Z_Ym256_K_merge args
+    | "caml_avx512dq_cvt_float32x8_int64x8_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtps2qq_Z_Y_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vcvtps2qq_Z_Y_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vcvtps2qq_Z_Y_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vcvtps2qq_Z_Y_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_float32x8_int64x8_maskz" ->
+      instr (vcvtps2qq_Z_Ym256_K ~z:true) args
+    | "caml_avx512dq_cvt_float32x8_int64x8_unsigned_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtps2uqq_Z_Y ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtps2uqq_Z_Y ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtps2uqq_Z_Y ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtps2uqq_Z_Y ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_float32x8_int64x8_unsigned" ->
+      instr vcvtps2uqq_Z_Ym256 args
+    | "caml_avx512dq_cvt_float32x8_int64x8_unsigned_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtps2uqq_Z_Y_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtps2uqq_Z_Y_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtps2uqq_Z_Y_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtps2uqq_Z_Y_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_float32x8_int64x8_unsigned_mask" ->
+      instr vcvtps2uqq_Z_Ym256_K_merge args
+    | "caml_avx512dq_cvt_float32x8_int64x8_unsigned_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtps2uqq_Z_Y_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vcvtps2uqq_Z_Y_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vcvtps2uqq_Z_Y_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vcvtps2uqq_Z_Y_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_float32x8_int64x8_unsigned_maskz" ->
+      instr (vcvtps2uqq_Z_Ym256_K ~z:true) args
+    | "caml_avx512dq_cvt_int64x8_float64x8_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtqq2pd_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtqq2pd_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtqq2pd_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtqq2pd_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_int64x8_float64x8" -> instr vcvtqq2pd_Z_Zm512 args
+    | "caml_avx512dq_cvt_int64x8_float64x8_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtqq2pd_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtqq2pd_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtqq2pd_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtqq2pd_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_int64x8_float64x8_mask" ->
+      instr vcvtqq2pd_Z_Zm512_K_merge args
+    | "caml_avx512dq_cvt_int64x8_float64x8_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtqq2pd_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vcvtqq2pd_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vcvtqq2pd_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vcvtqq2pd_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_int64x8_float64x8_maskz" ->
+      instr (vcvtqq2pd_Z_Zm512_K ~z:true) args
+    | "caml_avx512dq_cvt_int64x8_float32x8_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtqq2ps_Y_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtqq2ps_Y_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtqq2ps_Y_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtqq2ps_Y_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_int64x8_float32x8" -> instr vcvtqq2ps_Y_Zm512 args
+    | "caml_avx512dq_cvt_int64x8_float32x8_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtqq2ps_Y_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtqq2ps_Y_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtqq2ps_Y_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtqq2ps_Y_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_int64x8_float32x8_mask" ->
+      instr vcvtqq2ps_Y_Zm512_K_merge args
+    | "caml_avx512dq_cvt_int64x8_float32x8_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtqq2ps_Y_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vcvtqq2ps_Y_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vcvtqq2ps_Y_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vcvtqq2ps_Y_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_int64x8_float32x8_maskz" ->
+      instr (vcvtqq2ps_Y_Zm512_K ~z:true) args
+    | "caml_avx512dq_cvtt_float64x8_int64x8_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttpd2qq_Z_Z ~sae:true) args
+    | "caml_avx512dq_cvtt_float64x8_int64x8" -> instr vcvttpd2qq_Z_Zm512 args
+    | "caml_avx512dq_cvtt_float64x8_int64x8_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttpd2qq_Z_Z_K_merge ~sae:true) args
+    | "caml_avx512dq_cvtt_float64x8_int64x8_mask" ->
+      instr vcvttpd2qq_Z_Zm512_K_merge args
+    | "caml_avx512dq_cvtt_float64x8_int64x8_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttpd2qq_Z_Z_K ~sae:true ~z:true) args
+    | "caml_avx512dq_cvtt_float64x8_int64x8_maskz" ->
+      instr (vcvttpd2qq_Z_Zm512_K ~z:true) args
+    | "caml_avx512dq_cvtt_float64x8_int64x8_unsigned_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttpd2uqq_Z_Z ~sae:true) args
+    | "caml_avx512dq_cvtt_float64x8_int64x8_unsigned" ->
+      instr vcvttpd2uqq_Z_Zm512 args
+    | "caml_avx512dq_cvtt_float64x8_int64x8_unsigned_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttpd2uqq_Z_Z_K_merge ~sae:true) args
+    | "caml_avx512dq_cvtt_float64x8_int64x8_unsigned_mask" ->
+      instr vcvttpd2uqq_Z_Zm512_K_merge args
+    | "caml_avx512dq_cvtt_float64x8_int64x8_unsigned_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttpd2uqq_Z_Z_K ~sae:true ~z:true) args
+    | "caml_avx512dq_cvtt_float64x8_int64x8_unsigned_maskz" ->
+      instr (vcvttpd2uqq_Z_Zm512_K ~z:true) args
+    | "caml_avx512dq_cvtt_float32x8_int64x8_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttps2qq_Z_Y ~sae:true) args
+    | "caml_avx512dq_cvtt_float32x8_int64x8" -> instr vcvttps2qq_Z_Ym256 args
+    | "caml_avx512dq_cvtt_float32x8_int64x8_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttps2qq_Z_Y_K_merge ~sae:true) args
+    | "caml_avx512dq_cvtt_float32x8_int64x8_mask" ->
+      instr vcvttps2qq_Z_Ym256_K_merge args
+    | "caml_avx512dq_cvtt_float32x8_int64x8_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttps2qq_Z_Y_K ~sae:true ~z:true) args
+    | "caml_avx512dq_cvtt_float32x8_int64x8_maskz" ->
+      instr (vcvttps2qq_Z_Ym256_K ~z:true) args
+    | "caml_avx512dq_cvtt_float32x8_int64x8_unsigned_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttps2uqq_Z_Y ~sae:true) args
+    | "caml_avx512dq_cvtt_float32x8_int64x8_unsigned" ->
+      instr vcvttps2uqq_Z_Ym256 args
+    | "caml_avx512dq_cvtt_float32x8_int64x8_unsigned_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttps2uqq_Z_Y_K_merge ~sae:true) args
+    | "caml_avx512dq_cvtt_float32x8_int64x8_unsigned_mask" ->
+      instr vcvttps2uqq_Z_Ym256_K_merge args
+    | "caml_avx512dq_cvtt_float32x8_int64x8_unsigned_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttps2uqq_Z_Y_K ~sae:true ~z:true) args
+    | "caml_avx512dq_cvtt_float32x8_int64x8_unsigned_maskz" ->
+      instr (vcvttps2uqq_Z_Ym256_K ~z:true) args
+    | "caml_avx512dq_cvt_int64x8_float64x8_unsigned_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtuqq2pd_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtuqq2pd_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtuqq2pd_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtuqq2pd_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_int64x8_float64x8_unsigned" ->
+      instr vcvtuqq2pd_Z_Zm512 args
+    | "caml_avx512dq_cvt_int64x8_float64x8_unsigned_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtuqq2pd_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtuqq2pd_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtuqq2pd_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtuqq2pd_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_int64x8_float64x8_unsigned_mask" ->
+      instr vcvtuqq2pd_Z_Zm512_K_merge args
+    | "caml_avx512dq_cvt_int64x8_float64x8_unsigned_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtuqq2pd_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vcvtuqq2pd_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vcvtuqq2pd_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vcvtuqq2pd_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_int64x8_float64x8_unsigned_maskz" ->
+      instr (vcvtuqq2pd_Z_Zm512_K ~z:true) args
+    | "caml_avx512dq_cvt_int64x8_float32x8_unsigned_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtuqq2ps_Y_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtuqq2ps_Y_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtuqq2ps_Y_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtuqq2ps_Y_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_int64x8_float32x8_unsigned" ->
+      instr vcvtuqq2ps_Y_Zm512 args
+    | "caml_avx512dq_cvt_int64x8_float32x8_unsigned_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtuqq2ps_Y_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtuqq2ps_Y_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtuqq2ps_Y_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtuqq2ps_Y_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_int64x8_float32x8_unsigned_mask" ->
+      instr vcvtuqq2ps_Y_Zm512_K_merge args
+    | "caml_avx512dq_cvt_int64x8_float32x8_unsigned_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtuqq2ps_Y_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vcvtuqq2ps_Y_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vcvtuqq2ps_Y_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vcvtuqq2ps_Y_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512dq_cvt_int64x8_float32x8_unsigned_maskz" ->
+      instr (vcvtuqq2ps_Y_Zm512_K ~z:true) args
+    | "caml_avx512dq_int64x8_mul_low_mask" ->
+      instr vpmullq_Z_Z_Zm512_K_merge args
+    | "caml_avx512dq_int64x8_mul_low_maskz" ->
+      instr (vpmullq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512dq_int64x8_mul_low" -> instr vpmullq_Z_Z_Zm512 args
+    | "caml_avx512dq_mask8_add" -> instr kaddb args
+    | "caml_avx512dq_mask16_add" -> instr kaddw args
+    | "caml_avx512dq_mask8_and" -> instr kandb args
+    | "caml_avx512dq_mask8_andnot" -> instr kandnb args
+    | "caml_avx512dq_mask8_not" -> instr knotb args
+    | "caml_avx512dq_mask8_or" -> instr korb args
+    | "caml_avx512dq_mask8_xnor" -> instr kxnorb args
+    | "caml_avx512dq_mask8_xor" -> instr kxorb args
+    | "caml_avx512dq_mask8_shift_left" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr kshiftlb ~i args
+    | "caml_avx512dq_mask8_shift_right" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr kshiftrb ~i args
+    | "caml_avx512dq_mask8_to_int32" -> instr kmovb_r32_K args
+    | "caml_avx512dq_int32_to_mask8" -> instr kmovb_K_r32 args
+    | "caml_avx512f_float64x4_add_mask" -> instr vaddpd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_add_maskz" ->
+      instr (vaddpd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x2_add_mask" -> instr vaddpd_X_X_Xm128_K_merge args
+    | "caml_avx512f_float64x2_add_maskz" ->
+      instr (vaddpd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_add_mask" -> instr vaddps_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_add_maskz" ->
+      instr (vaddps_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x4_add_mask" -> instr vaddps_X_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_add_maskz" ->
+      instr (vaddps_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x4_div_mask" -> instr vdivpd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_div_maskz" ->
+      instr (vdivpd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x2_div_mask" -> instr vdivpd_X_X_Xm128_K_merge args
+    | "caml_avx512f_float64x2_div_maskz" ->
+      instr (vdivpd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_div_mask" -> instr vdivps_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_div_maskz" ->
+      instr (vdivps_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x4_div_mask" -> instr vdivps_X_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_div_maskz" ->
+      instr (vdivps_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x4_mul_add_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmadd231pd_Y_Y_Ym256_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_mul_add_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmadd132pd_Y_Y_Ym256_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_mul_add_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmadd132pd_Y_Y_Ym256_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_mul_add_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmadd231pd_X_X_Xm128_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_mul_add_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmadd132pd_X_X_Xm128_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_mul_add_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmadd132pd_X_X_Xm128_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_mul_add_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmadd231ps_Y_Y_Ym256_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_mul_add_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmadd132ps_Y_Y_Ym256_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_mul_add_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmadd132ps_Y_Y_Ym256_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_mul_add_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmadd231ps_X_X_Xm128_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_mul_add_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmadd132ps_X_X_Xm128_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_mul_add_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmadd132ps_X_X_Xm128_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_mul_addsub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmaddsub231pd_Y_Y_Ym256_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_mul_addsub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmaddsub132pd_Y_Y_Ym256_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_mul_addsub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmaddsub132pd_Y_Y_Ym256_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_mul_addsub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmaddsub231pd_X_X_Xm128_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_mul_addsub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmaddsub132pd_X_X_Xm128_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_mul_addsub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmaddsub132pd_X_X_Xm128_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_mul_addsub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmaddsub231ps_Y_Y_Ym256_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_mul_addsub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmaddsub132ps_Y_Y_Ym256_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_mul_addsub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmaddsub132ps_Y_Y_Ym256_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_mul_addsub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmaddsub231ps_X_X_Xm128_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_mul_addsub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmaddsub132ps_X_X_Xm128_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_mul_addsub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmaddsub132ps_X_X_Xm128_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_mul_sub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmsub231pd_Y_Y_Ym256_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_mul_sub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsub132pd_Y_Y_Ym256_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_mul_sub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsub132pd_Y_Y_Ym256_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_mul_sub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmsub231pd_X_X_Xm128_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_mul_sub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsub132pd_X_X_Xm128_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_mul_sub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsub132pd_X_X_Xm128_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_mul_sub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmsub231ps_Y_Y_Ym256_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_mul_sub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsub132ps_Y_Y_Ym256_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_mul_sub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsub132ps_Y_Y_Ym256_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_mul_sub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmsub231ps_X_X_Xm128_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_mul_sub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsub132ps_X_X_Xm128_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_mul_sub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsub132ps_X_X_Xm128_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_mul_subadd_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmsubadd231pd_Y_Y_Ym256_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_mul_subadd_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsubadd132pd_Y_Y_Ym256_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_mul_subadd_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsubadd132pd_Y_Y_Ym256_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_mul_subadd_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmsubadd231pd_X_X_Xm128_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_mul_subadd_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsubadd132pd_X_X_Xm128_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_mul_subadd_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsubadd132pd_X_X_Xm128_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_mul_subadd_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmsubadd231ps_Y_Y_Ym256_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_mul_subadd_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsubadd132ps_Y_Y_Ym256_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_mul_subadd_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsubadd132ps_Y_Y_Ym256_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_mul_subadd_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmsubadd231ps_X_X_Xm128_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_mul_subadd_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsubadd132ps_X_X_Xm128_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_mul_subadd_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsubadd132ps_X_X_Xm128_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_neg_mul_add_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfnmadd231pd_Y_Y_Ym256_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_neg_mul_add_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmadd132pd_Y_Y_Ym256_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_neg_mul_add_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmadd132pd_Y_Y_Ym256_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_neg_mul_add_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfnmadd231pd_X_X_Xm128_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_neg_mul_add_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmadd132pd_X_X_Xm128_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_neg_mul_add_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmadd132pd_X_X_Xm128_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_neg_mul_add_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfnmadd231ps_Y_Y_Ym256_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_neg_mul_add_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmadd132ps_Y_Y_Ym256_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_neg_mul_add_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmadd132ps_Y_Y_Ym256_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_neg_mul_add_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfnmadd231ps_X_X_Xm128_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_neg_mul_add_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmadd132ps_X_X_Xm128_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_neg_mul_add_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmadd132ps_X_X_Xm128_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_neg_mul_sub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfnmsub231pd_Y_Y_Ym256_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_neg_mul_sub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmsub132pd_Y_Y_Ym256_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_neg_mul_sub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmsub132pd_Y_Y_Ym256_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_neg_mul_sub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfnmsub231pd_X_X_Xm128_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_neg_mul_sub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmsub132pd_X_X_Xm128_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_neg_mul_sub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmsub132pd_X_X_Xm128_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_neg_mul_sub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfnmsub231ps_Y_Y_Ym256_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_neg_mul_sub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmsub132ps_Y_Y_Ym256_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_neg_mul_sub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmsub132ps_Y_Y_Ym256_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_neg_mul_sub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfnmsub231ps_X_X_Xm128_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_neg_mul_sub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmsub132ps_X_X_Xm128_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_neg_mul_sub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmsub132ps_X_X_Xm128_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_max_mask" -> instr vmaxpd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_max_maskz" ->
+      instr (vmaxpd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x2_max_mask" -> instr vmaxpd_X_X_Xm128_K_merge args
+    | "caml_avx512f_float64x2_max_maskz" ->
+      instr (vmaxpd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_max_mask" -> instr vmaxps_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_max_maskz" ->
+      instr (vmaxps_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x4_max_mask" -> instr vmaxps_X_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_max_maskz" ->
+      instr (vmaxps_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x4_min_mask" -> instr vminpd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_min_maskz" ->
+      instr (vminpd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x2_min_mask" -> instr vminpd_X_X_Xm128_K_merge args
+    | "caml_avx512f_float64x2_min_maskz" ->
+      instr (vminpd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_min_mask" -> instr vminps_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_min_maskz" ->
+      instr (vminps_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x4_min_mask" -> instr vminps_X_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_min_maskz" ->
+      instr (vminps_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x4_mul_mask" -> instr vmulpd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_mul_maskz" ->
+      instr (vmulpd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x2_mul_mask" -> instr vmulpd_X_X_Xm128_K_merge args
+    | "caml_avx512f_float64x2_mul_maskz" ->
+      instr (vmulpd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_mul_mask" -> instr vmulps_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_mul_maskz" ->
+      instr (vmulps_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x4_mul_mask" -> instr vmulps_X_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_mul_maskz" ->
+      instr (vmulps_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_abs_mask" -> instr vpabsd_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_abs_maskz" -> instr (vpabsd_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_abs_mask" -> instr vpabsd_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_abs_maskz" -> instr (vpabsd_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_abs" -> instr vpabsq_Y_Ym256 args
+    | "caml_avx512f_int64x4_abs_mask" -> instr vpabsq_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_abs_maskz" -> instr (vpabsq_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x2_abs" -> instr vpabsq_X_Xm128 args
+    | "caml_avx512f_int64x2_abs_mask" -> instr vpabsq_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_abs_maskz" -> instr (vpabsq_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_add_mask" -> instr vpaddd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_add_maskz" ->
+      instr (vpaddd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_add_mask" -> instr vpaddd_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_add_maskz" ->
+      instr (vpaddd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_add_mask" -> instr vpaddq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_add_maskz" ->
+      instr (vpaddq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x2_add_mask" -> instr vpaddq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_add_maskz" ->
+      instr (vpaddq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_max_mask" -> instr vpmaxsd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_max_maskz" ->
+      instr (vpmaxsd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_max_mask" -> instr vpmaxsd_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_max_maskz" ->
+      instr (vpmaxsd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_max_mask" -> instr vpmaxsq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_max_maskz" ->
+      instr (vpmaxsq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x4_max" -> instr vpmaxsq_Y_Y_Ym256 args
+    | "caml_avx512f_int64x2_max_mask" -> instr vpmaxsq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_max_maskz" ->
+      instr (vpmaxsq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x2_max" -> instr vpmaxsq_X_X_Xm128 args
+    | "caml_avx512f_int32x8_max_unsigned_mask" ->
+      instr vpmaxud_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_max_unsigned_maskz" ->
+      instr (vpmaxud_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_max_unsigned_mask" ->
+      instr vpmaxud_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_max_unsigned_maskz" ->
+      instr (vpmaxud_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_max_unsigned_mask" ->
+      instr vpmaxuq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_max_unsigned_maskz" ->
+      instr (vpmaxuq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x4_max_unsigned" -> instr vpmaxuq_Y_Y_Ym256 args
+    | "caml_avx512f_int64x2_max_unsigned_mask" ->
+      instr vpmaxuq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_max_unsigned_maskz" ->
+      instr (vpmaxuq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x2_max_unsigned" -> instr vpmaxuq_X_X_Xm128 args
+    | "caml_avx512f_int32x8_min_mask" -> instr vpminsd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_min_maskz" ->
+      instr (vpminsd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_min_mask" -> instr vpminsd_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_min_maskz" ->
+      instr (vpminsd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_min_mask" -> instr vpminsq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_min_maskz" ->
+      instr (vpminsq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x4_min" -> instr vpminsq_Y_Y_Ym256 args
+    | "caml_avx512f_int64x2_min_mask" -> instr vpminsq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_min_maskz" ->
+      instr (vpminsq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x2_min" -> instr vpminsq_X_X_Xm128 args
+    | "caml_avx512f_int32x8_min_unsigned_mask" ->
+      instr vpminud_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_min_unsigned_maskz" ->
+      instr (vpminud_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_min_unsigned_mask" ->
+      instr vpminud_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_min_unsigned_maskz" ->
+      instr (vpminud_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_min_unsigned_mask" ->
+      instr vpminuq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_min_unsigned_maskz" ->
+      instr (vpminuq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x4_min_unsigned" -> instr vpminuq_Y_Y_Ym256 args
+    | "caml_avx512f_int64x2_min_unsigned_mask" ->
+      instr vpminuq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_min_unsigned_maskz" ->
+      instr (vpminuq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x2_min_unsigned" -> instr vpminuq_X_X_Xm128 args
+    | "caml_avx512f_int32x8_mul_mask" -> instr vpmuldq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_mul_maskz" ->
+      instr (vpmuldq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_mul_mask" -> instr vpmuldq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_mul_maskz" ->
+      instr (vpmuldq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_mul_low_mask" ->
+      instr vpmulld_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_mul_low_maskz" ->
+      instr (vpmulld_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_mul_low_mask" ->
+      instr vpmulld_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_mul_low_maskz" ->
+      instr (vpmulld_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_mul_unsigned_mask" ->
+      instr vpmuludq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_mul_unsigned_maskz" ->
+      instr (vpmuludq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_mul_unsigned_mask" ->
+      instr vpmuludq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_mul_unsigned_maskz" ->
+      instr (vpmuludq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_sub_mask" -> instr vpsubd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_sub_maskz" ->
+      instr (vpsubd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_sub_mask" -> instr vpsubd_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_sub_maskz" ->
+      instr (vpsubd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_sub_mask" -> instr vpsubq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_sub_maskz" ->
+      instr (vpsubq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x2_sub_mask" -> instr vpsubq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_sub_maskz" ->
+      instr (vpsubq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x4_rcp14_mask" -> instr vrcp14pd_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_rcp14_maskz" ->
+      instr (vrcp14pd_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x4_rcp14" -> instr vrcp14pd_Y_Ym256 args
+    | "caml_avx512f_float64x2_rcp14_mask" -> instr vrcp14pd_X_Xm128_K_merge args
+    | "caml_avx512f_float64x2_rcp14_maskz" ->
+      instr (vrcp14pd_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x2_rcp14" -> instr vrcp14pd_X_Xm128 args
+    | "caml_avx512f_float32x8_rcp14_mask" -> instr vrcp14ps_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_rcp14_maskz" ->
+      instr (vrcp14ps_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x8_rcp14" -> instr vrcp14ps_Y_Ym256 args
+    | "caml_avx512f_float32x4_rcp14_mask" -> instr vrcp14ps_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_rcp14_maskz" ->
+      instr (vrcp14ps_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x4_rcp14" -> instr vrcp14ps_X_Xm128 args
+    | "caml_avx512f_float64x4_rsqrt14" -> instr vrsqrt14pd_Y_Ym256 args
+    | "caml_avx512f_float64x4_rsqrt14_mask" ->
+      instr vrsqrt14pd_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_rsqrt14_maskz" ->
+      instr (vrsqrt14pd_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x2_rsqrt14" -> instr vrsqrt14pd_X_Xm128 args
+    | "caml_avx512f_float64x2_rsqrt14_mask" ->
+      instr vrsqrt14pd_X_Xm128_K_merge args
+    | "caml_avx512f_float64x2_rsqrt14_maskz" ->
+      instr (vrsqrt14pd_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_rsqrt14" -> instr vrsqrt14ps_Y_Ym256 args
+    | "caml_avx512f_float32x8_rsqrt14_mask" ->
+      instr vrsqrt14ps_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_rsqrt14_maskz" ->
+      instr (vrsqrt14ps_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x4_rsqrt14" -> instr vrsqrt14ps_X_Xm128 args
+    | "caml_avx512f_float32x4_rsqrt14_mask" ->
+      instr vrsqrt14ps_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_rsqrt14_maskz" ->
+      instr (vrsqrt14ps_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x4_sub_mask" -> instr vsubpd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_sub_maskz" ->
+      instr (vsubpd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x2_sub_mask" -> instr vsubpd_X_X_Xm128_K_merge args
+    | "caml_avx512f_float64x2_sub_maskz" ->
+      instr (vsubpd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_sub_mask" -> instr vsubps_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_sub_maskz" ->
+      instr (vsubps_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x4_sub_mask" -> instr vsubps_X_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_sub_maskz" ->
+      instr (vsubps_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_align_right" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr valignd_Y_Y_Ym256 ~i args
+    | "caml_avx512f_int32x8_align_right_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr valignd_Y_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_int32x8_align_right_maskz" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr (valignd_Y_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int32x4_align_right" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr valignd_X_X_Xm128 ~i args
+    | "caml_avx512f_int32x4_align_right_mask" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr valignd_X_X_Xm128_K_merge ~i args
+    | "caml_avx512f_int32x4_align_right_maskz" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr (valignd_X_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int64x4_align_right" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr valignq_Y_Y_Ym256 ~i args
+    | "caml_avx512f_int64x4_align_right_mask" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr valignq_Y_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_int64x4_align_right_maskz" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr (valignq_Y_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int64x2_align_right" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr valignq_X_X_Xm128 ~i args
+    | "caml_avx512f_int64x2_align_right_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr valignq_X_X_Xm128_K_merge ~i args
+    | "caml_avx512f_int64x2_align_right_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (valignq_X_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_float64x4_blend" ->
+      instr (vblendmpd_Y_Y_Ym256_K ~z:false) args
+    | "caml_avx512f_float64x2_blend" ->
+      instr (vblendmpd_X_X_Xm128_K ~z:false) args
+    | "caml_avx512f_float32x8_blend" ->
+      instr (vblendmps_Y_Y_Ym256_K ~z:false) args
+    | "caml_avx512f_float32x4_blend" ->
+      instr (vblendmps_X_X_Xm128_K ~z:false) args
+    | "caml_avx512f_float64x4_broadcast_mask" ->
+      instr vbroadcastsd_Y_Xm64_K_merge args
+    | "caml_avx512f_float64x4_broadcast_maskz" ->
+      instr (vbroadcastsd_Y_Xm64_K ~z:true) args
+    | "caml_avx512f_float32x8_broadcast_mask" ->
+      instr vbroadcastss_Y_Xm32_K_merge args
+    | "caml_avx512f_float32x8_broadcast_maskz" ->
+      instr (vbroadcastss_Y_Xm32_K ~z:true) args
+    | "caml_avx512f_float32x4_broadcast_mask" ->
+      instr vbroadcastss_X_Xm32_K_merge args
+    | "caml_avx512f_float32x4_broadcast_maskz" ->
+      instr (vbroadcastss_X_Xm32_K ~z:true) args
+    | "caml_avx512f_float64x4_compress_mask" ->
+      instr vcompresspd_Y_Y_K_merge args
+    | "caml_avx512f_float64x4_compress_maskz" ->
+      instr (vcompresspd_Ym256_Y_K ~z:true) args
+    | "caml_avx512f_float64x2_compress_mask" ->
+      instr vcompresspd_X_X_K_merge args
+    | "caml_avx512f_float64x2_compress_maskz" ->
+      instr (vcompresspd_Xm128_X_K ~z:true) args
+    | "caml_avx512f_float32x8_compress_mask" ->
+      instr vcompressps_Y_Y_K_merge args
+    | "caml_avx512f_float32x8_compress_maskz" ->
+      instr (vcompressps_Ym256_Y_K ~z:true) args
+    | "caml_avx512f_float32x4_compress_mask" ->
+      instr vcompressps_X_X_K_merge args
+    | "caml_avx512f_float32x4_compress_maskz" ->
+      instr (vcompressps_Xm128_X_K ~z:true) args
+    | "caml_avx512f_float64x4_expand_mask" ->
+      instr vexpandpd_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_expand_maskz" ->
+      instr (vexpandpd_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x2_expand_mask" ->
+      instr vexpandpd_X_Xm128_K_merge args
+    | "caml_avx512f_float64x2_expand_maskz" ->
+      instr (vexpandpd_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_expand_mask" ->
+      instr vexpandps_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_expand_maskz" ->
+      instr (vexpandps_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x4_expand_mask" ->
+      instr vexpandps_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_expand_maskz" ->
+      instr (vexpandps_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_extract_float32x4" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextractf32x4_Xm128_Y ~i args
+    | "caml_avx512f_float32x8_extract_float32x4_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextractf32x4_X_Y_K_merge ~i args
+    | "caml_avx512f_float32x8_extract_float32x4_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (vextractf32x4_Xm128_Y_K ~z:true) ~i args
+    | "caml_avx512f_int32x8_extract_int32x4" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextracti32x4_Xm128_Y ~i args
+    | "caml_avx512f_int32x8_extract_int32x4_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextracti32x4_X_Y_K_merge ~i args
+    | "caml_avx512f_int32x8_extract_int32x4_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (vextracti32x4_Xm128_Y_K ~z:true) ~i args
+    | "caml_avx512f_float64x4_fixupimm" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfixupimmpd_Y_Y_Ym256 ~i args
+    | "caml_avx512f_float64x4_fixupimm_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmpd_Y_Y_Ym256_K ~z:false) ~i args
+    | "caml_avx512f_float64x4_fixupimm_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmpd_Y_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_float64x2_fixupimm" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfixupimmpd_X_X_Xm128 ~i args
+    | "caml_avx512f_float64x2_fixupimm_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmpd_X_X_Xm128_K ~z:false) ~i args
+    | "caml_avx512f_float64x2_fixupimm_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmpd_X_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_float32x8_fixupimm" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfixupimmps_Y_Y_Ym256 ~i args
+    | "caml_avx512f_float32x8_fixupimm_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmps_Y_Y_Ym256_K ~z:false) ~i args
+    | "caml_avx512f_float32x8_fixupimm_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmps_Y_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_float32x4_fixupimm" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfixupimmps_X_X_Xm128 ~i args
+    | "caml_avx512f_float32x4_fixupimm_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmps_X_X_Xm128_K ~z:false) ~i args
+    | "caml_avx512f_float32x4_fixupimm_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmps_X_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_float64x4_getexp" -> instr vgetexppd_Y_Ym256 args
+    | "caml_avx512f_float64x4_getexp_mask" ->
+      instr vgetexppd_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_getexp_maskz" ->
+      instr (vgetexppd_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x2_getexp" -> instr vgetexppd_X_Xm128 args
+    | "caml_avx512f_float64x2_getexp_mask" ->
+      instr vgetexppd_X_Xm128_K_merge args
+    | "caml_avx512f_float64x2_getexp_maskz" ->
+      instr (vgetexppd_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_getexp" -> instr vgetexpps_Y_Ym256 args
+    | "caml_avx512f_float32x8_getexp_mask" ->
+      instr vgetexpps_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_getexp_maskz" ->
+      instr (vgetexpps_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x4_getexp" -> instr vgetexpps_X_Xm128 args
+    | "caml_avx512f_float32x4_getexp_mask" ->
+      instr vgetexpps_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_getexp_maskz" ->
+      instr (vgetexpps_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x4_getmant" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vgetmantpd_Y_Ym256 ~i args
+    | "caml_avx512f_float64x4_getmant_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vgetmantpd_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_float64x4_getmant_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantpd_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_float64x2_getmant" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vgetmantpd_X_Xm128 ~i args
+    | "caml_avx512f_float64x2_getmant_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vgetmantpd_X_Xm128_K_merge ~i args
+    | "caml_avx512f_float64x2_getmant_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantpd_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_float32x8_getmant" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vgetmantps_Y_Ym256 ~i args
+    | "caml_avx512f_float32x8_getmant_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vgetmantps_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_float32x8_getmant_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantps_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_float32x4_getmant" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vgetmantps_X_Xm128 ~i args
+    | "caml_avx512f_float32x4_getmant_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vgetmantps_X_Xm128_K_merge ~i args
+    | "caml_avx512f_float32x4_getmant_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantps_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_float32x8_insert_float32x4" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinsertf32x4_Y_Y_Xm128 ~i args
+    | "caml_avx512f_float32x8_insert_float32x4_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinsertf32x4_Y_Y_Xm128_K_merge ~i args
+    | "caml_avx512f_float32x8_insert_float32x4_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (vinsertf32x4_Y_Y_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int32x8_insert_int32x4" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinserti32x4_Y_Y_Xm128 ~i args
+    | "caml_avx512f_int32x8_insert_int32x4_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinserti32x4_Y_Y_Xm128_K_merge ~i args
+    | "caml_avx512f_int32x8_insert_int32x4_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (vinserti32x4_Y_Y_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int32x8_blend" ->
+      instr (vpblendmd_Y_Y_Ym256_K ~z:false) args
+    | "caml_avx512f_int32x4_blend" ->
+      instr (vpblendmd_X_X_Xm128_K ~z:false) args
+    | "caml_avx512f_int64x4_blend" ->
+      instr (vpblendmq_Y_Y_Ym256_K ~z:false) args
+    | "caml_avx512f_int64x2_blend" ->
+      instr (vpblendmq_X_X_Xm128_K ~z:false) args
+    | "caml_avx512f_int32x8_broadcast_mask" ->
+      instr vpbroadcastd_Y_Xm32_K_merge args
+    | "caml_avx512f_int32x8_broadcast_maskz" ->
+      instr (vpbroadcastd_Y_Xm32_K ~z:true) args
+    | "caml_avx512f_int32x4_broadcast_mask" ->
+      instr vpbroadcastd_X_Xm32_K_merge args
+    | "caml_avx512f_int32x4_broadcast_maskz" ->
+      instr (vpbroadcastd_X_Xm32_K ~z:true) args
+    | "caml_avx512f_int64x4_broadcast_mask" ->
+      instr vpbroadcastq_Y_Xm64_K_merge args
+    | "caml_avx512f_int64x4_broadcast_maskz" ->
+      instr (vpbroadcastq_Y_Xm64_K ~z:true) args
+    | "caml_avx512f_int64x2_broadcast_mask" ->
+      instr vpbroadcastq_X_Xm64_K_merge args
+    | "caml_avx512f_int64x2_broadcast_maskz" ->
+      instr (vpbroadcastq_X_Xm64_K ~z:true) args
+    | "caml_avx512f_int32x8_compress_mask" -> instr vpcompressd_Y_Y_K_merge args
+    | "caml_avx512f_int32x8_compress_maskz" ->
+      instr (vpcompressd_Ym256_Y_K ~z:true) args
+    | "caml_avx512f_int32x4_compress_mask" -> instr vpcompressd_X_X_K_merge args
+    | "caml_avx512f_int32x4_compress_maskz" ->
+      instr (vpcompressd_Xm128_X_K ~z:true) args
+    | "caml_avx512f_int64x4_compress_mask" -> instr vpcompressq_Y_Y_K_merge args
+    | "caml_avx512f_int64x4_compress_maskz" ->
+      instr (vpcompressq_Ym256_Y_K ~z:true) args
+    | "caml_avx512f_int64x2_compress_mask" -> instr vpcompressq_X_X_K_merge args
+    | "caml_avx512f_int64x2_compress_maskz" ->
+      instr (vpcompressq_Xm128_X_K ~z:true) args
+    | "caml_avx512f_int32x8_permutexvar_mask" ->
+      instr vpermd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_permutexvar_maskz" ->
+      instr (vpermd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x8_permutexvar" -> instr vpermd_Y_Y_Ym256 args
+    | "caml_avx512f_int32x8_permutex2var_mask2" -> (
+      match args with
+      | a :: b :: rest -> instr (vpermi2d_Y_Y_Ym256_K ~z:false) (b :: a :: rest)
+      | _ -> None)
+    | "caml_avx512f_int32x8_permutex2var_mask" ->
+      instr (vpermt2d_Y_Y_Ym256_K ~z:false) args
+    | "caml_avx512f_int32x8_permutex2var_maskz" ->
+      instr (vpermt2d_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x8_permutex2var" -> instr vpermt2d_Y_Y_Ym256 args
+    | "caml_avx512f_int32x4_permutex2var_mask2" -> (
+      match args with
+      | a :: b :: rest -> instr (vpermi2d_X_X_Xm128_K ~z:false) (b :: a :: rest)
+      | _ -> None)
+    | "caml_avx512f_int32x4_permutex2var_mask" ->
+      instr (vpermt2d_X_X_Xm128_K ~z:false) args
+    | "caml_avx512f_int32x4_permutex2var_maskz" ->
+      instr (vpermt2d_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x4_permutex2var" -> instr vpermt2d_X_X_Xm128 args
+    | "caml_avx512f_float64x4_permutex2var_mask2" -> (
+      match args with
+      | a :: b :: rest -> instr (vpermi2pd_Y_Y_Ym256_K ~z:false) (b :: a :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x4_permutex2var_mask" ->
+      instr (vpermt2pd_Y_Y_Ym256_K ~z:false) args
+    | "caml_avx512f_float64x4_permutex2var_maskz" ->
+      instr (vpermt2pd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x4_permutex2var" -> instr vpermt2pd_Y_Y_Ym256 args
+    | "caml_avx512f_float64x2_permutex2var_mask2" -> (
+      match args with
+      | a :: b :: rest -> instr (vpermi2pd_X_X_Xm128_K ~z:false) (b :: a :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x2_permutex2var_mask" ->
+      instr (vpermt2pd_X_X_Xm128_K ~z:false) args
+    | "caml_avx512f_float64x2_permutex2var_maskz" ->
+      instr (vpermt2pd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x2_permutex2var" -> instr vpermt2pd_X_X_Xm128 args
+    | "caml_avx512f_float32x8_permutex2var_mask2" -> (
+      match args with
+      | a :: b :: rest -> instr (vpermi2ps_Y_Y_Ym256_K ~z:false) (b :: a :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x8_permutex2var_mask" ->
+      instr (vpermt2ps_Y_Y_Ym256_K ~z:false) args
+    | "caml_avx512f_float32x8_permutex2var_maskz" ->
+      instr (vpermt2ps_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x8_permutex2var" -> instr vpermt2ps_Y_Y_Ym256 args
+    | "caml_avx512f_float32x4_permutex2var_mask2" -> (
+      match args with
+      | a :: b :: rest -> instr (vpermi2ps_X_X_Xm128_K ~z:false) (b :: a :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x4_permutex2var_mask" ->
+      instr (vpermt2ps_X_X_Xm128_K ~z:false) args
+    | "caml_avx512f_float32x4_permutex2var_maskz" ->
+      instr (vpermt2ps_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x4_permutex2var" -> instr vpermt2ps_X_X_Xm128 args
+    | "caml_avx512f_int64x4_permutex2var_mask2" -> (
+      match args with
+      | a :: b :: rest -> instr (vpermi2q_Y_Y_Ym256_K ~z:false) (b :: a :: rest)
+      | _ -> None)
+    | "caml_avx512f_int64x4_permutex2var_mask" ->
+      instr (vpermt2q_Y_Y_Ym256_K ~z:false) args
+    | "caml_avx512f_int64x4_permutex2var_maskz" ->
+      instr (vpermt2q_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x4_permutex2var" -> instr vpermt2q_Y_Y_Ym256 args
+    | "caml_avx512f_int64x2_permutex2var_mask2" -> (
+      match args with
+      | a :: b :: rest -> instr (vpermi2q_X_X_Xm128_K ~z:false) (b :: a :: rest)
+      | _ -> None)
+    | "caml_avx512f_int64x2_permutex2var_mask" ->
+      instr (vpermt2q_X_X_Xm128_K ~z:false) args
+    | "caml_avx512f_int64x2_permutex2var_maskz" ->
+      instr (vpermt2q_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x2_permutex2var" -> instr vpermt2q_X_X_Xm128 args
+    | "caml_avx512f_float64x4_permute_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vpermilpd_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_float64x4_permutevar_mask" ->
+      instr vpermilpd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_permute_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vpermilpd_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_float64x4_permutevar_maskz" ->
+      instr (vpermilpd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x2_permute_mask" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vpermilpd_X_Xm128_K_merge ~i args
+    | "caml_avx512f_float64x2_permutevar_mask" ->
+      instr vpermilpd_X_X_Xm128_K_merge args
+    | "caml_avx512f_float64x2_permute_maskz" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr (vpermilpd_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_float64x2_permutevar_maskz" ->
+      instr (vpermilpd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_permute_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermilps_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_float32x8_permutevar_mask" ->
+      instr vpermilps_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_permute_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpermilps_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_float32x8_permutevar_maskz" ->
+      instr (vpermilps_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x4_permute_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermilps_X_Xm128_K_merge ~i args
+    | "caml_avx512f_float32x4_permutevar_mask" ->
+      instr vpermilps_X_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_permute_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpermilps_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_float32x4_permutevar_maskz" ->
+      instr (vpermilps_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x4_permute_across_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermpd_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_float64x4_permutexvar_mask" ->
+      instr vpermpd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_permute_across_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpermpd_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_float64x4_permutexvar_maskz" ->
+      instr (vpermpd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x4_permute_across" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermpd_Y_Ym256 ~i args
+    | "caml_avx512f_float64x4_permutexvar" -> instr vpermpd_Y_Y_Ym256 args
+    | "caml_avx512f_float32x8_permutexvar_mask" ->
+      instr vpermps_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_permutexvar_maskz" ->
+      instr (vpermps_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x8_permutexvar" -> instr vpermps_Y_Y_Ym256 args
+    | "caml_avx512f_int64x4_permute_across_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermq_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_int64x4_permutexvar_mask" ->
+      instr vpermq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_permute_across_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpermq_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int64x4_permutexvar_maskz" ->
+      instr (vpermq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x4_permute_across" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermq_Y_Ym256 ~i args
+    | "caml_avx512f_int64x4_permutexvar" -> instr vpermq_Y_Y_Ym256 args
+    | "caml_avx512f_int32x8_expand_mask" -> instr vpexpandd_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_expand_maskz" ->
+      instr (vpexpandd_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_expand_mask" -> instr vpexpandd_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_expand_maskz" ->
+      instr (vpexpandd_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_expand_mask" -> instr vpexpandq_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_expand_maskz" ->
+      instr (vpexpandq_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x2_expand_mask" -> instr vpexpandq_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_expand_maskz" ->
+      instr (vpexpandq_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_shuffle_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpshufd_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_int32x8_shuffle_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpshufd_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int32x4_shuffle_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpshufd_X_Xm128_K_merge ~i args
+    | "caml_avx512f_int32x4_shuffle_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpshufd_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int32x8_interleave_high_mask" ->
+      instr vpunpckhdq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_interleave_high_maskz" ->
+      instr (vpunpckhdq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_interleave_high_mask" ->
+      instr vpunpckhdq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_interleave_high_maskz" ->
+      instr (vpunpckhdq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_interleave_high_mask" ->
+      instr vpunpckhqdq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_interleave_high_maskz" ->
+      instr (vpunpckhqdq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x2_interleave_high_mask" ->
+      instr vpunpckhqdq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_interleave_high_maskz" ->
+      instr (vpunpckhqdq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_interleave_low_mask" ->
+      instr vpunpckldq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_interleave_low_maskz" ->
+      instr (vpunpckldq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_interleave_low_mask" ->
+      instr vpunpckldq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_interleave_low_maskz" ->
+      instr (vpunpckldq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_interleave_low_mask" ->
+      instr vpunpcklqdq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_interleave_low_maskz" ->
+      instr (vpunpcklqdq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x2_interleave_low_mask" ->
+      instr vpunpcklqdq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_interleave_low_maskz" ->
+      instr (vpunpcklqdq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x4_roundscale_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vrndscalepd_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_float64x4_roundscale_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscalepd_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_float64x4_roundscale" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vrndscalepd_Y_Ym256 ~i args
+    | "caml_avx512f_float64x2_roundscale_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vrndscalepd_X_Xm128_K_merge ~i args
+    | "caml_avx512f_float64x2_roundscale_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscalepd_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_float64x2_roundscale" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vrndscalepd_X_Xm128 ~i args
+    | "caml_avx512f_float32x8_roundscale_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vrndscaleps_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_float32x8_roundscale_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscaleps_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_float32x8_roundscale" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vrndscaleps_Y_Ym256 ~i args
+    | "caml_avx512f_float32x4_roundscale_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vrndscaleps_X_Xm128_K_merge ~i args
+    | "caml_avx512f_float32x4_roundscale_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscaleps_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_float32x4_roundscale" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vrndscaleps_X_Xm128 ~i args
+    | "caml_avx512f_float64x4_scalef_mask" ->
+      instr vscalefpd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_scalef_maskz" ->
+      instr (vscalefpd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x4_scalef" -> instr vscalefpd_Y_Y_Ym256 args
+    | "caml_avx512f_float64x2_scalef_mask" ->
+      instr vscalefpd_X_X_Xm128_K_merge args
+    | "caml_avx512f_float64x2_scalef_maskz" ->
+      instr (vscalefpd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x2_scalef" -> instr vscalefpd_X_X_Xm128 args
+    | "caml_avx512f_float32x8_scalef_mask" ->
+      instr vscalefps_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_scalef_maskz" ->
+      instr (vscalefps_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x8_scalef" -> instr vscalefps_Y_Y_Ym256 args
+    | "caml_avx512f_float32x4_scalef_mask" ->
+      instr vscalefps_X_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_scalef_maskz" ->
+      instr (vscalefps_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x4_scalef" -> instr vscalefps_X_X_Xm128 args
+    | "caml_avx512f_float32x8_shuffle_f32x4_mask" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vshuff32x4_Y_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_float32x8_shuffle_f32x4_maskz" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr (vshuff32x4_Y_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_float32x8_shuffle_f32x4" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vshuff32x4_Y_Y_Ym256 ~i args
+    | "caml_avx512f_float64x4_shuffle_f64x2_mask" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vshuff64x2_Y_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_float64x4_shuffle_f64x2_maskz" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr (vshuff64x2_Y_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_float64x4_shuffle_f64x2" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vshuff64x2_Y_Y_Ym256 ~i args
+    | "caml_avx512f_int32x8_shuffle_i32x4_mask" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vshufi32x4_Y_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_int32x8_shuffle_i32x4_maskz" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr (vshufi32x4_Y_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int32x8_shuffle_i32x4" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vshufi32x4_Y_Y_Ym256 ~i args
+    | "caml_avx512f_int64x4_shuffle_i64x2_mask" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vshufi64x2_Y_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_int64x4_shuffle_i64x2_maskz" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr (vshufi64x2_Y_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int64x4_shuffle_i64x2" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vshufi64x2_Y_Y_Ym256 ~i args
+    | "caml_avx512f_float64x4_shuffle_inlane_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vshufpd_Y_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_float64x4_shuffle_inlane_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vshufpd_Y_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_float64x2_shuffle_inlane_mask" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vshufpd_X_X_Xm128_K_merge ~i args
+    | "caml_avx512f_float64x2_shuffle_inlane_maskz" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr (vshufpd_X_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_float32x8_shuffle_inlane_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vshufps_Y_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_float32x8_shuffle_inlane_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vshufps_Y_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_float32x4_shuffle_inlane_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vshufps_X_X_Xm128_K_merge ~i args
+    | "caml_avx512f_float32x4_shuffle_inlane_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vshufps_X_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_float64x4_interleave_high_mask" ->
+      instr vunpckhpd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_interleave_high_maskz" ->
+      instr (vunpckhpd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x2_interleave_high_mask" ->
+      instr vunpckhpd_X_X_Xm128_K_merge args
+    | "caml_avx512f_float64x2_interleave_high_maskz" ->
+      instr (vunpckhpd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_interleave_high_mask" ->
+      instr vunpckhps_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_interleave_high_maskz" ->
+      instr (vunpckhps_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x4_interleave_high_mask" ->
+      instr vunpckhps_X_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_interleave_high_maskz" ->
+      instr (vunpckhps_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x4_interleave_low_mask" ->
+      instr vunpcklpd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_interleave_low_maskz" ->
+      instr (vunpcklpd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x2_interleave_low_mask" ->
+      instr vunpcklpd_X_X_Xm128_K_merge args
+    | "caml_avx512f_float64x2_interleave_low_maskz" ->
+      instr (vunpcklpd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_interleave_low_mask" ->
+      instr vunpcklps_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_interleave_low_maskz" ->
+      instr (vunpcklps_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x4_interleave_low_mask" ->
+      instr vunpcklps_X_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_interleave_low_maskz" ->
+      instr (vunpcklps_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x4_cmp" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmppd_K_Y_Ym256 ~i args
+    | "caml_avx512f_float64x4_cmp_mask" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmppd_K_Y_Ym256_K ~i args
+    | "caml_avx512f_float64x2_cmp" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmppd_K_X_Xm128 ~i args
+    | "caml_avx512f_float64x2_cmp_mask" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmppd_K_X_Xm128_K ~i args
+    | "caml_avx512f_float32x8_cmp" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmpps_K_Y_Ym256 ~i args
+    | "caml_avx512f_float32x8_cmp_mask" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmpps_K_Y_Ym256_K ~i args
+    | "caml_avx512f_float32x4_cmp" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmpps_K_X_Xm128 ~i args
+    | "caml_avx512f_float32x4_cmp_mask" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmpps_K_X_Xm128_K ~i args
+    | "caml_avx512f_int32x8_cmp" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpd_K_Y_Ym256 ~i args
+    | "caml_avx512f_int32x8_cmpeq" -> instr vpcmpd_K_Y_Ym256 ~i:0 args
+    | "caml_avx512f_int32x8_cmpge" -> instr vpcmpd_K_Y_Ym256 ~i:5 args
+    | "caml_avx512f_int32x8_cmpgt" -> instr vpcmpd_K_Y_Ym256 ~i:6 args
+    | "caml_avx512f_int32x8_cmple" -> instr vpcmpd_K_Y_Ym256 ~i:2 args
+    | "caml_avx512f_int32x8_cmplt" -> instr vpcmpd_K_Y_Ym256 ~i:1 args
+    | "caml_avx512f_int32x8_cmpneq" -> instr vpcmpd_K_Y_Ym256 ~i:4 args
+    | "caml_avx512f_int32x8_cmp_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpd_K_Y_Ym256_K ~i args
+    | "caml_avx512f_int32x8_cmpeq_mask" -> instr vpcmpd_K_Y_Ym256_K ~i:0 args
+    | "caml_avx512f_int32x8_cmpge_mask" -> instr vpcmpd_K_Y_Ym256_K ~i:5 args
+    | "caml_avx512f_int32x8_cmpgt_mask" -> instr vpcmpd_K_Y_Ym256_K ~i:6 args
+    | "caml_avx512f_int32x8_cmple_mask" -> instr vpcmpd_K_Y_Ym256_K ~i:2 args
+    | "caml_avx512f_int32x8_cmplt_mask" -> instr vpcmpd_K_Y_Ym256_K ~i:1 args
+    | "caml_avx512f_int32x8_cmpneq_mask" -> instr vpcmpd_K_Y_Ym256_K ~i:4 args
+    | "caml_avx512f_int32x4_cmp" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpd_K_X_Xm128 ~i args
+    | "caml_avx512f_int32x4_cmpeq" -> instr vpcmpd_K_X_Xm128 ~i:0 args
+    | "caml_avx512f_int32x4_cmpge" -> instr vpcmpd_K_X_Xm128 ~i:5 args
+    | "caml_avx512f_int32x4_cmpgt" -> instr vpcmpd_K_X_Xm128 ~i:6 args
+    | "caml_avx512f_int32x4_cmple" -> instr vpcmpd_K_X_Xm128 ~i:2 args
+    | "caml_avx512f_int32x4_cmplt" -> instr vpcmpd_K_X_Xm128 ~i:1 args
+    | "caml_avx512f_int32x4_cmpneq" -> instr vpcmpd_K_X_Xm128 ~i:4 args
+    | "caml_avx512f_int32x4_cmp_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpd_K_X_Xm128_K ~i args
+    | "caml_avx512f_int32x4_cmpeq_mask" -> instr vpcmpd_K_X_Xm128_K ~i:0 args
+    | "caml_avx512f_int32x4_cmpge_mask" -> instr vpcmpd_K_X_Xm128_K ~i:5 args
+    | "caml_avx512f_int32x4_cmpgt_mask" -> instr vpcmpd_K_X_Xm128_K ~i:6 args
+    | "caml_avx512f_int32x4_cmple_mask" -> instr vpcmpd_K_X_Xm128_K ~i:2 args
+    | "caml_avx512f_int32x4_cmplt_mask" -> instr vpcmpd_K_X_Xm128_K ~i:1 args
+    | "caml_avx512f_int32x4_cmpneq_mask" -> instr vpcmpd_K_X_Xm128_K ~i:4 args
+    | "caml_avx512f_int64x4_cmp" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpq_K_Y_Ym256 ~i args
+    | "caml_avx512f_int64x4_cmpeq" -> instr vpcmpq_K_Y_Ym256 ~i:0 args
+    | "caml_avx512f_int64x4_cmpge" -> instr vpcmpq_K_Y_Ym256 ~i:5 args
+    | "caml_avx512f_int64x4_cmpgt" -> instr vpcmpq_K_Y_Ym256 ~i:6 args
+    | "caml_avx512f_int64x4_cmple" -> instr vpcmpq_K_Y_Ym256 ~i:2 args
+    | "caml_avx512f_int64x4_cmplt" -> instr vpcmpq_K_Y_Ym256 ~i:1 args
+    | "caml_avx512f_int64x4_cmpneq" -> instr vpcmpq_K_Y_Ym256 ~i:4 args
+    | "caml_avx512f_int64x4_cmp_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpq_K_Y_Ym256_K ~i args
+    | "caml_avx512f_int64x4_cmpeq_mask" -> instr vpcmpq_K_Y_Ym256_K ~i:0 args
+    | "caml_avx512f_int64x4_cmpge_mask" -> instr vpcmpq_K_Y_Ym256_K ~i:5 args
+    | "caml_avx512f_int64x4_cmpgt_mask" -> instr vpcmpq_K_Y_Ym256_K ~i:6 args
+    | "caml_avx512f_int64x4_cmple_mask" -> instr vpcmpq_K_Y_Ym256_K ~i:2 args
+    | "caml_avx512f_int64x4_cmplt_mask" -> instr vpcmpq_K_Y_Ym256_K ~i:1 args
+    | "caml_avx512f_int64x4_cmpneq_mask" -> instr vpcmpq_K_Y_Ym256_K ~i:4 args
+    | "caml_avx512f_int64x2_cmp" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpq_K_X_Xm128 ~i args
+    | "caml_avx512f_int64x2_cmpeq" -> instr vpcmpq_K_X_Xm128 ~i:0 args
+    | "caml_avx512f_int64x2_cmpge" -> instr vpcmpq_K_X_Xm128 ~i:5 args
+    | "caml_avx512f_int64x2_cmpgt" -> instr vpcmpq_K_X_Xm128 ~i:6 args
+    | "caml_avx512f_int64x2_cmple" -> instr vpcmpq_K_X_Xm128 ~i:2 args
+    | "caml_avx512f_int64x2_cmplt" -> instr vpcmpq_K_X_Xm128 ~i:1 args
+    | "caml_avx512f_int64x2_cmpneq" -> instr vpcmpq_K_X_Xm128 ~i:4 args
+    | "caml_avx512f_int64x2_cmp_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpq_K_X_Xm128_K ~i args
+    | "caml_avx512f_int64x2_cmpeq_mask" -> instr vpcmpq_K_X_Xm128_K ~i:0 args
+    | "caml_avx512f_int64x2_cmpge_mask" -> instr vpcmpq_K_X_Xm128_K ~i:5 args
+    | "caml_avx512f_int64x2_cmpgt_mask" -> instr vpcmpq_K_X_Xm128_K ~i:6 args
+    | "caml_avx512f_int64x2_cmple_mask" -> instr vpcmpq_K_X_Xm128_K ~i:2 args
+    | "caml_avx512f_int64x2_cmplt_mask" -> instr vpcmpq_K_X_Xm128_K ~i:1 args
+    | "caml_avx512f_int64x2_cmpneq_mask" -> instr vpcmpq_K_X_Xm128_K ~i:4 args
+    | "caml_avx512f_int32x8_cmp_unsigned" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpud_K_Y_Ym256 ~i args
+    | "caml_avx512f_int32x8_cmpeq_unsigned" -> instr vpcmpud_K_Y_Ym256 ~i:0 args
+    | "caml_avx512f_int32x8_cmpge_unsigned" -> instr vpcmpud_K_Y_Ym256 ~i:5 args
+    | "caml_avx512f_int32x8_cmpgt_unsigned" -> instr vpcmpud_K_Y_Ym256 ~i:6 args
+    | "caml_avx512f_int32x8_cmple_unsigned" -> instr vpcmpud_K_Y_Ym256 ~i:2 args
+    | "caml_avx512f_int32x8_cmplt_unsigned" -> instr vpcmpud_K_Y_Ym256 ~i:1 args
+    | "caml_avx512f_int32x8_cmpneq_unsigned" ->
+      instr vpcmpud_K_Y_Ym256 ~i:4 args
+    | "caml_avx512f_int32x8_cmp_unsigned_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpud_K_Y_Ym256_K ~i args
+    | "caml_avx512f_int32x8_cmpeq_unsigned_mask" ->
+      instr vpcmpud_K_Y_Ym256_K ~i:0 args
+    | "caml_avx512f_int32x8_cmpge_unsigned_mask" ->
+      instr vpcmpud_K_Y_Ym256_K ~i:5 args
+    | "caml_avx512f_int32x8_cmpgt_unsigned_mask" ->
+      instr vpcmpud_K_Y_Ym256_K ~i:6 args
+    | "caml_avx512f_int32x8_cmple_unsigned_mask" ->
+      instr vpcmpud_K_Y_Ym256_K ~i:2 args
+    | "caml_avx512f_int32x8_cmplt_unsigned_mask" ->
+      instr vpcmpud_K_Y_Ym256_K ~i:1 args
+    | "caml_avx512f_int32x8_cmpneq_unsigned_mask" ->
+      instr vpcmpud_K_Y_Ym256_K ~i:4 args
+    | "caml_avx512f_int32x4_cmp_unsigned" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpud_K_X_Xm128 ~i args
+    | "caml_avx512f_int32x4_cmpeq_unsigned" -> instr vpcmpud_K_X_Xm128 ~i:0 args
+    | "caml_avx512f_int32x4_cmpge_unsigned" -> instr vpcmpud_K_X_Xm128 ~i:5 args
+    | "caml_avx512f_int32x4_cmpgt_unsigned" -> instr vpcmpud_K_X_Xm128 ~i:6 args
+    | "caml_avx512f_int32x4_cmple_unsigned" -> instr vpcmpud_K_X_Xm128 ~i:2 args
+    | "caml_avx512f_int32x4_cmplt_unsigned" -> instr vpcmpud_K_X_Xm128 ~i:1 args
+    | "caml_avx512f_int32x4_cmpneq_unsigned" ->
+      instr vpcmpud_K_X_Xm128 ~i:4 args
+    | "caml_avx512f_int32x4_cmp_unsigned_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpud_K_X_Xm128_K ~i args
+    | "caml_avx512f_int32x4_cmpeq_unsigned_mask" ->
+      instr vpcmpud_K_X_Xm128_K ~i:0 args
+    | "caml_avx512f_int32x4_cmpge_unsigned_mask" ->
+      instr vpcmpud_K_X_Xm128_K ~i:5 args
+    | "caml_avx512f_int32x4_cmpgt_unsigned_mask" ->
+      instr vpcmpud_K_X_Xm128_K ~i:6 args
+    | "caml_avx512f_int32x4_cmple_unsigned_mask" ->
+      instr vpcmpud_K_X_Xm128_K ~i:2 args
+    | "caml_avx512f_int32x4_cmplt_unsigned_mask" ->
+      instr vpcmpud_K_X_Xm128_K ~i:1 args
+    | "caml_avx512f_int32x4_cmpneq_unsigned_mask" ->
+      instr vpcmpud_K_X_Xm128_K ~i:4 args
+    | "caml_avx512f_int64x4_cmp_unsigned" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpuq_K_Y_Ym256 ~i args
+    | "caml_avx512f_int64x4_cmpeq_unsigned" -> instr vpcmpuq_K_Y_Ym256 ~i:0 args
+    | "caml_avx512f_int64x4_cmpge_unsigned" -> instr vpcmpuq_K_Y_Ym256 ~i:5 args
+    | "caml_avx512f_int64x4_cmpgt_unsigned" -> instr vpcmpuq_K_Y_Ym256 ~i:6 args
+    | "caml_avx512f_int64x4_cmple_unsigned" -> instr vpcmpuq_K_Y_Ym256 ~i:2 args
+    | "caml_avx512f_int64x4_cmplt_unsigned" -> instr vpcmpuq_K_Y_Ym256 ~i:1 args
+    | "caml_avx512f_int64x4_cmpneq_unsigned" ->
+      instr vpcmpuq_K_Y_Ym256 ~i:4 args
+    | "caml_avx512f_int64x4_cmp_unsigned_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpuq_K_Y_Ym256_K ~i args
+    | "caml_avx512f_int64x4_cmpeq_unsigned_mask" ->
+      instr vpcmpuq_K_Y_Ym256_K ~i:0 args
+    | "caml_avx512f_int64x4_cmpge_unsigned_mask" ->
+      instr vpcmpuq_K_Y_Ym256_K ~i:5 args
+    | "caml_avx512f_int64x4_cmpgt_unsigned_mask" ->
+      instr vpcmpuq_K_Y_Ym256_K ~i:6 args
+    | "caml_avx512f_int64x4_cmple_unsigned_mask" ->
+      instr vpcmpuq_K_Y_Ym256_K ~i:2 args
+    | "caml_avx512f_int64x4_cmplt_unsigned_mask" ->
+      instr vpcmpuq_K_Y_Ym256_K ~i:1 args
+    | "caml_avx512f_int64x4_cmpneq_unsigned_mask" ->
+      instr vpcmpuq_K_Y_Ym256_K ~i:4 args
+    | "caml_avx512f_int64x2_cmp_unsigned" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpuq_K_X_Xm128 ~i args
+    | "caml_avx512f_int64x2_cmpeq_unsigned" -> instr vpcmpuq_K_X_Xm128 ~i:0 args
+    | "caml_avx512f_int64x2_cmpge_unsigned" -> instr vpcmpuq_K_X_Xm128 ~i:5 args
+    | "caml_avx512f_int64x2_cmpgt_unsigned" -> instr vpcmpuq_K_X_Xm128 ~i:6 args
+    | "caml_avx512f_int64x2_cmple_unsigned" -> instr vpcmpuq_K_X_Xm128 ~i:2 args
+    | "caml_avx512f_int64x2_cmplt_unsigned" -> instr vpcmpuq_K_X_Xm128 ~i:1 args
+    | "caml_avx512f_int64x2_cmpneq_unsigned" ->
+      instr vpcmpuq_K_X_Xm128 ~i:4 args
+    | "caml_avx512f_int64x2_cmp_unsigned_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpuq_K_X_Xm128_K ~i args
+    | "caml_avx512f_int64x2_cmpeq_unsigned_mask" ->
+      instr vpcmpuq_K_X_Xm128_K ~i:0 args
+    | "caml_avx512f_int64x2_cmpge_unsigned_mask" ->
+      instr vpcmpuq_K_X_Xm128_K ~i:5 args
+    | "caml_avx512f_int64x2_cmpgt_unsigned_mask" ->
+      instr vpcmpuq_K_X_Xm128_K ~i:6 args
+    | "caml_avx512f_int64x2_cmple_unsigned_mask" ->
+      instr vpcmpuq_K_X_Xm128_K ~i:2 args
+    | "caml_avx512f_int64x2_cmplt_unsigned_mask" ->
+      instr vpcmpuq_K_X_Xm128_K ~i:1 args
+    | "caml_avx512f_int64x2_cmpneq_unsigned_mask" ->
+      instr vpcmpuq_K_X_Xm128_K ~i:4 args
+    | "caml_avx512f_int32x8_test_mask" -> instr vptestmd_K_Y_Ym256_K args
+    | "caml_avx512f_int32x8_test" -> instr vptestmd_K_Y_Ym256 args
+    | "caml_avx512f_int32x4_test_mask" -> instr vptestmd_K_X_Xm128_K args
+    | "caml_avx512f_int32x4_test" -> instr vptestmd_K_X_Xm128 args
+    | "caml_avx512f_int64x4_test_mask" -> instr vptestmq_K_Y_Ym256_K args
+    | "caml_avx512f_int64x4_test" -> instr vptestmq_K_Y_Ym256 args
+    | "caml_avx512f_int64x2_test_mask" -> instr vptestmq_K_X_Xm128_K args
+    | "caml_avx512f_int64x2_test" -> instr vptestmq_K_X_Xm128 args
+    | "caml_avx512f_int32x8_testn_mask" -> instr vptestnmd_K_Y_Ym256_K args
+    | "caml_avx512f_int32x8_testn" -> instr vptestnmd_K_Y_Ym256 args
+    | "caml_avx512f_int32x4_testn_mask" -> instr vptestnmd_K_X_Xm128_K args
+    | "caml_avx512f_int32x4_testn" -> instr vptestnmd_K_X_Xm128 args
+    | "caml_avx512f_int64x4_testn_mask" -> instr vptestnmq_K_Y_Ym256_K args
+    | "caml_avx512f_int64x4_testn" -> instr vptestnmq_K_Y_Ym256 args
+    | "caml_avx512f_int64x2_testn_mask" -> instr vptestnmq_K_X_Xm128_K args
+    | "caml_avx512f_int64x2_testn" -> instr vptestnmq_K_X_Xm128 args
+    | "caml_avx512f_cvt_int32x4_float64x4_mask" ->
+      instr vcvtdq2pd_Y_Xm128_K_merge args
+    | "caml_avx512f_cvt_int32x4_float64x4_maskz" ->
+      instr (vcvtdq2pd_Y_Xm128_K ~z:true) args
+    | "caml_avx512f_cvt_int32x4_float64x2_mask" ->
+      instr vcvtdq2pd_X_Xm128_K_merge args
+    | "caml_avx512f_cvt_int32x4_float64x2_maskz" ->
+      instr (vcvtdq2pd_X_Xm128_K ~z:true) args
+    | "caml_avx512f_cvt_int32x8_float32x8_mask" ->
+      instr vcvtdq2ps_Y_Ym256_K_merge args
+    | "caml_avx512f_cvt_int32x8_float32x8_maskz" ->
+      instr (vcvtdq2ps_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_cvt_int32x4_float32x4_mask" ->
+      instr vcvtdq2ps_X_Xm128_K_merge args
+    | "caml_avx512f_cvt_int32x4_float32x4_maskz" ->
+      instr (vcvtdq2ps_X_Xm128_K ~z:true) args
+    | "caml_avx512f_cvt_float64x4_int32x4_mask" ->
+      instr vcvtpd2dq_X_Ym256_K_merge args
+    | "caml_avx512f_cvt_float64x4_int32x4_maskz" ->
+      instr (vcvtpd2dq_X_Ym256_K ~z:true) args
+    | "caml_avx512f_cvt_float64x4_float32x4_mask" ->
+      instr vcvtpd2ps_X_Ym256_K_merge args
+    | "caml_avx512f_cvt_float64x4_float32x4_maskz" ->
+      instr (vcvtpd2ps_X_Ym256_K ~z:true) args
+    | "caml_avx512f_cvt_float64x4_int32x4_unsigned" ->
+      instr vcvtpd2udq_X_Ym256 args
+    | "caml_avx512f_cvt_float64x4_int32x4_unsigned_mask" ->
+      instr vcvtpd2udq_X_Ym256_K_merge args
+    | "caml_avx512f_cvt_float64x4_int32x4_unsigned_maskz" ->
+      instr (vcvtpd2udq_X_Ym256_K ~z:true) args
+    | "caml_avx512f_cvt_float32x8_int32x8_mask" ->
+      instr vcvtps2dq_Y_Ym256_K_merge args
+    | "caml_avx512f_cvt_float32x8_int32x8_maskz" ->
+      instr (vcvtps2dq_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_cvt_float32x4_int32x4_mask" ->
+      instr vcvtps2dq_X_Xm128_K_merge args
+    | "caml_avx512f_cvt_float32x4_int32x4_maskz" ->
+      instr (vcvtps2dq_X_Xm128_K ~z:true) args
+    | "caml_avx512f_cvt_float32x8_int32x8_unsigned" ->
+      instr vcvtps2udq_Y_Ym256 args
+    | "caml_avx512f_cvt_float32x8_int32x8_unsigned_mask" ->
+      instr vcvtps2udq_Y_Ym256_K_merge args
+    | "caml_avx512f_cvt_float32x8_int32x8_unsigned_maskz" ->
+      instr (vcvtps2udq_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_cvt_float32x4_int32x4_unsigned" ->
+      instr vcvtps2udq_X_Xm128 args
+    | "caml_avx512f_cvt_float32x4_int32x4_unsigned_mask" ->
+      instr vcvtps2udq_X_Xm128_K_merge args
+    | "caml_avx512f_cvt_float32x4_int32x4_unsigned_maskz" ->
+      instr (vcvtps2udq_X_Xm128_K ~z:true) args
+    | "caml_avx512f_cvtt_float64x4_int32x4_mask" ->
+      instr vcvttpd2dq_X_Ym256_K_merge args
+    | "caml_avx512f_cvtt_float64x4_int32x4_maskz" ->
+      instr (vcvttpd2dq_X_Ym256_K ~z:true) args
+    | "caml_avx512f_cvtt_float64x4_int32x4_unsigned" ->
+      instr vcvttpd2udq_X_Ym256 args
+    | "caml_avx512f_cvtt_float64x4_int32x4_unsigned_mask" ->
+      instr vcvttpd2udq_X_Ym256_K_merge args
+    | "caml_avx512f_cvtt_float64x4_int32x4_unsigned_maskz" ->
+      instr (vcvttpd2udq_X_Ym256_K ~z:true) args
+    | "caml_avx512f_cvtt_float32x8_int32x8_mask" ->
+      instr vcvttps2dq_Y_Ym256_K_merge args
+    | "caml_avx512f_cvtt_float32x8_int32x8_maskz" ->
+      instr (vcvttps2dq_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_cvtt_float32x4_int32x4_mask" ->
+      instr vcvttps2dq_X_Xm128_K_merge args
+    | "caml_avx512f_cvtt_float32x4_int32x4_maskz" ->
+      instr (vcvttps2dq_X_Xm128_K ~z:true) args
+    | "caml_avx512f_cvtt_float32x8_int32x8_unsigned" ->
+      instr vcvttps2udq_Y_Ym256 args
+    | "caml_avx512f_cvtt_float32x8_int32x8_unsigned_mask" ->
+      instr vcvttps2udq_Y_Ym256_K_merge args
+    | "caml_avx512f_cvtt_float32x8_int32x8_unsigned_maskz" ->
+      instr (vcvttps2udq_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_cvtt_float32x4_int32x4_unsigned" ->
+      instr vcvttps2udq_X_Xm128 args
+    | "caml_avx512f_cvtt_float32x4_int32x4_unsigned_mask" ->
+      instr vcvttps2udq_X_Xm128_K_merge args
+    | "caml_avx512f_cvtt_float32x4_int32x4_unsigned_maskz" ->
+      instr (vcvttps2udq_X_Xm128_K ~z:true) args
+    | "caml_avx512f_cvt_int32x4_float64x4_unsigned" ->
+      instr vcvtudq2pd_Y_Xm128 args
+    | "caml_avx512f_cvt_int32x4_float64x4_unsigned_mask" ->
+      instr vcvtudq2pd_Y_Xm128_K_merge args
+    | "caml_avx512f_cvt_int32x4_float64x4_unsigned_maskz" ->
+      instr (vcvtudq2pd_Y_Xm128_K ~z:true) args
+    | "caml_avx512f_cvt_int32x4_float64x2_unsigned" ->
+      instr vcvtudq2pd_X_Xm64 args
+    | "caml_avx512f_cvt_int32x4_float64x2_unsigned_mask" ->
+      instr vcvtudq2pd_X_Xm64_K_merge args
+    | "caml_avx512f_cvt_int32x4_float64x2_unsigned_maskz" ->
+      instr (vcvtudq2pd_X_Xm64_K ~z:true) args
+    | "caml_avx512f_cvt_int32x8_int16x8" -> instr vpmovdw_Xm128_Y args
+    | "caml_avx512f_cvt_int32x8_int16x8_mask" -> instr vpmovdw_X_Y_K_merge args
+    | "caml_avx512f_cvt_int32x8_int16x8_maskz" ->
+      instr (vpmovdw_Xm128_Y_K ~z:true) args
+    | "caml_avx512f_cvt_int64x4_int32x4" -> instr vpmovqd_Xm128_Y args
+    | "caml_avx512f_cvt_int64x4_int32x4_mask" -> instr vpmovqd_X_Y_K_merge args
+    | "caml_avx512f_cvt_int64x4_int32x4_maskz" ->
+      instr (vpmovqd_Xm128_Y_K ~z:true) args
+    | "caml_avx512f_cvt_int32x8_int16x8_saturating" ->
+      instr vpmovsdw_Xm128_Y args
+    | "caml_avx512f_cvt_int32x8_int16x8_saturating_mask" ->
+      instr vpmovsdw_X_Y_K_merge args
+    | "caml_avx512f_cvt_int32x8_int16x8_saturating_maskz" ->
+      instr (vpmovsdw_Xm128_Y_K ~z:true) args
+    | "caml_avx512f_cvt_int64x4_int32x4_saturating" ->
+      instr vpmovsqd_Xm128_Y args
+    | "caml_avx512f_cvt_int64x4_int32x4_saturating_mask" ->
+      instr vpmovsqd_X_Y_K_merge args
+    | "caml_avx512f_cvt_int64x4_int32x4_saturating_maskz" ->
+      instr (vpmovsqd_Xm128_Y_K ~z:true) args
+    | "caml_avx512f_cvtsx_int8x16_int32x8_mask" ->
+      instr vpmovsxbd_Y_Xm64_K_merge args
+    | "caml_avx512f_cvtsx_int8x16_int32x8_maskz" ->
+      instr (vpmovsxbd_Y_Xm64_K ~z:true) args
+    | "caml_avx512f_cvtsx_int8x16_int32x4_mask" ->
+      instr vpmovsxbd_X_Xm32_K_merge args
+    | "caml_avx512f_cvtsx_int8x16_int32x4_maskz" ->
+      instr (vpmovsxbd_X_Xm32_K ~z:true) args
+    | "caml_avx512f_cvtsx_int8x16_int64x4_mask" ->
+      instr vpmovsxbq_Y_Xm32_K_merge args
+    | "caml_avx512f_cvtsx_int8x16_int64x4_maskz" ->
+      instr (vpmovsxbq_Y_Xm32_K ~z:true) args
+    | "caml_avx512f_cvtsx_int8x16_int64x2_mask" ->
+      instr vpmovsxbq_X_Xm16_K_merge args
+    | "caml_avx512f_cvtsx_int8x16_int64x2_maskz" ->
+      instr (vpmovsxbq_X_Xm16_K ~z:true) args
+    | "caml_avx512f_cvtsx_int32x4_int64x4_mask" ->
+      instr vpmovsxdq_Y_Xm128_K_merge args
+    | "caml_avx512f_cvtsx_int32x4_int64x4_maskz" ->
+      instr (vpmovsxdq_Y_Xm128_K ~z:true) args
+    | "caml_avx512f_cvtsx_int32x4_int64x2_mask" ->
+      instr vpmovsxdq_X_Xm64_K_merge args
+    | "caml_avx512f_cvtsx_int32x4_int64x2_maskz" ->
+      instr (vpmovsxdq_X_Xm64_K ~z:true) args
+    | "caml_avx512f_cvtsx_int16x8_int32x8_mask" ->
+      instr vpmovsxwd_Y_Xm128_K_merge args
+    | "caml_avx512f_cvtsx_int16x8_int32x8_maskz" ->
+      instr (vpmovsxwd_Y_Xm128_K ~z:true) args
+    | "caml_avx512f_cvtsx_int16x8_int32x4_mask" ->
+      instr vpmovsxwd_X_Xm64_K_merge args
+    | "caml_avx512f_cvtsx_int16x8_int32x4_maskz" ->
+      instr (vpmovsxwd_X_Xm64_K ~z:true) args
+    | "caml_avx512f_cvtsx_int16x8_int64x4_mask" ->
+      instr vpmovsxwq_Y_Xm64_K_merge args
+    | "caml_avx512f_cvtsx_int16x8_int64x4_maskz" ->
+      instr (vpmovsxwq_Y_Xm64_K ~z:true) args
+    | "caml_avx512f_cvtsx_int16x8_int64x2_mask" ->
+      instr vpmovsxwq_X_Xm32_K_merge args
+    | "caml_avx512f_cvtsx_int16x8_int64x2_maskz" ->
+      instr (vpmovsxwq_X_Xm32_K ~z:true) args
+    | "caml_avx512f_cvt_int32x8_int16x8_saturating_unsigned" ->
+      instr vpmovusdw_Xm128_Y args
+    | "caml_avx512f_cvt_int32x8_int16x8_saturating_unsigned_mask" ->
+      instr vpmovusdw_X_Y_K_merge args
+    | "caml_avx512f_cvt_int32x8_int16x8_saturating_unsigned_maskz" ->
+      instr (vpmovusdw_Xm128_Y_K ~z:true) args
+    | "caml_avx512f_cvt_int64x4_int32x4_saturating_unsigned" ->
+      instr vpmovusqd_Xm128_Y args
+    | "caml_avx512f_cvt_int64x4_int32x4_saturating_unsigned_mask" ->
+      instr vpmovusqd_X_Y_K_merge args
+    | "caml_avx512f_cvt_int64x4_int32x4_saturating_unsigned_maskz" ->
+      instr (vpmovusqd_Xm128_Y_K ~z:true) args
+    | "caml_avx512f_cvtzx_int8x16_int32x8_mask" ->
+      instr vpmovzxbd_Y_Xm64_K_merge args
+    | "caml_avx512f_cvtzx_int8x16_int32x8_maskz" ->
+      instr (vpmovzxbd_Y_Xm64_K ~z:true) args
+    | "caml_avx512f_cvtzx_int8x16_int32x4_mask" ->
+      instr vpmovzxbd_X_Xm32_K_merge args
+    | "caml_avx512f_cvtzx_int8x16_int32x4_maskz" ->
+      instr (vpmovzxbd_X_Xm32_K ~z:true) args
+    | "caml_avx512f_cvtzx_int8x16_int64x4_mask" ->
+      instr vpmovzxbq_Y_Xm32_K_merge args
+    | "caml_avx512f_cvtzx_int8x16_int64x4_maskz" ->
+      instr (vpmovzxbq_Y_Xm32_K ~z:true) args
+    | "caml_avx512f_cvtzx_int8x16_int64x2_mask" ->
+      instr vpmovzxbq_X_Xm16_K_merge args
+    | "caml_avx512f_cvtzx_int8x16_int64x2_maskz" ->
+      instr (vpmovzxbq_X_Xm16_K ~z:true) args
+    | "caml_avx512f_cvtzx_int32x4_int64x4_mask" ->
+      instr vpmovzxdq_Y_Xm128_K_merge args
+    | "caml_avx512f_cvtzx_int32x4_int64x4_maskz" ->
+      instr (vpmovzxdq_Y_Xm128_K ~z:true) args
+    | "caml_avx512f_cvtzx_int32x4_int64x2_mask" ->
+      instr vpmovzxdq_X_Xm64_K_merge args
+    | "caml_avx512f_cvtzx_int32x4_int64x2_maskz" ->
+      instr (vpmovzxdq_X_Xm64_K ~z:true) args
+    | "caml_avx512f_cvtzx_int16x8_int32x8_mask" ->
+      instr vpmovzxwd_Y_Xm128_K_merge args
+    | "caml_avx512f_cvtzx_int16x8_int32x8_maskz" ->
+      instr (vpmovzxwd_Y_Xm128_K ~z:true) args
+    | "caml_avx512f_cvtzx_int16x8_int32x4_mask" ->
+      instr vpmovzxwd_X_Xm64_K_merge args
+    | "caml_avx512f_cvtzx_int16x8_int32x4_maskz" ->
+      instr (vpmovzxwd_X_Xm64_K ~z:true) args
+    | "caml_avx512f_cvtzx_int16x8_int64x4_mask" ->
+      instr vpmovzxwq_Y_Xm64_K_merge args
+    | "caml_avx512f_cvtzx_int16x8_int64x4_maskz" ->
+      instr (vpmovzxwq_Y_Xm64_K ~z:true) args
+    | "caml_avx512f_cvtzx_int16x8_int64x2_mask" ->
+      instr vpmovzxwq_X_Xm32_K_merge args
+    | "caml_avx512f_cvtzx_int16x8_int64x2_maskz" ->
+      instr (vpmovzxwq_X_Xm32_K ~z:true) args
+    | "caml_avx512f_float64x4_mov_mask" -> instr vmovupd_Y_Y_K_merge args
+    | "caml_avx512f_float64x4_mov_maskz" ->
+      instr (vmovupd_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x2_mov_mask" -> instr vmovupd_X_X_K_merge args
+    | "caml_avx512f_float64x2_mov_maskz" ->
+      instr (vmovupd_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_mov_mask" -> instr vmovups_Y_Y_K_merge args
+    | "caml_avx512f_float32x8_mov_maskz" ->
+      instr (vmovups_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x4_mov_mask" -> instr vmovups_X_X_K_merge args
+    | "caml_avx512f_float32x4_mov_maskz" ->
+      instr (vmovups_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x4_duplicate_even_mask" ->
+      instr vmovddup_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_duplicate_even_maskz" ->
+      instr (vmovddup_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x8_mov_mask" -> instr vmovdqu32_Y_Y_K_merge args
+    | "caml_avx512f_int32x8_mov_maskz" ->
+      instr (vmovdqu32_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_mov_mask" -> instr vmovdqu32_X_X_K_merge args
+    | "caml_avx512f_int32x4_mov_maskz" ->
+      instr (vmovdqu32_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_mov_mask" -> instr vmovdqu64_Y_Y_K_merge args
+    | "caml_avx512f_int64x4_mov_maskz" ->
+      instr (vmovdqu64_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x2_mov_mask" -> instr vmovdqu64_X_X_K_merge args
+    | "caml_avx512f_int64x2_mov_maskz" ->
+      instr (vmovdqu64_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_duplicate_odd_mask" ->
+      instr vmovshdup_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_duplicate_odd_maskz" ->
+      instr (vmovshdup_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x4_duplicate_odd_mask" ->
+      instr vmovshdup_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_duplicate_odd_maskz" ->
+      instr (vmovshdup_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_duplicate_even_mask" ->
+      instr vmovsldup_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_duplicate_even_maskz" ->
+      instr (vmovsldup_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x4_duplicate_even_mask" ->
+      instr vmovsldup_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_duplicate_even_maskz" ->
+      instr (vmovsldup_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_and_mask" -> instr vpandd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_and_maskz" ->
+      instr (vpandd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_and_mask" -> instr vpandd_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_and_maskz" ->
+      instr (vpandd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_andnot_mask" -> instr vpandnd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_andnot_maskz" ->
+      instr (vpandnd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_andnot_mask" -> instr vpandnd_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_andnot_maskz" ->
+      instr (vpandnd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_andnot_mask" -> instr vpandnq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_andnot_maskz" ->
+      instr (vpandnq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x2_andnot_mask" -> instr vpandnq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_andnot_maskz" ->
+      instr (vpandnq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_and_mask" -> instr vpandq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_and_maskz" ->
+      instr (vpandq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x2_and_mask" -> instr vpandq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_and_maskz" ->
+      instr (vpandq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_or_mask" -> instr vpord_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_or_maskz" -> instr (vpord_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_or_mask" -> instr vpord_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_or_maskz" -> instr (vpord_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_or_mask" -> instr vporq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_or_maskz" -> instr (vporq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x2_or_mask" -> instr vporq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_or_maskz" -> instr (vporq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_ternarylogic_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpternlogd_Y_Y_Ym256_K ~z:false) ~i args
+    | "caml_avx512f_int32x8_ternarylogic_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpternlogd_Y_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int32x8_ternarylogic" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpternlogd_Y_Y_Ym256 ~i args
+    | "caml_avx512f_int32x4_ternarylogic_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpternlogd_X_X_Xm128_K ~z:false) ~i args
+    | "caml_avx512f_int32x4_ternarylogic_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpternlogd_X_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int32x4_ternarylogic" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpternlogd_X_X_Xm128 ~i args
+    | "caml_avx512f_int64x4_ternarylogic_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpternlogq_Y_Y_Ym256_K ~z:false) ~i args
+    | "caml_avx512f_int64x4_ternarylogic_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpternlogq_Y_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int64x4_ternarylogic" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpternlogq_Y_Y_Ym256 ~i args
+    | "caml_avx512f_int64x2_ternarylogic_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpternlogq_X_X_Xm128_K ~z:false) ~i args
+    | "caml_avx512f_int64x2_ternarylogic_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpternlogq_X_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int64x2_ternarylogic" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpternlogq_X_X_Xm128 ~i args
+    | "caml_avx512f_int32x8_xor_mask" -> instr vpxord_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_xor_maskz" ->
+      instr (vpxord_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_xor_mask" -> instr vpxord_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_xor_maskz" ->
+      instr (vpxord_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_xor_mask" -> instr vpxorq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_xor_maskz" ->
+      instr (vpxorq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x2_xor_mask" -> instr vpxorq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_xor_maskz" ->
+      instr (vpxorq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_xor" -> instr vpxorq_Y_Y_Ym256 args
+    | "caml_avx512f_int32x8_xor" -> instr vpxord_Y_Y_Ym256 args
+    | "caml_avx512f_int64x2_xor" -> instr vpxorq_X_X_Xm128 args
+    | "caml_avx512f_int32x4_xor" -> instr vpxord_X_X_Xm128 args
+    | "caml_avx512f_int64x4_or" -> instr vporq_Y_Y_Ym256 args
+    | "caml_avx512f_int32x8_or" -> instr vpord_Y_Y_Ym256 args
+    | "caml_avx512f_int64x2_or" -> instr vporq_X_X_Xm128 args
+    | "caml_avx512f_int32x4_or" -> instr vpord_X_X_Xm128 args
+    | "caml_avx512f_int32x8_set1_mask" -> instr vpbroadcastd_Y_r32_K_merge args
+    | "caml_avx512f_int32x8_set1_maskz" ->
+      instr (vpbroadcastd_Y_r32_K ~z:true) args
+    | "caml_avx512f_int32x4_set1_mask" -> instr vpbroadcastd_X_r32_K_merge args
+    | "caml_avx512f_int32x4_set1_maskz" ->
+      instr (vpbroadcastd_X_r32_K ~z:true) args
+    | "caml_avx512f_int64x4_set1_mask" -> instr vpbroadcastq_Y_r64_K_merge args
+    | "caml_avx512f_int64x4_set1_maskz" ->
+      instr (vpbroadcastq_Y_r64_K ~z:true) args
+    | "caml_avx512f_int64x2_set1_mask" -> instr vpbroadcastq_X_r64_K_merge args
+    | "caml_avx512f_int64x2_set1_maskz" ->
+      instr (vpbroadcastq_X_r64_K ~z:true) args
+    | "caml_avx512f_int32x8_rol_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprold_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_int32x8_rol_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vprold_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int32x8_rol" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprold_Y_Ym256 ~i args
+    | "caml_avx512f_int32x4_rol_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprold_X_Xm128_K_merge ~i args
+    | "caml_avx512f_int32x4_rol_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vprold_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int32x4_rol" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprold_X_Xm128 ~i args
+    | "caml_avx512f_int64x4_rol_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprolq_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_int64x4_rol_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vprolq_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int64x4_rol" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprolq_Y_Ym256 ~i args
+    | "caml_avx512f_int64x2_rol_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprolq_X_Xm128_K_merge ~i args
+    | "caml_avx512f_int64x2_rol_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vprolq_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int64x2_rol" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprolq_X_Xm128 ~i args
+    | "caml_avx512f_int32x8_rolv_mask" -> instr vprolvd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_rolv_maskz" ->
+      instr (vprolvd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x8_rolv" -> instr vprolvd_Y_Y_Ym256 args
+    | "caml_avx512f_int32x4_rolv_mask" -> instr vprolvd_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_rolv_maskz" ->
+      instr (vprolvd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x4_rolv" -> instr vprolvd_X_X_Xm128 args
+    | "caml_avx512f_int64x4_rolv_mask" -> instr vprolvq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_rolv_maskz" ->
+      instr (vprolvq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x4_rolv" -> instr vprolvq_Y_Y_Ym256 args
+    | "caml_avx512f_int64x2_rolv_mask" -> instr vprolvq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_rolv_maskz" ->
+      instr (vprolvq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x2_rolv" -> instr vprolvq_X_X_Xm128 args
+    | "caml_avx512f_int32x8_ror_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprord_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_int32x8_ror_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vprord_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int32x8_ror" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprord_Y_Ym256 ~i args
+    | "caml_avx512f_int32x4_ror_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprord_X_Xm128_K_merge ~i args
+    | "caml_avx512f_int32x4_ror_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vprord_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int32x4_ror" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprord_X_Xm128 ~i args
+    | "caml_avx512f_int64x4_ror_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprorq_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_int64x4_ror_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vprorq_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int64x4_ror" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprorq_Y_Ym256 ~i args
+    | "caml_avx512f_int64x2_ror_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprorq_X_Xm128_K_merge ~i args
+    | "caml_avx512f_int64x2_ror_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vprorq_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int64x2_ror" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprorq_X_Xm128 ~i args
+    | "caml_avx512f_int32x8_rorv_mask" -> instr vprorvd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_rorv_maskz" ->
+      instr (vprorvd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x8_rorv" -> instr vprorvd_Y_Y_Ym256 args
+    | "caml_avx512f_int32x4_rorv_mask" -> instr vprorvd_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_rorv_maskz" ->
+      instr (vprorvd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x4_rorv" -> instr vprorvd_X_X_Xm128 args
+    | "caml_avx512f_int64x4_rorv_mask" -> instr vprorvq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_rorv_maskz" ->
+      instr (vprorvq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x4_rorv" -> instr vprorvq_Y_Y_Ym256 args
+    | "caml_avx512f_int64x2_rorv_mask" -> instr vprorvq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_rorv_maskz" ->
+      instr (vprorvq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x2_rorv" -> instr vprorvq_X_X_Xm128 args
+    | "caml_avx512f_int32x8_sll_mask" -> instr vpslld_Y_Y_Xm128_K_merge args
+    | "caml_avx512f_int32x8_slli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpslld_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_int32x8_sll_maskz" ->
+      instr (vpslld_Y_Y_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_slli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpslld_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int32x4_sll_mask" -> instr vpslld_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_slli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpslld_X_Xm128_K_merge ~i args
+    | "caml_avx512f_int32x4_sll_maskz" ->
+      instr (vpslld_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x4_slli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpslld_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int64x4_sll_mask" -> instr vpsllq_Y_Y_Xm128_K_merge args
+    | "caml_avx512f_int64x4_slli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsllq_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_int64x4_sll_maskz" ->
+      instr (vpsllq_Y_Y_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_slli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsllq_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int64x2_sll_mask" -> instr vpsllq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_slli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsllq_X_Xm128_K_merge ~i args
+    | "caml_avx512f_int64x2_sll_maskz" ->
+      instr (vpsllq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x2_slli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsllq_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int32x8_sllv_mask" -> instr vpsllvd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_sllv_maskz" ->
+      instr (vpsllvd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_sllv_mask" -> instr vpsllvd_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_sllv_maskz" ->
+      instr (vpsllvd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_sllv_mask" -> instr vpsllvq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_sllv_maskz" ->
+      instr (vpsllvq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x2_sllv_mask" -> instr vpsllvq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_sllv_maskz" ->
+      instr (vpsllvq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_sra_mask" -> instr vpsrad_Y_Y_Xm128_K_merge args
+    | "caml_avx512f_int32x8_srai_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsrad_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_int32x8_sra_maskz" ->
+      instr (vpsrad_Y_Y_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_srai_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsrad_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int32x4_sra_mask" -> instr vpsrad_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_srai_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsrad_X_Xm128_K_merge ~i args
+    | "caml_avx512f_int32x4_sra_maskz" ->
+      instr (vpsrad_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x4_srai_maskz" ->
+      let i, args = extract_constant args ~max:63 op in
+      instr (vpsrad_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int64x4_sra_mask" -> instr vpsraq_Y_Y_Xm128_K_merge args
+    | "caml_avx512f_int64x4_srai_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsraq_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_int64x4_sra_maskz" ->
+      instr (vpsraq_Y_Y_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_srai_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsraq_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int64x4_sra" -> instr vpsraq_Y_Y_Xm128 args
+    | "caml_avx512f_int64x4_srai" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsraq_Y_Ym256 ~i args
+    | "caml_avx512f_int64x2_sra_mask" -> instr vpsraq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_srai_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsraq_X_Xm128_K_merge ~i args
+    | "caml_avx512f_int64x2_sra_maskz" ->
+      instr (vpsraq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x2_srai_maskz" ->
+      let i, args = extract_constant args ~max:127 op in
+      instr (vpsraq_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int64x2_sra" -> instr vpsraq_X_X_Xm128 args
+    | "caml_avx512f_int64x2_srai" ->
+      let i, args = extract_constant args ~max:127 op in
+      instr vpsraq_X_Xm128 ~i args
+    | "caml_avx512f_int32x8_srav_mask" -> instr vpsravd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_srav_maskz" ->
+      instr (vpsravd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_srav_mask" -> instr vpsravd_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_srav_maskz" ->
+      instr (vpsravd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_srav_mask" -> instr vpsravq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_srav_maskz" ->
+      instr (vpsravq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x4_srav" -> instr vpsravq_Y_Y_Ym256 args
+    | "caml_avx512f_int64x2_srav_mask" -> instr vpsravq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_srav_maskz" ->
+      instr (vpsravq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x2_srav" -> instr vpsravq_X_X_Xm128 args
+    | "caml_avx512f_int32x8_srl_mask" -> instr vpsrld_Y_Y_Xm128_K_merge args
+    | "caml_avx512f_int32x8_srli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsrld_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_int32x8_srl_maskz" ->
+      instr (vpsrld_Y_Y_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x8_srli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsrld_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int32x4_srl_mask" -> instr vpsrld_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_srli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsrld_X_Xm128_K_merge ~i args
+    | "caml_avx512f_int32x4_srl_maskz" ->
+      instr (vpsrld_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x4_srli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsrld_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int64x4_srl_mask" -> instr vpsrlq_Y_Y_Xm128_K_merge args
+    | "caml_avx512f_int64x4_srli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsrlq_Y_Ym256_K_merge ~i args
+    | "caml_avx512f_int64x4_srl_maskz" ->
+      instr (vpsrlq_Y_Y_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_srli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsrlq_Y_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int64x2_srl_mask" -> instr vpsrlq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_srli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsrlq_X_Xm128_K_merge ~i args
+    | "caml_avx512f_int64x2_srl_maskz" ->
+      instr (vpsrlq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x2_srli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsrlq_X_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int32x8_srlv_mask" -> instr vpsrlvd_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int32x8_srlv_maskz" ->
+      instr (vpsrlvd_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int32x4_srlv_mask" -> instr vpsrlvd_X_X_Xm128_K_merge args
+    | "caml_avx512f_int32x4_srlv_maskz" ->
+      instr (vpsrlvd_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x4_srlv_mask" -> instr vpsrlvq_Y_Y_Ym256_K_merge args
+    | "caml_avx512f_int64x4_srlv_maskz" ->
+      instr (vpsrlvq_Y_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_int64x2_srlv_mask" -> instr vpsrlvq_X_X_Xm128_K_merge args
+    | "caml_avx512f_int64x2_srlv_maskz" ->
+      instr (vpsrlvq_X_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x4_sqrt_mask" -> instr vsqrtpd_Y_Ym256_K_merge args
+    | "caml_avx512f_float64x4_sqrt_maskz" ->
+      instr (vsqrtpd_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float64x2_sqrt_mask" -> instr vsqrtpd_X_Xm128_K_merge args
+    | "caml_avx512f_float64x2_sqrt_maskz" ->
+      instr (vsqrtpd_X_Xm128_K ~z:true) args
+    | "caml_avx512f_float32x8_sqrt_mask" -> instr vsqrtps_Y_Ym256_K_merge args
+    | "caml_avx512f_float32x8_sqrt_maskz" ->
+      instr (vsqrtps_Y_Ym256_K ~z:true) args
+    | "caml_avx512f_float32x4_sqrt_mask" -> instr vsqrtps_X_Xm128_K_merge args
+    | "caml_avx512f_float32x4_sqrt_maskz" ->
+      instr (vsqrtps_X_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x16_mul_low_maskz" ->
+      instr (vpmulld_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_add_maskz" ->
+      instr (vaddpd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_add_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vaddpd_Z_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vaddpd_Z_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vaddpd_Z_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vaddpd_Z_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_add_maskz" ->
+      instr (vaddps_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_add_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vaddps_Z_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vaddps_Z_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vaddps_Z_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vaddps_Z_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float64_add_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vaddsd_X_X_X ~rnd:Rnd_near) args
+      | 9 -> instr (vaddsd_X_X_X ~rnd:Rnd_down) args
+      | 10 -> instr (vaddsd_X_X_X ~rnd:Rnd_up) args
+      | 11 -> instr (vaddsd_X_X_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64_add_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vaddsd_X_X_X_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vaddsd_X_X_X_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vaddsd_X_X_X_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vaddsd_X_X_X_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64_add_mask" -> instr vaddsd_X_X_Xm64_K_merge args
+    | "caml_avx512f_float64_add_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vaddsd_X_X_X_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vaddsd_X_X_X_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vaddsd_X_X_X_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vaddsd_X_X_X_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float64_add_maskz" -> instr (vaddsd_X_X_Xm64_K ~z:true) args
+    | "caml_avx512f_float32_add_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vaddss_X_X_X ~rnd:Rnd_near) args
+      | 9 -> instr (vaddss_X_X_X ~rnd:Rnd_down) args
+      | 10 -> instr (vaddss_X_X_X ~rnd:Rnd_up) args
+      | 11 -> instr (vaddss_X_X_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32_add_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vaddss_X_X_X_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vaddss_X_X_X_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vaddss_X_X_X_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vaddss_X_X_X_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32_add_mask" -> instr vaddss_X_X_Xm32_K_merge args
+    | "caml_avx512f_float32_add_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vaddss_X_X_X_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vaddss_X_X_X_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vaddss_X_X_X_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vaddss_X_X_X_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float32_add_maskz" -> instr (vaddss_X_X_Xm32_K ~z:true) args
+    | "caml_avx512f_float64x8_div" -> instr vdivpd_Z_Z_Zm512 args
+    | "caml_avx512f_float64x8_div_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vdivpd_Z_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vdivpd_Z_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vdivpd_Z_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vdivpd_Z_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64x8_div_mask" -> instr vdivpd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_div_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vdivpd_Z_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vdivpd_Z_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vdivpd_Z_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vdivpd_Z_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64x8_div_maskz" ->
+      instr (vdivpd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_div_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vdivpd_Z_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vdivpd_Z_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vdivpd_Z_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vdivpd_Z_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_div" -> instr vdivps_Z_Z_Zm512 args
+    | "caml_avx512f_float32x16_div_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vdivps_Z_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vdivps_Z_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vdivps_Z_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vdivps_Z_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_div_mask" -> instr vdivps_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_div_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vdivps_Z_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vdivps_Z_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vdivps_Z_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vdivps_Z_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_div_maskz" ->
+      instr (vdivps_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_div_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vdivps_Z_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vdivps_Z_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vdivps_Z_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vdivps_Z_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float64_div_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vdivsd_X_X_X ~rnd:Rnd_near) args
+      | 9 -> instr (vdivsd_X_X_X ~rnd:Rnd_down) args
+      | 10 -> instr (vdivsd_X_X_X ~rnd:Rnd_up) args
+      | 11 -> instr (vdivsd_X_X_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64_div_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vdivsd_X_X_X_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vdivsd_X_X_X_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vdivsd_X_X_X_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vdivsd_X_X_X_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64_div_mask" -> instr vdivsd_X_X_Xm64_K_merge args
+    | "caml_avx512f_float64_div_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vdivsd_X_X_X_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vdivsd_X_X_X_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vdivsd_X_X_X_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vdivsd_X_X_X_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float64_div_maskz" -> instr (vdivsd_X_X_Xm64_K ~z:true) args
+    | "caml_avx512f_float32_div_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vdivss_X_X_X ~rnd:Rnd_near) args
+      | 9 -> instr (vdivss_X_X_X ~rnd:Rnd_down) args
+      | 10 -> instr (vdivss_X_X_X ~rnd:Rnd_up) args
+      | 11 -> instr (vdivss_X_X_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32_div_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vdivss_X_X_X_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vdivss_X_X_X_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vdivss_X_X_X_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vdivss_X_X_X_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32_div_mask" -> instr vdivss_X_X_Xm32_K_merge args
+    | "caml_avx512f_float32_div_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vdivss_X_X_X_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vdivss_X_X_X_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vdivss_X_X_X_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vdivss_X_X_X_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float32_div_maskz" -> instr (vdivss_X_X_Xm32_K ~z:true) args
+    | "caml_avx512f_float64x8_mul_add_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmadd132pd_Z_Z_Zm512_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_add_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmadd132pd_Z_Z_Z_K ~rnd:Rnd_near ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmadd132pd_Z_Z_Z_K ~rnd:Rnd_down ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmadd132pd_Z_Z_Z_K ~rnd:Rnd_up ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmadd132pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_add_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmadd132ps_Z_Z_Zm512_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_add_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmadd132ps_Z_Z_Z_K ~rnd:Rnd_near ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmadd132ps_Z_Z_Z_K ~rnd:Rnd_down ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmadd132ps_Z_Z_Z_K ~rnd:Rnd_up ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmadd132ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_mul_add_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmadd132sd_X_X_X ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmadd132sd_X_X_X ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmadd132sd_X_X_X ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmadd132sd_X_X_X ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_mul_add_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr (vfmadd231sd_X_X_X_K ~rnd:Rnd_near ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr (vfmadd231sd_X_X_X_K ~rnd:Rnd_down ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfmadd231sd_X_X_X_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr (vfmadd231sd_X_X_X_K ~rnd:Rnd_zero ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_mul_add_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmadd231sd_X_X_Xm64_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_mul_add_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfmadd132sd_X_X_X_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfmadd132sd_X_X_X_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmadd132sd_X_X_X_K ~rnd:Rnd_up ~z:false) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfmadd132sd_X_X_X_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_mul_add_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmadd132sd_X_X_Xm64_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_mul_add_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmadd132sd_X_X_X_K ~rnd:Rnd_near ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmadd132sd_X_X_X_K ~rnd:Rnd_down ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmadd132sd_X_X_X_K ~rnd:Rnd_up ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmadd132sd_X_X_X_K ~rnd:Rnd_zero ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_mul_add_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmadd132sd_X_X_Xm64_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_mul_add_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr (vfmadd231ss_X_X_X_K ~rnd:Rnd_near ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr (vfmadd231ss_X_X_X_K ~rnd:Rnd_down ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfmadd231ss_X_X_X_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr (vfmadd231ss_X_X_X_K ~rnd:Rnd_zero ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_mul_add_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmadd231ss_X_X_Xm32_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_mul_add_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmadd132ss_X_X_X ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmadd132ss_X_X_X ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmadd132ss_X_X_X ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmadd132ss_X_X_X ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_mul_add_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfmadd132ss_X_X_X_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfmadd132ss_X_X_X_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmadd132ss_X_X_X_K ~rnd:Rnd_up ~z:false) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfmadd132ss_X_X_X_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_mul_add_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmadd132ss_X_X_Xm32_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_mul_add_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmadd132ss_X_X_X_K ~rnd:Rnd_near ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmadd132ss_X_X_X_K ~rnd:Rnd_down ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmadd132ss_X_X_X_K ~rnd:Rnd_up ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmadd132ss_X_X_X_K ~rnd:Rnd_zero ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_mul_add_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmadd132ss_X_X_Xm32_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_addsub" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr vfmaddsub132pd_Z_Z_Zm512 (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_addsub_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmaddsub132pd_Z_Z_Z ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmaddsub132pd_Z_Z_Z ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmaddsub132pd_Z_Z_Z ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmaddsub132pd_Z_Z_Z ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_addsub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmaddsub231pd_Z_Z_Zm512_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_addsub_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr
+          (vfmaddsub231pd_Z_Z_Z_K ~rnd:Rnd_near ~z:false)
+          (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr
+          (vfmaddsub231pd_Z_Z_Z_K ~rnd:Rnd_down ~z:false)
+          (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfmaddsub231pd_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr
+          (vfmaddsub231pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:false)
+          (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_addsub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmaddsub132pd_Z_Z_Zm512_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_addsub_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfmaddsub132pd_Z_Z_Z_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfmaddsub132pd_Z_Z_Z_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr
+          (vfmaddsub132pd_Z_Z_Z_K ~rnd:Rnd_up ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfmaddsub132pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_addsub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmaddsub132pd_Z_Z_Zm512_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_addsub_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfmaddsub132pd_Z_Z_Z_K ~rnd:Rnd_near ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfmaddsub132pd_Z_Z_Z_K ~rnd:Rnd_down ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr
+          (vfmaddsub132pd_Z_Z_Z_K ~rnd:Rnd_up ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfmaddsub132pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:true)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_addsub" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr vfmaddsub132ps_Z_Z_Zm512 (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_addsub_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmaddsub132ps_Z_Z_Z ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmaddsub132ps_Z_Z_Z ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmaddsub132ps_Z_Z_Z ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmaddsub132ps_Z_Z_Z ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_addsub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmaddsub231ps_Z_Z_Zm512_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_addsub_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr
+          (vfmaddsub231ps_Z_Z_Z_K ~rnd:Rnd_near ~z:false)
+          (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr
+          (vfmaddsub231ps_Z_Z_Z_K ~rnd:Rnd_down ~z:false)
+          (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfmaddsub231ps_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr
+          (vfmaddsub231ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:false)
+          (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_addsub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmaddsub132ps_Z_Z_Zm512_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_addsub_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfmaddsub132ps_Z_Z_Z_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfmaddsub132ps_Z_Z_Z_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr
+          (vfmaddsub132ps_Z_Z_Z_K ~rnd:Rnd_up ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfmaddsub132ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_addsub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmaddsub132ps_Z_Z_Zm512_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_addsub_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfmaddsub132ps_Z_Z_Z_K ~rnd:Rnd_near ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfmaddsub132ps_Z_Z_Z_K ~rnd:Rnd_down ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr
+          (vfmaddsub132ps_Z_Z_Z_K ~rnd:Rnd_up ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfmaddsub132ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:true)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_sub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsub132pd_Z_Z_Zm512_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_sub_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmsub132pd_Z_Z_Z_K ~rnd:Rnd_near ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmsub132pd_Z_Z_Z_K ~rnd:Rnd_down ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmsub132pd_Z_Z_Z_K ~rnd:Rnd_up ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmsub132pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_sub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsub132ps_Z_Z_Zm512_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_sub_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmsub132ps_Z_Z_Z_K ~rnd:Rnd_near ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmsub132ps_Z_Z_Z_K ~rnd:Rnd_down ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmsub132ps_Z_Z_Z_K ~rnd:Rnd_up ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmsub132ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_mul_sub_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmsub132sd_X_X_X ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmsub132sd_X_X_X ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmsub132sd_X_X_X ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmsub132sd_X_X_X ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_mul_sub_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr (vfmsub231sd_X_X_X_K ~rnd:Rnd_near ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr (vfmsub231sd_X_X_X_K ~rnd:Rnd_down ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfmsub231sd_X_X_X_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr (vfmsub231sd_X_X_X_K ~rnd:Rnd_zero ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_mul_sub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmsub231sd_X_X_Xm64_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_mul_sub_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfmsub132sd_X_X_X_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfmsub132sd_X_X_X_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmsub132sd_X_X_X_K ~rnd:Rnd_up ~z:false) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfmsub132sd_X_X_X_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_mul_sub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsub132sd_X_X_Xm64_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_mul_sub_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmsub132sd_X_X_X_K ~rnd:Rnd_near ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmsub132sd_X_X_X_K ~rnd:Rnd_down ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmsub132sd_X_X_X_K ~rnd:Rnd_up ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmsub132sd_X_X_X_K ~rnd:Rnd_zero ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_mul_sub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsub132sd_X_X_Xm64_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_mul_sub_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmsub132ss_X_X_X ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmsub132ss_X_X_X ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmsub132ss_X_X_X ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmsub132ss_X_X_X ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_mul_sub_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr (vfmsub231ss_X_X_X_K ~rnd:Rnd_near ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr (vfmsub231ss_X_X_X_K ~rnd:Rnd_down ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfmsub231ss_X_X_X_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr (vfmsub231ss_X_X_X_K ~rnd:Rnd_zero ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_mul_sub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmsub231ss_X_X_Xm32_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_mul_sub_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfmsub132ss_X_X_X_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfmsub132ss_X_X_X_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmsub132ss_X_X_X_K ~rnd:Rnd_up ~z:false) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfmsub132ss_X_X_X_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_mul_sub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsub132ss_X_X_Xm32_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_mul_sub_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmsub132ss_X_X_X_K ~rnd:Rnd_near ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmsub132ss_X_X_X_K ~rnd:Rnd_down ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmsub132ss_X_X_X_K ~rnd:Rnd_up ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmsub132ss_X_X_X_K ~rnd:Rnd_zero ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_mul_sub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsub132ss_X_X_Xm32_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_subadd" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr vfmsubadd132pd_Z_Z_Zm512 (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_subadd_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmsubadd132pd_Z_Z_Z ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmsubadd132pd_Z_Z_Z ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmsubadd132pd_Z_Z_Z ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmsubadd132pd_Z_Z_Z ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_subadd_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmsubadd231pd_Z_Z_Zm512_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_subadd_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr
+          (vfmsubadd231pd_Z_Z_Z_K ~rnd:Rnd_near ~z:false)
+          (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr
+          (vfmsubadd231pd_Z_Z_Z_K ~rnd:Rnd_down ~z:false)
+          (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfmsubadd231pd_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr
+          (vfmsubadd231pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:false)
+          (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_subadd_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsubadd132pd_Z_Z_Zm512_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_subadd_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfmsubadd132pd_Z_Z_Z_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfmsubadd132pd_Z_Z_Z_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr
+          (vfmsubadd132pd_Z_Z_Z_K ~rnd:Rnd_up ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfmsubadd132pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_subadd_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsubadd132pd_Z_Z_Zm512_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_subadd_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfmsubadd132pd_Z_Z_Z_K ~rnd:Rnd_near ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfmsubadd132pd_Z_Z_Z_K ~rnd:Rnd_down ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr
+          (vfmsubadd132pd_Z_Z_Z_K ~rnd:Rnd_up ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfmsubadd132pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:true)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_subadd" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr vfmsubadd132ps_Z_Z_Zm512 (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_subadd_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmsubadd132ps_Z_Z_Z ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmsubadd132ps_Z_Z_Z ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmsubadd132ps_Z_Z_Z ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmsubadd132ps_Z_Z_Z ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_subadd_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmsubadd231ps_Z_Z_Zm512_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_subadd_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr
+          (vfmsubadd231ps_Z_Z_Z_K ~rnd:Rnd_near ~z:false)
+          (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr
+          (vfmsubadd231ps_Z_Z_Z_K ~rnd:Rnd_down ~z:false)
+          (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfmsubadd231ps_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr
+          (vfmsubadd231ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:false)
+          (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_subadd_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsubadd132ps_Z_Z_Zm512_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_subadd_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfmsubadd132ps_Z_Z_Z_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfmsubadd132ps_Z_Z_Z_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr
+          (vfmsubadd132ps_Z_Z_Z_K ~rnd:Rnd_up ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfmsubadd132ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_subadd_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsubadd132ps_Z_Z_Zm512_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_subadd_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfmsubadd132ps_Z_Z_Z_K ~rnd:Rnd_near ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfmsubadd132ps_Z_Z_Z_K ~rnd:Rnd_down ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr
+          (vfmsubadd132ps_Z_Z_Z_K ~rnd:Rnd_up ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfmsubadd132ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:true)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_neg_mul_add_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmadd132pd_Z_Z_Zm512_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_neg_mul_add_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfnmadd132pd_Z_Z_Z_K ~rnd:Rnd_near ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfnmadd132pd_Z_Z_Z_K ~rnd:Rnd_down ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmadd132pd_Z_Z_Z_K ~rnd:Rnd_up ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfnmadd132pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:true)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_neg_mul_add_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmadd132ps_Z_Z_Zm512_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_neg_mul_add_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfnmadd132ps_Z_Z_Z_K ~rnd:Rnd_near ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfnmadd132ps_Z_Z_Z_K ~rnd:Rnd_down ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmadd132ps_Z_Z_Z_K ~rnd:Rnd_up ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfnmadd132ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:true)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_neg_mul_add_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfnmadd132sd_X_X_X ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfnmadd132sd_X_X_X ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmadd132sd_X_X_X ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfnmadd132sd_X_X_X ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_neg_mul_add_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr (vfnmadd231sd_X_X_X_K ~rnd:Rnd_near ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr (vfnmadd231sd_X_X_X_K ~rnd:Rnd_down ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfnmadd231sd_X_X_X_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr (vfnmadd231sd_X_X_X_K ~rnd:Rnd_zero ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_neg_mul_add_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfnmadd231sd_X_X_Xm64_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_neg_mul_add_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfnmadd132sd_X_X_X_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfnmadd132sd_X_X_X_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmadd132sd_X_X_X_K ~rnd:Rnd_up ~z:false) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfnmadd132sd_X_X_X_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_neg_mul_add_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmadd132sd_X_X_Xm64_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_neg_mul_add_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfnmadd132sd_X_X_X_K ~rnd:Rnd_near ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfnmadd132sd_X_X_X_K ~rnd:Rnd_down ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmadd132sd_X_X_X_K ~rnd:Rnd_up ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfnmadd132sd_X_X_X_K ~rnd:Rnd_zero ~z:true)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_neg_mul_add_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmadd132sd_X_X_Xm64_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_neg_mul_add_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfnmadd132ss_X_X_X ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfnmadd132ss_X_X_X ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmadd132ss_X_X_X ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfnmadd132ss_X_X_X ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_neg_mul_add_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr (vfnmadd231ss_X_X_X_K ~rnd:Rnd_near ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr (vfnmadd231ss_X_X_X_K ~rnd:Rnd_down ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfnmadd231ss_X_X_X_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr (vfnmadd231ss_X_X_X_K ~rnd:Rnd_zero ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_neg_mul_add_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfnmadd231ss_X_X_Xm32_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_neg_mul_add_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfnmadd132ss_X_X_X_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfnmadd132ss_X_X_X_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmadd132ss_X_X_X_K ~rnd:Rnd_up ~z:false) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfnmadd132ss_X_X_X_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_neg_mul_add_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmadd132ss_X_X_Xm32_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_neg_mul_add_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfnmadd132ss_X_X_X_K ~rnd:Rnd_near ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfnmadd132ss_X_X_X_K ~rnd:Rnd_down ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmadd132ss_X_X_X_K ~rnd:Rnd_up ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfnmadd132ss_X_X_X_K ~rnd:Rnd_zero ~z:true)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_neg_mul_add_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmadd132ss_X_X_Xm32_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_neg_mul_sub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmsub132pd_Z_Z_Zm512_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_neg_mul_sub_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfnmsub132pd_Z_Z_Z_K ~rnd:Rnd_near ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfnmsub132pd_Z_Z_Z_K ~rnd:Rnd_down ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmsub132pd_Z_Z_Z_K ~rnd:Rnd_up ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfnmsub132pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:true)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_neg_mul_sub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmsub132ps_Z_Z_Zm512_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_neg_mul_sub_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfnmsub132ps_Z_Z_Z_K ~rnd:Rnd_near ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfnmsub132ps_Z_Z_Z_K ~rnd:Rnd_down ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmsub132ps_Z_Z_Z_K ~rnd:Rnd_up ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfnmsub132ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:true)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_neg_mul_sub_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfnmsub132sd_X_X_X ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfnmsub132sd_X_X_X ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmsub132sd_X_X_X ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfnmsub132sd_X_X_X ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_neg_mul_sub_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr (vfnmsub231sd_X_X_X_K ~rnd:Rnd_near ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr (vfnmsub231sd_X_X_X_K ~rnd:Rnd_down ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfnmsub231sd_X_X_X_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr (vfnmsub231sd_X_X_X_K ~rnd:Rnd_zero ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_neg_mul_sub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfnmsub231sd_X_X_Xm64_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_neg_mul_sub_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfnmsub132sd_X_X_X_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfnmsub132sd_X_X_X_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmsub132sd_X_X_X_K ~rnd:Rnd_up ~z:false) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfnmsub132sd_X_X_X_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_neg_mul_sub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmsub132sd_X_X_Xm64_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_neg_mul_sub_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfnmsub132sd_X_X_X_K ~rnd:Rnd_near ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfnmsub132sd_X_X_X_K ~rnd:Rnd_down ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmsub132sd_X_X_X_K ~rnd:Rnd_up ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfnmsub132sd_X_X_X_K ~rnd:Rnd_zero ~z:true)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64_neg_mul_sub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmsub132sd_X_X_Xm64_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_neg_mul_sub_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfnmsub132ss_X_X_X ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfnmsub132ss_X_X_X ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmsub132ss_X_X_X ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfnmsub132ss_X_X_X ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_neg_mul_sub_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr (vfnmsub231ss_X_X_X_K ~rnd:Rnd_near ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr (vfnmsub231ss_X_X_X_K ~rnd:Rnd_down ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfnmsub231ss_X_X_X_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr (vfnmsub231ss_X_X_X_K ~rnd:Rnd_zero ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_neg_mul_sub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfnmsub231ss_X_X_Xm32_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_neg_mul_sub_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfnmsub132ss_X_X_X_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfnmsub132ss_X_X_X_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmsub132ss_X_X_X_K ~rnd:Rnd_up ~z:false) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfnmsub132ss_X_X_X_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_neg_mul_sub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmsub132ss_X_X_Xm32_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_neg_mul_sub_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfnmsub132ss_X_X_X_K ~rnd:Rnd_near ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfnmsub132ss_X_X_X_K ~rnd:Rnd_down ~z:true)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmsub132ss_X_X_X_K ~rnd:Rnd_up ~z:true) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfnmsub132ss_X_X_X_K ~rnd:Rnd_zero ~z:true)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32_neg_mul_sub_maskz" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmsub132ss_X_X_Xm32_K ~z:true) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_maskz" ->
+      instr (vmulpd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_mul_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vmulpd_Z_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vmulpd_Z_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vmulpd_Z_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vmulpd_Z_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_maskz" ->
+      instr (vmulps_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_mul_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vmulps_Z_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vmulps_Z_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vmulps_Z_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vmulps_Z_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float64_mul_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vmulsd_X_X_X_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vmulsd_X_X_X_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vmulsd_X_X_X_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vmulsd_X_X_X_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64_mul_mask" -> instr vmulsd_X_X_Xm64_K_merge args
+    | "caml_avx512f_float64_mul_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vmulsd_X_X_X_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vmulsd_X_X_X_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vmulsd_X_X_X_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vmulsd_X_X_X_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float64_mul_maskz" -> instr (vmulsd_X_X_Xm64_K ~z:true) args
+    | "caml_avx512f_float64_mul_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vmulsd_X_X_X ~rnd:Rnd_near) args
+      | 9 -> instr (vmulsd_X_X_X ~rnd:Rnd_down) args
+      | 10 -> instr (vmulsd_X_X_X ~rnd:Rnd_up) args
+      | 11 -> instr (vmulsd_X_X_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32_mul_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vmulss_X_X_X_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vmulss_X_X_X_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vmulss_X_X_X_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vmulss_X_X_X_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32_mul_mask" -> instr vmulss_X_X_Xm32_K_merge args
+    | "caml_avx512f_float32_mul_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vmulss_X_X_X_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vmulss_X_X_X_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vmulss_X_X_X_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vmulss_X_X_X_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float32_mul_maskz" -> instr (vmulss_X_X_Xm32_K ~z:true) args
+    | "caml_avx512f_float32_mul_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vmulss_X_X_X ~rnd:Rnd_near) args
+      | 9 -> instr (vmulss_X_X_X ~rnd:Rnd_down) args
+      | 10 -> instr (vmulss_X_X_X ~rnd:Rnd_up) args
+      | 11 -> instr (vmulss_X_X_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_int32x16_add_maskz" ->
+      instr (vpaddd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_add" -> instr vpaddq_Z_Z_Zm512 args
+    | "caml_avx512f_int64x8_add_mask" -> instr vpaddq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_add_maskz" ->
+      instr (vpaddq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int32x16_mul_mask" -> instr vpmuldq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_mul_maskz" ->
+      instr (vpmuldq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int32x16_mul" -> instr vpmuldq_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_mul_unsigned_mask" ->
+      instr vpmuludq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_mul_unsigned_maskz" ->
+      instr (vpmuludq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int32x16_mul_unsigned" -> instr vpmuludq_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_sub_maskz" ->
+      instr (vpsubd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_sub_mask" -> instr vpsubq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_sub_maskz" ->
+      instr (vpsubq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_sub" -> instr vpsubq_Z_Z_Zm512 args
+    | "caml_avx512f_float64x8_sub_maskz" ->
+      instr (vsubpd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_sub_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsubpd_Z_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vsubpd_Z_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vsubpd_Z_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vsubpd_Z_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_sub_maskz" ->
+      instr (vsubps_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_sub_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsubps_Z_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vsubps_Z_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vsubps_Z_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vsubps_Z_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float64_sub_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsubsd_X_X_X_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vsubsd_X_X_X_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vsubsd_X_X_X_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vsubsd_X_X_X_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64_sub_mask" -> instr vsubsd_X_X_Xm64_K_merge args
+    | "caml_avx512f_float64_sub_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsubsd_X_X_X_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vsubsd_X_X_X_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vsubsd_X_X_X_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vsubsd_X_X_X_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float64_sub_maskz" -> instr (vsubsd_X_X_Xm64_K ~z:true) args
+    | "caml_avx512f_float64_sub_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsubsd_X_X_X ~rnd:Rnd_near) args
+      | 9 -> instr (vsubsd_X_X_X ~rnd:Rnd_down) args
+      | 10 -> instr (vsubsd_X_X_X ~rnd:Rnd_up) args
+      | 11 -> instr (vsubsd_X_X_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32_sub_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsubss_X_X_X_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vsubss_X_X_X_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vsubss_X_X_X_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vsubss_X_X_X_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32_sub_mask" -> instr vsubss_X_X_Xm32_K_merge args
+    | "caml_avx512f_float32_sub_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsubss_X_X_X_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vsubss_X_X_X_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vsubss_X_X_X_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vsubss_X_X_X_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float32_sub_maskz" -> instr (vsubss_X_X_Xm32_K ~z:true) args
+    | "caml_avx512f_float32_sub_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsubss_X_X_X ~rnd:Rnd_near) args
+      | 9 -> instr (vsubss_X_X_X ~rnd:Rnd_down) args
+      | 10 -> instr (vsubss_X_X_X ~rnd:Rnd_up) args
+      | 11 -> instr (vsubss_X_X_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_mask16_and" -> instr kandw args
+    | "caml_avx512f_mask16_andnot" -> instr kandnw args
+    | "caml_avx512f_mask16_not" -> instr knotw args
+    | "caml_avx512f_mask16_or" -> instr korw args
+    | "caml_avx512f_mask16_xnor" -> instr kxnorw args
+    | "caml_avx512f_mask16_xor" -> instr kxorw args
+    | "caml_avx512f_mask16_shift_left" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr kshiftlw ~i args
+    | "caml_avx512f_mask16_shift_right" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr kshiftrw ~i args
+    | "caml_avx512f_mask16_to_int32" -> instr kmovw_r32_K args
+    | "caml_avx512f_int32_to_mask16" -> instr kmovw_K_r32 args
+    | "caml_avx512f_mask16_unpack" -> instr kunpckbw args
+    | "caml_avx512f_int32x16_align_right_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (valignd_Z_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int64x8_align_right" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr valignq_Z_Z_Zm512 ~i args
+    | "caml_avx512f_int64x8_align_right_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr valignq_Z_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_int64x8_align_right_maskz" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr (valignq_Z_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_float64x8_fixupimm" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfixupimmpd_Z_Z_Zm512 ~i args
+    | "caml_avx512f_float64x8_fixupimm_round" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmpd_Z_Z_Z ~sae:true) ~i args
+    | "caml_avx512f_float64x8_fixupimm_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmpd_Z_Z_Zm512_K ~z:false) ~i args
+    | "caml_avx512f_float64x8_fixupimm_round_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmpd_Z_Z_Z_K ~sae:true ~z:false) ~i args
+    | "caml_avx512f_float64x8_fixupimm_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmpd_Z_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_float64x8_fixupimm_round_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmpd_Z_Z_Z_K ~sae:true ~z:true) ~i args
+    | "caml_avx512f_float32x16_fixupimm" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfixupimmps_Z_Z_Zm512 ~i args
+    | "caml_avx512f_float32x16_fixupimm_round" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmps_Z_Z_Z ~sae:true) ~i args
+    | "caml_avx512f_float32x16_fixupimm_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmps_Z_Z_Zm512_K ~z:false) ~i args
+    | "caml_avx512f_float32x16_fixupimm_round_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmps_Z_Z_Z_K ~sae:true ~z:false) ~i args
+    | "caml_avx512f_float32x16_fixupimm_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmps_Z_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_float32x16_fixupimm_round_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmps_Z_Z_Z_K ~sae:true ~z:true) ~i args
+    | "caml_avx512f_float64_fixupimm_round" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmsd_X_X_X ~sae:true) ~i args
+    | "caml_avx512f_float64_fixupimm" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfixupimmsd_X_X_Xm64 ~i args
+    | "caml_avx512f_float64_fixupimm_round_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmsd_X_X_X_K ~sae:true ~z:false) ~i args
+    | "caml_avx512f_float64_fixupimm_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmsd_X_X_Xm64_K ~z:false) ~i args
+    | "caml_avx512f_float64_fixupimm_round_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmsd_X_X_X_K ~sae:true ~z:true) ~i args
+    | "caml_avx512f_float64_fixupimm_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmsd_X_X_Xm64_K ~z:true) ~i args
+    | "caml_avx512f_float32_fixupimm_round" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmss_X_X_X ~sae:true) ~i args
+    | "caml_avx512f_float32_fixupimm" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vfixupimmss_X_X_Xm32 ~i args
+    | "caml_avx512f_float32_fixupimm_round_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmss_X_X_X_K ~sae:true ~z:false) ~i args
+    | "caml_avx512f_float32_fixupimm_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmss_X_X_Xm32_K ~z:false) ~i args
+    | "caml_avx512f_float32_fixupimm_round_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmss_X_X_X_K ~sae:true ~z:true) ~i args
+    | "caml_avx512f_float32_fixupimm_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vfixupimmss_X_X_Xm32_K ~z:true) ~i args
+    | "caml_avx512f_float64x8_getexp_maskz" ->
+      instr (vgetexppd_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_getexp_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vgetexppd_Z_Z_K ~sae:true ~z:true) args
+    | "caml_avx512f_float32x16_getexp_maskz" ->
+      instr (vgetexpps_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_getexp_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vgetexpps_Z_Z_K ~sae:true ~z:true) args
+    | "caml_avx512f_float64_getexp_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vgetexpsd_X_X_X ~sae:true) args
+    | "caml_avx512f_float64_getexp" -> instr vgetexpsd_X_X_Xm64 args
+    | "caml_avx512f_float64_getexp_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vgetexpsd_X_X_X_K_merge ~sae:true) args
+    | "caml_avx512f_float64_getexp_mask" ->
+      instr vgetexpsd_X_X_Xm64_K_merge args
+    | "caml_avx512f_float64_getexp_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vgetexpsd_X_X_X_K ~sae:true ~z:true) args
+    | "caml_avx512f_float64_getexp_maskz" ->
+      instr (vgetexpsd_X_X_Xm64_K ~z:true) args
+    | "caml_avx512f_float32_getexp_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vgetexpss_X_X_X ~sae:true) args
+    | "caml_avx512f_float32_getexp" -> instr vgetexpss_X_X_Xm32 args
+    | "caml_avx512f_float32_getexp_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vgetexpss_X_X_X_K_merge ~sae:true) args
+    | "caml_avx512f_float32_getexp_mask" ->
+      instr vgetexpss_X_X_Xm32_K_merge args
+    | "caml_avx512f_float32_getexp_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vgetexpss_X_X_X_K ~sae:true ~z:true) args
+    | "caml_avx512f_float32_getexp_maskz" ->
+      instr (vgetexpss_X_X_Xm32_K ~z:true) args
+    | "caml_avx512f_float64x8_getmant_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantpd_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_float64x8_getmant_round_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantpd_Z_Z_K ~sae:true ~z:true) ~i args
+    | "caml_avx512f_float32x16_getmant_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantps_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_float32x16_getmant_round_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantps_Z_Z_K ~sae:true ~z:true) ~i args
+    | "caml_avx512f_float64_getmant_round" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantsd_X_X_X ~sae:true) ~i args
+    | "caml_avx512f_float64_getmant" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vgetmantsd_X_X_Xm64 ~i args
+    | "caml_avx512f_float64_getmant_round_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantsd_X_X_X_K_merge ~sae:true) ~i args
+    | "caml_avx512f_float64_getmant_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vgetmantsd_X_X_Xm64_K_merge ~i args
+    | "caml_avx512f_float64_getmant_round_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantsd_X_X_X_K ~sae:true ~z:true) ~i args
+    | "caml_avx512f_float64_getmant_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantsd_X_X_Xm64_K ~z:true) ~i args
+    | "caml_avx512f_float32_getmant_round" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantss_X_X_X ~sae:true) ~i args
+    | "caml_avx512f_float32_getmant" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vgetmantss_X_X_Xm32 ~i args
+    | "caml_avx512f_float32_getmant_round_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantss_X_X_X_K_merge ~sae:true) ~i args
+    | "caml_avx512f_float32_getmant_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vgetmantss_X_X_Xm32_K_merge ~i args
+    | "caml_avx512f_float32_getmant_round_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantss_X_X_X_K ~sae:true ~z:true) ~i args
+    | "caml_avx512f_float32_getmant_maskz" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantss_X_X_Xm32_K ~z:true) ~i args
+    | "caml_avx512f_int32x16_rorv_maskz" ->
+      instr (vprorvd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_roundscale_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vrndscalepd_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_float64x8_roundscale_round_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscalepd_Z_Z_K_merge ~sae:true) ~i args
+    | "caml_avx512f_float64x8_roundscale_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscalepd_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_float64x8_roundscale_round_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscalepd_Z_Z_K ~sae:true ~z:true) ~i args
+    | "caml_avx512f_float64x8_roundscale" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vrndscalepd_Z_Zm512 ~i args
+    | "caml_avx512f_float64x8_roundscale_round" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscalepd_Z_Z ~sae:true) ~i args
+    | "caml_avx512f_float32x16_roundscale_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vrndscaleps_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_float32x16_roundscale_round_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscaleps_Z_Z_K_merge ~sae:true) ~i args
+    | "caml_avx512f_float32x16_roundscale_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscaleps_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_float32x16_roundscale_round_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscaleps_Z_Z_K ~sae:true ~z:true) ~i args
+    | "caml_avx512f_float32x16_roundscale" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vrndscaleps_Z_Zm512 ~i args
+    | "caml_avx512f_float32x16_roundscale_round" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscaleps_Z_Z ~sae:true) ~i args
+    | "caml_avx512f_float64_roundscale_round_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscalesd_X_X_X_K_merge ~sae:true) ~i args
+    | "caml_avx512f_float64_roundscale_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vrndscalesd_X_X_Xm64_K_merge ~i args
+    | "caml_avx512f_float64_roundscale_round_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscalesd_X_X_X_K ~sae:true ~z:true) ~i args
+    | "caml_avx512f_float64_roundscale_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscalesd_X_X_Xm64_K ~z:true) ~i args
+    | "caml_avx512f_float64_roundscale_round" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscalesd_X_X_X ~sae:true) ~i args
+    | "caml_avx512f_float64_roundscale" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vrndscalesd_X_X_Xm64 ~i args
+    | "caml_avx512f_float32_roundscale_round_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscaless_X_X_X_K_merge ~sae:true) ~i args
+    | "caml_avx512f_float32_roundscale_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vrndscaless_X_X_Xm32_K_merge ~i args
+    | "caml_avx512f_float32_roundscale_round_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscaless_X_X_X_K ~sae:true ~z:true) ~i args
+    | "caml_avx512f_float32_roundscale_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscaless_X_X_Xm32_K ~z:true) ~i args
+    | "caml_avx512f_float32_roundscale_round" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vrndscaless_X_X_X ~sae:true) ~i args
+    | "caml_avx512f_float32_roundscale" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vrndscaless_X_X_Xm32 ~i args
+    | "caml_avx512f_float64x8_scalef_mask" ->
+      instr vscalefpd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_scalef_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vscalefpd_Z_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vscalefpd_Z_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vscalefpd_Z_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vscalefpd_Z_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64x8_scalef_maskz" ->
+      instr (vscalefpd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_scalef_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vscalefpd_Z_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vscalefpd_Z_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vscalefpd_Z_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vscalefpd_Z_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float64x8_scalef" -> instr vscalefpd_Z_Z_Zm512 args
+    | "caml_avx512f_float64x8_scalef_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vscalefpd_Z_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vscalefpd_Z_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vscalefpd_Z_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vscalefpd_Z_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_scalef_mask" ->
+      instr vscalefps_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_scalef_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vscalefps_Z_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vscalefps_Z_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vscalefps_Z_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vscalefps_Z_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_scalef_maskz" ->
+      instr (vscalefps_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_scalef_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vscalefps_Z_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vscalefps_Z_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vscalefps_Z_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vscalefps_Z_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_scalef" -> instr vscalefps_Z_Z_Zm512 args
+    | "caml_avx512f_float32x16_scalef_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vscalefps_Z_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vscalefps_Z_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vscalefps_Z_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vscalefps_Z_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64_scalef_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vscalefsd_X_X_X_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vscalefsd_X_X_X_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vscalefsd_X_X_X_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vscalefsd_X_X_X_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64_scalef_mask" ->
+      instr vscalefsd_X_X_Xm64_K_merge args
+    | "caml_avx512f_float64_scalef_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vscalefsd_X_X_X_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vscalefsd_X_X_X_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vscalefsd_X_X_X_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vscalefsd_X_X_X_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float64_scalef_maskz" ->
+      instr (vscalefsd_X_X_Xm64_K ~z:true) args
+    | "caml_avx512f_float64_scalef_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vscalefsd_X_X_X ~rnd:Rnd_near) args
+      | 9 -> instr (vscalefsd_X_X_X ~rnd:Rnd_down) args
+      | 10 -> instr (vscalefsd_X_X_X ~rnd:Rnd_up) args
+      | 11 -> instr (vscalefsd_X_X_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64_scalef" -> instr vscalefsd_X_X_Xm64 args
+    | "caml_avx512f_float32_scalef_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vscalefss_X_X_X_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vscalefss_X_X_X_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vscalefss_X_X_X_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vscalefss_X_X_X_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32_scalef_mask" ->
+      instr vscalefss_X_X_Xm32_K_merge args
+    | "caml_avx512f_float32_scalef_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vscalefss_X_X_X_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vscalefss_X_X_X_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vscalefss_X_X_X_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vscalefss_X_X_X_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float32_scalef_maskz" ->
+      instr (vscalefss_X_X_Xm32_K ~z:true) args
+    | "caml_avx512f_float32_scalef_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vscalefss_X_X_X ~rnd:Rnd_near) args
+      | 9 -> instr (vscalefss_X_X_X ~rnd:Rnd_down) args
+      | 10 -> instr (vscalefss_X_X_X ~rnd:Rnd_up) args
+      | 11 -> instr (vscalefss_X_X_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32_scalef" -> instr vscalefss_X_X_Xm32 args
+    | "caml_avx512f_float64x8_broadcast" -> instr vbroadcastsd_Z_Xm64 args
+    | "caml_avx512f_float64x8_broadcast_mask" ->
+      instr vbroadcastsd_Z_Xm64_K_merge args
+    | "caml_avx512f_float64x8_broadcast_maskz" ->
+      instr (vbroadcastsd_Z_Xm64_K ~z:true) args
+    | "caml_avx512f_float32x16_broadcast" -> instr vbroadcastss_Z_Xm32 args
+    | "caml_avx512f_float32x16_broadcast_mask" ->
+      instr vbroadcastss_Z_Xm32_K_merge args
+    | "caml_avx512f_float32x16_broadcast_maskz" ->
+      instr (vbroadcastss_Z_Xm32_K ~z:true) args
+    | "caml_avx512f_float64x8_compress_mask" ->
+      instr vcompresspd_Z_Z_K_merge args
+    | "caml_avx512f_float64x8_compress_maskz" ->
+      instr (vcompresspd_Zm512_Z_K ~z:true) args
+    | "caml_avx512f_float32x16_compress_mask" ->
+      instr vcompressps_Z_Z_K_merge args
+    | "caml_avx512f_float32x16_compress_maskz" ->
+      instr (vcompressps_Zm512_Z_K ~z:true) args
+    | "caml_avx512f_float64x8_expand_mask" ->
+      instr vexpandpd_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_expand_maskz" ->
+      instr (vexpandpd_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_expand_mask" ->
+      instr vexpandps_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_expand_maskz" ->
+      instr (vexpandps_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_extract_float32x4" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vextractf32x4_Xm128_Z ~i args
+    | "caml_avx512f_float32x16_extract_float32x4_mask" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vextractf32x4_X_Z_K_merge ~i args
+    | "caml_avx512f_float32x16_extract_float32x4_maskz" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr (vextractf32x4_Xm128_Z_K ~z:true) ~i args
+    | "caml_avx512f_float64x8_extract_float64x4" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextractf64x4_Ym256_Z ~i args
+    | "caml_avx512f_float64x8_extract_float64x4_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextractf64x4_Y_Z_K_merge ~i args
+    | "caml_avx512f_float64x8_extract_float64x4_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (vextractf64x4_Ym256_Z_K ~z:true) ~i args
+    | "caml_avx512f_int32x16_extract_int32x4" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vextracti32x4_Xm128_Z ~i args
+    | "caml_avx512f_int32x16_extract_int32x4_mask" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vextracti32x4_X_Z_K_merge ~i args
+    | "caml_avx512f_int32x16_extract_int32x4_maskz" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr (vextracti32x4_Xm128_Z_K ~z:true) ~i args
+    | "caml_avx512f_int64x8_extract_int64x4" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextracti64x4_Ym256_Z ~i args
+    | "caml_avx512f_int64x8_extract_int64x4_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vextracti64x4_Y_Z_K_merge ~i args
+    | "caml_avx512f_int64x8_extract_int64x4_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (vextracti64x4_Ym256_Z_K ~z:true) ~i args
+    | "caml_avx512f_float32x16_insert_float32x4" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vinsertf32x4_Z_Z_Xm128 ~i args
+    | "caml_avx512f_float32x16_insert_float32x4_mask" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vinsertf32x4_Z_Z_Xm128_K_merge ~i args
+    | "caml_avx512f_float32x16_insert_float32x4_maskz" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr (vinsertf32x4_Z_Z_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_float64x8_insert_float64x4" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinsertf64x4_Z_Z_Ym256 ~i args
+    | "caml_avx512f_float64x8_insert_float64x4_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinsertf64x4_Z_Z_Ym256_K_merge ~i args
+    | "caml_avx512f_float64x8_insert_float64x4_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (vinsertf64x4_Z_Z_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int32x16_insert_int32x4" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vinserti32x4_Z_Z_Xm128 ~i args
+    | "caml_avx512f_int32x16_insert_int32x4_mask" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr vinserti32x4_Z_Z_Xm128_K_merge ~i args
+    | "caml_avx512f_int32x16_insert_int32x4_maskz" ->
+      let i, args = extract_constant args ~max:3 op in
+      instr (vinserti32x4_Z_Z_Xm128_K ~z:true) ~i args
+    | "caml_avx512f_int64x8_insert_int64x4" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinserti64x4_Z_Z_Ym256 ~i args
+    | "caml_avx512f_int64x8_insert_int64x4_mask" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr vinserti64x4_Z_Z_Ym256_K_merge ~i args
+    | "caml_avx512f_int64x8_insert_int64x4_maskz" ->
+      let i, args = extract_constant args ~max:1 op in
+      instr (vinserti64x4_Z_Z_Ym256_K ~z:true) ~i args
+    | "caml_avx512f_int32x16_broadcast" -> instr vpbroadcastd_Z_Xm32 args
+    | "caml_avx512f_int32x16_broadcast_mask" ->
+      instr vpbroadcastd_Z_Xm32_K_merge args
+    | "caml_avx512f_int32x16_broadcast_maskz" ->
+      instr (vpbroadcastd_Z_Xm32_K ~z:true) args
+    | "caml_avx512f_int64x8_broadcast" -> instr vpbroadcastq_Z_Xm64 args
+    | "caml_avx512f_int64x8_broadcast_mask" ->
+      instr vpbroadcastq_Z_Xm64_K_merge args
+    | "caml_avx512f_int64x8_broadcast_maskz" ->
+      instr (vpbroadcastq_Z_Xm64_K ~z:true) args
+    | "caml_avx512f_int32x16_compress_mask" ->
+      instr vpcompressd_Z_Z_K_merge args
+    | "caml_avx512f_int32x16_compress_maskz" ->
+      instr (vpcompressd_Zm512_Z_K ~z:true) args
+    | "caml_avx512f_int64x8_compress_mask" -> instr vpcompressq_Z_Z_K_merge args
+    | "caml_avx512f_int64x8_compress_maskz" ->
+      instr (vpcompressq_Zm512_Z_K ~z:true) args
+    | "caml_avx512f_int32x16_permutexvar_mask" ->
+      instr vpermd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_permutexvar_maskz" ->
+      instr (vpermd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int32x16_permutexvar" -> instr vpermd_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_permutex2var_mask2" -> (
+      match args with
+      | a :: b :: rest -> instr (vpermi2d_Z_Z_Zm512_K ~z:false) (b :: a :: rest)
+      | _ -> None)
+    | "caml_avx512f_int32x16_permutex2var_mask" ->
+      instr (vpermt2d_Z_Z_Zm512_K ~z:false) args
+    | "caml_avx512f_int32x16_permutex2var_maskz" ->
+      instr (vpermt2d_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int32x16_permutex2var" -> instr vpermt2d_Z_Z_Zm512 args
+    | "caml_avx512f_float64x8_permutex2var_mask2" -> (
+      match args with
+      | a :: b :: rest -> instr (vpermi2pd_Z_Z_Zm512_K ~z:false) (b :: a :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_permutex2var_mask" ->
+      instr (vpermt2pd_Z_Z_Zm512_K ~z:false) args
+    | "caml_avx512f_float64x8_permutex2var_maskz" ->
+      instr (vpermt2pd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_permutex2var" -> instr vpermt2pd_Z_Z_Zm512 args
+    | "caml_avx512f_float32x16_permutex2var_mask2" -> (
+      match args with
+      | a :: b :: rest -> instr (vpermi2ps_Z_Z_Zm512_K ~z:false) (b :: a :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_permutex2var_mask" ->
+      instr (vpermt2ps_Z_Z_Zm512_K ~z:false) args
+    | "caml_avx512f_float32x16_permutex2var_maskz" ->
+      instr (vpermt2ps_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_permutex2var" -> instr vpermt2ps_Z_Z_Zm512 args
+    | "caml_avx512f_int64x8_permutex2var_mask2" -> (
+      match args with
+      | a :: b :: rest -> instr (vpermi2q_Z_Z_Zm512_K ~z:false) (b :: a :: rest)
+      | _ -> None)
+    | "caml_avx512f_int64x8_permutex2var_mask" ->
+      instr (vpermt2q_Z_Z_Zm512_K ~z:false) args
+    | "caml_avx512f_int64x8_permutex2var_maskz" ->
+      instr (vpermt2q_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_permutex2var" -> instr vpermt2q_Z_Z_Zm512 args
+    | "caml_avx512f_float64x8_permute_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermilpd_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_float64x8_permutevar_mask" ->
+      instr vpermilpd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_permute_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpermilpd_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_float64x8_permutevar_maskz" ->
+      instr (vpermilpd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_permute" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermilpd_Z_Zm512 ~i args
+    | "caml_avx512f_float64x8_permutevar" -> instr vpermilpd_Z_Z_Zm512 args
+    | "caml_avx512f_float32x16_permute_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermilps_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_float32x16_permutevar_mask" ->
+      instr vpermilps_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_permute_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpermilps_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_float32x16_permutevar_maskz" ->
+      instr (vpermilps_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_permute" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermilps_Z_Zm512 ~i args
+    | "caml_avx512f_float32x16_permutevar" -> instr vpermilps_Z_Z_Zm512 args
+    | "caml_avx512f_float64x8_permute_across_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermpd_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_float64x8_permutexvar_mask" ->
+      instr vpermpd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_permute_across_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpermpd_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_float64x8_permutexvar_maskz" ->
+      instr (vpermpd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_permute_across" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermpd_Z_Zm512 ~i args
+    | "caml_avx512f_float64x8_permutexvar" -> instr vpermpd_Z_Z_Zm512 args
+    | "caml_avx512f_float32x16_permutexvar_mask" ->
+      instr vpermps_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_permutexvar_maskz" ->
+      instr (vpermps_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_permutexvar" -> instr vpermps_Z_Z_Zm512 args
+    | "caml_avx512f_int64x8_permute_across_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermq_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_int64x8_permutexvar_mask" ->
+      instr vpermq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_permute_across_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpermq_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int64x8_permutexvar_maskz" ->
+      instr (vpermq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_permute_across" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpermq_Z_Zm512 ~i args
+    | "caml_avx512f_int64x8_permutexvar" -> instr vpermq_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_expand_mask" ->
+      instr vpexpandd_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_expand_maskz" ->
+      instr (vpexpandd_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_expand_mask" -> instr vpexpandq_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_expand_maskz" ->
+      instr (vpexpandq_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int32x16_shuffle_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpshufd_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int32x16_interleave_high_mask" ->
+      instr vpunpckhdq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_interleave_high_maskz" ->
+      instr (vpunpckhdq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int32x16_interleave_high" -> instr vpunpckhdq_Z_Z_Zm512 args
+    | "caml_avx512f_int64x8_interleave_high_mask" ->
+      instr vpunpckhqdq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_interleave_high_maskz" ->
+      instr (vpunpckhqdq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_interleave_high" -> instr vpunpckhqdq_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_interleave_low_mask" ->
+      instr vpunpckldq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_interleave_low_maskz" ->
+      instr (vpunpckldq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int32x16_interleave_low" -> instr vpunpckldq_Z_Z_Zm512 args
+    | "caml_avx512f_int64x8_interleave_low_mask" ->
+      instr vpunpcklqdq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_interleave_low_maskz" ->
+      instr (vpunpcklqdq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_interleave_low" -> instr vpunpcklqdq_Z_Z_Zm512 args
+    | "caml_avx512f_float32x16_shuffle_f32x4_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vshuff32x4_Z_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_float32x16_shuffle_f32x4_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vshuff32x4_Z_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_float32x16_shuffle_f32x4" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vshuff32x4_Z_Z_Zm512 ~i args
+    | "caml_avx512f_float64x8_shuffle_f64x2_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vshuff64x2_Z_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_float64x8_shuffle_f64x2_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vshuff64x2_Z_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_float64x8_shuffle_f64x2" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vshuff64x2_Z_Z_Zm512 ~i args
+    | "caml_avx512f_int32x16_shuffle_i32x4_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vshufi32x4_Z_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_int32x16_shuffle_i32x4_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vshufi32x4_Z_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int32x16_shuffle_i32x4" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vshufi32x4_Z_Z_Zm512 ~i args
+    | "caml_avx512f_int64x8_shuffle_i64x2_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vshufi64x2_Z_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_int64x8_shuffle_i64x2_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vshufi64x2_Z_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int64x8_shuffle_i64x2" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vshufi64x2_Z_Z_Zm512 ~i args
+    | "caml_avx512f_float64x8_shuffle_inlane_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vshufpd_Z_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_float64x8_shuffle_inlane_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vshufpd_Z_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_float64x8_shuffle_inlane" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vshufpd_Z_Z_Zm512 ~i args
+    | "caml_avx512f_float32x16_shuffle_inlane_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vshufps_Z_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_float32x16_shuffle_inlane_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vshufps_Z_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_float32x16_shuffle_inlane" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vshufps_Z_Z_Zm512 ~i args
+    | "caml_avx512f_float64x8_interleave_high_mask" ->
+      instr vunpckhpd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_interleave_high_maskz" ->
+      instr (vunpckhpd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_interleave_high" -> instr vunpckhpd_Z_Z_Zm512 args
+    | "caml_avx512f_float32x16_interleave_high_mask" ->
+      instr vunpckhps_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_interleave_high_maskz" ->
+      instr (vunpckhps_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_interleave_high" ->
+      instr vunpckhps_Z_Z_Zm512 args
+    | "caml_avx512f_float64x8_interleave_low_mask" ->
+      instr vunpcklpd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_interleave_low_maskz" ->
+      instr (vunpcklpd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_interleave_low" -> instr vunpcklpd_Z_Z_Zm512 args
+    | "caml_avx512f_float32x16_interleave_low_mask" ->
+      instr vunpcklps_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_interleave_low_maskz" ->
+      instr (vunpcklps_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_interleave_low" -> instr vunpcklps_Z_Z_Zm512 args
+    | "caml_avx512f_float64_cmp" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmpsd_K_X_Xm64 ~i args
+    | "caml_avx512f_float64_cmp_mask" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmpsd_K_X_Xm64_K ~i args
+    | "caml_avx512f_float32_cmp" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmpss_K_X_Xm32 ~i args
+    | "caml_avx512f_float32_cmp_mask" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmpss_K_X_Xm32_K ~i args
+    | "caml_avx512f_int32x16_cmplt" -> instr vpcmpd_K_Z_Zm512 ~i:1 args
+    | "caml_avx512f_int32x16_cmplt_mask" -> instr vpcmpd_K_Z_Zm512_K ~i:1 args
+    | "caml_avx512f_int64x8_cmp" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpq_K_Z_Zm512 ~i args
+    | "caml_avx512f_int64x8_cmpeq" -> instr vpcmpeqq_K_Z_Zm512 args
+    | "caml_avx512f_int64x8_cmpge" -> instr vpcmpq_K_Z_Zm512 ~i:5 args
+    | "caml_avx512f_int64x8_cmpgt" -> instr vpcmpgtq_K_Z_Zm512 args
+    | "caml_avx512f_int64x8_cmple" -> instr vpcmpq_K_Z_Zm512 ~i:2 args
+    | "caml_avx512f_int64x8_cmplt" -> instr vpcmpq_K_Z_Zm512 ~i:1 args
+    | "caml_avx512f_int64x8_cmpneq" -> instr vpcmpq_K_Z_Zm512 ~i:4 args
+    | "caml_avx512f_int64x8_cmp_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpq_K_Z_Zm512_K ~i args
+    | "caml_avx512f_int64x8_cmpeq_mask" -> instr vpcmpeqq_K_Z_Zm512_K args
+    | "caml_avx512f_int64x8_cmpge_mask" -> instr vpcmpq_K_Z_Zm512_K ~i:5 args
+    | "caml_avx512f_int64x8_cmpgt_mask" -> instr vpcmpgtq_K_Z_Zm512_K args
+    | "caml_avx512f_int64x8_cmple_mask" -> instr vpcmpq_K_Z_Zm512_K ~i:2 args
+    | "caml_avx512f_int64x8_cmplt_mask" -> instr vpcmpq_K_Z_Zm512_K ~i:1 args
+    | "caml_avx512f_int64x8_cmpneq_mask" -> instr vpcmpq_K_Z_Zm512_K ~i:4 args
+    | "caml_avx512f_int64x8_cmp_unsigned" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpuq_K_Z_Zm512 ~i args
+    | "caml_avx512f_int64x8_cmpeq_unsigned" -> instr vpcmpuq_K_Z_Zm512 ~i:0 args
+    | "caml_avx512f_int64x8_cmpge_unsigned" -> instr vpcmpuq_K_Z_Zm512 ~i:5 args
+    | "caml_avx512f_int64x8_cmpgt_unsigned" -> instr vpcmpuq_K_Z_Zm512 ~i:6 args
+    | "caml_avx512f_int64x8_cmple_unsigned" -> instr vpcmpuq_K_Z_Zm512 ~i:2 args
+    | "caml_avx512f_int64x8_cmplt_unsigned" -> instr vpcmpuq_K_Z_Zm512 ~i:1 args
+    | "caml_avx512f_int64x8_cmpneq_unsigned" ->
+      instr vpcmpuq_K_Z_Zm512 ~i:4 args
+    | "caml_avx512f_int64x8_cmp_unsigned_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpuq_K_Z_Zm512_K ~i args
+    | "caml_avx512f_int64x8_cmpeq_unsigned_mask" ->
+      instr vpcmpuq_K_Z_Zm512_K ~i:0 args
+    | "caml_avx512f_int64x8_cmpge_unsigned_mask" ->
+      instr vpcmpuq_K_Z_Zm512_K ~i:5 args
+    | "caml_avx512f_int64x8_cmpgt_unsigned_mask" ->
+      instr vpcmpuq_K_Z_Zm512_K ~i:6 args
+    | "caml_avx512f_int64x8_cmple_unsigned_mask" ->
+      instr vpcmpuq_K_Z_Zm512_K ~i:2 args
+    | "caml_avx512f_int64x8_cmplt_unsigned_mask" ->
+      instr vpcmpuq_K_Z_Zm512_K ~i:1 args
+    | "caml_avx512f_int64x8_cmpneq_unsigned_mask" ->
+      instr vpcmpuq_K_Z_Zm512_K ~i:4 args
+    | "caml_avx512f_cvt_int32x8_float64x8" -> instr vcvtdq2pd_Z_Ym256 args
+    | "caml_avx512f_cvt_int32x8_float64x8_mask" ->
+      instr vcvtdq2pd_Z_Ym256_K_merge args
+    | "caml_avx512f_cvt_int32x8_float64x8_maskz" ->
+      instr (vcvtdq2pd_Z_Ym256_K ~z:true) args
+    | "caml_avx512f_cvt_int32x16_float32x16_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtdq2ps_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtdq2ps_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtdq2ps_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtdq2ps_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_cvt_int32x16_float32x16" -> instr vcvtdq2ps_Z_Zm512 args
+    | "caml_avx512f_cvt_int32x16_float32x16_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtdq2ps_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtdq2ps_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtdq2ps_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtdq2ps_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_cvt_int32x16_float32x16_mask" ->
+      instr vcvtdq2ps_Z_Zm512_K_merge args
+    | "caml_avx512f_cvt_int32x16_float32x16_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtdq2ps_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vcvtdq2ps_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vcvtdq2ps_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vcvtdq2ps_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_cvt_int32x16_float32x16_maskz" ->
+      instr (vcvtdq2ps_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_cvt_float64x8_int32x8_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtpd2dq_Y_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtpd2dq_Y_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtpd2dq_Y_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtpd2dq_Y_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_cvt_float64x8_int32x8" -> instr vcvtpd2dq_Y_Zm512 args
+    | "caml_avx512f_cvt_float64x8_int32x8_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtpd2dq_Y_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtpd2dq_Y_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtpd2dq_Y_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtpd2dq_Y_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_cvt_float64x8_int32x8_mask" ->
+      instr vcvtpd2dq_Y_Zm512_K_merge args
+    | "caml_avx512f_cvt_float64x8_int32x8_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtpd2dq_Y_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vcvtpd2dq_Y_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vcvtpd2dq_Y_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vcvtpd2dq_Y_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_cvt_float64x8_int32x8_maskz" ->
+      instr (vcvtpd2dq_Y_Zm512_K ~z:true) args
+    | "caml_avx512f_cvt_float64x8_float32x8_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtpd2ps_Y_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtpd2ps_Y_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtpd2ps_Y_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtpd2ps_Y_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_cvt_float64x8_float32x8" -> instr vcvtpd2ps_Y_Zm512 args
+    | "caml_avx512f_cvt_float64x8_float32x8_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtpd2ps_Y_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtpd2ps_Y_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtpd2ps_Y_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtpd2ps_Y_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_cvt_float64x8_float32x8_mask" ->
+      instr vcvtpd2ps_Y_Zm512_K_merge args
+    | "caml_avx512f_cvt_float64x8_float32x8_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtpd2ps_Y_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vcvtpd2ps_Y_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vcvtpd2ps_Y_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vcvtpd2ps_Y_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_cvt_float64x8_float32x8_maskz" ->
+      instr (vcvtpd2ps_Y_Zm512_K ~z:true) args
+    | "caml_avx512f_cvt_float64x8_int32x8_unsigned_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtpd2udq_Y_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtpd2udq_Y_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtpd2udq_Y_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtpd2udq_Y_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_cvt_float64x8_int32x8_unsigned" ->
+      instr vcvtpd2udq_Y_Zm512 args
+    | "caml_avx512f_cvt_float64x8_int32x8_unsigned_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtpd2udq_Y_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtpd2udq_Y_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtpd2udq_Y_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtpd2udq_Y_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_cvt_float64x8_int32x8_unsigned_mask" ->
+      instr vcvtpd2udq_Y_Zm512_K_merge args
+    | "caml_avx512f_cvt_float64x8_int32x8_unsigned_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtpd2udq_Y_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vcvtpd2udq_Y_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vcvtpd2udq_Y_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vcvtpd2udq_Y_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_cvt_float64x8_int32x8_unsigned_maskz" ->
+      instr (vcvtpd2udq_Y_Zm512_K ~z:true) args
+    | "caml_avx512f_cvt_float32x16_int32x16_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtps2dq_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtps2dq_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtps2dq_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtps2dq_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_cvt_float32x16_int32x16" -> instr vcvtps2dq_Z_Zm512 args
+    | "caml_avx512f_cvt_float32x16_int32x16_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtps2dq_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtps2dq_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtps2dq_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtps2dq_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_cvt_float32x16_int32x16_mask" ->
+      instr vcvtps2dq_Z_Zm512_K_merge args
+    | "caml_avx512f_cvt_float32x16_int32x16_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtps2dq_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vcvtps2dq_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vcvtps2dq_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vcvtps2dq_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_cvt_float32x16_int32x16_maskz" ->
+      instr (vcvtps2dq_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_cvt_float32x8_float64x8" -> instr vcvtps2pd_Z_Ym256 args
+    | "caml_avx512f_cvt_float32x8_float64x8_mask" ->
+      instr vcvtps2pd_Z_Ym256_K_merge args
+    | "caml_avx512f_cvt_float32x8_float64x8_maskz" ->
+      instr (vcvtps2pd_Z_Ym256_K ~z:true) args
+    | "caml_avx512f_cvt_float32x16_int32x16_unsigned_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtps2udq_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtps2udq_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtps2udq_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtps2udq_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_cvt_float32x16_int32x16_unsigned" ->
+      instr vcvtps2udq_Z_Zm512 args
+    | "caml_avx512f_cvt_float32x16_int32x16_unsigned_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtps2udq_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtps2udq_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtps2udq_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtps2udq_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_cvt_float32x16_int32x16_unsigned_mask" ->
+      instr vcvtps2udq_Z_Zm512_K_merge args
+    | "caml_avx512f_cvt_float32x16_int32x16_unsigned_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtps2udq_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vcvtps2udq_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vcvtps2udq_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vcvtps2udq_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_cvt_float32x16_int32x16_unsigned_maskz" ->
+      instr (vcvtps2udq_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64_cvt_int32_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtsd2si_r32_X ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtsd2si_r32_X ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtsd2si_r32_X ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtsd2si_r32_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64_cvt_int64_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtsd2si_r64_X ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtsd2si_r64_X ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtsd2si_r64_X ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtsd2si_r64_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64_cvt_int32" -> instr vcvtsd2si_r32_Xm64 args
+    | "caml_avx512f_float64_cvt_int64" -> instr vcvtsd2si_r64_Xm64 args
+    | "caml_avx512f_float64_cvt_int32_unsigned_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtsd2usi_r32_X ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtsd2usi_r32_X ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtsd2usi_r32_X ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtsd2usi_r32_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64_cvt_int64_unsigned_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtsd2usi_r64_X ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtsd2usi_r64_X ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtsd2usi_r64_X ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtsd2usi_r64_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64_cvt_int32_unsigned" ->
+      instr vcvtsd2usi_r32_Xm64 args
+    | "caml_avx512f_float64_cvt_int64_unsigned" ->
+      instr vcvtsd2usi_r64_Xm64 args
+    | "caml_avx512f_int64_cvt_float64_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtsi2sd_X_X_r64 ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtsi2sd_X_X_r64 ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtsi2sd_X_X_r64 ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtsi2sd_X_X_r64 ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_int32_cvt_float64" -> instr vcvtsi2sd_X_X_r32m32 args
+    | "caml_avx512f_int64_cvt_float64" -> instr vcvtsi2sd_X_X_r64m64 args
+    | "caml_avx512f_int32_cvt_float32_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtsi2ss_X_X_r32 ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtsi2ss_X_X_r32 ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtsi2ss_X_X_r32 ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtsi2ss_X_X_r32 ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_int64_cvt_float32_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtsi2ss_X_X_r64 ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtsi2ss_X_X_r64 ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtsi2ss_X_X_r64 ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtsi2ss_X_X_r64 ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_int32_cvt_float32" -> instr vcvtsi2ss_X_X_r32m32 args
+    | "caml_avx512f_int64_cvt_float32" -> instr vcvtsi2ss_X_X_r64m64 args
+    | "caml_avx512f_float32_cvt_int32_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtss2si_r32_X ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtss2si_r32_X ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtss2si_r32_X ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtss2si_r32_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32_cvt_int64_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtss2si_r64_X ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtss2si_r64_X ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtss2si_r64_X ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtss2si_r64_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32_cvt_int32" -> instr vcvtss2si_r32_Xm32 args
+    | "caml_avx512f_float32_cvt_int64" -> instr vcvtss2si_r64_Xm32 args
+    | "caml_avx512f_float32_cvt_int32_unsigned_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtss2usi_r32_X ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtss2usi_r32_X ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtss2usi_r32_X ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtss2usi_r32_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32_cvt_int64_unsigned_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtss2usi_r64_X ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtss2usi_r64_X ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtss2usi_r64_X ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtss2usi_r64_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32_cvt_int32_unsigned" ->
+      instr vcvtss2usi_r32_Xm32 args
+    | "caml_avx512f_float32_cvt_int64_unsigned" ->
+      instr vcvtss2usi_r64_Xm32 args
+    | "caml_avx512f_cvtt_float64x8_int32x8_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttpd2dq_Y_Z ~sae:true) args
+    | "caml_avx512f_cvtt_float64x8_int32x8" -> instr vcvttpd2dq_Y_Zm512 args
+    | "caml_avx512f_cvtt_float64x8_int32x8_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttpd2dq_Y_Z_K_merge ~sae:true) args
+    | "caml_avx512f_cvtt_float64x8_int32x8_mask" ->
+      instr vcvttpd2dq_Y_Zm512_K_merge args
+    | "caml_avx512f_cvtt_float64x8_int32x8_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttpd2dq_Y_Z_K ~sae:true ~z:true) args
+    | "caml_avx512f_cvtt_float64x8_int32x8_maskz" ->
+      instr (vcvttpd2dq_Y_Zm512_K ~z:true) args
+    | "caml_avx512f_cvtt_float64x8_int32x8_unsigned_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttpd2udq_Y_Z ~sae:true) args
+    | "caml_avx512f_cvtt_float64x8_int32x8_unsigned" ->
+      instr vcvttpd2udq_Y_Zm512 args
+    | "caml_avx512f_cvtt_float64x8_int32x8_unsigned_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttpd2udq_Y_Z_K_merge ~sae:true) args
+    | "caml_avx512f_cvtt_float64x8_int32x8_unsigned_mask" ->
+      instr vcvttpd2udq_Y_Zm512_K_merge args
+    | "caml_avx512f_cvtt_float64x8_int32x8_unsigned_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttpd2udq_Y_Z_K ~sae:true ~z:true) args
+    | "caml_avx512f_cvtt_float64x8_int32x8_unsigned_maskz" ->
+      instr (vcvttpd2udq_Y_Zm512_K ~z:true) args
+    | "caml_avx512f_cvtt_float32x16_int32x16_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttps2dq_Z_Z ~sae:true) args
+    | "caml_avx512f_cvtt_float32x16_int32x16" -> instr vcvttps2dq_Z_Zm512 args
+    | "caml_avx512f_cvtt_float32x16_int32x16_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttps2dq_Z_Z_K_merge ~sae:true) args
+    | "caml_avx512f_cvtt_float32x16_int32x16_mask" ->
+      instr vcvttps2dq_Z_Zm512_K_merge args
+    | "caml_avx512f_cvtt_float32x16_int32x16_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttps2dq_Z_Z_K ~sae:true ~z:true) args
+    | "caml_avx512f_cvtt_float32x16_int32x16_maskz" ->
+      instr (vcvttps2dq_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_cvtt_float32x16_int32x16_unsigned_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttps2udq_Z_Z ~sae:true) args
+    | "caml_avx512f_cvtt_float32x16_int32x16_unsigned" ->
+      instr vcvttps2udq_Z_Zm512 args
+    | "caml_avx512f_cvtt_float32x16_int32x16_unsigned_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttps2udq_Z_Z_K_merge ~sae:true) args
+    | "caml_avx512f_cvtt_float32x16_int32x16_unsigned_mask" ->
+      instr vcvttps2udq_Z_Zm512_K_merge args
+    | "caml_avx512f_cvtt_float32x16_int32x16_unsigned_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttps2udq_Z_Z_K ~sae:true ~z:true) args
+    | "caml_avx512f_cvtt_float32x16_int32x16_unsigned_maskz" ->
+      instr (vcvttps2udq_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64_cvtt_int32_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttsd2si_r32_X ~sae:true) args
+    | "caml_avx512f_float64_cvtt_int64_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttsd2si_r64_X ~sae:true) args
+    | "caml_avx512f_float64_cvtt_int32_unsigned_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttsd2usi_r32_X ~sae:true) args
+    | "caml_avx512f_float64_cvtt_int64_unsigned_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttsd2usi_r64_X ~sae:true) args
+    | "caml_avx512f_float32_cvtt_int32_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttss2si_r32_X ~sae:true) args
+    | "caml_avx512f_float32_cvtt_int64_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttss2si_r64_X ~sae:true) args
+    | "caml_avx512f_float32_cvtt_int32_unsigned_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttss2usi_r32_X ~sae:true) args
+    | "caml_avx512f_float32_cvtt_int64_unsigned_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vcvttss2usi_r64_X ~sae:true) args
+    | "caml_avx512f_cvt_int32x8_float64x8_unsigned" ->
+      instr vcvtudq2pd_Z_Ym256 args
+    | "caml_avx512f_cvt_int32x8_float64x8_unsigned_mask" ->
+      instr vcvtudq2pd_Z_Ym256_K_merge args
+    | "caml_avx512f_cvt_int32x8_float64x8_unsigned_maskz" ->
+      instr (vcvtudq2pd_Z_Ym256_K ~z:true) args
+    | "caml_avx512f_cvt_int32x16_float32x16_unsigned_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtudq2ps_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtudq2ps_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtudq2ps_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtudq2ps_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_cvt_int32x16_float32x16_unsigned" ->
+      instr vcvtudq2ps_Z_Zm512 args
+    | "caml_avx512f_cvt_int32x16_float32x16_unsigned_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtudq2ps_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtudq2ps_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtudq2ps_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtudq2ps_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_cvt_int32x16_float32x16_unsigned_mask" ->
+      instr vcvtudq2ps_Z_Zm512_K_merge args
+    | "caml_avx512f_cvt_int32x16_float32x16_unsigned_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtudq2ps_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vcvtudq2ps_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vcvtudq2ps_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vcvtudq2ps_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_cvt_int32x16_float32x16_unsigned_maskz" ->
+      instr (vcvtudq2ps_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64_unsigned_cvt_float64_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtusi2sd_X_X_r64 ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtusi2sd_X_X_r64 ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtusi2sd_X_X_r64 ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtusi2sd_X_X_r64 ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_int32_unsigned_cvt_float64" ->
+      instr vcvtusi2sd_X_X_r32m32 args
+    | "caml_avx512f_int64_unsigned_cvt_float64" ->
+      instr vcvtusi2sd_X_X_r64m64 args
+    | "caml_avx512f_int32_unsigned_cvt_float32_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtusi2ss_X_X_r32 ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtusi2ss_X_X_r32 ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtusi2ss_X_X_r32 ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtusi2ss_X_X_r32 ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_int64_unsigned_cvt_float32_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vcvtusi2ss_X_X_r64 ~rnd:Rnd_near) args
+      | 9 -> instr (vcvtusi2ss_X_X_r64 ~rnd:Rnd_down) args
+      | 10 -> instr (vcvtusi2ss_X_X_r64 ~rnd:Rnd_up) args
+      | 11 -> instr (vcvtusi2ss_X_X_r64 ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_int32_unsigned_cvt_float32" ->
+      instr vcvtusi2ss_X_X_r32m32 args
+    | "caml_avx512f_int64_unsigned_cvt_float32" ->
+      instr vcvtusi2ss_X_X_r64m64 args
+    | "caml_avx512f_cvt_int32x16_int8x16" -> instr vpmovdb_Xm128_Z args
+    | "caml_avx512f_cvt_int32x16_int8x16_mask" -> instr vpmovdb_X_Z_K_merge args
+    | "caml_avx512f_cvt_int32x16_int8x16_maskz" ->
+      instr (vpmovdb_Xm128_Z_K ~z:true) args
+    | "caml_avx512f_cvt_int32x16_int16x16" -> instr vpmovdw_Ym256_Z args
+    | "caml_avx512f_cvt_int32x16_int16x16_mask" ->
+      instr vpmovdw_Y_Z_K_merge args
+    | "caml_avx512f_cvt_int32x16_int16x16_maskz" ->
+      instr (vpmovdw_Ym256_Z_K ~z:true) args
+    | "caml_avx512f_cvt_int64x8_int32x8" -> instr vpmovqd_Ym256_Z args
+    | "caml_avx512f_cvt_int64x8_int32x8_mask" -> instr vpmovqd_Y_Z_K_merge args
+    | "caml_avx512f_cvt_int64x8_int32x8_maskz" ->
+      instr (vpmovqd_Ym256_Z_K ~z:true) args
+    | "caml_avx512f_cvt_int64x8_int16x8" -> instr vpmovqw_Xm128_Z args
+    | "caml_avx512f_cvt_int64x8_int16x8_mask" -> instr vpmovqw_X_Z_K_merge args
+    | "caml_avx512f_cvt_int64x8_int16x8_maskz" ->
+      instr (vpmovqw_Xm128_Z_K ~z:true) args
+    | "caml_avx512f_cvt_int32x16_int8x16_saturating" ->
+      instr vpmovsdb_Xm128_Z args
+    | "caml_avx512f_cvt_int32x16_int8x16_saturating_mask" ->
+      instr vpmovsdb_X_Z_K_merge args
+    | "caml_avx512f_cvt_int32x16_int8x16_saturating_maskz" ->
+      instr (vpmovsdb_Xm128_Z_K ~z:true) args
+    | "caml_avx512f_cvt_int32x16_int16x16_saturating" ->
+      instr vpmovsdw_Ym256_Z args
+    | "caml_avx512f_cvt_int32x16_int16x16_saturating_mask" ->
+      instr vpmovsdw_Y_Z_K_merge args
+    | "caml_avx512f_cvt_int32x16_int16x16_saturating_maskz" ->
+      instr (vpmovsdw_Ym256_Z_K ~z:true) args
+    | "caml_avx512f_cvt_int64x8_int32x8_saturating" ->
+      instr vpmovsqd_Ym256_Z args
+    | "caml_avx512f_cvt_int64x8_int32x8_saturating_mask" ->
+      instr vpmovsqd_Y_Z_K_merge args
+    | "caml_avx512f_cvt_int64x8_int32x8_saturating_maskz" ->
+      instr (vpmovsqd_Ym256_Z_K ~z:true) args
+    | "caml_avx512f_cvt_int64x8_int16x8_saturating" ->
+      instr vpmovsqw_Xm128_Z args
+    | "caml_avx512f_cvt_int64x8_int16x8_saturating_mask" ->
+      instr vpmovsqw_X_Z_K_merge args
+    | "caml_avx512f_cvt_int64x8_int16x8_saturating_maskz" ->
+      instr (vpmovsqw_Xm128_Z_K ~z:true) args
+    | "caml_avx512f_cvtsx_int8x16_int32x16" -> instr vpmovsxbd_Z_Xm128 args
+    | "caml_avx512f_cvtsx_int8x16_int32x16_mask" ->
+      instr vpmovsxbd_Z_Xm128_K_merge args
+    | "caml_avx512f_cvtsx_int8x16_int32x16_maskz" ->
+      instr (vpmovsxbd_Z_Xm128_K ~z:true) args
+    | "caml_avx512f_cvtsx_int8x16_int64x8" -> instr vpmovsxbq_Z_Xm64 args
+    | "caml_avx512f_cvtsx_int8x16_int64x8_mask" ->
+      instr vpmovsxbq_Z_Xm64_K_merge args
+    | "caml_avx512f_cvtsx_int8x16_int64x8_maskz" ->
+      instr (vpmovsxbq_Z_Xm64_K ~z:true) args
+    | "caml_avx512f_cvtsx_int32x8_int64x8" -> instr vpmovsxdq_Z_Ym256 args
+    | "caml_avx512f_cvtsx_int32x8_int64x8_mask" ->
+      instr vpmovsxdq_Z_Ym256_K_merge args
+    | "caml_avx512f_cvtsx_int32x8_int64x8_maskz" ->
+      instr (vpmovsxdq_Z_Ym256_K ~z:true) args
+    | "caml_avx512f_cvtsx_int16x16_int32x16" -> instr vpmovsxwd_Z_Ym256 args
+    | "caml_avx512f_cvtsx_int16x16_int32x16_mask" ->
+      instr vpmovsxwd_Z_Ym256_K_merge args
+    | "caml_avx512f_cvtsx_int16x16_int32x16_maskz" ->
+      instr (vpmovsxwd_Z_Ym256_K ~z:true) args
+    | "caml_avx512f_cvtsx_int16x8_int64x8" -> instr vpmovsxwq_Z_Xm128 args
+    | "caml_avx512f_cvtsx_int16x8_int64x8_mask" ->
+      instr vpmovsxwq_Z_Xm128_K_merge args
+    | "caml_avx512f_cvtsx_int16x8_int64x8_maskz" ->
+      instr (vpmovsxwq_Z_Xm128_K ~z:true) args
+    | "caml_avx512f_cvt_int32x16_int8x16_saturating_unsigned" ->
+      instr vpmovusdb_Xm128_Z args
+    | "caml_avx512f_cvt_int32x16_int8x16_saturating_unsigned_mask" ->
+      instr vpmovusdb_X_Z_K_merge args
+    | "caml_avx512f_cvt_int32x16_int8x16_saturating_unsigned_maskz" ->
+      instr (vpmovusdb_Xm128_Z_K ~z:true) args
+    | "caml_avx512f_cvt_int32x16_int16x16_saturating_unsigned" ->
+      instr vpmovusdw_Ym256_Z args
+    | "caml_avx512f_cvt_int32x16_int16x16_saturating_unsigned_mask" ->
+      instr vpmovusdw_Y_Z_K_merge args
+    | "caml_avx512f_cvt_int32x16_int16x16_saturating_unsigned_maskz" ->
+      instr (vpmovusdw_Ym256_Z_K ~z:true) args
+    | "caml_avx512f_cvt_int64x8_int32x8_saturating_unsigned" ->
+      instr vpmovusqd_Ym256_Z args
+    | "caml_avx512f_cvt_int64x8_int32x8_saturating_unsigned_mask" ->
+      instr vpmovusqd_Y_Z_K_merge args
+    | "caml_avx512f_cvt_int64x8_int32x8_saturating_unsigned_maskz" ->
+      instr (vpmovusqd_Ym256_Z_K ~z:true) args
+    | "caml_avx512f_cvt_int64x8_int16x8_saturating_unsigned" ->
+      instr vpmovusqw_Xm128_Z args
+    | "caml_avx512f_cvt_int64x8_int16x8_saturating_unsigned_mask" ->
+      instr vpmovusqw_X_Z_K_merge args
+    | "caml_avx512f_cvt_int64x8_int16x8_saturating_unsigned_maskz" ->
+      instr (vpmovusqw_Xm128_Z_K ~z:true) args
+    | "caml_avx512f_cvtzx_int8x16_int32x16" -> instr vpmovzxbd_Z_Xm128 args
+    | "caml_avx512f_cvtzx_int8x16_int32x16_mask" ->
+      instr vpmovzxbd_Z_Xm128_K_merge args
+    | "caml_avx512f_cvtzx_int8x16_int32x16_maskz" ->
+      instr (vpmovzxbd_Z_Xm128_K ~z:true) args
+    | "caml_avx512f_cvtzx_int8x16_int64x8" -> instr vpmovzxbq_Z_Xm64 args
+    | "caml_avx512f_cvtzx_int8x16_int64x8_mask" ->
+      instr vpmovzxbq_Z_Xm64_K_merge args
+    | "caml_avx512f_cvtzx_int8x16_int64x8_maskz" ->
+      instr (vpmovzxbq_Z_Xm64_K ~z:true) args
+    | "caml_avx512f_cvtzx_int32x8_int64x8" -> instr vpmovzxdq_Z_Ym256 args
+    | "caml_avx512f_cvtzx_int32x8_int64x8_mask" ->
+      instr vpmovzxdq_Z_Ym256_K_merge args
+    | "caml_avx512f_cvtzx_int32x8_int64x8_maskz" ->
+      instr (vpmovzxdq_Z_Ym256_K ~z:true) args
+    | "caml_avx512f_cvtzx_int16x16_int32x16" -> instr vpmovzxwd_Z_Ym256 args
+    | "caml_avx512f_cvtzx_int16x16_int32x16_mask" ->
+      instr vpmovzxwd_Z_Ym256_K_merge args
+    | "caml_avx512f_cvtzx_int16x16_int32x16_maskz" ->
+      instr (vpmovzxwd_Z_Ym256_K ~z:true) args
+    | "caml_avx512f_cvtzx_int16x8_int64x8" -> instr vpmovzxwq_Z_Xm128 args
+    | "caml_avx512f_cvtzx_int16x8_int64x8_mask" ->
+      instr vpmovzxwq_Z_Xm128_K_merge args
+    | "caml_avx512f_cvtzx_int16x8_int64x8_maskz" ->
+      instr (vpmovzxwq_Z_Xm128_K ~z:true) args
+    | "caml_avx512f_float64x8_max_mask" -> instr vmaxpd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_max_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vmaxpd_Z_Z_Z_K_merge ~sae:true) args
+    | "caml_avx512f_float64x8_max_maskz" ->
+      instr (vmaxpd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_max_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vmaxpd_Z_Z_Z_K ~sae:true ~z:true) args
+    | "caml_avx512f_float64x8_max" -> instr vmaxpd_Z_Z_Zm512 args
+    | "caml_avx512f_float64x8_max_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vmaxpd_Z_Z_Z ~sae:true) args
+    | "caml_avx512f_float32x16_max_mask" -> instr vmaxps_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_max_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vmaxps_Z_Z_Z_K_merge ~sae:true) args
+    | "caml_avx512f_float32x16_max_maskz" ->
+      instr (vmaxps_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_max_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vmaxps_Z_Z_Z_K ~sae:true ~z:true) args
+    | "caml_avx512f_float32x16_max" -> instr vmaxps_Z_Z_Zm512 args
+    | "caml_avx512f_float32x16_max_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vmaxps_Z_Z_Z ~sae:true) args
+    | "caml_avx512f_float64_max_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vmaxsd_X_X_X_K_merge ~sae:true) args
+    | "caml_avx512f_float64_max_mask" -> instr vmaxsd_X_X_Xm64_K_merge args
+    | "caml_avx512f_float64_max_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vmaxsd_X_X_X_K ~sae:true ~z:true) args
+    | "caml_avx512f_float64_max_maskz" -> instr (vmaxsd_X_X_Xm64_K ~z:true) args
+    | "caml_avx512f_float64_max_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vmaxsd_X_X_X ~sae:true) args
+    | "caml_avx512f_float32_max_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vmaxss_X_X_X_K_merge ~sae:true) args
+    | "caml_avx512f_float32_max_mask" -> instr vmaxss_X_X_Xm32_K_merge args
+    | "caml_avx512f_float32_max_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vmaxss_X_X_X_K ~sae:true ~z:true) args
+    | "caml_avx512f_float32_max_maskz" -> instr (vmaxss_X_X_Xm32_K ~z:true) args
+    | "caml_avx512f_float32_max_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vmaxss_X_X_X ~sae:true) args
+    | "caml_avx512f_float64x8_min_mask" -> instr vminpd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_min_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vminpd_Z_Z_Z_K_merge ~sae:true) args
+    | "caml_avx512f_float64x8_min_maskz" ->
+      instr (vminpd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_min_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vminpd_Z_Z_Z_K ~sae:true ~z:true) args
+    | "caml_avx512f_float64x8_min" -> instr vminpd_Z_Z_Zm512 args
+    | "caml_avx512f_float64x8_min_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vminpd_Z_Z_Z ~sae:true) args
+    | "caml_avx512f_float32x16_min_mask" -> instr vminps_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_min_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vminps_Z_Z_Z_K_merge ~sae:true) args
+    | "caml_avx512f_float32x16_min_maskz" ->
+      instr (vminps_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_min_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vminps_Z_Z_Z_K ~sae:true ~z:true) args
+    | "caml_avx512f_float32x16_min" -> instr vminps_Z_Z_Zm512 args
+    | "caml_avx512f_float32x16_min_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vminps_Z_Z_Z ~sae:true) args
+    | "caml_avx512f_float64_min_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vminsd_X_X_X_K_merge ~sae:true) args
+    | "caml_avx512f_float64_min_mask" -> instr vminsd_X_X_Xm64_K_merge args
+    | "caml_avx512f_float64_min_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vminsd_X_X_X_K ~sae:true ~z:true) args
+    | "caml_avx512f_float64_min_maskz" -> instr (vminsd_X_X_Xm64_K ~z:true) args
+    | "caml_avx512f_float64_min_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vminsd_X_X_X ~sae:true) args
+    | "caml_avx512f_float32_min_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vminss_X_X_X_K_merge ~sae:true) args
+    | "caml_avx512f_float32_min_mask" -> instr vminss_X_X_Xm32_K_merge args
+    | "caml_avx512f_float32_min_round_maskz" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vminss_X_X_X_K ~sae:true ~z:true) args
+    | "caml_avx512f_float32_min_maskz" -> instr (vminss_X_X_Xm32_K ~z:true) args
+    | "caml_avx512f_float32_min_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vminss_X_X_X ~sae:true) args
+    | "caml_avx512f_int32x16_abs" -> instr vpabsd_Z_Zm512 args
+    | "caml_avx512f_int32x16_abs_mask" -> instr vpabsd_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_abs_maskz" -> instr (vpabsd_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_abs" -> instr vpabsq_Z_Zm512 args
+    | "caml_avx512f_int64x8_abs_mask" -> instr vpabsq_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_abs_maskz" -> instr (vpabsq_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int32x16_max_maskz" ->
+      instr (vpmaxsd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_max_mask" -> instr vpmaxsq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_max_maskz" ->
+      instr (vpmaxsq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_max" -> instr vpmaxsq_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_max_unsigned_maskz" ->
+      instr (vpmaxud_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_max_unsigned_mask" ->
+      instr vpmaxuq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_max_unsigned_maskz" ->
+      instr (vpmaxuq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_max_unsigned" -> instr vpmaxuq_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_min_maskz" ->
+      instr (vpminsd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_min_mask" -> instr vpminsq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_min_maskz" ->
+      instr (vpminsq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_min" -> instr vpminsq_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_min_unsigned_maskz" ->
+      instr (vpminud_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_min_unsigned_mask" ->
+      instr vpminuq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_min_unsigned_maskz" ->
+      instr (vpminuq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_min_unsigned" -> instr vpminuq_Z_Z_Zm512 args
+    | "caml_avx512f_float64x8_mov_maskz" ->
+      instr (vmovupd_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_mov_maskz" ->
+      instr (vmovups_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_duplicate_even_mask" ->
+      instr vmovddup_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_duplicate_even_maskz" ->
+      instr (vmovddup_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_duplicate_even" -> instr vmovddup_Z_Zm512 args
+    | "caml_avx512f_int32x16_mov_maskz" ->
+      instr (vmovdqu32_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_mov_maskz" ->
+      instr (vmovdqu64_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64_move_mask" -> instr vmovsd_X_X_X_K_merge args
+    | "caml_avx512f_float64_move_maskz" -> instr (vmovsd_X_X_X_K ~z:true) args
+    | "caml_avx512f_float32x16_duplicate_odd_mask" ->
+      instr vmovshdup_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_duplicate_odd_maskz" ->
+      instr (vmovshdup_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_duplicate_odd" -> instr vmovshdup_Z_Zm512 args
+    | "caml_avx512f_float32x16_duplicate_even_mask" ->
+      instr vmovsldup_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_duplicate_even_maskz" ->
+      instr (vmovsldup_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_duplicate_even" -> instr vmovsldup_Z_Zm512 args
+    | "caml_avx512f_float32_move_mask" -> instr vmovss_X_X_X_K_merge args
+    | "caml_avx512f_float32_move_maskz" -> instr (vmovss_X_X_X_K ~z:true) args
+    | "caml_avx512f_int32x16_and_maskz" ->
+      instr (vpandd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int32x16_andnot_maskz" ->
+      instr (vpandnd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_andnot_maskz" ->
+      instr (vpandnq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_and_maskz" ->
+      instr (vpandq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int32x16_or_maskz" -> instr (vpord_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_or_maskz" -> instr (vporq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int32x16_ternarylogic_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpternlogd_Z_Z_Zm512_K ~z:false) ~i args
+    | "caml_avx512f_int32x16_ternarylogic_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpternlogd_Z_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int32x16_ternarylogic" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpternlogd_Z_Z_Zm512 ~i args
+    | "caml_avx512f_int64x8_ternarylogic_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpternlogq_Z_Z_Zm512_K ~z:false) ~i args
+    | "caml_avx512f_int64x8_ternarylogic_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpternlogq_Z_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int64x8_ternarylogic" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpternlogq_Z_Z_Zm512 ~i args
+    | "caml_avx512f_int64x8_test_mask" -> instr vptestmq_K_Z_Zm512_K args
+    | "caml_avx512f_int64x8_test" -> instr vptestmq_K_Z_Zm512 args
+    | "caml_avx512f_int32x16_testn_mask" -> instr vptestnmd_K_Z_Zm512_K args
+    | "caml_avx512f_int32x16_testn" -> instr vptestnmd_K_Z_Zm512 args
+    | "caml_avx512f_int64x8_testn_mask" -> instr vptestnmq_K_Z_Zm512_K args
+    | "caml_avx512f_int64x8_testn" -> instr vptestnmq_K_Z_Zm512 args
+    | "caml_avx512f_int32x16_xor_maskz" ->
+      instr (vpxord_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_xor_maskz" ->
+      instr (vpxorq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int8x64_set1" -> instr vpbroadcastb_Z_r32 args
+    | "caml_avx512f_int32x16_set1_mask" -> instr vpbroadcastd_Z_r32_K_merge args
+    | "caml_avx512f_int32x16_set1_maskz" ->
+      instr (vpbroadcastd_Z_r32_K ~z:true) args
+    | "caml_avx512f_int32x16_set1" -> instr vpbroadcastd_Z_r32 args
+    | "caml_avx512f_int64x8_set1_mask" -> instr vpbroadcastq_Z_r64_K_merge args
+    | "caml_avx512f_int64x8_set1_maskz" ->
+      instr (vpbroadcastq_Z_r64_K ~z:true) args
+    | "caml_avx512f_int64x8_set1" -> instr vpbroadcastq_Z_r64 args
+    | "caml_avx512f_int16x32_set1" -> instr vpbroadcastw_Z_r32 args
+    | "caml_avx512f_int32x16_rol_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprold_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_int32x16_rol_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vprold_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int32x16_rol" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprold_Z_Zm512 ~i args
+    | "caml_avx512f_int64x8_rol_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprolq_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_int64x8_rol_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vprolq_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int64x8_rol" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprolq_Z_Zm512 ~i args
+    | "caml_avx512f_int32x16_rolv_mask" -> instr vprolvd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_rolv_maskz" ->
+      instr (vprolvd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int32x16_rolv" -> instr vprolvd_Z_Z_Zm512 args
+    | "caml_avx512f_int64x8_rolv_mask" -> instr vprolvq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_rolv_maskz" ->
+      instr (vprolvq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_rolv" -> instr vprolvq_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_ror_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprord_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_int32x16_ror_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vprord_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int32x16_ror" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprord_Z_Zm512 ~i args
+    | "caml_avx512f_int64x8_ror_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprorq_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_int64x8_ror_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vprorq_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int64x8_ror" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vprorq_Z_Zm512 ~i args
+    | "caml_avx512f_int32x16_rorv_mask" -> instr vprorvd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_rorv" -> instr vprorvd_Z_Z_Zm512 args
+    | "caml_avx512f_int64x8_rorv_mask" -> instr vprorvq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_rorv_maskz" ->
+      instr (vprorvq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_rorv" -> instr vprorvq_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_sll_mask" -> instr vpslld_Z_Z_Xm128_K_merge args
+    | "caml_avx512f_int32x16_sll_maskz" ->
+      instr (vpslld_Z_Z_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x16_slli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpslld_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int32x16_sll" -> instr vpslld_Z_Z_Xm128 args
+    | "caml_avx512f_int64x8_sll_mask" -> instr vpsllq_Z_Z_Xm128_K_merge args
+    | "caml_avx512f_int64x8_slli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsllq_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_int64x8_sll_maskz" ->
+      instr (vpsllq_Z_Z_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x8_slli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsllq_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int64x8_sll" -> instr vpsllq_Z_Z_Xm128 args
+    | "caml_avx512f_int64x8_slli" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsllq_Z_Zm512 ~i args
+    | "caml_avx512f_int32x16_sllv_maskz" ->
+      instr (vpsllvd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_sllv_mask" -> instr vpsllvq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_sllv_maskz" ->
+      instr (vpsllvq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_sllv" -> instr vpsllvq_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_sra_mask" -> instr vpsrad_Z_Z_Xm128_K_merge args
+    | "caml_avx512f_int32x16_sra_maskz" ->
+      instr (vpsrad_Z_Z_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x16_srai_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsrad_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int32x16_sra" -> instr vpsrad_Z_Z_Xm128 args
+    | "caml_avx512f_int64x8_sra_mask" -> instr vpsraq_Z_Z_Xm128_K_merge args
+    | "caml_avx512f_int64x8_srai_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsraq_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_int64x8_sra_maskz" ->
+      instr (vpsraq_Z_Z_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x8_srai_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsraq_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int64x8_sra" -> instr vpsraq_Z_Z_Xm128 args
+    | "caml_avx512f_int64x8_srai" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsraq_Z_Zm512 ~i args
+    | "caml_avx512f_int32x16_srav_maskz" ->
+      instr (vpsravd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_srav_mask" -> instr vpsravq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_srav_maskz" ->
+      instr (vpsravq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_srav" -> instr vpsravq_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_srl_mask" -> instr vpsrld_Z_Z_Xm128_K_merge args
+    | "caml_avx512f_int32x16_srl_maskz" ->
+      instr (vpsrld_Z_Z_Xm128_K ~z:true) args
+    | "caml_avx512f_int32x16_srli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsrld_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int32x16_srl" -> instr vpsrld_Z_Z_Xm128 args
+    | "caml_avx512f_int64x8_srl_mask" -> instr vpsrlq_Z_Z_Xm128_K_merge args
+    | "caml_avx512f_int64x8_srli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsrlq_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_int64x8_srl_maskz" ->
+      instr (vpsrlq_Z_Z_Xm128_K ~z:true) args
+    | "caml_avx512f_int64x8_srli_maskz" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr (vpsrlq_Z_Zm512_K ~z:true) ~i args
+    | "caml_avx512f_int64x8_srl" -> instr vpsrlq_Z_Z_Xm128 args
+    | "caml_avx512f_int64x8_srli" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsrlq_Z_Zm512 ~i args
+    | "caml_avx512f_int32x16_srlv_maskz" ->
+      instr (vpsrlvd_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_srlv_mask" -> instr vpsrlvq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_srlv_maskz" ->
+      instr (vpsrlvq_Z_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_int64x8_srlv" -> instr vpsrlvq_Z_Z_Zm512 args
+    | "caml_avx512f_float64x8_rcp14_mask" -> instr vrcp14pd_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_rcp14_maskz" ->
+      instr (vrcp14pd_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_rcp14" -> instr vrcp14pd_Z_Zm512 args
+    | "caml_avx512f_float32x16_rcp14_mask" ->
+      instr vrcp14ps_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_rcp14_maskz" ->
+      instr (vrcp14ps_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_rcp14" -> instr vrcp14ps_Z_Zm512 args
+    | "caml_avx512f_float64_rcp14_mask" -> instr vrcp14sd_X_X_Xm64_K_merge args
+    | "caml_avx512f_float64_rcp14_maskz" ->
+      instr (vrcp14sd_X_X_Xm64_K ~z:true) args
+    | "caml_avx512f_float64_rcp14" -> instr vrcp14sd_X_X_Xm64 args
+    | "caml_avx512f_float32_rcp14_mask" -> instr vrcp14ss_X_X_Xm32_K_merge args
+    | "caml_avx512f_float32_rcp14_maskz" ->
+      instr (vrcp14ss_X_X_Xm32_K ~z:true) args
+    | "caml_avx512f_float32_rcp14" -> instr vrcp14ss_X_X_Xm32 args
+    | "caml_avx512f_float64x8_rsqrt14_mask" ->
+      instr vrsqrt14pd_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_rsqrt14_maskz" ->
+      instr (vrsqrt14pd_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_rsqrt14" -> instr vrsqrt14pd_Z_Zm512 args
+    | "caml_avx512f_float32x16_rsqrt14_mask" ->
+      instr vrsqrt14ps_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_rsqrt14_maskz" ->
+      instr (vrsqrt14ps_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_rsqrt14" -> instr vrsqrt14ps_Z_Zm512 args
+    | "caml_avx512f_float64_rsqrt14_mask" ->
+      instr vrsqrt14sd_X_X_Xm64_K_merge args
+    | "caml_avx512f_float64_rsqrt14_maskz" ->
+      instr (vrsqrt14sd_X_X_Xm64_K ~z:true) args
+    | "caml_avx512f_float64_rsqrt14" -> instr vrsqrt14sd_X_X_Xm64 args
+    | "caml_avx512f_float32_rsqrt14_mask" ->
+      instr vrsqrt14ss_X_X_Xm32_K_merge args
+    | "caml_avx512f_float32_rsqrt14_maskz" ->
+      instr (vrsqrt14ss_X_X_Xm32_K ~z:true) args
+    | "caml_avx512f_float32_rsqrt14" -> instr vrsqrt14ss_X_X_Xm32 args
+    | "caml_avx512f_float64x8_sqrt_mask" -> instr vsqrtpd_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_sqrt_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsqrtpd_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vsqrtpd_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vsqrtpd_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vsqrtpd_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64x8_sqrt_maskz" ->
+      instr (vsqrtpd_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float64x8_sqrt_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsqrtpd_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vsqrtpd_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vsqrtpd_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vsqrtpd_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float64x8_sqrt" -> instr vsqrtpd_Z_Zm512 args
+    | "caml_avx512f_float64x8_sqrt_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsqrtpd_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vsqrtpd_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vsqrtpd_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vsqrtpd_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_sqrt_mask" -> instr vsqrtps_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_sqrt_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsqrtps_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vsqrtps_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vsqrtps_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vsqrtps_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_sqrt_maskz" ->
+      instr (vsqrtps_Z_Zm512_K ~z:true) args
+    | "caml_avx512f_float32x16_sqrt_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsqrtps_Z_Z_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vsqrtps_Z_Z_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vsqrtps_Z_Z_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vsqrtps_Z_Z_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_sqrt" -> instr vsqrtps_Z_Zm512 args
+    | "caml_avx512f_float32x16_sqrt_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsqrtps_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vsqrtps_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vsqrtps_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vsqrtps_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64_sqrt_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsqrtsd_X_X_X_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vsqrtsd_X_X_X_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vsqrtsd_X_X_X_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vsqrtsd_X_X_X_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64_sqrt_mask" -> instr vsqrtsd_X_X_Xm64_K_merge args
+    | "caml_avx512f_float64_sqrt_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsqrtsd_X_X_X_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vsqrtsd_X_X_X_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vsqrtsd_X_X_X_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vsqrtsd_X_X_X_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float64_sqrt_maskz" ->
+      instr (vsqrtsd_X_X_Xm64_K ~z:true) args
+    | "caml_avx512f_float64_sqrt_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsqrtsd_X_X_X ~rnd:Rnd_near) args
+      | 9 -> instr (vsqrtsd_X_X_X ~rnd:Rnd_down) args
+      | 10 -> instr (vsqrtsd_X_X_X ~rnd:Rnd_up) args
+      | 11 -> instr (vsqrtsd_X_X_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32_sqrt_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsqrtss_X_X_X_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vsqrtss_X_X_X_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vsqrtss_X_X_X_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vsqrtss_X_X_X_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32_sqrt_mask" -> instr vsqrtss_X_X_Xm32_K_merge args
+    | "caml_avx512f_float32_sqrt_round_maskz" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsqrtss_X_X_X_K ~rnd:Rnd_near ~z:true) args
+      | 9 -> instr (vsqrtss_X_X_X_K ~rnd:Rnd_down ~z:true) args
+      | 10 -> instr (vsqrtss_X_X_X_K ~rnd:Rnd_up ~z:true) args
+      | 11 -> instr (vsqrtss_X_X_X_K ~rnd:Rnd_zero ~z:true) args
+      | _ -> None)
+    | "caml_avx512f_float32_sqrt_maskz" ->
+      instr (vsqrtss_X_X_Xm32_K ~z:true) args
+    | "caml_avx512f_float32_sqrt_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsqrtss_X_X_X ~rnd:Rnd_near) args
+      | 9 -> instr (vsqrtss_X_X_X ~rnd:Rnd_down) args
+      | 10 -> instr (vsqrtss_X_X_X ~rnd:Rnd_up) args
+      | 11 -> instr (vsqrtss_X_X_X ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64x8_add" -> instr vaddpd_Z_Z_Zm512 args
+    | "caml_avx512f_float64x8_add_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vaddpd_Z_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vaddpd_Z_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vaddpd_Z_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vaddpd_Z_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64x8_add_mask" -> instr vaddpd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_add_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vaddpd_Z_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vaddpd_Z_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vaddpd_Z_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vaddpd_Z_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_add" -> instr vaddps_Z_Z_Zm512 args
+    | "caml_avx512f_float32x16_add_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vaddps_Z_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vaddps_Z_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vaddps_Z_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vaddps_Z_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_add_mask" -> instr vaddps_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_add_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vaddps_Z_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vaddps_Z_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vaddps_Z_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vaddps_Z_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_add" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr vfmadd132pd_Z_Z_Zm512 (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_add_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmadd132pd_Z_Z_Z ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmadd132pd_Z_Z_Z ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmadd132pd_Z_Z_Z ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmadd132pd_Z_Z_Z ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_add_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmadd231pd_Z_Z_Zm512_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_add_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr (vfmadd231pd_Z_Z_Z_K ~rnd:Rnd_near ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr (vfmadd231pd_Z_Z_Z_K ~rnd:Rnd_down ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfmadd231pd_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr (vfmadd231pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_add_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmadd132pd_Z_Z_Zm512_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_add_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfmadd132pd_Z_Z_Z_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfmadd132pd_Z_Z_Z_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmadd132pd_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfmadd132pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_add" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr vfmadd132ps_Z_Z_Zm512 (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_add_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmadd132ps_Z_Z_Z ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmadd132ps_Z_Z_Z ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmadd132ps_Z_Z_Z ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmadd132ps_Z_Z_Z ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_add_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmadd231ps_Z_Z_Zm512_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_add_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr (vfmadd231ps_Z_Z_Z_K ~rnd:Rnd_near ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr (vfmadd231ps_Z_Z_Z_K ~rnd:Rnd_down ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfmadd231ps_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr (vfmadd231ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_add_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmadd132ps_Z_Z_Zm512_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_add_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfmadd132ps_Z_Z_Z_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfmadd132ps_Z_Z_Z_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmadd132ps_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfmadd132ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_sub" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr vfmsub132pd_Z_Z_Zm512 (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_sub_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmsub132pd_Z_Z_Z ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmsub132pd_Z_Z_Z ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmsub132pd_Z_Z_Z ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmsub132pd_Z_Z_Z ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_sub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmsub231pd_Z_Z_Zm512_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_sub_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr (vfmsub231pd_Z_Z_Z_K ~rnd:Rnd_near ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr (vfmsub231pd_Z_Z_Z_K ~rnd:Rnd_down ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfmsub231pd_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr (vfmsub231pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_sub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsub132pd_Z_Z_Zm512_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_sub_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfmsub132pd_Z_Z_Z_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfmsub132pd_Z_Z_Z_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmsub132pd_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfmsub132pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_sub" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr vfmsub132ps_Z_Z_Zm512 (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_sub_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfmsub132ps_Z_Z_Z ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfmsub132ps_Z_Z_Z ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmsub132ps_Z_Z_Z ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfmsub132ps_Z_Z_Z ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_sub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfmsub231ps_Z_Z_Zm512_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_sub_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr (vfmsub231ps_Z_Z_Z_K ~rnd:Rnd_near ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr (vfmsub231ps_Z_Z_Z_K ~rnd:Rnd_down ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfmsub231ps_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr (vfmsub231ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_sub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfmsub132ps_Z_Z_Zm512_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_sub_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfmsub132ps_Z_Z_Z_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfmsub132ps_Z_Z_Z_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfmsub132ps_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfmsub132ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_neg_mul_add" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr vfnmadd132pd_Z_Z_Zm512 (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_neg_mul_add_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfnmadd132pd_Z_Z_Z ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfnmadd132pd_Z_Z_Z ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmadd132pd_Z_Z_Z ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfnmadd132pd_Z_Z_Z ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_neg_mul_add_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfnmadd231pd_Z_Z_Zm512_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_neg_mul_add_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr (vfnmadd231pd_Z_Z_Z_K ~rnd:Rnd_near ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr (vfnmadd231pd_Z_Z_Z_K ~rnd:Rnd_down ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfnmadd231pd_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr (vfnmadd231pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_neg_mul_add_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmadd132pd_Z_Z_Zm512_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_neg_mul_add_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfnmadd132pd_Z_Z_Z_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfnmadd132pd_Z_Z_Z_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmadd132pd_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfnmadd132pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_neg_mul_add" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr vfnmadd132ps_Z_Z_Zm512 (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_neg_mul_add_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfnmadd132ps_Z_Z_Z ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfnmadd132ps_Z_Z_Z ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmadd132ps_Z_Z_Z ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfnmadd132ps_Z_Z_Z ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_neg_mul_add_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfnmadd231ps_Z_Z_Zm512_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_neg_mul_add_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr (vfnmadd231ps_Z_Z_Z_K ~rnd:Rnd_near ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr (vfnmadd231ps_Z_Z_Z_K ~rnd:Rnd_down ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfnmadd231ps_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr (vfnmadd231ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_neg_mul_add_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmadd132ps_Z_Z_Zm512_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_neg_mul_add_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfnmadd132ps_Z_Z_Z_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfnmadd132ps_Z_Z_Z_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmadd132ps_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfnmadd132ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_neg_mul_sub" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr vfnmsub132pd_Z_Z_Zm512 (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_neg_mul_sub_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfnmsub132pd_Z_Z_Z ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfnmsub132pd_Z_Z_Z ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmsub132pd_Z_Z_Z ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfnmsub132pd_Z_Z_Z ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_neg_mul_sub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfnmsub231pd_Z_Z_Zm512_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_neg_mul_sub_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr (vfnmsub231pd_Z_Z_Z_K ~rnd:Rnd_near ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr (vfnmsub231pd_Z_Z_Z_K ~rnd:Rnd_down ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfnmsub231pd_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr (vfnmsub231pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_neg_mul_sub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmsub132pd_Z_Z_Zm512_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_neg_mul_sub_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfnmsub132pd_Z_Z_Z_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfnmsub132pd_Z_Z_Z_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmsub132pd_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfnmsub132pd_Z_Z_Z_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_neg_mul_sub" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr vfnmsub132ps_Z_Z_Zm512 (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_neg_mul_sub_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr (vfnmsub132ps_Z_Z_Z ~rnd:Rnd_near) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr (vfnmsub132ps_Z_Z_Z ~rnd:Rnd_down) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmsub132ps_Z_Z_Z ~rnd:Rnd_up) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr (vfnmsub132ps_Z_Z_Z ~rnd:Rnd_zero) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_neg_mul_sub_mask3" -> (
+      match args with
+      | a :: b :: c :: rest ->
+        instr (vfnmsub231ps_Z_Z_Zm512_K ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_neg_mul_sub_round_mask3" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | a :: b :: c :: rest, 8 ->
+        instr (vfnmsub231ps_Z_Z_Z_K ~rnd:Rnd_near ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 9 ->
+        instr (vfnmsub231ps_Z_Z_Z_K ~rnd:Rnd_down ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 10 ->
+        instr (vfnmsub231ps_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (c :: a :: b :: rest)
+      | a :: b :: c :: rest, 11 ->
+        instr (vfnmsub231ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:false) (c :: a :: b :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_neg_mul_sub_mask" -> (
+      match args with
+      | dst :: x :: y :: rest ->
+        instr (vfnmsub132ps_Z_Z_Zm512_K ~z:false) (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float32x16_neg_mul_sub_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match args, i with
+      | dst :: x :: y :: rest, 8 ->
+        instr
+          (vfnmsub132ps_Z_Z_Z_K ~rnd:Rnd_near ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 9 ->
+        instr
+          (vfnmsub132ps_Z_Z_Z_K ~rnd:Rnd_down ~z:false)
+          (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 10 ->
+        instr (vfnmsub132ps_Z_Z_Z_K ~rnd:Rnd_up ~z:false) (dst :: y :: x :: rest)
+      | dst :: x :: y :: rest, 11 ->
+        instr
+          (vfnmsub132ps_Z_Z_Z_K ~rnd:Rnd_zero ~z:false)
+          (dst :: y :: x :: rest)
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul_mask" -> instr vmulpd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_mul_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vmulpd_Z_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vmulpd_Z_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vmulpd_Z_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vmulpd_Z_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64x8_mul" -> instr vmulpd_Z_Z_Zm512 args
+    | "caml_avx512f_float64x8_mul_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vmulpd_Z_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vmulpd_Z_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vmulpd_Z_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vmulpd_Z_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul_mask" -> instr vmulps_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_mul_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vmulps_Z_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vmulps_Z_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vmulps_Z_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vmulps_Z_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_mul" -> instr vmulps_Z_Z_Zm512 args
+    | "caml_avx512f_float32x16_mul_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vmulps_Z_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vmulps_Z_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vmulps_Z_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vmulps_Z_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_int32x16_add" -> instr vpaddd_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_add_mask" -> instr vpaddd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_mul_low_mask" ->
+      instr vpmulld_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_mul_low" -> instr vpmulld_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_sub_mask" -> instr vpsubd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_sub" -> instr vpsubd_Z_Z_Zm512 args
+    | "caml_avx512f_float64x8_sub_mask" -> instr vsubpd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_sub_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsubpd_Z_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vsubpd_Z_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vsubpd_Z_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vsubpd_Z_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float64x8_sub" -> instr vsubpd_Z_Z_Zm512 args
+    | "caml_avx512f_float64x8_sub_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsubpd_Z_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vsubpd_Z_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vsubpd_Z_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vsubpd_Z_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_sub_mask" -> instr vsubps_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_sub_round_mask" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsubps_Z_Z_Z_K_merge ~rnd:Rnd_near) args
+      | 9 -> instr (vsubps_Z_Z_Z_K_merge ~rnd:Rnd_down) args
+      | 10 -> instr (vsubps_Z_Z_Z_K_merge ~rnd:Rnd_up) args
+      | 11 -> instr (vsubps_Z_Z_Z_K_merge ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_float32x16_sub" -> instr vsubps_Z_Z_Zm512 args
+    | "caml_avx512f_float32x16_sub_round" -> (
+      let i, args = extract_constant args ~max:11 op in
+      match i with
+      | 8 -> instr (vsubps_Z_Z_Z ~rnd:Rnd_near) args
+      | 9 -> instr (vsubps_Z_Z_Z ~rnd:Rnd_down) args
+      | 10 -> instr (vsubps_Z_Z_Z ~rnd:Rnd_up) args
+      | 11 -> instr (vsubps_Z_Z_Z ~rnd:Rnd_zero) args
+      | _ -> None)
+    | "caml_avx512f_int32x16_align_right" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr valignd_Z_Z_Zm512 ~i args
+    | "caml_avx512f_int32x16_align_right_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr valignd_Z_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_float64x8_getexp" -> instr vgetexppd_Z_Zm512 args
+    | "caml_avx512f_float64x8_getexp_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vgetexppd_Z_Z ~sae:true) args
+    | "caml_avx512f_float64x8_getexp_mask" ->
+      instr vgetexppd_Z_Zm512_K_merge args
+    | "caml_avx512f_float64x8_getexp_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vgetexppd_Z_Z_K_merge ~sae:true) args
+    | "caml_avx512f_float32x16_getexp" -> instr vgetexpps_Z_Zm512 args
+    | "caml_avx512f_float32x16_getexp_round" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vgetexpps_Z_Z ~sae:true) args
+    | "caml_avx512f_float32x16_getexp_mask" ->
+      instr vgetexpps_Z_Zm512_K_merge args
+    | "caml_avx512f_float32x16_getexp_round_mask" ->
+      let _i, args = extract_constant args ~max:255 op in
+      instr (vgetexpps_Z_Z_K_merge ~sae:true) args
+    | "caml_avx512f_float64x8_getmant" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vgetmantpd_Z_Zm512 ~i args
+    | "caml_avx512f_float64x8_getmant_round" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantpd_Z_Z ~sae:true) ~i args
+    | "caml_avx512f_float64x8_getmant_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vgetmantpd_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_float64x8_getmant_round_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantpd_Z_Z_K_merge ~sae:true) ~i args
+    | "caml_avx512f_float32x16_getmant" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vgetmantps_Z_Zm512 ~i args
+    | "caml_avx512f_float32x16_getmant_round" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantps_Z_Z ~sae:true) ~i args
+    | "caml_avx512f_float32x16_getmant_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr vgetmantps_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_float32x16_getmant_round_mask" ->
+      let i, args = extract_constant args ~max:15 op in
+      instr (vgetmantps_Z_Z_K_merge ~sae:true) ~i args
+    | "caml_avx512f_float64x8_blend" ->
+      instr (vblendmpd_Z_Z_Zm512_K ~z:false) args
+    | "caml_avx512f_float32x16_blend" ->
+      instr (vblendmps_Z_Z_Zm512_K ~z:false) args
+    | "caml_avx512f_int32x16_blend" ->
+      instr (vpblendmd_Z_Z_Zm512_K ~z:false) args
+    | "caml_avx512f_int64x8_blend" ->
+      instr (vpblendmq_Z_Z_Zm512_K ~z:false) args
+    | "caml_avx512f_int32x16_shuffle_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpshufd_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_int32x16_shuffle" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpshufd_Z_Zm512 ~i args
+    | "caml_avx512f_float64x8_cmp" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmppd_K_Z_Zm512 ~i args
+    | "caml_avx512f_float64x8_cmpeq" -> instr vcmppd_K_Z_Zm512 ~i:0 args
+    | "caml_avx512f_float64x8_cmple" -> instr vcmppd_K_Z_Zm512 ~i:2 args
+    | "caml_avx512f_float64x8_cmplt" -> instr vcmppd_K_Z_Zm512 ~i:1 args
+    | "caml_avx512f_float64x8_cmpneq" -> instr vcmppd_K_Z_Zm512 ~i:4 args
+    | "caml_avx512f_float64x8_cmpnle" -> instr vcmppd_K_Z_Zm512 ~i:6 args
+    | "caml_avx512f_float64x8_cmpnlt" -> instr vcmppd_K_Z_Zm512 ~i:5 args
+    | "caml_avx512f_float64x8_cmpord" -> instr vcmppd_K_Z_Zm512 ~i:7 args
+    | "caml_avx512f_float64x8_cmpunord" -> instr vcmppd_K_Z_Zm512 ~i:3 args
+    | "caml_avx512f_float64x8_cmp_mask" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmppd_K_Z_Zm512_K ~i args
+    | "caml_avx512f_float64x8_cmpeq_mask" -> instr vcmppd_K_Z_Zm512_K ~i:0 args
+    | "caml_avx512f_float64x8_cmple_mask" -> instr vcmppd_K_Z_Zm512_K ~i:2 args
+    | "caml_avx512f_float64x8_cmplt_mask" -> instr vcmppd_K_Z_Zm512_K ~i:1 args
+    | "caml_avx512f_float64x8_cmpneq_mask" -> instr vcmppd_K_Z_Zm512_K ~i:4 args
+    | "caml_avx512f_float64x8_cmpnle_mask" -> instr vcmppd_K_Z_Zm512_K ~i:6 args
+    | "caml_avx512f_float64x8_cmpnlt_mask" -> instr vcmppd_K_Z_Zm512_K ~i:5 args
+    | "caml_avx512f_float64x8_cmpord_mask" -> instr vcmppd_K_Z_Zm512_K ~i:7 args
+    | "caml_avx512f_float64x8_cmpunord_mask" ->
+      instr vcmppd_K_Z_Zm512_K ~i:3 args
+    | "caml_avx512f_float32x16_cmp" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmpps_K_Z_Zm512 ~i args
+    | "caml_avx512f_float32x16_cmpeq" -> instr vcmpps_K_Z_Zm512 ~i:0 args
+    | "caml_avx512f_float32x16_cmple" -> instr vcmpps_K_Z_Zm512 ~i:2 args
+    | "caml_avx512f_float32x16_cmplt" -> instr vcmpps_K_Z_Zm512 ~i:1 args
+    | "caml_avx512f_float32x16_cmpneq" -> instr vcmpps_K_Z_Zm512 ~i:4 args
+    | "caml_avx512f_float32x16_cmpnle" -> instr vcmpps_K_Z_Zm512 ~i:6 args
+    | "caml_avx512f_float32x16_cmpnlt" -> instr vcmpps_K_Z_Zm512 ~i:5 args
+    | "caml_avx512f_float32x16_cmpord" -> instr vcmpps_K_Z_Zm512 ~i:7 args
+    | "caml_avx512f_float32x16_cmpunord" -> instr vcmpps_K_Z_Zm512 ~i:3 args
+    | "caml_avx512f_float32x16_cmp_mask" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr vcmpps_K_Z_Zm512_K ~i args
+    | "caml_avx512f_float32x16_cmpeq_mask" -> instr vcmpps_K_Z_Zm512_K ~i:0 args
+    | "caml_avx512f_float32x16_cmple_mask" -> instr vcmpps_K_Z_Zm512_K ~i:2 args
+    | "caml_avx512f_float32x16_cmplt_mask" -> instr vcmpps_K_Z_Zm512_K ~i:1 args
+    | "caml_avx512f_float32x16_cmpneq_mask" ->
+      instr vcmpps_K_Z_Zm512_K ~i:4 args
+    | "caml_avx512f_float32x16_cmpnle_mask" ->
+      instr vcmpps_K_Z_Zm512_K ~i:6 args
+    | "caml_avx512f_float32x16_cmpnlt_mask" ->
+      instr vcmpps_K_Z_Zm512_K ~i:5 args
+    | "caml_avx512f_float32x16_cmpord_mask" ->
+      instr vcmpps_K_Z_Zm512_K ~i:7 args
+    | "caml_avx512f_float32x16_cmpunord_mask" ->
+      instr vcmpps_K_Z_Zm512_K ~i:3 args
+    | "caml_avx512f_int32x16_cmp" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpd_K_Z_Zm512 ~i args
+    | "caml_avx512f_int32x16_cmpeq" -> instr vpcmpeqd_K_Z_Zm512 args
+    | "caml_avx512f_int32x16_cmpge" -> instr vpcmpd_K_Z_Zm512 ~i:5 args
+    | "caml_avx512f_int32x16_cmpgt" -> instr vpcmpgtd_K_Z_Zm512 args
+    | "caml_avx512f_int32x16_cmple" -> instr vpcmpd_K_Z_Zm512 ~i:2 args
+    | "caml_avx512f_int32x16_cmpneq" -> instr vpcmpd_K_Z_Zm512 ~i:4 args
+    | "caml_avx512f_int32x16_cmp_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpd_K_Z_Zm512_K ~i args
+    | "caml_avx512f_int32x16_cmpeq_mask" -> instr vpcmpeqd_K_Z_Zm512_K args
+    | "caml_avx512f_int32x16_cmpge_mask" -> instr vpcmpd_K_Z_Zm512_K ~i:5 args
+    | "caml_avx512f_int32x16_cmpgt_mask" -> instr vpcmpgtd_K_Z_Zm512_K args
+    | "caml_avx512f_int32x16_cmple_mask" -> instr vpcmpd_K_Z_Zm512_K ~i:2 args
+    | "caml_avx512f_int32x16_cmpneq_mask" -> instr vpcmpd_K_Z_Zm512_K ~i:4 args
+    | "caml_avx512f_int32x16_cmp_unsigned" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpud_K_Z_Zm512 ~i args
+    | "caml_avx512f_int32x16_cmpeq_unsigned" ->
+      instr vpcmpud_K_Z_Zm512 ~i:0 args
+    | "caml_avx512f_int32x16_cmpge_unsigned" ->
+      instr vpcmpud_K_Z_Zm512 ~i:5 args
+    | "caml_avx512f_int32x16_cmpgt_unsigned" ->
+      instr vpcmpud_K_Z_Zm512 ~i:6 args
+    | "caml_avx512f_int32x16_cmple_unsigned" ->
+      instr vpcmpud_K_Z_Zm512 ~i:2 args
+    | "caml_avx512f_int32x16_cmplt_unsigned" ->
+      instr vpcmpud_K_Z_Zm512 ~i:1 args
+    | "caml_avx512f_int32x16_cmpneq_unsigned" ->
+      instr vpcmpud_K_Z_Zm512 ~i:4 args
+    | "caml_avx512f_int32x16_cmp_unsigned_mask" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vpcmpud_K_Z_Zm512_K ~i args
+    | "caml_avx512f_int32x16_cmpeq_unsigned_mask" ->
+      instr vpcmpud_K_Z_Zm512_K ~i:0 args
+    | "caml_avx512f_int32x16_cmpge_unsigned_mask" ->
+      instr vpcmpud_K_Z_Zm512_K ~i:5 args
+    | "caml_avx512f_int32x16_cmpgt_unsigned_mask" ->
+      instr vpcmpud_K_Z_Zm512_K ~i:6 args
+    | "caml_avx512f_int32x16_cmple_unsigned_mask" ->
+      instr vpcmpud_K_Z_Zm512_K ~i:2 args
+    | "caml_avx512f_int32x16_cmplt_unsigned_mask" ->
+      instr vpcmpud_K_Z_Zm512_K ~i:1 args
+    | "caml_avx512f_int32x16_cmpneq_unsigned_mask" ->
+      instr vpcmpud_K_Z_Zm512_K ~i:4 args
+    | "caml_avx512f_float64x8_mov_mask" -> instr vmovupd_Z_Z_K_merge args
+    | "caml_avx512f_float32x16_mov_mask" -> instr vmovups_Z_Z_K_merge args
+    | "caml_avx512f_int32x16_mov_mask" -> instr vmovdqu32_Z_Z_K_merge args
+    | "caml_avx512f_int64x8_mov_mask" -> instr vmovdqu64_Z_Z_K_merge args
+    | "caml_avx512f_int32x16_and" -> instr vpandd_Z_Z_Zm512 args
+    | "caml_avx512f_vec512_and" -> instr vpandd_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_andnot" -> instr vpandnd_Z_Z_Zm512 args
+    | "caml_avx512f_vec512_andnot" -> instr vpandnd_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_andnot_mask" ->
+      instr vpandnd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_andnot" -> instr vpandnq_Z_Z_Zm512 args
+    | "caml_avx512f_int64x8_andnot_mask" -> instr vpandnq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_and" -> instr vpandq_Z_Z_Zm512 args
+    | "caml_avx512f_int64x8_and_mask" -> instr vpandq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_or_mask" -> instr vpord_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_or" -> instr vpord_Z_Z_Zm512 args
+    | "caml_avx512f_vec512_or" -> instr vpord_Z_Z_Zm512 args
+    | "caml_avx512f_int64x8_or_mask" -> instr vporq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_or" -> instr vporq_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_test_mask" -> instr vptestmd_K_Z_Zm512_K args
+    | "caml_avx512f_int32x16_test" -> instr vptestmd_K_Z_Zm512 args
+    | "caml_avx512f_int32x16_xor_mask" -> instr vpxord_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_xor" -> instr vpxord_Z_Z_Zm512 args
+    | "caml_avx512f_vec512_xor" -> instr vpxord_Z_Z_Zm512 args
+    | "caml_avx512f_int64x8_xor_mask" -> instr vpxorq_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int64x8_xor" -> instr vpxorq_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_and_mask" -> instr vpandd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_max_mask" -> instr vpmaxsd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_max" -> instr vpmaxsd_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_max_unsigned_mask" ->
+      instr vpmaxud_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_max_unsigned" -> instr vpmaxud_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_min_mask" -> instr vpminsd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_min" -> instr vpminsd_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_min_unsigned_mask" ->
+      instr vpminud_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_min_unsigned" -> instr vpminud_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_slli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpslld_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_int32x16_slli" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpslld_Z_Zm512 ~i args
+    | "caml_avx512f_int32x16_sllv_mask" -> instr vpsllvd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_sllv" -> instr vpsllvd_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_srai_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsrad_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_int32x16_srai" ->
+      let i, args = extract_constant args ~max:63 op in
+      instr vpsrad_Z_Zm512 ~i args
+    | "caml_avx512f_int32x16_srav_mask" -> instr vpsravd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_srav" -> instr vpsravd_Z_Z_Zm512 args
+    | "caml_avx512f_int32x16_srli_mask" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsrld_Z_Zm512_K_merge ~i args
+    | "caml_avx512f_int32x16_srli" ->
+      let i, args = extract_constant args ~max:255 op in
+      instr vpsrld_Z_Zm512 ~i args
+    | "caml_avx512f_int32x16_srlv_mask" -> instr vpsrlvd_Z_Z_Zm512_K_merge args
+    | "caml_avx512f_int32x16_srlv" -> instr vpsrlvd_Z_Z_Zm512 args
+    (* END GENERATED AVX512 *)
+    | _ -> None
+
+(* AVX512 memory operations (load/store, masked and unmasked). These lower to
+   [Isimd_mem] rather than [Isimd]; the address argument occupies the binding's
+   memory (RM_rm / mem-result) operand slot. Generated by
+   tools/avx512gen/genmem.py. *)
+let select_operation_avx512_mem ~dbg:_ op args =
+  if not (Arch.Extension.enabled AVX512F)
+  then None
+  else
+    let load instr = simd_load ~mode:Arch.identity_addressing instr args in
+    let store instr = simd_store ~mode:Arch.identity_addressing instr args in
+    ignore (load, store);
+    match op with
+    (* BEGIN GENERATED AVX512 MEM *)
+    | "caml_avx512f_int32x8_load" -> load vmovdqa32_Y_Ym256
+    | "caml_avx512f_int64x4_load" -> load vmovdqa64_Y_Ym256
+    | "caml_avx512bw_int16x16_loadu" -> load vmovdqu16_Y_Ym256
+    | "caml_avx512f_int32x8_loadu" -> load vmovdqu32_Y_Ym256
+    | "caml_avx512f_int64x4_loadu" -> load vmovdqu64_Y_Ym256
+    | "caml_avx512bw_int8x32_loadu" -> load vmovdqu8_Y_Ym256
+    | "caml_avx512f_int32x8_load_mask" -> load vmovdqa32_Y_Ym256_K_merge
+    | "caml_avx512f_int64x4_load_mask" -> load vmovdqa64_Y_Ym256_K_merge
+    | "caml_avx512f_float64x4_load_mask" -> load vmovapd_Y_Ym256_K_merge
+    | "caml_avx512f_float32x8_load_mask" -> load vmovaps_Y_Ym256_K_merge
+    | "caml_avx512bw_int16x16_loadu_mask" -> load vmovdqu16_Y_Ym256_K_merge
+    | "caml_avx512f_int32x8_loadu_mask" -> load vmovdqu32_Y_Ym256_K_merge
+    | "caml_avx512f_int64x4_loadu_mask" -> load vmovdqu64_Y_Ym256_K_merge
+    | "caml_avx512bw_int8x32_loadu_mask" -> load vmovdqu8_Y_Ym256_K_merge
+    | "caml_avx512f_float64x4_loadu_mask" -> load vmovupd_Y_Ym256_K_merge
+    | "caml_avx512f_float32x8_loadu_mask" -> load vmovups_Y_Ym256_K_merge
+    | "caml_avx512f_int32x8_store_mask" -> store vmovdqa32_m256_Y_K
+    | "caml_avx512f_int64x4_store_mask" -> store vmovdqa64_m256_Y_K
+    | "caml_avx512f_float64x4_store_mask" -> store vmovapd_m256_Y_K
+    | "caml_avx512f_float32x8_store_mask" -> store vmovaps_m256_Y_K
+    | "caml_avx512bw_int16x16_storeu_mask" -> store vmovdqu16_m256_Y_K
+    | "caml_avx512f_int32x8_storeu_mask" -> store vmovdqu32_m256_Y_K
+    | "caml_avx512f_int64x4_storeu_mask" -> store vmovdqu64_m256_Y_K
+    | "caml_avx512bw_int8x32_storeu_mask" -> store vmovdqu8_m256_Y_K
+    | "caml_avx512f_float64x4_storeu_mask" -> store vmovupd_m256_Y_K
+    | "caml_avx512f_float32x8_storeu_mask" -> store vmovups_m256_Y_K
+    | "caml_avx512f_int32x8_load_maskz" -> load (vmovdqa32_Y_Ym256_K ~z:true)
+    | "caml_avx512f_int64x4_load_maskz" -> load (vmovdqa64_Y_Ym256_K ~z:true)
+    | "caml_avx512f_float64x4_load_maskz" -> load (vmovapd_Y_Ym256_K ~z:true)
+    | "caml_avx512f_float32x8_load_maskz" -> load (vmovaps_Y_Ym256_K ~z:true)
+    | "caml_avx512bw_int16x16_loadu_maskz" -> load (vmovdqu16_Y_Ym256_K ~z:true)
+    | "caml_avx512f_int32x8_loadu_maskz" -> load (vmovdqu32_Y_Ym256_K ~z:true)
+    | "caml_avx512f_int64x4_loadu_maskz" -> load (vmovdqu64_Y_Ym256_K ~z:true)
+    | "caml_avx512bw_int8x32_loadu_maskz" -> load (vmovdqu8_Y_Ym256_K ~z:true)
+    | "caml_avx512f_float64x4_loadu_maskz" -> load (vmovupd_Y_Ym256_K ~z:true)
+    | "caml_avx512f_float32x8_loadu_maskz" -> load (vmovups_Y_Ym256_K ~z:true)
+    | "caml_avx512f_int32x8_store" -> store vmovdqa32_m256_Y
+    | "caml_avx512f_int64x4_store" -> store vmovdqa64_m256_Y
+    | "caml_avx512bw_int16x16_storeu" -> store vmovdqu16_m256_Y
+    | "caml_avx512f_int32x8_storeu" -> store vmovdqu32_m256_Y
+    | "caml_avx512f_int64x4_storeu" -> store vmovdqu64_m256_Y
+    | "caml_avx512bw_int8x32_storeu" -> store vmovdqu8_m256_Y
+    | "caml_avx512f_int32x16_load" -> load vmovdqa32_Z_Zm512
+    | "caml_avx512f_int64x8_load" -> load vmovdqa64_Z_Zm512
+    | "caml_avx512f_float64x8_load" -> load vmovapd_Z_Zm512
+    | "caml_avx512f_float32x16_load" -> load vmovaps_Z_Zm512
+    | "caml_avx512bw_int16x32_loadu" -> load vmovdqu16_Z_Zm512
+    | "caml_avx512f_int32x16_loadu" -> load vmovdqu32_Z_Zm512
+    | "caml_avx512f_int64x8_loadu" -> load vmovdqu64_Z_Zm512
+    | "caml_avx512bw_int8x64_loadu" -> load vmovdqu8_Z_Zm512
+    | "caml_avx512f_float64x8_loadu" -> load vmovupd_Z_Zm512
+    | "caml_avx512f_float32x16_loadu" -> load vmovups_Z_Zm512
+    | "caml_avx512f_int32x16_load_mask" -> load vmovdqa32_Z_Zm512_K_merge
+    | "caml_avx512f_int64x8_load_mask" -> load vmovdqa64_Z_Zm512_K_merge
+    | "caml_avx512f_float64x8_load_mask" -> load vmovapd_Z_Zm512_K_merge
+    | "caml_avx512f_float32x16_load_mask" -> load vmovaps_Z_Zm512_K_merge
+    | "caml_avx512bw_int16x32_loadu_mask" -> load vmovdqu16_Z_Zm512_K_merge
+    | "caml_avx512f_int32x16_loadu_mask" -> load vmovdqu32_Z_Zm512_K_merge
+    | "caml_avx512f_int64x8_loadu_mask" -> load vmovdqu64_Z_Zm512_K_merge
+    | "caml_avx512bw_int8x64_loadu_mask" -> load vmovdqu8_Z_Zm512_K_merge
+    | "caml_avx512f_float64x8_loadu_mask" -> load vmovupd_Z_Zm512_K_merge
+    | "caml_avx512f_float32x16_loadu_mask" -> load vmovups_Z_Zm512_K_merge
+    | "caml_avx512f_int32x16_store_mask" -> store vmovdqa32_m512_Z_K
+    | "caml_avx512f_int64x8_store_mask" -> store vmovdqa64_m512_Z_K
+    | "caml_avx512f_float64x8_store_mask" -> store vmovapd_m512_Z_K
+    | "caml_avx512f_float32x16_store_mask" -> store vmovaps_m512_Z_K
+    | "caml_avx512bw_int16x32_storeu_mask" -> store vmovdqu16_m512_Z_K
+    | "caml_avx512f_int32x16_storeu_mask" -> store vmovdqu32_m512_Z_K
+    | "caml_avx512f_int64x8_storeu_mask" -> store vmovdqu64_m512_Z_K
+    | "caml_avx512bw_int8x64_storeu_mask" -> store vmovdqu8_m512_Z_K
+    | "caml_avx512f_float64x8_storeu_mask" -> store vmovupd_m512_Z_K
+    | "caml_avx512f_float32x16_storeu_mask" -> store vmovups_m512_Z_K
+    | "caml_avx512f_int32x16_load_maskz" -> load (vmovdqa32_Z_Zm512_K ~z:true)
+    | "caml_avx512f_int64x8_load_maskz" -> load (vmovdqa64_Z_Zm512_K ~z:true)
+    | "caml_avx512f_float64x8_load_maskz" -> load (vmovapd_Z_Zm512_K ~z:true)
+    | "caml_avx512f_float32x16_load_maskz" -> load (vmovaps_Z_Zm512_K ~z:true)
+    | "caml_avx512bw_int16x32_loadu_maskz" -> load (vmovdqu16_Z_Zm512_K ~z:true)
+    | "caml_avx512f_int32x16_loadu_maskz" -> load (vmovdqu32_Z_Zm512_K ~z:true)
+    | "caml_avx512f_int64x8_loadu_maskz" -> load (vmovdqu64_Z_Zm512_K ~z:true)
+    | "caml_avx512bw_int8x64_loadu_maskz" -> load (vmovdqu8_Z_Zm512_K ~z:true)
+    | "caml_avx512f_float64x8_loadu_maskz" -> load (vmovupd_Z_Zm512_K ~z:true)
+    | "caml_avx512f_float32x16_loadu_maskz" -> load (vmovups_Z_Zm512_K ~z:true)
+    | "caml_avx512f_int32x16_store" -> store vmovdqa32_m512_Z
+    | "caml_avx512f_int64x8_store" -> store vmovdqa64_m512_Z
+    | "caml_avx512f_float64x8_store" -> store vmovapd_m512_Z
+    | "caml_avx512f_float32x16_store" -> store vmovaps_m512_Z
+    | "caml_avx512bw_int16x32_storeu" -> store vmovdqu16_m512_Z
+    | "caml_avx512f_int32x16_storeu" -> store vmovdqu32_m512_Z
+    | "caml_avx512f_int64x8_storeu" -> store vmovdqu64_m512_Z
+    | "caml_avx512bw_int8x64_storeu" -> store vmovdqu8_m512_Z
+    | "caml_avx512f_float64x8_storeu" -> store vmovupd_m512_Z
+    | "caml_avx512f_float32x16_storeu" -> store vmovups_m512_Z
+    | "caml_avx512f_int32x4_load" -> load vmovdqa32_X_Xm128
+    | "caml_avx512f_int64x2_load" -> load vmovdqa64_X_Xm128
+    | "caml_avx512bw_int16x8_loadu" -> load vmovdqu16_X_Xm128
+    | "caml_avx512f_int32x4_loadu" -> load vmovdqu32_X_Xm128
+    | "caml_avx512f_int64x2_loadu" -> load vmovdqu64_X_Xm128
+    | "caml_avx512bw_int8x16_loadu" -> load vmovdqu8_X_Xm128
+    | "caml_avx512f_int32x4_load_mask" -> load vmovdqa32_X_Xm128_K_merge
+    | "caml_avx512f_int64x2_load_mask" -> load vmovdqa64_X_Xm128_K_merge
+    | "caml_avx512f_float64x2_load_mask" -> load vmovapd_X_Xm128_K_merge
+    | "caml_avx512f_float32x4_load_mask" -> load vmovaps_X_Xm128_K_merge
+    | "caml_avx512bw_int16x8_loadu_mask" -> load vmovdqu16_X_Xm128_K_merge
+    | "caml_avx512f_int32x4_loadu_mask" -> load vmovdqu32_X_Xm128_K_merge
+    | "caml_avx512f_int64x2_loadu_mask" -> load vmovdqu64_X_Xm128_K_merge
+    | "caml_avx512bw_int8x16_loadu_mask" -> load vmovdqu8_X_Xm128_K_merge
+    | "caml_avx512f_float64x2_loadu_mask" -> load vmovupd_X_Xm128_K_merge
+    | "caml_avx512f_float32x4_loadu_mask" -> load vmovups_X_Xm128_K_merge
+    | "caml_avx512f_int32x4_store_mask" -> store vmovdqa32_m128_X_K
+    | "caml_avx512f_int64x2_store_mask" -> store vmovdqa64_m128_X_K
+    | "caml_avx512f_float64x2_store_mask" -> store vmovapd_m128_X_K
+    | "caml_avx512f_float32x4_store_mask" -> store vmovaps_m128_X_K
+    | "caml_avx512bw_int16x8_storeu_mask" -> store vmovdqu16_m128_X_K
+    | "caml_avx512f_int32x4_storeu_mask" -> store vmovdqu32_m128_X_K
+    | "caml_avx512f_int64x2_storeu_mask" -> store vmovdqu64_m128_X_K
+    | "caml_avx512bw_int8x16_storeu_mask" -> store vmovdqu8_m128_X_K
+    | "caml_avx512f_float64x2_storeu_mask" -> store vmovupd_m128_X_K
+    | "caml_avx512f_float32x4_storeu_mask" -> store vmovups_m128_X_K
+    | "caml_avx512f_int32x4_load_maskz" -> load (vmovdqa32_X_Xm128_K ~z:true)
+    | "caml_avx512f_int64x2_load_maskz" -> load (vmovdqa64_X_Xm128_K ~z:true)
+    | "caml_avx512f_float64x2_load_maskz" -> load (vmovapd_X_Xm128_K ~z:true)
+    | "caml_avx512f_float32x4_load_maskz" -> load (vmovaps_X_Xm128_K ~z:true)
+    | "caml_avx512bw_int16x8_loadu_maskz" -> load (vmovdqu16_X_Xm128_K ~z:true)
+    | "caml_avx512f_int32x4_loadu_maskz" -> load (vmovdqu32_X_Xm128_K ~z:true)
+    | "caml_avx512f_int64x2_loadu_maskz" -> load (vmovdqu64_X_Xm128_K ~z:true)
+    | "caml_avx512bw_int8x16_loadu_maskz" -> load (vmovdqu8_X_Xm128_K ~z:true)
+    | "caml_avx512f_float64x2_loadu_maskz" -> load (vmovupd_X_Xm128_K ~z:true)
+    | "caml_avx512f_float32x4_loadu_maskz" -> load (vmovups_X_Xm128_K ~z:true)
+    | "caml_avx512f_int32x4_store" -> store vmovdqa32_m128_X
+    | "caml_avx512f_int64x2_store" -> store vmovdqa64_m128_X
+    | "caml_avx512bw_int16x8_storeu" -> store vmovdqu16_m128_X
+    | "caml_avx512f_int32x4_storeu" -> store vmovdqu32_m128_X
+    | "caml_avx512f_int64x2_storeu" -> store vmovdqu64_m128_X
+    | "caml_avx512bw_int8x16_storeu" -> store vmovdqu8_m128_X
+    | "caml_avx512f_float32x8_broadcast_f32x4" -> load vbroadcastf32x4_Y_m128
+    | "caml_avx512f_float32x16_broadcast_f32x4" -> load vbroadcastf32x4_Z_m128
+    | "caml_avx512dq_float64x4_broadcast_f64x2" -> load vbroadcastf64x2_Y_m128
+    | "caml_avx512f_int32x8_broadcast_i32x4" -> load vbroadcasti32x4_Y_m128
+    | "caml_avx512f_int32x16_broadcast_i32x4" -> load vbroadcasti32x4_Z_m128
+    | "caml_avx512dq_int64x4_broadcast_i64x2" -> load vbroadcasti64x2_Y_m128
+    | "caml_avx512dq_int64x8_broadcast_i64x2" -> load vbroadcasti64x2_Z_m128
+    | "caml_avx512dq_int32x16_broadcast_i32x8" -> load vbroadcasti32x8_Z_m256
+    | "caml_avx512f_int64x8_broadcast_i64x4" -> load vbroadcasti64x4_Z_m256
+    | "caml_avx512f_int32x4_broadcast_d" -> load vpbroadcastd_X_Xm32
+    | "caml_avx512f_int32x8_broadcast_d" -> load vpbroadcastd_Y_Xm32
+    | "caml_avx512f_int32x16_broadcast_d" -> load vpbroadcastd_Z_Xm32
+    | "caml_avx512f_int64x2_broadcast_q" -> load vpbroadcastq_X_Xm64
+    | "caml_avx512f_int64x4_broadcast_q" -> load vpbroadcastq_Y_Xm64
+    | "caml_avx512f_int64x8_broadcast_q" -> load vpbroadcastq_Z_Xm64
+    | "caml_avx512f_int32x8_expandloadu_mask" -> load vpexpandd_Y_Ym256_K_merge
+    | "caml_avx512f_int64x4_expandloadu_mask" -> load vpexpandq_Y_Ym256_K_merge
+    | "caml_avx512f_float64x4_expandloadu_mask" ->
+      load vexpandpd_Y_Ym256_K_merge
+    | "caml_avx512f_float32x8_expandloadu_mask" ->
+      load vexpandps_Y_Ym256_K_merge
+    | "caml_avx512f_int32x8_expandloadu_maskz" ->
+      load (vpexpandd_Y_Ym256_K ~z:true)
+    | "caml_avx512f_int64x4_expandloadu_maskz" ->
+      load (vpexpandq_Y_Ym256_K ~z:true)
+    | "caml_avx512f_float64x4_expandloadu_maskz" ->
+      load (vexpandpd_Y_Ym256_K ~z:true)
+    | "caml_avx512f_float32x8_expandloadu_maskz" ->
+      load (vexpandps_Y_Ym256_K ~z:true)
+    | "caml_avx512f_int32x16_expandloadu_mask" -> load vpexpandd_Z_Zm512_K_merge
+    | "caml_avx512f_int64x8_expandloadu_mask" -> load vpexpandq_Z_Zm512_K_merge
+    | "caml_avx512f_float64x8_expandloadu_mask" ->
+      load vexpandpd_Z_Zm512_K_merge
+    | "caml_avx512f_float32x16_expandloadu_mask" ->
+      load vexpandps_Z_Zm512_K_merge
+    | "caml_avx512f_int32x16_expandloadu_maskz" ->
+      load (vpexpandd_Z_Zm512_K ~z:true)
+    | "caml_avx512f_int64x8_expandloadu_maskz" ->
+      load (vpexpandq_Z_Zm512_K ~z:true)
+    | "caml_avx512f_float64x8_expandloadu_maskz" ->
+      load (vexpandpd_Z_Zm512_K ~z:true)
+    | "caml_avx512f_float32x16_expandloadu_maskz" ->
+      load (vexpandps_Z_Zm512_K ~z:true)
+    | "caml_avx512f_int32x4_expandloadu_mask" -> load vpexpandd_X_Xm128_K_merge
+    | "caml_avx512f_int64x2_expandloadu_mask" -> load vpexpandq_X_Xm128_K_merge
+    | "caml_avx512f_float64x2_expandloadu_mask" ->
+      load vexpandpd_X_Xm128_K_merge
+    | "caml_avx512f_float32x4_expandloadu_mask" ->
+      load vexpandps_X_Xm128_K_merge
+    | "caml_avx512f_int32x4_expandloadu_maskz" ->
+      load (vpexpandd_X_Xm128_K ~z:true)
+    | "caml_avx512f_int64x2_expandloadu_maskz" ->
+      load (vpexpandq_X_Xm128_K ~z:true)
+    | "caml_avx512f_float64x2_expandloadu_maskz" ->
+      load (vexpandpd_X_Xm128_K ~z:true)
+    | "caml_avx512f_float32x4_expandloadu_maskz" ->
+      load (vexpandps_X_Xm128_K ~z:true)
+    | "caml_avx512f_int32x8_compressstoreu_mask" -> store vpcompressd_m256_Y_K
+    | "caml_avx512f_int64x4_compressstoreu_mask" -> store vpcompressq_m256_Y_K
+    | "caml_avx512f_float64x4_compressstoreu_mask" -> store vcompresspd_m256_Y_K
+    | "caml_avx512f_float32x8_compressstoreu_mask" -> store vcompressps_m256_Y_K
+    | "caml_avx512f_int32x16_compressstoreu_mask" -> store vpcompressd_m512_Z_K
+    | "caml_avx512f_int64x8_compressstoreu_mask" -> store vpcompressq_m512_Z_K
+    | "caml_avx512f_float64x8_compressstoreu_mask" -> store vcompresspd_m512_Z_K
+    | "caml_avx512f_float32x16_compressstoreu_mask" ->
+      store vcompressps_m512_Z_K
+    | "caml_avx512f_int32x4_compressstoreu_mask" -> store vpcompressd_m128_X_K
+    | "caml_avx512f_int64x2_compressstoreu_mask" -> store vpcompressq_m128_X_K
+    | "caml_avx512f_float64x2_compressstoreu_mask" -> store vcompresspd_m128_X_K
+    | "caml_avx512f_float32x4_compressstoreu_mask" -> store vcompressps_m128_X_K
+    | "caml_avx512bw_cvt_int16x16_int8x16_storeu_mask" -> store vpmovwb_m128_Y_K
+    | "caml_avx512f_cvt_int32x8_int16x8_storeu_mask" -> store vpmovdw_m128_Y_K
+    | "caml_avx512f_cvt_int32x8_int8x8_storeu_mask" -> store vpmovdb_m64_Y_K
+    | "caml_avx512f_cvt_int64x4_int16x4_storeu_mask" -> store vpmovqw_m64_Y_K
+    | "caml_avx512f_cvt_int64x4_int32x4_storeu_mask" -> store vpmovqd_m128_Y_K
+    | "caml_avx512f_cvt_int64x4_int8x4_storeu_mask" -> store vpmovqb_m32_Y_K
+    | "caml_avx512bw_cvt_int16x16_int8x16_saturating_storeu_mask" ->
+      store vpmovswb_m128_Y_K
+    | "caml_avx512f_cvt_int32x8_int16x8_saturating_storeu_mask" ->
+      store vpmovsdw_m128_Y_K
+    | "caml_avx512f_cvt_int32x8_int8x8_saturating_storeu_mask" ->
+      store vpmovsdb_m64_Y_K
+    | "caml_avx512f_cvt_int64x4_int16x4_saturating_storeu_mask" ->
+      store vpmovsqw_m64_Y_K
+    | "caml_avx512f_cvt_int64x4_int32x4_saturating_storeu_mask" ->
+      store vpmovsqd_m128_Y_K
+    | "caml_avx512f_cvt_int64x4_int8x4_saturating_storeu_mask" ->
+      store vpmovsqb_m32_Y_K
+    | "caml_avx512bw_cvt_int16x16_int8x16_saturating_unsigned_storeu_mask" ->
+      store vpmovuswb_m128_Y_K
+    | "caml_avx512f_cvt_int32x8_int16x8_saturating_unsigned_storeu_mask" ->
+      store vpmovusdw_m128_Y_K
+    | "caml_avx512f_cvt_int32x8_int8x8_saturating_unsigned_storeu_mask" ->
+      store vpmovusdb_m64_Y_K
+    | "caml_avx512f_cvt_int64x4_int16x4_saturating_unsigned_storeu_mask" ->
+      store vpmovusqw_m64_Y_K
+    | "caml_avx512f_cvt_int64x4_int32x4_saturating_unsigned_storeu_mask" ->
+      store vpmovusqd_m128_Y_K
+    | "caml_avx512f_cvt_int64x4_int8x4_saturating_unsigned_storeu_mask" ->
+      store vpmovusqb_m32_Y_K
+    | "caml_avx512bw_cvt_int16x32_int8x32_storeu_mask" -> store vpmovwb_m256_Z_K
+    | "caml_avx512f_cvt_int32x16_int16x16_storeu_mask" -> store vpmovdw_m256_Z_K
+    | "caml_avx512f_cvt_int32x16_int8x16_storeu_mask" -> store vpmovdb_m128_Z_K
+    | "caml_avx512f_cvt_int64x8_int16x8_storeu_mask" -> store vpmovqw_m128_Z_K
+    | "caml_avx512f_cvt_int64x8_int32x8_storeu_mask" -> store vpmovqd_m256_Z_K
+    | "caml_avx512f_cvt_int64x8_int8x8_storeu_mask" -> store vpmovqb_m64_Z_K
+    | "caml_avx512bw_cvt_int16x32_int8x32_saturating_storeu_mask" ->
+      store vpmovswb_m256_Z_K
+    | "caml_avx512f_cvt_int32x16_int16x16_saturating_storeu_mask" ->
+      store vpmovsdw_m256_Z_K
+    | "caml_avx512f_cvt_int32x16_int8x16_saturating_storeu_mask" ->
+      store vpmovsdb_m128_Z_K
+    | "caml_avx512f_cvt_int64x8_int16x8_saturating_storeu_mask" ->
+      store vpmovsqw_m128_Z_K
+    | "caml_avx512f_cvt_int64x8_int32x8_saturating_storeu_mask" ->
+      store vpmovsqd_m256_Z_K
+    | "caml_avx512f_cvt_int64x8_int8x8_saturating_storeu_mask" ->
+      store vpmovsqb_m64_Z_K
+    | "caml_avx512bw_cvt_int16x32_int8x32_saturating_unsigned_storeu_mask" ->
+      store vpmovuswb_m256_Z_K
+    | "caml_avx512f_cvt_int32x16_int16x16_saturating_unsigned_storeu_mask" ->
+      store vpmovusdw_m256_Z_K
+    | "caml_avx512f_cvt_int32x16_int8x16_saturating_unsigned_storeu_mask" ->
+      store vpmovusdb_m128_Z_K
+    | "caml_avx512f_cvt_int64x8_int16x8_saturating_unsigned_storeu_mask" ->
+      store vpmovusqw_m128_Z_K
+    | "caml_avx512f_cvt_int64x8_int32x8_saturating_unsigned_storeu_mask" ->
+      store vpmovusqd_m256_Z_K
+    | "caml_avx512f_cvt_int64x8_int8x8_saturating_unsigned_storeu_mask" ->
+      store vpmovusqb_m64_Z_K
+    | "caml_avx512bw_cvt_int16x8_int8x8_storeu_mask" -> store vpmovwb_m64_X_K
+    | "caml_avx512f_cvt_int32x4_int16x4_storeu_mask" -> store vpmovdw_m64_X_K
+    | "caml_avx512f_cvt_int32x4_int8x4_storeu_mask" -> store vpmovdb_m32_X_K
+    | "caml_avx512f_cvt_int64x2_int16x2_storeu_mask" -> store vpmovqw_m32_X_K
+    | "caml_avx512f_cvt_int64x2_int32x2_storeu_mask" -> store vpmovqd_m128_X_K
+    | "caml_avx512f_cvt_int64x2_int8x2_storeu_mask" -> store vpmovqb_m16_X_K
+    | "caml_avx512bw_cvt_int16x8_int8x8_saturating_storeu_mask" ->
+      store vpmovswb_m64_X_K
+    | "caml_avx512f_cvt_int32x4_int16x4_saturating_storeu_mask" ->
+      store vpmovsdw_m64_X_K
+    | "caml_avx512f_cvt_int32x4_int8x4_saturating_storeu_mask" ->
+      store vpmovsdb_m32_X_K
+    | "caml_avx512f_cvt_int64x2_int16x2_saturating_storeu_mask" ->
+      store vpmovsqw_m32_X_K
+    | "caml_avx512f_cvt_int64x2_int32x2_saturating_storeu_mask" ->
+      store vpmovsqd_m64_X_K
+    | "caml_avx512f_cvt_int64x2_int8x2_saturating_storeu_mask" ->
+      store vpmovsqb_m16_X_K
+    | "caml_avx512bw_cvt_int16x8_int8x8_saturating_unsigned_storeu_mask" ->
+      store vpmovuswb_m64_X_K
+    | "caml_avx512f_cvt_int32x4_int16x4_saturating_unsigned_storeu_mask" ->
+      store vpmovusdw_m64_X_K
+    | "caml_avx512f_cvt_int32x4_int8x4_saturating_unsigned_storeu_mask" ->
+      store vpmovusdb_m32_X_K
+    | "caml_avx512f_cvt_int64x2_int16x2_saturating_unsigned_storeu_mask" ->
+      store vpmovusqw_m32_X_K
+    | "caml_avx512f_cvt_int64x2_int32x2_saturating_unsigned_storeu_mask" ->
+      store vpmovusqd_m64_X_K
+    | "caml_avx512f_cvt_int64x2_int8x2_saturating_unsigned_storeu_mask" ->
+      store vpmovusqb_m16_X_K
+    | "caml_avx512f_int32x8_i32scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vpscatterdd_M32Y_Y_K args
+    | "caml_avx512f_int64x4_i32scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vpscatterdq_M32X_Y_K args
+    | "caml_avx512f_float64x4_i32scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vscatterdpd_M32X_Y_K args
+    | "caml_avx512f_float32x8_i32scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vscatterdps_M32Y_Y_K args
+    | "caml_avx512f_int32x4_i64scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vpscatterqd_M64Y_X_K args
+    | "caml_avx512f_int64x4_i64scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vpscatterqq_M64Y_Y_K args
+    | "caml_avx512f_float64x4_i64scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vscatterqpd_M64Y_Y_K args
+    | "caml_avx512f_float32x4_i64scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vscatterqps_M64Y_X_K args
+    | "caml_avx512f_int32x16_i32scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vpscatterdd_M32Z_Z_K args
+    | "caml_avx512f_int64x8_i32scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vpscatterdq_M32Y_Z_K args
+    | "caml_avx512f_float64x8_i32scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vscatterdpd_M32Y_Z_K args
+    | "caml_avx512f_float32x16_i32scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vscatterdps_M32Z_Z_K args
+    | "caml_avx512f_int32x8_i64scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vpscatterqd_M64Z_Y_K args
+    | "caml_avx512f_int64x8_i64scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vpscatterqq_M64Z_Z_K args
+    | "caml_avx512f_float64x8_i64scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vscatterqpd_M64Z_Z_K args
+    | "caml_avx512f_float32x8_i64scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vscatterqps_M64Z_Y_K args
+    | "caml_avx512f_int32x4_i32scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vpscatterdd_M32X_X_K args
+    | "caml_avx512f_int64x2_i32scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vpscatterdq_M32X_X_K args
+    | "caml_avx512f_float64x2_i32scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vscatterdpd_M32X_X_K args
+    | "caml_avx512f_float32x4_i32scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vscatterdps_M32X_X_K args
+    | "caml_avx512f_int64x2_i64scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vpscatterqq_M64X_X_K args
+    | "caml_avx512f_float64x2_i64scatter_mask" ->
+      let i, args = extract_scale args op in
+      simd_store ~mode:(Iindexed2scaled (i, 0)) vscatterqpd_M64X_X_K args
+    | "caml_avx512f_load_mask16" -> load kmovw_K_Km16
+    | "caml_avx512bw_load_mask32" -> load kmovd_K_Km32
+    | "caml_avx512bw_load_mask64" -> load kmovq_K_Km64
+    | "caml_avx512dq_load_mask8" -> load kmovb_K_Km8
+    | "caml_avx512f_store_mask16" -> store kmovw_m16_K
+    | "caml_avx512bw_store_mask32" -> store kmovd_m32_K
+    | "caml_avx512bw_store_mask64" -> store kmovq_m64_K
+    | "caml_avx512dq_store_mask8" -> store kmovb_m8_K
+    (* END GENERATED AVX512 MEM *)
+    | _ -> None
+
 let select_operation_cfg ~dbg op args =
   let or_else try_ opt =
     match opt with Some x -> Some x | None -> try_ ~dbg op args
@@ -1140,6 +9825,8 @@ let select_operation_cfg ~dbg op args =
   |> or_else select_operation_avx2
   |> or_else select_operation_f16c
   |> or_else select_operation_fma
+  |> or_else select_operation_avx512
+  |> or_else select_operation_avx512_mem
 
 let rax = Proc.phys_reg Int (P RAX)
 

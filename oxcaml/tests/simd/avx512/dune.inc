@@ -244,6 +244,76 @@
  (action
   (diff empty.expected arrays512_mask.out)))
 
+(executable
+ (name ops512_gen)
+ (modules ops512_gen)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs512))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops512_gen.out
+   (run ./ops512_gen.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (diff empty.expected ops512_gen.out)))
+
+(executable
+ (name ops512_mem)
+ (modules ops512_mem)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs512))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops512_mem.out
+   (run ./ops512_mem.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (diff empty.expected ops512_mem.out)))
+
 (rule
  (alias runtest)
  (enabled_if
@@ -567,6 +637,96 @@
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
  (action
+  (copy ops512_gen.ml ops512_gen_nodynlink.ml)))
+
+(executable
+ (name ops512_gen_nodynlink)
+ (modules ops512_gen_nodynlink)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs512))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops512_gen_nodynlink.out
+   (run ./ops512_gen_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (diff empty.expected ops512_gen_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (copy ops512_mem.ml ops512_mem_nodynlink.ml)))
+
+(executable
+ (name ops512_mem_nodynlink)
+ (modules ops512_mem_nodynlink)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs512))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops512_mem_nodynlink.out
+   (run ./ops512_mem_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (diff empty.expected ops512_mem_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
   (copy basic512.ml basic512_internal_assembler.ml)))
 
 (executable
@@ -873,3 +1033,93 @@
     (<> %{system} macosx)))
  (action
   (diff empty.expected arrays512_mask_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (copy ops512_gen.ml ops512_gen_internal_assembler.ml)))
+
+(executable
+ (name ops512_gen_internal_assembler)
+ (modules ops512_gen_internal_assembler)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs512))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops512_gen_internal_assembler.out
+   (run ./ops512_gen_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (diff empty.expected ops512_gen_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (copy ops512_mem.ml ops512_mem_internal_assembler.ml)))
+
+(executable
+ (name ops512_mem_internal_assembler)
+ (modules ops512_mem_internal_assembler)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs512))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   ops512_mem_internal_assembler.out
+   (run ./ops512_mem_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+   (and
+    (= %{context_name} "main")
+    (= %{architecture} "amd64")
+    (<> %{system} macosx)))
+ (action
+  (diff empty.expected ops512_mem_internal_assembler.out)))

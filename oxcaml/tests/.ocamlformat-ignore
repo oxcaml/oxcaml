@@ -17,6 +17,7 @@ simd/arrays.ml
 simd/arrays256.ml
 simd/avx512/arrays512.ml
 simd/avx512/arrays512_mask.ml
+simd/avx512/ops512_gen.ml
 simd/amd64/int_ops.ml
 simd/amd64/load_store.ml
 simd/mixed_modules.ml
@@ -47,3 +48,4 @@ dissector/huge_module*.ml
 dissector/module_a.ml
 dissector/module_b.ml
 dissector/module_c.ml
+simd/avx512/ops512_mem.ml

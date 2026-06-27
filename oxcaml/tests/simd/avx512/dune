@@ -8,7 +8,7 @@
 (foreign_library
  (archive_name stubs512)
  (language c)
- (names stubs512)
+ (names stubs512 ops512_gen_stubs ops512_mem_stubs)
  (flags
   (:standard
    (:include flags512.sexp)))
@@ -23,7 +23,7 @@
  (action
   (with-stdout-to
    flags512.sexp
-   (echo "(-mavx512f -mavx512vl -mavx512dq -mavx512bw)"))))
+   (echo "(-mavx512f -mavx512vl -mavx512dq -mavx512bw -mavx512cd)"))))
 
 (rule
  (targets flags512.sexp)

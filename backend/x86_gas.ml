@@ -134,22 +134,100 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
     | Legacy _ | Vex _ -> Misc.fatal_error "expected EVEX encoding"
   in
   let mask b = function None -> () | Some m -> bprintf b "{%a}" arg m in
-  let writemask = Array.find_opt X86_ast_utils.is_regmask args in
-  let last = ref 0 in
-  Array.iteri
-    (fun i a -> if not (X86_ast_utils.is_regmask a) then last := i)
-    args;
-  bprintf b "\t%s\t%s" instr.mnemonic rounding;
+  (* Identify the writemask by the instruction encoding rather than by operand
+     kind: for mask-producing instructions (e.g. vpcmpd) the destination is
+     itself a k-register, so "any k-register operand is the writemask" would be
+     wrong. The writemask is the [Mask]-encoded argument, which [expand_mask]
+     always appends last in [simd.args]; the operand reversal in
+     [emit_simd_instr] therefore places it first, just after the optional
+     immediate (this matches the binary emitter). The destination is the last
+     operand and is decorated with the writemask as [{k}]. *)
+  let dest = Array.length args - 1 in
+  let wm_idx =
+    if Amd64_simd_defs.instr_expects_mask instr
+    then match instr.imm with Imm_spec | Imm_reg -> 1 | Imm_none -> 0
+    else -1
+  in
+  let writemask = if wm_idx >= 0 then Some args.(wm_idx) else None in
+  (* Some EVEX instructions are ambiguous to the assembler when the source is in
+     memory and no register operand pins the operation width: a down-convert to
+     an xmm register (e.g. vcvtqq2ps m256,%xmm -- xmm is shared by the 128- and
+     256-bit forms) or a mask-producing op whose only source is the memory
+     operand (e.g. vfpclasspd m512,%k1). Emit an explicit x/y/z size suffix from
+     the EVEX vector length in those cases. (An xmm destination already pins
+     L128, so only L256/L512 need it; a k destination pins nothing, so all
+     do.) *)
+  let len_char =
+    match instr.enc.prefix with
+    | Evex { evex_ll = Ll_len L128; _ } -> "x"
+    | Evex { evex_ll = Ll_len L256; _ } -> "y"
+    | Evex { evex_ll = Ll_len L512; _ } -> "z"
+    | Evex { evex_ll = Ll_round _; _ } | Legacy _ | Vex _ -> ""
+  in
+  (* A mask-producing op only needs the length suffix when its memory source is
+     a full vector (vfpclasspd m512); a scalar memory source (vfpclassss m32)
+     names a unique form and must NOT be suffixed. *)
+  let has_vector_mem =
+    Array.exists
+      (fun (a : Amd64_simd_defs.arg) ->
+        match a.loc with
+        | Amd64_simd_defs.Temp temps ->
+          Array.exists
+            (function[@warning "-4"]
+              | Amd64_simd_defs.M128 | Amd64_simd_defs.M256
+              | Amd64_simd_defs.M512 ->
+                true
+              | _ -> false)
+            temps
+        | Amd64_simd_defs.Pin _ -> false)
+      instr.args
+  in
+  let size_suffix =
+    if not has_mem
+    then ""
+    else
+      match[@warning "-4"] args.(dest) with
+      | Regf (XMM _) -> if String.equal len_char "x" then "" else len_char
+      | Regmask _
+        when has_vector_mem && not (Array.exists X86_ast_utils.is_regf args) ->
+        len_char
+      | _ -> ""
+  in
+  (* The embedded rounding-control / SAE decoration must follow any immediate
+     operand (GAS: "RC/SAE operand must follow immediate operands"). The
+     immediate, when present, is the first operand; emit it, then the rounding,
+     then the remaining operands. With no immediate the rounding leads. *)
+  let imm_first =
+    match instr.imm with Imm_spec | Imm_reg -> true | Imm_none -> false
+  in
+  bprintf b "\t%s%s\t" instr.mnemonic size_suffix;
+  if imm_first
+  then (
+    arg b args.(0);
+    Buffer.add_string b ", ");
+  (* The rounding/SAE decoration precedes the first vector-register operand. For
+     most EVEX rounding ops that is the first operand (so it leads), but the
+     GPR-source converts (vcvtsi2ss/sd) lead with a general-purpose register and
+     gas requires the decoration to follow it: "vcvtsi2ss %eax, {rn-sae},
+     ...". *)
+  let rounding_emitted = ref (String.length rounding = 0) in
   let printed = ref false in
   Array.iteri
     (fun i a ->
-      if not (X86_ast_utils.is_regmask a)
+      if i <> wm_idx && not (imm_first && i = 0)
       then (
         if !printed then Buffer.add_string b ", ";
         printed := true;
+        (if not !rounding_emitted
+         then
+           match[@warning "-4"] a with
+           | Regf _ ->
+             Buffer.add_string b rounding;
+             rounding_emitted := true
+           | _ -> ());
         arg b a;
         if X86_ast_utils.is_mem a then Buffer.add_string b broadcast;
-        if i = !last then bprintf b "%a%s" mask writemask zeroing))
+        if i = dest then bprintf b "%a%s" mask writemask zeroing))
     args
 
 let i1_call_jmp b s = function
