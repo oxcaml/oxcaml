@@ -550,8 +550,10 @@ module Mod_bounds = struct
       (Bounds_mask.of_axis_set (relevant_axes_of_modality ~modality))
 
   let saturated_mask t mask =
-    let max_axis_mask = get_max_axes t |> Bounds_mask.of_axis_set in
-    Bounds_mask.meet max_axis_mask mask
+    Bounds_mask.meet (to_axis_lattice t) mask
+
+  let mask_of_externality externality =
+    to_axis_lattice (create Crossing.max ~externality)
 
   let cap_by_mask_l t mask =
     Bounds_mask.meet (to_axis_lattice t) mask |> of_axis_lattice
@@ -582,12 +584,33 @@ module With_bounds = struct
          axis from the set of relevant axes is semantically equivalent if the mod-
          bound on that axis is max.
 
+         If an axis already has explicit partial relevance, preserve that partial
+         mask rather than broadening it to the full axis.
+
          Note that this mostly matters because we mark axes as /not/ explicitly relevant
          on types when the axis is max, for performance reasons - but we don't want to
          print constant modalities for those axes!
       *)
       let implicit_relevant_bounds =
-        Mod_bounds.get_max_axes mod_bounds |> Bounds_mask.of_axis_set
+        let max_axis_mask =
+          Mod_bounds.get_max_axes mod_bounds |> Bounds_mask.of_axis_set
+        in
+        List.fold_left
+          (fun acc (Axis.Pack axis) ->
+            let axis_mask = Bounds_mask.of_axis_set (Axis_set.singleton axis) in
+            let has_explicit_relevance =
+              not
+                (Bounds_mask.is_empty
+                   (Bounds_mask.meet explicit_relevant_bounds axis_mask))
+            in
+            let is_max =
+              Bounds_mask.equal (Bounds_mask.meet max_axis_mask axis_mask)
+                axis_mask
+            in
+            if (not has_explicit_relevance) && is_max
+            then Bounds_mask.join acc axis_mask
+            else acc)
+          Bounds_mask.bot Axis.all
       in
       Bounds_mask.join explicit_relevant_bounds implicit_relevant_bounds
 
@@ -1760,7 +1783,16 @@ module Const = struct
               | Comonadic ax, Modality t ->
                 ( Modality.Const.set (Comonadic ax) t modal_modality,
                   nonmodal_axes ))
-            | Nonmodal _ -> modal_modality, Axis.Pack axis :: nonmodal_axes)
+            | Nonmodal Externality ->
+              let externality =
+                if Bounds_mask.is_empty axis_bounds
+                then Externality.min
+                else Axis_lattice.externality axis_bounds
+              in
+              let nonmodal_axis =
+                Fmt.asprintf "%a" Externality.print externality
+              in
+              modal_modality, nonmodal_axis :: nonmodal_axes)
         (Modality.Const.id, []) Axis.all
 
     (** Write [actual] in terms of [base] *)
@@ -1819,13 +1851,7 @@ module Const = struct
               let modal =
                 !outcometree_of_modalities Types.Immutable modal_modality
               in
-              let nonmodal =
-                List.map
-                  (fun (Axis.Pack axis) ->
-                    Fmt.asprintf "%a" (Per_axis.print axis) (Per_axis.min axis))
-                  nonmodal_axes
-              in
-              out_type, modal @ nonmodal)
+              out_type, modal @ nonmodal_axes)
             with_bounds otys
       in
       match matching_layouts, modal_bounds, scannable_axes with
@@ -2134,10 +2160,7 @@ module Const = struct
             in
             if is_top
             then bounds
-            else
-              Bounds_mask.residual bounds
-                (Bounds_mask.of_axis_set
-                   (Axis_set.singleton (Nonmodal Externality)))
+            else Bounds_mask.meet bounds (Mod_bounds.mask_of_externality ext)
         in
         { base = base.base;
           mod_bounds = base.mod_bounds;

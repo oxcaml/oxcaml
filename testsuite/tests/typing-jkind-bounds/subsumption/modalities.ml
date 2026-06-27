@@ -468,6 +468,50 @@ Error: This value is "contended"
 
 (* Non-modal axis: external_ in with-bounds *)
 
+module Direct_middle_bound_saturates_with_bound : sig
+  type 'a t : value mod shared
+end = struct
+  type 'a t : value mod shared with 'a @@ shared
+end
+[%%expect{|
+module Direct_middle_bound_saturates_with_bound :
+  sig type 'a t : value mod shared end
+|}]
+
+module External64_with_bound_is_middle : sig
+  type ('a : value mod external64) t : value mod external_
+end = struct
+  type ('a : value mod external64) t : value mod external_
+    with 'a @@ external64
+end
+[%%expect{|
+Lines 3-6, characters 6-3:
+3 | ......struct
+4 |   type ('a : value mod external64) t : value mod external_
+5 |     with 'a @@ external64
+6 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type ('a : value mod external64) t
+             : value mod external_ with 'a @@ external64
+         end
+       is not included in
+         sig type ('a : value mod external64) t : value mod external_ end
+       Type declarations do not match:
+         type ('a : value mod external64) t
+           : value mod external_ with 'a @@ external64
+       is not included in
+         type ('a : value mod external64) t : value mod external_
+       The kind of the first is value mod external_ with 'a @@ external64
+         because of the definition of t at lines 4-5, characters 2-25.
+       But the kind of the first must be a subkind of value mod external_
+         because of the definition of t at line 2, characters 2-58.
+
+       The first mode-crosses less than the second along:
+         externality: mod external_ with 'a ≰ mod external_
+|}]
+
 (* [value mod portable external_ with 'a @@ external_]
   always crosses externality, but crosses [portable] with ['a] *)
 
