@@ -13,4 +13,10 @@ type t1 : (value mod global) & (value mod global);;
 
 type t2 : value mod global & value mod global;;
 
-type t3 : (value mod global & value) mod global
+type t3 : (value mod global & value) mod global;;
+
+(* Scannable axes parse on products and other kinds, not just abbreviations. *)
+
+type t4 : (value & value) non_pointer;;
+
+type t5 : (value mod global) non_pointer
