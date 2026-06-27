@@ -163,9 +163,9 @@ jobs:
             --build-results-json "$GITHUB_WORKSPACE/compiler-perf-builds.json" \
             --json-output "$GITHUB_WORKSPACE/compiler-perf-results.json" \
             --markdown-output "$GITHUB_WORKSPACE/compiler-perf-results.md" \
-            --runs 5 \
+            --runs 20 \
             --warmups 1 \
-            --fail-corpus-lower-bound 1.03 \
+            --fail-corpus-lower-bound 1.015 \
             --fail-any-file-median 1.25 \
             --fail-build-ratio 1.15
 
