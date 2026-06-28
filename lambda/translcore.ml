@@ -1176,7 +1176,8 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
            transl_extension_constructor ~scopes e.exp_env None cd,
            transl_exp ~scopes layout body)
   | Texp_pack modl ->
-      !transl_module ~scopes Tcoerce_none None modl
+      let mod_scopes = enter_anonymous_module ~scopes ~loc:modl.mod_loc in
+      !transl_module ~scopes:mod_scopes Tcoerce_none None modl
   | Texp_assert ({exp_desc=Texp_construct(_, {cstr_name="false"}, _, _, _)},
                  loc) ->
       assert_failed loc ~scopes e
@@ -2780,14 +2781,23 @@ and transl_handler ~scopes ~return_layout ~body_layout e body
       attributes = Lambda.default_param_attribute;
       mode = alloc_heap }
   in
+  (* The handler arms and the body thunk are synthesized anonymous functions,
+     so give each its own scope (as [transl_function] would) and a location, so
+     they are named under the enclosing scope rather than the compilation unit. *)
+  let enter_handler_scope ~scopes ~loc =
+    enter_anonymous_function ~scopes
+      ~assume_zero_alloc:Zero_alloc_utils.Assume_info.none ~loc
+  in
   let val_fun =
+    let scopes = enter_handler_scope ~scopes ~loc:e.exp_loc in
+    let loc = of_location ~scopes e.exp_loc in
     match val_caselist with
     | None ->
         let param = Ident.create_local "param" in
         lfunction ~kind:(Curried {nlocal=0})
          ~params:[mk_param param Lambda.debug_uid_none body_layout]
          ~return:return_layout ~body:(Lvar param)
-         ~attr:default_function_attribute ~loc:Loc_unknown
+         ~attr:default_function_attribute ~loc
          ~mode:alloc_heap ~ret_mode:alloc_heap
     | Some (val_caselist, partial, body_sort) ->
         let val_cases = transl_cases ~scopes return_layout val_caselist in
@@ -2801,9 +2811,10 @@ and transl_handler ~scopes ~return_layout ~body_layout e body
         lfunction ~kind:(Curried {nlocal=0})
           ~params:[mk_param param param_duid body_layout]
           ~return:return_layout ~attr:default_function_attribute
-          ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:alloc_heap
+          ~loc ~body ~mode:alloc_heap ~ret_mode:alloc_heap
   in
   let exn_fun =
+    let scopes = enter_handler_scope ~scopes ~loc:e.exp_loc in
     let exn_cases = transl_cases ~scopes return_layout exn_caselist in
     let param, param_duid = Typecore.name_cases "exn" exn_caselist in
     let body =
@@ -2813,10 +2824,11 @@ and transl_handler ~scopes ~return_layout ~body_layout e body
     in
     lfunction ~kind:(Curried {nlocal=0})
       ~params:[mk_param param param_duid layout_exception] ~return:return_layout
-      ~attr:default_function_attribute ~loc:Loc_unknown ~body
+      ~attr:default_function_attribute ~loc:(of_location ~scopes e.exp_loc) ~body
       ~mode:alloc_heap ~ret_mode:alloc_heap
   in
   let eff_fun =
+    let scopes = enter_handler_scope ~scopes ~loc:e.exp_loc in
     let param, param_duid = Typecore.name_cases "eff" eff_caselist in
     let cont = Ident.create_local "k" in
     let cont_tail = Ident.create_local "ktail" in
@@ -2830,13 +2842,16 @@ and transl_handler ~scopes ~return_layout ~body_layout e body
       ~params:[mk_param param param_duid Lambda.layout_block;
                mk_param cont Lambda.debug_uid_none Lambda.layout_function;
                mk_param cont_tail Lambda.debug_uid_none Lambda.layout_function]
-      ~return:return_layout ~attr:default_function_attribute ~loc:Loc_unknown
+      ~return:return_layout ~attr:default_function_attribute
+      ~loc:(of_location ~scopes e.exp_loc)
       ~body ~mode:alloc_heap ~ret_mode:alloc_heap
   in
   (* Upstream decomposes [body] into [f x] when it is an application, avoiding
      the thunk. We always use the thunk path because we cannot verify that the
      arg has layout [value] from [Lapply]. *)
   let (body_fun, arg) =
+    let body_loc = body.exp_loc in
+    let scopes = enter_handler_scope ~scopes ~loc:body_loc in
     let body =
       maybe_region_layout body_layout (transl_exp ~scopes body_layout body)
     in
@@ -2844,7 +2859,7 @@ and transl_handler ~scopes ~return_layout ~body_layout e body
     (lfunction ~kind:(Curried {nlocal=0})
        ~params:[mk_param param Lambda.debug_uid_none Lambda.layout_int]
        ~return:body_layout
-       ~attr:default_function_attribute ~loc:Loc_unknown
+       ~attr:default_function_attribute ~loc:(of_location ~scopes body_loc)
        ~body ~mode:alloc_heap ~ret_mode:alloc_heap,
      Lconst(Const_base(Const_int 0)))
   in
@@ -2911,6 +2926,13 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
   in
   let func =
     let return_mode = alloc_heap (* XXX fixme: use result of is_function_type *) in
+    (* The binding-operator body [fun param -> case] is an anonymous function,
+       so give it its own scope (as [transl_function] would). *)
+    let scopes =
+      enter_anonymous_function ~scopes
+        ~assume_zero_alloc:Zero_alloc_utils.Assume_info.none
+        ~loc:case.c_rhs.exp_loc
+    in
     let (kind, params, return, _region, ret_mode), body =
       event_function ~scopes case.c_rhs
         (function repr ->
