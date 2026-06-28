@@ -11,9 +11,9 @@ File "multiply_bound_variable.ml", line 15, characters 8-9:
 File "multiply_bound_variable.ml", line 19, characters 10-12:
 19 | let z = f 10 + y
                ^^
-  The constant 10 has type int but an expression was expected of type
+  This expression has type int but an expression was expected of type
     'a * int * int
 File "multiply_bound_variable.ml", line 21, characters 17-19:
 21 | let a : string = 10
                       ^^
-  The constant 10 has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

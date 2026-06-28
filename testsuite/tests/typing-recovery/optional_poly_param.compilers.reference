@@ -23,12 +23,12 @@ Error: Multiple errors were encountered
 File "optional_poly_param.ml", line 12, characters 8-25:
 12 | let a ?(id : 'a. 'a -> 'a) () = id 3, id "three"
              ^^^^^^^^^^^^^^^^^
-  The optional parameter id cannot have a polymorphic type.
+  Optional parameters cannot be polymorphic
 File "optional_poly_param.ml", line 13, characters 8-27:
 13 | let b ?(id : 'a. int -> int) () = id 3
              ^^^^^^^^^^^^^^^^^^^
-  The optional parameter id cannot have a polymorphic type.
+  Optional parameters cannot be polymorphic
 File "optional_poly_param.ml", line 20, characters 17-18:
 20 | let t : string = r
                       ^
-  The value r has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

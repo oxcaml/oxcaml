@@ -15,4 +15,4 @@ File "outside_class.ml", line 16, characters 14-24:
 File "outside_class.ml", line 20, characters 17-19:
 20 | let x : string = 10
                       ^^
-  The constant 10 has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

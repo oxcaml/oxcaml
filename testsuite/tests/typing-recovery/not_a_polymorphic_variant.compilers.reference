@@ -15,4 +15,4 @@ File "not_a_polymorphic_variant.ml", line 23, characters 9-10:
 File "not_a_polymorphic_variant.ml", line 31, characters 17-18:
 31 | let t : string = u
                       ^
-  The value u has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

@@ -27,4 +27,4 @@ File "orpat_vars.ml", line 21, characters 31-32:
 File "orpat_vars.ml", line 23, characters 17-19:
 23 | let c : string = 10
                       ^^
-  The constant 10 has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

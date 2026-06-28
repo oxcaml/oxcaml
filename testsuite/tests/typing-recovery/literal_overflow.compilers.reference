@@ -15,4 +15,5 @@ File "literal_overflow.ml", line 12, characters 8-68:
 File "literal_overflow.ml", line 18, characters 17-18:
 18 | let s : string = r
                       ^
-  The value r has type int64 but an expression was expected of type string
+  This expression has type int64 but an expression was expected of type
+    string

@@ -12,4 +12,4 @@ File "or_pattern_type_clash.ml", line 12, characters 23-24:
 File "or_pattern_type_clash.ml", line 16, characters 8-9:
 16 | let y = x ^ "ocaml"
              ^
-  The value x has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

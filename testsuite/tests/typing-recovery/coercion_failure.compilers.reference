@@ -8,8 +8,8 @@ File "coercion_failure.ml", line 12, characters 13-17:
 File "coercion_failure.ml", line 16, characters 19-21:
 16 |   let t : string = 10
                         ^^
-  The constant 10 has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string
 File "coercion_failure.ml", line 19, characters 17-19:
 19 | let t : string = 10
                       ^^
-  The constant 10 has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

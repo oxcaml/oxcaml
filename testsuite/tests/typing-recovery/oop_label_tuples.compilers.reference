@@ -7,8 +7,7 @@ File "oop_label_tuples.ml", line 20, characters 14-24:
 File "oop_label_tuples.ml", line 21, characters 8-13:
 21 |     y + 220.2
              ^^^^^
-  The constant 220.2 has type float but an expression was expected of type
-    int
+  This expression has type float but an expression was expected of type int
 File "oop_label_tuples.ml", lines 27-28, characters 69-9:
 27 | .....................................................................object
 28 |       end
@@ -22,11 +21,11 @@ File "oop_label_tuples.ml", lines 30-34, characters 11-7:
 33 |       method finalize = 44
 34 |     end............
   This expression has type
-    < deal : String.t -> unit -> char Seq.node; finalize : int;
+    < deal : String.t -> char Seq.t; finalize : int;
       from : char Seq.t -> String.t >
   but an expression was expected of type
-    < deal : String.t -> unit -> char Seq.node; finalize : string;
-      from : (unit -> char Seq.node) -> string; .. >
+    < deal : String.t -> char Seq.t; finalize : string;
+      from : char Seq.t -> string; .. >
   The method finalize has type int, but the expected method type was string
 File "oop_label_tuples.ml", line 39, characters 12-21:
 39 | let u = fgh (1, 2, 3) + fgh (~a:11, ~b:300, ~c:3000) + fgh (~a:22, ~b:1, ~c:"30")
@@ -37,9 +36,8 @@ File "oop_label_tuples.ml", line 39, characters 12-21:
 File "oop_label_tuples.ml", line 39, characters 47-51:
 39 | let u = fgh (1, 2, 3) + fgh (~a:11, ~b:300, ~c:3000) + fgh (~a:22, ~b:1, ~c:"30")
                                                     ^^^^
-  The constant 3000 has type int but an expression was expected of type
-    string
+  This expression has type int but an expression was expected of type string
 File "oop_label_tuples.ml", line 45, characters 35-38:
 45 |   | Foo {bar; _} -> (int_of_string bar) + 10
                                         ^^^
-  The value bar has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

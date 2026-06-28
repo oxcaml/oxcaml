@@ -11,4 +11,4 @@ File "label_not_mutable.ml", line 15, characters 11-20:
 File "label_not_mutable.ml", line 20, characters 17-19:
 20 | let t : string = 10
                       ^^
-  The constant 10 has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

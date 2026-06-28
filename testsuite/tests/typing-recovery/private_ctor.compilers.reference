@@ -11,4 +11,4 @@ File "private_ctor.ml", line 20, characters 10-11:
 File "private_ctor.ml", line 24, characters 14-16:
 24 | let t : int = ""
                    ^^
-  This constant has type string but an expression was expected of type int
+  This expression has type string but an expression was expected of type int

@@ -17,7 +17,7 @@ Unbound value xFile "unbound_existential.ml", line 20, characters 17-18:
 20 | let t : string = c
                                                                                           ^
                                                                       
-The value c has type
+This expression has type
                                                                     int
                                                                     but an expression was expected of type
                                                                     string

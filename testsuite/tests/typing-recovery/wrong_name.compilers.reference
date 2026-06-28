@@ -5,9 +5,12 @@ File "wrong_name.ml", line 14, characters 4-10:
          ^^^^^^
   This expression has type person
   There is no field height within type person
+File "wrong_name.ml", line 19, characters 20-23:
+19 | let f (A {foo; bar; baz}) = ()
+                         ^^^
   The field baz is not part of the record argument for the t.A constructor
 Hint: Did you mean bar?
 File "wrong_name.ml", line 23, characters 17-19:
 23 | let t : string = 10
                       ^^
-  The constant 10 has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

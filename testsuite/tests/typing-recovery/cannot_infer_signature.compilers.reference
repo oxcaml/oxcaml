@@ -8,7 +8,3 @@ File "cannot_infer_signature.ml", line 22, characters 17-32:
 22 |   let module A = (val fst (U.f)) in
                       ^^^^^^^^^^^^^^^
   The signature for this packaged module couldn't be inferred.
-File "cannot_infer_signature.ml", line 26, characters 17-21:
-26 | let r : string = k ()
-                      ^^^^
-  This expression has type int but an expression was expected of type string

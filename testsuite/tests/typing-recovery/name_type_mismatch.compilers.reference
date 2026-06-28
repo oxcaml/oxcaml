@@ -8,4 +8,4 @@ File "name_type_mismatch.ml", line 13, characters 11-14:
 File "name_type_mismatch.ml", line 17, characters 17-19:
 17 | let t : string = 10
                       ^^
-  The constant 10 has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

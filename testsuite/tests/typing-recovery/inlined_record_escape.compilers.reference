@@ -15,4 +15,4 @@ File "inlined_record_escape.ml", line 17, characters 4-5:
 File "inlined_record_escape.ml", line 20, characters 17-18:
 20 | let t : string = u
                       ^
-  The value u has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

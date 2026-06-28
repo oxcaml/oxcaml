@@ -7,7 +7,7 @@ File "label_not_atomic.ml", line 12, characters 12-29:
 File "label_not_atomic.ml", line 17, characters 21-22:
 17 |   a + (int_of_string b)
                           ^
-  The value b has type string atomic_loc
+  This expression has type string atomic_loc
   but an expression was expected of type string
 File "label_not_atomic.ml", line 19, characters 17-21:
 19 | let t : string = f ()

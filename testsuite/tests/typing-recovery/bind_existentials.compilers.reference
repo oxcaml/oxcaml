@@ -1,3 +1,8 @@
+File "bind_existentials.ml", line 40, characters 48-49:
+40 |   | Thunk (type b c) (x, f : b * (b -> c)) -> f x
+                                                     ^
+Warning 20 [ignored-extra-argument]: this argument will not be used by the function.
+
 File "bind_existentials.ml", line 1:
 Error: Multiple errors were encountered
 File "bind_existentials.ml", line 20, characters 40-48:
@@ -38,4 +43,4 @@ File "bind_existentials.ml", line 40, characters 48-49:
 File "bind_existentials.ml", line 42, characters 17-19:
 42 | let t : string = 10
                       ^^
-  The constant 10 has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

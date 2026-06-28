@@ -20,4 +20,4 @@ File "virtual_class.ml", line 30, characters 10-15:
 File "virtual_class.ml", line 36, characters 14-16:
 36 | let t: bool = 10
                    ^^
-  The constant 10 has type int but an expression was expected of type bool
+  This expression has type int but an expression was expected of type bool

@@ -25,4 +25,4 @@ File "illegal_class_expr.ml", lines 28-30, characters 2-12:
 File "illegal_class_expr.ml", line 32, characters 17-19:
 32 | let t : string = 10
                       ^^
-  The constant 10 has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

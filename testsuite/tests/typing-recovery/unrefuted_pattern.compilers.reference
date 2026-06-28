@@ -8,4 +8,4 @@ File "unrefuted_pattern.ml", line 33, characters 5-6:
 File "unrefuted_pattern.ml", line 36, characters 17-18:
 36 | let u : string = x
                       ^
-  The value x has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

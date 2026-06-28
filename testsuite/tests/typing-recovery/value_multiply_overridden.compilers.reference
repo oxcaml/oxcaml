@@ -19,4 +19,4 @@ File "value_multiply_overridden.ml", line 33, characters 22-42:
 File "value_multiply_overridden.ml", line 39, characters 17-19:
 39 | let t : string = 11
                       ^^
-  The constant 11 has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

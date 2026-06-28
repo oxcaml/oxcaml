@@ -7,4 +7,4 @@ File "invalid_atomic_loc_payload.ml", line 12, characters 12-27:
 File "invalid_atomic_loc_payload.ml", line 16, characters 17-19:
 16 | let t : string = 10
                       ^^
-  The constant 10 has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string

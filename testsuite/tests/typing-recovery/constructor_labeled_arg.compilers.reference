@@ -13,4 +13,4 @@ File "constructor_labeled_arg.ml", line 14, characters 2-16:
 File "constructor_labeled_arg.ml", line 21, characters 14-15:
 21 | let t : int = r
                    ^
-  The value r has type bool but an expression was expected of type int
+  This expression has type bool but an expression was expected of type int

@@ -13,5 +13,5 @@ File "function_arity_type_clash.ml", line 13, characters 2-44:
   File "function_arity_type_clash.ml", line 15, characters 17-19:
   15 | let x : string = 10
                         ^^
-    The constant 10 has type int but an expression was expected of type
+    This expression has type int but an expression was expected of type
       string

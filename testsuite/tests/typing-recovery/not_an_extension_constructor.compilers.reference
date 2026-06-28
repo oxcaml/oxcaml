@@ -15,5 +15,5 @@ File "not_an_extension_constructor.ml", line 14, characters 34-35:
 File "not_an_extension_constructor.ml", line 18, characters 14-15:
 18 | let t : int = u
                    ^
-  The value u has type 'a * 'b * 'c but an expression was expected of type
-    int
+  This expression has type 'a * 'b * 'c
+  but an expression was expected of type int

@@ -10,4 +10,4 @@ File "atomic_in_pattern.ml", line 13, characters 16-24:
 File "atomic_in_pattern.ml", line 17, characters 17-18:
 17 | let r : string = k
                       ^
-  The value k has type int but an expression was expected of type string
+  This expression has type int but an expression was expected of type string
