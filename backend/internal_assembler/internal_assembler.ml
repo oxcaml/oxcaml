@@ -323,3 +323,4 @@ let assemble unix ~delayed asm output_file =
       + (header.e_shnum * header.e_shentsize))
   in
   write elf header sections symbol_table relocation_tables string_table
+
