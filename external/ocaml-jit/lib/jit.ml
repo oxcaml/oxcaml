@@ -206,6 +206,46 @@ let jit_run entry_points =
       | Ok x -> Result x
       | Err s -> failwithf "Jit.run: %s" s)
 
+(** Build an in-memory ELF symfile describing the just-loaded JIT'd code and
+    register it with GDB via the JIT-Interface protocol. On architectures
+    where the emitter does not implement [Gdb_jit_symfile.build] (currently
+    arm64), this is a no-op.
+
+    The [.text] entry's [sh_size] is set to [Jit_text_section.in_memory_size],
+    which covers the assembled text plus the GOT and PLT tables that follow
+    in memory. The trailing bytes in the symfile are zero-padded; GDB reads
+    actual instructions from inferior memory, not the symfile. *)
+let register_with_gdb (type a r)
+    (module E : Binary_emitter_intf.S
+      with type Assembled_section.t = a
+       and type Relocation.t = r) ~text ~sections =
+  let address_table = Hashtbl.create 16 in
+  let runtime_size_table = Hashtbl.create 16 in
+  Hashtbl.add address_table Jit_text_section.name
+    (Address.to_int64 text.address);
+  Hashtbl.add runtime_size_table Jit_text_section.name
+    (Jit_text_section.in_memory_size (module E) text.value);
+  String.Map.iter sections ~f:(fun ~key:name ~data:{ address; value = _ } ->
+      Hashtbl.add address_table name (Address.to_int64 address));
+  let section_address name = Hashtbl.find_opt address_table name in
+  let section_runtime_size name = Hashtbl.find_opt runtime_size_table name in
+  let sections_list =
+    let init =
+      [ Jit_text_section.name, Jit_text_section.binary_section text.value ]
+    in
+    String.Map.fold sections ~init
+      ~f:(fun ~key:name ~data:{ address = _; value } acc ->
+        (name, value) :: acc)
+  in
+  match
+    E.Gdb_jit_symfile.build ~sections:sections_list ~section_address
+      ~section_runtime_size
+  with
+  | None -> ()
+  | Some symfile ->
+    let handle = Gdb_jit.register symfile in
+    Globals.gdb_jit_handles := handle :: !Globals.gdb_jit_handles
+
 (** Load and run assembled binary sections. This is the main generic JIT entry
     point that works with any architecture. *)
 let jit_load (type a r)
@@ -260,6 +300,7 @@ let jit_load (type a r)
   Debug.save_text_section (module E) ~phrase_name relocated_text;
   load_text (module E) relocated_text;
   load_sections (module E) addressed_sections;
+  register_with_gdb (module E) ~text:relocated_text ~sections:addressed_sections;
   let entry_points = entry_points ~phrase_name symbols in
   let result = jit_run entry_points in
   outcome_ref := Some result

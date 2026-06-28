@@ -172,3 +172,16 @@ module Internal_assembler = struct
 
   let get () = !current_hook
 end
+
+module Gdb_jit_symfile = struct
+  type assembled_section = Assembled_section.t
+
+  (* EM_AARCH64 in [e_machine]. *)
+  let em_aarch64 = 0xB7
+
+  let build ~sections ~section_address ~section_runtime_size =
+    Some
+      (Jit_symfile.build
+         (module Assembled_section)
+         ~e_machine:em_aarch64 ~sections ~section_address ~section_runtime_size)
+end

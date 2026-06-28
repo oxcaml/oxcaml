@@ -2016,4 +2016,18 @@ module For_jit = struct
 
     let get () = !current_hook
   end
+
+  module Gdb_jit_symfile = struct
+    type assembled_section = Assembled_section.t
+
+    (* EM_X86_64 in [e_machine]. *)
+    let em_x86_64 = 0x3E
+
+    let build ~sections ~section_address ~section_runtime_size =
+      Some
+        (Jit_symfile.build
+           (module Assembled_section)
+           ~e_machine:em_x86_64 ~sections ~section_address
+           ~section_runtime_size)
+  end
 end
