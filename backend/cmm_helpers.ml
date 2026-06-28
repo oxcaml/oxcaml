@@ -3209,8 +3209,15 @@ module SArgBlocks = struct
   let arg_as_test arg = arg
 
   let make_if () cond ifso ifnot =
-    Cifthenelse
-      (cond, Debuginfo.none, ifso, Debuginfo.none, ifnot, Debuginfo.none)
+    (* See [ite] below for the rationale for this peephole. [cond] is always a
+       comparison built by [make_isin]/[make_isout]/etc., so [Csequence]
+       directly is safe (the [sequence] helper that handles [Ctuple []]
+       specially is defined below this module). *)
+    if P.Cmm_comparator.equivalent ifso ifnot
+    then Csequence (cond, ifso)
+    else
+      Cifthenelse
+        (cond, Debuginfo.none, ifso, Debuginfo.none, ifnot, Debuginfo.none)
 
   let make_switch dbg () arg cases actions =
     let actions = Array.map (fun expr -> expr, dbg) actions in
@@ -4686,7 +4693,17 @@ let sequence x y =
   | _, _ -> Csequence (x, y)
 
 let ite ~dbg ~then_dbg ~then_ ~else_dbg ~else_ cond =
-  Cifthenelse (cond, then_dbg, then_, else_dbg, else_, dbg)
+  (* If the two branches are syntactically equivalent (modulo debug info), we
+     don't need to dispatch on [cond]: every execution evaluates the same
+     expression. We keep [cond] under [sequence] to preserve its effects and
+     coeffects; later passes (DCE/CSE) can drop it if it turns out to be pure.
+     This commonly fires when the match compiler produces per-arm field accesses
+     that disagree at the lambda level (e.g. [Pmixedfield]s on constructors with
+     different total field counts) but resolve to the same [Block_load] /
+     [Cload] in Cmm. *)
+  if P.Cmm_comparator.equivalent then_ else_
+  then sequence cond then_
+  else Cifthenelse (cond, then_dbg, then_, else_dbg, else_, dbg)
 
 let trywith ~dbg ~body ~exn_var ~extra_args ~handler_cont ~handler () =
   Ccatch
