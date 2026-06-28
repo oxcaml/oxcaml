@@ -784,6 +784,8 @@ let emit_jump_table t =
   done
 
 let emit_jump_tables () =
+  I.ud2 ();
+  (* data in text below *)
   D.align ~fill:Nop ~bytes:4;
   List.iter emit_jump_table !jump_tables;
   jump_tables := []
@@ -3106,6 +3108,7 @@ let end_assembly () =
     if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Text
   in
   D.switch_to_section frametable_section;
+  I.ud2 ();
   D.align
     ~fill:(if !Oxcaml_flags.frametables_in_rodata then Zero else Nop)
     ~bytes:8;

@@ -332,9 +332,9 @@ let add_extra_params_for_mutable_unboxing cont uacc extra_params_and_args =
   let Flow_types.Mutable_unboxing_result.{ additional_epa; _ } =
     UA.mutable_unboxing_result uacc
   in
-  match Continuation.Map.find cont additional_epa with
-  | exception Not_found -> extra_params_and_args
-  | additional_epa ->
+  match Continuation.Map.find_or_null cont additional_epa with
+  | Null -> extra_params_and_args
+  | This additional_epa ->
     EPA.concat ~inner:extra_params_and_args ~outer:additional_epa
 
 type behaviour =
@@ -961,11 +961,11 @@ let create_handler_to_rebuild
     Apply_cont_rewrite_id.Map.of_set
       (fun rewrite_id ->
         match
-          Apply_cont_rewrite_id.Map.find rewrite_id
+          Apply_cont_rewrite_id.Map.find_or_null rewrite_id
             (EPA.extra_args data.invariant_extra_params_and_args)
         with
-        | extra_args -> extra_args
-        | exception Not_found ->
+        | This extra_args -> extra_args
+        | Null ->
           Or_invalid.Ok
             (List.map
                (fun param ->
