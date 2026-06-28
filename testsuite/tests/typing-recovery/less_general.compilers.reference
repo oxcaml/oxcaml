@@ -4,11 +4,11 @@ File "less_general.ml", line 17, characters 27-43:
 17 | let _less_general_1 = poly (fun x -> x + 1)
                                 ^^^^^^^^^^^^^^^^
   This argument has type int -> int which is less general than 'a. 'a -> 'a
-  The type int is not a type variable.
 File "less_general.ml", line 19, characters 13-58:
 19 | let _ = poly (let r = ref None in fun x -> r := Some x; x)
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  This argument has type 'a -> 'a which is less general than 'a0. 'a0 -> 'a0
-  The type variable 'a0 is not generalizable to an universal type variable.
-This method has type 'b -> 'b which is less general than 'b0. 'b0 -> 'b
-The type variable 'b0 is not generalizable to an universal type variable.
+  This argument has type 'b -> 'b which is less general than 'a. 'a -> 'a
+File "less_general.ml", line 23, characters 12-17:
+23 |   method id x = x
+                 ^^^^^
+This method has type 'a -> 'a which is less general than 'b. 'b -> 'a

@@ -8,7 +8,7 @@ File "missing_constructor_and_invalid_types.ml", line 12, characters 7-8:
 File "missing_constructor_and_invalid_types.ml", line 12, characters 22-24:
 12 | let f (C : t) : int = ()
                            ^^
-  This expression should not be a unit literal, the expected type is int
+  The constructor () has type unit but an expression was expected of type int
 File "missing_constructor_and_invalid_types.ml", line 18, characters 4-5:
 18 |   | C -> 'a'
          ^

@@ -15,4 +15,5 @@ File "modules_not_allowed.ml", line 17, characters 24-25:
 File "modules_not_allowed.ml", line 22, characters 14-18:
 22 | let t : int = true
                    ^^^^
-  This expression should not be a boolean literal, the expected type is int
+  The constructor true has type bool but an expression was expected of type
+    int

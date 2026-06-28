@@ -12,7 +12,7 @@ File "unbound_instance_variable.ml", line 22, characters 17-27:
 22 |   method a : f = {<x = 10>}
                       ^^^^^^^^^^
   This expression has type < a : f; b : f; c : f; .. >
-  but an expression was expected of type < .. >
+  but an expression was expected of type f
   Self type cannot escape its class
 File "unbound_instance_variable.ml", line 23, characters 17-35:
 23 |   method b : f = {<x = 10; y = 12>}
