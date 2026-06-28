@@ -87,9 +87,9 @@ File "wrong_expected_kind.ml", line 90, characters 9-24:
 90 | let () = (Record.get ()).a <- 5
               ^^^^^^^^^^^^^^^
   This expression has type 'a -> Record.t which is not a record type.
-File "wrong_expected_kind.ml", line 91, characters 18-33:
+File "wrong_expected_kind.ml", line 91, characters 16-46:
 91 | let () = ignore { (Record.get ()) with a = 5 }
-                       ^^^^^^^^^^^^^^^
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   This expression has type 'a -> Record.t which is not a record type.
 File "wrong_expected_kind.ml", line 92, characters 23-39:
 92 | let foo x = Record.put { x with a = 5 }

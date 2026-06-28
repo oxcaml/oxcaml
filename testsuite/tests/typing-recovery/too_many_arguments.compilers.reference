@@ -13,6 +13,9 @@ File "too_many_arguments.ml", line 12, characters 18-30:
 12 | let f: _ -> int = fun x y -> 0
                        ^^^^^^^^^^^^
   This function expects too many arguments, it should have type 'a -> int
+File "too_many_arguments.ml", line 12, characters 24-30:
+12 | let f: _ -> int = fun x y -> 0
+                             ^^^^^^
 This expression has type 'a -> int but an expression was expected of type int
 File "too_many_arguments.ml", line 15, characters 17-19:
 15 | let t : string = 10
