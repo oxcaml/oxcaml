@@ -142,9 +142,13 @@ let test_makearray_dynamic () =
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#y)
       : (u array, _) idx_mut)
     10;
+  Idx_mut.set a
+    ((.idx_mut(Idx_mut.unsafe_create_into_array 1).#y)
+      : (u array, _) idx_mut)
+    20;
   assert (u.#y = 1);
   assert ((array_get a 0).#y = 10);
-  assert ((array_get a 1).#y = 1);
+  assert ((array_get a 1).#y = 20);
   assert ((array_get a 2).#y = 1)
 
 let test_arrayblit () =
@@ -155,9 +159,14 @@ let test_arrayblit () =
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#y)
       : (u array, _) idx_mut)
     10;
+  Idx_mut.set dst
+    ((.idx_mut(Idx_mut.unsafe_create_into_array 1).#y)
+      : (u array, _) idx_mut)
+    20;
   assert ((array_get src 0).#y = 1);
+  assert ((array_get src 1).#y = 2);
   assert ((array_get dst 0).#y = 10);
-  assert ((array_get dst 1).#y = 2)
+  assert ((array_get dst 1).#y = 20)
 
 (* ===== Nested scannable product ===== *)
 
@@ -249,9 +258,13 @@ let test_ignorable_makearray_dynamic () =
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#i)
       : (ig array, _) idx_mut)
     10;
+  Idx_mut.set a
+    ((.idx_mut(Idx_mut.unsafe_create_into_array 1).#i)
+      : (ig array, _) idx_mut)
+    20;
   assert (v.#i = 1);
   assert ((array_get a 0).#i = 10);
-  assert ((array_get a 1).#i = 1);
+  assert ((array_get a 1).#i = 20);
   assert ((array_get a 2).#i = 1)
 
 let test_ignorable_arrayblit () =
@@ -262,9 +275,14 @@ let test_ignorable_arrayblit () =
     ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#i)
       : (ig array, _) idx_mut)
     10;
+  Idx_mut.set dst
+    ((.idx_mut(Idx_mut.unsafe_create_into_array 1).#i)
+      : (ig array, _) idx_mut)
+    20;
   assert ((array_get src 0).#i = 1);
+  assert ((array_get src 1).#i = 2);
   assert ((array_get dst 0).#i = 10);
-  assert ((array_get dst 1).#i = 2)
+  assert ((array_get dst 1).#i = 20)
 
 (* Regression tests: the evaluation order of arguments for [makearray_dynamic]
    and [array_blit] is consistent unboxed products and non-products. *)
