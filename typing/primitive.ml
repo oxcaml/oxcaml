@@ -684,7 +684,6 @@ module Primitive_reprs = struct
     in
     let array_types =
       [
-        "float_array";
         "floatarray";
         "unboxed_float_array";
         "unboxed_float32_array";
