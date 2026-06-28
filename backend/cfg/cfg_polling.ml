@@ -117,10 +117,6 @@ let () =
    `true` indicates the block contains a safe point such as a poll or an alloc
    instruction. *)
 
-(* CR-soon xclerc for xclerc: given how we use the safe map below, it is not
-   clear taking into accounts terminator makes a difference; maybe matching over
-   the terminator to always return `false` would be better. *)
-
 let is_safe_basic : Cfg.basic Cfg.instruction -> bool =
  fun instr -> Cfg.is_alloc instr || Cfg.is_poll instr
 
@@ -134,6 +130,13 @@ let is_safe_terminator : Cfg.terminator Cfg.instruction -> bool =
   | Switch _ ->
     false
   | Raise _ -> false
+  (* `Tailcall_self` can be the source of a back edge (its destination is the
+     tailrec entry, which dominates it). Treating it as safe avoids inserting a
+     redundant poll right before the tail call: `requires_prologue_poll`
+     guarantees a prologue poll, which covers each iteration of the
+     self-recursion. The other constructors here are inert in this analysis:
+     `Return` and `Tailcall_func` have no successors, and `Invalid _` is
+     unreachable. *)
   | Tailcall_self _ | Tailcall_func _ | Return | Invalid _ -> true
   | Call_no_return _ | Call _ | Prim _ -> false
 
@@ -273,84 +276,129 @@ let potentially_recursive_tailcall :
    if there is an unsafe path from the header of the loop to the back edge. An
    unsafe path is simply a path such that all blocks are unsafe. *)
 
-let exists_unsafe_path :
-    Cfg.t -> safe_map:bool Label.Tbl.t -> from:Label.t -> to_:Label.t -> bool =
- fun cfg ~safe_map ~from ~to_ ->
-  let exception Found in
-  try
-    let open_ = ref (Label.Set.singleton from) in
-    let closed = ref Label.Set.empty in
-    while not (Label.Set.is_empty !open_) do
-      let label = Label.Set.choose !open_ in
-      if Label.equal label to_ then raise Found;
-      open_ := Label.Set.remove label !open_;
-      closed := Label.Set.add label !closed;
-      match Label.Tbl.find_opt safe_map label with
-      | None ->
-        Misc.fatal_errorf
-          "Cfg_polling.exists_unsafe_path: missing safety information for \
-           block %a"
-          Label.format label
-      | Some true -> ()
-      | Some false ->
-        let block = Cfg.get_block_exn cfg label in
-        let successor_labels =
-          Cfg.successor_labels ~normal:true ~exn:true block
-        in
-        Label.Set.iter
-          (fun successor_label ->
-            match Label.Set.mem successor_label !closed with
-            | true -> ()
-            | false -> open_ := Label.Set.add successor_label !open_)
-          successor_labels
-    done;
-    false
-  with Found -> true
+(* Compute the set of labels reachable from [from] via an unsafe path. A label
+   [L] is in the result iff there is a path [from = L_0, L_1, ..., L_n = L] in
+   which [L_0, ..., L_{n-1}] are all unsafe (the endpoint itself need not
+   be). *)
+let unsafe_reachable_from :
+    Cfg.t -> safe_map:bool Label.Tbl.t -> from:Label.t -> unit Label.Tbl.t =
+ fun cfg ~safe_map ~from ->
+  let discovered = Label.Tbl.create 32 in
+  let open_ = Stack.create () in
+  Label.Tbl.replace discovered from ();
+  Stack.push from open_;
+  while not (Stack.is_empty open_) do
+    let label = Stack.pop open_ in
+    match Label.Tbl.find_opt safe_map label with
+    | None ->
+      Misc.fatal_errorf
+        "Cfg_polling.unsafe_reachable_from: missing safety information for \
+         block %a"
+        Label.format label
+    | Some true -> ()
+    | Some false ->
+      let block = Cfg.get_block_exn cfg label in
+      let successor_labels =
+        Cfg.successor_labels ~normal:true ~exn:true block
+      in
+      Label.Set.iter
+        (fun successor_label ->
+          if not (Label.Tbl.mem discovered successor_label)
+          then (
+            Label.Tbl.replace discovered successor_label ();
+            Stack.push successor_label open_))
+        successor_labels
+  done;
+  discovered
 
+(* Returns a pair [(added_poll, block_inserted)]: [added_poll] is [true] iff at
+   least one poll instruction was inserted (either in-place or via a new block);
+   [block_inserted] is [true] iff at least one new block was inserted (in which
+   case dominators and loop infos must be invalidated). *)
 let instr_cfg_with_layout :
     Cfg_with_layout.t ->
     safe_map:bool Label.Tbl.t ->
     back_edges:Cfg_edge.Set.t ->
-    bool =
+    bool * bool =
  fun cfg_with_layout ~safe_map ~back_edges ->
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   let next_instruction_id () =
     InstructionId.get_and_incr cfg.next_instruction_id
   in
-  Cfg_edge.Set.fold
-    (fun { Cfg_edge.src; dst } added_poll ->
-      let needs_poll =
-        (not (Label.Tbl.find safe_map src))
-        && exists_unsafe_path cfg ~safe_map ~from:dst ~to_:src
-      in
-      if needs_poll
-      then (
-        let after = Cfg.get_block_exn cfg src in
-        let poll =
-          { after.terminator with
-            Cfg.id = next_instruction_id ();
-            Cfg.desc = Cfg.Op Poll
-          }
-        in
-        (match
-           ( Label.Set.cardinal
-               (Cfg.successor_labels after ~normal:true ~exn:false),
-             after.exn )
-         with
-        | 1, None -> DLL.add_end after.body poll
-        | _ ->
-          let before = Some (Cfg.get_block_exn cfg dst) in
-          let instrs = DLL.of_list [poll] in
-          let inserted_blocks =
-            Cfg_with_layout.insert_block cfg_with_layout instrs ~after ~before
+  let block_inserted = ref false in
+  (* Group back edges by destination (loop header) so the unsafe-reachable set
+     is computed once per header rather than once per back edge. Reusing the set
+     across all back edges sharing a header is safe: when we insert a poll for
+     some back edge [(src, dst)] in a group, the resulting [safe_map] update
+     never changes the reachability outcome for another back edge [(src', dst)]
+     in the same group.
+
+     In-place branch: [src] becomes safe, but its only normal successor is [dst]
+     (and there is no exception successor); [dst] is the BFS root, so [src]'s
+     successors offered no new reachability anyway.
+
+     Edge-splitting branch: [safe_map] is updated for a freshly inserted block
+     sitting on the back edge from [src] to [dst]; that block is only reachable
+     from [src], so it cannot appear in a BFS starting from [dst]. *)
+  let back_edges_by_dst =
+    Cfg_edge.Set.fold
+      (fun { Cfg_edge.src; dst } acc ->
+        Label.Map.update dst
+          (function
+            | None -> Some (Label.Set.singleton src)
+            | Some srcs -> Some (Label.Set.add src srcs))
+          acc)
+      back_edges Label.Map.empty
+  in
+  Label.Map.fold
+    (fun dst srcs added_poll ->
+      let unsafe_reachable = unsafe_reachable_from cfg ~safe_map ~from:dst in
+      Label.Set.fold
+        (fun src added_poll ->
+          let needs_poll =
+            (not (Label.Tbl.find safe_map src))
+            && Label.Tbl.mem unsafe_reachable src
           in
-          (* All the inserted blocks are safe since they contain a poll
-             instruction *)
-          List.iter inserted_blocks ~f:(fun block ->
-              Label.Tbl.replace safe_map block.Cfg.start true));
-        true)
-      else added_poll)
-    back_edges false
+          if needs_poll
+          then (
+            let after = Cfg.get_block_exn cfg src in
+            let poll =
+              { after.terminator with
+                Cfg.id = next_instruction_id ();
+                Cfg.desc = Cfg.Op Poll
+              }
+            in
+            (match
+               ( Label.Set.cardinal
+                   (Cfg.successor_labels after ~normal:true ~exn:false),
+                 after.exn )
+             with
+            | 1, None ->
+              DLL.add_end after.body poll;
+              (* `after` is now safe since it contains a poll instruction.
+                 Updating `safe_map` here is a tightening, not a behavioural
+                 change: this branch requires `after` to have a single normal
+                 successor and no exception handler, so `after` cannot be the
+                 source of another back edge, meaning the `not (safe_map src)`
+                 check is never re-queried for this label. *)
+              Label.Tbl.replace safe_map after.start true
+            | _ ->
+              let before = Some (Cfg.get_block_exn cfg dst) in
+              let instrs = DLL.of_list [poll] in
+              let inserted_blocks =
+                Cfg_with_layout.insert_block cfg_with_layout instrs ~after
+                  ~before
+              in
+              block_inserted := true;
+              (* All the inserted blocks are safe since they contain a poll
+                 instruction *)
+              List.iter inserted_blocks ~f:(fun block ->
+                  Label.Tbl.replace safe_map block.Cfg.start true));
+            true)
+          else added_poll)
+        srcs added_poll)
+    back_edges_by_dst false
+  |> fun added_poll -> added_poll, !block_inserted
 
 type polling_points = (polling_point * Debuginfo.t) list
 
@@ -455,21 +503,23 @@ let contains_polls : Cfg.t -> bool =
 
 let instrument_fundecl :
     future_funcnames:Misc.Stdlib.String.Set.t ->
-    Cfg_with_layout.t ->
-    Cfg_with_layout.t =
- fun ~future_funcnames:_ cfg_with_layout ->
+    Cfg_with_infos.t ->
+    Cfg_with_infos.t =
+ fun ~future_funcnames:_ cfg_with_infos ->
+  let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   if is_disabled cfg.fun_name
-  then cfg_with_layout
+  then cfg_with_infos
   else
     let safe_map = safe_map_of_cfg cfg in
-    (* CR-soon xclerc for xclerc: consider using `Cfg_with_infos` to cache the
-       computations *)
-    let doms = Cfg_dominators.build cfg in
-    let back_edges = Cfg_loop_infos.compute_back_edges cfg doms in
-    let added_poll =
+    let back_edges =
+      (Cfg_with_infos.loop_infos cfg_with_infos).Cfg_loop_infos.back_edges
+    in
+    let added_poll, block_inserted =
       instr_cfg_with_layout cfg_with_layout ~safe_map ~back_edges
     in
+    if block_inserted
+    then Cfg_with_infos.invalidate_dominators_and_loop_infos cfg_with_infos;
     (match cfg.fun_poll with
     | Error_poll -> (
       match find_poll_alloc_or_calls cfg with
@@ -487,8 +537,8 @@ let instrument_fundecl :
          Poll instruction *)
       cfg.fun_contains_calls || added_poll || contains_polls cfg
     in
-    let cfg = { cfg with fun_contains_calls = new_contains_calls } in
-    Cfg_with_layout.create cfg ~layout:(Cfg_with_layout.layout cfg_with_layout)
+    cfg.fun_contains_calls <- new_contains_calls;
+    cfg_with_infos
 
 let requires_prologue_poll :
     future_funcnames:Misc.Stdlib.String.Set.t ->

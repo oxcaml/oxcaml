@@ -92,7 +92,7 @@ type t =
     fun_codegen_options : codegen_option list;
     fun_dbg : Debuginfo.t;
     entry_label : Label.t;
-    fun_contains_calls : bool;
+    mutable fun_contains_calls : bool;
     (* CR-someday gyorsh: compute locally. *)
     fun_num_stack_slots : int Stack_class.Tbl.t;
     fun_poll : Lambda.poll_attribute;

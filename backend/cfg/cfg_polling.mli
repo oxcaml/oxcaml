@@ -4,8 +4,8 @@
 
 val instrument_fundecl :
   future_funcnames:Misc.Stdlib.String.Set.t ->
-  Cfg_with_layout.t ->
-  Cfg_with_layout.t
+  Cfg_with_infos.t ->
+  Cfg_with_infos.t
 
 val requires_prologue_poll :
   future_funcnames:Misc.Stdlib.String.Set.t ->

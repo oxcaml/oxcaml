@@ -105,7 +105,7 @@ type t =
     fun_dbg : Debuginfo.t;  (** Dwarf debug info for function entry. *)
     entry_label : Label.t;
         (** This label must be the first in all layouts of this cfg. *)
-    fun_contains_calls : bool;
+    mutable fun_contains_calls : bool;
         (** Precomputed during selection and poll insertion. *)
     fun_num_stack_slots : int Stack_class.Tbl.t;
         (** Precomputed at register allocation time *)
