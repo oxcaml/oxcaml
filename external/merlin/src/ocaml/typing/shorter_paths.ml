@@ -396,8 +396,10 @@ let process_queue env state ~table ~canon_path target_kind best =
 let path_masks_cache : (Longident.t * Path.t, Path.t) Hashtbl.t ref =
   Local_store.s_table Hashtbl.create 32
 
-(* Permet d'afficher un chemin malgré la limitation que on ne puisse afficher
-   que des paths et *)
+(* The print function expect a path but we have longidents.
+
+   TODO What we should really do is modify the printing function to expect a
+   longident. *)
 let rec path_mask (path : Path.t) (lid : Longident.t) : Path.t =
   match Hashtbl.find_opt !path_masks_cache (lid, path) with
   | Some path -> path
@@ -406,7 +408,8 @@ let rec path_mask (path : Path.t) (lid : Longident.t) : Path.t =
       match (path, lid) with
       | Pident id, Lident _ -> Pident id
       | Pdot (p, s), Ldot (l, _) -> Pdot (path_mask p l.txt, s)
-      | Papply (p1, p2), Lapply (l1, _) -> Papply (path_mask p1 l1.txt, p2)
+      | Papply (p1, p2), Lapply (l1, l2) ->
+        Papply (path_mask p1 l1.txt, path_mask p2 l2.txt)
       | (Pdot _ | Papply _), Lident s ->
         let scope = Path.scope path in
         Pident (Ident.create_scoped ~scope s)
