@@ -120,8 +120,7 @@ val f :
 |}]
 let f (x : <[?l:$('a) -> $('b)]> expr) : ?l:('a eval) -> 'b eval = eval x
 [%%expect {|
-val f :
-  ('a : any) ('b : any). <[?l:$('a) -> $('b)]> expr -> ?l:'a eval -> 'b eval =
+val f : 'a ('b : any). <[?l:$('a) -> $('b)]> expr -> ?l:'a eval -> 'b eval =
   <fun>
 |}]
 let f (x : <[$('a) @ local -> $('b) @ local]> expr)
