@@ -333,9 +333,15 @@ type error =
         kind : [`Argument | `Result];
         why : [`Partial_match | `Optional_argument];
       }
+  | Function_return_not_rep of type_expr * Jkind.Violation.t
   | Effect_handler_result_not_value of type_expr * Jkind.Violation.t
   | Match_result_not_rep of
       match_result_context * type_expr * Jkind.Violation.t
+  | Function_return_sort_conflict of
+      { site_sort : Jkind.sort;
+        fun_ret_sort : Jkind.sort;
+        first_return_site : Location.t
+      }
   | Record_projection_not_rep of type_expr * Jkind.Violation.t
   | Record_not_rep of type_expr * Jkind.Violation.t
   | Mutable_var_not_rep of type_expr * Jkind.Violation.t
@@ -4659,18 +4665,27 @@ let force_delayed_checks () =
   reset_delayed_checks ();
   Btype.backtrack snap
 
-let rec final_subexpression exp =
+let tail_subexpressions exp =
   match exp.exp_desc with
-    Texp_let (_, _, e)
-  | Texp_sequence (_, _, e)
-  | Texp_try (e, _, _)
-  | Texp_ifthenelse (_, e, _)
-  | Texp_match (_, _, {c_rhs=e} :: _, _, _)
+  | Texp_let (_, _, e)
+  | Texp_letmutable (_, e)
   | Texp_letmodule (_, _, _, _, e)
   | Texp_letexception (_, e)
   | Texp_open (_, e)
-    -> final_subexpression e
-  | _ -> exp
+  | Texp_exclave e
+  | Texp_sequence (_, _, e) -> [e]
+  | Texp_ifthenelse (_, ifso, Some ifnot) -> [ifso; ifnot]
+  | Texp_match (_, _, cases, _, _) -> List.map (fun c -> c.c_rhs) cases
+  | _ -> []
+
+let rec final_subexpression exp =
+  match tail_subexpressions exp with
+  | e :: _ -> final_subexpression e
+  | [] ->
+      match exp.exp_desc with
+      | Texp_try (e, _, _) | Texp_ifthenelse (_, e, None) ->
+          final_subexpression e
+      | _ -> exp
 
 let is_prim ~name funct =
   match funct.exp_desc with
@@ -6099,6 +6114,113 @@ let check_absent_variant env =
                      (duplicate_type pat.pat_type)
     | _ -> () }
 
+module Return_sort : sig
+  (** Function returns must either:
+
+      1. Admit a consistent concrete layout
+      2. Fail to return by raising an exception or looping
+      3. Tail-call a function, possibly with [any] return
+
+      [classify] walks the tail positions of a typed function body to decide
+      which, and produces the function's return sort. All returns with
+      concrete layouts must have the same sort. A function may have several
+      return positions, for example:
+
+    {[
+      let rec len acc xs =
+        match xs with
+        | [] -> acc                    (* position 1 *)
+        | _ :: xs' -> len (acc + 1) xs (* position 2 *)
+    ]} *)
+  val classify : body:Typedtree.function_body -> Typedtree.function_return_sort
+end = struct
+  type return_kind =
+    | Never_returns
+    | Forwards
+    | Returns of
+        { sort : Jkind.Sort.t;
+          first_site : Location.t
+        }
+
+  let is_return_forwarder_shape exp =
+    match exp.exp_desc with
+    | Texp_apply (funct, _, Tail, _, _, _) ->
+        (* Object method calls can't be forwarded. *)
+        let rec head_is_send funct =
+          match funct.exp_desc with
+          | Texp_send _ -> true
+          | Texp_apply (funct, _, _, _, _, _) -> head_is_send funct
+          | _ -> false
+        in
+        not (head_is_send funct)
+    | _ -> false
+
+  let record_site demand exp =
+    let env = exp.exp_env in
+    let loc = proper_exp_loc exp in
+    let forwarder = is_return_forwarder_shape exp in
+    let type_sort ty =
+      Ctype.type_sort ~why:Function_result ~fixed:forwarder env ty
+    in
+    match type_sort exp.exp_type with
+    | Error _ when forwarder -> (
+        match !demand with
+        | Never_returns -> demand := Forwards
+        | Forwards | Returns _ -> ())
+    | Error err ->
+        raise (Error (loc, env, Function_return_not_rep (exp.exp_type, err)))
+    | Ok sort -> (
+        match !demand with
+        | Never_returns | Forwards ->
+            demand := Returns { sort; first_site = loc }
+        | Returns { sort = fun_ret_sort; first_site } ->
+            if not (Jkind.Sort.equate sort fun_ret_sort)
+            then
+              raise
+                (Error
+                   ( loc,
+                     env,
+                     Function_return_sort_conflict
+                       { site_sort = sort;
+                         fun_ret_sort;
+                         first_return_site = first_site
+                       } )))
+
+  let is_bool_literal ~name exp =
+    match exp.exp_desc with
+    | Texp_construct (_, { cstr_name; _ }, _, _, _) ->
+        String.equal cstr_name name
+    | _ -> false
+
+  let match_handles_exceptions cases =
+    List.exists (fun c -> contains_exception_pat c.c_lhs) cases
+
+  let rec walk demand exp =
+    match exp.exp_desc with
+    (* A match that handles exceptions is a return site: *)
+    | Texp_match (_, _, cases, _, _) when match_handles_exceptions cases ->
+        record_site demand exp
+    (* These do not return normally, so they demand nothing. *)
+    | Texp_unreachable -> ()
+    | Texp_assert (cond, _) when is_bool_literal ~name:"false" cond -> ()
+    | Texp_while { wh_cond; _ } when is_bool_literal ~name:"true" wh_cond -> ()
+    | _ ->
+        match tail_subexpressions exp with
+        | [] -> record_site demand exp
+        | subexps -> List.iter (walk demand) subexps
+
+  let classify ~body : Typedtree.function_return_sort =
+    let demand = ref Never_returns in
+    (match body with
+     | Tfunction_body exp -> walk demand exp
+     | Tfunction_cases { fc_cases; _ } ->
+         List.iter (fun { c_rhs; _ } -> walk demand c_rhs) fc_cases);
+    match !demand with
+    | Returns { sort; first_site = _ } -> Function_returns sort
+    | Forwards -> Function_forwards
+    | Never_returns -> Function_never_returns
+end
+
 let check_effect_handler_result_value env loc ty_expected =
   let value = Jkind.Builtin.value_or_null ~why:Effect_handler_result in
   match Ctype.constrain_type_jkind env ty_expected value with
@@ -6282,7 +6404,6 @@ type split_function_ty =
     *)
     filtered_arrow: filtered_arrow;
     arg_sort : Jkind.sort;
-    ret_sort : Jkind.sort;
     (* An instance of [a_i], unless [x_i] is annotated as polymorphic,
        in which case it's just [a_i] (not an instance).
     *)
@@ -6396,9 +6517,8 @@ let split_function_ty
     | Error err -> raise (Error (loc_fun, env, Function_type_not_rep (ty, err)))
   in
   let arg_sort = type_sort ~why:Function_argument ty_arg in
-  let ret_sort = type_sort ~why:Function_result ty_ret in
   env,
-  { filtered_arrow; arg_sort; ret_sort;
+  { filtered_arrow; arg_sort;
     alloc_mode; ty_arg_mono;
     expected_inner_mode; expected_pat_mode;
     really_poly
@@ -6409,32 +6529,61 @@ type type_function_result_param =
     has_poly : bool;
   }
 
-module Calling_convention_sort : sig
-  (* A sort reflected in the function's calling convention.
+module Calling_convention : sig
+  (* The sorts reflected in a function's calling convention.
 
      We can't allow constraints from parameters which partially match on GADTs
      to justify the function's argument/return sorts, as a caller can still pass
      a constructor missing from the partial match. See oxcaml/oxcaml#6689. *)
-  type t =
-    { ccs_ty : type_expr;
-      ccs_sort : Jkind.sort;
+  type t
+
+  val empty : t
+
+  (* [~env] is the environment the sort was derived in. *)
+  val add_argument :
+    ty:type_expr -> sort:Jkind.sort -> env:Env.t -> loc:Location.t -> t -> t
+
+  val add_result : ty:type_expr -> env:Env.t -> loc:Location.t -> t -> t
+
+  val check_partial_match :
+    partial:partial -> has_default:bool -> match_loc:Location.t ->
+    outer_env:Env.t -> branch_env:Env.t -> t -> t
+
+  val check_result : res_sort:Jkind.sort -> t -> unit
+end = struct
+  type site =
+    { ty : type_expr;
       (* The environment the sort was derived in. *)
-      ccs_env : Env.t;
-      ccs_loc : Location.t;
-      ccs_kind : [`Argument | `Result];
+      env : Env.t;
+      loc : Location.t;
     }
 
-  val check_doesn't_rely_on_partial_match :
-    partial:partial -> has_default:bool -> match_loc:Location.t ->
-    outer_env:Env.t -> branch_env:Env.t -> t list -> unit
-end = struct
-  type t =
-    { ccs_ty : type_expr;
-      ccs_sort : Jkind.sort;
-      ccs_env : Env.t;
-      ccs_loc : Location.t;
-      ccs_kind : [`Argument | `Result];
+  type partial_match =
+    { outer_env : Env.t;
+      match_loc : Location.t;
+      why : [`Partial_match | `Optional_argument];
     }
+
+  type t =
+    { arguments : (site * Jkind.sort) list;
+      result : site option;
+      (* The parameters whose patterns the sorts must not rely on, ordered
+         innermost parameter first. *)
+      partial_matches : partial_match list;
+    }
+
+  let empty = { arguments = []; result = None; partial_matches = [] }
+
+  let add_argument ~ty ~sort ~env ~loc t =
+    { t with arguments = ({ ty; env; loc }, sort) :: t.arguments }
+
+  let add_result ~ty ~env ~loc t =
+    match t.result with
+    | Some _ ->
+      Misc.fatal_error
+        "Calling_convention.add_result: the function's result was recorded \
+         twice"
+    | None -> { t with result = Some { ty; env; loc } }
 
   let added_constraints_from_partial_match
         ~partial ~has_default ~outer_env ~branch_env =
@@ -6447,44 +6596,58 @@ end = struct
       (* Optional arguments can be omitted, so they are effectively partial *)
       | Total, true -> Some `Optional_argument
 
-  let check_doesn't_rely_on_partial_match
-        ~partial ~has_default ~match_loc ~outer_env ~branch_env ts =
+  (* Try to re-derive [ty]'s sort in an environment without local
+     constraints added since [outer_env].
+
+     This is an approximate check of whether the sort relies on a partial
+     match, as it also disallows depending on parameters which totally match on
+     a GADT. *)
+  let check_sort_in_weak_env ~kind ~sort ({ ty; env; loc } : site)
+        { outer_env; match_loc; why } =
+    let weak_env = Env.revert_local_constraints env ~since:outer_env in
+    let sort_why =
+      match kind with
+      | `Argument -> Jkind.History.Function_argument
+      | `Result -> Jkind.History.Function_result
+    in
+    let ok =
+      match Ctype.type_sort ~why:sort_why ~fixed:true weak_env ty with
+      | Ok weak_sort -> Jkind.Sort.equate weak_sort sort
+      | Error _ -> false
+    in
+    if not ok then
+      raise
+        (Error
+           (loc, env,
+            Function_type_escapes_partial_match { ty; match_loc; kind; why }))
+
+  let check_partial_match
+        ~partial ~has_default ~match_loc ~outer_env ~branch_env t =
     match
       added_constraints_from_partial_match ~partial ~has_default ~outer_env
         ~branch_env
     with
-    | None -> ()
+    | None -> t
     | Some why ->
+      let partial_match = { outer_env; match_loc; why } in
       List.iter
-        (fun { ccs_ty; ccs_sort; ccs_env; ccs_loc; ccs_kind } ->
-          (* Try to re-derive the same sort using an environment without local
-             constraints added since [outer_env].
+        (fun (site, sort) ->
+          check_sort_in_weak_env ~kind:`Argument ~sort site partial_match)
+        t.arguments;
+      { t with partial_matches = t.partial_matches @ [partial_match] }
 
-             This is an approximate check of whether the sort relies on a
-             partial match, as it also disallows depending on parameters which
-             totally match on a GADT. *)
-          let weak_env =
-            Env.revert_local_constraints ccs_env ~since:outer_env
-          in
-          let sort_why =
-            match ccs_kind with
-            | `Argument -> Jkind.History.Function_argument
-            | `Result -> Jkind.History.Function_result
-          in
-          let ok =
-            match
-              Ctype.type_sort ~why:sort_why ~fixed:true weak_env ccs_ty
-            with
-            | Ok sort -> Jkind.Sort.equate sort ccs_sort
-            | Error _ -> false
-          in
-          if not ok then
-            raise
-              (Error
-                 (ccs_loc, ccs_env,
-                  Function_type_escapes_partial_match
-                    { ty = ccs_ty; match_loc; kind = ccs_kind; why })))
-        ts
+  let check_result ~res_sort t =
+    match t.result, t.partial_matches with
+    | _, [] -> ()
+    | None, _ :: _ ->
+      Misc.fatal_error
+        "Calling_convention.check_result: parameters whose patterns the \
+         result sort must not rely on were recorded, but the result itself \
+         was not"
+    | Some site, partial_matches ->
+      List.iter
+        (check_sort_in_weak_env ~kind:`Result ~sort:res_sort site)
+        partial_matches
 end
 
 (* The result of calling [type_function]. For the outer call to
@@ -6511,15 +6674,14 @@ type type_function_result =
        left.
     *)
     ret_info: type_function_ret_info option;
-    (* The argument/result sorts of this parameter suffix. *)
-    calling_convention_sorts: Calling_convention_sort.t list;
+    body_ret_sort: Typedtree.function_return_sort;
+    (* The argument sorts of this parameter suffix. *)
+    calling_convention: Calling_convention.t;
   }
 
 and type_function_ret_info =
   { (* The mode the function returns at. *)
     ret_mode: Mode.Alloc.l modes;
-    (* The sort returned by the function. *)
-    ret_sort: Jkind.sort;
   }
 
 (* value binding elaboration *)
@@ -9405,12 +9567,12 @@ and type_function
   | { pparam_desc = Pparam_newtype (newtype_var, jkind_annot) } :: rest ->
       (* Check everything else in the scope of (type a). *)
       let (params, body, newtypes, contains_gadt, fun_alloc_mode, ret_info,
-           calling_convention_sorts),
+           body_ret_sort, calling_convention),
           exp_type, id, uid =
         type_newtype env newtype_var jkind_annot (fun env ->
           let { function_ = exp_type, params, body;
                 newtypes; params_contain_gadt = contains_gadt;
-                fun_alloc_mode; ret_info; calling_convention_sorts;
+                fun_alloc_mode; ret_info; body_ret_sort; calling_convention;
               }
             =
             (* mimic the typing of Pexp_newtype by minting a new type var,
@@ -9421,7 +9583,7 @@ and type_function
               rest body_constraint body ~in_function ~first
           in
           (params, body, newtypes, contains_gadt, fun_alloc_mode, ret_info,
-           calling_convention_sorts),
+           body_ret_sort, calling_convention),
           exp_type)
       in
       let newtype = id, newtype_var, jkind_annot, uid in
@@ -9429,7 +9591,7 @@ and type_function
           unify_exp_types loc env exp_type (instance ty_expected));
       { function_ = exp_type, params, body;
         params_contain_gadt = contains_gadt; newtypes = newtype :: newtypes;
-        fun_alloc_mode; ret_info; calling_convention_sorts;
+        fun_alloc_mode; ret_info; body_ret_sort; calling_convention;
       }
   | { pparam_desc = Pparam_val (arg_label, default_arg, pat); pparam_loc }
       :: rest
@@ -9473,7 +9635,7 @@ and type_function
       in
       let env,
           { filtered_arrow = { ty_arg; arg_mode; ty_ret; ret_mode };
-            arg_sort; ret_sort;
+            arg_sort;
             ty_arg_mono; expected_pat_mode; expected_inner_mode;
             alloc_mode; really_poly
           } =
@@ -9525,8 +9687,8 @@ and type_function
             ty_default_arg, Some (default_arg, arg_label, default_arg_sort),
               default_arg_sort
       in
-      let (pat, params, body, ret_info, newtypes, contains_gadt, curry,
-           ext_env, inner_calling_convention_sorts), partial =
+      let (pat, params, body, ret_info, body_ret_sort, newtypes, contains_gadt,
+           curry, ext_env, inner_calling_convention), partial =
         (* Check everything else in the scope of the parameter. *)
         map_half_typed_cases Value env expected_pat_mode
           ty_arg_internal sort_arg_internal ty_ret pat.ppat_loc
@@ -9538,7 +9700,8 @@ and type_function
               ~contains_gadt:param_contains_gadt ->
               let { function_ = _, params_suffix, body;
                     newtypes; params_contain_gadt = suffix_contains_gadt;
-                    fun_alloc_mode; ret_info; calling_convention_sorts;
+                    fun_alloc_mode; ret_info; body_ret_sort;
+                    calling_convention;
                   }
                 =
                 type_function ext_env expected_inner_mode ty_expected
@@ -9581,8 +9744,8 @@ and type_function
                   end;
                   More_args {partial_mode = Alloc.disallow_right fun_alloc_mode}
               in
-              pat, params_suffix, body, ret_info, newtypes, contains_gadt,
-              curry, ext_env, calling_convention_sorts
+              pat, params_suffix, body, ret_info, body_ret_sort, newtypes,
+              contains_gadt, curry, ext_env, calling_convention
           end
         |> function
           (* The result must be a singleton because we passed a singleton
@@ -9590,9 +9753,11 @@ and type_function
         | [ result ], partial -> result, partial
         | ([] | _ :: _ :: _), _ -> assert false
       in
-      Calling_convention_sort.check_doesn't_rely_on_partial_match ~partial
-        ~has_default:(Option.is_some default_arg) ~match_loc:pat.pat_loc
-        ~outer_env:env ~branch_env:ext_env inner_calling_convention_sorts;
+      let inner_calling_convention =
+        Calling_convention.check_partial_match ~partial
+          ~has_default:(Option.is_some default_arg) ~match_loc:pat.pat_loc
+          ~outer_env:env ~branch_env:ext_env inner_calling_convention
+      in
       let exp_type =
         instance
           (newgenty
@@ -9663,29 +9828,28 @@ and type_function
             };
         }
       in
-      let calling_convention_sorts =
-        (* These sorts are added after the call to
-           [Calling_convention_sort.check_doesn't_rely_on_partial_match]
-           above, so they aren't checked against this parameter's own pattern.
+      let calling_convention =
+        (* These are added after the call to
+           [Calling_convention.check_partial_match] above, so they aren't
+           checked against this parameter's own pattern.
 
            This is sound as:
            1. A parameter pattern cannot refine its own sort
            2. The result type is created outside of the scope of the last
               parameter's pattern *)
-        let arg_ccs =
-          { Calling_convention_sort.ccs_ty = ty_arg; ccs_sort = arg_sort;
-            ccs_env = env; ccs_loc = pparam_loc; ccs_kind = `Argument }
+        let calling_convention =
+          Calling_convention.add_argument ~ty:ty_arg ~sort:arg_sort ~env
+            ~loc:pparam_loc inner_calling_convention
         in
         (* [ret_info] is [None] only in the innermost recursive call to
-           [type_function], when it is initially computed. In the other calls,
-           the result sort is already in [inner_calling_convention_sorts]. *)
-        let ret_ccs =
-          if Option.is_some ret_info then []
-          else
-            [ { Calling_convention_sort.ccs_ty = ty_ret; ccs_sort = ret_sort;
-                ccs_env = env; ccs_loc = loc; ccs_kind = `Result } ]
-        in
-        arg_ccs :: ret_ccs @ inner_calling_convention_sorts
+           [type_function], when the result is initially computed. In the other
+           calls, the result is already in [inner_calling_convention].
+           Its sort isn't known until the body has been typed, so only the
+           result type is recorded here; the check happens once
+           [Return_sort.classify] has produced the sort. *)
+        if Option.is_some ret_info then calling_convention
+        else
+          Calling_convention.add_result ~ty:ty_ret ~env ~loc calling_convention
       in
       let ret_info =
         match ret_info with
@@ -9694,15 +9858,16 @@ and type_function
           let ret_mode =
             {ret_mode_annots with mode_modes = Alloc.disallow_right ret_mode }
           in
-          Some { ret_sort ; ret_mode }
+          Some { ret_mode }
       in
       { function_ = exp_type, param :: params, body;
         newtypes = []; params_contain_gadt = contains_gadt;
-        ret_info; fun_alloc_mode = Some alloc_mode;
-        calling_convention_sorts;
+        ret_info; fun_alloc_mode = Some alloc_mode; body_ret_sort;
+        calling_convention;
       }
   | [] ->
-    let exp_type, body, fun_alloc_mode, ret_info, calling_convention_sorts =
+    let exp_type, body, fun_alloc_mode, ret_info, body_ret_sort,
+        calling_convention =
       let { ret_type_constraint; mode_annotations; ret_mode_annotations } =
         body_constraint
       in
@@ -9744,15 +9909,18 @@ and type_function
               let extra = Texp_mode type_mode, body_loc, [] in
               { body with exp_extra = extra :: body.exp_extra }
           in
-          body.exp_type, Tfunction_body body, None, None, []
+          let function_body = Tfunction_body body in
+          let ret_sort = Return_sort.classify ~body:function_body in
+          body.exp_type, function_body, None, None, ret_sort,
+          Calling_convention.empty
       | Pfunction_cases (cases, _, attributes) ->
           let type_cases_expect env expected_mode ty_expected =
             type_function_cases_expect
               env expected_mode ty_expected loc cases attributes ~in_function
               ~first
           in
-          let (cases, exp_type, fun_alloc_mode, ret_info,
-               calling_convention_sorts), exp_extra =
+          let (cases, exp_type, fun_alloc_mode, ret_info, ret_sort,
+               calling_convention), exp_extra =
             match ret_type_constraint with
             | None -> type_cases_expect env expected_mode ty_expected, []
             | Some constraint_ ->
@@ -9770,23 +9938,26 @@ and type_function
               let function_cases_constraint_arg =
                 { is_self = (fun _ -> false);
                   type_with_constraint = (fun env expected_mode ty ->
-                    let cases, _, fun_alloc_mode, ret_info,
-                        calling_convention_sorts =
+                    let cases, _, fun_alloc_mode, ret_info, ret_sort,
+                        calling_convention =
                       type_cases_expect env expected_mode ty
                     in
-                    cases, fun_alloc_mode, ret_info, calling_convention_sorts);
+                    cases, fun_alloc_mode, ret_info, ret_sort,
+                    calling_convention);
                   type_without_constraint = (fun env expected_mode ->
-                    let cases, ty_fun, fun_alloc_mode, ret_info,
-                        calling_convention_sorts =
+                    let cases, ty_fun, fun_alloc_mode, ret_info, ret_sort,
+                        calling_convention =
                       (* The analogy to [type_exp] for expressions. *)
                       type_cases_expect env expected_mode
                         (newvar (Jkind.Builtin.any ~why:Dummy_jkind))
                     in
-                    (cases, fun_alloc_mode, ret_info, calling_convention_sorts),
+                    (cases, fun_alloc_mode, ret_info, ret_sort,
+                     calling_convention),
                     ty_fun);
                 }
               in
-              let (body, fun_alloc_mode, ret_info, calling_convention_sorts),
+              let (body, fun_alloc_mode, ret_info, ret_sort,
+                   calling_convention),
                   exp_type, exp_extra =
                 type_constraint_expect function_cases_constraint_arg
                   env expected_mode loc type_mode.mode_modes constraint_
@@ -9798,8 +9969,8 @@ and type_function
                 | _ :: _ ->
                   [ Texp_mode type_mode ; exp_extra ]
               in
-              (body, exp_type, fun_alloc_mode, ret_info,
-               calling_convention_sorts),
+              (body, exp_type, fun_alloc_mode, ret_info, ret_sort,
+               calling_convention),
               exp_extra
           in
           let cases =
@@ -9808,7 +9979,7 @@ and type_function
             | _ :: _ as fc_exp_extra -> { cases with fc_exp_extra }
           in
           exp_type, Tfunction_cases cases, Some fun_alloc_mode, Some ret_info,
-          calling_convention_sorts
+          ret_sort, calling_convention
      in
      { function_ = exp_type, [], body; newtypes = [];
      (* [No_gadt] is fine because this return value is only meant to indicate
@@ -9816,7 +9987,7 @@ and type_function
         the body is a [Tfunction_cases] whose patterns include a GADT.
      *)
        params_contain_gadt = No_gadt;
-       ret_info; fun_alloc_mode; calling_convention_sorts;
+       ret_info; fun_alloc_mode; body_ret_sort; calling_convention;
      }
 
 and type_label_access
@@ -10409,7 +10580,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
                   };
               ret_mode =
                 { mode_modes = Alloc.disallow_right mret; mode_desc = [] };
-              ret_sort;
+              ret_sort = Function_returns ret_sort;
               alloc_mode;
               yielding = Yielding.disallow_right Yielding.yielding;
               zero_alloc = Zero_alloc.default
@@ -11380,7 +11551,7 @@ and type_function_cases_expect
   Builtin_attributes.warning_scope attrs begin fun () ->
     let env,
         { filtered_arrow = { ty_arg; ty_ret; arg_mode; ret_mode };
-          arg_sort; ret_sort;
+          arg_sort;
           ty_arg_mono; expected_pat_mode; expected_inner_mode; alloc_mode;
         } =
       split_function_ty env expected_mode ty_expected loc ~arg_label:Nolabel
@@ -11416,17 +11587,16 @@ and type_function_cases_expect
         fc_arg_sort = arg_sort;
       }
     in
-    let calling_convention_sorts =
-      [ { Calling_convention_sort.ccs_ty = ty_arg; ccs_sort = arg_sort;
-          ccs_env = env; ccs_loc = loc; ccs_kind = `Argument };
-        { Calling_convention_sort.ccs_ty = ty_ret; ccs_sort = ret_sort;
-          ccs_env = env; ccs_loc = loc; ccs_kind = `Result } ]
+    let ret_sort = Return_sort.classify ~body:(Tfunction_cases cases) in
+    let calling_convention =
+      Calling_convention.empty
+      |> Calling_convention.add_argument ~ty:ty_arg ~sort:arg_sort ~env ~loc
+      |> Calling_convention.add_result ~ty:ty_ret ~env ~loc
     in
     cases, ty_fun, alloc_mode,
-      { ret_sort;
-        ret_mode =
+      { ret_mode =
           {mode_modes = Alloc.disallow_right ret_mode; mode_desc = []} },
-      calling_convention_sorts
+      ret_sort, calling_convention
   end
 
 and type_effect_cases
@@ -11965,12 +12135,12 @@ and type_n_ary_function
     let in_function = mk_expected (instance ty_expected) ?explanation, loc in
     let { function_ = exp_type, result_params, body;
           newtypes; params_contain_gadt = contains_gadt;
-          ret_info; fun_alloc_mode; calling_convention_sorts = _;
+          ret_info; fun_alloc_mode; body_ret_sort; calling_convention;
         } =
       type_function env expected_mode ty_expected params constraint_ body
         ~in_function ~first:true
     in
-    let fun_alloc_mode, { ret_mode; ret_sort } =
+    let fun_alloc_mode, { ret_mode } =
       match fun_alloc_mode, ret_info with
       | Some x, Some y -> x, y
       | None, _ ->
@@ -11982,6 +12152,11 @@ and type_n_ary_function
             "[ret_info] can't be None -- that indicates a function with \
              no parameters."
     in
+    begin match body_ret_sort with
+    | Function_returns sort ->
+      Calling_convention.check_result ~res_sort:sort calling_convention
+    | Function_forwards | Function_never_returns -> ()
+    end;
     let params = List.map (fun { param } -> param) result_params in
     let syntactic_arity = function_arity params body in
     (* Require that the n-ary function is known to have at least n arrows
@@ -12090,7 +12265,7 @@ and type_n_ary_function
     re
       { exp_desc =
           Texp_function
-            { params; body; ret_sort;
+            { params; body; ret_sort = body_ret_sort;
               alloc_mode; ret_mode; yielding;
               zero_alloc
             };
@@ -13655,6 +13830,13 @@ let report_error ~loc env =
         Printtyp.type_expr ty
         (Location.Doc.loc ~capitalize_first:false) match_loc
         how what requirement
+  | Function_return_not_rep (ty,violation) ->
+      Location.errorf ~loc
+        "@[Expressions in return position must be representable unless they@ \
+          tail-forward the unknown result or do not return normally.@]@ %a"
+        (Jkind.Violation.report_with_offender
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           env) violation
   | Effect_handler_result_not_value (ty,violation) ->
       Location.errorf ~loc
         "@[The result of a match or try expression with effect handlers@ \
@@ -13669,6 +13851,18 @@ let report_error ~loc env =
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            env) violation
+  | Function_return_sort_conflict
+      { site_sort; fun_ret_sort; first_return_site } ->
+      let sub =
+        [ Location.msg ~loc:first_return_site
+            "This is the location of a conflicting return site." ]
+      in
+      Location.errorf ~loc ~sub
+        "@[A function may have at most one direct-return layout:@ \
+          this return site has layout %a,@ \
+          but another return site of the same function has layout %a.@]"
+        Jkind.Sort.format site_sort
+        Jkind.Sort.format fun_ret_sort
   | Record_projection_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Records being projected from must be representable.@]@ %a"
