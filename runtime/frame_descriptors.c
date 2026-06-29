@@ -208,6 +208,16 @@ extern uintnat caml_measure_all_frametables;
 #define REG_MAPS (1<<(MAX_REG_IN_SMALL_MAP + 1))
 #define REGMAP_REPORT_THRESHOLD 1000
 
+/* Step 2 of the small-frame-descriptor design: simulate, without changing the
+   format, how big each descriptor would be in the proposed "small" format, and
+   how much we'd save. */
+#define SIM_MAXK 8  /* ALLOC_BITS swept 0..SIM_MAXK in the combined na/nl byte */
+/* The 8 hottest GC registers, from the measured (each reg) histogram on
+   ocamlopt.opt: 0,1,2,3,4,5,6,8. A small alloc descriptor's live registers
+   must all be in this set (others escape to the normal format). */
+#define SIM_HOT_REGS \
+  ((1ULL<<0)|(1ULL<<1)|(1ULL<<2)|(1ULL<<3)|(1ULL<<4)|(1ULL<<5)|(1ULL<<6)|(1ULL<<8))
+
 struct frametable_stats {
   /* A few per-frametable items */
   unsigned char *last_retaddr;
@@ -287,6 +297,20 @@ struct frametable_stats {
   size_t log_alloc_sizes[MAX_LOG];
   size_t small_alloc_sizes[SMALL_FRAMES];
   size_t max_alloc_size;
+
+  /* Small-descriptor format simulation (step 2) */
+  size_t sim_descrs;                       /* descriptors simulated */
+  size_t sim_current_total;                /* bytes in the current packed format */
+  size_t sim_aligned_total;                /* bytes in the old (pre-relaxation) aligned format */
+  /* [varint delta?][16-bit register bitmap?][ALLOC_BITS] */
+  size_t sim_total[2][2][SIM_MAXK + 1];    /* total bytes, combined na/nl byte */
+  size_t sim_small[2][2][SIM_MAXK + 1];    /* # small descriptors */
+  /* [varint?][16-bit bitmap?]: separate full bytes for num_allocs & num_live */
+  size_t sim_sep_total[2][2];
+  size_t sim_sep_small[2][2];
+  /* base-ineligibility causes (independent of ALLOC_BITS) */
+  size_t sim_esc_first, sim_esc_rettoc, sim_esc_delta, sim_esc_size,
+         sim_esc_reg, sim_esc_allocsize;
 };
 
 static void clear_stats(struct frametable_stats *stats)
@@ -492,9 +516,67 @@ static void report_stats(struct frametable_stats *stats)
          MAX_REG, stats->big_reg_entries);
   printf("Non-allocation descriptors with registers: %zu\n",
          stats->noalloc_with_regs);
+
+  /* --- Small-descriptor format simulation (step 2) --- */
+  printf("\nSmall-descriptor simulation: %zu descriptors\n", stats->sim_descrs);
+  report_bytes(table_buf, TABLE_BUF_SIZE, stats->sim_aligned_total);
+  printf("  baseline aligned: %s\n", table_buf);
+  report_bytes(table_buf, TABLE_BUF_SIZE, stats->sim_current_total);
+  printf("  baseline packed:  %s\n", table_buf);
+  printf("  base-escape causes: first=%zu retC=%zu delta>255=%zu size=%zu "
+         "reg=%zu allocsz=%zu\n",
+         stats->sim_esc_first, stats->sim_esc_rettoc, stats->sim_esc_delta,
+         stats->sim_esc_size, stats->sim_esc_reg, stats->sim_esc_allocsize);
+  printf("  base format (8-reg bitmap, 1-byte delta), by ALLOC_BITS:\n");
+  printf("  %-10s %14s %10s %10s %9s %9s\n",
+         "ALLOC_BITS", "total", "small", "escaped", "vs_packed", "vs_aligned");
+  for (int k = 0; k <= SIM_MAXK; k++) {
+    size_t esc = stats->sim_descrs - stats->sim_small[0][0][k];
+    double pk = stats->sim_current_total
+      ? 100.0 * ((double)stats->sim_current_total
+                 - (double)stats->sim_total[0][0][k])
+        / (double)stats->sim_current_total : 0.0;
+    double al = stats->sim_aligned_total
+      ? 100.0 * ((double)stats->sim_aligned_total
+                 - (double)stats->sim_total[0][0][k])
+        / (double)stats->sim_aligned_total : 0.0;
+    printf("  %-10d %14zu %10zu %10zu %8.1f%% %8.1f%%\n",
+           k, stats->sim_total[0][0][k], stats->sim_small[0][0][k], esc, pk, al);
+  }
+  {
+    static const char *nm[2][2] =
+      { { "base", "+16b-bitmap" }, { "+varint", "+varint+16b" } };
+    printf("  refinements (each at its best ALLOC_BITS):\n");
+    for (int v = 0; v < 2; v++) for (int b = 0; b < 2; b++) {
+      int bk = 0;
+      for (int k = 1; k <= SIM_MAXK; k++)
+        if (stats->sim_total[v][b][k] < stats->sim_total[v][b][bk]) bk = k;
+      size_t tot = stats->sim_total[v][b][bk];
+      double pk = stats->sim_current_total
+        ? 100.0 * ((double)stats->sim_current_total - (double)tot)
+          / (double)stats->sim_current_total : 0.0;
+      double al = stats->sim_aligned_total
+        ? 100.0 * ((double)stats->sim_aligned_total - (double)tot)
+          / (double)stats->sim_aligned_total : 0.0;
+      printf("  %-12s k=%d  %14zu  vs_packed %5.1f%%  vs_aligned %5.1f%%\n",
+             nm[v][b], bk, tot, pk, al);
+    }
+    printf("  separate na/nl bytes (no ALLOC_BITS split):\n");
+    for (int v = 0; v < 2; v++) for (int b = 0; b < 2; b++) {
+      size_t tot = stats->sim_sep_total[v][b];
+      double pk = stats->sim_current_total
+        ? 100.0 * ((double)stats->sim_current_total - (double)tot)
+          / (double)stats->sim_current_total : 0.0;
+      double al = stats->sim_aligned_total
+        ? 100.0 * ((double)stats->sim_aligned_total - (double)tot)
+          / (double)stats->sim_aligned_total : 0.0;
+      printf("  %-12s      %14zu  vs_packed %5.1f%%  vs_aligned %5.1f%%\n",
+             nm[v][b], tot, pk, al);
+    }
+  }
 }
 
-/* Actually log+1.
+/* Actually floor(log_2(x))+1, clamped at MAX_LOG-1.
    mylog(0) = 0
    mylog(1) = 1
    mylog(2) = 2
@@ -583,6 +665,15 @@ static void add_descriptor_to_stats(frame_descr *d,
                                     struct frametable_stats *stats)
 {
   unsigned char *p;
+  /* Facts gathered for the small-descriptor simulation at the end. */
+  bool sim_is_first = false, sim_rettoc = false, sim_is_long = false;
+  bool sim_has_alloc = false, sim_has_debug = false, sim_bigreg = false;
+  bool sim_allocs4 = true;
+  intnat sim_delta = 0;
+  uint32_t sim_fsize = 0;
+  uint64_t sim_regmap = 0;
+  size_t sim_nlive = 0, sim_slots = 0, sim_regs = 0, sim_nalloc = 0,
+         sim_ndbg = 0;
   ++ stats->descrs;
   if (!stats->min_descr || ((unsigned char*)d < stats->min_descr)) {
     stats->min_descr = (unsigned char*)d;
@@ -598,6 +689,9 @@ static void add_descriptor_to_stats(frame_descr *d,
   }
 
   unsigned char *retaddr = (unsigned char *)Retaddr_frame(d);
+  sim_is_first = (stats->last_retaddr == NULL);
+  if (!sim_is_first)
+    sim_delta = (intnat)((uintnat)retaddr - (uintnat)stats->last_retaddr);
   if (stats->last_retaddr) {
     if (retaddr < stats->min_retaddr) {
       stats->min_retaddr = retaddr;
@@ -618,6 +712,7 @@ static void add_descriptor_to_stats(frame_descr *d,
 
   if (frame_return_to_C(d)) {
     ++ stats->return_to_C;
+    sim_rettoc = true;
     /* Top of an ML stack chunk. Skip over empty frame descriptor */
     p = (unsigned char*)&d->live_ofs[0];
   } else {
@@ -692,15 +787,18 @@ static void add_descriptor_to_stats(frame_descr *d,
 
     p = (unsigned char*)frame_end_of_live_ofs(d);
     size_t num_debuginfo = 1;
+    size_t num_allocs = 0;
+    bool all_allocs_4bit = true; /* do all alloc sizes fit in 4 bits? */
     if (frame_has_allocs(d)) {
       ++ stats->with_alloc;
-      size_t num_allocs = *(uint8_t *)p;
+      num_allocs = *(uint8_t *)p;
       stats->alloc_sizes += num_allocs;
       num_debuginfo = num_allocs;
       count_item(num_allocs, &stats->max_comballocs, stats->small_comballocs,
                  stats->log_comballocs);
       ++ p;
       for (size_t idx = 0; idx < num_allocs; ++idx) {
+        if (p[idx] > 15) all_allocs_4bit = false;
         count_item(p[idx], &stats->max_alloc_size, stats->small_alloc_sizes,
                    stats->log_alloc_sizes);
       }
@@ -717,9 +815,115 @@ static void add_descriptor_to_stats(frame_descr *d,
         p += sizeof(uint32_t);
       }
     }
+    /* Capture facts for the small-descriptor simulation. */
+    sim_is_long = frame_is_long(d);
+    sim_fsize = frame_size(d);
+    sim_has_alloc = frame_has_allocs(d);
+    sim_has_debug = frame_has_debug(d);
+    sim_nlive = num_live;
+    sim_slots = slots;
+    sim_regs = regs;
+    sim_regmap = reg_map;
+    sim_bigreg = has_big_reg;
+    sim_nalloc = num_allocs;
+    sim_ndbg = num_debuginfo;
+    sim_allocs4 = all_allocs_4bit;
   }
   if (!stats->max_descr || (p > stats->max_descr)) {
     stats->max_descr = p;
+  }
+
+  /* --- Small-descriptor format simulation (step 2) --- */
+  {
+    /* Current (packed) size of this descriptor. */
+    size_t cur;
+    if (sim_rettoc) {
+      cur = 8; /* retaddr(4) + frame_data(2) + num_live(2), no body */
+    } else {
+      size_t hdr = sim_is_long ? 16 : 8;
+      size_t live = sim_nlive * (sim_is_long ? 4 : 2);
+      size_t a = sim_has_alloc ? (1 + sim_nalloc) : 0;
+      size_t db = sim_has_debug ? (sim_ndbg * 4) : 0;
+      cur = hdr + live + a + db;
+    }
+    ++ stats->sim_descrs;
+    stats->sim_current_total += cur;
+    size_t escape = 1 + cur; /* leading zero byte + the normal/large descriptor */
+
+    /* Old aligned size: each descriptor was 8-byte aligned, debug_info[] 4. */
+    size_t aligned;
+    if (sim_rettoc) {
+      aligned = 8;
+    } else {
+      size_t off = (sim_is_long ? 16 : 8) + sim_nlive * (sim_is_long ? 4 : 2)
+                 + (sim_has_alloc ? (1 + sim_nalloc) : 0);
+      if (sim_has_debug) {
+        off = (off + 3) & ~(size_t)3;
+        off += sim_ndbg * 4;
+      }
+      aligned = (off + 7) & ~(size_t)7;
+    }
+    stats->sim_aligned_total += aligned;
+
+    /* Base-format escape causes (diagnostic: 8-reg bitmap, 1-byte delta). */
+    bool fits_size = !sim_rettoc && (sim_fsize % 16 == 0)
+                     && (sim_fsize / 16 >= 1) && (sim_fsize / 16 <= 64);
+    bool reg_ok = sim_has_alloc
+      ? (((sim_regmap & ~(uint64_t)SIM_HOT_REGS) == 0) && !sim_bigreg)
+      : (sim_regs == 0);
+    if (sim_is_first)        ++stats->sim_esc_first;
+    else if (sim_rettoc)     ++stats->sim_esc_rettoc;
+    else if (sim_delta < 1 || sim_delta > 255) ++stats->sim_esc_delta;
+    else if (!fits_size)     ++stats->sim_esc_size;
+    else if (!reg_ok)        ++stats->sim_esc_reg;
+    else if (!sim_allocs4)   ++stats->sim_esc_allocsize;
+
+    /* Small size = delta field + size+flags(1) + (alloc ? na/nl(1) + 4-bit
+       alloc sizes + register bitmap : num_live(1)) + live slots(1 each)
+       + debug(4 each). Refinements: v=1 varint delta (255 -> +16 bits),
+       b=1 a 16-bit (2-byte) register bitmap covering regs 0..15. */
+    size_t asz = sim_has_alloc ? ((sim_nalloc + 1) / 2) : 0;
+    size_t dbz = sim_has_debug ? (sim_ndbg * 4) : 0;
+    bool dok[2] = { (sim_delta >= 1 && sim_delta <= 255),
+                    (sim_delta >= 1 && sim_delta <= 65535) };
+    size_t dfield[2] = { 1, (sim_delta <= 254 ? 1 : 3) };
+    bool rok[2];
+    rok[0] = reg_ok;                                       /* 8-reg hot-set bitmap */
+    rok[1] = sim_has_alloc ? !sim_bigreg : (sim_regs == 0);/* 16-bit bitmap 0..15 */
+    size_t rfield[2] = { 1, 2 };
+    for (int v = 0; v < 2; v++) {
+      for (int b = 0; b < 2; b++) {
+        bool be = !sim_is_first && !sim_rettoc && fits_size && sim_allocs4
+                  && dok[v] && rok[b];
+        size_t sbase = dfield[v] + 1 + sim_slots + dbz
+          + (sim_has_alloc ? (asz + rfield[b]) : 0);
+        for (int k = 0; k <= SIM_MAXK; k++) {
+          bool small = be;
+          if (small && sim_has_alloc) {
+            if (!(sim_nalloc < ((size_t)1 << k)
+                  && sim_slots < ((size_t)1 << (8 - k))))
+              small = false;
+          } else if (small && sim_slots > 255) {
+            small = false;
+          }
+          if (small) {
+            stats->sim_total[v][b][k] += sbase + 1; /* na/nl or num_live byte */
+            ++ stats->sim_small[v][b][k];
+          } else {
+            stats->sim_total[v][b][k] += escape;
+          }
+        }
+        /* Separate full bytes for num_allocs and num_live (no ALLOC_BITS
+           split). num_allocs is a byte already; this fits whenever the
+           descriptor is base-eligible and num_live fits a byte. */
+        if (be && sim_slots <= 255) {
+          stats->sim_sep_total[v][b] += sbase + (sim_has_alloc ? 2 : 1);
+          ++ stats->sim_sep_small[v][b];
+        } else {
+          stats->sim_sep_total[v][b] += escape;
+        }
+      }
+    }
   }
 }
 
