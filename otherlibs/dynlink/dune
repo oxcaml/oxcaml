@@ -791,6 +791,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__CamlinternalMenhirLib.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser_types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typing_recovery.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Persistent_env.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Type_shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Env.cmo
@@ -804,6 +805,11 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Errortrace_report.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Includecore.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedtree.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Shape_reduce.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Tast_mapper.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Tast_iterator.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Cmt_format.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typing_recovery_state.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Static_label.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Slambdaident.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lambda.cmo
@@ -916,6 +922,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__CamlinternalMenhirLib.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser_types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typing_recovery.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Persistent_env.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Type_shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Env.cmx
@@ -929,6 +936,11 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Errortrace_report.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Includecore.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedtree.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Shape_reduce.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Tast_mapper.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Tast_iterator.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Cmt_format.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typing_recovery_state.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Static_label.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Slambdaident.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lambda.cmx
