@@ -34,3 +34,31 @@ external product_edge_case : ('a : any separable). #('a * 'a) array -> int
 val product_edge_case : ('a : value_maybe_null). #('a * 'a) array -> int =
   <fun>
 |}]
+
+type ('a : any mod separable) unboxed_record : any mod separable =
+  { field : 'a array } [@@unboxed]
+external unboxed_record_edge_case
+  : ('a : any mod separable). 'a unboxed_record array -> int
+  = "%identity"
+let unboxed_record_edge_case x = unboxed_record_edge_case x
+[%%expect{|
+type ('a : any separable) unboxed_record = { field : 'a array; } [@@unboxed]
+external unboxed_record_edge_case :
+  ('a : any separable). 'a unboxed_record array -> int = "%identity"
+val unboxed_record_edge_case :
+  ('a : any separable). 'a unboxed_record array -> int = <fun>
+|}]
+
+type ('a : any mod separable) unboxed_variant : any mod separable =
+  | Unboxed_variant of 'a array [@@unboxed]
+external unboxed_variant_edge_case
+  : ('a : any mod separable). 'a unboxed_variant array -> int
+  = "%identity"
+let unboxed_variant_edge_case x = unboxed_variant_edge_case x
+[%%expect{|
+type ('a : any separable) unboxed_variant = Unboxed_variant of 'a array [@@unboxed]
+external unboxed_variant_edge_case :
+  ('a : any separable). 'a unboxed_variant array -> int = "%identity"
+val unboxed_variant_edge_case :
+  ('a : any separable). 'a unboxed_variant array -> int = <fun>
+|}]
