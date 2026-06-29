@@ -43,7 +43,7 @@
   > let foo = Async_kernel.Deferred.return ()
   > EOF
 
-FIXME we expect Deferred.t 
+We expect Deferred.t 
   $ $MERLIN single type-enclosing -position 2:5 \
   > -filename main.ml <main.ml
   {
@@ -58,7 +58,7 @@ FIXME we expect Deferred.t
           "line": 2,
           "col": 7
         },
-        "type": "Async_kernel.Deferred.t",
+        "type": "Deferred.t",
         "tail": "no"
       }
     ],
