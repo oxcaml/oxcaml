@@ -120,6 +120,8 @@ type t =
         (* Earlier variables have mode In_types *)
     is_bottom : bool;
     name_info : name_info Name.Map.t
+        (* [name_info] should contain entries only for true canonical elements
+           (in any name mode) *)
   }
 
 and serializable =
@@ -372,12 +374,22 @@ let create ~machine_width ~resolver =
   }
 
 let add_param_projection t name param_projection =
-  { t with name_info = Name.Map.add name { param_projection } t.name_info }
+  Simple.pattern_match
+    (Aliases.get_canonical_ignoring_name_mode (aliases t) name)
+    ~const:(fun _ -> t)
+    ~name:(fun canonical ~coercion:_ ->
+      { t with
+        name_info = Name.Map.add canonical { param_projection } t.name_info
+      })
 
 let is_param_projection t name =
-  Option.map
-    (fun (x : name_info) -> x.param_projection)
-    (Name.Map.find_opt name t.name_info)
+  Simple.pattern_match
+    (Aliases.get_canonical_ignoring_name_mode (aliases t) name)
+    ~const:(fun _ -> None)
+    ~name:(fun canonical ~coercion:_ ->
+      Option.map
+        (fun (x : name_info) -> x.param_projection)
+        (Name.Map.find_opt canonical t.name_info))
 
 let machine_width t = t.machine_width
 
