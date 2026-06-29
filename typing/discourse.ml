@@ -336,8 +336,13 @@ let lid_and_path_of_ident ?root_lid ?root_path id =
           define ~from:`Open Module ~root_path ?root_lid id;
           let root_lid = Some lid in
           define_signature_for_open _env ~root_path:path ~root_lid s
-        | Sig_module (id, _, _md, _, _) ->
+        | Sig_module (id, _, { md_type; _ }, _, _) ->
           let lid, path = lid_and_path_of_ident ~root_path ?root_lid id in
+          let () =
+            match md_type with
+            | Mty_alias alias_path -> add_subst_g alias_path lid
+            | _ -> ()
+          in
           add_subst_g path lid;
           define ~from:`Open Module ~root_path ?root_lid id
           (* TODO Adding to U here fixes a few issues but we would prefer not to
