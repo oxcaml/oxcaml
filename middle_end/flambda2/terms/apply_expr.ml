@@ -167,9 +167,9 @@ let [@ocamlformat "disable"] print_effect ppf
 let print ppf t =
   match t.call_kind with
   | Function _ | Method _ | C_call _ ->
-      if Flambda_features.dump_compact ()
-      then print_compact ppf t
-      else print_normal ppf t
+    if Flambda_features.dump_compact ()
+    then print_compact ppf t
+    else print_normal ppf t
   | Effect _ -> print_effect ppf t
 
 let invariant
