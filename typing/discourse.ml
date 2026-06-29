@@ -318,19 +318,28 @@ let lid_and_path_of_ident ?root_lid ?root_path id =
      just to make sure they do.
   *)
 
-  let define_signature_for_open _env ~root_path (sg : Subst.Lazy.signature) =
+  let rec define_signature_for_open _env ~root_path ~root_lid
+      (sg : Subst.Lazy.signature) =
     List.iter
       (fun sig_item ->
         match (sig_item : Subst.Lazy.signature_item) with
         | Sig_type (id, _, _, _) ->
-          define_type ~from:`Open ~root_path id
+          define_type ~from:`Open ~root_path ?root_lid id
         | Sig_value (id, _, _) ->
-          define_value ~from:`Open ~root_path id
+          define_value ~from:`Open ~root_path ?root_lid id
         | Sig_typext (_, _, _, _) | Sig_jkind _ -> ()
-        | Sig_module (id, _, _md, _, _) ->
-          let lid, path = lid_and_path_of_ident ~root_path id in
+        | Sig_module (id, Mp_present, { md_type = Mty_signature s; _ }, _, _) ->
+          (* We recursively  bring everything that is direcelty defined in the
+             opened module, but without following aliases. *)
+          let lid, path = lid_and_path_of_ident ~root_path ?root_lid id in
           add_subst_g path lid;
-          define ~from:`Open Module ~root_path id
+          define ~from:`Open Module ~root_path ?root_lid id;
+          let root_lid = Some lid in
+          define_signature_for_open _env ~root_path:path ~root_lid s
+        | Sig_module (id, _, _md, _, _) ->
+          let lid, path = lid_and_path_of_ident ~root_path ?root_lid id in
+          add_subst_g path lid;
+          define ~from:`Open Module ~root_path ?root_lid id
           (* TODO Adding to U here fixes a few issues but we would prefer not to
              do it. *)
           (* g := *)
@@ -341,7 +350,7 @@ let lid_and_path_of_ident ?root_lid ?root_path id =
           (*     } *)
           (*     !g *)
         | Sig_modtype (id, _, _) ->
-          define_modtype ~from:`Open ~root_path id
+          define_modtype ~from:`Open ~root_path ?root_lid id
         | Sig_class (_, _, _, _) | Sig_class_type (_, _, _, _) ->
           (* TODO: do *) ())
       (Subst.Lazy.force_signature_once sg)
@@ -354,7 +363,8 @@ let lid_and_path_of_ident ?root_lid ?root_path id =
         let root_path = Env.normalize_module_path None env path in
         let md = Env.find_module_lazy root_path env in
         match md.md_type with
-        | Mty_signature sg -> define_signature_for_open env ~root_path sg
+        | Mty_signature sg ->
+          define_signature_for_open env ~root_path ~root_lid:None sg
         | _ -> ()
       with Not_found -> ()
     end
