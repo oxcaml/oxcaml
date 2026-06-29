@@ -6,5 +6,7 @@ jsmaindriver.ml
 jsmaindriver.mli
 jslibrarian.ml
 jslibrarian.mli
+functorizer.ml
+functorizer.mli
 oxcaml_args.ml
 oxcaml_args.mli

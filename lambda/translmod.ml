@@ -1489,6 +1489,284 @@ let transl_instance instance_unit ~runtime_args ~main_module_block_repr
   transl_instance_impl instance_unit ~runtime_args
     ~main_module_block_repr ~arg_block_idx
 
+let cu_of_impl (gm : Global_module.t) : Compilation_unit.t =
+  let cu, _params, _sig =
+    Env.find_import ~chain:[]
+      (Compilation_unit.Name.of_head_of_global_name (Global_module.to_name gm))
+  in
+  match cu with
+  | Some cu -> cu
+  | None ->
+      Misc.fatal_errorf_doc
+        "transl_functorize: %a is a parameter module"
+        Global_module.print gm
+
+(* [gm] must have been compiled with [-as-argument-for]. *)
+let project_arg_block ~find_impl_by_name ~chain ~(gm : Global_module.t)
+      main_block =
+  let _fmt, arg_descr = find_impl_by_name ~chain (cu_of_impl gm) in
+  let arg_block_idx, main_repr =
+    match (arg_descr : Lambda.arg_descr option) with
+    | Some { arg_block_idx; main_repr; _ } -> arg_block_idx, main_repr
+    | None ->
+        Misc.fatal_errorf_doc
+          "project_arg_block: %a was not compiled with -as-argument-for"
+          Global_module.print gm
+  in
+  Lprim (mod_field arg_block_idx main_repr, [main_block], Loc_unknown)
+
+let rec maybe_transl_local_instance ~(gm : Global_module.t) ~chain
+    ~find_impl_by_name ~param_ids ~module_ids ~k =
+  match Global_module.Map.find_opt gm module_ids with
+  | Some id -> k (Lvar id) module_ids
+  | None ->
+      transl_local_instance ~gm ~chain ~find_impl_by_name ~param_ids ~module_ids
+        ~k
+
+and transl_local_instance ~(gm : Global_module.t) ~chain
+    ~find_impl_by_name ~param_ids ~module_ids ~k =
+  let cu = cu_of_impl gm in
+  let ui_format, _arg_descr = find_impl_by_name ~chain cu in
+  let chain = gm :: chain in
+  let new_id = Ident.create_local (Global_module.to_string gm) in
+  let module_ids = Global_module.Map.add gm new_id module_ids in
+  let runtime_params =
+    match ui_format with
+    | Mb_struct _ ->
+        Misc.fatal_errorf_doc
+          "transl_local_instance: %a is not a parameterised module"
+          Global_module.print gm
+    | Mb_instantiating_functor { mb_runtime_params; _ } -> mb_runtime_params
+  in
+  let resolve_param (global : Global_module.t) =
+    match Global_module.find_in_parameter_map global param_ids with
+    | Some id -> id
+    | None ->
+        Misc.fatal_errorf_doc "transl_local_instance: %a not in param_ids"
+          Global_module.print global
+  in
+  let arg_params args =
+    List.map (fun (a : _ Global_module.Argument.t) -> a.param) args
+    |> Global_module.Parameter_name.Set.of_list
+  in
+  (* [gm]'s [visible_args] thread into inner runtime params. *)
+  let visible_arg_map =
+    List.fold_left
+      (fun map (a : _ Global_module.Argument.t) ->
+        Global_module.Parameter_name.Map.add a.param a.value map)
+      Global_module.Parameter_name.Map.empty gm.visible_args
+  in
+  let process_one (rp : Lambda.runtime_param) module_ids ~k =
+    match rp with
+    | Rp_main_module_block inner_gm ->
+        let inner_gm =
+          if Global_module.Parameter_name.Map.is_empty visible_arg_map
+          then inner_gm
+          else Global_module.subst_inside inner_gm visible_arg_map
+        in
+        if not
+             (Global_module.Parameter_name.Set.subset
+                (arg_params inner_gm.hidden_args)
+                (arg_params gm.hidden_args))
+        then
+          Misc.fatal_errorf_doc
+            "transl_local_instance: %a's hidden_args are not a subset of %a's"
+            Global_module.print inner_gm
+            Global_module.print gm;
+        maybe_transl_local_instance ~gm:inner_gm ~chain
+          ~find_impl_by_name ~param_ids ~module_ids
+          ~k
+    | Rp_argument_block global ->
+        (match Global_module.find_in_parameter_map global visible_arg_map with
+         | Some arg_value ->
+             maybe_transl_local_instance ~gm:arg_value ~chain
+               ~find_impl_by_name ~param_ids ~module_ids
+               ~k:(fun main_block module_ids ->
+                 let arg_block =
+                   project_arg_block ~find_impl_by_name ~chain
+                     ~gm:arg_value main_block
+                 in
+                 k arg_block module_ids)
+         | None ->
+             let global_name = Global_module.to_name global in
+             if not
+                  (Global_module.Name.mem_parameter_set global_name
+                     (arg_params gm.hidden_args))
+             then
+               Misc.fatal_errorf_doc
+                 "transl_local_instance: %a should have %a as a hidden_arg"
+                 Global_module.print gm
+                 Global_module.print global;
+             k (Lvar (resolve_param global)) module_ids)
+    | Rp_unit ->
+        k lambda_unit module_ids
+  in
+  Stdlib.List.fold_left_map_cont process_one runtime_params module_ids
+    ~k:(fun ap_args module_ids ->
+      let func =
+        Lprim
+          ( mod_field 0 (Module_value_only { field_count = 1 }),
+            [Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)],
+            Loc_unknown )
+      in
+      let rhs =
+        Lapply
+          { ap_func = func;
+            ap_args;
+            ap_result_layout = layout_module;
+            ap_loc = Loc_unknown;
+            ap_inlined = Always_inlined;
+            ap_tailcall = Default_tailcall;
+            ap_specialised = Default_specialise;
+            ap_mode = alloc_heap;
+            ap_region_close = Rc_normal;
+            ap_probe = None
+          }
+      in
+      let body, extra = k (Lvar new_id) module_ids in
+      ( Llet (Strict, layout_module, new_id, debug_uid_none, rhs, body),
+        extra ))
+
+(* Bundle's [Make]: generative functor over [params @ [unit]] that
+   let-binds each module in [modules] (and transitive deps). *)
+let transl_functorize_make ~params ~modules ~find_impl_by_name
+    : lambda * Compilation_unit.Set.t =
+  let mk_param layout name =
+    { name;
+      debug_uid = debug_uid_none;
+      layout;
+      attributes = default_param_attribute;
+      mode = alloc_heap
+    }
+  in
+  let attrs =
+    { default_function_attribute with
+      is_a_functor = true;
+      inline = Always_inline
+    }
+  in
+  let param_ids, param_idents =
+    List.fold_left_map
+      (fun map p_name ->
+        let id =
+          Ident.create_local (Global_module.Parameter_name.to_string p_name)
+        in
+        (Global_module.Parameter_name.Map.add p_name id map, id))
+      Global_module.Parameter_name.Map.empty
+      params
+  in
+  let body, required_globals =
+    Stdlib.List.fold_left_map_cont
+      (fun gm module_ids ~k ->
+        maybe_transl_local_instance ~gm ~chain:[]
+          ~find_impl_by_name ~param_ids ~module_ids ~k)
+      modules
+      Global_module.Map.empty
+      ~k:(fun exposed_lambdas module_ids ->
+        let block =
+          Lprim
+            ( Pmakeblock (0, Immutable, All_value, alloc_heap),
+              exposed_lambdas,
+              Loc_unknown )
+        in
+        let required_globals =
+          Global_module.Map.fold
+            (fun gm _id set -> Compilation_unit.Set.add (cu_of_impl gm) set)
+            module_ids Compilation_unit.Set.empty
+        in
+        (block, required_globals))
+  in
+  let unit_ident = Ident.create_local "*unit*" in
+  let func_params =
+    List.map (mk_param layout_module) param_idents
+    @ [mk_param layout_unit unit_ident]
+  in
+  let func =
+    lfunction ~params:func_params
+      ~kind:(Curried { nlocal = 0 })
+      ~return:layout_module
+      ~attr:attrs
+      ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:alloc_heap
+  in
+  (func, required_globals)
+
+(* Bundle's [Intf]: applicative functor with an empty runtime body. *)
+let transl_functorize_intf ~params =
+  let func_params =
+    List.map
+      (fun p_name ->
+        { name =
+            Ident.create_local
+              (Global_module.Parameter_name.to_string p_name);
+          debug_uid = debug_uid_none;
+          layout = layout_module;
+          attributes = default_param_attribute;
+          mode = alloc_heap
+        })
+      params
+  in
+  let attrs =
+    { default_function_attribute with
+      is_a_functor = true;
+      inline = Always_inline
+    }
+  in
+  let body =
+    Lprim
+      (Pmakeblock (0, Immutable, All_value, alloc_heap), [], Loc_unknown)
+  in
+  lfunction ~params:func_params
+    ~kind:(Curried { nlocal = 0 })
+    ~return:layout_module
+    ~attr:attrs
+    ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:alloc_heap
+
+let transl_functorize compilation_unit
+      (params : Global_module.Parameter_name.t list)
+      (modules : Global_module.t list)
+      ~ext
+      ~(read_format :
+          Misc.filepath ->
+          Lambda.main_module_block_format * Lambda.arg_descr option)
+      ~coercion : program =
+  let find_impl_by_name ~chain cu
+      : Lambda.main_module_block_format * Lambda.arg_descr option =
+    let base = Compilation_unit.base_filename cu ^ ext in
+    match Load_path.find_normalized base with
+    | filename -> read_format filename
+    | exception Not_found ->
+        let required_by =
+          List.map
+            (fun gm ->
+              Printf.sprintf ", required by %s" (Global_module.to_string gm))
+            chain
+          |> String.concat ""
+        in
+        Location.raise_errorf
+          "@[<hov>Cannot find %s on the load path%s.@]"
+          base required_by
+  in
+  let make_func, required_globals =
+    transl_functorize_make ~params ~modules ~find_impl_by_name
+  in
+  let intf_func = transl_functorize_intf ~params in
+  let code =
+    apply_coercion Loc_unknown Strict coercion
+      (Lprim
+         ( Pmakeblock (0, Immutable, All_value, alloc_heap),
+           [intf_func; make_func],
+           Loc_unknown ))
+  in
+  let main_module_block_format =
+    Mb_struct { mb_repr = Module_value_only { field_count = 2 } }
+  in
+  { compilation_unit;
+    main_module_block_format;
+    arg_block_idx = None;
+    required_globals;
+    code
+  }
+
 (* Error report *)
 
 open Format_doc

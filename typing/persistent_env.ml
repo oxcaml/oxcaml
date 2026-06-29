@@ -1076,6 +1076,10 @@ let loaded_transitive_dependencies penv intfs =
   Compilation_unit.Name.Set.iter add_loaded_deps intfs;
   !names
 
+let find_import penv modname =
+  let import = find_import ~allow_hidden:true penv ~check:true modname in
+  import.imp_impl, import.imp_params, import.imp_raw_sign
+
 let require_impl_for_quote {quoted_impls; _} name =
   quoted_impls := CU.Set.add name !quoted_impls
 

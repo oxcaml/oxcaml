@@ -1,0 +1,7 @@
+module DEP__Lib__ : sig module Mod_a = Mod_a module Mod_b = Mod_b end
+module Mod_a :
+  sig
+    module Mod_b_alias = DEP__Lib__.Mod_b
+    val foo : P_int.t -> string @@ portable
+  end
+module Mod_b : sig module Mod_a_alias = DEP__Lib__.Mod_a end
