@@ -545,6 +545,7 @@ and cstr_layout =
 and constructor_representation =
   | Constructor_uniform_value
   | Constructor_mixed of mixed_product_shape
+  | Constructor_variable
 
 and label_declaration =
   {
@@ -935,7 +936,9 @@ let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | Constructor_uniform_value, Constructor_uniform_value -> true
   | Constructor_mixed mx1, Constructor_mixed mx2 ->
       equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
-  | (Constructor_mixed _ | Constructor_uniform_value), _ -> false
+  | Constructor_variable, Constructor_variable -> true
+  | (Constructor_mixed _ | Constructor_uniform_value | Constructor_variable), _
+    -> false
 
 let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   match r1, r2 with

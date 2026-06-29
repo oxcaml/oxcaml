@@ -18,11 +18,9 @@
 
 #include "caml/config.h"
 #include "caml/mlvalues.h"
-#ifdef CAML_RUNTIME_5
 #include "caml/frame_descriptors.h"
 #define NATIVE_CODE
 #include "caml/globroots.h"
-#endif
 #include "caml/memory.h"
 #include "caml/stack.h"
 #include "caml/callback.h"
@@ -265,28 +263,13 @@ CAMLprim value jit_run(value symbols_addresses) {
 
   sym = addr_from_caml_option(Field(symbols_addresses, 0));
   if (NULL != sym) {
-#ifdef CAML_RUNTIME_5
     caml_register_frametables(&sym, 1);
-#else
-    caml_register_frametable(sym);
-#endif
   }
 
   sym = addr_from_caml_option(Field(symbols_addresses, 1));
   if (NULL != sym) {
-#ifdef CAML_RUNTIME_5
     caml_register_dyn_globals(&sym, 1);
-#else
-    caml_register_dyn_global(sym);
-#endif
   }
-
-#ifndef CAML_RUNTIME_5
-  sym = addr_from_caml_option(Field(symbols_addresses, 2));
-  sym2 = addr_from_caml_option(Field(symbols_addresses, 3));
-  if (NULL != sym && NULL != sym2)
-    caml_page_table_add(In_static_data, sym, sym2);
-#endif
 
   sym = addr_from_caml_option(Field(symbols_addresses, 4));
   sym2 = addr_from_caml_option(Field(symbols_addresses, 5));

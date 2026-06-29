@@ -1,5 +1,4 @@
 (* TEST
-   runtime5;
    poll_insertion;
    flags += "-w -21";
    { native; }

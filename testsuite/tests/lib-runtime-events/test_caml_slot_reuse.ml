@@ -1,8 +1,5 @@
 (* TEST
  {
-   runtime4;
-   skip;
- }{
    include runtime_events;
    multicore;
    { bytecode; }

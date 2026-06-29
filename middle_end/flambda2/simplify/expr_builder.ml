@@ -379,9 +379,9 @@ let create_let_symbols uacc lifted_constant ~body =
               (* We're not dropping the coercion: it gets used in [stop_here] *)
               stop_here ())
             ~var:(fun var' ~coercion:coercion_from_var'_to_simple ->
-              match Variable.Map.find var' symbol_projections with
-              | exception Not_found -> stop_here ()
-              | proj' ->
+              match Variable.Map.find_or_null var' symbol_projections with
+              | Null -> stop_here ()
+              | This proj' ->
                 let coercion_from_var'_to_proj =
                   (* Since [simple] is just an evaluated form of [proj] *)
                   coercion_from_var'_to_simple

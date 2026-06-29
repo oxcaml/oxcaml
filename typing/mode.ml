@@ -1981,24 +1981,24 @@ module Lattices_mono = struct
           (Visibility_op.t, Statefulness.t, 'l * 'r) t
       | Statefulness_to_visibility_op :
           (Statefulness.t, Visibility_op.t, 'l * 'r) t
-      | Monadic_to_comonadic_min :
+      | Monadic_op_to_comonadic_min :
           (Monadic_op.t, 'a comonadic_with, 'l * disallowed) t
           (** Dualize the monadic fragment to the comonadic fragment. The
               areality is set to min. *)
-      | Comonadic_to_monadic_min :
+      | Comonadic_to_monadic_op_min :
           'a areality
           -> ('a comonadic_with, Monadic_op.t, 'l * disallowed) t
           (** Dualize the comonadic fragment to the monadic fragment. The
               areality axis is ignored, the staticity axis is set to min. *)
-      | Monadic_to_comonadic_max :
+      | Monadic_op_to_comonadic_max :
           (Monadic_op.t, 'a comonadic_with, disallowed * 'r) t
           (** Dualize the monadic fragment to the comonadic fragment. The
               areality is set to max. *)
-      | Comonadic_to_monadic_max :
+      | Comonadic_to_monadic_op_max :
           'a areality
           -> ('a comonadic_with, Monadic_op.t, disallowed * 'r) t
           (** Dualize the comonadic fragment to the monadic fragment. The
-              areality axis is ignored. *)
+              areality axis is ignored, the staticity axis is set to max. *)
 
     let allow_left : type a b l r. (a, b, allowed * r) t -> (a, b, l * r) t =
       function
@@ -2011,8 +2011,8 @@ module Lattices_mono = struct
       | Portability_to_contention_op -> Portability_to_contention_op
       | Visibility_op_to_statefulness -> Visibility_op_to_statefulness
       | Statefulness_to_visibility_op -> Statefulness_to_visibility_op
-      | Monadic_to_comonadic_min -> Monadic_to_comonadic_min
-      | Comonadic_to_monadic_min a -> Comonadic_to_monadic_min a
+      | Monadic_op_to_comonadic_min -> Monadic_op_to_comonadic_min
+      | Comonadic_to_monadic_op_min a -> Comonadic_to_monadic_op_min a
 
     let allow_right : type a b l r. (a, b, l * allowed) t -> (a, b, l * r) t =
       function
@@ -2025,8 +2025,8 @@ module Lattices_mono = struct
       | Portability_to_contention_op -> Portability_to_contention_op
       | Visibility_op_to_statefulness -> Visibility_op_to_statefulness
       | Statefulness_to_visibility_op -> Statefulness_to_visibility_op
-      | Comonadic_to_monadic_max a -> Comonadic_to_monadic_max a
-      | Monadic_to_comonadic_max -> Monadic_to_comonadic_max
+      | Comonadic_to_monadic_op_max a -> Comonadic_to_monadic_op_max a
+      | Monadic_op_to_comonadic_max -> Monadic_op_to_comonadic_max
 
     let disallow_left : type a b l r.
         (a, b, l * r) t -> (a, b, disallowed * r) t = function
@@ -2039,10 +2039,10 @@ module Lattices_mono = struct
       | Portability_to_contention_op -> Portability_to_contention_op
       | Visibility_op_to_statefulness -> Visibility_op_to_statefulness
       | Statefulness_to_visibility_op -> Statefulness_to_visibility_op
-      | Monadic_to_comonadic_min -> Monadic_to_comonadic_min
-      | Comonadic_to_monadic_min a -> Comonadic_to_monadic_min a
-      | Monadic_to_comonadic_max -> Monadic_to_comonadic_max
-      | Comonadic_to_monadic_max a -> Comonadic_to_monadic_max a
+      | Monadic_op_to_comonadic_min -> Monadic_op_to_comonadic_min
+      | Comonadic_to_monadic_op_min a -> Comonadic_to_monadic_op_min a
+      | Monadic_op_to_comonadic_max -> Monadic_op_to_comonadic_max
+      | Comonadic_to_monadic_op_max a -> Comonadic_to_monadic_op_max a
 
     let disallow_right : type a b l r.
         (a, b, l * r) t -> (a, b, l * disallowed) t = function
@@ -2055,10 +2055,10 @@ module Lattices_mono = struct
       | Portability_to_contention_op -> Portability_to_contention_op
       | Visibility_op_to_statefulness -> Visibility_op_to_statefulness
       | Statefulness_to_visibility_op -> Statefulness_to_visibility_op
-      | Monadic_to_comonadic_min -> Monadic_to_comonadic_min
-      | Comonadic_to_monadic_min a -> Comonadic_to_monadic_min a
-      | Monadic_to_comonadic_max -> Monadic_to_comonadic_max
-      | Comonadic_to_monadic_max a -> Comonadic_to_monadic_max a
+      | Monadic_op_to_comonadic_min -> Monadic_op_to_comonadic_min
+      | Comonadic_to_monadic_op_min a -> Comonadic_to_monadic_op_min a
+      | Monadic_op_to_comonadic_max -> Monadic_op_to_comonadic_max
+      | Comonadic_to_monadic_op_max a -> Comonadic_to_monadic_op_max a
 
     let src : type a b d. (a, b, d) t -> a obj = function
       | Locality_restricted m -> Locality_morph.src_restricted m
@@ -2069,10 +2069,10 @@ module Lattices_mono = struct
       | Portability_to_contention_op -> Portability
       | Visibility_op_to_statefulness -> Visibility_op
       | Statefulness_to_visibility_op -> Statefulness
-      | Monadic_to_comonadic_min -> Monadic_op
-      | Comonadic_to_monadic_min ar -> areality_comonadic_obj ar
-      | Monadic_to_comonadic_max -> Monadic_op
-      | Comonadic_to_monadic_max ar -> areality_comonadic_obj ar
+      | Monadic_op_to_comonadic_min -> Monadic_op
+      | Comonadic_to_monadic_op_min ar -> areality_comonadic_obj ar
+      | Monadic_op_to_comonadic_max -> Monadic_op
+      | Comonadic_to_monadic_op_max ar -> areality_comonadic_obj ar
 
     let compare_total : type a1 d1 a2 b d2.
         (a1, b, d1) t -> (a2, b, d2) t -> int =
@@ -2103,20 +2103,20 @@ module Lattices_mono = struct
       | Statefulness_to_visibility_op, Statefulness_to_visibility_op -> 0
       | Statefulness_to_visibility_op, _ -> .
       | _, Statefulness_to_visibility_op -> .
-      | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> 0
-      | Monadic_to_comonadic_min, _ -> -1
-      | _, Monadic_to_comonadic_min -> 1
-      | Comonadic_to_monadic_min ar1, Comonadic_to_monadic_min ar2 ->
+      | Monadic_op_to_comonadic_min, Monadic_op_to_comonadic_min -> 0
+      | Monadic_op_to_comonadic_min, _ -> -1
+      | _, Monadic_op_to_comonadic_min -> 1
+      | Comonadic_to_monadic_op_min ar1, Comonadic_to_monadic_op_min ar2 ->
         compare_areality ar1 ar2
-      | Comonadic_to_monadic_min _, _ -> -1
-      | _, Comonadic_to_monadic_min _ -> 1
-      | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> 0
-      | Monadic_to_comonadic_max, _ -> .
-      | _, Monadic_to_comonadic_max -> .
-      | Comonadic_to_monadic_max ar1, Comonadic_to_monadic_max ar2 ->
+      | Comonadic_to_monadic_op_min _, _ -> -1
+      | _, Comonadic_to_monadic_op_min _ -> 1
+      | Monadic_op_to_comonadic_max, Monadic_op_to_comonadic_max -> 0
+      | Monadic_op_to_comonadic_max, _ -> .
+      | _, Monadic_op_to_comonadic_max -> .
+      | Comonadic_to_monadic_op_max ar1, Comonadic_to_monadic_op_max ar2 ->
         compare_areality ar1 ar2
-      | Comonadic_to_monadic_max _, _ -> .
-      | _, Comonadic_to_monadic_max _ -> .
+      | Comonadic_to_monadic_op_max _, _ -> .
+      | _, Comonadic_to_monadic_op_max _ -> .
 
     let equal : type a1 d1 a2 b d2.
         (a1, b, d1) t -> (a2, b, d2) t -> (a1, a2) Misc.is_eq =
@@ -2150,24 +2150,24 @@ module Lattices_mono = struct
         Misc.Is_eq
       | Statefulness_to_visibility_op, _ -> .
       | _, Statefulness_to_visibility_op -> .
-      | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Misc.Is_eq
-      | Monadic_to_comonadic_min, _ -> Misc.Is_not_eq
-      | _, Monadic_to_comonadic_min -> Misc.Is_not_eq
-      | Comonadic_to_monadic_min ar1, Comonadic_to_monadic_min ar2 -> (
+      | Monadic_op_to_comonadic_min, Monadic_op_to_comonadic_min -> Misc.Is_eq
+      | Monadic_op_to_comonadic_min, _ -> Misc.Is_not_eq
+      | _, Monadic_op_to_comonadic_min -> Misc.Is_not_eq
+      | Comonadic_to_monadic_op_min ar1, Comonadic_to_monadic_op_min ar2 -> (
         match equal_areality ar1 ar2 with
         | Misc.Is_eq -> Misc.Is_eq
         | Misc.Is_not_eq -> Misc.Is_not_eq)
-      | Comonadic_to_monadic_min _, _ -> Misc.Is_not_eq
-      | _, Comonadic_to_monadic_min _ -> Misc.Is_not_eq
-      | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> Misc.Is_eq
-      | Monadic_to_comonadic_max, _ -> Misc.Is_not_eq
-      | _, Monadic_to_comonadic_max -> Misc.Is_not_eq
-      | Comonadic_to_monadic_max ar1, Comonadic_to_monadic_max ar2 -> (
+      | Comonadic_to_monadic_op_min _, _ -> Misc.Is_not_eq
+      | _, Comonadic_to_monadic_op_min _ -> Misc.Is_not_eq
+      | Monadic_op_to_comonadic_max, Monadic_op_to_comonadic_max -> Misc.Is_eq
+      | Monadic_op_to_comonadic_max, _ -> Misc.Is_not_eq
+      | _, Monadic_op_to_comonadic_max -> Misc.Is_not_eq
+      | Comonadic_to_monadic_op_max ar1, Comonadic_to_monadic_op_max ar2 -> (
         match equal_areality ar1 ar2 with
         | Misc.Is_eq -> Misc.Is_eq
         | Misc.Is_not_eq -> Misc.Is_not_eq)
-      | Comonadic_to_monadic_max _, _ -> .
-      | _, Comonadic_to_monadic_max _ -> .
+      | Comonadic_to_monadic_op_max _, _ -> .
+      | _, Comonadic_to_monadic_op_max _ -> .
 
     let print : type a b d. Fmt.formatter -> (a, b, d) t -> unit =
      fun ppf -> function
@@ -2185,10 +2185,14 @@ module Lattices_mono = struct
         Fmt.fprintf ppf "visibility_op_to_statefulness"
       | Statefulness_to_visibility_op ->
         Fmt.fprintf ppf "statefulnes_to_visibility_op"
-      | Monadic_to_comonadic_min -> Fmt.fprintf ppf "monadic_to_comonadic_min"
-      | Comonadic_to_monadic_min _ -> Fmt.fprintf ppf "comonadic_to_monadic_min"
-      | Monadic_to_comonadic_max -> Fmt.fprintf ppf "monadic_to_comonadic_max"
-      | Comonadic_to_monadic_max _ -> Fmt.fprintf ppf "comonadic_to_monadic_max"
+      | Monadic_op_to_comonadic_min ->
+        Fmt.fprintf ppf "monadic_op_to_comonadic_min"
+      | Comonadic_to_monadic_op_min _ ->
+        Fmt.fprintf ppf "comonadic_to_monadic_op_min"
+      | Monadic_op_to_comonadic_max ->
+        Fmt.fprintf ppf "monadic_op_to_comonadic_max"
+      | Comonadic_to_monadic_op_max _ ->
+        Fmt.fprintf ppf "comonadic_to_monadic_op_max"
 
     let uniqueness_op_to_linearity = function
       | Uniqueness.Unique -> Linearity.Once
@@ -2222,7 +2226,7 @@ module Lattices_mono = struct
       | Statefulness.Reading -> Visibility.Read
       | Statefulness.Stateful -> Visibility.Read_write
 
-    let monadic_to_comonadic_min : type a.
+    let monadic_op_to_comonadic_min : type a.
         a comonadic_with obj -> Monadic_op.t -> a comonadic_with =
      fun obj m ->
       let areality : a =
@@ -2237,7 +2241,7 @@ module Lattices_mono = struct
       let statefulness = visibility_op_to_statefulness m.visibility in
       { areality; linearity; portability; forkable; yielding; statefulness }
 
-    let comonadic_to_monadic_min : type a.
+    let comonadic_to_monadic_op_min : type a.
         a areality -> a comonadic_with -> Monadic_op.t =
      fun _ m ->
       let uniqueness = linearity_to_uniqueness_op m.linearity in
@@ -2246,7 +2250,7 @@ module Lattices_mono = struct
       let staticity = Staticity_op.min in
       { uniqueness; contention; visibility; staticity }
 
-    let monadic_to_comonadic_max : type a.
+    let monadic_op_to_comonadic_max : type a.
         a comonadic_with obj -> Monadic_op.t -> a comonadic_with =
      fun obj m ->
       let areality : a =
@@ -2261,7 +2265,7 @@ module Lattices_mono = struct
       let statefulness = visibility_op_to_statefulness m.visibility in
       { areality; linearity; portability; forkable; yielding; statefulness }
 
-    let comonadic_to_monadic_max : type a.
+    let comonadic_to_monadic_op_max : type a.
         a areality -> a comonadic_with -> Monadic_op.t =
      fun _ m ->
       let uniqueness = linearity_to_uniqueness_op m.linearity in
@@ -2283,10 +2287,10 @@ module Lattices_mono = struct
       | Portability_to_contention_op -> portability_to_contention_op a
       | Visibility_op_to_statefulness -> visibility_op_to_statefulness a
       | Statefulness_to_visibility_op -> statefulness_to_visibility_op a
-      | Monadic_to_comonadic_min -> monadic_to_comonadic_min dst a
-      | Comonadic_to_monadic_min ar -> comonadic_to_monadic_min ar a
-      | Monadic_to_comonadic_max -> monadic_to_comonadic_max dst a
-      | Comonadic_to_monadic_max ar -> comonadic_to_monadic_max ar a
+      | Monadic_op_to_comonadic_min -> monadic_op_to_comonadic_min dst a
+      | Comonadic_to_monadic_op_min ar -> comonadic_to_monadic_op_min ar a
+      | Monadic_op_to_comonadic_max -> monadic_op_to_comonadic_max dst a
+      | Comonadic_to_monadic_op_max ar -> comonadic_to_monadic_op_max ar a
 
     let right_adjoint : type a b r.
         b obj -> (a, b, allowed * r) t -> (b, a, disallowed * allowed) t =
@@ -2300,9 +2304,9 @@ module Lattices_mono = struct
       | Portability_to_contention_op -> Contention_op_to_portability
       | Visibility_op_to_statefulness -> Statefulness_to_visibility_op
       | Statefulness_to_visibility_op -> Visibility_op_to_statefulness
-      | Monadic_to_comonadic_min ->
-        Comonadic_to_monadic_max (comonadic_obj_areality dst)
-      | Comonadic_to_monadic_min _ -> Monadic_to_comonadic_max
+      | Monadic_op_to_comonadic_min ->
+        Comonadic_to_monadic_op_max (comonadic_obj_areality dst)
+      | Comonadic_to_monadic_op_min _ -> Monadic_op_to_comonadic_max
 
     let left_adjoint : type a b l.
         b obj -> (a, b, l * allowed) t -> (b, a, allowed * disallowed) t =
@@ -2316,9 +2320,9 @@ module Lattices_mono = struct
       | Portability_to_contention_op -> Contention_op_to_portability
       | Visibility_op_to_statefulness -> Statefulness_to_visibility_op
       | Statefulness_to_visibility_op -> Visibility_op_to_statefulness
-      | Monadic_to_comonadic_max ->
-        Comonadic_to_monadic_min (comonadic_obj_areality dst)
-      | Comonadic_to_monadic_max _ -> Monadic_to_comonadic_min
+      | Monadic_op_to_comonadic_max ->
+        Comonadic_to_monadic_op_min (comonadic_obj_areality dst)
+      | Comonadic_to_monadic_op_max _ -> Monadic_op_to_comonadic_min
 
     type ('a, 'b, 'd) maybe_allowed_right =
       | Allowed_right :
@@ -2344,10 +2348,11 @@ module Lattices_mono = struct
       | Portability_to_contention_op as m -> Allowed_right m
       | Visibility_op_to_statefulness as m -> Allowed_right m
       | Statefulness_to_visibility_op as m -> Allowed_right m
-      | Monadic_to_comonadic_min -> Not_allowed_right
-      | Comonadic_to_monadic_min _ -> Not_allowed_right
-      | Monadic_to_comonadic_max as m -> Allowed_right m
-      | Comonadic_to_monadic_max a -> Allowed_right (Comonadic_to_monadic_max a)
+      | Monadic_op_to_comonadic_min -> Not_allowed_right
+      | Comonadic_to_monadic_op_min _ -> Not_allowed_right
+      | Monadic_op_to_comonadic_max as m -> Allowed_right m
+      | Comonadic_to_monadic_op_max a ->
+        Allowed_right (Comonadic_to_monadic_op_max a)
 
     type ('a, 'b, 'd) maybe_allowed_left =
       | Allowed_left :
@@ -2373,10 +2378,11 @@ module Lattices_mono = struct
       | Portability_to_contention_op as m -> Allowed_left m
       | Visibility_op_to_statefulness as m -> Allowed_left m
       | Statefulness_to_visibility_op as m -> Allowed_left m
-      | Monadic_to_comonadic_min as m -> Allowed_left m
-      | Comonadic_to_monadic_min a -> Allowed_left (Comonadic_to_monadic_min a)
-      | Monadic_to_comonadic_max -> Not_allowed_left
-      | Comonadic_to_monadic_max _ -> Not_allowed_left
+      | Monadic_op_to_comonadic_min as m -> Allowed_left m
+      | Comonadic_to_monadic_op_min a ->
+        Allowed_left (Comonadic_to_monadic_op_min a)
+      | Monadic_op_to_comonadic_max -> Not_allowed_left
+      | Comonadic_to_monadic_op_max _ -> Not_allowed_left
 
     (* Commutes a meet through a morphism from the right, such that:
        [apply dst m (meet_const c x)] is equivalent to
@@ -2399,8 +2405,8 @@ module Lattices_mono = struct
       | Uniqueness_op_to_linearity | Linearity_to_uniqueness_op
       | Contention_op_to_portability | Portability_to_contention_op
       | Visibility_op_to_statefulness | Statefulness_to_visibility_op
-      | Monadic_to_comonadic_min | Comonadic_to_monadic_min _
-      | Monadic_to_comonadic_max | Comonadic_to_monadic_max _ ->
+      | Monadic_op_to_comonadic_min | Comonadic_to_monadic_op_min _
+      | Monadic_op_to_comonadic_max | Comonadic_to_monadic_op_max _ ->
         (* The following proof depends on the fact that [Core_morph.t] preserves binary
            meets: m(x meet y) == m(x) meet m(y).
 
@@ -2479,57 +2485,57 @@ module Lattices_mono = struct
         (b, p) Axis.t -> (a, b, d) t -> (a, p, d) compose_proj_result =
      fun ax0 m1 ->
       match (m1 : (a, b, d) t), (ax0 : (b, p) Axis.t) with
-      | Monadic_to_comonadic_min, Areality -> Proj_const_min Monadic_op
-      | Monadic_to_comonadic_min, Forkable -> Proj_const_min Monadic_op
-      | Monadic_to_comonadic_min, Yielding -> Proj_const_min Monadic_op
-      | Monadic_to_comonadic_min, Linearity ->
+      | Monadic_op_to_comonadic_min, Areality -> Proj_const_min Monadic_op
+      | Monadic_op_to_comonadic_min, Forkable -> Proj_const_min Monadic_op
+      | Monadic_op_to_comonadic_min, Yielding -> Proj_const_min Monadic_op
+      | Monadic_op_to_comonadic_min, Linearity ->
         Proj_core (Uniqueness_op_to_linearity, Uniqueness, Monadic_op)
-      | Monadic_to_comonadic_min, Statefulness ->
+      | Monadic_op_to_comonadic_min, Statefulness ->
         Proj_core (Visibility_op_to_statefulness, Visibility, Monadic_op)
-      | Monadic_to_comonadic_min, Portability ->
+      | Monadic_op_to_comonadic_min, Portability ->
         Proj_core (Contention_op_to_portability, Contention, Monadic_op)
-      | Comonadic_to_monadic_min areality, Uniqueness ->
+      | Comonadic_to_monadic_op_min areality, Uniqueness ->
         Proj_core
           ( Linearity_to_uniqueness_op,
             Linearity,
             areality_comonadic_obj areality )
-      | Comonadic_to_monadic_min areality, Visibility ->
+      | Comonadic_to_monadic_op_min areality, Visibility ->
         Proj_core
           ( Statefulness_to_visibility_op,
             Statefulness,
             areality_comonadic_obj areality )
-      | Comonadic_to_monadic_min areality, Contention ->
+      | Comonadic_to_monadic_op_min areality, Contention ->
         Proj_core
           ( Portability_to_contention_op,
             Portability,
             areality_comonadic_obj areality )
-      | Comonadic_to_monadic_min areality, Staticity ->
+      | Comonadic_to_monadic_op_min areality, Staticity ->
         Proj_const_min (areality_comonadic_obj areality)
-      | Monadic_to_comonadic_max, Areality -> Proj_const_max Monadic_op
-      | Monadic_to_comonadic_max, Forkable -> Proj_const_max Monadic_op
-      | Monadic_to_comonadic_max, Yielding -> Proj_const_max Monadic_op
-      | Monadic_to_comonadic_max, Linearity ->
+      | Monadic_op_to_comonadic_max, Areality -> Proj_const_max Monadic_op
+      | Monadic_op_to_comonadic_max, Forkable -> Proj_const_max Monadic_op
+      | Monadic_op_to_comonadic_max, Yielding -> Proj_const_max Monadic_op
+      | Monadic_op_to_comonadic_max, Linearity ->
         Proj_core (Uniqueness_op_to_linearity, Uniqueness, Monadic_op)
-      | Monadic_to_comonadic_max, Statefulness ->
+      | Monadic_op_to_comonadic_max, Statefulness ->
         Proj_core (Visibility_op_to_statefulness, Visibility, Monadic_op)
-      | Monadic_to_comonadic_max, Portability ->
+      | Monadic_op_to_comonadic_max, Portability ->
         Proj_core (Contention_op_to_portability, Contention, Monadic_op)
-      | Comonadic_to_monadic_max areality, Uniqueness ->
+      | Comonadic_to_monadic_op_max areality, Uniqueness ->
         Proj_core
           ( Linearity_to_uniqueness_op,
             Linearity,
             areality_comonadic_obj areality )
-      | Comonadic_to_monadic_max areality, Visibility ->
+      | Comonadic_to_monadic_op_max areality, Visibility ->
         Proj_core
           ( Statefulness_to_visibility_op,
             Statefulness,
             areality_comonadic_obj areality )
-      | Comonadic_to_monadic_max areality, Contention ->
+      | Comonadic_to_monadic_op_max areality, Contention ->
         Proj_core
           ( Portability_to_contention_op,
             Portability,
             areality_comonadic_obj areality )
-      | Comonadic_to_monadic_max areality, Staticity ->
+      | Comonadic_to_monadic_op_max areality, Staticity ->
         Proj_const_max (areality_comonadic_obj areality)
       | Locality_full lm, (_ as ax0) -> compose_projection_locality_full ax0 lm
       | _, _ -> .
@@ -2594,25 +2600,25 @@ module Lattices_mono = struct
         (q, c, disallowed * r) compose_and_max_result =
      fun m0 ax1 ->
       match (m0 : (b, c, disallowed * r) t), (ax1 : (b, q) Axis.t) with
-      | Comonadic_to_monadic_max _, Portability ->
+      | Comonadic_to_monadic_op_max _, Portability ->
         And_max_core (Contention, Portability_to_contention_op)
-      | Comonadic_to_monadic_max _, Statefulness ->
+      | Comonadic_to_monadic_op_max _, Statefulness ->
         And_max_core (Visibility, Statefulness_to_visibility_op)
-      | Comonadic_to_monadic_max _, Linearity ->
+      | Comonadic_to_monadic_op_max _, Linearity ->
         And_max_core (Uniqueness, Linearity_to_uniqueness_op)
-      | Comonadic_to_monadic_max _, Yielding -> Const_max_core
-      | Comonadic_to_monadic_max _, Forkable -> Const_max_core
-      | Comonadic_to_monadic_max _, Areality -> Const_max_core
-      | Monadic_to_comonadic_max, Staticity -> Const_max_core
-      | Monadic_to_comonadic_max, Contention ->
+      | Comonadic_to_monadic_op_max _, Yielding -> Const_max_core
+      | Comonadic_to_monadic_op_max _, Forkable -> Const_max_core
+      | Comonadic_to_monadic_op_max _, Areality -> Const_max_core
+      | Monadic_op_to_comonadic_max, Staticity -> Const_max_core
+      | Monadic_op_to_comonadic_max, Contention ->
         And_max_core (Portability, Contention_op_to_portability)
-      | Monadic_to_comonadic_max, Visibility ->
+      | Monadic_op_to_comonadic_max, Visibility ->
         And_max_core (Statefulness, Visibility_op_to_statefulness)
-      | Monadic_to_comonadic_max, Uniqueness ->
+      | Monadic_op_to_comonadic_max, Uniqueness ->
         And_max_core (Linearity, Uniqueness_op_to_linearity)
       | Locality_full lm, (_ as ax0) -> compose_locality_full_max_with lm ax0
-      | Monadic_to_comonadic_min, _ -> Disallowed
-      | Comonadic_to_monadic_min _, _ -> Disallowed
+      | Monadic_op_to_comonadic_min, _ -> Disallowed
+      | Comonadic_to_monadic_op_min _, _ -> Disallowed
       | _, _ -> .
     [@@warning "-4"]
 
@@ -2645,25 +2651,25 @@ module Lattices_mono = struct
         (q, c, l * disallowed) compose_and_min_result =
      fun m0 ax1 ->
       match (m0 : (b, c, l * disallowed) t), (ax1 : (b, q) Axis.t) with
-      | Comonadic_to_monadic_min _, Portability ->
+      | Comonadic_to_monadic_op_min _, Portability ->
         And_min_core (Contention, Portability_to_contention_op)
-      | Comonadic_to_monadic_min _, Statefulness ->
+      | Comonadic_to_monadic_op_min _, Statefulness ->
         And_min_core (Visibility, Statefulness_to_visibility_op)
-      | Comonadic_to_monadic_min _, Linearity ->
+      | Comonadic_to_monadic_op_min _, Linearity ->
         And_min_core (Uniqueness, Linearity_to_uniqueness_op)
-      | Comonadic_to_monadic_min _, Yielding -> Const_min_core
-      | Comonadic_to_monadic_min _, Forkable -> Const_min_core
-      | Comonadic_to_monadic_min _, Areality -> Const_min_core
-      | Monadic_to_comonadic_min, Staticity -> Const_min_core
-      | Monadic_to_comonadic_min, Contention ->
+      | Comonadic_to_monadic_op_min _, Yielding -> Const_min_core
+      | Comonadic_to_monadic_op_min _, Forkable -> Const_min_core
+      | Comonadic_to_monadic_op_min _, Areality -> Const_min_core
+      | Monadic_op_to_comonadic_min, Staticity -> Const_min_core
+      | Monadic_op_to_comonadic_min, Contention ->
         And_min_core (Portability, Contention_op_to_portability)
-      | Monadic_to_comonadic_min, Visibility ->
+      | Monadic_op_to_comonadic_min, Visibility ->
         And_min_core (Statefulness, Visibility_op_to_statefulness)
-      | Monadic_to_comonadic_min, Uniqueness ->
+      | Monadic_op_to_comonadic_min, Uniqueness ->
         And_min_core (Linearity, Uniqueness_op_to_linearity)
       | Locality_full lm, (_ as ax0) -> compose_locality_full_min_with lm ax0
-      | Monadic_to_comonadic_max, _ -> Disallowed
-      | Comonadic_to_monadic_max _, _ -> Disallowed
+      | Monadic_op_to_comonadic_max, _ -> Disallowed
+      | Comonadic_to_monadic_op_max _, _ -> Disallowed
       | _, _ -> .
     [@@warning "-4"]
 
@@ -2710,17 +2716,17 @@ module Lattices_mono = struct
      fun src dst m ax0 ax1 ->
       match m, ax0, ax1, src, dst with
       | Uniqueness_op_to_linearity, Uniqueness, Linearity, _, _ ->
-        Morph Monadic_to_comonadic_max
+        Morph Monadic_op_to_comonadic_max
       | Linearity_to_uniqueness_op, Linearity, Uniqueness, _, _ ->
-        Morph (Comonadic_to_monadic_max (comonadic_obj_areality src))
+        Morph (Comonadic_to_monadic_op_max (comonadic_obj_areality src))
       | Contention_op_to_portability, Contention, Portability, _, _ ->
-        Morph Monadic_to_comonadic_max
+        Morph Monadic_op_to_comonadic_max
       | Portability_to_contention_op, Portability, Contention, _, _ ->
-        Morph (Comonadic_to_monadic_max (comonadic_obj_areality src))
+        Morph (Comonadic_to_monadic_op_max (comonadic_obj_areality src))
       | Visibility_op_to_statefulness, Visibility, Statefulness, _, _ ->
-        Morph Monadic_to_comonadic_max
+        Morph Monadic_op_to_comonadic_max
       | Statefulness_to_visibility_op, Statefulness, Visibility, _, _ ->
-        Morph (Comonadic_to_monadic_max (comonadic_obj_areality src))
+        Morph (Comonadic_to_monadic_op_max (comonadic_obj_areality src))
       | Locality_restricted lm, Areality, Areality, _, _ ->
         Morph (Locality_full (Locality_morph.disallow_left lm))
       | _, _, _, _, _ -> .
@@ -2740,17 +2746,17 @@ module Lattices_mono = struct
      fun src dst m ax0 ax1 ->
       match m, ax0, ax1, src, dst with
       | Uniqueness_op_to_linearity, Uniqueness, Linearity, _, _ ->
-        Morph Monadic_to_comonadic_min
+        Morph Monadic_op_to_comonadic_min
       | Linearity_to_uniqueness_op, Linearity, Uniqueness, _, _ ->
-        Morph (Comonadic_to_monadic_min (comonadic_obj_areality src))
+        Morph (Comonadic_to_monadic_op_min (comonadic_obj_areality src))
       | Contention_op_to_portability, Contention, Portability, _, _ ->
-        Morph Monadic_to_comonadic_min
+        Morph Monadic_op_to_comonadic_min
       | Portability_to_contention_op, Portability, Contention, _, _ ->
-        Morph (Comonadic_to_monadic_min (comonadic_obj_areality src))
+        Morph (Comonadic_to_monadic_op_min (comonadic_obj_areality src))
       | Visibility_op_to_statefulness, Visibility, Statefulness, _, _ ->
-        Morph Monadic_to_comonadic_min
+        Morph Monadic_op_to_comonadic_min
       | Statefulness_to_visibility_op, Statefulness, Visibility, _, _ ->
-        Morph (Comonadic_to_monadic_min (comonadic_obj_areality src))
+        Morph (Comonadic_to_monadic_op_min (comonadic_obj_areality src))
       | Locality_restricted lm, Areality, Areality, _, _ ->
         Morph (Locality_full (Locality_morph.disallow_right lm))
       | _, _, _, _, _ -> .
@@ -2777,16 +2783,16 @@ module Lattices_mono = struct
       | Visibility_op -> [To Statefulness_to_visibility_op]
       | Staticity_op -> []
       | Monadic_op ->
-        [ To (Comonadic_to_monadic_min Locality);
-          To (Comonadic_to_monadic_min Regionality) ]
+        [ To (Comonadic_to_monadic_op_min Locality);
+          To (Comonadic_to_monadic_op_min Regionality) ]
       | Comonadic_with_locality ->
         (let+ (Locality_morph.To lm) = Locality_morph.left_to Locality in
          To (Locality_full lm))
-        @ [To Monadic_to_comonadic_min]
+        @ [To Monadic_op_to_comonadic_min]
       | Comonadic_with_regionality ->
         (let+ (Locality_morph.To lm) = Locality_morph.left_to Regionality in
          To (Locality_full lm))
-        @ [To Monadic_to_comonadic_min]
+        @ [To Monadic_op_to_comonadic_min]
 
     let right_to : type b. b obj -> (b, right_only) to_ list = function
       | Locality ->
@@ -2805,16 +2811,16 @@ module Lattices_mono = struct
       | Visibility_op -> [To Statefulness_to_visibility_op]
       | Staticity_op -> []
       | Monadic_op ->
-        [ To (Comonadic_to_monadic_max Locality);
-          To (Comonadic_to_monadic_max Regionality) ]
+        [ To (Comonadic_to_monadic_op_max Locality);
+          To (Comonadic_to_monadic_op_max Regionality) ]
       | Comonadic_with_locality ->
         (let+ (Locality_morph.To lm) = Locality_morph.right_to Locality in
          To (Locality_full lm))
-        @ [To Monadic_to_comonadic_max]
+        @ [To Monadic_op_to_comonadic_max]
       | Comonadic_with_regionality ->
         (let+ (Locality_morph.To lm) = Locality_morph.right_to Regionality in
          To (Locality_full lm))
-        @ [To Monadic_to_comonadic_max]
+        @ [To Monadic_op_to_comonadic_max]
   end
 
   let proj_obj : type t r. (t, r) Axis.t -> t obj -> r obj =
@@ -3184,19 +3190,22 @@ module Lattices_mono = struct
       | Portability_to_contention_op, Contention_op_to_portability -> Id
       | Visibility_op_to_statefulness, Statefulness_to_visibility_op -> Id
       | Statefulness_to_visibility_op, Visibility_op_to_statefulness -> Id
-      | Comonadic_to_monadic_min areality, Monadic_to_comonadic_min ->
+      | Comonadic_to_monadic_op_min areality, Monadic_op_to_comonadic_min ->
         let c =
           match areality with
           | Locality ->
-            Core_morph.apply dst (Comonadic_to_monadic_min Locality)
+            Core_morph.apply dst (Comonadic_to_monadic_op_min Locality)
               Comonadic_with_locality.max
           | Regionality ->
-            Core_morph.apply dst (Comonadic_to_monadic_min Regionality)
+            Core_morph.apply dst (Comonadic_to_monadic_op_min Regionality)
               Comonadic_with_regionality.max
         in
         Meet_const c
-      | Monadic_to_comonadic_min, Comonadic_to_monadic_min areality -> begin
-        let c = Core_morph.apply dst Monadic_to_comonadic_min Monadic_op.max in
+      | Monadic_op_to_comonadic_min, Comonadic_to_monadic_op_min areality ->
+        begin
+        let c =
+          Core_morph.apply dst Monadic_op_to_comonadic_min Monadic_op.max
+        in
         match areality, dst with
         | Locality, Comonadic_with_locality -> Meet_const c
         | Regionality, Comonadic_with_locality ->
@@ -3205,9 +3214,12 @@ module Lattices_mono = struct
           Meet_const_core (c, Locality_full Locality_as_regionality)
         | Regionality, Comonadic_with_regionality -> Meet_const c
         end
-      | Monadic_to_comonadic_max, Comonadic_to_monadic_max areality -> begin
+      | Monadic_op_to_comonadic_max, Comonadic_to_monadic_op_max areality ->
+        begin
         let src = areality_comonadic_obj areality in
-        let c = Core_morph.apply src Monadic_to_comonadic_min Monadic_op.max in
+        let c =
+          Core_morph.apply src Monadic_op_to_comonadic_min Monadic_op.max
+        in
         match areality, dst with
         | Locality, Comonadic_with_locality -> Imply_const c
         | Regionality, Comonadic_with_locality ->
@@ -3216,44 +3228,45 @@ module Lattices_mono = struct
           Core_imply_const (Locality_full Locality_as_regionality, c)
         | Regionality, Comonadic_with_regionality -> Imply_const c
         end
-      | Comonadic_to_monadic_max areality, Monadic_to_comonadic_max ->
+      | Comonadic_to_monadic_op_max areality, Monadic_op_to_comonadic_max ->
         let c =
           match areality with
           | Locality ->
-            Core_morph.apply dst (Comonadic_to_monadic_min Locality)
+            Core_morph.apply dst (Comonadic_to_monadic_op_min Locality)
               Comonadic_with_locality.max
           | Regionality ->
-            Core_morph.apply dst (Comonadic_to_monadic_min Regionality)
+            Core_morph.apply dst (Comonadic_to_monadic_op_min Regionality)
               Comonadic_with_regionality.max
         in
         Imply_const c
-      | Comonadic_to_monadic_min _, Monadic_to_comonadic_max ->
+      | Comonadic_to_monadic_op_min _, Monadic_op_to_comonadic_max ->
         Compose (Core m1, Core m2)
-      | Monadic_to_comonadic_max, Comonadic_to_monadic_min _ ->
+      | Monadic_op_to_comonadic_max, Comonadic_to_monadic_op_min _ ->
         Compose (Core m1, Core m2)
-      | Comonadic_to_monadic_max _, Monadic_to_comonadic_min ->
+      | Comonadic_to_monadic_op_max _, Monadic_op_to_comonadic_min ->
         Compose (Core m1, Core m2)
-      | Monadic_to_comonadic_min, Comonadic_to_monadic_max _ ->
+      | Monadic_op_to_comonadic_min, Comonadic_to_monadic_op_max _ ->
         Compose (Core m1, Core m2)
-      | Comonadic_to_monadic_min _, Locality_full m2 ->
+      | Comonadic_to_monadic_op_min _, Locality_full m2 ->
         let src = Locality_morph.src_full m2 in
-        Core (Comonadic_to_monadic_min (comonadic_obj_areality src))
-      | Comonadic_to_monadic_max _, Locality_full m2 ->
+        Core (Comonadic_to_monadic_op_min (comonadic_obj_areality src))
+      | Comonadic_to_monadic_op_max _, Locality_full m2 ->
         let src = Locality_morph.src_full m2 in
-        Core (Comonadic_to_monadic_max (comonadic_obj_areality src))
-      | Locality_full lm1, Monadic_to_comonadic_min ->
+        Core (Comonadic_to_monadic_op_max (comonadic_obj_areality src))
+      | Locality_full lm1, Monadic_op_to_comonadic_min ->
         begin match Locality_morph.maybe_allowed_left lm1 with
         | Allowed_left _ ->
           (* Has a right adjoint so it preserves min *)
-          Core Monadic_to_comonadic_min
-        | Not_allowed_left -> Compose (Core m1, Core Monadic_to_comonadic_min)
+          Core Monadic_op_to_comonadic_min
+        | Not_allowed_left -> Compose (Core m1, Core Monadic_op_to_comonadic_min)
         end
-      | Locality_full lm1, Monadic_to_comonadic_max ->
+      | Locality_full lm1, Monadic_op_to_comonadic_max ->
         begin match Locality_morph.maybe_allowed_right lm1 with
         | Allowed_right _ ->
           (* Has a left adjoint so it preserves max *)
-          Core Monadic_to_comonadic_max
-        | Not_allowed_right -> Compose (Core m1, Core Monadic_to_comonadic_max)
+          Core Monadic_op_to_comonadic_max
+        | Not_allowed_right ->
+          Compose (Core m1, Core Monadic_op_to_comonadic_max)
         end
       | Locality_restricted _, _ -> .
       | _, Locality_restricted _ -> .
@@ -4185,26 +4198,26 @@ module Lattices_mono = struct
       | Locality_full _, (Statefulness as ax) -> Axis ax
       | Locality_full _, (Portability as ax) -> Axis ax
       | Locality_full _, _ -> .
-      | Monadic_to_comonadic_min, Areality -> None_responsible
-      | Monadic_to_comonadic_min, Forkable -> None_responsible
-      | Monadic_to_comonadic_min, Yielding -> None_responsible
-      | Monadic_to_comonadic_min, Linearity -> Axis Uniqueness
-      | Monadic_to_comonadic_min, Statefulness -> Axis Visibility
-      | Monadic_to_comonadic_min, Portability -> Axis Contention
-      | Comonadic_to_monadic_min _, Uniqueness -> Axis Linearity
-      | Comonadic_to_monadic_min _, Visibility -> Axis Statefulness
-      | Comonadic_to_monadic_min _, Contention -> Axis Portability
-      | Comonadic_to_monadic_min _, Staticity -> None_responsible
-      | Monadic_to_comonadic_max, Areality -> None_responsible
-      | Monadic_to_comonadic_max, Forkable -> None_responsible
-      | Monadic_to_comonadic_max, Yielding -> None_responsible
-      | Monadic_to_comonadic_max, Linearity -> Axis Uniqueness
-      | Monadic_to_comonadic_max, Statefulness -> Axis Visibility
-      | Monadic_to_comonadic_max, Portability -> Axis Contention
-      | Comonadic_to_monadic_max _, Uniqueness -> Axis Linearity
-      | Comonadic_to_monadic_max _, Visibility -> Axis Statefulness
-      | Comonadic_to_monadic_max _, Contention -> Axis Portability
-      | Comonadic_to_monadic_max _, Staticity -> None_responsible
+      | Monadic_op_to_comonadic_min, Areality -> None_responsible
+      | Monadic_op_to_comonadic_min, Forkable -> None_responsible
+      | Monadic_op_to_comonadic_min, Yielding -> None_responsible
+      | Monadic_op_to_comonadic_min, Linearity -> Axis Uniqueness
+      | Monadic_op_to_comonadic_min, Statefulness -> Axis Visibility
+      | Monadic_op_to_comonadic_min, Portability -> Axis Contention
+      | Comonadic_to_monadic_op_min _, Uniqueness -> Axis Linearity
+      | Comonadic_to_monadic_op_min _, Visibility -> Axis Statefulness
+      | Comonadic_to_monadic_op_min _, Contention -> Axis Portability
+      | Comonadic_to_monadic_op_min _, Staticity -> None_responsible
+      | Monadic_op_to_comonadic_max, Areality -> None_responsible
+      | Monadic_op_to_comonadic_max, Forkable -> None_responsible
+      | Monadic_op_to_comonadic_max, Yielding -> None_responsible
+      | Monadic_op_to_comonadic_max, Linearity -> Axis Uniqueness
+      | Monadic_op_to_comonadic_max, Statefulness -> Axis Visibility
+      | Monadic_op_to_comonadic_max, Portability -> Axis Contention
+      | Comonadic_to_monadic_op_max _, Uniqueness -> Axis Linearity
+      | Comonadic_to_monadic_op_max _, Visibility -> Axis Statefulness
+      | Comonadic_to_monadic_op_max _, Contention -> Axis Portability
+      | Comonadic_to_monadic_op_max _, Staticity -> None_responsible
 
     let rec find_responsible_axis_proj_simple : type a b b_ax l r.
         (a, b, l * r) Simple_morph.t -> (b, b_ax) Axis.t -> a responsible_axis =
@@ -5175,6 +5188,8 @@ module Report = struct
 end
 
 let print_pinpoint = Report.print_pinpoint
+
+let print_pinpoint_desc = Report.print_pinpoint_desc
 
 type changes = S.changes
 
@@ -6435,10 +6450,10 @@ module Value_with (Areality : Areality) = struct
       }
 
     let comonadic_to_monadic_min =
-      C.Core_morph.comonadic_to_monadic_min Areality.Const.areality
+      C.Core_morph.comonadic_to_monadic_op_max Areality.Const.areality
 
     let monadic_to_comonadic_min =
-      C.Core_morph.monadic_to_comonadic_min
+      C.Core_morph.monadic_op_to_comonadic_min
         (C.comonadic_with_obj Areality.Obj.obj)
 
     (** See [Alloc.close_over] for explanation. *)
@@ -6634,15 +6649,15 @@ module Value_with (Areality : Areality) = struct
 
   let comonadic_to_monadic_min ?hint m =
     S.apply ?hint Monadic.Obj.obj
-      (Simple (Core (Comonadic_to_monadic_max Areality.Const.areality)))
+      (Simple (Core (Comonadic_to_monadic_op_max Areality.Const.areality)))
       (Comonadic.disallow_left m)
 
   let monadic_to_comonadic_min m =
-    S.apply Comonadic.Obj.obj (Simple (Core Monadic_to_comonadic_min))
+    S.apply Comonadic.Obj.obj (Simple (Core Monadic_op_to_comonadic_min))
       (Monadic.disallow_left m)
 
   let monadic_to_comonadic_max m =
-    S.apply Comonadic.Obj.obj (Simple (Core Monadic_to_comonadic_max))
+    S.apply Comonadic.Obj.obj (Simple (Core Monadic_op_to_comonadic_max))
       (Monadic.disallow_right m)
 
   let meet_const c { comonadic; monadic } =

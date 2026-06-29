@@ -1329,7 +1329,8 @@ let record_has_atomic_field lbls =
 let record_gets_unboxed_version lbls repr =
   not (record_has_atomic_field lbls) &&
   match repr with
-  | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
+  | Record_unboxed | Record_inlined _
+  | Record_float | Record_ufloat -> false
   | Record_boxed | Record_variable -> true
   | Record_dummy { represent_as_float_array; flatten_floats } ->
     not represent_as_float_array && not flatten_floats
@@ -2356,27 +2357,53 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     Misc.fatal_error
       "Typedecl.update_record_kind: unexpected record representation"
 
+let update_record_inlined_kind env loc lbls jkinds tag vrep : _ Result.t =
+  match vrep with
+  | Variant_unboxed ->
+    (* The shape of an unboxed constructor is always
+       [Constructor_uniform_value], as at declaration time. *)
+    Ok (Record_inlined (tag, Constructor_uniform_value, Variant_unboxed))
+  | Variant_boxed _ as vrep ->
+    let lbl_decls =
+      List.map (fun (ld, ty) -> { ld with Types.ld_type = ty }) lbls
+    in
+    begin match
+      update_constructor_representation env (Cstr_record lbl_decls)
+        jkinds ~loc ~is_extension_constructor:false
+    with
+    | Ok shape -> Ok (Record_inlined (tag, shape, vrep))
+    | Error (Unrepresentable_argument_field name) ->
+      Error (Unrepresentable_field name)
+    | Error (Unrepresentable_argument _) ->
+      Misc.fatal_error
+        "Typedecl.update_record_kind: unexpected tuple constructor error"
+    end
+  | Variant_extensible | Variant_with_null ->
+    (* Extension constructors always have a known shape, and
+       [Variant_with_null] cannot have an inlined record argument. *)
+    Misc.fatal_error
+      "Typedecl.update_record_kind: unexpected variant representation"
+
 (* Given a record with a variable representation, but updated labels, compute
    the updated sorts and representation *)
 let update_record_kind (type rep) env loc (form : rep record_form)
-      lbls ~warn :
+      ~(old_repres : rep) lbls ~warn :
     _ * (rep, _) Result.t =
   let types = List.map snd lbls in
   let sorts, jkinds = update_label_sorts env loc types ~form in
   let reprs, repr_summary = compute_repr_summary env lbls jkinds in
   let rep : (rep, _) Result.t =
-    (* CR layouts: improve the readability of this match *)
-    let { values; floats; atomic_floats; float64s;
-            non_float64_unboxed_fields; atomic_fields; voids;
-            first_any } = repr_summary
-    in
-    let refining_block_with_any = true in
-    match form with
-    | Legacy ->
+    match form, old_repres with
+    | Legacy, Record_variable ->
+      (* CR layouts: improve the readability of this match *)
+      let { values; floats; atomic_floats; float64s;
+              non_float64_unboxed_fields; atomic_fields; voids;
+              first_any } = repr_summary
+      in
       let rep =
         compute_record_repr loc reprs lbls
           ~represent_as_float_array:false ~flatten_floats:false ~warn
-          ~refining_block_with_any ~values ~floats ~atomic_floats ~float64s
+          ~refining_block_with_any:true ~values ~floats ~atomic_floats ~float64s
           ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
       in
       begin match rep with
@@ -2386,15 +2413,23 @@ let update_record_kind (type rep) env loc (form : rep record_form)
       | Error _ -> ()
       end;
       rep
-    | Unboxed_product ->
-      (match first_any with
+    | Legacy, Record_inlined (tag, Constructor_variable, vrep) ->
+      update_record_inlined_kind env loc lbls jkinds tag vrep
+    | Unboxed_product, _ ->
+      (match repr_summary.first_any with
       | Some id -> Result.Error (Unrepresentable_field (Ident.name id))
       | None -> Ok Record_unboxed_product)
+    | Legacy,
+      (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
+      | Record_ufloat | Record_mixed _ | Record_dummy _) ->
+        Misc.fatal_error
+          "Typedecl.update_record_kind: representation already determined"
   in
   sorts, rep
 
 let update_record_representation
-      (type rep) ~why env loc (form : rep record_form) lbls_and_types =
+      (type rep) ~why ~old_repres
+      env loc (form : rep record_form) lbls_and_types =
   let kloc : jkind_sort_loc =
     match form with
     | Legacy -> Record { unboxed = false }
@@ -2416,7 +2451,9 @@ let update_record_representation
        layout/mode polymorphism introducing concerns about principality of
        inferred layouts/modes. *)
     let snap = Btype.snapshot () in
-    let ans = update_record_kind env loc form lbls_and_types ~warn in
+    let ans =
+      update_record_kind env loc form ~old_repres lbls_and_types ~warn
+    in
     Btype.backtrack snap;
     ans
   in
@@ -3929,15 +3966,7 @@ let transl_extension_constructor ~scope env type_path type_params
               in
               Types.Cstr_record lbls
         in
-        let shape =
-          match cdescr.cstr_shape with
-          | Some shape -> shape
-          | None ->
-              Misc.fatal_errorf
-                "unexpected non-constant representation for ext ctor %a"
-                (Format_doc.compat Path.print) type_path
-        in
-        args, shape,
+        args, cdescr.cstr_shape,
         cdescr.cstr_constant, ret_type,
         Text_rebind(path, lid)
   in
@@ -4595,7 +4624,6 @@ let transl_value_decl env loc ~modal ~why valdecl =
         if valdecl.pval_poly then begin
           Language_extension.assert_enabled ~loc Layout_poly
             Language_extension.Alpha;
-          raise (Error (loc, Poly_not_yet_implemented))
         end;
         let raw_modalities =
           Typemode.transl_modalities_with_default
@@ -4606,7 +4634,12 @@ let transl_value_decl env loc ~modal ~why valdecl =
         in
         md_mode, modalities, Valmi_sig_value raw_modalities
   in
-  let lpoly, cty = Typetexp.transl_type_scheme env valdecl.pval_type in
+  let lpoly_flag =
+    if valdecl.pval_poly then Typetexp.Lpoly else Typetexp.Lmono
+  in
+  let lpoly, cty =
+    Typetexp.transl_type_scheme env valdecl.pval_type lpoly_flag
+  in
   let sort =
     match Ctype.type_sort ~why ~fixed:false env cty.ctyp_type with
     | Ok sort -> sort

@@ -130,15 +130,14 @@ Line 2, characters 0-11:
 Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
 |}]
 
-(* Warning when poly_ binding generalizes no layout variables *)
+(* Error when poly_ binding generalizes no layout variables *)
 let poly_ f = 42
 [%%expect{|
 Line 1, characters 10-11:
 1 | let poly_ f = 42
               ^
-Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
-
-val f : int = 42
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
 |}]
 
 (* layout-polymorphic id is not included in regular id,
@@ -193,14 +192,9 @@ Error: This expression is not allowed in a "let poly_" definition;
 |}]
 
 (* variant: passing - no payload *)
-let poly_ f = `A
+let poly_ f _ = `A
 [%%expect{|
-Line 1, characters 10-11:
-1 | let poly_ f = `A
-              ^
-Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
-
-val f : [> `A ] = `A
+val f : layout_ l. ('a : l). 'a -> [> `A ] = <lpoly>
 |}]
 
 (* variant: passing - payload is a syntactic value *)
@@ -263,15 +257,10 @@ Error: This expression is not allowed in a "let poly_" definition;
 
 (* record: passing when all fields are syntactic values *)
 type r = { a : int; b : int -> int }
-let poly_ f = { a = 42; b = fun x -> x }
+let poly_ f _ = { a = 42; b = fun x -> x }
 [%%expect{|
 type r = { a : int; b : int -> int; }
-Line 2, characters 10-11:
-2 | let poly_ f = { a = 42; b = fun x -> x }
-              ^
-Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
-
-val f : r = {a = 42; b = <fun>}
+val f : layout_ l. ('a : l). 'a -> r = <lpoly>
 |}]
 
 (* record: failing when a field is not a syntactic value *)
@@ -286,15 +275,10 @@ Error: This expression is not allowed in a "let poly_" definition;
 
 (* unboxed product record: passing when all fields are syntactic values *)
 type ur = #{ a : int; b : int }
-let poly_ f = #{ a = 42; b = 0 }
+let poly_ f _ = #{ a = 42; b = 0 }
 [%%expect{|
 type ur = #{ a : int; b : int; }
-Line 2, characters 10-11:
-2 | let poly_ f = #{ a = 42; b = 0 }
-              ^
-Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
-
-val f : ur = <abstr>
+val f : layout_ l. ('a : l). 'a -> ur = <lpoly>
 |}]
 
 (* unboxed product record: failing when a field is not a syntactic value *)
@@ -325,9 +309,8 @@ let poly_ f x = (x : (_ : value))
 Line 1, characters 10-11:
 1 | let poly_ f x = (x : (_ : value))
               ^
-Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
-
-val f : 'a -> 'a = <fun>
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
 |}]
 
 (* [assert false] is layout poly *)
@@ -360,14 +343,14 @@ val foo : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit = <lpoly>
 
 (* [rec] prevents layout polymorphism, even for fake recursion (no
    self-reference). *)
-let rec poly_ f x = x
+let rec poly_ f _ x = x
 [%%expect{|
 Line 1, characters 14-15:
-1 | let rec poly_ f x = x
+1 | let rec poly_ f _ x = x
                   ^
 Warning 218: poly_ has no effect in recursive bindings, which do not support layout polymorphism. Consider using a regular let rec instead.
 
-val f : 'a -> 'a = <fun>
+val f : 'a -> 'b -> 'b = <fun>
 |}]
 
 (* CR-someday zqian: [rec poly_] should work with explicit user annotations. *)
@@ -412,19 +395,16 @@ Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
    regional, and that makes the captured environment to be local, which makes [f] unable
    to escape the region. *)
 let _bar (x @ local) =
-  let poly_ f = x in
+  let poly_ f _ = x in
   f
 [%%expect{|
-Line 2, characters 12-13:
-2 |   let poly_ f = x in
-                ^
-Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
-
 Line 3, characters 2-3:
 3 |   f
       ^
 Error: This value is "local"
-         because it is defined by a layout-polymorphic expression (at line 2, characters 12-13)
+         because it is allocated at line 2, characters 14-19 containing data
+         which is "local" to the parent region
+         because it closes over the value "x" at line 2, characters 18-19
          which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is a function return value.
@@ -433,26 +413,16 @@ Error: This value is "local"
 
 (* multiple poly can be have different captured environment mode *)
 let f (x @ local) =
-  let poly_ f = x
-  and poly_ g = () in
+  let poly_ f _ = x
+  and poly_ g _ = () in
   g
 [%%expect{|
-Line 3, characters 12-13:
-3 |   and poly_ g = () in
-                ^
-Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
-
 Line 2, characters 12-13:
-2 |   let poly_ f = x
-                ^
-Warning 217: This binding has no layout variables, so poly_ has no effect. Consider using a regular let instead.
-
-Line 2, characters 12-13:
-2 |   let poly_ f = x
+2 |   let poly_ f _ = x
                 ^
 Warning 26 [unused-var]: unused variable "f".
 
-val f : 'a @ local -> unit = <fun>
+val f : 'a @ local -> ('b -> unit) = <fun>
 |}]
 
 (* let poly_ instantiation *)

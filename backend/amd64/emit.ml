@@ -784,6 +784,8 @@ let emit_jump_table t =
   done
 
 let emit_jump_tables () =
+  I.ud2 ();
+  (* data in text below *)
   D.align ~fill:Nop ~bytes:4;
   List.iter emit_jump_table !jump_tables;
   jump_tables := []
@@ -2074,9 +2076,7 @@ let emit_instr ~first ~last ~fallthrough i =
       emit_jump func)
   | Lcall_op (Lextcall { func; alloc; stack_ofs; stack_align; _ }) ->
     add_used_symbol func;
-    if
-      stack_ofs > 0
-      && (Config.runtime5 || not (Cmm.equal_stack_align stack_align Align_16))
+    if stack_ofs > 0
     then (
       I.mov rsp r13;
       I.lea (mem64 QWORD stack_ofs (Scalar RSP)) r12;
@@ -2091,19 +2091,9 @@ let emit_instr ~first ~last ~fallthrough i =
     then (
       load_symbol_addr (Cmm.global_symbol func) rax;
       emit_call (Cmm.global_symbol "caml_c_call");
-      record_frame i.live (Dbg_other i.dbg);
-      if (not Config.runtime5) && not (is_win64 system)
-      then
-        (* In amd64.S, "caml_c_call" tail-calls the C function (in order to
-           produce nicer backtraces), so we need to restore r15 manually after
-           it returns (note that this increases code size).
-
-           In amd64nt.asm (used for Win64), "caml_c_call" invokes the C function
-           via a regular call, and restores r15 itself, thus avoiding the code
-           size increase. *)
-        I.mov (domain_field Domainstate.Domain_young_ptr) r15)
+      record_frame i.live (Dbg_other i.dbg))
     else
-      let switch_stacks = Config.runtime5 && not Config.no_stack_checks in
+      let switch_stacks = not Config.no_stack_checks in
       if switch_stacks
       then (
         I.mov rsp r13;
@@ -2538,15 +2528,9 @@ let emit_instr ~first ~last ~fallthrough i =
     I.cmp (int 0) (res16 i 0);
     I.set (cond Cne) (res8 i 0);
     I.movzx (res8 i 0) (res i 0)
-  | Lop Dls_get ->
-    if Config.runtime5
-    then I.mov (domain_field Domainstate.Domain_dls_state) (res i 0)
-    else Misc.fatal_error "Dls is not supported in runtime4."
+  | Lop Dls_get -> I.mov (domain_field Domainstate.Domain_dls_state) (res i 0)
   | Lop Tls_get -> I.mov (domain_field Domainstate.Domain_tls_state) (res i 0)
-  | Lop Domain_index ->
-    if Config.runtime5
-    then I.mov (domain_field Domainstate.Domain_id) (res i 0)
-    else I.xor (res32 i 0) (res32 i 0)
+  | Lop Domain_index -> I.mov (domain_field Domainstate.Domain_id) (res i 0)
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
   | Llabel { label = lbl; section_name } ->
@@ -2630,9 +2614,7 @@ let emit_instr ~first ~last ~fallthrough i =
     | Lambda.Raise_regular ->
       I.mov (int 0) (domain_field Domainstate.Domain_backtrace_pos);
       call_raise "caml_raise_exn"
-    | Lambda.Raise_reraise ->
-      call_raise
-        (if Config.runtime5 then "caml_reraise_exn" else "caml_raise_exn")
+    | Lambda.Raise_reraise -> call_raise "caml_reraise_exn"
     | Lambda.Raise_notrace ->
       I.mov (domain_field Domainstate.Domain_exn_handler) rsp;
       I.pop (domain_field Domainstate.Domain_exn_handler);
@@ -2724,10 +2706,7 @@ let fundecl fundecl =
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
   D.comment ("LLVM-MCA-BEGIN " ^ !function_name);
-  if
-    Config.runtime5
-    && (not Config.no_stack_checks)
-    && String.equal !Clflags.runtime_variant "d"
+  if (not Config.no_stack_checks) && String.equal !Clflags.runtime_variant "d"
   then emit_call (Cmm.global_symbol "caml_assert_stack_invariants");
   let fun_body_start = current_output_pos () in
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
@@ -2999,10 +2978,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   let padding = if wrapper_frame_size k mod 16 = 0 then 0 else 8 in
   let n = k + padding in
   (* Allocate stack space *)
-  if
-    Config.runtime5
-    && (not Config.no_stack_checks)
-    && n >= Stack_check.stack_threshold_size
+  if (not Config.no_stack_checks) && n >= Stack_check.stack_threshold_size
   then
     emit_stack_check ~size_in_bytes:n ~save_registers:true
       ~save_simd:(must_save_simd_regs p.probe_insn.live);
@@ -3132,6 +3108,7 @@ let end_assembly () =
     if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Text
   in
   D.switch_to_section frametable_section;
+  I.ud2 ();
   D.align
     ~fill:(if !Oxcaml_flags.frametables_in_rodata then Zero else Nop)
     ~bytes:8;

@@ -261,9 +261,9 @@ end = struct
       | `Var (id, s, uid, sort, mode) ->
         continue p (`Alias (Patterns.omega, id, s, uid, sort, mode, p.pat_type))
       | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
-      | `Alias (p, id, _, duid, sort, _, _) ->
+      | `Alias (sub_p, id, _, duid, sort, _, _) ->
           aux
-            ( (General.view p, patl),
+            ( (General.view sub_p, patl),
               bind_alias p id duid ~arg
                 ~arg_sort:(Jkind.Sort.default_for_transl_and_get sort) ~action )
       | `Record ([], _, _, _) as view -> stop p view
@@ -2155,6 +2155,8 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
       let shape = transl_mixed_product_shape shape in
       let e, layout = lambda_void_of_el shape.(pos) in
       { arg = e; binding_kind; mut = compose_mut mut Immutable; sort; layout; }
+    | Constructor_variable ->
+      fatal_error "Matching.get_exr_args_constr: variable representation"
   in
   let make_field_access binding_kind sort ~field:_ ~pos =
     if cstr.cstr_constant then
@@ -2174,6 +2176,8 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
                 shape
             in
             Pmixedfield ([pos], shape, sem)
+        | Constructor_variable ->
+            fatal_error "Matching.get_exr_args_constr: variable representation"
       in
       let layout = Typeopt.layout_of_sort head.pat_loc sort in
       {
@@ -2618,6 +2622,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
           fatal_error "get_expr_args_record: unexpected dummy representation"
+        | Record_inlined (_, Constructor_variable, _)
         | Record_variable ->
           fatal_error "get_expr_args_record: unexpected variable representation"
       in

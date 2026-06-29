@@ -559,6 +559,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
     | Pget_idx _ -> binary (Ccall "caml_get_idx_bytecode")
     | Pset_idx _ -> ternary (Ccall "caml_set_idx_bytecode")
+    | Pget_ptr _ -> unary (Ccall "caml_get_ptr_bytecode")
+    | Pset_ptr _ -> binary (Ccall "caml_set_ptr_bytecode")
     | Pmake_idx_field pos ->
       Const (Const_block (0, [Const_base (Const_int pos)]))
     | Pmake_idx_mixed_field (_, pos, path) ->
@@ -909,7 +911,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Punspecializedarray_set _ ->
         Misc.fatal_error "Blambda_of_lambda: Parrayblit Punspecializedarray_set"
       )
-    | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ | Pget_ptr _ | Pset_ptr _ ->
+    | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ ->
       Misc.fatal_errorf "Blambda_of_lambda: %a is not supported in bytecode"
         Printlambda.primitive primitive
     | Pmakelazyblock Lazy_tag ->
