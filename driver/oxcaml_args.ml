@@ -404,6 +404,12 @@ let mk_ssa_bounds_check_elim f =
     " Eliminate provably-redundant array bounds checks in the SSA pipeline \
      (EXPERIMENTAL)" )
 
+let mk_ssa_strength_reduce f =
+  ( "-ssa-strength-reduce",
+    Arg.Unit f,
+    " Strength-reduce derived induction variables in the SSA pipeline \
+     (EXPERIMENTAL)" )
+
 let mk_ssa_validate f =
   ( "-ssa-validate",
     Arg.Unit f,
@@ -1341,6 +1347,7 @@ module type Oxcaml_options = sig
   val ssa_simplify : unit -> unit
   val no_ssa_simplify : unit -> unit
   val ssa_bounds_check_elim : unit -> unit
+  val ssa_strength_reduce : unit -> unit
   val ssa_validate : unit -> unit
   val no_ssa_validate : unit -> unit
   val internal_assembler : unit -> unit
@@ -1532,6 +1539,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_ssa_simplify F.ssa_simplify;
       mk_no_ssa_simplify F.no_ssa_simplify;
       mk_ssa_bounds_check_elim F.ssa_bounds_check_elim;
+      mk_ssa_strength_reduce F.ssa_strength_reduce;
       mk_ssa_validate F.ssa_validate;
       mk_no_ssa_validate F.no_ssa_validate;
       mk_internal_assembler F.internal_assembler;
@@ -1938,6 +1946,7 @@ module Oxcaml_options_impl = struct
   let ssa_simplify = set' Oxcaml_flags.ssa_simplify
   let no_ssa_simplify () = Oxcaml_flags.ssa_simplify := false
   let ssa_bounds_check_elim = set' Oxcaml_flags.ssa_bounds_check_elim
+  let ssa_strength_reduce = set' Oxcaml_flags.ssa_strength_reduce
   let ssa_validate = set' Oxcaml_flags.ssa_validate
   let no_ssa_validate () = Oxcaml_flags.ssa_validate := false
   let internal_assembler = set' Oxcaml_flags.internal_assembler
@@ -2359,6 +2368,7 @@ module Extra_params = struct
     | "use-ssa" -> set' Oxcaml_flags.use_ssa
     | "ssa-simplify" -> set' Oxcaml_flags.ssa_simplify
     | "ssa-bounds-check-elim" -> set' Oxcaml_flags.ssa_bounds_check_elim
+    | "ssa-strength-reduce" -> set' Oxcaml_flags.ssa_strength_reduce
     | "ssa-validate" -> set' Oxcaml_flags.ssa_validate
     | "internal-assembler" -> set' Oxcaml_flags.internal_assembler
     | "verify-binary-emitter" -> set' Oxcaml_flags.verify_binary_emitter

@@ -715,6 +715,7 @@
   dead_induction_var
   delete_empty_loops
   bounds_check_elim
+  strength_reduction
   ;; backend/debug/
   available_ranges_vars
   compute_ranges

@@ -120,9 +120,18 @@ val combine : (module Reducer) list -> (module Reducer)
     [keep_unused_ops] (default to [false]) disables structural pruning: dead
     [Op]s and dropped block params are preserved in the output, useful when the
     output must remain faithful to the input shape (e.g. before [Cfg_compare]).
-*)
+
+    [extra_params] (default: none), keyed by a block's raw id
+    ([(block.id :> int)]), lets a reducer append new trailing parameters (i.e.
+    phis) to a block — the one structural change the per-instruction hooks
+    cannot express. The new params come after all of the block's original
+    params, which are therefore never dropped. The reducer must supply the
+    matching trailing args on every [Goto] into that block (via
+    [visit_terminator]) and may refer to a new param with
+    [Instruction.make_block_param]. *)
 val run :
   ?keep_unused_ops:bool ->
+  ?extra_params:(int -> (Cmm.machtype_component * string option) array) ->
   (module Reducer) ->
   (module Ssa.Finished_graph) ->
   (module Ssa.Finished_graph)

@@ -187,8 +187,11 @@ let combine (rs : (module Reducer) list) : (module Reducer) =
     end in
   (module Combined : Reducer)
 
-let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
-    (input : (module Ssa.Finished_graph)) : (module Ssa.Finished_graph) =
+let run ?(keep_unused_ops = false)
+    ?(extra_params =
+      fun (_ : int) : (Cmm.machtype_component * string option) array -> [||])
+    (module Red_ctor : Reducer) (input : (module Ssa.Finished_graph)) :
+    (module Ssa.Finished_graph) =
   let module In = (val input : Ssa.Finished_graph) in
   let module Out = (val Ssa.make_builder In.function_info ~keep_unused_ops) in
   (* Map each input block to its output counterpart. *)
@@ -216,6 +219,9 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
     in
     if
       keep_unused_ops || any_non_goto_pred ()
+      (* A reducer that appends params (via [extra_params]) relies on the
+         original params keeping their indices, so do not drop any of them. *)
+      || Array.length (extra_params (block.id :> int)) > 0
       || Array.for_all
            (fun (param : In.Block.param) -> param.usage_count > 0)
            block.params
@@ -251,6 +257,10 @@ let run ?(keep_unused_ops = false) (module Red_ctor : Reducer)
           |> List.map (fun (param : In.Block.param) -> param.typ, param.name)
           |> Array.of_list
         in
+        (* New params appended by a reducer (e.g. strength-reduction phis). They
+           come after all original params; the reducer is responsible for
+           supplying the matching trailing [Goto] args on every predecessor. *)
+        let params = Array.append params (extra_params (block.id :> int)) in
         In.Block.Tbl.replace block_map block (Out.new_block_with_names ~params)
       end)
     In.blocks;
