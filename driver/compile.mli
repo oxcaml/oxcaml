@@ -48,3 +48,8 @@ val emit_bytecode :
     Lambda.arg_descr option ->
     unit
 (** [emit_bytecode bytecode] output the bytecode executable. *)
+
+val emit_lambda_program : Compile_common.info -> Lambda.program -> unit
+(** Lower a [Lambda.program] to bytecode and emit the .cmo, honouring
+    [-stop-after lambda].  Used by [-functorize] after
+    [Translmod.transl_functorize]. *)
