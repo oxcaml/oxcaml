@@ -459,14 +459,14 @@ and eval_prim env prim =
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
   | Psetfloatfield _ | Psetufloatfield _ | Pufloatfield _ | Pduprecord _
   | Parray_element_size_in_bytes _ | Pmake_idx_field _ | Pwith_stack
-  | Pwith_stack_bind | Pwith_stack_preemptible | Pwith_stack_bind_preemptible
-  | Pperform | Presume | Preperform | Pccall _ | Praise _ | Psequand | Psequor
-  | Pnot | Pphys_equal _ | Pscalar _ | Poffsetref _ | Pstringlength
-  | Pstringrefu | Pstringrefs | Pbyteslength | Pbytesrefu | Pbytessetu
-  | Pbytesrefs | Pbytessets | Pmakearray _ | Pmakearray_dynamic _ | Pduparray _
-  | Parrayblit _ | Parraylength _ | Parrayrefu _ | Parraysetu _ | Parrayrefs _
-  | Parraysets _ | Pisint _ | Pisnull | Pisout | Pbigarrayref _ | Pbigarrayset _
-  | Pbigarraydim _ | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
+  | Pwith_stack_preemptible | Pperform | Presume | Preperform | Pccall _
+  | Praise _ | Psequand | Psequor | Pnot | Pphys_equal _ | Pscalar _
+  | Poffsetref _ | Pstringlength | Pstringrefu | Pstringrefs | Pbyteslength
+  | Pbytesrefu | Pbytessetu | Pbytesrefs | Pbytessets | Pmakearray _
+  | Pmakearray_dynamic _ | Pduparray _ | Parrayblit _ | Parraylength _
+  | Parrayrefu _ | Parraysetu _ | Parrayrefs _ | Parraysets _ | Pisint _
+  | Pisnull | Pisout | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _
+  | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
   | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
   | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _ | Pbytes_load_16 _
   | Pbytes_load_32 _ | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _

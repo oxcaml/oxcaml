@@ -31,6 +31,7 @@
 #include "caml/codefrag.h"
 #include "caml/fail.h"
 #include "caml/fiber.h"
+#include "caml/dynamic.h"
 #include "caml/gc_ctrl.h"
 #include "caml/platform.h"
 #include "caml/minor_gc.h"
@@ -293,8 +294,7 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
 
 static struct stack_info*
 alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
-                             value hexn, value heff, value htick,
-                             value dyn, value val, int64_t id)
+                             value hexn, value heff, value htick, int64_t id)
 {
   struct stack_info* stack;
   struct stack_cache* caches = Caml_state->stack_caches;
@@ -352,8 +352,7 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->local_sp = 0;
   stack->local_top = NULL;
   stack->local_limit = 0;
-  stack->dyn = dyn;
-  stack->val = val;
+  caml_dynamic_table_init(&stack->dyn);
 #ifdef DEBUG
   stack->magic = 42;
 #endif
@@ -366,47 +365,20 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
 
 /* allocate a stack with at least "wosize" usable words of stack */
 struct stack_info*
-caml_alloc_stack_noexc(mlsize_t wosize, value hval, value hexn, value heff,
-                       value dyn, value val, int64_t id)
+caml_alloc_stack_noexc(mlsize_t wosize, value hval, value hexn, value heff, int64_t id)
 {
   int cache_bucket = stack_cache_bucket (wosize);
   return alloc_size_class_stack_noexc(wosize, cache_bucket, hval, hexn, heff,
-                                      /*htick=*/Val_null, dyn, val, id);
+                                      /*htick=*/Val_null, id);
 }
 
 #ifdef NATIVE_CODE
 
-value caml_alloc_stack_bind (value hval, value hexn, value heff, value dyn, value val) {
+value caml_alloc_stack (value hval, value hexn, value heff) {
   const int64_t id = atomic_fetch_add(&fiber_id, 1);
   struct stack_info *stack =
       alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */, hval,
-                                   hexn, heff, /*htick=*/Val_null, dyn, val,
-                                   id);
-
-  if (!stack)
-#if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
-    caml_raise_out_of_fibers();
-#else
-    caml_raise_out_of_memory();
-#endif
-
-  fiber_debug_log ("Allocate stack=%p of %" ARCH_INTNAT_PRINTF_FORMAT
-                     "u words", stack, caml_fiber_wsz);
-
-  return Val_ptr(stack);
-}
-
-value caml_alloc_stack (value hval, value hexn, value heff) {
-  return caml_alloc_stack_bind(hval, hexn, heff, Val_null, Val_null);
-}
-
-value caml_alloc_stack_bind_preemptible(value hval, value hexn, value heff,
-                                        value htick, value dyn,
-                                        value val) {
-  const int64_t id = atomic_fetch_add(&fiber_id, 1);
-  struct stack_info* stack =
-    alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
-                                 hval, hexn, heff, htick, dyn, val, id);
+                                   hexn, heff, /*htick=*/Val_null, id);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -422,11 +394,24 @@ value caml_alloc_stack_bind_preemptible(value hval, value hexn, value heff,
 }
 
 value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
-                                   value htick) {
-  return caml_alloc_stack_bind_preemptible(hval, hexn, heff, htick,
-                                           Val_null, Val_null);
-}
+                                        value htick) {
+  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  struct stack_info* stack =
+    alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
+                                 hval, hexn, heff, htick, id);
 
+  if (!stack)
+#if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
+    caml_raise_out_of_fibers();
+#else
+    caml_raise_out_of_memory();
+#endif
+
+  fiber_debug_log ("Allocate stack=%p of %" ARCH_INTNAT_PRINTF_FORMAT
+                     "u words", stack, caml_fiber_wsz);
+
+  return Val_ptr(stack);
+}
 
 void caml_get_stack_sp_pc (struct stack_info* stack,
                            char** sp /* out */, uintnat* pc /* out */)
@@ -674,9 +659,8 @@ void caml_scan_stack(
 
     scan_stack_frames(f, fflags, fdata, stack, gc_regs, locals);
 
-    /* Scan dynamic binding, both key and value */
-    f(fdata, stack->dyn, &stack->dyn);
-    f(fdata, stack->val, &stack->val);
+    /* Scan dynamic bindings */
+    caml_dynamic_table_scan_roots(&stack->dyn, f, fflags, fdata);
 
     f(fdata, Stack_handle_value(stack), &Stack_handle_value(stack));
     f(fdata, Stack_handle_exception(stack), &Stack_handle_exception(stack));
@@ -724,15 +708,13 @@ void caml_maybe_expand_stack (void)
 
 value caml_global_data = Val_unit;
 
-CAMLprim value caml_alloc_stack_bind(value hval, value hexn, value heff,
-                                     value dyn, value val)
+CAMLprim value caml_alloc_stack(value hval, value hexn, value heff)
 {
   value* sp;
   const int64_t id = atomic_fetch_add(&fiber_id, 1);
   struct stack_info *stack =
       alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */, hval,
-                                   hexn, heff, /*htick=*/Val_null, dyn, val,
-                                   id);
+                                   hexn, heff, /*htick=*/Val_null, id);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -750,20 +732,14 @@ CAMLprim value caml_alloc_stack_bind(value hval, value hexn, value heff,
   return Val_ptr(stack);
 }
 
-CAMLprim value caml_alloc_stack(value hval, value hexn, value heff)
-{
-  return caml_alloc_stack_bind(hval, hexn, heff, Val_null, Val_null);
-}
-
-CAMLprim value caml_alloc_stack_bind_preemptible(value hval, value hexn,
-                                                 value heff, value htick,
-                                                 value dyn, value val)
+CAMLprim value caml_alloc_stack_preemptible(value hval, value hexn,
+                                            value heff, value htick)
 {
   value* sp;
   const int64_t id = atomic_fetch_add(&fiber_id, 1);
   struct stack_info* stack =
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
-                                 hval, hexn, heff, htick, dyn, val, id);
+                                 hval, hexn, heff, htick, id);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -779,13 +755,6 @@ CAMLprim value caml_alloc_stack_bind_preemptible(value hval, value hexn,
   stack->sp = sp;
 
   return Val_ptr(stack);
-}
-
-CAMLprim value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
-                                            value htick)
-{
-  return caml_alloc_stack_bind_preemptible(hval, hexn, heff, htick,
-                                           Val_null, Val_null);
 }
 
 CAMLprim value caml_ensure_stack_capacity(value required_space)
@@ -832,9 +801,8 @@ void caml_scan_stack(
       }
     }
 
-    /* Scan dynamic binding, both key and value */
-    f(fdata, stack->dyn, &stack->dyn);
-    f(fdata, stack->val, &stack->val);
+    /* Scan dynamic bindings */
+    caml_dynamic_table_scan_roots(&stack->dyn, f, fflags, fdata);
 
     if (is_scannable(fflags, Stack_handle_value(stack)))
       f(fdata, Stack_handle_value(stack), &Stack_handle_value(stack));
@@ -969,8 +937,6 @@ int caml_try_realloc_stack(asize_t required_space)
                                            Stack_handle_exception(old_stack),
                                            Stack_handle_effect(old_stack),
                                            Stack_handle_tick(old_stack),
-                                           old_stack->dyn,
-                                           old_stack->val,
                                            old_stack->id);
 
   if (!new_stack) return 0;
@@ -990,6 +956,10 @@ int caml_try_realloc_stack(asize_t required_space)
   old_stack->local_sp = 0;
   old_stack->local_top = NULL;
   old_stack->local_limit = 0;
+
+  // Move dynamic bindings
+  new_stack->dyn = old_stack->dyn;
+  caml_dynamic_table_init(&old_stack->dyn);
 
 #ifdef NATIVE_CODE
   /* There's no need to do another pass rewriting from
@@ -1060,8 +1030,7 @@ struct stack_info* caml_alloc_main_stack (uintnat init_wsize)
 {
   const int64_t id = atomic_fetch_add(&fiber_id, 1);
   struct stack_info* stk =
-    caml_alloc_stack_noexc(init_wsize, Val_unit, Val_unit, Val_unit,
-                           Val_unit, Val_unit, id);
+    caml_alloc_stack_noexc(init_wsize, Val_unit, Val_unit, Val_unit, id);
   return stk;
 }
 
@@ -1183,6 +1152,8 @@ void caml_free_stack (struct stack_info* stack)
 
   // Don't need to update local_sp since this is no longer the current stack.
   caml_free_local_arenas(stack->local_arenas);
+
+  caml_dynamic_table_free(&stack->dyn);
 
   if (cache_bucket != -1) {
 #if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
@@ -1441,126 +1412,4 @@ value caml_tick_fiber_exn(struct stack_info *stack) {
   }
 
   CAMLreturn(Val_false);
-}
-
-/**** Dynamic Binding ****/
-
-/* Implementation of primitives to support Dynamic.t */
-
-#define Is_bound(dyn) Is_this(dyn)
-#define Hash_dyn(dyn) Long_val(dyn)
-
-typedef struct {
-  value dyn;
-  value val;
-} binding_s, *binding_t;
-
-/* Per-thread cache: direct-mapped. TODO: Stephen Dolan's wild plan to
- * use vector instructions to do a fully-associative LRU cache. */
-
-/* If you change DYNAMIC_CACHE_BITS, you must also update the
- * assembly-language stubs such as amd64.S. TODO: single source of
- * truth for things like this. */
-#define DYNAMIC_CACHE_BITS 3
-#define DYNAMIC_CACHE_SIZE (1 << DYNAMIC_CACHE_BITS)
-
-/* Must match Dynamic_ definitions in amd64.S */
-
-typedef struct dynamic_cache_s {
-  binding_s tbl[DYNAMIC_CACHE_SIZE];
-} dynamic_cache_s, *dynamic_cache_t;
-
-static void dynamic_cache_flush(dynamic_cache_t cache)
-{
-  /* Clear keys */
-  for (size_t i = 0; i < DYNAMIC_CACHE_SIZE; ++i) {
-    cache->tbl[i].dyn = Val_null;
-  }
-}
-
-CAMLexport dynamic_cache_t caml_dynamic_cache_new(void)
-{
-  dynamic_cache_t res = caml_stat_alloc_noexc(sizeof(dynamic_cache_s));
-  if (!res) {
-    return NULL;
-  }
-  dynamic_cache_flush(res);
-  return res;
-}
-
-CAMLexport void caml_dynamic_cache_delete(dynamic_cache_t cache)
-{
-  caml_stat_free(cache);
-}
-
-CAMLexport void caml_dynamic_cache_flush(dynamic_cache_t cache)
-{
-  dynamic_cache_flush(cache);
-}
-
-CAMLexport void caml_dynamic_cache_enter_thread(dynamic_cache_t cache)
-{
-  Caml_state->dynamic_bindings = cache;
-}
-
-CAMLexport void caml_dynamic_cache_scan_roots(dynamic_cache_t cache,
-                                              scanning_action f,
-                                              scanning_action_flags fflags,
-                                              void *fdata)
-{
-  for (size_t i = 0; i < DYNAMIC_CACHE_SIZE; ++i) {
-    if (Is_bound(cache->tbl[i].dyn)) {
-      f(fdata, cache->tbl[i].dyn, &cache->tbl[i].dyn);
-      f(fdata, cache->tbl[i].val, &cache->tbl[i].val);
-    }
-  }
-}
-
-/* Making a dynamic value */
-
-extern value caml_fresh_oo_id(value v);
-
-CAMLprim value caml_dynamic_make(value unit)
-{
-  CAMLparam1(unit);
-  /* TODO: consider other hash functions. This one is ~unique, which is nice */
-  value hash = caml_fresh_oo_id(Val_unit);
-  CAMLreturn(hash);
-}
-
-/* Get the current value of a dynamic variable. Does not allocate.
- *
- * Comments indicate the memory accesses on the fast path (loads from
- * three cache lines; load #3 is dependent on load #2). */
-
-CAMLprim value caml_dynamic_get(value dyn)
-{
-  uintnat hash = Hash_dyn(dyn);
-  uintnat index = hash & (DYNAMIC_CACHE_SIZE - 1);
-  dynamic_cache_t cache = Caml_state->dynamic_bindings; /* load #1 */
-  CAMLassert(cache);
-  binding_t entry = cache->tbl + index; /* just arithmetic */
-  if (entry->dyn == dyn) { /* load #2; dependent on #1 */
-    return entry->val; /* load #3, should hit same cache line as #2 */
-  }
-  value val;
-  /* Not in cache; let's look at the fiber */
-  CAMLassert(Caml_state->current_stack);
-  struct stack_info *stack = Caml_state->current_stack;
-  while (stack) {
-    if (dyn == stack->dyn) {
-      val = stack->val;
-      goto found;
-    }
-    stack = Stack_parent(stack);
-  }
-
-  /* Never bound */
-  val = Val_null;
-
-found:
-  /* Update cache */
-  entry->dyn = dyn;
-  entry->val = val;
-  return val;
 }
