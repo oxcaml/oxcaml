@@ -4147,7 +4147,9 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         let previous_saved_types = Cmt_format.get_saved_types () in
         match type_str_item env shape_map item sig_acc_include_functor with
         | desc, sg, shape_map, new_env ->
-            let str = { str_desc = desc; str_loc = item.pstr_loc; str_env = env } in
+            let str =
+              { str_desc = desc; str_loc = item.pstr_loc; str_env = env }
+            in
             Cmt_format.set_saved_types
               (Cmt_format.Partial_structure_item str :: previous_saved_types);
             type_struct new_env shape_map srem (str :: str_acc)
