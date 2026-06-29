@@ -2563,7 +2563,8 @@ let build_or_pat env loc lid =
     let ty = expand_head env (newty(Tconstr(path, tyl, ref Mnil))) in
     match get_desc ty with
       Tvariant row when static_row row -> row
-    | _ -> Error.log_and_raise lid.loc env (Not_a_polymorphic_variant_type lid.txt)
+    | _ ->
+        Error.log_and_raise lid.loc env (Not_a_polymorphic_variant_type lid.txt)
   in
   let pats, fields =
     List.fold_left
@@ -5653,13 +5654,14 @@ let rec check_captures_comonadic env (exp : expression) =
 let annotate_recursive_bindings env valbinds =
   let ids = let_bound_idents valbinds in
   List.map
-    (fun ({vb_pat; vb_expr; vb_rec_kind = _; vb_sort; vb_attributes; vb_loc} as vb) ->
-       match (Value_rec_check.is_valid_recursive_expression ids vb_expr) with
-       | None ->
-           (Error.log_or_raise vb_expr.exp_loc env Illegal_letrec_expr);
-           vb
-       | Some vb_rec_kind ->
-           { vb_pat; vb_expr; vb_rec_kind; vb_sort; vb_attributes; vb_loc})
+    (fun ({vb_pat; vb_expr; vb_rec_kind = _; vb_sort;
+           vb_attributes; vb_loc} as vb) ->
+      match (Value_rec_check.is_valid_recursive_expression ids vb_expr) with
+      | None ->
+          (Error.log_or_raise vb_expr.exp_loc env Illegal_letrec_expr);
+          vb
+      | Some vb_rec_kind ->
+          { vb_pat; vb_expr; vb_rec_kind; vb_sort; vb_attributes; vb_loc})
     valbinds
 
 let check_recursive_class_bindings env ids exprs =
@@ -6949,7 +6951,8 @@ and type_expect_
               let _, ty_arg2, ty_res2 = instance_label ~fixed:false lbl in
               unify_exp_types record_loc env ty_arg1 ty_arg2;
               with_explanation (fun () ->
-                  unify_exp_types record_loc env (instance ty_expected) ty_res2);
+                  unify_exp_types record_loc env
+                    (instance ty_expected) ty_res2);
               check_project_mutability ~loc:extended_expr_loc ~env
                 (Record_field lbl.lbl_name) lbl.lbl_mut mode;
               let is_contained_by : Mode.Hint.is_contained_by =
@@ -8019,7 +8022,8 @@ and type_expect_
       match Modality.Const.equate modality expected_modality with
       | Ok () -> ()
       | Error err ->
-          Error.log_and_raise loc env (Block_index_modality_mismatch { mut; err })
+          Error.log_and_raise loc env
+            (Block_index_modality_mismatch { mut; err })
     end;
     let ty =
       if mut then
@@ -10933,7 +10937,8 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
   if constr.cstr_private = Private then
     begin match constr.cstr_repr with
     | Variant_extensible ->
-        Error.log_and_raise sexp.pexp_loc env (Private_constructor (constr, ty_res))
+        Error.log_and_raise sexp.pexp_loc env
+          (Private_constructor (constr, ty_res))
     | Variant_boxed _ | Variant_unboxed ->
         Error.log_and_raise sexp.pexp_loc env (Private_type ty_res);
     | Variant_with_null -> assert false

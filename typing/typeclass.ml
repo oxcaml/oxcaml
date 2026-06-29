@@ -222,7 +222,8 @@ let rec constructor_type constr cty =
 let raise_add_method_failure loc env label sign failure =
   match (failure : Ctype.add_method_failure) with
   | Ctype.Unexpected_method ->
-      Error.log_and_raise loc env (Unexpected_field (sign.Types.csig_self, label))
+      Error.log_and_raise loc env
+        (Unexpected_field (sign.Types.csig_self, label))
   | Ctype.Type_mismatch trace ->
       Error.log_and_raise loc env (Field_type_mismatch ("method", label, trace))
 

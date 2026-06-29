@@ -3946,7 +3946,8 @@ let transl_extension_constructor ~scope env type_path type_params
         (match Ctype.check_constructor_crossing_destruction env lid
           cdescr.cstr_tag ~res:cstr_res ~args locks with
         | Ok _ -> ()
-        | Error e -> Error.log_and_raise lid.loc (Constructor_submode_failed e));
+        | Error e ->
+            Error.log_and_raise lid.loc (Constructor_submode_failed e));
         (* Ensure that constructor's type matches the type being extended *)
         let cstr_res_type_path = Data_types.cstr_res_type_path cdescr in
         let cstr_res_type_params =
