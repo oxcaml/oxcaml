@@ -187,7 +187,10 @@ let emit_frames a =
     if fd.fd_long
     then (
       emit_u16 Oxcaml_flags.max_long_frames_threshold;
-      a.efa_align 4);
+      (* Explicit 2-byte pad (formerly [efa_align 4]) keeps
+         [frame_descr_long.frame_data] at struct offset 8 now that frame
+         descriptors are no longer aligned. *)
+      emit_u16 0);
     let emit_unsigned_16_or_32 = if fd.fd_long then emit_u32 else emit_u16 in
     (* The live offsets are always unsigned. *)
     let emit_live_offset n = emit_unsigned_16_or_32 n in
@@ -197,10 +200,8 @@ let emit_frames a =
     (match fd.fd_debuginfo with
     | _ when flags = 0 -> ()
     | Dbg_other dbg ->
-      a.efa_align 4;
       a.efa_label_rel (label_debuginfos false dbg) Int32.zero
     | Dbg_raise dbg ->
-      a.efa_align 4;
       a.efa_label_rel (label_debuginfos true dbg) Int32.zero
     | Dbg_alloc dbg ->
       assert (List.length dbg < 256);
@@ -215,15 +216,13 @@ let emit_frames a =
           emit_u8 (alloc_words - 2))
         dbg;
       if flags = 3
-      then (
-        a.efa_align 4;
+      then
         List.iter
           (fun Cmm.{ alloc_dbg; _ } ->
             if is_none_dbg alloc_dbg
             then emit_i32 0
             else a.efa_label_rel (label_debuginfos false alloc_dbg) Int32.zero)
-          dbg));
-    a.efa_align Arch.size_addr
+          dbg)
   in
   let emit_filename name lbl =
     a.efa_def_label lbl;

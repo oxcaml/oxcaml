@@ -82,12 +82,9 @@ static frame_descr * next_frame_descr(frame_descr * d) {
     }
     /* Skip debug info if present */
     if (frame_has_debug(d)) {
-      /* Align to 32 bits */
-      p = Align_to(p, uint32_t);
       p += sizeof(uint32_t) * (frame_has_allocs(d) ? num_allocs : 1);
     }
-    /* Align to word size */
-    p = Align_to(p, void*);
+    /* Frame descriptors are not aligned: the next one follows immediately. */
     return ((frame_descr*) p);
   } else {
     /* This marks the top of an ML stack chunk. Skip over empty
@@ -95,8 +92,6 @@ static frame_descr * next_frame_descr(frame_descr * d) {
     /* Skip to address of zero-sized live_ofs */
     CAMLassert(caml_read_unaligned_uint16(&d->num_live) == 0);
     p = (unsigned char*)&d->live_ofs[0];
-    /* Align to word size */
-    p = Align_to(p, void*);
     return ((frame_descr*) p);
   }
 }
@@ -263,6 +258,7 @@ struct frametable_stats {
   size_t max_lives; /* Overall maximum count of lives */
 
   /* GCable registers */
+  size_t reg[REGS]; /* # descriptors using each register */
   size_t reg_count[REGS]; /* Count GCable registers */
   size_t max_regs;
   size_t max_reg[REGS];  /* Count max GCable register index */
@@ -465,6 +461,7 @@ static void report_stats(struct frametable_stats *stats)
 
   printf("GCable registers (max %zu)\n", stats->max_regs);
   report_table("  (counts %s)\n", stats->reg_count, REGS);
+  report_table("  (each reg %s)\n", stats->reg, REGS);
   report_table("  (max %s)\n", stats->max_reg, REGS);
 
   /* report all register maps which are more than 1/128 of the total
@@ -548,7 +545,7 @@ Caml_inline void count_item(size_t item, size_t *max, size_t *smalls,
    permits large ones (e.g. Valx2 values held in SIMD registers), so we
    guard the fixed-size tables and count the outliers separately. */
 
-static void add_live_ofs(uint32_t ofs,
+static void add_live_ofs(uint32_t ofs, size_t *reg_p,
                          size_t *regs, size_t *max_reg, uint64_t *reg_map,
                          bool *has_big_reg,
                          size_t *slots, size_t *max_slot,
@@ -557,6 +554,9 @@ static void add_live_ofs(uint32_t ofs,
   if (ofs & 1) {
     size_t reg = ofs >> 1;
     ++ *regs;
+    if (reg < REGS) {
+      ++ reg_p[reg];
+    }
     if (reg > *max_reg) {
       *max_reg = reg;
     }
@@ -620,8 +620,6 @@ static void add_descriptor_to_stats(frame_descr *d,
     ++ stats->return_to_C;
     /* Top of an ML stack chunk. Skip over empty frame descriptor */
     p = (unsigned char*)&d->live_ofs[0];
-    /* Align to word size */
-    p = Align_to(p, void*);
   } else {
     uint32_t sz = frame_size(d); /* in bytes */
     sz /= sizeof(uintnat);
@@ -642,15 +640,17 @@ static void add_descriptor_to_stats(frame_descr *d,
       num_live = caml_read_unaligned_uint32(&dl->num_live);
       uint32_t n = num_live;
       for (uint32_t *ofp = dl->live_ofs; n > 0; n--, ofp++) {
-        add_live_ofs(caml_read_unaligned_uint32(ofp), &regs, &max_reg,
-                     &reg_map, &has_big_reg, &slots, &max_slot, stats);
+        add_live_ofs(caml_read_unaligned_uint32(ofp), stats->reg, &regs,
+                     &max_reg, &reg_map, &has_big_reg, &slots, &max_slot,
+                     stats);
       }
     } else {
       num_live = caml_read_unaligned_uint16(&d->num_live);
       uint16_t n = num_live;
       for (uint16_t *ofp = d->live_ofs; n > 0; n--, ofp++) {
-        add_live_ofs(caml_read_unaligned_uint16(ofp), &regs, &max_reg,
-                     &reg_map, &has_big_reg, &slots, &max_slot, stats);
+        add_live_ofs(caml_read_unaligned_uint16(ofp), stats->reg,
+                     &regs, &max_reg, &reg_map, &has_big_reg, &slots,
+                     &max_slot, stats);
       }
     }
 
@@ -709,8 +709,6 @@ static void add_descriptor_to_stats(frame_descr *d,
     /* Count debug info if present */
     if (frame_has_debug(d)) {
       ++ stats->with_debug;
-      /* Align to 32 bits */
-      p = Align_to(p, uint32_t);
       for (size_t i = 0; i <  num_debuginfo; ++i) {
         uint32_t offset = caml_read_unaligned_uint32(p);
         if (offset) { /* there may be invalid debuginfo slots */
@@ -719,8 +717,6 @@ static void add_descriptor_to_stats(frame_descr *d,
         p += sizeof(uint32_t);
       }
     }
-    /* Align to word size */
-    p = Align_to(p, void*);
   }
   if (!stats->max_descr || (p > stats->max_descr)) {
     stats->max_descr = p;
