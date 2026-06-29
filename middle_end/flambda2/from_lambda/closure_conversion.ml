@@ -1160,6 +1160,15 @@ let close_effect_primitive acc env ~dbg exn_continuation
   | Presume, [[cont]; [f]; [arg]] ->
     let call_kind = C.effect_ (E.resume ~cont ~f ~arg) in
     close call_kind
+  | Pcontinue, [[cont]; [value]] ->
+    let call_kind = C.effect_ (E.continue ~cont ~value) in
+    close call_kind
+  | Pdiscontinue, [[cont]; [exn]] ->
+    let call_kind = C.effect_ (E.discontinue ~cont ~exn) in
+    close call_kind
+  | Pdiscontinue_with_backtrace, [[cont]; [exn]; [bt]] ->
+    let call_kind = C.effect_ (E.discontinue_with_backtrace ~cont ~exn ~bt) in
+    close call_kind
   | Preperform, [[eff]; [cont]; [last_fiber]] ->
     let call_kind = C.effect_ (E.reperform ~eff ~cont ~last_fiber) in
     close call_kind
@@ -1289,7 +1298,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Preinterpret_tuple_as_boxed_vector _ | Pmake_unboxed_product _
       | Punboxed_product_field _ | Parray_element_size_in_bytes _
       | Pget_header _ | Pwith_stack | Pwith_stack_preemptible | Pperform
-      | Presume | Preperform | Pmake_idx_field _ | Pmake_idx_mixed_field _
+      | Presume | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
+      | Preperform | Pmake_idx_field _ | Pmake_idx_mixed_field _
       | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _ | Pset_idx _ | Pget_ptr _
       | Pset_ptr _ | Pget_ext_ptr _ | Pset_ext_ptr _ | Patomic_exchange_field _
       | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
@@ -1303,7 +1313,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
         assert false
     in
     k acc [Named.create_simple (Simple.symbol sym)]
-  | ( (Pperform | Pwith_stack | Pwith_stack_preemptible | Presume | Preperform),
+  | ( ( Pperform | Pwith_stack | Pwith_stack_preemptible | Presume | Pcontinue
+      | Pdiscontinue | Pdiscontinue_with_backtrace | Preperform ),
       args ) ->
     let exn_continuation =
       match exn_continuation with

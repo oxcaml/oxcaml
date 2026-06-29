@@ -1391,6 +1391,13 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
     | Resume { cont; f; arg } ->
       E.resume ~cont:(simplify_simple cont) ~f:(simplify_simple f)
         ~arg:(simplify_simple arg)
+    | Continue { cont; value } ->
+      E.continue ~cont:(simplify_simple cont) ~value:(simplify_simple value)
+    | Discontinue { cont; exn } ->
+      E.discontinue ~cont:(simplify_simple cont) ~exn:(simplify_simple exn)
+    | Discontinue_with_backtrace { cont; exn; bt } ->
+      E.discontinue_with_backtrace ~cont:(simplify_simple cont)
+        ~exn:(simplify_simple exn) ~bt:(simplify_simple bt)
   in
   let apply = Apply.with_call_kind apply (Call_kind.effect_ op) in
   let dacc, use_id =

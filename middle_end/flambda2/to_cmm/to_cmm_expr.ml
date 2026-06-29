@@ -494,7 +494,11 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         simple env res arg
       in
       let free_vars = BV.Set.union (BV.Set.union fv0 fv1) fv2 in
-      C.resume ~dbg ~cont ~f ~arg, free_vars, env, res, Ece.all)
+      C.resume ~dbg ~cont ~f ~arg, free_vars, env, res, Ece.all
+    | Continue _ | Discontinue _ | Discontinue_with_backtrace _ ->
+      Misc.fatal_error
+        "Continue/Discontinue/Discontinue_with_backtrace not yet implemented \
+         in to_cmm")
 
 let translate_apply env res apply =
   let dbg = Env.add_inlined_debuginfo env (Apply.dbg apply) in

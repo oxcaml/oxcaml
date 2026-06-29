@@ -1025,6 +1025,18 @@ let rewrite_call_kind env (call_kind : Call_kind.t) =
     Call_kind.effect_
       (Call_kind.Effect.resume ~cont:(rewrite_simple cont) ~f:(rewrite_simple f)
          ~arg:(rewrite_simple arg))
+  | Effect (Continue { cont; value }) ->
+    Call_kind.effect_
+      (Call_kind.Effect.continue ~cont:(rewrite_simple cont)
+         ~value:(rewrite_simple value))
+  | Effect (Discontinue { cont; exn }) ->
+    Call_kind.effect_
+      (Call_kind.Effect.discontinue ~cont:(rewrite_simple cont)
+         ~exn:(rewrite_simple exn))
+  | Effect (Discontinue_with_backtrace { cont; exn; bt }) ->
+    Call_kind.effect_
+      (Call_kind.Effect.discontinue_with_backtrace ~cont:(rewrite_simple cont)
+         ~exn:(rewrite_simple exn) ~bt:(rewrite_simple bt))
 
 let decide_whether_apply_needs_calling_convention_change env apply =
   let call_kind = rewrite_call_kind env (Apply.call_kind apply) in

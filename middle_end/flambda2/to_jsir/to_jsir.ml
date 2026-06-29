@@ -402,6 +402,10 @@ and apply_expr ~env ~res e =
           let f, res = To_jsir_shared.simple ~env ~res f in
           let arg, res = To_jsir_shared.simple ~env ~res arg in
           "%resume", [Pv cont; Pv f; Pv arg], res
+        | Continue _ | Discontinue _ | Discontinue_with_backtrace _ ->
+          Misc.fatal_error
+            "Continue/Discontinue/Discontinue_with_backtrace not yet \
+             implemented in to_jsir"
       in
       let prim : Jsir.expr = Prim (Extern prim_name, args) in
       let var = Jsir.Var.fresh () in

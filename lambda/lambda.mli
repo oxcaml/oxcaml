@@ -172,6 +172,9 @@ type primitive =
   | Pwith_stack_preemptible
   | Pperform
   | Presume
+  | Pcontinue
+  | Pdiscontinue
+  | Pdiscontinue_with_backtrace
   | Preperform
   (* External call *)
   | Pccall of external_call_description
