@@ -321,6 +321,20 @@ type fusable_function =
    It detects whether the AST is a method by the presence of [Texp_poly] on the
    inner function. This is only ever added to methods.
 *)
+let transl_function_return_sort ret_sort body =
+  match ret_sort with
+  | Function_returns sort -> Jkind.Sort.default_for_transl_and_get sort
+  | Function_forwards | Function_never_returns -> (
+      let env, ty =
+        match body with
+        | Tfunction_body exp -> exp.exp_env, exp.exp_type
+        | Tfunction_cases cases -> cases.fc_env, cases.fc_ret_type
+      in
+      (* CR dkalinichenko: support any layout here. *)
+      match Ctype.type_sort ~why:Function_result ~fixed:true env ty with
+      | Ok sort -> Jkind.Sort.default_for_transl_and_get sort
+      | Error _ -> Jkind.Sort.Const.Base Scannable)
+
 let fuse_method_arity (parent : fusable_function) : fusable_function =
   match parent with
   | { params = [ self_param ];
@@ -349,7 +363,7 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
         }
       in
       let return_sort =
-        Jkind.Sort.default_for_transl_and_get method_.ret_sort
+        transl_function_return_sort method_.ret_sort method_.body
       in
       (* We keep the outer function's yielding mode and drop [method_]'s: object
          code can never close over a yielding value, so the inner method is
@@ -480,7 +494,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         (event_before ~scopes body (transl_exp ~scopes layout body))
   | Texp_function { params; body; ret_sort; ret_mode; alloc_mode;
                     yielding; zero_alloc } ->
-      let ret_sort = Jkind.Sort.default_for_transl_and_get ret_sort in
+      let ret_sort = transl_function_return_sort ret_sort body in
       transl_function ~in_new_scope ~scopes e params body
         ~alloc_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
         ~yielding:(transl_yielding_mode_l yielding)
@@ -1830,10 +1844,9 @@ and transl_function_without_attributes
   let return_layout =
     match body with
     | Tfunction_body exp ->
-        layout_exp return_sort exp
+        layout_or_sort exp.exp_env exp.exp_loc return_sort exp.exp_type
     | Tfunction_cases cases ->
-        layout cases.fc_env cases.fc_loc return_sort cases.fc_ret_type
-
+        layout_or_sort cases.fc_env cases.fc_loc return_sort cases.fc_ret_type
   in
   match
     transl_tupled_function ~scopes loc params body
