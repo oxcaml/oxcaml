@@ -613,7 +613,7 @@ module Symbol = struct
   let print_with_reloc_directive : type w.
       Format.formatter -> string * w reloc_directive -> unit =
    fun ppf (s, reloc) ->
-    let macosx = Target_system.is_macos () in
+    let macosx = Target_system.Assembler.is_macos () in
     match reloc with
     | LOWER_TWELVE -> Format.fprintf ppf ":lo12:%s" s
     | GOT_LOWER_TWELVE -> Format.fprintf ppf ":got_lo12:%s" s
