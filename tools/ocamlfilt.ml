@@ -49,6 +49,7 @@ module Structured = struct
     | Anonymous_function (l, c, f) -> format_anonymous_location "fn" l c f
     | Anonymous_module (l, c, f) -> format_anonymous_location "mod" l c f
     | Partial_function (l, c, f) -> format_anonymous_location "partial" l c f
+    | Functor -> "<functor>"
     (* Inline_marker: the function body was specialized (copied) into the
        current compilation unit, not inlined at a particular call site, so we
        print [<specialization_of>] rather than [<inlining>]. *)
@@ -57,7 +58,22 @@ module Structured = struct
   let pp_path (path, suffix) =
     String.concat "." (List.map render_path_item path) ^ suffix
 
-  let unmangle sym = Option.map pp_path (Structured_mangling.Parse.parse sym)
+  (* The symbols of closures get a [_<number>_code] suffix appended; the length
+     prefix of the preceding identifier marks where it begins, so the whole
+     suffix is dropped when demangling: [foo_N_M_code] becomes [foo_N]. *)
+  let is_code_suffix s =
+    let n = String.length s in
+    n > 6
+    && s.[0] = '_'
+    && String.ends_with ~suffix:"_code" s
+    && String.for_all Char.Ascii.is_digit (String.sub s 1 (n - 6))
+
+  let unmangle sym =
+    Option.map
+      (fun (path, suffix) ->
+        let suffix = if is_code_suffix suffix then "" else suffix in
+        pp_path (path, suffix))
+      (Structured_mangling.Parse.parse sym)
 end
 
 module FlatCommon = struct

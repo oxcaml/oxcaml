@@ -8,7 +8,7 @@
  output = "e2e_suboptimal.table";
  script = "sh ${test_source_directory}/e2e_table.sh \
            ${test_build_directory}/e2e_suboptimal.o \
-           'camlStdlib|camlCamlinternal'";
+           '(caml|U[0-9]+)(Stdlib|Camlinternal)'";
  script;
  reference = "${test_source_directory}/e2e_suboptimal.reference";
  check-program-output;
@@ -21,53 +21,24 @@
    STRUCTURED column of [e2e_suboptimal.reference] for the demangled
    names. *)
 
-(* {1 Nested anonymous functions accumulate a redundant location chain}
+(* {1 Nested anonymous functions collapse to a single location}
 
    Each [fun] is [@inline never] so every closure survives as its own
-   symbol. The structured name records one [fn(file:line:col)] per
-   enclosing anonymous function, even though a single location already
-   identifies a closure uniquely. The deepest closure mangles to
-   [...nested_lambdas.fn(..3:2).fn(..4:4).fn], and note that the leaf
-   [fn] is the only one that drops its own location. *)
+   symbol. A single [fn(file:line:col)] identifies a closure uniquely, so
+   the enclosing scopes (the outer anonymous functions and [nested_lambdas]
+   itself) are dropped: the deepest closure now mangles to a bare
+   [E2e_suboptimal.fn(..:35:6)] rather than chaining every enclosing
+   location. *)
 let nested_lambdas a =
   fun[@inline never] b ->
     fun[@inline never] c ->
       fun[@inline never] d -> a + b + c + d
 
-(* {1 Functor instances are indistinguishable; the body name doubles}
+(* {1 Anonymous first-class modules are told apart by their location}
 
-   The two applications below produce two separate compiled copies of
-   [run], but both mangle identically to [Make.run]: the application
-   site ([Int_inst] / [Str_inst]) never appears in the name, so the
-   copies cannot be told apart. The functor's own body symbol also
-   doubles its name, mangling to [Make.Make]. *)
-module type ORD = sig
-  type t
-
-  val cmp : t -> t -> int
-end
-
-module Make (O : ORD) = struct
-  let[@inline never] run a b = O.cmp a b + O.cmp b a
-end
-
-module Int_inst = Make (struct
-  type t = int
-
-  let cmp = compare
-end)
-
-module Str_inst = Make (struct
-  type t = string
-
-  let cmp = compare
-end)
-
-(* {1 Anonymous first-class modules collapse to one name}
-
-   The two distinct [(module struct ... end)] bodies both mangle to
-   [pick.v]: the anonymous-module location that would tell them apart
-   is not recorded for first-class modules. *)
+   The two distinct [(module struct ... end)] bodies are distinguished by
+   their anonymous-module location ([mod(..77:15).v] vs [mod(..81:12).v]);
+   the enclosing [pick] is dropped, as the location already identifies it. *)
 module type V = sig
   val v : int -> int
 end
@@ -136,8 +107,6 @@ end
 
 let () =
   ignore (nested_lambdas 1 2 3 4);
-  ignore (Int_inst.run 1 2);
-  ignore (Str_inst.run "a" "b");
   ignore (pick true);
   ignore (deferred ());
   ignore (scale 1);

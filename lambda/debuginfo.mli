@@ -129,10 +129,15 @@ val merge : into:t -> t -> t
 val assume_zero_alloc : t -> ZA.Assume_info.t
 
 (** [to_structured_mangling_path] converts the debug info into a mangling path.
-    In all cases, the [name] is used to populate the last element of the path.
-*)
+    In all cases, the [name] is used to populate the last element of the path,
+    except when [is_a_functor] is set: a functor body is named after its own
+    binding (already present as the enclosing module), so it is represented by a
+    [Functor] marker instead, avoiding a repeated name such as [Make.Make]. *)
 val to_structured_mangling_path :
-  name:string -> t -> Compilation_unit.t Structured_mangling.path
+  name:string ->
+  is_a_functor:bool ->
+  t ->
+  Compilation_unit.t Structured_mangling.path
 
 module Dbg : sig
   type t

@@ -48,6 +48,7 @@
     - [F] - Function
     - [L] - anonymous function (L for lambda)
     - [P] - Partial application
+    - [G] - functor body (applicative or generative; [F] taken by Function)
 
     For example, [Foo.Bar.baz] in compilation unit [Foo] mangles to
     [_CamlU3FooM3BarF3baz]. *)
@@ -66,6 +67,11 @@ type 'cu path_item =
       (** [fun ... -> ...] at (line, col, file) *)
   | Partial_function of int * int * string option
       (** A partial application at (line, col, file) *)
+  | Functor
+      (** The body of a functor. It is a marker standing in for the functor's
+          name, which would otherwise be repeated: the body is named after the
+          functor binding, so without this it appears as [F.F] (e.g.
+          [Make.Make]) right below its own [Module] scope. *)
 
 (* CR sspies: Support for lazy expressions (they do not appear in the mangling
    path at all) and object methods (they appear as regular functions) is still

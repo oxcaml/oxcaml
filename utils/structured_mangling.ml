@@ -184,6 +184,10 @@ let tag_anonymous_function = "L" (* lambda *)
 
 let tag_partial_function = "P"
 
+(* [F] is already taken by [Function], so a functor body (applicative or
+   generative) uses the adjacent letter [G]. *)
+let tag_functor = "G"
+
 type 'cu path_item =
   | Compilation_unit of 'cu
   | Inline_marker
@@ -193,6 +197,7 @@ type 'cu path_item =
   | Function of string
   | Anonymous_function of int * int * string option
   | Partial_function of int * int * string option
+  | Functor
 
 type 'cu path = 'cu path_item list
 
@@ -221,6 +226,7 @@ let mangle_path_item buf path_item =
     tag_prefixed_loc ~line ~col ~file_opt ~tag:tag_anonymous_function
   | Partial_function (line, col, file_opt) ->
     tag_prefixed_loc ~line ~col ~file_opt ~tag:tag_partial_function
+  | Functor -> Buffer.add_string buf tag_functor
 
 let mangle_path buf path = List.iter (mangle_path_item buf) path
 
@@ -421,6 +427,7 @@ module Parse = struct
         | 'L' -> aux parse_loc (fun l c f -> Anonymous_function (l, c, f))
         | 'S' -> aux parse_loc (fun l c f -> Anonymous_module (l, c, f))
         | 'P' -> aux parse_loc (fun l c f -> Partial_function (l, c, f))
+        | 'G' -> loop (Functor :: path) (pos + 1)
         | 'I' -> loop (Inline_marker :: path) (pos + 1)
         | '_' -> build_result ()
         | _ -> None

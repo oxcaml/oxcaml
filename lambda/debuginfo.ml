@@ -465,30 +465,96 @@ let rec path_of_debug_info_scopes acc (scopes : Scoped_location.scopes) =
   | Cons { prev; mangling_item = Some mangling_item; _ } ->
     path_of_debug_info_scopes (mangling_item :: acc) prev
 
-let to_structured_mangling_path ~name dbg
-    : Compilation_unit.t Structured_mangling.path =
-  (* We ensure the path ends with [name] to preserve all stamps that the name
-     includes. To do so, we drop the suffix of partial applications if there is
-     any and, additionally, the last function or anonymous function if there is
-     any. It should effectively be the same function as [name]. *)
-  let rec drop_partials_and_last_function
+let to_structured_mangling_path ~name ~is_a_functor dbg :
+    Compilation_unit.t Structured_mangling.path =
+  (* A functor body is named after its own binding, which already appears as the
+     enclosing [Module] scope, so seeding it with [name] would repeat that name
+     ([Make.Make]). We instead seed it with the [Functor] marker, yielding
+     [Make.<functor>]. Outside a functor this is just [Function name]. *)
+  let leaf : Compilation_unit.t Structured_mangling.path_item =
+    if is_a_functor then Functor else Function name
+  in
+  (* An anonymous function or module is precisely located by its own position
+     information, so the scopes enclosing it (its ancestors, up to the
+     compilation unit) are redundant. [located_by_child] becomes true once we
+     have passed such an item; while it is set we drop every enclosing item
+     except compilation units, which keep it and reset the flag. (There is no
+     need to worry about the inlining marker, since it is inserted later by
+     [mangle_ident].) *)
+  let rec collapse_anonymous ~located_by_child
       (path : Compilation_unit.t Structured_mangling.path) =
     match path with
-    | Partial_function _ :: path -> drop_partials_and_last_function path
-    | Function _ :: path -> path
-    | Anonymous_function _ :: path -> path
-    | path -> path
-  in
-  let path_from_debug =
-    match to_items dbg with
     | [] -> []
-    | item :: _ ->
-      (* CR sspies: The list of debuginfo items can contain more than one item
-         in case of inlining (see [merge]). For the moment, we use the first
-         item. In the future, it would be good to track the original source of
-         the function. See #5099. *)
-      path_of_debug_info_scopes [] item.dinfo_scopes
+    | (Compilation_unit _ as cu) :: path ->
+      cu :: collapse_anonymous ~located_by_child:false path
+    | _ :: path when located_by_child ->
+      collapse_anonymous ~located_by_child path
+    | ((Anonymous_function _ | Anonymous_module _) as item) :: path ->
+      item :: collapse_anonymous ~located_by_child:true path
+    | item :: path -> item :: collapse_anonymous ~located_by_child:false path
   in
-  Structured_mangling.Function name
-  :: drop_partials_and_last_function (List.rev path_from_debug)
-  |> List.rev
+  (* Drop the suffix of partial applications and the innermost named function
+     (if any), then end the path with [leaf] (the [name], or the [Functor]
+     marker for a functor body). Using [name] preserves the stamps it includes
+     for uniqueness; we append it even after an innermost anonymous function
+     (which is kept for its position) so the stamps are not lost. *)
+  let rec drop_partials_and_adjust_function_name
+      (path : Compilation_unit.t Structured_mangling.path)
+      =
+    match path with
+    | Partial_function _ :: path ->
+      drop_partials_and_adjust_function_name path
+    | Function _ :: path -> leaf :: path
+    | path -> leaf :: path
+  in
+  (* Build the path describing the function body itself, from a single
+     debuginfo item's scopes, using the same collapse + name-adjustment as a
+     non-specialised symbol. *)
+  let body_path scopes =
+    List.rev (path_of_debug_info_scopes [] scopes)
+    |> collapse_anonymous ~located_by_child:false
+    |> drop_partials_and_adjust_function_name
+    |> List.rev
+  in
+  (* The list of debuginfo items holds the inlining/specialisation frames, from
+     the outermost call site down to the function body (the last item). The body
+     carries [name] and its stamps; the earlier frames are the call sites that
+     produced this (specialised) copy. We prefix the body path with each
+     call-site context, separated by an [Inline_marker] (rendered as
+     [<specialization_of>]), so that, e.g., two functor instances are told apart
+     by the module they were specialised into. With a single frame (no
+     specialisation) this is exactly the body path. *)
+  (* Across an [Inline_marker], drop a compilation unit that merely repeats the
+     one already in effect (a same-unit specialisation such as a functor
+     instance); keep it when it genuinely switches unit (cross-module
+     inlining). *)
+  let drop_repeated_units path =
+    let rec aux ~cur_unit ~after_marker acc
+        (path : Compilation_unit.t Structured_mangling.path) =
+      match path with
+      | [] -> List.rev acc
+      | (Compilation_unit cu as pi) :: path ->
+        if after_marker
+           &&
+           match cur_unit with
+           | Some u -> Compilation_unit.equal u cu
+           | None -> false
+        then aux ~cur_unit ~after_marker:false acc path
+        else aux ~cur_unit:(Some cu) ~after_marker:false (pi :: acc) path
+      | (Inline_marker as pi) :: path ->
+        aux ~cur_unit ~after_marker:true (pi :: acc) path
+      | pi :: path -> aux ~cur_unit ~after_marker:false (pi :: acc) path
+    in
+    aux ~cur_unit:None ~after_marker:false [] path
+  in
+  match List.rev (to_items dbg) with
+  | [] -> [leaf]
+  | body_item :: callsite_items_rev ->
+    let callsite_context =
+      List.rev callsite_items_rev
+      |> List.map (fun item ->
+             path_of_debug_info_scopes [] item.dinfo_scopes
+             @ [Structured_mangling.Inline_marker])
+      |> List.concat
+    in
+    drop_repeated_units (callsite_context @ body_path body_item.dinfo_scopes)
