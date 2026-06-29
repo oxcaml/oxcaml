@@ -303,6 +303,7 @@ static void dynamic_table_pop(dynamic_table_t table, value dyn)
 {
   dynamic_stack_t bindings = NULL;
   if(dynamic_table_find(table, dyn, &bindings)) {
+    // TODO: consider removing empty stacks from the table
     dynamic_stack_pop(bindings);
   }
 }
@@ -312,8 +313,10 @@ CAMLexport void caml_dynamic_table_scan_roots(dynamic_table_t table,
                                               scanning_action_flags fflags,
                                               void *fdata)
 {
- for (size_t i = 0; i < (size_t)table->mask + 1; ++i) {
-    dynamic_stack_scan_roots(&table->bindings[i], f, fflags, fdata);
+  if (table->bindings) {
+    for (size_t i = 0; i < (size_t)table->mask + 1; ++i) {
+      dynamic_stack_scan_roots(&table->bindings[i], f, fflags, fdata);
+    }
   }
 }
 
