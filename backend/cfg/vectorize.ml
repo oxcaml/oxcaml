@@ -1064,10 +1064,16 @@ end = struct
           | Spill | Reload ->
             Misc.fatal_error
               "Unexpected instruction Spill or Reload during vectorize"
+          (* Track allocations as memory operations: a fresh allocation starts a
+             new partition, disjoint from all other memory. Otherwise accesses
+             to the freshly-allocated block would be recorded against no
+             partition and miss dependencies (e.g. a load of a field a previous
+             store wrote), which is unsound. Mirrors [Ifar_alloc] on arm64. *)
+          | Alloc _ -> create Memory_access.Alloc
           | Move | Reinterpret_cast _ | Static_cast _ | Const_int _
           | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop _
-          | Int128op _ | Intop_imm _ | Floatop _ | Csel _ | Alloc _ ->
+          | Int128op _ | Intop_imm _ | Floatop _ | Csel _ ->
             None)
 
       let create (instruction : Instruction.t) reaching_definitions : t option =
