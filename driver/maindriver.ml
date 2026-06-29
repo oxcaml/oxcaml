@@ -52,7 +52,7 @@ let main argv ppf =
       List.length
         (List.filter (fun x -> !x)
            [make_archive;make_package;Compenv.stop_early;output_c_object;
-            instantiate])
+            instantiate;functorize])
         > 1
     then begin
       let module P = Clflags.Compiler_pass in
@@ -60,7 +60,7 @@ let main argv ppf =
       | None ->
           Compenv.fatal
             "Please specify at most one of -pack, -a, -c, -output-obj, \
-             -instantiate";
+             -instantiate, -functorize";
       | Some ((P.Parsing | P.Typing | P.Lambda) as p) ->
         assert (P.is_compilation_pass p);
         Printf.ksprintf Compenv.fatal
@@ -104,6 +104,22 @@ let main argv ppf =
             src, args
       in
       Byteinstantiator.instantiate ~src ~args target;
+      Warnings.check_fatal ();
+    end
+    else if !functorize then begin
+      Compmisc.init_path ();
+      let target = Compenv.extract_output !output_name in
+      let input_module_names =
+        Compenv.get_objfiles ~with_ocamlparam:false
+        |> Functorizer.validate_inputs
+      in
+      Functorizer.functorize input_module_names target
+        ~with_info:(Compile_common.with_info ~backend:Byte ~tool_name:"ocamlc")
+        ~impl_ext:"cmo"
+        ~read_format:(fun f ->
+          let cmo = Cmo_io.read_cmo f in
+          cmo.cu_format, cmo.cu_arg_descr)
+        ~compile_program:Compile.emit_lambda_program;
       Warnings.check_fatal ();
     end
     else if not !Compenv.stop_early && !objfiles <> [] then begin
