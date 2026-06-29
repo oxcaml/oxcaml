@@ -151,7 +151,8 @@ module U = struct
     let pp_u_item fmt { item = kind, path; env } =
       fprintf fmt "@[<1>{item = (%s,@ %a);@ env = %a}@]"
         (Shape.Sig_component_kind.to_string kind)
-        (Format_doc.compat Path.print) path pp_env env
+        (Format_doc.compat Path.print)
+        path pp_env env
     in
     let pp_item_set fmt set =
       fprintf fmt "@[<1>[%a]@]"
@@ -250,7 +251,8 @@ module U = struct
 
   let add_subst substs path lid =
     log ~title:"subst" "subst: %a -> %a (open/alias defined in file)" Logger.fmt
-      (Fun.flip (Format_doc.compat Path.print) path) Logger.fmt
+      (Fun.flip (Format_doc.compat Path.print) path)
+      Logger.fmt
       (Fun.flip Pprintast.longident lid);
     let substs =
       Lid_map.update
@@ -267,19 +269,19 @@ module U = struct
 
   (** {1 Rule U2: All paths for definitions in the current file are in U} *)
 
-let lid_and_path_of_ident ?root_lid ?root_path id =
-  let lid =
-    match root_lid with
-    | Some lid ->
-      Longident.Ldot (Location.mknoloc lid, Location.mknoloc (Ident.name id))
-    | None -> Longident.Lident (Ident.name id)
-  in
-  let path =
-    match root_path with
-    | Some path -> Path.Pdot (path, Ident.name id)
-    | None -> Path.Pident id
-  in
-  (lid, path)
+  let lid_and_path_of_ident ?root_lid ?root_path id =
+    let lid =
+      match root_lid with
+      | Some lid ->
+        Longident.Ldot (Location.mknoloc lid, Location.mknoloc (Ident.name id))
+      | None -> Longident.Lident (Ident.name id)
+    in
+    let path =
+      match root_path with
+      | Some path -> Path.Pdot (path, Ident.name id)
+      | None -> Path.Pident id
+    in
+    (lid, path)
 
   let if_record_usage f = if record_usages then f ()
 
@@ -305,8 +307,7 @@ let lid_and_path_of_ident ?root_lid ?root_path id =
   and define_component ?(from = `File) ?root_path ?root_lid sig_item =
     if record_usages then
       match (sig_item : Types.signature_item) with
-      | Sig_type (id, _, _, _) ->
-        define_type ~from ?root_path ?root_lid id
+      | Sig_type (id, _, _, _) -> define_type ~from ?root_path ?root_lid id
       | Sig_value (id, _, _) -> define_value ~from ?root_path ?root_lid id
       | Sig_typext (_, _, _, _) | Sig_jkind _ -> ()
       | Sig_module (id, _, md, _, _) ->
@@ -417,7 +418,9 @@ let lid_and_path_of_ident ?root_lid ?root_path id =
       log ~title:"U1" "U1: path %a used in file: %a (%a)" Logger.fmt
         (fun fmt ->
           Format.pp_print_string fmt (Shape.Sig_component_kind.to_string kind))
-        Logger.fmt (Fun.flip (Format_doc.compat Path.print) path) Logger.fmt
+        Logger.fmt
+        (Fun.flip (Format_doc.compat Path.print) path)
+        Logger.fmt
         (fun fmt -> Location.print_loc fmt loc);
       add_item lid
         { item = (kind, path);
@@ -426,15 +429,15 @@ let lid_and_path_of_ident ?root_lid ?root_path id =
         }
         acc
     in
-    fold_on_common_lid_and_path_segments ~init:t ~kind ~f (lid.Location.txt, path)
+    fold_on_common_lid_and_path_segments ~init:t ~kind ~f
+      (lid.Location.txt, path)
 
   let use_module env lid path = add_used env Module lid path
   let use_modtype env lid path = add_used env Module_type lid path
   let use_type env lid path = add_used env Type lid path
   let use_value env lid path = add_used env Value lid path
 
-  let use_constructor env (lid)
-      (constr : Data_types.constructor_description) t =
+  let use_constructor env lid (constr : Data_types.constructor_description) t =
     if record_usages then begin
       let t =
         (* When using a constructor, the modules appearing in its path should be
@@ -457,8 +460,7 @@ let lid_and_path_of_ident ?root_lid ?root_path id =
     end
     else t
 
-  let use_label env lid
-      (label : _ Data_types.gen_label_description) t =
+  let use_label env lid (label : _ Data_types.gen_label_description) t =
     if record_usages then begin
       let t =
         (* When using a constructor, the modules appearing in its path should be
@@ -519,7 +521,8 @@ module D = struct
   let follow_aliases_adding_subst log_detail env substs path lid =
     let add_to_substs substs path lid =
       log ~title:"D12" "D12: subst %a -> %a (%s)" Logger.fmt
-        (Fun.flip (Format_doc.compat Path.print) path) Logger.fmt
+        (Fun.flip (Format_doc.compat Path.print) path)
+        Logger.fmt
         (Fun.flip Pprintast.longident lid)
         log_detail;
       U.add_subst substs path lid
@@ -541,7 +544,8 @@ module D = struct
     try
       let substs =
         log ~title:"D12" "D12: subst %a -> %a (alias at %a)" Logger.fmt
-          (Fun.flip (Format_doc.compat Path.print) path) Logger.fmt
+          (Fun.flip (Format_doc.compat Path.print) path)
+          Logger.fmt
           (Fun.flip Pprintast.longident alias_lid.Location.txt)
           Logger.fmt
           (Fun.flip Location.print_loc alias_lid.loc);
@@ -615,42 +619,41 @@ module D = struct
       log ~title:"D5" "D5: merging discourse of module %a" Logger.fmt
         (Fun.flip Pprintast.longident lid);
       let paths = Lid_trie.union paths md.md_discourse in
-      begin
-        match md.md_type with
-        | Mty_alias path' ->
-          (* D12. If a module path m in D - note D not U - is a module alias
+      begin match md.md_type with
+      | Mty_alias path' ->
+        (* D12. If a module path m in D - note D not U - is a module alias
              with target n and another path p in D includes n within it, then
              the path obtained by substituting the m for n in p is also in D.
 
              We accumulate such substitution and will apply them when shortening
              a path. *)
-          let substs =
-            follow_aliases_adding_subst "Mty_alias target" env substs path' lid
-          in
-          (* We have to follow aliases to be able to add module components to
+        let substs =
+          follow_aliases_adding_subst "Mty_alias target" env substs path' lid
+        in
+        (* We have to follow aliases to be able to add module components to
              the discourse.
 
              TODO now that we have md_discourse_aliases, this might be redundant
              ? *)
-          let path' = Env.normalize_module_path None env path' in
-          (* TODO: Check, this might not be the same as the code before the
+        let path' = Env.normalize_module_path None env path' in
+        (* TODO: Check, this might not be the same as the code before the
              rebase. *)
-          let u_next =
-            U.add_item lid
-              { item = (Module, path');
-                env = Some env;
-                disambiguator = U.Disambiguate_id.get_id ()
-              }
-              u_next
-            (* add_path_to_discourse env { paths; substs } Module lid path'  *)
-          in
+        let u_next =
+          U.add_item lid
+            { item = (Module, path');
+              env = Some env;
+              disambiguator = U.Disambiguate_id.get_id ()
+            }
+            u_next
+          (* add_path_to_discourse env { paths; substs } Module lid path'  *)
+        in
 
-          ((paths, substs), u_next)
-        | Mty_signature sig_ ->
-          (* D3. If a module path is in U then all the paths of its subcomponents
+        ((paths, substs), u_next)
+      | Mty_signature sig_ ->
+        (* D3. If a module path is in U then all the paths of its subcomponents
              are in D *)
-          (d3_rule env (Location.mknoloc lid) path paths substs sig_, u_next)
-        | _ -> ((paths, substs), u_next)
+        (d3_rule env (Location.mknoloc lid) path paths substs sig_, u_next)
+      | _ -> ((paths, substs), u_next)
       end
     in
     ({ paths; substs }, u_next)
