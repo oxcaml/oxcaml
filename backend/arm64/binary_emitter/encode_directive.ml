@@ -590,6 +590,9 @@ let emit_directive state ~current_section ~all_sections
     match eval_constant state ~all_sections constant with
     | Some value -> D.Directive.emit_uleb128 buf value
     | None -> Misc.fatal_error "Cannot emit ULEB128 for external symbol")
+  | Frame_descr_delta _ ->
+    (* Small frame descriptors are not yet ported to ARM64. *)
+    Misc.fatal_error "Frame_descr_delta not supported on ARM64"
   (* Directives that don't emit data *)
   | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_endproc | Cfi_offset _
   | Cfi_startproc | Cfi_remember_state | Cfi_restore_state

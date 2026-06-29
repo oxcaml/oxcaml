@@ -286,6 +286,14 @@ val between_labels_32_bit :
 val between_labels_64_bit :
   ?comment:string -> upper:Asm_label.t -> lower:Asm_label.t -> unit -> unit
 
+(** Emit a variable-width return-address delta for a "small" frame descriptor.
+    The difference [upper - lower] is emitted in a single byte when it is in
+    1..254, otherwise as a 0xFF marker byte followed by a 16-bit little-endian
+    value (255..65535). A difference larger than 16 bits is a (loud) error.
+    The two labels must be in the same section. Supported only on the GAS text
+    backend. *)
+val frame_descr_delta : upper:Asm_label.t -> lower:Asm_label.t -> unit
+
 (** Like [between_symbols], but for two labels with additional offsets, emitting
     a 64-bit-wide reference. The labels must be in the same section. *)
 val between_labels_64_bit_with_offsets :
@@ -477,6 +485,12 @@ module Directive : sig
           target_symbol : Asm_symbol.t;
           addend : int64
         }
+    | Frame_descr_delta of { delta : Constant.t }
+        (** Variable-width return-address delta for a "small" frame
+            descriptor: a single byte holding [delta] when it fits 1..254,
+            otherwise a 0xFF marker byte followed by a 16-bit little-endian
+            value (255..65535). [delta] is a difference of two same-section
+            labels, hence an assembly-time constant. *)
 
   (** Translate the given directive to textual form. This produces output
       suitable for either gas or MASM as appropriate. *)

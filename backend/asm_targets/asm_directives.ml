@@ -283,6 +283,12 @@ module Directive = struct
           target_symbol : Asm_symbol.t;
           addend : int64
         }
+    | Frame_descr_delta of { delta : Constant.t }
+        (* Variable-width return-address delta for a "small" frame
+           descriptor: a single byte holding [delta] when it fits 1..254,
+           otherwise a 0xFF marker byte followed by a 16-bit little-endian
+           value (255..65535). [delta] is a difference of two same-section
+           labels, so it is an assembly-time constant. *)
 
   let bprintf = Printf.bprintf
 
@@ -411,6 +417,14 @@ module Directive = struct
       | _, _ -> print_ascii_string_gas ~chunk_size:80 buf str);
       bprintf buf "%s" (gas_comment_opt comment)
     | Comment s -> if emit_comments () then bprintf buf "\t\t\t\t/* %s */" s
+    | Frame_descr_delta { delta } ->
+      (* The delta is a difference of two same-section labels. We cannot
+         pick a fixed width by inspecting its value (it is only known to
+         the assembler, and can even change under branch relaxation), so
+         we emit it as an unsigned LEB128, which the assembler computes
+         directly. The value is always >= 1, so it never starts with a 0
+         byte and stays distinct from the escape marker. *)
+      bprintf buf "\t.uleb128 (%a)" Constant.print delta
     | Global sym -> bprintf buf "\t.globl\t%s" (Asm_symbol.encode sym)
     | New_label (Label lbl, _typ) -> bprintf buf "%s:" (Asm_label.encode lbl)
     | New_label (Symbol sym, _typ) -> bprintf buf "%s:" (Asm_symbol.encode sym)
@@ -573,6 +587,7 @@ module Directive = struct
     | External sym -> bprintf buf "\tEXTRN\t%s: NEAR" (Asm_symbol.encode sym)
     (* The only supported "type" on EXTRN declarations is NEAR. *)
     | Reloc _ -> unsupported "Reloc"
+    | Frame_descr_delta _ -> unsupported "Frame_descr_delta"
 
   let print b t =
     match TS.assembler () with
@@ -663,6 +678,12 @@ module Directive = struct
       | This | Label _ | Symbol _ | Variable _ | Add _ | Sub _ ->
         Misc.fatal_error
           "increment_offset_in_bytes: uleb128 with non-integer constant")
+    | Frame_descr_delta _ ->
+      (* Variable-width (1 or 3 bytes); not supported by the offset-accounting
+         binary-emitter path. Only emitted on amd64 via the GAS text backend,
+         which does not use this function. *)
+      Misc.fatal_error
+        "increment_offset_in_bytes: Frame_descr_delta is not supported"
     (* Directives that don't contribute to section size *)
     | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_endproc
     | Cfi_offset _ | Cfi_startproc | Cfi_remember_state | Cfi_restore_state
@@ -1125,6 +1146,13 @@ let between_labels_32_bit ?comment:_comment ~upper ~lower () =
 let between_labels_64_bit ?comment:_ ~upper:_ ~lower:_ () =
   (* CR poechsel: use the arguments *)
   Misc.fatal_error "between_labels_64_bit not implemented yet"
+
+let frame_descr_delta ~upper ~lower =
+  let delta =
+    Directive.Constant.Sub
+      (Directive.Constant.Label upper, Directive.Constant.Label lower)
+  in
+  emit (Frame_descr_delta { delta })
 
 let between_labels_64_bit_with_offsets ?comment:_comment ~upper ~upper_offset
     ~lower ~lower_offset () =

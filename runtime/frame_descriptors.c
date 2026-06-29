@@ -27,10 +27,20 @@
 #include "caml/backtrace_prim.h"
 #include <stddef.h>
 
+/* A small descriptor does not carry its own return address (it is
+   reconstructed by walking the delta chain when a frametable is
+   registered), so each hash-table slot stores the absolute return
+   address alongside the descriptor-body pointer. An empty slot has
+   [fd == NULL]. */
+typedef struct {
+  uintnat retaddr;
+  frame_descr *fd;
+} frame_descr_entry;
+
 struct caml_frame_descrs {
   int num_descr;
   int mask;
-  frame_descr** descriptors;
+  frame_descr_entry *descriptors;
   caml_frametable_list *frametables;
   caml_frametable_list *zombies;
   caml_plat_mutex mutex;
@@ -69,31 +79,118 @@ extern intnat * caml_frametable[];
 #define iter_list(list,cur) \
   for (caml_frametable_list *cur = list; cur != NULL; cur = cur->next)
 
-static frame_descr * next_frame_descr(frame_descr * d) {
-  unsigned char num_allocs = 0, *p;
-  CAMLassert(Retaddr_frame(d) >= 4096);
-  if (!frame_return_to_C(d)) {
-    /* Skip to end of live_ofs */
-    p = frame_end_of_live_ofs(d);
-    /* Skip alloc_lengths if present */
-    if (frame_has_allocs(d)) {
-      num_allocs = *p;
-      p += num_allocs + 1;
+/* Decode one descriptor (small or escaped) into [out], filling in its
+   flags, sizes, and the pointers needed to locate its live offsets,
+   allocation sizes, and debug words. [d] points at the descriptor body
+   (the byte after its LEB128 delta / escape byte). */
+void caml_decode_frame_descr(frame_descr *d, struct frame_descr_decoded *out)
+{
+  memset(out, 0, sizeof(*out));
+  if (frame_is_small(d)) {
+    const unsigned char *p = (const unsigned char *)d;
+    unsigned char sf = *p++; /* size+flags byte */
+    out->is_small = true;
+    out->has_allocs = (sf & FRAME_DESCRIPTOR_ALLOC) != 0;
+    out->has_debug = (sf & FRAME_DESCRIPTOR_DEBUG) != 0;
+    out->frame_size = (((uint32_t)(sf >> 2)) + 1) * 16;
+    if (out->has_allocs) {
+      out->small_num_allocs = *p++;
+      out->num_live = *p++;
+      out->small_allocs = p;
+      p += (out->small_num_allocs + 1) / 2; /* 4-bit alloc sizes */
+      out->small_reg_bitmap = *p++;
+    } else {
+      out->num_live = *p++;
     }
-    /* Skip debug info if present */
-    if (frame_has_debug(d)) {
-      p += sizeof(uint32_t) * (frame_has_allocs(d) ? num_allocs : 1);
+    out->small_live = p;
+    p += out->num_live; /* one byte per live stack slot (word offset) */
+    out->end_of_live = p;
+    out->num_debuginfo = out->has_allocs ? out->small_num_allocs : 1;
+    if (out->has_debug) {
+      p += sizeof(uint32_t) * out->num_debuginfo;
     }
-    /* Frame descriptors are not aligned: the next one follows immediately. */
-    return ((frame_descr*) p);
-  } else {
-    /* This marks the top of an ML stack chunk. Skip over empty
-     * frame descriptor */
-    /* Skip to address of zero-sized live_ofs */
-    CAMLassert(caml_read_unaligned_uint16(&d->num_live) == 0);
-    p = (unsigned char*)&d->live_ofs[0];
-    return ((frame_descr*) p);
+    out->end = p;
+    return;
   }
+
+  /* Escaped descriptor: normal or long format. */
+  if (frame_return_to_C(d)) {
+    out->return_to_C = true;
+    /* Top of an ML stack chunk: an empty descriptor. */
+    CAMLassert(caml_read_unaligned_uint16(&d->num_live) == 0);
+    out->end_of_live = out->end = (const unsigned char *)&d->live_ofs[0];
+    return;
+  }
+  out->is_long = frame_is_long(d);
+  out->has_allocs = frame_has_allocs(d);
+  out->has_debug = frame_has_debug(d);
+  out->frame_size = frame_size(d);
+  if (out->is_long) {
+    out->num_live = caml_read_unaligned_uint32(&frame_as_long(d)->num_live);
+  } else {
+    out->num_live = caml_read_unaligned_uint16(&d->num_live);
+  }
+  const unsigned char *p = frame_end_of_live_ofs(d);
+  out->end_of_live = p;
+  out->num_debuginfo = 1;
+  if (out->has_allocs) {
+    out->small_num_allocs = *p;
+    out->num_debuginfo = *p;
+    p += (uintnat)(*p) + 1; /* num_allocs byte + one byte per alloc */
+  }
+  if (out->has_debug) {
+    p += sizeof(uint32_t) * out->num_debuginfo;
+  }
+  out->end = p;
+}
+
+/* Iterate over the descriptors of one frametable, reconstructing the
+   absolute return address of each descriptor by walking the delta chain.
+   An escaped descriptor carries an absolute return address (retaddr_rel);
+   a small descriptor's address is the running address plus its delta. */
+typedef struct {
+  const unsigned char *next; /* points at the next descriptor's delta byte */
+  uintnat retaddr;           /* running absolute return address */
+  intnat remaining;          /* descriptors left to yield */
+} frametable_iter;
+
+static void frametable_iter_start(frametable_iter *it, intnat *tbl)
+{
+  it->remaining = (intnat)caml_read_unaligned_uintnat(tbl);
+  it->next = (const unsigned char *)(tbl + 1);
+  it->retaddr = 0;
+}
+
+/* Yield the next descriptor body and its absolute return address. Must
+   only be called while [it->remaining > 0]. */
+static frame_descr *frametable_iter_next(frametable_iter *it,
+                                         uintnat *retaddr_out)
+{
+  const unsigned char *p = it->next;
+  frame_descr *d;
+  if (*p == FRAME_DELTA_ESCAPE) {
+    p++;
+    d = (frame_descr *)p;
+    it->retaddr = Retaddr_frame(d);
+  } else {
+    /* Unsigned LEB128 delta (>= 1, so it never starts with a 0 byte). */
+    uintnat delta = 0;
+    int shift = 0;
+    unsigned char byte;
+    do {
+      byte = *p++;
+      delta |= (uintnat)(byte & 0x7f) << shift;
+      shift += 7;
+    } while (byte & 0x80);
+    it->retaddr += delta;
+    d = (frame_descr *)p;
+  }
+  struct frame_descr_decoded dec;
+  caml_decode_frame_descr(d, &dec);
+  it->next = dec.end;
+  it->remaining--;
+  *retaddr_out = it->retaddr;
+  return d;
 }
 
 static intnat count_descriptors(caml_frametable_list *list) {
@@ -122,38 +219,40 @@ static void fill_hashtable(
   caml_frame_descrs *table, caml_frametable_list *new_frametables)
 {
   iter_list(new_frametables,cur) {
-    intnat * tbl = (intnat*) cur->frametable;
-    intnat len = (intnat)caml_read_unaligned_uintnat(tbl);
-    frame_descr * d = (frame_descr *)(tbl + 1);
-    for (intnat j = 0; j < len; j++) {
-      uintnat h = Hash_retaddr(Retaddr_frame(d), table->mask);
-      while (table->descriptors[h] != NULL) {
+    frametable_iter it;
+    frametable_iter_start(&it, (intnat *) cur->frametable);
+    while (it.remaining > 0) {
+      uintnat retaddr;
+      frame_descr *d = frametable_iter_next(&it, &retaddr);
+      uintnat h = Hash_retaddr(retaddr, table->mask);
+      while (table->descriptors[h].fd != NULL) {
         h = (h+1) & table->mask;
       }
-      table->descriptors[h] = d;
-      d = next_frame_descr(d);
+      table->descriptors[h].retaddr = retaddr;
+      table->descriptors[h].fd = d;
     }
   }
 }
 
-static void remove_entry(caml_frame_descrs *table, frame_descr * d) {
+static void remove_entry(caml_frame_descrs *table, uintnat retaddr,
+                         frame_descr * d) {
   uintnat i;
   uintnat r;
   uintnat j;
 
-  i = Hash_retaddr(Retaddr_frame(d), table->mask);
-  while (table->descriptors[i] != d) {
+  i = Hash_retaddr(retaddr, table->mask);
+  while (table->descriptors[i].fd != d) {
     i = (i+1) & table->mask;
   }
 
  r1:
   j = i;
-  table->descriptors[i] = NULL;
+  table->descriptors[i].fd = NULL;
  r2:
   i = (i+1) & table->mask;
   // r3
-  if(table->descriptors[i] == NULL) return;
-  r = Hash_retaddr(Retaddr_frame(table->descriptors[i]), table->mask);
+  if(table->descriptors[i].fd == NULL) return;
+  r = Hash_retaddr(table->descriptors[i].retaddr, table->mask);
   /* If r is between i and j (cyclically), i.e. if
      table->descriptors[i]->retaddr don't need to be moved */
   if(( ( j < r )  && ( r <= i ) ) ||
@@ -168,16 +267,16 @@ static void remove_entry(caml_frame_descrs *table, frame_descr * d) {
 
 static void clean_frame_descriptors(caml_frame_descrs *table)
 {
-  intnat *tbl, len, decrease = 0;
-  frame_descr * d;
+  intnat decrease = 0;
   caml_frametable_list *cur = table->zombies, *rem;
   while (cur != NULL) {
-    tbl = (intnat*) cur->frametable;
-    len = *tbl;
-    d = (frame_descr *)(tbl + 1);
-    for (intnat j = 0; j < len; j++) {
-      remove_entry(table, d);
-      d = next_frame_descr(d);
+    frametable_iter it;
+    frametable_iter_start(&it, (intnat *) cur->frametable);
+    intnat len = it.remaining;
+    while (it.remaining > 0) {
+      uintnat retaddr;
+      frame_descr *d = frametable_iter_next(&it, &retaddr);
+      remove_entry(table, retaddr, d);
     }
     decrease += len;
     rem = cur;
@@ -190,152 +289,30 @@ static void clean_frame_descriptors(caml_frame_descrs *table)
 
 /* ---- Frametable measurement ---- */
 
-/* As preparation for designing a more memory-efficient frametable
- * format, this code measures various things about the frametables of
- * an executable. */
+/* Walks the frametables in the new ("small") on-disk format and reports
+ * their real sizes, so we can track how much the compact encoding saves.
+ * Settable via GC tweaks OCAMLRUNPARAM=Xmeasure_frametables (the
+ * frametables registered in this batch) and Xmeasure_all_frametables (all
+ * units linked into the executable, via the caml_all_frametables set). */
 
-/* Settable via GC tweak OCAMLRUNPARAM=Xmeasure_frametables */
 extern uintnat caml_measure_frametables;
-
-/* Settable via GC tweak OCAMLRUNPARAM=Xmeasure_all_frametables. */
 extern uintnat caml_measure_all_frametables;
 
-#define MAX_LOG 32
-#define SMALL_FRAMES 32
-#define REGS 64
-#define MAX_REG (REGS - 1) /* Largest register index recorded in reg tables */
-#define MAX_REG_IN_SMALL_MAP 12
-#define REG_MAPS (1<<(MAX_REG_IN_SMALL_MAP + 1))
-#define REGMAP_REPORT_THRESHOLD 1000
-
-/* Step 2 of the small-frame-descriptor design: simulate, without changing the
-   format, how big each descriptor would be in the proposed "small" format, and
-   how much we'd save. */
-#define SIM_MAXK 8  /* ALLOC_BITS swept 0..SIM_MAXK in the combined na/nl byte */
-
-/* Return addresses are byte-aligned on amd64 but 4-byte aligned on AArch64, so
-   a small descriptor stores delta/DELTA_SCALE -- one delta byte reaches 4x
-   further on AArch64, with correspondingly fewer escapes. */
-#if defined(__aarch64__)
-#define DELTA_SCALE 4
-#else
-#define DELTA_SCALE 1
-#endif
-
-/* The register map is direct-indexed (bit N = register N; no hot-set lookup):
-   a descriptor fits a width-W map iff its highest live register is < W. The
-   simulation sweeps W in {16, 32} -- the [b] axis below (b=0 -> 16, b=1 -> 32). */
-
 struct frametable_stats {
-  /* A few per-frametable items */
-  unsigned char *last_retaddr;
-  unsigned char *min_retaddr;
-  unsigned char *max_retaddr;
-  unsigned char *min_descr;
-  unsigned char *max_descr;
-  size_t descrs;
-
-  /* Everything else is accumulated over all frametables */
   size_t frametables;
-  size_t total_codesize;
-  size_t total_ft_size;
-  size_t total_debuginfo_size;
-  size_t total_descrs;
-  size_t total_debuginfo;
-
-  /* Are frametables in memory before or after the code they describe? */
-  size_t ft_before_code;
-  size_t ft_after_code;
-
-  /* Descriptor kinds */
+  size_t descrs;         /* total descriptors */
+  size_t small_descrs;   /* small-format descriptors */
+  size_t escaped_descrs; /* escaped (normal/long) descriptors */
+  size_t wide_deltas;    /* small descrs whose LEB128 delta needs >1 byte */
   size_t return_to_C;
-  size_t with_debug;
   size_t with_alloc;
-  size_t long_descrs;
+  size_t with_debug;
 
-  /* Frame sizes */
-  size_t small_frames[SMALL_FRAMES];
-  size_t log_framesize[MAX_LOG];
-  size_t max_framesize;
-
-  /* Relative return addresses */
-  size_t log_pos_retaddr_rel[MAX_LOG];
-  size_t max_pos_retaddr_rel;
-  size_t log_neg_retaddr_rel[MAX_LOG];
-  size_t max_neg_retaddr_rel;
-
-  /* Delta from one retaddr to the next */
-  size_t log_pos_delta[MAX_LOG];
-  size_t max_pos_delta;
-  size_t log_neg_delta[MAX_LOG];
-  size_t max_neg_delta;
-
-  /* Counts of "live offset" slots (GC regs + slots) */
-  size_t small_lives[SMALL_FRAMES];
-  size_t log_lives[MAX_LOG];
-  size_t max_lives; /* Overall maximum count of lives */
-
-  /* GCable registers */
-  size_t reg[REGS]; /* # descriptors using each register */
-  size_t reg_count[REGS]; /* Count GCable registers */
-  size_t max_regs;
-  size_t max_reg[REGS];  /* Count max GCable register index */
-  size_t reg_maps[REG_MAPS]; /* Count reg maps up to REG_MAPS */
-  size_t big_reg_descrs; /* Descrs with a register > MAX_REG_IN_SMALL_MAP */
-  size_t big_reg_entries; /* live_ofs register entries with number > MAX_REG */
-  size_t noalloc_with_regs; /* Non-alloc descrs that have registers (anomaly) */
-
-  /* Count of GCable stack slots */
-  size_t small_slots[SMALL_FRAMES];
-  size_t log_slots[MAX_LOG];
-  size_t max_slots;
-
-  /* maximum GCable stack slot offset */
-  size_t small_max_slot[SMALL_FRAMES];
-  size_t log_max_slot[MAX_LOG];
-  size_t max_slot;
-
-  /* Comballoc allocation counts */
-  size_t log_comballocs[MAX_LOG];
-  size_t small_comballocs[SMALL_FRAMES];
-  size_t max_comballocs;
-
-  /* allocation sizes */
-  size_t alloc_sizes;
-  size_t log_alloc_sizes[MAX_LOG];
-  size_t small_alloc_sizes[SMALL_FRAMES];
-  size_t max_alloc_size;
-
-  /* Small-descriptor format simulation (step 2) */
-  size_t sim_descrs;                       /* descriptors simulated */
-  size_t sim_current_total;                /* bytes in the current packed format */
-  size_t sim_aligned_total;                /* bytes in the old (pre-relaxation) aligned format */
-  /* [varint delta?][16-bit register bitmap?][ALLOC_BITS] */
-  size_t sim_total[2][2][SIM_MAXK + 1];    /* total bytes, combined na/nl byte */
-  size_t sim_small[2][2][SIM_MAXK + 1];    /* # small descriptors */
-  /* [varint?][16-bit bitmap?]: separate full bytes for num_allocs & num_live */
-  size_t sim_sep_total[2][2];
-  size_t sim_sep_small[2][2];
-  /* base-ineligibility causes (independent of ALLOC_BITS) */
-  size_t sim_esc_first, sim_esc_rettoc, sim_esc_delta, sim_esc_size,
-         sim_esc_reg, sim_esc_allocsize;
+  size_t descr_bytes;    /* bytes of frame descriptors (incl. delta bytes) */
+  size_t header_bytes;   /* per-frametable count words */
+  size_t debuginfo_bytes;
+  size_t debuginfo_count;
 };
-
-static void clear_stats(struct frametable_stats *stats)
-{
-  caml_debuginfo_reset();
-  memset(stats, 0, sizeof(*stats));
-}
-
-static void clear_per_frametable_stats(struct frametable_stats *stats)
-{
-  stats->min_retaddr = stats->max_retaddr = stats->last_retaddr =
-    stats->min_descr = stats->max_descr = NULL;
-  stats->descrs = 0;
-  caml_debuginfo_reset();
-}
-
-/* Turn `val` into a string representing that number of bytes */
 
 static void report_bytes(char *buf, size_t space, size_t val)
 {
@@ -345,7 +322,7 @@ static void report_bytes(char *buf, size_t space, size_t val)
     char suffix[] = " kMGTE";
     double scaled = val;
     char *p = suffix;
-    while(scaled > 1000 && *p) {
+    while (scaled > 1000 && *p) {
       scaled /= 1024.0;
       ++p;
     }
@@ -353,629 +330,101 @@ static void report_bytes(char *buf, size_t space, size_t val)
   }
 }
 
-/* Write text showing an array `vals` of `count` size_t values,
- * without trailing zero values, into `buf` (size `space` bytes). */
-
-/* This works for regs and logs and smalls */
-#define TABLE_BUF_SIZE (REGS * 16)
-
-static void report_table(char *fmt, size_t *vals, size_t count)
-{
-  char buf[TABLE_BUF_SIZE];
-  size_t space = TABLE_BUF_SIZE;
-
-  size_t max = count - 1;
-  while(max && vals[max] == 0) {
-    --max;
-  }
-  char *p = buf;
-  for (size_t i = 0; i <= max; ++i) {
-    int len = snprintf(p, space, "%zu ", vals[i]);
-    if (len > space) { /* truncated, replace with ... */
-      p[space-4] = p[space-3] = p[space-2] = '.';
-      p[space-1] = '\0';
-      return;
-    }
-    space -= len;
-    p += len;
-  }
-  printf(fmt, buf);
-}
-
-/* At the end of a single frametable, deduce per-frametable sizes and
- * add them to global stats. */
-
-static void accumulate_frametable_stats(intnat *frametable,
-                                        struct frametable_stats *stats)
-{
-  char *debuginfo_low, *debuginfo_high;
-  size_t debuginfo_count;
-  caml_debuginfo_measurements(&debuginfo_count,
-                              &debuginfo_low,
-                              &debuginfo_high);
-  /* round debuginfo_high up to word boundary */
-  debuginfo_high = Align_to(debuginfo_high, uintnat);
-/*
-  printf("Frametable at %p: return addresses %p-%p(0x%zx), "
-        "descriptors %p-%p(0x%zx, %zu), "
-        "debuginfo %p-%p(0x%zx, %zu)\n",
-        (void*)frametable,
-        (void*)stats->min_retaddr,
-        (void*)stats->max_retaddr,
-        (size_t)(stats->max_retaddr - stats->min_retaddr),
-        (void*)stats->min_descr,
-        (void*)stats->max_descr,
-        (size_t)(stats->max_descr - stats->min_descr),
-        stats->descrs,
-        (void*)debuginfo_low,
-        (void*)debuginfo_high,
-        (size_t)(debuginfo_high - debuginfo_low),
-        debuginfo_count);
-*/
-  stats->total_codesize += (stats->max_retaddr - stats->min_retaddr);
-  stats->total_ft_size += (stats->max_descr - stats->min_descr);
-  stats->total_debuginfo_size += (debuginfo_high - debuginfo_low);
-  stats->total_descrs += stats->descrs;
-  stats->total_debuginfo += debuginfo_count;
-  if (stats->min_retaddr) {
-    if (stats->min_retaddr > stats->min_descr)
-      ++ stats->ft_before_code;
-    else
-      ++ stats->ft_after_code;
-  }
-}
-
-/* Report all accumulated frametable stats to stdout. */
-
-static void report_stats(struct frametable_stats *stats)
-{
-  char table_buf[TABLE_BUF_SIZE];
-
-  size_t total_size =
-    stats->total_codesize
-    + stats->total_ft_size
-    + stats->total_debuginfo_size;
-  printf("Summary of %zu frametables.\n", stats->frametables);
-  report_bytes(table_buf, TABLE_BUF_SIZE, stats->total_codesize);
-  printf("%s code (%5.2f%%)\n", table_buf,
-         (double)stats->total_codesize/total_size * 100.0);
-  report_bytes(table_buf, TABLE_BUF_SIZE, stats->total_ft_size);
-  printf("%s descriptors (%5.2f%%; %zu descrs, %f bytes each)\n",
-         table_buf,
-         (double)stats->total_ft_size/total_size * 100.0,
-         stats->total_descrs,
-         (double)stats->total_ft_size / stats->total_descrs);
-  report_bytes(table_buf, TABLE_BUF_SIZE, stats->total_debuginfo_size);
-  printf("%s Debuginfo (%5.2f%% %zu entries)\n",
-         table_buf,
-         (double)stats->total_debuginfo_size/total_size * 100.0,
-         stats->total_debuginfo);
-  printf("%zu frametables before code, %zu after code.\n",
-         stats->ft_before_code, stats->ft_after_code);
-  printf("long %zu return to C %zu alloc %zu debug %zu\n",
-         stats->long_descrs, stats->return_to_C,
-         stats->with_alloc, stats->with_debug);
-
-  printf("Max pos retaddr offset %zu\n", stats->max_pos_retaddr_rel);
-  report_table("  (logs %s)\n", stats->log_pos_retaddr_rel, MAX_LOG);
-  printf("Max neg retaddr offset %zu\n", stats->max_neg_retaddr_rel);
-  report_table("  (logs %s)\n", stats->log_neg_retaddr_rel, MAX_LOG);
-  printf("Max retaddr pos delta %zu\n", stats->max_pos_delta);
-  report_table("  (logs %s)\n", stats->log_pos_delta, MAX_LOG);
-  printf("Max retaddr neg delta %zu\n", stats->max_neg_delta);
-  report_table("  (logs %s)\n", stats->log_neg_delta, MAX_LOG);
-
-  printf("Frame sizes (max %zu)\n", stats->max_framesize);
-  report_table("  (small %s)\n", stats->small_frames, SMALL_FRAMES);
-  report_table("  (logs %s)\n", stats->log_framesize, MAX_LOG);
-
-  printf("Comballoc entries (max %zu)\n",
-         stats->max_comballocs);
-  report_table("  (small %s)\n", stats->small_comballocs, SMALL_FRAMES);
-  report_table("  (logs %s)\n", stats->log_comballocs, MAX_LOG);
-
-  printf("Allocation sizes (wosize-1) (%zu allocs, max %zu)\n",
-         stats->alloc_sizes, stats->max_alloc_size);
-  report_table("  (small %s)\n", stats->small_alloc_sizes, SMALL_FRAMES);
-  report_table("  (logs %s)\n", stats->log_alloc_sizes, MAX_LOG);
-
-  printf("GC live values (max %zu)\n", stats->max_lives);
-  report_table("  (small %s)\n", stats->small_lives, SMALL_FRAMES);
-  report_table("  (logs %s)\n", stats->log_lives, MAX_LOG);
-
-  printf("GCable stack slots (max %zu)\n", stats->max_slots);
-  report_table("  (small %s)\n", stats->small_slots, SMALL_FRAMES);
-  report_table("  (logs %s)\n", stats->log_slots, MAX_LOG);
-
-  printf("Max GCable stack slot (max %zu)\n", stats->max_slot);
-  report_table("  (small %s)\n", stats->small_max_slot, SMALL_FRAMES);
-  report_table("  (logs %s)\n", stats->log_max_slot, MAX_LOG);
-
-  printf("GCable registers (max %zu)\n", stats->max_regs);
-  report_table("  (counts %s)\n", stats->reg_count, REGS);
-  report_table("  (each reg %s)\n", stats->reg, REGS);
-  report_table("  (max %s)\n", stats->max_reg, REGS);
-
-  /* report all register maps which are more than 1/128 of the total
-   * (apart from the empty reg map */
-  size_t others = 0;
-  size_t regmaps = 0;
-  for (size_t i = 1; i < REG_MAPS; ++i) {
-    regmaps += stats->reg_maps[i];
-  }
-
-  printf("Register map frequencies (of %zu allocation descriptors):\n",
-         stats->with_alloc);
-  for (size_t i = 0; i < REG_MAPS; ++i) {
-    if (stats->reg_maps[i] > regmaps/REGMAP_REPORT_THRESHOLD) {
-      for (size_t j = 0; j <= MAX_REG_IN_SMALL_MAP; ++j) {
-        table_buf[MAX_REG_IN_SMALL_MAP - j] = (i & (1 << j)) ? '1' : '0';
-      }
-      table_buf[MAX_REG_IN_SMALL_MAP+1] = '\0';
-      printf("  %s %zu\n", table_buf, stats->reg_maps[i]);
-    } else {
-      others += stats->reg_maps[i];
-    }
-  }
-  printf("  others (<= %zu) %zu\n", regmaps/REGMAP_REPORT_THRESHOLD, others);
-  printf("Descriptors with a register > %d: %zu\n",
-         MAX_REG_IN_SMALL_MAP, stats->big_reg_descrs);
-  printf("live_ofs register entries with number > %d: %zu\n",
-         MAX_REG, stats->big_reg_entries);
-  printf("Non-allocation descriptors with registers: %zu\n",
-         stats->noalloc_with_regs);
-
-  /* --- Small-descriptor format simulation (step 2) --- */
-  printf("\nSmall-descriptor simulation: %zu descriptors\n", stats->sim_descrs);
-  report_bytes(table_buf, TABLE_BUF_SIZE, stats->sim_aligned_total);
-  printf("  baseline aligned: %s\n", table_buf);
-  report_bytes(table_buf, TABLE_BUF_SIZE, stats->sim_current_total);
-  printf("  baseline packed:  %s\n", table_buf);
-  printf("  base-escape causes: first=%zu retC=%zu delta_ovf=%zu size=%zu "
-         "reg>=16=%zu allocsz=%zu\n",
-         stats->sim_esc_first, stats->sim_esc_rettoc, stats->sim_esc_delta,
-         stats->sim_esc_size, stats->sim_esc_reg, stats->sim_esc_allocsize);
-  printf("  base format (16-bit direct map, 1-byte delta), by ALLOC_BITS:\n");
-  printf("  %-10s %14s %10s %10s %9s %9s\n",
-         "ALLOC_BITS", "total", "small", "escaped", "vs_packed", "vs_aligned");
-  for (int k = 0; k <= SIM_MAXK; k++) {
-    size_t esc = stats->sim_descrs - stats->sim_small[0][0][k];
-    double pk = stats->sim_current_total
-      ? 100.0 * ((double)stats->sim_current_total
-                 - (double)stats->sim_total[0][0][k])
-        / (double)stats->sim_current_total : 0.0;
-    double al = stats->sim_aligned_total
-      ? 100.0 * ((double)stats->sim_aligned_total
-                 - (double)stats->sim_total[0][0][k])
-        / (double)stats->sim_aligned_total : 0.0;
-    printf("  %-10d %14zu %10zu %10zu %8.1f%% %8.1f%%\n",
-           k, stats->sim_total[0][0][k], stats->sim_small[0][0][k], esc, pk, al);
-  }
-  {
-    static const char *nm[2][2] =
-      { { "16-bit", "32-bit" }, { "16-bit+varint", "32-bit+varint" } };
-    printf("  refinements (each at its best ALLOC_BITS):\n");
-    for (int v = 0; v < 2; v++) for (int b = 0; b < 2; b++) {
-      int bk = 0;
-      for (int k = 1; k <= SIM_MAXK; k++)
-        if (stats->sim_total[v][b][k] < stats->sim_total[v][b][bk]) bk = k;
-      size_t tot = stats->sim_total[v][b][bk];
-      double pk = stats->sim_current_total
-        ? 100.0 * ((double)stats->sim_current_total - (double)tot)
-          / (double)stats->sim_current_total : 0.0;
-      double al = stats->sim_aligned_total
-        ? 100.0 * ((double)stats->sim_aligned_total - (double)tot)
-          / (double)stats->sim_aligned_total : 0.0;
-      printf("  %-14s k=%d  %14zu  vs_packed %5.1f%%  vs_aligned %5.1f%%\n",
-             nm[v][b], bk, tot, pk, al);
-    }
-    printf("  separate na/nl bytes (no ALLOC_BITS split):\n");
-    for (int v = 0; v < 2; v++) for (int b = 0; b < 2; b++) {
-      size_t tot = stats->sim_sep_total[v][b];
-      double pk = stats->sim_current_total
-        ? 100.0 * ((double)stats->sim_current_total - (double)tot)
-          / (double)stats->sim_current_total : 0.0;
-      double al = stats->sim_aligned_total
-        ? 100.0 * ((double)stats->sim_aligned_total - (double)tot)
-          / (double)stats->sim_aligned_total : 0.0;
-      printf("  %-14s      %14zu  vs_packed %5.1f%%  vs_aligned %5.1f%%\n",
-             nm[v][b], tot, pk, al);
-    }
-  }
-}
-
-/* Actually floor(log_2(x))+1, clamped at MAX_LOG-1.
-   mylog(0) = 0
-   mylog(1) = 1
-   mylog(2) = 2
-   mylog(3) = 2
-   mylog(4) = 3
-   ...
-   mylog(255) = 8
-   mylog(256) = 9
-   etc
-  */
-Caml_inline size_t mylog(size_t v)
-{
-  size_t log = 0;
-  while(v) {
-    v /= 2;
-    ++ log;
-  }
-  /* Clamp so the result is always a valid index into a MAX_LOG table */
-  if (log >= MAX_LOG) {
-    log = MAX_LOG - 1;
-  }
-  return log;
-}
-
-/* Common code for recording an item in:
-   - an optional max value;
-   - an optional table of small values (less than SMALL_FRAMES)
-   - an optional table of log values.
- */
-
-Caml_inline void count_item(size_t item, size_t *max, size_t *smalls,
-                            size_t *logs)
-{
-  if (max && item > *max) {
-    *max = item;
-  }
-  if (smalls && item < SMALL_FRAMES) {
-    ++ smalls[item];
-  }
-  if (logs) {
-    ++ logs[mylog(item)];
-  }
-}
-
-/* Record a single live_ofs entry: either a GCable register or a GCable
-   stack slot.  Register numbers are normally small (we have never
-   observed one larger than MAX_REG_IN_SMALL_MAP), but the format
-   permits large ones (e.g. Valx2 values held in SIMD registers), so we
-   guard the fixed-size tables and count the outliers separately. */
-
-static void add_live_ofs(uint32_t ofs, size_t *reg_p,
-                         size_t *regs, size_t *max_reg, uint64_t *reg_map,
-                         bool *has_big_reg,
-                         size_t *slots, size_t *max_slot,
-                         struct frametable_stats *stats)
-{
-  if (ofs & 1) {
-    size_t reg = ofs >> 1;
-    ++ *regs;
-    if (reg < REGS) {
-      ++ reg_p[reg];
-    }
-    if (reg > *max_reg) {
-      *max_reg = reg;
-    }
-    if (reg <= MAX_REG_IN_SMALL_MAP) {
-      *reg_map |= (uint64_t)1 << reg;
-    } else {
-      *has_big_reg = true;
-    }
-    if (reg > MAX_REG) {
-      ++ stats->big_reg_entries;
-    }
-  } else {
-    size_t slot = ofs / sizeof(value);
-    ++ *slots;
-    if (slot > *max_slot) {
-      *max_slot = slot;
-    }
-  }
-}
-
-/* Record stats for a single descriptor */
-
-static void add_descriptor_to_stats(frame_descr *d,
+/* Record stats for the descriptors of one frametable. */
+static void add_frametable_to_stats(intnat *frametable,
                                     struct frametable_stats *stats)
 {
-  unsigned char *p;
-  /* Facts gathered for the small-descriptor simulation at the end. */
-  bool sim_is_first = false, sim_rettoc = false, sim_is_long = false;
-  bool sim_has_alloc = false, sim_has_debug = false;
-  bool sim_allocs4 = true;
-  intnat sim_delta = 0;
-  uint32_t sim_fsize = 0;
-  size_t sim_nlive = 0, sim_slots = 0, sim_regs = 0, sim_nalloc = 0,
-         sim_ndbg = 0, sim_maxreg = 0;
-  ++ stats->descrs;
-  if (!stats->min_descr || ((unsigned char*)d < stats->min_descr)) {
-    stats->min_descr = (unsigned char*)d;
-  }
+  ++stats->frametables;
+  stats->header_bytes += sizeof(intnat);
+  caml_debuginfo_reset();
 
-  intnat retaddr_rel = caml_read_unaligned_int32(&d->retaddr_rel);
-  if (retaddr_rel < 0) {
-    count_item(-retaddr_rel, &stats->max_neg_retaddr_rel, NULL,
-               stats->log_neg_retaddr_rel);
-  } else {
-    count_item(retaddr_rel, &stats->max_pos_retaddr_rel, NULL,
-               stats->log_pos_retaddr_rel);
-  }
-
-  unsigned char *retaddr = (unsigned char *)Retaddr_frame(d);
-  sim_is_first = (stats->last_retaddr == NULL);
-  if (!sim_is_first)
-    sim_delta = (intnat)((uintnat)retaddr - (uintnat)stats->last_retaddr);
-  if (stats->last_retaddr) {
-    if (retaddr < stats->min_retaddr) {
-      stats->min_retaddr = retaddr;
-    }
-    if (retaddr > stats->max_retaddr) {
-      stats->max_retaddr = retaddr;
-    }
-    intnat delta = (uintnat)retaddr - (uintnat)stats->last_retaddr;
-    if (delta < 0) {
-      count_item(-delta, &stats->max_neg_delta, NULL, stats->log_neg_delta);
+  frametable_iter it;
+  frametable_iter_start(&it, frametable);
+  const unsigned char *start = it.next;
+  while (it.remaining > 0) {
+    const unsigned char *delta_at = it.next;
+    unsigned char delta0 = *delta_at;
+    uintnat retaddr;
+    frame_descr *d = frametable_iter_next(&it, &retaddr);
+    ++stats->descrs;
+    if (delta0 == FRAME_DELTA_ESCAPE) {
+      ++stats->escaped_descrs;
     } else {
-      count_item(delta, &stats->max_pos_delta, NULL, stats->log_pos_delta);
-    }
-  } else {
-    stats->min_retaddr = stats->max_retaddr = retaddr;
-  }
-  stats->last_retaddr = retaddr;
-
-  if (frame_return_to_C(d)) {
-    ++ stats->return_to_C;
-    sim_rettoc = true;
-    /* Top of an ML stack chunk. Skip over empty frame descriptor */
-    p = (unsigned char*)&d->live_ofs[0];
-  } else {
-    uint32_t sz = frame_size(d); /* in bytes */
-    sz /= sizeof(uintnat);
-    count_item(sz, &stats->max_framesize, stats->small_frames,
-               stats->log_framesize);
-
-    uint64_t reg_map = 0; /* bitmap of live registers */
-    size_t regs = 0; /* number of live registers */
-    size_t max_reg = 0; /* max live register number */
-    size_t slots = 0; /* number of live stack slots */
-    size_t max_slot = 0; /* max live stack slot offset */
-    bool has_big_reg = false; /* saw a register too big for the small map */
-
-    uint32_t num_live;
-    if (frame_is_long(d)) {
-      ++stats->long_descrs;
-      frame_descr_long *dl = frame_as_long(d);
-      num_live = caml_read_unaligned_uint32(&dl->num_live);
-      uint32_t n = num_live;
-      for (uint32_t *ofp = dl->live_ofs; n > 0; n--, ofp++) {
-        add_live_ofs(caml_read_unaligned_uint32(ofp), stats->reg, &regs,
-                     &max_reg, &reg_map, &has_big_reg, &slots, &max_slot,
-                     stats);
-      }
-    } else {
-      num_live = caml_read_unaligned_uint16(&d->num_live);
-      uint16_t n = num_live;
-      for (uint16_t *ofp = d->live_ofs; n > 0; n--, ofp++) {
-        add_live_ofs(caml_read_unaligned_uint16(ofp), stats->reg,
-                     &regs, &max_reg, &reg_map, &has_big_reg, &slots,
-                     &max_slot, stats);
-      }
+      ++stats->small_descrs;
+      /* Count small descriptors whose LEB128 delta needed more than one
+         byte (the high bit of the first byte is set). */
+      if (delta0 & 0x80) ++stats->wide_deltas;
     }
 
-    /* Record size of GC "offset" table */
-    count_item(num_live, &stats->max_lives, stats->small_lives,
-               stats->log_lives);
-
-    /* Register counts and maps, recorded only for allocation descriptors.
-       Non-allocation descriptors are not expected to keep GC roots in
-       registers, so count any that do as an anomaly rather than folding
-       them into the register statistics. */
-    if (frame_has_allocs(d)) {
-      if (regs < REGS) {
-        ++ stats->reg_count[regs];
+    struct frame_descr_decoded dec;
+    caml_decode_frame_descr(d, &dec);
+    if (dec.return_to_C) ++stats->return_to_C;
+    if (dec.has_allocs) ++stats->with_alloc;
+    if (dec.has_debug) {
+      ++stats->with_debug;
+      const unsigned char *p = dec.end_of_live;
+      if (!dec.is_small && dec.has_allocs) {
+        /* escaped: skip num_allocs byte + alloc bytes */
+        p += (uintnat)(*p) + 1;
       }
-      if (max_reg < REGS) {
-        ++ stats->max_reg[max_reg];
-      }
-      if (regs > stats->max_regs) {
-        stats->max_regs = regs;
-      }
-      if (reg_map < REG_MAPS) {
-        ++ stats->reg_maps[reg_map];
-      }
-      if (has_big_reg) {
-        ++ stats->big_reg_descrs;
-      }
-    } else if (regs > 0) {
-      ++ stats->noalloc_with_regs;
-    }
-
-    /* Slot counts */
-    count_item(slots, &stats->max_slots, stats->small_slots,
-               stats->log_slots);
-
-    /* Maximum slot offset */
-    count_item(max_slot, &stats->max_slot, stats->small_max_slot,
-               stats->log_max_slot);
-
-    p = (unsigned char*)frame_end_of_live_ofs(d);
-    size_t num_debuginfo = 1;
-    size_t num_allocs = 0;
-    bool all_allocs_4bit = true; /* do all alloc sizes fit in 4 bits? */
-    if (frame_has_allocs(d)) {
-      ++ stats->with_alloc;
-      num_allocs = *(uint8_t *)p;
-      stats->alloc_sizes += num_allocs;
-      num_debuginfo = num_allocs;
-      count_item(num_allocs, &stats->max_comballocs, stats->small_comballocs,
-                 stats->log_comballocs);
-      ++ p;
-      for (size_t idx = 0; idx < num_allocs; ++idx) {
-        if (p[idx] > 15) all_allocs_4bit = false;
-        count_item(p[idx], &stats->max_alloc_size, stats->small_alloc_sizes,
-                   stats->log_alloc_sizes);
-      }
-      p += num_allocs;
-    }
-    /* Count debug info if present */
-    if (frame_has_debug(d)) {
-      ++ stats->with_debug;
-      for (size_t i = 0; i <  num_debuginfo; ++i) {
+      for (uint32_t i = 0; i < dec.num_debuginfo; ++i) {
         uint32_t offset = caml_read_unaligned_uint32(p);
-        if (offset) { /* there may be invalid debuginfo slots */
+        if (offset) {
           caml_debuginfo_measure((debuginfo)(p + offset));
         }
         p += sizeof(uint32_t);
       }
     }
-    /* Capture facts for the small-descriptor simulation. */
-    sim_is_long = frame_is_long(d);
-    sim_fsize = frame_size(d);
-    sim_has_alloc = frame_has_allocs(d);
-    sim_has_debug = frame_has_debug(d);
-    sim_nlive = num_live;
-    sim_slots = slots;
-    sim_regs = regs;
-    sim_maxreg = max_reg;
-    sim_nalloc = num_allocs;
-    sim_ndbg = num_debuginfo;
-    sim_allocs4 = all_allocs_4bit;
   }
-  if (!stats->max_descr || (p > stats->max_descr)) {
-    stats->max_descr = p;
-  }
+  /* it.next now points just past the last descriptor. */
+  stats->descr_bytes += (size_t)(it.next - start);
 
-  /* --- Small-descriptor format simulation (step 2) --- */
-  {
-    /* Current (packed) size of this descriptor. */
-    size_t cur;
-    if (sim_rettoc) {
-      cur = 8; /* retaddr(4) + frame_data(2) + num_live(2), no body */
-    } else {
-      size_t hdr = sim_is_long ? 16 : 8;
-      size_t live = sim_nlive * (sim_is_long ? 4 : 2);
-      size_t a = sim_has_alloc ? (1 + sim_nalloc) : 0;
-      size_t db = sim_has_debug ? (sim_ndbg * 4) : 0;
-      cur = hdr + live + a + db;
-    }
-    ++ stats->sim_descrs;
-    stats->sim_current_total += cur;
-    size_t escape = 1 + cur; /* leading zero byte + the normal/large descriptor */
-
-    /* Old aligned size: each descriptor was 8-byte aligned, debug_info[] 4. */
-    size_t aligned;
-    if (sim_rettoc) {
-      aligned = 8;
-    } else {
-      size_t off = (sim_is_long ? 16 : 8) + sim_nlive * (sim_is_long ? 4 : 2)
-                 + (sim_has_alloc ? (1 + sim_nalloc) : 0);
-      if (sim_has_debug) {
-        off = (off + 3) & ~(size_t)3;
-        off += sim_ndbg * 4;
-      }
-      aligned = (off + 7) & ~(size_t)7;
-    }
-    stats->sim_aligned_total += aligned;
-
-    /* Base-format escape causes (diagnostic: 16-bit direct map, 1-byte delta).
-       delta is stored scaled by DELTA_SCALE. */
-    size_t dscaled = (size_t)(sim_delta / DELTA_SCALE);
-    bool fits_size = !sim_rettoc && (sim_fsize % 16 == 0)
-                     && (sim_fsize / 16 >= 1) && (sim_fsize / 16 <= 64);
-    bool reg_ok = sim_has_alloc ? (sim_maxreg < 16) : (sim_regs == 0);
-    if (sim_is_first)        ++stats->sim_esc_first;
-    else if (sim_rettoc)     ++stats->sim_esc_rettoc;
-    else if (sim_delta < 1 || dscaled > 255) ++stats->sim_esc_delta;
-    else if (!fits_size)     ++stats->sim_esc_size;
-    else if (!reg_ok)        ++stats->sim_esc_reg;
-    else if (!sim_allocs4)   ++stats->sim_esc_allocsize;
-
-    /* Small size = delta field + size+flags(1) + (alloc ? na/nl(1) + 4-bit
-       alloc sizes + register map : num_live(1)) + live slots(1 each)
-       + debug(4 each). Axes: v=1 varint delta (255 -> +16 bits); b selects the
-       direct register-map width, 16 bits (2 B) or 32 bits (4 B). */
-    size_t asz = sim_has_alloc ? ((sim_nalloc + 1) / 2) : 0;
-    size_t dbz = sim_has_debug ? (sim_ndbg * 4) : 0;
-    bool dok[2] = { (sim_delta >= 1 && dscaled <= 255),
-                    (sim_delta >= 1 && dscaled <= 65535) };
-    size_t dfield[2] = { 1, (dscaled <= 254 ? 1 : 3) };
-    bool rok[2];
-    rok[0] = sim_has_alloc ? (sim_maxreg < 16) : (sim_regs == 0); /* 16-bit map */
-    rok[1] = sim_has_alloc ? (sim_maxreg < 32) : (sim_regs == 0); /* 32-bit map */
-    size_t rfield[2] = { 2, 4 };
-    for (int v = 0; v < 2; v++) {
-      for (int b = 0; b < 2; b++) {
-        bool be = !sim_is_first && !sim_rettoc && fits_size && sim_allocs4
-                  && dok[v] && rok[b];
-        size_t sbase = dfield[v] + 1 + sim_slots + dbz
-          + (sim_has_alloc ? (asz + rfield[b]) : 0);
-        for (int k = 0; k <= SIM_MAXK; k++) {
-          bool small = be;
-          if (small && sim_has_alloc) {
-            if (!(sim_nalloc < ((size_t)1 << k)
-                  && sim_slots < ((size_t)1 << (8 - k))))
-              small = false;
-          } else if (small && sim_slots > 255) {
-            small = false;
-          }
-          if (small) {
-            stats->sim_total[v][b][k] += sbase + 1; /* na/nl or num_live byte */
-            ++ stats->sim_small[v][b][k];
-          } else {
-            stats->sim_total[v][b][k] += escape;
-          }
-        }
-        /* Separate full bytes for num_allocs and num_live (no ALLOC_BITS
-           split). num_allocs is a byte already; this fits whenever the
-           descriptor is base-eligible and num_live fits a byte. */
-        if (be && sim_slots <= 255) {
-          stats->sim_sep_total[v][b] += sbase + (sim_has_alloc ? 2 : 1);
-          ++ stats->sim_sep_small[v][b];
-        } else {
-          stats->sim_sep_total[v][b] += escape;
-        }
-      }
-    }
+  char *dbg_low, *dbg_high;
+  size_t dbg_count;
+  caml_debuginfo_measurements(&dbg_count, &dbg_low, &dbg_high);
+  dbg_high = Align_to(dbg_high, uintnat);
+  if (dbg_count) {
+    stats->debuginfo_bytes += (size_t)(dbg_high - dbg_low);
+    stats->debuginfo_count += dbg_count;
   }
 }
 
-/* Record stats for all descriptors from a frametable */
-
-static void add_frametable_to_stats(intnat *frametable,
-                                    struct frametable_stats *stats)
+static void report_stats(struct frametable_stats *stats)
 {
-  ++ stats->frametables;
-  if (!stats->min_descr ||
-      ((unsigned char*)frametable < stats->min_descr)) {
-    stats->min_descr = (unsigned char*)frametable;
-  }
-  if (!stats->max_descr ||
-      ((unsigned char*)frametable > stats->max_descr)) {
-    stats->max_descr = (unsigned char*)(frametable+1);
-  }
-  intnat len = *frametable;
-  frame_descr * d = (frame_descr *)(frametable + 1);
-  for (intnat j = 0; j < len; j++) {
-    add_descriptor_to_stats(d, stats);
-    d = next_frame_descr(d);
-  }
+  char buf[64];
+  size_t total = stats->header_bytes + stats->descr_bytes
+                 + stats->debuginfo_bytes;
+  printf("Summary of %zu frametables, %zu descriptors "
+         "(%zu small, %zu escaped, %zu multi-byte-delta).\n",
+         stats->frametables, stats->descrs, stats->small_descrs,
+         stats->escaped_descrs, stats->wide_deltas);
+  printf("return-to-C %zu  alloc %zu  debug %zu\n",
+         stats->return_to_C, stats->with_alloc, stats->with_debug);
+  report_bytes(buf, sizeof(buf), stats->descr_bytes);
+  printf("%s descriptors (%5.2f%%; %f bytes each)\n", buf,
+         total ? (double)stats->descr_bytes / total * 100.0 : 0.0,
+         stats->descrs ? (double)stats->descr_bytes / stats->descrs : 0.0);
+  report_bytes(buf, sizeof(buf), stats->header_bytes);
+  printf("%s frametable headers\n", buf);
+  report_bytes(buf, sizeof(buf), stats->debuginfo_bytes);
+  printf("%s Debuginfo (%5.2f%%; %zu entries)\n", buf,
+         total ? (double)stats->debuginfo_bytes / total * 100.0 : 0.0,
+         stats->debuginfo_count);
 }
-
-/* Record and report stats for all frametables on a list */
 
 static void report_frametables_stats(caml_frametable_list *new_frametables)
 {
   struct frametable_stats stats;
-  clear_stats(&stats);
+  memset(&stats, 0, sizeof(stats));
   iter_list(new_frametables, cur) {
     add_frametable_to_stats(cur->frametable, &stats);
-    accumulate_frametable_stats(cur->frametable, &stats);
-    clear_per_frametable_stats(&stats);
   }
   report_stats(&stats);
 }
 
 /* The backend emits one pointer per linked unit into the caml_all_frametables
- * section; the linker concatenates them and bounds them with these
- * __start_/__stop_ symbols. That linker-set mechanism is ELF-only -- on
- * Mach-O (macOS) and PE (Windows) the symbols don't exist (and the backend
- * doesn't emit the section there), so the all-frametables measurement is
- * available on ELF targets only. */
-#if defined(__ELF__)
+ * section; the linker concatenates them and provides these bounds. Weak so the
+ * runtime still links where no such section exists (both NULL). */
 extern intnat *__start_caml_all_frametables[] __attribute__((weak));
 extern intnat *__stop_caml_all_frametables[] __attribute__((weak));
 
@@ -985,21 +434,13 @@ extern intnat *__stop_caml_all_frametables[] __attribute__((weak));
 static void report_all_frametables_stats(void)
 {
   struct frametable_stats stats;
-  clear_stats(&stats);
+  memset(&stats, 0, sizeof(stats));
   for (intnat **p = __start_caml_all_frametables;
        p < __stop_caml_all_frametables; p++) {
     add_frametable_to_stats(*p, &stats);
-    accumulate_frametable_stats(*p, &stats);
-    clear_per_frametable_stats(&stats);
   }
   report_stats(&stats);
 }
-#else
-static void report_all_frametables_stats(void)
-{
-  printf("Xmeasure_all_frametables is only supported on ELF targets.\n");
-}
-#endif
 
 static void add_frame_descriptors(
   caml_frame_descrs *table,
@@ -1031,7 +472,8 @@ static void add_frame_descriptors(
 
     if (table->descriptors != NULL) caml_stat_free(table->descriptors);
     table->descriptors =
-      (frame_descr **) caml_stat_calloc_noexc(tblsize, sizeof(frame_descr *));
+      (frame_descr_entry *) caml_stat_calloc_noexc(tblsize,
+                                                   sizeof(frame_descr_entry));
     if (table->descriptors == NULL) caml_raise_out_of_memory();
 
     fill_hashtable(table, new_frametables);
@@ -1201,15 +643,14 @@ caml_frame_descrs* caml_get_frame_descrs(void)
 
 frame_descr* caml_find_frame_descr(caml_frame_descrs *fds, uintnat pc)
 {
-  frame_descr * d;
   uintnat h;
 
   h = Hash_retaddr(pc, fds->mask);
   while (1) {
-    d = fds->descriptors[h];
-    if (d == 0) return NULL; /* can happen if some code compiled without -g */
-    if (Retaddr_frame(d) == pc) break;
+    frame_descr_entry e = fds->descriptors[h];
+    if (e.fd == NULL)
+      return NULL; /* can happen if some code compiled without -g */
+    if (e.retaddr == pc) return e.fd;
     h = (h+1) & fds->mask;
   }
-  return d;
 }

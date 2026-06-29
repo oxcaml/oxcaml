@@ -58,13 +58,31 @@ Caml_inline intnat current_frame_alloc_wosize(unsigned char** alloc_len_out,
   d = caml_find_frame_descr(fds, retaddr);
   CAMLassert(d && !frame_return_to_C(d) && frame_has_allocs(d));
 
-  /* Compute the total allocation size at this point,
-     including allocations combined by Comballoc */
-  unsigned char* alloc_len = frame_end_of_live_ofs(d);
-  int nallocs = *alloc_len++;
-
-  if (nallocs == 0) {
-    return 0; /* This is a poll */
+  /* Compute the total allocation size at this point, including allocations
+     combined by Comballoc. The encoded allocation lengths are returned as a
+     byte-per-allocation array. In the small descriptor format they are stored
+     as 4-bit nibbles, so we unpack them into a thread-local buffer. */
+  unsigned char* alloc_len;
+  int nallocs;
+  if (frame_is_small(d)) {
+    struct frame_descr_decoded dec;
+    caml_decode_frame_descr(d, &dec);
+    nallocs = dec.small_num_allocs;
+    if (nallocs == 0) {
+      return 0; /* This is a poll */
+    }
+    static CAMLthread_local unsigned char unpacked[256];
+    for (int i = 0; i < nallocs; i++) {
+      unsigned char byte = dec.small_allocs[i / 2];
+      unpacked[i] = (i & 1) ? (byte >> 4) : (byte & 0xf);
+    }
+    alloc_len = unpacked;
+  } else {
+    alloc_len = frame_end_of_live_ofs(d);
+    nallocs = *alloc_len++;
+    if (nallocs == 0) {
+      return 0; /* This is a poll */
+    }
   }
 
   intnat allocsz = 0;
