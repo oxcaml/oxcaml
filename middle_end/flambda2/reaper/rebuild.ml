@@ -336,7 +336,10 @@ let rewrite_simple (env : env) simple =
         not
           (Option.is_none
              (Analysis.get_unboxed_fields env.uses (Code_id_or_name.name name)))
-      then simple (* XXX Misc.fatal_errorf "UNBOXED?? %a@." Name.print name; *)
+      then
+        (* This can happen if an unboxed block now only has an application for
+           its only use, see [unboxed_or_function.ml] test. *)
+        name_poison env name
       else if is_name_used env name
       then simple
       else name_poison env name)
