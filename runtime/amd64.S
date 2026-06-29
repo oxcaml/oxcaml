@@ -683,7 +683,7 @@ G(caml_system__code_begin):
 #endif
 
 #define Make_call_realloc_stack(suffix, simd)        \
-    FUNCTION(G(caml_call_realloc_stack ## suffix))   \
+    FUNCTION(caml_call_realloc_stack ## suffix)      \
     CFI_STARTPROC                                  ; \
         CFI_SIGNAL_FRAME;                            \
         ENTER_FUNCTION;                              \
@@ -714,7 +714,7 @@ Make_call_realloc_stack(_avx, YMM)
 Make_call_realloc_stack(_avx512, ZMM)
 
 #define Make_call_gc(suffix, simd)                   \
-    FUNCTION(G(caml_call_gc##suffix)) ;              \
+    FUNCTION(caml_call_gc##suffix) ;                 \
     CFI_STARTPROC                     ;              \
         CFI_SIGNAL_FRAME;                            \
         ENTER_FUNCTION;                              \
@@ -730,7 +730,7 @@ Make_call_gc(_sse, XMM)
 Make_call_gc(_avx, YMM)
 Make_call_gc(_avx512, ZMM)
 
-FUNCTION(G(caml_do_call_gc))
+FUNCTION(caml_do_call_gc)
 CFI_STARTPROC
         ENTER_FUNCTION
         movq    %r15, Caml_state(gc_regs)
@@ -773,7 +773,7 @@ LBL(restore_regs_and_ret):
 CFI_ENDPROC
 END_FUNCTION(caml_do_call_gc)
 
-FUNCTION(G(caml_raise_stack_overflow_nat))
+FUNCTION(caml_raise_stack_overflow_nat)
 CFI_STARTPROC
         CFI_SIGNAL_FRAME
         /* We assume that we are always on the OCaml stack at this point.
@@ -794,7 +794,7 @@ END_FUNCTION(caml_raise_stack_overflow_nat)
 #define r15_sub_N        /* do nothing */
 
 #define Make_alloc_fun(base_name, words, simd) \
-FUNCTION(G(base_name ## simd))                 \
+FUNCTION(base_name ## simd)                    \
 CFI_STARTPROC;                                 \
         ENTER_FUNCTION;                        \
         r15_sub_ ## words ;                    \
@@ -817,7 +817,7 @@ Make_alloc_funs(3) /* caml_alloc3* */
 Make_alloc_funs(N) /* caml_allocN* */
 
 #define Make_call_local_realloc(suffix, simd)        \
-    FUNCTION(G(caml_call_local_realloc ## suffix)) ; \
+    FUNCTION(caml_call_local_realloc ## suffix) ;    \
     CFI_STARTPROC               ;                    \
         CFI_SIGNAL_FRAME;                            \
         ENTER_FUNCTION;                              \
@@ -922,7 +922,7 @@ END_FUNCTION(caml_c_call)
    of arguments is done by these separate functions */
 
 #define Make_c_call_stack_args(suffix) \
-    FUNCTION(G(caml_c_call_copy_stack_args ## suffix)) ;                \
+    FUNCTION(caml_c_call_copy_stack_args ## suffix) ;                   \
     CFI_STARTPROC                                      ;                \
     /* Set up a frame pointer even without WITH_FRAME_POINTERS,         \
        which we use to pop an unknown number of arguments later */      \
@@ -951,7 +951,7 @@ END_FUNCTION(caml_c_call)
     CFI_ENDPROC                 ;                                       \
     END_FUNCTION(caml_c_call_copy_stack_args ## suffix)    ;            \
                                                                         \
-    FUNCTION(G(caml_c_call_stack_args ## suffix)) ;                     \
+    FUNCTION(caml_c_call_stack_args ## suffix) ;                        \
     CFI_STARTPROC                       ;                               \
         CFI_SIGNAL_FRAME;                                               \
         ENTER_FUNCTION;                                                 \
@@ -1344,7 +1344,7 @@ LBL(do_perform):
         LEAVE_FUNCTION
 #endif
     /* Record fiber id */
-        cmpb    $0, caml_cpu_ptwrite(%rip)
+        cmpb    $0, G(caml_cpu_ptwrite)(%rip)
         je      1f
         ptwriteq Stack_id(%rsi)
 1:      movq    %rdi, 8(%rbx) /* Set the last fiber field in the continuation */
@@ -1549,7 +1549,7 @@ CFI_STARTPROC
         LEAVE_FUNCTION
 #endif
     /* Record fiber id */
-        cmpb    $0, caml_cpu_ptwrite(%rip)
+        cmpb    $0, G(caml_cpu_ptwrite)(%rip)
         je      1f
         ptwriteq Stack_id(%r10)
     /* Add current stack to the last fiber */
@@ -1724,7 +1724,7 @@ CFI_STARTPROC
 CFI_ENDPROC
 END_FUNCTION(caml_ml_array_bound_error)
 
-FUNCTION(G(caml_ml_array_align_error))
+FUNCTION(caml_ml_array_align_error)
 CFI_STARTPROC
         ENTER_FUNCTION
         LEA_VAR(caml_array_align_error_asm, %rax)
@@ -1732,7 +1732,7 @@ CFI_STARTPROC
 CFI_ENDPROC
 END_FUNCTION(caml_ml_array_align_error)
 
-FUNCTION(G(caml_assert_stack_invariants))
+FUNCTION(caml_assert_stack_invariants)
 CFI_STARTPROC
         movq    Caml_state(current_stack), %r11
         movq    %rsp, %r10
