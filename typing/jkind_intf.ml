@@ -383,6 +383,7 @@ module History = struct
     | Probe
     | Captured_in_object
     | Let_rec_variable of Ident.t
+    | Effect_handler_result
     | Type_argument of
         { parent_path : Path.t;
           position : int;

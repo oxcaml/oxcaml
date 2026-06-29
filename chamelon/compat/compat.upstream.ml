@@ -140,6 +140,11 @@ type texp_match_identifier = unit
 let mkTexp_match ?id:(() = ()) (e, cases, partial) =
   Texp_match (e, cases, partial)
 
+type texp_try_identifier = unit
+
+let mkTexp_try ?id:(() = ()) (e, cases) =
+  Texp_try (e, cases, [])
+
 let mkTexp_assert e _loc = Texp_assert e
 
 type matched_expression_desc =

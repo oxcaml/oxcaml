@@ -654,7 +654,7 @@ let expression sub exp =
           eff_cases
       in
       Pexp_match (sub.expr sub exp, merged_cases)
-    | Texp_try (exp, exn_cases, eff_cases) ->
+    | Texp_try (exp, _, exn_cases, eff_cases) ->
         let merged_cases = List.map (sub.case sub) exn_cases
         @ List.map
           (fun c ->

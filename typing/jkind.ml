@@ -3020,6 +3020,9 @@ module Format_history = struct
       fprintf ppf "it's the type of a variable captured in an object"
     | Let_rec_variable v ->
       fprintf ppf "it's the type of the recursive variable %s" (Ident.name v)
+    | Effect_handler_result ->
+      fprintf ppf
+        "it's the result of a match or try expression with effect handlers"
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "the %stype argument of %a has %s value_or_null"
         (format_position ~arity position)
@@ -4052,6 +4055,7 @@ module Debug_printers = struct
     | Probe -> fprintf ppf "Probe"
     | Captured_in_object -> fprintf ppf "Captured_in_object"
     | Let_rec_variable v -> fprintf ppf "Let_rec_variable %a" Ident.print v
+    | Effect_handler_result -> fprintf ppf "Effect_handler_result"
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
         (Fmt.compat !printtyp_path)

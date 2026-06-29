@@ -262,6 +262,13 @@ type fusable_function =
    It detects whether the AST is a method by the presence of [Texp_poly] on the
    inner function. This is only ever added to methods.
 *)
+let transl_function_return_sort ret_sort =
+  match ret_sort with
+  | Function_returns sort -> Jkind.Sort.default_for_transl_and_get sort
+  | Function_forwards | Function_never_returns ->
+      fatal_error
+        "Translcore: layout-any function returns are not yet translated"
+
 let fuse_method_arity (parent : fusable_function) : fusable_function =
   match parent with
   | { params = [ self_param ];
@@ -289,7 +296,7 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
               Mode.Alloc.disallow_right Mode.Alloc.legacy }
         }
       in
-      let return_sort = Jkind.Sort.default_for_transl_and_get method_.ret_sort in
+      let return_sort = transl_function_return_sort method_.ret_sort in
       { params = self_param :: method_.params;
         body = method_.body;
         return_mode = transl_alloc_mode_l method_.ret_mode.mode_modes;
@@ -410,7 +417,7 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
         (event_before ~scopes body (transl_exp ~scopes layout body))
   | Texp_function { params; body; ret_sort; ret_mode; alloc_mode;
                     zero_alloc } ->
-      let ret_sort = Jkind.Sort.default_for_transl_and_get ret_sort in
+      let ret_sort = transl_function_return_sort ret_sort in
       transl_function ~in_new_scope ~scopes e params body
         ~alloc_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
   | Texp_apply({ exp_desc = Texp_ident { path;
@@ -517,14 +524,14 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
         ~body_layout:(layout_exp arg_sort arg) e arg
         (Some (pat_expr_list, partial, arg_sort)) exn_pat_expr_list
         eff_pat_expr_list
-  | Texp_try(body, pat_expr_list, []) ->
+  | Texp_try(body, _, pat_expr_list, []) ->
       let id, id_duid = Typecore.name_cases "exn" pat_expr_list in
       Ltrywith(transl_exp ~scopes layout body, id, id_duid,
                Matching.for_trywith ~scopes ~return_layout:layout
                  e.exp_loc (Lvar id)
                  (transl_cases_try ~scopes layout pat_expr_list),
                layout)
-  | Texp_try(body, exn_pat_expr_list, eff_pat_expr_list) ->
+  | Texp_try(body, _, exn_pat_expr_list, eff_pat_expr_list) ->
       transl_handler ~scopes ~return_layout:layout ~body_layout:layout e body
         None exn_pat_expr_list eff_pat_expr_list
   | Texp_unboxed_unit ->
