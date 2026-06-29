@@ -88,15 +88,19 @@ let remove_blocks t labels_to_remove =
     Cfg.remove_blocks t.cfg labels_to_remove;
     (* remove from layout *)
     let num_removed = ref 0 in
-    try
-      DLL.iter_cell t.layout ~f:(fun cell ->
-          if !num_removed = num_to_remove then raise Found_all;
-          let l = DLL.value cell in
-          if Label.Set.mem l labels_to_remove
-          then (
-            DLL.delete_curr cell;
-            incr num_removed))
-    with Found_all -> ())
+    (try
+       DLL.iter_cell t.layout ~f:(fun cell ->
+           if !num_removed = num_to_remove then raise Found_all;
+           let l = DLL.value cell in
+           if Label.Set.mem l labels_to_remove
+           then (
+             DLL.delete_curr cell;
+             incr num_removed))
+     with Found_all -> ());
+    (* remove from the section table, which is also keyed by label *)
+    Label.Set.iter
+      (fun label -> Hashtbl.remove t.sections label)
+      labels_to_remove)
 
 let add_block t (block : Cfg.basic_block) ~after =
   match
