@@ -69,7 +69,15 @@ type emit_frame_actions =
     efa_align : int -> unit;
     efa_label_rel : Label.t -> int32 -> unit;
     efa_def_label : Label.t -> unit;
-    efa_string : string -> unit
+    efa_string : string -> unit;
+    (* Switch to / from a mergeable string section (SHF_MERGE|SHF_STRINGS), used
+       to emit the deduplicable debuginfo filename and defname strings. While it
+       is open, [efa_def_string_label] defines a label there (and [efa_string]
+       emits into it); references from the frame table section back to those
+       labels still use [efa_label_rel]. *)
+    efa_open_string_section : unit -> unit;
+    efa_close_string_section : unit -> unit;
+    efa_def_string_label : Label.t -> unit
   }
 
 val emit_frames : emit_frame_actions -> unit

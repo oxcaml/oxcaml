@@ -105,7 +105,15 @@ type emit_frame_actions =
     efa_align : int -> unit;
     efa_label_rel : Label.t -> int32 -> unit;
     efa_def_label : Label.t -> unit;
-    efa_string : string -> unit
+    efa_string : string -> unit;
+    (* Switch to / from a mergeable string section (SHF_MERGE|SHF_STRINGS), used
+       to emit the deduplicable debuginfo filename and defname strings. While it
+       is open, [efa_def_string_label] defines a label there (and [efa_string]
+       emits into it); references from the frame table section back to those
+       labels still use [efa_label_rel]. *)
+    efa_open_string_section : unit -> unit;
+    efa_close_string_section : unit -> unit;
+    efa_def_string_label : Label.t -> unit
   }
 
 let emit_frames a =
@@ -160,6 +168,17 @@ let emit_frames a =
       let def_lbl = Cmm.new_label () in
       Hashtbl.add defnames (filename, defname, loc) (file_lbl, def_lbl);
       def_lbl
+  in
+  (* The defname strings, deduplicated by content within this unit. Each is
+     emitted once into the mergeable string section and referenced from the
+     name_info / name_and_loc_info struct by [defname_offs]. *)
+  let defstrings = Hashtbl.create 7 in
+  let label_defstring defname =
+    try Hashtbl.find defstrings defname
+    with Not_found ->
+      let lbl = Cmm.new_label () in
+      Hashtbl.add defstrings defname lbl;
+      lbl
   in
   let module Label_table = Hashtbl.Make (struct
     type t = bool * Debuginfo.Dbg.t
@@ -222,9 +241,11 @@ let emit_frames a =
             else a.efa_label_rel (label_debuginfos false alloc_dbg) Int32.zero)
           dbg
   in
-  let emit_filename name lbl =
-    a.efa_def_label lbl;
-    a.efa_string name
+  (* Emit one string (filename or defname) into the open mergeable string
+     section, defining its label there. *)
+  let emit_merged_string str lbl =
+    a.efa_def_string_label lbl;
+    a.efa_string str
   in
   let emit_defname (_filename, defname, loc) (file_lbl, lbl) =
     let emit_loc (start_chr, end_chr, end_offset) =
@@ -232,16 +253,21 @@ let emit_frames a =
       emit_u16 end_chr;
       emit_i32 end_offset
     in
-    (* These must be 32-bit aligned, both because they contain a 32-bit value,
-       and because emit_debuginfo assumes the low 2 bits of their addresses are
-       0. *)
+    (* The name_info / name_and_loc_info struct. Must be 32-bit aligned, both
+       because it contains 32-bit values and because emit_debuginfo assumes the
+       low 2 bits of its address are 0. The defname string is emitted separately
+       into the mergeable string section; [defname_offs] points at it, stored
+       relative to the start of the struct (like [filename_offs]), so the
+       [efa_label_rel] addend is the field's byte offset within the struct. *)
     a.efa_align 4;
     a.efa_def_label lbl;
     a.efa_label_rel file_lbl 0l;
     (* Include the additional 64-bits of location information which didn't pack
        in the main 64-bit word *)
     Option.iter emit_loc loc;
-    a.efa_string defname
+    let defname_field_offset = match loc with None -> 4 | Some _ -> 12 in
+    a.efa_label_rel (label_defstring defname)
+      (Int32.of_int defname_field_offset)
   in
   let fully_pack_info fd_raise d has_next =
     (* See format in caml_debuginfo_location in runtime/backtrace-nat.c *)
@@ -338,9 +364,17 @@ let emit_frames a =
   a.efa_word (List.length descrs);
   List.iter emit_frame descrs;
   Label_table.iter emit_debuginfo debuginfos;
-  Hashtbl.iter emit_filename filenames;
+  (* The name structs stay in the frame table section, near the debuginfo words
+     that reference them (a 24-bit, +/-64 MB offset). Emitting them also
+     populates [defstrings]. *)
   Hashtbl.iter emit_defname defnames;
   a.efa_align Arch.size_addr;
+  (* The filename and defname strings go into a mergeable string section so the
+     linker deduplicates them across compilation units. *)
+  a.efa_open_string_section ();
+  Hashtbl.iter emit_merged_string filenames;
+  Hashtbl.iter emit_merged_string defstrings;
+  a.efa_close_string_section ();
   frame_descriptors := []
 
 (* Detection of functions that can be duplicated between a DLL and the main

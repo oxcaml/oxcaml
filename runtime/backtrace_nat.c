@@ -360,11 +360,13 @@ debuginfo caml_debuginfo_next(debuginfo dbg)
     return (debuginfo*)(infoptr + 2);
 }
 
-/* Multiple names may share the same filename,
-   so it is referenced as an offset instead of stored inline */
+/* Both the filename and the defname are stored out of line, as offsets relative
+   to the struct, so that identical strings can be deduplicated across
+   compilation units by the linker (they are emitted into a mergeable string
+   section, SHF_MERGE|SHF_STRINGS). The offsets are signed 32-bit. */
 struct name_info {
   int32_t filename_offs;
-  char name[]; /* flexible array member */
+  int32_t defname_offs;
 };
 
 /* Extended version of name_info including location fields which didn't fit
@@ -374,7 +376,7 @@ struct name_and_loc_info {
   uint16_t start_chr;
   uint16_t end_chr;
   int32_t end_offset; /* End character position relative to start bol */
-  char name[]; /* flexible array member */
+  int32_t defname_offs;
 };
 
 /* Extract location information for the given frame descriptor */
@@ -423,7 +425,9 @@ void caml_debuginfo_location(debuginfo dbg, /*out*/ struct caml_loc_info * li)
   if (info2 & 0x80000000) {
     struct name_and_loc_info * name_and_loc_info =
       (struct name_and_loc_info*)((char *) dbg + (info1 & 0x3FFFFFC));
-    li->loc_defname = name_and_loc_info->name;
+    li->loc_defname =
+      (char *)name_and_loc_info
+      + caml_read_unaligned_int32(&name_and_loc_info->defname_offs);
     li->loc_filename =
       (char *)name_and_loc_info
       + caml_read_unaligned_int32(&name_and_loc_info->filename_offs);
@@ -436,7 +440,9 @@ void caml_debuginfo_location(debuginfo dbg, /*out*/ struct caml_loc_info * li)
   } else {
     struct name_info * name_info =
       (struct name_info*)((char *) dbg + (info1 & 0x3FFFFFC));
-    li->loc_defname = name_info->name;
+    li->loc_defname =
+      (char *)name_info
+      + caml_read_unaligned_int32(&name_info->defname_offs);
     li->loc_filename =
       (char *)name_info
       + caml_read_unaligned_int32(&name_info->filename_offs);
@@ -482,17 +488,16 @@ static void include_high(char *high)
 }
 
 
-static void include_string(char *s)
-{
-  include_low(s);
-  include_high(s + strlen(s) + 1);
-}
-
 void caml_debuginfo_measure(debuginfo dbg)
 {
   uint32_t info1, info2;
 
-  /* Control flow to match caml_debuginfo_location */
+  /* Control flow to match caml_debuginfo_location.
+     The defname and filename strings are no longer measured here: they live in
+     a separate mergeable string section (deduplicated across compilation units
+     by the linker), so they cannot be attributed to a single frametable. This
+     measures only the debuginfo words and the name_info/name_and_loc_info
+     structs. */
   if (dbg == NULL) {
     return;
   }
@@ -507,17 +512,12 @@ void caml_debuginfo_measure(debuginfo dbg)
       struct name_and_loc_info * name_and_loc_info =
         (struct name_and_loc_info*)((char *) dbg + (info1 & 0x3FFFFFC));
       include_low((char*)name_and_loc_info);
-      include_string(name_and_loc_info->name);
-      include_string((char *)name_and_loc_info
-                     + caml_read_unaligned_int32(
-                         &name_and_loc_info->filename_offs));
+      include_high((char*)name_and_loc_info + sizeof(struct name_and_loc_info));
     } else {
       struct name_info * name_info =
         (struct name_info*)((char *) dbg + (info1 & 0x3FFFFFC));
       include_low((char*)name_info);
-      include_string(name_info->name);
-      include_string((char *)name_info
-                     + caml_read_unaligned_int32(&name_info->filename_offs));
+      include_high((char*)name_info + sizeof(struct name_info));
     }
     dbg = (debuginfo)((uint32_t*)dbg + 2);
   } while (info1 & 1);

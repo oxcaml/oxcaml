@@ -3126,6 +3126,16 @@ let end_assembly () =
   let frametable_section : Asm_targets.Asm_section.t =
     if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Text
   in
+  (* Mergeable string section (SHF_MERGE|SHF_STRINGS, entsize 1) for the
+     deduplicable debuginfo filename and defname strings. *)
+  let debuginfo_strings_section : Asm_targets.Asm_section.t =
+    Custom
+      { names = [".rodata.str1.1"];
+        flags = Some "aMS";
+        args = ["@progbits"; "1"];
+        is_delayed = false
+      }
+  in
   D.switch_to_section frametable_section;
   D.align
     ~fill:(if !Oxcaml_flags.frametables_in_rodata then Zero else Nop)
@@ -3160,7 +3170,15 @@ let end_assembly () =
         (fun l ->
           let lbl = label_to_asm_label ~section:frametable_section l in
           D.define_label lbl);
-      efa_string = (fun s -> D.string (s ^ "\000"))
+      efa_string = (fun s -> D.string (s ^ "\000"));
+      efa_open_string_section =
+        (fun () -> D.switch_to_section debuginfo_strings_section);
+      efa_close_string_section =
+        (fun () -> D.switch_to_section frametable_section);
+      efa_def_string_label =
+        (fun l ->
+          let lbl = label_to_asm_label ~section:debuginfo_strings_section l in
+          D.define_label lbl)
     };
   let frametable_sym = S.create_global (Cmm_helpers.make_symbol "frametable") in
   D.size frametable_sym;

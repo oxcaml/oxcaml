@@ -212,11 +212,19 @@ extern uintnat caml_measure_all_frametables;
    format, how big each descriptor would be in the proposed "small" format, and
    how much we'd save. */
 #define SIM_MAXK 8  /* ALLOC_BITS swept 0..SIM_MAXK in the combined na/nl byte */
-/* The 8 hottest GC registers, from the measured (each reg) histogram on
-   ocamlopt.opt: 0,1,2,3,4,5,6,8. A small alloc descriptor's live registers
-   must all be in this set (others escape to the normal format). */
-#define SIM_HOT_REGS \
-  ((1ULL<<0)|(1ULL<<1)|(1ULL<<2)|(1ULL<<3)|(1ULL<<4)|(1ULL<<5)|(1ULL<<6)|(1ULL<<8))
+
+/* Return addresses are byte-aligned on amd64 but 4-byte aligned on AArch64, so
+   a small descriptor stores delta/DELTA_SCALE -- one delta byte reaches 4x
+   further on AArch64, with correspondingly fewer escapes. */
+#if defined(__aarch64__)
+#define DELTA_SCALE 4
+#else
+#define DELTA_SCALE 1
+#endif
+
+/* The register map is direct-indexed (bit N = register N; no hot-set lookup):
+   a descriptor fits a width-W map iff its highest live register is < W. The
+   simulation sweeps W in {16, 32} -- the [b] axis below (b=0 -> 16, b=1 -> 32). */
 
 struct frametable_stats {
   /* A few per-frametable items */
@@ -523,11 +531,11 @@ static void report_stats(struct frametable_stats *stats)
   printf("  baseline aligned: %s\n", table_buf);
   report_bytes(table_buf, TABLE_BUF_SIZE, stats->sim_current_total);
   printf("  baseline packed:  %s\n", table_buf);
-  printf("  base-escape causes: first=%zu retC=%zu delta>255=%zu size=%zu "
-         "reg=%zu allocsz=%zu\n",
+  printf("  base-escape causes: first=%zu retC=%zu delta_ovf=%zu size=%zu "
+         "reg>=16=%zu allocsz=%zu\n",
          stats->sim_esc_first, stats->sim_esc_rettoc, stats->sim_esc_delta,
          stats->sim_esc_size, stats->sim_esc_reg, stats->sim_esc_allocsize);
-  printf("  base format (8-reg bitmap, 1-byte delta), by ALLOC_BITS:\n");
+  printf("  base format (16-bit direct map, 1-byte delta), by ALLOC_BITS:\n");
   printf("  %-10s %14s %10s %10s %9s %9s\n",
          "ALLOC_BITS", "total", "small", "escaped", "vs_packed", "vs_aligned");
   for (int k = 0; k <= SIM_MAXK; k++) {
@@ -545,7 +553,7 @@ static void report_stats(struct frametable_stats *stats)
   }
   {
     static const char *nm[2][2] =
-      { { "base", "+16b-bitmap" }, { "+varint", "+varint+16b" } };
+      { { "16-bit", "32-bit" }, { "16-bit+varint", "32-bit+varint" } };
     printf("  refinements (each at its best ALLOC_BITS):\n");
     for (int v = 0; v < 2; v++) for (int b = 0; b < 2; b++) {
       int bk = 0;
@@ -558,7 +566,7 @@ static void report_stats(struct frametable_stats *stats)
       double al = stats->sim_aligned_total
         ? 100.0 * ((double)stats->sim_aligned_total - (double)tot)
           / (double)stats->sim_aligned_total : 0.0;
-      printf("  %-12s k=%d  %14zu  vs_packed %5.1f%%  vs_aligned %5.1f%%\n",
+      printf("  %-14s k=%d  %14zu  vs_packed %5.1f%%  vs_aligned %5.1f%%\n",
              nm[v][b], bk, tot, pk, al);
     }
     printf("  separate na/nl bytes (no ALLOC_BITS split):\n");
@@ -570,7 +578,7 @@ static void report_stats(struct frametable_stats *stats)
       double al = stats->sim_aligned_total
         ? 100.0 * ((double)stats->sim_aligned_total - (double)tot)
           / (double)stats->sim_aligned_total : 0.0;
-      printf("  %-12s      %14zu  vs_packed %5.1f%%  vs_aligned %5.1f%%\n",
+      printf("  %-14s      %14zu  vs_packed %5.1f%%  vs_aligned %5.1f%%\n",
              nm[v][b], tot, pk, al);
     }
   }
@@ -667,13 +675,12 @@ static void add_descriptor_to_stats(frame_descr *d,
   unsigned char *p;
   /* Facts gathered for the small-descriptor simulation at the end. */
   bool sim_is_first = false, sim_rettoc = false, sim_is_long = false;
-  bool sim_has_alloc = false, sim_has_debug = false, sim_bigreg = false;
+  bool sim_has_alloc = false, sim_has_debug = false;
   bool sim_allocs4 = true;
   intnat sim_delta = 0;
   uint32_t sim_fsize = 0;
-  uint64_t sim_regmap = 0;
   size_t sim_nlive = 0, sim_slots = 0, sim_regs = 0, sim_nalloc = 0,
-         sim_ndbg = 0;
+         sim_ndbg = 0, sim_maxreg = 0;
   ++ stats->descrs;
   if (!stats->min_descr || ((unsigned char*)d < stats->min_descr)) {
     stats->min_descr = (unsigned char*)d;
@@ -823,8 +830,7 @@ static void add_descriptor_to_stats(frame_descr *d,
     sim_nlive = num_live;
     sim_slots = slots;
     sim_regs = regs;
-    sim_regmap = reg_map;
-    sim_bigreg = has_big_reg;
+    sim_maxreg = max_reg;
     sim_nalloc = num_allocs;
     sim_ndbg = num_debuginfo;
     sim_allocs4 = all_allocs_4bit;
@@ -865,32 +871,32 @@ static void add_descriptor_to_stats(frame_descr *d,
     }
     stats->sim_aligned_total += aligned;
 
-    /* Base-format escape causes (diagnostic: 8-reg bitmap, 1-byte delta). */
+    /* Base-format escape causes (diagnostic: 16-bit direct map, 1-byte delta).
+       delta is stored scaled by DELTA_SCALE. */
+    size_t dscaled = (size_t)(sim_delta / DELTA_SCALE);
     bool fits_size = !sim_rettoc && (sim_fsize % 16 == 0)
                      && (sim_fsize / 16 >= 1) && (sim_fsize / 16 <= 64);
-    bool reg_ok = sim_has_alloc
-      ? (((sim_regmap & ~(uint64_t)SIM_HOT_REGS) == 0) && !sim_bigreg)
-      : (sim_regs == 0);
+    bool reg_ok = sim_has_alloc ? (sim_maxreg < 16) : (sim_regs == 0);
     if (sim_is_first)        ++stats->sim_esc_first;
     else if (sim_rettoc)     ++stats->sim_esc_rettoc;
-    else if (sim_delta < 1 || sim_delta > 255) ++stats->sim_esc_delta;
+    else if (sim_delta < 1 || dscaled > 255) ++stats->sim_esc_delta;
     else if (!fits_size)     ++stats->sim_esc_size;
     else if (!reg_ok)        ++stats->sim_esc_reg;
     else if (!sim_allocs4)   ++stats->sim_esc_allocsize;
 
     /* Small size = delta field + size+flags(1) + (alloc ? na/nl(1) + 4-bit
-       alloc sizes + register bitmap : num_live(1)) + live slots(1 each)
-       + debug(4 each). Refinements: v=1 varint delta (255 -> +16 bits),
-       b=1 a 16-bit (2-byte) register bitmap covering regs 0..15. */
+       alloc sizes + register map : num_live(1)) + live slots(1 each)
+       + debug(4 each). Axes: v=1 varint delta (255 -> +16 bits); b selects the
+       direct register-map width, 16 bits (2 B) or 32 bits (4 B). */
     size_t asz = sim_has_alloc ? ((sim_nalloc + 1) / 2) : 0;
     size_t dbz = sim_has_debug ? (sim_ndbg * 4) : 0;
-    bool dok[2] = { (sim_delta >= 1 && sim_delta <= 255),
-                    (sim_delta >= 1 && sim_delta <= 65535) };
-    size_t dfield[2] = { 1, (sim_delta <= 254 ? 1 : 3) };
+    bool dok[2] = { (sim_delta >= 1 && dscaled <= 255),
+                    (sim_delta >= 1 && dscaled <= 65535) };
+    size_t dfield[2] = { 1, (dscaled <= 254 ? 1 : 3) };
     bool rok[2];
-    rok[0] = reg_ok;                                       /* 8-reg hot-set bitmap */
-    rok[1] = sim_has_alloc ? !sim_bigreg : (sim_regs == 0);/* 16-bit bitmap 0..15 */
-    size_t rfield[2] = { 1, 2 };
+    rok[0] = sim_has_alloc ? (sim_maxreg < 16) : (sim_regs == 0); /* 16-bit map */
+    rok[1] = sim_has_alloc ? (sim_maxreg < 32) : (sim_regs == 0); /* 32-bit map */
+    size_t rfield[2] = { 2, 4 };
     for (int v = 0; v < 2; v++) {
       for (int b = 0; b < 2; b++) {
         bool be = !sim_is_first && !sim_rettoc && fits_size && sim_allocs4
@@ -964,8 +970,12 @@ static void report_frametables_stats(caml_frametable_list *new_frametables)
 }
 
 /* The backend emits one pointer per linked unit into the caml_all_frametables
- * section; the linker concatenates them and provides these bounds. Weak so the
- * runtime still links where no such section exists (both NULL). */
+ * section; the linker concatenates them and bounds them with these
+ * __start_/__stop_ symbols. That linker-set mechanism is ELF-only -- on
+ * Mach-O (macOS) and PE (Windows) the symbols don't exist (and the backend
+ * doesn't emit the section there), so the all-frametables measurement is
+ * available on ELF targets only. */
+#if defined(__ELF__)
 extern intnat *__start_caml_all_frametables[] __attribute__((weak));
 extern intnat *__stop_caml_all_frametables[] __attribute__((weak));
 
@@ -984,6 +994,12 @@ static void report_all_frametables_stats(void)
   }
   report_stats(&stats);
 }
+#else
+static void report_all_frametables_stats(void)
+{
+  printf("Xmeasure_all_frametables is only supported on ELF targets.\n");
+}
+#endif
 
 static void add_frame_descriptors(
   caml_frame_descrs *table,
