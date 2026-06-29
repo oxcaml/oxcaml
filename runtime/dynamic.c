@@ -169,9 +169,11 @@ static void dynamic_stack_scan_roots(dynamic_stack_t stack,
                                      scanning_action_flags fflags,
                                      void *fdata)
 {
-  f(fdata, stack->dyn, &stack->dyn);
-  for(size_t j = 0; j < stack->count; ++j) {
-    f(fdata, stack->vals[j], &stack->vals[j]);
+  if(Is_bound(stack->dyn)) {
+    f(fdata, stack->dyn, &stack->dyn);
+    for(size_t j = 0; j < stack->count; ++j) {
+      f(fdata, stack->vals[j], &stack->vals[j]);
+    }
   }
 }
 
