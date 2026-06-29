@@ -1635,6 +1635,15 @@ let assemble_line b loc ins =
             buf_int8 b 0
           done
     | Directive (D.Hidden _) | Directive D.New_line -> ()
+    | Directive (D.Frame_descr_delta { delta }) ->
+      (* Always use the wide encoding here (0xFF marker + 16-bit delta): the
+         runtime decodes either form, and the fixed 3-byte size keeps the
+         binary emitter's per-section layout simple. The 16-bit value is the
+         (same-section) label difference, resolved by the relocation pass
+         (mirrors the [Sixteen] case of [constant]). *)
+      buf_int8 b 0xFF;
+      record_local_reloc b (RelocConstant (delta, B16));
+      buf_int16L b 0L
     | Directive
         (D.Reloc
           { name = D.R_X86_64_PLT32;

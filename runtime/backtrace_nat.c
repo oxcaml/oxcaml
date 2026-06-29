@@ -298,6 +298,7 @@ static debuginfo debuginfo_extract(frame_descr *d, ptrdiff_t alloc_idx)
 {
   unsigned char* infoptr;
   uint32_t debuginfo_offset;
+  struct frame_descr_decoded dec;
 
   /* The special frames marking returns from Caml to C are never
      returned by caml_next_frame_descriptor, so should never reach
@@ -307,11 +308,16 @@ static debuginfo debuginfo_extract(frame_descr *d, ptrdiff_t alloc_idx)
   if (!frame_has_debug(d)) {
     return NULL;
   }
-  /* Recover debugging info */
-  infoptr = frame_end_of_live_ofs(d);
+  /* Recover debugging info. The debug words begin right after the live
+     offsets (small format) or after the alloc lengths (escaped format);
+     [caml_decode_frame_descr] gives us the precise start. */
+  caml_decode_frame_descr(d, &dec);
+  infoptr = (unsigned char *)dec.end_of_live;
   if (frame_has_allocs(d)) {
-    /* skip alloc_lengths */
-    infoptr += *infoptr + 1;
+    if (!dec.is_small) {
+      /* escaped: skip the num_allocs byte and the alloc bytes */
+      infoptr += *infoptr + 1;
+    }
     /* find debug info for this allocation */
     if (alloc_idx >= 0) {
       infoptr += alloc_idx * sizeof(uint32_t);

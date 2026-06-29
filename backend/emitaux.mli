@@ -52,6 +52,14 @@ val record_frame_descr :
   (* Location, if any *)
   unit
 
+(** Signals that subsequent frame descriptors' return addresses live in a new
+    text section. A "small" frame descriptor encodes its return address as a
+    delta from the previous descriptor's; that delta is only an assembly-time
+    constant when both are in the same section, so descriptors at a section
+    boundary escape to the full format. The backends call this whenever they
+    switch text section. *)
+val start_new_code_section : unit -> unit
+
 (** [with_snapshot f] runs [f] and returns its result, but also ensures that the
     state of this [Emitaux] module is unchanged after [f] returns. *)
 val with_snapshot : f:(unit -> 'a) -> 'a
@@ -68,6 +76,7 @@ type emit_frame_actions =
     efa_word : int -> unit;
     efa_align : int -> unit;
     efa_label_rel : Label.t -> int32 -> unit;
+    efa_label_delta : Label.t -> Label.t -> unit;
     efa_def_label : Label.t -> unit;
     efa_string : string -> unit
   }

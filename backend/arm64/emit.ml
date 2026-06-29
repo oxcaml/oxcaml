@@ -2257,6 +2257,12 @@ let end_assembly () =
           let lbl = label_to_asm_label ~section:frametable_section lbl in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:(Targetint.of_int32 ofs));
+      efa_label_delta =
+        (* The small frame-descriptor format and its runtime decoding are not
+           yet ported to ARM64; this is only reachable if [emit_frames]
+           produces a small descriptor on ARM64. *)
+        (fun _upper _lower ->
+          Misc.fatal_error "small frame descriptors not supported on ARM64");
       efa_def_label =
         (fun lbl ->
           let lbl = label_to_asm_label ~section:frametable_section lbl in

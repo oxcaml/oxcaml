@@ -1756,11 +1756,18 @@ G(caml_system__code_end):
         .align  EIGHT_ALIGN
 G(caml_system__frametable):
         .quad   2            /* two descriptors */
+        /* Each descriptor is preceded by a "delta" byte. These return-to-C
+           descriptors do not fit the "small" format, so each escapes: a 0
+           delta byte followed by a descriptor in the normal format (which
+           carries its own absolute return address). See frame_descriptors.h. */
+        .byte   0            /* escape: normal descriptor follows */
         .4byte  LBL(108) - . /* return address into callback */
         .value  -1           /* negative frame size => use callback link */
         .value  0            /* no roots here */
         /* Frame descriptors are packed: no inter-descriptor alignment. The
-           two descriptors above and below are exactly 8 bytes each. */
+           two descriptors above and below are exactly 8 bytes each (plus the
+           1-byte escape prefix). */
+        .byte   0            /* escape: normal descriptor follows */
         .4byte  LBL(frame_runstack) - . /* return address into fiber_val_handler */
         .value  -1                      /* negative frame size => use callback link */
         .value  0                       /* no roots here */
