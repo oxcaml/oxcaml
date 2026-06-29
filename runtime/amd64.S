@@ -1374,6 +1374,7 @@ LBL(do_perform):
         movq    $0, Handler_parent(%r11) /* Set parent of performer to NULL */
         movq    Handler_effect(%r11), %rsi  /* %rsi := effect handler */
         FLUSH_DYNAMIC_CACHE(%r11)
+LBL(caml_perform_enter):
         jmp     GCALL(caml_apply3)
 LBL(112):
     /* Switch back to original performer before raising Effect.Unhandled
@@ -1565,6 +1566,7 @@ CFI_STARTPROC
         FLUSH_DYNAMIC_CACHE(%r13)
         testq   %rdx, %rdx /* Do we have a gc_regs? */
         jnz     LBL(resume_preemption)
+LBL(caml_resume_enter):
         jmpq    *(%rbx)    /* no, just jump into the continuation */
 LBL(resume_preemption): /* %rdx -> gc_regs */
         /* This continuation represents a preemption, meaning we have to restore
@@ -1582,6 +1584,7 @@ LBL(resume_preemption): /* %rdx -> gc_regs */
         SWITCH_C_TO_OCAML
         /* Jump into the second half of caml_do_call_gc, which will restore the
            registers and `ret` to resume */
+LBL(caml_resume_preempted):
         jmp     LBL(restore_regs_and_ret)
 LBL(continuation_already_resumed):
         ENTER_FUNCTION
@@ -1660,6 +1663,7 @@ CFI_STARTPROC
 #endif
         movq    %rdi, %rax /* first argument */
         CHECK_STACK_ALIGNMENT;
+LBL(caml_runstack_enter):
         callq   *(%rbx) /* closure in %rbx (second argument) */
 LBL(frame_runstack):
         leaq    32(%rsp), %r11 /* SP with exn handler popped */
@@ -1701,7 +1705,9 @@ LBL(frame_runstack):
         movq    %r12, %rax
     /* Invoke handle_value (or handle_exn) */
         LEAVE_FUNCTION
+LBL(caml_runstack_exit):
         jmp     *(%rbx)
+LBL(caml_runstack_exn):
 LBL(fiber_exn_handler):
         leaq    16(%rsp), %r11
 #if Stack_padding_word
@@ -1789,3 +1795,25 @@ G(caml_absf32_mask):
         .quad   0xFFFFFFFF7FFFFFFFL, 0xFFFFFFFFFFFFFFFF
 
         NONEXECSTACK_NOTE
+
+/* Record effect machinery branch offsets for magic trace */
+.pushsection .note.ocaml_eff,"?",%note
+.balign 4
+        .long   LBL(ocaml_eff_owner_end) - LBL(ocaml_eff_owner)
+        .long   LBL(ocaml_eff_desc_end) - LBL(ocaml_eff_desc)
+        .long   2
+LBL(ocaml_eff_owner):
+        .asciz  "OCaml"
+LBL(ocaml_eff_owner_end):
+        .balign 4
+LBL(ocaml_eff_desc):
+        .quad   LBL(caml_runstack_enter) - G(caml_runstack)
+        .quad   LBL(caml_runstack_exit) - G(caml_runstack)
+        .quad   LBL(caml_runstack_exn) - G(caml_runstack)
+        .quad   LBL(caml_perform_enter) - G(caml_perform)
+        .quad   LBL(caml_resume_enter) - G(caml_resume)
+        .quad   LBL(caml_resume_preempted) - G(caml_resume)
+        .quad   0
+LBL(ocaml_eff_desc_end):
+        .balign 4
+.popsection
