@@ -22,7 +22,7 @@ module L = Lambda
 module P = Flambda_primitive
 
 let needs_64_bit_target prim dbg =
-  if not (Target_system.is_64_bit ())
+  if not (Target_system.Architecture.is_64_bit ())
   then
     Misc.fatal_errorf
       "Primitive %a is not yet supported on 32-bit targets (this is not \
@@ -1702,7 +1702,7 @@ let extract_block_index_offset ~machine_width idx =
 (* Given an index that points to data of some layout, produce the list of
    offsets needed to access each element *)
 let block_index_access_offsets ~machine_width layout idx =
-  assert (Target_system.is_64_bit ());
+  assert (Target_system.Architecture.is_64_bit ());
   let mbe = L.mixed_block_element_of_layout layout in
   let cts = MPB.count mbe in
   if MPB.has_value_and_flat cts
@@ -3157,14 +3157,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pdomain_index, _ -> [Nullary Domain_index]
   | Ppoll, _ -> [Nullary Poll]
   | Preinterpret_unboxed_int64_as_tagged_int63, [[i]] ->
-    if not (Target_system.is_64_bit ())
+    if not (Target_system.Architecture.is_64_bit ())
     then
       Misc.fatal_error
         "Preinterpret_unboxed_int64_as_tagged_int63 can only be used on 64-bit \
          targets";
     [Unary (Reinterpret_64_bit_word Unboxed_int64_as_tagged_int63, i)]
   | Preinterpret_tagged_int63_as_unboxed_int64, [[i]] ->
-    if not (Target_system.is_64_bit ())
+    if not (Target_system.Architecture.is_64_bit ())
     then
       Misc.fatal_error
         "Preinterpret_tagged_int63_as_unboxed_int64 can only be used on 64-bit \

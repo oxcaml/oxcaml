@@ -61,7 +61,7 @@ type align_padding =
    unambiguous across platforms (cf.
    https://sourceware.org/binutils/docs/as/Type.html). *)
 let symbol_type_to_string sym =
-  match TS.architecture () with
+  match TS.Architecture.get () with
   | AArch64 -> ( match sym with Function -> "%function" | Object -> "%object")
   | X86_64 -> (
     match sym with Function -> "@function" | Object -> "STT_OBJECT")
@@ -104,14 +104,14 @@ module Directive = struct
     and print_aux_subterm ~force_decimal buf t =
       match t with
       | This -> (
-        match TS.assembler () with
+        match TS.Assembler.get () with
         | MacOS | GAS_like -> Buffer.add_string buf "."
         | MASM -> Buffer.add_string buf "THIS BYTE")
       | Label lbl -> Buffer.add_string buf (Asm_label.encode lbl)
       | Symbol sym -> Buffer.add_string buf (Asm_symbol.encode sym)
       | Variable name -> Buffer.add_string buf name
       | Signed_int n -> (
-        match TS.assembler (), force_decimal with
+        match TS.Assembler.get (), force_decimal with
         | _, true -> Buffer.add_string buf (Int64.to_string n)
         | MASM, _ ->
           if
@@ -374,7 +374,7 @@ module Directive = struct
       (* Some assemblers interpret the integer n as a 2^n alignment and others
          as a number of bytes. *)
       let n =
-        match TS.assembler (), TS.architecture () with
+        match TS.Assembler.get (), TS.Architecture.get () with
         | MacOS, _ | GAS_like, (ARM | AArch64 | POWER) -> Misc.log2 n
         | _, _ -> n
       in
@@ -390,7 +390,7 @@ module Directive = struct
         match Constant_with_width.width_in_bytes constant with
         | Eight -> "byte"
         | Sixteen -> (
-          match TS.system () with Solaris -> "value" | _ -> "2byte")
+          match TS.System.get () with Solaris -> "value" | _ -> "2byte")
         | Thirty_two -> "4byte"
         | Sixty_four -> "8byte"
       in
@@ -399,7 +399,7 @@ module Directive = struct
         (Constant_with_width.constant constant)
         comment
     | Bytes { str; comment } ->
-      (match TS.system (), TS.architecture () with
+      (match TS.System.get (), TS.Architecture.get () with
       | Solaris, _ | _, POWER ->
         buf_bytes_directive buf ~directive:".byte" str
         (* Very long lines can cause gas to be extremely slow, so split up large
@@ -427,7 +427,7 @@ module Directive = struct
       | [] -> ()
       | args -> bprintf buf ",%s" (String.concat "," args))
     | Space { bytes } -> (
-      match TS.system () with
+      match TS.System.get () with
       | Solaris -> bprintf buf "\t.zero\t%d" bytes
       | _ -> bprintf buf "\t.space\t%d" bytes)
     | Cfi_adjust_cfa_offset n -> bprintf buf "\t.cfi_adjust_cfa_offset %d" n
@@ -489,7 +489,7 @@ module Directive = struct
       bprintf buf "\t.uleb128\t%a%s" Constant.print_using_decimals constant
         comment
     | Direct_assignment (var, const) -> (
-      match TS.assembler () with
+      match TS.Assembler.get () with
       | MacOS -> bprintf buf "\t.set %s, %a" var Constant.print const
       | _ ->
         Misc.fatal_error
@@ -575,7 +575,7 @@ module Directive = struct
     | Reloc _ -> unsupported "Reloc"
 
   let print b t =
-    match TS.assembler () with
+    match TS.Assembler.get () with
     | MASM -> print_masm b t
     | MacOS | GAS_like -> print_gas b t
 
@@ -729,7 +729,7 @@ let emit (d : Directive.t) =
   | None -> Misc.fatal_error "initialize not called"
 
 let emit_non_masm (d : Directive.t) =
-  match TS.assembler () with MASM -> () | MacOS | GAS_like -> emit d
+  match TS.Assembler.get () with MASM -> () | MacOS | GAS_like -> emit d
 
 let with_measuring ~f =
   let saved = !emit_ref in
@@ -840,7 +840,7 @@ let float64 f = float64_core f (Int64.bits_of_float f)
 let float64_from_bits f = float64_core (Int64.float_of_bits f) f
 
 let size ?size_of symbol =
-  match TS.system () with
+  match TS.System.get () with
   | GNU | Linux | FreeBSD | NetBSD | OpenBSD ->
     let size_of =
       match size_of with None -> symbol | Some size_of -> size_of
@@ -969,7 +969,7 @@ let initialize ~big_endian ~emit_assembly_comments ~(emit : Directive.t -> unit)
 let debug_header ~get_file_num =
   (* Forward label references are illegal on some assemblers/platforms. To avoid
      errors, emit the beginning of all dwarf sections in advance. *)
-  if TS.is_gas () || TS.is_macos ()
+  if TS.Assembler.is_gas () || TS.Assembler.is_macos ()
   then
     List.iter
       (switch_to_section ~emit_label_on_first_occurrence:true)
@@ -987,7 +987,7 @@ let define_data_symbol symbol =
   (* CR sspies: enable check again *)
   (* check_symbol_for_definition_in_current_section symbol; *)
   emit (New_label (Symbol symbol, Machine_width_data));
-  match TS.assembler (), TS.is_windows () with
+  match TS.Assembler.get (), TS.System.is_windows () with
   | GAS_like, false -> type_ (Symbol symbol) ~type_:Object
   | GAS_like, true | MacOS, _ | MASM, _ -> ()
 
@@ -997,7 +997,7 @@ let define_function_symbol symbol =
   (* check_symbol_for_definition_in_current_section symbol; *)
   (* CR mshinwell: This shouldn't be called "New_label" *)
   emit (New_label (Symbol symbol, Code));
-  match TS.assembler (), TS.is_windows () with
+  match TS.Assembler.get (), TS.System.is_windows () with
   | GAS_like, false -> type_ (Symbol symbol) ~type_:Function
   | GAS_like, true | MacOS, _ | MASM, _ -> ()
 
@@ -1008,12 +1008,12 @@ let define_symbol_label ~section symbol =
   emit (New_label (Symbol symbol, typ))
 
 let type_symbol symbol ~ty =
-  match TS.assembler (), TS.is_windows () with
+  match TS.Assembler.get (), TS.System.is_windows () with
   | GAS_like, false -> type_ (Symbol symbol) ~type_:ty
   | GAS_like, true | MacOS, _ | MASM, _ -> ()
 
 let type_label label ~ty =
-  match TS.assembler (), TS.is_windows () with
+  match TS.Assembler.get (), TS.System.is_windows () with
   | GAS_like, false -> type_ (Label label) ~type_:ty
   | GAS_like, true | MacOS, _ | MASM, _ -> ()
 
@@ -1077,7 +1077,7 @@ let emit_cached_strings () =
     old_dwarf_section
 
 let mark_stack_non_executable () =
-  match TS.system () with
+  match TS.System.get () with
   | Linux -> switch_to_section Asm_section.Note_gnu_stack
   | _ -> ()
 
@@ -1087,7 +1087,7 @@ let new_temp_var () =
   Printf.sprintf "temp%d" id
 
 let force_assembly_time_constant expr =
-  if not (TS.is_macos ())
+  if not (TS.Assembler.is_macos ())
   then expr
   else
     (* This ensures the correct result is obtained on macOS. (Apparently just
@@ -1105,7 +1105,7 @@ let between_symbols_in_current_unit ~upper ~lower =
   let lower = const_symbol lower in
   let expr = const_sub upper lower in
   (* CR sspies: is this check even needed? *)
-  if TS.is_macos ()
+  if TS.Assembler.is_macos ()
   then const_machine_width (force_assembly_time_constant expr)
   else const_machine_width expr
 
@@ -1195,7 +1195,7 @@ let offset_into_dwarf_section_label ?comment:_comment ~width section upper =
      where they might be expected. Instead dsymutil and other tools parse DWARF
      sections properly and adjust offsets manually. *)
   let expr =
-    if TS.is_macos ()
+    if TS.Assembler.is_macos ()
     then
       let lower = Asm_label.for_dwarf_section section in
       if Asm_label.equal lower upper
@@ -1263,7 +1263,7 @@ let offset_into_dwarf_section_symbol ?comment:_comment
   in
   Option.iter comment _comment;
   let expr =
-    if TS.is_macos ()
+    if TS.Assembler.is_macos ()
     then
       let in_current_unit =
         true

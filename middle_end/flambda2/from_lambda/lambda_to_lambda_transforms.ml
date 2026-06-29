@@ -366,7 +366,7 @@ let makearray_dynamic_singleton_uninitialized name (mode : L.locality_mode)
 let makearray_dynamic_unboxed_products_only_64_bit () =
   (* To keep things simple in the C stub as regards array length, we currently
      restrict to 64-bit targets. *)
-  if not (Target_system.is_64_bit ())
+  if not (Target_system.Architecture.is_64_bit ())
   then
     Misc.fatal_error
       "Cannot compile Pmakearray_dynamic at unboxed product layouts for 32-bit \

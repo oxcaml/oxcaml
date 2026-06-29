@@ -1328,7 +1328,7 @@ let nullable_value raw_kind =
   Pvalue { raw_kind; nullable = Nullable }
 
 let split_vectors =
-  match Target_system.architecture () with
+  match Target_system.Architecture.get () with
   | X86_64 -> false
   | AArch64 -> true
   | IA32 | ARM | POWER | Z | Riscv ->

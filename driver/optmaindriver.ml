@@ -65,7 +65,7 @@ let main unix argv ppf ~flambda2 =
        enabled *)
     if Config.oxcaml_dwarf &&
        !Clflags.dwarf_fission = Clflags.Fission_none &&
-       Target_system.is_macos () then
+       Target_system.System.is_macos () then
       Clflags.dwarf_fission := Clflags.Fission_dsymutil;
     (* Set up DWARF compression for C compiler invocations *)
     if !Clflags.debug && !Clflags.native_code then

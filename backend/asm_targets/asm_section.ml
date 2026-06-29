@@ -166,9 +166,9 @@ let details t first_occurrence =
   let text () = [".text"], None, [] in
   let data () = [".data"], None, [] in
   let rodata () = [".rodata"], None, [] in
-  let system = Target_system.derived_system () in
+  let system = Target_system.System.derived_system () in
   let names, flags, args =
-    match t, Target_system.architecture (), system with
+    match t, Target_system.Architecture.get (), system with
     | Text, _, _ -> text ()
     | Function_text name, _, _ -> [name], Some "ax", ["@progbits"]
     | Data, _, _ -> data ()

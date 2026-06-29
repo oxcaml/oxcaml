@@ -159,7 +159,7 @@ let load_sections (type a r)
         set_protection ~mprotect:Externals.mprotect_ro ~name address size)
 
 let symbol_prefix () =
-  match Target_system.derived_system () with
+  match Target_system.System.derived_system () with
   | MacOS_like -> "_"
   | Linux | Win32 | Win64 | MinGW_32 | MinGW_64 | Cygwin | FreeBSD | NetBSD
   | OpenBSD | Solaris | BeOS | GNU | Dragonfly | Unknown ->

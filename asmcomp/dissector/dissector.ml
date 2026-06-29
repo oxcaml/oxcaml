@@ -113,7 +113,7 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
      relocations which are only emitted when dlcode=true. *)
   if not !Clflags.dlcode then raise (Error Nodynlink_incompatible);
   (* Check that we're targeting Linux *)
-  (match Target_system.system () with
+  (match Target_system.System.get () with
   | Linux -> ()
   | Windows _ | MacOS_like | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly
   | GNU | BeOS | Unknown ->

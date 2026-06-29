@@ -28,9 +28,9 @@ open! Int_replace_polymorphic_compare
 
 let symbol_prefix () =
   (* CR mshinwell: needs checking *)
-  match Target_system.architecture () with
+  match Target_system.Architecture.get () with
   | IA32 | X86_64 | AArch64 -> (
-    match Target_system.derived_system () with
+    match Target_system.System.derived_system () with
     | Linux | Win32 | Win64 | MinGW_32 | MinGW_64 | Cygwin | FreeBSD | NetBSD
     | OpenBSD | Solaris | BeOS | GNU | Dragonfly | Unknown ->
       "" (* checked ok. *)
