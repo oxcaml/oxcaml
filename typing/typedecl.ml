@@ -158,6 +158,7 @@ type error =
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
+  | Missing_immediate_all_void_constructor_attribute of string
 
 open Typedtree
 
@@ -2559,10 +2560,24 @@ let rec update_decl_jkind env dpath decl =
     | cstrs, Variant_boxed cstr_layouts ->
       let cstrs =
         List.mapi (fun idx cstr ->
-          let cd_args, _all_void, jkinds, arg_sorts =
+          let cd_args, all_void, jkinds, arg_sorts =
             update_constructor_arguments_sorts env cstr.Types.cd_loc
               cstr.Types.cd_args
           in
+          let is_nonempty_all_void =
+            all_void
+            && (match cd_args with
+                | Cstr_tuple (_ :: _) -> true
+                | Cstr_tuple [] | Cstr_record _ -> false)
+          in
+          if is_nonempty_all_void
+          && not (Builtin_attributes.has_immediate_all_void_constructor
+                    cstr.Types.cd_attributes)
+          then
+            raise
+              (Error (cstr.Types.cd_loc,
+                      Missing_immediate_all_void_constructor_attribute
+                        (Ident.name cstr.Types.cd_id)));
           let cstr_repr =
             update_constructor_representation env cd_args jkinds
               ~is_extension_constructor:false
@@ -5921,6 +5936,12 @@ let report_error ~loc = function
       "%a can only be used on records whose fields \
        are all float64."
       Style.inline_code "[@@represent_as_float_array]"
+  | Missing_immediate_all_void_constructor_attribute name ->
+    Location.errorf ~loc
+      "All arguments of the constructor %a are void, so it must be@ \
+       annotated with %a."
+      Style.inline_code name
+      Style.inline_code "[@immediate_all_void_constructor]"
 
 let () =
   Location.register_error_of_exn
