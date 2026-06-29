@@ -1248,6 +1248,15 @@ let layout_of_sort loc sort =
     | Genvar _ -> assert false
     )
 
+let layout_of_type env loc ty =
+  let jkind = Ctype.type_jkind_purely env ty in
+  match Jkind.get_layout_defaulting_to_scannable env jkind with
+  | None -> Lambda.Ptop
+  | Some layout_const ->
+    match Jkind.Layout.Const.get_sort layout_const with
+    | Some sort -> layout env loc sort ty
+    | None -> Lambda.Ptop
+
 let layout_of_non_void_sort c =
   layout_of_const_sort_generic
     c

@@ -2994,15 +2994,24 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
           when expand_components ->
           (* This is an unboxed product with at least one [any] field, so we
              need to recompute the jkind if we want it to be precise *)
+          (* Instance and unify at the level of [ty], like [jkind_subst]:
+             [current_level] may be lower than the scope of local abstract
+             types appearing in [args] when this is called after typechecking
+             (e.g. from [Typeopt]), and unifying fresh variables created at
+             that level with [args] would raise a spurious [Escape]. *)
+          let old_level = !current_level in
+          current_level := get_level ty;
           let label_params_and_tys, record_params =
             instance_label_declarations ~fixed:false (Array.of_list lbls)
               ~params:type_decl.type_params
           in
           let uenv = Expression { env; in_subst = false } in
           begin try
-            List.iter2 (!unify' uenv) record_params args
+            List.iter2 (!unify' uenv) record_params args;
+            current_level := old_level
           with
           | Unify_trace _ ->
+            current_level := old_level;
             (* Shouldn't happen, since [record_params] should just be type
                variables *)
             Misc.fatal_errorf "failed to unify %a"
