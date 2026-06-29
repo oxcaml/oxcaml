@@ -1,0 +1,1 @@
+store_with_load_after_store { a0 = 10 ; a1 = 11 ; a2 = 13 }
