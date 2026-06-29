@@ -115,6 +115,18 @@ val read : 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
 val read_cmi_file :
      'a t -> string
   -> Global_module.Name.t * Subst.Lazy.persistent_signature
+
+(** Like [read_cmi_file] / [read], but skips the persistent-name registration
+    (and therefore the parameter-accessibility check), so the caller can pull
+    in parameterised modules without declaring those parameters itself — used
+    e.g. by [-functorize], whose bundle is implicitly parameterised by the
+    union of its inputs.  Memoised; raises [Not_found] when no cmi can be
+    loaded for [modname]. *)
+val find_import :
+  'a t -> Compilation_unit.Name.t ->
+  Compilation_unit.t option
+  * Global_module.Parameter_name.t list
+  * Signature_with_global_bindings.t
 val find : allow_hidden:bool -> 'a t -> 'a sig_reader
   -> Global_module.Name.t -> allow_excess_args:bool -> 'a
 

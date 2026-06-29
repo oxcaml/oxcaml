@@ -331,6 +331,7 @@
   makedepend
   compile_common
   instantiator
+  functorizer
   ; manual update: mli only files
   annot
   value_rec_types
@@ -381,6 +382,8 @@
   blambda_of_lambda
   bytegen
   byteinstantiator
+  bytefunctorizer
+  cmo_io
   bytelibrarian
   bytelink
   bytepackager

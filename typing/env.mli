@@ -633,6 +633,14 @@ val save_signature_with_imports:
         (* Arguments: signature, module name, module kind,
            file name, imported units with their CRCs. *)
 
+(** See [Persistent_env.find_import]. *)
+val find_import:
+  chain:Compilation_unit.Name.t list ->
+  Compilation_unit.Name.t ->
+  Compilation_unit.t option
+  * Global_module.Parameter_name.t list
+  * Signature_with_global_bindings.t
+
 (* Register a module as a parameter to this unit. *)
 val register_parameter: Global_module.Parameter_name.t -> unit
 
@@ -696,6 +704,12 @@ type error =
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t; }
   | Toplevel_splice of Location.t
   | Unsupported_inside_quotation of Location.t * no_open_quotations_context
+  | Cmi_not_found of
+      { modname : Compilation_unit.Name.t;
+        chain : Compilation_unit.Name.t list;
+            (** Dependency chain leading to [modname], in reversed order
+                (most-recent loader first). *)
+      }
 
 exception Error of error
 

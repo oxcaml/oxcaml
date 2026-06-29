@@ -1,0 +1,143 @@
+(* TEST (* DO NOT EDIT. Instead edit bad_bundle_cmi_overwritten/test_byte.ml and run gen-native.sh. *)
+ (* Bytecode-link-time CRC mismatch on the BUNDLE'S OWN cmi.
+
+    Phase 1 of [-functorize] generates [bundle_crc.cmi] v1 (Basic+Util);
+    phase 2 produces [bundle_crc.cmx] recording v1's CRC; a third [-functorize]
+    call overwrites [bundle_crc.cmi] with a v2 (Basic only).  Then
+    [main_crc_mismatch.ml] is compiled against v2.  At link time, the linker
+    sees [bundle_crc.cmx] and [main_crc_mismatch.cmx] declaring different CRCs
+    for [Bundle_crc] and reports the inconsistency.
+
+    Compare to [bad_dep_cmi_changed], which exercises the same OCaml error
+    machinery but during the [-functorize] pre-typecheck — over an underlying
+    parameter module's cmi, not the bundle's own. *)
+
+ readonly_files = "\
+   bad_bundle_cmi_overwritten_native.reference \
+   main_crc_mismatch.ml \
+ ";
+
+ setup-ocamlopt.byte-build-env;
+
+ set OCAMLPARAM = "";
+
+ script = "mkdir p basic util p_int bundle_crc";
+ script;
+
+ src = "${test_source_directory}/../p.mli \
+        ${test_source_directory}/../../dunelike/p__.ml";
+ dst = "p/";
+ copy;
+
+ src = "${test_source_directory}/../../dunelike/basic.mli \
+        ${test_source_directory}/../../dunelike/basic.ml \
+        ${test_source_directory}/../../dunelike/basic__.ml";
+ dst = "basic/";
+ copy;
+
+ src = "${test_source_directory}/../../dunelike/util.mli \
+        ${test_source_directory}/../../dunelike/util.ml \
+        ${test_source_directory}/../../dunelike/util__.ml";
+ dst = "util/";
+ copy;
+
+ src = "${test_source_directory}/../../dunelike/p_int.mli \
+        ${test_source_directory}/../../dunelike/p_int.ml \
+        ${test_source_directory}/../../dunelike/p_int__.ml";
+ dst = "p_int/";
+ copy;
+
+ set flg = "-no-alias-deps -w -53";
+ set flg_int_iface = "$flg -w -49";
+
+ (* Parameter P. *)
+
+ flags = "$flg_int_iface";
+ module = "p/p__.ml";
+ ocamlopt.byte;
+
+ flags = "$flg -as-parameter -I p -open P__";
+ module = "p/p.mli";
+ ocamlopt.byte;
+
+ (* [Basic] and [Util], both parameterised by P. *)
+
+ flags = "$flg_int_iface -parameter P -I p";
+ module = "basic/basic__.ml";
+ ocamlopt.byte;
+
+ flags = "$flg -parameter P -I p -I basic -open Basic__";
+ module = "basic/basic.mli basic/basic.ml";
+ ocamlopt.byte;
+
+ flags = "$flg_int_iface -parameter P -I p";
+ module = "util/util__.ml";
+ ocamlopt.byte;
+
+ flags = "$flg -parameter P -I p -I util -open Util__";
+ module = "util/util.mli util/util.ml";
+ ocamlopt.byte;
+
+ (* [P_int] is an argument for P. *)
+
+ flags = "$flg_int_iface";
+ module = "p_int/p_int__.ml";
+ ocamlopt.byte;
+
+ flags = "$flg -as-argument-for P -I p -I p_int -open P_int__";
+ module = "p_int/p_int.mli p_int/p_int.ml";
+ ocamlopt.byte;
+
+ (* Phase 1: generate [Bundle_crc.cmi] with [Basic+Util]. *)
+
+ flags = "$flg -functorize -I p -I basic -I util Basic Util";
+ module = "";
+ program = "bundle_crc/bundle_crc.cmi";
+ all_modules = "";
+ ocamlopt.byte;
+
+ (* Phase 2: produce [Bundle_crc.cmx] recording the v1 cmi CRC. *)
+
+ flags = "$flg -functorize -I p -I basic -I util \
+   -cmi-file bundle_crc/bundle_crc.cmi Basic Util";
+ module = "";
+ program = "bundle_crc/bundle_crc.cmx";
+ all_modules = "";
+ ocamlopt.byte;
+
+ (* Overwrite [Bundle_crc.cmi] with a different signature (Basic only). *)
+
+ flags = "$flg -functorize -I p -I basic Basic";
+ module = "";
+ program = "bundle_crc/bundle_crc.cmi";
+ all_modules = "";
+ ocamlopt.byte;
+
+ (* Compile [main_crc_mismatch.ml] against the v2 cmi. *)
+
+ flags = "$flg -I bundle_crc -I p -I p_int -I basic";
+ module = "main_crc_mismatch.ml";
+ ocamlopt.byte;
+
+ (* Link: [bundle_crc.cmx] recorded CRC of cmi v1; [main_crc_mismatch.cmx]
+    recorded CRC of cmi v2.  The linker must detect the inconsistency. *)
+ flags = "";
+ module = "";
+ program = "$test_build_directory/test_crc_mismatch.exe";
+ all_modules = "\
+   basic/basic__.cmx \
+   util/util__.cmx \
+   basic/basic.cmx \
+   util/util.cmx \
+   p_int/p_int__.cmx \
+   p_int/p_int.cmx \
+   bundle_crc/bundle_crc.cmx \
+   main_crc_mismatch.cmx \
+ ";
+ ocamlopt_byte_exit_status = "2";
+ compiler_output = "bad_bundle_cmi_overwritten.output";
+ ocamlopt.byte;
+
+ compiler_reference = "bad_bundle_cmi_overwritten_native.reference";
+ check-ocamlopt.byte-output;
+*)

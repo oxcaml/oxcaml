@@ -899,6 +899,10 @@ type error =
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t }
   | Toplevel_splice of Location.t
   | Unsupported_inside_quotation of Location.t * no_open_quotations_context
+  | Cmi_not_found of
+      { modname : Compilation_unit.Name.t;
+        chain : Compilation_unit.Name.t list;
+      }
 
 exception Error of error
 
@@ -3293,6 +3297,10 @@ let read_signature modname cmi =
   let mty, staticity = read_pers_mod modname cmi in
   Subst.Lazy.force_signature mty, staticity
 
+let find_import ~chain modname =
+  try Persistent_env.find_import !persistent_env modname
+  with Not_found -> error (Cmi_not_found { modname; chain })
+
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname
 
@@ -5488,6 +5496,18 @@ let report_error_doc = function
          as seen at %a.@]"
         print_unsupported_quotation context
         (Location.Doc.loc ~capitalize_first:false) loc
+  | Cmi_not_found { modname; chain } ->
+      let pp_referenced_from ppf chain =
+        List.iter
+          (fun loader ->
+            Format_doc.fprintf ppf ",@ referenced from %a"
+              (Style.as_inline_code Compilation_unit.Name.print) loader)
+          chain
+      in
+      Location.errorf ~loc:Location.none
+        "@[<hov>Cannot find the compiled interface for %a%a@]"
+        (Style.as_inline_code Compilation_unit.Name.print) modname
+        pp_referenced_from chain
 
 let () =
   Location.register_error_of_exn

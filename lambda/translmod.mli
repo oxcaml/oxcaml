@@ -61,6 +61,18 @@ val transl_instance:
         -> arg_block_idx:int option
         -> program
 
+(** [transl_functorize cu params modules ~find_impl_by_name ~coercion]
+    translates the bundle [cu] as a generative functor over [params] whose
+    body exposes [modules] (in order, after [coercion]).  Transitive deps
+    fetched via [find_impl_by_name] are let-bound but not exposed. *)
+val transl_functorize:
+      Compilation_unit.t
+        -> Global_module.Parameter_name.t list
+        -> Global_module.t list
+        -> find_impl_by_name:(Compilation_unit.t -> main_module_block_format)
+        -> coercion:module_coercion
+        -> program
+
 val toplevel_name: Ident.t -> string
 
 val primitive_declarations: Primitive.description list ref

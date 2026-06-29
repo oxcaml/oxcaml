@@ -98,6 +98,14 @@ let emit_bytecode i
             ~main_module_block_format ~arg_descr);
     )
 
+(* Lowers a [Lambda.program] to bytecode and emits the .cmo, honouring
+   [-stop-after lambda].  Used by [-functorize] after
+   [Translmod.transl_functorize]. *)
+let emit_lambda_program info program =
+  let bytecode = tlambda_to_bytecode info program ~as_arg_for:None in
+  if not (Clflags.should_stop_after Clflags.Compiler_pass.Lambda)
+  then emit_bytecode info bytecode
+
 type starting_point =
   | Parsing
   | Instantiation of {
