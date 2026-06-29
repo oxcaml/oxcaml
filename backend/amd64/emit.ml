@@ -636,8 +636,8 @@ type gc_call =
     gc_return_lbl : L.t; (* Where to branch after GC *)
     (* The frame descriptor is recorded (and its return-address label defined)
        when the out-of-line GC stub is emitted, rather than at the allocation
-       site, so that frame descriptors are emitted in increasing
-       return-address order. *)
+       site, so that frame descriptors are emitted in increasing return-address
+       order. *)
     gc_frame_lbl : Label.t; (* Linear label of the frame descriptor *)
     gc_frame_size : int;
     gc_live_offset : int list;
@@ -3165,11 +3165,10 @@ let end_assembly () =
   let frametable_sym = S.create_global (Cmm_helpers.make_symbol "frametable") in
   D.size frametable_sym;
   (* Experimental: emit a pointer to this unit's frametable into a
-     linker-collected section, so the runtime can enumerate the frametable
-     of *every* linked unit, including ones that are not in
-     caml_frametable[]. The linker concatenates these per-unit entries and
-     bounds them with __start_/__stop_caml_all_frametables. ELF/GAS
-     targets only. *)
+     linker-collected section, so the runtime can enumerate the frametable of
+     *every* linked unit, including ones that are not in caml_frametable[]. The
+     linker concatenates these per-unit entries and bounds them with
+     __start_/__stop_caml_all_frametables. ELF/GAS targets only. *)
   (match[@ocaml.warning "-4"] system with
   | S_macosx | S_win32 | S_win64 | S_mingw | S_mingw64 | S_cygwin | S_unknown ->
     ()

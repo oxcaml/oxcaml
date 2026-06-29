@@ -753,7 +753,8 @@ let record_frame_label env live dbg =
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of linear labels. *)
   record_frame_descr ~label:lbl ~frame_size:(Env.frame_size env)
-    ~live_offset:(compute_live_offset env live) dbg;
+    ~live_offset:(compute_live_offset env live)
+    dbg;
   label_to_asm_label ~section:Text lbl
 
 let record_frame env live dbg =
@@ -775,11 +776,13 @@ let emit_call_gc gc =
   (* Record the frame descriptor here, where its return-address label is
      defined, so descriptors are recorded (and emitted) in increasing
      return-address order. Safe across the relaxation/sizing pass: that pass
-     runs under [Emitaux.with_snapshot], which rolls back [frame_descriptors].
-  *)
+     runs under [Emitaux.with_snapshot], which rolls back
+     [frame_descriptors]. *)
   record_frame_descr ~label:gc.gc_frame_lbl ~frame_size:gc.gc_frame_size
     ~live_offset:gc.gc_live_offset gc.gc_frame_dbg;
-  labelled_ins1 (label_to_asm_label ~section:Text gc.gc_frame_lbl) B
+  labelled_ins1
+    (label_to_asm_label ~section:Text gc.gc_frame_lbl)
+    B
     (local_label gc.gc_return_lbl)
 
 (* Record calls to local stack reallocation *)
