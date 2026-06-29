@@ -147,7 +147,7 @@ type texp_function =
 
 type texp_function_identifier =
   { alloc_mode : alloc_mode;
-    ret_sort : Jkind.sort;
+    ret_sort : Typedtree.function_return_sort;
     ret_mode : Alloc.l;
     zero_alloc : Zero_alloc.t
   }
@@ -170,7 +170,7 @@ let texp_function_param_identifier_defaults =
 
 let texp_function_defaults =
   { alloc_mode = dummy_alloc_mode;
-    ret_sort = Jkind.Sort.scannable;
+    ret_sort = Typedtree.Function_returns Jkind.Sort.scannable;
     ret_mode = Alloc.disallow_right Alloc.legacy;
     zero_alloc = Zero_alloc.default
   }

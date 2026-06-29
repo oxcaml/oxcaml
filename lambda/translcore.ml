@@ -320,6 +320,13 @@ type fusable_function =
    It detects whether the AST is a method by the presence of [Texp_poly] on the
    inner function. This is only ever added to methods.
 *)
+let transl_function_return_sort ret_sort =
+  match ret_sort with
+  | Function_returns sort -> Jkind.Sort.default_for_transl_and_get sort
+  | Function_forwards | Function_never_returns ->
+      fatal_error
+        "Translcore: layout-any function returns are not yet translated"
+
 let fuse_method_arity (parent : fusable_function) : fusable_function =
   match parent with
   | { params = [ self_param ];
@@ -347,7 +354,7 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
               Mode.Alloc.disallow_right Mode.Alloc.legacy }
         }
       in
-      let return_sort = Jkind.Sort.default_for_transl_and_get method_.ret_sort in
+      let return_sort = transl_function_return_sort method_.ret_sort in
       { params = self_param :: method_.params;
         body = method_.body;
         return_mode = transl_alloc_mode_l method_.ret_mode.mode_modes;
@@ -471,7 +478,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         (event_before ~scopes body (transl_exp ~scopes layout body))
   | Texp_function { params; body; ret_sort; ret_mode; alloc_mode;
                     zero_alloc } ->
-      let ret_sort = Jkind.Sort.default_for_transl_and_get ret_sort in
+      let ret_sort = transl_function_return_sort ret_sort in
       transl_function ~in_new_scope ~scopes e params body
         ~alloc_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
   | Texp_apply({ exp_desc = Texp_ident { path;

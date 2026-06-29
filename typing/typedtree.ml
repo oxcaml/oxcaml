@@ -160,6 +160,11 @@ type record_sorts =
   | Fixed
   | Variable of Jkind.sort array
 
+type function_return_sort =
+  | Function_returns of Jkind.sort
+  | Function_forwards
+  | Function_never_returns
+
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
 
@@ -292,7 +297,7 @@ and expression_desc =
       { params : function_param list;
         body : function_body;
         ret_mode : Mode.Alloc.l modes;
-        ret_sort : Jkind.sort;
+        ret_sort : function_return_sort;
         alloc_mode : alloc_mode;
         zero_alloc : Zero_alloc.t;
       }
