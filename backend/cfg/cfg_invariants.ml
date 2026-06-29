@@ -43,6 +43,16 @@ let report t =
   Format.fprintf t.ppf "Cfg invariant failed in %s: " t.fun_name;
   Format.fprintf t.ppf
 
+(* Look up a block referenced by another block, reporting (instead of raising)
+   if the referenced label is dangling. Returns [None] if not present. *)
+let lookup_block t ~kind ~referrer label =
+  match Cfg.get_block t.cfg label with
+  | Some _ as block -> block
+  | None ->
+    report t "%s %a (referenced from block %a) is not present in the cfg" kind
+      Label.print label Label.print referrer;
+    None
+
 let print_layout ppf layout =
   Format.(
     pp_print_list ~pp_sep:pp_print_space Label.print ppf (layout |> DLL.to_list))
@@ -119,23 +129,25 @@ let check_tailrec_position t =
      entry block. *)
   match t.tailrec_entry_label with
   | None -> ()
-  | Some tailrec_label ->
+  | Some tailrec_label -> (
     if not (Label.equal tailrec_label t.cfg.entry_label)
     then
-      let entry_block = Cfg.get_block_exn t.cfg t.cfg.entry_label in
-      let successors =
-        Cfg.successor_labels ~normal:true ~exn:false entry_block
-      in
-      if
-        not
-          (Label.Set.cardinal successors = 1
-          && Label.equal tailrec_label (Label.Set.min_elt successors))
-      then
-        report t
-          "Expected tailrec block %a to be the entry block or the only \
-           successor of the entry block but entry block the \
-           followingsuccessors:@.%a@."
-          Label.print tailrec_label Label.Set.print successors
+      match Cfg.get_block t.cfg t.cfg.entry_label with
+      | None -> ()
+      | Some entry_block ->
+        let successors =
+          Cfg.successor_labels ~normal:true ~exn:false entry_block
+        in
+        if
+          not
+            (Label.Set.cardinal successors = 1
+            && Label.equal tailrec_label (Label.Set.min_elt successors))
+        then
+          report t
+            "Expected tailrec block %a to be the entry block or the only \
+             successor of the entry block but entry block the \
+             followingsuccessors:@.%a@."
+            Label.print tailrec_label Label.Set.print successors)
 
 let check_terminator_arity t label block =
   let term = block.Cfg.terminator in
@@ -391,38 +403,44 @@ let check_stack_offset t label (block : Cfg.basic_block) =
      let stack_offset = block.stack_offset in
      List.iter
        (fun predecessor ->
-         let pred_block = Cfg.get_block_exn t.cfg predecessor in
-         let pred_terminator_stack_offset =
-           pred_block.terminator.stack_offset
-         in
-         if not (Int.equal stack_offset pred_terminator_stack_offset)
-         then
-           report t
-             "Wrong stack offset: block %s in predecessors of block %s, stack \
-              offset of the terminator of %s is %d, stack offset of block %s \
-              is %d, expected stack offset of terminator is %d \
-              (block.is_trap_handler=%b).\n"
-             (Label.to_string predecessor)
-             (Label.to_string label)
-             (Label.to_string predecessor)
-             pred_terminator_stack_offset (Label.to_string label)
-             block.stack_offset stack_offset block.is_trap_handler)
+         match
+           lookup_block t ~kind:"predecessor" ~referrer:label predecessor
+         with
+         | None -> ()
+         | Some pred_block ->
+           let pred_terminator_stack_offset =
+             pred_block.terminator.stack_offset
+           in
+           if not (Int.equal stack_offset pred_terminator_stack_offset)
+           then
+             report t
+               "Wrong stack offset: block %s in predecessors of block %s, \
+                stack offset of the terminator of %s is %d, stack offset of \
+                block %s is %d, expected stack offset of terminator is %d \
+                (block.is_trap_handler=%b).\n"
+               (Label.to_string predecessor)
+               (Label.to_string label)
+               (Label.to_string predecessor)
+               pred_terminator_stack_offset (Label.to_string label)
+               block.stack_offset stack_offset block.is_trap_handler)
        (Cfg.predecessor_labels block));
   let terminator_stack_offset = block.terminator.stack_offset in
   Label.Set.iter
     (fun successor ->
-      let succ_block = Cfg.get_block_exn t.cfg successor in
-      if not (Int.equal terminator_stack_offset succ_block.stack_offset)
-      then
-        report t
-          "Wrong stack offset: block %s in normal successors of block %s, \
-           stack offset of the terminator of %s is %d, stack offset of block \
-           %s is %d.\n"
-          (Label.to_string successor)
-          (Label.to_string label) (Label.to_string label)
-          terminator_stack_offset
-          (Label.to_string successor)
-          succ_block.stack_offset)
+      match lookup_block t ~kind:"successor" ~referrer:label successor with
+      | None -> ()
+      | Some succ_block ->
+        if not (Int.equal terminator_stack_offset succ_block.stack_offset)
+        then
+          report t
+            "Wrong stack offset: block %s in normal successors of block %s, \
+             stack offset of the terminator of %s is %d, stack offset of block \
+             %s is %d.\n"
+            (Label.to_string successor)
+            (Label.to_string label) (Label.to_string label)
+            terminator_stack_offset
+            (Label.to_string successor)
+            succ_block.stack_offset)
     (Cfg.successor_labels ~normal:true ~exn:false block);
   let stack_offset_after_body =
     DLL.fold_left block.body ~init:block.stack_offset
@@ -436,16 +454,20 @@ let check_stack_offset t label (block : Cfg.basic_block) =
             Printcfg.basic_desc basic.desc basic.stack_offset cur_stack_offset;
         match basic.desc with
         | Pushtrap { lbl_handler } ->
-          let handler_block = Cfg.get_block_exn t.cfg lbl_handler in
-          if not (Int.equal cur_stack_offset handler_block.stack_offset)
-          then
-            report t
-              "Wrong stack offset in block %s: the offset of [(id:%a) %a] \
-               instruction is %d, the offset of block %s is %d.\n"
-              (Label.to_string label) InstructionId.print basic.id
-              Printcfg.basic_desc basic.desc cur_stack_offset
-              (Label.to_string lbl_handler)
-              handler_block.stack_offset;
+          (match
+             lookup_block t ~kind:"trap handler" ~referrer:label lbl_handler
+           with
+          | None -> ()
+          | Some handler_block ->
+            if not (Int.equal cur_stack_offset handler_block.stack_offset)
+            then
+              report t
+                "Wrong stack offset in block %s: the offset of [(id:%a) %a] \
+                 instruction is %d, the offset of block %s is %d.\n"
+                (Label.to_string label) InstructionId.print basic.id
+                Printcfg.basic_desc basic.desc cur_stack_offset
+                (Label.to_string lbl_handler)
+                handler_block.stack_offset);
           cur_stack_offset + Proc.trap_size_in_bytes ()
         | Poptrap { lbl_handler = _ } ->
           let new_stack_offset =
@@ -504,38 +526,43 @@ let check_block t label (block : Cfg.basic_block) =
   (* successors and predecessors agree *)
   Label.Set.iter
     (fun successor ->
-      let succ_block = Cfg.get_block_exn t.cfg successor in
-      if
-        not
-          (List.exists (Label.equal label) (Cfg.predecessor_labels succ_block))
-      then
-        report t "%s in successors(%s) but %s is not in predecessors(%s)"
-          (Label.to_string successor)
-          (Label.to_string label) (Label.to_string label)
-          (Label.to_string successor))
+      match lookup_block t ~kind:"successor" ~referrer:label successor with
+      | None -> ()
+      | Some succ_block ->
+        if
+          not
+            (List.exists (Label.equal label)
+               (Cfg.predecessor_labels succ_block))
+        then
+          report t "%s in successors(%s) but %s is not in predecessors(%s)"
+            (Label.to_string successor)
+            (Label.to_string label) (Label.to_string label)
+            (Label.to_string successor))
     successors;
   List.iter
     (fun predecessor ->
-      let pred_block = Cfg.get_block_exn t.cfg predecessor in
-      (* trap handler block is reachable through exceptional edges only. *)
-      let exn = Cfg.successor_labels ~normal:false ~exn:true pred_block in
-      let normal = Cfg.successor_labels ~normal:true ~exn:false pred_block in
-      let check_edge ~must ~must_not =
-        if Label.Set.mem label must_not
-        then
-          report t "Unexpected edge from %s to block %s"
-            (Label.to_string predecessor)
-            (Label.to_string label);
-        if not (Label.Set.mem label must)
-        then
-          report t "%s in predecessors of %s but %s not in successors of %s"
-            (Label.to_string predecessor)
-            (Label.to_string label) (Label.to_string label)
-            (Label.to_string predecessor)
-      in
-      if block.is_trap_handler
-      then check_edge ~must:exn ~must_not:normal
-      else check_edge ~must:normal ~must_not:exn)
+      match lookup_block t ~kind:"predecessor" ~referrer:label predecessor with
+      | None -> ()
+      | Some pred_block ->
+        (* trap handler block is reachable through exceptional edges only. *)
+        let exn = Cfg.successor_labels ~normal:false ~exn:true pred_block in
+        let normal = Cfg.successor_labels ~normal:true ~exn:false pred_block in
+        let check_edge ~must ~must_not =
+          if Label.Set.mem label must_not
+          then
+            report t "Unexpected edge from %s to block %s"
+              (Label.to_string predecessor)
+              (Label.to_string label);
+          if not (Label.Set.mem label must)
+          then
+            report t "%s in predecessors of %s but %s not in successors of %s"
+              (Label.to_string predecessor)
+              (Label.to_string label) (Label.to_string label)
+              (Label.to_string predecessor)
+        in
+        if block.is_trap_handler
+        then check_edge ~must:exn ~must_not:normal
+        else check_edge ~must:normal ~must_not:exn)
     (Cfg.predecessor_labels block);
   (* [stack_offset] consistent across edges and calculated correctly within
      blocks *)
@@ -552,21 +579,49 @@ let check_reducibility t cfg_with_infos =
 
 let check_liveness t cfg_with_infos =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
-  let entry_block = Cfg.get_block_exn cfg cfg.entry_label in
-  let first_instruction_id = Cfg.first_instruction_id entry_block in
-  match
-    Cfg_with_infos.liveness_find_opt cfg_with_infos first_instruction_id
-  with
-  | None -> report t "Unable to get liveness for first instruction"
-  | Some { Cfg_liveness.before; across = _ } ->
-    Reg.Set.iter
-      (fun reg ->
-        match reg.loc with
-        | Reg _ | Stack (Incoming _ | Local _ | Domainstate _) -> ()
-        | Unknown | Stack (Outgoing _) ->
-          report t "Reg %a is unexpectedly live (%a) at function entry"
-            Printreg.reg reg Reg.format_location reg.loc)
-      before
+  match Cfg.get_block cfg cfg.entry_label with
+  | None -> ()
+  | Some entry_block -> (
+    let first_instruction_id = Cfg.first_instruction_id entry_block in
+    match
+      Cfg_with_infos.liveness_find_opt cfg_with_infos first_instruction_id
+    with
+    | None -> report t "Unable to get liveness for first instruction"
+    | Some { Cfg_liveness.before; across = _ } ->
+      Reg.Set.iter
+        (fun reg ->
+          match reg.loc with
+          | Reg _ | Stack (Incoming _ | Local _ | Domainstate _) -> ()
+          | Unknown | Stack (Outgoing _) ->
+            report t "Reg %a is unexpectedly live (%a) at function entry"
+              Printreg.reg reg Reg.format_location reg.loc)
+        before)
+
+let check_instruction_ids t =
+  (* All instruction ids (basic and terminator) must be distinct, and
+     [next_instruction_id] must be greater than every id in use, so that freshly
+     allocated ids cannot collide with existing ones. Several passes build
+     [id]-keyed tables that rely on this. *)
+  let seen = ref InstructionId.Set.empty in
+  let max_id = ref InstructionId.none in
+  let add_id label id =
+    if InstructionId.Set.mem id !seen
+    then
+      report t "Duplicate instruction id %a in block %a" InstructionId.print id
+        Label.print label
+    else seen := InstructionId.Set.add id !seen;
+    max_id := InstructionId.max !max_id id
+  in
+  Cfg.iter_blocks t.cfg ~f:(fun label block ->
+      DLL.iter block.body ~f:(fun (i : Cfg.basic Cfg.instruction) ->
+          add_id label i.id);
+      add_id label block.terminator.id);
+  let next_id = InstructionId.get t.cfg.next_instruction_id in
+  if not (InstructionId.compare !max_id next_id < 0)
+  then
+    report t
+      "next_instruction_id %a is not greater than the largest id in use %a"
+      InstructionId.print next_id InstructionId.print !max_id
 
 let run ppf cfg_with_layout =
   let cfg = CL.cfg cfg_with_layout in
@@ -581,6 +636,7 @@ let run ppf cfg_with_layout =
   in
   check_layout t layout;
   Cfg.iter_blocks ~f:(check_block t) cfg;
+  check_instruction_ids t;
   check_tailrec_position t;
   let cfg_with_infos = Cfg_with_infos.make cfg_with_layout in
   check_reducibility t cfg_with_infos;
