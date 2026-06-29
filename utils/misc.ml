@@ -256,6 +256,18 @@ module Stdlib = struct
       in
       aux f accu [] l1 l2
 
+    let map_cont f xs k =
+      List.fold_right (fun x k ys -> f x (fun y -> k (y :: ys)))
+        xs (fun ys -> k (List.rev ys)) []
+
+    let rec fold_left_map_cont f xs acc ~k =
+      match xs with
+      | [] -> k [] acc
+      | x :: xs ->
+        f x acc ~k:(fun y acc ->
+          fold_left_map_cont f xs acc ~k:(fun ys acc ->
+            k (y :: ys) acc))
+
     let chunks_of n l =
       if n <= 0 then raise (Invalid_argument "chunks_of");
       (* Invariant: List.length l = remaining *)
