@@ -85,8 +85,7 @@ end
 Line 2, characters 13-19:
 2 |   let g () = X.g ()
                  ^^^^^^
-Error: This expression has type "t_any_mod_separable"
-       but an expression was expected of type "('a : '_representable_layout_2)"
+Error: Function arguments and returns must be representable.
        The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
        But the layout of t_any_mod_separable must be representable

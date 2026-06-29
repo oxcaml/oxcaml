@@ -64,9 +64,9 @@ Error: Function arguments and returns must be representable.
 let f3 : Function_b.return_t = fun () -> assert false
 
 [%%expect{|
-Line 1, characters 31-53:
+Line 1, characters 41-53:
 1 | let f3 : Function_b.return_t = fun () -> assert false
-                                   ^^^^^^^^^^^^^^^^^^^^^^
+                                             ^^^^^^^^^^^^
 Error: Function arguments and returns must be representable.
        The layout of Function_a.t is any
          because the .cmi file for Function_a.t is missing.
