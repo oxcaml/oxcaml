@@ -12,12 +12,12 @@ type rule_result =
 let is_control_flow = function
   | J _ | JMP _ | CALL _ | RET | HLT | UD2 -> true
   | LEAVE | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _
-  | ADD _ | SUB _ | IMUL _ | MUL _ | IDIV _ | AND _ | OR _ | XOR _ | SAL _
-  | SAR _ | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO | SET _
-  | CMOV _ | BSF _ | BSR _ | BSWAP _ | XCHG _ | LOCK_CMPXCHG _ | LOCK_XADD _
-  | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _
-  | PREFETCH _ | NOP | PAUSE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _
-  | ADC _ | SBB _ ->
+  | ADD _ | SUB _ | IMUL _ | MUL _ | IDIV _ | DIV _ | AND _ | OR _ | XOR _
+  | SAL _ | SAR _ | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO
+  | SET _ | CMOV _ | BSF _ | BSR _ | BSWAP _ | XCHG _ | LOCK_CMPXCHG _
+  | LOCK_XADD _ | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _
+  | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE | RDTSC | RDPMC | LFENCE | SFENCE
+  | MFENCE | SIMD _ | ADC _ | SBB _ ->
     false
 
 let is_hard_barrier = function
@@ -119,7 +119,7 @@ let writes_to_reg64 target = function
     is_reg64_subregister target src || is_reg64_subregister target dst
   | XCHG (op1, op2) ->
     is_reg64_subregister target op1 || is_reg64_subregister target op2
-  | MUL _ | IMUL (_, None) | IDIV _ ->
+  | MUL _ | IMUL (_, None) | IDIV _ | DIV _ ->
     equal_reg64 target RAX || equal_reg64 target RDX
   | CDQ | CQO -> equal_reg64 target RDX
   | LOCK_CMPXCHG (_, dst) ->
@@ -178,7 +178,7 @@ let reads_from_reg64 target = function
   | LOCK_OR (op1, op2)
   | LOCK_XOR (op1, op2) ->
     arg_contains_reg64 target op1 || arg_contains_reg64 target op2
-  | MUL op | IMUL (op, None) | IDIV op ->
+  | MUL op | IMUL (op, None) | IDIV op | DIV op ->
     (* MUL / IMUL don't usually read RDX, but the 16bit version does and in any
        case, we assume that these instructions write RDX, which is not true for
        the 8bit version. Assuming that we read RDX makes this conservative,
@@ -261,9 +261,9 @@ let flags_never_observed start_cell =
 
 let maybe_writes_flags = function
   | ADD _ | SUB _ | AND _ | OR _ | XOR _ | CMP _ | TEST _ | INC _ | DEC _
-  | NEG _ | MUL _ | IMUL _ | IDIV _ | BSF _ | BSR _ | SAL _ | SAR _ | SHR _
-  | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | LOCK_XADD _
-  | LOCK_CMPXCHG _ | ADC _ | SBB _ ->
+  | NEG _ | MUL _ | IMUL _ | IDIV _ | DIV _ | BSF _ | BSR _ | SAL _ | SAR _
+  | SHR _ | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _
+  | LOCK_XADD _ | LOCK_CMPXCHG _ | ADC _ | SBB _ ->
     true
   | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | CDQ | CQO
   | SET _ | CMOV _ | BSWAP _ | XCHG _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE
