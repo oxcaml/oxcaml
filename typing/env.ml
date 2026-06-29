@@ -763,7 +763,8 @@ and type_data =
   { tda_declaration : type_declaration;
     tda_descriptions : type_descriptions;
     tda_shape : Shape.t;
-    tda_unboxed_version_descriptions : type_descriptions option }
+    tda_unboxed_version_descriptions : type_descriptions option;
+    tda_hidden : bool }
 
 and module_data =
   { mda_declaration : Subst.Lazy.module_declaration;
@@ -1516,6 +1517,7 @@ let type_of_cstr path = function
           tda_descriptions = Type_record (labels, repr, umc);
           tda_shape = Shape.leaf decl.type_uid;
           tda_unboxed_version_descriptions = None;
+          tda_hidden = false;
         }
       | _ -> assert false
       end
@@ -1559,6 +1561,7 @@ let rec find_type_data path env seen =
       tda_descriptions = Type_abstract (Btype.type_origin decl);
       tda_shape = Shape.leaf decl.type_uid;
       tda_unboxed_version_descriptions = None;
+      tda_hidden = false;
     }
   | exception Not_found -> begin
       match path with
@@ -1682,7 +1685,8 @@ and find_type_unboxed_version_data path env seen =
     tda_declaration;
     tda_descriptions = descrs;
     tda_shape = Shape.leaf tda_declaration.type_uid;
-    tda_unboxed_version_descriptions = None
+    tda_unboxed_version_descriptions = None;
+    tda_hidden = false;
   }
 
 let find_modtype_lazy path env =
@@ -2471,7 +2475,8 @@ let rec components_of_module_maker
               { tda_declaration = final_decl;
                 tda_descriptions = descrs;
                 tda_shape = shape;
-                tda_unboxed_version_descriptions = unboxed_descrs }
+                tda_unboxed_version_descriptions = unboxed_descrs;
+                tda_hidden = false }
             in
             c.comp_types <- NameMap.add (Ident.name id) tda c.comp_types;
             env := store_type_infos ~tda_shape:shape id decl !env
@@ -2721,7 +2726,7 @@ and store_label
   end;
   add_label record_form env lbl_id lbl
 
-and store_type ~check id info shape env =
+and store_type ~check ~hidden id info shape env =
   let loc = info.type_loc in
   if check then
     check_usage loc id info.type_uid
@@ -2770,7 +2775,8 @@ and store_type ~check id info shape env =
     { tda_declaration = info;
       tda_descriptions = descrs;
       tda_shape = shape;
-      tda_unboxed_version_descriptions = unboxed_descrs }
+      tda_unboxed_version_descriptions = unboxed_descrs;
+      tda_hidden = hidden }
   in
   Builtin_attributes.mark_alerts_used info.type_attributes;
   { env with
@@ -2791,6 +2797,7 @@ and store_type_infos ~tda_shape id info env =
       tda_unboxed_version_descriptions =
         Option.map (fun uinfo -> Type_abstract (Btype.type_origin uinfo))
           info.type_unboxed_version;
+      tda_hidden = false;
     }
   in
   { env with
@@ -2962,9 +2969,11 @@ let add_value_lazy ?check ?shape ~mode id desc env =
   let mode = Mode.Value.disallow_right mode in
   store_value ?check ~mode id addr desc shape env
 
-let add_type ~check ?shape id info env =
+let add_type_maybe_hidden ~check ~hidden ?shape id info env =
   let shape = shape_or_leaf info.type_uid shape in
-  store_type ~check id info shape env
+  store_type ~check ~hidden id info shape env
+
+let add_type = add_type_maybe_hidden ~hidden:false
 
 and add_extension ~check ?shape ~rebind id ext env =
   let addr = extension_declaration_address env id ext in
@@ -3057,7 +3066,9 @@ let enter_value ?check ~mode name desc env =
 
 let enter_type ~scope name info env =
   let id = Ident.create_scoped ~scope name in
-  let env = store_type ~check:true id info (Shape.leaf info.type_uid) env in
+  let env =
+    store_type ~check:true ~hidden:false id info (Shape.leaf info.type_uid) env
+  in
   (id, env)
 
 let enter_extension ~scope ~rebind name ext env =
@@ -3375,12 +3386,19 @@ let add_language_extension_types env =
       f (add_type ?shape:None ~check:false) env
     | false -> env
   in
+  let add_or_hide ext lvl f env =
+    let hidden = not (Language_extension.is_at_least ext lvl) in
+    f (add_type_maybe_hidden ?shape:None ~check:false ~hidden) env
+  in
+  (* Small number types are hidden when [Small_numbers] is disabled since they
+     can easily be shimmed and emulated upstream. This could be done for other
+     extension types if desired. *)
   lazy
     Language_extension.(env ()
     |> add SIMD Stable Predef.add_simd_stable_extension_types
     |> add SIMD Beta Predef.add_simd_beta_extension_types
     |> add SIMD Alpha Predef.add_simd_alpha_extension_types
-    |> add Small_numbers Stable Predef.add_small_number_extension_types
+    |> add_or_hide Small_numbers Stable Predef.add_small_number_extension_types
     |> add Small_numbers Beta Predef.add_small_number_beta_extension_types
     |> add Layouts Stable Predef.add_or_null
     |> add Runtime_metaprogramming () Predef.add_runtime_metaprogramming_types)
@@ -3871,12 +3889,12 @@ let lookup_ident_value ~errors ~use ~loc name env =
 
 let lookup_ident_type ~errors ~use ~loc s env =
   match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.types with
-  | Ok (path, locks, tda) ->
+  | Ok (path, locks, ({ tda_hidden = false; _ } as tda)) ->
       check_cross_quotation ~errors ~loc_use:loc
         ~loc_def:tda.tda_declaration.type_loc env path (Lident s) locks;
       use_type ~use ~loc path tda;
       path, tda
-  | Error _ ->
+  | Ok (_, _, { tda_hidden = true; _ }) | Error _ ->
       may_lookup_error errors loc env (Unbound_type (Lident s))
 
 let lookup_ident_modtype ~errors ~use ~loc s env =
@@ -4140,11 +4158,11 @@ let lookup_dot_type ~errors ~use ~loc l s env =
     lookup_structure_components ~errors ~use l env
   in
   match NameMap.find s.txt comps.comp_types with
-  | tda ->
+  | { tda_hidden = false; _ } as tda ->
       let path = Pdot(p, s.txt) in
       use_type ~use ~loc path tda;
       (path, tda)
-  | exception Not_found ->
+  | { tda_hidden = true; _ } | exception Not_found ->
       may_lookup_error errors loc env (Unbound_type (Ldot(l, s)))
 
 let lookup_dot_modtype ~errors ~use ~loc l s env =
@@ -4934,6 +4952,11 @@ and fold_types f =
   find_all wrap_identity
     (fun env -> env.types) (fun sc -> sc.comp_types)
     (fun k p tda acc -> f k p tda.tda_declaration acc)
+and fold_visible_types f =
+  find_all wrap_identity
+    (fun env -> env.types) (fun sc -> sc.comp_types)
+    (fun k p tda acc ->
+       if tda.tda_hidden then acc else f k p tda.tda_declaration acc)
 and fold_modtypes f =
   find_all wrap_identity
     (fun env -> env.modtypes) (fun sc -> sc.comp_modtypes)
@@ -5080,8 +5103,8 @@ let spellcheck_name extract env name =
 
 let extract_values path env =
   fold_values (fun name _ _ _ acc -> name :: acc) path env []
-let extract_types path env =
-  fold_types (fun name _ _ acc -> name :: acc) path env []
+let extract_visible_types path env =
+  fold_visible_types (fun name _ _ acc -> name :: acc) path env []
 let extract_modules path env =
   fold_modules (fun name _ _ acc -> name :: acc) path env []
 let extract_constructors path env =
@@ -5181,7 +5204,7 @@ let report_lookup_error_doc loc env = function
      Location.aligned_error_hint ~loc
        "@{<ralign>Unbound type constructor @}%a"
        quoted_longident lid
-       (spellcheck extract_types env lid)
+       (spellcheck extract_visible_types env lid)
   | Unbound_module lid -> begin
       let main ppf =
         fprintf ppf "@{<ralign>Unbound module @}%a" quoted_longident lid in
