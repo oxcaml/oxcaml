@@ -1626,6 +1626,16 @@ let assemble_line b loc ins =
             buf_int8 b 0
           done
     | Directive (D.Hidden _) | Directive D.New_line -> ()
+    | Directive (D.Frame_descr_delta _) ->
+      (* The internal assembler does not support the short frame-descriptor
+         format's return-address delta, so the compiler escapes every
+         descriptor when the internal-assembler backend is active (see
+         [Emitaux.disable_short_descriptors]); this directive is therefore
+         never emitted here. TODO: fix this. Claude tried and failed
+         2026-06-30. *)
+      Misc.fatal_error
+        "x86_binary_emitter: Frame_descr_delta unsupported (short descriptors \
+         must be escaped under the internal assembler)"
     | Directive
         (D.Reloc
           { name = D.R_X86_64_PLT32;

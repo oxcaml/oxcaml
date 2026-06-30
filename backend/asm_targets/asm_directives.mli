@@ -286,6 +286,10 @@ val between_labels_32_bit :
 val between_labels_64_bit :
   ?comment:string -> upper:Asm_label.t -> lower:Asm_label.t -> unit -> unit
 
+(** Emit a variable-width return-address delta for a "short" frame descriptor.
+    Supported only on the GAS text backend. *)
+val frame_descr_delta : upper:Asm_label.t -> lower:Asm_label.t -> unit
+
 (** Like [between_symbols], but for two labels with additional offsets, emitting
     a 64-bit-wide reference. The labels must be in the same section. *)
 val between_labels_64_bit_with_offsets :
@@ -477,6 +481,8 @@ module Directive : sig
           target_symbol : Asm_symbol.t;
           addend : int64
         }
+    | Frame_descr_delta of { delta : Constant.t }
+        (** Variable-width return-address delta for a short frame descriptor *)
 
   (** Translate the given directive to textual form. This produces output
       suitable for either gas or MASM as appropriate. *)

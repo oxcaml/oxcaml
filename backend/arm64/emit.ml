@@ -2306,6 +2306,9 @@ let end_assembly () =
   let frametable_sym = S.create_global frametable in
   global_maybe_protected frametable_sym;
   D.define_symbol_label ~section:frametable_section frametable_sym;
+  (* The short-format return-address delta is not yet ported to ARM64, so escape
+     every descriptor to the normal format. *)
+  Emitaux.disable_short_descriptors := true;
   (* CR sspies: Share the [emit_frames] code with the x86 backend. *)
   emit_frames
     { efa_code_label =
@@ -2331,6 +2334,12 @@ let end_assembly () =
           let lbl = label_to_asm_label ~section:frametable_section lbl in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:(Targetint.of_int32 ofs));
+      efa_label_delta =
+        (* The short frame-descriptor format and its runtime decoding are not
+           yet ported to ARM64; this is only reachable if [emit_frames] produces
+           a short descriptor on ARM64. *)
+        (fun _upper _lower ->
+          Misc.fatal_error "short frame descriptors not supported on ARM64");
       efa_def_label =
         (fun lbl ->
           let lbl = label_to_asm_label ~section:frametable_section lbl in
