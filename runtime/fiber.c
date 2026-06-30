@@ -1451,7 +1451,7 @@ value caml_tick_fiber_exn(struct stack_info *stack) {
 #define Hash_dyn(dyn) Long_val(dyn)
 
 typedef struct {
-  value dyn;
+  value dyn; /* Dynamic id, or Val_null if unbound */
   value val;
 } binding_s, *binding_t;
 
