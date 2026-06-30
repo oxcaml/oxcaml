@@ -43,7 +43,7 @@ module Dynamic_inside_fiber : Dynamic_S = struct
       (fun () ->
         push d v;
         Fun.protect f ~finally:(fun () -> pop d)) ()
-      { retc = (fun () -> ());
+      { retc = (fun v -> v);
         exnc = (fun e -> raise e);
         effc = (fun (type a) (_ : a Effect.t) -> None) }
 end
@@ -60,7 +60,7 @@ module Dynamic_outside_fiber : Dynamic_S = struct
     push d v;
     Fun.protect (fun () ->
       Effect.Deep.match_with f ()
-        { retc = (fun () -> ());
+        { retc = (fun v -> v);
           exnc = (fun e -> raise e);
           effc = (fun (type a) (_ : a Effect.t) -> None) })
       ~finally:(fun () -> pop d)

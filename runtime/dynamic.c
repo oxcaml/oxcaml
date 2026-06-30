@@ -105,6 +105,27 @@ static void dynamic_stack_free(dynamic_stack_t stack)
 }
 
 // Returns false if allocation fails.
+static bool dynamic_stack_dup(dynamic_stack_t dst, dynamic_stack_t src)
+{
+  dst->capacity = src->capacity;
+  dst->count = src->count;
+  dst->dyn = src->dyn;
+
+  if(src->vals) {
+    dst->vals = caml_stat_alloc_noexc(sizeof(value) * src->capacity);
+    if(dst->vals == NULL) {
+      return false;
+    }
+
+    memcpy(dst->vals, src->vals, sizeof(value) * src->count);
+  } else {
+    dst->vals = NULL;
+  }
+
+  return true;
+}
+
+// Returns false if allocation fails.
 static bool dynamic_stack_grow(dynamic_stack_t stack)
 {
   size_t old_capacity = stack->capacity;
@@ -177,7 +198,7 @@ CAMLexport void caml_dynamic_table_free(dynamic_table_t table)
 {
   if (table->bindings) {
     size_t capacity = dynamic_table_capacity(table);
-    for (size_t i = 0; i < capacity; ++ i) {
+    for (size_t i = 0; i < capacity; ++i) {
       dynamic_stack_free(&table->bindings[i]);
     }
     caml_stat_free(table->bindings);
@@ -219,7 +240,7 @@ static bool dynamic_table_grow(dynamic_table_t table)
   table->bindings = new_bindings;
 
   /* Copy existing bindings */
-  for (size_t i = 0; i < old_capacity; ++ i) {
+  for (size_t i = 0; i < old_capacity; ++i) {
     if (Is_this(old_bindings[i].dyn)) {
       dynamic_table_add(table, old_bindings[i]);
     }
@@ -310,6 +331,30 @@ static void dynamic_table_pop(dynamic_table_t table, value dyn)
       }
     }
   }
+}
+
+CAMLexport bool caml_dynamic_table_dup(dynamic_table_t dst, dynamic_table_t src)
+{
+  size_t capacity = dynamic_table_capacity(src);
+
+  dst->mask = src->mask;
+  dst->count = src->count;
+  dst->bindings = caml_stat_alloc_noexc(sizeof(dynamic_stack_s) * capacity);
+  if(dst->bindings == NULL) {
+    return false;
+  }
+
+  for(size_t i = 0; i < capacity; ++i) {
+    if(!dynamic_stack_dup(&dst->bindings[i], &src->bindings[i])) {
+      for(size_t j = 0; j < i; ++j) {
+        dynamic_stack_free(&dst->bindings[j]);
+      }
+      caml_stat_free(dst->bindings);
+      return false;
+    }
+  }
+
+  return true;
 }
 
 CAMLexport void caml_dynamic_table_scan_roots(dynamic_table_t table,

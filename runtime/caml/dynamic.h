@@ -78,6 +78,9 @@ extern void caml_dynamic_table_init(dynamic_table_t table);
 /* Uninitialize a dynamic table, freeing any internal allocations. */
 extern void caml_dynamic_table_free(dynamic_table_t table);
 
+/* Duplicate a dynamic table. Returns false if allocation fails. */
+extern bool caml_dynamic_table_dup(dynamic_table_t dst, dynamic_table_t src);
+
 /* Apply a GC scanning action to all bindings in a dynamic table. */
 extern void caml_dynamic_table_scan_roots(dynamic_table_t,
                                           scanning_action,

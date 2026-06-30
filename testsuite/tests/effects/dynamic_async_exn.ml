@@ -76,5 +76,5 @@ let () =
   with
   | Sys.Break -> assert !finished
   | _ -> assert false);
-  (* Async exns bypass [protect], should still read as [child]. *)
-  Printf.printf "after async unwind [expect %d]: %s\n%!" child (print_dyn d)
+  (* The bound fiber is gone; [d] must read as [root] again. *)
+  Printf.printf "after async unwind [expect null]: %s\n%!" (print_dyn d)
