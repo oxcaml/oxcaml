@@ -23,6 +23,7 @@
 
 #include <stdbool.h>
 #include "config.h"
+#include "misc.h"
 
 /* The compiler generates a "frame descriptor" for every potential
  * return address. Each loaded module has a block of memory, the
@@ -43,16 +44,46 @@
  *   be allocated by this call. Each size is stored reduced by 1, so
  *   that a single byte can record sizes (wosize) from 1 to 256 words.
  *
- * - frame_has_debug(): Whether we have debug information for this
- *   stack frame, and if so the "debuginfo" (source location) of this
- *   return address. (If frame_has_allocs(), this is an array of
- *   debuginfo, one for each of the set of allocations performed by
- *   this GC entry).
+ * - frame_has_debug(): Whether the frame descriptor has debug
+ *   information. (The debug info is one or more 32-bit relative
+ *   pointers: if frame_has_allocs(), there is one for each of the set
+ *   of allocations performed by this GC entry).
  *
  * - the register or stack frame offset of every "live" value,
  *   which should be scanned by the garbage collector if a GC is
  *   performed at this point.
- */
+ *
+ * A frame descriptor is read as a packed byte sequence rather than
+ * through a C struct: we treat a [frame_descr *] as an opaque byte
+ * pointer and read its fields at explicit byte offsets via
+ * [caml_read_unaligned_*]. This allows a denser descriptor format.
+ *
+ * There are two layouts; the field at offset 4 tells them apart (a uint16
+ * equal to FRAME_LONG_MARKER means long):
+ *
+ *  normal:                      long:
+ *    int32  retaddr_rel  @ 0      int32  retaddr_rel  @ 0
+ *    uint16 frame_data   @ 4      uint16 marker       @ 4: FRAME_LONG_MARKER
+ *    uint16 num_live     @ 6      uint16 _pad         @ 6
+ *    uint16 live_ofs[]   @ 8      uint32 frame_data   @ 8
+ *                                 uint32 num_live     @ 12
+ *                                 uint32 live_ofs[]   @ 16
+ *
+ * retaddr_rel is the byte offset from the descriptor to the return address.
+ *
+ * After live_ofs[]:
+ *
+ *   If frame_has_allocs(), allocation sizes follow:
+ *       uint8 num_allocs;
+ *       uint8 alloc[num_allocs];
+ *
+ *   If frame_has_debug(), debug info follows (32-bit aligned):
+ *       int32 debug_info[frame_has_allocs() ? num_allocs : 1];
+ *
+ * Each debug info is a signed relative offset, in bytes, from its own
+ * address to a debuginfo structure. */
+
+typedef unsigned char frame_descr;
 
 #define FRAME_DESCRIPTOR_DEBUG 1
 #define FRAME_DESCRIPTOR_ALLOC 2
@@ -60,71 +91,39 @@
 #define FRAME_RETURN_TO_C 0xFFFF
 #define FRAME_LONG_MARKER 0x7FFF
 
-typedef struct {
-  int32_t retaddr_rel; /* offset of return address from &retaddr_rel */
-  uint16_t frame_data; /* frame size and various flags */
-  uint16_t num_live;
-  uint16_t live_ofs[/* num_live */]; /* flexible array member */
-  /*
-    If frame_has_allocs(), alloc lengths follow:
-        uint8_t num_allocs;
-        uint8_t alloc[num_allocs];
-
-    If frame_has_debug(), debug info follows (32-bit aligned):
-        uint32_t debug_info[frame_has_allocs() ? num_allocs : 1];
-
-    Debug info is stored as a relative offset, in bytes, from the
-    debug_info itself to a debuginfo structure. */
-} frame_descr;
-
-typedef struct {
-  int32_t retaddr_rel; /* offset of return address from &retaddr_rel */
-  uint16_t marker;     /* FRAME_LONG_MARKER */
-  uint16_t _pad;       /* Ensure frame_data is 4-byte aligned */
-  uint32_t frame_data; /* frame size and various flags */
-  uint32_t num_live;
-  uint32_t live_ofs[1 /* num_live */];
-  /*
-    If frame_has_allocs(), alloc lengths follow:
-        uint8_t num_allocs;
-        uint8_t alloc[num_allocs];
-
-    If frame_has_debug(), debug info follows (32-bit aligned):
-        uint32_t debug_info[frame_has_allocs() ? num_allocs : 1];
-
-    Debug info is stored as a relative offset, in bytes, from the
-    debug_info itself to a debuginfo structure. */
-} frame_descr_long;
+/* Field byte offsets within a descriptor (normal and long). */
+#define Frame_retaddr_rel_ofs   0
+#define Frame_data_ofs          4
+#define Frame_num_live_ofs      6
+#define Frame_live_ofs          8
+#define Frame_long_data_ofs     8
+#define Frame_long_num_live_ofs 12
+#define Frame_long_live_ofs     16
 
 Caml_inline bool frame_return_to_C(frame_descr *d) {
-  return d->frame_data == FRAME_RETURN_TO_C;
+  return caml_read_unaligned_uint16(d + Frame_data_ofs) == FRAME_RETURN_TO_C;
 }
 
 Caml_inline bool frame_is_long(frame_descr *d) {
   CAMLassert(d && !frame_return_to_C(d));
-  return (d -> frame_data == FRAME_LONG_MARKER);
-}
-
-Caml_inline frame_descr_long *frame_as_long(frame_descr *d) {
-  frame_descr_long *dl = (frame_descr_long *) d;
-  return dl;
+  return (caml_read_unaligned_uint16(d + Frame_data_ofs) == FRAME_LONG_MARKER);
 }
 
 Caml_inline uint32_t frame_data(frame_descr *d) {
   if (frame_is_long(d)) {
-    frame_descr_long *dl = frame_as_long(d);
-    return (dl -> frame_data);
+    return caml_read_unaligned_uint32(d + Frame_long_data_ofs);
   } else {
-    return (d -> frame_data);
+    return caml_read_unaligned_uint16(d + Frame_data_ofs);
   }
 }
 
 Caml_inline unsigned char *frame_end_of_live_ofs(frame_descr *d) {
   if (frame_is_long(d)) {
-    frame_descr_long *dl = frame_as_long(d);
-    return ((unsigned char *)&dl->live_ofs[dl->num_live]);
+    uint32_t num_live = caml_read_unaligned_uint32(d + Frame_long_num_live_ofs);
+    return d + Frame_long_live_ofs + (uintnat)num_live * sizeof(uint32_t);
   } else {
-    return ((unsigned char *)&d->live_ofs[d->num_live]);
+    uint16_t num_live = caml_read_unaligned_uint16(d + Frame_num_live_ofs);
+    return d + Frame_live_ofs + (uintnat)num_live * sizeof(uint16_t);
   }
 }
 
@@ -154,8 +153,8 @@ Caml_inline bool frame_has_debug(frame_descr *d) {
   ((((uintnat)(addr) * 52437813) >> 5) & (mask))
 
 #define Retaddr_frame(d) \
-  ((uintnat)&(d)->retaddr_rel + \
-   (uintnat)(intnat)((d)->retaddr_rel))
+  ((uintnat)(d) + \
+   (uintnat)(intnat)caml_read_unaligned_int32(d))
 
 void caml_init_frame_descriptors(void);
 

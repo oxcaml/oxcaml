@@ -93,8 +93,8 @@ static frame_descr * next_frame_descr(frame_descr * d) {
     /* This marks the top of an ML stack chunk. Skip over empty
      * frame descriptor */
     /* Skip to address of zero-sized live_ofs */
-    CAMLassert(d->num_live == 0);
-    p = (unsigned char*)&d->live_ofs[0];
+    CAMLassert(caml_read_unaligned_uint16(d + Frame_num_live_ofs) == 0);
+    p = d + Frame_live_ofs;
     /* Align to word size */
     p = Align_to(p, void*);
     return ((frame_descr*) p);
@@ -104,7 +104,7 @@ static frame_descr * next_frame_descr(frame_descr * d) {
 static intnat count_descriptors(caml_frametable_list *list) {
   intnat num_descr = 0;
   iter_list(list,cur) {
-    num_descr += *((intnat*) cur->frametable);
+    num_descr += (intnat)caml_read_unaligned_uintnat(cur->frametable);
   }
   return num_descr;
 }
@@ -128,7 +128,7 @@ static void fill_hashtable(
 {
   iter_list(new_frametables,cur) {
     intnat * tbl = (intnat*) cur->frametable;
-    intnat len = *tbl;
+    intnat len = (intnat)caml_read_unaligned_uintnat(tbl);
     frame_descr * d = (frame_descr *)(tbl + 1);
     for (intnat j = 0; j < len; j++) {
       uintnat h = Hash_retaddr(Retaddr_frame(d), table->mask);
@@ -593,7 +593,7 @@ static void add_descriptor_to_stats(frame_descr *d,
     stats->min_descr = (unsigned char*)d;
   }
 
-  intnat retaddr_rel = d->retaddr_rel;
+  intnat retaddr_rel = caml_read_unaligned_int32(d + Frame_retaddr_rel_ofs);
   if (retaddr_rel < 0) {
     count_item(-retaddr_rel, &stats->max_neg_retaddr_rel, NULL,
                stats->log_neg_retaddr_rel);
@@ -624,7 +624,7 @@ static void add_descriptor_to_stats(frame_descr *d,
   if (frame_return_to_C(d)) {
     ++ stats->return_to_C;
     /* Top of an ML stack chunk. Skip over empty frame descriptor */
-    p = (unsigned char*)&d->live_ofs[0];
+    p = d + Frame_live_ofs;
     /* Align to word size */
     p = Align_to(p, void*);
   } else {
@@ -643,19 +643,22 @@ static void add_descriptor_to_stats(frame_descr *d,
     uint32_t num_live;
     if (frame_is_long(d)) {
       ++stats->long_descrs;
-      frame_descr_long *dl = frame_as_long(d);
-      num_live = dl->num_live;
+      num_live = caml_read_unaligned_uint32(d + Frame_long_num_live_ofs);
       uint32_t n = num_live;
-      for (uint32_t *ofp = dl->live_ofs; n > 0; n--, ofp++) {
-        add_live_ofs(*ofp, stats->reg, &regs, &max_reg, &reg_map,
-                     &has_big_reg, &slots, &max_slot, stats);
+      const unsigned char *lp = d + Frame_long_live_ofs;
+      for (; n > 0; n--, lp += sizeof(uint32_t)) {
+        add_live_ofs(caml_read_unaligned_uint32(lp), stats->reg, &regs,
+                     &max_reg, &reg_map, &has_big_reg, &slots, &max_slot,
+                     stats);
       }
     } else {
-      num_live = d->num_live;
+      num_live = caml_read_unaligned_uint16(d + Frame_num_live_ofs);
       uint16_t n = num_live;
-      for (uint16_t *ofp = d->live_ofs; n > 0; n--, ofp++) {
-        add_live_ofs(*ofp, stats->reg, &regs, &max_reg, &reg_map,
-                     &has_big_reg, &slots, &max_slot, stats);
+      const unsigned char *lp = d + Frame_live_ofs;
+      for (; n > 0; n--, lp += sizeof(uint16_t)) {
+        add_live_ofs(caml_read_unaligned_uint16(lp), stats->reg, &regs,
+                     &max_reg, &reg_map, &has_big_reg, &slots, &max_slot,
+                     stats);
       }
     }
 
@@ -717,7 +720,7 @@ static void add_descriptor_to_stats(frame_descr *d,
       /* Align to 32 bits */
       p = Align_to(p, uint32_t);
       for (size_t i = 0; i <  num_debuginfo; ++i) {
-        uint32_t offset = *(uint32_t*)p;
+        uint32_t offset = caml_read_unaligned_uint32(p);
         if (offset) { /* there may be invalid debuginfo slots */
           caml_debuginfo_measure((debuginfo)(p + offset));
         }
