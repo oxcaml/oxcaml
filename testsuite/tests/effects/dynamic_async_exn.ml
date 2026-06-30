@@ -21,8 +21,8 @@
 module Dynamic : sig
   type 'a t
 
-  val make : 'a -> 'a t
-  val get : 'a t -> 'a
+  val make : unit -> 'a t
+  val get : 'a t -> 'a or_null
 
   val with_temporarily : 'a t -> 'a -> f: (unit -> 'b) -> 'b
 
@@ -44,8 +44,8 @@ end = struct
     'e ->
     'b = "%with_stack_bind"
 
-  external make : 'a -> 'a t = "caml_dynamic_make"
-  external get : 'a t -> 'a = "caml_dynamic_get"
+  external make : unit -> 'a t = "caml_dynamic_make"
+  external get : 'a t -> 'a or_null = "caml_dynamic_get"
 
   let with_temporarily d v ~f =
     let effc eff k last_fiber = reperform eff k last_fiber in
@@ -62,11 +62,16 @@ let[@inline never] allocate_bytes finished =
     b;
   ref (Some b)
 
-let root = 100
-let child = 200
+let print_null = function
+  | This x -> Int.to_string x
+  | Null -> "null"
+
+let print_dyn d = print_null (Dynamic.get d)
+
+let child = 100
 
 let () =
-  let d = Dynamic.make root in
+  let d = Dynamic.make () in
   let finished = ref false in
   let r = allocate_bytes finished in
   (try
@@ -76,7 +81,7 @@ let () =
          [d -> child], then allocate until the finaliser raises [Sys.Break]
          asynchronously, unwinding out of this fiber. *)
       Dynamic.with_temporarily d child ~f:(fun () ->
-        Printf.printf "in fiber [expect %d]: %d\n%!" child (Dynamic.get d);
+        Printf.printf "in fiber [expect %d]: %s\n%!" child (print_dyn d);
         while true do
           let _ @ global = Sys.opaque_identity (42, Random.int 42) in
           ()
@@ -85,4 +90,4 @@ let () =
   | Sys.Break -> assert !finished
   | _ -> assert false);
   (* The bound fiber is gone; [d] must read as [root] again. *)
-  Printf.printf "after async unwind [expect %d]: %d\n%!" root (Dynamic.get d)
+  Printf.printf "after async unwind [expect null]: %s\n%!" (print_dyn d)
