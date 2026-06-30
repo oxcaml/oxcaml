@@ -46,7 +46,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
        (if (field_int 0 x/0)
          (let (*match*/0 =o? (field_mut 1 x/0))
            (if *match*/0
-             (if (seq (setfield_ptr 1 x/0 0) 0) 2
+             (if (seq (setfield_ptr(maybe-stack) 1 x/0 0) 0) 2
                (let (*match*/1 =o? (field_mut 1 x/0))
                  (if *match*/1 (field_imm 0 *match*/1)
                    (raise
@@ -160,7 +160,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
                  (if *match*/6 (exit 13) 0))
                (exit 13))
             with (13)
-             (if (seq (setfield_ptr 0 r/0 0) 0) 1
+             (if (seq (setfield_ptr(maybe-stack) 0 r/0 0) 0) 1
                (if *match*/5
                  (let (*match*/7 =o? (field_mut 0 (field_imm 0 *match*/5)))
                    (if *match*/7 (field_imm 0 *match*/7)
@@ -309,7 +309,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
                  (if (field_imm 1 *match*/13) (exit 21) 0))
                (exit 21))
             with (21)
-             (if (seq (setfield_ptr 0 r/1 [0: 0 0]) 0) 1
+             (if (seq (setfield_ptr(maybe-stack) 0 r/1 [0: 0 0]) 0) 1
                (if *match*/12
                  (let
                    (*match*/14 =o? (field_mut 0 (field_imm 0 *match*/12))

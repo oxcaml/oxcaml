@@ -141,7 +141,8 @@ val is_at_least : 'a t -> 'a -> bool
 (* CR ageorges: TODO: remove *)
 
 (** Check if mode polymorphism is enabled at the given level. If
-    [OXCAML_MODE_POLYMORPHISM_DEBUG=1] is set, this always returns [true]. *)
+    [OXCAML_MODE_POLYMORPHISM_DEBUG=1] is set and mode polymorphism is enabled
+    at any level, this returns [true]. *)
 val is_at_least_mode_poly : maturity -> bool
 
 (** Tooling support: Temporarily enable and disable language extensions; these

@@ -864,6 +864,34 @@ let create_allocation_mode_r mode =
   let locality_mode = Alloc.proj_comonadic Areality mode in
   newvar_below_if_modepoly 0 locality_mode |> Locality.disallow_left
 
+let alloc_mode_can_be_global mode =
+  For_copy.with_scope (fun copy_scope ->
+    let mode = For_copy.mode_duplicate copy_scope mode in
+    let locality_mode = Alloc.proj_comonadic Areality mode in
+    match Locality.submode locality_mode Locality.global with
+    | Ok () -> true
+    | Error _ -> false)
+
+let create_allocation_mode_l_global_if_possible mode : alloc_mode_l =
+  if Language_extension.(is_at_least_mode_poly Beta)
+     && alloc_mode_can_be_global mode
+  then Locality.disallow_right Locality.global
+  else create_allocation_mode_l mode
+
+let create_omitted_closure_mode mode : alloc_mode_r =
+  if Language_extension.(is_at_least_mode_poly Beta)
+     && alloc_mode_can_be_global mode
+  then Locality.disallow_left Locality.global
+  else create_allocation_mode_r mode
+
+let create_omitted_return_mode mode : return_mode =
+  if Language_extension.(is_at_least_mode_poly Beta)
+     && alloc_mode_can_be_global mode
+  then Locality.disallow_right Locality.global |> Typedtree.create_return_mode
+  else
+    create_allocation_mode_l mode
+    |> Typedtree.create_return_mode
+
 let register_allocation_value_mode ~loc
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
   let alloc_mode = create_allocation_mode_r (value_to_alloc_r2g mode) in
@@ -5186,11 +5214,14 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
                Alloc.newvar_above (Ctype.get_current_level ()) (Alloc.join
                 (mode_partial_fun:: mode_closed_args))
              in
+             submode ~loc ~env ~reason:Other
+               (alloc_as_value mode_cls)
+               (mode_partial_application expected_mode);
              let mode_closure =
-               create_allocation_mode_r mode_cls
+               create_omitted_closure_mode mode_cls
              in
              let mode_arg =
-               create_allocation_mode_l mode_arg
+               create_allocation_mode_l_global_if_possible mode_arg
              in
              (* [mode_ret] < [mode_ret_alloc] < [mode_ret_eta]*)
              let mode_ret_alloc =
@@ -9589,7 +9620,7 @@ and type_function
             param_uid
       in
       let arg_mode =
-        create_allocation_mode_l arg_mode
+        create_allocation_mode_l_global_if_possible arg_mode
       in
       let param =
         { has_poly;
@@ -10314,11 +10345,10 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       let ret_sort = type_sort ~why:Function_result ty_res in
       let eta_pat, eta_var = var_pair ~mode:eta_mode "eta" ty_arg arg_sort in
       let fc_arg_mode =
-        create_allocation_mode_l marg
+        create_allocation_mode_l_global_if_possible marg
       in
       let fc_ret_mode =
-        create_allocation_mode_l mret
-        |> Typedtree.create_return_mode
+        create_omitted_return_mode mret
       in
       (* CR layouts v10: When we add abstract jkinds, the eta expansion here
          becomes impossible in some cases - we'll need better errors.  For test
@@ -11339,7 +11369,7 @@ and type_function_cases_expect
     in
     unify_exp_types loc env ty_fun (instance ty_expected);
     let fc_arg_mode =
-      create_allocation_mode_l arg_mode
+      create_allocation_mode_l_global_if_possible arg_mode
     in
     let param , param_uid = name_cases "param" cases in
     let cases =

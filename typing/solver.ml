@@ -582,9 +582,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Amode _ -> true
     | Amodevar mv -> check_level_morphvar mv i
     | Amodemeet (_, _, mvs) ->
-      VarMap.fold (fun _ mv acc -> acc || check_level_morphvar mv i) mvs true
+      VarMap.fold (fun _ mv acc -> acc || check_level_morphvar mv i) mvs false
     | Amodejoin (_, _, mvs) ->
-      VarMap.fold (fun _ mv acc -> acc || check_level_morphvar mv i) mvs true
+      VarMap.fold (fun _ mv acc -> acc || check_level_morphvar mv i) mvs false
 
   let check_level_var : type a l r. (a, l * r) mode -> int -> bool =
    fun m i ->
@@ -1453,7 +1453,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
     PRECONDITIONS: None
     POSTCONDITIONS:
-      u.level <= current_level ==> no changes to u
+      u.level = generic_level || u.level <= current_level ==> no changes to u
       current_level < u.level ==>
         ( (u.upper <= u.lower
               ==> u.vlower = Ø && u.vupper = Ø && u.level = generic_level)
@@ -1472,7 +1472,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     (* if the following does not hold: current_level < u.level
       [generalize_topology] and [update_level] do nothing. We check it here to optimize
       away the subsequent checks *)
-    if u.level <= current_level
+    if u.level = generic_level || u.level <= current_level
     then ()
     else begin
       (* we optimize away vlower and vuppers if bounds are tight *)
@@ -2211,7 +2211,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       | Amodevar mv1, Amodevar mv2 -> equal_morphvar obj mv1 mv2
       | Amodejoin (a1, mv1), Amodejoin (a2, mv2) ->
         C.equal obj a1 a2 && List.for_all2 (equal_morphvar obj) mv1 mv2
-      | Amodemeet (a1, mv1), Amodejoin (a2, mv2) ->
+      | Amodemeet (a1, mv1), Amodemeet (a2, mv2) ->
         C.equal obj a1 a2 && List.for_all2 (equal_morphvar obj) mv1 mv2
       | _, _ -> false
 

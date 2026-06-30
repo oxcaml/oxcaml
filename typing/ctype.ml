@@ -8197,7 +8197,8 @@ let add_nongen_vars_in_schema =
     end
   in
   fun env acc ty ->
-    Alloc.with_zap_scope (remove_mode_and_jkind_variables ty);
+    Alloc.with_zap_scope
+      (fun ~zap_scope -> remove_mode_and_jkind_variables ~zap_scope ty);
     let _, result = loop env (TypeSet.empty, acc) ty in
     result
 

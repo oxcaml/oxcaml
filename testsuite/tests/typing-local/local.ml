@@ -271,7 +271,7 @@ val f4 : int -> 'a @ local -> int -> int -> int = <fun>
 
 let apply1 x = f4 x
 [%%expect{|
-val apply1 : int -> 'a @ local -> int -> int -> int = <fun>
+val apply1 : int -> 'a @ local -> (int -> int -> int) @ local = <fun>
 |}]
 let apply2 x = f4 x x
 [%%expect{|
@@ -360,11 +360,11 @@ Line 1, characters 61-65:
 1 | let optret1 (f : ?x:int -> local_ (y:unit -> unit -> int)) = f ()
                                                                  ^^^^
 Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+       but is expected to be "global"
+         because it is captured by a partial application
+         which is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
-Hint: This is a partial application
-      Adding 1 more argument will make the value non-local
 |}]
 
 (* Optional argument elimination eta-expands and therefore allocates *)
@@ -947,7 +947,7 @@ let foo (local_ x : string ref) =
       object method m = y end
   end in new M.c
 [%%expect{|
-val foo : string ref @ local -> (unit -> < m : string >) = <fun>
+val foo : string ref @ local -> unit -> < m : string > = <fun>
 |}]
 
 (* Don't escape in inherit expressions *)
@@ -1092,7 +1092,9 @@ Line 4, characters 2-5:
 4 |   foo ()
       ^^^
 Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+         because it closes over the value "r" at line 3, characters 22-23
+         which is "local".
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is the function in a tail call.
 |}]
 
@@ -2811,15 +2813,15 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            val g : 'a -> 'b -> string @ local
-           val f : 'a -> ('b -> string @ local) @ local
+           val f : 'a -> 'b -> string @ local
          end
        is not included in
          sig val f : string -> string -> string @ local end
        Values do not match:
-         val f : 'a -> ('b -> string @ local) @ local
+         val f : 'a -> 'b -> string @ local
        is not included in
          val f : string -> string -> string @ local
-       The type "string -> (string -> string @ local) @ local"
+       The type "string -> string -> string @ local"
        is not compatible with the type "string -> string -> string @ local"
 |}]
 
@@ -2828,7 +2830,7 @@ Error: Signature mismatch:
 (* Valid; [local_ string -> string -> string] is [local_ string -> local_ (string -> string)] *)
 let f () = ((fun x y -> "") : (local_ string -> string -> string));;
 [%%expect{|
-val f : unit -> string @ local -> string -> string = <fun>
+val f : unit -> string @ local -> (string -> string) @ local = <fun>
 |}];;
 
 (* Illegal: the return mode on (string -> string) is global. *)
@@ -2891,13 +2893,13 @@ val f : unit -> string @ local -> (string -> string) = <fun>
 
 let f () = exclave_ ((fun x -> fun y -> x + y) : (_ -> _));;
 [%%expect{|
-val f : unit -> (int -> (int -> int)) @ local = <fun>
+val f : unit -> int -> (int -> int) = <fun>
 |}];;
 
 (* ok if curried *)
 let f () = exclave_ ((fun x -> (fun y -> x + y) [@extension.curry]) : (_ -> _));;
 [%%expect{|
-val f : unit -> (int -> (int -> int)) @ local = <fun>
+val f : unit -> int -> (int -> int) = <fun>
 |}];;
 
 (* Type annotations on a [local_] binding are interpreted in a local context,
@@ -2987,12 +2989,12 @@ val _ret : unit -> M.t -> unit = <fun>
 
 let _ret () : M.t -> unit = exclave_ (fun M_constructor -> ())
 [%%expect{|
-val _ret : unit -> (M.t -> unit) @ local = <fun>
+val _ret : unit -> M.t -> unit = <fun>
 |}]
 
 let _ret () : M.t -> unit = exclave_ (fun M_constructor -> ())
 [%%expect{|
-val _ret : unit -> (M.t -> unit) @ local = <fun>
+val _ret : unit -> M.t -> unit = <fun>
 |}]
 
 type r = {global_ x : string; y : string}

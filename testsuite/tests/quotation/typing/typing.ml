@@ -435,7 +435,7 @@ type _ t_param_re_staged_gadt =
 - : <[
      ('a. 'a -> 'a) ->
      ('b 'c. 'b list -> ('b -> 'c) -> 'c list) ->
-     $('d) list -> ($('d) -> $('e)) -> $('e) list]>
+     $('d) list -> (($('d) -> $('e)) -> $('e) list)]>
     expr
 =
 <[fun (f : 'a. 'a -> 'a) (g : 'b 'c. 'b list -> ('b -> 'c) -> 'c list) -> f g

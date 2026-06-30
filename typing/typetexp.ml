@@ -1647,7 +1647,9 @@ let transl_type_scheme_mono env styp =
      declarations from having undefaulted jkind variables. Without
      this line, we might accidentally export a jkind-flexible definition
      from a compilation unit, which would lead to miscompilation. *)
-  Alloc.with_zap_scope (remove_mode_and_jkind_variables typ.ctyp_type);
+  Alloc.with_zap_scope
+    (fun ~zap_scope ->
+       remove_mode_and_jkind_variables ~zap_scope typ.ctyp_type);
   typ
 
 let transl_type_scheme_poly env attrs loc vars inner_type =
@@ -1671,7 +1673,9 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
     ~before_generalize:(fun (_,_,typ) -> generalize_ctyp typ)
   in
   let _ : _ list = TyVarEnv.instance_poly_univars env loc univars in
-  Alloc.with_zap_scope (remove_mode_and_jkind_variables typ.ctyp_type);
+  Alloc.with_zap_scope
+    (fun ~zap_scope ->
+       remove_mode_and_jkind_variables ~zap_scope typ.ctyp_type);
   { ctyp_desc = Ttyp_poly (typed_vars, typ);
     ctyp_type = typ.ctyp_type;
     ctyp_env = env;

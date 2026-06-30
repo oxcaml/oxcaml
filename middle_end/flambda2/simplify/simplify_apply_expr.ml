@@ -485,8 +485,15 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           first_complex_local_param - num_non_unarized_args )
     else
       match Apply_expr.return_mode apply with
-      | Not_alloc_stack ->
-        (* This can happen in dead GADT match cases. *) Bottom
+      | Not_alloc_stack -> (
+        (* [first_complex_local_param] says the closure may be allocated locally
+           at this application depth.  A heap-returning partial application still
+           needs a heap-allocated closure unless the type requires locality. *)
+        match closure_alloc_mode_from_type with
+        | Local ->
+          (* This can happen in dead GADT match cases. *)
+          Bottom
+        | Heap | Heap_or_local -> Ok (Alloc_mode.For_allocations.heap, 0))
       | Maybe_alloc_stack { region; _ } ->
         Ok (Alloc_mode.For_allocations.local ~region, 0)
   in

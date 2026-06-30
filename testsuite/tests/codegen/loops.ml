@@ -57,17 +57,21 @@ let for_loop_layout n f =
 for_loop_layout:
   cmpq  $1, %rax
   jl    .L2
-  subq  $24, %rsp
+  subq  $40, %rsp
   movq  %rbx, (%rsp)
   sarq  $1, %rax
   movq  %rax, 8(%rsp)
   xorl  %eax, %eax
 .L0:
   movq  %rax, 16(%rsp)
+  movq  64(%r14), %rax
+  movq  %rax, 24(%rsp)
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
 .L1:
+  movq  24(%rsp), %rax
+  movq  %rax, 64(%r14)
   movq  16(%rsp), %rax
   incq  %rax
   movq  (%rsp), %rbx
@@ -75,7 +79,7 @@ for_loop_layout:
   cmpq  %rdi, %rax
   jle   .L0
   movl  $1, %eax
-  addq  $24, %rsp
+  addq  $40, %rsp
   ret
 .L2:
   movl  $1, %eax

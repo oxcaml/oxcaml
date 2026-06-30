@@ -137,7 +137,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                       expression 
                         Texp_apply
                         apply_mode Default
-                        return_mode global
+                        return_mode local
                         expression 
                           Texp_ident "fib"
                         [
@@ -146,7 +146,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                             expression 
                               Texp_apply
                               apply_mode Default
-                              return_mode global
+                              return_mode id(modevar#31<0>[global .. local])
                               expression 
                                 Texp_ident "Stdlib!.-"
                               [
@@ -165,7 +165,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                       expression 
                         Texp_apply
                         apply_mode Default
-                        return_mode global
+                        return_mode local
                         expression 
                           Texp_ident "fib"
                         [
@@ -174,7 +174,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                             expression 
                               Texp_apply
                               apply_mode Default
-                              return_mode global
+                              return_mode id(modevar#4a<0>[global .. local])
                               expression 
                                 Texp_ident "Stdlib!.-"
                               [
@@ -196,6 +196,9 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
 (letrec
   (fib
      (function {nlocal = 0} n[value<int>] : int
-       (if (isout 1 n)
-         (%int_add (apply fib (%int_sub n 1)) (apply fib (%int_sub n 2))) 1)))
+       (region
+         (if (isout 1 n)
+           (%int_add (apply[L] fib (%int_sub n 1))
+             (apply[L] fib (%int_sub n 2)))
+           1))))
   (makeblock 0 fib))

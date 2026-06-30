@@ -1,27 +1,33 @@
 let $camlUnroll__first_const = Block 0 () in
-(let code rec size(27)
+(let code rec size(30)
        fact_0 (n : imm tagged)
          my_closure _region _ghost_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
+   let `region` = %begin_region () in
+   let ghost_region = %begin_ghost_region () in
    (let prim = %phys_eq (n, 0) in
     let eq = %tag_imm (prim) in
     (let untagged = %untag_imm (eq) in
      switch untagged
-       | 0 -> k4
-       | 1 -> k1 (1))
-      where k4 =
-        cont k3)
-     where k3 =
+       | 0 -> k5
+       | 1 -> k3 (1))
+      where k5 =
+        cont k4)
+     where k4 =
        ((let int_sub = %int_barith.sub (n, 1) in
-         apply direct(fact_0)
+         apply direct(fact_0 &`region` &ghost_region)
            (my_closure ~ depth my_depth -> next_depth : _ -> imm tagged)
              (int_sub)
-             -> k3 * k2)
-          where k3 (apply_result : imm tagged) =
+             -> k4 * k2)
+          where k4 (apply_result : imm tagged) =
             let int_mul = %int_barith.mul (n, apply_result) in
-            cont k1 (int_mul))
+            cont k3 (int_mul))
+     where k3 (region_return : imm tagged) =
+       let `unit` = %end_region (`region`) in
+       let unit_1 = %end_ghost_region (ghost_region) in
+       cont k1 (region_return)
  in
  let fact = closure fact_0 @fact in
  apply direct(fact_0) unroll(4) (fact : _ -> imm tagged) (6) -> k1 * error

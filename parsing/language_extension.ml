@@ -398,7 +398,10 @@ end
 
 (* After the migration to extension universes, this will be an empty list. *)
 let legacy_default_extensions : extn_pair list =
-  Universe.allowed_extensions_in Stable
+  Pair (Mode_polymorphism, Alpha)
+  :: List.filter
+       (fun (Pair (extn, _)) -> not (equal extn Mode_polymorphism))
+       (Universe.allowed_extensions_in Stable)
 
 let extensions : extn_pair list ref = ref legacy_default_extensions
 
@@ -497,6 +500,7 @@ let mode_polymorphism_debug_enabled () =
 
 let is_at_least_mode_poly (value : maturity) =
   if mode_polymorphism_debug_enabled ()
+     && is_at_least Mode_polymorphism Stable
   then true
   else is_at_least Mode_polymorphism value
 

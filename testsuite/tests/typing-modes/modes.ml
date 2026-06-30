@@ -158,7 +158,7 @@ Error: This value is "local"
     expected currying behavior *)
 let foo a : (string -> string -> unit) @ local = fun b c -> ()
 [%%expect{|
-val foo : 'a -> (string -> string -> unit) @ local = <fun>
+val foo : 'a -> string -> (string -> unit) @ local = <fun>
 |}]
 
 (* the return mode annotation overrides the whole-function mode annotation, even when they
@@ -168,7 +168,7 @@ let bar () = exclave_
   let (foo @ local) a : (string -> string -> unit) @ nonportable = fun b c -> () in
   foo
 [%%expect{|
-val bar : unit -> ('a -> (string -> string -> unit)) @ local = <fun>
+val bar : unit -> 'a -> string -> (string -> unit) = <fun>
 |}]
 
 (* Expressions *)

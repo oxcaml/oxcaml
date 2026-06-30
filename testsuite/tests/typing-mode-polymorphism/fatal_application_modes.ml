@@ -18,6 +18,11 @@ let takes_local (_ @ local) =
 let local_argument_application () =
   takes_local 42
 
+let out_of_order_partial_application () =
+  let foo ~a:_ ~b:_ ~c:_ = () in
+  let f = foo ~a:() ~c:() in
+  f ~b:()
+
 let rec direct_tail_call x =
   if x then x else direct_tail_call true
 
@@ -39,6 +44,7 @@ let omitted_labelled_argument_application () =
 
 let () =
   local_argument_application ();
+  out_of_order_partial_application ();
   ignore (direct_tail_call false);
   ignore (sequand_tail_call true);
   ignore (sequor_tail_call false);

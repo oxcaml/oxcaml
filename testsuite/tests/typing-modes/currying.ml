@@ -46,7 +46,7 @@ Error: This value is "local"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
 Hint: This is a partial application
-      Adding 1 more argument will make the value non-local
+      Adding 1 more argument may make the value non-local
 |}]
 let apply4 x = g x x x x
 [%%expect{|
@@ -167,9 +167,15 @@ val app5 : (b:int ref @ local -> a:int -> unit) -> b:int ref @ local -> unit =
 |}]
 let app6 (f : a:local_ int ref -> b:local_ int ref -> c:int -> unit) = f ~c:42
 [%%expect{|
-val app6 :
-  (a:int ref @ local -> b:int ref @ local -> c:int -> unit) ->
-  a:int ref @ local -> b:int ref @ local -> unit = <fun>
+Line 1, characters 71-78:
+1 | let app6 (f : a:local_ int ref -> b:local_ int ref -> c:int -> unit) = f ~c:42
+                                                                           ^^^^^^^
+Error: This value is "local"
+       but is expected to be "global"
+         because it is captured by a partial application
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 let app1' (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(ref 42) ()
@@ -231,7 +237,7 @@ let app43'_wrapped (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int ->
 [%%expect{|
 val app43'_wrapped :
   (a:int ref @ local -> (int -> b:int ref @ local -> c:int -> unit)) ->
-  b:int ref @ local -> c:int -> unit = <fun>
+  b:int ref @ local -> (c:int -> unit) @ local = <fun>
 |}]
 
 let rapp1 (f : a:int -> unit -> local_ int ref) = f ()
@@ -307,35 +313,21 @@ let overapp ~(local_ a) ~b = (); fun ~c ~d -> ()
 
 let () = overapp ~a:1 ~b:2 ~c:3 ~d:4
 [%%expect{|
-val overapp : a:'a @ local -> b:'b -> (c:'c -> d:'d -> unit) = <fun>
-Line 3, characters 9-26:
-3 | let () = overapp ~a:1 ~b:2 ~c:3 ~d:4
-             ^^^^^^^^^^^^^^^^^
-Error: This application is complete, but surplus arguments were provided afterwards.
-       When passing or calling local values, extra arguments are passed in a separate application.
-Hint: Try wrapping the marked application in parentheses.
+val overapp : a:'a @ local -> b:'b -> c:'c -> d:'d -> unit = <fun>
 |}]
 
 let () = overapp ~b:2 ~a:1 ~c:3 ~d:4
 [%%expect{|
-Line 1, characters 20-21:
-1 | let () = overapp ~b:2 ~a:1 ~c:3 ~d:4
-                        ^
-Error: This application is complete, but surplus arguments were provided afterwards.
-       When passing or calling local values, extra arguments are passed in a separate application.
-Hint: Try splitting the application in two. The arguments that come
-after this one in the function's type should be applied separately.
 |}]
 
 let () = overapp ~c:1 ~b:2
 [%%expect{|
-Line 1, characters 25-26:
+Line 1, characters 9-26:
 1 | let () = overapp ~c:1 ~b:2
-                             ^
-Error: This application is complete, but surplus arguments were provided afterwards.
-       When passing or calling local values, extra arguments are passed in a separate application.
-Hint: Try splitting the application in two. The arguments that come
-after this one in the function's type should be applied separately.
+             ^^^^^^^^^^^^^^^^^
+Error: This expression has type "a:'a @ local -> d:'b -> unit"
+       but an expression was expected of type "unit"
+Hint: This function application is partial, maybe some arguments are missing.
 |}]
 
 let () = overapp ~d:1 ~a:2
@@ -343,10 +335,7 @@ let () = overapp ~d:1 ~a:2
 Line 1, characters 9-26:
 1 | let () = overapp ~d:1 ~a:2
              ^^^^^^^^^^^^^^^^^
-Error: This application is complete, but surplus arguments were provided afterwards.
-       When passing or calling local values, extra arguments are passed in a separate application.
-Hint: Try splitting the application in two. The arguments that come
-after b in the function's type should be applied separately.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 
@@ -358,8 +347,6 @@ Line 2, characters 11-25:
 2 |   fun f -> f ~foo:"hello"
                ^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
-Hint: This is a partial application
-      Adding 1 more argument will make the value non-local
 |}]
 
 (* The fixed version. Note that in the printed type, local returning is implicit
@@ -381,11 +368,11 @@ Line 3, characters 25-31:
 3 |   let local_ perm ~foo = f ~foo in
                              ^^^^^^
 Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+       but is expected to be "global"
+         because it is captured by a partial application
+         which is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
-Hint: This is a partial application
-      Adding 1 more argument may make the value non-local
 |}]
 
 (* The above tests for the locality axis exhaust cases wrt
@@ -485,9 +472,9 @@ val f : ('a -> 'b -> 'c) -> 'a @ unique -> 'b -> 'c = <fun>
 let f (g @ unique) x =
   g x x [@nontail]
 [%%expect{|
-val f : ('a -> 'a -> 'b) @ unique -> ('a -> 'b) = <fun>
+val f : ('a -> 'a -> 'b) @ unique -> 'a -> 'b = <fun>
 |}, Principal{|
-val f : ('a -> 'a -> 'b) @ unique -> ('a -> 'b) = <fun>
+val f : ('a -> 'a -> 'b) @ unique -> 'a -> 'b = <fun>
 |}]
 
 let f (g @ once) x =
