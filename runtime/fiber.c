@@ -1448,8 +1448,7 @@ value caml_tick_fiber_exn(struct stack_info *stack) {
 
 /* Implementation of primitives to support Dynamic.t */
 
-#define Is_bound(dyn) Is_this(dyn)
-#define Hash_dyn(dyn) (CAMLassert(Is_bound(dyn)), Long_val(dyn))
+#define Hash_dyn(dyn) Long_val(dyn)
 
 typedef struct {
   value dyn;
@@ -1510,7 +1509,7 @@ CAMLexport void caml_dynamic_cache_scan_roots(dynamic_cache_t cache,
                                               void *fdata)
 {
   for (size_t i = 0; i < DYNAMIC_CACHE_SIZE; ++i) {
-    if (Is_bound(cache->tbl[i].dyn)) {
+    if (Is_this(cache->tbl[i].dyn)) {
       f(fdata, cache->tbl[i].dyn, &cache->tbl[i].dyn);
       f(fdata, cache->tbl[i].val, &cache->tbl[i].val);
     }
