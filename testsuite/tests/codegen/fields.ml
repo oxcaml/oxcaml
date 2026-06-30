@@ -53,9 +53,10 @@ let set_b r v = r.b <- v
 [%%expect_asm X86_64{|
 set_b:
   subq  $8, %rsp
-  movq  %rbx, %rsi
-  leaq  8(%rax), %rdi
-  call  caml_modify@PLT
+  movq  %rax, %rdi
+  movq  %rbx, %rdx
+  movl  $1, %esi
+  call  caml_modify_local@PLT
   movl  $1, %eax
   addq  $8, %rsp
   ret
@@ -155,8 +156,9 @@ let assign r v = r := v
 assign:
   subq  $8, %rsp
   movq  %rax, %rdi
-  movq  %rbx, %rsi
-  call  caml_modify@PLT
+  movq  %rbx, %rdx
+  xorl  %esi, %esi
+  call  caml_modify_local@PLT
   movl  $1, %eax
   addq  $8, %rsp
   ret

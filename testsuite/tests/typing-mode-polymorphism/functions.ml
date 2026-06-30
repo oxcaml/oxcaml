@@ -148,7 +148,7 @@ let rec recursive x n =
 [%%expect{|
 val recursive :
   'a @ [< 'm & global] ->
-  (int @ [< many uncontended] -> 'a @ [< global > 'm]) @ [> close('m) | close('m) | nonportable] =
+  (int @ [< many uncontended] -> 'a @ [< global > 'm]) @ [> close('m) | nonportable] =
   <fun>
 |}]
 
@@ -163,7 +163,7 @@ let recursive' = recursive
 [%%expect{|
 val recursive' :
   'a @ [< 'm & global] ->
-  (int @ [< many uncontended] -> 'a @ [< global > 'm]) @ [> close('m) | close('m) | nonportable] =
+  (int @ [< many uncontended] -> 'a @ [< global > 'm]) @ [> close('m) | nonportable] =
   <fun>
 |}]
 

@@ -1438,6 +1438,9 @@ end = struct
   another visible monadic/comonadic variable, and records
   them in their respective tables *)
   let add_visible_paths () =
+    VarPairTbl.reset visible_monadic_paths_tbl;
+    VarPairTbl.reset visible_comonadic_paths_tbl;
+    VarPairTbl.reset visible_closing_over_paths_tbl;
     let memoized = VarTbl.create 17 in
     List.iter
       (fun { monadic; comonadic } ->
@@ -1832,6 +1835,22 @@ end = struct
     | 4 -> "'q"
     | _ -> Fmt.asprintf "'mm%d" (i - 5)
 
+  let mode_name_is_already_used name =
+    let type_name =
+      if String.length name > 0 && name.[0] = '\''
+      then String.sub name 1 (String.length name - 1)
+      else name
+    in
+    List.mem type_name !named_vars
+    || List.exists (fun (_, name') -> type_name = name') !names
+    || String.Set.mem type_name !named_weak_vars
+    || List.exists (fun (_, name') -> name = name') !modenames
+
+  let rec fresh_mode_name cnt =
+    let name = pick_name cnt in
+    if mode_name_is_already_used name then fresh_mode_name (cnt + 1)
+    else cnt, name
+
   let add_named_modevar name =
     let mopt =
       List.find_opt
@@ -1841,9 +1860,8 @@ end = struct
     match mopt with
     | Some (_, m) -> m
     | None ->
-      let cnt = !modename_counter in
+      let cnt, m = fresh_mode_name !modename_counter in
       modename_counter := cnt + 1;
-      let m = pick_name cnt in
       modenames := (name, m) :: !modenames;
       m
 
@@ -1933,12 +1951,26 @@ end = struct
     let lower = List.map into_lower_to edges_to in
     lower, upper
 
+  let dedup_printed pp items =
+    let seen = ref [] in
+    List.filter
+      (fun item ->
+        let s = Fmt.asprintf "%a" pp item in
+        if List.mem s !seen then false
+        else begin
+          seen := s :: !seen;
+          true
+        end)
+      items
+
   let print_raw_constraints { lo; hi } ppf pair =
     let edges_to = construct_edges_to pair in
     let edges_from = construct_edges_from pair in
     let edges_lower, edges_upper =
       partition_edges_into_bounds ~edges_from ~edges_to
     in
+    let edges_upper = dedup_printed print_raw_upper_bound edges_upper in
+    let edges_lower = dedup_printed print_raw_lower_bound edges_lower in
     if edges_lower = [] && edges_upper = []
        && lo = "" && hi = ""
     then begin

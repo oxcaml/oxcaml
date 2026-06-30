@@ -3450,6 +3450,12 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     then Lambda.alloc_heap, first_complex_local_param - num_provided
     else Lambda.alloc_local, 0
   in
+  let closure_alloc_mode =
+    match closure_alloc_mode, apply.IR.mode with
+    | Alloc_local, Not_alloc_stack -> Lambda.alloc_heap
+    | (Alloc_heap | Alloc_local), Maybe_alloc_stack -> closure_alloc_mode
+    | Alloc_heap, Not_alloc_stack -> closure_alloc_mode
+  in
   if not (Lambda.locality_return_compat closure_alloc_mode apply.IR.mode)
   then
     (* This can happen in a dead GADT match case. *)

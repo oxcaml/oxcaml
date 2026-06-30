@@ -465,7 +465,6 @@ module Foo :
   end
 |}]
 
-(* CR ageorges: remove duplicates in [< 'm & 'm] and [> 'm | 'm] *)
 module Foo : sig
   type t
 
@@ -494,9 +493,7 @@ Error: Signature mismatch:
          val illegal : 'a @ [< 'm] -> 'a @ [> 'm]
        is not included in
          val illegal : t -> t @ portable
-       The type
-         "t @ [< 'm & 'm & 'm & 'm > nonportable] ->
-         t @ [> 'm | 'm | 'm | 'm | nonportable]"
+       The type "t @ [< 'm > nonportable] -> t @ [> 'm | nonportable]"
        is not compatible with the type "t -> t @ portable"
 |}]
 
