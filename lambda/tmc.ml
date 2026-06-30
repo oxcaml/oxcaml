@@ -933,6 +933,7 @@ let rec choice ctx t =
     | Pmakefloatblock _
     | Pmakeufloatblock _
     | Pmakeblock _
+    | Pinit_module_block _
 
     (* nor unboxed products *)
     | Pmake_unboxed_product _ | Punboxed_product_field _

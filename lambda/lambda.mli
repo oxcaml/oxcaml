@@ -133,6 +133,12 @@ type primitive =
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
+  | Pinit_module_block of
+      int * mutable_flag * block_shape * locality_mode * Path.t
+    (** Like [Pmakeblock], but additionally records that the resulting block
+        is the value of the module identified by the given [Path.t].
+        Semantically identical to [Pmakeblock]; the path is metadata for
+        downstream consumers. Emitted only by [Translmod]. *)
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
   | Pmakelazyblock of lazy_block_tag

@@ -158,6 +158,8 @@ type primitive =
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
+  | Pinit_module_block of
+      int * mutable_flag * block_shape * locality_mode * Path.t
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
   | Pmakelazyblock of lazy_block_tag
@@ -2456,6 +2458,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pignore -> None
   | Pgetglobal _ | Pgetpredef _ -> None
   | Pmakeblock (_, _, _, m) -> Some m
+  | Pinit_module_block (_, _, _, m, _) -> Some m
   | Pmakefloatblock (_, m) -> Some m
   | Pmakeufloatblock (_, m) -> Some m
   | Pmakelazyblock _ -> Some alloc_heap
@@ -2677,7 +2680,7 @@ let primitive_can_raise prim =
   | Pbigarrayset (_, _, _, Pbigarray_unknown_layout) ->
     true
   | Pbytes_to_string | Pbytes_of_string | Parray_of_iarray | Parray_to_iarray
-  | Pignore | Pgetglobal _ | Pgetpredef _ | Pmakeblock _
+  | Pignore | Pgetglobal _ | Pgetpredef _ | Pmakeblock _ | Pinit_module_block _
   | Pmakefloatblock _ | Pfield _ | Pfield_computed _ | Psetfield _
   | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Pduprecord _
   | Pmakeufloatblock _ | Pufloatfield _ | Psetufloatfield _ | Psequand | Psequor
@@ -3057,7 +3060,8 @@ let primitive_result_layout (p : primitive) =
   | Pgetglobal _ -> layout_module
     (* Note the assumption that predefs are always values *)
   | Pgetpredef _ -> layout_predef_value
-  | Pmakeblock _ | Pmakefloatblock _ | Pmakearray _ | Pmakearray_dynamic _
+  | Pmakeblock _ | Pinit_module_block _ | Pmakefloatblock _ | Pmakearray _
+  | Pmakearray_dynamic _
   | Pduprecord _ | Pmakeufloatblock _ | Pmakelazyblock _
   | Pduparray _ | Pbigarraydim _ | Pobj_dup -> layout_block
   | Pfield _ | Pfield_computed _ -> layout_value_field
