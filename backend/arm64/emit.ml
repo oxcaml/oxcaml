@@ -2250,6 +2250,16 @@ let end_assembly () =
        unclear how much this matters. *)
     if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Data
   in
+  (* Mergeable string section (SHF_MERGE|SHF_STRINGS, entsize 1) for debuginfo
+     filename and defname strings (so linker will de-dupe). *)
+  let debuginfo_strings_section : Asm_targets.Asm_section.t =
+    Custom
+      { names = [".rodata.str1.1"];
+        flags = Some "aMS";
+        args = ["%progbits"; "1"];
+        is_delayed = false
+      }
+  in
   D.switch_to_section frametable_section;
   D.align ~fill:Zero ~bytes:8;
   (* #7887 *)
@@ -2286,7 +2296,15 @@ let end_assembly () =
         (fun lbl ->
           let lbl = label_to_asm_label ~section:frametable_section lbl in
           D.define_label lbl);
-      efa_string = (fun s -> D.string (s ^ "\000"))
+      efa_string = (fun s -> D.string (s ^ "\000"));
+      efa_open_string_section =
+        (fun () -> D.switch_to_section debuginfo_strings_section);
+      efa_close_string_section =
+        (fun () -> D.switch_to_section frametable_section);
+      efa_def_string_label =
+        (fun lbl ->
+          let lbl = label_to_asm_label ~section:debuginfo_strings_section lbl in
+          D.define_label lbl)
     };
   D.type_symbol ~ty:Object frametable_sym;
   D.size frametable_sym;

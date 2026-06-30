@@ -361,8 +361,6 @@ static void accumulate_frametable_stats(intnat *frametable,
   caml_debuginfo_measurements(&debuginfo_count,
                               &debuginfo_low,
                               &debuginfo_high);
-  /* round debuginfo_high up to word boundary */
-  debuginfo_high = Align_to(debuginfo_high, uintnat);
 /*
   printf("Frametable at %p: return addresses %p-%p(0x%zx), "
         "descriptors %p-%p(0x%zx, %zu), "
@@ -382,7 +380,12 @@ static void accumulate_frametable_stats(intnat *frametable,
 */
   stats->total_codesize += (stats->max_retaddr - stats->min_retaddr);
   stats->total_ft_size += (stats->max_descr - stats->min_descr);
-  stats->total_debuginfo_size += (debuginfo_high - debuginfo_low);
+  /* Each debuginfo record is two 32-bit words; the name_info /
+     name_and_loc_info structs occupy [debuginfo_low, debuginfo_high). The
+     deduplicated filename/defname strings live in a separate section and are
+     not counted here. */
+  stats->total_debuginfo_size += debuginfo_count * 2 * sizeof(uint32_t)
+                                 + (debuginfo_high - debuginfo_low);
   stats->total_descrs += stats->descrs;
   stats->total_debuginfo += debuginfo_count;
   if (stats->min_retaddr) {
