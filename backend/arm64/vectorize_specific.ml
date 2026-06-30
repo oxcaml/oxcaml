@@ -18,6 +18,9 @@ let memory_access : Arch.specific_operation -> Memory_access.t option =
        insertion pass currently happens after vectorize. *)
     create Arbitrary
   | Ifar_alloc _ -> create Alloc
+  | Ifar_stackcheck _ ->
+    (* Conservative: the stack check may reallocate the stack. *)
+    create Arbitrary
   | Ishiftarith _ | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf
   | Imulsubf | Inegmulsubf | Isqrtf | Ibswap _ | Imove32 | Isignext _ | Isimd _
     ->
@@ -31,9 +34,9 @@ let memory_access : Arch.specific_operation -> Memory_access.t option =
 
 let is_seed_store (op : Arch.specific_operation) =
   match op with
-  | Ifar_poll | Ifar_alloc _ | Ishiftarith _ | Imuladd | Imulsub | Inegmulf
-  | Imuladdf | Inegmuladdf | Imulsubf | Inegmulsubf | Isqrtf | Ibswap _
-  | Imove32 | Isignext _ | Isimd _ ->
+  | Ifar_poll | Ifar_alloc _ | Ifar_stackcheck _ | Ishiftarith _ | Imuladd
+  | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf | Inegmulsubf
+  | Isqrtf | Ibswap _ | Imove32 | Isignext _ | Isimd _ ->
     None
   | Illvm_intrinsic intr ->
     Misc.fatal_errorf
