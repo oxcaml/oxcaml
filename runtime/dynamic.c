@@ -157,11 +157,14 @@ static bool dynamic_stack_push(dynamic_stack_t stack, value val)
   return true;
 }
 
-static void dynamic_stack_pop(dynamic_stack_t stack)
+static bool dynamic_stack_pop(dynamic_stack_t stack)
 {
-  if(stack->count > 0) {
-    --stack->count;
+  CAMLassert(stack->count > 0);
+  if(--stack->count == 0) {
+    dynamic_stack_free(stack);
+    return true;
   }
+  return false;
 }
 
 static void dynamic_stack_scan_roots(dynamic_stack_t stack,
@@ -207,7 +210,7 @@ static void dynamic_table_add(dynamic_table_t table, dynamic_stack_s stack)
   size_t j = i;
   while(Is_bound(table->bindings[j].dyn)) { /* collision */
     j = (j + 1) & mask; /* linear probing */
-    CAMLassert (j != i); /* Caller guarantees table has space */
+    CAMLassert(j != i); /* Caller guarantees table has space */
   }
   table->bindings[j] = stack;
 }
@@ -305,8 +308,20 @@ static void dynamic_table_pop(dynamic_table_t table, value dyn)
 {
   dynamic_stack_t bindings = NULL;
   if(dynamic_table_find(table, dyn, &bindings)) {
-    // TODO: consider removing empty stacks from the table
-    dynamic_stack_pop(bindings);
+    if(dynamic_stack_pop(bindings)) {
+
+      --table->count;
+      size_t idx = table->bindings - bindings;
+
+      // Rehash chain after removal
+      size_t next = (idx + 1) & table->mask;
+      while(Is_bound(table->bindings[next].dyn)) {
+        dynamic_stack_s stack = table->bindings[next];
+        dynamic_stack_init(&table->bindings[next]);
+        dynamic_table_add(table, stack);
+        next = (next + 1) & table->mask;
+      }
+    }
   }
 }
 
