@@ -83,12 +83,18 @@ void caml_free_backtrace_buffer(backtrace_slot *backtrace_buffer) {
     caml_stat_free(backtrace_buffer);
 }
 
-/* A backtrace_slot is either a debuginfo or a frame_descr* */
+/* A backtrace_slot is either a frame_descr* or a debuginfo. Both are encoded
+   with the address shifted left two bits, leaving the low two bits free for a
+   tag: bit 1 distinguishes a debuginfo (set) from a frame_descr (clear), and
+   bit 0 is kept clear so the [>>1] in [Val_backtrace_slot] still round-trips
+   (and the bytecode backtrace encoding is unaffected). The shift means frame
+   descriptors no longer need to be aligned. 64-bit only: there are ample
+   spare high bits for the shift. */
 #define Slot_is_debuginfo(s) ((uintnat)(s) & 2)
-#define Debuginfo_slot(s) ((debuginfo)((uintnat)(s) - 2))
-#define Slot_debuginfo(d) ((backtrace_slot)((uintnat)(d) + 2))
-#define Frame_descr_slot(s) ((frame_descr*)(s))
-#define Slot_frame_descr(f) ((backtrace_slot)(f))
+#define Debuginfo_slot(s) ((debuginfo)((uintnat)(s) >> 2))
+#define Slot_debuginfo(d) ((backtrace_slot)(((uintnat)(d) << 2) | 2))
+#define Frame_descr_slot(s) ((frame_descr*)((uintnat)(s) >> 2))
+#define Slot_frame_descr(f) ((backtrace_slot)((uintnat)(f) << 2))
 
 static debuginfo debuginfo_extract(frame_descr *d, ptrdiff_t alloc_idx);
 
@@ -126,7 +132,7 @@ void caml_stash_backtrace(value exn, uintnat pc, char * sp, const char* trapsp)
     /* store its descriptor in the backtrace buffer */
     if (domain_state->backtrace_pos >= BACKTRACE_BUFFER_SIZE) return;
     domain_state->backtrace_buffer[domain_state->backtrace_pos++] =
-      (backtrace_slot) descr;
+      Slot_frame_descr(descr);
 
     /* Stop when we reach the current exception handler */
     if (sp > trapsp) return;
@@ -306,8 +312,6 @@ static debuginfo debuginfo_extract(frame_descr *d, ptrdiff_t alloc_idx)
   if (frame_has_allocs(d)) {
     /* skip alloc_lengths */
     infoptr += *infoptr + 1;
-    /* align to 32 bits */
-    infoptr = Align_to(infoptr, uint32_t);
     /* find debug info for this allocation */
     if (alloc_idx >= 0) {
       infoptr += alloc_idx * sizeof(uint32_t);
@@ -323,8 +327,6 @@ static debuginfo debuginfo_extract(frame_descr *d, ptrdiff_t alloc_idx)
       }
     }
   } else {
-    /* align to 32 bits */
-    infoptr = Align_to(infoptr, uint32_t);
     CAMLassert(alloc_idx == -1);
   }
   /* read offset to debuginfo */
