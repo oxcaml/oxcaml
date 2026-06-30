@@ -680,9 +680,13 @@ void caml_thread_tick_hook(void)
      ticks are. There can be a slight imprecision here if the tick interval is
      changed while we are waiting to preempt, but that's fine; we'll stabilize
      on the next go around. */
+  uintnat interval = caml_effective_tick_interval_usec();
+  /* A stale tick can be processed after the effective interval has dropped to
+     0 (tick thread disabled, or the last tick request released). Nobody wants
+     preemption in that case, and dividing by 0 would be undefined behaviour. */
+  if (interval == 0) return;
   uintnat ticks_per_preemption =
-      ceil((double)Thread_timeout_usec /
-           (double)(caml_effective_tick_interval_usec()));
+      ceil((double)Thread_timeout_usec / (double)interval);
 
   if (++Ticks_elapsed >= ticks_per_preemption) {
     Ticks_elapsed = 0;
