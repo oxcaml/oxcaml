@@ -13,9 +13,9 @@ Error: Unknown kind modifier non_pointerrrrr
 
 type t : non_pointer value
 [%%expect{|
-Line 1, characters 9-26:
+Line 1, characters 9-20:
 1 | type t : non_pointer value
-             ^^^^^^^^^^^^^^^^^
+             ^^^^^^^^^^^
 Error: Unbound kind "non_pointer"
 |}]
 
@@ -403,4 +403,66 @@ Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "value non_pointer".
 
 type t : void mod global & value non_pointer mod global
+|}]
+
+(* Scannable axes can be written on arbitrary kinds, not just abbreviations.
+   Products are not scannable, so they get the ignored-kind-modifier warning. *)
+
+type t : (value & value) non_pointer
+[%%expect{|
+Line 1, characters 9-36:
+1 | type t : (value & value) non_pointer
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
+
+Line 1, characters 9-36:
+1 | type t : (value & value) non_pointer
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
+
+Line 1, characters 9-36:
+1 | type t : (value & value) non_pointer
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
+
+type t : value & value
+|}]
+
+(* On a scannable kind the axis applies, with no warning. *)
+
+type t : (value) non_pointer
+[%%expect{|
+type t : value non_pointer
+|}]
+
+(* Redundant axes still warn. *)
+
+type t : (value) non_pointer non_pointer
+[%%expect{|
+Line 1, characters 29-40:
+1 | type t : (value) non_pointer non_pointer
+                                 ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer".
+
+Line 1, characters 29-40:
+1 | type t : (value) non_pointer non_pointer
+                                 ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer".
+
+Line 1, characters 29-40:
+1 | type t : (value) non_pointer non_pointer
+                                 ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value non_pointer".
+
+type t : value non_pointer
+|}]
+
+(* Axes compose with [mod]. *)
+
+type t : (value mod global) non_pointer
+[%%expect{|
+type t : value non_pointer mod global
 |}]
