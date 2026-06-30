@@ -543,6 +543,14 @@ let save_cmt target cu binary_annots initial_env cmi shape =
            let cmt_args = Array.copy Sys.argv in
            cmt_args.(0) <- Location.rewrite_absolute_path Sys.argv.(0);
            cmt_args in
+         let cmt_loadpath =
+           let { Load_path.visible; hidden } = Load_path.get_paths () in
+           let rewrite (incl : Clflags.include_dir) =
+             { incl with
+               Clflags.path = Location.rewrite_absolute_path incl.path }
+           in
+           { Load_path.visible = List.map rewrite visible;
+             hidden = List.map rewrite hidden } in
          let cmt = {
            cmt_modname = cu;
            cmt_annots;
@@ -551,7 +559,7 @@ let save_cmt target cu binary_annots initial_env cmi shape =
            cmt_args;
            cmt_sourcefile = sourcefile;
            cmt_builddir = Location.rewrite_absolute_path (Sys.getcwd ());
-           cmt_loadpath = Load_path.get_paths ();
+           cmt_loadpath;
            cmt_source_digest = source_digest;
            cmt_initial_env = if need_to_clear_env then
                keep_only_summary initial_env else initial_env;

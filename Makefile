@@ -41,6 +41,8 @@ CLEAN_FILES = \
   oc_cflags.sexp \
   oc_cppflags.sexp \
   sharedlib_cflags.sexp \
+  build_map_cflags.sexp \
+  build_map_ccopt.sexp \
   .rsync-output \
   .rsync-output-compare \
   ocamlc \
