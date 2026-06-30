@@ -168,6 +168,7 @@ _build/_bootinstall: Makefile.config Makefile.common-ox $(dune_config_targets)
 	echo '( $(subst -I $(ROOTDIR)/,-I $(CURDIR)/,$(OC_CPPFLAGS)) )' > oc_cppflags.sexp
 	echo '( $(SHAREDLIB_CFLAGS) )' > sharedlib_cflags.sexp
 	echo '( $(BUILD_MAP_CFLAGS) )' > build_map_cflags.sexp
+	echo '( $(foreach f,$(BUILD_MAP_CFLAGS),-ccopt $(f)) )' > build_map_ccopt.sexp
 
 # _build/_bootinstall: a minimal install directory for the boot compiler,
 # which is placed on PATH for subsequent builds
