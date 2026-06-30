@@ -410,19 +410,19 @@ let emit_frames a =
     in
     (* The name_info / name_and_loc_info struct. Must be 32-bit aligned, both
        because it contains 32-bit values and because emit_debuginfo assumes the
-       low 2 bits of its address are 0. The defname string is emitted separately
-       into the mergeable string section; [defname_offs] points at it, stored
-       relative to the start of the struct (like [filename_offs]), so the
-       [efa_label_rel] addend is the field's byte offset within the struct. *)
+       low 2 bits of its address are 0. *)
     a.efa_align 4;
     a.efa_def_label lbl;
     a.efa_label_rel file_lbl 0l;
-    (* Include the additional 64-bits of location information which didn't pack
-       in the main 64-bit word *)
-    Option.iter emit_loc loc;
-    let defname_field_offset = match loc with None -> 4 | Some _ -> 12 in
-    a.efa_label_rel (label_defstring defname)
-      (Int32.of_int defname_field_offset)
+    (* [defname_offs] immediately follows [filename_offs] (offset 4) in both
+       struct formats, so it is at a fixed offset regardless of [loc]. The
+       defname string is emitted into the mergeable string section; the offset
+       is stored relative to the start of the struct, so the [efa_label_rel]
+       addend is the field's byte offset (4). *)
+    a.efa_label_rel (label_defstring defname) 4l;
+    (* Then the extra 64 bits of location info that didn't pack into the main
+       debuginfo word (name_and_loc_info only). *)
+    Option.iter emit_loc loc
   in
   let fully_pack_info fd_raise d has_next =
     (* See format in caml_debuginfo_location in runtime/backtrace-nat.c *)

@@ -379,10 +379,10 @@ struct name_info {
    in the main debuginfo word. */
 struct name_and_loc_info {
   int32_t filename_offs;
+  int32_t defname_offs; /* immediately after filename_offs, as in name_info */
   uint16_t start_chr;
   uint16_t end_chr;
   int32_t end_offset; /* End character position relative to start bol */
-  int32_t defname_offs;
 };
 
 /* Extract location information for the given frame descriptor */
