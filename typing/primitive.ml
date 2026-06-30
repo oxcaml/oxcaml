@@ -998,6 +998,22 @@ let prim_has_valid_reprs ~loc prim =
         any;
         is (Same_as_ocaml_repr C.scannable);
       ]
+    | "%unsafe_get_ext_ptr" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        any
+      ]
+    | "%unsafe_get_ext_ptr_imm" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        any
+      ]
+    | "%unsafe_set_ext_ptr" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        any;
+        is (Same_as_ocaml_repr C.scannable);
+      ]
     | "%box_float" ->
       exactly [Same_as_ocaml_repr C.float64; Same_as_ocaml_repr C.scannable]
     | "%unbox_float" ->

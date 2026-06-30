@@ -415,6 +415,8 @@ type primitive =
   | Pset_idx of layout * modify_mode
   | Pget_ptr of layout * Asttypes.mutable_flag
   | Pset_ptr of layout * modify_mode
+  | Pget_ext_ptr of layout * Asttypes.mutable_flag
+  | Pset_ext_ptr of layout * modify_mode
 
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
@@ -2594,6 +2596,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Parray_element_size_in_bytes _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
+  | Pget_ext_ptr _ | Pset_ext_ptr _
   | Ppeek _ | Ppoke _ ->
     None
   | Pmake_idx_field _
@@ -2781,6 +2784,7 @@ let primitive_can_raise prim =
   | Pidx_deepen _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
+  | Pget_ext_ptr _ | Pset_ext_ptr _
   | Ppeek _ | Ppoke _ ->
     false
 
@@ -3255,6 +3259,8 @@ let primitive_result_layout (p : primitive) =
   | Pset_idx _ -> layout_unit
   | Pget_ptr (layout, _) -> layout
   | Pset_ptr _ -> layout_unit
+  | Pget_ext_ptr (layout, _) -> layout
+  | Pset_ext_ptr _ -> layout_unit
 
 let array_ref_kind mode = function
   | Pgenarray -> Pgenarray_ref mode
