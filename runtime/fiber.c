@@ -37,6 +37,7 @@
 #include "caml/misc.h"
 #include "caml/major_gc.h"
 #include "caml/memory.h"
+#include "caml/obj.h"
 #include "caml/startup_aux.h"
 #include "caml/shared_heap.h"
 #ifdef NATIVE_CODE
@@ -1448,7 +1449,7 @@ value caml_tick_fiber_exn(struct stack_info *stack) {
 /* Implementation of primitives to support Dynamic.t */
 
 #define Is_bound(dyn) Is_this(dyn)
-#define Hash_dyn(dyn) Long_val(dyn) /* dyn should not be Val_null */
+#define Hash_dyn(dyn) (CAMLassert(Is_bound(dyn)), Long_val(dyn))
 
 typedef struct {
   value dyn;
@@ -1515,8 +1516,6 @@ CAMLexport void caml_dynamic_cache_scan_roots(dynamic_cache_t cache,
     }
   }
 }
-
-extern value caml_fresh_oo_id(value v);
 
 /* Make a fresh dynamic value, which is an immediate unique ID. */
 CAMLprim value caml_dynamic_make(value unit)
