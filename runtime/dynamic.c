@@ -311,7 +311,7 @@ static void dynamic_table_pop(dynamic_table_t table, value dyn)
     if(dynamic_stack_pop(bindings)) {
 
       --table->count;
-      size_t idx = table->bindings - bindings;
+      size_t idx = bindings - table->bindings;
 
       // Rehash chain after removal
       size_t next = (idx + 1) & table->mask;
