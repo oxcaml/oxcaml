@@ -474,7 +474,7 @@ CAMLprim value caml_dynamic_push(value dyn, value val)
 /* Pop a local binding fora dynamic variable. */
 CAMLprim value caml_dynamic_pop(value dyn)
 {
-  CAMLparam1(dyn);
+  CAMLnoalloc;
 
   struct stack_info *stack = Caml_state->current_stack;
   CAMLassert(stack);
