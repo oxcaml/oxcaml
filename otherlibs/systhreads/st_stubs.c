@@ -831,16 +831,22 @@ static void * caml_thread_start(void * v)
 CAMLprim value caml_thread_new(value clos)
 {
   CAMLparam1(clos);
+  CAMLlocal1(descr);
 
 #ifndef NATIVE_CODE
   if (caml_debugger_in_use)
     caml_fatal_error("ocamldebug does not support multithreaded programs");
 #endif
 
+  /* Allocate the descriptor before adding to the ring; if
+   * [caml_thread_new_descriptor] raises then we don't want to add a
+   * zombie entry. */
+  descr = caml_thread_new_descriptor(clos);
+
   /* Create a thread info block */
   caml_thread_t th = thread_alloc_and_add();
   if (th == NULL) caml_raise_out_of_memory();
-  th->descr = caml_thread_new_descriptor(clos);
+  th->descr = descr;
 
   st_retcode err = st_thread_create(NULL, caml_thread_start, (void *) th);
 
