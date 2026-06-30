@@ -1,0 +1,19 @@
+# Domains
+  spawning domain [expect 1/1]:       inheritable=1 non-inheritable=1
+  spawned domain  [expect null/null]: inheritable=null non-inheritable=null
+
+# Threads
+  spawning thread [expect 2/2]:    inheritable=2 non-inheritable=2
+  new thread      [expect 2/null]: inheritable=2 non-inheritable=null
+
+# Threads (snapshot at creation)
+  parent now [expect 99]: 99
+  thread     [expect 3]:  3
+
+# C-registered threads
+  registering C thread [expect 5/5]:       inheritable=5 non-inheritable=5
+  C thread             [expect null/null]: inheritable=null non-inheritable=null
+
+# Fibers
+  first run         [expect 4/4]:    inheritable=4 non-inheritable=4
+  resumed elsewhere [expect 4/null]: inheritable=4 non-inheritable=null

@@ -11,7 +11,7 @@
 module type Dynamic_S = sig
   type 'a t
 
-  val make : unit -> 'a t
+  val make : bool -> 'a t
   val get : 'a t -> 'a or_null
 
   val with_temporarily : 'a t -> 'a -> f: (unit -> 'b) -> 'b
@@ -20,7 +20,7 @@ end
 module Dynamic : Dynamic_S = struct
   type 'a t
 
-  external make : unit -> 'a t = "caml_dynamic_make"
+  external make : bool -> 'a t = "caml_dynamic_make"
   external get : 'a t -> 'a or_null = "caml_dynamic_get"
   external push : 'a t -> 'a -> unit  = "caml_dynamic_push"
   external pop : 'a t -> unit = "caml_dynamic_pop"
@@ -33,7 +33,7 @@ end
 module Dynamic_inside_fiber : Dynamic_S = struct
   type 'a t
 
-  external make : unit -> 'a t = "caml_dynamic_make"
+  external make : bool -> 'a t = "caml_dynamic_make"
   external get : 'a t -> 'a or_null = "caml_dynamic_get"
   external push : 'a t -> 'a -> unit  = "caml_dynamic_push"
   external pop : 'a t -> unit = "caml_dynamic_pop"
@@ -51,7 +51,7 @@ end
 module Dynamic_outside_fiber : Dynamic_S = struct
   type 'a t
 
-  external make : unit -> 'a t = "caml_dynamic_make"
+  external make : bool -> 'a t = "caml_dynamic_make"
   external get : 'a t -> 'a or_null = "caml_dynamic_get"
   external push : 'a t -> 'a -> unit  = "caml_dynamic_push"
   external pop : 'a t -> unit = "caml_dynamic_pop"
@@ -120,7 +120,7 @@ module Test_with_temp (Dynamic : Dynamic_S) = struct
 
   let _ =
     print_endline "\n# Test 1";
-    let d = Dynamic.make () in
+    let d = Dynamic.make false in
     Printf.printf "get [expect null]: %s\n" (print_dyn d);
     Thread.create (fun () -> Printf.printf "get on other thread [expect null]: %s\n" (print_dyn d)) ()
     |> Thread.join
@@ -145,7 +145,7 @@ module Test_with_temp (Dynamic : Dynamic_S) = struct
 
   let _ =
     print_endline "\n# Test 2";
-    let d = Dynamic.make () in
+    let d = Dynamic.make false in
     (test_with_temp d Null 8)
 
   (* Does with_temporarily work correctly in effect handlers? *)
@@ -153,7 +153,7 @@ module Test_with_temp (Dynamic : Dynamic_S) = struct
   let _ =
     print_endline "\n# Test 3";
     let n = 20 in
-    let d = Dynamic.make () in
+    let d = Dynamic.make false in
     let check_other_thread, finish =
       sync_thread (fun () ->
         Printf.printf "In pre-existing thread [expect null]: %s\n"
@@ -192,7 +192,7 @@ module Test_with_temp (Dynamic : Dynamic_S) = struct
   let _ =
     print_endline "\n# Test 4";
     let n = 40 in
-    let d = Dynamic.make () in
+    let d = Dynamic.make false in
     let check_other_thread, finish =
       sync_thread (fun () -> Printf.printf "In pre-existing thread [expect null]: %s\n" (print_dyn d)) in
 

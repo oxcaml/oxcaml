@@ -410,7 +410,7 @@ static void caml_thread_leave_blocking_section(void)
 /* Create and setup a new thread info block.
    This block has no associated thread descriptor and
    is not inserted in the list of threads. */
-static caml_thread_t caml_thread_new_info(caml_thread_t parent)
+static caml_thread_t caml_thread_new_info(bool inherit)
 {
   caml_thread_t th = NULL;
   caml_domain_state *domain_state = Caml_state;
@@ -430,7 +430,7 @@ static caml_thread_t caml_thread_new_info(caml_thread_t parent)
   /* The remaining fields which store the values of the domain state
      must be initialized to a valid value, as in [domain_create]. */
 
-  th->current_stack = caml_alloc_main_stack(stack_wsize);
+  th->current_stack = caml_alloc_main_stack(stack_wsize, inherit);
   if (th->current_stack == NULL) goto fail_alloc_stack;
 
   th->memprof = caml_memprof_new_thread(domain_state);
@@ -517,9 +517,9 @@ static value caml_thread_new_descriptor(value clos)
 }
 
 /* Allocate a thread info block and add it to the list of threads */
-static caml_thread_t thread_alloc_and_add(void)
+static caml_thread_t thread_alloc_and_add(bool inherit)
 {
-  caml_thread_t th = caml_thread_new_info(Active_thread);
+  caml_thread_t th = caml_thread_new_info(inherit);
 
   if (th == NULL) return NULL;
 
@@ -848,7 +848,7 @@ CAMLprim value caml_thread_new(value clos)
   descr = caml_thread_new_descriptor(clos);
 
   /* Create a thread info block */
-  caml_thread_t th = thread_alloc_and_add();
+  caml_thread_t th = thread_alloc_and_add(true);
   if (th == NULL) caml_raise_out_of_memory();
   th->descr = descr;
 
@@ -891,7 +891,7 @@ CAMLexport int caml_c_thread_register(void)
   caml_acquire_domain_lock();
 
   /* Set a thread info block */
-  caml_thread_t th = thread_alloc_and_add();
+  caml_thread_t th = thread_alloc_and_add(false);
   /* If it fails, we release the lock and return an error. */
   if (th == NULL) goto out_err;
   thread_init_current(th);

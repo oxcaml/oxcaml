@@ -292,9 +292,12 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
   return -1;
 }
 
+static void free_stack_memory(struct stack_info* stack);
+
 static struct stack_info*
 alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
-                             value hexn, value heff, value htick, int64_t id)
+                             value hexn, value heff, value htick, int64_t id,
+                             bool inherit)
 {
   struct stack_info* stack;
   struct stack_cache* caches = Caml_state->stack_caches;
@@ -352,7 +355,15 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->local_sp = 0;
   stack->local_top = NULL;
   stack->local_limit = 0;
+
   caml_dynamic_table_init(&stack->dyn);
+  if(inherit) {
+    if (!caml_dynamic_table_inherit(&stack->dyn)) {
+      free_stack_memory(stack);
+      return NULL;
+    }
+  }
+
 #ifdef DEBUG
   stack->magic = 42;
 #endif
@@ -365,11 +376,12 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
 
 /* allocate a stack with at least "wosize" usable words of stack */
 struct stack_info*
-caml_alloc_stack_noexc(mlsize_t wosize, value hval, value hexn, value heff, int64_t id)
+caml_alloc_stack_noexc(mlsize_t wosize, value hval, value hexn, value heff,
+                       int64_t id, bool inherit)
 {
   int cache_bucket = stack_cache_bucket (wosize);
   return alloc_size_class_stack_noexc(wosize, cache_bucket, hval, hexn, heff,
-                                      /*htick=*/Val_null, id);
+                                      /*htick=*/Val_null, id, inherit);
 }
 
 #ifdef NATIVE_CODE
@@ -378,7 +390,7 @@ value caml_alloc_stack (value hval, value hexn, value heff) {
   const int64_t id = atomic_fetch_add(&fiber_id, 1);
   struct stack_info *stack =
       alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */, hval,
-                                   hexn, heff, /*htick=*/Val_null, id);
+                                   hexn, heff, /*htick=*/Val_null, id, true);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -398,7 +410,7 @@ value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
   const int64_t id = atomic_fetch_add(&fiber_id, 1);
   struct stack_info* stack =
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
-                                 hval, hexn, heff, htick, id);
+                                 hval, hexn, heff, htick, id, true);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -714,7 +726,7 @@ CAMLprim value caml_alloc_stack(value hval, value hexn, value heff)
   const int64_t id = atomic_fetch_add(&fiber_id, 1);
   struct stack_info *stack =
       alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */, hval,
-                                   hexn, heff, /*htick=*/Val_null, id);
+                                   hexn, heff, /*htick=*/Val_null, id, true);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -739,7 +751,7 @@ CAMLprim value caml_alloc_stack_preemptible(value hval, value hexn,
   const int64_t id = atomic_fetch_add(&fiber_id, 1);
   struct stack_info* stack =
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
-                                 hval, hexn, heff, htick, id);
+                                 hval, hexn, heff, htick, id, true);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -937,7 +949,8 @@ int caml_try_realloc_stack(asize_t required_space)
                                            Stack_handle_exception(old_stack),
                                            Stack_handle_effect(old_stack),
                                            Stack_handle_tick(old_stack),
-                                           old_stack->id);
+                                           old_stack->id,
+                                           false);
 
   if (!new_stack) return 0;
   memcpy(Stack_high(new_stack) - stack_used,
@@ -1024,11 +1037,12 @@ int caml_try_realloc_stack(asize_t required_space)
 #endif
 }
 
-struct stack_info* caml_alloc_main_stack (uintnat init_wsize)
+struct stack_info* caml_alloc_main_stack (uintnat init_wsize, bool inherit)
 {
   const int64_t id = atomic_fetch_add(&fiber_id, 1);
   struct stack_info* stk =
-    caml_alloc_stack_noexc(init_wsize, Val_unit, Val_unit, Val_unit, id);
+    caml_alloc_stack_noexc(init_wsize, Val_unit, Val_unit, Val_unit,
+                           id, inherit);
   return stk;
 }
 

@@ -20,8 +20,9 @@
 #include "mlvalues.h"
 #include "roots.h"
 
-/* Define a new dynamic value, which is an immediate unique ID. */
-CAMLprim value caml_dynamic_make(value unit);
+/* Define a new dynamic value, which is an immediate unique ID.
+   If [inherit] is Val_true, fresh fibers snapshot the value of this dynamic. */
+CAMLprim value caml_dynamic_make(value inherit);
 
 /* Get the current value of a dynamic variable. Does not allocate. */
 CAMLprim value caml_dynamic_get(value dyn);
@@ -96,6 +97,10 @@ extern void caml_dynamic_table_free(dynamic_table_t table);
 
 /* Duplicate a dynamic table. Returns false if allocation fails. */
 extern bool caml_dynamic_table_dup(dynamic_table_t dst, dynamic_table_t src);
+
+/* Bind the current value of every inheritable dynamic bound in the current
+   stack or one of its parents. */
+extern bool caml_dynamic_table_inherit(dynamic_table_t table);
 
 /* Register all bindings as GC roots. */
 extern void caml_dynamic_table_register_roots(dynamic_table_t table);

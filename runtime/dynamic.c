@@ -23,7 +23,10 @@
 #include "caml/fiber.h"
 #include "caml/obj.h"
 
-#define Hash_dyn(dyn) Long_val(dyn)
+#define DYNAMIC_INHERIT_BIT (1ull<<63)
+
+#define Hash_dyn(dyn)   Long_val(dyn)
+#define Is_inherit(dyn) (((dyn) & DYNAMIC_INHERIT_BIT) == DYNAMIC_INHERIT_BIT)
 
 static void dynamic_cache_flush(dynamic_cache_t cache)
 {
@@ -383,6 +386,33 @@ CAMLexport bool caml_dynamic_table_dup(dynamic_table_t dst, dynamic_table_t src)
   return true;
 }
 
+CAMLexport bool caml_dynamic_table_inherit(dynamic_table_t table)
+{
+  struct stack_info *stack = Caml_state->current_stack;
+  while (stack) {
+    dynamic_table_t src = &stack->dyn;
+    if (src->bindings) {
+      for (size_t i = 0; i < (size_t)src->mask + 1; ++i) {
+        dynamic_stack_t src_slot = &src->bindings[i];
+        value dyn = src_slot->dyn;
+        if (Is_this(dyn) && Is_inherit(dyn)) {
+          CAMLassert(src_slot->count > 0);
+          dynamic_stack_t dst_slot = NULL;
+          if (!dynamic_table_find(table, dyn, &dst_slot)) {
+            value val = src_slot->vals[src_slot->count - 1];
+            if (!dynamic_table_push(table, dyn, val)) {
+              caml_dynamic_table_free(table);
+              return false;
+            }
+          }
+        }
+      }
+    }
+    stack = Stack_parent(stack);
+  }
+  return true;
+}
+
 CAMLexport void caml_dynamic_table_register_roots(dynamic_table_t table)
 {
   size_t capacity = dynamic_table_capacity(table);
@@ -412,11 +442,17 @@ CAMLexport void caml_dynamic_table_scan_roots(dynamic_table_t table,
   }
 }
 
-CAMLprim value caml_dynamic_make(value unit)
+CAMLprim value caml_dynamic_make(value inherit)
 {
-  CAMLparam1(unit);
+  CAMLparam1(inherit);
+
   /* TODO: consider other hash functions. This one is ~unique, which is nice */
   value hash = caml_fresh_oo_id(Val_unit);
+
+  if(Bool_val(inherit)) {
+    hash |= DYNAMIC_INHERIT_BIT;
+  }
+
   CAMLreturn(hash);
 }
 
