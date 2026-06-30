@@ -199,7 +199,7 @@ struct c_stack_link {
  *  -----------
  *
  * In native compilation the stack switching primitives
- * Pwith_stack, Pperform, Preperform and Presume make use of
+ * Pwith_stack/Pwith_stack_preemptible, Pperform, Preperform and Presume make use of
  * corresponding functions implemented in the assembly files for an architecture
  * (such as runtime/amd64.S).
  *

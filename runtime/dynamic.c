@@ -14,6 +14,8 @@
 
 #define CAML_INTERNALS
 
+#include <string.h>
+
 #include "caml/mlvalues.h"
 #include "caml/memory.h"
 #include "caml/fail.h"
@@ -21,33 +23,10 @@
 #include "caml/fiber.h"
 #include "caml/obj.h"
 
-/* Implementation of primitives to support Dynamic.t */
-
 #define Hash_dyn(dyn) Long_val(dyn)
-
-typedef struct dynamic_binding_s {
-  value dyn; /* Dynamic id, or Val_null if unbound */
-  value val;
-} dynamic_binding_s, *dynamic_binding_t;
-
-/* Per-thread cache: direct-mapped. TODO: Stephen Dolan's wild plan to
- * use vector instructions to do a fully-associative LRU cache. */
-
-/* If you change DYNAMIC_CACHE_BITS, you must also update the
- * assembly-language stubs such as amd64.S. TODO: single source of
- * truth for things like this. */
-#define DYNAMIC_CACHE_BITS 3
-#define DYNAMIC_CACHE_SIZE (1 << DYNAMIC_CACHE_BITS)
-
-/* Must match Dynamic_ definitions in amd64.S */
-
-typedef struct dynamic_cache_s {
-  dynamic_binding_s tbl[DYNAMIC_CACHE_SIZE];
-} dynamic_cache_s, *dynamic_cache_t;
 
 static void dynamic_cache_flush(dynamic_cache_t cache)
 {
-  /* Clear keys */
   for (size_t i = 0; i < DYNAMIC_CACHE_SIZE; ++i) {
     cache->tbl[i].dyn = Val_null;
   }
@@ -100,8 +79,6 @@ CAMLexport void caml_dynamic_cache_scan_roots(dynamic_cache_t cache,
   }
 }
 
-/* Stacks of bindings, growing when half full. */
-
 typedef struct dynamic_stack_s {
   size_t capacity;
   size_t count;
@@ -127,6 +104,7 @@ static void dynamic_stack_free(dynamic_stack_t stack)
   dynamic_stack_init(stack);
 }
 
+// Returns false if allocation fails.
 static bool dynamic_stack_grow(dynamic_stack_t stack)
 {
   size_t old_capacity = stack->capacity;
@@ -135,10 +113,8 @@ static bool dynamic_stack_grow(dynamic_stack_t stack)
   if (!new_vals) {
     return false;
   }
-  for (size_t i = 0; i < stack->count; ++i) {
-    new_vals[i] = stack->vals[i];
-  }
   if (stack->vals) {
+    memcpy(new_vals, stack->vals, sizeof(value) * stack->count);
     caml_stat_free(stack->vals);
   }
   stack->vals = new_vals;
@@ -146,6 +122,7 @@ static bool dynamic_stack_grow(dynamic_stack_t stack)
   return true;
 }
 
+// Returns false if allocation fails.
 static bool dynamic_stack_push(dynamic_stack_t stack, value val)
 {
   if (stack->count == stack->capacity) {
@@ -157,6 +134,7 @@ static bool dynamic_stack_push(dynamic_stack_t stack, value val)
   return true;
 }
 
+// Returns true if the stack is now empty.
 static bool dynamic_stack_pop(dynamic_stack_t stack)
 {
   CAMLassert(stack->count > 0);
@@ -184,6 +162,10 @@ static void dynamic_stack_scan_roots(dynamic_stack_t stack,
 
 #define DYNAMIC_TABLE_INIT_CAPACITY 8
 
+static size_t dynamic_table_capacity(dynamic_table_t table) {
+  return table->mask + 1;
+}
+
 CAMLexport void caml_dynamic_table_init(dynamic_table_t table)
 {
   table->mask = (size_t)-1;
@@ -194,7 +176,8 @@ CAMLexport void caml_dynamic_table_init(dynamic_table_t table)
 CAMLexport void caml_dynamic_table_free(dynamic_table_t table)
 {
   if (table->bindings) {
-    for (size_t i = 0; i < table->mask + 1; ++ i) {
+    size_t capacity = dynamic_table_capacity(table);
+    for (size_t i = 0; i < capacity; ++ i) {
       dynamic_stack_free(&table->bindings[i]);
     }
     caml_stat_free(table->bindings);
@@ -215,9 +198,10 @@ static void dynamic_table_add(dynamic_table_t table, dynamic_stack_s stack)
   table->bindings[j] = stack;
 }
 
+// Returns false if allocation fails.
 static bool dynamic_table_grow(dynamic_table_t table)
 {
-  size_t old_capacity = table->mask + 1;
+  size_t old_capacity = dynamic_table_capacity(table);
   size_t new_capacity = old_capacity ? old_capacity * 2 : DYNAMIC_TABLE_INIT_CAPACITY;
   size_t new_mask = new_capacity - 1;
   CAMLassert(Is_power_of_2(new_capacity));
@@ -246,6 +230,8 @@ static bool dynamic_table_grow(dynamic_table_t table)
   return true;
 }
 
+// Returns whether [dyn] is bound in this table. Sets [bindings_out] to the slot
+// [dyn] maps to, or NULL if the table is empty.
 static bool dynamic_table_find(dynamic_table_t table, value dyn,
                                dynamic_stack_t *bindings_out)
 {
@@ -269,6 +255,7 @@ static bool dynamic_table_find(dynamic_table_t table, value dyn,
   }
 }
 
+// Returns false if allocation fails.
 static bool dynamic_table_push(dynamic_table_t table, value dyn, value val)
 {
   dynamic_stack_t bindings = NULL;
@@ -286,7 +273,7 @@ static bool dynamic_table_push(dynamic_table_t table, value dyn, value val)
       return false;
     }
   } else { /* Not found */
-    if (table->count * 2 == table->mask+1) {
+    if (table->count * 2 == dynamic_table_capacity(table)) {
       /* grow when half-full (includes the special case of being empty) */
       if (!dynamic_table_grow(table)) {
         return false;
@@ -331,7 +318,8 @@ CAMLexport void caml_dynamic_table_scan_roots(dynamic_table_t table,
                                               void *fdata)
 {
   if (table->bindings) {
-    for (size_t i = 0; i < (size_t)table->mask + 1; ++i) {
+    size_t capacity = dynamic_table_capacity(table);
+    for (size_t i = 0; i < capacity; ++i) {
       dynamic_stack_scan_roots(&table->bindings[i], f, fflags, fdata);
     }
   }

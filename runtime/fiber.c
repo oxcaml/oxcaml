@@ -950,15 +950,13 @@ int caml_try_realloc_stack(asize_t required_space)
   new_stack->local_sp = old_stack->local_sp;
   new_stack->local_top = old_stack->local_top;
   new_stack->local_limit = old_stack->local_limit;
+  new_stack->dyn = old_stack->dyn;
 
-  // Detach locals stack from old_stack so it will not be freed
+  // Detach locals stack and dynamic bindings from old_stack so they will not be freed
   old_stack->local_arenas = NULL;
   old_stack->local_sp = 0;
   old_stack->local_top = NULL;
   old_stack->local_limit = 0;
-
-  // Move dynamic bindings
-  new_stack->dyn = old_stack->dyn;
   caml_dynamic_table_init(&old_stack->dyn);
 
 #ifdef NATIVE_CODE

@@ -30,20 +30,6 @@ module Dynamic : Dynamic_S = struct
     Fun.protect f ~finally:(fun () -> pop d)
 end
 
-type last_fiber : immediate
-type (-'a, +'b) cont
-
-external reperform :
-  'a Effect.t -> ('a, 'b) cont -> last_fiber -> 'b = "%reperform"
-
-external with_stack :
-  ('a -> 'b) ->
-  (exn -> 'b) ->
-  ('c Effect.t -> ('c, 'b) cont -> last_fiber -> 'b) ->
-  ('e -> 'a) ->
-  'e ->
-  'b = "%with_stack"
-
 module Dynamic_inside_fiber : Dynamic_S = struct
   type 'a t
 
@@ -53,10 +39,13 @@ module Dynamic_inside_fiber : Dynamic_S = struct
   external pop : 'a t -> unit = "caml_dynamic_pop"
 
   let with_temporarily d v ~f =
-    let effc eff k last_fiber = reperform eff k last_fiber in
-    with_stack (fun x -> x) (fun e -> raise e) effc (fun () ->
-      push d v;
-      Fun.protect f ~finally:(fun () -> pop d)) ()
+    Effect.Deep.match_with
+      (fun () ->
+        push d v;
+        Fun.protect f ~finally:(fun () -> pop d)) ()
+      { retc = (fun () -> ());
+        exnc = (fun e -> raise e);
+        effc = (fun (type a) (_ : a Effect.t) -> None) }
 end
 
 module Dynamic_outside_fiber : Dynamic_S = struct
@@ -68,10 +57,12 @@ module Dynamic_outside_fiber : Dynamic_S = struct
   external pop : 'a t -> unit = "caml_dynamic_pop"
 
   let with_temporarily d v ~f =
-    let effc eff k last_fiber = reperform eff k last_fiber in
     push d v;
     Fun.protect (fun () ->
-      with_stack (fun x -> x) (fun e -> raise e) effc f ())
+      Effect.Deep.match_with f ()
+        { retc = (fun () -> ());
+          exnc = (fun e -> raise e);
+          effc = (fun (type a) (_ : a Effect.t) -> None) })
       ~finally:(fun () -> pop d)
 end
 
