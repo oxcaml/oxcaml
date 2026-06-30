@@ -1,0 +1,3 @@
+before callback [expect 17]: 17
+inside callback [expect 0]: 0
+after callback [expect 17]: 17
