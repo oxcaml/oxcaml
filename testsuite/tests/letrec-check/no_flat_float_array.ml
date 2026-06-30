@@ -22,7 +22,7 @@ val f : bytes -> bytes array = <fun>
 (* Generic case (element may or may not be float), no dynamic test. *)
 let f z = let rec x = [| y; z |] and y = z in x;;
 [%%expect {|
-val f : 'a -> 'a array = <fun>
+val f : ('a : value_maybe_null). 'a -> 'a array = <fun>
 |}]
 
 (* Float case, no unboxing. *)
