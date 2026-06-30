@@ -68,86 +68,10 @@ let run_tests ~sh config env =
   TestBytecodeBinaries.run config env;
   TestLinkModes.run ~sh config env
 
-<<<<<<< OxCaml
-||||||| Upstream OCaml
-type launch_method =
-| Shebang_bin_sh of string
-| Executable
-
-type runtime_launch_info = {
-  buffer : string;
-  launcher : launch_method;
-  executable_offset : int
-}
-
-let read_runtime_launch_info file =
-  let buffer =
-    try
-      In_channel.with_open_bin file In_channel.input_all
-    with Sys_error msg -> Harness.fail_because "%s: %s" file msg
-  in
-  try
-    let bindir_start = String.index buffer '\n' + 1 in
-    let bindir_end = String.index_from buffer bindir_start '\000' in
-    let executable_offset = bindir_end + 2 in
-    let launcher =
-      let kind = String.sub buffer 0 (bindir_start - 1) in
-      if kind = "exe" then
-        Executable
-      else if kind <> "" && (kind.[0] = '/' || kind = "sh") then
-        Shebang_bin_sh kind
-      else
-        raise Not_found in
-    if String.length buffer < executable_offset
-       || buffer.[executable_offset - 1] <> '\n' then
-      raise Not_found
-    else
-      {launcher; buffer; executable_offset}
-  with Not_found ->
-    Harness.fail_because "%s: corrupt header" file
-
-=======
-type launch_method =
-| Shebang_bin_sh of string
-| Executable
-
-type runtime_launch_info = {
-  buffer : string;
-  launcher : launch_method;
-  executable_offset : int
-}
-
-let read_runtime_launch_info file =
-  let buffer =
-    try
-      In_channel.with_open_bin file In_channel.input_all
-    with Sys_error msg -> Harness.fail_because "%s: %s" file msg
-  in
-  try
-    let bindir_start = String.index buffer '\n' + 1 in
-    let bindir_end = String.index_from buffer bindir_start '\000' in
-    let executable_offset = bindir_end + 2 in
-    let launcher =
-      let kind = String.sub buffer 0 (bindir_start - 1) in
-      if kind = "exe" then
-        Executable
-      else if kind <> "" && (kind.[0] = '/' || kind = "sh") then
-        Shebang_bin_sh kind
-      else
-        raise Not_found in
-    if String.length buffer < executable_offset
-       || buffer.[executable_offset - 1] <> '\n' then
-      raise Not_found
-    else
-      {launcher; buffer; executable_offset}
-  with Not_found ->
-    Harness.fail_because "%s: corrupt header" file
-
 let rename_exe_in_test_root env from_base to_base =
   Sys.rename (Environment.in_test_root env (Harness.exe from_base))
              (Environment.in_test_root env (Harness.exe to_base))
 
->>>>>>> ocaml/ocaml#14245
 let () =
   let ~config, ~pwd, ~prefix, ~bindir:_, ~bindir_suffix, ~libdir,
       ~libdir_suffix, ~summarise_only, ~verbose =
@@ -197,37 +121,15 @@ let () =
   in
   let header_size, filename_mangling =
     let file = Filename.concat libdir "runtime-launch-info" in
-<<<<<<< OxCaml
-    Bytelink.read_runtime_launch_info file in
-  let header_size =
-    let {Bytelink.buffer; executable_offset; _} = runtime_launch_info in
-    String.length buffer - executable_offset in
-||||||| Upstream OCaml
-    read_runtime_launch_info file in
-  let header_size =
-    let {buffer; executable_offset; _} = runtime_launch_info in
-    String.length buffer - executable_offset in
-=======
     In_channel.with_open_bin file @@ fun ic ->
       In_channel.length ic, (input_char ic <> '\000')
   in
->>>>>>> ocaml/ocaml#14245
   let bytecode_shebangs_by_default =
-<<<<<<< OxCaml
-    runtime_launch_info.launcher <> Bytelink.Executable in
-  let launcher_searches_for_ocamlrun = Sys.win32 in
-  let target_launcher_searches_for_ocamlrun = Sys.win32 in
-||||||| Upstream OCaml
-    runtime_launch_info.launcher <> Executable in
-  let launcher_searches_for_ocamlrun = Sys.win32 in
-  let target_launcher_searches_for_ocamlrun = Sys.win32 in
-=======
     Config.launch_method <> Config.Executable in
   let launcher_searches_for_ocamlrun =
     (config.has_runtime_search <> Config.Disable) in
   let target_launcher_searches_for_ocamlrun =
     (Config.search_method <> Config.Disable) in
->>>>>>> ocaml/ocaml#14245
   let config =
     {config with libraries;
                  launcher_searches_for_ocamlrun;

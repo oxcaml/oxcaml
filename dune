@@ -427,6 +427,7 @@
   bytepackager
   emitcode
   printinstr
+  byterntm
   instruct
   ;; driver/
   errors

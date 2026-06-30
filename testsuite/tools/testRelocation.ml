@@ -667,21 +667,12 @@ let run ~reproducible config env =
   in
   (* Abort the harness if there are files which didn't match a ruleset *)
   if failed then
-<<<<<<< OxCaml
     Harness.fail_because {|Installed files don't match expectation
 If you are seeing this when working locally, verify that main passes this test.
 If it does, Claude et al are extremely good at analysing this test in the
 context of your changes. In extremis, this test can be disabled by commenting
 out the call to TestRelocation.run in testsuite/tools/test_in_prefix.ml; in
-ultima hora, @dra27 (dallsopp) can help.|}
-  else
-  List.iter display sections
-||||||| Upstream OCaml
-    Harness.fail_because "Installed files don't match expectation"
-  else
-  List.iter display sections
-=======
-    Harness.fail_because "Installed files don't match expectation";
+ultima hora, @dra27 (dallsopp) can help.|};
   List.iter display sections;
   if results_are_reproducible && not consistent then
     Harness.fail_because
@@ -691,4 +682,3 @@ ultima hora, @dra27 (dallsopp) can help.|}
     Harness.fail_because
       "The build is %sexpected to be reproducible"
       (if not reproducible then "not " else "")
->>>>>>> ocaml/ocaml#14245
