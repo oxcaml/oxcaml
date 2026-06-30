@@ -140,5 +140,31 @@
                 mode "global" (parsing_ambiguous_product.ml[22,602+21]..[22,602+27])
               scannable_axis "non_pointer" (parsing_ambiguous_product.ml[22,602+29]..[22,602+40])
     ]
+  structure_item (parsing_ambiguous_product.ml[24,646+0]..[24,646+38])
+    Pstr_type Rec
+    [
+      type_declaration "t6" (parsing_ambiguous_product.ml[24,646+5]..[24,646+7]) (parsing_ambiguous_product.ml[24,646+0]..[24,646+38])
+        ptype_params =
+          []
+        ptype_cstrs =
+          []
+        ptype_kind =
+          Ptype_abstract
+        ptype_private = Public
+        ptype_manifest =
+          None
+        ptype_jkind_annotation =
+          Some
+            jkind (parsing_ambiguous_product.ml[24,646+10]..[24,646+38])
+            Pjk_operator
+              jkind (parsing_ambiguous_product.ml[24,646+11]..[24,646+25])
+              Pjk_with
+                jkind (parsing_ambiguous_product.ml[24,646+11]..[24,646+16])
+                Pjk_abbreviation "value" (parsing_ambiguous_product.ml[24,646+11]..[24,646+16])
+                core_type (parsing_ambiguous_product.ml[24,646+22]..[24,646+25])
+                  Ptyp_constr "int" (parsing_ambiguous_product.ml[24,646+22]..[24,646+25])
+                  []
+              scannable_axis "non_pointer" (parsing_ambiguous_product.ml[24,646+27]..[24,646+38])
+    ]
 ]
 
