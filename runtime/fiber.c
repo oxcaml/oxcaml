@@ -644,11 +644,9 @@ next_chunk:
           visit (f, fdata, locals, colors, root);
         }
       } else if (frame_is_long(d)) {
-        frame_descr_long *dl = frame_as_long(d);
-        uint32_t *p;
-        uint32_t n;
-        for (p = dl->live_ofs, n = caml_read_unaligned_uint32(&dl->num_live);
-             n > 0; n--, p++) {
+        const unsigned char *p = d + Frame_long_live_ofs;
+        uint32_t n = caml_read_unaligned_uint32(d + Frame_long_num_live_ofs);
+        for (; n > 0; n--, p += sizeof(uint32_t)) {
           uint32_t ofs = caml_read_unaligned_uint32(p);
           if (ofs & 1) {
             root = regs + (ofs >> 1);
@@ -658,10 +656,9 @@ next_chunk:
           visit (f, fdata, locals, colors, root);
         }
       } else {
-        uint16_t *p;
-        uint16_t n;
-        for (p = d->live_ofs, n = caml_read_unaligned_uint16(&d->num_live);
-             n > 0; n--, p++) {
+        const unsigned char *p = d + Frame_live_ofs;
+        uint16_t n = caml_read_unaligned_uint16(d + Frame_num_live_ofs);
+        for (; n > 0; n--, p += sizeof(uint16_t)) {
           uint16_t ofs = caml_read_unaligned_uint16(p);
           if (ofs & 1) {
             root = regs + (ofs >> 1);

@@ -94,11 +94,11 @@ void caml_decode_frame_descr(frame_descr *d, struct frame_descr_decoded *out)
     out->has_debug = (sf & FRAME_DESCRIPTOR_DEBUG) != 0;
     out->frame_size = (((uint32_t)(sf >> 2)) + 1) * 16;
     if (out->has_allocs) {
+      out->small_reg_bitmap = *p++;
       out->small_num_allocs = *p++;
-      out->num_live = *p++;
       out->small_allocs = p;
       p += (out->small_num_allocs + 1) / 2; /* 4-bit alloc sizes */
-      out->small_reg_bitmap = *p++;
+      out->num_live = *p++;
     } else {
       out->num_live = *p++;
     }
@@ -117,8 +117,8 @@ void caml_decode_frame_descr(frame_descr *d, struct frame_descr_decoded *out)
   if (frame_return_to_C(d)) {
     out->return_to_C = true;
     /* Top of an ML stack chunk: an empty descriptor. */
-    CAMLassert(caml_read_unaligned_uint16(&d->num_live) == 0);
-    out->end_of_live = out->end = (const unsigned char *)&d->live_ofs[0];
+    CAMLassert(caml_read_unaligned_uint16(d + Frame_num_live_ofs) == 0);
+    out->end_of_live = out->end = d + Frame_live_ofs;
     return;
   }
   out->is_long = frame_is_long(d);
@@ -126,9 +126,9 @@ void caml_decode_frame_descr(frame_descr *d, struct frame_descr_decoded *out)
   out->has_debug = frame_has_debug(d);
   out->frame_size = frame_size(d);
   if (out->is_long) {
-    out->num_live = caml_read_unaligned_uint32(&frame_as_long(d)->num_live);
+    out->num_live = caml_read_unaligned_uint32(d + Frame_long_num_live_ofs);
   } else {
-    out->num_live = caml_read_unaligned_uint16(&d->num_live);
+    out->num_live = caml_read_unaligned_uint16(d + Frame_num_live_ofs);
   }
   const unsigned char *p = frame_end_of_live_ofs(d);
   out->end_of_live = p;

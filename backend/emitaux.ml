@@ -63,10 +63,11 @@ let frame_section_epoch = ref 0
 
 let start_new_code_section () = incr frame_section_epoch
 
-(* Set by a backend before [emit_frames] when the small descriptor format cannot be
-   emitted in the current context: internal-assembler (which cannot resolve the
-   variable-length return-address delta directive) and ARM64 (where the delta is not yet
-   ported). Every descriptor then escapes to the normal format. *)
+(* Set by a backend before [emit_frames] when the small descriptor format cannot
+   be emitted in the current context: internal-assembler (which cannot resolve
+   the variable-length return-address delta directive) and ARM64 (where the
+   delta is not yet ported). Every descriptor then escapes to the normal
+   format. *)
 let disable_small_descriptors = ref false
 
 let is_none_dbg d = Debuginfo.Dbg.is_none (Debuginfo.get_dbg d)
@@ -381,10 +382,13 @@ let emit_frames a =
     let flags = get_flags fd.fd_debuginfo in
     let has_alloc = flags land 2 <> 0 in
     emit_u8 ((size_units_minus_1 lsl 2) lor flags);
+    (* Order: reg_bitmap, num_allocs, alloc sizes, num_live -- so num_allocs is
+       immediately followed by its alloc sizes, and num_live (here or in the
+       no-alloc branch) is immediately followed by the live stack slots. *)
     if has_alloc
     then (
+      emit_u8 reg_bitmap;
       emit_u8 num_allocs;
-      emit_u8 (List.length word_slots);
       let rec emit_nibbles = function
         | [] -> ()
         | [a] -> emit_u8 (a land 0xf)
@@ -393,7 +397,7 @@ let emit_frames a =
           emit_nibbles rest
       in
       emit_nibbles alloc_nibbles;
-      emit_u8 reg_bitmap)
+      emit_u8 (List.length word_slots))
     else emit_u8 (List.length word_slots);
     List.iter emit_u8 word_slots;
     emit_debug_words fd

@@ -3153,9 +3153,8 @@ let end_assembly () =
   (* PR#7591 *)
   emit_global_label ~section:frametable_section "frametable";
   (* The internal-assembler / JIT binary backend cannot yet emit the small
-     format's variable-length retaddr delta, so escape every descriptor to
-     the normal format when it is active. TODO: extend internal
-     assembler. *)
+     format's variable-length retaddr delta, so escape every descriptor to the
+     normal format when it is active. TODO: extend internal assembler. *)
   Emitaux.disable_small_descriptors
     := Option.is_some !X86_proc.internal_assembler;
   (* CR sspies: Share the [emit_frames] code with the Arm backend. *)
