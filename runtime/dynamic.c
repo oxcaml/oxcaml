@@ -166,6 +166,20 @@ static bool dynamic_stack_pop(dynamic_stack_t stack)
   return false;
 }
 
+static void dynamic_stack_register_roots(dynamic_stack_t stack)
+{
+  for(size_t i = 0; i < stack->count; ++i) {
+    caml_register_global_root(&stack->vals[i]);
+  }
+}
+
+static void dynamic_stack_unregister_roots(dynamic_stack_t stack)
+{
+  for(size_t i = 0; i < stack->count; ++i) {
+    caml_remove_global_root(&stack->vals[i]);
+  }
+}
+
 static void dynamic_stack_scan_roots(dynamic_stack_t stack,
                                      scanning_action f,
                                      scanning_action_flags fflags,
@@ -355,6 +369,22 @@ CAMLexport bool caml_dynamic_table_dup(dynamic_table_t dst, dynamic_table_t src)
   }
 
   return true;
+}
+
+CAMLexport void caml_dynamic_table_register_roots(dynamic_table_t table)
+{
+  size_t capacity = dynamic_table_capacity(table);
+  for(size_t i = 0; i < capacity; ++i) {
+    dynamic_stack_register_roots(&table->bindings[i]);
+  }
+}
+
+CAMLexport void caml_dynamic_table_unregister_roots(dynamic_table_t table)
+{
+  size_t capacity = dynamic_table_capacity(table);
+  for(size_t i = 0; i < capacity; ++i) {
+    dynamic_stack_unregister_roots(&table->bindings[i]);
+  }
 }
 
 CAMLexport void caml_dynamic_table_scan_roots(dynamic_table_t table,

@@ -81,6 +81,12 @@ extern void caml_dynamic_table_free(dynamic_table_t table);
 /* Duplicate a dynamic table. Returns false if allocation fails. */
 extern bool caml_dynamic_table_dup(dynamic_table_t dst, dynamic_table_t src);
 
+/* Register all bindings as GC roots. */
+extern void caml_dynamic_table_register_roots(dynamic_table_t table);
+
+/* Unregister all bindings as GC roots. */
+extern void caml_dynamic_table_unregister_roots(dynamic_table_t table);
+
 /* Apply a GC scanning action to all bindings in a dynamic table. */
 extern void caml_dynamic_table_scan_roots(dynamic_table_t,
                                           scanning_action,

@@ -580,7 +580,9 @@ CAMLprim value caml_with_async_exns(value body_callback)
     caml_raise_out_of_memory();
   }
 
+  caml_dynamic_table_register_roots(&tbl);
   caml_result res = Result_encoded(caml_callback_exn(body_callback, Val_unit));
+  caml_dynamic_table_unregister_roots(&tbl);
 
   caml_dynamic_table_free(&Caml_state->current_stack->dyn);
   Caml_state->current_stack->dyn = tbl;

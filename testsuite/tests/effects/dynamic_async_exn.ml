@@ -18,15 +18,7 @@
 (* Dynamic.t isn't yet implemented in the OxCaml stdlib, only the runtime
    support for it, so testing requires faking the infrastructure here. *)
 
-module Dynamic : sig
-  type 'a t
-
-  val make : unit -> 'a t
-  val get : 'a t -> 'a or_null
-
-  val with_temporarily : 'a t -> 'a -> f: (unit -> 'b) -> 'b
-
-end = struct
+module Dynamic = struct
   type 'a t
 
   external make : unit -> 'a t = "caml_dynamic_make"
@@ -50,15 +42,15 @@ let[@inline never] allocate_bytes finished =
   ref (Some b)
 
 let print_null = function
-  | This x -> Int.to_string x
+  | This x -> x
   | Null -> "null"
 
 let print_dyn d = print_null (Dynamic.get d)
 
-let child = 100
-
 let () =
   let d = Dynamic.make () in
+  let parent = (Bytes.unsafe_to_string (Bytes.make 4 'x')) in
+  Dynamic.push d parent;
   let finished = ref false in
   let r = allocate_bytes finished in
   (try
@@ -67,8 +59,9 @@ let () =
       (* Bind [d] to [child] in a fiber and read it so the cache holds
          [d -> child], then allocate until the finaliser raises [Sys.Break]
          asynchronously, unwinding out of this fiber. *)
+      let child = (Bytes.unsafe_to_string (Bytes.make 4 'y')) in
       Dynamic.with_temporarily d child ~f:(fun () ->
-        Printf.printf "in fiber [expect %d]: %s\n%!" child (print_dyn d);
+        Printf.printf "in fiber [expect %s]: %s\n%!" child (print_dyn d);
         while true do
           let _ @ global = Sys.opaque_identity (42, Random.int 42) in
           ()
@@ -76,5 +69,5 @@ let () =
   with
   | Sys.Break -> assert !finished
   | _ -> assert false);
-  (* The bound fiber is gone; [d] must read as [root] again. *)
-  Printf.printf "after async unwind [expect null]: %s\n%!" (print_dyn d)
+  (* The bound fiber is gone; [d] must read as [parent] again. *)
+  Printf.printf "after async unwind [expect %s]: %s\n%!" parent (print_dyn d)
