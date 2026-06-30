@@ -609,3 +609,21 @@ debuginfo caml_debuginfo_next(debuginfo dbg)
   /* No inlining in bytecode */
   return NULL;
 }
+
+/* In the bytecode runtime, we don't measure frametables or debuginfo */
+
+void caml_debuginfo_reset(void)
+{
+}
+
+void caml_debuginfo_measure(debuginfo dbg)
+{
+  (void)dbg;
+}
+
+void caml_debuginfo_measurements(size_t *count_p, char **low_p, char **high_p)
+{
+  (void)count_p;
+  (void)low_p;
+  (void)high_p;
+}
