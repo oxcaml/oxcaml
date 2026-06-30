@@ -574,7 +574,11 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
             transl_exp ~scopes layout e) args_with_sorts
         in
         match cstr.cstr_tag, cstr.cstr_repr with
-      | Null, Variant_with_null -> Lconst Const_null
+      | Null, Variant_with_null ->
+        List.fold_left
+          (fun (acc : lambda) (e : lambda) -> Lsequence (e, acc))
+          (Lconst Const_null)
+          ll
       | Null, (Variant_boxed _ | Variant_unboxed | Variant_extensible) ->
         assert false
       | Ordinary {runtime_tag},

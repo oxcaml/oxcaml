@@ -166,7 +166,7 @@ Lines 1-4, characters 0-11:
 3 |   | B of int * int
 4 | [@@or_null]
 Error: Invalid [@or_null] declaration:
-       it must have exactly one nullary constructor and one unary constructor.
+       each constructor must be nullary or unary.
 |}]
 
 (* Non-parameterized custom [@@or_null] types. *)
@@ -233,6 +233,144 @@ Error: This type "float_payload" should be an instance of type
        But the layout of float_payload must be a sublayout of
            value_or_null non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-56.
+|}]
+
+type void : void mod everything
+external void : unit -> void = "%unbox_unit"
+
+[%%expect{|
+type void : void mod everything
+external void : unit -> void = "%unbox_unit"
+|}]
+
+type void_null =
+  | Null_void of void
+  | This_void of int
+[@@or_null]
+
+[%%expect{|
+type void_null = Null_void of void | This_void of int [@@or_null]
+|}]
+
+type void_null_flipped =
+  | This_void_flipped of int
+  | Null_void_flipped of #(void * void)
+[@@or_null]
+
+[%%expect{|
+type void_null_flipped =
+    This_void_flipped of int
+  | Null_void_flipped of #(void * void) [@@or_null]
+|}]
+
+type void_null_succeeds_sep = void_null accepts_sep
+type void_null_succeeds_nonfloat = void_null accepts_nonfloat
+
+[%%expect{|
+type void_null_succeeds_sep = void_null accepts_sep
+type void_null_succeeds_nonfloat = void_null accepts_nonfloat
+|}]
+
+type void_alias = void
+type 'a void_param : void
+
+[%%expect{|
+type void_alias = void
+type 'a void_param : void
+|}]
+
+type void_alias_null =
+  | Null_void_alias of void_alias
+  | This_void_alias of string
+[@@or_null]
+
+type 'a void_param_null =
+  | Null_void_param of 'a void_param
+  | This_void_param of int
+[@@or_null]
+
+[%%expect{|
+type void_alias_null =
+    Null_void_alias of void_alias
+  | This_void_alias of string [@@or_null]
+type 'a void_param_null =
+    Null_void_param of 'a void_param
+  | This_void_param of int [@@or_null]
+|}]
+
+type 'a constrained_void_null =
+  | Null_constrained of 'a
+  | This_constrained of int
+  constraint 'a = void
+[@@or_null]
+
+[%%expect{|
+type 'a constrained_void_null =
+    Null_constrained of 'a
+  | This_constrained of int constraint 'a = void [@@or_null]
+|}]
+
+type recursive_void_null =
+  | Null_recursive_void of recursive_void
+  | This_recursive_void of int
+[@@or_null]
+and recursive_void : void mod everything
+
+type recursive_void_alias = void
+and recursive_void_alias_null =
+  | Null_recursive_void_alias of recursive_void_alias
+  | This_recursive_void_alias of int
+[@@or_null]
+
+type recursive_payload = int
+and recursive_payload_null =
+  | Null_recursive_payload
+  | This_recursive_payload of recursive_payload
+[@@or_null]
+
+[%%expect{|
+type recursive_void_null =
+    Null_recursive_void of recursive_void
+  | This_recursive_void of int [@@or_null]
+and recursive_void : void mod everything
+type recursive_void_alias = void
+and recursive_void_alias_null =
+    Null_recursive_void_alias of recursive_void_alias
+  | This_recursive_void_alias of int [@@or_null]
+type recursive_payload = int
+and recursive_payload_null =
+    Null_recursive_payload
+  | This_recursive_payload of recursive_payload [@@or_null]
+|}]
+
+type no_nonvoid_payload =
+  | A_no_nonvoid
+  | B_no_nonvoid of void
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type no_nonvoid_payload =
+2 |   | A_no_nonvoid
+3 |   | B_no_nonvoid of void
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       it must have exactly one null constructor and one payload constructor.
+|}]
+
+type two_nonvoid_payloads =
+  | A_nonvoid of int
+  | B_nonvoid of string
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type two_nonvoid_payloads =
+2 |   | A_nonvoid of int
+3 |   | B_nonvoid of string
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       it must have exactly one null constructor and one payload constructor.
 |}]
 
 type portable_payload : value_or_null mod portable =

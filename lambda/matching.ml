@@ -2201,7 +2201,11 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
         @ rem
     | Variant_unboxed | Variant_with_null ->
       if cstr.cstr_constant then
-        rem (* [Null] constructor case. *)
+        List.mapi
+          (fun i ca_sort ->
+             make_field_access binding_kind ca_sort ~field:i ~pos:i)
+          arg_sorts
+        @ rem
       else
         { arg; binding_kind; mut; sort; layout } :: rem
         (* the unboxed variant constructor, or the [This] constructor
