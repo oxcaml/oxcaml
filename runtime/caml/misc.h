@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <limits.h>
+#include <string.h>
 
 /* Detection of available C attributes and compiler extensions */
 
@@ -529,6 +530,39 @@ extern int caml_umul_overflow(uintnat a, uintnat b, uintnat * res);
 Caml_inline uintnat caml_round_up(uintnat value, uintnat align) {
   CAMLassert(Is_power_of_2(align));
   return (value + align - 1) & ~(align - 1);
+}
+
+/* Unaligned reads.
+
+   Frame descriptors are not guaranteed to be aligned, so reads from
+   them must not assume alignment. These helpers read a value of the
+   given type from a possibly-unaligned address. Every C compiler we
+   use compiles the [memcpy] to a single (unaligned) load instruction
+   at the optimisation levels used to build the runtime, and the idiom
+   is portable to architectures that fault on unaligned accesses. */
+
+Caml_inline uint16_t caml_read_unaligned_uint16(const void *p) {
+  uint16_t v;
+  memcpy(&v, p, sizeof(v));
+  return v;
+}
+
+Caml_inline uint32_t caml_read_unaligned_uint32(const void *p) {
+  uint32_t v;
+  memcpy(&v, p, sizeof(v));
+  return v;
+}
+
+Caml_inline int32_t caml_read_unaligned_int32(const void *p) {
+  int32_t v;
+  memcpy(&v, p, sizeof(v));
+  return v;
+}
+
+Caml_inline uintnat caml_read_unaligned_uintnat(const void *p) {
+  uintnat v;
+  memcpy(&v, p, sizeof(v));
+  return v;
 }
 
 #endif
