@@ -50,7 +50,14 @@ open! Int_replace_polymorphic_compare
 type gc_call =
   { gc_lbl : L.t; (* Entry label *)
     gc_return_lbl : L.t; (* Where to branch after GC *)
-    gc_frame_lbl : L.t (* Label of frame descriptor *)
+    (* The frame descriptor is recorded (and its return-address label defined)
+       when the out-of-line GC stub is emitted, rather than at the allocation
+       site, so that frame descriptors are emitted in increasing return-address
+       order. *)
+    gc_frame_lbl : label; (* Linear label of the frame descriptor *)
+    gc_frame_size : int;
+    gc_live_offset : int list;
+    gc_frame_dbg : frame_debuginfo
   }
 
 type local_realloc_call =
@@ -717,9 +724,8 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
 
 (* Record live pointers at call points *)
 
-let record_frame_label env live dbg =
+let compute_live_offset env live =
   let encode_reg_offset n = (n lsl 1) + 1 in
-  let lbl = Cmm.new_label () in
   let live_offset = ref [] in
   Reg.Set.iter
     (function
@@ -740,10 +746,15 @@ let record_frame_label env live dbg =
       | { typ = Vec256 | Vec512; _ } ->
         Misc.fatal_error "arm64: got 256/512 bit vector")
     live;
+  !live_offset
+
+let record_frame_label env live dbg =
+  let lbl = Cmm.new_label () in
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of linear labels. *)
   record_frame_descr ~label:lbl ~frame_size:(Env.frame_size env)
-    ~live_offset:!live_offset dbg;
+    ~live_offset:(compute_live_offset env live)
+    dbg;
   label_to_asm_label ~section:Text lbl
 
 let record_frame env live dbg =
@@ -762,7 +773,17 @@ let emit_debug_info ?discriminator dbg =
 
 let emit_call_gc gc =
   labelled_ins1 gc.gc_lbl BL (runtime_function S.Predef.caml_call_gc);
-  labelled_ins1 gc.gc_frame_lbl B (local_label gc.gc_return_lbl)
+  (* Record the frame descriptor here, where its return-address label is
+     defined, so descriptors are recorded (and emitted) in increasing
+     return-address order. Safe across the relaxation/sizing pass: that pass
+     runs under [Emitaux.with_snapshot], which rolls back
+     [frame_descriptors]. *)
+  record_frame_descr ~label:gc.gc_frame_lbl ~frame_size:gc.gc_frame_size
+    ~live_offset:gc.gc_live_offset gc.gc_frame_dbg;
+  labelled_ins1
+    (label_to_asm_label ~section:Text gc.gc_frame_lbl)
+    B
+    (local_label gc.gc_return_lbl)
 
 (* Record calls to local stack reallocation *)
 
@@ -1117,11 +1138,20 @@ let assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg =
   gc_lbl, gc_return_lbl
 
 let assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo =
-  let gc_frame_lbl = record_frame_label env i.live (Dbg_alloc dbginfo) in
+  let gc_frame_lbl = Cmm.new_label () in
+  let gc_frame_size = Env.frame_size env in
+  let gc_live_offset = compute_live_offset env i.live in
   let gc_lbl, gc_return_lbl =
     assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg:(H.reg_x i.res.(0))
   in
-  Env.add_call_gc_site env { gc_lbl; gc_return_lbl; gc_frame_lbl }
+  Env.add_call_gc_site env
+    { gc_lbl;
+      gc_return_lbl;
+      gc_frame_lbl;
+      gc_frame_size;
+      gc_live_offset;
+      gc_frame_dbg = Dbg_alloc dbginfo
+    }
 
 let assembly_code_for_slow_heap_allocation env i ~n ~dbginfo =
   let lbl_frame = record_frame_label env i.live (Dbg_alloc dbginfo) in
@@ -1176,9 +1206,18 @@ let assembly_code_for_poll0 ~far ~return_label =
   gc_lbl, gc_return_lbl
 
 let assembly_code_for_poll env i ~far ~return_label =
-  let gc_frame_lbl = record_frame_label env i.live (Dbg_alloc []) in
+  let gc_frame_lbl = Cmm.new_label () in
+  let gc_frame_size = Env.frame_size env in
+  let gc_live_offset = compute_live_offset env i.live in
   let gc_lbl, gc_return_lbl = assembly_code_for_poll0 ~far ~return_label in
-  Env.add_call_gc_site env { gc_lbl; gc_return_lbl; gc_frame_lbl }
+  Env.add_call_gc_site env
+    { gc_lbl;
+      gc_return_lbl;
+      gc_frame_lbl;
+      gc_frame_size;
+      gc_live_offset;
+      gc_frame_dbg = Dbg_alloc []
+    }
 
 (* Output the assembly code for a stack check. *)
 
