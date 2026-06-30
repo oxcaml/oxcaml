@@ -2011,6 +2011,19 @@ module Const = struct
                 (Layout.Const.set_root_scannable_axes layout (update_sa sa))
           }))
 
+  let warn_ignored_kind_modifier ~loc env base base_jkind sa_annot =
+    if
+      sa_annot <> []
+      &&
+      match get_layout_result env base_jkind with
+      | Ok layout -> not (Layout.Const.is_scannable_or_any layout)
+      | Error _ -> false
+    then
+      Location.prerr_warning loc
+        (Warnings.Ignored_kind_modifier
+           ( Format.asprintf "%a" Pprintast.jkind_annotation base,
+             List.map Location.get_txt sa_annot ))
+
   let jkind_of_product_annotations (type l r) ~loc env (jkinds : (l * r) t list)
       =
     let folder (type l r) (layouts_acc, mod_bounds_acc, with_bounds_acc)
@@ -2086,17 +2099,7 @@ module Const = struct
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
           context base
       in
-      if
-        sa_annot <> []
-        &&
-        match get_layout_result env base_jkind with
-        | Ok layout -> not (Layout.Const.is_scannable_or_any layout)
-        | Error _ -> false
-      then
-        Location.prerr_warning loc
-          (Warnings.Ignored_kind_modifier
-             ( Format.asprintf "%a" Pprintast.jkind_annotation base,
-               List.map Location.get_txt sa_annot ));
+      warn_ignored_kind_modifier ~loc env base base_jkind sa_annot;
       let jkind, _ =
         List.fold_left
           (fun (jkind, rev_axes) axis ->
