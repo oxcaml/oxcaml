@@ -168,15 +168,21 @@ static bool dynamic_stack_pop(dynamic_stack_t stack)
 
 static void dynamic_stack_register_roots(dynamic_stack_t stack)
 {
-  for(size_t i = 0; i < stack->count; ++i) {
-    caml_register_global_root(&stack->vals[i]);
+  if(Is_this(stack->dyn)) {
+    caml_register_global_root(&stack->dyn);
+    for(size_t i = 0; i < stack->count; ++i) {
+      caml_register_global_root(&stack->vals[i]);
+    }
   }
 }
 
 static void dynamic_stack_unregister_roots(dynamic_stack_t stack)
 {
-  for(size_t i = 0; i < stack->count; ++i) {
-    caml_remove_global_root(&stack->vals[i]);
+  if(Is_this(stack->dyn)) {
+    caml_remove_global_root(&stack->dyn);
+    for(size_t i = 0; i < stack->count; ++i) {
+      caml_remove_global_root(&stack->vals[i]);
+    }
   }
 }
 
@@ -347,25 +353,31 @@ static void dynamic_table_pop(dynamic_table_t table, value dyn)
   }
 }
 
+// Returns false if allocation fails.
 CAMLexport bool caml_dynamic_table_dup(dynamic_table_t dst, dynamic_table_t src)
 {
   size_t capacity = dynamic_table_capacity(src);
 
   dst->mask = src->mask;
   dst->count = src->count;
-  dst->bindings = caml_stat_alloc_noexc(sizeof(dynamic_stack_s) * capacity);
-  if(dst->bindings == NULL) {
-    return false;
-  }
 
-  for(size_t i = 0; i < capacity; ++i) {
-    if(!dynamic_stack_dup(&dst->bindings[i], &src->bindings[i])) {
-      for(size_t j = 0; j < i; ++j) {
-        dynamic_stack_free(&dst->bindings[j]);
-      }
-      caml_stat_free(dst->bindings);
+  if(src->bindings) {
+    dst->bindings = caml_stat_alloc_noexc(sizeof(dynamic_stack_s) * capacity);
+    if(dst->bindings == NULL) {
       return false;
     }
+
+    for(size_t i = 0; i < capacity; ++i) {
+      if(!dynamic_stack_dup(&dst->bindings[i], &src->bindings[i])) {
+        for(size_t j = 0; j < i; ++j) {
+          dynamic_stack_free(&dst->bindings[j]);
+        }
+        caml_stat_free(dst->bindings);
+        return false;
+      }
+    }
+  } else {
+    dst->bindings = NULL;
   }
 
   return true;
