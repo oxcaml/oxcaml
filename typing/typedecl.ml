@@ -2514,7 +2514,7 @@ let rec update_decl_jkind env dpath decl =
         in
         begin match
           Jkind.apply_modality_l modality jkind
-          |> Jkind.apply_or_null_l
+          |> Jkind.apply_or_null_l env
         with
         | Ok type_jkind ->
           let type_jkind =
@@ -3093,7 +3093,8 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
   match decl.Types.jkind_manifest with
   | None -> ()
   | Some { base = Layout _; _ } -> ()
-  | Some ({ base = Kconstr kpath; mod_bounds = _; with_bounds = No_with_bounds }
+  | Some ({ base = Kconstr (kpath, _); mod_bounds = _;
+            with_bounds = No_with_bounds }
           as manifest) ->
     if not (Path.exists_free recmod_ids kpath) then ()
     else
@@ -3107,7 +3108,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
         | [] -> [expand]
         | _ :: _ ->
           (match manifest.base with
-           | Kconstr base_path -> [Contains (manifest, base_path); expand]
+           | Kconstr (base_path, _) -> [Contains (manifest, base_path); expand]
            | Layout _ -> assert false)
       in
       let rec follow current acc visited =
@@ -3119,7 +3120,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
           None
         else
           match (Env.find_jkind current env).jkind_manifest with
-          | Some ({ base = Kconstr next; mod_bounds = _;
+          | Some ({ base = Kconstr (next, _); mod_bounds = _;
                     with_bounds = No_with_bounds } as m) ->
             follow next ((steps_of current m) @ acc) (current :: visited)
           | Some { base = Layout _; _ } | None -> None
@@ -5314,7 +5315,12 @@ module Reaching_path = struct
          : jkind_const_desc_lr ) =
     let pp_base ppf = function
       | Types.Layout l -> Fmt.fprintf ppf "%s" (Jkind.Layout.Const.to_string l)
-      | Kconstr p -> Printtyp.path ppf p
+      | Kconstr (p, sa) ->
+        (match Jkind.Scannable_axes.to_string_list sa with
+         | [] -> Printtyp.path ppf p
+         | _ :: _ as sa_strs ->
+           Fmt.fprintf ppf "%a %s" Printtyp.path p
+             (String.concat " " sa_strs))
     in
     let mod_strings =
       Typemode.untransl_mod_bounds mod_bounds

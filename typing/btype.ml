@@ -490,7 +490,8 @@ let type_iterators_without_type_expr =
   and it_jkind_declaration it jkd =
     match jkd.jkind_manifest with
     | None -> ()
-    | Some { base = Kconstr p; mod_bounds = _; with_bounds = No_with_bounds } ->
+    | Some { base = Kconstr (p, _); mod_bounds = _;
+             with_bounds = No_with_bounds } ->
       it.it_path p
     | Some { base = Layout _; mod_bounds = _; with_bounds = No_with_bounds } ->
       ()
@@ -1269,6 +1270,13 @@ module Jkind0 = struct
       | Layout l -> (
         match f l with None -> None | Some l -> Some { t with base = Layout l })
 
+    let meet_scannable_axes (base : Jkind_types.Layout.Const.t jkind_base) sa :
+        Jkind_types.Layout.Const.t jkind_base =
+      match base with
+      | Kconstr (p, sa') -> Kconstr (p, Jkind_types.Scannable_axes.meet sa sa')
+      | Layout l ->
+        Layout (Jkind_types.Layout.Const.meet_root_scannable_axes l sa)
+
     let map_type_expr f t =
       { t with with_bounds = With_bounds.map_type_expr f t.with_bounds }
 
@@ -1299,7 +1307,7 @@ module Jkind0 = struct
     end)
 
     let of_path path =
-      { base = Kconstr path;
+      { base = Kconstr (path, Jkind_types.Scannable_axes.max);
         mod_bounds = Mod_bounds.max;
         with_bounds = No_with_bounds
       }
@@ -1328,8 +1336,9 @@ module Jkind0 = struct
       | None -> false
       | Some (t1, t2) -> (
         match t1.base, t2.base with
-        | Kconstr p1, Kconstr p2 ->
+        | Kconstr (p1, sa1), Kconstr (p2, sa2) ->
           Path.same p1 p2 &&
+          Jkind_types.Scannable_axes.equal sa1 sa2 &&
           Mod_bounds.equal t1.mod_bounds t2.mod_bounds
         | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
         | Layout l1, Layout l2 ->
@@ -2097,6 +2106,28 @@ module Jkind0 = struct
         | _ ->
           fresh_jkind Jkind_desc.Builtin.any
             ~annotation:(mk_annot "any") ~why:(Any_creation why)
+
+      let any_with_nullability nullability
+          ~(why : Jkind_intf.History.any_creation_reason) =
+        fresh_jkind
+          { Jkind_desc.Builtin.any with
+            base =
+              Layout
+                (Jkind_types.Layout.Any
+                   { Jkind_types.Scannable_axes.max with nullability })
+          }
+          ~annotation:None ~why:(Any_creation why)
+
+      let any_with_separability separability
+          ~(why : Jkind_intf.History.any_creation_reason) =
+        fresh_jkind
+          { Jkind_desc.Builtin.any with
+            base =
+              Layout
+                (Jkind_types.Layout.Any
+                   { Jkind_types.Scannable_axes.max with separability })
+          }
+          ~annotation:None ~why:(Any_creation why)
 
       let value_v1_safety_check =
         { jkind = Jkind_desc.Builtin.value_or_null;
