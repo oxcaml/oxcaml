@@ -412,7 +412,6 @@ CAMLexport void caml_dynamic_table_scan_roots(dynamic_table_t table,
   }
 }
 
-/* Make a fresh dynamic value, which is an immediate unique ID. */
 CAMLprim value caml_dynamic_make(value unit)
 {
   CAMLparam1(unit);
@@ -421,7 +420,6 @@ CAMLprim value caml_dynamic_make(value unit)
   CAMLreturn(hash);
 }
 
-/* Get the current value of a dynamic variable. Does not allocate. */
 CAMLprim value caml_dynamic_get(value dyn)
 {
   CAMLnoalloc;
@@ -452,7 +450,6 @@ CAMLprim value caml_dynamic_get(value dyn)
   return val;
 }
 
-/* Push a local binding fora dynamic variable. */
 CAMLprim value caml_dynamic_push(value dyn, value val)
 {
   CAMLparam2(dyn, val);
@@ -471,7 +468,6 @@ CAMLprim value caml_dynamic_push(value dyn, value val)
   CAMLreturn(Val_unit);
 }
 
-/* Pop a local binding fora dynamic variable. */
 CAMLprim value caml_dynamic_pop(value dyn)
 {
   CAMLnoalloc;
@@ -486,5 +482,5 @@ CAMLprim value caml_dynamic_pop(value dyn)
     entry->dyn = Val_null;
   }
 
-  CAMLreturn(Val_unit);
+  return Val_unit;
 }

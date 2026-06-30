@@ -20,6 +20,21 @@
 #include "mlvalues.h"
 #include "roots.h"
 
+/* Define a new dynamic value, which is an immediate unique ID. */
+CAMLprim value caml_dynamic_make(value unit);
+
+/* Get the current value of a dynamic variable. Does not allocate. */
+CAMLprim value caml_dynamic_get(value dyn);
+
+/* Push a local binding for a dynamic variable.
+   Must be paired with [caml_dynamic_pop] on the same fiber. */
+CAMLprim value caml_dynamic_push(value dyn, value val);
+
+/* Pop a local binding for a dynamic variable.
+   Must be paired with [caml_dynamic_push] on the same fiber. */
+CAMLprim value caml_dynamic_pop(value dyn);
+
+
 typedef struct dynamic_binding_s {
   value dyn; /* Dynamic id, or Val_null if unbound */
   value val;
@@ -60,6 +75,7 @@ extern void caml_dynamic_cache_scan_roots(dynamic_cache_t,
                                           scanning_action,
                                           scanning_action_flags,
                                           void *);
+
 
 /* Each entry in a dynamic table is a stack that grows when full. */
 typedef struct dynamic_stack_s *dynamic_stack_t;
