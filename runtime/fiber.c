@@ -1448,7 +1448,7 @@ value caml_tick_fiber_exn(struct stack_info *stack) {
 /* Implementation of primitives to support Dynamic.t */
 
 #define Is_bound(dyn) Is_this(dyn)
-#define Hash_dyn(dyn) Long_val(dyn)
+#define Hash_dyn(dyn) Long_val(dyn) /* dyn should not be Val_null */
 
 typedef struct {
   value dyn;
@@ -1516,10 +1516,9 @@ CAMLexport void caml_dynamic_cache_scan_roots(dynamic_cache_t cache,
   }
 }
 
-/* Making a dynamic value */
-
 extern value caml_fresh_oo_id(value v);
 
+/* Make a fresh dynamic value, which is an immediate unique ID. */
 CAMLprim value caml_dynamic_make(value unit)
 {
   CAMLparam1(unit);
@@ -1532,7 +1531,6 @@ CAMLprim value caml_dynamic_make(value unit)
  *
  * Comments indicate the memory accesses on the fast path (loads from
  * three cache lines; load #3 is dependent on load #2). */
-
 CAMLprim value caml_dynamic_get(value dyn)
 {
   uintnat hash = Hash_dyn(dyn);
