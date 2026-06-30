@@ -2571,11 +2571,25 @@ let rec update_decl_jkind env dpath decl =
     | cstrs, Variant_boxed cstr_layouts ->
       let cstrs =
         List.mapi (fun idx cstr ->
-          let cd_args, ~constant:_, cstr_repr, arg_sorts =
+          let cd_args, ~constant, cstr_repr, arg_sorts =
             update_constructor_representation_and_arg_sorts env
               cstr.Types.cd_loc cstr.Types.cd_args
               ~is_extension_constructor:false
           in
+          let is_nonempty_all_void =
+            constant
+            && (match cd_args with
+                | Cstr_tuple (_ :: _) -> true
+                | Cstr_tuple [] | Cstr_record _ -> false)
+          in
+          if is_nonempty_all_void
+          && not (Builtin_attributes.has_immediate_all_void_constructor
+                    cstr.Types.cd_attributes)
+          then
+            raise
+              (Error (cstr.Types.cd_loc,
+                      Missing_immediate_all_void_constructor_attribute
+                        (Ident.name cstr.Types.cd_id)));
           let () =
             match cstr_repr, arg_sorts with
             | Ok shape, Some sorts ->
