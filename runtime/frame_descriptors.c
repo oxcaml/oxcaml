@@ -82,12 +82,9 @@ static frame_descr * next_frame_descr(frame_descr * d) {
     }
     /* Skip debug info if present */
     if (frame_has_debug(d)) {
-      /* Align to 32 bits */
-      p = Align_to(p, uint32_t);
       p += sizeof(uint32_t) * (frame_has_allocs(d) ? num_allocs : 1);
     }
-    /* Align to word size */
-    p = Align_to(p, void*);
+    /* Frame descriptors are not aligned: the next one follows immediately. */
     return ((frame_descr*) p);
   } else {
     /* This marks the top of an ML stack chunk. Skip over empty
@@ -95,8 +92,6 @@ static frame_descr * next_frame_descr(frame_descr * d) {
     /* Skip to address of zero-sized live_ofs */
     CAMLassert(caml_read_unaligned_uint16(d + Frame_num_live_ofs) == 0);
     p = d + Frame_live_ofs;
-    /* Align to word size */
-    p = Align_to(p, void*);
     return ((frame_descr*) p);
   }
 }
@@ -625,8 +620,6 @@ static void add_descriptor_to_stats(frame_descr *d,
     ++ stats->return_to_C;
     /* Top of an ML stack chunk. Skip over empty frame descriptor */
     p = d + Frame_live_ofs;
-    /* Align to word size */
-    p = Align_to(p, void*);
   } else {
     uint32_t sz = frame_size(d); /* in bytes */
     sz /= sizeof(uintnat);
@@ -717,8 +710,6 @@ static void add_descriptor_to_stats(frame_descr *d,
     /* Count debug info if present */
     if (frame_has_debug(d)) {
       ++ stats->with_debug;
-      /* Align to 32 bits */
-      p = Align_to(p, uint32_t);
       for (size_t i = 0; i <  num_debuginfo; ++i) {
         uint32_t offset = caml_read_unaligned_uint32(p);
         if (offset) { /* there may be invalid debuginfo slots */
@@ -727,8 +718,6 @@ static void add_descriptor_to_stats(frame_descr *d,
         p += sizeof(uint32_t);
       }
     }
-    /* Align to word size */
-    p = Align_to(p, void*);
   }
   if (!stats->max_descr || (p > stats->max_descr)) {
     stats->max_descr = p;
