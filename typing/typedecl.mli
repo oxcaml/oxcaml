@@ -110,10 +110,10 @@ type unrepresentable_record =
   | Unrepresentable_field of string
 
 (* Update the representation of a record whose representation at declaration
-   time was [None] because it has a field of kind [any]. *)
+   time was variable because it has a field of kind [any] *)
 val update_record_representation:
-    why:Jkind_intf.History.concrete_creation_reason ->
-    Env.t -> Location.t -> 'rep Data_types.record_form ->
+    why:Jkind_intf.History.concrete_creation_reason -> old_repres:'rep ->
+    Env.t -> Location.t -> 'rep Data_types.record_form -> 
     (Types.label_declaration * Types.type_expr) list ->
     (Jkind.Sort.Const.t list * 'rep, unrepresentable_record) Result.t
 
@@ -248,6 +248,7 @@ type error =
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
+  | Missing_immediate_all_void_constructor_attribute of string
 
 exception Error of Location.t * error
 

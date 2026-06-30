@@ -1907,7 +1907,8 @@ and build_as_type_aux (env : Env.t) p ~mode =
 let is_variable_repres : type rep. rep record_form -> rep -> bool =
   fun form rep ->
     match form, rep with
-    | Legacy, Record_variable -> true
+    | Legacy, (Record_variable | Record_inlined (_, Constructor_variable, _)) ->
+      true
     | Unboxed_product, Record_unboxed_product_variable -> true
     | _ -> false
 
@@ -1942,6 +1943,7 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
       in
       match
         Typedecl.update_record_representation ~why env loc form
+          ~old_repres:representative_label.lbl_repres
           (lbls_and_ty_args |> Array.to_list)
       with
       | Ok (sorts, rep) ->
@@ -3072,7 +3074,7 @@ type unrepresentable_arg =
 let representation_for_tuple_constructor env constr ty_args ~loc ~types
       ~containing_type ~why : _ Result.t =
   match constr.cstr_shape with
-  | Some shape ->
+  | (Constructor_uniform_value | Constructor_mixed _) as shape ->
       begin match
         Misc.Stdlib.List.map_option
           (fun arg -> arg.ca_sort |> Option.map Jkind.Sort.of_const)
@@ -3081,7 +3083,7 @@ let representation_for_tuple_constructor env constr ty_args ~loc ~types
       | Some sorts -> Ok (shape, sorts)
       | None -> Misc.fatal_error "representable constructor missing a sort"
       end
-  | None ->
+  | Constructor_variable ->
       begin match
         Misc.Stdlib.List.mapi_result
           (fun _ (ty, loc) ->
@@ -6813,7 +6815,8 @@ and type_expect_
                  each label all over again. Possibly we're doing things in the
                  wrong order. *)
               Typedecl.update_record_representation ~why env
-                sexp.pexp_loc record_form labels_with_updated_types
+                sexp.pexp_loc record_form ~old_repres:representation
+                labels_with_updated_types
             with
             | Ok (_, rep) -> rep
             | Error _ ->

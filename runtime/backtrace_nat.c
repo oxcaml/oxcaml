@@ -280,7 +280,7 @@ CAMLprim value caml_get_continuation_callstack (value cont, value max_frames)
   stack = Ptr_val(caml_continuation_use(cont));
   {
     CAMLnoalloc;
-    slots = get_callstack(stack, max_frames, -1,
+    slots = get_callstack(stack, Long_val(max_frames), -1,
                           &trace, &trace_size);
     caml_continuation_replace(cont, stack);
   }

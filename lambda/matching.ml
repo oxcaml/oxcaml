@@ -2155,6 +2155,8 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
       let shape = transl_mixed_product_shape shape in
       let e, layout = lambda_void_of_el shape.(pos) in
       { arg = e; binding_kind; mut = compose_mut mut Immutable; sort; layout; }
+    | Constructor_variable ->
+      fatal_error "Matching.get_exr_args_constr: variable representation"
   in
   let make_field_access binding_kind sort ~field:_ ~pos =
     if cstr.cstr_constant then
@@ -2174,6 +2176,8 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
                 shape
             in
             Pmixedfield ([pos], shape, sem)
+        | Constructor_variable ->
+            fatal_error "Matching.get_exr_args_constr: variable representation"
       in
       let layout = Typeopt.layout_of_sort head.pat_loc sort in
       {
@@ -2618,6 +2622,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
           fatal_error "get_expr_args_record: unexpected dummy representation"
+        | Record_inlined (_, Constructor_variable, _)
         | Record_variable ->
           fatal_error "get_expr_args_record: unexpected variable representation"
       in
@@ -2730,7 +2735,7 @@ let get_expr_args_array ~scopes kind head { arg; mut; _ } rem =
       (* TODO: The resulting float should be allocated to at the mode of the
          array pattern, once that's available *)
       let ref_kind = Lambda.(array_ref_kind alloc_heap kind) in
-      let result_layout = array_ref_kind_result_layout ref_kind in
+      let result_layout = element_layout_of_array_kind kind in
       let am_mut = if Types.is_mutable am then Mutable else Immutable in
       { arg = Lprim
           (Parrayrefu (ref_kind, Ptagged_int_index, am_mut),

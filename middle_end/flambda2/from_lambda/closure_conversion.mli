@@ -88,7 +88,7 @@ type 'a close_program_metadata =
   | Classic :
       (Exported_code.t
       * Name_occurrences.t
-      * Flambda_cmx_format.t option
+      * Flambda_cmx_format.raw option
       * Exported_offsets.t)
       -> [`Classic] close_program_metadata
 
@@ -110,4 +110,5 @@ val close_program :
   exn_continuation:Continuation.t ->
   toplevel_my_region:Ident.t ->
   toplevel_my_ghost_region:Ident.t ->
+  sections:Oxcaml_utils.File_sections.Builder.t ->
   'mode close_program_result

@@ -2875,19 +2875,44 @@ and layout_of_ignorable_kind = function
   | Punboxedoruntaggedint_ignorable i -> layout_unboxed_int i
   | Pproduct_ignorable kinds -> layout_of_ignorable_kinds kinds
 
-let array_ref_kind_result_layout = function
-  | Pintarray_ref -> layout_int
-  | Pfloatarray_ref _ -> layout_boxed_float Boxed_float64
-  | Punboxedfloatarray_ref bf -> layout_unboxed_float bf
-  | Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref ->
-    layout_value_field
-  | Punboxedoruntaggedintarray_ref i -> layout_unboxed_int i
-  | Punboxedvectorarray_ref bv -> layout_unboxed_vector bv
-  | Pgcscannableproductarray_ref kinds -> layout_of_scannable_kinds kinds
-  | Pgcignorableproductarray_ref kinds -> layout_of_ignorable_kinds kinds
-  | Punspecializedarray_ref _ ->
+let element_layout_of_array_kind = function
+  | Pintarray -> layout_int
+  | Pfloatarray -> layout_boxed_float Boxed_float64
+  | Punboxedfloatarray bf -> layout_unboxed_float bf
+  | Pgenarray | Paddrarray | Pgcignorableaddrarray -> layout_value_field
+  | Punboxedoruntaggedintarray i -> layout_unboxed_int i
+  | Punboxedvectorarray bv -> layout_unboxed_vector bv
+  | Pgcscannableproductarray kinds -> layout_of_scannable_kinds kinds
+  | Pgcignorableproductarray kinds -> layout_of_ignorable_kinds kinds
+  | Punspecializedarray ->
     Misc.fatal_error
-      "Lambda.array_ref_kind_result_layout: Punspecializedarray_ref"
+      "Lambda.element_layout_of_array_kind: Punspecializedarray_ref"
+
+let array_kind_of_array_ref_kind : array_ref_kind -> array_kind = function
+  | Pgenarray_ref _ -> Pgenarray
+  | Paddrarray_ref -> Paddrarray
+  | Pgcignorableaddrarray_ref -> Pgcignorableaddrarray
+  | Pintarray_ref -> Pintarray
+  | Pfloatarray_ref _ -> Pfloatarray
+  | Punboxedfloatarray_ref bf -> Punboxedfloatarray bf
+  | Punboxedoruntaggedintarray_ref i -> Punboxedoruntaggedintarray i
+  | Punboxedvectorarray_ref bv -> Punboxedvectorarray bv
+  | Pgcscannableproductarray_ref kinds -> Pgcscannableproductarray kinds
+  | Pgcignorableproductarray_ref kinds -> Pgcignorableproductarray kinds
+  | Punspecializedarray_ref _ -> Punspecializedarray
+
+let array_kind_of_array_set_kind : array_set_kind -> array_kind = function
+  | Pgenarray_set _ -> Pgenarray
+  | Paddrarray_set _ -> Paddrarray
+  | Pgcignorableaddrarray_set -> Pgcignorableaddrarray
+  | Pintarray_set -> Pintarray
+  | Pfloatarray_set -> Pfloatarray
+  | Punboxedfloatarray_set bf -> Punboxedfloatarray bf
+  | Punboxedoruntaggedintarray_set i -> Punboxedoruntaggedintarray i
+  | Punboxedvectorarray_set bv -> Punboxedvectorarray bv
+  | Pgcscannableproductarray_set (_, kinds) -> Pgcscannableproductarray kinds
+  | Pgcignorableproductarray_set kinds -> Pgcignorableproductarray kinds
+  | Punspecializedarray_set _ -> Punspecializedarray
 
 let rec layout_of_mixed_block_element element =
   match element with
@@ -3095,7 +3120,7 @@ let primitive_result_layout (p : primitive) =
   | Pbigstring_load_i16 { tagged = false; _ } ->
     layout_unboxed_int16
   | Parrayrefu (array_ref_kind, _, _) | Parrayrefs (array_ref_kind, _, _) ->
-    array_ref_kind_result_layout array_ref_kind
+    element_layout_of_array_kind (array_kind_of_array_ref_kind array_ref_kind)
   | Punbox_unit -> layout_unboxed_unit
   | Pstring_load_32 { boxed = true; _ } | Pbytes_load_32 { boxed = true; _ }
   | Pbigstring_load_32 { boxed = true; _ } ->
@@ -3414,10 +3439,6 @@ let array_element_size_in_bytes (array_kind : array_kind) =
   | Punspecializedarray ->
     Misc.fatal_error
       "Lambda.array_element_size_in_bytes: Punspecializedarray"
-
-let element_layout_of_array_kind ak =
-  (* [alloc_heap] is ignored by [array_ref_kind_result_layout]. *)
-  array_ref_kind_result_layout (array_ref_kind alloc_heap ak)
 
 let rec ignorable_product_element_kind_involves_int
     (kind : ignorable_product_element_kind) =

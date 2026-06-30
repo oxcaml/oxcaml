@@ -19,10 +19,10 @@
 #include "caml/fail.h"
 #include "caml/dynamic.h"
 #include "caml/fiber.h"
+#include "caml/obj.h"
 
 /* Implementation of primitives to support Dynamic.t */
 
-#define Is_bound(dyn) Is_this(dyn)
 #define Hash_dyn(dyn) Long_val(dyn)
 
 typedef struct dynamic_binding_s {
@@ -93,7 +93,7 @@ CAMLexport void caml_dynamic_cache_scan_roots(dynamic_cache_t cache,
                                               void *fdata)
 {
   for (size_t i = 0; i < DYNAMIC_CACHE_SIZE; ++i) {
-    if (Is_bound(cache->tbl[i].dyn)) {
+    if (Is_this(cache->tbl[i].dyn)) {
       f(fdata, cache->tbl[i].dyn, &cache->tbl[i].dyn);
       f(fdata, cache->tbl[i].val, &cache->tbl[i].val);
     }
@@ -172,7 +172,7 @@ static void dynamic_stack_scan_roots(dynamic_stack_t stack,
                                      scanning_action_flags fflags,
                                      void *fdata)
 {
-  if(Is_bound(stack->dyn)) {
+  if(Is_this(stack->dyn)) {
     f(fdata, stack->dyn, &stack->dyn);
     for(size_t j = 0; j < stack->count; ++j) {
       f(fdata, stack->vals[j], &stack->vals[j]);
@@ -208,7 +208,7 @@ static void dynamic_table_add(dynamic_table_t table, dynamic_stack_s stack)
   value hash = Hash_dyn(stack.dyn);
   size_t i = hash & mask;
   size_t j = i;
-  while(Is_bound(table->bindings[j].dyn)) { /* collision */
+  while(Is_this(table->bindings[j].dyn)) { /* collision */
     j = (j + 1) & mask; /* linear probing */
     CAMLassert(j != i); /* Caller guarantees table has space */
   }
@@ -236,7 +236,7 @@ static bool dynamic_table_grow(dynamic_table_t table)
 
   /* Copy existing bindings */
   for (size_t i = 0; i < old_capacity; ++ i) {
-    if (Is_bound(old_bindings[i].dyn)) {
+    if (Is_this(old_bindings[i].dyn)) {
       dynamic_table_add(table, old_bindings[i]);
     }
   }
@@ -260,7 +260,7 @@ static bool dynamic_table_find(dynamic_table_t table, value dyn,
     if (bindings->dyn == dyn) { /* Found */
       *bindings_out = bindings;
       return true;
-    } else if (!Is_bound(bindings->dyn)) { /* Not found */
+    } else if (!Is_this(bindings->dyn)) { /* Not found */
       *bindings_out = bindings;
       return false;
     }
@@ -293,7 +293,7 @@ static bool dynamic_table_push(dynamic_table_t table, value dyn, value val)
       }
       return dynamic_table_push(table, dyn, val);
     } else {
-      CAMLassert(!Is_bound(bindings->dyn));
+      CAMLassert(!Is_this(bindings->dyn));
       if(!dynamic_stack_push(bindings, val)) {
         return false;
       }
@@ -315,7 +315,7 @@ static void dynamic_table_pop(dynamic_table_t table, value dyn)
 
       // Rehash chain after removal
       size_t next = (idx + 1) & table->mask;
-      while(Is_bound(table->bindings[next].dyn)) {
+      while(Is_this(table->bindings[next].dyn)) {
         dynamic_stack_s stack = table->bindings[next];
         dynamic_stack_init(&table->bindings[next]);
         dynamic_table_add(table, stack);
@@ -337,10 +337,7 @@ CAMLexport void caml_dynamic_table_scan_roots(dynamic_table_t table,
   }
 }
 
-/* Making a dynamic value */
-
-extern value caml_fresh_oo_id(value v);
-
+/* Make a fresh dynamic value, which is an immediate unique ID. */
 CAMLprim value caml_dynamic_make(value unit)
 {
   CAMLparam1(unit);

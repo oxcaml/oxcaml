@@ -425,6 +425,11 @@ module Jkind0 : sig
       ('a -> 'b option) -> ('a, 'd) base_and_axes ->
       ('b, 'd) base_and_axes option
 
+    val meet_scannable_axes :
+      Jkind_types.Layout.Const.t jkind_base ->
+      Jkind_types.Scannable_axes.t ->
+      Jkind_types.Layout.Const.t jkind_base
+
     val try_allow_l :
       ('layout, 'l * 'r) base_and_axes ->
       ('layout, allowed * 'r) base_and_axes option
@@ -671,6 +676,14 @@ module Jkind0 : sig
 
     module Builtin : sig
       val any : why:Jkind_intf.History.any_creation_reason -> 'd jkind
+      val any_with_nullability :
+        Jkind_axis.Nullability.t ->
+        why:Jkind_intf.History.any_creation_reason ->
+        'd jkind
+      val any_with_separability :
+        Jkind_axis.Separability.t ->
+        why:Jkind_intf.History.any_creation_reason ->
+        'd jkind
       val void :
         why:Jkind_intf.History.void_creation_reason -> ('l * disallowed) jkind
       val scannable :
