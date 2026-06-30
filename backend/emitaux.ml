@@ -63,6 +63,12 @@ let frame_section_epoch = ref 0
 
 let start_new_code_section () = incr frame_section_epoch
 
+(* Set by a backend before [emit_frames] when the small descriptor format cannot be
+   emitted in the current context: internal-assembler (which cannot resolve the
+   variable-length return-address delta directive) and ARM64 (where the delta is not yet
+   ported). Every descriptor then escapes to the normal format. *)
+let disable_small_descriptors = ref false
+
 let is_none_dbg d = Debuginfo.Dbg.is_none (Debuginfo.get_dbg d)
 
 let get_flags debuginfo =
@@ -119,10 +125,7 @@ type emit_frame_actions =
     efa_label_rel : Label.t -> int32 -> unit;
     efa_label_delta : Label.t -> Label.t -> unit;
     (* [efa_label_delta upper lower] emits the variable-width return-address
-       delta of a "small" frame descriptor: the difference [upper - lower] in
-       a single byte when it fits 1..254, otherwise a 0xFF marker followed by
-       a 16-bit little-endian value. The two labels are return addresses in
-       the text section. *)
+       delta of a "small" frame descriptor, as a ULEB128 constant. *)
     efa_def_label : Label.t -> unit;
     efa_string : string -> unit;
     (* Switch to / from a mergeable string section (SHF_MERGE|SHF_STRINGS), used
@@ -295,9 +298,9 @@ let emit_frames a =
       live
   in
   (* Register-number -> hot-bitmap-bit-index. This is the inverse of
-     [caml_frame_hot_regs] in runtime/caml/frame_descriptors.h; the compiler
-     and the runtime MUST agree exactly or the GC scans the wrong registers
-     (silent heap corruption). *)
+     [caml_frame_hot_regs] in runtime/caml/frame_descriptors.h; the compiler and
+     the runtime MUST agree exactly or the GC scans the wrong registers (silent
+     heap corruption). *)
   let hot_regs = [| 0; 1; 2; 3; 4; 5; 6; 8 |] in
   let hot_reg_bit reg =
     let rec find i =
@@ -310,8 +313,8 @@ let emit_frames a =
     find 0
   in
   (* Compute the small-format encoding of a descriptor, or [None] if it must
-     escape. Result:
-     [(size_units_minus_1, num_allocs, alloc_nibbles, reg_bitmap, word_slots)] *)
+     escape. Result: [(size_units_minus_1, num_allocs, alloc_nibbles,
+     reg_bitmap, word_slots)] *)
   let small_encoding fd =
     let flags = get_flags fd.fd_debuginfo in
     let has_alloc = flags land 2 <> 0 in
@@ -350,7 +353,7 @@ let emit_frames a =
         in
         match reg_bits with
         | None -> None
-        | Some reg_bitmap -> (
+        | Some reg_bitmap ->
           let num_allocs, alloc_nibbles =
             match fd.fd_debuginfo with
             | Dbg_alloc dbg ->
@@ -360,8 +363,9 @@ let emit_frames a =
               List.length sizes, sizes
             | Dbg_other _ | Dbg_raise _ -> 0, []
           in
-          if num_allocs > 255
-             || List.exists (fun s -> s < 0 || s > 15) alloc_nibbles
+          if
+            num_allocs > 255
+            || List.exists (fun s -> s < 0 || s > 15) alloc_nibbles
           then None
           else
             Some
@@ -369,7 +373,7 @@ let emit_frames a =
                 num_allocs,
                 alloc_nibbles,
                 reg_bitmap,
-                word_slots ))
+                word_slots )
   in
   (* Emit a small descriptor body (after its leading delta byte/bytes). *)
   let emit_small_body fd
@@ -385,7 +389,7 @@ let emit_frames a =
         | [] -> ()
         | [a] -> emit_u8 (a land 0xf)
         | a :: b :: rest ->
-          emit_u8 ((a land 0xf) lor ((b land 0xf) lsl 4));
+          emit_u8 (a land 0xf lor ((b land 0xf) lsl 4));
           emit_nibbles rest
       in
       emit_nibbles alloc_nibbles;
@@ -509,31 +513,34 @@ let emit_frames a =
      emit the frame table in increasing return-address order. *)
   let descrs = List.rev !frame_descriptors in
   a.efa_word (List.length descrs);
-  (* Emit each descriptor preceded by a delta byte. The first descriptor of
-     the frametable, and any descriptor that does not fit the small format,
-     escapes: a 0 delta byte followed by the existing normal/long descriptor
-     (which carries its own absolute return address). A small descriptor is
-     preceded by its return-address delta from the previous descriptor. *)
+  (* Emit each descriptor preceded by retaddr delta. The first descriptor of the
+     frametable, and any descriptor that does not fit the small format, escapes:
+     a 0 delta byte followed by the existing normal/long descriptor (which
+     carries its own relative return address). A small descriptor is preceded by
+     its return-address delta from the previous descriptor, as ULEB128. *)
   let emit_descr prev fd =
     let escape () =
       emit_u8 0;
       emit_escaped_frame fd;
       Some fd
     in
-    match prev with
-    | Some prev_fd when prev_fd.fd_section = fd.fd_section -> (
-      (* Same text section as the previous descriptor, so the delta is an
-         assembly-time constant. *)
-      match small_encoding fd with
-      | Some enc ->
-        a.efa_label_delta fd.fd_lbl prev_fd.fd_lbl;
-        emit_small_body fd enc;
-        Some fd
-      | None -> escape ())
-    | Some _ | None ->
-      (* First descriptor of the frametable, or first of a new text section
-         (no same-section previous return address for a delta): escape. *)
-      escape ()
+    if !disable_small_descriptors
+    then escape ()
+    else
+      match prev with
+      | Some prev_fd when prev_fd.fd_section = fd.fd_section -> (
+        (* Same text section as the previous descriptor, so the delta is an
+           assembly-time constant. *)
+        match small_encoding fd with
+        | Some enc ->
+          a.efa_label_delta fd.fd_lbl prev_fd.fd_lbl;
+          emit_small_body fd enc;
+          Some fd
+        | None -> escape ())
+      | Some _ | None ->
+        (* First descriptor of the frametable, or first of a new text section
+           (no same-section previous return address for a delta): escape. *)
+        escape ()
   in
   ignore (List.fold_left emit_descr None descrs);
   Label_table.iter emit_debuginfo debuginfos;

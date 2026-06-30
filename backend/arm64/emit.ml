@@ -2242,6 +2242,9 @@ let end_assembly () =
   let frametable_sym = S.create_global frametable in
   global_maybe_protected frametable_sym;
   D.define_symbol_label ~section:frametable_section frametable_sym;
+  (* The small-format return-address delta is not yet ported to ARM64, so escape
+     every descriptor to the normal format. *)
+  Emitaux.disable_small_descriptors := true;
   (* CR sspies: Share the [emit_frames] code with the x86 backend. *)
   emit_frames
     { efa_code_label =
@@ -2269,8 +2272,8 @@ let end_assembly () =
             ~offset_upper:(Targetint.of_int32 ofs));
       efa_label_delta =
         (* The small frame-descriptor format and its runtime decoding are not
-           yet ported to ARM64; this is only reachable if [emit_frames]
-           produces a small descriptor on ARM64. *)
+           yet ported to ARM64; this is only reachable if [emit_frames] produces
+           a small descriptor on ARM64. *)
         (fun _upper _lower ->
           Misc.fatal_error "small frame descriptors not supported on ARM64");
       efa_def_label =

@@ -1635,15 +1635,16 @@ let assemble_line b loc ins =
             buf_int8 b 0
           done
     | Directive (D.Hidden _) | Directive D.New_line -> ()
-    | Directive (D.Frame_descr_delta { delta }) ->
-      (* Always use the wide encoding here (0xFF marker + 16-bit delta): the
-         runtime decodes either form, and the fixed 3-byte size keeps the
-         binary emitter's per-section layout simple. The 16-bit value is the
-         (same-section) label difference, resolved by the relocation pass
-         (mirrors the [Sixteen] case of [constant]). *)
-      buf_int8 b 0xFF;
-      record_local_reloc b (RelocConstant (delta, B16));
-      buf_int16L b 0L
+    | Directive (D.Frame_descr_delta _) ->
+      (* The internal assembler does not support the small frame-descriptor
+         format's return-address delta, so the compiler escapes every
+         descriptor when the internal-assembler backend is active (see
+         [Emitaux.disable_small_descriptors]); this directive is therefore
+         never emitted here. TODO: fix this. Claude tried and failed
+         2026-06-30. *)
+      Misc.fatal_error
+        "x86_binary_emitter: Frame_descr_delta unsupported (small descriptors \
+         must be escaped under the internal assembler)"
     | Directive
         (D.Reloc
           { name = D.R_X86_64_PLT32;

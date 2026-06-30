@@ -284,11 +284,7 @@ module Directive = struct
           addend : int64
         }
     | Frame_descr_delta of { delta : Constant.t }
-        (* Variable-width return-address delta for a "small" frame
-           descriptor: a single byte holding [delta] when it fits 1..254,
-           otherwise a 0xFF marker byte followed by a 16-bit little-endian
-           value (255..65535). [delta] is a difference of two same-section
-           labels, so it is an assembly-time constant. *)
+  (* Variable-width return-address delta for a "small" frame descriptor *)
 
   let bprintf = Printf.bprintf
 
@@ -418,12 +414,9 @@ module Directive = struct
       bprintf buf "%s" (gas_comment_opt comment)
     | Comment s -> if emit_comments () then bprintf buf "\t\t\t\t/* %s */" s
     | Frame_descr_delta { delta } ->
-      (* The delta is a difference of two same-section labels. We cannot
-         pick a fixed width by inspecting its value (it is only known to
-         the assembler, and can even change under branch relaxation), so
-         we emit it as an unsigned LEB128, which the assembler computes
-         directly. The value is always >= 1, so it never starts with a 0
-         byte and stays distinct from the escape marker. *)
+      (* The delta is a difference of two same-section labels. Emit as ULEB128
+         so the assembler can compute it. Always positive, so it never starts
+         with a 0 byte *)
       bprintf buf "\t.uleb128 (%a)" Constant.print delta
     | Global sym -> bprintf buf "\t.globl\t%s" (Asm_symbol.encode sym)
     | New_label (Label lbl, _typ) -> bprintf buf "%s:" (Asm_label.encode lbl)

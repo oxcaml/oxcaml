@@ -60,6 +60,11 @@ val record_frame_descr :
     switch text section. *)
 val start_new_code_section : unit -> unit
 
+(* When set before [emit_frames], every frame descriptor escapes to the normal
+   format instead of the small encoding. Backends set this when the small format
+   cannot be emitted (the internal-assembler / JIT binary backend; ARM64). *)
+val disable_small_descriptors : bool ref
+
 (** [with_snapshot f] runs [f] and returns its result, but also ensures that the
     state of this [Emitaux] module is unchanged after [f] returns. *)
 val with_snapshot : f:(unit -> 'a) -> 'a
