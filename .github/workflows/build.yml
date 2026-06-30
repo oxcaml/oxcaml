@@ -47,6 +47,11 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             sysdeps: gdb
 
+          - name: no-flat-float-array (x86_64-linux)
+            config: --disable-flat-float-array
+            os: warp-ubuntu-latest-x64-8x
+            sysdeps: gdb
+
           # We use a custom install prefix for this workflow.
           # Consider renaming it to indicate as such when convenient.
           - name: dev (x86_64-linux)

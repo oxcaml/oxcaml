@@ -17,7 +17,7 @@ let code loopify(never) size(11) newer_version_of(list_to_array_0)
       list_to_array_0_1 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure _region _ghost_region my_depth
         -> k * k1
-        : any array =
+        : val array =
   let prim = %is_int (param) in
   switch prim
     | 0 -> k1 pop(regular k1) ($camlTests15__Pmakeblock18)
