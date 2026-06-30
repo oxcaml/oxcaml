@@ -23,7 +23,7 @@
  }{
    setup-ocamlc.byte-build-env;
    program = "stubs.cma";
-   flags = "-a -dllib ./ocamlc.byte/dllstubs";
+   flags = "-a -dllib-suffixed ./ocamlc.byte/dllstubs";
    all_modules = "stubs.c";
    ocamlc.byte;
    program = "stubs";

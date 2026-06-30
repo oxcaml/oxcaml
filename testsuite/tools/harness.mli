@@ -75,25 +75,15 @@ module Import : sig
     bytecode_shebangs_by_default: bool;
       (** True if ocamlc uses a shebang-style header rather than an executable
           header for tendered bytecode executables. *)
-<<<<<<< OxCaml
     cross_module_inlining: bool;
       (** True if the native compiler exports cross-module inlining information
           (i.e. an optimising build), so that [config.cmx] inlines
           [Config.standard_library]. False for OxCaml's [dev] build profile;
           true for its [main] profile and for upstream.
           Derived from {v [$(main_build_profile)] v} - {v Makefile.config v} *)
-    libraries: string list list
-||||||| Upstream OCaml
-    shebangscripts: bool;
-      (** {v $(SHEBANGSCRIPTS) v} - {v Makefile.config v} *)
-    libraries: string list list
-=======
-    shebangscripts: bool;
-      (** {v $(SHEBANGSCRIPTS) v} - {v Makefile.config v} *)
     filename_mangling: bool;
       (** True if the Runtime ID is being used for filename mangling. *)
     libraries: string list list;
->>>>>>> ocaml/ocaml#14245
       (** Sorted list of basenames of libraries to test.
           Derived from {v [$(OTHERLIBRARIES)] v} - {v Makefile.config v} *)
   }

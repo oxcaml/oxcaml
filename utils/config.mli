@@ -445,20 +445,11 @@ val multidomain : bool
 val tsan : bool
 (** Whether ThreadSanitizer instrumentation is enabled *)
 
-<<<<<<< OxCaml
 val shebangscripts : bool
 (** Whether the target supports shebang scripts
 
     @since 5.5 *)
 
-val parameterised_modules : bool
-(** Whether parameterised modules are supported *)
-
-val syntax_quotations : bool
-(** Whether quote [<[_]>] and splice [$] syntax is enabled. *)
-
-||||||| Upstream OCaml
-=======
 (** Launch mechanisms for bytecode executables
 
     @since 5.5 *)
@@ -510,7 +501,12 @@ val native_runtime_id : string
 
     @since 5.5 *)
 
->>>>>>> ocaml/ocaml#14245
+val parameterised_modules : bool
+(** Whether parameterised modules are supported *)
+
+val syntax_quotations : bool
+(** Whether quote [<[_]>] and splice [$] syntax is enabled. *)
+
 (** Access to configuration values *)
 val print_config : out_channel -> unit
 

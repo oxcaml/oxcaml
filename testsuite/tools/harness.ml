@@ -44,14 +44,8 @@ module Import = struct
     launcher_searches_for_ocamlrun: bool;
     target_launcher_searches_for_ocamlrun: bool;
     bytecode_shebangs_by_default: bool;
-<<<<<<< OxCaml
     cross_module_inlining : bool;
-||||||| Upstream OCaml
-    shebangscripts: bool;
-=======
-    shebangscripts: bool;
     filename_mangling: bool;
->>>>>>> ocaml/ocaml#14245
     libraries: string list list
   }
 

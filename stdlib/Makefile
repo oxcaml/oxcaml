@@ -21,6 +21,10 @@ OCAMLDEP ?= $(BOOT_OCAMLDEP)
 
 include $(ROOTDIR)/Makefile.common
 
+%.$(O): %.c $(REQUIRED_HEADERS)
+	$(V_CC)$(CC) $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) \
+	  $(OUTPUTOBJ)$@ -c $<
+
 # There are three ways the Standard Library is compiled in bytecode:
 # 1. During coldstart
 #      - using ../boot/ocamlc which runs on ../boot/ocamlrun
