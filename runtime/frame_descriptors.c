@@ -382,10 +382,14 @@ static void add_frametable_to_stats(intnat *frametable,
   char *dbg_low, *dbg_high;
   size_t dbg_count;
   caml_debuginfo_measurements(&dbg_count, &dbg_low, &dbg_high);
-  dbg_high = Align_to(dbg_high, uintnat);
   if (dbg_count) {
-    stats->debuginfo_bytes += (size_t)(dbg_high - dbg_low);
+    /* Each debuginfo record is two 32-bit words; the referenced
+       name_info/name_and_loc_info structs occupy [dbg_low, dbg_high). The
+       deduplicated filename/defname strings live in a separate section and are
+       not counted here. */
     stats->debuginfo_count += dbg_count;
+    stats->debuginfo_bytes += dbg_count * 2 * sizeof(uint32_t)
+                              + (size_t)(dbg_high - dbg_low);
   }
 }
 

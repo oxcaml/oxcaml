@@ -498,16 +498,17 @@ void caml_debuginfo_measure(debuginfo dbg)
 {
   uint32_t info1, info2;
 
-  /* Control flow to match caml_debuginfo_location.
-     The defname and filename strings are no longer measured here: they live in
-     a separate mergeable string section (deduplicated across compilation units
-     by the linker), so they cannot be attributed to a single frametable. This
-     measures only the debuginfo words and the name_info/name_and_loc_info
-     structs. */
+  /* Control flow to match caml_debuginfo_location. For each debuginfo record
+     we bump the record count and bracket the referenced
+     name_info/name_and_loc_info struct into [debuginfo_low, debuginfo_high).
+     The debuginfo words themselves are accounted for by the count (each record
+     is two 32-bit words); only the structs contribute to the low/high span.
+     The defname and filename strings are not measured: they live in a separate
+     mergeable string section (deduplicated across compilation units by the
+     linker), so they cannot be attributed to a single frametable. */
   if (dbg == NULL) {
     return;
   }
-  include_low((char*)dbg);
 
   do {
     info1 = caml_read_unaligned_uint32(dbg);
@@ -527,7 +528,6 @@ void caml_debuginfo_measure(debuginfo dbg)
     }
     dbg = (debuginfo)((uint32_t*)dbg + 2);
   } while (info1 & 1);
-  include_high(dbg);
 }
 
 value caml_add_debug_info(backtrace_slot start, value size, value events)
