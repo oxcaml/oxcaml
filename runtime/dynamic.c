@@ -26,7 +26,7 @@
 #define Hash_dyn(dyn) Long_val(dyn)
 
 typedef struct dynamic_binding_s {
-  value dyn;
+  value dyn; /* Dynamic id, or Val_null if unbound */
   value val;
 } dynamic_binding_s, *dynamic_binding_t;
 
@@ -105,7 +105,7 @@ CAMLexport void caml_dynamic_cache_scan_roots(dynamic_cache_t cache,
 typedef struct dynamic_stack_s {
   size_t capacity;
   size_t count;
-  value dyn;
+  value dyn; /* Dynamic id, or Val_null if unbound */
   value* vals;
 } dynamic_stack_s, *dynamic_stack_t;
 
