@@ -180,7 +180,7 @@ static void dynamic_stack_scan_roots(dynamic_stack_t stack,
   }
 }
 
-/* Hash tables of binding stacks. Linear probing, add-only, growing when half full. */
+/* Hash tables of binding stacks. Linear probing, growing when half full. */
 
 #define DYNAMIC_TABLE_INIT_CAPACITY 8
 
