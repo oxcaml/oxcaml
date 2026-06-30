@@ -324,6 +324,8 @@ module Stdlib : sig
 
     val for_all : (char -> bool) -> t -> bool
 
+    val to_utf_8_seq : t -> Uchar.t Seq.t
+
     val begins_with : ?from:int -> string -> prefix:string -> bool
 
     val split_on_string : string -> split_on:string -> string list
