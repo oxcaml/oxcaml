@@ -704,21 +704,6 @@ let mk_unsafe f =
   "-unsafe", Arg.Unit f,
   " Do not compile bounds checking on array and string access"
 
-<<<<<<< OxCaml
-||||||| Upstream OCaml
-let mk_unsafe_string =
- let err () =
-   raise (Arg.Bad "-unsafe-string is not available since OCaml 5.0")
- in
- "-unsafe-string", Arg.Unit err, " (option not available)"
-
-=======
-let mk_unsafe_string =
- let err () =
-   raise (Arg.Bad "-unsafe-string is not available since OCaml 5.0")
- in
- "-unsafe-string", Arg.Unit err, " (option not available)"
-
 let mk_launch_method f =
   "-launch-method", Arg.String f,
   "<method>  Specify the mechanism for the bytecode launcher:\n\
@@ -738,7 +723,6 @@ let mk_search_method f =
     \      enable   always search for the interpreter\n\
     \    The default setting is 'disable'."
 
->>>>>>> ocaml/ocaml#14245
 let mk_use_runtime f =
   "-use-runtime", Arg.String f,
   "<file>  Generate bytecode for the given runtime system"
