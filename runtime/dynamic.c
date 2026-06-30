@@ -169,9 +169,9 @@ static bool dynamic_stack_pop(dynamic_stack_t stack)
 static void dynamic_stack_register_roots(dynamic_stack_t stack)
 {
   if(Is_this(stack->dyn)) {
-    caml_register_global_root(&stack->dyn);
+    caml_register_generational_global_root(&stack->dyn);
     for(size_t i = 0; i < stack->count; ++i) {
-      caml_register_global_root(&stack->vals[i]);
+      caml_register_generational_global_root(&stack->vals[i]);
     }
   }
 }
@@ -179,9 +179,9 @@ static void dynamic_stack_register_roots(dynamic_stack_t stack)
 static void dynamic_stack_unregister_roots(dynamic_stack_t stack)
 {
   if(Is_this(stack->dyn)) {
-    caml_remove_global_root(&stack->dyn);
+    caml_remove_generational_global_root(&stack->dyn);
     for(size_t i = 0; i < stack->count; ++i) {
-      caml_remove_global_root(&stack->vals[i]);
+      caml_remove_generational_global_root(&stack->vals[i]);
     }
   }
 }

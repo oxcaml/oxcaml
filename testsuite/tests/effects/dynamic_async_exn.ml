@@ -56,9 +56,9 @@ let () =
   (try
     Sys.with_async_exns (fun () ->
       r := None;
-      (* Bind [d] to [child] in a fiber and read it so the cache holds
+      (* Bind [d] to [child] and read it so the cache holds
          [d -> child], then allocate until the finaliser raises [Sys.Break]
-         asynchronously, unwinding out of this fiber. *)
+         asynchronously, unwinding out of this async exn handler. *)
       let child = (Bytes.unsafe_to_string (Bytes.make 4 'y')) in
       Dynamic.with_temporarily d child ~f:(fun () ->
         Printf.printf "in fiber [expect %s]: %s\n%!" child (print_dyn d);
