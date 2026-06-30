@@ -1008,8 +1008,6 @@ module Rewriter : sig
 
     val unknown : Flambda_kind.t -> 'a t
 
-    val bottom : Flambda_kind.t -> 'a t
-
     val tag_immediate : 'a t -> 'a t
 
     val immutable_block :
