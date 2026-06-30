@@ -187,21 +187,18 @@ let emit_frames a =
     if fd.fd_long
     then (
       emit_u16 Oxcaml_flags.max_long_frames_threshold;
-      a.efa_align 4);
+      (* Keep frame_data at offset 8 *)
+      emit_u16 0);
     let emit_unsigned_16_or_32 = if fd.fd_long then emit_u32 else emit_u16 in
     (* The live offsets are always unsigned. *)
     let emit_live_offset n = emit_unsigned_16_or_32 n in
     emit_unsigned_16_or_32 (fd.fd_frame_size + flags);
     emit_unsigned_16_or_32 (List.length fd.fd_live_offset);
     List.iter emit_live_offset fd.fd_live_offset;
-    (match fd.fd_debuginfo with
+    match fd.fd_debuginfo with
     | _ when flags = 0 -> ()
-    | Dbg_other dbg ->
-      a.efa_align 4;
-      a.efa_label_rel (label_debuginfos false dbg) Int32.zero
-    | Dbg_raise dbg ->
-      a.efa_align 4;
-      a.efa_label_rel (label_debuginfos true dbg) Int32.zero
+    | Dbg_other dbg -> a.efa_label_rel (label_debuginfos false dbg) Int32.zero
+    | Dbg_raise dbg -> a.efa_label_rel (label_debuginfos true dbg) Int32.zero
     | Dbg_alloc dbg ->
       assert (List.length dbg < 256);
       emit_u8 (List.length dbg);
@@ -215,15 +212,13 @@ let emit_frames a =
           emit_u8 (alloc_words - 2))
         dbg;
       if flags = 3
-      then (
-        a.efa_align 4;
+      then
         List.iter
           (fun Cmm.{ alloc_dbg; _ } ->
             if is_none_dbg alloc_dbg
             then emit_i32 0
             else a.efa_label_rel (label_debuginfos false alloc_dbg) Int32.zero)
-          dbg));
-    a.efa_align Arch.size_addr
+          dbg
   in
   let emit_filename name lbl =
     a.efa_def_label lbl;

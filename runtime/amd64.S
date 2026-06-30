@@ -1766,7 +1766,6 @@ G(caml_system__frametable):
         .4byte  LBL(108) - . /* return address into callback */
         .value  -1           /* negative frame size => use callback link */
         .value  0            /* no roots here */
-        .align  EIGHT_ALIGN
         .4byte  LBL(frame_runstack) - . /* return address into fiber_val_handler */
         .value  -1                      /* negative frame size => use callback link */
         .value  0                       /* no roots here */
