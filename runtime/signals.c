@@ -428,9 +428,11 @@ caml_result caml_do_pending_actions_flags_res(int flags)
      again before returning to OCaml. The continuation this allocates is
      uninitialized, and should not be promoted before being initialized.
    */
+#ifdef NATIVE_CODE
   if (flags & CAML_FROM_CAML) {
     caml_domain_setup_preemption();
   }
+#endif
 
   return Result_unit;
 
