@@ -1312,3 +1312,50 @@ type ('a, 'b) t = { a : 'a; }
 type ('a, 'b) s = ('a, 'b) t
 type packed = T : (int, 'b) s# -> packed [@@unboxed]
 |}]
+
+(* Unboxed arrays and iarrays, which are unrepresentable *)
+
+type 'a arr_u : any = 'a array#
+[%%expect{|
+type 'a arr_u = 'a array#
+|}]
+
+type 'a arr = 'a array
+type 'a arr_u_2 = 'a arr#
+[%%expect{|
+type 'a arr = 'a array
+type 'a arr_u_2 = 'a arr#
+|}]
+
+type 'a iarr_u : any = 'a iarray#
+[%%expect{|
+type 'a iarr_u = 'a iarray#
+|}]
+
+let bad (_ : 'a array#) = ()
+[%%expect{|
+Line 1, characters 8-23:
+1 | let bad (_ : 'a array#) = ()
+            ^^^^^^^^^^^^^^^
+Error: This pattern matches values of type "'a array#"
+       but a pattern was expected which matches values of type
+         "('b : '_representable_layout_1)"
+       The layout of 'a array# is any
+         because it is the unboxed version of the primitive type array.
+       But the layout of 'a array# must be representable
+         because we must know concretely how to pass a function argument.
+|}]
+
+let bad (_ : 'a iarray#) = ()
+[%%expect{|
+Line 1, characters 8-24:
+1 | let bad (_ : 'a iarray#) = ()
+            ^^^^^^^^^^^^^^^^
+Error: This pattern matches values of type "'a iarray#"
+       but a pattern was expected which matches values of type
+         "('b : '_representable_layout_2)"
+       The layout of 'a iarray# is any
+         because it is the unboxed version of the primitive type iarray.
+       But the layout of 'a iarray# must be representable
+         because we must know concretely how to pass a function argument.
+|}]
