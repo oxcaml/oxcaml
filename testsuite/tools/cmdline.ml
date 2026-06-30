@@ -106,16 +106,8 @@ let parse argv =
     ref {has_ocamlnat = false; has_ocamlopt = false; has_relative_libdir = None;
          has_runtime_search = Disable; launcher_searches_for_ocamlrun = false;
          target_launcher_searches_for_ocamlrun = false;
-<<<<<<< OxCaml
          bytecode_shebangs_by_default = false; cross_module_inlining = true;
-         libraries = []}
-||||||| Upstream OCaml
-         bytecode_shebangs_by_default = false; shebangscripts = false;
-         libraries = []}
-=======
-         bytecode_shebangs_by_default = false; shebangscripts = false;
          filename_mangling = false; libraries = []}
->>>>>>> ocaml/ocaml#14245
   in
   let error fmt = Printf.ksprintf (fun s -> raise (Arg.Bad s)) fmt in
   let check_tree () =

@@ -203,8 +203,6 @@ _install: compiler
 	$(cpl) _build/install/main/bin/* _install/bin/
 	( cd _install/bin; for i in *.opt; do ln -s $$i $${i%.opt}; done )
 	$(cpl) -R _build/default/stdlib/build/* _install/lib/ocaml/
-	mv _install/lib/ocaml/target_runtime-launch-info \
-	   _install/lib/ocaml/runtime-launch-info
 	rm -f _install/lib/ocaml/{META,dune-package,dynlink.cmxa,dynlink/dynlink.cmxa}
 	rm -f _install/lib/ocaml/{stdlib,camlinternal}*.{o,cmo}
 	$(cpl) -R _build/install/main/lib/ocaml/* _install/lib/ocaml/

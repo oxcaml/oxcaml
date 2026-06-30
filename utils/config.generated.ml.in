@@ -120,9 +120,14 @@ let no_stack_checks = "@enable_stack_checks@" <> "yes"
 let multidomain = "@enable_multidomain@" = "yes"
 
 let tsan = @tsan@
-<<<<<<< OxCaml
 
 let shebangscripts = @shebangscripts@
+
+let suffixing = @suffixing@
+
+let launch_method = {@QS@|@launch_method_target@|@QS@}
+
+let search_method = {@QS@|@runtime_search_target@|@QS@}
 
 let has_popcnt = "@has_popcnt@" = "yes"
 
@@ -160,12 +165,3 @@ let objcopy = {@QS@|@objcopy@|@QS@}
 let oxcaml_dwarf = "@enable_oxcaml_dwarf@" = "yes"
 
 let default_keyword_edition = @default_keyword_edition@
-||||||| Upstream OCaml
-=======
-
-let suffixing = @suffixing@
-
-let launch_method = {@QS@|@launch_method_target@|@QS@}
-
-let search_method = {@QS@|@runtime_search_target@|@QS@}
->>>>>>> ocaml/ocaml#14245
