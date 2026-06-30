@@ -1,2 +1,2 @@
 in fiber [expect 100]: 100
-after async unwind [expect null]: null
+after async unwind [expect 100]: 100
