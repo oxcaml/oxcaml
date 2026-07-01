@@ -28,13 +28,23 @@ module CU = Compilation_unit
 module GM = Global_module
 
 type state = {
-  rev_modules : (GM.t * Ident.t * Types.signature) list;
-      (** Bundled modules, reversed (newest first). *)
+  rev_modules : (GM.t * Ident.t * Subst.Lazy.signature) list;
+      (** Loaded bundled modules, reversed (newest first), with their
+          unsubstituted lazy signatures. Substitution is applied in one pass at
+          the end of [compute]. ([bound_globals] is consumed by [insert_module]
+          itself and not retained here.) *)
   rev_params : (GM.Parameter_name.t * Ident.t) list;
       (** Discovered parameters, reversed (newest first). *)
   param_ids : Ident.t GM.Parameter_name.Map.t;
       (** Dedup: parameter → its local Ident. *)
-  module_ids : Ident.t GM.Map.t;  (** Dedup: bundled module → its local Ident. *)
+  module_ids : Ident.t option GM.Name.Map.t;
+      (** Bundled module → its local Ident. Keyed by [GM.Name.t] (head +
+          visible_args) so that [Approximate] and [Exact] references to the same
+          logical module unify. [Some id] means we loaded the cmi and the module
+          appears in [rev_modules]; [None] means the module was only ever
+          referenced as an [Approximate] dependency and never loaded — such
+          references substitute to a [Pruned_<head>] placeholder at the end. A
+          [None] entry can be overwritten by an [Exact] reference later. *)
 }
 
 let empty_state =
@@ -42,7 +52,7 @@ let empty_state =
     rev_modules = [];
     rev_params = [];
     param_ids = GM.Parameter_name.Map.empty;
-    module_ids = GM.Map.empty;
+    module_ids = GM.Name.Map.empty;
   }
 
 let register_parameter p_name state =
@@ -111,50 +121,45 @@ let rec insert_module ~chain (gm : GM.t)
   in
   let new_id = Ident.create_local local_name in
   let state =
-    { state with module_ids = GM.Map.add gm new_id state.module_ids }
+    {
+      state with
+      module_ids =
+        GM.Name.Map.add (GM.to_name gm) (Some new_id) state.module_ids;
+    }
   in
   let chain = CU.Name.of_head_of_global_name (GM.to_name gm) :: chain in
-  let inner_subst, state =
+  let state =
     Array.fold_left
-      (fun (subst, state) ((orig_gm, prec) : GM.With_precision.t) ->
-        let orig_name = GM.to_name orig_gm in
-        let orig_ident = Ident.create_global orig_name in
-        match prec with
-        | Approximate ->
-            (* [Approximate] = [-no-alias-deps] alias whose cmi was never
-               validated.  Replace with a [Pruned_<head>] placeholder. *)
-            let pruned_name =
-              GM.Name.create_exn ("Pruned_" ^ orig_name.head) orig_name.args
-            in
-            ( Subst.add_module orig_ident
-                (Path.Pident (Ident.create_global pruned_name))
-                subst,
-              state )
-        | Exact ->
-            let swg = validate_and_load ~chain orig_gm in
-            let id, state = maybe_insert_module ~chain orig_gm swg state in
-            (Subst.add_module orig_ident (Path.Pident id) subst, state))
-      (Subst.identity, state) swg.bound_globals
+      (fun state gm_prec -> maybe_insert_module ~chain gm_prec state)
+      state swg.bound_globals
   in
-  let inner_subst, state =
+  let state =
     List.fold_left
-      (fun (subst, state) (a : _ GM.Argument.t) ->
-        let id, state = maybe_register_parameter a.param state in
-        let n = GM.Name.of_parameter_name a.param in
-        (Subst.add_module (Ident.create_global n) (Path.Pident id) subst, state))
-      (inner_subst, state) gm.hidden_args
+      (fun state (a : _ GM.Argument.t) ->
+        let _id, state = maybe_register_parameter a.param state in
+        state)
+      state gm.hidden_args
   in
   let sign_lazy, _staticity = swg.sign in
-  (* CR-soon zqian: introduce substitution as a constructor of the module
-     type algebra, which allows lazy substitution to persist across files. *)
-  let sign_lazy = Subst.Lazy.signature Keep inner_subst sign_lazy in
-  let sign = Subst.Lazy.force_signature sign_lazy in
-  (new_id, { state with rev_modules = (gm, new_id, sign) :: state.rev_modules })
+  { state with rev_modules = (gm, new_id, sign_lazy) :: state.rev_modules }
 
-and maybe_insert_module ~chain (gm : GM.t) swg state =
-  match GM.Map.find_opt gm state.module_ids with
-  | Some id -> (id, state)
-  | None -> insert_module ~chain gm swg state
+and maybe_insert_module_exact ~chain (gm : GM.t) swg state =
+  match GM.Name.Map.find_opt (GM.to_name gm) state.module_ids with
+  | Some (Some _) -> state
+  | Some None | None -> insert_module ~chain gm swg state
+
+and maybe_insert_module ~chain ((gm, prec) : GM.With_precision.t) state =
+  match prec with
+  | Approximate -> (
+      let name = GM.to_name gm in
+      match GM.Name.Map.find_opt name state.module_ids with
+      | Some _ -> state
+      | None ->
+          { state with module_ids = GM.Name.Map.add name None state.module_ids }
+      )
+  | Exact ->
+      let swg = validate_and_load ~chain gm in
+      maybe_insert_module_exact ~chain gm swg state
 
 let make_md md_type : Types.module_declaration =
   {
@@ -207,11 +212,46 @@ let compute (src_names : CU.Name.Set.t) : result =
                 (CU.Name.to_string cu_name)
                 [] ~hidden_args:cmi_params
             in
-            let _id, state = maybe_insert_module ~chain gm swg state in
-            state)
+            maybe_insert_module_exact ~chain gm swg state)
       src_names empty_state
   in
-  { modules = List.rev state.rev_modules; params = List.rev state.rev_params }
+  (* Build a global substitution from [module_ids] and [param_ids], then
+     apply it to each loaded module's signature in one pass. *)
+  let subst =
+    GM.Name.Map.fold
+      (fun (name : GM.Name.t) id_opt subst ->
+        let orig_ident = Ident.create_global name in
+        let target =
+          match id_opt with
+          | Some id -> Path.Pident id
+          | None ->
+              let pruned =
+                GM.Name.create_exn ("Pruned_" ^ name.head) name.args
+              in
+              Path.Pident (Ident.create_global pruned)
+        in
+        Subst.add_module orig_ident target subst)
+      state.module_ids Subst.identity
+  in
+  let subst =
+    List.fold_left
+      (fun subst (p_name, p_id) ->
+        let n = GM.Name.of_parameter_name p_name in
+        Subst.add_module (Ident.create_global n) (Path.Pident p_id) subst)
+      subst state.rev_params
+  in
+  let modules =
+    List.rev_map
+      (fun (gm, id, sign_lazy) ->
+        (* CR-soon zqian: introduce substitution as a constructor of the
+           module type algebra, which allows lazy substitution to persist
+           across files. *)
+        let sign_lazy = Subst.Lazy.signature Keep subst sign_lazy in
+        let sign = Subst.Lazy.force_signature sign_lazy in
+        (gm, id, sign))
+      state.rev_modules
+  in
+  { modules; params = List.rev state.rev_params }
 
 let wrap_in_named_functor_layers (params : (GM.Parameter_name.t * Ident.t) list)
     (body : Types.module_type) : Types.module_type =

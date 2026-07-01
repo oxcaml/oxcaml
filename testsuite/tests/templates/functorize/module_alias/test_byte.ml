@@ -1,31 +1,21 @@
 (* TEST
- (* Module aliases under [-no-alias-deps].  Behaviour hinges on whether the
-    alias target shows up in the source cmi's [bound_globals] with [Exact]
-    or [Approximate] precision:
+ (* Module aliases under [-no-alias-deps].  Each case bundles one or two
+    modules with [-functorize] and observes how alias targets appear in
+    the resulting bundle.
 
-    1. [with_message.ml] aliases [Message] AND uses [Message.hello] in its
-       body.  The body use forces a CRC, so [with_message.cmi] records
-       [Message] with [Exact] precision.  [-functorize With_message] then
-       transitively pulls [Message] into the bundle (no need to name it on
-       the command line).
-
-    2. [pure_alias.ml] declares only [module Message = Message] (no use).
-       Under [-no-alias-deps], [Message] is recorded with [Approximate]
-       precision (no CRC).  The functorizer substitutes such references
-       with the placeholder [Pruned_<head>].  Bundling itself
-       succeeds, but a consumer that accesses [Inst.Pure_alias.Message]
-       fails to compile.
-
-    3. [included_alias.ml] uses [module Message = struct include Message
-       end] — a workaround for case (2).  The [include] in the body forces
-       a body-level use of [Message] so its cmi records [Message] with
-       [Exact] precision; transitively pulled in like case (1). *)
+    Pruning rule: a module is pulled into the bundle iff some loaded cmi
+    lists it as [Exact] in [bound_globals].  If a module appears only as
+    [Approximate] (never [Exact] anywhere), the functorizer substitutes
+    it with a [Pruned_<head>] placeholder — the bundle still typechecks
+    but any consumer path that reaches the pruned module fails. *)
 
  readonly_files = "\
    message.mli message.ml with_message.ml \
    pure_alias.ml main_pure_alias.ml bad_pure_alias.reference \
    included_alias.ml main_included_alias.ml \
    test_functorize_included_alias.reference \
+   lib__.ml mod_a.ml mod_b.ml main_circular.ml \
+   test_functorize_circular.reference \
  ";
 
  setup-ocamlc.byte-build-env;
@@ -33,7 +23,8 @@
  set OCAMLPARAM = "";
 
  script = "mkdir p p_int message with_message pure_alias included_alias \
-                 bundle_msg bundle_pure_alias bundle_included_alias";
+                 bundle_msg bundle_pure_alias bundle_included_alias \
+                 lib bundle_circular";
  script;
 
  src = "${test_source_directory}/../p.mli \
@@ -63,10 +54,14 @@
  dst = "included_alias/";
  copy;
 
+ src = "lib__.ml mod_a.ml mod_b.ml";
+ dst = "lib/";
+ copy;
+
  set flg = "-no-alias-deps -w -53";
  set flg_int_iface = "$flg -w -49";
 
- (* Parameter P. *)
+ (* Parameter [P] and argument [P_int]. *)
 
  flags = "$flg_int_iface";
  module = "p/p__.ml";
@@ -76,8 +71,6 @@
  module = "p/p.mli";
  ocamlc.byte;
 
- (* [P_int] argument for P. *)
-
  flags = "$flg_int_iface";
  module = "p_int/p_int__.ml";
  ocamlc.byte;
@@ -86,32 +79,45 @@
  module = "p_int/p_int.mli p_int/p_int.ml";
  ocamlc.byte;
 
- (* [Message] parameterised by P. *)
+ (* Common alias target [Message], and the three source modules that
+    reference it in different ways. *)
 
  flags = "$flg -parameter P -I p -I message";
  module = "message/message.mli message/message.ml";
  ocamlc.byte;
 
- (* [With_message] aliases [Message] and uses [Message.hello]. *)
-
  flags = "$flg -parameter P -I p -I message";
  module = "with_message/with_message.ml";
  ocamlc.byte;
-
- (* [Pure_alias] is alias-only. *)
 
  flags = "$flg -parameter P -I p -I pure_alias";
  module = "pure_alias/pure_alias.ml";
  ocamlc.byte;
 
- (* [Included_alias] uses [include Message] (forces a body-level use). *)
-
  flags = "$flg -parameter P -I p -I message -I included_alias";
  module = "included_alias/included_alias.ml";
  ocamlc.byte;
 
- (* Case 1: bundle only [With_message] — [Message] gets pulled in
-    transitively via [with_message.cmi]'s [Exact]-precision dependency. *)
+ (* dune-style renaming library [Lib__] and its two wrappers, which
+    mutually alias each other through [-open Lib__]. *)
+
+ flags = "$flg_int_iface -parameter P -I p";
+ module = "lib/lib__.ml";
+ ocamlc.byte;
+
+ set flg_lib = "$flg -parameter P -I p -I lib -open Lib__";
+
+ flags = "$flg_lib";
+ module = "lib/mod_a.ml";
+ ocamlc.byte;
+
+ flags = "$flg_lib";
+ module = "lib/mod_b.ml";
+ ocamlc.byte;
+
+ (* Case 1 — [with_message.ml] aliases [Message] AND uses [Message.hello]
+    in its body.  The body use forces a CRC, so [with_message.cmi] lists
+    [Message] as [Exact] and it is pulled into the bundle. *)
 
  flags = "$flg -functorize -I p -I message -I with_message With_message";
  module = "";
@@ -119,17 +125,17 @@
  all_modules = "";
  ocamlc.byte;
 
- (* Case 2: bundle [Pure_alias] alone — bundling succeeds, but the
-    bundle's signature now references [Pruned_<head>]. *)
+ (* Case 2 — [pure_alias.ml] declares only [module Message = Message].
+    Under [-no-alias-deps] this records [Message] as [Approximate]
+    (no CRC), and since no other loaded cmi lists it as [Exact],
+    [Message] is pruned to [Pruned_Message].  Bundling succeeds; a
+    consumer that touches [Inst.Pure_alias.Message] fails to compile. *)
 
  flags = "$flg -functorize -I p -I message -I pure_alias Pure_alias";
  module = "";
  program = "bundle_pure_alias/bundle_pure_alias.cmo";
  all_modules = "";
  ocamlc.byte;
-
- (* Consumer of [Pure_alias] bundle — fails because
-    [Inst.Pure_alias.Message] resolves to [Pruned_<head>]. *)
 
  flags = "$flg -I bundle_pure_alias -I p -I p_int -I message";
  module = "main_pure_alias.ml";
@@ -140,8 +146,9 @@
  compiler_reference = "bad_pure_alias.reference";
  check-ocamlc.byte-output;
 
- (* Case 3: bundle [Included_alias] alone — [Message] gets pulled in via
-    the include's [Exact]-precision dependency.  Consumer works. *)
+ (* Case 3 — [included_alias.ml] uses [module Message = struct include
+    Message end].  The [include] forces a body-level use, so its cmi
+    records [Message] as [Exact] (same effect as case 1). *)
 
  flags = "$flg -functorize -I p -I message -I included_alias \
    Included_alias";
@@ -174,5 +181,43 @@
  run;
 
  reference = "test_functorize_included_alias.reference";
+ check-program-output;
+
+ (* Case 4 — circular aliases through a dune-style renaming module.
+    [mod_a] and [mod_b] each body-use [Lib__] (recording it [Exact])
+    and mutually alias each other.  Bundling [Mod_a Mod_b] together
+    makes both top-level inputs [Exact], so the long chain
+    [Inst.Mod_a.Mod_b_alias.Mod_a_alias....] resolves at runtime. *)
+
+ flags = "$flg -functorize -I p -I lib Mod_a Mod_b";
+ module = "";
+ program = "bundle_circular/bundle_circular.cmo";
+ all_modules = "";
+ ocamlc.byte;
+
+ flags = "$flg -I bundle_circular -I p -I p_int -I lib";
+ module = "main_circular.ml";
+ ocamlc.byte;
+
+ flags = "";
+ module = "";
+ program = "$test_build_directory/test_functorize_circular.bc";
+ all_modules = "\
+   lib/lib__.cmo \
+   lib/mod_a.cmo \
+   lib/mod_b.cmo \
+   p_int/p_int__.cmo \
+   p_int/p_int.cmo \
+   bundle_circular/bundle_circular.cmo \
+   main_circular.cmo \
+ ";
+ ocamlc.byte;
+
+ stdout = "test_functorize_circular.output";
+ stderr = "test_functorize_circular.output";
+ output = "test_functorize_circular.output";
+ run;
+
+ reference = "test_functorize_circular.reference";
  check-program-output;
 *)

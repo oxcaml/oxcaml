@@ -1,0 +1,4 @@
+File "main_pruned_c.ml", line 8, characters 24-41:
+8 | let () = print_endline (Inst.DEP__Foo__.C.combined (P_int.create ()))
+                            ^^^^^^^^^^^^^^^^^
+Error: The module Inst.DEP__Foo__.C is an alias for module Pruned_Foo__C, which is missing
