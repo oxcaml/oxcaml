@@ -178,7 +178,7 @@ let convert_array_kind dbg (kind : L.array_kind) : converted_array_kind =
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         P.Array_kind.t =
       match kind with
-      | Pint_scannable -> Values
+      | Pint_scannable -> Gc_ignorable_values
       | Paddr_scannable -> Values
       | Pproduct_scannable kinds ->
         Unboxed_product (List.map convert_kind kinds)
@@ -188,7 +188,7 @@ let convert_array_kind dbg (kind : L.array_kind) : converted_array_kind =
     let rec convert_kind (kind : L.ignorable_product_element_kind) :
         P.Array_kind.t =
       match kind with
-      | Pint_ignorable -> Values
+      | Pint_ignorable -> Gc_ignorable_values
       | Punboxedfloat_ignorable Unboxed_float32 -> Naked_float32s
       | Punboxedfloat_ignorable Unboxed_float64 -> Naked_floats
       | Punboxedvector_ignorable Unboxed_vec128 -> Naked_vec128s
@@ -279,7 +279,7 @@ let convert_array_ref_kind dbg (kind : L.array_ref_kind) :
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         Array_ref_kind.no_float_array_opt =
       match kind with
-      | Pint_scannable -> Values
+      | Pint_scannable -> Gc_ignorable_values
       | Paddr_scannable -> Values
       | Pproduct_scannable kinds ->
         Unboxed_product (List.map convert_kind kinds)
@@ -290,7 +290,7 @@ let convert_array_ref_kind dbg (kind : L.array_ref_kind) :
     let rec convert_kind (kind : L.ignorable_product_element_kind) :
         Array_ref_kind.no_float_array_opt =
       match kind with
-      | Pint_ignorable -> Values
+      | Pint_ignorable -> Gc_ignorable_values
       | Punboxedfloat_ignorable Unboxed_float32 -> Naked_float32s
       | Punboxedfloat_ignorable Unboxed_float64 -> Naked_floats
       | Punboxedvector_ignorable Unboxed_vec128 -> Naked_vec128s
