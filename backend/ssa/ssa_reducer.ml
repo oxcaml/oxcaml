@@ -72,10 +72,6 @@ open! Int_replace_polymorphic_compare
 
 open! Ssa.Export
 
-type 'a did_emit =
-  | For_next_reducer
-  | Emitted_replacement of 'a
-
 (** [Context] methods to emit into the output graph are mutually recursive with
     the reducer's hooks. Since recursive modules currently stop inlining, we
     instead cut the cycle at the point of the reducer calling into the context,
@@ -201,6 +197,18 @@ module Context = struct
         }
 end
 
+type 'a reduction =
+  | Unchanged
+  | Reduce of (Context.Cursor.t -> 'a)
+
+let reduce_output_terminator (ctx : Context.t) ~dbg
+    (terminator : Context.out Terminator.t) =
+  Reduce (fun c -> Context.Cursor.finish_block ctx c ~dbg terminator)
+
+let reduce_input_terminator (ctx : Context.t) ~dbg
+    (terminator : finished Terminator.t) =
+  reduce_output_terminator ctx (Context.map_terminator ctx terminator) ~dbg
+
 module type Analyzer = sig
   type result
 
@@ -215,33 +223,26 @@ module type Reducer = sig
     Context.t ->
     finished Block.t ->
     instr_index:int ->
-    Context.Cursor.t ->
-    Context.out Value.t array did_emit
+    Context.out Value.t array reduction
 
   val visit_terminator :
-    Analyzer.result ->
-    Context.t ->
-    finished Block.t ->
-    Context.Cursor.t ->
-    unit did_emit
+    Analyzer.result -> Context.t -> finished Block.t -> unit reduction
 
   val emit_op :
     Analyzer.result ->
     Context.t ->
-    Context.Cursor.t ->
     op:Ssa.op ->
     dbg:Debuginfo.t ->
     typ:Cmm.machtype ->
     args:Context.out Value.t array ->
-    Context.out Value.t array did_emit
+    Context.out Value.t array reduction
 
   val finish_block :
     Analyzer.result ->
     Context.t ->
-    Context.Cursor.t ->
     dbg:Debuginfo.t ->
     Context.out Terminator.t ->
-    unit did_emit
+    unit reduction
 end
 
 module Default_analyzer = struct
@@ -254,21 +255,21 @@ module Default_reducer (Analyzer : Analyzer) = struct
   module Analyzer = Analyzer
 
   let visit_instruction (_ : Analyzer.result) (_ : Context.t)
-      (_ : finished Block.t) ~instr_index:(_ : int) (_ : Context.Cursor.t) =
-    For_next_reducer
+      (_ : finished Block.t) ~instr_index:(_ : int) =
+    Unchanged
 
   let visit_terminator (_ : Analyzer.result) (_ : Context.t)
-      (_ : finished Block.t) (_ : Context.Cursor.t) =
-    For_next_reducer
+      (_ : finished Block.t) =
+    Unchanged
 
-  let emit_op (_ : Analyzer.result) (_ : Context.t) (_ : Context.Cursor.t)
-      ~op:(_ : Ssa.op) ~dbg:(_ : Debuginfo.t) ~typ:(_ : Cmm.machtype)
+  let emit_op (_ : Analyzer.result) (_ : Context.t) ~op:(_ : Ssa.op)
+      ~dbg:(_ : Debuginfo.t) ~typ:(_ : Cmm.machtype)
       ~args:(_ : Context.out Value.t array) =
-    For_next_reducer
+    Unchanged
 
-  let finish_block (_ : Analyzer.result) (_ : Context.t) (_ : Context.Cursor.t)
-      ~dbg:(_ : Debuginfo.t) (_ : Context.out Terminator.t) =
-    For_next_reducer
+  let finish_block (_ : Analyzer.result) (_ : Context.t) ~dbg:(_ : Debuginfo.t)
+      (_ : Context.out Terminator.t) =
+    Unchanged
 end
 
 module Combine (A : Reducer) (B : Reducer) : Reducer = struct
@@ -278,25 +279,25 @@ module Combine (A : Reducer) (B : Reducer) : Reducer = struct
     let run g = A.Analyzer.run g, B.Analyzer.run g
   end
 
-  let visit_instruction (ra, rb) ctx block ~instr_index c =
-    match A.visit_instruction ra ctx block ~instr_index c with
-    | For_next_reducer -> B.visit_instruction rb ctx block ~instr_index c
-    | Emitted_replacement vs -> Emitted_replacement vs
+  let visit_instruction (ra, rb) ctx block ~instr_index =
+    match A.visit_instruction ra ctx block ~instr_index with
+    | Unchanged -> B.visit_instruction rb ctx block ~instr_index
+    | Reduce _ as r -> r
 
-  let visit_terminator (ra, rb) ctx block c =
-    match A.visit_terminator ra ctx block c with
-    | For_next_reducer -> B.visit_terminator rb ctx block c
-    | Emitted_replacement () -> Emitted_replacement ()
+  let visit_terminator (ra, rb) ctx block =
+    match A.visit_terminator ra ctx block with
+    | Unchanged -> B.visit_terminator rb ctx block
+    | Reduce _ as r -> r
 
-  let emit_op (ra, rb) ctx c ~op ~dbg ~typ ~args =
-    match A.emit_op ra ctx c ~op ~dbg ~typ ~args with
-    | For_next_reducer -> B.emit_op rb ctx c ~op ~dbg ~typ ~args
-    | Emitted_replacement vs -> Emitted_replacement vs
+  let emit_op (ra, rb) ctx ~op ~dbg ~typ ~args =
+    match A.emit_op ra ctx ~op ~dbg ~typ ~args with
+    | Unchanged -> B.emit_op rb ctx ~op ~dbg ~typ ~args
+    | Reduce _ as r -> r
 
-  let finish_block (ra, rb) ctx c ~dbg t =
-    match A.finish_block ra ctx c ~dbg t with
-    | For_next_reducer -> B.finish_block rb ctx c ~dbg t
-    | Emitted_replacement () -> Emitted_replacement ()
+  let finish_block (ra, rb) ctx ~dbg t =
+    match A.finish_block ra ctx ~dbg t with
+    | Unchanged -> B.finish_block rb ctx ~dbg t
+    | Reduce _ as r -> r
 end
 
 module Make_run (R : Reducer) = struct
@@ -359,14 +360,14 @@ module Make_run (R : Reducer) = struct
        closures stored in [Context.t]; the main walk calls them directly, while
        [Context.Cursor.*] are thin wrappers onto them for the reducer. *)
     let emit_op ctx c ~op ~dbg ~typ ~args =
-      match R.emit_op analysis ctx c ~op ~dbg ~typ ~args with
-      | For_next_reducer -> Ssa.Cursor.emit_op out_graph c op dbg typ args
-      | Emitted_replacement vs -> vs
+      match R.emit_op analysis ctx ~op ~dbg ~typ ~args with
+      | Unchanged -> Ssa.Cursor.emit_op out_graph c op dbg typ args
+      | Reduce f -> f c
     in
     let finish_block ctx c ~dbg term =
-      match R.finish_block analysis ctx c ~dbg term with
-      | For_next_reducer -> Ssa.Cursor.finish_block out_graph c ~dbg term
-      | Emitted_replacement () -> ()
+      match R.finish_block analysis ctx ~dbg term with
+      | Unchanged -> Ssa.Cursor.finish_block out_graph c ~dbg term
+      | Reduce f -> f c
     in
     let ctx =
       Context.create ~in_graph ~out_graph ~block_map ~op_map ~block_param_values
@@ -395,9 +396,9 @@ module Make_run (R : Reducer) = struct
     let visit_instruction (block : finished Block.t) ~instr_index c =
       let instr = Array.get (Block.body block) instr_index in
       let vs =
-        match R.visit_instruction analysis ctx block ~instr_index c with
-        | Emitted_replacement vs -> vs
-        | For_next_reducer -> default_translate_instruction instr c
+        match R.visit_instruction analysis ctx block ~instr_index with
+        | Reduce f -> f c
+        | Unchanged -> default_translate_instruction instr c
       in
       if Instruction.result_arity instr <> Array.length vs
       then
@@ -412,14 +413,15 @@ module Make_run (R : Reducer) = struct
       | Push_trap _ | Pop_trap _ -> ()
     in
     let visit_terminator (block : finished Block.t) c =
-      match R.visit_terminator analysis ctx block c with
-      | Emitted_replacement () ->
+      match R.visit_terminator analysis ctx block with
+      | Reduce f ->
+        f c;
         if not (Cursor.is_finished c)
         then
           Misc.fatal_error
             "The reducer promised to have replaced the block terminator, but \
              did not actually finish the block."
-      | For_next_reducer ->
+      | Unchanged ->
         let term = Context.map_terminator ctx (Block.terminator block) in
         finish_block ctx c ~dbg:(Block.terminator_dbg block) term
     in

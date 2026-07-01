@@ -136,9 +136,25 @@ module Context : sig
   val map_terminator : t -> finished Terminator.t -> out Terminator.t
 end
 
-type 'a did_emit =
-  | For_next_reducer
-  | Emitted_replacement of 'a
+(** A hook's decision for one instruction or terminator. [Unchanged]: defer to
+    the next reducer (under [Combine]) or the framework's default translation.
+    [Reduce f]: the reducer takes over; [f] is run with the output cursor to
+    emit the replacement (through the [Context]) and returns what the input's
+    results map to ([unit] for a terminator). *)
+type 'a reduction =
+  | Unchanged
+  | Reduce of (Context.Cursor.t -> 'a)
+
+(** Shorthand for
+    [Reduce (fun c -> Context.Cursor.finish_block ctx c ~dbg terminator)] *)
+val reduce_output_terminator :
+  Context.t -> dbg:Debuginfo.t -> Context.out Terminator.t -> unit reduction
+
+(** Shorthand for
+    [reduce_output_terminator ctx ~dbg (Context.map_terminator ctx terminator)]
+*)
+val reduce_input_terminator :
+  Context.t -> dbg:Debuginfo.t -> finished Terminator.t -> unit reduction
 
 module type Analyzer = sig
   type result
@@ -165,16 +181,11 @@ module type Reducer = sig
     Context.t ->
     finished Block.t ->
     instr_index:int ->
-    Context.Cursor.t ->
-    Context.out Value.t array did_emit
+    Context.out Value.t array reduction
 
   (** Called once per input block, after its body. *)
   val visit_terminator :
-    Analyzer.result ->
-    Context.t ->
-    finished Block.t ->
-    Context.Cursor.t ->
-    unit did_emit
+    Analyzer.result -> Context.t -> finished Block.t -> unit reduction
 
   (** Called each time the framework is about to emit an [Op] into the cursor.
       [For_next_reducer]: emit it as-is. [Emitted_replacement values]: the
@@ -183,12 +194,11 @@ module type Reducer = sig
   val emit_op :
     Analyzer.result ->
     Context.t ->
-    Context.Cursor.t ->
     op:Ssa.op ->
     dbg:Debuginfo.t ->
     typ:Cmm.machtype ->
     args:Context.out Value.t array ->
-    Context.out Value.t array did_emit
+    Context.out Value.t array reduction
 
   (** Called each time the framework is about to finish a block.
       [For_next_reducer]: the framework will finish the block with the given
@@ -197,10 +207,9 @@ module type Reducer = sig
   val finish_block :
     Analyzer.result ->
     Context.t ->
-    Context.Cursor.t ->
     dbg:Debuginfo.t ->
     Context.out Terminator.t ->
-    unit did_emit
+    unit reduction
 end
 
 (* Trivial analyzer that doesn't do anything. *)

@@ -70,32 +70,33 @@ module Simplify_conditions = struct
       true
     | _ -> false
 
-  let emit_op () ctx c ~op ~dbg ~typ ~(args : out Value.t array) =
+  let emit_op () ctx ~op ~dbg ~typ ~(args : out Value.t array) =
     match[@warning "-fragile-match"] op, args with
     | Operation.Intop_imm (Icomp Cne, 0), [| arg |] when is_comparison arg ->
-      Emitted_replacement [| arg |]
+      Reduce (fun _c -> [| arg |])
     | ( Operation.Intop_imm (Icomp Ceq, 0),
         [| Res ({ op = inner; args = inner_args; _ }, 0) |] ) -> (
       match negate_comparison inner with
       | Some negated ->
-        Emitted_replacement (Cursor.emit_op ctx c negated dbg typ inner_args)
-      | None -> For_next_reducer)
-    | _ -> For_next_reducer
+        Reduce (fun c -> Cursor.emit_op ctx c negated dbg typ inner_args)
+      | None -> Unchanged)
+    | _ -> Unchanged
 
   (* Fallback for [(cmp) = 0] feeding a two-target switch when [cmp] could not
      be flipped (so [emit_op] left the comparison in place): swap the targets
      and use [cmp] directly as the index. *)
-  let finish_block () ctx c ~dbg (t : out Terminator.t) =
+  let finish_block () ctx ~dbg (t : out Terminator.t) =
     match[@warning "-fragile-match"] t with
     | Switch
         { index = Res ({ op = Intop_imm (Icomp Ceq, 0); args = [| arg |]; _ }, 0);
           targets = [| ifnot; ifso |]
         }
       when is_comparison arg ->
-      Cursor.finish_block ctx c ~dbg
-        (Switch { index = arg; targets = [| ifso; ifnot |] });
-      Emitted_replacement ()
-    | _ -> For_next_reducer
+      Reduce
+        (fun c ->
+          Cursor.finish_block ctx c ~dbg
+            (Switch { index = arg; targets = [| ifso; ifnot |] }))
+    | _ -> Unchanged
 end
 
 module Runner = Make_run (Simplify_conditions)

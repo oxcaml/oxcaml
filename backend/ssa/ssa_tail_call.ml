@@ -76,7 +76,7 @@ module Tail_call_reducer = struct
     let _, stack_ofs_res = Proc.loc_results_call ret_ty in
     stack_ofs_args = 0 && stack_ofs_res = 0
 
-  let visit_terminator () ctx (block : finished Block.t) (c : Cursor.t) =
+  let visit_terminator () ctx (block : finished Block.t) =
     match Block.terminator block with
     | Call
         ({ op = (Direct _ | Indirect _) as call_op;
@@ -94,16 +94,13 @@ module Tail_call_reducer = struct
                (Ssa.function_info (in_graph ctx)).sym_name ->
         (* A self-recursive tail call is a back-edge to the entry block. Build
            it over input values/blocks and let [map_terminator] translate it. *)
-        Cursor.finish_block ctx c ~dbg
-          (map_terminator ctx
-             (Continue { continuation = Goto (Ssa.entry (in_graph ctx)); args }));
-        Emitted_replacement ()
+        reduce_input_terminator ctx ~dbg
+          (Continue { continuation = Goto (Ssa.entry (in_graph ctx)); args })
       | (Direct _ | Indirect _)
         when stack_offsets_zero call_op args (Block.params_machtype cont) ->
-        Cursor.finish_block ctx c ~dbg
-          (map_terminator ctx (Call { operation with continuation = Return }));
-        Emitted_replacement ()
-      | Direct _ | Indirect _ -> For_next_reducer
+        reduce_input_terminator ctx ~dbg
+          (Call { operation with continuation = Return })
+      | Direct _ | Indirect _ -> Unchanged
       | External _ | Probe _ -> Misc.fatal_error "excluded by match above")
     | Call
         { op = External _ | Probe _ | Direct _ | Indirect _;
@@ -111,7 +108,7 @@ module Tail_call_reducer = struct
           _
         }
     | Continue _ | Switch _ | Invalid _ ->
-      For_next_reducer
+      Unchanged
 end
 
 module Runner = Make_run (Tail_call_reducer)

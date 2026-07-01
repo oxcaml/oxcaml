@@ -108,10 +108,6 @@ val caml_apply_inline_fast_path : bool ref
 
 val use_ssa : bool ref
 
-(** Whether the SSA pipeline is actually used; [use_ssa] adjusted for
-    incompatible configurations (currently the LLVM backend). *)
-val ssa_enabled : unit -> bool
-
 val ssa_simplify : bool ref
 
 val ssa_validate : bool ref
