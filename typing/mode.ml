@@ -3065,7 +3065,7 @@ module Lattices_mono = struct
       | Compose :
           ('b, 'c, neither) t * ('a, 'b, neither) t
           -> ('a, 'c, neither) t
-          (** Compoistion of two morphisms. We don't allow compositions to
+          (** Composition of two morphisms. We don't allow compositions to
               appear on either side to ensure that there are a finite number of
               morphisms we can encounter in practice. *)
 
@@ -3679,7 +3679,7 @@ module Lattices_mono = struct
     | Compose :
         ('b, 'c, neither) morph * ('a, 'b, neither) morph
         -> ('a, 'c, neither) morph
-        (** Compoistion of two morphisms. We don't allow compositions to appear
+        (** Composition of two morphisms. We don't allow compositions to appear
             on either side to ensure that there are a finite number of morphisms
             we can encounter in practice. *)
 
