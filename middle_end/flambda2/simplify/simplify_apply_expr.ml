@@ -493,7 +493,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       match Apply_expr.return_mode apply with
       | Not_alloc_stack -> (
         (* [first_complex_local_param] says the closure may be allocated locally
-           at this application depth.  A heap-returning partial application still
+           at this application depth. A heap-returning partial application still
            needs a heap-allocated closure unless the type requires locality. *)
         match closure_alloc_mode_from_type with
         | Local ->

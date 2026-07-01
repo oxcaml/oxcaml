@@ -9,7 +9,7 @@
 *)
 
 let rec f x =
-  if not (x = 0 || x = 10000 || x = 20000)
+  if not (x = 0 || x = 10000)
   then 1 + f (x + 1)
   else
     try

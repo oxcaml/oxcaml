@@ -2027,9 +2027,8 @@ end = struct
     if List.exists (eq_pair pair)
          !aliased_visible_pairs
     then begin
-      let cnt = !modename_counter in
+      let cnt, m = fresh_mode_name !modename_counter in
       modename_counter := cnt + 1;
-      let m = pick_name cnt in
       printed_aliased_visible_pairs :=
         (pair,m) :: !printed_aliased_visible_pairs;
       Fmt.fprintf ppf "as %s" m
