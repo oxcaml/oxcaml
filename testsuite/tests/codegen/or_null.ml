@@ -37,13 +37,11 @@ let get_or (x : int or_null) ~default =
     match x with Null -> default | This v -> v
 [%%expect_asm X86_64{|
 get_or:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  testq %rdi, %rdi
+  testq %rax, %rax
   jne   .L0
+  movq  %rbx, %rax
   ret
 .L0:
-  movq  %rdi, %rax
   ret
 |}]
 

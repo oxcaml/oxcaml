@@ -79,11 +79,8 @@ let win64 = Arch.win64
 
 let types_are_compatible (left : Reg.t)  (right : Reg.t) =
   match left.typ, right.typ with
-  | (Tagged_int | Val | Addr), (Tagged_int | Val | Addr)
-  | Naked_int Int64, Naked_int Int64
-  | Naked_int Int32, Naked_int Int32
-  | Naked_int Int16, Naked_int Int16
-  | Naked_int Int8, Naked_int Int8
+  | (Tagged_int | Val | Addr | Naked_int (Int64 | Int32 | Int16 | Int8)),
+    (Tagged_int | Val | Addr | Naked_int (Int64 | Int32 | Int16 | Int8))
   | Float, Float
   | Float32, Float32
   | (Valx2 | Vec128), (Valx2 | Vec128) ->

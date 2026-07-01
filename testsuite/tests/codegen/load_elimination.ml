@@ -69,17 +69,13 @@ immutable_load_loop:
   movq  (%rax), %rbx
   movl  $21, %edi
   movq  %rbx, %rax
-  movq  %rdi, %rsi
-  cmpq  $1, %rsi
-  jne   .L1
+  jmp   .L1
 .L0:
   ret
 .L1:
-  leaq  -1(%rax,%rbx), %rdi
-  leaq  -2(%rsi), %rax
-  movq  %rax, %rsi
-  movq  %rdi, %rax
-  cmpq  $1, %rsi
+  leaq  -1(%rax,%rbx), %rax
+  addq  $-2, %rdi
+  cmpq  $1, %rdi
   jne   .L1
   jmp   .L0
 |}]
@@ -90,21 +86,17 @@ let mutable_load_loop r =
   foo 10 !r
 [%%expect_asm X86_64{|
 mutable_load_loop:
-  movq  %rax, %rdi
-  movq  (%rdi), %rax
-  movl  $21, %ebx
-  movq  %rbx, %rsi
-  cmpq  $1, %rsi
-  jne   .L1
+  movq  %rax, %rbx
+  movq  (%rbx), %rax
+  movl  $21, %edi
+  jmp   .L1
 .L0:
   ret
 .L1:
-  movq  (%rdi), %rbx
-  leaq  -1(%rax,%rbx), %rbx
-  leaq  -2(%rsi), %rax
-  movq  %rax, %rsi
-  movq  %rbx, %rax
-  cmpq  $1, %rsi
+  movq  (%rbx), %rsi
+  leaq  -1(%rax,%rsi), %rax
+  addq  $-2, %rdi
+  cmpq  $1, %rdi
   jne   .L1
   jmp   .L0
 |}]
@@ -115,11 +107,10 @@ let reload_after_nonaliasing_store r out =
   load r + load r
 [%%expect_asm X86_64{|
 reload_after_nonaliasing_store:
-  movq  %rax, %rdi
   movq  $3, (%rbx)
-  movq  (%rdi), %rax
+  movq  (%rax), %rdi
   movq  $3, (%rbx)
-  movq  (%rdi), %rbx
-  leaq  -1(%rbx,%rax), %rax
+  movq  (%rax), %rax
+  leaq  -1(%rax,%rdi), %rax
   ret
 |}]

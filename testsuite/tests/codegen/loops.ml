@@ -91,15 +91,10 @@ let loop_with_non_dominating_load x l =
   loop 100 0
 [%%expect_asm X86_64{|
 loop_with_non_dominating_load:
-  movq  %rbx, %rdi
-  movl  $1, %ebx
-  movl  $201, %eax
-  movq  %rax, %rsi
-  movq  %rbx, %rax
-  cmpq  $1, %rsi
-  jle   .L2
+  movl  $1, %eax
+  movl  $201, %edi
 .L0:
-  testb $1, %dil
+  testb $1, %bl
   je    .L1
   movq  camlStdlib__List__Pmakeblock2453@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
@@ -107,14 +102,11 @@ loop_with_non_dominating_load:
   popq  %r11
   jmp   *%r11
 .L1:
-  movq  (%rdi), %rbx
-  leaq  -1(%rax,%rbx), %rbx
-  leaq  -2(%rsi), %rax
-  movq  %rax, %rsi
-  movq  %rbx, %rax
-  cmpq  $1, %rsi
+  movq  (%rbx), %rsi
+  leaq  -1(%rax,%rsi), %rax
+  addq  $-2, %rdi
+  cmpq  $1, %rdi
   jg    .L0
-.L2:
   ret
 |}]
 
@@ -149,15 +141,14 @@ f:
   jmp   camlTOP5__do_work_11_15_code@PLT
 
 f.do_work:
-  movq  %rbx, %rdi
-  movq  16(%rdi), %rax
+  movq  16(%rbx), %rax
   leaq  -1(%rax,%rax), %rax
-  movl  $1, %ebx
+  movl  $1, %edi
 .L0:
-  movq  16(%rdi), %rsi
+  movq  16(%rbx), %rsi
   leaq  -1(%rax,%rsi), %rax
-  incq  %rbx
-  cmpq  $100, %rbx
+  incq  %rdi
+  cmpq  $100, %rdi
   jle   .L0
   ret
 |}]
@@ -195,25 +186,21 @@ let f n =
   !sum
 [%%expect_asm X86_64{|
 f:
-  cmpq  $1, %rax
-  jl    .L2
   movq  %rax, %rbx
+  cmpq  $1, %rbx
+  jl    .L1
   sarq  $1, %rbx
   movl  $1, %eax
   xorl  %edi, %edi
-  movq  %rax, %rsi
 .L0:
-  movq  %rdi, %rax
-  imulq $6, %rax
+  movq  %rdi, %rsi
+  imulq $6, %rsi
   addq  %rsi, %rax
   incq  %rdi
   cmpq  %rbx, %rdi
-  jg    .L1
-  movq  %rax, %rsi
-  jmp   .L0
-.L1:
+  jle   .L0
   ret
-.L2:
+.L1:
   movl  $1, %eax
   ret
 |}]
@@ -240,31 +227,31 @@ module M = struct
 end
 [%%expect_asm X86_64{|
 M.f:
-  movq  %rax, %rdi
-  movq  -8(%rdi), %rax
+  movq  %rax, %rbx
+  movq  -8(%rbx), %rax
   salq  $8, %rax
   shrq  $18, %rax
-  movq  %rax, %rbx
-  shrq  $63, %rbx
+  movq  %rax, %rdi
+  shrq  $63, %rdi
   movabsq $6148914691236517206, %rsi
   imulq %rsi
-  leaq  (%rdx,%rbx), %rax
+  leaq  (%rdx,%rdi), %rax
   leaq  -1(%rax,%rax), %rax
   cmpq  $1, %rax
   jl    .L1
   sarq  $1, %rax
   vxorpd %xmm0, %xmm0, %xmm0
-  xorl  %ebx, %ebx
+  xorl  %edi, %edi
 .L0:
-  movq  %rbx, %rsi
+  movq  %rdi, %rsi
   imulq $6, %rsi
   incq  %rsi
-  vmovsd -4(%rdi,%rsi,4), %xmm1
-  vmulsd 4(%rdi,%rsi,4), %xmm1, %xmm1
-  vmulsd 12(%rdi,%rsi,4), %xmm1, %xmm1
+  vmovsd -4(%rbx,%rsi,4), %xmm1
+  vmulsd 4(%rbx,%rsi,4), %xmm1, %xmm1
+  vmulsd 12(%rbx,%rsi,4), %xmm1, %xmm1
   vaddsd %xmm1, %xmm0, %xmm0
-  incq  %rbx
-  cmpq  %rax, %rbx
+  incq  %rdi
+  cmpq  %rax, %rdi
   jle   .L0
   ret
 .L1:
@@ -282,9 +269,8 @@ let loop_invariant_code (should_call_f : bool) (f : unit -> unit) =
 loop_invariant_code:
   subq  $24, %rsp
   movq  %rax, (%rsp)
-  movq  %rbx, %rdi
-  movq  %rdi, 8(%rsp)
-  xorl  %ebx, %ebx
+  movq  %rbx, 8(%rsp)
+  xorl  %edi, %edi
   cmpq  $1, %rax
   je    .L3
   jmp   .L1
@@ -292,18 +278,17 @@ loop_invariant_code:
   cmpq  $1, %rax
   je    .L3
 .L1:
-  movq  %rbx, 16(%rsp)
+  movq  %rdi, 16(%rsp)
   movl  $1, %eax
-  movq  (%rdi), %rsi
-  movq  %rdi, %rbx
-  call  *%rsi
+  movq  (%rbx), %rdi
+  call  *%rdi
 .L2:
   movq  (%rsp), %rax
-  movq  8(%rsp), %rdi
-  movq  16(%rsp), %rbx
+  movq  8(%rsp), %rbx
+  movq  16(%rsp), %rdi
 .L3:
-  incq  %rbx
-  cmpq  $9, %rbx
+  incq  %rdi
+  cmpq  $9, %rdi
   jle   .L0
   movl  $1, %eax
   addq  $24, %rsp

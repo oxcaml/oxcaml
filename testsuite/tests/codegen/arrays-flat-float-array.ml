@@ -68,9 +68,8 @@ let int32_unsafe_get_indexed_by_int64 (x : Int32_u.t array) (i : Int64_u.t) =
 ;;
 [%%expect_asm X86_64{|
 int32_unsafe_get_indexed_by_int64:
-  movq  %rax, %rdi
-  leaq  1(%rbx,%rbx), %rax
-  movslq -2(%rdi,%rax,2), %rax
+  leaq  1(%rbx,%rbx), %rbx
+  movslq -2(%rax,%rbx,2), %rax
   ret
 |}]
 
@@ -121,23 +120,23 @@ let poly_unsafe_get (a : 'a array) (i : int) =
   Array.unsafe_get a i
 [%%expect_asm X86_64{|
 poly_unsafe_get:
-  movzbq -8(%rax), %rdi
-  cmpq  $254, %rdi
+  movq  %rax, %rdi
+  movzbq -8(%rdi), %rax
+  cmpq  $254, %rax
   jne   .L1
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rdi
-  movq  $1277, -8(%rdi)
-  vmovsd -4(%rax,%rbx,4), %xmm0
-  vmovsd %xmm0, (%rdi)
-  movq  %rdi, %rax
+  leaq  8(%r15), %rax
+  movq  $1277, -8(%rax)
+  vmovsd -4(%rdi,%rbx,4), %xmm0
+  vmovsd %xmm0, (%rax)
   addq  $8, %rsp
   ret
 .L1:
-  movq  -4(%rax,%rbx,4), %rax
+  movq  -4(%rdi,%rbx,4), %rax
   ret
 |}]
 
@@ -424,13 +423,12 @@ let int_safe_get (a : int array) (i : int) =
   Array.get a i
 [%%expect_asm X86_64{|
 int_safe_get:
-  movq  %rax, %rdi
-  movq  -8(%rdi), %rax
-  salq  $8, %rax
-  shrq  $17, %rax
-  cmpq  %rax, %rbx
+  movq  -8(%rax), %rdi
+  salq  $8, %rdi
+  shrq  $17, %rdi
+  cmpq  %rdi, %rbx
   jae   .L0
-  movq  -4(%rdi,%rbx,4), %rax
+  movq  -4(%rax,%rbx,4), %rax
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
@@ -445,14 +443,13 @@ let ref_safe_set (a : string array) (i : int) (v : string) =
 [%%expect_asm X86_64{|
 ref_safe_set:
   subq  $8, %rsp
-  movq  %rax, %rdx
   movq  %rdi, %rsi
-  movq  -8(%rdx), %rax
-  salq  $8, %rax
-  shrq  $17, %rax
-  cmpq  %rax, %rbx
+  movq  -8(%rax), %rdi
+  salq  $8, %rdi
+  shrq  $17, %rdi
+  cmpq  %rdi, %rbx
   jae   .L0
-  leaq  -4(%rdx,%rbx,4), %rdi
+  leaq  -4(%rax,%rbx,4), %rdi
   call  caml_modify@PLT
   movl  $1, %eax
   addq  $8, %rsp
@@ -509,23 +506,22 @@ let poly_safe_set (a : 'a array) (i : int) (v : 'a) =
   Array.set a i v
 [%%expect_asm X86_64{|
 poly_safe_set:
-  movq  %rax, %rdx
   movq  %rdi, %rsi
-  movq  -8(%rdx), %rax
-  salq  $8, %rax
-  shrq  $17, %rax
-  cmpq  %rax, %rbx
+  movq  -8(%rax), %rdi
+  salq  $8, %rdi
+  shrq  $17, %rdi
+  cmpq  %rdi, %rbx
   jae   .L1
-  movzbq -8(%rdx), %rax
-  cmpq  $254, %rax
+  movzbq -8(%rax), %rdi
+  cmpq  $254, %rdi
   jne   .L0
   vmovsd (%rsi), %xmm0
-  vmovsd %xmm0, -4(%rdx,%rbx,4)
+  vmovsd %xmm0, -4(%rax,%rbx,4)
   movl  $1, %eax
   ret
 .L0:
   subq  $8, %rsp
-  leaq  -4(%rdx,%rbx,4), %rdi
+  leaq  -4(%rax,%rbx,4), %rdi
   call  caml_modify@PLT
   movl  $1, %eax
   addq  $8, %rsp
@@ -544,14 +540,13 @@ let int64_safe_get (a : int64# array) (i : int) =
   Array.get a i
 [%%expect_asm X86_64{|
 int64_safe_get:
-  movq  %rax, %rdi
-  movq  -8(%rdi), %rax
-  salq  $8, %rax
-  shrq  $18, %rax
-  salq  $1, %rax
-  cmpq  %rax, %rbx
+  movq  -8(%rax), %rdi
+  salq  $8, %rdi
+  shrq  $18, %rdi
+  salq  $1, %rdi
+  cmpq  %rdi, %rbx
   jae   .L0
-  movq  -4(%rdi,%rbx,4), %rax
+  movq  -4(%rax,%rbx,4), %rax
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
@@ -565,13 +560,12 @@ let float_safe_get (a : float# array) (i : int) =
   Array.get a i
 [%%expect_asm X86_64{|
 float_safe_get:
-  movq  %rax, %rdi
-  movq  -8(%rdi), %rax
-  salq  $8, %rax
-  shrq  $17, %rax
-  cmpq  %rax, %rbx
+  movq  -8(%rax), %rdi
+  salq  $8, %rdi
+  shrq  $17, %rdi
+  cmpq  %rdi, %rbx
   jae   .L0
-  vmovsd -4(%rdi,%rbx,4), %xmm0
+  vmovsd -4(%rax,%rbx,4), %xmm0
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
@@ -585,13 +579,12 @@ let float_safe_get_plain (a : float array) (i : int) =
   Float_u.of_float (Array.get a i)
 [%%expect_asm X86_64{|
 float_safe_get_plain:
-  movq  %rax, %rdi
-  movq  -8(%rdi), %rax
-  salq  $8, %rax
-  shrq  $17, %rax
-  cmpq  %rax, %rbx
+  movq  -8(%rax), %rdi
+  salq  $8, %rdi
+  shrq  $17, %rdi
+  cmpq  %rdi, %rbx
   jae   .L0
-  vmovsd -4(%rdi,%rbx,4), %xmm0
+  vmovsd -4(%rax,%rbx,4), %xmm0
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
@@ -605,19 +598,17 @@ let int32_safe_get (a : int32# array) (i : int) =
   Array.get a i
 [%%expect_asm X86_64{|
 int32_safe_get:
-  movq  %rax, %rdi
-  movzbq -8(%rdi), %rax
-  movq  %rax, %rsi
-  andl  $1, %esi
-  movq  -8(%rdi), %rax
-  salq  $8, %rax
-  shrq  $18, %rax
-  salq  $1, %rax
-  subq  %rsi, %rax
-  salq  $1, %rax
-  cmpq  %rax, %rbx
+  movzbq -8(%rax), %rdi
+  andl  $1, %edi
+  movq  -8(%rax), %rsi
+  salq  $8, %rsi
+  shrq  $18, %rsi
+  salq  $1, %rsi
+  subq  %rdi, %rsi
+  salq  $1, %rsi
+  cmpq  %rsi, %rbx
   jae   .L0
-  movslq -2(%rdi,%rbx,2), %rax
+  movslq -2(%rax,%rbx,2), %rax
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
