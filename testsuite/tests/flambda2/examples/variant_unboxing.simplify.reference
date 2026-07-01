@@ -72,7 +72,7 @@ let code loopify(never) size(94) newer_version_of(f2_1)
                         a,
                         poison.val.variant_unboxing_field)))
     where k3
-            (t : [ 0 |1 | 0 of imm tagged |1 of imm tagged * imm tagged ],
+            (t : [ 0 | 1 | 0 of imm tagged | 1 of imm tagged * imm tagged ],
              tag : imm,
              is_int : imm,
              unboxed_field_1_1,

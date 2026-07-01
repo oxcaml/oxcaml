@@ -761,14 +761,20 @@ module With_subkind = struct
             | (Naked_number _ | Region | Rec_info), _, Nullable ->
               assert false
           in
-          Format.fprintf ppf "%t=Variant((consts (%a))@ (non_consts (%a)))%t"
-            colour Target_ocaml_int.Set.print consts
-            (Tag.Scannable.Map.print (fun ppf (_shape, fields) ->
-                 Format.fprintf ppf "[%a]"
-                   (Format.pp_print_list ~pp_sep:Format.pp_print_space
-                      print_field)
-                   fields))
-            non_consts Flambda_colours.pop
+          let consts = consts |> Target_ocaml_int.Set.to_seq |> List.of_seq in
+          let non_consts =
+            non_consts |> Tag.Scannable.Map.to_seq |> List.of_seq
+          in
+          let pp_const = Target_ocaml_int.print in
+          let pp_tag = Tag.Scannable.print in
+          let pp_non_const ppf (_shape, fields) =
+            Format.fprintf ppf "@[<hov 1>[%a]@]"
+              (Format.pp_print_list ~pp_sep:Format.pp_print_space print_field)
+              fields
+          in
+          Format.fprintf ppf "%t=%a%t" colour
+            (Misc.pp_variant_shape ~pp_const ~pp_tag ~pp_non_const)
+            (~consts, ~non_consts) Flambda_colours.pop
         | Float_block { num_fields } ->
           Format.fprintf ppf "%t=Float_block(%d)%t" colour num_fields
             Flambda_colours.pop

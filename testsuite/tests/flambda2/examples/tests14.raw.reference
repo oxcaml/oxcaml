@@ -51,7 +51,7 @@ let $camlTests14__first_const = Block 0 () in
        cont k1 (1)
  in
  let code size(12)
-       gadt_match_3 (x : [ 0 |1 | 0 of imm tagged ], n : val)
+       gadt_match_3 (x : [ 0 | 1 | 0 of imm tagged ], n : val)
          my_closure _region _ghost_region my_depth
          -> k1 * k2
          : val =

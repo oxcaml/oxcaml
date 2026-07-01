@@ -100,8 +100,7 @@ and code rec loopify(never) size(35) newer_version_of(remove_min_binding_2)
                       (apply_result :
                          [ 0
                          | 0 of [ 0 | 0 of val * imm tagged * val ] *
-                             imm tagged * [ 0 | 0 of val * imm tagged * val ]
-                         ]) =
+                             imm tagged * [ 0 | 0 of val * imm tagged * val ] ]) =
                 apply direct(bal_0_1)
                   ($camlMap_remove__bal_5
                    : _ ->

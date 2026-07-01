@@ -9,8 +9,6 @@ let pp_comma_list f = pp_list ~sep:",@ " f
 
 let pp_semi_list f = pp_list ~sep:";@ " f
 
-let pp_pipe_list f = pp_list ~sep:"@ |" f
-
 let empty_fmt : (unit, Format.formatter, unit) format = ""
 
 let space_fmt : (unit, Format.formatter, unit) format = "@ "
@@ -208,25 +206,11 @@ let rec subkind ppf (k : subkind) =
   | Generic_array -> str "any array"
 
 and variant_subkind ppf consts non_consts =
-  match consts, non_consts with
-  | [], [] ->
-    Format.pp_print_string ppf "[ ]" (* Empty variant? Sure, whatever *)
-  | _, _ ->
-    (* Align first | in line with opening [*)
-    Format.fprintf ppf "@[<hov 0>[ ";
-    pp_pipe_list (fun ppf -> Format.fprintf ppf "%Ld") ppf consts;
-    let () =
-      match consts, non_consts with
-      | [], _ | _, [] -> ()
-      | _ :: _, _ :: _ -> Format.fprintf ppf "@ | "
-    in
-    let pp_pair ppf (tag, sk) =
-      Format.fprintf ppf "@[<hov 2>%d of %a@]" tag
-        (pp_star_list kind_with_subkind)
-        sk
-    in
-    pp_pipe_list pp_pair ppf non_consts;
-    Format.fprintf ppf "@ ]@]"
+  let pp_const ppf const = Format.fprintf ppf "%Ld" const in
+  let pp_tag ppf tag = Format.fprintf ppf "%d" tag in
+  let pp_non_const = pp_star_list kind_with_subkind in
+  Misc.pp_variant_shape ~pp_const ~pp_tag ~pp_non_const ppf
+    (~consts, ~non_consts)
 
 and kind_with_subkind ppf (k : kind_with_subkind) =
   let str s = Format.pp_print_string ppf s in

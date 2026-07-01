@@ -21,7 +21,7 @@ let f (b : bool) (x : int) =
      (function {nlocal = 0} b[value<int>] x[value<int>] : int
        (region
          (let
-           (opt =[value<(consts (0)) (non_consts ([0: value<int>]))>]
+           (opt =[value<[ 0 | 0 of value<int> ]>]
               (if b 0 (makelocalblock 0 (value<int>) x)))
            (if opt (field_imm 0 opt) 1)))))
   (apply (field_imm 1 (global Toploop!)) "f" f))
@@ -43,9 +43,9 @@ let g (b : bool) (x : float#) =
      (function {nlocal = 0} b[value<int>] x[float] : float
        (region
          (let
-           (opt =[value<(consts (0)) (non_consts ([0: float64]))>]
+           (opt =[value<[ 0 | 0 of float64 ]>]
               (if b 0 (makelocalblock 0 (float64) x)))
-           (if opt (%float_of_float# (mixedfield 0  (float64) opt)) 0.0)))))
+           (if opt (%float_of_float# (mixedfield 0 (float64) opt)) 0.0)))))
   (apply (field_imm 1 (global Toploop!)) "g" g))
 val g : bool -> float# -> float = <fun>
 |}]
@@ -65,9 +65,8 @@ let containing_void (r : unit# t) = r
 [%%expect{|
 (let
   (containing_void =
-     (function {nlocal = 0}
-       r[value<(consts (0)) (non_consts ([0: product ]))>]
-       : (consts (0)) (non_consts ([0: product ])) r))
+     (function {nlocal = 0} r[value<[ 0 | 0 of product ]>]
+       : [ 0 | 0 of product ] r))
   (apply (field_imm 1 (global Toploop!)) "containing_void" containing_void))
 val containing_void : unit# t -> unit# t = <fun>
 |}]

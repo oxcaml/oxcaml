@@ -111,7 +111,7 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
             let s' = %block_load.[`1`] (`*match*`) in
             let x = %block_load.[`0`] (`*match*`) in
             (apply f (x) -> k5 * k2
-               where k5 (apply_result : [ 0 |1 ]) =
+               where k5 (apply_result : [ 0 | 1 ]) =
                  ((let untagged = %untag_imm (apply_result) in
                    switch untagged
                      | 0 -> k5

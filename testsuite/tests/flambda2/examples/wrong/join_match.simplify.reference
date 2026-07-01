@@ -1,7 +1,7 @@
 let code g_0 deleted in
 let code bar_1 deleted in
 let code inline(always) loopify(never) size(33) newer_version_of(g_0)
-      g_0_1 (t : [ 0 of imm tagged |1 of imm tagged |2 of imm tagged ])
+      g_0_1 (t : [ 0 of imm tagged | 1 of imm tagged | 2 of imm tagged ])
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =

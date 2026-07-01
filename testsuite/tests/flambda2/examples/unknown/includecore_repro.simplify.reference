@@ -6,9 +6,9 @@ in
 let code inline(never) loopify(never) size(160) newer_version_of(f_0)
       f_0_1
         (x :
-           [ 0 of [ 0 |1 | 0 of imm tagged * imm tagged |1 of imm tagged ] ],
+           [ 0 of [ 0 | 1 | 0 of imm tagged * imm tagged | 1 of imm tagged ] ],
          y :
-           [ 0 of [ 0 |1 | 0 of imm tagged * imm tagged |1 of imm tagged ] ])
+           [ 0 of [ 0 | 1 | 0 of imm tagged * imm tagged | 1 of imm tagged ] ])
         my_closure _region _ghost_region my_depth
         -> k * k1
         : [ 0 | 0 of val ] =

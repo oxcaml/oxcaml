@@ -1621,6 +1621,27 @@ let pp_nested_list ~nested ~pp_element ~pp_sep ppf arg =
        (Format.pp_print_list ~pp_sep (pp_element ~nested:true)))
     arg
 
+let pp_variant_shape
+      ~pp_const ~pp_tag ~pp_non_const ppf (~consts, ~non_consts) =
+  match consts, non_consts with
+  | [], [] ->
+    Format.pp_print_string ppf "[ ]"
+  | _, _ ->
+    (* Align first | in line with opening [*)
+    Format.fprintf ppf "@[<hov 0>[ ";
+    let pp_sep ppf () = Format.fprintf ppf "@ | " in
+    Format.pp_print_list ~pp_sep pp_const ppf consts;
+    let () =
+      match consts, non_consts with
+      | [], _ | _, [] -> ()
+      | _ :: _, _ :: _ -> pp_sep ppf ()
+    in
+    let pp_pair ppf (tag, non_const) =
+      Format.fprintf ppf "@[<hov 2>%a of@ %a@]"
+        pp_tag tag pp_non_const non_const
+    in
+    Format.pp_print_list ~pp_sep pp_pair ppf non_consts;
+    Format.fprintf ppf " ]@]"
 
 (* Printing a table of strings with headers. *)
 type table =

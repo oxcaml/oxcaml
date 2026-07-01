@@ -79,7 +79,7 @@ type s = { e : t; f : t; }
           (two_u =? (apply (field_imm 0 (global Toploop!)) "two_u")
            one =? (apply (field_imm 0 (global Toploop!)) "one"))
           (region
-            (mixedfield 0  (value<int>,untagged_immediate)
+            (mixedfield 0 (value<int>,untagged_immediate)
               (makelocalblock 0 (value_or_null<int>,untagged_immediate) one
                 two_u)))) ⟫ }
 - : int = 1
@@ -106,14 +106,12 @@ let y = { a = two; b = one } in
   r = ⟪ (let
           (two =? (apply (field_imm 0 (global Toploop!)) "two")
            one =? (apply (field_imm 0 (global Toploop!)) "one")
-           x =[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+           x =[value<[ 0 of value<int>, value<int> ]>]
              (makeblock 0 (value<int>,value<int>) one two)
-           y =[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+           y =[value<[ 0 of value<int>, value<int> ]>]
              (makeblock 0 (value<int>,value<int>) two one))
-          (makeblock 0 (value<
-                         (consts ())
-                          (non_consts ([0: value<int>, value<int>]))>,
-            value<(consts ()) (non_consts ([0: value<int>, value<int>]))>) x
-            y)) ⟫ }
+          (makeblock 0 (value<[ 0 of value<int>, value<int> ]>,
+                        value<[ 0 of value<int>, value<int> ]>)
+            x y)) ⟫ }
 - : s = {e = {a = 1; b = 2}; f = {a = 2; b = 1}}
 |}];;

@@ -59,10 +59,8 @@ end
 [%%expect{|
 (apply (field_imm 1 (global Toploop!)) "X/366"
   (let
-    (x1 =[value<(consts ()) (non_consts ([0: *, value<int>]))>]
-       [0: "first" 1]
-     x2 =[value<(consts ()) (non_consts ([0: *, value<int>]))>]
-       [0: "second" 2])
+    (x1 =[value<[ 0 of *, value<int> ]>] [0: "first" 1]
+     x2 =[value<[ 0 of *, value<int> ]>] [0: "second" 2])
     (makeblock 0 x1 x2)))
 module X : sig type t : immutable_data val x1 : t val x2 : t end
 |}]

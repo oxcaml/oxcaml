@@ -33,15 +33,12 @@ let example_1 () =
   | { a = true; b = Either.Left y } -> Result.Ok y;;
 (let
   (example_1/0 =
-     (function {nlocal = 0} param/0[value<int>]
-       : (consts ()) (non_consts ([1: ?] [0: ?]))
+     (function {nlocal = 0} param/0[value<int>] : [ 1 of ? | 0 of ? ]
        (region
          (let
            (input/0 =
-              (makelocalmutable 0 (value<int>,value<
-                                               (consts ())
-                                                (non_consts ([1: ?] [0: ?]))>)
-                1 [0: 1]))
+              (makelocalmutable 0 (value<int>,value<[ 1 of ? | 0 of ? ]>) 1
+                [0: 1]))
            (if (field_int 0 input/0)
              (let (*match*/0 =o? (field_mut 1 input/0))
                (switch* *match*/0
@@ -88,16 +85,12 @@ let example_2 () =
   | { a = true; b = { mut = Either.Left y } } -> Result.Ok y;;
 (let
   (example_2/0 =
-     (function {nlocal = 0} param/1[value<int>]
-       : (consts ()) (non_consts ([1: ?] [0: ?]))
+     (function {nlocal = 0} param/1[value<int>] : [ 1 of ? | 0 of ? ]
        (region
          (let
-           (input/1 =[value<(consts ()) (non_consts ([0: value<int>, *]))>]
+           (input/1 =[value<[ 0 of value<int>, * ]>]
               (makelocalblock 0 (value<int>,*) 1
-                (makelocalmutable 0 (value<
-                                      (consts ()) (non_consts ([1: ?]
-                                       [0: ?]))>)
-                  [0: 1])))
+                (makelocalmutable 0 (value<[ 1 of ? | 0 of ? ]>) [0: 1])))
            (if (field_int 0 input/1)
              (let (*match*/2 =o? (field_mut 0 (field_imm 1 input/1)))
                (switch* *match*/2
@@ -146,16 +139,11 @@ let example_3 () =
   | { mut = (true, Either.Left y) } -> Result.Ok y;;
 (let
   (example_3/0 =
-     (function {nlocal = 0} param/2[value<int>]
-       : (consts ()) (non_consts ([1: ?] [0: ?]))
+     (function {nlocal = 0} param/2[value<int>] : [ 1 of ? | 0 of ? ]
        (region
          (let
            (input/2 =mut[value<
-                          (consts ())
-                           (non_consts ([0: value<int>,
-                                         value<
-                                          (consts ()) (non_consts ([1: ?]
-                                           [0: ?]))>]))>]
+                          [ 0 of value<int>, value<[ 1 of ? | 0 of ? ]> ]>]
               [0: 1 [0: 1]]
             *match*/4 =o? *input/2)
            (if (field_imm 0 *match*/4)

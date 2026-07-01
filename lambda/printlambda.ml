@@ -163,6 +163,9 @@ let locality_mode ppf = function
   | Alloc_heap -> fprintf ppf "heap"
   | Alloc_local -> fprintf ppf "local"
 
+(* CR-soon lmaurer: We should really refactor [mixed_block_element] and
+   [mixed_block_element] into one function. *)
+
 let rec mixed_block_element print_value_kind ppf el =
   match el with
   | Value vk -> print_value_kind ppf vk
@@ -178,6 +181,7 @@ let rec mixed_block_element print_value_kind ppf el =
   | Vec512 -> fprintf ppf "vec512"
   | Word -> fprintf ppf "word"
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
+  | Product [| |] -> fprintf ppf "product"
   | Product shape ->
     fprintf ppf "product %a"
       (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
@@ -185,28 +189,22 @@ let rec mixed_block_element print_value_kind ppf el =
   | Splice_variable id -> fprintf ppf "$%a" Ident.print id
 
 let constructor_shape print_value_kind ppf shape =
+  let pp_sep ppf () = fprintf ppf ",@ " in
   match shape with
   | Constructor_uniform fields ->
-     Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
-       print_value_kind ppf fields
+    fprintf ppf "@[<hov>%a@]"
+      (Format.pp_print_list ~pp_sep print_value_kind) fields
   | Constructor_mixed shape->
-    fprintf ppf "%a"
-      (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
-         (mixed_block_element print_value_kind)) (Array.to_list shape)
-
-let tag_and_constructor_shape print_value_kind ppf (tag, shape) =
-  fprintf ppf "@[<hov 1>[%d:@ %a]@]"
-    tag
-    (constructor_shape print_value_kind)
-    shape
+    fprintf ppf "@[<hov>%a@]"
+      (Format.pp_print_list ~pp_sep (mixed_block_element print_value_kind))
+      (Array.to_list shape)
 
 let variant_kind print_value_kind ppf ~consts ~non_consts =
-  fprintf ppf "@[<hov 1>(consts (%a))@ (non_consts (%a))@]"
-    (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_int)
-    consts
-    (Format.pp_print_list ~pp_sep:Format.pp_print_space
-      (tag_and_constructor_shape print_value_kind))
-    non_consts
+  let pp_const = Format.pp_print_int in
+  let pp_tag = Format.pp_print_int in
+  let pp_non_const = constructor_shape print_value_kind in
+  Misc.pp_variant_shape ~pp_const ~pp_tag ~pp_non_const ppf
+    (~consts, ~non_consts)
 
 let or_null_suffix ppf nullable =
   match nullable with
@@ -344,7 +342,7 @@ let rec mixed_block_element
   | Word -> fprintf ppf "word"
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
   | Product shape ->
-    fprintf ppf "product %a" (mixed_block_shape (fun _ _ -> ())) shape
+    fprintf ppf "product%a" (mixed_block_shape (fun _ _ -> ())) shape
   | Splice_variable id -> fprintf ppf "$%a" Ident.print id
 
 and mixed_block_shape
@@ -354,13 +352,16 @@ and mixed_block_shape
   | 0 -> ()
   | 1 -> fprintf ppf " (%a)" (mixed_block_element print_mode) shape.(0)
   | _ -> begin
+    (* This really should break the line optionally, since we may be a good ways
+       into the line and we're about to print something arbitrarily long. But we
+       would need to be sure we're in a box that makes that sensible. This would
+       require some refactoring since this function has many call sites. *)
+    fprintf ppf " (@[";
     Array.iteri (fun i elt ->
-      if i = 0 then
-        fprintf ppf " (%a" (mixed_block_element print_mode) elt
-      else
-        fprintf ppf ",%a" (mixed_block_element print_mode) elt)
+      if i <> 0 then fprintf ppf ",@,";
+      fprintf ppf "%a" (mixed_block_element print_mode) elt)
       shape;
-    fprintf ppf ")"
+    fprintf ppf "@])"
   end
 
 let block_shape ppf shape = match shape with
@@ -486,7 +487,7 @@ let primitive ppf = function
       fprintf ppf "ufloatfield%a %i"
         field_read_semantics sem n
   | Pmixedfield (n, shape, sem) ->
-      fprintf ppf "mixedfield%a %a %a"
+      fprintf ppf "mixedfield%a %a%a"
         field_read_semantics sem
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int) n
         (mixed_block_shape
@@ -518,7 +519,7 @@ let primitive ppf = function
         | Assignment Modify_heap -> ""
         | Assignment Modify_maybe_stack -> "(maybe-stack)"
       in
-      fprintf ppf "setmixedfield%s %a %a"
+      fprintf ppf "setmixedfield%s %a%a"
         init
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int) n
         (mixed_block_shape (fun _ _ -> ())) shape
@@ -543,7 +544,7 @@ let primitive ppf = function
   | Pmake_idx_field pos ->
       fprintf ppf "idx_field %d" pos
   | Pmake_idx_mixed_field (shape, pos, path) ->
-      fprintf ppf "idx_mixed_field %a %a %a"
+      fprintf ppf "idx_mixed_field %a %a%a"
         (mixed_block_shape (fun _ _ -> ())) shape
         pp_print_int pos
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int)

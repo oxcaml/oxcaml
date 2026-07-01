@@ -52,7 +52,7 @@ let $camlFrom_core_char_test__char_of_string_6 =
   closure char_of_string_0_1 @char_of_string
 in
 let code inline(always) loopify(never) size(5) newer_version_of(result_is_error_1)
-      result_is_error_1_1 (r : [ 0 of val |1 of val ])
+      result_is_error_1_1 (r : [ 0 of val | 1 of val ])
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
@@ -67,7 +67,7 @@ let code inline(always) loopify(never) size(29) newer_version_of(result_try_with
       result_try_with_2_1 (f : val)
         my_closure _region _ghost_region my_depth
         -> k * k1
-        : [ 0 of val |1 of val ] =
+        : [ 0 of val | 1 of val ] =
   let try_region = %begin_try_region () in
   let try_ghost_region = %begin_try_ghost_region () in
   cont k3 push(k2)

@@ -116,8 +116,8 @@ let Popaque = %opaque ($camlData_flow_bug__immstring19) in
                                                                    0 of val *
                                                                     [ 0
                                                                     | 
-                                                                    0 of val *
-                                                                    val ] ]) =
+                                                                    0 of
+                                                                    val * val ] ]) =
                                                       let prim_1 =
                                                         %is_int (param)
                                                       in

@@ -31,8 +31,8 @@
        is_c_1
          (x,
           param :
-            [ 0 of imm tagged |1 of imm tagged |2 of imm tagged
-            |3 of imm tagged ])
+            [ 0 of imm tagged | 1 of imm tagged | 2 of imm tagged
+            | 3 of imm tagged ])
          my_closure _region _ghost_region my_depth
          -> k1 * k2
          : imm tagged =
