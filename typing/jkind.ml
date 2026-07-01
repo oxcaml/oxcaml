@@ -2097,14 +2097,14 @@ module Const = struct
            (Scannable_axis.annot_of_separability_annot separability)
     | Pjk_operator (base, sa_annot) ->
       let base_jkind =
-        of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
-          context base
+        of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
+          env context base
       in
       if warn then warn_ignored_kind_modifier ~loc env base base_jkind sa_annot;
       let jkind, _ =
         List.fold_left
           (fun (jkind, rev_axes) axis ->
-            ( apply_scannable_axis ~prior_annot:(base, rev_axes) env
+            ( apply_scannable_axis ~prior_annot:(base, rev_axes) ~warn env
                 (Some (transl_scannable_axis axis))
                 jkind,
               axis.Location.txt :: rev_axes ))
