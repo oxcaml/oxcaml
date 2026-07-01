@@ -1356,6 +1356,7 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
   let print_to_string_opt print a = Option.map (Fmt.asprintf "%a" print) a in
   let modes =
     [ print_to_string_opt Mode.Locality.Const.print diff.areality
+    ; print_to_string_opt Mode.ArealityQuoted.Const.print diff.areality_quoted
     ; print_to_string_opt Mode.Uniqueness.Const.print diff.uniqueness
     ; print_to_string_opt Mode.Linearity.Const.print diff.linearity
     ; print_to_string_opt Mode.Portability.Const.print diff.portability

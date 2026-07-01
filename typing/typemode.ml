@@ -72,6 +72,8 @@ module Mode_axis_pair = struct
     | "local" -> comonadic Areality Local
     (* "regional" is not supported *)
     | "global" -> comonadic Areality Global
+    | "quote_local" -> comonadic ArealityQuoted (Quote Local)
+    | "quote_global" -> comonadic ArealityQuoted (Quote Global)
     | "unique" -> monadic Uniqueness Unique
     | "aliased" -> monadic Uniqueness Aliased
     | "once" -> comonadic Linearity Once
@@ -136,6 +138,8 @@ module Transled_modifiers = struct
 
   type t =
     { areality : Mode.Regionality.Const.t Comonadic.Atom.t Location.loc option;
+      areality_quoted :
+        Mode.ArealityQuoted.Const.t Comonadic.Atom.t Location.loc option;
       linearity : Mode.Linearity.Const.t Comonadic.Atom.t Location.loc option;
       uniqueness : Mode.Uniqueness.Const.t Monadic.Atom.t Location.loc option;
       portability :
@@ -158,6 +162,7 @@ module Transled_modifiers = struct
 
   let empty =
     { areality = None;
+      areality_quoted = None;
       linearity = None;
       uniqueness = None;
       portability = None;
@@ -175,6 +180,7 @@ module Transled_modifiers = struct
   let get (type a) ~(axis : a Axis.t) (t : t) : a Location.loc option =
     match axis with
     | Modal (Comonadic Areality) -> t.areality
+    | Modal (Comonadic ArealityQuoted) -> t.areality_quoted
     | Modal (Comonadic Linearity) -> t.linearity
     | Modal (Monadic Uniqueness) -> t.uniqueness
     | Modal (Comonadic Portability) -> t.portability
@@ -190,6 +196,7 @@ module Transled_modifiers = struct
       t =
     match axis with
     | Modal (Comonadic Areality) -> { t with areality = value }
+    | Modal (Comonadic ArealityQuoted) -> { t with areality_quoted = value }
     | Modal (Comonadic Linearity) -> { t with linearity = value }
     | Modal (Monadic Uniqueness) -> { t with uniqueness = value }
     | Modal (Comonadic Portability) -> { t with portability = value }
@@ -316,6 +323,9 @@ let transl_mod_bounds annots =
         Transled_modifiers.
           { areality =
               Some { txt = Per_axis.min (Modal (Comonadic Areality)); loc };
+            areality_quoted =
+              Some
+                { txt = Per_axis.min (Modal (Comonadic ArealityQuoted)); loc };
             linearity =
               Some { txt = Per_axis.min (Modal (Comonadic Linearity)); loc };
             uniqueness =

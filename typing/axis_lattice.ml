@@ -63,6 +63,7 @@ let axis_shapes =
     (fun (Pack axis) ->
       match axis with
       | Modal (Comonadic Areality) -> Chain3
+      | Modal (Comonadic ArealityQuoted) -> Chain3
       | Modal (Monadic Uniqueness) -> Chain2
       | Modal (Comonadic Linearity) -> Chain2
       | Modal (Monadic Contention) -> Diamond4
