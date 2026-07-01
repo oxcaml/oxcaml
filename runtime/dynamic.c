@@ -388,28 +388,21 @@ CAMLexport bool caml_dynamic_table_dup(dynamic_table_t dst, dynamic_table_t src)
 
 CAMLexport bool caml_dynamic_table_inherit(dynamic_table_t table)
 {
-  struct stack_info *stack = Caml_state->current_stack;
-  while (stack) {
-    dynamic_table_t src = &stack->dyn;
-    if (src->bindings) {
-      size_t capacity = dynamic_table_capacity(src);
-      for (size_t i = 0; i < capacity; ++i) {
-        dynamic_stack_t src_slot = &src->bindings[i];
-        value dyn = src_slot->dyn;
-        if (Is_this(dyn) && Is_inherit(dyn)) {
-          CAMLassert(src_slot->count > 0);
-          dynamic_stack_t dst_slot = NULL;
-          if (!dynamic_table_find(table, dyn, &dst_slot)) {
-            value val = src_slot->vals[src_slot->count - 1];
-            if (!dynamic_table_push(table, dyn, val)) {
-              caml_dynamic_table_free(table);
-              return false;
-            }
-          }
+  dynamic_table_t src = &Caml_state->current_stack->dyn;
+  if (src->bindings) {
+    size_t capacity = dynamic_table_capacity(src);
+    for (size_t i = 0; i < capacity; ++i) {
+      dynamic_stack_t src_slot = &src->bindings[i];
+      value dyn = src_slot->dyn;
+      if (Is_this(dyn) && Is_inherit(dyn)) {
+        CAMLassert(src_slot->count > 0);
+        value val = src_slot->vals[src_slot->count - 1];
+        if (!dynamic_table_push(table, dyn, val)) {
+          caml_dynamic_table_free(table);
+          return false;
         }
       }
     }
-    stack = Stack_parent(stack);
   }
   return true;
 }
@@ -478,6 +471,9 @@ CAMLprim value caml_dynamic_get(value dyn)
         val = bindings->vals[bindings->count - 1];
         break;
       }
+    }
+    if(Is_inherit(dyn)) {
+      break;
     }
     stack = Stack_parent(stack);
   }
