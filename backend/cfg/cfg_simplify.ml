@@ -78,8 +78,7 @@ end = struct
        eliminate them here too, so that the [Cfg_selectgen] pipeline produces a
        comparable CFG (see [Cfg_compare]). *)
     let eliminate_dead_trap_handlers =
-      !Oxcaml_flags.cfg_eliminate_dead_trap_handlers
-      || Oxcaml_flags.ssa_enabled ()
+      !Oxcaml_flags.cfg_eliminate_dead_trap_handlers || !Oxcaml_flags.use_ssa
     in
     let handlers_are_entry_points = not eliminate_dead_trap_handlers in
     match Dataflow.run cfg ~init:Reachable ~handlers_are_entry_points () with

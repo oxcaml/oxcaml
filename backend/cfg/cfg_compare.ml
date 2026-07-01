@@ -190,8 +190,8 @@ let is_move (instr : Cfg.basic Cfg.instruction) =
   | Op (Move | Opaque) ->
     Array.length instr.arg = 1
     && Array.length instr.res = 1
-    && Reg.equal_location instr.arg.(0).Reg.loc Reg.Unknown
-    && Reg.equal_location instr.res.(0).Reg.loc Reg.Unknown
+    && Reg.is_unknown instr.arg.(0)
+    && Reg.is_unknown instr.res.(0)
   | _ -> false
 
 (* === Phase 1: structural matching === *)
@@ -285,8 +285,8 @@ let compare_instruction_fields ~ppf_m ~kind ~old_label ~new_label
 let compare_body ~ppf_m ~map_label ~old_label ~new_label old_body new_body =
   let rec skip_moves cell =
     match cell with
-    | Some c when is_move (DLL.value c) -> skip_moves (DLL.next c)
-    | _ -> cell
+    | Some c -> if is_move (DLL.value c) then skip_moves (DLL.next c) else cell
+    | None -> cell
   in
   let rec loop old_cell new_cell =
     match skip_moves old_cell, skip_moves new_cell with
@@ -314,7 +314,8 @@ let compare_body ~ppf_m ~map_label ~old_label ~new_label old_body new_body =
 let terminator_structure_match ~map_label (old_term : Cfg.terminator)
     (new_term : Cfg.terminator) =
   match old_term, new_term with
-  | Never, Never -> assert false
+  | Never, _ | _, Never ->
+    Misc.fatal_error "Never is unexpected in finished graphs"
   | Always old_label, Always new_label ->
     map_label old_label new_label;
     true
@@ -427,11 +428,77 @@ let terminator_structure_match ~map_label (old_term : Cfg.terminator)
     && String.equal old_message new_message
     && Int.equal old_stack_ofs new_stack_ofs
     && Cmm.equal_stack_align old_stack_align new_stack_align
-  | ( ( Never | Always _ | Parity_test _ | Truth_test _ | Int_test _
-      | Float_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-      | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ),
+  | ( ( Always _ | Parity_test _ | Truth_test _ | Int_test _ | Float_test _
+      | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
+      | Call_no_return _ | Call _ | Prim _ | Invalid _ ),
       _ ) ->
     false
+
+let compare_block_flags ~ppf_m ~(old_block : Cfg.basic_block)
+    ~(new_block : Cfg.basic_block) =
+  let flags_equal
+      ({ is_trap_handler;
+         can_raise;
+         stack_offset;
+         cold;
+         start = _;
+         body = _;
+         terminator = _;
+         predecessors = _;
+         exn = _
+       } :
+        Cfg.basic_block) (other : Cfg.basic_block) =
+    Bool.equal is_trap_handler other.is_trap_handler
+    && Bool.equal can_raise other.can_raise
+    && Bool.equal cold other.cold
+    && Int.equal stack_offset other.stack_offset
+  in
+  let format_block_flags ppf (block : Cfg.basic_block) =
+    Format.fprintf ppf "is_trap_handler=%b can_raise=%b cold=%b stack_offset=%d"
+      block.is_trap_handler block.can_raise block.cold block.stack_offset
+  in
+  if not (flags_equal old_block new_block)
+  then
+    Format.fprintf ppf_m "Block flags mismatch at old=%a(%a) new=%a(%a)@."
+      Label.format old_block.start format_block_flags old_block Label.format
+      new_block.start format_block_flags new_block
+
+let compare_block_exn ~ppf_m ~map_label ~(old_block : Cfg.basic_block)
+    ~(new_block : Cfg.basic_block) =
+  match old_block.exn, new_block.exn with
+  | Some old_exn, Some new_exn -> map_label old_exn new_exn
+  | None, None -> ()
+  | _ ->
+    Format.fprintf ppf_m "Exn presence mismatch at old=%a new=%a@." Label.format
+      old_block.start Label.format new_block.start
+
+let compare_terminator ~ppf_m ~map_label ~(old_block : Cfg.basic_block)
+    ~(new_block : Cfg.basic_block) =
+  if
+    not
+      (terminator_structure_match ~map_label old_block.terminator.desc
+         new_block.terminator.desc)
+  then
+    Format.fprintf ppf_m
+      "Terminator mismatch at old=%a(id:%a) new=%a(id:%a): %a vs %a@."
+      Label.format old_block.start InstructionId.print old_block.terminator.id
+      Label.format new_block.start InstructionId.print new_block.terminator.id
+      (Printcfg.terminator_desc ~sep:"")
+      old_block.terminator.desc
+      (Printcfg.terminator_desc ~sep:"")
+      new_block.terminator.desc
+  else
+    compare_instruction_fields ~ppf_m ~kind:"Terminator"
+      ~old_label:old_block.start ~new_label:new_block.start old_block.terminator
+      new_block.terminator
+
+let compare_matched_blocks ~ppf_m ~map_label ~(old_block : Cfg.basic_block)
+    ~(new_block : Cfg.basic_block) =
+  compare_block_flags ~ppf_m ~old_block ~new_block;
+  compare_block_exn ~ppf_m ~map_label ~old_block ~new_block;
+  compare_body ~ppf_m ~map_label ~old_label:old_block.start
+    ~new_label:new_block.start old_block.body new_block.body;
+  compare_terminator ~ppf_m ~map_label ~old_block ~new_block
 
 let collect_matching_blocks ~ppf_m ~old_cfg ~new_cfg =
   (* new_to_old: the primary label mapping (new_label -> old_label) *)
@@ -475,52 +542,7 @@ let collect_matching_blocks ~ppf_m ~old_cfg ~new_cfg =
           Label.format new_label
           (if Option.is_none new_block then "missing" else "ok")
       | Some old_block, Some new_block ->
-        if not (Bool.equal old_block.is_trap_handler new_block.is_trap_handler)
-        then
-          Format.fprintf ppf_m "Trap handler mismatch at old=%a new=%a@."
-            Label.format old_label Label.format new_label;
-        if not (Bool.equal old_block.can_raise new_block.can_raise)
-        then
-          Format.fprintf ppf_m "can_raise mismatch at old=%a(%b) new=%a(%b)@."
-            Label.format old_label old_block.can_raise Label.format new_label
-            new_block.can_raise;
-        if not (Bool.equal old_block.cold new_block.cold)
-        then
-          Format.fprintf ppf_m "cold mismatch at old=%a(%b) new=%a(%b)@."
-            Label.format old_label old_block.cold Label.format new_label
-            new_block.cold;
-        if not (Int.equal old_block.stack_offset new_block.stack_offset)
-        then
-          Format.fprintf ppf_m
-            "Block stack_offset mismatch at old=%a(%d) new=%a(%d)@."
-            Label.format old_label old_block.stack_offset Label.format new_label
-            new_block.stack_offset;
-        (match old_block.exn, new_block.exn with
-        | Some old_exn, Some new_exn -> map_label old_exn new_exn
-        | None, None -> ()
-        | _ ->
-          Format.fprintf ppf_m "Exn presence mismatch at old=%a new=%a@."
-            Label.format old_label Label.format new_label);
-        (* Compare body structure, debuginfo, and map labels *)
-        compare_body ~ppf_m ~map_label ~old_label ~new_label old_block.body
-          new_block.body;
-        (* Compare terminator structure and map labels *)
-        if
-          not
-            (terminator_structure_match ~map_label old_block.terminator.desc
-               new_block.terminator.desc)
-        then
-          Format.fprintf ppf_m
-            "Terminator mismatch at old=%a(id:%a) new=%a(id:%a): %a vs %a@."
-            Label.format old_label InstructionId.print old_block.terminator.id
-            Label.format new_label InstructionId.print new_block.terminator.id
-            (Printcfg.terminator_desc ~sep:"")
-            old_block.terminator.desc
-            (Printcfg.terminator_desc ~sep:"")
-            new_block.terminator.desc
-        else
-          compare_instruction_fields ~ppf_m ~kind:"Terminator" ~old_label
-            ~new_label old_block.terminator new_block.terminator
+        compare_matched_blocks ~ppf_m ~map_label ~old_block ~new_block
     end
   done;
   (* Validate predecessors match under the label mapping *)
@@ -573,17 +595,15 @@ let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
     for i = 0 to Array.length old_regs - 1 do
       let old_reg = old_regs.(i) in
       let new_reg = new_regs.(i) in
-      if
-        Reg.equal_location old_reg.Reg.loc Reg.Unknown
-        && Reg.equal_location new_reg.Reg.loc Reg.Unknown
+      if Reg.is_unknown old_reg && Reg.is_unknown new_reg
       then eqs := f !eqs ~old_reg ~new_reg
       else if not (Reg.same_loc old_reg new_reg)
       then
         Format.fprintf ppf_m
-          "Physical reg mismatch at old=%a(id:%a) new=%a(id:%a): %a vs %a@."
-          Label.format old_label InstructionId.print old_instr.id Label.format
-          new_label InstructionId.print new_instr.id Printreg.reg old_reg
-          Printreg.reg new_reg
+          "Reg mismatch at old=%a(id:%a) new=%a(id:%a): %a vs %a@." Label.format
+          old_label InstructionId.print old_instr.id Label.format new_label
+          InstructionId.print new_instr.id Printreg.reg old_reg Printreg.reg
+          new_reg
     done;
     !eqs
   in

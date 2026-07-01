@@ -511,6 +511,9 @@ module Cfg_selection = Cfg_selectgen.Make (Cfg_selection)
 
 let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
     Cfg_with_layout.t =
+  (* CR ttebbi: We should add LLVM backend support to SSA. *)
+  if !Clflags.llvm_backend
+  then Misc.fatal_error "The SSA pipeline does not support the LLVM backend.";
   let report_pipeline_error exn ssa =
     let backtrace = Printexc.get_raw_backtrace () in
     Format.fprintf ppf_dump "*** CMM:@.%a@." Printcmm.fundecl fd_cmm;
@@ -562,11 +565,11 @@ let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
   Reg.clear_relocatable_regs ();
   fd_cmm
   ++ Profile.record ~accumulate:true "cmm_invariants" (cmm_invariants ppf_dump)
-  ++ (if Oxcaml_flags.ssa_enabled ()
+  ++ (if !Oxcaml_flags.use_ssa
       then compile_via_ssa ~ppf_dump ~funcnames
       else Cfg_selection.emit_fundecl ~future_funcnames:funcnames)
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg
-       (if Oxcaml_flags.ssa_enabled () then "After SSA" else "After selection")
+       (if !Oxcaml_flags.use_ssa then "After SSA" else "After selection")
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
       if !Clflags.llvm_backend

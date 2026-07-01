@@ -60,7 +60,9 @@ module Tail_call_reducer = struct
         (fun instr -> not (Instruction.has_side_effect instr))
         (Block.body block)
       && Array.equal Value.equal args (Block.params block)
-    | _ -> false
+    | Continue { continuation = Raise _ | Unreachable | Goto _; _ }
+    | Call _ | Switch _ | Invalid _ ->
+      false
 
   let stack_offsets_zero (call_op : Ssa.call_op) (args : finished Value.t array)
       (ret_ty : Cmm.machtype) : bool =
@@ -75,7 +77,7 @@ module Tail_call_reducer = struct
     stack_ofs_args = 0 && stack_ofs_res = 0
 
   let visit_terminator () ctx (block : finished Block.t) (c : Cursor.t) =
-    match[@warning "-fragile-match"] Block.terminator block with
+    match Block.terminator block with
     | Call
         ({ op = (Direct _ | Indirect _) as call_op;
            args;
@@ -102,8 +104,14 @@ module Tail_call_reducer = struct
           (map_terminator ctx (Call { operation with continuation = Return }));
         Emitted_replacement ()
       | Direct _ | Indirect _ -> For_next_reducer
-      | External _ | Probe _ -> assert false)
-    | _ -> For_next_reducer
+      | External _ | Probe _ -> Misc.fatal_error "excluded by match above")
+    | Call
+        { op = External _ | Probe _ | Direct _ | Indirect _;
+          continuation = Return | Raise _ | Unreachable | Goto _;
+          _
+        }
+    | Continue _ | Switch _ | Invalid _ ->
+      For_next_reducer
 end
 
 module Runner = Make_run (Tail_call_reducer)

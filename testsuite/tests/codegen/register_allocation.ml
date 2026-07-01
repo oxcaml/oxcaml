@@ -563,8 +563,7 @@ f:
   movq  %rbx, %rdi
   imulq %rax, %rdi
   movq  %rbx, %rax
-  imulq %rdi, %rbx
-  subq  %rbx, %rax
+  subq  %rdi, %rax
   ret
 |}]
 
@@ -584,7 +583,7 @@ let[@inline never] register_pressure (x : int) =
   (a, b, c, d, e, f, g, h, i, j, u, v)
 [%%expect_asm X86_64{|
 register_pressure:
-  subq  $8, %rsp
+  subq  $24, %rsp
   subq  $488, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
@@ -630,11 +629,15 @@ register_pressure:
   leaq  28(%rax), %r8
   movq  %r8, 16(%rcx)
   leaq  -32(%rcx), %r8
+  movq  %r8, 8(%rsp)
   movq  $3072, -8(%r8)
+  movq  8(%rsp), %r8
   movq  %rbx, (%r8)
+  movq  8(%rsp), %r8
   movq  %rdx, 8(%r8)
+  movq  8(%rsp), %r8
   movq  %rcx, 16(%r8)
-  movq  %r8, (%rsp)
+  movq  8(%rsp), %r8
   addq  $-32, %r8
   movq  $3072, -8(%r8)
   movq  %rbx, (%r8)
@@ -675,8 +678,10 @@ register_pressure:
   leaq  -32(%r10), %r11
   movq  $3072, -8(%r11)
   leaq  30(%rax), %rbp
+  movq  %rbp, (%rsp)
   movq  %rbp, (%r11)
   leaq  32(%rax), %rbp
+  movq  %rbp, (%rsp)
   movq  %rbp, 8(%r11)
   addq  $34, %rax
   movq  %rax, 16(%r11)
@@ -693,8 +698,8 @@ register_pressure:
   movq  %r12, 64(%rax)
   movq  %r9, 72(%rax)
   movq  %r8, 80(%rax)
-  movq  (%rsp), %rbx
+  movq  8(%rsp), %rbx
   movq  %rbx, 88(%rax)
-  addq  $8, %rsp
+  addq  $24, %rsp
   ret
 |}]
