@@ -281,9 +281,8 @@ let find_best_lid env ~canon_path table target_kind =
   | Some lids ->
     Lid_path_set.to_seq lids
     |> Seq.find_map (fun ((kind, lid, _) as item) ->
-           if kind <> target_kind then None
-           else
-             Option.map (fun path -> (lid, path)) @@ find_path_in_env env item)
+        if kind <> target_kind then None
+        else Option.map (fun path -> (lid, path)) @@ find_path_in_env env item)
 
 let improve_lid env ~canon_path table kind lid =
   find_best_lid env ~canon_path table kind
@@ -301,12 +300,13 @@ let process_queue env state ~table ~canon_path target_kind best =
       (best_path, state)
     | Seq.Cons ((kind, next_lid, path), next) ->
       let next_level = compare next_lid < 0 in
-      if next_level then begin
-        match improve_lid env ~canon_path table kind best_lid with
+      if next_level then
+        begin match improve_lid env ~canon_path table kind best_lid with
         | Some (best_lid, path) when compare_longidents best_lid next_lid < 0 ->
           log ~title:"fill_by_level"
             "Finished level and found a name shorter than the previous level:\n\
-            \ %a (%a)" Logger.fmt
+            \ %a (%a)"
+            Logger.fmt
             (fun fmt -> Pprintast.longident fmt best_lid)
             Logger.fmt (Fun.flip path_print path);
           (Some (best_lid, path), state)
@@ -315,7 +315,7 @@ let process_queue env state ~table ~canon_path target_kind best =
             Logger.fmt (fun f ->
               Format.pp_print_option Lid_path_set.pp_lid_path f best_lid);
           add_lid_to_table state (kind, next_lid, path) next best_lid
-      end
+        end
       else add_lid_to_table state (kind, next_lid, path) next best_lid
   and add_lid_to_table state ((kind, lid, path) as item) next best_lid =
     log ~title:"fill_by_level" "Treating %a (%a)" Logger.fmt
@@ -356,7 +356,7 @@ let process_queue env state ~table ~canon_path target_kind best =
         (* And remove it from the queue *)
         let queue = Priority_queue.remove item state.queue in
         { state with queue }
-      end
+        end
       | _ -> begin
         log ~title:"fill_by_level" "Name: %a invalid in the current env"
           Logger.fmt (fun fmt -> Pprintast.longident fmt lid);
@@ -370,7 +370,7 @@ let process_queue env state ~table ~canon_path target_kind best =
           Discourse_types.add lid (Type, path) state.not_in_env
         in
         { queue; not_in_env }
-      end
+        end
     in
     fill_by_level ~compare:(compare_longidents lid) next state best_lid
   in
