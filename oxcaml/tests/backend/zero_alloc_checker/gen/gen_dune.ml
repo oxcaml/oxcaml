@@ -279,14 +279,17 @@ let () =
     ~cutoff:default_cutoff ~extra_deps:[] ~extra_sources:[] ~exit_code:2
     "fail28_opt";
   print_cmi_target "fail29.mli";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:["fail29.cmi"]
+  print_test_expected_output ~cutoff:default_cutoff
+    ~extra_deps:["fail29.cmi"; "fail29.mli"]
     ~extra_sources:[] ~exit_code:2 "fail29";
   print_cmi_target "fail29_opt.mli";
   print_test_expected_output ~cutoff:default_cutoff
-    ~extra_deps:["fail29_opt.cmi"] ~extra_sources:[] ~exit_code:2 "fail29_opt";
+    ~extra_deps:["fail29_opt.cmi"; "fail29_opt.mli"]
+    ~extra_sources:[] ~exit_code:2 "fail29_opt";
   print_cmi_target "fail29_opt2.mli";
   print_test_expected_output ~cutoff:default_cutoff
-    ~extra_flags:"-zero-alloc-check all" ~extra_deps:["fail29_opt2.cmi"]
+    ~extra_flags:"-zero-alloc-check all"
+    ~extra_deps:["fail29_opt2.cmi"; "fail29_opt2.mli"]
     ~extra_sources:[] ~exit_code:2 "fail29_opt2";
   print_test_expected_output ~extra_flags:"-zero-alloc-check all"
     ~cutoff:default_cutoff ~extra_deps:[] ~extra_sources:[] ~exit_code:2

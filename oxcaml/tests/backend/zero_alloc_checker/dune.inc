@@ -1329,7 +1329,7 @@
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
  (targets fail29.output.corrected)
- (deps fail29.cmi (:ml fail29.ml) filter.sh)
+ (deps fail29.cmi fail29.mli (:ml fail29.ml) filter.sh)
  (action
    (with-outputs-to fail29.output.corrected
     (pipe-outputs
@@ -1356,7 +1356,7 @@
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
  (targets fail29_opt.output.corrected)
- (deps fail29_opt.cmi (:ml fail29_opt.ml) filter.sh)
+ (deps fail29_opt.cmi fail29_opt.mli (:ml fail29_opt.ml) filter.sh)
  (action
    (with-outputs-to fail29_opt.output.corrected
     (pipe-outputs
@@ -1383,7 +1383,7 @@
 (rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
  (targets fail29_opt2.output.corrected)
- (deps fail29_opt2.cmi (:ml fail29_opt2.ml) filter.sh)
+ (deps fail29_opt2.cmi fail29_opt2.mli (:ml fail29_opt2.ml) filter.sh)
  (action
    (with-outputs-to fail29_opt2.output.corrected
     (pipe-outputs
