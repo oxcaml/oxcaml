@@ -5,7 +5,7 @@
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib.Bytes.make [inlined]
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib.String.make [inlined]
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_allocate_string(param=100 : ocaml_value, param=120 : ocaml_value)
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_allocate_string(param=[100, 120] : ocaml_value)
 === Testing OCaml/C boundary - array allocation ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_array_make(len=101, init=201)
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_array_make(len=101, init=201)
