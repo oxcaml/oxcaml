@@ -5150,7 +5150,16 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
              let args = (lbl, Arg (exp, sort), sch) :: args in
              (ty_ret, mode_ret, open_args, closed_args, args)
          | Omitted { mode_fun; ty_arg; mode_arg; level; sort_arg } ->
-             let arrow_desc = (lbl, mode_arg, mode_ret) in
+             (* Under mode polymorphism we define a new return mode above mode_ret
+                and a new level-0 allocation mode for mode_ret (to know whether then
+                function needs a region to allocate the return value):
+                [mode_ret] < [mode_ret_alloc] < [mode_ret_eta] *)
+             let mode_ret_eta =
+               if Language_extension.(is_at_least_mode_poly Beta)
+               then fst (Alloc.newvar_above (Ctype.get_current_level ()) mode_ret)
+               else mode_ret
+             in
+             let arrow_desc = (lbl, mode_arg, mode_ret_eta) in
              let sort_ret =
                match type_sort ~why:Function_result ~fixed:false env ty_ret with
                | Ok sort -> sort
@@ -5183,9 +5192,19 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
              let mode_arg =
                create_allocation_mode_l mode_arg
              in
+             (* [mode_ret] < [mode_ret_alloc] < [mode_ret_eta]*)
+             let mode_ret_alloc =
+              if Language_extension.(is_at_least_mode_poly Beta)
+              then begin
+                let m = Locality.newvar 0 in
+                Locality.submode_exn (Alloc.proj_comonadic Areality mode_ret) m;
+                Locality.submode_exn m (Alloc.proj_comonadic Areality mode_ret_eta);
+                m
+              end else Alloc.proj_comonadic Areality mode_ret
+            in
              let mode_ret =
-               create_allocation_mode_l mode_ret
-               |> Typedtree.create_return_mode
+              Typedtree.create_return_mode
+                (Locality.disallow_right mode_ret_alloc)
              in
              register_allocation_mode mode_closure;
              let arg =
