@@ -209,7 +209,8 @@ let make_non_scannable_unboxed_product_array ~dbg kind mode args =
     P.Array_kind.element_kinds kind
   in
   let mem_chunks_per_non_unarized_element =
-    List.map C.memory_chunk_of_kind element_kinds_per_non_unarized_element
+    List.map C.memory_chunk_of_non_scannable_kind
+      element_kinds_per_non_unarized_element
   in
   let num_mem_chunks_per_non_unarized_element =
     List.length mem_chunks_per_non_unarized_element
