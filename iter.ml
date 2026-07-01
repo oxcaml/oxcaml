@@ -5,6 +5,7 @@ include (struct
       external ( + ) : int64# -> int64# -> int64# = "%int64#_add"
       external ( * ) : int64# -> int64# -> int64# = "%int64#_mul"
       external ( < ) : int64# -> int64# -> bool = "%int64#_lessthan"
+      external ( >= ) : int64# -> int64# -> bool = "%int64#_greaterequal"
       external of_int : int -> int64# = "%int64#_of_int"
     end
 
@@ -39,6 +40,7 @@ include (struct
     ;;
 
     let[@inline] iter_naive ~block ~idx ~len ~f =
+      assert (I64.(len >= #0L && len < #1_000_000L));
       let mutable i = #0L in
       while I64.(i < len) do
         f (Idx.get block (Idx.advance idx ~by:i));

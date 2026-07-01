@@ -112,6 +112,8 @@ val ssa_bounds_check_elim : bool ref
 
 val ssa_strength_reduce : bool ref
 
+val ssa_lftr : bool ref
+
 val ssa_validate : bool ref
 
 type function_result_types = Never | Functors_only | All_functions

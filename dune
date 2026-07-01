@@ -710,12 +710,15 @@
   ssa_of_cmm
   cfg_of_ssa
   ;; backend/ssa/loop/
+  fourier_motzkin
   induction_var
+  affine_ssa
   termination
   dead_induction_var
   delete_empty_loops
   bounds_check_elim
   strength_reduction
+  lftr
   ;; backend/debug/
   available_ranges_vars
   compute_ranges

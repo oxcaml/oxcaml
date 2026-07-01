@@ -553,6 +553,9 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
   then
     Format.fprintf ppf_dump "*** SSA after Strength_reduction@.@.%a"
       Ssa_print.print ssa;
+  let ssa = if !Oxcaml_flags.ssa_lftr then Lftr.run ssa else ssa in
+  if !Oxcaml_flags.dump_ssa && !Oxcaml_flags.ssa_lftr
+  then Format.fprintf ppf_dump "*** SSA after Lftr@.@.%a" Ssa_print.print ssa;
   (if !Oxcaml_flags.ssa_bounds_check_elim
    then
      let removed = Bounds_check_elim.run ssa in

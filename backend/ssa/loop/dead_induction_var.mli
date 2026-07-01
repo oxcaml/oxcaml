@@ -26,5 +26,10 @@ module Make (S : Ssa.Finished_graph) : sig
     (Induction_var.Make(S).loop * Induction_var.Make(S).biv list) list ->
     loop_result list
 
+  (** [is_dead biv] is [true] iff [biv]'s only uses in the whole graph are the
+      loop's exit comparison and its own back-edge update — i.e. it would become
+      removable if the exit test stopped mentioning it. *)
+  val is_dead : Induction_var.Make(S).biv -> bool
+
   val print : Format.formatter -> loop_result list -> unit
 end

@@ -129,6 +129,8 @@ let ssa_bounds_check_elim = ref false       (* -ssa-bounds-check-elim *)
 
 let ssa_strength_reduce = ref false         (* -ssa-strength-reduce *)
 
+let ssa_lftr = ref false                    (* -ssa-lftr *)
+
 type function_result_types = Never | Functors_only | All_functions
 type join_algorithm = Binary | N_way | Checked
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
