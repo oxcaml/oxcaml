@@ -101,7 +101,9 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
       [{item = (value, Async!.Let_syntax.return); env = with env}]];
     substs =
     [Async.Deferred -> [Deferred];
-    Async.Let_syntax -> [Let_syntax]] }
+    Async.Let_syntax -> [Let_syntax];
+    Async_kernel__.Deferred -> [Deferred];
+    Async_kernel__Deferred.Let_syntax.Let_syntax -> [Let_syntax]] }
   # discourse-recap - next_U
   next_U (non-empty, looping):
   { u_paths =
@@ -186,6 +188,7 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
     [Async_kernel__Deferred -> [Async.Deferred];
     Async.Deferred -> [Deferred];
     Async.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
+    Async_kernel__.Deferred -> [Deferred];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax]]
     }
@@ -197,6 +200,7 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
     [Async_kernel__Deferred -> [Async.Deferred];
     Async.Deferred -> [Deferred];
     Async.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
+    Async_kernel__.Deferred -> [Deferred];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax]] }
   # discourse-recap - D
@@ -209,6 +213,7 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
     [Async_kernel__Deferred -> [Async.Deferred];
     Async.Deferred -> [Deferred];
     Async.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
+    Async_kernel__.Deferred -> [Deferred];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax]]
     }
@@ -245,7 +250,9 @@ Dump the discourse so regressions show up as a diff in this test:
       [{item = (value, Async!.Let_syntax.return); env = with env}]];
     substs =
     [Async.Deferred -> [Deferred];
-    Async.Let_syntax -> [Let_syntax]] }
+    Async.Let_syntax -> [Let_syntax];
+    Async_kernel__.Deferred -> [Deferred];
+    Async_kernel__Deferred.Let_syntax.Let_syntax -> [Let_syntax]] }
   # discourse-recap - next_U
   next_U (non-empty, looping):
   { u_paths =
@@ -330,6 +337,7 @@ Dump the discourse so regressions show up as a diff in this test:
     [Async_kernel__Deferred -> [Async.Deferred];
     Async.Deferred -> [Deferred];
     Async.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
+    Async_kernel__.Deferred -> [Deferred];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax]]
     }
@@ -341,6 +349,7 @@ Dump the discourse so regressions show up as a diff in this test:
     [Async_kernel__Deferred -> [Async.Deferred];
     Async.Deferred -> [Deferred];
     Async.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
+    Async_kernel__.Deferred -> [Deferred];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax]] }
   # discourse-recap - D
@@ -353,6 +362,7 @@ Dump the discourse so regressions show up as a diff in this test:
     [Async_kernel__Deferred -> [Async.Deferred];
     Async.Deferred -> [Deferred];
     Async.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
+    Async_kernel__.Deferred -> [Deferred];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax]]
     }
