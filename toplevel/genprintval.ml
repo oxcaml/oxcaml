@@ -720,7 +720,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                     Ctype.instance_label_declarations ~fixed:false
                       (lbl_list |> Array.of_list) ~params:type_params
                   in
-                  List.iter2 (Ctype.unify env) record_params ty_list;
+                  List.iter2 (Ctype.unify env) record_params
+                    (Ctype.instance_list ty_list);
                   let lds_and_types =
                     List.map2 (fun lbl (_params, ty) -> lbl, ty)
                       lbl_list (label_params_and_types |> Array.to_list)
