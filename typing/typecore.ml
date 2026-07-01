@@ -7219,7 +7219,18 @@ and type_expect_
       in
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = Alloc.proj_comonadic Areality mode_ret in
-      let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
+      let mode_ret_uncrossed = alloc_as_value mode_ret in
+      let mode_ret_crossed = cross_left env ty_ret mode_ret_uncrossed in
+      let mode_ret =
+        match pm.region_mode with
+        | None -> mode_ret_crossed
+        | Some _ ->
+          Value.join
+            [ mode_ret_crossed;
+              Value.min_with_comonadic Areality
+                (Value.proj_comonadic Areality mode_ret_uncrossed)
+            ]
+      in
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
           ~on_application:true
