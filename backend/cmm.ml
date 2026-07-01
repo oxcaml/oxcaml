@@ -23,6 +23,12 @@ type int_width = Cmx_format.int_width =
   | Int16
   | Int8
 
+let string_of_int_width = function
+  | Int64 -> "Int64"
+  | Int32 -> "Int32"
+  | Int16 -> "Int16"
+  | Int8 -> "Int8"
+
 type machtype_component = Cmx_format.machtype_component =
   | Val
   | Addr
@@ -68,12 +74,6 @@ let typ_vec256 = [| Vec256 |]
 let typ_vec512 = [| Vec512 |]
 
 let typ_int128 = [| Naked_int Int64; Naked_int Int64 |]
-
-let string_of_int_width = function
-  | Int64 -> "Int64"
-  | Int32 -> "Int32"
-  | Int16 -> "Int16"
-  | Int8 -> "Int8"
 
 let string_of_machtype_component (comp : machtype_component) =
   match comp with
