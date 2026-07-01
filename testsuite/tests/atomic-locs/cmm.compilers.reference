@@ -17,7 +17,7 @@
 (data
  int 4087
  global "camlCmm__set_imm_12":
- addr G:"caml_curry2"
+ addr G:"caml_curry2L1"
  int 180143985094819847
  addr G:"camlCmm__set_imm_5_12_code")
 (data

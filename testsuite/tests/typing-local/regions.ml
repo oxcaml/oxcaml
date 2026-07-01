@@ -1,8 +1,16 @@
 (* TEST
  modules = "cstubs.c int_as_pointer_regions.ml int_as_pointer_regions_classic_mode.ml";
  include ocamlcommon;
+ set OCAMLPARAM = "_,";
  stack-allocation;
- native;
+ {
+   reference = "${test_source_directory}/regions.reference";
+   native;
+ } {
+   OCAMLPARAM = "_,O3=1";
+   reference = "${test_source_directory}/regions.o3.reference";
+   native;
+ }
 *)
 
 external local_stack_offset : unit -> int = "caml_local_stack_offset"

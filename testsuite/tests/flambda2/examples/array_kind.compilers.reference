@@ -1,6 +1,6 @@
 (let
   (f/279 =
-     (function {nlocal = 0} a/281[value<addrarray>]
+     (function {nlocal = 1} a/281[L][value<addrarray>]
        : (consts (0)) (non_consts ([0: ?]))
        (array.get[gen indexed by int] a/281 0)))
   (makeblock 0 f/279))

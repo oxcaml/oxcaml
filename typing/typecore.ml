@@ -5169,14 +5169,15 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs
 (* See Note [Type-checking applications] for an overview *)
 let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
       mode_ret args =
-  let ty_ret, mode_ret, _, _, args =
+  let ty_ret, mode_ret, _, _, args, has_omitted_arg =
     List.fold_left
-      (fun (ty_ret, mode_ret, open_args, closed_args, args) (lbl, arg, sch) ->
+      (fun (ty_ret, mode_ret, open_args, closed_args, args, has_omitted_arg)
+           (lbl, arg, sch) ->
          match arg with
          | Arg (exp, marg, sort) ->
              let open_args = (exp, marg) :: open_args in
              let args = (lbl, Arg (exp, sort), sch) :: args in
-             (ty_ret, mode_ret, open_args, closed_args, args)
+             (ty_ret, mode_ret, open_args, closed_args, args, has_omitted_arg)
          | Omitted { mode_fun; ty_arg; mode_arg; level; sort_arg } ->
              (* Under mode polymorphism we define a new return mode above mode_ret
                 and a new level-0 allocation mode for mode_ret (to know whether then
@@ -5214,9 +5215,6 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
                Alloc.newvar_above (Ctype.get_current_level ()) (Alloc.join
                 (mode_partial_fun:: mode_closed_args))
              in
-             submode ~loc ~env ~reason:Other
-               (alloc_as_value mode_cls)
-               (mode_partial_application expected_mode);
              let mode_closure =
                create_omitted_closure_mode mode_cls
              in
@@ -5247,9 +5245,13 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
                 sort_ret }
              in
              let args = (lbl, arg, None) :: args in
-             (ty_ret, mode_cls, open_args, closed_args, args))
-      (ty_ret, mode_ret, [], [], []) (List.rev args)
+             (ty_ret, mode_cls, open_args, closed_args, args, true))
+      (ty_ret, mode_ret, [], [], [], false) (List.rev args)
   in
+  if has_omitted_arg then
+    submode ~loc ~env ~reason:Other
+      (alloc_as_value mode_ret)
+      (mode_partial_application expected_mode);
   ty_ret, mode_ret, args
 
 (* Generalization criterion for expressions *)
@@ -9620,7 +9622,7 @@ and type_function
             param_uid
       in
       let arg_mode =
-        create_allocation_mode_l_global_if_possible arg_mode
+        create_allocation_mode_l arg_mode
       in
       let param =
         { has_poly;
@@ -10345,7 +10347,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       let ret_sort = type_sort ~why:Function_result ty_res in
       let eta_pat, eta_var = var_pair ~mode:eta_mode "eta" ty_arg arg_sort in
       let fc_arg_mode =
-        create_allocation_mode_l_global_if_possible marg
+        create_allocation_mode_l marg
       in
       let fc_ret_mode =
         create_omitted_return_mode mret
@@ -11369,7 +11371,7 @@ and type_function_cases_expect
     in
     unify_exp_types loc env ty_fun (instance ty_expected);
     let fc_arg_mode =
-      create_allocation_mode_l_global_if_possible arg_mode
+      create_allocation_mode_l arg_mode
     in
     let param , param_uid = name_cases "param" cases in
     let cases =

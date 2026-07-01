@@ -1,6 +1,6 @@
 (let
   (f/286 =
-     (function {nlocal = 0} x/288[value<int>] init/289[value<int>] : int
+     (function {nlocal = 0} x/288[L][value<int>] init/289[value<int>] : int
        (let (m/290 =mut[value<int>] init/289)
          (catch
            (try

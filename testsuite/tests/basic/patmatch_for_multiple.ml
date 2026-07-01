@@ -104,8 +104,8 @@ let _ = fun a b ->
   | ((true, _) as _g)
   | ((false, _) as _g) -> ()
 [%%expect{|
-(function {nlocal = 0} a/0[value<int>] b/0? : int 0)
-(function {nlocal = 0} a/0[value<int>] b/0? : int 0)
+(function {nlocal = 1} a/0[L][value<int>] b/0[L]? : int 0)
+(function {nlocal = 1} a/0[L][value<int>] b/0[L]? : int 0)
 - : bool -> 'a -> unit = <fun>
 |}];;
 

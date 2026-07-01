@@ -42,7 +42,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
   (see manual section 13.5.5)
 (let
   (f/0 =
-     (function {nlocal = 0} x/0 : int
+     (function {nlocal = 1} x/0[L] : int
        (if (field_int 0 x/0)
          (let (*match*/0 =o? (field_mut 1 x/0))
            (if *match*/0
@@ -75,7 +75,7 @@ let simple x =
 type t = { a : bool; mutable b : int option; }
 (let
   (simple/0 =
-     (function {nlocal = 0} x/1 : int
+     (function {nlocal = 1} x/1[L] : int
        (let (*match*/2 =o? (field_mut 1 x/1))
          (if *match*/2 (field_imm 0 *match*/2) 1))))
   (apply (field_imm 1 (global Toploop!)) "simple" simple/0))
@@ -106,7 +106,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
   (see manual section 13.5.5)
 (let
   (f/1 =
-     (function {nlocal = 0} x/2 : int
+     (function {nlocal = 1} x/2[L] : int
        (if (field_int 0 x/2)
          (let (*match*/3 =o? (field_mut 1 x/2))
            (if *match*/3 (field_imm 0 *match*/3)
@@ -149,7 +149,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
   (see manual section 13.5.5)
 (let
   (f/2 =
-     (function {nlocal = 0} r/0 : int
+     (function {nlocal = 1} r/0[L] : int
        (region
          (let
            (*match*/5 =[value<(consts (0)) (non_consts ([0: ?]))>]
@@ -190,8 +190,8 @@ let test = function
 type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
   (test/0 =
-     (function {nlocal = 0}
-       param/0[value<(consts (0)) (non_consts ([0: ?]))>] : int
+     (function {nlocal = 1}
+       param/0[L][value<(consts (0)) (non_consts ([0: ?]))>] : int
        (if param/0 (field_imm 0 (field_imm 0 param/0)) 0)))
   (apply (field_imm 1 (global Toploop!)) "test" test/0))
 val test : int t option -> int = <fun>
@@ -212,7 +212,7 @@ let test = function
 type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
   (test/1 =
-     (function {nlocal = 0} param/1 : int
+     (function {nlocal = 1} param/1[L] : int
        (let (*match*/8 =o? (field_mut 0 param/1))
          (if *match*/8 (field_imm 0 (field_imm 0 *match*/8)) 0))))
   (apply (field_imm 1 (global Toploop!)) "test" test/1))
@@ -237,7 +237,7 @@ let test n =
 type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
   (test/2 =
-     (function {nlocal = 0} n/0? : int
+     (function {nlocal = 1} n/0[L]? : int
        (region
          (let
            (*match*/9 =[value<(consts (0)) (non_consts ([0: ?]))>]
@@ -298,7 +298,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
   (see manual section 13.5.5)
 (let
   (deep/0 =
-     (function {nlocal = 0} r/1 : int
+     (function {nlocal = 1} r/1[L] : int
        (region
          (let
            (*match*/12 =[value<(consts (0)) (non_consts ([0: ?]))>]
@@ -426,11 +426,13 @@ let compare t1 t2 =
 type t = A of int | B of string | C of string | D of string
 (let
   (compare/0 =
-     (function {nlocal = 0}
-       t1/0[value<
-             (consts ()) (non_consts ([3: *] [2: *] [1: *] [0: value<int>]))>]
-       t2/0[value<
-             (consts ()) (non_consts ([3: *] [2: *] [1: *] [0: value<int>]))>]
+     (function {nlocal = 1}
+       t1/0[L][value<
+                (consts ()) (non_consts ([3: *] [2: *] [1: *]
+                 [0: value<int>]))>]
+       t2/0[L][value<
+                (consts ()) (non_consts ([3: *] [2: *] [1: *]
+                 [0: value<int>]))>]
        : int
        (catch
          (switch* t1/0
@@ -485,7 +487,7 @@ let f x y =
 [%%expect {|
 (let
   (f/4 =
-     (function {nlocal = 0} x/3[value<int>] y/0[value<int>] : int
+     (function {nlocal = 1} x/3[L][value<int>] y/0[L][value<int>] : int
        (catch
          (catch
            (catch
@@ -517,7 +519,7 @@ let check_results r1 r2 =
 [%%expect {|
 (let
   (check_results/0 =
-     (function {nlocal = 0} r1/0 r2/0?
+     (function {nlocal = 1} r1/0[L] r2/0[L]?
        : (consts ()) (non_consts ([1: ?] [0: ?]))
        (let
          (*match*/16 =[value<

@@ -108,7 +108,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
           []
           []
           Tfunction_cases (test_locations.ml[17,534+14]..test_locations.ml[19,572+34])
-            locality_mode global
+            locality_mode local
             value
             [
               <case>
@@ -195,7 +195,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
 
 (letrec
   (fib
-     (function {nlocal = 0} n[value<int>] : int
+     (function {nlocal = 1} n[L][value<int>] : int
        (region
          (funct-body Test_locations.fib test_locations.ml(17):548-606
            (if (isout 1 n)

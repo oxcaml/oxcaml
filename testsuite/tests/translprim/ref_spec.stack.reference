@@ -43,7 +43,7 @@
            set_open_poly =
              (function {nlocal = 2} r y : int (setfield_ptr 0 r y))
            set_open_poly =
-             (function {nlocal = 0} r y : int
+             (function {nlocal = 0} r[L] y : int
                (setfield_ptr(maybe-stack) 0 r y)))
           (makeblock 0 int_ref var_ref vargen_ref cst_ref gen_ref flt_ref
             int_rec var_rec vargen_rec cst_rec gen_rec flt_rec flt_rec'

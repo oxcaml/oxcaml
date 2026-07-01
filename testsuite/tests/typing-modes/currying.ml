@@ -167,15 +167,9 @@ val app5 : (b:int ref @ local -> a:int -> unit) -> b:int ref @ local -> unit =
 |}]
 let app6 (f : a:local_ int ref -> b:local_ int ref -> c:int -> unit) = f ~c:42
 [%%expect{|
-Line 1, characters 71-78:
-1 | let app6 (f : a:local_ int ref -> b:local_ int ref -> c:int -> unit) = f ~c:42
-                                                                           ^^^^^^^
-Error: This value is "local"
-       but is expected to be "global"
-         because it is captured by a partial application
-         which is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+val app6 :
+  (a:int ref @ local -> b:int ref @ local -> c:int -> unit) ->
+  a:int ref @ local -> b:int ref @ local -> unit = <fun>
 |}]
 
 let app1' (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(ref 42) ()
