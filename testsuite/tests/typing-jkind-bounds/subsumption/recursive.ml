@@ -86,15 +86,8 @@ type ('a, 'b) zipped_list = Nil | Cons of 'a * 'b * ('a, 'b) zipped_list
 module rec My_list : sig
   type 'a t : immutable_data with 'a = Nil | Cons of 'a * 'a My_list.t
 end = My_list
-(* CR layouts v2.8: fix this. Internal ticket 5127 *)
 [%%expect {|
-Line 2, characters 2-70:
-2 |   type 'a t : immutable_data with 'a = Nil | Cons of 'a * 'a My_list.t
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a with 'a My_list.t
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data with 'a
-         because of the annotation on the declaration of the type t.
+module rec My_list : sig type 'a t = Nil | Cons of 'a * 'a My_list.t end
 |}]
 
 (* We can however make the signature slightly stranger-looking to pass. *)
