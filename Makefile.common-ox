@@ -46,7 +46,7 @@ main_ocamlopt_optimization_flags := -O3
 endif
 
 define dune_runtime_stdlib_context
-(lang dune 3.22)
+(lang dune 3.23)
 (using oxcaml 0.1)
 (context (default
   (name runtime_stdlib)
@@ -62,7 +62,7 @@ define dune_runtime_stdlib_context
 endef
 
 define dune_main_context
-(lang dune 3.22)
+(lang dune 3.23)
 (using oxcaml 0.1)
 (context (default
   (name main)
