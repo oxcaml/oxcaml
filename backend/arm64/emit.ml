@@ -1564,9 +1564,7 @@ let emit_instr env i =
       (match addressing_mode with
       | Iindexed v ->
         let n = Validated_mem_offset.offset v in
-        A.ins4 ADD_immediate reg_x_tmp1
-          (H.reg_x i.arg.(0))
-          (O.imm n) O.optional_none
+        emit_addimm reg_x_tmp1 (H.reg_x i.arg.(0)) n
       | Ibased (s, offset) ->
         assert (not !Clflags.dlcode);
         (* see selection_utils.ml *)
@@ -1613,9 +1611,7 @@ let emit_instr env i =
       match addr with
       | Iindexed v ->
         let n = Validated_mem_offset.offset v in
-        A.ins4 ADD_immediate reg_x_tmp1
-          (H.reg_x i.arg.(1))
-          (O.imm n) O.optional_none;
+        emit_addimm reg_x_tmp1 (H.reg_x i.arg.(1)) n;
         A.ins2 STR_simd_and_fp (H.reg_q src) (H.mem reg_tmp1_base)
       | Ibased (s, offset) ->
         assert (not !Clflags.dlcode);
