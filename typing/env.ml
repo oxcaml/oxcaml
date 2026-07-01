@@ -1237,6 +1237,7 @@ let mode_unit ~staticity =
   let hint : _ Mode.Hint.const = Legacy Compilation_unit in
   Mode.Value.of_const
     { areality = Global;
+      areality_quoted = Quote Global;
       linearity = Many;
       uniqueness = Aliased;
       portability = Nonportable;
@@ -4350,6 +4351,7 @@ let add_components slot root env0 comps (locks : locks) =
     implicit_jkinds = env0.implicit_jkinds;
     flags = env0.flags;
     stage = env0.stage;
+    last_quote_lock = env0.last_quote_lock;
     toplevel_scope = env0.toplevel_scope;
   }
 

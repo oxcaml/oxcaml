@@ -372,6 +372,8 @@ module type S = sig
          and type 'd hint_const := 'd neg_hint_const
   end
 
+  type 'a quoted = Quote of 'a [@@unboxed]
+
   module Locality : sig
     module Const : sig
       type t =
@@ -421,6 +423,16 @@ module type S = sig
     val regional : lr
 
     val local : lr
+  end
+
+  module ArealityQuoted : sig
+    module Const : sig
+      type t = Regionality.Const.t quoted
+
+      include Const with type t := t
+    end
+
+    include Common_axis_pos with module Const := Const
   end
 
   module Linearity : sig
@@ -570,6 +582,7 @@ module type S = sig
 
   type 'a comonadic_with =
     { areality : 'a;
+      areality_quoted : ArealityQuoted.Const.t;
       linearity : Linearity.Const.t;
       portability : Portability.Const.t;
       forkable : Forkable.Const.t;
@@ -591,6 +604,7 @@ module type S = sig
         NB: must listed in the order of axis implication. See [typemode.ml]. *)
     type ('p, 'r) t =
       | Areality : ('a comonadic_with, 'a) t
+      | ArealityQuoted : ('a comonadic_with, ArealityQuoted.Const.t) t
       | Forkable : ('areality comonadic_with, Forkable.Const.t) t
       | Yielding : ('areality comonadic_with, Yielding.Const.t) t
       | Linearity : ('areality comonadic_with, Linearity.Const.t) t
@@ -663,8 +677,9 @@ module type S = sig
       include Axis with type 'a t := 'a t
     end
 
-    type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes =
+    type ('a, 'aq, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes =
       { areality : 'a;
+        areality_quoted : 'aq;
         linearity : 'b;
         uniqueness : 'c;
         portability : 'd;
@@ -681,6 +696,7 @@ module type S = sig
         Const
           with type t =
             ( Areality.Const.t,
+              ArealityQuoted.Const.t,
               Linearity.Const.t,
               Uniqueness.Const.t,
               Portability.Const.t,
@@ -697,6 +713,7 @@ module type S = sig
 
         type t =
           ( Areality.Const.t option,
+            ArealityQuoted.Const.t option,
             Linearity.Const.t option,
             Uniqueness.Const.t option,
             Portability.Const.t option,
