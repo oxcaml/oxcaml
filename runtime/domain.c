@@ -743,8 +743,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   }
 
   CAMLassert(domain_state->dynamic_bindings == NULL);
-  domain_state->dynamic_bindings =
-    caml_dynamic_new_thread(parent ? parent->dynamic_bindings : NULL);
+  domain_state->dynamic_bindings = caml_dynamic_cache_new();
   if (!domain_state->dynamic_bindings) {
     goto fail_dynamic;
   }
@@ -878,7 +877,7 @@ fail_shared_heap:
   caml_free_minor_tables(domain_state->minor_tables);
   domain_state->minor_tables = NULL;
 fail_minor_tables:
-  caml_dynamic_delete_thread(domain_state->dynamic_bindings);
+  caml_dynamic_cache_delete(domain_state->dynamic_bindings);
   domain_state->dynamic_bindings = NULL;
 fail_dynamic:
   caml_memprof_delete_domain(domain_state);
@@ -2744,7 +2743,7 @@ void caml_domain_terminate(bool last)
   caml_free_extern_state();
   caml_teardown_major_gc();
 
-  caml_dynamic_delete_thread(domain_state->dynamic_bindings);
+  caml_dynamic_cache_delete(domain_state->dynamic_bindings);
   domain_state->dynamic_bindings = NULL;
 
   /* At this point, we know that the shared heap has been orphaned,
