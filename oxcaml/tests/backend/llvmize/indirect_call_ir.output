@@ -99,8 +99,8 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @header.camlIndirect_call = global i64 1792, section ".data", align 8
 @camlIndirect_call = global { ptr } { ptr @camlIndirect_call__apply_1 }, section ".data", align 8
 @header.camlIndirect_call__apply_1 = global i64 4087, section ".data", align 8
-@camlIndirect_call__apply_1 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlIndirect_call__apply_HIDE_STAMP }, section ".data", align 8
-@caml_curry2 = external global ptr
+@camlIndirect_call__apply_1 = global { ptr, i64, ptr } { ptr @caml_curry2L1, i64 180143985094819847, ptr @camlIndirect_call__apply_HIDE_STAMP }, section ".data", align 8
+@caml_curry2L1 = external global ptr
 
 
 

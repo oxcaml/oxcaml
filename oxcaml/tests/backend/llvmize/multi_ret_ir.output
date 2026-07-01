@@ -96,10 +96,10 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @header.camlMulti_ret = global i64 2816, section ".data", align 8
 @camlMulti_ret = global { ptr, ptr } { ptr @camlMulti_ret__empty_block4, ptr @camlMulti_ret__permute_1 }, section ".data", align 8
 @header.camlMulti_ret__permute_1 = global i64 4087, section ".data", align 8
-@camlMulti_ret__permute_1 = global { ptr, i64, ptr } { ptr @caml_curryF_F_F_F_RFFFF, i64 324259173170675719, ptr @camlMulti_ret__permute_HIDE_STAMP }, section ".data", align 8
+@camlMulti_ret__permute_1 = global { ptr, i64, ptr } { ptr @caml_curryF_F_F_F_RFFFFL1, i64 324259173170675719, ptr @camlMulti_ret__permute_HIDE_STAMP }, section ".data", align 8
 @header.camlMulti_ret__empty_block4 = global i64 768, section ".data", align 8
 @camlMulti_ret__empty_block4 = global {  } {  }, section ".data", align 8
-@caml_curryF_F_F_F_RFFFF = external global ptr
+@caml_curryF_F_F_F_RFFFFL1 = external global ptr
 
 
 
