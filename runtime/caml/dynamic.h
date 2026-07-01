@@ -99,7 +99,7 @@ extern void caml_dynamic_table_free(dynamic_table_t table);
 extern bool caml_dynamic_table_dup(dynamic_table_t dst, dynamic_table_t src);
 
 /* Bind the current value of every inheritable dynamic bound in the current
-   stack or one of its parents. */
+   stack or one of its parents. Frees the table and returns false if allocation fails. */
 extern bool caml_dynamic_table_inherit(dynamic_table_t table);
 
 /* Register all bindings as GC roots. */

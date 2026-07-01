@@ -392,7 +392,8 @@ CAMLexport bool caml_dynamic_table_inherit(dynamic_table_t table)
   while (stack) {
     dynamic_table_t src = &stack->dyn;
     if (src->bindings) {
-      for (size_t i = 0; i < (size_t)src->mask + 1; ++i) {
+      size_t capacity = dynamic_table_capacity(src);
+      for (size_t i = 0; i < capacity; ++i) {
         dynamic_stack_t src_slot = &src->bindings[i];
         value dyn = src_slot->dyn;
         if (Is_this(dyn) && Is_inherit(dyn)) {
