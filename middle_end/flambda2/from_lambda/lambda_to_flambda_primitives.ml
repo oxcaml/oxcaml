@@ -178,7 +178,7 @@ let convert_array_kind dbg (kind : L.array_kind) : converted_array_kind =
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         P.Array_kind.t =
       match kind with
-      | Pint_scannable -> Immediates
+      | Pint_scannable -> Values
       | Paddr_scannable -> Values
       | Pproduct_scannable kinds ->
         Unboxed_product (List.map convert_kind kinds)
@@ -188,7 +188,7 @@ let convert_array_kind dbg (kind : L.array_kind) : converted_array_kind =
     let rec convert_kind (kind : L.ignorable_product_element_kind) :
         P.Array_kind.t =
       match kind with
-      | Pint_ignorable -> Immediates
+      | Pint_ignorable -> Values
       | Punboxedfloat_ignorable Unboxed_float32 -> Naked_float32s
       | Punboxedfloat_ignorable Unboxed_float64 -> Naked_floats
       | Punboxedvector_ignorable Unboxed_vec128 -> Naked_vec128s
@@ -279,7 +279,7 @@ let convert_array_ref_kind dbg (kind : L.array_ref_kind) :
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         Array_ref_kind.no_float_array_opt =
       match kind with
-      | Pint_scannable -> Immediates
+      | Pint_scannable -> Values
       | Paddr_scannable -> Values
       | Pproduct_scannable kinds ->
         Unboxed_product (List.map convert_kind kinds)
@@ -290,7 +290,7 @@ let convert_array_ref_kind dbg (kind : L.array_ref_kind) :
     let rec convert_kind (kind : L.ignorable_product_element_kind) :
         Array_ref_kind.no_float_array_opt =
       match kind with
-      | Pint_ignorable -> Immediates
+      | Pint_ignorable -> Values
       | Punboxedfloat_ignorable Unboxed_float32 -> Naked_float32s
       | Punboxedfloat_ignorable Unboxed_float64 -> Naked_floats
       | Punboxedvector_ignorable Unboxed_vec128 -> Naked_vec128s
@@ -385,7 +385,6 @@ let convert_array_ref_kind_for_length dbg array_ref_kind :
 
 module Array_set_kind = struct
   type no_float_array_opt =
-    | Immediates
     | Values of P.Init_or_assign.t
     | Gc_ignorable_values
     | Naked_floats
@@ -422,7 +421,7 @@ let convert_array_set_kind dbg (kind : L.array_set_kind) :
          (Values (Assignment (Alloc_mode.For_assignments.from_lambda mode))))
   | Pgcignorableaddrarray_set ->
     Array_set_kind (No_float_array_opt Gc_ignorable_values)
-  | Pintarray_set -> Array_set_kind (No_float_array_opt Immediates)
+  | Pintarray_set -> Array_set_kind (No_float_array_opt Gc_ignorable_values)
   | Pfloatarray_set -> Array_set_kind Naked_floats_to_be_unboxed
   | Punboxedfloatarray_set Unboxed_float64 ->
     Array_set_kind (No_float_array_opt Naked_floats)
@@ -450,7 +449,7 @@ let convert_array_set_kind dbg (kind : L.array_set_kind) :
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         Array_set_kind.no_float_array_opt =
       match kind with
-      | Pint_scannable -> Immediates
+      | Pint_scannable -> Gc_ignorable_values
       | Paddr_scannable ->
         Values (Assignment (Alloc_mode.For_assignments.from_lambda mode))
       | Pproduct_scannable kinds ->
@@ -462,7 +461,7 @@ let convert_array_set_kind dbg (kind : L.array_set_kind) :
     let rec convert_kind (kind : L.ignorable_product_element_kind) :
         Array_set_kind.no_float_array_opt =
       match kind with
-      | Pint_ignorable -> Immediates
+      | Pint_ignorable -> Gc_ignorable_values
       | Punboxedfloat_ignorable Unboxed_float32 -> Naked_float32s
       | Punboxedfloat_ignorable Unboxed_float64 -> Naked_floats
       | Punboxedvector_ignorable Unboxed_vec128 -> Naked_vec128s
@@ -487,7 +486,6 @@ let convert_array_set_kind dbg (kind : L.array_set_kind) :
 let rec convert_unboxed_product_array_set_kind
     (kind : Array_set_kind.no_float_array_opt) : P.Array_kind.t =
   match kind with
-  | Immediates -> Immediates
   | Gc_ignorable_values -> Gc_ignorable_values
   | Values _init_or_assign -> Values
   | Naked_floats -> Naked_floats
@@ -510,7 +508,6 @@ let convert_array_set_kind_to_array_kind (array_set_kind : Array_set_kind.t) :
   | Naked_floats_to_be_unboxed -> Naked_floats
   | No_float_array_opt nfo -> (
     match nfo with
-    | Immediates -> Immediates
     | Gc_ignorable_values -> Gc_ignorable_values
     | Values _ -> Values
     | Naked_floats -> Naked_floats
@@ -534,7 +531,6 @@ let convert_array_set_kind_for_length dbg array_set_kind :
   | Array_set_kind Naked_floats_to_be_unboxed -> Array_kind Naked_floats
   | Array_set_kind (No_float_array_opt nfo) -> (
     match nfo with
-    | Immediates -> Array_kind Immediates
     | Gc_ignorable_values -> Array_kind Gc_ignorable_values
     | Values _ -> Array_kind Values
     | Naked_floats -> Array_kind Naked_floats
@@ -1425,7 +1421,6 @@ let rec array_set_unsafe ~machine_width dbg ~array ~index array_kind
     let rec unarize_kind (array_set_kind : Array_set_kind.no_float_array_opt) :
         Array_set_kind.t list =
       match array_set_kind with
-      | Immediates -> [Array_set_kind.No_float_array_opt Immediates]
       | Values init_or_assign ->
         [Array_set_kind.No_float_array_opt (Values init_or_assign)]
       | Gc_ignorable_values ->
@@ -1470,12 +1465,11 @@ let rec array_set_unsafe ~machine_width dbg ~array ~index array_kind
                array_set_kind ~new_values:[new_value])
            (List.combine indexes (List.combine unarized new_values))) ]
   | No_float_array_opt
-      (( Immediates | Gc_ignorable_values | Values _ | Naked_floats
-       | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
-       | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-       | Naked_vec512s ) as nfo) -> (
+      (( Gc_ignorable_values | Values _ | Naked_floats | Naked_float32s
+       | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
+       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ) as
+       nfo) -> (
     match nfo with
-    | Immediates -> normal_case Immediates new_values
     | Values init_or_assign -> normal_case (Values init_or_assign) new_values
     | Gc_ignorable_values -> normal_case Gc_ignorable_values new_values
     | Naked_floats -> normal_case Naked_floats new_values
