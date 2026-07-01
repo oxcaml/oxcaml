@@ -2353,6 +2353,18 @@ let of_type_decl_overapproximate_unknown ~context env
     | Pjk_default | Pjk_kind_of _ ->
       raise ~loc:jkind.pjka_loc Unimplemented_syntax
   in
+  let rec strip_to_layout (jkind : Parsetree.jkind_annotation) :
+      Parsetree.jkind_annotation =
+    let pjka_desc : Parsetree.jkind_annotation_desc =
+      match jkind.pjka_desc with
+      | Pjk_mod (base, _) | Pjk_with (base, _, _) ->
+        (strip_to_layout base).pjka_desc
+      | Pjk_product jkinds -> Pjk_product (List.map strip_to_layout jkinds)
+      | Pjk_operator (base, ops) -> Pjk_operator (strip_to_layout base, ops)
+      | (Pjk_abbreviation _ | Pjk_default | Pjk_kind_of _) as desc -> desc
+    in
+    { jkind with pjka_desc }
+  in
   let transl_type sty =
     Misc.fatal_errorf
       "@[Unexpected call to [transl_type] in \
@@ -2360,15 +2372,18 @@ let of_type_decl_overapproximate_unknown ~context env
        Street OCaml Language team."
       Pprintast.core_type sty
   in
-  match decl.ptype_jkind_annotation with
-  | Some annot when has_with_bounds annot ->
-    (* CR with-kinds: we could still compute the layout here. *)
-    Some (Builtin.any ~why:Overapproximation_of_with_bounds)
-  | _ ->
-    (* Warnings are emitted in [of_type_decl] rather than here *)
-    of_type_decl ~use_abstract_jkinds:false ~warn:false ~context ~transl_type
-      env decl
-    |> Option.map fst
+  let decl =
+    match decl.ptype_jkind_annotation with
+    | Some annot when has_with_bounds annot ->
+      (* Over-approximate the [with]/[mod] bounds to the top, but keep the
+         layout precise. *)
+      { decl with ptype_jkind_annotation = Some (strip_to_layout annot) }
+    | _ -> decl
+  in
+  (* Warnings are emitted in [of_type_decl] rather than here *)
+  of_type_decl ~use_abstract_jkinds:false ~warn:false ~context ~transl_type env
+    decl
+  |> Option.map fst
 
 let for_unboxed_record_with_updates lbls =
   let open Types in
