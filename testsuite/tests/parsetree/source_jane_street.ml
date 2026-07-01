@@ -161,6 +161,11 @@ type t17b : (value & value) non_pointer
 type t15 : any non_pointer
 type t16 : value non_pointer
 type t17 : value & value non_pointer
+Line 4, characters 12-39:
+4 | type t17b : (value & value) non_pointer
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
+
 type t17b : value & value
 |}]
 

@@ -213,16 +213,6 @@ Line 1, characters 9-36:
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
 
-Line 1, characters 9-36:
-1 | type t : (value & value) non_pointer
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
-
-Line 1, characters 9-36:
-1 | type t : (value & value) non_pointer
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
-
 type t : value & value
 |}]
 
@@ -237,18 +227,6 @@ type t : value non_pointer
 
 type t : (value) non_pointer non_pointer
 [%%expect{|
-Line 1, characters 29-40:
-1 | type t : (value) non_pointer non_pointer
-                                 ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer".
-
-Line 1, characters 29-40:
-1 | type t : (value) non_pointer non_pointer
-                                 ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer".
-
 Line 1, characters 29-40:
 1 | type t : (value) non_pointer non_pointer
                                  ^^^^^^^^^^^
