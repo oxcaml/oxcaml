@@ -40,7 +40,7 @@
     (glob_files caml/*.h))
   (action
     (progn
-     (bash "rm -f build_config.h")
+     (bash "rm -f build_config.h sak")
      (bash "cd .. && make V=1 -f Makefile.upstream COMPUTE_DEPS=false runtime/build_config.h")
     )
   ))
