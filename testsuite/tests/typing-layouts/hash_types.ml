@@ -1315,21 +1315,21 @@ type packed = T : (int, 'b) s# -> packed [@@unboxed]
 
 (* Unboxed arrays and iarrays, which are unrepresentable *)
 
-type 'a arr_u : any = 'a array#
+type ('a : any) arr_u : any = 'a array#
 [%%expect{|
-type 'a arr_u = 'a array#
+type ('a : any separable) arr_u = 'a array#
 |}]
 
-type 'a arr = 'a array
-type 'a arr_u_2 = 'a arr#
+type ('a : any) arr = 'a array
+type ('a : any) arr_u_2 = 'a arr#
 [%%expect{|
-type 'a arr = 'a array
-type 'a arr_u_2 = 'a arr#
+type ('a : any separable) arr = 'a array
+type ('a : any separable) arr_u_2 = 'a arr#
 |}]
 
-type 'a iarr_u : any = 'a iarray#
+type ('a : any) iarr_u : any = 'a iarray#
 [%%expect{|
-type 'a iarr_u = 'a iarray#
+type ('a : any separable) iarr_u = 'a iarray#
 |}]
 
 let bad (_ : 'a array#) = ()
@@ -1358,4 +1358,21 @@ Error: This pattern matches values of type "'a iarray#"
          because it is the unboxed version of the primitive type iarray.
        But the layout of 'a iarray# must be representable
          because we must know concretely how to pass a function argument.
+|}]
+
+(* [array#] is invariant in its parameter, like [array]. *)
+type +'a bad = 'a array#
+[%%expect{|
+Line 1, characters 0-24:
+1 | type +'a bad = 'a array#
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
+|}]
+
+(* [iarray#] is covariant in its parameter, like [iarray] (unlike [array#]). *)
+type +'a co = 'a iarray#
+[%%expect{|
+type 'a co = 'a iarray#
 |}]
