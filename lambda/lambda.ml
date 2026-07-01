@@ -2867,7 +2867,7 @@ let rec layout_of_scannable_kinds kinds =
   Punboxed_product (List.map layout_of_scannable_kind kinds)
 
 and layout_of_scannable_kind = function
-  | Pint_scannable -> layout_int
+  | Pint_scannable -> layout_int_or_null
   | Paddr_scannable -> layout_value_field
   | Pproduct_scannable kinds -> layout_of_scannable_kinds kinds
 
@@ -2875,7 +2875,7 @@ let rec layout_of_ignorable_kinds kinds =
   Punboxed_product (List.map layout_of_ignorable_kind kinds)
 
 and layout_of_ignorable_kind = function
-  | Pint_ignorable -> layout_int
+  | Pint_ignorable -> layout_int_or_null
   | Punboxedfloat_ignorable f -> layout_unboxed_float f
   | Punboxedvector_ignorable v -> layout_unboxed_vector v
   | Punboxedoruntaggedint_ignorable i -> layout_unboxed_int i
