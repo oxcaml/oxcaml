@@ -698,7 +698,12 @@ type error =
   | Toplevel_splice of Location.t
   | Unsupported_inside_quotation of Location.t * no_open_quotations_context
 
-exception Error of error
+module Error : sig
+  type exn += private In_context of error
+
+  val log_or_raise : error -> unit
+  val log_and_raise : error -> 'a
+end
 
 val in_signature: bool -> t -> t
 

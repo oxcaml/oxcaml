@@ -1,0 +1,8 @@
+File "abstract_wrong_label.ml", lines 18-21, characters 0-5:
+18 | class t =
+19 |   object
+20 |     method foo (f : int -> int) = f ~x:10
+21 |   end
+Error: Some type variables are unbound in this type:
+         class t : object method foo : (int -> int) -> 'a end
+       The method foo has type (int -> int) -> 'a where 'a is unbound

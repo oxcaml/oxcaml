@@ -258,6 +258,11 @@ type error =
   | Bad_represent_as_float_array_attribute
   | Missing_immediate_all_void_constructor_attribute of string
 
-exception Error of Location.t * error
+module Error : sig
+    type exn += private In_context of Location.t * error
+
+  val log_or_raise : Location.t -> error -> unit
+  val log_and_raise : Location.t -> error -> 'a
+end
 
 val report_error: loc:Location.t -> error -> Location.report
