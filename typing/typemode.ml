@@ -628,9 +628,7 @@ let sort_dedup_modalities l =
   let open Modality in
   let compare { txt = Atom (ax0, _); loc = _ } { txt = Atom (ax1, _); loc = _ }
       =
-    let (P ax0) = Axis.to_value (P ax0) in
-    let (P ax1) = Axis.to_value (P ax1) in
-    Mode.Value.Axis.compare ax0 ax1
+    Axis.compare (P ax0) (P ax1)
   in
   (* Keep the last atom on each axis (later modalities override earlier ones). *)
   let dedup =
@@ -675,9 +673,7 @@ let transl_modalities_with_default ?(allow_redundant_staticity = false)
     | _ -> false
   in
   let same_axis (Atom (ax0, _)) (Atom (ax1, _)) =
-    let (P ax0) = Axis.to_value (P ax0) in
-    let (P ax1) = Axis.to_value (P ax1) in
-    Mode.Value.Axis.compare ax0 ax1 = 0
+    Axis.compare (P ax0) (P ax1) = 0
   in
   let indexed = List.mapi (fun i { txt; _ } -> i, txt) annots in
   (* Keep the first modality on each axis and warn on every later modality

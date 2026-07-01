@@ -7252,6 +7252,11 @@ module Modality = struct
     let to_value : packed -> Value.Axis.packed = function
       | P (Monadic ax) -> P (Monadic ax)
       | P (Comonadic ax) -> P (Comonadic ax)
+
+    let compare (P ax0 : packed) (P ax1 : packed) =
+      let (P ax0) = to_value (P ax0) in
+      let (P ax1) = to_value (P ax1) in
+      Value.Axis.compare ax0 ax1
   end
 
   type atom = Atom : 'a Axis.t * 'a -> atom

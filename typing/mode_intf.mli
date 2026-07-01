@@ -898,6 +898,8 @@ module type S = sig
       val of_value : Value.Axis.packed -> packed
 
       val to_value : packed -> Value.Axis.packed
+
+      val compare : packed -> packed -> int
     end
 
     type atom = Atom : 'a Axis.t * 'a -> atom
