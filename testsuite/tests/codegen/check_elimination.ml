@@ -10,23 +10,24 @@
 let unwrap_twice o = Option.value ~default:7 o + Option.value ~default:7 o
 [%%expect_asm X86_64{|
 unwrap_twice:
-  testb $1, %al
+  movq  %rax, %rbx
+  testb $1, %bl
   je    .L0
-  movl  $15, %ebx
-  testb $1, %al
+  movl  $15, %eax
+  testb $1, %bl
   je    .L2
   jmp   .L1
 .L0:
-  movq  (%rax), %rbx
-  testb $1, %al
+  movq  (%rbx), %rax
+  testb $1, %bl
   je    .L2
 .L1:
-  movl  $15, %eax
+  movl  $15, %ebx
   jmp   .L3
 .L2:
-  movq  (%rax), %rax
+  movq  (%rbx), %rbx
 .L3:
-  leaq  -1(%rax,%rbx), %rax
+  leaq  -1(%rbx,%rax), %rax
   ret
 |}]
 
@@ -41,34 +42,38 @@ let arr_sum arr =
 ;;
 [%%expect_asm X86_64{|
 arr_sum:
-  movq  %rax, %rbx
-  movq  -8(%rbx), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
-  orq   $1, %rdi
-  leaq  -2(%rdi), %rsi
-  cmpq  $1, %rsi
-  jl    .L2
-  sarq  $1, %rsi
+  movq  %rax, %rdx
+  movq  -8(%rdx), %rbx
+  salq  $8, %rbx
+  shrq  $17, %rbx
+  orq   $1, %rbx
+  leaq  -2(%rbx), %rdi
+  cmpq  $1, %rdi
+  jl    .L3
+  sarq  $1, %rdi
   movl  $1, %eax
-  xorl  %edx, %edx
+  xorl  %esi, %esi
+  movq  %rax, %rcx
 .L0:
-  leaq  1(%rdx,%rdx), %rcx
-  cmpq  %rdi, %rcx
-  jae   .L1
-  movq  -4(%rbx,%rcx,4), %rcx
-  leaq  -1(%rax,%rcx), %rax
-  incq  %rdx
-  cmpq  %rsi, %rdx
-  jle   .L0
-  ret
+  leaq  1(%rsi,%rsi), %rax
+  cmpq  %rbx, %rax
+  jae   .L2
+  movq  -4(%rdx,%rax,4), %rax
+  leaq  -1(%rcx,%rax), %rax
+  incq  %rsi
+  cmpq  %rdi, %rsi
+  jg    .L1
+  movq  %rax, %rcx
+  jmp   .L0
 .L1:
+  ret
+.L2:
   movq  <hidden PC-relative offset>(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L2:
+.L3:
   movl  $1, %eax
   ret
 |}]
@@ -91,31 +96,32 @@ let search ~target (start : int list) =
 search:
   movq  %rax, %rdi
   testb $1, %bl
-  je    .L1
+  je    .L2
+  jmp   .L1
 .L0:
+  testb $1, %bl
+  je    .L2
+.L1:
   xorl  %esi, %esi
   movl  $1, %eax
+  movq  %rax, %rbx
   jmp   .L4
-.L1:
+.L2:
   movq  (%rbx), %rax
   xorl  %esi, %esi
   cmpq  %rax, %rdi
   setl  %sil
   testq %rsi, %rsi
-  je    .L2
-  movq  8(%rbx), %rax
+  je    .L3
+  movq  8(%rbx), %rbx
   testq %rsi, %rsi
-  jne   .L3
-  jmp   .L4
-.L2:
-  movq  %rbx, %rax
+  jne   .L0
   jmp   .L4
 .L3:
-  movq  %rax, %rbx
-  testb $1, %bl
-  je    .L1
-  jmp   .L0
+  testq %rsi, %rsi
+  jne   .L0
 .L4:
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -161,11 +167,9 @@ let complex_branching_on_two_comparisons (x: int) (y: int) c1 c2 c3 =
 [%%expect_asm X86_64{|
 complex_branching_on_two_comparisons:
   movq  %rax, %rcx
-  movq  %rbx, %rax
-  movq  %rsi, %rbx
-  cmpq  $5, %rax
+  xorl  %eax, %eax
+  cmpq  $5, %rbx
   sete  %al
-  movzbq %al, %rax
   cmpq  $5, %rcx
   jne   .L0
   testq %rax, %rax
@@ -183,6 +187,7 @@ complex_branching_on_two_comparisons:
   jmp   *%rdi
 .L1:
   movl  $1, %eax
-  movq  (%rbx), %rdi
+  movq  (%rsi), %rdi
+  movq  %rsi, %rbx
   jmp   *%rdi
 |}]

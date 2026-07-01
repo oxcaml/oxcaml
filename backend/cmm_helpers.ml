@@ -1085,7 +1085,7 @@ let mk_compare_ints_untagged dbg a1 a2 =
           let cond = Cop (Ccmpi Cge, [a1; a2], dbg) in
           let ifso = Cop (Ccmpi Cgt, [a1; a2], dbg) in
           let ifnot = Cconst_int (-1, dbg) in
-          Cop (Ccsel typ_int, [cond; ifso; ifnot], dbg)))
+          Cop (Ccsel typ_tagged_int, [cond; ifso; ifnot], dbg)))
 
 let mk_unsigned_compare_ints_untagged dbg a1 a2 =
   bind "uint_cmp" a2 (fun a2 ->
@@ -1095,7 +1095,7 @@ let mk_unsigned_compare_ints_untagged dbg a1 a2 =
           let cond = Cop (Ccmpi Cuge, [a1; a2], dbg) in
           let ifso = Cop (Ccmpi Cugt, [a1; a2], dbg) in
           let ifnot = Cconst_int (-1, dbg) in
-          Cop (Ccsel typ_int, [cond; ifso; ifnot], dbg)))
+          Cop (Ccsel typ_tagged_int, [cond; ifso; ifnot], dbg)))
 
 let mk_compare_ints dbg a1 a2 =
   match a1, a2 with
@@ -1531,7 +1531,7 @@ let float16_of_float dbg c =
   Cop
     ( Cextcall
         { func = "caml_float16_of_double";
-          ty = typ_int;
+          ty = typ_int64;
           alloc = false;
           builtin = false;
           returns = true;
@@ -1649,13 +1649,13 @@ let addr_array_length_shifted hdr dbg = lsr_const hdr wordsize_shift dbg
    The optional ?typ argument is the C-- type of the result. By default, it is
    Addr, meaning we are constructing a derived pointer into the heap. If we know
    the pointer is outside the heap (this is the case for bigarray indexing), we
-   give type Int instead. *)
+   give type Int64 instead. *)
 
 let array_indexing ?typ log2size ptr ofs dbg =
   let add =
     match typ with
     | None | Some Addr -> Cadda
-    | Some Int -> Caddi
+    | Some (Tagged_int | Naked_int (Int64 | Int32 | Int16 | Int8)) -> Caddi
     | _ -> assert false
   in
   match ofs with
@@ -2158,7 +2158,7 @@ module Extended_machtype_component = struct
     match component with
     | Val -> Val
     | Addr -> Addr
-    | Int -> Any_int
+    | Tagged_int | Naked_int _ -> Any_int
     | Float -> Float
     | Vec128 -> Vec128
     | Vec256 -> Vec256
@@ -2170,7 +2170,7 @@ module Extended_machtype_component = struct
     match t with
     | Val -> Val
     | Addr -> Addr
-    | Val_and_int | Any_int -> Int
+    | Val_and_int | Any_int -> Naked_int Int64
     | Float -> Float
     | Vec128 -> Vec128
     | Vec256 -> Vec256
@@ -2182,7 +2182,7 @@ module Extended_machtype_component = struct
     | Val -> Val
     | Addr -> Addr
     | Val_and_int -> Val
-    | Any_int -> Int
+    | Any_int -> Tagged_int
     | Float -> Float
     | Vec128 -> Vec128
     | Vec256 -> Vec256
@@ -2250,7 +2250,11 @@ let machtype_identifier t =
   let char_of_component (component : machtype_component) =
     match component with
     | Val -> 'V'
-    | Int -> 'I'
+    | Tagged_int -> 'I'
+    | Naked_int Int64 -> 'Q'
+    | Naked_int Int32 -> 'D'
+    | Naked_int Int16 -> 'W'
+    | Naked_int Int8 -> 'B'
     | Float -> 'F'
     | Vec128 -> 'X'
     | Vec256 -> 'Y'
@@ -2497,7 +2501,10 @@ let curry_function_sym_name function_kind arity result =
     ^ result_layout_suffix result
     ^ if nlocal > 0 then "L" ^ Int.to_string nlocal else ""
   | Lambda.Tupled ->
-    if List.exists (function [| Val |] | [| Int |] -> false | _ -> true) arity
+    if
+      List.exists
+        (function [| Val |] | [| Tagged_int |] -> false | _ -> true)
+        arity
     then
       Misc.fatal_error
         "tuplify_function is currently unsupported if arity contains non-values";
@@ -3523,7 +3530,7 @@ let cache_public_method meths tag cache dbg =
   let loop_body =
     ccatch
       ( check_cont,
-        [VP.create check_li, typ_int; VP.create check_hi, typ_int],
+        [VP.create check_li, typ_tagged_int; VP.create check_hi, typ_tagged_int],
         dichotomy_expr,
         check_expr,
         dbg,
@@ -3533,11 +3540,11 @@ let cache_public_method meths tag cache dbg =
   let hi_vp = VP.create hi in
   ccatch
     ( found_cont,
-      [VP.create result_label_index, typ_int],
+      [VP.create result_label_index, typ_tagged_int],
       Ccatch
         ( Recursive,
           [ { label = loop_cont;
-              params = [li_vp, typ_int; hi_vp, typ_int];
+              params = [li_vp, typ_tagged_int; hi_vp, typ_tagged_int];
               body = loop_body;
               dbg;
               is_cold = false
@@ -3707,7 +3714,7 @@ let send_function (arity, result, mode) =
   let body = Clet (VP.create clos', clos, body) in
   let fun_name = send_function_name arity result mode in
   let fun_args =
-    [obj, typ_val; tag, typ_int; cache, typ_val; pos, typ_int]
+    [obj, typ_val; tag, typ_tagged_int; cache, typ_val; pos, typ_tagged_int]
     @ List.combine (List.tl args) arity
   in
   let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
@@ -3742,7 +3749,10 @@ let apply_function (arity, result, mode) =
  *)
 
 let tuplify_function arity return =
-  if List.exists (function [| Val |] | [| Int |] -> false | _ -> true) arity
+  if
+    List.exists
+      (function [| Val |] | [| Tagged_int |] -> false | _ -> true)
+      arity
   then
     Misc.fatal_error
       "tuplify_function is currently unsupported if arity contains non-values";
@@ -3819,7 +3829,7 @@ let machtype_stored_size t =
       match (c : machtype_component) with
       | Addr -> Misc.fatal_error "[Addr] cannot be stored"
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-      | Val | Int -> cur + 1
+      | Val | Tagged_int | Naked_int _ -> cur + 1
       | Float -> cur + ints_per_float
       | Float32 ->
         (* Float32 slots still take up a full word *)
@@ -3836,7 +3846,7 @@ let machtype_non_scanned_size t =
       | Addr -> Misc.fatal_error "[Addr] cannot be stored"
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
       | Val -> cur
-      | Int -> cur + 1
+      | Tagged_int | Naked_int _ -> cur + 1
       | Float -> cur + ints_per_float
       | Float32 ->
         (* Float32 slots still take up a full word *)
@@ -3856,7 +3866,9 @@ let value_slot_given_machtype vs =
     List.partition
       (fun (_, c) ->
         match (c : machtype_component) with
-        | Int | Float | Float32 | Vec128 | Vec256 | Vec512 -> true
+        | Tagged_int | Naked_int _ | Float | Float32 | Vec128 | Vec256 | Vec512
+          ->
+          true
         | Val -> false
         | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
         | Addr -> assert false)
@@ -3872,7 +3884,7 @@ let read_from_closure_given_machtype t clos base_offset dbg =
     List.fold_left_map
       (fun (non_scanned_pos, scanned_pos) c ->
         match (c : machtype_component) with
-        | Int ->
+        | Tagged_int | Naked_int _ ->
           (non_scanned_pos + 1, scanned_pos), load Word_int non_scanned_pos
         | Float ->
           ( (non_scanned_pos + ints_per_float, scanned_pos),
@@ -4100,7 +4112,7 @@ let bbswap (bitwidth : Cmm.bswap_bitwidth) arg dbg =
             returns = true;
             effects = No_effects;
             coeffects = No_coeffects;
-            ty = typ_int;
+            ty = typ_tagged_int;
             alloc = false;
             ty_args = [tyarg]
           },
@@ -4408,7 +4420,7 @@ let entry_point namelist =
         Ccatch
           ( Recursive,
             [ { label = cont;
-                params = [VP.create id, typ_int];
+                params = [VP.create id, typ_tagged_int];
                 body =
                   Csequence
                     ( exit_if_last_iteration id,
@@ -5084,7 +5096,7 @@ let atomic_arith ~dbg ~op ~untag ~ext_name block ~field i =
             returns = true;
             effects = Arbitrary_effects;
             coeffects = Has_coeffects;
-            ty = typ_int;
+            ty = typ_tagged_int;
             ty_args = [];
             alloc = false
           },
@@ -5128,7 +5140,7 @@ let atomic_compare_and_set_extcall ~dbg block ~field ~old_value ~new_value =
           returns = true;
           effects = Arbitrary_effects;
           coeffects = Has_coeffects;
-          ty = typ_int;
+          ty = typ_tagged_int;
           ty_args = [];
           alloc = false
         },

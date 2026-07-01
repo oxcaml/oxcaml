@@ -51,13 +51,14 @@ module Variant_with_uneven_mutability = struct
 end
 [%%expect_asm X86_64{|
 Variant_with_uneven_mutability.get:
-  movzbq -8(%rax), %rbx
-  cmpq  $1, %rbx
+  movq  %rax, %rbx
+  movzbq -8(%rbx), %rax
+  cmpq  $1, %rax
   jne   .L0
-  movq  (%rax), %rax
+  movq  (%rbx), %rax
   ret
 .L0:
-  movq  (%rax), %rax
+  movq  (%rbx), %rax
   ret
 |}]
 

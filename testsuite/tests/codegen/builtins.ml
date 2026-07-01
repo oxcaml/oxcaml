@@ -755,11 +755,12 @@ let ptr_fetch_sub_int (p : nativeint#) v =
     (Nativeint_u.to_nativeint p) v
 [%%expect_asm X86_64{|
 ptr_fetch_sub_int:
-  sarq  $1, %rbx
-  xorl  %edi, %edi
-  subq  %rbx, %rdi
-  lock xaddq %rdi, (%rax)
-  leaq  1(%rdi,%rdi), %rax
+  movq  %rbx, %rdi
+  sarq  $1, %rdi
+  xorl  %ebx, %ebx
+  subq  %rdi, %rbx
+  lock xaddq %rbx, (%rax)
+  leaq  1(%rbx,%rbx), %rax
   ret
 |}]
 
@@ -769,8 +770,8 @@ let ptr_cas_int (p : nativeint#) old_v new_v =
 [%%expect_asm X86_64{|
 ptr_cas_int:
   movq  %rax, %rsi
-  movq  %rbx, %rax
   sarq  $1, %rdi
+  movq  %rbx, %rax
   sarq  $1, %rax
   lock cmpxchgq %rdi, (%rsi)
   sete  %al
@@ -845,8 +846,9 @@ let ptr_fetch_sub_int32 (p : nativeint#) (v : int32#) =
 ptr_fetch_sub_int32:
   xorl  %edi, %edi
   subq  %rbx, %rdi
-  lock xaddl %edi, (%rax)
-  movslq %edi, %rax
+  movq  %rdi, %rbx
+  lock xaddl %ebx, (%rax)
+  movslq %ebx, %rax
   ret
 |}]
 
@@ -1064,8 +1066,8 @@ let ext_cas_int (p : Builtins.ext_pointer) old_v new_v =
 [%%expect_asm X86_64{|
 ext_cas_int:
   movq  %rax, %rsi
-  movq  %rbx, %rax
   sarq  $1, %rdi
+  movq  %rbx, %rax
   sarq  $1, %rax
   leaq  -1(%rsi), %rbx
   lock cmpxchgq %rdi, (%rbx)
@@ -1083,10 +1085,9 @@ let ext_fetch_add_int64
        p (Int64_u.to_int64 v))
 [%%expect_asm X86_64{|
 ext_fetch_add_int64:
-  movq  %rax, %rdi
+  leaq  -1(%rax), %rdi
   movq  %rbx, %rax
-  leaq  -1(%rdi), %rbx
-  lock xaddq %rax, (%rbx)
+  lock xaddq %rax, (%rdi)
   ret
 |}]
 
@@ -1110,10 +1111,9 @@ let ext_fetch_add_nativeint
        p (Nativeint_u.to_nativeint v))
 [%%expect_asm X86_64{|
 ext_fetch_add_nativeint:
-  movq  %rax, %rdi
+  leaq  -1(%rax), %rdi
   movq  %rbx, %rax
-  leaq  -1(%rdi), %rbx
-  lock xaddq %rax, (%rbx)
+  lock xaddq %rax, (%rdi)
   ret
 |}]
 
@@ -1124,12 +1124,14 @@ let bs_fetch_add_int
   Builtins.bigstring_fetch_add_int bs pos v
 [%%expect_asm X86_64{|
 bs_fetch_add_int:
-  sarq  $1, %rdi
+  movq  %rax, %rsi
+  movq  %rdi, %rax
+  sarq  $1, %rax
   sarq  $1, %rbx
-  movq  8(%rax), %rax
-  addq  %rbx, %rax
-  lock xaddq %rdi, (%rax)
-  leaq  1(%rdi,%rdi), %rax
+  movq  8(%rsi), %rdi
+  addq  %rdi, %rbx
+  lock xaddq %rax, (%rbx)
+  leaq  1(%rax,%rax), %rax
   ret
 |}]
 
@@ -1141,10 +1143,11 @@ let bs_fetch_add_int64
 [%%expect_asm X86_64{|
 bs_fetch_add_int64:
   movq  %rax, %rsi
+  movq  %rbx, %rax
+  sarq  $1, %rax
+  movq  8(%rsi), %rbx
+  addq  %rax, %rbx
   movq  %rdi, %rax
-  sarq  $1, %rbx
-  movq  8(%rsi), %rdi
-  addq  %rdi, %rbx
   lock xaddq %rax, (%rbx)
   ret
 |}]
@@ -1156,11 +1159,14 @@ let bs_fetch_add_int32
        bs pos (Int32_u.to_int32 v))
 [%%expect_asm X86_64{|
 bs_fetch_add_int32:
-  sarq  $1, %rbx
-  movq  8(%rax), %rax
+  movq  %rax, %rsi
+  movq  %rbx, %rax
+  sarq  $1, %rax
+  movq  8(%rsi), %rbx
   addq  %rbx, %rax
-  lock xaddl %edi, (%rax)
-  movslq %edi, %rax
+  movq  %rdi, %rbx
+  lock xaddl %ebx, (%rax)
+  movslq %ebx, %rax
   ret
 |}]
 
@@ -1170,8 +1176,8 @@ let bs_cas_int
 [%%expect_asm X86_64{|
 bs_cas_int:
   movq  %rax, %rdx
-  movq  %rdi, %rax
   sarq  $1, %rsi
+  movq  %rdi, %rax
   sarq  $1, %rax
   sarq  $1, %rbx
   movq  8(%rdx), %rdi

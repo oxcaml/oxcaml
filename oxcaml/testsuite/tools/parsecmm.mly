@@ -203,7 +203,7 @@ machtype:
 component:
     VAL                         { Val }
   | ADDR                        { Addr }
-  | INT                         { Int }
+  | INT                         { Tagged_int }
   | FLOAT                       { Float }
 ;
 componentlist:

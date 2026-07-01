@@ -366,8 +366,8 @@ let () =
       (Printf.sprintf
          ">> Fatal error: In function arguments: changed preassigned \
           register's location from %s to %s"
-         (Regs.register_name Cmm.Int (P RAX))
-         (Regs.register_name Cmm.Int (P RBX)))
+         (Regs.register_name Cmm.Int64 (P RAX))
+         (Regs.register_name Cmm.Int64 (P RBX)))
 
 let () =
   check "Location can't be unknown after allocation"
@@ -398,8 +398,8 @@ let () =
       (Printf.sprintf
          ">> Fatal error: In instruction's no 17 results: changed preassigned \
           register's location from %s to %s"
-         (Regs.register_name Cmm.Int (P RDI))
-         (Regs.register_name Cmm.Int (P RBX)))
+         (Regs.register_name Cmm.Int64 (P RDI))
+         (Regs.register_name Cmm.Int64 (P RBX)))
 
 let () =
   check "Duplicate instruction found when validating description"
@@ -658,7 +658,8 @@ let make_loop ~loop_loc_first n =
   in
   let stack_loc =
     let locs =
-      Array.init (n + 1) (fun i -> Reg.create_at_location Int (Stack (Local i)))
+      Array.init (n + 1) (fun i ->
+          Reg.create_at_location Int64 (Stack (Local i)))
     in
     fun i -> locs.(i)
   in
@@ -672,7 +673,7 @@ let make_loop ~loop_loc_first n =
   let int_arg2 = args.(1) in
   let int_arg3 = args.(2) in
   let extra_regs =
-    Array.init n (fun _ -> Reg.create_at_location Int int_arg3.loc)
+    Array.init n (fun _ -> Reg.create_at_location Int64 int_arg3.loc)
   in
   let results, result_locs = make_locs [| int_arg1 |] Proc.loc_results_return in
   let make_moves src dst =
@@ -858,22 +859,22 @@ let test_loop ~loop_loc_first n =
           Equations: R[%s]=%s R[%s]=%s R[%s]=%s\n\
           Function argument descriptions: R[%s], R[%s], R[%s]\n\
           Function argument locations: %s, %s, %s"
-         (Regs.register_name Cmm.Int (P RDI))
-         (Regs.register_name Cmm.Int (P RBX))
-         (Regs.register_name Cmm.Int (P RBX))
-         (Regs.register_name Cmm.Int (P RBX))
-         (Regs.register_name Cmm.Int (P RAX))
-         (Regs.register_name Cmm.Int (P RAX))
-         (Regs.register_name Cmm.Int (P RDI))
-         (Regs.register_name Cmm.Int (P RBX))
-         (Regs.register_name Cmm.Int (P RDI))
-         (Regs.register_name Cmm.Int (P RDI))
-         (Regs.register_name Cmm.Int (P RAX))
-         (Regs.register_name Cmm.Int (P RBX))
-         (Regs.register_name Cmm.Int (P RDI))
-         (Regs.register_name Cmm.Int (P RAX))
-         (Regs.register_name Cmm.Int (P RBX))
-         (Regs.register_name Cmm.Int (P RDI)))
+         (Regs.register_name Cmm.Int64 (P RDI))
+         (Regs.register_name Cmm.Int64 (P RBX))
+         (Regs.register_name Cmm.Int64 (P RBX))
+         (Regs.register_name Cmm.Int64 (P RBX))
+         (Regs.register_name Cmm.Int64 (P RAX))
+         (Regs.register_name Cmm.Int64 (P RAX))
+         (Regs.register_name Cmm.Int64 (P RDI))
+         (Regs.register_name Cmm.Int64 (P RBX))
+         (Regs.register_name Cmm.Int64 (P RDI))
+         (Regs.register_name Cmm.Int64 (P RDI))
+         (Regs.register_name Cmm.Int64 (P RAX))
+         (Regs.register_name Cmm.Int64 (P RBX))
+         (Regs.register_name Cmm.Int64 (P RDI))
+         (Regs.register_name Cmm.Int64 (P RAX))
+         (Regs.register_name Cmm.Int64 (P RBX))
+         (Regs.register_name Cmm.Int64 (P RDI)))
     ~exp_err:"";
   let end_time = Sys.time () in
   Format.printf "  Time of loop test: %fs\n" (end_time -. start_time);

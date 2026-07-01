@@ -18,11 +18,11 @@ open Intrinsics
 let select_identity x = Builtins.select x 1 0
 [%%expect_asm X86_64{|
 select_identity:
-  movq  %rax, %rbx
-  movl  $1, %eax
+  movl  $1, %ebx
   movl  $3, %edi
-  cmpq  $1, %rbx
-  cmovne %rdi, %rax
+  cmpq  $1, %rax
+  cmovne %rdi, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -32,10 +32,10 @@ select_identity:
 let select_cmp (x : int) = Builtins.select (x > 10) x 55
 [%%expect_asm X86_64{|
 select_cmp:
-  movq  %rax, %rbx
-  movl  $111, %eax
-  cmpq  $21, %rbx
-  cmovg %rbx, %rax
+  movl  $111, %ebx
+  cmpq  $21, %rax
+  cmovg %rax, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 

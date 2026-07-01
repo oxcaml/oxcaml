@@ -181,21 +181,22 @@ let bytes_safe_get_int32 (buf : bytes) (i : int) =
   Bytes.get_int32_ne buf i
 [%%expect_asm X86_64{|
 bytes_safe_get_int32:
-  movq  -8(%rax), %rdi
-  salq  $8, %rdi
-  shrq  $18, %rdi
-  leaq  -1(,%rdi,8), %rdi
-  movzbq (%rax,%rdi), %rsi
-  subq  %rsi, %rdi
-  addq  $-3, %rdi
+  movq  %rax, %rdi
+  movq  -8(%rdi), %rax
+  salq  $8, %rax
+  shrq  $18, %rax
+  leaq  -1(,%rax,8), %rax
+  movzbq (%rdi,%rax), %rsi
+  subq  %rsi, %rax
+  addq  $-3, %rax
   sarq  $1, %rbx
-  movq  %rdi, %rsi
+  movq  %rax, %rsi
   sarq  $63, %rsi
   xorq  $-1, %rsi
-  andq  %rdi, %rsi
+  andq  %rax, %rsi
   cmpq  %rsi, %rbx
   jae   .L0
-  movslq (%rax,%rbx), %rax
+  movslq (%rdi,%rbx), %rax
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
@@ -396,26 +397,28 @@ string_unsafe_get_and_use:
 let str_length (s : string) = String.length s
 [%%expect_asm X86_64{|
 str_length:
-  movq  -8(%rax), %rbx
-  salq  $8, %rbx
-  shrq  $18, %rbx
-  leaq  -1(,%rbx,8), %rbx
-  movzbq (%rax,%rbx), %rax
-  subq  %rax, %rbx
-  leaq  1(%rbx,%rbx), %rax
+  movq  %rax, %rbx
+  movq  -8(%rbx), %rax
+  salq  $8, %rax
+  shrq  $18, %rax
+  leaq  -1(,%rax,8), %rax
+  movzbq (%rbx,%rax), %rbx
+  subq  %rbx, %rax
+  leaq  1(%rax,%rax), %rax
   ret
 |}]
 
 let buf_length (b : bytes) = Bytes.length b
 [%%expect_asm X86_64{|
 buf_length:
-  movq  -8(%rax), %rbx
-  salq  $8, %rbx
-  shrq  $18, %rbx
-  leaq  -1(,%rbx,8), %rbx
-  movzbq (%rax,%rbx), %rax
-  subq  %rax, %rbx
-  leaq  1(%rbx,%rbx), %rax
+  movq  %rax, %rbx
+  movq  -8(%rbx), %rax
+  salq  $8, %rax
+  shrq  $18, %rax
+  leaq  -1(,%rax,8), %rax
+  movzbq (%rbx,%rax), %rbx
+  subq  %rbx, %rax
+  leaq  1(%rax,%rax), %rax
   ret
 |}]
 
@@ -425,10 +428,11 @@ let u8_to_int_unsafe_set (x : bytes) (y : Uint8_u.t) =
   Bytes.unsafe_set x 0 (Uint8_u.to_int y)
 [%%expect_asm X86_64{|
 u8_to_int_unsafe_set:
-  leaq  1(%rbx,%rbx), %rbx
-  andl  $511, %ebx
-  sarq  $1, %rbx
-  movb  %bl, (%rax)
+  movq  %rax, %rdi
+  leaq  1(%rbx,%rbx), %rax
+  andl  $511, %eax
+  sarq  $1, %rax
+  movb  %al, (%rdi)
   movl  $1, %eax
   ret
 |}]

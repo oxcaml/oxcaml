@@ -75,13 +75,13 @@ do_intersect:
 let logand_branch x y f = if x land (1 lsl 4) <> 0 then f()
 [%%expect_asm X86_64{|
 logand_branch:
-  movq  %rdi, %rbx
   andl  $33, %eax
   cmpq  $1, %rax
   je    .L0
   movl  $1, %eax
-  movq  (%rbx), %rdi
-  jmp   *%rdi
+  movq  (%rdi), %rsi
+  movq  %rdi, %rbx
+  jmp   *%rsi
 .L0:
   movl  $1, %eax
   ret
@@ -145,7 +145,8 @@ let bad_max a b =
 [%%expect_asm X86_64{|
 bad_max:
   movq  %rax, %rdi
-  movl  $1, %esi
+  movl  $1, %eax
+  movq  %rax, %rsi
   cmpq  %rdi, %rsi
   jge   .L1
 .L0:
@@ -158,7 +159,8 @@ bad_max:
   testq %rax, %rax
   je    .L3
 .L2:
-  addq  $2, %rsi
+  leaq  2(%rsi), %rax
+  movq  %rax, %rsi
   cmpq  %rdi, %rsi
   jge   .L1
   jmp   .L0
@@ -222,15 +224,16 @@ two_element_list:
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rdi
-  addq  $24, %rdi
-  movq  $2048, -8(%rdi)
-  movq  %rbx, (%rdi)
-  movq  $1, 8(%rdi)
-  leaq  -24(%rdi), %rax
+  leaq  8(%r15), %rax
+  addq  $24, %rax
   movq  $2048, -8(%rax)
   movq  %rbx, (%rax)
-  movq  %rdi, 8(%rax)
+  movq  $1, 8(%rax)
+  leaq  -24(%rax), %rdi
+  movq  $2048, -8(%rdi)
+  movq  %rbx, (%rdi)
+  movq  %rax, 8(%rdi)
+  movq  %rdi, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -245,8 +248,9 @@ let constant_folding (x : int) =
 constant_folding:
   cmpq  %rax, %rax
   jl    .L0
-  subq  %rax, %rax
-  incq  %rax
+  movq  %rax, %rbx
+  subq  %rax, %rbx
+  leaq  1(%rbx), %rax
   cmpq  $1, %rax
   jne   .L1
 .L0:

@@ -58,11 +58,12 @@ let[@cold] reduce t =
 
 [%%expect_asm X86_64{|
 reduce:
-  movq  (%rax), %rbx
-  movq  8(%rax), %rdi
-  leaq  2(%rbx), %rsi
-  movq  %rsi, (%rax)
-  leaq  -1(%rbx,%rdi), %rax
+  movq  %rax, %rdi
+  movq  (%rdi), %rax
+  movq  8(%rdi), %rbx
+  leaq  2(%rax), %rsi
+  movq  %rsi, (%rdi)
+  leaq  -1(%rax,%rbx), %rax
   ret
 |}]
 
@@ -80,13 +81,14 @@ let[@cold] sink _x _y = ()
 let useless_movs x y = sink (x - y) x
 [%%expect_asm X86_64{|
 useless_movs:
-  movq  %rax, %rsi
+  movq  %rax, %rdi
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  24(%rax), %rdi
-  movq  %rsi, %rax
+  movq  24(%rax), %rsi
+  movq  %rdi, %rax
   subq  %rbx, %rax
   incq  %rax
-  movq  %rsi, %rbx
+  movq  %rdi, %rbx
+  movq  %rsi, %rdi
   jmp   caml_apply2@PLT
 |}]
 
@@ -196,12 +198,13 @@ spill_unspill_loop_movement:
   incq  %rdi
   cmpq  %rbx, %rdi
   jle   .L0
+  movq  %rsi, %rax
   movq  24(%rsp), %rdi
   jmp   .L5
 .L4:
-  movl  $1, %esi
+  movl  $1, %eax
 .L5:
-  leaq  -1(%rdi,%rsi), %rax
+  leaq  -1(%rdi,%rax), %rax
   addq  $40, %rsp
   ret
 
@@ -214,8 +217,9 @@ let f a b c = if a > 10 then b - c else a - b
 f:
   cmpq  $21, %rax
   jle   .L0
-  subq  %rdi, %rbx
-  leaq  1(%rbx), %rax
+  movq  %rbx, %rax
+  subq  %rdi, %rax
+  incq  %rax
   ret
 .L0:
   subq  %rbx, %rax
@@ -272,10 +276,8 @@ let unnecessary_moves (a : int) (b : int) (c : int) (d : int) f =
 [%%expect_asm X86_64{|
 unnecessary_moves:
   movq  %rax, %rcx
-  movq  %rbx, %r8
-  movq  %rdx, %rbx
-  leaq  -1(%rcx,%r8), %rax
-  cmpq  %r8, %rcx
+  leaq  -1(%rcx,%rbx), %rax
+  cmpq  %rbx, %rcx
   jge   .L0
   movq  %rcx, %rax
   ret
@@ -284,8 +286,9 @@ unnecessary_moves:
   jge   .L2
   subq  $8, %rsp
   movq  %rax, (%rsp)
-  movq  (%rbx), %rdi
-  movq  %r8, %rax
+  movq  (%rdx), %rdi
+  movq  %rbx, %rax
+  movq  %rdx, %rbx
   call  *%rdi
 .L1:
   movq  (%rsp), %rax
@@ -307,10 +310,10 @@ spill_one_or_two:
   subq  $24, %rsp
   movq  %rax, (%rsp)
   movq  %rbx, 8(%rsp)
-  movq  %rdi, %rbx
   movl  $1, %eax
-  movq  (%rbx), %rdi
-  call  *%rdi
+  movq  (%rdi), %rsi
+  movq  %rdi, %rbx
+  call  *%rsi
 .L0:
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
@@ -336,76 +339,79 @@ let double_loop_no_definition_at_beginning array n list =
 [%%expect_asm X86_64{|
 double_loop_no_definition_at_beginning:
   subq  $72, %rsp
-  movq  %rbx, %rsi
-  movq  64(%r14), %rbx
-  cmpq  $1, %rsi
+  movq  %rax, %rsi
+  movq  64(%r14), %rax
+  cmpq  $1, %rbx
   jl    .L5
-  movq  %rbx, 16(%rsp)
+  movq  %rax, 16(%rsp)
   movq  %rdi, 32(%rsp)
-  movq  %rax, 24(%rsp)
-  sarq  $1, %rsi
-  movq  %rsi, 40(%rsp)
-  xorl  %edx, %edx
+  movq  %rsi, 24(%rsp)
+  movq  %rbx, %rax
+  sarq  $1, %rax
+  movq  %rax, 40(%rsp)
+  xorl  %ebx, %ebx
 .L0:
-  movq  64(%r14), %rbx
-  movq  %rbx, 8(%rsp)
-  movq  64(%r14), %rbx
-  subq  $40, %rbx
-  movq  %rbx, 64(%r14)
-  cmpq  80(%r14), %rbx
+  movq  64(%r14), %rdx
+  movq  %rdx, 8(%rsp)
+  movq  64(%r14), %rdx
+  subq  $40, %rdx
+  movq  %rdx, 64(%r14)
+  cmpq  80(%r14), %rdx
   jl    <hidden GC jump pad>
 .L1:
-  addq  72(%r14), %rbx
-  addq  $8, %rbx
-  movq  $5111, -8(%rbx)
+  addq  72(%r14), %rdx
+  addq  $8, %rdx
+  movq  $5111, -8(%rdx)
   movq  <hidden PC-relative offset>(%rip), %rcx
-  movq  %rcx, (%rbx)
+  movq  %rcx, (%rdx)
   movabsq $108086391056891911, %rcx
-  movq  %rcx, 8(%rbx)
-  leaq  1(%rdx,%rdx), %rcx
-  movq  %rdx, (%rsp)
-  movq  %rcx, 16(%rbx)
-  movq  %rax, 24(%rbx)
-  movq  %rbx, 48(%rsp)
-  movq  %rdi, %rdx
-  testb $1, %dl
+  movq  %rcx, 8(%rdx)
+  leaq  1(%rbx,%rbx), %rcx
+  movq  %rbx, (%rsp)
+  movq  %rcx, 16(%rdx)
+  movq  %rsi, 24(%rdx)
+  movq  %rdx, 48(%rsp)
+  movq  %rdi, %rbx
+  testb $1, %bl
   jne   .L4
 .L2:
-  movq  (%rdx), %rax
-  movq  %rdx, 56(%rsp)
+  movq  (%rbx), %rax
+  movq  %rbx, 56(%rsp)
+  movq  %rdx, %rbx
   call  camlTOP15__f_33_37_code@PLT
 .L3:
-  movq  56(%rsp), %rdx
-  movq  8(%rdx), %rdx
-  movq  24(%rsp), %rax
+  movq  56(%rsp), %rbx
+  movq  8(%rbx), %rbx
+  movq  24(%rsp), %rsi
   movq  32(%rsp), %rdi
-  movq  40(%rsp), %rsi
-  movq  48(%rsp), %rbx
-  testb $1, %dl
+  movq  40(%rsp), %rax
+  movq  48(%rsp), %rdx
+  testb $1, %bl
   je    .L2
 .L4:
   movq  8(%rsp), %rbx
   movq  %rbx, 64(%r14)
-  movq  (%rsp), %rdx
-  incq  %rdx
-  cmpq  %rsi, %rdx
+  movq  (%rsp), %rbx
+  incq  %rbx
+  cmpq  %rax, %rbx
   jle   .L0
-  movq  16(%rsp), %rbx
+  movq  16(%rsp), %rax
 .L5:
-  movq  %rbx, 64(%r14)
+  movq  %rax, 64(%r14)
   movl  $1, %eax
   addq  $72, %rsp
   ret
 
 double_loop_no_definition_at_beginning.f:
-  movq  24(%rbx), %rsi
-  movq  -8(%rsi), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
-  cmpq  %rdi, %rax
+  movq  %rbx, %rsi
+  movq  24(%rsi), %rdi
+  movq  -8(%rdi), %rbx
+  salq  $8, %rbx
+  shrq  $17, %rbx
+  cmpq  %rbx, %rax
   jae   .L0
-  movq  16(%rbx), %rbx
-  movq  %rbx, -4(%rsi,%rax,4)
+  movq  16(%rsi), %rbx
+  movq  %rbx, -4(%rdi,%rax,4)
   movl  $1, %eax
   ret
 .L0:
@@ -428,9 +434,10 @@ spilled_phi_merge:
   movq  %rax, 8(%rsp)
   movq  %rbx, 48(%rsp)
   movq  %rdi, (%rsp)
-  movq  %rsi, %rbp
-  movq  %rdx, %rbx
-  movq  %rcx, 24(%rsp)
+  movq  %rsi, %rbx
+  movq  %rdx, %rbp
+  movq  %rcx, %rax
+  movq  %rax, 24(%rsp)
   movq  %r8, %r12
   movq  %r9, %r13
   movl  $1, %edi
@@ -441,8 +448,8 @@ spilled_phi_merge:
   movq  %r13, 40(%rsp)
   movq  %r12, 32(%rsp)
   movq  24(%rsp), %rax
-  movq  %rbx, 16(%rsp)
-  movq  %rbp, 8(%rsp)
+  movq  %rbp, 16(%rsp)
+  movq  %rbx, 8(%rsp)
   movq  (%rsp), %rax
   movl  $1, %eax
   movq  48(%rsp), %rbx
@@ -451,8 +458,8 @@ spilled_phi_merge:
   call  *%rdi
 .L0:
   movq  (%rsp), %rax
-  movq  8(%rsp), %rbp
-  movq  16(%rsp), %rbx
+  movq  8(%rsp), %rbx
+  movq  16(%rsp), %rbp
   movq  24(%rsp), %rdi
   movq  32(%rsp), %r8
   movq  40(%rsp), %r9
@@ -461,7 +468,8 @@ spilled_phi_merge:
   movq  %r8, %r12
   movq  %r9, %r13
 .L1:
-  movq  %rbp, %rax
+  movq  %rbx, %rax
+  movq  %rbp, %rbx
   movq  24(%rsp), %rdi
   movq  %r12, %rsi
   movq  %r13, %rdx

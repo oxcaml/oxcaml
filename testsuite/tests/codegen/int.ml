@@ -51,9 +51,9 @@ mul_3:
 let div x y = x / y
 [%%expect_asm X86_64{|
 div:
-  movq  %rbx, %rcx
-  cmpq  $1, %rcx
+  cmpq  $1, %rbx
   je    .L0
+  movq  %rbx, %rcx
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
@@ -104,9 +104,9 @@ div_2:
 let rem x y = x mod y
 [%%expect_asm X86_64{|
 rem:
-  movq  %rbx, %rcx
-  cmpq  $1, %rcx
+  cmpq  $1, %rbx
   je    .L0
+  movq  %rbx, %rcx
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
