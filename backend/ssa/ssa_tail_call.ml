@@ -46,9 +46,9 @@ open Ssa_reducer
     compiles as a normal call followed by a return. Such shapes would show up as
     a [Cfg_compare] mismatch under [-ssa-validate]; they do not seem to be
     produced in practice. *)
-module Tail_call_reducer (C : Context) = struct
-  open! C
-  include Default (C)
+module Tail_call_reducer = struct
+  open! Context
+  include Default_reducer (Default_analyzer)
 
   let returns_args_unchanged (block : finished Block.t) : bool =
     match[@warning "-fragile-match"] Block.terminator block with

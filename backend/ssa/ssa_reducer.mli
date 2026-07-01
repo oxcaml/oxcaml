@@ -64,7 +64,7 @@ open Ssa.Export
     input->output value maps. The reducer's analysis result is passed directly
     to the reducer hooks as opposed to being available from the context to
     simplify the functor construction. *)
-module type Context = sig
+module Context : sig
   type t
 
   (** A marker for the output graph's construction state, kept abstract so a
@@ -140,22 +140,19 @@ type 'a did_emit =
   | For_next_reducer
   | Emitted_replacement of 'a
 
-(** The signature of a reducer applied to a [Context]: the analysis pass plus
-    the hooks. [context] / [cursor] / [out] are the corresponding types of that
-    context; {!Reducer} substitutes them with [C.t] / [C.Cursor.t] / [C.out]. *)
-module type S = sig
-  type analysis_result
-
-  type context
-
-  type cursor
-
-  type out
+module type Analyzer = sig
+  type result
 
   (** Called once at the start of each run, before any [visit_*] / [emit_*].
       Scans the input graph and produces the analysis result consulted by the
       per-instruction hooks. *)
-  val analyze : finished Ssa.graph -> analysis_result
+  val run : finished Ssa.graph -> result
+end
+
+(** A reducer is turned into an optimization pass using the {!Make_run} functor.
+    The {!Combine} functor can be used to compose multiple reducers into one. *)
+module type Reducer = sig
+  module Analyzer : Analyzer
 
   (** Called for each instruction in each input block. [For_next_reducer]: defer
       to the framework's default translation. [Emitted_replacement values]: the
@@ -164,59 +161,57 @@ module type S = sig
       what the input instruction's results map to (empty for a trap
       instruction), and is remembered as the output-graph mapping. *)
   val visit_instruction :
-    analysis_result ->
-    context ->
+    Analyzer.result ->
+    Context.t ->
     finished Block.t ->
     instr_index:int ->
-    cursor ->
-    out Value.t array did_emit
+    Context.Cursor.t ->
+    Context.out Value.t array did_emit
 
   (** Called once per input block, after its body. *)
   val visit_terminator :
-    analysis_result -> context -> finished Block.t -> cursor -> unit did_emit
+    Analyzer.result ->
+    Context.t ->
+    finished Block.t ->
+    Context.Cursor.t ->
+    unit did_emit
 
   (** Called each time the framework is about to emit an [Op] into the cursor.
       [For_next_reducer]: emit it as-is. [Emitted_replacement values]: the
       reducer has already emitted a replacement producing the values [values].
   *)
   val emit_op :
-    analysis_result ->
-    context ->
-    cursor ->
+    Analyzer.result ->
+    Context.t ->
+    Context.Cursor.t ->
     op:Ssa.op ->
     dbg:Debuginfo.t ->
     typ:Cmm.machtype ->
-    args:out Value.t array ->
-    out Value.t array did_emit
+    args:Context.out Value.t array ->
+    Context.out Value.t array did_emit
 
   (** Called each time the framework is about to finish a block.
       [For_next_reducer]: the framework will finish the block with the given
       terminator. [Emitted_replacement ()]: the reducer indicates it has already
       finalised the block using the context. *)
   val finish_block :
-    analysis_result ->
-    context ->
-    cursor ->
+    Analyzer.result ->
+    Context.t ->
+    Context.Cursor.t ->
     dbg:Debuginfo.t ->
-    out Terminator.t ->
+    Context.out Terminator.t ->
     unit did_emit
 end
 
-(** A reducer is a functor over a [Context]. It is instantiated exactly once (by
-    {!Make_run}, not per graph). Its [analyze] runs once per graph and produces
-    an [analysis_result] that is then passed to every hook. *)
-module type Reducer = functor (C : Context) ->
-  S with type context := C.t and type cursor := C.Cursor.t and type out := C.out
+(* Trivial analyzer that doesn't do anything. *)
+module Default_analyzer : Analyzer with type result = unit
 
-(** A trivial reducer: every hook returns [For_next_reducer], so the framework
-    always takes the default path. Typically used via [include Default (C)] so a
-    reducer only writes the hooks it actually overrides. *)
-module Default : functor (C : Context) ->
-  S
-    with type analysis_result = unit
-     and type context := C.t
-     and type cursor := C.Cursor.t
-     and type out := C.out
+(** Trivial reducer: every hook returns [For_next_reducer], so the framework
+    always takes the default path. Typically used via
+    [include Default_reducer (Default_analyzer)] so a reducer only mentions the
+    hooks it actually overrides. *)
+module Default_reducer (Analyzer : Analyzer) :
+  Reducer with module Analyzer = Analyzer
 
 (** Combine two reducers into one. For each hook the first reducer is tried, and
     if it returns [For_next_reducer] the second one is tried. *)

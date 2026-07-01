@@ -31,11 +31,12 @@ open! Int_replace_polymorphic_compare
 
 (** Framework for SSA-to-SSA transformations.
 
-    A reducer is a functor over a [Context]; {!Make_run} instantiates it once
-    and drives the framework. [Make_run.run] allocates a fresh output graph,
-    creates an output block per input block, then walks the input in the
-    finished-graph default order (which is guaranteed to have dominators first)
-    and translates each block while removing unused block parameters.
+    A reducer is a module matching {!Reducer}. {!Make_run} turns one into a
+    pass: [run] rebuilds the input graph into a fresh output graph, visiting
+    blocks in dominators-first order (one output block per input block) and
+    dropping block parameters that turned out unused. At each instruction and
+    terminator the reducer's hooks may take over; where they defer, the
+    framework applies its default translation (below).
 
     The per-run state (the two graphs and the input->output reference maps)
     lives in [Context.t]; it is threaded to every hook and on to the [Context]
@@ -75,286 +76,233 @@ type 'a did_emit =
   | For_next_reducer
   | Emitted_replacement of 'a
 
-module type Context = sig
-  type t
+(** [Context] methods to emit into the output graph are mutually recursive with
+    the reducer's hooks. Since recursive modules currently stop inlining, we
+    instead cut the cycle at the point of the reducer calling into the context,
+    so that the actual implementation of these functions can be inlined into the
+    main loop in [run].
 
-  type out
+    [out] is really [under_construction]; in the interface it is keept abstract
+    so a reducer can only extend the output through the [Cursor] operations
+    (which route through the [emit_*] hooks), not via the raw [Ssa] builder. *)
+module Context = struct
+  type out = under_construction
 
-  (** Mirrors [Ssa.Cursor], with the context taking the graph's place; [emit_op]
-      and [finish_block] route through the reducer's [emit_op] / [finish_block]
-      hooks. *)
-  module Cursor : sig
-    type context := t
+  type t =
+    { in_graph : finished Ssa.graph;
+      out_graph : under_construction Ssa.graph;
+      block_map : under_construction Block.t Block.Tbl.t;
+      (* Output value(s) for each input [Op], indexed by its id. *)
+      op_map :
+        (finished, under_construction Value.t array) Instruction.Id.Tbl.t;
+      (* Per input block, indexed by the original param index: the output value
+         of a kept param, or [Value.undefined] for a param dropped from the
+         output block. *)
+      block_param_values : under_construction Value.t array Block.Tbl.t;
+      emit_op :
+        t ->
+        Ssa.Cursor.t ->
+        op:Ssa.op ->
+        dbg:Debuginfo.t ->
+        typ:Cmm.machtype ->
+        args:under_construction Value.t array ->
+        under_construction Value.t array;
+      finish_block :
+        t ->
+        Ssa.Cursor.t ->
+        dbg:Debuginfo.t ->
+        under_construction Terminator.t ->
+        unit
+    }
 
-    type t
+  type context = t
 
-    val start : out Block.t -> t
+  module Cursor = struct
+    include Ssa.Cursor
 
-    val move : t -> new_pos:out Block.t -> unit
+    let emit_op (ctx : context) c op dbg typ args =
+      ctx.emit_op ctx c ~op ~dbg ~typ ~args
 
-    val is_finished : t -> bool
-
-    val emit_op :
-      context ->
-      t ->
-      Ssa.op ->
-      Debuginfo.t ->
-      Cmm.machtype ->
-      out Value.t array ->
-      out Value.t array
-
-    val emit_push_trap : t -> handler:out Block.t -> unit
-
-    val emit_pop_trap : t -> handler:out Block.t -> unit
-
-    val finish_block :
-      context -> t -> dbg:Debuginfo.t -> out Terminator.t -> unit
+    let finish_block (ctx : context) c ~dbg term =
+      ctx.finish_block ctx c ~dbg term
   end
 
-  val in_graph : t -> finished Ssa.graph
+  let create ~in_graph ~out_graph ~block_map ~op_map ~block_param_values
+      ~emit_op ~finish_block =
+    { in_graph;
+      out_graph;
+      block_map;
+      op_map;
+      block_param_values;
+      emit_op;
+      finish_block
+    }
 
-  val out_graph : t -> out Ssa.graph
+  let in_graph t = t.in_graph
 
-  val map_value : t -> finished Value.t -> out Value.t
+  let out_graph t = t.out_graph
 
-  val map_block : t -> finished Block.t -> out Block.t
+  let map_block t (old : finished Block.t) : under_construction Block.t =
+    Block.Tbl.find t.block_map old
 
-  val map_terminator : t -> finished Terminator.t -> out Terminator.t
+  let map_value t (value : finished Value.t) : under_construction Value.t =
+    match value with
+    | Res ({ id; _ }, i) -> (Instruction.Id.Tbl.find t.op_map id).(i)
+    | Block_param (block, i) -> (Block.Tbl.find t.block_param_values block).(i)
+    | Undefined -> Value.undefined
+
+  let map_values t (args : finished Value.t array) : out Value.t array =
+    Array.map (map_value t) args
+
+  let map_continuation t (cont : finished Ssa.continuation) :
+      out Ssa.continuation =
+    match cont with
+    | Goto b -> Goto (map_block t b)
+    | Return -> Return
+    | Raise k -> Raise k
+    | Unreachable -> Unreachable
+
+  let map_terminator t (term : finished Terminator.t) : out Terminator.t =
+    match term with
+    | Continue { continuation = Goto goto; args } ->
+      (* Drop the args going to dropped target params. *)
+      let param_values = Block.Tbl.find t.block_param_values goto in
+      let mapped_args =
+        args
+        |> Misc.Stdlib.Array.filteri (fun i _ ->
+            not (Value.equal param_values.(i) Value.undefined))
+        |> Array.map (map_value t)
+      in
+      Continue { continuation = Goto (map_block t goto); args = mapped_args }
+    | Continue
+        { continuation = (Return | Raise _ | Unreachable) as continuation;
+          args
+        } ->
+      Continue
+        { continuation = map_continuation t continuation;
+          args = map_values t args
+        }
+    | Switch { index; targets } ->
+      Switch
+        { index = map_value t index; targets = Array.map (map_block t) targets }
+    | Call { op; args; continuation; may_raise; nontail } ->
+      Call
+        { op;
+          args = map_values t args;
+          continuation = map_continuation t continuation;
+          may_raise;
+          nontail
+        }
+    | Invalid { message; args; continuation } ->
+      Invalid
+        { message;
+          args = map_values t args;
+          continuation = Option.map (map_block t) continuation
+        }
 end
 
-module type S = sig
-  type analysis_result
+module type Analyzer = sig
+  type result
 
-  type context
+  val run : finished Ssa.graph -> result
+end
 
-  type cursor
-
-  type out
-
-  val analyze : finished Ssa.graph -> analysis_result
+module type Reducer = sig
+  module Analyzer : Analyzer
 
   val visit_instruction :
-    analysis_result ->
-    context ->
+    Analyzer.result ->
+    Context.t ->
     finished Block.t ->
     instr_index:int ->
-    cursor ->
-    out Value.t array did_emit
+    Context.Cursor.t ->
+    Context.out Value.t array did_emit
 
   val visit_terminator :
-    analysis_result -> context -> finished Block.t -> cursor -> unit did_emit
+    Analyzer.result ->
+    Context.t ->
+    finished Block.t ->
+    Context.Cursor.t ->
+    unit did_emit
 
   val emit_op :
-    analysis_result ->
-    context ->
-    cursor ->
+    Analyzer.result ->
+    Context.t ->
+    Context.Cursor.t ->
     op:Ssa.op ->
     dbg:Debuginfo.t ->
     typ:Cmm.machtype ->
-    args:out Value.t array ->
-    out Value.t array did_emit
+    args:Context.out Value.t array ->
+    Context.out Value.t array did_emit
 
   val finish_block :
-    analysis_result ->
-    context ->
-    cursor ->
+    Analyzer.result ->
+    Context.t ->
+    Context.Cursor.t ->
     dbg:Debuginfo.t ->
-    out Terminator.t ->
+    Context.out Terminator.t ->
     unit did_emit
 end
 
-module type Reducer = functor (C : Context) ->
-  S with type context := C.t and type cursor := C.Cursor.t and type out := C.out
+module Default_analyzer = struct
+  type result = unit
 
-module Default (C : Context) = struct
-  type analysis_result = unit
+  let run (_ : finished Ssa.graph) = ()
+end
 
-  let analyze (_ : finished Ssa.graph) = ()
+module Default_reducer (Analyzer : Analyzer) = struct
+  module Analyzer = Analyzer
 
-  let visit_instruction (_ : analysis_result) (_ : C.t) (_ : finished Block.t)
-      ~instr_index:(_ : int) (_ : C.Cursor.t) =
+  let visit_instruction (_ : Analyzer.result) (_ : Context.t)
+      (_ : finished Block.t) ~instr_index:(_ : int) (_ : Context.Cursor.t) =
     For_next_reducer
 
-  let visit_terminator (_ : analysis_result) (_ : C.t) (_ : finished Block.t)
-      (_ : C.Cursor.t) =
+  let visit_terminator (_ : Analyzer.result) (_ : Context.t)
+      (_ : finished Block.t) (_ : Context.Cursor.t) =
     For_next_reducer
 
-  let emit_op (_ : analysis_result) (_ : C.t) (_ : C.Cursor.t) ~op:(_ : Ssa.op)
-      ~dbg:(_ : Debuginfo.t) ~typ:(_ : Cmm.machtype)
-      ~args:(_ : C.out Value.t array) =
+  let emit_op (_ : Analyzer.result) (_ : Context.t) (_ : Context.Cursor.t)
+      ~op:(_ : Ssa.op) ~dbg:(_ : Debuginfo.t) ~typ:(_ : Cmm.machtype)
+      ~args:(_ : Context.out Value.t array) =
     For_next_reducer
 
-  let finish_block (_ : analysis_result) (_ : C.t) (_ : C.Cursor.t)
-      ~dbg:(_ : Debuginfo.t) (_ : C.out Terminator.t) =
+  let finish_block (_ : Analyzer.result) (_ : Context.t) (_ : Context.Cursor.t)
+      ~dbg:(_ : Debuginfo.t) (_ : Context.out Terminator.t) =
     For_next_reducer
 end
 
-module Combine (Reducer_a : Reducer) (Reducer_b : Reducer) : Reducer =
-functor
-  (C : Context)
-  ->
-  struct
-    module A = Reducer_a (C)
-    module B = Reducer_b (C)
+module Combine (A : Reducer) (B : Reducer) : Reducer = struct
+  module Analyzer = struct
+    type result = A.Analyzer.result * B.Analyzer.result
 
-    type analysis_result = A.analysis_result * B.analysis_result
-
-    let analyze g = A.analyze g, B.analyze g
-
-    let visit_instruction (ra, rb) ctx block ~instr_index c =
-      match A.visit_instruction ra ctx block ~instr_index c with
-      | For_next_reducer -> B.visit_instruction rb ctx block ~instr_index c
-      | Emitted_replacement vs -> Emitted_replacement vs
-
-    let visit_terminator (ra, rb) ctx block c =
-      match A.visit_terminator ra ctx block c with
-      | For_next_reducer -> B.visit_terminator rb ctx block c
-      | Emitted_replacement () -> Emitted_replacement ()
-
-    let emit_op (ra, rb) ctx c ~op ~dbg ~typ ~args =
-      match A.emit_op ra ctx c ~op ~dbg ~typ ~args with
-      | For_next_reducer -> B.emit_op rb ctx c ~op ~dbg ~typ ~args
-      | Emitted_replacement vs -> Emitted_replacement vs
-
-    let finish_block (ra, rb) ctx c ~dbg t =
-      match A.finish_block ra ctx c ~dbg t with
-      | For_next_reducer -> B.finish_block rb ctx c ~dbg t
-      | Emitted_replacement () -> Emitted_replacement ()
+    let run g = A.Analyzer.run g, B.Analyzer.run g
   end
+
+  let visit_instruction (ra, rb) ctx block ~instr_index c =
+    match A.visit_instruction ra ctx block ~instr_index c with
+    | For_next_reducer -> B.visit_instruction rb ctx block ~instr_index c
+    | Emitted_replacement vs -> Emitted_replacement vs
+
+  let visit_terminator (ra, rb) ctx block c =
+    match A.visit_terminator ra ctx block c with
+    | For_next_reducer -> B.visit_terminator rb ctx block c
+    | Emitted_replacement () -> Emitted_replacement ()
+
+  let emit_op (ra, rb) ctx c ~op ~dbg ~typ ~args =
+    match A.emit_op ra ctx c ~op ~dbg ~typ ~args with
+    | For_next_reducer -> B.emit_op rb ctx c ~op ~dbg ~typ ~args
+    | Emitted_replacement vs -> Emitted_replacement vs
+
+  let finish_block (ra, rb) ctx c ~dbg t =
+    match A.finish_block ra ctx c ~dbg t with
+    | For_next_reducer -> B.finish_block rb ctx c ~dbg t
+    | Emitted_replacement () -> Emitted_replacement ()
+end
 
 module Make_run (R : Reducer) = struct
-  (** [Context] is a plain (non-recursive) module so that the reducer's calls
-      into it are inlined. The [emit_op] / [finish_block] closures in [t] are
-      the whole emission step: the reducer's hook plus, when it defers, the
-      default emission into the output graph. [run] builds them with the
-      analysis already captured. The main walk calls these closures directly;
-      [Cursor.emit_op] / [Cursor.finish_block] are thin wrappers onto them for
-      the reducer to call, the only place that indirect call is left un-inlined.
-  *)
-  module Context = struct
-    type out = under_construction
-
-    type t =
-      { in_graph : finished Ssa.graph;
-        out_graph : under_construction Ssa.graph;
-        block_map : under_construction Block.t Block.Tbl.t;
-        (* Output value(s) for each input [Op], indexed by its id. *)
-        op_map :
-          (finished, under_construction Value.t array) Instruction.Id.Tbl.t;
-        (* Per input block, indexed by the original param index: the output
-           value of a kept param, or [Value.undefined] for a param dropped from
-           the output block. *)
-        block_param_values : under_construction Value.t array Block.Tbl.t;
-        emit_op :
-          t ->
-          Ssa.Cursor.t ->
-          op:Ssa.op ->
-          dbg:Debuginfo.t ->
-          typ:Cmm.machtype ->
-          args:under_construction Value.t array ->
-          under_construction Value.t array;
-        finish_block :
-          t ->
-          Ssa.Cursor.t ->
-          dbg:Debuginfo.t ->
-          under_construction Terminator.t ->
-          unit
-      }
-
-    type context = t
-
-    module Cursor = struct
-      include Ssa.Cursor
-
-      let emit_op (ctx : context) c op dbg typ args =
-        ctx.emit_op ctx c ~op ~dbg ~typ ~args
-
-      let finish_block (ctx : context) c ~dbg term =
-        ctx.finish_block ctx c ~dbg term
-    end
-
-    let create ~in_graph ~out_graph ~block_map ~op_map ~block_param_values
-        ~emit_op ~finish_block =
-      { in_graph;
-        out_graph;
-        block_map;
-        op_map;
-        block_param_values;
-        emit_op;
-        finish_block
-      }
-
-    let in_graph t = t.in_graph
-
-    let out_graph t = t.out_graph
-
-    let map_block t (old : finished Block.t) : under_construction Block.t =
-      Block.Tbl.find t.block_map old
-
-    let map_value t (value : finished Value.t) : under_construction Value.t =
-      match value with
-      | Res ({ id; _ }, i) -> (Instruction.Id.Tbl.find t.op_map id).(i)
-      | Block_param (block, i) ->
-        (Block.Tbl.find t.block_param_values block).(i)
-      | Undefined -> Value.undefined
-
-    let map_values t (args : finished Value.t array) : out Value.t array =
-      Array.map (map_value t) args
-
-    let map_continuation t (cont : finished Ssa.continuation) :
-        out Ssa.continuation =
-      match cont with
-      | Goto b -> Goto (map_block t b)
-      | Return -> Return
-      | Raise k -> Raise k
-      | Unreachable -> Unreachable
-
-    let map_terminator t (term : finished Terminator.t) : out Terminator.t =
-      match term with
-      | Continue { continuation = Goto goto; args } ->
-        (* Drop the args going to dropped target params. *)
-        let param_values = Block.Tbl.find t.block_param_values goto in
-        let mapped_args =
-          args
-          |> Misc.Stdlib.Array.filteri (fun i _ ->
-              not (Value.equal param_values.(i) Value.undefined))
-          |> Array.map (map_value t)
-        in
-        Continue { continuation = Goto (map_block t goto); args = mapped_args }
-      | Continue
-          { continuation = (Return | Raise _ | Unreachable) as continuation;
-            args
-          } ->
-        Continue
-          { continuation = map_continuation t continuation;
-            args = map_values t args
-          }
-      | Switch { index; targets } ->
-        Switch
-          { index = map_value t index;
-            targets = Array.map (map_block t) targets
-          }
-      | Call { op; args; continuation; may_raise; nontail } ->
-        Call
-          { op;
-            args = map_values t args;
-            continuation = map_continuation t continuation;
-            may_raise;
-            nontail
-          }
-      | Invalid { message; args; continuation } ->
-        Invalid
-          { message;
-            args = map_values t args;
-            continuation = Option.map (map_block t) continuation
-          }
-  end
-
-  module Red = R (Context)
-
   let run ?(keep_unused_ops = false) (in_graph : finished Ssa.graph) :
       finished Ssa.graph =
-    let analysis = Red.analyze in_graph in
+    let analysis = R.Analyzer.run in_graph in
     let out_graph =
       Ssa.create_graph (Ssa.function_info in_graph) ~keep_unused_ops
     in
@@ -411,12 +359,12 @@ module Make_run (R : Reducer) = struct
        closures stored in [Context.t]; the main walk calls them directly, while
        [Context.Cursor.*] are thin wrappers onto them for the reducer. *)
     let emit_op ctx c ~op ~dbg ~typ ~args =
-      match Red.emit_op analysis ctx c ~op ~dbg ~typ ~args with
+      match R.emit_op analysis ctx c ~op ~dbg ~typ ~args with
       | For_next_reducer -> Ssa.Cursor.emit_op out_graph c op dbg typ args
       | Emitted_replacement vs -> vs
     in
     let finish_block ctx c ~dbg term =
-      match Red.finish_block analysis ctx c ~dbg term with
+      match R.finish_block analysis ctx c ~dbg term with
       | For_next_reducer -> Ssa.Cursor.finish_block out_graph c ~dbg term
       | Emitted_replacement () -> ()
     in
@@ -447,7 +395,7 @@ module Make_run (R : Reducer) = struct
     let visit_instruction (block : finished Block.t) ~instr_index c =
       let instr = Array.get (Block.body block) instr_index in
       let vs =
-        match Red.visit_instruction analysis ctx block ~instr_index c with
+        match R.visit_instruction analysis ctx block ~instr_index c with
         | Emitted_replacement vs -> vs
         | For_next_reducer -> default_translate_instruction instr c
       in
@@ -464,7 +412,7 @@ module Make_run (R : Reducer) = struct
       | Push_trap _ | Pop_trap _ -> ()
     in
     let visit_terminator (block : finished Block.t) c =
-      match Red.visit_terminator analysis ctx block c with
+      match R.visit_terminator analysis ctx block c with
       | Emitted_replacement () ->
         if not (Cursor.is_finished c)
         then

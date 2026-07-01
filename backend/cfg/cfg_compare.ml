@@ -302,8 +302,8 @@ let compare_body ~ppf_m ~map_label ~old_label ~new_label old_body new_body =
         Format.fprintf ppf_m
           "Instruction mismatch at old=%a(id:%a) new=%a(id:%a): %a vs %a@."
           Label.format old_label InstructionId.print old_instr.id Label.format
-          new_label InstructionId.print new_instr.id Cfg.dump_basic
-          old_instr.desc Cfg.dump_basic new_instr.desc
+          new_label InstructionId.print new_instr.id Printcfg.basic_desc
+          old_instr.desc Printcfg.basic_desc new_instr.desc
       else
         compare_instruction_fields ~ppf_m ~kind:"Instruction" ~old_label
           ~new_label old_instr new_instr;
@@ -514,9 +514,9 @@ let collect_matching_blocks ~ppf_m ~old_cfg ~new_cfg =
             "Terminator mismatch at old=%a(id:%a) new=%a(id:%a): %a vs %a@."
             Label.format old_label InstructionId.print old_block.terminator.id
             Label.format new_label InstructionId.print new_block.terminator.id
-            (Cfg.dump_terminator ~sep:"")
+            (Printcfg.terminator_desc ~sep:"")
             old_block.terminator.desc
-            (Cfg.dump_terminator ~sep:"")
+            (Printcfg.terminator_desc ~sep:"")
             new_block.terminator.desc
         else
           compare_instruction_fields ~ppf_m ~kind:"Terminator" ~old_label

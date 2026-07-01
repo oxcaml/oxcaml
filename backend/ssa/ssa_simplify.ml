@@ -41,9 +41,9 @@ open Ssa_reducer
    (e.g. an [and 1] parity test), we instead fold [(cmp) = 0] at the [Switch] by
    swapping its two targets. Folding lets Cfg_of_ssa fuse the inner comparison
    into the branch test instead of materializing a bit. *)
-module Simplify_conditions (C : Context) = struct
-  open! C
-  include Default (C)
+module Simplify_conditions = struct
+  open! Context
+  include Default_reducer (Default_analyzer)
 
   (* The negation of a comparison op, when it is itself a single op. *)
   let negate_comparison (op : Ssa.op) : Ssa.op option =

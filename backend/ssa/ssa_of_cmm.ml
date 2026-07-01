@@ -375,7 +375,7 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
   | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
   | Invalid _ ->
     Misc.fatal_errorf "Ssa_of_cmm: unexpected terminator (%a)"
-      (Cfg.dump_terminator ~sep:"")
+      (Printcfg.terminator_desc ~sep:"")
       new_op
 
 and emit_expr_op env c op args dbg : result =
@@ -437,8 +437,8 @@ and emit_expr_op env c op args dbg : result =
     | Basic
         (( Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
          | Stack_check _ ) as basic) ->
-      Misc.fatal_errorf "Ssa_of_cmm: unexpected basic (%a)" Cfg.dump_basic basic
-    )
+      Misc.fatal_errorf "Ssa_of_cmm: unexpected basic (%a)" Printcfg.basic_desc
+        basic)
 
 and emit_ifthenelse env c ~tail econd eif eelse : result =
   let cond, earg = Sel.select_condition econd in
