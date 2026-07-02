@@ -1835,21 +1835,30 @@ end = struct
     | 4 -> "'q"
     | _ -> Fmt.asprintf "'mm%d" (i - 5)
 
+  (* [name] is unquoted; entries of [modenames] carry a leading quote. *)
+  let printed_name_is_already_used name =
+    List.mem name !named_vars
+    || List.exists (fun (_, name') -> name = name') !names
+    || String.Set.mem name !named_weak_vars
+    || List.exists (fun (_, name') -> "'" ^ name = name') !modenames
+
   let mode_name_is_already_used name =
     let type_name =
       if String.length name > 0 && name.[0] = '\''
       then String.sub name 1 (String.length name - 1)
       else name
     in
-    List.mem type_name !named_vars
-    || List.exists (fun (_, name') -> type_name = name') !names
-    || String.Set.mem type_name !named_weak_vars
-    || List.exists (fun (_, name') -> name = name') !modenames
+    printed_name_is_already_used type_name
 
   let rec fresh_mode_name cnt =
     let name = pick_name cnt in
     if mode_name_is_already_used name then fresh_mode_name (cnt + 1)
     else cnt, name
+
+  let next_mode_name () =
+    let cnt, m = fresh_mode_name !modename_counter in
+    modename_counter := cnt + 1;
+    m
 
   let add_named_modevar name =
     let mopt =
@@ -1860,8 +1869,7 @@ end = struct
     match mopt with
     | Some (_, m) -> m
     | None ->
-      let cnt, m = fresh_mode_name !modename_counter in
-      modename_counter := cnt + 1;
+      let m = next_mode_name () in
       modenames := (name, m) :: !modenames;
       m
 
@@ -2027,8 +2035,7 @@ end = struct
     if List.exists (eq_pair pair)
          !aliased_visible_pairs
     then begin
-      let cnt, m = fresh_mode_name !modename_counter in
-      modename_counter := cnt + 1;
+      let m = next_mode_name () in
       printed_aliased_visible_pairs :=
         (pair,m) :: !printed_aliased_visible_pairs;
       Fmt.fprintf ppf "as %s" m
@@ -2057,10 +2064,7 @@ end = struct
         subst
       @ !name_subst
 
-  let name_is_already_used name =
-    List.mem name !named_vars
-    || List.exists (fun (_, name') -> name = name') !names
-    || String.Set.mem name !named_weak_vars
+  let name_is_already_used name = printed_name_is_already_used name
 
   let rec new_name () =
     let name = Misc.letter_of_int !name_counter in
