@@ -1,6 +1,5 @@
 (* TEST
  readonly_files = "base.ml dep_a.ml dep_b.ml diamond.ml gc_test.ml closures.ml gc_compact_test.ml reentrant_a.ml reentrant_b.ml reentrant_c.ml reentrant_stubs.c ocaml_init.ml raises.ml driver.c";
- runtime5;
  {
    setup-ocamlopt.byte-build-env;
 
@@ -33,7 +32,7 @@
 
    (* Compile the C stubs *)
    module = "";
-   script = "${cc} ${cflags} -I${ocamlsrcdir}/${runtime_dir} -c reentrant_stubs.c -o reentrant_stubs.${objext}";
+   script = "${cc} ${cflags} -I${ocamlsrcdir}/runtime -c reentrant_stubs.c -o reentrant_stubs.${objext}";
    script;
 
    (* Create complete object with all modules *)
@@ -43,7 +42,7 @@
    ocamlopt.byte;
 
    (* Link with C driver and stubs *)
-   script = "${mkexe} -I${ocamlsrcdir}/${runtime_dir} -o test_driver test_modules.${objext} reentrant_stubs.${objext} ${bytecc_libs} driver.c";
+   script = "${mkexe} -I${ocamlsrcdir}/runtime -o test_driver test_modules.${objext} reentrant_stubs.${objext} ${bytecc_libs} driver.c";
    script;
 
    (* Run the test *)

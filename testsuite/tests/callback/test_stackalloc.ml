@@ -1,7 +1,6 @@
 (* TEST
  modules = "test_stackalloc_.c";
  stack-allocation;
- runtime5;
  native;
 *)
 

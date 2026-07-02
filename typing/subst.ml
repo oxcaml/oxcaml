@@ -206,8 +206,8 @@ end = struct
         ~ran_out_of_fuel_during_normalize
         ~annotation:
           (Some { pjka_loc = Location.none;
-                  pjka_desc = Pjk_abbreviation ({ loc = Location.none;
-                                                  txt = name }, []) })
+                  pjka_desc = Pjk_abbreviation { loc = Location.none;
+                                                 txt = name } })
         ~why:Jkind_intf.History.Imported)
       (const_builtins @ const_predefs)
 
@@ -573,16 +573,16 @@ let rec layout s l =
 
 let jkind_desc s jkind =
   match jkind.base with
-  | Kconstr p ->
+  | Kconstr (p, sa) ->
     begin match Path.Map.find p s.jkinds with
     | exception Not_found ->
       let p' = jkind_path s p in
       if Path.compare p' p = 0 then jkind else
-        { jkind with base = Kconstr p' }
-    | Jkind_path p -> { jkind with base = Kconstr p }
+        { jkind with base = Kconstr (p', sa) }
+    | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
       let const =
-        { base;
+        { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
           mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
           with_bounds = jkind.with_bounds }
       in
@@ -596,15 +596,15 @@ let jkind_desc s jkind =
 let jkind_const_desc s
       ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
   match jkind.base with
-  | Kconstr p ->
+  | Kconstr (p, sa) ->
     begin match Path.Map.find p s.jkinds with
     | exception Not_found ->
       let p' = jkind_path s p in
       if Path.compare p' p = 0 then jkind else
-        { jkind with base = Kconstr p' }
-    | Jkind_path p -> { jkind with base = Kconstr p }
+        { jkind with base = Kconstr (p', sa) }
+    | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
-      { base;
+      { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
         mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
         with_bounds = jkind.with_bounds }
     end

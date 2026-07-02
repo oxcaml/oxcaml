@@ -367,7 +367,8 @@ and value_kind_record env subst ~visited ~depth
     (* TODO: To support these, we'll need to stop calling
        [value_kind] on all fields. *)
   | Record_inlined (Null, _, _) -> raise (Vicuna_unsupported With_null_variants)
-  | Record_variable -> raise (Vicuna_unsupported Field_of_kind_any)
+  | Record_variable | Record_inlined (_, Constructor_variable, _) ->
+    raise (Vicuna_unsupported Field_of_kind_any)
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> (
     match labels with
     | [{ ld_type; _ }] -> value_kind env subst ~visited ~depth ld_type

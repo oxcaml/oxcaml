@@ -286,7 +286,8 @@ type lookup_error =
         container_class_type : string
       }
   | Cannot_scrape_alias of Longident.t * Path.t
-  | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
+    (* CR modes: merge into mode error hints. *)
+  | Local_value_used_in_exclave of Mode.Hint.pinpoint_desc
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
@@ -317,6 +318,13 @@ val lookup_error: Location.t -> t -> lookup_error -> 'a
 val walk_locks : env:t -> loc:Location.t -> Longident.t ->
   item:Mode.Hint.lock_item ->
   type_expr option -> mode_with_locks -> Mode.Value.l
+
+(** Registers a use of a construct that is at legacy comonadic modes,
+    constraining every enclosing closure lock as if a legacy value defined at
+    toplevel were used at the pinpoint's location. Used for constructs (e.g.
+    effect handlers) that force enclosing functions to be nonportable and
+    stateful. *)
+val walk_locks_for_legacy_construct : env:t -> Mode.Hint.pinpoint -> unit
 
 val lookup_value:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->

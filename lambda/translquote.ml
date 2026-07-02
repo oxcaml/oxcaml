@@ -2483,6 +2483,9 @@ let type_for_path loc env = function
         | "nativeint#" -> Identifier.Type.unboxed_nativeint
         | "int32#" -> Identifier.Type.unboxed_int32
         | "int64#" -> Identifier.Type.unboxed_int64
+        | "nativeint_u" -> Identifier.Type.unboxed_nativeint
+        | "int32_u" -> Identifier.Type.unboxed_int32
+        | "int64_u" -> Identifier.Type.unboxed_int64
         | "int8x16" -> Identifier.Type.int8x16
         | "int16x8" -> Identifier.Type.int16x8
         | "int32x4" -> Identifier.Type.int32x4
@@ -2751,7 +2754,7 @@ let assert_no_jkinds jkind =
     (fun ({ pjka_loc; pjka_desc } : Parsetree.jkind_annotation) ->
       (* Naively check if the jkind annotation is trivial *)
       match pjka_desc with
-      | Pjk_abbreviation ({ loc = _; txt = Lident "value" }, []) -> ()
+      | Pjk_abbreviation { loc = _; txt = Lident "value" } -> ()
       | _ ->
         fatal_errorf
           "Translquote [at %a]: no support for jkind annotations in this \

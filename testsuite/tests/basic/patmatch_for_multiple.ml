@@ -223,7 +223,7 @@ let _ = fun a b -> match a, b with
                                  (non_consts ([0: value<int>, value<int>]))>)
         x/5 p/4))
     (let
-      (x/6 =a[value<(consts ()) (non_consts ([0: ]))>] b/5
+      (x/6 =a[value<int>] b/5
        p/5 =a[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
          (makeblock 0 a/5 b/5))
       (makeblock 0 (value<int>,value<
@@ -266,7 +266,7 @@ let _ = fun a b -> match a, b with
            (makeblock 0 a/6 b/6))
         (exit 31 x/7 p/6))
       (let
-        (x/8 =a[value<(consts ()) (non_consts ([0: ]))>] b/6
+        (x/8 =a[value<int>] b/6
          p/7 =a[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
            (makeblock 0 a/6 b/6))
         (exit 31 x/8 p/7)))

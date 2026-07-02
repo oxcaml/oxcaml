@@ -36,7 +36,7 @@ type 'a close_program_metadata =
   | Classic :
       (Exported_code.t
       * Name_occurrences.t
-      * Flambda_cmx_format.t option
+      * Flambda_cmx_format.raw option
       * Exported_offsets.t)
       -> [`Classic] close_program_metadata
 
@@ -1083,8 +1083,6 @@ let close_raise acc env ~raise_kind ~arg ~dbg exn_continuation =
 let close_effect_primitive acc env ~dbg exn_continuation
     (prim : Lambda.primitive) ~args ~let_bound_ids_with_kinds
     (k : Acc.t -> Named.t list -> Expr_with_acc.t) : Expr_with_acc.t =
-  if not Config.runtime5
-  then Misc.fatal_error "Effect primitives are only supported on runtime5";
   (* CR mshinwell: share with close_c_call, above *)
   let _env, let_bound_vars =
     List.fold_left_map
@@ -1307,12 +1305,12 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pwith_stack_bind_preemptible | Pperform | Presume | Preperform
       | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
       | Pidx_deepen _ | Pget_idx _ | Pset_idx _ | Pget_ptr _ | Pset_ptr _
-      | Patomic_exchange_field _ | Patomic_compare_exchange_field _
-      | Patomic_compare_set_field _ | Patomic_fetch_add_field
-      | Patomic_add_field | Patomic_sub_field | Patomic_land_field
-      | Patomic_lor_field | Patomic_lxor_field | Pdls_get | Ptls_get
-      | Pdomain_index | Ppoll | Patomic_load_field _ | Patomic_set_field _
-      | Preinterpret_tagged_int63_as_unboxed_int64
+      | Pget_ext_ptr _ | Pset_ext_ptr _ | Patomic_exchange_field _
+      | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
+      | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
+      | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field | Pdls_get
+      | Ptls_get | Pdomain_index | Ppoll | Patomic_load_field _
+      | Patomic_set_field _ | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
       | Pscalar _ | Pphys_equal _ | Pcpu_relax ->
         (* Inconsistent with outer match *)
@@ -4053,7 +4051,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
 let close_program (type mode) ~(mode : mode Flambda_features.mode)
     ~machine_width ~big_endian ~cmx_loader ~compilation_unit ~module_repr
     ~program ~prog_return_cont ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region : mode close_program_result =
+    ~toplevel_my_ghost_region ~sections : mode close_program_result =
   let env = Env.create ~big_endian in
   let module_symbol =
     Symbol.create_wrapped
@@ -4161,7 +4159,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     let reachable_names, cmx =
       Flambda_cmx.prepare_cmx_from_approx ~machine_width:(Acc.machine_width acc)
         ~approxs:symbols_approximations ~module_symbol ~exported_offsets
-        ~used_value_slots all_code
+        ~used_value_slots ~sections all_code
     in
     let unit =
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation

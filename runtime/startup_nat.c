@@ -42,6 +42,7 @@
 #include "caml/sys.h"
 #include "caml/globroots.h"
 #include "caml/frame_descriptors.h"
+#include "caml/cpu.h"
 
 extern char caml_system__code_begin, caml_system__code_end;
 /* The two symbols above are defined in runtime/$ARCH.S. */
@@ -110,6 +111,7 @@ value caml_startup_common(char_os **argv, int pooling)
   value res;
 
   caml_init_os_params();
+  caml_detect_cpu_features();
 
   /* Determine options */
   caml_parse_ocamlrunparam();

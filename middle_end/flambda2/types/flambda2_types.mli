@@ -637,6 +637,7 @@ val kind : t -> Flambda_kind.t
 
 (** For each of the kinds in an arity, create an "unknown" type. *)
 val unknown_types_from_arity :
+  ?alloc_mode:Alloc_mode.For_types.t ->
   machine_width:Target_system.Machine_width.t ->
   [`Unarized] Flambda_arity.t ->
   t list
@@ -1006,8 +1007,6 @@ module Rewriter : sig
     val var : 'a -> 'a t
 
     val unknown : Flambda_kind.t -> 'a t
-
-    val bottom : Flambda_kind.t -> 'a t
 
     val tag_immediate : 'a t -> 'a t
 

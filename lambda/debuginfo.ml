@@ -46,7 +46,8 @@ module Scoped_location = struct
     | Empty
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
                assume_zero_alloc: ZA.Assume_info.t;
-               mangling_item: Structured_mangling.path_item option}
+               mangling_item:
+                 Compilation_unit.t Structured_mangling.path_item option}
 
   let str = function
     | Empty -> ""
@@ -83,7 +84,7 @@ module Scoped_location = struct
     let str = str_fun scopes in
     let (file, line, col) = Location.get_pos_info loc.loc_start in
     let file = Filename.basename file in
-    let mangling_item : Structured_mangling.path_item option =
+    let mangling_item : _ Structured_mangling.path_item option =
       Some (Anonymous_function (line, col, Some file))
     in
     Cons {item = Sc_anonymous_function; str; str_fun = str; name = ""; prev = scopes;
@@ -93,7 +94,7 @@ module Scoped_location = struct
     let str = str scopes in
     let (file, line, col) = Location.get_pos_info loc.loc_start in
     let file = Filename.basename file in
-    let mangling_item : Structured_mangling.path_item option =
+    let mangling_item : _ Structured_mangling.path_item option =
       Some (Anonymous_module (line, col, Some file))
     in
     Cons {item = Sc_module_definition; str; str_fun = str ^ ".(fun)"; name = "";
@@ -464,17 +465,39 @@ let rec path_of_debug_info_scopes acc (scopes : Scoped_location.scopes) =
   | Cons { prev; mangling_item = Some mangling_item; _ } ->
     path_of_debug_info_scopes (mangling_item :: acc) prev
 
-let to_structured_mangling_path ~name dbg : Structured_mangling.path =
-  (* We ensure the path ends with [name] to preserve all stamps that the name
-     includes. To do so, we drop the suffix of partial applications if there is
-     any and, additionally, the last function or anonymous function if there is
-     any. It should effectively be the same function as [name]. *)
-  let rec drop_partials_and_last_function (path : Structured_mangling.path) =
+let to_structured_mangling_path ~name dbg :
+    Compilation_unit.t Structured_mangling.path =
+  (* An anonymous function or module is precisely located by its own position
+     information, so the scopes enclosing it (its ancestors, up to the
+     compilation unit) are redundant. [located_by_child] becomes true once we
+     have passed such an item; while it is set we drop every enclosing item
+     except compilation units, which keep it and reset the flag. (There is no
+     need to worry about the inlining marker, since it is inserted later by
+     [mangle_ident].) *)
+  let rec collapse_anonymous ~located_by_child
+      (path : Compilation_unit.t Structured_mangling.path) =
     match path with
-    | Partial_function _ :: path -> drop_partials_and_last_function path
-    | Function _ :: path -> path
-    | Anonymous_function _ :: path -> path
-    | path -> path
+    | [] -> []
+    | (Compilation_unit _ as cu) :: path ->
+      cu :: collapse_anonymous ~located_by_child:false path
+    | _ :: path when located_by_child ->
+      collapse_anonymous ~located_by_child path
+    | ((Anonymous_function _ | Anonymous_module _) as item) :: path ->
+      item :: collapse_anonymous ~located_by_child:true path
+    | item :: path -> item :: collapse_anonymous ~located_by_child:false path
+  in
+  (* Drop the suffix of partial applications and the innermost named function
+     (if any), then end the path with [name]. Using [name] preserves the stamps
+     it includes for uniqueness; we append it even after an innermost anonymous
+     function (which is kept for its position) so the stamps are not lost. *)
+  let rec drop_partials_and_adjust_function_name ~name
+      (path : Compilation_unit.t Structured_mangling.path)
+      =
+    match path with
+    | Partial_function _ :: path ->
+      drop_partials_and_adjust_function_name ~name path
+    | Function _ :: path -> Structured_mangling.Function name :: path
+    | path -> Structured_mangling.Function name :: path
   in
   let path_from_debug =
     match to_items dbg with
@@ -486,6 +509,7 @@ let to_structured_mangling_path ~name dbg : Structured_mangling.path =
          the function. See #5099. *)
       path_of_debug_info_scopes [] item.dinfo_scopes
   in
-  Structured_mangling.Function name
-  :: drop_partials_and_last_function (List.rev path_from_debug)
+  List.rev path_from_debug
+  |> collapse_anonymous ~located_by_child:false
+  |> drop_partials_and_adjust_function_name ~name
   |> List.rev

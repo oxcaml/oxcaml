@@ -1833,7 +1833,9 @@ type binary_primitive =
 
 let binary_primitive_eligible_for_cse p =
   match p with
-  | Array_load _ | Block_set _ -> false
+  | Array_load (_, _, (Immutable | Immutable_unique)) -> true
+  | Array_load (_, _, Mutable) -> false
+  | Block_set _ -> false
   | String_or_bigstring_load _ -> false (* CR mshinwell: review *)
   | Bigarray_load _ -> false
   | Bigarray_get_alignment _ -> true

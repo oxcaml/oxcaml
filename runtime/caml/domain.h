@@ -71,7 +71,9 @@ int caml_incoming_interrupts_queued(void);
 void caml_poll_gc_work(void);
 void caml_handle_gc_interrupt(void);
 void caml_handle_incoming_interrupts(void);
+#ifdef NATIVE_CODE
 void caml_domain_setup_preemption(void);
+#endif
 void caml_domain_reset_preemption(void);
 value caml_process_tick_exn(void);
 
