@@ -423,6 +423,7 @@ module Let_cont_expr : sig
 
   (** Create a definition of a set of possibly-recursive continuations. *)
   val create_recursive :
+    ?first_iteration_peeled:bool ->
     invariant_params:Bound_parameters.t ->
     Continuation_handler.t Continuation.Lmap.t ->
     body:expr ->
@@ -467,6 +468,11 @@ module Recursive_let_cont_handlers : sig
       Continuation_handlers.t ->
       'a) ->
     'a
+
+  (** Whether loop peeling has already spliced a copy of the first iteration
+      ahead of this recursive continuation group (see [Simplify_let_cont]).
+      Read without opening the abstraction over the bound continuations. *)
+  val first_iteration_peeled : t -> bool
 
   (** Deconstruct two continuation bindings using the same bound continuations.
   *)

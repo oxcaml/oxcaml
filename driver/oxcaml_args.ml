@@ -662,6 +662,22 @@ let mk_no_flambda2_backend_cse_at_toplevel f =
       \     module initializers%s (Flambda 2 only)"
       (format_not_default Flambda2.Default.backend_cse_at_toplevel) )
 
+let mk_flambda2_peel_loopified f =
+  ( "-flambda2-peel-loopified",
+    Arg.Unit f,
+    Printf.sprintf
+      " Peel the first iteration of loops arising from\n\
+      \     loopified tail-recursive functions%s (Flambda 2 only)"
+      (format_default Flambda2.Default.peel_loopified) )
+
+let mk_no_flambda2_peel_loopified f =
+  ( "-no-flambda2-peel-loopified",
+    Arg.Unit f,
+    Printf.sprintf
+      " Do not peel the first iteration of loops arising\n\
+      \     from loopified tail-recursive functions%s (Flambda 2 only)"
+      (format_not_default Flambda2.Default.peel_loopified) )
+
 let mk_flambda2_cse_depth f =
   ( "-flambda2-cse-depth",
     Arg.Int f,
@@ -1399,6 +1415,8 @@ module type Oxcaml_options = sig
   val no_flambda2_unbox_along_intra_function_control_flow : unit -> unit
   val flambda2_backend_cse_at_toplevel : unit -> unit
   val no_flambda2_backend_cse_at_toplevel : unit -> unit
+  val flambda2_peel_loopified : unit -> unit
+  val no_flambda2_peel_loopified : unit -> unit
   val flambda2_cse_depth : int -> unit
   val flambda2_join_depth : int -> unit
   val flambda2_reaper : unit -> unit
@@ -1600,6 +1618,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_flambda2_backend_cse_at_toplevel F.flambda2_backend_cse_at_toplevel;
       mk_no_flambda2_backend_cse_at_toplevel
         F.no_flambda2_backend_cse_at_toplevel;
+      mk_flambda2_peel_loopified F.flambda2_peel_loopified;
+      mk_no_flambda2_peel_loopified F.no_flambda2_peel_loopified;
       mk_flambda2_cse_depth F.flambda2_cse_depth;
       mk_flambda2_join_depth F.flambda2_join_depth;
       mk_flambda2_reaper F.flambda2_reaper;
@@ -2036,6 +2056,10 @@ module Oxcaml_options_impl = struct
 
   let no_flambda2_backend_cse_at_toplevel =
     clear Flambda2.backend_cse_at_toplevel
+
+  let flambda2_peel_loopified = set Flambda2.peel_loopified
+
+  let no_flambda2_peel_loopified = clear Flambda2.peel_loopified
 
   let flambda2_cse_depth n = Flambda2.cse_depth := Oxcaml_flags.Set n
   let flambda2_join_depth n = Flambda2.join_depth := Oxcaml_flags.Set n
@@ -2586,6 +2610,7 @@ module Extra_params = struct
     | "flambda2-unbox-along-intra-function-control-flow" ->
         set Flambda2.unbox_along_intra_function_control_flow
     | "flambda2-backend-cse-at-toplevel" -> set Flambda2.backend_cse_at_toplevel
+    | "flambda2-peel-loopified" -> set Flambda2.peel_loopified
     | "flambda2-cse-depth" -> set_int Flambda2.cse_depth
     | "flambda2-join-depth" -> set_int Flambda2.join_depth
     | "flambda2-expert-inline-effects-in-cmm" ->

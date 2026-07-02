@@ -48,6 +48,10 @@ let backend_cse_at_toplevel () =
   !Oxcaml_flags.Flambda2.backend_cse_at_toplevel
   |> with_default ~f:(fun d -> d.backend_cse_at_toplevel)
 
+let peel_loopified () =
+  !Oxcaml_flags.Flambda2.peel_loopified
+  |> with_default ~f:(fun d -> d.peel_loopified)
+
 let cse_depth () =
   !Oxcaml_flags.Flambda2.cse_depth |> with_default ~f:(fun d -> d.cse_depth)
 

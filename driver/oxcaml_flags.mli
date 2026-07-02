@@ -157,6 +157,7 @@ module Flambda2 : sig
     val join_points : bool
     val unbox_along_intra_function_control_flow : bool
     val backend_cse_at_toplevel : bool
+    val peel_loopified : bool
     val cse_depth : int
     val join_depth : int
     val join_algorithm : join_algorithm
@@ -179,6 +180,7 @@ module Flambda2 : sig
     join_points : bool;
     unbox_along_intra_function_control_flow : bool;
     backend_cse_at_toplevel : bool;
+    peel_loopified : bool;
     cse_depth : int;
     join_depth : int;
     join_algorithm : join_algorithm;
@@ -201,6 +203,7 @@ module Flambda2 : sig
   val join_points : bool or_default ref
   val unbox_along_intra_function_control_flow : bool or_default ref
   val backend_cse_at_toplevel : bool or_default ref
+  val peel_loopified : bool or_default ref
   val cse_depth : int or_default ref
   val join_depth : int or_default ref
   val join_algorithm : join_algorithm or_default ref

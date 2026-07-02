@@ -137,6 +137,8 @@ module type Oxcaml_options = sig
   val no_flambda2_unbox_along_intra_function_control_flow : unit -> unit
   val flambda2_backend_cse_at_toplevel : unit -> unit
   val no_flambda2_backend_cse_at_toplevel : unit -> unit
+  val flambda2_peel_loopified : unit -> unit
+  val no_flambda2_peel_loopified : unit -> unit
   val flambda2_cse_depth : int -> unit
   val flambda2_join_depth : int -> unit
   val flambda2_reaper : unit -> unit
