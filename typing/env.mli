@@ -473,6 +473,20 @@ val add_modtype_lazy: update_summary:bool ->
 val add_class: Ident.t -> class_declaration -> t -> t
 val add_cltype: Ident.t -> class_type_declaration -> t -> t
 val add_local_constraint: stage:stage -> Path.t -> type_declaration -> t -> t
+
+(** Whether [env], assumed to derive from [base], carries local (GADT)
+    constraints beyond those of [base]. The comparison is physical, which is
+    exact because local constraints are only ever added, each with a fresh
+    declaration. *)
+val gadt_constraints_differ : base:t -> t -> bool
+
+(** [revert_local_constraints ~base env] reverts [env]'s local (GADT)
+    constraints to their state in [base]. Constraints added after [base] are
+    dropped even when they came from later, unrelated patterns: their
+    recorded jkinds may have been derived under the constraints being
+    reverted (see [Ctype.add_gadt_equation]), so keeping them would be
+    unsound. [env] must derive from [base]. *)
+val revert_local_constraints : base:t -> t -> t
 val add_implicit_jkind: loc:Location.t -> string -> jkind_lr -> t -> t
 val clear_implicit_jkinds : t -> t
 val add_jkind:

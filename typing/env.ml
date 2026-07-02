@@ -2995,6 +2995,12 @@ let add_local_constraint ~stage path info env =
     local_constraints =
       StagedPath.Map.add { stage; path } info env.local_constraints }
 
+let gadt_constraints_differ ~base env =
+  base.local_constraints != env.local_constraints
+
+let revert_local_constraints ~base env =
+  { env with local_constraints = base.local_constraints }
+
 let add_implicit_jkind ~loc name jkind env =
   { env with
     implicit_jkinds =
