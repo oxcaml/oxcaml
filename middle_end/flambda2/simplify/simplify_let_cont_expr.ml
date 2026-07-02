@@ -1562,12 +1562,12 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
      outside of its context. So the remaining thing to do is setup the dacc, and
      later decide whether to lift the continuations defined inside the
      continuation being currently let-bound. *)
-  let dacc_after_body = dacc in
-  let body_continuation_uses_env = DA.continuation_uses_env dacc in
-  let denv = data.denv_for_join in
   let dacc, consts_lifted_during_body =
     DA.get_and_clear_lifted_constants dacc
   in
+  let dacc_after_body = dacc in
+  let body_continuation_uses_env = DA.continuation_uses_env dacc in
+  let denv = data.denv_for_join in
   let previous_are_lifting_conts = DA.are_lifting_conts dacc in
   match data.handlers with
   | Non_recursive
