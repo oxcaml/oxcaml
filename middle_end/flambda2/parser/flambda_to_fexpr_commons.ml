@@ -20,12 +20,16 @@ module type Convertible_id = sig
 
   val name : t -> string
 
+  val stamp : t -> int option
+
   val add_tag : string -> int -> string
 
   val mk_fexpr_id : string -> fexpr_id
 end
 
 let default_add_tag name tag = Printf.sprintf "%s_%d" name tag
+
+let add_stamp name stamp = Printf.sprintf "%s/%d" name stamp
 
 module Name_map (I : Convertible_id) : sig
   type t
@@ -49,6 +53,7 @@ end = struct
 
   let bind { id_map; names } id =
     let name = I.name id in
+    let stamp = I.stamp id in
     let rec try_name name names =
       match String_map.find_opt name names with
       | None ->
@@ -62,7 +67,13 @@ end = struct
          * case we'll end up with x_1_1 *)
         try_name name names
     in
-    let fexpr_id, names = try_name name names in
+    let fexpr_id, names =
+      if !Clflags.canonical_ids || Option.is_none stamp
+      then try_name name names
+      else
+        let name = add_stamp name (Option.get stamp) in
+        I.mk_fexpr_id name, names
+    in
     let id_map = I.Map.add id fexpr_id id_map in
     fexpr_id, { id_map; names }
 
@@ -170,6 +181,8 @@ end = struct
 
     let name v = raw_name v
 
+    let stamp v = Some (name_stamp v)
+
     let add_tag = default_add_tag
 
     let mk_fexpr_id name = name |> nowhere
@@ -186,6 +199,8 @@ end = struct
 
     let name v = linkage_name v |> Linkage_name.to_string
 
+    let stamp _ = None
+
     let add_tag = default_add_tag
 
     let mk_fexpr_id name = name
@@ -199,6 +214,8 @@ end = struct
     let desc = "code id"
 
     let name v = Code_id.name v
+
+    let stamp _ = None
 
     let add_tag = default_add_tag
 
@@ -214,6 +231,8 @@ end = struct
 
     let name v = Function_slot.name v
 
+    let stamp _ = None
+
     let add_tag = default_add_tag
 
     let mk_fexpr_id name = name |> nowhere
@@ -228,6 +247,8 @@ end = struct
 
     let name v = Value_slot.name v
 
+    let stamp _ = None
+
     let add_tag = default_add_tag
 
     let mk_fexpr_id name = name |> nowhere
@@ -241,6 +262,8 @@ end = struct
     let desc = "continuation"
 
     let name c = Continuation.name c
+
+    let stamp c = Some (Continuation.name_stamp c)
 
     let add_tag name tag =
       match name with
