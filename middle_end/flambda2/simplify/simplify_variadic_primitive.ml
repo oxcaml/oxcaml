@@ -17,7 +17,8 @@
 open! Simplify_import
 
 let simplify_make_block ~original_prim ~(block_kind : P.Block_kind.t)
-    ~(mutable_or_immutable : Mutability.t) alloc_mode dacc ~original_term _dbg
+    ~(mutable_or_immutable : Mutability.t)
+    (alloc_mode : Alloc_mode.For_allocations.t) dacc ~original_term _dbg
     ~args_with_tys ~result_var =
   let typing_env = DA.typing_env dacc in
   let typing_env : _ Or_bottom.t =
@@ -32,9 +33,15 @@ let simplify_make_block ~original_prim ~(block_kind : P.Block_kind.t)
           "Shape in [Make_block] of different length from argument list:@ %a"
           Named.print original_term;
       List.fold_left2
-        (fun typing_env arg_kind (arg, _arg_ty) : _ Or_bottom.t ->
+        (fun typing_env arg_kind (arg, arg_ty) : _ Or_bottom.t ->
           let open Or_bottom.Let_syntax in
           let<* typing_env = typing_env in
+          let<* typing_env =
+            match alloc_mode, T.prove_alloc_mode typing_env arg_ty with
+            | Heap, Proved Local -> Bottom
+            | Heap, (Proved (Heap | Heap_or_local) | Unknown) | Local _, _ ->
+              Ok typing_env
+          in
           Simple.pattern_match' arg
             ~var:(fun _ ~coercion:_ : _ Or_bottom.t ->
               let<+ _ty, typing_env =

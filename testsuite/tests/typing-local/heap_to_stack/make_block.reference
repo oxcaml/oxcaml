@@ -1,0 +1,14 @@
+[ocaml] [flambda2] Invalid code:
+(Defining_expr_of_let (bound_pattern Pmakeblock/60N)
+ (defining_expr
+  (((Make_block
+     (Values (tag 0)
+      (shape
+       (𝕍=Variant((consts ({ 0 })) (non_consts ({(0 [𝕍?])})))
+        𝕍=Variant((consts ({ 0 })) (non_consts ({(0 [𝕍?])})))))) Immutable
+     Heap) x/50UV x/50UV) make_block.ml:12,45--49)))
+
+This might have arisen from a wrong use of [%identity],
+for example confusing arrays and records, or non-mixed and
+mixed blocks.
+Consider using [Obj.magic], [Obj.repr] and/or [Obj.obj].

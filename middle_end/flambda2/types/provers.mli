@@ -304,6 +304,9 @@ val meet_rec_info :
 val prove_alloc_mode_of_boxed_number :
   Typing_env.t -> Type_grammar.t -> Alloc_mode.For_types.t proof_of_property
 
+val prove_alloc_mode :
+  Typing_env.t -> Type_grammar.t -> Alloc_mode.For_types.t proof_of_property
+
 val never_holds_locally_allocated_values :
   Typing_env.t -> Variable.t -> unit proof_of_property
 
