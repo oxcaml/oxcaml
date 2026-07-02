@@ -14,25 +14,27 @@ type ('a : any) t = V : 'a t | B : ('a : bits64). 'a t
    call before a match error can be raised. *)
 let f : type (a : any). a t -> a -> unit -> a = fun V x () -> x
 [%%expect{|
-Line 1, characters 52-53:
+Line 1, characters 48-63:
 1 | let f : type (a : any). a t -> a -> unit -> a = fun V x () -> x
-                                                        ^
-Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-  Here is an example of a case that is not matched: "B"
-
-val f : ('a : any). 'a t -> 'a -> unit -> 'a = <fun>
+                                                    ^^^^^^^^^^^^^^^
+Error: Function arguments and returns must be representable.
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because we must know concretely how to pass a function argument.
 |}]
 
 (* The result sort is part of the calling convention for the same reason. *)
 let f_ret : type (a : any). a t -> unit -> a = fun V () -> assert false
 [%%expect{|
-Line 1, characters 51-52:
+Line 1, characters 47-71:
 1 | let f_ret : type (a : any). a t -> unit -> a = fun V () -> assert false
-                                                       ^
-Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-  Here is an example of a case that is not matched: "B"
-
-val f_ret : ('a : any). 'a t -> unit -> 'a = <fun>
+                                                   ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Function arguments and returns must be representable.
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because we must know concretely how to return a function result.
 |}]
 
 (* Trailing [function] cases form one function with the preceding parameters,
@@ -40,13 +42,14 @@ val f_ret : ('a : any). 'a t -> unit -> 'a = <fun>
    too. *)
 let f_cases : type (a : any). a t -> a -> a = fun V -> function x -> x
 [%%expect{|
-Line 1, characters 50-51:
+Line 1, characters 46-70:
 1 | let f_cases : type (a : any). a t -> a -> a = fun V -> function x -> x
-                                                      ^
-Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-  Here is an example of a case that is not matched: "B"
-
-val f_cases : ('a : any). 'a t -> 'a -> 'a = <fun>
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Function arguments and returns must be representable.
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because we must know concretely how to pass a function argument.
 |}]
 
 (* The pattern on the optional argument covers its payload, but a caller can
@@ -64,7 +67,14 @@ Warning 18 [not-principal]: typing this pattern requires considering
   "int -> int" and "a" as equal. But the knowledge of these types is not
   principal.
 
-val g_opt : ('a : any). ?x:'a opt -> 'a -> unit -> int -> int = <fun>
+Line 4, characters 2-40:
+4 |   fun ?x:(YesO = assert false) y () -> y
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Function arguments and returns must be representable.
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because we must know concretely how to pass a function argument.
 |}]
 
 (* Sound, as the later layouts do not rely on the optional argument's
@@ -89,13 +99,14 @@ val opt_value : ?x:'a w -> 'a -> unit = <fun>
    a partial match's equations everywhere. *)
 let nested : type (a : any). a t -> (a -> a) = fun V -> fun x -> x
 [%%expect{|
-Line 1, characters 51-52:
+Line 1, characters 56-66:
 1 | let nested : type (a : any). a t -> (a -> a) = fun V -> fun x -> x
-                                                       ^
-Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-  Here is an example of a case that is not matched: "B"
-
-val nested : ('a : any). 'a t -> 'a -> 'a = <fun>
+                                                            ^^^^^^^^^^
+Error: Function arguments and returns must be representable.
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because we must know concretely how to pass a function argument.
 |}]
 
 (* Sound, as at [a : value], [B] is refuted by its kind, making the match
@@ -136,13 +147,10 @@ val partial_value : 'a v -> 'a -> unit = <fun>
    equations everywhere. *)
 let body_uses_narrowing : type a. a v -> a -> int = fun A x -> x
 [%%expect{|
-Line 1, characters 56-57:
+Line 1, characters 63-64:
 1 | let body_uses_narrowing : type a. a v -> a -> int = fun A x -> x
-                                                            ^
-Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-  Here is an example of a case that is not matched: "C"
-
-val body_uses_narrowing : 'a v -> 'a -> int = <fun>
+                                                                   ^
+Error: The value "x" has type "a" but an expression was expected of type "int"
 |}]
 
 (* A total match's equations are kept even under an enclosing partial match:
@@ -170,12 +178,12 @@ let f_eq : type (a : any) (b : any). a tv -> (a, b) eq -> b -> unit -> unit =
 [%%expect{|
 type ('a : any) tv = Val : 'a tv | B64 : ('a : bits64). 'a tv
 type ('x : any, 'y : any) eq = Refl : ('z : any). ('z, 'z) eq
-Line 5, characters 6-9:
+Line 5, characters 2-25:
 5 |   fun Val Refl x () -> ()
-          ^^^
-Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-  Here is an example of a case that is not matched: "B64"
-
-val f_eq : ('a : any) ('b : any). 'a tv -> ('a, 'b) eq -> 'b -> unit -> unit =
-  <fun>
+      ^^^^^^^^^^^^^^^^^^^^^^^
+Error: Function arguments and returns must be representable.
+       The layout of b is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of b must be representable
+         because we must know concretely how to pass a function argument.
 |}]
