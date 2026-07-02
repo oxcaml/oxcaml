@@ -1165,9 +1165,9 @@ val foo : unit -> int = <fun>
 |}]
 
 (* tail-calling local-returning functions make the current function
-   local-returning as well; mode-crossing is irrelavent here. Whether or not the
-   function actually allocates in parent-region is also irrelavent here, but we
-   allocate just to demonstrate the potential leaking. *)
+   local-returning as well, and must therefore use [exclave_] even if
+   the callee does not return an allocation. We allocate to demonstrate
+   the potential leaking.  *)
 let foo () = exclave_
   let _ = local_ (52, 24) in
   42
@@ -1176,6 +1176,18 @@ val foo : unit -> int @ local = <fun>
 |}]
 
 let bar () =
+  let _x = 52 in
+  foo ()
+[%%expect{|
+Line 3, characters 2-8:
+3 |   foo ()
+      ^^^^^^
+Error: This application is local-returning, but is at the tail
+       position of a function that is not local-returning.
+       Hint: Use exclave_ to return a local value.
+|}]
+
+let bar () = exclave_
   let _x = 52 in
   foo ()
 [%%expect{|
@@ -1195,6 +1207,23 @@ let bar' () =
   foo () [@nontail]
 [%%expect{|
 val bar' : unit -> int = <fun>
+|}]
+
+(* variant of above where f is an argument that is local-returning, but does not
+   return an allocation *)
+let foo g = let () = g () in ()
+[%%expect{|
+val foo : (unit -> unit) -> unit = <fun>
+|}]
+
+let bar (f : _ -> _ @ local) = foo (fun () -> f ())
+[%%expect{|
+Line 1, characters 46-50:
+1 | let bar (f : _ -> _ @ local) = foo (fun () -> f ())
+                                                  ^^^^
+Error: This application is local-returning, but is at the tail
+       position of a function that is not local-returning.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* Parameter modes must be matched by the type *)
@@ -2098,6 +2127,17 @@ let foo () = exclave_ let local_ _x = "hello" in true
 let testboo3 () =  true && (foo ())
 [%%expect{|
 val foo : unit -> bool @ local = <fun>
+Line 2, characters 27-35:
+2 | let testboo3 () =  true && (foo ())
+                               ^^^^^^^^
+Error: This application is local-returning, but is at the tail
+       position of a function that is not local-returning.
+       Hint: Use exclave_ to return a local value.
+|}]
+(* since the tailcall calls a local-returning function, it will only type-check
+   under an exclave_ *)
+let testboo3 () = exclave_ true && (foo ())
+[%%expect{|
 val testboo3 : unit -> bool @ local = <fun>
 |}]
 
