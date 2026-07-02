@@ -762,11 +762,9 @@ let transl_type_param env path jkind_default styp =
 
 let get_type_param_jkind env path styp =
   let of_annotation jkind name =
-    let jkind =
-      Jkind.of_annotation env ~use_abstract_jkinds:false
-        ~context:(Type_parameter (path, name)) jkind
-    in
-    jkind
+    (* Warnings are emitted in [transl_type_param] rather than here *)
+    Jkind.of_annotation env ~use_abstract_jkinds:false ~warn:false
+      ~context:(Type_parameter (path, name)) jkind
   in
   match styp.ptyp_desc with
   | Ptyp_any (Some jkind) ->
