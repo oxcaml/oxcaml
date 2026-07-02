@@ -8,12 +8,11 @@
 *)
 
 (* Regression tests: an argument that follows a non-exhaustive GADT
-   constructor match gets its value kind from the matched branch's equations,
-   miscompiling callers that pick a missing constructor. The native version of
-   this test currently segfaults. *)
+   constructor match used to get its value kind from the matched branch's
+   equations, miscompiling callers that pick a missing constructor. *)
 
 (* The matched branch says [f]'s second argument is a tuple, but a caller can
-   reach it with an immediate. This segfaults. *)
+   reach it with an immediate. This used to segfault. *)
 type 'a rep = Block : (int * int) rep | Int : int rep
 
 let[@inline never] g b =
@@ -60,8 +59,8 @@ let () =
   | exception Match_failure _ -> ()
 
 (* The pattern on the optional argument covers its payload, but a caller can
-   omit the argument, so [y]'s slot must not be marked immediate. This
-   segfaults. *)
+   omit the argument, so [y]'s slot must not be marked immediate. This used to
+   segfault. *)
 type 'a rep4 = Int4 : int rep4
 
 let f4 : type a. ?x:(a rep4) -> a -> unit -> a =
