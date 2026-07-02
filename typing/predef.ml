@@ -689,9 +689,8 @@ let decl_of_type_constr type_constr =
     let manifest = Option.map (fun f -> f param) manifest in
     let type_unboxed_version =
       Option.map
-        (fun unboxed_jkind ->
-          mk_unboxed_version ~params:[param] ~variance:[variance]
-            ~separability:[separability] unboxed_jkind)
+        (mk_unboxed_version ~params:[param] ~variance:[variance]
+           ~separability:[separability])
         unboxed_jkind
     in
     { base with

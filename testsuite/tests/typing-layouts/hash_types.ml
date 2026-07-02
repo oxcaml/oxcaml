@@ -1376,3 +1376,14 @@ type +'a co = 'a iarray#
 [%%expect{|
 type 'a co = 'a iarray#
 |}]
+
+(* The parameters of [array#] and [iarray#] have separability mode [Ind], like
+   [array]'s: an existential under them needn't be separable. (Cf. the abstract
+   type in hash_types-flat-float-array.ml, whose parameter gets the worst-case
+   mode.) *)
+type p = P : 'a array# -> p [@@unboxed]
+type q = Q : 'a iarray# -> q [@@unboxed]
+[%%expect{|
+type p = P : 'a array# -> p [@@unboxed]
+type q = Q : 'a iarray# -> q [@@unboxed]
+|}]
