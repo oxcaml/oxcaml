@@ -411,10 +411,11 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
   let old_code_id = code_id in
   let code_id, newer_version_of =
     match
-      Code_id.Map.find old_code_id (C.old_to_new_code_ids_all_sets context)
+      Code_id.Map.find_or_null old_code_id
+        (C.old_to_new_code_ids_all_sets context)
     with
-    | new_code_id -> new_code_id, Some old_code_id
-    | exception Not_found -> old_code_id, None
+    | This new_code_id -> new_code_id, Some old_code_id
+    | Null -> old_code_id, None
   in
   let inlining_decision =
     let decision =
@@ -704,11 +705,13 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
           ~name:(fun name ~coercion ->
             Name.pattern_match name
               ~var:(fun var ->
-                match Variable.Map.find var closure_bound_vars_inverse with
-                | exception Not_found ->
+                match
+                  Variable.Map.find_or_null var closure_bound_vars_inverse
+                with
+                | Null ->
                   assert (DE.mem_variable (DA.denv dacc) var);
                   T.alias_type_of kind in_slot
-                | function_slot ->
+                | This function_slot ->
                   let closure_symbol =
                     Function_slot.Map.find function_slot closure_symbols_map
                   in

@@ -55,6 +55,10 @@ type cannot_quantify_reason =
   | Univar
   | Scope_escape
 
+type valdecl_lpoly_flag =
+  | Lpoly
+  | Lmono
+
 (* a description of the jkind on an explicitly quantified universal
    variable, containing whether the jkind was a default
    (e.g. [let f : 'a. 'a -> 'a = ...]) or explicit
@@ -106,6 +110,7 @@ type error =
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
+  | Val_poly_and_layout
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -757,11 +762,9 @@ let transl_type_param env path jkind_default styp =
 
 let get_type_param_jkind env path styp =
   let of_annotation jkind name =
-    let jkind =
-      Jkind.of_annotation env ~use_abstract_jkinds:false
-        ~context:(Type_parameter (path, name)) jkind
-    in
-    jkind
+    (* Warnings are emitted in [transl_type_param] rather than here *)
+    Jkind.of_annotation env ~use_abstract_jkinds:false ~warn:false
+      ~context:(Type_parameter (path, name)) jkind
   in
   match styp.ptyp_desc with
   | Ptyp_any (Some jkind) ->
@@ -1679,7 +1682,20 @@ let transl_type_scheme_lmono env styp =
   | _ ->
     transl_type_scheme_mono env styp
 
-let transl_type_scheme_lpoly env attrs loc vars inner_type =
+let transl_type_scheme_poly_val env styp =
+  let cty, sort_vars =
+    Jkind_types.Sort.generalize_with (fun () ->
+      transl_type_scheme_lmono env styp)
+  in
+  if List.is_empty sort_vars then
+    Location.prerr_warning cty.ctyp_loc Warnings.Useless_valpoly;
+  let vars_names_loc =
+    List.map (fun v -> mknoloc (Jkind_types.Sort.Var.name v)) sort_vars
+  in
+  let ctyp = { cty with ctyp_desc = Ttyp_newlayout (vars_names_loc, cty) } in
+  sort_vars, ctyp
+
+let transl_type_scheme_newlayout env attrs loc vars inner_type =
   (* Use [with_local_level] just for scoping *)
   with_local_level begin fun () ->
     let env', ident_var_pairs =
@@ -1704,7 +1720,7 @@ let transl_type_scheme_lpoly env attrs loc vars inner_type =
         | Tvar { jkind; _ } ->
           let desc = jkind.jkind in
           (match desc.base with
-          | Kconstr (Pident id) ->
+          | Kconstr (Pident id, sa) ->
             let v_opt =
               List.find_map
                 (fun (id', v) ->
@@ -1714,8 +1730,7 @@ let transl_type_scheme_lpoly env attrs loc vars inner_type =
             (match v_opt with
             | Some v ->
               let base : Jkind_types.Sort.t Jkind_types.Layout.t jkind_base
-                = Layout (Sort (Var v, {separability = Maybe_separable;
-                                        nullability = Maybe_null})) in
+                = Layout (Sort (Var v, sa)) in
               let desc = {desc with base} in
               let jkind = {jkind with jkind = desc} in
               Types.set_var_jkind t jkind
@@ -1736,15 +1751,19 @@ let transl_type_scheme_lpoly env attrs loc vars inner_type =
     ident_var_pairs |> List.map snd |> List.rev, ctyp
   end
 
-let transl_type_scheme env styp =
-  match styp.ptyp_desc with
-  | Ptyp_newlayout (vars, st) ->
+let transl_type_scheme env styp valdecl_flag =
+  match styp.ptyp_desc, valdecl_flag with
+  | Ptyp_newlayout _, Lpoly ->
     Language_extension.assert_enabled ~loc:styp.ptyp_loc Layout_poly
       Language_extension.Alpha;
-    transl_type_scheme_lpoly env styp.ptyp_attributes
+    raise (Error (styp.ptyp_loc, env, Val_poly_and_layout));
+  | Ptyp_newlayout (vars, st), Lmono ->
+    Language_extension.assert_enabled ~loc:styp.ptyp_loc Layout_poly
+      Language_extension.Alpha;
+    transl_type_scheme_newlayout env styp.ptyp_attributes
       styp.ptyp_loc vars st
-  | _ ->
-    [], transl_type_scheme_lmono env styp
+  | _, Lpoly -> transl_type_scheme_poly_val env styp
+  | _, Lmono -> [], transl_type_scheme_lmono env styp
 
 (* Error report *)
 
@@ -1968,6 +1987,12 @@ let report_error_doc loc env = function
       Location.errorf ~loc
         "Layout polymorphism is not supported in term-level type \
          annotations"
+  | Val_poly_and_layout ->
+      Location.errorf ~loc
+        "@[The %a keyword is not supported inside layout-polymorphic@ \
+         value descriptions introduced using %a.@]"
+        Style.inline_code "layout_"
+        Style.inline_code "val poly_"
 
 let () =
   Location.register_error_of_exn

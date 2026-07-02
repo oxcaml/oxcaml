@@ -66,6 +66,7 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_float : unit -> unit
   val cfg_value_propagation_flow : unit -> unit
   val no_cfg_value_propagation_flow : unit -> unit
+  val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
@@ -93,6 +94,7 @@ module type Oxcaml_options = sig
   val long_frames : unit -> unit
   val no_long_frames : unit -> unit
   val long_frames_threshold : int -> unit
+  val dbranch_relaxation_max_displacement : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
   val internal_assembler : unit -> unit
   val verify_binary_emitter : unit -> unit

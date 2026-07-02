@@ -37,6 +37,7 @@
 #include "caml/misc.h"
 #include "caml/major_gc.h"
 #include "caml/memory.h"
+#include "caml/obj.h"
 #include "caml/startup_aux.h"
 #include "caml/shared_heap.h"
 #ifdef NATIVE_CODE
@@ -856,13 +857,13 @@ CAMLexport void caml_do_local_roots (
   struct caml__roots_block *local_roots,
   struct stack_info *current_stack,
   value * v_gc_regs,
-  dynamic_thread_t dynamic_bindings)
+  dynamic_cache_t dynamic_bindings)
 {
 #ifdef NATIVE_CODE
   caml_local_arenas* locals = caml_refresh_locals(current_stack);
 #endif
 
-  caml_dynamic_scan_thread_roots(dynamic_bindings, f, fflags, fdata);
+  caml_dynamic_cache_scan_roots(dynamic_bindings, f, fflags, fdata);
   for (struct caml__roots_block *lr = local_roots; lr != NULL; lr = lr->next) {
     for (int i = 0; i < lr->ntables; i++){
       for (int j = 0; j < lr->nitems; j++){
@@ -1403,58 +1404,6 @@ CAMLexport value caml_get_preemption_effect(void) {
   return *eff;
 }
 
-/**** Dynamic Binding ****/
-
-/* Implementation of primitives to support Dynamic.t */
-
-extern value caml_fresh_oo_id(value v);
-
-/* Making a dynamic value */
-
-CAMLprim value caml_dynamic_make(value val)
-{
-  CAMLparam1(val);
-  /* TODO: consider other hash functions. This one is ~unique, which is nice */
-  value hash = caml_fresh_oo_id(Val_unit);
-  value dyn = caml_alloc_2(0, hash, val);
-  CAMLreturn(dyn);
-}
-
-#define Val_dyn(dyn) (atomic_load(Op_atomic_val(dyn) + 1))
-#define Hash_dyn(dyn) (Long_val(Field(dyn, 0)))
-
-/* Per-thread cache: direct-mapped. TODO: Stephen Dolan's wild plan to
- * use vector instructions to do a fully-associative LRU cache. */
-
-/* If you change DYNAMIC_CACHE_BITS, you must also update the
- * assembly-language stubs such as amd64.S. TODO: single source of
- * truth for things like this. */
-#define DYNAMIC_CACHE_BITS 3
-#define DYNAMIC_CACHE_SIZE (1 << DYNAMIC_CACHE_BITS)
-
-typedef struct {
-  value dyn;
-  value val;
-} binding_s, *binding_t;
-
-#define Is_bound(b) Is_block((b)->dyn)
-
-/* Per-thread dynamic binding data structure */
-
-/* Must match Dynamic_ definitions in amd64.S */
-
-typedef struct dynamic_thread_s {
-  binding_s cache[DYNAMIC_CACHE_SIZE];
-} dynamic_thread_s, *dynamic_thread_t;
-
-static void dynamic_flush_cache(dynamic_thread_t thread)
-{
-  /* Clear keys */
-  for (size_t i = 0; i < DYNAMIC_CACHE_SIZE; ++i) {
-    thread->cache[i].dyn = Val_null;
-  }
-}
-
 /* Call the tick handler for each running fiber *in reverse order*, stopping as
    soon as one preempts
 
@@ -1495,62 +1444,100 @@ value caml_tick_fiber_exn(struct stack_info *stack) {
   CAMLreturn(Val_false);
 }
 
-/* parent is NULL for the first thread when systhreads initializes */
+/**** Dynamic Binding ****/
 
-CAMLexport dynamic_thread_t caml_dynamic_new_thread(dynamic_thread_t parent)
+/* Implementation of primitives to support Dynamic.t */
+
+#define Hash_dyn(dyn) Long_val(dyn)
+
+typedef struct {
+  value dyn; /* Dynamic id, or Val_null if unbound */
+  value val;
+} binding_s, *binding_t;
+
+/* Per-thread cache: direct-mapped. TODO: Stephen Dolan's wild plan to
+ * use vector instructions to do a fully-associative LRU cache. */
+
+/* If you change DYNAMIC_CACHE_BITS, you must also update the
+ * assembly-language stubs such as amd64.S. TODO: single source of
+ * truth for things like this. */
+#define DYNAMIC_CACHE_BITS 3
+#define DYNAMIC_CACHE_SIZE (1 << DYNAMIC_CACHE_BITS)
+
+/* Must match Dynamic_ definitions in amd64.S */
+
+typedef struct dynamic_cache_s {
+  binding_s tbl[DYNAMIC_CACHE_SIZE];
+} dynamic_cache_s, *dynamic_cache_t;
+
+static void dynamic_cache_flush(dynamic_cache_t cache)
 {
-  dynamic_thread_t res = caml_stat_alloc_noexc(sizeof(dynamic_thread_s));
+  /* Clear keys */
+  for (size_t i = 0; i < DYNAMIC_CACHE_SIZE; ++i) {
+    cache->tbl[i].dyn = Val_null;
+  }
+}
+
+CAMLexport dynamic_cache_t caml_dynamic_cache_new(void)
+{
+  dynamic_cache_t res = caml_stat_alloc_noexc(sizeof(dynamic_cache_s));
   if (!res) {
     return NULL;
   }
-  /* Not even going to think about the semantics of copying cache entries */
-  dynamic_flush_cache(res);
-
+  dynamic_cache_flush(res);
   return res;
 }
 
-CAMLexport void caml_dynamic_delete_thread(dynamic_thread_t thread)
+CAMLexport void caml_dynamic_cache_delete(dynamic_cache_t cache)
 {
-  caml_stat_free(thread);
+  caml_stat_free(cache);
 }
 
-CAMLexport void caml_dynamic_flush_thread(dynamic_thread_t thread)
+CAMLexport void caml_dynamic_cache_flush(dynamic_cache_t cache)
 {
-  dynamic_flush_cache(thread);
+  dynamic_cache_flush(cache);
 }
 
-CAMLexport void caml_dynamic_enter_thread(dynamic_thread_t thread)
+CAMLexport void caml_dynamic_cache_enter_thread(dynamic_cache_t cache)
 {
-  Caml_state->dynamic_bindings = thread;
+  Caml_state->dynamic_bindings = cache;
 }
 
-CAMLexport void caml_dynamic_scan_thread_roots(dynamic_thread_t thread,
-                                               scanning_action f,
-                                               scanning_action_flags fflags,
-                                               void *fdata)
+CAMLexport void caml_dynamic_cache_scan_roots(dynamic_cache_t cache,
+                                              scanning_action f,
+                                              scanning_action_flags fflags,
+                                              void *fdata)
 {
   for (size_t i = 0; i < DYNAMIC_CACHE_SIZE; ++i) {
-    if (Is_bound(&thread->cache[i])) {
-      f(fdata, thread->cache[i].dyn, &thread->cache[i].dyn);
-      f(fdata, thread->cache[i].val, &thread->cache[i].val);
+    if (Is_this(cache->tbl[i].dyn)) {
+      f(fdata, cache->tbl[i].dyn, &cache->tbl[i].dyn);
+      f(fdata, cache->tbl[i].val, &cache->tbl[i].val);
     }
   }
+}
+
+/* Make a fresh dynamic value, which is an immediate unique ID. */
+CAMLprim value caml_dynamic_make(value unit)
+{
+  CAMLparam1(unit);
+  /* TODO: consider other hash functions. This one is ~unique, which is nice */
+  value hash = caml_fresh_oo_id(Val_unit);
+  CAMLreturn(hash);
 }
 
 /* Get the current value of a dynamic variable. Does not allocate.
  *
  * Comments indicate the memory accesses on the fast path (loads from
  * three cache lines; load #3 is dependent on load #2). */
-
 CAMLprim value caml_dynamic_get(value dyn)
 {
-  uintnat hash = Hash_dyn(dyn); /* load #1 */
+  uintnat hash = Hash_dyn(dyn);
   uintnat index = hash & (DYNAMIC_CACHE_SIZE - 1);
-  dynamic_thread_t thread = Caml_state->dynamic_bindings; /* load #2 */
-  CAMLassert(thread);
-  binding_t entry = thread->cache + index; /* just arithmetic */
-  if (entry->dyn == dyn) { /* load #3; dependent on #2 */
-    return entry->val; /* load #4, should hit same cache line as #3 */
+  dynamic_cache_t cache = Caml_state->dynamic_bindings; /* load #1 */
+  CAMLassert(cache);
+  binding_t entry = cache->tbl + index; /* just arithmetic */
+  if (entry->dyn == dyn) { /* load #2; dependent on #1 */
+    return entry->val; /* load #3, should hit same cache line as #2 */
   }
   value val;
   /* Not in cache; let's look at the fiber */
@@ -1564,8 +1551,8 @@ CAMLprim value caml_dynamic_get(value dyn)
     stack = Stack_parent(stack);
   }
 
-  /* Not bound on a fiber; back to the initial binding */
-  val = Val_dyn(dyn);
+  /* Never bound */
+  val = Val_null;
 
 found:
   /* Update cache */

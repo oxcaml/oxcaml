@@ -52,7 +52,7 @@
   (target opnames.ml)
   (deps
      (:make_opcodes make_opcodes.exe)
-     (:input ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/instruct.h))
+     (:input ../runtime/caml/instruct.h))
   (action
     (with-stdin-from %{input}
       (with-stdout-to %{target}
@@ -113,13 +113,6 @@
   (section bin)
   (package ocaml))
 
-(install
-  (files
-    eventlog_metadata
-  )
-  (section lib)
-  (package ocaml))
-
 (library
   (name debug_printers)
   (modes byte)
@@ -167,3 +160,16 @@
  (name gen_compiler_libs_installation)
  (modes native)
  (modules gen_compiler_libs_installation))
+
+(executable
+ (name ocamlfilt)
+ (modes byte native)
+ (modules ocamlfilt)
+ (libraries ocamlcommon))
+
+(install
+ (files
+  (ocamlfilt.bc as ocamlfilt.byte)
+  (ocamlfilt.exe as ocamlfilt))
+ (section bin)
+ (package ocaml))

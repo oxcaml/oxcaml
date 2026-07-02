@@ -428,9 +428,11 @@ caml_result caml_do_pending_actions_flags_res(int flags)
      again before returning to OCaml. The continuation this allocates is
      uninitialized, and should not be promoted before being initialized.
    */
+#ifdef NATIVE_CODE
   if (flags & CAML_FROM_CAML) {
     caml_domain_setup_preemption();
   }
+#endif
 
   return Result_unit;
 
@@ -684,7 +686,7 @@ void * caml_init_signal_stack(size_t* signal_stack_size)
     stk.ss_size = max_size_t(
       SIGSTKSZ, 4 * max_size_t(MINSIGSTKSZ, at_minsigstksz));
 #else
-  /* Preserve existing runtime5 behaviour for now. */
+  /* Preserve existing behaviour for now. */
   stk.ss_size = SIGSTKSZ;
 #endif
 

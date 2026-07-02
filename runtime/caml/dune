@@ -95,6 +95,7 @@
   (mlvalues.h as caml/mlvalues.h)
   (opnames.h as caml/opnames.h)
   (osdeps.h as caml/osdeps.h)
+  (obj.h as caml/obj.h)
   (platform.h as caml/platform.h)
   (prims.h as caml/prims.h)
   (printexc.h as caml/printexc.h)

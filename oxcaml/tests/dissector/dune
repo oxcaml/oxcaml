@@ -51,8 +51,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target simple.exe)
  (deps simple.ml)
  (action
@@ -63,8 +62,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target simple.output)
  (deps simple.exe)
  (action (with-outputs-to %{target} (run ./simple.exe))))
@@ -74,8 +72,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps simple.expected simple.output)
  (action (diff simple.expected simple.output)))
 
@@ -85,8 +82,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target simple_funcsect.exe)
  (deps simple_funcsect.ml)
  (action
@@ -97,8 +93,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target simple_funcsect.output)
  (deps simple_funcsect.exe)
  (action (with-outputs-to %{target} (run ./simple_funcsect.exe))))
@@ -108,8 +103,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps simple.expected simple_funcsect.output)
  (action (diff simple.expected simple_funcsect.output)))
 
@@ -122,8 +116,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (targets gen_module_a.cmi gen_module_a.cmx gen_module_a.o)
  (deps gen_module_a.ml)
  (action
@@ -133,8 +126,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (targets gen_module_b.cmi gen_module_b.cmx gen_module_b.o)
  (deps gen_module_b.ml gen_module_a.cmi gen_module_a.cmx)
  (action
@@ -144,8 +136,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (targets gen_module_c.cmi gen_module_c.cmx gen_module_c.o)
  (deps gen_module_c.ml gen_module_a.cmi gen_module_a.cmx
        gen_module_b.cmi gen_module_b.cmx)
@@ -157,8 +148,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (targets gen_main.cmi gen_main.cmx gen_main.o)
  (deps gen_main.ml gen_module_a.cmi gen_module_a.cmx
        gen_module_b.cmi gen_module_b.cmx
@@ -172,8 +162,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cross_partition.exe)
  (deps gen_module_a.cmx gen_module_a.o
        gen_module_b.cmx gen_module_b.o
@@ -188,8 +177,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cross_partition.output)
  (deps cross_partition.exe)
  (action (with-outputs-to %{target} (run ./cross_partition.exe))))
@@ -199,8 +187,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps cross_partition.expected cross_partition.output)
  (action (diff cross_partition.expected cross_partition.output)))
 
@@ -210,8 +197,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps cross_partition.exe)
  (action (progn
   (with-stdout-to cross_partition_sections.txt (run readelf -S cross_partition.exe))
@@ -222,8 +208,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cross_partition_fs.exe)
  (deps gen_module_a.cmx gen_module_a.o
        gen_module_b.cmx gen_module_b.o
@@ -238,8 +223,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cross_partition_fs.output)
  (deps cross_partition_fs.exe)
  (action (with-outputs-to %{target} (run ./cross_partition_fs.exe))))
@@ -249,8 +233,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps cross_partition.expected cross_partition_fs.output)
  (action (diff cross_partition.expected cross_partition_fs.output)))
 
@@ -260,8 +243,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps gen_module_a.cmx gen_module_a.o gen_module_b.cmx gen_module_b.o
        gen_module_c.cmx gen_module_c.o gen_main.cmx gen_main.o)
  (action
@@ -379,8 +361,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps gen_module_a.cmx gen_module_a.o gen_module_b.cmx gen_module_b.o
        gen_module_c.cmx gen_module_c.o gen_main.cmx gen_main.o)
  (action
@@ -429,8 +410,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps gen_module_a.cmx gen_module_a.o gen_module_b.cmx gen_module_b.o
        gen_module_c.cmx gen_module_c.o gen_main.cmx gen_main.o)
  (action
@@ -525,8 +505,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (targets mylib_a.cmi mylib_a.cmx mylib_a.o)
  (deps mylib_a.ml)
  (action
@@ -536,8 +515,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (targets mylib_b.cmi mylib_b.cmx mylib_b.o)
  (deps mylib_b.ml mylib_a.cmi mylib_a.cmx)
  (action
@@ -548,8 +526,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (targets mylib.cmxa mylib.a)
  (deps mylib_a.cmx mylib_a.o mylib_b.cmx mylib_b.o)
  (action
@@ -560,8 +537,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cmxa_test.exe)
  (deps mylib.cmxa mylib.a mylib_a.cmi mylib_b.cmi cmxa_main.ml)
  (action
@@ -572,8 +548,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cmxa_test.output)
  (deps cmxa_test.exe)
  (action (with-outputs-to %{target} (run ./cmxa_test.exe))))
@@ -583,8 +558,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps cmxa_test.expected cmxa_test.output)
  (action (diff cmxa_test.expected cmxa_test.output)))
 
@@ -594,8 +568,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps cmxa_test.exe)
  (action (progn
   (with-stdout-to cmxa_sections.txt (run readelf -S cmxa_test.exe))
@@ -606,8 +579,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cclib_test.exe)
  (deps cclib_test.ml)
  (action
@@ -619,8 +591,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cclib_test.output)
  (deps cclib_test.exe)
  (action
@@ -632,8 +603,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps cclib_test.output)
  (action (bash "grep -q 'cclib test passed' cclib_test.output")))
 
@@ -644,8 +614,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cstub.o)
  (deps cstub.c)
  (action
@@ -656,8 +625,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target libcstub.a)
  (deps cstub.o)
  (action
@@ -668,8 +636,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cstub_passthrough.exe)
  (deps cstub_passthrough.ml libcstub.a)
  (action
@@ -682,8 +649,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cstub_passthrough.output)
  (deps cstub_passthrough.exe)
  (action
@@ -695,8 +661,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps cstub_passthrough.output)
  (action (bash "grep -q 'C stub passthrough test passed' cstub_passthrough.output")))
 
@@ -706,8 +671,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps cstub_passthrough.ml libcstub.a)
  (action
   (bash "

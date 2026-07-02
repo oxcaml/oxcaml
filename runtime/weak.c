@@ -335,6 +335,7 @@ static void ephe_copy_and_darken(value from, value to)
   CAMLassert(Tag_val(from) == Tag_val(to));
   CAMLassert(Tag_val(from) != Infix_tag);
   CAMLassert(Wosize_val(from) == Wosize_val(to));
+  CAMLassert(Reserved_val(from) == Reserved_val(to));
 
   if (!Scannable_val(from)) {
     scan_from = Wosize_val(from);
@@ -408,7 +409,8 @@ static value ephe_get_field_copy (value e, mlsize_t offset)
 
     if (copy != Val_unit &&
         (Tag_val(val) == Tag_val(copy)) &&
-        (Wosize_val(val) == Wosize_val(copy))) {
+        (Wosize_val(val) == Wosize_val(copy)) &&
+        (Reserved_val(val) == Reserved_val(copy))) {
       /* The copy we allocated (on a previous iteration) is large
        * enough and has the right header bits for us to copy the
        * contents of val into it. Note that we don't care whether val

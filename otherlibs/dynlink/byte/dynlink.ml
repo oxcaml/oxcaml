@@ -115,14 +115,6 @@ module Bytecode = struct
 
   let run_shared_startup _ = ()
 
-  let with_lock lock f =
-    match lock with
-    | None -> f ()
-    | Some lock ->
-      Mutex.lock lock;
-      Fun.protect f
-        ~finally:(fun () -> Mutex.unlock lock)
-
   let really_input_bigarray ic ar st n =
     match In_channel.really_input_bigarray ic ar st n with
       | None -> raise End_of_file
@@ -136,7 +128,7 @@ module Bytecode = struct
     = "caml_reify_bytecode"
 
   let run lock (ic, file_name, file_digest, _old_st) ~unit_header ~priv:_ =
-    let clos = with_lock lock (fun () ->
+    let clos = Mutex.protect lock (fun () ->
         let compunit : Cmo_format.compilation_unit_descr = unit_header in
         seek_in ic compunit.cu_pos;
         let code =
