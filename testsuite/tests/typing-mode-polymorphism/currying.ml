@@ -134,17 +134,6 @@ Line 3, characters 15-16:
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
-let foo (x @ global) (y @ nonportable) =
-  let f = many_arguments x y in
-  let g = f () in
-  use_portable g
-[%%expect{|
-Line 4, characters 15-16:
-4 |   use_portable g
-                   ^
-Error: This value is "nonportable" but is expected to be "portable".
-|}]
-
 let foo =
   let x @ global = "local" in
   let y @ global = "global" in

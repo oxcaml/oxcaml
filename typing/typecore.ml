@@ -668,12 +668,9 @@ let mode_strictly_local expected_mode =
     with strictly_local = true
   }
 
-let mode_return_from_exclave (expected_mode : expected_mode) =
-  match expected_mode.return_from_exclave with
-  | Some r -> r, expected_mode
-  | None ->
-    let r = ref false in
-    r, { expected_mode with return_from_exclave = Some r }
+let mode_return_from_exclave (expected_mode : expected_mode) r =
+  { expected_mode
+    with return_from_exclave = Some r }
 
 let mode_coerce mode expected_mode =
   mode_morph (fun m -> Value.meet [m; mode]) expected_mode
@@ -859,6 +856,15 @@ let create_function_return_mode
     else create_allocation_mode_l ret_mode
   in
   Typedtree.create_return_mode ret_mode
+
+let create_application_mode ~return_from_exclave ret_mode : return_mode =
+  match return_from_exclave with
+  | Some return_from_exclave ->
+    create_function_return_mode
+      ~return_from_exclave:!return_from_exclave ret_mode
+  | None ->
+    create_allocation_mode_l ret_mode
+    |> Typedtree.create_return_mode
 
 let create_allocation_mode_r mode =
   let locality_mode = Alloc.proj_comonadic Areality mode in
@@ -5199,16 +5205,7 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
              let args = (lbl, Arg (exp, sort), sch) :: args in
              (ty_ret, mode_ret, open_args, closed_args, args)
          | Omitted { mode_fun; ty_arg; mode_arg; level; sort_arg } ->
-             (* Under mode polymorphism we define a new return mode above mode_ret
-                and a new level-0 allocation mode for mode_ret (to know whether then
-                function needs a region to allocate the return value):
-                [mode_ret] < [mode_ret_alloc] < [mode_ret_eta] *)
-             let mode_ret_eta =
-               if Language_extension.(is_at_least_mode_poly Beta)
-               then fst (Alloc.newvar_above (Ctype.get_current_level ()) mode_ret)
-               else mode_ret
-             in
-             let arrow_desc = (lbl, mode_arg, mode_ret_eta) in
+             let arrow_desc = (lbl, mode_arg, mode_ret) in
              let sort_ret =
                match type_sort ~why:Function_result ~fixed:false env ty_ret with
                | Ok sort -> sort
@@ -5241,19 +5238,8 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
              let mode_arg =
                create_allocation_mode_l_global_if_possible mode_arg
              in
-             (* [mode_ret] < [mode_ret_alloc] < [mode_ret_eta]*)
-             let mode_ret_alloc =
-              if Language_extension.(is_at_least_mode_poly Beta)
-              then begin
-                let m = Locality.newvar 0 in
-                Locality.submode_exn (Alloc.proj_comonadic Areality mode_ret) m;
-                Locality.submode_exn m (Alloc.proj_comonadic Areality mode_ret_eta);
-                m
-              end else Alloc.proj_comonadic Areality mode_ret
-            in
              let mode_ret =
-              Typedtree.create_return_mode
-                (Locality.disallow_right mode_ret_alloc)
+               create_omitted_return_mode mode_ret
              in
              register_allocation_mode mode_closure;
              let arg =
@@ -7444,8 +7430,13 @@ and type_expect_
       let (args, ty_ret, mode_ret, pm) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
       in
+      let ap_mode_alloc =
+        create_application_mode
+          ~return_from_exclave:expected_mode.return_from_exclave
+          mode_ret
+      in
       let mode_ret = Alloc.disallow_right mode_ret in
-      let ap_mode = create_allocation_mode_l mode_ret in
+      let ap_mode = Alloc.proj_comonadic Areality mode_ret in
       let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
@@ -7464,8 +7455,8 @@ and type_expect_
       in
       let args = List.map (fun (lbl, arg, _) -> (lbl, arg)) args in
       let exp = rue {
-        exp_desc = Texp_apply(funct, args, pm.apply_position,
-                    Typedtree.create_return_mode ap_mode, zero_alloc);
+        exp_desc = Texp_apply(funct, args, pm.apply_position, ap_mode_alloc,
+                              zero_alloc);
         exp_loc = loc; exp_extra;
         exp_type = ty_ret;
         exp_attributes = sexp.pexp_attributes;
@@ -9500,8 +9491,9 @@ and type_function
             ty_default_arg, Some (default_arg, arg_label, default_arg_sort),
               default_arg_sort
       in
-      let excl, expected_inner_mode =
-        mode_return_from_exclave expected_inner_mode
+      let excl = ref false in
+      let expected_inner_mode =
+        mode_return_from_exclave expected_inner_mode excl
       in
       let (pat, params, body, ret_info, newtypes, contains_gadt, curry), partial =
         (* Check everything else in the scope of the parameter. *)
@@ -11376,8 +11368,9 @@ and type_function_cases_expect
         ~ret_mode_annots:Mode.Alloc.Const.Option.none
         ~is_first_val_param:first ~is_final_val_param:true
     in
-    let excl, expected_inner_mode =
-      mode_return_from_exclave expected_inner_mode
+    let excl = ref false in
+    let expected_inner_mode =
+      mode_return_from_exclave expected_inner_mode excl
     in
     let cases, partial =
       type_cases Value env
