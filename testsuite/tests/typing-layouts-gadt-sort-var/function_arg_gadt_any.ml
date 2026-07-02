@@ -21,7 +21,13 @@ Line 1, characters 52-53:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: "B"
 
-val f : ('a : any). 'a t -> 'a -> unit -> 'a = <fun>
+Line 1, characters 54-55:
+1 | let f : type (a : any). a t -> a -> unit -> a = fun V x () -> x
+                                                          ^
+Error: This function's argument has type a,
+       whose layout is known only from the GADT pattern match at line 1, characters 52-53.
+       That match is not exhaustive, so a caller could reach this argument at a different layout.
+       Function arguments and results must be representable independently of any non-exhaustive match.
 |}]
 
 (* Like [f], but the narrowing comes from a type equation ([Yes] forces
@@ -41,7 +47,13 @@ Line 4, characters 6-9:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: "No"
 
-val g : ('a : any). 'a isf -> 'a -> unit -> int -> int = <fun>
+Line 4, characters 10-11:
+4 |   fun Yes x () -> x
+              ^
+Error: This function's argument has type a,
+       whose layout is known only from the GADT pattern match at line 4, characters 6-9.
+       That match is not exhaustive, so a caller could reach this argument at a different layout.
+       Function arguments and results must be representable independently of any non-exhaustive match.
 |}]
 
 (* The result sort is part of the calling convention for the same reason. *)
@@ -53,7 +65,13 @@ Line 1, characters 51-52:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: "B"
 
-val f_ret : ('a : any). 'a t -> unit -> 'a = <fun>
+Line 1, characters 53-71:
+1 | let f_ret : type (a : any). a t -> unit -> a = fun V () -> assert false
+                                                         ^^^^^^^^^^^^^^^^^^
+Error: This function's result has type a,
+       whose layout is known only from the GADT pattern match at line 1, characters 51-52.
+       That match is not exhaustive, so a caller could reach this result at a different layout.
+       Function arguments and results must be representable independently of any non-exhaustive match.
 |}]
 
 (* Trailing [function] cases form one function with the preceding parameters,
@@ -67,7 +85,13 @@ Line 1, characters 50-51:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: "B"
 
-val f_cases : ('a : any). 'a t -> 'a -> 'a = <fun>
+Line 1, characters 55-70:
+1 | let f_cases : type (a : any). a t -> a -> a = fun V -> function x -> x
+                                                           ^^^^^^^^^^^^^^^
+Error: This function's argument has type a,
+       whose layout is known only from the GADT pattern match at line 1, characters 50-51.
+       That match is not exhaustive, so a caller could reach this argument at a different layout.
+       Function arguments and results must be representable independently of any non-exhaustive match.
 |}]
 
 (* An optional argument's pattern does not justify later layouts even when it
@@ -86,7 +110,13 @@ Warning 18 [not-principal]: typing this pattern requires considering
   "int -> int" and "a" as equal. But the knowledge of these types is not
   principal.
 
-val g_opt : ('a : any). ?x:'a opt -> 'a -> unit -> int -> int = <fun>
+Line 4, characters 31-32:
+4 |   fun ?x:(YesO = assert false) y () -> y
+                                   ^
+Error: This function's argument has type a,
+       whose layout is known only from the GADT pattern match at line 4, characters 10-14.
+       That pattern matches an optional argument that a caller could omit, so a caller could reach this argument at a different layout.
+       Function arguments and results must be representable independently of the patterns of optional arguments.
 |}]
 
 (* But an optional argument's pattern is fine when the later layouts do not
