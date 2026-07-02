@@ -304,6 +304,17 @@ Caml_inline void prefetch_block(value v)
  * marked, and data values if they have any unmarked keys). Ephemeron
  * sweeping cannot mark blocks so does not need to take place in
  * rounds.
+ *
+ * Remark: if the data of ephemeron A is found to be alive before the
+ * data of ephemeron B in the current major GC cycle, then A will
+ * occur before B in the todo list for the next cycle. In other words,
+ * ephemerons dynamically get sorted in dependency order, which
+ * reduces the number of rounds necessary.
+ * In the details, this dependency order is preserved because
+ * `ephe_mark()` pushes the element of `todo` into `live`, which
+ * reverses their order, but then `ephe_sweep()` moves `live` into
+ * `todo` and pushes them into `live` again, which reverses their
+ * order a second time.
 */
 
 extern value caml_ephe_none; /* See weak.c */
@@ -448,6 +459,15 @@ static void prepare_for_ephe_sweeping (caml_domain_state *domain_state)
   }
 }
 
+enum mark_flag { MARK_DEFAULT, MARK_NO_FINISH };
+static intnat mark(intnat budget, enum mark_flag flag);
+
+// call this once after calling mark with MARK_NO_FINISH
+static void mark_finish (void)
+{
+  (void)mark(1, MARK_DEFAULT);
+}
+
 #define EPHE_MARK_DEFAULT false
 #define EPHE_MARK_FORCE_ALIVE true
 
@@ -482,6 +502,7 @@ static intnat ephe_mark (intnat budget, uintnat round,
     prev_linkp = &domain_state->ephe_info->todo;
   }
   value next = *prev_linkp;
+  bool must_mark_again = false;
   while (next != 0 && budget > 0) {
 
     /* TODO: this reproduces much of caml_ephe_clean; can we share code? */
@@ -531,6 +552,7 @@ static intnat ephe_mark (intnat budget, uintnat round,
 
     if (force_alive) preserve_data = true;
 
+<<<<<<< OxCaml
     bool keep;
     value data = Ephe_data(ephe);
     if (data == caml_ephe_none || Is_long(data)) {
@@ -545,6 +567,43 @@ static intnat ephe_mark (intnat budget, uintnat round,
       caml_darken (domain_state, data, 0);
       preserved ++;
       keep = false;
+||||||| Upstream OCaml
+    if (preserve_data) {
+      value data = Ephe_data(ephe);
+      if (data != caml_ephe_none && Is_block(data)) {
+        caml_darken (domain_state, data, 0);
+      }
+      /* Move to 'live' list */
+      caml_ephe_list_cons_inplace(ephe, &domain_state->ephe_info->live);
+      /* Remove from 'todo' list */
+      *prev_linkp = next;
+
+      ++ preserved;
+=======
+    if (preserve_data) {
+      value data = Ephe_data(ephe);
+      if (data != caml_ephe_none && Is_block(data)) {
+        caml_darken (domain_state, data, 0);
+        if (!domain_state->marking_done) {
+          /* We try to mark the data fully (as budget allows); this
+             can mark the keys of some ephemerons that are later in
+             the todo list, which would otherwise have to wait for the
+             next round.
+             This is important in the happy path where ephemerons occur
+             in the list in dependency order, so a single round suffices
+             to mark all the live ones.
+          */
+          budget = mark(budget, MARK_NO_FINISH);
+          must_mark_again = true;
+        }
+      }
+      /* Move to 'live' list */
+      caml_ephe_list_cons_inplace(ephe, &domain_state->ephe_info->live);
+      /* Remove from 'todo' list */
+      *prev_linkp = next;
+
+      ++ preserved;
+>>>>>>> ocaml/ocaml#14688
     } else {
       /* Leave this ephemeron on the todo list */
       keep = true;
@@ -561,6 +620,7 @@ static intnat ephe_mark (intnat budget, uintnat round,
     scanned ++;
   }
 
+<<<<<<< OxCaml
 #define F_U "%"ARCH_INTNAT_PRINTF_FORMAT"u"
 #define F_D "%"ARCH_INTNAT_PRINTF_FORMAT"d"
   CAML_GC_MESSAGE(SLICE, "Marked ephemerons: %s. Ephemeron cycle "F_U
@@ -568,6 +628,26 @@ static intnat ephe_mark (intnat budget, uintnat round,
                   domain_state->ephe_info->cursor.round == round ?
                   "Continued from cursor" : "Discarded cursor",
                   round, scanned, trivial, preserved);
+||||||| Upstream OCaml
+  caml_gc_log
+  ("Mark Ephemeron: %s. Ephemeron round=%"CAML_PRIuNAT
+   " examined=%" CAML_PRIuSZT " preserved=%" CAML_PRIuSZT " ",
+   domain_state->ephe_info->cursor.round == round ?
+     "Continued from cursor" : "Discarded cursor",
+   round, scanned, preserved);
+=======
+  if (must_mark_again) {
+    CAMLassert(!domain_state->marking_done);
+    mark_finish();
+  }
+
+  caml_gc_log
+  ("Mark Ephemeron: %s. Ephemeron round=%"CAML_PRIuNAT
+   " examined=%" CAML_PRIuSZT " preserved=%" CAML_PRIuSZT " ",
+   domain_state->ephe_info->cursor.round == round ?
+     "Continued from cursor" : "Discarded cursor",
+   round, scanned, preserved);
+>>>>>>> ocaml/ocaml#14688
 
   domain_state->ephe_info->cursor.round = round;
   domain_state->ephe_info->cursor.todop = prev_linkp;
@@ -1646,8 +1726,16 @@ Caml_noinline static intnat do_some_marking(struct mark_stack* stk,
   return budget;
 }
 
-/* mark until the budget runs out or marking is done */
-static intnat mark(intnat budget) {
+/* mark until the budget runs out or marking is done.
+
+   if flag == MARK_NO_FINISH, then the caller promises that mark will be
+   called again within the same GC slice, in MARK_DEFAULT mode, with a nonzero
+   budget. You can use [mark_finish()] which will use a budget of 1.
+
+   This allows the MARK_NO_FINISH call to skip the end-of-marking work
+   (setting marking_done and advancing the ephemeron round), since it will be
+   handled by the next MARK_DEFAULT call. */
+static intnat mark(intnat budget, enum mark_flag flag) {
   caml_domain_state *domain_state = Caml_state;
   CAMLassert(caml_marking_started());
   while (budget > 0 && !domain_state->marking_done) {
@@ -1671,6 +1759,8 @@ static intnat mark(intnat budget) {
             mark_slice_darken(domain_state->mark_stack, *p, &budget);
           }
         }
+      } else if (flag == MARK_NO_FINISH) {
+        break;
       } else {
         ephe_next_round ();
         domain_state->marking_done = 1;
@@ -2400,8 +2490,16 @@ mark_again:
     if (events_begun) CAML_EV_BEGIN(EV_MAJOR_MARK);
 
     while (!domain_state->marking_done &&
+<<<<<<< OxCaml
            (budget = get_major_slice_markwork(mode)) > 0) {
       intnat left = mark(budget);
+||||||| Upstream OCaml
+           (budget = get_major_slice_work(mode)) > 0) {
+      intnat left = mark(budget);
+=======
+           (budget = get_major_slice_work(mode)) > 0) {
+      intnat left = mark(budget, MARK_DEFAULT);
+>>>>>>> ocaml/ocaml#14688
       intnat work_done = budget - left;
       /* It is possible to call caml_darken directly during marking,
          if we e.g. discover a continuation and mark its stack.
@@ -2460,10 +2558,17 @@ mark_again:
                (budget = get_major_slice_markwork(mode)) > 0) {
           intnat left = ephe_mark(budget, saved_ephe_round, EPHE_MARK_DEFAULT);
           intnat work_done = budget - left;
+<<<<<<< OxCaml
           /* caml_darken is called by ephe_mark, so count the work it does */
           work_done += mark_work_done_between_slices();
           ephe_mark_work += work_done;
           commit_major_slice_markwork(work_done);
+||||||| Upstream OCaml
+          commit_major_slice_work (work_done);
+=======
+          work_done += mark_work_done_between_slices();
+          commit_major_slice_work (work_done);
+>>>>>>> ocaml/ocaml#14688
 
           // FIXME: Can we delete this?
           if (left > 0) {
@@ -2723,7 +2828,7 @@ static void empty_mark_stack (void)
       /* This calls caml_mark_roots_stw with the minor heap empty */
       caml_empty_minor_heaps_once();
     }
-    mark(1000);
+    mark(1000, MARK_DEFAULT);
     caml_handle_incoming_interrupts();
   }
 
