@@ -307,6 +307,23 @@ extern uintnat caml_measure_all_frametables;
 #define MAX_REG (REGS - 1) /* Largest register index recorded in reg tables */
 #define MAX_REG_IN_SMALL_MAP 12
 
+/* Why an escaped descriptor could not use the short format. [ESC_FITS] means
+   its content is short-compatible, so it escaped only for a positional reason
+   (a function / text-section boundary). Mirrors [short_encoding] in
+   backend/emitaux.ml; the enum order follows that function's checks. */
+enum escape_reason {
+  ESC_FITS = 0,     /* short-compatible: escaped only for a boundary */
+  ESC_LONG,         /* long (32-bit) descriptor */
+  ESC_BADSIZE,      /* frame size 0, > 1024, or not a multiple of 16 */
+  ESC_BADSLOT,      /* a live stack slot is unaligned or > 255 words in */
+  ESC_MANYSLOTS,    /* more than 255 live stack slots */
+  ESC_NOALLOC_REGS, /* non-allocation descriptor with live registers */
+  ESC_COLDREG,      /* a live register outside the 8 hot registers */
+  ESC_MANYALLOCS,   /* more than 255 allocations (comballoc) */
+  ESC_BIGALLOC,     /* an allocation size that does not fit a 4-bit nibble */
+  NUM_ESCAPE_REASONS
+};
+
 struct frametable_stats {
   /* A few per-frametable items */
   unsigned char *last_retaddr;
@@ -335,6 +352,14 @@ struct frametable_stats {
   size_t short_descrs;
   size_t medium_descrs;
   size_t long_descrs;
+
+  /* Why escaped (non-short) descriptors could not use the short format.
+     [escape_ft_first] is the first descriptor of a frametable, which always
+     escapes. Of the remaining escapes, [escape_reason[ESC_FITS]] are
+     short-compatible and so escaped only for a function / text-section
+     boundary -- the descriptors a cross-function delta chain could reclaim. */
+  size_t escape_ft_first;
+  size_t escape_reason[NUM_ESCAPE_REASONS];
 
   /* Frame sizes */
   size_t small_frames[SMALL_FRAMES];
@@ -512,6 +537,29 @@ static void report_stats(struct frametable_stats *stats)
          stats->short_descrs, stats->medium_descrs, stats->long_descrs,
          stats->return_to_C, stats->with_alloc, stats->with_debug);
 
+  {
+    static const char *const escape_names[NUM_ESCAPE_REASONS] = {
+      "fits (reclaimable boundary escape)",
+      "long",
+      "bad frame size",
+      "bad stack slot",
+      "> 255 stack slots",
+      "non-alloc with registers",
+      "cold register",
+      "> 255 allocations",
+      "alloc size > nibble"
+    };
+    size_t total_escapes = stats->escape_ft_first;
+    for (int i = 0; i < NUM_ESCAPE_REASONS; ++i) {
+      total_escapes += stats->escape_reason[i];
+    }
+    printf("Escaped descriptors: %zu (frametable-first %zu)\n",
+           total_escapes, stats->escape_ft_first);
+    for (int i = 0; i < NUM_ESCAPE_REASONS; ++i) {
+      printf("  %-36s %zu\n", escape_names[i], stats->escape_reason[i]);
+    }
+  }
+
   printf("Max pos retaddr offset %zu\n", stats->max_pos_retaddr_rel);
   report_table("  (logs %s)\n", stats->log_pos_retaddr_rel, MAX_LOG);
   printf("Max neg retaddr offset %zu\n", stats->max_neg_retaddr_rel);
@@ -639,6 +687,63 @@ static void add_slot(size_t byte_ofs, size_t *slots, size_t *max_slot)
   }
 }
 
+/* Is [reg] one of the eight hot registers the short format can encode? */
+
+static bool reg_is_hot(size_t reg)
+{
+  for (int i = 0; i < FRAME_NUM_HOT_REGS; ++i) {
+    if (caml_frame_hot_regs[i] == reg) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/* For an escaped (non-short, non-return-to-C) descriptor, determine why it
+   could not be encoded in the short format, mirroring [short_encoding] in
+   backend/emitaux.ml (same checks, same order). Returns [ESC_FITS] if the
+   content is short-compatible, meaning the descriptor escaped only for a
+   positional reason (first-in-frametable or a function/text-section
+   boundary). */
+
+static enum escape_reason classify_escape(frame_descr *d,
+                                          struct frame_descr_decoded *dec)
+{
+  if (dec->is_long) return ESC_LONG;
+  uint32_t size = dec->frame_size; /* in bytes, flag bits already masked off */
+  if (size == 0 || size > 1024 || (size & 15) != 0) return ESC_BADSIZE;
+
+  size_t nregs = 0, nslots = 0;
+  bool cold_reg = false;
+  const uint16_t *ofp = (const uint16_t *)(d + Frame_live_ofs);
+  for (uint32_t n = dec->num_live; n > 0; n--, ofp++) {
+    uint16_t v = caml_read_unaligned_uint16(ofp);
+    if (v & 1) {
+      ++ nregs;
+      if (!reg_is_hot(v >> 1)) cold_reg = true;
+    } else {
+      ++ nslots;
+      if ((v & (sizeof(value) - 1)) != 0) return ESC_BADSLOT; /* unaligned */
+      if ((size_t)(v / sizeof(value)) > 255) return ESC_BADSLOT;
+    }
+  }
+  if (nslots > 255) return ESC_MANYSLOTS;
+  if (!dec->has_allocs && nregs > 0) return ESC_NOALLOC_REGS;
+  if (cold_reg) return ESC_COLDREG;
+
+  if (dec->has_allocs) {
+    size_t num_allocs = dec->short_num_allocs;
+    if (num_allocs > 255) return ESC_MANYALLOCS;
+    /* Escaped alloc sizes are one byte each (same wosize-1 value the short
+       format would store in a nibble), just past the num_allocs byte. */
+    const unsigned char *sizes = dec->end_of_live + 1;
+    for (size_t i = 0; i < num_allocs; ++i) {
+      if (sizes[i] > 15) return ESC_BIGALLOC;
+    }
+  }
+  return ESC_FITS;
+}
+
 /* Record stats for a single descriptor, given its decoded form, its
    descriptor body pointer, and its absolute return address (as
    reconstructed by the frametable iterator). */
@@ -648,6 +753,7 @@ static void add_descriptor_to_stats(frame_descr *d,
                                     uintnat retaddr,
                                     struct frametable_stats *stats)
 {
+  bool first_in_ft = (stats->descrs == 0);
   ++ stats->descrs;
   if (!stats->min_descr || ((unsigned char*)d < stats->min_descr)) {
     stats->min_descr = (unsigned char*)d;
@@ -691,6 +797,17 @@ static void add_descriptor_to_stats(frame_descr *d,
     if (dec->is_short) ++ stats->short_descrs;
     else if (dec->is_long) ++ stats->long_descrs;
     else ++ stats->medium_descrs;
+
+    /* For escaped descriptors, record why they could not go short. The first
+       descriptor of a frametable always escapes; the rest are classified by
+       whether their content fits (a reclaimable boundary escape) or not. */
+    if (!dec->is_short) {
+      if (first_in_ft) {
+        ++ stats->escape_ft_first;
+      } else {
+        ++ stats->escape_reason[classify_escape(d, dec)];
+      }
+    }
 
     uint32_t sz = dec->frame_size; /* in bytes */
     sz /= sizeof(uintnat);
