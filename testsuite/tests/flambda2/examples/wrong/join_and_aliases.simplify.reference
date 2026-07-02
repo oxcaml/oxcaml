@@ -8,7 +8,7 @@ let $camlJoin_and_aliases__Pmakeblock29 =
 in
 let code f_0 deleted in
 let code loopify(never) size(35) newer_version_of(f_0)
-      f_0_1 (r : [ 0 of imm tagged |1 of val ])
+      f_0_1 (r : [ 0 of imm tagged | 1 of val ])
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =

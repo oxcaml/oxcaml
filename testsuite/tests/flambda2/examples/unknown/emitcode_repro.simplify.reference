@@ -17,7 +17,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(out_0)
 in
 let $camlEmitcode_repro__out_3 = closure out_0_1 @out in
 let code loopify(never) size(50) newer_version_of(emit_instr_1)
-      emit_instr_1_1 (param : [ 0 |1 | 0 of imm tagged |1 of imm tagged ])
+      emit_instr_1_1 (param : [ 0 | 1 | 0 of imm tagged | 1 of imm tagged ])
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : imm tagged local =

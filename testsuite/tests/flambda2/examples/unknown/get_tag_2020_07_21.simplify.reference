@@ -1,7 +1,7 @@
 let code of_src_0 deleted in
 let code test_1 deleted in
 let code inline(always) loopify(never) size(5) newer_version_of(of_src_0)
-      of_src_0_1 (param : [ 0 of imm tagged |1 of imm tagged ])
+      of_src_0_1 (param : [ 0 of imm tagged | 1 of imm tagged ])
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
@@ -11,11 +11,12 @@ let code inline(always) loopify(never) size(5) newer_version_of(of_src_0)
 in
 let $camlGet_tag_2020_07_21__of_src_2 = closure of_src_0_1 @of_src in
 let code loopify(never) size(29) newer_version_of(test_1)
-      test_1_1 (src : [ 0 of imm tagged |1 of imm tagged ], f : val, g : val)
+      test_1_1
+        (src : [ 0 of imm tagged | 1 of imm tagged ], f : val, g : val)
         my_closure _region _ghost_region my_depth
         -> k * k1 =
   apply f (0) -> k4 * k1
-    where k4 (param : [ 0 |1 ]) =
+    where k4 (param : [ 0 | 1 ]) =
       let unboxed_field = %untag_imm (param) in
       cont k3 (unboxed_field)
     where k3 (unboxed_field : imm) =

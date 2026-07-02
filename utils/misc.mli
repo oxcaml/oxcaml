@@ -877,6 +877,18 @@ val pp_nested_list :
     always called with [nested:true], indicating that any inner lists are nested
     and need parens. *)
 
+val pp_variant_shape :
+     pp_const:(Format.formatter -> 'const -> unit)
+  -> pp_tag:(Format.formatter -> 'tag -> unit)
+  -> pp_non_const:(Format.formatter -> 'non_const -> unit)
+  -> Format.formatter
+  -> (consts:'const list * non_consts:('tag * 'non_const) list)
+  -> unit
+(** [pp_variant_shape ~pp_tag ~pp_non_const ppf (~consts, ~non_consts)] prints a
+    representation of the general runtime form of a variant, whose value might
+    be either a tag on its own or a tagged block. The output will be something
+    like [[ 0 | 1 | 0 of val | 1 of imm * val ]]. *)
+
 val print_see_manual : int list Format_doc.printer
 (** See manual section *)
 

@@ -1,7 +1,6 @@
 (let
   (f/0 =
-     (function {nlocal = 0} a/0[value<addrarray>]
-       : (consts (0)) (non_consts ([0: ?]))
+     (function {nlocal = 0} a/0[value<addrarray>] : [ 0 | 0 of ? ]
        (array.get[addr indexed by int] a/0 0)))
   (makeblock 0 f/0))
 (data global "camlArray_kind__gc_roots": int 0)

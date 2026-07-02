@@ -2,7 +2,7 @@ let $camlMeet_with_incompatible_kinds__float12 = 0x1.8p+1 in
 let code aux_0 deleted in
 let code f_1 deleted in
 let code inline(always) loopify(never) size(20) newer_version_of(aux_0)
-      aux_0_1 (x : [ 0 of [ 0 of imm tagged * val ] |1 of float ^ 1 ])
+      aux_0_1 (x : [ 0 of [ 0 of imm tagged * val ] | 1 of float ^ 1 ])
         my_closure _region _ghost_region my_depth
         -> k * k1
         : float boxed =
@@ -18,7 +18,7 @@ let code inline(always) loopify(never) size(20) newer_version_of(aux_0)
 in
 let $camlMeet_with_incompatible_kinds__aux_2 = closure aux_0_1 @aux in
 let code loopify(never) size(10) newer_version_of(f_1)
-      f_1_1 (x : [ 0 of [ 0 of imm tagged * val ] |1 of float ^ 1 ])
+      f_1_1 (x : [ 0 of [ 0 of imm tagged * val ] | 1 of float ^ 1 ])
         my_closure _region _ghost_region my_depth
         -> k * k1
         : [ 0 of float boxed * imm tagged ] =

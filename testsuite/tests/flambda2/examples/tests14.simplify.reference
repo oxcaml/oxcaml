@@ -34,7 +34,7 @@ let $camlTests14__needs_try_region_6 =
   closure needs_try_region_2_1 @needs_try_region
 in
 let code loopify(never) size(12) newer_version_of(gadt_match_3)
-      gadt_match_3_1 (x : [ 0 |1 | 0 of imm tagged ], n : val)
+      gadt_match_3_1 (x : [ 0 | 1 | 0 of imm tagged ], n : val)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : val =

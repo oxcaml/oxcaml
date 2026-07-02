@@ -39,7 +39,3 @@ val locality_mode : formatter -> locality_mode -> unit
 val array_kind : array_kind -> string
 val array_set_kind : formatter -> array_set_kind -> unit
 val array_ref_kind : formatter -> array_ref_kind -> unit
-
-val tag_and_constructor_shape :
-  (formatter -> value_kind -> unit) ->
-  formatter -> int * constructor_shape -> unit

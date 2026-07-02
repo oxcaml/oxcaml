@@ -38,7 +38,7 @@ let code loopify(never) size(64) newer_version_of(foobar_0)
       let bar2 = closure bar2_1_1 @bar2 with { x_1 = x; z = z } in
       let Pmakeblock = %block.[`1`] (bar2) in
       cont k2 (Pmakeblock)
-    where k2 (f : [ 0 of val |1 of val ]) =
+    where k2 (f : [ 0 of val | 1 of val ]) =
       let Pfield = %block_load.[`0`] (f) in
       apply Pfield (x) -> k * k1
 in

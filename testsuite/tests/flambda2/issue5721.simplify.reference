@@ -1,6 +1,6 @@
 let code main_0 deleted in
 let code loopify(never) size(33) newer_version_of(main_0)
-      main_0_1 (f : val, x : [ 0 |1 | 0 of val ])
+      main_0_1 (f : val, x : [ 0 | 1 | 0 of val ])
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =

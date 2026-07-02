@@ -1,5 +1,5 @@
 (let code size(21)
-       extract_int_0 (x : [ 0 |1 | 0 of imm tagged |1 of imm tagged ])
+       extract_int_0 (x : [ 0 | 1 | 0 of imm tagged | 1 of imm tagged ])
          my_closure _region _ghost_region my_depth
          -> k1 * k2
          : imm tagged =
@@ -21,7 +21,7 @@
  let $camlGadt_simplified_switch__immstring21 = "A" in
  let $camlGadt_simplified_switch__immstring23 = "B" in
  let code size(11)
-       extract_string_1 (x : [ 0 |1 | 0 of imm tagged |1 of imm tagged ])
+       extract_string_1 (x : [ 0 | 1 | 0 of imm tagged | 1 of imm tagged ])
          my_closure _region _ghost_region my_depth
          -> k1 * k2
          : val =

@@ -30,14 +30,14 @@ let code div_4 deleted in
 let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
       inv_borne_sup_1_1
         (b :
-           [ 0 |1 | 0 of [ 0 of imm tagged * imm tagged ]
-           |1 of [ 0 of imm tagged * imm tagged ] ],
+           [ 0 | 1 | 0 of [ 0 of imm tagged * imm tagged ]
+           | 1 of [ 0 of imm tagged * imm tagged ] ],
          is_int,
          other)
         my_closure _region _ghost_region my_depth
         -> k * k1
-        : [ 0 |1 | 0 of [ 0 of imm tagged * imm tagged ]
-          |1 of [ 0 of imm tagged * imm tagged ] ] =
+        : [ 0 | 1 | 0 of [ 0 of imm tagged * imm tagged ]
+          | 1 of [ 0 of imm tagged * imm tagged ] ] =
   let prim = %is_int (b) in
   switch prim
     | 0 -> k2
@@ -53,7 +53,7 @@ let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
         let Popaque = %opaque (0) in
         let Pobj_magic = %opaque (Popaque) in
         apply Pobj_magic (Pfield_1) -> k3 * k1
-          where k3 (param : [ 0 |1 ]) =
+          where k3 (param : [ 0 | 1 ]) =
             let unboxed_field = %untag_imm (param) in
             cont k2 (unboxed_field))
          where k2 (unboxed_field : imm) =
@@ -87,25 +87,25 @@ let $camlAlt_ergo__inv_borne_sup_6 = closure inv_borne_sup_1_1 @inv_borne_sup
 in
 let code loopify(never) size(14) newer_version_of(inv_bornes_2)
       inv_bornes_2_1
-        (param : [ 0 of val * [ 0 |1 | 0 of val |1 of val ] ], is_int)
+        (param : [ 0 of val * [ 0 | 1 | 0 of val | 1 of val ] ], is_int)
         my_closure _region _ghost_region my_depth
         -> k * k1
-        : [ 0 of [ 0 |1 | 0 of val |1 of val ] *
-              [ 0 |1 | 0 of val |1 of val ] ] =
+        : [ 0 of [ 0 | 1 | 0 of val | 1 of val ] *
+              [ 0 | 1 | 0 of val | 1 of val ] ] =
   let u = %block_load.[`1`] (param) in
   (let Pfield = %block_load.[`0`] (param) in
    apply direct(inv_borne_sup_1_1)
      ($camlAlt_ergo__inv_borne_sup_6
       : _ ->
-        [ 0 |1 | 0 of [ 0 of imm tagged * imm tagged ]
-        |1 of [ 0 of imm tagged * imm tagged ] ]
+        [ 0 | 1 | 0 of [ 0 of imm tagged * imm tagged ]
+        | 1 of [ 0 of imm tagged * imm tagged ] ]
       )
        (u, is_int, Pfield)
        -> k2 * k1)
     where k2
             (apply_result :
-               [ 0 |1 | 0 of [ 0 of imm tagged * imm tagged ]
-               |1 of [ 0 of imm tagged * imm tagged ] ]) =
+               [ 0 | 1 | 0 of [ 0 of imm tagged * imm tagged ]
+               | 1 of [ 0 of imm tagged * imm tagged ] ]) =
       let Pmakeblock = %block.[`0`] (apply_result, u) in
       cont k (Pmakeblock)
 in
@@ -133,15 +133,15 @@ let code loopify(never) size(45) newer_version_of(inv_3) tupled
              apply direct(inv_bornes_2_1)
                ($camlAlt_ergo__inv_bornes_7
                 : _ ->
-                  [ 0 of [ 0 |1 | 0 of val |1 of val ] *
-                      [ 0 |1 | 0 of val |1 of val ] ]
+                  [ 0 of [ 0 | 1 | 0 of val | 1 of val ] *
+                      [ 0 | 1 | 0 of val | 1 of val ] ]
                 )
                  (Pmakeblock, param_1)
                  -> k2 * k1)
               where k2
                       (apply_result :
-                         [ 0 of [ 0 |1 | 0 of val |1 of val ] *
-                             [ 0 |1 | 0 of val |1 of val ] ]) =
+                         [ 0 of [ 0 | 1 | 0 of val | 1 of val ] *
+                             [ 0 | 1 | 0 of val | 1 of val ] ]) =
                 let Pmakeblock = %block.[`0`] (apply_result, 0) in
                 cont k (Pmakeblock)))
 in

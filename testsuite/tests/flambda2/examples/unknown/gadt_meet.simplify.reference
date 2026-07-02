@@ -23,12 +23,12 @@ let code inline(never) loopify(never) size(1) newer_version_of(f_1)
       f_1_1 (param : imm tagged)
         my_closure _region _ghost_region my_depth
         -> k * k1
-        : [ 0 of [ 0 of imm tagged ] |1 of imm tagged ] =
+        : [ 0 of [ 0 of imm tagged ] | 1 of imm tagged ] =
   cont k ($camlGadt_meet__const_block20)
 in
 let $camlGadt_meet__f_6 = closure f_1_1 @f in
 let code loopify(never) size(2) newer_version_of(get_2)
-      get_2_1 (t : [ 0 of [ 0 of imm tagged ] |1 of imm tagged ])
+      get_2_1 (t : [ 0 of [ 0 of imm tagged ] | 1 of imm tagged ])
         my_closure _region _ghost_region my_depth
         -> k * k1
         : [ 0 of imm tagged ] =
@@ -42,11 +42,11 @@ let code loopify(never) size(44) newer_version_of(test_3)
         -> k * k1
         : [ 0 | 0 of val ] =
   apply direct(f_1_1)
-    ($camlGadt_meet__f_6 : _ -> [ 0 of [ 0 of imm tagged ] |1 of imm tagged ]
-     )
+    ($camlGadt_meet__f_6
+     : _ -> [ 0 of [ 0 of imm tagged ] | 1 of imm tagged ])
       (0)
       -> k2 * k1
-    where k2 (op : [ 0 of [ 0 of imm tagged ] |1 of imm tagged ]) =
+    where k2 (op : [ 0 of [ 0 of imm tagged ] | 1 of imm tagged ]) =
       let Pfield = %block_load.[`0`] (op) in
       (apply direct(with_y_0_1)
          ($camlGadt_meet__with_y_5 : _ -> [ 0 of imm tagged ])
@@ -75,7 +75,7 @@ let code loopify(never) size(17) newer_version_of(foo_4)
       foo_4_1 (param : imm tagged)
         my_closure _region _ghost_region my_depth
         -> k * k1
-        : [ 0 of imm tagged * [ 0 of val |1 of imm tagged ] ] =
+        : [ 0 of imm tagged * [ 0 of val | 1 of imm tagged ] ] =
   apply direct(test_3_1)
     ($camlGadt_meet__test_8 : _ -> [ 0 | 0 of val ]) (0) -> k2 * k1
     where k2 (`*match*` : [ 0 | 0 of val ]) =

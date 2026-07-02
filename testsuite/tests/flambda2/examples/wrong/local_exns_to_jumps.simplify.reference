@@ -28,7 +28,7 @@ apply ccall noalloc
                   | 1 -> k4
                   where k4 =
                     (apply g (r_294_unboxed0) -> k6 * k2
-                       where k6 (param : [ 0 |1 ]) =
+                       where k6 (param : [ 0 | 1 ]) =
                          let unboxed_field = %untag_imm (param) in
                          cont k5 (unboxed_field)
                        where k5 (unboxed_field : imm) =
@@ -71,7 +71,7 @@ apply ccall noalloc
                    where k7 =
                      let r_299_unboxed0_1 = r_299_unboxed0 in
                      (apply g (r_299_unboxed0) -> k8 * k6
-                        where k8 (param : [ 0 |1 ]) =
+                        where k8 (param : [ 0 | 1 ]) =
                           let unboxed_field = %untag_imm (param) in
                           cont k7 (unboxed_field)
                         where k7 (unboxed_field : imm) =
@@ -118,7 +118,7 @@ apply ccall noalloc
                    where k7 =
                      let r_304_unboxed0_1 = r_304_unboxed0 in
                      (apply g (r_304_unboxed0) -> k8 * k6
-                        where k8 (param : [ 0 |1 ]) =
+                        where k8 (param : [ 0 | 1 ]) =
                           let unboxed_field = %untag_imm (param) in
                           cont k7 (unboxed_field)
                         where k7 (unboxed_field : imm) =
@@ -172,7 +172,7 @@ apply ccall noalloc
                         where k7 =
                           let r_310_unboxed0_1 = r_310_unboxed0 in
                           (apply g (r_310_unboxed0) -> k8 * k6
-                             where k8 (param : [ 0 |1 ]) =
+                             where k8 (param : [ 0 | 1 ]) =
                                let unboxed_field = %untag_imm (param) in
                                cont k7 (unboxed_field)
                              where k7 (unboxed_field : imm) =
