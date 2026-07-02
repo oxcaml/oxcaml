@@ -962,12 +962,19 @@ module Base_and_axes = struct
       | Kconstr _ -> true
     in
     let mod_bounds_with_ambient =
-      Mod_bounds.join_axis_lattice t.mod_bounds ambient_bounds
+      (* The short-circuit keeps the common exact-normalization case
+         allocation-free: normalization is on a very hot path. *)
+      if Axis_lattice.equal ambient_bounds Axis_lattice.bot
+      then t.mod_bounds
+      else Mod_bounds.join_axis_lattice t.mod_bounds ambient_bounds
     in
     (* handle a few common cases first, before doing anything else *)
     match t with
     | { with_bounds = No_with_bounds; _ } as t ->
-      { t with mod_bounds = mod_bounds_with_ambient }, Sufficient_fuel
+      ( (if mod_bounds_with_ambient == t.mod_bounds
+         then t
+         else { t with mod_bounds = mod_bounds_with_ambient }),
+        Sufficient_fuel )
     | { with_bounds = With_bounds tys; _ } as t
       when Axis_lattice.equal ambient_bounds Axis_lattice.top
            || With_bounds_types.is_empty tys ->
@@ -978,8 +985,7 @@ module Base_and_axes = struct
         Sufficient_fuel )
     | _
       when (not t_has_abstract_base)
-           && Mod_bounds.is_max_within_mask mod_bounds_with_ambient
-                Axis_lattice.top ->
+           && Mod_bounds.is_max mod_bounds_with_ambient ->
       ( { t with
           mod_bounds = mod_bounds_with_ambient;
           with_bounds = No_with_bounds
@@ -1262,9 +1268,7 @@ module Base_and_axes = struct
           let relevant_bounds_for_ty =
             let from_ti =
               if t_has_abstract_base
-              then
-                Bounds_mask.residual ti.relevant_bounds
-                  (Bounds_mask.meet ambient_bounds ti.relevant_bounds)
+              then Bounds_mask.residual ti.relevant_bounds ambient_bounds
               else
                 Bounds_mask.residual ti.relevant_bounds
                   (Mod_bounds.saturated_mask bounds_so_far ti.relevant_bounds)
@@ -1509,8 +1513,12 @@ module Jkind_desc = struct
         Sub_result.Less
       | _ -> Sub_result.combine bases (Sub_result.Not_le [With_bounds_on_left]))
 
-  let sub (type l r) ~type_equal:_ ~context env ~sub_previously_ran_out_of_fuel
-      (sub : (allowed * r) jkind_desc) (super : (l * allowed) jkind_desc) =
+  (* When [exact], the ambient-bounds optimization is skipped so that the
+     result reliably distinguishes [Less] from [Equal]; otherwise a result of
+     [Equal] may really be [Less]. *)
+  let sub (type l r) ~type_equal:_ ~context ?(exact = false) env
+      ~sub_previously_ran_out_of_fuel (sub : (allowed * r) jkind_desc)
+      (super : (l * allowed) jkind_desc) =
     let super =
       (* The [ambient_bounds_on_right] optimization just below generalizes the
          old [axes_max_on_right] optimization, which was massively important for
@@ -1526,14 +1534,17 @@ module Jkind_desc = struct
       Base_and_axes.fully_expand_aliases env super
     in
     let ambient_bounds_on_right =
-      (* Optimization: direct bounds on the right are already part of the final
-         comparison, so normalization of the left can avoid computing
-         contributions below those bounds. But we can only do this optimization
-         for a concrete base, as an abstract base may later be filled in with
-         lower bounds. *)
+      (* Optimization: direct bounds on the right are already part of the
+         final comparison ([join l s <= s] iff [l <= s]), so normalization of
+         the left can avoid computing contributions below those bounds. We
+         can't do this for an abstract base: there, even a max direct bound
+         doesn't make an axis trivially satisfied, since the abstract base
+         may later be filled in with lower bounds (and a bare kind
+         constructor has max direct bounds). Compare with the abstract-base
+         case in [sub_jkind_l]. *)
       match super.base with
-      | Layout _ -> Mod_bounds.to_axis_lattice super.mod_bounds
-      | Kconstr _ -> Axis_lattice.bot
+      | Layout _ when not exact -> Mod_bounds.to_axis_lattice super.mod_bounds
+      | Layout _ | Kconstr _ -> Axis_lattice.bot
     in
     let sub, _ =
       Base_and_axes.normalize ~ambient_bounds:ambient_bounds_on_right
@@ -2652,11 +2663,11 @@ let get_mod_bounds (type l r) ~context ~ambient_bounds env (jk : (l * r) jkind)
     Misc.fatal_error
       "Jkind.get_mod_bounds: violated Ignore_best normalize invariant."
 
+let all_nonmodal_axes = Axis_lattice.of_axis_set Axis_set.all_nonmodal_axes
+
 let get_mode_crossing (type l r) ~context env (jk : (l * r) jkind) =
   let mod_bounds =
-    get_mod_bounds ~context
-      ~ambient_bounds:(Axis_lattice.of_axis_set Axis_set.all_nonmodal_axes)
-      env jk
+    get_mod_bounds ~context ~ambient_bounds:all_nonmodal_axes env jk
   in
   Mod_bounds.crossing mod_bounds
 
@@ -2665,14 +2676,11 @@ let to_unsafe_mode_crossing jkind =
     unsafe_with_bounds = jkind.jkind.with_bounds
   }
 
-let all_except_externality =
-  Axis_set.singleton (Nonmodal Externality) |> Axis_set.complement
+let all_except_externality = Axis_lattice.of_axis_set Axis_set.all_modal_axes
 
 let get_externality_upper_bound ~context env jk =
   let mod_bounds =
-    get_mod_bounds ~context
-      ~ambient_bounds:(Axis_lattice.of_axis_set all_except_externality)
-      env jk
+    get_mod_bounds ~context ~ambient_bounds:all_except_externality env jk
   in
   Mod_bounds.get mod_bounds ~axis:(Nonmodal Externality)
 
@@ -3701,8 +3709,8 @@ let combine_histories ~type_equal ~context env reason (Pack_jkind k1)
     in
     let choose_subjkind_history k_a history_a roofdn_a k_b history_b =
       match
-        Jkind_desc.sub ~type_equal ~sub_previously_ran_out_of_fuel:roofdn_a
-          ~context env k_a k_b
+        Jkind_desc.sub ~type_equal ~exact:true
+          ~sub_previously_ran_out_of_fuel:roofdn_a ~context env k_a k_b
       with
       | Less -> history_a
       | Not_le _ ->
@@ -3871,9 +3879,9 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) env sub super
     let ambient_bounds_on_right =
       (* Direct bounds on the right are already part of the final comparison,
          so normalization of the left can avoid computing contributions below
-         those bounds. For an abstract base, only preserve the old optimization
-         for axes that are fully max on the right.
-      *)
+         those bounds. Unlike in [Jkind_desc.sub], [best_super] here is
+         [Require_best]-normalized, and we preserve the old optimization for
+         an abstract base: skip axes whose bound is fully max on the right. *)
       match best_super.base with
       | Layout _ -> Mod_bounds.to_axis_lattice best_super.mod_bounds
       | Kconstr _ ->

@@ -950,43 +950,6 @@ module Jkind0 = struct
     let[@inline] set_crossing crossing t = { t with crossing }
     let[@inline] set_externality externality t = { t with externality }
 
-    let[@inline] set_max_in_set t max_axes =
-      let open Jkind_axis.Axis_set in
-      let[@inline] modal ax =
-        if mem max_axes (Modal ax)
-        then (Crossing.Per_axis.max [@inlined hint]) ax
-        else modal ax t
-      in
-      (* a little optimization *)
-      if is_empty max_axes then t else
-      let regionality = modal areality in
-      let linearity = modal linearity in
-      let uniqueness = modal uniqueness in
-      let portability = modal portability in
-      let contention = modal contention in
-      let forkable = modal forkable in
-      let yielding = modal yielding in
-      let statefulness = modal statefulness in
-      let visibility = modal visibility in
-      let staticity = modal staticity in
-      let externality =
-        if mem max_axes (Nonmodal Externality)
-        then Externality.max
-        else t.externality
-      in
-      let monadic =
-        Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
-      in
-      let comonadic =
-        Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
-          ~forkable ~statefulness
-      in
-      let crossing : Mode.Crossing.t = { monadic; comonadic } in
-      {
-        crossing;
-        externality;
-      }
-
     let[@inline] set_min_in_set t min_axes =
       let open Jkind_axis.Axis_set in
       let modal ax =
