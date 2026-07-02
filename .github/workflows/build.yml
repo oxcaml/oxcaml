@@ -47,6 +47,11 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             sysdeps: gdb
 
+          - name: no-flat-float-array (x86_64-linux)
+            config: --disable-flat-float-array
+            os: warp-ubuntu-latest-x64-8x
+            sysdeps: gdb
+
           # We use a custom install prefix for this workflow.
           # Consider renaming it to indicate as such when convenient.
           - name: dev (x86_64-linux)
@@ -76,7 +81,7 @@ jobs:
             build_ocamlparam: '_'
             ocamlparam: '_,O3=1'
             collect_metrics: true
-            disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l'
+            disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml'
 
           - name: Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
             config: --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
@@ -90,7 +95,7 @@ jobs:
             #   effects/preemptible_fibers.ml
             #   effects/preemption/*
             #   frame-pointers/* (apart from exceptions.ml which was new in 5.4, but is sensitive to inlining)
-            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/backtrace/backtrace_effects_nested.ml testsuite/tests/backtrace/print_location.ml testsuite/tests/effects/preemptible_fibers.ml testsuite/tests/effects/preemption/basic.ml testsuite/tests/effects/preemption/basic2.ml testsuite/tests/effects/preemption/gc_in_handler.ml testsuite/tests/effects/preemption/lazy_values.ml testsuite/tests/effects/preemption/live_across_preemption1.ml testsuite/tests/effects/preemption/live_across_preemption2.ml testsuite/tests/effects/preemption/multiple_live_continuations.ml testsuite/tests/effects/preemption/resume_after_alloc.ml testsuite/tests/effects/preemption/shallow_handlers.ml testsuite/tests/effects/preemption/stored_continuation.ml testsuite/tests/effects/preemption/weak_references.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml testsuite/tests/reaper/* testsuite/tests/flambda2/n_way_join_null.ml testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/issue5721.ml testsuite/tests/flambda2/stdlib_functor_inlining.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/flambda2/gadt_simplified_switch.ml testsuite/tests/flambda2/simplify/* testsuite/tests/frame-pointers/c_call.ml testsuite/tests/frame-pointers/effects.ml testsuite/tests/frame-pointers/exceptions.ml testsuite/tests/frame-pointers/reperform.ml testsuite/tests/frame-pointers/stack_realloc.ml testsuite/tests/frame-pointers/stack_realloc2.ml testsuite/tests/quotation/eval/current_unit/eval_before_init_ok.ml testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/array_element_kind_meet.ml'
+            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/backtrace/backtrace_effects_nested.ml testsuite/tests/backtrace/print_location.ml testsuite/tests/effects/preemptible_fibers.ml testsuite/tests/effects/preemption/basic.ml testsuite/tests/effects/preemption/basic2.ml testsuite/tests/effects/preemption/gc_in_handler.ml testsuite/tests/effects/preemption/lazy_values.ml testsuite/tests/effects/preemption/live_across_preemption1.ml testsuite/tests/effects/preemption/live_across_preemption2.ml testsuite/tests/effects/preemption/multiple_live_continuations.ml testsuite/tests/effects/preemption/resume_after_alloc.ml testsuite/tests/effects/preemption/shallow_handlers.ml testsuite/tests/effects/preemption/stored_continuation.ml testsuite/tests/effects/preemption/weak_references.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml testsuite/tests/reaper/* testsuite/tests/flambda2/n_way_join_null.ml testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/issue5721.ml testsuite/tests/flambda2/stdlib_functor_inlining.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/flambda2/gadt_simplified_switch.ml testsuite/tests/flambda2/simplify/* testsuite/tests/frame-pointers/c_call.ml testsuite/tests/frame-pointers/effects.ml testsuite/tests/frame-pointers/exceptions.ml testsuite/tests/frame-pointers/reperform.ml testsuite/tests/frame-pointers/stack_realloc.ml testsuite/tests/frame-pointers/stack_realloc2.ml testsuite/tests/quotation/eval/current_unit/eval_before_init_ok.ml testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/array_element_kind_meet.ml testsuite/tests/tool-ocamlfilt/e2e_[ios]*.ml'
 
           - name: regalloc (aarch64-darwin)
             config: --disable-warn-error
@@ -162,6 +167,13 @@ jobs:
             check_arch: true
             sysdeps: gdb
 
+          - name: experimental-optimizations (x86_64-linux)
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: "_,w=-46,experimental-optimizations-optimize=1"
+            ocamlparam: "_,w=-46,experimental-optimizations-optimize=1"
+            check_arch: true
+            sysdeps: gdb
+
           - name: address-sanitizer (x86_64-linux)
             config: --enable-address-sanitizer
             os: warp-ubuntu-latest-x64-8x
@@ -203,14 +215,14 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'reaper=1,_'
             ocamlparam: 'reaper=1,_'
-            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml'
+            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml testsuite/tests/tool-ocamlfilt/e2e_ocaml.ml'
             sysdeps: gdb
 
           - name: reaper with local value slots
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'reaper=1,reaper-local-fields=1,_'
             ocamlparam: 'reaper=1,reaper-local-fields=1,_'
-            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml testsuite/tests/flambda2/examples/unknown/bigarrays.ml testsuite/tests/flambda2/examples/unknown/test_cmx_offsets2.ml'
+            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml testsuite/tests/flambda2/examples/unknown/bigarrays.ml testsuite/tests/flambda2/examples/unknown/test_cmx_offsets2.ml testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml'
             sysdeps: gdb
 
           # Same as for the reaper, some tests rely on being able to enable or disable

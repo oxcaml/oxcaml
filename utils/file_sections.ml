@@ -38,8 +38,10 @@ type t =
         sections : section array
       }
   | In_memory of Obj.t array
-  | Cat of int * t * t
-(* For efficient concatenation *)
+
+module Idx = struct
+  type t = int
+end
 
 let create section_toc file channel ~first_section_offset =
   if Array.length section_toc = 0
@@ -61,7 +63,6 @@ let empty = In_memory [||]
 let length = function
   | From_file { sections; _ } -> Array.length sections
   | In_memory sections -> Array.length sections
-  | Cat (length, _, _) -> length
 
 let read_section sections channel index =
   match sections.(index) with
@@ -73,13 +74,10 @@ let read_section sections channel index =
     sections.(index) <- Loaded section_contents;
     section_contents
 
-let rec unsafe_get t index =
+let unsafe_get t index =
   match t with
   | From_file { sections; channel } -> read_section sections channel index
   | In_memory sections -> sections.(index)
-  | Cat (_, t1, t2) ->
-    let n = length t1 in
-    if index < n then unsafe_get t1 index else unsafe_get t2 (index - n)
 
 let get t index =
   let len = length t in
@@ -90,7 +88,7 @@ let get t index =
       index len;
   unsafe_get t index
 
-let rec unsafe_blit_to_array t dest start_index =
+let unsafe_blit_to_array t dest start_index =
   match t with
   | From_file { sections; channel } ->
     for i = 0 to Array.length sections - 1 do
@@ -98,9 +96,6 @@ let rec unsafe_blit_to_array t dest start_index =
     done
   | In_memory sections ->
     Array.blit sections 0 dest start_index (Array.length sections)
-  | Cat (_, t1, t2) ->
-    unsafe_blit_to_array t1 dest start_index;
-    unsafe_blit_to_array t2 dest (start_index + length t1)
 
 let to_array t =
   let dest = Array.make (length t) (Obj.repr 0) in
@@ -108,8 +103,6 @@ let to_array t =
   dest
 
 let from_array t = In_memory (Array.copy t)
-
-let concat t1 t2 = Cat (length t1 + length t2, t1, t2)
 
 let compute_toc serialized_sections =
   let toc = Array.make (Array.length serialized_sections) 0 in
@@ -127,3 +120,42 @@ let serialize t =
   in
   let toc, total_length = compute_toc serialized_sections in
   serialized_sections, toc, total_length
+
+module Builder = struct
+  type t = Obj.t Dynarray.t
+
+  let create capacity =
+    let sections = Dynarray.create () in
+    Dynarray.ensure_capacity sections capacity;
+    sections
+
+  let of_file_sections file_sections =
+    let length = length file_sections in
+    let t = create length in
+    for i = 0 to length - 1 do
+      Dynarray.add_last t (unsafe_get file_sections i)
+    done;
+    t
+
+  let add t section =
+    let idx = Dynarray.length t in
+    Dynarray.add_last t section;
+    idx
+
+  let add_all t sections =
+    let offset = Dynarray.length t in
+    (match sections with
+    | From_file { sections; channel } ->
+      let num_new_sections = Array.length sections in
+      Dynarray.ensure_extra_capacity t num_new_sections;
+      for i = 0 to num_new_sections - 1 do
+        Dynarray.add_last t (read_section sections channel i)
+      done;
+    | In_memory sections ->
+      Dynarray.append_array t sections);
+    (fun i -> i + offset)
+
+  let build t = In_memory (Dynarray.to_array t)
+
+  let clear t = Dynarray.clear t
+end

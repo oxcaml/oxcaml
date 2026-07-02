@@ -622,7 +622,7 @@ let compile_genfuns ~ppf_dump f =
         compile_phrase ~ppf_dump ph
       | _ -> ())
     (Generic_fns.compile ~cache:false ~shared:true
-       (Generic_fns.Tbl.of_fns (Compilenv.current_unit_infos ()).ui_generic_fns))
+       (Generic_fns.Tbl.of_fns (Compilenv.current_generic_fns ())))
 
 let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
     ~may_reduce_heap ~ppf_dump gen =

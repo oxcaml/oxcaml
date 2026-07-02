@@ -763,7 +763,8 @@ and type_data =
   { tda_declaration : type_declaration;
     tda_descriptions : type_descriptions;
     tda_shape : Shape.t;
-    tda_unboxed_version_descriptions : type_descriptions option }
+    tda_unboxed_version_descriptions : type_descriptions option;
+    tda_hidden : bool }
 
 and module_data =
   { mda_declaration : Subst.Lazy.module_declaration;
@@ -883,7 +884,7 @@ type lookup_error =
         container_class_type : string;
       }
   | Cannot_scrape_alias of Longident.t * Path.t
-  | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
+  | Local_value_used_in_exclave of Mode.Hint.pinpoint_desc
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
@@ -1516,6 +1517,7 @@ let type_of_cstr path = function
           tda_descriptions = Type_record (labels, repr, umc);
           tda_shape = Shape.leaf decl.type_uid;
           tda_unboxed_version_descriptions = None;
+          tda_hidden = false;
         }
       | _ -> assert false
       end
@@ -1559,6 +1561,7 @@ let rec find_type_data path env seen =
       tda_descriptions = Type_abstract (Btype.type_origin decl);
       tda_shape = Shape.leaf decl.type_uid;
       tda_unboxed_version_descriptions = None;
+      tda_hidden = false;
     }
   | exception Not_found -> begin
       match path with
@@ -1682,7 +1685,8 @@ and find_type_unboxed_version_data path env seen =
     tda_declaration;
     tda_descriptions = descrs;
     tda_shape = Shape.leaf tda_declaration.type_uid;
-    tda_unboxed_version_descriptions = None
+    tda_unboxed_version_descriptions = None;
+    tda_hidden = false;
   }
 
 let find_modtype_lazy path env =
@@ -2471,7 +2475,8 @@ let rec components_of_module_maker
               { tda_declaration = final_decl;
                 tda_descriptions = descrs;
                 tda_shape = shape;
-                tda_unboxed_version_descriptions = unboxed_descrs }
+                tda_unboxed_version_descriptions = unboxed_descrs;
+                tda_hidden = false }
             in
             c.comp_types <- NameMap.add (Ident.name id) tda c.comp_types;
             env := store_type_infos ~tda_shape:shape id decl !env
@@ -2721,7 +2726,7 @@ and store_label
   end;
   add_label record_form env lbl_id lbl
 
-and store_type ~check id info shape env =
+and store_type ~check ~hidden id info shape env =
   let loc = info.type_loc in
   if check then
     check_usage loc id info.type_uid
@@ -2770,7 +2775,8 @@ and store_type ~check id info shape env =
     { tda_declaration = info;
       tda_descriptions = descrs;
       tda_shape = shape;
-      tda_unboxed_version_descriptions = unboxed_descrs }
+      tda_unboxed_version_descriptions = unboxed_descrs;
+      tda_hidden = hidden }
   in
   Builtin_attributes.mark_alerts_used info.type_attributes;
   { env with
@@ -2791,6 +2797,7 @@ and store_type_infos ~tda_shape id info env =
       tda_unboxed_version_descriptions =
         Option.map (fun uinfo -> Type_abstract (Btype.type_origin uinfo))
           info.type_unboxed_version;
+      tda_hidden = false;
     }
   in
   { env with
@@ -2962,9 +2969,11 @@ let add_value_lazy ?check ?shape ~mode id desc env =
   let mode = Mode.Value.disallow_right mode in
   store_value ?check ~mode id addr desc shape env
 
-let add_type ~check ?shape id info env =
+let add_type_maybe_hidden ~check ~hidden ?shape id info env =
   let shape = shape_or_leaf info.type_uid shape in
-  store_type ~check id info shape env
+  store_type ~check ~hidden id info shape env
+
+let add_type = add_type_maybe_hidden ~hidden:false
 
 and add_extension ~check ?shape ~rebind id ext env =
   let addr = extension_declaration_address env id ext in
@@ -3057,7 +3066,9 @@ let enter_value ?check ~mode name desc env =
 
 let enter_type ~scope name info env =
   let id = Ident.create_scoped ~scope name in
-  let env = store_type ~check:true id info (Shape.leaf info.type_uid) env in
+  let env =
+    store_type ~check:true ~hidden:false id info (Shape.leaf info.type_uid) env
+  in
   (id, env)
 
 let enter_extension ~scope ~rebind name ext env =
@@ -3375,12 +3386,19 @@ let add_language_extension_types env =
       f (add_type ?shape:None ~check:false) env
     | false -> env
   in
+  let add_or_hide ext lvl f env =
+    let hidden = not (Language_extension.is_at_least ext lvl) in
+    f (add_type_maybe_hidden ?shape:None ~check:false ~hidden) env
+  in
+  (* Small number types are hidden when [Small_numbers] is disabled since they
+     can easily be shimmed and emulated upstream. This could be done for other
+     extension types if desired. *)
   lazy
     Language_extension.(env ()
     |> add SIMD Stable Predef.add_simd_stable_extension_types
     |> add SIMD Beta Predef.add_simd_beta_extension_types
     |> add SIMD Alpha Predef.add_simd_alpha_extension_types
-    |> add Small_numbers Stable Predef.add_small_number_extension_types
+    |> add_or_hide Small_numbers Stable Predef.add_small_number_extension_types
     |> add Small_numbers Beta Predef.add_small_number_beta_extension_types
     |> add Layouts Stable Predef.add_or_null
     |> add Runtime_metaprogramming () Predef.add_runtime_metaprogramming_types)
@@ -3715,9 +3733,7 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
       path, (mode, locks), a
     end
 
-let closure_mode ~loc ~item ~lid
-  {Mode.monadic; comonadic} closure_context comonadic0 =
-  let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
+let closure_mode pp {Mode.monadic; comonadic} closure_context comonadic0 =
   let hint_comonadic : _ Mode.Hint.morph =
     Is_closed_by (Comonadic, {closure = closure_context; closed = pp})
   in
@@ -3733,9 +3749,8 @@ let closure_mode ~loc ~item ~lid
   in
   {Mode.monadic; comonadic}
 
-let const_closure_mode ~loc ~item ~lid {Mode.monadic; comonadic}
+let const_closure_mode pp {Mode.monadic; comonadic}
   closure_context comonadic0 =
-  let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
   Mode.Value.Comonadic.(submode_err pp comonadic
     (of_const ~hint:(Is_used_in closure_context) comonadic0));
   let monadic =
@@ -3746,7 +3761,7 @@ let const_closure_mode ~loc ~item ~lid {Mode.monadic; comonadic}
   in
   {Mode.monadic; comonadic}
 
-let exclave_mode ~errors ~env ~loc ~item ~lid vmode =
+let exclave_mode ~errors ~env ~pp vmode =
   match
   Mode.Regionality.submode
     (Mode.Value.proj_comonadic Areality vmode)
@@ -3754,16 +3769,16 @@ let exclave_mode ~errors ~env ~loc ~item ~lid vmode =
 with
 | Ok () -> vmode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
 | Error _ ->
-    may_lookup_error errors loc env
-      (Local_value_used_in_exclave (item, lid))
+    may_lookup_error errors (fst pp) env
+      (Local_value_used_in_exclave (snd pp))
 
 let region_mode vmode =
   vmode |> Mode.value_to_alloc_r2l |> Mode.alloc_to_value_l2r
 
-let unboxed_type ~errors ~env ~loc ~lid ty =
-  match ty with
+let unboxed_type ~errors ~env ~loc ty_and_lid =
+  match ty_and_lid with
   | None -> ()
-  | Some ty ->
+  | Some (ty, lid) ->
     (* The type is the type of a variable in the environment. It thus is likely
        generic. Despite the fact that instantiated variables work better in
        [constrain_type_jkind] (because they can be assigned more specific
@@ -3776,29 +3791,45 @@ let unboxed_type ~errors ~env ~loc ~lid ty =
     with
     | Ok () -> ()
     | Result.Error err ->
-      may_lookup_error errors loc env (Non_value_used_in_object (lid, ty, err))
+      may_lookup_error errors loc env
+        (Non_value_used_in_object (lid, ty, err))
 
 (** Takes the [mode] and [ty] of a value at definition site, walks through the
     list of locks and constrains [mode] and [ty]. Return the access mode of the
     value allowed by the locks.
 
-    [ty] is optional as the function works on modules and classes as well, for
-    which [ty] should be [None]. *)
-let walk_locks ~errors ~env ~loc ~item ~lid mode ty locks =
+    [ty_and_lid] is the type of the value paired with its identifier; it is
+    [None] when the function is used on modules and classes.
+
+    [pp] is the pinpoint used in errors. *)
+let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
   List.fold_left
     (fun vmode lock ->
       match lock with
       | Region_lock -> region_mode vmode
       | Const_closure_lock (_, closure_context, comonadic) ->
-          const_closure_mode ~loc ~item ~lid vmode closure_context comonadic
+          const_closure_mode pp vmode closure_context comonadic
       | Closure_lock (closure_context, comonadic) ->
-          closure_mode ~loc ~item ~lid vmode closure_context comonadic
+          closure_mode pp vmode closure_context comonadic
       | Exclave_lock ->
-          exclave_mode ~errors ~env ~loc ~item ~lid vmode
+          exclave_mode ~errors ~env ~pp vmode
       | Unboxed_lock ->
-          unboxed_type ~errors ~env ~loc ~lid ty;
+          unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
           vmode
     ) mode locks
+
+(** Registers a use of a construct that is at legacy comonadic modes,
+    constraining every enclosing closure lock as if a legacy value defined at
+    toplevel were used at the pinpoint's location. Used for constructs (e.g.
+    effect handlers) that force enclosing functions to be nonportable and
+    stateful. *)
+let walk_locks_for_legacy_construct ~env pp =
+  let locks = IdTbl.get_all_locks env.values in
+  let _stage_locks, locks = partition_locks locks in
+  ignore
+    (walk_locks ~errors:true ~env ~pp
+       (Mode.Value.disallow_right Mode.Value.legacy) None locks
+      : Mode.Value.l)
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
   and [locks] which is the locks between the declaration and the usage (either
@@ -3858,12 +3889,12 @@ let lookup_ident_value ~errors ~use ~loc name env =
 
 let lookup_ident_type ~errors ~use ~loc s env =
   match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.types with
-  | Ok (path, locks, tda) ->
+  | Ok (path, locks, ({ tda_hidden = false; _ } as tda)) ->
       check_cross_quotation ~errors ~loc_use:loc
         ~loc_def:tda.tda_declaration.type_loc env path (Lident s) locks;
       use_type ~use ~loc path tda;
       path, tda
-  | Error _ ->
+  | Ok (_, _, { tda_hidden = true; _ }) | Error _ ->
       may_lookup_error errors loc env (Unbound_type (Lident s))
 
 let lookup_ident_modtype ~errors ~use ~loc s env =
@@ -4127,11 +4158,11 @@ let lookup_dot_type ~errors ~use ~loc l s env =
     lookup_structure_components ~errors ~use l env
   in
   match NameMap.find s.txt comps.comp_types with
-  | tda ->
+  | { tda_hidden = false; _ } as tda ->
       let path = Pdot(p, s.txt) in
       use_type ~use ~loc path tda;
       (path, tda)
-  | exception Not_found ->
+  | { tda_hidden = true; _ } | exception Not_found ->
       may_lookup_error errors loc env (Unbound_type (Ldot(l, s)))
 
 let lookup_dot_modtype ~errors ~use ~loc l s env =
@@ -4529,7 +4560,8 @@ let lookup_class ~errors ~use ~loc lid env =
   in
   let vmode =
     if use then
-      walk_locks ~errors ~loc ~env ~item:Class ~lid clda_mode None locks
+      let pp : Mode.Hint.pinpoint = (loc, Ident {category = Class; lid}) in
+      walk_locks ~errors ~env ~pp clda_mode None locks
     else
       clda_mode
   in
@@ -4677,7 +4709,9 @@ let find_cltype_index id env = find_index_tbl id env.cltypes
 (* Ordinary lookup functions *)
 
 let walk_locks ~env ~loc lid ~item ty (mode, locks) =
-  walk_locks ~errors:true ~loc ~env ~item ~lid mode ty locks
+  let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
+  let ty_and_lid = Option.map (fun ty -> (ty, lid)) ty in
+  walk_locks ~errors:true ~env ~pp mode ty_and_lid locks
 
 let lookup_module_path ?(use=true) ~loc ~load lid env =
   lookup_module_path ~errors:true ~use ~loc ~load lid env
@@ -4918,6 +4952,11 @@ and fold_types f =
   find_all wrap_identity
     (fun env -> env.types) (fun sc -> sc.comp_types)
     (fun k p tda acc -> f k p tda.tda_declaration acc)
+and fold_visible_types f =
+  find_all wrap_identity
+    (fun env -> env.types) (fun sc -> sc.comp_types)
+    (fun k p tda acc ->
+       if tda.tda_hidden then acc else f k p tda.tda_declaration acc)
 and fold_modtypes f =
   find_all wrap_identity
     (fun env -> env.modtypes) (fun sc -> sc.comp_modtypes)
@@ -5064,8 +5103,8 @@ let spellcheck_name extract env name =
 
 let extract_values path env =
   fold_values (fun name _ _ _ acc -> name :: acc) path env []
-let extract_types path env =
-  fold_types (fun name _ _ acc -> name :: acc) path env []
+let extract_visible_types path env =
+  fold_visible_types (fun name _ _ acc -> name :: acc) path env []
 let extract_modules path env =
   fold_modules (fun name _ _ acc -> name :: acc) path env []
 let extract_constructors path env =
@@ -5087,20 +5126,9 @@ let extract_settable_variables env =
        | Val_ivar _ | Val_mut _ -> name :: acc
        | _ -> acc) None env []
 
-let print_lock_item ppf (item, lid) =
-  match (item : Mode.Hint.lock_item) with
-  | Module ->
-      fprintf ppf "The module %a is"
-        quoted_longident lid
-  | Class ->
-      fprintf ppf "%a is a class, and classes are always"
-        quoted_longident lid
-  | Value ->
-      fprintf ppf "The value %a is"
-        quoted_longident lid
-  | Constructor ->
-      fprintf ppf "The constructor %a is"
-        quoted_longident lid
+let print_pinpoint_desc ppf desc =
+  (Mode.print_pinpoint_desc desc |> Option.get)
+    ~definite:true ~capitalize:true ppf
 
 let print_stage ppf stage =
   if stage = 0 then fprintf ppf "outside any quotations"
@@ -5176,7 +5204,7 @@ let report_lookup_error_doc loc env = function
      Location.aligned_error_hint ~loc
        "@{<ralign>Unbound type constructor @}%a"
        quoted_longident lid
-       (spellcheck extract_types env lid)
+       (spellcheck extract_visible_types env lid)
   | Unbound_module lid -> begin
       let main ppf =
         fprintf ppf "@{<ralign>Unbound module @}%a" quoted_longident lid in
@@ -5382,10 +5410,10 @@ let report_lookup_error_doc loc env = function
         "The module %a is an alias for module %a, which %s"
         quoted_longident lid
         (Style.as_inline_code pp_path) p cause
-  | Local_value_used_in_exclave (item, lid) ->
+  | Local_value_used_in_exclave desc ->
       Location.errorf ~loc
-        "%a local, so it cannot be used inside an exclave_"
-        print_lock_item (item, lid)
+        "%a is local, so it cannot be used inside an exclave_"
+        print_pinpoint_desc desc
   | Non_value_used_in_object (lid, typ, err) ->
       Location.errorf ~loc
         "%a must have a type of layout value because it is captured by an \

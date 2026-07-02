@@ -1,0 +1,13 @@
+let code f_0 deleted in
+let code loopify(never) size(1) newer_version_of(f_0)
+      f_0_1 (arr : imm array, i : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (1)
+in
+let $camlCse_immutable_array_load_var_index__f_1 = closure f_0_1 @f in
+let $camlCse_immutable_array_load_var_index =
+  Block 0 ($camlCse_immutable_array_load_var_index__f_1)
+in
+cont done ($camlCse_immutable_array_load_var_index)

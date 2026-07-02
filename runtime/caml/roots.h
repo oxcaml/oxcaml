@@ -38,7 +38,7 @@ CAMLextern void caml_do_roots (
   void* data, caml_domain_state* d, int do_final_val);
 
 /* duplicate typedef (from fiber.h) to resolve circular header file dependency */
-typedef struct dynamic_thread_s *dynamic_thread_t;
+typedef struct dynamic_cache_s *dynamic_cache_t;
 
 CAMLextern void caml_do_local_roots(
   scanning_action f, scanning_action_flags,
@@ -46,7 +46,7 @@ CAMLextern void caml_do_local_roots(
   struct caml__roots_block* local_roots,
   struct stack_info *current_stack,
   value * v_gc_regs,
-  dynamic_thread_t dynamic_bindings);
+  dynamic_cache_t dynamic_bindings);
 
 #endif /* CAML_INTERNALS */
 

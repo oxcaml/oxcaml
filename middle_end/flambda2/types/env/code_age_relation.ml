@@ -32,8 +32,8 @@ let rec has_older_version_in t ~resolver id candidates : _ Or_unknown.t =
   if Code_id.Set.mem id candidates
   then Known true
   else
-    match Code_id.Map.find id t with
-    | exception Not_found -> (
+    match Code_id.Map.find_or_null id t with
+    | Null -> (
       let comp_unit = Code_id.get_compilation_unit id in
       if Compilation_unit.equal comp_unit (Compilation_unit.get_current_exn ())
       then Known false
@@ -46,10 +46,10 @@ let rec has_older_version_in t ~resolver id candidates : _ Or_unknown.t =
         | Some t -> (
           (* Inlining the base case, so that we do not recursively loop in case
              of a code_id that is not bound in the map *)
-          match Code_id.Map.find id t with
-          | exception Not_found -> Known false
-          | older -> has_older_version_in t ~resolver older candidates))
-    | older -> has_older_version_in t ~resolver older candidates
+          match Code_id.Map.find_or_null id t with
+          | Null -> Known false
+          | This older -> has_older_version_in t ~resolver older candidates))
+    | This older -> has_older_version_in t ~resolver older candidates
 
 let meet_set t ~resolver ids1 ids2 : _ Or_bottom.t =
   if Code_id.Set.equal ids1 ids2

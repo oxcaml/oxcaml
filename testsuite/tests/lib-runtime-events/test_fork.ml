@@ -1,11 +1,7 @@
 (* TEST
  {
-   runtime4;
-   skip;
- }{
    include runtime_events;
    include unix;
-   runtime5;
    hasunix;
    not-target-windows;
    {

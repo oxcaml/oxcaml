@@ -226,6 +226,12 @@ let mk_no_cfg_value_propagation_flow f =
     Arg.Unit f,
     " Do not propagate values across block to simplify CFG" )
 
+let mk_experimental_optimizations f =
+  ( "-experimental-optimizations",
+    Arg.Unit f,
+    " Enable a bundle of experimental codegen optimizations that are not yet \
+     on by default (subject to change)" )
+
 let mk_reorder_blocks_random f =
   ( "-reorder-blocks-random",
     Arg.Int f,
@@ -387,7 +393,12 @@ let mk_no_long_frames f =
 let mk_debug_long_frames_threshold f =
   ( "-debug-long-frames-threshold",
     Arg.Int f,
-    "n debug only: set long frames threshold" )
+    "<n>  debug only: set long frames threshold" )
+
+let mk_dbranch_relaxation_max_displacement f =
+  ( "-dbranch-relaxation-max-displacement",
+    Arg.Int f,
+    "<n>  debug only: lower the branch relaxation displacement threshold" )
 
 let mk_caml_apply_inline_fast_path f =
   ( "-caml-apply-inline-fast-path",
@@ -1324,6 +1335,7 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_float : unit -> unit
   val cfg_value_propagation_flow : unit -> unit
   val no_cfg_value_propagation_flow : unit -> unit
+  val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
@@ -1351,6 +1363,7 @@ module type Oxcaml_options = sig
   val long_frames : unit -> unit
   val no_long_frames : unit -> unit
   val long_frames_threshold : int -> unit
+  val dbranch_relaxation_max_displacement : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
   val use_ssa : unit -> unit
   val no_use_ssa : unit -> unit
@@ -1517,6 +1530,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_cfg_value_propagation_float F.no_cfg_value_propagation_float;
       mk_cfg_value_propagation_flow F.cfg_value_propagation_flow;
       mk_no_cfg_value_propagation_flow F.no_cfg_value_propagation_flow;
+      mk_experimental_optimizations F.experimental_optimizations;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_basic_block_sections F.basic_block_sections;
       mk_module_entry_functions_section F.module_entry_functions_section;
@@ -1545,6 +1559,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_long_frames F.long_frames;
       mk_no_long_frames F.no_long_frames;
       mk_debug_long_frames_threshold F.long_frames_threshold;
+      mk_dbranch_relaxation_max_displacement
+        F.dbranch_relaxation_max_displacement;
       mk_caml_apply_inline_fast_path F.caml_apply_inline_fast_path;
       mk_use_ssa F.use_ssa;
       mk_no_use_ssa F.no_use_ssa;
@@ -1864,6 +1880,20 @@ module Oxcaml_options_impl = struct
   let no_cfg_value_propagation_flow =
     clear' Oxcaml_flags.cfg_value_propagation_flow
 
+  (* Bundle of experimental codegen optimizations enabled by
+     [-experimental-optimizations]. *)
+  let experimental_optimizations () =
+    cfg_prologue_shrink_wrap ();
+    cfg_prologue_validate ();
+    x86_peephole_optimize ();
+    regalloc_param "SPLIT_AROUND_LOOPS:on";
+    regalloc_param "AFFINITY:on";
+    regalloc_param "BIT_MATRIX_THRESHOLD:8192";
+    regalloc_param "IRC_INTERF_THRESHOLD:4096";
+    cfg_merge_blocks ();
+    cfg_eliminate_dead_trap_handlers ();
+    cfg_value_propagation_flow ()
+
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
 
@@ -1952,6 +1982,9 @@ module Oxcaml_options_impl = struct
   let long_frames = set' Oxcaml_flags.allow_long_frames
   let no_long_frames = clear' Oxcaml_flags.allow_long_frames
   let long_frames_threshold n = set_long_frames_threshold n
+
+  let dbranch_relaxation_max_displacement n =
+    Oxcaml_flags.branch_relaxation_max_displacement := n
 
   let caml_apply_inline_fast_path =
     set' Oxcaml_flags.caml_apply_inline_fast_path
@@ -2405,6 +2438,8 @@ module Extra_params = struct
                     possible_values)))
     | "regalloc-linscan-threshold" ->
         set_int' Oxcaml_flags.regalloc_linscan_threshold
+    | "dbranch-relaxation-max-displacement" ->
+        set_int' Oxcaml_flags.branch_relaxation_max_displacement
     | "regalloc-param" -> add_string Oxcaml_flags.regalloc_params
     | "regalloc-validate" -> set' Oxcaml_flags.regalloc_validate
     | "vectorize" -> set' Oxcaml_flags.vectorize
@@ -2424,6 +2459,10 @@ module Extra_params = struct
         set' Oxcaml_flags.cfg_value_propagation_float
     | "cfg-value-propagation-flow" ->
         set' Oxcaml_flags.cfg_value_propagation_flow
+    | "experimental-optimizations" ->
+        if Compenv.check_bool ppf name v then
+          Oxcaml_options_impl.experimental_optimizations ();
+        true
     | "dump-inlining-paths" -> set' Oxcaml_flags.dump_inlining_paths
     | "davail" -> set' Oxcaml_flags.davail
     | "dranges" -> set' Oxcaml_flags.dranges

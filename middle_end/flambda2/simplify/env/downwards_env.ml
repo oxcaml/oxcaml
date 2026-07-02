@@ -522,9 +522,9 @@ let mem_code t id =
   Code_id.Map.mem id t.all_code || Exported_code.mem id (t.get_imported_code ())
 
 let find_code_exn t id =
-  match Code_id.Map.find id t.all_code with
-  | code -> Code_or_metadata.create code
-  | exception Not_found ->
+  match Code_id.Map.find_or_null id t.all_code with
+  | This code -> Code_or_metadata.create code
+  | Null ->
     (* We might have already loaded the metadata, from another unit that
        references it. However we force loading of the corresponding .cmx to make
        sure that we will have access to the actual code (assuming the .cmx isn't

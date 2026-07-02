@@ -1183,7 +1183,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Array.iter
           (fun reg ->
             match reg.Reg.typ with
-            | Addr -> assert false
+            | Addr ->
+              Misc.fatal_error
+                "Cfg_selectgen.emit_expr_exit: unexpected machtype_component \
+                 Addr in Ccatch register"
             | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
             | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> ())
           src;

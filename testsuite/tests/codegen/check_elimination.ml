@@ -1,10 +1,6 @@
 (* TEST
  flags += " -O3";
- flags += " -cfg-prologue-shrink-wrap";
- flags += " -x86-peephole-optimize";
- flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
- flags += " -regalloc-param AFFINITY:on -regalloc irc";
- flags += " -cfg-merge-blocks";
+ flags += " -experimental-optimizations";
  only-default-codegen;
  expect.opt;
 *)
@@ -77,9 +73,8 @@ arr_sum:
   ret
 |}]
 
-(* CR ttebbi: The generated control flow branches three (!) times on
-   should_continue. In block 123, we can even statically know that the bit is 1.
-   Additionally, we materialise the should_continue bit. *)
+(* CR ttebbi: The generated control flow branches two times on
+   should_continue. Additionally, we materialise the should_continue bit. *)
 let search ~target (start : int list) =
   let node = ref start in
   while
@@ -99,7 +94,7 @@ search:
   je    .L1
 .L0:
   xorl  %esi, %esi
-  movq  %rbx, %rax
+  movl  $1, %eax
   jmp   .L4
 .L1:
   movq  (%rbx), %rdx
@@ -113,8 +108,7 @@ search:
   jmp   .L4
 .L2:
   movq  %rbx, %rax
-  testq %rsi, %rsi
-  je    .L4
+  jmp   .L4
 .L3:
   movq  %rax, %rbx
   testb $1, %bl

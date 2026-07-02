@@ -272,6 +272,7 @@ let pseudoregs_for_operation op arg res =
   | Specific
       ( Ifar_poll | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf
       | Imulsubf | Inegmulsubf | Isqrtf | Imove32 | Ifar_alloc _
+      | Ifar_stackcheck _
       | Ishiftarith (_, _)
       | Ibswap _ | Isignext _ )
   | Move | Spill | Reload | Pause | Begin_region | End_region | Dls_get

@@ -150,15 +150,14 @@ type t =
   | Unboxing_impossible                     (* 210 *)
   | Mod_by_top of string                    (* 211 *)
   (* 212 taken *)
-  | Modal_axis_specified_twice of
-    { axis : string;
-      overriden_by : string;
-    }                                       (* 213 *)
+  (* 213 was [Modal_axis_specified_twice], now subsumed by
+     [Redundant_modality] (220) *)
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
   | Use_during_borrowing                    (* 216 *)
-  | Useless_lpoly                           (* 217 *)
   | Lpoly_in_letrec                         (* 218 *)
+  | Useless_valpoly                         (* 219 *)
+  | Redundant_modality                      (* 220 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -254,12 +253,12 @@ let number = function
   | Unchecked_zero_alloc_attribute -> 199
   | Unboxing_impossible -> 210
   | Mod_by_top _ -> 211
-  | Modal_axis_specified_twice _ -> 213
   | Atomic_float_record_boxed -> 214
   | Implied_attribute _ -> 215
   | Use_during_borrowing -> 216
-  | Useless_lpoly -> 217
   | Lpoly_in_letrec -> 218
+  | Useless_valpoly -> 219
+  | Redundant_modality -> 220
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -688,6 +687,10 @@ let descriptions = [
     names = ["use-during-borrowing"];
     description = "Use of a value during an active borrow.";
     since = since 5 3 };
+  { number = 220;
+    names = ["redundant-modality"];
+    description = "Modality is redundant with the default.";
+    since = since 5 2 };
 ]
 
 let name_to_number =
@@ -1022,7 +1025,7 @@ let parse_options errflag s =
   alerts
 
 (* If you change these, don't forget to change them in man/ocamlc.m *)
-let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74-183..184"
+let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74"
 let defaults_warn_error = "-a"
 let default_disabled_alerts = [ "unstable"; "unsynchronized_access" ]
 
@@ -1477,8 +1480,7 @@ let message = function
   | Mod_by_top modifier ->
       msg "%s is the top-most modifier.@ \
            Modifying by a top element is a no-op." modifier
-  | Modal_axis_specified_twice {axis; overriden_by} ->
-      msg "This %s is overridden by %s later." axis overriden_by
+  (* 213 was [Modal_axis_specified_twice] *)
   | Atomic_float_record_boxed ->
       msg "This record contains atomic float fields,@ \
            which prevents the float record optimization.@ \
@@ -1490,12 +1492,14 @@ let message = function
         Style.inline_code (Printf.sprintf "[@%s]" implying)
   | Use_during_borrowing ->
       msg "This value is used while being borrowed."
-  | Useless_lpoly ->
-      msg "This binding has no layout variables, so poly_ has no effect. \
-           Consider using a regular let instead."
   | Lpoly_in_letrec ->
       msg "poly_ has no effect in recursive bindings, which do not support \
            layout polymorphism. Consider using a regular let rec instead."
+  | Useless_valpoly ->
+      msg "This value description has no layout-polymorphic type variables,@ \
+      so \"poly_\" has no effect. Consider using a regular \"val\" instead."
+  | Redundant_modality ->
+      msg "This modality is redundant."
 ;;
 
 let nerrors = ref 0

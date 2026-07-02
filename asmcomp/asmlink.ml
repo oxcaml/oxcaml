@@ -42,9 +42,7 @@ type unit_link_info = Linkenv.unit_link_info =
 
 let runtime_lib () =
   let variant =
-    if Config.runtime5 && !Clflags.runtime_variant = "nnp"
-    then ""
-    else !Clflags.runtime_variant
+    if !Clflags.runtime_variant = "nnp" then "" else !Clflags.runtime_variant
   in
   let libname = "libasmrun" ^ variant ^ ext_lib in
   try

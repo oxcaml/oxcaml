@@ -35,6 +35,7 @@ m4_include([build-aux/ax_compare_version.m4])
 
 AC_CONFIG_AUX_DIR([build-aux])
 
+# TODO: Remove this check
 AC_ARG_ENABLE([runtime5], [],
   [AS_IF([test "x$enableval" != 'xyes'],
     [AC_MSG_ERROR(m4_normalize([OxCaml 5.4 does not support runtime4 and must be
@@ -236,8 +237,6 @@ ostype="Unix"
 SO="so"
 toolchain="cc"
 reserved_header_bits=8
-profinfo=true
-profinfo_width=8
 custom_ops_struct_size=64
 instrumented_runtime=false
 instrumented_runtime_libs=""
@@ -272,8 +271,6 @@ AC_ARG_ENABLE([stack_checks],
 
 ## Output variables
 
-AC_SUBST([enable_runtime5], [yes])
-AC_SUBST([runtime_suffix], [])
 AC_SUBST([enable_stack_checks])
 AC_SUBST([enable_oxcaml_dwarf])
 AC_SUBST([enable_syntax_quotations])
@@ -435,8 +432,6 @@ AC_SUBST([install_bytecode_programs])
 AC_SUBST([install_source_artifacts])
 AC_SUBST([install_ocamlnat])
 AC_SUBST([reserved_header_bits])
-AC_SUBST([profinfo])
-AC_SUBST([profinfo_width])
 AC_SUBST([custom_ops_struct_size])
 AC_SUBST([no_partial_inlining_cflags])
 AC_SUBST([frame_pointers])
@@ -488,19 +483,10 @@ AC_CONFIG_FILES([ocamltest/ocamltest_config.ml])
 AC_CONFIG_FILES([otherlibs/dynlink/dynlink_config.ml])
 AC_CONFIG_FILES([utils/config.common.ml])
 AC_CONFIG_FILES([utils/config.generated.ml])
-AC_CONFIG_FILES([tools/eventlog_metadata])
-AS_IF([test "x$enable_runtime5" = "xyes"],
-  [ AC_CONFIG_HEADERS([runtime/caml/m.h])
-    AC_CONFIG_HEADERS([runtime/caml/s.h])
-    AC_CONFIG_HEADERS([runtime/caml/exec.h])
-    AC_CONFIG_HEADERS([runtime/caml/version.h])
-  ],
-  [ AC_CONFIG_HEADERS([runtime4/caml/m.h])
-    AC_CONFIG_HEADERS([runtime4/caml/s.h])
-    AC_CONFIG_HEADERS([runtime4/caml/exec.h])
-    AC_CONFIG_HEADERS([runtime4/caml/version.h])
-  ]
-)
+AC_CONFIG_HEADERS([runtime/caml/m.h])
+AC_CONFIG_HEADERS([runtime/caml/s.h])
+AC_CONFIG_HEADERS([runtime/caml/exec.h])
+AC_CONFIG_HEADERS([runtime/caml/version.h])
 AC_CONFIG_FILES([compilerlibs/META])
 AC_CONFIG_FILES([otherlibs/stdlib_upstream_compatible/META])
 AC_CONFIG_FILES([otherlibs/stdlib_stable/META])
@@ -1119,23 +1105,18 @@ AS_CASE([$target],
   ocamltest_libunix="Some true"
   ocamlyacc_wstr_module=""])
 
-otherlibraries="dynlink"
-otherlibs=""
+otherlibraries="dynlink runtime_events"
+otherlibs="runtime_events"
 optional_libraries="$optional_libraries otherlibs/dynlink/dynlink"
 
 lib_dynlink=true
+lib_runtime_events=true
 dldir=otherlibs/dynlink
 AC_CONFIG_LINKS([
   $dldir/dynlink_cmo_format.mli:file_formats/cmo_format.mli
   $dldir/dynlink_cmxs_format.mli:file_formats/cmxs_format.mli
   $dldir/dynlink_platform_intf.mli:$dldir/dynlink_platform_intf.ml
 ])
-
-AS_IF([test x"$enable_runtime5" = xyes],
-  [otherlibraries="$otherlibraries runtime_events"
-  otherlibs="$otherlibs runtime_events"
-  lib_runtime_events=true],
-  [lib_runtime_events=false])
 
 AS_IF([test x"$enable_unix_lib" != "xno"],
   [enable_unix_lib=yes
@@ -1507,13 +1488,13 @@ AS_IF([test x"$build" = x"$target" -o x"$target_runnable" = xtrue],
         /link /out:\$(1) $oc_exe_ldflags \$(OC_LDFLAGS) \$(LDFLAGS)"])],
     [SAK_BUILD=m4_normalize([
       '$(MKEXE_VIA_CC) $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS)'])])
-  SAK="\$(ROOTDIR)/\$(RUNTIME_DIR)/sak${EXEEXT}"],
+  SAK="\$(ROOTDIR)/runtime/sak${EXEEXT}"],
   [AC_MSG_NOTICE([detecting the C toolchain for build])
   AX_PROG_CC_FOR_BUILD
   # Note that *-pc-windows is not supported for _build_ so we can use '-o'
   SAK_BUILD=m4_normalize(["$CC_FOR_BUILD $LDFLAGS_FOR_BUILD -o \$(1) \$(2)
     $CFLAGS_FOR_BUILD $CPPFLAGS_FOR_BUILD"])
-  SAK="\$(ROOTDIR)/\$(RUNTIME_DIR)/sak${BUILD_EXEEXT}"])
+  SAK="\$(ROOTDIR)/runtime/sak${BUILD_EXEEXT}"])
 
 # sak command to use to encode C literal strings
 
@@ -2764,10 +2745,6 @@ AC_CHECK_HEADER([spawn.h],
   [AC_CHECK_FUNC([posix_spawn],
     [AC_CHECK_FUNC([posix_spawnp], [AC_DEFINE([HAS_POSIX_SPAWN], [1])])])])
 
-## ffs or _BitScanForward
-# CR mshinwell all-runtime5: remove ffs check, it's only needed for runtime4
-AC_CHECK_FUNC([ffs], [AC_DEFINE([HAS_FFS])])
-
 ## pthread_getaffinity_np, args differ from GNU and BSD
 AC_MSG_CHECKING([arguments for pthread_getaffinity_np])
 AC_LINK_IFELSE(
@@ -3039,11 +3016,10 @@ AS_CASE([$enable_systhreads,$enable_unix_lib],
     AC_MSG_NOTICE([the threads library is disabled])],
   [systhread_support=true
   AC_CONFIG_FILES([otherlibs/systhreads/META])
-  AC_CONFIG_FILES([otherlibs/systhreads4/META])
-  otherlibraries="$otherlibraries systhreads${runtime_suffix}"
-  otherlibs="$otherlibs systhreads${runtime_suffix}"
+  otherlibraries="$otherlibraries systhreads"
+  otherlibs="$otherlibs systhreads"
   lib_systhreads=true
-  lib_systhreads_path="systhreads${runtime_suffix}"
+  lib_systhreads_path="systhreads"
   AC_MSG_NOTICE([the threads library is supported])])
 
 ## Does the assembler support debug prefix map and CFI directives
@@ -3130,11 +3106,9 @@ AS_CASE([$name_mangling_scheme],
 ## Check for mmap support for huge pages and contiguous heap
 OCAML_MMAP_SUPPORTS_HUGE_PAGES
 
-# Unconditionally reserve 8 header bits in both runtime 4 and
-# runtime 5, which is required for mixed block support.
+# Unconditionally reserve 8 header bits, which is required for mixed block
+# support.
 AC_DEFINE_UNQUOTED([HEADER_RESERVED_BITS], [$reserved_header_bits])
-AC_DEFINE_UNQUOTED([PROFINFO_WIDTH], [$profinfo_width])
-AS_IF([$profinfo], [AC_DEFINE([WITH_PROFINFO])])
 
 # Only gcc supports -fno-partial-inlining
 AS_CASE([$ocaml_cc_vendor],
@@ -3322,10 +3296,9 @@ AS_IF([test x"$enable_poll_insertion" = "xyes"],
 # Multidomain is permitted without stack checks, you'll just get large
 # non-resizeable fiber stacks.
 AS_IF([test x"$enable_multidomain" = "xyes"],
-  [AS_IF([test x"$enable_runtime5" = "xyes" &&
-          test x"$enable_poll_insertion" = "xyes"],
+  [AS_IF([test x"$enable_poll_insertion" = "xyes"],
     [AC_DEFINE([MULTIDOMAIN]) enable_multidomain=yes],
-    [AC_MSG_ERROR([Creating multiple domains is only supported on runtime5 with \
+    [AC_MSG_ERROR([Creating multiple domains is only supported with \
 poll insertion enabled.])])], [])
 
 AC_SUBST([has_popcnt])

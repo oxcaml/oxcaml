@@ -504,7 +504,6 @@ end
 type 'a expr =
   | Identity of 'a
   | Unknown of K.With_subkind.t
-  | Bottom of K.t
   | Tag_imm of 'a expr
   | Block of
       { is_unique : bool;
@@ -530,7 +529,6 @@ module Expr = struct
     | Identity x -> pp ppf x
     | Unknown kind ->
       Format.fprintf ppf "@[<hv 1>(unknown@ %a)@]" K.With_subkind.print kind
-    | Bottom kind -> Format.fprintf ppf "@[<hv 1>(bottom@ %a)@]" K.print kind
     | Tag_imm expr ->
       Format.fprintf ppf "@[<hv 1>(tag_imm@ %a)@]" (print pp) expr
     | Block _ -> Format.fprintf ppf "@[<hv 1>(block)@]"
@@ -592,8 +590,6 @@ module Expr = struct
   let var var = Identity var
 
   let unknown kind = Unknown (K.With_subkind.anything kind)
-
-  let bottom kind = Bottom kind
 
   let unknown_with_subkind kind = Unknown kind
 
@@ -799,7 +795,6 @@ struct
       | Some ty -> ty
       | None -> Misc.fatal_errorf "Variable is not defined: %a" Var.print var)
     | Unknown kind -> MTC.unknown_with_subkind ~machine_width kind
-    | Bottom kind -> MTC.bottom kind
     | Tag_imm field ->
       TG.tag_immediate (rewrite_expr ~machine_width sigma field)
     | Block { is_unique; tag; shape; alloc_mode; fields } ->

@@ -516,7 +516,7 @@ let option_of_arg_or_omitted arg =
 let mk_constructor_description cstr_name =
   { Data_types.cstr_name;
     cstr_res = Btype.newty2 ~level:0 (mkTvar (Some "a"));
-    cstr_shape = Some Constructor_uniform_value;
+    cstr_shape = Constructor_uniform_value;
     cstr_existentials = [];
     cstr_args = [];
     cstr_arity = 0;
