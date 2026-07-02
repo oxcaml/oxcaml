@@ -683,6 +683,13 @@ let specific_operation_as_affine :
   | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ | Illvm_intrinsic _ ->
     None
 
+(* amd64 has no fused integer multiply-add specific operation ([i * k + c]
+   stays as separate [Imul]/[Iadd], which the SSA affine analyses already
+   handle), so there is nothing to decode here. *)
+let specific_operation_as_muladd :
+    specific_operation -> (int * int * int * bool) option =
+ fun _ -> None
+
 let isomorphic_specific_operation op1 op2 =
   match op1, op2 with
   | Ilea a1, Ilea a2 -> equal_addressing_mode_without_displ a1 a2

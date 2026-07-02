@@ -331,6 +331,17 @@ let specific_operation_as_affine :
   | Isignext _ | Isimd _ | Illvm_intrinsic _ ->
     None
 
+(* [Imuladd] computes [arg.(0) * arg.(1) + arg.(2)] (MADD); [Imulsub] computes
+   [arg.(2) - arg.(0) * arg.(1)] (MSUB), i.e. the product is negated. *)
+let specific_operation_as_muladd :
+    specific_operation -> (int * int * int * bool) option = function
+  | Imuladd -> Some (0, 1, 2, false)
+  | Imulsub -> Some (0, 1, 2, true)
+  | Ishiftarith _ | Ifar_poll | Ifar_alloc _ | Inegmulf | Imuladdf
+  | Inegmuladdf | Imulsubf | Inegmulsubf | Isqrtf | Ibswap _ | Imove32
+  | Isignext _ | Isimd _ | Illvm_intrinsic _ ->
+    None
+
 (* Specific operations that are pure *)
 
 let operation_is_pure : specific_operation -> bool = function

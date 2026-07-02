@@ -74,7 +74,27 @@ module Make (S : Ssa.Finished_graph) = struct
           (fun i c -> acc := Affine.add !acc (Affine.scale c (lin args.(i))))
           coeff;
         !acc
-      | _ -> Affine.var (intern ctx instr))
+      | Some _ | None -> (
+        (* Fused multiply-add/sub: affine when one multiplicand linearizes to a
+           constant [k], giving [±k * other + addend]. Otherwise atomize. *)
+        match Arch.specific_operation_as_muladd spec with
+        | Some (m0, m1, a, negate)
+          when m0 < Array.length args
+               && m1 < Array.length args
+               && a < Array.length args -> (
+          let a0 = lin args.(m0) and a1 = lin args.(m1) in
+          let prod =
+            if Affine.is_const a0
+            then Some (Affine.scale a0.Affine.const a1)
+            else if Affine.is_const a1
+            then Some (Affine.scale a1.Affine.const a0)
+            else None
+          in
+          match prod with
+          | Some p ->
+            Affine.add (if negate then Affine.neg p else p) (lin args.(a))
+          | None -> Affine.var (intern ctx instr))
+        | Some _ | None -> Affine.var (intern ctx instr)))
     | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
     | Stack_check _ | Name_for_debugger _ ->
       Affine.var (intern ctx instr)
@@ -111,13 +131,28 @@ module Make (S : Ssa.Finished_graph) = struct
       if not (S.Block.equal idom block)
       then begin
         (match idom.terminator with
-        | Branch { cond; ifso; ifnot } -> (
-          let on_true = S.Block.dominates ifso target in
-          let on_false = S.Block.dominates ifnot target in
-          match on_true, on_false with
-          | true, false -> acc := cond_facts ctx side ~negate:false cond @ !acc
-          | false, true -> acc := cond_facts ctx side ~negate:true cond @ !acc
-          | true, true | false, false -> ())
+        | Branch { cond; ifso; ifnot } ->
+          (* [cond] (or its negation) is a fact at [target] only if the taken
+             edge [idom -> ifso] (resp. [idom -> ifnot]) *dominates* [target] --
+             i.e. every path from entry to [target] traverses that specific
+             edge. Block-dominance of [ifso] is not enough: control can reach
+             [ifso] via the other edge when it reconverges, so the guard need
+             not have held. We use the standard sufficient condition: the
+             successor is dominated (so all paths to [target] pass through it)
+             *and* its only predecessor is [idom] (so the only way into it is
+             the taken edge). *)
+          let edge_dominates (succ : S.Block.t) =
+            S.Block.dominates succ target
+            &&
+            match S.Block.predecessors succ with
+            | [p] -> S.Block.equal p idom
+            | [] | _ :: _ :: _ -> false
+          in
+          if edge_dominates ifso
+          then acc := cond_facts ctx side ~negate:false cond @ !acc
+          else if edge_dominates ifnot
+          then acc := cond_facts ctx side ~negate:true cond @ !acc
+          else ()
         | Goto _ | Switch _ | Return _ | Raise _ | Tailcall_self _
         | Tailcall_func _ | Call _ | Invalid _ ->
           ());

@@ -120,7 +120,25 @@ module Make (S : Ssa.Finished_graph) = struct
               | _ -> acc := None)
             coeffs;
           !acc
-        | _ -> None)
+        | Some _ | None -> (
+          (* Fused multiply-add/sub (e.g. arm64 [madd]/[msub]): affine only when
+             one multiplicand is a compile-time constant [k], in which case the
+             IV coefficient is [±k * coeff(other) + coeff(addend)]. *)
+          match Arch.specific_operation_as_muladd spec with
+          | Some (m0, m1, a, negate)
+            when m0 < Array.length args
+                 && m1 < Array.length args
+                 && a < Array.length args ->
+            let prod =
+              match const_int args.(m0), const_int args.(m1) with
+              | Some k, _ -> Option.map (fun c -> k * c) (recur args.(m1))
+              | None, Some k -> Option.map (fun c -> k * c) (recur args.(m0))
+              | None, None -> None
+            in
+            let* pc = prod in
+            let* ac = recur args.(a) in
+            Some ((if negate then -pc else pc) + ac)
+          | Some _ | None -> None))
       | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
       | Stack_check _ | Name_for_debugger _ ->
         None
@@ -350,11 +368,31 @@ module Reducer (C : Ssa_reducer.Context) = struct
       in
       r.new_index, clone r ~i_init c r.derived
     | Incr r ->
-      ( r.new_index,
-        C.emit_op c
-          ~op:Operation.(Intop_imm (Iadd, r.step_delta))
-          ~typ:r.typ ~dbg:r.derived_dbg
-          ~args:[| new_param r |] )
+      let arg = new_param r in
+      (* The per-iteration increment is [step_delta]. Instruction selection only
+         ever forms an [Intop_imm (Iadd, n)] when [n] is a valid add immediate
+         for the target; [Cfg_of_ssa] copies our op through verbatim without
+         re-checking, so a large [step_delta] would reach the emitter as an
+         illegal immediate (arm64 asserts, amd64 truncates). When it does not
+         fit, materialise the step in a register and add it. *)
+      let incr =
+        match Cfg_selection.is_immediate Operation.Iadd r.step_delta with
+        | Cfg_selectgen_target_intf.Is_immediate true ->
+          C.emit_op c
+            ~op:Operation.(Intop_imm (Iadd, r.step_delta))
+            ~typ:r.typ ~dbg:r.derived_dbg ~args:[| arg |]
+        | Cfg_selectgen_target_intf.Is_immediate false
+        | Cfg_selectgen_target_intf.Use_default ->
+          let cst =
+            C.emit_op c
+              ~op:Operation.(Const_int (Nativeint.of_int r.step_delta))
+              ~typ:r.typ ~dbg:r.derived_dbg ~args:[||]
+          in
+          C.emit_op c
+            ~op:Operation.(Intop Iadd)
+            ~typ:r.typ ~dbg:r.derived_dbg ~args:[| arg; cst |]
+      in
+      r.new_index, incr
 
   let visit_terminator (block : C.In.Block.t) (c : C.Cursor.t) =
     match C.In.Block.Tbl.find_opt pred_tbl block with

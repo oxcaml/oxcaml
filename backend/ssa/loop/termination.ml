@@ -54,21 +54,27 @@ module Make (S : Ssa.Finished_graph) = struct
     | Down, (Clt | Cle | Cne | Cult | Cugt | Cule | Cuge) ->
       false
 
-  let biv_implies_termination (biv : IV.biv) : bool =
+  let biv_implies_termination ~op_def (biv : IV.biv) : bool =
     match find_exit_branch biv.loop, direction_of_biv biv with
     | None, _ | _, None -> false
     | Some exit_info, Some dir -> (
       let header = biv.loop.header in
+      let body = biv.loop.body in
       let is_self = IV.is_header_param header biv.param_index in
       let is_iv_val v = is_self v || List.exists (IV.instr_same v) biv.update in
+      (* The IV progresses monotonically, but that only forces the comparison to
+         flip if the operand it is tested against stays put. A loop-variant
+         other operand (e.g. a second counter in [while i < j]) can keep the
+         comparison true forever, so we require it to be loop-invariant. *)
+      let is_bound v = IV.is_loop_invariant op_def body v in
       let extract =
         match exit_info.condition with
         | Op { op = Intop_imm (Icomp cmp, _); args = [| x |]; _ } ->
           if is_iv_val x then Some (cmp, `Iv_left) else None
         | Op { op = Intop (Icomp cmp); args = [| x; y |]; _ } ->
-          if is_iv_val x
+          if is_iv_val x && is_bound y
           then Some (cmp, `Iv_left)
-          else if is_iv_val y
+          else if is_iv_val y && is_bound x
           then Some (cmp, `Iv_right)
           else None
         | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
@@ -91,7 +97,10 @@ module Make (S : Ssa.Finished_graph) = struct
         continue_terminates dir continue_cmp)
 
   let analyze (_loop : IV.loop) (bivs : IV.biv list) : t =
-    if List.exists biv_implies_termination bivs then Terminates else Unknown
+    let op_def = IV.build_op_def_block () in
+    if List.exists (biv_implies_termination ~op_def) bivs
+    then Terminates
+    else Unknown
 
   let print_one ppf = function
     | Terminates -> Format.fprintf ppf "terminates"

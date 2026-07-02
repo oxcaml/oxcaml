@@ -159,6 +159,26 @@ module Make (S : Ssa.Finished_graph) = struct
 
   (* === Per-check proof and rewrite === *)
 
+  (* The overflow reasoning below (induction-variable monotonicity, and the [x
+     lsl k = 2^k * x] decomposition) is only valid for operands that stay in the
+     63-bit OCaml [int] range; a full-width [int64#]/[nativeint] index could in
+     principle wrap. [Cmm.machtype_component] is [Int] for both, so we cannot
+     tell them apart by type. What we *can* recognise is the shape the frontend
+     only ever emits for a genuine array / string / bytes bounds check -- an
+     unsigned comparison guarding a load whose out-of-bounds edge raises -- and
+     whose operands are therefore tagged [int]s. We require that shape here, via
+     the out-of-bounds ([ifnot]) edge reaching a raising terminator through a
+     chain of gotos, so the pass stays confined to real bounds checks. *)
+  let rec out_of_bounds_raises ~fuel (bl : S.Block.t) : bool =
+    fuel > 0
+    &&
+    match bl.terminator with
+    | Raise _ | Invalid _ -> true
+    | Goto { goto; _ } -> out_of_bounds_raises ~fuel:(fuel - 1) goto
+    | Branch _ | Switch _ | Return _ | Tailcall_self _ | Tailcall_func _
+    | Call _ ->
+      false
+
   let try_eliminate ctx ~op_def_block (loop : IV.loop) (bivs : IV.biv list)
       (block : S.Block.t) : bool =
     match block.terminator with
@@ -170,8 +190,9 @@ module Make (S : Ssa.Finished_graph) = struct
                 _
               };
           ifso;
-          ifnot = _
-        } ->
+          ifnot
+        }
+      when out_of_bounds_raises ~fuel:5 ifnot ->
       let side = ref [] in
       let gidx = linearize ctx side idx in
       let glen = linearize ctx side len in

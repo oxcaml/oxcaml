@@ -10,6 +10,35 @@ module Make (S : Ssa.Finished_graph) = struct
       exit_target : S.Block.t
     }
 
+  (* A loop may only be deleted if, besides spinning its (dead) induction
+     variables, it performs no observable work. [Dead_induction_var.useless]
+     only checks the header parameters; it says nothing about the body, so a
+     loop like [while i < n do print_int 7; i <- i + 1 done] has a dead IV [i]
+     yet is emphatically not empty. Here we additionally require every body
+     block to contain only pure operations and to end in a pure control-flow
+     terminator, ruling out stores, calls, raises, allocations, early returns
+     and trap manipulation. *)
+  let instr_effect_free (i : S.Instruction.t) : bool =
+    match i with
+    | Op { op; _ } -> Operation.is_pure op
+    | Name_for_debugger _ | Stack_check _ -> true
+    | Push_trap _ | Pop_trap _ -> false
+    | Block_param _ | Proj _ | Tuple _ -> true
+
+  let terminator_pure_control (t : S.Terminator.t) : bool =
+    match t with
+    | Goto _ | Branch _ | Switch _ -> true
+    | Return _ | Raise _ | Tailcall_self _ | Tailcall_func _ | Call _
+    | Invalid _ ->
+      false
+
+  let body_effect_free (loop : IV.loop) : bool =
+    S.Block.Set.for_all
+      (fun (bl : S.Block.t) ->
+        Array.for_all instr_effect_free bl.body
+        && terminator_pure_control bl.terminator)
+      loop.body
+
   (* If the header's terminator matches the simple exit shape the dead-IV
      analysis also requires (exactly one in-loop target), return the out-of-loop
      target. *)
@@ -37,7 +66,7 @@ module Make (S : Ssa.Finished_graph) = struct
           | Term.Terminates -> true
           | Term.Unknown -> false
         in
-        if dr.useless && terminates
+        if dr.useless && terminates && body_effect_free loop
         then
           match exit_target_of_loop loop with
           | Some exit_target ->
@@ -61,3 +90,18 @@ module Make (S : Ssa.Finished_graph) = struct
         ds;
       Format.fprintf ppf "@]"
 end
+
+let run (input : (module Ssa.Finished_graph)) :
+    (module Ssa.Finished_graph) * int =
+  let module S = (val input : Ssa.Finished_graph) in
+  let module D = Make (S) in
+  match D.run () with
+  | [] -> input, 0
+  | deletions ->
+    (* [D.run] rewrote header terminators in place, which leaves the graph's
+       cached metadata stale and the loop bodies unreachable. A trivial reducer
+       pass rebuilds a fresh finished graph (recomputing predecessors,
+       dominators and use counts, and pruning the now-dead blocks), so the
+       result is safe to feed to the next pass. *)
+    ( Ssa_reducer.run (module Ssa_reducer.Default : Ssa_reducer.Reducer) input,
+      List.length deletions )

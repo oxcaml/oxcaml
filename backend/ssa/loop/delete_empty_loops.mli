@@ -26,3 +26,9 @@ module Make (S : Ssa.Finished_graph) : sig
 
   val print : Format.formatter -> deletion list -> unit
 end
+
+(** Delete empty loops in [input], returning a fresh finished graph (rebuilt so
+    the stale metadata and now-unreachable loop bodies are cleaned up) together
+    with the number of loops deleted. Returns [input] unchanged when there is
+    nothing to delete. *)
+val run : (module Ssa.Finished_graph) -> (module Ssa.Finished_graph) * int

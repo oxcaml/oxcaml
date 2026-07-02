@@ -556,6 +556,19 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
   let ssa = if !Oxcaml_flags.ssa_lftr then Lftr.run ssa else ssa in
   if !Oxcaml_flags.dump_ssa && !Oxcaml_flags.ssa_lftr
   then Format.fprintf ppf_dump "*** SSA after Lftr@.@.%a" Ssa_print.print ssa;
+  let ssa =
+    if !Oxcaml_flags.ssa_delete_empty_loops
+    then begin
+      let ssa, removed = Delete_empty_loops.run ssa in
+      if !Oxcaml_flags.dump_ssa && removed > 0
+      then
+        Format.fprintf ppf_dump
+          "*** SSA after Delete_empty_loops (%d deleted)@.@.%a" removed
+          Ssa_print.print ssa;
+      ssa
+    end
+    else ssa
+  in
   (if !Oxcaml_flags.ssa_bounds_check_elim
    then
      let removed = Bounds_check_elim.run ssa in

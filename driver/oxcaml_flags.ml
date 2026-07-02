@@ -131,6 +131,8 @@ let ssa_strength_reduce = ref false         (* -ssa-strength-reduce *)
 
 let ssa_lftr = ref false                    (* -ssa-lftr *)
 
+let ssa_delete_empty_loops = ref false      (* -ssa-delete-empty-loops *)
+
 type function_result_types = Never | Functors_only | All_functions
 type join_algorithm = Binary | N_way | Checked
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto

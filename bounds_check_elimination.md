@@ -155,13 +155,21 @@ and `idx < len`. Two things make that imply the unsigned comparison:
    The guarantee is specifically about **`int`-typed (63-bit) operands**, which
    is the case for ordinary array / string / bytes bounds checks. For an index
    or length that is a full-width `Nativeint`/`Int64`, a monotone IV could in
-   principle wrap, so the pass must not fire there; v1 only rewrites checks
-   whose comparison is an integer `Icomp` on `int`-typed operands. (A stronger,
-   self-contained alternative — not relied on here — is that an in-bounds index
-   is `< len ≤ Sys.max_array_length ≈ 2^57`, reached by `< 2^57` monotone
-   steps from `0`, hence far below any overflow threshold; this is why
-   recognising `len` as a genuine array length would let us drop even the
-   `int`-typed restriction.)
+   principle wrap, so the pass must not fire there. `Cmm.machtype_component` is
+   `Int` for both tagged `int`s and unboxed `int64#`/`nativeint`, so we cannot
+   distinguish them by type. Instead the pass keys off the *shape* the frontend
+   only ever emits for a genuine array / string / bytes bounds check — an
+   unsigned (`<u`/`<=u`) comparison guarding a load whose out-of-bounds edge
+   **raises** — and whose operands are therefore tagged `int`s. Concretely,
+   `try_eliminate` only fires when the `ifnot` edge of the checked branch
+   reaches a `Raise`/`Invalid` terminator (through a chain of gotos); a
+   hand-written unsigned comparison on `int64#`/`nativeint` values does not have
+   this raising failure path, and in any case the wrap it would need requires an
+   unrealizable ~2^63 iterations. (A stronger, self-contained alternative — not
+   relied on here — is that an in-bounds index is `< len ≤ Sys.max_array_length
+   ≈ 2^57`, reached by `< 2^57` monotone steps from `0`, hence far below any
+   overflow threshold; this is why recognising `len` as a genuine array length
+   would let us drop even this restriction.)
 
 ## Transformation
 

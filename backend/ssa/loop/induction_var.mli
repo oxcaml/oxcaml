@@ -43,4 +43,15 @@ module Make (S : Ssa.Finished_graph) : sig
       referring to parameter [index] of [block]. Used in place of building a
       [Block_param] value, which a finished graph does not let us construct. *)
   val is_header_param : S.Block.t -> int -> S.Instruction.t -> bool
+
+  (** Map each [Op]'s id to the block in which it is defined. *)
+  val build_op_def_block : unit -> S.Block.t S.Instruction.Id.Tbl.t
+
+  (** [is_loop_invariant op_def loop_body v] is [true] iff [v] cannot change
+      across iterations of a loop whose body is [loop_body]: it is a
+      compile-time constant, or its defining block (for [op_def]) / owning block
+      (for a [Block_param]) lies outside [loop_body]. [op_def] should come from
+      [build_op_def_block]. *)
+  val is_loop_invariant :
+    S.Block.t S.Instruction.Id.Tbl.t -> S.Block.Set.t -> S.Instruction.t -> bool
 end

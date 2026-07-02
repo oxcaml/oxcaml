@@ -66,8 +66,8 @@ module Make (S : Ssa.Finished_graph) = struct
   (* An opportunity to retire the dead counter [i_param_index] by re-expressing
      the loop's exit test on the live induction variable [sr_param_index], which
      runs in lockstep: [sr = ratio * i + b] with [ratio > 0]. The test [i CMP
-     bound] becomes [(sr - limit) CMP 0] with [limit] the value of [sr] when [i =
-     bound], built once in the preheader. *)
+     bound] becomes [(sr - limit) CMP 0] with [limit] the value of [sr] when [i
+     = bound], built once in the preheader. *)
   type opportunity =
     { header : S.Block.t;
       preheader : S.Block.t;
@@ -82,25 +82,38 @@ module Make (S : Ssa.Finished_graph) = struct
     }
 
   (* Soundness of the rewrite hinges on the derived-IV difference [ratio*(i -
-     bound)] staying in signed range. With [0 <= i <= bound] (the loop's own
-     invariant) that reduces to proving, from the guards dominating [header],
-     that [bound >= 0] and that [ratio * bound] does not overflow — i.e. [bound
-     <= max_int64 / ratio]. That upper bound fits in an OCaml int for [ratio >=
-     2] (it doesn't for [ratio = 1], which we then conservatively reject). The
-     two facts are discharged by Fourier-Motzkin over the guards. *)
-  let scaled_no_overflow ~(header : S.Block.t) ~(value : S.Instruction.t) ~ratio
-      : bool =
+     bound)] staying in signed range at every evaluation of the exit test. The
+     values of [i] seen at the header run from [i_init] up towards [bound] (the
+     caller only offers up-counting, upper-bounded loops), so it suffices to
+     bound the trajectory's two ends. We prove, from the guards dominating
+     [header]: - [0 <= bound] and [ratio * bound] does not overflow (i.e. [bound
+     <= max_int64 / ratio]); and - [0 <= i_init <= bound]. Then for every [i] in
+     [i_init, bound + step_i) we have [-ratio*bound <= ratio*(i - bound) <
+     ratio*step_i], both inside signed range (the upper multiplier
+     [ratio*step_i] is itself an [int] step). The upper bound [max_int64 /
+     ratio] fits in an OCaml int only for [ratio >= 2] (it does not for [ratio =
+     1], which we then conservatively reject). All facts are discharged by
+     Fourier-Motzkin over the guards. *)
+  let scaled_no_overflow ~(header : S.Block.t) ~(bound : S.Instruction.t)
+      ~(i_init : S.Instruction.t) ~ratio : bool =
     let hi64 = Int64.div Int64.max_int (Int64.of_int ratio) in
     Int64.equal (Int64.of_int (Int64.to_int hi64)) hi64
     &&
     let hi = Int64.to_int hi64 in
     let ctx = AS.new_ctx () in
     let side = ref [] in
-    let lv = AS.linearize ctx side value in
+    let lb = AS.linearize ctx side bound in
+    let li = AS.linearize ctx side i_init in
     let facts = AS.guards_at ctx side header @ !side in
-    Fourier_motzkin.entails facts lv
-    && Fourier_motzkin.entails facts
-         Fourier_motzkin.Affine.(add_const (neg lv) hi)
+    let entails = Fourier_motzkin.entails facts in
+    (* bound >= 0 *)
+    entails lb
+    (* bound <= hi *)
+    && entails Fourier_motzkin.Affine.(add_const (neg lb) hi)
+    (* i_init >= 0 *)
+    && entails li
+    (* i_init <= bound *)
+    && entails (Fourier_motzkin.Affine.sub lb li)
 
   let opportunity_of_loop ((loop, bivs) : IV.loop * IV.biv list) :
       opportunity option =
@@ -120,7 +133,7 @@ module Make (S : Ssa.Finished_graph) = struct
     | [preheader] -> (
       match Term.find_exit_branch loop with
       | None -> None
-      | Some { condition; continue_when_true = _ } -> (
+      | Some { condition; continue_when_true } -> (
         match condition with
         | Op { op = Intop (Icomp cmp); args = [| x; y |]; typ; dbg; _ }
           when is_signed_order cmp -> (
@@ -143,45 +156,70 @@ module Make (S : Ssa.Finished_graph) = struct
           match chosen with
           | None -> None
           | Some (i_biv, bound, i_is_left) -> (
-            match signed_step i_biv with
-            | None -> None
-            | Some step_i ->
-              (* A live induction variable whose step is a positive integer
-                 multiple of [i]'s carries the test. *)
-              let anchor =
-                List.find_opt
-                  (fun (b : IV.biv) ->
-                    (not (Int.equal b.param_index i_biv.param_index))
-                    && (not (Dead.is_dead b))
-                    &&
-                    match signed_step b with
-                    | Some step_sr ->
-                      (not (Int.equal step_i 0))
-                      && Int.equal (step_sr mod step_i) 0
-                      && step_sr / step_i > 0
-                    | None -> false)
-                  bivs
+            (* The overflow argument in [scaled_no_overflow] relies on [i]
+               counting up towards [bound] and the loop exiting once it reaches
+               it, so [i] stays in [i_init, bound + step_i). Restrict to that
+               shape: a positive step and an oriented continue-condition of [i <
+               bound] / [i <= bound]. Other shapes (down-counters, [i > bound]
+               continue) are left alone. *)
+            let up_and_upper_bounded step_i =
+              let cmp_iv_left =
+                if i_is_left then cmp else Cmm.swap_integer_comparison cmp
               in
-              Option.bind anchor (fun (sr_biv : IV.biv) ->
-                  match signed_step sr_biv with
-                  | None -> None
-                  | Some step_sr ->
-                    let ratio = step_sr / step_i in
-                    if scaled_no_overflow ~header ~value:bound ~ratio
-                    then
-                      Some
-                        { header;
-                          preheader;
-                          bound;
-                          i_param_index = i_biv.param_index;
-                          sr_param_index = sr_biv.param_index;
-                          ratio;
-                          cmp;
-                          i_is_left;
-                          typ;
-                          dbg
-                        }
-                    else None)))
+              let continue_cmp =
+                if continue_when_true
+                then cmp_iv_left
+                else Cmm.negate_integer_comparison cmp_iv_left
+              in
+              step_i > 0
+              &&
+              match continue_cmp with
+              | Clt | Cle -> true
+              | Ceq | Cne | Cgt | Cge | Cult | Cugt | Cule | Cuge -> false
+            in
+            match i_biv.init with
+            | [] | _ :: _ :: _ -> None
+            | [i_init] -> (
+              match signed_step i_biv with
+              | None -> None
+              | Some step_i when not (up_and_upper_bounded step_i) -> None
+              | Some step_i ->
+                (* A live induction variable whose step is a positive integer
+                   multiple of [i]'s carries the test. *)
+                let anchor =
+                  List.find_opt
+                    (fun (b : IV.biv) ->
+                      (not (Int.equal b.param_index i_biv.param_index))
+                      && (not (Dead.is_dead b))
+                      &&
+                      match signed_step b with
+                      | Some step_sr ->
+                        (not (Int.equal step_i 0))
+                        && Int.equal (step_sr mod step_i) 0
+                        && step_sr / step_i > 0
+                      | None -> false)
+                    bivs
+                in
+                Option.bind anchor (fun (sr_biv : IV.biv) ->
+                    match signed_step sr_biv with
+                    | None -> None
+                    | Some step_sr ->
+                      let ratio = step_sr / step_i in
+                      if scaled_no_overflow ~header ~bound ~i_init ~ratio
+                      then
+                        Some
+                          { header;
+                            preheader;
+                            bound;
+                            i_param_index = i_biv.param_index;
+                            sr_param_index = sr_biv.param_index;
+                            ratio;
+                            cmp;
+                            i_is_left;
+                            typ;
+                            dbg
+                          }
+                      else None))))
         | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
         | Stack_check _ | Name_for_debugger _ ->
           None))

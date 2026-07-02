@@ -100,6 +100,7 @@ module type Oxcaml_options = sig
   val ssa_bounds_check_elim : unit -> unit
   val ssa_strength_reduce : unit -> unit
   val ssa_lftr : unit -> unit
+  val ssa_delete_empty_loops : unit -> unit
   val ssa_validate : unit -> unit
   val no_ssa_validate : unit -> unit
   val internal_assembler : unit -> unit
