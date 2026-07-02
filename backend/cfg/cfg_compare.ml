@@ -595,6 +595,13 @@ let process_block_backward ~ppf_m eqs ~(old_block : Cfg.basic_block)
     for i = 0 to Array.length old_regs - 1 do
       let old_reg = old_regs.(i) in
       let new_reg = new_regs.(i) in
+      if not (Proc.types_are_compatible old_reg new_reg)
+      then
+        Format.fprintf ppf_m
+          "Reg type mismatch at old=%a(id:%a) new=%a(id:%a): %a vs %a@."
+          Label.format old_label InstructionId.print old_instr.id Label.format
+          new_label InstructionId.print new_instr.id Printreg.reg old_reg
+          Printreg.reg new_reg;
       if Reg.is_unknown old_reg && Reg.is_unknown new_reg
       then eqs := f !eqs ~old_reg ~new_reg
       else if not (Reg.same_loc old_reg new_reg)
