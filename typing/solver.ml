@@ -2168,7 +2168,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       | Amodevar mv1, Amodevar mv2 -> equal_morphvar obj mv1 mv2
       | Amodejoin (a1, mv1), Amodejoin (a2, mv2) ->
         C.equal obj a1 a2 && List.for_all2 (equal_morphvar obj) mv1 mv2
-      | Amodemeet (a1, mv1), Amodejoin (a2, mv2) ->
+      | Amodemeet (a1, mv1), Amodemeet (a2, mv2) ->
         C.equal obj a1 a2 && List.for_all2 (equal_morphvar obj) mv1 mv2
       | _, _ -> false
 
