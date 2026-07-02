@@ -282,6 +282,8 @@ let constructor_representation i ppf = let open Types in function
   | Constructor_mixed shape ->
     line i ppf "Constructor_mixed\n";
     array (i+1) mixed_block_element ppf shape
+  | Constructor_variable ->
+    line i ppf "Constructor_variable"
 
 let attribute i ppf k a =
   line i ppf "%s \"%s\"\n" k a.Parsetree.attr_name.txt;
