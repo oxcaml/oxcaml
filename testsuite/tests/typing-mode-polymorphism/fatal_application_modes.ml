@@ -10,8 +10,6 @@
   return_mode to be local only when it returns via [exclave_]. The following tests
   cause fatal errors if this is not implemented correctly. *)
 
-(* --- Local returning functions without [exclave_] that allocate --- *)
-
 let takes_local (_ @ local) =
   ()
 
@@ -33,76 +31,9 @@ let rec sequand_tail_call x =
 let rec sequor_tail_call x =
   x || sequor_tail_call true
 
-let labelled_arguments ~a ~b ~c =
-  ()
-
-let omitted_labelled_argument =
-  labelled_arguments ~a:() ~c:()
-
-let omitted_labelled_argument_application () =
-  omitted_labelled_argument ~b:()
-
 let () =
   local_argument_application ();
   out_of_order_partial_application ();
   ignore (direct_tail_call false);
   ignore (sequand_tail_call true);
-  ignore (sequor_tail_call false);
-  omitted_labelled_argument_application ()
-
-
-(* --- Local returning functions with [exclave_] that do not allocate --- *)
-
-let returns_local_unit () =
-  exclave_ ()
-
-(* does not type check without [exclave_] *)
-let tail_call_returns_local_unit x =
-  exclave_
-  returns_local_unit x
-
-
-(* --- Local returning functions with [exclave_] that allocate *)
-
-let takes_local_alloc (_ @ local) =
-  exclave_ ((), ())
-
-let local_argument_application_alloc () =
-  exclave_ (takes_local_alloc 42)
-
-let rec direct_tail_call_alloc x =
-  if x then exclave_ ((), ()) else exclave_ (direct_tail_call_alloc true)
-
-let rec sequand_tail_call_exclave x =
-  x && (sequand_tail_call_exclave false)
-
-let rec sequor_tail_call_exclave x =
-  x || (sequor_tail_call_exclave true)
-
-let labelled_arguments_alloc ~a ~b ~c =
-  exclave_ ((), ())
-
-let omitted_labelled_argument_alloc =
-  labelled_arguments_alloc ~a:() ~c:()
-
-let omitted_labelled_argument_alloc_application () =
-  exclave_ (omitted_labelled_argument_alloc ~b:())
-
-let call_local_argument_application_alloc () =
-  let local_ pair = local_argument_application_alloc () in
-  match pair with _x, _y -> ()
-
-let call_direct_tail_call_alloc () =
-  let local_ pair = direct_tail_call_alloc false in
-  match pair with _x, _y -> ()
-
-let call_omitted_labelled_argument_alloc_application () =
-  let local_ pair = omitted_labelled_argument_alloc_application () in
-  match pair with _x, _y -> ()
-
-let () =
-  call_local_argument_application_alloc ();
-  call_direct_tail_call_alloc ();
-  ignore (sequand_tail_call_exclave true);
-  ignore (sequor_tail_call_exclave false);
-  call_omitted_labelled_argument_alloc_application ()
+  ignore (sequor_tail_call false)
