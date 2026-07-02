@@ -1208,27 +1208,23 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     then ()
     else begin
       let f' = C.right_adjoint dst f in
-      let _, src, f'_hint = Comp_hint.Morph_hint.right_adjoint pp dst f_hint in
+      let src = C.src dst f in
+      let f'_hint = Comp_hint.Morph_hint.Base (H.Morph.unknown, f') in
       push_upper_bound ~log src v f' f'_hint u;
       set_vlower ~log v (VarMap.add key x v.vlower);
       VarMap.iter
-        (fun _ (Amorphvar (w, h, h_hint)) ->
+        (fun _ (Amorphvar (w, h, _)) ->
           if w.level < u.level
           then begin
             let f'h = C.compose src f' h in
-            let f'h_hint = Comp_hint.Morph_hint.Compose (f'_hint, h_hint) in
+            let f'h_hint = Comp_hint.Morph_hint.Base (H.Morph.unknown, f'h) in
             add_vupper_nocheck ~log src u w f'h f'h_hint
           end
           else begin
             let h' = C.left_adjoint dst h in
-            let _, src, h'_hint =
-              Comp_hint.Morph_hint.left_adjoint pp dst h_hint
-            in
+            let src = C.src dst h in
             let h'f = C.compose src h' (C.disallow_right f) in
-            let h'f_hint =
-              Comp_hint.Morph_hint.Compose
-                (h'_hint, Comp_hint.Morph_hint.disallow_right f_hint)
-            in
+            let h'f_hint = Comp_hint.Morph_hint.Base (H.Morph.unknown, h'f) in
             add_vlower_reversed ~log pp src w u h'f h'f_hint
           end)
         v.vupper
@@ -1256,27 +1252,23 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     then ()
     else begin
       let f' = C.left_adjoint dst f in
-      let _, src, f'_hint = Comp_hint.Morph_hint.left_adjoint pp dst f_hint in
+      let src = C.src dst f in
+      let f'_hint = Comp_hint.Morph_hint.Base (H.Morph.unknown, f') in
       push_lower_bound ~log src v f' f'_hint u;
       set_vupper ~log v (VarMap.add key x v.vupper);
       VarMap.iter
-        (fun _ (Amorphvar (w, h, h_hint)) ->
+        (fun _ (Amorphvar (w, h, _)) ->
           if u.level < w.level
           then begin
             let h' = C.right_adjoint dst h in
-            let _, src, h'_hint =
-              Comp_hint.Morph_hint.right_adjoint pp dst h_hint
-            in
+            let src = C.src dst h in
             let h'f = C.compose src h' (C.disallow_left f) in
-            let h'f_hint =
-              Comp_hint.Morph_hint.Compose
-                (h'_hint, Comp_hint.Morph_hint.disallow_left f_hint)
-            in
+            let h'f_hint = Comp_hint.Morph_hint.Base (H.Morph.unknown, h'f) in
             add_vupper_reversed ~log pp src w u h'f h'f_hint
           end
           else begin
             let f'h = C.compose src f' h in
-            let f'h_hint = Comp_hint.Morph_hint.Compose (f'_hint, h_hint) in
+            let f'h_hint = Comp_hint.Morph_hint.Base (H.Morph.unknown, f'h) in
             add_vlower_nocheck ~log src u w f'h f'h_hint
           end)
         v.vlower
@@ -1295,19 +1287,22 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     set_vlower ~log u vlower_le;
     set_vupper ~log u vupper_lt;
     VarMap.iter
-      (fun _ (Amorphvar (v, f, f_hint)) ->
+      (fun _ (Amorphvar (v, f, _)) ->
+        (* Performance hack: level updates are not user-visible constraints,
+           so we drop the accumulated hint tree instead of computing its
+           adjoint. Walking and rebuilding hint trees here is superlinear on
+           large recursive groups (they grow by [Compose] on every
+           propagation), while the hint only affects error-message quality. *)
         let f' = C.right_adjoint dst f in
-        let _, src, f'_hint =
-          Comp_hint.Morph_hint.right_adjoint H.Pinpoint.unknown dst f_hint
-        in
+        let src = C.src dst f in
+        let f'_hint = Comp_hint.Morph_hint.Base (H.Morph.unknown, f') in
         add_vupper_reversed ~log H.Pinpoint.unknown src v u f' f'_hint)
       vlower_gt;
     VarMap.iter
-      (fun _ (Amorphvar (v, f, f_hint)) ->
+      (fun _ (Amorphvar (v, f, _)) ->
         let f' = C.left_adjoint dst f in
-        let _, src, f'_hint =
-          Comp_hint.Morph_hint.left_adjoint H.Pinpoint.unknown dst f_hint
-        in
+        let src = C.src dst f in
+        let f'_hint = Comp_hint.Morph_hint.Base (H.Morph.unknown, f') in
         add_vlower_reversed ~log H.Pinpoint.unknown src v u f' f'_hint)
       vupper_ge;
     (* optimization: if lower = upper, we can remove vuppers and vlowers since the
