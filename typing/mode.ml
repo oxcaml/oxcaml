@@ -7308,6 +7308,11 @@ module Modality = struct
     let to_value : packed -> Value.Axis.packed = function
       | P (Monadic ax) -> P (Monadic ax)
       | P (Comonadic ax) -> P (Comonadic ax)
+
+    let compare (P ax0 : packed) (P ax1 : packed) =
+      let (P ax0) = to_value (P ax0) in
+      let (P ax1) = to_value (P ax1) in
+      Value.Axis.compare ax0 ax1
   end
 
   type atom = Atom : 'a Axis.t * 'a -> atom
@@ -7329,6 +7334,13 @@ module Modality = struct
       match ax with
       | Monadic ax -> Monadic.is_constant ax t
       | Comonadic ax -> Comonadic.is_constant ax t
+
+    let le (type a) (ax : a Axis.t) (a : a) (b : a) : bool =
+      match ax, a, b with
+      | Monadic ax, Join_const a, Join_const b ->
+        Value.Monadic.Const.Per_axis.le ax a b
+      | Comonadic ax, Meet_const a, Meet_const b ->
+        Value.Comonadic.Const.Per_axis.le ax a b
 
     let print (type a) (ax : a Axis.t) ppf (t : a) =
       match ax, t with

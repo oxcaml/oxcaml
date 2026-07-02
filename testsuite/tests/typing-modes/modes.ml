@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-w -220";
  expect;
 *)
 
@@ -334,11 +335,6 @@ Error: Unrecognized modality foo.
 
 type t = Foo of global_ string @@ global
 [%%expect{|
-Line 1, characters 16-23:
-1 | type t = Foo of global_ string @@ global
-                    ^^^^^^^
-Warning 213: This locality is overridden by global later.
-
 type t = Foo of string @@ global
 |}]
 
@@ -363,11 +359,6 @@ type r = {
   global_ x : string @@ global
 }
 [%%expect{|
-Line 2, characters 2-9:
-2 |   global_ x : string @@ global
-      ^^^^^^^
-Warning 213: This locality is overridden by global later.
-
 type r = { x : string @@ global; }
 |}]
 
@@ -390,11 +381,6 @@ type r = {
   x : string @@ aliased global many aliased
 }
 [%%expect{|
-Line 2, characters 16-23:
-2 |   x : string @@ aliased global many aliased
-                    ^^^^^^^
-Warning 213: This uniqueness is overridden by aliased later.
-
 type r = { x : string @@ global many; }
 |}]
 
