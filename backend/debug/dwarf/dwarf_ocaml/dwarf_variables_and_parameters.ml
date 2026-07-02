@@ -228,9 +228,9 @@ let rec phantom_var_location_description state
       else lvalue (SLDL.Lvalue.read_field ~block ~field))
   | Lphantom_offset_var { var; offset_in_words } -> (
     (* [var] holds an (infix) pointer; the projected pointer is that value plus
-       [offset_in_words] words, with no dereference. We therefore consult [var]'s
-       value (rvalue), not the place where it is stored, and present the result
-       directly as a value rather than an address to be dereferenced. *)
+       [offset_in_words] words, with no dereference. We therefore consult
+       [var]'s value (rvalue), not the place where it is stored, and present the
+       result directly as a value rather than an address to be dereferenced. *)
     match die_location_of_variable_rvalue state var ~proto_dies_for_vars with
     | None -> None
     | Some block ->
@@ -238,7 +238,8 @@ let rec phantom_var_location_description state
       let offset = SLDL.Rvalue.offset_pointer block ~offset_in_words in
       if need_rvalue
       then rvalue offset
-      else lvalue_without_address (SLDL.Lvalue_without_address.of_rvalue offset))
+      else lvalue_without_address (SLDL.Lvalue_without_address.of_rvalue offset)
+    )
   | Lphantom_block { tag; fields } ->
     (* A phantom block construction: instead of the block existing in the target
        program's address space, it is going to be conjured up in the debugger's

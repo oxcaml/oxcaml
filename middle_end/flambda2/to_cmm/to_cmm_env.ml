@@ -357,10 +357,10 @@ let gen_variable t ~debug_uid ~dbg ~bv_is_parameter v =
     else
       match (bv_is_parameter : Bound_var.Is_parameter.t) with
       | Implicit_parameter ->
-        (* [my_closure] (and similar implicit parameters) are never user-visible,
-           but value-slot / function-slot projections need a located DIE to key
-           off, so we still emit provenance. The OCaml type is irrelevant here,
-           hence [Flambda_debug_uid.none]. *)
+        (* [my_closure] (and similar implicit parameters) are never
+           user-visible, but value-slot / function-slot projections need a
+           located DIE to key off, so we still emit provenance. The OCaml type
+           is irrelevant here, hence [Flambda_debug_uid.none]. *)
         let dbg = add_inlined_debuginfo t dbg in
         Some
           (Backend_var.Provenance.create ~module_path:(Path.Pident v)

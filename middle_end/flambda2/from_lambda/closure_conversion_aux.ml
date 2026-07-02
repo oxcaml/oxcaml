@@ -267,9 +267,7 @@ module Env = struct
         ids
     in
     let t =
-      List.fold_left
-        (fun t (id, uid, _, _) -> add_var_debug_uid t id uid)
-        t ids
+      List.fold_left (fun t (id, uid, _, _) -> add_var_debug_uid t id uid) t ids
     in
     add_vars t (List.map (fun (id, _, _, _) -> id) ids) vars, List.map fst vars
 

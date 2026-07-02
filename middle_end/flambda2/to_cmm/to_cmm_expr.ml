@@ -905,9 +905,7 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
         ~bv_is_parameter
     in
     let body_cmm, free_vars, symbol_inits, res = expr env res body in
-    let cmm =
-      C.make_phantom_let backend_var_with_prov defining_expr body_cmm
-    in
+    let cmm = C.make_phantom_let backend_var_with_prov defining_expr body_cmm in
     (* The free variables passed to [wrap] must include those referenced by the
        phantom defining expression, to prevent the (just-flushed) bindings of
        such variables from being deleted as dead code. The [Cphantom_let] binds
@@ -1070,8 +1068,8 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
       | None -> drop_phantom_let env res ~wrap ~body)
     | None -> expr env res body)
   | ( Singleton bound_var,
-      Prim (Unary (Project_value_slot { project_from; value_slot }, arg), _dbg) )
-    -> (
+      Prim (Unary (Project_value_slot { project_from; value_slot }, arg), _dbg)
+    ) -> (
     match Simple.must_be_var arg with
     | Some (var, _coercion) -> (
       let wrap, env, res =
@@ -1123,7 +1121,9 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
        that any subsequent phantom lets reading from it -- for example a
        [Project_value_slot] or [Project_function_slot] from an optimised-out
        [my_closure] -- can refer to it rather than being dropped. *)
-    let wrap, env, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
+    let wrap, env, res =
+      Env.flush_delayed_lets ~mode:Flush_everything env res
+    in
     make_phantom_let_gen env res ~wrap bound_var None
       ~free_vars_of_defining_expr:Backend_var.Set.empty ~body
   | _ -> expr env res body

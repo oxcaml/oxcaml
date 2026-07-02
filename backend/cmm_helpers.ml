@@ -3771,7 +3771,8 @@ let tuplify_function arity return =
       fun_body =
         Cop
           ( Capply { result_type = return; region = Rc_normal; callees = None },
-            (* The closure code pointer is write-once; see [apply_function_body]. *)
+            (* The closure code pointer is write-once; see
+               [apply_function_body]. *)
             get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
             :: access_components 0
             @ [Cvar clos],
@@ -3873,10 +3874,10 @@ let value_slot_given_machtype vs =
 
 let read_from_closure_given_machtype t clos base_offset dbg =
   let load chunk offset =
-    (* Closure value slots are write-once (a partial-application closure is never
-       back-patched), so these reads are immutable.  Besides being correct, this
-       lets the debugger describe the recovered arguments as projections of the
-       closure for call site information. *)
+    (* Closure value slots are write-once (a partial-application closure is
+       never back-patched), so these reads are immutable. Besides being correct,
+       this lets the debugger describe the recovered arguments as projections of
+       the closure for call site information. *)
     Cop (mk_load_immut chunk, [field_address clos offset dbg], dbg)
   in
   let _, l =

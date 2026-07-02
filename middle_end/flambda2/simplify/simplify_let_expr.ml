@@ -208,9 +208,9 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
               (* Phantomise even non-user-visible variables: they may be
                  intermediates (for example the [my_closure] introduced when
                  inlining, or temporaries) that are referenced by user-visible
-                 phantom lets -- e.g. [Project_value_slot] / [Project_function_slot]
-                 projections -- which would otherwise resolve to a deleted
-                 binding and display garbage. *)
+                 phantom lets -- e.g. [Project_value_slot] /
+                 [Project_function_slot] projections -- which would otherwise
+                 resolve to a deleted binding and display garbage. *)
               let can_phantomise = not is_depth in
               let will_delete_binding =
                 if is_end_region_for_unused_region
