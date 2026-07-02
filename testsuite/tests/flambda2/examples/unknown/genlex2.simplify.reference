@@ -18,7 +18,7 @@ apply ccall noalloc
           foo_0_1 (f : imm tagged, g : val)
             my_closure &my_alloc_region my_depth
             -> k * k1
-            : [ 0 | 0 of val ] =
+            : val =
       let prim = %int_comp.ne (f, 97) in
       switch prim
         | 0 -> k2
