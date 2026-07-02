@@ -364,10 +364,6 @@ module Jkind0 : sig
     val set_crossing : Crossing.t -> t -> t
     val set_externality : Externality.t -> t -> t
 
-    (** [set_max_in_set bounds axes] sets all the axes in [axes] to their [max]
-        within [bounds] *)
-    val set_max_in_set : t -> Jkind_axis.Axis_set.t -> t
-
     (** [set_min_in_set bounds axes] sets all the axes in [axes] to their [min]
         within [bounds] *)
     val set_min_in_set : t -> Jkind_axis.Axis_set.t -> t
