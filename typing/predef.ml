@@ -600,7 +600,6 @@ let all_predef_constrs = [
 
 let option_argument_sort = None
 let option_argument_jkind = Jkind.Builtin.any ~why:(
-  (* XXX New creation reason *)
   Type_argument {parent_path = path_option; position = 1; arity = 1})
 
 let unrestricted tvar ca_sort =
