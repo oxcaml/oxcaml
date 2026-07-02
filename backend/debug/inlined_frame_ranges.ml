@@ -176,6 +176,16 @@ module Inlined_frames = struct
       in
       dbg :: parents items
 
+  let is_spill_or_reload (insn : L.instruction) =
+    match insn.desc with
+    | Lop (Spill | Reload) -> true
+    | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lop _ | Lcall_op _
+    | Lreloadretaddr | Lreturn | Llabel _ | Lbranch _ | Lcondbranch _
+    | Lcondbranch3 _ | Lswitch _ | Lentertrap | Ladjust_stack_offset _
+    | Lpushtrap _ | Lpoptrap _ | Lraise _ | Lstackcheck _ ->
+      false
+  [@@ocaml.warning "-4"]
+
   let available_before (_fundecl : L.fundecl) (insn : L.instruction) =
     (* Inlined-frame keys are derived solely from the instruction's own [dbg]
        (and all of its parents): an instruction physically located inside an
@@ -191,11 +201,25 @@ module Inlined_frames = struct
        function, none of whose instructions remain, gets no
        DW_TAG_inlined_subroutine DIE; the phantom lets corresponding to its
        parameters are correspondingly restricted -- see
-       [Available_ranges_phantom_vars].) *)
-    match Debuginfo.to_items insn.dbg with
-    | [] -> None
-    | _ :: _ ->
-      Some (Key.Set.Ok (Key.Raw_set.of_list (dbg_and_parents insn.dbg)))
+       [Available_ranges_phantom_vars].)
+
+       Spill and reload instructions are register-allocator bookkeeping, not
+       code lowered from any inlined body; typically they preserve the
+       _enclosing_ function's state across a call to which the surrounding
+       debuginfo relates. They are treated as belonging to no inlined frame (an
+       empty key set, closing any open ranges), so that the address ranges of
+       inlined frames never cover them. This matters in particular for reloads
+       of the enclosing function's variables after a call within an inlined
+       body: such reloads must not be attributed to the inlined function (e.g.
+       by a profiler). Note that returning [None] would not suffice, since that
+       would leave existing open ranges untouched. *)
+    if is_spill_or_reload insn
+    then Some (Key.Set.Ok Key.Raw_set.empty)
+    else
+      match Debuginfo.to_items insn.dbg with
+      | [] -> None
+      | _ :: _ ->
+        Some (Key.Set.Ok (Key.Raw_set.of_list (dbg_and_parents insn.dbg)))
 
   let available_across fundecl insn =
     (* A single [Linear] instruction never spans inlined frames. *)
