@@ -5021,7 +5021,9 @@ let for_optional_arg_default
               makes it impossible to overwrite and safe to use [Reads_agree]
               here. It would be slightly safer to use [Reads_vary] here, but
               that could degrade performance of programs not using uniqueness *)
-           (* XXX Does not work for non-value options! *)
+           (* Assumes that the argument type has layout [value_or_null].
+              Currently this is enforced by the typechecker but we intend to
+              lift this restriction soon. *)
            (Pfield (0, Pointer, Reads_agree),
             [ Lvar param ],
             sloc))
