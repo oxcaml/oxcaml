@@ -864,33 +864,48 @@ let create_allocation_mode_r mode =
   let locality_mode = Alloc.proj_comonadic Areality mode in
   newvar_below_if_modepoly 0 locality_mode |> Locality.disallow_left
 
+(* Whether the allocation mode's locality can (currently) be [global].
+   This is a non-committing probe: the trial constraint is rolled back
+   rather than recorded, using the change log instead of duplicating the
+   mode's constraint graph.
+
+   CR jujacobs: because the probe does not constrain the variable, a later
+   constraint can still resolve it to local while the typedtree records
+   global/heap for the omitted-argument wrapper (e.g. the eta-wrapper's
+   continuation after a local argument in an out-of-order application),
+   letting the backend heap-allocate a closure that captures
+   stack-allocated values. Committing the constraint here instead changes
+   inferred schemes (see typing-mode-polymorphism/labelled_args.ml and
+   typing-modes/currying.ml), so the right fix needs a policy decision. *)
 let alloc_mode_can_be_global mode =
-  For_copy.with_scope (fun copy_scope ->
-    let mode = For_copy.mode_duplicate copy_scope mode in
-    let locality_mode = Alloc.proj_comonadic Areality mode in
-    match Locality.submode locality_mode Locality.global with
+  let snap = Btype.snapshot () in
+  let result =
+    match
+      Locality.submode (Alloc.proj_comonadic Areality mode) Locality.global
+    with
     | Ok () -> true
-    | Error _ -> false)
+    | Error _ -> false
+  in
+  Btype.backtrack snap;
+  result
+
+let should_pin_omitted_mode_global mode =
+  Language_extension.(is_at_least_mode_poly Beta)
+  && alloc_mode_can_be_global mode
 
 let create_allocation_mode_l_global_if_possible mode : alloc_mode_l =
-  if Language_extension.(is_at_least_mode_poly Beta)
-     && alloc_mode_can_be_global mode
+  if should_pin_omitted_mode_global mode
   then Locality.disallow_right Locality.global
   else create_allocation_mode_l mode
 
 let create_omitted_closure_mode mode : alloc_mode_r =
-  if Language_extension.(is_at_least_mode_poly Beta)
-     && alloc_mode_can_be_global mode
+  if should_pin_omitted_mode_global mode
   then Locality.disallow_left Locality.global
   else create_allocation_mode_r mode
 
 let create_omitted_return_mode mode : return_mode =
-  if Language_extension.(is_at_least_mode_poly Beta)
-     && alloc_mode_can_be_global mode
-  then Locality.disallow_right Locality.global |> Typedtree.create_return_mode
-  else
-    create_allocation_mode_l mode
-    |> Typedtree.create_return_mode
+  create_allocation_mode_l_global_if_possible mode
+  |> Typedtree.create_return_mode
 
 let register_allocation_value_mode ~loc
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
@@ -5169,15 +5184,20 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs
 (* See Note [Type-checking applications] for an overview *)
 let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
       mode_ret args =
-  let ty_ret, mode_ret, _, _, args, has_omitted_arg =
+  let has_omitted_arg =
+    List.exists
+      (fun (_, arg, _) ->
+         match arg with Omitted _ -> true | Arg _ -> false)
+      args
+  in
+  let ty_ret, mode_ret, _, _, args =
     List.fold_left
-      (fun (ty_ret, mode_ret, open_args, closed_args, args, has_omitted_arg)
-           (lbl, arg, sch) ->
+      (fun (ty_ret, mode_ret, open_args, closed_args, args) (lbl, arg, sch) ->
          match arg with
          | Arg (exp, marg, sort) ->
              let open_args = (exp, marg) :: open_args in
              let args = (lbl, Arg (exp, sort), sch) :: args in
-             (ty_ret, mode_ret, open_args, closed_args, args, has_omitted_arg)
+             (ty_ret, mode_ret, open_args, closed_args, args)
          | Omitted { mode_fun; ty_arg; mode_arg; level; sort_arg } ->
              (* Under mode polymorphism we define a new return mode above mode_ret
                 and a new level-0 allocation mode for mode_ret (to know whether then
@@ -5245,8 +5265,8 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
                 sort_ret }
              in
              let args = (lbl, arg, None) :: args in
-             (ty_ret, mode_cls, open_args, closed_args, args, true))
-      (ty_ret, mode_ret, [], [], [], false) (List.rev args)
+             (ty_ret, mode_cls, open_args, closed_args, args))
+      (ty_ret, mode_ret, [], [], []) (List.rev args)
   in
   if has_omitted_arg then
     submode ~loc ~env ~reason:Other

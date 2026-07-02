@@ -398,10 +398,7 @@ end
 
 (* After the migration to extension universes, this will be an empty list. *)
 let legacy_default_extensions : extn_pair list =
-  Pair (Mode_polymorphism, Alpha)
-  :: List.filter
-       (fun (Pair (extn, _)) -> not (equal extn Mode_polymorphism))
-       (Universe.allowed_extensions_in Stable)
+  Universe.allowed_extensions_in Stable
 
 let extensions : extn_pair list ref = ref legacy_default_extensions
 
@@ -430,6 +427,11 @@ let set extn ~enabled = set_worker extn (if enabled then Some () else None)
 let enable extn value = set_worker extn (Some value)
 
 let disable extn = set_worker extn None
+
+(* Mode polymorphism is currently enabled by default for testing. Going
+   through [enable] (rather than editing [legacy_default_extensions]) keeps
+   the [Universe.check] invariant on [extensions]. *)
+let () = enable Mode_polymorphism Alpha
 
 (* This is similar to [Misc.protect_refs], but we don't have values to set
    [extensions] to. *)
@@ -495,13 +497,13 @@ let is_at_least (type a) (extn : a t) (value : a) =
   in
   check !extensions
 
-let mode_polymorphism_debug_enabled () =
-  Sys.getenv_opt "OXCAML_MODE_POLYMORPHISM_DEBUG" = Some "1"
+let mode_polymorphism_debug_enabled =
+  lazy (Sys.getenv_opt "OXCAML_MODE_POLYMORPHISM_DEBUG" = Some "1")
 
 let is_at_least_mode_poly (value : maturity) =
-  if mode_polymorphism_debug_enabled () && is_at_least Mode_polymorphism Stable
-  then true
-  else is_at_least Mode_polymorphism value
+  is_at_least Mode_polymorphism value
+  || Lazy.force mode_polymorphism_debug_enabled
+     && is_at_least Mode_polymorphism Stable
 
 let is_enabled extn =
   let rec check : extn_pair list -> bool = function
