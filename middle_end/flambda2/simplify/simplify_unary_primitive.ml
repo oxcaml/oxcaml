@@ -775,7 +775,8 @@ let simplify_obj_dup dbg dacc ~original_term ~arg ~arg_ty ~result_var =
       in
       let contents_pat =
         Bound_pattern.singleton
-          (Bound_var.create contents_var contents_var_duid NM.normal)
+          (Bound_var.create contents_var contents_var_duid NM.normal
+             ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var)
       in
       let contents_simple = Simple.var contents_var in
       let box_expr =

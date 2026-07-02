@@ -205,7 +205,7 @@
   ast_invariants
   depend
   parser_types ; manual update: mli only files asttypes parsetree
-  ;; TYPING
+               ;; TYPING
   ident
   path
   jkind
@@ -545,6 +545,7 @@
   ;; middle_end/
   backend_var
   compilenv
+  is_parameter
   ;; asmcomp/
   asmgen
   binary_emitter_verify
@@ -698,10 +699,11 @@
   cfg_format
   ;; backend/debug/
   available_ranges_vars
+  available_ranges_phantom_vars
+  available_ranges_all_vars
   compute_ranges
   compute_ranges_intf
   inlined_frame_ranges
-  is_parameter
   reg_availability_set
   reg_with_debug_info
   stack_reg_offset
@@ -710,6 +712,7 @@
   ;; build it as part of that library.
   dwarf
   dwarf_abstract_instances
+  dwarf_call_sites
   dwarf_compilation_unit
   dwarf_concrete_instances
   dwarf_inlined_frames
@@ -804,7 +807,15 @@
  (instrumentation
   (backend bisect_ppx))
  (ocamlopt_flags
-  (:standard -runtime-variant nnp))
+  (:standard
+   -runtime-variant
+   nnp
+   ; Emit DWARF for the startup file of the compiler itself (when OxCaml
+   ; DWARF is enabled via the flags below): debuggers need the call site
+   ; information of the caml_apply and caml_curry functions, which live
+   ; there, in order to see through generically-applied calls.
+   -gstartup
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (libraries
   memtrace
   flambda2
@@ -863,8 +874,8 @@
    %{dep:middle_end/flambda2/identifiers/flambda2_identifiers.a}
    %{dep:middle_end/flambda2/nominal/flambda2_nominal.a}
    %{dep:middle_end/flambda2/lattices/flambda2_lattices.a}
-   %{dep:middle_end/flambda2/bound_identifiers/flambda2_bound_identifiers.a}
    %{dep:middle_end/flambda2/term_basics/flambda2_term_basics.a}
+   %{dep:middle_end/flambda2/bound_identifiers/flambda2_bound_identifiers.a}
    %{dep:middle_end/flambda2/classic_mode_types/flambda2_classic_mode_types.a}
    %{dep:middle_end/flambda2/types/flambda2_types.a}
    %{dep:middle_end/flambda2/terms/flambda2_terms.a}
@@ -905,8 +916,8 @@
    %{dep:middle_end/flambda2/identifiers/flambda2_identifiers.cma}
    %{dep:middle_end/flambda2/nominal/flambda2_nominal.cma}
    %{dep:middle_end/flambda2/lattices/flambda2_lattices.cma}
-   %{dep:middle_end/flambda2/bound_identifiers/flambda2_bound_identifiers.cma}
    %{dep:middle_end/flambda2/term_basics/flambda2_term_basics.cma}
+   %{dep:middle_end/flambda2/bound_identifiers/flambda2_bound_identifiers.cma}
    %{dep:middle_end/flambda2/classic_mode_types/flambda2_classic_mode_types.cma}
    %{dep:middle_end/flambda2/types/flambda2_types.cma}
    %{dep:middle_end/flambda2/terms/flambda2_terms.cma}
@@ -947,8 +958,8 @@
    %{dep:middle_end/flambda2/identifiers/flambda2_identifiers.cmxa}
    %{dep:middle_end/flambda2/nominal/flambda2_nominal.cmxa}
    %{dep:middle_end/flambda2/lattices/flambda2_lattices.cmxa}
-   %{dep:middle_end/flambda2/bound_identifiers/flambda2_bound_identifiers.cmxa}
    %{dep:middle_end/flambda2/term_basics/flambda2_term_basics.cmxa}
+   %{dep:middle_end/flambda2/bound_identifiers/flambda2_bound_identifiers.cmxa}
    %{dep:middle_end/flambda2/classic_mode_types/flambda2_classic_mode_types.cmxa}
    %{dep:middle_end/flambda2/types/flambda2_types.cmxa}
    %{dep:middle_end/flambda2/terms/flambda2_terms.cmxa}

@@ -357,6 +357,12 @@ let loc_exn_bucket = rax
 let stack_ptr_dwarf_register_number = 7
 let domainstate_ptr_dwarf_register_number = 14
 
+let extcall_code_size_after_return_address ~alloc:_ ~stack_ofs:_ =
+  (* CR mshinwell: implement this, mirroring the [Lextcall] case of
+     [emit_instr] in emit.ml (more delicate than for arm64, since
+     instructions are of variable length). *)
+  None
+
 (* Registers destroyed by operations *)
 
 let int_regs_destroyed_at_c_call_win64 =
@@ -736,6 +742,7 @@ let operation_supported = function
 let expression_supported = function
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
+  | Cname_for_debugger _
   | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
   | Cexit _ | Cinvalid _ -> true
   | Cconst_vec256 _ -> Arch.Extension.enabled_vec256 ()

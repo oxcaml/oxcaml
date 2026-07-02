@@ -130,7 +130,8 @@ module Instruction = struct
       stack_offset = -1;
       id = InstructionId.none;
       available_before = Reg_availability_set.Unreachable;
-      available_across = Reg_availability_set.Unreachable
+      available_across = Reg_availability_set.Unreachable;
+      phantom_available_before = None
     }
 
   let compare (left : t) (right : t) : int =
@@ -259,6 +260,25 @@ module Move = struct
     | Load -> Operation.Reload
     | Store -> Operation.Spill
 
+  (* Spills and reloads are bookkeeping, not code lowered from the source of the
+     function identified by the debuginfo of [copy]. If such debuginfo were used
+     unaltered for spill and reload instructions, then in the case where such
+     debuginfo indicated the body of an inlined function, the instructions would
+     be attributed to that inlined function (e.g. by a profiler reading the
+     DWARF line table), which could be confusing: for example reloads, of a
+     caller's variables after a call, being attributed to an inlined callee.
+     Instead only the outermost frame of the debuginfo is kept, attributing such
+     instructions to the enclosing (non-inlined) function. This is consistent
+     with [Inlined_frame_ranges], which excludes spills and reloads from the
+     DWARF address ranges of all inlined frames. *)
+  let dbg_for_move (move : t) (copy : _ Cfg.instruction) : Debuginfo.t =
+    match move with
+    | Plain -> copy.dbg
+    | Load | Store -> (
+      match Debuginfo.to_items copy.dbg with
+      | [] | [_] -> copy.dbg
+      | outermost :: _ :: _ -> Debuginfo.of_items [outermost])
+
   let make_instr :
       t ->
       id:InstructionId.t ->
@@ -269,7 +289,7 @@ module Move = struct
    fun move ~id ~copy ~from ~to_ ->
     Cfg.make_instruction_from_copy copy
       ~desc:(Cfg.Op (op_of_move move))
-      ~arg:[| from |] ~res:[| to_ |] ~id ()
+      ~arg:[| from |] ~res:[| to_ |] ~id ~dbg:(dbg_for_move move copy) ()
 
   let to_string = function Plain -> "move" | Load -> "load" | Store -> "store"
 end

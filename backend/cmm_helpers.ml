@@ -140,6 +140,8 @@ let bind name arg fn =
     let id = V.create_local name in
     Clet (VP.create id, arg, fn (Cvar id))
 
+let make_phantom_let var def body = Cphantom_let (var, def, body)
+
 let bind_list name args fn =
   let rec aux bound_args = function
     | [] -> fn bound_args
@@ -481,6 +483,7 @@ let rec map_tail1 e ~f =
   match e with
   | Clet (id, exp, body) -> Clet (id, exp, map_tail1 body ~f)
   | Cphantom_let (id, exp, body) -> Cphantom_let (id, exp, map_tail1 body ~f)
+  | Cname_for_debugger (var, body) -> Cname_for_debugger (var, map_tail1 body ~f)
   | Csequence (e1, e2) -> Csequence (e1, map_tail1 e2 ~f)
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
@@ -3585,7 +3588,10 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
       let app =
         Cop
           ( Capply { result_type = result; region = Rc_normal; callees = None },
-            [ get_field_codepointer Asttypes.Mutable (Cvar clos) 0 (dbg ());
+            (* The code pointer and closure info of a closure are write-once;
+               reading them immutably is correct and lets the debugger describe
+               the call target (and closure projections) for call sites. *)
+            [ get_field_codepointer Asttypes.Immutable (Cvar clos) 0 (dbg ());
               Cvar arg;
               Cvar clos ],
             dbg () )
@@ -3605,7 +3611,7 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
           Cop
             ( Capply
                 { result_type = typ_val; region = Rc_normal; callees = None },
-              [ get_field_codepointer Asttypes.Mutable (Cvar clos) 0 (dbg ());
+              [ get_field_codepointer Asttypes.Immutable (Cvar clos) 0 (dbg ());
                 Cvar arg;
                 Cvar clos ],
               dbg () ),
@@ -3628,7 +3634,7 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
             ( Ccmpi Ceq,
               [ Cop
                   ( Casr,
-                    [ get_field_gen Asttypes.Mutable (Cvar clos) 1 (dbg ());
+                    [ get_field_gen Asttypes.Immutable (Cvar clos) 1 (dbg ());
                       Cconst_int (pos_arity_in_closinfo, dbg ()) ],
                     dbg () );
                 Cconst_int (List.length arity, dbg ()) ],
@@ -3636,7 +3642,7 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
           dbg (),
           Cop
             ( Capply { result_type = result; region = Rc_normal; callees = None },
-              get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ())
+              get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
               :: List.map (fun s -> Cvar s) all_args,
               dbg () ),
           dbg (),
@@ -3765,7 +3771,9 @@ let tuplify_function arity return =
       fun_body =
         Cop
           ( Capply { result_type = return; region = Rc_normal; callees = None },
-            get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ())
+            (* The closure code pointer is write-once; see
+               [apply_function_body]. *)
+            get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
             :: access_components 0
             @ [Cvar clos],
             dbg () );
@@ -3866,7 +3874,11 @@ let value_slot_given_machtype vs =
 
 let read_from_closure_given_machtype t clos base_offset dbg =
   let load chunk offset =
-    Cop (mk_load_mut chunk, [field_address clos offset dbg], dbg)
+    (* Closure value slots are write-once (a partial-application closure is
+       never back-patched), so these reads are immutable. Besides being correct,
+       this lets the debugger describe the recovered arguments as projections of
+       the closure for call site information. *)
+    Cop (mk_load_immut chunk, [field_address clos offset dbg], dbg)
   in
   let _, l =
     List.fold_left_map
@@ -3908,7 +3920,10 @@ let rec make_curry_apply result narity args_type args clos n =
   | [] ->
     Cop
       ( Capply { result_type = result; region = Rc_normal; callees = None },
-        (get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ()) :: args)
+        (* Code pointer and chain links of a partial-application closure are
+           write-once; reading them immutably lets the debugger describe the
+           call target and the recovered arguments as closure projections. *)
+        (get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ()) :: args)
         @ [Cvar clos],
         dbg () )
   | arg_type :: args_type ->
@@ -3917,7 +3932,7 @@ let rec make_curry_apply result narity args_type args clos n =
     let clos_pos = arg_pos + machtype_stored_size arg_type in
     Clet
       ( VP.create newclos,
-        get_field_gen Asttypes.Mutable (Cvar clos) clos_pos (dbg ()),
+        get_field_gen Asttypes.Immutable (Cvar clos) clos_pos (dbg ()),
         make_curry_apply result narity args_type
           (read_from_closure_given_machtype arg_type (Cvar clos) arg_pos
              (dbg ())
@@ -4675,8 +4690,8 @@ let letin v ~defining_expr ~body =
     defining_expr
   | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-  | Clet _ | Cphantom_let _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _
-  | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
+  | Clet _ | Cphantom_let _ | Cname_for_debugger _ | Ctuple _ | Cop _
+  | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
     Clet (v, defining_expr, body)
 
 let sequence x y =
@@ -5030,8 +5045,8 @@ let cmm_arith_size (e : Cmm.expression) =
   | Cconst_vec512 _ ->
     Some 0
   | Cop _ -> Some (cmm_arith_size0 e)
-  | Clet _ | Cphantom_let _ | Ctuple _ | Csequence _ | Cifthenelse _ | Cswitch _
-  | Ccatch _ | Cexit _ | Cinvalid _ ->
+  | Clet _ | Cphantom_let _ | Cname_for_debugger _ | Ctuple _ | Csequence _
+  | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
     None
 
 (* Atomics *)

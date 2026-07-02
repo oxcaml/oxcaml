@@ -456,7 +456,9 @@ let add_extra_params_and_args extra_params_and_args ~invalids decision =
       List.fold_left
         (fun extra_params_and_args ({ epa; decision; kind } : U.field_decision)
            ->
-          let extra_param = BP.create epa.param kind epa.param_debug_uid in
+          let extra_param =
+            BP.create epa.param kind epa.param_debug_uid ~dbg:Debuginfo.none
+          in
           let extra_params_and_args =
             EPA.add extra_params_and_args ~invalids ~extra_param
               ~extra_args:epa.args
@@ -467,7 +469,9 @@ let add_extra_params_and_args extra_params_and_args ~invalids decision =
       Value_slot.Map.fold
         (fun _ ({ epa; decision; kind } : U.field_decision)
              extra_params_and_args ->
-          let extra_param = BP.create epa.param kind epa.param_debug_uid in
+          let extra_param =
+            BP.create epa.param kind epa.param_debug_uid ~dbg:Debuginfo.none
+          in
           let extra_params_and_args =
             EPA.add extra_params_and_args ~invalids ~extra_param
               ~extra_args:epa.args
@@ -483,6 +487,7 @@ let add_extra_params_and_args extra_params_and_args ~invalids decision =
                    ({ epa; decision; kind } : U.field_decision) ->
                 let extra_param =
                   BP.create epa.param kind epa.param_debug_uid
+                    ~dbg:Debuginfo.none
                 in
                 let extra_params_and_args =
                   EPA.add extra_params_and_args ~invalids ~extra_param
@@ -498,7 +503,7 @@ let add_extra_params_and_args extra_params_and_args ~invalids decision =
         | At_least_one { is_int; ctor = Do_not_unbox _; _ } ->
           let extra_param =
             BP.create is_int.param K.With_subkind.naked_immediate
-              is_int.param_debug_uid
+              is_int.param_debug_uid ~dbg:Debuginfo.none
           in
           EPA.add extra_params_and_args ~invalids ~extra_param
             ~extra_args:is_int.args
@@ -506,7 +511,7 @@ let add_extra_params_and_args extra_params_and_args ~invalids decision =
           ->
           let extra_param =
             BP.create is_int.param K.With_subkind.naked_immediate
-              is_int.param_debug_uid
+              is_int.param_debug_uid ~dbg:Debuginfo.none
           in
           let extra_params_and_args =
             EPA.add extra_params_and_args ~invalids ~extra_param
@@ -514,7 +519,7 @@ let add_extra_params_and_args extra_params_and_args ~invalids decision =
           in
           let extra_param =
             BP.create ctor.param K.With_subkind.naked_immediate
-              ctor.param_debug_uid
+              ctor.param_debug_uid ~dbg:Debuginfo.none
           in
           EPA.add extra_params_and_args ~invalids ~extra_param
             ~extra_args:ctor.args
@@ -535,6 +540,7 @@ let add_extra_params_and_args extra_params_and_args ~invalids decision =
       in
       let extra_param =
         BP.create tag.param K.With_subkind.naked_immediate tag.param_debug_uid
+          ~dbg:Debuginfo.none
       in
       EPA.add extra_params_and_args ~invalids ~extra_param ~extra_args:tag.args
     | Unbox (Number (naked_number_kind, epa)) ->
@@ -543,6 +549,7 @@ let add_extra_params_and_args extra_params_and_args ~invalids decision =
       in
       let extra_param =
         BP.create epa.param kind_with_subkind epa.param_debug_uid
+          ~dbg:Debuginfo.none
       in
       EPA.add extra_params_and_args ~invalids ~extra_param ~extra_args:epa.args
   in

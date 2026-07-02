@@ -178,11 +178,14 @@ let get_parameters params_decisions =
       match param_decision with
       | Delete -> acc
       | Keep (var, kind) ->
-        Bound_parameter.create var kind Flambda_debug_uid.none :: acc
+        Bound_parameter.create var kind Flambda_debug_uid.none
+          ~dbg:Debuginfo.none
+        :: acc
       | Unbox fields ->
         Unboxed_fields.fold_with_kind
           (fun kind v acc ->
             Bound_parameter.create v (KS.anything kind) Flambda_debug_uid.none
+              ~dbg:Debuginfo.none
             :: acc)
           fields acc) (* CR sspies: Missing debug uid. *)
     [] params_decisions
@@ -194,11 +197,15 @@ let get_parameters_and_modes params_decisions modes =
       match param_decision with
       | Delete -> acc
       | Keep (var, kind) ->
-        (Bound_parameter.create var kind Flambda_debug_uid.none, mode) :: acc
+        ( Bound_parameter.create var kind Flambda_debug_uid.none
+            ~dbg:Debuginfo.none,
+          mode )
+        :: acc
       | Unbox fields ->
         Unboxed_fields.fold_with_kind
           (fun kind v acc ->
-            ( Bound_parameter.create v (KS.anything kind) Flambda_debug_uid.none,
+            ( Bound_parameter.create v (KS.anything kind) Flambda_debug_uid.none
+                ~dbg:Debuginfo.none,
               mode )
             :: acc)
           fields acc) (* CR sspies: Missing debug uid. *)
@@ -248,7 +255,8 @@ let bind_fields fields arg_fields hole =
     (fun var arg hole ->
       let bp =
         Bound_pattern.singleton
-          (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
+          (Bound_var.create var Flambda_debug_uid.none Name_mode.normal
+             ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var)
         (* CR sspies: Missing debug uid. *)
       in
       let simple = Simple.var arg in
@@ -1428,7 +1436,9 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
           (fun var (field, kind) hole ->
             let bp =
               Bound_pattern.singleton
-                (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
+                (Bound_var.create var Flambda_debug_uid.none Name_mode.normal
+                   ~dbg:Debuginfo.none
+                   ~is_parameter:Bound_var.Is_parameter.local_var)
               (* CR sspies: Missing debug uid. *)
             in
             let prim =
@@ -1459,7 +1469,9 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
           (fun var value_slot hole ->
             let bp =
               Bound_pattern.singleton
-                (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
+                (Bound_var.create var Flambda_debug_uid.none Name_mode.normal
+                   ~dbg:Debuginfo.none
+                   ~is_parameter:Bound_var.Is_parameter.local_var)
               (* CR sspies: Missing debug uid. *)
             in
             let prim =
@@ -1526,7 +1538,9 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
           in
           let bp =
             Bound_pattern.singleton
-              (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
+              (Bound_var.create var Flambda_debug_uid.none Name_mode.normal
+                 ~dbg:Debuginfo.none
+                 ~is_parameter:Bound_var.Is_parameter.local_var)
             (* CR sspies: Missing debug uid. *)
           in
           RE.create_let bp
@@ -1595,7 +1609,8 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
                 let bp =
                   Bound_pattern.singleton
                     (Bound_var.create var Flambda_debug_uid.none
-                       Name_mode.normal)
+                       Name_mode.normal ~dbg:Debuginfo.none
+                       ~is_parameter:Bound_var.Is_parameter.local_var)
                   (* CR sspies: Missing debug uid. *)
                 in
                 RE.create_let bp (Named.create_simple arg)
@@ -2319,6 +2334,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
         ( Unboxed_fields.fold_with_kind
             (fun kind v acc ->
               Bound_parameter.create v (KS.anything kind) Flambda_debug_uid.none
+                ~dbg:Debuginfo.none
               :: acc)
             (* CR sspies: Missing debug uid. *)
             fields [],
