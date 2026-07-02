@@ -9838,7 +9838,8 @@ and type_option_some env expected_mode sarg ty ty0 =
   let jkind, sort =
     (* XXX Check that this shouldn't be ty0' *)
     match
-      Ctype.type_jkind_and_sort env ty' ~fixed:false ~why:Constructor_arg_assignment
+      Ctype.type_jkind_and_sort env ty' ~fixed:false
+        ~why:Constructor_arg_assignment
     with
     | Ok jkind_and_sort -> jkind_and_sort
     | Error _ ->
