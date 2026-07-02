@@ -539,7 +539,7 @@
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target cmxa_test.exe)
- (deps mylib.cmxa mylib.a mylib_a.cmi mylib_b.cmi cmxa_main.ml)
+ (deps mylib.cmxa mylib.a mylib_a.cmi mylib_a.cmx mylib_b.cmi mylib_b.cmx cmxa_main.ml)
  (action
   (run %{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.005
        mylib.cmxa cmxa_main.ml -o %{target})))
