@@ -134,6 +134,11 @@ let classify_variant_with_null_constructor payload_cstr =
   | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
     Misc.fatal_error "Invalid constructor for Variant_with_null"
 
+(* Note: before [update_decl_jkind] has filled in the argument sorts, a
+   unary null constructor is indistinguishable from the payload constructor
+   (its [ca_sort] is still [None]), so this function can return the wrong
+   constructor. Callers must run after sorts are filled in, or tolerate
+   misclassification. *)
 let find_variant_with_null_payload cstrs =
   List.find_map
     (fun cstr ->

@@ -441,6 +441,39 @@ and both_aliased_null =
   | This_both_aliased of both_aliased_int [@@or_null]
 |}]
 
+(* Null-first declarations exercise [Ctype.contained_without_boxing] (via the
+   unboxed-recursion check and the jkind update order) before argument sorts
+   are known, when the null constructor cannot yet be told apart from the
+   payload constructor. *)
+
+type null_first_rec =
+  | Null_first of void
+  | This_first of first_wrapper
+[@@or_null]
+and first_wrapper = { fw : int } [@@unboxed]
+
+[%%expect{|
+type null_first_rec = Null_first of void | This_first of first_wrapper [@@or_null]
+and first_wrapper = { fw : int; } [@@unboxed]
+|}]
+
+type bad_rec =
+  | Null_bad of void
+  | This_bad of bad_wrapper
+[@@or_null]
+and bad_wrapper = { bw : bad_rec } [@@unboxed]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type bad_rec =
+2 |   | Null_bad of void
+3 |   | This_bad of bad_wrapper
+4 | [@@or_null]
+Error: The definition of "bad_rec" is recursive without boxing:
+         "bad_rec" contains "bad_wrapper",
+         "bad_wrapper" contains "bad_rec"
+|}]
+
 type portable_payload : value_or_null mod portable =
   | Portable_none
   | Portable_some of (unit -> unit) @@ portable
