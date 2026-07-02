@@ -373,6 +373,74 @@ Error: Invalid [@or_null] declaration:
        it must have exactly one null constructor and one payload constructor.
 |}]
 
+(* The null constructor's void argument counts towards the mod-bounds of the
+   type: matching on the null constructor synthesizes a value of the argument
+   type. *)
+
+type nonportable_void : void
+
+type crossing_void_null : value_or_null mod portable =
+  | Null_crossing_void of void
+  | This_crossing_void of int
+[@@or_null]
+
+type noncrossing_void_null : value_or_null mod portable =
+  | Null_noncrossing_void of nonportable_void
+  | This_noncrossing_void of int
+[@@or_null]
+
+[%%expect{|
+type nonportable_void : void
+type crossing_void_null =
+    Null_crossing_void of void
+  | This_crossing_void of int [@@or_null]
+Lines 8-11, characters 0-11:
+ 8 | type noncrossing_void_null : value_or_null mod portable =
+ 9 |   | Null_noncrossing_void of nonportable_void
+10 |   | This_noncrossing_void of int
+11 | [@@or_null]
+Error: The kind of type "noncrossing_void_null" is
+           immediate_or_null with nonportable_void
+         because an [@@or_null] type gets its kind by applying or_null to its
+         payload kind.
+       But the kind of type "noncrossing_void_null" must be a subkind of
+           value_or_null mod portable
+         because of the annotation on the declaration of the type noncrossing_void_null.
+|}]
+
+type two_nullary =
+  | A_nullary
+  | B_nullary
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type two_nullary =
+2 |   | A_nullary
+3 |   | B_nullary
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       it must have exactly one null constructor and one payload constructor.
+|}]
+
+(* Both arguments are aliases from the same recursive group, so neither can
+   be classified before the whole group is translated. *)
+
+type both_aliased_void = void
+and both_aliased_int = int
+and both_aliased_null =
+  | Null_both_aliased of both_aliased_void
+  | This_both_aliased of both_aliased_int
+[@@or_null]
+
+[%%expect{|
+type both_aliased_void = void
+and both_aliased_int = int
+and both_aliased_null =
+    Null_both_aliased of both_aliased_void
+  | This_both_aliased of both_aliased_int [@@or_null]
+|}]
+
 type portable_payload : value_or_null mod portable =
   | Portable_none
   | Portable_some of (unit -> unit) @@ portable

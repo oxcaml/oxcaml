@@ -224,62 +224,9 @@ let check_or_null_variant_shape sdecl scstrs =
   check_or_null_decl bad sdecl;
   check_or_null_constructors bad scstrs
 
-type or_null_constructor =
-  | Or_null_null
-  | Or_null_payload of Types.constructor_argument
-  | Or_null_unresolved of Types.constructor_argument
-
-type or_null_payload_arg =
-  | Or_null_known_payload of Types.constructor_argument
-  | Or_null_unresolved_payload of Types.constructor_argument
-  | Or_null_deferred_payload
-
-let invalid_or_null_payload_message =
-  "it must have exactly one null constructor and one payload constructor"
-
 let bad_or_null_payload_count loc =
-  raise (Error (loc, Bad_or_null_attribute invalid_or_null_payload_message))
-
-let classify_or_null_payload env (arg : Types.constructor_argument) =
-  let sort =
-    arg.ca_type
-    |> Ctype.type_jkind env
-    |> Jkind.sort_option_of_jkind env
-  in
-  match sort with
-  | Some sort ->
-    let all_void =
-      sort
-      |> Jkind.Sort.default_to_scannable_and_get
-      |> Jkind.Sort.Const.all_void
-    in
-    if all_void then Or_null_null else Or_null_payload arg
-  | None -> Or_null_unresolved arg
-
-let classify_or_null_constructor env (cstr : Types.constructor_declaration) =
-  match cstr.cd_args with
-  | Cstr_tuple [] -> Or_null_null
-  | Cstr_tuple [arg] -> classify_or_null_payload env arg
-  | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
-    Misc.fatal_error "Invalid constructor for Variant_with_null"
-
-let get_or_null_payload_arg env sdecl cstrs : or_null_payload_arg =
-  let num_nulls, payloads, unresolved =
-    List.fold_left
-      (fun (num_nulls, payloads, unresolved) cstr ->
-         match classify_or_null_constructor env cstr with
-         | Or_null_null -> num_nulls + 1, payloads, unresolved
-         | Or_null_payload payload -> num_nulls, payload :: payloads, unresolved
-         | Or_null_unresolved payload ->
-           num_nulls, payloads, payload :: unresolved)
-      (0, [], []) cstrs
-  in
-  match num_nulls, payloads, unresolved with
-  | 1, [payload_arg], [] -> Or_null_known_payload payload_arg
-  | 1, [], [payload_arg] -> Or_null_unresolved_payload payload_arg
-  | _, [payload_arg], _ -> Or_null_known_payload payload_arg
-  | 0, [], [_; _] -> Or_null_deferred_payload
-  | _ -> bad_or_null_payload_count sdecl.ptype_loc
+  raise (Error (loc, Bad_or_null_attribute
+    "it must have exactly one null constructor and one payload constructor"))
 
 let constrain_or_null_payload ~env ~path payload_ty payload_loc =
   let required = Btype.Jkind0.for_or_null_payload path in
@@ -1020,19 +967,6 @@ let transl_declaration env sdecl (id, uid) =
       transl_simple_type ~new_var_jkind:Sort env ~closed:false Mode.Alloc.Const.legacy sty', loc)
     sdecl.ptype_cstrs
   in
-  let constraints_checked = ref false in
-  let check_constraints () =
-    if not !constraints_checked then begin
-      List.iter
-        (fun (cty, cty', loc) ->
-           let ty = cty.ctyp_type in
-           let ty' = cty'.ctyp_type in
-           try Ctype.unify env ty ty' with Ctype.Unify err ->
-             raise(Error(loc, Inconsistent_constraint (env, err))))
-        cstrs;
-      constraints_checked := true
-    end
-  in
   let unboxed_attr = get_unboxed_from_attributes sdecl in
   let represent_as_float_array =
     Builtin_attributes.has_represent_as_float_array sdecl.ptype_attributes
@@ -1181,56 +1115,66 @@ let transl_declaration env sdecl (id, uid) =
             (fun () -> make_cstr scstr)
         in
         let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
-        let or_null_payload_arg =
-          if or_null then begin
-            check_constraints ();
-            let payload_arg = get_or_null_payload_arg env sdecl cstrs in
-            begin match payload_arg with
-            | Or_null_known_payload payload_arg ->
-              let payload_ty = payload_arg.Types.ca_type in
-              let payload_loc = payload_arg.Types.ca_loc in
-              constrain_or_null_payload ~env ~path payload_ty payload_loc
-            | Or_null_unresolved_payload _ | Or_null_deferred_payload -> ()
-            end;
-            Some payload_arg
-          end else
-            None
-        in
         let rep, jkind =
-          match or_null_payload_arg with
-          | Some
-              (Or_null_known_payload payload_arg
-              | Or_null_unresolved_payload payload_arg) ->
-            let payload_ty = payload_arg.Types.ca_type in
-            let modality = payload_arg.Types.ca_modalities in
+          if or_null then begin
+            (* Which constructor is the null constructor and which is the
+               payload constructor is determined by which one has an
+               all-void argument. Jkinds are not reliably available here
+               (types in the same recursive group still have temporary
+               jkinds), so the constructors are classified - and the
+               payload constrained - in [update_decl_jkind], where the
+               argument sorts of ordinary variants are computed too. Here
+               we only need a jkind for the temporary environment:
+               [value_or_null], bounded by the arguments of both
+               constructors, is correct whichever way the classification
+               goes. *)
+            let unary_args =
+              List.filter_map
+                (fun (cstr : Types.constructor_declaration) ->
+                   match cstr.cd_args with
+                   | Cstr_tuple [] -> None
+                   | Cstr_tuple [arg] -> Some arg
+                   | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
+                     Misc.fatal_error
+                       "Invalid constructor for Variant_with_null")
+                cstrs
+            in
+            begin match unary_args with
+            | [] ->
+              (* Two nullary constructors: no payload constructor. *)
+              bad_or_null_payload_count sdecl.ptype_loc
+            | _ :: _ -> ()
+            end;
             Variant_with_null,
-            Btype.Jkind0.for_variant_with_null_result path ~modality payload_ty
-          | Some Or_null_deferred_payload ->
-            Variant_with_null, Jkind.Builtin.any ~why:Initial_typedecl_env
-          | None ->
-            if unbox then
-              Variant_unboxed,
-              Jkind.Builtin.any ~why:Old_style_unboxed_type
-            else
-              (* We mark all arg sorts "void" here.  They are updated later,
-                 after the circular type checks make it safe to check sorts.
-                 Likewise, [Constructor_uniform_value] is potentially wrong
-                 and will be updated later.
-              *)
-              Variant_boxed (
-                Array.map
-                  (fun cstr ->
-                     let sorts =
-                       match Types.(cstr.cd_args) with
-                        | Cstr_tuple args ->
-                          Array.make (List.length args) Jkind.Sort.Const.void
-                        | Cstr_record _ -> [| Jkind.Sort.Const.scannable |]
-                      in
-                      Cstr_layout_known
-                        { shape = Constructor_uniform_value; sorts })
-                   (Array.of_list cstrs)
-               ),
-               Jkind.for_non_float ~why:Boxed_variant
+            Btype.Jkind0.for_variant_with_null_result path
+              (List.map
+                 (fun (arg : Types.constructor_argument) ->
+                    arg.ca_modalities, arg.ca_type)
+                 unary_args)
+          end
+          else if unbox then
+            Variant_unboxed,
+            Jkind.Builtin.any ~why:Old_style_unboxed_type
+          else
+            (* We mark all arg sorts "void" here.  They are updated later,
+               after the circular type checks make it safe to check sorts.
+               Likewise, [Constructor_uniform_value] is potentially wrong
+               and will be updated later.
+            *)
+            Variant_boxed (
+              Array.map
+                (fun cstr ->
+                   let sorts =
+                     match Types.(cstr.cd_args) with
+                      | Cstr_tuple args ->
+                        Array.make (List.length args) Jkind.Sort.Const.void
+                      | Cstr_record _ -> [| Jkind.Sort.Const.scannable |]
+                    in
+                    Cstr_layout_known
+                      { shape = Constructor_uniform_value; sorts })
+                 (Array.of_list cstrs)
+             ),
+             Jkind.for_non_float ~why:Boxed_variant
         in
           Ttype_variant tcstrs, Type_variant (cstrs, rep, None), jkind
       | Ptype_record lbls ->
@@ -1335,7 +1279,13 @@ let transl_declaration env sdecl (id, uid) =
            translated, in [derive_unboxed_versions] *)
       } in
   (* Check constraints *)
-    check_constraints ();
+    List.iter
+      (fun (cty, cty', loc) ->
+        let ty = cty.ctyp_type in
+        let ty' = cty'.ctyp_type in
+        try Ctype.unify env ty ty' with Ctype.Unify err ->
+          raise(Error(loc, Inconsistent_constraint (env, err))))
+      cstrs;
   (* Check for imprecise type parameter annotations *)
     List.iter2 (check_imprecise_type_param_annotation env)
       tparams param_annotated_jkinds;
@@ -2593,54 +2543,66 @@ let rec update_decl_jkind env dpath decl =
     (* CR layouts: factor out duplication *)
     match cstrs, rep with
     | _, Variant_with_null ->
+      (* The null constructor is the one with an all-void argument (or no
+         argument); the payload constructor is the other one. We classify
+         the constructors here, rather than in [transl_declaration],
+         because the jkinds of the arguments are only known once the whole
+         recursive group has been translated, just like the argument sorts
+         of ordinary variants. *)
       let payload = ref None in
+      let null_payload = ref None in
+      let sort_of_jkind jkind =
+        Option.bind
+          (Jkind.sort_option_of_jkind env jkind)
+          Jkind.Sort.default_to_scannable_and_get_some
+      in
       let cstrs =
         List.map
           (fun (cstr : Types.constructor_declaration) ->
              match cstr.cd_args with
              | Cstr_tuple [] -> cstr
-             | Cstr_tuple [{ ca_type; ca_modalities; ca_loc; _ }] ->
+             | Cstr_tuple [({ ca_type; ca_modalities; ca_loc; _ } as arg)] ->
                let jkind = Ctype.type_jkind env ca_type in
                let ca_sort =
-                 let sort = Jkind.sort_option_of_jkind env jkind in
-                 Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
-               in
-               let ca_sort =
-                 if match ca_sort with
-                   | Some sort -> Jkind.Sort.Const.all_void sort
-                   | None -> false
-                 then
-                   ca_sort
-                 else begin
-                   constrain_or_null_payload ~env ~path:dpath ca_type ca_loc;
-                   let jkind = Ctype.type_jkind env ca_type in
-                   let ca_sort =
-                     let sort = Jkind.sort_option_of_jkind env jkind in
-                     Option.bind sort
-                       Jkind.Sort.default_to_scannable_and_get_some
-                   in
-                   begin match !payload with
-                   | None -> payload := Some (jkind, ca_modalities, ca_sort)
+                 match sort_of_jkind jkind with
+                 | Some sort when Jkind.Sort.Const.all_void sort ->
+                   (* The null constructor. *)
+                   begin match !null_payload with
+                   | None -> null_payload := Some (ca_modalities, ca_type)
                    | Some _ -> bad_or_null_payload_count loc
                    end;
-                   ca_sort
-                 end
+                   Some sort
+                 | _ ->
+                   (* The payload constructor. *)
+                   constrain_or_null_payload ~env ~path:dpath ca_type ca_loc;
+                   let jkind = Ctype.type_jkind env ca_type in
+                   begin match !payload with
+                   | None -> payload := Some (jkind, ca_modalities)
+                   | Some _ -> bad_or_null_payload_count loc
+                   end;
+                   sort_of_jkind jkind
                in
-               { cstr with
-                 cd_args =
-                   Cstr_tuple
-                     [{ ca_type; ca_sort; ca_modalities; ca_loc }] }
+               { cstr with cd_args = Cstr_tuple [{ arg with ca_sort }] }
              | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
                Misc.fatal_error "Invalid constructor for Variant_with_null")
           cstrs
       in
       begin match !payload with
-      | Some (jkind, modality, _) ->
+      | Some (jkind, modality) ->
         begin match
           Jkind.apply_modality_l modality jkind
           |> Jkind.apply_or_null_l env
         with
         | Ok type_jkind ->
+          let type_jkind =
+            (* A void argument of the null constructor still counts
+               towards the bounds of the declaration: matching on the null
+               constructor synthesizes a value of that type. *)
+            match !null_payload with
+            | None -> type_jkind
+            | Some (modality, type_expr) ->
+              Btype.Jkind0.add_with_bounds ~modality ~type_expr type_jkind
+          in
           let type_jkind =
             Jkind.History.update_reason type_jkind
               (Value_or_null_creation (Or_null_payload dpath))

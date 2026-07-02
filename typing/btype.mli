@@ -752,7 +752,7 @@ module Jkind0 : sig
     val for_or_null_argument : Ident.t -> 'd jkind
     val for_or_null_payload : Path.t -> 'd jkind
     val for_variant_with_null_result :
-      Path.t -> modality:Mode.Modality.Const.t -> type_expr -> jkind_l
+      Path.t -> (Mode.Modality.Const.t * type_expr) list -> jkind_l
 
     val for_effect_arg : Ident.t -> 'd jkind
 

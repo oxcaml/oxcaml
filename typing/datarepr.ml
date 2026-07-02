@@ -116,28 +116,21 @@ type variant_with_null_payload =
     payload_arg: constructor_argument;
   }
 
-type variant_with_null_null =
-  {
-    null_arg: constructor_argument option;
-  }
-
 type variant_with_null_constructor =
-  | Variant_with_null_null of variant_with_null_null
+  | Variant_with_null_null of Jkind_types.Sort.Const.t option
+      (* The sort of the null constructor's all-void argument, if any. *)
   | Variant_with_null_payload of variant_with_null_payload
-
-let constructor_argument_all_void (arg : constructor_argument) =
-  match arg.ca_sort with
-  | Some sort -> Jkind_types.Sort.Const.all_void sort
-  | None -> false
 
 let classify_variant_with_null_constructor payload_cstr =
   match payload_cstr.cd_args with
-  | Cstr_tuple [] -> Variant_with_null_null { null_arg = None }
-  | Cstr_tuple [payload_arg] when constructor_argument_all_void payload_arg ->
-    Variant_with_null_null { null_arg = Some payload_arg }
+  | Cstr_tuple [] -> Variant_with_null_null None
   | Cstr_tuple [payload_arg] ->
-    Variant_with_null_payload
-      { payload_cstr; payload_arg }
+    begin match payload_arg.ca_sort with
+    | Some sort when Jkind_types.Sort.Const.all_void sort ->
+      Variant_with_null_null (Some sort)
+    | Some _ | None ->
+      Variant_with_null_payload { payload_cstr; payload_arg }
+    end
   | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
     Misc.fatal_error "Invalid constructor for Variant_with_null"
 
@@ -182,19 +175,15 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     | Variant_with_null, _ ->
       let layout cstr =
         match classify_variant_with_null_constructor cstr with
-        | Variant_with_null_null { null_arg = None } ->
+        | Variant_with_null_null None ->
           Cstr_layout_known
             { shape = Constructor_uniform_value; sorts = [| |] }
-        | Variant_with_null_null
-            { null_arg = Some { ca_sort = Some sort; _ } } ->
+        | Variant_with_null_null (Some sort) ->
           Cstr_layout_known
             { shape =
                 Constructor_mixed
                   [| Types.mixed_block_element_of_const_sort sort |];
               sorts = [| sort |] }
-        | Variant_with_null_null
-            { null_arg = Some { ca_sort = None; _ } } ->
-          Misc.fatal_error "Invalid constructor for Variant_with_null"
         | Variant_with_null_payload
             { payload_arg = { ca_sort = Some sort; _ }; _ } ->
           Cstr_layout_known
