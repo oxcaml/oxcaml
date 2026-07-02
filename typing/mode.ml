@@ -6344,9 +6344,15 @@ module Zap_scope = struct
     }
 
   let add_job_to_map map i job =
-    match ModeIdMap.find_opt map i with
-    | Some jobs -> ModeIdMap.replace map i (job :: jobs)
-    | None -> ModeIdMap.add map i [job]
+    (* Performance hack: keep only the first job per variable. A variable
+       reachable through many paths/edges would otherwise accumulate one
+       job per (visible mode, path), which is quadratic in practice (tens
+       of millions of jobs on large modules). This matches the behavior of
+       [zap_to_legacy_map], which keeps a single job per variable.
+       CR-someday: the dropped jobs would zap through different path
+       morphisms joined with different visible-mode bounds; confirm with
+       the mode team that the first job suffices. *)
+    if not (ModeIdMap.mem map i) then ModeIdMap.add map i [job]
 
   let add_zap_to_floor_to_zap_scope i zap_to_floor zap_to_legacy zs =
     if ModeIdMap.mem zs.zap_to_legacy_map i

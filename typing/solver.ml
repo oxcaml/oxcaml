@@ -1199,12 +1199,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       push_upper_bound ~log dst v f f_hint u;
       set_vlower ~log v (VarMap.add key x v.vlower);
       VarMap.iter
-        (fun _ (Amorphvar (w, h, h_hint)) ->
+        (fun _ (Amorphvar (w, h, _)) ->
           let fh = C.compose dst (C.disallow_left f) h in
-          let fh_hint =
-            Comp_hint.Morph_hint.Compose
-              (Comp_hint.Morph_hint.disallow_left f_hint, h_hint)
-          in
+          let fh_hint = Comp_hint.Morph_hint.Base (H.Morph.unknown, fh) in
           if w.level < u.level
           then add_vupper_nocheck ~log dst u w fh fh_hint
           else add_vlower_reversed ~log pp dst w u fh fh_hint)
@@ -1235,12 +1232,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       push_lower_bound ~log dst v f f_hint u;
       set_vupper ~log v (VarMap.add key x v.vupper);
       VarMap.iter
-        (fun _ (Amorphvar (w, h, h_hint)) ->
+        (fun _ (Amorphvar (w, h, _)) ->
           let fh = C.compose dst (C.disallow_right f) h in
-          let fh_hint =
-            Comp_hint.Morph_hint.Compose
-              (Comp_hint.Morph_hint.disallow_right f_hint, h_hint)
-          in
+          let fh_hint = Comp_hint.Morph_hint.Base (H.Morph.unknown, fh) in
           if u.level < w.level
           then add_vupper_reversed ~log pp dst w u fh fh_hint
           else add_vlower_nocheck ~log dst u w fh fh_hint)
