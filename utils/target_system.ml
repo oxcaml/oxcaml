@@ -189,11 +189,6 @@ let system () : system =
   | BeOS -> BeOS
   | Unknown -> Unknown
 
-let windows () =
-  match system () with
-  | Windows _ -> true
-  | _ -> false
-
 let is_macos () =
   match assembler () with
   | MASM | GAS_like -> false

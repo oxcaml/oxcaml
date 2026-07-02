@@ -1026,7 +1026,7 @@ let define_data_symbol symbol =
   (* CR sspies: enable check again *)
   (* check_symbol_for_definition_in_current_section symbol; *)
   emit (New_label (Symbol symbol, Machine_width_data));
-  match TS.assembler (), TS.windows () with
+  match TS.assembler (), TS.is_windows () with
   | GAS_like, false -> type_ (Symbol symbol) ~type_:Object
   | GAS_like, true | MacOS, _ | MASM, _ -> ()
 
@@ -1036,7 +1036,7 @@ let define_function_symbol symbol =
   (* check_symbol_for_definition_in_current_section symbol; *)
   (* CR mshinwell: This shouldn't be called "New_label" *)
   emit (New_label (Symbol symbol, Code));
-  match TS.assembler (), TS.windows () with
+  match TS.assembler (), TS.is_windows () with
   | GAS_like, false -> type_ (Symbol symbol) ~type_:Function
   | GAS_like, true | MacOS, _ | MASM, _ -> ()
 
@@ -1047,12 +1047,12 @@ let define_symbol_label ~section symbol =
   emit (New_label (Symbol symbol, typ))
 
 let type_symbol symbol ~ty =
-  match TS.assembler (), TS.windows () with
+  match TS.assembler (), TS.is_windows () with
   | GAS_like, false -> type_ (Symbol symbol) ~type_:ty
   | GAS_like, true | MacOS, _ | MASM, _ -> ()
 
 let type_label label ~ty =
-  match TS.assembler (), TS.windows () with
+  match TS.assembler (), TS.is_windows () with
   | GAS_like, false -> type_ (Label label) ~type_:ty
   | GAS_like, true | MacOS, _ | MASM, _ -> ()
 
