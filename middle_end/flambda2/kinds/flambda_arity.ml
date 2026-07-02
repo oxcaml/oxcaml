@@ -131,7 +131,7 @@ let fresh_idents_unarized t ~id =
     (fun n kind ->
       let ident =
         Ident.create_local
-          (Printf.sprintf "%s_unboxed%d" (Ident.unique_name id) n)
+          (Printf.sprintf "%s_unboxed%d" (Ident.canonical_name id) n)
       in
       ident, kind)
     (unarize t)

@@ -67,9 +67,15 @@ let is_unquoted_symbol s =
   (not (String.equal s "")) && Misc.Stdlib.String.for_all is_identchar s
 
 let is_unquoted_ident s =
+  let name, stamp =
+    match String.split_on_char '/' s with
+    | [] | [_] | _ :: _ :: _ :: _ -> s, ""
+    | [name; stamp] -> name, stamp
+  in
   (not (String.equal s ""))
   && is_identstart s.[0]
-  && Misc.Stdlib.String.for_all is_identchar s
+  && Misc.Stdlib.String.for_all is_identchar name
+  && Misc.Stdlib.String.for_all (fun c -> char_between c ('0', '9')) stamp
 
 let symbol_part ppf s =
   if is_unquoted_symbol s
