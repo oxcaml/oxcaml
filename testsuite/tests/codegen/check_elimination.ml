@@ -108,7 +108,8 @@ search:
   jmp   .L4
 .L2:
   movq  %rbx, %rax
-  jmp   .L4
+  testq %rsi, %rsi
+  je    .L4
 .L3:
   movq  %rax, %rbx
   testb $1, %bl
