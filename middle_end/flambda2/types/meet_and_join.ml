@@ -259,9 +259,9 @@ type ext =
         when_b : TEE.t
       }
 
-let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_expanded_head
-    ~join_env_extension initial_env val_a1 val_b1 extensions1 val_a2 val_b2
-    extensions2 =
+let[@inline] meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b
+    ~meet_expanded_head ~join_env_extension initial_env val_a1 val_b1
+    extensions1 val_a2 val_b2 extensions2 =
   let join_scope = ME.current_scope initial_env in
   let env = ME.increment_scope initial_env in
   let to_extension scoped_env =
@@ -366,6 +366,310 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_expanded_head
       ME.add_env_extension initial_env result_extension ~meet_expanded_head
     in
     Ok (result, result_env)
+
+let[@inline] meet_row_like :
+    'lattice 'shape 'maps_to 'row_tag 'known.
+    meet_maps_to:(ME.t -> 'maps_to -> 'maps_to -> 'maps_to meet_result) ->
+    equal_index:('lattice -> 'lattice -> bool) ->
+    subset_index:('lattice -> 'lattice -> bool) ->
+    union_index:('lattice -> 'lattice -> 'lattice) ->
+    meet_shape:('shape -> 'shape -> 'shape Or_bottom.t) ->
+    is_empty_map_known:('known -> bool) ->
+    get_singleton_map_known:
+      ('known ->
+      ('row_tag * ('lattice, 'shape, 'maps_to) TG.Row_like_case.t) option) ->
+    merge_map_known:
+      (('row_tag ->
+       ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option ->
+       ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option ->
+       ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option) ->
+      'known ->
+      'known ->
+      'known) ->
+    join_env_extension:(Join_env.t -> TEE.t -> TEE.t -> TEE.t) ->
+    meet_expanded_head:(ME.t -> ET.t -> ET.t -> ET.t meet_result) ->
+    ME.t ->
+    known1:'known ->
+    known2:'known ->
+    other1:('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t ->
+    other2:('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t ->
+    ('known * ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t)
+    meet_result =
+ fun ~meet_maps_to ~equal_index ~subset_index ~union_index ~meet_shape
+     ~is_empty_map_known ~get_singleton_map_known ~merge_map_known
+     ~join_env_extension ~meet_expanded_head initial_env ~known1 ~known2 ~other1
+     ~other2 ->
+  let common_scope = ME.current_scope initial_env in
+  let base_env = ME.increment_scope initial_env in
+  let extract_extension scoped_env =
+    ME.cut_as_extension scoped_env ~cut_after:common_scope
+  in
+  let open struct
+    type result_env =
+      | No_result
+      | Extension of TEE.t
+  end in
+  let result_env = ref No_result in
+  let need_join =
+    (* The returned env_extension is the join of the env_extension produced by
+       each non bottom cases. Therefore there is some loss of precision in that
+       case and we need to store the one produced for each tag. But when only
+       one tag is kept it would be wasteful (but correct) to store it.
+
+       We consider that the result of the meet between t1 and t2 will have only
+       one tag when t1 (or t2) has exactly one tag (one that and no 'other'
+       cases).
+
+       This is an overapproximation because the result could have only one tag
+       for instance if
+
+       t1 = [Tag 1 | Tag 2] and t2 = [Tag 2 | Tag 3], or if
+
+       t1 = [Tag 1 | Tag 2] and t2 = [Tag 1 | Tag 2]
+
+       but the meet between some combinations result in a bottom. *)
+    match
+      ( other1,
+        get_singleton_map_known known1,
+        other2,
+        get_singleton_map_known known2 )
+    with
+    | Bottom, Some _, _, _ | _, _, Bottom, Some _ -> false
+    | (Ok _ | Bottom), _, (Ok _ | Bottom), _ ->
+      if is_empty_map_known known1 && is_empty_map_known known2
+      then false
+      else true
+  in
+  let result_is_t1 = ref true in
+  let result_is_t2 = ref true in
+  let update_refs = function
+    | Both_inputs -> ()
+    | Left_input -> result_is_t2 := false
+    | Right_input -> result_is_t1 := false
+    | New_result _ ->
+      result_is_t1 := false;
+      result_is_t2 := false
+  in
+  let join_result_env scoped_env =
+    let new_result_env =
+      match !result_env with
+      | No_result -> Extension (extract_extension scoped_env)
+      | Extension ext1 ->
+        assert need_join;
+        let ext2 = extract_extension scoped_env in
+        let join_env =
+          Join_env.create (ME.typing_env base_env)
+            ~left_env:(ME.typing_env base_env)
+            ~right_env:(ME.typing_env scoped_env)
+        in
+        let extension = join_env_extension join_env ext1 ext2 in
+        Extension extension
+    in
+    result_env := new_result_env
+  in
+  let meet_index env (i1 : ('lattice, 'shape) TG.row_like_index)
+      (i2 : ('lattice, 'shape) TG.row_like_index) :
+      ('lattice, 'shape) TG.row_like_index meet_result =
+    match meet_shape i1.shape i2.shape with
+    | Bottom -> Bottom (New_result ())
+    | Ok shape -> (
+      match i1.domain, i2.domain with
+      | Known i1', Known i2' ->
+        if equal_index i1' i2'
+        then Ok (Both_inputs, env)
+        else Bottom (New_result ())
+      | Known known, At_least at_least ->
+        if subset_index at_least known
+        then
+          (* [at_least] is included in [known] hence [Known known] is included
+             in [At_least at_least], hence [Known known] \inter [At_least
+             at_least] = [Known known] *)
+          Ok (Left_input, env)
+        else Bottom (New_result ())
+      | At_least at_least, Known known ->
+        if subset_index at_least known
+        then Ok (Right_input, env)
+        else Bottom (New_result ())
+      | At_least i1', At_least i2' ->
+        if subset_index i1' i2'
+        then
+          if subset_index i2' i1'
+          then Ok (Both_inputs, env)
+          else Ok (Right_input, env)
+        else if subset_index i2' i1'
+        then Ok (Left_input, env)
+        else
+          let domain =
+            TG.Row_like_index_domain.at_least (union_index i1' i2')
+          in
+          Ok (New_result (TG.Row_like_index.create ~domain ~shape), env))
+  in
+  let bottom_case r =
+    update_refs r;
+    None
+  in
+  let meet_case env (case1 : ('lattice, 'shape, 'maps_to) TG.Row_like_case.t)
+      (case2 : ('lattice, 'shape, 'maps_to) TG.Row_like_case.t) =
+    match meet_index env case1.index case2.index with
+    | Bottom r -> bottom_case r
+    | Ok (index_result, env) -> (
+      match meet_maps_to env case1.maps_to case2.maps_to with
+      | Bottom r -> bottom_case r
+      | Ok (maps_to_result, env) -> (
+        let env : _ Or_bottom.t =
+          match
+            ME.add_env_extension_strict env case1.env_extension
+              ~meet_expanded_head
+          with
+          | Bottom -> Bottom
+          | Ok env ->
+            ME.add_env_extension_strict env case2.env_extension
+              ~meet_expanded_head
+        in
+        match env with
+        | Bottom -> bottom_case (New_result ())
+        | Ok env ->
+          join_result_env env;
+          update_refs index_result;
+          update_refs maps_to_result;
+          let index = extract_value index_result case1.index case2.index in
+          let maps_to =
+            extract_value maps_to_result case1.maps_to case2.maps_to
+          in
+          let env_extension =
+            if need_join then extract_extension env else TEE.empty
+          in
+          if TEE.is_empty env_extension
+          then ()
+          else (
+            result_is_t1 := false;
+            result_is_t2 := false);
+          Some
+            (Or_unknown.Known
+               (TG.Row_like_case.create ~maps_to ~index ~env_extension))))
+  in
+  let meet_knowns
+      (case1 :
+        ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option)
+      (case2 :
+        ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option) :
+      ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option =
+    (* CR bclement: When we return [None] below but either of the inputs were
+       not [None], we fall back to the [other] case. This can cause loss of
+       precision if the [other] case is not [Bottom], as we forget that the
+       current case is impossible.
+
+       Fixing this would require storing [Or_unknown_or_bottom.t] in the
+       row_like_for_block case, so leave it as is for now -- this should be
+       fairly rare. *)
+    match case1, case2 with
+    | None, None -> None
+    | Some case1, None -> (
+      match other2 with
+      | Bottom ->
+        result_is_t1 := false;
+        None
+      | Ok other_case -> (
+        match case1 with
+        | Unknown -> (
+          match
+            ME.add_env_extension_strict base_env other_case.env_extension
+              ~meet_expanded_head
+          with
+          | Bottom -> None
+          | Ok env ->
+            join_result_env env;
+            result_is_t1 := false;
+            result_is_t2 := false;
+            Some (Known other_case))
+        | Known case1 -> meet_case base_env case1 other_case))
+    | None, Some case2 -> (
+      match other1 with
+      | Bottom ->
+        result_is_t2 := false;
+        None
+      | Ok other_case -> (
+        match case2 with
+        | Unknown -> (
+          match
+            ME.add_env_extension_strict base_env other_case.env_extension
+              ~meet_expanded_head
+          with
+          | Bottom -> None
+          | Ok env ->
+            join_result_env env;
+            result_is_t1 := false;
+            result_is_t2 := false;
+            Some (Known other_case))
+        | Known case2 -> meet_case base_env other_case case2))
+    | Some case1, Some case2 -> (
+      match case1, case2 with
+      | Unknown, Unknown ->
+        join_result_env base_env;
+        Some Unknown
+      | Known case, Unknown -> (
+        match
+          ME.add_env_extension_strict base_env case.env_extension
+            ~meet_expanded_head
+        with
+        | Bottom -> None
+        | Ok env ->
+          join_result_env env;
+          result_is_t2 := false;
+          Some (Known case))
+      | Unknown, Known case -> (
+        match
+          ME.add_env_extension_strict base_env case.env_extension
+            ~meet_expanded_head
+        with
+        | Bottom -> None
+        | Ok env ->
+          join_result_env env;
+          result_is_t1 := false;
+          Some (Known case))
+      | Known case1, Known case2 -> meet_case base_env case1 case2)
+  in
+  let known =
+    merge_map_known
+      (fun _tag case1 case2 -> meet_knowns case1 case2)
+      known1 known2
+  in
+  let other : ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t =
+    match other1, other2 with
+    | Bottom, Bottom -> Bottom
+    | Bottom, _ ->
+      result_is_t2 := false;
+      Bottom
+    | _, Bottom ->
+      result_is_t1 := false;
+      Bottom
+    | Ok other1, Ok other2 -> (
+      match meet_case base_env other1 other2 with
+      | None -> Bottom
+      | Some Unknown -> Misc.fatal_error "meet_case should not produce Unknown"
+      | Some (Known r) -> Ok r)
+  in
+  if
+    is_empty_map_known known
+    && match other with Bottom -> true | Ok _ -> false
+  then Bottom (New_result ())
+  else
+    let env : _ Or_bottom.t =
+      match !result_env with
+      | No_result -> Bottom
+      | Extension ext ->
+        ME.add_env_extension_strict initial_env ext ~meet_expanded_head
+    in
+    let match_with_input v =
+      match !result_is_t1, !result_is_t2 with
+      | true, true -> Both_inputs
+      | true, false -> Left_input
+      | false, true -> Right_input
+      | false, false -> New_result v
+    in
+    match env with
+    | Bottom -> Bottom (match_with_input ())
+    | Ok env -> Ok (match_with_input (known, other), env)
 
 let meet_code_id (env : ME.t) (code_id1 : Code_id.t) (code_id2 : Code_id.t) :
     Code_id.t meet_result =
@@ -1114,307 +1418,6 @@ and meet_head_of_kind_rec_info env _t1 _t2 =
 
 and meet_head_of_kind_region env () () : _ meet_result = Ok (Both_inputs, env)
 
-and meet_row_like :
-    'lattice 'shape 'maps_to 'row_tag 'known.
-    meet_maps_to:(ME.t -> 'maps_to -> 'maps_to -> 'maps_to meet_result) ->
-    equal_index:('lattice -> 'lattice -> bool) ->
-    subset_index:('lattice -> 'lattice -> bool) ->
-    union_index:('lattice -> 'lattice -> 'lattice) ->
-    meet_shape:('shape -> 'shape -> 'shape Or_bottom.t) ->
-    is_empty_map_known:('known -> bool) ->
-    get_singleton_map_known:
-      ('known ->
-      ('row_tag * ('lattice, 'shape, 'maps_to) TG.Row_like_case.t) option) ->
-    merge_map_known:
-      (('row_tag ->
-       ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option ->
-       ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option ->
-       ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option) ->
-      'known ->
-      'known ->
-      'known) ->
-    ME.t ->
-    known1:'known ->
-    known2:'known ->
-    other1:('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t ->
-    other2:('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t ->
-    ('known * ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t)
-    meet_result =
- fun ~meet_maps_to ~equal_index ~subset_index ~union_index ~meet_shape
-     ~is_empty_map_known ~get_singleton_map_known ~merge_map_known initial_env
-     ~known1 ~known2 ~other1 ~other2 ->
-  let common_scope = ME.current_scope initial_env in
-  let base_env = ME.increment_scope initial_env in
-  let extract_extension scoped_env =
-    ME.cut_as_extension scoped_env ~cut_after:common_scope
-  in
-  let open struct
-    type result_env =
-      | No_result
-      | Extension of TEE.t
-  end in
-  let result_env = ref No_result in
-  let need_join =
-    (* The returned env_extension is the join of the env_extension produced by
-       each non bottom cases. Therefore there is some loss of precision in that
-       case and we need to store the one produced for each tag. But when only
-       one tag is kept it would be wasteful (but correct) to store it.
-
-       We consider that the result of the meet between t1 and t2 will have only
-       one tag when t1 (or t2) has exactly one tag (one that and no 'other'
-       cases).
-
-       This is an overapproximation because the result could have only one tag
-       for instance if
-
-       t1 = [Tag 1 | Tag 2] and t2 = [Tag 2 | Tag 3], or if
-
-       t1 = [Tag 1 | Tag 2] and t2 = [Tag 1 | Tag 2]
-
-       but the meet between some combinations result in a bottom. *)
-    match
-      ( other1,
-        get_singleton_map_known known1,
-        other2,
-        get_singleton_map_known known2 )
-    with
-    | Bottom, Some _, _, _ | _, _, Bottom, Some _ -> false
-    | (Ok _ | Bottom), _, (Ok _ | Bottom), _ ->
-      if is_empty_map_known known1 && is_empty_map_known known2
-      then false
-      else true
-  in
-  let result_is_t1 = ref true in
-  let result_is_t2 = ref true in
-  let update_refs = function
-    | Both_inputs -> ()
-    | Left_input -> result_is_t2 := false
-    | Right_input -> result_is_t1 := false
-    | New_result _ ->
-      result_is_t1 := false;
-      result_is_t2 := false
-  in
-  let join_result_env scoped_env =
-    let new_result_env =
-      match !result_env with
-      | No_result -> Extension (extract_extension scoped_env)
-      | Extension ext1 ->
-        assert need_join;
-        let ext2 = extract_extension scoped_env in
-        let join_env =
-          Join_env.create (ME.typing_env base_env)
-            ~left_env:(ME.typing_env base_env)
-            ~right_env:(ME.typing_env scoped_env)
-        in
-        let extension = join_env_extension join_env ext1 ext2 in
-        Extension extension
-    in
-    result_env := new_result_env
-  in
-  let meet_index env (i1 : ('lattice, 'shape) TG.row_like_index)
-      (i2 : ('lattice, 'shape) TG.row_like_index) :
-      ('lattice, 'shape) TG.row_like_index meet_result =
-    match meet_shape i1.shape i2.shape with
-    | Bottom -> Bottom (New_result ())
-    | Ok shape -> (
-      match i1.domain, i2.domain with
-      | Known i1', Known i2' ->
-        if equal_index i1' i2'
-        then Ok (Both_inputs, env)
-        else Bottom (New_result ())
-      | Known known, At_least at_least ->
-        if subset_index at_least known
-        then
-          (* [at_least] is included in [known] hence [Known known] is included
-             in [At_least at_least], hence [Known known] \inter [At_least
-             at_least] = [Known known] *)
-          Ok (Left_input, env)
-        else Bottom (New_result ())
-      | At_least at_least, Known known ->
-        if subset_index at_least known
-        then Ok (Right_input, env)
-        else Bottom (New_result ())
-      | At_least i1', At_least i2' ->
-        if subset_index i1' i2'
-        then
-          if subset_index i2' i1'
-          then Ok (Both_inputs, env)
-          else Ok (Right_input, env)
-        else if subset_index i2' i1'
-        then Ok (Left_input, env)
-        else
-          let domain =
-            TG.Row_like_index_domain.at_least (union_index i1' i2')
-          in
-          Ok (New_result (TG.Row_like_index.create ~domain ~shape), env))
-  in
-  let bottom_case r =
-    update_refs r;
-    None
-  in
-  let meet_case env (case1 : ('lattice, 'shape, 'maps_to) TG.Row_like_case.t)
-      (case2 : ('lattice, 'shape, 'maps_to) TG.Row_like_case.t) =
-    match meet_index env case1.index case2.index with
-    | Bottom r -> bottom_case r
-    | Ok (index_result, env) -> (
-      match meet_maps_to env case1.maps_to case2.maps_to with
-      | Bottom r -> bottom_case r
-      | Ok (maps_to_result, env) -> (
-        let env : _ Or_bottom.t =
-          match
-            ME.add_env_extension_strict env case1.env_extension
-              ~meet_expanded_head
-          with
-          | Bottom -> Bottom
-          | Ok env ->
-            ME.add_env_extension_strict env case2.env_extension
-              ~meet_expanded_head
-        in
-        match env with
-        | Bottom -> bottom_case (New_result ())
-        | Ok env ->
-          join_result_env env;
-          update_refs index_result;
-          update_refs maps_to_result;
-          let index = extract_value index_result case1.index case2.index in
-          let maps_to =
-            extract_value maps_to_result case1.maps_to case2.maps_to
-          in
-          let env_extension =
-            if need_join then extract_extension env else TEE.empty
-          in
-          if TEE.is_empty env_extension
-          then ()
-          else (
-            result_is_t1 := false;
-            result_is_t2 := false);
-          Some
-            (Or_unknown.Known
-               (TG.Row_like_case.create ~maps_to ~index ~env_extension))))
-  in
-  let meet_knowns
-      (case1 :
-        ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option)
-      (case2 :
-        ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option) :
-      ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option =
-    (* CR bclement: When we return [None] below but either of the inputs were
-       not [None], we fall back to the [other] case. This can cause loss of
-       precision if the [other] case is not [Bottom], as we forget that the
-       current case is impossible.
-
-       Fixing this would require storing [Or_unknown_or_bottom.t] in the
-       row_like_for_block case, so leave it as is for now -- this should be
-       fairly rare. *)
-    match case1, case2 with
-    | None, None -> None
-    | Some case1, None -> (
-      match other2 with
-      | Bottom ->
-        result_is_t1 := false;
-        None
-      | Ok other_case -> (
-        match case1 with
-        | Unknown -> (
-          match
-            ME.add_env_extension_strict base_env other_case.env_extension
-              ~meet_expanded_head
-          with
-          | Bottom -> None
-          | Ok env ->
-            join_result_env env;
-            result_is_t1 := false;
-            result_is_t2 := false;
-            Some (Known other_case))
-        | Known case1 -> meet_case base_env case1 other_case))
-    | None, Some case2 -> (
-      match other1 with
-      | Bottom ->
-        result_is_t2 := false;
-        None
-      | Ok other_case -> (
-        match case2 with
-        | Unknown -> (
-          match
-            ME.add_env_extension_strict base_env other_case.env_extension
-              ~meet_expanded_head
-          with
-          | Bottom -> None
-          | Ok env ->
-            join_result_env env;
-            result_is_t1 := false;
-            result_is_t2 := false;
-            Some (Known other_case))
-        | Known case2 -> meet_case base_env other_case case2))
-    | Some case1, Some case2 -> (
-      match case1, case2 with
-      | Unknown, Unknown ->
-        join_result_env base_env;
-        Some Unknown
-      | Known case, Unknown -> (
-        match
-          ME.add_env_extension_strict base_env case.env_extension
-            ~meet_expanded_head
-        with
-        | Bottom -> None
-        | Ok env ->
-          join_result_env env;
-          result_is_t2 := false;
-          Some (Known case))
-      | Unknown, Known case -> (
-        match
-          ME.add_env_extension_strict base_env case.env_extension
-            ~meet_expanded_head
-        with
-        | Bottom -> None
-        | Ok env ->
-          join_result_env env;
-          result_is_t1 := false;
-          Some (Known case))
-      | Known case1, Known case2 -> meet_case base_env case1 case2)
-  in
-  let known =
-    merge_map_known
-      (fun _tag case1 case2 -> meet_knowns case1 case2)
-      known1 known2
-  in
-  let other : ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t =
-    match other1, other2 with
-    | Bottom, Bottom -> Bottom
-    | Bottom, _ ->
-      result_is_t2 := false;
-      Bottom
-    | _, Bottom ->
-      result_is_t1 := false;
-      Bottom
-    | Ok other1, Ok other2 -> (
-      match meet_case base_env other1 other2 with
-      | None -> Bottom
-      | Some Unknown -> Misc.fatal_error "meet_case should not produce Unknown"
-      | Some (Known r) -> Ok r)
-  in
-  if
-    is_empty_map_known known
-    && match other with Bottom -> true | Ok _ -> false
-  then Bottom (New_result ())
-  else
-    let env : _ Or_bottom.t =
-      match !result_env with
-      | No_result -> Bottom
-      | Extension ext ->
-        ME.add_env_extension_strict initial_env ext ~meet_expanded_head
-    in
-    let match_with_input v =
-      match !result_is_t1, !result_is_t2 with
-      | true, true -> Both_inputs
-      | true, false -> Left_input
-      | false, true -> Right_input
-      | false, false -> New_result v
-    in
-    match env with
-    | Bottom -> Bottom (match_with_input ())
-    | Ok env -> Ok (match_with_input (known, other), env)
-
 and meet_row_like_for_blocks env
     ({ known_tags = known1; other_tags = other1; alloc_mode = alloc_mode1 } :
       TG.Row_like_for_blocks.t)
@@ -1432,11 +1435,12 @@ and meet_row_like_for_blocks env
     ~rebuild:(fun (known_tags, other_tags) alloc_mode ->
       TG.Row_like_for_blocks.create_raw ~known_tags ~other_tags ~alloc_mode)
     ~meet_a:(fun env (known1, other1) (known2, other2) ->
-      meet_row_like ~meet_maps_to:meet_int_indexed_product
-        ~equal_index:TG.Block_size.equal ~subset_index:TG.Block_size.subset
-        ~union_index:TG.Block_size.union ~meet_shape
-        ~is_empty_map_known:Tag.Map.is_empty ~get_singleton_map_known
-        ~merge_map_known:Tag.Map.merge env ~known1 ~known2 ~other1 ~other2)
+      meet_row_like ~meet_expanded_head ~join_env_extension
+        ~meet_maps_to:meet_int_indexed_product ~equal_index:TG.Block_size.equal
+        ~subset_index:TG.Block_size.subset ~union_index:TG.Block_size.union
+        ~meet_shape ~is_empty_map_known:Tag.Map.is_empty
+        ~get_singleton_map_known ~merge_map_known:Tag.Map.merge env ~known1
+        ~known2 ~other1 ~other2)
     ~meet_b:meet_alloc_mode ~left_a:(known1, other1) ~right_a:(known2, other2)
     ~left_b:alloc_mode1 ~right_b:alloc_mode2
 
@@ -1461,7 +1465,8 @@ and meet_row_like_for_closures env
   map_result
     ~f:(fun (known_closures, other_closures) ->
       TG.Row_like_for_closures.create_raw ~known_closures ~other_closures)
-    (meet_row_like ~meet_maps_to:meet_closures_entry
+    (meet_row_like ~meet_expanded_head ~join_env_extension
+       ~meet_maps_to:meet_closures_entry
        ~equal_index:Set_of_closures_contents.equal
        ~subset_index:Set_of_closures_contents.subset
        ~union_index:Set_of_closures_contents.union ~meet_shape
