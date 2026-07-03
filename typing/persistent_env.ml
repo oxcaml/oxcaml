@@ -546,10 +546,6 @@ let check_for_unset_parameters penv global =
            }))
     global.Global_module.hidden_args
 
-(* The mode of a compilation unit: legacy on every axis, with the given
-   staticity. *)
-(* CR-soon zqian: all persistent modules should always be [Static], at which
-   point the [staticity] parameter can be removed. *)
 let mode_pers_mod staticity =
   let hint : _ Mode.Hint.const = Legacy Compilation_unit in
   Mode.Value.of_const
@@ -712,8 +708,6 @@ and acknowledge_new_pers_name penv check global_name global import =
     let mode =
       match import.imp_visibility with
       | Visible { cmx_guaranteed = true } ->
-        (* A [.cmx] is guaranteed, so the unit keeps the staticity recorded in
-           its [.cmi]. *)
         mode
       | Visible { cmx_guaranteed = false } | Hidden ->
         (* Without a guaranteed [.cmx], the unit is not available for
