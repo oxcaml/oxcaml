@@ -1,5 +1,5 @@
 let code escape_string_0 deleted in
-let code loopify(never) size(64) newer_version_of(escape_string_0)
+let code loopify(never) size(99) newer_version_of(escape_string_0)
       escape_string_0_1 (s : val, s' : val)
         my_closure _region _ghost_region my_depth
         -> k * k1
@@ -12,7 +12,24 @@ let code loopify(never) size(64) newer_version_of(escape_string_0)
     | 1 -> k2
     where k2 =
       let for_stop_naked = %num_conv.[`imm`].[`int64`] (prim) in
-      (cont k2 (0L, 0)
+      ((let prim_2 = %string_load.[`8`] (s, 0n) in
+        let c = %tag_imm (prim_2) in
+        (let prim_3 = %int_comp.ne (c, 0) in
+         switch prim_3
+           | 0 -> k3 (1)
+           | 1 -> k4
+           where k4 =
+             let prim_4 = %num_conv.[`tagged_imm`].[`int8`] (c) in
+             let Pbytessetu =
+               %bytes_or_bigstring_set.bytes.[`8`] (s', 0n, prim_4)
+             in
+             cont k3 (0))
+          where k3 (n_289_unboxed0 : imm tagged) =
+            let int_add = %int_barith.add (n_289_unboxed0, 1) in
+            let prim_3 = %int_comp.`int64`.le (1L, for_stop_naked) in
+            switch prim_3
+              | 0 -> k (0)
+              | 1 -> k2 (1L, int_add))
          where rec k2
                      (for_counter_naked : int64, n_289_unboxed0 : imm tagged) =
            let prim_2 = %num_conv.[`int64`].[`imm`] (for_counter_naked) in

@@ -1,10 +1,10 @@
 let code f_0 deleted in
-let code loopify(never) size(44) newer_version_of(f_0)
+let code loopify(never) size(43) newer_version_of(f_0)
       f_0_1 (param : imm tagged)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : float boxed =
-  cont k3 (1L, 0x0p+0)
+  cont k3 (2L, 0x1p+1)
     where rec k3 (for_counter_naked : int64, unboxed_float : float) =
       let prim = %num_conv.[`int64`].[`imm`] (for_counter_naked) in
       let i = %tag_imm (prim) in
@@ -34,7 +34,7 @@ let code loopify(never) size(44) newer_version_of(f_0)
       cont k (r_277_unboxed0)
 in
 let $camlFloat_unboxing__f_1 = closure f_0_1 @f in
-let $camlFloat_unboxing__Pmakeblock120 = Block 0 ($camlFloat_unboxing__f_1)
+let $camlFloat_unboxing__Pmakeblock176 = Block 0 ($camlFloat_unboxing__f_1)
 in
-let $camlFloat_unboxing = Block 0 ($camlFloat_unboxing__Pmakeblock120) in
+let $camlFloat_unboxing = Block 0 ($camlFloat_unboxing__Pmakeblock176) in
 cont done ($camlFloat_unboxing)

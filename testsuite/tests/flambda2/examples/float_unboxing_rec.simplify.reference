@@ -1,5 +1,5 @@
 let code f_0 deleted in
-let code loopify(never) size(41) newer_version_of(f_0)
+let code loopify(never) size(54) newer_version_of(f_0)
       f_0_1 (n : imm tagged, x : float boxed)
         my_closure _region _ghost_region my_depth
         -> k * k1
@@ -14,8 +14,12 @@ let code loopify(never) size(41) newer_version_of(f_0)
      where k3 =
        let prim_1 = %untag_imm (n) in
        let for_stop_naked = %num_conv.[`imm`].[`int64`] (prim_1) in
-       ((let unboxed_float = %unbox_num.`float` (x) in
-         cont k3 (0L, unboxed_float))
+       ((let prim_2 = %unbox_num.`float` (x) in
+         let prim_3 = %bfloat_arith.add (prim_2, prim_2) in
+         let prim_4 = %int_comp.`int64`.le (1L, for_stop_naked) in
+         switch prim_4
+           | 0 -> k2 (prim_3)
+           | 1 -> k3 (1L, prim_3))
           where rec k3 (for_counter_naked : int64, unboxed_float : float) =
             let prim_2 = %unbox_num.`float` (x) in
             let prim_3 = %bfloat_arith.add (unboxed_float, prim_2) in

@@ -1935,6 +1935,30 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
     ~down_to_up:
       (after_downwards_traversal_of_body ~simplify_expr data ~down_to_up)
 
+(* Would this expression still be an innermost loop body after inlining? Only if
+   it contains neither a recursive continuation (an existing nested loop) nor a
+   function [Apply] (which could later be inlined to introduce one). Requiring
+   no [Apply] is what makes the innermost test robust to inlining: a handler
+   that still contains a call is left unpeeled until the call is inlined away (a
+   later round), after which its final loop structure is visible. We do not
+   descend into [Let] defining expressions (they are [Named]s -- primitives,
+   closures, etc. -- not control flow); a closure defined and later called here
+   shows up as the [Apply] at its call site. *)
+let rec contains_apply_or_recursive_cont (expr : Expr.t) : bool =
+  match Expr.descr expr with
+  | Apply _ | Let_cont (Recursive _) -> true
+  | Apply_cont _ | Switch _ | Invalid _ -> false
+  | Let let_expr ->
+    Let.pattern_match let_expr ~f:(fun _bound ~body ->
+        contains_apply_or_recursive_cont body)
+  | Let_cont (Non_recursive { handler = nrh; _ }) ->
+    Flambda.Non_recursive_let_cont_handler.pattern_match nrh
+      ~f:(fun _cont ~body -> contains_apply_or_recursive_cont body)
+    || Continuation_handler.pattern_match
+         (Flambda.Non_recursive_let_cont_handler.handler nrh)
+         ~f:(fun _params ~handler:hexpr ->
+           contains_apply_or_recursive_cont hexpr)
+
 (* Loop peeling. A loop is a recursive continuation; peeling its first iteration
    means splicing one copy of the handler ahead of the loop, binding the
    continuation's parameters to the loop's initial arguments, and leaving the
@@ -1949,10 +1973,8 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
    term; the loopify path presets it from [-flambda2-peel-loopified]) so that
    loopified tail-recursive functions are only peeled when that flag is on.
 
-   This first version only handles the simplest loop shape: a single
-   self-recursive continuation with no invariant parameters, whose loop entry is
-   a bare [Apply_cont k init] with no trap action. Anything else is left
-   unchanged. *)
+   Restricted to a single self-recursive continuation that is an innermost loop
+   (see [contains_apply_or_recursive_cont]); other shapes are left unchanged. *)
 let try_peel_first_iteration (let_cont : Let_cont.t) : Expr.t option =
   match let_cont with
   | Non_recursive _ -> None
@@ -1984,34 +2006,39 @@ let try_peel_first_iteration (let_cont : Let_cont.t) : Expr.t option =
                edges; being invariant, this preserves their value. *)
             Continuation_handler.pattern_match handler
               ~f:(fun params ~handler:handler_expr ->
-                let combined =
-                  Bound_parameters.append invariant_params params
-                in
-                let combined_fresh = Bound_parameters.rename combined in
-                let renaming =
-                  Bound_parameters.renaming combined
-                    ~guaranteed_fresh:combined_fresh
-                in
-                let handler_expr = Expr.apply_renaming handler_expr renaming in
-                let peeled_handler =
-                  Continuation_handler.create combined_fresh
-                    ~handler:handler_expr
-                    ~free_names_of_handler:Or_unknown.Unknown
-                    ~is_exn_handler:false
-                    ~is_cold:(Continuation_handler.is_cold handler)
-                in
-                let k' = Continuation.create ~name:"peeled" () in
-                let renamed_body =
-                  Expr.apply_renaming body
-                    (Renaming.add_continuation Renaming.empty k k')
-                in
-                let peeled_body =
-                  Let_cont.create_non_recursive k' peeled_handler
-                    ~body:renamed_body ~free_names_of_body:Or_unknown.Unknown
-                in
-                Some
-                  (Let_cont.create_recursive ~first_iteration_peeled:true
-                     ~invariant_params handlers_map ~body:peeled_body))
+                if contains_apply_or_recursive_cont handler_expr
+                then (* Not (yet provably) an innermost, call-free loop. *) None
+                else
+                  let combined =
+                    Bound_parameters.append invariant_params params
+                  in
+                  let combined_fresh = Bound_parameters.rename combined in
+                  let renaming =
+                    Bound_parameters.renaming combined
+                      ~guaranteed_fresh:combined_fresh
+                  in
+                  let handler_expr =
+                    Expr.apply_renaming handler_expr renaming
+                  in
+                  let peeled_handler =
+                    Continuation_handler.create combined_fresh
+                      ~handler:handler_expr
+                      ~free_names_of_handler:Or_unknown.Unknown
+                      ~is_exn_handler:false
+                      ~is_cold:(Continuation_handler.is_cold handler)
+                  in
+                  let k' = Continuation.create ~name:"peeled" () in
+                  let renamed_body =
+                    Expr.apply_renaming body
+                      (Renaming.add_continuation Renaming.empty k k')
+                  in
+                  let peeled_body =
+                    Let_cont.create_non_recursive k' peeled_handler
+                      ~body:renamed_body ~free_names_of_body:Or_unknown.Unknown
+                  in
+                  Some
+                    (Let_cont.create_recursive ~first_iteration_peeled:true
+                       ~invariant_params handlers_map ~body:peeled_body))
           | [] | [_] | _ :: _ :: _ -> None)
 
 let simplify_let_cont ~simplify_expr dacc let_cont ~down_to_up =
