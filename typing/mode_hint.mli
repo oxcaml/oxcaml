@@ -120,7 +120,9 @@ type 'd const =
   | Stack_expression : ('l * disallowed) pos const
   | Module_allocated_on_heap : (disallowed * 'r) pos const
   | Always_dynamic : always_dynamic -> ('l * disallowed) neg const
-  | Cmx_not_guaranteed : ('l * disallowed) neg const
+  | Cmx_not_guaranteed :
+      Compilation_unit.t option
+      -> ('l * disallowed) neg const
   | Branching : ('l * disallowed) neg const
   | Lpoly_inst : (disallowed * 'r) neg const
   | Is_used_in : pinpoint -> (disallowed * 'r) const

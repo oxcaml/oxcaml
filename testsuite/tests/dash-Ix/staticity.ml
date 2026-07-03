@@ -9,11 +9,13 @@
    cmi and can be used at [@ static].  A module loaded from a plain -I directory
    has no such guarantee, so it is forced to [dynamic].
 
-   Below we rebind the static module S at [@ static]: this succeeds when S is
-   loaded via -Ix, but fails when loaded via plain -I.
+   Each scenario below is compiled twice: via -Ix (a cmx is guaranteed, so the
+   static use succeeds) and via plain -I (S is forced dynamic, so the static use
+   fails with an error naming S).
 *)
 
 subdirectories = "slib";
+readonly_files = "use_module.ml use_field.ml use_open.ml";
 setup-ocamlc.byte-build-env;
 
 (* Compile the static library module S. *)
@@ -23,26 +25,58 @@ ocamlc.byte;
 module = "slib/s.ml";
 ocamlc.byte;
 
+(* Scenario 1: rebind the whole module S at [@ static]. *)
 {
-  (* -Ix guarantees a cmx, so S keeps its [Static] staticity and can be rebound
-     at [@ static]: compilation succeeds. *)
   flags = "-Ix slib -nocwd";
-  module = "staticity.ml";
+  module = "use_module.ml";
   setup-ocamlc.byte-build-env;
   ocamlc_byte_exit_status = "0";
   ocamlc.byte;
 }
 {
-  (* Plain -I does not guarantee a cmx, so S is forced to [dynamic] and the
-     rebind at [@ static] fails. *)
   flags = "-I slib -nocwd";
-  module = "staticity.ml";
+  module = "use_module.ml";
   setup-ocamlc.byte-build-env;
   ocamlc_byte_exit_status = "2";
   ocamlc.byte;
-  compiler_reference = "${test_source_directory}/staticity.ocamlc.reference";
+  compiler_reference = "${test_source_directory}/use_module.ocamlc.reference";
+  check-ocamlc.byte-output;
+}
+
+(* Scenario 2: use the value [S.x] at [@ static]. *)
+{
+  flags = "-Ix slib -nocwd";
+  module = "use_field.ml";
+  setup-ocamlc.byte-build-env;
+  ocamlc_byte_exit_status = "0";
+  ocamlc.byte;
+}
+{
+  flags = "-I slib -nocwd";
+  module = "use_field.ml";
+  setup-ocamlc.byte-build-env;
+  ocamlc_byte_exit_status = "2";
+  ocamlc.byte;
+  compiler_reference = "${test_source_directory}/use_field.ocamlc.reference";
+  check-ocamlc.byte-output;
+}
+
+(* Scenario 3: [open S], with the [@ static] use occurring later. *)
+{
+  flags = "-Ix slib -nocwd";
+  module = "use_open.ml";
+  setup-ocamlc.byte-build-env;
+  ocamlc_byte_exit_status = "0";
+  ocamlc.byte;
+}
+{
+  flags = "-I slib -nocwd";
+  module = "use_open.ml";
+  setup-ocamlc.byte-build-env;
+  ocamlc_byte_exit_status = "2";
+  ocamlc.byte;
+  compiler_reference = "${test_source_directory}/use_open.ocamlc.reference";
   check-ocamlc.byte-output;
 }
 
 *)
-module (M @ static) = S

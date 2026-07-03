@@ -717,7 +717,8 @@ and acknowledge_new_pers_name penv check global_name global import =
         Mode.Value.join
           [ mode;
             Mode.Value.min_with_monadic Staticity
-              (Mode.Staticity.of_const ~hint:Cmx_not_guaranteed
+              (Mode.Staticity.of_const
+                 ~hint:(Cmx_not_guaranteed import.imp_impl)
                  Mode.Staticity.Dynamic) ]
     in
     signature, mode

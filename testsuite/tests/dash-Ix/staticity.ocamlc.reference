@@ -1,6 +1,0 @@
-File "staticity.ml", line 48, characters 22-23:
-48 | module (M @ static) = S
-                           ^
-Error: The module is dynamic
-         because only modules from core libraries and the current library can currently be static.
-       However, the module highlighted is expected to be static.
