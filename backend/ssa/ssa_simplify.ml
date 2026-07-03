@@ -43,7 +43,7 @@ open Ssa_reducer
    into the branch test instead of materializing a bit. *)
 module Simplify_conditions = struct
   open! Context
-  include Default_reducer (Default_analyzer)
+  include Default_reducer
 
   (* The negation of a comparison op, when it is itself a single op. *)
   let negate_comparison (op : Ssa.op) : Ssa.op option =
@@ -70,7 +70,7 @@ module Simplify_conditions = struct
       true
     | _ -> false
 
-  let emit_op () ctx ~op ~dbg ~typ ~(args : out Value.t array) =
+  let emit_op ctx ~op ~dbg ~typ ~(args : out Value.t array) =
     match[@warning "-fragile-match"] op, args with
     | Operation.Intop_imm (Icomp Cne, 0), [| arg |] when is_comparison arg ->
       Reduce (fun _c -> [| arg |])
@@ -85,7 +85,7 @@ module Simplify_conditions = struct
   (* Fallback for [(cmp) = 0] feeding a two-target switch when [cmp] could not
      be flipped (so [emit_op] left the comparison in place): swap the targets
      and use [cmp] directly as the index. *)
-  let finish_block () ctx ~dbg (t : out Terminator.t) =
+  let finish_block ctx ~dbg (t : out Terminator.t) =
     match[@warning "-fragile-match"] t with
     | Switch
         { index = Res ({ op = Intop_imm (Icomp Ceq, 0); args = [| arg |]; _ }, 0);

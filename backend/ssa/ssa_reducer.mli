@@ -61,9 +61,9 @@
 open Ssa.Export
 
 (** Framework-provided context: the input and output graphs and the
-    input->output value maps. The reducer's analysis result is passed directly
-    to the reducer hooks as opposed to being available from the context to
-    simplify the functor construction. *)
+    input->output value maps. A reducer is handed the context once, by
+    {!Reducer.create}, and keeps in its own state whatever it needs from it
+    (including, if any, its analysis result). *)
 module Context : sig
   type t
 
@@ -156,19 +156,12 @@ val reduce_output_terminator :
 val reduce_input_terminator :
   Context.t -> dbg:Debuginfo.t -> finished Terminator.t -> unit reduction
 
-module type Analyzer = sig
-  type result
-
-  (** Called once at the start of each run, before any [visit_*] / [emit_*].
-      Scans the input graph and produces the analysis result consulted by the
-      per-instruction hooks. *)
-  val run : finished Ssa.graph -> result
-end
-
 (** A reducer is turned into an optimization pass using the {!Make_run} functor.
     The {!Combine} functor can be used to compose multiple reducers into one. *)
 module type Reducer = sig
-  module Analyzer : Analyzer
+  type t
+
+  val create : Context.t -> t
 
   (** Called for each instruction in each input block. [For_next_reducer]: defer
       to the framework's default translation. [Emitted_replacement values]: the
@@ -177,23 +170,20 @@ module type Reducer = sig
       what the input instruction's results map to (empty for a trap
       instruction), and is remembered as the output-graph mapping. *)
   val visit_instruction :
-    Analyzer.result ->
-    Context.t ->
+    t ->
     finished Block.t ->
     instr_index:int ->
     Context.out Value.t array reduction
 
   (** Called once per input block, after its body. *)
-  val visit_terminator :
-    Analyzer.result -> Context.t -> finished Block.t -> unit reduction
+  val visit_terminator : t -> finished Block.t -> unit reduction
 
   (** Called each time the framework is about to emit an [Op] into the cursor.
       [For_next_reducer]: emit it as-is. [Emitted_replacement values]: the
       reducer has already emitted a replacement producing the values [values].
   *)
   val emit_op :
-    Analyzer.result ->
-    Context.t ->
+    t ->
     op:Ssa.op ->
     dbg:Debuginfo.t ->
     typ:Cmm.machtype ->
@@ -205,22 +195,38 @@ module type Reducer = sig
       terminator. [Emitted_replacement ()]: the reducer indicates it has already
       finalised the block using the context. *)
   val finish_block :
-    Analyzer.result ->
-    Context.t ->
-    dbg:Debuginfo.t ->
-    Context.out Terminator.t ->
-    unit reduction
+    t -> dbg:Debuginfo.t -> Context.out Terminator.t -> unit reduction
 end
 
-(* Trivial analyzer that doesn't do anything. *)
-module Default_analyzer : Analyzer with type result = unit
+(** Trivial hooks that all return [For_next_reducer], so the framework always
+    takes the default path. [include Default_reducer] lets a reducer mention
+    only the hooks it actually overrides; it still supplies its own [type t] and
+    [create]. This is not using the [Reducer] signature because the more generic
+    hook types keep working even when [t] has been overwritten. *)
+module Default_reducer : sig
+  type t = Context.t
 
-(** Trivial reducer: every hook returns [For_next_reducer], so the framework
-    always takes the default path. Typically used via
-    [include Default_reducer (Default_analyzer)] so a reducer only mentions the
-    hooks it actually overrides. *)
-module Default_reducer (Analyzer : Analyzer) :
-  Reducer with module Analyzer = Analyzer
+  val create : Context.t -> t
+
+  val visit_instruction :
+    't ->
+    finished Block.t ->
+    instr_index:int ->
+    Context.out Value.t array reduction
+
+  val visit_terminator : 't -> finished Block.t -> unit reduction
+
+  val emit_op :
+    't ->
+    op:Ssa.op ->
+    dbg:Debuginfo.t ->
+    typ:Cmm.machtype ->
+    args:Context.out Value.t array ->
+    Context.out Value.t array reduction
+
+  val finish_block :
+    't -> dbg:Debuginfo.t -> Context.out Terminator.t -> unit reduction
+end
 
 (** Combine two reducers into one. For each hook the first reducer is tried, and
     if it returns [For_next_reducer] the second one is tried. *)

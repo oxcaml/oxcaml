@@ -48,7 +48,7 @@ open Ssa_reducer
     produced in practice. *)
 module Tail_call_reducer = struct
   open! Context
-  include Default_reducer (Default_analyzer)
+  include Default_reducer
 
   let returns_args_unchanged (block : finished Block.t) : bool =
     match[@warning "-fragile-match"] Block.terminator block with
@@ -76,7 +76,7 @@ module Tail_call_reducer = struct
     let _, stack_ofs_res = Proc.loc_results_call ret_ty in
     stack_ofs_args = 0 && stack_ofs_res = 0
 
-  let visit_terminator () ctx (block : finished Block.t) =
+  let visit_terminator ctx (block : finished Block.t) =
     match Block.terminator block with
     | Call
         ({ op = (Direct _ | Indirect _) as call_op;

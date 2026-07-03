@@ -39,13 +39,16 @@ open! Int_replace_polymorphic_compare
     framework applies its default translation (below).
 
     The per-run state (the two graphs and the input->output reference maps)
-    lives in [Context.t]; it is threaded to every hook and on to the [Context]
-    operations. [Context] is a plain (non-recursive) module so that a reducer's
-    calls into it ([Cursor.emit_op] / [Cursor.finish_block] / [map_value] / ...)
-    inline. To route emissions back through the reducer's [emit_op] and
-    [finish_block] hooks without a recursive module, [Context.t] also stores
-    those hooks (with the run's analysis already captured); the only non-inlined
-    step is then the indirect call back into the reducer.
+    lives in [Context.t]. The context is built once and passed to the reducer's
+    [create], which produces the reducer's own state — holding whatever the
+    reducer needs, such as some analysis result and the context itself; that
+    state is then threaded to every hook. [Context] is a plain (non-recursive)
+    module so that a reducer's calls into it ([Cursor.emit_op] /
+    [Cursor.finish_block] / [map_value] / ...) inline. To route emissions back
+    through the reducer's [emit_op] and [finish_block] hooks without a recursive
+    module, [Context.t] stores those hooks (which reach the reducer state
+    through a forward reference, since it is built from the context); the only
+    non-inlined step is then the indirect call back into the reducer.
 
     Two layered hooks:
     - [visit_instruction] / [visit_terminator]: intercept the walk over the
@@ -96,7 +99,6 @@ module Context = struct
          output block. *)
       block_param_values : under_construction Value.t array Block.Tbl.t;
       emit_op :
-        t ->
         Ssa.Cursor.t ->
         op:Ssa.op ->
         dbg:Debuginfo.t ->
@@ -104,7 +106,6 @@ module Context = struct
         args:under_construction Value.t array ->
         under_construction Value.t array;
       finish_block :
-        t ->
         Ssa.Cursor.t ->
         dbg:Debuginfo.t ->
         under_construction Terminator.t ->
@@ -117,22 +118,10 @@ module Context = struct
     include Ssa.Cursor
 
     let emit_op (ctx : context) c op dbg typ args =
-      ctx.emit_op ctx c ~op ~dbg ~typ ~args
+      ctx.emit_op c ~op ~dbg ~typ ~args
 
-    let finish_block (ctx : context) c ~dbg term =
-      ctx.finish_block ctx c ~dbg term
+    let finish_block (ctx : context) c ~dbg term = ctx.finish_block c ~dbg term
   end
-
-  let create ~in_graph ~out_graph ~block_map ~op_map ~block_param_values
-      ~emit_op ~finish_block =
-    { in_graph;
-      out_graph;
-      block_map;
-      op_map;
-      block_param_values;
-      emit_op;
-      finish_block
-    }
 
   let in_graph t = t.in_graph
 
@@ -209,28 +198,21 @@ let reduce_input_terminator (ctx : Context.t) ~dbg
     (terminator : finished Terminator.t) =
   reduce_output_terminator ctx (Context.map_terminator ctx terminator) ~dbg
 
-module type Analyzer = sig
-  type result
-
-  val run : finished Ssa.graph -> result
-end
-
 module type Reducer = sig
-  module Analyzer : Analyzer
+  type t
+
+  val create : Context.t -> t
 
   val visit_instruction :
-    Analyzer.result ->
-    Context.t ->
+    t ->
     finished Block.t ->
     instr_index:int ->
     Context.out Value.t array reduction
 
-  val visit_terminator :
-    Analyzer.result -> Context.t -> finished Block.t -> unit reduction
+  val visit_terminator : t -> finished Block.t -> unit reduction
 
   val emit_op :
-    Analyzer.result ->
-    Context.t ->
+    t ->
     op:Ssa.op ->
     dbg:Debuginfo.t ->
     typ:Cmm.machtype ->
@@ -238,72 +220,58 @@ module type Reducer = sig
     Context.out Value.t array reduction
 
   val finish_block :
-    Analyzer.result ->
-    Context.t ->
-    dbg:Debuginfo.t ->
-    Context.out Terminator.t ->
-    unit reduction
+    t -> dbg:Debuginfo.t -> Context.out Terminator.t -> unit reduction
 end
 
-module Default_analyzer = struct
-  type result = unit
+module Default_reducer = struct
+  type t = Context.t
 
-  let run (_ : finished Ssa.graph) = ()
-end
+  let create ctx = ctx
 
-module Default_reducer (Analyzer : Analyzer) = struct
-  module Analyzer = Analyzer
-
-  let visit_instruction (_ : Analyzer.result) (_ : Context.t)
-      (_ : finished Block.t) ~instr_index:(_ : int) =
+  let visit_instruction _ (_ : finished Block.t) ~instr_index:(_ : int) =
     Unchanged
 
-  let visit_terminator (_ : Analyzer.result) (_ : Context.t)
-      (_ : finished Block.t) =
-    Unchanged
+  let visit_terminator _ (_ : finished Block.t) = Unchanged
 
-  let emit_op (_ : Analyzer.result) (_ : Context.t) ~op:(_ : Ssa.op)
-      ~dbg:(_ : Debuginfo.t) ~typ:(_ : Cmm.machtype)
+  let emit_op _ ~op:(_ : Ssa.op) ~dbg:(_ : Debuginfo.t) ~typ:(_ : Cmm.machtype)
       ~args:(_ : Context.out Value.t array) =
     Unchanged
 
-  let finish_block (_ : Analyzer.result) (_ : Context.t) ~dbg:(_ : Debuginfo.t)
-      (_ : Context.out Terminator.t) =
+  let finish_block _ ~dbg:(_ : Debuginfo.t) (_ : Context.out Terminator.t) =
     Unchanged
 end
 
 module Combine (A : Reducer) (B : Reducer) : Reducer = struct
-  module Analyzer = struct
-    type result = A.Analyzer.result * B.Analyzer.result
+  (* Each sub-reducer keeps its own state; both are built from the same context,
+     so emissions from either still route through the combined chain. *)
+  type t = A.t * B.t
 
-    let run g = A.Analyzer.run g, B.Analyzer.run g
-  end
+  let create ctx = A.create ctx, B.create ctx
 
-  let visit_instruction (ra, rb) ctx block ~instr_index =
-    match A.visit_instruction ra ctx block ~instr_index with
-    | Unchanged -> B.visit_instruction rb ctx block ~instr_index
+  let visit_instruction (a, b) block ~instr_index =
+    match A.visit_instruction a block ~instr_index with
+    | Unchanged -> B.visit_instruction b block ~instr_index
     | Reduce _ as r -> r
 
-  let visit_terminator (ra, rb) ctx block =
-    match A.visit_terminator ra ctx block with
-    | Unchanged -> B.visit_terminator rb ctx block
+  let visit_terminator (a, b) block =
+    match A.visit_terminator a block with
+    | Unchanged -> B.visit_terminator b block
     | Reduce _ as r -> r
 
-  let emit_op (ra, rb) ctx ~op ~dbg ~typ ~args =
-    match A.emit_op ra ctx ~op ~dbg ~typ ~args with
-    | Unchanged -> B.emit_op rb ctx ~op ~dbg ~typ ~args
+  let emit_op (a, b) ~op ~dbg ~typ ~args =
+    match A.emit_op a ~op ~dbg ~typ ~args with
+    | Unchanged -> B.emit_op b ~op ~dbg ~typ ~args
     | Reduce _ as r -> r
 
-  let finish_block (ra, rb) ctx ~dbg t =
-    match A.finish_block ra ctx ~dbg t with
-    | Unchanged -> B.finish_block rb ctx ~dbg t
+  let finish_block (a, b) ~dbg t =
+    match A.finish_block a ~dbg t with
+    | Unchanged -> B.finish_block b ~dbg t
     | Reduce _ as r -> r
 end
 
 module Make_run (R : Reducer) = struct
   let run ?(keep_unused_ops = false) (in_graph : finished Ssa.graph) :
       finished Ssa.graph =
-    let analysis = R.Analyzer.run in_graph in
     let out_graph =
       Ssa.create_graph (Ssa.function_info in_graph) ~keep_unused_ops
     in
@@ -359,29 +327,32 @@ module Make_run (R : Reducer) = struct
        when it defers, the default emission into the output graph. These are the
        closures stored in [Context.t]; the main walk calls them directly, while
        [Context.Cursor.*] are thin wrappers onto them for the reducer. *)
-    let emit_op ctx c ~op ~dbg ~typ ~args =
-      match R.emit_op analysis ctx ~op ~dbg ~typ ~args with
+    let rec emit_op c ~op ~dbg ~typ ~args =
+      match R.emit_op (Lazy.force reducer) ~op ~dbg ~typ ~args with
       | Unchanged -> Ssa.Cursor.emit_op out_graph c op dbg typ args
       | Reduce f -> f c
-    in
-    let finish_block ctx c ~dbg term =
-      match R.finish_block analysis ctx ~dbg term with
+    and finish_block c ~dbg term =
+      match R.finish_block (Lazy.force reducer) ~dbg term with
       | Unchanged -> Ssa.Cursor.finish_block out_graph c ~dbg term
       | Reduce f -> f c
-    in
-    let ctx =
-      Context.create ~in_graph ~out_graph ~block_map ~op_map ~block_param_values
-        ~emit_op ~finish_block
-    in
+    and ctx : Context.t =
+      { in_graph;
+        out_graph;
+        block_map;
+        op_map;
+        block_param_values;
+        emit_op;
+        finish_block
+      }
+    and reducer : R.t Lazy.t = lazy (R.create ctx) in
+    let reducer = Lazy.force reducer in
     (* Default translation of one body instruction, returning the value(s) its
        results map to ([||] for a trap instruction). *)
     let default_translate_instruction (instr : finished Instruction.t)
         (c : Cursor.t) : under_construction Value.t array =
       match instr with
       | Op { op; typ; args; dbg; name; _ } ->
-        let vs =
-          emit_op ctx c ~op ~dbg ~typ ~args:(Context.map_values ctx args)
-        in
+        let vs = emit_op c ~op ~dbg ~typ ~args:(Context.map_values ctx args) in
         (match name with
         | Some name when Array.length vs > 0 -> Value.set_name vs.(0) name
         | Some _ | None -> ());
@@ -396,7 +367,7 @@ module Make_run (R : Reducer) = struct
     let visit_instruction (block : finished Block.t) ~instr_index c =
       let instr = Array.get (Block.body block) instr_index in
       let vs =
-        match R.visit_instruction analysis ctx block ~instr_index with
+        match R.visit_instruction reducer block ~instr_index with
         | Reduce f -> f c
         | Unchanged -> default_translate_instruction instr c
       in
@@ -413,7 +384,7 @@ module Make_run (R : Reducer) = struct
       | Push_trap _ | Pop_trap _ -> ()
     in
     let visit_terminator (block : finished Block.t) c =
-      match R.visit_terminator analysis ctx block with
+      match R.visit_terminator reducer block with
       | Reduce f ->
         f c;
         if not (Cursor.is_finished c)
@@ -423,7 +394,7 @@ module Make_run (R : Reducer) = struct
              did not actually finish the block."
       | Unchanged ->
         let term = Context.map_terminator ctx (Block.terminator block) in
-        finish_block ctx c ~dbg:(Block.terminator_dbg block) term
+        finish_block c ~dbg:(Block.terminator_dbg block) term
     in
     (* Step 2: walk the input graph in [blocks] order, which already guarantees
        each block's dominators come before it. *)
