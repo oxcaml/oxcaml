@@ -550,7 +550,13 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
                        S.field_value = arg, layout
                      } ->
                   ( field_name,
-                    type_shape_to_complex_shape ~cache ~rec_env arg layout ))
+                    match layout with
+                    | Some layout ->
+                      type_shape_to_complex_shape ~cache ~rec_env arg layout
+                    | None ->
+                      (* It's an [any] field with no fixed layout - must
+                         recompute *)
+                      type_shape_to_complex_shape_exn ~cache ~rec_env arg None ))
                 args
             in
             let constr_args =
