@@ -2964,10 +2964,6 @@ module Format_history = struct
       fprintf ppf "the %stype argument of %a has %s any"
         (format_position ~arity position)
         !printtyp_path parent_path layout_or_kind
-    | Overapproximation_of_with_bounds ->
-      fprintf ppf
-        "the compiler failed to deduce its exact kind@ due to with-bound \
-         checking limitations"
     | Inside_quote ->
       fprintf ppf "it's the type of an expression inside of a quote"
     | Evaluated_quote -> fprintf ppf "it's the result of evaluating a quote"
@@ -4016,8 +4012,6 @@ module Debug_printers = struct
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
         (Fmt.compat !printtyp_path)
         parent_path
-    | Overapproximation_of_with_bounds ->
-      fprintf ppf "Overapproximation_of_with_bounds"
     | Inside_quote -> fprintf ppf "Inside_quote"
     | Evaluated_quote -> fprintf ppf "Evaluated_quote"
     | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
