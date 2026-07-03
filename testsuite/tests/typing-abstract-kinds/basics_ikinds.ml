@@ -1919,7 +1919,7 @@ module G2 :
 
 module AppG = G2 (struct kind_ k end)
 [%%expect{|
-module AppG : sig type t = (type : X.k) box end
+module AppG : sig type t end
 |}]
 
 type u = AppG.t
