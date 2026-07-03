@@ -2290,14 +2290,21 @@ let end_assembly () =
     if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Data
   in
   (* Mergeable string section (SHF_MERGE|SHF_STRINGS, entsize 1) for debuginfo
-     filename and defname strings (so linker will de-dupe). *)
+     filename and defname strings (so linker will de-dupe). Mach-O relocations
+     are atom-based and cannot target the assembler-local labels that define the
+     strings, so on macOS the strings stay in the frametable section,
+     un-deduplicated; the references are then same-section label differences,
+     resolved entirely by the assembler. *)
   let debuginfo_strings_section : Asm_targets.Asm_section.t =
-    Custom
-      { names = [".rodata.str1.1"];
-        flags = Some "aMS";
-        args = ["%progbits"; "1"];
-        is_delayed = false
-      }
+    if macosx
+    then frametable_section
+    else
+      Custom
+        { names = [".rodata.str1.1"];
+          flags = Some "aMS";
+          args = ["%progbits"; "1"];
+          is_delayed = false
+        }
   in
   D.switch_to_section frametable_section;
   D.align ~fill:Zero ~bytes:8;
