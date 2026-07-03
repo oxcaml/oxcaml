@@ -39,7 +39,7 @@ CAMLprim value heap_extent_finalised_count(value unit)
 }
 
 /* Create a heap extent containing one block per element of [sizes],
-   each a tag-0 block of the given wosize (which may be 0) with all
+   each a tag-0 block of the given wosize (at least 1) with all
    fields initialized to Val_unit. Returns the array of blocks. */
 
 CAMLprim value heap_extent_make(value sizes)
@@ -48,8 +48,11 @@ CAMLprim value heap_extent_make(value sizes)
   CAMLlocal1(blocks);
   mlsize_t n = Wosize_val(sizes);
   size_t wsize = 0;
-  for (mlsize_t i = 0; i < n; i++)
+  for (mlsize_t i = 0; i < n; i++) {
+    if (Long_val(Field(sizes, i)) < 1)
+      caml_invalid_argument("heap_extent_make: zero-wosize block");
     wsize += Whsize_wosize(Long_val(Field(sizes, i)));
+  }
   if (wsize == 0)
     caml_invalid_argument("heap_extent_make: empty extent");
 

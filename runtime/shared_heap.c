@@ -92,9 +92,7 @@ typedef struct heap_extent {
  * the extent. Adjacent free blocks are combined during sweeping.
  *
  * These distinguished headers can't simply be NOT_MARKABLE, as
- * continuations have that colour during their stack scan. And keeping
- * the size in the header means we can permit zero-wosize blocks in
- * extents.
+ * continuations have that colour during their stack scan.
  *
  * TODO: Consider defining a new tag ("Bad_tag"?), never used in real
  * objects but available for uses like this; hanging new functionality
@@ -711,6 +709,7 @@ static void add_extent(struct caml_heap_state *local,
   while (p < limit) {
     header_t hd = Hd_hp(p);
     CAMLassert(!Is_extent_free_hd(hd));
+    CAMLassert(Wosize_hd(hd) > 0);
     mlsize_t whsize = Whsize_hd(hd);
     CAMLassert(whsize <= remaining);
     Hd_hp(p) = With_status_hd(hd, color); /* force to allocation colour */

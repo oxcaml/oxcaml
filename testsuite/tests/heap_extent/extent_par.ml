@@ -132,7 +132,7 @@ let many_orphans_test () =
     List.init num_domains (fun d ->
         Domain.spawn (fun () ->
             for i = 0 to extents_per_domain - 1 do
-              let b = make_extent [| 2; 0; 6 |] in
+              let b = make_extent [| 2; 3; 6 |] in
               Obj.set_field b.(2) 1 (Obj.repr (ref ((d * 1000) + i)));
               published.((d * extents_per_domain) + i) <- Some b.(2)
             done;

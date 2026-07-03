@@ -43,6 +43,10 @@ void caml_orphan_shared_heap(struct caml_heap_state* heap);
 void caml_free_shared_heap(struct caml_heap_state* heap);
 
 
+/* Donate [size] bytes at [base] to the major heap, as an "extent"
+   already filled with well-formed blocks. Each block must have wosize
+   >= 1. Once all the extent's blocks are dead, the memory is returned
+   to the caller via [free_callback](base, size). */
 void caml_add_blocks_to_heap(void *base, size_t size,
                              void (*free_callback)(void *, size_t));
 

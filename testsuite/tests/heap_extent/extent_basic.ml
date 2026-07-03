@@ -35,15 +35,15 @@ let expect_freed msg expected =
 
 let expected_string () = String.init 64 Char.chr
 
-(* First extent: includes a zero-wosize block; fields hold pointers
-   into the major heap and into the extent itself. *)
+(* First extent: fields hold pointers into the major heap and into
+   the extent itself. *)
 
-let create_first () = roots := make_extent [| 1; 2; 3; 0; 5 |]
+let create_first () = roots := make_extent [| 1; 2; 3; 4; 5 |]
 
 let fill_first () =
   let b = !roots in
   Obj.set_field b.(0) 0 (Obj.repr (expected_string ()));
-  Obj.set_field b.(1) 0 b.(3); (* point at the zero-wosize block *)
+  Obj.set_field b.(1) 0 b.(3); (* point at another extent block *)
   Obj.set_field b.(1) 1 b.(4);
   Obj.set_field b.(4) 0 (Obj.repr 12345)
 

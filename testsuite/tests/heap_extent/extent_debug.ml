@@ -33,7 +33,7 @@ let check msg b =
   Printf.printf "%s: %s\n%!" msg (if b then "ok" else "FAILED")
 
 let create () =
-  let b = make_extent [| 1; 2; 0; 3; 4; 0; 5 |] in
+  let b = make_extent [| 1; 2; 6; 3; 4; 7; 5 |] in
   Array.iteri (fun i blk ->
       if Obj.size blk > 0 then
         Obj.set_field blk 0 (Obj.repr (ref (i * 11)))) b;
