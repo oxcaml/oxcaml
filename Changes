@@ -28,6 +28,10 @@ OCaml 5.4.1
 - #14370: Fix headers for C++ inclusion.
   (Antonin Décimo, review by Gabriel Scherer)
 
+- #14969: Fix the units of the runtime events counter EV_C_MINOR_ALLOCATED_WORDS
+  to report as the number of words of minor heap consumed, including headers.
+  (Tim McGilchrist, review by Nicolás Ojeda Bär)
+
 - #15016, #14151: Fix spurious "Runtime_events: corrupt stream" failures when a
   consumer falls behind the producer. The consumer now reports an overwritten
   ring slot as lost events rather than corruption, and write_to_ring publishes
