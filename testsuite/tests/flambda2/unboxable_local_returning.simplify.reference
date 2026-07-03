@@ -30,7 +30,7 @@ let code loopify(never) size(13) stub
       let boxed_return = %box_num.`float`.my_alloc_region (unboxed_return) in
       cont k (boxed_return)
 in
-let $camlUnboxable_local_returning__immstring81 = "ok" in
+let $camlUnboxable_local_returning__immstring_7 = "ok" in
 let code loopify(never) size(1) newer_version_of(ret_local_1)
       ret_local_1_2 (param : imm tagged)
         my_unboxed_closure &my_alloc_region &my_region &my_ghost_region
@@ -58,7 +58,7 @@ and $camlUnboxable_local_returning__ret_heap_unboxed_7 =
 in
 apply direct(print_endline_47 &toplevel.alloc_region) inlined(never)
   ($Stdlib.camlStdlib__print_endline_138 : _ -> imm tagged)
-    ($camlUnboxable_local_returning__immstring81)
+    ($camlUnboxable_local_returning__immstring_7)
     -> k1 * error
   where k1 (param : imm tagged) =
     cont k
