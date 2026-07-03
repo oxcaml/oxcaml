@@ -497,9 +497,9 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
   let rebuilding = UA.are_rebuilding_terms uacc in
   let block_sym =
     let var = Variable.create "switch_block" K.value in
-    Symbol.create
+    Symbol.create_for_current_scheme ~dbg
       (Compilation_unit.get_current_exn ())
-      (Linkage_name.of_string (Variable.unique_name var))
+      ~name:(Variable.unique_name var)
   in
   let uacc, array_kind, array_load_kind, loaded_kind =
     let alias_types_of kind simples =

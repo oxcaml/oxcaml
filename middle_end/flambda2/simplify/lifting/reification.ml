@@ -88,7 +88,7 @@ let create_static_const dacc dbg (to_lift : T.to_lift) : RSC.t =
     RSC.create_immutable_value_array art fields
   | Empty_array array_kind -> RSC.create_empty_array art array_kind
 
-let lift dacc ty ~bound_to static_const : _ Or_invalid.t * DA.t =
+let lift dacc dbg ty ~bound_to static_const : _ Or_invalid.t * DA.t =
   let dacc, symbol =
     let existing_symbol =
       match RSC.to_const static_const with
@@ -108,9 +108,9 @@ let lift dacc ty ~bound_to static_const : _ Or_invalid.t * DA.t =
       dacc, symbol
     | None ->
       let symbol =
-        Symbol.create
+        Symbol.create_for_current_scheme ~dbg
           (Compilation_unit.get_current_exn ())
-          (Linkage_name.of_string (Variable.unique_name bound_to))
+          ~name:(Variable.unique_name bound_to)
       in
       if not (K.equal (T.kind ty) K.value)
       then
@@ -170,7 +170,7 @@ let try_to_reify dacc dbg (term : Simplified_named.t) ~bound_to
     if Name_mode.is_normal occ_kind && allow_lifting
     then
       let static_const = create_static_const dacc dbg to_lift in
-      lift dacc ty ~bound_to static_const
+      lift dacc dbg ty ~bound_to static_const
     else Ok term, dacc
   | Simple simple when Simple.equal simple (Simple.var bound_to) ->
     (* This could happen if [ty] is an alias type to a canonical that has

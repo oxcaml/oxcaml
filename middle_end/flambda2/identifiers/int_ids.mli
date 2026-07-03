@@ -138,8 +138,18 @@ module Symbol : sig
 
   (* CR lmaurer: This treats the [Linkage_name.t] as a string to be prefixed
      rather than the actual linkage name. That's not really consistent with the
-     way linkage names are treated elsewhere. *)
+     way linkage names are treated elsewhere.
+
+     Also this produces flat-mangled names only, to create a symbol that honours
+     the current unit's name mangling scheme use [create_for_current_scheme]. *)
   val create : Compilation_unit.t -> Linkage_name.t -> t
+
+  (** Create a symbol for [name] under the current unit's name-mangling scheme.
+      Under [Flat] this is [create] with [name] as the linkage name. Under
+      [Structured] the mangling encoder is applied to [name], preceded by the
+      scopes derived from [dbg] (empty by default). *)
+  val create_for_current_scheme :
+    ?dbg:Debuginfo.t -> Compilation_unit.t -> name:string -> t
 
   val create_wrapped : Flambda2_import.Symbol.t -> t
 
@@ -247,6 +257,8 @@ module Code_id : sig
   val linkage_name : t -> Linkage_name.t
 
   val name : t -> string
+
+  val debug : t -> Debuginfo.t
 
   (* The [rename] function, in addition to changing the stamp of the code ID,
      changes the compilation unit to the current one. *)

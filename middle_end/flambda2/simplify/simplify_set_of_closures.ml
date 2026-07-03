@@ -682,12 +682,21 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
   let function_decls = Set_of_closures.function_decls set_of_closures in
   let closure_symbols =
     Function_slot.Lmap.mapi
-      (fun function_slot _func_decl ->
+      (fun function_slot
+           (code_id_in_decl :
+             Function_declarations.code_id_in_function_declaration) ->
+        let dbg =
+          match code_id_in_decl with
+          | Function_declarations.Deleted { dbg; _ } -> dbg
+          | Function_declarations.Code_id { code_id; _ } ->
+            Code_id.debug code_id
+        in
         let name =
           function_slot |> Function_slot.rename |> Function_slot.to_string
-          |> Linkage_name.of_string
         in
-        Symbol.create (Compilation_unit.get_current_exn ()) name)
+        Symbol.create_for_current_scheme ~dbg
+          (Compilation_unit.get_current_exn ())
+          ~name)
       (Function_declarations.funs_in_order function_decls)
   in
   let closure_symbols_map =

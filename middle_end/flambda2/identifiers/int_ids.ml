@@ -573,6 +573,18 @@ module Symbol = struct
     in
     create_wrapped data
 
+  let create_for_current_scheme ?(dbg = Debuginfo.none) compilation_unit ~name =
+    let data =
+      match Compilation_unit.name_mangling_scheme_for_current_unit () with
+      | Flat -> Symbol0.for_name compilation_unit name
+      | Structured ->
+        (* [suffix] is only used by [Code_id.create] to append its
+           "_<stamp>_code" tag, data symbols have no such tag. *)
+        let path = Debuginfo.to_structured_mangling_path ~name dbg in
+        Symbol0.for_structured_mangling_path ~compilation_unit ~path ~suffix:""
+    in
+    create_wrapped data
+
   let compilation_unit t = Symbol0.compilation_unit (find_data t)
 
   let for_compilation_unit t = Symbol0.for_compilation_unit t |> create_wrapped
