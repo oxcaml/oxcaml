@@ -701,6 +701,7 @@ static void add_extent(struct caml_heap_state *local,
   status color = caml_allocation_status();
   size_t blocks = 0;
   size_t remaining = wsize; /* for validation */
+  (void)remaining; /* kill warning; used in assertions */
 
   if (wsize > Whsize_wosize(Max_wosize)) {
     caml_fatal_error("caml_add_extent: extent too large (%zu words)", wsize);
