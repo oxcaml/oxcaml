@@ -23,6 +23,22 @@ module rec T1 : sig type 'a t : value mod portable with 'a end
 and T2 : sig type t = { x : int T1.t require_value; } end
 |}]
 
+(* The layout also stays precise when the [with]-bounded kind is spelled with
+   an abbreviation that carries its own bounds. *)
+module rec T1 : sig
+  type 'a t : immutable_data with 'a
+end =
+  T1
+
+and T2 : sig
+  type t = { x : int T1.t require_value }
+end =
+  T2
+[%%expect{|
+module rec T1 : sig type 'a t : immutable_data with 'a end
+and T2 : sig type t = { x : int T1.t require_value; } end
+|}]
+
 (* CR layouts v2.8: fix this. Internal ticket 5127 *)
 module rec T1 : sig
   type 'a t = A

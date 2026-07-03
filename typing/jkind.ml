@@ -1595,12 +1595,19 @@ end
 (*** constant jkinds ***)
 
 module Context_with_transl = struct
+  type transl_with_bound_types =
+    | Transl_type of (Parsetree.core_type -> Types.type_expr)
+    | Overapproximate_to_top
+        (** Instead of translating each [with]-bound's type, over-approximate it
+            by raising the bounds of its base to top. Used during the
+            recursive-module approximation pass. *)
+
   type 'd t =
     | Right_jkind :
         ('l * allowed) History.annotation_context
         -> ('l * allowed) t
     | Left_jkind :
-        (Parsetree.core_type -> Types.type_expr)
+        transl_with_bound_types
         * (allowed * disallowed) History.annotation_context
         -> (allowed * disallowed) t
 
@@ -2126,25 +2133,37 @@ module Const = struct
       in
       match context with
       | Right_jkind c -> raise ~loc:type_.ptyp_loc (With_on_right c)
-      | Left_jkind (transl_type, _) ->
-        let type_ = transl_type type_ in
-        let modality, externality =
-          Typemode.transl_with_bound_modifiers modalities
-        in
-        let relevant_axes =
-          let axes = Mod_bounds.relevant_axes_of_modality ~modality in
-          match externality with
-          | None -> axes
-          | Some ext ->
-            let is_top =
-              Per_axis.le (Nonmodal Externality) Externality.max ext
-            in
-            if is_top then axes else Axis_set.remove axes (Nonmodal Externality)
-        in
-        { base = base.base;
-          mod_bounds = base.mod_bounds;
-          with_bounds = With_bounds.add type_ { relevant_axes } base.with_bounds
-        })
+      | Left_jkind (transl_type, _) -> (
+        match transl_type with
+        | Transl_type transl_type ->
+          let type_ = transl_type type_ in
+          let modality, externality =
+            Typemode.transl_with_bound_modifiers modalities
+          in
+          let relevant_axes =
+            let axes = Mod_bounds.relevant_axes_of_modality ~modality in
+            match externality with
+            | None -> axes
+            | Some ext ->
+              let is_top =
+                Per_axis.le (Nonmodal Externality) Externality.max ext
+              in
+              if is_top
+              then axes
+              else Axis_set.remove axes (Nonmodal Externality)
+          in
+          { base = base.base;
+            mod_bounds = base.mod_bounds;
+            with_bounds =
+              With_bounds.add type_ { relevant_axes } base.with_bounds
+          }
+        | Overapproximate_to_top ->
+          (* A [with]-bound can only raise the bounds of its base, so raising
+             them all to the top over-approximates it. *)
+          { base = base.base;
+            mod_bounds = Mod_bounds.max;
+            with_bounds = base.with_bounds
+          }))
     | Pjk_default | Pjk_kind_of _ ->
       raise ~loc:jkind.pjka_loc Unimplemented_syntax
 
@@ -2316,9 +2335,9 @@ let of_attribute ~context
   of_annotated_const ~context ~annotation:(mk_annot name) ~const
     ~const_loc:attribute.loc
 
-let of_type_decl ?(use_abstract_jkinds = true) ?(warn = true) ~context
-    ~transl_type env (decl : Parsetree.type_declaration) =
-  let context = Context_with_transl.Left_jkind (transl_type, context) in
+let of_type_decl_gen ?(use_abstract_jkinds = true) ?(warn = true) ~context
+    ~transl env (decl : Parsetree.type_declaration) =
+  let context = Context_with_transl.Left_jkind (transl, context) in
   let jkind_of_annotation =
     decl.ptype_jkind_annotation
     |> Option.map (fun annot ->
@@ -2337,52 +2356,15 @@ let of_type_decl ?(use_abstract_jkinds = true) ?(warn = true) ~context
     raise ~loc:decl.ptype_loc
       (Multiple_jkinds { from_annotation; from_attribute })
 
+let of_type_decl ?use_abstract_jkinds ?warn ~context ~transl_type env decl =
+  of_type_decl_gen ?use_abstract_jkinds ?warn ~context
+    ~transl:(Context_with_transl.Transl_type transl_type) env decl
+
 let of_type_decl_overapproximate_unknown ~context env
     (decl : Parsetree.type_declaration) =
-  (* CR with-kinds: we could avoid this syntactic check and instead return
-     [None] if [transl_type] is ever called. However, then we end up parsing
-     the jkind annotation multiple times. We should refactor the code to
-     avoid passing the unparsed annotation around. *)
-  let rec has_with_bounds (jkind : Parsetree.jkind_annotation) =
-    match jkind.pjka_desc with
-    | Pjk_with _ -> true
-    | Pjk_mod (base, _) -> has_with_bounds base
-    | Pjk_operator (base, _) -> has_with_bounds base
-    | Pjk_product jkinds -> List.exists has_with_bounds jkinds
-    | Pjk_abbreviation _ -> false
-    | Pjk_default | Pjk_kind_of _ ->
-      raise ~loc:jkind.pjka_loc Unimplemented_syntax
-  in
-  let rec strip_to_layout (jkind : Parsetree.jkind_annotation) :
-      Parsetree.jkind_annotation =
-    let pjka_desc : Parsetree.jkind_annotation_desc =
-      match jkind.pjka_desc with
-      | Pjk_mod (base, _) | Pjk_with (base, _, _) ->
-        (strip_to_layout base).pjka_desc
-      | Pjk_product jkinds -> Pjk_product (List.map strip_to_layout jkinds)
-      | Pjk_operator (base, ops) -> Pjk_operator (strip_to_layout base, ops)
-      | (Pjk_abbreviation _ | Pjk_default | Pjk_kind_of _) as desc -> desc
-    in
-    { jkind with pjka_desc }
-  in
-  let transl_type sty =
-    Misc.fatal_errorf
-      "@[Unexpected call to [transl_type] in \
-       [of_type_decl_overapproximate_unknown]. Please report this to the Jane \
-       Street OCaml Language team."
-      Pprintast.core_type sty
-  in
-  let decl =
-    match decl.ptype_jkind_annotation with
-    | Some annot when has_with_bounds annot ->
-      (* Over-approximate the [with]/[mod] bounds to the top, but keep the
-         layout precise. *)
-      { decl with ptype_jkind_annotation = Some (strip_to_layout annot) }
-    | _ -> decl
-  in
   (* Warnings are emitted in [of_type_decl] rather than here *)
-  of_type_decl ~use_abstract_jkinds:false ~warn:false ~context ~transl_type env
-    decl
+  of_type_decl_gen ~use_abstract_jkinds:false ~warn:false ~context
+    ~transl:Context_with_transl.Overapproximate_to_top env decl
   |> Option.map fst
 
 let for_unboxed_record_with_updates lbls =
