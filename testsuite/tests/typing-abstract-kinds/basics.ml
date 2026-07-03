@@ -1870,24 +1870,7 @@ end = struct
   type t = Rec.a
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = Rec.a
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t = Rec.a end
-       is not included in
-         sig type t : Rec.k end
-       Type declarations do not match:
-         type t = Rec.a
-       is not included in
-         type t : Rec.k
-       The kind of the first is k
-         because of the annotation on the type at line 3, characters 11-21.
-       But the kind of the first must be a subkind of Rec.k
-         because of the definition of t at line 2, characters 2-16.
-       No .cmi file found containing k.
+module Use_rec : sig type t : Rec.k end
 |}]
 
 module Plain = struct
@@ -1904,24 +1887,7 @@ end = struct
   type t = Plain.a
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = Plain.a
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t = Plain.a end
-       is not included in
-         sig type t : Plain.k end
-       Type declarations do not match:
-         type t = Plain.a
-       is not included in
-         type t : Plain.k
-       The kind of the first is k
-         because of the annotation on the type at line 3, characters 11-21.
-       But the kind of the first must be a subkind of Plain.k
-         because of the definition of t at line 2, characters 2-18.
-       No .cmi file found containing k.
+module Use_plain : sig type t : Plain.k end
 |}]
 
 (**************************************************************)
