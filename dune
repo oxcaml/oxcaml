@@ -719,6 +719,7 @@
   bounds_check_elim
   strength_reduction
   lftr
+  loop_fusion
   ;; backend/debug/
   available_ranges_vars
   compute_ranges

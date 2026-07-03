@@ -116,6 +116,8 @@ val ssa_lftr : bool ref
 
 val ssa_delete_empty_loops : bool ref
 
+val ssa_fuse_loops : bool ref
+
 val ssa_validate : bool ref
 
 type function_result_types = Never | Functors_only | All_functions

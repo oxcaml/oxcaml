@@ -545,6 +545,18 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
     Format.fprintf ppf_dump "*** SSA after Ssa_simplify@.@.%a" Ssa_print.print
       ssa;
   let ssa =
+    if !Oxcaml_flags.ssa_fuse_loops
+    then begin
+      let ssa, fused = Loop_fusion.run ssa in
+      if !Oxcaml_flags.dump_ssa && fused > 0
+      then
+        Format.fprintf ppf_dump "*** SSA after Fusion (%d fused)@.@.%a" fused
+          Ssa_print.print ssa;
+      ssa
+    end
+    else ssa
+  in
+  let ssa =
     if !Oxcaml_flags.ssa_strength_reduce
     then Strength_reduction.run ssa
     else ssa

@@ -423,6 +423,12 @@ let mk_ssa_delete_empty_loops f =
     " Delete terminating loops whose body does no observable work in the SSA \
      pipeline (EXPERIMENTAL)" )
 
+let mk_ssa_fuse_loops f =
+  ( "-ssa-fuse-loops",
+    Arg.Unit f,
+    " Fuse chains of adjacent reversing list-map loops in the SSA pipeline \
+     (EXPERIMENTAL)" )
+
 let mk_ssa_validate f =
   ( "-ssa-validate",
     Arg.Unit f,
@@ -1379,6 +1385,7 @@ module type Oxcaml_options = sig
   val ssa_strength_reduce : unit -> unit
   val ssa_lftr : unit -> unit
   val ssa_delete_empty_loops : unit -> unit
+  val ssa_fuse_loops : unit -> unit
   val ssa_validate : unit -> unit
   val no_ssa_validate : unit -> unit
   val internal_assembler : unit -> unit
@@ -1575,6 +1582,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_ssa_strength_reduce F.ssa_strength_reduce;
       mk_ssa_lftr F.ssa_lftr;
       mk_ssa_delete_empty_loops F.ssa_delete_empty_loops;
+      mk_ssa_fuse_loops F.ssa_fuse_loops;
       mk_ssa_validate F.ssa_validate;
       mk_no_ssa_validate F.no_ssa_validate;
       mk_internal_assembler F.internal_assembler;
@@ -1986,6 +1994,7 @@ module Oxcaml_options_impl = struct
   let ssa_strength_reduce = set' Oxcaml_flags.ssa_strength_reduce
   let ssa_lftr = set' Oxcaml_flags.ssa_lftr
   let ssa_delete_empty_loops = set' Oxcaml_flags.ssa_delete_empty_loops
+  let ssa_fuse_loops = set' Oxcaml_flags.ssa_fuse_loops
   let ssa_validate = set' Oxcaml_flags.ssa_validate
   let no_ssa_validate () = Oxcaml_flags.ssa_validate := false
   let internal_assembler = set' Oxcaml_flags.internal_assembler
@@ -2058,9 +2067,7 @@ module Oxcaml_options_impl = struct
     clear Flambda2.backend_cse_at_toplevel
 
   let flambda2_peel_loopified = set Flambda2.peel_loopified
-
   let no_flambda2_peel_loopified = clear Flambda2.peel_loopified
-
   let flambda2_cse_depth n = Flambda2.cse_depth := Oxcaml_flags.Set n
   let flambda2_join_depth n = Flambda2.join_depth := Oxcaml_flags.Set n
   let flambda2_reaper = set Flambda2.enable_reaper
@@ -2414,6 +2421,7 @@ module Extra_params = struct
     | "ssa-strength-reduce" -> set' Oxcaml_flags.ssa_strength_reduce
     | "ssa-lftr" -> set' Oxcaml_flags.ssa_lftr
     | "ssa-delete-empty-loops" -> set' Oxcaml_flags.ssa_delete_empty_loops
+    | "ssa-fuse-loops" -> set' Oxcaml_flags.ssa_fuse_loops
     | "ssa-validate" -> set' Oxcaml_flags.ssa_validate
     | "internal-assembler" -> set' Oxcaml_flags.internal_assembler
     | "verify-binary-emitter" -> set' Oxcaml_flags.verify_binary_emitter

@@ -133,6 +133,8 @@ let ssa_lftr = ref false                    (* -ssa-lftr *)
 
 let ssa_delete_empty_loops = ref false      (* -ssa-delete-empty-loops *)
 
+let ssa_fuse_loops = ref false              (* -ssa-fuse-loops *)
+
 type function_result_types = Never | Functors_only | All_functions
 type join_algorithm = Binary | N_way | Checked
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
