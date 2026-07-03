@@ -1,10 +1,10 @@
-let $camlVariant_unboxed__immstring26 = "variant_unboxed.ml" in
-let $camlVariant_unboxed__const_block28 =
-  Block 0 ($camlVariant_unboxed__immstring26, 32, 14)
+let $camlVariant_unboxed__immstring_0 = "variant_unboxed.ml" in
+let $camlVariant_unboxed__const_block_1 =
+  Block 0 ($camlVariant_unboxed__immstring_0, 32, 14)
 in
-let $camlVariant_unboxed__Pmakeblock31 =
+let $camlVariant_unboxed__Pmakeblock_2 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
-           $camlVariant_unboxed__const_block28)
+           $camlVariant_unboxed__const_block_1)
 in
 let code foo_0 deleted in
 let code loopify(never) size(48) newer_version_of(foo_0)
@@ -55,7 +55,7 @@ let code loopify(never) size(48) newer_version_of(foo_0)
       (switch tag
          | 0 -> k2
          | 1 -> k3
-         | 2 -> k1 pop(regular k1) ($camlVariant_unboxed__Pmakeblock31)
+         | 2 -> k1 pop(regular k1) ($camlVariant_unboxed__Pmakeblock_2)
          where k3 =
            let prim = %num_conv.[`float`].[`imm`] (unboxed_float) in
            let int_of_float = %tag_imm (prim) in

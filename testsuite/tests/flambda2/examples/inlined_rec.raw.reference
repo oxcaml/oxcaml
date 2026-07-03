@@ -1,4 +1,4 @@
-let $camlInlined_rec__first_const = Block 0 () in
+let $camlInlined_rec__first_const_0 = Block 0 () in
 (let code inline(always) size(6)
        apply_0 (f : val, i)
          my_closure _region _ghost_region my_depth

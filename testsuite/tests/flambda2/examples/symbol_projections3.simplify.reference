@@ -1,13 +1,13 @@
 let code g_1 deleted in
 let code f_0 deleted in
-let $camlSymbol_projections3__immstring10 = "FOO" in
+let $camlSymbol_projections3__immstring_0 = "FOO" in
 (let try_region = %begin_try_region () in
  let try_ghost_region = %begin_try_ghost_region () in
  cont k2 push(k1)
    where k2 =
      (apply ccall
         ($`*extern*`.caml_sys_getenv : val -> val)
-          ($camlSymbol_projections3__immstring10)
+          ($camlSymbol_projections3__immstring_0)
           -> k3 * k1
         where k3 (param) =
           cont k2
@@ -33,7 +33,7 @@ let $camlSymbol_projections3__immstring10 = "FOO" in
         %block.[`0`]
           (x,
            $camlSymbol_projections3__g_3,
-           $camlSymbol_projections3__block_to_lift60)
+           $camlSymbol_projections3__block_to_lift_1)
       in
       cont k (Pmakeblock)
     and set_of_closures
@@ -56,7 +56,7 @@ let $camlSymbol_projections3__immstring10 = "FOO" in
         where k2 =
           let int_add = %int_barith.add (y, y) in
           cont k (int_add)
-    and $camlSymbol_projections3__block_to_lift60 =
+    and $camlSymbol_projections3__block_to_lift_1 =
       Block 0 (foo_1, foo_1)
     in
     let $camlSymbol_projections3 =

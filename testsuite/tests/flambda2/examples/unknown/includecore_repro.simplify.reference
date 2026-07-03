@@ -1,7 +1,7 @@
-let $camlIncludecore_repro__const_block56 = Block 0 (0, 0) in
+let $camlIncludecore_repro__const_block_0 = Block 0 (0, 0) in
 let code f_0 deleted in
-let $camlIncludecore_repro__const_block61 =
-  Block 0 ($camlIncludecore_repro__const_block56)
+let $camlIncludecore_repro__const_block_1 =
+  Block 0 ($camlIncludecore_repro__const_block_0)
 in
 let code inline(never) loopify(never) size(160) newer_version_of(f_0)
       f_0_1
@@ -84,15 +84,15 @@ let code inline(never) loopify(never) size(160) newer_version_of(f_0)
              | 0 -> k2
              | 1 -> k (0))
     where k2 =
-      let Popaque = %opaque ($camlIncludecore_repro__const_block56) in
+      let Popaque = %opaque ($camlIncludecore_repro__const_block_0) in
       let Pmakeblock = %block.[`0`] (Popaque) in
       cont k (Pmakeblock)
 in
 let $camlIncludecore_repro__f_1 = closure f_0_1 @f in
 apply direct(f_0_1)
   ($camlIncludecore_repro__f_1 : _ -> [ 0 | 0 of val ])
-    ($camlIncludecore_repro__const_block61,
-     $camlIncludecore_repro__const_block61)
+    ($camlIncludecore_repro__const_block_1,
+     $camlIncludecore_repro__const_block_1)
     -> k1 * error
   where k1 (param : [ 0 | 0 of val ]) =
     cont k

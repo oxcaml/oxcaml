@@ -1,11 +1,11 @@
 let code index_0 deleted in
-let $camlArrays_compatibility__string32 = "index out of bounds" in
-let $camlArrays_compatibility__block34 =
+let $camlArrays_compatibility__string_1 = "index out of bounds" in
+let $camlArrays_compatibility__block_2 =
   Block 0 ($`*predef*`.caml_exn_Invalid_argument,
-           $camlArrays_compatibility__string32)
+           $camlArrays_compatibility__string_1)
 in
 let code convert_fast_1 deleted in
-let $camlArrays_compatibility__empty_array5 = Empty_array in
+let $camlArrays_compatibility__empty_array_0 = Empty_array in
 let code f_2 deleted in
 let code inline(never) loopify(never) size(8) newer_version_of(index_0)
       index_0_1 (source)
@@ -45,7 +45,7 @@ let code inline(always) loopify(never) size(60) newer_version_of(convert_fast_1)
                  let int_add = %int_barith.add (int_sub_1, 1) in
                  cont k2 (int_add)
                where k4 =
-                 cont k1 pop(regular k1) ($camlArrays_compatibility__block34))))
+                 cont k1 pop(regular k1) ($camlArrays_compatibility__block_2))))
     where k3 =
       let int_add = %int_barith.add (offset, 1) in
       cont k2 (int_add)
@@ -56,8 +56,8 @@ in
 let $camlArrays_compatibility__convert_fast_4 =
   closure convert_fast_1_1 @convert_fast
 in
-let $camlArrays_compatibility__Pmakeblock95 =
-  Block 0 ($camlArrays_compatibility__empty_array5,
+let $camlArrays_compatibility__Pmakeblock_3 =
+  Block 0 ($camlArrays_compatibility__empty_array_0,
            $camlArrays_compatibility__index_3,
            $camlArrays_compatibility__convert_fast_4)
 in
@@ -68,7 +68,7 @@ let code loopify(never) size(75) newer_version_of(f_2)
         : [ 0 of imm tagged * imm tagged ] =
   (let untagged = %untag_imm (fast) in
    switch untagged
-     | 0 -> k2 ($camlArrays_compatibility__empty_array5)
+     | 0 -> k2 ($camlArrays_compatibility__empty_array_0)
      | 1 -> k3)
     where k3 =
       apply direct(index_0_1)
@@ -100,7 +100,7 @@ let code loopify(never) size(75) newer_version_of(f_2)
                     where k4 =
                       cont k1
                              pop(regular k1)
-                             ($camlArrays_compatibility__block34))))
+                             ($camlArrays_compatibility__block_2))))
          where k3 =
            let int_add = %int_barith.add (offset, 1) in
            cont k2 (int_add)
@@ -110,7 +110,7 @@ let code loopify(never) size(75) newer_version_of(f_2)
 in
 let $camlArrays_compatibility__f_5 = closure f_2_1 @f in
 let $camlArrays_compatibility =
-  Block 0 ($camlArrays_compatibility__Pmakeblock95,
+  Block 0 ($camlArrays_compatibility__Pmakeblock_3,
            $camlArrays_compatibility__f_5)
 in
 cont done ($camlArrays_compatibility)

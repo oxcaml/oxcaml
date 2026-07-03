@@ -1,5 +1,5 @@
 let code read_int_0 deleted in
-let $camlFloat_and_int_mix__float16 = 0x0p+0 in
+let $camlFloat_and_int_mix__float_0 = 0x0p+0 in
 let code gasp_in_horror_1 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(read_int_0)
       read_int_0_1 (param : imm tagged)
@@ -17,7 +17,7 @@ let code loopify(never) size(15) newer_version_of(gasp_in_horror_1)
   let Popaque = %opaque (1) in
   (let untagged = %untag_imm (Popaque) in
    switch untagged
-     | 0 -> k ($camlFloat_and_int_mix__float16)
+     | 0 -> k ($camlFloat_and_int_mix__float_0)
      | 1 -> k2)
     where k2 =
       apply direct(read_int_0_1)

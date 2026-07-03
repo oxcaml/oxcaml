@@ -1,14 +1,14 @@
 let code h_1 deleted in
 let code g_2 deleted in
 let code f_0 deleted in
-let $camlSymbol_projections4__immstring10 = "FOO" in
+let $camlSymbol_projections4__immstring_0 = "FOO" in
 (let try_region = %begin_try_region () in
  let try_ghost_region = %begin_try_ghost_region () in
  cont k2 push(k1)
    where k2 =
      (apply ccall
         ($`*extern*`.caml_sys_getenv : val -> val)
-          ($camlSymbol_projections4__immstring10)
+          ($camlSymbol_projections4__immstring_0)
           -> k3 * k1
         where k3 (param) =
           cont k2

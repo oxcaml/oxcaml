@@ -1,11 +1,11 @@
 let code length_aux_0 deleted in
 let code length_1 deleted in
 let code rev_append_2 deleted in
-let $camlTests9__immstring48 = "tests9.ml" in
-let $camlTests9__const_block50 = Block 0 ($camlTests9__immstring48, 39, 52)
+let $camlTests9__immstring_0 = "tests9.ml" in
+let $camlTests9__const_block_1 = Block 0 ($camlTests9__immstring_0, 39, 52)
 in
-let $camlTests9__Pmakeblock53 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests9__const_block50)
+let $camlTests9__Pmakeblock_2 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests9__const_block_1)
 in
 let code chop_3 deleted in
 let code rev_merge_5 deleted in
@@ -83,7 +83,7 @@ let code loopify(done) size(28) newer_version_of(chop_3)
            let prim_1 = %is_int (l_1) in
            (switch prim_1
               | 0 -> k2
-              | 1 -> k1 pop(regular k1) ($camlTests9__Pmakeblock53)
+              | 1 -> k1 pop(regular k1) ($camlTests9__Pmakeblock_2)
               where k2 =
                 let Pfield = %block_load.[`1`] (l_1) in
                 let int_sub = %int_barith.sub (k_1, 1) in

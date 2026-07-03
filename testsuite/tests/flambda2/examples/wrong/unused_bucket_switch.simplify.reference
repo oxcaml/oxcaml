@@ -1,5 +1,5 @@
 let code opaque_0 deleted in
-let $camlUnused_bucket_switch__immstring27 = "urk" in
+let $camlUnused_bucket_switch__immstring_0 = "urk" in
 let code f_1 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(opaque_0)
       opaque_0_1 (x) my_closure _region _ghost_region my_depth -> k * k1 =
@@ -12,9 +12,9 @@ let ghost_region = %begin_ghost_region () in
  let try_ghost_region = %begin_try_ghost_region (ghost_region) in
  cont k3 push(k1)
    where k3 =
-     let $camlUnused_bucket_switch__Pmakeblock68 =
+     let $camlUnused_bucket_switch__Pmakeblock_1 =
        Block 0 ($`*predef*`.caml_exn_Failure,
-                $camlUnused_bucket_switch__immstring27)
+                $camlUnused_bucket_switch__immstring_0)
      in
      let code loopify(never) size(16) newer_version_of(f_1)
            f_1_1 (param : imm tagged)
@@ -30,7 +30,7 @@ let ghost_region = %begin_ghost_region () in
            let naked_immediate = unboxed_field in
            switch naked_immediate
              | 0 ->
-               k4 pop(reraise k4) ($camlUnused_bucket_switch__Pmakeblock68)
+               k4 pop(reraise k4) ($camlUnused_bucket_switch__Pmakeblock_1)
              | 1 -> k3 (42)
      in
      let $camlUnused_bucket_switch__f_3 = closure f_1_1 @f in

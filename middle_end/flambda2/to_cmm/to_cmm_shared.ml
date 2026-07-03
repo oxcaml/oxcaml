@@ -358,11 +358,7 @@ let invalid res ~message =
     match To_cmm_result.invalid_message_symbol res ~message with
     | None ->
       let message_sym =
-        Symbol.create
-          (Compilation_unit.get_current_exn ())
-          (Linkage_name.of_string
-             (Variable.unique_name
-                (Variable.create "invalid" Flambda_kind.value)))
+        Symbol.manufacture (Compilation_unit.get_current_exn ()) "invalid"
       in
       let res =
         Cmm_helpers.emit_string_constant

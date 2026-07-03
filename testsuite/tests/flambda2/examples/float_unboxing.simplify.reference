@@ -34,7 +34,6 @@ let code loopify(never) size(44) newer_version_of(f_0)
       cont k (r_unboxed0)
 in
 let $camlFloat_unboxing__f_1 = closure f_0_1 @f in
-let $camlFloat_unboxing__Pmakeblock120 = Block 0 ($camlFloat_unboxing__f_1)
-in
-let $camlFloat_unboxing = Block 0 ($camlFloat_unboxing__Pmakeblock120) in
+let $camlFloat_unboxing__Pmakeblock_2 = Block 0 ($camlFloat_unboxing__f_1) in
+let $camlFloat_unboxing = Block 0 ($camlFloat_unboxing__Pmakeblock_2) in
 cont done ($camlFloat_unboxing)

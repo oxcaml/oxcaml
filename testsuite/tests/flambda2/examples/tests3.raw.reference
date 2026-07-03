@@ -1,6 +1,6 @@
-(let $camlTests3__string14 = "index out of bounds" in
- let $camlTests3__block16 =
-   Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlTests3__string14)
+(let $camlTests3__string_0 = "index out of bounds" in
+ let $camlTests3__block_1 =
+   Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlTests3__string_0)
  in
  let code size(94)
        foo_0 (arr : any array, f : val, i : imm tagged)
@@ -16,7 +16,7 @@
      where k6 =
        cont k4
      where k5 =
-       cont k2 pop(regular k2) ($camlTests3__block16)
+       cont k2 pop(regular k2) ($camlTests3__block_1)
      where k4 =
        ((let cond_result = %is_flat_float_array (arr) in
          switch cond_result
@@ -40,7 +40,7 @@
           where k5 =
             cont k3
           where k4 =
-            cont k2 pop(regular k2) ($camlTests3__block16)
+            cont k2 pop(regular k2) ($camlTests3__block_1)
           where k3 =
             ((let cond_result = %is_flat_float_array (arr) in
               switch cond_result

@@ -1,10 +1,10 @@
-let $camlTests15__immstring13 = "tests15.ml" in
-let $camlTests15__const_block15 = Block 0 ($camlTests15__immstring13, 18, 52)
+let $camlTests15__immstring_0 = "tests15.ml" in
+let $camlTests15__const_block_1 = Block 0 ($camlTests15__immstring_0, 18, 52)
 in
-let $camlTests15__Pmakeblock18 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests15__const_block15)
+let $camlTests15__Pmakeblock_2 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests15__const_block_1)
 in
-let $camlTests15__empty_array20 = Empty_array in
+let $camlTests15__empty_array_3 = Empty_array in
 let code list_to_array_0 deleted in
 let code is_c_1 deleted in
 let code set_to_x_2 deleted in
@@ -12,7 +12,7 @@ let code classical_id_3 deleted in
 let code swapped_4 deleted in
 let code negate_5 deleted in
 let code foo_6 deleted in
-let $camlTests15__immstring61 = " \\ \n " in
+let $camlTests15__immstring_4 = " \\ \n " in
 let code loopify(never) size(11) newer_version_of(list_to_array_0)
       list_to_array_0_1 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure _region _ghost_region my_depth
@@ -20,8 +20,8 @@ let code loopify(never) size(11) newer_version_of(list_to_array_0)
         : any array =
   let prim = %is_int (param) in
   switch prim
-    | 0 -> k1 pop(regular k1) ($camlTests15__Pmakeblock18)
-    | 1 -> k ($camlTests15__empty_array20)
+    | 0 -> k1 pop(regular k1) ($camlTests15__Pmakeblock_2)
+    | 1 -> k ($camlTests15__empty_array_3)
 in
 let $camlTests15__list_to_array_7 = closure list_to_array_0_1 @list_to_array
 in
@@ -93,7 +93,7 @@ let $camlTests15 =
            $camlTests15__classical_id_10,
            $camlTests15__swapped_11,
            $camlTests15__negate_12,
-           $camlTests15__immstring61,
+           $camlTests15__immstring_4,
            $camlTests15__foo_13)
 in
 cont done ($camlTests15)

@@ -53,38 +53,30 @@ type close_functions_result =
       * Alloc_mode.For_allocations.t
       * Env.value_approximation Function_slot.Map.t
 
-let manufacture_symbol acc proposed_name =
-  let acc, linkage_name =
-    if Flambda_features.Expert.shorten_symbol_names ()
-    then Acc.manufacture_symbol_short_name acc
-    else acc, Linkage_name.of_string proposed_name
-  in
-  let symbol =
-    Symbol.create (Compilation_unit.get_current_exn ()) linkage_name
-  in
-  acc, symbol
+let manufacture_symbol proposed_name =
+  Symbol.manufacture (Compilation_unit.get_current_exn ()) proposed_name
 
-let declare_symbol_for_function_slot env acc ident function_slot :
-    Env.t * Acc.t * Symbol.t =
-  let acc, symbol =
-    manufacture_symbol acc (Function_slot.to_string function_slot)
+let manufacture_symbol_of_variable v =
+  let name =
+    if !Clflags.canonical_ids
+    then Variable.canonical_name v
+    else Variable.unique_name v
   in
+  manufacture_symbol name
+
+let declare_symbol_for_function_slot env ident function_slot : Env.t * Symbol.t
+    =
+  let symbol = manufacture_symbol (Function_slot.to_string function_slot) in
   let env =
     Env.add_simple_to_substitute env ident (Simple.symbol symbol)
       K.With_subkind.any_value
   in
-  env, acc, symbol
+  env, symbol
 
 let register_const0 acc constant name =
   match Static_const.Map.find constant (Acc.shareable_constants acc) with
   | exception Not_found ->
-    (* Create a variable to ensure uniqueness of the symbol. *)
-    let var = Variable.create name K.value in
-    let acc, symbol =
-      manufacture_symbol acc
-        (* CR mshinwell: this Variable.rename looks to be redundant *)
-        (Variable.unique_name (Variable.rename var))
-    in
+    let symbol = manufacture_symbol name in
     let acc = Acc.add_declared_symbol ~symbol ~constant acc in
     let acc =
       if Static_const.can_share constant
@@ -1612,9 +1604,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
               (* This is a inconstant statically-allocated value, so cannot go
                  through [register_const0]. The definition must be placed right
                  away. *)
-              let acc, symbol =
-                manufacture_symbol acc (Variable.unique_name var)
-              in
+              let symbol = manufacture_symbol_of_variable var in
               let static_consts =
                 [Static_const_or_code.create_static_const static_const]
               in
@@ -1664,7 +1654,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                && Env.at_toplevel env
                && Flambda_features.classic_mode () ->
           (* Special case to lift toplevel exception declarations *)
-          let acc, symbol = manufacture_symbol acc (Variable.unique_name var) in
+          let symbol = manufacture_symbol_of_variable var in
           let transform_arg arg = Simple.With_debuginfo.create arg dbg in
           (* This is an inconstant statically-allocated value, so cannot go
              through [register_const0]. The definition must be placed right
@@ -3114,8 +3104,8 @@ let close_functions acc external_env ~current_region function_declarations =
     then
       Ident.Map.fold
         (fun ident function_slot (acc, env, symbol_map) ->
-          let env, acc, symbol =
-            declare_symbol_for_function_slot env acc ident function_slot
+          let env, symbol =
+            declare_symbol_for_function_slot env ident function_slot
           in
           let approx =
             match Function_slot.Map.find function_slot approx_map with
@@ -4094,7 +4084,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
          - we have already called [bind_static_consts_and_code]; and
 
          - this symbol definition must be the very first. *)
-      let acc, symbol = manufacture_symbol acc "first_const" in
+      let symbol = manufacture_symbol "first_const" in
       let bound_static =
         Bound_static.singleton (Bound_static.Pattern.block_like symbol)
       in
