@@ -549,17 +549,7 @@ let check_for_unset_parameters penv global =
 let mode_pers_mod staticity =
   let hint : _ Mode.Hint.const = Legacy Compilation_unit in
   Mode.Value.of_const
-    { areality = Global;
-      linearity = Many;
-      uniqueness = Aliased;
-      portability = Nonportable;
-      contention = Uncontended;
-      forkable = Forkable;
-      yielding = Unyielding;
-      statefulness = Stateful;
-      visibility = Read_write;
-      staticity;
-    }
+    { Mode.Value.Const.legacy with staticity }
     ~hint_monadic:hint ~hint_comonadic:hint
 
 let rec global_of_global_name penv ~check name ~allow_excess_args =
