@@ -199,7 +199,7 @@ apply ccall
                                  where k4 (apply_result : imm tagged) =
                                    let int_mul = %int_barith.mul (i, 2) in
                                    let prim_4 =
-                                     %num_conv.[tagged_imm].[int8]
+                                     %num_conv.[tagged_imm].[`int8`]
                                        (apply_result)
                                    in
                                    let prim_5 =
@@ -222,7 +222,7 @@ apply ccall
                                           %int_barith.add (int_mul, 1)
                                         in
                                         let prim_6 =
-                                          %num_conv.[tagged_imm].[int8]
+                                          %num_conv.[tagged_imm].[`int8`]
                                             (apply_result_1)
                                         in
                                         let prim_7 =
