@@ -616,6 +616,32 @@ let or_null_kind tvar =
 let decl_of_type_constr type_constr =
   let type_ident = ident_of_type_constr type_constr in
   let type_uid = Uid.of_predef_id type_ident in
+  (* The unboxed versions explicitly added to the predef are abstract, as they
+     are special-cased; other unboxed versions are automatically derived. *)
+  let mk_unboxed_version ~params ~variance ~separability
+      (unboxed_jkind : Jkind.Const.Builtin.t) =
+    let type_jkind =
+      Jkind.of_builtin ~why:(Unboxed_primitive type_ident) unboxed_jkind
+      |> Jkind.mark_best
+    in
+    { type_params = params;
+      type_arity = List.length params;
+      type_kind = Type_abstract Definition;
+      type_jkind;
+      type_ikind = ikind_of_jkind ~params type_jkind;
+      type_loc = Location.none;
+      type_private = Asttypes.Public;
+      type_manifest = None;
+      type_variance = variance;
+      type_separability = separability;
+      type_is_newtype = false;
+      type_expansion_scope = lowest_level;
+      type_attributes = [];
+      type_unboxed_default = false;
+      type_uid = Uid.unboxed_version type_uid;
+      type_unboxed_version = None;
+    }
+  in
   let decl0
       ?(kind = Type_abstract Definition)
       ~(jkind : jkind_l)
@@ -623,36 +649,10 @@ let decl_of_type_constr type_constr =
       ?manifest
       ()
     =
-    let type_unboxed_version = match unboxed_jkind with
-      | None -> None
-      | Some unboxed_jkind ->
-        let type_jkind =
-          Jkind.of_builtin ~why:(Unboxed_primitive type_ident) unboxed_jkind
-        in
-        let type_jkind = Jkind.mark_best type_jkind in
-        let type_ikind = ikind_of_jkind ~params:[] type_jkind in
-        (* All unboxed versions of types explicitly added in the predef are
-           abstract, as they are special cased. Other unboxed versions are
-           automatically derived. *)
-        let type_kind = Type_abstract Definition in
-        Some {
-          type_params = [];
-          type_arity = 0;
-          type_kind;
-          type_jkind;
-          type_ikind;
-          type_loc = Location.none;
-          type_private = Asttypes.Public;
-          type_manifest = None;
-          type_variance = [];
-          type_separability = [];
-          type_is_newtype = false;
-          type_expansion_scope = lowest_level;
-          type_attributes = [];
-          type_unboxed_default = false;
-          type_uid = Uid.unboxed_version type_uid;
-          type_unboxed_version = None;
-        }
+    let type_unboxed_version =
+      Option.map
+        (mk_unboxed_version ~params:[] ~variance:[] ~separability:[])
+        unboxed_jkind
     in
     let type_jkind = Jkind.mark_best jkind in
     let type_ikind = ikind_of_jkind ~params:[] type_jkind in
@@ -681,11 +681,18 @@ let decl_of_type_constr type_constr =
       ?(separability = Separability.Ind)
       ?(kind = fun _ -> Type_abstract Definition)
       ?manifest
+      ?(unboxed_jkind : Jkind.Const.Builtin.t option)
       ()
     =
     let param = newgenvar param_jkind in
     let base = decl0 ~jkind:(jkind param) ~kind:(kind param) () in
     let manifest = Option.map (fun f -> f param) manifest in
+    let type_unboxed_version =
+      Option.map
+        (mk_unboxed_version ~params:[param] ~variance:[variance]
+           ~separability:[separability])
+        unboxed_jkind
+    in
     { base with
       type_params = [param];
       type_arity = 1;
@@ -693,6 +700,7 @@ let decl_of_type_constr type_constr =
       type_variance = [variance];
       type_separability = [separability];
       type_manifest = manifest;
+      type_unboxed_version;
     }
   in
   let decl2
@@ -815,6 +823,7 @@ let decl_of_type_constr type_constr =
       ~jkind:(builtin2 Jkind.Const.Builtin.value) ()
   | `Array ->
     decl1 ~variance:Variance.full ~param_jkind:Jkind.for_array_argument
+       ~unboxed_jkind:Jkind.Const.Builtin.any
        ~jkind:(fun param ->
          Jkind.Builtin.mutable_data ~why:(Primitive ident_array) |>
          Jkind.add_with_bounds
@@ -834,6 +843,7 @@ let decl_of_type_constr type_constr =
   | `Iarray ->
       decl1 ~variance:Variance.covariant
        ~param_jkind:Jkind.for_array_argument
+       ~unboxed_jkind:Jkind.Const.Builtin.any
        ~jkind:(fun param ->
          Jkind.Builtin.immutable_data ~why:(Primitive ident_iarray) |>
          Jkind.add_with_bounds
