@@ -16,7 +16,7 @@ let code loopify(never) size(0) newer_version_of(gasp_in_horror_1)
         -> k * k1
         : imm tagged =
   let Popaque = %opaque (1) in
-  invalid "(Defining_expr_of_let (bound_pattern untagged/54N)\n (defining_expr ((Untag_imm Popaque/53N) float_and_int_mix.ml:25,5--25)))"
+  invalid "(Defining_expr_of_let (bound_pattern untagged/52N)\n (defining_expr ((Untag_imm Popaque/51N) float_and_int_mix.ml:25,5--25)))"
 in
 let $camlFloat_and_int_mix__gasp_in_horror_3 =
   closure gasp_in_horror_1_1 @gasp_in_horror &toplevel.alloc_region
