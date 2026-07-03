@@ -98,7 +98,8 @@ type after_downwards_traversal_of_body_and_handlers_data =
     lifted_params : Lifted_cont_params.t;
     invariant_params : Bound_parameters.t;
     invariant_extra_params_and_args : EPA.t;
-    handlers : handler_after_downwards_traversal Continuation.Map.t
+    handlers : handler_after_downwards_traversal Continuation.Map.t;
+    first_iteration_peeled : bool
   }
 
 type handler_to_rebuild =
@@ -115,7 +116,9 @@ type handler_to_rebuild =
 
 type handlers_to_rebuild_group =
   | Recursive of
-      { rebuild_continuation_handlers : handler_to_rebuild Continuation.Map.t }
+      { rebuild_continuation_handlers : handler_to_rebuild Continuation.Map.t;
+        first_iteration_peeled : bool
+      }
   | Non_recursive of
       { cont : Continuation.t;
         handler : handler_to_rebuild;
@@ -140,7 +143,8 @@ type rebuilt_handler =
 type rebuilt_handlers_group =
   | Recursive of
       { continuation_handlers : rebuilt_handler Continuation.Lmap.t;
-        invariant_params : Bound_parameters.t
+        invariant_params : Bound_parameters.t;
+        first_iteration_peeled : bool
       }
   | Non_recursive of
       { cont : Continuation.t;
@@ -494,7 +498,9 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
             expr, name_occurrences, cost_metrics
       in
       rebuild_groups expr name_occurrences cost_metrics uacc groups
-    | Recursive { continuation_handlers; invariant_params } :: groups ->
+    | Recursive
+        { continuation_handlers; invariant_params; first_iteration_peeled }
+      :: groups ->
       let rec_handlers =
         Continuation.Lmap.map
           (fun handler -> handler.handler)
@@ -503,7 +509,7 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
       let expr =
         RE.create_recursive_let_cont
           (UA.are_rebuilding_terms uacc)
-          ~invariant_params rec_handlers ~body
+          ~first_iteration_peeled ~invariant_params rec_handlers ~body
       in
       let name_occurrences =
         Continuation.Lmap.fold
@@ -847,7 +853,8 @@ let rec rebuild_continuation_handlers_loop ~rebuild_body
           ~at_unit_toplevel ~original_invariant_params ~invariant_extra_params
           uacc ~after_rebuild groups_to_rebuild
           (Non_recursive { cont; handler = rebuilt_handler } :: rebuilt_groups))
-  | Recursive { rebuild_continuation_handlers } :: groups_to_rebuild ->
+  | Recursive { rebuild_continuation_handlers; first_iteration_peeled }
+    :: groups_to_rebuild ->
     (* Common setup for recursive handlers: add rewrites; for now: always add
        params (ignore alias analysis) *)
     let uacc =
@@ -900,7 +907,10 @@ let rec rebuild_continuation_handlers_loop ~rebuild_body
           ~at_unit_toplevel ~original_invariant_params ~invariant_extra_params
           uacc ~after_rebuild groups_to_rebuild
           (Recursive
-             { continuation_handlers = rebuilt_handlers; invariant_params }
+             { continuation_handlers = rebuilt_handlers;
+               invariant_params;
+               first_iteration_peeled
+             }
           :: rebuilt_groups))
 
 let prepare_to_rebuild_handlers (data : prepare_to_rebuild_handlers_data) uacc
@@ -1046,7 +1056,10 @@ let sort_handlers data handlers =
                   group)
               Continuation.Map.empty conts
           in
-          Recursive { rebuild_continuation_handlers }
+          Recursive
+            { rebuild_continuation_handlers;
+              first_iteration_peeled = data.first_iteration_peeled
+            }
         | No_loop cont ->
           let handler = Continuation.Map.find cont handlers in
           let is_single_inlinable_use =
@@ -1466,7 +1479,8 @@ and simplify_single_recursive_handler ~simplify_expr cont_uses_env_so_far
 and simplify_recursive_handlers ~down_to_up ~data ~rebuild_body ~dacc_after_body
     ~denv_for_join ~previous_are_lifting_conts ~cont_uses_env_after_body
     ~lifted_params ~invariant_params ~invariant_epa ~continuation_handlers
-    ~simplify_expr ~consts_lifted_during_body ~all_conts_set ~common_denv =
+    ~simplify_expr ~consts_lifted_during_body ~all_conts_set ~common_denv
+    ~first_iteration_peeled =
   let rec loop consts_lifted_after_fork cont_uses_env_so_far
       reachable_handlers_to_simplify simplified_handlers_set simplified_handlers
       dacc =
@@ -1493,7 +1507,8 @@ and simplify_recursive_handlers ~down_to_up ~data ~rebuild_body ~dacc_after_body
           handlers = simplified_handlers;
           at_unit_toplevel = false;
           consts_lifted_during_body;
-          consts_lifted_after_fork
+          consts_lifted_after_fork;
+          first_iteration_peeled
         }
       in
       let dacc = DA.with_are_lifting_conts dacc previous_are_lifting_conts in
@@ -1571,7 +1586,8 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
           handlers = Continuation.Map.empty;
           at_unit_toplevel = false;
           consts_lifted_during_body;
-          consts_lifted_after_fork = consts_lifted_during_body
+          consts_lifted_after_fork = consts_lifted_during_body;
+          first_iteration_peeled = false
         }
       in
       after_downwards_traversal_of_body_and_handlers data dacc ~simplify_expr
@@ -1644,7 +1660,9 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
               handlers = Continuation.Map.singleton cont rebuild;
               at_unit_toplevel;
               consts_lifted_during_body;
-              consts_lifted_after_fork
+              consts_lifted_after_fork;
+              (* This is the non-recursive path: not a loop, so never peeled. *)
+              first_iteration_peeled = false
             }
           in
           after_downwards_traversal_of_body_and_handlers data dacc
@@ -1653,7 +1671,8 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
       { continuation_handlers;
         invariant_params;
         lifted_params;
-        can_be_lifted = _
+        can_be_lifted = _;
+        first_iteration_peeled
       } ->
     (* CR gbury: we currently do not lift any continuation out of a recursive
      * continuation. For instance it would be useful on the following example:
@@ -1711,8 +1730,8 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
       ~cont_uses_env_after_body:body_continuation_uses_env ~lifted_params
       ~invariant_params ~invariant_epa ~continuation_handlers ~simplify_expr
       ~consts_lifted_during_body ~all_conts_set ~common_denv
-      body_continuation_uses_env used_handlers_in_body Continuation.Set.empty
-      Continuation.Map.empty dacc
+      ~first_iteration_peeled body_continuation_uses_env used_handlers_in_body
+      Continuation.Set.empty Continuation.Map.empty dacc
 
 and after_downwards_traversal_of_body ~simplify_expr ~down_to_up
     (data : after_downwards_traversal_of_body_data) dacc ~rebuild:rebuild_body =
@@ -1867,7 +1886,8 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
           { invariant_params;
             lifted_params;
             continuation_handlers;
-            can_be_lifted = _
+            can_be_lifted = _;
+            first_iteration_peeled
           } ->
         assert (Lifted_cont_params.is_empty lifted_params);
         if not can_be_lifted
@@ -1897,7 +1917,7 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
           in
           let ret =
             Original_handlers.create_recursive ~invariant_params ~lifted_params
-              ~continuation_handlers ~can_be_lifted
+              ~continuation_handlers ~can_be_lifted ~first_iteration_peeled
           in
           ret)
   in
@@ -1915,32 +1935,118 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
     ~down_to_up:
       (after_downwards_traversal_of_body ~simplify_expr data ~down_to_up)
 
+(* Loop peeling. A loop is a recursive continuation; peeling its first iteration
+   means splicing one copy of the handler ahead of the loop, binding the
+   continuation's parameters to the loop's initial arguments, and leaving the
+   continuation recursive for the remaining iterations. No SSA-style phi
+   reconstruction is needed: exits from the handler are [Apply_cont]s to outer
+   continuations, so live-out values merge at those continuations' parameters
+   for free.
+
+   [first_iteration_peeled] on the recursive handlers is set to [true] on the
+   result, so this fires at most once per loop across simplifier rounds. The
+   value is preset by the two entry points ([simplify_let_cont] reads it off the
+   term; the loopify path presets it from [-flambda2-peel-loopified]) so that
+   loopified tail-recursive functions are only peeled when that flag is on.
+
+   This first version only handles the simplest loop shape: a single
+   self-recursive continuation with no invariant parameters, whose loop entry is
+   a bare [Apply_cont k init] with no trap action. Anything else is left
+   unchanged. *)
+let try_peel_first_iteration (let_cont : Let_cont.t) : Expr.t option =
+  match let_cont with
+  | Non_recursive _ -> None
+  | Recursive handlers ->
+    if Recursive_let_cont_handlers.first_iteration_peeled handlers
+    then None
+    else
+      Recursive_let_cont_handlers.pattern_match handlers
+        ~f:(fun ~invariant_params ~body cont_handlers ->
+          let handlers_map = Continuation_handlers.to_map cont_handlers in
+          match Continuation.Lmap.bindings handlers_map with
+          | [(k, handler)]
+            when not (Continuation_handler.is_exn_handler handler) ->
+            (* Intercept the loop entry(ies) [apply_cont k …] in the body by
+               renaming [k] to a fresh [k'] there, and binding [k'] to a
+               *non-recursive* copy of the handler. A non-recursive handler is
+               not in scope of its own binding, so the copy's back edges
+               [apply_cont k …] still refer to the outer recursive [k] and flow
+               into the loop -- peeling the first iteration. We do not have to
+               find or rewrite the entry inside the body: the recursion's own
+               back edges live in the handler (left untouched), so renaming [k]
+               throughout the body redirects only the entries.
+
+               An [Apply_cont] to [k] passes the invariant parameters followed
+               by the handler's own parameters, so the copy [k'] binds the
+               concatenation of both (freshened, since they are also bound by
+               the enclosing recursive continuation). The freshened invariant
+               parameters flow back to the recursive [k] on the copy's back
+               edges; being invariant, this preserves their value. *)
+            Continuation_handler.pattern_match handler
+              ~f:(fun params ~handler:handler_expr ->
+                let combined =
+                  Bound_parameters.append invariant_params params
+                in
+                let combined_fresh = Bound_parameters.rename combined in
+                let renaming =
+                  Bound_parameters.renaming combined
+                    ~guaranteed_fresh:combined_fresh
+                in
+                let handler_expr = Expr.apply_renaming handler_expr renaming in
+                let peeled_handler =
+                  Continuation_handler.create combined_fresh
+                    ~handler:handler_expr
+                    ~free_names_of_handler:Or_unknown.Unknown
+                    ~is_exn_handler:false
+                    ~is_cold:(Continuation_handler.is_cold handler)
+                in
+                let k' = Continuation.create ~name:"peeled" () in
+                let renamed_body =
+                  Expr.apply_renaming body
+                    (Renaming.add_continuation Renaming.empty k k')
+                in
+                let peeled_body =
+                  Let_cont.create_non_recursive k' peeled_handler
+                    ~body:renamed_body ~free_names_of_body:Or_unknown.Unknown
+                in
+                Some
+                  (Let_cont.create_recursive ~first_iteration_peeled:true
+                     ~invariant_params handlers_map ~body:peeled_body))
+          | [] | [_] | _ :: _ :: _ -> None)
+
 let simplify_let_cont ~simplify_expr dacc let_cont ~down_to_up =
   (* This is the entry point to simplify a let cont expression. The only thing
      it does is to match all handlers to break the name abstraction, and then
      call [simplify_let_cont_stage1]. *)
-  let body, handlers =
-    match (let_cont : Let_cont.t) with
-    | Non_recursive { handler; can_be_lifted; _ } ->
-      let body, non_rec_handler =
-        split_non_recursive_let_cont ~can_be_lifted handler
-      in
-      let original_handlers =
-        Original_handlers.create_non_recursive non_rec_handler
-      in
-      body, original_handlers
-    | Recursive handlers ->
-      let lifted_params = Lifted_cont_params.empty in
-      let body, invariant_params, continuation_handlers =
-        split_recursive_let_cont handlers
-      in
-      let original_handlers =
-        Original_handlers.create_recursive ~invariant_params ~lifted_params
-          ~continuation_handlers ~can_be_lifted:true
-      in
-      body, original_handlers
-  in
-  simplify_let_cont0 ~simplify_expr dacc { body; handlers } ~down_to_up
+  match try_peel_first_iteration let_cont with
+  | Some peeled_expr -> simplify_expr dacc peeled_expr ~down_to_up
+  | None ->
+    let body, handlers =
+      match (let_cont : Let_cont.t) with
+      | Non_recursive { handler; can_be_lifted; _ } ->
+        let body, non_rec_handler =
+          split_non_recursive_let_cont ~can_be_lifted handler
+        in
+        let original_handlers =
+          Original_handlers.create_non_recursive non_rec_handler
+        in
+        body, original_handlers
+      | Recursive handlers ->
+        let lifted_params = Lifted_cont_params.empty in
+        let body, invariant_params, continuation_handlers =
+          split_recursive_let_cont handlers
+        in
+        (* Explicit source loops carry the peel marker on the term itself. *)
+        let first_iteration_peeled =
+          Recursive_let_cont_handlers.first_iteration_peeled handlers
+        in
+        let original_handlers =
+          Original_handlers.create_recursive ~invariant_params ~lifted_params
+            ~continuation_handlers ~can_be_lifted:true ~first_iteration_peeled
+        in
+        body, original_handlers
+    in
+    simplify_let_cont0 ~simplify_expr dacc { body; handlers } ~down_to_up
 
 let simplify_as_recursive_let_cont ~simplify_expr dacc (body, handlers)
     ~down_to_up =
@@ -1963,6 +2069,11 @@ let simplify_as_recursive_let_cont ~simplify_expr dacc (body, handlers)
           ~invariant_params:Bound_parameters.empty
           ~lifted_params:Lifted_cont_params.empty ~continuation_handlers
           ~can_be_lifted:true
+            (* This entry is only reached from loopify (see [simplify_expr]), so
+               these loops are the loopified tail-recursive functions. Marking
+               them as already-peeled unless [-flambda2-peel-loopified] is set
+               keeps peeling from firing on every tail-recursive function. *)
+          ~first_iteration_peeled:(not (Flambda_features.peel_loopified ()))
     }
   in
   simplify_let_cont0 ~simplify_expr dacc data ~down_to_up

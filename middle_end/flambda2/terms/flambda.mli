@@ -470,8 +470,8 @@ module Recursive_let_cont_handlers : sig
     'a
 
   (** Whether loop peeling has already spliced a copy of the first iteration
-      ahead of this recursive continuation group (see [Simplify_let_cont]).
-      Read without opening the abstraction over the bound continuations. *)
+      ahead of this recursive continuation group (see [Simplify_let_cont]). Read
+      without opening the abstraction over the bound continuations. *)
   val first_iteration_peeled : t -> bool
 
   (** Deconstruct two continuation bindings using the same bound continuations.

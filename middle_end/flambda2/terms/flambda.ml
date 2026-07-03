@@ -103,10 +103,11 @@ and recursive_let_cont_handlers_t0 =
   { handlers : continuation_handlers_t0;
     body : expr;
     first_iteration_peeled : bool
-        (** [true] once loop peeling (see [Simplify_let_cont]) has spliced a copy
-            of the first iteration ahead of this recursive continuation group, so
-            that the peeling transformation fires at most once per loop and does
-            not unroll it without bound across simplifier rounds. *)
+        (** [true] once loop peeling (see [Simplify_let_cont]) has spliced a
+            copy of the first iteration ahead of this recursive continuation
+            group, so that the peeling transformation fires at most once per
+            loop and does not unroll it without bound across simplifier rounds.
+        *)
   }
 
 and recursive_let_cont_handlers =
