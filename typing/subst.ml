@@ -655,10 +655,11 @@ let rec typexp copy_scope s ty =
     let has_fixed_row =
       not (is_Tconstr ty) && is_constr_row ~allow_ident:false tm in
     (* Make a stub *)
-    let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
+    let stub_jkind = Jkind.Builtin.any ~why:Dummy_jkind in
     let ty' =
-      if should_duplicate_vars then newpersty (Tvar {name = None; jkind})
-      else newgenstub ~scope:(get_scope ty) jkind
+      if should_duplicate_vars
+      then newpersty (Tvar {name = None; jkind = stub_jkind})
+      else newgenstub ~scope:(get_scope ty) stub_jkind
     in
     For_copy.redirect_desc copy_scope ty (Tsubst (ty', None));
     let desc =
@@ -751,6 +752,7 @@ let rec typexp copy_scope s ty =
           let ret = typexp copy_scope s ret in
           let comm = copy_commu comm in
           Tarrow ((label, marg, mret), arg, ret, comm)
+      | Tof_kind jk -> Tof_kind (jkind copy_scope s jk)
       | _ -> copy_type_desc (typexp copy_scope s) desc
     in
     Transient_expr.set_stub_desc ty' desc;
