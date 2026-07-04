@@ -53,7 +53,13 @@ let via_functor_application =
 [%%expect {|
 module F_c :
   functor (X : sig type t : bits64 end) -> sig val f : X.t foo -> X.t foo end
-val via_functor_application : M.t foo -> M.t foo = <fun>
+Line 8, characters 2-5:
+8 |   N.f
+      ^^^
+Error: The value "N.f" has type "M.t foo -> M.t foo"
+       but an expression was expected of type "'a"
+       This instance of "$0" is ambiguous:
+       it would escape the scope of its equation
 |}]
 
 
@@ -71,7 +77,13 @@ let via_modtype_path =
 module Mk_S :
   functor (X : sig type t : bits64 end) ->
     sig module type S = sig val f : X.t foo -> X.t foo end end
-val via_modtype_path : M.t foo -> M.t foo = <fun>
+Line 8, characters 2-5:
+8 |   N.f
+      ^^^
+Error: The value "N.f" has type "M.t foo -> M.t foo"
+       but an expression was expected of type "'a"
+       This instance of "$0" is ambiguous:
+       it would escape the scope of its equation
 |}]
 
 (* Similar test, but we match on the witness inside of the module *)
@@ -96,7 +108,13 @@ module F_b :
 module Mk_S_b :
   functor (X : sig type t : bits64 end) ->
     sig module type S = sig val f : X.t foo -> X.t foo end end
-val via_first_class_module : M.t foo -> M.t foo = <fun>
+Line 15, characters 2-5:
+15 |   N.f
+       ^^^
+Error: The value "N.f" has type "M.t foo -> M.t foo"
+       but an expression was expected of type "'a"
+       This instance of "M.t" is ambiguous:
+       it would escape the scope of its equation
 |}]
 
 (* CR layouts: Once we support [any] in tuples, the below will and should
@@ -143,14 +161,11 @@ let tuple_via_modtype_path =
   let module N : Mk_St(Mv).S = struct let x = Mv.v (), Mv.v () end in
   N.x
 [%%expect {|
-Lines 2-4, characters 2-5:
-2 | ..let V = Mv.witness in
-3 |   let module N : Mk_St(Mv).S = struct let x = Mv.v (), Mv.v () end in
+Line 4, characters 2-5:
 4 |   N.x
-Error: Non-value detected in [value_kind].
-       Please report this error to the Jane Street compilers team.
-       The layout of Mv.t is any
-         because of the definition of t at line 4, characters 2-14.
-       But the layout of Mv.t must be a value layout
-         because it has to be value for the V1 safety check.
+      ^^^
+Error: The value "N.x" has type "Mv.t * Mv.t"
+       but an expression was expected of type "'a"
+       This instance of "$0" is ambiguous:
+       it would escape the scope of its equation
 |}]
