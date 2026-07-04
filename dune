@@ -437,6 +437,7 @@
  (deps
   Makefile.build_config
   Makefile.config_if_required
+  Makefile.config
   Makefile.common
   (source_tree yacc))
  (targets ocamlyacc)

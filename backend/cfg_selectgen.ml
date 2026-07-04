@@ -760,7 +760,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Never_returns -> Never_returns
       | Ok (simple_args, env) ->
         let* rs = emit_tuple env sub_cfg simple_args in
-        Ok (insert_op_debug env sub_cfg (SU.make_opaque ()) dbg rs rs))
+        let rd = Reg.createv_with_typs rs in
+        Ok (insert_op_debug env sub_cfg (SU.make_opaque ()) dbg rs rd))
     | Cop (Ctuple_field (field, fields_layout), [arg], _dbg) -> (
       match emit_expr env sub_cfg arg ~bound_name:None with
       | Never_returns -> Never_returns
