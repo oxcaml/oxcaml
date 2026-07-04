@@ -32,26 +32,24 @@
 
     - [visit_*] intercepts the walk: when an input instruction is reached, the
       reducer can handle it itself (emit something else or nothing at all) or
-      return [For_next_reducer] to let another reducer have a go (when using
-      Combine) or let the framework apply the default translation, which will
-      map the inputs to the output graph and continue with the output graph
-      hooks described in the next bullet.
+      return [Unchanged] to let another reducer have a go (when using Combine)
+      or let the framework apply the default translation, which will map the
+      inputs to the output graph and continue with the output graph hooks
+      described in the next bullet.
 
-    - [emit_*] and [finish_block] intercept every emission into the output
-      graph: as the framework (or the reducer itself via the context) is about
-      to emit an operation or finish a block, the reducer can keep it as-is or
-      swap in a replacement.
+    - [emit_op] and [finish_block] intercept every emission into the output
+      graph: as an operation is about to be emitted (by the framework, or by the
+      reducer itself via [Cursor.emit_op]) or a block is about to be finished,
+      the reducer can keep it as-is or swap in a replacement.
 
     The hooks are interleaved for each instruction: if [visit] returns
-    [For_next_reducer], the framework's default translation maps args and calls
-    the output-side hook ([emit_*] or [finish_block]) before moving on. For both
-    visit and emit functions, [Emitted_replacement values] means that the
-    reducer has already emitted a replacement (or not, if the intention was to
-    delete the instruction) and the values [values] are what the input
-    instruction's results map to. An input operation of arity [n] must map to an
-    array of exactly [n] values. Note that returning
-    [Emitted_replacement values] does NOT add anything to the output graph by
-    itself; that must be done beforehand through the context.
+    [Unchanged], the framework's default translation maps args and calls the
+    output-side hook ([emit_*] or [finish_block]) before moving on. For both
+    visit and emit functions, [Reduce (fun c -> ...)] means that the reducer
+    wants to emit a replacement. It is handed the cursor [c] to do so and is
+    expected to return the replacement values or the new terminator, depending
+    on the hook. An input operation of arity [n] must map to an array of exactly
+    [n] values.
 
     Input and output graphs are distinguished by the construction-state phantom:
     the input is [Ssa.finished], the output [Context.out]. Their [Block.t] /
@@ -82,20 +80,13 @@ module Context : sig
 
     type t
 
-    val start : out Block.t -> t
-
-    val move : t -> new_pos:out Block.t -> unit
-
-    val is_finished : t -> bool
-
     (** Emit an [Op] into the cursor, going through the reducer's [emit_op]
         hook. Returns the value(s) it produces, which may differ from a plain
         [Ssa.Cursor.emit_op] if the reducer replaced the emission.
 
         ATTENTION: Calling this from the reducer's [emit_op] without first
         reducing the size of the arguments will lead to infinite recursion! Use
-        [For_next_reducer] if the intention is to emit the operation without
-        change. *)
+        [Unchanged] if the intention is to emit the operation without change. *)
     val emit_op :
       context ->
       t ->
@@ -108,16 +99,6 @@ module Context : sig
     val emit_push_trap : t -> handler:out Block.t -> unit
 
     val emit_pop_trap : t -> handler:out Block.t -> unit
-
-    (** Finish the cursor's block, going through the reducer's [finish_block]
-        hook.
-
-        ATTENTION: Calling this from the reducer's [finish_block] without first
-        reducing the size of the arguments will lead to infinite recursion! Use
-        [For_next_reducer] if the intention is to emit the terminator without
-        change. *)
-    val finish_block :
-      context -> t -> dbg:Debuginfo.t -> out Terminator.t -> unit
   end
 
   val in_graph : t -> finished Ssa.graph
@@ -138,23 +119,14 @@ end
 
 (** A hook's decision for one instruction or terminator. [Unchanged]: defer to
     the next reducer (under [Combine]) or the framework's default translation.
-    [Reduce f]: the reducer takes over; [f] is run with the output cursor to
-    emit the replacement (through the [Context]) and returns what the input's
-    results map to ([unit] for a terminator). *)
+    [Reduce f]: the reducer takes over; [f] is run with the output cursor (to
+    emit through the [Context]) and returns what the input maps to: the result
+    value(s) for [visit_instruction] / [emit_op], or the replacement
+    [(dbg, terminator)] for [visit_terminator] / [finish_block] (which the
+    framework then finishes and re-reduces). *)
 type 'a reduction =
   | Unchanged
   | Reduce of (Context.Cursor.t -> 'a)
-
-(** Shorthand for
-    [Reduce (fun c -> Context.Cursor.finish_block ctx c ~dbg terminator)] *)
-val reduce_output_terminator :
-  Context.t -> dbg:Debuginfo.t -> Context.out Terminator.t -> unit reduction
-
-(** Shorthand for
-    [reduce_output_terminator ctx ~dbg (Context.map_terminator ctx terminator)]
-*)
-val reduce_input_terminator :
-  Context.t -> dbg:Debuginfo.t -> finished Terminator.t -> unit reduction
 
 (** A reducer is turned into an optimization pass using the {!Make_run} functor.
     The {!Combine} functor can be used to compose multiple reducers into one. *)
@@ -163,11 +135,11 @@ module type Reducer = sig
 
   val create : Context.t -> t
 
-  (** Called for each instruction in each input block. [For_next_reducer]: defer
-      to the framework's default translation. [Emitted_replacement values]: the
-      reducer has handled the instruction itself (by emitting replacements via
-      the context, or by doing nothing, which means it is dropped). [values] is
-      what the input instruction's results map to (empty for a trap
+  (** Called for each instruction in each input block. [Unchanged]: defer to the
+      framework's default translation. [Reduce (fun c -> ...)]: the reducer
+      handles the instruction itself (by emitting replacements via the given
+      cursor [c], or by doing nothing, which means it is dropped). The closure
+      returns what the input instruction's results map to (empty for a trap
       instruction), and is remembered as the output-graph mapping. *)
   val visit_instruction :
     t ->
@@ -175,13 +147,17 @@ module type Reducer = sig
     instr_index:int ->
     Context.out Value.t array reduction
 
-  (** Called once per input block, after its body. *)
-  val visit_terminator : t -> finished Block.t -> unit reduction
+  (** Called once per input block, after its body. [Unchanged]: the framework
+      finishes the block with its translated terminator.
+      [Reduce (fun c -> ...)]: the reducer returns the replacement
+      [(dbg, terminator)] for the framework to finish (and re-reduce through
+      [finish_block]). *)
+  val visit_terminator :
+    t -> finished Block.t -> (Debuginfo.t * Context.out Terminator.t) reduction
 
   (** Called each time the framework is about to emit an [Op] into the cursor.
-      [For_next_reducer]: emit it as-is. [Emitted_replacement values]: the
-      reducer has already emitted a replacement producing the values [values].
-  *)
+      [Unchanged]: emit it as-is. [Reduce (fun c -> ...)]: the reducer emits a
+      replacement using the given cursor [c]. *)
   val emit_op :
     t ->
     op:Ssa.op ->
@@ -190,17 +166,24 @@ module type Reducer = sig
     args:Context.out Value.t array ->
     Context.out Value.t array reduction
 
-  (** Called each time the framework is about to finish a block.
-      [For_next_reducer]: the framework will finish the block with the given
-      terminator. [Emitted_replacement ()]: the reducer indicates it has already
-      finalised the block using the context. *)
+  (** Called each time the framework is about to finish a block. [Unchanged]:
+      the framework finishes the block with the given terminator. Otherwise the
+      reducer returns a replacement [(dbg, terminator)] and the framework
+      finishes the block with it — the reducer does not finish the block itself.
+
+      ATTENTION: The returned terminator will be reduced recursively, including
+      calling this function again, so it needs to be smaller than the original
+      one. *)
   val finish_block :
-    t -> dbg:Debuginfo.t -> Context.out Terminator.t -> unit reduction
+    t ->
+    dbg:Debuginfo.t ->
+    Context.out Terminator.t ->
+    (Debuginfo.t * Context.out Terminator.t) reduction
 end
 
-(** Trivial hooks that all return [For_next_reducer], so the framework always
-    takes the default path. [include Default_reducer] lets a reducer mention
-    only the hooks it actually overrides; it still supplies its own [type t] and
+(** Trivial hooks that all return [Unchanged], so the framework always takes the
+    default path. [include Default_reducer] lets a reducer mention only the
+    hooks it actually overrides; it still supplies its own [type t] and
     [create]. This is not using the [Reducer] signature because the more generic
     hook types keep working even when [t] has been overwritten. *)
 module Default_reducer : sig
@@ -214,7 +197,8 @@ module Default_reducer : sig
     instr_index:int ->
     Context.out Value.t array reduction
 
-  val visit_terminator : 't -> finished Block.t -> unit reduction
+  val visit_terminator :
+    't -> finished Block.t -> (Debuginfo.t * Context.out Terminator.t) reduction
 
   val emit_op :
     't ->
@@ -225,11 +209,14 @@ module Default_reducer : sig
     Context.out Value.t array reduction
 
   val finish_block :
-    't -> dbg:Debuginfo.t -> Context.out Terminator.t -> unit reduction
+    't ->
+    dbg:Debuginfo.t ->
+    Context.out Terminator.t ->
+    (Debuginfo.t * Context.out Terminator.t) reduction
 end
 
 (** Combine two reducers into one. For each hook the first reducer is tried, and
-    if it returns [For_next_reducer] the second one is tried. *)
+    if it returns [Unchanged] the second one is tried. *)
 module Combine (_ : Reducer) (_ : Reducer) : Reducer
 
 (** Instantiate a reducer (once) and obtain its driver.

@@ -43,23 +43,22 @@ open! Int_replace_polymorphic_compare
     [create], which produces the reducer's own state — holding whatever the
     reducer needs, such as some analysis result and the context itself; that
     state is then threaded to every hook. [Context] is a plain (non-recursive)
-    module so that a reducer's calls into it ([Cursor.emit_op] /
-    [Cursor.finish_block] / [map_value] / ...) inline. To route emissions back
-    through the reducer's [emit_op] and [finish_block] hooks without a recursive
-    module, [Context.t] stores those hooks (which reach the reducer state
-    through a forward reference, since it is built from the context); the only
-    non-inlined step is then the indirect call back into the reducer.
+    module so that a reducer's calls into it ([Cursor.emit_op] / [map_value] /
+    ...) inline. To route a reducer's own op emissions back through its
+    [emit_op] hook without a recursive module, [Context.t] stores that hook
+    (which reaches the reducer state through a forward reference, since the
+    reducer is built from the context); the only non-inlined step is then the
+    indirect call back into the reducer.
 
     Two layered hooks:
     - [visit_instruction] / [visit_terminator]: intercept the walk over the
-      input. Return [Emitted_replacement] after take over (that is, having
-      emitted something else), or [For_next_reducer] to let the framework apply
-      its default translation.
-    - [emit_op] / [finish_block]: intercept emissions into the output. Fire on
-      every emission — both the framework's default translation and
-      reducer-driven ones go through here.
+      input. Return [Reduce] to handle the instruction or terminator, or
+      [Unchanged] to let the framework apply its default translation.
+    - [emit_op] / [finish_block]: intercept what is emitted into the output —
+      every op and every block terminator, whether from the framework's default
+      translation or from a reducer's replacement.
 
-    Default translation, applied when [visit_*] returns [For_next_reducer]:
+    Default translation, applied when [visit_*] returns [Unchanged]:
     - Op args and block-param uses are mapped from the input to the output via
       [map_value]; block references via [map_block].
     - The terminator is translated by [map_terminator] (exposed on the
@@ -75,15 +74,14 @@ open! Int_replace_polymorphic_compare
 
 open! Ssa.Export
 
-(** [Context] methods to emit into the output graph are mutually recursive with
-    the reducer's hooks. Since recursive modules currently stop inlining, we
-    instead cut the cycle at the point of the reducer calling into the context,
-    so that the actual implementation of these functions can be inlined into the
-    main loop in [run].
+(** [Context.Cursor.emit_op] is mutually recursive with the reducer's [emit_op]
+    hook. Since recursive modules currently stop inlining, we instead cut the
+    cycle at the point of the reducer calling into the context, so that the
+    actual implementation can be inlined into the main loop in [run].
 
-    [out] is really [under_construction]; in the interface it is keept abstract
+    [out] is really [under_construction]; in the interface it is kept abstract
     so a reducer can only extend the output through the [Cursor] operations
-    (which route through the [emit_*] hooks), not via the raw [Ssa] builder. *)
+    (which route through the [emit_op] hook), not via the raw [Ssa] builder. *)
 module Context = struct
   type out = under_construction
 
@@ -104,12 +102,7 @@ module Context = struct
         dbg:Debuginfo.t ->
         typ:Cmm.machtype ->
         args:under_construction Value.t array ->
-        under_construction Value.t array;
-      finish_block :
-        Ssa.Cursor.t ->
-        dbg:Debuginfo.t ->
-        under_construction Terminator.t ->
-        unit
+        under_construction Value.t array
     }
 
   type context = t
@@ -119,8 +112,6 @@ module Context = struct
 
     let emit_op (ctx : context) c op dbg typ args =
       ctx.emit_op c ~op ~dbg ~typ ~args
-
-    let finish_block (ctx : context) c ~dbg term = ctx.finish_block c ~dbg term
   end
 
   let in_graph t = t.in_graph
@@ -190,14 +181,6 @@ type 'a reduction =
   | Unchanged
   | Reduce of (Context.Cursor.t -> 'a)
 
-let reduce_output_terminator (ctx : Context.t) ~dbg
-    (terminator : Context.out Terminator.t) =
-  Reduce (fun c -> Context.Cursor.finish_block ctx c ~dbg terminator)
-
-let reduce_input_terminator (ctx : Context.t) ~dbg
-    (terminator : finished Terminator.t) =
-  reduce_output_terminator ctx (Context.map_terminator ctx terminator) ~dbg
-
 module type Reducer = sig
   type t
 
@@ -209,7 +192,8 @@ module type Reducer = sig
     instr_index:int ->
     Context.out Value.t array reduction
 
-  val visit_terminator : t -> finished Block.t -> unit reduction
+  val visit_terminator :
+    t -> finished Block.t -> (Debuginfo.t * Context.out Terminator.t) reduction
 
   val emit_op :
     t ->
@@ -220,7 +204,10 @@ module type Reducer = sig
     Context.out Value.t array reduction
 
   val finish_block :
-    t -> dbg:Debuginfo.t -> Context.out Terminator.t -> unit reduction
+    t ->
+    dbg:Debuginfo.t ->
+    Context.out Terminator.t ->
+    (Debuginfo.t * Context.out Terminator.t) reduction
 end
 
 module Default_reducer = struct
@@ -323,29 +310,32 @@ module Make_run (R : Reducer) = struct
         in
         Block.Tbl.replace block_param_values block param_values)
       (Ssa.blocks in_graph);
-    (* The whole emission step for an op / a terminator: the reducer's hook, and
-       when it defers, the default emission into the output graph. These are the
-       closures stored in [Context.t]; the main walk calls them directly, while
-       [Context.Cursor.*] are thin wrappers onto them for the reducer. *)
+    (* The op-emission step: the reducer's [emit_op] hook, and when it defers,
+       the default emission into the output graph. It is stored in [Context.t]
+       so the reducer's own [Cursor.emit_op] calls route back through it (see
+       [Context.Cursor.emit_op]). [ctx] and [reducer] are mutually recursive —
+       the reducer is built from [ctx], but [ctx]'s stored hook calls into the
+       reducer — so we tie the knot with a [lazy] reducer. *)
     let rec emit_op c ~op ~dbg ~typ ~args =
       match R.emit_op (Lazy.force reducer) ~op ~dbg ~typ ~args with
       | Unchanged -> Ssa.Cursor.emit_op out_graph c op dbg typ args
       | Reduce f -> f c
-    and finish_block c ~dbg term =
-      match R.finish_block (Lazy.force reducer) ~dbg term with
-      | Unchanged -> Ssa.Cursor.finish_block out_graph c ~dbg term
-      | Reduce f -> f c
     and ctx : Context.t =
-      { in_graph;
-        out_graph;
-        block_map;
-        op_map;
-        block_param_values;
-        emit_op;
-        finish_block
-      }
+      { in_graph; out_graph; block_map; op_map; block_param_values; emit_op }
     and reducer : R.t Lazy.t = lazy (R.create ctx) in
     let reducer = Lazy.force reducer in
+    (* Finish a block: run its terminator through the reducer's [finish_block]
+       hook, and when the reducer returns a replacement, re-reduce that (it must
+       shrink each round to terminate) before finishing. Unlike [emit_op] this
+       is a pure framework step — the reducer never finishes a block itself — so
+       it is not reachable through [Context.t]. *)
+    let rec finish_block c ~dbg term =
+      match R.finish_block reducer ~dbg term with
+      | Unchanged -> Ssa.Cursor.finish_block out_graph c ~dbg term
+      | Reduce f ->
+        let dbg, term = f c in
+        finish_block c ~dbg term
+    in
     (* Default translation of one body instruction, returning the value(s) its
        results map to ([||] for a trap instruction). *)
     let default_translate_instruction (instr : finished Instruction.t)
@@ -384,17 +374,14 @@ module Make_run (R : Reducer) = struct
       | Push_trap _ | Pop_trap _ -> ()
     in
     let visit_terminator (block : finished Block.t) c =
-      match R.visit_terminator reducer block with
-      | Reduce f ->
-        f c;
-        if not (Cursor.is_finished c)
-        then
-          Misc.fatal_error
-            "The reducer promised to have replaced the block terminator, but \
-             did not actually finish the block."
-      | Unchanged ->
-        let term = Context.map_terminator ctx (Block.terminator block) in
-        finish_block c ~dbg:(Block.terminator_dbg block) term
+      let dbg, terminator =
+        match R.visit_terminator reducer block with
+        | Reduce f -> f c
+        | Unchanged ->
+          ( Block.terminator_dbg block,
+            Context.map_terminator ctx (Block.terminator block) )
+      in
+      finish_block c ~dbg terminator
     in
     (* Step 2: walk the input graph in [blocks] order, which already guarantees
        each block's dominators come before it. *)

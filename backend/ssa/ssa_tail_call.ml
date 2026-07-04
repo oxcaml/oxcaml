@@ -46,7 +46,7 @@ open Ssa_reducer
     compiles as a normal call followed by a return. Such shapes would show up as
     a [Cfg_compare] mismatch under [-ssa-validate]; they do not seem to be
     produced in practice. *)
-module Tail_call_reducer = struct
+module Tail_call_reducer : Reducer = struct
   open! Context
   include Default_reducer
 
@@ -94,12 +94,19 @@ module Tail_call_reducer = struct
                (Ssa.function_info (in_graph ctx)).sym_name ->
         (* A self-recursive tail call is a back-edge to the entry block. Build
            it over input values/blocks and let [map_terminator] translate it. *)
-        reduce_input_terminator ctx ~dbg
-          (Continue { continuation = Goto (Ssa.entry (in_graph ctx)); args })
+        Reduce
+          (fun _c ->
+            ( dbg,
+              Context.map_terminator ctx
+                (Continue
+                   { continuation = Goto (Ssa.entry (in_graph ctx)); args }) ))
       | (Direct _ | Indirect _)
         when stack_offsets_zero call_op args (Block.params_machtype cont) ->
-        reduce_input_terminator ctx ~dbg
-          (Call { operation with continuation = Return })
+        Reduce
+          (fun _c ->
+            ( dbg,
+              Context.map_terminator ctx
+                (Call { operation with continuation = Return }) ))
       | Direct _ | Indirect _ -> Unchanged
       | External _ | Probe _ -> Misc.fatal_error "excluded by match above")
     | Call

@@ -41,7 +41,7 @@ open Ssa_reducer
    (e.g. an [and 1] parity test), we instead fold [(cmp) = 0] at the [Switch] by
    swapping its two targets. Folding lets Cfg_of_ssa fuse the inner comparison
    into the branch test instead of materializing a bit. *)
-module Simplify_conditions = struct
+module Simplify_conditions : Reducer = struct
   open! Context
   include Default_reducer
 
@@ -85,7 +85,8 @@ module Simplify_conditions = struct
   (* Fallback for [(cmp) = 0] feeding a two-target switch when [cmp] could not
      be flipped (so [emit_op] left the comparison in place): swap the targets
      and use [cmp] directly as the index. *)
-  let finish_block ctx ~dbg (t : out Terminator.t) =
+  let finish_block _ ~dbg (t : out Terminator.t) :
+      (Debuginfo.t * out Terminator.t) reduction =
     match[@warning "-fragile-match"] t with
     | Switch
         { index = Res ({ op = Intop_imm (Icomp Ceq, 0); args = [| arg |]; _ }, 0);
@@ -93,9 +94,7 @@ module Simplify_conditions = struct
         }
       when is_comparison arg ->
       Reduce
-        (fun c ->
-          Cursor.finish_block ctx c ~dbg
-            (Switch { index = arg; targets = [| ifso; ifnot |] }))
+        (fun _c -> dbg, Switch { index = arg; targets = [| ifso; ifnot |] })
     | _ -> Unchanged
 end
 

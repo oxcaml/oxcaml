@@ -183,11 +183,7 @@ end
 
 let is_move (instr : Cfg.basic Cfg.instruction) =
   match instr.desc with
-  (* Opaque should not be treated as a move, really. However, there is a bug in
-     the current Cfg_selectgen, where let a = opaque x in let b = opaque x in
-     ... is translated as let a = opaque x in let b = opaque a in ... *)
-  (* CR ttebbi: Fix Cfg_selectgen and remove Opaque here. *)
-  | Op (Move | Opaque) ->
+  | Op Move ->
     Array.length instr.arg = 1
     && Array.length instr.res = 1
     && Reg.is_unknown instr.arg.(0)
