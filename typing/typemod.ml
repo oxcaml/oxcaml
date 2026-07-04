@@ -887,9 +887,11 @@ module Merge = struct
       else sg
     in
     (* check that the resulting signature is still wellformed *)
-    let () = if not approx then
+    let () = if not approx then begin
+               Mtype.scope_local_equations env (Mty_signature sg);
                check_well_formed_module env loc "this instantiated signature"
-                 (Mty_signature sg) in
+                 (Mty_signature sg)
+             end in
     sg
 
   (* Main recursive knot to handle deep merges *)
@@ -3551,6 +3553,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
             end;
             nondep_mty
       in
+      Mtype.scope_local_equations env mty_appl;
       check_well_formed_module env apply_loc
         "the signature of this functor application" mty_appl;
       check_curried_application_complete

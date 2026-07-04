@@ -196,6 +196,9 @@ val has_probe: string -> bool
 
 val has_local_constraints: t -> bool
 
+(* Whether [path] denotes a local type equation (e.g. a GADT equation). *)
+val is_local_type_constraint: Path.t -> t -> bool
+
 (* Mark definitions as used *)
 val mark_value_used: Uid.t -> unit
 val mark_module_used: Uid.t -> unit
@@ -722,6 +725,8 @@ val check_functor_application:
 (* Forward declaration to break mutual recursion with Typemod. *)
 val check_well_formed_module:
     (t -> Location.t -> string -> module_type -> unit) ref
+(* Forward declaration to break mutual recursion with Mtype. *)
+val scope_local_equations: (t -> module_type -> unit) ref
 (* Forward declaration to break mutual recursion with Typecore. *)
 val add_delayed_check_forward: ((unit -> unit) -> unit) ref
 (* Forward declaration to break mutual recursion with Mtype. *)

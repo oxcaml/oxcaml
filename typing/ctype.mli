@@ -303,6 +303,12 @@ val expand_head_opt: Env.t -> type_expr -> type_expr
 (** The compiler's own version of [expand_head] necessary for type-based
     optimisations. *)
 
+val iterator_scope_local_equations:
+  Env.t -> Btype.type_iterators_full -> Btype.type_iterators_full
+(** Extend an iterator to update scopes to reflect a potential dependence on
+    local equations on any [Tconstr]s; these scopes can be stale after a
+    signature substitution. *)
+
 (** Expansion of types for error traces; lives here instead of in [Errortrace]
     because the expansion machinery lives here. *)
 
