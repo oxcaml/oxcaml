@@ -381,6 +381,7 @@ let deep_copy () =
         | Tquote t -> Tquote (copy t)
         | Tquote_eval t -> Tquote_eval (copy t)
         | Tsplice t -> Tsplice (copy t)
+        | Tbox t -> Tbox (copy t)
         | Tlink _ | Tsubst _ -> assert false
       in
       Transient_expr.(set_desc (repr ty') desc);

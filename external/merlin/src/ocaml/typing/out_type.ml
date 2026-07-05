@@ -1310,6 +1310,8 @@ module Aliases = struct
       | Tnil -> ()
       | Tquote ty | Tsplice ty | Tquote_eval ty ->
           mark_loops_rec visited ty
+      | Tbox ty ->
+          mark_loops_rec visited ty
       | Trepr (ty, _) ->
           mark_loops_rec visited ty
       | Tof_kind _ -> ()
@@ -1699,13 +1701,17 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_module pack
     | Tof_kind jkind ->
       Otyp_of_kind (out_jkind_of_desc !printing_env (Jkind.get jkind))
-    | Tbox ty ->
+    | Tbox ty -> begin
       (* Render as if a regular Tconstr application of Predef.path_box,
          so path shortening and shadowing (e.g. [box/2]) work uniformly. *)
-      let p', s = best_type_path Predef.path_box in
-      let tyl' = apply_subst s [ty] in
-      Internal_names.add p';
-      Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
+        match best_type_path Predef.path_box with
+        | Nth n ->
+            tree_of_typexp mode Alloc.Const.legacy (apply_nth n [ty])
+        | Path (nso, p') ->
+            Internal_names.add p';
+            let tyl' = apply_subst_opt nso [ty] in
+            Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
+      end
   in
   Aliases.remove_delay px;
   alias_nongen_row mode px ty;
