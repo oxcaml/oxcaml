@@ -290,3 +290,52 @@ Line 1, characters 29-39:
                                  ^^^^^^^^^^
 Error: The externality axis has already been specified.
 |}]
+
+(**************************************************************************)
+(* Part 7: Kind abbreviations and abstract kinds *)
+(**************************************************************************)
+
+(* The redundancy check runs on the modifier list alone and does not consult
+   the base kind, so modifiers that are redundant with the bounds of a
+   built-in abbreviation, a user-defined abbreviation, or an abstract kind
+   are not reported. *)
+
+type t : immutable_data mod portable
+[%%expect{|
+type t : immutable_data
+|}]
+
+type t : immutable_data mod contended
+[%%expect{|
+type t : immutable_data
+|}]
+
+kind_ portable_value = value mod portable
+
+type t : portable_value mod portable
+[%%expect{|
+kind_ portable_value = value mod portable
+type t : value mod portable
+|}]
+
+kind_ abstract
+
+type t : abstract mod portable
+[%%expect{|
+kind_ abstract
+type t : abstract mod portable
+|}]
+
+(* Scannable axes, by contrast, are checked against the base kind: a
+   scannable modifier already implied by the kind triggers warning 183. *)
+
+type t : immediate non_pointer
+[%%expect{|
+Line 1, characters 19-30:
+1 | type t : immediate non_pointer
+                       ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "immediate".
+
+type t : immediate
+|}]
