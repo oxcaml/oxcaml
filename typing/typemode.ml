@@ -408,17 +408,28 @@ let sort_dedup_modalities_with_locs l =
 let transl_modality_atoms ~warn_redundant ~default ~loc ~annot_type
     (atoms : Modality.atom Location.loc list) =
   let open Modality in
-  let modalities =
+  (* [implied] maps each axis set by an implied modality to the printed form
+     of the modality that implied it, for reporting redundancy reasons. *)
+  let modalities, _ =
     List.fold_left
-      (fun m { txt = Atom (ax, a) as t; loc } ->
+      (fun (m, implied) { txt = Atom (ax, a) as t; loc } ->
         let current_a = Const.proj ax m in
-        if Misc.Le_result.equal ~le:(Per_axis.le ax) a current_a
-        then warn_redundant loc t;
+        (if Misc.Le_result.equal ~le:(Per_axis.le ax) a current_a
+         then
+           let implied_by =
+             List.find_opt
+               (fun (p, _) -> Axis.compare p (Axis.P ax) = 0)
+               implied
+             |> Option.map snd
+           in
+           warn_redundant loc t ~implied_by);
+        let name = Format_doc.asprintf "%a" (Per_axis.print ax) a in
         let m = Const.set ax a m in
         List.fold_left
-          (fun m (Atom (ax, a)) -> Const.set ax a m)
-          m (implied_modalities t))
-      default atoms
+          (fun (m, implied) (Atom (ax, a)) ->
+            Const.set ax a m, (Axis.P ax, name) :: implied)
+          (m, implied) (implied_modalities t))
+      (default, []) atoms
   in
   enforce_forbidden_modalities annot_type ~loc modalities;
   modalities
@@ -568,7 +579,9 @@ let transl_mod_bounds ?(warn = true) annots =
       let axis = Axis.Nonmodal ax in
       let is_top = Per_axis.(le axis (max axis) mode) in
       if is_top && warn
-      then Location.prerr_warning loc Warnings.Redundant_modifier;
+      then
+        Location.prerr_warning loc
+          (Warnings.Redundant_modifier { modifier = txt; implied_by = None });
       if Option.is_some (Nonmodal_bounds.get ax nonmodal)
       then raise (Error (loc, Duplicated_axis (Modifier, axis)));
       Nonmodal_bounds.set ax (Some { txt = mode; loc }) nonmodal
@@ -641,8 +654,12 @@ let transl_mod_bounds ?(warn = true) annots =
     (* axes listed in the order of implication. *)
     nm, base, sort_dedup_modalities_with_locs (List.rev atoms)
   in
-  let warn_redundant loc (_ : Modality.atom) =
-    if warn then Location.prerr_warning loc Warnings.Redundant_modifier
+  let warn_redundant loc (Modality.Atom (ax, a)) ~implied_by =
+    if warn
+    then
+      let modifier = Format_doc.asprintf "%a" (Modality.Per_axis.print ax) a in
+      Location.prerr_warning loc
+        (Warnings.Redundant_modifier { modifier; implied_by })
   in
   let modality =
     transl_modality_atoms ~warn_redundant ~default:base_modality ~loc:bounds_loc

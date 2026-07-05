@@ -54,7 +54,8 @@ type t : value mod local
 Line 1, characters 19-24:
 1 | type t : value mod local
                        ^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
+Warning 211 [redundant-modifier]: This modifier is redundant:
+  "local" is the default bound on its axis, so it has no effect.
 
 type t
 |}]
@@ -64,7 +65,8 @@ type t : value mod unique
 Line 1, characters 19-25:
 1 | type t : value mod unique
                        ^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
+Warning 211 [redundant-modifier]: This modifier is redundant:
+  "unique" is the default bound on its axis, so it has no effect.
 
 type t
 |}]
@@ -74,7 +76,8 @@ type t : value mod uncontended
 Line 1, characters 19-30:
 1 | type t : value mod uncontended
                        ^^^^^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
+Warning 211 [redundant-modifier]: This modifier is redundant:
+  "uncontended" is the default bound on its axis, so it has no effect.
 
 type t
 |}]
@@ -84,7 +87,8 @@ type t : value mod internal
 Line 1, characters 19-27:
 1 | type t : value mod internal
                        ^^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
+Warning 211 [redundant-modifier]: This modifier is redundant:
+  "internal" is the default bound on its axis, so it has no effect.
 
 type t
 |}]
@@ -94,7 +98,8 @@ type t : value mod static
 Line 1, characters 19-25:
 1 | type t : value mod static
                        ^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
+Warning 211 [redundant-modifier]: This modifier is redundant:
+  "static" is the default bound on its axis, so it has no effect.
 
 type t
 |}]
@@ -108,7 +113,8 @@ type t : value mod global aliased
 Line 1, characters 26-33:
 1 | type t : value mod global aliased
                               ^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
+Warning 211 [redundant-modifier]: This modifier is redundant
+  because it is implied by "global".
 
 type t : value mod global
 |}]
@@ -118,7 +124,8 @@ type t : value mod aliased global
 Line 1, characters 19-26:
 1 | type t : value mod aliased global
                        ^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
+Warning 211 [redundant-modifier]: This modifier is redundant
+  because it is implied by "global".
 
 type t : value mod global
 |}]
@@ -128,7 +135,8 @@ type t : value mod stateless portable
 Line 1, characters 29-37:
 1 | type t : value mod stateless portable
                                  ^^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
+Warning 211 [redundant-modifier]: This modifier is redundant
+  because it is implied by "stateless".
 
 type t : value mod stateless
 |}]
@@ -138,7 +146,8 @@ type t : value mod portable stateless
 Line 1, characters 19-27:
 1 | type t : value mod portable stateless
                        ^^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
+Warning 211 [redundant-modifier]: This modifier is redundant
+  because it is implied by "stateless".
 
 type t : value mod stateless
 |}]
@@ -148,7 +157,8 @@ type t : value mod immutable contended
 Line 1, characters 29-38:
 1 | type t : value mod immutable contended
                                  ^^^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
+Warning 211 [redundant-modifier]: This modifier is redundant
+  because it is implied by "immutable".
 
 type t : value mod immutable
 |}]
@@ -158,7 +168,8 @@ type t : value mod contended immutable
 Line 1, characters 19-28:
 1 | type t : value mod contended immutable
                        ^^^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
+Warning 211 [redundant-modifier]: This modifier is redundant
+  because it is implied by "immutable".
 
 type t : value mod immutable
 |}]
@@ -244,7 +255,8 @@ type t : value mod everything static
 Line 1, characters 30-36:
 1 | type t : value mod everything static
                                   ^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
+Warning 211 [redundant-modifier]: This modifier is redundant:
+  "static" is the default bound on its axis, so it has no effect.
 
 type t : value mod everything
 |}]
@@ -254,7 +266,8 @@ type t : value mod static everything
 Line 1, characters 19-25:
 1 | type t : value mod static everything
                        ^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
+Warning 211 [redundant-modifier]: This modifier is redundant:
+  "static" is the default bound on its axis, so it has no effect.
 
 type t : value mod everything
 |}]

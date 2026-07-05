@@ -153,7 +153,9 @@ type t =
   | Zero_alloc_all_hidden_arrow of string   (* 198 *)
   | Unchecked_zero_alloc_attribute          (* 199 *)
   | Unboxing_impossible                     (* 210 *)
-  | Redundant_modifier                      (* 211 *)
+  | Redundant_modifier of
+      { modifier : string;
+        implied_by : string option }          (* 211 *)
   (* 212 taken *)
   (* 213 was [Modal_axis_specified_twice], now subsumed by
      [Redundant_modality] (220) *)
@@ -258,7 +260,7 @@ let number = function
   | Zero_alloc_all_hidden_arrow _ -> 198
   | Unchecked_zero_alloc_attribute -> 199
   | Unboxing_impossible -> 210
-  | Redundant_modifier -> 211
+  | Redundant_modifier _ -> 211
   | Atomic_float_record_boxed -> 214
   | Implied_attribute _ -> 215
   | Use_during_borrowing -> 216
@@ -682,7 +684,8 @@ let descriptions = [
     since = since 4 14 };
   { number = 211;
     names = ["redundant-modifier"];
-    description = "Modifier is redundant with the default.";
+    description = "Modifier is redundant with the default or implied by \
+                   another modifier.";
     since = since 4 14 };
   { number = 214;
     names = ["atomic-float-record-boxed"];
@@ -1493,8 +1496,15 @@ let message = function
       msg "This %a attribute cannot be used.@ \
            The type of this value does not allow unboxing."
         Style.inline_code "[@unboxed]"
-  | Redundant_modifier ->
-      msg "This modifier is redundant."
+  | Redundant_modifier { modifier; implied_by } ->
+      (match implied_by with
+       | Some implying ->
+           msg "This modifier is redundant@ because it is implied by %a."
+             Style.inline_code implying
+       | None ->
+           msg "This modifier is redundant:@ %a is the default bound on its@ \
+                axis, so it has no effect."
+             Style.inline_code modifier)
   (* 213 was [Modal_axis_specified_twice] *)
   | Atomic_float_record_boxed ->
       msg "This record contains atomic float fields,@ \
