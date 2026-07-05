@@ -1276,19 +1276,9 @@ module PpxContext = struct
                  { path; cmx_guaranteed })
               visible
           in
-<<<<<<< janestreet/merlin-jst:dkalinichenko/update-merlin-5.4.0-ox-2
           Load_path.(init ~auto_include:no_auto_include ~visible ~hidden)
-      | "open_modules" ->
-          Clflags.open_modules := get_list get_string payload
-||||||| oxcaml/oxcaml:2e42b051a77a140631b20fe0452d5024b81b57ba
-          Load_path.init ~auto_include ~visible ~hidden
-      | "open_modules" ->
-          Clflags.open_modules := get_list get_string payload
-=======
-          Load_path.init ~auto_include ~visible ~hidden
       | "open_args" ->
           Clflags.open_args := get_list get_open_arg payload
->>>>>>> oxcaml/oxcaml:5.4.0-ox2
       | "for_package" ->
           Clflags.for_package := get_option get_string payload
       | "debug" ->

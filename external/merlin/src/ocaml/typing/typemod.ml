@@ -2192,12 +2192,6 @@ and transl_with ~loc env remove_aliases (rev_tcstrs, sg) constr =
         (constr, merge_res)
   in
   ((path, lid, constr) :: rev_tcstrs, sg)
-<<<<<<< janestreet/merlin-jst:dkalinichenko/update-merlin-5.4.0-ox-2
-||||||| oxcaml/oxcaml:2e42b051a77a140631b20fe0452d5024b81b57ba
-
-and transl_signature env {psg_items; psg_modalities; psg_loc} =
-  let names = Signature_names.create () in
-=======
 
 and add_implicit_jkinds env attrs =
   let register_default env (var_name, jkind_annot) =
@@ -2207,10 +2201,6 @@ and add_implicit_jkinds env attrs =
       (Jkind.of_annotation ~context env jkind_annot) env
   in
   List.fold_left register_default env attrs
-
-and transl_signature env {psg_items; psg_modalities; psg_loc} =
-  let names = Signature_names.create () in
->>>>>>> oxcaml/oxcaml:5.4.0-ox2
 
 (* In the real compiler, there is no notion of incrementally checking a signature,
    as there is for structures when using the toplevel.  So this function doesn't
@@ -3738,7 +3728,6 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
     } in
     open_descr, mode, sg, newenv
 
-<<<<<<< janestreet/merlin-jst:dkalinichenko/update-merlin-5.4.0-ox-2
 (* In the real compiler, the `toplevel` argument is a `signature option` because it serves
    two purposes: To tweak typing if we're in the toplevel, and to pass in the signature
    for what's been typed so far in that case (needed by include functor).  But in merlin
@@ -3748,15 +3737,6 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
    extra argument (sig_acc), but leave `toplevel` alone to minimize the diff *)
 and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
     anchor env sig_acc sstr =
-  (* CR implicit-types: implement implicit variable jkinds in structures. *)
-  let env = Env.clear_implicit_jkinds env in
-||||||| oxcaml/oxcaml:2e42b051a77a140631b20fe0452d5024b81b57ba
-and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
-  (* CR implicit-types: implement implicit variable jkinds in structures. *)
-  let env = Env.clear_implicit_jkinds env in
-=======
-and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
->>>>>>> oxcaml/oxcaml:5.4.0-ox2
   let names = Signature_names.create () in
   let loc_md = location_of_structure sstr in
   let _, md_mode = register_allocation loc_md in

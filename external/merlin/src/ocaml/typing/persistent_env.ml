@@ -1011,12 +1011,6 @@ let check_pers_struct ~allow_hidden penv f1 f2 ~loc name =
 let read penv modname a =
   read_pers_struct penv true modname a
 
-<<<<<<< janestreet/merlin-jst:dkalinichenko/update-merlin-5.4.0-ox-2
-||||||| oxcaml/oxcaml:2e42b051a77a140631b20fe0452d5024b81b57ba
-let find ~allow_hidden penv f name ~allow_excess_args =
-  (find_pers_struct ~allow_hidden ~allow_excess_args penv f ~check:true
-     name).ps_val
-=======
 let read_cmi_file penv filename =
   let cmi = read_cmi_lazy filename in
   let unit_name = cmi.cmi_name in
@@ -1033,10 +1027,6 @@ let read_cmi_file penv filename =
   in
   modname, pers_name.pn_sign
 
-let find ~allow_hidden penv f name ~allow_excess_args =
-  (find_pers_struct ~allow_hidden ~allow_excess_args penv f ~check:true
-     name).ps_val
->>>>>>> oxcaml/oxcaml:5.4.0-ox2
 let find ~allow_hidden penv f1 f2 name ~allow_excess_args =
   (find_pers_struct ~allow_hidden ~allow_excess_args penv f1 f2 ~check:true
      name).ps_val

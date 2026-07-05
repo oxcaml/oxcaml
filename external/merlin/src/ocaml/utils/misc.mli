@@ -1333,37 +1333,6 @@ module Maybe_bounded : sig
   val of_int : int -> t
 end
 
-(** {1 Merlin} *)
-(** These functions are specific to merlin. *)
-
-val exact_file_exists : dirname:string -> basename:string -> bool
-	(* Like [Sys.file_exists], but takes into account case-insensitive file
-	   systems: return true only if the basename (last component of the
-           path) has the correct case. *)
-
-val canonicalize_filename : ?cwd:string -> string -> string
-        (* Ensure that path is absolute (wrt to cwd), by following ".." and "." *)
-
-val expand_glob : ?filter:(string -> bool) -> string -> string list -> string list
-        (* [expand_glob ~filter pattern acc] adds all filenames matching
-          [pattern] and satistfying the [filter] predicate to [acc]*)
-val split_path : string -> string list
-        (* [split_path path] returns the components of [path],
-          including implicit "." if path is not absolute.
-          [split_path "a/b/c"] = ["."; "a"; "b"; "c"]
-<<<<<<< janestreet/merlin-jst:dkalinichenko/update-merlin-5.4.0-ox-2
-          [split_path "/a/b/c"] = ["/"; "a"; "b"; "c"]
-        FIXME: explain windows behavior
-        *)
-||||||| oxcaml/oxcaml:2e42b051a77a140631b20fe0452d5024b81b57ba
-  (** [of_int n] creates a bounded integer with bound [n] (not inclusive). *)
-  val of_int : int -> t
-end
-=======
-  (** [of_int n] creates a bounded integer with bound [n] (not inclusive). *)
-  val of_int : int -> t
-end
-
 (** Shared infrastructure for ANSI 256-colour pretty-printing. Front-ends such
     as [Cfg_colours] and [Flambda_colours] define domain-specific directives on
     top of {!push}; all directives push or pop a state on a single global
@@ -1391,4 +1360,25 @@ module Colours : sig
       setting when [f] returns (or raises). *)
   val without_colours : f:(unit -> 'a) -> 'a
 end
->>>>>>> oxcaml/oxcaml:5.4.0-ox2
+
+(** {1 Merlin} *)
+(** These functions are specific to merlin. *)
+
+val exact_file_exists : dirname:string -> basename:string -> bool
+	(* Like [Sys.file_exists], but takes into account case-insensitive file
+	   systems: return true only if the basename (last component of the
+           path) has the correct case. *)
+
+val canonicalize_filename : ?cwd:string -> string -> string
+        (* Ensure that path is absolute (wrt to cwd), by following ".." and "." *)
+
+val expand_glob : ?filter:(string -> bool) -> string -> string list -> string list
+        (* [expand_glob ~filter pattern acc] adds all filenames matching
+          [pattern] and satistfying the [filter] predicate to [acc]*)
+val split_path : string -> string list
+        (* [split_path path] returns the components of [path],
+          including implicit "." if path is not absolute.
+          [split_path "a/b/c"] = ["."; "a"; "b"; "c"]
+          [split_path "/a/b/c"] = ["/"; "a"; "b"; "c"]
+        FIXME: explain windows behavior
+        *)

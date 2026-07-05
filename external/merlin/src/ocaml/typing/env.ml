@@ -2848,13 +2848,7 @@ and store_label
   end;
   add_label record_form env lbl_id lbl
 
-<<<<<<< janestreet/merlin-jst:dkalinichenko/update-merlin-5.4.0-ox-2
-and store_type ~check ~long_path ~predef id info shape env =
-||||||| oxcaml/oxcaml:2e42b051a77a140631b20fe0452d5024b81b57ba
-and store_type ~check id info shape env =
-=======
-and store_type ~check ~hidden id info shape env =
->>>>>>> oxcaml/oxcaml:5.4.0-ox2
+and store_type ~check ~long_path ~predef ~hidden id info shape env =
   let loc = info.type_loc in
   if check then
     check_usage loc id info.type_uid
@@ -3204,17 +3198,9 @@ let enter_value ?check ~mode name desc env =
 
 let enter_type ?(long_path = false) ~scope name info env =
   let id = Ident.create_scoped ~scope name in
-<<<<<<< janestreet/merlin-jst:dkalinichenko/update-merlin-5.4.0-ox-2
-  let env = store_type ~check:true ~predef:false ~long_path
+  let env = store_type ~check:true ~predef:false ~long_path ~hidden:false
     id info (Shape.leaf info.type_uid) env
   in
-||||||| oxcaml/oxcaml:2e42b051a77a140631b20fe0452d5024b81b57ba
-  let env = store_type ~check:true id info (Shape.leaf info.type_uid) env in
-=======
-  let env =
-    store_type ~check:true ~hidden:false id info (Shape.leaf info.type_uid) env
-  in
->>>>>>> oxcaml/oxcaml:5.4.0-ox2
   (id, env)
 
 let enter_extension ~scope ~rebind name ext env =
@@ -4454,41 +4440,25 @@ let add_components slot root env0 comps (locks : locks) =
     add_types (fun x -> `Type x)
       comps.comp_types env0.types env0.short_paths_additions
   in
-<<<<<<< janestreet/merlin-jst:dkalinichenko/update-merlin-5.4.0-ox-2
   let modtypes, additions =
     add_modtypes (fun x -> `Module_type x)
       comps.comp_modtypes env0.modtypes additions
   in
   let classes =
     add_v (fun x -> `Class x) comps.comp_classes env0.classes
-||||||| oxcaml/oxcaml:2e42b051a77a140631b20fe0452d5024b81b57ba
-  let modules =
-    add_v (fun x -> `Module x) comps.comp_modules env0.modules
-=======
-  let jkinds =
-    add (fun x -> `Jkind x) comps.comp_jkinds env0.jkinds
   in
-  let modules =
-    add_v (fun x -> `Module x) comps.comp_modules env0.modules
->>>>>>> oxcaml/oxcaml:5.4.0-ox2
-  in
-<<<<<<< janestreet/merlin-jst:dkalinichenko/update-merlin-5.4.0-ox-2
   let cltypes, additions =
     add_cltypes (fun x -> `Class_type x)
       comps.comp_cltypes env0.cltypes additions
+  in
+  let jkinds =
+    add (fun x -> `Jkind x) comps.comp_jkinds env0.jkinds
   in
   let modules, additions =
     add_modules (fun x -> `Module x)
       comps.comp_modules env0.modules additions
   in
-  { env0 with
-    summary = Env_open(env0.summary, root);
-||||||| oxcaml/oxcaml:2e42b051a77a140631b20fe0452d5024b81b57ba
-  { env0 with
-    summary = Env_open(env0.summary, root);
-=======
   { values;
->>>>>>> oxcaml/oxcaml:5.4.0-ox2
     constrs;
     labels;
     unboxed_labels;
@@ -4497,21 +4467,16 @@ let add_components slot root env0 comps (locks : locks) =
     modtypes;
     classes;
     cltypes;
-<<<<<<< janestreet/merlin-jst:dkalinichenko/update-merlin-5.4.0-ox-2
-    modules;
-    short_paths_additions = additions
-||||||| oxcaml/oxcaml:2e42b051a77a140631b20fe0452d5024b81b57ba
-    modules;
-=======
     functor_args = env0.functor_args;
     jkinds;
     summary = Env_open(env0.summary, root);
     local_constraints = env0.local_constraints;
     implicit_jkinds = env0.implicit_jkinds;
     flags = env0.flags;
+    short_paths = env0.short_paths;
+    short_paths_additions = additions;
     stage = env0.stage;
     toplevel_scope = env0.toplevel_scope;
->>>>>>> oxcaml/oxcaml:5.4.0-ox2
   }
 
 let open_signature_by_path path env0 =
