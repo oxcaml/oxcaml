@@ -321,6 +321,7 @@ type error =
   | Let_poly_not_yet_implemented
   | Let_poly_not_syntactic_value
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
+  | Useless_lpoly
 
 and invalid_layout_poly_inst_context =
   | Binding_op
@@ -711,7 +712,13 @@ let mode_return mode =
     inside the region. *)
 let mode_region ?region mode =
   let hint = Option.map (fun x -> Hint.Escape_region x) region in
-  { (mode_default (mode |> value_r2g |> meet_regional ?hint)) with
+  let body_mode =
+    mode
+    |> value_to_alloc_r2g
+    |> alloc_as_value
+    |> meet_regional ?hint
+  in
+  { (mode_default body_mode) with
     position =
       RTail (Regionality.disallow_left
         (Value.proj_comonadic Areality mode), FNontail);
@@ -779,7 +786,15 @@ let mode_lazy expected_mode =
   expected_mode, closure_mode
 
 let mode_partial_application expected_mode =
-  mode_morph (value_r2g ~hint:Captured_by_partial_application) expected_mode
+  let allocation : Hint.allocation =
+    {loc = Location.none; txt = Captured_by_partial_application}
+  in
+  mode_morph
+    (fun mode ->
+       mode
+       |> value_to_alloc_r2g ~allocation
+       |> alloc_as_value ~allocation)
+    expected_mode
 
 let mode_trywith expected_mode =
   { expected_mode with position = RNontail }
@@ -867,9 +882,10 @@ let tuple_pat_mode mode tuple_modes =
   let tuple_modes = Some (Value.List.disallow_right tuple_modes) in
   { mode; tuple_modes }
 
-let effect_handler_modes loc pinpoint env expected_mode =
+let effect_handler_modes pinpoint env expected_mode =
+  Env.walk_locks_for_legacy_construct ~env pinpoint;
   let env =
-    Env.add_const_closure_lock (loc, pinpoint) Value.Comonadic.Const.legacy env
+    Env.add_const_closure_lock pinpoint Value.Comonadic.Const.legacy env
   in
   env, simple_pat_mode Value.legacy, mode_effect_handler_body mode_legacy,
   mode_effect_handler_body expected_mode
@@ -904,10 +920,13 @@ let register_allocation_value_mode ~loc
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
   let alloc_mode = value_to_alloc_r2g mode in
   register_allocation_mode alloc_mode;
+  (* We must apply each morphism separately so that their hints correspond to
+     the correct morphism *)
   let mode =
-    value_r2g ~hint:(Allocation_r {loc; txt = desc})
+    value_to_alloc_r2g ~allocation:({loc; txt = desc})
       (Mode.Value.disallow_left mode)
   in
+  let mode = alloc_as_value ~allocation:({loc; txt = desc}) mode in
   alloc_mode, mode
 
 (* Unlike most allocations, which can be the highest mode allowed by
@@ -916,13 +935,13 @@ let register_allocation_value_mode ~loc
    to one argument must be global. As a result, a function gets an
    [Alloc.lr] allocation mode that can be further constrained. *)
 let register_closure_allocation (mode : Value.r) ~loc : Alloc.lr * Value.r =
-  let hint = Hint.Allocation_r {loc; txt = Unknown} in
+  let allocation : Hint.allocation = {loc; txt = Unknown} in
   let (alloc_mode : Alloc.lr), _ =
-    Alloc.newvar_below (value_to_alloc_r2g ~hint mode)
+    Alloc.newvar_below (value_to_alloc_r2g ~allocation mode)
   in
   register_allocation_mode (Alloc.disallow_left alloc_mode);
   let closed_over_mode =
-    alloc_as_value ~hint:Skip (Alloc.disallow_left alloc_mode)
+    alloc_as_value ~allocation (Alloc.disallow_left alloc_mode)
   in
   alloc_mode, closed_over_mode
 
@@ -2003,7 +2022,8 @@ and build_as_type_aux (env : Env.t) p ~mode =
 let is_variable_repres : type rep. rep record_form -> rep -> bool =
   fun form rep ->
     match form, rep with
-    | Legacy, Record_variable -> true
+    | Legacy, (Record_variable | Record_inlined (_, Constructor_variable, _)) ->
+      true
     | Unboxed_product, Record_unboxed_product_variable -> true
     | _ -> false
 
@@ -2039,6 +2059,7 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
       in
       match
         Typedecl.update_record_representation ~why env loc form
+          ~old_repres:representative_label.lbl_repres
           (lbls_and_ty_args |> Array.to_list)
       with
       | Ok (sorts, rep) ->
@@ -3170,7 +3191,7 @@ type unrepresentable_arg =
 let representation_for_tuple_constructor env constr ty_args ~loc ~types
       ~containing_type ~why : _ Result.t =
   match constr.cstr_shape with
-  | Some shape ->
+  | (Constructor_uniform_value | Constructor_mixed _) as shape ->
       begin match
         Misc.Stdlib.List.map_option
           (fun arg -> arg.ca_sort |> Option.map Jkind.Sort.of_const)
@@ -3179,7 +3200,7 @@ let representation_for_tuple_constructor env constr ty_args ~loc ~types
       | Some sorts -> Ok (shape, sorts)
       | None -> Misc.fatal_error "representable constructor missing a sort"
       end
-  | None ->
+  | Constructor_variable ->
       begin match
         Misc.Stdlib.List.mapi_result
           (fun _ (ty, loc) ->
@@ -6996,7 +7017,8 @@ and type_expect_
                  each label all over again. Possibly we're doing things in the
                  wrong order. *)
               Typedecl.update_record_representation ~why env
-                sexp.pexp_loc record_form labels_with_updated_types
+                sexp.pexp_loc record_form ~old_repres:representation
+                labels_with_updated_types
             with
             | Ok (_, rep) -> rep
             | Error _ ->
@@ -7494,7 +7516,7 @@ and type_expect_
           in
           env, arg_pat_mode, arg_expected_mode, expected_mode
         | _ :: _ ->
-          effect_handler_modes loc Effect_match env expected_mode
+          effect_handler_modes (loc, Effect_match) env expected_mode
       in
       let arg, sort =
         with_local_level_generalize begin fun () ->
@@ -7548,7 +7570,7 @@ and type_expect_
           expected_mode
         | _ :: _ ->
           let env, arg_mode, _, expected_mode =
-            effect_handler_modes loc Effect_try env expected_mode
+            effect_handler_modes (loc, Effect_try) env expected_mode
           in
           env, arg_mode, expected_mode, expected_mode
       in
@@ -11734,7 +11756,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
                 Jkind_types.Sort.generalize_with (fun () -> generalize ty)
               in
               if List.is_empty univars then
-                Location.prerr_warning loc Warnings.Useless_lpoly;
+                raise (Error (loc, env, Useless_lpoly));
               univars)
             pv_lpoly)
         ~f_mut:(unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)))
@@ -13769,6 +13791,12 @@ let report_error ~loc env =
       Location.errorf ~loc
         "Instantiation of layout-polymorphic values is not yet supported \
          for %s." ctx_str
+  | Useless_lpoly ->
+      Location.errorf ~loc
+        "This binding has no layout variables, so %a has no effect.@ \
+         Consider using a regular %a instead."
+        Style.inline_code "poly_"
+        Style.inline_code "let"
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

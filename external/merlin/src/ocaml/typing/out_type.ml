@@ -1350,10 +1350,10 @@ let add_type_to_preparation = prepare_type
 let print_labels = ref true
 let with_labels b f = Misc.protect_refs [R (print_labels,b)] f
 
-(* Whether to expand [eval] in types for reductions before printing.
+(* Whether to expand [eval] and [box] in types for reductions before printing.
    Disabled when printing errors, as they usually contain an expansion trace. *)
-let print_reduced_evals = ref true
-let with_reduced_evals b f = Misc.protect_refs [R (print_reduced_evals,b)] f
+let print_reduced_abbrevs = ref true
+let with_reduced_abbrevs b f = Misc.protect_refs [R (print_reduced_abbrevs,b)] f
 
 let out_jkind_of_const_jkind env jkind =
   Ojkind_const (Jkind.Const.to_out_jkind_const env jkind)
@@ -1519,7 +1519,8 @@ let rec tree_of_modal_typexp mode modal ty =
     | Other _ -> tree
   in
   let ty =
-    Ctype.reduce_head ~expand_eval:!print_reduced_evals !printing_env ty
+    Ctype.reduce_head ~expand_reducible_abbrevs:!print_reduced_abbrevs
+      !printing_env ty
   in
   let px = proxy ty in
   if Aliases.is_printed_proxy px && not (Aliases.is_delayed px) then
@@ -1698,6 +1699,13 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_module pack
     | Tof_kind jkind ->
       Otyp_of_kind (out_jkind_of_desc !printing_env (Jkind.get jkind))
+    | Tbox ty ->
+      (* Render as if a regular Tconstr application of Predef.path_box,
+         so path shortening and shadowing (e.g. [box/2]) work uniformly. *)
+      let p', s = best_type_path Predef.path_box in
+      let tyl' = apply_subst s [ty] in
+      Internal_names.add p';
+      Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
   in
   Aliases.remove_delay px;
   alias_nongen_row mode px ty;
@@ -1996,7 +2004,7 @@ let extension_constructor_args_and_ret_type_subtree args ret_type =
       let qtvs = extract_qtvs (res :: tys_of_constr_args args) in
       (out_args, Some (qtvs, out_ret))
 
-let tree_of_single_constructor cd =
+let tree_of_single_constructor ~all_void cd =
   let name = Ident.name cd.cd_id in
   let args, ret =
     extension_constructor_args_and_ret_type_subtree cd.cd_args cd.cd_res
@@ -2005,7 +2013,25 @@ let tree_of_single_constructor cd =
       ocstr_name = name;
       ocstr_args = args;
       ocstr_return_type = ret;
+      ocstr_all_void = all_void;
   }
+
+(* A constructor takes [@immediate_all_void_constructor] iff it belongs to a
+   boxed variant and has at least one argument, all of which are void. *)
+let constructor_is_all_void rep cd =
+  match (rep : Types.variant_representation) with
+  | Variant_boxed _ -> begin
+      match cd.cd_args with
+      | Cstr_tuple ((_ :: _) as args) ->
+          List.for_all
+            (fun (ca : Types.constructor_argument) ->
+               match ca.ca_sort with
+               | Some s -> Jkind.Sort.Const.all_void s
+               | None -> false)
+            args
+      | Cstr_tuple [] | Cstr_record _ -> false
+    end
+  | Variant_unboxed | Variant_extensible | Variant_with_null -> false
 
 (* When printing GADT constructor, we need to forget the naming decision we took
   for the type parameters and constraints. Indeed, in
@@ -2015,11 +2041,12 @@ let tree_of_single_constructor cd =
   It is fine to print both the type parameter ['a] and the existentially
   quantified ['a] in the definition of the constructor X as ['a]
  *)
-let tree_of_constructor_in_decl cd =
+let tree_of_constructor_in_decl ~all_void cd =
   match cd.cd_res with
-  | None -> tree_of_single_constructor cd
+  | None -> tree_of_single_constructor ~all_void cd
   | Some _ ->
-      Variable_names.with_local_names (fun () -> tree_of_single_constructor cd)
+      Variable_names.with_local_names
+        (fun () -> tree_of_single_constructor ~all_void cd)
 
 let prepare_decl id decl =
   let params = filter_params decl.type_params in
@@ -2155,7 +2182,12 @@ let tree_of_type_decl ?(print_non_value_inferred_jkind = false) id decl =
           else None
         in
         tree_of_manifest
-          (Otyp_sum (List.map tree_of_constructor_in_decl cstrs)),
+          (Otyp_sum
+             (List.map
+                (fun cd ->
+                   tree_of_constructor_in_decl
+                     ~all_void:(constructor_is_all_void rep cd) cd)
+                cstrs)),
         decl.type_private,
         unboxed,
         or_null_attribute,
@@ -2229,7 +2261,7 @@ let add_constructor_to_preparation c =
   Option.iter prepare_type c.cd_res
 
 let prepared_constructor ppf c =
-  !Oprint.out_constr ppf (tree_of_single_constructor c)
+  !Oprint.out_constr ppf (tree_of_single_constructor ~all_void:false c)
 
 
 let tree_of_type_declaration ?print_non_value_inferred_jkind id decl rs =
@@ -2957,8 +2989,8 @@ let trees_of_type_expansion'
     (* beware order matter due to side effect,
        e.g. when printing object types *)
     let first =
-      (* preserve unreduced eval in types *)
-      with_reduced_evals false (fun () -> tree_of_typexp' t)
+      (* preserve unreduced abbrevs in types *)
+      with_reduced_abbrevs false (fun () -> tree_of_typexp' t)
     in
     let second = tree_of_typexp' t' in
     if first = second then Same first
