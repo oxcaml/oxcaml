@@ -3,13 +3,14 @@
  expect;
 *)
 
-(* Many tests below use deliberately redundant modifiers; silence the warning. *)
+(******************)
+(* Test 1: Syntax *)
+
+(* The syntax tests below spell out kind abbreviations in full, including
+   deliberately redundant modifiers; silence the warning for this section. *)
 [@@@warning "-211"]
 [%%expect{|
 |}]
-
-(******************)
-(* Test 1: Syntax *)
 
 type 'a list : immutable_data with 'a
 
@@ -85,6 +86,10 @@ Line 4, characters 16-27:
 4 |   type 'a gel : kind_of_ 'a mod global
                     ^^^^^^^^^^^
 Error: Unimplemented kind syntax
+|}]
+
+[@@@warning "+211"]
+[%%expect{|
 |}]
 
 (**************************************)
@@ -1299,7 +1304,7 @@ Error: Bad layout annotation:
            because of the annotation on the type variable 'a.
 |}]
 
-let f : ('a : any mod global aliased) -> ('a: any mod contended) = fun x -> x
+let f : ('a : any mod global) -> ('a: any mod contended) = fun x -> x
 let f : ('a : value mod external64) -> ('a: any mod external_) = fun x -> x
 let f : ('a : value) -> ('a: immediate) = fun x -> x
 [%%expect {|
