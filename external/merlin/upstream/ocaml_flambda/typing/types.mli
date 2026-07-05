@@ -274,6 +274,9 @@ and type_desc =
       They are only used to represent the kinds of existentially-quantified types
       mentioned in with-bounds. See test typing-jkind-bounds/gadt.ml *)
 
+  | Tbox of type_expr
+  (** [Tbox ty] ==> [ty box] *)
+
 (** This is used in the Typedtree. It is distinct from
     {{!Asttypes.arg_label}[arg_label]} because Position argument labels are
     discovered through typechecking. *)
@@ -386,7 +389,7 @@ and 'd with_bounds =
 
 and 'layout jkind_base =
   | Layout of 'layout
-  | Kconstr of Path.t
+  | Kconstr of Path.t * Jkind_types.Scannable_axes.t
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
@@ -856,10 +859,8 @@ type type_declaration =
        records (besides records that flattens floats or have with atomic
        fields), but [None] for aliases of these types
 
-       invariants:
-       1. there are no "twice-unboxed" types: the [type_declaration] stored here
-          itself has [type_unboxed_version = None].
-       2. the Uid of the unboxed version is [Uid.unboxed_version <uid of boxed>]
+       invariant:
+       the Uid of the unboxed version is [Uid.unboxed_version <uid of boxed>]
     *)
   }
 
@@ -960,9 +961,9 @@ and record_representation =
 
      After [update_decls_jkind], no record should have this representation. *)
   | Record_variable
-  (* Used after [update_decls_jkind] for records whose representation cannot be
-     determined because at least one field has layout [any]. The actual
-     representation is decided at construction sites. *)
+  (* Used after [update_decls_jkind] for non-inlined records whose
+     representation cannot be determined because at least one field has layout
+     [any]. The actual representation is decided at construction sites. *)
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
@@ -1009,6 +1010,9 @@ and constructor_representation =
   *)
   | Constructor_mixed of mixed_product_shape
   (* A constructor that has some non-value fields. *)
+  | Constructor_variable
+  (* The constructor has an inlined record argument with a field of layout
+     [any], so its shape cannot be determined at typedecl time. *)
 
 and label_declaration =
   {
