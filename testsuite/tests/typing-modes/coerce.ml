@@ -44,11 +44,8 @@ let cross_ret :
   type a (b : value mod portable). (a -> b) -> (a -> b @ portable) =
   fun f -> (f :> _ -> b @ portable)
 [%%expect{|
-Line 3, characters 12-13:
-3 |   fun f -> (f :> _ -> b @ portable)
-                ^
-Error: This expression cannot be coerced to type ""'c -> b @ portable"";
-       it has type "a -> b" but is here used with type "'a -> b @ portable"
+val cross_ret :
+  'a ('b : value mod portable). ('a -> 'b) -> 'a -> 'b @ portable = <fun>
 |}]
 
 (* Same, with a closed coercion (exercises the ground subtyping path rather
@@ -57,10 +54,8 @@ let cross_ret_closed :
   type a (b : value mod portable). (a -> b) -> (a -> b @ portable) =
   fun f -> (f : a -> b :> a -> b @ portable)
 [%%expect{|
-Line 3, characters 11-44:
-3 |   fun f -> (f : a -> b :> a -> b @ portable)
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "a -> b" is not a subtype of "a -> b @ portable"
+val cross_ret_closed :
+  'a ('b : value mod portable). ('a -> 'b) -> 'a -> 'b @ portable = <fun>
 |}]
 
 (* Locality on the return position must not cross, even for immediates: the
@@ -90,13 +85,10 @@ let cross_ret_nested :
     ((a -> b @ portable) -> c) -> ((a -> b) -> c) =
   fun f -> (f :> (_ -> b) -> _)
 [%%expect{|
-Line 4, characters 12-13:
-4 |   fun f -> (f :> (_ -> b) -> _)
-                ^
-Error: This expression cannot be coerced to type ""('b -> b) -> 'c""; it has type
-         "(a -> b @ portable) -> c"
-       but is here used with type "('a -> b) -> 'b"
-       Type "a -> b @ portable" is not compatible with type "'a -> b"
+val cross_ret_nested :
+  'a ('b : value mod portable) 'c.
+    (('a -> 'b @ portable) -> 'c) -> ('a -> 'b) -> 'c =
+  <fun>
 |}]
 
 let cross_ret_nested_closed :
@@ -104,11 +96,10 @@ let cross_ret_nested_closed :
     ((a -> b @ portable) -> c) -> ((a -> b) -> c) =
   fun f -> (f : (a -> b @ portable) -> c :> (a -> b) -> c)
 [%%expect{|
-Line 4, characters 11-58:
-4 |   fun f -> (f : (a -> b @ portable) -> c :> (a -> b) -> c)
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "(a -> b @ portable) -> c" is not a subtype of "(a -> b) -> c"
-       Type "a -> b" is not a subtype of "a -> b @ portable"
+val cross_ret_nested_closed :
+  'a ('b : value mod portable) 'c.
+    (('a -> 'b @ portable) -> 'c) -> ('a -> 'b) -> 'c =
+  <fun>
 |}]
 
 (* Locality on the nested return position must still not cross. *)
