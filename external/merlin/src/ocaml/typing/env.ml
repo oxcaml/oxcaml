@@ -3526,9 +3526,8 @@ let add_language_extension_types env =
   in
   let add_or_hide ext lvl f env =
     let hidden = not (Language_extension.is_at_least ext lvl) in
-    f (fun id info env ->
-        add_type_maybe_hidden ?shape:None ~check:false ~hidden id info env
-          ~long_path:false ~predef:false)
+    f (add_type_maybe_hidden ?shape:None ~check:false ~hidden
+        ~long_path:false ~predef:false)
       env
   in
   (* Small number types are hidden when [Small_numbers] is disabled since they
