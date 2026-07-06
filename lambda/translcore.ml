@@ -35,7 +35,7 @@ type error =
   | Illegal_void_record_field
   | Illegal_product_record_field of Jkind.Sort.Const.t
   | Void_sort of type_expr
-  | Unboxed_vector_in_array_comprehension
+  | Unboxed_vector_or_mask_in_array_comprehension
   | Unboxed_product_in_array_comprehension
   | Unboxed_product_in_let_mutable
   | Block_index_gap_overflow_possible
@@ -995,7 +995,7 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
                 | Pgenarray ->
                   raise Not_constant    (* can this really happen? *)
                 | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-                | Punboxedvectorarray _
+                | Punboxedvectorarray _ | Punboxedmaskarray
                 | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
                   Misc.fatal_error "Use flambda2 for unboxed arrays"
                 | Punspecializedarray ->
@@ -1021,8 +1021,8 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
       begin match array_kind with
       | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
       | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ -> ()
-      | Punboxedvectorarray _ ->
-        raise (Error(e.exp_loc, Unboxed_vector_in_array_comprehension))
+      | Punboxedvectorarray _ | Punboxedmaskarray ->
+        raise (Error(e.exp_loc, Unboxed_vector_or_mask_in_array_comprehension))
       | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
         raise (Error(e.exp_loc, Unboxed_product_in_array_comprehension))
       | Punspecializedarray ->
@@ -3002,10 +3002,10 @@ let report_error_doc ppf = function
         "Void detected in translation for type %a:@ Please report this error \
          to the Jane Street compilers team."
         Printtyp.Doc.type_expr ty
-  | Unboxed_vector_in_array_comprehension ->
+  | Unboxed_vector_or_mask_in_array_comprehension ->
       fprintf ppf
         "Array comprehensions are not yet supported for arrays of unboxed \
-         vectors."
+         vectors or masks."
   | Unboxed_product_in_array_comprehension ->
       fprintf ppf
         "Array comprehensions are not yet supported for arrays of unboxed \

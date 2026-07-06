@@ -25,6 +25,7 @@ type machtype_component = Cmx_format.machtype_component =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Float32
   | Valx2
 
@@ -75,6 +76,8 @@ val typ_vec128 : machtype
 val typ_vec256 : machtype
 
 val typ_vec512 : machtype
+
+val typ_mask : machtype
 
 val typ_int128 : machtype
 
@@ -291,6 +294,7 @@ type memory_chunk =
   | Thirtytwo_unsigned
   | Thirtytwo_signed
   | Word_int (* integer or pointer outside heap *)
+  | Word_mask (* integer-sized AVX512 mask *)
   | Word_val (* pointer inside heap or encoded int *)
   | Single of { reg : float_width }
     (* F32 on the heap, may be F32 or F64 in registers. *)
@@ -360,6 +364,7 @@ type alloc_block_kind =
   | Alloc_block_kind_vec128
   | Alloc_block_kind_vec256
   | Alloc_block_kind_vec512
+  | Alloc_block_kind_mask
   | Alloc_block_kind_boxed_int of Primitive.boxed_integer
   | Alloc_block_kind_float_array
   | Alloc_block_kind_float32_u_array
@@ -371,6 +376,7 @@ type alloc_block_kind =
   | Alloc_block_kind_vec128_u_array
   | Alloc_block_kind_vec256_u_array
   | Alloc_block_kind_vec512_u_array
+  | Alloc_block_kind_mask_u_array
 
 val equal_alloc_block_kind : alloc_block_kind -> alloc_block_kind -> bool
 
@@ -557,6 +563,7 @@ and expression =
   | Cconst_vec128 of vec128_bits * Debuginfo.t
   | Cconst_vec256 of vec256_bits * Debuginfo.t
   | Cconst_vec512 of vec512_bits * Debuginfo.t
+  | Cconst_mask of int64 * Debuginfo.t
   | Cconst_symbol of symbol * Debuginfo.t
   | Cvar of Backend_var.t
   | Clet of Backend_var.With_provenance.t * expression * expression

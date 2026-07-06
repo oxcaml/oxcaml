@@ -2160,7 +2160,7 @@ module Const = struct
       match l with
       | Base
           ( ( Scannable | Float64 | Float32 | Word | Bits8 | Bits16 | Bits32
-            | Bits64 | Vec128 | Vec256 | Vec512 | Untagged_immediate ),
+            | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Untagged_immediate ),
             _ )
       | Any _ ->
         Stable

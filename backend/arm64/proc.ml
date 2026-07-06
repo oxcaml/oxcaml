@@ -50,8 +50,8 @@ let types_are_compatible left right =
   | Float32, Float32 -> true
   | Vec128, Vec128 -> true
   | Valx2,Valx2 -> true
-  | (Vec256 | Vec512), _ | _, (Vec256 | Vec512) ->
-    Misc.fatal_error "arm64: got 256/512 bit vector"
+  | (Vec256 | Vec512 | Mask), _ | _, (Vec256 | Vec512 | Mask) ->
+    Misc.fatal_error "arm64: got 256/512 bit vector or mask"
   | (Int | Val | Addr | Float | Float32 | Vec128 | Valx2), _ -> false
 
 (* Representation of hard registers by pseudo-registers *)
@@ -90,7 +90,8 @@ let phys_reg typ phys_reg =
   | Float -> hard_float_reg.(index_in_class)
   | Float32 -> hard_float32_reg.(index_in_class)
   | Vec128 | Valx2 -> hard_vec128_reg.(index_in_class)
-  | Vec256 | Vec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
+  | Vec256 | Vec512 | Mask ->
+    Misc.fatal_error "arm64: got 256/512 bit vector or mask"
 
 let reg_x8 = phys_reg Int X8
 
@@ -114,7 +115,8 @@ let calling_conventions
       | Val | Int | Addr -> int_registers, size_int
       | Float | Float32 -> float_registers, Arch.size_float
       | Vec128 -> float_registers, Arch.size_vec128
-      | Vec256 | Vec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
+      | Vec256 | Vec512 | Mask ->
+        Misc.fatal_error "arm64: got 256/512 bit vector or mask"
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
     in
     match !registers with
@@ -294,13 +296,13 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op (Load
           {memory_chunk=(Byte_unsigned|Byte_signed|Sixteen_unsigned|
                          Sixteen_signed|Thirtytwo_unsigned|Thirtytwo_signed|
-                         Word_int|Word_val|Double|Onetwentyeight_unaligned|
-                         Onetwentyeight_aligned);
+                         Word_int|Word_mask|Word_val|Double|
+                         Onetwentyeight_unaligned|Onetwentyeight_aligned);
            _ })
   | Op (Store
           ((Byte_unsigned|Byte_signed|Sixteen_unsigned|Sixteen_signed|
-            Thirtytwo_unsigned|Thirtytwo_signed|Word_int|Word_val|Double|
-            Onetwentyeight_unaligned|Onetwentyeight_aligned),
+            Thirtytwo_unsigned|Thirtytwo_signed|Word_int|Word_mask|Word_val|
+            Double|Onetwentyeight_unaligned|Onetwentyeight_aligned),
            _, _))
     -> [||]
   | Op (Static_cast
@@ -538,7 +540,7 @@ let expression_supported : Cmm.expression -> bool = function
   | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
   | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
   | Cexit _ | Cinvalid _ -> true
-  | Cconst_vec256 _ | Cconst_vec512 _ -> false
+  | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _ -> false
 
 
 let trap_size_in_bytes () =

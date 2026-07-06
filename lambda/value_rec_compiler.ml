@@ -356,7 +356,8 @@ let compute_static_size lam =
         | Pfloatarray ->
             Block (Float_record size)
         | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-        | Punboxedvectorarray _ | Pgcscannableproductarray _
+        | Punboxedvectorarray _ | Punboxedmaskarray
+        | Pgcscannableproductarray _
         | Pgcignorableproductarray _ ->
             Misc.fatal_error "size_of_primitive"
         | Punspecializedarray ->

@@ -40,6 +40,7 @@ let machtype_component ppf (ty : machtype_component) =
   | Vec128 -> fprintf ppf "vec128"
   | Vec256 -> fprintf ppf "vec256"
   | Vec512 -> fprintf ppf "vec512"
+  | Mask -> fprintf ppf "mask"
   | Float32 -> fprintf ppf "float32"
   | Valx2 -> fprintf ppf "valx2"
 
@@ -150,6 +151,7 @@ let chunk = function
   | Fivetwelve_unaligned -> "unaligned vec512"
   | Fivetwelve_aligned -> "aligned vec512"
   | Word_int -> "int"
+  | Word_mask -> "mask"
   | Word_val -> "val"
   | Single { reg = Float64 } -> "float32_as_float64"
   | Single { reg = Float32 } -> "float32"
@@ -348,6 +350,7 @@ let rec expr ppf = function
       ({ word0; word1; word2; word3; word4; word5; word6; word7 }, _dbg) ->
     fprintf ppf "%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx" word7
       word6 word5 word4 word3 word2 word1 word0
+  | Cconst_mask (n, _dbg) -> fprintf ppf "mask:%016Lx" n
   | Cconst_float32 (n, _dbg) -> fprintf ppf "%Fs" n
   | Cconst_float (n, _dbg) -> fprintf ppf "%F" n
   | Cconst_symbol (s, _dbg) ->

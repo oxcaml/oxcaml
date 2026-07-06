@@ -146,7 +146,7 @@ let unbox_number ~machine_width kind =
   else
     match (kind : Flambda_kind.Boxable_number.t) with
     | Naked_float | Naked_float32 | Naked_vec128 | Naked_vec256 | Naked_vec512
-      ->
+    | Naked_mask ->
       1 (* 1 load *)
     | Naked_int64 when Target_system.Machine_width.is_32_bit machine_width ->
       4 (* 2 Cadda + 2 loads *)
@@ -160,7 +160,7 @@ let box_number ~machine_width kind =
   else
     match (kind : Flambda_kind.Boxable_number.t) with
     | Naked_float | Naked_float32 | Naked_vec128 | Naked_vec256 | Naked_vec512
-      ->
+    | Naked_mask ->
       alloc_size (* 1 alloc *)
     | Naked_int32 when not (Target_system.Machine_width.is_32_bit machine_width)
       ->
@@ -173,7 +173,7 @@ let block_load (kind : Flambda_primitive.Block_access_kind.t) =
 let array_load (kind : Flambda_primitive.Array_load_kind.t) =
   match kind with
   | Immediates -> 1 (* cadda + load *)
-  | Naked_floats | Naked_ints | Naked_int64s | Naked_nativeints
+  | Naked_floats | Naked_ints | Naked_int64s | Naked_nativeints | Naked_masks
   | Gc_ignorable_values | Values ->
     1
   | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s | Naked_vec128s
@@ -197,7 +197,8 @@ let array_set (kind : Flambda_primitive.Array_set_kind.t) =
   | Values (Assignment Heap) -> does_not_need_caml_c_call_extcall_size
   | Values (Assignment Local | Initialization) -> 1
   | Gc_ignorable_values -> 1
-  | Immediates | Naked_floats | Naked_ints | Naked_int64s | Naked_nativeints ->
+  | Immediates | Naked_floats | Naked_ints | Naked_int64s | Naked_nativeints
+  | Naked_masks ->
     1
   | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s | Naked_vec128s
   | Naked_vec256s | Naked_vec512s ->
@@ -407,7 +408,7 @@ let unary_prim_size ~machine_width prim =
     | Array_kind
         ( Immediates | Values | Gc_ignorable_values | Naked_floats
         | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-        | Naked_vec512s | Unboxed_product _ ) ->
+        | Naked_vec512s | Naked_masks | Unboxed_product _ ) ->
       array_length_size
     | Array_kind
         (Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s | Naked_float32s)

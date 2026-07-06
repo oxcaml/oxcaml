@@ -25,6 +25,7 @@ type machtype_component = Cmx_format.machtype_component =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Float32
   | Valx2
 
@@ -52,6 +53,8 @@ let typ_vec256 = [| Vec256 |]
 
 let typ_vec512 = [| Vec512 |]
 
+let typ_mask = [| Mask |]
+
 let typ_int128 = [| Int; Int |]
 
 let string_of_machtype_component (comp : machtype_component) =
@@ -63,13 +66,14 @@ let string_of_machtype_component (comp : machtype_component) =
   | Vec128 -> "Vec128"
   | Vec256 -> "Vec256"
   | Vec512 -> "Vec512"
+  | Mask -> "Mask"
   | Float32 -> "Float32"
   | Valx2 -> "Valx2"
 
 (** [machtype_component]s are partially ordered as follows:
 
     {v
-      Addr     Float32     Float     Vec128     Vec256     Vec512   Valx2
+      Addr     Float32     Float     Vec128     Vec256     Vec512   Mask   Valx2
        ^
        |
       Val
@@ -101,10 +105,13 @@ let lub_component comp1 comp2 =
   | Vec128, Vec128 -> Vec128
   | Vec256, Vec256 -> Vec256
   | Vec512, Vec512 -> Vec512
-  | (Int | Addr | Val), (Float | Float32 | Vec128 | Vec256 | Vec512)
-  | (Float | Float32 | Vec128 | Vec256 | Vec512), (Int | Addr | Val)
-  | (Float | Float32 | Vec256 | Vec512), (Vec128 | Vec256 | Vec512)
-  | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512)
+  | Mask, Mask -> Mask
+  | (Int | Addr | Val), (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask)
+  | (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask), (Int | Addr | Val)
+  | (Float | Float32 | Vec256 | Vec512 | Mask), (Vec128 | Vec256 | Vec512)
+  | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512 | Mask)
+  | Mask, (Float | Float32)
+  | (Float | Float32), Mask
   | Float32, Float
   | Float, Float32 ->
     (* Float unboxing code must be sure to avoid this case. *)
@@ -131,10 +138,13 @@ let ge_component comp1 comp2 =
   | Vec128, Vec128 -> true
   | Vec256, Vec256 -> true
   | Vec512, Vec512 -> true
-  | (Int | Addr | Val), (Float | Float32 | Vec128 | Vec256 | Vec512)
-  | (Float | Float32 | Vec128 | Vec256 | Vec512), (Int | Addr | Val)
-  | (Float | Float32 | Vec256 | Vec512), (Vec128 | Vec256 | Vec512)
-  | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512)
+  | Mask, Mask -> true
+  | (Int | Addr | Val), (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask)
+  | (Float | Float32 | Vec128 | Vec256 | Vec512 | Mask), (Int | Addr | Val)
+  | (Float | Float32 | Vec256 | Vec512 | Mask), (Vec128 | Vec256 | Vec512)
+  | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512 | Mask)
+  | Mask, (Float | Float32)
+  | (Float | Float32), Mask
   | Float32, Float
   | Float, Float32 ->
     Misc.fatal_errorf
@@ -371,6 +381,7 @@ type memory_chunk =
   | Thirtytwo_unsigned
   | Thirtytwo_signed
   | Word_int
+  | Word_mask
   | Word_val
   | Single of { reg : float_width }
   | Double
@@ -385,7 +396,7 @@ let size_of_memory_chunk : memory_chunk -> int = function
   | Byte_unsigned | Byte_signed -> 1
   | Sixteen_unsigned | Sixteen_signed -> 2
   | Thirtytwo_unsigned | Thirtytwo_signed | Single _ -> 4
-  | Word_int | Word_val | Double -> 8
+  | Word_int | Word_mask | Word_val | Double -> 8
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> 16
   | Twofiftysix_unaligned | Twofiftysix_aligned -> 32
   | Fivetwelve_unaligned | Fivetwelve_aligned -> 64
@@ -445,6 +456,7 @@ type alloc_block_kind =
   | Alloc_block_kind_vec128
   | Alloc_block_kind_vec256
   | Alloc_block_kind_vec512
+  | Alloc_block_kind_mask
   | Alloc_block_kind_boxed_int of Primitive.boxed_integer
   | Alloc_block_kind_float_array
   | Alloc_block_kind_float32_u_array
@@ -456,6 +468,7 @@ type alloc_block_kind =
   | Alloc_block_kind_vec128_u_array
   | Alloc_block_kind_vec256_u_array
   | Alloc_block_kind_vec512_u_array
+  | Alloc_block_kind_mask_u_array
 
 let equal_alloc_block_kind left right =
   match left, right with
@@ -466,6 +479,7 @@ let equal_alloc_block_kind left right =
   | Alloc_block_kind_vec128, Alloc_block_kind_vec128
   | Alloc_block_kind_vec256, Alloc_block_kind_vec256
   | Alloc_block_kind_vec512, Alloc_block_kind_vec512
+  | Alloc_block_kind_mask, Alloc_block_kind_mask
   | Alloc_block_kind_float_array, Alloc_block_kind_float_array
   | Alloc_block_kind_float32_u_array, Alloc_block_kind_float32_u_array
   | Alloc_block_kind_int_u_array, Alloc_block_kind_int_u_array
@@ -475,19 +489,21 @@ let equal_alloc_block_kind left right =
   | Alloc_block_kind_int64_u_array, Alloc_block_kind_int64_u_array
   | Alloc_block_kind_vec128_u_array, Alloc_block_kind_vec128_u_array
   | Alloc_block_kind_vec256_u_array, Alloc_block_kind_vec256_u_array
-  | Alloc_block_kind_vec512_u_array, Alloc_block_kind_vec512_u_array ->
+  | Alloc_block_kind_vec512_u_array, Alloc_block_kind_vec512_u_array
+  | Alloc_block_kind_mask_u_array, Alloc_block_kind_mask_u_array ->
     true
   | Alloc_block_kind_boxed_int left_bi, Alloc_block_kind_boxed_int right_bi ->
     Primitive.equal_boxed_integer left_bi right_bi
   | ( ( Alloc_block_kind_other | Alloc_block_kind_closure
       | Alloc_block_kind_float | Alloc_block_kind_float32
       | Alloc_block_kind_vec128 | Alloc_block_kind_vec256
-      | Alloc_block_kind_vec512 | Alloc_block_kind_boxed_int _
-      | Alloc_block_kind_float_array | Alloc_block_kind_float32_u_array
-      | Alloc_block_kind_int_u_array | Alloc_block_kind_int8_u_array
-      | Alloc_block_kind_int16_u_array | Alloc_block_kind_int32_u_array
-      | Alloc_block_kind_int64_u_array | Alloc_block_kind_vec128_u_array
-      | Alloc_block_kind_vec256_u_array | Alloc_block_kind_vec512_u_array ),
+      | Alloc_block_kind_vec512 | Alloc_block_kind_mask
+      | Alloc_block_kind_boxed_int _ | Alloc_block_kind_float_array
+      | Alloc_block_kind_float32_u_array | Alloc_block_kind_int_u_array
+      | Alloc_block_kind_int8_u_array | Alloc_block_kind_int16_u_array
+      | Alloc_block_kind_int32_u_array | Alloc_block_kind_int64_u_array
+      | Alloc_block_kind_vec128_u_array | Alloc_block_kind_vec256_u_array
+      | Alloc_block_kind_vec512_u_array | Alloc_block_kind_mask_u_array ),
       _ ) ->
     false
 
@@ -664,6 +680,7 @@ and expression =
   | Cconst_vec128 of vec128_bits * Debuginfo.t
   | Cconst_vec256 of vec256_bits * Debuginfo.t
   | Cconst_vec512 of vec512_bits * Debuginfo.t
+  | Cconst_mask of int64 * Debuginfo.t
   | Cconst_symbol of symbol * Debuginfo.t
   | Cvar of Backend_var.t
   | Clet of Backend_var.With_provenance.t * expression * expression
@@ -774,8 +791,8 @@ let iter_shallow_tail f = function
     true
   | Cexit _ | Cop (Craise _, _, _) | Cinvalid _ -> true
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-  | Cvar _ | Ctuple _
+  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+  | Cconst_symbol _ | Cvar _ | Ctuple _
   | Cop
       ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Caddi128 | Csubi128
         | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cpopcnt | Caddv
@@ -808,8 +825,8 @@ let map_shallow_tail f = function
     Ccatch (flag, List.map map_h handlers, f body)
   | (Cexit _ | Cop (Craise _, _, _) | Cinvalid _) as cmm -> cmm
   | ( Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-    | Cvar _ | Ctuple _
+    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+    | Cconst_symbol _ | Cvar _ | Ctuple _
     | Cop
         ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Caddi128
           | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
@@ -831,7 +848,7 @@ let map_tail f =
   let rec loop = function
     | ( Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
       | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-      | Cvar _ | Ctuple _ | Cop _ ) as c ->
+      | Cconst_mask _ | Cvar _ | Ctuple _ | Cop _ ) as c ->
       f c
     | ( Cexit _ | Cinvalid _
       | Clet (_, _, _)
@@ -865,8 +882,8 @@ let iter_shallow f = function
     f body
   | Cexit (_n, el, _traps) -> List.iter f el
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-  | Cvar _ | Cinvalid _ ->
+  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+  | Cconst_symbol _ | Cvar _ | Cinvalid _ ->
     ()
 
 let map_shallow f = function
@@ -886,8 +903,8 @@ let map_shallow f = function
     Ccatch (flag, List.map map_h hl, f body)
   | Cexit (n, el, traps) -> Cexit (n, List.map f el, traps)
   | ( Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-    | Cvar _ | Cinvalid _ ) as c ->
+    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+    | Cconst_symbol _ | Cvar _ | Cinvalid _ ) as c ->
     c
 
 let rank_machtype_component : machtype_component -> int = function
@@ -898,18 +915,19 @@ let rank_machtype_component : machtype_component -> int = function
   | Vec128 -> 4
   | Vec256 -> 5
   | Vec512 -> 6
-  | Float32 -> 7
-  | Valx2 -> 8
+  | Mask -> 7
+  | Float32 -> 8
+  | Valx2 -> 9
 
 let compare_machtype_component
-    ((Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2) as
-     left :
+    (( Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32
+     | Valx2 ) as left :
       machtype_component) (right : machtype_component) =
   rank_machtype_component left - rank_machtype_component right
 
 let equal_machtype_component
-    ((Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2) as
-     left :
+    (( Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32
+     | Valx2 ) as left :
       machtype_component) (right : machtype_component) =
   rank_machtype_component left = rank_machtype_component right
 
@@ -1049,6 +1067,7 @@ let equal_memory_chunk left right =
   | Thirtytwo_unsigned, Thirtytwo_unsigned -> true
   | Thirtytwo_signed, Thirtytwo_signed -> true
   | Word_int, Word_int -> true
+  | Word_mask, Word_mask -> true
   | Word_val, Word_val -> true
   | Single { reg = regl }, Single { reg = regr } -> equal_float_width regl regr
   | Double, Double -> true
@@ -1060,92 +1079,98 @@ let equal_memory_chunk left right =
   | Fivetwelve_aligned, Fivetwelve_aligned -> true
   | ( Byte_unsigned,
       ( Byte_signed | Sixteen_unsigned | Sixteen_signed | Thirtytwo_unsigned
-      | Thirtytwo_signed | Word_int | Word_val | Single _ | Double
+      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
       | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Byte_signed,
       ( Byte_unsigned | Sixteen_unsigned | Sixteen_signed | Thirtytwo_unsigned
-      | Thirtytwo_signed | Word_int | Word_val | Single _ | Double
+      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
       | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Sixteen_unsigned,
       ( Byte_unsigned | Byte_signed | Sixteen_signed | Thirtytwo_unsigned
-      | Thirtytwo_signed | Word_int | Word_val | Single _ | Double
+      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
       | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Sixteen_signed,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Thirtytwo_unsigned
-      | Thirtytwo_signed | Word_int | Word_val | Single _ | Double
+      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
       | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Thirtytwo_unsigned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_signed | Word_int | Word_val | Single _ | Double
+      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
       | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Thirtytwo_signed,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Word_int | Word_val | Single _ | Double
+      | Thirtytwo_unsigned | Word_int | Word_mask | Word_val | Single _ | Double
       | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Word_int,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_val | Single _ | Double
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_mask | Word_val | Single _
+      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
+      | Fivetwelve_aligned ) )
+  | ( Word_mask,
+      ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val | Single _
+      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Word_val,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Single _ | Double
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Single _
+      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Double,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val | Single _
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Single _ | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Onetwentyeight_unaligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val | Single _
-      | Double | Onetwentyeight_aligned | Twofiftysix_unaligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_aligned | Twofiftysix_unaligned
       | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ) )
   | ( Onetwentyeight_aligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val | Single _
-      | Double | Onetwentyeight_unaligned | Twofiftysix_unaligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Twofiftysix_unaligned
       | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ) )
   | ( Twofiftysix_unaligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val | Single _
-      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ) )
   | ( Twofiftysix_aligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val | Single _
-      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Fivetwelve_unaligned | Fivetwelve_aligned ) )
   | ( Fivetwelve_unaligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val | Single _
-      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_aligned ) )
   | ( Fivetwelve_aligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val | Single _
-      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned ) )
   | ( Single _,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val | Double
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) ) ->
     false
@@ -1157,17 +1182,20 @@ let caml_flambda2_invalid = "caml_flambda2_invalid"
 let is_val (m : machtype_component) =
   match m with
   | Val -> true
-  | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 -> false
+  | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
+    false
 
 let is_int (m : machtype_component) =
   match m with
   | Int -> true
-  | Addr | Val | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 -> false
+  | Addr | Val | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
+    false
 
 let is_addr (m : machtype_component) =
   match m with
   | Addr -> true
-  | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 -> false
+  | Val | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2 ->
+    false
 
 let is_exn_handler (flag : ccatch_flag) =
   match flag with Exn_handler -> true | Normal | Recursive -> false

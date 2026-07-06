@@ -7,6 +7,7 @@ type reg_class =
   | SIMD
       (** 128/256/512-bit SIMD registers. Different names are used when storing
           different sized values. *)
+  | MASK  (** AVX512 mask registers k1-k7. Note k0 is implicitly all ones. *)
 
 type[@ocamlformat "disable"] _ phys_reg_classed =
   | RAX : [> `GPR] phys_reg_classed | RBX : [> `GPR] phys_reg_classed
@@ -26,6 +27,11 @@ type[@ocamlformat "disable"] _ phys_reg_classed =
   | MM12 : [> `SIMD] phys_reg_classed | MM13 : [> `SIMD] phys_reg_classed
   | MM14 : [> `SIMD] phys_reg_classed | MM15 : [> `SIMD] phys_reg_classed
 
+  | K1 : [> `MASK] phys_reg_classed | K2 : [> `MASK] phys_reg_classed
+  | K3 : [> `MASK] phys_reg_classed | K4 : [> `MASK] phys_reg_classed
+  | K5 : [> `MASK] phys_reg_classed | K6 : [> `MASK] phys_reg_classed
+  | K7 : [> `MASK] phys_reg_classed
+
 type phys_reg = P : _ phys_reg_classed -> phys_reg [@@unboxed]
 
 val phys_gpr_regs_classed : [`GPR] phys_reg_classed array
@@ -35,6 +41,10 @@ val phys_gpr_regs : phys_reg array
 val phys_simd_regs_classed : [`SIMD] phys_reg_classed array
 
 val phys_simd_regs : phys_reg array
+
+val phys_mask_regs_classed : [`MASK] phys_reg_classed array
+
+val phys_mask_regs : phys_reg array
 
 include
   Regs_utils.T with type Reg_class.t = reg_class with type Phys_reg.t = phys_reg

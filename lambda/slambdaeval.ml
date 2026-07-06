@@ -354,7 +354,7 @@ and eval_mixed_block_element :
     in
     if new_elements == old_elements then element else Product new_elements
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     element
 
 and eval_layout env layout =
@@ -368,7 +368,7 @@ and eval_layout env layout =
     in
     if new_layouts == old_layouts then layout else Punboxed_product new_layouts
   | Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
-  | Punboxed_vector _ | Pbottom ->
+  | Punboxed_vector _ | Punboxed_mask | Pbottom ->
     layout
 
 and eval_lfunction_shallow env
@@ -511,7 +511,7 @@ exception Found_a_splice
 let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
   | Psplicevar _ -> raise Found_a_splice
   | Ptop | Pbottom | Pvalue _ | Punboxed_float _
-  | Punboxed_or_untagged_integer _ | Punboxed_vector _ ->
+  | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask ->
     ()
   | Punboxed_product layouts ->
     List.iter assert_layout_contains_no_splices layouts
@@ -520,7 +520,7 @@ let rec assert_mixed_block_element_contains_no_splices : type a.
     a Lambda.mixed_block_element -> unit = function
   | Splice_variable _ -> raise Found_a_splice
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     ()
   | Product elements ->
     Array.iter assert_mixed_block_element_contains_no_splices elements

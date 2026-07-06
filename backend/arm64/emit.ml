@@ -737,8 +737,8 @@ let record_frame_label env live dbg =
       | { typ = Val; loc = Unknown; _ } as r ->
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
       | { typ = Int | Float | Float32 | Vec128; _ } -> ()
-      | { typ = Vec256 | Vec512; _ } ->
-        Misc.fatal_error "arm64: got 256/512 bit vector")
+      | { typ = Vec256 | Vec512 | Mask; _ } ->
+        Misc.fatal_error "arm64: got 256/512 bit vector or mask")
     live;
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of linear labels. *)
@@ -1244,8 +1244,8 @@ let emit_load_literal dst lbl =
   | Float32 -> A.ins2 LDR_simd_and_fp (H.reg_s dst) addr
   | Val | Int | Addr -> A.ins2 LDR (H.reg_x dst) addr
   | Vec128 | Valx2 -> A.ins2 LDR_simd_and_fp (H.reg_q dst) addr
-  | Vec256 | Vec512 ->
-    Misc.fatal_errorf "emit_load_literal: unexpected vector register %a"
+  | Vec256 | Vec512 | Mask ->
+    Misc.fatal_errorf "emit_load_literal: unexpected vector or mask register %a"
       Printreg.reg dst
 
 let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
@@ -1254,8 +1254,8 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
   | Float32, Reg _, Float32, Reg _ -> A.ins2 FMOV_fp (H.reg_s dst) (H.reg_s src)
   | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Reg _ ->
     A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
-  | (Vec256 | Vec512), _, _, _ | _, _, (Vec256 | Vec512), _ ->
-    Misc.fatal_error "arm64: got 256/512 bit vector"
+  | (Vec256 | Vec512 | Mask), _, _, _ | _, _, (Vec256 | Vec512 | Mask), _ ->
+    Misc.fatal_error "arm64: got 256/512 bit vector or mask"
   | (Int | Val | Addr), Reg _, (Int | Val | Addr), Reg _ ->
     A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
   | Float, Reg _, Float, Stack _ ->
@@ -1574,9 +1574,9 @@ let emit_instr env i =
           (symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s)
           O.optional_none);
       A.ins2 LDR_simd_and_fp (H.reg_q dst) (H.mem reg_tmp1_base)
-    | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
-    | Fivetwelve_unaligned ->
-      Misc.fatal_error "arm64: got 256/512 bit vector")
+    | Word_mask | Twofiftysix_aligned | Twofiftysix_unaligned
+    | Fivetwelve_aligned | Fivetwelve_unaligned ->
+      Misc.fatal_error "arm64: got 256/512 bit vector or mask")
   | Lop (Store (size, addr, assignment)) -> (
     (* NB: assignments other than Word_int and Word_val do not follow the
        Multicore OCaml memory model and so do not emit a barrier *)
@@ -1622,9 +1622,9 @@ let emit_instr env i =
           (symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s)
           O.optional_none;
         A.ins2 STR_simd_and_fp (H.reg_q src) (H.mem reg_tmp1_base))
-    | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
-    | Fivetwelve_unaligned ->
-      Misc.fatal_error "arm64: got 256/512 bit vector")
+    | Word_mask | Twofiftysix_aligned | Twofiftysix_unaligned
+    | Fivetwelve_aligned | Fivetwelve_unaligned ->
+      Misc.fatal_error "arm64: got 256/512 bit vector or mask")
   | Lop (Alloc { bytes = n; dbginfo; mode = Heap }) ->
     assembly_code_for_allocation env i ~n ~local:false ~far:false ~dbginfo
   | Lop (Specific (Ifar_alloc { bytes = n; dbginfo; mode })) ->

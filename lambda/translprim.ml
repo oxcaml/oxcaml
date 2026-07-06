@@ -49,7 +49,7 @@ let unboxed_product_uninitialized_array_check loc array_kind =
     when not (List.exists
         Lambda.ignorable_product_element_kind_involves_int igns) -> ()
   | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-  | Punboxedvectorarray _ ->
+  | Punboxedvectorarray _ | Punboxedmaskarray ->
     ()
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
@@ -206,6 +206,7 @@ let extern_repr_of_native_repr:
   | Unboxed_float f, _ -> Unboxed_float f
   | Unboxed_or_untagged_integer i, _ -> Unboxed_or_untagged_integer i
   | Unboxed_vector i, _ -> Unboxed_vector i
+  | Unboxed_mask, _ -> Unboxed_mask
   | Unpacked_product sort, _ ->
     (* The product sort is unarized into separate C arguments by
        [unarize_extern_repr] in [closure_conversion.ml]. *)
@@ -215,7 +216,7 @@ let sort_of_native_repr ~poly_sort repr =
   match extern_repr_of_native_repr ~poly_sort repr with
   | Same_as_ocaml_repr s -> s
   | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
-     Unboxed_vector _) ->
+     Unboxed_vector _ | Unboxed_mask) ->
     Jkind.Sort.Const.Base Scannable
 
 let to_lambda_prim prim ~poly_sort =
@@ -1320,7 +1321,7 @@ let glb_array_type loc t1 t2 =
   | Punspecializedarray, x | x, Punspecializedarray -> x
   (* Handle unboxed array kinds which can only match with themselves. *)
   | Pfloatarray, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-                 | Punboxedvectorarray _) ->
+                 | Punboxedvectorarray _ | Punboxedmaskarray) ->
     (* Have a nice error message for a case reachable. *)
     raise(Error(loc, Invalid_floatarray_glb))
   | Punboxedfloatarray Unboxed_float64, Punboxedfloatarray Unboxed_float64 ->
@@ -1356,6 +1357,10 @@ let glb_array_type loc t1 t2 =
   | Punboxedvectorarray Unboxed_vec512, Punboxedvectorarray Unboxed_vec512 ->
     Punboxedvectorarray Unboxed_vec512
   | Punboxedvectorarray _, _ | _, Punboxedvectorarray _ ->
+    unexpected ()
+  | (Pgenarray | Punboxedmaskarray), Punboxedmaskarray ->
+    Punboxedmaskarray
+  | Punboxedmaskarray, _ | _, Punboxedmaskarray ->
     unexpected ()
 
   (* Unboxed product arrays. *)
@@ -1408,7 +1413,7 @@ let glb_array_ref_type loc t1 t2 =
   | t1, Punspecializedarray -> t1
   (* Handle unboxed array kinds which can only match with themselves. *)
   | Pfloatarray_ref _, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-                       | Punboxedvectorarray _) ->
+                       | Punboxedvectorarray _ | Punboxedmaskarray) ->
     (* Have a nice error message for a case reachable. *)
     raise(Error(loc, Invalid_floatarray_glb))
   | Punboxedfloatarray_ref Unboxed_float64,
@@ -1450,6 +1455,10 @@ let glb_array_ref_type loc t1 t2 =
     Punboxedvectorarray Unboxed_vec512 ->
     Punboxedvectorarray_ref Unboxed_vec512
   | Punboxedvectorarray_ref _, _ | _, Punboxedvectorarray _ ->
+    unexpected ()
+  | (Pgenarray_ref _ | Punboxedmaskarray_ref), Punboxedmaskarray ->
+    Punboxedmaskarray_ref
+  | Punboxedmaskarray_ref, _ | _, Punboxedmaskarray ->
     unexpected ()
 
   (* Unboxed product arrays. *)
@@ -1515,7 +1524,7 @@ let glb_array_set_type loc t1 t2 =
   | t1, Punspecializedarray -> t1
   (* Handle unboxed array kinds which can only match with themselves. *)
   | Pfloatarray_set, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-                     | Punboxedvectorarray _) ->
+                     | Punboxedvectorarray _ | Punboxedmaskarray) ->
     (* Have a nice error message for a case reachable. *)
     raise(Error(loc, Invalid_floatarray_glb))
   | Punboxedfloatarray_set Unboxed_float64,
@@ -1557,6 +1566,10 @@ let glb_array_set_type loc t1 t2 =
     Punboxedvectorarray Unboxed_vec512 ->
     Punboxedvectorarray_set Unboxed_vec512
   | Punboxedvectorarray_set _, _ | _, Punboxedvectorarray _ ->
+    unexpected ()
+  | (Pgenarray_set _ | Punboxedmaskarray_set), Punboxedmaskarray ->
+    Punboxedmaskarray_set
+  | Punboxedmaskarray_set, _ | _, Punboxedmaskarray ->
     unexpected ()
 
   (* Unboxed product arrays. *)
@@ -1629,6 +1642,7 @@ let peek_or_poke_layout_from_type ~prim_name error_loc env ty
     | Ptop
     | Pvalue _
     | Punboxed_vector _
+    | Punboxed_mask
     | Punboxed_product _
     | Pbottom
     | Psplicevar _ ->
@@ -2567,12 +2581,13 @@ let lambda_primitive_needs_event_after = function
   | Pbytessetu
   | Pmakearray ((Pintarray | Paddrarray | Pgcignorableaddrarray | Pfloatarray
                  | Punboxedfloatarray _
-      | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
+      | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ | Punboxedmaskarray
       | Pgcscannableproductarray _ | Pgcignorableproductarray _), _, _)
   | Pmakearray_dynamic
       ((Pintarray | Paddrarray | Pgcignorableaddrarray | Pfloatarray
         | Punboxedfloatarray _
        | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
+       | Punboxedmaskarray
        | Pgcscannableproductarray _ | Pgcignorableproductarray _), _, _)
   | Parrayblit _
   | Parraylength _ | Parrayrefu _ | Parraysetu _ | Pisint _ | Pisnull | Pisout
