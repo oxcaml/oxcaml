@@ -84,9 +84,7 @@ let rec subkind (k : Flambda_kind.With_subkind.Non_null_value_subkind.t) :
   | Unboxed_vec128_array -> Unboxed_vec128_array
   | Unboxed_vec256_array -> Unboxed_vec256_array
   | Unboxed_vec512_array -> Unboxed_vec512_array
-  | Unboxed_mask_array ->
-    Misc.fatal_error
-      "fexpr support for arrays of unboxed masks not yet implemented"
+  | Unboxed_mask_array -> Unboxed_mask_array
   | Unboxed_product_array -> Unboxed_product_array
 
 and variant_subkind consts non_consts : Fexpr.subkind =

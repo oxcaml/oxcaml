@@ -1521,23 +1521,15 @@ let unbox_vec512 =
              ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
       | _ -> None)
 
-let box_mask dbg mode c =
-  Cop
-    ( Calloc (mode, Alloc_block_kind_mask),
-      [alloc_boxedmask_header mode dbg; c],
-      dbg )
+let box_mask =
+  box_vector ~alloc_kind:Alloc_block_kind_mask ~header:alloc_boxedmask_header
 
-let unbox_mask dbg =
-  map_tail (function
-    | Cop (Calloc _, [Cconst_natint (hdr, _); c], _)
-      when Nativeint.equal hdr boxedmask_header
-           || Nativeint.equal hdr boxedmask_local_header ->
-      c
-    | Cconst_symbol (s, _dbg) as cmm -> (
-      match Cmmgen_state.structured_constant_of_sym s.sym_name with
-      | Some (Const_mask n) -> Cconst_mask (n, dbg)
-      | _ -> Cop (mk_load_immut Word_mask, [cmm], dbg))
-    | cmm -> Cop (mk_load_immut Word_mask, [cmm], dbg))
+let unbox_mask =
+  unbox_vector ~header:boxedmask_header ~local_header:boxedmask_local_header
+    ~chunk:Word_mask ~structured_constant_of_sym:(fun symbol dbg ->
+      match Cmmgen_state.structured_constant_of_sym symbol with
+      | Some (Const_mask n) -> Some (Cconst_mask (n, dbg))
+      | _ -> None)
 
 (* Conversions for 16-bit floats *)
 
@@ -2501,10 +2493,10 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
         then
           (* regular scanned part of a block *)
           match memory_chunk with
-          | Word_int | Word_mask | Word_val -> ok ()
+          | Word_int | Word_val -> ok ()
           | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
           | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Double
-          | Onetwentyeight_unaligned | Onetwentyeight_aligned
+          | Word_mask | Onetwentyeight_unaligned | Onetwentyeight_aligned
           | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
           | Fivetwelve_aligned ->
             error "the value prefix of a mixed block"

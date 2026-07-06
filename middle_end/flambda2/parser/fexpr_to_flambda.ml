@@ -79,6 +79,7 @@ let rec subkind :
   | Unboxed_vec128_array -> Unboxed_vec128_array
   | Unboxed_vec256_array -> Unboxed_vec256_array
   | Unboxed_vec512_array -> Unboxed_vec512_array
+  | Unboxed_mask_array -> Unboxed_mask_array
   | Unboxed_product_array -> Unboxed_product_array
 
 and value_kind_with_subkind :

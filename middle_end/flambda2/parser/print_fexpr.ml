@@ -227,6 +227,7 @@ let rec subkind ppf (k : subkind) =
   | Unboxed_vec128_array -> str "vec128 array"
   | Unboxed_vec256_array -> str "vec256 array"
   | Unboxed_vec512_array -> str "vec512 array"
+  | Unboxed_mask_array -> str "mask array"
   | Unboxed_product_array -> str "product array"
 
 and variant_subkind ppf consts non_consts =
