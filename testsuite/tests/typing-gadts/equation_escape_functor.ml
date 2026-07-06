@@ -2,13 +2,45 @@
  expect;
 *)
 
-(* Matching a GADT witness can refine an abstract type's jkind (here [M.t : any]
-   becomes [bits64] under [T]). A type relying on that narrowing must not escape
-   the match.
+(* Matching a GADT witness can refine an abstract type. A type relying on that
+   narrowing (via a kind annotation or constraint) must not escape the match.
 
    These tests check that such a type cannot be laundered out through
    a module type produced by a functor application *)
 
+module M : sig
+  type t
+  val witness : (t, string) Type.eq
+end = struct
+  type t = string
+  let witness = Type.Equal
+end
+
+type 'a foo constraint 'a = string
+
+module F_c (X : sig type t = string end) = struct
+  let f (x : X.t foo) = x
+end
+
+let f =
+  let Equal = M.witness in
+  let module N = F_c(M) in
+  N.f
+[%%expect{|
+module M : sig type t val witness : (t, string) Type.eq end
+type 'a foo constraint 'a = string
+module F_c :
+  functor (X : sig type t = string end) -> sig val f : X.t foo -> X.t foo end
+Line 18, characters 2-5:
+18 |   N.f
+       ^^^
+Error: The value "N.f" has type "M.t foo -> M.t foo"
+       but an expression was expected of type "'a"
+       This instance of "string" is ambiguous:
+       it would escape the scope of its equation
+|}]
+
+(* In this test, [M.t]'s kind narrows from [any] to [bits64] under [T] *)
 type ('a : any) is_bits64 = T : ('a : bits64). 'a is_bits64
 
 module M : sig
