@@ -105,6 +105,7 @@ logic.
   -dasm-comments
   -davail
   -dblambda
+  -dbranch-relaxation-max-displacement
   -dcamlprimc
   -dcanonical-ids
   -dcfg
@@ -198,6 +199,7 @@ logic.
   -dzero-alloc
   -enable-poll-insertion
   -error-style
+  -experimental-optimizations
   -extension
   -extension-universe
   -fPIC
@@ -432,6 +434,7 @@ logic.
   -only-erasable-extensions
   -opaque
   -open
+  -open-cmi
   -output-complete-exe
   -output-complete-obj
   -output-obj

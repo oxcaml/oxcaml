@@ -632,6 +632,7 @@ let ocaml_ignored_flags =
     "-dzero-alloc";
     "-dletreclambda";
     "-dcounters";
+    "-experimental-optimizations";
     "-vectorize";
     "-no-vectorize";
     "-dvectorize";
@@ -814,6 +815,7 @@ let ocaml_ignored_parametrized_flags =
     "-reorder-blocks-random";
     "-heap-reduction-threshold";
     "-flambda2-cse-depth";
+    "-dbranch-relaxation-max-displacement";
     "-flambda2-expert-max-block-size-for-projections";
     "-flambda2-expert-max-unboxing-depth";
     "-flambda2-join-depth";
