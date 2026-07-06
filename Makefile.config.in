@@ -27,37 +27,9 @@ OCAML_VERSION_EXTRA=@OCAML_VERSION_EXTRA@
 ## The EMPTY variable, used in other definitions to preserve spaces
 EMPTY=
 
-## Arguments passed to the configure script
-
-CONFIGURE_ARGS=@CONFIGURE_ARGS@
-
 ## Top build directory
 
 TOP_BUILDDIR = @top_builddir@
-
-## Installation directories
-
-prefix=@prefix@
-
-exec_prefix=@exec_prefix@
-
-### Where to install the binaries
-BINDIR=@bindir@
-
-datarootdir=@datarootdir@
-
-### Where to install the standard library on host
-LIBDIR=@libdir@
-
-### Where to install the stub code for the standard library
-STUBLIBDIR=@libdir@/stublibs
-
-### Where to install the man pages
-# Man pages for commands go in $(MANDIR)/man1
-# Man pages for the library go in $(MANDIR)/man3
-MANDIR=@mandir@
-PROGRAMS_MAN_DIR=$(MANDIR)/man1
-LIBRARIES_MAN_DIR=$(MANDIR)/man3
 
 ### Path to the libtool script
 LIBTOOL = $(TOP_BUILDDIR)/libtool
@@ -271,7 +243,6 @@ RUNTIMEI=$(INSTRUMENTED_RUNTIME)
 
 ## Variables used by oxcaml build
 
-install_prefix = @prefix@
 dune = @dune@
 middle_end = @middle_end@
 coverage = @coverage@

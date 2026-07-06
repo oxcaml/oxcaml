@@ -49,11 +49,7 @@ let effective_toolchain config =
 (* The reproducible ruleset is the simplest: nothing is allowed to contain the
    build path and only Makefile.config may contain the installation prefix or
    use the relative prefix. *)
-let reproducible_rules file =
-  if Filename.basename file = "Makefile.config" then
-    LocationSet.of_list [Relative; Prefix]
-  else
-    LocationSet.empty
+let reproducible_rules = Fun.const LocationSet.empty
 
 (* The ruleset for files in bindir *)
 let bindir_rules config file =
@@ -190,7 +186,7 @@ let libdir_rules config file =
          ~s:contains_assembled_objects) =
       if basename = "Makefile.config" then
         (* Embeds the Standard Library location *)
-        (~stdlib:true, ~ocaml_debug:false, ~c_debug:false, ~s:false)
+        (~stdlib:false, ~ocaml_debug:false, ~c_debug:false, ~s:false)
       else if List.mem ext [".cma"; ".cmo"; ".cmt"; ".cmti"] then
         let stdlib = (* via Config.standard_library *)
           config.has_relative_libdir = None
@@ -293,13 +289,6 @@ let libdir_rules config file =
         LocationSet.singleton Prefix
       else
         LocationSet.empty
-    in
-    let prefix =
-      if config.has_relative_libdir <> None
-         && basename = "Makefile.config" then
-        LocationSet.add Relative prefix
-      else
-        prefix
     in
     if contains_build_path then
       LocationSet.add Build prefix
