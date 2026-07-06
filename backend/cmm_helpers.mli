@@ -1247,13 +1247,6 @@ val with_stack_preemptible :
   arg:expression ->
   expression
 
-val resume :
-  dbg:Debuginfo.t ->
-  cont:expression ->
-  f:expression ->
-  arg:expression ->
-  expression
-
 val continue :
   dbg:Debuginfo.t -> cont:expression -> value:expression -> expression
 

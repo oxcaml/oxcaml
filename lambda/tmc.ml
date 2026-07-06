@@ -908,7 +908,7 @@ let rec choice ctx t =
 
     (* we don't handle effect or DLS primitives *)
     | Pwith_stack | Pwith_stack_preemptible
-    | Pperform | Presume | Pcontinue | Pdiscontinue
+    | Pperform | Pcontinue | Pdiscontinue
     | Pdiscontinue_with_backtrace | Preperform
     | Pdls_get | Ptls_get | Pdomain_index
 

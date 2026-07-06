@@ -599,7 +599,6 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
             Prim (Ccall "caml_array_of_uniform_array", [block]))
         | Punspecializedarray ->
           Misc.fatal_error "Blambda_of_lambda: Pmakearray Punspecializedarray")
-    | Presume -> context_switch Resume ~arity:3
     | Pcontinue -> context_switch Continue ~arity:2
     | Pdiscontinue -> context_switch Discontinue ~arity:2
     | Pdiscontinue_with_backtrace ->

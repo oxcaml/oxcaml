@@ -3358,7 +3358,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | ( ( Pignore | Psequand | Psequor | Pbytes_of_string | Pbytes_to_string
       | Parray_of_iarray | Parray_to_iarray | Pwith_stack
-      | Pwith_stack_preemptible | Pperform | Presume | Pcontinue | Pdiscontinue
+      | Pwith_stack_preemptible | Pperform | Pcontinue | Pdiscontinue
       | Pdiscontinue_with_backtrace | Preperform ),
       _ ) ->
     Misc.fatal_errorf

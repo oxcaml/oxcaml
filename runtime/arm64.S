@@ -379,7 +379,8 @@ G(name):
    including stack_info and stack_handler structures.
    caml_try_realloc_stack will not be able to update the linked list of
    frame-pointers if it has been split (i.e., in a continuation).
-   caml_resume and caml_reperform use this macro to update the oldest saved x29
+   the resume primitives and caml_reperform use this macro to update the oldest
+   saved x29
    (highest one in the stack) in case the fiber was reallocated to reattach the
    frame-pointer linked list.
 
@@ -1313,7 +1314,7 @@ L(preemption_unhandled):
         bl      G(caml_continuation_use_noexc)
         ldp     x29, x30, [sp], 16
         CFI_ADJUST(-16)
-    /* Jump into caml_resume's preemption-resume path, which handles
+    /* Jump into the preemption-resume path (in caml_continue), which handles
        redoing the interrupted allocation, restoring registers, and
        returning to user code. */
         b       L(resume_preemption)
@@ -1338,110 +1339,12 @@ FUNCTION(caml_reperform)
         CFI_ENDPROC
 END_FUNCTION(caml_reperform)
 
-FUNCTION(caml_resume)
-        CFI_STARTPROC
-    /*  x0: continuation
-        x1: fun
-        x2: arg */
-        CFI_OFFSET(29, -16)
-        CFI_OFFSET(30, -8)
-        stp     x29, x30, [sp, -16]!
-        CFI_ADJUST(16)
-        add     x29, sp, #0
-        mov     x22, x2                       /* x22 := arg */
-        ldr     x23, Cont_last_fiber(x0)      /* x23 := last_fiber */
-        mov     x24, x1                       /* x24 := fun */
-    /* Check if this is a preemption continuation (wosize == 3) */
-        WOSIZE_BLOCK_VAL TMP, x0
-        cmp     TMP, #3
-        b.ne    2f
-    /* This is a preemption; load the gc regs to be restored later */
-        ldr     x25, Cont_gc_regs(x0)         /* x25 := gc_regs */
-        b       3f
-    /* This is not a preemption, so set gc_regs = null */
-2:      mov     x25, xzr                       /* x25 := NULL */
-3:      bl      G(caml_continuation_use_noexc) /* x0 := stack */
-        sub     x0, x0, 1 /* x0 (new stack) = Ptr_val(x0) */
-        mov     x2, x22 /* x2 := argument */
-        mov     x1, x24 /* x1 := fun */
-    /* Check if stack null, then already used */
-        cbz     x0, L(continuation_already_resumed)
-        ldr     x4, [x1]  /* code pointer */
-#if defined(WITH_THREAD_SANITIZER)
-    /* Save non-callee-saved registers x0, x1, x2, x3 and x4 */
-        stp     x0, x1, [sp, -16]!
-        CFI_ADJUST(16)
-        stp     x2, x3, [sp, -16]!
-        CFI_ADJUST(16)
-        str     x4, [sp, -16]!
-        CFI_ADJUST(16)
-    /* Necessary to include the caller of caml_resume in the TSan backtrace */
-        TSAN_ENTER_FUNCTION
-        ldr     x4, [sp], 16
-        CFI_ADJUST(-16)
-        ldp     x2, x3, [sp], 16
-        CFI_ADJUST(-16)
-        ldp     x0, x1, [sp], 16
-        CFI_ADJUST(-16)
-        TSAN_SAVE_CALLER_REGS
-    /* Signal to TSan all stack frames exited by the perform. */
-        mov     x2, x0           /* arg 3: fiber */
-        ldr     x1, Stack_sp(x0)
-        ldr     x0, [x1, 8]      /* arg 1: pc of perform */
-        /* This stack address adjustment is required to compensate the
-           saving of x29 and x30 in SWITCH_OCAML_STACKS, which causes
-           Stack_sp() to be 16 bytes lower than expected. */
-        add     x1, x1, 16       /* arg 2: sp at perform */
-        TSAN_C_CALL G(caml_tsan_entry_on_resume)
-        TSAN_RESTORE_CALLER_REGS
-#endif
-    /* Add current stack to the end */
-        sub     x23, x23, 1 /* x23 = Ptr_val(last_fiber) */
-        ldr     x8, Stack_handler(x23)
-        ldr     x9, Caml_state(current_stack)
-        str     x9, Handler_parent(x8)
-    /* Pop our frame before stack switch */
-        ldp     x29, x30, [sp], 16
-        CFI_ADJUST(-16)
-        SWITCH_OCAML_STACKS x9, x0
-        FLUSH_DYNAMIC_CACHE
-    /* Is this a preemption continuation? */
-        cbnz    x25, L(resume_preemption)
-    /* Normal continuation: jump directly to the handler */
-        mov     x0, x2
-        br      x4
-L(resume_preemption): /* x25 -> gc_regs */
-    /* This continuation represents a preemption, meaning we have to restore
-       its gc_regs before resuming */
-        str     x25, Caml_state(gc_regs)
-        str     ALLOC_PTR, Caml_state(young_ptr)
-    /* Before restoring registers, redo whatever allocation was interrupted by
-       preemption. This ensures ALLOC_PTR will point to a valid allocation in
-       the (possibly new) young heap. */
-    /* Push a frame so caml_redo_preempted_allocation sees the expected stack
-       layout, and L(resume_from_preempt) can pop it. */
-        stp     x29, x30, [sp, -16]!
-        CFI_ADJUST(16)
-        add     x29, sp, #0
-        SWITCH_OCAML_TO_C
-        bl      G(caml_redo_preempted_allocation)
-        SWITCH_C_TO_OCAML
-    /* Jump into the second half of caml_call_gc, which will restore the
-       registers and `ret` to resume */
-        b       L(resume_from_preempt)
-L(continuation_already_resumed):
-        ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
-        b       G(caml_c_call)
-        CFI_ENDPROC
-END_FUNCTION(caml_resume)
-
 /* Consume the continuation in x0, make the current stack its parent, and switch
    to it. The payload register x22 is preserved across the switch. On a
-   preemption continuation this branches to L(resume_preemption) (defined in
-   caml_resume above); otherwise it falls through to the caller's tail. After
-   the switch, x30 is the perform-site return address and TRAP_PTR is the
-   resumed stack's handler. Shared by caml_continue / caml_discontinue /
-   caml_discontinue_with_backtrace. */
+   preemption continuation this branches to L(resume_preemption); otherwise it
+   falls through to the caller's tail. After the switch, x30 is the perform-site
+   return address and TRAP_PTR is the resumed stack's handler. Shared by
+   caml_continue / caml_discontinue / caml_discontinue_with_backtrace. */
 .macro DO_RESUME_SWITCH
         CFI_OFFSET(29, -16)
         CFI_OFFSET(30, -8)
@@ -1510,10 +1413,31 @@ FUNCTION(caml_continue)
         x1: value */
         mov     x22, x1                       /* x22 := value */
         DO_RESUME_SWITCH
-    /* Return the value to the perform site (this is what the identity function
-       used by [%resume] does). */
+    /* Return the value to the perform site on the resumed stack. */
         mov     x0, x22
         ret
+L(resume_preemption): /* x25 -> gc_regs */
+    /* This continuation represents a preemption, meaning we have to restore
+       its gc_regs before resuming */
+        str     x25, Caml_state(gc_regs)
+        str     ALLOC_PTR, Caml_state(young_ptr)
+    /* Before restoring registers, redo whatever allocation was interrupted by
+       preemption. This ensures ALLOC_PTR will point to a valid allocation in
+       the (possibly new) young heap. */
+    /* Push a frame so caml_redo_preempted_allocation sees the expected stack
+       layout, and L(resume_from_preempt) can pop it. */
+        stp     x29, x30, [sp, -16]!
+        CFI_ADJUST(16)
+        add     x29, sp, #0
+        SWITCH_OCAML_TO_C
+        bl      G(caml_redo_preempted_allocation)
+        SWITCH_C_TO_OCAML
+    /* Jump into the second half of caml_call_gc, which will restore the
+       registers and `ret` to resume */
+        b       L(resume_from_preempt)
+L(continuation_already_resumed):
+        ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
+        b       G(caml_c_call)
         CFI_ENDPROC
 END_FUNCTION(caml_continue)
 
@@ -1523,8 +1447,7 @@ FUNCTION(caml_discontinue)
         x1: exn */
         mov     x22, x1                       /* x22 := exn */
         DO_RESUME_SWITCH
-    /* Raise the exception within the resumed computation (this is what the
-       [fun e -> raise e] function used by [%resume] does). */
+    /* Raise the exception within the resumed computation. */
         mov     x0, x22
         b       G(caml_raise_exn)
         CFI_ENDPROC
@@ -1552,9 +1475,8 @@ FUNCTION(caml_discontinue_with_backtrace)
         mov     x0, x24                       /* restore continuation */
         mov     x30, x19                      /* restore return address */
         DO_RESUME_SWITCH
-    /* Reraise within the resumed computation (this is what the
-       [fun e -> Printexc.raise_with_backtrace e bt] function used by [%resume]
-       does). caml_reraise_exn preserves the just-restored backtrace. */
+    /* Reraise the exception within the resumed computation.
+       caml_reraise_exn preserves the just-restored backtrace. */
         mov     x0, x22
         b       G(caml_reraise_exn)
         CFI_ENDPROC

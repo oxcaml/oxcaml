@@ -108,8 +108,6 @@ let instruction ppf = function
   | Kgetpubmet n -> fprintf ppf "\tgetpubmet %i" n
   | Kgetdynmet -> fprintf ppf "\tgetdynmet"
   | Kperform -> fprintf ppf "\tperform"
-  | Kresume -> fprintf ppf "\tresume"
-  | Kresumeterm n -> fprintf ppf "\tresumeterm %i" n
   | Kcontinue -> fprintf ppf "\tcontinue"
   | Kcontinueterm n -> fprintf ppf "\tcontinueterm %i" n
   | Kdiscontinue -> fprintf ppf "\tdiscontinue"

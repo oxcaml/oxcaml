@@ -491,8 +491,6 @@ let traverse_apply denv acc apply : rev_expr =
       List.iter
         (Acc.add_cond_any_usage acc ~denv)
         [valuec; exnc; effc; handle_tick; f; arg]
-    | Effect (Resume { cont; f; arg }) ->
-      List.iter (Acc.add_cond_any_usage acc ~denv) [cont; f; arg]
     | Effect (Continue { cont; value }) ->
       List.iter (Acc.add_cond_any_usage acc ~denv) [cont; value]
     | Effect (Discontinue { cont; exn }) ->

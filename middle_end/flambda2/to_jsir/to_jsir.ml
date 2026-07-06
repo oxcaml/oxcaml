@@ -397,11 +397,6 @@ and apply_expr ~env ~res e =
           ( "%with_stack_preemptible",
             [Pv valuec; Pv exnc; Pv effc; Pv handle_tick; Pv f; Pv arg; unit],
             res )
-        | Resume { cont; f; arg } ->
-          let cont, res = To_jsir_shared.simple ~env ~res cont in
-          let f, res = To_jsir_shared.simple ~env ~res f in
-          let arg, res = To_jsir_shared.simple ~env ~res arg in
-          "%resume", [Pv cont; Pv f; Pv arg], res
         | Continue { cont; value } ->
           let cont, res = To_jsir_shared.simple ~env ~res cont in
           let value, res = To_jsir_shared.simple ~env ~res value in

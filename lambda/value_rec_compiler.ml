@@ -397,7 +397,6 @@ let compute_static_size lam =
     | Pwith_stack
     | Pwith_stack_preemptible
     | Pperform
-    | Presume
     | Pcontinue
     | Pdiscontinue
     | Pdiscontinue_with_backtrace

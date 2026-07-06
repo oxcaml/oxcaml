@@ -515,19 +515,6 @@ and comp_expr stack_info env exp sz cont =
     *)
     comp_args stack_info env args sz
       (Kmake_faux_mixedblock (total_len, tag) :: cont)
-  | Context_switch (Resume, args) ->
-    let nargs = List.length args - 1 in
-    assert (nargs = 2);
-    if is_tailcall cont
-    then (
-      (* Resumeterm itself only pushes 2 words, but perform adds another *)
-      check_stack stack_info 3;
-      comp_args stack_info env args sz
-        (Kresumeterm (sz + nargs) :: discard_dead_code cont))
-    else (
-      (* Resume itself only pushes 2 words, but perform adds another *)
-      check_stack stack_info (sz + nargs + 3);
-      comp_args stack_info env args sz (Kresume :: cont))
   | Context_switch (Continue, args) ->
     let nargs = List.length args - 1 in
     assert (nargs = 1);

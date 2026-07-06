@@ -1339,22 +1339,6 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
 
 /* Context switching */
 
-    Instruct(RESUME):
-      resume_action = Resume_call_fn;
-      resume_fn = sp[0];
-      resume_arg = sp[1];
-      resume_tail = Ptr_val(Field(accu, 1));
-      Setup_for_c_call;
-      accu = caml_continuation_use_noexc(accu);
-      Restore_after_c_call;
-      sp -= 2;
-      sp[0] = Val_long(domain_state->trap_sp_off);
-      sp[1] = Val_long(0);
-      sp[2] = (value)pc;
-      sp[3] = env;
-      sp[4] = Val_long(extra_args);
-      goto do_resume;
-
 do_resume: {
       struct stack_info* stk = Ptr_val(accu);
       if (stk == NULL) {
@@ -1406,20 +1390,6 @@ do_resume: {
         caml_fatal_error("do_resume: invalid resume_action");
       }
     }
-
-    Instruct(RESUMETERM):
-      resume_action = Resume_call_fn;
-      resume_fn = sp[0];
-      resume_arg = sp[1];
-      resume_tail = Ptr_val(Field(accu, 1));
-      Setup_for_c_call;
-      accu = caml_continuation_use_noexc(accu);
-      Restore_after_c_call;
-      sp = sp + *pc - 2;
-      sp[0] = Val_long(domain_state->trap_sp_off);
-      sp[1] = Val_long(extra_args);
-      goto do_resume;
-
     Instruct(CONTINUE):
       /* accu = continuation, sp[0] = value */
       resume_action = Resume_return;

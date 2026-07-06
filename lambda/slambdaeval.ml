@@ -465,7 +465,7 @@ and eval_prim env prim =
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
   | Psetfloatfield _ | Psetufloatfield _ | Pufloatfield _ | Pduprecord _
   | Parray_element_size_in_bytes _ | Pmake_idx_field _ | Pwith_stack
-  | Pwith_stack_preemptible | Pperform | Presume | Pcontinue | Pdiscontinue
+  | Pwith_stack_preemptible | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace | Preperform | Pccall _ | Praise _ | Psequand
   | Psequor | Pnot | Pphys_equal _ | Pscalar _ | Poffsetref _ | Pstringlength
   | Pstringrefu | Pstringrefs | Pbyteslength | Pbytesrefu | Pbytessetu

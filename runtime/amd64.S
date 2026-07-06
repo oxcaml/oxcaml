@@ -381,7 +381,8 @@ X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(28) X(
    including stack_info and stack_handler structures.
    caml_try_realloc_stack will not be able to update the linked list of
    frame-pointers if it has been split (ie, in a continuation).
-   caml_resume and caml_reperform use this macro to update the oldest saved rbp
+   the resume primitives and caml_reperform use this macro to update the oldest
+   saved rbp
    (highest one in the stack) in case the fiber was reallocated to reattach the
    frame-pointer linked list.
 
@@ -1431,9 +1432,9 @@ LBL(preemption_unhandled):
         SWITCH_OCAML_TO_C
         C_call (GCALL(caml_continuation_use_noexc)) /* %rax := stack */
         SWITCH_C_TO_OCAML
-    /* jump into the end of caml_resume, which will handle redoing the
-       interrupted allocation, restoring registers, and returning to user
-       code */
+    /* jump into the preemption-resume path (in caml_continue), which will
+       handle redoing the interrupted allocation, restoring registers, and
+       returning to user code */
         movq   Cont_gc_regs(%rbx), %rdx
         jmp    LBL(resume_preemption)
 LBL(113):
@@ -1506,96 +1507,6 @@ CFI_STARTPROC
 CFI_ENDPROC
 END_FUNCTION(caml_preempt)
 
-FUNCTION(caml_resume)
-CFI_STARTPROC
-    /* %rax -> continuation, %rbx -> fun, %rdi -> arg */
-        movq   %rdi, %r12                    /* %r12 := arg */
-        movq   Cont_last_fiber(%rax),  %r13  /* %r13 := last_fiber */
-        WOSIZE_BLOCK_VAL(%rax, %rcx)
-        cmpq   $3, %rcx                      /* Wosize_hd(%rax) == 3 ? */
-        je     1f
-        pushq  $0                            /* no gc_regs, push NULL */
-        jmp    2f
-1:      pushq  Cont_gc_regs(%rax)            /* we have a gc_regs, push it */
-        CFI_ADJUST(8)                        /* for either push */
-2:      movq   %rax, C_ARG_1
-        SWITCH_OCAML_TO_C
-        C_call (GCALL(caml_continuation_use_noexc)) /* %rax := stack */
-        SWITCH_C_TO_OCAML
-        leaq    -1(%rax), %r10  /* %r10 (new stack) = Ptr_val(%rax) */
-        movq    %r12, %rax      /* %rax := argument to the function in %rbx */
-    /*  check if stack null, then already used */
-        testq   %r10, %r10
-        jz      LBL(continuation_already_resumed)
-#if defined(WITH_THREAD_SANITIZER)
-    /* Save non-callee-saved registers %rax, %rsi and %r10 before C call */
-        ENTER_FUNCTION
-        pushq   %rax; CFI_ADJUST(8);
-        pushq   %rsi; CFI_ADJUST(8);
-        pushq   %r10; CFI_ADJUST(8);
-    /* Necessary to include the caller of caml_resume in the TSan backtrace */
-        TSAN_ENTER_FUNCTION(24)
-        popq    %r10; CFI_ADJUST(-8);
-        popq    %rsi; CFI_ADJUST(-8);
-        popq    %rax; CFI_ADJUST(-8);
-        TSAN_SAVE_CALLER_REGS
-    /* Signal to TSan all stack frames exited by the perform. */
-        movq    Stack_sp(%r10), %r11
-        movq    STACK_RETADDR(%r11), C_ARG_1  /* arg 1: pc of perform */
-        leaq    STACK_ARG_1(%r11), C_ARG_2    /* arg 2: sp at perform */
-        movq    %r10, C_ARG_3                 /* arg 3: fiber */
-        SWITCH_OCAML_TO_C
-        C_call  (GCALL(caml_tsan_entry_on_resume))
-        SWITCH_C_TO_OCAML
-        TSAN_RESTORE_CALLER_REGS
-        LEAVE_FUNCTION
-#endif
-    /* Record fiber id */
-        cmpb    $0, G(caml_cpu_ptwrite)(%rip)
-        je      1f
-        ptwriteq Stack_id(%r10)
-    /* Add current stack to the last fiber */
-1:      popq    %rdx; CFI_ADJUST(-8)
-        movq    (Stack_handler-1)(%r13), %rdi
-        movq    Caml_state(current_stack), %rsi
-        movq    %rsi, Handler_parent(%rdi)
-     /* Need to update the oldest saved frame pointer here as the current fiber
-        stack may have been reallocated or we may be resuming a computation
-        that was not originally run here. */
-        UPDATE_BASE_POINTER(%rdi)
-        SWITCH_OCAML_STACKS
-        FLUSH_DYNAMIC_CACHE(%r13)
-        testq   %rdx, %rdx /* Do we have a gc_regs? */
-        jnz     LBL(resume_preemption)
-LBL(caml_resume_enter):
-        jmpq    *(%rbx)    /* no, just jump into the continuation */
-LBL(resume_preemption): /* %rdx -> gc_regs */
-        /* This continuation represents a preemption, meaning we have to restore
-           its gc_regs before resuming */
-        movq    %rdx, Caml_state(gc_regs)  /* Save gc_regs */
-        movq    %r15, Caml_state(young_ptr)
-        /* Before restoring registers, redo whatever allocation was interrupted
-           by preemption. This ensures r15 will point to a valid allocation in
-           the (possibly new) young heap. */
-        ENTER_FUNCTION /* Push frame pointer so that
-                          caml_redo_preempted_allocation sees the expected stack
-                          layout, and restore_regs_and_ret can pop it. */
-        SWITCH_OCAML_TO_C
-        C_call  (GCALL(caml_redo_preempted_allocation))
-        SWITCH_C_TO_OCAML
-        /* Jump into the second half of caml_do_call_gc, which will restore the
-           registers and `ret` to resume */
-LBL(caml_resume_preempted):
-        jmp     LBL(restore_regs_and_ret)
-LBL(continuation_already_resumed):
-        ENTER_FUNCTION
-        TSAN_ENTER_FUNCTION(0) /* Necessary to include the caller of caml_resume
-                                  in the TSan backtrace */
-        LEA_VAR(caml_raise_continuation_already_resumed, %rax)
-        jmp LBL(caml_c_call)
-CFI_ENDPROC
-END_FUNCTION(caml_resume)
-
 /* The TSan instrumentation shared by the resume primitives */
 #if defined(WITH_THREAD_SANITIZER)
 #define RESUME_SWITCH_TSAN \
@@ -1627,9 +1538,9 @@ END_FUNCTION(caml_resume)
 /* Consume the continuation in %rax, make the current stack its parent, and
    switch to it. The payload register %rbx (and, for the backtrace variant,
    the restored backtrace) is preserved across the switch. On a preemption
-   continuation this jumps to LBL(resume_preemption) (defined in caml_resume
-   above); otherwise it falls through to the caller's tail. Shared by
-   caml_continue / caml_discontinue / caml_discontinue_with_backtrace. */
+   continuation this jumps to LBL(resume_preemption); otherwise it falls
+   through to the caller's tail. Shared by caml_continue / caml_discontinue /
+   caml_discontinue_with_backtrace. */
 #define DO_RESUME_SWITCH \
         movq   Cont_last_fiber(%rax),  %r13 ; /* %r13 := last_fiber */ \
         WOSIZE_BLOCK_VAL(%rax, %rcx) ; \
@@ -1670,10 +1581,34 @@ FUNCTION(caml_continue)
 CFI_STARTPROC
     /* %rax -> continuation, %rbx -> value */
         DO_RESUME_SWITCH
-    /* Return the value to the perform site on the resumed stack (this is what
-       the identity function used by [%resume] does). */
+LBL(caml_continue_enter):
+    /* Return the value to the perform site on the resumed stack. */
         movq    %rbx, %rax
         ret
+LBL(resume_preemption): /* %rdx -> gc_regs */
+        /* This continuation represents a preemption, meaning we have to restore
+           its gc_regs before resuming */
+        movq    %rdx, Caml_state(gc_regs)  /* Save gc_regs */
+        movq    %r15, Caml_state(young_ptr)
+        /* Before restoring registers, redo whatever allocation was interrupted
+           by preemption. This ensures r15 will point to a valid allocation in
+           the (possibly new) young heap. */
+        ENTER_FUNCTION /* Push frame pointer so that
+                          caml_redo_preempted_allocation sees the expected stack
+                          layout, and restore_regs_and_ret can pop it. */
+        SWITCH_OCAML_TO_C
+        C_call  (GCALL(caml_redo_preempted_allocation))
+        SWITCH_C_TO_OCAML
+        /* Jump into the second half of caml_do_call_gc, which will restore the
+           registers and `ret` to resume */
+LBL(caml_continue_preempted):
+        jmp     LBL(restore_regs_and_ret)
+LBL(continuation_already_resumed):
+        ENTER_FUNCTION
+        TSAN_ENTER_FUNCTION(0) /* Necessary to include the caller in the TSan
+                                  backtrace */
+        LEA_VAR(caml_raise_continuation_already_resumed, %rax)
+        jmp LBL(caml_c_call)
 CFI_ENDPROC
 END_FUNCTION(caml_continue)
 
@@ -1681,6 +1616,7 @@ FUNCTION(caml_discontinue)
 CFI_STARTPROC
     /* %rax -> continuation, %rbx -> exn */
         DO_RESUME_SWITCH
+LBL(caml_discontinue_enter):
     /* Raise the exception within the resumed computation. */
         movq    %rbx, %rax
         jmp     G(caml_raise_exn)
@@ -1702,6 +1638,7 @@ CFI_STARTPROC
         SWITCH_C_TO_OCAML
         movq    %r12, %rax                    /* restore continuation */
         DO_RESUME_SWITCH
+LBL(caml_discontinue_with_backtrace_enter):
     /* Reraise the exception within the resumed computation. */
         movq    %rbx, %rax
         jmp     G(caml_reraise_exn)
@@ -1924,8 +1861,10 @@ LBL(ocaml_eff_desc):
         .quad   LBL(caml_runstack_exit) - G(caml_runstack)
         .quad   LBL(caml_runstack_exn) - G(caml_runstack)
         .quad   LBL(caml_perform_enter) - G(caml_perform)
-        .quad   LBL(caml_resume_enter) - G(caml_resume)
-        .quad   LBL(caml_resume_preempted) - G(caml_resume)
+        .quad   LBL(caml_continue_enter) - G(caml_continue)
+        .quad   LBL(caml_continue_preempted) - G(caml_continue)
+        .quad   LBL(caml_discontinue_enter) - G(caml_discontinue)
+        .quad   LBL(caml_discontinue_with_backtrace_enter) - G(caml_discontinue_with_backtrace)
         .quad   0
 LBL(ocaml_eff_desc_end):
         .balign 4

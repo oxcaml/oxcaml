@@ -68,11 +68,6 @@ module Effect : sig
           f : Simple.t;
           arg : Simple.t
         }
-    | Resume of
-        { cont : Simple.t;
-          f : Simple.t;
-          arg : Simple.t
-        }
     | Continue of
         { cont : Simple.t;
           value : Simple.t
@@ -109,8 +104,6 @@ module Effect : sig
     f:Simple.t ->
     arg:Simple.t ->
     t
-
-  val resume : cont:Simple.t -> f:Simple.t -> arg:Simple.t -> t
 
   val continue : cont:Simple.t -> value:Simple.t -> t
 

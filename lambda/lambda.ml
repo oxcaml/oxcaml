@@ -192,7 +192,6 @@ type primitive =
   | Pwith_stack
   | Pwith_stack_preemptible
   | Pperform
-  | Presume
   | Pcontinue
   | Pdiscontinue
   | Pdiscontinue_with_backtrace
@@ -2572,7 +2571,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
     (* Aborts in bytecode, unboxed in native code *)
     None
   | Pwith_stack | Pwith_stack_preemptible
-  | Presume | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
+  | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
   | Pperform | Preperform
     (* CR mshinwell: check *)
   | Ppoll ->
@@ -2774,7 +2773,7 @@ let primitive_can_raise prim =
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
   | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
   | Pwith_stack | Pwith_stack_preemptible
-  | Pperform | Presume | Pcontinue | Pdiscontinue
+  | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace
   | Preperform -> true (* XXX! *)
   | Pdls_get | Ptls_get | Pdomain_index | Ppoll | Pcpu_relax
@@ -3215,7 +3214,7 @@ let primitive_result_layout (p : primitive) =
   | (Parray_to_iarray | Parray_of_iarray) -> layout_any_value
   | Pget_header _ -> layout_boxed_int Boxed_nativeint
   | Pwith_stack | Pwith_stack_preemptible
-  | Presume | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
+  | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
   | Pperform | Preperform ->
     layout_any_value
   | Patomic_load_field { immediate_or_pointer = Immediate } ->

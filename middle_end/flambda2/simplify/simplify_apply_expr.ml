@@ -1388,9 +1388,6 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
         ~exnc:(simplify_simple exnc) ~effc:(simplify_simple effc)
         ~handle_tick:(simplify_simple handle_tick)
         ~f:(simplify_simple f) ~arg:(simplify_simple arg)
-    | Resume { cont; f; arg } ->
-      E.resume ~cont:(simplify_simple cont) ~f:(simplify_simple f)
-        ~arg:(simplify_simple arg)
     | Continue { cont; value } ->
       E.continue ~cont:(simplify_simple cont) ~value:(simplify_simple value)
     | Discontinue { cont; exn } ->

@@ -214,7 +214,6 @@ let rec blambda ppf = function
       | Reperform -> "reperform"
       | With_stack -> "with_stack"
       | With_stack_preemptible -> "with_stack_preemptible"
-      | Resume -> "resume"
       | Continue -> "continue"
       | Discontinue -> "discontinue"
       | Discontinue_with_backtrace -> "discontinue_with_backtrace"

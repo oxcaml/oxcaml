@@ -483,18 +483,6 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         env,
         res,
         Ece.all )
-    | Resume { cont; f; arg } ->
-      let { env; res; expr = { cmm = cont; free_vars = fv0; effs = _ } } =
-        simple env res cont
-      in
-      let { env; res; expr = { cmm = f; free_vars = fv1; effs = _ } } =
-        simple env res f
-      in
-      let { env; res; expr = { cmm = arg; free_vars = fv2; effs = _ } } =
-        simple env res arg
-      in
-      let free_vars = BV.Set.union (BV.Set.union fv0 fv1) fv2 in
-      C.resume ~dbg ~cont ~f ~arg, free_vars, env, res, Ece.all
     | Continue { cont; value } ->
       let { env; res; expr = { cmm = cont; free_vars = fv0; effs = _ } } =
         simple env res cont

@@ -338,8 +338,6 @@ let emit_instr = function
   | Kgetdynmet -> out opGETDYNMET
   | Kevent ev -> record_event ev
   | Kperform -> out opPERFORM
-  | Kresume -> out opRESUME
-  | Kresumeterm n -> out opRESUMETERM; out_int n
   | Kcontinue -> out opCONTINUE
   | Kcontinueterm n -> out opCONTINUETERM; out_int n
   | Kdiscontinue -> out opDISCONTINUE

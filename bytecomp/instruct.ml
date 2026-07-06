@@ -128,8 +128,6 @@ type instruction =
   | Kgetdynmet
   | Kevent of debug_event
   | Kperform
-  | Kresume
-  | Kresumeterm of int
   | Kcontinue
   | Kcontinueterm of int
   | Kdiscontinue
