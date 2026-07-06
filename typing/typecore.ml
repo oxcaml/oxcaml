@@ -7219,18 +7219,22 @@ and type_expect_
       in
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = Alloc.proj_comonadic Areality mode_ret in
-      let mode_ret_uncrossed = alloc_as_value mode_ret in
-      let mode_ret_crossed = cross_left env ty_ret mode_ret_uncrossed in
-      let mode_ret =
+      let crossing = crossing_of_ty env ty_ret in
+      let crossing =
         match pm.region_mode with
-        | None -> mode_ret_crossed
+        | None -> crossing
         | Some _ ->
-          Value.join
-            [ mode_ret_crossed;
-              Value.min_with_comonadic Areality
-                (Value.proj_comonadic Areality mode_ret_uncrossed)
-            ]
+          (* The application is in tail position, so if it returns local, it
+             allocates in the caller's region, and this info must be preserved
+             even if [ty_ret] crosses locality: forwarding the region to the
+             callee requires an explicit [exclave_]. Hence, we prevent mode
+             crossing on the areality axis. *)
+          Crossing.set
+            (Crossing.Axis.Comonadic Areality)
+            (Crossing.Per_axis.max (Crossing.Axis.Comonadic Areality))
+            crossing
       in
+      let mode_ret = Crossing.apply_left crossing (alloc_as_value mode_ret) in
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
           ~on_application:true
