@@ -482,7 +482,7 @@ let apply_type_function params args body =
                     Tsubst (ty, None) -> ty
                     (* TODO: is this case possible?
                        possibly an interaction with (copy more) below? *)
-                  | Tconstr _ | Tnil ->
+                  | Tconstr _ | Tnil | Tof_kind _ ->
                       copy more
                   | Tvar _ | Tunivar _ ->
                       newgenty mored
