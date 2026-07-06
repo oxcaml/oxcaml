@@ -697,7 +697,10 @@ let print_one bind instr =
   let fun_ =
     let z = if instr.flags.z then "~z" else "" in
     let b =
-      match instr.flags.r with Rnd_er -> "~rnd" | Rnd_sae -> "~sae" | _ -> ""
+      match instr.flags.r with
+      | Rnd_er -> "~rnd"
+      | Rnd_sae -> "~sae:()"
+      | _ -> ""
     in
     (List.filter (fun s -> String.length s > 0)) [bind; b; z]
     |> String.concat " "

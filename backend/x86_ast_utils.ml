@@ -113,12 +113,6 @@ let is_regf = function
   | Mem _ | Mem64_RIP _ ->
     false
 
-let is_regmask = function
-  | Regmask _ -> true
-  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
-  | Mem _ | Mem64_RIP _ ->
-    false
-
 let equal_args arg1 arg2 =
   match arg1, arg2 with
   | Imm i1, Imm i2 -> Int64.equal i1 i2
