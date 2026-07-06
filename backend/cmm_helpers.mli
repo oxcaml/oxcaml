@@ -1588,7 +1588,9 @@ module Scalar_type : sig
       is unspecified (although it's generally zero).
 
       Casting floats to/from unsigned register-width integers is not implemented
-      and will raise in the compiler. *)
+      and will raise in the compiler.
+
+      CR jrayman *)
   type 'a static_cast :=
     dbg:Debuginfo.t -> src:'a -> dst:'a -> expression -> expression
 
@@ -1615,35 +1617,12 @@ module Scalar_type : sig
     val static_cast : t static_cast
   end
 
-  module Signedness : sig
-    type t =
-      | Signed
-      | Unsigned
-
-    val equal : t -> t -> bool
-
-    val print : Format.formatter -> t -> unit
-  end
-
   module type Integral_ops := sig
     type t
 
     val print : Format.formatter -> t -> unit
 
     val equal : t -> t -> bool
-
-    val signedness : t -> Signedness.t
-
-    val with_signedness : t -> signedness:Signedness.t -> t
-
-    val signed : t -> t
-
-    val unsigned : t -> t
-
-    (** This function relates to the set of possible values that each type can
-        represent. Even if it returns [true], it does not necessarily mean that
-        casting from [src] to [dst] is a no-op. *)
-    val can_cast_without_losing_information : src:t -> dst:t -> bool
 
     val static_cast : t static_cast
 
@@ -1658,37 +1637,17 @@ module Scalar_type : sig
 
     val nativeint : t
 
-    val create_exn : bit_width:int -> signedness:Signedness.t -> t
+    val create : width:int_width -> t
 
     val bit_width : t -> int
 
     include Integral_ops with type t := t
   end
 
-  (** An {!Integer.t} but with the additional stipulation that its lowest bit is
-      always set to 1 and is not considered in mathematical operations on the
-      numbers. *)
-  module Tagged_integer : sig
-    type t [@@immediate]
-
-    val immediate : t
-
-    val create_exn :
-      bit_width_including_tag_bit:int -> signedness:Signedness.t -> t
-
-    val bit_width_excluding_tag_bit : t -> int
-
-    val bit_width_including_tag_bit : t -> int
-
-    val untagged : t -> Integer.t
-
-    include Integral_ops with type t := t
-  end
-
   module Integral : sig
     type t =
-      | Untagged of Integer.t
-      | Tagged of Tagged_integer.t
+      | Naked_int of Integer.t
+      | Tagged_int
 
     val nativeint : t
 
@@ -1710,16 +1669,4 @@ module Scalar_type : sig
   val static_cast : t static_cast
 
   val conjugate : t conjugate
-
-  module Untagged : sig
-    type numeric = t
-
-    type t =
-      | Untagged of Integer.t
-      | Float of float_width
-
-    val to_numeric : t -> numeric
-
-    val static_cast : t static_cast
-  end
 end
