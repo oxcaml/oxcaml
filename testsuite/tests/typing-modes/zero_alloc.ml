@@ -1665,6 +1665,66 @@ Line 1, characters 32-51:
 Error: This value is "alloc" but is expected to be "noalloc_strict".
 |}]
 
+(** Test 5.10:
+
+    CR shsong: a curried multi-argument function cannot be [noalloc]/
+    [noalloc_strict].
+
+    Writing [let f x y = x] desugars to [fun x -> (fun y -> x)]. Applying [f] to
+    one argument builds the inner closure [fun y -> x], preventing [f] from
+    begin [noalloc]/[noalloc_strict]. *)
+
+let (f @ noalloc_strict) x y = x
+[%%expect{|
+Line 10, characters 27-32:
+10 | let (f @ noalloc_strict) x y = x
+                                ^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 10, characters 25-32
+         which is expected to be "noalloc_strict".
+|}]
+
+let (f_explicit @ noalloc_strict) x = fun y -> x
+[%%expect{|
+Line 1, characters 38-48:
+1 | let (f_explicit @ noalloc_strict) x = fun y -> x
+                                          ^^^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 34-48
+         which is expected to be "noalloc_strict".
+|}]
+
+let (f_n @ noalloc) x y = x
+[%%expect{|
+Line 1, characters 22-27:
+1 | let (f_n @ noalloc) x y = x
+                          ^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 1, characters 20-27
+         which is expected to be "noalloc".
+|}]
+
+(* Contrast: a single-argument function builds no inner closure and so is
+   accepted at [noalloc_strict]. *)
+let (g @ noalloc_strict) x = x
+[%%expect{|
+val g : 'a -> 'a = <fun>
+|}]
+
+let (f_exclave @ noalloc_strict) x = exclave_ (fun y -> x)
+[%%expect{|
+Line 1, characters 46-58:
+1 | let (f_exclave @ noalloc_strict) x = exclave_ (fun y -> x)
+                                                  ^^^^^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 33-58
+         which is expected to be "noalloc_strict".
+|}]
+
 (** Test 6: Misc *)
 
 type record_t = { x : float; y : float }
