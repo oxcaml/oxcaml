@@ -90,18 +90,28 @@ let () =
    adopts it and becomes responsible for sweeping and freeing it. *)
 
 let orphan_test () =
+  (* The blocks are published through an atomic rather than returned
+     from the domain: a domain's result is rooted (via its termination
+     sync value) until teardown completes, and teardown can be delayed
+     arbitrarily while [gc_until] keeps interrupting it with STW
+     sections, which would keep the extent alive. *)
+  let shared = Atomic.make None in
+  Domain.join
+    (Domain.spawn (fun () ->
+         let b = make_extent [| 4; 4; 4; 4 |] in
+         (* Heap-allocated strings reachable only through the extent;
+            they must survive orphaning and adoption. *)
+         Array.iteri
+           (fun i blk ->
+             Obj.set_field blk 0 (Obj.repr (string_of_int (100 + i))))
+           b;
+         Atomic.set shared (Some b)));
   let blocks =
-    Domain.join
-      (Domain.spawn (fun () ->
-           let b = make_extent [| 4; 4; 4; 4 |] in
-           (* Heap-allocated strings reachable only through the extent;
-              they must survive orphaning and adoption. *)
-           Array.iteri
-             (fun i blk ->
-               Obj.set_field blk 0 (Obj.repr (string_of_int (100 + i))))
-             b;
-           b))
+    match Atomic.get shared with
+    | Some b -> b
+    | None -> assert false
   in
+  Atomic.set shared None;
   Gc.full_major ();
   Gc.full_major ();
   check "orphaned extent not freed while blocks live" (freed_count () = 1);
