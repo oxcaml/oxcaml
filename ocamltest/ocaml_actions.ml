@@ -1034,19 +1034,9 @@ let run_scalar_codegen log env =
     in
     drain ();
     close_in ic;
-    match
-      List.fold_left
-        (fun acc ((_, (loc : Location.t)) as c) ->
-          match acc with
-          | Some (_, (best : Location.t)) when
-              best.loc_start.pos_cnum <= loc.loc_start.pos_cnum
-            -> acc
-          | _ -> Some c)
-        None
-        (Lexer.comments ())
-    with
-    | Some (s, _) -> s
-    | None -> ""
+    match Lexer.comments () with
+    | (s, _loc) :: _ -> s
+    | [] -> failwith "expected TEST stanza"
   in
   let sorted_ops =
     List.sort
