@@ -1418,9 +1418,10 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Specific _ | Alloc _
       | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_float32 _
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-      | Const_vec512 _ | Stackoffset _ | Int128op _ | Intop_atomic _ | Floatop _
-      | Csel _ | Probe_is_enabled _ | Opaque | Begin_region | End_region | Pause
-      | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll ->
+      | Const_vec512 _ | Const_mask _ | Stackoffset _ | Int128op _
+      | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
+      | Begin_region | End_region | Pause | Name_for_debugger _ | Dls_get
+      | Tls_get | Domain_index | Poll ->
         assert false
     in
     assert (arg_count = 0 && res_count = 1);
@@ -1473,10 +1474,10 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Move | Load _ | Store _ | Intop _ | Specific _ | Alloc _
       | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
       | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Int128op _
-      | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
-      | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
-      | Domain_index | Poll | Pause ->
+      | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _
+      | Int128op _ | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _
+      | Opaque | Begin_region | End_region | Name_for_debugger _ | Dls_get
+      | Tls_get | Domain_index | Poll | Pause ->
         assert false
     in
     let consts = List.map extract_intop_imm_int cfg_ops in
@@ -1509,17 +1510,17 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
             | Iindexed2scaled (scale, displ) -> Some scale, Some displ
             | Ibased _ -> None, None)
           | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _
-          | Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence
-          | Imfence | Ipackf32 | Isimd _ | Isimd_mem _ | Iprefetch _
+          | Isextend32 | Izextend32 | Ikmovq | Irdtsc | Irdpmc | Ilfence
+          | Isfence | Imfence | Ipackf32 | Isimd _ | Isimd_mem _ | Iprefetch _
           | Icldemote _ | Illvm_intrinsic _ ->
             assert false)
         | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Alloc _
         | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
         | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-        | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Int128op _
-        | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
-        | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
-        | Domain_index | Poll | Pause ->
+        | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _
+        | Int128op _ | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _
+        | Opaque | Begin_region | End_region | Name_for_debugger _ | Dls_get
+        | Tls_get | Domain_index | Poll | Pause ->
           assert false
       in
       let get_scale op =
@@ -1634,6 +1635,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | W32 -> None (* See previous comment *)
       | W16 -> None
       | W8 -> None)
+    | Ikmovq -> None
     | Istore_int (_n, addressing_mode, is_assignment) -> (
       if not (Vectorize_utils.Width_in_bits.equal width_type W64)
       then None
@@ -1645,14 +1647,15 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
               ( Ifloatarithmem _ | Ioffset_loc _ | Iprefetch _ | Icldemote _
               | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
               | Isimd _ | Isimd_mem _ | Ilea _ | Ibswap _ | Isextend32
-              | Izextend32 | Illvm_intrinsic _ )
+              | Izextend32 | Ikmovq | Illvm_intrinsic _ )
           | Intop_imm _ | Move | Load _ | Store _ | Intop _ | Int128op _
           | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
           | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-          | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-          | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
-          | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
-          | Domain_index | Poll | Pause ->
+          | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
+          | Stackoffset _ | Intop_atomic _ | Floatop _ | Csel _
+          | Probe_is_enabled _ | Opaque | Begin_region | End_region
+          | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll
+          | Pause ->
             assert false
         in
         let consts = List.map extract_store_int_imm cfg_ops in
@@ -1755,7 +1758,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         intr)
   | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
   | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-  | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Int128op _
+  | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _ | Int128op _
   | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Pause
   | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
   | Domain_index | Poll ->

@@ -240,6 +240,8 @@ let reinterpret_cast : Cmm.reinterpret_cast -> string = function
   | Int64_of_float -> "float as int64"
   | Float32_of_int32 -> "int32 as float32"
   | Int32_of_float32 -> "float32 as int32"
+  | Mask_of_int64 -> "int64 as mask"
+  | Int64_of_mask -> "mask as int64"
 
 let static_cast : Cmm.static_cast -> string = function
   | Int_of_float Float64 -> "float->int"

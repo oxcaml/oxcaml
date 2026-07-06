@@ -94,6 +94,7 @@ type specific_operation =
                                           extension *)
   | Izextend32                         (* 32 to 64 bit conversion with zero
                                           extension *)
+  | Ikmovq                             (* move between an AVX512 mask and GPR *)
   | Irdtsc                             (* read timestamp *)
   | Irdpmc                             (* read performance counter *)
   | Ilfence                            (* load fence *)

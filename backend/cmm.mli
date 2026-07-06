@@ -322,6 +322,8 @@ type reinterpret_cast =
   | Int64_of_float
   | Float32_of_int32
   | Int32_of_float32
+  | Mask_of_int64
+  | Int64_of_mask
   (* When reinterpreting a smaller vector as a larger vector, the upper bits are
      unspecified. *)
   | V128_of_vec of vector_width

@@ -551,7 +551,7 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
         | Tls_get | Domain_index | Poll | Pause | Const_int _ | Const_float32 _
         | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-        | Const_vec512 _ | Load _
+        | Const_vec512 _ | Const_mask _ | Load _
         | Store (_, _, _)
         | Intop _ | Int128op _
         | Intop_imm (_, _)

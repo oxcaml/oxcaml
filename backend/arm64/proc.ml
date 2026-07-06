@@ -271,20 +271,20 @@ let destroy_neon_reg (reg : Regs.Phys_reg.t) =
 
 let destroy_neon_reg7 = destroy_neon_reg D7
 
-let destroyed_at_raise = all_phys_regs
+let destroyed_at_raise () = all_phys_regs
 
-let destroyed_at_reloadretaddr = [| |]
+let destroyed_at_reloadretaddr () = [| |]
 
-let destroyed_at_pushtrap = [| |]
+let destroyed_at_pushtrap () = [| |]
 
 let destroyed_at_alloc_or_poll = [| reg_x8 |]
 
 let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   match basic with
   | Reloadretaddr ->
-    destroyed_at_reloadretaddr
+    destroyed_at_reloadretaddr ()
   | Pushtrap _ ->
-    destroyed_at_pushtrap
+    destroyed_at_pushtrap ()
   | Op Poll -> destroyed_at_alloc_or_poll
   | Op (Alloc _) ->
     destroyed_at_alloc_or_poll
@@ -338,7 +338,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Stack_check _ ->
     (* This case is used by [Cfg_available_regs] *)
     [||]
-  | Op (Const_vec256 _ | Const_vec512 _)
+  | Op (Const_vec256 _ | Const_vec512 _ | Const_mask _)
   | Op (Load
           {memory_chunk=(Twofiftysix_aligned|Twofiftysix_unaligned|
                          Fivetwelve_aligned|Fivetwelve_unaligned);
@@ -348,7 +348,8 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
             Fivetwelve_aligned|Fivetwelve_unaligned),
             _, _))
   | Op (Reinterpret_cast (V128_of_vec (Vec256 | Vec512) |
-                          V256_of_vec _ | V512_of_vec _))
+                          V256_of_vec _ | V512_of_vec _ |
+                          Mask_of_int64 | Int64_of_mask))
   | Op (Static_cast (V256_of_scalar _ | Scalar_of_v256 _ |
                      V512_of_scalar _ | Scalar_of_v512 _))
     -> Misc.fatal_error "arm64: got 256/512 bit vector"
@@ -500,7 +501,8 @@ let operation_supported : Cmm.operation -> bool = function
     false
   | Cprefetch _ | Catomic _
   | Creinterpret_cast (V128_of_vec (Vec256 | Vec512) |
-                       V256_of_vec _ | V512_of_vec _)
+                       V256_of_vec _ | V512_of_vec _ |
+                       Mask_of_int64 | Int64_of_mask)
   | Cstatic_cast (V256_of_scalar _ | Scalar_of_v256 _ |
                   V512_of_scalar _ | Scalar_of_v512 _) ->
     false

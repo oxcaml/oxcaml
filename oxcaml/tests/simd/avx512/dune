@@ -1,0 +1,49 @@
+; AVX512 tests. Like the other SIMD tests they are enabled on amd64 (non-macos)
+; and rely on the compiler having been configured on a host with the relevant
+; ISA support (here AVX512), so that the register allocator has the zmm/mask
+; registers and these tests (which use 512-bit vectors and mask registers)
+; compile. Each test is built and run three ways -- plain, with -nodynlink, and
+; with the internal assembler -- via the rules generated in dune.inc.
+
+(foreign_library
+ (archive_name stubs512)
+ (language c)
+ (names stubs512)
+ (flags
+  (:standard
+   (:include flags512.sexp)))
+ (include_dirs "../../../../runtime"))
+
+(rule
+ (targets flags512.sexp)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (action
+  (with-stdout-to
+   flags512.sexp
+   (echo "(-mavx512f -mavx512vl -mavx512dq -mavx512bw)"))))
+
+(rule
+ (targets flags512.sexp)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (<> %{architecture} "amd64")))
+ (action
+  (with-stdout-to
+   flags512.sexp
+   (echo "()"))))
+
+(include dune.inc)
+
+(rule
+ (with-stdout-to
+  dune.inc.gen
+  (run ./gen/gen_dune.exe)))
+
+(rule
+ (alias runtest)
+ (action
+  (diff dune.inc dune.inc.gen)))

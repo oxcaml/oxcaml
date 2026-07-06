@@ -31,7 +31,7 @@ let remove_overwritten_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
     match fst_val.desc, snd_val.desc with
     | ( Op
           ( Const_int _ | Const_float _ | Const_float32 _ | Const_vec128 _
-          | Const_vec256 _ | Const_vec512 _ ),
+          | Const_vec256 _ | Const_vec512 _ | Const_mask _ ),
         Op
           ( Const_int _ | Const_float _ | Const_float32 _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ ) ) ->

@@ -438,7 +438,7 @@ let buf_sym b sym offset =
       record_reloc b (Buffer.length b.buf) (Relocation.Kind.DIR32 (lbl, offset));
       buf_int32L b 0L
 
-let emit_prefix_modrm b opcodes rm reg ~prefix =
+let emit_prefix_modrm b opcodes rm reg ~prefix ~evex =
   (* When required for a particular instruction, the REX / REXW flag is added in
      [emit_mod_rm_reg]. This function otherwise assumes [~rex:0] for Reg32,
      Reg64, Regf, and addressing modes. *)
@@ -487,7 +487,9 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
         let displ = Int64.of_int displ in
         match sym with
         | None ->
-            if is_imm8L displ then OImm8 displ
+            (* EVEX scales OImm8 by the memory operand width. *)
+            if is_imm8L displ && (not evex || Int64.equal displ 0L)
+            then OImm8 displ
             else if is_imm32L displ then OImm32 (None, displ)
             else assert false
         | Some s -> OImm32 (Some s, displ)
@@ -594,7 +596,8 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
     here does not mean that no REX prefix will be emitted: [emit_prefix_modrm]
     can still request REX.R, REX.B or REX.X for the operands. *)
 let emit_mod_rm_reg b rex_always opcodes rm reg =
-  emit_prefix_modrm b opcodes rm reg ~prefix:(fun b ~rex ~rexr ~rexb ~rexx ->
+  emit_prefix_modrm b opcodes rm reg ~evex:false
+    ~prefix:(fun b ~rex ~rexr ~rexb ~rexx ->
     emit_rex b (rex_always lor rex lor rexr lor rexb lor rexx))
 
 let emit_bsf b ~dst ~src =
@@ -724,7 +727,7 @@ let rex_prefix_adaptor f =
 
 let emit_vex_rm_reg b ops rm reg ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p =
   let vex_w, vex_l = Bool.to_int vex_w, Bool.to_int vex_l in
-  emit_prefix_modrm b ops rm reg ~prefix:(rex_prefix_adaptor
+  emit_prefix_modrm b ops rm reg ~evex:false ~prefix:(rex_prefix_adaptor
     (fun b ~rexr ~rexx ~rexb -> emit_vex b ~rexr ~rexx ~rexb
                                            ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p))
 
@@ -751,7 +754,7 @@ let emit_evex_rm_reg b ops rm reg ~evex_m ~evex_w ~evex_v ~evex_ll ~evex_p
   let evex_w = Bool.to_int evex_w in
   let evex_b = Bool.to_int evex_b in
   let evex_z = Bool.to_int evex_z in
-  emit_prefix_modrm b ops rm reg
+  emit_prefix_modrm b ops rm reg ~evex:true
     ~prefix:(rex_prefix_adaptor (fun b ~rexr ~rexx ~rexb ->
               emit_evex b ~rexr ~rexx ~rexb ~evex_m ~evex_w ~evex_v ~evex_ll
                                             ~evex_p ~evex_z ~evex_b ~evex_a))
