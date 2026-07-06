@@ -129,7 +129,7 @@ let compute_closure_types_inside_functions ~denv ~all_sets_of_closures
                        _new_ code IDs (where such exist), so that direct
                        recursive calls can be compiled straight to the new
                        code. *)
-                    if function_can_be_simplified code_or_metadata
+                    if function_can_be_simplified denv code_or_metadata
                     then
                       Code_id.Map.find old_code_id old_to_new_code_ids_all_sets
                     else old_code_id
@@ -245,7 +245,7 @@ let bind_existing_code_to_new_code_ids denv ~old_to_new_code_ids_all_sets =
       match DE.find_code_exn denv old_code_id with
       | exception Not_found -> denv
       | code ->
-        if function_can_be_simplified code
+        if function_can_be_simplified denv code
         then
           let code =
             Code_or_metadata.get_code code
