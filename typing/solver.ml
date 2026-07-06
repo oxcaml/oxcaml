@@ -17,6 +17,47 @@ open Allowance
 open Solver_intf
 module Fmt = Format_doc
 
+(* Statistics about mode-solver work, for performance measurement only.
+   Enabled by setting the environment variable [OXCAML_MODE_STATS]; a summary
+   is printed to stderr at exit. *)
+module Stats = struct
+  let enabled = Option.is_some (Sys.getenv_opt "OXCAML_MODE_STATS")
+
+  let vars = ref 0
+
+  let edges = ref 0
+
+  let join_cells = ref 0
+
+  let join_elems = ref 0
+
+  let meet_cells = ref 0
+
+  let meet_elems = ref 0
+
+  let cell_morphs = ref 0
+
+  let cell_morph_elems = ref 0
+
+  let submodes = ref 0
+
+  let () =
+    if enabled
+    then
+      at_exit (fun () ->
+          Printf.eprintf
+            "mode-solver-stats: vars=%d edges=%d join_cells=%d join_elems=%d \
+             meet_cells=%d meet_elems=%d cell_morphs=%d cell_morph_elems=%d \
+             submodes=%d\n\
+             %!"
+            !vars !edges !join_cells !join_elems !meet_cells !meet_elems
+            !cell_morphs !cell_morph_elems !submodes)
+
+  let[@inline] incr r = if enabled then Stdlib.incr r
+
+  let[@inline] add r n = if enabled then r := !r + n
+end
+
 module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   type ('a, 'd) hint =
     | Apply :
@@ -553,6 +594,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               Comp_hint.disallow_left a_hint_upper ) )
     | Amodevar mv -> Amodevar (apply_morphvar dst morph hint mv)
     | Amodejoin (a, a_hint, vs) ->
+      Stats.incr Stats.cell_morphs;
+      Stats.add Stats.cell_morph_elems (VarMap.cardinal vs);
       let hint = Comp_hint.Morph_hint.disallow_right hint in
       let vs =
         VarMap.fold
@@ -563,6 +606,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       in
       Amodejoin (C.apply dst morph a, Apply (hint, a_hint), vs)
     | Amodemeet (a, a_hint, vs) ->
+      Stats.incr Stats.cell_morphs;
+      Stats.add Stats.cell_morph_elems (VarMap.cardinal vs);
       let hint = Comp_hint.Morph_hint.disallow_left hint in
       let vs =
         VarMap.fold
@@ -813,12 +858,18 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           let x = Amorphvar (v, g'f, g'f_hint) in
           let key = get_key src x in
           if not (VarMap.mem key u.vlower)
-          then set_vlower ~log u (VarMap.add key x u.vlower);
+          then (
+            Stats.incr Stats.edges;
+            set_vlower ~log u (VarMap.add key x u.vlower));
           Ok ())
 
   let vars = ref (0, [])
 
   let fresh ?upper ?upper_hint ?lower ?lower_hint ?vlower obj =
+    Stats.incr Stats.vars;
+    (match vlower with
+    | None -> ()
+    | Some vl -> Stats.add Stats.edges (VarMap.cardinal vl));
     let id, l = !vars in
     let upper, upper_hint =
       match upper, upper_hint with
@@ -862,6 +913,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   let submode (type a r l) (pp : H.Pinpoint.t) (obj : a C.obj)
       (a : (a, allowed * r) mode) (b : (a, l * allowed) mode) ~log =
+    Stats.incr Stats.submodes;
     let submode_cc ~log:_ _pp obj left left_hint right right_hint =
       if C.le obj left right
       then Ok ()
@@ -966,7 +1018,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         Amode (a, a_hint_lower, Max)
       else
         match rest with
-        | [] -> Amodejoin (a, a_hint_lower, mvs)
+        | [] ->
+          Stats.incr Stats.join_cells;
+          Stats.add Stats.join_elems (VarMap.cardinal mvs);
+          Amodejoin (a, a_hint_lower, mvs)
         | mv :: xs -> (
           match disallow_right mv with
           | Amode (b, b_hint_lower, _b_hint_upper) ->
@@ -1004,7 +1059,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         Amode (a, Min, a_hint_upper)
       else
         match rest with
-        | [] -> Amodemeet (a, a_hint_upper, mvs)
+        | [] ->
+          Stats.incr Stats.meet_cells;
+          Stats.add Stats.meet_elems (VarMap.cardinal mvs);
+          Amodemeet (a, a_hint_upper, mvs)
         | mv :: xs -> (
           match disallow_left mv with
           | Amode (b, _b_hint_lower, b_hint_upper) ->
