@@ -598,7 +598,7 @@ let emit_prefix_modrm b opcodes rm reg ~prefix ~evex =
 let emit_mod_rm_reg b rex_always opcodes rm reg =
   emit_prefix_modrm b opcodes rm reg ~evex:false
     ~prefix:(fun b ~rex ~rexr ~rexb ~rexx ->
-    emit_rex b (rex_always lor rex lor rexr lor rexb lor rexx))
+      emit_rex b (rex_always lor rex lor rexr lor rexb lor rexx))
 
 let emit_bsf b ~dst ~src =
   match (dst, src) with

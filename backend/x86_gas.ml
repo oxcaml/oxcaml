@@ -134,22 +134,32 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
     | Legacy _ | Vex _ -> Misc.fatal_error "expected EVEX encoding"
   in
   let mask b = function None -> () | Some m -> bprintf b "{%a}" arg m in
-  let writemask = Array.find_opt X86_ast_utils.is_regmask args in
-  let last = ref 0 in
-  Array.iteri
-    (fun i a -> if not (X86_ast_utils.is_regmask a) then last := i)
-    args;
-  bprintf b "\t%s\t%s" instr.mnemonic rounding;
-  let printed = ref false in
+  (* [emit_simd_instr] passes the immediate first, then the writemask, then the
+     remaining operands in AT&T order. *)
+  let imm, args =
+    match instr.imm with
+    | Imm_spec | Imm_reg ->
+      Some args.(0), Array.sub args 1 (Array.length args - 1)
+    | Imm_none -> None, args
+  in
+  let writemask, args =
+    if Amd64_simd_defs.instr_expects_mask instr
+    then Some args.(0), Array.sub args 1 (Array.length args - 1)
+    else None, args
+  in
+  bprintf b "\t%s\t" instr.mnemonic;
+  (* The assembler requires the rounding mode to follow the immediate. *)
+  (match imm with
+  | Some imm -> bprintf b "%a, " arg imm
+  | None -> ());
+  Buffer.add_string b rounding;
+  let last = Array.length args - 1 in
   Array.iteri
     (fun i a ->
-      if not (X86_ast_utils.is_regmask a)
-      then (
-        if !printed then Buffer.add_string b ", ";
-        printed := true;
-        arg b a;
-        if X86_ast_utils.is_mem a then Buffer.add_string b broadcast;
-        if i = !last then bprintf b "%a%s" mask writemask zeroing))
+      if i > 0 then Buffer.add_string b ", ";
+      arg b a;
+      if X86_ast_utils.is_mem a then Buffer.add_string b broadcast;
+      if i = last then bprintf b "%a%s" mask writemask zeroing)
     args
 
 let i1_call_jmp b s = function
