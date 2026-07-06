@@ -304,7 +304,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
            _, _))
     -> [||]
   | Op (Static_cast
-          (Int_of_float _ | Float_of_int _
+          (Int64_of_float _ | Float_of_int64 _
           | Float_of_float32|Float32_of_float))
     -> [||]
   | Op (Static_cast
@@ -328,7 +328,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
         | Begin_region | End_region | Dls_get | Tls_get | Domain_index)
   | Poptrap _ | Prologue | Epilogue
-  | Op (Reinterpret_cast (Int_of_value | Value_of_int | Float_of_float32 |
+  | Op (Reinterpret_cast (Int64_of_value | Value_of_int64 | Float_of_float32 |
                           Float32_of_float | Float_of_int64 | Int64_of_float |
                           Float32_of_int32 | Int32_of_float32 |
                           V128_of_vec Vec128))
@@ -522,14 +522,14 @@ let operation_supported : Cmm.operation -> bool = function
   | Ctls_get
   | Cdomain_index
   | Cpoll
-  | Creinterpret_cast (Int_of_value | Value_of_int |
+  | Creinterpret_cast (Int64_of_value | Value_of_int64 |
                        Int64_of_float | Float_of_int64 |
                        Float32_of_float | Float_of_float32 |
                        Float32_of_int32 | Int32_of_float32 |
                        V128_of_vec Vec128)
   | Cstatic_cast (Float_of_float32 | Float32_of_float |
-                  Int_of_float Float32 | Float_of_int Float32 |
-                  Float_of_int Float64 | Int_of_float Float64 |
+                  Int64_of_float Float32 | Float_of_int64 Float32 |
+                  Float_of_int64 Float64 | Int64_of_float Float64 |
                   V128_of_scalar _ | Scalar_of_v128 _) ->
     true
 

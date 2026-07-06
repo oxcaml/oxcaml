@@ -1325,17 +1325,17 @@ let emit_reinterpret_cast env (cast : Cmm.reinterpret_cast) i =
     then A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
   | V128_of_vec (Vec256 | Vec512) | V256_of_vec _ | V512_of_vec _ ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
-  | Int_of_value | Value_of_int -> move env src dst
+  | Int64_of_value | Value_of_int64 -> move env src dst
 
 let emit_static_cast (cast : Cmm.static_cast) i =
   let dst = i.res.(0) in
   let src = i.arg.(0) in
   let distinct = not (Reg.same_loc src dst) in
   match cast with
-  | Int_of_float Float64 -> A.ins2 FCVTZS (H.reg_x dst) (H.reg_d src)
-  | Int_of_float Float32 -> A.ins2 FCVTZS (H.reg_x dst) (H.reg_s src)
-  | Float_of_int Float64 -> A.ins2 SCVTF (H.reg_d dst) (H.reg_x src)
-  | Float_of_int Float32 -> A.ins2 SCVTF (H.reg_s dst) (H.reg_x src)
+  | Int64_of_float Float64 -> A.ins2 FCVTZS (H.reg_x dst) (H.reg_d src)
+  | Int64_of_float Float32 -> A.ins2 FCVTZS (H.reg_x dst) (H.reg_s src)
+  | Float_of_int64 Float64 -> A.ins2 SCVTF (H.reg_d dst) (H.reg_x src)
+  | Float_of_int64 Float32 -> A.ins2 SCVTF (H.reg_s dst) (H.reg_x src)
   | Float_of_float32 -> A.ins2 FCVT (H.reg_d dst) (H.reg_s src)
   | Float32_of_float -> A.ins2 FCVT (H.reg_s dst) (H.reg_d src)
   | Scalar_of_v128 v -> (

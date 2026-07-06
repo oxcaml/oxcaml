@@ -1268,9 +1268,9 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
       store_into_reg t i.res.(0) converted
     in
     match cast_op with
-    | Float_of_int width ->
+    | Float_of_int64 width ->
       do_conv Sitofp ~from:T.i64 ~to_:(T.of_float_width width)
-    | Int_of_float width ->
+    | Int64_of_float width ->
       do_conv Fptosi ~from:(T.of_float_width width) ~to_:T.i64
     | Float_of_float32 -> do_conv Fpext ~from:T.float ~to_:T.double
     | Float32_of_float -> do_conv Fptrunc ~from:T.double ~to_:T.float
@@ -1279,7 +1279,7 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
       not_implemented_basic ~msg:"static cast" i)
   | Reinterpret_cast cast_op -> (
     match cast_op with
-    | Int_of_value | Value_of_int | Float_of_int64 | Int64_of_float
+    | Int64_of_value | Value_of_int64 | Float_of_int64 | Int64_of_float
     | Float32_of_int32 | Int32_of_float32 | Float_of_float32 | Float32_of_float
       ->
       let arg = load_reg_to_temp t i.arg.(0) in
