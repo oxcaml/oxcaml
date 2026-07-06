@@ -1019,9 +1019,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       else
         match rest with
         | [] ->
-          Stats.incr Stats.join_cells;
-          Stats.add Stats.join_elems (VarMap.cardinal mvs);
-          Amodejoin (a, a_hint_lower, mvs)
+          if C.le obj a (C.min obj) && VarMap.cardinal mvs = 1
+          then
+            (* The constant is neutral, so a join of a single element is that
+               element. *)
+            Amodevar (snd (VarMap.choose mvs))
+          else (
+            Stats.incr Stats.join_cells;
+            Stats.add Stats.join_elems (VarMap.cardinal mvs);
+            Amodejoin (a, a_hint_lower, mvs))
         | mv :: xs -> (
           match disallow_right mv with
           | Amode (b, b_hint_lower, _b_hint_upper) ->
@@ -1042,7 +1048,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (hint_join obj a a_hint_lower b b_hint)
               (union_morphvars mvs' mvs) xs)
     in
-    loop (C.min obj) Min VarMap.empty l
+    (* Constants below [min] are neutral for the join; drop them, and a
+       remaining singleton is the join itself. *)
+    let neutral : (a, allowed * r) mode -> bool = function
+      | Amode (a, _, _) -> C.le obj a (C.min obj)
+      | _ -> false
+    in
+    match List.filter (fun m -> not (neutral m)) l with
+    | [m] -> disallow_right m
+    | l -> loop (C.min obj) Min VarMap.empty l
 
   let meet (type a l) obj l =
     let rec loop :
@@ -1060,9 +1074,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       else
         match rest with
         | [] ->
-          Stats.incr Stats.meet_cells;
-          Stats.add Stats.meet_elems (VarMap.cardinal mvs);
-          Amodemeet (a, a_hint_upper, mvs)
+          if C.le obj (C.max obj) a && VarMap.cardinal mvs = 1
+          then
+            (* The constant is neutral, so a meet of a single element is that
+               element. *)
+            Amodevar (snd (VarMap.choose mvs))
+          else (
+            Stats.incr Stats.meet_cells;
+            Stats.add Stats.meet_elems (VarMap.cardinal mvs);
+            Amodemeet (a, a_hint_upper, mvs))
         | mv :: xs -> (
           match disallow_left mv with
           | Amode (b, _b_hint_lower, b_hint_upper) ->
@@ -1081,7 +1101,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (hint_meet obj a a_hint_upper b b_hint)
               (union_morphvars mvs' mvs) xs)
     in
-    loop (C.max obj) Max VarMap.empty l
+    (* Constants above [max] are neutral for the meet; drop them, and a
+       remaining singleton is the meet itself. *)
+    let neutral : (a, l * allowed) mode -> bool = function
+      | Amode (a, _, _) -> C.le obj (C.max obj) a
+      | _ -> false
+    in
+    match List.filter (fun m -> not (neutral m)) l with
+    | [m] -> disallow_left m
+    | l -> loop (C.max obj) Max VarMap.empty l
 
   let get_loose_ceil : type a l r. a C.obj -> (a, l * r) mode -> a =
    fun obj m ->
