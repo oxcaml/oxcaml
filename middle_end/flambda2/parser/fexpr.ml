@@ -84,6 +84,7 @@ type subkind =
   | Unboxed_vec128_array
   | Unboxed_vec256_array
   | Unboxed_vec512_array
+  | Unboxed_mask_array
   | Unboxed_product_array
 
 and kind_with_subkind =
