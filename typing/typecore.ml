@@ -4949,6 +4949,10 @@ let collect_apply_args env loc funct ignore_labels ty_fun ty_fun0 mode_fun sargs
       let ty_fun_is_arrow =
         match get_desc ty_fun' with Tarrow _ -> true | _ -> false
       in
+      (* CR shsong: this check for partial application is not strong enough
+          to guarantee soundness. Especially for the case where the partial
+          application's return type is an abstract type and is actually a
+          function. *)
       (* CR shsong: Alternative design: only register_allocation_mode if
           partial_app = is_partial_apply untyped_args (where untyped_args
           are in the return value) is false, since if partial_app is true,
