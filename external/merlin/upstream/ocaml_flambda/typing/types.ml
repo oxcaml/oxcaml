@@ -164,6 +164,7 @@ and type_desc =
   | Trepr of type_expr * Jkind_types.Sort.univar list
   | Tpackage of package
   | Tof_kind of jkind_lr
+  | Tbox of type_expr
 
 and arg_label =
   | Nolabel
@@ -242,7 +243,7 @@ and 'd with_bounds =
 
 and 'layout jkind_base =
   | Layout of 'layout
-  | Kconstr of Path.t
+  | Kconstr of Path.t * Jkind_types.Scannable_axes.t
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
@@ -544,6 +545,7 @@ and cstr_layout =
 and constructor_representation =
   | Constructor_uniform_value
   | Constructor_mixed of mixed_product_shape
+  | Constructor_variable
 
 and label_declaration =
   {
@@ -934,7 +936,9 @@ let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | Constructor_uniform_value, Constructor_uniform_value -> true
   | Constructor_mixed mx1, Constructor_mixed mx2 ->
       equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
-  | (Constructor_mixed _ | Constructor_uniform_value), _ -> false
+  | Constructor_variable, Constructor_variable -> true
+  | (Constructor_mixed _ | Constructor_uniform_value | Constructor_variable), _
+    -> false
 
 let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   match r1, r2 with
@@ -1347,6 +1351,7 @@ let best_effort_compare_type_expr te1 te2 =
         | Tquote _
         | Tsplice _
         | Tquote_eval _
+        | Tbox _
         (* CR layouts v2.8: we can actually see Tsubst here in certain cases, eg during
            [Ctype.copy] when copying the types inside of with_bounds. We also can't
            compare Tsubst structurally, because the Tsubsts that are created in

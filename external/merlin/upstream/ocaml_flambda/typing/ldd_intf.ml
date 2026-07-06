@@ -20,9 +20,9 @@ module type Ordered = sig
   val to_string : t -> string
 end
 
-(** Lattice polynomial terms built from joins, meets, constants, and
-    variables. The interface supports least and greatest fixpoint solving
-    over these terms. *)
+(** Lattice polynomial terms built from joins, meets, constants, and variables.
+    The interface supports least and greatest fixpoint solving over these terms.
+*)
 module type S = sig
   type node
 
@@ -65,11 +65,9 @@ module type S = sig
   val decompose_into_linear_terms :
     universe:var list -> node -> node * node list
 
-  (** If [a ⊑ b] fails, return witness axes where they differ.
-      Empty list means [a ⊑ b] succeeds. Non-empty list is the witness axes
-      where it fails. *)
-  val leq_with_reason :
-    node -> node -> Jkind_axis.Axis.packed list
+  (** If [a ⊑ b] fails, return witness axes where they differ. Empty list means
+      [a ⊑ b] succeeds. Non-empty list is the witness axes where it fails. *)
+  val leq_with_reason : node -> node -> Jkind_axis.Axis.packed list
 
   val round_up : node -> Axis_lattice.t
 
