@@ -679,8 +679,19 @@ let print_one bind instr =
   let ext =
     Array.map print_ext instr.ext |> Array.to_list |> String.concat ";"
   in
-  let args = print_args instr.args in
-  let res = print_res instr.res in
+  let args, res =
+    match instr.res with
+    | Res rr when instr.flags.z ->
+      (* Without zeroing, masked-off lanes of the destination are preserved,
+         so the destination must also be an input operand. *)
+      let args = print_args instr.args in
+      let res_args = print_args rr in
+      let idxs = print_idxs (Array.init (Array.length rr) (fun i -> i)) in
+      ( sprintf "(if z then [|%s|] else [|%s;%s|])" args res_args args,
+        sprintf "(if z then Res [|%s|] else Arg [|%s|])" res_args idxs )
+    | (Res_none | Arg _ | Res _) as res ->
+      sprintf "[|%s|]" (print_args instr.args), print_res res
+  in
   let imm = print_imm instr.imm in
   let enc = print_enc instr.enc in
   let fun_ =
@@ -696,7 +707,7 @@ let print_one bind instr =
 let %s = {
     id = %s
   ; ext = [|%s|]
-  ; args = [|%s|]
+  ; args = %s
   ; res = %s
   ; imm = %s
   ; mnemonic = "%s"
