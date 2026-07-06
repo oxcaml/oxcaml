@@ -973,8 +973,8 @@ let ocaml_flags =
     ( "-open-cmi",
       Marg.param "file" (fun file ocaml ->
           { ocaml with open_args = Clflags.Open_cmi file :: ocaml.open_args }),
-      "<file>  Opens the module whose compiled interface is <file> before typing"
-    );
+      "<file>  Opens the module whose compiled interface is <file> before \
+       typing" );
     ( "-ppx",
       marg_commandline (fun command ocaml ->
           { ocaml with ppx = command :: ocaml.ppx }),
