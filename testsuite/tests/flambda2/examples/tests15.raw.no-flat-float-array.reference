@@ -1,11 +1,11 @@
-(let $camlTests15__immstring13 = "tests15.ml" in
- let $camlTests15__const_block15 =
-   Block 0 ($camlTests15__immstring13, 18, 52)
+(let $camlTests15__immstring_0 = "tests15.ml" in
+ let $camlTests15__const_block_1 =
+   Block 0 ($camlTests15__immstring_0, 18, 52)
  in
- let $camlTests15__Pmakeblock18 =
-   Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests15__const_block15)
+ let $camlTests15__Pmakeblock_2 =
+   Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests15__const_block_1)
  in
- let $camlTests15__empty_array20 = Empty_array in
+ let $camlTests15__empty_array_3 = Empty_array in
  let code size(20)
        list_to_array_0 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
          my_closure _region _ghost_region my_depth
@@ -23,9 +23,9 @@
       where k5 =
         cont k4)
      where k4 =
-       cont k2 pop(regular k2) ($camlTests15__Pmakeblock18)
+       cont k2 pop(regular k2) ($camlTests15__Pmakeblock_2)
      where k3 =
-       cont k1 ($camlTests15__empty_array20)
+       cont k1 ($camlTests15__empty_array_3)
  in
  let code size(18)
        is_c_1
@@ -95,7 +95,7 @@
    let int_or = %int_barith.or (x, 42) in
    cont k1 (int_or)
  in
- let $camlTests15__immstring61 = " \\ \n " in
+ let $camlTests15__immstring_4 = " \\ \n " in
  let list_to_array = closure list_to_array_0 @list_to_array in
  let is_c = closure is_c_1 @is_c in
  let set_to_x = closure set_to_x_2 @set_to_x in
@@ -111,7 +111,7 @@
       classical_id,
       swapped,
       negate,
-      $camlTests15__immstring61,
+      $camlTests15__immstring_4,
       foo)
  in
  cont k (Pmakeblock))
@@ -122,7 +122,7 @@
     let field_3 = %block_load.tag[`0`].`size`[`8`].[`3`] (module_block) in
     let field_4 = %block_load.tag[`0`].`size`[`8`].[`4`] (module_block) in
     let field_5 = %block_load.tag[`0`].`size`[`8`].[`5`] (module_block) in
-    let field_6 = $camlTests15__immstring61 in
+    let field_6 = $camlTests15__immstring_4 in
     let field_7 = %block_load.tag[`0`].`size`[`8`].[`7`] (module_block) in
     let $camlTests15 =
       Block 0 (field_0,

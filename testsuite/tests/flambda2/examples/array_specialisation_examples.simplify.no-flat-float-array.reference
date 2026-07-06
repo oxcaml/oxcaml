@@ -1,7 +1,7 @@
-let $camlArray_specialisation_examples__string11 = "index out of bounds" in
-let $camlArray_specialisation_examples__block13 =
+let $camlArray_specialisation_examples__string_0 = "index out of bounds" in
+let $camlArray_specialisation_examples__block_1 =
   Block 0 ($`*predef*`.caml_exn_Invalid_argument,
-           $camlArray_specialisation_examples__string11)
+           $camlArray_specialisation_examples__string_0)
 in
 let code f_0 deleted in
 let code g_1 deleted in
@@ -21,7 +21,7 @@ let code loopify(never) size(19) newer_version_of(f_0)
       let Parrayrefs = %array_load.mut (arr, 0) in
       cont k (Parrayrefs)
     where k2 =
-      cont k1 pop(regular k1) ($camlArray_specialisation_examples__block13)
+      cont k1 pop(regular k1) ($camlArray_specialisation_examples__block_1)
 in
 let $camlArray_specialisation_examples__f_4 = closure f_0_1 @f in
 let code loopify(never) size(8) newer_version_of(g_1)
