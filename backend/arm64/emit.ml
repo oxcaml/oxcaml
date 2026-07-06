@@ -2294,9 +2294,13 @@ let end_assembly () =
      are atom-based and cannot target the assembler-local labels that define the
      strings, so on macOS the strings stay in the frametable section,
      un-deduplicated; the references are then same-section label differences,
-     resolved entirely by the assembler. *)
+     resolved entirely by the assembler. The binary emitter keeps them there
+     too: in JIT mode the mergeable section contains no symbol to anchor
+     cross-section relocations, and in verify mode GAS keeps local-label
+     relocations into SHF_MERGE sections (non-zero addends must not be reduced
+     to section symbols), so the two outputs would diverge. *)
   let debuginfo_strings_section : Asm_targets.Asm_section.t =
-    if macosx
+    if macosx || Binary_emitter_helpers.should_use_binary_emitter ()
     then frametable_section
     else
       Custom

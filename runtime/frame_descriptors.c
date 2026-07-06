@@ -981,9 +981,18 @@ static void report_frametables_stats(caml_frametable_list *new_frametables)
 
 /* The backend emits one pointer per linked unit into the caml_all_frametables
  * section; the linker concatenates them and provides these bounds. Weak so the
- * runtime still links where no such section exists (both NULL). */
+ * runtime still links where no such section exists (both NULL). The
+ * __start_/__stop_ encapsulation symbols are an ELF linker feature; on other
+ * platforms (e.g. Mach-O) the measurement covers no frametables. */
+#ifdef __ELF__
 extern intnat *__start_caml_all_frametables[] __attribute__((weak));
 extern intnat *__stop_caml_all_frametables[] __attribute__((weak));
+#define ALL_FRAMETABLES_START __start_caml_all_frametables
+#define ALL_FRAMETABLES_STOP __stop_caml_all_frametables
+#else
+#define ALL_FRAMETABLES_START ((intnat **)NULL)
+#define ALL_FRAMETABLES_STOP ((intnat **)NULL)
+#endif
 
 /* Measure every frametable in the executable - including dynlink-available
  * units that are never registered in caml_frametable[]. Reads only static data
@@ -992,8 +1001,8 @@ static void report_all_frametables_stats(void)
 {
   struct frametable_stats stats;
   clear_stats(&stats);
-  for (intnat **p = __start_caml_all_frametables;
-       p < __stop_caml_all_frametables; p++) {
+  for (intnat **p = ALL_FRAMETABLES_START;
+       p < ALL_FRAMETABLES_STOP; p++) {
     add_frametable_to_stats(*p, &stats);
     accumulate_frametable_stats(*p, &stats);
     clear_per_frametable_stats(&stats);
