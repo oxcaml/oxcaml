@@ -201,9 +201,7 @@ let register_name typ phys_reg : X86_ast.arg =
   | Vec512 ->
     I.require_vec512 ();
     Regf zmm_reg_name.(reg_index)
-  | Mask ->
-    (* Indices [0..6] correspond to [k1..7]. *)
-    Regmask (reg_index + 1)
+  | Mask -> Misc.fatal_error "avx512 masks not yet implemented"
 
 let phys_rax = phys_reg Int (P RAX)
 
@@ -346,11 +344,11 @@ let emit_cmm_symbol (s : Cmm.symbol) =
   in
   match (s.sym_global : Cmm.is_global) with
   | Global -> `Symbol sym
-  (* This label is special in that it is not of the form "Lnumber". Instead, we take the
-     symbol, encode it, and turn the resulting string into a label. The label will still
-     be prefixed by ".L"/"L" when emitting. *)
-  (* CR sspies: Improve the handling of these local symbols in the rest of the emission
-     code. *)
+  (* This label is special in that it is not of the form "Lnumber". Instead, we
+     take the symbol, encode it, and turn the resulting string into a label. The
+     label will still be prefixed by ".L"/"L" when emitting. *)
+  (* CR sspies: Improve the handling of these local symbols in the rest of the
+     emission code. *)
   | Local -> `Label (L.create_label_for_local_symbol Text sym)
 
 let emit_cmm_symbol_str (s : Cmm.symbol) =
@@ -399,9 +397,10 @@ let emit_named_text_section ?(suffix = "") func_name =
     | _ ->
       D.switch_to_section_raw ~names:[".text.startup.caml"] ~flags:(Some "ax")
         ~args:["@progbits"] ~is_delayed:false;
-      (* Warning: We set the internal section ref to Text here, because it currently does
-         not supported named text sections. In the rest of this file, we pretend the
-         section is called Text rather than the function specific text section. *)
+      (* Warning: We set the internal section ref to Text here, because it
+         currently does not supported named text sections. In the rest of this
+         file, we pretend the section is called Text rather than the function
+         specific text section. *)
       (* CR sspies: Add proper support for named text sections. *)
       D.unsafe_set_internal_section_ref Text)
   else if !Clflags.function_sections || !Oxcaml_flags.basic_block_sections
@@ -419,9 +418,10 @@ let emit_named_text_section ?(suffix = "") func_name =
       D.switch_to_section_raw
         ~names:[Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix]
         ~flags:(Some "ax") ~args:["@progbits"] ~is_delayed:false;
-      (* Warning: We set the internal section ref to Text here, because it currently does
-         not supported named text sections. In the rest of this file, we pretend the
-         section is called Text rather than the function specific text section. *)
+      (* Warning: We set the internal section ref to Text here, because it
+         currently does not supported named text sections. In the rest of this
+         file, we pretend the section is called Text rather than the function
+         specific text section. *)
       (* CR sspies: Add proper support for named text sections. *)
       D.unsafe_set_internal_section_ref Text)
   else D.text ()
@@ -519,9 +519,9 @@ let res32 i n = emit_subreg reg_low_32_name DWORD i.res.(n)
 
 let narrow_to_xmm : X86_ast.arg -> X86_ast.arg = function
   | Regf (YMM r | ZMM r) -> Regf (XMM r)
-  | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
+  | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regmask _
     | Regf (XMM _)
-    | Regmask _ | Mem _ | Mem64_RIP _ ) as res ->
+    | Mem _ | Mem64_RIP _ ) as res ->
     res
 
 let arg_idx i n : X86_ast.reg_idx =
@@ -632,12 +632,12 @@ let record_frame live dbg =
 (* Record calls to the GC -- we've moved them out of the way *)
 
 type gc_call =
-  { gc_lbl : L.t (* Entry label *);
-    gc_return_lbl : L.t (* Where to branch after GC *);
-    gc_frame : L.t (* Label of frame descriptor *);
-    gc_dbg : Debuginfo.t (* Location of the original instruction *);
-    gc_save_simd :
-      Regs.Save_simd_regs.t (* What SIMD regs, if any, we need to save *)
+  { gc_lbl : L.t; (* Entry label *)
+    gc_return_lbl : L.t; (* Where to branch after GC *)
+    gc_frame : L.t; (* Label of frame descriptor *)
+    gc_dbg : Debuginfo.t; (* Location of the original instruction *)
+    gc_save_simd : Regs.Save_simd_regs.t
+        (* What SIMD regs, if any, we need to save *)
   }
 
 let call_gc_sites = ref ([] : gc_call list)
@@ -681,8 +681,8 @@ type safety_check =
   | Align_check
 
 type safety_check_failure =
-  { sc_lbl : L.t (* Entry label *);
-    sc_frame : L.t (* Label of frame descriptor *);
+  { sc_lbl : L.t; (* Entry label *)
+    sc_frame : L.t; (* Label of frame descriptor *)
     sc_dbg : Debuginfo.t (* As for [gc_call]. *)
   }
 
@@ -725,11 +725,11 @@ let emit_call_safety_errors () =
 
 (* Stack reallocation *)
 type stack_realloc =
-  { sc_label : L.t (* Label of the reallocation code. *);
-    sc_return : L.t (* Label to return to after reallocation. *);
+  { sc_label : L.t; (* Label of the reallocation code. *)
+    sc_return : L.t; (* Label to return to after reallocation. *)
     sc_size_in_bytes : int; (* Size for reallocation. *)
-    sc_save_simd :
-      Regs.Save_simd_regs.t (* What SIMD regs, if any, we need to save. *)
+    sc_save_simd : Regs.Save_simd_regs.t
+        (* What SIMD regs, if any, we need to save. *)
   }
 
 let stack_realloc = ref ([] : stack_realloc list)
@@ -1137,7 +1137,7 @@ let prefer_load_form (src : X86_ast.arg) (dst : X86_ast.arg) =
     (* otherwise load form needs 3-byte VEX *)
     && regf_index s <= 7
   | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
-      | Regmask _ | Mem _ | Mem64_RIP _ ),
+      | Mem _ | Mem64_RIP _ | Regmask _ ),
       _ ) ->
     false
 
@@ -1250,10 +1250,10 @@ let emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label =
   then I.call (sym (S.encode wrap_label))
   else if !Clflags.pic_code
   then (
-    (* Manually emit encoding of cmp and an explicit relocation on it as needed for a call
-       instruction, to ensure a correct result, instead of relying on an assembler that
-       might choose a different encoding which produces an incorrect relocation and
-       changes the meaning of the program. *)
+    (* Manually emit encoding of cmp and an explicit relocation on it as needed
+       for a call instruction, to ensure a correct result, instead of relying on
+       an assembler that might choose a different encoding which produces an
+       incorrect relocation and changes the meaning of the program. *)
     (* Emit the required encoding of "cmp $0, %eax" directly using .byte *)
     D.int8 (Numbers.Int8.of_int_exn 0x3d);
     D.int8 (Numbers.Int8.of_int_exn 0);
@@ -1261,12 +1261,13 @@ let emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label =
     D.int8 (Numbers.Int8.of_int_exn 0);
     D.int8 (Numbers.Int8.of_int_exn 0);
     (* Emit the relocation for the call target *)
-    (* [rel_size] is the number of bytes taken by the operand of cmp/call that needs to be
-       relocated. It is used to form reloc's offset. [rel_offset_from_next] is the
-       distance from the start of the relocated bytes to the start to the next instruction
-       after the call. It used to form reloc's expr for call's operand (see above).
-       [rel_size] is equal to [rel_offset_from_next] because the relocated operand is the
-       last one and arch is little endian. *)
+    (* [rel_size] is the number of bytes taken by the operand of cmp/call that
+       needs to be relocated. It is used to form reloc's offset.
+       [rel_offset_from_next] is the distance from the start of the relocated
+       bytes to the start to the next instruction after the call. It used to
+       form reloc's expr for call's operand (see above). [rel_size] is equal to
+       [rel_offset_from_next] because the relocated operand is the last one and
+       arch is little endian. *)
     let rel_size = 4L in
     let rel_offset_from_next = 4L in
     D.reloc_x86_64_plt32 ~offset_from_this:rel_size ~target_symbol:wrap_label
@@ -1480,7 +1481,7 @@ end = struct
     | Mem { idx = Scalar register'; base = Some register''; _ } ->
       equal_reg64 register register' || equal_reg64 register register''
     | Mem { idx = Vector _; _ }
-    | Regf _ | Regmask _ | Imm _ | Sym _ | Reg8H _
+    | Regf _ | Imm _ | Sym _ | Reg8H _ | Regmask _
     | Mem64_RIP (_, _, _) ->
       false
 
@@ -1853,7 +1854,7 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
   let args =
     Array.fold_left
       (fun (idx, args) (arg : Simd.arg) ->
-        if Amd64_simd_defs.arg_is_implicit arg
+        if Simd.arg_is_implicit arg
         then idx + 1, args
         else
           match Simd.loc_allows_mem arg.loc, mode with
@@ -2268,26 +2269,30 @@ let emit_instr ~first ~last ~fallthrough i =
       && not
            (Reg.equal_location i.res.(0).loc i.arg.(0).loc
            || Reg.equal_location i.res.(0).loc i.arg.(1).loc)
-    then (
+    then begin
       I.xor (res32 i 0) (res32 i 0);
       I.cmp (arg i 1) (arg i 0);
-      I.set (cond cmp) (res8 i 0))
-    else (
+      I.set (cond cmp) (res8 i 0)
+    end
+    else begin
       I.cmp (arg i 1) (arg i 0);
       I.set (cond cmp) al;
-      I.movzx al (res i 0))
+      I.movzx al (res i 0)
+    end
   | Lop (Intop_imm (Icomp cmp, n)) ->
     if
       Reg.is_reg i.res.(0)
       && not (Reg.equal_location i.res.(0).loc i.arg.(0).loc)
-    then (
+    then begin
       I.xor (res32 i 0) (res32 i 0);
       I.cmp (int n) (arg i 0);
-      I.set (cond cmp) (res8 i 0))
-    else (
+      I.set (cond cmp) (res8 i 0)
+    end
+    else begin
       I.cmp (int n) (arg i 0);
       I.set (cond cmp) al;
-      I.movzx al (res i 0))
+      I.movzx al (res i 0)
+    end
   | Lop (Intop_imm (Iand, n))
     when n >= 0 && n <= 0xFFFF_FFFF && Reg.is_reg i.res.(0) ->
     I.and_ (int n) (res32 i 0)
@@ -2434,8 +2439,8 @@ let emit_instr ~first ~last ~fallthrough i =
     (* Combine edx and eax into a single 64-bit result. *)
     I.sal (int 32) rdx;
     (* shift edx to the high part of rdx *)
-    (* On processors that support the Intel 64 architecture, the high-order 32 bits of
-       each of RAX and RDX are cleared. *)
+    (* On processors that support the Intel 64 architecture, the high-order 32
+       bits of each of RAX and RDX are cleared. *)
     match reg64 i.res.(0) with
     | RAX -> I.or_ rdx (res i 0) (* combine high and low into rax *)
     | RDX -> I.or_ rax (res i 0) (* combine high and low into rdx *)
@@ -2516,10 +2521,10 @@ let emit_instr ~first ~last ~fallthrough i =
     D.define_label (label_to_asm_label ~section:Text probe_label);
     I.nop ();
     (* for uprobes and usdt probes as well *)
-    (* A probe site does not directly call the probe handler. There is an intervening
-       wrapper that deals with getting the arguments to the probe in the correct place and
-       managing the spilling/reloading of live registers. See [emit_probe_handler_wrapper]
-       below. *)
+    (* A probe site does not directly call the probe handler. There is an
+       intervening wrapper that deals with getting the arguments to the probe in
+       the correct place and managing the spilling/reloading of live registers.
+       See [emit_probe_handler_wrapper] below. *)
     emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label
   | Lop (Probe_is_enabled { name; enabled_at_init }) ->
     let semaphore_sym =
@@ -2528,10 +2533,9 @@ let emit_instr ~first ~last ~fallthrough i =
     (* Load unsigned 2-byte integer value of the semaphore. According to the
        documentation [1], semaphores are of type unsigned short. [1]
        https://sourceware.org/systemtap/wiki/UserSpaceProbeImplementation *)
-    (* OCaml has it's own semaphore, in addition to system tap, to control ocaml probe
-       handlers independently from stap probe handlers. It is placed immediately after
-       stap semaphore, and is the same size - hence offset
-
+    (* OCaml has it's own semaphore, in addition to system tap, to control ocaml
+       probe handlers independently from stap probe handlers. It is placed
+       immediately after stap semaphore, and is the same size - hence offset
        2. *)
     I.mov (addressing (Ibased (semaphore_sym, Global, 2)) WORD i 0) (res16 i 0);
     (* If the semaphore is 0, then the result is 0, otherwise 1. *)
