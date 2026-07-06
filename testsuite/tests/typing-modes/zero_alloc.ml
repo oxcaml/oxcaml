@@ -1605,6 +1605,66 @@ Error: This value is "local" because it is "stack_"-allocated.
 |}]
 
 
+(** Test 5i: annotating the codomain of the arrow with [@ noalloc_strict]
+    constrains the mode of the application result. With
+    [foo : int -> t @ noalloc_strict], applying [M.foo 1] yields a
+    [noalloc_strict] value (and likewise [M.foo_int 1]). Note the codomain mode
+    [@ noalloc_strict] must precede the [@@ noalloc_strict] modality; writing it
+    as [(t @ noalloc_strict) @@ ...] is a syntax error. *)
+
+module M : sig
+  type t
+  val foo : int -> t @ noalloc_strict @@ noalloc_strict
+
+  type int_t
+  val foo_int : int -> int_t @ noalloc_strict @@ noalloc_strict
+  val foo_int_default : int -> int_t @@ noalloc_strict
+end = struct
+  type t = (int -> unit) -> unit
+  let g0 : t = fun g -> g 0
+  let foo (_ : int) = g0
+
+  type int_t = int
+  let foo_int x = x
+  let foo_int_default x = x
+end
+[%%expect{|
+module M :
+  sig
+    type t
+    val foo : int -> t @ noalloc_strict @@ noalloc_strict
+    type int_t
+    val foo_int : int -> int_t @ noalloc_strict @@ noalloc_strict
+    val foo_int_default : int -> int_t @@ noalloc_strict
+  end @@ stateless noalloc_strict
+|}]
+
+(* CR shsong: Error expected -- [M.foo 1] is a partial application,
+    which causes allocation. The current partial application detection
+    cannot detect whether an abstract type is an arrow type. *)
+let apply_one () = (M.foo 1 : _ @ noalloc_strict)
+[%%expect{|
+val apply_one : unit -> M.t = <fun>
+|}]
+
+let apply_zero () = (M.foo : _ @ noalloc_strict)
+[%%expect{|
+val apply_zero : unit -> int -> M.t @ noalloc_strict = <fun>
+|}]
+
+let apply_foo_int () = (M.foo_int 1 : _ @ noalloc_strict)
+[%%expect{|
+val apply_foo_int : unit -> M.int_t = <fun>
+|}]
+
+let apply_foo_int_default () = (M.foo_int_default 1 : _ @ noalloc_strict)
+[%%expect{|
+Line 1, characters 32-51:
+1 | let apply_foo_int_default () = (M.foo_int_default 1 : _ @ noalloc_strict)
+                                    ^^^^^^^^^^^^^^^^^^^
+Error: This value is "alloc" but is expected to be "noalloc_strict".
+|}]
+
 (** Test 6: Misc *)
 
 type record_t = { x : float; y : float }
