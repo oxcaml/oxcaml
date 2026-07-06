@@ -1,0 +1,90 @@
+# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
+# If you want this functionality, ask for help from a subset of:
+# @jvanburen @glittershark @mshinwell
+#
+# (This workflow complies: it has read-only access to repository contents and
+# can only post PR comments.)
+#
+# --------------------------------------------------------------------------
+#
+# On-demand Claude code review.
+#
+# Apply the `claude-review` label to a PR to get a code review from Claude.
+# Remove and re-apply the label to request a fresh review after pushing
+# changes. Only users with triage access or better can apply labels, so this
+# has the same human-in-the-loop property as @claude mentions.
+#
+# Limitations:
+#
+# - Fork PRs are not supported: GitHub does not grant the `id-token: write`
+#   permission to `pull_request` runs from forks, which Workload Identity
+#   Federation requires. For a fork PR, have a maintainer comment
+#   `@claude review this PR` instead (handled by claude.yml, which runs in
+#   base-repository context).
+#
+# - Authentication and spend isolation work the same way as claude.yml: the
+#   `anthropic_*` values are identifiers (not secrets), and usage is billed
+#   to a dedicated spend-capped workspace.
+
+name: Claude Review
+
+on:
+  pull_request:
+    types: [labeled]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: |
+      github.event.label.name == 'claude-review' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      pull-requests: write # post the review
+      id-token: write # fetch the GitHub OIDC token used for federation
+      actions: read # let the review consider CI results
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6 # zizmor: ignore[artipacked]
+        with:
+          fetch-depth: 1
+          # persist-credentials is left at the default (true) deliberately;
+          # see the note in claude.yml (claude-code-action#1236). The token
+          # persisted here is read-only for contents in any case.
+
+      - name: Run Claude review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_federation_rule_id: fdrl_015iVLLGGrmMY6UypP2Y97ox
+          anthropic_organization_id: fb378cfa-9348-499b-93f9-97cd7cb90bb8
+          anthropic_service_account_id: svac_019GSU6DGYXcX3KRARribqrD
+          anthropic_workspace_id: wrkspc_01X7e2sYrF2zVoBya9Szjf8k
+
+          additional_permissions: |
+            actions: read
+
+          prompt: |
+            Review this pull request.
+
+            Focus on:
+            - correctness (including subtle compiler-correctness issues:
+              soundness, missing cases in matches over IR, effects on
+              existing optimizations)
+            - adherence to the conventions in AGENTS.md
+            - missing or inadequate tests (testsuite/ coverage for behavior
+              changes)
+
+            Be concise. Only comment where you have something substantive to
+            say; do not pad the review with praise or restatements of the
+            diff. Use inline comments for line-specific feedback and a short
+            summary comment for overall assessment.
+
+          claude_args: |
+            --model claude-fable-5
+            --effort xhigh
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(rg:*),Bash(cat:*),Bash(ls:*)"

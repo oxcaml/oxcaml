@@ -1,0 +1,194 @@
+# CYBERSECURITY WARNING: DO NOT replicate this workflow's setup elsewhere
+# without consulting the repo security managers: @jvanburen @glittershark
+# @mshinwell. Also, see the security notes below before modifying this file
+#
+# This particular workflow is a deliberate, signed-off exception to the
+# cybersecurity warning in other workflow files, as the whole purpose of this
+# workflow is to let Claude push commits when explicitly invoked by a maintainer.
+#
+# --------------------------------------------------------------------------
+#
+# Claude Code for issues and PRs.
+#
+# Mentioning @claude in an issue or PR (in the body, a comment, or a review)
+# triggers a Claude Code session that can answer questions about the code or
+# push commits addressing feedback. See
+# https://github.com/anthropics/claude-code-action for full documentation.
+#
+# Security notes:
+#
+# - Only users with *write* access to this repository can trigger the action.
+#   The @claude mention gate below is just a cheap pre-filter; the action itself
+#   checks the author's permissions and refuses to run for anyone else. Do not
+#   weaken this (e.g. via `allowed_non_write_users`): issue and comment text is
+#   untrusted input, and this job can push commits to unprotected branches.
+#
+# - The Claude GitHub App cannot modify workflow files (it has no `workflows`
+#   permission), and the action constrains Claude to only ever push to the
+#   branch it was invoked on (the PR branch, or a fresh branch for issues) --
+#   never to other branches, and never force-pushes.
+#
+# - There are no static credentials here. The `anthropic_*` values below are
+#   identifiers, not secrets: authentication uses Workload Identity Federation,
+#   exchanging this workflow's short-lived GitHub OIDC token (hence `id-token:
+#   write`) for a short-lived Anthropic token scoped to a service account.
+#   GitHub-side access comes from the Claude GitHub App installed on this
+#   repository. There is no ANTHROPIC_API_KEY to leak or rotate.
+#
+# - Anthropic-side spend for this workflow is isolated in a dedicated workspace
+#   (`anthropic_workspace_id` below) with its own spend limit, so a runaway job
+#   cannot exhaust the whole organization's budget. The job-level
+#   `timeout-minutes` bounds runner spend.
+#
+# - Claude's toolchain comes from the flake devShell, substituted read-only
+#   from the CI-only `oxcaml` cachix cache (see nix-github-actions.yml). The
+#   cachix step below deliberately has no authToken: nothing built during a
+#   Claude session may ever be pushed to the cache.
+#
+# - In CI, Claude's Bash access is disabled by default (its built-in file
+#   read/edit and GitHub tools do not go through Bash), and headless runs
+#   have no "ask the human" fallback: anything not pre-allowed is refused.
+#   The `--allowedTools` list under `claude_args` below is therefore the
+#   authoritative allowlist. Note that the repo's `.claude/settings.json`
+#   `allow` entries also merge in -- but that file is read from the
+#   checked-out ref (the PR head, which for fork PRs is third-party
+#   content), whereas this workflow file is always taken from the default
+#   branch. Keep CI policy here, not in settings.json. Do NOT add
+#   `Bash(nix:*)` or `Bash(nix develop:*)` to the allowlist:
+#   `nix develop -c bash -c '...'` would let Claude run arbitrary commands,
+#   bypassing the allowlist entirely.
+
+name: Claude
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+  # Manual smoke-test hook: lets maintainers exercise this workflow -- and
+  # iterate on the environment setup -- from any branch via the Actions UI,
+  # without merging to main first. (GitHub runs `issue_comment` etc. from the
+  # default branch only, but `workflow_dispatch` can target any ref once this
+  # file exists on main.)
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: "Task for Claude (runs in automation mode, no @claude needed)"
+        required: true
+        type: string
+
+concurrency:
+  # One Claude session at a time per issue/PR; let existing runs finish.
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
+
+jobs:
+  claude-response:
+    # Pre-filter: only spin up a runner when @claude is actually mentioned.
+    # (Authorization is enforced by the action, not by this condition.)
+    if: |
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    runs-on: warp-ubuntu-latest-x64-8x
+    timeout-minutes: 90
+    permissions:
+      contents: write # push commits to the invoking PR's branch (see header)
+      pull-requests: write # comment on / update PRs
+      issues: write # comment on issues
+      id-token: write # fetch the GitHub OIDC token used for federation
+      actions: read # read CI results on PRs
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6 # zizmor: ignore[artipacked]
+        with:
+          fetch-depth: 1
+          # persist-credentials is left at the default (true) deliberately,
+          # even though security audits (e.g. zizmor's artipacked) flag it:
+          # claude-code-action's branch setup runs `git fetch` before
+          # configuring its own auth and fails without the persisted token.
+          # Revisit when anthropics/claude-code-action#1236 is fixed.
+
+      # Claude's build environment is the flake devShell -- the same
+      # toolchain as `nix develop` locally and the nix CI builds, including
+      # the boot compilers, autoconf, and the pinned ocamlformat (so
+      # `make -s fmt` works). A cold cache still works: `nix develop` then
+      # builds the boot compilers from source, it is just slow.
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          # Pin to nix 2.33.0 to match nix-github-actions.yml
+          install_url: https://releases.nixos.org/nix/nix-2.33.0/install
+
+      - uses: cachix/cachix-action@v17
+        with:
+          name: oxcaml
+          # No authToken, deliberately: read-only substitution. Nothing
+          # built during a Claude session may ever enter the cache.
+
+      - name: Enter the flake devShell
+        # Exports the devShell environment into GITHUB_ENV/GITHUB_PATH so
+        # later steps (including Claude's shell) run inside it. Third-party
+        # action: keep it pinned to a full commit SHA.
+        uses: nicknovitski/nix-develop@9be7cfb4b10451d3390a75dc18ad0465bed4932a # v1.2.1
+
+      - name: Configure OxCaml
+        # Pre-configure so that `make` just works in Claude's session (the
+        # build commands Claude follows are documented in AGENTS.md).
+        run: |
+          autoconf
+          ./configure --prefix="$GITHUB_WORKSPACE/_install"
+
+      # The action runs in interactive (mention) mode by default, and in
+      # automation mode when a prompt is supplied. These are split into two
+      # if-guarded steps so the mention path never depends on how the action
+      # treats an empty `prompt` input.
+
+      - name: Run Claude Code (mention)
+        if: github.event_name != 'workflow_dispatch'
+        uses: anthropics/claude-code-action@v1
+        with:
+          # Workload Identity Federation (see security notes above). These
+          # are identifiers, not credentials, so they are safe to commit.
+          anthropic_federation_rule_id: fdrl_015iVLLGGrmMY6UypP2Y97ox
+          anthropic_organization_id: fb378cfa-9348-499b-93f9-97cd7cb90bb8
+          anthropic_service_account_id: svac_019GSU6DGYXcX3KRARribqrD
+          anthropic_workspace_id: wrkspc_01X7e2sYrF2zVoBya9Szjf8k
+
+          # Let Claude read CI logs/results for PRs (pairs with the
+          # job-level `actions: read` permission above).
+          additional_permissions: |
+            actions: read
+
+          # Bash commands Claude may run. Keep this list tight: anything not
+          # listed is refused. Extend deliberately rather than globbing, and
+          # see the header note about `nix`. Note there is deliberately no
+          # `Bash(git:*)`: the action's built-in tools already provide
+          # read-only git plus commit/push to the invoking branch, and raw
+          # git would allow `git push` to arbitrary external remotes -- an
+          # exfiltration channel for the job's (short-lived) credentials.
+          claude_args: |
+            --model claude-fable-5
+            --effort xhigh
+            --allowedTools "Bash(make:*),Bash(autoconf),Bash(./configure:*),Bash(rg:*),Bash(cat:*),Bash(ls:*),Bash(sed -n:*)"
+
+      - name: Run Claude Code (manual smoke test)
+        if: github.event_name == 'workflow_dispatch'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_federation_rule_id: fdrl_015iVLLGGrmMY6UypP2Y97ox
+          anthropic_organization_id: fb378cfa-9348-499b-93f9-97cd7cb90bb8
+          anthropic_service_account_id: svac_019GSU6DGYXcX3KRARribqrD
+          anthropic_workspace_id: wrkspc_01X7e2sYrF2zVoBya9Szjf8k
+          additional_permissions: |
+            actions: read
+          prompt: ${{ inputs.prompt }}
+          claude_args: |
+            --model claude-fable-5
+            --effort xhigh
+            --allowedTools "Bash(make:*),Bash(autoconf),Bash(./configure:*),Bash(rg:*),Bash(cat:*),Bash(ls:*),Bash(sed -n:*)"
