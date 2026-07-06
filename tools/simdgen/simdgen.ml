@@ -682,8 +682,8 @@ let print_one bind instr =
   let args, res =
     match instr.res with
     | Res rr when instr.flags.z ->
-      (* Without zeroing, masked-off lanes of the destination are preserved,
-         so the destination must also be an input operand. *)
+      (* Without zeroing, masked-off lanes of the destination are preserved, so
+         the destination must also be an input operand. *)
       let args = print_args instr.args in
       let res_args = print_args rr in
       let idxs = print_idxs (Array.init (Array.length rr) (fun i -> i)) in
