@@ -1485,12 +1485,12 @@ Error: This expression is not an allocation site.
 let (stack_inner_lazy @ noalloc_strict) (a : int) =
   exclave_ stack_ (lazy (Just a))
 [%%expect{|
-Line 18, characters 18-33:
-18 |   exclave_ stack_ (lazy (Just a))
+Line 12, characters 18-33:
+12 |   exclave_ stack_ (lazy (Just a))
                        ^^^^^^^^^^^^^^^
 Error: The allocation is "alloc"
        but is expected to be "noalloc_strict"
-         because it is used inside the function at lines 17-18, characters 40-33
+         because it is used inside the function at lines 11-12, characters 40-33
          which is expected to be "noalloc_strict".
 |}]
 

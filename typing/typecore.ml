@@ -4954,7 +4954,7 @@ let collect_apply_args env loc funct ignore_labels ty_fun ty_fun0 mode_fun sargs
           are in the return value) is false, since if partial_app is true,
           there are Omitted args and the code walks the locks already *)
       if ty_fun_is_arrow then
-        Env.walk_locks_for_allocation ~env (loc, Hint.Allocation);
+        register_allocation_mode ~env ~loc Alloc.legacy;
       collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
         ret_tvar
     end
@@ -8180,10 +8180,8 @@ and type_expect_
       let to_unify = Predef.type_lazy_t ty in
       with_explanation (fun () ->
         unify_exp_types loc env to_unify (generic_instance ty_expected));
-      (* Allocation axis check: constructing a lazy block allocates, but
-         register_allocation_mode is not called, so we manually
-         walk locks here *)
-      Env.walk_locks_for_allocation ~env (loc, Hint.Allocation);
+      (* Allocation axis check: constructing a lazy block allocates *)
+      register_allocation_mode ~env ~loc Alloc.legacy;
       let env = Env.add_closure_lock (loc, Lazy) closure_mode.comonadic env in
       let arg = type_expect env expected_mode e (mk_expected ty) in
       re {
@@ -8196,10 +8194,8 @@ and type_expect_
   | Pexp_object s ->
       Env.check_no_open_quotations loc env Object_qt;
       submode ~loc ~env Value.legacy expected_mode;
-      (* Allocation axis check: constructing an object block allocates,
-         but register_allocation_mode is not called, so we manually
-         walk locks here *)
-      Env.walk_locks_for_allocation ~env (loc, Hint.Allocation);
+      (* Allocation axis check: constructing an object block allocates *)
+      register_allocation_mode ~env ~loc Alloc.legacy;
       let desc, meths = !type_object env loc s in
       rue {
         exp_desc = Texp_object (desc, meths);
@@ -11923,10 +11919,8 @@ and type_comprehension_expr ~loc ~env ~ty_expected ~attributes cexpr =
        "What modes should comprehensions use?", above *)
     type_expect new_env mode_legacy sbody (mk_expected element_ty)
   in
-  (* Allocation axis check: comprehension expr allocates, but
-    register_allocation_mode is not called, so we manually
-    walk locks here *)
-  Env.walk_locks_for_allocation ~env (loc, Hint.Allocation);
+  (* Allocation axis check: comprehension expr allocates *)
+  register_allocation_mode ~env ~loc Alloc.legacy;
   re { exp_desc       = make_texp { comp_body ; comp_clauses }
      ; exp_loc        = loc
      ; exp_extra      = []
