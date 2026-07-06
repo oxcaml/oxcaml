@@ -11,7 +11,7 @@ let syntax_doc_url (doc_website_base : Doc_website_base.t) endpoint =
   let base_url =
     match doc_website_base with
     | Ocaml -> "https://ocaml.org/manual/5.2/"
-    | Oxcaml -> "https://oxcaml.org/documentation/"
+    | Oxcaml -> "https://beta.oxcaml.org/documentation/"
   in
   Some (base_url ^ endpoint)
 
