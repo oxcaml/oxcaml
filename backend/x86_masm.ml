@@ -85,6 +85,7 @@ let arg b = function
   | Reg32 x -> Buffer.add_string b (string_of_reg32 x)
   | Reg64 x -> Buffer.add_string b (string_of_reg64 x)
   | Regf x -> Buffer.add_string b (string_of_regf x)
+  | Regmask k -> bprintf b "k%d" k
   (* We don't need to specify RIP on Win64, since EXTERN will provide the list
      of external symbols that need this addressing mode, and MASM will
      automatically use RIP addressing when needed. *)
@@ -124,6 +125,53 @@ let i2 b s x y = bprintf b "\t%s\t%a, %a" s arg y arg x
 let i3 b s x y z = bprintf b "\t%s\t%a, %a, %a" s arg x arg y arg z
 
 let i4 b s x y z w = bprintf b "\t%s\t%a, %a, %a, %a" s arg x arg y arg z arg w
+
+let evex_rounding : Amd64_simd_defs.evex_rounding -> string = function
+  | Rnd_near -> ", {rn-sae}"
+  | Rnd_down -> ", {rd-sae}"
+  | Rnd_up -> ", {ru-sae}"
+  | Rnd_zero -> ", {rz-sae}"
+
+let evex_broadcast evex_w (len : Amd64_simd_defs.evex_length) =
+  let bits = match len with L128 -> 128 | L256 -> 256 | L512 -> 512 in
+  Printf.sprintf "{1to%d}" (bits / if evex_w then 64 else 32)
+
+let ievex b (instr : Amd64_simd_instrs.instr) args =
+  let has_mem = Array.exists X86_ast_utils.is_mem args in
+  let zeroing, rounding, broadcast =
+    match instr.enc.prefix with
+    | Evex { evex_z; evex_b; evex_ll; evex_w; _ } ->
+      let rounding, broadcast =
+        match evex_ll with
+        | Ll_round rnd -> evex_rounding rnd, ""
+        | Ll_len len ->
+          if not evex_b
+          then "", ""
+          else if has_mem
+          then "", evex_broadcast evex_w len
+          else ", {sae}", ""
+      in
+      (if evex_z then "{z}" else ""), rounding, broadcast
+    | Legacy _ | Vex _ -> Misc.fatal_error "expected EVEX encoding"
+  in
+  let mask b = function None -> () | Some m -> bprintf b "{%a}" arg m in
+  let writemask = Array.find_opt X86_ast_utils.is_regmask args in
+  bprintf b "\t%s\t" instr.mnemonic;
+  let n = Array.length args in
+  let printed = ref false in
+  Array.iteri
+    (fun j _ ->
+      let a = args.(n - 1 - j) in
+      if not (X86_ast_utils.is_regmask a)
+      then (
+        let first = not !printed in
+        if not first then Buffer.add_string b ", ";
+        arg b a;
+        if X86_ast_utils.is_mem a then Buffer.add_string b broadcast;
+        if first then bprintf b "%a%s" mask writemask zeroing;
+        printed := true))
+    args;
+  Buffer.add_string b rounding
 
 let i1_call_jmp b s = function
   | Sym x -> bprintf b "\t%s\t%s" s x
@@ -199,6 +247,8 @@ let print_instr b = function
   | UD2 -> i0 b "ud2"
   | XCHG (arg1, arg2) -> i2 b "xchg" arg1 arg2
   | XOR (arg1, arg2) -> i2 b "xor" arg1 arg2
+  | SIMD (instr, args) when Amd64_simd_defs.instr_is_evex instr ->
+    ievex b instr args
   | SIMD (instr, args) -> (
     match instr.id, args with
     (* The assembler won't accept these mnemonics directly. *)

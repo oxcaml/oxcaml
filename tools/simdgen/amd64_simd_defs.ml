@@ -31,6 +31,11 @@ type ext =
   | AVX2
   | F16C
   | FMA
+  | AVX512F
+  | AVX512DQ
+  | AVX512CD
+  | AVX512BW
+  | AVX512VL
 
 (* Fixed machine register location *)
 type reg =
@@ -52,13 +57,18 @@ type temp =
   | M64
   | M128
   | M256
+  | M512
   | MM
   | XMM
   | YMM
+  | ZMM
+  | K (* AVX512 mask register (k0-k7) *)
   | VM32X (* R64 base + i32x4 offset *)
   | VM32Y (* R64 base + i32x8 offset *)
+  | VM32Z (* R64 base + i32x16 offset *)
   | VM64X (* R64 base + i64x2 offset *)
   | VM64Y (* R64 base + i64x4 offset *)
+  | VM64Z (* R64 base + i64x8 offset *)
 
 (* Possible argument location *)
 type loc =
@@ -70,6 +80,7 @@ type loc_enc =
   | RM_r
   | RM_rm
   | Vex_v
+  | Mask
   | Implicit
   | Immediate
 
@@ -105,6 +116,21 @@ type vex_map =
   | Vexm_0F38
   | Vexm_0F3A
 
+type evex_length =
+  | L128
+  | L256
+  | L512
+
+type evex_rounding =
+  | Rnd_near
+  | Rnd_down
+  | Rnd_up
+  | Rnd_zero
+
+type evex_ll =
+  | Ll_len of evex_length
+  | Ll_round of evex_rounding
+
 type prefix =
   | Legacy of
       { prefix : legacy_prefix;
@@ -117,6 +143,14 @@ type prefix =
         vex_w : bool;
         vex_l : bool;
         vex_p : legacy_prefix
+      }
+  | Evex of
+      { evex_m : vex_map;
+        evex_w : bool;
+        evex_b : bool;
+        evex_ll : evex_ll;
+        evex_p : legacy_prefix;
+        evex_z : bool
       }
 
 type rm_reg =
@@ -146,6 +180,17 @@ type 'id instr =
     enc : enc
   }
 
+let instr_expects_mask instr =
+  Array.exists
+    (fun (arg : arg) ->
+      match arg.enc with
+      | Mask -> true
+      | RM_r | RM_rm | Vex_v | Implicit | Immediate -> false)
+    instr.args
+
+let instr_is_evex (instr : _ instr) =
+  match instr.enc.prefix with Evex _ -> true | Legacy _ | Vex _ -> false
+
 let equal_reg reg0 reg1 =
   match reg0, reg1 with
   | RAX, RAX | RDI, RDI | RCX, RCX | RDX, RDX | XMM0, XMM0 -> true
@@ -163,16 +208,21 @@ let equal_temp temp0 temp1 =
   | M64, M64
   | M128, M128
   | M256, M256
+  | M512, M512
   | MM, MM
   | XMM, XMM
   | YMM, YMM
+  | ZMM, ZMM
+  | K, K
   | VM32X, VM32X
   | VM32Y, VM32Y
+  | VM32Z, VM32Z
   | VM64X, VM64X
-  | VM64Y, VM64Y ->
+  | VM64Y, VM64Y
+  | VM64Z, VM64Z ->
     true
-  | ( ( R8 | R16 | R32 | R64 | M8 | M16 | M32 | M64 | M128 | M256 | MM | XMM
-      | YMM | VM32X | VM32Y | VM64X | VM64Y ),
+  | ( ( R8 | R16 | R32 | R64 | M8 | M16 | M32 | M64 | M128 | M256 | M512 | MM
+      | XMM | YMM | ZMM | K | VM32X | VM32Y | VM32Z | VM64X | VM64Y | VM64Z ),
       _ ) ->
     false
 
@@ -183,13 +233,15 @@ let equal_loc loc0 loc1 =
   | (Pin _ | Temp _), _ -> false
 
 let temp_is_reg = function
-  | R8 | R16 | R32 | R64 | MM | XMM | YMM -> true
-  | M8 | M16 | M32 | M64 | M128 | M256 | VM32X | VM32Y | VM64X | VM64Y -> false
+  | R8 | R16 | R32 | R64 | MM | XMM | YMM | ZMM | K -> true
+  | M8 | M16 | M32 | M64 | M128 | M256 | M512 | VM32X | VM32Y | VM32Z | VM64X
+  | VM64Y | VM64Z ->
+    false
 
 let temp_is_vm = function
-  | VM32X | VM32Y | VM64X | VM64Y -> true
-  | R8 | R16 | R32 | R64 | MM | XMM | YMM | M8 | M16 | M32 | M64 | M128 | M256
-    ->
+  | VM32X | VM32Y | VM32Z | VM64X | VM64Y | VM64Z -> true
+  | R8 | R16 | R32 | R64 | MM | XMM | YMM | ZMM | K | M8 | M16 | M32 | M64
+  | M128 | M256 | M512 ->
     false
 
 let loc_allows_reg = function
@@ -214,7 +266,9 @@ let unarized_reg_index args arg_idx =
   !idx
 
 let arg_is_implicit ({ enc; _ } : arg) =
-  match enc with Implicit -> true | Immediate | RM_r | RM_rm | Vex_v -> false
+  match enc with
+  | Implicit -> true
+  | Immediate | RM_r | RM_rm | Vex_v | Mask -> false
 
 let ext_to_string : ext -> string = function
   | SSE -> "SSE"
@@ -232,6 +286,11 @@ let ext_to_string : ext -> string = function
   | AVX2 -> "AVX2"
   | F16C -> "F16C"
   | FMA -> "FMA"
+  | AVX512F -> "AVX512F"
+  | AVX512DQ -> "AVX512DQ"
+  | AVX512CD -> "AVX512CD"
+  | AVX512BW -> "AVX512BW"
+  | AVX512VL -> "AVX512VL"
 
 let exts_to_string exts =
   Array.map ext_to_string exts |> Array.to_list |> String.concat ", "
@@ -244,6 +303,7 @@ module Layout = struct
     | R64
     | R128
     | R256
+    | R512
 
   type mem =
     | M8
@@ -252,10 +312,13 @@ module Layout = struct
     | M64
     | M128
     | M256
+    | M512
     | M32X
     | M64X
     | M32Y
     | M64Y
+    | M32Z
+    | M64Z
 end
 
 let loc_register_width = function
@@ -274,7 +337,9 @@ let loc_register_width = function
         | R64 | MM -> set Layout.R64
         | XMM -> set Layout.R128
         | YMM -> set Layout.R256
-        | M8 | M16 | M32 | M64 | M128 | M256 | VM32X | VM32Y | VM64X | VM64Y ->
+        | ZMM -> set Layout.R512
+        | K | M8 | M16 | M32 | M64 | M128 | M256 | M512 | VM32X | VM32Y | VM32Z
+        | VM64X | VM64Y | VM64Z ->
           ())
       temps;
     !width
@@ -295,10 +360,13 @@ let loc_memory_width = function
         | M64 -> set Layout.M64
         | M128 -> set Layout.M128
         | M256 -> set Layout.M256
+        | M512 -> set Layout.M512
         | VM32X -> set Layout.M32X
         | VM32Y -> set Layout.M32Y
+        | VM32Z -> set Layout.M32Z
         | VM64X -> set Layout.M64X
         | VM64Y -> set Layout.M64Y
-        | R8 | R16 | R32 | R64 | MM | XMM | YMM -> ())
+        | VM64Z -> set Layout.M64Z
+        | R8 | R16 | R32 | R64 | MM | XMM | YMM | ZMM | K -> ())
       temps;
     Option.get !width
