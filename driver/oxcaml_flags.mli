@@ -103,6 +103,7 @@ val disable_poll_insertion : bool ref
 val allow_long_frames : bool ref
 val max_long_frames_threshold : int
 val long_frames_threshold : int ref
+val branch_relaxation_max_displacement : int ref
 val caml_apply_inline_fast_path : bool ref
 
 type function_result_types = Never | Functors_only | All_functions

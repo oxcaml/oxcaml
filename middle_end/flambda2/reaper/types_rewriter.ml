@@ -740,7 +740,19 @@ module Rewriter = struct
     | Many_sources_usages (Usages m) when Code_id_or_name.Map.is_empty m ->
       forget_type ()
     | No_source ->
-      Rule.rewrite Pattern.any (Expr.bottom (Flambda2_types.kind flambda_type))
+      (* We should be able to use [Expr.bottom] here (if we have something that
+         has no source accessible at toplevel, it means that the initialisation
+         code of the module necessarily raises).
+
+         However, we currently can't do this because there can be leftover
+         symbols in the typing env that no longer have corresponding lets in the
+         output post-simplify and returning bottom here would actually be
+         unsound in that case.
+
+         So we simply return [unknown] instead of [bottom] here because it would
+         be too easy to incorrectly conclude that the environment is
+         unsatisfiable for little actual benefit. *)
+      Rule.rewrite Pattern.any (Expr.unknown (Flambda2_types.kind flambda_type))
     | Single_source _ | Many_sources_any_usage | Many_sources_usages (Usages _)
       -> (
       match
@@ -942,8 +954,14 @@ module Rewriter = struct
             List.is_empty from_local_sets_of_closures
             && Option.is_none from_external_sources
           then
+            (* We should be able to use [Expr.bottom] here (a set of closures
+               that can't be local and also can't be external simply cannot
+               exist), but we don't because it would be too easy to be unsound
+               if there are symbols in the typing env that no longer have a
+               corresponding let symbol in the output of simplify -- see the
+               discussion for the [No_source] case in [rewrite]. *)
             Rule.rewrite Pattern.any
-              (Expr.bottom (Flambda2_types.kind flambda_type))
+              (Expr.unknown (Flambda2_types.kind flambda_type))
           else
             let from_everything =
               match from_external_sources with

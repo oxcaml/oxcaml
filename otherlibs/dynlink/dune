@@ -286,8 +286,6 @@
 
 (copy_files ../../parsing/parser_types.ml)
 
-(copy_files ../../parsing/parser.ml)
-
 (copy_files ../../parsing/printast.ml)
 
 (copy_files ../../parsing/pprintast.ml)
@@ -515,8 +513,6 @@
 
 (copy_files ../../typing/jkind.mli)
 
-(copy_files ../../typing/jkind_intf.mli)
-
 (copy_files ../../typing/jkind_types.mli)
 
 (copy_files ../../typing/jkind_axis.mli)
@@ -583,7 +579,7 @@
 
 (copy_files ../../typing/datarepr.mli)
 
-(copy_files ../../typing/unit_info.mli)
+(copy_files ../../parsing/unit_info.mli)
 
 (copy_files ../../typing/typedtree.mli)
 
@@ -811,8 +807,16 @@
    %{read:../../natdynlinkops}
    -o
    dynlink.cmxa
-   %{deps}))
+   %{cmx}))
  (deps
+  ; The .o files are read by [ocamlopt -a] when building dynlink.a but are not
+  ; passed on the command line; they must be present alongside the .cmx files.
+  (glob_files .dynlink_compilerlibs.objs/native/*.o)
+  (glob_files .dynlink_internal_common.objs/native/*.o)
+  (glob_files .dynlink_internal_byte.objs/native/*.o)
+  (glob_files .dynlink_internal_native.objs/native/*.o)
+  (glob_files .dynlink_internal.objs/native/*.o)
+  (:cmx
   ; NOTE: Be sure to keep these arguments in dependency order!
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Runtimetags.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Int_replace_polymorphic_compare.cmx
@@ -923,7 +927,7 @@
   .dynlink_internal_common.objs/native/dynlink_common.cmx
   .dynlink_internal_byte.objs/native/dynlink_internal_byte.cmx
   .dynlink_internal_native.objs/native/dynlink_internal_native.cmx
-  .dynlink_internal.objs/native/dynlink.cmx))
+  .dynlink_internal.objs/native/dynlink.cmx)))
 
 (install
  (files

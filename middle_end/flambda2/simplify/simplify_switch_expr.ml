@@ -833,7 +833,7 @@ let simplify_arm ~typing_env_at_use ~scrutinee_ty arm action (arms, dacc) =
       Simplify_common.apply_cont_use_kind ~context:Switch_branch action
     in
     let { S.simples = args; simple_tys = arg_types } =
-      S.simplify_simples dacc args
+      S.simplify_simples (DA.with_denv dacc denv_at_use) args
     in
     let dacc, rewrite_id =
       DA.record_continuation_use dacc (AC.continuation action) use_kind

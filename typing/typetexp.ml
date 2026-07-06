@@ -762,11 +762,9 @@ let transl_type_param env path jkind_default styp =
 
 let get_type_param_jkind env path styp =
   let of_annotation jkind name =
-    let jkind =
-      Jkind.of_annotation env ~use_abstract_jkinds:false
-        ~context:(Type_parameter (path, name)) jkind
-    in
-    jkind
+    (* Warnings are emitted in [transl_type_param] rather than here *)
+    Jkind.of_annotation env ~use_abstract_jkinds:false ~warn:false
+      ~context:(Type_parameter (path, name)) jkind
   in
   match styp.ptyp_desc with
   | Ptyp_any (Some jkind) ->
@@ -1722,7 +1720,7 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
         | Tvar { jkind; _ } ->
           let desc = jkind.jkind in
           (match desc.base with
-          | Kconstr (Pident id) ->
+          | Kconstr (Pident id, sa) ->
             let v_opt =
               List.find_map
                 (fun (id', v) ->
@@ -1732,8 +1730,7 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
             (match v_opt with
             | Some v ->
               let base : Jkind_types.Sort.t Jkind_types.Layout.t jkind_base
-                = Layout (Sort (Var v, {separability = Maybe_separable;
-                                        nullability = Maybe_null})) in
+                = Layout (Sort (Var v, sa)) in
               let desc = {desc with base} in
               let jkind = {jkind with jkind = desc} in
               Types.set_var_jkind t jkind

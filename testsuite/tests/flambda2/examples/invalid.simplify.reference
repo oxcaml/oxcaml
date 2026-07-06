@@ -48,7 +48,7 @@ let code loopify(never) size(11) newer_version_of(foo_2)
     where k3 (param_1 : imm tagged) =
       cont k2
     where k2 =
-      invalid "(Defining_expr_of_let (bound_pattern prim/110N)\n (defining_expr\n  (((Array_load Naked_floats Naked_floats Mutable) t2/106UV 0)\n   invalid.ml:20,2--23)))"
+      invalid "(Defining_expr_of_let (bound_pattern prim/110N)\n (defining_expr\n  (((Array_load Naked_floats Naked_floats Mutable) t2/106UV 0)\n   invalid.ml:29,2--23)))"
 in
 let $camlInvalid__foo_5 = closure foo_2_1 @foo in
 let $camlInvalid =

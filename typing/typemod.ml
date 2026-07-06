@@ -716,11 +716,11 @@ let type_decl_is_alias sdecl = (* assuming no explicit constraint *)
 
 let kind_decl_is_alias sdecl =
   match sdecl.pjkind_manifest with
-  | Some { pjka_desc = Pjk_abbreviation (lid, []); _ } -> Some lid
+  | Some { pjka_desc = Pjk_abbreviation lid; _ } -> Some lid
   | None
   | Some { pjka_desc =
-             ( Pjk_abbreviation (_, _ :: _) | Pjk_default | Pjk_mod _
-             | Pjk_with _ | Pjk_kind_of _ | Pjk_product _ ); _ }
+             ( Pjk_operator _ | Pjk_default | Pjk_mod _ | Pjk_with _
+             | Pjk_kind_of _ | Pjk_product _ ); _ }
     -> None
 
 let params_are_constrained =
@@ -1403,11 +1403,12 @@ and apply_modalities_module_type env modalities = function
   | (Mty_functor _ | Mty_alias _) as mty -> mty
 
 let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
-  modalities =
+    ?(allow_redundant_staticity = false) modalities =
   match modalities with
   | [] -> { moda_modalities = default_modalities; moda_desc = [] }
   | _ :: _ ->
     Typemode.transl_modalities_with_default
+      ~allow_redundant_staticity
       ~default:default_modalities ~maturity:Stable modalities
 
 let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
@@ -2193,7 +2194,8 @@ and add_implicit_jkinds env attrs =
   in
   List.fold_left register_default env attrs
 
-and transl_signature env {psg_items; psg_modalities; psg_loc} =
+and transl_signature ?(interface_toplevel = false) env
+      {psg_items; psg_modalities; psg_loc} =
   let names = Signature_names.create () in
 
   (* We assume the structure (described by the signature) to be at legacy mode,
@@ -2201,7 +2203,10 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
   (* CR-soon zqian: make it a parameter instead *)
   let md_mode = Value.legacy in
 
-  let sig_modalities = transl_modalities psg_modalities in
+  let sig_modalities =
+    transl_modalities ~allow_redundant_staticity:interface_toplevel
+      psg_modalities
+  in
 
   let transl_include ~loc env sig_acc sincl modalities =
     let smty = sincl.pincl_mod in
@@ -4676,7 +4681,7 @@ let type_interface ~sourcefile modulename env ast =
     let uid = Shape.Uid.of_compilation_unit_id modulename in
     cms_register_toplevel_signature_attributes ~uid ~sourcefile ast
   end;
-  let sg = transl_signature env ast in
+  let sg = transl_signature ~interface_toplevel:true env ast in
   let arg_type =
     !Clflags.as_argument_for
     |> Option.map Global_module.Parameter_name.of_string

@@ -115,12 +115,17 @@ let enter_code env =
     vars_within_closures = env.vars_within_closures
   }
 
+let chop_stamp name =
+  match String.split_on_char '/' name with
+  | [] | _ :: _ :: _ :: _ -> Misc.fatal_errorf "invalid id '%s'" name
+  | [name] | [name; _] -> name
+
 let fresh_cont env { Fexpr.txt = name; loc = _ } ~sort ~arity =
-  let c = Continuation.create ~sort ~name () in
+  let c = Continuation.create ~sort ~name:(chop_stamp name) () in
   c, { env with continuations = CM.add name (c, arity) env.continuations }
 
 let fresh_exn_cont env { Fexpr.txt = name; loc = _ } ~arity =
-  let c = Continuation.create ~name () in
+  let c = Continuation.create ~name:(chop_stamp name) () in
   ( c,
     { env with
       continuations = CM.add name (c, arity) env.continuations;
@@ -128,7 +133,7 @@ let fresh_exn_cont env { Fexpr.txt = name; loc = _ } ~arity =
     } )
 
 let fresh_var env { Fexpr.txt = name; loc = _ } k =
-  let v = Variable.create name ~user_visible:() k in
+  let v = Variable.create (chop_stamp name) ~user_visible:() k in
   let v_duid = Flambda_debug_uid.none in
   (* CR sspies: In the future, try to improve the debug UID propagation here. *)
   v, v_duid, { env with variables = VM.add name v env.variables }
