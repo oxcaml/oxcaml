@@ -8217,12 +8217,25 @@ module Crossing = struct
     let modality m (Modality t) = Modality (Modality.Const.concat ~then_:t m)
 
     let apply_left (Modality (Join_const c)) m =
-      Mode.subtract_const_unhint c
-        (Mode.unhint (Mode.join [Mode.of_const c; m]))
+      (* [fl (f m)] where [f = join_const c] and [fl = subtract_const c]. By
+         adjunction, [subtract (join c m) c = subtract m c]: both are the least
+         [y] with [m <= join c y].
+         Fast-path the two extreme crossings: [c = min] is the identity, and
+         [c = max] (full crossing) gives the constant [min]. These are the
+         common cases and avoid materializing the join below. *)
+      if Mode.Const.le c Mode.Const.min
+      then Mode.unhint m
+      else if Mode.Const.le Mode.Const.max c
+      then Mode.unhint (Mode.of_const Mode.Const.min |> Mode.disallow_right)
+      else
+        Mode.subtract_const_unhint c
+          (Mode.unhint (Mode.join [Mode.of_const c; m]))
 
     let apply_right_unhint (Modality (Join_const c)) m =
       (* The right adjoint of join is a restriction of identity *)
-      Mode.join_const_unhint c m
+      if Mode.Const.le c Mode.Const.min
+      then m
+      else Mode.join_const_unhint c m
 
     let apply_right_alloc t m =
       Monadic.hint ~hint:Crossing (apply_right_unhint t (S.Unhint.unhint m))
@@ -8328,7 +8341,9 @@ module Crossing = struct
 
     let apply_left_unhint (Modality (Meet_const c)) m =
       (* The left adjoint of meet is a restriction of identity *)
-      Mode.meet_const_unhint c m
+      if Mode.Const.le Mode.Const.max c
+      then m
+      else Mode.meet_const_unhint c m
 
     let apply_left_alloc t m =
       Alloc.Comonadic.hint ~hint:Crossing
@@ -8336,7 +8351,18 @@ module Crossing = struct
         |> apply_left_unhint t |> comonadic_regional_to_local)
 
     let apply_right (Modality (Meet_const c)) m =
-      Mode.imply_const_unhint c (Mode.unhint (Mode.meet [Mode.of_const c; m]))
+      (* [fr (f m)] where [f = meet_const c] and [fr = imply_const c]. By
+         adjunction, [imply c (meet c m) = imply c m]: both are the largest [y]
+         with [meet c y <= m].
+         Fast-path the two extreme crossings: [c = max] is the identity, and
+         [c = min] (full crossing) gives the constant [max]. These are the
+         common cases and avoid materializing the meet below. *)
+      if Mode.Const.le Mode.Const.max c
+      then Mode.unhint m
+      else if Mode.Const.le c Mode.Const.min
+      then Mode.unhint (Mode.of_const Mode.Const.max |> Mode.disallow_left)
+      else
+        Mode.imply_const_unhint c (Mode.unhint (Mode.meet [Mode.of_const c; m]))
 
     let le (Modality (Meet_const c1)) (Modality (Meet_const c2)) =
       Mode.Const.le c1 c2
