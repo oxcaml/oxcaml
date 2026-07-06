@@ -30,8 +30,9 @@ let scale_of_chunk : Cmm.memory_chunk -> int = function
   | Fivetwelve_aligned ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
   | ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-    | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int | Word_val
-    | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned ) as chunk ->
+    | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int
+    | Word_int_unaligned | Word_val | Double | Onetwentyeight_unaligned
+    | Onetwentyeight_aligned ) as chunk ->
     Cmm.size_of_memory_chunk chunk
 
 let is_offset chunk n =

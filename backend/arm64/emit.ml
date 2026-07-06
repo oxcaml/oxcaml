@@ -1546,7 +1546,7 @@ let emit_instr env i =
     | Single { reg = Float64 } ->
       A.ins2 LDR_simd_and_fp reg_s7 addressing;
       A.ins2 FCVT (H.reg_d dst) reg_s7
-    | Word_int | Word_val ->
+    | Word_int | Word_int_unaligned | Word_val ->
       if is_atomic
       then (
         assert (
@@ -1599,7 +1599,7 @@ let emit_instr env i =
     | Single { reg = Float64 } ->
       A.ins2 FCVT reg_s7 (H.reg_d src);
       A.ins2 STR_simd_and_fp reg_s7 addressing
-    | Word_int | Word_val ->
+    | Word_int | Word_int_unaligned | Word_val ->
       (* memory model barrier for non-initializing store *)
       if assignment then A.ins0 (DMB ISHLD);
       A.ins2 STR (H.reg_x src) addressing

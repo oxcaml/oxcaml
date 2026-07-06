@@ -291,6 +291,10 @@ type memory_chunk =
   | Thirtytwo_unsigned
   | Thirtytwo_signed
   | Word_int (* integer or pointer outside heap *)
+  | Word_int_unaligned
+    (* 64-bit integer that may be stored at an unaligned address (e.g.
+       [Bytes.set_int64]); must not use ordered (release/acquire) accesses,
+       which require natural alignment on Arm. *)
   | Word_val (* pointer inside heap or encoded int *)
   | Single of { reg : float_width }
     (* F32 on the heap, may be F32 or F64 in registers. *)
