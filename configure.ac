@@ -956,7 +956,7 @@ AC_ARG_WITH([relative-libdir],
     [yes],
       [bindir_to_libdir="..${default_separator}lib${default_separator}ocaml"],
     [bindir_to_libdir="$withval"])],
-  [bindir_to_libdir=''])
+  [bindir_to_libdir="..${default_separator}lib${default_separator}ocaml"])
 
 AC_ARG_ENABLE([suffixing],
   [AS_HELP_STRING([--disable-suffixing],
@@ -972,7 +972,8 @@ AC_ARG_ENABLE([runtime-search],
     [yes],[runtime_search='enable'],
     [fallback],[runtime_search='fallback'],
     [AC_MSG_ERROR(m4_normalize([valid values are yes, no or fallback for
-       --enable-runtime-search]))])])
+       --enable-runtime-search]))])],
+  [runtime_search='enable'])
 
 AC_ARG_ENABLE([runtime-search-target],
   [AS_HELP_STRING([--enable-runtime-search-target],
@@ -982,7 +983,8 @@ AC_ARG_ENABLE([runtime-search-target],
     [yes],[runtime_search_target='enable'],
     [fallback],[runtime_search_target='fallback'],
     [AC_MSG_ERROR(m4_normalize([valid values are yes, no or fallback for
-       --enable-runtime-search-target]))])])
+       --enable-runtime-search-target]))])],
+  [runtime_search_target='fallback'])
 
 AS_CASE([$suffixing,$runtime_search,$runtime_search_target],
   [true,*,*|false,,],[],
