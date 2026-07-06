@@ -1617,8 +1617,18 @@ module Scalar_type : sig
     val static_cast : t static_cast
   end
 
-  module type Integral_ops := sig
-    type t
+  (** A naked integer of a given width, or a tagged OCaml immediate. *)
+  module Integer : sig
+    type t =
+      | Naked_int of int_width
+      | Tagged_int
+
+    val nativeint : t
+
+    val naked_immediate : t
+
+    (** [bit_width Tagged_int] is [arch_bits], which includes the tag bit. *)
+    val bit_width : t -> int
 
     val print : Format.formatter -> t -> unit
 
@@ -1629,41 +1639,8 @@ module Scalar_type : sig
     val conjugate : t conjugate
   end
 
-  (** An integer stored the lower [bits] bits of a register-width
-      twos-complement integer, and sign- or zero-extended as needed, according
-      to [signedness]. *)
-  module Integer : sig
-    type t [@@immediate]
-
-    val nativeint : t
-
-    val create : width:int_width -> t
-
-    val bit_width : t -> int
-
-    include Integral_ops with type t := t
-  end
-
-  module Integral : sig
-    type t =
-      | Naked_int of Integer.t
-      | Tagged_int
-
-    val nativeint : t
-
-    (** Gets the integer resulting from untagging the integeral iff it is
-        tagged.
-
-        E.g., you can use [static_cast ~src ~dst:(Untagged (untagged src))] to
-        untag a value of type [src], And in the cas where [src] is already
-        untagged, this becomes the identity function *)
-    val untagged_or_identity : t -> Integer.t
-
-    include Integral_ops with type t := t
-  end
-
   type t =
-    | Integral of Integral.t
+    | Integer of Integer.t
     | Float of Float_width.t
 
   val static_cast : t static_cast

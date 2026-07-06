@@ -5537,60 +5537,39 @@ module Scalar_type = struct
   end
 
   module Integer = struct
-    type t = int_width
-
-    let create ~width = width
-
-    let bit_width t = bits_of_int_width t
-
-    let equal x y = equal_int_width x y
-
-    let[@inline] static_cast ~dbg:_ ~src:_ ~dst:_ _exp = assert false
-    (* if can_cast_without_losing_information ~src ~dst then (* Since
-       [Bit_width_and_signedness] represents sign- or zero-extended expressions,
-       this is a no-op *) exp else match signedness dst with | Signed ->
-       sign_extend ~bits:(bit_width dst) exp ~dbg | Unsigned -> zero_extend
-       ~bits:(bit_width dst) exp ~dbg *)
-
-    let[@inline] conjugate ~outer ~inner ~dbg ~f x =
-      x
-      |> static_cast ~src:outer ~dst:inner ~dbg
-      |> f
-      |> static_cast ~src:inner ~dst:outer ~dbg
-
-    let print ppf t = Format.fprintf ppf "int%d" (bits_of_int_width t)
-
-    let nativeint =
-      assert (arch_bits = 64);
-      Int64
-  end
-
-  module Integral = struct
     type t =
-      | Naked_int of Integer.t
+      | Naked_int of int_width
       | Tagged_int
 
-    let nativeint = Naked_int Integer.nativeint
+    let nativeint, naked_immediate =
+      assert (arch_bits = 64);
+      Naked_int Int64, Naked_int Int63
 
-    let[@inline] untagged_or_identity = function
-      | Naked_int t -> t
-      | Tagged_int -> Integer.nativeint
+    let bit_width = function
+      | Naked_int width -> bits_of_int_width width
+      | Tagged_int -> arch_bits
 
     let[@inline] equal x y =
       match x, y with
-      | Naked_int x, Naked_int y -> Integer.equal x y
+      | Naked_int x, Naked_int y -> equal_int_width x y
       | Naked_int _, _ -> false
       | Tagged_int, Tagged_int -> true
       | Tagged_int, _ -> false
 
     let print ppf t =
       match t with
-      | Naked_int untagged -> Integer.print ppf untagged
+      | Naked_int width -> Format.fprintf ppf "int%d" (bits_of_int_width width)
       | Tagged_int -> Format.fprintf ppf "tagged_int"
 
-    let static_cast ~dbg ~src ~dst exp =
+    let static_cast ~dbg:_ ~src ~dst exp =
       match src, dst with
-      | Naked_int src, Naked_int dst -> Integer.static_cast ~dbg ~src ~dst exp
+      | Naked_int _, Naked_int _ ->
+        (* if can_cast_without_losing_information ~src ~dst then (* Since
+           [Bit_width_and_signedness] represents sign- or zero-extended
+           expressions, this is a no-op *) exp else match signedness dst with |
+           Signed -> sign_extend ~bits:(bit_width dst) exp ~dbg | Unsigned ->
+           zero_extend ~bits:(bit_width dst) exp ~dbg *)
+        assert false
       | Tagged_int, Tagged_int -> exp
       | Naked_int _, Tagged_int -> assert false
       | Tagged_int, Naked_int _ -> assert false
@@ -5603,27 +5582,27 @@ module Scalar_type = struct
   end
 
   type t =
-    | Integral of Integral.t
+    | Integer of Integer.t
     | Float of Float_width.t
 
   let static_cast ~dbg ~src ~dst exp =
     match src, dst with
-    | Integral src, Integral dst -> Integral.static_cast ~dbg ~src ~dst exp
+    | Integer src, Integer dst -> Integer.static_cast ~dbg ~src ~dst exp
     | Float src, Float dst -> Float_width.static_cast ~dbg ~src ~dst exp
-    | Integral src, Float dst ->
-      let float_of_int_arg = Integral.nativeint in
+    | Integer src, Float dst ->
+      let float_of_int_arg = Integer.nativeint in
       (*= if *)
       (*=   not *)
-      (*=     (Integral.can_cast_without_losing_information ~src *)
+      (*=     (Integer.can_cast_without_losing_information ~src *)
       (*=        ~dst:float_of_int_arg) *)
       (*= then *)
       (*=   Misc.fatal_errorf "static_cast: casting %a to float is not implemented" *)
-      (*=     Integral.print src *)
+      (*=     Integer.print src *)
       (*= else *)
       unary (Cstatic_cast (Float_of_int64 dst)) ~dbg
-        (Integral.static_cast exp ~dbg ~src ~dst:float_of_int_arg)
-    | Float src, Integral dst ->
-      (*= match Integral.signedness dst with *)
+        (Integer.static_cast exp ~dbg ~src ~dst:float_of_int_arg)
+    | Float src, Integer dst ->
+      (*= match Integer.signedness dst with *)
       (*= | Unsigned -> *)
       (*=   Misc.fatal_errorf *)
       (*=     "static_cast: casting floats to unsigned values is not implemented" *)
@@ -5634,9 +5613,9 @@ module Scalar_type = struct
 
          CR jrayman *)
       let exp = unary (Cstatic_cast (Int64_of_float src)) exp ~dbg in
-      let src = Integral.nativeint in
+      let src = Integer.nativeint in
       (* CR jrayman: cast down *)
-      Integral.static_cast exp ~dbg ~src ~dst
+      Integer.static_cast exp ~dbg ~src ~dst
 
   let[@inline] conjugate ~outer ~inner ~dbg ~f x =
     x
