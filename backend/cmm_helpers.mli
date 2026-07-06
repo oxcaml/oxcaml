@@ -1592,7 +1592,12 @@ module Scalar_type : sig
 
       CR jrayman *)
   type 'a static_cast :=
-    dbg:Debuginfo.t -> src:'a -> dst:'a -> expression -> expression
+    dbg:Debuginfo.t ->
+    src:'a ->
+    dst:'a ->
+    signedness:Scalar.Signedness.t ->
+    expression ->
+    expression
 
   (** Conjugate f by [static_cast ~src:outer ~dst:inner].
 
@@ -1604,6 +1609,7 @@ module Scalar_type : sig
     outer:'a ->
     inner:'a ->
     dbg:Debuginfo.t ->
+    signedness:Scalar.Signedness.t ->
     f:(expression -> expression) ->
     expression ->
     expression

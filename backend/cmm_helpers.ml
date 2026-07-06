@@ -5528,7 +5528,7 @@ module Scalar_type = struct
       | Float64
       | Float32
 
-    let[@inline] static_cast ~dbg ~src ~dst exp =
+    let[@inline] static_cast ~dbg ~src ~dst ~signedness:_ exp =
       match src, dst with
       | Float64, Float64 -> exp
       | Float32, Float32 -> exp
@@ -5561,34 +5561,42 @@ module Scalar_type = struct
       | Naked_int width -> Format.fprintf ppf "int%d" (bits_of_int_width width)
       | Tagged_int -> Format.fprintf ppf "tagged_int"
 
-    let static_cast ~dbg:_ ~src ~dst exp =
+    let static_cast ~dbg ~src ~dst ~signedness exp =
       match src, dst with
-      | Naked_int _, Naked_int _ ->
+      | Naked_int src, Naked_int dst ->
         (* if can_cast_without_losing_information ~src ~dst then (* Since
            [Bit_width_and_signedness] represents sign- or zero-extended
            expressions, this is a no-op *) exp else match signedness dst with |
            Signed -> sign_extend ~bits:(bit_width dst) exp ~dbg | Unsigned ->
            zero_extend ~bits:(bit_width dst) exp ~dbg *)
-        assert false
+        unary (Cstatic_cast (Int_conv { src; dst; signedness })) ~dbg exp
       | Tagged_int, Tagged_int -> exp
-      | Naked_int _, Tagged_int -> assert false
-      | Tagged_int, Naked_int _ -> assert false
+      | Naked_int src, Tagged_int ->
+        unary
+          (Cstatic_cast (Int_conv { src; dst = Int64; signedness }))
+          ~dbg exp
+        |> unary (Cstatic_cast Tagged_int_of_int64) ~dbg
+      | Tagged_int, Naked_int dst ->
+        unary (Cstatic_cast (Int64_of_tagged_int { signedness })) ~dbg exp
+        |> unary (Cstatic_cast (Int_conv { src = Int64; dst; signedness })) ~dbg
 
-    let[@inline] conjugate ~outer ~inner ~dbg ~f x =
+    let[@inline] conjugate ~outer ~inner ~dbg ~signedness ~f x =
       x
-      |> static_cast ~src:outer ~dst:inner ~dbg
+      |> static_cast ~src:outer ~dst:inner ~dbg ~signedness
       |> f
-      |> static_cast ~src:inner ~dst:outer ~dbg
+      |> static_cast ~src:inner ~dst:outer ~dbg ~signedness
   end
 
   type t =
     | Integer of Integer.t
     | Float of Float_width.t
 
-  let static_cast ~dbg ~src ~dst exp =
+  let static_cast ~dbg ~src ~dst ~signedness exp =
     match src, dst with
-    | Integer src, Integer dst -> Integer.static_cast ~dbg ~src ~dst exp
-    | Float src, Float dst -> Float_width.static_cast ~dbg ~src ~dst exp
+    | Integer src, Integer dst ->
+      Integer.static_cast ~dbg ~src ~dst ~signedness exp
+    | Float src, Float dst ->
+      Float_width.static_cast ~dbg ~src ~dst ~signedness exp
     | Integer src, Float dst ->
       let float_of_int_arg = Integer.nativeint in
       (*= if *)
@@ -5600,7 +5608,8 @@ module Scalar_type = struct
       (*=     Integer.print src *)
       (*= else *)
       unary (Cstatic_cast (Float_of_int64 dst)) ~dbg
-        (Integer.static_cast exp ~dbg ~src ~dst:float_of_int_arg)
+        (Integer.static_cast exp ~dbg ~src ~dst:float_of_int_arg
+           ~signedness:Scalar.Signedness.Signed)
     | Float src, Integer dst ->
       (*= match Integer.signedness dst with *)
       (*= | Unsigned -> *)
@@ -5616,10 +5625,11 @@ module Scalar_type = struct
       let src = Integer.nativeint in
       (* CR jrayman: cast down *)
       Integer.static_cast exp ~dbg ~src ~dst
+        ~signedness:Scalar.Signedness.Signed
 
-  let[@inline] conjugate ~outer ~inner ~dbg ~f x =
+  let[@inline] conjugate ~outer ~inner ~dbg ~signedness ~f x =
     x
-    |> static_cast ~src:outer ~dst:inner ~dbg
+    |> static_cast ~src:outer ~dst:inner ~dbg ~signedness
     |> f
-    |> static_cast ~src:inner ~dst:outer ~dbg
+    |> static_cast ~src:inner ~dst:outer ~dbg ~signedness
 end

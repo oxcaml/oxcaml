@@ -817,14 +817,14 @@ let unary_int_arith_primitive _env dbg kind op arg =
     | Tagged_immediate ->
       (* XXX mshinwell: Why does this case arise when it did not before? *)
       C.Scalar_type.Integer.conjugate arg ~outer:tagged_immediate
-        ~inner:naked_immediate ~dbg ~f:(fun arg ->
+        ~inner:naked_immediate ~dbg ~signedness:Signed ~f:(fun arg ->
           C.bbswap Sixteen arg dbg |> C.zero_extend ~bits:16 ~dbg)
     | Naked_immediate ->
       (* This case should not have a sign extension, confusingly, because it
          arises from the [Pbswap16] Lambda primitive. That operation does not
          affect the sign of the resulting value. *)
       C.Scalar_type.Integer.static_cast arg ~dbg ~src:naked_immediate
-        ~dst:naked_int16
+        ~dst:naked_int16 ~signedness:Signed
       |> (fun arg -> C.bbswap Sixteen arg dbg)
       |> C.zero_extend ~bits:16 ~dbg
     | Naked_int8 -> arg
@@ -865,7 +865,7 @@ let arithmetic_conversion dbg src dst arg =
           (Integer (Tagged_int | Naked_int _) | Float (Float32 | Float64)) ) ->
         None
     in
-    extra, C.Scalar_type.static_cast ~dbg ~src ~dst arg
+    extra, C.Scalar_type.static_cast ~dbg ~src ~dst ~signedness:Signed arg
 
 let phys_equal _env dbg op x y =
   match (op : P.equality_comparison) with
@@ -910,7 +910,7 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     let[@inline] prepare_operand operand =
       let operand =
         C.Scalar_type.Integer.static_cast ~dbg ~src:kind ~dst:operator_type
-          operand
+          ~signedness:Signed operand
       in
       if requires_sign_extended_operands op
       then operand
@@ -921,7 +921,8 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     let x = prepare_operand x in
     let y = prepare_operand y in
     let result = operator x y dbg in
-    C.Scalar_type.Integer.static_cast ~dbg ~src:operator_type ~dst:kind result
+    C.Scalar_type.Integer.static_cast ~dbg ~src:operator_type ~dst:kind
+      ~signedness:Signed result
     (* Operations on integer arguments must return something in the range of
        their values, hence the [static_cast] here. The [C.low_bits] operations
        (see above in [prepare_operand]) are used to avoid unnecessary
@@ -977,24 +978,24 @@ let binary_int_shift_primitive _env dbg kind (op : P.int_shift_op) x y =
     | Asr -> C.asr_int_caml_raw x y ~dbg)
   | kind ->
     let kind = integral_of_standard_int kind in
-    let right_shift_kind (_ : Scalar.Signedness.t) =
+    let right_shift_kind (signedness : Scalar.Signedness.t) =
       (* right shifts can operate directly on any untagged integers of the
          correct signedness, as they do not require sign- or zero-extension
          after the shift, since the cmm scalar types are already stored sign- or
          zero-extended *)
-      kind
+      kind, signedness
     in
-    let f, (op_kind : C.Scalar_type.Integer.t) =
+    let f, ((op_kind : C.Scalar_type.Integer.t), signedness) =
       match op with
       | Asr -> C.asr_int, right_shift_kind Signed
       | Lsr -> C.lsr_int, right_shift_kind Unsigned
       | Lsl ->
         (* Left shifts operate on nativeints since they might shift arbitrary
            bits into the high bits of the register. *)
-        C.lsl_int, C.Scalar_type.Integer.nativeint
+        C.lsl_int, (C.Scalar_type.Integer.nativeint, Scalar.Signedness.Signed)
     in
     let y = C.low_bits ~bits:relevant_bits_for_shift_amount y ~dbg in
-    C.Scalar_type.Integer.conjugate ~outer:kind ~inner:op_kind ~dbg
+    C.Scalar_type.Integer.conjugate ~outer:kind ~inner:op_kind ~dbg ~signedness
       ~f:(fun x ->
         (* [kind] only applies to [x], the [y] argument is always a bare
            register-sized integer *)
