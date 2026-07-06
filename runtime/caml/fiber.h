@@ -235,6 +235,15 @@ struct c_stack_link {
  *  The function with argument is then executed on the new stack. Care is taken
  *  to check if the continuation has already been resumed and so its stack null.
  *
+ * caml_continue continuation value
+ * caml_discontinue continuation exn
+ * caml_discontinue_with_backtrace continuation exn backtrace
+ *  These are defunctionalized variants of caml_resume that switch to the
+ *  continuation's stack as above, but instead of running an arbitrary function
+ *  they perform a fixed action on the new stack: caml_continue returns value
+ *  (to the perform site), caml_discontinue raises exn, and
+ *  caml_discontinue_with_backtrace reraises exn with the provided backtrace.
+ *
  *
  *  Bytecode
  *  --------
@@ -254,6 +263,17 @@ struct c_stack_link {
  *   stack. Care is taken to setup the exception handler for the new stack.
  *   Execution continues on the new OCaml stack with the passed function and
  *   argument.
+ *
+ *  Pcontinue -> CONTINUE (& CONTINUETERM if a tail call)
+ *  Pdiscontinue -> DISCONTINUE (& DISCONTINUETERM if a tail call)
+ *  Pdiscontinue_with_backtrace -> DISCONTINUE_WITH_BACKTRACE
+ *                                 (& DISCONTINUE_WITH_BACKTRACETERM if a tail
+ *                                 call)
+ *   These are defunctionalized variants of RESUME: they switch stacks as RESUME
+ *   does, but then run a fixed action on the new stack rather than a passed
+ *   function. CONTINUE returns the value, DISCONTINUE raises the exception, and
+ *   DISCONTINUE_WITH_BACKTRACE restores the backtrace and reraises the
+ *   exception.
  *
  *  Pperform -> PERFORM
  *   PERFORM captures the current stack in a continuation object it allocates.

@@ -600,10 +600,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         | Punspecializedarray ->
           Misc.fatal_error "Blambda_of_lambda: Pmakearray Punspecializedarray")
     | Presume -> context_switch Resume ~arity:3
-    | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace ->
-      Misc.fatal_error
-        "Blambda_of_lambda: continue/discontinue/discontinue_with_backtrace \
-         not implemented in bytecode yet"
+    | Pcontinue -> context_switch Continue ~arity:2
+    | Pdiscontinue -> context_switch Discontinue ~arity:2
+    | Pdiscontinue_with_backtrace ->
+      context_switch Discontinue_with_backtrace ~arity:3
     | Pwith_stack -> context_switch With_stack ~arity:5
     | Pwith_stack_preemptible -> context_switch With_stack_preemptible ~arity:6
     | Preperform -> context_switch Reperform ~arity:3

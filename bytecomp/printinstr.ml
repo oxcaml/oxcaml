@@ -110,6 +110,13 @@ let instruction ppf = function
   | Kperform -> fprintf ppf "\tperform"
   | Kresume -> fprintf ppf "\tresume"
   | Kresumeterm n -> fprintf ppf "\tresumeterm %i" n
+  | Kcontinue -> fprintf ppf "\tcontinue"
+  | Kcontinueterm n -> fprintf ppf "\tcontinueterm %i" n
+  | Kdiscontinue -> fprintf ppf "\tdiscontinue"
+  | Kdiscontinueterm n -> fprintf ppf "\tdiscontinueterm %i" n
+  | Kdiscontinue_with_backtrace -> fprintf ppf "\tdiscontinue_with_backtrace"
+  | Kdiscontinue_with_backtraceterm n ->
+    fprintf ppf "\tdiscontinue_with_backtraceterm %i" n
   | Kreperformterm n -> fprintf ppf "\treperformterm %i" n
   | Kwith_stack -> fprintf ppf "\twith_stack"
   | Kwith_stack_preemptible -> fprintf ppf "\twith_stack_preemptible"

@@ -246,7 +246,15 @@ Caml_inline void check_trap_barrier_for_effect
 static CAMLthread_local intnat caml_bcodcount;
 #endif
 
-static value raise_unhandled_effect;
+/* What to do on the resumed stack after a context switch to a continuation */
+enum resume_action {
+  Resume_call_fn, /* run [resume_fn] on the resumed stack */
+  Resume_return,  /* return [resume_arg] to the perform site */
+  Resume_raise,   /* raise [resume_arg] at the perform site */
+  Resume_reraise  /* reraise [resume_arg], preserving the restored backtrace */
+};
+
+extern value caml_restore_raw_backtrace(value exn, value backtrace);
 
 /* The interpreter itself */
 
@@ -281,6 +289,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
   volatile value raise_async_exn_bucket = Val_unit;
   struct longjmp_buffer raise_buf, raise_async_buf;
   value resume_fn, resume_arg;
+  enum resume_action resume_action;
   struct stack_info* resume_tail;
   caml_domain_state* domain_state = Caml_state;
   struct caml_exception_context exception_ctx =
@@ -300,25 +309,9 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
 #endif
 
   if (prog == NULL) {           /* Interpreter is initializing */
-    static opcode_t raise_unhandled_effect_code[] = { ACC, 0, RAISE };
-    value raise_unhandled_effect_closure;
-
-    caml_register_code_fragment(
-      (char *) raise_unhandled_effect_code,
-      (char *) raise_unhandled_effect_code +
-      sizeof(raise_unhandled_effect_code),
-      DIGEST_IGNORE, NULL);
 #ifdef THREADED_CODE
     caml_init_thread_code(jumptable, Jumptbl_base);
-    caml_thread_code(raise_unhandled_effect_code,
-                     sizeof(raise_unhandled_effect_code));
 #endif
-    raise_unhandled_effect_closure = caml_alloc_small (2, Closure_tag);
-    Code_val(raise_unhandled_effect_closure) =
-      (code_t)raise_unhandled_effect_code;
-    Closinfo_val(raise_unhandled_effect_closure) = Make_closinfo(0, 2, 1);
-    raise_unhandled_effect = raise_unhandled_effect_closure;
-    caml_register_generational_global_root(&raise_unhandled_effect);
     caml_register_generational_global_root(&caml_global_data);
     caml_init_callbacks();
     return Val_unit;
@@ -1347,6 +1340,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
 /* Context switching */
 
     Instruct(RESUME):
+      resume_action = Resume_call_fn;
       resume_fn = sp[0];
       resume_arg = sp[1];
       resume_tail = Ptr_val(Field(accu, 1));
@@ -1378,15 +1372,43 @@ do_resume: {
       caml_dynamic_cache_flush(domain_state->dynamic_bindings);
 
       domain_state->trap_sp_off = Long_val(sp[0]);
-      sp[0] = resume_arg;
-      accu = resume_fn;
-      pc = Code_val(accu);
-      env = accu;
-      extra_args = 0;
-      goto check_stacks;
+      switch (resume_action) {
+      case Resume_call_fn:
+        /* Run [resume_fn resume_arg] on the resumed stack; the argument is
+           passed on the stack, replacing the trap-offset slot. */
+        sp[0] = resume_arg;
+        accu = resume_fn;
+        pc = Code_val(accu);
+        env = accu;
+        extra_args = 0;
+        goto check_stacks;
+      case Resume_return:
+        accu = resume_arg; /* value */
+        pc = (code_t) sp[1];
+        env = sp[2];
+        extra_args = Long_val(sp[3]);
+        sp += 4;
+        goto check_stacks;
+      case Resume_raise:
+        accu = resume_arg;
+        check_trap_barrier_for_exception (domain_state);
+        if (domain_state->backtrace_active) {
+          caml_stash_backtrace(accu, sp, /*reraise=*/ 0);
+        }
+        goto raise_notrace;
+      case Resume_reraise:
+        accu = resume_arg;
+        check_trap_barrier_for_exception (domain_state);
+        if (domain_state->backtrace_active)
+          caml_stash_backtrace(accu, sp, /*reraise=*/ 1);
+        goto raise_notrace;
+      default:
+        caml_fatal_error("do_resume: invalid resume_action");
+      }
     }
 
     Instruct(RESUMETERM):
+      resume_action = Resume_call_fn;
       resume_fn = sp[0];
       resume_arg = sp[1];
       resume_tail = Ptr_val(Field(accu, 1));
@@ -1397,6 +1419,99 @@ do_resume: {
       sp[0] = Val_long(domain_state->trap_sp_off);
       sp[1] = Val_long(extra_args);
       goto do_resume;
+
+    Instruct(CONTINUE):
+      /* accu = continuation, sp[0] = value */
+      resume_action = Resume_return;
+      resume_arg = sp[0];
+      resume_tail = Ptr_val(Field(accu, 1));
+      Setup_for_c_call;
+      accu = caml_continuation_use_noexc(accu);
+      Restore_after_c_call;
+      sp -= 4;
+      sp[0] = Val_long(domain_state->trap_sp_off);
+      sp[1] = Val_long(0);
+      sp[2] = (value)pc;
+      sp[3] = env;
+      sp[4] = Val_long(extra_args);
+      goto do_resume;
+
+    Instruct(DISCONTINUE):
+      /* accu = continuation, sp[0] = exn */
+      resume_action = Resume_raise;
+      resume_arg = sp[0];
+      resume_tail = Ptr_val(Field(accu, 1));
+      Setup_for_c_call;
+      accu = caml_continuation_use_noexc(accu);
+      Restore_after_c_call;
+      sp -= 4;
+      sp[0] = Val_long(domain_state->trap_sp_off);
+      sp[1] = Val_long(0);
+      sp[2] = (value)pc;
+      sp[3] = env;
+      sp[4] = Val_long(extra_args);
+      goto do_resume;
+
+    Instruct(DISCONTINUE_WITH_BACKTRACE): {
+      /* accu = continuation, sp[0] = exn, sp[1] = backtrace */
+      value bt = sp[1];
+      resume_action = Resume_reraise;
+      resume_arg = sp[0];
+      resume_tail = Ptr_val(Field(accu, 1));
+      Setup_for_c_call;
+      caml_restore_raw_backtrace(resume_arg, bt);
+      accu = caml_continuation_use_noexc(accu);
+      Restore_after_c_call;
+      sp -= 3;
+      sp[0] = Val_long(domain_state->trap_sp_off);
+      sp[1] = Val_long(0);
+      sp[2] = (value)pc;
+      sp[3] = env;
+      sp[4] = Val_long(extra_args);
+      goto do_resume;
+    }
+
+    Instruct(CONTINUETERM):
+      /* accu = continuation, sp[0] = value */
+      resume_action = Resume_return;
+      resume_arg = sp[0];
+      resume_tail = Ptr_val(Field(accu, 1));
+      Setup_for_c_call;
+      accu = caml_continuation_use_noexc(accu);
+      Restore_after_c_call;
+      sp = sp + *pc - 2;
+      sp[0] = Val_long(domain_state->trap_sp_off);
+      sp[1] = Val_long(extra_args);
+      goto do_resume;
+
+    Instruct(DISCONTINUETERM):
+      /* accu = continuation, sp[0] = exn */
+      resume_action = Resume_raise;
+      resume_arg = sp[0];
+      resume_tail = Ptr_val(Field(accu, 1));
+      Setup_for_c_call;
+      accu = caml_continuation_use_noexc(accu);
+      Restore_after_c_call;
+      sp = sp + *pc - 2;
+      sp[0] = Val_long(domain_state->trap_sp_off);
+      sp[1] = Val_long(extra_args);
+      goto do_resume;
+
+    Instruct(DISCONTINUE_WITH_BACKTRACETERM): {
+      /* accu = continuation, sp[0] = exn, sp[1] = backtrace */
+      value bt = sp[1];
+      resume_action = Resume_reraise;
+      resume_arg = sp[0];
+      resume_tail = Ptr_val(Field(accu, 1));
+      Setup_for_c_call;
+      caml_restore_raw_backtrace(resume_arg, bt);
+      accu = caml_continuation_use_noexc(accu);
+      Restore_after_c_call;
+      sp = sp + *pc - 2;
+      sp[0] = Val_long(domain_state->trap_sp_off);
+      sp[1] = Val_long(extra_args);
+      goto do_resume;
+    }
 
     Instruct(PERFORM): {
       value cont;
@@ -1457,7 +1572,9 @@ do_resume: {
         resume_arg = caml_make_unhandled_effect_exn(eff);
         accu = caml_continuation_use(cont);
         Restore_after_c_call;
-        resume_fn = raise_unhandled_effect;
+        /* Deliver Effect.Unhandled by raising it at the perform site on
+           the continuation's stack. */
+        resume_action = Resume_raise;
         resume_tail = cont_tail;
 
         goto do_resume;
@@ -1494,6 +1611,7 @@ do_resume: {
       accu = caml_alloc_stack(valuec, exnc, effc);
       Restore_after_c_call;
       CAMLnoalloc;
+      resume_action = Resume_call_fn;
       resume_fn = sp[2];
       resume_arg = sp[3];
       resume_tail = NULL;
@@ -1515,6 +1633,7 @@ do_resume: {
       accu = caml_alloc_stack_preemptible(valuec, exnc, effc, htick);
       Restore_after_c_call;
       CAMLnoalloc;
+      resume_action = Resume_call_fn;
       resume_fn = sp[3];
       resume_arg = sp[4];
       resume_tail = NULL;

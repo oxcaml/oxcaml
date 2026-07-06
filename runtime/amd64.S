@@ -1596,6 +1596,118 @@ LBL(continuation_already_resumed):
 CFI_ENDPROC
 END_FUNCTION(caml_resume)
 
+/* The TSan instrumentation shared by the resume primitives */
+#if defined(WITH_THREAD_SANITIZER)
+#define RESUME_SWITCH_TSAN \
+    /* Save non-callee-saved registers %rax, %rsi and %r10 before C call */ \
+        ENTER_FUNCTION ; \
+        pushq   %rax; CFI_ADJUST(8); \
+        pushq   %rsi; CFI_ADJUST(8); \
+        pushq   %r10; CFI_ADJUST(8); \
+    /* Necessary to include the caller in the TSan backtrace */ \
+        TSAN_ENTER_FUNCTION(24) ; \
+        popq    %r10; CFI_ADJUST(-8); \
+        popq    %rsi; CFI_ADJUST(-8); \
+        popq    %rax; CFI_ADJUST(-8); \
+        TSAN_SAVE_CALLER_REGS ; \
+    /* Signal to TSan all stack frames exited by the perform. */ \
+        movq    Stack_sp(%r10), %r11 ; \
+        movq    STACK_RETADDR(%r11), C_ARG_1 ; /* arg 1: pc of perform */ \
+        leaq    STACK_ARG_1(%r11), C_ARG_2 ;   /* arg 2: sp at perform */ \
+        movq    %r10, C_ARG_3 ;                /* arg 3: fiber */ \
+        SWITCH_OCAML_TO_C ; \
+        C_call  (GCALL(caml_tsan_entry_on_resume)) ; \
+        SWITCH_C_TO_OCAML ; \
+        TSAN_RESTORE_CALLER_REGS ; \
+        LEAVE_FUNCTION
+#else
+#define RESUME_SWITCH_TSAN
+#endif
+
+/* Consume the continuation in %rax, make the current stack its parent, and
+   switch to it. The payload register %rbx (and, for the backtrace variant,
+   the restored backtrace) is preserved across the switch. On a preemption
+   continuation this jumps to LBL(resume_preemption) (defined in caml_resume
+   above); otherwise it falls through to the caller's tail. Shared by
+   caml_continue / caml_discontinue / caml_discontinue_with_backtrace. */
+#define DO_RESUME_SWITCH \
+        movq   Cont_last_fiber(%rax),  %r13 ; /* %r13 := last_fiber */ \
+        WOSIZE_BLOCK_VAL(%rax, %rcx) ; \
+        cmpq   $3, %rcx ;                    /* Wosize_hd(%rax) == 3 ? */ \
+        je     1f ; \
+        pushq  $0 ;                          /* no gc_regs, push NULL */ \
+        jmp    2f ; \
+1:      pushq  Cont_gc_regs(%rax) ;      /* we have a gc_regs, push it */ \
+        CFI_ADJUST(8) ;                          /* for either push */ \
+2:      movq   %rax, C_ARG_1 ; \
+        SWITCH_OCAML_TO_C ; \
+        C_call (GCALL(caml_continuation_use_noexc)) ; /* %rax := stack */ \
+        SWITCH_C_TO_OCAML ; \
+        leaq    -1(%rax), %r10 ;  /* %r10 (new stack) = Ptr_val(%rax) */ \
+    /* check if stack null, then already used */ \
+        testq   %r10, %r10 ; \
+        jz      LBL(continuation_already_resumed) ; \
+        RESUME_SWITCH_TSAN ; \
+    /* Record fiber id */ \
+        cmpb    $0, G(caml_cpu_ptwrite)(%rip) ; \
+        je      1f ; \
+        ptwriteq Stack_id(%r10) ; \
+    /* Add current stack to the last fiber */ \
+1:      popq    %rdx; CFI_ADJUST(-8) ; \
+        movq    (Stack_handler-1)(%r13), %rdi ; \
+        movq    Caml_state(current_stack), %rsi ; \
+        movq    %rsi, Handler_parent(%rdi) ; \
+    /* Need to update the oldest saved frame pointer here as the current \
+       fiber stack may have been reallocated or we may be resuming a \
+       computation that was not originally run here. */ \
+        UPDATE_BASE_POINTER(%rdi) ; \
+        SWITCH_OCAML_STACKS ; \
+        FLUSH_DYNAMIC_CACHE(%r13) ; \
+        testq   %rdx, %rdx ;               /* Do we have a gc_regs? */ \
+        jnz     LBL(resume_preemption)
+
+FUNCTION(caml_continue)
+CFI_STARTPROC
+    /* %rax -> continuation, %rbx -> value */
+        DO_RESUME_SWITCH
+    /* Return the value to the perform site on the resumed stack (this is what
+       the identity function used by [%resume] does). */
+        movq    %rbx, %rax
+        ret
+CFI_ENDPROC
+END_FUNCTION(caml_continue)
+
+FUNCTION(caml_discontinue)
+CFI_STARTPROC
+    /* %rax -> continuation, %rbx -> exn */
+        DO_RESUME_SWITCH
+    /* Raise the exception within the resumed computation. */
+        movq    %rbx, %rax
+        jmp     G(caml_raise_exn)
+CFI_ENDPROC
+END_FUNCTION(caml_discontinue)
+
+FUNCTION(caml_discontinue_with_backtrace)
+CFI_STARTPROC
+    /* %rax -> continuation, %rbx -> exn, %rdi -> backtrace */
+    /* Restore the provided backtrace before switching and reraising. The
+       backtrace buffer lives in the domain state, so restoring it before the
+       stack switch is fine. The continuation is carried in %r12 and the
+       exception in %rbx across the C call; both are C-callee-saved. */
+        movq    %rdi, C_ARG_2                 /* arg 2: backtrace */
+        movq    %rbx, C_ARG_1                 /* arg 1: exn */
+        movq    %rax, %r12                    /* save continuation */
+        SWITCH_OCAML_TO_C
+        C_call  (GCALL(caml_restore_raw_backtrace))
+        SWITCH_C_TO_OCAML
+        movq    %r12, %rax                    /* restore continuation */
+        DO_RESUME_SWITCH
+    /* Reraise the exception within the resumed computation. */
+        movq    %rbx, %rax
+        jmp     G(caml_reraise_exn)
+CFI_ENDPROC
+END_FUNCTION(caml_discontinue_with_backtrace)
+
 /* Run a function on a new stack,
    then invoke either the value or exception handler */
 FUNCTION(caml_runstack)

@@ -528,6 +528,42 @@ and comp_expr stack_info env exp sz cont =
       (* Resume itself only pushes 2 words, but perform adds another *)
       check_stack stack_info (sz + nargs + 3);
       comp_args stack_info env args sz (Kresume :: cont))
+  | Context_switch (Continue, args) ->
+    let nargs = List.length args - 1 in
+    assert (nargs = 1);
+    if is_tailcall cont
+    then (
+      check_stack stack_info 3;
+      comp_args stack_info env args sz
+        (Kcontinueterm (sz + nargs) :: discard_dead_code cont))
+    else (
+      (* The resume return frame is 5 words and sits above [sz]; if the
+         resumed fiber performs, PERFORM/REPERFORMTERM push one more word
+         onto this stack. *)
+      check_stack stack_info (sz + 6);
+      comp_args stack_info env args sz (Kcontinue :: cont))
+  | Context_switch (Discontinue, args) ->
+    let nargs = List.length args - 1 in
+    assert (nargs = 1);
+    if is_tailcall cont
+    then (
+      check_stack stack_info 3;
+      comp_args stack_info env args sz
+        (Kdiscontinueterm (sz + nargs) :: discard_dead_code cont))
+    else (
+      check_stack stack_info (sz + 6);
+      comp_args stack_info env args sz (Kdiscontinue :: cont))
+  | Context_switch (Discontinue_with_backtrace, args) ->
+    let nargs = List.length args - 1 in
+    assert (nargs = 2);
+    if is_tailcall cont
+    then (
+      check_stack stack_info 3;
+      comp_args stack_info env args sz
+        (Kdiscontinue_with_backtraceterm (sz + nargs) :: discard_dead_code cont))
+    else (
+      check_stack stack_info (sz + 6);
+      comp_args stack_info env args sz (Kdiscontinue_with_backtrace :: cont))
   | Context_switch (With_stack, args) ->
     let nargs = List.length args in
     assert (nargs = 5);

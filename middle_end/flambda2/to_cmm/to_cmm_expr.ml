@@ -495,10 +495,40 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       in
       let free_vars = BV.Set.union (BV.Set.union fv0 fv1) fv2 in
       C.resume ~dbg ~cont ~f ~arg, free_vars, env, res, Ece.all
-    | Continue _ | Discontinue _ | Discontinue_with_backtrace _ ->
-      Misc.fatal_error
-        "Continue/Discontinue/Discontinue_with_backtrace not yet implemented \
-         in to_cmm")
+    | Continue { cont; value } ->
+      let { env; res; expr = { cmm = cont; free_vars = fv0; effs = _ } } =
+        simple env res cont
+      in
+      let { env; res; expr = { cmm = value; free_vars = fv1; effs = _ } } =
+        simple env res value
+      in
+      let free_vars = BV.Set.union fv0 fv1 in
+      C.continue ~dbg ~cont ~value, free_vars, env, res, Ece.all
+    | Discontinue { cont; exn } ->
+      let { env; res; expr = { cmm = cont; free_vars = fv0; effs = _ } } =
+        simple env res cont
+      in
+      let { env; res; expr = { cmm = exn; free_vars = fv1; effs = _ } } =
+        simple env res exn
+      in
+      let free_vars = BV.Set.union fv0 fv1 in
+      C.discontinue ~dbg ~cont ~exn, free_vars, env, res, Ece.all
+    | Discontinue_with_backtrace { cont; exn; bt } ->
+      let { env; res; expr = { cmm = cont; free_vars = fv0; effs = _ } } =
+        simple env res cont
+      in
+      let { env; res; expr = { cmm = exn; free_vars = fv1; effs = _ } } =
+        simple env res exn
+      in
+      let { env; res; expr = { cmm = bt; free_vars = fv2; effs = _ } } =
+        simple env res bt
+      in
+      let free_vars = BV.Set.union (BV.Set.union fv0 fv1) fv2 in
+      ( C.discontinue_with_backtrace ~dbg ~cont ~exn ~bt,
+        free_vars,
+        env,
+        res,
+        Ece.all ))
 
 let translate_apply env res apply =
   let dbg = Env.add_inlined_debuginfo env (Apply.dbg apply) in

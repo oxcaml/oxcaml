@@ -1254,6 +1254,19 @@ val resume :
   arg:expression ->
   expression
 
+val continue :
+  dbg:Debuginfo.t -> cont:expression -> value:expression -> expression
+
+val discontinue :
+  dbg:Debuginfo.t -> cont:expression -> exn:expression -> expression
+
+val discontinue_with_backtrace :
+  dbg:Debuginfo.t ->
+  cont:expression ->
+  exn:expression ->
+  bt:expression ->
+  expression
+
 val reperform :
   dbg:Debuginfo.t ->
   eff:expression ->
