@@ -245,6 +245,20 @@ let reinterpret_cast : Cmm.reinterpret_cast -> string = function
   | Int32_of_float32 -> "float32 as int32"
 
 let static_cast : Cmm.static_cast -> string = function
+  | Int_conv { src; dst; signedness } ->
+    let unsigned_sigil =
+      match signedness with Signed -> "" | Unsigned -> "U"
+    in
+    Printf.sprintf "%s%s->%s%s" unsigned_sigil
+      (Cmm.string_of_int_width src)
+      unsigned_sigil
+      (Cmm.string_of_int_width dst)
+  | Tagged_int_of_int64 -> "Int64->Tagged_int"
+  | Int64_of_tagged_int { signedness } ->
+    let unsigned_sigil =
+      match signedness with Signed -> "" | Unsigned -> "U"
+    in
+    Printf.sprintf "%sTagged_int->%sInt64" unsigned_sigil unsigned_sigil
   | Int64_of_float Float64 -> "float->int64"
   | Float_of_int64 Float64 -> "int64->float"
   | Int64_of_float Float32 -> "float32->int64"

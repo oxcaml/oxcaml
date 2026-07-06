@@ -31,6 +31,19 @@ let string_of_int_width = function
   | Int16 -> "Int16"
   | Int8 -> "Int8"
 
+let bits_of_int_width = function
+  | Int64 -> 64
+  | Int63 -> 63
+  | Int32 -> 32
+  | Int16 -> 16
+  | Int8 -> 8
+
+let equal_int_width w1 w2 =
+  match w1, w2 with
+  | Int64, Int64 | Int63, Int63 | Int32, Int32 | Int16, Int16 | Int8, Int8 ->
+    true
+  | (Int64 | Int63 | Int32 | Int16 | Int8), _ -> false
+
 type machtype_component = Cmx_format.machtype_component =
   | Val
   | Addr
@@ -57,13 +70,15 @@ let typ_addr = [| Addr |]
 
 let typ_tagged_int = [| Tagged_int |]
 
-let typ_int64 = [| Naked_int Int64 |]
+let typ_int w = [| Naked_int w |]
 
-let typ_int32 = [| Naked_int Int32 |]
+let typ_int64 = typ_int Int64
 
-let typ_int16 = [| Naked_int Int16 |]
+let typ_int32 = typ_int Int32
 
-let typ_int8 = [| Naked_int Int8 |]
+let typ_int16 = typ_int Int16
+
+let typ_int8 = typ_int Int8
 
 let typ_float = [| Float |]
 
@@ -456,6 +471,9 @@ type reinterpret_cast =
   | V512_of_vec of vector_width
 
 type static_cast =
+  | Int_conv of int_cast
+  | Tagged_int_of_int64
+  | Int64_of_tagged_int of { signedness : Scalar.Signedness.t }
   | Float_of_int64 of float_width
   | Int64_of_float of float_width
   | Float_of_float32
@@ -466,6 +484,34 @@ type static_cast =
   | Scalar_of_v256 of vec256_type
   | V512_of_scalar of vec512_type
   | Scalar_of_v512 of vec512_type
+
+and int_cast =
+  { src : int_width;
+    dst : int_width;
+    signedness : Scalar.Signedness.t
+  }
+
+type int_cast_class =
+  | Sign_extend of int_width
+  | Zero_extend of int_width
+  | Zero_then_sign_extend of
+      { zero_extend_from : int_width;
+        sign_extend_from : int_width
+      }
+  | Identity
+
+let class_of_int_cast { src; dst; signedness } =
+  let src_bits = bits_of_int_width src in
+  let dst_bits = bits_of_int_width dst in
+  if src_bits = dst_bits
+  then Identity
+  else if dst_bits < src_bits
+  then Sign_extend dst
+  else
+    match signedness with
+    | Signed -> Identity
+    | Unsigned ->
+      Zero_then_sign_extend { zero_extend_from = src; sign_extend_from = dst }
 
 module Alloc_mode = struct
   type t =
@@ -1057,6 +1103,14 @@ let equal_reinterpret_cast (left : reinterpret_cast) (right : reinterpret_cast)
 
 let equal_static_cast (left : static_cast) (right : static_cast) =
   match left, right with
+  | ( Int_conv { src = src1; dst = dst1; signedness = s1 },
+      Int_conv { src = src2; dst = dst2; signedness = s2 } ) ->
+    equal_int_width src1 src2 && equal_int_width dst1 dst2
+    && Scalar.Signedness.equal s1 s2
+  | Tagged_int_of_int64, Tagged_int_of_int64 -> true
+  | ( Int64_of_tagged_int { signedness = s1 },
+      Int64_of_tagged_int { signedness = s2 } ) ->
+    Scalar.Signedness.equal s1 s2
   | Float32_of_float, Float32_of_float -> true
   | Float_of_float32, Float_of_float32 -> true
   | Float_of_int64 f1, Float_of_int64 f2 -> equal_float_width f1 f2
@@ -1067,7 +1121,8 @@ let equal_static_cast (left : static_cast) (right : static_cast) =
   | V256_of_scalar v1, V256_of_scalar v2 -> equal_vec256_type v1 v2
   | Scalar_of_v512 v1, Scalar_of_v512 v2 -> equal_vec512_type v1 v2
   | V512_of_scalar v1, V512_of_scalar v2 -> equal_vec512_type v1 v2
-  | ( ( Float32_of_float | Float_of_float32 | Float_of_int64 _
+  | ( ( Int_conv _ | Tagged_int_of_int64 | Int64_of_tagged_int _
+      | Float32_of_float | Float_of_float32 | Float_of_int64 _
       | Int64_of_float _ | Scalar_of_v128 _ | V128_of_scalar _
       | Scalar_of_v256 _ | V256_of_scalar _ | Scalar_of_v512 _
       | V512_of_scalar _ ),

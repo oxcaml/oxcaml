@@ -1684,7 +1684,56 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
 let emit_static_cast (cast : Cmm.static_cast) i =
   let open Simd_instrs in
   let distinct = not (Reg.same_loc i.arg.(0) i.res.(0)) in
+  let sign_extend (w : Cmm.int_width) ~(src : Reg.t) =
+    match w with
+    | Int8 -> I.movsx (emit_subreg reg_low_8_name BYTE src) (res i 0)
+    | Int16 -> I.movsx (emit_subreg reg_low_16_name WORD src) (res i 0)
+    | Int32 -> I.movsxd (emit_subreg reg_low_32_name DWORD src) (res i 0)
+    | Int63 ->
+      if not (Reg.same_loc src i.res.(0)) then I.mov (reg src) (res i 0);
+      I.sal (int 1) (res i 0);
+      I.sar (int 1) (res i 0)
+    | Int64 ->
+      if not (Reg.same_loc src i.res.(0)) then I.mov (reg src) (res i 0)
+  in
+  let zero_extend (w : Cmm.int_width) ~(src : Reg.t) =
+    match w with
+    | Int8 -> I.movzx (emit_subreg reg_low_8_name BYTE src) (res i 0)
+    | Int16 -> I.movzx (emit_subreg reg_low_16_name WORD src) (res i 0)
+    | Int32 -> I.mov (emit_subreg reg_low_32_name DWORD src) (res32 i 0)
+    | Int63 ->
+      if not (Reg.same_loc src i.res.(0)) then I.mov (reg src) (res i 0);
+      I.sal (int 1) (res i 0);
+      I.shr (int 1) (res i 0)
+    | Int64 ->
+      if not (Reg.same_loc src i.res.(0)) then I.mov (reg src) (res i 0)
+  in
   match cast with
+  | Int_conv cast -> (
+    match Cmm.class_of_int_cast cast with
+    | Identity -> if distinct then I.mov (arg i 0) (res i 0)
+    | Sign_extend w -> sign_extend w ~src:i.arg.(0)
+    | Zero_extend w -> zero_extend w ~src:i.arg.(0)
+    | Zero_then_sign_extend { zero_extend_from; sign_extend_from } ->
+      zero_extend zero_extend_from ~src:i.arg.(0);
+      sign_extend sign_extend_from ~src:i.res.(0))
+  | Tagged_int_of_int64 ->
+    let r =
+      (* CR jrayman: Should we have this check or change
+         [regalloc_stack_operands.ml]? *)
+      if Reg.is_stack i.arg.(0)
+      then (
+        I.mov (arg i 0) (res i 0);
+        reg64 i.res.(0))
+      else arg64 i 0
+    in
+    I.lea (mem64 NONE ~base:r 1 (Scalar r)) (res i 0)
+  | Int64_of_tagged_int { signedness } ->
+    if distinct then I.mov (arg i 0) (res i 0);
+    begin match signedness with
+    | Signed -> I.sar (int 1) (res i 0)
+    | Unsigned -> I.shr (int 1) (res i 0)
+    end
   | Float_of_int64 Float64 ->
     sse_or_avx_dst cvtsi2sd_X_r64m64 vcvtsi2sd_X_X_r64m64 (arg i 0) (res i 0)
   | Int64_of_float Float64 ->
