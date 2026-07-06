@@ -1619,7 +1619,12 @@ let emit_instr env i =
         match addr with
         | Iindexed v ->
           let ofs = Validated_mem_offset.offset v in
-          if ofs = 0
+          if !Arch.feat_lrcpc2 && ofs >= -256 && ofs <= 255
+          then
+            (* stlur takes a [base, #imm9] offset directly, no address calc. *)
+            A.ins2 STLUR (H.reg_x src)
+              (H.mem_offset_unscaled (H.gp_reg_of_reg base) ofs)
+          else if ofs = 0
           then A.ins2 STLR (H.reg_x src) (H.mem (H.gp_reg_of_reg base))
           else (
             (if ofs >= 0
@@ -2233,6 +2238,12 @@ let begin_assembly _unix =
       D.Directive.print asm_line_buffer d;
       Buffer.add_string asm_line_buffer "\n";
       Emitaux.emit_buffer asm_line_buffer);
+  (* stlur (from -flrcpc2) needs the GNU assembler at armv8.4-a; macOS's
+     assembler already accepts it.  Keep any enabled CSSC extension. *)
+  if !Arch.feat_lrcpc2 && not macosx
+  then
+    Emitaux.emit_string
+      (if !Arch.feat_cssc then "\t.arch armv8.4-a+cssc\n" else "\t.arch armv8.4-a\n");
   D.file ~file_num:None ~file_name:"";
   (* PR#7037 *)
   let data_begin = Cmm_helpers.make_symbol "data_begin" in

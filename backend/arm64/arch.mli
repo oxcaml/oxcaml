@@ -20,6 +20,8 @@
 val macosx : bool
 val is_asan_enabled : bool ref
 val feat_cssc : bool ref
+
+val feat_lrcpc2 : bool ref
 val trap_notes : bool ref
 (* Machine-specific command-line options *)
 

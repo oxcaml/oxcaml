@@ -28,6 +28,9 @@ let is_asan_enabled = ref false
 (* CR gyorsh: refactor to use [Arch.Extension] like amd64 *)
 let feat_cssc = ref false
 
+(* FEAT_LRCPC2: store-release with an unscaled immediate offset (stlur). *)
+let feat_lrcpc2 = ref false
+
 (* Emit elf notes with trap handling information. *)
 let trap_notes = ref true
 
@@ -43,6 +46,12 @@ let command_line_options = [
   "-fcssc",
     Arg.Set feat_cssc,
     " Enable the Common Short Sequence Compression (CSSC) instructions."
+  ;
+
+  "-flrcpc2",
+    Arg.Set feat_lrcpc2,
+    " Enable FEAT_LRCPC2 store-release with unscaled offset (stlur), used to \
+     avoid an address computation for aligned release stores."
 ]
 
 (* Addressing modes *)
