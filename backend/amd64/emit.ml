@@ -2126,9 +2126,13 @@ let emit_instr ~first ~last ~fallthrough i =
           { word0; word1; word2; word3; word4; word5; word6; word7 }
       in
       I.simd vmovapd_Z_Zm512 [| mem64_rip VEC512 (L.encode lbl); res i 0 |])
-  | Lop (Const_mask n) ->
-    let lbl = add_float_constant n in
-    I.simd kmovq_K_Km64 [| mem64_rip QWORD (L.encode lbl); res i 0 |]
+  | Lop (Const_mask n) -> (
+    match n with
+    | 0L -> I.simd kxorq [| res i 0; res i 0; res i 0 |]
+    | -1L -> I.simd kxnorq [| res i 0; res i 0; res i 0 |]
+    | _ ->
+      let lbl = add_float_constant n in
+      I.simd kmovq_K_Km64 [| mem64_rip QWORD (L.encode lbl); res i 0 |])
   | Lop (Const_symbol s) ->
     add_used_symbol s.sym_name;
     load_symbol_addr s (res i 0)
@@ -2468,7 +2472,16 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop (Specific (Ibswap { bitwidth = Sixtyfour })) -> I.bswap (res i 0)
   | Lop (Specific Isextend32) -> I.movsxd (arg32 i 0) (res i 0)
   | Lop (Specific Izextend32) -> I.mov (arg32 i 0) (res32 i 0)
-  | Lop (Specific Ikmovq) -> I.simd kmovq_r64_K [| arg i 0; res i 0 |]
+  | Lop (Specific Ikmovq) -> (
+    (* Masks are passed to external calls as integers; the destination is either
+       an argument register or, once the register arguments are exhausted, a
+       stack slot. *)
+    match i.res.(0).loc with
+    | Reg _ -> I.simd kmovq_r64_K [| arg i 0; res i 0 |]
+    | Stack _ -> I.simd kmovq_m64_K [| arg i 0; res i 0 |]
+    | Unknown ->
+      Misc.fatal_errorf "Ikmovq: unknown result location %a" Printreg.reg
+        i.res.(0))
   | Lop (Intop Iclz) ->
     (* CR-someday gyorsh: can we do it at selection? mshinwell: We need to
        address this and the similar CRs below. My feeling is that we should try

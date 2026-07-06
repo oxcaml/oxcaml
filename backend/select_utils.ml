@@ -675,8 +675,21 @@ let insert_move_args env sub_cfg arg loc stacksize =
   then insert env sub_cfg (make_stack_offset stacksize) [||] [||];
   insert_moves env sub_cfg arg loc
 
+let insert_move_result env sub_cfg (src : Reg.t) (dst : Reg.t) =
+  if
+    equal_machtype_component dst.typ Mask
+    && not (equal_machtype_component src.typ Mask)
+  then
+    (* External calls return masks in a general-purpose register (see
+       [Proc.loc_external_results]), so the bits must be moved into the mask
+       register with a conversion. *)
+    insert env sub_cfg (Op (Reinterpret_cast Mask_of_int64)) [| src |] [| dst |]
+  else insert_move env sub_cfg src dst
+
 let insert_move_results env sub_cfg loc res stacksize =
-  insert_moves env sub_cfg loc res;
+  for i = 0 to min (Array.length loc) (Array.length res) - 1 do
+    insert_move_result env sub_cfg loc.(i) res.(i)
+  done;
   if stacksize <> 0
   then insert env sub_cfg (make_stack_offset (-stacksize)) [||] [||]
 

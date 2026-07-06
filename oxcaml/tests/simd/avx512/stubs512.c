@@ -123,6 +123,37 @@ int64_t mask_and(__mmask8 l, __mmask8 r)
     return (int64_t)_mm512_mask_test_epi64_mask(r, v, v);
 }
 
+// A mask argument beyond the six integer argument registers, passed on the
+// stack per the C ABI.
+int64_t mask_stack_arg(int64_t i0, int64_t i1, int64_t i2, int64_t i3,
+                       int64_t i4, int64_t i5, __mmask64 m)
+{
+    return i0 + i1 + i2 + i3 + i4 + i5 + (int64_t)m;
+}
+
+// Masks are returned as integers per the C ABI.
+__mmask64 mask_ret(int64_t x)
+{
+    return (__mmask64)x;
+}
+
+// Overwrites every mask register, checking that the compiler treats them as
+// destroyed at C calls.
+int64_t clobber_masks(int64_t x)
+{
+    __asm__ volatile(
+        "kxnorq %%k0, %%k0, %%k0\n\t"
+        "kxnorq %%k1, %%k1, %%k1\n\t"
+        "kxnorq %%k2, %%k2, %%k2\n\t"
+        "kxnorq %%k3, %%k3, %%k3\n\t"
+        "kxnorq %%k4, %%k4, %%k4\n\t"
+        "kxnorq %%k5, %%k5, %%k5\n\t"
+        "kxnorq %%k6, %%k6, %%k6\n\t"
+        "kxnorq %%k7, %%k7, %%k7"
+        ::: "k0", "k1", "k2", "k3", "k4", "k5", "k6", "k7");
+    return x;
+}
+
 // Mixed vector/float arguments, exercising the C calling convention.
 __m512i vectors_and_floats512(
     __m512i v0, double f0, __m512i v1, double f1,

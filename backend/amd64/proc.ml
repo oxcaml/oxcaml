@@ -321,6 +321,17 @@ let max_arguments_for_tailcalls = 10 (* in regs *) + 64 (* in domain state *)
      Return value in rax or xmm0. *)
 
 let loc_external_results res =
+  (* The C ABI returns masks in general-purpose registers; the bits are moved
+     into a mask register by [Select_utils.insert_move_results]. *)
+  let res =
+    Array.map
+      (fun (c : machtype_component) ->
+        match c with
+        | Mask -> (Int : machtype_component)
+        | Val | Addr | Int | Float | Float32
+        | Vec128 | Vec256 | Vec512 | Valx2 -> c)
+      res
+  in
   let (loc, _ofs, _align) =
     (* `~last_int:4 ~step_int:4` below is to get rdx as the second int register
        (See https://refspecs.linuxbase.org/elf/x86_64-abi-0.99.pdf, pages 21 and 22) *)
@@ -396,7 +407,7 @@ let int_regs_destroyed_at_c_call =
        Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9; R13; R10; R11|]
   else Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9;      R10; R11|]
 
-let destroyed_at_c_call_win64 =
+let destroyed_at_c_call_win64 = lazy ((* To be forced after flags are parsed. *)
   (* Win64: rbx, rbp, rsi, rdi, r12-r15, xmm6-xmm15 preserved *)
   [ Array.map (fun p -> phys_reg Int (P p)) int_regs_destroyed_at_c_call_win64;
     Array.sub hard_float_reg 0 6;
@@ -405,9 +416,9 @@ let destroyed_at_c_call_win64 =
   |> add_hard_vec256_regs ~f:(fun regs -> Array.sub regs 0 6)
   |> add_hard_vec512_regs ~f:(fun regs -> Array.sub regs 0 6)
   |> add_hard_mask_regs ~f:(fun regs -> regs)
-  |> Array.concat
+  |> Array.concat)
 
-let destroyed_at_c_call_unix =
+let destroyed_at_c_call_unix = lazy ((* To be forced after flags are parsed. *)
   (* Unix: rbx, rbp, r12-r15 preserved *)
   [ Array.map (fun p -> phys_reg Int (P p)) int_regs_destroyed_at_c_call;
     hard_float_reg;
@@ -416,7 +427,7 @@ let destroyed_at_c_call_unix =
   |> add_hard_vec256_regs ~f:(fun regs -> regs)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
   |> add_hard_mask_regs ~f:(fun regs -> regs)
-  |> Array.concat
+  |> Array.concat)
 
 let destroyed_at_c_call =
   (* C calling conventions preserve rbx, but it is clobbered
@@ -427,7 +438,7 @@ let destroyed_at_c_call =
 let destroyed_at_alloc_or_poll =
   if X86_proc.use_plt then destroyed_by_plt_stub else [| r11 |]
 
-let destroyed_at_pushtrap () = [| r11 |]
+let destroyed_at_pushtrap = [| r11 |]
 
 let destroyed_at_large_memory_op =
   if Config.with_address_sanitizer then
@@ -512,7 +523,7 @@ let destroyed_by_simd_mem_op (instr : Simd.Mem.operation) =
 
 let destroyed_at_raise () = Lazy.force all_phys_regs
 
-let destroyed_at_reloadretaddr () = [| |]
+let destroyed_at_reloadretaddr = [| |]
 
 let destroyed_rax = [| rax |] (* CR-someday vkarvonen: Use [iarray] *)
 let destroyed_rax_rdx = [| rax; rdx |]
@@ -522,9 +533,9 @@ let destroyed_r10 = [| r10 |]
 let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   match basic with
   | Reloadretaddr ->
-    destroyed_at_reloadretaddr ()
+    destroyed_at_reloadretaddr
   | Pushtrap _ ->
-    destroyed_at_pushtrap ()
+    destroyed_at_pushtrap
   | Op (Intop (Idiv | Imod)) | Op (Intop_imm ((Idiv | Imod), _)) ->
     destroyed_rax_rdx
   | Op(Store(Single { reg = Float64 }, _, _)) ->
@@ -618,10 +629,12 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
     assert (stack_ofs >= 0);
     if alloc || stack_ofs > 0
     then Lazy.force all_phys_regs
-    else destroyed_at_c_call
+    else Lazy.force destroyed_at_c_call
   | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
     assert (stack_ofs >= 0);
-    if stack_ofs > 0 then Lazy.force all_phys_regs else destroyed_at_c_call
+    if stack_ofs > 0
+    then Lazy.force all_phys_regs
+    else Lazy.force destroyed_at_c_call
   | Call {op = Indirect _ | Direct _; _} -> Lazy.force all_phys_regs
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.

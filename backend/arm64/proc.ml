@@ -273,18 +273,18 @@ let destroy_neon_reg7 = destroy_neon_reg D7
 
 let destroyed_at_raise () = all_phys_regs
 
-let destroyed_at_reloadretaddr () = [| |]
+let destroyed_at_reloadretaddr = [| |]
 
-let destroyed_at_pushtrap () = [| |]
+let destroyed_at_pushtrap = [| |]
 
 let destroyed_at_alloc_or_poll = [| reg_x8 |]
 
 let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   match basic with
   | Reloadretaddr ->
-    destroyed_at_reloadretaddr ()
+    destroyed_at_reloadretaddr
   | Pushtrap _ ->
-    destroyed_at_pushtrap ()
+    destroyed_at_pushtrap
   | Op Poll -> destroyed_at_alloc_or_poll
   | Op (Alloc _) ->
     destroyed_at_alloc_or_poll

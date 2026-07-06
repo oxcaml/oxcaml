@@ -60,9 +60,9 @@ val max_arguments_for_tailcalls : int
 (* Registers destroyed by operations *)
 val destroyed_at_raise : unit -> Reg.t array
 
-val destroyed_at_reloadretaddr : unit -> Reg.t array
+val destroyed_at_reloadretaddr : Reg.t array
 
-val destroyed_at_pushtrap : unit -> Reg.t array
+val destroyed_at_pushtrap : Reg.t array
 
 val destroyed_at_basic : Cfg_intf.S.basic -> Reg.t array
 

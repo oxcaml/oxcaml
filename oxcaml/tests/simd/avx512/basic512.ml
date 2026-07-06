@@ -284,3 +284,38 @@ let () =
   let m0 = mask_of_int64 0xF0L in
   let m1 = mask_of_int64 0x3CL in
   eq (mask_and m0 m1) 0x30L
+
+(* Pass a mask on the stack: the six preceding arguments exhaust the C integer
+   argument registers, so the mask is passed in a stack slot. *)
+external mask_stack_arg :
+  int64 -> int64 -> int64 -> int64 -> int64 -> int64 -> mask -> int64
+  = "" "mask_stack_arg"
+[@@noalloc] [@@unboxed]
+
+let () =
+  let m = Sys.opaque_identity (mask_of_int64 0x5AL) in
+  eq (mask_stack_arg 1L 2L 3L 4L 5L 6L m) 0x6FL
+
+(* Return a mask from an external: per the C ABI, masks are returned as integers
+   (this exercises the GPR-to-mask conversion of the result). *)
+external mask_ret : int64 -> mask = "" "mask_ret" [@@noalloc] [@@unboxed]
+
+let () =
+  let bits = Sys.opaque_identity 0xFEDC_BA98_7654_3210L in
+  check_mask (mask_ret bits) 0xFEDC_BA98_7654_3210L
+
+(* Keep a mask live across an external call that clobbers every mask register:
+   [destroyed_at_c_call] must treat the k registers as destroyed. *)
+external clobber_masks : int64 -> int64 = "" "clobber_masks"
+[@@noalloc] [@@unboxed]
+
+let () =
+  let m = Sys.opaque_identity (mask_of_int64 0x0FF0L) in
+  let x = clobber_masks (Sys.opaque_identity 3L) in
+  eq (Int64.add x (int64_of_mask m)) 0x0FF3L
+
+(* Mask constants, including all-zeros and all-ones. *)
+let () =
+  check_mask (mask_of_int64 0L) 0L;
+  check_mask (mask_of_int64 (-1L)) (-1L);
+  check_mask (mask_of_int64 0x8000_0000_0000_0001L) 0x8000_0000_0000_0001L

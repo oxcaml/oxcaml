@@ -34,7 +34,7 @@ let remove_overwritten_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
           | Const_vec256 _ | Const_vec512 _ | Const_mask _ ),
         Op
           ( Const_int _ | Const_float _ | Const_float32 _ | Const_vec128 _
-          | Const_vec256 _ | Const_vec512 _ ) ) ->
+          | Const_vec256 _ | Const_vec512 _ | Const_mask _ ) ) ->
       (* Removing the first instruction is okay here since it doesn't change the
          set of addresses we touch. *)
       delete_fst_if_redundant ~fst ~snd ~fst_val ~snd_val
