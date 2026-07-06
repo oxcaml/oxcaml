@@ -74,3 +74,93 @@ let () =
   match p4 () with
   | _ -> assert false
   | exception Assert_failure _ -> ()
+
+(* Segfault: partial match unpacking, unarized. *)
+type 'a rep5 = Block5 : (int * int) rep5 | Int5 : int rep5
+
+let[@inline never] g5 b =
+  let[@local] f : type a. a rep5 * a -> int = fun (Block5, (a, _b)) -> a in
+  if b then f (Block5, (1, 2)) else f (Int5, Sys.opaque_identity 0)
+
+let () =
+  assert (g5 true = 1);
+  match g5 false with
+  | _ -> assert false
+  | exception Match_failure _ -> ()
+
+(* Segfault: total match unpacking a tuple, unarized *)
+type 'a rep6 = Block6 : (int * int) rep6 | Int6 : int rep6
+
+let[@inline never] g6 b =
+  let[@local] f : type a. a rep6 * a -> int = function
+    | Block6, (a, _b) -> a
+    | Int6, x -> x
+  in
+  if b then f (Block6, (1, 2)) else f (Int6, Sys.opaque_identity 0)
+
+let () =
+  assert (g6 true = 1);
+  assert (g6 false = 0)
+
+(* Runtime error: partial match unpacking a tuple,
+   not unarized due to the extra argument. *)
+type 'a rep7 = Block7 : (int * int) rep7 | Int7 : int rep7
+
+let[@inline never] g7 b =
+  let[@local] f : type a. a rep7 * a -> unit -> int =
+    fun (Block7, (a, _b)) () -> a
+  in
+  if b then f (Block7, (1, 2)) () else f (Int7, Sys.opaque_identity 0) ()
+
+let () =
+  assert (g7 true = 1);
+  match g7 false with
+  | _ -> assert false
+  | exception Match_failure _ -> ()
+
+(* Runtime error: partial match unpacking a tuple,
+   not unarized due to [as _p]. *)
+type 'a rep8 = Block8 : (int * int) rep8 | Int8 : int rep8
+
+let[@inline never] g8 b =
+  let[@local] f : type a. a rep8 * a -> int =
+    fun ((Block8, (a, _b)) as _p) -> a
+  in
+  if b then f (Block8, (1, 2)) else f (Int8, Sys.opaque_identity 0)
+
+let () =
+  assert (g8 true = 1);
+  match g8 false with
+  | _ -> assert false
+  | exception Match_failure _ -> ()
+
+(* Runtime error: total match unpacking a tuple,
+   not unarized due to the extra argument. *)
+type 'a rep9 = Block9 : (int * int) rep9 | Int9 : int rep9
+
+let[@inline never] g9 b =
+  let[@local] f : type a. unit -> a rep9 * a -> int = fun () -> function
+    | Block9, (a, _b) -> a
+    | Int9, x -> x
+  in
+  if b then f () (Block9, (1, 2)) else f () (Int9, Sys.opaque_identity 0)
+
+let () =
+  assert (g9 true = 1);
+  assert (g9 false = 0)
+
+(* Runtime error: total match unpacking a tuple,
+   not unarized due to [as _t]. *)
+type 'a rep10 = Int10 : int rep10 | Float10 : float rep10
+
+let[@inline never] g10 b =
+  let[@local] f : type a. a rep10 * a -> float = function
+    | (Float10, x) as _t -> x +. 1.0
+    | Int10, z -> float_of_int z
+  in
+  if b then f (Float10, Sys.opaque_identity 3.5)
+  else f (Int10, Sys.opaque_identity 7)
+
+let () =
+  assert (g10 true = 4.5);
+  assert (g10 false = 7.0)
