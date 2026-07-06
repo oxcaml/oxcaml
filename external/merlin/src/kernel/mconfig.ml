@@ -18,7 +18,7 @@ type ocaml =
     applicative_functors : bool;
     nopervasives : bool;
     strict_formats : bool;
-    open_modules : string list;
+    open_args : Clflags.open_arg list;
     ppx : string with_workdir list;
     pp : string with_workdir option;
     warnings : Warnings.state;
@@ -55,7 +55,13 @@ let dump_ocaml x =
       ("applicative_functors", `Bool x.applicative_functors);
       ("nopervasives", `Bool x.nopervasives);
       ("strict_formats", `Bool x.strict_formats);
-      ("open_modules", Json.list Json.string x.open_modules);
+      ( "open_args",
+        Json.list
+          (fun (arg : Clflags.open_arg) ->
+            match arg with
+            | Open md -> `Assoc [ ("open", `String md) ]
+            | Open_cmi file -> `Assoc [ ("open-cmi", `String file) ])
+          x.open_args );
       ("ppx", Json.list (dump_with_workdir Json.string) x.ppx);
       ("pp", Json.option (dump_with_workdir Json.string) x.pp);
       ("warnings", dump_warnings x.warnings);
@@ -960,8 +966,13 @@ let ocaml_flags =
       " Reject invalid formats accepted by legacy implementations" );
     ( "-open",
       Marg.param "module" (fun md ocaml ->
-          { ocaml with open_modules = md :: ocaml.open_modules }),
+          { ocaml with open_args = Clflags.Open md :: ocaml.open_args }),
       "<module>  Opens the module <module> before typing" );
+    ( "-open-cmi",
+      Marg.param "file" (fun file ocaml ->
+          { ocaml with open_args = Clflags.Open_cmi file :: ocaml.open_args }),
+      "<file>  Opens the module whose compiled interface is <file> before typing"
+    );
     ( "-ppx",
       marg_commandline (fun command ocaml ->
           { ocaml with ppx = command :: ocaml.ppx }),
@@ -1064,7 +1075,7 @@ let initial =
         applicative_functors = true;
         nopervasives = false;
         strict_formats = false;
-        open_modules = [];
+        open_args = [];
         ppx = [];
         pp = None;
         warnings = Warnings.backup ();
