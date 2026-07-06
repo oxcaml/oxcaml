@@ -199,7 +199,12 @@ jobs:
             config: --enable-frame-pointers
             os: warp-ubuntu-latest-x64-8x
             llvmize_tests_only: true
-            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
+            # TEMPORARY: personal-fork release of llvmize-oxcaml +
+            # ocaml-flambda/llvm-project#37 (short frametables support, needed
+            # by this PR). Once #37 is merged and an official release is
+            # minted, drop oxcaml_llvm_repo and point oxcaml_llvm_tag at it.
+            oxcaml_llvm_repo: julesjacobs/llvm-project
+            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3-pr37
             oxcaml_llvm_source_branch: llvmize-oxcaml
             sysdeps: gdb
 
@@ -313,9 +318,10 @@ jobs:
             exit 1
           fi
 
+          OXCAML_LLVM_REPO="${{ matrix.oxcaml_llvm_repo || 'ocaml-flambda/llvm-project' }}"
           OXCAML_LLVM_TAG="${{ matrix.oxcaml_llvm_tag }}"
           OXCAML_LLVM_SOURCE_BRANCH="${{ matrix.oxcaml_llvm_source_branch }}"
-          OXCAML_LLVM_URL="https://github.com/ocaml-flambda/llvm-project/releases/download/${OXCAML_LLVM_TAG}/${OXCAML_LLVM_TAG}-llvm-linux-${ARCH}-${OXCAML_LLVM_SOURCE_BRANCH}.tar.gz"
+          OXCAML_LLVM_URL="https://github.com/${OXCAML_LLVM_REPO}/releases/download/${OXCAML_LLVM_TAG}/${OXCAML_LLVM_TAG}-llvm-linux-${ARCH}-${OXCAML_LLVM_SOURCE_BRANCH}.tar.gz"
 
           # Download and extract custom OxCaml LLVM (includes LLDB and other LLVM tools)
           cd $GITHUB_WORKSPACE
