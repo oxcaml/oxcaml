@@ -1599,10 +1599,38 @@ let emit_instr env i =
     | Single { reg = Float64 } ->
       A.ins2 FCVT reg_s7 (H.reg_d src);
       A.ins2 STR_simd_and_fp reg_s7 addressing
-    | Word_int | Word_int_unaligned | Word_val ->
-      (* memory model barrier for non-initializing store *)
+    | Word_int_unaligned ->
+      (* May be unaligned (e.g. [Bytes.set_int64]); store-release requires
+         natural alignment, so keep the [dmb ishld; str] fence form, which
+         tolerates unaligned addresses. *)
       if assignment then A.ins0 (DMB ISHLD);
       A.ins2 STR (H.reg_x src) addressing
+    | Word_int | Word_val ->
+      if assignment
+      then (
+        (* OCaml 5 memory model: a non-initializing store needs load->store
+           ordering on weakly-ordered targets.  Rather than the pipeline-
+           draining [dmb ishld; str], use a store-release (stlr), which
+           provides at least that ordering in a single instruction and is far
+           cheaper on cores where [dmb] is expensive.  stlr requires natural
+           alignment (hence only the aligned chunks reach here) and has no
+           offset addressing, so the effective address is first materialised
+           in reg_tmp1 (x16). *)
+        match addr with
+        | Iindexed v ->
+          let ofs = Validated_mem_offset.offset v in
+          if ofs = 0
+          then A.ins2 STLR (H.reg_x src) (H.mem (H.gp_reg_of_reg base))
+          else (
+            (if ofs >= 0
+            then emit_addimm reg_x_tmp1 (H.reg_x base) ofs
+            else emit_subimm reg_x_tmp1 (H.reg_x base) (-ofs));
+            A.ins2 STLR (H.reg_x src) (H.mem reg_tmp1_base))
+        | Ibased _ ->
+          (* rare: statically-allocated mutable data; keep the barrier form *)
+          A.ins0 (DMB ISHLD);
+          A.ins2 STR (H.reg_x src) addressing)
+      else A.ins2 STR (H.reg_x src) addressing
     | Double -> A.ins2 STR_simd_and_fp (H.reg_d src) addressing
     | Single { reg = Float32 } ->
       A.ins2 STR_simd_and_fp (H.reg_s src) addressing

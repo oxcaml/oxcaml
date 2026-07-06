@@ -1467,6 +1467,7 @@ module Instruction_name = struct
            )
            t
     | LDAR : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Mem of [`Base_reg]]) t
+    | STLR : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Mem of [`Base_reg]]) t
     | LDP :
         ('w1, 'w2) LDP_STP_width.t
         -> ( triple,
@@ -2024,6 +2025,7 @@ module Instruction_name = struct
         | INS _ -> "ins"
         | INS_V _ -> "ins"
         | LDAR -> "ldar"
+        | STLR -> "stlr"
         | LDP _ -> "ldp"
         | LDR -> "ldr"
         | LDR_simd_and_fp -> "ldr"
@@ -2383,6 +2385,9 @@ module Instruction_name = struct
       | LDAR ->
         let (Pair (rt, addr)) = ops in
         [| o rt; o addr |]
+      | STLR ->
+        let (Pair (rt, addr)) = ops in
+        [| o rt; o addr |]
       | LDP _ ->
         let (Triple (rt1, rt2, addr)) = ops in
         [| o rt1; o rt2; o addr |]
@@ -2677,7 +2682,7 @@ module Instruction = struct
     | FMOV_scalar_immediate | FMSUB | FMUL | FMUL_vector | FNEG | FNEG_vector
     | FNMADD | FNMSUB | FNMUL | FRECPE_vector | FRINT _ | FRINT_vector _
     | FRSQRTE_vector | FSQRT | FSQRT_vector | FSUB | FSUB_vector | INS _
-    | INS_V _ | LDAR | LDP _ | LDR | LDRB | LDRH | LDRSB | LDRSH | LDRSW
+    | INS_V _ | LDAR | STLR | LDP _ | LDR | LDRB | LDRH | LDRSB | LDRSH | LDRSW
     | LDR_simd_and_fp | LSLV | LSRV | MADD | MOVI | MOVK | MOVN | MOVZ | MSUB
     | MUL_vector | MVN_vector | NEG_vector | NOP | ORR_immediate
     | ORR_shifted_register | ORR_vector | RBIT | RET | REV | REV16 | SBFM

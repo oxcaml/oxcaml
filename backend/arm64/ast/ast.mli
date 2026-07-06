@@ -1086,6 +1086,7 @@ module Instruction_name : sig
            )
            t
     | LDAR : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Mem of [`Base_reg]]) t
+    | STLR : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Mem of [`Base_reg]]) t
     | LDP :
         ('w1, 'w2) LDP_STP_width.t
         -> ( triple,

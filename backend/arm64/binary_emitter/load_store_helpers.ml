@@ -374,6 +374,38 @@ let encode_load_acquire : type a.
   let result = logor result (of_int rt) in
   result
 
+(* Store-Release (STLR) encoding. Identical layout to LDAR (load-acquire) but
+   with L=0 (store). Provides at least the load->store ordering of
+   [dmb ishld; str] in a single instruction. *)
+let encode_store_release : type a.
+    rd:[`GP of a] Reg.t -> rn:[`GP of _] Reg.t -> int32 =
+ fun ~rd ~rn ->
+  let size =
+    match rd.reg_name with
+    | GP W | GP WZR | GP WSP -> 0b10
+    | GP X | GP XZR | GP SP | GP LR | GP FP -> 0b11
+  in
+  let rt = Reg.gp_encoding rd in
+  let rn_enc = Reg.gp_encoding rn in
+  let o2 = 1 in
+  let l = 0 in
+  let o1 = 0 in
+  let o0 = 1 in
+  let rs = 0b11111 in
+  let rt2 = 0b11111 in
+  let open Int32 in
+  let result = shift_left (of_int size) 30 in
+  let result = logor result (shift_left (of_int 0b001000) 24) in
+  let result = logor result (shift_left (of_int o2) 23) in
+  let result = logor result (shift_left (of_int l) 22) in
+  let result = logor result (shift_left (of_int o1) 21) in
+  let result = logor result (shift_left (of_int rs) 16) in
+  let result = logor result (shift_left (of_int o0) 15) in
+  let result = logor result (shift_left (of_int rt2) 10) in
+  let result = logor result (shift_left (of_int rn_enc) 5) in
+  let result = logor result (of_int rt) in
+  result
+
 (* Memory barrier encoding. Format: 1101 0101 0000 0011 0011 | CRm[11:8] |
    op2[7:5] | 11111
 
