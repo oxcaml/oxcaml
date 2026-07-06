@@ -51,22 +51,34 @@ jobs:
           # Pin to nix 2.33.0; later versions of nix cause out of memory issues
           # on darwin
           install_url: https://releases.nixos.org/nix/nix-2.33.0/install
-      - uses: cachix/cachix-action@v17
+      # The `oxcaml` cachix cache is a CI-only optimization, NOT a
+      # distribution channel: internal builds are always from source, and
+      # nothing outside GitHub CI should consume these binaries. Do not add
+      # the cache as a substituter in flake.nix or otherwise encourage
+      # non-CI use. The cache is disposable: if it is ever suspect, wipe it
+      # and CI falls back to building from source.
+      #
+      # The two mutually exclusive steps below configure the cache for
+      # reading on every event, but only hand the write token to builds of
+      # trusted refs (post-merge and merge-queue). PR builds -- same-repo
+      # or fork -- must run without the token in the job at all: `nix
+      # build` executes build scripts controlled by the PR, and unreviewed
+      # code must never be able to populate a cache that later CI runs
+      # consume.
+
+      - name: Set up cache (read-only; PR builds)
+        if: github.event_name == 'pull_request'
+        uses: cachix/cachix-action@v17
+        with:
+          # Public caches are readable without credentials.
+          name: oxcaml
+
+      - name: Set up cache (read/write; trusted refs)
+        if: github.event_name == 'push' || github.event_name == 'merge_group'
+        uses: cachix/cachix-action@v17
         with:
           name: oxcaml
-          # This cache is a CI-only optimization, NOT a distribution
-          # channel: internal builds are always from source, and nothing
-          # outside GitHub CI should consume these binaries. Do not add the
-          # cache as a substituter in flake.nix or otherwise encourage
-          # non-CI use. The cache is disposable: if it is ever suspect,
-          # wipe it and CI falls back to building from source.
-          #
-          # Only push to the cache from trusted refs (post-merge and
-          # merge-queue builds). PR builds -- same-repo or fork -- run
-          # read-only: unreviewed code must never populate a cache that
-          # later CI runs consume. (Public caches are readable without a
-          # token, so read-only needs no credentials.)
-          authToken: ${{ (github.event_name == 'push' || github.event_name == 'merge_group') && secrets.CACHIX_AUTH_TOKEN || '' }}
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
       - run: nix build -L '.#${{ matrix.attr }}'
 
 concurrency:
