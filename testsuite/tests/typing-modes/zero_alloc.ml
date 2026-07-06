@@ -401,7 +401,7 @@ Error: This value is "alloc" but is expected to be "noalloc_strict".
 |}]
 
 
-(** Test 5: Allocation mode identifies all allocations and forces the proper
+(** Test 5.1: Allocation mode identifies all allocations and forces the proper
     mode. For each kind of allocation the typechecker can see, we test a
     [noalloc_strict] and a [noalloc] enclosing function side by side, and -- for
     the allocations that [stack_] supports -- a [stack_]-marked pair as well. An
@@ -1232,7 +1232,7 @@ Error: The allocation is "alloc"
 |}]
 
 
-(** Test 5b: an allocation nested inside several enclosing functions forces
+(** Test 5.2: an allocation nested inside several enclosing functions forces
     every enclosing layer. The functions [g] and [h] each capture the parameter
     [a], so building each inner closure is itself an allocation in its parent;
     together with the innermost [Just a] this makes every one of the three nested
@@ -1313,7 +1313,7 @@ Error: The allocation is "alloc"
          which is expected to be "noalloc_strict".
 |}]
 
-(** Test 5c: [stack_] negative cases *)
+(** Test 5.3: [stack_] negative cases *)
 
 (* [stack_] on a non-allocation (a plain value) is rejected: it is not an
    allocation. *)
@@ -1325,7 +1325,7 @@ Line 5, characters 67-68:
 Error: This expression is not an allocation site.
 |}]
 
-(** Test 5d: [stack_] nested cases. *)
+(** Test 5.4: [stack_] nested cases. *)
 (* Nested: an inner allocation that is not itself [stack_]-marked still
    allocates on the heap, even when an enclosing allocation is [stack_]-marked. *)
 let (stack_nested @ noalloc_strict) (a : int) = exclave_ stack_ (Just (Just a))
@@ -1359,7 +1359,7 @@ Error: The allocation is "alloc"
 |}]
 
 
-(** Test 5e: the allocation axis is exempted only by [stack_]
+(** Test 5.5: the allocation axis is exempted only by [stack_]
     ([expected_mode.strictly_stack]), not by [local_]/[exclave_]
     ([expected_mode.strictly_local]). The two flags are independent, so they are
     NOT interchangeable:
@@ -1419,7 +1419,7 @@ val stack_in_let : int -> unit = <fun>
 |}]
 
 
-(** Test 5f: a transparent wrapper around the [stack_] operand should not defeat
+(** Test 5.6: a transparent wrapper around the [stack_] operand should not defeat
     the [stack_] exemption.
 
     [stack_] sets [strictly_stack] on its operand.
@@ -1472,8 +1472,8 @@ Error: This expression is not an allocation site.
 |}]
 
 
-(** Test 5g: a genuinely NEW inner allocation under a [stack_] outer is still
-    flagged. Unlike a transparent wrapper (Test 5f), these inner expressions
+(** Test 5.7: a genuinely NEW inner allocation under a [stack_] outer is still
+    flagged. Unlike a transparent wrapper (Test 5.6), these inner expressions
     introduce their own allocation, so the [stack_] exemption must NOT reach
     them. It does not: [stack_] only marks its top operand, and every inner
     allocation below is registered with [strictly_stack = false] -- either
@@ -1550,7 +1550,7 @@ Error: The allocation is "alloc"
 |}]
 
 
-(** Test 5h: regression guard for making [stack_] set [strictly_local].
+(** Test 5.8: regression guard for making [stack_] set [strictly_local].
 
     A [stack_] closure placed where a [global] value is required must report a
     clean locality error, NOT crash. If the [Pexp_stack] handler is changed to
@@ -1605,7 +1605,7 @@ Error: This value is "local" because it is "stack_"-allocated.
 |}]
 
 
-(** Test 5i: annotating the codomain of the arrow with [@ noalloc_strict]
+(** Test 5.9: annotating the codomain of the arrow with [@ noalloc_strict]
     constrains the mode of the application result. With
     [foo : int -> t @ noalloc_strict], applying [M.foo 1] yields a
     [noalloc_strict] value (and likewise [M.foo_int 1]). Note the codomain mode
