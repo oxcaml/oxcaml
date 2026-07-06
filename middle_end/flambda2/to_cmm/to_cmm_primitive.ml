@@ -851,7 +851,7 @@ let unary_float_arith_primitive _env dbg width op arg =
   | Float32, Abs -> C.float32_abs ~dbg arg
   | Float32, Neg -> C.float32_neg ~dbg arg
 
-let arithmetic_conversion dbg src dst arg =
+let arithmetic_conversion dbg src dst arg ~signedness =
   if K.Standard_int_or_float.equal src dst
   then None, arg
   else
@@ -860,12 +860,16 @@ let arithmetic_conversion dbg src dst arg =
     let extra =
       (* CR-someday jvanburen: add Env.Tag? *)
       match src, dst with
-      | Integer Tagged_int, Integer (Naked_int _) -> Some (Env.Untag arg)
-      | ( (Integer (Tagged_int | Naked_int _) | Float (Float32 | Float64)),
-          (Integer (Tagged_int | Naked_int _) | Float (Float32 | Float64)) ) ->
+      | Integer Tagged_int, Integer (Naked_int Int63) -> Some (Env.Untag arg)
+      | ( ( Integer
+              (Tagged_int | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8))
+          | Float (Float32 | Float64) ),
+          ( Integer
+              (Tagged_int | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8))
+          | Float (Float32 | Float64) ) ) ->
         None
     in
-    extra, C.Scalar_type.static_cast ~dbg ~src ~dst ~signedness:Signed arg
+    extra, C.Scalar_type.static_cast ~dbg ~src ~dst ~signedness arg
 
 let phys_equal _env dbg op x y =
   match (op : P.equality_comparison) with
@@ -1138,7 +1142,9 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   | Float_arith (width, op) ->
     None, res, unary_float_arith_primitive env dbg width op arg
   | Num_conv { src; dst } ->
-    let extra, expr = arithmetic_conversion dbg src dst arg in
+    let extra, expr =
+      arithmetic_conversion dbg src dst arg ~signedness:Signed
+    in
     extra, res, expr
   | Boolean_not -> None, res, C.mk_not dbg arg
   | Reinterpret_64_bit_word reinterpret ->
