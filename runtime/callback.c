@@ -61,7 +61,7 @@ Caml_inline value alloc_and_clear_stack_parent(caml_domain_state* domain_state)
   } else {
     value cont = caml_alloc_2(Cont_tag, Val_ptr(parent_stack), Val_long(0));
     Stack_parent(domain_state->current_stack) = NULL;
-    caml_dynamic_flush_thread(domain_state->dynamic_bindings);
+    caml_dynamic_cache_flush(domain_state->dynamic_bindings);
     return cont;
   }
 }
@@ -73,7 +73,7 @@ Caml_inline void restore_stack_parent(caml_domain_state* domain_state,
   if (Is_block(cont)) {
     struct stack_info* parent_stack = Ptr_val(caml_continuation_use(cont));
     Stack_parent(domain_state->current_stack) = parent_stack;
-    caml_dynamic_flush_thread(domain_state->dynamic_bindings);
+    caml_dynamic_cache_flush(domain_state->dynamic_bindings);
   }
 }
 
