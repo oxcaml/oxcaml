@@ -1985,7 +1985,10 @@ let write_module_metadata t =
   in
   F.pp_line t.ppf "";
   F.pp_line t.ppf {|!0 = !{ i32 1, !"oxcaml_module", !"%s" }|} module_name;
-  F.pp_line t.ppf {|!llvm.module.flags = !{ !0 }|}
+  (* Tell LLVM's frametable printer to emit the short (escape-byte, unpadded)
+     frame-descriptor format expected by this runtime. *)
+  F.pp_line t.ppf {|!1 = !{ i32 1, !"oxcaml_short_frametables", i32 1 }|};
+  F.pp_line t.ppf {|!llvm.module.flags = !{ !0, !1 }|}
 
 let write_llvmir_to_file t =
   (match t.sourcefile with
