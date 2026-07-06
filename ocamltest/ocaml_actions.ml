@@ -901,22 +901,30 @@ let run_expect_once input_file principal log env ~backend =
   let exit_status =
     Actions_helpers.run_cmd ~environment:default_ocaml_env log env commandline
   in
-  if exit_status=0 then (Result.pass, env)
+  if exit_status=0 then (Result.pass, env, ~needs_principal:false)
+  else if exit_status=3 then (Result.pass, env, ~needs_principal:true)
   else begin
     let reason = (Actions_helpers.mkreason
       "expect" (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env)
+    (Result.fail_with_reason reason, env, ~needs_principal:false)
   end
 
 let run_expect_twice input_file log env ~backend =
   let corrected filename = Filename.make_filename filename "corrected" in
-  let (result1, env1) = run_expect_once input_file false log env ~backend in
+  let (result1, env1, ~needs_principal) =
+    run_expect_once input_file false log env ~backend
+  in
   if Result.is_pass result1 then begin
     let intermediate_file = corrected input_file in
-    let (result2, env2) =
-      run_expect_once intermediate_file true log env1 ~backend in
+    let (result2, env2, output_file) =
+      if needs_principal then
+        let (result2, env2, ..) =
+          run_expect_once intermediate_file true log env1 ~backend
+        in
+        (result2, env2, corrected intermediate_file)
+      else (result1, env1, intermediate_file)
+    in
     if Result.is_pass result2 then begin
-      let output_file = corrected intermediate_file in
       let output_env = Environments.add_bindings
       [
         Builtin_variables.reference, input_file;
