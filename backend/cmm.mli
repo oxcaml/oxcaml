@@ -19,6 +19,7 @@
 
 type int_width = Cmx_format.int_width =
   | Int64
+  | Int63
   | Int32
   | Int16
   | Int8

@@ -679,8 +679,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               | Vec256 -> Twofiftysix_unaligned
               | Vec512 -> Fivetwelve_unaligned
               | Val | Addr | Tagged_int
-              | Naked_int (Int64 | Int32 | Int16 | Int8) ->
-                Word_val
+              | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8) ->
+                Word_val (* CR jrayman: This is not correct *)
               | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
             in
             insert_debug env sub_cfg
@@ -1200,7 +1200,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                  Addr in Ccatch register"
             | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
             | Val | Tagged_int
-            | Naked_int (Int64 | Int32 | Int16 | Int8)
+            | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8)
             | Float | Vec128 | Vec256 | Vec512 | Float32 ->
               ())
           src;

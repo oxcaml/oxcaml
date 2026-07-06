@@ -19,12 +19,14 @@ open! Int_replace_polymorphic_compare [@@warning "-66"]
 
 type int_width = Cmx_format.int_width =
   | Int64
+  | Int63
   | Int32
   | Int16
   | Int8
 
 let string_of_int_width = function
   | Int64 -> "Int64"
+  | Int63 -> "Int63"
   | Int32 -> "Int32"
   | Int16 -> "Int16"
   | Int8 -> "Int8"
@@ -126,15 +128,20 @@ let lub_component comp1 comp2 =
   | Vec256, Vec256 -> Vec256
   | Vec512, Vec512 -> Vec512
   | Naked_int Int64, Naked_int Int64 -> Naked_int Int64
+  | Naked_int Int63, Naked_int Int63 -> Naked_int Int63
   | Naked_int Int32, Naked_int Int32 -> Naked_int Int32
   | Naked_int Int16, Naked_int Int16 -> Naked_int Int16
   | Naked_int Int8, Naked_int Int8 -> Naked_int Int8
-  | ( (Tagged_int | Naked_int (Int64 | Int32 | Int16 | Int8) | Addr | Val),
+  | ( ( Tagged_int
+      | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8)
+      | Addr | Val ),
       ( Float | Float32 | Vec128 | Vec256 | Vec512
-      | Naked_int (Int64 | Int32 | Int16 | Int8) ) )
+      | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8) ) )
   | ( ( Float | Float32 | Vec128 | Vec256 | Vec512
-      | Naked_int (Int64 | Int32 | Int16 | Int8) ),
-      (Tagged_int | Naked_int (Int64 | Int32 | Int16 | Int8) | Addr | Val) )
+      | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8) ),
+      ( Tagged_int
+      | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8)
+      | Addr | Val ) )
   | (Float | Float32 | Vec256 | Vec512), (Vec128 | Vec256 | Vec512)
   | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512)
   | Float32, Float
@@ -159,6 +166,7 @@ let ge_component comp1 comp2 =
   | Addr, Addr -> true
   | Addr, Val -> true
   | Naked_int Int64, Naked_int Int64 -> true
+  | Naked_int Int63, Naked_int Int63 -> true
   | Naked_int Int32, Naked_int Int32 -> true
   | Naked_int Int16, Naked_int Int16 -> true
   | Naked_int Int8, Naked_int Int8 -> true
@@ -167,12 +175,16 @@ let ge_component comp1 comp2 =
   | Vec128, Vec128 -> true
   | Vec256, Vec256 -> true
   | Vec512, Vec512 -> true
-  | ( (Tagged_int | Naked_int (Int64 | Int32 | Int16 | Int8) | Addr | Val),
+  | ( ( Tagged_int
+      | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8)
+      | Addr | Val ),
       ( Float | Float32 | Vec128 | Vec256 | Vec512
-      | Naked_int (Int64 | Int32 | Int16 | Int8) ) )
+      | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8) ) )
   | ( ( Float | Float32 | Vec128 | Vec256 | Vec512
-      | Naked_int (Int64 | Int32 | Int16 | Int8) ),
-      (Tagged_int | Naked_int (Int64 | Int32 | Int16 | Int8) | Addr | Val) )
+      | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8) ),
+      ( Tagged_int
+      | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8)
+      | Addr | Val ) )
   | (Float | Float32 | Vec256 | Vec512), (Vec128 | Vec256 | Vec512)
   | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512)
   | Float32, Float
@@ -941,9 +953,10 @@ let rank_machtype_component : machtype_component -> int = function
   | Float32 -> 7
   | Valx2 -> 8
   | Naked_int Int64 -> 9
-  | Naked_int Int32 -> 10
-  | Naked_int Int16 -> 11
-  | Naked_int Int8 -> 12
+  | Naked_int Int63 -> 10
+  | Naked_int Int32 -> 11
+  | Naked_int Int16 -> 12
+  | Naked_int Int8 -> 13
 
 let compare_machtype_component
     (( Val | Addr | Tagged_int | Naked_int _ | Float | Vec128 | Vec256 | Vec512

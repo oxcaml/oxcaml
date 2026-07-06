@@ -42,6 +42,7 @@ let reg ppf r =
     | Addr -> "A"
     | Tagged_int -> "I"
     | Naked_int Int64 -> "Q"
+    | Naked_int Int63 -> "U"
     | Naked_int Int32 -> "D"
     | Naked_int Int16 -> "W"
     | Naked_int Int8 -> "B"

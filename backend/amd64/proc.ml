@@ -79,8 +79,9 @@ let win64 = Arch.win64
 
 let types_are_compatible (left : Reg.t)  (right : Reg.t) =
   match left.typ, right.typ with
-  | (Tagged_int | Val | Addr | Naked_int (Int64 | Int32 | Int16 | Int8)),
-    (Tagged_int | Val | Addr | Naked_int (Int64 | Int32 | Int16 | Int8))
+  | (Tagged_int | Val | Addr | Naked_int
+                                 (Int64 | Int63 | Int32 | Int16 | Int8)),
+    (Tagged_int | Val | Addr | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8))
   | Float, Float
   | Float32, Float32
   | (Valx2 | Vec128), (Valx2 | Vec128) ->
@@ -89,8 +90,8 @@ let types_are_compatible (left : Reg.t)  (right : Reg.t) =
     true
   | Vec512, Vec512 ->
     true
-  | (Tagged_int | Naked_int (Int64 | Int32 | Int16 | Int8) | Val | Addr | Float
-    | Float32 | Vec128 | Vec256 | Vec512 | Valx2), _ -> false
+  | (Tagged_int | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8) | Val | Addr
+    | Float | Float32 | Vec128 | Vec256 | Vec512 | Valx2), _ -> false
 
 (* Representation of hard registers by pseudo-registers *)
 
@@ -106,6 +107,8 @@ let hard_float_reg =
 
 let hard_tagged_int_reg =
   Array.map (Reg.create_alias ~typ:Tagged_int) hard_int64_reg
+let hard_int63_reg =
+  Array.map (Reg.create_alias ~typ:(Naked_int Int63)) hard_int64_reg
 let hard_int32_reg =
   Array.map (Reg.create_alias ~typ:(Naked_int Int32)) hard_int64_reg
 let hard_int16_reg =
@@ -130,8 +133,9 @@ let add_hard_vec512_regs list ~f =
   then f hard_vec512_reg :: list else list
 
 let all_phys_regs =
-  [hard_int64_reg; hard_tagged_int_reg; hard_int32_reg; hard_int16_reg;
-   hard_int8_reg; hard_float_reg; hard_float32_reg; hard_vec128_reg]
+  [hard_int64_reg; hard_tagged_int_reg; hard_int63_reg; hard_int32_reg;
+   hard_int16_reg; hard_int8_reg; hard_float_reg; hard_float32_reg;
+   hard_vec128_reg]
   |> add_hard_vec256_regs ~f:(fun regs -> regs)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
   |> Array.concat
@@ -149,6 +153,7 @@ let phys_reg ty (phys_reg : Regs.Phys_reg.t) =
     then Reg.create_alias ~typ:ty r
     else r
   | Tagged_int -> hard_tagged_int_reg.(index_in_class)
+  | Naked_int Int63 -> hard_int63_reg.(index_in_class)
   | Naked_int Int32 -> hard_int32_reg.(index_in_class)
   | Naked_int Int16 -> hard_int16_reg.(index_in_class)
   | Naked_int Int8 -> hard_int8_reg.(index_in_class)
@@ -341,7 +346,8 @@ let win64_loc_external_arguments arg =
     let arguments, size =
       match ty with
       | Val | Tagged_int | Naked_int _ | Addr ->
-        win64_int_external_arguments, size_int (* CR jrayman: change size? *)
+        win64_int_external_arguments, size_int
+        (* CR jrayman: change size for [Naked_int]? *)
       | Float | Float32 -> win64_float_external_arguments, size_float
       | Vec128 | Vec256 | Vec512 ->
         (* CR mslater: (SIMD) win64 calling convention requires pass by reference *)

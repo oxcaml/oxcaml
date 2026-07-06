@@ -222,8 +222,7 @@ let oper_result_type = function
   | Creinterpret_cast (V512_of_vec _) -> typ_vec512
   | Creinterpret_cast (Float_of_int64 | Float_of_float32) -> typ_float
   | Creinterpret_cast (Float32_of_int32 | Float32_of_float) -> typ_float32
-  | Creinterpret_cast Int_of_value -> typ_tagged_int
-  | Creinterpret_cast Int64_of_float -> typ_int64
+  | Creinterpret_cast (Int_of_value | Int64_of_float) -> typ_int64
   | Creinterpret_cast Int32_of_float32 -> typ_int32
   | Cstatic_cast (Float_of_float32 | Float_of_int Float64) -> typ_float
   | Cstatic_cast (Float32_of_float | Float_of_int Float32) -> typ_float32
@@ -271,6 +270,7 @@ let size_component : machtype_component -> int = function
   | Tagged_int | Naked_int _ ->
     assert (Int.equal Arch.size_int Arch.size_addr);
     Arch.size_int
+  (* CR jrayman: Should [Naked_int w] instead return [bits_of_int_width w]? *)
   | Float -> Arch.size_float
   | Float32 ->
     (* CR layouts v5.1: reconsider when float32 fields are efficiently packed.

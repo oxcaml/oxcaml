@@ -54,6 +54,8 @@ module Type : sig
 
   val i64 : t
 
+  val i63 : t
+
   val i32 : t
 
   val i16 : t

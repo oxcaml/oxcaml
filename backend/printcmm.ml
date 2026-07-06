@@ -37,6 +37,7 @@ let machtype_component ppf (ty : machtype_component) =
   | Addr -> fprintf ppf "addr"
   | Tagged_int -> fprintf ppf "tagged_int"
   | Naked_int Int64 -> fprintf ppf "int64"
+  | Naked_int Int63 -> fprintf ppf "int63"
   | Naked_int Int32 -> fprintf ppf "int32"
   | Naked_int Int16 -> fprintf ppf "int16"
   | Naked_int Int8 -> fprintf ppf "int8"
