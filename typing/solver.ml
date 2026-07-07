@@ -1060,100 +1060,75 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       then ()
       else set_vupper ~log v (VarMap.add key x v.vupper)
 
-  (* Add a vlower entry for the relation [f u <= v], tighten the upper bound of [u],
+  (* Add a vlower entry for the relation [f' u <= v], tighten the upper bound of [u],
   and recursively add relations to maintain invariant.
   The lower and upper bounds of [u] and [v] are not checked, upper bound is not pushed
   down [u.vlower] *)
-  let rec add_vlower_reversed : type a b r.
+  let rec add_vlower_reversed : type a b l.
       log:_ ->
       H.Pinpoint.t ->
-      a C.obj ->
+      b C.obj ->
       a var ->
       b var ->
-      (b, a, allowed * r) C.morph ->
-      (b, a, allowed * r) Comp_hint.Morph_hint.t ->
+      (a, b, l * allowed) C.morph ->
+      (a, b, l * allowed) Comp_hint.Morph_hint.t ->
       unit =
    fun ~log pp dst v u f f_hint ->
-    let x =
-      Amorphvar
-        (u, C.disallow_right f, Comp_hint.Morph_hint.disallow_right f_hint)
-    in
-    let key = get_key dst x in
+    let f' = C.left_adjoint dst f in
+    let _, src, f'_hint = Comp_hint.Morph_hint.left_adjoint pp dst f_hint in
+    let x = Amorphvar (u, f', f'_hint) in
+    let key = get_key src x in
     if VarMap.mem key v.vlower
     then ()
     else begin
-      let f' = C.right_adjoint dst f in
-      let _, src, f'_hint = Comp_hint.Morph_hint.right_adjoint pp dst f_hint in
-      push_upper_bound ~log src v f' f'_hint u;
+      push_upper_bound ~log dst v f f_hint u;
       set_vlower ~log v (VarMap.add key x v.vlower);
       VarMap.iter
         (fun _ (Amorphvar (w, h, h_hint)) ->
+          let fh = C.compose dst (C.disallow_left f) h in
+          let fh_hint =
+            Comp_hint.Morph_hint.Compose
+              (Comp_hint.Morph_hint.disallow_left f_hint, h_hint)
+          in
           if w.level < u.level
-          then begin
-            let f'h = C.compose src f' h in
-            let f'h_hint = Comp_hint.Morph_hint.Compose (f'_hint, h_hint) in
-            add_vupper_nocheck ~log src u w f'h f'h_hint
-          end
-          else begin
-            let h' = C.left_adjoint dst h in
-            let _, src, h'_hint =
-              Comp_hint.Morph_hint.left_adjoint pp dst h_hint
-            in
-            let h'f = C.compose src h' (C.disallow_right f) in
-            let h'f_hint =
-              Comp_hint.Morph_hint.Compose
-                (h'_hint, Comp_hint.Morph_hint.disallow_right f_hint)
-            in
-            add_vlower_reversed ~log pp src w u h'f h'f_hint
-          end)
+          then add_vupper_nocheck ~log dst u w fh fh_hint
+          else add_vlower_reversed ~log pp dst w u fh fh_hint)
         v.vupper
     end
 
-  (* Add a vupper entry for the relation [v <= f u], tighten the lower bound of [u],
+  (* Add a vupper entry for the relation [v <= f' u], tighten the lower bound of [u],
     and recursively add relations to maintain invariant.
     The lower and upper bounds of [u] and [v] are not checked, lower bound is not pushed
     down [u.vupper] *)
-  let rec add_vupper_reversed : type a b l.
+  let rec add_vupper_reversed : type a b r.
       log:_ ->
       H.Pinpoint.t ->
-      a C.obj ->
+      b C.obj ->
       a var ->
       b var ->
-      (b, a, l * allowed) C.morph ->
-      (b, a, l * allowed) Comp_hint.Morph_hint.t ->
+      (a, b, allowed * r) C.morph ->
+      (a, b, allowed * r) Comp_hint.Morph_hint.t ->
       unit =
    fun ~log pp dst v u f f_hint ->
-    let x =
-      Amorphvar (u, C.disallow_left f, Comp_hint.Morph_hint.disallow_left f_hint)
-    in
-    let key = get_key dst x in
+    let f' = C.right_adjoint dst f in
+    let _, src, f'_hint = Comp_hint.Morph_hint.right_adjoint pp dst f_hint in
+    let x = Amorphvar (u, f', f'_hint) in
+    let key = get_key src x in
     if VarMap.mem key v.vupper
     then ()
     else begin
-      let f' = C.left_adjoint dst f in
-      let _, src, f'_hint = Comp_hint.Morph_hint.left_adjoint pp dst f_hint in
-      push_lower_bound ~log src v f' f'_hint u;
+      push_lower_bound ~log dst v f f_hint u;
       set_vupper ~log v (VarMap.add key x v.vupper);
       VarMap.iter
         (fun _ (Amorphvar (w, h, h_hint)) ->
+          let fh = C.compose dst (C.disallow_right f) h in
+          let fh_hint =
+            Comp_hint.Morph_hint.Compose
+              (Comp_hint.Morph_hint.disallow_right f_hint, h_hint)
+          in
           if u.level < w.level
-          then begin
-            let h' = C.right_adjoint dst h in
-            let _, src, h'_hint =
-              Comp_hint.Morph_hint.right_adjoint pp dst h_hint
-            in
-            let h'f = C.compose src h' (C.disallow_left f) in
-            let h'f_hint =
-              Comp_hint.Morph_hint.Compose
-                (h'_hint, Comp_hint.Morph_hint.disallow_left f_hint)
-            in
-            add_vupper_reversed ~log pp src w u h'f h'f_hint
-          end
-          else begin
-            let f'h = C.compose src f' h in
-            let f'h_hint = Comp_hint.Morph_hint.Compose (f'_hint, h_hint) in
-            add_vlower_nocheck ~log src u w f'h f'h_hint
-          end)
+          then add_vupper_reversed ~log pp dst w u fh fh_hint
+          else add_vlower_nocheck ~log dst u w fh fh_hint)
         v.vlower
     end
 
@@ -1171,19 +1146,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     set_vupper ~log u vupper_lt;
     VarMap.iter
       (fun _ (Amorphvar (v, f, f_hint)) ->
-        let f' = C.right_adjoint dst f in
-        let _, src, f'_hint =
-          Comp_hint.Morph_hint.right_adjoint H.Pinpoint.unknown dst f_hint
-        in
-        add_vupper_reversed ~log H.Pinpoint.unknown src v u f' f'_hint)
+        add_vupper_reversed ~log H.Pinpoint.unknown dst v u f f_hint)
       vlower_gt;
     VarMap.iter
       (fun _ (Amorphvar (v, f, f_hint)) ->
-        let f' = C.left_adjoint dst f in
-        let _, src, f'_hint =
-          Comp_hint.Morph_hint.left_adjoint H.Pinpoint.unknown dst f_hint
-        in
-        add_vlower_reversed ~log H.Pinpoint.unknown src v u f' f'_hint)
+        add_vlower_reversed ~log H.Pinpoint.unknown dst v u f f_hint)
       vupper_ge;
     (* optimization: if lower = upper, we can remove vuppers and vlowers since the
       information is as precise as it can get *)
