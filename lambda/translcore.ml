@@ -47,15 +47,15 @@ let use_dup_for_constant_mutable_arrays_bigger_than = 4
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
+let pat_contains_gadt pat =
+  exists_pattern
+    (fun p ->
+      match p.pat_desc with
+      | Tpat_construct (_, cd, _, _, _) -> cd.cstr_generalized
+      | _ -> false)
+    pat
+
 let param_is_partial_gadt_match fp =
-  let pat_contains_gadt pat =
-    exists_pattern
-      (fun p ->
-        match p.pat_desc with
-        | Tpat_construct (_, cd, _, _, _) -> cd.cstr_generalized
-        | _ -> false)
-      pat
-  in
   match fp.fp_kind with
   | Tparam_pat pat -> (
       match fp.fp_partial with
@@ -66,6 +66,21 @@ let param_is_partial_gadt_match fp =
          effectively partial even when it covers the payload: the omitted
          case carries no GADT evidence. *)
       pat_contains_gadt pat
+
+let cases_are_partial_gadt_match cases partial =
+  match (partial : partial) with
+  | Total -> false
+  | Partial -> List.exists (fun { c_lhs; _ } -> pat_contains_gadt c_lhs) cases
+
+let join_layout_of_cases sort cases =
+  match cases with
+  | [] -> None
+  | { c_lhs; _ } :: rest ->
+      Some
+        (List.fold_left
+           (fun acc { c_lhs; _ } ->
+             Lambda.join_layout acc (layout_pat sort c_lhs))
+           (layout_pat sort c_lhs) rest)
 
 let field_offset_for_label lbl repres =
   match repres with
@@ -1761,13 +1776,20 @@ and transl_tupled_function
   match eligible_cases with
   | Some
       (cases, partial,
-       ({ pat_desc = Tpat_tuple pl } as arg_pat), arg_mode, arg_sort)
+       { pat_desc = Tpat_tuple pl }, arg_mode, arg_sort)
     when is_alloc_heap mode
       && is_alloc_heap (transl_alloc_mode_l arg_mode)
       && !Clflags.native_code
       && List.length pl <= (Lambda.max_arity ()) ->
       begin try
-        let arg_layout = layout_pat arg_sort arg_pat in
+        let arg_layout =
+          if cases_are_partial_gadt_match cases partial
+          then layout_of_sort loc arg_sort
+          else
+            match join_layout_of_cases arg_sort cases with
+            | Some arg_layout -> arg_layout
+            | None -> raise Matching.Cannot_flatten
+        in
         let size = List.length pl in
         let pats_expr_list =
           List.map
@@ -1882,15 +1904,14 @@ and transl_curried_function ~scopes loc repr params body
        | Tfunction_cases fc -> param_curries @ [ Final_arg, fc.fc_arg_mode ])
   in
   add_type_shapes_of_params params;
-  (* The layout of an argument that following a non-exhaustive match on a GADT
-     constructor is must not be narrowed by the equations introduced by that
+  (* The layout of a parameter that comes after a partial match on a GADT
+     constructor must not be narrowed by the equations introduced by that
      constructor, as the caller can still pass a missing constructor. See
      oxcaml/oxcaml#6356 *)
-  let follows_partial_gadt_match =
+  let any_param_is_partial_gadt_match, follows_partial_gadt_match =
     List.fold_left_map
       (fun seen fp -> seen || param_is_partial_gadt_match fp, seen)
       false params
-    |> snd
   in
   let cases_param, body =
     match body with
@@ -1902,17 +1923,18 @@ and transl_curried_function ~scopes loc repr params body
       ->
         let fc_arg_sort = Jkind.Sort.default_for_transl_and_get fc_arg_sort in
         let arg_layout =
-          match fc_cases with
-          | { c_lhs } :: _ ->
-              if List.exists param_is_partial_gadt_match params
-              then layout_of_sort fc_loc fc_arg_sort
-              else layout_pat fc_arg_sort c_lhs
-          | [] ->
-              (* ppxes can generate empty function cases, which compiles to
-                 a function that always raises Match_failure. We try less
-                 hard to calculate a detailed layout that the middle-end can
-                 use for optimizations. *)
-              layout_of_sort fc_loc fc_arg_sort
+          if any_param_is_partial_gadt_match
+             || cases_are_partial_gadt_match fc_cases fc_partial
+          then layout_of_sort fc_loc fc_arg_sort
+          else
+            match join_layout_of_cases fc_arg_sort fc_cases with
+            | Some arg_layout -> arg_layout
+            | None ->
+                (* ppxes can generate empty function cases, which compiles to
+                   a function that always raises Match_failure. We try less
+                   hard to calculate a detailed layout that the middle-end can
+                   use for optimizations. *)
+                layout_of_sort fc_loc fc_arg_sort
         in
         let arg_mode = transl_alloc_mode_l fc_arg_mode in
         add_type_shapes_of_cases fc_cases;
@@ -1950,7 +1972,8 @@ and transl_curried_function ~scopes loc repr params body
         in
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
         let arg_layout =
-          if follows_partial_gadt then layout_of_sort fp_loc fp_sort
+          if follows_partial_gadt || param_is_partial_gadt_match fp
+          then layout_of_sort fp_loc fp_sort
           else layout arg_env fp_loc fp_sort arg_type
         in
         let arg_mode = transl_alloc_mode_l fp_mode.mode_modes in

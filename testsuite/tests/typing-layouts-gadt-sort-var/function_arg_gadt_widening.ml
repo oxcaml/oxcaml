@@ -75,7 +75,7 @@ let () =
   | _ -> assert false
   | exception Assert_failure _ -> ()
 
-(* Segfault: partial match unpacking, unarized. *)
+(* Regression test: partial match unpacking, unarized. *)
 type 'a rep5 = Block5 : (int * int) rep5 | Int5 : int rep5
 
 let[@inline never] g5 b =
@@ -88,7 +88,7 @@ let () =
   | _ -> assert false
   | exception Match_failure _ -> ()
 
-(* Segfault: total match unpacking a tuple, unarized *)
+(* Regression test: total match unpacking a tuple, unarized *)
 type 'a rep6 = Block6 : (int * int) rep6 | Int6 : int rep6
 
 let[@inline never] g6 b =
@@ -102,7 +102,7 @@ let () =
   assert (g6 true = 1);
   assert (g6 false = 0)
 
-(* Runtime error: partial match unpacking a tuple,
+(* Regression test: partial match unpacking a tuple,
    not unarized due to the extra argument. *)
 type 'a rep7 = Block7 : (int * int) rep7 | Int7 : int rep7
 
@@ -118,7 +118,7 @@ let () =
   | _ -> assert false
   | exception Match_failure _ -> ()
 
-(* Runtime error: partial match unpacking a tuple,
+(* Regression test: partial match unpacking a tuple,
    not unarized due to [as _p]. *)
 type 'a rep8 = Block8 : (int * int) rep8 | Int8 : int rep8
 
@@ -134,7 +134,7 @@ let () =
   | _ -> assert false
   | exception Match_failure _ -> ()
 
-(* Runtime error: total match unpacking a tuple,
+(* Regression test: total match unpacking a tuple,
    not unarized due to the extra argument. *)
 type 'a rep9 = Block9 : (int * int) rep9 | Int9 : int rep9
 
@@ -149,7 +149,7 @@ let () =
   assert (g9 true = 1);
   assert (g9 false = 0)
 
-(* Runtime error: total match unpacking a tuple,
+(* Regression test: total match unpacking a tuple,
    not unarized due to [as _t]. *)
 type 'a rep10 = Int10 : int rep10 | Float10 : float rep10
 

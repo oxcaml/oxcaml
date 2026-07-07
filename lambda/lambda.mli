@@ -656,6 +656,11 @@ val equal_raise_kind : raise_kind -> raise_kind -> bool
 
 val equal_value_kind : value_kind -> value_kind -> bool
 
+val join_value_kind : value_kind -> value_kind -> value_kind
+
+(** Join of two layouts, must be of the same kind. *)
+val join_layout : layout -> layout -> layout
+
 val equal_layout : layout -> layout -> bool
 
 val print_boxed_vector : Format.formatter -> boxed_vector -> unit

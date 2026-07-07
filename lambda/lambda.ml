@@ -695,6 +695,21 @@ and equal_constructor_shape x y =
       equal_mixed_block_shape shape1 shape2
   | (Constructor_uniform _ | Constructor_mixed _), _ -> false
 
+let join_nullable x y =
+  match x, y with
+  | Non_nullable, Non_nullable -> Non_nullable
+  | Nullable, _ | _, Nullable -> Nullable
+
+(* CR dkalinichenko: we could have a finer-grained join here,
+   but I don't think the complexity is worth it. *)
+let join_value_kind_non_null x y =
+  if equal_value_kind_non_null x y then x else Pgenval
+
+let join_value_kind x y =
+  { raw_kind = join_value_kind_non_null x.raw_kind y.raw_kind;
+    nullable = join_nullable x.nullable y.nullable;
+  }
+
 let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
   match vks with
   | None -> All_value
@@ -729,6 +744,29 @@ let equal_layout x y =
   | Ptop, Ptop -> true
   | Pbottom, Pbottom -> true
   | _, _ -> false
+
+let rec join_layout x y =
+  match x, y with
+  | Pbottom, l | l, Pbottom -> l
+  | Ptop, _ | _, Ptop -> Ptop
+  | Pvalue kind1, Pvalue kind2 -> Pvalue (join_value_kind kind1 kind2)
+  | Punboxed_product layouts1, Punboxed_product layouts2
+    when List.length layouts1 = List.length layouts2 ->
+      Punboxed_product (List.map2 join_layout layouts1 layouts2)
+  | Punboxed_float f1, Punboxed_float f2
+    when Primitive.equal_unboxed_float f1 f2 ->
+      x
+  | Punboxed_or_untagged_integer i1, Punboxed_or_untagged_integer i2
+    when Primitive.equal_unboxed_or_untagged_integer i1 i2 ->
+      x
+  | Punboxed_vector v1, Punboxed_vector v2
+    when Primitive.equal_unboxed_vector v1 v2 ->
+      x
+  | Psplicevar id1, Psplicevar id2 when Ident.equal id1 id2 -> x
+  | ( ( Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+      | Punboxed_vector _ | Punboxed_product _ | Psplicevar _ ),
+      _ ) ->
+      Misc.fatal_error "Lambda.join_layout: layouts of different sorts"
 
 let rec equal_ignorable_product_element_kind k1 k2 =
   match k1, k2 with

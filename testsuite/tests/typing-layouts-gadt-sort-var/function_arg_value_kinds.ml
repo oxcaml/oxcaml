@@ -18,7 +18,7 @@ let f : type a. a rep -> a -> int = fun Block (a, _b) -> a
 [%%expect{|
 (let
   (f =
-     (function {nlocal = 0} param[value<int>] param? : int
+     (function {nlocal = 0} param? param? : int
        (if param
          (raise (makeblock 0 (getpredef Match_failure!!) [0: "" 1 40]))
          (field_imm 0 param))))
@@ -45,8 +45,7 @@ let h b =
 (let
   (h =
      (function {nlocal = 0} b[value<int>] : int
-       (catch (if b (exit 9 0 [0: 1 2]) (exit 9 1 0))
-        with (9 param[value<int>] param?)
+       (catch (if b (exit 9 0 [0: 1 2]) (exit 9 1 0)) with (9 param? param?)
          (if param
            (raise (makeblock 0 (getpredef Match_failure!!) [0: "" 2 50]))
            (field_imm 0 param)))))
@@ -54,8 +53,8 @@ let h b =
 val h : bool -> int = <fun>
 |}]
 
-(* Control: no GADT narrowing involved. The parameter's kind comes from the
-   function's own type and must stay precise. *)
+(* Control: no GADT narrowing involved. The parameter's kind must stay
+   precise. *)
 let fst2 (p : int * int) = match p with a, _b -> a
 [%%expect{|
 (let
@@ -113,7 +112,7 @@ val j : 'a rep -> 'a -> int = <fun>
 |}]
 
 (* Sound: a single-constructor GADT; every caller's instantiation satisfies
-   the equation. *)
+   the equation, and the total match lets the kind stay precise. *)
 type _ only = Only : (int * int) only
 
 let k : type a. a only -> a -> int = fun Only (a, _b) -> a
@@ -129,7 +128,8 @@ type _ only = Only : (int * int) only
 val k : 'a only -> 'a -> int = <fun>
 |}]
 
-(* A total multi-case GADT match; the branches' kinds agree exactly. *)
+(* Sound: a total multi-case GADT match; the parameter's kind is the join of
+   the branches' kinds, which here agree exactly. *)
 type _ ab = A : int ab | B : bool ab
 
 let m : type a. a ab * a -> int = function
@@ -149,34 +149,28 @@ type _ ab = A : int ab | B : bool ab
 val m : 'a ab * 'a -> int = <fun>
 |}]
 
-(* A total multi-case GADT match whose branch kinds disagree in the payload
-   slot; the kind must not come from the first case only. *)
+(* Sound: a total multi-case GADT match whose branch kinds disagree; the
+   join widens the parameter's kind to a generic value. *)
 let n : type a. a rep * a -> int = function
   | Block, (a, _b) -> a
   | Int, x -> x
 [%%expect{|
 (let
   (n =
-     (function {nlocal = 0}
-       param[value<
-              (consts ())
-               (non_consts ([0: value<int>,
-                             value<
-                              (consts ())
-                               (non_consts ([0: value<int>, value<int>]))>]))>]
-       : int
+     (function {nlocal = 0} param : int
        (if (field_imm 0 param) (field_imm 1 param)
          (field_imm 0 (field_imm 1 param)))))
   (apply (field_imm 1 (global Toploop!)) "n" n))
 val n : 'a rep * 'a -> int = <fun>
 |}]
 
-(* A parameter following a partial GADT match on a preceding parameter. *)
+(* A parameter following a partial GADT match falls back to the sort's layout
+   even when its own type is concrete. *)
 let p : type a. a rep -> int * int -> int = fun Block (x, _y) -> x
 [%%expect{|
 (let
   (p =
-     (function {nlocal = 0} param[value<int>] param? : int
+     (function {nlocal = 0} param? param? : int
        (if param
          (raise (makeblock 0 (getpredef Match_failure!!) [0: "" 1 48]))
          (field_imm 0 param))))
