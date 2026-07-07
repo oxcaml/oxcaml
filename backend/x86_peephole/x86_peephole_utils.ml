@@ -145,9 +145,7 @@ let reads_from_reg64 target = function
   | MOVSX (src, dst)
   | MOVSXD (src, dst)
   | MOVZX (src, dst)
-  | LEA (src, dst)
-  | BSF (src, dst)
-  | BSR (src, dst) ->
+  | LEA (src, dst) ->
     arg_contains_reg64 target src || reg64_read_when_writing target dst
   | PUSH src -> arg_contains_reg64 target src || equal_reg64 target RSP
   | ADD (src, dst)
@@ -162,6 +160,11 @@ let reads_from_reg64 target = function
   | SAL (src, dst)
   | SAR (src, dst)
   | SHR (src, dst)
+  (* BSF/BSR leave the destination unchanged (officially: undefined) when the
+     source is zero, so, like CMOV, they conditionally preserve - i.e. read -
+     the destination. *)
+  | BSF (src, dst)
+  | BSR (src, dst)
   | CMOV (_, src, dst) ->
     arg_contains_reg64 target src || arg_contains_reg64 target dst
   | INC dst | DEC dst | NEG dst | BSWAP dst -> arg_contains_reg64 target dst
