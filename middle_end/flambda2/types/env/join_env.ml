@@ -1912,7 +1912,7 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
         (equations_for_bindings bindings ~since:empty_bindings)
     in
     let rec loop t equations_to_join concrete_types_in_target_env
-        inverse_relations =
+        inverse_relations depth =
       let bindings_before_this_round = t.bindings in
       let types_in_target_env, inverse_relations, t =
         n_way_join_round ~n_way_join_type t equations_to_join
@@ -1921,7 +1921,9 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
       let new_equations_to_join =
         equations_for_bindings t.bindings ~since:bindings_before_this_round
       in
-      if Name_in_target_env.Map.is_empty new_equations_to_join
+      if
+        Name_in_target_env.Map.is_empty new_equations_to_join
+        || depth >= Flambda_features.join_depth ()
       then
         let env_extension_for_inverse_relations =
           TEE.from_map
@@ -1942,7 +1944,9 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
           env_extension_for_inverse_relations,
           n_way_join_symbol_projections t symbol_projections_to_join,
           t.bindings )
-      else loop t new_equations_to_join types_in_target_env inverse_relations
+      else
+        loop t new_equations_to_join types_in_target_env inverse_relations
+          (depth + 1)
     in
     let ( equations,
           env_extension_for_inverse_relations,
@@ -1951,7 +1955,7 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
       loop { joined_envs; bindings } equations_to_join
         (Name_in_target_env.from_source_env_map
            (Bindings_in_target_env.alias_types_in_target_env bindings))
-        Name.Map.empty
+        Name.Map.empty 0
     in
     (* Variables that only occur once in the target environment are projected
        out and replaced with their type. *)
