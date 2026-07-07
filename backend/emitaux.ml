@@ -57,11 +57,17 @@ type frame_descr =
 
 let frame_descriptors = ref ([] : frame_descr list)
 
-(* Bumped by the backends whenever they switch to a different text section, so
-   [record_frame_descr] can tag each descriptor with its section. *)
+(* Bumped only on a genuine text-section change, so descriptors may be
+   delta-chained across function boundaries within a shared section. *)
 let frame_section_epoch = ref 0
 
-let start_new_code_section () = incr frame_section_epoch
+let current_code_section = ref ""
+
+let enter_code_section name =
+  if not (String.equal name !current_code_section)
+  then (
+    current_code_section := name;
+    incr frame_section_epoch)
 
 (* Set by a backend before [emit_frames] when the short descriptor format cannot
    be emitted in the current context (currently only MASM, which has no .uleb128
@@ -586,10 +592,14 @@ let with_snapshot ~f =
   let saved_file_pos_nums = !file_pos_nums in
   let saved_file_pos_num_cnt = !file_pos_num_cnt in
   let saved_frame_descriptors = !frame_descriptors in
+  let saved_frame_section_epoch = !frame_section_epoch in
+  let saved_current_code_section = !current_code_section in
   let result = f () in
   file_pos_nums := saved_file_pos_nums;
   file_pos_num_cnt := saved_file_pos_num_cnt;
   frame_descriptors := saved_frame_descriptors;
+  frame_section_epoch := saved_frame_section_epoch;
+  current_code_section := saved_current_code_section;
   result
 
 let get_file_num ~file_emitter file_name =

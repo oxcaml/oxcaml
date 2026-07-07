@@ -52,13 +52,13 @@ val record_frame_descr :
   (* Location, if any *)
   unit
 
-(** Signals that subsequent frame descriptors' return addresses live in a new
-    text section. A "short" frame descriptor encodes its return address as a
-    delta from the previous descriptor's; that delta is only an assembly-time
-    constant when both are in the same section, so descriptors at a section
-    boundary escape to the full format. The backends call this whenever they
-    switch text section. *)
-val start_new_code_section : unit -> unit
+(** The backends call this whenever they switch text section, with the section's
+    name. A "short" frame descriptor encodes its return address as a delta from
+    the previous descriptor's; that delta is only an assembly-time constant
+    within one section, so descriptors escape at a section change. Re-entering
+    the current section does not bump the epoch: deltas chain across function
+    boundaries in a shared [.text]. *)
+val enter_code_section : string -> unit
 
 (* When set before [emit_frames], every frame descriptor escapes to the normal
    format instead of the short encoding. Backends set this when the short format

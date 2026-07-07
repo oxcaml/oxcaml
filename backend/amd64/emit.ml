@@ -396,8 +396,7 @@ let emit_named_text_section ?(suffix = "") func_name =
     | _ ->
       D.switch_to_section_raw ~names:[".text.startup.caml"] ~flags:(Some "ax")
         ~args:["@progbits"] ~is_delayed:false;
-      (* A new text section: frame-descriptor deltas cannot cross it. *)
-      Emitaux.start_new_code_section ();
+      Emitaux.enter_code_section ".text.startup.caml";
       (* Warning: We set the internal section ref to Text here, because it
          currently does not supported named text sections. In the rest of this
          file, we pretend the section is called Text rather than the function
@@ -416,11 +415,12 @@ let emit_named_text_section ?(suffix = "") func_name =
          does not support function sections. *) ->
       assert false
     | _ ->
-      D.switch_to_section_raw
-        ~names:[Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix]
-        ~flags:(Some "ax") ~args:["@progbits"] ~is_delayed:false;
-      (* A new text section: frame-descriptor deltas cannot cross it. *)
-      Emitaux.start_new_code_section ();
+      let name =
+        Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix
+      in
+      D.switch_to_section_raw ~names:[name] ~flags:(Some "ax")
+        ~args:["@progbits"] ~is_delayed:false;
+      Emitaux.enter_code_section name;
       (* Warning: We set the internal section ref to Text here, because it
          currently does not supported named text sections. In the rest of this
          file, we pretend the section is called Text rather than the function
@@ -429,11 +429,11 @@ let emit_named_text_section ?(suffix = "") func_name =
       D.unsafe_set_internal_section_ref Text)
   else (
     D.text ();
-    (* Conservatively treat each function start as a new section boundary for
-       frame-descriptor deltas. With a single shared [.text] this only forgoes
-       cross-function deltas (safe); it avoids emitting a cross-section delta
-       should a return address ever land in a different section. *)
-    Emitaux.start_new_code_section ())
+    (* Mach-O assemblers refuse to fold label differences across atoms (each
+       non-private symbol starts one) and .uleb128 has no relocated form, so
+       function boundaries must remain delta boundaries there. *)
+    Emitaux.enter_code_section
+      (if is_macosx system then ".text." ^ func_name else ".text"))
 
 let emit_function_or_basic_block_section_name () =
   let suffix =
