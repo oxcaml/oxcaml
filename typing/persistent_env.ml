@@ -702,8 +702,7 @@ and acknowledge_new_pers_name penv check global_name global import =
       | Visible { cmx_guaranteed = false } | Hidden ->
         (* Without a guaranteed [.cmx], the unit is not available for
            compile-time evaluation, so its staticity is forced to [Dynamic]
-           regardless of what the [.cmi] claims. The [Cmx_not_guaranteed] hint
-           explains why in any resulting error. *)
+           regardless of what the [.cmi] claims. *)
         Mode.Value.join
           [ mode;
             Mode.Value.min_with_monadic Staticity

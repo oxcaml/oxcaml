@@ -1214,6 +1214,8 @@ module type Wrapped = sig
 
   and signature = signature_item list wrapped
 
+  (** A left mode instead of a constant mode, in order to encode mode hints.
+      Note that cmi record constant modes anyway. *)
   and persistent_signature = signature * Mode.Value.l
 
   and signature_item =
