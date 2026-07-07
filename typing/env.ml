@@ -473,13 +473,14 @@ module IdTbl =
       }
 
     let rec find_same_without_locks id tbl =
-      try Ident.find_same id tbl.current
-      with Not_found as exn ->
+      match Ident.find_same_opt id tbl.current with
+      | Some data -> data
+      | None ->
         begin match tbl.layer with
         | Open {next; _} -> find_same_without_locks id next
         | Map {f; next} -> f (find_same_without_locks id next)
         | Lock {lock=_; next} -> find_same_without_locks id next
-        | Nothing -> raise exn
+        | Nothing -> raise Not_found
         end
 
     let find_same id (tbl : (empty, _, _) t) =

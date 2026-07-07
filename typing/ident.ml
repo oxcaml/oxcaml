@@ -348,6 +348,24 @@ let rec find_same id = function
       else
         find_same id (if c < 0 then l else r)
 
+let rec find_previous_opt id = function
+    None ->
+      None
+  | Some k ->
+      if same id k.ident then Some k.data else find_previous_opt id k.previous
+
+let rec find_same_opt id = function
+    Empty ->
+      None
+  | Node(l, k, r, _) ->
+      let c = String.compare (name id) (name k.ident) in
+      if c = 0 then
+        if same id k.ident
+        then Some k.data
+        else find_previous_opt id k.previous
+      else
+        find_same_opt id (if c < 0 then l else r)
+
 let rec find_name n = function
     Empty ->
       raise Not_found
