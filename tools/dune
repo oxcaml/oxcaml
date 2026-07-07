@@ -115,9 +115,28 @@
 
 (library
   (name debug_printers)
-  (modes byte)
+  ; Bytecode for ocamldebug's load_printer (see the debug_printers rule
+  ; below); native for debug_printers_wrapper.
+  (modes byte native)
   (libraries ocamlcommon)
   (modules debug_printers))
+
+; Command-line wrapper around the debug printers, used as an external
+; pretty-printer by lldb's OxCaml support: it takes a type name as its only
+; argument, reads a value in Marshal wire format from stdin, and prints the
+; value on stdout (exiting nonzero if the type name is not recognized).
+(executable
+  (name debug_printers_wrapper)
+  (modes byte native)
+  (modules debug_printers_wrapper)
+  (libraries ocamlcommon debug_printers))
+
+(install
+  (files
+    (debug_printers_wrapper.bc as ocamldebugprinters.byte)
+    (debug_printers_wrapper.exe as ocamldebugprinters.opt))
+  (section bin)
+  (package ocaml))
 
 (rule
   (target debug_printers)
