@@ -2214,6 +2214,37 @@ let add_exception_ident id =
 let remove_exception_ident id =
   Hashtbl.remove try_ids id
 
+(* Inline fast path for [String.compare]/[%compare] on strings.  The dominant
+   cost of [caml_string_compare] on the (many, short) strings compared during
+   typing is the C-call boundary, not the comparison itself.  We compare the
+   first byte inline and only fall back to the C call when the first bytes are
+   equal.  This is exact: byte 0 is always in bounds (a string occupies at least
+   one word) and is 0 for the empty string (the last word is zero-filled at
+   allocation, see [caml_alloc_string]), so the first-byte test yields the exact
+   lexicographic sign whenever byte 0 differs, and defers to the byte-accurate C
+   comparison otherwise. *)
+let string_compare_fast_path a b loc =
+  let int_scalar : any_locality_mode Scalar.Integral.t = Value (Taggable Int) in
+  let ceq = Pscalar (Binary (Icmp (int_scalar, Ceq))) in
+  let three_way =
+    Pscalar (Binary (Three_way_compare_int (Signed, int_scalar)))
+  in
+  let ida = Ident.create_local "cmp_s1" in
+  let idb = Ident.create_local "cmp_s2" in
+  let idb1 = Ident.create_local "cmp_b1" in
+  let idb2 = Ident.create_local "cmp_b2" in
+  let duid = Lambda.debug_uid_none in
+  let byte0 v = Lprim (Pstringrefu, [v; Lconst (Const_base (Const_int 0))], loc) in
+  Llet (Strict, Lambda.layout_string, ida, duid, a,
+  Llet (Strict, Lambda.layout_string, idb, duid, b,
+  Llet (Strict, Lambda.layout_int, idb1, duid, byte0 (Lvar ida),
+  Llet (Strict, Lambda.layout_int, idb2, duid, byte0 (Lvar idb),
+    Lifthenelse
+      ( Lprim (ceq, [Lvar idb1; Lvar idb2], loc),
+        Lprim (Pccall caml_string_compare, [Lvar ida; Lvar idb], loc),
+        Lprim (three_way, [Lvar idb1; Lvar idb2], loc),
+        Lambda.layout_int )))))
+
 let lambda_of_prim prim_name prim loc args arg_exps =
   match prim, args with
   | Primitive (prim, arity), args when arity = List.length args ->
@@ -2222,6 +2253,8 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       Lprim(Pccall prim_sys_argv, [lambda_unit], loc)
   | External prim, args ->
       Lprim(Pccall prim, args, loc)
+  | Comparison(Compare, Compare_strings), [a; b] ->
+      string_compare_fast_path a b loc
   | Comparison(comp, knd), ([_;_] as args) ->
       let prim = comparison_primitive comp knd in
       Lprim(prim, args, loc)

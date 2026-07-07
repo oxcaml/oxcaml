@@ -12,7 +12,13 @@
    float_cmp =
      (function {nlocal = 0} x[value<float>] y[value<float>] : int
        (%float_compare x y))
-   string_cmp = (function {nlocal = 0} x y : int (caml_string_compare x y))
+   string_cmp =
+     (function {nlocal = 0} x y : int
+       (let
+         (cmp_b1 =[value<int>] (string.unsafe_get x 0)
+          cmp_b2 =[value<int>] (string.unsafe_get y 0))
+         (if (%int_equal cmp_b1 cmp_b2) (caml_string_compare x y)
+           (%int_compare cmp_b1 cmp_b2))))
    int32_cmp =
      (function {nlocal = 0} x[value<int32>] y[value<int32>] : int
        (%int32_compare x y))
@@ -172,7 +178,11 @@
        (%float_compare prim prim))
    eta_string_cmp =
      (function {nlocal = 0} prim prim stub : int
-       (caml_string_compare prim prim))
+       (let
+         (cmp_b1 =[value<int>] (string.unsafe_get prim 0)
+          cmp_b2 =[value<int>] (string.unsafe_get prim 0))
+         (if (%int_equal cmp_b1 cmp_b2) (caml_string_compare prim prim)
+           (%int_compare cmp_b1 cmp_b2))))
    eta_int32_cmp =
      (function {nlocal = 0} prim[value<int32>] prim[value<int32>] stub : int
        (%int32_compare prim prim))

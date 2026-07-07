@@ -441,28 +441,49 @@ type t = A of int | B of string | C of string | D of string
                (field_imm 0 t2/0))
             default: -1)
           case tag 1:
-           (catch
+           (let (l1/0 =a? (field_imm 0 t1/0))
+             (catch
+               (switch* t2/0
+                case tag 0: (exit 31)
+                case tag 1:
+                 (let
+                   (l2/0 =a? (field_imm 0 t2/0)
+                    cmp_b1/0 =[value<int>] (string.unsafe_get l1/0 0)
+                    cmp_b2/0 =[value<int>] (string.unsafe_get l2/0 0))
+                   (if (%int_equal cmp_b1/0 cmp_b2/0)
+                     (caml_string_compare l1/0 l2/0)
+                     (%int_compare cmp_b1/0 cmp_b2/0)))
+                case tag 2: (exit 36)
+                case tag 3: (exit 36))
+              with (36) -1))
+          case tag 2:
+           (let (l1/1 =a? (field_imm 0 t1/0))
              (switch* t2/0
               case tag 0: (exit 31)
-              case tag 1:
-               (caml_string_compare (field_imm 0 t1/0) (field_imm 0 t2/0))
-              case tag 2: (exit 36)
-              case tag 3: (exit 36))
-            with (36) -1)
-          case tag 2:
-           (switch* t2/0
-            case tag 0: (exit 31)
-            case tag 1: (exit 31)
-            case tag 2:
-             (caml_string_compare (field_imm 0 t1/0) (field_imm 0 t2/0))
-            case tag 3: -1)
+              case tag 1: (exit 31)
+              case tag 2:
+               (let
+                 (l2/1 =a? (field_imm 0 t2/0)
+                  cmp_b1/1 =[value<int>] (string.unsafe_get l1/1 0)
+                  cmp_b2/1 =[value<int>] (string.unsafe_get l2/1 0))
+                 (if (%int_equal cmp_b1/1 cmp_b2/1)
+                   (caml_string_compare l1/1 l2/1)
+                   (%int_compare cmp_b1/1 cmp_b2/1)))
+              case tag 3: -1))
           case tag 3:
-           (switch* t2/0
-            case tag 0: (exit 31)
-            case tag 1: (exit 31)
-            case tag 2: 1
-            case tag 3:
-             (caml_string_compare (field_imm 0 t1/0) (field_imm 0 t2/0))))
+           (let (l1/2 =a? (field_imm 0 t1/0))
+             (switch* t2/0
+              case tag 0: (exit 31)
+              case tag 1: (exit 31)
+              case tag 2: 1
+              case tag 3:
+               (let
+                 (l2/2 =a? (field_imm 0 t2/0)
+                  cmp_b1/2 =[value<int>] (string.unsafe_get l1/2 0)
+                  cmp_b2/2 =[value<int>] (string.unsafe_get l2/2 0))
+                 (if (%int_equal cmp_b1/2 cmp_b2/2)
+                   (caml_string_compare l1/2 l2/2)
+                   (%int_compare cmp_b1/2 cmp_b2/2))))))
         with (31) (switch* t2/0 case tag 0: 1
                                 case tag 1: 1))))
   (apply (field_imm 1 (global Toploop!)) "compare" compare/0))
