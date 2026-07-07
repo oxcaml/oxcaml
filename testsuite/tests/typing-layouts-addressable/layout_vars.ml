@@ -47,7 +47,7 @@ module type Check =
           val g3 : b8a -> b8a -> unit
           val g4 : int64_u -> unit
         end
-      @@ stateless noalloc_strict
+      @@ stateless
   end
 |}]
 
@@ -77,7 +77,7 @@ module type Check_swapped =
   sig
     module F :
       functor (M : S_swapped @ static) -> sig val g : b8a -> b8 -> unit end
-      @@ stateless noalloc_strict
+      @@ stateless
   end
 |}]
 
@@ -111,7 +111,7 @@ end
 module type Check_unswapped =
   sig
     module F : functor (M : S @ static) -> sig val g : b8a -> b8a -> unit end
-      @@ stateless noalloc_strict
+      @@ stateless
   end
 |}]
 

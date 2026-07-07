@@ -717,7 +717,7 @@ end
 module F :
   functor (M : sig val foo : 'a -> 'a end) ->
     sig module M' : sig val foo : 'a -> 'a @@ global many end end
-  @@ stateless noalloc_strict
+  @@ stateless
 |}]
 
 (* Similiar for recursive modules *)
@@ -737,13 +737,12 @@ module F (M : sig val f : 'a -> 'a @@ global many end) = struct
 end
 [%%expect{|
 module F : functor (M : sig val f : 'a -> 'a @@ global many end) -> sig end
-  @@ stateless noalloc_strict
+  @@ stateless
 |}]
 
 module G (M : sig val f : 'a -> 'a end) = F(M)
 [%%expect{|
 module G : functor (M : sig val f : 'a -> 'a end) -> sig end @@ stateless
-  noalloc_strict
 |}]
 
 (* Similiar for [include_functor] *)
@@ -753,7 +752,7 @@ module G (M : sig val f : 'a -> 'a end) = struct
 end
 [%%expect{|
 module G : functor (M : sig val f : 'a -> 'a end) -> sig val f : 'a -> 'a end
-  @@ stateless noalloc_strict
+  @@ stateless
 |}]
 
 (* functor declaration inclusion check  looks at the modes of parameter and
@@ -763,7 +762,7 @@ functor (M : sig val foo : 'a -> 'a @@ global many end) -> struct let bar = M.fo
 [%%expect{|
 module F :
   sig val foo : 'a -> 'a end -> sig val bar : 'a -> 'a @@ global many end @@
-  stateless noalloc_strict
+  stateless
 |}]
 
 (* CR zqian: package subtyping doesn't look at the package mode for simplicity.
@@ -1362,7 +1361,6 @@ let (bar @ portable) () =
 [%%expect{|
 module type F = sig end -> sig end
 module F : functor (X : sig end) -> sig end @@ stateless nonportable
-  noalloc_strict
 Line 4, characters 18-19:
 4 |   let k = (module F : F) in
                       ^
@@ -1380,7 +1378,7 @@ let (bar @ portable) () =
   k
 [%%expect{|
 module type F = sig end -> sig end
-module F : functor (X : sig end) -> sig end @@ stateless noalloc_strict
+module F : functor (X : sig end) -> sig end @@ stateless
 val bar : unit -> (module F) = <fun>
 |}]
 
@@ -1446,7 +1444,6 @@ let (f @ portable) () =
   ()
 [%%expect{|
 module F : functor (X : sig end) -> sig type t = string end @@ stateless
-  noalloc_strict
 module X : sig end @@ stateless noalloc_strict
 val f : unit -> unit = <fun>
 |}]

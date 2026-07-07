@@ -32,17 +32,16 @@ module M_self :
   sig
     val id : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless noalloc_strict
     val const : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] @@ stateless
-      noalloc_strict
     val compose :
       ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
       ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
-      'c @ [< 'o] -> 'b @ [> 'm | dynamic] @@ stateless noalloc_strict
+      'c @ [< 'o] -> 'b @ [> 'm | dynamic] @@ stateless
     val curried :
       'a @ [< 'p & global] ->
       'b @ [< 'o & global] ->
       'c @ [< 'n & global] ->
       'd @ [< 'm & global] -> 'a * 'b * 'c * 'd @ [> 'm | 'n | 'o | 'p] @@
-      stateless noalloc_strict
+      stateless
   end
 |}]
 
@@ -57,17 +56,16 @@ module M_restruct :
   sig
     val id : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless noalloc_strict
     val const : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] @@ stateless
-      noalloc_strict
     val compose :
       ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
       ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
-      'c @ [< 'o] -> 'b @ [> 'm | dynamic] @@ stateless noalloc_strict
+      'c @ [< 'o] -> 'b @ [> 'm | dynamic] @@ stateless
     val curried :
       'a @ [< 'p & global] ->
       'b @ [< 'o & global] ->
       'c @ [< 'n & global] ->
       'd @ [< 'm & global] -> 'a * 'b * 'c * 'd @ [> 'm | 'n | 'o | 'p] @@
-      stateless noalloc_strict
+      stateless
   end
 |}]
 
@@ -79,17 +77,16 @@ module type S =
   sig
     val id : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless noalloc_strict
     val const : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] @@ stateless
-      noalloc_strict
     val compose :
       ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
       ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
-      'c @ [< 'o] -> 'b @ [> 'm | dynamic] @@ stateless noalloc_strict
+      'c @ [< 'o] -> 'b @ [> 'm | dynamic] @@ stateless
     val curried :
       'a @ [< 'p & global] ->
       'b @ [< 'o & global] ->
       'c @ [< 'n & global] ->
       'd @ [< 'm & global] -> 'a * 'b * 'c * 'd @ [> 'm | 'n | 'o | 'p] @@
-      stateless noalloc_strict
+      stateless
   end
 module M_via_sig : S
 |}]
@@ -149,9 +146,9 @@ module Bounded_self :
       'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic]
     val local_arg : 'a @ [> local] -> unit @ 'm @@ stateless noalloc_strict
     val two_axes : 'a @ [< 'm & global] -> 'b @ [< unique] -> 'a @ [> 'm] @@
-      stateless noalloc_strict
+      stateless
     val dup : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased] @@
-      stateless noalloc_strict
+      stateless
     val tick : unit -> int @ [> dynamic]
   end
 |}, Principal{|
@@ -163,9 +160,9 @@ module Bounded_self :
       'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic]
     val local_arg : 'a @ [> local] -> unit @ 'm @@ stateless noalloc_strict
     val two_axes : 'a @ [< 'm & global] -> 'b @ [< unique] -> 'a @ [> 'm] @@
-      stateless noalloc_strict
+      stateless
     val dup : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased] @@
-      stateless noalloc_strict
+      stateless
     val tick : unit -> int @ [> aliased stateful dynamic alloc]
   end
 |}]
@@ -192,9 +189,9 @@ module Bounded_restruct :
       'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic]
     val local_arg : 'a @ [> local] -> unit @ 'm @@ stateless noalloc_strict
     val two_axes : 'a @ [< 'm & global] -> 'b @ [< unique] -> 'a @ [> 'm] @@
-      stateless noalloc_strict
+      stateless
     val dup : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased] @@
-      stateless noalloc_strict
+      stateless
     val tick : unit -> int @ [> dynamic]
   end
 |}, Principal{|
@@ -206,9 +203,9 @@ module Bounded_restruct :
       'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic]
     val local_arg : 'a @ [> local] -> unit @ 'm @@ stateless noalloc_strict
     val two_axes : 'a @ [< 'm & global] -> 'b @ [< unique] -> 'a @ [> 'm] @@
-      stateless noalloc_strict
+      stateless
     val dup : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased] @@
-      stateless noalloc_strict
+      stateless
     val tick : unit -> int @ [> aliased stateful dynamic alloc]
   end
 |}]
@@ -384,10 +381,7 @@ end
 let keep = Good_client.f 1
 [%%expect{|
 module Good_client :
-  sig
-    val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
-      noalloc_strict
-  end
+  sig val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless end
 val keep : '_weak1 -> '_weak1 @ [> aliased stateful dynamic alloc] = <fun>
 |}]
 
@@ -408,13 +402,11 @@ Error: Signature mismatch:
        is not included in
          sig
            val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
-             noalloc_strict
          end
        Values do not match:
          val f : 'a @ [> local] -> 'b @ [< 'm] -> 'b @ [> 'm]
        is not included in
          val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
-           noalloc_strict
        The type
          "'a @ [> past('o) | local] -> 'b @ [< 'm > past('n)] -> 'b @ [> 'm]"
        is not compatible with the type
