@@ -675,18 +675,19 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     end
 
   let iter_covariant : type a r.
+      ?visited:(int, unit) Hashtbl.t ->
       a C.obj ->
       (a, allowed * r) mode ->
       (id:int -> level:int -> (a, allowed * disallowed) mode -> unit) ->
       unit =
-   fun dst m iter ->
+   fun ?visited dst m iter ->
+    let visited =
+      match visited with Some visited -> visited | None -> Hashtbl.create 17
+    in
     match m with
     | Amode _ -> ()
-    | Amodevar mv ->
-      let visited = Hashtbl.create 17 in
-      iter_covariant_morphvar ~visited dst iter mv
+    | Amodevar mv -> iter_covariant_morphvar ~visited dst iter mv
     | Amodejoin (_, _, mvs) ->
-      let visited = Hashtbl.create 17 in
       VarMap.iter (fun _ mv -> iter_covariant_morphvar ~visited dst iter mv) mvs
 
   let rec iter_contravariant_morphvar : type a l.
@@ -714,18 +715,19 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     end
 
   let iter_contravariant : type a l.
+      ?visited:(int, unit) Hashtbl.t ->
       a C.obj ->
       (a, l * allowed) mode ->
       (id:int -> level:int -> (a, disallowed * allowed) mode -> unit) ->
       unit =
-   fun dst m iter ->
+   fun ?visited dst m iter ->
+    let visited =
+      match visited with Some visited -> visited | None -> Hashtbl.create 17
+    in
     match m with
     | Amode _ -> ()
-    | Amodevar mv ->
-      let visited = Hashtbl.create 17 in
-      iter_contravariant_morphvar ~visited dst iter mv
+    | Amodevar mv -> iter_contravariant_morphvar ~visited dst iter mv
     | Amodemeet (_, _, mvs) ->
-      let visited = Hashtbl.create 17 in
       VarMap.iter
         (fun _ mv -> iter_contravariant_morphvar ~visited dst iter mv)
         mvs
