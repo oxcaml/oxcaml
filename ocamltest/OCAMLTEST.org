@@ -611,6 +611,44 @@ For instance, given the following blocks:
 
 - The definition of =baz= is visible only in =subtest1=.
 
+*** Repeating similar tests with =split=
+
+You can concisely define several tests with differing initial setups with the
+=split= command:
+
+#+begin_src
+(* TEST
+  {
+    split [
+    | flags = "-flag1";
+    | flags = "-flag2";
+    ]
+    native;
+  }
+*)
+#+end_src
+
+is equivalent to
+
+#+begin_src
+(* TEST
+  {
+    flags = "-flag1";
+    native;
+  }
+  {
+    flags = "-flag2";
+    native;
+  }
+*)
+#+end_src
+
+Each alternative introduced by =|= is a (possibly empty) sequence of environment
+statements and tests. Everything that follows the =split= in the enclosing
+block, including sub-blocks, is run once per alternative, after the
+alternative's statements. Combining =split= statements produces a cartesian
+product.
+
 ** Other useful tests
 
 This section introduces three tests provided by =ocamltest= and that can

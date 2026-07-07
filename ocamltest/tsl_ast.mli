@@ -33,6 +33,7 @@ type tsl_item =
     int (* test depth *) *
     string located (* test name *) *
     string located list (* environment modifiers *)
+  | Split of tsl_item list list
 
 type tsl_block = tsl_item list
 
