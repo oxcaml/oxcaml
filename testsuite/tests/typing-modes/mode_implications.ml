@@ -440,7 +440,7 @@ module Self :
 module Self_check :
   sig
     val f : 'a @ local unyielding -> unit
-    val g : 'a -> (unit -> 'a) @ local @@ stateless noalloc_strict
+    val g : 'a -> (unit -> 'a) @ local @@ stateless
   end
 |}]
 

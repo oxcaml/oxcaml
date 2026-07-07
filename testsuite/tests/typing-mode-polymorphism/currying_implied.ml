@@ -86,7 +86,7 @@ let local_closure x = exclave_ (fun y -> (x, y))
 [%%expect{|
 val local_closure :
   'a @ [< 'm & global] ->
-  ('b @ [< 'n & global] -> 'a * 'b @ [> 'n | 'm]) @ [> close('m) | local] =
+  ('b @ [< 'n & global] -> 'a * 'b @ [> 'n | 'm]) @ [> close('m) | local alloc] =
   <fun>
 |}]
 
@@ -118,9 +118,16 @@ type 'a cell = { mutable v : 'a; }
 let store_and_call c g x = c.v <- g; c.v x
 [%%expect{|
 val store_and_call :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< global read_write] ->
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global many read_write] ->
-  'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< past('mm0) & past('p) & global read_write] ->
+  (('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('q) & past('o) & global many read_write] ->
+   ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('q) | past('mm0) mod many forkable unyielding | stateful alloc]) @ [> past('o) | past('p) mod many forkable unyielding | stateful alloc] =
+  <fun>
+|}, Principal{|
+val store_and_call :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< past('mm0) & past('p) & global read_write] ->
+  (('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('q) & past('o) & global many read_write] ->
+   ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('q) | past('mm0) | stateful alloc]) @ [> past('o) | past('p) | stateful alloc] =
+  <fun>
 |}]
 
 let unique_fst (x @ unique) y = x
