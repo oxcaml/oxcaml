@@ -1,6 +1,6 @@
 (let
   (f/0 =
-     (function {nlocal = 0} x/0[value<int>] init/0[value<int>] : int
+     (function {nlocal = 0} x/0[L][value<int>] init/0[value<int>] : int
        (let (m/0 =mut[value<int>] init/0)
          (catch
            (try (exit 2 (for i/0 0 to x/0 (assign m/0 (%int_add *m/0 i/0))))

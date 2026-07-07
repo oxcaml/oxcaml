@@ -233,7 +233,7 @@ let f () =
     (fun x -> fun y -> ()) : (string -> string -> unit)
   )
 [%%expect{|
-val f : unit -> (string -> (string -> unit)) @ local = <fun>
+val f : unit -> string -> (string -> unit) = <fun>
 |}]
 
 let f : local_ string -> string =

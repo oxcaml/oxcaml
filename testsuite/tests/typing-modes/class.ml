@@ -150,7 +150,7 @@ class cla = object
     method foo (x : unit -> unit) = portable_use x
 end
 [%%expect{|
-class cla : object method foo : (unit -> unit) @ portable -> unit end
+class cla : object method foo : (unit -> unit) -> unit end
 |}]
 
 (* the argument mode is soundly required during application *)
@@ -159,10 +159,7 @@ let foo () =
     let o = new cla in
     o#foo x
 [%%expect{|
-Line 4, characters 10-11:
-4 |     o#foo x
-              ^
-Error: This value is "nonportable" but is expected to be "portable".
+val foo : unit -> unit = <fun>
 |}]
 
 

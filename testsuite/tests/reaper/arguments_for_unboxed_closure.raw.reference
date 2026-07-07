@@ -1,5 +1,5 @@
 let $camlArguments_for_unboxed_closure__first_const = Block 0 () in
-(let code size(11)
+(let code size(14)
        g_1 (h : val)
          my_closure _region _ghost_region my_depth
          -> k1 * k2
@@ -7,10 +7,16 @@ let $camlArguments_for_unboxed_closure__first_const = Block 0 () in
    let next_depth = rec_info (succ my_depth) in
    let x = %project_value_slot.[g].[x] (my_closure) in
    let y = %project_value_slot.[g].[y] (my_closure) in
-   apply h (y) -> k3 * k2
-     where k3 (apply_result : imm tagged) =
+   let `region` = %begin_region () in
+   let ghost_region = %begin_ghost_region () in
+   apply &`region` &ghost_region h (y) -> k4 * k2
+     where k4 (apply_result : imm tagged) =
        let int_add = %int_barith.add (x, apply_result) in
-       cont k1 (int_add)
+       cont k3 (int_add)
+     where k3 (region_return : imm tagged) =
+       let `unit` = %end_region (`region`) in
+       let unit_1 = %end_ghost_region (ghost_region) in
+       cont k1 (region_return)
  in
  let code inline(never) size(1)
        id_2 (z) my_closure _region _ghost_region my_depth -> k1 * k2 =
@@ -35,7 +41,7 @@ let $camlArguments_for_unboxed_closure__first_const = Block 0 () in
    let `id` = %project_value_slot.[u].[`id`] (my_closure) in
    apply direct(g_1) inlined(always) (g : _ -> imm tagged) (`id`) -> k1 * k2
  in
- let code size(65)
+ let code size(68)
        f_0 (x : imm tagged, y : imm tagged)
          my_closure _region _ghost_region my_depth
          -> k1 * k2

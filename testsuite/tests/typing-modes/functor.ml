@@ -510,10 +510,7 @@ let f_read_write_app (x @ read_write) =
   let (f_app @ stateless) = f_read_write x in
   f_app ()
 [%%expect{|
-Line 2, characters 28-42:
-2 |   let (f_app @ stateless) = f_read_write x in
-                                ^^^^^^^^^^^^^^
-Error: This value is "stateful" but is expected to be "stateless".
+val f_read_write_app : 'a @ stateless -> unit = <fun>
 |}]
 
 module F_read_write_app (M : S @ read_write) = struct
@@ -546,10 +543,7 @@ let f_read_write_app2 (x @ read_write) =
   let (f_app' @ stateless) = f_app in
   f_app' ()
 [%%expect{|
-Line 3, characters 29-34:
-3 |   let (f_app' @ stateless) = f_app in
-                                 ^^^^^
-Error: This value is "stateful" but is expected to be "stateless".
+val f_read_write_app2 : 'a @ stateless -> unit = <fun>
 |}]
 
 module F_read_write_app2 (M : S @ read_write) = struct

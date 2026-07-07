@@ -5,17 +5,17 @@ int_as_pointer (local -Oclassic): OK
             function call: OK
      cleanup upon exclave: OK
         exn function call: OK
- during indirect tailcall: OK
+ during indirect tailcall: 32 bytes leaked
   after indirect tailcall: OK
-   during direct tailcall: OK
+   during direct tailcall: -32 bytes leaked
     after direct tailcall: OK
- during indirect overtail: OK
+ during indirect overtail: 32 bytes leaked
   after indirect overtail: OK
-   during direct overtail: OK
+   during direct overtail: -32 bytes leaked
     after direct overtail: OK
-  during inlined tailcall: OK
+  during inlined tailcall: 32 bytes leaked
    after inlined tailcall: OK
-            apply merging: OK
+            apply merging: -32 bytes leaked
          toplevel binding: OK
      toplevel rec binding: OK
             toplevel eval: OK

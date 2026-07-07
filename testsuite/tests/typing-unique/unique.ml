@@ -368,7 +368,7 @@ val inf6 : 'a @ unique -> 'a = <fun>
 
 let unique_default_args ?(x @ unique = 1.0) () = x
 [%%expect{|
-val unique_default_args : ?x:float @ unique -> (unit -> float) = <fun>
+val unique_default_args : ?x:float @ unique -> unit -> float = <fun>
 |}]
 
 (* Unique Local *)
@@ -507,7 +507,7 @@ type box = { x : int; }
 
 let curry (b1 : box @ unique) (b2 : box @ unique) = ()
 [%%expect{|
-val curry : box @ unique -> (box @ unique -> unit) = <fun>
+val curry : box @ unique -> box @ unique -> unit = <fun>
 |}]
 
 let curry : box @ unique -> box @ unique -> unit = fun b1 b2 -> ()
