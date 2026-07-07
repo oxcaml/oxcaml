@@ -24,7 +24,10 @@ type string_constant =
 
 type expectation_filter = Principal | X86_64 | Raw | Simplify | Reaper
 
-type expectation_kind = Expect_toplevel | Expect_asm of bool | Expect_fexpr
+type expectation_kind =
+  | Expect_toplevel
+  | Expect_asm of { include_cold : bool }
+  | Expect_fexpr
 
 type expectation =
   { extid_loc       : Location.t (* Location of "expect" in "[%%expect ...]" *)
@@ -72,9 +75,10 @@ let string_of_filter = function
 let match_expect_extension (ext : Parsetree.extension) =
   let match_ext_name = function
     | "expect" | "ocaml.expect" -> Some Expect_toplevel
-    | "expect_asm" | "ocaml.expect_asm" -> Some (Expect_asm false)
+    | "expect_asm" | "ocaml.expect_asm" ->
+      Some (Expect_asm { include_cold = false })
     | "expect_asm_with_cold" | "ocaml.expect_asm_with_cold" ->
-      Some (Expect_asm true)
+      Some (Expect_asm { include_cold = true })
     | "expect_fexpr" | "ocaml.expect_fexpr" -> Some Expect_fexpr
     | _ -> None
   in
@@ -478,20 +482,34 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
                   | Expect_fexpr -> true | _ -> false)
                 chunk.expectations
             in
+            let asm_expectations =
+              List.filter_map chunk.expectations ~f:(fun exp ->
+                  match exp.kind with
+                  | Expect_asm { include_cold } -> Some (exp, include_cold)
+                  | Expect_toplevel | Expect_fexpr -> None)
+            in
+            let include_cold = List.exists ~f:snd asm_expectations in
+            (if include_cold then
+               match
+                 List.find_opt asm_expectations
+                   ~f:(fun (_, with_cold) -> not with_cold)
+               with
+               | Some (exp, _) ->
+                 Location.raise_errorf ~loc:exp.extid_loc
+                   "[%%%%expect_asm] and [%%%%expect_asm_with_cold] cannot be \
+                    attached to the same code block"
+               | None -> ());
             let keep_asm = !Clflags.keep_asm_file in
             if has_fexpr then Clflags.keep_asm_file := true;
-            let include_cold =
-              List.exists ~f:(fun exp ->
-                  match exp.kind with Expect_asm true -> true | _ -> false)
-                chunk.expectations
-            in
             Option.iter (fun set -> set include_cold)
               !set_assembly_include_cold;
         let (success, toplevel_output, asm_output, last_unit) =
-          exec_phrases chunk.phrases
+          Fun.protect
+            ~finally:(fun () ->
+              Option.iter (fun set -> set false) !set_assembly_include_cold;
+              Clflags.keep_asm_file := keep_asm)
+            (fun () -> exec_phrases chunk.phrases)
         in
-        Option.iter (fun set -> set false) !set_assembly_include_cold;
-        Clflags.keep_asm_file := keep_asm;
         List.filter_map chunk.expectations ~f:(fun expectation ->
           let output = match expectation.kind with
             | Expect_toplevel -> toplevel_output
