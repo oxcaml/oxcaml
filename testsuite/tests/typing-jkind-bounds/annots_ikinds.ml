@@ -1,9 +1,10 @@
 (* TEST
  include stdlib_upstream_compatible;
  {
+   flags = "-w -181";
    expect;
  }{
-   flags = "-extension layouts_beta";
+   flags = "-extension layouts_beta -w -181";
    expect;
  }
 *)
