@@ -1,5 +1,5 @@
 let code f_0 deleted in
-let code loopify(never) size(48) newer_version_of(f_0)
+let code loopify(never) size(50) newer_version_of(f_0)
       f_0_1 (read : val, x : [ 0 | 0 of val ])
         my_closure _region _ghost_region my_depth
         -> k * k1
@@ -10,9 +10,13 @@ let code loopify(never) size(48) newer_version_of(f_0)
     where k4 =
       (cont k5
          where rec k5 =
-           (apply read (0) -> k6 * k2
+           let `region` = %begin_region () in
+           let ghost_region = %begin_ghost_region () in
+           (apply &`region` &ghost_region read (0) -> k6 * k2
               where k6 (return_val0 : imm tagged) =
                 let prim = %phys_ne (return_val0, 10) in
+                let `unit` = %end_region (`region`) in
+                let unit_1 = %end_ghost_region (ghost_region) in
                 switch prim
                   | 0 -> k4
                   | 1 -> k5)

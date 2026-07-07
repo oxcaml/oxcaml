@@ -14,14 +14,14 @@ in
 let code char_of_string_0 deleted in
 let code result_is_error_1 deleted in
 let code result_try_with_2 deleted in
-let $camlFrom_core_char_test__immstring64 = "c" in
+let $camlFrom_core_char_test__immstring67 = "c" in
 let code test_3 deleted in
-let $camlFrom_core_char_test__const_block87 =
+let $camlFrom_core_char_test__const_block94 =
   Block 0 ($camlFrom_core_char_test__immstring26, 35, 35)
 in
-let $camlFrom_core_char_test__Pmakeblock90 =
+let $camlFrom_core_char_test__Pmakeblock97 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
-           $camlFrom_core_char_test__const_block87)
+           $camlFrom_core_char_test__const_block94)
 in
 let code top_5 deleted in
 let code inline(always) loopify(never) size(40) newer_version_of(char_of_string_0)
@@ -90,7 +90,7 @@ let code inline(always) loopify(never) size(20) newer_version_of(test_3)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring64, 0n)
+  let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring67, 0n)
   in
   let Pstringrefs = %tag_imm (prim) in
   let prim_1 = %phys_eq (Pstringrefs, 99) in
@@ -110,7 +110,7 @@ let code loopify(never) size(30) newer_version_of(top_5)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  (let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring64, 0n)
+  (let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring67, 0n)
    in
    let Pstringrefs = %tag_imm (prim) in
    let prim_1 = %phys_eq (Pstringrefs, 99) in
@@ -125,7 +125,7 @@ let code loopify(never) size(30) newer_version_of(top_5)
        cont k2 (1i))
     where k2 (naked_immediate : imm) =
       switch naked_immediate
-        | 0 -> k1 pop(regular k1) ($camlFrom_core_char_test__Pmakeblock90)
+        | 0 -> k1 pop(regular k1) ($camlFrom_core_char_test__Pmakeblock97)
         | 1 -> k (0)
 in
 let $camlFrom_core_char_test__top_11 = closure top_5_1 @top in

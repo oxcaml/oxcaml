@@ -1,25 +1,31 @@
 let code f_0 deleted in
 let $camlTests2__f_1 =
   closure f_0_1 @f
-and code rec loopify(never) size(21) newer_version_of(f_0)
+and code rec loopify(never) size(24) newer_version_of(f_0)
       f_0_1 (x : imm tagged)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %int_comp.gt (x, 0) in
-  switch prim
-    | 0 -> k (42)
-    | 1 -> k2
-    where k2 =
-      ((let int_sub = %int_barith.sub (x, 1) in
-        apply direct(f_0_1)
-          ($camlTests2__f_1 ~ depth my_depth -> succ my_depth
-           : _ -> imm tagged)
-            (int_sub)
-            -> k2 * k1)
-         where k2 (apply_result : imm tagged) =
-           let int_add = %int_barith.add (1, apply_result) in
-           cont k (int_add))
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  (let prim = %int_comp.gt (x, 0) in
+   switch prim
+     | 0 -> k2 (42)
+     | 1 -> k3
+     where k3 =
+       ((let int_sub = %int_barith.sub (x, 1) in
+         apply direct(f_0_1 &`region` &ghost_region)
+           ($camlTests2__f_1 ~ depth my_depth -> succ my_depth
+            : _ -> imm tagged)
+             (int_sub)
+             -> k3 * k1)
+          where k3 (apply_result : imm tagged) =
+            let int_add = %int_barith.add (1, apply_result) in
+            cont k2 (int_add)))
+    where k2 (region_return : imm tagged) =
+      let `unit` = %end_region (`region`) in
+      let unit_1 = %end_ghost_region (ghost_region) in
+      cont k (region_return)
 in
 let $camlTests2 = Block 0 ($camlTests2__f_1, 47) in
 cont done ($camlTests2)

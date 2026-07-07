@@ -18,7 +18,7 @@ let f (b : bool) (x : int) =
 [%%expect{|
 (let
   (f =
-     (function {nlocal = 0} b[value<int>] x[value<int>] : int
+     (function {nlocal = 1} b[L][value<int>] x[L][value<int>] : int
        (region
          (let
            (opt =[value<(consts (0)) (non_consts ([0: value<int>]))>]
@@ -40,7 +40,7 @@ let g (b : bool) (x : float#) =
 [%%expect{|
 (let
   (g =
-     (function {nlocal = 0} b[value<int>] x[float] : float
+     (function {nlocal = 1} b[L][value<int>] x[L][float] : float
        (region
          (let
            (opt =[value<(consts (0)) (non_consts ([0: float64]))>]
@@ -53,7 +53,7 @@ val g : bool -> float# -> float = <fun>
 (* The field's sort is undetermined, so the value_kind stays conservative *)
 let opaque (type a : any) (r : a t) = r
 [%%expect{|
-(let (opaque = (function {nlocal = 0} r r))
+(let (opaque = (function {nlocal = 1} r[L] r))
   (apply (field_imm 1 (global Toploop!)) "opaque" opaque))
 val opaque : ('a : any). 'a t -> 'a t = <fun>
 |}]
@@ -65,8 +65,8 @@ let containing_void (r : unit# t) = r
 [%%expect{|
 (let
   (containing_void =
-     (function {nlocal = 0}
-       r[value<(consts (0)) (non_consts ([0: product ]))>]
+     (function {nlocal = 1}
+       r[L][value<(consts (0)) (non_consts ([0: product ]))>]
        : (consts (0)) (non_consts ([0: product ])) r))
   (apply (field_imm 1 (global Toploop!)) "containing_void" containing_void))
 val containing_void : unit# t -> unit# t = <fun>

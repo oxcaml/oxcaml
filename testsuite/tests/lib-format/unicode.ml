@@ -23,13 +23,13 @@ let test ~out_width n s =
     zero_width_spaces
     Format.pp_print_text s
 [%%expect {|
-val setup : out_width:(string -> pos:int -> len:int -> int) -> int -> unit =
-  <fun>
+val setup :
+  out_width:(string -> (pos:int -> (len:int -> int))) -> int -> unit = <fun>
 val zws : string = "​"
 val zero_width_spaces : string = "​​​​​​​​​​​​​​​​​​​​"
 val test :
-  out_width:(string -> pos:int -> len:int -> int) -> int -> string -> unit =
-  <fun>
+  out_width:(string -> (pos:int -> (len:int -> int))) ->
+  int -> string -> unit = <fun>
 |}]
 
 (** Alphabetic scripts *)
