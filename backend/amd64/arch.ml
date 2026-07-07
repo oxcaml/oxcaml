@@ -306,6 +306,14 @@ let size_vec128 = 16
 let size_vec256 = 32
 let size_vec512 = 64
 
+(* The eight registers that the short frame-descriptor format can record in
+   its hot-register bitmap, numbered as in [compute_live_offset] (see
+   [Emitaux.emit_frames]). Chosen by measuring which registers are most often
+   live across allocation points. Must agree exactly with
+   [caml_frame_hot_regs] in runtime/caml/frame_descriptors.h: a mismatch
+   makes the GC scan the wrong registers (silent heap corruption). *)
+let frame_hot_regs = [| 0; 1; 2; 3; 4; 5; 6; 8 |]
+
 let allow_unaligned_access = true
 
 (* Whether Ocaml provides shift operations where the shift amount is interpreted

@@ -174,6 +174,14 @@ let local_labels = String.Tbl.create 100
 
 let forced_long_jumps = ref IntSet.empty
 
+(* Final positions of labels in sections that have already been assembled,
+   keyed by encoded label name. Used to resolve [Frame_descr_delta].
+   Drivers clear this per program and assemble text-like sections first. *)
+let cross_section_labels : (Section_name.t * int) String.Tbl.t =
+  String.Tbl.create 100
+
+let clear_cross_section_labels () = String.Tbl.clear cross_section_labels
+
 let new_buffer sec =
   {
     sec;
@@ -1626,6 +1634,41 @@ let assemble_line b loc ins =
             buf_int8 b 0
           done
     | Directive (D.Hidden _) | Directive D.New_line -> ()
+    | Directive (D.Frame_descr_delta { delta }) -> (
+      (* ULEB128 difference of two labels in the same text section. *)
+      match delta with
+      | C.Sub (C.Label upper, C.Label lower) ->
+          let resolve lbl =
+            let name = Asm_label.encode lbl in
+            let local =
+              match String.Tbl.find b.labels name with
+              | { sy_pos = Some pos; _ } -> Some (b.sec.sec_name, pos)
+              | _ -> None
+              | exception Not_found -> None
+            in
+            match local with
+            | Some entry -> entry
+            | None -> (
+                match String.Tbl.find cross_section_labels name with
+                | entry -> entry
+                | exception Not_found ->
+                    Misc.fatal_errorf
+                      "x86_binary_emitter: Frame_descr_delta label %s not \
+                       defined in any assembled section"
+                      name)
+          in
+          let sec_u, pos_u = resolve upper in
+          let sec_l, pos_l = resolve lower in
+          if not (Section_name.equal sec_u sec_l) then
+            Misc.fatal_error
+              "x86_binary_emitter: Frame_descr_delta labels in different \
+               sections";
+          if pos_u < pos_l then
+            Misc.fatal_error "x86_binary_emitter: negative Frame_descr_delta";
+          D.emit_uleb128 b.buf (Int64.of_int (pos_u - pos_l))
+      | C.Signed_int _ | C.Unsigned_int _ | C.This | C.Label _ | C.Symbol _
+      | C.Variable _ | C.Add _ | C.Sub _ ->
+          Misc.fatal_error "x86_binary_emitter: malformed Frame_descr_delta")
     | Directive
         (D.Reloc
           { name = D.R_X86_64_PLT32;
@@ -1741,7 +1784,17 @@ and assemble_section0 _arch section =
 
     if !retry then iter_assemble () else b
   in
-  iter_assemble ()
+  let b = iter_assemble () in
+  (* Record this section's final label positions for cross-section
+     [Frame_descr_delta] resolution in sections assembled later. *)
+  String.Tbl.iter
+    (fun name sym ->
+      match sym.sy_pos with
+      | Some pos ->
+          String.Tbl.replace cross_section_labels name (b.sec.sec_name, pos)
+      | None -> ())
+    b.labels;
+  b
 
 (* Relocations: we should compute all non-local relocations completely at the
    end. We should keep the last string/bytes couple to avoid duplication.

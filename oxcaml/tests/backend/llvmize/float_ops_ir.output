@@ -342,4 +342,5 @@ declare double @llvm.fabs.double(double)
 
 
 !0 = !{ i32 1, !"oxcaml_module", !"Float_ops" }
-!llvm.module.flags = !{ !0 }
+!1 = !{ i32 1, !"oxcaml_short_frametables", i32 1 }
+!llvm.module.flags = !{ !0, !1 }

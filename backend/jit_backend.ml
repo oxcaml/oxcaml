@@ -58,6 +58,15 @@ let register callback =
     (* Save old x86 internal assembler and register our hook *)
     saved_x86_internal_assembler := !X86_proc.internal_assembler;
     X86_proc.register_internal_assembler (fun ~delayed:_ sections _filename ->
+        X86_binary_emitter.clear_cross_section_labels ();
+        (* Assemble text-like sections first: frametable sections contain
+           [Frame_descr_delta] directives referencing text labels. *)
+        let text, others =
+          List.partition
+            (fun (name, _) -> X86_proc.Section_name.is_text_like name)
+            sections
+        in
+        let sections = text @ others in
         (* Assemble each section *)
         let sections_map =
           List.fold_left

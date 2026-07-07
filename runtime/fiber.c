@@ -611,7 +611,31 @@ next_chunk:
     CAMLassert(d);
     if (!frame_return_to_C(d)) {
       /* Scan the roots in this frame */
-      if (frame_is_long(d)) {
+      if (frame_is_short(d)) {
+        /* Short descriptor: live registers come from the hot-register
+         * bitmap, live stack slots from the frame's slot bitmap. */
+        struct frame_descr_decoded dec;
+        caml_decode_frame_descr(d, &dec);
+        if (dec.has_allocs) {
+          unsigned char bitmap = dec.short_reg_bitmap;
+          for (int i = 0; bitmap; i++, bitmap >>= 1) {
+            if (bitmap & 1) {
+              root = regs + caml_frame_hot_regs[i];
+              visit (f, fdata, locals, colors, root);
+            }
+          }
+        }
+        /* Live stack slots: a bitmap of the frame. */
+        for (uint32_t byte = 0; byte < dec.short_live_bytes; byte++) {
+          unsigned char bits = dec.short_live[byte];
+          for (int i = 0; bits != 0; i++, bits >>= 1) {
+            if (bits & 1) {
+              root = (value *)(sp + ((uintnat)byte * 8 + i) * sizeof(value));
+              visit (f, fdata, locals, colors, root);
+            }
+          }
+        }
+      } else if (frame_is_long(d)) {
         const unsigned char *p = d + Frame_long_live_ofs;
         uint32_t n = caml_read_unaligned_uint32(d + Frame_long_num_live_ofs);
         for (; n > 0; n--, p += sizeof(uint32_t)) {

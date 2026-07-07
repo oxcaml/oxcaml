@@ -87,7 +87,17 @@ let iter emitter ~all_sections ~on_insn ~on_directive =
         on_directive !current_state d;
         let offset_in_bytes = Section_state.offset_in_bytes !current_state in
         let new_offset =
-          D.Directive.increment_offset_in_bytes d ~offset_in_bytes
+          match[@warning "-4"] d with
+          | Frame_descr_delta { delta } -> (
+            (* Variable-width (ULEB128) encoding of a label difference. *)
+            match
+              Encode_directive.eval_constant !current_state ~all_sections delta
+            with
+            | Some value -> offset_in_bytes + D.Directive.uleb128_size value
+            | None ->
+              Misc.fatal_error
+                "Frame_descr_delta: cannot resolve label difference")
+          | _ -> D.Directive.increment_offset_in_bytes d ~offset_in_bytes
         in
         Section_state.set_offset_in_bytes !current_state new_offset)
     (enqueued emitter)
@@ -116,7 +126,7 @@ let compute_label_offsets emitter ~all_sections =
       | Cfi_restore_state | Cfi_def_cfa_register _ | Comment _ | Const _
       | File _ | Indirect_symbol _ | Loc _ | New_line | Private_extern _
       | Section _ | Size _ | Sleb128 _ | Space _ | Type _ | Uleb128 _
-      | Protected _ | Hidden _ | External _ | Reloc _ ->
+      | Protected _ | Hidden _ | External _ | Reloc _ | Frame_descr_delta _ ->
         ())
 
 (* Second pass: emit machine code and data *)

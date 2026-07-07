@@ -396,6 +396,8 @@ let emit_named_text_section ?(suffix = "") func_name =
     | _ ->
       D.switch_to_section_raw ~names:[".text.startup.caml"] ~flags:(Some "ax")
         ~args:["@progbits"] ~is_delayed:false;
+      (* A new text section: frame-descriptor deltas cannot cross it. *)
+      Emitaux.start_new_code_section ();
       (* Warning: We set the internal section ref to Text here, because it
          currently does not supported named text sections. In the rest of this
          file, we pretend the section is called Text rather than the function
@@ -417,13 +419,21 @@ let emit_named_text_section ?(suffix = "") func_name =
       D.switch_to_section_raw
         ~names:[Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix]
         ~flags:(Some "ax") ~args:["@progbits"] ~is_delayed:false;
+      (* A new text section: frame-descriptor deltas cannot cross it. *)
+      Emitaux.start_new_code_section ();
       (* Warning: We set the internal section ref to Text here, because it
          currently does not supported named text sections. In the rest of this
          file, we pretend the section is called Text rather than the function
          specific text section. *)
       (* CR sspies: Add proper support for named text sections. *)
       D.unsafe_set_internal_section_ref Text)
-  else D.text ()
+  else (
+    D.text ();
+    (* Conservatively treat each function start as a new section boundary for
+       frame-descriptor deltas. With a single shared [.text] this only forgoes
+       cross-function deltas (safe); it avoids emitting a cross-section delta
+       should a return address ever land in a different section. *)
+    Emitaux.start_new_code_section ())
 
 let emit_function_or_basic_block_section_name () =
   let suffix =
@@ -3171,6 +3181,9 @@ let end_assembly () =
     ~bytes:8;
   (* PR#7591 *)
   emit_global_label ~section:frametable_section "frametable";
+  (* MASM can't assemble computed ULEB128 constants, so can't do short frame
+     descriptors *)
+  Emitaux.disable_short_descriptors := X86_proc.masm;
   (* CR sspies: Share the [emit_frames] code with the Arm backend. *)
   emit_frames
     { efa_code_label =
@@ -3188,13 +3201,24 @@ let end_assembly () =
       efa_u16 = (fun n -> D.uint16 n);
       efa_u32 = (fun n -> D.uint32 n);
       efa_word = (fun n -> D.targetint (Targetint.of_int_exn n));
-      efa_align = (fun n -> D.align ~fill:Nop ~bytes:n);
+      efa_align =
+        (fun n ->
+          (* Match GAS's implicit fill: zero in data sections, nops in text. *)
+          D.align
+            ~fill:(if !Oxcaml_flags.frametables_in_rodata then Zero else Nop)
+            ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
           let lbl = label_to_asm_label ~section:frametable_section lbl in
           let ofs = Targetint.of_int32 ofs in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:ofs);
+      efa_label_delta =
+        (fun upper lower ->
+          (* The return-address labels live in the text section. *)
+          let upper = label_to_asm_label ~section:Text upper in
+          let lower = label_to_asm_label ~section:Text lower in
+          D.frame_descr_delta ~upper ~lower);
       efa_def_label =
         (fun l ->
           let lbl = label_to_asm_label ~section:frametable_section l in
