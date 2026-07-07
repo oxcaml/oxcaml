@@ -73,6 +73,120 @@ void caml_plat_fatal_error(const char * action, int err)
 
 /* Mutexes */
 
+#ifdef CAML_BARE_METAL
+
+CAMLexport void caml_plat_mutex_init(caml_plat_mutex * m)
+{
+  (void)m;
+}
+
+void caml_plat_assert_locked(caml_plat_mutex* m)
+{
+  (void)m;
+}
+
+CAMLexport CAMLthread_local int caml_lockdepth = 0;
+
+void caml_plat_assert_all_locks_unlocked(void)
+{
+#ifdef DEBUG
+  if (caml_lockdepth) caml_fatal_error("Locks still locked at termination");
+#endif
+}
+
+CAMLexport void caml_plat_lock_non_blocking_actual(caml_plat_mutex* m)
+{
+  (void)m;
+}
+
+void caml_plat_mutex_free(caml_plat_mutex* m)
+{
+  (void)m;
+}
+
+CAMLexport void caml_plat_mutex_reinit(caml_plat_mutex *m)
+{
+  (void)m;
+}
+
+void caml_plat_cond_init(caml_plat_cond* cond)
+{
+  (void)cond;
+}
+
+void caml_plat_wait(caml_plat_cond* cond, caml_plat_mutex* mut)
+{
+  (void)cond;
+  (void)mut;
+}
+
+void caml_plat_broadcast(caml_plat_cond* cond)
+{
+  (void)cond;
+}
+
+void caml_plat_signal(caml_plat_cond* cond)
+{
+  (void)cond;
+}
+
+void caml_plat_cond_free(caml_plat_cond* cond)
+{
+  (void)cond;
+}
+
+void caml_plat_futex_wait(caml_plat_futex* futex,
+                          caml_plat_futex_value undesired)
+{
+  (void)futex;
+  (void)undesired;
+}
+
+void caml_plat_futex_wake_all(caml_plat_futex* futex)
+{
+  (void)futex;
+}
+
+void caml_plat_futex_init(caml_plat_futex* ftx,
+                          caml_plat_futex_value value)
+{
+  ftx->value = value;
+}
+
+void caml_plat_futex_free(caml_plat_futex* ftx)
+{
+  (void)ftx;
+}
+
+void caml_plat_latch_release(caml_plat_binary_latch* latch)
+{
+  atomic_store_release(&latch->value, Latch_released);
+}
+
+void caml_plat_latch_wait(caml_plat_binary_latch* latch)
+{
+  (void)latch;
+}
+
+void caml_plat_barrier_flip(caml_plat_barrier* barrier,
+                            barrier_status current_sense)
+{
+  atomic_store_relaxed(&barrier->arrived,
+                       current_sense ^ BARRIER_SENSE_BIT);
+  atomic_store_release(&barrier->futex.value,
+                       (caml_plat_futex_value)
+                         (current_sense ^ BARRIER_SENSE_BIT));
+}
+
+void caml_plat_barrier_wait_sense(caml_plat_barrier* barrier,
+                                  barrier_status sense_bit)
+{
+  (void)barrier;
+  (void)sense_bit;
+}
+
+#else /* !CAML_BARE_METAL */
+
 CAMLexport void caml_plat_mutex_init(caml_plat_mutex * m)
 {
   int rc;
@@ -400,6 +514,8 @@ void caml_plat_barrier_wait_sense(caml_plat_barrier* barrier,
   latchlike_wait(&barrier->futex, sense_bit, sense_bit | 1);
 }
 
+#endif /* CAML_BARE_METAL */
+
 /* Memory management */
 
 intnat caml_plat_pagesize = 0;
@@ -508,6 +624,11 @@ void caml_mem_name_map(void* mem, size_t length, const char* format, ...)
 unsigned caml_plat_spin_back_off(unsigned sleep_nsec,
                                  const struct caml_plat_srcloc* loc)
 {
+#ifdef CAML_BARE_METAL
+  (void)loc;
+  cpu_relax();
+  return sleep_nsec + 1;
+#else
   if (sleep_nsec < Min_sleep_nsec) sleep_nsec = Min_sleep_nsec;
   if (sleep_nsec > Max_sleep_nsec) sleep_nsec = Max_sleep_nsec;
   unsigned next_sleep_nsec = sleep_nsec + sleep_nsec / 4;
@@ -524,4 +645,5 @@ unsigned caml_plat_spin_back_off(unsigned sleep_nsec,
   usleep(sleep_nsec / NSEC_PER_USEC);
 #endif
   return next_sleep_nsec;
+#endif
 }

@@ -67,6 +67,65 @@
 #include "caml/major_gc.h"
 #include "caml/shared_heap.h"
 
+#ifdef CAML_BARE_METAL
+static int caml_bare_syscall_error(void)
+{
+  errno = ENOSYS;
+  return -1;
+}
+
+static int caml_bare_open(const char_os *path, int flags, int perm)
+{
+  (void)path;
+  (void)flags;
+  (void)perm;
+  return caml_bare_syscall_error();
+}
+
+static int caml_bare_stat(const char_os *path, struct stat *st)
+{
+  (void)path;
+  (void)st;
+  return caml_bare_syscall_error();
+}
+
+static char_os *caml_bare_getcwd(char_os *buf, size_t size)
+{
+  (void)buf;
+  (void)size;
+  errno = ENOSYS;
+  return NULL;
+}
+
+#undef open_os
+#undef stat_os
+#undef rename_os
+#undef chdir_os
+#undef mkdir_os
+#undef getcwd_os
+#undef system_os
+#undef rmdir_os
+#undef caml_unlink
+#define open_os caml_bare_open
+#define stat_os caml_bare_stat
+#define rename_os(oldname, newname) \
+  ((void)(oldname), (void)(newname), caml_bare_syscall_error())
+#define chdir_os(path) ((void)(path), caml_bare_syscall_error())
+#define mkdir_os(path, perm) \
+  ((void)(path), (void)(perm), caml_bare_syscall_error())
+#define getcwd_os caml_bare_getcwd
+#define system_os(command) ((void)(command), caml_bare_syscall_error())
+#define rmdir_os(path) ((void)(path), caml_bare_syscall_error())
+#define caml_unlink(path) ((void)(path), caml_bare_syscall_error())
+#define close(fd) ((void)(fd), caml_bare_syscall_error())
+#define read(fd, buf, count) \
+  ((void)(fd), (void)(buf), (void)(count), caml_bare_syscall_error())
+#define isatty(fd) ((void)(fd), 0)
+#define getenv(var) ((void)(var), NULL)
+#define getpid() 0
+#define getppid() 0
+#endif
+
 CAMLexport char * caml_strerror(int errnum, char * buf, size_t buflen)
 {
 #ifdef _WIN32
@@ -575,7 +634,10 @@ CAMLprim value caml_sys_system_command(value command)
 
 double caml_sys_time_include_children_unboxed(value include_children)
 {
-#ifdef HAS_GETRUSAGE
+#ifdef CAML_BARE_METAL
+  (void)include_children;
+  return 0.;
+#elif defined(HAS_GETRUSAGE)
   struct rusage ru;
   double sec = 0.;
 
@@ -635,6 +697,10 @@ extern int caml_win32_random_seed(intnat data[16]);
 #else
 int caml_unix_random_seed(intnat data[16])
 {
+#ifdef CAML_BARE_METAL
+  for (int i = 0; i < 16; i++) data[i] = i;
+  return 16;
+#else
   unsigned n = 0;
   unsigned char buffer[12];
   int nread = 0;
@@ -669,6 +735,7 @@ int caml_unix_random_seed(intnat data[16])
   if (n < 16) data[n++] = getpid();
   if (n < 16) data[n++] = getppid();
   return n;
+#endif
 }
 #endif
 

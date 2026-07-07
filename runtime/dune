@@ -70,7 +70,7 @@
      (with-stdout-to prims.c (run bash %{dep:gen_primsc.sh} primitives %{deps})))))
 
 (rule
- (targets libasmrun.a libasmrund.a libasmruni.a libasmrun_pic.a
+ (targets libasmrun.a libasmrund.a libasmruni.a libasmrunBARE_MTEAL.a libasmrunBARE_METAL.a libasmrun_pic.a
     libasmrun_shared.so libcamlrun.a libcamlrund.a libcamlruni.a libcamlrun_pic.a
     libcamlrun_shared.so ocamlrun ocamlrund ocamlruni ld.conf)
  (mode    fallback)
@@ -98,7 +98,7 @@
  (no-infer
    (progn
      (bash "rm -f sak build_config.h")
-     (bash "cd .. && make V=1 -j8 -f Makefile.upstream runtime/libasmrun.a runtime/libasmrund.a runtime/libasmruni.a runtime/libasmrun_pic.a \
+     (bash "cd .. && make V=1 -j8 -f Makefile.upstream runtime/libasmrun.a runtime/libasmrund.a runtime/libasmruni.a runtime/libasmrunBARE_MTEAL.a runtime/libasmrunBARE_METAL.a runtime/libasmrun_pic.a \
     runtime/libasmrun_shared.so runtime/libcamlrun.a runtime/libcamlrund.a runtime/libcamlruni.a runtime/libcamlrun_pic.a \
     runtime/libcamlrun_shared.so runtime/ocamlrun runtime/ocamlrund runtime/ocamlruni runtime/ld.conf COMPUTE_DEPS=false")))))
 
@@ -129,6 +129,8 @@
     libasmrun.a
     libasmrund.a
     libasmruni.a
+    libasmrunBARE_MTEAL.a
+    libasmrunBARE_METAL.a
     libasmrun_pic.a
     libasmrun_shared.so
   )
@@ -149,5 +151,7 @@
     libasmrun.a
     libasmrund.a
     libasmruni.a
+    libasmrunBARE_MTEAL.a
+    libasmrunBARE_METAL.a
     libasmrun_pic.a
     libasmrun_shared.so))

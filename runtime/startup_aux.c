@@ -41,7 +41,9 @@
 #include "caml/platform.h"
 
 #include <pthread.h>
+#ifndef CAML_BARE_METAL
 #include <sys/resource.h>
+#endif
 
 #ifdef _WIN32
 extern void caml_win32_unregister_overflow_detection (void);
@@ -54,6 +56,9 @@ const struct caml_params* const caml_params = &params;
 
 static size_t get_pthreads_stack_size_in_bytes(void)
 {
+#ifdef CAML_BARE_METAL
+  return 8 * 1024 * 1024;
+#else
   pthread_attr_t attr;
   size_t res =
     // default value, retrieved from a recent system (May 2024)
@@ -63,6 +68,7 @@ static size_t get_pthreads_stack_size_in_bytes(void)
     pthread_attr_destroy(&attr);
   }
   return res;
+#endif
 }
 
 static void init_startup_params(void)
@@ -73,6 +79,9 @@ static void init_startup_params(void)
 
   // Initial stack sizes only apply in native code with stack checks disabled.
 
+#ifdef CAML_BARE_METAL
+  caml_init_main_stack_wsz = Wsize_bsize(8192 * 1024);
+#else
   struct rlimit rlimit;
   if (getrlimit(RLIMIT_STACK, &rlimit)) {
     // default value, retrieved from a recent system (May 2024)
@@ -84,6 +93,7 @@ static void init_startup_params(void)
       caml_init_main_stack_wsz = Wsize_bsize(rlimit.rlim_cur);
     }
   }
+#endif
   if (caml_init_main_stack_wsz > Max_stack_def) {
     caml_init_main_stack_wsz = Max_stack_def;
   }

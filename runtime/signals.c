@@ -43,6 +43,18 @@
 #include <linux/auxvec.h>
 #endif
 
+#ifdef CAML_BARE_METAL
+#undef POSIX_SIGNALS
+#undef BSD_SIGNALS
+static void (*caml_bare_signal(int signo, void (*handler)(int)))(int)
+{
+  (void)signo;
+  (void)handler;
+  return SIG_ERR;
+}
+#define signal caml_bare_signal
+#endif
+
 /* The set of pending signals (received but not yet processed).
    It is represented as a bit vector.
    Valid signal numbers range from 1 to NSIG - 1 included.
@@ -652,7 +664,7 @@ CAMLexport int caml_rev_convert_signal_number(int signo)
   return signo;
 }
 
-#ifdef __linux__
+#if defined(__linux__) && defined(POSIX_SIGNALS)
 static size_t max_size_t(size_t a, size_t b)
 {
   return (a > b) ? a : b;

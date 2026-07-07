@@ -473,6 +473,36 @@ CAMLextern CAMLthread_local int caml_lockdepth;
 #define DEBUG_UNLOCK(m)
 #endif
 
+#ifdef CAML_BARE_METAL
+
+Caml_inline void caml_plat_lock_blocking(caml_plat_mutex* m)
+{
+  (void)m;
+  DEBUG_LOCK(m);
+}
+
+Caml_inline int caml_plat_try_lock(caml_plat_mutex* m)
+{
+  (void)m;
+  DEBUG_LOCK(m);
+  return 1;
+}
+
+CAMLextern void caml_plat_lock_non_blocking_actual(caml_plat_mutex* m);
+
+Caml_inline void caml_plat_lock_non_blocking(caml_plat_mutex* m)
+{
+  caml_plat_try_lock(m);
+}
+
+Caml_inline void caml_plat_unlock(caml_plat_mutex* m)
+{
+  (void)m;
+  DEBUG_UNLOCK(m);
+}
+
+#else
+
 Caml_inline void caml_plat_lock_blocking(caml_plat_mutex* m)
 {
   check_err("lock", pthread_mutex_lock(m));
@@ -505,6 +535,8 @@ Caml_inline void caml_plat_unlock(caml_plat_mutex* m)
   DEBUG_UNLOCK(m);
   check_err("unlock", pthread_mutex_unlock(m));
 }
+
+#endif
 
 extern intnat caml_plat_pagesize;
 extern intnat caml_plat_hugepagesize; /* zero if unknown/unsupported */

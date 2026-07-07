@@ -89,6 +89,207 @@
 #define EWOULDBLOCK (-1)
 #endif
 
+#ifdef CAML_BARE_METAL
+
+/* Route the standard descriptors through newlib's read()/write(), which
+   the BSP's syscall layer implements (typically UART). There is no way
+   to obtain any other file descriptor on bare metal, so anything else
+   fails with ENOSYS. */
+
+Caml_inline int is_std_fd(int fd)
+{
+  return fd >= 0 && fd <= 2;
+}
+
+int caml_read_fd(int fd, int flags, void * buf, int n)
+{
+  (void)flags;
+  if (is_std_fd(fd)) return read(fd, buf, n);
+  errno = ENOSYS;
+  return -1;
+}
+
+int caml_write_fd(int fd, int flags, void * buf, int n)
+{
+  (void)flags;
+  if (is_std_fd(fd)) return write(fd, buf, n);
+  errno = ENOSYS;
+  return -1;
+}
+
+caml_stat_string caml_decompose_path(struct ext_table * tbl, char * path)
+{
+  char * p, * q;
+  size_t n;
+
+  if (path == NULL) return NULL;
+  p = caml_stat_strdup(path);
+  q = p;
+  while (1) {
+    for (n = 0; q[n] != 0 && q[n] != ':'; n++) /*nothing*/;
+    caml_ext_table_add(tbl, q);
+    q = q + n;
+    if (*q == 0) break;
+    *q = 0;
+    q += 1;
+  }
+  return p;
+}
+
+caml_stat_string caml_search_in_path(struct ext_table * path, const char * name)
+{
+  (void)path;
+  return caml_stat_strdup(name);
+}
+
+caml_stat_string caml_search_exe_in_path(const char * name)
+{
+  return caml_stat_strdup(name);
+}
+
+caml_stat_string caml_search_dll_in_path(struct ext_table * path,
+                                         const char * name)
+{
+  (void)path;
+  return caml_stat_strconcat(2, name, ".so");
+}
+
+void * caml_dlopen(char * libname, int global)
+{
+  (void)libname;
+  (void)global;
+  return NULL;
+}
+
+void caml_dlclose(void * handle)
+{
+  (void)handle;
+}
+
+void * caml_dlsym(void * handle, const char * name)
+{
+  (void)handle;
+  (void)name;
+  return NULL;
+}
+
+void * caml_globalsym(const char * name)
+{
+  (void)name;
+  return NULL;
+}
+
+char * caml_dlerror(void)
+{
+  return "dynamic loading not supported on bare metal";
+}
+
+CAMLexport int caml_read_directory(char * dirname, struct ext_table * contents)
+{
+  (void)dirname;
+  (void)contents;
+  errno = ENOSYS;
+  return -1;
+}
+
+char * caml_executable_name(void)
+{
+  return NULL;
+}
+
+char *caml_secure_getenv (char const *var)
+{
+  (void)var;
+  return NULL;
+}
+
+uint64_t caml_time_counter(void)
+{
+#if defined(__aarch64__)
+  /* Use the Armv8-A generic timer: readable from any exception level
+     without OS support (provided CNTKCTL/CNTHCTL grant access, which
+     bare-metal BSPs do by default). */
+  uint64_t cnt, freq;
+  __asm__ __volatile__("isb; mrs %0, cntvct_el0" : "=r"(cnt));
+  __asm__ __volatile__("mrs %0, cntfrq_el0" : "=r"(freq));
+  if (freq == 0) return cnt;
+  return (uint64_t)(((unsigned __int128)cnt * NSEC_PER_SEC) / freq);
+#else
+  /* No timesource: a monotonically increasing counter keeps GC pacing
+     and timestamps well-defined, if meaningless. */
+  static uint64_t counter = 0;
+  return ++counter;
+#endif
+}
+
+int caml_num_rows_fd(int fd)
+{
+  (void)fd;
+  return -1;
+}
+
+int caml_format_timestamp(char* buf, size_t sz, int formatted)
+{
+  (void)formatted;
+  return snprintf(buf, sz, "0.000000 ");
+}
+
+void caml_init_os_params(void)
+{
+  caml_plat_pagesize = Page_size;
+  caml_plat_mmap_alignment = Page_size;
+  caml_plat_hugepagesize = 0;
+}
+
+void caml_plat_mem_name_map(void *mem, size_t length, const char *name)
+{
+  (void)mem;
+  (void)length;
+  (void)name;
+}
+
+static void *bare_aligned_alloc(uintnat size, uintnat alignment)
+{
+  uintptr_t raw, aligned;
+  void **slot;
+  if (alignment < sizeof(void *)) alignment = sizeof(void *);
+  raw = (uintptr_t)malloc(size + alignment - 1 + sizeof(void *));
+  if (raw == 0) return NULL;
+  aligned = (raw + sizeof(void *) + alignment - 1) & ~(alignment - 1);
+  slot = (void **)aligned;
+  slot[-1] = (void *)raw;
+  return (void *)aligned;
+}
+
+void *caml_plat_mem_map(uintnat size, uintnat flags, const char* name)
+{
+  (void)flags;
+  (void)name;
+  return bare_aligned_alloc(size, caml_plat_mmap_alignment);
+}
+
+void* caml_plat_mem_commit(void* mem, uintnat size, const char* name)
+{
+  (void)size;
+  (void)name;
+  return mem;
+}
+
+void caml_plat_mem_decommit(void* mem, uintnat size, const char* name)
+{
+  (void)mem;
+  (void)size;
+  (void)name;
+}
+
+void caml_plat_mem_unmap(void* mem, uintnat size)
+{
+  (void)size;
+  if (mem != NULL) free(((void **)mem)[-1]);
+}
+
+#else /* !CAML_BARE_METAL */
+
 int caml_read_fd(int fd, int flags, void * buf, int n)
 {
   int retcode;
@@ -686,3 +887,5 @@ void caml_plat_mem_unmap(void* mem, uintnat size)
     CAMLassert(0);
 #endif
 }
+
+#endif /* CAML_BARE_METAL */

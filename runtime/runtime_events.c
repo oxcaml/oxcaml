@@ -43,6 +43,27 @@
 #include <unistd.h>
 #endif
 
+#ifdef CAML_BARE_METAL
+#define getpid() 0
+#define open(path, flags, mode) (-1)
+#define ftruncate(fd, length) (-1)
+#define close(fd) ((void)(fd))
+#define unlink(path) ((void)(path))
+#define mmap(addr, length, prot, flags, fd, offset) NULL
+#define munmap(addr, length) ((void)(addr), (void)(length))
+#ifndef O_RDWR
+#define O_RDWR 0
+#endif
+#ifndef O_CREAT
+#define O_CREAT 0
+#endif
+#ifndef PROT_READ
+#define PROT_READ 0
+#define PROT_WRITE 0
+#define MAP_SHARED 0
+#endif
+#endif
+
 #define RUNTIME_EVENTS_VERSION 1
 
 /*
