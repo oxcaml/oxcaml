@@ -1684,27 +1684,26 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
 let emit_static_cast (cast : Cmm.static_cast) i =
   let open Simd_instrs in
   let distinct = not (Reg.same_loc i.arg.(0) i.res.(0)) in
+  let extend_using_shift r ~by ~shift_right =
+    if not (Reg.same_loc r i.res.(0)) then I.mov (reg r) (res i 0);
+    I.sal (int by) (res i 0);
+    shift_right (int by) (res i 0)
+  in
   let sign_extend (w : Cmm.int_width) ~(src : Reg.t) =
     match w with
-    | Int8 -> I.movsx (emit_subreg reg_low_8_name BYTE src) (res i 0)
-    | Int16 -> I.movsx (emit_subreg reg_low_16_name WORD src) (res i 0)
+    | Int8 -> extend_using_shift ~by:56 ~shift_right:I.sar src
+    | Int16 -> extend_using_shift ~by:48 ~shift_right:I.sar src
     | Int32 -> I.movsxd (emit_subreg reg_low_32_name DWORD src) (res i 0)
-    | Int63 ->
-      if not (Reg.same_loc src i.res.(0)) then I.mov (reg src) (res i 0);
-      I.sal (int 1) (res i 0);
-      I.sar (int 1) (res i 0)
+    | Int63 -> extend_using_shift ~by:1 ~shift_right:I.sar src
     | Int64 ->
       if not (Reg.same_loc src i.res.(0)) then I.mov (reg src) (res i 0)
   in
   let zero_extend (w : Cmm.int_width) ~(src : Reg.t) =
     match w with
-    | Int8 -> I.movzx (emit_subreg reg_low_8_name BYTE src) (res i 0)
-    | Int16 -> I.movzx (emit_subreg reg_low_16_name WORD src) (res i 0)
+    | Int8 -> extend_using_shift ~by:56 ~shift_right:I.shr src
+    | Int16 -> extend_using_shift ~by:48 ~shift_right:I.shr src
     | Int32 -> I.mov (emit_subreg reg_low_32_name DWORD src) (res32 i 0)
-    | Int63 ->
-      if not (Reg.same_loc src i.res.(0)) then I.mov (reg src) (res i 0);
-      I.sal (int 1) (res i 0);
-      I.shr (int 1) (res i 0)
+    | Int63 -> extend_using_shift ~by:1 ~shift_right:I.shr src
     | Int64 ->
       if not (Reg.same_loc src i.res.(0)) then I.mov (reg src) (res i 0)
   in
