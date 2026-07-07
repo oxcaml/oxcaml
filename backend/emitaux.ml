@@ -481,13 +481,9 @@ module Dwarf_helpers = struct
   let init ~ppf_dump ~disable_dwarf ~sourcefile =
     reset_dwarf ppf_dump;
     let can_emit_dwarf = !Clflags.debug && not disable_dwarf in
-    match
-      ( can_emit_dwarf,
-        Target_system.architecture (),
-        Target_system.derived_system () )
-    with
-    | true, (X86_64 | AArch64), _ -> sourcefile_for_dwarf := sourcefile
-    | true, (IA32 | ARM | POWER | Z | Riscv), _ | false, _, _ -> ()
+    match can_emit_dwarf, Target_system.architecture () with
+    | true, (X86_64 | AArch64) -> sourcefile_for_dwarf := sourcefile
+    | true, (IA32 | ARM | POWER | Z | Riscv) | false, _ -> ()
 
   let emit_dwarf () =
     Option.iter
