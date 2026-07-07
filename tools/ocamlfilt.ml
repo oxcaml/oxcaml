@@ -39,9 +39,22 @@
 module Structured = struct
   let starts_with_prefix = Structured_mangling.Parse.starts_with_prefix
 
+  (* Locations coming from [Location.none] or from ppx-generated code can be
+     missing individual fields (see the note on [Lexing.position] in
+     [Location]). [Location.none] gives file ["_none_"], line [0] and column
+     [-1]; ppx code using the [pos_lnum = -1] convention gives line [-1] while
+     keeping a real file and column. Real lines are 1-based and real columns are
+     non-negative, so we treat [line < 1] and [col < 0] as unknown, and render
+     the unavailable fields as placeholders rather than nonsensical numbers. *)
   let format_anonymous_location prefix line col file_opt =
-    let file = Option.value ~default:"" file_opt in
-    Printf.sprintf "%s(%s:%d:%d)" prefix file line col
+    let file =
+      match file_opt with
+      | None | Some ("" | "." | "_none_") -> "<unknown>"
+      | Some file -> file
+    in
+    let line = if line < 1 then "??" else string_of_int line in
+    let col = if col < 0 then "??" else string_of_int col in
+    Printf.sprintf "%s(%s:%s:%s)" prefix file line col
 
   let render_path_item (item : string Structured_mangling.path_item) =
     match item with
