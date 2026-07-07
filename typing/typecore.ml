@@ -6761,7 +6761,7 @@ and type_expect_
                 ~before_generalize:(fun (exp, _) ->
                   generalize_structure_exp exp)
                 begin fun () ->
-                let mode = Value.newvar 0 in
+                let mode = Value.newvar (Ctype.get_current_level ()) in
                 let exp = type_exp ~recarg env (mode_default mode) sexp in
                 exp, mode
               end
