@@ -1181,7 +1181,7 @@ let rec update_level env level expand ty =
             variance tl
         in
         begin try
-          if not needs_expand then raise Cannot_expand;
+          if not needs_expand then raise_notrace Cannot_expand;
           let ty' = !forward_try_expand_safe env ty in
           link_type ty ty';
           update_level env level expand ty'
@@ -2308,7 +2308,7 @@ let expand_abbrev_gen kind find_type_expansion env ty =
       | exception Not_found ->
           (* another way to expand is to normalize the path itself *)
           let path' = Env.normalize_type_path None env path in
-          if Path.same path path' then raise Cannot_expand
+          if Path.same path path' then raise_notrace Cannot_expand
           else newty2 ~level (Tconstr (path', args, abbrev))
       | (params, body, lv) ->
           (* prerr_endline
@@ -2360,7 +2360,7 @@ let rec try_expand_once_gen expand_abbrev env ty =
       try_expand_once_gen expand_abbrev (incr_stage env) t |> new_quote_eval_ty
   | Tbox t ->
       try_expand_once_gen expand_abbrev env t |> new_box_ty
-  | _ -> raise Cannot_expand
+  | _ -> raise_notrace Cannot_expand
 
 let unbox_ty env ty =
   match get_desc ty with
@@ -2391,7 +2391,7 @@ let try_expand_safe env ty =
   let snap = Btype.snapshot () in
   try try_expand_once env ty
   with Escape _ ->
-    Btype.backtrack snap; cleanup_abbrev (); raise Cannot_expand
+    Btype.backtrack snap; cleanup_abbrev (); raise_notrace Cannot_expand
 
 (* Note [Beta normal form]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2440,7 +2440,7 @@ let rec try_reduce_once env t =
     (* reduce in subterm *)
     | Tsplice _ -> try_reduce_once (decr_stage env) t |> new_splice_ty
     | Tquote_eval _ -> try_reduce_once (decr_stage env) t |> new_splice_ty
-    | _ -> raise Cannot_expand
+    | _ -> raise_notrace Cannot_expand
     end
   | Tquote t -> begin
     match get_desc t with
@@ -2450,18 +2450,18 @@ let rec try_reduce_once env t =
     (* reduce in subterm *)
     | Tquote _ -> try_reduce_once (incr_stage env) t |> new_quote_ty
     | Tquote_eval _ -> try_reduce_once (incr_stage env) t |> new_quote_ty
-    | _ -> raise Cannot_expand
+    | _ -> raise_notrace Cannot_expand
     end
-  | _ -> raise Cannot_expand
+  | _ -> raise_notrace Cannot_expand
 
 and try_reduce_quote_eval env t =
   let path_must_be_toplevel env path =
     if not (Env.path_is_toplevel_in_quotations env path) then
-      raise Cannot_expand
+      raise_notrace Cannot_expand
   in
   let try_reduce_poly env t = if is_Tpoly t then try_reduce_once env t else t in
   match get_desc t with
-  | Tvar _ | Tunivar _ -> raise Cannot_expand
+  | Tvar _ | Tunivar _ -> raise_notrace Cannot_expand
   (* [<[t1 -> t2]> eval]  ==>  [<[t1]> eval -> <[t2]> eval] *)
   | Tarrow (a, t1, t2, c) ->
     (* Reduce the parameter type's [Tpoly] immediately *)
@@ -2554,7 +2554,7 @@ and try_reduce_quote_eval env t =
                pack_cstrs =
                  List.map (fun (n, t) -> n, new_quote_eval_ty t) pack_cstrs }
   (* It is safe not to expand [Tof_kind], and we do not need to currently *)
-  | Tof_kind _ -> raise Cannot_expand
+  | Tof_kind _ -> raise_notrace Cannot_expand
   | Tlink _ | Tsubst _ -> assert false
 
 and try_reduce_box t =
@@ -2563,11 +2563,11 @@ and try_reduce_box t =
   | Tconstr (p, args, _) ->
     begin match Path.boxed_version p with
     | Some boxed_p -> Tconstr (boxed_p, args, ref Mnil)
-    | None -> raise Cannot_expand
+    | None -> raise_notrace Cannot_expand
     end
   (* [#(t1 * t2) box] ==> [t1 * t2] *)
   | Tunboxed_tuple tys -> Ttuple tys
-  | _ -> raise Cannot_expand
+  | _ -> raise_notrace Cannot_expand
 
 (* Perform head-position reductions exhaustively til the normal form. *)
 let rec try_reduce env ty =
@@ -2582,7 +2582,7 @@ let expand_reducible_abbrevs env ty =
   | Tconstr (path, [_], _) when Path.same path Predef.path_eval
                              || Path.same path Predef.path_box ->
     try_expand_once env ty
-  | _ -> raise Cannot_expand
+  | _ -> raise_notrace Cannot_expand
 
 
 let try_expand_reducible_abbrevs_once =
@@ -2605,7 +2605,7 @@ let reduce_head ~expand_reducible_abbrevs env ty =
   let try_once =
     if expand_reducible_abbrevs
     then try_expand_reducible_abbrevs_once
-    else (fun _env _ty -> raise Cannot_expand)
+    else (fun _env _ty -> raise_notrace Cannot_expand)
   in
   try try_expand_head try_once env ty
   with Cannot_expand -> ty
@@ -2687,7 +2687,7 @@ let try_expand_safe_opt env ty =
   let snap = Btype.snapshot () in
   try try_expand_once_opt env ty
   with Escape _ ->
-    Btype.backtrack snap; raise Cannot_expand
+    Btype.backtrack snap; raise_notrace Cannot_expand
 
 let expand_head_opt env ty =
   try try_expand_head try_expand_safe_opt env ty with Cannot_expand -> ty
@@ -4989,7 +4989,7 @@ and unify2_rec uenv t10 t1 t20 t2 =
         then unify2_rec uenv t10 t1 t20 (try_expand_safe env t2)
         else unify2_rec uenv t10 (try_expand_safe env t1) t20 t2
   | _ ->
-      raise Cannot_expand
+      raise_notrace Cannot_expand
   with Cannot_expand ->
     unify2_expand uenv t10 t1 t20 t2
 
