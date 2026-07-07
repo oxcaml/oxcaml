@@ -6378,6 +6378,22 @@ module Zap_scope = struct
       else add_job_to_map zs.zap_to_ceil_map i zap_to_ceil
       end
 
+  (* [zap_to_floor_pending i zs] is [false] exactly when enqueuing a
+     zap-to-floor job for [i] would be a no-op under the keep-first policy of
+     [add_job_to_map] and [add_zap_to_floor_to_zap_scope]: either [i] is already
+     resolved to legacy, or it already has a zap-to-floor job. When [i] currently
+     has a zap-to-ceil job this returns [true], because enqueuing a floor job
+     then transitions it to legacy. Callers use this to skip constructing the
+     (expensive) job and its join/meet cell for the many duplicate enqueue
+     requests that keep-first would otherwise drop. *)
+  let zap_to_floor_pending i zs =
+    (not (ModeIdMap.mem zs.zap_to_legacy_map i))
+    && not (ModeIdMap.mem zs.zap_to_floor_map i)
+
+  let zap_to_ceil_pending i zs =
+    (not (ModeIdMap.mem zs.zap_to_legacy_map i))
+    && not (ModeIdMap.mem zs.zap_to_ceil_map i)
+
   let resolve_zap_scope { zap_to_floor_map; zap_to_ceil_map; zap_to_legacy_map }
       =
     ModeIdMap.iter (fun _ f -> f ()) zap_to_legacy_map;
@@ -7221,7 +7237,7 @@ module Value_with (Areality : Areality) = struct
     in
     let monadic_upper = Monadic.Guts.get_floor monadic |> Monadic.of_const in
     Monadic.iter_covariant monadic (fun ~id ~level m ->
-        if level <> generic_level
+        if level <> generic_level && Z.zap_to_ceil_pending id scope
         then begin
           let zap_to_legacy () = zap_to_legacy_src_var_monadic m in
           let m = Monadic.join [monadic_upper; m] in
@@ -7229,7 +7245,7 @@ module Value_with (Areality : Areality) = struct
           Z.add_zap_to_ceil_to_zap_scope id zap_to_floor zap_to_legacy scope
         end);
     Comonadic.iter_covariant comonadic (fun ~id ~level m ->
-        if level <> generic_level
+        if level <> generic_level && Z.zap_to_floor_pending id scope
         then begin
           let zap_to_legacy () = zap_to_legacy_src_var_comonadic m in
           let m = Comonadic.join [comonadic_upper; m] in
@@ -7243,7 +7259,7 @@ module Value_with (Areality : Areality) = struct
     in
     let monadic_lower = Monadic.Guts.get_ceil monadic |> Monadic.of_const in
     Monadic.iter_contravariant monadic (fun ~id ~level m ->
-        if level <> generic_level
+        if level <> generic_level && Z.zap_to_floor_pending id scope
         then begin
           let zap_to_legacy () = zap_to_legacy_src_var_monadic m in
           let m = Monadic.meet [monadic_lower; m] in
@@ -7251,7 +7267,7 @@ module Value_with (Areality : Areality) = struct
           Z.add_zap_to_floor_to_zap_scope id zap_to_ceil zap_to_legacy scope
         end);
     Comonadic.iter_contravariant comonadic (fun ~id ~level m ->
-        if level <> generic_level
+        if level <> generic_level && Z.zap_to_ceil_pending id scope
         then begin
           let zap_to_legacy () = zap_to_legacy_src_var_comonadic m in
           let m = Comonadic.meet [comonadic_upper; m] in
