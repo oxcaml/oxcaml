@@ -2710,8 +2710,9 @@ let fundecl fundecl =
   if (not Config.no_stack_checks) && String.equal !Clflags.runtime_variant "d"
   then emit_call (Cmm.global_symbol "caml_assert_stack_invariants");
   let fun_body_start = current_output_pos () in
+  let peephole_pos = current_peephole_pos () in
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
-  X86_proc.peephole_optimize_from fun_body_start;
+  X86_proc.peephole_optimize_from peephole_pos;
   let fun_body_end = current_output_pos () in
   List.iter emit_call_gc !call_gc_sites;
   List.iter emit_local_realloc !local_realloc_sites;

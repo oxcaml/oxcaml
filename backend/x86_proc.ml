@@ -402,15 +402,34 @@ let next_pos pos =
 let output_range ~from_pos ~to_pos =
   DLL.range_to_list ~left_incl:(next_pos from_pos) ~right_excl:(next_pos to_pos)
 
-let peephole_optimize_from pos =
+type peephole_pos =
+  { code_pos : output_pos;
+    section : asm_line DLL.t;
+    section_pos : asm_line DLL.cell option
+  }
+
+let current_peephole_pos () =
+  { code_pos = current_output_pos ();
+    section = !asm_code_current_section;
+    section_pos = DLL.last_cell !asm_code_current_section
+  }
+
+(* Each asm line is added both to [asm_code] (consumed by the textual assembly
+   emitters) and to a per-section list (consumed by the internal assembler), as
+   two distinct cells. The peephole pass must therefore rewrite both lists; the
+   rules are deterministic and both lists contain the same instructions, so the
+   two outputs remain consistent. *)
+let peephole_optimize_from { code_pos; section; section_pos } =
   if !Oxcaml_flags.x86_peephole_optimize
-  then
-    let start =
+  then begin
+    let start_from pos list =
       match pos with
-      | None -> DLL.hd_cell asm_code
+      | None -> DLL.hd_cell list
       | Some start_excl -> DLL.next start_excl
     in
-    X86_peephole_optimize.optimize_from_cell start
+    X86_peephole_optimize.optimize_from_cell (start_from code_pos asm_code);
+    X86_peephole_optimize.optimize_from_cell (start_from section_pos section)
+  end
 
 let generate_code asm =
   (match asm with

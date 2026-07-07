@@ -77,7 +77,15 @@ val current_output_pos : unit -> output_pos
 
 val output_range : from_pos:output_pos -> to_pos:output_pos -> asm_line list
 
-val peephole_optimize_from : output_pos -> unit
+(** Start position for [peephole_optimize_from]: records the current position
+    both in the flat code buffer (consumed by the textual assembly emitters) and
+    in the current per-section buffer (consumed by the internal assembler), so
+    that the peephole pass can rewrite both. *)
+type peephole_pos
+
+val current_peephole_pos : unit -> peephole_pos
+
+val peephole_optimize_from : peephole_pos -> unit
 
 (** Code emission *)
 
