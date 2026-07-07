@@ -1771,6 +1771,15 @@ G(caml_system__frametable):
         .value  -1                      /* negative frame size => use callback link */
         .value  0                       /* no roots here */
 
+/* Contribute this hand-written frametable to the linker-collected
+   caml_all_frametables table, so the runtime "measure all frametables" pass
+   sees it alongside the compiler-emitted ones. ELF targets only. */
+#if !defined(SYS_macosx) && !defined(SYS_mingw64) && !defined(SYS_cygwin)
+        .section caml_all_frametables,"aw",@progbits
+        .align  EIGHT_ALIGN
+        .quad   G(caml_system__frametable)
+#endif
+
 #if defined(SYS_macosx)
         .literal16
 #elif defined(SYS_mingw64) || defined(SYS_cygwin)
