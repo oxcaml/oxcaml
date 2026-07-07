@@ -1490,12 +1490,12 @@ let stack_inner_function_application
   let (f @ noalloc_strict) () = exclave_ stack_ (g (Just a) 2 3) in
   ()
 [%%expect{|
-Line 3, characters 51-59:
-3 |   let (f @ noalloc_strict) () = exclave_ stack_ (g (Just a) 2 3) in
-                                                       ^^^^^^^^
+Line 13, characters 51-59:
+13 |   let (f @ noalloc_strict) () = exclave_ stack_ (g (Just a) 2 3) in
+                                                        ^^^^^^^^
 Error: The allocation is "alloc"
        but is expected to be "noalloc_strict"
-         because it is used inside the function at line 3, characters 27-64
+         because it is used inside the function at line 13, characters 27-64
          which is expected to be "noalloc_strict".
 |}]
 
