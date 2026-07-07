@@ -50,8 +50,14 @@ struct
   module HT = Hashtbl.Make (struct
     type t = int
 
-    (* CR mshinwell: maybe this should be a proper hash function *)
-    let hash (t : t) = Hashtbl.hash t
+    (* [t] is an integer id.  The polymorphic [Hashtbl.hash] compiles to a C
+       call ([caml_hash]), which is needlessly expensive for a single integer
+       and shows up in profiles of every id-table lookup.  Use an inline
+       integer finalizer instead; this only affects bucket placement, not id
+       assignment or equality. *)
+    let hash (t : t) =
+      let h = (t lxor (t lsr 31)) * 0x27d4eb2f in
+      h lxor (h lsr 29)
 
     let equal t1 t2 = t1 == t2
   end)
