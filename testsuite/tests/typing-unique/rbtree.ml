@@ -502,12 +502,9 @@ module Make_Okasaki :
       type 'a t = (Ord.t, 'a) tree
       val fold : ('a -> 'b -> 'c -> 'c) -> 'c -> ('a, 'b) tree -> 'c
       val balance_left : ('a, 'b) tree -> ('a, 'b) tree @@ stateless
-        noalloc_strict
       val balance_right : ('a, 'b) tree -> ('a, 'b) tree @@ stateless
-        noalloc_strict
       val ins : Ord.t -> 'a -> (Ord.t, 'a) tree -> (Ord.t, 'a) tree
       val set_black : ('a, 'b) tree -> ('a, 'b) tree @@ stateless
-        noalloc_strict
       val insert : Ord.t -> 'a -> (Ord.t, 'a) tree -> (Ord.t, 'a) tree
     end
 Line 110, characters 16-52:
