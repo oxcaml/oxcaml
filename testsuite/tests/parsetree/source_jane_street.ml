@@ -1,5 +1,5 @@
 (* TEST
-   flags = "-extension-universe alpha -w -220";
+   flags = "-extension-universe alpha -w -181-220";
    include stdlib_upstream_compatible;
    include stdlib_stable;
    expect;
