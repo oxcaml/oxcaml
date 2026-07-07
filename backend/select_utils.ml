@@ -267,10 +267,11 @@ let oper_result_type = function
    dependencies, because it uses [Arch]. *)
 let size_component : machtype_component -> int = function
   | Val | Addr -> Arch.size_addr
-  | Tagged_int | Naked_int _ ->
+  | Tagged_int | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8) ->
     assert (Int.equal Arch.size_int Arch.size_addr);
     Arch.size_int
-  (* CR jrayman: Should [Naked_int w] instead return [bits_of_int_width w]? *)
+    (* CR jrayman: Should [Naked_int w] instead return [bits_of_int_width w]?
+       Also see the CR under [| Float32 ->]. *)
   | Float -> Arch.size_float
   | Float32 ->
     (* CR layouts v5.1: reconsider when float32 fields are efficiently packed.

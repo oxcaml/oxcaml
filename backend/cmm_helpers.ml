@@ -2251,7 +2251,6 @@ let machtype_identifier t =
     match component with
     | Val -> 'V'
     | Tagged_int -> 'I'
-    (* CR jrayman: Do all of the naked ints need separate chars? *)
     | Naked_int Int64 -> 'Q'
     | Naked_int Int63 -> 'U'
     | Naked_int Int32 -> 'D'

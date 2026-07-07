@@ -622,7 +622,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     let reset_addressing () =
       (* Use a temporary to store the address [!base + !byte_offset]. *)
-      (* CR jrayman: should registers have a machtype of tagged int? *)
       let tmp = Reg.createv Cmm.typ_tagged_int in
       (* CR-someday xclerc: Now that this code in the "generic" part, it is
          maybe a bit unexpected to assume there is no better sequence to emit x
@@ -678,9 +677,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               | Vec128 -> Onetwentyeight_unaligned
               | Vec256 -> Twofiftysix_unaligned
               | Vec512 -> Fivetwelve_unaligned
-              | Val | Addr | Tagged_int
-              | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8) ->
-                Word_val (* CR jrayman: This is not correct *)
+              | Val -> Word_val
+              (* CR jrayman: Unclear why [Addr] and [Int] were previously mapped
+                 to [Word_val] *)
+              | Addr | Tagged_int | Naked_int (Int64 | Int63) -> Word_int
+              | Naked_int Int32 -> Thirtytwo_signed
+              | Naked_int Int16 -> Sixteen_signed
+              | Naked_int Int8 -> Byte_signed
               | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
             in
             insert_debug env sub_cfg
