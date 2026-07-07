@@ -161,6 +161,16 @@ let rec find_stack_check_block :
 let insert_instruction (cfg : Cfg.t) (label : Label.t) ~max_frame_size =
   let block = Cfg.get_block_exn cfg label in
   let stack_offset = Cfg.first_instruction_stack_offset block in
+  (* Registers live across the check are the block's live-in = the next
+     instruction's live-in. As [instr.live] is the live-across set, recover the
+     live-in by adding the next instruction's arguments. This is what the
+     emitter's [save_simd] needs to preserve SIMD registers across the realloc
+     handler (a C call that clobbers caller-save SIMD registers). *)
+  let live =
+    match DLL.hd block.body with
+    | Some hd -> Reg.add_set_array hd.live hd.arg
+    | None -> Reg.add_set_array block.terminator.live block.terminator.arg
+  in
   let check : Cfg.basic Cfg.instruction =
     (* CR xclerc for xclerc: double check `available_before` and
        `available_across`.
@@ -173,7 +183,7 @@ let insert_instruction (cfg : Cfg.t) (label : Label.t) ~max_frame_size =
     let id = InstructionId.get_and_incr cfg.next_instruction_id in
     Cfg.make_instruction ()
       ~desc:(Cfg.Stack_check { max_frame_size_bytes = max_frame_size })
-      ~stack_offset ~id ~available_before:Reg_availability_set.Unreachable
+      ~stack_offset ~id ~live ~available_before:Reg_availability_set.Unreachable
       ~available_across:Reg_availability_set.Unreachable
   in
   DLL.add_begin block.body check
