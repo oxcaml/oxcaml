@@ -90,7 +90,6 @@ module TE = Typing_env
 module ME = Meet_env
 module TEE = Typing_env_extension
 module TEL = Typing_env_level
-module ET = Expand_head.Expanded_type
 
 module Symbol_projection = struct
   include Symbol_projection
@@ -766,7 +765,7 @@ module Bindings_in_target_env : sig
   (* Must only be called from the toplevel join, before creating any local
      variable. *)
   val add_alias_between_names_in_source_env :
-    t -> K.t -> Name_in_source_env.t -> Simple_in_source_env.t -> t
+    t -> K.t -> Name_in_source_env.t -> Simple_in_target_env.t -> t
 
   (* Record the [name_in_source_env] as the canonical name for this set of
      simples in joined environments. If there was already a [name_in_source_env]
@@ -796,6 +795,7 @@ module Bindings_in_target_env : sig
     Variable_in_one_joined_env.t ->
     K.t ->
     t
+  [@@warning "-unused-value-declaration"]
 
   (* Return the (unique across the whole join) name to be used to represent an
      imported variable.
@@ -984,8 +984,7 @@ end = struct
            (Name_in_target_env.from_source_env name)
            t.definitions_in_joined_envs));
     add_alias t kind ~name_to_be_demoted:name
-      ~coercion_to_name_to_be_demoted:Coercion.id
-      ~canonical_element:(Simple_in_target_env.from_source_env canonical)
+      ~coercion_to_name_to_be_demoted:Coercion.id ~canonical_element:canonical
 
   let update_aliases_of_names_in_joined_envs ~f simples aliases_in_target_env =
     Index.Map.fold
@@ -1305,14 +1304,29 @@ end = struct
         else None)
       (envs_and_equations t)
 
+  let expand_head env ty =
+    match TG.get_alias_opt ty with
+    | None -> ty
+    | Some simple ->
+      let kind = TG.kind ty in
+      let simple = TE.get_canonical_simple_ignoring_name_mode env simple in
+      Simple.pattern_match simple
+        ~const:(fun _ -> TG.alias_type_of kind simple)
+        ~name:(fun name ~coercion ->
+          let ty = TE.find env name (Some kind) in
+          match TG.get_alias_opt ty with
+          | Some _ ->
+            Misc.fatal_errorf
+              "Canonical alias %a should never have [Equals] type %a:@\n\n%a"
+              Simple.print simple TG.print ty TE.print env
+          | None -> TG.apply_coercion ty coercion)
+
   let expand_heads t types =
     Index.Map.mapi
       (fun index ty ->
         let typing_env = get_nth_joined_env t index in
-        Type_in_one_joined_env.create
-          (ET.to_type
-             (Expand_head.expand_head typing_env
-                (ty : Type_in_one_joined_env.t :> TG.t))))
+        let ty = (ty : Type_in_one_joined_env.t :> TG.t) in
+        Type_in_one_joined_env.create (expand_head typing_env ty))
       types
 end
 
@@ -1530,15 +1544,26 @@ let join_aliases_into_bindings ~joined_envs ~bindings equations_to_join =
         | Canonical_in_source_env canonical ->
           let bindings =
             Bindings_in_target_env.add_alias_between_names_in_source_env
-              bindings kind name canonical
+              bindings kind name
+              (Simple_in_target_env.from_source_env canonical)
           in
           equations_to_join, bindings
         | Import_from_all_joined_envs (var, coercion) ->
-          (* name = coercion(var) *)
+          (* CR bclement: we would want to call [add_imported_var] here instead
+             of always importing the variable, and only import it if it is
+             actually needed (i.e. if it appears in an imported type).
+
+             We can't do this currently because the variable could be imported
+             from within an env extension, and it is not possible to call
+             [add_alias_between_names_in_source_env] from within an env
+             extension at the moment. *)
+          let imported, bindings =
+            Bindings_in_target_env.import_from_all_envs bindings var kind
+          in
           let bindings =
-            Bindings_in_target_env.add_imported_var bindings
-              ~name_in_source_env:name ~coercion_to_name_in_source_env:coercion
-              var kind
+            Bindings_in_target_env.add_alias_between_names_in_source_env
+              bindings kind name
+              (Simple_in_target_env.apply_coercion_exn imported coercion)
           in
           equations_to_join, bindings
         | Existential_for_these_simples ->
@@ -1715,6 +1740,31 @@ let recover_inverse_relations inverse_relations name ty =
   | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
     ty, inverse_relations
 
+let import_type t ty : t =
+  let bindings =
+    Name_occurrences.fold_variables (TG.free_names ty) ~init:t.bindings
+      ~f:(fun bindings var ->
+        match
+          Source_env.exists_in_source_env
+            (Bindings_in_target_env.source_env bindings)
+            var
+        with
+        | Some _ -> bindings
+        | None ->
+          let simple, bindings =
+            Bindings_in_target_env.import_from_all_envs bindings
+              (Variable_in_one_joined_env.create var)
+              (Variable.kind var)
+          in
+          if not (Simple.equal (simple :> Simple.t) (Simple.var var))
+          then
+            Misc.fatal_errorf "Imported variable %a under a different name (%a)"
+              Variable.print var Simple.print
+              (simple :> Simple.t);
+          bindings)
+  in
+  { t with bindings }
+
 let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join
     types_in_target_env inverse_relations =
   Name_in_target_env.Map.fold
@@ -1726,21 +1776,37 @@ let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join
         Misc.fatal_errorf
           "Processing join of %a but we already have a type for it."
           Name_in_target_env.print name;
-      match
-        n_way_join_type t
-          (Index.Map.bindings (Joined_envs.expand_heads t.joined_envs types)
-            : (Index.t * Type_in_one_joined_env.t) list
-            :> (Index.t * TG.t) list)
-      with
-      | Unknown, t -> types_in_target_env, inverse_relations, t
-      | Known ty, t ->
-        let ty, inverse_relations =
-          recover_inverse_relations inverse_relations (name :> Name.t) ty
-        in
-        let ty = Type_in_target_env.create ty in
-        ( Name_in_target_env.Map.add name ty types_in_target_env,
-          inverse_relations,
-          t ))
+      let heads =
+        (Index.Map.bindings (Joined_envs.expand_heads t.joined_envs types)
+          : (Index.t * Type_in_one_joined_env.t) list
+          :> (Index.t * TG.t) list)
+      in
+      let[@local] regular_join () =
+        match n_way_join_type t heads with
+        | Unknown, t -> types_in_target_env, inverse_relations, t
+        | Known ty, t ->
+          let ty, inverse_relations =
+            recover_inverse_relations inverse_relations (name :> Name.t) ty
+          in
+          let ty = Type_in_target_env.create ty in
+          ( Name_in_target_env.Map.add name ty types_in_target_env,
+            inverse_relations,
+            t )
+      in
+      match heads with
+      | [] -> regular_join ()
+      | (_, t1) :: ts ->
+        if List.for_all (fun (_, t2) -> t1 == t2) ts
+        then
+          let t = import_type t t1 in
+          let t1, inverse_relations =
+            recover_inverse_relations inverse_relations (name :> Name.t) t1
+          in
+          let ty = Type_in_target_env.create t1 in
+          ( Name_in_target_env.Map.add name ty types_in_target_env,
+            inverse_relations,
+            t )
+        else regular_join ())
     equations_to_join
     (types_in_target_env, inverse_relations, t)
 

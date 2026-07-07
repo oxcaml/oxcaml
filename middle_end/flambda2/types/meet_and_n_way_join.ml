@@ -2979,35 +2979,64 @@ and n_way_join_value_slot_indexed_product env
 and n_way_join_int_indexed_product env shape
     (fields : TG.Product.Int_indexed.t Join_env.join_arg list) :
     TG.Product.Int_indexed.t * Join_env.t =
-  let length =
-    match fields with
-    | [] -> Misc.fatal_error "Join of empty int indexed product."
-    | (_, first_fields) :: other_fields ->
+  match fields with
+  | [] -> Misc.fatal_error "Join of empty int indexed product."
+  | (_, first_fields) :: other_fields ->
+    let length =
       List.fold_left
         (fun length (_, other_fields) -> min length (Array.length other_fields))
         (Array.length first_fields)
         other_fields
-  in
-  let fields, env =
-    let env_ref = ref env in
-    let fields =
-      Array.init length (fun index ->
-          (* CR bclement: if fields are all physically equal and only involve
-             variables defined in the central env, we should reuse the type. *)
-          let fields =
-            List.map (fun (id, fields) -> id, fields.(index)) fields
-          in
-          match n_way_join !env_ref fields with
-          | Unknown, env ->
-            env_ref := env;
-            MTC.unknown_from_shape shape index
-          | Known ty, env ->
-            env_ref := env;
-            ty)
     in
-    fields, !env_ref
-  in
-  TG.Product.Int_indexed.create_from_array fields, env
+    let all_phys_equal =
+      try
+        for index = 0 to length - 1 do
+          let first_field = Array.unsafe_get first_fields index in
+          if
+            List.exists
+              (fun (_, other_fields) ->
+                Array.unsafe_get other_fields index != first_field)
+              other_fields
+          then raise_notrace Exit
+        done;
+        true
+      with Exit -> false
+    in
+    if all_phys_equal
+    then
+      match
+        List.find_map
+          (fun (_, fields) ->
+            if Array.length fields = length then Some fields else None)
+          fields
+      with
+      | None -> assert false
+      | Some fields ->
+        ( TG.Product.Int_indexed.create_from_array fields,
+          Array.fold_left (fun env ty -> Join_env.import_type env ty) env fields
+        )
+    else
+      let fields, env =
+        let env_ref = ref env in
+        let fields =
+          Array.init length (fun index ->
+              (* CR bclement: if fields are all physically equal and only
+                 involve variables defined in the central env, we should reuse
+                 the type. *)
+              let fields =
+                List.map (fun (id, fields) -> id, fields.(index)) fields
+              in
+              match n_way_join !env_ref fields with
+              | Unknown, env ->
+                env_ref := env;
+                MTC.unknown_from_shape shape index
+              | Known ty, env ->
+                env_ref := env;
+                ty)
+        in
+        fields, !env_ref
+      in
+      TG.Product.Int_indexed.create_from_array fields, env
 
 and n_way_join_function_type (env : Join_env.t)
     (func_types : TG.Function_type.t Or_unknown.t Join_env.join_arg list) :
