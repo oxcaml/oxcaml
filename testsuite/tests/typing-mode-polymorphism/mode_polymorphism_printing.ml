@@ -114,9 +114,8 @@ val foo : 'a @ [< 'm & global] -> ('a, int) mytype @ [> 'm] = <fun>
 
 let foo r = { r with y = 42 }
 [%%expect{|
-val foo :
-  ('a, 'b) mytype @ [< global many uncontended forkable unyielding read_write] ->
-  ('a, int) mytype @ [> aliased nonportable stateful dynamic] = <fun>
+val foo : ('a, 'b) mytype @ [< 'm & global] -> ('a, int) mytype @ [> 'm] =
+  <fun>
 |}]
 
 type 'a myref = { mutable x : 'a }
