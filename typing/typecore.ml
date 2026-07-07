@@ -6766,6 +6766,15 @@ and type_expect_
             in
             None, label_definitions
         | Some (exp, mode), _ ->
+            (* Quick-and-dirty: functional update ([{ e with ... }]) on a
+               record with any atomic fields (even ones not being updated) is
+               hard to reason about, since it is unclear when the atomic
+               accesses occur. Reject it outright for now. *)
+            if Array.exists (fun lbl -> Types.is_atomic lbl.lbl_mut) lbl.lbl_all
+            then
+              Misc.fatal_error
+                "Functional update ({ e with ... }) on a record with atomic \
+                 fields is not supported";
             let ty_exp = instance exp.exp_type in
             let label_definitions =
               Array.map
