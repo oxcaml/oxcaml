@@ -19,29 +19,6 @@ module Architecture : sig
 end
 
 module System : sig
-  type derived_system =
-    | Linux
-    | MinGW_32
-    | MinGW_64
-    | Win32
-    | Win64
-    | Cygwin
-    | MacOS_like
-    | FreeBSD
-    | NetBSD
-    | OpenBSD
-    | Solaris
-    | Dragonfly
-    | GNU
-    | BeOS
-    | Unknown
-
-  val derived_system : unit -> derived_system
-
-  val is_windows : unit -> bool
-
-  val is_macos : unit -> bool
-
   type windows_system = private
     | Cygwin
     | MinGW
@@ -62,6 +39,10 @@ module System : sig
     | Unknown
 
   val get : unit -> t
+
+  val is_windows : unit -> bool
+
+  val is_macos : unit -> bool
 end
 
 module Assembler : sig

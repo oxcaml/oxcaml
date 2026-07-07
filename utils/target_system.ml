@@ -32,62 +32,7 @@ module Architecture = struct
 end
 
 module System = struct
-  (* CR shym Maybe get rid of derived systems and return system directly? *)
   (* CR shym Why [MacOS_like] instead of simply [MacOS]? *)
-  type derived_system =
-    | Linux
-    | MinGW_32
-    | MinGW_64
-    | Win32
-    | Win64
-    | Cygwin
-    | MacOS_like
-    | FreeBSD
-    | NetBSD
-    | OpenBSD
-    | Solaris
-    | Dragonfly
-    | GNU
-    | BeOS
-    | Unknown
-
-  let derived_system () : derived_system =
-    match Config.system with
-    | "beos" -> BeOS
-    | "cygwin" -> Cygwin
-    | "dragonfly" -> Dragonfly
-    | "freebsd" -> FreeBSD
-    | "gnu" -> GNU
-    | "linux" -> Linux
-    | "macosx" -> MacOS_like
-    | "mingw64" -> MinGW_64
-    | "mingw" -> MinGW_32
-    | "netbsd" -> NetBSD
-    | "openbsd" -> OpenBSD
-    | "solaris" -> Solaris
-    | "win32" -> Win32
-    | "win64" -> Win64
-    | "unknown" -> Unknown
-    | _ ->
-      Misc.fatal_errorf
-        "Cannot determine system type (%s): ensure `target_system.ml' matches \
-         `configure'"
-        Config.system
-
-  let is_windows () =
-    match derived_system () with
-    | Linux | MacOS_like | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly
-    | GNU | BeOS | Unknown ->
-      false
-    | MinGW_32 | MinGW_64 | Win32 | Win64 | Cygwin -> true
-
-  let is_macos () =
-    match derived_system () with
-    | Linux | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU | BeOS
-    | Unknown | MinGW_32 | MinGW_64 | Win32 | Win64 | Cygwin ->
-      false
-    | MacOS_like -> true
-
   type windows_system =
     | Cygwin
     | MinGW
@@ -107,20 +52,39 @@ module System = struct
     | Unknown
 
   let get () : t =
-    match derived_system () with
-    | Linux -> Linux
-    | MinGW_32 | MinGW_64 -> Windows MinGW
-    | Win32 | Win64 -> Windows Native
-    | Cygwin -> Windows Cygwin
-    | MacOS_like -> MacOS_like
-    | FreeBSD -> FreeBSD
-    | NetBSD -> NetBSD
-    | OpenBSD -> OpenBSD
-    | Solaris -> Solaris
-    | Dragonfly -> Dragonfly
-    | GNU -> GNU
-    | BeOS -> BeOS
-    | Unknown -> Unknown
+    match Config.system with
+    | "linux" -> Linux
+    | "mingw" | "mingw64" -> Windows MinGW
+    | "win32" | "win64" -> Windows Native
+    | "cygwin" -> Windows Cygwin
+    | "macosx" -> MacOS_like
+    | "freebsd" -> FreeBSD
+    | "netbsd" -> NetBSD
+    | "openbsd" -> OpenBSD
+    | "solaris" -> Solaris
+    | "dragonfly" -> Dragonfly
+    | "gnu" -> GNU
+    | "beos" -> BeOS
+    | "unknown" -> Unknown
+    | _ ->
+      Misc.fatal_errorf
+        "Cannot determine system type (%s): ensure `target_system.ml' matches \
+         `configure'"
+        Config.system
+
+  let is_windows () =
+    match get () with
+    | Linux | MacOS_like | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly
+    | GNU | BeOS | Unknown ->
+      false
+    | Windows _ -> true
+
+  let is_macos () =
+    match get () with
+    | Linux | Windows _ | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU
+    | BeOS | Unknown ->
+      false
+    | MacOS_like -> true
 end
 
 module Assembler = struct
@@ -132,11 +96,12 @@ module Assembler = struct
   (* CR shym Note that [Asm_label.label_prefix] will call this function at
      initialisation *)
   let get () =
-    match System.derived_system () with
-    | Win32 | Win64 -> MASM
+    match System.get () with
+    | Windows Native -> MASM
     | MacOS_like -> MacOS
-    | MinGW_32 | MinGW_64 | Cygwin | Linux | FreeBSD | NetBSD | OpenBSD
-    | Solaris | GNU | Dragonfly | BeOS | Unknown ->
+    | Linux
+    | Windows (Cygwin | MinGW)
+    | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU | BeOS | Unknown ->
       GAS_like
 
   let is_macos () = match get () with MASM | GAS_like -> false | MacOS -> true
