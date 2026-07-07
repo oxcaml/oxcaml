@@ -12,11 +12,13 @@ in
 let $camlGet_tag_2020_07_21__of_src_2 =
   closure of_src_0_1 @of_src &toplevel.alloc_region
 in
-let code loopify(never) size(29) newer_version_of(test_1)
+let code loopify(never) size(31) newer_version_of(test_1)
       test_1_1 (src : [ 0 of imm tagged |1 of imm tagged ], f : val, g : val)
         my_closure &my_alloc_region my_depth
         -> k * k1 =
-  apply &my_alloc_region f (0) -> k4 * k1
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  apply &my_alloc_region &`region` &ghost_region f (0) -> k4 * k1
     where k4 (param : [ 0 |1 ]) =
       let unboxed_field = %untag_imm (param) in
       cont k3 (unboxed_field)
@@ -30,6 +32,8 @@ let code loopify(never) size(29) newer_version_of(test_1)
            let tagged_scrutinee = %tag_imm (prim) in
            cont k2 (tagged_scrutinee))
     where k2 (dst : imm tagged) =
+      let `unit` = %end_region (`region`) in
+      let unit_1 = %end_ghost_region (ghost_region) in
       apply &my_alloc_region g (dst) -> k * k1
 in
 let $camlGet_tag_2020_07_21__test_3 =

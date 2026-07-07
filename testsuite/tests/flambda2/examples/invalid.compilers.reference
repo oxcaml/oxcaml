@@ -22,13 +22,13 @@
 (data
  int 4087
  global "camlInvalid__bar_4":
- addr G:"caml_curry2"
+ addr G:"caml_curry2L1"
  int 180143985094819847
  addr G:"camlInvalid__bar_1_4_code")
 (data
  int 4087
  global "camlInvalid__check_3":
- addr G:"caml_curry2"
+ addr G:"caml_curry2L1"
  int 180143985094819847
  addr G:"camlInvalid__check_0_3_code")
 (data

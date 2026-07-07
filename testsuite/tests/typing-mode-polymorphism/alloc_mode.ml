@@ -19,10 +19,10 @@ type 'a myref = { mutable i : 'a; }
 let foo r x = r.i <- x
 [%%expect{|
 (let
-  (foo/292 =
-     (function {nlocal = 0} r/294[L] x/295 : int
-       (setfield_ptr(maybe-stack) 0 r/294 x/295)))
-  (apply (field_imm 1 (global Toploop!)) "foo" foo/292))
+  (foo/293 =
+     (function {nlocal = 0} r/295[L] x/296 : int
+       (setfield_ptr(maybe-stack) 0 r/295 x/296)))
+  (apply (field_imm 1 (global Toploop!)) "foo" foo/293))
 val foo :
   'a myref @ [< 'm @@ past & global corrupted] ->
   ('a @ [< global many uncontended] -> unit @ 'n) @ [> 'm | corruptible] =
@@ -32,10 +32,10 @@ val foo :
 let foo (r @ local) x = r.i <- x
 [%%expect{|
 (let
-  (foo/296 =
-     (function {nlocal = 2} r/297[L] x/298 : int
-       (setfield_ptr(maybe-stack) 0 r/297 x/298)))
-  (apply (field_imm 1 (global Toploop!)) "foo" foo/296))
+  (foo/297 =
+     (function {nlocal = 2} r/298[L] x/299 : int
+       (setfield_ptr(maybe-stack) 0 r/298 x/299)))
+  (apply (field_imm 1 (global Toploop!)) "foo" foo/297))
 val foo :
   'a myref @ [< 'm @@ past & corrupted > local] ->
   ('a @ [< global many uncontended] -> unit @ 'n) @ [> 'm | local corruptible] =
@@ -46,9 +46,9 @@ val foo :
 let foo (r @ global) x = r.i <- x
 [%%expect{|
 (let
-  (foo/299 =
-     (function {nlocal = 0} r/300 x/301 : int (setfield_ptr 0 r/300 x/301)))
-  (apply (field_imm 1 (global Toploop!)) "foo" foo/299))
+  (foo/300 =
+     (function {nlocal = 0} r/301 x/302 : int (setfield_ptr 0 r/301 x/302)))
+  (apply (field_imm 1 (global Toploop!)) "foo" foo/300))
 val foo :
   'a myref @ [< 'm @@ past & global corrupted] ->
   ('a @ [< global many uncontended] -> unit @ 'n) @ [> 'm | corruptible] =
@@ -61,16 +61,16 @@ let foo () =
   fun () -> store r
 [%%expect{|
 (let
-  (foo/302 =
-     (function {nlocal = 1} param/308[L][value<int>]
+  (foo/303 =
+     (function {nlocal = 1} param/309[L][value<int>]
        (let
-         (r/303 = (makemutable 0 (*) "bar")
-          store/304 =
-            (function {nlocal = 0} r/306 : int
-              (setfield_ptr 0 r/306 "foobar")))
-         (function {nlocal = 1} param/307[L][value<int>] : int
-           (apply store/304 r/303)))))
-  (apply (field_imm 1 (global Toploop!)) "foo" foo/302))
+         (r/304 = (makemutable 0 (*) "bar")
+          store/305 =
+            (function {nlocal = 0} r/307 : int
+              (setfield_ptr 0 r/307 "foobar")))
+         (function {nlocal = 1} param/308[L][value<int>] : int
+           (apply store/305 r/304)))))
+  (apply (field_imm 1 (global Toploop!)) "foo" foo/303))
 val foo : unit @ 'o -> (unit @ 'n -> unit @ 'm) @ [> corruptible] = <fun>
 |}]
 
@@ -84,13 +84,13 @@ Line 2, characters 6-7:
           ^
 Warning 26 [unused-var]: unused variable "r".
 (let
-  (foo/310 =
-     (function {nlocal = 1} param/315[L][value<int>]
+  (foo/311 =
+     (function {nlocal = 1} param/316[L][value<int>]
        (region
-         (let (r/311 =mut "bar")
-           (function {nlocal = 1} r/314[L] : int
-             (setfield_ptr(maybe-stack) 0 r/314 "foobar"))))))
-  (apply (field_imm 1 (global Toploop!)) "foo" foo/310))
+         (let (r/312 =mut "bar")
+           (function {nlocal = 1} r/315[L] : int
+             (setfield_ptr(maybe-stack) 0 r/315 "foobar"))))))
+  (apply (field_imm 1 (global Toploop!)) "foo" foo/311))
 
 val foo : unit @ 'o -> (string myref @ [< corrupted] -> unit @ 'n) @ 'm =
   <fun>
@@ -102,16 +102,16 @@ let foo () =
   fun () -> store r
 [%%expect{|
 (let
-  (foo/317 =
-     (function {nlocal = 1} param/323[L][value<int>]
+  (foo/318 =
+     (function {nlocal = 1} param/324[L][value<int>]
        (let
-         (r/318 = (makemutable 0 (*) "bar")
-          store/319 =
-            (function {nlocal = 0} r/321 : int
-              (setfield_ptr 0 r/321 "foobar")))
-         (function {nlocal = 1} param/322[L][value<int>] : int
-           (apply store/319 r/318)))))
-  (apply (field_imm 1 (global Toploop!)) "foo" foo/317))
+         (r/319 = (makemutable 0 (*) "bar")
+          store/320 =
+            (function {nlocal = 0} r/322 : int
+              (setfield_ptr 0 r/322 "foobar")))
+         (function {nlocal = 1} param/323[L][value<int>] : int
+           (apply store/320 r/319)))))
+  (apply (field_imm 1 (global Toploop!)) "foo" foo/318))
 val foo : unit @ 'o -> (unit @ 'n -> unit @ 'm) @ [> corruptible] = <fun>
 |}]
 
@@ -131,17 +131,17 @@ val foo : unit @ 'o -> (unit @ 'n -> unit @ 'm) @ [> corruptible] = <fun>
 let fst x = fun y -> x
 [%%expect{|
 (let
-  (fst/325 =
-     (function {nlocal = 0} x/326? (function {nlocal = 1} y/327[L]? x/326)))
-  (apply (field_imm 1 (global Toploop!)) "fst" fst/325))
+  (fst/326 =
+     (function {nlocal = 0} x/327? (function {nlocal = 1} y/328[L]? x/327)))
+  (apply (field_imm 1 (global Toploop!)) "fst" fst/326))
 val fst : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
   <fun>
 |}]
 
 let fst' x y = x
 [%%expect{|
-(let (fst'/328 = (function {nlocal = 1} x/330[L]? y/331[L]? x/330))
-  (apply (field_imm 1 (global Toploop!)) "fst'" fst'/328))
+(let (fst'/329 = (function {nlocal = 1} x/331[L]? y/332[L]? x/331))
+  (apply (field_imm 1 (global Toploop!)) "fst'" fst'/329))
 val fst' : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
   <fun>
 |}]
@@ -151,10 +151,10 @@ val fst' : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
 let fst_local (x @ local) = exclave_ fun y -> x
 [%%expect{|
 (let
-  (fst_local/332 =
-     (function {nlocal = 1} x/334[L]? : stack
-       (function[L] {nlocal = 1} y/335[L]? x/334)))
-  (apply (field_imm 1 (global Toploop!)) "fst_local" fst_local/332))
+  (fst_local/333 =
+     (function {nlocal = 1} x/335[L]? : stack
+       (function[L] {nlocal = 1} y/336[L]? x/335)))
+  (apply (field_imm 1 (global Toploop!)) "fst_local" fst_local/333))
 val fst_local :
   'a @ [< 'm > local] ->
   ('b @ 'n -> 'a @ [> 'm | local]) @ [> close('m) | local] = <fun>
@@ -163,9 +163,9 @@ val fst_local :
 let foo = fst 42
 [%%expect{|
 (let
-  (fst/325 =? (apply (field_imm 0 (global Toploop!)) "fst")
-   foo/336 = (apply fst/325 42))
-  (apply (field_imm 1 (global Toploop!)) "foo" foo/336))
+  (fst/326 =? (apply (field_imm 0 (global Toploop!)) "fst")
+   foo/337 = (apply fst/326 42))
+  (apply (field_imm 1 (global Toploop!)) "foo" foo/337))
 val foo : '_weak1 -> int @ [> aliased] = <fun>
 |}]
 
@@ -173,10 +173,10 @@ let foo () =
   exclave_ (fst_local 42)
 [%%expect{|
 (let
-  (fst_local/332 =? (apply (field_imm 0 (global Toploop!)) "fst_local")
-   foo/337 =
-     (function {nlocal = 1} param/338[L][value<int>] : stack
-       (apply[L] fst_local/332 42)))
-  (apply (field_imm 1 (global Toploop!)) "foo" foo/337))
+  (fst_local/333 =? (apply (field_imm 0 (global Toploop!)) "fst_local")
+   foo/338 =
+     (function {nlocal = 1} param/339[L][value<int>] : stack
+       (apply[L] fst_local/333 42)))
+  (apply (field_imm 1 (global Toploop!)) "foo" foo/338))
 val foo : unit @ 'n -> ('a @ 'm -> int @ [> local]) @ [> local] = <fun>
 |}]

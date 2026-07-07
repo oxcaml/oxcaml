@@ -14,14 +14,14 @@ in
 let code char_of_string_0 deleted in
 let code result_is_error_1 deleted in
 let code result_try_with_2 deleted in
-let $camlFrom_core_char_test__immstring69 = "c" in
+let $camlFrom_core_char_test__immstring72 = "c" in
 let code test_3 deleted in
-let $camlFrom_core_char_test__const_block94 =
+let $camlFrom_core_char_test__const_block101 =
   Block 0 ($camlFrom_core_char_test__immstring28, 35, 35)
 in
-let $camlFrom_core_char_test__Pmakeblock97 =
+let $camlFrom_core_char_test__Pmakeblock104 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
-           $camlFrom_core_char_test__const_block94)
+           $camlFrom_core_char_test__const_block101)
 in
 let code top_5 deleted in
 let code inline(always) loopify(never) size(40) newer_version_of(char_of_string_0)
@@ -90,7 +90,7 @@ let code inline(always) loopify(never) size(20) newer_version_of(test_3)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring69, 0n)
+  let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring72, 0n)
   in
   let Pstringrefs = %tag_imm (prim) in
   let prim_1 = %phys_eq (Pstringrefs, 99) in
@@ -112,7 +112,7 @@ let code loopify(never) size(30) newer_version_of(top_5)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  (let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring69, 0n)
+  (let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring72, 0n)
    in
    let Pstringrefs = %tag_imm (prim) in
    let prim_1 = %phys_eq (Pstringrefs, 99) in
@@ -127,7 +127,7 @@ let code loopify(never) size(30) newer_version_of(top_5)
        cont k2 (1i))
     where k2 (naked_immediate : imm) =
       switch naked_immediate
-        | 0 -> k1 pop(regular k1) ($camlFrom_core_char_test__Pmakeblock97)
+        | 0 -> k1 pop(regular k1) ($camlFrom_core_char_test__Pmakeblock104)
         | 1 -> k (0)
 in
 let $camlFrom_core_char_test__top_11 =

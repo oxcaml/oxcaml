@@ -57,14 +57,14 @@ end
 [%%expect{|
 (apply (field_imm 1 (global Toploop!)) "Basic/331"
   (let
-    (get = (function {nlocal = 0} r (atomic_load_field_ptr r 1))
-     get_imm = (function {nlocal = 0} r : int (atomic_load_field_imm r 1))
-     set = (function {nlocal = 0} r v : int (atomic_set_field_ptr r 1 v))
+    (get = (function {nlocal = 1} r[L] (atomic_load_field_ptr r 1))
+     get_imm = (function {nlocal = 1} r[L] : int (atomic_load_field_imm r 1))
+     set = (function {nlocal = 0} r[L] v : int (atomic_set_field_ptr r 1 v))
      set_imm =
-       (function {nlocal = 0} r v[value<int>] : int
+       (function {nlocal = 1} r[L] v[L][value<int>] : int
          (atomic_set_field_imm r 1 v))
      cas =
-       (function {nlocal = 0} r oldv newv : int
+       (function {nlocal = 0} r[L] oldv newv : int
          (atomic_compare_set_field_ptr r 1 oldv newv))
      get_loc =
        (function {nlocal = 0} r never_inline
@@ -204,7 +204,8 @@ type ('a : any) t = { a : 'a; mutable f : int [@atomic]; }
 let ok_project (t: int t) = t.f
 [%%expect{|
 (let
-  (ok_project = (function {nlocal = 0} t : int (atomic_load_field_imm t 1)))
+  (ok_project =
+     (function {nlocal = 1} t[L] : int (atomic_load_field_imm t 1)))
   (apply (field_imm 1 (global Toploop!)) "ok_project" ok_project))
 val ok_project : int t -> int = <fun>
 |}];;
@@ -220,7 +221,8 @@ Error: Accessing atomic fields (here "f") of mixed records is not yet
 
 let ok_set (t: int t) = t.f <- 42
 [%%expect{|
-(let (ok_set = (function {nlocal = 0} t : int (atomic_set_field_imm t 1 42)))
+(let
+  (ok_set = (function {nlocal = 1} t[L] : int (atomic_set_field_imm t 1 42)))
   (apply (field_imm 1 (global Toploop!)) "ok_set" ok_set))
 val ok_set : int t -> unit = <fun>
 |}];;
@@ -310,7 +312,8 @@ type ('a : any) t = A of { a : 'a; mutable f : int [@atomic]; }
 let ok_project (t: int t) = match t with A r -> r.f
 [%%expect{|
 (let
-  (ok_project = (function {nlocal = 0} t : int (atomic_load_field_imm t 1)))
+  (ok_project =
+     (function {nlocal = 1} t[L] : int (atomic_load_field_imm t 1)))
   (apply (field_imm 1 (global Toploop!)) "ok_project" ok_project))
 val ok_project : int t -> int = <fun>
 |}];;
@@ -326,7 +329,8 @@ Error: Accessing atomic fields (here "f") of mixed records is not yet
 
 let ok_set (t: int t) = match t with A r -> r.f <- 42
 [%%expect{|
-(let (ok_set = (function {nlocal = 0} t : int (atomic_set_field_imm t 1 42)))
+(let
+  (ok_set = (function {nlocal = 1} t[L] : int (atomic_set_field_imm t 1 42)))
   (apply (field_imm 1 (global Toploop!)) "ok_set" ok_set))
 val ok_set : int t -> unit = <fun>
 |}];;
@@ -380,7 +384,7 @@ Warning 214 [atomic-float-record-boxed]: This record contains atomic float field
      mk_t =
        (function {nlocal = 0} x[value<float>] y[value<float>]
          (makemutable 0 (value<float>,value<float>) x y))
-     get = (function {nlocal = 0} v : float (atomic_load_field_ptr v 1)))
+     get = (function {nlocal = 1} v[L] : float (atomic_load_field_ptr v 1)))
     (makeblock 0 mk_flat mk_t get)))
 
 module Float_records :
@@ -594,9 +598,10 @@ Warning 9 [missing-record-field-pattern]: the following labels are not bound
   Either bind these labels explicitly or add "; _" to the pattern.
 (apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/534"
   (let
-    (warning = (function {nlocal = 0} param : int (field_int 0 param))
-     allowed = (function {nlocal = 0} param : int (field_int 0 param))
-     also_allowed = (function {nlocal = 0} param : int (field_int 0 param)))
+    (warning = (function {nlocal = 1} param[L] : int (field_int 0 param))
+     allowed = (function {nlocal = 1} param[L] : int (field_int 0 param))
+     also_allowed =
+       (function {nlocal = 1} param[L] : int (field_int 0 param)))
     (makeblock 0 warning allowed also_allowed)))
 
 module Pattern_matching_wildcard :
@@ -636,7 +641,7 @@ end
 (apply (field_imm 1 (global Toploop!)) "Functional_update_ok/550"
   (let
     (allowed =
-       (function {nlocal = 0} t
+       (function {nlocal = 1} t[L]
          (makemutable 0 (value<int>,value<int>) (field_int 0 t) 42)))
     (makeblock 0 allowed)))
 module Functional_update_ok :
@@ -656,7 +661,7 @@ end
 (apply (field_imm 1 (global Toploop!)) "Functional_update_copy_ok/558"
   (let
     (allowed =
-       (function {nlocal = 0} t
+       (function {nlocal = 1} t[L]
          (makemutable 0 (value<int>,value<int>) (field_int 0 t)
            (atomic_load_field_imm t 1))))
     (makeblock 0 allowed)))
@@ -690,7 +695,7 @@ end
 (apply (field_imm 1 (global Toploop!)) "Functional_update_multi_ok/574"
   (let
     (allowed =
-       (function {nlocal = 0} t
+       (function {nlocal = 1} t[L]
          (makemutable 0 (value<int>,value<int>,value<int>) (field_int 0 t) 42
            67)))
     (makeblock 0 allowed)))
@@ -714,7 +719,7 @@ end
 (apply (field_imm 1 (global Toploop!)) "Functional_update_multi_copy_ok/583"
   (let
     (allowed =
-       (function {nlocal = 0} t
+       (function {nlocal = 1} t[L]
          (makemutable 0 (value<int>,value<int>,value<int>) (field_int 0 t)
            (atomic_load_field_imm t 1) (atomic_load_field_imm t 2))))
     (makeblock 0 allowed)))
@@ -764,13 +769,13 @@ Warning 9 [missing-record-field-pattern]: the following labels are not bound
 (apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/607"
   (let
     (warning =
-       (function {nlocal = 0} param : unboxed_int64
+       (function {nlocal = 1} param[L] : unboxed_int64
          (mixedfield 0  (bits64,value_or_null<int>) param))
      allowed =
-       (function {nlocal = 0} param : unboxed_int64
+       (function {nlocal = 1} param[L] : unboxed_int64
          (mixedfield 0  (bits64,value_or_null<int>) param))
      also_allowed =
-       (function {nlocal = 0} param : unboxed_int64
+       (function {nlocal = 1} param[L] : unboxed_int64
          (mixedfield 0  (bits64,value_or_null<int>) param)))
     (makeblock 0 warning allowed also_allowed)))
 

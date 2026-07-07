@@ -2311,7 +2311,7 @@ Error: The value "x" has type "< foo : ('a : float64). 'a foo bar >"
 let rec f () : 'a -> 'a = f ()
 
 [%%expect{|
-val f : ('a : any). unit -> 'a -> 'a = <fun>
+val f : ('a : any). unit -> ('a -> 'a) = <fun>
 |}]
 
 module M = struct
@@ -2319,14 +2319,14 @@ module M = struct
 end
 
 [%%expect{|
-module M : sig val f : ('a : any). unit -> 'a -> 'a end
+module M : sig val f : ('a : any). unit -> ('a -> 'a) end
 |}]
 
 let rec f () : 'a -> 'a = f ()
 let g : ('a : any). unit -> 'a -> 'a = f
 
 [%%expect{|
-val f : ('a : any). unit -> 'a -> 'a = <fun>
+val f : ('a : any). unit -> ('a -> 'a) = <fun>
 val g : ('a : any). unit -> 'a -> 'a = <fun>
 |}]
 
