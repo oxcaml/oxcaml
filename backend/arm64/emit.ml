@@ -2290,6 +2290,43 @@ let end_assembly () =
        unclear how much this matters. *)
     if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Data
   in
+  (* Mergeable string section for debuginfo filename and defname strings (so the
+     linker will de-dupe). On macOS they go to __cstring under l-prefixed
+     private symbols, since Mach-O relocations cannot target L temporaries. The
+     binary emitter keeps them in the frametable section as same-section label
+     differences: in JIT mode a mergeable section has no symbol to anchor
+     cross-section relocations, and in verify mode GAS keeps local-label
+     relocations into SHF_MERGE sections, so the two outputs would diverge. *)
+  let macos_cstrings =
+    macosx && not (Binary_emitter_helpers.should_use_binary_emitter ())
+  in
+  let debuginfo_strings_section : Asm_targets.Asm_section.t =
+    if macos_cstrings
+    then
+      Custom
+        { names = ["__TEXT"; "__cstring"];
+          flags = None;
+          args = ["cstring_literals"];
+          is_delayed = false
+        }
+    else if macosx || Binary_emitter_helpers.should_use_binary_emitter ()
+    then frametable_section
+    else
+      Custom
+        { names = [".rodata.str1.1"];
+          flags = Some "aMS";
+          args = ["%progbits"; "1"];
+          is_delayed = false
+        }
+  in
+  (* References carry the frametable section (the directive layer requires a
+     referenced label's section to match the current one); definitions carry the
+     strings section. The encoded name is the same either way. *)
+  let string_label ~section lbl =
+    if macos_cstrings
+    then L.create_private_int section (Label.to_int lbl)
+    else label_to_asm_label ~section lbl
+  in
   D.switch_to_section frametable_section;
   D.align ~fill:Zero ~bytes:8;
   (* #7887 *)
@@ -2326,7 +2363,19 @@ let end_assembly () =
         (fun lbl ->
           let lbl = label_to_asm_label ~section:frametable_section lbl in
           D.define_label lbl);
-      efa_string = (fun s -> D.string (s ^ "\000"))
+      efa_string = (fun s -> D.string (s ^ "\000"));
+      efa_open_string_section =
+        (fun () -> D.switch_to_section debuginfo_strings_section);
+      efa_close_string_section =
+        (fun () -> D.switch_to_section frametable_section);
+      efa_def_string_label =
+        (fun lbl ->
+          D.define_label (string_label ~section:debuginfo_strings_section lbl));
+      efa_string_label_rel =
+        (fun lbl ofs ->
+          D.between_this_and_label_offset_32bit_expr
+            ~upper:(string_label ~section:frametable_section lbl)
+            ~offset_upper:(Targetint.of_int32 ofs))
     };
   D.type_symbol ~ty:Object frametable_sym;
   D.size frametable_sym;

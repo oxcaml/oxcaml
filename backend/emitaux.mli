@@ -69,7 +69,17 @@ type emit_frame_actions =
     efa_align : int -> unit;
     efa_label_rel : Label.t -> int32 -> unit;
     efa_def_label : Label.t -> unit;
-    efa_string : string -> unit
+    efa_string : string -> unit;
+    (* Switch to / from mergeable string section, used for debuginfo filename
+       and defname strings. While it is open, [efa_def_string_label] defines a
+       label and [efa_string] emits a string; references from frametables to
+       those labels use [efa_label_rel]. *)
+    efa_open_string_section : unit -> unit;
+    efa_close_string_section : unit -> unit;
+    efa_def_string_label : Label.t -> unit;
+    (* Like [efa_label_rel], for labels defined via [efa_def_string_label]
+       (which the backends may render in a different form). *)
+    efa_string_label_rel : Label.t -> int32 -> unit
   }
 
 val emit_frames : emit_frame_actions -> unit

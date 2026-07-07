@@ -105,7 +105,17 @@ type emit_frame_actions =
     efa_align : int -> unit;
     efa_label_rel : Label.t -> int32 -> unit;
     efa_def_label : Label.t -> unit;
-    efa_string : string -> unit
+    efa_string : string -> unit;
+    (* Switch to / from mergeable string section, used for debuginfo filename
+       and defname strings. While it is open, [efa_def_string_label] defines a
+       label and [efa_string] emits a string; references from frametables to
+       those labels use [efa_label_rel]. *)
+    efa_open_string_section : unit -> unit;
+    efa_close_string_section : unit -> unit;
+    efa_def_string_label : Label.t -> unit;
+    (* Like [efa_label_rel], for labels defined via [efa_def_string_label]
+       (which the backends may render in a different form). *)
+    efa_string_label_rel : Label.t -> int32 -> unit
   }
 
 let emit_frames a =
@@ -160,6 +170,16 @@ let emit_frames a =
       let def_lbl = Cmm.new_label () in
       Hashtbl.add defnames (filename, defname, loc) (file_lbl, def_lbl);
       def_lbl
+  in
+  (* defname strings, each emitted once into the mergeable string section and
+     referenced from the name_info / name_and_loc_info struct. *)
+  let defstrings = Hashtbl.create 7 in
+  let label_defstring defname =
+    try Hashtbl.find defstrings defname
+    with Not_found ->
+      let lbl = Cmm.new_label () in
+      Hashtbl.add defstrings defname lbl;
+      lbl
   in
   let module Label_table = Hashtbl.Make (struct
     type t = bool * Debuginfo.Dbg.t
@@ -220,9 +240,9 @@ let emit_frames a =
             else a.efa_label_rel (label_debuginfos false alloc_dbg) Int32.zero)
           dbg
   in
-  let emit_filename name lbl =
-    a.efa_def_label lbl;
-    a.efa_string name
+  let emit_merged_string str lbl =
+    a.efa_def_string_label lbl;
+    a.efa_string str
   in
   let emit_defname (_filename, defname, loc) (file_lbl, lbl) =
     let emit_loc (start_chr, end_chr, end_offset) =
@@ -230,16 +250,16 @@ let emit_frames a =
       emit_u16 end_chr;
       emit_i32 end_offset
     in
-    (* These must be 32-bit aligned, both because they contain a 32-bit value,
-       and because emit_debuginfo assumes the low 2 bits of their addresses are
-       0. *)
+    (* The name_info / name_and_loc_info struct. Must be 32-bit aligned, because
+       the low 2 bits of its address are used for flags in debuginfo *)
     a.efa_align 4;
     a.efa_def_label lbl;
-    a.efa_label_rel file_lbl 0l;
-    (* Include the additional 64-bits of location information which didn't pack
-       in the main 64-bit word *)
-    Option.iter emit_loc loc;
-    a.efa_string defname
+    a.efa_string_label_rel file_lbl 0l;
+    (* [defname_offs] relative to the start of the struct, so offset by 4 *)
+    a.efa_string_label_rel (label_defstring defname) 4l;
+    (* Then the extra 64 bits of location info that didn't pack into the main
+       debuginfo word (name_and_loc_info only). *)
+    Option.iter emit_loc loc
   in
   let fully_pack_info fd_raise d has_next =
     (* See format in caml_debuginfo_location in runtime/backtrace-nat.c *)
@@ -336,9 +356,15 @@ let emit_frames a =
   a.efa_word (List.length descrs);
   List.iter emit_frame descrs;
   Label_table.iter emit_debuginfo debuginfos;
-  Hashtbl.iter emit_filename filenames;
+  (* The name structs are kept near the debuginfo words that reference them (a
+     24-bit, +/-64 MB offset). Emitting them also populates [defstrings]. *)
   Hashtbl.iter emit_defname defnames;
   a.efa_align Arch.size_addr;
+  (* Strings go into a mergeable string section to be de-duped by the linker *)
+  a.efa_open_string_section ();
+  Hashtbl.iter emit_merged_string filenames;
+  Hashtbl.iter emit_merged_string defstrings;
+  a.efa_close_string_section ();
   frame_descriptors := []
 
 (* Detection of functions that can be duplicated between a DLL and the main
