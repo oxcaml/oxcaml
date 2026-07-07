@@ -26,10 +26,9 @@
 #include "mlvalues.h"
 #include "domain_state.h"
 
-/* On bare metal there is a single domain (Domain.spawn fails) and the
-   reserve-only minor-heap mapping is eagerly allocated, so keep the
-   reservation to a single domain's worth of memory. */
-#if defined(MULTIDOMAIN) && !defined(CAML_BARE_METAL)
+
+
+#if defined(MULTIDOMAIN)
 #ifdef ARCH_SIXTYFOUR
 #define Max_domains_def 128
 #else

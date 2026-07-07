@@ -147,6 +147,11 @@ typedef uint64_t uintnat;
 
 #endif /* CAML_CONFIG_H_NO_TYPEDEFS */
 
+
+#if defined(CAML_BARE_METAL)
+#undef MULTIDOMAIN
+#endif
+
 /* Endianness of floats */
 
 /* ARCH_FLOAT_ENDIANNESS encodes the byte order of doubles as follows:
