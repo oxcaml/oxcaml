@@ -469,6 +469,7 @@ let type_iterators_without_type_expr =
     | Sig_jkind (_ , jkd, _)        -> it.it_jkind_declaration it jkd
   and it_value_description it vd =
     it.it_type_expr it vd.val_type;
+    it.it_modality vd.val_modalities
   and it_type_declaration it td =
     List.iter (it.it_type_expr it) td.type_params;
     Option.iter (it.it_type_expr it) td.type_manifest;
@@ -480,7 +481,8 @@ let type_iterators_without_type_expr =
     iter_type_expr_cstr_args (it.it_type_expr it) td.ext_args;
     Option.iter (it.it_type_expr it) td.ext_ret_type
   and it_module_declaration it md =
-    it.it_module_type it md.md_type
+    it.it_module_type it md.md_type;
+    it.it_modality md.md_modalities
   and it_modtype_declaration it mtd =
     Option.iter (it.it_module_type it) mtd.mtd_type
   and it_class_declaration it cd =
@@ -502,14 +504,17 @@ let type_iterators_without_type_expr =
       ()
   and it_functor_param it = function
     | Unit -> ()
-    | Named (_, mt, _) -> it.it_module_type it mt
+    | Named (_, mt, mm) ->
+        it.it_module_type it mt;
+        it.it_mode_expr mm
   and it_module_type it = function
       Mty_ident p
     | Mty_alias p -> it.it_path p
     | Mty_signature sg -> it.it_signature it sg
-    | Mty_functor (p, mt, _) ->
+    | Mty_functor (p, mt, mm) ->
         it.it_functor_param it p;
-        it.it_module_type it mt
+        it.it_module_type it mt;
+        it.it_mode_expr mm
     | Mty_strengthen (mty, p, _) ->
         it.it_module_type it mty;
         it.it_path p
