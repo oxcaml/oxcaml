@@ -227,7 +227,15 @@ let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
       in
       if to_remove
       then (
-        let continue = Some (U.prev_at_most U.go_back_const cell) in
+        (* Compute the continuation from cells that survive the deletion: if
+           [cell] were the first element of the block, [prev_at_most] would
+           return [cell] itself, and the traversal would then operate on a
+           deleted cell. *)
+        let continue =
+          match DLL.prev cell with
+          | Some _ as prev -> prev
+          | None -> DLL.next cell
+        in
         DLL.delete_curr cell;
         continue)
       else None
