@@ -30,7 +30,9 @@ let min x y = Int32_u.min x y
 min:
   movq  %rax, %rdi
   movq  %rbx, %rax
-  cmpq  %rax, %rdi
+  movq  %rax, %rbx
+  movq  %rdi, %rsi
+  cmpq  %rbx, %rsi
   jg    .L0
   movq  %rdi, %rax
   ret
@@ -64,8 +66,8 @@ compare:
 let of_int x = Int32_u.of_int x
 [%%expect_asm X86_64{|
 of_int:
-  salq  $31, %rax
-  sarq  $32, %rax
+  sarq  $1, %rax
+  movslq %eax, %rax
   ret
 |}]
 

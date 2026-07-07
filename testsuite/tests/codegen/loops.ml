@@ -186,10 +186,10 @@ let f n =
   !sum
 [%%expect_asm X86_64{|
 f:
-  movq  %rax, %rbx
-  cmpq  $1, %rbx
+  cmpq  $1, %rax
   jl    .L1
-  sarq  $1, %rbx
+  sarq  $1, %rax
+  movq  %rax, %rbx
   movl  $1, %eax
   xorl  %edi, %edi
 .L0:

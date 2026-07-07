@@ -437,6 +437,17 @@ let select_operation'
     | [Cconst_natint (0xffff_ffffn, _); arg] ->
       Rewritten (specific Izextend32, [arg])
     | _ -> Use_default)
+  (* Recognize a tag followed by an untag *)
+  | Cstatic_cast (Int64_of_tagged_int { signedness }) -> (
+    match args with
+    | [Cop (Cstatic_cast Tagged_int_of_int64, [k], _)] ->
+      let op : Operation.integer_operation =
+        match signedness with Signed -> Iasr | Unsigned -> Ilsr
+      in
+      Rewritten
+        ( Basic (Op (Intop_imm (op, 1))),
+          [Cop (Clsl, [k; Cconst_int (1, dbg)], dbg)] )
+    | _ -> Use_default)
   | Ccsel _ -> (
     match args with
     | [cond; ifso; ifnot] -> (

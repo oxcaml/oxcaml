@@ -118,7 +118,8 @@ external float_u_of_int16 : int16 -> float# = "%float#_of_int16"
 let float_u_of_int16 x = float_u_of_int16 x
 [%%expect_asm X86_64{|
 float_u_of_int16:
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   vcvtsi2sdq %rax, %xmm0, %xmm0
   ret
@@ -170,7 +171,8 @@ external float_u_of_int8 : int8 -> float# = "%float#_of_int8"
 let float_u_of_int8 x = float_u_of_int8 x
 [%%expect_asm X86_64{|
 float_u_of_int8:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   vcvtsi2sdq %rax, %xmm0, %xmm0
   ret
@@ -432,7 +434,8 @@ external float32_u_of_int16 : int16 -> float32# = "%float32#_of_int16"
 let float32_u_of_int16 x = float32_u_of_int16 x
 [%%expect_asm X86_64{|
 float32_u_of_int16:
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   vcvtsi2ssq %rax, %xmm0, %xmm0
   ret
@@ -484,7 +487,8 @@ external float32_u_of_int8 : int8 -> float32# = "%float32#_of_int8"
 let float32_u_of_int8 x = float32_u_of_int8 x
 [%%expect_asm X86_64{|
 float32_u_of_int8:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   vcvtsi2ssq %rax, %xmm0, %xmm0
   ret
@@ -890,7 +894,8 @@ float32_of_int16:
   movq  $2303, -8(%rax)
   movq  caml_float32_ops@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rax)
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
   vcvtsi2ssq %rbx, %xmm0, %xmm0
   vmovss %xmm0, 8(%rax)
@@ -1014,7 +1019,8 @@ float32_of_int8:
   movq  $2303, -8(%rax)
   movq  caml_float32_ops@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rax)
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
   vcvtsi2ssq %rbx, %xmm0, %xmm0
   vmovss %xmm0, 8(%rax)
@@ -1465,7 +1471,8 @@ float_of_int16:
 .L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
   vcvtsi2sdq %rbx, %xmm0, %xmm0
   vmovsd %xmm0, (%rax)
@@ -1577,7 +1584,8 @@ float_of_int8:
 .L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
   vcvtsi2sdq %rbx, %xmm0, %xmm0
   vmovsd %xmm0, (%rax)
@@ -1816,6 +1824,8 @@ int_u_asr:
   movq  %rbx, %rcx
   sarq  $1, %rcx
   sarq  %cl, %rax
+  salq  $1, %rax
+  sarq  $1, %rax
   ret
 |}]
 
@@ -1938,8 +1948,8 @@ let int_u_lsr x y = int_u_lsr x y
 int_u_lsr:
   movq  %rbx, %rcx
   sarq  $1, %rcx
-  movabsq $9223372036854775807, %rbx
-  andq  %rbx, %rax
+  salq  $1, %rax
+  shrq  $1, %rax
   shrq  %cl, %rax
   salq  $1, %rax
   sarq  $1, %rax
@@ -1981,9 +1991,9 @@ external int_u_neg : int# -> int# = "%int#_neg"
 let int_u_neg x = int_u_neg x
 [%%expect_asm X86_64{|
 int_u_neg:
-  movq  %rax, %rbx
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  xorl  %ebx, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   salq  $1, %rax
   sarq  $1, %rax
   ret
@@ -2054,7 +2064,8 @@ external int_u_of_int16 : int16 -> int# = "%int#_of_int16"
 let int_u_of_int16 x = int_u_of_int16 x
 [%%expect_asm X86_64{|
 int_u_of_int16:
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   ret
 |}]
@@ -2104,7 +2115,8 @@ external int_u_of_int8 : int8 -> int# = "%int#_of_int8"
 let int_u_of_int8 x = int_u_of_int8 x
 [%%expect_asm X86_64{|
 int_u_of_int8:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   ret
 |}]
@@ -2204,7 +2216,11 @@ external int_u_unsigned_compare : int# -> int# -> bool = "%int#_unsigned_compare
 let int_u_unsigned_compare x y = int_u_unsigned_compare x y
 [%%expect_asm X86_64{|
 int_u_unsigned_compare:
+  salq  $1, %rbx
+  shrq  $1, %rbx
   movq  %rax, %rdi
+  salq  $1, %rdi
+  shrq  $1, %rdi
   movq  $-1, %rsi
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
@@ -2218,6 +2234,10 @@ external int_u_unsigned_greaterequal : int# -> int# -> bool = "%int#_unsigned_gr
 let int_u_unsigned_greaterequal x y = int_u_unsigned_greaterequal x y
 [%%expect_asm X86_64{|
 int_u_unsigned_greaterequal:
+  salq  $1, %rbx
+  shrq  $1, %rbx
+  salq  $1, %rax
+  shrq  $1, %rax
   cmpq  %rbx, %rax
   setae %al
   movzbq %al, %rax
@@ -2229,6 +2249,10 @@ external int_u_unsigned_greaterthan : int# -> int# -> bool = "%int#_unsigned_gre
 let int_u_unsigned_greaterthan x y = int_u_unsigned_greaterthan x y
 [%%expect_asm X86_64{|
 int_u_unsigned_greaterthan:
+  salq  $1, %rbx
+  shrq  $1, %rbx
+  salq  $1, %rax
+  shrq  $1, %rax
   cmpq  %rbx, %rax
   seta  %al
   movzbq %al, %rax
@@ -2240,6 +2264,10 @@ external int_u_unsigned_lessequal : int# -> int# -> bool = "%int#_unsigned_lesse
 let int_u_unsigned_lessequal x y = int_u_unsigned_lessequal x y
 [%%expect_asm X86_64{|
 int_u_unsigned_lessequal:
+  salq  $1, %rbx
+  shrq  $1, %rbx
+  salq  $1, %rax
+  shrq  $1, %rax
   cmpq  %rbx, %rax
   setbe %al
   movzbq %al, %rax
@@ -2251,6 +2279,10 @@ external int_u_unsigned_lessthan : int# -> int# -> bool = "%int#_unsigned_lessth
 let int_u_unsigned_lessthan x y = int_u_unsigned_lessthan x y
 [%%expect_asm X86_64{|
 int_u_unsigned_lessthan:
+  salq  $1, %rbx
+  shrq  $1, %rbx
+  salq  $1, %rax
+  shrq  $1, %rax
   cmpq  %rbx, %rax
   setb  %al
   movzbq %al, %rax
@@ -2295,6 +2327,8 @@ int16_u_asr:
   movq  %rbx, %rcx
   sarq  $1, %rcx
   sarq  %cl, %rax
+  salq  $48, %rax
+  sarq  $48, %rax
   ret
 |}]
 
@@ -2416,7 +2450,8 @@ let int16_u_lsr x y = int16_u_lsr x y
 int16_u_lsr:
   movq  %rbx, %rcx
   sarq  $1, %rcx
-  andl  $65535, %eax
+  salq  $48, %rax
+  shrq  $48, %rax
   shrq  %cl, %rax
   salq  $48, %rax
   sarq  $48, %rax
@@ -2458,9 +2493,9 @@ external int16_u_neg : int16# -> int16# = "%int16#_neg"
 let int16_u_neg x = int16_u_neg x
 [%%expect_asm X86_64{|
 int16_u_neg:
-  movq  %rax, %rbx
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  xorl  %ebx, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   salq  $48, %rax
   sarq  $48, %rax
   ret
@@ -2523,7 +2558,8 @@ external int16_u_of_int : int -> int16# = "%int16#_of_int"
 let int16_u_of_int x = int16_u_of_int x
 [%%expect_asm X86_64{|
 int16_u_of_int:
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   ret
 |}]
@@ -2541,7 +2577,8 @@ external int16_u_of_int16 : int16 -> int16# = "%int16#_of_int16"
 let int16_u_of_int16 x = int16_u_of_int16 x
 [%%expect_asm X86_64{|
 int16_u_of_int16:
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   ret
 |}]
@@ -2588,7 +2625,8 @@ external int16_u_of_int8 : int8 -> int16# = "%int16#_of_int8"
 let int16_u_of_int8 x = int16_u_of_int8 x
 [%%expect_asm X86_64{|
 int16_u_of_int8:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   ret
 |}]
@@ -2688,7 +2726,11 @@ external int16_u_unsigned_compare : int16# -> int16# -> bool = "%int16#_unsigned
 let int16_u_unsigned_compare x y = int16_u_unsigned_compare x y
 [%%expect_asm X86_64{|
 int16_u_unsigned_compare:
+  salq  $48, %rbx
+  shrq  $48, %rbx
   movq  %rax, %rdi
+  salq  $48, %rdi
+  shrq  $48, %rdi
   movq  $-1, %rsi
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
@@ -2702,6 +2744,10 @@ external int16_u_unsigned_greaterequal : int16# -> int16# -> bool = "%int16#_uns
 let int16_u_unsigned_greaterequal x y = int16_u_unsigned_greaterequal x y
 [%%expect_asm X86_64{|
 int16_u_unsigned_greaterequal:
+  salq  $48, %rbx
+  shrq  $48, %rbx
+  salq  $48, %rax
+  shrq  $48, %rax
   cmpq  %rbx, %rax
   setae %al
   movzbq %al, %rax
@@ -2713,6 +2759,10 @@ external int16_u_unsigned_greaterthan : int16# -> int16# -> bool = "%int16#_unsi
 let int16_u_unsigned_greaterthan x y = int16_u_unsigned_greaterthan x y
 [%%expect_asm X86_64{|
 int16_u_unsigned_greaterthan:
+  salq  $48, %rbx
+  shrq  $48, %rbx
+  salq  $48, %rax
+  shrq  $48, %rax
   cmpq  %rbx, %rax
   seta  %al
   movzbq %al, %rax
@@ -2724,6 +2774,10 @@ external int16_u_unsigned_lessequal : int16# -> int16# -> bool = "%int16#_unsign
 let int16_u_unsigned_lessequal x y = int16_u_unsigned_lessequal x y
 [%%expect_asm X86_64{|
 int16_u_unsigned_lessequal:
+  salq  $48, %rbx
+  shrq  $48, %rbx
+  salq  $48, %rax
+  shrq  $48, %rax
   cmpq  %rbx, %rax
   setbe %al
   movzbq %al, %rax
@@ -2735,6 +2789,10 @@ external int16_u_unsigned_lessthan : int16# -> int16# -> bool = "%int16#_unsigne
 let int16_u_unsigned_lessthan x y = int16_u_unsigned_lessthan x y
 [%%expect_asm X86_64{|
 int16_u_unsigned_lessthan:
+  salq  $48, %rbx
+  shrq  $48, %rbx
+  salq  $48, %rax
+  shrq  $48, %rax
   cmpq  %rbx, %rax
   setb  %al
   movzbq %al, %rax
@@ -2784,8 +2842,11 @@ let int16_asr x y = int16_asr x y
 int16_asr:
   movq  %rbx, %rcx
   sarq  $1, %rcx
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
+  sarq  $48, %rax
   sarq  %cl, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -2795,7 +2856,8 @@ external int16_bswap : int16 -> int16 = "%int16_bswap"
 let int16_bswap x = int16_bswap x
 [%%expect_asm X86_64{|
 int16_bswap:
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   xchg  %ah, %al
   movzwq %ax, %rax
@@ -2809,11 +2871,13 @@ external int16_compare : int16 -> int16 -> bool = "%int16_compare"
 let int16_compare x y = int16_compare x y
 [%%expect_asm X86_64{|
 int16_compare:
-  movq  %rax, %rdi
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
-  salq  $47, %rdi
-  sarq  $48, %rdi
+  sarq  $1, %rax
+  salq  $48, %rax
+  sarq  $48, %rax
+  movq  %rax, %rdi
   movq  $-1, %rsi
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
@@ -2827,12 +2891,14 @@ external int16_div : int16 -> int16 -> int16 = "%int16_div"
 let int16_div x y = int16_div x y
 [%%expect_asm X86_64{|
 int16_div:
+  sarq  $1, %rbx
+  salq  $48, %rbx
+  sarq  $48, %rbx
   movq  %rbx, %rcx
-  salq  $47, %rcx
-  sarq  $48, %rcx
   testq %rcx, %rcx
   je    .L0
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   cqto
   idivq %rcx
@@ -2852,9 +2918,11 @@ external int16_equal : int16 -> int16 -> bool = "%int16_equal"
 let int16_equal x y = int16_equal x y
 [%%expect_asm X86_64{|
 int16_equal:
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   cmpq  %rbx, %rax
   sete  %al
@@ -2867,9 +2935,11 @@ external int16_greaterequal : int16 -> int16 -> bool = "%int16_greaterequal"
 let int16_greaterequal x y = int16_greaterequal x y
 [%%expect_asm X86_64{|
 int16_greaterequal:
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   cmpq  %rbx, %rax
   setge %al
@@ -2882,9 +2952,11 @@ external int16_greaterthan : int16 -> int16 -> bool = "%int16_greaterthan"
 let int16_greaterthan x y = int16_greaterthan x y
 [%%expect_asm X86_64{|
 int16_greaterthan:
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   cmpq  %rbx, %rax
   setg  %al
@@ -2897,9 +2969,11 @@ external int16_lessequal : int16 -> int16 -> bool = "%int16_lessequal"
 let int16_lessequal x y = int16_lessequal x y
 [%%expect_asm X86_64{|
 int16_lessequal:
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   cmpq  %rbx, %rax
   setle %al
@@ -2912,9 +2986,11 @@ external int16_lessthan : int16 -> int16 -> bool = "%int16_lessthan"
 let int16_lessthan x y = int16_lessthan x y
 [%%expect_asm X86_64{|
 int16_lessthan:
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   cmpq  %rbx, %rax
   setl  %al
@@ -2929,7 +3005,8 @@ let int16_lsl x y = int16_lsl x y
 int16_lsl:
   movq  %rbx, %rcx
   sarq  $1, %rcx
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   salq  %cl, %rax
   salq  $48, %rax
@@ -2945,7 +3022,10 @@ int16_lsr:
   movq  %rbx, %rcx
   sarq  $1, %rcx
   sarq  $1, %rax
-  andl  $65535, %eax
+  salq  $48, %rax
+  sarq  $48, %rax
+  salq  $48, %rax
+  shrq  $48, %rax
   shrq  %cl, %rax
   salq  $48, %rax
   sarq  $48, %rax
@@ -2957,18 +3037,21 @@ external int16_mod : int16 -> int16 -> int16 = "%int16_mod"
 let int16_mod x y = int16_mod x y
 [%%expect_asm X86_64{|
 int16_mod:
+  sarq  $1, %rbx
+  salq  $48, %rbx
+  sarq  $48, %rbx
   movq  %rbx, %rcx
-  salq  $47, %rcx
-  sarq  $48, %rcx
   testq %rcx, %rcx
   je    .L0
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   cqto
   idivq %rcx
-  salq  $48, %rdx
-  sarq  $48, %rdx
-  leaq  1(%rdx,%rdx), %rax
+  movq  %rdx, %rax
+  salq  $48, %rax
+  sarq  $48, %rax
+  leaq  1(%rax,%rax), %rax
   ret
 .L0:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
@@ -2998,9 +3081,10 @@ int16_neg:
   sarq  $1, %rax
   xorl  %ebx, %ebx
   subq  %rax, %rbx
-  salq  $48, %rbx
-  sarq  $48, %rbx
-  leaq  1(%rbx,%rbx), %rax
+  movq  %rbx, %rax
+  salq  $48, %rax
+  sarq  $48, %rax
+  leaq  1(%rax,%rax), %rax
   ret
 |}]
 
@@ -3008,9 +3092,11 @@ external int16_notequal : int16 -> int16 -> bool = "%int16_notequal"
 let int16_notequal x y = int16_notequal x y
 [%%expect_asm X86_64{|
 int16_notequal:
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   cmpq  %rbx, %rax
   setne %al
@@ -3069,7 +3155,8 @@ external int16_of_int : int -> int16 = "%int16_of_int"
 let int16_of_int x = int16_of_int x
 [%%expect_asm X86_64{|
 int16_of_int:
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -3139,7 +3226,8 @@ external int16_of_int8 : int8 -> int16 = "%int16_of_int8"
 let int16_of_int8 x = int16_of_int8 x
 [%%expect_asm X86_64{|
 int16_of_int8:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -3228,10 +3316,12 @@ external int16_unsafe_div : int16 -> int16 -> int16 = "%int16_unsafe_div"
 let int16_unsafe_div x y = int16_unsafe_div x y
 [%%expect_asm X86_64{|
 int16_unsafe_div:
+  sarq  $1, %rbx
+  salq  $48, %rbx
+  sarq  $48, %rbx
   movq  %rbx, %rcx
-  salq  $47, %rcx
-  sarq  $48, %rcx
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   cqto
   idivq %rcx
@@ -3245,16 +3335,19 @@ external int16_unsafe_mod : int16 -> int16 -> int16 = "%int16_unsafe_mod"
 let int16_unsafe_mod x y = int16_unsafe_mod x y
 [%%expect_asm X86_64{|
 int16_unsafe_mod:
+  sarq  $1, %rbx
+  salq  $48, %rbx
+  sarq  $48, %rbx
   movq  %rbx, %rcx
-  salq  $47, %rcx
-  sarq  $48, %rcx
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   cqto
   idivq %rcx
-  salq  $48, %rdx
-  sarq  $48, %rdx
-  leaq  1(%rdx,%rdx), %rax
+  movq  %rdx, %rax
+  salq  $48, %rax
+  sarq  $48, %rax
+  leaq  1(%rax,%rax), %rax
   ret
 |}]
 
@@ -3262,11 +3355,17 @@ external int16_unsigned_compare : int16 -> int16 -> bool = "%int16_unsigned_comp
 let int16_unsigned_compare x y = int16_unsigned_compare x y
 [%%expect_asm X86_64{|
 int16_unsigned_compare:
-  movq  %rax, %rdi
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
-  salq  $47, %rdi
-  sarq  $48, %rdi
+  salq  $48, %rbx
+  shrq  $48, %rbx
+  sarq  $1, %rax
+  salq  $48, %rax
+  sarq  $48, %rax
+  movq  %rax, %rdi
+  salq  $48, %rdi
+  shrq  $48, %rdi
   movq  $-1, %rsi
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
@@ -3280,10 +3379,16 @@ external int16_unsigned_greaterequal : int16 -> int16 -> bool = "%int16_unsigned
 let int16_unsigned_greaterequal x y = int16_unsigned_greaterequal x y
 [%%expect_asm X86_64{|
 int16_unsigned_greaterequal:
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
-  salq  $47, %rax
+  salq  $48, %rbx
+  shrq  $48, %rbx
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
+  salq  $48, %rax
+  shrq  $48, %rax
   cmpq  %rbx, %rax
   setae %al
   movzbq %al, %rax
@@ -3295,10 +3400,16 @@ external int16_unsigned_greaterthan : int16 -> int16 -> bool = "%int16_unsigned_
 let int16_unsigned_greaterthan x y = int16_unsigned_greaterthan x y
 [%%expect_asm X86_64{|
 int16_unsigned_greaterthan:
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
-  salq  $47, %rax
+  salq  $48, %rbx
+  shrq  $48, %rbx
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
+  salq  $48, %rax
+  shrq  $48, %rax
   cmpq  %rbx, %rax
   seta  %al
   movzbq %al, %rax
@@ -3310,10 +3421,16 @@ external int16_unsigned_lessequal : int16 -> int16 -> bool = "%int16_unsigned_le
 let int16_unsigned_lessequal x y = int16_unsigned_lessequal x y
 [%%expect_asm X86_64{|
 int16_unsigned_lessequal:
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
-  salq  $47, %rax
+  salq  $48, %rbx
+  shrq  $48, %rbx
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
+  salq  $48, %rax
+  shrq  $48, %rax
   cmpq  %rbx, %rax
   setbe %al
   movzbq %al, %rax
@@ -3325,10 +3442,16 @@ external int16_unsigned_lessthan : int16 -> int16 -> bool = "%int16_unsigned_les
 let int16_unsigned_lessthan x y = int16_unsigned_lessthan x y
 [%%expect_asm X86_64{|
 int16_unsigned_lessthan:
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
-  salq  $47, %rax
+  salq  $48, %rbx
+  shrq  $48, %rbx
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
+  salq  $48, %rax
+  shrq  $48, %rax
   cmpq  %rbx, %rax
   setb  %al
   movzbq %al, %rax
@@ -3374,6 +3497,7 @@ int32_u_asr:
   movq  %rbx, %rcx
   sarq  $1, %rcx
   sarq  %cl, %rax
+  movslq %eax, %rax
   ret
 |}]
 
@@ -3588,8 +3712,8 @@ external int32_u_of_int : int -> int32# = "%int32#_of_int"
 let int32_u_of_int x = int32_u_of_int x
 [%%expect_asm X86_64{|
 int32_u_of_int:
-  salq  $31, %rax
-  sarq  $32, %rax
+  sarq  $1, %rax
+  movslq %eax, %rax
   ret
 |}]
 
@@ -3605,7 +3729,8 @@ external int32_u_of_int16 : int16 -> int32# = "%int32#_of_int16"
 let int32_u_of_int16 x = int32_u_of_int16 x
 [%%expect_asm X86_64{|
 int32_u_of_int16:
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   ret
 |}]
@@ -3646,7 +3771,8 @@ external int32_u_of_int8 : int8 -> int32# = "%int32#_of_int8"
 let int32_u_of_int8 x = int32_u_of_int8 x
 [%%expect_asm X86_64{|
 int32_u_of_int8:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   ret
 |}]
@@ -3737,7 +3863,8 @@ external int32_u_unsigned_compare : int32# -> int32# -> bool = "%int32#_unsigned
 let int32_u_unsigned_compare x y = int32_u_unsigned_compare x y
 [%%expect_asm X86_64{|
 int32_u_unsigned_compare:
-  movq  %rax, %rdi
+  movl  %ebx, %ebx
+  movl  %eax, %edi
   movq  $-1, %rsi
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
@@ -3751,6 +3878,8 @@ external int32_u_unsigned_greaterequal : int32# -> int32# -> bool = "%int32#_uns
 let int32_u_unsigned_greaterequal x y = int32_u_unsigned_greaterequal x y
 [%%expect_asm X86_64{|
 int32_u_unsigned_greaterequal:
+  movl  %ebx, %ebx
+  movl  %eax, %eax
   cmpq  %rbx, %rax
   setae %al
   movzbq %al, %rax
@@ -3762,6 +3891,8 @@ external int32_u_unsigned_greaterthan : int32# -> int32# -> bool = "%int32#_unsi
 let int32_u_unsigned_greaterthan x y = int32_u_unsigned_greaterthan x y
 [%%expect_asm X86_64{|
 int32_u_unsigned_greaterthan:
+  movl  %ebx, %ebx
+  movl  %eax, %eax
   cmpq  %rbx, %rax
   seta  %al
   movzbq %al, %rax
@@ -3773,6 +3904,8 @@ external int32_u_unsigned_lessequal : int32# -> int32# -> bool = "%int32#_unsign
 let int32_u_unsigned_lessequal x y = int32_u_unsigned_lessequal x y
 [%%expect_asm X86_64{|
 int32_u_unsigned_lessequal:
+  movl  %ebx, %ebx
+  movl  %eax, %eax
   cmpq  %rbx, %rax
   setbe %al
   movzbq %al, %rax
@@ -3784,6 +3917,8 @@ external int32_u_unsigned_lessthan : int32# -> int32# -> bool = "%int32#_unsigne
 let int32_u_unsigned_lessthan x y = int32_u_unsigned_lessthan x y
 [%%expect_asm X86_64{|
 int32_u_unsigned_lessthan:
+  movl  %ebx, %ebx
+  movl  %eax, %eax
   cmpq  %rbx, %rax
   setb  %al
   movzbq %al, %rax
@@ -3897,7 +4032,8 @@ let int32_compare x y = int32_compare x y
 [%%expect_asm X86_64{|
 int32_compare:
   movslq 8(%rbx), %rbx
-  movslq 8(%rax), %rdi
+  movslq 8(%rax), %rax
+  movq  %rax, %rdi
   movq  $-1, %rsi
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
@@ -3912,7 +4048,8 @@ let int32_div x y = int32_div x y
 [%%expect_asm X86_64{|
 int32_div:
   subq  $8, %rsp
-  movslq 8(%rbx), %rcx
+  movslq 8(%rbx), %rbx
+  movq  %rbx, %rcx
   testq %rcx, %rcx
   je    .L1
   subq  $24, %r15
@@ -4044,7 +4181,8 @@ int32_lsr:
   movq  caml_int32_ops@GOTPCREL(%rip), %rbx
   movq  %rbx, (%rax)
   sarq  $1, %rcx
-  movl  8(%rdi), %ebx
+  movslq 8(%rdi), %rbx
+  movl  %ebx, %ebx
   shrq  %cl, %rbx
   movslq %ebx, %rbx
   movq  %rbx, 8(%rax)
@@ -4057,7 +4195,8 @@ let int32_mod x y = int32_mod x y
 [%%expect_asm X86_64{|
 int32_mod:
   subq  $8, %rsp
-  movslq 8(%rbx), %rcx
+  movslq 8(%rbx), %rbx
+  movq  %rbx, %rcx
   testq %rcx, %rcx
   je    .L1
   subq  $24, %r15
@@ -4282,8 +4421,10 @@ int32_of_int16:
   movq  $2303, -8(%rax)
   movq  caml_int32_ops@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rax)
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
+  movslq %ebx, %rbx
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
@@ -4384,8 +4525,10 @@ int32_of_int8:
   movq  $2303, -8(%rax)
   movq  caml_int32_ops@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rax)
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
+  movslq %ebx, %rbx
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
@@ -4555,7 +4698,8 @@ int32_unsafe_div:
   movq  $2303, -8(%rdi)
   movq  caml_int32_ops@GOTPCREL(%rip), %rsi
   movq  %rsi, (%rdi)
-  movslq 8(%rbx), %rcx
+  movslq 8(%rbx), %rbx
+  movq  %rbx, %rcx
   movslq 8(%rax), %rax
   cqto
   idivq %rcx
@@ -4579,7 +4723,8 @@ int32_unsafe_mod:
   movq  $2303, -8(%rdi)
   movq  caml_int32_ops@GOTPCREL(%rip), %rsi
   movq  %rsi, (%rdi)
-  movslq 8(%rbx), %rcx
+  movslq 8(%rbx), %rbx
+  movq  %rbx, %rcx
   movslq 8(%rax), %rax
   cqto
   idivq %rcx
@@ -4595,7 +4740,9 @@ let int32_unsigned_compare x y = int32_unsigned_compare x y
 [%%expect_asm X86_64{|
 int32_unsigned_compare:
   movslq 8(%rbx), %rbx
-  movslq 8(%rax), %rdi
+  movl  %ebx, %ebx
+  movslq 8(%rax), %rax
+  movl  %eax, %edi
   movq  $-1, %rsi
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
@@ -4610,7 +4757,9 @@ let int32_unsigned_greaterequal x y = int32_unsigned_greaterequal x y
 [%%expect_asm X86_64{|
 int32_unsigned_greaterequal:
   movslq 8(%rbx), %rbx
+  movl  %ebx, %ebx
   movslq 8(%rax), %rax
+  movl  %eax, %eax
   cmpq  %rbx, %rax
   setae %al
   movzbq %al, %rax
@@ -4623,7 +4772,9 @@ let int32_unsigned_greaterthan x y = int32_unsigned_greaterthan x y
 [%%expect_asm X86_64{|
 int32_unsigned_greaterthan:
   movslq 8(%rbx), %rbx
+  movl  %ebx, %ebx
   movslq 8(%rax), %rax
+  movl  %eax, %eax
   cmpq  %rbx, %rax
   seta  %al
   movzbq %al, %rax
@@ -4636,7 +4787,9 @@ let int32_unsigned_lessequal x y = int32_unsigned_lessequal x y
 [%%expect_asm X86_64{|
 int32_unsigned_lessequal:
   movslq 8(%rbx), %rbx
+  movl  %ebx, %ebx
   movslq 8(%rax), %rax
+  movl  %eax, %eax
   cmpq  %rbx, %rax
   setbe %al
   movzbq %al, %rax
@@ -4649,7 +4802,9 @@ let int32_unsigned_lessthan x y = int32_unsigned_lessthan x y
 [%%expect_asm X86_64{|
 int32_unsigned_lessthan:
   movslq 8(%rbx), %rbx
+  movl  %ebx, %ebx
   movslq 8(%rax), %rax
+  movl  %eax, %eax
   cmpq  %rbx, %rax
   setb  %al
   movzbq %al, %rax
@@ -4935,7 +5090,8 @@ external int64_u_of_int16 : int16 -> int64# = "%int64#_of_int16"
 let int64_u_of_int16 x = int64_u_of_int16 x
 [%%expect_asm X86_64{|
 int64_u_of_int16:
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   ret
 |}]
@@ -4974,7 +5130,8 @@ external int64_u_of_int8 : int8 -> int64# = "%int64#_of_int8"
 let int64_u_of_int8 x = int64_u_of_int8 x
 [%%expect_asm X86_64{|
 int64_u_of_int8:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   ret
 |}]
@@ -5611,7 +5768,8 @@ int64_of_int16:
   movq  $2303, -8(%rax)
   movq  caml_int64_ops@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rax)
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
@@ -5709,7 +5867,8 @@ int64_of_int8:
   movq  $2303, -8(%rax)
   movq  caml_int64_ops@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rax)
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
@@ -6034,6 +6193,8 @@ int8_u_asr:
   movq  %rbx, %rcx
   sarq  $1, %rcx
   sarq  %cl, %rax
+  salq  $56, %rax
+  sarq  $56, %rax
   ret
 |}]
 
@@ -6151,7 +6312,8 @@ let int8_u_lsr x y = int8_u_lsr x y
 int8_u_lsr:
   movq  %rbx, %rcx
   sarq  $1, %rcx
-  andl  $255, %eax
+  salq  $56, %rax
+  shrq  $56, %rax
   shrq  %cl, %rax
   salq  $56, %rax
   sarq  $56, %rax
@@ -6193,9 +6355,9 @@ external int8_u_neg : int8# -> int8# = "%int8#_neg"
 let int8_u_neg x = int8_u_neg x
 [%%expect_asm X86_64{|
 int8_u_neg:
-  movq  %rax, %rbx
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  xorl  %ebx, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   salq  $56, %rax
   sarq  $56, %rax
   ret
@@ -6258,7 +6420,8 @@ external int8_u_of_int : int -> int8# = "%int8#_of_int"
 let int8_u_of_int x = int8_u_of_int x
 [%%expect_asm X86_64{|
 int8_u_of_int:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   ret
 |}]
@@ -6276,7 +6439,10 @@ external int8_u_of_int16 : int16 -> int8# = "%int8#_of_int16"
 let int8_u_of_int16 x = int8_u_of_int16 x
 [%%expect_asm X86_64{|
 int8_u_of_int16:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
+  sarq  $48, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   ret
 |}]
@@ -6332,7 +6498,8 @@ external int8_u_of_int8 : int8 -> int8# = "%int8#_of_int8"
 let int8_u_of_int8 x = int8_u_of_int8 x
 [%%expect_asm X86_64{|
 int8_u_of_int8:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   ret
 |}]
@@ -6425,7 +6592,11 @@ external int8_u_unsigned_compare : int8# -> int8# -> bool = "%int8#_unsigned_com
 let int8_u_unsigned_compare x y = int8_u_unsigned_compare x y
 [%%expect_asm X86_64{|
 int8_u_unsigned_compare:
+  salq  $56, %rbx
+  shrq  $56, %rbx
   movq  %rax, %rdi
+  salq  $56, %rdi
+  shrq  $56, %rdi
   movq  $-1, %rsi
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
@@ -6439,6 +6610,10 @@ external int8_u_unsigned_greaterequal : int8# -> int8# -> bool = "%int8#_unsigne
 let int8_u_unsigned_greaterequal x y = int8_u_unsigned_greaterequal x y
 [%%expect_asm X86_64{|
 int8_u_unsigned_greaterequal:
+  salq  $56, %rbx
+  shrq  $56, %rbx
+  salq  $56, %rax
+  shrq  $56, %rax
   cmpq  %rbx, %rax
   setae %al
   movzbq %al, %rax
@@ -6450,6 +6625,10 @@ external int8_u_unsigned_greaterthan : int8# -> int8# -> bool = "%int8#_unsigned
 let int8_u_unsigned_greaterthan x y = int8_u_unsigned_greaterthan x y
 [%%expect_asm X86_64{|
 int8_u_unsigned_greaterthan:
+  salq  $56, %rbx
+  shrq  $56, %rbx
+  salq  $56, %rax
+  shrq  $56, %rax
   cmpq  %rbx, %rax
   seta  %al
   movzbq %al, %rax
@@ -6461,6 +6640,10 @@ external int8_u_unsigned_lessequal : int8# -> int8# -> bool = "%int8#_unsigned_l
 let int8_u_unsigned_lessequal x y = int8_u_unsigned_lessequal x y
 [%%expect_asm X86_64{|
 int8_u_unsigned_lessequal:
+  salq  $56, %rbx
+  shrq  $56, %rbx
+  salq  $56, %rax
+  shrq  $56, %rax
   cmpq  %rbx, %rax
   setbe %al
   movzbq %al, %rax
@@ -6472,6 +6655,10 @@ external int8_u_unsigned_lessthan : int8# -> int8# -> bool = "%int8#_unsigned_le
 let int8_u_unsigned_lessthan x y = int8_u_unsigned_lessthan x y
 [%%expect_asm X86_64{|
 int8_u_unsigned_lessthan:
+  salq  $56, %rbx
+  shrq  $56, %rbx
+  salq  $56, %rax
+  shrq  $56, %rax
   cmpq  %rbx, %rax
   setb  %al
   movzbq %al, %rax
@@ -6521,8 +6708,11 @@ let int8_asr x y = int8_asr x y
 int8_asr:
   movq  %rbx, %rcx
   sarq  $1, %rcx
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
+  sarq  $56, %rax
   sarq  %cl, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -6532,7 +6722,8 @@ external int8_bswap : int8 -> int8 = "%int8_bswap"
 let int8_bswap x = int8_bswap x
 [%%expect_asm X86_64{|
 int8_bswap:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -6542,11 +6733,13 @@ external int8_compare : int8 -> int8 -> bool = "%int8_compare"
 let int8_compare x y = int8_compare x y
 [%%expect_asm X86_64{|
 int8_compare:
-  movq  %rax, %rdi
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
-  salq  $55, %rdi
-  sarq  $56, %rdi
+  sarq  $1, %rax
+  salq  $56, %rax
+  sarq  $56, %rax
+  movq  %rax, %rdi
   movq  $-1, %rsi
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
@@ -6560,12 +6753,14 @@ external int8_div : int8 -> int8 -> int8 = "%int8_div"
 let int8_div x y = int8_div x y
 [%%expect_asm X86_64{|
 int8_div:
+  sarq  $1, %rbx
+  salq  $56, %rbx
+  sarq  $56, %rbx
   movq  %rbx, %rcx
-  salq  $55, %rcx
-  sarq  $56, %rcx
   testq %rcx, %rcx
   je    .L0
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   cqto
   idivq %rcx
@@ -6585,9 +6780,11 @@ external int8_equal : int8 -> int8 -> bool = "%int8_equal"
 let int8_equal x y = int8_equal x y
 [%%expect_asm X86_64{|
 int8_equal:
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   cmpq  %rbx, %rax
   sete  %al
@@ -6600,9 +6797,11 @@ external int8_greaterequal : int8 -> int8 -> bool = "%int8_greaterequal"
 let int8_greaterequal x y = int8_greaterequal x y
 [%%expect_asm X86_64{|
 int8_greaterequal:
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   cmpq  %rbx, %rax
   setge %al
@@ -6615,9 +6814,11 @@ external int8_greaterthan : int8 -> int8 -> bool = "%int8_greaterthan"
 let int8_greaterthan x y = int8_greaterthan x y
 [%%expect_asm X86_64{|
 int8_greaterthan:
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   cmpq  %rbx, %rax
   setg  %al
@@ -6630,9 +6831,11 @@ external int8_lessequal : int8 -> int8 -> bool = "%int8_lessequal"
 let int8_lessequal x y = int8_lessequal x y
 [%%expect_asm X86_64{|
 int8_lessequal:
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   cmpq  %rbx, %rax
   setle %al
@@ -6645,9 +6848,11 @@ external int8_lessthan : int8 -> int8 -> bool = "%int8_lessthan"
 let int8_lessthan x y = int8_lessthan x y
 [%%expect_asm X86_64{|
 int8_lessthan:
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   cmpq  %rbx, %rax
   setl  %al
@@ -6662,7 +6867,8 @@ let int8_lsl x y = int8_lsl x y
 int8_lsl:
   movq  %rbx, %rcx
   sarq  $1, %rcx
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   salq  %cl, %rax
   salq  $56, %rax
@@ -6678,7 +6884,10 @@ int8_lsr:
   movq  %rbx, %rcx
   sarq  $1, %rcx
   sarq  $1, %rax
-  andl  $255, %eax
+  salq  $56, %rax
+  sarq  $56, %rax
+  salq  $56, %rax
+  shrq  $56, %rax
   shrq  %cl, %rax
   salq  $56, %rax
   sarq  $56, %rax
@@ -6690,18 +6899,21 @@ external int8_mod : int8 -> int8 -> int8 = "%int8_mod"
 let int8_mod x y = int8_mod x y
 [%%expect_asm X86_64{|
 int8_mod:
+  sarq  $1, %rbx
+  salq  $56, %rbx
+  sarq  $56, %rbx
   movq  %rbx, %rcx
-  salq  $55, %rcx
-  sarq  $56, %rcx
   testq %rcx, %rcx
   je    .L0
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   cqto
   idivq %rcx
-  salq  $56, %rdx
-  sarq  $56, %rdx
-  leaq  1(%rdx,%rdx), %rax
+  movq  %rdx, %rax
+  salq  $56, %rax
+  sarq  $56, %rax
+  leaq  1(%rax,%rax), %rax
   ret
 .L0:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
@@ -6731,9 +6943,10 @@ int8_neg:
   sarq  $1, %rax
   xorl  %ebx, %ebx
   subq  %rax, %rbx
-  salq  $56, %rbx
-  sarq  $56, %rbx
-  leaq  1(%rbx,%rbx), %rax
+  movq  %rbx, %rax
+  salq  $56, %rax
+  sarq  $56, %rax
+  leaq  1(%rax,%rax), %rax
   ret
 |}]
 
@@ -6741,9 +6954,11 @@ external int8_notequal : int8 -> int8 -> bool = "%int8_notequal"
 let int8_notequal x y = int8_notequal x y
 [%%expect_asm X86_64{|
 int8_notequal:
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   cmpq  %rbx, %rax
   setne %al
@@ -6802,7 +7017,8 @@ external int8_of_int : int -> int8 = "%int8_of_int"
 let int8_of_int x = int8_of_int x
 [%%expect_asm X86_64{|
 int8_of_int:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -6822,7 +7038,10 @@ external int8_of_int16 : int16 -> int8 = "%int8_of_int16"
 let int8_of_int16 x = int8_of_int16 x
 [%%expect_asm X86_64{|
 int8_of_int16:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
+  sarq  $48, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -6963,10 +7182,12 @@ external int8_unsafe_div : int8 -> int8 -> int8 = "%int8_unsafe_div"
 let int8_unsafe_div x y = int8_unsafe_div x y
 [%%expect_asm X86_64{|
 int8_unsafe_div:
+  sarq  $1, %rbx
+  salq  $56, %rbx
+  sarq  $56, %rbx
   movq  %rbx, %rcx
-  salq  $55, %rcx
-  sarq  $56, %rcx
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   cqto
   idivq %rcx
@@ -6980,16 +7201,19 @@ external int8_unsafe_mod : int8 -> int8 -> int8 = "%int8_unsafe_mod"
 let int8_unsafe_mod x y = int8_unsafe_mod x y
 [%%expect_asm X86_64{|
 int8_unsafe_mod:
+  sarq  $1, %rbx
+  salq  $56, %rbx
+  sarq  $56, %rbx
   movq  %rbx, %rcx
-  salq  $55, %rcx
-  sarq  $56, %rcx
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   cqto
   idivq %rcx
-  salq  $56, %rdx
-  sarq  $56, %rdx
-  leaq  1(%rdx,%rdx), %rax
+  movq  %rdx, %rax
+  salq  $56, %rax
+  sarq  $56, %rax
+  leaq  1(%rax,%rax), %rax
   ret
 |}]
 
@@ -6997,11 +7221,17 @@ external int8_unsigned_compare : int8 -> int8 -> bool = "%int8_unsigned_compare"
 let int8_unsigned_compare x y = int8_unsigned_compare x y
 [%%expect_asm X86_64{|
 int8_unsigned_compare:
-  movq  %rax, %rdi
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
-  salq  $55, %rdi
-  sarq  $56, %rdi
+  salq  $56, %rbx
+  shrq  $56, %rbx
+  sarq  $1, %rax
+  salq  $56, %rax
+  sarq  $56, %rax
+  movq  %rax, %rdi
+  salq  $56, %rdi
+  shrq  $56, %rdi
   movq  $-1, %rsi
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
@@ -7015,10 +7245,16 @@ external int8_unsigned_greaterequal : int8 -> int8 -> bool = "%int8_unsigned_gre
 let int8_unsigned_greaterequal x y = int8_unsigned_greaterequal x y
 [%%expect_asm X86_64{|
 int8_unsigned_greaterequal:
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
-  salq  $55, %rax
+  salq  $56, %rbx
+  shrq  $56, %rbx
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
+  salq  $56, %rax
+  shrq  $56, %rax
   cmpq  %rbx, %rax
   setae %al
   movzbq %al, %rax
@@ -7030,10 +7266,16 @@ external int8_unsigned_greaterthan : int8 -> int8 -> bool = "%int8_unsigned_grea
 let int8_unsigned_greaterthan x y = int8_unsigned_greaterthan x y
 [%%expect_asm X86_64{|
 int8_unsigned_greaterthan:
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
-  salq  $55, %rax
+  salq  $56, %rbx
+  shrq  $56, %rbx
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
+  salq  $56, %rax
+  shrq  $56, %rax
   cmpq  %rbx, %rax
   seta  %al
   movzbq %al, %rax
@@ -7045,10 +7287,16 @@ external int8_unsigned_lessequal : int8 -> int8 -> bool = "%int8_unsigned_lesseq
 let int8_unsigned_lessequal x y = int8_unsigned_lessequal x y
 [%%expect_asm X86_64{|
 int8_unsigned_lessequal:
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
-  salq  $55, %rax
+  salq  $56, %rbx
+  shrq  $56, %rbx
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
+  salq  $56, %rax
+  shrq  $56, %rax
   cmpq  %rbx, %rax
   setbe %al
   movzbq %al, %rax
@@ -7060,10 +7308,16 @@ external int8_unsigned_lessthan : int8 -> int8 -> bool = "%int8_unsigned_lesstha
 let int8_unsigned_lessthan x y = int8_unsigned_lessthan x y
 [%%expect_asm X86_64{|
 int8_unsigned_lessthan:
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
-  salq  $55, %rax
+  salq  $56, %rbx
+  shrq  $56, %rbx
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
+  salq  $56, %rax
+  shrq  $56, %rax
   cmpq  %rbx, %rax
   setb  %al
   movzbq %al, %rax
@@ -7115,6 +7369,8 @@ external int_bswap : int -> int = "%int_bswap"
 let int_bswap x = int_bswap x
 [%%expect_asm X86_64{|
 int_bswap:
+  sarq  $1, %rax
+  salq  $1, %rax
   sarq  $1, %rax
   xchg  %ah, %al
   movzwq %ax, %rax
@@ -7339,7 +7595,8 @@ external int_of_int16 : int16 -> int = "%int_of_int16"
 let int_of_int16 x = int_of_int16 x
 [%%expect_asm X86_64{|
 int_of_int16:
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -7391,7 +7648,8 @@ external int_of_int8 : int8 -> int = "%int_of_int8"
 let int_of_int8 x = int_of_int8 x
 [%%expect_asm X86_64{|
 int_of_int8:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -7803,7 +8061,8 @@ external nativeint_u_of_int16 : int16 -> nativeint# = "%nativeint#_of_int16"
 let nativeint_u_of_int16 x = nativeint_u_of_int16 x
 [%%expect_asm X86_64{|
 nativeint_u_of_int16:
-  salq  $47, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
   sarq  $48, %rax
   ret
 |}]
@@ -7849,7 +8108,8 @@ external nativeint_u_of_int8 : int8 -> nativeint# = "%nativeint#_of_int8"
 let nativeint_u_of_int8 x = nativeint_u_of_int8 x
 [%%expect_asm X86_64{|
 nativeint_u_of_int8:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   ret
 |}]
@@ -8479,7 +8739,8 @@ nativeint_of_int16:
   movq  $2303, -8(%rax)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rax)
-  salq  $47, %rbx
+  sarq  $1, %rbx
+  salq  $48, %rbx
   sarq  $48, %rbx
   movq  %rbx, 8(%rax)
   addq  $8, %rsp
@@ -8597,7 +8858,8 @@ nativeint_of_int8:
   movq  $2303, -8(%rax)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
   movq  %rdi, (%rax)
-  salq  $55, %rbx
+  sarq  $1, %rbx
+  salq  $56, %rbx
   sarq  $56, %rbx
   movq  %rbx, 8(%rax)
   addq  $8, %rsp

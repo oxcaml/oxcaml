@@ -69,6 +69,8 @@ shift_left:
   movq  %rbx, %rcx
   sarq  $1, %rcx
   sarq  %cl, %rax
+  salq  $56, %rax
+  sarq  $56, %rax
   ret
 |}]
 
@@ -88,7 +90,8 @@ let logical_shift_right x y = Int8_u.logical_shift_right x y
 logical_shift_right:
   movq  %rbx, %rcx
   sarq  $1, %rcx
-  andl  $255, %eax
+  salq  $56, %rax
+  shrq  $56, %rax
   shrq  %cl, %rax
   salq  $56, %rax
   sarq  $56, %rax
@@ -131,9 +134,9 @@ bswap:
 let neg x = Int8_u.neg x
 [%%expect_asm X86_64{|
 neg:
-  movq  %rax, %rbx
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  xorl  %ebx, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   salq  $56, %rax
   sarq  $56, %rax
   ret
@@ -275,7 +278,11 @@ lessthan:
 let unsigned_compare x y = Int8_u.unsigned_compare x y
 [%%expect_asm X86_64{|
 unsigned_compare:
+  salq  $56, %rbx
+  shrq  $56, %rbx
   movq  %rax, %rdi
+  salq  $56, %rdi
+  shrq  $56, %rdi
   movq  $-1, %rsi
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
@@ -288,6 +295,10 @@ unsigned_compare:
 let unsigned_greaterequal x y = Int8_u.unsigned_greaterequal x y
 [%%expect_asm X86_64{|
 unsigned_greaterequal:
+  salq  $56, %rbx
+  shrq  $56, %rbx
+  salq  $56, %rax
+  shrq  $56, %rax
   cmpq  %rbx, %rax
   setae %al
   movzbq %al, %rax
@@ -298,6 +309,10 @@ unsigned_greaterequal:
 let unsigned_greaterthan x y = Int8_u.unsigned_greaterthan x y
 [%%expect_asm X86_64{|
 unsigned_greaterthan:
+  salq  $56, %rbx
+  shrq  $56, %rbx
+  salq  $56, %rax
+  shrq  $56, %rax
   cmpq  %rbx, %rax
   seta  %al
   movzbq %al, %rax
@@ -308,6 +323,10 @@ unsigned_greaterthan:
 let unsigned_lessequal x y = Int8_u.unsigned_lessequal x y
 [%%expect_asm X86_64{|
 unsigned_lessequal:
+  salq  $56, %rbx
+  shrq  $56, %rbx
+  salq  $56, %rax
+  shrq  $56, %rax
   cmpq  %rbx, %rax
   setbe %al
   movzbq %al, %rax
@@ -318,6 +337,10 @@ unsigned_lessequal:
 let unsigned_lessthan x y = Int8_u.unsigned_lessthan x y
 [%%expect_asm X86_64{|
 unsigned_lessthan:
+  salq  $56, %rbx
+  shrq  $56, %rbx
+  salq  $56, %rax
+  shrq  $56, %rax
   cmpq  %rbx, %rax
   setb  %al
   movzbq %al, %rax
@@ -366,7 +389,8 @@ of_float32_u:
 let of_int x = Int8_u.of_int x
 [%%expect_asm X86_64{|
 of_int:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   ret
 |}]
@@ -382,7 +406,10 @@ of_int_u:
 let of_int16 x = Int8_u.of_int16 x
 [%%expect_asm X86_64{|
 of_int16:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $48, %rax
+  sarq  $48, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   ret
 |}]
@@ -432,7 +459,8 @@ of_int64_u:
 let of_int8 x = Int8_u.of_int8 x
 [%%expect_asm X86_64{|
 of_int8:
-  salq  $55, %rax
+  sarq  $1, %rax
+  salq  $56, %rax
   sarq  $56, %rax
   ret
 |}]

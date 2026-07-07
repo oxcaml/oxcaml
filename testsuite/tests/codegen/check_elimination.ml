@@ -46,10 +46,11 @@ arr_sum:
   salq  $8, %rdi
   shrq  $17, %rdi
   orq   $1, %rdi
-  leaq  -2(%rdi), %rsi
-  cmpq  $1, %rsi
+  leaq  -2(%rdi), %rax
+  cmpq  $1, %rax
   jl    .L2
-  sarq  $1, %rsi
+  sarq  $1, %rax
+  movq  %rax, %rsi
   movl  $1, %eax
   xorl  %edx, %edx
 .L0:

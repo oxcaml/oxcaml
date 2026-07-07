@@ -998,6 +998,19 @@ let rec low_bits ~bits ~dbg x =
     map_tail
       (function
         | Cop
+            ( Cstatic_cast (Int64_of_tagged_int _),
+              [Cop (Cstatic_cast Tagged_int_of_int64, [x], _)],
+              _ ) ->
+          low_bits ~bits x ~dbg
+        | Cop (Cstatic_cast (Int_conv cast), [x], _)
+          when match class_of_int_cast cast with
+               | Identity -> true
+               | Sign_extend width | Zero_extend width ->
+                 bits_of_int_width width >= bits
+               | Zero_then_sign_extend { zero_extend_from; _ } ->
+                 bits_of_int_width zero_extend_from >= bits ->
+          low_bits ~bits x ~dbg
+        | Cop
             ( (Casr | Clsr),
               [Cop (Clsl, [x; Cconst_int (left, _)], _); Cconst_int (right, _)],
               _ )
@@ -5565,7 +5578,10 @@ module Scalar_type = struct
          low bits nor which bits are meaningful. *)
       if equal_int_width src dst
       then exp
-      else unary (Cstatic_cast (Int_conv { src; dst; signedness })) ~dbg exp
+      else
+        match exp with
+        | Cconst_int _ | Cconst_natint _ -> exp
+        | _ -> unary (Cstatic_cast (Int_conv { src; dst; signedness })) ~dbg exp
 
     let static_cast ~dbg ~src ~dst ~signedness exp =
       match src, dst with

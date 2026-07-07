@@ -336,14 +336,14 @@ let double_loop_no_definition_at_beginning array n list =
 [%%expect_asm X86_64{|
 double_loop_no_definition_at_beginning:
   subq  $72, %rsp
-  movq  %rbx, %rsi
-  movq  64(%r14), %rbx
-  cmpq  $1, %rsi
+  movq  64(%r14), %rsi
+  cmpq  $1, %rbx
   jl    .L5
-  movq  %rbx, 16(%rsp)
+  movq  %rsi, 16(%rsp)
   movq  %rdi, 32(%rsp)
   movq  %rax, 24(%rsp)
-  sarq  $1, %rsi
+  sarq  $1, %rbx
+  movq  %rbx, %rsi
   movq  %rsi, 40(%rsp)
   xorl  %edx, %edx
 .L0:
@@ -390,9 +390,9 @@ double_loop_no_definition_at_beginning:
   incq  %rdx
   cmpq  %rsi, %rdx
   jle   .L0
-  movq  16(%rsp), %rbx
+  movq  16(%rsp), %rsi
 .L5:
-  movq  %rbx, 64(%r14)
+  movq  %rsi, 64(%r14)
   movl  $1, %eax
   addq  $72, %rsp
   ret
