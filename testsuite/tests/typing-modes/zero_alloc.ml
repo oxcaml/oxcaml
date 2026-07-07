@@ -585,6 +585,8 @@ let (alloc_polyvariant @ noalloc) (a : int) = exclave_ stack_ (`Tag a)
 val alloc_polyvariant : int -> [> `Tag of int ] @ local = <fun>
 |}]
 
+(* CR shsong: Currently it may also because multi-argument function
+    always allocates. Revisit this in the next PR. *)
 (* A function that takes an optional argument allocates (to handle the
    optional-argument wrapping). *)
 let (alloc_optional_arg @ noalloc_strict) ?a () = a
@@ -892,8 +894,7 @@ Error: The allocation is "alloc"
 |}]
 
 (* An object with no allocating method (here only a value field) still
-   allocates the object block itself, which the [Pexp_object] walk detects,
-   so it is rejected even though [get] does not allocate. *)
+   allocates the object block itself. *)
 let (obj_no_alloc_method @ noalloc_strict) () = object val x = 0 end
 [%%expect{|
 Line 1, characters 48-68:
@@ -1160,14 +1161,16 @@ Error: The allocation is "alloc"
    [register_allocation_mode], which now walks locks, so it is wrongly rejected
    -- note the error is "The allocation is alloc". It should be accepted once the
    Prim_poly site is exempted from walking. *)
-let (array_get_prim_poly @ noalloc_strict) (a : int array) (i : int) = a.(i)
+let array_get_prim_poly (a : int array) (i : int) =
+  let (f @ noalloc_strict) () = a.(i) in
+  f ()
 [%%expect{|
-Line 1, characters 59-76:
-1 | let (array_get_prim_poly @ noalloc_strict) (a : int array) (i : int) = a.(i)
-                                                               ^^^^^^^^^^^^^^^^^
-Error: The allocation is "alloc"
+Line 2, characters 32-37:
+2 |   let (f @ noalloc_strict) () = a.(i) in
+                                    ^^^^^
+Error: The value "Array.get" is "alloc"
        but is expected to be "noalloc_strict"
-         because it is used inside the function at line 1, characters 43-76
+         because it is used inside the function at line 2, characters 27-37
          which is expected to be "noalloc_strict".
 |}]
 
@@ -1481,30 +1484,36 @@ Error: This expression is not an allocation site.
     components, record fields, function bodies) or because [mode_morph] resets
     [strictly_stack] for children (lazy thunk body, partial-application args). *)
 
-(* lazy thunk body holds a new allocation *)
-let (stack_inner_lazy @ noalloc_strict) (a : int) =
-  exclave_ stack_ (lazy (Just a))
+(* a new allocation captured as an argument of a function application *)
+let stack_inner_function_application
+      (g : (int variant_t5 -> int -> int -> int) @ noalloc_strict) (a : int) =
+  let (f @ noalloc_strict) () = exclave_ stack_ (g (Just a) 2 3) in
+  ()
 [%%expect{|
-Line 12, characters 18-33:
-12 |   exclave_ stack_ (lazy (Just a))
-                       ^^^^^^^^^^^^^^^
+Line 3, characters 51-59:
+3 |   let (f @ noalloc_strict) () = exclave_ stack_ (g (Just a) 2 3) in
+                                                       ^^^^^^^^
 Error: The allocation is "alloc"
        but is expected to be "noalloc_strict"
-         because it is used inside the function at lines 11-12, characters 40-33
+         because it is used inside the function at line 3, characters 27-64
          which is expected to be "noalloc_strict".
 |}]
 
+(* CR shsong: function partial application triggers allocation, and is not
+    considered to be on the stack even though it is annotated with [stack_].
+    Revisit this in the next PR. *)
 (* a new allocation captured as an argument of a partial application *)
-let (stack_inner_partial @ noalloc_strict)
+let stack_inner_partial_application
       (g : (int variant_t5 -> int -> int -> int) @ noalloc_strict) (a : int) =
-  exclave_ stack_ (g (Just a) 2)
+  let (f @ noalloc_strict) () = exclave_ stack_ (g (Just a) 2) in
+  ()
 [%%expect{|
-Lines 2-3, characters 67-32:
-2 | ...................................................................(a : int) =
-3 |   exclave_ stack_ (g (Just a) 2)
+Line 3, characters 48-62:
+3 |   let (f @ noalloc_strict) () = exclave_ stack_ (g (Just a) 2) in
+                                                    ^^^^^^^^^^^^^^
 Error: The allocation is "alloc"
        but is expected to be "noalloc_strict"
-         because it is used inside the function at lines 2-3, characters 6-32
+         because it is used inside the function at line 3, characters 27-62
          which is expected to be "noalloc_strict".
 |}]
 
@@ -1829,7 +1838,8 @@ Line 1, characters 27-52:
 Error: This value is "alloc" but is expected to be "noalloc_strict".
 |}]
 
-(* CR-soon shsong: error expected -- cannot call [whitewashed ()] *)
+(** CR-soon shsong: revisit the following tests after supporting
+    using zero_alloc backend for our analysis. *)
 let (secretly_allocates @ noalloc) () =
   let (whitewashed @ alloc) = fun () -> { x = 1.; y = 2. } in
   whitewashed ()
@@ -1843,7 +1853,6 @@ Error: The allocation is "alloc"
          which is expected to be "noalloc".
 |}]
 
-(* CR-soon shsong: error expected -- cannot assign alloc func to escape_hatch ref *)
 let (secretly_allocates' @ noalloc) () = exclave_
  let mutable escape_hatch = None in
  (escape_hatch <- stack_ Some (fun () -> { x = 1.; y = 2. })) [@zero_alloc];
@@ -1860,7 +1869,6 @@ Error: The allocation is "alloc"
          which is expected to be "noalloc".
 |}]
 
-(* CR-soon shsong: error expected -- cannot call [f ()] because it is alloc *)
 let (secretly_allocates @ noalloc) () = exclave_
  let mutable (escape_hatch @ alloc) = None in
  (escape_hatch <- stack_ Some (fun () -> { x = 1.; y = 2. })) [@zero_alloc];
