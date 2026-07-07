@@ -618,13 +618,11 @@ You can concisely define several tests with differing initial setups with the
 
 #+begin_src
 (* TEST
-  {
-    split [
-    | flags = "-flag1";
-    | flags = "-flag2";
-    ]
-    native;
-  }
+  split [
+  | flags = "-flag1";
+  | flags = "-flag2";
+  ]
+  native;
 *)
 #+end_src
 
