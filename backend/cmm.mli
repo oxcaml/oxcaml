@@ -28,6 +28,8 @@ val string_of_int_width : int_width -> string
 
 val bits_of_int_width : int_width -> int
 
+val equal_int_width : int_width -> int_width -> bool
+
 type machtype_component = Cmx_format.machtype_component =
   | Val
   | Addr

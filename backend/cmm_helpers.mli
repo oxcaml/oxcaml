@@ -1572,25 +1572,29 @@ val poll : dbg:Debuginfo.t -> expression
 (** This module defines the various kinds of scalars usable in Cmm. It also
     provides ways to generate expressions to cast between them. *)
 module Scalar_type : sig
-  (** A static_cast from a larger integral type to a smaller one logically
-      truncates the upper bits. Note that values are stored in registers sign-
-      or zero- extended according to their signdness, so the result may be
-      sign-extended.
+  (** Cmm integer operations assume register-width (int64) inputs and produce
+      register-width outputs, so the bits of a register holding a narrower
+      integer above that integer's width are unspecified. Operands must be
+      [static_cast] up to int64 before an integer operation and the result
+      [static_cast] back down to its type afterwards.
 
-      A static_cast from a smaller integral type to an equal or larger
-      sized-integral type sign- or zero-extends the input value according to the
-      sign of the result.
+      - Widening a naked integer (or tagging one) sign- or zero-extends its low
+        [src] bits according to [signedness].
+      - Narrowing a naked integer just retypes the register: the bits above the
+        destination width become unspecified. Untagging also shifts out the tag
+        bit.
+      - A static_cast from a float to an integral type rounds toward zero; the
+        result is unspecified if the rounded value does not fit. Casts between
+        integral types and floats go through int64.
 
-      A static_cast from an integral type to a float is pretty self-explanatory.
-
-      A static_cast from a float to an integral type always rounds toward zero.
-      If the resulting integral does not fit in the destination type, the result
-      is unspecified (although it's generally zero).
-
-      Casting floats to/from unsigned register-width integers is not implemented
-      and will raise in the compiler. *)
+      CR jrayman *)
   type 'a static_cast :=
-    dbg:Debuginfo.t -> src:'a -> dst:'a -> expression -> expression
+    dbg:Debuginfo.t ->
+    src:'a ->
+    dst:'a ->
+    signedness:Scalar.Signedness.t ->
+    expression ->
+    expression
 
   (** Conjugate f by [static_cast ~src:outer ~dst:inner].
 
@@ -1602,6 +1606,7 @@ module Scalar_type : sig
     outer:'a ->
     inner:'a ->
     dbg:Debuginfo.t ->
+    signedness:Scalar.Signedness.t ->
     f:(expression -> expression) ->
     expression ->
     expression
@@ -1615,111 +1620,33 @@ module Scalar_type : sig
     val static_cast : t static_cast
   end
 
-  module Signedness : sig
+  (** A naked integer of a given width, or a tagged OCaml immediate. *)
+  module Integer : sig
     type t =
-      | Signed
-      | Unsigned
+      | Naked_int of int_width
+      | Tagged_int
 
-    val equal : t -> t -> bool
+    val nativeint : t
+
+    val naked_immediate : t
+
+    (** [bit_width Tagged_int] is [arch_bits], which includes the tag bit. *)
+    val bit_width : t -> int
 
     val print : Format.formatter -> t -> unit
-  end
-
-  module type Integral_ops := sig
-    type t
-
-    val print : Format.formatter -> t -> unit
 
     val equal : t -> t -> bool
-
-    val signedness : t -> Signedness.t
-
-    val with_signedness : t -> signedness:Signedness.t -> t
-
-    val signed : t -> t
-
-    val unsigned : t -> t
-
-    (** This function relates to the set of possible values that each type can
-        represent. Even if it returns [true], it does not necessarily mean that
-        casting from [src] to [dst] is a no-op. *)
-    val can_cast_without_losing_information : src:t -> dst:t -> bool
 
     val static_cast : t static_cast
 
     val conjugate : t conjugate
   end
 
-  (** An integer stored the lower [bits] bits of a register-width
-      twos-complement integer, and sign- or zero-extended as needed, according
-      to [signedness]. *)
-  module Integer : sig
-    type t [@@immediate]
-
-    val nativeint : t
-
-    val create_exn : bit_width:int -> signedness:Signedness.t -> t
-
-    val bit_width : t -> int
-
-    include Integral_ops with type t := t
-  end
-
-  (** An {!Integer.t} but with the additional stipulation that its lowest bit is
-      always set to 1 and is not considered in mathematical operations on the
-      numbers. *)
-  module Tagged_integer : sig
-    type t [@@immediate]
-
-    val immediate : t
-
-    val create_exn :
-      bit_width_including_tag_bit:int -> signedness:Signedness.t -> t
-
-    val bit_width_excluding_tag_bit : t -> int
-
-    val bit_width_including_tag_bit : t -> int
-
-    val untagged : t -> Integer.t
-
-    include Integral_ops with type t := t
-  end
-
-  module Integral : sig
-    type t =
-      | Untagged of Integer.t
-      | Tagged of Tagged_integer.t
-
-    val nativeint : t
-
-    (** Gets the integer resulting from untagging the integeral iff it is
-        tagged.
-
-        E.g., you can use [static_cast ~src ~dst:(Untagged (untagged src))] to
-        untag a value of type [src], And in the cas where [src] is already
-        untagged, this becomes the identity function *)
-    val untagged_or_identity : t -> Integer.t
-
-    include Integral_ops with type t := t
-  end
-
   type t =
-    | Integral of Integral.t
+    | Integer of Integer.t
     | Float of Float_width.t
 
   val static_cast : t static_cast
 
   val conjugate : t conjugate
-
-  module Untagged : sig
-    type numeric = t
-
-    type t =
-      | Untagged of Integer.t
-      | Float of float_width
-
-    val to_numeric : t -> numeric
-
-    val static_cast : t static_cast
-  end
 end
