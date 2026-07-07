@@ -123,6 +123,8 @@ val add_to_type_decls :
 val add_to_type_shapes :
   Uid.t -> Types.type_expr -> Layout.t -> name:string -> path_lookup -> unit
 
+val has_type_shape : Uid.t -> bool
+
 val print_table_all_type_decls : Format.formatter -> unit
 
 val print_table_all_type_shapes : Format.formatter -> unit

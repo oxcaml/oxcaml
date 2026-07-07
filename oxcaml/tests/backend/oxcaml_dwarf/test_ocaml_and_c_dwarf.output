@@ -1,11 +1,11 @@
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_start(param=0 : ocaml_value)
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_start(param=() : unit @ value)
 === Testing OCaml/C boundary - string allocation ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_alloc_string(len=100)
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_alloc_string(len=100)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib.Bytes.make [inlined]
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib.String.make [inlined]
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_allocate_string(param=[100, 120] : ocaml_value)
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_allocate_string(param=(100, 'x') : int * char @ value)
 === Testing OCaml/C boundary - array allocation ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_array_make(len=101, init=201)
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_array_make(len=101, init=201)
@@ -28,7 +28,7 @@
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_hash_exn(count=21, limit=201, seed=1, obj=<PTR>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`camlStdlib__Hashtbl__add_XXX_XXX_code
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_hash(param="key" : ocaml_value, param=42 : ocaml_value)
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_hash(param="key" : string @ value, param=42 : int @ value)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`camlTest_ocaml_and_c_dwarf__entry
 === Testing OCaml/C boundary - polymorphic compare ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_compare(v1=<PTR>, v2=<PTR>)
@@ -72,16 +72,16 @@
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_large_tuple(n=42 : int @ value)
 === Testing OCaml/C boundary - callback (C calls OCaml) ===
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_callback_inner(param=0 : ocaml_value)
-  * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_callback_inner(param=0 : ocaml_value)
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_callback_inner(param=() : unit @ value)
+  * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_callback_inner(param=() : unit @ value)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_start_program
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`callback(closure=<unavailable>, arg=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_callback_exn(arg=1, closure=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib.Sys.(partial) at sys.ml.in:239 [inlined]
 === Testing OCaml/C boundary - finalizer (C calls OCaml during GC) ===
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_my_finalizer(param=[42] : ocaml_value)
-  * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_my_finalizer(param=[42] : ocaml_value)
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_my_finalizer(param=[42] : int ref @ value)
+  * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_my_finalizer(param=[42] : int ref @ value)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_start_program
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`callback(closure=<unavailable>, arg=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_callback_exn(arg=<unavailable>, closure=<unavailable>)

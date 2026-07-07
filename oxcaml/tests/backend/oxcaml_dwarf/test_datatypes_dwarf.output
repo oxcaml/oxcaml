@@ -1,4 +1,4 @@
-    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_start(param=0 : ocaml_value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_start(param=() : unit @ value)
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_simple_variant(x=A : simple_variant @ value)
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_simple_variant(x=B : simple_variant @ value)
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_simple_variant(x=C 42 : simple_variant @ value)

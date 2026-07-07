@@ -518,7 +518,10 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
         (Some (pat_expr_list, partial, arg_sort)) exn_pat_expr_list
         eff_pat_expr_list
   | Texp_try(body, pat_expr_list, []) ->
-      let id, id_duid = Typecore.name_cases "exn" pat_expr_list in
+      let id, id_duid =
+        Typecore.name_cases ~pattern_kind:Exception_pattern "exn"
+          pat_expr_list
+      in
       Ltrywith(transl_exp ~scopes layout body, id, id_duid,
                Matching.for_trywith ~scopes ~return_layout:layout
                  e.exp_loc (Lvar id)
@@ -1769,13 +1772,20 @@ and transl_tupled_function
                  Argument should be a tuple, but couldn't get the kinds"
         in
         let tparams =
-          List.map (fun kind -> {
+          List.map2 (fun kind (_, fld_pat) ->
+              let debug_uid =
+                Typecore.create_uid_for_pattern_kind Value_pattern_in_argument
+              in
+              add_type_shapes_of_param ~env:arg_pat.pat_env
+                ~uid:debug_uid ~sort:Jkind.Sort.Const.for_tuple_element
+                ~type_expr:fld_pat.pat_type;
+              {
                 name = Ident.create_local "param";
-                debug_uid = Lambda.debug_uid_none;
+                debug_uid;
                 layout = kind;
                 attributes = Lambda.default_param_attribute;
                 mode = alloc_heap
-              }) kinds
+              }) kinds pl
         in
         let params = List.map (fun p -> p.name) tparams in
         let body =
@@ -1829,11 +1839,15 @@ and add_type_shapes_of_cases cases =
     variable with the type expression of the variable. *)
 and add_type_shapes_of_params params =
     let add_param (param : Typedtree.function_param) =
-      let pattern = match param.fp_kind with
-                    | Tparam_pat p -> p
-                    | Tparam_optional_default (p, _, _) -> p
-      in
-      add_type_shapes_of_pattern ~env:pattern.pat_env pattern
+      match param.fp_kind with
+      | Tparam_pat pat ->
+          add_type_shapes_of_pattern ~env:pat.pat_env pat;
+          add_type_shapes_of_param ~env:pat.pat_env
+            ~uid:param.fp_param_debug_uid
+            ~sort:(Jkind.Sort.default_for_transl_and_get param.fp_sort)
+            ~type_expr:pat.pat_type
+      | Tparam_optional_default (pat, _, _) ->
+          add_type_shapes_of_pattern ~env:pat.pat_env pat
     in
     List.iter add_param params
 
@@ -1846,6 +1860,23 @@ and add_type_shapes_of_patterns patterns =
       value_binding.vb_pat
   in
   List.iter add_case patterns
+
+(** [add_type_shapes_of_param] associates the type of a function parameter with
+    the parameter's debugging UID. It only adds a binding if [uid] has none
+    already: if the parameter is a variable or an alias, it is handled by
+    [add_type_shapes_of_pattern]. The cases that are handled by
+    [add_type_shapes_of_param] binders for composite expressions such as the
+    parameter of [fun (x, y) -> ...]. *)
+and add_type_shapes_of_param ~env ~uid ~sort ~type_expr =
+  if
+    !Clflags.debug
+    && !Clflags.shape_format = Clflags.Debugging_shapes
+    && not (Shape.Uid.equal uid Shape.Uid.internal_not_actually_unique)
+    && not (Type_shape.has_type_shape uid)
+  then
+    let type_name = Format_doc.asprintf "%a" Printtyp.Doc.type_expr type_expr in
+    Type_shape.add_to_type_shapes uid type_expr sort ~name:type_name
+      (Env.shape_for_constr env)
 
 and transl_curried_function ~scopes loc repr params body
     ~return_layout ~return_mode ~region ~mode
@@ -1883,6 +1914,12 @@ and transl_curried_function ~scopes loc repr params body
         in
         let arg_mode = transl_alloc_mode_l fc_arg_mode in
         add_type_shapes_of_cases fc_cases;
+        (match fc_cases with
+         | { c_lhs; _ } :: _ ->
+             add_type_shapes_of_param ~env:c_lhs.pat_env
+               ~uid:fc_param_debug_uid ~sort:fc_arg_sort
+               ~type_expr:c_lhs.pat_type
+         | [] -> ());
         let attributes =
           match fc_cases with
           | [ { c_lhs }] -> Translattribute.transl_param_attributes c_lhs
@@ -2672,7 +2709,10 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
      value actions run outside the try..with exception handler.
   *)
   let static_catch scrutinees val_ids handler =
-    let id, id_duid = Typecore.name_pattern "exn" (List.map fst exn_cases) in
+    let id, id_duid =
+      Typecore.name_pattern ~pattern_kind:Exception_pattern "exn"
+        (List.map fst exn_cases)
+    in
     let static_exception_id = next_raise_count () in
     Lstaticcatch
       (Ltrywith (Lstaticraise (static_exception_id, scrutinees), id, id_duid,
@@ -2706,7 +2746,10 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
           List.map
             (fun (arg,s) ->
                let layout = layout_exp s arg in
-               let id, id_duid = Typecore.name_pattern "val" [] in
+               let id, id_duid =
+                 Typecore.name_pattern ~pattern_kind:Value_pattern_in_match
+                   "val" []
+               in
                (id, id_duid, layout), (Lvar id, s, layout))
             argl
           |> List.split
@@ -2722,7 +2765,8 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
         e.exp_loc None (transl_exp ~scopes arg_layout arg) val_cases partial
     | arg, _ :: _ ->
         let val_id, val_id_duid =
-          Typecore.name_pattern "val" (List.map fst val_cases)
+          Typecore.name_pattern ~pattern_kind:Value_pattern_in_match "val"
+            (List.map fst val_cases)
         in
         let arg_layout = layout_exp arg_sort arg in
         static_catch
@@ -2790,7 +2834,10 @@ and transl_handler ~scopes ~return_layout ~body_layout e body
          ~mode:alloc_heap ~ret_mode:alloc_heap
     | Some (val_caselist, partial, body_sort) ->
         let val_cases = transl_cases ~scopes return_layout val_caselist in
-        let param, param_duid = Typecore.name_cases "param" val_caselist in
+        let param, param_duid =
+          Typecore.name_cases ~pattern_kind:Value_pattern_in_match "param"
+            val_caselist
+        in
         let body =
           maybe_region_layout return_layout
             (Matching.for_function ~scopes
@@ -2804,7 +2851,9 @@ and transl_handler ~scopes ~return_layout ~body_layout e body
   in
   let exn_fun =
     let exn_cases = transl_cases ~scopes return_layout exn_caselist in
-    let param, param_duid = Typecore.name_cases "exn" exn_caselist in
+    let param, param_duid =
+      Typecore.name_cases ~pattern_kind:Exception_pattern "exn" exn_caselist
+    in
     let body =
       maybe_region_layout return_layout
         (Matching.for_trywith ~scopes ~return_layout e.exp_loc
@@ -2816,7 +2865,9 @@ and transl_handler ~scopes ~return_layout ~body_layout e body
       ~mode:alloc_heap ~ret_mode:alloc_heap
   in
   let eff_fun =
-    let param, param_duid = Typecore.name_cases "eff" eff_caselist in
+    let param, param_duid =
+      Typecore.name_cases ~pattern_kind:Effect_pattern "eff" eff_caselist
+    in
     let cont = Ident.create_local "k" in
     let cont_tail = Ident.create_local "ktail" in
     let eff_cases = transl_cases ~scopes ~cont return_layout eff_caselist in
