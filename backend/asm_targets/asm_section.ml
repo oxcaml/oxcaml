@@ -166,7 +166,7 @@ let details t first_occurrence =
   let text () = [".text"], None, [] in
   let data () = [".data"], None, [] in
   let rodata () = [".rodata"], None, [] in
-  let system = Target_system.System.derived_system () in
+  let system = Target_system.System.get () in
   let names, flags, args =
     match t, Target_system.Architecture.get (), system with
     | Text, _, _ -> text ()
@@ -217,33 +217,35 @@ let details t first_occurrence =
     (* Eight Byte Literals; based on corresponding upstream secions *)
     | Eight_byte_literals, _, MacOS_like ->
       ["__TEXT"; "__literal8"], None, ["8byte_literals"]
-    | Eight_byte_literals, _, (MinGW_64 | Cygwin) -> [".rdata"], Some "dr", []
-    | Eight_byte_literals, _, Win64 -> data ()
+    | Eight_byte_literals, _, Windows (MinGW | Cygwin) ->
+      [".rdata"], Some "dr", []
+    | Eight_byte_literals, _, Windows Native -> data ()
     | Eight_byte_literals, _, _ ->
       [".rodata.cst8"], Some "aM", ["@progbits"; "8"]
     (* Sixteen Byte Literals; based on corresponding upstream secions *)
     | Sixteen_byte_literals, _, MacOS_like ->
       ["__TEXT"; "__literal16"], None, ["16byte_literals"]
-    | Sixteen_byte_literals, _, (MinGW_64 | Cygwin) -> [".rdata"], Some "dr", []
-    | Sixteen_byte_literals, _, Win64 -> data ()
+    | Sixteen_byte_literals, _, Windows (MinGW | Cygwin) ->
+      [".rdata"], Some "dr", []
+    | Sixteen_byte_literals, _, Windows Native -> data ()
     | Sixteen_byte_literals, _, _ ->
       [".rodata.cst16"], Some "aM", ["@progbits"; "16"]
-    | Thirtytwo_byte_literals, _, (MinGW_64 | Cygwin) ->
+    | Thirtytwo_byte_literals, _, Windows (MinGW | Cygwin) ->
       [".rdata"], Some "dr", []
-    | Thirtytwo_byte_literals, _, Win64 -> data ()
+    | Thirtytwo_byte_literals, _, Windows Native -> data ()
     | Thirtytwo_byte_literals, _, _ ->
       [".rodata.cst32"], Some "aM", ["@progbits"; "32"]
-    | Sixtyfour_byte_literals, _, (MinGW_64 | Cygwin) ->
+    | Sixtyfour_byte_literals, _, Windows (MinGW | Cygwin) ->
       [".rdata"], Some "dr", []
-    | Sixtyfour_byte_literals, _, Win64 -> data ()
+    | Sixtyfour_byte_literals, _, Windows Native -> data ()
     | Sixtyfour_byte_literals, _, _ ->
       [".rodata.cst64"], Some "aM", ["@progbits"; "64"]
-    | Jump_tables, _, (MinGW_64 | Cygwin) -> [".rdata"], Some "dr", []
-    | Jump_tables, _, (MacOS_like | Win64) ->
+    | Jump_tables, _, Windows (MinGW | Cygwin) -> [".rdata"], Some "dr", []
+    | Jump_tables, _, (MacOS_like | Windows Native) ->
       text () (* with LLVM/OS X and MASM, use the text segment *)
     | Jump_tables, _, _ -> [".rodata"], None, []
     | Read_only_data, _, MacOS_like -> ["__DATA"; "__const"], None, ["regular"]
-    | Read_only_data, _, (MinGW_64 | Cygwin) -> [".rdata"], Some "dr", []
+    | Read_only_data, _, Windows (MinGW | Cygwin) -> [".rdata"], Some "dr", []
     | Read_only_data, _, _ -> rodata ()
     | Stapsdt_base, _, Linux ->
       [".stapsdt.base"], Some "aG", ["\"progbits\""; ".stapsdt.base"; "comdat"]
