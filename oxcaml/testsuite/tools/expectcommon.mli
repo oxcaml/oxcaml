@@ -45,8 +45,9 @@ end
 val register_assembly_callback : ((string -> unit) -> unit) option ref
 
 (** Set before compiling each chunk: tells the backend whether the
-    [%%expect_asm] capture should include the cold trailers. *)
-val set_assembly_include_cold : (bool -> unit) option ref
+    [%%expect_asm] capture should extend to the whole function, including the
+    trailing out-of-line code. *)
+val set_assembly_whole_function : (bool -> unit) option ref
 
 (** Hook to capture phrase compilation unit for [%%expect_fexpr]. This
     function should be set by expectnat.ml. *)

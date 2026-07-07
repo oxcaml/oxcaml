@@ -26,6 +26,8 @@ val end_assembly: unit -> unit
     tests. The callback is automatically cleared after being invoked once. *)
 val register_expect_asm_callback : (string -> unit) -> unit
 
-(** When set, the captured assembly for [%%expect_asm] includes each
-    function's cold trailers (e.g. the stack-realloc handler). *)
-val expect_asm_include_cold : bool ref
+(** When set, the captured assembly for [%%expect_asm] extends past each
+    function's hot body to the end of the function, including the trailing
+    out-of-line code (GC jump pads, safety-error calls, the stack-realloc
+    handler). *)
+val expect_asm_whole_function : bool ref

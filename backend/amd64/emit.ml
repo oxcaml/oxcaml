@@ -55,10 +55,11 @@ let expect_asm_callbacks = ref []
 
 let asm_collected_for_expect_asm = ref []
 
-(* When set, [record_for_expect_asm] extends the captured body to include the
-   function's cold trailers (e.g. the stack-realloc handler) instead of stopping
-   at the hot body. Used by the [%%expect_asm_with_cold] variant. *)
-let expect_asm_include_cold = ref false
+(* When set, [record_for_expect_asm] extends the captured body past the hot body
+   to the end of the function's emission, including the trailing out-of-line
+   code (GC jump pads, safety-error calls, the stack-realloc handler). Used by
+   the [%%expect_asm_full] variant. *)
+let expect_asm_whole_function = ref false
 
 let register_expect_asm_callback f =
   (* Reset label counter to make assembly more predictable. *)
@@ -2723,14 +2724,16 @@ let fundecl fundecl =
   let gc_jump_pads_end = current_output_pos () in
   emit_call_safety_errors ();
   emit_stack_realloc ();
-  (* [record_for_expect_asm] runs after the cold trailers so the
-     [%%expect_asm_with_cold] variant can include them (e.g. the stack-realloc
+  (* [record_for_expect_asm] runs after the trailing out-of-line code so the
+     [%%expect_asm_full] variant can include it (e.g. the stack-realloc
      handler). For the plain variant the body still stops at [fun_body_end] and
      the gc-pad range is unchanged, so its output is identical. *)
   record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
     ~fun_body_start
     ~fun_body_end:
-      (if !expect_asm_include_cold then current_output_pos () else fun_body_end)
+      (if !expect_asm_whole_function
+       then current_output_pos ()
+       else fun_body_end)
     ~gc_jump_pads_start:fun_body_end ~gc_jump_pads_end;
   (if !frame_required
    then

@@ -26,7 +26,10 @@ type expectation_filter = Principal | X86_64 | Raw | Simplify | Reaper
 
 type expectation_kind =
   | Expect_toplevel
-  | Expect_asm of { include_cold : bool }
+  (* When [whole_function] is [true], the capture extends past the hot body
+     and also shows the trailing out-of-line code: GC jump pads, safety-error
+     calls and the stack-realloc handler. *)
+  | Expect_asm of { whole_function : bool }
   | Expect_fexpr
 
 type expectation =
@@ -45,9 +48,9 @@ type chunk =
 let register_assembly_callback :
   ((string -> unit) -> unit) option ref = ref None
 
-(* Set before compiling a chunk to tell the backend whether to include the
-   functions' cold trailers in the [%%expect_asm] capture. *)
-let set_assembly_include_cold : (bool -> unit) option ref = ref None
+(* Set before compiling a chunk to tell the backend whether the [%%expect_asm]
+   capture should extend to the whole function (see [Expect_asm]). *)
+let set_assembly_whole_function : (bool -> unit) option ref = ref None
 
 let register_compilation_unit_callback :
   ((Compilation_unit.t -> unit) -> unit) option ref = ref None
@@ -76,9 +79,9 @@ let match_expect_extension (ext : Parsetree.extension) =
   let match_ext_name = function
     | "expect" | "ocaml.expect" -> Some Expect_toplevel
     | "expect_asm" | "ocaml.expect_asm" ->
-      Some (Expect_asm { include_cold = false })
-    | "expect_asm_with_cold" | "ocaml.expect_asm_with_cold" ->
-      Some (Expect_asm { include_cold = true })
+      Some (Expect_asm { whole_function = false })
+    | "expect_asm_full" | "ocaml.expect_asm_full" ->
+      Some (Expect_asm { whole_function = true })
     | "expect_fexpr" | "ocaml.expect_fexpr" -> Some Expect_fexpr
     | _ -> None
   in
@@ -485,28 +488,28 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
             let asm_expectations =
               List.filter_map chunk.expectations ~f:(fun exp ->
                   match exp.kind with
-                  | Expect_asm { include_cold } -> Some (exp, include_cold)
+                  | Expect_asm { whole_function } -> Some (exp, whole_function)
                   | Expect_toplevel | Expect_fexpr -> None)
             in
-            let include_cold = List.exists ~f:snd asm_expectations in
-            (if include_cold then
+            let whole_function = List.exists ~f:snd asm_expectations in
+            (if whole_function then
                match
                  List.find_opt asm_expectations
-                   ~f:(fun (_, with_cold) -> not with_cold)
+                   ~f:(fun (_, whole_function) -> not whole_function)
                with
                | Some (exp, _) ->
                  Location.raise_errorf ~loc:exp.extid_loc
-                   "[%%%%expect_asm] and [%%%%expect_asm_with_cold] cannot be \
+                   "[%%%%expect_asm] and [%%%%expect_asm_full] cannot be \
                     attached to the same code block"
                | None -> ());
             let keep_asm = !Clflags.keep_asm_file in
             if has_fexpr then Clflags.keep_asm_file := true;
-            Option.iter (fun set -> set include_cold)
-              !set_assembly_include_cold;
+            Option.iter (fun set -> set whole_function)
+              !set_assembly_whole_function;
         let (success, toplevel_output, asm_output, last_unit) =
           Fun.protect
             ~finally:(fun () ->
-              Option.iter (fun set -> set false) !set_assembly_include_cold;
+              Option.iter (fun set -> set false) !set_assembly_whole_function;
               Clflags.keep_asm_file := keep_asm)
             (fun () -> exec_phrases chunk.phrases)
         in
@@ -540,7 +543,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
       List.exists chunk.expectations ~f:(fun expectation ->
         match expectation.kind with
         | Expect_toplevel -> true
-        | Expect_asm | Expect_fexpr -> false))
+        | Expect_asm _ | Expect_fexpr -> false))
   in
   { corrected_expectations; trailing_output }, ~needs_principal
 
