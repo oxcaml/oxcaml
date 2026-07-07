@@ -6,11 +6,11 @@ Error: Signature mismatch:
        Modules do not match:
          sig val f : string -> int -> int end
        is not included in
-         sig val f : string -> int -> int @@ stateless noalloc_strict end
+         sig val f : string -> int -> int @@ stateless end
        Values do not match:
          val f : string -> int -> int
        is not included in
-         val f : string -> int -> int @@ stateless noalloc_strict
+         val f : string -> int -> int @@ stateless
        The type string -> int -> int is not compatible with the type
          string -> int -> int
        Type int -> int is not compatible with type int -> int
