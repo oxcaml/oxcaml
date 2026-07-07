@@ -89,7 +89,10 @@ let combine_add_rsp stats cell =
 
    This is safe when x is a register that is not read before the next write to x
    within the same basic block, and either A or B is a register, as memory to
-   memory moves don't exist.
+   memory moves don't exist. B must also not use x in its addressing expression:
+   the rewrite would compute the address from the stale value of x (deleting the
+   write of A to x). A may use x, since its read happens at the same program
+   point in both versions.
 
    We restrict x to Reg64 to avoid issues with aliasing or zeroed bits. *)
 let remove_mov_to_dead_register stats cell =
@@ -97,8 +100,9 @@ let remove_mov_to_dead_register stats cell =
   | [cell1; cell2] -> (
     match DLL.value cell1, DLL.value cell2 with
     | Ins (MOV (src1, Reg64 dst1)), Ins (MOV (Reg64 src2, dst2))
-      when equal_reg64 dst1 src2 && (U.is_register src1 || U.is_register dst2)
-      ->
+      when equal_reg64 dst1 src2
+           && (U.is_register src1 || U.is_register dst2)
+           && not (U.arg_contains_reg64 dst1 dst2) ->
       if
         (* Pattern: mov A, x; mov x, B *)
         U.reg64_is_never_read dst1 cell2

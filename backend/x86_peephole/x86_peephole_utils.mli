@@ -22,6 +22,8 @@ val is_register : arg -> bool
 
 val underlying_reg64 : arg -> reg64 option
 
+val arg_contains_reg64 : reg64 -> arg -> bool
+
 (** Instruction analysis *)
 
 val writes_to_reg64 : reg64 -> instruction -> bool
