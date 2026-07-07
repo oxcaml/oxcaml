@@ -119,11 +119,7 @@ let is_var_used (env : env) var =
 let is_name_used (env : env) name =
   Name.pattern_match name ~symbol:(is_symbol_used env) ~var:(is_var_used env)
 
-(* XXX so which is it? *)
-let poison_value = 0 (* 123456789 *)
-
-let poison ~machine_width kind =
-  Simple.const_int_of_kind ~machine_width kind poison_value
+let poison name kind = Simple.const (Reg_width_const.const_poison kind name)
 
 let simple_is_unboxable env simple =
   Simple.pattern_match
@@ -318,7 +314,7 @@ let get_simple_kind env simple =
     ~var:(fun var ~coercion:_ -> Name.Map.find (Name.var var) env.kinds)
     simple
 
-let name_poison env name =
+let name_poison ~category env name =
   let kind =
     match Name.Map.find_opt name env.kinds with
     | Some k -> k
@@ -327,7 +323,7 @@ let name_poison env name =
       then K.value
       else Misc.fatal_errorf "Unbound name %a" Name.print name
   in
-  poison ~machine_width:env.machine_width kind
+  poison category kind
 
 let rewrite_simple (env : env) simple =
   Simple.pattern_match simple
@@ -339,10 +335,10 @@ let rewrite_simple (env : env) simple =
       then
         (* This can happen if an unboxed block now only has an application for
            its only use, see [unboxed_or_function.ml] test. *)
-        name_poison env name
+        name_poison ~category:"reaper_rewrite_simple_unboxed" env name
       else if is_name_used env name
       then simple
-      else name_poison env name)
+      else name_poison ~category:"reaper_unused_name" env name)
     ~const:(fun _ -> simple)
 
 let rewrite_simple_opt (env : env) = function
@@ -596,7 +592,7 @@ let rewrite_static_const (env : env) ~(bound_to : Symbol.t) (sc : SC.t) =
           then rewrite_simple_with_debuginfo env field
           else
             Simple.With_debuginfo.create
-              (poison ~machine_width:env.machine_width kind)
+              (poison "reaper_field_of_static_const" kind)
               (Simple.With_debuginfo.dbg field))
         fields
     in
@@ -858,7 +854,7 @@ let make_apply_wrapper env
             | Keep (_, kind), Delete ->
               Ok
                 ( i + 1,
-                  poison ~machine_width:env.machine_width (KS.kind kind)
+                  poison "reaper_unused_variable_of_continuation" (KS.kind kind)
                   :: rev_args )
             | Unbox fields_apply, Unbox fields_func ->
               Ok
@@ -1214,7 +1210,8 @@ let rebuild_apply env apply =
               | Delete ->
                 Simple.pattern_match arg
                   ~const:(fun _ -> arg)
-                  ~name:(fun name ~coercion:_ -> name_poison env name)
+                  ~name:(fun name ~coercion:_ ->
+                    name_poison ~category:"reaper_unused_argument" env name)
             in
             let args_and_keep =
               if known_arity
@@ -1499,8 +1496,8 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
                 let arg = List.nth args nth in
                 if K.equal field_kind (get_simple_kind env arg)
                 then arg
-                else poison ~machine_width:env.machine_width field_kind
-              else poison ~machine_width:env.machine_width field_kind
+                else poison "reaper_dead_unboxed_field" field_kind
+              else poison "reaper_dead_unboxed_field" field_kind
             in
             if simple_is_unboxable env arg
             then Right (get_simple_unboxable env arg)
@@ -1789,7 +1786,7 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
         let f = Field.block i kind in
         if Analysis.field_used env.uses bound_name f
         then rewrite_simple env field
-        else poison ~machine_width:env.machine_width kind)
+        else poison "reaper_unused_field_of_block" kind)
       fields
   in
   let prim : P.t =
