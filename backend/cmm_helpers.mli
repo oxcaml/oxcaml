@@ -897,13 +897,13 @@ val float_as_int64 : dbg:Debuginfo.t -> expression -> expression
 
 (** Conversions functions between integers and floats. *)
 
-val int_of_float : dbg:Debuginfo.t -> expression -> expression
+val int64_of_float : dbg:Debuginfo.t -> expression -> expression
 
-val float_of_int : dbg:Debuginfo.t -> expression -> expression
+val float_of_int64 : dbg:Debuginfo.t -> expression -> expression
 
-val int_of_float32 : dbg:Debuginfo.t -> expression -> expression
+val int64_of_float32 : dbg:Debuginfo.t -> expression -> expression
 
-val float32_of_int : dbg:Debuginfo.t -> expression -> expression
+val float32_of_int64 : dbg:Debuginfo.t -> expression -> expression
 
 val float32_of_float : dbg:Debuginfo.t -> expression -> expression
 

@@ -63,9 +63,9 @@ let if_operation_supported_bi bi op ~f =
 let if_expr_supported expr =
   match Proc.expression_supported expr with true -> Some expr | false -> None
 
-let int_of_value arg dbg = Cop (Creinterpret_cast Int_of_value, [arg], dbg)
+let int64_of_value arg dbg = Cop (Creinterpret_cast Int64_of_value, [arg], dbg)
 
-let value_of_int arg dbg = Cop (Creinterpret_cast Value_of_int, [arg], dbg)
+let value_of_int64 arg dbg = Cop (Creinterpret_cast Value_of_int64, [arg], dbg)
 
 let shift ~bits make_op arg count dbg =
   assert (size_int = 8);
@@ -849,17 +849,17 @@ let transl_builtin name args dbg typ_res =
   | "caml_int64_float_of_bits_unboxed" ->
     Some (Cop (Creinterpret_cast Float_of_int64, args, dbg))
   | "caml_int64_of_float_unboxed" ->
-    Some (Cop (Cstatic_cast (Int_of_float Float64), args, dbg))
+    Some (Cop (Cstatic_cast (Int64_of_float Float64), args, dbg))
   | "caml_int64_to_float_unboxed" ->
-    Some (Cop (Cstatic_cast (Float_of_int Float64), args, dbg))
+    Some (Cop (Cstatic_cast (Float_of_int64 Float64), args, dbg))
   | "caml_float32_of_bits" ->
     Some (Cop (Creinterpret_cast Float32_of_int32, args, dbg))
   | "caml_float32_to_bits" ->
     Some (Cop (Creinterpret_cast Int32_of_float32, args, dbg))
   | "caml_float32_to_int64" ->
-    Some (Cop (Cstatic_cast (Int_of_float Float32), args, dbg))
+    Some (Cop (Cstatic_cast (Int64_of_float Float32), args, dbg))
   | "caml_float32_of_int64" ->
-    Some (Cop (Cstatic_cast (Float_of_int Float32), args, dbg))
+    Some (Cop (Cstatic_cast (Float_of_int64 Float32), args, dbg))
   | "caml_int_clz_tagged_to_untagged" ->
     if_operation_supported Cclz ~f:(fun () -> Cop (Cclz, args, dbg))
   | "caml_int_clz_untagged_to_untagged" ->
@@ -1021,9 +1021,9 @@ let transl_builtin name args dbg typ_res =
   | "caml_ext_pointer_as_native_pointer" ->
     Some (int_as_pointer (one_arg name args) dbg)
   | "caml_native_pointer_of_value" ->
-    Some (int_of_value (one_arg name args) dbg)
+    Some (int64_of_value (one_arg name args) dbg)
   | "caml_native_pointer_to_value" ->
-    Some (value_of_int (one_arg name args) dbg)
+    Some (value_of_int64 (one_arg name args) dbg)
   | "caml_native_pointer_load_immediate"
   | "caml_native_pointer_load_unboxed_nativeint" ->
     Some (Cop (mk_load_mut Word_int, args, dbg))

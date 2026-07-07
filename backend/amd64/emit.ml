@@ -1659,7 +1659,8 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
   let open Simd_instrs in
   let distinct = not (Reg.same_loc i.arg.(0) i.res.(0)) in
   match cast with
-  | Int_of_value | Value_of_int -> if distinct then I.mov (arg i 0) (res i 0)
+  | Int64_of_value | Value_of_int64 ->
+    if distinct then I.mov (arg i 0) (res i 0)
   | Float_of_float32 | Float32_of_float ->
     if distinct then movss (arg i 0) (res i 0)
   | V128_of_vec (Vec128 | Vec256) ->
@@ -1684,13 +1685,13 @@ let emit_static_cast (cast : Cmm.static_cast) i =
   let open Simd_instrs in
   let distinct = not (Reg.same_loc i.arg.(0) i.res.(0)) in
   match cast with
-  | Float_of_int Float64 ->
+  | Float_of_int64 Float64 ->
     sse_or_avx_dst cvtsi2sd_X_r64m64 vcvtsi2sd_X_X_r64m64 (arg i 0) (res i 0)
-  | Int_of_float Float64 ->
+  | Int64_of_float Float64 ->
     sse_or_avx cvttsd2si_r64_Xm64 vcvttsd2si_r64_Xm64 (arg i 0) (res i 0)
-  | Float_of_int Float32 ->
+  | Float_of_int64 Float32 ->
     sse_or_avx_dst cvtsi2ss_X_r64m64 vcvtsi2ss_X_X_r64m64 (arg i 0) (res i 0)
-  | Int_of_float Float32 ->
+  | Int64_of_float Float32 ->
     sse_or_avx cvttss2si_r64_Xm32 vcvttss2si_r64_Xm32 (arg i 0) (res i 0)
   | Float_of_float32 -> sse_or_avx_dst cvtss2sd vcvtss2sd (arg i 0) (res i 0)
   | Float32_of_float -> sse_or_avx_dst cvtsd2ss vcvtsd2ss (arg i 0) (res i 0)

@@ -4732,13 +4732,13 @@ let int64_as_float = unary (Creinterpret_cast Float_of_int64)
 
 let float_as_int64 = unary (Creinterpret_cast Int64_of_float)
 
-let int_of_float = unary (Cstatic_cast (Int_of_float Float64))
+let int64_of_float = unary (Cstatic_cast (Int64_of_float Float64))
 
-let float_of_int = unary (Cstatic_cast (Float_of_int Float64))
+let float_of_int64 = unary (Cstatic_cast (Float_of_int64 Float64))
 
-let int_of_float32 = unary (Cstatic_cast (Int_of_float Float32))
+let int64_of_float32 = unary (Cstatic_cast (Int64_of_float Float32))
 
-let float32_of_int = unary (Cstatic_cast (Float_of_int Float32))
+let float32_of_int64 = unary (Cstatic_cast (Float_of_int64 Float32))
 
 let float32_of_float = unary (Cstatic_cast Float32_of_float)
 
@@ -5752,7 +5752,7 @@ module Scalar_type = struct
         Misc.fatal_errorf "static_cast: casting %a to float is not implemented"
           Integral.print src
       else
-        unary (Cstatic_cast (Float_of_int dst)) ~dbg
+        unary (Cstatic_cast (Float_of_int64 dst)) ~dbg
           (Integral.static_cast exp ~dbg ~src ~dst:float_of_int_arg)
     | Float src, Integral dst -> (
       match Integral.signedness dst with
@@ -5764,7 +5764,7 @@ module Scalar_type = struct
            the rounded value doesn't fit in the integral type. We can't promote
            since nativeint is already the largest integral type supported
            here. *)
-        let exp = unary (Cstatic_cast (Int_of_float src)) exp ~dbg in
+        let exp = unary (Cstatic_cast (Int64_of_float src)) exp ~dbg in
         let src = Integral.nativeint in
         (* assert that nativeint is indeed the largest integer width *)
         assert (Integral.can_cast_without_losing_information ~src:dst ~dst:src);
