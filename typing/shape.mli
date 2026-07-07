@@ -111,6 +111,10 @@ module Rec_var_env : sig
   val find_opt : Rec_var_ident.t -> 'a t -> 'a option
 
   val map : ('a -> 'b) -> 'a t -> 'b t
+
+  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+
+  val hash : ('a -> int) -> 'a t -> int
 end
 
 module Sig_component_kind : sig
@@ -359,6 +363,8 @@ val equal_record_kind : record_kind -> record_kind -> bool
 val equal_complex_constructor :
   ('a -> 'a -> bool) -> 'a complex_constructor -> 'a complex_constructor -> bool
 
+val hash : t -> int
+
 (* Smart constructors *)
 
 val for_unnamed_functor_param : var
@@ -473,5 +479,3 @@ val of_path :
   namespace:Sig_component_kind.t -> Path.t -> t
 
 val set_uid_if_none : t -> Uid.t -> t
-
-module Cache : Hashtbl.S with type key = t

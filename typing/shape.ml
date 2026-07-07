@@ -147,7 +147,16 @@ module Rec_var_ident = struct
         (Compilation_unit.full_path_as_string cu) id
 end
 
-module Rec_var_env = Map.Make (Rec_var_ident)
+module Rec_var_env = struct
+  include Map.Make (Rec_var_ident)
+
+  let hash hash_value m =
+    fold
+      (fun k v acc -> Hashtbl.hash (Rec_var_ident.hash k, hash_value v, acc))
+      m 0
+
+  let equal eq_value m1 m2 = m1 == m2 || equal eq_value m1 m2
+end
 
 module Sig_component_kind = struct
   type t =
@@ -636,7 +645,7 @@ let rec equal_desc0 d1 d2 =
     Rec_var_ident.equal rv1 rv2 && equal t1_body t2_body
   | Rec_var rv1, Rec_var rv2 -> Rec_var_ident.equal rv1 rv2
   | Struct t1, Struct t2 ->
-    Item.Map.equal equal t1 t2
+    t1 == t2 || Item.Map.equal equal t1 t2
   | Proj (t1, i1), Proj (t2, i2) ->
     if Item.compare i1 i2 <> 0 then false
     else equal t1 t2
@@ -645,7 +654,7 @@ let rec equal_desc0 d1 d2 =
     Ident.equal c1 c2
     && List.equal equal ts1 ts2
   | Mutrec t1, Mutrec t2 ->
-    Ident.Map.equal equal t1 t2
+    t1 == t2 || Ident.Map.equal equal t1 t2
   | Proj_decl (t1, i1), Proj_decl (t2, i2) ->
     if Ident.equal i1 i2 then
       equal t1 t2
@@ -713,6 +722,8 @@ and equal_poly_variant_constructor
   { pv_constr_name = name2; pv_constr_args = args2 } =
   String.equal name1 name2 &&
   List.equal equal args1 args2
+
+let hash t = t.hash
 
 let rec print fmt t =
   let print_uid_opt =
@@ -1256,11 +1267,3 @@ module Map = struct
     let item = Item.jkind id in
     Item.Map.add item (proj shape item) t
 end
-
-module Cache = Hashtbl.Make (struct
-  type nonrec t = t
-
-  let hash t = t.hash
-
-  let equal = equal
-end)

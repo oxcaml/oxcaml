@@ -1207,54 +1207,10 @@ let create_boxed_simd_type ?name ~reference ~parent_proto_die split =
            DAH.create_type_from_reference ~proto_die_reference:base_ref ])
     ()
 
-module Shape_with_layout = struct
-  type t =
-    { type_shape : Shape.t;
-      type_layout : Layout.t
-    }
-
-  include Identifiable.Make (struct
-    type nonrec t = t
-
-    let compare = Stdlib.compare
-    (* CR sspies: Fix compare and equals on this type. Move the module to type
-       shape once it is more cleaned up. *)
-
-    let print fmt { type_shape; type_layout } =
-      Format.fprintf fmt "%a @ %a" Shape.print type_shape
-        (Format_doc.compat Layout.format)
-        type_layout
-
-    let hash { type_shape; type_layout } =
-      Hashtbl.hash (type_shape.hash, type_layout)
-
-    let equal ({ type_shape = x1; type_layout = y1 } : t)
-        ({ type_shape = x2; type_layout = y2 } : t) =
-      Shape.equal x1 x2 && Layout.equal y1 y2
-
-    let output _oc _t = Misc.fatal_error "unimplemented"
-  end)
-end
-
-module Dwarf_die_cache : sig
-  val find_in_cache :
-    RS.t -> rec_env:'a RS.DeBruijn_env.t -> Proto_die.reference option
-
-  val add_to_cache :
-    RS.t -> Proto_die.reference -> rec_env:'a RS.DeBruijn_env.t -> unit
-end = struct
-  let cache = RS.Cache.create 100
-
-  let find_in_cache (runtime_shape : RS.t) ~rec_env =
-    if RS.DeBruijn_env.is_empty rec_env
-    then RS.Cache.find_opt cache runtime_shape
-    else None
-
-  let add_to_cache (runtime_shape : RS.t) reference ~rec_env =
-    (* [rec_env] being empty means that the shape is closed. *)
-    if RS.DeBruijn_env.is_empty rec_env
-    then RS.Cache.add cache runtime_shape reference
-end
+module Die_gen_ctx = DS.Die_gen_ctx
+module Rec_var_env = Die_gen_ctx.Rec_var_env
+module Cache = Die_gen_ctx.Cache
+module Name_cache = Die_gen_ctx.Name_cache
 
 let partition_constructors constructors ~f =
   List.partition_map
@@ -1276,22 +1232,22 @@ let partition_constructors constructors ~f =
    [runtime_shape_to_dwarf_die] only works for types without names, and types
    with names are handled in [runtime_shape_to_dwarf_die_with_aliased_name]
    below. *)
-let rec runtime_shape_to_dwarf_die (t : RS.t) ~parent_proto_die
+let rec runtime_shape_to_dwarf_die ~ctx (t : RS.t) ~parent_proto_die
     ~fallback_value_die ~rec_env =
-  match Dwarf_die_cache.find_in_cache t ~rec_env with
+  match Cache.find (Die_gen_ctx.cache ctx) ~inp:t ~rec_env with
   | Some reference -> reference
   | None ->
     let reference = Proto_die.create_reference () in
-    Dwarf_die_cache.add_to_cache t reference ~rec_env;
+    Cache.add (Die_gen_ctx.cache ctx) ~inp:t ~rec_env ~outp:reference;
     let name = None in
     (* Instead of omitting the name argument below, we fix it to be [None] here
        such that it is easier to change this code if in the future we want to
        change how the names of types are handled. *)
-    runtime_shape_to_dwarf_die_memo t ?name ~reference ~parent_proto_die
+    runtime_shape_to_dwarf_die_memo ~ctx t ?name ~reference ~parent_proto_die
       ~fallback_value_die ~rec_env;
     reference
 
-and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
+and runtime_shape_to_dwarf_die_memo ~ctx ~reference ?name (t : RS.t)
     ~parent_proto_die ~fallback_value_die ~rec_env : unit =
   let err ~fallback f =
     if !Clflags.dwarf_pedantic
@@ -1301,11 +1257,12 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
         ~fallback_value_die ()
   in
   let die sh =
-    runtime_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die ~rec_env sh
+    runtime_shape_to_dwarf_die ~ctx ~parent_proto_die ~fallback_value_die
+      ~rec_env sh
   in
   let die_with_extended_env sh new_ref =
-    runtime_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die
-      ~rec_env:(RS.DeBruijn_env.push rec_env new_ref)
+    runtime_shape_to_dwarf_die ~ctx ~parent_proto_die ~fallback_value_die
+      ~rec_env:(Die_gen_ctx.push_rec_binder ctx rec_env new_ref)
       sh
   in
   match t.desc with
@@ -1313,8 +1270,8 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
     create_runtime_layout_type ~reference type_layout ?name ~parent_proto_die
       ~fallback_value_die ()
   | Predef p ->
-    predef_to_dwarf_die ~reference ?name p ~parent_proto_die ~fallback_value_die
-      ~rec_env
+    predef_to_dwarf_die ~ctx ~reference ?name p ~parent_proto_die
+      ~fallback_value_die ~rec_env
   | Tuple { args; kind = Tuple_boxed } ->
     (* CR sspies: In the future, tuples have to be handled like mixed
        records. *)
@@ -1406,7 +1363,7 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
              Format.pp_print_string)
           constructor_names)
   | Rec_var (de_bruijn_index, layout) -> (
-    match RS.DeBruijn_env.get_opt rec_env ~de_bruijn_index with
+    match Rec_var_env.get_opt rec_env ~de_bruijn_index with
     | Some reference' ->
       create_typedef_die ~reference ~parent_proto_die ?name reference'
     | None ->
@@ -1421,10 +1378,11 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
     let reference' = die_with_extended_env sh reference in
     create_typedef_die ~reference ~parent_proto_die ?name reference'
 
-and predef_to_dwarf_die ~reference ?name (t : RS.predef) ~parent_proto_die
+and predef_to_dwarf_die ~ctx ~reference ?name (t : RS.predef) ~parent_proto_die
     ~fallback_value_die ~rec_env =
   let die sh =
-    runtime_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die ~rec_env sh
+    runtime_shape_to_dwarf_die ~ctx ~parent_proto_die ~fallback_value_die
+      ~rec_env sh
   in
   match t with
   | Array (Regular s) ->
@@ -1456,11 +1414,6 @@ and predef_to_dwarf_die ~reference ?name (t : RS.predef) ~parent_proto_die
       ~fallback_value_die ()
 (* CR sspies: Create a separate block for lazy values. We now have type
    information for them. *)
-
-(** This second cache is for named type shapes. Every type name should be
-    associated with at most one DWARF die, so this cache maps type names to type
-    shapes and DWARF dies. *)
-let name_cache = String.Tbl.create 16
 
 module With_cms_reduce = Shape_reduce.Make (struct
   let fuel () = MB.of_option !Clflags.gdwarf_config_shape_reduce_fuel
@@ -1549,43 +1502,29 @@ end)
 
 module D = Shape_reduction_diagnostics
 
-(* Search for the first unused suffix-numbered version of [name] in the
-   [name_cache] cache. If we come along a type of the same name and runtime
-   shape, then we simply use that reference. *)
-let find_unused_type_name_or_cached (name : string) (runtime_shape : RS.t) :
-    (Proto_die.reference, string) Either.t =
-  let rec aux inc : _ Either.t =
-    let name_suffix = if inc = 0 then "" else "/" ^ string_of_int inc in
-    let name = name ^ name_suffix in
-    match String.Tbl.find_opt name_cache name with
-    | Some (runtime_shape', reference) ->
-      if RS.equal runtime_shape runtime_shape'
-      then Left reference
-      else aux (inc + 1)
-    | None -> Right name
-  in
-  aux 0
-
 (* We represent all types as DIE entries of the form [typedef ... type_name;]
    and use caching for types that have the same name and shape. For name
    conflicts, we search for the next available suffix-numbered version of the
    name, [type_name/n]. *)
-let runtime_shape_to_dwarf_die_with_aliased_name (type_name : string)
+let runtime_shape_to_dwarf_die_with_aliased_name ~ctx (type_name : string)
     (runtime_shape : RS.t) ~parent_proto_die ~fallback_value_die :
     Proto_die.reference =
-  match find_unused_type_name_or_cached type_name runtime_shape with
+  let name_cache = Die_gen_ctx.name_cache ctx in
+  match
+    Name_cache.find_unused_name_or_cached name_cache type_name runtime_shape
+  with
   | Left reference -> reference
   | Right name ->
     let unnamed_die =
-      runtime_shape_to_dwarf_die runtime_shape ~parent_proto_die
+      runtime_shape_to_dwarf_die ~ctx runtime_shape ~parent_proto_die
         ~fallback_value_die (* note that we do not pass the type name here *)
-        ~rec_env:RS.DeBruijn_env.empty
+        ~rec_env:(Die_gen_ctx.empty_rec_env ctx)
     in
     let reference = Proto_die.create_reference () in
     let runtime_layout = RS.runtime_layout runtime_shape in
     let layout_name = RL.to_string runtime_layout in
     let full_name = name ^ " @ " ^ layout_name in
-    String.Tbl.add name_cache name (runtime_shape, reference);
+    Name_cache.add name_cache name runtime_shape reference;
     create_typedef_die ~reference ~name:full_name ~parent_proto_die unnamed_die;
     reference
 
@@ -1633,6 +1572,7 @@ let variable_to_die state ~value_type_proto_die (var_uid : Uid.t)
       Profile.record "unfold_and_evaluate"
         (fun () ->
           Type_shape.Evaluated_shape.unfold_and_evaluate
+            ~ctx:(DS.eval_context state)
             ~diagnostics:(D.shape_evaluation_diagnostics reduction_diagnostics)
             type_shape)
         ~accumulate:true ()
@@ -1699,8 +1639,9 @@ let variable_to_die state ~value_type_proto_die (var_uid : Uid.t)
         let reference =
           Profile.record "dwarf_produce_dies"
             (fun () ->
-              runtime_shape_to_dwarf_die_with_aliased_name type_name
-                runtime_shape ~parent_proto_die ~fallback_value_die)
+              runtime_shape_to_dwarf_die_with_aliased_name
+                ~ctx:(DS.die_gen_ctx state) type_name runtime_shape
+                ~parent_proto_die ~fallback_value_die)
             ~accumulate:true ()
         in
         if Debugging_the_compiler.enabled ()
