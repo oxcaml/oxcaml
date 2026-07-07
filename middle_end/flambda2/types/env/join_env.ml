@@ -85,6 +85,7 @@
    an efficient (linear) implementation of this function. *)
 
 module K = Flambda_kind
+module NO = Name_occurrences
 module TG = Type_grammar
 module TE = Typing_env
 module ME = Meet_env
@@ -1952,20 +1953,68 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
            (Bindings_in_target_env.alias_types_in_target_env bindings))
         Name.Map.empty
     in
-    let target_env =
+    (* Variables that only occur once in the target environment are projected
+       out and replaced with their type. *)
+    let equations =
+      (equations
+        : Type_in_target_env.t Name_in_target_env.Map.t
+        :> TG.t Name.Map.t)
+    in
+    let name_occurrences =
+      Name.Map.fold
+        (fun _name ty free_names ->
+          NO.union free_names (NO.with_only_variables (TG.free_names ty)))
+        equations NO.empty
+    in
+    let name_occurrences =
+      NO.union name_occurrences
+        (NO.with_only_variables
+           (TEE.free_names env_extension_for_inverse_relations))
+    in
+    let target_env, to_project =
       Bindings_in_target_env.fold_created_variables
-        (fun var kind target_env ->
-          ME.add_variable_definition target_env
-            (var : Variable_in_target_env.t :> Variable.t)
-            kind Name_mode.in_types)
-        bindings source_env
+        (fun var kind (target_env, to_project) ->
+          let var = (var : Variable_in_target_env.t :> Variable.t) in
+          match NO.count_variable name_occurrences var with
+          | Zero | One -> target_env, Variable.Set.add var to_project
+          | More_than_one ->
+            let target_env =
+              ME.add_variable_definition target_env var kind Name_mode.in_types
+            in
+            target_env, to_project)
+        bindings
+        (source_env, Variable.Set.empty)
+    in
+    let rec expand var =
+      match Name.Map.find_or_null (Name.var var) equations with
+      | Null -> More_type_creators.unknown (Variable.kind var)
+      | This ty -> (
+        match TG.get_alias_opt ty with
+        | None -> TG.project_variables_out ~to_project ~expand ty
+        | Some simple ->
+          Simple.pattern_match' simple
+            ~const:(fun _ -> ty)
+            ~symbol:(fun _ ~coercion:_ -> ty)
+            ~var:(fun var ~coercion ->
+              if Variable.Set.mem var to_project
+              then TG.apply_coercion (expand var) coercion
+              else ty))
+    in
+    let equations =
+      Name.Map.filter_map
+        (fun name ty ->
+          Name.pattern_match name
+            ~symbol:(fun _ ->
+              Some (TG.project_variables_out ~to_project ~expand ty))
+            ~var:(fun var ->
+              if Variable.Set.mem var to_project
+              then None
+              else Some (TG.project_variables_out ~to_project ~expand ty)))
+        equations
     in
     let target_env =
       ME.add_env_extension ~meet_expanded_head target_env
-        (TEE.from_map
-           (equations
-             : Type_in_target_env.t Name_in_target_env.Map.t
-             :> TG.t Name.Map.t))
+        (TEE.from_map equations)
     in
     let target_env =
       ME.add_env_extension ~meet_expanded_head target_env
@@ -1979,8 +2028,18 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
             symbol_projection)
         symbol_projections target_env
     in
-    ( target_env,
-      Bindings_in_target_env.new_bindings bindings ~since:empty_bindings )
+    let new_bindings =
+      (* Variables that have been projected need to also be removed from the
+         bindings, since they no longer exist. *)
+      Name_in_target_env.Map.filter
+        (fun name _ ->
+          Name.pattern_match
+            (name :> Name.t)
+            ~var:(fun var -> not (Variable.Set.mem var to_project))
+            ~symbol:(fun _ -> true))
+        (Bindings_in_target_env.new_bindings bindings ~since:empty_bindings)
+    in
+    target_env, new_bindings
   with Misc.Fatal_error ->
     let bt = Printexc.get_raw_backtrace () in
     Format.eprintf "\n@[<v 2>%tContext is:%t cut and join of levels:@ %a@]\n"
