@@ -302,7 +302,7 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
               ~arg_types:
                 (T.unknown_types_from_arity result_arity
                    ~alloc_mode:
-                     (Apply.alloc_mode apply
+                     (Apply.return_mode apply
                     |> Alloc_mode.For_applications.as_type)
                    ~machine_width:(DE.machine_width (DA.denv dacc)))
           in
@@ -357,7 +357,7 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
                       (VB.create result_var result_uid NM.in_types)
                       (T.unknown_with_subkind kind
                          ~alloc_mode:
-                           (Apply.alloc_mode apply
+                           (Apply.return_mode apply
                           |> Alloc_mode.For_applications.as_type)
                          ~machine_width:(DE.machine_width denv)))
                   denv result_arity results
@@ -1035,7 +1035,7 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
           ~arg_types:
             (T.unknown_types_from_arity (Apply.return_arity apply)
                ~alloc_mode:
-                 (Apply.alloc_mode apply |> Alloc_mode.For_applications.as_type)
+                 (Apply.return_mode apply |> Alloc_mode.For_applications.as_type)
                ~machine_width:(DE.machine_width denv))
       in
       dacc, Some use_id
@@ -1275,7 +1275,7 @@ let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~down_to_up =
       ~arg_types:
         (T.unknown_types_from_arity (Apply.return_arity apply)
            ~alloc_mode:
-             (Apply.alloc_mode apply |> Alloc_mode.For_applications.as_type)
+             (Apply.return_mode apply |> Alloc_mode.For_applications.as_type)
            ~machine_width:(DE.machine_width denv))
   in
   let dacc, exn_cont_use_id =
@@ -1327,7 +1327,7 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
           let from_arity =
             T.unknown_types_from_arity return_arity
               ~alloc_mode:
-                (Apply.alloc_mode apply |> Alloc_mode.For_applications.as_type)
+                (Apply.return_mode apply |> Alloc_mode.For_applications.as_type)
               ~machine_width:(DE.machine_width (DA.denv dacc))
           in
           match return_types with
@@ -1415,7 +1415,7 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
           ~arg_types:
             (T.unknown_types_from_arity (Apply.return_arity apply)
                ~alloc_mode:
-                 (Apply.alloc_mode apply |> Alloc_mode.For_applications.as_type)
+                 (Apply.return_mode apply |> Alloc_mode.For_applications.as_type)
                ~machine_width:(DE.machine_width denv))
       in
       dacc, Some use_id
