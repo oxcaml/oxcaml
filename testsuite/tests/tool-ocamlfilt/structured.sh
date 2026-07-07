@@ -26,4 +26,7 @@ ${OCAMLFILT} --format structured \
   "_CamlU3FooSu14D2e_fooml_2_10F4initF4fn_5_6" \
   "_CamlU3FooF3barPu14D2e_fooml_9_15" \
   "_CamlU3FooM3BarIU3BazF3qux" \
-  "_CamlU3FooM3BarO5ShapeF4area"
+  "_CamlU3FooM3BarO5ShapeF4area" \
+  "_CamlU3FooLu14J2d__none__0_1" \
+  "_CamlU3FooLu18D2eD2d_fooml_1_512" \
+  "_CamlU3FooSu8B2d__1_7"

@@ -19,3 +19,7 @@ check_roundtrip 'let*'
 check_roundtrip '@@'
 check_roundtrip 'file.ml:12:34'
 check_roundtrip 'Naïveté'
+# Missing-location payloads carry negative components (Location.none gives
+# line 0 / column -1; ppx code may use line -1); the '-' must still round-trip.
+check_roundtrip '_none__0_-1'
+check_roundtrip 'foo.ml_-1_512'
