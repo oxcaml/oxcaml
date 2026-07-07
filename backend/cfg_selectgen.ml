@@ -681,9 +681,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               (* CR jrayman: Unclear why [Addr] and [Int] were previously mapped
                  to [Word_val] *)
               | Addr | Tagged_int | Naked_int (Int64 | Int63) -> Word_int
-              | Naked_int Int32 -> Thirtytwo_signed
-              | Naked_int Int16 -> Sixteen_signed
-              | Naked_int Int8 -> Byte_signed
+              | Naked_int (Int32 | Int16 | Int8) -> Word_int
               | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
             in
             insert_debug env sub_cfg
