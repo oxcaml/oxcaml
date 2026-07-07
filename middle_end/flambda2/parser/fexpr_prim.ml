@@ -85,6 +85,8 @@ let binary_int_arith_op =
          "mul", Mul;
          "div", Div Signed;
          "mod", Mod Signed;
+         "udiv", Div Unsigned;
+         "umod", Mod Unsigned;
          "and", And;
          "or", Or;
          "xor", Xor ]
