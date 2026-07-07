@@ -326,6 +326,11 @@ val walk_locks : env:t -> loc:Location.t -> Longident.t ->
     stateful. *)
 val walk_locks_for_legacy_construct : env:t -> Mode.Hint.pinpoint -> unit
 
+(** Registers a use of an allocation, constraining every enclosing closure lock.
+    Used for constructs with allocations that force enclosing functions to be
+    alloc (rather than noalloc_strict) *)
+val walk_locks_for_allocation : env:t -> Mode.Hint.pinpoint -> unit
+
 val lookup_value:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
   Path.t * value_description * mode_with_locks
