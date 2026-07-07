@@ -1061,3 +1061,38 @@ module type S37 =
     val f : ('t : word). 't -> 't
   end
 |}]
+
+(* Explicit [('a : any)] annotation on this GADT compiles. *)
+
+module type S38_explicit = sig
+  type ('a : any) t =
+    | F32 : float# t
+    | I32 : int# t
+end
+
+[%%expect{|
+module type S38_explicit =
+  sig type ('a : any) t = F32 : float# t | I32 : int# t end
+|}]
+
+(* CR dkalinichenko: should be equivalent to the explicit version. *)
+
+module type S38_implicit = sig
+  [@@@implicit_kind: ('a : any)]
+
+  type 'a t =
+    | F32 : float# t
+    | I32 : int# t
+end
+
+[%%expect{|
+Line 6, characters 12-16:
+6 |     | I32 : int# t
+                ^^^^
+Error: This type "int#" should be an instance of type "('a : float64)"
+       The layout of int# is untagged_immediate
+         because it is the unboxed version of the primitive type int.
+       But the layout of int# must be a sublayout of float64
+         because it instantiates an unannotated type parameter of t,
+         chosen to have layout float64.
+|}]
