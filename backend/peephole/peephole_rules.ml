@@ -42,7 +42,13 @@ let remove_overwritten_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
       (* We only consider the removal of spill and reload instructions because a
          move from/to an arbitrary memory location could fail because of memory
          protection. *)
-      delete_fst_if_redundant ~fst ~snd ~fst_val ~snd_val
+      (* If [snd] reads the location it overwrites (i.e. is an identity move),
+         deleting [fst] would change the value [snd] reads. Such moves are
+         currently removed by [Regalloc_utils.simplify_cfg] before this pass
+         runs, but do not rely on that here. *)
+      if U.are_equal_regs snd_val.arg.(0) snd_val.res.(0)
+      then None
+      else delete_fst_if_redundant ~fst ~snd ~fst_val ~snd_val
     | _, _ -> None)
   | _ -> None
 
