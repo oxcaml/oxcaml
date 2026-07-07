@@ -2351,6 +2351,7 @@ let end_assembly () =
   let frametable_sym = S.create_global frametable in
   global_maybe_protected frametable_sym;
   D.define_symbol_label ~section:frametable_section frametable_sym;
+  Emitaux.disable_short_descriptors := false;
   (* CR sspies: Share the [emit_frames] code with the x86 backend. *)
   emit_frames
     { efa_code_label =
@@ -2376,6 +2377,12 @@ let end_assembly () =
           let lbl = label_to_asm_label ~section:frametable_section lbl in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:(Targetint.of_int32 ofs));
+      efa_label_delta =
+        (fun upper lower ->
+          (* The return-address labels live in the text section. *)
+          let upper = label_to_asm_label ~section:Text upper in
+          let lower = label_to_asm_label ~section:Text lower in
+          D.delta_uleb128 ~upper ~lower);
       efa_def_label =
         (fun lbl ->
           let lbl = label_to_asm_label ~section:frametable_section lbl in
