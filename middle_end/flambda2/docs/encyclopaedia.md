@@ -430,3 +430,155 @@ of match forwarding:
 - matches on polymorphic variants will not be forwarded
 - some matches can be transformed into array lookups, in which case match forwarding
   will not trigger
+
+## Interprocedural optimizations
+
+The following optimizations are performed by the *reaper* pass, which runs
+after the main simplification pass and reasons across function boundaries. It
+is not enabled by default, you need `-flambda2-reaper` or `-O4` to enable it.
+A more detailed explanation of the model of the reaper is in [reaper.md], which
+can help in practice understanding why a particular change is or is not made.
+
+Note: in all the examples, `[@inline never][@local never]` are not necessary
+for the optimization to happen, they are necessary to prevent *other*
+optimizations from happening so we can demonstrate those optimizations on
+simple examples.
+
+### Calling convention change
+
+Calling convention change can remove parameters that are never used or return
+values that are never read from a function. In that case, the dead parameters
+and dead return values are removed from the function's signature, and all call
+sites are updated accordingly. It can only happen if all the call sites of the
+function are known: the function must not be indirectly called, nor exported in
+the `.mli`.
+
+```ocaml
+(* Before calling convention change *)
+let f n =
+  let[@inline never][@local never] helper x _unused = x * x in
+  helper n 42
+
+(* After calling convention change *)
+let f n =
+  let[@inline never][@local never] helper x = x * x in
+  helper n
+```
+
+```ocaml
+(* Before calling convention change *)
+let f n =
+  let[@inline never][@local never] helper x = #(x * x, x + 1) in
+  let #(a, _) = (helper n) in
+  a
+
+(* After calling convention change *)
+let f n =
+  let[@inline never][@local never] helper x = x * x in
+  let a = helper n in
+  a
+```
+
+### Cross-function unboxing
+
+Cross-function unboxing allows unboxing of blocks that could not undergo
+intraprocedural unboxing, because they are passed to, or returned from, a
+function. The block will then be replaced by its fields at each place it is
+passed. If the block is passed as an argument to a function, or returned from
+it, that function must be able to undergo calling convention change. An
+important restriction is that cross-function unboxing will only unbox single
+allocations: if a value could come from two different allocations in the
+program, even if these have the same shape, cross-function unboxing is not
+applied. This limitation may be lifted in the future.
+
+```ocaml
+(* Before cross-function unboxing *)
+let f n =
+  let[@inline never][@local never] add pair = fst pair + snd pair in
+  add (n, n * 2)
+
+(* After cross-function unboxing *)
+let f n =
+  let[@inline never][@local never] add x y = x + y in
+  add n (n * 2)
+```
+
+Cross-function unboxing also applies to return values:
+
+```ocaml
+(* Before cross-function unboxing *)
+let f n =
+  let[@inline never][@local never] make_pair x = (x, x + 1) in
+  let (a, b) = make_pair n in
+  a + b
+
+(* After cross-function unboxing *)
+let f n =
+  let[@inline never][@local never] make_pair x = #(x, x + 1) in
+  let #(a, b) = make_pair n in
+  a + b
+```
+
+### Closure unboxing
+
+Closure unboxing triggers when a closure is never stored or passed as a
+higher-order value, so all of its uses are direct calls. In that case, the
+closure allocation itself is eliminated: its free variables are passed as extra
+parameters at every call site instead of being bundled into a closure object.
+Like cross-function unboxing, this requires calling convention change to be
+applicable to the function.
+
+```ocaml
+(* Before closure unboxing *)
+let f x =
+  (* g captures x; a closure is allocated containing [x]. *)
+  let[@inline never][@local never] g y = x + y in
+  g 1 + g 2
+
+(* After closure unboxing and calling convention change *)
+(* No closure is allocated; x is passed as an extra argument *)
+let f x =
+  let[@inline never][@local never] g x y = x + y in
+  g x 1 + g x 2
+```
+
+### Unboxing free variables of closures
+
+Unboxing free variables of closures triggers when a closure captures a block as
+a free variable, but the block itself can be unboxed. In that case, the
+closure's representation is changed: instead of storing the block pointer, it
+stores the fields of the block directly as separate captured variables. Unlike
+closure unboxing, this optimization applies even when the closure escapes (e.g.
+is passed to a higher-order function), as long as the function has been defined
+*in the current compilation unit*, and you use `-O4` or `-reaper-local-fields`.
+
+```ocaml
+(* Before unboxing free variables of closures *)
+let f a b callback =
+  let pair = (a, b) in
+  (* pair is stored in g's closure *)
+  let[@inline never][@local never] g () = fst pair + snd pair in
+  callback g
+
+(* After unboxing free variables of closures *)
+(* pair is no longer stored in the closure; its fields are stored instead *)
+let f a b callback =
+  let[@inline never][@local never] g () = a + b in
+  callback g
+```
+
+### Limitations
+
+- Only single allocations may be unboxed: a variable that might correspond to
+  several allocations will *not* be unboxed, even if those allocations have the
+  same shape. This also means that in cases where the allocation is not visible
+  (for instance if we know a given value is a pair, without seeing its actual
+  allocation), cross-function unboxing will not happen. This restriction may be
+  lifted in the future.
+
+- Boxed numbers (floats and int32/int64/nativeint) are *not* supported for the
+  moment. It is likely this restriction will be lifted in the near future.
+
+- Functions not defined in the current compilation unit will *not* have their
+  free variables unboxed if they escape. This is a limitation of the semantic
+  model of flambda, and this will *not* be changed in the future.
