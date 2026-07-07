@@ -123,6 +123,36 @@ let read_clflags_from_env () =
   set_from_env Clflags.error_style Clflags.error_style_reader;
   ()
 
+(* The compiler is allocation-heavy and short-lived, so it benefits from a
+   laxer GC pace than the runtime default (space_overhead = 120): raising it
+   trades peak heap for fewer major collections. On large compilation units
+   this is about -8 to -10% wall-clock time at the cost of roughly +45% peak
+   heap. We only bump the default: if OCAMLRUNPARAM/CAMLRUNPARAM explicitly
+   sets space_overhead ("o=..."), the user/build-farm asked for a specific
+   value (possibly the default 120) and we leave it untouched. *)
+let compiler_space_overhead = 200
+
+(* Mirror the runtime's OCAMLRUNPARAM parser (runtime/startup_aux.c): the
+   active variable is OCAMLRUNPARAM if it is set at all, otherwise
+   CAMLRUNPARAM; within it, fields are separated by commas and each field's
+   first character is its single-letter key. Lowercase 'o' is space_overhead
+   (uppercase 'O' is a different knob, max_overhead, which we ignore here). *)
+let space_overhead_set_in_env () =
+  let param =
+    match Sys.getenv_opt "OCAMLRUNPARAM" with
+    | Some _ as p -> p
+    | None -> Sys.getenv_opt "CAMLRUNPARAM"
+  in
+  match param with
+  | None -> false
+  | Some s ->
+    String.split_on_char ',' s
+    |> List.exists (fun field -> String.length field > 0 && field.[0] = 'o')
+
+let set_gc_pacing_defaults () =
+  if not (space_overhead_set_in_env ()) then
+    Gc.set { (Gc.get ()) with Gc.space_overhead = compiler_space_overhead }
+
 let directory_exists dir =
   Sys.file_exists dir && Sys.is_directory dir
 
