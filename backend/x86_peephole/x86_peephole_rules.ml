@@ -31,7 +31,12 @@ let peephole_stats_to_counters stats =
    d2 Rewrite: addq $(n1+n2), %rsp; .cfi_adjust_cfa_offset (d1+d2)
 
    This only applies when d1 = -n1 and d2 = -n2 (i.e., the CFI offsets correctly
-   track the stack adjustment). *)
+   track the stack adjustment).
+
+   The rewrite does not preserve the flags: the combined ADD sets CF/OF/AF
+   differently from the second original ADD, and when n1 + n2 = 0 the sequence
+   is deleted and no flags are written at all. This relies on the emitter never
+   generating code that reads the flags of a stack adjustment. *)
 let combine_add_rsp stats cell =
   match U.get_cells cell 4 with
   | [cell1; cell2; cell3; cell4] -> (
