@@ -248,6 +248,11 @@ val outer_with_aliased_contention_crossing :
 
 type unique_abstract_payload = { x : abstract_value @@ unique }
 [%%expect{|
+Line 1, characters 55-61:
+1 | type unique_abstract_payload = { x : abstract_value @@ unique }
+                                                           ^^^^^^
+Warning 220 [redundant-modality]: This modality is redundant.
+
 type unique_abstract_payload = { x : abstract_value; }
 |}]
 
@@ -272,6 +277,11 @@ type crosses_contention_payload = int option
 type aliased_crossing_payload = {
   x : crosses_contention_payload @@ aliased;
 }
+Line 3, characters 67-73:
+3 | type unique_crossing_payload = { x : crosses_contention_payload @@ unique }
+                                                                       ^^^^^^
+Warning 220 [redundant-modality]: This modality is redundant.
+
 type unique_crossing_payload = { x : crosses_contention_payload; }
 |}]
 
