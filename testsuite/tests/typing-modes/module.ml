@@ -244,7 +244,7 @@ Error: The module "M" is "nonportable"
 module F (X : S @ portable) = struct
 end
 [%%expect{|
-module F : functor (X : S @ portable) -> sig end @@ stateless noalloc_strict
+module F : functor (X : S @ portable) -> sig end @@ stateless
 |}]
 
 module type S = functor () (M : S @ portable) (_ : S @ portable) -> S
@@ -264,7 +264,7 @@ end
 module F :
   functor () ->
     sig val foo : unit -> unit @@ stateless noalloc_strict end @ once
-  @@ stateless noalloc_strict
+  @@ stateless
 |}]
 
 module type Empty = sig end
@@ -398,7 +398,7 @@ end
 [%%expect{|
 module F :
   functor (X : sig val x : int -> int end) -> sig val bar : int -> int end @@
-  stateless noalloc_strict
+  stateless
 |}]
 
 
