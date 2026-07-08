@@ -2779,6 +2779,9 @@ let unbox_once env ty =
                                    or_null = None }) lbls)
         | Type_record_unboxed_product ([], _, _) ->
           Misc.fatal_error "Ctype.unboxed_once: fieldless record"
+        (* [@repr null] coexistence ([Variant_with_null_boxed]) types are
+           boxed, not unboxed, so they fall through to the [Final_result]
+           catch-all below. *)
         | Type_variant (cstrs, Variant_with_null, _) ->
           begin match Datarepr.find_variant_with_null_payload cstrs with
           | Some

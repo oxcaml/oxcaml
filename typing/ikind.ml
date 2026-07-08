@@ -776,13 +776,17 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
               ~validate_label:validate_immutable_unboxed_label lbls
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
-        | Types.Type_variant (_cstrs, Types.Variant_with_null, _umc_opt) ->
-          (* [Variant_with_null] (i.e. [or_null]) has semantics that are not
-             captured by its constructors: nullability/separability and
-             mode-crossing are baked into its representation. We defer to
-             jkinds because ikinds cannot express this today. This deferral
-             can be removed once separability and nullability become layout
-             properties rather than modal axes. *)
+        | Types.Type_variant
+            ( _cstrs,
+              (Types.Variant_with_null | Types.Variant_with_null_boxed _),
+              _umc_opt ) ->
+          (* [Variant_with_null] (i.e. [or_null]) and the [@repr null]
+             coexistence representation [Variant_with_null_boxed] have
+             semantics that are not captured by their constructors:
+             nullability/separability and mode-crossing are baked into the
+             representation. We defer to jkinds because ikinds cannot express
+             this today. This deferral can be removed once separability and
+             nullability become layout properties rather than modal axes. *)
           use_decl_jkind ~treat_as_abstract:false
         | Types.Type_variant (cstrs, rep, _umc_opt) ->
           (* Choose base: immediate for void-only variants; sync if any record

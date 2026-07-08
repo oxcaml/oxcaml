@@ -978,6 +978,11 @@ and variant_representation =
   *)
   | Variant_extensible
   | Variant_with_null
+  (* [@repr null] prototype: a single nullary constructor represented as the
+     null pointer, coexisting with ordinary constructors represented exactly
+     like [Variant_boxed].  The array has an element for each constructor (the
+     null constructor occupies a dead nullary slot). *)
+  | Variant_with_null_boxed of cstr_layout array
 
 and cstr_layout =
   | Cstr_layout_known of

@@ -534,6 +534,13 @@ and variant_representation =
   | Variant_boxed of cstr_layout array
   | Variant_extensible
   | Variant_with_null
+  (* [@repr null] prototype: a single nullary constructor represented as the
+     null pointer, coexisting with ordinary constructors that are represented
+     exactly like [Variant_boxed] (constants as immediates, non-constants as
+     boxed blocks -- never payload-unboxed).  The layout array covers every
+     constructor in source order; the null constructor occupies a (dead)
+     nullary slot. *)
+  | Variant_with_null_boxed of cstr_layout array
 
 and cstr_layout =
   | Cstr_layout_known of
@@ -958,7 +965,19 @@ let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | Variant_extensible, Variant_extensible ->
       true
   | Variant_with_null, Variant_with_null -> true
-  | (Variant_unboxed | Variant_boxed _ | Variant_extensible | Variant_with_null), _ ->
+  | Variant_with_null_boxed layouts1, Variant_with_null_boxed layouts2 ->
+      Misc.Stdlib.Array.equal
+        (fun l1 l2 -> match l1, l2 with
+           | Cstr_layout_variable, Cstr_layout_variable -> true
+           | Cstr_layout_known { shape = s1; sorts = ss1 },
+             Cstr_layout_known { shape = s2; sorts = ss2 } ->
+             equal_constructor_representation_up_to_scannable_axes s1 s2
+             && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal ss1 ss2
+           | (Cstr_layout_known _ | Cstr_layout_variable), _ -> false)
+        layouts1
+        layouts2
+  | (Variant_unboxed | Variant_boxed _ | Variant_extensible | Variant_with_null
+    | Variant_with_null_boxed _), _ ->
       false
 
 let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
@@ -1038,7 +1057,8 @@ let find_unboxed_type decl =
   | Type_record_unboxed_product
       (_, (Record_unboxed_product | Record_unboxed_product_variable), _)
   | Type_variant (_, ( Variant_boxed _ | Variant_unboxed
-                     | Variant_extensible | Variant_with_null), _)
+                     | Variant_extensible | Variant_with_null
+                     | Variant_with_null_boxed _), _)
   | Type_abstract _ | Type_open ->
     None
 

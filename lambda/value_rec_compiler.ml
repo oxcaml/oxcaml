@@ -307,12 +307,14 @@ let compute_static_size lam =
         begin match repres with
         | Record_boxed
         | Record_inlined (_, Constructor_uniform_value,
-                          (Variant_boxed _ | Variant_extensible)) ->
+                          (Variant_boxed _ | Variant_with_null_boxed _
+                          | Variant_extensible)) ->
             Block (Regular_block size)
         | Record_float ->
             Block (Float_record size)
         | Record_inlined (_, Constructor_mixed shape,
-                          (Variant_boxed _ | Variant_extensible))
+                          (Variant_boxed _ | Variant_with_null_boxed _
+                          | Variant_extensible))
         | Record_mixed shape ->
             if Mixed_product_bytes.types_shape_is_all_value shape
             then

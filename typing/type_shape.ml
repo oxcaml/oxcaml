@@ -583,8 +583,10 @@ module Type_decl_shape = struct
         | Type_variant (([] | _ :: _ :: _), Variant_unboxed, _) ->
           Misc.fatal_error "Unboxed variant must have exactly one constructor."
         | Type_variant
-            (_, (Variant_extensible | Variant_with_null), _unsafe_mode_crossing)
-          ->
+            ( _,
+              ( Variant_extensible | Variant_with_null
+              | Variant_with_null_boxed _ ),
+              _unsafe_mode_crossing ) ->
           unknown_shape ()
           (* CR sspies: These variants are not yet supported. *)
         | Type_record (lbl_list, record_repr, _unsafe_mode_crossing) -> (

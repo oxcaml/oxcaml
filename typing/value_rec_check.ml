@@ -789,7 +789,7 @@ let rec expression : Typedtree.expression -> term_judg =
       let arg_mode i = match desc.cstr_repr with
         | Variant_unboxed | Variant_with_null ->
           Return
-        | Variant_boxed _ | Variant_extensible ->
+        | Variant_boxed _ | Variant_with_null_boxed _ | Variant_extensible ->
            (match shape with
             | Constructor_uniform_value -> Guard
             | Constructor_mixed mixed_shape ->

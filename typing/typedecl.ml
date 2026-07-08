@@ -139,6 +139,8 @@ type error =
   | Unexpected_layout_any_in_primitive of string
   | Useless_layout_poly
   | Bad_or_null_attribute of string
+  | Unsupported_repr_attribute of string
+  | Bad_repr_attribute of string
   | Zero_alloc_attr_unsupported of Builtin_attributes.zero_alloc_attribute
   | Zero_alloc_attr_non_function
   | Zero_alloc_attr_bad_user_arity
@@ -980,6 +982,21 @@ let transl_declaration env sdecl (id, uid) =
   let flatten_floats =
     Builtin_attributes.has_flatten_floats sdecl.ptype_attributes
   in
+  (* [@repr unboxed] on a constructor requests the whole-variant unboxed
+     representation, exactly like [@@unboxed].  We reuse the [unbox] flag so it
+     flows through main's existing [Variant_unboxed] machinery; the shape is
+     validated in the [Ptype_variant] branch below. *)
+  let repr_unboxed_ctor =
+    match sdecl.ptype_kind with
+    | Ptype_variant scstrs ->
+      List.exists
+        (fun (c : Parsetree.constructor_declaration) ->
+           Builtin_attributes.repr_payload_ident c.pcd_attributes
+           = Some "unboxed")
+        scstrs
+    | Ptype_abstract | Ptype_record _ | Ptype_record_unboxed_product _
+    | Ptype_open -> false
+  in
   let unbox, unboxed_default =
     (* [unboxed_default] is [true] iff the user did not specify an explicit
        representation attribute ([@@unboxed], [@@represent_as_float_array],
@@ -988,11 +1005,13 @@ let transl_declaration env sdecl (id, uid) =
     | Ptype_variant [{pcd_args = Pcstr_tuple [_]; _}]
     | Ptype_variant [{pcd_args = Pcstr_record [{pld_mutable=Immutable; _}]; _}]
     | Ptype_record [{pld_mutable=Immutable; _}] ->
-      Option.value unboxed_attr
-        ~default:(!Clflags.unboxed_types && not represent_as_float_array),
+      (Option.value unboxed_attr
+        ~default:(!Clflags.unboxed_types && not represent_as_float_array))
+      || repr_unboxed_ctor,
       Option.is_none unboxed_attr
       && not represent_as_float_array
       && not flatten_floats
+      && not repr_unboxed_ctor
     | Ptype_record_unboxed_product _ -> false, false
     | _ -> false, false (* Not unboxable, mark as boxed *)
   in
@@ -1121,8 +1140,79 @@ let transl_declaration env sdecl (id, uid) =
             (fun () -> make_cstr scstr)
         in
         let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
+        (* [@repr <ident>] prototype.  Supported idents: [null], [value],
+           [unboxed].  [immediate] and [pointer] are rejected with a clean
+           "not yet supported" error; any other ident likewise. *)
+        let repr_of (scstr : Parsetree.constructor_declaration) =
+          Builtin_attributes.repr_payload_ident scstr.pcd_attributes
+        in
+        List.iter
+          (fun scstr ->
+             match repr_of scstr with
+             | None | Some ("null" | "value" | "unboxed") -> ()
+             | Some other ->
+               raise (Error (scstr.pcd_loc, Unsupported_repr_attribute other)))
+          scstrs;
+        let count ident =
+          List.length (List.filter (fun c -> repr_of c = Some ident) scstrs)
+        in
+        let n_null = count "null" and n_value = count "value"
+        and n_unboxed = count "unboxed" in
+        let uses_repr_value = n_value > 0 in
+        let uses_repr_unboxed = n_unboxed > 0 in
+        let bad msg = raise (Error (sdecl.ptype_loc, Bad_repr_attribute msg)) in
+        (* [@repr value]: exactly one [@repr null] (nullary) + one [@repr value]
+           (unary), nothing else.  This is precisely the [@@or_null] shape, and
+           is mapped onto the [Variant_with_null] representation below. *)
+        if uses_repr_value then begin
+          if n_value <> 1 || n_null <> 1 || List.length scstrs <> 2
+             || uses_repr_unboxed
+          then bad "[@repr value] may only coexist with a single \
+                    [@repr null] constructor";
+          (match sdecl.ptype_private with
+           | Private -> bad "[@repr value] is not supported on private types"
+           | Public -> ());
+          List.iter
+            (fun scstr ->
+               match repr_of scstr, scstr.pcd_args with
+               | Some "value", Pcstr_tuple [_] -> ()
+               | Some "value", _ ->
+                 bad "[@repr value] requires a unary constructor"
+               | Some "null", Pcstr_tuple [] -> ()
+               | Some "null", _ ->
+                 bad "[@repr null] requires a nullary constructor"
+               | _ -> bad "[@repr value] may only coexist with [@repr null]")
+            scstrs
+        end;
+        (* [@repr unboxed]: exactly one unary constructor, not combined with any
+           other [@repr] attribute.  Mapped onto [Variant_unboxed] via the
+           [unbox] flag computed above. *)
+        if uses_repr_unboxed then begin
+          if n_unboxed > 1 || n_null > 0 || uses_repr_value then
+            bad "[@repr unboxed] cannot be combined with other [@repr] \
+                 attributes";
+          match scstrs with
+          | [c] when (match c.pcd_args with
+                      | Pcstr_tuple [_] | Pcstr_record [_] -> true
+                      | _ -> false) -> ()
+          | _ -> bad "[@repr unboxed] requires a single unary constructor"
+        end;
+        (* [@repr null] without [@repr value]: the coexistence-with-ordinary
+           representation from stage 1. *)
+        let uses_repr_null_boxed = n_null > 0 && not uses_repr_value in
+        if uses_repr_null_boxed then
+          List.iter
+            (fun scstr ->
+               if Builtin_attributes.has_repr_null scstr.pcd_attributes then
+                 match scstr.pcd_args with
+                 | Pcstr_tuple [] -> ()
+                 | _ ->
+                   bad "[@repr null] requires a nullary constructor")
+            scstrs;
+        (* [@repr value] reuses the [@@or_null] payload machinery wholesale. *)
+        let treat_as_or_null = or_null || uses_repr_value in
         let or_null_payload_arg =
-          if or_null then begin
+          if treat_as_or_null then begin
             let payload_arg = get_or_null_payload_arg cstrs in
             let payload_ty = payload_arg.Types.ca_type in
             let payload_loc = payload_arg.Types.ca_loc in
@@ -1131,8 +1221,30 @@ let transl_declaration env sdecl (id, uid) =
           end else
             None
         in
+        (* We mark all arg sorts "void" here.  They are updated later, after
+           the circular type checks make it safe to check sorts.  Likewise,
+           [Constructor_uniform_value] is potentially wrong and will be updated
+           later. *)
+        let dummy_boxed_layouts () =
+          Array.map
+            (fun cstr ->
+               let sorts =
+                 match Types.(cstr.cd_args) with
+                 | Cstr_tuple args ->
+                   Array.make (List.length args) Jkind.Sort.Const.void
+                 | Cstr_record _ -> [| Jkind.Sort.Const.scannable |]
+               in
+               Cstr_layout_known
+                 { shape = Constructor_uniform_value; sorts })
+            (Array.of_list cstrs)
+        in
         let rep, jkind =
           match or_null_payload_arg with
+          | _ when uses_repr_null_boxed ->
+            (* The type includes the null pointer, so its (placeholder) jkind
+               is nullable; [update_decl_jkind] refines it later. *)
+            Variant_with_null_boxed (dummy_boxed_layouts ()),
+            Jkind.Builtin.value_or_null ~why:V1_safety_check
           | Some payload_arg ->
             let payload_ty = payload_arg.Types.ca_type in
             let modality = payload_arg.Types.ca_modalities in
@@ -1143,25 +1255,8 @@ let transl_declaration env sdecl (id, uid) =
               Variant_unboxed,
               Jkind.Builtin.any ~why:Old_style_unboxed_type
             else
-              (* We mark all arg sorts "void" here.  They are updated later,
-                 after the circular type checks make it safe to check sorts.
-                 Likewise, [Constructor_uniform_value] is potentially wrong
-                 and will be updated later.
-              *)
-              Variant_boxed (
-                Array.map
-                  (fun cstr ->
-                     let sorts =
-                       match Types.(cstr.cd_args) with
-                        | Cstr_tuple args ->
-                          Array.make (List.length args) Jkind.Sort.Const.void
-                        | Cstr_record _ -> [| Jkind.Sort.Const.scannable |]
-                      in
-                      Cstr_layout_known
-                        { shape = Constructor_uniform_value; sorts })
-                   (Array.of_list cstrs)
-               ),
-               Jkind.for_non_float ~why:Boxed_variant
+              Variant_boxed (dummy_boxed_layouts ()),
+              Jkind.for_non_float ~why:Boxed_variant
         in
           Ttype_variant tcstrs, Type_variant (cstrs, rep, None), jkind
       | Ptype_record lbls ->
@@ -2405,7 +2500,7 @@ let update_record_inlined_kind env loc lbls jkinds tag vrep : _ Result.t =
     (* The shape of an unboxed constructor is always
        [Constructor_uniform_value], as at declaration time. *)
     Ok (Record_inlined (tag, Constructor_uniform_value, Variant_unboxed))
-  | Variant_boxed _ as vrep ->
+  | (Variant_boxed _ | Variant_with_null_boxed _) as vrep ->
     let lbl_decls =
       List.map (fun (ld, ty) -> { ld with Types.ld_type = ty }) lbls
     in
@@ -2529,6 +2624,59 @@ let rec update_decl_jkind env dpath decl =
   let update_variant_kind loc cstrs rep =
     (* CR layouts: factor out duplication *)
     match cstrs, rep with
+    | cstrs, Variant_with_null_boxed cstr_layouts ->
+      (* [@repr null] coexistence: the ordinary constructors are represented
+         exactly like [Variant_boxed] (constants as immediates, non-constants
+         as boxed blocks), so reuse that machinery to fill the layout array and
+         compute the jkind, then mark it nullable because the type includes the
+         null pointer. *)
+      let cstrs =
+        List.mapi (fun idx cstr ->
+          let cd_args, ~constant, cstr_repr, arg_sorts =
+            update_constructor_representation_and_arg_sorts env
+              cstr.Types.cd_loc cstr.Types.cd_args
+              ~is_extension_constructor:false
+          in
+          let is_nonempty_all_void =
+            constant
+            && (match cd_args with
+                | Cstr_tuple (_ :: _) -> true
+                | Cstr_tuple [] | Cstr_record _ -> false)
+          in
+          if is_nonempty_all_void
+          && not (Builtin_attributes.has_immediate_all_void_constructor
+                    cstr.Types.cd_attributes)
+          then
+            raise
+              (Error (cstr.Types.cd_loc,
+                      Missing_immediate_all_void_constructor_attribute
+                        (Ident.name cstr.Types.cd_id)));
+          let () =
+            match cstr_repr, arg_sorts with
+            | Ok shape, Some sorts ->
+                cstr_layouts.(idx) <- Cstr_layout_known { shape; sorts }
+            | Ok _, None ->
+                Misc.fatal_error "Representation but no arg sorts?"
+            | _, _ ->
+                assert_any_args_support loc;
+                cstr_layouts.(idx) <- Cstr_layout_variable
+          in
+          { cstr with Types.cd_args }) cstrs
+      in
+      let jkind =
+        Jkind.for_boxed_variant
+          ~loc
+          ~decl_params:decl.type_params
+          ~type_apply:(Ctype.apply env)
+          ~get_free_vars:(Ctype.free_variable_set_of_list env)
+          (List.rev cstrs)
+      in
+      let jkind =
+        match Jkind.apply_or_null_l env jkind with
+        | Ok jkind -> jkind
+        | Error () -> jkind
+      in
+      cstrs, Variant_with_null_boxed cstr_layouts, jkind
     | _, Variant_with_null ->
       begin match Datarepr.find_variant_with_null_payload cstrs with
       | Some
@@ -5896,6 +6044,16 @@ let report_error ~loc = function
         Style.inline_code "[@layout_poly]"
   | Bad_or_null_attribute msg ->
       Location.errorf ~loc "Invalid [@@or_null] declaration:@ %s." msg
+  | Unsupported_repr_attribute repr ->
+      Location.errorf ~loc
+        "%a is not yet supported;@ only %a, %a and %a are currently \
+         implemented."
+        Style.inline_code (Printf.sprintf "[@repr %s]" repr)
+        Style.inline_code "[@repr null]"
+        Style.inline_code "[@repr value]"
+        Style.inline_code "[@repr unboxed]"
+  | Bad_repr_attribute msg ->
+      Location.errorf ~loc "Invalid [@repr] declaration:@ %s." msg
   | Zero_alloc_attr_unsupported ca ->
       let variety = match ca with
         | Default_zero_alloc  | Check _ -> assert false

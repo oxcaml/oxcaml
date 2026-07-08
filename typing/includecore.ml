@@ -1312,7 +1312,8 @@ module Variant_diffing = struct
     | None, Variant_unboxed, Variant_unboxed
     | None, Variant_boxed _, Variant_boxed _
     | None, Variant_extensible, Variant_extensible
-    | None, Variant_with_null, Variant_with_null -> None
+    | None, Variant_with_null, Variant_with_null
+    | None, Variant_with_null_boxed _, Variant_with_null_boxed _ -> None
     | Some err, _, _ ->
         Some (Variant_mismatch err)
     | None, Variant_unboxed, Variant_boxed _ ->
@@ -1326,6 +1327,10 @@ module Variant_diffing = struct
     | None, Variant_with_null, _ ->
       Some (With_null_representation First)
     | None, _, Variant_with_null ->
+      Some (With_null_representation Second)
+    | None, Variant_with_null_boxed _, _ ->
+      Some (With_null_representation First)
+    | None, _, Variant_with_null_boxed _ ->
       Some (With_null_representation Second)
 end
 

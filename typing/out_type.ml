@@ -1907,7 +1907,7 @@ let tree_of_single_constructor ~all_void cd =
    boxed variant and has at least one argument, all of which are void. *)
 let constructor_is_all_void rep cd =
   match (rep : Types.variant_representation) with
-  | Variant_boxed _ -> begin
+  | Variant_boxed _ | Variant_with_null_boxed _ -> begin
       match cd.cd_args with
       | Cstr_tuple ((_ :: _) as args) ->
           List.for_all
@@ -2059,7 +2059,8 @@ let tree_of_type_decl id decl =
         let unboxed =
           match rep with
           | Variant_unboxed -> true
-          | Variant_boxed _ | Variant_extensible | Variant_with_null -> false
+          | Variant_boxed _ | Variant_extensible | Variant_with_null
+          | Variant_with_null_boxed _ -> false
         in
         let or_null_attribute =
           if Builtin_attributes.has_or_null decl.type_attributes then

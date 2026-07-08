@@ -915,7 +915,16 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       | _ -> assert false
     end
-  | Variant_boxed cstr_layouts ->
+  | Variant_boxed cstr_layouts | Variant_with_null_boxed cstr_layouts ->
+    (* [@repr null] coexistence ([Variant_with_null_boxed]) reuses the boxed
+       analysis for accurate block shapes, then marks the result nullable
+       because the type includes the null pointer. *)
+    let result_nullable : Lambda.nullable =
+      match rep with
+      | Variant_with_null_boxed _ -> Nullable
+      | Variant_unboxed | Variant_boxed _ | Variant_extensible
+      | Variant_with_null -> Non_nullable
+    in
     let depth = depth + 1 in
     let substitute_cd_args (cd_args : Types.constructor_arguments) =
       let substitute ty = Ctype.apply env params ty args in
@@ -1084,7 +1093,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           (num_nodes_visited, Pvariant { consts; non_consts })
       end
     in
-    num_nodes_visited, non_nullable raw_kind
+    num_nodes_visited, { raw_kind; nullable = result_nullable }
 
 and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
       (labels : Types.label_declaration list) rep =
@@ -1105,7 +1114,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected variable representation"
   | Record_inlined (_, _, Variant_with_null) -> assert false
-  | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
+  | Record_inlined (_, _, (Variant_boxed _ | Variant_with_null_boxed _
+                          | Variant_extensible))
   | Record_boxed | Record_float | Record_ufloat | Record_mixed _ -> begin
       let is_mutable =
         List.exists (fun label -> Types.is_mutable label.Types.ld_mutable)
