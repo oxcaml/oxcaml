@@ -1,0 +1,16 @@
+# Keep the SHA-pinned GitHub Actions in .github/workflows/ from going stale.
+# Dependabot understands SHA pins: it bumps the commit hash and rewrites the
+# trailing "# vX.Y.Z" comment to match the new release.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: / # scans .github/workflows/ (and action.yml files at the root)
+    schedule:
+      interval: weekly
+    groups:
+      # One combined PR per week instead of one PR per action.
+      actions:
+        patterns:
+          - "*"
+    cooldown:
+      default-days: 7

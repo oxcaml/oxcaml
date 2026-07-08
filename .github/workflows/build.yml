@@ -11,10 +11,14 @@ on:
       - '*'
   pull_request:
   merge_group:
+permissions: {}
 jobs:
   build:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      actions: read # the "Print diff artifact URL" step reads workflow artifacts via `gh api`
 
     strategy:
       fail-fast: false
@@ -241,7 +245,9 @@ jobs:
 
     steps:
       - name: Checkout the OxCaml repo
-        uses: actions/checkout@master
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
 
       - name: Runner information
         if: runner.os == 'Linux'
@@ -253,12 +259,17 @@ jobs:
 
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux' && (matrix.sysdeps != '')
+        env:
+          SYSDEPS: ${{ matrix.sysdeps }}
+          MATRIX_CC: ${{ matrix.cc }}
         run: |
-          if ! sudo apt-get install -y ${{ matrix.sysdeps }}; then
+          # $SYSDEPS is deliberately unquoted: word-splitting is intended
+          # (it is a whitespace-separated list of packages).
+          if ! sudo apt-get install -y $SYSDEPS; then
             sudo apt-get update -y
-            sudo apt-get install -y ${{ matrix.sysdeps }}
+            sudo apt-get install -y $SYSDEPS
           fi
-          if [ '${{ matrix.cc }}' = 'musl-gcc' ]; then
+          if [ "$MATRIX_CC" = 'musl-gcc' ]; then
             # Install musl-compatible kernel headers
             mkdir musl-kernel
             filename='v4.19.88-1.tar.gz'
@@ -279,7 +290,7 @@ jobs:
         # makes setup-ocaml skip apt-get, which is slow on first invocation
 
       - name: Set up Opam
-        uses: ocaml/setup-ocaml@v3
+        uses: ocaml/setup-ocaml@e32b06a3e831ff2fbc6f08cf35be2085e3918014 # v3.6.1
         with:
           ocaml-compiler: oxcaml-ci-deps.5.4.0-with-ocaml.5.4.0-with-ocamlformat.0.29.0
           opam-repositories: |
@@ -294,27 +305,32 @@ jobs:
           opam env --set-root --set-switch --shell=cmd | sed -n 's/^set //p' | tee -a "$GITHUB_ENV"
 
       - name: Disable any testcases
+        env:
+          DISABLE_TESTCASES: ${{ matrix.disable_testcases }}
         run: |
-          disable_testcases="${{matrix.disable_testcases}}"
+          disable_testcases="$DISABLE_TESTCASES"
           if [ -n "$disable_testcases" ]; then
             rm -fv $disable_testcases
           fi
 
       - name: Install custom OxCaml LLVM
         if: matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'
+        env:
+          MATRIX_OXCAML_LLVM_TAG: ${{ matrix.oxcaml_llvm_tag }}
+          MATRIX_OXCAML_LLVM_SOURCE_BRANCH: ${{ matrix.oxcaml_llvm_source_branch }}
         run: |
           # Determine architecture
-          if [[ "${{ runner.arch }}" == "X64" ]]; then
+          if [[ "$RUNNER_ARCH" == "X64" ]]; then
             ARCH="x86_64"
-          elif [[ "${{ runner.arch }}" == "ARM64" ]]; then
+          elif [[ "$RUNNER_ARCH" == "ARM64" ]]; then
             ARCH="aarch64"
           else
-            echo "Unsupported architecture: ${{ runner.arch }}"
+            echo "Unsupported architecture: $RUNNER_ARCH"
             exit 1
           fi
 
-          OXCAML_LLVM_TAG="${{ matrix.oxcaml_llvm_tag }}"
-          OXCAML_LLVM_SOURCE_BRANCH="${{ matrix.oxcaml_llvm_source_branch }}"
+          OXCAML_LLVM_TAG="$MATRIX_OXCAML_LLVM_TAG"
+          OXCAML_LLVM_SOURCE_BRANCH="$MATRIX_OXCAML_LLVM_SOURCE_BRANCH"
           OXCAML_LLVM_URL="https://github.com/ocaml-flambda/llvm-project/releases/download/${OXCAML_LLVM_TAG}/${OXCAML_LLVM_TAG}-llvm-linux-${ARCH}-${OXCAML_LLVM_SOURCE_BRANCH}.tar.gz"
 
           # Download and extract custom OxCaml LLVM (includes LLDB and other LLVM tools)
@@ -324,23 +340,30 @@ jobs:
           tar -xzf oxcaml-llvm.tar.gz -C oxcaml-llvm --strip-components=1
 
       - name: Configure OxCaml
+        env:
+          MATRIX_CC: ${{ matrix.cc }}
+          INSTALL_PATH: ${{ matrix.install_path }}
+          DISSECTOR_ASSEMBLER: ${{ matrix.dissector_assembler }}
+          MATRIX_CONFIG: ${{ matrix.config }}
         run: |
-          if [[ -n "${{matrix.cc}}" ]]; then
-            export CC="${{matrix.cc}}"
+          if [[ -n "$MATRIX_CC" ]]; then
+            export CC="$MATRIX_CC"
           fi
-          if [[ -n "${{matrix.install_path}}" ]]; then
-            install_path="${{matrix.install_path}}"
+          if [[ -n "$INSTALL_PATH" ]]; then
+            install_path="$INSTALL_PATH"
           else
             install_path="_install"
           fi
           dissector_config=""
-          if [[ "${{matrix.dissector_assembler}}" == "true" ]]; then
+          if [[ "$DISSECTOR_ASSEMBLER" == "true" ]]; then
             dissector_config="--enable-assembler-suitable-for-dissector=$GITHUB_WORKSPACE/oxcaml-llvm/bin/llvm-mc"
           fi
           autoconf
+          # $MATRIX_CONFIG is deliberately unquoted: word-splitting is
+          # intended (it is a whitespace-separated list of configure flags).
           ./configure \
             --prefix=$GITHUB_WORKSPACE/$install_path \
-            ${{ matrix.config }} \
+            $MATRIX_CONFIG \
             $dissector_config
 
       - name: Setup for saving core files (Linux)
@@ -366,7 +389,7 @@ jobs:
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
         id: build
         run: |
-          if [ "${{ matrix.collect_metrics }}" = "true" ]; then
+          if [ "$COLLECT_METRICS" = "true" ]; then
             mkdir $GITHUB_WORKSPACE/_profile_csv
             BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
             OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
@@ -375,6 +398,7 @@ jobs:
           make compiler \
             || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
         env:
+          COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
           OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
@@ -383,7 +407,7 @@ jobs:
       - name: Run OxCaml testsuite
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
         run: |
-          if [ "${{ matrix.collect_metrics }}" = "true" ]; then
+          if [ "$COLLECT_METRICS" = "true" ]; then
             BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
             OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
           fi
@@ -391,6 +415,7 @@ jobs:
           make runtest \
             || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
         env:
+          COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
           OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
@@ -399,7 +424,7 @@ jobs:
       - name: Run upstream testsuite
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
         run: |
-          if [ "${{ matrix.collect_metrics }}" = "true" ]; then
+          if [ "$COLLECT_METRICS" = "true" ]; then
             BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
             OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
           fi
@@ -407,6 +432,7 @@ jobs:
           make runtest-upstream \
             || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
         env:
+          COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
           OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
@@ -415,7 +441,7 @@ jobs:
       - name: Run minimizer
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
         run: |
-          if [ "${{ matrix.collect_metrics }}" = "true" ]; then
+          if [ "$COLLECT_METRICS" = "true" ]; then
             BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
             OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
           fi
@@ -423,6 +449,7 @@ jobs:
           make minimizer \
             || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
         env:
+          COLLECT_METRICS: ${{ matrix.collect_metrics }}
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
           OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
@@ -503,7 +530,7 @@ jobs:
 
       - name: Upload test diffs
         if: failure() && env.DIFF_CREATED == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         continue-on-error: true
         with:
           name: test-diffs-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
@@ -514,18 +541,19 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+          MATRIX_NAME: ${{ matrix.name }}
         run: |
-          ARTIFACT_NAME="test-diffs-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}"
+          ARTIFACT_NAME="test-diffs-$GITHUB_SHA-$GITHUB_RUN_ID-$MATRIX_NAME"
           # Wait a moment for artifact to be registered
           sleep 5
           # Get artifact URL from GitHub API
-          ARTIFACT_URL=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
+          ARTIFACT_URL=$(gh api repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts \
             --jq ".artifacts[] | select(.name == \"$ARTIFACT_NAME\") | .archive_download_url")
           if [ -n "$ARTIFACT_URL" ]; then
             COMMAND="./tools/apply-diff.sh $ARTIFACT_URL"
             echo "$COMMAND"
           else
-            echo "Artifact uploaded but URL not yet available. Check: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "Artifact uploaded but URL not yet available. Check: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           fi
 
       - name: Check other architectures
@@ -534,9 +562,11 @@ jobs:
 
       - name: Build and test ocamldebug
         if: matrix.build_debug == true
+        env:
+          INSTALL_PATH: ${{ matrix.install_path }}
         run: |
-          if [[ -n "${{matrix.install_path}}" ]]; then
-            install_path="${{matrix.install_path}}"
+          if [[ -n "$INSTALL_PATH" ]]; then
+            install_path="$INSTALL_PATH"
           else
             install_path="_install"
           fi
@@ -568,8 +598,13 @@ jobs:
       - name: Collect and push metrics
         if: matrix.collect_metrics == true && github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
-          GH_TOKEN: ${{ secrets.METRICS_REPO_TOKEN }}
+          # Ideally this secret would be scoped to a dedicated deployment
+          # environment (with `environment:` on the job); that requires
+          # repo-settings changes, so we suppress the finding for now.
+          GH_TOKEN: ${{ secrets.METRICS_REPO_TOKEN }} # zizmor: ignore[secrets-outside-env]
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          # The actual commit being tested (not the merge commit, for PRs)
+          COMMIT_HASH: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: |
           # Checkout metrics repository
           gh repo clone oxcaml/oxcaml-metrics metrics-repo
@@ -577,29 +612,13 @@ jobs:
           # Create raw-data directory if it doesn't exist
           mkdir -p metrics-repo/raw-data
 
-          # Determine the actual commit being tested (not the merge commit for PRs)
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            COMMIT_HASH="${{ github.event.pull_request.head.sha }}"
-          else
-            COMMIT_HASH="${{ github.sha }}"
-          fi
-          SHORT_HASH="${COMMIT_HASH:0:8}"
-          DATE=$(date -u +"%Y-%m-%d")
-
-          # Determine the actual commit being tested (not the merge commit for PRs)
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            COMMIT_HASH="${{ github.event.pull_request.head.sha }}"
-          else
-            COMMIT_HASH="${{ github.sha }}"
-          fi
-
           # Use the metrics collection script (CSV filename and PR number computed internally)
-          python3 ${{ github.workspace }}/scripts/collect-metrics.py \
-            --install-dir "${{ github.workspace }}/_install" \
+          python3 $GITHUB_WORKSPACE/scripts/collect-metrics.py \
+            --install-dir "$GITHUB_WORKSPACE/_install" \
             --output-dir "metrics-repo/raw-data" \
             --commit-hash "$COMMIT_HASH" \
             --commit-message "$COMMIT_MESSAGE" \
-            --profile-dir "${{ github.workspace }}/_profile_csv" \
+            --profile-dir "$GITHUB_WORKSPACE/_profile_csv" \
             --verbose
 
           # Commit and push metrics
@@ -616,14 +635,14 @@ jobs:
           git push || (git pull --rebase && git push)
 
       - name: Upload core dumps
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: cores-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
           path: /cores
 
       - name: Upload DiagnosticReports (macOS)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure() && runner.os == 'macOS'
         with:
           name: DiagnosticReports-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}

@@ -2,13 +2,22 @@ name: build
 on:
   workflow_dispatch:
 #  pull_request:
+permissions: {}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 jobs:
   build:
+    name: boot-build comparison
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout the OxCaml repo
-        uses: actions/checkout@master
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
 
       - name: Pretend we're running in a container (makes setup-ocaml go faster)
         if: runner.os == 'Linux'
@@ -16,7 +25,7 @@ jobs:
         # makes setup-ocaml skip apt-get, which is slow on first invocation
 
       - name: Set up Opam
-        uses: ocaml/setup-ocaml@v3
+        uses: ocaml/setup-ocaml@e32b06a3e831ff2fbc6f08cf35be2085e3918014 # v3.6.1
         with:
           ocaml-compiler: oxcaml-ci-deps.5.4.0-with-ocaml.5.4.0
           opam-repositories: |
@@ -31,10 +40,12 @@ jobs:
           opam env --set-root --set-switch --shell=cmd | sed -n 's/^set //p' | tee -a "$GITHUB_ENV"
 
       - name: Get the current state of play
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          echo "::group::Building ${{ github.event.pull_request.base.ref }}"
+          echo "::group::Building $BASE_REF"
           cp .github/workflows/boot-files.txt .
-          git fetch origin ${{ github.event.pull_request.base.ref }}
+          git fetch origin "$BASE_REF"
           git checkout FETCH_HEAD
           autoconf
           ./configure -C \
@@ -53,9 +64,9 @@ jobs:
 
       - name: See what builds now
         run: |
-          echo "::group::Building ${{ github.sha }}"
+          echo "::group::Building $GITHUB_SHA"
           make distclean
-          git checkout ${{ github.sha }}
+          git checkout "$GITHUB_SHA"
           autoconf
           ./configure -C \
             --prefix $PWD/_install \
@@ -88,10 +99,12 @@ jobs:
           done | sort
 
       - name: This PR's status
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           success=true
           echo 'Files changed in the PR itself...'
-          for source in $(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }}) ; do
+          for source in $(git diff --diff-filter=d --name-only "$BASE_SHA" "$GITHUB_SHA") ; do
             artefact="$(fgrep "$source"$'\t' boot-files.txt | cut -f2)"
             if [ -z "$artefact" ]; then
               echo "$source: can't determine artefact"
