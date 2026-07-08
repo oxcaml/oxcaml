@@ -6379,18 +6379,20 @@ let cross_right_alloc env ?modalities ty mode =
   mode |> Alloc.disallow_left |> Crossing.apply_right_alloc crossing
 
 let submode_with_cross env ~is_ret ty l r =
-  let r' = cross_right_alloc env ty r in
-  let r' =
+  let crossing = crossing_of_ty env ty in
+  let crossing =
     if is_ret then
       (* the locality axis of the return mode cannot cross modes, because a
          local-returning function might allocate in the caller's region, and
-         this info must be preserved. *)
-      Alloc.meet
-        [r';
-         Alloc.max_with_comonadic Areality (Alloc.proj_comonadic Areality r)]
-    else
-      r'
+         this info must be preserved. Hence, we prevent mode crossing on the
+         areality axis. *)
+      Crossing.set
+        (Crossing.Axis.Comonadic Areality)
+        (Crossing.Per_axis.max (Crossing.Axis.Comonadic Areality))
+        crossing
+    else crossing
   in
+  let r' = r |> Alloc.disallow_left |> Crossing.apply_right_alloc crossing in
   Alloc.submode l r'
 
 let moregen_alloc_mode env ~is_ret ty v a1 a2 =
@@ -8215,7 +8217,8 @@ let add_nongen_vars_in_schema =
     end
   in
   fun env acc ty ->
-    Alloc.with_zap_scope (remove_mode_and_jkind_variables ty);
+    Alloc.with_zap_scope
+      (fun ~zap_scope -> remove_mode_and_jkind_variables ~zap_scope ty);
     let _, result = loop env (TypeSet.empty, acc) ty in
     result
 

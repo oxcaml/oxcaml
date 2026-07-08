@@ -936,11 +936,11 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @header.camlTailcall__tail_call_outside_8 = global i64 4087, section ".data", align 8
 @camlTailcall__tail_call_outside_8 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlTailcall__tail_call_outside_HIDE_STAMP }, section ".data", align 8
 @header.camlTailcall__collatz_even_7 = global i64 8183, section ".data", align 8
-@camlTailcall__collatz_even_7 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 144115188075855887, ptr @camlTailcall__collatz_even_HIDE_STAMP }, section ".data", align 8
+@camlTailcall__collatz_even_7 = global { ptr, i64, ptr } { ptr @caml_curry2L1, i64 144115188075855887, ptr @camlTailcall__collatz_even_HIDE_STAMP }, section ".data", align 8
 @header.camlTailcall__collatz_odd_6 = global i64 4345, section ".data", align 8
 @camlTailcall__collatz_odd_6 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlTailcall__collatz_odd_HIDE_STAMP }, section ".data", align 8
 @header.camlTailcall__fib_general_5 = global i64 4087, section ".data", align 8
-@camlTailcall__fib_general_5 = global { ptr, i64, ptr } { ptr @caml_curry3, i64 252201579132747783, ptr @camlTailcall__fib_general_HIDE_STAMP }, section ".data", align 8
+@camlTailcall__fib_general_5 = global { ptr, i64, ptr } { ptr @caml_curry3L1, i64 252201579132747783, ptr @camlTailcall__fib_general_HIDE_STAMP }, section ".data", align 8
 @header.camlTailcall__const_block89 = global i64 2827, section ".data", align 8
 @camlTailcall__const_block89 = global { ptr, ptr } { ptr @camlTailcall__immstring83, ptr @camlTailcall__const_block87 }, section ".data", align 8
 @header.camlTailcall__immstring83 = global i64 3068, section ".data", align 8
@@ -960,7 +960,8 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @camlTailcall2 = external global ptr
 @caml_apply3 = external global ptr
 @caml_curry2 = external global ptr
-@caml_curry3 = external global ptr
+@caml_curry2L1 = external global ptr
+@caml_curry3L1 = external global ptr
 
 
 

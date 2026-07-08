@@ -329,9 +329,7 @@ let () = overapp ~d:1 ~a:2
 Line 1, characters 9-26:
 1 | let () = overapp ~d:1 ~a:2
              ^^^^^^^^^^^^^^^^^
-Error: This expression has type "b:'a -> (c:'b -> unit) @ local"
-       but an expression was expected of type "unit"
-Hint: This function application is partial, maybe some arguments are missing.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 
@@ -343,8 +341,6 @@ Line 2, characters 11-25:
 2 |   fun f -> f ~foo:"hello"
                ^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
-Hint: This is a partial application
-      Adding 1 more argument will make the value non-local
 |}]
 
 (* The fixed version. Note that in the printed type, local returning is implicit
@@ -366,11 +362,11 @@ Line 3, characters 25-31:
 3 |   let local_ perm ~foo = f ~foo in
                              ^^^^^^
 Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+       but is expected to be "global"
+         because it is captured by a partial application
+         which is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
-Hint: This is a partial application
-      Adding 1 more argument may make the value non-local
 |}]
 
 (* The above tests for the locality axis exhaust cases wrt

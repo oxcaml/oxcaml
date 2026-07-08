@@ -5493,9 +5493,10 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let check_generic a = S.check_generic a
 
-  let iter_covariant a iter = S.iter_covariant obj a iter
+  let iter_covariant ?visited a iter = S.iter_covariant ?visited obj a iter
 
-  let iter_contravariant a iter = S.iter_contravariant obj a iter
+  let iter_contravariant ?visited a iter =
+    S.iter_contravariant ?visited obj a iter
 
   let zap_to_ceil_force ?(commit = true) m =
     if commit
@@ -5536,11 +5537,19 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let apply_hint hint m = wrap ~hint Fun.id m
 
-  let meet_const_unhint c m = S.Unhint.apply obj (Simple (Meet_const c)) m
+  let meet_const_unhint c m =
+    (* [meet_const max] is the identity *)
+    if C.le obj (C.max obj) c
+    then m
+    else S.Unhint.apply obj (Simple (Meet_const c)) m
 
   let meet_const ?hint c m = wrap ?hint (meet_const_unhint c) (disallow_right m)
 
-  let imply_const_unhint c m = S.Unhint.apply obj (Simple (Imply_const c)) m
+  let imply_const_unhint c m =
+    (* [imply_const max] is the identity *)
+    if C.le obj (C.max obj) c
+    then m
+    else S.Unhint.apply obj (Simple (Imply_const c)) m
 
   let imply_const c m = m |> disallow_left |> wrap (imply_const_unhint c)
 
@@ -5678,9 +5687,9 @@ module Monadic_gen (Obj : Obj) = struct
 
   let check_generic a = S.check_generic a
 
-  let iter_covariant a iter = S.iter_contravariant obj a iter
+  let iter_covariant ?visited a iter = S.iter_contravariant ?visited obj a iter
 
-  let iter_contravariant a iter = S.iter_covariant obj a iter
+  let iter_contravariant ?visited a iter = S.iter_covariant ?visited obj a iter
 
   let zap_to_ceil_force ?(commit = true) m =
     if commit
@@ -5721,11 +5730,21 @@ module Monadic_gen (Obj : Obj) = struct
 
   let apply_hint hint m = wrap ~hint Fun.id m
 
-  let join_const_unhint c m = S.Unhint.apply Obj.obj (Simple (Meet_const c)) m
+  let join_const_unhint c m =
+    (* The underlying object is the opposite lattice, so this is a meet, and
+       [meet_const max] is the identity *)
+    if C.le Obj.obj (C.max Obj.obj) c
+    then m
+    else S.Unhint.apply Obj.obj (Simple (Meet_const c)) m
 
   let join_const ?hint c m = wrap ?hint (join_const_unhint c) (disallow_left m)
 
-  let subtract_const_unhint c m = S.Unhint.apply obj (Simple (Imply_const c)) m
+  let subtract_const_unhint c m =
+    (* The underlying object is the opposite lattice, so this is an imply, and
+       [imply_const max] is the identity *)
+    if C.le obj (C.max obj) c
+    then m
+    else S.Unhint.apply obj (Simple (Imply_const c)) m
 
   let subtract_const c m = m |> disallow_right |> wrap (subtract_const_unhint c)
 
@@ -6344,9 +6363,15 @@ module Zap_scope = struct
     }
 
   let add_job_to_map map i job =
-    match ModeIdMap.find_opt map i with
-    | Some jobs -> ModeIdMap.replace map i (job :: jobs)
-    | None -> ModeIdMap.add map i [job]
+    (* Performance hack: keep only the first job per variable. A variable
+       reachable through many paths/edges would otherwise accumulate one
+       job per (visible mode, path), which is quadratic in practice (tens
+       of millions of jobs on large modules). This matches the behavior of
+       [zap_to_legacy_map], which keeps a single job per variable.
+       CR-someday: the dropped jobs would zap through different path
+       morphisms joined with different visible-mode bounds; confirm with
+       the mode team that the first job suffices. *)
+    if not (ModeIdMap.mem map i) then ModeIdMap.add map i [job]
 
   let add_zap_to_floor_to_zap_scope i zap_to_floor zap_to_legacy zs =
     if ModeIdMap.mem zs.zap_to_legacy_map i
@@ -6371,6 +6396,22 @@ module Zap_scope = struct
       end
       else add_job_to_map zs.zap_to_ceil_map i zap_to_ceil
       end
+
+  (* [zap_to_floor_pending i zs] is [false] exactly when enqueuing a
+     zap-to-floor job for [i] would be a no-op under the keep-first policy of
+     [add_job_to_map] and [add_zap_to_floor_to_zap_scope]: either [i] is already
+     resolved to legacy, or it already has a zap-to-floor job. When [i] currently
+     has a zap-to-ceil job this returns [true], because enqueuing a floor job
+     then transitions it to legacy. Callers use this to skip constructing the
+     (expensive) job and its join/meet cell for the many duplicate enqueue
+     requests that keep-first would otherwise drop. *)
+  let zap_to_floor_pending i zs =
+    (not (ModeIdMap.mem zs.zap_to_legacy_map i))
+    && not (ModeIdMap.mem zs.zap_to_floor_map i)
+
+  let zap_to_ceil_pending i zs =
+    (not (ModeIdMap.mem zs.zap_to_legacy_map i))
+    && not (ModeIdMap.mem zs.zap_to_ceil_map i)
 
   let resolve_zap_scope { zap_to_floor_map; zap_to_ceil_map; zap_to_legacy_map }
       =
@@ -7209,21 +7250,23 @@ module Value_with (Areality : Areality) = struct
     S.mode_iter Comonadic.Obj.obj m
       { iter = (fun obj msrc -> zap_to_legacy_obj obj msrc) }
 
-  let add_covariant_to_zap_scope { monadic; comonadic } scope =
+  let add_covariant_to_zap_scope ~visited_monadic ~visited_comonadic
+      { monadic; comonadic } scope =
     let comonadic_upper =
       Comonadic.Guts.get_floor comonadic |> Comonadic.of_const
     in
     let monadic_upper = Monadic.Guts.get_floor monadic |> Monadic.of_const in
-    Monadic.iter_covariant monadic (fun ~id ~level m ->
-        if level <> generic_level
+    Monadic.iter_covariant ~visited:visited_monadic monadic (fun ~id ~level m ->
+        if level <> generic_level && Z.zap_to_ceil_pending id scope
         then begin
           let zap_to_legacy () = zap_to_legacy_src_var_monadic m in
           let m = Monadic.join [monadic_upper; m] in
           let zap_to_floor () = Monadic.zap_to_floor_force m |> ignore in
           Z.add_zap_to_ceil_to_zap_scope id zap_to_floor zap_to_legacy scope
         end);
-    Comonadic.iter_covariant comonadic (fun ~id ~level m ->
-        if level <> generic_level
+    Comonadic.iter_covariant ~visited:visited_comonadic comonadic
+      (fun ~id ~level m ->
+        if level <> generic_level && Z.zap_to_floor_pending id scope
         then begin
           let zap_to_legacy () = zap_to_legacy_src_var_comonadic m in
           let m = Comonadic.join [comonadic_upper; m] in
@@ -7231,21 +7274,24 @@ module Value_with (Areality : Areality) = struct
           Z.add_zap_to_floor_to_zap_scope id zap_to_floor zap_to_legacy scope
         end)
 
-  let add_contravariant_to_zap_scope { monadic; comonadic } scope =
+  let add_contravariant_to_zap_scope ~visited_monadic ~visited_comonadic
+      { monadic; comonadic } scope =
     let comonadic_upper =
       Comonadic.Guts.get_ceil comonadic |> Comonadic.of_const
     in
     let monadic_lower = Monadic.Guts.get_ceil monadic |> Monadic.of_const in
-    Monadic.iter_contravariant monadic (fun ~id ~level m ->
-        if level <> generic_level
+    Monadic.iter_contravariant ~visited:visited_monadic monadic
+      (fun ~id ~level m ->
+        if level <> generic_level && Z.zap_to_floor_pending id scope
         then begin
           let zap_to_legacy () = zap_to_legacy_src_var_monadic m in
           let m = Monadic.meet [monadic_lower; m] in
           let zap_to_ceil () = Monadic.zap_to_ceil_force m |> ignore in
           Z.add_zap_to_floor_to_zap_scope id zap_to_ceil zap_to_legacy scope
         end);
-    Comonadic.iter_contravariant comonadic (fun ~id ~level m ->
-        if level <> generic_level
+    Comonadic.iter_contravariant ~visited:visited_comonadic comonadic
+      (fun ~id ~level m ->
+        if level <> generic_level && Z.zap_to_ceil_pending id scope
         then begin
           let zap_to_legacy () = zap_to_legacy_src_var_comonadic m in
           let m = Comonadic.meet [comonadic_upper; m] in
@@ -7265,12 +7311,28 @@ module Value_with (Areality : Areality) = struct
     2) if a mode appears only as a lower bound to generic modes, it is zapped to
       floor
     3) if it appears as both, it is zapped to legacy *)
+    (* The [visited] sets are shared across all visible roots (one per mode
+       component and polarity) so that each reachable constraint variable is
+       walked at most once per polarity for the whole [resolve_zap_scope],
+       rather than once per root. The reachable set (hence the floor/ceil/legacy
+       classification of each variable) is unchanged: it is the union over roots
+       either way. Only which composed-mode job is kept per variable can differ,
+       which stays within the single-job-per-variable approximation already made
+       by [Z.add_job_to_map]. This turns a quadratic re-walk into a linear one on
+       large mutually-connected mode graphs (e.g. high-arity functions). *)
+    let visited_covariant_monadic = Hashtbl.create 17 in
+    let visited_covariant_comonadic = Hashtbl.create 17 in
+    let visited_contravariant_monadic = Hashtbl.create 17 in
+    let visited_contravariant_comonadic = Hashtbl.create 17 in
     List.iter
       (fun m ->
         if check_generic m
         then begin
-          add_covariant_to_zap_scope m variables;
-          add_contravariant_to_zap_scope m variables
+          add_covariant_to_zap_scope ~visited_monadic:visited_covariant_monadic
+            ~visited_comonadic:visited_covariant_comonadic m variables;
+          add_contravariant_to_zap_scope
+            ~visited_monadic:visited_contravariant_monadic
+            ~visited_comonadic:visited_contravariant_comonadic m variables
         end)
       !visible;
     Z.resolve_zap_scope variables

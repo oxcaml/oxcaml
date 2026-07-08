@@ -395,6 +395,7 @@ module type Solver_mono = sig
       iterator is only applied once per constraint, even when it appears as a
       constraint multiple times via different morphisms *)
   val iter_covariant :
+    ?visited:(int, unit) Hashtbl.t ->
     'a obj ->
     ('a, allowed * 'r) mode ->
     (id:int -> level:int -> ('a, allowed * disallowed) mode -> unit) ->
@@ -406,6 +407,7 @@ module type Solver_mono = sig
       iterator is only applied once per constraint, even when it appears as a
       constraint multiple times via different morphisms *)
   val iter_contravariant :
+    ?visited:(int, unit) Hashtbl.t ->
     'a obj ->
     ('a, 'l * allowed) mode ->
     (id:int -> level:int -> ('a, disallowed * allowed) mode -> unit) ->

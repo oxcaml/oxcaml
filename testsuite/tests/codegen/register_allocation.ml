@@ -250,8 +250,9 @@ spill_xmm_on_caml_modify:
   vaddsd %xmm0, %xmm1, %xmm0
   vmovsd %xmm0, 8(%rsp)
   vmovsd %xmm0, (%rbx)
-  movq  %r12, %rsi
-  call  caml_modify@PLT
+  xorl  %esi, %esi
+  movq  %r12, %rdx
+  call  caml_modify_local@PLT
   vmovsd 8(%rsp), %xmm0
   vmovsd %xmm0, (%rbx)
   vmovsd (%rsp), %xmm0
@@ -271,27 +272,30 @@ let unnecessary_moves (a : int) (b : int) (c : int) (d : int) f =
 ;;
 [%%expect_asm X86_64{|
 unnecessary_moves:
+  subq  $24, %rsp
   movq  %rax, %rcx
   movq  %rbx, %r8
   movq  %rdx, %rbx
+  movq  64(%r14), %rdx
   leaq  -1(%rcx,%r8), %rax
   cmpq  %r8, %rcx
   jge   .L0
   movq  %rcx, %rax
-  ret
+  jmp   .L2
 .L0:
   cmpq  %rsi, %rdi
   jge   .L2
-  subq  $8, %rsp
-  movq  %rax, (%rsp)
+  movq  %rax, 8(%rsp)
+  movq  %rdx, (%rsp)
   movq  (%rbx), %rdi
   movq  %r8, %rax
   call  *%rdi
 .L1:
-  movq  (%rsp), %rax
-  addq  $8, %rsp
-  ret
+  movq  8(%rsp), %rax
+  movq  (%rsp), %rdx
 .L2:
+  movq  %rdx, 64(%r14)
+  addq  $24, %rsp
   ret
 |}]
 
@@ -305,16 +309,19 @@ let spill_one_or_two (a : int) (b : int) f =
 [%%expect_asm X86_64{|
 spill_one_or_two:
   subq  $24, %rsp
-  movq  %rax, (%rsp)
-  movq  %rbx, 8(%rsp)
+  movq  %rbx, %rsi
   movq  %rdi, %rbx
+  movq  64(%r14), %rdi
+  movq  %rdi, (%rsp)
+  leaq  -1(%rax,%rsi), %rax
+  movq  %rax, 8(%rsp)
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
 .L0:
   movq  (%rsp), %rax
-  movq  8(%rsp), %rbx
-  leaq  -1(%rax,%rbx), %rax
+  movq  %rax, 64(%r14)
+  movq  8(%rsp), %rax
   addq  $24, %rsp
   ret
 |}]
@@ -424,49 +431,52 @@ let spilled_phi_merge cond callback f a b c d e =
   f a b c d e
 [%%expect_asm X86_64{|
 spilled_phi_merge:
-  subq  $56, %rsp
+  subq  $72, %rsp
   movq  %rax, 8(%rsp)
-  movq  %rbx, 48(%rsp)
+  movq  %rbx, 56(%rsp)
   movq  %rdi, (%rsp)
-  movq  %rsi, %rbp
+  movq  %rsi, %r12
   movq  %rdx, %rbx
   movq  %rcx, 24(%rsp)
-  movq  %r8, %r12
+  movq  %r8, 32(%rsp)
   movq  %r9, %r13
+  movq  64(%r14), %rbp
   movl  $1, %edi
   call  caml_sys_time_unboxed@PLT
   movq  8(%rsp), %rax
   cmpq  $1, %rax
   je    .L1
+  movq  %rbp, 48(%rsp)
   movq  %r13, 40(%rsp)
-  movq  %r12, 32(%rsp)
   movq  24(%rsp), %rax
   movq  %rbx, 16(%rsp)
-  movq  %rbp, 8(%rsp)
+  movq  %r12, 8(%rsp)
   movq  (%rsp), %rax
   movl  $1, %eax
-  movq  48(%rsp), %rbx
+  movq  56(%rsp), %rbx
   movq  (%rbx), %rdi
-  movq  48(%rsp), %rbx
+  movq  56(%rsp), %rbx
   call  *%rdi
 .L0:
   movq  (%rsp), %rax
-  movq  8(%rsp), %rbp
+  movq  8(%rsp), %r12
   movq  16(%rsp), %rbx
   movq  24(%rsp), %rdi
-  movq  32(%rsp), %r8
+  movq  32(%rsp), %rsi
   movq  40(%rsp), %r9
+  movq  48(%rsp), %rbp
   movq  %rax, (%rsp)
   movq  %rdi, 24(%rsp)
-  movq  %r8, %r12
+  movq  %rsi, 32(%rsp)
   movq  %r9, %r13
 .L1:
-  movq  %rbp, %rax
+  movq  %rbp, 64(%r14)
+  movq  %r12, %rax
   movq  24(%rsp), %rdi
-  movq  %r12, %rsi
+  movq  32(%rsp), %rsi
   movq  %r13, %rdx
   movq  (%rsp), %rcx
-  addq  $56, %rsp
+  addq  $72, %rsp
   jmp   caml_apply5@PLT
 |}]
 

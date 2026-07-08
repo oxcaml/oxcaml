@@ -360,11 +360,11 @@ Line 1, characters 61-65:
 1 | let optret1 (f : ?x:int -> local_ (y:unit -> unit -> int)) = f ()
                                                                  ^^^^
 Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+       but is expected to be "global"
+         because it is captured by a partial application
+         which is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
-Hint: This is a partial application
-      Adding 1 more argument may make the value non-local
 |}]
 
 (* Optional argument elimination eta-expands and therefore allocates *)

@@ -47,6 +47,21 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             -> ('a, 'c, 'l * 'r) t
         | Id : ('a, 'a, 'l * 'r) t
             (** Short-hand for [Base (H.id, C.id)] to save memory *)
+        | Adjoint_l :
+            ('a, 'b, 'l2 * allowed) t * ('b, 'a, allowed * disallowed) C.morph
+            -> ('b, 'a, 'l * disallowed) t
+            (** [Adjoint_l (h, m)] is the left adjoint of [h], deferred; [m] is
+                the (already computed) left adjoint of [h]'s morphism, kept so
+                consumers can recover source objects. Deferral avoids eagerly
+                rebuilding hint trees for adjoints taken on hot paths (level
+                updates), which is superlinear on large constraint graphs; the
+                tree is only walked if the hint is consumed (to render an
+                error). Unlike a closure this is plain data, so it survives
+                [output_value] into cmt files. *)
+        | Adjoint_r :
+            ('a, 'b, allowed * 'r2) t * ('b, 'a, disallowed * allowed) C.morph
+            -> ('b, 'a, disallowed * 'r) t
+            (** Right-adjoint analogue of [Adjoint_l]. *)
         constraint 'd = _ * _
       [@@ocaml.warning "-62"]
 
@@ -57,6 +72,56 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
        fun m1 m2 ->
         match m1, m2 with Id, m -> m | m, Id -> m | _, _ -> Compose (m1, m2)
 
+      include Magic_allow_disallow (struct
+        type ('a, 'b, 'd) sided = ('a, 'b, 'd) t constraint 'd = 'l * 'r
+
+        let rec allow_left : type l a b r.
+            (a, b, allowed * r) t -> (a, b, l * r) t =
+         fun h ->
+          match h with
+          | Id -> Id
+          | Base (morph_hint, morph) ->
+            Base (H.Morph.allow_left morph_hint, C.allow_left morph)
+          | Compose (a_morph_hint, b_morph_hint) ->
+            Compose (allow_left a_morph_hint, allow_left b_morph_hint)
+          | Adjoint_l (h, m) -> Adjoint_l (h, m)
+
+        let rec allow_right : type a b l r.
+            (a, b, l * allowed) t -> (a, b, l * r) t =
+         fun h ->
+          match h with
+          | Id -> Id
+          | Base (morph_hint, morph) ->
+            Base (H.Morph.allow_right morph_hint, C.allow_right morph)
+          | Compose (a_morph_hint, b_morph_hint) ->
+            Compose (allow_right a_morph_hint, allow_right b_morph_hint)
+          | Adjoint_r (h, m) -> Adjoint_r (h, m)
+
+        let rec disallow_left : type a b l r.
+            (a, b, l * r) t -> (a, b, disallowed * r) t =
+         fun h ->
+          match h with
+          | Id -> Id
+          | Base (morph_hint, morph) ->
+            Base (H.Morph.disallow_left morph_hint, C.disallow_left morph)
+          | Compose (a_morph_hint, b_morph_hint) ->
+            Compose (disallow_left a_morph_hint, disallow_left b_morph_hint)
+          | Adjoint_l (h, m) -> Adjoint_l (h, m)
+          | Adjoint_r (h, m) -> Adjoint_r (h, m)
+
+        let rec disallow_right : type a b l r.
+            (a, b, l * r) t -> (a, b, l * disallowed) t =
+         fun h ->
+          match h with
+          | Id -> Id
+          | Base (morph_hint, morph) ->
+            Base (H.Morph.disallow_right morph_hint, C.disallow_right morph)
+          | Compose (a_morph_hint, b_morph_hint) ->
+            Compose (disallow_right a_morph_hint, disallow_right b_morph_hint)
+          | Adjoint_l (h, m) -> Adjoint_l (h, m)
+          | Adjoint_r (h, m) -> Adjoint_r (h, m)
+      end)
+
       let rec left_adjoint : type a b l.
           H.Pinpoint.t ->
           b C.obj ->
@@ -64,6 +129,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           H.Pinpoint.t * a C.obj * (b, a, allowed * disallowed) t =
        fun pp b_obj -> function
         | Id -> pp, b_obj, Id
+        | Adjoint_r (h, m) ->
+          (* Adjoints cancel: the left adjoint of [h]'s right adjoint is
+             [h]. The pinpoint is returned unchanged, matching the two
+             leaf-level pinpoint flips cancelling out. *)
+          pp, C.src b_obj m, disallow_right h
         | Base (small_morph_hint, morph) ->
           let pp, small_morph_hint = H.Morph.left_adjoint pp small_morph_hint in
           ( pp,
@@ -85,6 +155,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           H.Pinpoint.t * a C.obj * (b, a, disallowed * allowed) t =
        fun pp b_obj -> function
         | Id -> pp, b_obj, Id
+        | Adjoint_l (h, m) -> pp, C.src b_obj m, disallow_left h
         | Base (small_morph_hint, morph) ->
           let pp, small_morph_hint =
             H.Morph.right_adjoint pp small_morph_hint
@@ -101,50 +172,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           in
           src_pp, src, Compose (g_morph_hint_adj, f_morph_hint_adj)
 
-      include Magic_allow_disallow (struct
-        type ('a, 'b, 'd) sided = ('a, 'b, 'd) t constraint 'd = 'l * 'r
-
-        let rec allow_left : type l a b r.
-            (a, b, allowed * r) t -> (a, b, l * r) t =
-         fun h ->
-          match h with
-          | Id -> Id
-          | Base (morph_hint, morph) ->
-            Base (H.Morph.allow_left morph_hint, C.allow_left morph)
-          | Compose (a_morph_hint, b_morph_hint) ->
-            Compose (allow_left a_morph_hint, allow_left b_morph_hint)
-
-        let rec allow_right : type a b l r.
-            (a, b, l * allowed) t -> (a, b, l * r) t =
-         fun h ->
-          match h with
-          | Id -> Id
-          | Base (morph_hint, morph) ->
-            Base (H.Morph.allow_right morph_hint, C.allow_right morph)
-          | Compose (a_morph_hint, b_morph_hint) ->
-            Compose (allow_right a_morph_hint, allow_right b_morph_hint)
-
-        let rec disallow_left : type a b l r.
-            (a, b, l * r) t -> (a, b, disallowed * r) t =
-         fun h ->
-          match h with
-          | Id -> Id
-          | Base (morph_hint, morph) ->
-            Base (H.Morph.disallow_left morph_hint, C.disallow_left morph)
-          | Compose (a_morph_hint, b_morph_hint) ->
-            Compose (disallow_left a_morph_hint, disallow_left b_morph_hint)
-
-        let rec disallow_right : type a b l r.
-            (a, b, l * r) t -> (a, b, l * disallowed) t =
-         fun h ->
-          match h with
-          | Id -> Id
-          | Base (morph_hint, morph) ->
-            Base (H.Morph.disallow_right morph_hint, C.disallow_right morph)
-          | Compose (a_morph_hint, b_morph_hint) ->
-            Compose (disallow_right a_morph_hint, disallow_right b_morph_hint)
-      end)
-
       let rec populate : type b a l r.
           a C.obj ->
           (b, a, l * r) t ->
@@ -153,6 +180,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
        fun obj_a hint cont ->
         match hint with
         | Id -> cont obj_a
+        | Adjoint_l (h, m) ->
+          let obj_b = C.src obj_a m in
+          let _, _, h' = left_adjoint H.Pinpoint.unknown obj_b h in
+          populate obj_a (allow_left h') cont
+        | Adjoint_r (h, m) ->
+          let obj_b = C.src obj_a m in
+          let _, _, h' = right_adjoint H.Pinpoint.unknown obj_b h in
+          populate obj_a (allow_right h') cont
         | Base (morph_hint, morph) ->
           let obj_b = C.src obj_a morph in
           let ahint = cont obj_b in
@@ -629,18 +664,19 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     end
 
   let iter_covariant : type a r.
+      ?visited:(int, unit) Hashtbl.t ->
       a C.obj ->
       (a, allowed * r) mode ->
       (id:int -> level:int -> (a, allowed * disallowed) mode -> unit) ->
       unit =
-   fun dst m iter ->
+   fun ?visited dst m iter ->
+    let visited =
+      match visited with Some visited -> visited | None -> Hashtbl.create 17
+    in
     match m with
     | Amode _ -> ()
-    | Amodevar mv ->
-      let visited = Hashtbl.create 17 in
-      iter_covariant_morphvar ~visited dst iter mv
+    | Amodevar mv -> iter_covariant_morphvar ~visited dst iter mv
     | Amodejoin (_, _, mvs) ->
-      let visited = Hashtbl.create 17 in
       VarMap.iter (fun _ mv -> iter_covariant_morphvar ~visited dst iter mv) mvs
 
   let rec iter_contravariant_morphvar : type a l.
@@ -668,18 +704,19 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     end
 
   let iter_contravariant : type a l.
+      ?visited:(int, unit) Hashtbl.t ->
       a C.obj ->
       (a, l * allowed) mode ->
       (id:int -> level:int -> (a, disallowed * allowed) mode -> unit) ->
       unit =
-   fun dst m iter ->
+   fun ?visited dst m iter ->
+    let visited =
+      match visited with Some visited -> visited | None -> Hashtbl.create 17
+    in
     match m with
     | Amode _ -> ()
-    | Amodevar mv ->
-      let visited = Hashtbl.create 17 in
-      iter_contravariant_morphvar ~visited dst iter mv
+    | Amodevar mv -> iter_contravariant_morphvar ~visited dst iter mv
     | Amodemeet (_, _, mvs) ->
-      let visited = Hashtbl.create 17 in
       VarMap.iter
         (fun _ mv -> iter_contravariant_morphvar ~visited dst iter mv)
         mvs
@@ -1190,7 +1227,12 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       unit =
    fun ~log pp dst v u f f_hint ->
     let f' = C.left_adjoint dst f in
-    let _, src, f'_hint = Comp_hint.Morph_hint.left_adjoint pp dst f_hint in
+    let src = C.src dst f in
+    (* Defer the hint adjoint (O(1) wrapper) instead of eagerly walking and
+       rebuilding the hint tree, which is superlinear on large constraint
+       graphs. The tree is only walked if the hint is consumed to render an
+       error. [pp] is always [H.Pinpoint.unknown] on this path. *)
+    let f'_hint = Comp_hint.Morph_hint.Adjoint_l (f_hint, f') in
     let x = Amorphvar (u, f', f'_hint) in
     let key = get_key src x in
     if VarMap.mem key v.vlower
@@ -1226,7 +1268,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       unit =
    fun ~log pp dst v u f f_hint ->
     let f' = C.right_adjoint dst f in
-    let _, src, f'_hint = Comp_hint.Morph_hint.right_adjoint pp dst f_hint in
+    let src = C.src dst f in
+    let f'_hint = Comp_hint.Morph_hint.Adjoint_r (f_hint, f') in
     let x = Amorphvar (u, f', f'_hint) in
     let key = get_key src x in
     if VarMap.mem key v.vupper
@@ -1739,7 +1782,13 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         Amode (a, a_hint_lower, Max)
       else
         match rest with
-        | [] -> Amodejoin (a, a_hint_lower, mvs)
+        | [] ->
+          if C.le obj a (C.min obj) && VarMap.cardinal mvs = 1
+          then
+            (* The constant is neutral, so a join of a single element is that
+               element. *)
+            Amodevar (snd (VarMap.choose mvs))
+          else Amodejoin (a, a_hint_lower, mvs)
         | mv :: xs -> (
           match disallow_right mv with
           | Amode (b, b_hint_lower, _b_hint_upper) ->
@@ -1760,7 +1809,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (hint_join obj a a_hint_lower b b_hint)
               (union_morphvars mvs' mvs) xs)
     in
-    loop (C.min obj) Min VarMap.empty l
+    (* Constants below [min] are neutral for the join; drop them, and a
+       remaining singleton is the join itself. *)
+    let neutral : (a, allowed * r) mode -> bool = function
+      | Amode (a, _, _) -> C.le obj a (C.min obj)
+      | _ -> false
+    in
+    match List.filter (fun m -> not (neutral m)) l with
+    | [m] -> disallow_right m
+    | l -> loop (C.min obj) Min VarMap.empty l
 
   let meet (type a l) obj l =
     let rec loop :
@@ -1777,7 +1834,13 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         Amode (a, Min, a_hint_upper)
       else
         match rest with
-        | [] -> Amodemeet (a, a_hint_upper, mvs)
+        | [] ->
+          if C.le obj (C.max obj) a && VarMap.cardinal mvs = 1
+          then
+            (* The constant is neutral, so a meet of a single element is that
+               element. *)
+            Amodevar (snd (VarMap.choose mvs))
+          else Amodemeet (a, a_hint_upper, mvs)
         | mv :: xs -> (
           match disallow_left mv with
           | Amode (b, _b_hint_lower, b_hint_upper) ->
@@ -1796,7 +1859,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (hint_meet obj a a_hint_upper b b_hint)
               (union_morphvars mvs' mvs) xs)
     in
-    loop (C.max obj) Max VarMap.empty l
+    (* Constants above [max] are neutral for the meet; drop them, and a
+       remaining singleton is the meet itself. *)
+    let neutral : (a, l * allowed) mode -> bool = function
+      | Amode (a, _, _) -> C.le obj (C.max obj) a
+      | _ -> false
+    in
+    match List.filter (fun m -> not (neutral m)) l with
+    | [m] -> disallow_left m
+    | l -> loop (C.max obj) Max VarMap.empty l
 
   let get_loose_ceil : type a l r. a C.obj -> (a, l * r) mode -> a =
    fun obj m ->

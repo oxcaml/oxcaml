@@ -148,7 +148,7 @@ let rec recursive x n =
 [%%expect{|
 val recursive :
   'a @ [< 'm & global] ->
-  (int @ [< many uncontended] -> 'a @ [< global > 'm]) @ [> close('m) | close('m) | nonportable] =
+  (int @ [< many uncontended] -> 'a @ [< global > 'm]) @ [> close('m) | nonportable] =
   <fun>
 |}]
 
@@ -163,7 +163,7 @@ let recursive' = recursive
 [%%expect{|
 val recursive' :
   'a @ [< 'm & global] ->
-  (int @ [< many uncontended] -> 'a @ [< global > 'm]) @ [> close('m) | close('m) | nonportable] =
+  (int @ [< many uncontended] -> 'a @ [< global > 'm]) @ [> close('m) | nonportable] =
   <fun>
 |}]
 
@@ -182,8 +182,8 @@ let rec map f = function
   | x :: xs -> f x :: map f xs
 [%%expect{|
 val map :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & 'p @@ past & global many > aliased] ->
-  ('a list @ [< 'n] -> 'b list @ [< global > 'm]) @ [> 'o | 'p | nonportable] =
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global many > aliased] ->
+  ('a list @ [< 'n] -> 'b list @ [< global > 'm]) @ [> 'o | nonportable] =
   <fun>
 |}]
 

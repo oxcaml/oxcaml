@@ -65,7 +65,11 @@ let stop_in_alloc restart =
   let deallocs_minor = ref AllocSet.empty in
   let deallocs_major = ref AllocSet.empty in
 
-  let record s (p, a, sz) = s := AllocSet.add (p,a,sz) (!s) in
+  (* These tests assert minor-heap combined-allocation bookkeeping, so keep the
+     callback bookkeeping itself on the normal heap. *)
+  let record (s @ global) ((p, a, sz) @ global) =
+    s := AllocSet.add (p,a,sz) (!s)
+  in
   let promote minor = (record promotes minor; Some minor) in
   let dealloc_minor minor = (record deallocs_minor minor; ()) in
   let dealloc_major major = (record deallocs_major major; ()) in

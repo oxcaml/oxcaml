@@ -12,7 +12,7 @@
         closure: No Allocation
     currylocal1: No Allocation
     currylocal2: No Allocation
-    currylocal3: No Allocation
+    currylocal3: Allocation
       partprim1: No Allocation
       partprim2: No Allocation
        intarray: No Allocation
