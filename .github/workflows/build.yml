@@ -84,6 +84,14 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_'
             ocamlparam: '_,O3=1'
+            # This leg is also our only plain-O3 testsuite coverage (the
+            # match-in-match leg only exercises O3 combined with
+            # flambda2-match-in-match), so don't remove it if the metrics
+            # pipeline goes away.
+            # The metrics pipeline (instrumentation, install, collection) runs
+            # on every event so that breakage surfaces before merging; the
+            # artifact upload and the push to the metrics repo happen only on
+            # pushes to main (see the push-metrics job).
             collect_metrics: true
             disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml'
 
@@ -595,44 +603,33 @@ jobs:
               -validate -param AFFINITY:on -regalloc $allocator || exit 1; \
           done
 
-      - name: Collect and push metrics
-        if: matrix.collect_metrics == true && github.ref == 'refs/heads/main' && github.event_name == 'push'
+      - name: Collect metrics
+        if: matrix.collect_metrics == true
         env:
-          # Ideally this secret would be scoped to a dedicated deployment
-          # environment (with `environment:` on the job); that requires
-          # repo-settings changes, so we suppress the finding for now.
-          GH_TOKEN: ${{ secrets.METRICS_REPO_TOKEN }} # zizmor: ignore[secrets-outside-env]
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-          # The actual commit being tested (not the merge commit, for PRs)
-          COMMIT_HASH: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: |
-          # Checkout metrics repository
-          gh repo clone oxcaml/oxcaml-metrics metrics-repo
-
-          # Create raw-data directory if it doesn't exist
-          mkdir -p metrics-repo/raw-data
-
-          # Use the metrics collection script (CSV filename and PR number computed internally)
-          python3 $GITHUB_WORKSPACE/scripts/collect-metrics.py \
+          mkdir -p "$GITHUB_WORKSPACE/_metrics_output"
+          # CSV filename and PR number are computed inside the script
+          python3 "$GITHUB_WORKSPACE/scripts/collect-metrics.py" \
             --install-dir "$GITHUB_WORKSPACE/_install" \
-            --output-dir "metrics-repo/raw-data" \
-            --commit-hash "$COMMIT_HASH" \
+            --output-dir "$GITHUB_WORKSPACE/_metrics_output" \
+            --commit-hash "$GITHUB_SHA" \
             --commit-message "$COMMIT_MESSAGE" \
             --profile-dir "$GITHUB_WORKSPACE/_profile_csv" \
             --verbose
+          # The script only warns when profiling produced no CSVs (it then
+          # skips the profiles archive); fail loudly so a silently broken
+          # profile=1 pipeline is caught before merging.
+          ls "$GITHUB_WORKSPACE"/_metrics_output/profiles-*.tar.gz
 
-          # Commit and push metrics
-          cd metrics-repo
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Configure git to use gh for authentication
-          git config --local credential.helper ""
-          git config --local credential.https://github.com.helper "!gh auth git-credential"
-
-          git add raw-data/
-          git commit -m "Add metrics for commit ${COMMIT_HASH}"
-          git push || (git pull --rebase && git push)
+      - name: Upload metrics artifact
+        # Only pushes to main upload: the artifact exists solely as the
+        # handoff to the push-metrics job.
+        if: matrix.collect_metrics == true && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: metrics-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ github.workspace }}/_metrics_output
 
       - name: Upload core dumps
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -648,6 +645,43 @@ jobs:
           name: DiagnosticReports-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
           path: /Users/runner/Library/Logs/DiagnosticReports
 
+  push-metrics:
+    name: Push metrics
+    runs-on: ubuntu-latest
+    needs: build
+    # !cancelled(): push metrics whenever the O3 metrics leg produced data,
+    # even if an unrelated matrix leg failed.
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    # The METRICS_REPO_TOKEN secret is scoped to this deployment environment,
+    # which restricts it to deployments from main.
+    environment: metrics
+    steps:
+      - name: Download metrics artifact
+        id: download
+        # The artifact is absent if the O3 metrics leg failed; skip the push then.
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: metrics-${{ github.sha }}-${{ github.run_id }}
+          path: metrics-data
+
+      - name: Push metrics to oxcaml/oxcaml-metrics
+        if: steps.download.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.METRICS_REPO_TOKEN }}
+        run: |
+          # Let git authenticate through gh (which uses GH_TOKEN)
+          gh auth setup-git
+          gh repo clone oxcaml/oxcaml-metrics metrics-repo
+          mkdir -p metrics-repo/raw-data
+          cp metrics-data/* metrics-repo/raw-data/
+
+          cd metrics-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add raw-data/
+          git commit -m "Add metrics for commit ${GITHUB_SHA}"
+          git push || (git pull --rebase && git push)
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
