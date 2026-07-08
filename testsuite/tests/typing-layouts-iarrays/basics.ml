@@ -379,7 +379,15 @@ let f (arr : #(string * int) iarray @ local) =
   | [: #(s, _) :] -> use_global s
   | _ -> ()
 [%%expect{|
-val f : #(string * int) iarray @ local -> unit = <fun>
+Line 3, characters 32-33:
+3 |   | [: #(s, _) :] -> use_global s
+                                    ^
+Error: This value is "local" to the parent region
+         because it is an element of the tuple at line 3, characters 7-14
+         which is "local" to the parent region
+         because it is an element of the array at line 3, characters 4-17
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* Same with let pattern *)
@@ -393,5 +401,13 @@ Line 2, characters 6-19:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: "[:  :]"
 
-val f : #(string * int) iarray @ local -> unit = <fun>
+Line 3, characters 13-14:
+3 |   use_global s
+                 ^
+Error: This value is "local" to the parent region
+         because it is an element of the tuple at line 2, characters 9-16
+         which is "local" to the parent region
+         because it is an element of the array at line 2, characters 6-19
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
