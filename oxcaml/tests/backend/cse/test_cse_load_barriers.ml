@@ -1,8 +1,6 @@
 (* Regression test for CSE across memory fences. CSE must not merge a mutable
    load across [lfence] or [mfence] — the merge would effectively hoist the load
-   above the fence. The expected output currently captures the incorrect
-   behaviour: the loads following [load_fence] and [memory_fence] are merged
-   with the loads preceding them.
+   above the fence.
 
    These externals are rewritten to fence instructions at direct call sites (see
    [backend/amd64/cfg_selection.ml]); this file is only compiled, never linked

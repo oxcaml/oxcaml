@@ -3,16 +3,18 @@ no_barrier:
 	leaq	-1(%rax,%rax), %rax
 	ret
 load_across_load_fence:
-	movq	(%rax), %rax
-	movl	$1, %ebx
+	movq	(%rax), %rbx
+	movl	$1, %edi
 	lfence
-	leaq	-1(%rax,%rax), %rax
+	movq	(%rax), %rax
+	leaq	-1(%rbx,%rax), %rax
 	ret
 load_across_memory_fence:
-	movq	(%rax), %rax
-	movl	$1, %ebx
+	movq	(%rax), %rbx
+	movl	$1, %edi
 	mfence
-	leaq	-1(%rax,%rax), %rax
+	movq	(%rax), %rax
+	leaq	-1(%rbx,%rax), %rax
 	ret
 load_across_store_fence:
 	movq	(%rax), %rax

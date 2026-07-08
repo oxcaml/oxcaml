@@ -106,13 +106,13 @@ module Make (Op : Operation) : S with type op = Op.t = struct
         { m with
           mutable_load_equations = Rhs_map.add op v m.mutable_load_equations
         }
-      | Op_pure | Op_load Immutable | Op_store _ | Op_other ->
+      | Op_pure | Op_load Immutable | Op_store _ | Op_load_barrier | Op_other ->
         { m with other_equations = Rhs_map.add op v m.other_equations }
 
     let find (op_class : op_class) op m =
       match op_class with
       | Op_load Mutable -> Rhs_map.find op m.mutable_load_equations
-      | Op_pure | Op_load Immutable | Op_store _ | Op_other ->
+      | Op_pure | Op_load Immutable | Op_store _ | Op_load_barrier | Op_other ->
         Rhs_map.find op m.other_equations
 
     let remove_mutable_loads m =
@@ -308,14 +308,21 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
     | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ->
       Op_pure
-    | (Opaque | Pause) as op ->
+    | Opaque as op ->
       Misc.fatal_errorf "Cfg_cse.class_of_operation0: %a is handled specially"
         Operation.dump op
+    | Pause ->
+      (* Pause is used to spin on memory locations, so equations over mutable
+         loads must not survive it. *)
+      Op_load_barrier
     | Stackoffset _ -> Op_other
     | Load { mutability; is_atomic; memory_chunk = _; addressing_mode = _ } ->
-      (* #12173: disable CSE for atomic loads. *)
+      (* #12173: disable CSE for atomic loads. Moreover, an atomic load is an
+         acquire: a load that follows it must not be satisfied by an equation
+         over a load that precedes it, so atomic loads are also load
+         barriers. *)
       if is_atomic
-      then Op_other
+      then Op_load_barrier
       else
         Op_load
           (match mutability with Mutable -> Mutable | Immutable -> Immutable)
@@ -368,10 +375,6 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Op Opaque ->
       (* Assume arbitrary side effects from Opaque *)
       empty_numbering
-    | Op Pause ->
-      (* We don't want to reorder loads across Pause, since it's used to spin on
-         memory locations. *)
-      kill_loads n
     | Op (Alloc _) | Op Poll ->
       (* For allocations, we must avoid extending the live range of a
          pseudoregister across the allocation if this pseudoreg is a derived
@@ -396,7 +399,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
          | Intop_atomic _
          | Floatop (_, _)
          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-         | Specific _ | Name_for_debugger _ ) as op) -> (
+         | Specific _ | Name_for_debugger _ | Pause ) as op) -> (
       match class_of_operation op with
       | (Op_pure | Op_load _) as op_class -> (
         let n1, varg = valnum_regs n i.arg in
@@ -432,9 +435,11 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
         let n1 = set_unknown_regs n (Proc.destroyed_at_basic i.desc) in
         let n2 = set_unknown_regs n1 i.res in
         n2
-      | Op_store true ->
+      | Op_store true | Op_load_barrier ->
         (* A non-initializing store can invalidate anything we know about prior
-           mutable loads. *)
+           mutable loads; a load barrier (atomic load, load fence, pause) must
+           similarly prevent a later load from reusing an equation over an
+           earlier one. *)
         let n1 = set_unknown_regs n (Proc.destroyed_at_basic i.desc) in
         let n2 = set_unknown_regs n1 i.res in
         let n3 = kill_loads n2 in
