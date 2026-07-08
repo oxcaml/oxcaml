@@ -49,6 +49,7 @@ let rec type_is_arrow ty =
   | Tarrow _ -> true
   | Tlink ty -> type_is_arrow ty
   | Tpoly (ty, _) -> type_is_arrow ty
+  | Tmod (ty, _) -> type_is_arrow ty
   | _ -> false
 
 (* surround function types in parentheses *)
@@ -69,6 +70,7 @@ let pp_parameter env label ppf ty =
       | Types.Tconstr (path, [ ty ], _) when Path.same path Predef.path_option
         -> ty
       | Types.Tpoly (ty, []) -> unwrap_option ty
+      | Types.Tmod (ty, _) -> unwrap_option ty
       | _ -> ty
     in
     Format.fprintf ppf "?%s:%a" l (pp_parameter_type env) (unwrap_option ty)

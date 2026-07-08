@@ -245,6 +245,7 @@ let rec get_match = function
         let param_typ =
           match Types.get_desc param_typ with
           | Tpoly (param_typ, []) -> param_typ
+          | Tmod (param_typ, _) -> param_typ
           | _ -> param_typ
         in
         (m, param_typ)

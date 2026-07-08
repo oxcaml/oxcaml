@@ -96,7 +96,7 @@ type classification =
 
 (* Classify a ty into a [classification]. Looks through synonyms, using
    [scrape_ty]. Returning [Any] is safe, though may skip some optimizations. *)
-let classify env ty : classification =
+let rec classify env ty : classification =
   (* NOTE: this call is redundant, but also does not hurt.
      It is inherited from the original definition. *)
   let ty = scrape_ty env ty in
@@ -105,6 +105,7 @@ let classify env ty : classification =
   else
     match get_desc ty with
     | Tvar _ | Tunivar _ -> Any
+    | Tmod (ty, _) -> classify env ty
     | Tconstr (p, _args, _abbrev) -> (
       if Path.same p Predef.path_float
       then Float
@@ -260,6 +261,7 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
     then Value
     else
       match lookup_subst (get_id ty) subst with None -> Value | Some sh -> sh)
+  | Tmod (ty, _) -> value_kind env subst ~visited ~depth ty
   | Tpoly _ ->
     raise
       (Vicuna_unsupported

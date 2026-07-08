@@ -126,12 +126,12 @@ let inspect_expression ~cursor ~lid e : t =
     let name = Path.last p in
     log ~title:"inspect_context" "name is: [%s]" name;
     if name = "*type-error*" then
-      (* For type_enclosing: it is enough to return Module_path here.
-         - If the cursor was on the end of the lid typing should fail anyway
-         - If the cursor is on a segment of the path it should be typed ad a
-         Module_path
-         TODO: double check that this is correct-enough behavior for Locate *)
-      Module_path
+      (* When recovery has inserted a fake identifier, use the reconstructed
+         identifier to distinguish [x] from [M.x].  For [x], locate should try
+         the value namespace first; for a non-final path segment, module lookup
+         is still the useful fallback. *)
+      if cursor_on_longident_end ~cursor ~lid_loc (Longident.last lid) then Expr
+      else Module_path
     else if cursor_on_longident_end ~cursor ~lid_loc name then Expr
     else Module_path
   | Texp_constant _ -> Constant

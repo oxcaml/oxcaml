@@ -1061,7 +1061,7 @@ let rec copy_spine copy_scope ty =
   | Tof_kind _
   | Tbox _ -> ty
   | ( Tarrow _ | Tpoly _ | Trepr _ | Ttuple _ | Tunboxed_tuple _ | Tpackage _
-    | Tconstr _ ) as desc ->
+    | Tconstr _ | Tmod _ ) as desc ->
       let level = get_level ty in
       if level < !current_level || level = generic_level then ty else
       let t =
@@ -1085,6 +1085,8 @@ let rec copy_spine copy_scope ty =
           Tpackage {pack_path; pack_cstrs = fl}
       | Tconstr (path, tyl, _) ->
           Tconstr (path, List.map copy_rec tyl, ref Mnil)
+      | Tmod (ty, bounds) ->
+          Tmod (copy_rec ty, bounds)
       | _ -> assert false
       in
       Transient_expr.set_stub_desc t desc';
@@ -2504,6 +2506,8 @@ and try_reduce_quote_eval env t =
   | Tconstr (p, tl, a) ->
     path_must_be_toplevel env p;
     Tconstr (p, List.map new_quote_eval_ty tl, a)
+  | Tmod (ty, bounds) ->
+    Tmod (new_quote_eval_ty ty, bounds)
   (* [<[ < .. > ]> eval]  ==>  [< <[..]> eval >] *)
   | Tobject (t, ct) ->
     (* Attempt to reduce the field list immediately:
@@ -2685,7 +2689,7 @@ let rec extract_concrete_typedecl env ty =
                 | May_have_typedecl -> May_have_typedecl
           end
       end
-  | Tpoly(ty, _) -> extract_concrete_typedecl env ty
+  | Tpoly(ty, _) | Tmod (ty, _) -> extract_concrete_typedecl env ty
   | Trepr _ -> Has_no_typedecl
   | Tquote ty -> extract_concrete_typedecl (incr_stage env) ty
   | Tsplice ty -> extract_concrete_typedecl (decr_stage env) ty
@@ -2846,7 +2850,7 @@ let contained_without_boxing env ty =
     end
   | Tunboxed_tuple labeled_tys ->
     List.map snd labeled_tys
-  | Tpoly (ty, _) -> [ty]
+  | Tpoly (ty, _) | Tmod (ty, _) -> [ty]
   | Trepr (_, _) ->  Misc.fatal_error "Ctype.contained_without_boxing: repr"
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
   | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _ | Tbox _
@@ -3014,6 +3018,8 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
   match get_desc ty with
   | Tvar { jkind } -> Jkind.disallow_right jkind
   | Tarrow _ -> Jkind.for_arrow
+  | Tmod (ty, _) ->
+    estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty
   | Ttuple elts -> Jkind.for_boxed_tuple elts
   | Tunboxed_tuple ltys ->
       let tys = List.map snd ltys in
@@ -7704,6 +7710,10 @@ let rec build_subtype env (visited : transient_expr list)
   | Tbox t1 ->
       let (t1', c) = build_subtype env visited loops posi level t1 in
       if c > Unchanged then (newty (Tbox t1'), c)
+      else (t, Unchanged)
+  | Tmod (t1, bounds) ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Tmod (t1', bounds)), c)
       else (t, Unchanged)
   | Tnil ->
       if posi then

@@ -99,7 +99,8 @@ and core_type type_expr =
     Typ.object_ fields closed
   | Tfield _ -> failwith "Found object field outside of object."
   | Tnil -> Typ.object_ [] Closed
-  | Tlink type_expr | Tsubst (type_expr, _) -> core_type type_expr
+  | Tlink type_expr | Tmod (type_expr, _) | Tsubst (type_expr, _) ->
+    core_type type_expr
   | Tvariant row ->
     let row_fields = row_fields row in
     let row_closed = row_closed row in

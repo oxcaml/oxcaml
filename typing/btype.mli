@@ -376,6 +376,7 @@ module Jkind0 : sig
         [axes] are [max] within [bounds] *)
     val is_max_within_set : t -> Jkind_axis.Axis_set.t -> bool
     val is_max : t -> bool
+    val get_max_axes : t -> Jkind_axis.Axis_set.t
 
     val min : t
     val max : t

@@ -352,6 +352,7 @@ let fold_type_expr f init ty =
   | Ttuple l            -> List.fold_left (fun acc (_, t) -> f acc t) init l
   | Tunboxed_tuple l    -> List.fold_left (fun acc (_, t) -> f acc t) init l
   | Tconstr (_, l, _)   -> List.fold_left f init l
+  | Tmod (ty, _)        -> f init ty
   | Tobject(ty, {contents = Some (_, p)}) ->
       let result = f init ty in
       List.fold_left f result p
@@ -598,6 +599,7 @@ let rec copy_type_desc ?(keep_names=false) f = function
   | Tunboxed_tuple l    ->
     Tunboxed_tuple (List.map (fun (label, t) -> label, f t) l)
   | Tconstr (p, l, _)   -> Tconstr (p, List.map f l, ref Mnil)
+  | Tmod (ty, bounds)   -> Tmod (f ty, bounds)
   | Tobject(ty, {contents = Some (p, tl)})
                         -> Tobject (f ty, ref (Some(p, List.map f tl)))
   | Tobject (ty, _)     -> Tobject (f ty, ref None)

@@ -1265,6 +1265,7 @@ module Aliases = struct
       | Tvar _ -> Variable_names.reserve ty
       | Tarrow(_, ty1, ty2, _) ->
           mark_loops_rec visited ty1; mark_loops_rec visited ty2
+      | Tmod (ty, _) -> mark_loops_rec visited ty
       | Ttuple tyl | Tunboxed_tuple tyl ->
           List.iter (fun (_, ty) -> mark_loops_rec visited ty) tyl
       | Tconstr(p, tyl, _) -> begin
@@ -1563,6 +1564,7 @@ let rec tree_of_modal_typexp mode modal ty =
         let modal = Arrow_return {acc = acc_mode; mode = mret} in
         let t2 = tree_of_modal_typexp mode modal ty2 in
         Otyp_arrow (lab, tree_of_modes arg_mode, t1, t2)
+    | Tmod (ty, _) -> tree_of_modal_typexp mode modal ty
     | Ttuple labeled_tyl ->
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
     | Tunboxed_tuple labeled_tyl ->

@@ -113,10 +113,11 @@ module Solver = struct
     let param_id = Types.get_id ty in
     rigid_name ctx (Ldd.Name.param param_id)
 
-  let type_may_be_circular (ty : Types.type_expr) : bool =
+  let rec type_may_be_circular (ty : Types.type_expr) : bool =
     match Types.get_desc ty with
     | Types.Tvariant _ -> true
     | Types.Tconstr _ -> true
+    | Types.Tmod (ty, _) -> type_may_be_circular ty
     | Types.Tobject _ -> true
     | _ -> !Clflags.recursive_types
 
@@ -429,6 +430,10 @@ module Solver = struct
         (* Keep a rigid param, but cap it by its annotated jkind. *)
         Ldd.meet (rigid ctx ty) (ckind_of_jkind ctx jkind)
       | Types.Tconstr (path, args, _abbrev_memo) -> constr ctx path args
+      | Types.Tmod (ty, mod_bounds) ->
+        Ldd.meet
+          (kind ~use_tables:true ctx ty)
+          (Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds))
       | Types.Ttuple elts ->
         (* Boxed tuples: immutable_data base + per-element contributions
            under id modality. *)

@@ -491,7 +491,7 @@ module Gen = struct
       let constructed_from_type =
         match get_desc rtyp with
         | Tlink _ | Tsubst _ -> assert false
-        | Tpoly (texp, _) ->
+        | Tpoly (texp, _) | Tmod (texp, _) ->
           (* We are not going "deeper" so we don't call [exp_or_hole] here *)
           expression ~idents_table values_scope ~depth env texp
         | Tunivar _ | Tvar _ | Tof_kind _ -> []

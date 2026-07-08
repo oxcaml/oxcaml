@@ -148,6 +148,7 @@ let rec immediate_subtypes : type_expr -> type_expr list = fun ty ->
          but "better safe than sorry" *)
       immediate_subtypes_object_row [] ty
   | Tquote ty | Tsplice ty | Tquote_eval ty | Tbox ty -> [ty]
+  | Tmod (ty, _) -> [ty]
   | Tlink _ | Tsubst _ -> assert false (* impossible due to Ctype.repr *)
   | Tvar _ | Tunivar _ -> []
   | Tof_kind _ -> []
@@ -472,6 +473,8 @@ let check_type
         assert false
     | (Tunivar(_)         , _      ) -> empty
     | (Tof_kind(_)         , _      ) -> empty
+    | (Tmod(ty, _)         , m      ) ->
+        check_type hyps ty m
     (* Type constructor case. *)
     | (Tconstr(path,tys,_), m      ) ->
         let msig = (Env.find_type path env).type_separability in

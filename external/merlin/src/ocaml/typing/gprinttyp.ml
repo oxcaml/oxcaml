@@ -683,6 +683,7 @@ module Digraph = struct
         mk "*" |> labeled_edges params id tl
     | Types.Tunboxed_tuple tl ->
         mk "#*" |> labeled_edges params id tl
+    | Types.Tmod (t, _) -> mk "[Mod]" |> std_edge t
     | Types.Tconstr (p,tl,abbrevs) ->
         let constr = mk "%a" pp_path p |> numbered tl in
         if not params.follow_expansions then

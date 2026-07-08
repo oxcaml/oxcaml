@@ -49,6 +49,7 @@ let match_query env query t =
       let t1 =
         match Types.get_desc t1 with
         | Tpoly (t1, []) -> t1
+        | Tmod (t1, _) -> t1
         | _ -> t1
       in
       traverse neg neg_fun pos pos_fun t2;

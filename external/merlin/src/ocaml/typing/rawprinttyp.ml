@@ -118,6 +118,8 @@ and raw_type_desc ppf ty =
       fprintf ppf "@[<hov1>Tconstr(@,%a,@,%a,@,%a)@]" path p
         raw_type_list tl
         (raw_list path) (list_of_memo !abbrev)
+  | Tmod (t, _) ->
+      fprintf ppf "@[<hov1>Tmod(@,%a)@]" raw_type t
   | Tobject (t, nm) ->
       fprintf ppf "@[<hov1>Tobject(@,%a,@,@[<1>ref%t@])@]" raw_type t
         (fun ppf ->

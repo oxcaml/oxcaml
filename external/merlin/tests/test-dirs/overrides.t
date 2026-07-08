@@ -247,8 +247,14 @@ Test overrides on last character of %swap
 Test overrides one character to the right of %swap
 
   $ test_merlin_overrides "2:15" "./basic.ml"
-  [merlin locate] output: Not in environment 'f'
-  [merlin document] output: Not in environment 'f'
+  [merlin locate] output: {
+    "file": "$TESTCASE_ROOT/test/basic.ml",
+    "pos": {
+      "line": 1,
+      "col": 4
+    }
+  }
+  [merlin document] output: No documentation available
 
 Test overrides on @add_one
 
