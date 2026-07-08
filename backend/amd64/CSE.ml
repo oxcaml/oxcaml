@@ -37,8 +37,16 @@ let class_of_operation (op : Operation.t)
     | Ioffset_loc(_, _) -> Class (Op_store true)
     | Ifloatarithmem _ -> Class (Op_load Mutable)
     | Ibswap _ -> Use_default
-    | Irdtsc | Irdpmc
-    | Ilfence | Isfence | Imfence -> Class Op_other
+    | Irdtsc | Irdpmc -> Class Op_other
+    | Ilfence | Imfence ->
+      (* A load that follows a load fence must not be satisfied by an equation
+         over a load that precedes the fence: that would effectively hoist the
+         load above the fence. *)
+      Class Op_load_barrier
+    | Isfence ->
+      (* [sfence] only orders stores, and CSE neither eliminates nor moves
+         stores, so it does not need to be a load barrier. *)
+      Class Op_other
     | Ipackf32 -> Class Op_pure
     | Isimd op ->
       Class (of_simd_class (Simd.class_of_operation op))

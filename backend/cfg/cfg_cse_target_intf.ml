@@ -28,6 +28,11 @@ type op_class =
   | Op_pure  (** pure arithmetic, produce one or several result *)
   | Op_load of Operation.mutable_flag  (** memory load *)
   | Op_store of bool  (** memory store, false = init, true = assign *)
+  | Op_load_barrier
+      (** operation that is never eligible for CSE itself, and across which
+          equations over mutable loads must not survive, so that a load
+          following the operation cannot reuse the result of a load preceding it
+          (e.g. atomic loads, load fences, pause) *)
   | Op_other  (** anything else that does not allocate nor store in memory *)
 
 type class_of_operation_result =
