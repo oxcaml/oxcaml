@@ -1990,9 +1990,9 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
         (source_env, Variable.Set.empty)
     in
     let rec expand var =
-      match Name.Map.find_or_null (Name.var var) equations with
-      | Null -> More_type_creators.unknown (Variable.kind var)
-      | This ty -> (
+      match Name.Map.find_opt (Name.var var) equations with
+      | None -> More_type_creators.unknown (Variable.kind var)
+      | Some ty -> (
         match TG.get_alias_opt ty with
         | None -> TG.project_variables_out ~to_project ~expand ty
         | Some simple ->
