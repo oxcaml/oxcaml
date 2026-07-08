@@ -435,14 +435,62 @@ of match forwarding:
 
 The following optimizations are performed by the *reaper* pass, which runs
 after the main simplification pass and reasons across function boundaries. It
-is not enabled by default, you need `-flambda2-reaper` or `-O4` to enable it.
-A more detailed explanation of the model of the reaper is in [reaper.md], which
-can help in practice understanding why a particular change is or is not made.
+is not enabled by default, you need `-flambda2-reaper` (optionally with
+`-reaper-local-fields`) or `-O4` (which enables both the previous flags) to
+enable it. A more detailed explanation of the model of the reaper is in
+[reaper.md], which can help in practice understanding why a particular change
+is or is not made.
 
 Note: in all the examples, `[@inline never][@local never]` are not necessary
 for the optimization to happen, they are necessary to prevent *other*
 optimizations from happening so we can demonstrate those optimizations on
 simple examples.
+
+### Cross-function dead code elimination
+
+Dead code elimination can be performed cross-function. If the reaper can prove
+that a given side-effect-free value will never be used, it will replace it with
+a special dummy value, which could be arbitrary.
+
+```ocaml
+(* Before cross-function dead code elimination *)
+let[@inline never] f _ = 0
+
+let g x = f (x * x)
+```
+
+```ocaml
+(* After cross-function dead code elimination *)
+let[@inline never] f _ = 0
+
+let g x = f __DUMMY__
+```
+
+### Removal of unnecessary block field initializations
+
+Removal of unnecessary block field initializations will delete side-effect-free
+expressions used to initialize block fields that are never read from, replacing
+the initialization of that field with a dummy value.
+
+```ocaml
+(* Before removal of unnecessary block field initializations *)
+
+let[@inline never] f pair =
+  let (a, _) = pair in
+  a
+
+let g x = f (x * x, x + 1)
+```
+
+```ocaml
+(* After removal of unnecessary block field initializations *)
+
+let[@inline never] f pair =
+  let (a, _) = pair in
+  a
+
+let g x = f (x * x, __DUMMY__)
+```
 
 ### Calling convention change
 
@@ -519,7 +567,7 @@ let f n =
   a + b
 ```
 
-### Closure unboxing
+### Closure unboxing (lambda lifting)
 
 Closure unboxing triggers when a closure is never stored or passed as a
 higher-order value, so all of its uses are direct calls. In that case, the
@@ -579,6 +627,6 @@ let f a b callback =
 - Boxed numbers (floats and int32/int64/nativeint) are *not* supported for the
   moment. It is likely this restriction will be lifted in the near future.
 
-- Functions not defined in the current compilation unit will *not* have their
-  free variables unboxed if they escape. This is a limitation of the semantic
-  model of flambda, and this will *not* be changed in the future.
+- Specialized version of functions defined in another compilation unit will
+  *not* have their free variables unboxed if they escape. This is a limitation
+  of the semantic model of flambda.
