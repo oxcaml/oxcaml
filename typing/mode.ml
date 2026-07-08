@@ -5539,14 +5539,16 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let meet_const_unhint c m =
     (* [meet_const max] is the identity *)
-    if C.le obj (C.max obj) c then m
+    if C.le obj (C.max obj) c
+    then m
     else S.Unhint.apply obj (Simple (Meet_const c)) m
 
   let meet_const ?hint c m = wrap ?hint (meet_const_unhint c) (disallow_right m)
 
   let imply_const_unhint c m =
     (* [imply_const max] is the identity *)
-    if C.le obj (C.max obj) c then m
+    if C.le obj (C.max obj) c
+    then m
     else S.Unhint.apply obj (Simple (Imply_const c)) m
 
   let imply_const c m = m |> disallow_left |> wrap (imply_const_unhint c)
@@ -5685,8 +5687,7 @@ module Monadic_gen (Obj : Obj) = struct
 
   let check_generic a = S.check_generic a
 
-  let iter_covariant ?visited a iter =
-    S.iter_contravariant ?visited obj a iter
+  let iter_covariant ?visited a iter = S.iter_contravariant ?visited obj a iter
 
   let iter_contravariant ?visited a iter = S.iter_covariant ?visited obj a iter
 
@@ -5732,7 +5733,8 @@ module Monadic_gen (Obj : Obj) = struct
   let join_const_unhint c m =
     (* The underlying object is the opposite lattice, so this is a meet, and
        [meet_const max] is the identity *)
-    if C.le Obj.obj (C.max Obj.obj) c then m
+    if C.le Obj.obj (C.max Obj.obj) c
+    then m
     else S.Unhint.apply Obj.obj (Simple (Meet_const c)) m
 
   let join_const ?hint c m = wrap ?hint (join_const_unhint c) (disallow_left m)
@@ -5740,7 +5742,8 @@ module Monadic_gen (Obj : Obj) = struct
   let subtract_const_unhint c m =
     (* The underlying object is the opposite lattice, so this is an imply, and
        [imply_const max] is the identity *)
-    if C.le obj (C.max obj) c then m
+    if C.le obj (C.max obj) c
+    then m
     else S.Unhint.apply obj (Simple (Imply_const c)) m
 
   let subtract_const c m = m |> disallow_right |> wrap (subtract_const_unhint c)

@@ -50,14 +50,13 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         | Adjoint_l :
             ('a, 'b, 'l2 * allowed) t * ('b, 'a, allowed * disallowed) C.morph
             -> ('b, 'a, 'l * disallowed) t
-            (** [Adjoint_l (h, m)] is the left adjoint of [h], deferred;
-                [m] is the (already computed) left adjoint of [h]'s
-                morphism, kept so consumers can recover source objects.
-                Deferral avoids eagerly rebuilding hint trees for
-                adjoints taken on hot paths (level updates), which is
-                superlinear on large constraint graphs; the tree is only
-                walked if the hint is consumed (to render an error).
-                Unlike a closure this is plain data, so it survives
+            (** [Adjoint_l (h, m)] is the left adjoint of [h], deferred; [m] is
+                the (already computed) left adjoint of [h]'s morphism, kept so
+                consumers can recover source objects. Deferral avoids eagerly
+                rebuilding hint trees for adjoints taken on hot paths (level
+                updates), which is superlinear on large constraint graphs; the
+                tree is only walked if the hint is consumed (to render an
+                error). Unlike a closure this is plain data, so it survives
                 [output_value] into cmt files. *)
         | Adjoint_r :
             ('a, 'b, allowed * 'r2) t * ('b, 'a, disallowed * allowed) C.morph
