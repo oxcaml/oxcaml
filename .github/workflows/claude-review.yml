@@ -1,30 +1,29 @@
-# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
-# If you want this functionality, ask for help from a subset of:
+# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source
+# code repo. If you want this functionality, ask for help from a subset of:
 # @jvanburen @glittershark @mshinwell
 #
-# (This workflow complies: it has read-only access to repository contents and
-# can only post PR comments.)
+# (This workflow complies: repository contents are read-only. Claude cannot
+# commit or push; it reviews and proposes changes as GitHub suggestion blocks
+# that humans review and apply.)
 #
 # --------------------------------------------------------------------------
 #
-# On-demand Claude code review.
+# On-demand Claude Code review.
 #
 # Apply the `claude-review` label to a PR to get a code review from Claude.
-# Remove and re-apply the label to request a fresh review after pushing
-# changes. Only users with triage access or better can apply labels, so this
-# has the same human-in-the-loop property as @claude mentions.
+# Remove and re-apply the label to request a fresh review after pushing changes.
 #
-# Limitations:
-#
-# - Fork PRs are not supported: GitHub does not grant the `id-token: write`
-#   permission to `pull_request` runs from forks, which Workload Identity
-#   Federation requires. (claude.yml also deliberately skips fork PRs at
-#   the moment -- see the fork-PR notes there -- so neither workflow runs
-#   Claude against fork-controlled code.)
-#
-# - Authentication and spend isolation work the same way as claude.yml: the
-#   `anthropic_*` values are identifiers (not secrets), and usage is billed
-#   to a dedicated spend-capped workspace.
+# SECURITY: this workflow shares the model documented in
+# .github/claude-code-security.md (WIF auth, no write-capable token, actor and
+# fork gating, untrusted-input handling). Read it before modifying this file.
+# Three points specific to this workflow:
+#   - It runs in the action's "agent mode" (it supplies a `prompt`); see the
+#     tag-vs-agent section of the doc for how that shapes the allowlist below.
+#   - Fork PRs are excluded by the job `if:` (the pull_request payload carries
+#     head.repo directly, so no API-call guard step is needed as in claude.yml).
+#   - It sets up NO build environment: reviews read the code and CI results,
+#     they do not compile. claude.yml is the build-capable lane -- when a
+#     review warrants deeper investigation, escalate with an @claude mention.
 
 name: Claude Review
 
@@ -46,42 +45,46 @@ jobs:
     if: |
       github.event.label.name == 'claude-review' &&
       github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # Plain runner, deliberately: reviews do not build.
     timeout-minutes: 90
-    # A subset of claude.yml's grants; each is audited, with receipts,
-    # directly above the permissions block in claude.yml, alongside the
-    # list of explicitly prohibited actions.
+    # Same grant set as claude.yml; per-grant rationale and the
+    # prohibited-actions list are in .github/claude-code-security.md.
     permissions:
-      contents: read
-      pull-requests: write # post the review (summary + inline comments)
-      id-token: write # mint the OIDC identity token for Anthropic WIF
+      contents: read # checkout + read the tree for review (read-only)
+      pull-requests: write # post the review (summary + inline suggestion comments)
+      id-token: write # mint the OIDC token for Anthropic WIF; grants no GitHub write access (see doc)
       actions: read # let the review consider CI results
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6 # zizmor: ignore[artipacked]
+      - name: Checkout Repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          fetch-depth: 1
-          # persist-credentials is left at the default (true) deliberately;
-          # see the note in claude.yml (claude-code-action#1236). The token
-          # persisted here is read-only for contents in any case.
+          persist-credentials: true # zizmor: ignore[artipacked]
+            # anthropics/claude-code-action runs `git fetch` before configuring
+            # its own auth and fails without the persisted token
+            # (anthropics/claude-code-action#1236). More importantly, the
+            # persisted token is the workflow token above, which is passed into
+            # the Claude Code action anyway. For defense in depth, we should set
+            # persist-credentials to false once that issue is resolved.
 
-      - name: Run Claude review
-        uses: anthropics/claude-code-action@v1
+      - name: Run Claude Review
+        uses: anthropics/claude-code-action@ba0aafd4308cbba7165f9f2cdb0cfbed5a3c99ce # v1.0.168
         with:
-          # WIF identifiers, shared with claude.yml via repo Actions
-          # variables (identifiers, not credentials).
+          # Workload Identity Federation identifiers, not credentials (see the
+          # WIF section in .github/claude-code-security.md).
           anthropic_federation_rule_id: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID }}
           anthropic_organization_id: ${{ vars.ANTHROPIC_ORGANIZATION_ID }}
           anthropic_service_account_id: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID }}
           anthropic_workspace_id: ${{ vars.ANTHROPIC_WORKSPACE_ID }}
 
-          # Use the workflow's own (contents: read) token instead of the
-          # Claude GitHub App's exchanged token, which would carry
-          # `contents: write` despite this job's read-only permissions.
-          # Keeps the job free of write-capable GitHub tokens. The app is
-          # deliberately NOT installed on this repository; see the
-          # security notes and permissions audit in claude.yml.
+          # Pass the workflow's own token so the action does NOT exchange the
+          # OIDC token for a write-capable app token (see
+          # .github/claude-code-security.md).
           github_token: ${{ github.token }}
+
+          # Trigger-weakening knobs pinned empty so loosening requires a visible
+          # diff: only write-access humans can trigger (doc: actor gating).
+          allowed_non_write_users: ""
+          allowed_bots: ""
 
           prompt: |
             Review this pull request.
@@ -94,21 +97,36 @@ jobs:
             - missing or inadequate tests (testsuite/ coverage for behavior
               changes)
 
+            You do not have a build environment and cannot compile or run
+            tests; do not attempt to. Read the code, and consult the CI
+            results (via the CI tools) for build and test status.
+
             Be concise. Only comment where you have something substantive to
-            say; do not pad the review with praise or restatements of the
-            diff. Use inline comments for line-specific feedback and a short
-            summary comment for overall assessment. Where you have a
-            concrete, small, local fix, include it in the inline comment as
-            a GitHub suggestion block so the author can apply it with one
-            click.
+            say; do not pad the review with praise or restatements of the diff.
+            Use inline comments for line-specific feedback and a short summary
+            comment for overall assessment. Where you have a concrete, small,
+            local fix, include it in the inline comment as a GitHub suggestion
+            block so the author can apply it with one click.
 
 
-          # Note: this workflow supplies a `prompt`, so the action runs in
-          # "agent mode", where the CI-reading tools (mcp__github_ci__*) are
-          # only mounted if they appear in --allowedTools AND the workflow
-          # token passes the action's runtime probe for `actions: read`
-          # (checkActionsReadPermission in src/mcp/install-mcp-server.ts).
-          # Listing them here is what makes "consider CI results" work.
+          # This workflow supplies a `prompt`, so the action runs in "agent
+          # mode", which differs from claude.yml's "tag mode" in ways that
+          # shape this allowlist:
+          #   - The CI-reading tools (mcp__github_ci__*) are only mounted if
+          #     they appear here AND the workflow token passes the action's
+          #     runtime `actions: read` probe (checkActionsReadPermission in
+          #     src/mcp/install-mcp-server.ts). Listing them is what makes
+          #     "consider CI results" work.
+          #   - Agent mode does not pre-fetch the PR diff into the prompt
+          #     (that is a tag-mode feature) and creates no auto-tracking
+          #     comment. So, unlike claude.yml, this workflow needs
+          #     `gh pr diff`/`gh pr view` to read the PR and `gh pr comment`
+          #     to post its summary. These are scoped subcommands riding the
+          #     pull-requests:write / contents:read grants we already hold --
+          #     NOT a general `Bash(gh:*)` (which would expose `gh api` to
+          #     any endpoint) and NOT `Bash(git:*)` (arbitrary-remote push).
+          # Inline review comments still go through the inline-comment MCP
+          # tool, same as claude.yml.
           claude_args: |
             --model claude-fable-5
             --effort xhigh

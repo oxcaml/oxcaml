@@ -4,8 +4,8 @@
 #
 # (This workflow complies: repository contents are read-only. Claude cannot
 # commit or push; it proposes changes as GitHub suggestion blocks and diffs that
-# humans review and apply. See the security notes below before modifying this
-# file.)
+# humans review and apply. See .github/claude-code-security.md for the shared
+# security model before modifying this file.)
 #
 # --------------------------------------------------------------------------
 #
@@ -24,95 +24,15 @@
 # GitHub issues are deliberately not supported (we barely use them); this keeps
 # the trigger surface and the permission grants PR-only.
 #
-# See https://github.com/anthropics/claude-code-action for documentation.
+# See https://github.com/anthropics/claude-code-action for the action's docs.
 #
-# Security notes:
-#
-# - Only users with *write* access to this repository can trigger the action.
-#   https://github.com/anthropics/claude-code-action/blob/main/docs/security.md
-#   The action itself checks the author's permissions and refuses to run for
-#   anyone else. Do not weaken this: issue and comment text is untrusted
-#   input. The weakening knobs (`allowed_non_write_users`, `allowed_bots`)
-#   are explicitly pinned to their safe defaults on the action step below.
-#
-# - No write-capable GitHub token exists anywhere in this job. The workflow
-#   `permissions` grant `contents: read`, and we pass that same token to the
-#   action via `github_token`. Passing `github_token` matters: it bypasses the
-#   Claude GitHub App's token exchange, which would otherwise mint an app token
-#   carrying `contents: write` even though our workflow permissions are
-#   read-only. Consequently, even arbitrary code execution inside this job (e.g.
-#   a compromised or misbehaving session running `make` on attacker-influenced
-#   sources) can only read the public repo, post comments, and spend our capped
-#   Anthropic budget -- it cannot push code anywhere. (Tradeoff: comments are
-#   attributed to github-actions[bot] rather than claude[bot].)
-#
-# - The Claude GitHub App is deliberately NOT installed on this repository.
-#   It is only needed for the token exchange we bypass, and an installed
-#   app would be a standing contents-write grant on this repo exercisable
-#   by Anthropic's backend. Its absence is also a tripwire: if someone
-#   later removes the `github_token` input, the action fails loudly at the
-#   app exchange ("app not installed") instead of silently acquiring a
-#   write token.
-#
-# - There are no static credentials here. The `anthropic_*` values below are
-#   identifiers, not secrets: authentication uses Workload Identity Federation
-#   (WIF), exchanging this workflow's short-lived GitHub OIDC token (hence
-#   `id-token: write`) for a short-lived Anthropic token scoped to a service
-#   account. There is no API key to leak or rotate.
-#
-# - Anthropic-side spend for this workflow is isolated in a dedicated workspace
-#   (`anthropic_workspace_id` below) with its own spend limit, so a runaway job
-#   cannot exhaust the whole organization's budget. The job-level
-#   `timeout-minutes` bounds individual runner spend.
-#
-# - Claude's toolchain comes from the flake devShell, substituted read-only
-#   from the CI-only `oxcaml` cachix cache (see nix-github-actions.yml). The
-#   cachix step below deliberately has no authToken: nothing built during a
-#   Claude session may ever be pushed to the cache.
-#
-# - PR threads on a public repo are untrusted input. The action
-#   sanitizes hidden-markdown tricks (HTML comments, invisible characters,
-#   etc.), but that is best-effort. With no write token in the job the
-#   blast radius of injection is comments and budget, but still: treat
-#   Claude's suggestions like any external contributor's -- read them
-#   before applying.
-#
-# - In CI, Claude's Bash access is disabled by default (its built-in file
-#   read/edit and GitHub tools do not go through Bash), and headless runs
-#   have no "ask the human" fallback: anything not pre-allowed is refused.
-#   Two sources feed the allowlist (see src/modes/tag/index.ts in the
-#   action):
-#     1. the action's own mention-mode baseline: read-only file tools
-#        (Glob/Grep/LS/Read), its comment-update and CI-reading MCP tools,
-#        `git add`/`git commit`/a push wrapper/`git rm` -- inert here,
-#        since pushes 403 against our contents:read token -- and
-#        `--permission-mode acceptEdits`, which permits file edits inside
-#        the checkout (and only there). Workspace-local edits are wanted:
-#        Claude edits, builds, and tests before proposing a diff; nothing
-#        can leave the runner except comments.
-#     2. our additive `--allowedTools` list under `claude_args` below,
-#        which is where all extensions belong.
-#
-#   How the repo's `.claude/settings.json` interacts with this (checked against
-#   the Claude Code docs): permission rules from all settings scopes MERGE --
-#   arrays concatenate and deduplicate, a deny in any scope beats an allow in
-#   any other, and evaluation order is deny, ask, allow -- with CLI arguments
-#   like --allowedTools sitting above project settings in the precedence order.
-#   Critically, though, `allow` rules in a committed .claude/settings.json only
-#   take effect after the workspace trust dialog is accepted, and "in
-#   non-interactive mode with -p, no dialog appears and the rules stay ignored"
-#   -- which is how this action runs Claude, and the action does not pre-trust
-#   the workspace. (Receipts: the action invokes Claude through the Agent
-#   SDK -- non-interactive by construction -- with settingSources
-#   user/project/local set in base-action/src/parse-sdk-options.ts, which
-#   is also the receipt that project settings load at all; and searches of
-#   the action for workspace-trust-granting code come up empty.) So the
-#   checked-out settings.json (which may be untrusted
-#   PR-head content!) cannot WIDEN permissions in CI; its deny/ask rules do
-#   still apply, which is at worst a self-inflicted nuisance for a PR author.
-#   Keep CI policy here regardless.
-#   https://code.claude.com/docs/en/permissions#project-allow-rules-and-workspace-trust
-#   https://code.claude.com/docs/en/permissions#settings-precedence
+# SECURITY: the shared security model for both Claude workflows -- how WIF
+# authentication works, why no write-capable GitHub token exists in the job,
+# why the Claude GitHub App is not installed, the actor/fork gating, tag vs.
+# agent mode, and the .claude/settings.json behavior -- lives in
+# .github/claude-code-security.md. Read it before modifying this file. The
+# comments here justify only this file's individual settings and defer there
+# for the mechanism.
 
 name: Claude
 
@@ -151,7 +71,7 @@ jobs:
     name: Respond
     # Pre-filter: only spin up a runner when @claude is actually mentioned.
     # (Authorization is enforced by the action, not by this condition, and
-    # the fork-PR exclusion is enforced by the "Check for fork PR" step, so
+    # the fork-PR exclusion is enforced by the "Reject PRs in Forks" step, so
     # nothing in this `if:` is security-critical. The head.repo checks on
     # the review events duplicate the guard step's decision for the two
     # payloads that carry the head repo, purely to avoid spinning up a
@@ -162,143 +82,39 @@ jobs:
       (github.event_name == 'issue_comment' && github.event.issue.pull_request != null && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.review.body, '@claude'))
-    runs-on: warp-ubuntu-latest-x64-8x
+    runs-on: warp-ubuntu-latest-x64-8x # CI builder since building is expected.
     timeout-minutes: 90
     permissions:
-      # Permissions audit -- every grant is documented, followed by the actions
-      # we explicitly prohibit.
-      # https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions
-      # This is the complete set of permissions available to the action
-      # Unspecifed permissions all default to none:
-      # https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#defining-access-for-the-github_token-scopes
-
-      contents: read # For actions/checkout, and Claude reading the tree to build and test.
-      # Read-only contents is what makes the whole design propose-only; see
-      # the prohibited list below for what that blocks.
-      # https://docs.github.com/en/rest/authentication/permissions-required-for-github-apps?apiVersion=2022-11-28#repository-permissions-for-contents
-
-      pull-requests: write # For posting Claude's response comment and the inline review comments that carry suggestion blocks.
-      # https://docs.github.com/en/rest/authentication/permissions-required-for-github-apps?apiVersion=2022-11-28#repository-permissions-for-pull-requests
-
-      id-token: write # For minting the OIDC identity token for Anthropic WIF.
-      # Prima facie the scariest grant; actually the most misnamed. This is the
-      # standard mechanism for keyless CI authentication to
-      # Anthropic/AWS/GCP/etc. It does NOT allow writing to anything on GitHub.
-      # The "id-token" is the GitHub Actions OIDC *identity* token: a JWT,
-      # signed by GitHub, valid for minutes, whose claims describe this workflow
-      # run (repository, ref, workflow file, triggering actor, audience).
-      # `write` means only "this job may request such a token about itself" --
-      # no read variant exists. The token conveys zero GitHub API access; it is
-      # an identity assertion, not an authorization. How this workflow uses it:
-      # the action sends the JWT to Anthropic's WIF endpoint; Anthropic verifies
-      # GitHub's signature against the GitHub's published keys, matches the
-      # claims against our federation rule (the vars.ANTHROPIC_* values below
-      # select the rule / org / service account / workspace -- routing), and
-      # returns a short-lived Anthropic API token billed to our spend-capped
-      # workspace. This is why no static Anthropic credential is stored anywhere
-      # in this repository.
-      # https://docs.github.com/en/actions/concepts/security/openid-connect
-      #
-      # Defense in depth: the action deletes the OIDC request env vars
-      # (ACTIONS_ID_TOKEN_REQUEST_URL/_TOKEN) from Claude's own session
-      # environment before launching it, so the model's processes cannot mint
-      # identity tokens directly (base-action/src/parse-sdk-options.ts: "Remove
-      # OIDC token request variables so Claude cannot mint new tokens").
-      #
-      # Fork-PR note: for workflows triggered by pull_request-family events from
-      # a forked repository (claude-review.yml's trigger; not this file's
-      # comment/review events, which always run in base-repository context),
-      # GitHub downgrades every write permission to read-only -- and since
-      # id-token has no read level (it is write|none), fork-PR runs get no OIDC
-      # token at all. This is platform behavior, not a repo setting; the only
-      # exceptions are pull_request_target (unused here) and a "Send write
-      # tokens to workflows from pull requests" setting that exists only for
-      # private-repo forks. See the fork-downgrade paragraph and the `id-token:
-      # write|none syntax`:
-      # https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#permissions
-      # Corollary, cutting the other way: comment events are base-repo events,
-      # so the fork downgrade does NOT apply to them -- a maintainer tagging
-      # @claude on a fork PR would yield a fully privileged base-repo run
-      # (id-token included) building fork-controlled code. We currently sidestep
-      # that subtlety entirely: the "Check for fork PR" step skips all runs on
-      # PRs from forks, so @claude only works on same-repo PRs. The disable is
-      # not hypothetical caution: the human-vouching assumption fails in the
-      # most natural usage imaginable -- a maintainer reflexively tagging
-      # "@claude is this legit?" on a *suspicious* PR invokes Claude precisely
-      # because they distrust the content, and would hand that content a
-      # privileged run. If re-enabling fork PRs is ever considered, the safety
-      # argument would rest on: a write-access human explicitly triggering the
-      # run (after skimming the fork's diff, as before running an external patch
-      # locally), the job holding no write-capable GitHub token for
-      # fork-controlled build scripts to steal, and the OIDC token's worst case
-      # being capped Anthropic spend. Background on this attack shape:
-      # https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/
-
-      actions: read
-        # For letting Claude read workflow runs and job logs on this repo to
-        # diagnose CI failures. The action probes this permission at runtime and
-        # mounts its CI tools only when the probe succeeds
-        # (checkActionsReadPermission in src/mcp/install-mcp-server.ts). Our CI
-        # results never include data from internal systems, so this isn't very
-        # interesting (and secrets are masked in logs).
-        # https://docs.github.com/en/rest/actions/workflow-runs#download-workflow-run-logs
-        # https://docs.github.com/en/rest/authentication/permissions-required-for-github-apps?apiVersion=2022-11-28#repository-permissions-for-actions
-
-      # Explicitly prohibited actions
-      # -----------------------------
-      # For each: the grant(s) it would require, and a receipt confirming that
-      # requirement. None of these grants are present above.
-      #
-      # - Pushing commits, editing files, creating branches or tags all modify
-      #   the repo and require `contents: write`.
-      #
-      # - Merging a PR requires `contents: write`.
-      #   https://docs.github.com/en/rest/pulls/pulls#merge-a-pull-request
-      #
-      # - Creating or approving PRs: The workflow token is additionally gated by
-      #   the Actions setting "Allow GitHub Actions to create and approve pull
-      #   requests" (Settings -> Actions -> General), which is GitHub's
-      #   default-off for organizations and verified off for this repo by
-      #   dkalinichenko-js on 2026-07-07. It must stay off.
-      #   https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#preventing-github-actions-from-creating-or-approving-pull-requests
-      #
-      # - Creating issues requires `issues: write`.
-      #   https://docs.github.com/en/rest/issues/issues#create-an-issue
-      #
-      # - Poisoning the Actions cache: since June 2026, GitHub issues a
-      #   read-only cache token when both (a) the triggering event is untrusted
-      #   (non-collaborators can trigger events of that type) and (b) the run
-      #   executes in the shared default-branch context. Both hold for this
-      #   workflow's comment/review triggers: anyone can comment or review on a
-      #   public repo, and those events always run from the default branch.
-      #   (workflow_dispatch runs are collaborator-initiated and may receive a
-      #   read-write cache token; this workflow writes no caches in any case --
-      #   nix substitution goes through cachix, tokenlessly.) Note there is no
-      #   unconditional opt-out: the `permissions:` key has no cache scope
-      #   (cache access rides the runner's ACTIONS_RUNTIME_TOKEN, outside the
-      #   permissions system entirely), so the contextual platform behavior
-      #   above plus this workflow's zero cache usage is the whole story.
-      #   https://github.blog/changelog/2026-06-26-read-only-actions-cache-for-untrusted-triggers/
+      # This is the complete grant set; unspecified permissions default to none
+      # (workflow-level `permissions: {}` above). Each grant's rationale is one
+      # line here; the shared mechanism (and the list of actions these grants
+      # deliberately do NOT enable -- push, merge, create/approve PRs, create
+      # issues, poison the cache) is in .github/claude-code-security.md.
+      contents: read # checkout + let Claude read the tree; read-only is what makes this propose-only
+      pull-requests: write # post Claude's response comment and inline suggestion-block comments
+      id-token: write # mint the OIDC token for Anthropic WIF; grants no GitHub write access (see doc)
+      actions: read # let Claude read CI runs/logs to diagnose failures (CI logs here are already public)
 
     steps:
-      - name: Checkout Repository # zizmor: ignore[artipacked]
-        uses: actions/checkout@v6
+      - name: Checkout Repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          fetch-depth: 1
-          persist-credentials: true
+          persist-credentials: true # zizmor: ignore[artipacked]
             # anthropics/claude-code-action runs `git fetch` before configuring
             # its own auth and fails without the persisted token
             # (anthropics/claude-code-action#1236). More importantly, the
             # persisted token is the workflow token above, which is passed into
-            # the claude code action anyway.
+            # the Claude Code action anyway. For defense in depth, we should set
+            # persist-credentials to false once that issue is resolved.
 
       - name: Reject PRs in Forks
-        # The single enforcement point for the fork-PR exclusion (see the
-        # fork-PR notes in the id-token section for why fork PRs are disabled):
-        # runs for every trigger except workflow_dispatch and *fails the job* on
-        # a fork PR, so all later steps are skipped by GitHub's default status
-        # check -- no per-step gating needed. The red X (with the error
-        # annotation) is the visible feedback that @claude is disabled there.
+        # The single enforcement point for the fork-PR exclusion (why fork PRs
+        # are disabled: see "Fork PRs are not run" in
+        # .github/claude-code-security.md). Runs for every trigger except
+        # workflow_dispatch and *fails the job* on a fork PR, so all later steps
+        # are skipped by GitHub's default status check -- no per-step gating
+        # needed. The red X (with the error annotation) is the visible feedback
+        # that @claude is disabled there.
         #
         # We ask the API for the head repo rather than reading the event payload
         # because the issue_comment payload does not carry it (verified against
@@ -323,8 +139,8 @@ jobs:
       # Claude's build environment is the flake devShell -- the same toolchain
       # as the nix CI builds:
 
-      - uses: cachix/install-nix-action@v31
-      - uses: cachix/cachix-action@v17
+      - uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
+      - uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
         with:
           name: oxcaml
           # No authToken, deliberately: read-only substitution. Nothing built
@@ -336,30 +152,25 @@ jobs:
         uses: nicknovitski/nix-develop@9be7cfb4b10451d3390a75dc18ad0465bed4932a # v1.2.1
 
       - name: Run Claude Code
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@ba0aafd4308cbba7165f9f2cdb0cfbed5a3c99ce # v1.0.168
         with:
-          # Workload Identity Federation (see security notes above). These
-          # are identifiers, not credentials.
+          # Workload Identity Federation identifiers, not credentials (see the
+          # WIF section in .github/claude-code-security.md).
           anthropic_federation_rule_id: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID }}
           anthropic_organization_id: ${{ vars.ANTHROPIC_ORGANIZATION_ID }}
           anthropic_service_account_id: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID }}
           anthropic_workspace_id: ${{ vars.ANTHROPIC_WORKSPACE_ID }}
 
-          # Use the workflow's own token instead of the Claude GitHub App's
-          # exchanged token, which would carry its own set of permissions. The
-          # app is deliberately NOT installed on this repository; see the
-          # security notes at the top of this file.
+          # Pass the workflow's own token so the action does NOT exchange the
+          # OIDC token for a write-capable app token. This is half of the
+          # "no write-capable token in the job" invariant; see
+          # .github/claude-code-security.md.
           github_token: ${{ github.token }}
 
-          # Trigger-weakening knobs, pinned to their safe defaults so that
-          # weakening them requires a visible diff to this file. Empty means
-          # disabled: only human users with write access can trigger the action.
-          # `allowed_non_write_users` would let listed users (or '*' for anyone)
-          # trigger it; `allowed_bots` would let listed GitHub Apps trigger it
-          # -- with NO check that the app has any permission on this repo, so on
-          # a public repo '*' means roughly "anyone willing to register an app".
-          # Comment text is untrusted input; keep both empty.
-          # https://github.com/anthropics/claude-code-action/blob/main/docs/security.md#access-control
+          # Trigger-weakening knobs pinned empty so loosening requires a visible
+          # diff: only write-access humans can trigger. Why '*' for allowed_bots
+          # is especially dangerous on a public repo is in the doc's actor-gating
+          # section.
           allowed_non_write_users: ""
           allowed_bots: ""
 
@@ -373,14 +184,14 @@ jobs:
           prompt: ${{ inputs.prompt }}
 
           # Bash commands and MCP tools Claude may use, additive on top of the
-          # action's mention-mode baseline (see the allowlist security note in
-          # the header). Keep this list tight: anything not pre-allowed is
-          # refused. Extend deliberately rather than globbing.
-          # The inline-comment entry is deliberate double duty: the action
-          # only mounts the inline-comment MCP server when this exact tool
-          # name appears in --allowedTools (install-mcp-server.ts), and it is
-          # what carries suggestion blocks. The CI-reading tools are NOT
-          # listed because the mention-mode baseline already includes them.
+          # action's tag-mode baseline (see "Tag mode vs. agent mode" in
+          # .github/claude-code-security.md). Keep tight: anything not
+          # pre-allowed is refused; extend deliberately rather than globbing.
+          # The inline-comment entry is double duty -- the action only mounts
+          # the inline-comment MCP server when this exact tool name appears in
+          # --allowedTools, and it is what carries suggestion blocks. The
+          # CI-reading tools are omitted because the tag-mode baseline already
+          # includes them.
           claude_args: |
             --model claude-fable-5
             --effort xhigh
