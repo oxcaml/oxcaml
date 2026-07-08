@@ -6104,8 +6104,6 @@ module Monadic = struct
     | Unique -> true
     | Aliased -> false
 
-  let definitely_unique_unhint m = m |> hint ~hint:Skip |> definitely_unique
-
   let unique_implies_uncontended_unhint m =
     let c : Const.t = { Const.min with contention = Contended } in
     subtract_const_unhint c m
@@ -7817,11 +7815,26 @@ module Crossing = struct
 
   let apply_left_unhint { crossing; unique_implies_uncontended }
       { monadic; comonadic } =
+    (* UIC discharges a contention obligation using uniqueness the value
+       ALREADY has, so we read the value's uniqueness from the [monadic] input
+       BEFORE mode crossing is applied. Reading pre-crossing means an artificial
+       uniqueness crossing (e.g. a [@@ aliased] field, or a [mod aliased] type)
+       can never be mistaken here for genuine uniqueness: this site does not
+       rely on the ikind UIC bit to exclude uniqueness-crossing types. The bit
+       governs only WHICH types are granted [unique_implies_uncontended]; it is
+       not load-bearing for the soundness of the uniqueness read.
+
+       The read is non-destructive: [definitely_unique] inspects the loose
+       ceiling and never forces a flexible variable. Because [Unique] is the
+       extreme point of the uniqueness axis, "loose ceiling is [Unique]" is
+       equivalent to "the mode is pinned to the constant [Unique]" -- i.e. a
+       precise, non-mutating constant read. *)
+    let value_is_definitely_unique =
+      unique_implies_uncontended && Value.Monadic.definitely_unique monadic
+    in
     let monadic = Monadic.apply_left crossing.monadic monadic in
     let monadic =
-      if
-        unique_implies_uncontended
-        && Value.Monadic.definitely_unique_unhint monadic
+      if value_is_definitely_unique
       then Value.Monadic.unique_implies_uncontended_unhint monadic
       else monadic
     in
