@@ -4458,22 +4458,18 @@ module Report = struct
          prioritize for better error messages. For example, prioritize the first
          element in a [join]. This requires inspecting the [solver.ml] to ensure
          the ordering in the [join] list is preserved. *)
-      (* The branch is only built when the submode against [other] failed, i.e.
-         [not (other <= meet (x, y))] (resp. [not (join (x, y) <= other)]).
-         So if the bound named in the [if] satisfies [other], the other bound
-         must be the culprit, which is what the [assert] records. *)
       match b with
       | Meet ->
         if C.le a_obj other x
         then begin
-          assert (not (C.le a_obj other y));
+          if C.le a_obj other y then print_bug_stderr ();
           `Second
         end
         else `First
       | Join ->
         if C.le a_obj x other
         then begin
-          assert (not (C.le a_obj y other));
+          if C.le a_obj y other then print_bug_stderr ();
           `Second
         end
         else `First
