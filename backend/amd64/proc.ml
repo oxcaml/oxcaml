@@ -209,19 +209,20 @@ let calling_conventions
   in
   for i = 0 to Array.length arg - 1 do
     let ty : machtype_component = arg.(i) in
-    let registers, size =
+    let registers, size, ty =
       match ty with
-      | Val | Int | Addr -> int_registers, size_int
-      | Float | Float32 -> float_registers, size_float
-      | Vec128 -> float_registers, size_vec128
-      | Vec256 -> float_registers, size_vec256
-      | Vec512 -> float_registers, size_vec512
+      | Val | Int | Addr -> int_registers, size_int, ty
+      | Float | Float32 -> float_registers, size_float, ty
+      | Vec128 -> float_registers, size_vec128, ty
+      | Vec256 -> float_registers, size_vec256, ty
+      | Vec512 -> float_registers, size_vec512, ty
       | Mask -> (
         match mask_registers with
-        | Some mask_registers -> mask_registers, size_int
+        | Some mask_registers -> mask_registers, size_int, ty
         | None ->
-          (* The C ABI passes masks in GPRs. *)
-          int_registers, size_int)
+          (* The C ABI passes masks in GPRs. The location is typed [Int] so
+             that instruction selection inserts the mask<->GPR conversions. *)
+          int_registers, size_int, Int)
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
     in
     match !registers with
