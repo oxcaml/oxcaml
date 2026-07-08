@@ -420,8 +420,8 @@ Error: The layout of type "int t" is value_or_null
          because the payload of bad_payload has layout value.
 |}]
 
-(* CR or-null: allow GADT custom [@@or_null] types.
-   Internal ticket 6854. *)
+(* GADT custom [@@or_null] types are allowed. See gadts.ml for a thorough
+   treatment; here we just check the basic accepted forms. *)
 
 type 'a gadt =
   | A : 'a gadt
@@ -429,17 +429,10 @@ type 'a gadt =
 [@@or_null]
 
 [%%expect{|
-Lines 1-4, characters 0-11:
-1 | type 'a gadt =
-2 |   | A : 'a gadt
-3 |   | B : 'a -> 'a gadt
-4 | [@@or_null]
-Error: Invalid [@or_null] declaration:
-       GADT constructors are not supported with [@@or_null].
+type 'a gadt = A : 'a gadt | B : 'a -> 'a gadt [@@or_null]
 |}]
 
-(* CR or-null: allow GADT custom [@@or_null] types with concrete indices.
-   Internal ticket 6854. *)
+(* GADTs with concrete indices are allowed too. *)
 
 type 'a concrete_gadt =
   | Null : int concrete_gadt
@@ -447,13 +440,9 @@ type 'a concrete_gadt =
 [@@or_null]
 
 [%%expect{|
-Lines 1-4, characters 0-11:
-1 | type 'a concrete_gadt =
-2 |   | Null : int concrete_gadt
-3 |   | This : string -> bool concrete_gadt
-4 | [@@or_null]
-Error: Invalid [@or_null] declaration:
-       GADT constructors are not supported with [@@or_null].
+type 'a concrete_gadt =
+    Null : int concrete_gadt
+  | This : string -> bool concrete_gadt [@@or_null]
 |}]
 
 type ('a : any) widened_bad_jkind =
