@@ -89,7 +89,12 @@ jobs:
         uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
         with:
           name: oxcaml
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          # A GitHub environment would add little here: the cachix cache is a
+          # disposable CI-only artifact store, not a deployment target. The
+          # write token is already withheld from PR builds by the `if:` above
+          # (only post-merge and merge-queue runs receive it), so untrusted
+          # code can never reach this secret.
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }} # zizmor: ignore[secrets-outside-env]
       - env:
           ATTR: ${{ matrix.attr }}
         run: nix build -L ".#$ATTR"
