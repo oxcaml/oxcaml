@@ -213,6 +213,63 @@ def describe_change(ratio: float) -> str:
     return f"{abs(percent):.1f}% {direction}"
 
 
+def evaluate_verdict(
+    *,
+    corpus: dict,
+    files: list[dict],
+    thresholds: dict,
+    precision_gap: float,
+    reached_max_runs: bool,
+) -> dict:
+    """Decide pass/fail from the measured statistics.
+
+    The primary gate compares the point estimate of the corpus head/base
+    ratio against the threshold. The confidence bound is still computed and
+    reported for context, but it is not subtracted from the estimate here:
+    subtracting it (the old lower-bound gate) let measurement noise protect
+    real regressions, so a genuine slowdown could pass just by being noisy.
+
+    Returns the list of failures, any warnings, and whether the result is
+    low confidence (max runs reached without the margin achieving the target
+    precision). Low confidence is a warning, not a failure: the point-estimate
+    verdict stands.
+    """
+    failures = []
+    warnings = []
+
+    if corpus["ratio"] > thresholds["fail_corpus_ratio"]:
+        failures.append(
+            f"corpus ratio {corpus['ratio']:.3f} exceeds "
+            f"{thresholds['fail_corpus_ratio']:.3f}"
+        )
+
+    for result in files:
+        if result["ratio_median"] > thresholds["fail_any_file_median"]:
+            failures.append(
+                f"{result['name']} median ratio "
+                f"{result['ratio_median']:.3f} exceeds "
+                f"{thresholds['fail_any_file_median']:.3f}"
+            )
+
+    low_confidence = (
+        reached_max_runs and corpus["confidence_margin_log"] > precision_gap
+    )
+    if low_confidence:
+        warnings.append(
+            "LOW CONFIDENCE: reached the maximum number of runs without the "
+            "confidence margin reaching the target precision (log-space "
+            f"margin {corpus['confidence_margin_log']:.4f} still exceeds the "
+            f"target {precision_gap:.4f}). The point-estimate verdict above "
+            "stands, but treat it as provisional."
+        )
+
+    return {
+        "failures": failures,
+        "warnings": warnings,
+        "low_confidence": low_confidence,
+    }
+
+
 def write_markdown(
     path: Path,
     *,
@@ -221,10 +278,15 @@ def write_markdown(
     runs: list[dict],
     files: list[dict],
     thresholds: dict,
+    verdict: dict,
 ) -> None:
     lines = [
         "# Compiler performance benchmark",
         "",
+    ]
+    for warning in verdict["warnings"]:
+        lines.extend([f"> **:warning: {warning}**", ""])
+    lines.extend([
         "## What this checks",
         "",
         (
@@ -237,19 +299,20 @@ def write_markdown(
         ),
         "",
         (
-            "The script computes the mean and sample standard deviation of "
-            "`log(r_i)`. If there are `n` runs, the reported 99% lower "
-            "confidence bound is:"
+            "The corpus ratio is the point estimate "
+            "`exp(mean(log(r_i)))`. The main check fails when this ratio is "
+            f"greater than `{thresholds['fail_corpus_ratio']:.3f}`, i.e. when "
+            "the head compiler is measured slower than the base compiler by "
+            "more than the configured threshold."
         ),
         "",
-        "`exp(mean(log(r_i)) - t_0.99,n-1 * sd(log(r_i)) / sqrt(n))`",
-        "",
         (
-            "The main check fails when this lower confidence bound is greater "
-            f"than `{thresholds['fail_corpus_lower_bound']:.3f}`. In other "
-            "words, the check only fails when even the conservative estimate "
-            "says that the head compiler is slower than the base compiler by "
-            "more than the configured threshold."
+            "A 99% lower confidence bound "
+            "`exp(mean(log(r_i)) - t_0.99,n-1 * sd(log(r_i)) / sqrt(n))` and "
+            "its log-space margin are reported for context, but the gate uses "
+            "the point estimate, not the bound: subtracting the confidence "
+            "margin before comparing to the threshold let measurement noise "
+            "hide real regressions."
         ),
         "",
         (
@@ -257,18 +320,20 @@ def write_markdown(
             "more runs if the confidence margin is too wide to distinguish "
             f"a `{thresholds['precision_target_slowdown']:.3f}` slowdown from "
             "the failure threshold. This spends extra time only on noisy "
-            "measurements."
+            "measurements. If the maximum number of runs is reached without "
+            "achieving that precision, the result is flagged **low "
+            "confidence** but the point-estimate verdict still stands."
         ),
         "",
         (
-            "There are two secondary checks. The build check compares the "
-            "elapsed time for building and installing the head compiler "
-            "against building and installing the base compiler. The per-file "
-            "check computes the median `H_i / B_i` for each benchmark file "
-            "and catches large localized slowdowns."
+            "The per-file check computes the median `H_i / B_i` for each "
+            "benchmark file and catches large localized slowdowns. The build "
+            "time below is reported for information only: it is a single "
+            "(n=1) wall-clock measurement on a shared runner, so it does not "
+            "gate."
         ),
         "",
-    ]
+    ])
 
     if build_results is not None:
         builds = build_results["builds"]
@@ -351,9 +416,8 @@ def main() -> int:
     parser.add_argument("--max-runs", type=int, default=60)
     parser.add_argument("--run-batch-size", type=int, default=5)
     parser.add_argument("--warmups", type=int, default=1)
-    parser.add_argument("--fail-corpus-lower-bound", type=float, default=1.015)
+    parser.add_argument("--fail-corpus-ratio", type=float, default=1.015)
     parser.add_argument("--fail-any-file-median", type=float, default=1.25)
-    parser.add_argument("--fail-build-ratio", type=float, default=1.15)
     parser.add_argument("--precision-target-slowdown", type=float, default=1.03)
     parser.add_argument("--build-results-json", type=Path)
     parser.add_argument("--json-output", type=Path)
@@ -369,10 +433,10 @@ def main() -> int:
         raise SystemExit("--max-runs must be at least --runs")
     if args.run_batch_size < 1:
         raise SystemExit("--run-batch-size must be at least 1")
-    if args.precision_target_slowdown <= args.fail_corpus_lower_bound:
+    if args.precision_target_slowdown <= args.fail_corpus_ratio:
         raise SystemExit(
             "--precision-target-slowdown must be greater than "
-            "--fail-corpus-lower-bound"
+            "--fail-corpus-ratio"
         )
 
     for compiler in [args.base_compiler, args.head_compiler]:
@@ -430,7 +494,7 @@ def main() -> int:
 
     precision_gap = (
         math.log(args.precision_target_slowdown)
-        - math.log(args.fail_corpus_lower_bound)
+        - math.log(args.fail_corpus_ratio)
     )
 
     runs = []
@@ -483,29 +547,42 @@ def main() -> int:
         if not should_check:
             continue
         corpus = corpus_statistics(runs)
-        if corpus["lower_bound_99"] > args.fail_corpus_lower_bound:
-            break
+        # Extend runs until the confidence margin is tight enough to
+        # distinguish the precision target from the failure threshold. The
+        # verdict itself uses the point estimate, not this bound; the margin
+        # only decides when to stop measuring (and flags low confidence if we
+        # never get there).
         if corpus["confidence_margin_log"] <= precision_gap:
             break
 
+    reached_max_runs = len(runs) >= args.max_runs
     corpus = corpus_statistics(runs)
     files = file_statistics(benchmark_files, runs)
     build_results = load_build_results(args.build_results_json)
+
+    thresholds = {
+        "fail_corpus_ratio": args.fail_corpus_ratio,
+        "fail_any_file_median": args.fail_any_file_median,
+        "precision_target_slowdown": args.precision_target_slowdown,
+        "min_runs": args.runs,
+        "max_runs": args.max_runs,
+        "run_batch_size": args.run_batch_size,
+    }
+    verdict = evaluate_verdict(
+        corpus=corpus,
+        files=files,
+        thresholds=thresholds,
+        precision_gap=precision_gap,
+        reached_max_runs=reached_max_runs,
+    )
 
     payload = {
         "build": build_results,
         "corpus": corpus,
         "runs": runs,
         "files": files,
-        "thresholds": {
-            "fail_corpus_lower_bound": args.fail_corpus_lower_bound,
-            "fail_any_file_median": args.fail_any_file_median,
-            "fail_build_ratio": args.fail_build_ratio,
-            "precision_target_slowdown": args.precision_target_slowdown,
-            "min_runs": args.runs,
-            "max_runs": args.max_runs,
-            "run_batch_size": args.run_batch_size,
-        },
+        "thresholds": thresholds,
+        "verdict": verdict,
     }
     if args.json_output is not None:
         args.json_output.parent.mkdir(parents=True, exist_ok=True)
@@ -518,7 +595,8 @@ def main() -> int:
             corpus=corpus,
             runs=runs,
             files=files,
-            thresholds=payload["thresholds"],
+            thresholds=thresholds,
+            verdict=verdict,
         )
 
     print("Compiler performance benchmark")
@@ -544,33 +622,21 @@ def main() -> int:
             f"median_ratio={result['ratio_median']:.3f}"
         )
 
-    failures = []
-    if (
-        build_results is not None
-        and build_results["ratio"] > args.fail_build_ratio
-    ):
-        failures.append(
-            f"build ratio {build_results['ratio']:.3f} exceeds "
-            f"{args.fail_build_ratio:.3f}"
+    # The build ratio is a single, unreplicated wall-clock measurement (n=1)
+    # on a shared runner, so it is reported but never gates.
+    if build_results is not None:
+        print(
+            f"build ratio {build_results['ratio']:.3f} "
+            "(reported only, not a gate)"
         )
-    if corpus["lower_bound_99"] > args.fail_corpus_lower_bound:
-        failures.append(
-            f"99% lower confidence bound {corpus['lower_bound_99']:.3f} "
-            f"exceeds {args.fail_corpus_lower_bound:.3f}"
-        )
-    for result in files:
-        if result["ratio_median"] > args.fail_any_file_median:
-            failures.append(
-                f"{result['name']} median ratio "
-                f"{result['ratio_median']:.3f} exceeds "
-                f"{args.fail_any_file_median:.3f}"
-            )
 
     if not args.keep_work_dir:
         shutil.rmtree(args.work_dir, ignore_errors=True)
 
-    if failures:
-        for failure in failures:
+    for warning in verdict["warnings"]:
+        print(f"::warning::{warning}")
+    if verdict["failures"]:
+        for failure in verdict["failures"]:
             print(f"::error::{failure}")
         return 1
     return 0
