@@ -1,3 +1,4 @@
 (tests
- (names global_module_test axis_lattice_roundtrip_test ldd_imply_test)
+ (names global_module_test axis_lattice_roundtrip_test ldd_imply_test
+   meet_right_adjoint_test)
  (libraries ocamlfrontend))
