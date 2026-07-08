@@ -30,6 +30,9 @@ type view = private
   | Call_witness of closure_entry_point
   | Is_int
   | Get_tag
+  | Boxed_number of Flambda_kind.Boxable_number.t
+      (** The contents of a boxed number. Currently only created for boxed
+          int32, int64 and nativeint values (which are all custom blocks). *)
   | Return_of_call of return_kind
   | Code_id_of_call_witness
 
@@ -58,6 +61,8 @@ val function_slot : Function_slot.t -> t
 val is_int : t
 
 val get_tag : t
+
+val boxed_number : Flambda_kind.Boxable_number.t -> t
 
 (** {2 Virtual fields}
 

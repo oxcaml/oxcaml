@@ -25,6 +25,7 @@ type 'a block_or_closure_fields =
         fields : (Flambda_kind.t * 'a) option list
       }
   | Closure_fields of 'a Value_slot.Map.t * 'a Function_slot.Map.t
+  | Boxed_number_field of Flambda_kind.Boxable_number.t * 'a
   | Block_and_closure_fields
 
 let classify_field_map fields =
@@ -33,6 +34,10 @@ let classify_field_map fields =
       (fun field x acc ->
         match acc with
         | `Block_and_closure_fields -> `Block_and_closure_fields
+        | `Boxed_number_field _ ->
+          (* A boxed number has a single field, so it cannot be combined with
+             any other field. *)
+          `Block_and_closure_fields
         | (`Block_fields _ | `Closure_fields _ | `Empty) as acc -> (
           let[@inline] block_fields k =
             let[@local] k is_int get_tag fields =
@@ -56,6 +61,10 @@ let classify_field_map fields =
           match Field.view field with
           | Call_witness _ | Return_of_call _ | Code_id_of_call_witness ->
             `Block_and_closure_fields
+          | Boxed_number bn -> (
+            match acc with
+            | `Empty -> `Boxed_number_field (bn, x)
+            | `Block_fields _ | `Closure_fields _ -> `Block_and_closure_fields)
           | Value_slot vs ->
             closure_fields (fun ~value_slots ~function_slots ->
                 `Closure_fields
@@ -86,6 +95,7 @@ let classify_field_map fields =
   match r with
   | `Empty -> Empty
   | `Block_and_closure_fields -> Block_and_closure_fields
+  | `Boxed_number_field (bn, x) -> Boxed_number_field (bn, x)
   | `Closure_fields (vs, fs) -> Closure_fields (vs, fs)
   | `Block_fields (is_int, get_tag, fields) ->
     let n =
@@ -138,6 +148,15 @@ let[@inline] erase kind =
     Flambda_kind.With_subkind.Non_null_value_subkind.Anything
     (Flambda_kind.With_subkind.nullable kind)
 
+let rewrite_boxed_number_kind context usages kind bn =
+  (* The contents of boxed int32/int64/nativeint values are tracked via
+     [Boxed_number] fields. If the contents are read, the value must really be a
+     boxed number (in particular, it cannot have been replaced by a poison
+     value), so the subkind can be kept. *)
+  match PTA.get_one_field_usage context.db (Field.boxed_number bn) usages with
+  | Bottom -> erase kind
+  | Unknown | Ok _ -> kind
+
 let rec rewrite_kind_with_subkind_not_top_not_bottom context usages kind =
   (* CR ncourant: rewrite changed representation, or at least replace with Top.
      Not needed while we don't change representation of blocks. *)
@@ -145,13 +164,16 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom context usages kind =
   | Anything -> kind
   | Tagged_immediate ->
     kind (* Always correct, since poison is a tagged immediate *)
-  | Boxed_float32 | Boxed_float | Boxed_int32 | Boxed_int64 | Boxed_nativeint
-  | Boxed_vec128 | Boxed_vec256 | Boxed_vec512 | Float_block _ | Float_array
-  | Immediate_array | Value_array | Generic_array | Unboxed_float32_array
-  | Untagged_int_array | Untagged_int8_array | Untagged_int16_array
-  | Unboxed_int32_array | Unboxed_int64_array | Unboxed_nativeint_array
-  | Unboxed_vec128_array | Unboxed_vec256_array | Unboxed_vec512_array
-  | Unboxed_product_array ->
+  | Boxed_int32 -> rewrite_boxed_number_kind context usages kind Naked_int32
+  | Boxed_int64 -> rewrite_boxed_number_kind context usages kind Naked_int64
+  | Boxed_nativeint ->
+    rewrite_boxed_number_kind context usages kind Naked_nativeint
+  | Boxed_float32 | Boxed_float | Boxed_vec128 | Boxed_vec256 | Boxed_vec512
+  | Float_block _ | Float_array | Immediate_array | Value_array | Generic_array
+  | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
+  | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
+  | Unboxed_nativeint_array | Unboxed_vec128_array | Unboxed_vec256_array
+  | Unboxed_vec512_array | Unboxed_product_array ->
     (* For all these subkinds, we don't track fields (for now). Thus, being in
        this case without being top or bottom means that we never use this
        particular value, but that it syntactically looks like it could be used.
@@ -310,7 +332,7 @@ module Rewriter = struct
             | Call_witness _ | Code_id_of_call_witness | Return_of_call _ ->
               (* Virtual fields *) ()
             | Function_slot _ -> (* Shortcut *) ()
-            | Block _ | Value_slot _ | Is_int | Get_tag -> (
+            | Block _ | Value_slot _ | Is_int | Get_tag | Boxed_number _ -> (
               let field_source =
                 PTA.get_single_field_source db unboxed_block field
               in
@@ -397,6 +419,15 @@ module Rewriter = struct
     | Empty | Block_and_closure_fields ->
       ( Field.Map.map (fun (_, unboxed_fields) -> forget unboxed_fields) combined,
         Pattern.any )
+    | Boxed_number_field (bn, use) ->
+      if Option.is_some patterns_for_function_slots
+      then
+        Misc.fatal_errorf
+          "[patterns_for_unboxed_fields] sees a boxed number but needs to bind \
+           function slots";
+      let field = Field.boxed_number bn in
+      let vars, pat = for_one_use field use in
+      Field.Map.singleton field vars, Pattern.boxed_number bn pat
     | Block_fields { is_int; get_tag; fields } ->
       if Option.is_some patterns_for_function_slots
       then

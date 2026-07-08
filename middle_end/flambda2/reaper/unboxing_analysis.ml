@@ -21,10 +21,11 @@
    have a unique allocation point for each of its uses that read from it.
    Formally, a value allocated at a given point $x$ can be unboxed if, for each
    usage $y$ of $x$ that reads from $x$ for one of the fields [Block],
-   [Value_slot], [Function_slot], [Is_int] or [Get_tag], (but not [Call_witness]
-   which connects the call witness which is not read at runtime from $x$, nor
-   [Apply] or [Code_id_of_call_witnes] which are only read from call witnesses),
-   $y$ has known sources, and the only source of $y$ is $x$.
+   [Value_slot], [Function_slot], [Is_int], [Get_tag] or [Boxed_number], (but
+   not [Call_witness] which connects the call witness which is not read at
+   runtime from $x$, nor [Apply] or [Code_id_of_call_witnes] which are only read
+   from call witnesses), $y$ has known sources, and the only source of $y$ is
+   $x$.
 
    In the case where $x$ has unknown usages, we can assume any field defined in
    $x$ that is not local might be read from it. As such, as soon as $x$ has a
@@ -368,13 +369,13 @@ let datalog_rules =
        [cannot_change_representation1 x] ==> cannot_change_representation x);
       (* Due to value_kinds rewriting not taking representation changes into
          account for now, blocks cannot have their representation changed, so we
-         prevent it here. *)
+         prevent it here. The same applies to boxed numbers. *)
       (let$ [x; field; y] = ["x"; "field"; "y"] in
        [ constructor ~base:x field ~from:y;
          when1
            (fun f ->
              match Field.view f with
-             | Block _ | Is_int | Get_tag -> true
+             | Block _ | Is_int | Get_tag | Boxed_number _ -> true
              | Value_slot _ | Function_slot _ | Call_witness _
              | Return_of_call _ | Code_id_of_call_witness ->
                false)
@@ -511,7 +512,7 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
         Misc.fatal_errorf "Unexpected field kind %a in [mk_unboxed_fields]"
           Field.print field
       | Call_witness _ -> None
-      | Block _ | Value_slot _ | Is_int | Get_tag -> (
+      | Block _ | Value_slot _ | Is_int | Get_tag | Boxed_number _ -> (
         let field_source = PTA.get_single_field_source db unboxed_block field in
         match field_source with
         | No_source -> None

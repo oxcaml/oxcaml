@@ -199,6 +199,22 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     let name = Acc.simple_to_node acc ~denv arg in
     default_bp (fun to_ ->
         Acc.add_accessor_dep acc ~to_ Field.get_tag ~base:name)
+  | Unary
+      ( Box_number
+          (((Naked_int32 | Naked_int64 | Naked_nativeint) as bn), _alloc_mode),
+        contents ) ->
+    (* Boxed numbers are treated like blocks with a single field. Unlike blocks,
+       no [Is_int] or [Get_tag] fields are needed: those primitives arise from
+       matches on variants and are never applied to boxed numbers. *)
+    let from = Acc.simple_to_node acc ~denv contents in
+    default_bp (fun base ->
+        Acc.add_constructor_dep acc ~base (Field.boxed_number bn) ~from)
+  | Unary
+      (Unbox_number ((Naked_int32 | Naked_int64 | Naked_nativeint) as bn), arg)
+    ->
+    let name = Acc.simple_to_node acc ~denv arg in
+    default_bp (fun to_ ->
+        Acc.add_accessor_dep acc ~to_ (Field.boxed_number bn) ~base:name)
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
       | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax )
@@ -208,7 +224,14 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
         | Is_null | Array_length _ | Bigarray_length _ | String_length _
         | Int_as_pointer _ | Opaque_identity _ | Int_arith _ | Float_arith _
         | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
-        | Reinterpret_boxed_vector | Unbox_number _ | Box_number _
+        | Reinterpret_boxed_vector
+        | Unbox_number
+            ( Naked_float | Naked_float32 | Naked_vec128 | Naked_vec256
+            | Naked_vec512 )
+        | Box_number
+            ( ( Naked_float | Naked_float32 | Naked_vec128 | Naked_vec256
+              | Naked_vec512 ),
+              _ )
         | Untag_immediate | Tag_immediate | Is_boxed_float | Is_flat_float_array
         | End_region _ | End_try_region _ | Obj_dup | Get_header | Peek _
         | Make_lazy _ ),
