@@ -525,8 +525,17 @@ module Solver = struct
       | Types.Tconstr (path, args, _abbrev_memo) -> constr ctx path args
       | Types.Ttuple elts ->
         (* Boxed tuples: immutable_data base + per-element contributions
-           under id modality. *)
-        let base = Ldd.const Axis_lattice.immutable_data in
+           under id modality. Tuple elements are immutable, so a uniquely-held
+           tuple reads each element at its own uniqueness (unique), exactly like
+           an immutable record field. Allow UIC on the base and let each
+           element's own UIC bit disable it as needed (an element that is not
+           UIC-safe carries [uic_disabled], which dominates under join). This
+           mirrors the immutable-field treatment in
+           [sum_record_label_contributions] and lets e.g. [int ref * int] carry
+           UIC just as [ref_record] does. *)
+        let base =
+          Ldd.const (Axis_lattice.allow_uic Axis_lattice.immutable_data)
+        in
         Ldd.sum elts ~base ~f:(fun (_lbl, t) -> kind ~use_tables:true ctx t)
       | Types.Tunboxed_tuple elts ->
         (* Unboxed tuples: per-element contributions; shallow axes relevant
