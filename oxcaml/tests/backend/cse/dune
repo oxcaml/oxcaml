@@ -1,0 +1,36 @@
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (targets
+  test_cse_load_barriers.s
+  test_cse_load_barriers.cmx
+  test_cse_load_barriers.cmi
+  test_cse_load_barriers.o)
+ (deps test_cse_load_barriers.ml)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} %{deps} -S -c -O3))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (deps filter.sh test_cse_load_barriers.s)
+ (action
+  (with-outputs-to
+   test_cse_load_barriers.output
+   (run ./filter.sh test_cse_load_barriers.s))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (action
+  (diff test_cse_load_barriers.expected test_cse_load_barriers.output)))

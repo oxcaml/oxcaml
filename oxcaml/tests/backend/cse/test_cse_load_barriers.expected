@@ -1,0 +1,22 @@
+no_barrier:
+	movq	(%rax), %rax
+	leaq	-1(%rax,%rax), %rax
+	ret
+load_across_load_fence:
+	movq	(%rax), %rax
+	movl	$1, %ebx
+	lfence
+	leaq	-1(%rax,%rax), %rax
+	ret
+load_across_memory_fence:
+	movq	(%rax), %rax
+	movl	$1, %ebx
+	mfence
+	leaq	-1(%rax,%rax), %rax
+	ret
+load_across_store_fence:
+	movq	(%rax), %rax
+	movl	$1, %ebx
+	sfence
+	leaq	-1(%rax,%rax), %rax
+	ret
