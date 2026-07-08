@@ -1312,7 +1312,8 @@ end = struct
       let kind = TG.kind ty in
       let simple = TE.get_canonical_simple_ignoring_name_mode env simple in
       Simple.pattern_match simple
-        ~const:(fun _ -> TG.alias_type_of kind simple)
+        ~const:(fun const ->
+          Expand_head.Expanded_type.(create_const const |> to_type))
         ~name:(fun name ~coercion ->
           let ty = TE.find env name (Some kind) in
           match TG.get_alias_opt ty with
