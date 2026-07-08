@@ -21,7 +21,7 @@
 module Dynamic = struct
   type 'a t
 
-  external make : unit -> 'a t = "caml_dynamic_make"
+  external make : inherit_:bool -> 'a t = "caml_dynamic_make"
   external get : 'a t -> 'a or_null = "caml_dynamic_get"
   external push : 'a t -> 'a -> unit  = "caml_dynamic_push"
   external pop : 'a t -> unit = "caml_dynamic_pop"
@@ -48,7 +48,7 @@ let print_null = function
 let print_dyn d = print_null (Dynamic.get d)
 
 let () =
-  let d = Dynamic.make () in
+  let d = Dynamic.make ~inherit_:false in
   let parent = (Bytes.unsafe_to_string (Bytes.make 4 'x')) in
   Dynamic.push d parent;
   let finished = ref false in

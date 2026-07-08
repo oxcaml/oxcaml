@@ -9,7 +9,7 @@
 module Dynamic = struct
   type 'a t
 
-  external make : bool -> 'a t = "caml_dynamic_make"
+  external make : inherit_:bool -> 'a t = "caml_dynamic_make"
   external get : 'a t -> 'a or_null = "caml_dynamic_get"
   external push : 'a t -> 'a -> unit = "caml_dynamic_push"
   external pop : 'a t -> unit = "caml_dynamic_pop"
@@ -28,6 +28,12 @@ let show inh non =
 external run_in_c_thread : (unit -> unit) -> unit =
   "dynamic_inherit_run_in_c_thread"
 
+external is_inherit : _ Dynamic.t -> bool = "caml_dynamic_is_inherited"
+
+let test_is_inherit () =
+  let inh = Dynamic.make ~inherit_:true and non = Dynamic.make ~inherit_:false in
+  Printf.printf "  is_inherit  [expect true/false]: %b/%b\n\n" (is_inherit inh) (is_inherit non)
+
 (* [trigger ()] is [(wait, go)]: [wait ()] blocks until [go ()] is called. *)
 let trigger () =
   let t = Atomic.make false in
@@ -40,7 +46,7 @@ let trigger () =
    with no enclosing binding to capture, so neither kind is inherited. *)
 let test_domain () =
   print_endline "# Domains";
-  let inh = Dynamic.make true and non = Dynamic.make false in
+  let inh = Dynamic.make ~inherit_:true and non = Dynamic.make ~inherit_:false in
   Dynamic.with_temporarily inh 1 ~f:(fun () ->
     Dynamic.with_temporarily non 1 ~f:(fun () ->
       Printf.printf "  spawning domain [expect 1/1]:       %s\n" (show inh non);
@@ -52,7 +58,7 @@ let test_domain () =
    non-inheritable one. *)
 let test_thread () =
   print_endline "\n# Threads";
-  let inh = Dynamic.make true and non = Dynamic.make false in
+  let inh = Dynamic.make ~inherit_:true and non = Dynamic.make ~inherit_:false in
   Dynamic.with_temporarily inh 2 ~f:(fun () ->
     Dynamic.with_temporarily non 2 ~f:(fun () ->
       Printf.printf "  spawning thread [expect 2/2]:    %s\n" (show inh non);
@@ -65,7 +71,7 @@ let test_thread () =
    view of the parent's binding. *)
 let test_thread_snapshot () =
   print_endline "\n# Threads (snapshot at creation)";
-  let inh = Dynamic.make true in
+  let inh = Dynamic.make ~inherit_:true in
   let wait, go = trigger () in
   Dynamic.push inh 3;
   let observed = ref "" in
@@ -86,7 +92,7 @@ let test_thread_snapshot () =
    inside a binding, they should start with an empty dynamic environment. *)
 let test_c_thread () =
   print_endline "\n# C-registered threads";
-  let inh = Dynamic.make true and non = Dynamic.make false in
+  let inh = Dynamic.make ~inherit_:true and non = Dynamic.make ~inherit_:false in
   Dynamic.with_temporarily inh 5 ~f:(fun () ->
     Dynamic.with_temporarily non 5 ~f:(fun () ->
       Printf.printf "  registering C thread [expect 5/5]:       %s\n"
@@ -105,7 +111,7 @@ type _ Effect.t += Suspend : unit Effect.t
 
 let test_fiber () =
   print_endline "\n# Fibers";
-  let inh = Dynamic.make true and non = Dynamic.make false in
+  let inh = Dynamic.make ~inherit_:true and non = Dynamic.make ~inherit_:false in
   let k : (unit, unit) Effect.Deep.continuation option ref = ref None in
   let f () =
     Printf.printf "  first run         [expect 4/4]:    %s\n" (show inh non);
@@ -128,6 +134,7 @@ let test_fiber () =
   match !k with Some c -> Effect.Deep.continue c () | None -> ()
 
 let () =
+  test_is_inherit ();
   test_domain ();
   test_thread ();
   test_thread_snapshot ();

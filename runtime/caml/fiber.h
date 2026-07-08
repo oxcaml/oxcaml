@@ -305,7 +305,8 @@ void caml_enable_stack_caches(struct stack_cache*);
 void caml_disable_stack_caches(struct stack_cache*);
 void caml_free_stack_caches(struct stack_cache*);
 
-CAMLextern struct stack_info* caml_alloc_main_stack (uintnat init_wsize, bool inherit);
+CAMLextern struct stack_info* caml_alloc_main_stack(uintnat init_wsize,
+                                                    bool inherit_dynamics);
 
 void caml_scan_stack(
   scanning_action f, scanning_action_flags fflags, void* fdata,
@@ -315,7 +316,7 @@ value caml_alloc_stack(value hval, value hexn, value heff);
 value caml_alloc_stack_preemptible(value hval, value hexn, value heff, value htick);
 struct stack_info* caml_alloc_stack_noexc(mlsize_t wosize, value hval,
                                           value hexn, value heff,
-                                          int64_t id, bool inherit);
+                                          int64_t id, bool inherit_dynamics);
 /* try to grow the stack until at least required_size words are available.
    returns nonzero on success */
 CAMLextern int caml_try_realloc_stack (asize_t required_wsize);

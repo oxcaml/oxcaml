@@ -794,7 +794,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->extern_state = NULL;
   domain_state->intern_state = NULL;
 
-  domain_state->current_stack = caml_alloc_main_stack(stack_wsize, false);
+  domain_state->current_stack = caml_alloc_main_stack(stack_wsize,
+                                                      /*inherit_dynamics=*/false);
   if(domain_state->current_stack == NULL) {
     goto fail_main_stack;
   }

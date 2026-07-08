@@ -1,3 +1,5 @@
+  is_inherit  [expect true/false]: true/false
+
 # Domains
   spawning domain [expect 1/1]:       inheritable=1 non-inheritable=1
   spawned domain  [expect null/null]: inheritable=null non-inheritable=null

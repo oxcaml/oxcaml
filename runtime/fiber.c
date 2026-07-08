@@ -297,7 +297,7 @@ static void free_stack_memory(struct stack_info* stack);
 static struct stack_info*
 alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
                              value hexn, value heff, value htick, int64_t id,
-                             bool inherit)
+                             bool inherit_dynamics)
 {
   struct stack_info* stack;
   struct stack_cache* caches = Caml_state->stack_caches;
@@ -357,8 +357,8 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->local_limit = 0;
 
   caml_dynamic_table_init(&stack->dyn);
-  if(inherit) {
-    if (!caml_dynamic_table_inherit(&stack->dyn)) {
+  if(inherit_dynamics) {
+    if (!caml_dynamic_table_inherit(&stack->dyn, &Caml_state->current_stack->dyn)) {
       free_stack_memory(stack);
       return NULL;
     }
@@ -377,11 +377,11 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
 /* allocate a stack with at least "wosize" usable words of stack */
 struct stack_info*
 caml_alloc_stack_noexc(mlsize_t wosize, value hval, value hexn, value heff,
-                       int64_t id, bool inherit)
+                       int64_t id, bool inherit_dynamics)
 {
   int cache_bucket = stack_cache_bucket (wosize);
   return alloc_size_class_stack_noexc(wosize, cache_bucket, hval, hexn, heff,
-                                      /*htick=*/Val_null, id, inherit);
+                                      /*htick=*/Val_null, id, inherit_dynamics);
 }
 
 #ifdef NATIVE_CODE
@@ -390,7 +390,8 @@ value caml_alloc_stack (value hval, value hexn, value heff) {
   const int64_t id = atomic_fetch_add(&fiber_id, 1);
   struct stack_info *stack =
       alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */, hval,
-                                   hexn, heff, /*htick=*/Val_null, id, true);
+                                   hexn, heff, /*htick=*/Val_null, id,
+                                   /*inherit_dynamics=*/true);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -410,7 +411,8 @@ value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
   const int64_t id = atomic_fetch_add(&fiber_id, 1);
   struct stack_info* stack =
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
-                                 hval, hexn, heff, htick, id, true);
+                                 hval, hexn, heff, htick, id,
+                                 /*inherit_dynamics=*/true);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)

@@ -6,7 +6,7 @@
 module Dynamic = struct
   type 'a t
 
-  external make : bool -> 'a t = "caml_dynamic_make"
+  external make : inherit_:bool -> 'a t = "caml_dynamic_make"
   external get : 'a t -> 'a or_null = "caml_dynamic_get"
   external push : 'a t -> 'a -> unit = "caml_dynamic_push"
   external pop : 'a t -> unit = "caml_dynamic_pop"
@@ -40,7 +40,7 @@ let in_fresh_fiber (f : unit -> unit) =
    exercises repeated pop and the eventual free of the emptied stack. *)
 let test_stack_growth () =
   print_endline "# stack growth: deep nesting on a single variable";
-  let d = Dynamic.make false in
+  let d = Dynamic.make ~inherit_:false in
   let depth = 20 in
   let down = Buffer.create 64 and up = Buffer.create 64 in
   let rec go i =
@@ -61,7 +61,7 @@ let test_stack_growth () =
 let test_table_growth () =
   print_endline "\n# table growth: many simultaneous distinct variables";
   let n = 25 in
-  let ds = Array.init n (fun _ -> Dynamic.make false) in
+  let ds = Array.init n (fun _ -> Dynamic.make ~inherit_:false) in
   let rec bind i =
     if i = n then begin
       let visible = ref 0 and correct = ref true in
@@ -97,7 +97,7 @@ let test_collision () =
        stays at 8 while at most 4 keys are bound, so the table slot of a key is
        [hash land 7]. Find two keys sharing the same NON-zero slot. *)
     let slot d = Dynamic.hash d land 7 in
-    let pool = Array.init 128 (fun _ -> Dynamic.make false) in
+    let pool = Array.init 128 (fun _ -> Dynamic.make ~inherit_:false) in
     let a, b =
       let found = ref None in
       Array.iter
@@ -132,12 +132,12 @@ let test_gc () =
   print_endline "\n# GC root scanning of live bindings";
   let flush_gc () =
     for _ = 1 to 64 do
-      ignore (Dynamic.get (Dynamic.make false))
+      ignore (Dynamic.get (Dynamic.make ~inherit_:false))
     done;
     Gc.full_major ();
     Gc.compact ()
   in
-  let d = Dynamic.make false in
+  let d = Dynamic.make ~inherit_:false in
   Dynamic.push d (Bytes.unsafe_to_string (Bytes.make 4 'x'));
   Dynamic.push d (Bytes.unsafe_to_string (Bytes.make 6 'y'));
   flush_gc ();
@@ -147,7 +147,7 @@ let test_gc () =
   Printf.printf "below after GC [expect xxxx]: %s\n" (get_str d);
   Dynamic.pop d;
   in_fresh_fiber (fun () ->
-    let e = Dynamic.make false and g = Dynamic.make false in
+    let e = Dynamic.make ~inherit_:false and g = Dynamic.make ~inherit_:false in
     Dynamic.push e (Bytes.unsafe_to_string (Bytes.make 3 'p'));
     Dynamic.push g (Bytes.unsafe_to_string (Bytes.make 3 'q'));
     flush_gc ();

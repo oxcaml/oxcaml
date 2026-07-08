@@ -25,8 +25,8 @@
 
 #define DYNAMIC_INHERIT_BIT (1ull<<63)
 
-#define Hash_dyn(dyn)   Long_val(dyn)
-#define Is_inherit(dyn) (((dyn) & DYNAMIC_INHERIT_BIT) == DYNAMIC_INHERIT_BIT)
+#define Hash_dyn(dyn)       Long_val(dyn)
+#define Is_inherit_dyn(dyn) (((dyn) & DYNAMIC_INHERIT_BIT) == DYNAMIC_INHERIT_BIT)
 
 static void dynamic_cache_flush(dynamic_cache_t cache)
 {
@@ -386,19 +386,18 @@ CAMLexport bool caml_dynamic_table_dup(dynamic_table_t dst, dynamic_table_t src)
   return true;
 }
 
-CAMLexport bool caml_dynamic_table_inherit(dynamic_table_t table)
+CAMLexport bool caml_dynamic_table_inherit(dynamic_table_t dst, dynamic_table_t src)
 {
-  dynamic_table_t src = &Caml_state->current_stack->dyn;
-  if (src->bindings) {
+  if (src->bindings != NULL) {
     size_t capacity = dynamic_table_capacity(src);
     for (size_t i = 0; i < capacity; ++i) {
       dynamic_stack_t src_slot = &src->bindings[i];
       value dyn = src_slot->dyn;
-      if (Is_this(dyn) && Is_inherit(dyn)) {
+      if (Is_this(dyn) && Is_inherit_dyn(dyn)) {
         CAMLassert(src_slot->count > 0);
         value val = src_slot->vals[src_slot->count - 1];
-        if (!dynamic_table_push(table, dyn, val)) {
-          caml_dynamic_table_free(table);
+        if (!dynamic_table_push(dst, dyn, val)) {
+          caml_dynamic_table_free(dst);
           return false;
         }
       }
@@ -450,6 +449,12 @@ CAMLprim value caml_dynamic_make(value inherit)
   CAMLreturn(hash);
 }
 
+CAMLprim value caml_dynamic_is_inherited(value dyn)
+{
+  CAMLnoalloc;
+  return Val_bool(Is_inherit_dyn(dyn));
+}
+
 CAMLprim value caml_dynamic_get(value dyn)
 {
   CAMLnoalloc;
@@ -472,7 +477,7 @@ CAMLprim value caml_dynamic_get(value dyn)
         break;
       }
     }
-    if(Is_inherit(dyn)) {
+    if(Is_inherit_dyn(dyn)) {
       break;
     }
     stack = Stack_parent(stack);
