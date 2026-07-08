@@ -305,8 +305,11 @@ module Unary_int_arith_naked_int64 = Unary_int_arith (A.For_int64s)
 module Unary_int_arith_naked_nativeint = Unary_int_arith (A.For_nativeints)
 
 module Make_simplify_int_conv (N : A.Number_kind) = struct
-  let simplify ~(dst : K.Standard_int_or_float.t) dacc ~original_term ~arg
-      ~arg_ty ~result_var =
+  let simplify ~(dst : K.Standard_int_or_float.t)
+      ~(signedness : Scalar.Signedness.t) dacc ~original_term ~arg ~arg_ty
+      ~result_var =
+    (* CR jrayman *)
+    let _ = signedness in
     if K.Standard_int_or_float.equal N.standard_int_or_float_kind dst
     then
       let dacc = DA.add_variable dacc result_var arg_ty in
@@ -1011,17 +1014,21 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
       | Naked_nativeint -> Unary_int_arith_naked_nativeint.simplify op)
     | Float_arith (Float64, op) -> simplify_float_arith_op op
     | Float_arith (Float32, op) -> simplify_float32_arith_op op
-    | Num_conv { src; dst } -> (
+    | Num_conv { src; dst; signedness } -> (
       match src with
-      | Tagged_immediate -> Simplify_int_conv_tagged_immediate.simplify ~dst
-      | Naked_immediate -> Simplify_int_conv_naked_immediate.simplify ~dst
-      | Naked_float32 -> Simplify_int_conv_naked_float32.simplify ~dst
-      | Naked_float -> Simplify_int_conv_naked_float.simplify ~dst
-      | Naked_int8 -> Simplify_int_conv_naked_int8.simplify ~dst
-      | Naked_int16 -> Simplify_int_conv_naked_int16.simplify ~dst
-      | Naked_int32 -> Simplify_int_conv_naked_int32.simplify ~dst
-      | Naked_int64 -> Simplify_int_conv_naked_int64.simplify ~dst
-      | Naked_nativeint -> Simplify_int_conv_naked_nativeint.simplify ~dst)
+      | Tagged_immediate ->
+        Simplify_int_conv_tagged_immediate.simplify ~dst ~signedness
+      | Naked_immediate ->
+        Simplify_int_conv_naked_immediate.simplify ~dst ~signedness
+      | Naked_float32 ->
+        Simplify_int_conv_naked_float32.simplify ~dst ~signedness
+      | Naked_float -> Simplify_int_conv_naked_float.simplify ~dst ~signedness
+      | Naked_int8 -> Simplify_int_conv_naked_int8.simplify ~dst ~signedness
+      | Naked_int16 -> Simplify_int_conv_naked_int16.simplify ~dst ~signedness
+      | Naked_int32 -> Simplify_int_conv_naked_int32.simplify ~dst ~signedness
+      | Naked_int64 -> Simplify_int_conv_naked_int64.simplify ~dst ~signedness
+      | Naked_nativeint ->
+        Simplify_int_conv_naked_nativeint.simplify ~dst ~signedness)
     | Boolean_not -> simplify_boolean_not
     | Reinterpret_64_bit_word reinterpret ->
       simplify_reinterpret_64_bit_word reinterpret

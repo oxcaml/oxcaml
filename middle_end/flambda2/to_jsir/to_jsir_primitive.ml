@@ -224,7 +224,9 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     let op_name = match op with Abs -> "abs" | Neg -> "neg" in
     let extern_name = with_float_suffix ~bitwidth op_name in
     use_prim' (Extern extern_name)
-  | Num_conv { src; dst } -> (
+  | Num_conv { src; dst; signedness } -> (
+    if Scalar.Signedness.equal signedness Unsigned
+    then Misc.fatal_error "JSIR: unsigned conversions are not supported";
     let caml_of src dst =
       use_prim' (Extern (Format.sprintf "caml_%s_of_%s" src dst))
     in
