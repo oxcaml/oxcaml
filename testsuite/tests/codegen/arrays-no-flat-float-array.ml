@@ -38,14 +38,16 @@ let push (vec : 'a option vec) x =
 push:
   subq  $8, %rsp
   movq  %rax, %r12
-  movq  %rdi, %rsi
+  movq  %rdi, %rdx
   movq  -8(%rbx), %rax
   salq  $8, %rax
   shrq  $17, %rax
   cmpq  %rax, %r12
   jae   .L0
-  leaq  -4(%rbx,%r12,4), %rdi
-  call  caml_modify@PLT
+  movq  %r12, %rsi
+  sarq  $1, %rsi
+  movq  %rbx, %rdi
+  call  caml_modify_local@PLT
   leaq  2(%r12), %rax
   addq  $8, %rsp
   ret
@@ -109,9 +111,11 @@ let ref_unsafe_set (a : string array) (i : int) (v : string) =
 [%%expect_asm X86_64{|
 ref_unsafe_set:
   subq  $8, %rsp
-  movq  %rdi, %rsi
-  leaq  -4(%rax,%rbx,4), %rdi
-  call  caml_modify@PLT
+  movq  %rbx, %rsi
+  movq  %rdi, %rdx
+  sarq  $1, %rsi
+  movq  %rax, %rdi
+  call  caml_modify_local@PLT
   movl  $1, %eax
   addq  $8, %rsp
   ret
@@ -133,9 +137,11 @@ let poly_unsafe_set (a : 'a array) (i : int) (v : 'a) =
 [%%expect_asm X86_64{|
 poly_unsafe_set:
   subq  $8, %rsp
-  movq  %rdi, %rsi
-  leaq  -4(%rax,%rbx,4), %rdi
-  call  caml_modify@PLT
+  movq  %rbx, %rsi
+  movq  %rdi, %rdx
+  sarq  $1, %rsi
+  movq  %rax, %rdi
+  call  caml_modify_local@PLT
   movl  $1, %eax
   addq  $8, %rsp
   ret
@@ -206,15 +212,17 @@ let float_unsafe_set_plain (a : float array) (i : int) (v : float#) =
 [%%expect_asm X86_64{|
 float_unsafe_set_plain:
   subq  $8, %rsp
+  movq  %rax, %rdi
+  movq  %rbx, %rsi
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rsi
-  movq  $1277, -8(%rsi)
-  vmovsd %xmm0, (%rsi)
-  leaq  -4(%rax,%rbx,4), %rdi
-  call  caml_modify@PLT
+  leaq  8(%r15), %rdx
+  movq  $1277, -8(%rdx)
+  vmovsd %xmm0, (%rdx)
+  sarq  $1, %rsi
+  call  caml_modify_local@PLT
   movl  $1, %eax
   addq  $8, %rsp
   ret
@@ -434,14 +442,16 @@ let ref_safe_set (a : string array) (i : int) (v : string) =
 [%%expect_asm X86_64{|
 ref_safe_set:
   subq  $8, %rsp
-  movq  %rdi, %rsi
-  movq  -8(%rax), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
-  cmpq  %rdi, %rbx
+  movq  %rbx, %rsi
+  movq  %rdi, %rdx
+  movq  -8(%rax), %rbx
+  salq  $8, %rbx
+  shrq  $17, %rbx
+  cmpq  %rbx, %rsi
   jae   .L0
-  leaq  -4(%rax,%rbx,4), %rdi
-  call  caml_modify@PLT
+  sarq  $1, %rsi
+  movq  %rax, %rdi
+  call  caml_modify_local@PLT
   movl  $1, %eax
   addq  $8, %rsp
   ret
@@ -481,14 +491,16 @@ let poly_safe_set (a : 'a array) (i : int) (v : 'a) =
 [%%expect_asm X86_64{|
 poly_safe_set:
   subq  $8, %rsp
-  movq  %rdi, %rsi
-  movq  -8(%rax), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
-  cmpq  %rdi, %rbx
+  movq  %rbx, %rsi
+  movq  %rdi, %rdx
+  movq  -8(%rax), %rbx
+  salq  $8, %rbx
+  shrq  $17, %rbx
+  cmpq  %rbx, %rsi
   jae   .L0
-  leaq  -4(%rax,%rbx,4), %rdi
-  call  caml_modify@PLT
+  sarq  $1, %rsi
+  movq  %rax, %rdi
+  call  caml_modify_local@PLT
   movl  $1, %eax
   addq  $8, %rsp
   ret
