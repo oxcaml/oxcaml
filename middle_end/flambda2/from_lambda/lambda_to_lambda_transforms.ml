@@ -1421,6 +1421,14 @@ let transform_primitive0 env (prim : L.primitive) args loc =
             ext, unboxed_vec256_field ~loc 1 (Lvar arg_id) ]
         | _ -> [(mode, repr), arg]
       in
+      if List.compare_lengths desc.prim_native_repr_args args <> 0
+      then
+        Misc.fatal_errorf
+          "Pccall %s: [prim_native_repr_args] specifies %d argument(s) but %d \
+           were supplied"
+          desc.prim_name
+          (List.length desc.prim_native_repr_args)
+          (List.length args);
       List.map2 expand desc.prim_native_repr_args args
       |> List.concat |> List.split
     in

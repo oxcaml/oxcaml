@@ -269,6 +269,16 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
        even better, add support for lifting mixed blocks, then remove this
        special handling for Const_block and Const_mixed_block and use that
        (mshinwell has a partial patch for this). *)
+    let flattened_reordered_shape =
+      Mixed_block_shape.flattened_reordered_shape shape
+    in
+    if List.length args <> Array.length flattened_reordered_shape
+    then
+      Misc.fatal_errorf
+        "Const_mixed_block: number of fields (%d) is not consistent with shape \
+         length (%d)"
+        (List.length args)
+        (Array.length flattened_reordered_shape);
     let args =
       let new_indexes_to_old_indexes =
         Mixed_block_shape.new_indexes_to_old_indexes shape
@@ -279,9 +289,6 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
       |> Array.to_list
     in
     let args =
-      let flattened_reordered_shape =
-        Mixed_block_shape.flattened_reordered_shape shape
-      in
       List.mapi
         (fun new_index arg ->
           match flattened_reordered_shape.(new_index) with
@@ -444,6 +451,14 @@ module Inlining = struct
     in
     let bind_params ~params ~args ~body:(acc, body) =
       let acc = Acc.with_free_names free_names_of_body acc in
+      if List.compare_lengths params args <> 0
+      then
+        Misc.fatal_errorf
+          "Mismatch between number of parameters (%d) and arguments (%d) when \
+           inlining code ID %a:@ parameters@ (%a),@ arguments@ (%a)"
+          (List.length params) (List.length args) Code_id.print called_code_id
+          (Format.pp_print_list ~pp_sep:Format.pp_print_space Variable.print)
+          (List.map fst params) Simple.List.print args;
       List.fold_left2
         (fun (acc, body) (param, param_duid) arg ->
           Let_with_acc.create acc
@@ -1749,6 +1764,12 @@ let close_let_cont acc env ~name ~is_exn_handler ~params
       match Acc.continuation_known_arguments ~cont:name acc with
       | None -> handler_env
       | Some args ->
+        if List.compare_lengths args env_params <> 0
+        then
+          Misc.fatal_errorf
+            "Continuation %a has %d parameter(s) but %d argument \
+             approximation(s) were recorded for it"
+            Continuation.print name (List.length env_params) (List.length args);
         List.fold_left2
           (fun env arg_approx (param, (param_id, _param_uid, _, kind)) ->
             let env = Env.add_var_approximation env param arg_approx in
