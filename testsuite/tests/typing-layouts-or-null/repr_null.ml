@@ -36,26 +36,24 @@ type u = K of string [@repr unboxed]
 type u = K of string [@@unboxed]
 |}]
 
-(* Rejection: [@repr immediate] is not yet supported. *)
+(* [@repr immediate]: a payload-unboxed immediate constructor (tranche 2). *)
 type b_imm = Small of int [@repr immediate]
 
 [%%expect{|
-Line 1, characters 13-43:
-1 | type b_imm = Small of int [@repr immediate]
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: "[@repr immediate]" is not yet supported;
-       only "[@repr null]", "[@repr value]" and "[@repr unboxed]" are currently implemented.
+type b_imm = Small of int
 |}]
 
-(* Rejection: [@repr pointer] is not yet supported. *)
+(* [@repr pointer] is now supported (tranche 2); an [int] payload is rejected
+   because it is an immediate, not a pointer.  See repr_erased.ml for full
+   pointer coverage. *)
 type b_ptr = P of int [@repr pointer]
 
 [%%expect{|
 Line 1, characters 13-37:
 1 | type b_ptr = P of int [@repr pointer]
                  ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: "[@repr pointer]" is not yet supported;
-       only "[@repr null]", "[@repr value]" and "[@repr unboxed]" are currently implemented.
+Error: Invalid [@repr] declaration:
+       [@repr pointer] requires a payload that is definitely a non-null pointer.
 |}]
 
 (* Rejection: [@repr value] may only coexist with a single [@repr null]. *)
