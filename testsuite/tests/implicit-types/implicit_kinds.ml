@@ -1061,3 +1061,31 @@ module type S37 =
     val f : ('t : word). 't -> 't
   end
 |}]
+
+(* Explicit [('a : any)] annotation on this GADT compiles. *)
+
+module type S38_explicit = sig
+  type ('a : any) t =
+    | F32 : float# t
+    | I32 : int# t
+end
+
+[%%expect{|
+module type S38_explicit =
+  sig type ('a : any) t = F32 : float# t | I32 : int# t end
+|}]
+
+(* Implicit version compiles. *)
+
+module type S38_implicit = sig
+  [@@@implicit_kind: ('a : any)]
+
+  type 'a t =
+    | F32 : float# t
+    | I32 : int# t
+end
+
+[%%expect{|
+module type S38_implicit =
+  sig type ('a : any) t = F32 : float# t | I32 : int# t end
+|}]
