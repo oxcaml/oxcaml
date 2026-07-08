@@ -233,14 +233,10 @@ let _ = f_large_int64_array
 
 (* Corner cases for sub-word elements. These exercise the bytes/halfwords
    that are likely to be mishandled if the backend ever changes how small
-   unboxed integers are packed into arrays or unboxed records.
-
-   CR sspies: densely packed sub-word array tests whose element count is
-   not a multiple of (word_size / element_size) display trailing zeros
-   that are not part of the array - see the "Layout of OCaml array
-   elements" commentary at the top of
-   [backend/debug/dwarf/dwarf_ocaml/dwarf_type.ml] for the cause. The
-   fix requires DWARF expression support in the language plugin. *)
+   unboxed integers are packed into arrays or unboxed records. Element
+   counts that are not a multiple of (word_size / element_size) exercise
+   the tag-aware count expression emitted in
+   [backend/debug/dwarf/dwarf_ocaml/dwarf_type.ml]. *)
 let[@inline never] [@local never] f_int8_array (arr: int8# array) = arr
 let _ = f_int8_array
   [|(Int8_u.of_int 1); (Int8_u.of_int 2);
