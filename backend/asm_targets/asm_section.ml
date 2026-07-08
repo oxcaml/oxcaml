@@ -239,12 +239,10 @@ let details t first_occurrence =
     | Sixtyfour_byte_literals, _, _ ->
       [".rodata.cst64"], Some "aM", ["@progbits"; "64"]
     | Jump_tables, _, (MinGW_64 | Cygwin) -> [".rdata"], Some "dr", []
-    | Jump_tables, _, (MinGW_32 | Win32) -> data ()
     | Jump_tables, _, (MacOS_like | Win64) ->
       text () (* with LLVM/OS X and MASM, use the text segment *)
     | Jump_tables, _, _ -> [".rodata"], None, []
     | Read_only_data, _, MacOS_like -> ["__DATA"; "__const"], None, ["regular"]
-    | Read_only_data, _, (MinGW_32 | Win32) -> data ()
     | Read_only_data, _, (MinGW_64 | Cygwin) -> [".rdata"], Some "dr", []
     | Read_only_data, _, _ -> rodata ()
     | Stapsdt_base, _, Linux ->
