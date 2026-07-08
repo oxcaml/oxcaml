@@ -1176,7 +1176,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
         | None -> ()
         | Some _ ->
           Location.raise_errorf ~loc:field.prf_loc
-            "The [@immediate] attribute is not supported on polymorphic \
+            "The [@tag] attribute is not supported on polymorphic \
              variant constructors"
         end;
         if field.prf_attributes <> [] then

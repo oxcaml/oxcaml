@@ -1899,7 +1899,7 @@ let tree_of_single_constructor ~all_void cd =
   let attrs =
     match Builtin_attributes.immediate_constructor_tag cd.cd_attributes with
     | Some (Builtin_attributes.Immediate_constructor_tag { txt; _ }) ->
-      [{ oattr_name = Printf.sprintf "immediate %d" txt }]
+      [{ oattr_name = Printf.sprintf "tag %d" txt }]
     | Some (Builtin_attributes.Invalid_immediate_constructor_tag _)
     | Some (Builtin_attributes.Duplicate_immediate_constructor_tag _)
     | None ->

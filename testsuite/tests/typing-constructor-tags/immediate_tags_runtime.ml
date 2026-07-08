@@ -2,12 +2,12 @@
 *)
 
 type t =
-  | A [@immediate 2]
+  | A [@tag 2]
   | B
-  | C [@immediate 1]
+  | C [@tag 1]
 
 type mixed =
-  | I0 [@immediate 1]
+  | I0 [@tag 1]
   | Block of int
   | I1
 

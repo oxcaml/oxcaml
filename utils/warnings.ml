@@ -43,7 +43,7 @@ type upstream_compat_warning =
       (* example: [type t = A of void] is immediate, but
          not after erasure, which boxes void, so it can't be erased. *)
   | Immediate_constructor_tag
-      (* example: [type t = A [@immediate 1] | B] changes runtime
+      (* example: [type t = A [@tag 1] | B] changes runtime
          representation, so the attribute can't be erased. *)
   | Separability_check
       (* example: [type packed = | Mk of 'a t [@@unboxed]]
@@ -1462,7 +1462,7 @@ let message = function
            @[but after erasure for upstream compatibility,@ \
            void is no longer zero-width,@ so it won't be immediate.@]"
   | Incompatible_with_upstream Immediate_constructor_tag ->
-      msg "This [@immediate] constructor tag changes runtime representation@ \
+      msg "This [@tag] constructor tag changes runtime representation@ \
            and is not upstream compatible."
   | Incompatible_with_upstream Separability_check ->
       msg "This type relies on OxCaml's extended separability checking@ \

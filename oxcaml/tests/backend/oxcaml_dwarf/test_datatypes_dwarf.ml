@@ -13,7 +13,7 @@ let _ = f_simple_variant (D 3.14)
 
 (* Variants with explicitly assigned immediate constructor tags *)
 type immediate_tag_variant =
-  | IA [@immediate 1]
+  | IA [@tag 1]
   | IB
 
 let[@inline never] [@local never] f_immediate_tag_variant
@@ -24,7 +24,7 @@ let _ = f_immediate_tag_variant IA
 let _ = f_immediate_tag_variant IB
 
 type immediate_tag_mixed_variant =
-  | MI0 [@immediate 1]
+  | MI0 [@tag 1]
   | MBlock of int
   | MI1
 

@@ -133,6 +133,7 @@ let builtin_attrs =
   ; "flatten_floats"
   ; "represent_as_float_array"
   ; "immediate_all_void_constructor"
+  ; "tag"
   ]
 
 let builtin_attrs =
@@ -519,7 +520,7 @@ let parse_immediate_constructor_tag_payload loc = function
   | _ -> Invalid_immediate_constructor_tag loc
 
 let immediate_constructor_tag attrs =
-  match select_attributes [ "immediate", Return ] attrs with
+  match select_attributes [ "tag", Return ] attrs with
   | [] -> None
   | [attr] ->
     Some

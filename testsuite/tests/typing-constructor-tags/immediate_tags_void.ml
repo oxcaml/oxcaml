@@ -18,14 +18,11 @@ external unbox_unit : unit -> unit_u = "%unbox_unit"
 |}]
 
 type t =
-  | A [@immediate 1]
-  | B of unit_u [@immediate_all_void_constructor] [@immediate 0]
+  | A [@tag 1]
+  | B of unit_u [@immediate_all_void_constructor] [@tag 0]
 
 [%%expect {|
-type t =
-    A
-  [@immediate 1]
-  | B of unit_u [@immediate 0] [@immediate_all_void_constructor]
+type t = A [@tag 1] | B of unit_u [@tag 0] [@immediate_all_void_constructor]
 |}]
 
 let tags = (Obj.magic A : int), (Obj.magic (B (unbox_unit ())) : int)

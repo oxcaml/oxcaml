@@ -126,17 +126,17 @@ let immediate_constructor_tag attrs =
   | Some (Builtin_attributes.Immediate_constructor_tag tag) -> Some tag
   | Some (Builtin_attributes.Invalid_immediate_constructor_tag loc) ->
     Location.raise_errorf ~loc
-      "Invalid [@immediate] attribute: expected an integer payload"
+      "Invalid [@tag] attribute: expected an integer payload"
   | Some (Builtin_attributes.Duplicate_immediate_constructor_tag loc) ->
     Location.raise_errorf ~loc
-      "The [@immediate] attribute cannot be repeated"
+      "The [@tag] attribute cannot be repeated"
 
 let reject_immediate_constructor_tag attrs kind =
   match immediate_constructor_tag attrs with
   | None -> ()
   | Some { loc; _ } ->
     Location.raise_errorf ~loc
-      "The [@immediate] attribute can only be used on %s" kind
+      "The [@tag] attribute can only be used on %s" kind
 
 let classify_variant_with_null_constructor payload_cstr =
   match payload_cstr.cd_args with
@@ -184,14 +184,14 @@ let immediate_constructor_runtime_tags cstrs ~is_constant =
     | Some { txt = tag; loc } ->
       if not is_constant.(src_index) then
         Location.raise_errorf ~loc
-          "The [@immediate] attribute can only be used on constructors \
+          "The [@tag] attribute can only be used on constructors \
            without runtime fields";
       if tag < 0 then
         Location.raise_errorf ~loc
-          "Negative [@immediate] constructor tags are not supported yet";
+          "Negative [@tag] constructor tags are not supported yet";
       if tag >= num_consts then
         Location.raise_errorf ~loc
-          "This [@immediate] constructor tag is sparse; in this version tags \
+          "This [@tag] constructor tag is sparse; in this version tags \
            must form the dense range 0 to %d"
           (num_consts - 1);
       if not used_tags.(tag) then begin
@@ -199,7 +199,7 @@ let immediate_constructor_runtime_tags cstrs ~is_constant =
         explicit_tags.(src_index) <- Some tag
       end else
         Location.raise_errorf ~loc
-          "Two constructors cannot use the same [@immediate] tag %d" tag
+          "Two constructors cannot use the same [@tag] value %d" tag
     )
     cstrs;
   let next_implicit_tag = ref 0 in
@@ -309,13 +309,13 @@ let immediate_constructor_tags rep cstrs cstr_constant =
           | Variant_boxed _ -> assert false
           | Variant_unboxed ->
             Location.raise_errorf ~loc
-              "The [@immediate] attribute is not supported on unboxed variants"
+              "The [@tag] attribute is not supported on unboxed variants"
           | Variant_with_null ->
             Location.raise_errorf ~loc
-              "The [@immediate] attribute is not supported on or_null variants"
+              "The [@tag] attribute is not supported on or_null variants"
           | Variant_extensible ->
             Location.raise_errorf ~loc
-              "The [@immediate] attribute is not supported on extensible \
+              "The [@tag] attribute is not supported on extensible \
                variants"
           end)
       cstrs

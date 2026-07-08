@@ -1,3 +1,3 @@
 type t =
-  | A [@immediate 1]
+  | A [@tag 1]
   | B

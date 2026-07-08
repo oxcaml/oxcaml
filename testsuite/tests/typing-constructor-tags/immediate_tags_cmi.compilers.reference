@@ -2,11 +2,11 @@ File "immediate_tags_cmi_bad.ml", line 1:
 Error: The implementation immediate_tags_cmi_bad.ml
        does not match the interface immediate_tags_cmi_bad.cmi: 
        Type declarations do not match:
-         type t = A [@immediate 1] | B
+         type t = A [@tag 1] | B
        is not included in
-         type t = A [@immediate 0] | B
+         type t = A [@tag 0] | B
        Their internal representations differ:
-       constructor A has immediate tag 1 in the first declaration, but immediate tag 0 in the second declaration.
+       constructor A has tag 1 in the first declaration, but tag 0 in the second declaration.
        File "immediate_tags_cmi_bad.mli", lines 1-3, characters 0-5:
          Expected declaration
        File "immediate_tags_cmi_bad.ml", lines 1-3, characters 0-5:

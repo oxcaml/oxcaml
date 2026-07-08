@@ -843,7 +843,7 @@ let report_type_mismatch first second decl env ppf err =
   | Constructor_tag_mismatch (name, tag1, tag2) ->
       pr
         "Their internal representations differ:@ constructor %a has \
-         immediate tag %d in %s %s, but immediate tag %d in %s %s."
+         tag %d in %s %s, but tag %d in %s %s."
         Style.inline_code name tag1 first decl tag2 second decl
   | Jkind v ->
       Jkind.Violation.report_with_name ~name:first
