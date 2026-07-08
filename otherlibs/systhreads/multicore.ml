@@ -17,19 +17,12 @@
 
 type ('a : value_or_null) spawn_result =
   | Spawned
-  | Failed of
-      'a @@ contended
-      * exn @@ aliased many contended
-      * Printexc.raw_backtrace @@ aliased many contended
-
-type ('a : value_or_null) pending_spawn_result =
-  | No_spawn_result
-  | Has_spawn_result of 'a spawn_result Modes.Portended.t
+  | Failed of 'a * exn @@ aliased many * Printexc.raw_backtrace @@ aliased many
 
 type ('a : value_or_null) request_inner : value mod contended portable =
   { action : 'a @ contended once portable unique -> unit @@ portable
   ; argument : 'a @@ contended portable
-  ; mutable spawn_result : 'a pending_spawn_result [@atomic]
+  ; mutable spawn_result : 'a spawn_result Modes.Portended.t or_null [@atomic]
   ; sender_domain : int
   }
 
@@ -95,10 +88,10 @@ let wait_spawn_result req =
   Mutex.lock sender_domain.mutex;
   let rec loop () =
     match req.spawn_result with
-    | Has_spawn_result result ->
+    | This result ->
       Mutex.unlock sender_domain.mutex;
       magic_unique__contended_portable result.portended
-    | No_spawn_result ->
+    | Null ->
       Condition.wait sender_domain.condition_spawn_result sender_domain.mutex;
       loop ()
   in
@@ -154,7 +147,7 @@ let rec manager_loop t =
           Atomic.Loc.decr [%atomic.loc t.threads];
           Failed (req.argument, exn, bt)
       in
-      req.spawn_result <- Has_spawn_result { portended = spawn_result };
+      req.spawn_result <- This { portended = spawn_result };
       wakeup_spawn_result req)
       requests;
     manager_loop t
@@ -212,7 +205,7 @@ let spawn_on ~domain:i f a =
   let req =
     { action = f;
       argument = a;
-      spawn_result = No_spawn_result;
+      spawn_result = Null;
       sender_domain = current_domain () }
   in
   push target_domain (Request req);

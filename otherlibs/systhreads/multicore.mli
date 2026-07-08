@@ -32,10 +32,7 @@ val current_domain : unit -> int
 
 type ('a : value_or_null) spawn_result =
   | Spawned
-  | Failed of
-      'a @@ contended
-      * exn @@ aliased many contended
-      * Printexc.raw_backtrace @@ aliased many contended
+  | Failed of 'a * exn @@ aliased many * Printexc.raw_backtrace @@ aliased many
 
 (** [spawn_on ~domain action] spawns [action] as a thread running on the
     specified [domain].
