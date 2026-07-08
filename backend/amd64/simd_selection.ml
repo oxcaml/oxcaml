@@ -1510,8 +1510,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
             | Iindexed2scaled (scale, displ) -> Some scale, Some displ
             | Ibased _ -> None, None)
           | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _
-          | Isextend32 | Izextend32 | Ikmovq | Irdtsc | Irdpmc | Ilfence
-          | Isfence | Imfence | Ipackf32 | Isimd _ | Isimd_mem _ | Iprefetch _
+          | Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence
+          | Imfence | Ipackf32 | Isimd _ | Isimd_mem _ | Iprefetch _
           | Icldemote _ | Illvm_intrinsic _ ->
             assert false)
         | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Alloc _
@@ -1635,7 +1635,6 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | W32 -> None (* See previous comment *)
       | W16 -> None
       | W8 -> None)
-    | Ikmovq -> None
     | Istore_int (_n, addressing_mode, is_assignment) -> (
       if not (Vectorize_utils.Width_in_bits.equal width_type W64)
       then None
@@ -1647,7 +1646,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
               ( Ifloatarithmem _ | Ioffset_loc _ | Iprefetch _ | Icldemote _
               | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
               | Isimd _ | Isimd_mem _ | Ilea _ | Ibswap _ | Isextend32
-              | Izextend32 | Ikmovq | Illvm_intrinsic _ )
+              | Izextend32 | Illvm_intrinsic _ )
           | Intop_imm _ | Move | Load _ | Store _ | Intop _ | Int128op _
           | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
           | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _

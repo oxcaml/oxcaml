@@ -219,7 +219,9 @@ let calling_conventions
       | Mask -> (
         match mask_registers with
         | Some mask_registers -> mask_registers, size_int
-        | None -> Misc.fatal_error "Unsupported machtype_component Mask")
+        | None ->
+          (* The C ABI passes masks in GPRs. *)
+          int_registers, size_int)
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
     in
     match !registers with
@@ -321,17 +323,6 @@ let max_arguments_for_tailcalls = 10 (* in regs *) + 64 (* in domain state *)
      Return value in rax or xmm0. *)
 
 let loc_external_results res =
-  (* The C ABI returns masks in general-purpose registers; the bits are moved
-     into a mask register by [Select_utils.insert_move_results]. *)
-  let res =
-    Array.map
-      (fun (c : machtype_component) ->
-        match c with
-        | Mask -> (Int : machtype_component)
-        | Val | Addr | Int | Float | Float32
-        | Vec128 | Vec256 | Vec512 | Valx2 -> c)
-      res
-  in
   let (loc, _ofs, _align) =
     (* `~last_int:4 ~step_int:4` below is to get rdx as the second int register
        (See https://refspecs.linuxbase.org/elf/x86_64-abi-0.99.pdf, pages 21 and 22) *)
@@ -598,7 +589,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Begin_region
        | End_region
        | Specific (Ilea _ | Ioffset_loc _ | Ibswap _
-                  | Isextend32 | Izextend32 | Ikmovq
+                  | Isextend32 | Izextend32
                   | Ilfence | Isfence | Imfence)
        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Pause)
   | Poptrap _ | Prologue | Epilogue ->

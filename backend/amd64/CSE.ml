@@ -32,7 +32,7 @@ let class_of_operation (op : Operation.t)
   match op with
   | Specific spec ->
     begin match spec with
-    | Ilea _ | Isextend32 | Izextend32 | Ikmovq -> Class Op_pure
+    | Ilea _ | Isextend32 | Izextend32 -> Class Op_pure
     | Istore_int(_, _, is_asg) -> Class (Op_store is_asg)
     | Ioffset_loc(_, _) -> Class (Op_store true)
     | Ifloatarithmem _ -> Class (Op_load Mutable)

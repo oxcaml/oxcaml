@@ -278,7 +278,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
          (Int_of_value | Value_of_int | Mask_of_int64 | Int64_of_mask))
   | Op
       (Specific
-         ( Isextend32 | Izextend32 | Ikmovq | Ilea _
+         ( Isextend32 | Izextend32 | Ilea _
          | Istore_int (_, _, _)
          | Ioffset_loc (_, _)
          | Ifloatarithmem (_, _, _)

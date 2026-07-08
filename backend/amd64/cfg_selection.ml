@@ -222,7 +222,7 @@ let pseudoregs_for_operation op arg res =
       ( (Iadd | Isub | Imulh _ | Idiv | Imod | Icomp _ | Ipopcnt | Iclz | Ictz),
         _ )
   | Specific
-      ( Isextend32 | Izextend32 | Ikmovq | Ilea _
+      ( Isextend32 | Izextend32 | Ilea _
       | Istore_int (_, _, _)
       | Ilfence | Isfence | Imfence
       | Ioffset_loc (_, _)
@@ -335,9 +335,8 @@ let insert_move_extcall_arg _exttype src dst :
   let is_mask (reg : Reg.t) = Cmm.equal_machtype_component reg.typ Cmm.Mask in
   match src, dst with
   | [| s |], [| d |] when is_mask s && not (is_mask d) ->
-    (* The C ABI passes an AVX512 mask as an integer, so move it from its mask
-       register into the general-purpose argument register. *)
-    Rewritten (Op (Specific Ikmovq), src, dst)
+    (* The C ABI passes masks in GPRs. *)
+    Rewritten (Op (Reinterpret_cast Cmm.Int64_of_mask), src, dst)
   | _ -> Use_default
 
 (* Recognize float arithmetic with mem *)

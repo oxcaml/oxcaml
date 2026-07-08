@@ -1714,7 +1714,14 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
   | Float32_of_int32 -> movd (arg32 i 0) (res i 0)
   | Int32_of_float32 -> movd (arg i 0) (res32 i 0)
   | Mask_of_int64 -> I.simd kmovq_K_r64 [| arg i 0; res i 0 |]
-  | Int64_of_mask -> I.simd kmovq_r64_K [| arg i 0; res i 0 |]
+  | Int64_of_mask -> (
+    (* The C ABI passes masks as GPRs, which may be stored in stack slots. *)
+    match i.res.(0).loc with
+    | Reg _ -> I.simd kmovq_r64_K [| arg i 0; res i 0 |]
+    | Stack _ -> I.simd kmovq_m64_K [| arg i 0; res i 0 |]
+    | Unknown ->
+      Misc.fatal_errorf "Int64_of_mask: unknown result location %a" Printreg.reg
+        i.res.(0))
 
 let emit_static_cast (cast : Cmm.static_cast) i =
   let open Simd_instrs in
@@ -2472,16 +2479,6 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop (Specific (Ibswap { bitwidth = Sixtyfour })) -> I.bswap (res i 0)
   | Lop (Specific Isextend32) -> I.movsxd (arg32 i 0) (res i 0)
   | Lop (Specific Izextend32) -> I.mov (arg32 i 0) (res32 i 0)
-  | Lop (Specific Ikmovq) -> (
-    (* Masks are passed to external calls as integers; the destination is either
-       an argument register or, once the register arguments are exhausted, a
-       stack slot. *)
-    match i.res.(0).loc with
-    | Reg _ -> I.simd kmovq_r64_K [| arg i 0; res i 0 |]
-    | Stack _ -> I.simd kmovq_m64_K [| arg i 0; res i 0 |]
-    | Unknown ->
-      Misc.fatal_errorf "Ikmovq: unknown result location %a" Printreg.reg
-        i.res.(0))
   | Lop (Intop Iclz) ->
     (* CR-someday gyorsh: can we do it at selection? mshinwell: We need to
        address this and the similar CRs below. My feeling is that we should try
