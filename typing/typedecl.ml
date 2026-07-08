@@ -198,14 +198,6 @@ let check_or_null_decl bad sdecl =
 
 let check_or_null_constructors bad = function
   | [c1; c2] ->
-    let check_no_gadt ({ pcd_res; _ } : Parsetree.constructor_declaration) =
-      match pcd_res with
-      | None -> ()
-      | Some _ ->
-        bad "GADT constructors are not supported with [@@or_null]"
-    in
-    check_no_gadt c1;
-    check_no_gadt c2;
     begin match c1.pcd_args, c2.pcd_args with
     | Pcstr_tuple [],
       Pcstr_tuple
@@ -1136,8 +1128,25 @@ let transl_declaration env sdecl (id, uid) =
           | Some payload_arg ->
             let payload_ty = payload_arg.Types.ca_type in
             let modality = payload_arg.Types.ca_modalities in
-            Variant_with_null,
-            Btype.Jkind0.for_variant_with_null_result path ~modality payload_ty
+            let jkind =
+              if List.exists
+                   (fun (c : Types.constructor_declaration) ->
+                     c.cd_res <> None)
+                   cstrs
+              then
+                (* For a GADT [@@or_null], the payload type lives in the
+                   constructor's local scope and may mention existential
+                   variables; adding it as a with-bound during the
+                   recursive-group phase would capture an out-of-scope
+                   variable. Use a bound-free [value_or_null] default here,
+                   just like boxed variants use a bound-free default; the real
+                   with-bounds are computed later in [update_decl_jkind]. *)
+                Jkind.Builtin.value_or_null ~why:(Or_null_payload path)
+              else
+                Btype.Jkind0.for_variant_with_null_result path ~modality
+                  payload_ty
+            in
+            Variant_with_null, jkind
           | None ->
             if unbox then
               Variant_unboxed,
@@ -2532,7 +2541,7 @@ let rec update_decl_jkind env dpath decl =
     | _, Variant_with_null ->
       begin match Datarepr.find_variant_with_null_payload cstrs with
       | Some
-          { payload_cstr = { Types.cd_uid; _ };
+          { payload_cstr = { Types.cd_uid; cd_res; _ };
             payload_arg = { ca_type = ty; ca_modalities = modality; _ } } ->
         let jkind = Ctype.type_jkind env ty in
         let sort = Jkind.sort_of_jkind env jkind in
@@ -2553,21 +2562,60 @@ let rec update_decl_jkind env dpath decl =
                else cstr)
             cstrs
         in
-        begin match
-          Jkind.apply_modality_l modality jkind
-          |> Jkind.apply_or_null_l env
-        with
-        | Ok type_jkind ->
-          let type_jkind =
-            Jkind.History.update_reason type_jkind
-              (Value_or_null_creation (Or_null_payload dpath))
+        (* For a GADT [@@or_null] the payload type lives in the constructor's
+           local scope: it mentions the constructor's own copies of the
+           declaration parameters (refined by the result-type indices) and may
+           mention existentials. Project it onto the declaration parameters
+           using Steps B1-B4 of Note [With-bounds for GADTs] (orphaned
+           existentials become [Tof_kind]), exactly as [for_boxed_variant]
+           does for boxed GADTs. The projected payload is expressed purely in
+           the declaration parameters, so it can feed the ordinary non-GADT
+           jkind computation below and yields a precise declaration jkind (e.g.
+           [immediate_or_null] for a ground [int] payload). Separability is
+           kept honest per instantiation by [Ctype.unbox_once], not by this
+           declaration jkind. *)
+        let payload_ty =
+          let extra_substs =
+            Btype.Jkind0.variant_constructor_gadt_extra_substs
+              ~projected_params:decl.type_params
+              ~cstr_res:cd_res
+              ~payload_tys:[ty]
+              ~get_free_vars:(Ctype.free_variable_set_of_list env)
           in
-          cstrs, rep, type_jkind
-        | Error () ->
-          Misc.fatal_error
-            "Typedecl.update_variant_kind: Variant_with_null payload is \
-             already maybe-null"
-        end
+          match extra_substs with
+          | [] -> ty
+          | _ ->
+            let domain, range = List.split extra_substs in
+            Ctype.apply env domain ty range
+        in
+        let payload_jkind = Ctype.type_jkind env payload_ty in
+        let type_jkind =
+          match
+            Jkind.apply_modality_l modality payload_jkind
+            |> Jkind.apply_or_null_l env
+          with
+          | Ok type_jkind -> type_jkind
+          | Error () ->
+            begin match cd_res with
+            | Some _ ->
+              (* A GADT payload's parameter is constructor-local, so
+                 [constrain_or_null_payload] does not narrow the declaration
+                 parameter: a widened parameter (e.g. [('a : any)]) can reach
+                 here with a non-[value] layout that [apply_or_null_l] rejects.
+                 Fall back to the conservative [value_or_null] jkind, which is
+                 always sound. *)
+              Jkind.Builtin.value_or_null ~why:(Or_null_payload dpath)
+            | None ->
+              Misc.fatal_error
+                "Typedecl.update_variant_kind: Variant_with_null payload is \
+                 already maybe-null"
+            end
+        in
+        let type_jkind =
+          Jkind.History.update_reason type_jkind
+            (Value_or_null_creation (Or_null_payload dpath))
+        in
+        cstrs, rep, type_jkind
       | None ->
         Misc.fatal_error "Invalid constructor for Variant_with_null"
       end
