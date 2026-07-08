@@ -1009,7 +1009,7 @@ let default_mapper =
       let pjka_desc =
         match pjka_desc with
         | Pjk_default -> Pjk_default
-        | Pjk_abbreviation lid -> Pjk_abbreviation (map_loc this lid)
+        | Pjk_abbreviation lid -> Pjk_abbreviation (map_loc_lid this lid)
         | Pjk_operator (t, sa) ->
           Pjk_operator
             (this.jkind_annotation this t, List.map (map_loc this) sa)
