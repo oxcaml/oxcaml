@@ -142,7 +142,9 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
   let cstr_layouts, is_unboxed =
     match rep, cstrs with
     | Variant_extensible, _ -> assert false
-    | (Variant_boxed x | Variant_with_null_boxed x), _ -> x, false
+    | Variant_boxed x, _ -> x, false
+    | Variant_with_null_boxed erased, _ ->
+      Array.map (fun (e : Types.cstr_erased) -> e.layout) erased, false
     | Variant_unboxed, [{ cd_args }] ->
       (* CR layouts: It's tempting just to use [decl.type_jkind] here, instead
          of grabbing the jkind from the argument. However, doing so does not
@@ -231,10 +233,15 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     in
     let cstr_tag =
       match rep with
-      | Variant_with_null_boxed _ ->
-        if Builtin_attributes.has_repr_null cd_attributes
-        then Null
-        else Ordinary {src_index; runtime_tag}
+      | Variant_with_null_boxed erased ->
+        (* The [erased_kind] array is the source of truth: the null constructor
+           is the null pointer; ordinary/immediate/pointer constructors carry
+           an [Ordinary] tag (immediate/pointer never materialize a block, so
+           their [runtime_tag] slot is unused). *)
+        (match erased.(src_index).erased with
+         | Erased_null -> Null
+         | Erased_boxed | Erased_immediate | Erased_pointer ->
+           Ordinary {src_index; runtime_tag})
       | Variant_with_null ->
         begin match classify_variant_with_null_constructor
           { cd_id; cd_args; cd_res; cd_loc; cd_attributes; cd_uid }

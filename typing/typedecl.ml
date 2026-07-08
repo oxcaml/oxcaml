@@ -1141,15 +1141,17 @@ let transl_declaration env sdecl (id, uid) =
         in
         let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
         (* [@repr <ident>] prototype.  Supported idents: [null], [value],
-           [unboxed].  [immediate] and [pointer] are rejected with a clean
-           "not yet supported" error; any other ident likewise. *)
+           [unboxed], [immediate], [pointer].  Any other ident is rejected with
+           a clean "not yet supported" error. *)
         let repr_of (scstr : Parsetree.constructor_declaration) =
           Builtin_attributes.repr_payload_ident scstr.pcd_attributes
         in
         List.iter
           (fun scstr ->
              match repr_of scstr with
-             | None | Some ("null" | "value" | "unboxed") -> ()
+             | None
+             | Some ("null" | "value" | "unboxed" | "immediate" | "pointer") ->
+               ()
              | Some other ->
                raise (Error (scstr.pcd_loc, Unsupported_repr_attribute other)))
           scstrs;
@@ -1157,16 +1159,19 @@ let transl_declaration env sdecl (id, uid) =
           List.length (List.filter (fun c -> repr_of c = Some ident) scstrs)
         in
         let n_null = count "null" and n_value = count "value"
-        and n_unboxed = count "unboxed" in
+        and n_unboxed = count "unboxed" and n_immediate = count "immediate"
+        and n_pointer = count "pointer" in
         let uses_repr_value = n_value > 0 in
         let uses_repr_unboxed = n_unboxed > 0 in
+        let uses_repr_immediate = n_immediate > 0 in
+        let uses_repr_pointer = n_pointer > 0 in
         let bad msg = raise (Error (sdecl.ptype_loc, Bad_repr_attribute msg)) in
         (* [@repr value]: exactly one [@repr null] (nullary) + one [@repr value]
            (unary), nothing else.  This is precisely the [@@or_null] shape, and
            is mapped onto the [Variant_with_null] representation below. *)
         if uses_repr_value then begin
           if n_value <> 1 || n_null <> 1 || List.length scstrs <> 2
-             || uses_repr_unboxed
+             || uses_repr_unboxed || uses_repr_immediate || uses_repr_pointer
           then bad "[@repr value] may only coexist with a single \
                     [@repr null] constructor";
           (match sdecl.ptype_private with
@@ -1188,7 +1193,8 @@ let transl_declaration env sdecl (id, uid) =
            other [@repr] attribute.  Mapped onto [Variant_unboxed] via the
            [unbox] flag computed above. *)
         if uses_repr_unboxed then begin
-          if n_unboxed > 1 || n_null > 0 || uses_repr_value then
+          if n_unboxed > 1 || n_null > 0 || uses_repr_value
+             || uses_repr_immediate || uses_repr_pointer then
             bad "[@repr unboxed] cannot be combined with other [@repr] \
                  attributes";
           match scstrs with
@@ -1197,9 +1203,90 @@ let transl_declaration env sdecl (id, uid) =
                       | _ -> false) -> ()
           | _ -> bad "[@repr unboxed] requires a single unary constructor"
         end;
+        (* [@repr immediate]: the payload is passed through unchanged as an
+           immediate, distinguished at run time from the boxed constructors by
+           an [isint] test.
+
+           Immediate-space accounting: the [isint]-true bucket holds BOTH the
+           ordinary constant constructors (tags 0..k) AND the [@repr immediate]
+           payload (which spans the whole int range).  They cannot be told
+           apart, so [@repr immediate] must not coexist with any ordinary
+           constant constructor.  It MAY coexist with [@repr null] (the null
+           pointer is caught by an outer [isnull] and consumes no immediate
+           slot) and with ordinary non-constant (boxed) constructors (caught on
+           the [isint]-false side by a tag switch). *)
+        if uses_repr_immediate then begin
+          if n_immediate > 1 then
+            bad "there may be at most one [@repr immediate] constructor";
+          if uses_repr_value then
+            bad "[@repr immediate] may only coexist with [@repr null] and \
+                 ordinary constructors";
+          let has_unannotated_constant =
+            List.exists
+              (fun (scstr : Parsetree.constructor_declaration) ->
+                 repr_of scstr = None
+                 && match scstr.pcd_args with
+                    | Pcstr_tuple [] -> true
+                    | Pcstr_tuple (_ :: _) | Pcstr_record _ -> false)
+              scstrs
+          in
+          if has_unannotated_constant then
+            bad "[@repr immediate] must not coexist with ordinary constant \
+                 constructors: both occupy the immediate space";
+          List.iter
+            (fun (scstr : Parsetree.constructor_declaration) ->
+               match repr_of scstr, scstr.pcd_args with
+               | Some "immediate", Pcstr_tuple [_] -> ()
+               | Some "immediate", _ ->
+                 bad "[@repr immediate] requires a unary tuple constructor"
+               | _ -> ())
+            scstrs
+        end;
+        (* [@repr pointer]: the payload is passed through unchanged as a
+           non-null, non-immediate pointer, caught at run time on the
+           [isint]-false side (after the outer [isnull]).
+
+           Pointer-space accounting: [@repr pointer] takes the ENTIRE
+           non-immediate side -- any block value matches it -- so it cannot
+           share a variant with an ordinary constructor: an ordinary
+           non-constant (boxed block) would be indistinguishable from the raw
+           pointer, and we conservatively forbid ordinary constant constructors
+           too.  [@repr pointer] MAY coexist with [@repr null] (caught by the
+           outer [isnull]) and [@repr immediate] (caught by [isint]). *)
+        if uses_repr_pointer then begin
+          if n_pointer > 1 then
+            bad "there may be at most one [@repr pointer] constructor";
+          if uses_repr_value then
+            bad "[@repr pointer] may only coexist with [@repr null] and \
+                 [@repr immediate]";
+          let has_unannotated =
+            List.exists
+              (fun (scstr : Parsetree.constructor_declaration) ->
+                 repr_of scstr = None)
+              scstrs
+          in
+          if has_unannotated then
+            bad "[@repr pointer] may only coexist with [@repr null] and \
+                 [@repr immediate] constructors: a raw pointer occupies the \
+                 whole non-immediate space and would collide with ordinary \
+                 constructors";
+          List.iter
+            (fun (scstr : Parsetree.constructor_declaration) ->
+               match repr_of scstr, scstr.pcd_args with
+               | Some "pointer", Pcstr_tuple [_] -> ()
+               | Some "pointer", _ ->
+                 bad "[@repr pointer] requires a unary tuple constructor"
+               | _ -> ())
+            scstrs
+        end;
         (* [@repr null] without [@repr value]: the coexistence-with-ordinary
            representation from stage 1. *)
         let uses_repr_null_boxed = n_null > 0 && not uses_repr_value in
+        (* [@repr null]/[@repr immediate]/[@repr pointer] coexisting with
+           ordinary constructors all share [Variant_with_null_boxed]. *)
+        let uses_erased_boxed =
+          uses_repr_null_boxed || uses_repr_immediate || uses_repr_pointer
+        in
         if uses_repr_null_boxed then
           List.iter
             (fun scstr ->
@@ -1225,25 +1312,44 @@ let transl_declaration env sdecl (id, uid) =
            the circular type checks make it safe to check sorts.  Likewise,
            [Constructor_uniform_value] is potentially wrong and will be updated
            later. *)
+        let dummy_layout_of (cstr : Types.constructor_declaration) =
+          let sorts =
+            match cstr.cd_args with
+            | Cstr_tuple args ->
+              Array.make (List.length args) Jkind.Sort.Const.void
+            | Cstr_record _ -> [| Jkind.Sort.Const.scannable |]
+          in
+          Cstr_layout_known { shape = Constructor_uniform_value; sorts }
+        in
         let dummy_boxed_layouts () =
-          Array.map
-            (fun cstr ->
-               let sorts =
-                 match Types.(cstr.cd_args) with
-                 | Cstr_tuple args ->
-                   Array.make (List.length args) Jkind.Sort.Const.void
-                 | Cstr_record _ -> [| Jkind.Sort.Const.scannable |]
-               in
-               Cstr_layout_known
-                 { shape = Constructor_uniform_value; sorts })
-            (Array.of_list cstrs)
+          Array.map dummy_layout_of (Array.of_list cstrs)
+        in
+        (* Per-constructor [erased_kind] array for [Variant_with_null_boxed].
+           The kind comes from the source [@repr <ident>] annotation; every
+           unannotated constructor is [Erased_boxed]. *)
+        let dummy_erased_layouts () =
+          Array.of_list
+            (List.map2
+               (fun (scstr : Parsetree.constructor_declaration)
+                    (cstr : Types.constructor_declaration) ->
+                  let erased : Types.erased_kind =
+                    match repr_of scstr with
+                    | Some "null" -> Erased_null
+                    | Some "immediate" -> Erased_immediate
+                    | Some "pointer" -> Erased_pointer
+                    | Some _ | None -> Erased_boxed
+                  in
+                  { Types.layout = dummy_layout_of cstr; erased })
+               scstrs cstrs)
         in
         let rep, jkind =
           match or_null_payload_arg with
-          | _ when uses_repr_null_boxed ->
-            (* The type includes the null pointer, so its (placeholder) jkind
-               is nullable; [update_decl_jkind] refines it later. *)
-            Variant_with_null_boxed (dummy_boxed_layouts ()),
+          | _ when uses_erased_boxed ->
+            (* The (placeholder) jkind is nullable when a null pointer is
+               possible, and value-ish otherwise; [update_decl_jkind] refines
+               it later (to immediate / immediate_or_null when [@repr immediate]
+               is present). *)
+            Variant_with_null_boxed (dummy_erased_layouts ()),
             Jkind.Builtin.value_or_null ~why:V1_safety_check
           | Some payload_arg ->
             let payload_ty = payload_arg.Types.ca_type in
@@ -2629,52 +2735,170 @@ let rec update_decl_jkind env dpath decl =
          exactly like [Variant_boxed] (constants as immediates, non-constants
          as boxed blocks), so reuse that machinery to fill the layout array and
          compute the jkind, then mark it nullable because the type includes the
-         null pointer. *)
+         null pointer.
+
+         [@repr immediate] constructors are payload-unboxed: the value is the
+         payload itself, which must be an immediate and non-null.  They do not
+         go through the boxed-representation machinery; instead we check the
+         payload and record its sort. *)
+      let has kind =
+        Array.exists
+          (fun (e : Types.cstr_erased) -> Types.equal_erased_kind e.erased kind)
+          cstr_layouts
+      in
+      let has_immediate = has Erased_immediate in
+      let has_pointer = has Erased_pointer in
+      let has_null = has Erased_null in
+      (* Set when any ordinary ([Erased_boxed]) constructor is non-constant,
+         i.e. represented as a boxed block (a pointer value).  When this holds
+         the type has pointer values and cannot be an [immediate] jkind even if
+         a [@repr immediate] constructor is present. *)
+      let has_block = ref false in
+      (* Shared by the payload-unboxed kinds ([@repr immediate]/[@repr
+         pointer]): record the payload's sort in the layout and keep the
+         payload as the value. *)
+      let record_payload_unboxed idx cstr ca ty =
+        let jk = Ctype.type_jkind env ty in
+        let sort = Jkind.sort_of_jkind env jk in
+        let ca_sort =
+          match Jkind.Sort.default_to_scannable_and_get_some sort with
+          | Some s -> s
+          | None -> Jkind.Sort.Const.scannable
+        in
+        cstr_layouts.(idx) <-
+          { (cstr_layouts.(idx)) with
+            layout =
+              Cstr_layout_known
+                { shape = Constructor_uniform_value; sorts = [| ca_sort |] } };
+        { cstr with
+          Types.cd_args =
+            Cstr_tuple [{ ca with Types.ca_sort = Some ca_sort }] }
+      in
+      let payload_arg (cstr : Types.constructor_declaration) ~what =
+        match cstr.cd_args with
+        | Cstr_tuple [ca] -> ca
+        | _ ->
+          (* shape enforced at [transl_declaration] *)
+          Misc.fatal_error (what ^ " constructor is not a unary tuple")
+      in
       let cstrs =
         List.mapi (fun idx cstr ->
-          let cd_args, ~constant, cstr_repr, arg_sorts =
-            update_constructor_representation_and_arg_sorts env
-              cstr.Types.cd_loc cstr.Types.cd_args
-              ~is_extension_constructor:false
-          in
-          let is_nonempty_all_void =
-            constant
-            && (match cd_args with
-                | Cstr_tuple (_ :: _) -> true
-                | Cstr_tuple [] | Cstr_record _ -> false)
-          in
-          if is_nonempty_all_void
-          && not (Builtin_attributes.has_immediate_all_void_constructor
-                    cstr.Types.cd_attributes)
-          then
-            raise
-              (Error (cstr.Types.cd_loc,
-                      Missing_immediate_all_void_constructor_attribute
-                        (Ident.name cstr.Types.cd_id)));
-          let () =
-            match cstr_repr, arg_sorts with
-            | Ok shape, Some sorts ->
-                cstr_layouts.(idx) <- Cstr_layout_known { shape; sorts }
-            | Ok _, None ->
-                Misc.fatal_error "Representation but no arg sorts?"
-            | _, _ ->
-                assert_any_args_support loc;
-                cstr_layouts.(idx) <- Cstr_layout_variable
-          in
-          { cstr with Types.cd_args }) cstrs
+          match cstr_layouts.(idx).Types.erased with
+          | Erased_immediate ->
+            let ca = payload_arg cstr ~what:"[@repr immediate]" in
+            let ty = ca.Types.ca_type in
+            if not (Ctype.is_always_gc_ignorable env ty
+                    && Ctype.check_type_nullability env ty
+                         Jkind_axis.Nullability.Non_null)
+            then
+              raise
+                (Error (cstr.Types.cd_loc,
+                        Bad_repr_attribute
+                          "[@repr immediate] requires an immediate, non-null \
+                           payload"));
+            record_payload_unboxed idx cstr ca ty
+          | Erased_pointer ->
+            let ca = payload_arg cstr ~what:"[@repr pointer]" in
+            let ty = ca.Types.ca_type in
+            (* No pointer jkind axis on this foundation, so the conservative
+               head-shape allowlist is the sole pointer-definiteness gate. *)
+            if not (Ctype.repr_pointer_payload_ok env ty) then
+              raise
+                (Error (cstr.Types.cd_loc,
+                        Bad_repr_attribute
+                          "[@repr pointer] requires a payload that is \
+                           definitely a non-null pointer"));
+            record_payload_unboxed idx cstr ca ty
+          | Erased_boxed | Erased_null ->
+            let cd_args, ~constant, cstr_repr, arg_sorts =
+              update_constructor_representation_and_arg_sorts env
+                cstr.Types.cd_loc cstr.Types.cd_args
+                ~is_extension_constructor:false
+            in
+            (* A non-constant ordinary constructor is a boxed block. *)
+            if not constant then has_block := true;
+            let is_nonempty_all_void =
+              constant
+              && (match cd_args with
+                  | Cstr_tuple (_ :: _) -> true
+                  | Cstr_tuple [] | Cstr_record _ -> false)
+            in
+            if is_nonempty_all_void
+            && not (Builtin_attributes.has_immediate_all_void_constructor
+                      cstr.Types.cd_attributes)
+            then
+              raise
+                (Error (cstr.Types.cd_loc,
+                        Missing_immediate_all_void_constructor_attribute
+                          (Ident.name cstr.Types.cd_id)));
+            let () =
+              let set_layout layout =
+                cstr_layouts.(idx) <- { (cstr_layouts.(idx)) with layout }
+              in
+              match cstr_repr, arg_sorts with
+              | Ok shape, Some sorts ->
+                  set_layout (Cstr_layout_known { shape; sorts })
+              | Ok _, None ->
+                  Misc.fatal_error "Representation but no arg sorts?"
+              | _, _ ->
+                  assert_any_args_support loc;
+                  set_layout Cstr_layout_variable
+            in
+            { cstr with Types.cd_args }) cstrs
       in
       let jkind =
-        Jkind.for_boxed_variant
-          ~loc
-          ~decl_params:decl.type_params
-          ~type_apply:(Ctype.apply env)
-          ~get_free_vars:(Ctype.free_variable_set_of_list env)
-          (List.rev cstrs)
-      in
-      let jkind =
-        match Jkind.apply_or_null_l env jkind with
-        | Ok jkind -> jkind
-        | Error () -> jkind
+        if has_pointer then
+          (* A [@repr pointer] value is a bare non-immediate pointer; it may
+             coexist with [@repr immediate] (a value) and [@repr null].  We do
+             NOT use [for_non_float] (which would assert [Non_float]); instead
+             use the plain [value]/[value_or_null] builtins, whose separability
+             is [Separable]/[Maybe_separable].  This keeps the flat-float-array
+             optimization sound even though the [repr_pointer_payload_ok] float
+             guard already rejects float payloads.  With no [@repr null]
+             constructor the type is genuinely non-null, so use [value] (which,
+             being [Non_null], also lets clients use e.g. [Obj.repr]); otherwise
+             [value_or_null]. *)
+          if has_null then
+            Jkind.Builtin.value_or_null
+              ~why:(Type_argument
+                      { parent_path = dpath; position = 1; arity = 1 })
+          else
+            Jkind.Builtin.value ~why:Boxed_variant
+        else if has_immediate && not !has_block then
+          (* Immediate-ONLY (no ordinary boxed block coexists): every value is
+             an immediate or (with [@repr null]) null pointer.  [immediate]'s
+             [Non_pointer] separability also makes it a non-float, so the
+             flat-float-array optimization is unaffected.  (When a boxed block
+             DOES coexist -- e.g. [Small of int [@repr immediate] | Big of
+             string] -- the type has pointer values and must fall through to the
+             boxed [value] jkind below.) *)
+          if has_null then
+            Jkind.Builtin.immediate_or_null
+              ~why:(Primitive (Ident.create_local "repr_immediate_or_null"))
+          else
+            Jkind.Builtin.immediate
+              ~why:(Primitive (Ident.create_local "repr_immediate"))
+        else
+          (* Ordinary boxed constructors (possibly mixed with a payload-unboxed
+             [@repr immediate] constructor, which [for_boxed_variant] sees as a
+             constructor with a value payload -- sound, since [value] is a safe
+             over-approximation).  Mark the result nullable ONLY when a
+             [@repr null] constructor is present; otherwise (e.g. [Small of int
+             [@repr immediate] | Big of string]) the type is genuinely non-null
+             and staying [value] lets clients use e.g. [Obj.repr]. *)
+          let jkind =
+            Jkind.for_boxed_variant
+              ~loc
+              ~decl_params:decl.type_params
+              ~type_apply:(Ctype.apply env)
+              ~get_free_vars:(Ctype.free_variable_set_of_list env)
+              (List.rev cstrs)
+          in
+          if has_null then
+            match Jkind.apply_or_null_l env jkind with
+            | Ok jkind -> jkind
+            | Error () -> jkind
+          else jkind
       in
       cstrs, Variant_with_null_boxed cstr_layouts, jkind
     | _, Variant_with_null ->
@@ -6046,12 +6270,13 @@ let report_error ~loc = function
       Location.errorf ~loc "Invalid [@@or_null] declaration:@ %s." msg
   | Unsupported_repr_attribute repr ->
       Location.errorf ~loc
-        "%a is not yet supported;@ only %a, %a and %a are currently \
+        "%a is not yet supported;@ only %a, %a, %a and %a are currently \
          implemented."
         Style.inline_code (Printf.sprintf "[@repr %s]" repr)
         Style.inline_code "[@repr null]"
         Style.inline_code "[@repr value]"
         Style.inline_code "[@repr unboxed]"
+        Style.inline_code "[@repr immediate]"
   | Bad_repr_attribute msg ->
       Location.errorf ~loc "Invalid [@repr] declaration:@ %s." msg
   | Zero_alloc_attr_unsupported ca ->

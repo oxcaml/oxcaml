@@ -50,6 +50,10 @@ val equal_constr :
 val may_equal_constr :
     constructor_description ->  constructor_description -> bool
 
+(* For a [Variant_with_null_boxed] variant, how the constructor is represented
+   at run time.  [None] for all other representations. *)
+val erased_kind_of_constructor : constructor_description -> erased_kind option
+
 (* Type constructor of the constructor's result type. *)
 val cstr_res_type_path : constructor_description -> Path.t
 

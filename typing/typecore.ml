@@ -10556,6 +10556,12 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
       Mode.Value.meet [ expected_mode.mode; constructor_mode ] }
   in
   let (argument_mode, alloc_mode) =
+    match erased_kind_of_constructor constr with
+    | Some (Erased_null | Erased_immediate | Erased_pointer) ->
+      (* No allocation: the null pointer, or a payload-unboxed
+         [@repr immediate]/[@repr pointer] value (the payload is the value). *)
+      expected_mode, None
+    | Some Erased_boxed | None ->
     match constr.cstr_repr with
     | Variant_unboxed | Variant_with_null -> expected_mode, None
     | (Variant_boxed _ | Variant_with_null_boxed _)

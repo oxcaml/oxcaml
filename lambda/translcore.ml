@@ -594,6 +594,13 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
           (* The unboxed variant constructor, or the non-null constructor of an
              [@@or_null] type: the value is the payload itself. *)
           (match ll with [v] -> v | _ -> assert false)
+      | Ordinary _, Variant_with_null_boxed _
+        when (match erased_kind_of_constructor cstr with
+              | Some (Erased_immediate | Erased_pointer) -> true
+              | Some (Erased_boxed | Erased_null) | None -> false) ->
+          (* [@repr immediate]/[@repr pointer]: payload-unboxed, so the value is
+             the payload itself (distinguished at run time by isint). *)
+          (match ll with [v] -> v | _ -> assert false)
       | Ordinary {runtime_tag}, (Variant_boxed _ | Variant_with_null_boxed _) ->
           let constant =
             match List.map extract_constant ll with

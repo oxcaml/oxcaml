@@ -915,16 +915,33 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       | _ -> assert false
     end
-  | Variant_boxed cstr_layouts | Variant_with_null_boxed cstr_layouts ->
+  | Variant_boxed _ | Variant_with_null_boxed _ ->
     (* [@repr null] coexistence ([Variant_with_null_boxed]) reuses the boxed
        analysis for accurate block shapes, then marks the result nullable
-       because the type includes the null pointer. *)
-    let result_nullable : Lambda.nullable =
+       because the type includes the null pointer.  [@repr immediate]/[@repr
+       pointer] constructors are payload-unboxed and their runtime values are
+       not the blocks the boxed analysis would describe, so if any is present
+       we fall back to the generic [Pgenval] value kind (conservative: it makes
+       no block-shape or immediacy claims). *)
+    let cstr_layouts, result_nullable, erased_unboxed_payload =
       match rep with
-      | Variant_with_null_boxed _ -> Nullable
-      | Variant_unboxed | Variant_boxed _ | Variant_extensible
-      | Variant_with_null -> Non_nullable
+      | Variant_boxed x -> x, (Non_nullable : Lambda.nullable), false
+      | Variant_with_null_boxed erased ->
+        let has_unboxed_payload =
+          Array.exists
+            (fun (e : Types.cstr_erased) ->
+               match e.erased with
+               | Erased_immediate | Erased_pointer -> true
+               | Erased_boxed | Erased_null -> false)
+            erased
+        in
+        Array.map (fun (e : Types.cstr_erased) -> e.layout) erased,
+        Nullable, has_unboxed_payload
+      | Variant_unboxed | Variant_extensible | Variant_with_null -> assert false
     in
+    if erased_unboxed_payload
+    then num_nodes_visited, { raw_kind = Pgenval; nullable = result_nullable }
+    else
     let depth = depth + 1 in
     let substitute_cd_args (cd_args : Types.constructor_arguments) =
       let substitute ty = Ctype.apply env params ty args in
