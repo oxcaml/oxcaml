@@ -17,7 +17,9 @@ permissions: {}
 
 jobs:
   nix-matrix:
-    name: Generate Nix build matrix
+    # Keep this name equal to the job id: it is the GitHub status-check name,
+    # and branch protection on `main` requires the check named `nix-matrix`.
+    name: nix-matrix
     runs-on: warp-ubuntu-latest-arm64-8x
     permissions:
       contents: read
