@@ -91,6 +91,8 @@ val new_splice_ty: type_expr -> type_expr
         (* Splice a type expression *)
 val new_quote_eval_ty: type_expr -> type_expr
         (* Quote-eval a type expression *)
+val new_box_ty: type_expr -> type_expr
+        (* Box a type expression *)
 
 (**** Types ****)
 
@@ -139,6 +141,10 @@ val proxy: type_expr -> type_expr
 val tpoly_is_mono : type_expr -> bool
 val tpoly_get_mono : type_expr -> type_expr
 val tpoly_get_poly : type_expr -> type_expr * type_expr list
+
+(* Create an expression for the unboxing of the given type
+   if one exists in an empty environment *)
+val simple_unbox_ty : type_expr -> type_expr option
 
 (**** Utilities for private abbreviations with fixed rows ****)
 val row_of_type: type_expr -> type_expr
@@ -418,6 +424,11 @@ module Jkind0 : sig
       ('a -> 'b option) -> ('a, 'd) base_and_axes ->
       ('b, 'd) base_and_axes option
 
+    val meet_scannable_axes :
+      Jkind_types.Layout.Const.t jkind_base ->
+      Jkind_types.Scannable_axes.t ->
+      Jkind_types.Layout.Const.t jkind_base
+
     val try_allow_l :
       ('layout, 'l * 'r) base_and_axes ->
       ('layout, allowed * 'r) base_and_axes option
@@ -664,6 +675,14 @@ module Jkind0 : sig
 
     module Builtin : sig
       val any : why:Jkind_intf.History.any_creation_reason -> 'd jkind
+      val any_with_nullability :
+        Jkind_axis.Nullability.t ->
+        why:Jkind_intf.History.any_creation_reason ->
+        'd jkind
+      val any_with_separability :
+        Jkind_axis.Separability.t ->
+        why:Jkind_intf.History.any_creation_reason ->
+        'd jkind
       val void :
         why:Jkind_intf.History.void_creation_reason -> ('l * disallowed) jkind
       val scannable :
@@ -730,7 +749,9 @@ module Jkind0 : sig
       Types.jkind_l
 
     val for_or_null_argument : Ident.t -> 'd jkind
-    val for_variant_with_null_result : Path.t -> type_expr -> jkind_l
+    val for_or_null_payload : Path.t -> 'd jkind
+    val for_variant_with_null_result :
+      Path.t -> modality:Mode.Modality.Const.t -> type_expr -> jkind_l
 
     val for_effect_arg : Ident.t -> 'd jkind
 

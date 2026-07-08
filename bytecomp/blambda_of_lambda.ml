@@ -757,6 +757,16 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         let copied_value = copy_mixed_block_element elt (comp_expr value) in
         Prim (Ccall "caml_set_ptr_bytecode", [comp_expr ptr; copied_value])
       | _ -> wrong_arity ~expected:2)
+    | Pget_ext_ptr (layout, _) ->
+      let elt = Lambda.mixed_block_element_of_layout layout in
+      copy_mixed_block_element elt (unary (Ccall "caml_get_ext_ptr_bytecode"))
+    | Pset_ext_ptr (layout, _) -> (
+      let elt = Lambda.mixed_block_element_of_layout layout in
+      match args with
+      | [ptr; value] ->
+        let copied_value = copy_mixed_block_element elt (comp_expr value) in
+        Prim (Ccall "caml_set_ext_ptr_bytecode", [comp_expr ptr; copied_value])
+      | _ -> wrong_arity ~expected:2)
     | Pmake_idx_field pos ->
       Const (Const_block (0, [Const_base (Const_int pos)]))
     | Pmake_idx_mixed_field (_, pos, path) ->

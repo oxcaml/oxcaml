@@ -8385,6 +8385,11 @@ let rec nondep_type_rec ?(expand_private=false) env ids ty =
                 Tvariant (set_row_name row None)
             | _ -> Tvariant row
           end
+      | Tof_kind jk ->
+          let jk = nondep_jkind_base env ids jk in
+          (* CR layouts v2.8: This should be done with a proper nondep_jkind.
+             Internal ticket 5113. *)
+          Tof_kind (Jkind.map_type_expr (nondep_type_rec env ids) jk)
       | desc -> copy_type_desc (nondep_type_rec env ids) desc
     with
     | desc ->

@@ -1930,6 +1930,7 @@ void caml_interrupt_self(void)
   is run care must be taken not to enter the GC before returning from
   caml_garbage_collection.
 */
+#ifdef NATIVE_CODE
 void caml_domain_setup_preemption(void) {
   CAMLparam0();
   CAMLlocal1(cont);
@@ -1952,6 +1953,7 @@ void caml_domain_setup_preemption(void) {
   Caml_state->preemption = cont;
   CAMLreturn0;
 }
+#endif
 
 void caml_domain_reset_preemption(void) {
   if (Is_block(Caml_state->preemption)) {

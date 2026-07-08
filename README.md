@@ -3,7 +3,7 @@
 A performance-focused version of OCaml.
 This is also the home of the Flambda 2 optimiser and the Cfg backend.
 
-OxCaml is currently based on OCaml 5.2.0 (plus some patches from later
+OxCaml is currently based on OCaml 5.4 (plus some patches from later
 upstream revisions, mainly in the runtime).
 
 The following gives basic instructions for getting set up.  Please see

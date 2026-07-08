@@ -917,6 +917,16 @@ let primitive ppf = function
       fprintf ppf "(set_ptr%s@ %a)"
         (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
         layout l
+  | Pget_ext_ptr (l, Mutable) ->
+      fprintf ppf "(get_ext_ptr@ %a)"
+        layout l
+  | Pget_ext_ptr (l, Immutable) ->
+      fprintf ppf "(get_ext_ptr_imm@ %a)"
+        layout l
+  | Pset_ext_ptr (l, mode) ->
+      fprintf ppf "(set_ext_ptr%s@ %a)"
+        (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
+        layout l
 
 let name_of_primitive = function
   | Pscalar i ->
@@ -1095,6 +1105,8 @@ let name_of_primitive = function
   | Pset_idx _ -> "Pset_idx"
   | Pget_ptr _ -> "Pget_ptr"
   | Pset_ptr _ -> "Pset_ptr"
+  | Pget_ext_ptr _ -> "Pget_ext_ptr"
+  | Pset_ext_ptr _ -> "Pset_ext_ptr"
 
 let zero_alloc_attribute ppf check =
   match check with
