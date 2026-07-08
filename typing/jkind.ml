@@ -554,6 +554,9 @@ module Mod_bounds = struct
   let cap_by_mask_l t mask =
     Bounds_mask.meet (to_axis_lattice t) mask |> of_axis_lattice
 
+  let join_axis_lattice t bounds =
+    Bounds_mask.join (to_axis_lattice t) bounds |> of_axis_lattice
+
   let relax_by_mask_r t mask =
     Axis_lattice.meet_right_adjoint ~expected:(to_axis_lattice t) ~mask
     |> of_axis_lattice
@@ -933,21 +936,22 @@ module Base_and_axes = struct
      prevented from being expanded by mapping the relevant bounds to an empty
      mask. [map_type_info] is used by sub_jkind_l to remove irrelevant bounds.
 
-     The [skip_axes] argument says which axes we can skip normalizing along. The
-     behavior of this function for these axes is undefined; do *not* look at the
-     results for these axes. *)
+     The [ambient_bounds] argument is a lattice value that normalization joins
+     into the result. It may avoid expanding with-bounds that can contribute
+     only below [ambient_bounds]. Passing [Axis_lattice.bot] gives exact
+     normalization. *)
   let normalize : type l r.
       context:_ ->
       mode:normalize_mode ->
-      skip_axes:_ ->
+      ambient_bounds:Axis_lattice.t ->
       previously_ran_out_of_fuel:bool ->
       ?map_type_info:
         (type_expr -> With_bounds_type_info.t -> With_bounds_type_info.t) ->
       Env.t ->
       (_, l * r) base_and_axes ->
       (_, l * r) base_and_axes * Fuel_status.t =
-   fun ~context ~mode ~skip_axes ~previously_ran_out_of_fuel ?map_type_info env
-       t ->
+   fun ~context ~mode ~ambient_bounds ~previously_ran_out_of_fuel ?map_type_info
+       env t ->
     let t = fully_expand_aliases env t in
     let t_has_abstract_base =
       (* If the kind's base is abstract, optimization that skip axes where the
@@ -957,18 +961,36 @@ module Base_and_axes = struct
       | Layout _ -> false
       | Kconstr _ -> true
     in
+    let mod_bounds_with_ambient =
+      (* The short-circuit keeps the common exact-normalization case
+         allocation-free: normalization is on a very hot path. *)
+      if Axis_lattice.equal ambient_bounds Axis_lattice.bot
+      then t.mod_bounds
+      else Mod_bounds.join_axis_lattice t.mod_bounds ambient_bounds
+    in
     (* handle a few common cases first, before doing anything else *)
     match t with
-    | { with_bounds = No_with_bounds; _ } as t -> t, Sufficient_fuel
+    | { with_bounds = No_with_bounds; _ } as t ->
+      ( (if mod_bounds_with_ambient == t.mod_bounds
+         then t
+         else { t with mod_bounds = mod_bounds_with_ambient }),
+        Sufficient_fuel )
     | { with_bounds = With_bounds tys; _ } as t
-      when Axis_set.equal skip_axes Axis_set.all
+      when Axis_lattice.equal ambient_bounds Axis_lattice.top
            || With_bounds_types.is_empty tys ->
-      { t with with_bounds = No_with_bounds }, Sufficient_fuel
+      ( { t with
+          mod_bounds = mod_bounds_with_ambient;
+          with_bounds = No_with_bounds
+        },
+        Sufficient_fuel )
     | _
       when (not t_has_abstract_base)
-           && Mod_bounds.is_max_within_mask t.mod_bounds
-                (Bounds_mask.of_axis_set (Axis_set.complement skip_axes)) ->
-      { t with with_bounds = No_with_bounds }, Sufficient_fuel
+           && Mod_bounds.is_max mod_bounds_with_ambient ->
+      ( { t with
+          mod_bounds = mod_bounds_with_ambient;
+          with_bounds = No_with_bounds
+        },
+        Sufficient_fuel )
     | _ ->
       (* Sadly, it seems hard (impossible?) to be sure to expand all types
          here without using a fuel parameter to stop infinite regress. Here
@@ -1246,7 +1268,7 @@ module Base_and_axes = struct
           let relevant_bounds_for_ty =
             let from_ti =
               if t_has_abstract_base
-              then ti.relevant_bounds
+              then Bounds_mask.residual ti.relevant_bounds ambient_bounds
               else
                 Bounds_mask.residual ti.relevant_bounds
                   (Mod_bounds.saturated_mask bounds_so_far ti.relevant_bounds)
@@ -1341,13 +1363,12 @@ module Base_and_axes = struct
                 found_jkind_for_ty ctl Mod_bounds.max No_with_bounds Not_best
                   skippable_bounds [@nontail])))
       in
-      let mod_bounds = Mod_bounds.set_max_in_set t.mod_bounds skip_axes in
       let mod_bounds, with_bounds, ctl =
         match t.with_bounds with
-        | No_with_bounds -> mod_bounds, No_with_bounds, Loop_control.starting
+        | No_with_bounds ->
+          mod_bounds_with_ambient, No_with_bounds, Loop_control.starting
         | With_bounds _ ->
-          (loop Loop_control.starting mod_bounds
-             (Bounds_mask.of_axis_set (Axis_set.complement skip_axes))
+          (loop Loop_control.starting mod_bounds_with_ambient Axis_lattice.top
              (With_bounds.to_list t.with_bounds)
             : _ * (_ * r) with_bounds * _)
       in
@@ -1389,9 +1410,9 @@ module Base_and_axes = struct
              out of fuel (when in require-best mode), we bail out of the loop
              since there's no point in continuing. Instead, we return arbitrary
              mod- and with-bounds, because down here we detect the case and
-             simply return [t].
+             simply return [t] with the ambient bounds joined in.
           *)
-          t
+          { t with mod_bounds = mod_bounds_with_ambient }
       in
       normalized_t, ctl.fuel_status
 end
@@ -1468,8 +1489,8 @@ module Jkind_desc = struct
         (l * allowed) jkind_desc) =
     (* Rather than carefully expanding only as much as needed, this assumes both
        kinds are fully expanded, and that [sub] is Ignore_best normalized. See
-       comment about [axes_max_on_right] in [sub] just below for why we do it
-       this way. *)
+       comment about [ambient_bounds_on_right] in [sub] just below for why we
+       do it this way. *)
     let bases = Base.sub_expanded base1 base2 in
     match with_bounds1 with
     | No_with_bounds ->
@@ -1492,32 +1513,41 @@ module Jkind_desc = struct
         Sub_result.Less
       | _ -> Sub_result.combine bases (Sub_result.Not_le [With_bounds_on_left]))
 
-  let sub (type l r) ~type_equal:_ ~context env ~sub_previously_ran_out_of_fuel
-      (sub : (allowed * r) jkind_desc) (super : (l * allowed) jkind_desc) =
+  (* When [exact], the ambient-bounds optimization is skipped so that the
+     result reliably distinguishes [Less] from [Equal]; otherwise a result of
+     [Equal] may really be [Less]. *)
+  let sub (type l r) ~type_equal:_ ~context ?(exact = false) env
+      ~sub_previously_ran_out_of_fuel (sub : (allowed * r) jkind_desc)
+      (super : (l * allowed) jkind_desc) =
     let super =
-      (* The [axes_max_on_right] optimization just below is massively important
-         for the speed of the compiler. In a quick test in Nov 2025, it brought
-         the time to compile the compiler itself from 2:06 to 1:21. However, we
-         can't do the optimization without fully expanding [super], because a
-         kind alias may be hiding a mod bound. So, we eagerly fully expand
-         [super].
+      (* The [ambient_bounds_on_right] optimization just below generalizes the
+         old [axes_max_on_right] optimization, which was massively important for
+         the speed of the compiler. In a quick test in Nov 2025, it brought the
+         time to compile the compiler itself from 2:06 to 1:21. However, we
+         can't use right-hand direct bounds without fully expanding [super],
+         because a kind alias may be hiding a mod bound. So, we eagerly fully
+         expand [super].
 
          Possibly the normalization of [sub] should somehow be interleaved with
          the expansion of [super] to avoid needing this, but we leave that
          question for the in-progress rework of normalization. *)
       Base_and_axes.fully_expand_aliases env super
     in
-    let axes_max_on_right =
-      (* Optimization: if the upper_bound is max on the right, then that axis is
-         irrelevant - the left will always satisfy the right along that
-         axis. But we can only do this optimization for a concrete base, as an
-         abstract base may later be filled in with lower bounds. *)
+    let ambient_bounds_on_right =
+      (* Optimization: direct bounds on the right are already part of the
+         final comparison ([join l s <= s] iff [l <= s]), so normalization of
+         the left can avoid computing contributions below those bounds. We
+         can't do this for an abstract base: there, even a max direct bound
+         doesn't make an axis trivially satisfied, since the abstract base
+         may later be filled in with lower bounds (and a bare kind
+         constructor has max direct bounds). Compare with the abstract-base
+         case in [sub_jkind_l]. *)
       match super.base with
-      | Layout _ -> Mod_bounds.get_max_axes super.mod_bounds
-      | Kconstr _ -> Axis_set.empty
+      | Layout _ when not exact -> Mod_bounds.to_axis_lattice super.mod_bounds
+      | Layout _ | Kconstr _ -> Axis_lattice.bot
     in
     let sub, _ =
-      Base_and_axes.normalize ~skip_axes:axes_max_on_right
+      Base_and_axes.normalize ~ambient_bounds:ambient_bounds_on_right
         ~previously_ran_out_of_fuel:sub_previously_ran_out_of_fuel
         ~mode:Ignore_best ~context env sub
     in
@@ -2535,7 +2565,7 @@ let[@inline] normalize ~mode ~context env t =
     match mode with Require_best -> Require_best | Ignore_best -> Ignore_best
   in
   let jkind, fuel_result =
-    Base_and_axes.normalize ~context ~skip_axes:Axis_set.empty
+    Base_and_axes.normalize ~context ~ambient_bounds:Axis_lattice.bot
       ~previously_ran_out_of_fuel:t.ran_out_of_fuel_during_normalize ~mode env
       t.jkind
   in
@@ -2613,9 +2643,10 @@ let sort_of_jkind env (t : jkind_l) : sort =
   | Some sort -> sort
   | None -> Misc.fatal_error "Jkind.sort_of_jkind: layout is any"
 
-let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
+let get_mod_bounds (type l r) ~context ~ambient_bounds env (jk : (l * r) jkind)
+    =
   let jk, _ =
-    Base_and_axes.normalize ~mode:Ignore_best ~skip_axes
+    Base_and_axes.normalize ~mode:Ignore_best ~ambient_bounds
       ~previously_ran_out_of_fuel:jk.ran_out_of_fuel_during_normalize ~context
       env jk.jkind
   in
@@ -2630,11 +2661,13 @@ let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
     mod_bounds
   | { base = Layout _; with_bounds = With_bounds _; _ } ->
     Misc.fatal_error
-      "Jkind.get_mod_crossing: violated Ignore_best normalize invariant."
+      "Jkind.get_mod_bounds: violated Ignore_best normalize invariant."
+
+let all_nonmodal_axes = Axis_lattice.of_axis_set Axis_set.all_nonmodal_axes
 
 let get_mode_crossing (type l r) ~context env (jk : (l * r) jkind) =
   let mod_bounds =
-    get_mod_bounds ~context ~skip_axes:Axis_set.all_nonmodal_axes env jk
+    get_mod_bounds ~context ~ambient_bounds:all_nonmodal_axes env jk
   in
   Mod_bounds.crossing mod_bounds
 
@@ -2643,12 +2676,11 @@ let to_unsafe_mode_crossing jkind =
     unsafe_with_bounds = jkind.jkind.with_bounds
   }
 
-let all_except_externality =
-  Axis_set.singleton (Nonmodal Externality) |> Axis_set.complement
+let all_except_externality = Axis_lattice.of_axis_set Axis_set.all_modal_axes
 
 let get_externality_upper_bound ~context env jk =
   let mod_bounds =
-    get_mod_bounds ~context ~skip_axes:all_except_externality env jk
+    get_mod_bounds ~context ~ambient_bounds:all_except_externality env jk
   in
   Mod_bounds.get mod_bounds ~axis:(Nonmodal Externality)
 
@@ -3677,8 +3709,8 @@ let combine_histories ~type_equal ~context env reason (Pack_jkind k1)
     in
     let choose_subjkind_history k_a history_a roofdn_a k_b history_b =
       match
-        Jkind_desc.sub ~type_equal ~sub_previously_ran_out_of_fuel:roofdn_a
-          ~context env k_a k_b
+        Jkind_desc.sub ~type_equal ~exact:true
+          ~sub_previously_ran_out_of_fuel:roofdn_a ~context env k_a k_b
       with
       | Less -> history_a
       | Not_le _ ->
@@ -3840,15 +3872,21 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) env sub super
   | false -> (
     let best_super, _ =
       (* MB_EXPAND_R *)
-      Base_and_axes.normalize ~context ~skip_axes:Axis_set.empty
+      Base_and_axes.normalize ~context ~ambient_bounds:Axis_lattice.bot
         ~mode:Require_best ~previously_ran_out_of_fuel:false env super_jkind
     in
     let right_bounds = With_bounds.to_best_eff_map best_super.with_bounds in
-    let axes_max_on_right =
-      (* If the upper_bound is max on the right, then that axis is irrelevant -
-         the left will always satisfy the right along that axis. This is an
-         optimization, not necessary for correctness *)
-      Mod_bounds.get_max_axes best_super.mod_bounds
+    let ambient_bounds_on_right =
+      (* Direct bounds on the right are already part of the final comparison,
+         so normalization of the left can avoid computing contributions below
+         those bounds. Unlike in [Jkind_desc.sub], [best_super] here is
+         [Require_best]-normalized, and we preserve the old optimization for
+         an abstract base: skip axes whose bound is fully max on the right. *)
+      match best_super.base with
+      | Layout _ -> Mod_bounds.to_axis_lattice best_super.mod_bounds
+      | Kconstr _ ->
+        Mod_bounds.get_max_axes best_super.mod_bounds
+        |> Axis_lattice.of_axis_set
     in
     let right_bounds_seq = right_bounds |> With_bounds_types.to_seq in
     let sub, _ =
@@ -3870,7 +3908,8 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) env sub super
       (* [Jkind_desc.map_normalize] handles the stepping, jkind lookups, and
          joining.  [map_type_info] handles looking for [ty] on the right and
          removing irrelevant bounds. *)
-      Base_and_axes.normalize env sub_jkind ~skip_axes:axes_max_on_right
+      Base_and_axes.normalize env sub_jkind
+        ~ambient_bounds:ambient_bounds_on_right
         ~previously_ran_out_of_fuel:sub.ran_out_of_fuel_during_normalize
         ~context ~mode:Ignore_best
         ~map_type_info:(fun ty { relevant_bounds = left_relevant_bounds } ->
