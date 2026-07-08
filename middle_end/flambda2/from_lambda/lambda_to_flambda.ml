@@ -699,14 +699,50 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
           body new_ids_with_kinds new_values acc ccenv)
       k_exn
   | Llet
-      ((Strict | Alias | StrictOpt), _layout, id, _duid, defining_expr, Lvar id')
-    when Ident.same id id' ->
-    (* CR sspies: To propagate the debug UID here correctly, insert a phantom
-       let here once they are available in the compiler. *)
+      ((Strict | Alias | StrictOpt), layout, id, duid, defining_expr, Lvar id')
+    when Ident.same id id' -> (
     (* Simplif already simplifies such bindings, but we can generate new ones
        when translating primitives (see the Lprim case below). *)
     (* This case must not be moved above the case for let-bound primitives. *)
-    cps acc env ccenv defining_expr k k_exn
+    let phantom_binding =
+      if
+        not
+          (Flambda_features.debug () && Flambda_features.Expert.phantom_lets ())
+      then None
+      else
+        match is_user_visible env id with
+        | Not_user_visible -> None
+        | User_visible -> (
+          match
+            Flambda_arity.Component_for_creation.from_lambda layout
+              ~machine_width:(Acc.machine_width acc)
+          with
+          | Singleton kind_with_subkind ->
+            let kind = Flambda_kind.With_subkind.kind kind_with_subkind in
+            let var =
+              Variable.create_with_same_name_as_ident ~user_visible:() id kind
+            in
+            let phantom_uid = Flambda_debug_uid.of_lambda_debug_uid duid in
+            let bound_pattern =
+              Bound_pattern.singleton
+                (Bound_var.create var phantom_uid Name_mode.phantom)
+            in
+            let named =
+              Flambda.Named.create_prim
+                (Flambda_primitive.Nullary (Optimised_out kind)) Debuginfo.none
+            in
+            Some (bound_pattern, named)
+          | Unboxed_product _ ->
+            (* This would need multiple phantom lets with projected debug uids;
+               not currently supported. *)
+            None)
+    in
+    match phantom_binding with
+    | None -> cps acc env ccenv defining_expr k k_exn
+    | Some (bound_pattern, named) ->
+      let acc, body_expr = cps acc env ccenv defining_expr k k_exn in
+      Closure_conversion_aux.Let_with_acc.create acc bound_pattern named
+        ~body:body_expr)
   | Llet ((Strict | Alias | StrictOpt), layout, id, duid, defining_expr, body)
     ->
     let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler:false
