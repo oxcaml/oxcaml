@@ -1880,30 +1880,36 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       |> Flambda_arity.Component_for_creation.from_lambda ~machine_width
     in
     let field_arity = Flambda_arity.create [field_arity_component] in
-    let num_fields_prior_to_projected_fields =
+    (* "Components" below refers to the unarized components of the block, as
+       distinct from the source-level fields of the unboxed product; the
+       projected field occupies a contiguous range of such components. *)
+    let num_components_prior_to_projected_field =
       Misc.Stdlib.List.split_at n layouts
       |> fst
       |> List.map
            (Flambda_arity.Component_for_creation.from_lambda ~machine_width)
       |> Flambda_arity.create |> Flambda_arity.cardinal_unarized
     in
-    let num_projected_fields = Flambda_arity.cardinal_unarized field_arity in
+    let num_projected_components =
+      Flambda_arity.cardinal_unarized field_arity
+    in
     let projected_args =
       let unarized_args = List.hd orig_args |> Array.of_list in
       if
-        num_fields_prior_to_projected_fields + num_projected_fields
+        num_components_prior_to_projected_field + num_projected_components
         > Array.length unarized_args
       then
         Misc.fatal_errorf
           "Punboxed_product_field: projection of field %d requires unarized \
-           arguments %d to %d (inclusive), but only %d unarized argument(s) \
+           components %d to %d (inclusive), but only %d unarized argument(s) \
            were supplied:@ %a"
-          n num_fields_prior_to_projected_fields
-          (num_fields_prior_to_projected_fields + num_projected_fields - 1)
+          n num_components_prior_to_projected_field
+          (num_components_prior_to_projected_field + num_projected_components
+         - 1)
           (Array.length unarized_args)
           Printlambda.primitive prim;
-      Array.sub unarized_args num_fields_prior_to_projected_fields
-        num_projected_fields
+      Array.sub unarized_args num_components_prior_to_projected_field
+        num_projected_components
       |> Array.to_list
     in
     List.map (fun arg : H.expr_primitive -> Simple arg) projected_args
