@@ -51,61 +51,28 @@ module System = struct
     | BeOS
     | Unknown
 
-  (* CR shym It's unclear to me what we gain here by matching on [architecture]
-     and [model], as the result is really only related to the value of [system].
-     Is there a historical reason with some strange case where some generic
-     value in [Config.system] could be made more precise by looking at the other
-     settings? Or was it to ensure somewhere that [Target_system] and
-     [configure] are somewhat consistent? *)
   let derived_system () : derived_system =
-    (* Derived from [configure.ac] *)
-    match architecture (), Config.model, Config.system with
-    | IA32, _, "linux_elf" -> Linux
-    | IA32, _, "beos" -> BeOS
-    | IA32, _, "cygwin" -> Cygwin
-    | IA32, _, "gnu" -> GNU
-    | IA32, _, "mingw" -> MinGW_32
-    | IA32, _, "win32" -> Win32
-    | X86_64, _, "win64" -> Win64
-    | POWER, "ppc64le", "elf" -> Linux
-    | POWER, "ppc64", "elf" -> Linux
-    | POWER, "ppc", "elf" -> Linux
-    | Z, "z10", "elf" -> Linux
-    | ARM, "armv6", "linux_eabihf" -> Linux
-    | ARM, "armv7", "linux_eabihf" -> Linux
-    | ARM, "armv8", "linux_eabihf" -> Linux
-    | ARM, "armv8", "linux_eabi" -> Linux
-    | ARM, "armv7", "linux_eabi" -> Linux
-    | ARM, "armv6t2", "linux_eabi" -> Linux
-    | ARM, "armv6", "linux_eabi" -> Linux
-    | ARM, "armv6", "freebsd" -> FreeBSD
-    | ARM, "armv6", "netbsd" -> NetBSD
-    | ARM, "armv7", "netbsd" -> NetBSD
-    | ARM, "armv5te", "linux_eabi" -> Linux
-    | ARM, "armv5", "linux_eabi" -> Linux
-    | ARM, _, "linux_eabihf" -> Linux
-    | ARM, _, "linux_eabi" -> Linux
-    | ARM, _, "bsd" -> OpenBSD
-    | X86_64, _, "linux" -> Linux
-    | X86_64, _, "gnu" -> GNU
-    | X86_64, _, "dragonfly" -> Dragonfly
-    | X86_64, _, "solaris" -> Solaris
-    | X86_64, _, "freebsd" -> FreeBSD
-    | X86_64, _, "netbsd" -> NetBSD
-    | X86_64, _, "openbsd" -> OpenBSD
-    | AArch64, _, "macosx" -> MacOS_like
-    | X86_64, _, "macosx" -> MacOS_like
-    | X86_64, _, "mingw64" -> MinGW_64
-    | AArch64, _, "linux" -> Linux
-    | AArch64, _, "freebsd" -> FreeBSD
-    | X86_64, _, "cygwin" -> Cygwin
-    | Riscv, "riscv64", "linux" -> Linux
-    | _, _, "unknown" -> Unknown
-    | _, _, _ ->
+    match Config.system with
+    | "beos" -> BeOS
+    | "cygwin" -> Cygwin
+    | "dragonfly" -> Dragonfly
+    | "freebsd" -> FreeBSD
+    | "gnu" -> GNU
+    | "linux" -> Linux
+    | "macosx" -> MacOS_like
+    | "mingw64" -> MinGW_64
+    | "mingw" -> MinGW_32
+    | "netbsd" -> NetBSD
+    | "openbsd" -> OpenBSD
+    | "solaris" -> Solaris
+    | "win32" -> Win32
+    | "win64" -> Win64
+    | "unknown" -> Unknown
+    | _ ->
       Misc.fatal_errorf
-        "Cannot determine system type (model %s, system %s): ensure \
-         `target_system.ml' matches `configure'"
-        Config.model Config.system
+        "Cannot determine system type (%s): ensure `target_system.ml' matches \
+         `configure'"
+        Config.system
 
   let is_windows () =
     match derived_system () with
