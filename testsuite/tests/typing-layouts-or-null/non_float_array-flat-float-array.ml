@@ -21,7 +21,7 @@ let get_gen (xs : 'a array) i = xs.(i)
 [%%expect{|
 (let
   (get_gen =
-     (function {nlocal = 1} xs[L][value<genarray>] i[L][value<int>]
+     (function {nlocal = 0} xs[value<genarray>] i[value<int>]
        (array.get[gen indexed by int] xs i)))
   (apply (field_imm 1 (global Toploop!)) "get_gen" get_gen))
 val get_gen : ('a : value_maybe_null). 'a array -> int -> 'a = <fun>
@@ -31,8 +31,8 @@ let set_gen (xs : 'a array) x i = xs.(i) <- x
 [%%expect{|
 (let
   (set_gen =
-     (function {nlocal = 1} xs[L][value<genarray>] x? i[L][value<int>] : int
-       (array.set[gen(local) indexed by int] xs i x)))
+     (function {nlocal = 0} xs[value<genarray>] x? i[value<int>] : int
+       (array.set[gen indexed by int] xs i x)))
   (apply (field_imm 1 (global Toploop!)) "set_gen" set_gen))
 val set_gen : ('a : value_maybe_null). 'a array -> 'a -> int -> unit = <fun>
 |}]

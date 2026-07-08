@@ -543,8 +543,8 @@ let rec map f = function
   | x :: xs -> f x :: map f xs
 [%%expect{|
 val map :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & 'p @@ past & global many > aliased] ->
-  ('a list @ [< 'n] -> 'b list @ [< global > 'm]) @ [> 'o | 'p | nonportable] =
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global many > aliased] ->
+  ('a list @ [< 'n] -> 'b list @ [< global > 'm]) @ [> 'o | nonportable] =
   <fun>
 |}]
 
