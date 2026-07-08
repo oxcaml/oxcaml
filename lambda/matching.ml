@@ -2574,7 +2574,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
       let ptr, _ = Typeopt.maybe_pointer_type head.pat_env lbl.lbl_arg in
       let lbl_sort =
         match label_sort Legacy lbl all_sorts with
-        | `Sort s -> s
+        | `Sort s -> Jkind.Sort.default_for_transl_and_get s
         | `Same_as_record_sort -> sort
       in
       let lbl_layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
@@ -2655,7 +2655,9 @@ let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
   in
   let lbl_layouts =
     Array.map (fun lbl ->
-      Typeopt.layout_of_sort lbl.lbl_loc (unboxed_label_sort lbl all_sorts)
+      Typeopt.layout_of_sort lbl.lbl_loc
+        (Jkind.Sort.default_for_transl_and_get
+           (unboxed_label_sort lbl all_sorts))
     ) all_labels
     |> Array.to_list
   in
@@ -2677,7 +2679,10 @@ let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
         else
           Alias, compose_mut mut Immutable
       in
-      let lbl_sort = unboxed_label_sort lbl all_sorts in
+      let lbl_sort =
+        Jkind.Sort.default_for_transl_and_get
+          (unboxed_label_sort lbl all_sorts)
+      in
       let layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       {
         arg = access;

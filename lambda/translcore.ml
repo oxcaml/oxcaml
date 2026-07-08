@@ -834,7 +834,10 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
       fatal_error "transl_exp0: variable unboxed-product record representation"
     | Record_unboxed_product ->
       let lbl_layout l =
-        let sort = unboxed_label_sort l record_sorts in
+        let sort =
+          Jkind.Sort.default_for_transl_and_get
+            (unboxed_label_sort l record_sorts)
+        in
         if l.lbl_pos = lbl.lbl_pos then
           (* This is the field being projected, so give it a precise value kind
              (by using the known type of the expression) *)
@@ -873,7 +876,7 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
       in
       let sort_newval =
         match label_sort Legacy lbl record_sorts with
-        | `Sort s -> s
+        | `Sort s -> Jkind.Sort.default_for_transl_and_get s
         | `Same_as_record_sort -> sort_arg
       in
       let arg_layout = layout_exp sort_arg arg in
@@ -2534,7 +2537,10 @@ and transl_idx ~scopes loc _env ba uas =
     begin match uas with
     | [] -> idx
     | Uaccess_unboxed_field (_, lbl, sorts) :: _ ->
-      let sorts = unboxed_label_all_sorts lbl sorts in
+      let sorts =
+        Array.map Jkind.Sort.default_for_transl_and_get
+          (unboxed_label_all_sorts lbl sorts)
+      in
       (* Preserve the invariant that products have at least two elements *)
       let base_sort =
         if Int.equal (Array.length sorts) 1 then
