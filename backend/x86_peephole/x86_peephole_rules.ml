@@ -33,10 +33,8 @@ let peephole_stats_to_counters stats =
    This only applies when d1 = -n1 and d2 = -n2 (i.e., the CFI offsets correctly
    track the stack adjustment).
 
-   The rewrite does not preserve the flags: the combined ADD sets CF/OF/AF
-   differently from the second original ADD, and when n1 + n2 = 0 the sequence
-   is deleted and no flags are written at all. This relies on the emitter never
-   generating code that reads the flags of a stack adjustment. *)
+   The rewrite does not preserve the flags, so we only apply it when we can
+   prove the flags are unobserved. *)
 let combine_add_rsp stats cell =
   match U.get_cells cell 4 with
   | [cell1; cell2; cell3; cell4] -> (
@@ -48,7 +46,8 @@ let combine_add_rsp stats cell =
           (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d1),
         Ins (ADD (Imm n2, Reg64 RSP)),
         Directive
-          (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d2) ) ->
+          (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d2) )
+      when U.flags_never_observed cell4 ->
       if
         not
           (Int64.equal (Int64.of_int d1) (Int64.neg n1)
@@ -95,9 +94,9 @@ let combine_add_rsp stats cell =
    This is safe when x is a register that is not read before the next write to x
    within the same basic block, and either A or B is a register, as memory to
    memory moves don't exist. B must also not use x in its addressing expression:
-   the rewrite would compute the address from the stale value of x (deleting the
-   write of A to x). A may use x, since its read happens at the same program
-   point in both versions.
+   the rewrite would compute the address from a stale value of x (since we are
+   deleting the write of A to x). A may use x, since its read happens at the
+   same program point in both versions.
 
    We restrict x to Reg64 to avoid issues with aliasing or zeroed bits. *)
 let remove_mov_to_dead_register stats cell =
@@ -124,10 +123,9 @@ let remove_mov_to_dead_register stats cell =
     | _, _ -> U.No_match)
   | _ -> U.No_match
 
-(* Find a redundant CMP instruction with the same operands. [src_reg] and
-   [dst_reg] are the underlying 64-bit registers of [src] and [dst]. Returns
-   Some cell if found, None otherwise. *)
-let find_redundant_cmp src dst src_reg dst_reg start_cell =
+(* Find a redundant CMP instruction with the same operands. Returns Some cell if
+   found, None otherwise. *)
+let find_redundant_cmp src dst start_cell =
   let rec loop cell_opt =
     match cell_opt with
     | None -> None
@@ -142,10 +140,11 @@ let find_redundant_cmp src dst src_reg dst_reg start_cell =
           | CMP (src2, dst2) when equal_args src src2 && equal_args dst dst2 ->
             Some cell
           | _ ->
-            if U.writes_flags instr
+            if U.maybe_writes_flags instr
             then None
             else if
-              U.writes_to_reg64 src_reg instr || U.writes_to_reg64 dst_reg instr
+              U.writes_to_reg64 (U.underlying_reg64 src |> Option.get) instr
+              || U.writes_to_reg64 (U.underlying_reg64 dst |> Option.get) instr
             then None
             else loop (DLL.next cell))
         | Directive _ -> loop (DLL.next cell))
@@ -162,22 +161,18 @@ let find_redundant_cmp src dst src_reg dst_reg start_cell =
    control flow between the CMPs *)
 let remove_redundant_cmp stats cell =
   match DLL.value cell with
-  (* Only optimize comparisons between general-purpose registers, to avoid
-     issues with mutable memory. [underlying_reg64] returns None for the other
-     kinds of arguments, including float registers. *)
-  | Ins (CMP (src, dst)) -> (
-    match U.underlying_reg64 src, U.underlying_reg64 dst with
-    | Some src_reg, Some dst_reg -> (
-      (* Search for a redundant CMP *)
-      match find_redundant_cmp src dst src_reg dst_reg cell with
-      | Some redundant_cell ->
-        (* Delete the redundant CMP *)
-        DLL.delete_curr redundant_cell;
-        stats.remove_redundant_cmp <- stats.remove_redundant_cmp + 1;
-        (* Return the first CMP cell to allow iterative removal *)
-        U.Matched (Some cell)
-      | None -> U.No_match)
-    | (Some _ | None), _ -> U.No_match)
+  (* Only optimize register-register comparisons to avoid issues with mutable
+     memory *)
+  | Ins (CMP (src, dst)) when U.is_register src && U.is_register dst -> (
+    (* Search for a redundant CMP *)
+    match find_redundant_cmp src dst cell with
+    | Some redundant_cell ->
+      (* Delete the redundant CMP *)
+      DLL.delete_curr redundant_cell;
+      stats.remove_redundant_cmp <- stats.remove_redundant_cmp + 1;
+      (* Return the first CMP cell to allow iterative removal *)
+      U.Matched (Some cell)
+    | None -> U.No_match)
   | _ -> U.No_match
 
 (* Apply all rewrite rules in sequence using a pipeline. *)

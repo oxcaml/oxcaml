@@ -8,9 +8,6 @@ module U = X86_peephole_utils
 (* Main optimization loop. Iterates through the instruction list starting from
    [start], applying rewrite rules and respecting hard barriers. *)
 let optimize_from_cell start =
-  (* Fresh stats per call: [Profile] merges successive [counter_f] snapshots by
-     summing them, so the counters must be per-call deltas rather than
-     cumulative totals. *)
   let stats = R.create_peephole_stats () in
   let counter_f () = R.peephole_stats_to_counters stats in
   Profile.record_with_counters ~accumulate:true ~counter_f "x86_peephole"
