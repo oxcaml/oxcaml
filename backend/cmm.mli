@@ -420,9 +420,13 @@ type operation =
   | Capply of
       { result_type : machtype;
         region : Lambda.region_close;
-        callees : symbol list option
+        callees : symbol list option;
             (* List of possible callees, or [None] if not known. The actual
                callee might be a re-optimized versions of one these callees. *)
+        returns : bool
+            (* [false] iff the call is statically known never to return
+               normally, e.g. because its return continuation is unreachable.
+               Such calls may still raise. *)
       }
   | Cextcall of
       { func : string;

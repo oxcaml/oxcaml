@@ -695,6 +695,7 @@ val send :
   Extended_machtype.t list ->
   Extended_machtype.t ->
   Lambda.region_close * Cmx_format.alloc_mode ->
+  returns:bool ->
   Debuginfo.t ->
   expression
 
@@ -1030,6 +1031,7 @@ val caml_modify_local :
     If a closure needs to be passed, it must be included in [args]. *)
 val direct_call :
   dbg:Debuginfo.t ->
+  returns:bool ->
   machtype ->
   Lambda.region_close ->
   symbol ->
@@ -1039,6 +1041,7 @@ val direct_call :
 (** Same as {!direct_call} but for an indirect call. *)
 val indirect_call :
   dbg:Debuginfo.t ->
+  returns:bool ->
   Extended_machtype.t ->
   Lambda.region_close ->
   Cmx_format.alloc_mode ->
@@ -1051,6 +1054,7 @@ val indirect_call :
     application (since this enables a few optimisations). *)
 val indirect_full_call :
   dbg:Debuginfo.t ->
+  returns:bool ->
   Extended_machtype.t ->
   Lambda.region_close ->
   expression ->
@@ -1226,10 +1230,11 @@ val atomic_compare_exchange_field :
 
 val emit_gc_roots_table : symbols:symbol list -> phrase list -> phrase list
 
-val perform : dbg:Debuginfo.t -> expression -> expression
+val perform : dbg:Debuginfo.t -> returns:bool -> expression -> expression
 
 val with_stack :
   dbg:Debuginfo.t ->
+  returns:bool ->
   valuec:expression ->
   exnc:expression ->
   effc:expression ->
@@ -1239,6 +1244,7 @@ val with_stack :
 
 val with_stack_bind :
   dbg:Debuginfo.t ->
+  returns:bool ->
   valuec:expression ->
   exnc:expression ->
   effc:expression ->
@@ -1250,6 +1256,7 @@ val with_stack_bind :
 
 val with_stack_preemptible :
   dbg:Debuginfo.t ->
+  returns:bool ->
   valuec:expression ->
   exnc:expression ->
   effc:expression ->
@@ -1260,6 +1267,7 @@ val with_stack_preemptible :
 
 val with_stack_bind_preemptible :
   dbg:Debuginfo.t ->
+  returns:bool ->
   valuec:expression ->
   exnc:expression ->
   effc:expression ->
@@ -1272,6 +1280,7 @@ val with_stack_bind_preemptible :
 
 val resume :
   dbg:Debuginfo.t ->
+  returns:bool ->
   cont:expression ->
   f:expression ->
   arg:expression ->
@@ -1279,6 +1288,7 @@ val resume :
 
 val reperform :
   dbg:Debuginfo.t ->
+  returns:bool ->
   eff:expression ->
   cont:expression ->
   last_fiber:expression ->
