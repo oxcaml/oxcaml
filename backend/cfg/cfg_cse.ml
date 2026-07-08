@@ -346,7 +346,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Class op_class -> op_class
     | Use_default -> class_of_operation0 op
 
-  let is_cheap_operation : Operation.t -> bool = function
+  let is_cheap_operation0 : Operation.t -> bool = function
     | Const_int _ -> true
     | Move | Spill | Reload | Const_float32 _ | Const_float _ | Const_symbol _
     | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Opaque | Stackoffset _
@@ -356,6 +356,11 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Specific _ | Name_for_debugger _ | Probe_is_enabled _ | Begin_region
     | End_region | Dls_get | Tls_get | Domain_index ->
       false
+
+  let is_cheap_operation op =
+    match Target.is_cheap_operation op with
+    | Cheap cheap -> cheap
+    | Use_default -> is_cheap_operation0 op
 
   let kill_loads (n : numbering) : numbering = remove_mutable_load_numbering n
 
