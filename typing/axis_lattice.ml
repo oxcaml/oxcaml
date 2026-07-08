@@ -192,6 +192,13 @@ let imply (a : t) (b : t) : t =
   let invalid_chain3_hi_bits = r land chain3_hi_mask land lnot (r lsl 1) in
   r land lnot invalid_chain3_hi_bits
 
+(* Right adjoint of [meet _ ~mask]: the greatest [c] with
+   [meet c mask <= expected]. Enumerated per axis (11 axes x <=4 levels), not
+   via a bitwise closed form: the prefix-ones chain encoding makes a uniform
+   bit-complement wrong (e.g. it can yield the invalid chain element 0b10), so
+   we join the accepting down-set of each axis instead. Reached only from
+   [apply_modality_r] (a few [ctype] sites), never from the [normalize] hot
+   loop. *)
 let meet_right_adjoint ~expected ~mask : t =
   let max_level = function Chain2 -> 1 | Chain3 -> 2 | Diamond4 -> 3 in
   let rec loop_axis i acc =
