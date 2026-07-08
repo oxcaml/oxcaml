@@ -172,7 +172,15 @@ val warning_scope:
     the purposes of misplaced attribute warnings. *)
 val has_attribute : string -> Parsetree.attributes -> bool
 
-(** Result of parsing a constructor-level [@tag <int>] attribute. *)
+(** Result of parsing a constructor-level [@tag <int>] attribute.
+
+    The attribute assigns the constant constructor's runtime immediate directly,
+    so it may be sparse or negative.  Polymorphic structural comparison and
+    hashing observe these runtime tag values, not declaration order: with sparse
+    or negative tags, [compare]/[(=)]/[Set]/[Map]/[Hashtbl.hash] order and
+    distinguish constructors by their assigned immediate.  For ordinary variants
+    tag order and declaration order coincide, so this is invisible; re-tagging a
+    constructor with [@tag] therefore silently changes those semantics. *)
 type immediate_constructor_tag_attribute =
   | Immediate_constructor_tag of int Location.loc
   | Invalid_immediate_constructor_tag of Location.t

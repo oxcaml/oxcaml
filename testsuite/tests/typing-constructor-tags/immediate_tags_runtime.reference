@@ -41,3 +41,11 @@ many mixed negative
 many mixed default
 many mixed high
 many mixed block 42
+compare Oa Ob:1
+compare Ob Oc:-1
+compare Oc Oa:-1
+eq Oa Oa:true Oa Ob:false
+sort: Ob Oc Oa
+set: Ob Oc Oa
+hash Oa=hash 5:true Oa=hash Ob:false
+gadt:Gi:9 Gb:-2 Gu:0

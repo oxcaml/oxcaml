@@ -127,6 +127,28 @@ type many_sparse_mixed =
   | MS39
   | MShigh [@tag 100]
 
+(* Polymorphic [compare]/[hash]/[Hashtbl.hash] observe the runtime tag value,
+   not declaration order.  With sparse/negative tags, tag order and declaration
+   order no longer coincide, so structural comparison, sorting, [Set]/[Map]
+   ordering, and hashing all key off the assigned immediate. *)
+type ordered =
+  | Oa [@tag 5]
+  | Ob [@tag (-3)]
+  | Oc
+
+module Ordered_set = Set.Make (struct
+  type t = ordered
+
+  let compare = compare
+end)
+
+(* GADT with sparse/negative tags on constant constructors dispatches at runtime
+   to its declared immediate. *)
+type _ gadt =
+  | Gi : int gadt [@tag 9]
+  | Gb : bool gadt [@tag (-2)]
+  | Gu : unit gadt
+
 let int_of_t (x : t) : int = Obj.magic x
 
 let int_of_mixed (x : mixed) : int = Obj.magic x
@@ -216,6 +238,13 @@ let print_many_sparse_mixed x =
   | MSblock n -> Printf.printf "many mixed block %d\n" n
   | _ -> Printf.printf "many mixed default\n"
 
+let name_ordered = function Oa -> "Oa" | Ob -> "Ob" | Oc -> "Oc"
+
+let describe_gadt : type a. a gadt -> string = function
+  | Gi -> "Gi"
+  | Gb -> "Gb"
+  | Gu -> "Gu"
+
 let () =
   List.iter print_t [ A; B; C ];
   List.iter print_mixed [ I0; I1; Block 42 ];
@@ -240,7 +269,29 @@ let () =
   List.iter
     (fun x -> Printf.printf "%s\n" (classify_many_sparse x))
     [ Mneg; M00; Mhigh ];
-  List.iter print_many_sparse_mixed [ MSneg; MS00; MShigh; MSblock 42 ]
+  List.iter print_many_sparse_mixed [ MSneg; MS00; MShigh; MSblock 42 ];
+  (* compare/hash follow tag value, not declaration order *)
+  Printf.printf "compare Oa Ob:%d\n" (compare Oa Ob);
+  Printf.printf "compare Ob Oc:%d\n" (compare Ob Oc);
+  Printf.printf "compare Oc Oa:%d\n" (compare Oc Oa);
+  Printf.printf "eq Oa Oa:%b Oa Ob:%b\n" (Oa = Oa) (Oa = Ob);
+  Printf.printf "sort:";
+  List.iter
+    (fun x -> Printf.printf " %s" (name_ordered x))
+    (List.sort compare [ Oa; Ob; Oc ]);
+  print_newline ();
+  Printf.printf "set:";
+  Ordered_set.iter
+    (fun x -> Printf.printf " %s" (name_ordered x))
+    (Ordered_set.of_list [ Oa; Ob; Oc ]);
+  print_newline ();
+  Printf.printf "hash Oa=hash 5:%b Oa=hash Ob:%b\n"
+    (Hashtbl.hash Oa = Hashtbl.hash 5)
+    (Hashtbl.hash Oa = Hashtbl.hash Ob);
+  (* GADT sparse/negative tags dispatch at runtime *)
+  Printf.printf "gadt:%s:%d %s:%d %s:%d\n" (describe_gadt Gi)
+    (Obj.magic Gi : int) (describe_gadt Gb)
+    (Obj.magic Gb : int) (describe_gadt Gu) (Obj.magic Gu : int)
 
 (* TEST
  flags = "-extension layouts_alpha";

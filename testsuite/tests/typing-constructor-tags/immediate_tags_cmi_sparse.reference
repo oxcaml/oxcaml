@@ -1,0 +1,5 @@
+A:5
+B:-3
+C:0
+compare A B:1
+sort: B C A
