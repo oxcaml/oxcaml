@@ -1024,26 +1024,6 @@ module Jkind0 = struct
         externality;
       }
 
-    let[@inline] is_max_within_set t axes =
-      let open Jkind_axis.Axis_set in
-      let modal ax =
-        not (mem axes (Modal ax)) ||
-        Crossing.Per_axis.((le [@inlined hint]) ax ((max [@inlined hint]) ax)
-          (modal ax t))
-      in
-      modal areality &&
-      modal linearity &&
-      modal uniqueness &&
-      modal portability &&
-      modal contention &&
-      modal forkable &&
-      modal yielding &&
-      modal statefulness &&
-      modal visibility &&
-      modal staticity &&
-      (not (mem axes (Nonmodal Externality)) ||
-       Externality.(le max (externality t)))
-
     (** Get all axes that are set to max *)
     let get_max_axes t =
       let[@inline] add_if b ax axis_set =
@@ -1151,30 +1131,13 @@ module Jkind0 = struct
       let externality = Externality.meet (externality t1) (externality t2) in
       create crossing ~externality
 
-    (* Returns the set of axes that is relevant under a given modality. For
-       example, under the [global] modality, the areality axis is *not*
-       relevant. *)
-    let relevant_axes_of_modality ~modality =
-      Jkind_axis.Axis_set.create ~f:(fun ~axis:(Pack axis) ->
-        match axis with
-        | Modal axis ->
-          let (P axis) = P axis |> Mode.Crossing.Axis.to_modality in
-          let modality = Mode.Modality.Const.proj axis modality in
-           not (Mode.Modality.Per_axis.is_constant axis modality)
-        (* The kind-inference.md document (in the repo) discusses both constant
-           modalities and identity modalities. Of course, reality has modalities
-           (such as [shared]) that are neither constants nor identities. Here,
-           we treat all non-constant modalities the way that the design treats
-           identity modalities. This is safe, because it leads to a minimum of
-           mode-crossing. In the future, we may want to complexify the
-           modal-kinds setup to allow for more mode-crossing in the presence of
-           non-constant non-identity modalities. *)
-        | Nonmodal Externality -> true)
-
-    let mask_of_modality ~modality =
-      Axis_lattice.meet
-        (Axis_lattice.mask_of_modality modality)
-        (Axis_lattice.of_axis_set (relevant_axes_of_modality ~modality))
+    (* The per-axis relevance mask of a constant modality: an identity axis
+       maps to its top (fully relevant), a constant axis to its bottom
+       (irrelevant), and a middle modality to its level.
+       [Axis_lattice.mask_of_modality] already encodes exactly this for every
+       axis, monadic and comonadic, so no separate whole-axis relevance
+       intersection is needed. *)
+    let mask_of_modality ~modality = Axis_lattice.mask_of_modality modality
 
     let cap_by_mask_l t mask =
       Axis_lattice.meet (to_axis_lattice t) mask |> of_axis_lattice

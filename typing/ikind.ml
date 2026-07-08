@@ -27,11 +27,7 @@ let reset_constructor_ikind_on_substitution = false
 
 module Ldd = Types.Ldd
 
-let mask_of_modality ~modality =
-  Axis_lattice.meet
-    (Axis_lattice.mask_of_modality modality)
-    (Axis_lattice.of_axis_set
-       (Btype.Jkind0.Mod_bounds.relevant_axes_of_modality ~modality))
+let mask_of_modality ~modality = Axis_lattice.mask_of_modality modality
 
 let instance_poly_for_jkind' =
   ref (fun _univars _ty -> Misc.fatal_error "instance_poly_for_jkind")

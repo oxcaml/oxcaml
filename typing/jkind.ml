@@ -544,10 +544,7 @@ module Mod_bounds = struct
     | Modal ax -> t |> crossing |> (Crossing.proj [@inlined hint]) ax
     | Nonmodal Externality -> externality t
 
-  let mask_of_modality ~modality =
-    Bounds_mask.meet
-      (Axis_lattice.mask_of_modality modality)
-      (Bounds_mask.of_axis_set (relevant_axes_of_modality ~modality))
+  let mask_of_modality ~modality = Axis_lattice.mask_of_modality modality
 
   let saturated_mask t mask = Bounds_mask.meet (to_axis_lattice t) mask
 

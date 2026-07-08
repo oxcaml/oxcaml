@@ -187,6 +187,13 @@ let co_sub (a : t) (b : t) : t =
   let r = a land lnot b in
   r lor ((r land chain3_hi_mask) lsr 1)
 
+(* Right adjoint of [meet _ ~mask]: the greatest [c] with
+   [meet c mask <= expected]. Enumerated per axis (11 axes x <=4 levels), not
+   via a bitwise closed form: the prefix-ones chain encoding makes a uniform
+   bit-complement wrong (e.g. it can yield the invalid chain element 0b10), so
+   we join the accepting down-set of each axis instead. Reached only from
+   [apply_modality_r] (a few [ctype] sites), never from the [normalize] hot
+   loop. *)
 let meet_right_adjoint ~expected ~mask : t =
   let max_level = function Chain2 -> 1 | Chain3 -> 2 | Diamond4 -> 3 in
   let rec loop_axis i acc =
