@@ -271,6 +271,50 @@ type void_null_succeeds_sep = void_null accepts_sep
 type void_null_succeeds_nonfloat = void_null accepts_nonfloat
 |}]
 
+(* A void null constructor with a [float] payload is maybe-separable (like
+   [float or_null]), unlike the [int] payload above. Separability is a jkind
+   axis computed structurally from the payload and does not depend on the
+   flat-float-array optimization, so this is rejected identically under both
+   the flat-float-array and no-flat-float-array configurations. *)
+
+type void_null_float =
+  | Null_void_float of void
+  | This_void_float of float
+[@@or_null]
+
+[%%expect{|
+type void_null_float = Null_void_float of void | This_void_float of float [@@or_null]
+|}]
+
+type void_null_float_fails_sep = void_null_float accepts_sep
+
+[%%expect{|
+Line 1, characters 33-48:
+1 | type void_null_float_fails_sep = void_null_float accepts_sep
+                                     ^^^^^^^^^^^^^^^
+Error: This type "void_null_float" should be an instance of type
+         "('a : any separable)"
+       The layout of void_null_float is value_or_null
+         because of the definition of void_null_float at lines 1-4, characters 0-11.
+       But the layout of void_null_float must be a sublayout of any separable
+         because of the definition of accepts_sep at line 2, characters 0-41.
+|}]
+
+type void_null_float_fails_nonfloat = void_null_float accepts_nonfloat
+
+[%%expect{|
+Line 1, characters 38-53:
+1 | type void_null_float_fails_nonfloat = void_null_float accepts_nonfloat
+                                          ^^^^^^^^^^^^^^^
+Error: This type "void_null_float" should be an instance of type
+         "('a : value_or_null non_float)"
+       The layout of void_null_float is value_or_null
+         because of the definition of void_null_float at lines 1-4, characters 0-11.
+       But the layout of void_null_float must be a sublayout of
+           value_or_null non_float
+         because of the definition of accepts_nonfloat at line 3, characters 0-56.
+|}]
+
 type void_alias = void
 type 'a void_param : void
 
