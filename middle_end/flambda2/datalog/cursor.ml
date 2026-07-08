@@ -379,8 +379,8 @@ let with_bound_cursor ?callback cursor db f =
 let evaluate = function
   | Unless (is_trie, cell, args, _cell_name, _args_names) ->
     if
-      Option.is_some
-        (Trie.find_opt is_trie
+      Or_null.is_this
+        (Trie.find_or_null is_trie
            (Or_null_receiver.recv_hlist args)
            (Channel.recv cell))
     then Virtual_machine.Skip
