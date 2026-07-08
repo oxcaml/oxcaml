@@ -1734,6 +1734,49 @@ Error: The allocation is "alloc"
          which is expected to be "noalloc_strict".
 |}]
 
+(* The exemption extends down the whole curry chain: a three-argument function
+   is accepted, with a [local] codomain at each step. *)
+let (f3 @ noalloc_strict) x y z = x
+[%%expect{|
+|}]
+
+(* Soundness: the returned closure is pinned [local], so it cannot escape to a
+   [global] (heap) position -- using [f] where a [global] codomain is expected
+   is rejected. *)
+let escapes = (f : _ -> (_ -> _) @ global)
+[%%expect{|
+|}]
+
+(* Soundness: a genuine allocation in the body (here a tuple) is still counted;
+   only the curried intermediate closures are exempt. *)
+let (f_body_alloc @ noalloc_strict) x y = (x, y)
+[%%expect{|
+|}]
+
+(** Test 5.11: forcing the codomain of a [noalloc] curried function to [local]
+    interacts with an explicit codomain areality annotation. Because the
+    codomain arrow is forced to [local], an explicit [@ global] on it conflicts,
+    while an explicit [@ local] agrees (and the function is accepted). *)
+
+(* The codomain is forced to [local], which conflicts with the explicit
+   [@ global] on the returned arrow. *)
+let (f : int -> (int -> int) @ global) @ noalloc_strict = fun x y -> x
+[%%expect{|
+|}]
+
+(* Contrast: without the [noalloc_strict] annotation the codomain is NOT forced,
+   so the same [@ global] arrow is accepted. *)
+let (f : int -> (int -> int) @ global) = fun x y -> x
+[%%expect{|
+|}]
+
+(* Annotating the codomain [@ local] agrees with the forcing, so the function
+   is accepted. *)
+let (f : int -> (int -> int) @ local) @ noalloc_strict = fun x y -> x
+[%%expect{|
+|}]
+
+
 (** Test 6: Misc *)
 
 type record_t = { x : float; y : float }
