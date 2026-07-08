@@ -223,7 +223,7 @@ let let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler
               (fun n kind ->
                 let field =
                   Ident.create_local
-                    (Printf.sprintf "%s_unboxed%d" (Ident.unique_name id) n)
+                    (Printf.sprintf "%s_unboxed%d" (Ident.canonical_name id) n)
                 in
                 let field_uid =
                   Flambda_debug_uid.of_lambda_debug_uid_proj duid ~field:n
@@ -833,7 +833,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                         let ident =
                           Ident.create_local
                             (Printf.sprintf "%s_unboxed%d"
-                               (Ident.unique_name arg) n)
+                               (Ident.canonical_name arg) n)
                         in
                         let duid =
                           Flambda_debug_uid.of_lambda_debug_uid_proj duid
@@ -1560,7 +1560,9 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
                 in
                 let ident =
                   Ident.create_local
-                    (Printf.sprintf "%s_unboxed%d" (Ident.unique_name name) n)
+                    (Printf.sprintf "%s_unboxed%d"
+                       (Ident.canonical_name name)
+                       n)
                 in
                 ident, duid, kind)
               kinds

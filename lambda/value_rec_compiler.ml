@@ -446,7 +446,9 @@ let compute_static_size lam =
     | Pget_idx _
     | Pset_idx _
     | Pget_ptr _
-    | Pset_ptr _ ->
+    | Pset_ptr _
+    | Pget_ext_ptr _
+    | Pset_ext_ptr _ ->
         dynamic_size lam
 
     (* Primitives specific to oxcaml *)

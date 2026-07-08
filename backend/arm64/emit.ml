@@ -1564,9 +1564,7 @@ let emit_instr env i =
       (match addressing_mode with
       | Iindexed v ->
         let n = Validated_mem_offset.offset v in
-        A.ins4 ADD_immediate reg_x_tmp1
-          (H.reg_x i.arg.(0))
-          (O.imm n) O.optional_none
+        emit_addimm reg_x_tmp1 (H.reg_x i.arg.(0)) n
       | Ibased (s, offset) ->
         assert (not !Clflags.dlcode);
         (* see selection_utils.ml *)
@@ -1613,9 +1611,7 @@ let emit_instr env i =
       match addr with
       | Iindexed v ->
         let n = Validated_mem_offset.offset v in
-        A.ins4 ADD_immediate reg_x_tmp1
-          (H.reg_x i.arg.(1))
-          (O.imm n) O.optional_none;
+        emit_addimm reg_x_tmp1 (H.reg_x i.arg.(1)) n;
         A.ins2 STR_simd_and_fp (H.reg_q src) (H.mem reg_tmp1_base)
       | Ibased (s, offset) ->
         assert (not !Clflags.dlcode);
@@ -1786,7 +1782,8 @@ let emit_instr env i =
     match H.reg_fp_operand_4 i.res.(0) i.arg.(1) i.arg.(2) i.arg.(0) with
     | S_regs (rd, rn, rm, ra) -> A.ins4 FNMSUB rd rn rm ra
     | D_regs (rd, rn, rm, ra) -> A.ins4 FNMSUB rd rn rm ra)
-  | Lop Opaque -> assert (Reg.equal_location i.arg.(0).loc i.res.(0).loc)
+  | Lop Opaque ->
+    assert (Array.equal (fun a b -> Reg.equal_location a.loc b.loc) i.arg i.res)
   | Lop (Specific (Ishiftarith (op, shift))) ->
     let rd, rn, rm = H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1) in
     let emit_shift_arith instr kind amount =

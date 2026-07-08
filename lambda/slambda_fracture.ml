@@ -440,7 +440,7 @@ and fracture_prim lambda prim args loc =
   | Preinterpret_tagged_int63_as_unboxed_int64 | Parray_to_iarray
   | Parray_of_iarray | Pget_header _ | Ppeek _ | Ppoke _ | Pdls_get | Ptls_get
   | Pdomain_index | Ppoll | Pcpu_relax | Pget_idx _ | Pset_idx _ | Pget_ptr _
-  | Pset_ptr _ ->
+  | Pset_ptr _ | Pget_ext_ptr _ | Pset_ext_ptr _ ->
     let fargs = fracture_dynamic_list args in
     SLhalves
       { sval_comptime = SLmissing;

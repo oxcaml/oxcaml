@@ -13,23 +13,8 @@ module Array = Array
 0
 |}]
 
-(* Regression test showing that an [i]array of iarrays
-   has element kind [addr].
- *)
-
-let _ = [: [: :] :];;
-
-[%%expect {|
-(makearray_imm[addr] (makearray_imm[gen]))
-- : 'a iarray iarray = [:[::]:]
-|}]
-
-let _ = [| [: :] |];;
-
-[%%expect {|
-(makearray[addr] (makearray_imm[gen]))
-- : '_weak1 iarray array = [|[::]|]
-|}]
+(* See test_iarray_typeopt-no-flat-float-array.ml for tests of [: [: :] :] that depend on
+   the flat float array optimization. *)
 
 (* Test that reading from an iarray generates an immutable load (iarray.get) *)
 

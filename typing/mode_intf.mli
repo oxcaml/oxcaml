@@ -898,6 +898,8 @@ module type S = sig
       val of_value : Value.Axis.packed -> packed
 
       val to_value : packed -> Value.Axis.packed
+
+      val compare : packed -> packed -> int
     end
 
     type atom = Atom : 'a Axis.t * 'a -> atom
@@ -909,6 +911,8 @@ module type S = sig
 
       (** Test if the given modality is a constant modality. *)
       val is_constant : 'a Axis.t -> 'a -> bool
+
+      val le : 'a Axis.t -> 'a -> 'a -> bool
 
       val print : 'a Axis.t -> Fmt.formatter -> 'a -> unit
     end

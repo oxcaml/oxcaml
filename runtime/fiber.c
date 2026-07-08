@@ -38,6 +38,7 @@
 #include "caml/misc.h"
 #include "caml/major_gc.h"
 #include "caml/memory.h"
+#include "caml/obj.h"
 #include "caml/startup_aux.h"
 #include "caml/shared_heap.h"
 #ifdef NATIVE_CODE

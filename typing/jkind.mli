@@ -299,6 +299,7 @@ module Const : sig
      as uses of them for unused abstract kind warnings. *)
   val of_annotation :
     ?use_abstract_jkinds:bool ->
+    ?warn:bool ->
     context:('l * allowed) History.annotation_context ->
     Env.t ->
     Parsetree.jkind_annotation ->
@@ -429,9 +430,13 @@ val of_sort_univar :
   'd Types.jkind
 
 (* [use_abstract_jkinds] controls whether references to other kinds here count
-   as uses of them for unused abstract kind warnings. *)
+   as uses of them for unused abstract kind warnings.
+
+   [warn] (default: true) controls whether redundant/ignored kind modifier
+   warnings are emitted. *)
 val of_annotation :
   ?use_abstract_jkinds:bool ->
+  ?warn:bool ->
   context:('l * allowed) History.annotation_context ->
   Env.t ->
   Parsetree.jkind_annotation ->
@@ -461,6 +466,7 @@ val of_annotation_option_default :
     as uses of them for unused abstract kind warnings. *)
 val of_type_decl :
   ?use_abstract_jkinds:bool ->
+  ?warn:bool ->
   context:History.annotation_context_l ->
   transl_type:(Parsetree.core_type -> Types.type_expr) ->
   Env.t ->

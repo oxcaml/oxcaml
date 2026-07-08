@@ -1,0 +1,2 @@
+get: Failure: External ptr primitives are unimplemented on bytecode
+set: Failure: External ptr primitives are unimplemented on bytecode

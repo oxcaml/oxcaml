@@ -33,7 +33,11 @@
   ../../Makefile.config
   ../../Makefile.build_config
   ../../Makefile.config_if_required
-  ../../Makefile.best_binaries)
+  ../../Makefile.best_binaries
+  ../../Makefile.menhir
+  ../../.depend.menhir
+  ../../Makefile.dev
+  ../../config.status)
  (action
   (run make -s -f Makefile.upstream -C ../.. COMPUTE_DEPS=false runtime/caml/opnames.h)))
 
