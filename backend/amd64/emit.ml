@@ -519,21 +519,21 @@ let res16 i n = emit_subreg reg_low_16_name WORD i.res.(n)
 
 let res32 i n = emit_subreg reg_low_32_name DWORD i.res.(n)
 
-let narrow_to_xmm : X86_ast.arg -> X86_ast.arg = function
+let arg_as_xmm : X86_ast.arg -> X86_ast.arg = function
   | Regf (YMM r | ZMM r) -> Regf (XMM r)
   | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
     | Regf (XMM _)
     | Regmask _ | Mem _ | Mem64_RIP _ ) as res ->
     res
 
-let narrow_to_ymm : X86_ast.arg -> X86_ast.arg = function
+let arg_as_ymm : X86_ast.arg -> X86_ast.arg = function
   | Regf (XMM r | ZMM r) -> Regf (YMM r)
   | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
     | Regf (YMM _)
     | Regmask _ | Mem _ | Mem64_RIP _ ) as res ->
     res
 
-let widen_to_zmm : X86_ast.arg -> X86_ast.arg = function
+let arg_as_zmm : X86_ast.arg -> X86_ast.arg = function
   | Regf (XMM r | YMM r) -> Regf (ZMM r)
   | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
     | Regf (ZMM _)
@@ -548,13 +548,13 @@ let arg_idx i n : X86_ast.reg_idx =
   | Mem64_RIP _ ->
     assert false
 
-let argX i n = narrow_to_xmm (reg i.arg.(n))
+let argX i n = arg_as_xmm (reg i.arg.(n))
 
-let resX i n = narrow_to_xmm (reg i.res.(n))
+let resX i n = arg_as_xmm (reg i.res.(n))
 
-let argY i n = narrow_to_ymm (reg i.arg.(n))
+let argY i n = arg_as_ymm (reg i.arg.(n))
 
-let argZ i n = widen_to_zmm (reg i.arg.(n))
+let argZ i n = arg_as_zmm (reg i.arg.(n))
 
 (* Output an addressing mode *)
 
