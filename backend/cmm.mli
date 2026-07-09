@@ -305,6 +305,8 @@ type memory_chunk =
 (** Size in bytes of a memory access for the given chunk type. *)
 val size_of_memory_chunk : memory_chunk -> int
 
+val machtype_of_memory_chunk : memory_chunk -> machtype
+
 (* These casts compile to a single move instruction. If the operands are
    assigned the same physical register, the move will be omitted entirely. *)
 type reinterpret_cast =

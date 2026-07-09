@@ -390,6 +390,17 @@ let size_of_memory_chunk : memory_chunk -> int = function
   | Twofiftysix_unaligned | Twofiftysix_aligned -> 32
   | Fivetwelve_unaligned | Fivetwelve_aligned -> 64
 
+let machtype_of_memory_chunk : memory_chunk -> machtype = function
+  | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+  | Thirtytwo_unsigned | Thirtytwo_signed | Word_int ->
+    typ_int
+  | Word_val -> typ_val
+  | Single { reg = Float64 } | Double -> typ_float
+  | Single { reg = Float32 } -> typ_float32
+  | Onetwentyeight_unaligned | Onetwentyeight_aligned -> typ_vec128
+  | Twofiftysix_unaligned | Twofiftysix_aligned -> typ_vec256
+  | Fivetwelve_unaligned | Fivetwelve_aligned -> typ_vec512
+
 type reinterpret_cast =
   | Int_of_value
   | Value_of_int

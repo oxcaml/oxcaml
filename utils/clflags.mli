@@ -251,6 +251,7 @@ val unbox_free_vars_of_closures : bool ref
 val unbox_specialised_args : bool ref
 val clambda_checks : bool ref
 val cmm_invariants : bool ref
+val check_machtypes : bool ref
 val parsetree_ghost_loc_invariant : bool ref
 val default_inline_max_depth : int
 val inline_max_depth : Int_arg_helper.parsed ref
