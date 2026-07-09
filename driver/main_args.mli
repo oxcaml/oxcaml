@@ -246,6 +246,8 @@ module type Optcommon_options = sig
   val _o4 : unit -> unit
   val _insn_sched : unit -> unit
   val _no_insn_sched : unit -> unit
+  val _dcmm_check_machtypes : unit -> unit
+  val _dcmm_no_check_machtypes : unit -> unit
   val _linscan : unit -> unit
   val _no_float_const_prop : unit -> unit
 
