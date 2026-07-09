@@ -1042,12 +1042,32 @@ type subcheck_polys =
    - otherwise, only round up [sub] if [super] is constant *)
 (* Stage-1 validation harness helpers (see STAGE1-DESIGN.md). *)
 
-(* Semantic (not structural) equality of two ikinds: mutual subsumption. Two
-   derivations of the same jkind may differ structurally (fresh var ids) while
-   denoting the same kind, and mutual [leq] is exactly the "they agree"
-   property stage 2 relies on. *)
+(* Unknown atoms ([fresh_unknown_uid]: open rows, first-class modules, some
+   existential projections) get a fresh, non-deterministic uid on every
+   derivation, so two independent derivations of the same jkind disagree on
+   their identity. Canonicalize all unknowns to a single atom before comparing,
+   so the harness compares the determinate structure rather than reporting these
+   as spurious mismatches. *)
+let canonical_unknown_node : Ldd.node =
+  Ldd.node_of_var (Ldd.rigid (Ldd.Name.unknown (fresh_unknown_uid ())))
+
+let canonicalize_unknowns (n : Ldd.node) : Ldd.node =
+  Ldd.map_rigid
+    (fun (name : Ldd.Name.t) ->
+      match name with
+      | Ldd.Name.Unknown _ -> canonical_unknown_node
+      | Ldd.Name.Param _ | Ldd.Name.Atom _ | Ldd.Name.KAtom _ ->
+        Ldd.node_of_var (Ldd.rigid name))
+    n
+
+(* Semantic (not structural) equality of two ikinds: mutual subsumption, modulo
+   unknown-atom identity. Two derivations of the same jkind may differ
+   structurally (fresh var ids) while denoting the same kind, and mutual [leq]
+   is exactly the "they agree" property stage 2 relies on. *)
 let ldd_semantically_equal (a : Ldd.node) (b : Ldd.node) : bool =
   Ldd.solve_pending ();
+  let a = canonicalize_unknowns a in
+  let b = canonicalize_unknowns b in
   (match Ldd.leq_with_reason a b with [] -> true | _ -> false)
   && match Ldd.leq_with_reason b a with [] -> true | _ -> false
 
