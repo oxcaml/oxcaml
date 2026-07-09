@@ -21,7 +21,7 @@ let enable_sub_jkind_l = true
 
 let enable_sub_or_intersect = true
 
-let enable_sub_or_error = false
+let enable_sub_or_error = true
 
 let reset_constructor_ikind_on_substitution = false
 
@@ -1243,7 +1243,7 @@ let sub_or_intersect ?origin
     Jkind.Sub)
   else generic_sub_or_intersect ()
 
-let sub_or_error ?origin:_origin
+let sub_or_error ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) env
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
@@ -1252,14 +1252,52 @@ let sub_or_error ?origin:_origin
   if not (enable_sub_or_error && !Clflags.ikinds)
   then Jkind.sub_or_error ~type_equal ~context env t1 t2
   else
-    let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; _ } =
-      compute_subcheck_polys ~context env t1 t2
+    (* The ikind engine decides the accept/reject verdict: first the layout
+       subcheck (which the axis polynomials do not capture), then the modal-axis
+       subcheck via [leq_with_reason]. On rejection we delegate to [Jkind] for
+       the detailed error message so it is identical to the legacy path. *)
+    let ikind_ok =
+      match Jkind.sub_layout_or_error ~context env t1 t2 with
+      | Error _ -> false
+      | Ok () -> (
+        let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; _ } =
+          compute_subcheck_polys ~context env t1 t2
+        in
+        match Ldd.leq_with_reason sub_poly super_poly with
+        | [] -> true
+        | _ -> false)
     in
-    match Ldd.leq_with_reason sub_poly super_poly with
-    | [] -> Ok ()
-    | _ ->
-      (* Delegate to Jkind for detailed error reporting. *)
-      Jkind.sub_or_error ~type_equal ~context env t1 t2
+    if ikind_ok
+    then (
+      (* Safety net: in debug builds, dual-run the legacy engine and flag any
+         disagreement on the accept/reject verdict (error text is expected to
+         differ, so we do not compare it). *)
+      (if !Clflags.ikinds_debug
+       then
+         match Jkind.sub_or_error ~type_equal ~context env t1 t2 with
+         | Ok () -> ()
+         | Error _ ->
+           Format.eprintf
+             "[ikind-sub-or-error] VERDICT DISAGREEMENT%s: ikind=accept \
+              legacy=reject@."
+             (origin_suffix_of origin));
+      Ok ())
+    else
+      (* ikind found a violation. Delegate to Jkind for detailed error reporting
+         so error messages are identical to the legacy path. This also serves as
+         the dual-run safety net: if the legacy engine accepts (which should not
+         happen, as ikinds are at least as permissive), we defer to it and, in
+         debug builds, flag the disagreement. *)
+      match Jkind.sub_or_error ~type_equal ~context env t1 t2 with
+      | Error _ as err -> err
+      | Ok () as ok ->
+        if !Clflags.ikinds_debug
+        then
+          Format.eprintf
+            "[ikind-sub-or-error] VERDICT DISAGREEMENT%s: ikind=reject \
+             legacy=accept@."
+            (origin_suffix_of origin);
+        ok
 
 (** Substitute constructor ikinds according to [lookup] without requiring Env.
 *)
