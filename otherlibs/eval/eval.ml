@@ -89,12 +89,7 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
             ui_force_link = uir.uir_force_link;
             ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
             ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
-<<<<<<< HEAD
             ui_static_data = uir.uir_static_data;
-||||||| 3d795b5080
-            ui_external_symbols = uir.uir_external_symbols |> Array.to_list
-=======
->>>>>>> main
             ui_file_sections = sections
           }
         in

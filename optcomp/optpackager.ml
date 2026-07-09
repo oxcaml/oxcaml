@@ -182,7 +182,6 @@ end) : S = struct
           match m.pm_kind with PM_intf -> accu | PM_impl info -> info :: accu)
         members []
     in
-<<<<<<< HEAD
     let static_data =
       Slambdaeval.CU_data.package
         (Misc.Stdlib.Array.of_list_map
@@ -203,22 +202,6 @@ end) : S = struct
       List.map
         (fun info ->
           File_sections.Builder.add_all file_sections info.ui_file_sections)
-||||||| 3d795b5080
-    let ui = Compilenv.current_unit_infos () in
-=======
-    let ui =
-      (* [arg_descr] is None because we don't allow packs to be arguments. *)
-      Compilenv.build_unit_info ~main_module_block_format ~arg_descr:None
-    in
-    let file_sections =
-      Oxcaml_utils.File_sections.Builder.of_file_sections ui.ui_file_sections
-    in
-    let section_id_mapping =
-      List.map
-        (fun info ->
-          Oxcaml_utils.File_sections.Builder.add_all file_sections
-            info.ui_file_sections)
->>>>>>> main
         units
     in
     let ui_export_info =
@@ -262,15 +245,8 @@ end) : S = struct
         ui_zero_alloc_info;
         ui_external_symbols =
           union (List.map (fun info -> info.ui_external_symbols) units);
-<<<<<<< HEAD
         ui_static_data = ui.ui_static_data;
         ui_file_sections = File_sections.Builder.build file_sections
-||||||| 3d795b5080
-          union (List.map (fun info -> info.ui_external_symbols) units)
-=======
-        ui_file_sections =
-          Oxcaml_utils.File_sections.Builder.build file_sections
->>>>>>> main
       }
     in
     Compilenv.write_unit_info pkg_infos cmxfile

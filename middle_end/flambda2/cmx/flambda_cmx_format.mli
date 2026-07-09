@@ -14,8 +14,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Oxcaml_utils
-
 (** Contents of middle-end-specific portion of .cmx files when using Flambda. *)
 
 type t

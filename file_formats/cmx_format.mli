@@ -77,27 +77,11 @@ type unit_infos =
     ui_requires_metaprogramming: bool;
                                   (* Requires metaprogramming libs *)
     ui_external_symbols: string list; (* Set of external symbols *)
-<<<<<<< HEAD
     ui_static_data: Slambdaeval.CU_data.raw;
                                   (* Compile-time (comptime) value of the unit's
                                      main module block, as produced by
                                      [Slambda.eval]. *)
     ui_file_sections: File_sections.t;
-||||||| 3d795b5080
-                                          (* Implementations that are used in
-                                             quotes *)
-    mutable ui_format: 'format;
-                                          (* Structure of the main module block *)
-    mutable ui_generic_fns: generic_fns;  (* Generic functions needed *)
-    mutable ui_export_info: Flambda2_cmx.Flambda_cmx_format.t option;
-    mutable ui_zero_alloc_info: Zero_alloc_info.t;
-    mutable ui_force_link: bool;          (* Always linked *)
-    mutable ui_requires_metaprogramming: bool;
-                                          (* Requires metaprogramming libs *)
-    mutable ui_external_symbols: string list; (* Set of external symbols *)
-=======
-    ui_file_sections: Oxcaml_utils.File_sections.t;
->>>>>>> main
   }
 
 type unit_infos_raw =
@@ -118,11 +102,7 @@ type unit_infos_raw =
                                       relative to byte immediately after
                                       this record *)
     uir_external_symbols: string array;
-<<<<<<< HEAD
     uir_static_data: Slambdaeval.CU_data.raw;
-||||||| 3d795b5080
-=======
->>>>>>> main
     uir_sections_length: int;      (* Byte length of all sections *)
   }
 

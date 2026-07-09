@@ -73,13 +73,7 @@ let cmx_bundle ~quoted_cmx =
   ListLabels.map (CU.Tbl.to_list cmxes)
     ~f:(fun ((_, info) : CU.t * Cmx_format.unit_infos) ->
       let serialized_sections, toc, total_length =
-<<<<<<< HEAD
         File_sections.serialize info.ui_file_sections
-||||||| 3d795b5080
-        Oxcaml_utils.File_sections.serialize sections
-=======
-        Oxcaml_utils.File_sections.serialize info.ui_file_sections
->>>>>>> main
       in
       let raw_info : Cmx_format.unit_infos_raw =
         { uir_unit = info.ui_unit;
