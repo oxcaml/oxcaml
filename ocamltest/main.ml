@@ -130,6 +130,10 @@ let string_of_test_location ~branches line =
   ^ Printf.sprintf "line %d" line
 
 let run_test_tree log add_msg behavior env summ ast =
+  (* Interpret the statements contained in [stmts] and [segments] (effectively,
+     run [stmts @ List.concat segments]), then go into each of the subtrees in
+     [subs]. [branches] is a list of indices of [split] arms that we've
+     descended into. *)
   let rec run_statements behavior env summ stmts segments subs ~branches
       ~must_do_something =
     match stmts with
