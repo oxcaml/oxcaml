@@ -42,7 +42,7 @@ val create_metadata_only : Code_metadata.t -> t
 
 val from_raw : sections:Oxcaml_utils.File_sections.t -> raw -> t
 
-val to_raw : add_section:(Obj.t -> int) -> t -> raw
+val to_raw : add_section:(Obj.t -> Oxcaml_utils.File_sections.Idx.t) -> t -> raw
 
 val remember_only_metadata : t -> t
 
@@ -54,7 +54,10 @@ val code_metadata : t -> Code_metadata.t
 
 val code_present : t -> bool
 
-val map_raw_index : (int -> int) -> raw -> raw
+val map_raw_index :
+  (Oxcaml_utils.File_sections.Idx.t -> Oxcaml_utils.File_sections.Idx.t) ->
+  raw ->
+  raw
 
 (** As for [Code_metadata], the free names of a value of type [t] do not include
     the code ID, which is only kept for convenience. *)

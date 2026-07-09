@@ -373,6 +373,7 @@ type error =
   | Let_poly_not_yet_implemented
   | Let_poly_not_syntactic_value
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
+  | Useless_lpoly
 
 and invalid_layout_poly_inst_context =
   | Binding_op

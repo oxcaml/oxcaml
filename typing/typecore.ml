@@ -1907,7 +1907,8 @@ and build_as_type_aux (env : Env.t) p ~mode =
 let is_variable_repres : type rep. rep record_form -> rep -> bool =
   fun form rep ->
     match form, rep with
-    | Legacy, Record_variable -> true
+    | Legacy, (Record_variable | Record_inlined (_, Constructor_variable, _)) ->
+      true
     | Unboxed_product, Record_unboxed_product_variable -> true
     | _ -> false
 
@@ -1942,6 +1943,7 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
       in
       match
         Typedecl.update_record_representation ~why env loc form
+          ~old_repres:representative_label.lbl_repres
           (lbls_and_ty_args |> Array.to_list)
       with
       | Ok (sorts, rep) ->
@@ -3072,7 +3074,7 @@ type unrepresentable_arg =
 let representation_for_tuple_constructor env constr ty_args ~loc ~types
       ~containing_type ~why : _ Result.t =
   match constr.cstr_shape with
-  | Some shape ->
+  | (Constructor_uniform_value | Constructor_mixed _) as shape ->
       begin match
         Misc.Stdlib.List.map_option
           (fun arg -> arg.ca_sort |> Option.map Jkind.Sort.of_const)
@@ -3081,7 +3083,7 @@ let representation_for_tuple_constructor env constr ty_args ~loc ~types
       | Some sorts -> Ok (shape, sorts)
       | None -> Misc.fatal_error "representable constructor missing a sort"
       end
-  | None ->
+  | Constructor_variable ->
       begin match
         Misc.Stdlib.List.mapi_result
           (fun _ (ty, loc) ->
@@ -3500,12 +3502,21 @@ and type_pat_aux
         pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_unpack name ->
       let t = instance expected_ty in
+      let pat_extra = [
+        Tpat_unpack, name.loc, sp.ppat_attributes;
+        (* [t] is intentionally not instantiated here, as it is still refined
+           e.g. in [map_half_typed_cases]. Ideally, we'd copy it after that.
+           However, at that point it is required to be closed, and hence
+           hopefully nothing surprising happens to it. *)
+        Tpat_inspected_type (Module_pack t), loc, []
+        ]
+      in
       begin match name.txt with
       | None ->
           rvp {
             pat_desc = Tpat_any;
             pat_loc = sp.ppat_loc;
-            pat_extra=[Tpat_unpack, name.loc, sp.ppat_attributes];
+            pat_extra;
             pat_type = t;
             pat_attributes = [];
             pat_env = !!penv;
@@ -3524,7 +3535,7 @@ and type_pat_aux
             pat_desc = Tpat_var { id; name = v; uid; sort;
                                   mode = alloc_mode.mode };
             pat_loc = sp.ppat_loc;
-            pat_extra=[Tpat_unpack, loc, sp.ppat_attributes];
+            pat_extra;
             pat_type = t;
             pat_attributes = [];
             pat_env = !!penv;
@@ -6813,7 +6824,8 @@ and type_expect_
                  each label all over again. Possibly we're doing things in the
                  wrong order. *)
               Typedecl.update_record_representation ~why env
-                sexp.pexp_loc record_form labels_with_updated_types
+                sexp.pexp_loc record_form ~old_repres:representation
+                labels_with_updated_types
             with
             | Ok (_, rep) -> rep
             | Error _ ->
@@ -8261,12 +8273,17 @@ and type_expect_
               raise (Error (loc, env, Not_a_packed_module ty_expected))
           in
           let (modl, pack') = !type_package env m pack in
+          let exp_type = newty (Tpackage pack') in
+          let exp_extra =
+            Texp_inspected_type (Module_pack (Ctype.instance exp_type))
+          in
           let mode = Typedtree.mode_without_locks_exn modl.mod_mode in
           submode ~loc ~env mode expected_mode;
           rue {
             exp_desc = Texp_pack modl;
-            exp_loc = loc; exp_extra = [];
-            exp_type = newty (Tpackage pack');
+            exp_loc = loc;
+            exp_extra = [exp_extra, loc, []];
+            exp_type;
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
       end

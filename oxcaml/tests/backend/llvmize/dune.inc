@@ -92,7 +92,7 @@
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets int_ops_stub.o int_ops_data.cmx int_ops.cmx int_ops_ir.output.corrected int_ops_main.cmx int_ops.output.exe)
- (deps int_ops_stub.c int_ops_data.ml int_ops.ml int_ops_main.ml)
+ (deps int_ops_stub.c int_ops_data.ml int_ops.ml int_ops_main.ml (glob_files %{project_root}/runtime/caml/*.h) %{project_root}/runtime/caml/domain_state.tbl)
  (action
   (progn
    (run clang int_ops_stub.c -c -g -O3 -I %{project_root}/runtime)
@@ -454,7 +454,7 @@
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets extcalls_defn.o extcalls.cmx extcalls_ir.output.corrected extcalls_main.cmx extcalls.output.exe)
- (deps extcalls_defn.c extcalls.ml extcalls_main.ml)
+ (deps extcalls_defn.c extcalls.ml extcalls_main.ml (glob_files %{project_root}/runtime/caml/*.h) %{project_root}/runtime/caml/domain_state.tbl)
  (action
   (progn
    (run clang extcalls_defn.c -c -g -O3 -I %{project_root}/runtime)
@@ -759,7 +759,7 @@
    (= %{architecture} "amd64")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets csel_stub.o csel.cmx csel_ir.output.corrected csel.output.exe)
- (deps csel_stub.c csel.ml)
+ (deps csel_stub.c csel.ml (glob_files %{project_root}/runtime/caml/*.h) %{project_root}/runtime/caml/domain_state.tbl)
  (action
   (progn
    (run clang csel_stub.c -c -g -O3 -I %{project_root}/runtime)

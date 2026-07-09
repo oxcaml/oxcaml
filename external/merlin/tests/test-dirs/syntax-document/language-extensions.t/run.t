@@ -907,6 +907,6 @@ Validate that docstrings, URLs, and levels are being created correctly
   {
     "name": "Kind abbreviation",
     "description": "The kind of ordinary OCaml types",
-    "url": "https://oxcaml.org/documentation/kinds/syntax/",
+    "url": "https://beta.oxcaml.org/documentation/kinds/syntax/",
     "level": "advanced"
   }

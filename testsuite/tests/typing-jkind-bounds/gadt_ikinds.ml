@@ -30,6 +30,40 @@ type 'a require_nonnull
 type ('a : value mod external_) require_external
 |}]
 
+module Recursive_boxed_variant_with_bounded_parameter = struct
+  module Variable = struct
+    type ('v : value mod contended portable) t
+      : value mod contended portable with 'v
+  end
+
+  module Record_t = struct
+    type ('v : value mod contended portable) t
+      : value mod contended portable =
+      | Variable of 'v Variable.t
+      | Linear_combination of ('v t * int)
+      | Abs of 'v t * (int * (int * int))
+      | Max of { ts : ('v t * int) * ('v t * int) list }
+  end
+end
+[%%expect{|
+module Recursive_boxed_variant_with_bounded_parameter :
+  sig
+    module Variable :
+      sig
+        type ('v : value mod portable contended) t
+          : value mod portable contended with 'v
+      end
+    module Record_t :
+      sig
+        type ('v : value mod portable contended) t =
+            Variable of 'v Variable.t
+          | Linear_combination of ('v t * int)
+          | Abs of 'v t * (int * (int * int))
+          | Max of { ts : ('v t * int) * ('v t * int) list; }
+      end
+  end
+|}]
+
 (***********************************************************************)
 type 'a eq_int = Eq : int eq_int
 [%%expect{|

@@ -784,6 +784,8 @@ let emit_jump_table t =
   done
 
 let emit_jump_tables () =
+  I.ud2 ();
+  (* data in text below *)
   D.align ~fill:Nop ~bytes:4;
   List.iter emit_jump_table !jump_tables;
   jump_tables := []
@@ -2356,7 +2358,8 @@ let emit_instr ~first ~last ~fallthrough i =
       (res i 0)
   | Lop (Floatop (width, ((Iaddf | Isubf | Imulf | Idivf) as floatop))) ->
     instr_for_floatop width floatop (arg i 0) (arg i 1) (res i 0)
-  | Lop Opaque -> assert (Reg.equal_location i.arg.(0).loc i.res.(0).loc)
+  | Lop Opaque ->
+    assert (Array.equal (fun a b -> Reg.equal_location a.loc b.loc) i.arg i.res)
   | Lop (Specific (Ilea addr)) -> I.lea (addressing addr NONE i 0) (res i 0)
   | Lop (Specific (Ioffset_loc (n, addr))) ->
     I.add (int n) (addressing addr QWORD i 0)
@@ -3106,6 +3109,7 @@ let end_assembly () =
     if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Text
   in
   D.switch_to_section frametable_section;
+  I.ud2 ();
   D.align
     ~fill:(if !Oxcaml_flags.frametables_in_rodata then Zero else Nop)
     ~bytes:8;

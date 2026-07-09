@@ -42,6 +42,9 @@ type abstract_type_constr = [
   | `Int16
 ]
 type abstract_non_value_type_constr = [
+  | `Nativeint_u
+  | `Int32_u
+  | `Int64_u
   | `Idx_imm
   | `Idx_mut
   | `Int8x16
@@ -120,6 +123,9 @@ val type_unboxed_int8: type_expr
 val type_unboxed_int16: type_expr
 val type_unboxed_int32:type_expr
 val type_unboxed_int64:type_expr
+val type_nativeint_u: type_expr
+val type_int32_u: type_expr
+val type_int64_u: type_expr
 val type_or_null: type_expr -> type_expr
 val type_idx_imm : type_expr -> type_expr -> type_expr
 val type_idx_mut : type_expr -> type_expr -> type_expr
@@ -208,6 +214,9 @@ val path_unboxed_int8: Path.t
 val path_unboxed_int16: Path.t
 val path_unboxed_int32: Path.t
 val path_unboxed_int64: Path.t
+val path_nativeint_u: Path.t
+val path_int32_u: Path.t
+val path_int64_u: Path.t
 val path_or_null: Path.t
 val path_idx_imm: Path.t
 val path_idx_mut: Path.t

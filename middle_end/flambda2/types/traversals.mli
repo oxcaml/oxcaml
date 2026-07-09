@@ -90,8 +90,6 @@ module Expr : sig
 
   val unknown : Flambda_kind.t -> 'a t
 
-  val bottom : Flambda_kind.t -> 'a t
-
   val unknown_with_subkind : Flambda_kind.With_subkind.t -> 'a t
 
   val tag_immediate : 'a t -> 'a t

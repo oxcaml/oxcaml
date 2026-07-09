@@ -195,9 +195,9 @@ G(name):
 #define Cstack_prev(reg)        [reg, #16]
 #define Cstack_async_exn_handler(reg) [reg, #24]
 
-/* struct dynamic_thread_s */
+/* struct dynamic_cache_s */
 /* If you change Dynamic_cache_entries, you must also update FLUSH_DYNAMIC_CACHE */
-#define Dynamic_cache            0 /* offset of cache in dynamic_thread_t */
+#define Dynamic_cache            0 /* offset of cache in dynamic_cache_t */
 #define Dynamic_binding_size     (2*8) /* dyn, val */
 #define Dynamic_binding_var      0 /* offset of var within a single binding */
 #define Dynamic_cache_entries    8 /* must match DYNAMIC_CACHE_SIZE in fiber.c */
