@@ -295,7 +295,20 @@ let oper_arg_types : operation -> expected_arg_types = function
     in
     Args_then_any_number_of ([Any_machtype (* header *)], field)
   | Cstore (memory_chunk, _) ->
-    Args [Any_machtype; Exactly (machtype_of_memory_chunk memory_chunk)]
+    let value =
+      match memory_chunk with
+      | Word_int ->
+        (* A raw word slot is not scanned, so it accepts any word in a
+           general-purpose register, including derived pointers. *)
+        Exactly typ_addr
+      | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_val | Single _ | Double
+      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
+      | Fivetwelve_aligned ->
+        Exactly (machtype_of_memory_chunk memory_chunk)
+    in
+    Args [Any_machtype; value]
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor | Clsl
   | Clsr | Casr | Ccmpi _ ->
     (* Under [ge_component], [typ_addr] accepts any word in a general-purpose
