@@ -60,6 +60,7 @@ let main() =
   Arg.parse [
      "-S", Arg.Set write_asm_file,
        " Output file to filename.s (default is stdout)";
+     "-dcmm-no-check-machtypes", Arg.Clear Clflags.check_machtypes, "";
      "-g", Arg.Set Clflags.debug, "";
      "-dcfg", Arg.Set Oxcaml_flags.dump_cfg, "";
      "-dcmm", Arg.Set dump_cmm, "";
