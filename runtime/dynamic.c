@@ -155,6 +155,19 @@ static bool dynamic_stack_push(dynamic_stack_t stack, value val)
   return true;
 }
 
+static void dynamic_stack_shrink(dynamic_stack_t stack)
+{
+  size_t new_capacity = stack->capacity / 2;
+  value* new_vals =
+    caml_stat_resize_noexc(stack->vals, sizeof(value) * new_capacity);
+  if(new_vals == NULL) {
+    /* Keep the larger buffer if allocation fails */
+    return;
+  }
+  stack->vals = new_vals;
+  stack->capacity = new_capacity;
+}
+
 // Returns true if the stack is now empty.
 static bool dynamic_stack_pop(dynamic_stack_t stack)
 {
@@ -162,6 +175,10 @@ static bool dynamic_stack_pop(dynamic_stack_t stack)
   if(--stack->count == 0) {
     dynamic_stack_free(stack);
     return true;
+  }
+  if(stack->capacity > DYNAMIC_STACK_INIT_CAPACITY &&
+     stack->count < stack->capacity / 2) {
+    dynamic_stack_shrink(stack);
   }
   return false;
 }
@@ -240,12 +257,12 @@ static void dynamic_table_add(dynamic_table_t table, dynamic_stack_s stack)
 }
 
 // Returns false if allocation fails.
-static bool dynamic_table_grow(dynamic_table_t table)
+static bool dynamic_table_resize(dynamic_table_t table, size_t new_capacity)
 {
   size_t old_capacity = dynamic_table_capacity(table);
-  size_t new_capacity = old_capacity ? old_capacity * 2 : DYNAMIC_TABLE_INIT_CAPACITY;
   size_t new_mask = new_capacity - 1;
   CAMLassert(Is_power_of_2(new_capacity));
+  CAMLassert(table->count < new_capacity / 2);
 
   dynamic_stack_t new_bindings =
     caml_stat_alloc_noexc(sizeof(dynamic_stack_s) * new_capacity);
@@ -269,6 +286,22 @@ static bool dynamic_table_grow(dynamic_table_t table)
     caml_stat_free(old_bindings);
   }
   return true;
+}
+
+// Returns false if allocation fails.
+static bool dynamic_table_grow(dynamic_table_t table)
+{
+  size_t old_capacity = dynamic_table_capacity(table);
+  size_t new_capacity =
+    old_capacity ? old_capacity * 2 : DYNAMIC_TABLE_INIT_CAPACITY;
+  return dynamic_table_resize(table, new_capacity);
+}
+
+static void dynamic_table_shrink(dynamic_table_t table)
+{
+  size_t new_capacity = dynamic_table_capacity(table) / 2;
+  /* Keep the larger table if allocation fails */
+  (void)dynamic_table_resize(table, new_capacity);
 }
 
 // Returns whether [dyn] is bound in this table. Sets [bindings_out] to the slot
@@ -314,7 +347,7 @@ static bool dynamic_table_push(dynamic_table_t table, value dyn, value val)
       return false;
     }
   } else { /* Not found */
-    if(table->count * 2 == dynamic_table_capacity(table)) {
+    if(table->count == dynamic_table_capacity(table) / 2) {
       /* grow when half-full (includes the special case of being empty) */
       if(!dynamic_table_grow(table)) {
         return false;
@@ -349,12 +382,18 @@ static void dynamic_table_pop(dynamic_table_t table, value dyn)
         dynamic_table_add(table, stack);
         next = (next + 1) & table->mask;
       }
+
+      size_t capacity = dynamic_table_capacity(table);
+      if(capacity > DYNAMIC_TABLE_INIT_CAPACITY &&
+         table->count < capacity / 4) {
+        dynamic_table_shrink(table);
+      }
     }
   }
 }
 
 // Returns false if allocation fails.
-CAMLexport bool caml_dynamic_table_dup(dynamic_table_t dst, dynamic_table_t src)
+CAMLexport bool caml_dynamic_table_copy(dynamic_table_t dst, dynamic_table_t src)
 {
   size_t capacity = dynamic_table_capacity(src);
 
