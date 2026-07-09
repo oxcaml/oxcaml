@@ -149,7 +149,7 @@ let rec parse_args mnemonic acc encs args imm flags res =
           | "k1" | "k2" -> flags.k <- true
           | "er" -> flags.r <- Rnd_er
           | "sae" -> flags.r <- Rnd_sae
-          | _ -> ())
+          | _ -> failwith mnemonic)
         mods;
       match arg with
       | "<RAX>" -> Some (Pin RAX)
