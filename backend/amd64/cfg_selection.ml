@@ -330,11 +330,12 @@ let is_offset_out_of_range _byte_offset :
     Cfg_selectgen_target_intf.is_store_out_of_range_result =
   Within_range
 
-let insert_move_extcall_arg _exttype src dst :
+let insert_move_extcall_arg _exttype (src : Reg.t array) (dst : Reg.t array) :
     Cfg_selectgen_target_intf.insert_move_extcall_arg_result =
-  let is_mask (reg : Reg.t) = Cmm.equal_machtype_component reg.typ Cmm.Mask in
   match src, dst with
-  | [| s |], [| d |] when is_mask s && not (is_mask d) ->
+  | [| s |], [| d |]
+    when Cmm.equal_machtype_component s.typ Mask
+         && Cmm.equal_machtype_component d.typ Int ->
     (* The C ABI passes masks in GPRs. *)
     Rewritten (Op (Reinterpret_cast Cmm.Int64_of_mask), src, dst)
   | _ -> Use_default
