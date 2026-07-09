@@ -3,7 +3,7 @@
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -25,28 +25,9 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Instruction selection, parameterised over the target machine. *)
+(** Tail-call detection.
 
-[@@@ocaml.warning "+a-40-41-42"]
+    Replaces [Call]+[Return] sequences with tail calls when possible. *)
 
-module Make (_ : Cfg_selectgen_target_intf.S) : sig
-  val emit_fundecl :
-    future_funcnames:Misc.Stdlib.String.Set.t ->
-    Cmm.fundecl ->
-    Cfg_with_layout.t
-
-  val is_immediate : Operation.integer_operation -> int -> bool
-
-  val select_condition : Cmm.expression -> Operation.test * Cmm.expression
-
-  val select_operation :
-    Cmm.operation ->
-    Cmm.expression list ->
-    Debuginfo.t ->
-    label_after:Label.t ->
-    Cfg.basic_or_terminator * Cmm.expression list
-
-  val effects_of : Cmm.expression -> Select_utils.Effect_and_coeffect.t
-
-  val is_simple_expr : Cmm.expression -> bool
-end
+val run :
+  keep_unused_ops:bool -> Ssa.finished Ssa.graph -> Ssa.finished Ssa.graph

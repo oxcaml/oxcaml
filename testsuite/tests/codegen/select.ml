@@ -18,11 +18,11 @@ open Intrinsics
 let select_identity x = Builtins.select x 1 0
 [%%expect_asm X86_64{|
 select_identity:
-  movq  %rax, %rbx
-  movl  $1, %eax
+  movl  $1, %ebx
   movl  $3, %edi
-  cmpq  $1, %rbx
-  cmovne %rdi, %rax
+  cmpq  $1, %rax
+  cmovne %rdi, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -32,10 +32,10 @@ select_identity:
 let select_cmp (x : int) = Builtins.select (x > 10) x 55
 [%%expect_asm X86_64{|
 select_cmp:
-  movq  %rax, %rbx
-  movl  $111, %eax
-  cmpq  $21, %rbx
-  cmovg %rbx, %rax
+  movl  $111, %ebx
+  cmpq  $21, %rax
+  cmovg %rax, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -49,14 +49,14 @@ select_cmp_twice:
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
   setl  %al
-  leaq  1(%rax,%rax), %rax
-  movl  $41, %esi
+  leaq  1(%rax,%rax), %rsi
+  movl  $41, %eax
   movl  $21, %edx
-  cmpq  $1, %rax
-  cmovne %rdx, %rsi
-  cmpq  $1, %rax
+  cmpq  $1, %rsi
+  cmovne %rdx, %rax
+  cmpq  $1, %rsi
   cmovne %rdi, %rbx
-  leaq  -1(%rbx,%rsi), %rax
+  leaq  -1(%rbx,%rax), %rax
   ret
 |}]
 
@@ -74,10 +74,9 @@ let select_int32 b (x : int32#) (y : int32#) =
   Builtins.select_int32 b x y
 [%%expect_asm X86_64{|
 select_int32:
-  movq  %rax, %rsi
+  cmpq  $1, %rax
+  cmovne %rbx, %rdi
   movq  %rdi, %rax
-  cmpq  $1, %rsi
-  cmovne %rbx, %rax
   ret
 |}]
 
@@ -87,10 +86,9 @@ let select_int64 b (x : int64#) (y : int64#) =
   Builtins.select_int64 b x y
 [%%expect_asm X86_64{|
 select_int64:
-  movq  %rax, %rsi
+  cmpq  $1, %rax
+  cmovne %rbx, %rdi
   movq  %rdi, %rax
-  cmpq  $1, %rsi
-  cmovne %rbx, %rax
   ret
 |}]
 
@@ -100,10 +98,9 @@ let select_nativeint b (x : nativeint#) (y : nativeint#) =
   Builtins.select_nativeint b x y
 [%%expect_asm X86_64{|
 select_nativeint:
-  movq  %rax, %rsi
+  cmpq  $1, %rax
+  cmovne %rbx, %rdi
   movq  %rdi, %rax
-  cmpq  $1, %rsi
-  cmovne %rbx, %rax
   ret
 |}]
 
@@ -115,16 +112,15 @@ let repeated_select_shared x y z w  a b =
   #(q,r)
 [%%expect_asm X86_64{|
 repeated_select_shared:
-  movq  %rbx, %r8
-  movq  %rcx, %rbx
-  cmpq  %r8, %rax
+  cmpq  %rbx, %rax
   setl  %al
   movzbq %al, %rax
-  leaq  1(%rax,%rax), %rcx
+  leaq  1(%rax,%rax), %r8
   movq  %rsi, %rax
-  cmpq  $1, %rcx
+  cmpq  $1, %r8
   cmovne %rdi, %rax
-  cmpq  $1, %rcx
+  movq  %rcx, %rbx
+  cmpq  $1, %r8
   cmovne %rdx, %rbx
   ret
 |}]
@@ -140,16 +136,15 @@ let repeated_select_repeated x y z w  a b =
   #(q,r)
 [%%expect_asm X86_64{|
 repeated_select_repeated:
-  movq  %rbx, %r8
-  movq  %rcx, %rbx
-  cmpq  %r8, %rax
+  cmpq  %rbx, %rax
   setl  %al
   movzbq %al, %rax
-  leaq  1(%rax,%rax), %rcx
+  leaq  1(%rax,%rax), %r8
   movq  %rsi, %rax
-  cmpq  $1, %rcx
+  cmpq  $1, %r8
   cmovne %rdi, %rax
-  cmpq  $1, %rcx
+  movq  %rcx, %rbx
+  cmpq  $1, %r8
   cmovne %rdx, %rbx
   ret
 |}]
@@ -161,28 +156,28 @@ let unboxing_through_select b x y =
 [%%expect_asm X86_64{|
 unboxing_through_select:
   subq  $8, %rsp
+  movq  64(%r14), %rcx
   movq  64(%r14), %rsi
-  movq  64(%r14), %rdx
-  subq  $48, %rdx
-  movq  %rdx, 64(%r14)
-  cmpq  80(%r14), %rdx
+  subq  $48, %rsi
+  movq  %rsi, 64(%r14)
+  cmpq  80(%r14), %rsi
   jl    <hidden GC jump pad>
 .L0:
-  addq  72(%r14), %rdx
-  addq  $8, %rdx
-  addq  $24, %rdx
-  movq  $3071, -8(%rdx)
-  movq  caml_int64_ops@GOTPCREL(%rip), %rcx
-  movq  %rcx, (%rdx)
-  movq  %rdi, 8(%rdx)
-  leaq  -24(%rdx), %rdi
+  addq  72(%r14), %rsi
+  addq  $8, %rsi
+  addq  $24, %rsi
+  movq  $3071, -8(%rsi)
+  movq  caml_int64_ops@GOTPCREL(%rip), %rdx
+  movq  %rdx, (%rsi)
+  movq  %rdi, 8(%rsi)
+  leaq  -24(%rsi), %rdi
   movq  $3071, -8(%rdi)
-  movq  %rcx, (%rdi)
+  movq  %rdx, (%rdi)
   movq  %rbx, 8(%rdi)
   cmpq  $1, %rax
-  cmovne %rdi, %rdx
-  movq  8(%rdx), %rax
-  movq  %rsi, 64(%r14)
+  cmovne %rdi, %rsi
+  movq  8(%rsi), %rax
+  movq  %rcx, 64(%r14)
   addq  $8, %rsp
   ret
 |}]

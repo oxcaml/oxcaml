@@ -99,6 +99,10 @@ val size_component : Cmx_format.machtype_component -> int
 
 val size_machtype : Cmx_format.machtype_component array -> int
 
+(** Compute the size in bytes of a (simple) Cmm expression, using [size_of_var]
+    to determine the size of free variables. *)
+val size_expr_with : size_of_var:(Backend_var.t -> int) -> Cmm.expression -> int
+
 val size_expr : environment -> Cmm.expression -> int
 
 val current_function_name : string ref
@@ -166,6 +170,26 @@ module Or_never_returns : sig
     val ( let** ) : 'a t -> ('a -> unit) -> unit
   end
 end
+
+(** Prepare the arguments [exp_list] of an operation for right-to-left
+    evaluation (as required by the Flambda [Un_anf] pass, and to be consistent
+    with the bytecode compiler). Expressions that may safely be deferred (per
+    their (co)effects and [is_simple_expr]) are returned unchanged for the
+    caller to evaluate in place; every other expression is evaluated immediately
+    (right to left) via [emit] and replaced by a fresh [Cvar] whose binding is
+    recorded in the environment by [bind_result]. *)
+val emit_parts_list :
+  effects_of:(Cmm.expression -> Effect_and_coeffect.t) ->
+  is_simple_expr:(Cmm.expression -> bool) ->
+  emit:('env -> Cmm.expression -> 'value array Or_never_returns.t) ->
+  bind_result:('env -> Backend_var.t -> 'value array -> 'env) ->
+  'env ->
+  Cmm.expression list ->
+  (Cmm.expression list * 'env) Or_never_returns.t
+
+(** The memory chunk to use when storing one component of a value, e.g. when
+    initialising the fields of a freshly allocated block ([emit_stores]). *)
+val chunk_of_machtype_component : Cmm.machtype_component -> Cmm.memory_chunk
 
 val float_test_of_float_comparison :
   Cmm.float_width ->

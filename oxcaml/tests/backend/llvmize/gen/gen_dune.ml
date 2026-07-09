@@ -197,7 +197,7 @@ let print_rule ~extra_subst ~buf rule_template =
            insertions *)
         (* CR yusumez: find a better way to detect LLVM_PATH *)
         "-llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir \
-         -dno-asm-comments -disable-poll-insertion"
+         -dno-asm-comments -disable-poll-insertion -no-use-ssa"
       | "common_flags" ->
         "-g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear"
       | "stop_after_llvm_flags" ->

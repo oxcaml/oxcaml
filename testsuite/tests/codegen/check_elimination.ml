@@ -41,12 +41,12 @@ let arr_sum arr =
 ;;
 [%%expect_asm X86_64{|
 arr_sum:
-  movq  %rax, %rbx
-  movq  -8(%rbx), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
-  orq   $1, %rdi
-  leaq  -2(%rdi), %rsi
+  movq  %rax, %rdi
+  movq  -8(%rdi), %rbx
+  salq  $8, %rbx
+  shrq  $17, %rbx
+  orq   $1, %rbx
+  leaq  -2(%rbx), %rsi
   cmpq  $1, %rsi
   jl    .L2
   sarq  $1, %rsi
@@ -54,9 +54,9 @@ arr_sum:
   xorl  %edx, %edx
 .L0:
   leaq  1(%rdx,%rdx), %rcx
-  cmpq  %rdi, %rcx
+  cmpq  %rbx, %rcx
   jae   .L1
-  movq  -4(%rbx,%rcx,4), %rcx
+  movq  -4(%rdi,%rcx,4), %rcx
   leaq  -1(%rax,%rcx), %rax
   incq  %rdx
   cmpq  %rsi, %rdx
@@ -97,19 +97,19 @@ search:
   movl  $1, %eax
   jmp   .L4
 .L1:
-  movq  (%rbx), %rax
+  movq  (%rbx), %rdx
   xorl  %esi, %esi
-  cmpq  %rax, %rdi
+  cmpq  %rdx, %rdi
   setl  %sil
-  testq %rsi, %rsi
-  je    .L2
+  jge   .L2
   movq  8(%rbx), %rax
   testq %rsi, %rsi
   jne   .L3
   jmp   .L4
 .L2:
   movq  %rbx, %rax
-  jmp   .L4
+  testq %rsi, %rsi
+  je    .L4
 .L3:
   movq  %rax, %rbx
   testb $1, %bl
@@ -160,23 +160,19 @@ let complex_branching_on_two_comparisons (x: int) (y: int) c1 c2 c3 =
  | false, _ -> c3 ()
 [%%expect_asm X86_64{|
 complex_branching_on_two_comparisons:
-  movq  %rax, %rcx
-  movq  %rbx, %rax
+  movq  %rbx, %rcx
   movq  %rsi, %rbx
   cmpq  $5, %rax
-  sete  %al
-  movzbq %al, %rax
+  jne   .L0
   cmpq  $5, %rcx
   jne   .L0
-  testq %rax, %rax
-  je    .L0
   movl  $1, %eax
   movq  (%rdi), %rsi
   movq  %rdi, %rbx
   jmp   *%rsi
 .L0:
-  testq %rax, %rax
-  je    .L1
+  cmpq  $5, %rcx
+  jne   .L1
   movl  $1, %eax
   movq  (%rdx), %rdi
   movq  %rdx, %rbx

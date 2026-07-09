@@ -166,37 +166,37 @@ spill_unspill_loop_movement:
   movq  %rbx, %rax
   cmpq  $3, %rax
   jl    .L4
-  movq  %rdi, 24(%rsp)
+  movq  %rdi, 32(%rsp)
   movq  %rax, %rbx
   movq  %rax, (%rsp)
   sarq  $1, %rbx
-  movq  %rbx, 8(%rsp)
+  movq  %rbx, 16(%rsp)
   movl  $1, %edi
 .L0:
-  movq  %rdi, 16(%rsp)
+  movq  %rdi, 8(%rsp)
   call  camlTOP9__f_20_23_code@PLT
 .L1:
   movq  %rax, %rsi
-  movq  16(%rsp), %rdi
+  movq  8(%rsp), %rdi
   movq  %rdi, %rdx
   salq  $1, %rdx
   movq  (%rsp), %rax
-  movq  8(%rsp), %rbx
+  movq  16(%rsp), %rbx
   cmpq  $11, %rdx
   jle   .L3
-  movq  %rsi, 32(%rsp)
-  movq  %rdi, 16(%rsp)
+  movq  %rsi, 24(%rsp)
+  movq  %rdi, 8(%rsp)
   call  camlTOP9__f_20_23_code@PLT
 .L2:
   movq  (%rsp), %rax
-  movq  8(%rsp), %rbx
-  movq  16(%rsp), %rdi
-  movq  32(%rsp), %rsi
+  movq  8(%rsp), %rdi
+  movq  24(%rsp), %rsi
+  movq  16(%rsp), %rbx
 .L3:
   incq  %rdi
   cmpq  %rbx, %rdi
   jle   .L0
-  movq  24(%rsp), %rdi
+  movq  32(%rsp), %rdi
   jmp   .L5
 .L4:
   movl  $1, %esi
@@ -271,13 +271,13 @@ let unnecessary_moves (a : int) (b : int) (c : int) (d : int) f =
 ;;
 [%%expect_asm X86_64{|
 unnecessary_moves:
-  movq  %rax, %rcx
-  movq  %rbx, %r8
+  movq  %rax, %r8
+  movq  %rbx, %rcx
   movq  %rdx, %rbx
-  leaq  -1(%rcx,%r8), %rax
-  cmpq  %r8, %rcx
+  leaq  -1(%r8,%rcx), %rax
+  cmpq  %rcx, %r8
   jge   .L0
-  movq  %rcx, %rax
+  movq  %r8, %rax
   ret
 .L0:
   cmpq  %rsi, %rdi
@@ -285,7 +285,7 @@ unnecessary_moves:
   subq  $8, %rsp
   movq  %rax, (%rsp)
   movq  (%rbx), %rdi
-  movq  %r8, %rax
+  movq  %rcx, %rax
   call  *%rdi
 .L1:
   movq  (%rsp), %rax
@@ -307,10 +307,10 @@ spill_one_or_two:
   subq  $24, %rsp
   movq  %rax, (%rsp)
   movq  %rbx, 8(%rsp)
-  movq  %rdi, %rbx
   movl  $1, %eax
-  movq  (%rbx), %rdi
-  call  *%rdi
+  movq  (%rdi), %rsi
+  movq  %rdi, %rbx
+  call  *%rsi
 .L0:
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
@@ -344,7 +344,7 @@ double_loop_no_definition_at_beginning:
   movq  %rdi, 32(%rsp)
   movq  %rax, 24(%rsp)
   sarq  $1, %rsi
-  movq  %rsi, 40(%rsp)
+  movq  %rsi, 48(%rsp)
   xorl  %edx, %edx
 .L0:
   movq  64(%r14), %rbx
@@ -366,21 +366,21 @@ double_loop_no_definition_at_beginning:
   movq  %rdx, (%rsp)
   movq  %rcx, 16(%rbx)
   movq  %rax, 24(%rbx)
-  movq  %rbx, 48(%rsp)
+  movq  %rbx, 56(%rsp)
   movq  %rdi, %rdx
   testb $1, %dl
   jne   .L4
 .L2:
   movq  (%rdx), %rax
-  movq  %rdx, 56(%rsp)
+  movq  %rdx, 40(%rsp)
   call  camlTOP15__f_33_37_code@PLT
 .L3:
-  movq  56(%rsp), %rdx
+  movq  40(%rsp), %rdx
   movq  8(%rdx), %rdx
   movq  24(%rsp), %rax
   movq  32(%rsp), %rdi
-  movq  40(%rsp), %rsi
-  movq  48(%rsp), %rbx
+  movq  48(%rsp), %rsi
+  movq  56(%rsp), %rbx
   testb $1, %dl
   je    .L2
 .L4:
@@ -556,10 +556,10 @@ let f ~(s: int64#) (t : int64#) =
   Int64_u.sub t (Int64_u.mul t s)
 [%%expect_asm X86_64{|
 f:
-  movq  %rax, %rdi
+  movq  %rbx, %rdi
+  imulq %rax, %rdi
   movq  %rbx, %rax
-  imulq %rdi, %rbx
-  subq  %rbx, %rax
+  subq  %rdi, %rax
   ret
 |}]
 
@@ -579,7 +579,7 @@ let[@inline never] register_pressure (x : int) =
   (a, b, c, d, e, f, g, h, i, j, u, v)
 [%%expect_asm X86_64{|
 register_pressure:
-  subq  $8, %rsp
+  subq  $24, %rsp
   subq  $488, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
@@ -625,11 +625,15 @@ register_pressure:
   leaq  28(%rax), %r8
   movq  %r8, 16(%rcx)
   leaq  -32(%rcx), %r8
+  movq  %r8, 8(%rsp)
   movq  $3072, -8(%r8)
+  movq  8(%rsp), %r8
   movq  %rbx, (%r8)
+  movq  8(%rsp), %r8
   movq  %rdx, 8(%r8)
+  movq  8(%rsp), %r8
   movq  %rcx, 16(%r8)
-  movq  %r8, (%rsp)
+  movq  8(%rsp), %r8
   addq  $-32, %r8
   movq  $3072, -8(%r8)
   movq  %rbx, (%r8)
@@ -670,8 +674,10 @@ register_pressure:
   leaq  -32(%r10), %r11
   movq  $3072, -8(%r11)
   leaq  30(%rax), %rbp
+  movq  %rbp, (%rsp)
   movq  %rbp, (%r11)
   leaq  32(%rax), %rbp
+  movq  %rbp, (%rsp)
   movq  %rbp, 8(%r11)
   addq  $34, %rax
   movq  %rax, 16(%r11)
@@ -688,8 +694,8 @@ register_pressure:
   movq  %r12, 64(%rax)
   movq  %r9, 72(%rax)
   movq  %r8, 80(%rax)
-  movq  (%rsp), %rbx
+  movq  8(%rsp), %rbx
   movq  %rbx, 88(%rax)
-  addq  $8, %rsp
+  addq  $24, %rsp
   ret
 |}]

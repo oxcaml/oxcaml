@@ -144,14 +144,14 @@ let just_one_allocation (x: int) : int option = Some x
 [%%expect_asm X86_64{|
 just_one_allocation:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rax
-  movq  $1024, -8(%rax)
-  movq  %rbx, (%rax)
+  leaq  8(%r15), %rbx
+  movq  $1024, -8(%rbx)
+  movq  %rax, (%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]

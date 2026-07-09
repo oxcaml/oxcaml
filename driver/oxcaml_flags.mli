@@ -17,6 +17,7 @@
 (** OxCaml specific command line flags *)
 
 val dump_cfg : bool ref
+val dump_ssa : bool ref
 val cfg_invariants : bool ref
 val regalloc : Clflags.Register_allocator.t ref
 val default_regalloc_linscan_threshold : int
@@ -105,6 +106,12 @@ val max_long_frames_threshold : int
 val long_frames_threshold : int ref
 val branch_relaxation_max_displacement : int ref
 val caml_apply_inline_fast_path : bool ref
+
+val use_ssa : bool ref
+
+val ssa_simplify : bool ref
+
+val ssa_validate : bool ref
 
 type function_result_types = Never | Functors_only | All_functions
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto

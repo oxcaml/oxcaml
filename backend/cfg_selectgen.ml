@@ -500,6 +500,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
      right-to-left evaluation order as required by the Flambda [Un_anf] pass
      (and to be consistent with the bytecode compiler). *)
 
+  (* CR ttebbi: This duplicates [Select_utils.emit_parts_list], which the SSA
+     pipeline uses. Once [Cfg_compare] has validated the two against each other
+     for a while, we can use the [Select_utils] version. *)
   let rec emit_parts env sub_cfg ~effects_after exp : _ Or_never_returns.t =
     let module EC = SU.Effect_and_coeffect in
     let may_defer_evaluation =
@@ -668,18 +671,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | None ->
           for i = 0 to Array.length regs - 1 do
             let r = regs.(i) in
-            let chunk : Cmm.memory_chunk =
-              match r.Reg.typ with
-              | Float -> Double
-              | Float32 -> Single { reg = Float32 }
-              (* SIMD memory operations are unaligned by default. Aligned
-                 bigarray operations are handled separately via cmm. *)
-              | Vec128 -> Onetwentyeight_unaligned
-              | Vec256 -> Twofiftysix_unaligned
-              | Vec512 -> Fivetwelve_unaligned
-              | Val | Addr | Int -> Word_val
-              | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-            in
+            let chunk = SU.chunk_of_machtype_component r.Reg.typ in
             insert_debug env sub_cfg
               (Op (Store (chunk, !addressing_mode, false)))
               dbg
