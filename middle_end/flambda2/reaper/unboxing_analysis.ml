@@ -199,9 +199,14 @@ let cannot_unbox0 x = cannot_unbox0_tbl % [x]
 
 let cannot_unbox = rel1 "cannot_unbox" Cols.[n]
 
-let to_unbox = rel1 "to_unbox" Cols.[n]
+let to_unbox_tbl = Datalog.create_relation ~name:"to_unbox" Cols.[n]
 
-let to_change_representation = rel1 "to_change_representation" Cols.[n]
+let to_unbox x = to_unbox_tbl % [x]
+
+let to_change_representation_tbl =
+  Datalog.create_relation ~name:"to_change_representation" Cols.[n]
+
+let to_change_representation x = to_change_representation_tbl % [x]
 
 let datalog_rules =
   saturate_in_order
@@ -623,7 +628,30 @@ let perform_analysis db ~stats =
   in
   let has_to_be_unboxed code_or_name = has_to_be_unboxed [code_or_name] db in
   let unboxed, changed_representation =
-    Profile.record_call ~accumulate:true "compute_unboxing_variables" (fun () ->
+    Profile.record_call_with_counters ~accumulate:true
+      "compute_unboxing_variables"
+      ~counter_f:(fun (unboxed, _changed_representation) ->
+        let counters = Profile.Counters.create () in
+        let counters =
+          Profile.Counters.set "unboxed_blocks"
+            (Code_id_or_name.Map.cardinal (Datalog.get_table to_unbox_tbl db))
+            counters
+        in
+        let counters =
+          Profile.Counters.set "changed_representation"
+            (Code_id_or_name.Map.cardinal
+               (Datalog.get_table to_change_representation_tbl db))
+            counters
+        in
+        let total_unboxed_vars =
+          Code_id_or_name.Map.fold
+            (fun _ uf c ->
+              Unboxed_fields.fold_with_kind (fun _ _ c -> c + 1) uf c)
+            unboxed 0
+        in
+        Profile.Counters.set "total_unboxed_variables" total_unboxed_vars
+          counters)
+      (fun () ->
         let unboxed =
           Datalog.Cursor.fold query_to_unbox db ~init:Code_id_or_name.Map.empty
             ~f:(fun [code_or_name; to_patch] unboxed ->

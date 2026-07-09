@@ -73,6 +73,17 @@ type subkind =
   | Immediate_array
   | Value_array
   | Generic_array
+  | Unboxed_float32_array
+  | Untagged_int_array
+  | Untagged_int8_array
+  | Untagged_int16_array
+  | Unboxed_int32_array
+  | Unboxed_int64_array
+  | Unboxed_nativeint_array
+  | Unboxed_vec128_array
+  | Unboxed_vec256_array
+  | Unboxed_vec512_array
+  | Unboxed_product_array
 
 and kind_with_subkind =
   | Value of subkind

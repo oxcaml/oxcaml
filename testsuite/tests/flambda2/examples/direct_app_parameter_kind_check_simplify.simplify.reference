@@ -30,8 +30,8 @@ in
 let $camlDirect_app_parameter_kind_check_simplify__create_4 =
   closure create_1_1 @create
 in
-(let Pmakeblock72_0 = 0 in
- let `*match*` = Pmakeblock72_0 in
+(let Pmakeblock_0 = 0 in
+ let `*match*` = Pmakeblock_0 in
  let prim = %is_int (`*match*`) in
  switch prim
    | 0 -> k1

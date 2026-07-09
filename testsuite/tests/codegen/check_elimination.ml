@@ -94,7 +94,7 @@ search:
   je    .L1
 .L0:
   xorl  %esi, %esi
-  movq  %rbx, %rax
+  movl  $1, %eax
   jmp   .L4
 .L1:
   movq  (%rbx), %rax

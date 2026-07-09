@@ -456,6 +456,12 @@ and eval_prim env prim =
   | Pset_ptr (old_layout, mode) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then prim else Pset_ptr (new_layout, mode)
+  | Pget_ext_ptr (old_layout, mut) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout then prim else Pget_ext_ptr (new_layout, mut)
+  | Pset_ext_ptr (old_layout, mode) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout then prim else Pset_ext_ptr (new_layout, mode)
   | Pbytes_to_string | Pbytes_of_string | Pignore | Pgetglobal _ | Pgetpredef _
   | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _ | Pfield _
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
@@ -531,7 +537,9 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   | Pget_idx (layout, _)
   | Pset_idx (layout, _)
   | Pget_ptr (layout, _)
-  | Pset_ptr (layout, _) ->
+  | Pset_ptr (layout, _)
+  | Pget_ext_ptr (layout, _)
+  | Pset_ext_ptr (layout, _) ->
     assert_layout_contains_no_splices layout
   | Pmake_unboxed_product layouts | Punboxed_product_field (_, layouts) ->
     List.iter assert_layout_contains_no_splices layouts

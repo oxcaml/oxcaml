@@ -223,7 +223,7 @@ let let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler
               (fun n kind ->
                 let field =
                   Ident.create_local
-                    (Printf.sprintf "%s_unboxed%d" (Ident.unique_name id) n)
+                    (Printf.sprintf "%s_unboxed%d" (Ident.canonical_name id) n)
                 in
                 let field_uid =
                   Flambda_debug_uid.of_lambda_debug_uid_proj duid ~field:n
@@ -833,7 +833,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                         let ident =
                           Ident.create_local
                             (Printf.sprintf "%s_unboxed%d"
-                               (Ident.unique_name arg) n)
+                               (Ident.canonical_name arg) n)
                         in
                         let duid =
                           Flambda_debug_uid.of_lambda_debug_uid_proj duid
@@ -1561,7 +1561,9 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
                 in
                 let ident =
                   Ident.create_local
-                    (Printf.sprintf "%s_unboxed%d" (Ident.unique_name name) n)
+                    (Printf.sprintf "%s_unboxed%d"
+                       (Ident.canonical_name name)
+                       n)
                 in
                 ident, duid, kind)
               kinds
@@ -1824,7 +1826,7 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
 (* CR pchambart: define a record `target_config` to hold things like
    `big_endian` *)
 let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
-    ~compilation_unit ~module_repr (lam : Lambda.lambda) =
+    ~compilation_unit ~module_repr ~sections (lam : Lambda.lambda) =
   let return_continuation = Continuation.create ~sort:Define_root_symbol () in
   let exn_continuation = Continuation.create () in
   let toplevel_my_region = Ident.create_local "toplevel_my_region" in
@@ -1841,4 +1843,4 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
   CC.close_program ~mode ~machine_width ~big_endian ~cmx_loader
     ~compilation_unit ~module_repr ~program
     ~prog_return_cont:return_continuation ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region
+    ~toplevel_my_ghost_region ~sections

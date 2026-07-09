@@ -427,6 +427,10 @@ type primitive =
   | Pset_idx of layout * modify_mode
   | Pget_ptr of layout * Asttypes.mutable_flag
   | Pset_ptr of layout * modify_mode
+  (* External pointer primitives: like [Pget_ptr]/[Pset_ptr] but take only the
+     offset and behave as if the base were null. *)
+  | Pget_ext_ptr of layout * Asttypes.mutable_flag
+  | Pset_ext_ptr of layout * modify_mode
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
     compiled away. *)
@@ -1488,7 +1492,8 @@ val will_be_reordered : _ mixed_block_element -> bool
 
 val primitive_result_layout : primitive -> layout
 
-val array_ref_kind_result_layout: array_ref_kind -> layout
+val array_kind_of_array_ref_kind : array_ref_kind -> array_kind
+val array_kind_of_array_set_kind : array_set_kind -> array_kind
 
 (** The mode will be discarded if unnecessary for the given [array_kind] *)
 val array_ref_kind : locality_mode -> array_kind -> array_ref_kind

@@ -476,7 +476,7 @@ module Fold_prims = struct
               (fun i kind ->
                 let name =
                   Simple.pattern_match' block_needed
-                    ~var:(fun var ~coercion:_ -> Variable.unique_name var)
+                    ~var:(fun var ~coercion:_ -> Variable.canonical_name var)
                     ~symbol:(fun _ ~coercion:_ ->
                       Misc.fatal_errorf
                         "[Mutable Unboxing] Cannot unbox mutable symbols")

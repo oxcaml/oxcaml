@@ -1179,7 +1179,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
            transl_extension_constructor ~scopes e.exp_env None cd,
            transl_exp ~scopes layout body)
   | Texp_pack modl ->
-      !transl_module ~scopes Tcoerce_none None modl
+      let mod_scopes = enter_anonymous_module ~scopes ~loc:modl.mod_loc in
+      !transl_module ~scopes:mod_scopes Tcoerce_none None modl
   | Texp_assert ({exp_desc=Texp_construct(_, {cstr_name="false"}, _, _, _)},
                  loc) ->
       assert_failed loc ~scopes e
@@ -2527,7 +2528,7 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
     end
 
 (* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
-and transl_idx ~scopes loc env ba uas =
+and transl_idx ~scopes loc _env ba uas =
   let ua_to_pos (Uaccess_unboxed_field (_, lbl, _)) =
     (* erase singleton unboxed products before lambda *)
     if Array.length lbl.lbl_all == 1 then None else Some lbl.lbl_pos
@@ -2547,9 +2548,7 @@ and transl_idx ~scopes loc env ba uas =
         else
           Jkind.Sort.Const.Product (Array.to_list sorts)
       in
-      (* CR layouts v8: this might unnecessarily compute the value kind, which
-         shouldn't be needed for deepening *)
-      let base_layout = layout env lbl.lbl_loc base_sort lbl.lbl_res in
+      let base_layout = layout_of_sort lbl.lbl_loc base_sort in
       let mbe = mixed_block_element_of_layout base_layout in
       (* [uas_path] is a path into [mbe] *)
       Lprim (Pidx_deepen (mbe, uas_path), [idx], (of_location ~scopes loc))

@@ -4422,6 +4422,24 @@ module Report = struct
       right : loosening * ('a, right_only) ahint
     }
 
+  let print_bug ?explanation () ppf =
+    let print_explanation ppf = function
+      | None -> ()
+      | Some explanation ->
+        Fmt.fprintf ppf " (%a)" Fmt.pp_print_text explanation
+    in
+    Fmt.pp_force_newline ppf ();
+    Fmt.fprintf ppf
+      "@{<error>@[<hov 2>Note: mode error hint reporting went wrong%a, and the \
+       current mode error message might be inaccurate.@ If you hit this case, \
+       report it to the Jane Street compilers team.@]@}"
+      print_explanation explanation
+
+  let print_bug_stderr ?explanation () =
+    Misc.output_of_doc_print
+      (fun ppf () -> print_bug ?explanation () ppf)
+      stderr ()
+
   (** Convert Solver error to report. *)
   module Of_solver = struct
     (** Given a branch of two constant bounds on a single axis, choose the the
@@ -4444,14 +4462,14 @@ module Report = struct
       | Meet ->
         if C.le a_obj other x
         then begin
-          assert (not (C.le a_obj other y));
+          if C.le a_obj other y then print_bug_stderr ();
           `Second
         end
         else `First
       | Join ->
         if C.le a_obj x other
         then begin
-          assert (not (C.le a_obj y other));
+          if C.le a_obj y other then print_bug_stderr ();
           `Second
         end
         else `First
@@ -4849,7 +4867,8 @@ module Report = struct
       prints the const to explain the mode on the pinpoint. *)
   let print_const (type l r) ((_, pp_desc) : pinpoint) ppf :
       (l * r) const -> unit = function
-    | Unknown -> Misc.fatal_error "Unknown hint should not be printed"
+    | Unknown ->
+      print_bug ~explanation:"Unknown hint should not be printed" () ppf
     | Lazy_allocated_on_heap ->
       (match pp_desc with
       | Lazy ->
@@ -4898,10 +4917,12 @@ module Report = struct
         Fmt.pp_print_string ppf "modules always need"
       | _ -> Fmt.pp_print_string ppf "it is a module and thus needs");
       Fmt.pp_print_string ppf " to be allocated on the heap"
-    | Is_used_in pp ->
-      let print_pp = print_pinpoint pp |> Option.get in
-      Fmt.fprintf ppf "it is used in %t"
-        (print_pp ~definite:false ~capitalize:false)
+    | Is_used_in pp -> (
+      match print_pinpoint pp with
+      | Some print_pp ->
+        Fmt.fprintf ppf "it is used in %t"
+          (print_pp ~definite:false ~capitalize:false)
+      | None -> print_bug () ppf)
     | Always_dynamic x ->
       Fmt.fprintf ppf "%t are always dynamic" (print_always_dynamic x)
     | Branching -> Fmt.fprintf ppf "it has branches"
@@ -4927,11 +4948,16 @@ module Report = struct
       (l * r) morph ->
       ((Fmt.formatter -> unit) * pinpoint) option =
    fun ~fixpoint pp -> function
-    | Skip -> Misc.fatal_error "Skip hint should not be printed"
+    | Skip ->
+      Some (print_bug ~explanation:"Skip hint should not be printed" (), pp)
     | Allocation _ ->
-      Misc.fatal_error
-        "This hint is from turning an allocation mode into a value mode, and \
-         should never be printed"
+      Some
+        ( print_bug
+            ~explanation:
+              "This hint is from turning an allocation mode into a value mode, \
+               and should never be printed"
+            (),
+          pp )
     | Unknown -> None
     | Close_over (Comonadic, { closed = pp; _ }) ->
       print_pinpoint pp
@@ -5061,8 +5087,8 @@ module Report = struct
       have slightly different skip conditions. An [Allocation] hint should
       always be skipped, while [Allocation_l] and [Allocation_r] hints are
       skipped when they change a regionality mode to a different locality mode.
-      In each case, we assert that the hint was applied to their expected
-      associated morphism. *)
+      In each case, we report an error if the hint was not applied to its
+      expected associated morphism. *)
   let should_skip : type l r a b.
       (l * r) morph ->
       src:a C.obj ->
@@ -5081,21 +5107,24 @@ module Report = struct
       (* We only skip when the morphism changes the mode *)
       ~is_skip:fixpoint, ~fixpoint
     | Allocation_r _ ->
-      (* We assert that the morphism is value_to_alloc_r2g *)
-      assert (implements_value_to_alloc Regional_to_global src obj a b);
+      (* We check that the morphism is value_to_alloc_r2g *)
+      if not (implements_value_to_alloc Regional_to_global src obj a b)
+      then print_bug_stderr ();
       (* We only skip when the morphism changes the mode, but allow for axis changes *)
       ( ~is_skip:(implements_alloc_to_value Locality_as_regionality obj src b a),
         ~fixpoint )
     | Allocation_l _ ->
-      (* We assert that the morphism is value_to_alloc_r2l *)
-      assert (implements_value_to_alloc Regional_to_local src obj a b);
+      (* We check that the morphism is value_to_alloc_r2l *)
+      if not (implements_value_to_alloc Regional_to_local src obj a b)
+      then print_bug_stderr ();
       (* We only skip when the morphism changes the mode, but allow for axis changes *)
       ( ~is_skip:(implements_alloc_to_value Locality_as_regionality obj src b a),
         ~fixpoint )
     | Allocation _ ->
-      (* We always want to skip an Allocation hint. All we need is to assert that the
-         hint was indeed applied to an alloc_as_value morphism *)
-      assert (implements_alloc_to_value Locality_as_regionality src obj a b);
+      (* We always want to skip an Allocation hint. Report if the hint was not
+         applied to an alloc_as_value morphism. *)
+      if not (implements_alloc_to_value Locality_as_regionality src obj a b)
+      then print_bug_stderr ();
       ~is_skip:true, ~fixpoint
 
   let rec print_ahint : type a l r.
@@ -5129,9 +5158,11 @@ module Report = struct
     | Irrelevant ->
       if not sub
       then
-        Misc.fatal_error
-          "the current mode is not responsible for the error, so must be \
-           inside a responsible morphism";
+        print_bug
+          ~explanation:
+            "the current mode is not responsible for the error, so must be \
+             inside a responsible morphism"
+          () ppf;
       None
     | Const c ->
       Fmt.fprintf ppf "%a@ because %a"
@@ -5182,8 +5213,20 @@ module Report = struct
       then Right right, Left left
       else Left left, Right right
     in
-    let left ppf = Option.get (print_ahint_sided pp obj ppf actual) in
-    let right ppf = Option.get (print_ahint_sided pp obj ppf expected) in
+    let left ppf =
+      match print_ahint_sided pp obj ppf actual with
+      | None ->
+        print_bug_stderr ();
+        Mode
+      | Some hint -> hint
+    in
+    let right ppf =
+      match print_ahint_sided pp obj ppf expected with
+      | None ->
+        print_bug_stderr ();
+        Mode
+      | Some hint -> hint
+    in
     { left; right }
 end
 
@@ -7265,6 +7308,11 @@ module Modality = struct
     let to_value : packed -> Value.Axis.packed = function
       | P (Monadic ax) -> P (Monadic ax)
       | P (Comonadic ax) -> P (Comonadic ax)
+
+    let compare (P ax0 : packed) (P ax1 : packed) =
+      let (P ax0) = to_value (P ax0) in
+      let (P ax1) = to_value (P ax1) in
+      Value.Axis.compare ax0 ax1
   end
 
   type atom = Atom : 'a Axis.t * 'a -> atom
@@ -7286,6 +7334,13 @@ module Modality = struct
       match ax with
       | Monadic ax -> Monadic.is_constant ax t
       | Comonadic ax -> Comonadic.is_constant ax t
+
+    let le (type a) (ax : a Axis.t) (a : a) (b : a) : bool =
+      match ax, a, b with
+      | Monadic ax, Join_const a, Join_const b ->
+        Value.Monadic.Const.Per_axis.le ax a b
+      | Comonadic ax, Meet_const a, Meet_const b ->
+        Value.Comonadic.Const.Per_axis.le ax a b
 
     let print (type a) (ax : a Axis.t) ppf (t : a) =
       match ax, t with

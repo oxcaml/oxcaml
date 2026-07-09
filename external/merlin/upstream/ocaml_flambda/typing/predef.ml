@@ -52,11 +52,15 @@ type abstract_type_constr = [
   | `Lexing_position
   | `Code
   | `Eval
+  | `Box
   | `Float32
   | `Int8
   | `Int16
 ]
 type abstract_non_value_type_constr = [
+  | `Nativeint_u
+  | `Int32_u
+  | `Int64_u
   | `Idx_imm
   | `Idx_mut
   | `Int8x16
@@ -119,6 +123,10 @@ let base_type_constrs : type_constr list = [
   `Iarray;
   `Atomic_loc;
   `Lexing_position;
+  `Box;
+  `Nativeint_u;
+  `Int32_u;
+  `Int64_u;
   `Idx_imm;
   `Idx_mut;
 ]
@@ -206,7 +214,11 @@ and ident_lexing_position = ident_create "lexing_position"
    keep `expr` for now instead of `code` *)
 and ident_code = ident_create "expr"
 and ident_eval = ident_create "eval"
+and ident_box = ident_create "box"
 
+and ident_nativeint_u = ident_create "nativeint_u"
+and ident_int32_u = ident_create "int32_u"
+and ident_int64_u = ident_create "int64_u"
 and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
 and ident_idx_mut = ident_create "idx_mut"
@@ -258,9 +270,13 @@ let ident_of_type_constr : type_constr -> Ident.t = function
   | `Lexing_position -> ident_lexing_position
   | `Code -> ident_code
   | `Eval -> ident_eval
+  | `Box -> ident_box
   | `Float32 -> ident_float32
   | `Int8 -> ident_int8
   | `Int16 -> ident_int16
+  | `Nativeint_u -> ident_nativeint_u
+  | `Int32_u -> ident_int32_u
+  | `Int64_u -> ident_int64_u
   | `Idx_imm -> ident_idx_imm
   | `Idx_mut -> ident_idx_mut
   | `Int8x16 -> ident_int8x16
@@ -311,10 +327,14 @@ and path_floatarray = Pident ident_floatarray
 and path_iarray = Pident ident_iarray
 and path_atomic_loc = Pident ident_atomic_loc
 and path_lexing_position = Pident ident_lexing_position
+and path_nativeint_u = Pident ident_nativeint_u
+and path_int32_u = Pident ident_int32_u
+and path_int64_u = Pident ident_int64_u
 and path_idx_imm = Pident ident_idx_imm
 and path_idx_mut = Pident ident_idx_mut
 and path_code = Pident ident_code
 and path_eval = Pident ident_eval
+and path_box = Pident ident_box
 
 and path_or_null = Pident ident_or_null
 
@@ -416,6 +436,9 @@ and type_unboxed_char = tconstr path_unboxed_char []
 and type_unboxed_int = tconstr path_unboxed_int []
 and type_unboxed_int8 = tconstr path_unboxed_int8 []
 and type_unboxed_int16 = tconstr path_unboxed_int16 []
+and type_nativeint_u = tconstr path_nativeint_u []
+and type_int32_u = tconstr path_int32_u []
+and type_int64_u = tconstr path_int64_u []
 and type_or_null t = tconstr path_or_null [t]
 and type_idx_imm t1 t2 = tconstr path_idx_imm [t1; t2]
 and type_idx_mut t1 t2 = tconstr path_idx_mut [t1; t2]
@@ -590,13 +613,14 @@ let or_null_kind tvar =
       cstr ident_this [unrestricted tvar or_null_argument_sort]] in
   Type_variant (cstrs, Variant_with_null, None)
 
-let decl_of_type_constr tconstr =
-  let type_ident = ident_of_type_constr tconstr in
+let decl_of_type_constr type_constr =
+  let type_ident = ident_of_type_constr type_constr in
   let type_uid = Uid.of_predef_id type_ident in
   let decl0
       ?(kind = Type_abstract Definition)
       ~(jkind : jkind_l)
       ?(unboxed_jkind : Jkind.Const.Builtin.t option)
+      ?manifest
       ()
     =
     let type_unboxed_version = match unboxed_jkind with
@@ -639,7 +663,7 @@ let decl_of_type_constr tconstr =
      type_ikind;
      type_loc = Location.none;
      type_private = Asttypes.Public;
-     type_manifest = None;
+     type_manifest = manifest;
      type_variance = [];
      type_separability = [];
      type_is_newtype = false;
@@ -730,7 +754,7 @@ let decl_of_type_constr tconstr =
       ~why:(Type_argument {parent_path = Path.Pident type_ident;
                            position = 2; arity = 2}))
   in
-  match tconstr with
+  match type_constr with
   | `Int ->
     decl0 ~jkind:(builtin Jkind.Const.Builtin.immediate)
        ~unboxed_jkind:Jkind.Const.Builtin.kind_of_untagged_int ()
@@ -847,6 +871,15 @@ let decl_of_type_constr tconstr =
       ~param_jkind:value_param_jkind
       ~jkind:(fun _ -> Jkind.for_non_float ~why:(Primitive ident_lazy_t))
       ()
+  | `Nativeint_u ->
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_nativeint)
+      ~manifest:(tconstr (Path.unboxed_version path_nativeint) []) ()
+  | `Int32_u ->
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int32)
+      ~manifest:(tconstr (Path.unboxed_version path_int32) []) ()
+  | `Int64_u ->
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int64)
+      ~manifest:(tconstr (Path.unboxed_version path_int64) []) ()
   | `Idx_imm ->
     decl2 ~variance:(Variance.full, Variance.covariant)
        ~param_jkinds:(
@@ -938,6 +971,19 @@ let decl_of_type_constr tconstr =
        ~param_jkind:(
          Jkind.Builtin.any ~why:(Type_argument {
            parent_path = Path.Pident ident_eval;
+           position = 1;
+           arity = 1;
+         }))
+       ()
+  | `Box ->
+    decl1
+       ~variance:Variance.covariant
+       ~separability:Separability.Ind
+       ~manifest:(fun param -> newgenty (Tbox param))
+       ~jkind:(fun _ -> Jkind.Builtin.value ~why:Boxed)
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_box;
            position = 1;
            arity = 1;
          }))

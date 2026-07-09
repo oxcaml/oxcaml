@@ -45,7 +45,12 @@ type bswap_bitwidth = Sixteen | Thirtytwo | Sixtyfour
 
 type specific_operation =
   | Ifar_poll
-  | Ifar_alloc of { bytes : int; dbginfo : Cmm.alloc_dbginfo }
+  | Ifar_alloc of
+      { bytes : int;
+        dbginfo : Cmm.alloc_dbginfo;
+        mode : Cmm.Alloc_mode.t
+      }
+  | Ifar_stackcheck of { max_frame_size_bytes : int }
   | Ishiftarith of arith_operation * int
   | Imuladd       (* multiply and add *)
   | Imulsub       (* multiply and subtract *)
