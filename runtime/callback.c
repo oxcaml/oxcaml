@@ -577,8 +577,10 @@ CAMLexport void caml_iterate_named_values(caml_named_action f)
 
 CAMLprim value caml_with_async_exns(value body_callback)
 {
+  // Save and restore the current dynamic binding state so that local bindings
+  // are not leaked upon raising an async exception.
   dynamic_table_s tbl;
-  if(!caml_dynamic_table_dup(&tbl, &Caml_state->current_stack->dyn)) {
+  if(!caml_dynamic_table_copy(/*dst=*/&tbl, /*src=*/&Caml_state->current_stack->dyn)) {
     caml_raise_out_of_memory();
   }
 

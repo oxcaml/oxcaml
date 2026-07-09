@@ -96,7 +96,7 @@ extern void caml_dynamic_table_init(dynamic_table_t table);
 extern void caml_dynamic_table_free(dynamic_table_t table);
 
 /* Duplicate a dynamic table. Returns false if allocation fails. */
-extern bool caml_dynamic_table_dup(dynamic_table_t dst, dynamic_table_t src);
+extern bool caml_dynamic_table_copy(dynamic_table_t dst, dynamic_table_t src);
 
 /* Record the current value of every inheritable dynamic bound by [src] in [dst].
    Frees [dst] and returns false if allocation fails. */
