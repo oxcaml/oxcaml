@@ -741,8 +741,7 @@ let operation_supported = function
   | Cstatic_cast (V512_of_scalar _ | Scalar_of_v512 _) ->
     Arch.Extension.enabled_vec512 ()
   | Creinterpret_cast (Mask_of_int64 | Int64_of_mask) ->
-    (* The mask <-> integer moves use [kmovq], which requires AVX512BW. *)
-    Arch.Extension.enabled_vec512 () && Arch.Extension.enabled AVX512BW
+    Arch.Extension.enabled AVX512BW
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
