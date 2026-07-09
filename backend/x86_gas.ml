@@ -83,7 +83,8 @@ let suf arg =
   | QWORD -> "q"
   | REAL4 -> "s"
   | VEC128 | VEC256 | VEC512 | NONE -> ""
-  | NEAR | PROC -> assert false
+  | NEAR -> Misc.fatal_error "X86_gas.suf: unexpected datatype NEAR"
+  | PROC -> Misc.fatal_error "X86_gas.suf: unexpected datatype PROC"
 
 let i0 b s = bprintf b "\t%s" s
 
@@ -110,7 +111,11 @@ let i1_call_jmp b s = function
   | (Reg32 _ | Reg64 _ | Mem { arch = X64 | X86; _ } | Mem64_RIP _) as x ->
     bprintf b "\t%s\t*%a" s arg x
   | Sym x -> bprintf b "\t%s\t%s" s x
-  | Imm _ | Reg8L _ | Reg8H _ | Reg16 _ | Regf _ -> assert false
+  | (Imm _ | Reg8L _ | Reg8H _ | Reg16 _ | Regf _) as x ->
+    let buf = Buffer.create 16 in
+    arg buf x;
+    Misc.fatal_errorf "X86_gas.i1_call_jmp: invalid operand %s"
+      (Buffer.contents buf)
 
 let print_instr b = function
   | ADD (arg1, arg2) -> i2_s b "add" arg1 arg2
@@ -186,6 +191,7 @@ let print_instr b = function
   | SUB (arg1, arg2) -> i2_s b "sub" arg1 arg2
   | SBB (arg1, arg2) -> i2_s b "sbb" arg1 arg2
   | TEST (arg1, arg2) -> i2_s b "test" arg1 arg2
+  | UD2 -> i0 b "ud2"
   | XCHG (arg1, arg2) -> i2 b "xchg" arg1 arg2
   | XOR (arg1, arg2) -> i2_s b "xor" arg1 arg2
   | SIMD (instr, args) -> (
@@ -275,6 +281,7 @@ let map_arg (f : arg -> arg) (instr : instruction) : instruction =
   | SUB (a, b) -> SUB (f a, f b)
   | SBB (a, b) -> SBB (f a, f b)
   | TEST (a, b) -> TEST (f a, f b)
+  | UD2 -> UD2
   | XCHG (a, b) -> XCHG (f a, f b)
   | XOR (a, b) -> XOR (f a, f b)
   | SIMD (simd_instr, args) -> SIMD (simd_instr, Array.map f args)

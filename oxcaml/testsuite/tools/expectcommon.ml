@@ -421,7 +421,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
         Btype.backtrack snap;
         false
     in
-    let (_ : bool) =
+    let (success : bool) =
       List.fold_left phrases ~init:true ~f:(fun acc phrase ->
           if acc then exec_one phrase else acc)
     in
@@ -432,7 +432,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
       Buffer.add_char buf '\n';
     let s = Buffer.contents buf in
     Buffer.clear buf;
-    (Misc.delete_eol_spaces s, !last_asm, !last_unit)
+    (success, Misc.delete_eol_spaces s, !last_asm, !last_unit)
   in
   let fexpr_outputs unit filters =
     let read_dump_file pass =
@@ -472,20 +472,25 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
             in
             let keep_asm = !Clflags.keep_asm_file in
             if has_fexpr then Clflags.keep_asm_file := true;
-        let (toplevel_output, asm_output, last_unit) =
+        let (success, toplevel_output, asm_output, last_unit) =
           exec_phrases chunk.phrases
         in
         Clflags.keep_asm_file := keep_asm;
         List.filter_map chunk.expectations ~f:(fun expectation ->
           let output = match expectation.kind with
             | Expect_toplevel -> toplevel_output
-            | Expect_asm -> Option.value asm_output
-                              ~default:"\nNo assembly: compilation failed\n"
+            | Expect_asm ->
+                if success then
+                  Option.value asm_output
+                    ~default:"\nNo assembly: compilation failed\n"
+                else toplevel_output
             | Expect_fexpr ->
-                let filters =
-                  List.concat_map ~f:fst expectation.expected_output
-                in
-                fexpr_outputs last_unit filters
+                if success then
+                  let filters =
+                    List.concat_map ~f:fst expectation.expected_output
+                  in
+                  fexpr_outputs last_unit filters
+                else toplevel_output
           in
           eval_expectation expectation ~output)))
   in
@@ -494,9 +499,16 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
     | None -> ""
     | Some phrases ->
       capture_everything buf ppf
-        ~f:(fun () -> let (r, _, _) = exec_phrases phrases in r)
+        ~f:(fun () -> let (_, r, _, _) = exec_phrases phrases in r)
   in
-  { corrected_expectations; trailing_output }
+  let needs_principal =
+    List.exists chunks ~f:(fun chunk ->
+      List.exists chunk.expectations ~f:(fun expectation ->
+        match expectation.kind with
+        | Expect_toplevel -> true
+        | Expect_asm | Expect_fexpr -> false))
+  in
+  { corrected_expectations; trailing_output }, ~needs_principal
 
 let output_slice oc s a b =
   output_string oc (String.sub s ~pos:a ~len:(b - a))
@@ -541,8 +553,11 @@ let process_expect_file fname ~execute_phrase =
     | s           -> close_in ic; Misc.normalise_eol s
     | exception e -> close_in ic; raise e
   in
-  let correction = eval_expect_file fname ~file_contents ~execute_phrase in
-  write_corrected ~file:corrected_fname ~file_contents correction
+  let correction, ~needs_principal =
+    eval_expect_file fname ~file_contents ~execute_phrase
+  in
+  write_corrected ~file:corrected_fname ~file_contents correction;
+  needs_principal
 
 let repo_root = ref None
 let keep_original_error_size = ref false
@@ -602,8 +617,10 @@ let main (module Toplevel : Toplevel) fname =
       exit 2);
   (* We are in interactive mode and should record directive error on stdout *)
   Sys.interactive := true;
-  process_expect_file fname ~execute_phrase:Toplevel.execute_phrase;
-  exit 0
+  let needs_principal =
+    process_expect_file fname ~execute_phrase:Toplevel.execute_phrase
+  in
+  exit (if needs_principal then 3 else 0)
 
 let run ~read_anonymous_arg ~extra_args ~extra_init toplevel =
   let args =

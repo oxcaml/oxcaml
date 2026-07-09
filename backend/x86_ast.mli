@@ -173,6 +173,7 @@ type instruction =
   | SUB of arg * arg
   | SBB of arg * arg
   | TEST of arg * arg
+  | UD2
   | XCHG of arg * arg
   | XOR of arg * arg
   | SIMD of Amd64_simd_instrs.instr * arg array

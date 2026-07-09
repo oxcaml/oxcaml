@@ -772,21 +772,6 @@ let emit_local_realloc lr =
   A.ins1 BL (runtime_function S.Predef.caml_call_local_realloc);
   A.ins1 B (local_label lr.lr_return_lbl)
 
-(* Local stack reallocation *)
-
-let emit_stack_realloc env =
-  match Env.stack_realloc env with
-  | None -> ()
-  | Some { sc_label; sc_return; sc_max_frame_size_in_bytes } ->
-    D.define_label sc_label;
-    (* Pass the desired frame size on the stack, since all of the
-       argument-passing registers may be in use. *)
-    A.ins_mov_imm reg_x_tmp1 (O.imm_sixteen sc_max_frame_size_in_bytes);
-    A.ins3 (STP X) reg_x_tmp1 O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
-    A.ins1 BL (runtime_function S.Predef.caml_call_realloc_stack);
-    A.ins3 (LDP X) reg_x_tmp1 O.lr (O.mem_post_pair ~base:R.sp ~offset:16);
-    A.ins1 B (local_label sc_return)
-
 (* Names of various instructions *)
 
 let cond_for_comparison : integer_comparison -> Cond.t = function
@@ -847,6 +832,23 @@ let emit_intconst dst n =
           (O.imm_sixteen_of_nativeint nf)
           (O.optional_lsl_by_multiple_of_16_bits p);
         List.iter (emit_movk dst) l
+
+(* Local stack reallocation *)
+
+let emit_stack_realloc env =
+  match Env.stack_realloc env with
+  | None -> ()
+  | Some { sc_label; sc_return; sc_max_frame_size_in_bytes } ->
+    D.define_label sc_label;
+    (* Pass the desired frame size on the stack, since all of the
+       argument-passing registers may be in use. The frame size can exceed the
+       16-bit immediate of a single MOVZ, so use [emit_intconst] which
+       decomposes it into MOVZ/MOVK fragments as needed. *)
+    emit_intconst reg_x_tmp1 (Nativeint.of_int sc_max_frame_size_in_bytes);
+    A.ins3 (STP X) reg_x_tmp1 O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
+    A.ins1 BL (runtime_function S.Predef.caml_call_realloc_stack);
+    A.ins3 (LDP X) reg_x_tmp1 O.lr (O.mem_post_pair ~base:R.sp ~offset:16);
+    A.ins1 B (local_label sc_return)
 
 (* Recognize float constants appropriate for FMOV dst, #fpimm instruction: "a
    normalized binary floating point encoding with 1 sign bit, 4 bits of fraction
@@ -1063,20 +1065,34 @@ let cond_for_cset_for_float_comparison : Cmm.float_comparison -> Cond.t =
 
 (* Output the assembly code for an allocation. *)
 
-let assembly_code_for_local_allocation env i ~n =
-  let r = H.reg_x i.res.(0) in
+let assembly_code_for_local_allocation0 ~n ~far ~res_reg =
+  (* This must not use [env], as it is called from [emit_relaxed_instruction] *)
+  let r = res_reg in
   A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_local_limit);
   A.ins2 LDR r (H.domainstate_field Domain_local_sp);
   emit_subimm r r n;
   A.ins2 STR r (H.domainstate_field Domain_local_sp);
   A.ins_cmp_reg r reg_x_tmp1 O.optional_none;
   let lr_lbl = L.create Text in
-  A.ins1 (B_cond (Branch_cond.Int LT)) (local_label lr_lbl);
   let lr_return_lbl = L.create Text in
+  if not far
+  then A.ins1 (B_cond (Branch_cond.Int LT)) (local_label lr_lbl)
+  else (
+    (* Invert the condition and branch over an unconditional branch, so the
+       out-of-line reallocation block is reached via [B] (whose range we treat
+       as unbounded) rather than the limited range of [B_cond]. *)
+    A.ins1 (B_cond (Branch_cond.Int GE)) (local_label lr_return_lbl);
+    A.ins1 B (local_label lr_lbl));
   D.define_label lr_return_lbl;
   A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_local_top);
   A.ins4 ADD_shifted_register r r reg_x_tmp1 O.optional_none;
   A.ins4 ADD_immediate r r (O.imm 8) O.optional_none;
+  lr_lbl, lr_return_lbl
+
+let assembly_code_for_local_allocation env i ~n ~far =
+  let lr_lbl, lr_return_lbl =
+    assembly_code_for_local_allocation0 ~n ~far ~res_reg:(H.reg_x i.res.(0))
+  in
   Env.add_local_realloc_site env { lr_lbl; lr_dbg = i.dbg; lr_return_lbl }
 
 let assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg =
@@ -1122,7 +1138,7 @@ let assembly_code_for_slow_heap_allocation env i ~n ~dbginfo =
 
 let assembly_code_for_allocation env i ~local ~n ~far ~dbginfo =
   if local
-  then assembly_code_for_local_allocation env i ~n
+  then assembly_code_for_local_allocation env i ~n ~far
   else if Env.fastcode_flag env
   then assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo
   else assembly_code_for_slow_heap_allocation env i ~n ~dbginfo
@@ -1163,6 +1179,36 @@ let assembly_code_for_poll env i ~far ~return_label =
   let gc_frame_lbl = record_frame_label env i.live (Dbg_alloc []) in
   let gc_lbl, gc_return_lbl = assembly_code_for_poll0 ~far ~return_label in
   Env.add_call_gc_site env { gc_lbl; gc_return_lbl; gc_frame_lbl }
+
+(* Output the assembly code for a stack check. *)
+
+let assembly_code_for_stack_check0 ~far ~max_frame_size_bytes =
+  (* This must not use [env], as it is called from [emit_relaxed_instruction] *)
+  let sc_label = L.create Text and sc_return = L.create Text in
+  let threshold_offset =
+    (Domainstate.stack_ctx_words * 8) + Stack_check.stack_threshold_size
+  in
+  let f = max_frame_size_bytes + threshold_offset in
+  A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_current_stack);
+  emit_addimm reg_x_tmp1 reg_x_tmp1 f;
+  A.ins_cmp_reg O.sp reg_x_tmp1 O.optional_none;
+  if not far
+  then A.ins1 (B_cond (Branch_cond.Int CC)) (local_label sc_label)
+  else (
+    (* Invert the condition and branch over an unconditional branch, so the
+       out-of-line reallocation block is reached via [B] (whose range we treat
+       as unbounded) rather than the limited range of [B_cond]. *)
+    A.ins1 (B_cond (Branch_cond.Int CS)) (local_label sc_return);
+    A.ins1 B (local_label sc_label));
+  D.define_label sc_return;
+  sc_label, sc_return
+
+let assembly_code_for_stack_check env ~far ~max_frame_size_bytes =
+  let sc_label, sc_return =
+    assembly_code_for_stack_check0 ~far ~max_frame_size_bytes
+  in
+  Env.set_stack_realloc env
+    { sc_label; sc_return; sc_max_frame_size_in_bytes = max_frame_size_bytes }
 
 (* Output .text section directive, or named .text.caml.<name> if enabled. *)
 
@@ -1384,7 +1430,9 @@ let emit_instr env i =
       | Reg _, Reg _ -> A.ins_mov_reg_w (H.reg_w dst) (H.reg_w src)
       | Reg _, Stack _ -> emit_stack_str env (H.reg_w src) dst
       | Stack _, Reg _ -> emit_stack_ldr env (H.reg_w dst) src
-      | Stack _, Stack _ | _, Unknown | Unknown, _ -> assert false)
+      | Stack _, Stack _ | _, Unknown | Unknown, _ ->
+        Misc.fatal_errorf "Emit.emit_instr: illegal Imove32 (%a to %a)"
+          Printreg.reg src Printreg.reg dst)
   | Lop (Const_int n) -> emit_intconst (H.reg_x i.res.(0)) n
   | Lop (Const_float32 f) ->
     if Int32.equal f 0l
@@ -1439,7 +1487,7 @@ let emit_instr env i =
       | Some tailrec_entry_point -> A.ins1 B (local_label tailrec_entry_point)
     else A.ins1 B (symbol (Needs_reloc JUMP26) (symbol_of_cmm_symbol func))
   | Lcall_op (Lextcall { func; alloc; stack_ofs; _ }) ->
-    if Config.runtime5 && stack_ofs > 0
+    if stack_ofs > 0
     then (
       A.ins_mov_from_sp ~dst:reg_stack_arg_begin;
       A.ins4 ADD_immediate reg_stack_arg_end O.sp
@@ -1458,17 +1506,14 @@ let emit_instr env i =
          call will preserve. We used to use x29 (frame pointer) here, but
          caml_start_program leaves it pointing to its C stack for the unwinder,
          so it can't be clobbered here. *)
-      if Config.runtime5
-      then (
-        A.ins_mov_from_sp ~dst:reg_x_extcall_saved_sp;
-        D.cfi_remember_state ();
-        D.cfi_def_cfa_register
-          ~reg:(Int.to_string (H.gp_x_dwarf_encoding reg_x_extcall_saved_sp));
-        A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_c_stack);
-        A.ins_mov_to_sp ~src:reg_x_tmp1)
-      else D.cfi_remember_state ();
+      A.ins_mov_from_sp ~dst:reg_x_extcall_saved_sp;
+      D.cfi_remember_state ();
+      D.cfi_def_cfa_register
+        ~reg:(Int.to_string (H.gp_x_dwarf_encoding reg_x_extcall_saved_sp));
+      A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_c_stack);
+      A.ins_mov_to_sp ~src:reg_x_tmp1;
       A.ins1 BL (symbol (Needs_reloc CALL26) (S.create_global func));
-      if Config.runtime5 then A.ins_mov_to_sp ~src:reg_x_extcall_saved_sp;
+      A.ins_mov_to_sp ~src:reg_x_extcall_saved_sp;
       D.cfi_restore_state ())
   | Lop (Stackoffset n) ->
     assert (n mod 16 = 0);
@@ -1519,9 +1564,7 @@ let emit_instr env i =
       (match addressing_mode with
       | Iindexed v ->
         let n = Validated_mem_offset.offset v in
-        A.ins4 ADD_immediate reg_x_tmp1
-          (H.reg_x i.arg.(0))
-          (O.imm n) O.optional_none
+        emit_addimm reg_x_tmp1 (H.reg_x i.arg.(0)) n
       | Ibased (s, offset) ->
         assert (not !Clflags.dlcode);
         (* see selection_utils.ml *)
@@ -1568,9 +1611,7 @@ let emit_instr env i =
       match addr with
       | Iindexed v ->
         let n = Validated_mem_offset.offset v in
-        A.ins4 ADD_immediate reg_x_tmp1
-          (H.reg_x i.arg.(1))
-          (O.imm n) O.optional_none;
+        emit_addimm reg_x_tmp1 (H.reg_x i.arg.(1)) n;
         A.ins2 STR_simd_and_fp (H.reg_q src) (H.mem reg_tmp1_base)
       | Ibased (s, offset) ->
         assert (not !Clflags.dlcode);
@@ -1586,8 +1627,10 @@ let emit_instr env i =
       Misc.fatal_error "arm64: got 256/512 bit vector")
   | Lop (Alloc { bytes = n; dbginfo; mode = Heap }) ->
     assembly_code_for_allocation env i ~n ~local:false ~far:false ~dbginfo
-  | Lop (Specific (Ifar_alloc { bytes = n; dbginfo })) ->
-    assembly_code_for_allocation env i ~n ~local:false ~far:true ~dbginfo
+  | Lop (Specific (Ifar_alloc { bytes = n; dbginfo; mode })) ->
+    assembly_code_for_allocation env i ~n
+      ~local:(Cmm.Alloc_mode.is_local mode)
+      ~far:true ~dbginfo
   | Lop (Alloc { bytes = n; dbginfo; mode = Local }) ->
     assembly_code_for_allocation env i ~n ~local:true ~far:false ~dbginfo
   | Lop Begin_region ->
@@ -1739,7 +1782,8 @@ let emit_instr env i =
     match H.reg_fp_operand_4 i.res.(0) i.arg.(1) i.arg.(2) i.arg.(0) with
     | S_regs (rd, rn, rm, ra) -> A.ins4 FNMSUB rd rn rm ra
     | D_regs (rd, rn, rm, ra) -> A.ins4 FNMSUB rd rn rm ra)
-  | Lop Opaque -> assert (Reg.equal_location i.arg.(0).loc i.res.(0).loc)
+  | Lop Opaque ->
+    assert (Array.equal (fun a b -> Reg.equal_location a.loc b.loc) i.arg i.res)
   | Lop (Specific (Ishiftarith (op, shift))) ->
     let rd, rn, rm = H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1) in
     let emit_shift_arith instr kind amount =
@@ -1788,16 +1832,12 @@ let emit_instr env i =
     (* Compare with 0 and set result to 1 if non-zero, 0 if zero *)
     A.ins_cmp (H.reg_w i.res.(0)) (O.imm 0) O.optional_none;
     A.ins_cset (H.reg_x i.res.(0)) Cond.NE
-  | Lop Dls_get when not Config.runtime5 ->
-    Misc.fatal_error "Dls is not supported in runtime4."
   | Lop Dls_get ->
     A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_dls_state)
   | Lop Tls_get ->
     A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_tls_state)
   | Lop Domain_index ->
-    if Config.runtime5
-    then A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_id)
-    else A.ins3 MOVZ (H.reg_x i.res.(0)) (O.imm_sixteen 0) O.optional_none
+    A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_id)
   | Lop (Csel tst) -> (
     let len = Array.length i.arg in
     let ifso = i.arg.(len - 2) in
@@ -1900,28 +1940,17 @@ let emit_instr env i =
       A.ins1 BL (runtime_function S.Predef.caml_raise_exn);
       record_frame env Reg.Set.empty (Dbg_raise i.dbg)
     | Raise_reraise ->
-      if Config.runtime5
-      then A.ins1 BL (runtime_function S.Predef.caml_reraise_exn)
-      else A.ins1 BL (runtime_function S.Predef.caml_raise_exn);
+      A.ins1 BL (runtime_function S.Predef.caml_reraise_exn);
       record_frame env Reg.Set.empty (Dbg_raise i.dbg)
     | Raise_notrace ->
       A.ins_mov_to_sp ~src:reg_x_trap_ptr;
       A.ins3 (LDP X) reg_x_trap_ptr reg_x_tmp1
         (O.mem_post_pair ~base:R.sp ~offset:16);
       A.ins1 BR reg_x_tmp1)
-  | Lstackcheck { max_frame_size_bytes = sc_max_frame_size_in_bytes } ->
-    let sc_label = L.create Text and sc_return = L.create Text in
-    let threshold_offset =
-      (Domainstate.stack_ctx_words * 8) + Stack_check.stack_threshold_size
-    in
-    let f = sc_max_frame_size_in_bytes + threshold_offset in
-    A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_current_stack);
-    emit_addimm reg_x_tmp1 reg_x_tmp1 f;
-    A.ins_cmp_reg O.sp reg_x_tmp1 O.optional_none;
-    A.ins1 (B_cond (Branch_cond.Int CC)) (local_label sc_label);
-    D.define_label sc_return;
-    Env.set_stack_realloc env
-      { sc_label; sc_return; sc_max_frame_size_in_bytes }
+  | Lstackcheck { max_frame_size_bytes } ->
+    assembly_code_for_stack_check env ~far:false ~max_frame_size_bytes
+  | Lop (Specific (Ifar_stackcheck { max_frame_size_bytes })) ->
+    assembly_code_for_stack_check env ~far:true ~max_frame_size_bytes
   | Lop (Specific (Illvm_intrinsic intr)) ->
     Misc.fatal_errorf
       "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
@@ -1979,8 +2008,10 @@ type relaxed_instruction =
   | Far_alloc of
       { num_bytes : int;
         dbginfo : Cmm.alloc_dbginfo;
-        res : Reg.t
+        res : Reg.t;
+        mode : Cmm.Alloc_mode.t
       }
+  | Far_stackcheck of { max_frame_size_bytes : int }
   | Condbranch of
       { test : Operation.test;
         lbl : Cmm.label;
@@ -1995,10 +2026,21 @@ let emit_relaxed_instruction (relaxed : relaxed_instruction) =
       assembly_code_for_poll0 ~far:true ~return_label:None
     in
     ()
-  | Far_alloc { num_bytes; res; dbginfo = _ } ->
+  | Far_alloc { num_bytes; res; dbginfo = _; mode = Heap } ->
     let _gc_lbl, _gc_return_lbl =
       assembly_code_for_fast_heap_allocation0 ~n:num_bytes ~far:true
         ~res_reg:(H.reg_x res)
+    in
+    ()
+  | Far_alloc { num_bytes; res; dbginfo = _; mode = Local } ->
+    let _lr_lbl, _lr_return_lbl =
+      assembly_code_for_local_allocation0 ~n:num_bytes ~far:true
+        ~res_reg:(H.reg_x res)
+    in
+    ()
+  | Far_stackcheck { max_frame_size_bytes } ->
+    let _sc_label, _sc_return =
+      assembly_code_for_stack_check0 ~far:true ~max_frame_size_bytes
     in
     ()
   | Condbranch { test; lbl; arg } -> emit_condbranch arg test lbl
@@ -2033,15 +2075,20 @@ let relax_branches env body =
     let relaxed_instruction_desc ri : Linear.instruction_desc =
       match ri with
       | Far_poll -> Lop (Specific Ifar_poll)
-      | Far_alloc { num_bytes; dbginfo; res = _ } ->
-        Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
+      | Far_alloc { num_bytes; dbginfo; res = _; mode } ->
+        Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo; mode }))
+      | Far_stackcheck { max_frame_size_bytes } ->
+        Lop (Specific (Ifar_stackcheck { max_frame_size_bytes }))
       | Condbranch { test; lbl; arg = _ } -> Lcondbranch (test, lbl)
       | Branch lbl -> Lbranch lbl
 
     let relax_poll () = Far_poll
 
-    let relax_allocation ~num_bytes ~dbginfo ~res =
-      Far_alloc { num_bytes; dbginfo; res }
+    let relax_allocation ~num_bytes ~dbginfo ~res ~mode =
+      Far_alloc { num_bytes; dbginfo; res; mode }
+
+    let relax_stackcheck ~max_frame_size_bytes =
+      Far_stackcheck { max_frame_size_bytes }
 
     let relax_condbranch test lbl ~arg = Condbranch { test; lbl; arg }
 
@@ -2094,7 +2141,16 @@ let fundecl fundecl =
   List.iter emit_call_gc (Env.call_gc_sites env);
   List.iter emit_local_realloc (Env.local_realloc_sites env);
   emit_stack_realloc env;
-  assert (List.length (Env.call_gc_sites env) = num_call_gc_sites);
+  let num_call_gc_sites_after_relaxation =
+    List.length (Env.call_gc_sites env)
+  in
+  if num_call_gc_sites_after_relaxation <> num_call_gc_sites
+  then
+    Misc.fatal_errorf
+      "Branch relaxation changed the number of calls to the GC in function %s: \
+       there were %d before relaxation but %d afterwards"
+      (Env.function_name env) num_call_gc_sites
+      num_call_gc_sites_after_relaxation;
   (match fun_end_label with
   | None -> ()
   | Some fun_end_label ->

@@ -51,6 +51,9 @@ val rename: t -> t
 
 val name: t -> string
 val unique_name: t -> string
+val canonical_name: t -> string
+        (** [name] or [unique_name] following [-d(no)canonical-ids] flag *)
+
 val unique_toplevel_name: t -> string
 val same: t -> t -> bool
         (** Compare identifiers by binding location.

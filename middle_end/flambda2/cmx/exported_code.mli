@@ -55,6 +55,21 @@ val iter_code : t -> f:(Code.t -> unit) -> unit
 
 val from_raw : sections:File_sections.t -> raw -> t
 
+<<<<<<< HEAD
 val to_raw : add_section:(Obj.t -> File_sections.Idx.t) -> t -> raw
+||||||| 3d795b5080
+val to_raw : add_section:(Obj.t -> int) -> t -> raw
+=======
+val to_raw : add_section:(Obj.t -> Oxcaml_utils.File_sections.Idx.t) -> t -> raw
+>>>>>>> main
 
+<<<<<<< HEAD
 val map_raw_index : (File_sections.Idx.t -> File_sections.Idx.t) -> raw -> raw
+||||||| 3d795b5080
+val map_raw_index : (int -> int) -> raw -> raw
+=======
+val map_raw_index :
+  (Oxcaml_utils.File_sections.Idx.t -> Oxcaml_utils.File_sections.Idx.t) ->
+  raw ->
+  raw
+>>>>>>> main

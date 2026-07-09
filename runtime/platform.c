@@ -39,7 +39,10 @@
 #include "sync_posix.h"
 
 #ifdef _WIN32
-/* CR ocaml 5 compactor:
+/* CR nbarnes: The following comment is no longer quite true (since
+ * #3179); think again about Windows compatibility.
+
+   CR ocaml 5 compactor:
 
    The runtime does not currently guarantee that memory is released to the OS in
    the same block sizes as it was allocated, making it incompatible with

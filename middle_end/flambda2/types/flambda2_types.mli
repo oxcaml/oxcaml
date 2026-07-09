@@ -77,9 +77,19 @@ module Typing_env_extension : sig
 
   val add_or_replace_equation : t -> Name.t -> flambda_type -> t
 
-  val add_is_null_relation : t -> Name.t -> scrutinee:Simple.t -> t
+  val add_is_null_relation :
+    machine_width:Target_system.Machine_width.t ->
+    t ->
+    Name.t ->
+    scrutinee:Simple.t ->
+    t
 
-  val add_is_int_relation : t -> Name.t -> scrutinee:Simple.t -> t
+  val add_is_int_relation :
+    machine_width:Target_system.Machine_width.t ->
+    t ->
+    Name.t ->
+    scrutinee:Simple.t ->
+    t
 
   val add_get_tag_relation : t -> Name.t -> scrutinee:Simple.t -> t
 
@@ -637,6 +647,7 @@ val kind : t -> Flambda_kind.t
 
 (** For each of the kinds in an arity, create an "unknown" type. *)
 val unknown_types_from_arity :
+  ?alloc_mode:Alloc_mode.For_types.t ->
   machine_width:Target_system.Machine_width.t ->
   [`Unarized] Flambda_arity.t ->
   t list
@@ -1006,8 +1017,6 @@ module Rewriter : sig
     val var : 'a -> 'a t
 
     val unknown : Flambda_kind.t -> 'a t
-
-    val bottom : Flambda_kind.t -> 'a t
 
     val tag_immediate : 'a t -> 'a t
 

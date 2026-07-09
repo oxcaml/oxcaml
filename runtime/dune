@@ -19,7 +19,7 @@
   (deps ../Makefile.upstream ../Makefile.menhir ../Makefile.best_binaries
     ../stdlib/StdlibModules ../.depend.menhir ../config.status
     ../Makefile.common ../Makefile.config_if_required
-    ../Makefile.build_config ../Makefile.config sak.c
+    ../Makefile.build_config ../Makefile.config ../Makefile.dev sak.c
    (glob_files caml/*.h)
   )
   (action
@@ -32,10 +32,15 @@
 (rule
   (targets build_config.h)
   (mode fallback)
-  (deps sak ../Makefile.upstream)
+  (deps sak sak.c ../Makefile.upstream ../Makefile.menhir
+    ../Makefile.best_binaries
+    ../.depend.menhir ../config.status ../stdlib/StdlibModules
+    ../Makefile.common ../Makefile.config_if_required
+    ../Makefile.build_config ../Makefile.config ../Makefile.dev
+    (glob_files caml/*.h))
   (action
     (progn
-     (bash "rm -f build_config.h")
+     (bash "rm -f build_config.h sak")
      (bash "cd .. && make V=1 -f Makefile.upstream COMPUTE_DEPS=false runtime/build_config.h")
     )
   ))
@@ -53,9 +58,12 @@
      runtime_events.c sync.c
    dynlink.c backtrace_byt.c backtrace.c afl.c bigarray.c prng.c float32.c
    simd.c
+   cpu.c
    blake2.c
    misc.c
-   build_config.h sync_posix.h caml/jumptbl.h caml/domain_state.tbl)
+   build_config.h sync_posix.h caml/jumptbl.h caml/domain_state.tbl
+   ../Makefile.config
+   (glob_files caml/*.h))
  (action
    (progn
      (run %{dep:gen_primitives.sh} primitives %{deps})
@@ -72,6 +80,8 @@
    ../Makefile.config_if_required
    ../Makefile.common ../Makefile.upstream
    ../Makefile.menhir
+   ../Makefile.best_binaries
+   ../Makefile.dev
    ../.depend.menhir
    ../config.status
    ../stdlib/StdlibModules

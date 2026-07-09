@@ -33,7 +33,14 @@ val current_zero_alloc_info : unit -> Zero_alloc_info.t
 val current_generic_fns : unit -> generic_fns
         (* Return the generic functions for the unit being compiled. *)
 
+<<<<<<< HEAD
 val current_sections : unit -> File_sections.Builder.t
+||||||| 3d795b5080
+val current_unit_infos: unit -> unit unit_infos_gen
+        (* Return the infos for the unit being compiled *)
+=======
+val current_sections : unit -> Oxcaml_utils.File_sections.Builder.t
+>>>>>>> main
         (* Return the file sections builder for the unit being compiled. *)
 
 val get_global_export_info : Compilation_unit.t
@@ -44,10 +51,15 @@ val get_global_export_info : Compilation_unit.t
 val get_unit_export_info
   : Compilation_unit.t -> Flambda2_cmx.Flambda_cmx_format.t option
 
+<<<<<<< HEAD
 val get_static_data :
   Compilation_unit.t -> Slambdaeval.CU_data.t option
         (* Returns [None] if the .cmx file cannot be located. *)
 
+||||||| 3d795b5080
+val set_export_info : Flambda2_cmx.Flambda_cmx_format.t -> unit
+=======
+>>>>>>> main
 val set_export_info : Flambda2_cmx.Flambda_cmx_format.raw -> unit
         (* Set the export information for the current unit. *)
 
@@ -76,7 +88,11 @@ val write_unit_info: unit_infos -> string -> unit
 val build_unit_info:
   main_module_block_format:Lambda.main_module_block_format ->
   arg_descr:Lambda.arg_descr option ->
+<<<<<<< HEAD
   static_data:Slambdaeval.CU_data.t ->
+||||||| 3d795b5080
+=======
+>>>>>>> main
   unit_infos
         (* Build the infos for the current unit. *)
 val save_unit_info:

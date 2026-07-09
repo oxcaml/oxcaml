@@ -37,7 +37,12 @@ val prepare_cmx_file_contents :
   module_symbol:Symbol.t ->
   used_value_slots:Value_slot.Set.t ->
   exported_offsets:Exported_offsets.t ->
+<<<<<<< HEAD
   sections:File_sections.Builder.t ->
+||||||| 3d795b5080
+=======
+  sections:Oxcaml_utils.File_sections.Builder.t ->
+>>>>>>> main
   Exported_code.t ->
   Name_occurrences.t * Flambda_cmx_format.raw option
 
@@ -47,6 +52,11 @@ val prepare_cmx_from_approx :
   module_symbol:Symbol.t ->
   exported_offsets:Exported_offsets.t ->
   used_value_slots:Value_slot.Set.t ->
+<<<<<<< HEAD
   sections:File_sections.Builder.t ->
+||||||| 3d795b5080
+=======
+  sections:Oxcaml_utils.File_sections.Builder.t ->
+>>>>>>> main
   Exported_code.t ->
   Name_occurrences.t * Flambda_cmx_format.raw option

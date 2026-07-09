@@ -264,7 +264,7 @@ module Env = struct
     try Ident.Map.find id t.variables
     with Not_found ->
       Misc.fatal_errorf "Closure_conversion.Env.find_var: %s@ %s"
-        (Ident.unique_name id)
+        (Ident.canonical_name id)
         (Printexc.raw_backtrace_to_string (Printexc.get_callstack 42))
 
   let find_var_exn t id = Ident.Map.find id t.variables

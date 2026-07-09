@@ -160,7 +160,8 @@ let pseudoregs_for_operation op arg res =
   (* One-address unary operations: arg.(0) and res.(0) must be the same *)
   | Intop_imm ((Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr), _)
   | Floatop ((Float64 | Float32), (Iabsf | Inegf))
-  | Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour }) ->
+  | Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour })
+  | Opaque ->
     res, res
   (* For xchg, args must be a register allowing access to high 8 bit register
      (rax, rbx, rcx or rdx). Keep it simple, just force the argument in rax. *)
@@ -230,8 +231,8 @@ let pseudoregs_for_operation op arg res =
   | Const_float32 _ | Const_float _ | Const_vec128 _ | Const_vec256 _
   | Const_vec512 _ | Const_symbol _ | Stackoffset _ | Load _
   | Store (_, _, _)
-  | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
-  | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index ->
+  | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Pause | Begin_region
+  | End_region | Poll | Dls_get | Tls_get | Domain_index ->
     raise Use_default_exn
   | Specific (Illvm_intrinsic intr) ->
     Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
@@ -359,7 +360,12 @@ let select_floatarith commutative width (regular_op : Operation.float_operation)
     Rewritten (specific (Ifloatarithmem (width, mem_op, addr)), [arg2; arg1])
   | _, [arg1; arg2] ->
     Rewritten (Basic (Op (Floatop (width, regular_op))), [arg1; arg2])
-  | _ -> assert false
+  | _ ->
+    Misc.fatal_errorf
+      "Cfg_selection.select_floatarith: unexpected combination of width %s and \
+       %d argument(s)"
+      (match width with Float64 -> "Float64" | Float32 -> "Float32")
+      (List.length args)
 
 let select_operation'
     ~(generic_select_condition :

@@ -1,5 +1,7 @@
 (* TEST
  include stdlib_stable;
+ (* CR-soon lmaurer: Remove this flag when [any] in blocks leaves beta *)
+ flags = "-extension layouts_beta";
  expect;
 *)
 
@@ -396,6 +398,14 @@ let a () =
 [%%expect{|
 type r = { a : string; }
 val a : unit -> (r# ref# array, string) idx_mut = <fun>
+|}]
+
+type ('a : any) any_ref = { any_contents : 'a }
+let a () =
+  (.idx_mut(Idx_mut.unsafe_create_into_array 5).#any_contents.#a)
+[%%expect{|
+type ('a : any) any_ref = { any_contents : 'a; }
+val a : unit -> (r# any_ref# array, string) idx_mut = <fun>
 |}]
 
 type t = { mutable a : string; b : int }

@@ -2901,7 +2901,7 @@ let apply_layout_wrapping_l ~env
         when ['a] is [non_float]/[non_pointer64]/[non_pointer], we can give
         ['a or_null] the same separability (per [Jkind.apply_or_null_l]). So
         here we recompute the layout based on the inner jkind. *)
-    begin match Jkind.apply_or_null_l jkind with
+    begin match Jkind.apply_or_null_l env jkind with
     | Ok jkind -> Ok (get_layout jkind)
     | Error () -> Error prev
     end
@@ -2931,14 +2931,15 @@ let apply_jkind_wrapping_l ~env ~level
   end
   |> Result.map (Jkind.apply_modality_l modality)
 
-let apply_jkind_wrapping_r ~unwrapped_ty:{ ty = _; modality; or_null } jkind =
+let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; modality; or_null }
+      jkind =
   begin
     if Option.is_some or_null then
       (* The testsuite passes if we replace the body of this [then] with
          [assert false]. But we don't have a principled reason why (one likely
          exists by thinking sufficiently hard about the sole callsite in
          [constrain_type_jkind].) *)
-      match Jkind.apply_or_null_r jkind with
+      match Jkind.apply_or_null_r env jkind with
       | Ok jkind -> jkind
       | Error () ->
         Misc.fatal_error "Ctype.apply_jkind_wrapping_r: nested or_nulls"
@@ -3311,7 +3312,9 @@ let constrain_type_jkind ~fixed env ty jkind =
                let results =
                  Misc.Stdlib.List.map3
                    (fun unwrapped_ty ty's_jkind jkind ->
-                      let jkind = apply_jkind_wrapping_r jkind ~unwrapped_ty in
+                      let jkind =
+                        apply_jkind_wrapping_r ~env jkind ~unwrapped_ty
+                      in
                       match Jkind.extract_layout env ty's_jkind with
                       | Ok (Any _) ->
                         (* We re-estimate in this case rather than reuse the
@@ -3408,7 +3411,7 @@ let constrain_type_jkind ~fixed env ty jkind =
             in
             let jkind = Jkind.apply_modality_r modality jkind in
             match
-              Jkind.apply_or_null_r jkind
+              Jkind.apply_or_null_r env jkind
             with
             | Ok jkind ->
               (match
@@ -3509,14 +3512,40 @@ let check_type_externality env ty ext =
 
 let check_type_nullability env ty null =
   let upper_bound =
-    Jkind.set_root_nullability (Jkind.Builtin.any ~why:Dummy_jkind) null
+    Jkind.Builtin.any_with_nullability null ~why:Dummy_jkind
   in
   match check_type_jkind env ty upper_bound with
   | Ok () -> true
   | Error _ -> false
 
-let check_type_separability jkind env ty sep =
-  let upper_bound = Jkind.set_root_separability jkind sep in
+let check_type_separability env ty sep =
+  let upper_bound =
+    Jkind.Builtin.any_with_separability sep ~why:Dummy_jkind
+  in
+  match check_type_jkind env ty upper_bound with
+  | Ok () -> true
+  | Error _ -> false
+
+let type_is_gc_ignorable_scannable env ty =
+  (* Checking against the upper bound [scannable non_pointer(64)] ensures that
+     whenever [ty]'s layout is not scannable, the check will be [false]. *)
+  (* CR layouts-scannable: Since we check against [scannable non_pointer(64)],
+     a type of kind [value non_pointer & value non_pointer] will fail to be
+     recognized as being always_gc_ignorable, even though it is. To avoid this,
+     [non_pointer(64)] should imply [external(64)]. *)
+  let scannable = Jkind.Builtin.scannable ~why:Dummy_jkind in
+  let l =
+    match scannable.jkind.base with
+    | Layout l -> l
+    | Kconstr _ ->
+      Misc.fatal_error "Ctype.type_is_gc_ignorable_scannable: abstract Kconstr"
+  in
+  let sep =
+    Jkind_axis.Separability.upper_bound_if_is_always_gc_ignorable ()
+  in
+  let upper_bound =
+    Jkind.set_layout scannable (Jkind.Layout.set_root_separability l sep)
+  in
   match check_type_jkind env ty upper_bound with
   | Ok () -> true
   | Error _ -> false
@@ -3525,18 +3554,7 @@ let is_always_gc_ignorable env ty =
   (* CR layouts: calling [check_type_jkind] two times (indirectly) is sad. *)
   check_type_externality env ty
     (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
-  ||
-  (* Checking against the upper bound [scannable non_pointer(64)] ensures that
-     whenever [ty]'s layout is not scannable, the check will be [false]. *)
-  (* CR layouts-scannable: Since we check against [scannable non_pointer(64)],
-     a type of kind [value non_pointer & value non_pointer] will fail to be
-     recognized as being always_gc_ignorable, even though it is. To avoid this,
-     [non_pointer(64)] should imply [external(64)]. *)
-  check_type_separability (Jkind.Builtin.scannable ~why:Dummy_jkind) env ty
-      (Jkind_axis.Separability.upper_bound_if_is_always_gc_ignorable ())
-
-let check_type_separability env ty sep =
-  check_type_separability (Jkind.Builtin.any ~why:Dummy_jkind) env ty sep
+  || type_is_gc_ignorable_scannable env ty
 
 let check_type_jkind_exn env texn ty jkind =
   match check_type_jkind env ty jkind with
@@ -8253,7 +8271,7 @@ let clear_hash ()   =
    [jkind_const_desc]s. *)
 let rec nondep_jkind_desc_base env ids ~desc_of_const jkind_desc =
   match jkind_desc.base with
-  | Kconstr p -> begin
+  | Kconstr (p, _sa) -> begin
       match Path.find_free_opt ids p with
       | None -> jkind_desc
       | Some id ->
@@ -8367,6 +8385,11 @@ let rec nondep_type_rec ?(expand_private=false) env ids ty =
                 Tvariant (set_row_name row None)
             | _ -> Tvariant row
           end
+      | Tof_kind jk ->
+          let jk = nondep_jkind_base env ids jk in
+          (* CR layouts v2.8: This should be done with a proper nondep_jkind.
+             Internal ticket 5113. *)
+          Tof_kind (Jkind.map_type_expr (nondep_type_rec env ids) jk)
       | desc -> copy_type_desc (nondep_type_rec env ids) desc
     with
     | desc ->

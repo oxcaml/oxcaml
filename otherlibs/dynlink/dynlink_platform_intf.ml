@@ -67,7 +67,7 @@ module type S = sig
   val run_shared_startup : handle -> unit
 
   val run
-     : Mutex.t option
+     : Mutex.t
     -> handle
     -> unit_header:Unit_header.t
     -> priv:bool

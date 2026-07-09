@@ -768,7 +768,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Never_returns -> Never_returns
       | Ok (simple_args, env) ->
         let* rs = emit_tuple env sub_cfg simple_args in
-        Ok (insert_op_debug env sub_cfg (SU.make_opaque ()) dbg rs rs))
+        let rd = Reg.createv_with_typs rs in
+        Ok (insert_op_debug env sub_cfg (SU.make_opaque ()) dbg rs rd))
     | Cop (Ctuple_field (field, fields_layout), [arg], _dbg) -> (
       match emit_expr env sub_cfg arg ~bound_name:None with
       | Never_returns -> Never_returns
@@ -1191,7 +1192,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Array.iter
           (fun reg ->
             match reg.Reg.typ with
-            | Addr -> assert false
+            | Addr ->
+              Misc.fatal_error
+                "Cfg_selectgen.emit_expr_exit: unexpected machtype_component \
+                 Addr in Ccatch register"
             | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
             | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> ())
           src;
@@ -1476,8 +1480,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               }
           in
           DLL.add_end block.Cfg.body
-            (Sub_cfg.make_instr (Cfg.Op naming_op) hard_regs_for_arg [||]
-               Debuginfo.none))
+            (Sub_cfg.make_instr (Cfg.Op naming_op) [||] [||] Debuginfo.none))
       fun_args
 
   (* Sequentialization of a function definition *)

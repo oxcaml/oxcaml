@@ -94,6 +94,8 @@ let unique_name = function
       name
   | Global_with_args g -> global_name g
 
+let canonical_name i = if !Clflags.canonical_ids then name i else unique_name i
+
 let unique_toplevel_name = function
   | Local { name; stamp }
   | Scoped { name; stamp } -> name ^ "/" ^ Int.to_string stamp

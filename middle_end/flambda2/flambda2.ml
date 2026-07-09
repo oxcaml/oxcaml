@@ -150,7 +150,12 @@ let flambda_to_flambda0 : type m.
     mode:m Flambda_features.mode ->
     close_prog_metadata:m Closure_conversion.close_program_metadata ->
     code_slot_offsets:Slot_offsets.t Flambda2_identifiers.Code_id.Map.t ->
+<<<<<<< HEAD
     sections:File_sections.Builder.t ->
+||||||| 3d795b5080
+=======
+    sections:Oxcaml_utils.File_sections.Builder.t ->
+>>>>>>> main
     Flambda_unit.t ->
     flambda_result =
  fun ~ppf_dump:ppf ~prefixname ~cmx_loader ~machine_width ~mode

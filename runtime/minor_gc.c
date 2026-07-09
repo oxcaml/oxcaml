@@ -312,7 +312,12 @@ Caml_inline value try_promote(value v, volatile value *p, header_t hd,
   }
 
   st->live_bytes += Bhsize_hd(hd);
-  *p = result + infix_offset;
+  /* Publish with a release store: a concurrent major-GC marker may scan
+     `p` (a remembered-set field) and dereference the promoted block's
+     header/infix-prefix relying only on an address dependency, so the
+     copy's header and unscannable-prefix writes above must be ordered
+     before this store. */
+  atomic_store_release((atomic_value *)p, result + infix_offset);
   return result;
 }
 
@@ -1155,7 +1160,9 @@ void caml_alloc_small_dispatch (caml_domain_state * dom_st,
        promoted) by the GC before it is initialized. Fortunately, we do not need
        to maintain the invariant that there is enough room in the minor heap to
        re-do the allocation in this case, since we are about to preempt anyway,
-       so we can just return. */
+       so we can just return. (In the bytecode runtime [Caml_state->preemption]
+       is never set to a block, as this is only done by the native-only
+       [caml_domain_setup_preemption]). */
     if (Is_block(Caml_state->preemption)) {
       /* We should only see this case if we allocated from ocaml */
       CAMLassert(flags & CAML_FROM_CAML);

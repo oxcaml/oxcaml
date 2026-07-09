@@ -158,6 +158,7 @@ type error =
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
+  | Missing_immediate_all_void_constructor_attribute of string
 
 open Typedtree
 
@@ -257,11 +258,12 @@ let make_params env path params =
         ~level:(Ctype.get_current_level ())
     in
     try
-      (transl_type_param env path jkind sty, v)
+      let cty, annotated_jkind = transl_type_param env path jkind sty in
+      ((cty, v), annotated_jkind)
     with Already_bound ->
       raise(Error(sty.ptyp_loc, Repeated_parameter))
   in
-    List.map make_param params
+    List.split (List.map make_param params)
 
 (* Enter all declared types in the environment as abstract types *)
 
@@ -931,13 +933,39 @@ let shape_extension_constructor ext =
   | Debugging_shapes ->
     Type_shape.Type_decl_shape.of_extension_constructor_merlin_only ext
 
+let check_imprecise_type_param_annotation env (cty, _) annotated_jkind =
+  match cty.ctyp_desc, get_desc cty.ctyp_type, annotated_jkind with
+  | Ttyp_var (name_opt, Some _), Tvar { jkind; _ }, Some annotated_jkind
+    when not (Jkind.History.has_warned jkind) ->
+    if not (Jkind.equate env jkind annotated_jkind) then begin
+      let format_jkind jkind =
+        Format_doc.asprintf "%a" !Oprint.out_jkind
+          (Out_type.out_jkind_of_jkind env jkind)
+      in
+      let name =
+        match name_opt with
+        | Some name -> Pprintast.tyvar_of_name name
+        | None -> "anonymous type parameter"
+      in
+      Location.prerr_warning cty.ctyp_loc
+        (Warnings.Imprecise_kind_annotation {
+          name;
+          annotated = format_jkind annotated_jkind;
+          inferred = format_jkind jkind;
+        });
+      Types.set_var_jkind cty.ctyp_type (Jkind.History.with_warning jkind)
+    end
+  | _ -> ()
+
 let transl_declaration env sdecl (id, uid) =
   (* Bind type parameters *)
   Ctype.with_local_level begin fun () ->
   TyVarEnv.reset();
   let or_null, or_null_reexport = get_or_null_attributes sdecl in
   let path = Path.Pident id in
-  let tparams = make_params env path sdecl.ptype_params in
+  let tparams, param_annotated_jkinds =
+    make_params env path sdecl.ptype_params
+  in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
   let cstrs = List.map
     (fun (sty, sty', loc) ->
@@ -1245,6 +1273,9 @@ let transl_declaration env sdecl (id, uid) =
         try Ctype.unify env ty ty' with Ctype.Unify err ->
           raise(Error(loc, Inconsistent_constraint (env, err))))
       cstrs;
+  (* Check for imprecise type parameter annotations *)
+    List.iter2 (check_imprecise_type_param_annotation env)
+      tparams param_annotated_jkinds;
   (* Add abstract row *)
     if is_fixed_type sdecl then begin
       let p, _ =
@@ -1329,7 +1360,8 @@ let record_has_atomic_field lbls =
 let record_gets_unboxed_version lbls repr =
   not (record_has_atomic_field lbls) &&
   match repr with
-  | Record_unboxed | Record_inlined _ | Record_float | Record_ufloat -> false
+  | Record_unboxed | Record_inlined _
+  | Record_float | Record_ufloat -> false
   | Record_boxed | Record_variable -> true
   | Record_dummy { represent_as_float_array; flatten_floats } ->
     not represent_as_float_array && not flatten_floats
@@ -2083,6 +2115,17 @@ let update_constructor_representation
         raise (Error (loc, Illegal_mixed_product Extension_constructor));
       Ok (Constructor_mixed shape)
 
+let update_constructor_representation_and_arg_sorts env loc args
+      ~is_extension_constructor =
+  let args, constant, jkinds, arg_sorts =
+    update_constructor_arguments_sorts env loc args
+  in
+  let constructor_shape =
+    update_constructor_representation env args jkinds ~loc
+      ~is_extension_constructor
+  in
+  args, ~constant, constructor_shape, arg_sorts
+
 type unrepresentable_record =
   | Unrepresentable_field of string
 
@@ -2356,27 +2399,53 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     Misc.fatal_error
       "Typedecl.update_record_kind: unexpected record representation"
 
+let update_record_inlined_kind env loc lbls jkinds tag vrep : _ Result.t =
+  match vrep with
+  | Variant_unboxed ->
+    (* The shape of an unboxed constructor is always
+       [Constructor_uniform_value], as at declaration time. *)
+    Ok (Record_inlined (tag, Constructor_uniform_value, Variant_unboxed))
+  | Variant_boxed _ as vrep ->
+    let lbl_decls =
+      List.map (fun (ld, ty) -> { ld with Types.ld_type = ty }) lbls
+    in
+    begin match
+      update_constructor_representation env (Cstr_record lbl_decls)
+        jkinds ~loc ~is_extension_constructor:false
+    with
+    | Ok shape -> Ok (Record_inlined (tag, shape, vrep))
+    | Error (Unrepresentable_argument_field name) ->
+      Error (Unrepresentable_field name)
+    | Error (Unrepresentable_argument _) ->
+      Misc.fatal_error
+        "Typedecl.update_record_kind: unexpected tuple constructor error"
+    end
+  | Variant_extensible | Variant_with_null ->
+    (* Extension constructors always have a known shape, and
+       [Variant_with_null] cannot have an inlined record argument. *)
+    Misc.fatal_error
+      "Typedecl.update_record_kind: unexpected variant representation"
+
 (* Given a record with a variable representation, but updated labels, compute
    the updated sorts and representation *)
 let update_record_kind (type rep) env loc (form : rep record_form)
-      lbls ~warn :
+      ~(old_repres : rep) lbls ~warn :
     _ * (rep, _) Result.t =
   let types = List.map snd lbls in
   let sorts, jkinds = update_label_sorts env loc types ~form in
   let reprs, repr_summary = compute_repr_summary env lbls jkinds in
   let rep : (rep, _) Result.t =
-    (* CR layouts: improve the readability of this match *)
-    let { values; floats; atomic_floats; float64s;
-            non_float64_unboxed_fields; atomic_fields; voids;
-            first_any } = repr_summary
-    in
-    let refining_block_with_any = true in
-    match form with
-    | Legacy ->
+    match form, old_repres with
+    | Legacy, Record_variable ->
+      (* CR layouts: improve the readability of this match *)
+      let { values; floats; atomic_floats; float64s;
+              non_float64_unboxed_fields; atomic_fields; voids;
+              first_any } = repr_summary
+      in
       let rep =
         compute_record_repr loc reprs lbls
           ~represent_as_float_array:false ~flatten_floats:false ~warn
-          ~refining_block_with_any ~values ~floats ~atomic_floats ~float64s
+          ~refining_block_with_any:true ~values ~floats ~atomic_floats ~float64s
           ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
       in
       begin match rep with
@@ -2386,15 +2455,23 @@ let update_record_kind (type rep) env loc (form : rep record_form)
       | Error _ -> ()
       end;
       rep
-    | Unboxed_product ->
-      (match first_any with
+    | Legacy, Record_inlined (tag, Constructor_variable, vrep) ->
+      update_record_inlined_kind env loc lbls jkinds tag vrep
+    | Unboxed_product, _ ->
+      (match repr_summary.first_any with
       | Some id -> Result.Error (Unrepresentable_field (Ident.name id))
       | None -> Ok Record_unboxed_product)
+    | Legacy,
+      (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
+      | Record_ufloat | Record_mixed _ | Record_dummy _) ->
+        Misc.fatal_error
+          "Typedecl.update_record_kind: representation already determined"
   in
   sorts, rep
 
 let update_record_representation
-      (type rep) ~why env loc (form : rep record_form) lbls_and_types =
+      (type rep) ~why ~old_repres
+      env loc (form : rep record_form) lbls_and_types =
   let kloc : jkind_sort_loc =
     match form with
     | Legacy -> Record { unboxed = false }
@@ -2416,7 +2493,9 @@ let update_record_representation
        layout/mode polymorphism introducing concerns about principality of
        inferred layouts/modes. *)
     let snap = Btype.snapshot () in
-    let ans = update_record_kind env loc form lbls_and_types ~warn in
+    let ans =
+      update_record_kind env loc form ~old_repres lbls_and_types ~warn
+    in
     Btype.backtrack snap;
     ans
   in
@@ -2476,7 +2555,7 @@ let rec update_decl_jkind env dpath decl =
         in
         begin match
           Jkind.apply_modality_l modality jkind
-          |> Jkind.apply_or_null_l
+          |> Jkind.apply_or_null_l env
         with
         | Ok type_jkind ->
           let type_jkind =
@@ -2522,15 +2601,25 @@ let rec update_decl_jkind env dpath decl =
     | cstrs, Variant_boxed cstr_layouts ->
       let cstrs =
         List.mapi (fun idx cstr ->
-          let cd_args, _all_void, jkinds, arg_sorts =
-            update_constructor_arguments_sorts env cstr.Types.cd_loc
-              cstr.Types.cd_args
-          in
-          let cstr_repr =
-            update_constructor_representation env cd_args jkinds
+          let cd_args, ~constant, cstr_repr, arg_sorts =
+            update_constructor_representation_and_arg_sorts env
+              cstr.Types.cd_loc cstr.Types.cd_args
               ~is_extension_constructor:false
-              ~loc:cstr.Types.cd_loc
           in
+          let is_nonempty_all_void =
+            constant
+            && (match cd_args with
+                | Cstr_tuple (_ :: _) -> true
+                | Cstr_tuple [] | Cstr_record _ -> false)
+          in
+          if is_nonempty_all_void
+          && not (Builtin_attributes.has_immediate_all_void_constructor
+                    cstr.Types.cd_attributes)
+          then
+            raise
+              (Error (cstr.Types.cd_loc,
+                      Missing_immediate_all_void_constructor_attribute
+                        (Ident.name cstr.Types.cd_id)));
           let () =
             match cstr_repr, arg_sorts with
             | Ok shape, Some sorts ->
@@ -3041,7 +3130,8 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
   match decl.Types.jkind_manifest with
   | None -> ()
   | Some { base = Layout _; _ } -> ()
-  | Some ({ base = Kconstr kpath; mod_bounds = _; with_bounds = No_with_bounds }
+  | Some ({ base = Kconstr (kpath, _); mod_bounds = _;
+            with_bounds = No_with_bounds }
           as manifest) ->
     if not (Path.exists_free recmod_ids kpath) then ()
     else
@@ -3055,7 +3145,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
         | [] -> [expand]
         | _ :: _ ->
           (match manifest.base with
-           | Kconstr base_path -> [Contains (manifest, base_path); expand]
+           | Kconstr (base_path, _) -> [Contains (manifest, base_path); expand]
            | Layout _ -> assert false)
       in
       let rec follow current acc visited =
@@ -3067,7 +3157,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
           None
         else
           match (Env.find_jkind current env).jkind_manifest with
-          | Some ({ base = Kconstr next; mod_bounds = _;
+          | Some ({ base = Kconstr (next, _); mod_bounds = _;
                     with_bounds = No_with_bounds } as m) ->
             follow next ((steps_of current m) @ acc) (current :: visited)
           | Some { base = Layout _; _ } | None -> None
@@ -3806,11 +3896,8 @@ let transl_extension_constructor_decl
       ~cstr_path:(Pident id) ~type_path ~unboxed:false ~extension:true
       typext_params svars sargs sret_type
   in
-  let args, constant, jkinds, _arg_sorts =
-    update_constructor_arguments_sorts env loc args
-  in
-  let constructor_shape =
-    update_constructor_representation env args jkinds ~loc
+  let args, ~constant, constructor_shape, _arg_sorts =
+    update_constructor_representation_and_arg_sorts env loc args
       ~is_extension_constructor:true
   in
   let constructor_shape =
@@ -3929,15 +4016,7 @@ let transl_extension_constructor ~scope env type_path type_params
               in
               Types.Cstr_record lbls
         in
-        let shape =
-          match cdescr.cstr_shape with
-          | Some shape -> shape
-          | None ->
-              Misc.fatal_errorf
-                "unexpected non-constant representation for ext ctor %a"
-                (Format_doc.compat Path.print) type_path
-        in
-        args, shape,
+        args, cdescr.cstr_shape,
         cdescr.cstr_constant, ret_type,
         Text_rebind(path, lid)
   in
@@ -4027,7 +4106,7 @@ let transl_type_extension extend env loc styext =
     let scope = Ctype.create_scope () in
     Ctype.with_local_level_generalize begin fun () ->
       TyVarEnv.reset();
-      let ttype_params = make_params env type_path styext.ptyext_params in
+      let ttype_params, _ = make_params env type_path styext.ptyext_params in
       let type_params = List.map (fun (cty, _) -> cty.ctyp_type) ttype_params in
       List.iter2 (Ctype.unify_var env)
         (Ctype.instance_list type_decl.type_params)
@@ -4595,7 +4674,6 @@ let transl_value_decl env loc ~modal ~why valdecl =
         if valdecl.pval_poly then begin
           Language_extension.assert_enabled ~loc Layout_poly
             Language_extension.Alpha;
-          raise (Error (loc, Poly_not_yet_implemented))
         end;
         let raw_modalities =
           Typemode.transl_modalities_with_default
@@ -4606,7 +4684,12 @@ let transl_value_decl env loc ~modal ~why valdecl =
         in
         md_mode, modalities, Valmi_sig_value raw_modalities
   in
-  let lpoly, cty = Typetexp.transl_type_scheme env valdecl.pval_type in
+  let lpoly_flag =
+    if valdecl.pval_poly then Typetexp.Lpoly else Typetexp.Lmono
+  in
+  let lpoly, cty =
+    Typetexp.transl_type_scheme env valdecl.pval_type lpoly_flag
+  in
   let sort =
     match Ctype.type_sort ~why ~fixed:false env cty.ctyp_type with
     | Ok sort -> sort
@@ -4761,7 +4844,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
   let env = outer_env in
   let decl_path = Path.Pident id in
   let loc = sdecl.ptype_loc in
-  let tparams = make_params env (Pident id) sdecl.ptype_params in
+  let tparams, _ = make_params env (Pident id) sdecl.ptype_params in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
   let arity = List.length params in
   let constraints =
@@ -5266,7 +5349,12 @@ module Reaching_path = struct
          : jkind_const_desc_lr ) =
     let pp_base ppf = function
       | Types.Layout l -> Fmt.fprintf ppf "%s" (Jkind.Layout.Const.to_string l)
-      | Kconstr p -> Printtyp.path ppf p
+      | Kconstr (p, sa) ->
+        (match Jkind.Scannable_axes.to_string_list sa with
+         | [] -> Printtyp.path ppf p
+         | _ :: _ as sa_strs ->
+           Fmt.fprintf ppf "%a %s" Printtyp.path p
+             (String.concat " " sa_strs))
     in
     let mod_strings =
       Typemode.untransl_mod_bounds mod_bounds
@@ -5888,6 +5976,12 @@ let report_error ~loc = function
       "%a can only be used on records whose fields \
        are all float64."
       Style.inline_code "[@@represent_as_float_array]"
+  | Missing_immediate_all_void_constructor_attribute name ->
+    Location.errorf ~loc
+      "All arguments of the constructor %a are void, so it must be@ \
+       annotated with %a."
+      Style.inline_code name
+      Style.inline_code "[@immediate_all_void_constructor]"
 
 let () =
   Location.register_error_of_exn

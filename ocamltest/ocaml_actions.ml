@@ -901,22 +901,30 @@ let run_expect_once input_file principal log env ~backend =
   let exit_status =
     Actions_helpers.run_cmd ~environment:default_ocaml_env log env commandline
   in
-  if exit_status=0 then (Result.pass, env)
+  if exit_status=0 then (Result.pass, env, ~needs_principal:false)
+  else if exit_status=3 then (Result.pass, env, ~needs_principal:true)
   else begin
     let reason = (Actions_helpers.mkreason
       "expect" (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env)
+    (Result.fail_with_reason reason, env, ~needs_principal:false)
   end
 
 let run_expect_twice input_file log env ~backend =
   let corrected filename = Filename.make_filename filename "corrected" in
-  let (result1, env1) = run_expect_once input_file false log env ~backend in
+  let (result1, env1, ~needs_principal) =
+    run_expect_once input_file false log env ~backend
+  in
   if Result.is_pass result1 then begin
     let intermediate_file = corrected input_file in
-    let (result2, env2) =
-      run_expect_once intermediate_file true log env1 ~backend in
+    let (result2, env2, output_file) =
+      if needs_principal then
+        let (result2, env2, ..) =
+          run_expect_once intermediate_file true log env1 ~backend
+        in
+        (result2, env2, corrected intermediate_file)
+      else (result1, env1, intermediate_file)
+    in
     if Result.is_pass result2 then begin
-      let output_file = corrected intermediate_file in
       let output_env = Environments.add_bindings
       [
         Builtin_variables.reference, input_file;
@@ -1261,9 +1269,7 @@ let config_variables _log env =
       Ocamltest_config.ocamlopt_default_flags;
     Ocaml_variables.ocamlrunparam, Sys.safe_getenv "OCAMLRUNPARAM";
     Ocaml_variables.ocamlsrcdir, Ocaml_directories.srcdir;
-    Ocaml_variables.os_type, Sys.os_type;
-    Ocaml_variables.runtime_dir,
-      if Config.runtime5 then "runtime" else "runtime4"
+    Ocaml_variables.os_type, Sys.os_type
   ] env
 
 let flat_float_array = Actions.make
@@ -1446,22 +1452,6 @@ let no_stack_checks = Actions.make
     "Stack checks disabled"
     "Stack checks enabled")
 
-let runtime4 = Actions.make
-  ~name:"runtime4"
-  ~description:"Passes if the OCaml 4.x runtime is being used"
-  ~does_something:false
-  (Actions_helpers.predicate (not Config.runtime5)
-    "4.x runtime being used"
-    "5.x runtime being used")
-
-let runtime5 = Actions.make
-  ~name:"runtime5"
-  ~description:"Passes if the OCaml 5.x runtime is being used"
-  ~does_something:false
-  (Actions_helpers.predicate Config.runtime5
-    "5.x runtime being used"
-    "4.x runtime being used")
-
 (* CR ttebbi: We should also protect against non-default register allocation
     options. *)
 let only_default_codegen = Actions.make
@@ -1471,7 +1461,6 @@ let only_default_codegen = Actions.make
   ~does_something:false
   (Actions_helpers.predicate
     (Config.no_stack_checks
-      && Config.runtime5
       && not Config.poll_insertion
       && not Config.with_address_sanitizer
       && not Config.with_frame_pointers)
@@ -1698,7 +1687,5 @@ let init () =
     ocamlobjinfo;
     stack_checks;
     no_stack_checks;
-    runtime4;
-    runtime5;
     only_default_codegen
   ]

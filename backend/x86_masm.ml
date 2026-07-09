@@ -196,6 +196,7 @@ let print_instr b = function
   | SUB (arg1, arg2) -> i2 b "sub" arg1 arg2
   | SBB (arg1, arg2) -> i2 b "sbb" arg1 arg2
   | TEST (arg1, arg2) -> i2 b "test" arg1 arg2
+  | UD2 -> i0 b "ud2"
   | XCHG (arg1, arg2) -> i2 b "xchg" arg1 arg2
   | XOR (arg1, arg2) -> i2 b "xor" arg1 arg2
   | SIMD (instr, args) -> (

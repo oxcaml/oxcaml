@@ -32,7 +32,7 @@ $(patsubst %.cmo,%.cmx,$(patsubst %.cma,%.cmxa,$1))
 endef
 
 CAMLC = $(BOOT_OCAMLC) -g -nostdlib -I $(ROOTDIR)/boot \
-        -use-prims $(ROOTDIR)/$(RUNTIME_DIR)/primitives -I $(ROOTDIR)
+        -use-prims $(ROOTDIR)/runtime/primitives -I $(ROOTDIR)
 CAMLOPT = $(OCAMLRUN) $(ROOTDIR)/ocamlopt$(EXE) \
   -g -nostdlib -I $(ROOTDIR)/stdlib
 INCLUDES = $(addprefix -I $(ROOTDIR)/,utils parsing typing bytecomp \
@@ -259,13 +259,6 @@ lintapidiff.opt$(EXE): $(LINTAPIDIFF)
 clean::
 	rm -f -- lintapidiff.opt lintapidiff.opt.exe
 	rm -f lintapidiff.cm? lintapidiff.o lintapidiff.obj
-
-# Eventlog metadata file
-
-install::
-	$(INSTALL_DATA) \
-	  eventlog_metadata \
-	  "$(INSTALL_LIBDIR)"
 
 # Copy a bytecode executable, stripping debug info
 

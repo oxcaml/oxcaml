@@ -2059,6 +2059,8 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_color F._color;
     mk_error_style F._error_style;
 
+    mk_dcanonical_ids F._dcanonical_ids;
+    mk_dno_canonical_ids F._dno_canonical_ids;
     mk_dno_unique_ids F._dno_unique_ids;
     mk_dunique_ids F._dunique_ids;
     mk_dno_locations F._dno_locations;

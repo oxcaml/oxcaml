@@ -268,12 +268,14 @@ let pseudoregs_for_operation op arg res =
   match (op : Operation.t) with
   | Specific (Isimd simd_op) ->
     Simd_selection.pseudoregs_for_operation simd_op arg res
+  | Opaque -> res, res
   | Specific
       ( Ifar_poll | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf
       | Imulsubf | Inegmulsubf | Isqrtf | Imove32 | Ifar_alloc _
+      | Ifar_stackcheck _
       | Ishiftarith (_, _)
       | Ibswap _ | Isignext _ )
-  | Move | Spill | Reload | Opaque | Pause | Begin_region | End_region | Dls_get
+  | Move | Spill | Reload | Pause | Begin_region | End_region | Dls_get
   | Tls_get | Domain_index | Poll | Const_int _ | Const_float32 _
   | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
   | Const_vec512 _ | Stackoffset _ | Load _
