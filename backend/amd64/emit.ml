@@ -1120,6 +1120,20 @@ let movq src dst =
     then I.simd vmovq_Xm64_X [| src; dst |]
     else I.simd vmovq_r64m64_X [| src; dst |]
 
+let kmov src dst =
+  let open Simd_instrs in
+  match is_regmask src, is_regmask dst with
+  | true, true -> I.simd kmovq_K_Km64 [| src; dst |]
+  | false, true ->
+    if is_mem src
+    then I.simd kmovq_K_Km64 [| src; dst |]
+    else I.simd kmovq_K_r64 [| src; dst |]
+  | true, false ->
+    if is_mem dst
+    then I.simd kmovq_m64_K [| src; dst |]
+    else I.simd kmovq_r64_K [| src; dst |]
+  | false, false -> Misc.fatal_error "Illegal kmov operands"
+
 let movss src dst =
   let open Simd_instrs in
   match Arch.Extension.enabled AVX, is_mem src, is_mem dst with
@@ -1713,15 +1727,7 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
   | Float_of_int64 | Int64_of_float -> movq (arg i 0) (res i 0)
   | Float32_of_int32 -> movd (arg32 i 0) (res i 0)
   | Int32_of_float32 -> movd (arg i 0) (res32 i 0)
-  | Mask_of_int64 -> I.simd kmovq_K_r64 [| arg i 0; res i 0 |]
-  | Int64_of_mask -> (
-    (* The C ABI passes masks as GPRs, which may be stored in stack slots. *)
-    match i.res.(0).loc with
-    | Reg _ -> I.simd kmovq_r64_K [| arg i 0; res i 0 |]
-    | Stack _ -> I.simd kmovq_m64_K [| arg i 0; res i 0 |]
-    | Unknown ->
-      Misc.fatal_errorf "Int64_of_mask: unknown result location %a" Printreg.reg
-        i.res.(0))
+  | Mask_of_int64 | Int64_of_mask -> kmov (arg i 0) (res i 0)
 
 let emit_static_cast (cast : Cmm.static_cast) i =
   let open Simd_instrs in
@@ -1912,7 +1918,7 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
   let args =
     Array.fold_left
       (fun (idx, args) (arg : Simd.arg) ->
-        if Amd64_simd_defs.arg_is_implicit arg
+        if Simd.arg_is_implicit arg
         then idx + 1, args
         else
           match Simd.loc_allows_mem arg.loc, mode with
