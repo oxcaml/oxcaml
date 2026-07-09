@@ -478,14 +478,15 @@ CAMLprim value caml_dynamic_make(value inherit)
 {
   CAMLparam1(inherit);
 
-  /* TODO: consider other hash functions. This one is ~unique, which is nice */
-  value hash = caml_fresh_oo_id(Val_unit);
+  /* Increments a global counter, so id is unique among dynamics. */
+  value id = caml_fresh_oo_id(Val_unit);
 
+  CAMLassert((id & DYNAMIC_INHERIT_BIT) == 0);
   if(Bool_val(inherit)) {
-    hash |= DYNAMIC_INHERIT_BIT;
+    id |= DYNAMIC_INHERIT_BIT;
   }
 
-  CAMLreturn(hash);
+  CAMLreturn(id);
 }
 
 CAMLprim value caml_dynamic_is_inherited(value dyn)
