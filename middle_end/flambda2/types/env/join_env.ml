@@ -2500,6 +2500,9 @@ let join_aliases_in_env_extension ~joined_envs ~bindings equations_to_join =
         in
         equations_in_target_env, equations_to_join, bindings)
 
+let do_not_join_env_extensions =
+  Oxcaml_args.Extra_options.bool __LOC__ "no-flambda2-join-env-extensions"
+
 let n_way_join_env_extension ~n_way_join_type ~meet_expanded_head t extensions :
     _ Or_bottom.t =
   let joined_equations =
@@ -2518,57 +2521,61 @@ let n_way_join_env_extension ~n_way_join_type ~meet_expanded_head t extensions :
   if Index.Map.is_empty joined_equations
   then Bottom
   else
-    try
-      let joined_envs = Joined_envs.create joined_equations in
-      let alias_types_in_target_env, concrete_types_to_join, bindings =
-        join_aliases_in_env_extension ~joined_envs ~bindings:t.bindings
-          joined_equations
-      in
-      (* CR-someday bclement: if we create new existential variables during the
-         join of env extensions, we might need additional rounds for
-         completeness (see comment in [n_way_join_simples]) -- in practice one
-         round should be plenty. *)
-      let ( equations,
-            _env_extension_for_inverse_relations,
-            { bindings = bindings_after_extension; _ } ) =
-        n_way_join_round ~n_way_join_type { joined_envs; bindings }
-          concrete_types_to_join alias_types_in_target_env Name.Map.empty
-      in
-      (* It is possible for the call to [add_env_extension] in
-         [prepare_nested_join] above to create new variables, which do not exist
-         in the parent environments. These variables must not leak into the
-         [bindings]: since they don't exist in the parent joined environments,
-         we won't be able to find a type for them in the target environment
-         outside of the extension.
+    match Index.Map.get_singleton joined_equations with
+    | None when do_not_join_env_extensions () -> Ok (TEE.empty, t)
+    | _ -> (
+      try
+        let joined_envs = Joined_envs.create joined_equations in
+        let alias_types_in_target_env, concrete_types_to_join, bindings =
+          join_aliases_in_env_extension ~joined_envs ~bindings:t.bindings
+            joined_equations
+        in
+        (* CR-someday bclement: if we create new existential variables during
+           the join of env extensions, we might need additional rounds for
+           completeness (see comment in [n_way_join_simples]) -- in practice one
+           round should be plenty. *)
+        let ( equations,
+              _env_extension_for_inverse_relations,
+              { bindings = bindings_after_extension; _ } ) =
+          n_way_join_round ~n_way_join_type { joined_envs; bindings }
+            concrete_types_to_join alias_types_in_target_env Name.Map.empty
+        in
+        (* It is possible for the call to [add_env_extension] in
+           [prepare_nested_join] above to create new variables, which do not
+           exist in the parent environments. These variables must not leak into
+           the [bindings]: since they don't exist in the parent joined
+           environments, we won't be able to find a type for them in the target
+           environment outside of the extension.
 
-         For now, we avoid this problem by simply forgetting about the
-         definition of new variables (in the target env) during the join of
-         extensions. This means that in some cases we might create the same
-         variable twice (e.g. we might create a variable to represent {0, 1}
-         inside an env extension and then another one outside of the env
-         extension), but not incorrect, only slighly inefficient. *)
-      let bindings =
-        Bindings_in_target_env.forget_definition_of_created_variables
-          bindings_after_extension ~since:t.bindings
-      in
-      Ok
-        ( TEE.from_map
-            (equations
-              : Type_in_target_env.t Name_in_target_env.Map.t
-              :> TG.t Name.Map.t),
-          { t with bindings } )
-    with Misc.Fatal_error ->
-      (* Note that we display the env extensions in their current canonical
-         form, which might differ from their form as recorded in the input
-         types. *)
-      let bt = Printexc.get_raw_backtrace () in
-      Format.eprintf "\n@[<v 2>%tContext is:%t join of env extensions:@ %a@]\n"
-        Flambda_colours.error Flambda_colours.pop
-        (Index.Map.print (fun ppf (_, extension) ->
-             TEE.print ppf
-               (TEE.from_map
-                  (extension.current
-                    : Type_in_one_joined_env.t Name.Map.t
-                    :> TG.t Name.Map.t))))
-        joined_equations;
-      Printexc.raise_with_backtrace Misc.Fatal_error bt
+           For now, we avoid this problem by simply forgetting about the
+           definition of new variables (in the target env) during the join of
+           extensions. This means that in some cases we might create the same
+           variable twice (e.g. we might create a variable to represent {0, 1}
+           inside an env extension and then another one outside of the env
+           extension), but not incorrect, only slighly inefficient. *)
+        let bindings =
+          Bindings_in_target_env.forget_definition_of_created_variables
+            bindings_after_extension ~since:t.bindings
+        in
+        Ok
+          ( TEE.from_map
+              (equations
+                : Type_in_target_env.t Name_in_target_env.Map.t
+                :> TG.t Name.Map.t),
+            { t with bindings } )
+      with Misc.Fatal_error ->
+        (* Note that we display the env extensions in their current canonical
+           form, which might differ from their form as recorded in the input
+           types. *)
+        let bt = Printexc.get_raw_backtrace () in
+        Format.eprintf
+          "\n@[<v 2>%tContext is:%t join of env extensions:@ %a@]\n"
+          Flambda_colours.error Flambda_colours.pop
+          (Index.Map.print (fun ppf (_, extension) ->
+               TEE.print ppf
+                 (TEE.from_map
+                    (extension.current
+                      : Type_in_one_joined_env.t Name.Map.t
+                      :> TG.t Name.Map.t))))
+          joined_equations;
+        Printexc.raise_with_backtrace Misc.Fatal_error bt)
