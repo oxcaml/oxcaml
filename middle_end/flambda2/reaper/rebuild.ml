@@ -1538,12 +1538,19 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
         | Left simple -> bind_field_to_simple var simple hole
         | Right arg_fields -> bind_fields var (Unboxed arg_fields) hole)
       to_bind hole
-  | Prim (Unary (Box_number _, contents), _dbg) ->
+  | Prim (Unary (Box_number (prim_bn, _), contents), _dbg) ->
     Field.Map.fold
       (fun field (var : _ Unboxed_fields.u) hole ->
         let arg =
           match Field.view field with
-          | Boxed_number _ -> contents
+          | Boxed_number bn ->
+            if not (K.Boxable_number.equal bn prim_bn)
+            then
+              Misc.fatal_errorf
+                "Field %a does not match the kind of the [Box_number] \
+                 primitive when unboxing boxed number binding for %a"
+                Field.print field Bound_var.print bv;
+            contents
           | Block _ | Is_int | Get_tag | Value_slot _ | Function_slot _
           | Call_witness _ | Return_of_call _ | Code_id_of_call_witness ->
             Misc.fatal_errorf

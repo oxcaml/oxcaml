@@ -369,7 +369,12 @@ let datalog_rules =
        [cannot_change_representation1 x] ==> cannot_change_representation x);
       (* Due to value_kinds rewriting not taking representation changes into
          account for now, blocks cannot have their representation changed, so we
-         prevent it here. The same applies to boxed numbers. *)
+         prevent it here. Boxed numbers are also prevented from changing their
+         representation, but for a different reason: since they only have a
+         single field, a representation change could never be useful. Either
+         that field is used, and no representation change is necessary, or it is
+         unused, and the whole boxed number should be replaced by a poison value
+         instead. *)
       (let$ [x; field; y] = ["x"; "field"; "y"] in
        [ constructor ~base:x field ~from:y;
          when1

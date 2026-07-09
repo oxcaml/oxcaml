@@ -26,25 +26,25 @@ type 'a block_or_closure_fields =
       }
   | Closure_fields of 'a Value_slot.Map.t * 'a Function_slot.Map.t
   | Boxed_number_field of Flambda_kind.Boxable_number.t * 'a
-  | Block_and_closure_fields
+  | Fields_from_distinct_subkinds
 
 let classify_field_map fields =
   let r =
     Field.Map.fold
       (fun field x acc ->
         match acc with
-        | `Block_and_closure_fields -> `Block_and_closure_fields
+        | `Fields_from_distinct_subkinds -> `Fields_from_distinct_subkinds
         | `Boxed_number_field _ ->
           (* A boxed number has a single field, so it cannot be combined with
              any other field. *)
-          `Block_and_closure_fields
+          `Fields_from_distinct_subkinds
         | (`Block_fields _ | `Closure_fields _ | `Empty) as acc -> (
           let[@inline] block_fields k =
             let[@local] k is_int get_tag fields =
               (k [@inlined hint]) ~is_int ~get_tag ~fields
             in
             match acc with
-            | `Closure_fields _ -> `Block_and_closure_fields
+            | `Closure_fields _ -> `Fields_from_distinct_subkinds
             | `Block_fields (is_int, get_tag, fields) -> k is_int get_tag fields
             | `Empty -> k None None Numeric_types.Int.Map.empty
           in
@@ -55,16 +55,17 @@ let classify_field_map fields =
             match acc with
             | `Closure_fields (value_slots, function_slots) ->
               k value_slots function_slots
-            | `Block_fields _ -> `Block_and_closure_fields
+            | `Block_fields _ -> `Fields_from_distinct_subkinds
             | `Empty -> k Value_slot.Map.empty Function_slot.Map.empty
           in
           match Field.view field with
           | Call_witness _ | Return_of_call _ | Code_id_of_call_witness ->
-            `Block_and_closure_fields
+            `Fields_from_distinct_subkinds
           | Boxed_number bn -> (
             match acc with
             | `Empty -> `Boxed_number_field (bn, x)
-            | `Block_fields _ | `Closure_fields _ -> `Block_and_closure_fields)
+            | `Block_fields _ | `Closure_fields _ ->
+              `Fields_from_distinct_subkinds)
           | Value_slot vs ->
             closure_fields (fun ~value_slots ~function_slots ->
                 `Closure_fields
@@ -84,7 +85,7 @@ let classify_field_map fields =
           | Block (i, kind) ->
             block_fields (fun ~is_int ~get_tag ~fields ->
                 if Numeric_types.Int.Map.mem i fields
-                then `Block_and_closure_fields
+                then `Fields_from_distinct_subkinds
                 else
                   `Block_fields
                     ( is_int,
@@ -94,7 +95,7 @@ let classify_field_map fields =
   in
   match r with
   | `Empty -> Empty
-  | `Block_and_closure_fields -> Block_and_closure_fields
+  | `Fields_from_distinct_subkinds -> Fields_from_distinct_subkinds
   | `Boxed_number_field (bn, x) -> Boxed_number_field (bn, x)
   | `Closure_fields (vs, fs) -> Closure_fields (vs, fs)
   | `Block_fields (is_int, get_tag, fields) ->
@@ -152,7 +153,16 @@ let rewrite_boxed_number_kind context usages kind bn =
   (* The contents of boxed int32/int64/nativeint values are tracked via
      [Boxed_number] fields. If the contents are read, the value must really be a
      boxed number (in particular, it cannot have been replaced by a poison
-     value), so the subkind can be kept. *)
+     value), so the subkind can be kept.
+
+     Note that the [Bottom] case below is reachable even though this function is
+     only called for values with usages: the value's usages may all read a
+     different field, for example when the value flows into a parameter that is
+     also fed by values of a different shape and only the fields of those other
+     values are read. Such a read is invalid when it is reached with a value of
+     this kind, but not immediately invalid (it may be behind a branch), so the
+     value here can still have been replaced by a poison value and the subkind
+     must be erased. *)
   match PTA.get_one_field_usage context.db (Field.boxed_number bn) usages with
   | Bottom -> erase kind
   | Unknown | Ok _ -> kind
@@ -416,7 +426,7 @@ module Rewriter = struct
     match classify_field_map combined with
     | Empty when Option.is_some patterns_for_function_slots ->
       closure Value_slot.Map.empty
-    | Empty | Block_and_closure_fields ->
+    | Empty | Fields_from_distinct_subkinds ->
       ( Field.Map.map (fun (_, unboxed_fields) -> forget unboxed_fields) combined,
         Pattern.any )
     | Boxed_number_field (bn, use) ->

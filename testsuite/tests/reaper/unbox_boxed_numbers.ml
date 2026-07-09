@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
    flags += "-flambda2-reaper -reaper-debug-flags=nostamps";
-   { native with dump-reaper; check-fexpr-dump; }
+   { native with dump-simplify, dump-reaper; check-fexpr-dump; }
  *)
 
 (* The .mli ensures that only the [test_*] functions escape, so the reaper is
@@ -28,6 +28,16 @@ let test_value_slot n =
   let b = Int64.of_int n in
   let[@inline never] [@local never] read () = Int64.to_int b in
   read () + 1
+
+(* As for [test_value_slot], but here the closure [read] is called indirectly
+   and so cannot itself be unboxed.  Its representation can however still be
+   changed: the boxed number's value slot is replaced by a value slot of kind
+   naked int64. *)
+let test_value_slot_not_unboxed n =
+  let b = Int64.of_int n in
+  let[@inline never] [@local never] read () = Int64.to_int b in
+  let[@inline never] [@local never] indirect read = read () in
+  indirect read + 1
 
 (* Boxed numbers inside an unboxed block: the pair is unboxed into its
    components, whose boxes are unboxed in turn (and the unused second

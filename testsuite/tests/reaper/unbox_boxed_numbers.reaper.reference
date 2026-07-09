@@ -6,8 +6,11 @@ let code test_int32_4 deleted in
 let code test_nativeint_5 deleted in
 let code read_7 deleted in
 let code test_value_slot_6 deleted in
-let code pair_first_8 deleted in
-let code test_pair_9 deleted in
+let code read_9 deleted in
+let code indirect_10 deleted in
+let code test_value_slot_not_unboxed_8 deleted in
+let code pair_first_11 deleted in
+let code test_pair_12 deleted in
 let code inline(never) loopify(never) size(2) newer_version_of(add_int64_0)
       add_int64_0_1
         (int64_of_int_into_x_field_unboxed_int64 : int64,
@@ -21,7 +24,7 @@ let code inline(never) loopify(never) size(2) newer_version_of(add_int64_0)
   let int64_add_into_int64_add_field_unboxed_int64 = prim_2 in
   cont k (int64_add_into_int64_add_field_unboxed_int64)
 in
-let $camlUnbox_boxed_numbers__add_int64_10 = closure add_int64_0_1 @add_int64
+let $camlUnbox_boxed_numbers__add_int64_13 = closure add_int64_0_1 @add_int64
 in
 let code inline(never) loopify(never) size(2) newer_version_of(add_int32_1)
       add_int32_1_1
@@ -36,7 +39,7 @@ let code inline(never) loopify(never) size(2) newer_version_of(add_int32_1)
   let int32_add_into_int32_add_field_unboxed_int32 = prim_2 in
   cont k (int32_add_into_int32_add_field_unboxed_int32)
 in
-let $camlUnbox_boxed_numbers__add_int32_11 = closure add_int32_1_1 @add_int32
+let $camlUnbox_boxed_numbers__add_int32_14 = closure add_int32_1_1 @add_int32
 in
 let code inline(never) loopify(never) size(2) newer_version_of(add_nativeint_2)
       add_nativeint_2_1
@@ -51,7 +54,7 @@ let code inline(never) loopify(never) size(2) newer_version_of(add_nativeint_2)
   let nativeint_add_into_nativeint_add_field_unboxed_nativeint = prim_2 in
   cont k (nativeint_add_into_nativeint_add_field_unboxed_nativeint)
 in
-let $camlUnbox_boxed_numbers__add_nativeint_12 =
+let $camlUnbox_boxed_numbers__add_nativeint_15 =
   closure add_nativeint_2_1 @add_nativeint
 in
 let code loopify(never) size(9) newer_version_of(test_int64_3)
@@ -66,7 +69,7 @@ let code loopify(never) size(9) newer_version_of(test_int64_3)
    let prim_3 = %num_conv.[`imm`].[`int64`] (prim_2) in
    let int64_of_int_into_int64_of_int_field_unboxed_int64_1 = prim_3 in
    apply direct(add_int64_0_1)
-     ($camlUnbox_boxed_numbers__add_int64_10 : _ -> int64)
+     ($camlUnbox_boxed_numbers__add_int64_13 : _ -> int64)
        (int64_of_int_into_int64_of_int_field_unboxed_int64_1,
         int64_of_int_into_int64_of_int_field_unboxed_int64)
        -> k2 * k1)
@@ -76,7 +79,7 @@ let code loopify(never) size(9) newer_version_of(test_int64_3)
       let int_of_int64 = %tag_imm (prim_1) in
       cont k (int_of_int64)
 in
-let $camlUnbox_boxed_numbers__test_int64_13 =
+let $camlUnbox_boxed_numbers__test_int64_16 =
   closure test_int64_3_1 @test_int64
 in
 let code loopify(never) size(11) newer_version_of(test_int32_4)
@@ -91,7 +94,7 @@ let code loopify(never) size(11) newer_version_of(test_int32_4)
    let prim_3 = %num_conv.[`imm`].[`int32`] (prim_2) in
    let int32_of_int_into_int32_of_int_field_unboxed_int32_1 = prim_3 in
    apply direct(add_int32_1_1)
-     ($camlUnbox_boxed_numbers__add_int32_11 : _ -> int32)
+     ($camlUnbox_boxed_numbers__add_int32_14 : _ -> int32)
        (int32_of_int_into_int32_of_int_field_unboxed_int32_1,
         int32_of_int_into_int32_of_int_field_unboxed_int32)
        -> k2 * k1)
@@ -101,7 +104,7 @@ let code loopify(never) size(11) newer_version_of(test_int32_4)
       let int_of_int32 = %tag_imm (prim_1) in
       cont k (int_of_int32)
 in
-let $camlUnbox_boxed_numbers__test_int32_14 =
+let $camlUnbox_boxed_numbers__test_int32_17 =
   closure test_int32_4_1 @test_int32
 in
 let code loopify(never) size(10) newer_version_of(test_nativeint_5)
@@ -120,7 +123,7 @@ let code loopify(never) size(10) newer_version_of(test_nativeint_5)
      prim_3
    in
    apply direct(add_nativeint_2_1)
-     ($camlUnbox_boxed_numbers__add_nativeint_12 : _ -> nativeint)
+     ($camlUnbox_boxed_numbers__add_nativeint_15 : _ -> nativeint)
        (nativeint_of_int_into_nativeint_of_int_field_unboxed_nativeint_1,
         nativeint_of_int_into_nativeint_of_int_field_unboxed_nativeint)
        -> k2 * k1)
@@ -132,7 +135,7 @@ let code loopify(never) size(10) newer_version_of(test_nativeint_5)
       let int_of_nativeint = %tag_imm (prim_1) in
       cont k (int_of_nativeint)
 in
-let $camlUnbox_boxed_numbers__test_nativeint_15 =
+let $camlUnbox_boxed_numbers__test_nativeint_18 =
   closure test_nativeint_5_1 @test_nativeint
 in
 let code inline(never) loopify(never) size(3) newer_version_of(read_7)
@@ -167,11 +170,59 @@ let code loopify(never) size(10) newer_version_of(test_value_slot_6)
       let `unit` = %end_region (`region`) in
       cont k (int_add)
 in
-let $camlUnbox_boxed_numbers__test_value_slot_16 =
+let $camlUnbox_boxed_numbers__test_value_slot_19 =
   closure test_value_slot_6_1 @test_value_slot
 in
-let code inline(never) loopify(never) size(3) newer_version_of(pair_first_8)
-      pair_first_8_1 (Pmakeblock_into_p_field_0_field_unboxed_int64 : int64)
+let code inline(never) loopify(never) size(6) newer_version_of(indirect_10)
+      indirect_10_1 (read : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  apply read (0) -> k * k1
+in
+let $camlUnbox_boxed_numbers__indirect_21 = closure indirect_10_1 @indirect
+in
+let code inline(never) loopify(never) size(4) newer_version_of(read_9)
+      read_9_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let b_into_b_field_unboxed_int64 =
+    %project_value_slot.[read].[unboxed_field_b_field_unboxed_int64]
+      (my_closure)
+  in
+  let prim = b_into_b_field_unboxed_int64 in
+  let prim_1 = %num_conv.[`int64`].[`imm`] (prim) in
+  let int_of_int64 = %tag_imm (prim_1) in
+  cont k (int_of_int64)
+in
+let code loopify(never) size(22) newer_version_of(test_value_slot_not_unboxed_8)
+      test_value_slot_not_unboxed_8_1 (n : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let prim = %untag_imm (n) in
+  let prim_1 = %num_conv.[`imm`].[`int64`] (prim) in
+  let b_into_b_field_unboxed_int64 = prim_1 in
+  let read = closure read_9_1 @read
+  with {
+    unboxed_field_b_field_unboxed_int64 :
+      int64 =
+      b_into_b_field_unboxed_int64
+  }
+  in
+  apply direct(indirect_10_1)
+    $camlUnbox_boxed_numbers__indirect_21 (read) -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      let int_add = %int_barith.add (apply_result, 1) in
+      let `unit` = %end_region (`region`) in
+      cont k (int_add)
+in
+let $camlUnbox_boxed_numbers__test_value_slot_not_unboxed_20 =
+  closure test_value_slot_not_unboxed_8_1 @test_value_slot_not_unboxed
+in
+let code inline(never) loopify(never) size(3) newer_version_of(pair_first_11)
+      pair_first_11_1 (Pmakeblock_into_p_field_0_field_unboxed_int64 : int64)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
@@ -183,11 +234,11 @@ let code inline(never) loopify(never) size(3) newer_version_of(pair_first_8)
   let int_of_int64 = %tag_imm (prim_1) in
   cont k (int_of_int64)
 in
-let $camlUnbox_boxed_numbers__pair_first_17 =
-  closure pair_first_8_1 @pair_first
+let $camlUnbox_boxed_numbers__pair_first_22 =
+  closure pair_first_11_1 @pair_first
 in
-let code loopify(never) size(5) newer_version_of(test_pair_9)
-      test_pair_9_1 (a : imm tagged, b : imm tagged)
+let code loopify(never) size(5) newer_version_of(test_pair_12)
+      test_pair_12_1 (a : imm tagged, b : imm tagged)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
@@ -197,18 +248,20 @@ let code loopify(never) size(5) newer_version_of(test_pair_9)
   let Pmakeblock_into_Pmakeblock_field_0_field_unboxed_int64 =
     int64_of_int_into_int64_of_int_field_unboxed_int64
   in
-  apply direct(pair_first_8_1)
-    ($camlUnbox_boxed_numbers__pair_first_17 : _ -> imm tagged)
+  apply direct(pair_first_11_1)
+    ($camlUnbox_boxed_numbers__pair_first_22 : _ -> imm tagged)
       (Pmakeblock_into_Pmakeblock_field_0_field_unboxed_int64)
       -> k * k1
 in
-let $camlUnbox_boxed_numbers__test_pair_18 = closure test_pair_9_1 @test_pair
+let $camlUnbox_boxed_numbers__test_pair_23 =
+  closure test_pair_12_1 @test_pair
 in
 let $camlUnbox_boxed_numbers =
-  Block 0 ($camlUnbox_boxed_numbers__test_int64_13,
-           $camlUnbox_boxed_numbers__test_int32_14,
-           $camlUnbox_boxed_numbers__test_nativeint_15,
-           $camlUnbox_boxed_numbers__test_value_slot_16,
-           $camlUnbox_boxed_numbers__test_pair_18)
+  Block 0 ($camlUnbox_boxed_numbers__test_int64_16,
+           $camlUnbox_boxed_numbers__test_int32_17,
+           $camlUnbox_boxed_numbers__test_nativeint_18,
+           $camlUnbox_boxed_numbers__test_value_slot_19,
+           $camlUnbox_boxed_numbers__test_value_slot_not_unboxed_20,
+           $camlUnbox_boxed_numbers__test_pair_23)
 in
 cont done ($camlUnbox_boxed_numbers)

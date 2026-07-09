@@ -298,7 +298,11 @@ and destructure_head_of_kind_value_non_null ~machine_width discriminant accessor
       | Bottom -> bottom_accessor ~machine_width accessor
       | Unknown -> unknown_accessor ~machine_width accessor
       | Ok function_type -> TG.Function_type.rec_info function_type))
-  | Boxed_number boxable_number, Unbox_number _, head -> (
+  (* The type returned here must have the kind stored in the accessor (the
+     [Boxed_number] discriminant and [Unbox_number] accessor kinds always match
+     when built via [Pattern.boxed_number], but the accessor's kind is the
+     authoritative one). *)
+  | Boxed_number _, Unbox_number boxable_number, head -> (
     match boxable_number, head with
     | Naked_float32, Boxed_float32 (ty, _alloc_mode)
     | Naked_float, Boxed_float (ty, _alloc_mode)
