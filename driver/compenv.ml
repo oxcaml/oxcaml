@@ -460,6 +460,10 @@ let read_one_param ppf position name v =
       set "linscan" [ use_linscan ] v
   | "insn-sched" -> set "insn-sched" [ insn_sched ] v
   | "no-insn-sched" -> clear "insn-sched" [ insn_sched ] v
+  | "cmm-check-machtypes" ->
+      set "cmm-check-machtypes" [ check_machtypes ] v
+  | "no-cmm-check-machtypes" ->
+      clear "cmm-check-machtypes" [ check_machtypes ] v
 
   (* color output *)
   | "color" ->

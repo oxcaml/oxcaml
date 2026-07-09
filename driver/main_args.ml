@@ -329,6 +329,14 @@ let mk_no_insn_sched f =
   Printf.sprintf " Do not run the instruction scheduling pass%s"
     (if not Clflags.insn_sched_default then " (default)" else "")
 
+let mk_dcmm_check_machtypes f =
+  "-dcmm-check-machtypes", Arg.Unit f,
+  " Check that machtypes are used consistently in Cmm (default)"
+
+let mk_dcmm_no_check_machtypes f =
+  "-dcmm-no-check-machtypes", Arg.Unit f,
+  " Do not check that machtypes are used consistently in Cmm"
+
 let mk_keep_docs f =
   "-keep-docs", Arg.Unit f, " Keep documentation strings in .cmi files"
 
@@ -1364,6 +1372,8 @@ module type Optcommon_options = sig
   val _o4 : unit -> unit
   val _insn_sched : unit -> unit
   val _no_insn_sched : unit -> unit
+  val _dcmm_check_machtypes : unit -> unit
+  val _dcmm_no_check_machtypes : unit -> unit
   val _linscan : unit -> unit
   val _no_float_const_prop : unit -> unit
 
@@ -1804,6 +1814,7 @@ struct
     mk_inline_lifting_benefit F._inline_lifting_benefit;
     mk_inlining_report F._inlining_report;
     mk_insn_sched F._insn_sched;
+    mk_dcmm_check_machtypes F._dcmm_check_machtypes;
     mk_instantiate_opt F._instantiate;
     mk_intf F._intf;
     mk_intf_suffix F._intf_suffix;
@@ -1829,6 +1840,7 @@ struct
     mk_noautolink_opt F._noautolink;
     mk_nodynlink F._nodynlink;
     mk_no_insn_sched F._no_insn_sched;
+    mk_dcmm_no_check_machtypes F._dcmm_no_check_machtypes;
     mk_nolabels F._nolabels;
     mk_nostdlib F._nostdlib;
     mk_no_auto_include_otherlibs F._no_auto_include_otherlibs;
@@ -2544,6 +2556,8 @@ module Default = struct
     let _inlining_report () = inlining_report := true
     let _insn_sched = set insn_sched
     let _no_insn_sched = clear insn_sched
+    let _dcmm_check_machtypes = set check_machtypes
+    let _dcmm_no_check_machtypes = clear check_machtypes
     let _linscan = set use_linscan
     let _no_float_const_prop = clear float_const_prop
     let _no_unbox_free_vars_of_closures = clear unbox_free_vars_of_closures
