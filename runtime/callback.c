@@ -584,6 +584,7 @@ CAMLprim value caml_with_async_exns(value body_callback)
     caml_raise_out_of_memory();
   }
 
+  // The saved table must be updated if its contents are promoted.
   caml_dynamic_table_register_roots(&tbl);
   caml_result res = Result_encoded(caml_callback_exn(body_callback, Val_unit));
   caml_dynamic_table_unregister_roots(&tbl);
