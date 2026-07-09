@@ -31,6 +31,7 @@ val ocamlopt_opt : Actions.t
 val check_ocamlopt_opt_output : Actions.t
 val run_expect : Actions.t
 val run_expectnat : Actions.t
+val generate_test : Actions.t
 val run_scalar_codegen : Actions.t
 val compare_bytecode_programs : Actions.t
 val compare_binary_files : Actions.t
