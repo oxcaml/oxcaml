@@ -456,6 +456,11 @@ type expected_mode =
     strictly_stack. However, if we do that, there would be uncaught exception
     in Test 5h in test typing-modes/zero_alloc.ml. We will review this later. *)
 
+    strictly_local_closure : bool;
+    (** Indicates that the expression is inside a function that CANNOT be
+    [alloc], and if the expression is a newly registered closure, it has to
+    be local allocated on the stack. *)
+
     tuple_modes : (Value.r * Location.t) list option;
     (** No invariant between this and [mode]. It is UNSOUND to ignore this
         field. If this is [Some [x0; x1; ..]]:
@@ -534,11 +539,12 @@ let meet_regional ?hint:h mode =
     areality = Regional
   }); mode]
 
-let mode_default mode =
+let mode_default ?(strictly_local_closure = false) mode =
   { position = RNontail;
     mode = Value.disallow_left mode;
     strictly_local = false;
     strictly_stack = false;
+    strictly_local_closure = strictly_local_closure;
     tuple_modes = None }
 
 let mode_legacy = mode_default Value.legacy
@@ -584,18 +590,19 @@ let mode_morph f expected_mode =
   let mode = as_single_mode expected_mode in
   let mode = f mode |> Mode.Value.disallow_left in
   let tuple_modes = None in
-  { expected_mode with mode; tuple_modes }
+  { expected_mode with mode; tuple_modes;
+    strictly_local_closure = expected_mode.strictly_local_closure }
 
 (** Similiar to [apply_left_is_contained_by] but for [expected_mode]. *)
 let mode_is_contained_by is_contained_by ?modalities expected_mode =
   as_single_mode expected_mode
   |> apply_right_is_contained_by is_contained_by ?modalities
-  |> mode_default
+  |> mode_default ~strictly_local_closure:expected_mode.strictly_local_closure
 
 let mode_modality modality expected_mode =
   as_single_mode expected_mode
   |> Modality.Const.apply_right modality
-  |> mode_default
+  |> mode_default ~strictly_local_closure:expected_mode.strictly_local_closure
 
 (* used when entering a function;
 mode is the mode of the function region *)
@@ -607,7 +614,7 @@ let mode_return mode =
 
 (** Given the expected mode of a region, gives the [expected_mode] of the body
     inside the region. *)
-let mode_region ?region mode =
+let mode_region ?region ?(strictly_local_closure = false) mode =
   let hint = Option.map (fun x -> Hint.Escape_region x) region in
   let body_mode =
     mode
@@ -615,7 +622,7 @@ let mode_region ?region mode =
     |> alloc_as_value
     |> meet_regional ?hint
   in
-  { (mode_default body_mode) with
+  { (mode_default ~strictly_local_closure body_mode) with
     position =
       RTail (Regionality.disallow_left
         (Value.proj_comonadic Areality mode), FNontail);
@@ -624,7 +631,9 @@ let mode_region ?region mode =
 let enter_region_if cond ?region env expected_mode =
   if cond then
     Env.add_region_lock env,
-    mode_region ?region (as_single_mode expected_mode),
+    mode_region ?region
+      ~strictly_local_closure:expected_mode.strictly_local_closure
+      (as_single_mode expected_mode),
     [(Texp_ghost_region, Location.none, [])]
   else
     env, expected_mode, []
@@ -649,7 +658,8 @@ let mode_exclave expected_mode =
      |> alloc_as_value
   in
   { (mode_default mode)
-    with strictly_local = true
+    with strictly_local = true;
+    strictly_local_closure = expected_mode.strictly_local_closure
   }
 
 let mode_strictly_local expected_mode =
@@ -661,6 +671,18 @@ let mode_strictly_stack expected_mode =
   { expected_mode
     with strictly_stack = true
   }
+
+let mode_strictly_local_closure expected_mode =
+  { expected_mode
+    with strictly_local_closure = true
+  }
+
+let is_not_alloc_mode expected_mode =
+  let ceil =
+    Allocation.Guts.get_loose_ceil
+      (Value.proj_comonadic Allocation expected_mode.mode)
+  in
+  not (Allocation.Const.le Allocation.Const.max ceil)
 
 let mode_coerce mode expected_mode =
   mode_morph (fun m -> Value.meet [m; mode]) expected_mode
@@ -861,7 +883,8 @@ let register_allocation ~env ~loc ?desc (expected_mode : expected_mode) =
     register_allocation_value_mode ~env ~loc ~stack:expected_mode.strictly_stack
       ?desc (as_single_mode expected_mode)
   in
-  alloc_mode, mode_default mode
+  alloc_mode,
+  mode_default ~strictly_local_closure:expected_mode.strictly_local_closure mode
 
 let optimise_allocations () =
   (* CR zqian: Ideally we want to optimise all axes relavant to allocation. For
@@ -4938,30 +4961,13 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
   loop ty_fun0 mode_fun rev_args sargs
 
 (* See Note [Type-checking applications] for an overview *)
-let collect_apply_args env loc funct ignore_labels ty_fun ty_fun0 mode_fun sargs
+let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs
       ret_tvar =
   let warned = ref false in
   let rec loop ty_fun ty_fun0 mode_fun rev_args sargs =
-    if sargs = [] then begin
-      (* Allocation axis check: partial application of a function returns
-         an arrow type and allocates *)
-      let ty_fun' = expand_head env ty_fun in
-      let ty_fun_is_arrow =
-        match get_desc ty_fun' with Tarrow _ -> true | _ -> false
-      in
-      (* CR shsong: this check for partial application is not strong enough
-          to guarantee soundness. Especially for the case where the partial
-          application's return type is an abstract type and is actually a
-          function. *)
-      (* CR shsong: Alternative design: only register_allocation_mode if
-          partial_app = is_partial_apply untyped_args (where untyped_args
-          are in the return value) is false, since if partial_app is true,
-          there are Omitted args and the code walks the locks already *)
-      if ty_fun_is_arrow then
-        register_allocation_mode ~env ~loc Alloc.legacy;
+    if sargs = [] then
       collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
         ret_tvar
-    end
     else
     let ty_fun' = expand_head env ty_fun in
     let lv = get_level ty_fun' in
@@ -6239,10 +6245,23 @@ let split_function_ty
     env (expected_mode : expected_mode) ty_expected loc ~arg_label ~has_poly
     ~mode_annots ~ret_mode_annots ~in_function ~is_first_val_param ~is_final_val_param
   =
+  (* Allocation mode axis: if strictly_local_closure is set, we should (1) set
+    the closure mode to local so that it will be on stack; (2) skip walking
+    locks in register_closure_allocation. *)
+  if expected_mode.strictly_local_closure then
+    submode ~loc ~env ~reason:Other
+      (Mode.Value.min_with_comonadic Areality Mode.Regionality.local)
+      expected_mode;
   let alloc_mode, closed_over_mode =
-    register_closure_allocation ~env ~stack:expected_mode.strictly_stack ~loc
-      (as_single_mode expected_mode)
+    register_closure_allocation ~env
+      ~stack:(expected_mode.strictly_stack ||
+              expected_mode.strictly_local_closure)
+      ~loc (as_single_mode expected_mode)
   in
+  (* CR shsong: Not sure about the difference between calling submode on
+    expected_mode and alloc_mode. Keep the check for strictly_local_closure
+    and strictly_local separate for now since mode constraint for
+    strictly_local_closure is enfoced here, but not for strictly_local. *)
   if expected_mode.strictly_local then
     Locality.submode_exn ~pp:(loc, Function) Locality.local
       (Alloc.proj_comonadic Areality alloc_mode);
@@ -6296,6 +6315,18 @@ let split_function_ty
       let ret_value_mode = mode_return ret_value_mode in
       let ret_value_mode = expect_mode_cross env ty_ret ret_value_mode in
       ret_value_mode
+  in
+  (* Allocation mode axis: if outer closure is explicitly expected not to be
+    alloc, the inner closure should be local.
+    strictly_local_closure should also be passed to the inner layer.
+    Note that we cannot constrain the expected_inner_mode to local here since
+    we only want to apply this constraint if the innder layer is a closure *)
+  let expected_inner_mode =
+    if is_not_alloc_mode expected_mode ||
+      expected_mode.strictly_local_closure
+    then
+      mode_strictly_local_closure expected_inner_mode
+    else expected_inner_mode
   in
   let ty_arg_mono =
     if has_poly then ty_arg
@@ -7828,7 +7859,11 @@ and type_expect_
           {Value.Comonadic.Const.max with linearity = Many} env
       in
       let cond_env = Env.add_region_lock env in
-      let mode = mode_region Value.max in
+      let mode =
+        mode_region
+          ~strictly_local_closure:expected_mode.strictly_local_closure
+          Value.max
+      in
       let wh_cond =
         type_expect cond_env mode scond
           (mk_expected ~explanation:While_loop_conditional Predef.type_bool)
@@ -7853,11 +7888,19 @@ and type_expect_
         exp_env = env }
   | Pexp_for(param, slow, shigh, dir, sbody) ->
       let for_from =
-        type_expect env (mode_region Value.max) slow
+        type_expect env
+          (mode_region
+            ~strictly_local_closure:expected_mode.strictly_local_closure
+            Value.max)
+          slow
           (mk_expected ~explanation:For_loop_start_index Predef.type_int)
       in
       let for_to =
-        type_expect env (mode_region Value.max) shigh
+        type_expect env
+          (mode_region
+            ~strictly_local_closure:expected_mode.strictly_local_closure
+            Value.max)
+          shigh
           (mk_expected ~explanation:For_loop_stop_index Predef.type_int)
       in
       let env =
@@ -10320,7 +10363,7 @@ and type_application env app_loc expected_mode position_and_mode
             (fun (label, e) -> Typetexp.transl_label_from_expr label e) sargs
           in
           let ty_ret, mode_ret, untyped_args =
-            collect_apply_args env app_loc funct ignore_labels ty (instance ty)
+            collect_apply_args env funct ignore_labels ty (instance ty)
               (value_to_alloc_r2l funct_mode) sargs ret_tvar
           in
           (* example: [collect_apply_args] returns
