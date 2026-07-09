@@ -92,7 +92,9 @@ Line 1, characters 43-46:
 1 | let get : 'a t -> 'a @ portable = fun t -> t.x
                                                ^^^
 Error: This value is "shareable"
-         because it is the field "x" (with some modality) of the record at line 1, characters 43-44.
+         because it is the field "x" of the record at line 1, characters 43-44
+         which is "shareable" because it crosses with something
+         which is "nonportable".
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -121,16 +123,73 @@ val cross_shareable2 : cross_shareable -> cross_shareable @ shareable = <fun>
 
 type t
 
-(* Doesn't work yet. *)
 type s : value mod shareable = { v : t @@ shareable } [@@unboxed]
+type u : value mod corruptible = { v : t @@ corruptible } [@@unboxed]
 
 [%%expect{|
 type t
-Line 4, characters 0-65:
-4 | type s : value mod shareable = { v : t @@ shareable } [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "s" is value
-         because of the definition of t at line 1, characters 0-6.
-       But the kind of type "s" must be a subkind of value mod shareable
-         because of the annotation on the declaration of the type s.
+type s = { v : t @@ shareable; } [@@unboxed]
+type u = { v : t @@ corruptible; } [@@unboxed]
+|}]
+
+let s_from_corruptible (x : s @ corruptible) : s @ portable = x
+
+let s_from_nonportable (x : s @ nonportable) : s @ shareable = x
+
+[%%expect{|
+val s_from_corruptible : s @ corruptible -> s @ portable = <fun>
+val s_from_nonportable : s -> s @ shareable = <fun>
+|}]
+
+let s_no_self_cross (x : s @ shareable) : s @ portable = x
+
+[%%expect{|
+Line 1, characters 57-58:
+1 | let s_no_self_cross (x : s @ shareable) : s @ portable = x
+                                                             ^
+Error: This value is "shareable"
+       but is expected to be "corruptible" because it crosses with something
+         which is expected to be "portable".
+|}]
+
+let s_no_overcross (x : s @ nonportable) : s @ portable = x
+
+[%%expect{|
+Line 1, characters 58-59:
+1 | let s_no_overcross (x : s @ nonportable) : s @ portable = x
+                                                              ^
+Error: This value is "shareable" because it crosses with something
+         which is "nonportable".
+       However, the highlighted expression is expected to be "corruptible"
+         because it crosses with something which is expected to be "portable".
+|}]
+
+let u_from_shareable (x : u @ shareable) : u @ portable = x
+
+let u_from_nonportable (x : u @ nonportable) : u @ corruptible = x
+
+[%%expect{|
+val u_from_shareable : u @ shareable -> u @ portable = <fun>
+val u_from_nonportable : u -> u @ corruptible = <fun>
+|}]
+
+let u_no_self_cross (x : u @ corruptible) : u @ shareable = x
+
+[%%expect{|
+Line 1, characters 60-61:
+1 | let u_no_self_cross (x : u @ corruptible) : u @ shareable = x
+                                                                ^
+Error: This value is "corruptible" but is expected to be "shareable".
+|}]
+
+let u_no_overcross (x : u @ nonportable) : u @ portable = x
+
+[%%expect{|
+Line 1, characters 58-59:
+1 | let u_no_overcross (x : u @ nonportable) : u @ portable = x
+                                                              ^
+Error: This value is "corruptible" because it crosses with something
+         which is "nonportable".
+       However, the highlighted expression is expected to be "shareable"
+         because it crosses with something which is expected to be "portable".
 |}]

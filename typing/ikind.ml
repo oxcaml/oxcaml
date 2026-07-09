@@ -27,6 +27,8 @@ let reset_constructor_ikind_on_substitution = false
 
 module Ldd = Types.Ldd
 
+let mask_of_modality ~modality = Axis_lattice.mask_of_modality modality
+
 let instance_poly_for_jkind' =
   ref (fun _univars _ty -> Misc.fatal_error "instance_poly_for_jkind")
 
@@ -339,13 +341,11 @@ module Solver = struct
         let atom = rigid_name ctx (Ldd.Name.katom path) in
         Ldd.meet base_mod_bounds atom
     in
-    (* For each with-bound (ty, axes), contribute
-       modality(axes_mask, kind ty). *)
+    (* For each with-bound (ty, mask), contribute the masked kind of [ty]. *)
     Jkind.With_bounds.to_seq with_bounds
     |> Seq.fold_left
          (fun acc (ty, bound_info) ->
-           let axes = bound_info.Types.With_bounds_type_info.relevant_axes in
-           let mask = Axis_lattice.of_axis_set axes in
+           let mask = bound_info.Types.With_bounds_type_info.relevant_bounds in
            let ty_kind = kind ~use_tables:true ctx ty in
            Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
          base
@@ -559,7 +559,7 @@ let sum_record_label_contributions ~(base : Ldd.node)
     (lbls : Types.label_declaration list) : Ldd.node =
   Ldd.sum lbls ~base ~f:(fun (lbl : Types.label_declaration) ->
       validate_label lbl;
-      let mask = Axis_lattice.mask_of_modality lbl.ld_modalities in
+      let mask = mask_of_modality ~modality:lbl.ld_modalities in
       Ldd.join
         (label_mutability_contribution lbl)
         (Ldd.meet (Ldd.const mask) (payload_kind lbl.ld_type)))
@@ -827,9 +827,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
               | Types.Cstr_tuple args ->
                 Ldd.sum args ~base:Ldd.bot
                   ~f:(fun (arg : Types.constructor_argument) ->
-                    let mask =
-                      Axis_lattice.mask_of_modality arg.ca_modalities
-                    in
+                    let mask = mask_of_modality ~modality:arg.ca_modalities in
                     Ldd.meet (Ldd.const mask) (payload_kind arg.ca_type))
               | Types.Cstr_record lbls ->
                 sum_record_label_contributions ~base:Ldd.bot ~payload_kind

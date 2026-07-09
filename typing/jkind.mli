@@ -644,8 +644,9 @@ val apply_modality_l :
   Mode.Modality.Const.t -> (allowed * 'r) Types.jkind -> Types.jkind_l
 
 (** Change a jkind to be appropriate for an expectation of a type under a
-    modality. This means that the jkind's axes affected by the modality will all
-    be top. The with-bounds are left unchanged. *)
+    modality. This relaxes the jkind's mod-bounds just enough that applying the
+    modality on the left would satisfy the original expectation. The with-bounds
+    are left unchanged. *)
 val apply_modality_r :
   Mode.Modality.Const.t -> ('l * allowed) Types.jkind -> Types.jkind_r
 

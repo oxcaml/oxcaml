@@ -85,8 +85,8 @@ val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
 (** Information tracked about an individual type within the with-bounds for a jkind *)
 module With_bounds_type_info : sig
-  (** The axes that the with-bound applies to *)
-  type t = { relevant_axes : Jkind_axis.Axis_set.t } [@@unboxed]
+  (** The bounds of the axes that the with-bound applies to. *)
+  type t = { relevant_bounds : Axis_lattice.t } [@@unboxed]
 
   val join : t -> t -> t
 end

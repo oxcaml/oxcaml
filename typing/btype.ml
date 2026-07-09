@@ -1024,25 +1024,33 @@ module Jkind0 = struct
         externality;
       }
 
-    let[@inline] is_max_within_set t axes =
-      let open Jkind_axis.Axis_set in
-      let modal ax =
-        not (mem axes (Modal ax)) ||
-        Crossing.Per_axis.((le [@inlined hint]) ax ((max [@inlined hint]) ax)
-          (modal ax t))
+    (** Get all axes that are set to max *)
+    let get_max_axes t =
+      let[@inline] add_if b ax axis_set =
+        if b then Jkind_axis.Axis_set.add axis_set ax else axis_set
       in
-      modal areality &&
-      modal linearity &&
-      modal uniqueness &&
-      modal portability &&
-      modal contention &&
-      modal forkable &&
-      modal yielding &&
-      modal statefulness &&
-      modal visibility &&
-      modal staticity &&
-      (not (mem axes (Nonmodal Externality)) ||
-       Externality.(le max (externality t)))
+      let[@inline] add_crossing_if ax axis_set =
+        if
+          Crossing.Per_axis.(
+            (le [@inlined hint]) ax ((max [@inlined hint]) ax)
+              ((Crossing.proj [@inlined hint]) ax (crossing t)))
+        then Jkind_axis.Axis_set.add axis_set (Modal ax)
+        else axis_set
+      in
+      Jkind_axis.Axis_set.empty
+      |> add_crossing_if (Comonadic Areality)
+      |> add_crossing_if (Comonadic Linearity)
+      |> add_crossing_if (Monadic Uniqueness)
+      |> add_crossing_if (Comonadic Portability)
+      |> add_crossing_if (Monadic Contention)
+      |> add_crossing_if (Comonadic Forkable)
+      |> add_crossing_if (Comonadic Yielding)
+      |> add_crossing_if (Comonadic Statefulness)
+      |> add_crossing_if (Monadic Visibility)
+      |> add_crossing_if (Monadic Staticity)
+      |> add_if
+           (Externality.le Externality.max (externality t))
+           (Nonmodal Externality)
 
     let min = create Crossing.min ~externality:Externality.min
 
@@ -1123,25 +1131,16 @@ module Jkind0 = struct
       let externality = Externality.meet (externality t1) (externality t2) in
       create crossing ~externality
 
-    (* Returns the set of axes that is relevant under a given modality. For
-       example, under the [global] modality, the areality axis is *not*
-       relevant. *)
-    let relevant_axes_of_modality ~modality =
-      Jkind_axis.Axis_set.create ~f:(fun ~axis:(Pack axis) ->
-        match axis with
-        | Modal axis ->
-          let (P axis) = P axis |> Mode.Crossing.Axis.to_modality in
-          let modality = Mode.Modality.Const.proj axis modality in
-           not (Mode.Modality.Per_axis.is_constant axis modality)
-        (* The kind-inference.md document (in the repo) discusses both constant
-           modalities and identity modalities. Of course, reality has modalities
-           (such as [shared]) that are neither constants nor identities. Here,
-           we treat all non-constant modalities the way that the design treats
-           identity modalities. This is safe, because it leads to a minimum of
-           mode-crossing. In the future, we may want to complexify the
-           modal-kinds setup to allow for more mode-crossing in the presence of
-           non-constant non-identity modalities. *)
-        | Nonmodal Externality -> true)
+    (* The per-axis relevance mask of a constant modality: an identity axis
+       maps to its top (fully relevant), a constant axis to its bottom
+       (irrelevant), and a middle modality to its level.
+       [Axis_lattice.mask_of_modality] already encodes exactly this for every
+       axis, monadic and comonadic, so no separate whole-axis relevance
+       intersection is needed. *)
+    let mask_of_modality ~modality = Axis_lattice.mask_of_modality modality
+
+    let cap_by_mask_l t mask =
+      Axis_lattice.meet (to_axis_lattice t) mask |> of_axis_lattice
   end
 
   module Quality = struct
@@ -1223,16 +1222,14 @@ module Jkind0 = struct
 
     let add_modality ~modality ~type_expr
         (t : (allowed * 'r) t) : (allowed * 'r) t =
-      let relevant_axes =
-        Mod_bounds.relevant_axes_of_modality ~modality
-      in
+      let relevant_bounds = Mod_bounds.mask_of_modality ~modality in
       match t with
       | No_with_bounds ->
         With_bounds
           (With_bounds_types.singleton type_expr
-             ({ relevant_axes } : With_bounds_type_info.t))
+             ({ relevant_bounds } : With_bounds_type_info.t))
       | With_bounds tys ->
-        With_bounds (add_bound type_expr { relevant_axes } tys)
+        With_bounds (add_bound type_expr { relevant_bounds } tys)
 
   let is_empty (type l r) (t : (l * r) t) : bool =
     match t with
@@ -1923,8 +1920,15 @@ module Jkind0 = struct
     let map_type_expr f t = Base_and_axes.map_type_expr f t
 
     let add_with_bounds ~type_expr ~modality t =
-      match get_desc type_expr with
-      | Tarrow (_, _, _, _) ->
+      let rec is_arrow_type type_expr =
+        match get_desc type_expr with
+        | Tarrow (_, _, _, _) -> true
+        | Tpoly (type_expr, _) | Trepr (type_expr, _) ->
+          is_arrow_type type_expr
+        | _ -> false
+      in
+      match is_arrow_type type_expr with
+      | true ->
         (* Optimization: all arrow types have the same (with-bound-free) jkind,
            so we can just eagerly do a join on the mod-bounds here rather than
            having to add them to our with bounds only to be normalized away
@@ -1932,11 +1936,10 @@ module Jkind0 = struct
         { t with
           mod_bounds =
             Mod_bounds.join t.mod_bounds
-              (Mod_bounds.set_min_in_set Mod_bounds.for_arrow
-                 (Jkind_axis.Axis_set.complement
-                    (Mod_bounds.relevant_axes_of_modality ~modality)))
+              (Mod_bounds.cap_by_mask_l Mod_bounds.for_arrow
+                 (Mod_bounds.mask_of_modality ~modality))
         }
-      | _ ->
+      | false ->
         { t with
           with_bounds =
             With_bounds.add_modality ~type_expr ~modality
@@ -2271,8 +2274,9 @@ module Jkind0 = struct
 
     let add_labels_as_with_bounds lbls jkind =
       List.fold_right
-        (fun ((lbl : label_declaration), ld_type, _sort) ->
-          add_with_bounds ~type_expr:ld_type ~modality:lbl.ld_modalities)
+        (fun ((lbl : label_declaration), ld_type, _sort) jkind ->
+          add_with_bounds ~type_expr:ld_type ~modality:lbl.ld_modalities
+            jkind)
         lbls jkind
 
     let for_boxed_record_with_updates lbls =

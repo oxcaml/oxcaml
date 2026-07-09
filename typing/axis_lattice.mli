@@ -27,6 +27,8 @@ val leq : t -> t -> bool
 
 val co_sub : t -> t -> t
 
+val meet_right_adjoint : expected:t -> mask:t -> t
+
 val equal : t -> t -> bool
 
 val hash : t -> int
@@ -38,7 +40,11 @@ val non_bot_axes : t -> int list
 (** Build a mask from a set of relevant axes. *)
 val of_axis_set : Jkind_axis.Axis_set.t -> t
 
-(** Relevant axes of a constant modality and the corresponding mask. *)
+(** Raw per-axis bounds selected by a constant modality.
+
+    This does not apply jkind with-bound relevance filtering for constant
+    modalities. Callers that need a with-bound relevance mask should intersect
+    this with the modality's relevant axes. *)
 val mask_of_modality : Mode.Modality.Const.t -> t
 
 val create :

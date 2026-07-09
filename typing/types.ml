@@ -126,10 +126,10 @@ type mod_bounds =
   }
 
 module With_bounds_type_info = struct
-  type t = {relevant_axes : Jkind_axis.Axis_set.t } [@@unboxed]
+  type t = {relevant_bounds : Axis_lattice.t } [@@unboxed]
 
-  let join { relevant_axes = axes1 } { relevant_axes = axes2 } =
-    { relevant_axes = Jkind_axis.Axis_set.union axes1 axes2 }
+  let join { relevant_bounds = bounds1 } { relevant_bounds = bounds2 } =
+    { relevant_bounds = Axis_lattice.join bounds1 bounds2 }
 end
 
 type transient_expr =
@@ -1485,15 +1485,19 @@ let equal_unsafe_mode_crossing
          the fact that these maps are best-effort. But in practice these will usually not
          be huge, and the attribute triggering this check is (hopefully) rare. *)
       With_bounds_types.for_all
-        (fun ty1 _info ->
+        (fun ty1 info1 ->
            With_bounds_types.exists
-             (fun ty2 _info -> type_equal ty1 ty2)
+             (fun ty2 info2 ->
+               type_equal ty1 ty2 && Axis_lattice.equal
+                 info1.relevant_bounds info2.relevant_bounds)
              wb2)
         wb1
       && With_bounds_types.for_all
-        (fun ty2 _info ->
+        (fun ty2 info2 ->
            With_bounds_types.exists
-             (fun ty1 _info -> type_equal ty1 ty2)
+             (fun ty1 info1 ->
+               type_equal ty1 ty2 && Axis_lattice.equal
+                 info1.relevant_bounds info2.relevant_bounds)
              wb1)
         wb2)
 

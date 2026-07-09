@@ -187,6 +187,37 @@ let co_sub (a : t) (b : t) : t =
   let r = a land lnot b in
   r lor ((r land chain3_hi_mask) lsr 1)
 
+(* Right adjoint of [meet _ ~mask]: the greatest [c] with
+   [meet c mask <= expected]. Enumerated per axis (11 axes x <=4 levels), not
+   via a bitwise closed form: the prefix-ones chain encoding makes a uniform
+   bit-complement wrong (e.g. it can yield the invalid chain element 0b10), so
+   we join the accepting down-set of each axis instead. Reached only from
+   [apply_modality_r] (a few [ctype] sites), never from the [normalize] hot
+   loop. *)
+let meet_right_adjoint ~expected ~mask : t =
+  let max_level = function Chain2 -> 1 | Chain3 -> 2 | Diamond4 -> 3 in
+  let rec loop_axis i acc =
+    if i = num_axes
+    then acc
+    else
+      let expected_bits = expected land axis_mask.(i) in
+      let mask_bits = mask land axis_mask.(i) in
+      let rec loop_level level axis_acc =
+        if level > max_level axis_shapes.(i)
+        then axis_acc
+        else
+          let candidate = set_axis bot ~axis:i ~level in
+          let axis_acc =
+            if leq (candidate land mask_bits) expected_bits
+            then axis_acc lor candidate
+            else axis_acc
+          in
+          loop_level (level + 1) axis_acc
+      in
+      loop_axis (i + 1) (acc lor loop_level 0 bot)
+  in
+  loop_axis 0 bot
+
 (* Build a mask from a set of relevant axes. *)
 let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
   let set : int = Obj.magic set in
@@ -200,27 +231,6 @@ let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
     lor ((set land 0x1800) lsl 6)
   in
   lo lor ((lo land 0x49451) lsl 1)
-
-(* IK-only: compute relevant axes of a constant modality, mirroring
-   Jkind.relevant_axes_of_modality. *)
-let relevant_axes_of_modality (modality : Mode.Modality.Const.t) :
-    Jkind_axis.Axis_set.t =
-  Jkind_axis.Axis_set.create ~f:(fun ~axis:(Jkind_axis.Axis.Pack axis) ->
-      match axis with
-      | Modal axis ->
-        let (Mode.Modality.Axis.P axis_for_modality) =
-          Mode.Crossing.Axis.(P axis |> to_modality)
-        in
-        let modality_on_axis =
-          Mode.Modality.Const.proj axis_for_modality modality
-        in
-        not
-          (Mode.Modality.Per_axis.is_constant axis_for_modality modality_on_axis)
-      | Nonmodal Externality -> true)
-
-(* Directly produce an axis-lattice mask from a constant modality. *)
-let mask_of_modality (modality : Mode.Modality.Const.t) : t =
-  relevant_axes_of_modality modality |> of_axis_set
 
 (* Helpers to translate between axis enumerations and packed levels. *)
 module Levels = struct
@@ -465,6 +475,45 @@ let create ~areality ~linearity ~uniqueness ~portability ~contention ~forkable
   |> set_statefulness statefulness
   |> set_visibility visibility |> set_staticity staticity
   |> set_externality externality
+
+let mask_of_modality (modality : Mode.Modality.Const.t) : t =
+  let module Modality = Mode.Modality in
+  let module Value = Mode.Value in
+  let set_monadic : type a. a Value.Monadic.Axis.t -> (a -> t -> t) -> t -> t =
+   fun axis set_axis mask ->
+    let modality_axis = Modality.Axis.Monadic axis in
+    let (Modality.Monadic.Atom.Join_const c) =
+      Modality.Const.proj modality_axis modality
+    in
+    set_axis c mask
+  in
+  let set_comonadic : type a.
+      a Value.Comonadic.Axis.t -> (a -> t -> t) -> t -> t =
+   fun axis set_axis mask ->
+    let modality_axis = Modality.Axis.Comonadic axis in
+    let (Modality.Comonadic.Atom.Meet_const c as modality_on_axis) =
+      Modality.Const.proj modality_axis modality
+    in
+    let max = Value.Comonadic.Const.Per_axis.max axis in
+    let min = Value.Comonadic.Const.Per_axis.min axis in
+    if Modality.Per_axis.is_constant modality_axis modality_on_axis
+    then set_axis min mask
+    else if Modality.Per_axis.is_id modality_axis modality_on_axis
+    then set_axis max mask
+    else set_axis c mask
+  in
+  let open Mode.Axis in
+  top
+  |> set_comonadic Areality set_areality
+  |> set_comonadic Linearity set_linearity
+  |> set_monadic Uniqueness set_uniqueness
+  |> set_comonadic Portability set_portability
+  |> set_monadic Contention set_contention
+  |> set_comonadic Forkable set_forkable
+  |> set_comonadic Yielding set_yielding
+  |> set_comonadic Statefulness set_statefulness
+  |> set_monadic Visibility set_visibility
+  |> set_monadic Staticity set_staticity
 
 (* Canonical lattice constants used by ikinds. *)
 let nonfloat_value : t =
