@@ -591,23 +591,11 @@ val alloc_polyvariant : int -> [> `Tag of int ] @ local = <fun>
    optional-argument wrapping). *)
 let (alloc_optional_arg @ noalloc_strict) ?a () = a
 [%%expect{|
-Line 1, characters 45-51:
-1 | let (alloc_optional_arg @ noalloc_strict) ?a () = a
-                                                 ^^^^^^
-Error: The allocation is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 1, characters 42-51
-         which is expected to be "noalloc_strict".
+val alloc_optional_arg : ?a:'a -> (unit -> 'a option) @ local = <fun>
 |}]
 let (alloc_optional_arg @ noalloc) ?a () = a
 [%%expect{|
-Line 1, characters 38-44:
-1 | let (alloc_optional_arg @ noalloc) ?a () = a
-                                          ^^^^^^
-Error: The allocation is "alloc"
-       but is expected to be "noalloc"
-         because it is used inside the function at line 1, characters 35-44
-         which is expected to be "noalloc".
+val alloc_optional_arg : ?a:'a -> (unit -> 'a option) @ local = <fun>
 |}]
 
 (* Building a closure that captures a variable allocates. *)
@@ -616,20 +604,20 @@ let (alloc_closure @ noalloc_strict) (a : int) = fun () -> a
 Line 1, characters 49-60:
 1 | let (alloc_closure @ noalloc_strict) (a : int) = fun () -> a
                                                      ^^^^^^^^^^^
-Error: The allocation is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 1, characters 37-60
-         which is expected to be "noalloc_strict".
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 let (alloc_closure @ noalloc) (a : int) = fun () -> a
 [%%expect{|
 Line 1, characters 42-53:
 1 | let (alloc_closure @ noalloc) (a : int) = fun () -> a
                                               ^^^^^^^^^^^
-Error: The allocation is "alloc"
-       but is expected to be "noalloc"
-         because it is used inside the function at line 1, characters 30-53
-         which is expected to be "noalloc".
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 (* The same closure, but [stack_]-marked. *)
@@ -715,24 +703,14 @@ val alloc_tuple : unit -> int * int @ local = <fun>
 let (alloc_partial_app @ noalloc_strict)
       (f : (int -> int -> int -> int) @ noalloc_strict) = f 1 2
 [%%expect{|
-Line 2, characters 58-63:
-2 |       (f : (int -> int -> int -> int) @ noalloc_strict) = f 1 2
-                                                              ^^^^^
-Error: The allocation is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 2, characters 6-63
-         which is expected to be "noalloc_strict".
+val alloc_partial_app :
+  (int -> int -> int -> int) @ noalloc_strict -> int -> int = <fun>
 |}]
 let (alloc_partial_app @ noalloc)
       (f : (int -> int -> int -> int) @ noalloc) = f 1 2
 [%%expect{|
-Line 2, characters 51-56:
-2 |       (f : (int -> int -> int -> int) @ noalloc) = f 1 2
-                                                       ^^^^^
-Error: The allocation is "alloc"
-       but is expected to be "noalloc"
-         because it is used inside the function at line 2, characters 6-56
-         which is expected to be "noalloc".
+val alloc_partial_app : (int -> int -> int -> int) @ noalloc -> int -> int =
+  <fun>
 |}]
 
 (* [stack_] on a partial application is rejected: it is an application, not a
@@ -744,10 +722,7 @@ let (stack_partial_app @ noalloc_strict)
 Line 2, characters 74-81:
 2 |       (f : (int -> int -> int -> int) @ noalloc_strict) = exclave_ stack_ (f 1 2)
                                                                               ^^^^^^^
-Error: The allocation is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 2, characters 6-81
-         which is expected to be "noalloc_strict".
+Error: This expression is not an allocation site.
 |}]
 
 (* Partial application whose result is a function hidden behind a
@@ -761,13 +736,8 @@ let (alloc_partial_app_abbrev @ noalloc_strict)
       (f : (int -> int -> myfun) @ noalloc_strict) = f 1 2
 [%%expect{|
 type myfun = int -> int
-Line 3, characters 53-58:
-3 |       (f : (int -> int -> myfun) @ noalloc_strict) = f 1 2
-                                                         ^^^^^
-Error: The allocation is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 3, characters 6-58
-         which is expected to be "noalloc_strict".
+val alloc_partial_app_abbrev :
+  (int -> int -> myfun) @ noalloc_strict -> myfun = <fun>
 |}]
 
 (* A function [f] with mixed arguments: optional [a], mandatory [b], optional
@@ -796,9 +766,9 @@ let (call_one_opt_one_mand @ noalloc_strict)
       (f : (?a:int -> int -> ?c:int -> int -> ?e:int -> int -> int)) =
   f ~a:1 2
 [%%expect{|
-Line 3, characters 2-10:
+Line 3, characters 7-8:
 3 |   f ~a:1 2
-      ^^^^^^^^
+           ^
 Error: The allocation is "alloc"
        but is expected to be "noalloc_strict"
          because it is used inside the function at lines 2-3, characters 6-10
@@ -812,9 +782,9 @@ let (call_one_opt_one_mand @ noalloc_strict)
       (f : (?a:int -> int -> ?c:int -> int -> ?e:int -> int)) =
   f ~a:1 2
 [%%expect{|
-Line 3, characters 2-10:
+Line 3, characters 7-8:
 3 |   f ~a:1 2
-      ^^^^^^^^
+           ^
 Error: The allocation is "alloc"
        but is expected to be "noalloc_strict"
          because it is used inside the function at lines 2-3, characters 6-10
@@ -1508,9 +1478,9 @@ let stack_inner_partial_application
   let (f @ noalloc_strict) () = exclave_ stack_ (g (Just a) 2) in
   ()
 [%%expect{|
-Line 3, characters 48-62:
+Line 3, characters 51-59:
 3 |   let (f @ noalloc_strict) () = exclave_ stack_ (g (Just a) 2) in
-                                                    ^^^^^^^^^^^^^^
+                                                       ^^^^^^^^
 Error: The allocation is "alloc"
        but is expected to be "noalloc_strict"
          because it is used inside the function at line 3, characters 27-62
@@ -1674,24 +1644,15 @@ Line 1, characters 32-51:
 Error: This value is "alloc" but is expected to be "noalloc_strict".
 |}]
 
-(** Test 5.10:
 
-    CR shsong: a curried multi-argument function cannot be [noalloc]/
-    [noalloc_strict].
+(** Test 6: Muti-argument function (currying) and partial application *)
 
-    Writing [let f x y = x] desugars to [fun x -> (fun y -> x)]. Applying [f] to
-    one argument builds the inner closure [fun y -> x], preventing [f] from
-    begin [noalloc]/[noalloc_strict]. *)
+(** Test 6.1: a curried multi-argument function can be [noalloc]/
+  [noalloc_strict], but the inner closure (its codomain) must be [local]. *)
 
 let (f @ noalloc_strict) x y = x
 [%%expect{|
-Line 10, characters 27-32:
-10 | let (f @ noalloc_strict) x y = x
-                                ^^^^^
-Error: The allocation is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 10, characters 25-32
-         which is expected to be "noalloc_strict".
+val f : 'a -> ('b -> 'a) @ local = <fun>
 |}]
 
 let (f_explicit @ noalloc_strict) x = fun y -> x
@@ -1699,61 +1660,125 @@ let (f_explicit @ noalloc_strict) x = fun y -> x
 Line 1, characters 38-48:
 1 | let (f_explicit @ noalloc_strict) x = fun y -> x
                                           ^^^^^^^^^^
-Error: The allocation is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 1, characters 34-48
-         which is expected to be "noalloc_strict".
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
-let (f_n @ noalloc) x y = x
+let (f_explicit_exclave @ noalloc_strict) x = exclave_ fun y -> x
 [%%expect{|
-Line 1, characters 22-27:
-1 | let (f_n @ noalloc) x y = x
-                          ^^^^^
-Error: The allocation is "alloc"
-       but is expected to be "noalloc"
-         because it is used inside the function at line 1, characters 20-27
-         which is expected to be "noalloc".
+val f_explicit_exclave : 'a -> ('b -> 'a) @ local = <fun>
 |}]
 
-(* Contrast: a single-argument function builds no inner closure and so is
-   accepted at [noalloc_strict]. *)
+let (f @ noalloc) x y = x
+[%%expect{|
+val f : 'a -> ('b -> 'a) @ local = <fun>
+|}]
+
+let (f_explicit @ noalloc) x = fun y -> x
+[%%expect{|
+Line 1, characters 31-41:
+1 | let (f_explicit @ noalloc) x = fun y -> x
+                                   ^^^^^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+
+let (f_explicit_exclave @ noalloc) x = exclave_ fun y -> x
+[%%expect{|
+val f_explicit_exclave : 'a -> ('b -> 'a) @ local = <fun>
+|}]
+
+(* Contrast: a single-argument function builds no inner closure.
+  Its return type is not a closure, so it can be global. *)
 let (g @ noalloc_strict) x = x
 [%%expect{|
 val g : 'a -> 'a = <fun>
 |}]
 
-let (f_exclave @ noalloc_strict) x = exclave_ (fun y -> x)
+let (g @ noalloc) x = x
 [%%expect{|
-Line 1, characters 46-58:
-1 | let (f_exclave @ noalloc_strict) x = exclave_ (fun y -> x)
-                                                  ^^^^^^^^^^^^
-Error: The allocation is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 1, characters 33-58
-         which is expected to be "noalloc_strict".
-|}]
-
-(* The exemption extends down the whole curry chain: a three-argument function
-   is accepted, with a [local] codomain at each step. *)
-let (f3 @ noalloc_strict) x y z = x
-[%%expect{|
+val g : 'a -> 'a = <fun>
 |}]
 
 (* Soundness: the returned closure is pinned [local], so it cannot escape to a
-   [global] (heap) position -- using [f] where a [global] codomain is expected
-   is rejected. *)
+  [global] (heap) position -- using [f] where a [global] codomain is expected
+  is rejected. *)
+let (f @ noalloc_strict) x y = x
 let escapes = (f : _ -> (_ -> _) @ global)
 [%%expect{|
+val f : 'a -> ('b -> 'a) @ local = <fun>
+Line 2, characters 15-16:
+2 | let escapes = (f : _ -> (_ -> _) @ global)
+                   ^
+Error: The value "f" has type "'a -> ('b -> 'a) @ local"
+       but an expression was expected of type "'c -> 'd -> 'e"
+|}]
+
+(* The local requirement is passed down the whole curry chain:
+  a three-argument function is accepted, with [local] mode at each layer of
+  codomain. Although [local] for inner layers is not printed, we have the
+  following sanity checks to validate this. *)
+let (f3 @ noalloc_strict) x y z = x
+[%%expect{|
+val f3 : 'a -> ('b -> 'c -> 'a) @ local = <fun>
+|}]
+
+(* Sanity check: [c' -> 'a] above is local and cannot be returned *)
+let g () = f3 0 1
+[%%expect{|
+Line 1, characters 11-17:
+1 | let g () = f3 0 1
+               ^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
+|}]
+
+(* Sanity check: Prove local constraints on inner steps with coercions.
+  Requiring the inner arrow ([_ -> _], the result of [f3 x y]) to be
+  [local] is accepted. *)
+let f3_inner_local = (f3 : _ -> ((_ -> (_ -> _) @ local)) @ local)
+[%%expect{|
+val f3_inner_local : 'a -> ('b -> 'c -> 'a) @ local = <fun>
+|}]
+
+(* Sanity check: Conversely, requiring that same inner arrow to be [global]
+  is rejected: it is really [local]. This is the definitive evidence that
+  the propagation reaches the inner step; the missing [@ local] in the
+  printed signature above is only a type-printer elision. *)
+let f3_inner_not_global = (f3 : _ -> ((_ -> (_ -> _) @ global)) @ local)
+[%%expect{|
+Line 1, characters 27-29:
+1 | let f3_inner_not_global = (f3 : _ -> ((_ -> (_ -> _) @ global)) @ local)
+                               ^^
+Error: The value "f3" has type "'a -> ('b -> 'c -> 'a) @ local"
+       but an expression was expected of type
+         "'a -> ('d -> ('e -> 'f)) @ local"
+       Type "'b -> ('c -> 'a) @ local" is not compatible with type
+         "'d -> 'e -> 'f"
 |}]
 
 (* Soundness: a genuine allocation in the body (here a tuple) is still counted;
    only the curried intermediate closures are exempt. *)
 let (f_body_alloc @ noalloc_strict) x y = (x, y)
 [%%expect{|
+Line 1, characters 42-48:
+1 | let (f_body_alloc @ noalloc_strict) x y = (x, y)
+                                              ^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 36-48
+         which is expected to be "noalloc_strict".
 |}]
 
-(** Test 5.11: forcing the codomain of a [noalloc] curried function to [local]
+(** Test 6.2: forcing the codomain of a [noalloc] curried function to [local]
     interacts with an explicit codomain areality annotation. Because the
     codomain arrow is forced to [local], an explicit [@ global] on it conflicts,
     while an explicit [@ local] agrees (and the function is accepted). *)
@@ -1762,22 +1787,208 @@ let (f_body_alloc @ noalloc_strict) x y = (x, y)
    [@ global] on the returned arrow. *)
 let (f : int -> (int -> int) @ global) @ noalloc_strict = fun x y -> x
 [%%expect{|
+Line 8, characters 64-70:
+8 | let (f : int -> (int -> int) @ global) @ noalloc_strict = fun x y -> x
+                                                                    ^^^^^^
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* Contrast: without the [noalloc_strict] annotation the codomain is NOT forced,
    so the same [@ global] arrow is accepted. *)
 let (f : int -> (int -> int) @ global) = fun x y -> x
 [%%expect{|
+val f : int -> int -> int = <fun>
 |}]
 
 (* Annotating the codomain [@ local] agrees with the forcing, so the function
    is accepted. *)
 let (f : int -> (int -> int) @ local) @ noalloc_strict = fun x y -> x
 [%%expect{|
+val f : int -> (int -> int) @ local = <fun>
 |}]
 
+(* Sanity check: [f 0] is local *)
+let g () = f 0
+[%%expect{|
+Line 1, characters 11-14:
+1 | let g () = f 0
+               ^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
+|}]
 
-(** Test 6: Misc *)
+(** Test 6.3: propagation of [strictly_local_closure] to inner layers.
+
+    A closure built inside a [noalloc_strict] / [noalloc] function (if
+    the information is known when type check the closure) is forced to be
+    [local] and on stack. It is also exempted from the allocation check.
+    We probe each syntactic position for a nested closure.
+
+    Reading the results:
+    - Acceptance (a [val ... = <fun>] with a [@ local] codomain) means the flag
+      reached that position: the closure was exempted.
+    - "The allocation is "alloc" ... expected to be "noalloc_strict"" means the
+      flag did NOT reach that position (a propagation gap): the closure counts as
+      a heap allocation and forces the enclosing function.
+
+    [exclave_] is used as a uniform wrapper so a returned [local] closure is
+    allowed to escape its region; it does NOT by itself skip the allocation
+    lock-walk (that is what [strictly_local_closure] does), so acceptance below
+    genuinely reflects propagation -- see the control at the end of Part B. *)
+
+(* --- Part A: positions that DO receive the flag (closure exempted) --- *)
+
+(* Inner function parameter / curried closure (no [exclave_] needed). *)
+let (p_curried @ noalloc_strict) x y = x
+[%%expect{|
+val p_curried : 'a -> ('b -> 'a) @ local = <fun>
+|}]
+
+(* Function body / return via [exclave_]. *)
+let (p_exclave @ noalloc_strict) x = exclave_ (fun y -> x)
+[%%expect{|
+val p_exclave : 'a -> ('b -> 'a) @ local = <fun>
+|}]
+
+(* Mode annotation on the returned closure ([mode_morph]/[type_expect_mode]). We
+   annotate a NON-locality axis ([contended]) on purpose: the [contended] in the
+   result shows the annotation itself took effect (so the [mode_morph] path is
+   exercised), while the [@ local] codomain is enforced by annotating the outer
+   closure p_mode_annot with [@ noalloc_strict]. *)
+let (p_mode_annot @ noalloc_strict) x = exclave_ (fun y -> x : _ @ contended)
+[%%expect{|
+val p_mode_annot : 'a -> ('b -> 'a) @ local contended = <fun>
+|}]
+
+(* Type constraint on the returned closure ([type_argument] reuses the expected
+   mode). *)
+let (p_constraint @ noalloc_strict) x = exclave_ ((fun y -> x) : _ -> _)
+[%%expect{|
+val p_constraint : 'a -> ('b -> 'a) @ local = <fun>
+|}]
+
+(* [if] branches (reuse the expected mode). *)
+let (p_if @ noalloc_strict) b x =
+  exclave_ (if b then (fun y -> x) else (fun y -> x))
+[%%expect{|
+val p_if : bool -> ('a -> 'b -> 'a) @ local = <fun>
+|}]
+
+(* [match] branches (reuse the expected mode). *)
+let (p_match @ noalloc_strict) o x =
+  exclave_ (match o with Some _ -> (fun y -> x) | None -> (fun y -> x))
+[%%expect{|
+val p_match : 'a option -> ('b -> 'c -> 'b) @ local = <fun>
+|}]
+
+(* Record field via a modality ([mode_is_contained_by]); the record block is
+   [stack_]-allocated so the field closure is the only thing exercising the
+   propagation. *)
+type box = { g : unit -> int }
+[%%expect{|
+type box = { g : unit -> int; }
+|}]
+let (p_record @ noalloc_strict) (x : int) = exclave_ stack_ { g = (fun () -> x) }
+[%%expect{|
+val p_record : int -> box @ local = <fun>
+|}]
+
+(* --- Part B: positions that do NOT yet receive the flag (propagation gaps) --- *)
+
+(* [let]-binding RHS: [pat_modes] rebuilds the RHS mode with [mode_default] and
+   drops the flag. The closure is treated as a heap allocation. *)
+let (g_let @ noalloc_strict) (x : int) =
+  let h = fun () -> x in
+  h ()
+[%%expect{|
+Line 2, characters 10-21:
+2 |   let h = fun () -> x in
+              ^^^^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 1-3, characters 29-6
+         which is expected to be "noalloc_strict".
+|}]
+
+(* Application argument: [mode_argument] returns [mode_default] without the
+   flag, so the argument closure is not exempted. [use] and [g_arg] are wrapped
+   in an outer function so [use] stays a local [noalloc_strict] value -- a
+   top-level [use] would instead be exported at [alloc] and trip the capture rule
+   first. The only allocation here is the argument closure [fun () -> x], which
+   is what the error correctly points at. *)
+let g_app_arg () =
+  let (use @ noalloc_strict) (g : unit -> int) = g () in
+  let (g_arg @ noalloc_strict) (x : int) = use (fun () -> x) in
+  ()
+[%%expect{|
+Line 3, characters 47-60:
+3 |   let (g_arg @ noalloc_strict) (x : int) = use (fun () -> x) in
+                                                   ^^^^^^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 3, characters 31-60
+         which is expected to be "noalloc_strict".
+|}]
+
+(* Region body ([for]/[while]/comprehension): [mode_region] rebuilds the body
+   mode with [mode_default] and drops the flag. *)
+let (g_region @ noalloc_strict) (x : int) =
+  for _i = 0 to 0 do
+    let _g = fun () -> x in ()
+  done
+[%%expect{|
+Line 3, characters 13-24:
+3 |     let _g = fun () -> x in ()
+                 ^^^^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 1-4, characters 32-6
+         which is expected to be "noalloc_strict".
+|}]
+
+(* Let-binding operator (letop): the [let*] body is a continuation closure typed
+   at legacy via [mode_return] in [type_binding_op] (the [mode_return Value.legacy]
+   there), so it does not receive the flag. In practice the failure surfaces even
+   earlier: the [let*] operator is itself an [alloc] value, so referencing it
+   inside a [noalloc_strict] function trips the capture rule first. Either way,
+   [let*] does not currently compose with [noalloc_strict]. *)
+let ( let* ) o f = match o with None -> None | Some x -> f x
+[%%expect{|
+val ( let* ) : 'a option -> ('a -> 'b option) -> 'b option = <fun>
+|}]
+let (g_letop @ noalloc_strict) (x : int) =
+  let* _ = Some 0 in
+  fun () -> x
+[%%expect{|
+Line 2, characters 2-6:
+2 |   let* _ = Some 0 in
+      ^^^^
+Error: The value "( let* )" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 1-3, characters 31-13
+         which is expected to be "noalloc_strict".
+|}]
+
+(* Control: [exclave_] does NOT rescue a gap position -- it forces [local] but
+   does not skip the lock-walk, so the [let]-RHS closure still errors. This
+   confirms the acceptances in Part A are due to [strictly_local_closure]
+   propagation, not to [exclave_]. *)
+let (g_let_exclave @ noalloc_strict) (x : int) = exclave_ (let h = fun () -> x in h)
+[%%expect{|
+Line 1, characters 67-78:
+1 | let (g_let_exclave @ noalloc_strict) (x : int) = exclave_ (let h = fun () -> x in h)
+                                                                       ^^^^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 37-84
+         which is expected to be "noalloc_strict".
+|}]
+
+(** Test 7: Misc *)
 
 type record_t = { x : float; y : float }
 [%%expect{|
