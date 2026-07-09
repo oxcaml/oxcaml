@@ -555,22 +555,18 @@ let label_mutability_contribution (lbl : Types.label_declaration) =
 
 let sum_record_label_contributions ~(base : Ldd.node)
     ~(payload_kind : Types.type_expr -> Ldd.node)
-    ~(validate_label : Types.label_declaration -> unit)
+    ~(mutability_contribution : Types.label_declaration -> Ldd.node)
     (lbls : Types.label_declaration list) : Ldd.node =
   Ldd.sum lbls ~base ~f:(fun (lbl : Types.label_declaration) ->
-      validate_label lbl;
       let mask = Axis_lattice.mask_of_modality lbl.ld_modalities in
       Ldd.join
-        (label_mutability_contribution lbl)
+        (mutability_contribution lbl)
         (Ldd.meet (Ldd.const mask) (payload_kind lbl.ld_type)))
 
-let no_validation (_ : Types.label_declaration) = ()
-
-let validate_immutable_unboxed_label (lbl : Types.label_declaration) =
-  match lbl.ld_mutable with
-  | Immutable -> ()
-  | Mutable _ ->
-    failwith "ikind: mutable fields in unboxed records are not supported"
+(* Unboxed records ignore field mutability: with no heap identity to mutate
+   through, mutability adds nothing to the kind. This matches the legacy
+   [Jkind_desc.product], which never consults [ld_mutable]. *)
+let no_mutability_contribution (_ : Types.label_declaration) = Ldd.bot
 
 (* Gather constructor-local vars from [tys]. *)
 let collect_type_vars (tys : Types.type_expr list) :
@@ -764,7 +760,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
            fun (ctx : Solver.ctx) ->
             sum_record_label_contributions ~base:immutable_base
               ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
-              ~validate_label:no_validation lbls
+              ~mutability_contribution:label_mutability_contribution lbls
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
@@ -773,7 +769,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
             let base = Ldd.const Axis_lattice.immediate in
             sum_record_label_contributions ~base
               ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
-              ~validate_label:validate_immutable_unboxed_label lbls
+              ~mutability_contribution:no_mutability_contribution lbls
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_variant (_cstrs, Types.Variant_with_null, _umc_opt) ->
@@ -833,7 +829,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
                     Ldd.meet (Ldd.const mask) (payload_kind arg.ca_type))
               | Types.Cstr_record lbls ->
                 sum_record_label_contributions ~base:Ldd.bot ~payload_kind
-                  ~validate_label:no_validation lbls
+                  ~mutability_contribution:label_mutability_contribution lbls
             in
             Ldd.sum cstrs ~base:(Ldd.const base_lat0) ~f:constructor_contrib
           in
