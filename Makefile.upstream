@@ -1183,7 +1183,7 @@ runtime_BYTECODE_STATIC_LIBRARIES = $(addprefix runtime/, \
   ld.conf libcamlrun.$(A))
 runtime_BYTECODE_SHARED_LIBRARIES =
 runtime_NATIVE_STATIC_LIBRARIES = \
-  runtime/libasmrun.$(A) runtime/libasmrunBARE_MTEAL.$(A) \
+  runtime/libasmrun.$(A) \
   runtime/libasmrunBARE_METAL.$(A) runtime/libcomprmarsh.$(A)
 runtime_NATIVE_SHARED_LIBRARIES =
 
@@ -1355,9 +1355,6 @@ runtime/libasmrund.$(A): $(libasmrund_OBJECTS)
 	$(V_MKLIB)$(call MKLIB,$@, $^)
 
 runtime/libasmruni.$(A): $(libasmruni_OBJECTS)
-	$(V_MKLIB)$(call MKLIB,$@, $^)
-
-runtime/libasmrunBARE_MTEAL.$(A): $(libasmrunbaremetal_OBJECTS)
 	$(V_MKLIB)$(call MKLIB,$@, $^)
 
 runtime/libasmrunBARE_METAL.$(A): $(libasmrunbaremetal_OBJECTS)
