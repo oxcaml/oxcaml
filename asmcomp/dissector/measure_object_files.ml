@@ -112,7 +112,6 @@ end
 let measure_files (unix : (module Compiler_owee.Unix_intf.S)) ~files =
   (* Check for duplicates in the input list first (extract just filenames) *)
   check_for_duplicates (List.map fst files);
-  let module Unix = (val unix) in
   (* Open output file if -ddissector-inputs is set *)
   let out_channel = Option.map open_out !Clflags.ddissector_inputs in
   let log fmt =
@@ -124,34 +123,32 @@ let measure_files (unix : (module Compiler_owee.Unix_intf.S)) ~files =
   let analyze_object_file filename =
     if not (Sys.file_exists filename)
     then raise (Error (File_not_found filename))
-    else
-      let buf = Compiler_owee.Owee_buf.map_binary (module Unix) filename in
-      analyze_elf_buf buf
+    else Compiler_owee.Owee_buf.with_map_binary unix filename analyze_elf_buf
   in
   (* Analyze an archive (.a) file, returning (size, has_probes, member_names) *)
   let analyze_archive_file filename =
     if not (Sys.file_exists filename)
     then raise (Error (File_not_found filename))
     else
-      let buf = Compiler_owee.Owee_buf.map_binary (module Unix) filename in
-      let archive, members = Compiler_owee.Owee_archive.read buf in
-      let size, has_probes, member_names =
-        List.fold_left
-          (fun (acc_size, acc_probes, acc_names) member ->
-            let name = member.Compiler_owee.Owee_archive.name in
-            if Filename.check_suffix name ".o"
-            then
-              let member_buf =
-                Compiler_owee.Owee_archive.member_body archive member
-              in
-              let size, has_probes = analyze_elf_buf member_buf in
-              ( Int64.add acc_size size,
-                acc_probes || has_probes,
-                name :: acc_names )
-            else acc_size, acc_probes, acc_names)
-          (0L, false, []) members
-      in
-      size, has_probes, List.rev member_names
+      Compiler_owee.Owee_buf.with_map_binary unix filename (fun buf ->
+          let archive, members = Compiler_owee.Owee_archive.read buf in
+          let size, has_probes, member_names =
+            List.fold_left
+              (fun (acc_size, acc_probes, acc_names) member ->
+                let name = member.Compiler_owee.Owee_archive.name in
+                if Filename.check_suffix name ".o"
+                then
+                  let member_buf =
+                    Compiler_owee.Owee_archive.member_body archive member
+                  in
+                  let size, has_probes = analyze_elf_buf member_buf in
+                  ( Int64.add acc_size size,
+                    acc_probes || has_probes,
+                    name :: acc_names )
+                else acc_size, acc_probes, acc_names)
+              (0L, false, []) members
+          in
+          size, has_probes, List.rev member_names)
   in
   (* Track which files we've already analyzed to avoid double-counting *)
   let analyzed = String.Tbl.create 256 in
