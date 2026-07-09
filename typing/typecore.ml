@@ -662,6 +662,13 @@ let mode_strictly_stack expected_mode =
     with strictly_stack = true
   }
 
+let is_not_alloc_mode expected_mode =
+  let ceil =
+    Allocation.Guts.get_loose_ceil
+      (Value.proj_comonadic Allocation expected_mode.mode)
+  in
+  not (Allocation.Const.le Allocation.Const.max ceil)
+
 let mode_coerce mode expected_mode =
   mode_morph (fun m -> Value.meet [m; mode]) expected_mode
 
@@ -815,11 +822,24 @@ let allocations : Alloc.r list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
 
-let register_allocation_mode ~env ~loc ?(stack = false) alloc_mode =
+let register_allocation_mode ~env ~loc
+    ?(stack = false) ?(closure = false) alloc_mode =
   (* [stack_]-marked allocations are stack-allocated and so do not count
      towards the allocation axis; only heap allocations walk the locks. *)
   if not stack then
-    Env.walk_locks_for_allocation ~env (loc, Hint.Allocation);
+    let local_closure =
+      Env.walk_locks_for_allocation ~env (loc, Hint.Allocation closure)
+    in
+    if local_closure then
+      (match
+        Value.submode ~pp:(loc, Function)
+          (Value.min_with_comonadic Areality Regionality.local)
+          (alloc_as_value alloc_mode)
+      with
+      | Ok () -> ()
+      | Error failure_reason ->
+        let error = Submode_failed(failure_reason, Other) in
+        raise (Error (loc, env, error)));
   let alloc_mode = Alloc.disallow_left alloc_mode in
   allocations := alloc_mode :: !allocations
 
@@ -847,7 +867,8 @@ let register_closure_allocation ~env ?(stack = false) (mode : Value.r) ~loc
   let (alloc_mode : Alloc.lr), _ =
     Alloc.newvar_below (value_to_alloc_r2g ~allocation mode)
   in
-  register_allocation_mode ~env ~loc ~stack (Alloc.disallow_left alloc_mode);
+  register_allocation_mode ~env ~loc ~stack ~closure:true
+    (Alloc.disallow_left alloc_mode);
   let closed_over_mode =
     alloc_as_value ~allocation (Alloc.disallow_left alloc_mode)
   in
@@ -4938,30 +4959,13 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
   loop ty_fun0 mode_fun rev_args sargs
 
 (* See Note [Type-checking applications] for an overview *)
-let collect_apply_args env loc funct ignore_labels ty_fun ty_fun0 mode_fun sargs
+let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs
       ret_tvar =
   let warned = ref false in
   let rec loop ty_fun ty_fun0 mode_fun rev_args sargs =
-    if sargs = [] then begin
-      (* Allocation axis check: partial application of a function returns
-         an arrow type and allocates *)
-      let ty_fun' = expand_head env ty_fun in
-      let ty_fun_is_arrow =
-        match get_desc ty_fun' with Tarrow _ -> true | _ -> false
-      in
-      (* CR shsong: this check for partial application is not strong enough
-          to guarantee soundness. Especially for the case where the partial
-          application's return type is an abstract type and is actually a
-          function. *)
-      (* CR shsong: Alternative design: only register_allocation_mode if
-          partial_app = is_partial_apply untyped_args (where untyped_args
-          are in the return value) is false, since if partial_app is true,
-          there are Omitted args and the code walks the locks already *)
-      if ty_fun_is_arrow then
-        register_allocation_mode ~env ~loc Alloc.legacy;
+    if sargs = [] then
       collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
         ret_tvar
-    end
     else
     let ty_fun' = expand_head env ty_fun in
     let lv = get_level ty_fun' in
@@ -6239,11 +6243,11 @@ let split_function_ty
     env (expected_mode : expected_mode) ty_expected loc ~arg_label ~has_poly
     ~mode_annots ~ret_mode_annots ~in_function ~is_first_val_param ~is_final_val_param
   =
-  let alloc_mode, closed_over_mode =
+    let alloc_mode, closed_over_mode =
     register_closure_allocation ~env ~stack:expected_mode.strictly_stack ~loc
       (as_single_mode expected_mode)
   in
-  if expected_mode.strictly_local then
+    if expected_mode.strictly_local then
     Locality.submode_exn ~pp:(loc, Function) Locality.local
       (Alloc.proj_comonadic Areality alloc_mode);
   let { ty = ty_fun; explanation }, loc_fun = in_function in
@@ -6278,6 +6282,11 @@ let split_function_ty
     match is_first_val_param with
     | false -> env
     | true ->
+        let env =
+          if is_not_alloc_mode expected_mode
+          then Env.add_closure_noalloc_lock env
+          else env
+        in
         let env =
           Env.add_closure_lock
             (loc, Function)
@@ -8578,7 +8587,7 @@ and type_expect_
             Alloc.(of_const ~hint_comonadic:Stack_expression
               { Const.min with areality = Local })
           in
-          Alloc.submode_err (exp.exp_loc, Allocation) local alloc_mode
+          Alloc.submode_err (exp.exp_loc, Allocation false) local alloc_mode
         end
       | Texp_list_comprehension _ -> unsupported List_comprehension
       | Texp_array_comprehension _ -> unsupported Array_comprehension
@@ -10320,7 +10329,7 @@ and type_application env app_loc expected_mode position_and_mode
             (fun (label, e) -> Typetexp.transl_label_from_expr label e) sargs
           in
           let ty_ret, mode_ret, untyped_args =
-            collect_apply_args env app_loc funct ignore_labels ty (instance ty)
+            collect_apply_args env funct ignore_labels ty (instance ty)
               (value_to_alloc_r2l funct_mode) sargs ret_tvar
           in
           (* example: [collect_apply_args] returns

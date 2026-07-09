@@ -4806,7 +4806,10 @@ module Report = struct
       Some (print_article_noun Consonant "pattern match with effect cases")
     | Effect_try ->
       Some (print_article_noun Consonant "try-with with effect cases")
-    | Allocation -> Some (print_article_noun Vowel "allocation")
+    | Allocation closure ->
+      if closure
+      then Some (print_article_noun Vowel "allocation for closure")
+      else Some (print_article_noun Vowel "allocation")
     | Class -> Some (print_article_noun Consonant "class")
     | Object -> Some (print_article_noun Vowel "object")
     | Loop -> Some (print_article_noun Consonant "loop")
@@ -5957,6 +5960,10 @@ module Allocation = struct
   let legacy = of_const Const.legacy
 
   let zap_to_legacy = zap_to_ceil
+
+  module Guts = struct
+    let get_loose_ceil = Guts.get_loose_ceil
+  end
 end
 
 module type Areality = sig
