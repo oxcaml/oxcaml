@@ -85,8 +85,10 @@ heap_alloc_loop:
   jmp   .L1
 |}]
 
-(* BUG: a loop whose only allocation is local gets no poll at all: there is
-   no [young_limit] check anywhere in the code below. *)
+(* A loop whose only allocation is local gets a poll on its back edge: a
+   local allocation does not check [young_limit] (neither on its fast path,
+   which only involves [local_sp]/[local_limit], nor in
+   [caml_local_realloc]), and is therefore not a safe point. *)
 let[@inline never] local_alloc_loop n =
   for i = 0 to n do
     let local_ r = ref (opaque i) in
@@ -96,7 +98,7 @@ let[@inline never] local_alloc_loop n =
 [%%expect_asm_full X86_64{|
 local_alloc_loop:
   cmpq  $1, %rax
-  jl    .L2
+  jl    .L4
   subq  $8, %rsp
   sarq  $1, %rax
   xorl  %ebx, %ebx
@@ -107,7 +109,7 @@ local_alloc_loop:
   subq  $16, %rdx
   movq  %rdx, 64(%r14)
   cmpq  80(%r14), %rdx
-  jl    .L3
+  jl    .L7
 .L1:
   addq  72(%r14), %rdx
   addq  $8, %rdx
@@ -116,14 +118,23 @@ local_alloc_loop:
   movq  %rdi, 64(%r14)
   incq  %rbx
   cmpq  %rax, %rbx
-  jle   .L0
+  jg    .L3
+  cmpq  (%r14), %r15
+  jbe   .L5
+.L2:
+  jmp   .L0
+.L3:
   movl  $1, %eax
   addq  $8, %rsp
   ret
-.L2:
+.L4:
   movl  $1, %eax
   ret
-.L3:
+.L5:
+  call  .Lcaml_call_gc_
+.L6:
+  jmp   .L2
+.L7:
   call  caml_call_local_realloc@PLT
   jmp   .L1
 |}]
