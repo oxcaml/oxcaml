@@ -1376,6 +1376,7 @@ let layout_poly_variant = non_null_value Pgenval
 let layout_class = non_null_value Pgenval
 let layout_module = non_null_value Pgenval
 let layout_functor = non_null_value Pgenval
+let layout_template_env = non_null_value Pgenval
 let layout_boxed_float f = non_null_value (Pboxedfloatval f)
 let layout_unboxed_float f = Punboxed_float f
 let layout_unboxed_nativeint = Punboxed_or_untagged_integer Unboxed_nativeint

@@ -394,7 +394,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         e.exp_env e.exp_type path desc kind
   | Texp_apply_layout (func, args) ->
       Lkindinstantiate {
-        kinst_func = (transl_exp ~scopes Lambda.layout_block func);
+        kinst_func = (transl_exp ~scopes Lambda.layout_template_env func);
         kinst_args = List.map
           (fun var ->
             let layout = Jkind.Sort.var_default_to_scannable_and_get var in
