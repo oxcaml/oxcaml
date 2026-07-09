@@ -1,6 +1,6 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -reaper-debug-flags=nostamps";
+   flags += "-flambda2-reaper -reaper-debug-flags=nostamps -extension small_numbers";
    { native with dump-simplify, dump-reaper; check-fexpr-dump; }
  *)
 
@@ -21,6 +21,21 @@ let test_int32 a b = Int32.to_int (add_int32 (Int32.of_int a) (Int32.of_int b))
 
 let test_nativeint a b =
   Nativeint.to_int (add_nativeint (Nativeint.of_int a) (Nativeint.of_int b))
+
+external float32_of_int : int -> float32 = "%float32ofint"
+
+external float32_to_int : float32 -> int = "%intoffloat32"
+
+external ( +$ ) : float32 -> float32 -> float32 = "%addfloat32"
+
+let[@inline never] [@local never] add_float x y = x +. y
+
+let[@inline never] [@local never] add_float32 x y = x +$ y
+
+let test_float a b = int_of_float (add_float (float_of_int a) (float_of_int b))
+
+let test_float32 a b =
+  float32_to_int (add_float32 (float32_of_int a) (float32_of_int b))
 
 (* A boxed number captured in a closure: the closure is unboxed, and the
    contents of its value slot along with it. *)

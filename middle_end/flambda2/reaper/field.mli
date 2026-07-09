@@ -31,8 +31,7 @@ type view = private
   | Is_int
   | Get_tag
   | Boxed_number of Flambda_kind.Boxable_number.t
-      (** The contents of a boxed number. Currently only created for boxed
-          int32, int64 and nativeint values. *)
+      (** The contents of a boxed number. *)
   | Return_of_call of return_kind
   | Code_id_of_call_witness
 

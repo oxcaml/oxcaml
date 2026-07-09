@@ -150,10 +150,10 @@ let[@inline] erase kind =
     (Flambda_kind.With_subkind.nullable kind)
 
 let rewrite_boxed_number_kind context usages kind bn =
-  (* The contents of boxed int32/int64/nativeint values are tracked via
-     [Boxed_number] fields. If the contents are read, the value must really be a
-     boxed number (in particular, it cannot have been replaced by a poison
-     value), so the subkind can be kept.
+  (* The contents of boxed numbers are tracked via [Boxed_number] fields. If the
+     contents are read, the value must really be a boxed number (in particular,
+     it cannot have been replaced by a poison value), so the subkind can be
+     kept.
 
      Note that the [Bottom] case below is reachable even though this function is
      only called for values with usages: the value's usages may all read a
@@ -174,11 +174,15 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom context usages kind =
   | Anything -> kind
   | Tagged_immediate ->
     kind (* Always correct, since poison is a tagged immediate *)
+  | Boxed_float32 -> rewrite_boxed_number_kind context usages kind Naked_float32
+  | Boxed_float -> rewrite_boxed_number_kind context usages kind Naked_float
   | Boxed_int32 -> rewrite_boxed_number_kind context usages kind Naked_int32
   | Boxed_int64 -> rewrite_boxed_number_kind context usages kind Naked_int64
   | Boxed_nativeint ->
     rewrite_boxed_number_kind context usages kind Naked_nativeint
-  | Boxed_float32 | Boxed_float | Boxed_vec128 | Boxed_vec256 | Boxed_vec512
+  | Boxed_vec128 -> rewrite_boxed_number_kind context usages kind Naked_vec128
+  | Boxed_vec256 -> rewrite_boxed_number_kind context usages kind Naked_vec256
+  | Boxed_vec512 -> rewrite_boxed_number_kind context usages kind Naked_vec512
   | Float_block _ | Float_array | Immediate_array | Value_array | Generic_array
   | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
   | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
