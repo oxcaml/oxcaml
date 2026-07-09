@@ -1308,7 +1308,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pobj_dup | Pobj_magic _ | Pmakelazyblock _ | Punbox_vector _
       | Punbox_unit
       | Pbox_vector (_, _)
-      | Pjoin_vec256 | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
+      | Punbox_mask | Pbox_mask _ | Pjoin_vec256 | Psplit_vec256
+      | Preinterpret_boxed_vector_as_tuple _
       | Preinterpret_tuple_as_boxed_vector _ | Pmake_unboxed_product _
       | Punboxed_product_field _ | Parray_element_size_in_bytes _
       | Pget_header _ | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible

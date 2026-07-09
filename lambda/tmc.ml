@@ -919,6 +919,7 @@ let rec choice ctx t =
     | Patomic_load_field _ | Patomic_set_field _
     | Pcpu_relax
     | Punbox_vector _ | Pbox_vector (_, _)
+    | Punbox_mask | Pbox_mask _
     | Pjoin_vec256 | Psplit_vec256
 
     (* we don't handle array indices as destinations yet *)

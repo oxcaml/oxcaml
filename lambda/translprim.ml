@@ -1107,6 +1107,8 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%split_vec256" -> Primitive(Psplit_vec256, 1)
     | "%unbox_vec512" -> Primitive(Punbox_vector Boxed_vec512, 1)
     | "%box_vec512" -> Primitive(Pbox_vector (Boxed_vec512, mode), 1)
+    | "%unbox_mask" -> Primitive(Punbox_mask, 1)
+    | "%box_mask" -> Primitive(Pbox_mask mode, 1)
     | "%get_header" -> Primitive (Pget_header mode, 1)
     | "%atomic_load" -> Atomic(Load, Ref, Pointer)
     | "%atomic_load_field" -> Atomic(Load, Field, Pointer)
@@ -2601,10 +2603,11 @@ let lambda_primitive_needs_event_after = function
   | Pdls_get
   | Ptls_get
   | Pdomain_index
-  | Pobj_magic _ | Punbox_vector _
+  | Pobj_magic _ | Punbox_vector _ | Punbox_mask
   | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
   (* These don't allocate in bytecode; they're just identity functions: *)
   | Pbox_vector (_, _)
+  | Pbox_mask _
   | Punbox_unit
     -> false
   | Pmakearray (Punspecializedarray, _, _)
