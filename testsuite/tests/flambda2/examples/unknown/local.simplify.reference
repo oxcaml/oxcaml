@@ -1,6 +1,6 @@
-let $camlLocal__const_block11 = Block 0 (3, 0) in
-let $camlLocal__const_block13 = Block 0 (2, $camlLocal__const_block11) in
-let $camlLocal__const_block15 = Block 0 (1, $camlLocal__const_block13) in
+let $camlLocal__const_block_0 = Block 0 (3, 0) in
+let $camlLocal__const_block_1 = Block 0 (2, $camlLocal__const_block_0) in
+let $camlLocal__const_block_2 = Block 0 (1, $camlLocal__const_block_1) in
 let code return_local_0 deleted in
 let code map_local_1 deleted in
 let code length_2 deleted in
@@ -9,35 +9,35 @@ let code rev_app_4 deleted in
 let code find_span_6 deleted in
 let code spans_5 deleted in
 let code is_even_7 deleted in
-let $camlLocal__immstring52 = "local.ml" in
-let $camlLocal__const_block183 = Block 0 ($camlLocal__immstring52, 58, 2) in
-let $camlLocal__Pmakeblock186 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block183)
+let $camlLocal__immstring_4 = "local.ml" in
+let $camlLocal__const_block_16 = Block 0 ($camlLocal__immstring_4, 58, 2) in
+let $camlLocal__Pmakeblock_17 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block_16)
 in
-let $camlLocal__const_block168 = Block 0 (4, 0) in
-let $camlLocal__const_block170 = Block 0 (3, $camlLocal__const_block168) in
-let $camlLocal__const_block172 = Block 0 (2, $camlLocal__const_block170) in
-let $camlLocal__const_block174 = Block 0 (1, $camlLocal__const_block172) in
-let $camlLocal__const_block176 = Block 0 (0, $camlLocal__const_block174) in
-let $camlLocal__const_block93 = Block 0 ($camlLocal__immstring52, 33, 2) in
-let $camlLocal__Pmakeblock96 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block93)
+let $camlLocal__const_block_11 = Block 0 (4, 0) in
+let $camlLocal__const_block_12 = Block 0 (3, $camlLocal__const_block_11) in
+let $camlLocal__const_block_13 = Block 0 (2, $camlLocal__const_block_12) in
+let $camlLocal__const_block_14 = Block 0 (1, $camlLocal__const_block_13) in
+let $camlLocal__const_block_15 = Block 0 (0, $camlLocal__const_block_14) in
+let $camlLocal__const_block_9 = Block 0 ($camlLocal__immstring_4, 33, 2) in
+let $camlLocal__Pmakeblock_10 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block_9)
 in
-let $camlLocal__const_block69 = Block 0 ($camlLocal__immstring52, 28, 9) in
-let $camlLocal__Pmakeblock72 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block69)
+let $camlLocal__const_block_7 = Block 0 ($camlLocal__immstring_4, 28, 9) in
+let $camlLocal__Pmakeblock_8 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block_7)
 in
-let $camlLocal__const_block54 = Block 0 ($camlLocal__immstring52, 26, 9) in
-let $camlLocal__Pmakeblock57 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block54)
+let $camlLocal__const_block_5 = Block 0 ($camlLocal__immstring_4, 26, 9) in
+let $camlLocal__Pmakeblock_6 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block_5)
 in
-let $camlLocal__const_block46 = Block 0 (1, 0) in
+let $camlLocal__const_block_3 = Block 0 (1, 0) in
 let code loopify(never) size(1) newer_version_of(return_local_0)
       return_local_0_1 (param : imm tagged)
         my_closure my_region my_ghost_region my_depth
         -> k * k1
         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] local =
-  cont k ($camlLocal__const_block15)
+  cont k ($camlLocal__const_block_2)
 in
 let $camlLocal__return_local_8 = closure return_local_0_1 @return_local in
 let $camlLocal__map_local_9 =
@@ -92,12 +92,12 @@ and code rec loopify(never) size(19) newer_version_of(length_2)
 in
 apply direct(length_2_1)
   ($camlLocal__length_10 : _ -> imm tagged)
-    ($camlLocal__const_block46)
+    ($camlLocal__const_block_3)
     -> k1 * error
   where k1 (apply_result : imm tagged) =
     let prim = %phys_eq (apply_result, 1) in
     switch prim
-      | 0 -> error pop(regular error) ($camlLocal__Pmakeblock57)
+      | 0 -> error pop(regular error) ($camlLocal__Pmakeblock_6)
       | 1 -> k
   where k =
     (apply direct(length_2_1) inlining_state(depth(30))
@@ -111,7 +111,7 @@ apply direct(length_2_1)
          let int_add_2 = %int_barith.add (1, int_add_1) in
          let prim = %phys_eq (int_add_2, 3) in
          switch prim
-           | 0 -> error pop(regular error) ($camlLocal__Pmakeblock72)
+           | 0 -> error pop(regular error) ($camlLocal__Pmakeblock_8)
            | 1 -> k
        where k =
          let `region` = %begin_region () in
@@ -131,7 +131,7 @@ apply direct(length_2_1)
              ($camlLocal__map_local_9
               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                ($`camlLocal__fn[local.ml:32,27--43]_11`,
-                $camlLocal__const_block15)
+                $camlLocal__const_block_2)
                -> k1 * error)
             where k1 (ms : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
               (apply direct(length_2_1)
@@ -140,7 +140,7 @@ apply direct(length_2_1)
                    let prim = %phys_eq (apply_result, 3) in
                    switch prim
                      | 0 ->
-                       error pop(regular error) ($camlLocal__Pmakeblock96)
+                       error pop(regular error) ($camlLocal__Pmakeblock_10)
                      | 1 -> k)
             where k =
               let `unit` = %end_region (`region`) in
@@ -297,7 +297,7 @@ apply direct(length_2_1)
               (apply direct(spans_5_1 &region_1 &ghost_region_1)
                  ($camlLocal__spans_13
                   : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
-                   ($camlLocal__is_even_15, $camlLocal__const_block176)
+                   ($camlLocal__is_even_15, $camlLocal__const_block_15)
                    -> k1 * error
                  where k1
                          (even_spans :
@@ -312,7 +312,7 @@ apply direct(length_2_1)
                           | 0 ->
                             error
                               pop(regular error)
-                              ($camlLocal__Pmakeblock186)
+                              ($camlLocal__Pmakeblock_17)
                           | 1 -> k)
                  where k =
                    let unit_2 = %end_region (region_1) in

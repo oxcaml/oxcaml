@@ -18,8 +18,8 @@
        let Pfield = %block_load.[`0`] (x) in
        cont k1 (Pfield)
  in
- let $camlGadt_simplified_switch__immstring21 = "A" in
- let $camlGadt_simplified_switch__immstring23 = "B" in
+ let $camlGadt_simplified_switch__immstring_0 = "A" in
+ let $camlGadt_simplified_switch__immstring_1 = "B" in
  let code size(11)
        extract_string_1 (x : [ 0 |1 | 0 of imm tagged |1 of imm tagged ])
          my_closure _region _ghost_region my_depth
@@ -28,8 +28,8 @@
    let next_depth = rec_info (succ my_depth) in
    let untagged = %untag_imm (x) in
    switch untagged
-     | 0 -> k1 ($camlGadt_simplified_switch__immstring21)
-     | 1 -> k1 ($camlGadt_simplified_switch__immstring23)
+     | 0 -> k1 ($camlGadt_simplified_switch__immstring_0)
+     | 1 -> k1 ($camlGadt_simplified_switch__immstring_1)
  in
  let extract_int = closure extract_int_0 @extract_int in
  let extract_string = closure extract_string_1 @extract_string in

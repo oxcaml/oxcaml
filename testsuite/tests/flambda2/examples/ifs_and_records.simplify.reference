@@ -16,7 +16,7 @@ let code main_no_if_14 deleted in
 let code main_no_if_tuple_15 deleted in
 let code main_hand_inline_16 deleted in
 let code main_hand_inline_tuple_17 deleted in
-let $camlIfs_and_records__empty_block4 = Block 0 () in
+let $camlIfs_and_records__empty_block_0 = Block 0 () in
 let code inline(always) loopify(never) size(27) newer_version_of(help_desired_0)
       help_desired_0_1
         (should_swap : imm tagged, a : imm tagged, b : imm tagged)
@@ -310,8 +310,8 @@ let $camlIfs_and_records__main_hand_inline_tuple_35 =
   closure main_hand_inline_tuple_17_1 @main_hand_inline_tuple
 in
 let $camlIfs_and_records =
-  Block 0 ($camlIfs_and_records__empty_block4,
-           $camlIfs_and_records__empty_block4,
+  Block 0 ($camlIfs_and_records__empty_block_0,
+           $camlIfs_and_records__empty_block_0,
            $camlIfs_and_records__help_desired_18,
            $camlIfs_and_records__help_wrap_19,
            $camlIfs_and_records__help_variant_20,

@@ -1,11 +1,11 @@
-let $camlInvalid__immstring17 = "lengths" in
+let $camlInvalid__immstring_0 = "lengths" in
 let code check_0 deleted in
 let code bar_1 deleted in
-let $camlInvalid__empty_array40 = Empty_array in
-let $camlInvalid__float43 = 0x1p+0 in
+let $camlInvalid__empty_array_2 = Empty_array in
+let $camlInvalid__float_3 = 0x1p+0 in
 let code foo_2 deleted in
-let $camlInvalid__Pmakeblock69 =
-  Block 0 ($`*predef*`.caml_exn_Failure, $camlInvalid__immstring17)
+let $camlInvalid__Pmakeblock_4 =
+  Block 0 ($`*predef*`.caml_exn_Failure, $camlInvalid__immstring_0)
 in
 let code inline(never) loopify(never) size(16) newer_version_of(check_0)
       check_0_1 (t1 : val array, t2 : val array)
@@ -17,7 +17,7 @@ let code inline(never) loopify(never) size(16) newer_version_of(check_0)
   let prim = %phys_ne (Parraylength_1, Parraylength) in
   switch prim
     | 0 -> k (0)
-    | 1 -> k1 pop(reraise k1) ($camlInvalid__Pmakeblock69)
+    | 1 -> k1 pop(reraise k1) ($camlInvalid__Pmakeblock_4)
 in
 let $camlInvalid__check_3 = closure check_0_1 @check in
 let code inline(always) loopify(never) size(12) newer_version_of(bar_1)
@@ -42,15 +42,15 @@ let code loopify(never) size(18) newer_version_of(foo_2)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let Pmakearray = %array.mut ($camlInvalid__float43) in
+  let Pmakearray = %array.mut ($camlInvalid__float_3) in
   apply direct(check_0_1) inlining_state(depth(1))
     ($camlInvalid__check_3 : _ -> imm tagged)
-      (Pmakearray, $camlInvalid__empty_array40)
+      (Pmakearray, $camlInvalid__empty_array_2)
       -> k3 * k1
     where k3 (param_1 : imm tagged) =
       cont k2
     where k2 =
-      let Parrayrefu = %array_load.`imm`.mut ($camlInvalid__empty_array40, 0)
+      let Parrayrefu = %array_load.`imm`.mut ($camlInvalid__empty_array_2, 0)
       in
       let prim = %unbox_num.`float` (Parrayrefu) in
       let prim_1 = %float_comp.eq (prim, 0x0p+0) in

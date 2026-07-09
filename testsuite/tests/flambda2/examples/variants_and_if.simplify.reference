@@ -1,11 +1,11 @@
 let code f_0 deleted in
-let $camlVariants_and_if__immstring6 = "Variants_and_if.Foo" in
+let $camlVariants_and_if__immstring_0 = "Variants_and_if.Foo" in
 apply ccall noalloc
   ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
   where k (Pccall) =
-    let $camlVariants_and_if__Foo28 =
+    let $camlVariants_and_if__Foo_1 =
       Block immutable_unique
-      248 ($camlVariants_and_if__immstring6, Pccall)
+      248 ($camlVariants_and_if__immstring_0, Pccall)
     in
     let code loopify(never) size(33) newer_version_of(f_0)
           f_0_1 (x : imm tagged, t : [ 0 | 0 of imm tagged ])
@@ -20,7 +20,7 @@ apply ccall noalloc
           let prim = %is_int (t) in
           switch prim
             | 0 -> k2
-            | 1 -> k1 pop(regular k1) ($camlVariants_and_if__Foo28)
+            | 1 -> k1 pop(regular k1) ($camlVariants_and_if__Foo_1)
         where k2 =
           let prim = %is_int (t) in
           switch prim
@@ -29,6 +29,6 @@ apply ccall noalloc
     in
     let $camlVariants_and_if__f_1 = closure f_0_1 @f in
     let $camlVariants_and_if =
-      Block 0 ($camlVariants_and_if__Foo28, $camlVariants_and_if__f_1)
+      Block 0 ($camlVariants_and_if__Foo_1, $camlVariants_and_if__f_1)
     in
     cont done ($camlVariants_and_if)

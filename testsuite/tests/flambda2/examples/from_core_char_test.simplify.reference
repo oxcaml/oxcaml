@@ -1,27 +1,27 @@
-let $camlFrom_core_char_test__string18 = "index out of bounds" in
-let $camlFrom_core_char_test__block20 =
+let $camlFrom_core_char_test__string_0 = "index out of bounds" in
+let $camlFrom_core_char_test__block_1 =
   Block 0 ($`*predef*`.caml_exn_Invalid_argument,
-           $camlFrom_core_char_test__string18)
+           $camlFrom_core_char_test__string_0)
 in
-let $camlFrom_core_char_test__immstring26 = "from_core_char_test.ml" in
-let $camlFrom_core_char_test__const_block28 =
-  Block 0 ($camlFrom_core_char_test__immstring26, 24, 56)
+let $camlFrom_core_char_test__immstring_2 = "from_core_char_test.ml" in
+let $camlFrom_core_char_test__const_block_3 =
+  Block 0 ($camlFrom_core_char_test__immstring_2, 24, 56)
 in
-let $camlFrom_core_char_test__Pmakeblock31 =
+let $camlFrom_core_char_test__Pmakeblock_4 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
-           $camlFrom_core_char_test__const_block28)
+           $camlFrom_core_char_test__const_block_3)
 in
 let code char_of_string_0 deleted in
 let code result_is_error_1 deleted in
 let code result_try_with_2 deleted in
-let $camlFrom_core_char_test__immstring64 = "c" in
+let $camlFrom_core_char_test__immstring_5 = "c" in
 let code test_3 deleted in
-let $camlFrom_core_char_test__const_block87 =
-  Block 0 ($camlFrom_core_char_test__immstring26, 35, 35)
+let $camlFrom_core_char_test__const_block_7 =
+  Block 0 ($camlFrom_core_char_test__immstring_2, 35, 35)
 in
-let $camlFrom_core_char_test__Pmakeblock90 =
+let $camlFrom_core_char_test__Pmakeblock_8 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
-           $camlFrom_core_char_test__const_block87)
+           $camlFrom_core_char_test__const_block_7)
 in
 let code top_5 deleted in
 let code inline(always) loopify(never) size(40) newer_version_of(char_of_string_0)
@@ -34,7 +34,7 @@ let code inline(always) loopify(never) size(40) newer_version_of(char_of_string_
   let prim_1 = %int_comp.ne (`*match*`, 1) in
   switch prim_1
     | 0 -> k2
-    | 1 -> k1 pop(regular k1) ($camlFrom_core_char_test__Pmakeblock31)
+    | 1 -> k1 pop(regular k1) ($camlFrom_core_char_test__Pmakeblock_4)
     where k2 =
       ((let prim_2 = %num_conv.[`imm`].[`nativeint`] (prim) in
         let prim_3 = %int_comp.`nativeint`.unsigned.lt (0n, prim_2) in
@@ -46,7 +46,7 @@ let code inline(always) loopify(never) size(40) newer_version_of(char_of_string_
            let Pstringrefs = %tag_imm (prim_2) in
            cont k (Pstringrefs)
          where k2 =
-           cont k1 pop(regular k1) ($camlFrom_core_char_test__block20))
+           cont k1 pop(regular k1) ($camlFrom_core_char_test__block_1))
 in
 let $camlFrom_core_char_test__char_of_string_6 =
   closure char_of_string_0_1 @char_of_string
@@ -90,7 +90,7 @@ let code inline(always) loopify(never) size(20) newer_version_of(test_3)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring64, 0n)
+  let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring_5, 0n)
   in
   let Pstringrefs = %tag_imm (prim) in
   let prim_1 = %phys_eq (Pstringrefs, 99) in
@@ -110,7 +110,7 @@ let code loopify(never) size(30) newer_version_of(top_5)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  (let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring64, 0n)
+  (let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring_5, 0n)
    in
    let Pstringrefs = %tag_imm (prim) in
    let prim_1 = %phys_eq (Pstringrefs, 99) in
@@ -125,7 +125,7 @@ let code loopify(never) size(30) newer_version_of(top_5)
        cont k2 (1i))
     where k2 (naked_immediate : imm) =
       switch naked_immediate
-        | 0 -> k1 pop(regular k1) ($camlFrom_core_char_test__Pmakeblock90)
+        | 0 -> k1 pop(regular k1) ($camlFrom_core_char_test__Pmakeblock_8)
         | 1 -> k (0)
 in
 let $camlFrom_core_char_test__top_11 = closure top_5_1 @top in

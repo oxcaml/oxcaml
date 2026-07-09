@@ -1,10 +1,10 @@
-let $camlInvalid__immstring17 = "lengths" in
+let $camlInvalid__immstring_0 = "lengths" in
 let code check_0 deleted in
 let code bar_1 deleted in
-let $camlInvalid__empty_array41 = Empty_array in
+let $camlInvalid__empty_array_2 = Empty_array in
 let code foo_2 deleted in
-let $camlInvalid__Pmakeblock71 =
-  Block 0 ($`*predef*`.caml_exn_Failure, $camlInvalid__immstring17)
+let $camlInvalid__Pmakeblock_4 =
+  Block 0 ($`*predef*`.caml_exn_Failure, $camlInvalid__immstring_0)
 in
 let code inline(never) loopify(never) size(22) newer_version_of(check_0)
       check_0_1 (t1 : any array, t2 : any array)
@@ -16,7 +16,7 @@ let code inline(never) loopify(never) size(22) newer_version_of(check_0)
   let prim = %phys_ne (Parraylength_1, Parraylength) in
   switch prim
     | 0 -> k (0)
-    | 1 -> k1 pop(reraise k1) ($camlInvalid__Pmakeblock71)
+    | 1 -> k1 pop(reraise k1) ($camlInvalid__Pmakeblock_4)
 in
 let $camlInvalid__check_3 = closure check_0_1 @check in
 let code inline(always) loopify(never) size(11) newer_version_of(bar_1)
@@ -43,12 +43,12 @@ let code loopify(never) size(11) newer_version_of(foo_2)
   let Pmakearray = %array.`float`.mut (0x1p+0) in
   apply direct(check_0_1) inlining_state(depth(1))
     ($camlInvalid__check_3 : _ -> imm tagged)
-      (Pmakearray, $camlInvalid__empty_array41)
+      (Pmakearray, $camlInvalid__empty_array_2)
       -> k3 * k1
     where k3 (param_1 : imm tagged) =
       cont k2
     where k2 =
-      invalid "(Defining_expr_of_let (bound_pattern prim/110N)\n (defining_expr\n  (((Array_load Naked_floats Naked_floats Mutable) t2/106UV 0)\n   invalid.ml:29,2--23)))"
+      invalid "(Defining_expr_of_let (bound_pattern prim/102N)\n (defining_expr\n  (((Array_load Naked_floats Naked_floats Mutable) t2/98UV 0)\n   invalid.ml:29,2--23)))"
 in
 let $camlInvalid__foo_5 = closure foo_2_1 @foo in
 let $camlInvalid =

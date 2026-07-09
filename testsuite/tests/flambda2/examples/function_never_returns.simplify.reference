@@ -6,7 +6,7 @@ let code inline(never) loopify(never) size(3) newer_version_of(f_0)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  cont k1 pop(reraise k1) ($Stdlib.camlStdlib__Exit1434)
+  cont k1 pop(reraise k1) ($Stdlib.camlStdlib__Exit1354)
 in
 let $camlFunction_never_returns__f_3 = closure f_0_1 @f in
 let code loopify(never) size(4) newer_version_of(foo_1)

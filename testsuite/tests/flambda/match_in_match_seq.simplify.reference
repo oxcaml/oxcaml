@@ -26,10 +26,9 @@ let code loopify(never) size(35) newer_version_of(foo_12)
            cont `self` (int_add_2, int_add_1))
 in
 let $camlMatch_in_match_seq__foo_22 = closure foo_12_1 @foo in
-let $camlMatch_in_match_seq__Pmakeblock898 =
+let $camlMatch_in_match_seq__Pmakeblock_7 =
   Block 0 ($camlMatch_in_match_seq__foo_22)
 in
-let $camlMatch_in_match_seq =
-  Block 0 ($camlMatch_in_match_seq__Pmakeblock898)
+let $camlMatch_in_match_seq = Block 0 ($camlMatch_in_match_seq__Pmakeblock_7)
 in
 cont done ($camlMatch_in_match_seq)

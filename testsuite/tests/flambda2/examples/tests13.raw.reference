@@ -1,4 +1,4 @@
-let $camlTests13__first_const = Block 0 () in
+let $camlTests13__first_const_0 = Block 0 () in
 (let code size(1)
        `fn[tests13.ml:30,44--59]_2` (param : imm tagged)
          my_closure _region _ghost_region my_depth

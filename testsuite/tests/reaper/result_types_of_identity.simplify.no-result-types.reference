@@ -1,12 +1,12 @@
-let $camlResult_types_of_identity__immstring16 =
+let $camlResult_types_of_identity__immstring_0 =
   "result_types_of_identity.ml"
 in
-let $camlResult_types_of_identity__const_block18 =
-  Block 0 ($camlResult_types_of_identity__immstring16, 30, 2)
+let $camlResult_types_of_identity__const_block_1 =
+  Block 0 ($camlResult_types_of_identity__immstring_0, 30, 2)
 in
-let $camlResult_types_of_identity__Pmakeblock21 =
+let $camlResult_types_of_identity__Pmakeblock_2 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
-           $camlResult_types_of_identity__const_block18)
+           $camlResult_types_of_identity__const_block_1)
 in
 let code always_0_0 deleted in
 let code loopify(never) size(16) newer_version_of(always_0_0)
@@ -23,7 +23,7 @@ let code loopify(never) size(16) newer_version_of(always_0_0)
       let prim = %phys_eq (apply_result, 0) in
       switch prim
         | 0 ->
-          k1 pop(regular k1) ($camlResult_types_of_identity__Pmakeblock21)
+          k1 pop(regular k1) ($camlResult_types_of_identity__Pmakeblock_2)
         | 1 -> k (0)
 in
 let $camlResult_types_of_identity__always_0_1 =

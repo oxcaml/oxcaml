@@ -1,14 +1,14 @@
 let code is_true_1 deleted in
 let code is_false_2 deleted in
-let $camlPhantom__immstring48 = "phantom.ml" in
-let $camlPhantom__const_block50 = Block 0 ($camlPhantom__immstring48, 42, 6)
+let $camlPhantom__immstring_1 = "phantom.ml" in
+let $camlPhantom__const_block_2 = Block 0 ($camlPhantom__immstring_1, 42, 6)
 in
-let $camlPhantom__Pmakeblock53 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlPhantom__const_block50)
+let $camlPhantom__Pmakeblock_3 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlPhantom__const_block_2)
 in
 let code eval_level_3 deleted in
 let code true_at_level0_4 deleted in
-let $camlPhantom__immstring11 = "Phantom.Make(F).UndecidedLit" in
+let $camlPhantom__immstring_0 = "Phantom.Make(F).UndecidedLit" in
 let code Make_0 deleted in
 let code Make2_5 deleted in
 let code loopify(never) size(77) newer_version_of(true_at_level0_4)
@@ -33,7 +33,7 @@ let code loopify(never) size(77) newer_version_of(true_at_level0_4)
           where k6 (lvl_1) =
             let prim = %int_comp.ge (lvl_1, 0) in
             switch prim
-              | 0 -> k2 pop(regular k2) ($camlPhantom__Pmakeblock53)
+              | 0 -> k2 pop(regular k2) ($camlPhantom__Pmakeblock_3)
               | 1 -> k4 (lvl_1, 1i)
           where k5 (lvl_1) =
             let Pfield_2 = %block_load.[`2`] (a) in
@@ -79,7 +79,7 @@ let code inline(always) loopify(never) size(56) newer_version_of(eval_level_3)
     where k3 =
       ((let prim = %int_comp.ge (lvl, 0) in
         switch prim
-          | 0 -> k1 pop(regular k1) ($camlPhantom__Pmakeblock53)
+          | 0 -> k1 pop(regular k1) ($camlPhantom__Pmakeblock_3)
           | 1 -> k3)
          where k3 =
            let Pmakeblock = %block.[`0`] (1, lvl) in
@@ -123,7 +123,7 @@ let code inline(always) loopify(never) size(176) newer_version_of(Make_0)
     ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k2 * k1
     where k2 (Pccall) =
       let UndecidedLit =
-        %block.immut_uniq.[`248`] ($camlPhantom__immstring11, Pccall)
+        %block.immut_uniq.[`248`] ($camlPhantom__immstring_0, Pccall)
       in
       let eval_level = closure eval_level_3_1 @eval_level
       with {
@@ -168,7 +168,7 @@ let code loopify(never) size(77) newer_version_of(true_at_level0_4_1)
           where k6 (lvl_1) =
             let prim = %int_comp.ge (lvl_1, 0) in
             switch prim
-              | 0 -> k2 pop(regular k2) ($camlPhantom__Pmakeblock53)
+              | 0 -> k2 pop(regular k2) ($camlPhantom__Pmakeblock_3)
               | 1 -> k4 (1i, lvl_1)
           where k5 (lvl_1) =
             let Pfield_2 = %block_load.[`2`] (a) in
@@ -214,7 +214,7 @@ let code inline(always) loopify(never) size(56) newer_version_of(eval_level_3_1)
     where k3 =
       ((let prim = %int_comp.ge (lvl, 0) in
         switch prim
-          | 0 -> k1 pop(regular k1) ($camlPhantom__Pmakeblock53)
+          | 0 -> k1 pop(regular k1) ($camlPhantom__Pmakeblock_3)
           | 1 -> k3)
          where k3 =
            let Pmakeblock = %block.[`0`] (1, lvl) in
@@ -239,7 +239,7 @@ let code inline(always) loopify(never) size(176) newer_version_of(Make2_5)
     ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k2 * k1
     where k2 (Pccall) =
       let UndecidedLit =
-        %block.immut_uniq.[`248`] ($camlPhantom__immstring11, Pccall)
+        %block.immut_uniq.[`248`] ($camlPhantom__immstring_0, Pccall)
       in
       let eval_level = closure eval_level_3_2 @eval_level
       with {

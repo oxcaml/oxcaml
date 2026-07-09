@@ -1,4 +1,4 @@
-let $camlMeet_with_incompatible_kinds__float12 = 0x1.8p+1 in
+let $camlMeet_with_incompatible_kinds__float_0 = 0x1.8p+1 in
 let code aux_0 deleted in
 let code f_1 deleted in
 let code inline(always) loopify(never) size(20) newer_version_of(aux_0)
@@ -8,7 +8,7 @@ let code inline(always) loopify(never) size(20) newer_version_of(aux_0)
         : float boxed =
   (let prim = %get_tag (x) in
    switch prim
-     | 0 -> k ($camlMeet_with_incompatible_kinds__float12)
+     | 0 -> k ($camlMeet_with_incompatible_kinds__float_0)
      | 1 -> k2)
     where k2 =
       let Pfield = %block_load.[`0`] (x) in
@@ -25,7 +25,7 @@ let code loopify(never) size(10) newer_version_of(f_1)
   let Pfield = %block_load.[`0`] (x) in
   let n = %block_load.[`0`] (Pfield) in
   let Pmakeblock =
-    %block.[`0`] ($camlMeet_with_incompatible_kinds__float12, n)
+    %block.[`0`] ($camlMeet_with_incompatible_kinds__float_0, n)
   in
   cont k (Pmakeblock)
 in

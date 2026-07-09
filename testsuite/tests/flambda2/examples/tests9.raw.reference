@@ -57,11 +57,11 @@
            (Pfield_1, Pmakeblock)
            -> k1 * k2
  in
- let $camlTests9__immstring48 = "tests9.ml" in
- let $camlTests9__const_block50 = Block 0 ($camlTests9__immstring48, 39, 52)
+ let $camlTests9__immstring_0 = "tests9.ml" in
+ let $camlTests9__const_block_1 = Block 0 ($camlTests9__immstring_0, 39, 52)
  in
- let $camlTests9__Pmakeblock53 =
-   Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests9__const_block50)
+ let $camlTests9__Pmakeblock_2 =
+   Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests9__const_block_1)
  in
  let code rec loopify(default tailrec) size(42)
        chop_3 (k : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
@@ -97,7 +97,7 @@
                 (int_sub, Pfield)
                 -> k1 * k2
           where k3 =
-            cont k2 pop(regular k2) ($camlTests9__Pmakeblock53))
+            cont k2 pop(regular k2) ($camlTests9__Pmakeblock_2))
  in
  let code rec loopify(default tailrec) size(119)
        rev_merge_5

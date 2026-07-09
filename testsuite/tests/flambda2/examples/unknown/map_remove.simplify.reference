@@ -1,6 +1,6 @@
 let code bal_0 deleted in
 let code min_binding_1 deleted in
-let $camlMap_remove__immstring46 = "Map.remove_min_elt" in
+let $camlMap_remove__immstring_0 = "Map.remove_min_elt" in
 let code remove_min_binding_2 deleted in
 let code merge_3 deleted in
 let code remove_4 deleted in
@@ -54,9 +54,9 @@ let code loopify(done) size(26) newer_version_of(min_binding_1)
                 cont k (Pfield)))
 in
 let $camlMap_remove__min_binding_6 = closure min_binding_1_1 @min_binding in
-let $camlMap_remove__Pmakeblock161 =
+let $camlMap_remove__Pmakeblock_1 =
   Block 0 ($`*predef*`.caml_exn_Invalid_argument,
-           $camlMap_remove__immstring46)
+           $camlMap_remove__immstring_0)
 in
 let $camlMap_remove__remove_min_binding_7 =
   closure remove_min_binding_2_1 @remove_min_binding
@@ -74,7 +74,7 @@ and code rec loopify(never) size(35) newer_version_of(remove_min_binding_2)
   let prim = %is_int (param) in
   switch prim
     | 0 -> k2
-    | 1 -> k1 pop(reraise k1) ($camlMap_remove__Pmakeblock161)
+    | 1 -> k1 pop(reraise k1) ($camlMap_remove__Pmakeblock_1)
     where k2 =
       let l = %block_load.[`0`] (param) in
       let prim_1 = %is_int (l) in
