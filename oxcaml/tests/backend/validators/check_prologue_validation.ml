@@ -32,7 +32,7 @@ let () =
     (fun () ->
       seq := InstructionId.make_sequence ();
       let cfg : Cfg_desc.t =
-        let stack_loc = [| Reg.create_at_location Int (Stack (Local 0)) |] in
+        let stack_loc = [| Reg.create_at_location Int64 (Stack (Local 0)) |] in
         { fun_args = [||];
           blocks =
             [ { start = entry_label;
@@ -90,7 +90,7 @@ let () =
   check "Missing prologue when using stack slots"
     (fun () ->
       seq := InstructionId.make_sequence ();
-      let stack_loc = [| Reg.create_at_location Int (Stack (Local 0)) |] in
+      let stack_loc = [| Reg.create_at_location Int64 (Stack (Local 0)) |] in
       let cfg : Cfg_desc.t =
         { fun_args = [||];
           blocks =
@@ -338,7 +338,7 @@ let () =
     (fun () ->
       seq := InstructionId.make_sequence ();
       let second_label = new_label 1 in
-      let stack_loc = [| Reg.create_at_location Int (Stack (Local 0)) |] in
+      let stack_loc = [| Reg.create_at_location Int64 (Stack (Local 0)) |] in
       let cfg : Cfg_desc.t =
         { fun_args = [||];
           blocks =
