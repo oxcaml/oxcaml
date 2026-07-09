@@ -2111,9 +2111,10 @@ let emit_instr ~first ~last ~fallthrough i =
       let lbl = add_vec128_constant { word0; word1 } in
       movpd ~unaligned:false (mem64_rip VEC128 (L.encode lbl)) (res i 0))
   | Lop (Const_vec256 { word0; word1; word2; word3 }) -> (
-    match
+    let all_zero =
       List.for_all (fun w -> Int64.equal w 0L) [word3; word2; word1; word0]
-    with
+    in
+    match all_zero with
     | true -> I.simd vxorpd_Y_Y_Ym256 [| res i 0; res i 0; res i 0 |]
     | false ->
       let lbl = add_vec256_constant { word0; word1; word2; word3 } in
@@ -2121,11 +2122,12 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop
       (Const_vec512 { word0; word1; word2; word3; word4; word5; word6; word7 })
     -> (
-    match
+    let all_zero =
       List.for_all
         (fun w -> Int64.equal w 0L)
         [word7; word6; word5; word4; word3; word2; word1; word0]
-    with
+    in
+    match all_zero with
     | true -> I.simd vpxorq_Z_Z_Zm512 [| res i 0; res i 0; res i 0 |]
     | false ->
       let lbl =
@@ -2138,6 +2140,8 @@ let emit_instr ~first ~last ~fallthrough i =
     | 0L -> I.simd kxorq [| res i 0; res i 0; res i 0 |]
     | -1L -> I.simd kxnorq [| res i 0; res i 0; res i 0 |]
     | _ ->
+      (* Float constants are simply 64 bits of static storage, so we may use
+         them as masks. *)
       let lbl = add_float_constant n in
       I.simd kmovq_K_Km64 [| mem64_rip QWORD (L.encode lbl); res i 0 |])
   | Lop (Const_symbol s) ->

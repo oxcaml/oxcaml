@@ -2493,12 +2493,12 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
         then
           (* regular scanned part of a block *)
           match memory_chunk with
-          | Word_int | Word_mask | Word_val -> ok ()
+          | Word_int | Word_val -> ok ()
           | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
           | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Double
           | Onetwentyeight_unaligned | Onetwentyeight_aligned
           | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-          | Fivetwelve_aligned ->
+          | Fivetwelve_aligned | Word_mask ->
             error "the value prefix of a mixed block"
         else
           (* flat suffix part of the block *)

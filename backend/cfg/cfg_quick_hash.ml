@@ -26,7 +26,6 @@ let operation : Operation.t -> int =
   | Const_vec128 _ -> 15
   | Const_vec256 _ -> 16
   | Const_vec512 _ -> 17
-  | Const_mask _ -> 33
   | Stackoffset _ -> 18
   | Load _ -> 19
   | Store _ -> 20
@@ -42,6 +41,7 @@ let operation : Operation.t -> int =
   | Specific _ -> 30
   | Name_for_debugger _ -> 31
   | Alloc _ -> 32
+  | Const_mask _ -> 33
 
 let basic : Cfg.basic -> int = function
   | Op op -> operation op
