@@ -25,6 +25,43 @@ let enable_sub_or_error = true
 
 let reset_constructor_ikind_on_substitution = false
 
+(* Stage-1 validation harness (see STAGE1-DESIGN.md). When
+   [Clflags.ikinds_validate] (env var OXCAML_IKINDS_VALIDATE) is set, each kind
+   subcheck / crossing query re-derives the ikind twice -- once using the
+   stored decl ikinds ([type_declaration.type_ikind]) and once forcing a full
+   recompute from each declaration -- and asserts the two agree. This is the
+   representation-level "stored ikind agrees with the derived-on-the-fly one".
+   It is inert (default builds byte-identical) unless the flag is set. *)
+let () =
+  match Sys.getenv_opt "OXCAML_IKINDS_VALIDATE" with
+  | Some ("1" | "true" | "yes" | "on") -> Clflags.ikinds_validate := true
+  | Some _ | None -> ()
+
+(* When set, [lookup_of_env] ignores any stored [Constructor_ikind] and takes
+   the recompute-from-declaration fallback. Used only by the validation harness
+   to obtain the "derived on the fly" reference. *)
+let force_recompute_ikinds = ref false
+
+let validate_checks = ref 0
+
+let validate_mismatches = ref 0
+
+(* Counts, in the normal (non-forced) path, how many constructor lookups used a
+   stored decl ikind vs fell back to recompute. *)
+let stored_decl_ikind_hits = ref 0
+
+let recomputed_decl_ikind = ref 0
+
+let () =
+  at_exit (fun () ->
+      if !Clflags.ikinds_validate
+      then
+        Format.eprintf
+          "[ikind-validate] summary: checks=%d mismatches=%d; decl-ikind \
+           stored=%d recomputed=%d@."
+          !validate_checks !validate_mismatches !stored_decl_ikind_hits
+          !recomputed_decl_ikind)
+
 module Ldd = Types.Ldd
 
 let instance_poly_for_jkind' =
@@ -851,12 +888,19 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
     (* Prefer a stored constructor ikind if one is present and enabled. *)
     let ikind =
       match type_decl.type_ikind with
-      | Types.Constructor_ikind { base; coeffs } when !Clflags.ikinds ->
+      | Types.Constructor_ikind { base; coeffs }
+        when !Clflags.ikinds && not !force_recompute_ikinds ->
+        if !Clflags.ikinds_validate then incr stored_decl_ikind_hits;
         Solver.Poly (base, coeffs)
       | Types.No_constructor_ikind reason ->
         if !Clflags.ikinds_debug then Format.eprintf "[ikind-miss] %s@." reason;
+        if !Clflags.ikinds_validate && not !force_recompute_ikinds
+        then incr recomputed_decl_ikind;
         fallback ()
-      | Types.Constructor_ikind _ -> fallback ()
+      | Types.Constructor_ikind _ ->
+        if !Clflags.ikinds_validate && not !force_recompute_ikinds
+        then incr recomputed_decl_ikind;
+        fallback ()
     in
     (if !Clflags.ikinds_debug
      then
@@ -955,6 +999,57 @@ type subcheck_polys =
    - fast path: if [super] is constant top, no need to compute [sub]
    - otherwise, if [super] is constant, try the lhs mod-bounds floor fast path
    - otherwise, only round up [sub] if [super] is constant *)
+(* Stage-1 validation harness helpers (see STAGE1-DESIGN.md). *)
+
+(* Semantic (not structural) equality of two ikinds: mutual subsumption. Two
+   derivations of the same jkind may differ structurally (fresh var ids) while
+   denoting the same kind, and mutual [leq] is exactly the "they agree"
+   property stage 2 relies on. *)
+let ldd_semantically_equal (a : Ldd.node) (b : Ldd.node) : bool =
+  Ldd.solve_pending ();
+  (match Ldd.leq_with_reason a b with [] -> true | _ -> false)
+  && match Ldd.leq_with_reason b a with [] -> true | _ -> false
+
+(* Derive the ikind of [jkind] in [mode], either using stored decl ikinds
+   ([use_stored:true]) or forcing a full recompute from each declaration
+   ([use_stored:false]). Allocates its own solver context, so it must only be
+   called at a top-level seam entry, never inside another derivation. *)
+let derive_ikind ~(use_stored : bool) ~(mode : Solver.mode) env
+    (jkind : ('l * 'r) Types.jkind) : Ldd.node =
+  let saved = !force_recompute_ikinds in
+  force_recompute_ikinds := not use_stored;
+  Fun.protect
+    ~finally:(fun () -> force_recompute_ikinds := saved)
+    (fun () ->
+      let ctx = create_ctx ~mode ~env:(Some env) in
+      let node = Solver.ckind_of_jkind ctx jkind in
+      Ldd.solve_pending ();
+      node)
+
+(* Assert that the stored-ikind derivation of [jkind] agrees with a full
+   recompute, in both solver modes. Inert unless [ikinds_validate] is set. *)
+let validate_ikind ~(origin : string option) env (jkind : ('l * 'r) Types.jkind)
+    : unit =
+  if !Clflags.ikinds_validate
+  then
+    List.iter
+      (fun mode ->
+        let stored = derive_ikind ~use_stored:true ~mode env jkind in
+        let recomputed = derive_ikind ~use_stored:false ~mode env jkind in
+        incr validate_checks;
+        if not (ldd_semantically_equal stored recomputed)
+        then (
+          incr validate_mismatches;
+          let mode_s =
+            match mode with
+            | Solver.Normal -> "normal"
+            | Solver.Round_up -> "round_up"
+          in
+          Format.eprintf
+            "[ikind-validate] MISMATCH%s mode=%s@;@;stored=%s@;recompute=%s@."
+            (origin_suffix_of origin) mode_s (Ldd.pp stored) (Ldd.pp recomputed)))
+      [Solver.Normal; Solver.Round_up]
+
 let compute_subcheck_polys ~context:_ env (sub : ('l1 * 'r1) Types.jkind)
     (super : ('l2 * 'r2) Types.jkind) : subcheck_polys =
   let ctx = create_ctx ~mode:Solver.Normal ~env:(Some env) in
@@ -1013,6 +1108,12 @@ let sub_jkind_l ?allow_any_crossing ?origin
   if not (enable_sub_jkind_l && !Clflags.ikinds)
   then Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context env sub super
   else
+    let () =
+      if !Clflags.ikinds_validate
+      then (
+        validate_ikind ~origin env sub;
+        validate_ikind ~origin env super)
+    in
     (* Check layouts first; if that fails, print both sides with full
        info and return the error. *)
     let* () =
@@ -1071,6 +1172,10 @@ let crossing_of_jkind ~(context : Jkind.jkind_context) env
   if not (enable_crossing && !Clflags.ikinds)
   then Jkind.get_mode_crossing ~context env jkind
   else
+    let () =
+      if !Clflags.ikinds_validate
+      then validate_ikind ~origin:(Some "crossing") env jkind
+    in
     let with_bounds_is_empty : type l r. (l * r) Types.with_bounds -> bool =
       function
       | No_with_bounds -> true
@@ -1233,15 +1338,20 @@ let sub_or_intersect ?origin
   in
   if not (enable_sub_or_intersect && !Clflags.ikinds)
   then Jkind.sub_or_intersect ~type_equal ~context env t1 t2
-  else if fast_sub ~context env t1 t2
-  then (
-    (if !Clflags.ikinds_debug
-     then
-       let origin_suffix = origin_suffix_of origin in
-       Format.eprintf "[ikind-sub-or-intersect] outcome=Sub%s fast_sub=true@."
-         origin_suffix);
-    Jkind.Sub)
-  else generic_sub_or_intersect ()
+  else (
+    if !Clflags.ikinds_validate
+    then (
+      validate_ikind ~origin env t1;
+      validate_ikind ~origin env t2);
+    if fast_sub ~context env t1 t2
+    then (
+      (if !Clflags.ikinds_debug
+       then
+         let origin_suffix = origin_suffix_of origin in
+         Format.eprintf "[ikind-sub-or-intersect] outcome=Sub%s fast_sub=true@."
+           origin_suffix);
+      Jkind.Sub)
+    else generic_sub_or_intersect ())
 
 let sub_or_error ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
@@ -1252,6 +1362,12 @@ let sub_or_error ?origin
   if not (enable_sub_or_error && !Clflags.ikinds)
   then Jkind.sub_or_error ~type_equal ~context env t1 t2
   else
+    let () =
+      if !Clflags.ikinds_validate
+      then (
+        validate_ikind ~origin env t1;
+        validate_ikind ~origin env t2)
+    in
     (* The ikind engine decides the accept/reject verdict: first the layout
        subcheck (which the axis polynomials do not capture), then the modal-axis
        subcheck via [leq_with_reason]. On rejection we delegate to [Jkind] for
