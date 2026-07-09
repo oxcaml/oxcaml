@@ -978,6 +978,47 @@ let type_declaration_ikind_of_jkind ~(env : Env.t option)
           (Ldd.pp payload.base) (pp_coeffs payload.coeffs);
       payload)
 
+(* Compute a declaration's ikind from its manifest body over [params]. This is
+   the eager form of the recompute [lookup_of_env] performs for a manifest decl
+   carrying [No_constructor_ikind]; it mirrors [Solver.constr_kind]'s [Ty]
+   branch (parameters bound to rigid vars, plain type variables capped by their
+   written jkind) so the stored ikind equals that recompute. Used to fill in
+   the ikind at manifest-installing sites (e.g. with-constraints) that today
+   fall back to env-recompute -- see STAGE1-DESIGN.md and STAGE0C-CENSUS.md. *)
+let type_declaration_ikind_of_manifest ~(env : Env.t option)
+    ~(params : Types.type_expr list) (manifest : Types.type_expr) :
+    Types.type_ikind =
+  with_ikinds_enabled (fun () ->
+      let ctx = create_ctx ~mode:Solver.Normal ~env in
+      let rigid_vars =
+        List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
+      in
+      List.iter2
+        (fun ty var ->
+          let param_kind =
+            match Types.get_desc ty with
+            | Types.Tvar { jkind; _ } ->
+              Ldd.meet (Ldd.node_of_var var) (Solver.ckind_of_jkind ctx jkind)
+            | Types.Tunivar _ ->
+              Misc.fatal_error
+                "Ikind.type_declaration_ikind_of_manifest: unexpected Tunivar"
+            | _ -> Ldd.node_of_var var
+          in
+          Solver.TyTbl.add ctx.Solver.ty_to_kind ty param_kind)
+        params rigid_vars;
+      let body_kind = Solver.kind ~use_tables:true ctx manifest in
+      Ldd.solve_pending ();
+      let base, coeffs =
+        Ldd.decompose_into_linear_terms ~universe:rigid_vars body_kind
+      in
+      let coeffs = Array.of_list coeffs in
+      let payload = constructor_ikind ~base ~coeffs in
+      if !Clflags.ikinds_debug
+      then
+        Format.eprintf "[ikind] from manifest: base=%s; coeffs=[%s]@."
+          (Ldd.pp payload.base) (pp_coeffs payload.coeffs);
+      payload)
+
 let predef_ikind_of_jkind ~params type_jkind =
   type_declaration_ikind_of_jkind ~env:None ~params type_jkind
 
