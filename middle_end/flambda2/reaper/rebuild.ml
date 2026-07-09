@@ -1895,6 +1895,19 @@ let rebuild_let_expr_singleton (env : env) res bv ~(defining_expr : Named.t)
       ( rebuild_make_block_default_case env bound_pattern ~block_kind
           ~mutability ~alloc_mode ~fields ~hole dbg,
         res )
+    | Flambda.Prim (Unary (Box_number (bn, _alloc_mode), _contents), _dbg)
+      when not
+             (Analysis.field_used env.uses
+                (Code_id_or_name.var (Bound_var.var bv))
+                (Field.boxed_number bn)) ->
+      (* The contents of the boxed number are never read, so the whole primitive
+         can be replaced by a poison value (as for the unused fields of blocks
+         in [rebuild_make_block_default_case]). *)
+      let simple = poison "reaper_unused_boxed_number" K.value in
+      ( RE.create_let bound_pattern
+          (Named.create_simple simple)
+          ~size_of_defining_expr:(Code_size.simple simple) ~body:hole,
+        res )
     | _ ->
       let defining_expr, size_of_defining_expr =
         rebuild_named_default_case env defining_expr
