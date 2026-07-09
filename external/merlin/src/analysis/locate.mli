@@ -119,6 +119,7 @@ val from_string :
   | `At_origin ]
 
 val get_doc :
+  buffer_source:string ->
   config:Mconfig.t ->
   env:Env.t ->
   local_defs:Mtyper.typedtree ->
