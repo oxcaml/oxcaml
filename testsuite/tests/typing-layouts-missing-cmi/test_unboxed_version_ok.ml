@@ -16,7 +16,6 @@
  check-ocamlc.byte-output;
 *)
 
-(* Companion to [test_unboxed_version.ml]: identical except that the final
-   unit is compiled without [-short-paths], so the genuine type error below is
-   reported rather than the bogus "has no unboxed version" error. *)
+(* Same as [test_unboxed_version.ml] but without [-short-paths], which was
+   needed to trigger the bug there. *)
 let _f : Defs.z = ""

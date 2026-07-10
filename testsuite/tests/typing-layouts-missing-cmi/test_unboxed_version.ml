@@ -17,6 +17,10 @@
  check-ocamlc.byte-output;
 *)
 
-(* Regression test for a bogus error report: the genuine type error below is
-   replaced by a whole-file "Unloaded.Record.t has no unboxed version" error. *)
+(* Test that the genuine type error below is reported under [-short-paths].
+   It used to be replaced by a whole-file "Unloaded.Record.t has no unboxed
+   version" error: printing the error forced the components of [Make(Arg)]
+   (reachable via [type w] in defs.mli), whose well-formedness check failed
+   spuriously because [unloaded.cmi] is neither loaded (this unit never
+   mentions [Unloaded]) nor loadable from the printing context. *)
 let _f : Defs.z = ""
