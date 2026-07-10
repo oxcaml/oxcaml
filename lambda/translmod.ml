@@ -921,12 +921,12 @@ and transl_structure ~scopes loc
             match incl.incl_kind with
             | Tincl_structure ->
                 pure_module modl, transl_module ~scopes Tcoerce_none None modl
-            | Tincl_functor { input_coercion; input_repr } ->
+            | Tincl_functor { input_coercion; input_repr; yielding } ->
                 Strict, transl_include_functor ~generative:false modl
-                          input_coercion scopes loc ~input_repr
-            | Tincl_gen_functor { input_coercion; input_repr } ->
+                          input_coercion scopes loc ~input_repr ~yielding
+            | Tincl_gen_functor { input_coercion; input_repr; yielding } ->
                 Strict, transl_include_functor ~generative:true modl
-                          input_coercion scopes loc ~input_repr
+                          input_coercion scopes loc ~input_repr ~yielding
           in
           Llet(let_kind, Lambda.layout_module, mid, mid_duid, modl, body),
           repr
@@ -980,7 +980,8 @@ and transl_structure ~scopes loc
           transl_structure ~scopes loc fields cc rootpath final_env rem
 
 (* construct functor application in "include functor" case *)
-and transl_include_functor ~generative ~input_repr modl params scopes loc =
+and transl_include_functor ~generative ~input_repr ~yielding modl params scopes
+      loc =
   let input_repr = transl_module_representation input_repr in
   let inlined_attribute =
     Translattribute.get_inlined_attribute_on_module modl
@@ -1002,9 +1003,7 @@ and transl_include_functor ~generative ~input_repr modl params scopes loc =
     ap_result_layout = Lambda.layout_module;
     ap_region_close=Rc_normal;
     ap_mode = alloc_heap;
-    (* [include functor]: the functor is applied to the enclosing structure,
-       whose yielding mode we don't have here, so conservatively may yield *)
-    ap_yielding = May_yield;
+    ap_yielding = Translmode.transl_yielding_mode_l yielding;
     ap_tailcall = Default_tailcall;
     ap_inlined = inlined_attribute;
     ap_specialised = Default_specialise;
@@ -1339,12 +1338,12 @@ let transl_toplevel_item ~scopes item =
         match incl.incl_kind with
         | Tincl_structure ->
             transl_module ~scopes Tcoerce_none None modl
-        | Tincl_functor { input_coercion; input_repr } ->
+        | Tincl_functor { input_coercion; input_repr; yielding } ->
             transl_include_functor ~generative:false modl input_coercion scopes
-              loc ~input_repr
-        | Tincl_gen_functor { input_coercion; input_repr } ->
+              loc ~input_repr ~yielding
+        | Tincl_gen_functor { input_coercion; input_repr; yielding } ->
             transl_include_functor ~generative:true modl input_coercion scopes
-              loc ~input_repr
+              loc ~input_repr ~yielding
       in
       let mid = Ident.create_local "include" in
       let mid_duid = Lambda.debug_uid_none in

@@ -156,18 +156,18 @@ let module_substitution sub x =
 
 let include_kind sub = function
   | Tincl_structure -> Tincl_structure
-  | Tincl_functor { input_coercion; input_repr } ->
+  | Tincl_functor { input_coercion; input_repr; yielding } ->
       let input_coercion =
         List.map
           (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) input_coercion
       in
-      Tincl_functor { input_coercion; input_repr }
-  | Tincl_gen_functor { input_coercion; input_repr } ->
+      Tincl_functor { input_coercion; input_repr; yielding }
+  | Tincl_gen_functor { input_coercion; input_repr; yielding } ->
       let input_coercion =
         List.map
           (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) input_coercion
       in
-      Tincl_gen_functor { input_coercion; input_repr }
+      Tincl_gen_functor { input_coercion; input_repr; yielding }
 
 let str_include_infos sub x =
   let incl_loc = sub.location sub x.incl_loc in
