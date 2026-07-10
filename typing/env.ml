@@ -3738,7 +3738,7 @@ let closure_mode pp {Mode.monadic; comonadic} closure_context comonadic0 =
 let closure_noalloc_mode (pp : Mode.Hint.pinpoint) vmode =
   let _, pp_desc = pp in
   match pp_desc with
-  | Mode.Hint.Allocation true ->
+  | Mode.Hint.Allocation ->
     Mode.Value.meet_const_with Allocation Mode.Allocation.Const.Noalloc_strict
       vmode
   | _ -> vmode
