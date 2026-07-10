@@ -29,18 +29,12 @@
 
 type t =
   { igot : Igot.t;
-    iplt : Iplt.t;
-    plt_symbols : string list;
-    got_symbols : string list
+    iplt : Iplt.t
   }
 
 let igot t = t.igot
 
 let iplt t = t.iplt
-
-let plt_symbols t = t.plt_symbols
-
-let got_symbols t = t.got_symbols
 
 let build ~prefix relocations =
   (* Extract unique symbol names from PLT32 relocations *)
@@ -60,7 +54,7 @@ let build ~prefix relocations =
   let igot = Igot.build ~prefix ~symbols:all_got_symbols in
   (* Build IPLT for PLT symbols only *)
   let iplt = Iplt.build ~prefix ~igot ~symbols:plt_syms in
-  { igot; iplt; plt_symbols = plt_syms; got_symbols = got_only_symbols }
+  { igot; iplt }
 
 let igot_symbol_for_got_reloc t reloc =
   let symbol = Extract_relocations.Relocation_entry.symbol_name reloc in

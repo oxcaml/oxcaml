@@ -58,9 +58,6 @@ let num_plt t = t.num_plt
 
 let num_got t = t.num_got
 
-let empty =
-  { convert_to_plt = []; convert_to_got = []; num_plt = 0; num_got = 0 }
-
 (* Accumulator for efficient merging - stores lists in reverse order *)
 type accumulator =
   { acc_plt : Relocation_entry.t list;

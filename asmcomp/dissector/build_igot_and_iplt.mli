@@ -53,15 +53,6 @@ val igot : t -> Igot.t
 (** Returns the built IPLT. *)
 val iplt : t -> Iplt.t
 
-(** Returns the original symbols that had PLT32 relocations (need IPLT entries).
-*)
-val plt_symbols : t -> string list
-
-(** Returns the original symbols that had GOTPCRELX relocations (need IGOT
-    entries, but not IPLT entries). These are in addition to the PLT symbols
-    which also get IGOT entries. *)
-val got_symbols : t -> string list
-
 (** [build ~prefix relocations] builds IGOT and IPLT sections from the extracted
     relocations.
 
