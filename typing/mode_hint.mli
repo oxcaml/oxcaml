@@ -34,9 +34,7 @@ type pinpoint_desc =
   | Structure  (** A structure definition *)
   | Lazy  (** A lazy expression *)
   | Quote  (** A quoted expression *)
-  | Allocation of bool
-      (** An allocation, the boolean indicates whether the allocation is for a
-          closure or not *)
+  | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
   | Effect_match  (** A pattern match with effect cases *)
   | Effect_try  (** A try-with expression with effect cases *)
