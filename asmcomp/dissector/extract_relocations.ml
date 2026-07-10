@@ -103,8 +103,7 @@ let parse_rela_section ~rela_body ~symbols =
       if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.pc32
       then
         match Elf.symbol_table_lookup symbols ~sym_index:entry.r_sym with
-        | Some sym when Rela.Section_index.(is_undef (of_int sym.Elf.st_shndx))
-          ->
+        | Some sym when Rela.Section_index.is_undef sym.Elf.st_shndx ->
           let symbol_name =
             if String.equal sym.Elf.name "" then "<unknown>" else sym.Elf.name
           in
@@ -125,11 +124,11 @@ let parse_rela_section ~rela_body ~symbols =
           log_verbose "  reloc %s at 0x%Lx: no symbol shndx"
             (Rela.Reloc_type.name entry.r_type)
             entry.r_offset
-        | Some sym
-          when Rela.Section_index.(is_defined (of_int sym.Elf.st_shndx)) ->
+        | Some sym when Rela.Section_index.is_defined sym.Elf.st_shndx ->
           log_verbose "  reloc %s at 0x%Lx: symbol defined (shndx=%d), skipping"
             (Rela.Reloc_type.name entry.r_type)
-            entry.r_offset sym.Elf.st_shndx
+            entry.r_offset
+            (Rela.Section_index.to_int sym.Elf.st_shndx)
         | Some sym ->
           let symbol_name = sym.Elf.name in
           log_verbose "  reloc %s at 0x%Lx -> %s (UNDEF)"

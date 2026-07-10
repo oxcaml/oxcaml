@@ -248,7 +248,7 @@ type symbol = {
   name : string;
   st_info : int;
   st_other : int;
-  st_shndx : int;
+  st_shndx : Owee_elf_relocation.Section_index.t;
   st_value : int64;
   st_size : int64;
 }

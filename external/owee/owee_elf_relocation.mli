@@ -180,7 +180,7 @@ type sym_entry =
     (** Symbol type and binding. *)
     st_other : int;
     (** Symbol visibility. *)
-    st_shndx : int;
+    st_shndx : Section_index.t;
     (** Section header index. *)
     st_value : int64;
     (** Symbol value. *)

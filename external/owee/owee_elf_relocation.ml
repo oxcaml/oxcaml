@@ -167,7 +167,7 @@ type sym_entry =
   { st_name : int;
     st_info : int;
     st_other : int;
-    st_shndx : int;
+    st_shndx : Section_index.t;
     st_value : int64;
     st_size : int64
   }
@@ -176,6 +176,6 @@ let write_sym_entry ~cursor entry =
   Owee_buf.Write.u32 cursor entry.st_name;
   Owee_buf.Write.u8 cursor entry.st_info;
   Owee_buf.Write.u8 cursor entry.st_other;
-  Owee_buf.Write.u16 cursor entry.st_shndx;
+  Owee_buf.Write.u16 cursor (Section_index.to_int entry.st_shndx);
   Owee_buf.Write.u64 cursor entry.st_value;
   Owee_buf.Write.u64 cursor entry.st_size

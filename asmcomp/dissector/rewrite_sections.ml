@@ -60,8 +60,8 @@ let write_synthetic_symbol ~cursor ~strtab ~name ~section_index ~offset ~size
   let section_index' = Rela.Section_index.of_int section_index in
   let st_shndx =
     if Rela.Section_index.needs_extended section_index'
-    then Rela.Section_index.(to_int xindex)
-    else section_index
+    then Rela.Section_index.xindex
+    else section_index'
   in
   Rela.write_sym_entry ~cursor
     { st_name = Strtab.add strtab name;

@@ -559,7 +559,7 @@ type symbol = {
   name : string;
   st_info : int;
   st_other : int;
-  st_shndx : int;
+  st_shndx : Owee_elf_relocation.Section_index.t;
   st_value : int64;
   st_size : int64;
 }
@@ -571,7 +571,7 @@ let read_symbols ~symtab_body ~strtab_body =
     let st_name_offset = Read.u32 sym_cursor in
     let st_info = Read.u8 sym_cursor in
     let st_other = Read.u8 sym_cursor in
-    let st_shndx = Read.u16 sym_cursor in
+    let st_shndx = Owee_elf_relocation.Section_index.of_int (Read.u16 sym_cursor) in
     let st_value = Read.u64 sym_cursor in
     let st_size = Read.u64 sym_cursor in
     let name =
