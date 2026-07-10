@@ -2167,8 +2167,7 @@ module Const = struct
             | Kconstr (_, sa) ->
               (* However, we can't raise the mod-bounds of a truly-abstract
                  [Kconstr] because its mod-bounds can be further narrowed by
-                 substitution. Instead, we approximate the layout as as [any].
-              *)
+                 substitution. Instead, we approximate the layout as [any]. *)
               Layout (Layout.Const.Any sa)
           in
           { base;

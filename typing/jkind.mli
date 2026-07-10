@@ -476,7 +476,8 @@ val of_type_decl :
 (** Find a jkind from a type declaration in the same way as [of_type_decl], but
     avoiding translating types in with-bounds. Over-approximates each
     [with]-bound by raising the bounds of its base to top, keeping the layout
-    precise.
+    precise (except in the case of a truly-abstract kind, which is approximated
+    as [any]).
 
     Returns the jkind (at quality [Not_best]). *)
 val of_type_decl_overapproximate_unknown :
