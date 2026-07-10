@@ -40,9 +40,12 @@ type raw = File_sections.Idx.t
 
 type t = t0 list * File_sections.t
 
-let from_raw ~sections raw = Obj.obj (File_sections.get sections raw), sections
+let from_raw ~sections raw =
+  let t : t0 list = Obj.obj (File_sections.get sections raw) in
+  t, sections
 
-let to_raw ~sections t = File_sections.Builder.add sections (Obj.repr t)
+let to_raw ~sections (t : t0 list) =
+  File_sections.Builder.add sections (Obj.repr t)
 
 let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
     ~sections =
@@ -224,8 +227,8 @@ let pack ~sections (units : t option list) =
   | _ ->
     let t =
       List.fold_right
-        (fun unit_opt t ->
-          let t2_old, unit_sections =
+        (fun unit_opt pack_data ->
+          let unit_data_old_idxs, unit_sections =
             match unit_opt with
             | Some unit -> unit
             | None ->
@@ -246,15 +249,15 @@ let pack ~sections (units : t option list) =
               Hashtbl.add idx_map old_idx new_idx;
               new_idx
           in
-          let t2_new =
+          let unit_data_new_idxs =
             List.map
               (fun t0 ->
                 { t0 with
                   all_code = Exported_code.map_raw_index idx_mapper t0.all_code
                 })
-              t2_old
+              unit_data_old_idxs
           in
-          t2_new @ t)
+          unit_data_new_idxs @ pack_data)
         units []
     in
     Some (to_raw ~sections t)
