@@ -2139,8 +2139,11 @@ let solve_constructor_annotation
         let type_equal = Ctype.type_equal !!penv in
         let context = Ctype.mk_jkind_context_always_principal !!penv in
         (match
-           Jkind.sub_or_error ~type_equal ~context !!penv
-             declared_jkind annotated_jkind
+           (* Route through [Ikind] so axis subsumption is checked by the
+              ikind engine (falls back to [Jkind.sub_or_error] under
+              -no-ikinds). *)
+           Ikind.sub_or_error ~origin:"typecore:check_existential"
+             ~type_equal ~context !!penv declared_jkind annotated_jkind
          with
          | Ok () -> ()
          | Error err ->
