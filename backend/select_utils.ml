@@ -205,17 +205,17 @@ let oper_result_type = function
     typ_float32
   | Cpackf32 -> typ_float
   | Ccsel ty -> ty
-  | Creinterpret_cast Value_of_int -> typ_val
+  | Creinterpret_cast Value_of_int64 -> typ_val
   | Creinterpret_cast (V128_of_vec _) -> typ_vec128
   | Creinterpret_cast (V256_of_vec _) -> typ_vec256
   | Creinterpret_cast (V512_of_vec _) -> typ_vec512
   | Creinterpret_cast (Float_of_int64 | Float_of_float32) -> typ_float
   | Creinterpret_cast (Float32_of_int32 | Float32_of_float) -> typ_float32
-  | Creinterpret_cast (Int_of_value | Int64_of_float | Int32_of_float32) ->
+  | Creinterpret_cast (Int64_of_value | Int64_of_float | Int32_of_float32) ->
     typ_int
-  | Cstatic_cast (Float_of_float32 | Float_of_int Float64) -> typ_float
-  | Cstatic_cast (Float32_of_float | Float_of_int Float32) -> typ_float32
-  | Cstatic_cast (Int_of_float (Float64 | Float32)) -> typ_int
+  | Cstatic_cast (Float_of_float32 | Float_of_int64 Float64) -> typ_float
+  | Cstatic_cast (Float32_of_float | Float_of_int64 Float32) -> typ_float32
+  | Cstatic_cast (Int64_of_float (Float64 | Float32)) -> typ_int
   | Cstatic_cast (V128_of_scalar _) -> typ_vec128
   | Cstatic_cast (Scalar_of_v128 Float64x2) -> typ_float
   | Cstatic_cast (Scalar_of_v128 Float32x4) -> typ_float32

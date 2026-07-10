@@ -402,8 +402,8 @@ let machtype_of_memory_chunk : memory_chunk -> machtype = function
   | Fivetwelve_unaligned | Fivetwelve_aligned -> typ_vec512
 
 type reinterpret_cast =
-  | Int_of_value
-  | Value_of_int
+  | Int64_of_value
+  | Value_of_int64
   | Float_of_float32
   | Float32_of_float
   | Float_of_int64
@@ -415,8 +415,8 @@ type reinterpret_cast =
   | V512_of_vec of vector_width
 
 type static_cast =
-  | Float_of_int of float_width
-  | Int_of_float of float_width
+  | Float_of_int64 of float_width
+  | Int64_of_float of float_width
   | Float_of_float32
   | Float32_of_float
   | V128_of_scalar of vec128_type
@@ -991,8 +991,8 @@ let equal_vector_width left right =
 let equal_reinterpret_cast (left : reinterpret_cast) (right : reinterpret_cast)
     =
   match left, right with
-  | Int_of_value, Int_of_value -> true
-  | Value_of_int, Value_of_int -> true
+  | Int64_of_value, Int64_of_value -> true
+  | Value_of_int64, Value_of_int64 -> true
   | Float_of_float32, Float_of_float32 -> true
   | Float32_of_float, Float32_of_float -> true
   | Float_of_int64, Float_of_int64 -> true
@@ -1003,7 +1003,7 @@ let equal_reinterpret_cast (left : reinterpret_cast) (right : reinterpret_cast)
   | V256_of_vec w1, V256_of_vec w2
   | V512_of_vec w1, V512_of_vec w2 ->
     equal_vector_width w1 w2
-  | ( ( Int_of_value | Value_of_int | Float_of_float32 | Float32_of_float
+  | ( ( Int64_of_value | Value_of_int64 | Float_of_float32 | Float32_of_float
       | Float_of_int64 | Int64_of_float | Float32_of_int32 | Int32_of_float32
       | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ),
       _ ) ->
@@ -1013,17 +1013,18 @@ let equal_static_cast (left : static_cast) (right : static_cast) =
   match left, right with
   | Float32_of_float, Float32_of_float -> true
   | Float_of_float32, Float_of_float32 -> true
-  | Float_of_int f1, Float_of_int f2 -> equal_float_width f1 f2
-  | Int_of_float f1, Int_of_float f2 -> equal_float_width f1 f2
+  | Float_of_int64 f1, Float_of_int64 f2 -> equal_float_width f1 f2
+  | Int64_of_float f1, Int64_of_float f2 -> equal_float_width f1 f2
   | Scalar_of_v128 v1, Scalar_of_v128 v2 -> equal_vec128_type v1 v2
   | V128_of_scalar v1, V128_of_scalar v2 -> equal_vec128_type v1 v2
   | Scalar_of_v256 v1, Scalar_of_v256 v2 -> equal_vec256_type v1 v2
   | V256_of_scalar v1, V256_of_scalar v2 -> equal_vec256_type v1 v2
   | Scalar_of_v512 v1, Scalar_of_v512 v2 -> equal_vec512_type v1 v2
   | V512_of_scalar v1, V512_of_scalar v2 -> equal_vec512_type v1 v2
-  | ( ( Float32_of_float | Float_of_float32 | Float_of_int _ | Int_of_float _
-      | Scalar_of_v128 _ | V128_of_scalar _ | Scalar_of_v256 _
-      | V256_of_scalar _ | Scalar_of_v512 _ | V512_of_scalar _ ),
+  | ( ( Float32_of_float | Float_of_float32 | Float_of_int64 _
+      | Int64_of_float _ | Scalar_of_v128 _ | V128_of_scalar _
+      | Scalar_of_v256 _ | V256_of_scalar _ | Scalar_of_v512 _
+      | V512_of_scalar _ ),
       _ ) ->
     false
 

@@ -722,14 +722,14 @@ let operation_supported = function
   | Cdomain_index
   | Cpoll
   | Cpause
-  | Creinterpret_cast (Int_of_value | Value_of_int |
+  | Creinterpret_cast (Int64_of_value | Value_of_int64 |
                        Int64_of_float | Float_of_int64 |
                        Float32_of_float | Float_of_float32 |
                        Float32_of_int32 | Int32_of_float32 |
                        V128_of_vec Vec128)
   | Cstatic_cast (Float_of_float32 | Float32_of_float |
-                  Int_of_float Float32 | Float_of_int Float32 |
-                  Float_of_int Float64 | Int_of_float Float64 |
+                  Int64_of_float Float32 | Float_of_int64 Float32 |
+                  Float_of_int64 Float64 | Int64_of_float Float64 |
                   V128_of_scalar _ | Scalar_of_v128 _) ->
     true
 
