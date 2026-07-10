@@ -103,6 +103,7 @@ type error =
       old_source_file : Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+  | Cannot_be_local
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -116,8 +117,11 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   mode
 
 let register_allocation ~env ~loc : Alloc.lr * Value.lr =
-  ignore
-    (Env.walk_locks_for_allocation ~env (loc, Hint.Allocation false) : bool);
+  let is_local =
+    Env.walk_locks_for_allocation ~env (loc, Hint.Allocation)
+  in
+  if is_local then
+    raise (Error (loc, env, Cannot_be_local));
   let upper_bound =
     Alloc.of_const
       ~hint_comonadic:Module_allocated_on_heap
@@ -5149,6 +5153,8 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "This instance has multiple arguments with the name %a."
         (Style.as_inline_code Global_module.Parameter_name.print) name
+  | Cannot_be_local ->
+      Location.errorf ~loc "Module cannot be \"local\"."
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env ~error:true env

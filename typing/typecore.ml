@@ -823,15 +823,14 @@ let allocations : Alloc.r list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
 
-let register_allocation_mode ~env ~loc
-    ?(stack = false) ?(closure = false) alloc_mode =
+let register_allocation_mode ~env ~loc ?(stack = false) alloc_mode =
   (* [stack_]-marked allocations are stack-allocated and so do not count
      towards the allocation axis; only heap allocations walk the locks. *)
   if not stack then
-    let local_closure =
-      Env.walk_locks_for_allocation ~env (loc, Hint.Allocation closure)
+    let is_local =
+      Env.walk_locks_for_allocation ~env (loc, Hint.Allocation)
     in
-    if local_closure then
+    if is_local then
       (match
         Value.submode ~pp:(loc, Function)
           (Value.min_with_comonadic Areality Regionality.local)
@@ -868,8 +867,7 @@ let register_closure_allocation ~env ?(stack = false) (mode : Value.r) ~loc
   let (alloc_mode : Alloc.lr), _ =
     Alloc.newvar_below (value_to_alloc_r2g ~allocation mode)
   in
-  register_allocation_mode ~env ~loc ~stack ~closure:true
-    (Alloc.disallow_left alloc_mode);
+  register_allocation_mode ~env ~loc ~stack (Alloc.disallow_left alloc_mode);
   let closed_over_mode =
     alloc_as_value ~allocation (Alloc.disallow_left alloc_mode)
   in
@@ -8593,7 +8591,7 @@ and type_expect_
             Alloc.(of_const ~hint_comonadic:Stack_expression
               { Const.min with areality = Local })
           in
-          Alloc.submode_err (exp.exp_loc, Allocation false) local alloc_mode
+          Alloc.submode_err (exp.exp_loc, Allocation) local alloc_mode
         end
       | Texp_list_comprehension _ -> unsupported List_comprehension
       | Texp_array_comprehension _ -> unsupported Array_comprehension

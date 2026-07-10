@@ -175,6 +175,7 @@ type error =
       old_source_file: Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+  | Cannot_be_local
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

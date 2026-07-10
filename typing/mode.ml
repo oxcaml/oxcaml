@@ -4806,10 +4806,7 @@ module Report = struct
       Some (print_article_noun Consonant "pattern match with effect cases")
     | Effect_try ->
       Some (print_article_noun Consonant "try-with with effect cases")
-    | Allocation closure ->
-      if closure
-      then Some (print_article_noun Vowel "allocation for closure")
-      else Some (print_article_noun Vowel "allocation")
+    | Allocation -> Some (print_article_noun Vowel "allocation")
     | Class -> Some (print_article_noun Consonant "class")
     | Object -> Some (print_article_noun Vowel "object")
     | Loop -> Some (print_article_noun Consonant "loop")
