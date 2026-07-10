@@ -909,8 +909,11 @@ let run_expect_once input_file principal log env ~backend =
     (Result.fail_with_reason reason, env, ~needs_principal:false)
   end
 
-let run_expect_twice input_file log env ~backend =
-  let corrected filename = Filename.make_filename filename "corrected" in
+let corrected filename = Filename.make_filename filename "corrected"
+
+let generated filename = Filename.make_filename filename "generated"
+
+let run_expect_twice input_file log env ~backend ~reference_file =
   let (result1, env1, ~needs_principal) =
     run_expect_once input_file false log env ~backend
   in
@@ -927,7 +930,7 @@ let run_expect_twice input_file log env ~backend =
     if Result.is_pass result2 then begin
       let output_env = Environments.add_bindings
       [
-        Builtin_variables.reference, input_file;
+        Builtin_variables.reference, reference_file;
         Builtin_variables.output, output_file
       ] env2 in
       (Result.pass, output_env)
@@ -935,8 +938,12 @@ let run_expect_twice input_file log env ~backend =
   end else (result1, env1)
 
 let run_expect_with ~backend log env =
-  let input_file = Actions_helpers.testfile env in
-  run_expect_twice input_file log env ~backend
+  let reference_file = Actions_helpers.testfile env in
+  let input_file =
+    Option.value ~default:reference_file
+      (Environments.lookup Builtin_variables.generated_test_file env)
+  in
+  run_expect_twice input_file log env ~backend ~reference_file
 
 let run_expect =
   Actions.make ~name:"run-expect" ~description:"Run expect test"
@@ -948,6 +955,92 @@ let run_expectnat =
     ~description:"Run expect test (native code)"
     ~does_something:true
     (run_expect_with ~backend:Native)
+
+let extract_test_stanza input_file =
+  let ic = open_in input_file in
+  let lexbuf = Lexing.from_channel ic in
+  Location.init lexbuf input_file;
+  Lexer.init ();
+  let rec drain () =
+    match[@warning "-fragile-match"] Lexer.token lexbuf with
+    | Parser.EOF -> ()
+    | _ -> drain ()
+  in
+  drain ();
+  close_in ic;
+  match Lexer.comments () with
+  | (s, _loc) :: _ -> s
+  | [] -> failwith "expected TEST stanza"
+
+let run_generate_test log env =
+  match Environments.lookup Builtin_variables.generate_test_script env with
+  | None ->
+    let reason =
+      Printf.sprintf "%s is not set"
+        (Variables.name_of_variable Builtin_variables.generate_test_script)
+    in
+    (Result.fail_with_reason reason, env)
+  | Some script ->
+    let testfile = Actions_helpers.testfile env in
+    let generated_file =
+      Filename.make_path [Sys.getcwd (); generated testfile]
+    in
+    let what = Printf.sprintf "Generating %s using %s" generated_file script in
+    let env =
+      Environments.add Builtin_variables.generated_test_file generated_file env
+    in
+    let oc = open_out generated_file in
+    Printf.fprintf oc "(*%s*)\n\n" (extract_test_stanza testfile);
+    close_out oc;
+    let exit_status =
+      Actions_helpers.run_cmd
+        ~environment:default_ocaml_env
+        ~stdout_variable:Builtin_variables.generated_test_file
+        ~append:true
+        log env [script]
+    in
+    if exit_status = 0
+    then (Result.pass, env)
+    else begin
+      let reason = Actions_helpers.mkreason what script exit_status in
+      (Result.fail_with_reason reason, env)
+    end
+
+let generate_test =
+  Actions.make
+    ~name:"generate-test"
+    ~description:"Generate a test from the output of generate_test_script"
+    ~does_something:true
+    run_generate_test
+
+let run_scalar_codegen log env =
+  let input_file = Actions_helpers.testfile env in
+  let test_stanza = extract_test_stanza input_file in
+  let sorted_ops =
+    List.sort
+      (fun op1 op2 ->
+         String.compare
+           (Scalar.Operation.to_string op1)
+           (Scalar.Operation.to_string op2))
+      Scalar.Operation.all
+  in
+  let intermediate_file = corrected input_file in
+  let oc = open_out intermediate_file in
+  output_string oc
+    (Printf.sprintf "(*%s*)\n\n%s"
+      test_stanza
+      (String.concat "\n"
+         (List.map Scalar_codegen.test_of_operation sorted_ops)));
+  close_out oc;
+  run_expect_twice intermediate_file log env
+    ~backend:Native ~reference_file:input_file
+
+let run_scalar_codegen =
+  Actions.make
+    ~name:"run-scalar-codegen"
+    ~description:"Create an expect_asm test for all scalar primitives"
+    ~does_something:true
+    run_scalar_codegen
 
 let make_check_tool_output name tool = Actions.make
   ~name
@@ -1648,6 +1741,7 @@ let init () =
     check_ocamlopt_opt_output;
     run_expect;
     run_expectnat;
+    generate_test;
     compare_bytecode_programs;
     compare_binary_files;
     setup_ocaml_build_env;
@@ -1687,5 +1781,6 @@ let init () =
     ocamlobjinfo;
     stack_checks;
     no_stack_checks;
-    only_default_codegen
+    only_default_codegen;
+    run_scalar_codegen
   ]

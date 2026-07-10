@@ -42,6 +42,12 @@ let exit_status = Variables.make ("exit_status",
 let file = Variables.make ("file",
   "File whose existence should be tested")
 
+let generate_test_script = Variables.make ("generate_test_script",
+  "Script whose standard output is the body of a generated test")
+
+let generated_test_file = Variables.make ("generated_test_file",
+  "File containing the test produced by the generate-test action")
+
 let readonly_files = Variables.make ("readonly_files",
   "Files which are only read by the tests")
 
@@ -127,6 +133,8 @@ let init () =
     dst;
     exit_status;
     file;
+    generate_test_script;
+    generated_test_file;
     readonly_files;
     make;
     ocamltest_response;

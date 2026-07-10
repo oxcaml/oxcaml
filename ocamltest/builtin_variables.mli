@@ -31,6 +31,10 @@ val exit_status : Variables.t
 
 val file : Variables.t
 
+val generate_test_script : Variables.t
+
+val generated_test_file : Variables.t
+
 val readonly_files : Variables.t
 
 val make : Variables.t

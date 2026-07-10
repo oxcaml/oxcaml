@@ -146,6 +146,20 @@ let natexpect =
   ]
 }
 
+let scalarcodegen =
+{
+  test_name = "generate-scalar-codegen";
+  test_run_by_default = false;
+  test_description =
+    "Generate and run an expect_asm test for all scalar primitives";
+  test_actions =
+  [
+    setup_simple_build_env;
+    run_scalar_codegen;
+    check_program_output
+  ]
+}
+
 let ocamldoc =
 {
   test_name = "ocamldoc";
@@ -220,4 +234,5 @@ let init () =
     ocamldoc;
     asmgen;
     fexpr;
+    scalarcodegen;
   ]
