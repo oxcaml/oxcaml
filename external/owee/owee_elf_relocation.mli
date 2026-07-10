@@ -113,23 +113,6 @@ type rela_entry =
     the given section body, calling [f] for each entry. *)
 val iter_rela_entries : rela_body:Owee_buf.t -> f:(rela_entry -> unit) -> unit
 
-(** {1 Symbol Name Lookup} *)
-
-(** [read_symbol_name ~symtab_body ~strtab_body ~sym_index] reads the name
-    of the symbol at the given index from the symbol table.
-
-    Returns [None] if the index is out of bounds or the name cannot be read. *)
-val read_symbol_name :
-  symtab_body:Owee_buf.t -> strtab_body:Owee_buf.t -> sym_index:int -> string option
-
-(** [read_symbol_shndx ~symtab_body ~sym_index] reads the section header index
-    (st_shndx) of the symbol at the given index.
-
-    Returns [None] if the index is out of bounds.
-    Use [Section_index.is_undef] to check for undefined symbols. *)
-val read_symbol_shndx :
-  symtab_body:Owee_buf.t -> sym_index:int -> Section_index.t option
-
 (** {1 Entry Sizes} *)
 
 val rela_entry_size : int

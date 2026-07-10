@@ -95,22 +95,18 @@ let finalize acc =
 
    PC32 relocations to undefined symbols are an error. They occur when code is
    compiled with -nodynlink, which is incompatible with the dissector. *)
-let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
+let parse_rela_section ~rela_body ~symbols =
   let convert_to_plt = ref [] in
   let convert_to_got = ref [] in
   Rela.iter_rela_entries ~rela_body ~f:(fun entry ->
       (* Check for PC32 relocations to undefined symbols - these are an error *)
       if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.pc32
       then
-        match Rela.read_symbol_shndx ~symtab_body ~sym_index:entry.r_sym with
-        | Some shndx when Rela.Section_index.is_undef shndx ->
+        match Elf.symbol_table_lookup symbols ~sym_index:entry.r_sym with
+        | Some sym when Rela.Section_index.(is_undef (of_int sym.Elf.st_shndx))
+          ->
           let symbol_name =
-            match
-              Rela.read_symbol_name ~symtab_body ~strtab_body
-                ~sym_index:entry.r_sym
-            with
-            | Some name -> name
-            | None -> "<unknown>"
+            if String.equal sym.Elf.name "" then "<unknown>" else sym.Elf.name
           in
           Misc.fatal_errorf
             "Dissector: R_X86_64_PC32 relocation to undefined symbol %s at \
@@ -124,35 +120,27 @@ let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
         || Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.rex_gotpcrelx
       then
         (* Only process relocations for undefined symbols *)
-        match Rela.read_symbol_shndx ~symtab_body ~sym_index:entry.r_sym with
+        match Elf.symbol_table_lookup symbols ~sym_index:entry.r_sym with
         | None ->
           log_verbose "  reloc %s at 0x%Lx: no symbol shndx"
             (Rela.Reloc_type.name entry.r_type)
             entry.r_offset
-        | Some shndx when Rela.Section_index.is_defined shndx ->
+        | Some sym
+          when Rela.Section_index.(is_defined (of_int sym.Elf.st_shndx)) ->
           log_verbose "  reloc %s at 0x%Lx: symbol defined (shndx=%d), skipping"
             (Rela.Reloc_type.name entry.r_type)
-            entry.r_offset
-            (Rela.Section_index.to_int shndx)
-        | Some _ -> (
-          match
-            Rela.read_symbol_name ~symtab_body ~strtab_body
-              ~sym_index:entry.r_sym
-          with
-          | None ->
-            log_verbose "  reloc %s at 0x%Lx: no symbol name"
-              (Rela.Reloc_type.name entry.r_type)
-              entry.r_offset
-          | Some symbol_name ->
-            log_verbose "  reloc %s at 0x%Lx -> %s (UNDEF)"
-              (Rela.Reloc_type.name entry.r_type)
-              entry.r_offset symbol_name;
-            let reloc_entry =
-              { Relocation_entry.symbol_name; offset = entry.r_offset }
-            in
-            if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
-            then convert_to_plt := reloc_entry :: !convert_to_plt
-            else convert_to_got := reloc_entry :: !convert_to_got));
+            entry.r_offset sym.Elf.st_shndx
+        | Some sym ->
+          let symbol_name = sym.Elf.name in
+          log_verbose "  reloc %s at 0x%Lx -> %s (UNDEF)"
+            (Rela.Reloc_type.name entry.r_type)
+            entry.r_offset symbol_name;
+          let reloc_entry =
+            { Relocation_entry.symbol_name; offset = entry.r_offset }
+          in
+          if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
+          then convert_to_plt := reloc_entry :: !convert_to_plt
+          else convert_to_got := reloc_entry :: !convert_to_got);
   let rev_and_count lst =
     List.fold_left (fun (acc, n) x -> x :: acc, n + 1) ([], 0) lst
   in
@@ -208,14 +196,13 @@ let extract_into_accumulator (unix : (module Compiler_owee.Unix_intf.S))
         let strtab_section = sections.(strtab_index) in
         let symtab_body = Elf.section_body buf symtab_section in
         let strtab_body = Elf.section_body buf strtab_section in
+        let symbols = Elf.read_symbols ~symtab_body ~strtab_body in
         (* Process all .rela.text* sections and accumulate results *)
         List.fold_left
           (fun acc (rela_section : Elf.section) ->
             log_verbose "  processing section %s" rela_section.sh_name_str;
             let rela_body = Elf.section_body buf rela_section in
-            let result =
-              parse_rela_section ~rela_body ~symtab_body ~strtab_body
-            in
+            let result = parse_rela_section ~rela_body ~symbols in
             accumulate acc result)
           acc rela_text_sections)
 

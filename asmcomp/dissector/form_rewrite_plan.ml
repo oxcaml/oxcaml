@@ -369,6 +369,8 @@ let compute ~header ~sections ~symtab_body ~strtab_body ~rela_text_sections
     ~partition_kind ~igot_and_iplt ~relocations =
   log_verbose "forming rewrite plan for partition %s"
     (Partition.symbol_prefix partition_kind);
+  (* CR sspies: This is inefficient. We should read the symbols only once. This
+     read will be removed in a subsequent change. *)
   let original_symbols = Elf.read_symbols ~symtab_body ~strtab_body in
   let strtab = Strtab.create () in
   let symbol_to_index, total_symbols =

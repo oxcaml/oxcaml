@@ -108,37 +108,6 @@ let iter_rela_entries ~rela_body ~f =
     f entry
   done
 
-(* Elf64_Sym layout:
-   st_name  (4 bytes, offset 0)  - index into string table
-   st_info  (1 byte,  offset 4)  - type and binding
-   st_other (1 byte,  offset 5)  - visibility
-   st_shndx (2 bytes, offset 6)  - section header index
-   st_value (8 bytes, offset 8)  - value
-   st_size  (8 bytes, offset 16) - size *)
-
-let read_symbol_name ~symtab_body ~strtab_body ~sym_index =
-  let sym_offset = sym_index * sym_entry_size in
-  if sym_offset >= Owee_buf.size symtab_body
-  then None
-  else
-    let cursor = Owee_buf.cursor symtab_body ~at:sym_offset in
-    let st_name = Owee_buf.Read.u32 cursor in
-    (* Read null-terminated string from strtab *)
-    if st_name >= Owee_buf.size strtab_body
-    then None
-    else
-      let cursor = Owee_buf.cursor strtab_body ~at:st_name in
-      Owee_buf.Read.zero_string cursor ()
-
-let read_symbol_shndx ~symtab_body ~sym_index =
-  let sym_offset = sym_index * sym_entry_size in
-  if sym_offset >= Owee_buf.size symtab_body
-  then None
-  else
-    (* st_shndx is at offset 6 within the symbol entry *)
-    let cursor = Owee_buf.cursor symtab_body ~at:(sym_offset + 6) in
-    Some (Section_index.of_int (Owee_buf.Read.u16 cursor))
-
 (* Construct r_info from symbol index and relocation type *)
 let make_r_info ~sym ~typ =
   Int64.logor (Int64.shift_left (Int64.of_int sym) 32) (Reloc_type.to_int64 typ)
@@ -187,6 +156,13 @@ end
 let make_st_info ~binding ~typ =
   (Symbol_binding.to_int binding lsl 4) lor Symbol_type.to_int typ
 
+(* Elf64_Sym layout:
+   st_name  (4 bytes, offset 0)  - index into string table
+   st_info  (1 byte,  offset 4)  - type and binding
+   st_other (1 byte,  offset 5)  - visibility
+   st_shndx (2 bytes, offset 6)  - section header index
+   st_value (8 bytes, offset 8)  - value
+   st_size  (8 bytes, offset 16) - size *)
 type sym_entry =
   { st_name : int;
     st_info : int;
