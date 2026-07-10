@@ -1333,32 +1333,21 @@ let emit_static_cast (cast : Cmm.static_cast) i =
   let distinct = not (Reg.same_loc src dst) in
   match cast with
   | Int_conv cast -> (
-    let mov (src : Reg.t) =
-      if not (Reg.same_loc src dst)
-      then A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
-    in
-    let sign_extend (w : Cmm.int_width) ~(src : Reg.t) =
+    match Cmm.class_of_int_cast cast with
+    | Identity -> if distinct then A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
+    | Sign_extend w -> (
       match w with
       | Int8 | Int16 | Int32 | Int63 ->
         A.ins4 SBFM (H.reg_x dst) (H.reg_x src) (O.imm_six 0)
           (O.imm_six (Cmm.bits_of_int_width w - 1))
-      | Int64 -> mov src
-    in
-    let zero_extend (w : Cmm.int_width) ~(src : Reg.t) =
+      | Int64 -> Misc.fatal_error "unexpected Sign_extend Int64")
+    | Zero_extend w -> (
       match w with
       | Int8 | Int16 | Int63 ->
         A.ins4 UBFM (H.reg_x dst) (H.reg_x src) (O.imm_six 0)
           (O.imm_six (Cmm.bits_of_int_width w - 1))
       | Int32 -> A.ins_mov_reg_w (H.reg_w dst) (H.reg_w src)
-      | Int64 -> mov src
-    in
-    match Cmm.class_of_int_cast cast with
-    | Identity -> mov src
-    | Sign_extend w -> sign_extend w ~src
-    | Zero_extend w -> zero_extend w ~src
-    | Zero_then_sign_extend { zero_extend_from; sign_extend_from } ->
-      zero_extend zero_extend_from ~src;
-      sign_extend sign_extend_from ~src:dst)
+      | Int64 -> Misc.fatal_error "unexpected Zero_extend Int64"))
   | Tagged_int_of_int64 ->
     A.ins_lsl_immediate (H.reg_x dst) (H.reg_x src) ~shift_in_bits:1;
     A.ins3 ORR_immediate (H.reg_x dst) (H.reg_x dst) (O.bitmask 1n)

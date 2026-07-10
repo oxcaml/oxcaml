@@ -363,10 +363,6 @@ and int_cast =
 type int_cast_class =
   | Sign_extend of int_width
   | Zero_extend of int_width
-  | Zero_then_sign_extend of
-      { zero_extend_from : int_width;
-        sign_extend_from : int_width
-      }
   | Identity
 
 val class_of_int_cast : int_cast -> int_cast_class

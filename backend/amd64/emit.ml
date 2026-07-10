@@ -1676,38 +1676,29 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
 let emit_static_cast (cast : Cmm.static_cast) i =
   let open Simd_instrs in
   let distinct = not (Reg.same_loc i.arg.(0) i.res.(0)) in
-  let extend_using_shift r ~by ~shift_right =
-    if not (Reg.same_loc r i.res.(0)) then I.mov (reg r) (res i 0);
+  let extend_using_shift ~by ~shift_right =
+    if distinct then I.mov (arg i 0) (res i 0);
     I.sal (int by) (res i 0);
     shift_right (int by) (res i 0)
-  in
-  let sign_extend (w : Cmm.int_width) ~(src : Reg.t) =
-    match w with
-    | Int8 -> extend_using_shift ~by:56 ~shift_right:I.sar src
-    | Int16 -> extend_using_shift ~by:48 ~shift_right:I.sar src
-    | Int32 -> I.movsxd (emit_subreg reg_low_32_name DWORD src) (res i 0)
-    | Int63 -> extend_using_shift ~by:1 ~shift_right:I.sar src
-    | Int64 ->
-      if not (Reg.same_loc src i.res.(0)) then I.mov (reg src) (res i 0)
-  in
-  let zero_extend (w : Cmm.int_width) ~(src : Reg.t) =
-    match w with
-    | Int8 -> extend_using_shift ~by:56 ~shift_right:I.shr src
-    | Int16 -> extend_using_shift ~by:48 ~shift_right:I.shr src
-    | Int32 -> I.mov (emit_subreg reg_low_32_name DWORD src) (res32 i 0)
-    | Int63 -> extend_using_shift ~by:1 ~shift_right:I.shr src
-    | Int64 ->
-      if not (Reg.same_loc src i.res.(0)) then I.mov (reg src) (res i 0)
   in
   match cast with
   | Int_conv cast -> (
     match Cmm.class_of_int_cast cast with
     | Identity -> if distinct then I.mov (arg i 0) (res i 0)
-    | Sign_extend w -> sign_extend w ~src:i.arg.(0)
-    | Zero_extend w -> zero_extend w ~src:i.arg.(0)
-    | Zero_then_sign_extend { zero_extend_from; sign_extend_from } ->
-      zero_extend zero_extend_from ~src:i.arg.(0);
-      sign_extend sign_extend_from ~src:i.res.(0))
+    | Sign_extend w -> (
+      match w with
+      | Int8 -> extend_using_shift ~by:56 ~shift_right:I.sar
+      | Int16 -> extend_using_shift ~by:48 ~shift_right:I.sar
+      | Int32 -> I.movsxd (arg32 i 0) (res i 0)
+      | Int63 -> extend_using_shift ~by:1 ~shift_right:I.sar
+      | Int64 -> Misc.fatal_error "unexpected Sign_extend Int64")
+    | Zero_extend w -> (
+      match w with
+      | Int8 -> extend_using_shift ~by:56 ~shift_right:I.shr
+      | Int16 -> extend_using_shift ~by:48 ~shift_right:I.shr
+      | Int32 -> I.mov (arg32 i 0) (res32 i 0)
+      | Int63 -> extend_using_shift ~by:1 ~shift_right:I.shr
+      | Int64 -> Misc.fatal_error "unexpected Zero_extend Int64"))
   | Tagged_int_of_int64 ->
     let r =
       (* CR jrayman: Should we have this check or change

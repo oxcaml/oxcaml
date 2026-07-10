@@ -465,10 +465,6 @@ and int_cast =
 type int_cast_class =
   | Sign_extend of int_width
   | Zero_extend of int_width
-  | Zero_then_sign_extend of
-      { zero_extend_from : int_width;
-        sign_extend_from : int_width
-      }
   | Identity
 
 let class_of_int_cast { src; dst; signedness } =
@@ -476,13 +472,9 @@ let class_of_int_cast { src; dst; signedness } =
   let dst_bits = bits_of_int_width dst in
   if src_bits = dst_bits
   then Identity
-  else if dst_bits < src_bits
+  else if src_bits > dst_bits
   then Sign_extend dst
-  else
-    match signedness with
-    | Signed -> Identity
-    | Unsigned ->
-      Zero_then_sign_extend { zero_extend_from = src; sign_extend_from = dst }
+  else match signedness with Signed -> Identity | Unsigned -> Zero_extend src
 
 module Alloc_mode = struct
   type t =
