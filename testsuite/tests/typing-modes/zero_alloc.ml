@@ -1283,15 +1283,7 @@ let f () =
   let _ = require_noalloc () in
   ()
 [%%expect{|
-Line 20, characters 13-31:
-20 |     let _  = exclave_not_exempt in ()
-                  ^^^^^^^^^^^^^^^^^^
-Error: The value "exclave_not_exempt" is "alloc"
-         because it closes over the allocation at line 18, characters 46-54
-         which is "alloc".
-       However, the value "exclave_not_exempt" highlighted is expected to be "noalloc_strict"
-         because it is used inside the function at lines 19-20, characters 41-37
-         which is expected to be "noalloc_strict".
+val f : unit -> unit = <fun>
 |}]
 
 (* CR shsong: currently, [local_] does not exempt the allocation. *)
@@ -1306,15 +1298,7 @@ let f () =
   let _ = require_noalloc () in
   ()
 [%%expect{|
-Line 7, characters 13-29:
-7 |     let _  = local_not_exempt in ()
-                 ^^^^^^^^^^^^^^^^
-Error: The value "local_not_exempt" is "alloc"
-         because it closes over the allocation at line 3, characters 20-28
-         which is "alloc".
-       However, the value "local_not_exempt" highlighted is expected to be "noalloc_strict"
-         because it is used inside the function at lines 6-7, characters 41-35
-         which is expected to be "noalloc_strict".
+val f : unit -> unit = <fun>
 |}]
 
 (* For contrast, the same allocation wrapped in [stack_] (sets [strictly_stack])
@@ -1577,42 +1561,42 @@ Error: The value "stack_inner_funbody" is "alloc"
 (* stack_ closure stored in a ref (ref contents must be global) *)
 let stack_clo_in_ref = ref (stack_ (fun x -> x))
 [%%expect{|
-Line 13, characters 27-48:
+Line 13, characters 35-47:
 13 | let stack_clo_in_ref = ref (stack_ (fun x -> x))
-                                ^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+                                        ^^^^^^^^^^^^
+Error: The function is "local" but is expected to be "global".
 |}]
 
 (* stack_ closure as the function in a tail call *)
 let stack_clo_tailcall () = (stack_ (fun x -> x)) 42
 [%%expect{|
-Line 1, characters 28-49:
+Line 1, characters 36-48:
 1 | let stack_clo_tailcall () = (stack_ (fun x -> x)) 42
-                                ^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "local" to the parent region or "global"
+                                        ^^^^^^^^^^^^
+Error: The function is "local"
+       but is expected to be "global" because it is an allocation
+         which is expected to be "local" to the parent region or "global"
          because it is the function in a tail call.
 |}]
 
 (* stack_ multi-argument closure stored in a ref *)
 let stack_clo_multiarg () = ref (stack_ (fun x y -> x : 'a -> 'a -> 'a))
 [%%expect{|
-Line 1, characters 32-72:
+Line 1, characters 41-53:
 1 | let stack_clo_multiarg () = ref (stack_ (fun x y -> x : 'a -> 'a -> 'a))
-                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+                                             ^^^^^^^^^^^^
+Error: The function is "local" but is expected to be "global".
 |}]
 
 (* stack_ closure returned where a global function is expected *)
 let stack_clo_global_return () : int -> int = stack_ (fun x -> x)
 [%%expect{|
-Line 1, characters 46-65:
+Line 1, characters 53-65:
 1 | let stack_clo_global_return () : int -> int = stack_ (fun x -> x)
-                                                  ^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "local" to the parent region or "global"
+                                                         ^^^^^^^^^^^^
+Error: The function is "local"
+       but is expected to be "global" because it is an allocation
+         which is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
 |}]

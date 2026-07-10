@@ -446,16 +446,6 @@ type expected_mode =
     field and [mode]: this field being [true] while [mode] being [global] is
     sensible, but not very useful as it will fail all expressions. *)
 
-    strictly_stack : bool;
-    (** True iff this expression is the direct operand of [stack_].
-    Suppresses the allocation-axis lock-walk for its top allocation. *)
-
-    (* CR shsong: An alternative design is to unify strictly_local and
-    strictly_stack. Specifically, we want to set strictly_local when
-    [stack_] keyword is used, so that we can use strictly_local and remove
-    strictly_stack. However, if we do that, there would be uncaught exception
-    in Test 5h in test typing-modes/zero_alloc.ml. We will review this later. *)
-
     tuple_modes : (Value.r * Location.t) list option;
     (** No invariant between this and [mode]. It is UNSOUND to ignore this
         field. If this is [Some [x0; x1; ..]]:
@@ -538,7 +528,6 @@ let mode_default mode =
   { position = RNontail;
     mode = Value.disallow_left mode;
     strictly_local = false;
-    strictly_stack = false;
     tuple_modes = None }
 
 let mode_legacy = mode_default Value.legacy
@@ -655,11 +644,6 @@ let mode_exclave expected_mode =
 let mode_strictly_local expected_mode =
   { expected_mode
     with strictly_local = true
-  }
-
-let mode_strictly_stack expected_mode =
-  { expected_mode
-    with strictly_stack = true
   }
 
 let is_not_alloc_mode expected_mode =
@@ -877,7 +861,7 @@ let register_closure_allocation ~env ?(stack = false) (mode : Value.r) ~loc
     of potential subcomponents. *)
 let register_allocation ~env ~loc ?desc (expected_mode : expected_mode) =
   let alloc_mode, mode =
-    register_allocation_value_mode ~env ~loc ~stack:expected_mode.strictly_stack
+    register_allocation_value_mode ~env ~loc ~stack:expected_mode.strictly_local
       ?desc (as_single_mode expected_mode)
   in
   alloc_mode, mode_default mode
@@ -6242,11 +6226,11 @@ let split_function_ty
     ~mode_annots ~ret_mode_annots ~in_function ~is_first_val_param ~is_final_val_param
   =
     let alloc_mode, closed_over_mode =
-    register_closure_allocation ~env ~stack:expected_mode.strictly_stack ~loc
+    register_closure_allocation ~env ~stack:expected_mode.strictly_local ~loc
       (as_single_mode expected_mode)
   in
     if expected_mode.strictly_local then
-    Locality.submode_exn ~pp:(loc, Function) Locality.local
+    Locality.submode_err (loc, Function) Locality.local
       (Alloc.proj_comonadic Areality alloc_mode);
   let { ty = ty_fun; explanation }, loc_fun = in_function in
   let separate = !Clflags.principal || Env.has_local_constraints env in
@@ -8564,8 +8548,8 @@ and type_expect_
   | Pexp_stack e ->
       (* Allocation axis: suppress the axis lock-walk at the registration
           site *)
-      let expected_stack_mode = mode_strictly_stack expected_mode in
-      let exp = type_expect env expected_stack_mode e ty_expected_explained in
+      let expected_mode = mode_strictly_local expected_mode in
+      let exp = type_expect env expected_mode e ty_expected_explained in
       let unsupported category =
         raise (Error (exp.exp_loc, env, Unsupported_stack_allocation category))
       in
@@ -10375,7 +10359,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
     (Misc.repeated_label sexpl);
   let alloc_mode, value_mode =
     register_allocation_value_mode ~env ~loc
-      ~stack:expected_mode.strictly_stack expected_mode.mode
+      ~stack:expected_mode.strictly_local expected_mode.mode
   in
   let argument_mode =
     value_mode
@@ -10407,7 +10391,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
         let tuple_modes =
           List.map (fun (mode, _) ->
             snd (register_allocation_value_mode ~env ~loc
-                   ~stack:expected_mode.strictly_stack mode)) tuple_modes
+                   ~stack:expected_mode.strictly_local mode)) tuple_modes
         in
         let argument_mode = Value.meet (argument_mode :: tuple_modes) in
         List.init arity (fun _ -> argument_mode)
