@@ -592,7 +592,8 @@ and typecheck_cop env op args dbg : inferred_machtype =
   else
     match op with
     | Craise _
-    | Cextcall { returns = false; _ } ->
+    | Cextcall { returns = false; _ }
+    | Capply { returns = false; _ } ->
       Never_returns
     | Copaque -> (
       (* [Copaque] is the identity whatever the machtype of its argument;
@@ -601,7 +602,7 @@ and typecheck_cop env op args dbg : inferred_machtype =
       | [ty] -> ty
       | [] | _ :: _ :: _ -> arity_error "1")
     | Cextcall { returns = true; _ }
-    | Capply _
+    | Capply { returns = true; _ }
     | Cload _ | Calloc _ | Cstore _ | Caddi | Csubi | Cmuli
     | Cmulhi _ | Cdivi | Cmodi | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor
     | Cxor | Clsl | Clsr | Casr | Cbswap _ | Ccsel _ | Cclz | Cctz | Cpopcnt
