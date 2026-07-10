@@ -624,9 +624,6 @@ let f a b callback =
   allocation), cross-function unboxing will not happen. This restriction may be
   lifted in the future.
 
-- Boxed numbers (floats and int32/int64/nativeint) are *not* supported for the
-  moment. It is likely this restriction will be lifted in the near future.
-
 - Specialized version of functions defined in another compilation unit will
   *not* have their free variables unboxed if they escape. This is a limitation
   of the semantic model of flambda.
