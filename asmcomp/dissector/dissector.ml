@@ -178,7 +178,10 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
         let input_file = Partition.Linked.linked_object linked in
         let relocations =
           Profile.record_call ~accumulate:true "dissector/extract_relocations"
-            (fun () -> Extract_relocations.extract unix ~filename:input_file)
+            (fun () ->
+              Extract_relocations.extract
+                (Extract_relocations.Mapped_object_file.read unix
+                   ~filename:input_file))
         in
         let n_plt = Extract_relocations.num_plt relocations in
         let n_got = Extract_relocations.num_got relocations in

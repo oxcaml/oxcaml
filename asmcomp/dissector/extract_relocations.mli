@@ -60,9 +60,39 @@ val num_plt : t -> int
 (** Returns the number of GOT relocations (O(1)). *)
 val num_got : t -> int
 
-(** [extract unix ~filename] reads the ELF object file at [filename] and
-    extracts relocations from the .rela.text section that need to be converted
-    for the medium code model.
+(** A partition's partially-linked object file. *)
+module Mapped_object_file : sig
+  type t
+
+  (** Map the ELF object file at [filename] and parse its header, section table,
+      symbol table and .rela.text* sections. Fatal error if the file has no
+      symbol table. *)
+  val read : (module Compiler_owee.Unix_intf.S) -> filename:string -> t
+
+  (** The filename passed to [read]. *)
+  val filename : t -> string
+
+  (** The whole mapped file. *)
+  val buf : t -> Compiler_owee.Owee_buf.t
+
+  (** The ELF header. *)
+  val header : t -> Compiler_owee.Owee_elf.header
+
+  (** The section table. *)
+  val sections : t -> Compiler_owee.Owee_elf.section array
+
+  (** The symbol table, indexed by symbol index. *)
+  val symbols : t -> Compiler_owee.Owee_elf.symbol array
+
+  (** All .rela.text* sections with their bodies, in section table order.
+      Handles both a traditional single .rela.text section and function
+      sections: .rela.text.foo, .rela.text.bar, etc. *)
+  val rela_text_sections :
+    t -> (Compiler_owee.Owee_elf.section * Compiler_owee.Owee_buf.t) list
+end
+
+(** [extract input] scans the .rela.text* sections of [input] for relocations
+    that need to be converted for the medium code model.
 
     Returns the lists of PLT32 and REX_GOTPCRELX relocations found. *)
-val extract : (module Compiler_owee.Unix_intf.S) -> filename:string -> t
+val extract : Mapped_object_file.t -> t
