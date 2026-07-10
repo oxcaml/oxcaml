@@ -13,9 +13,12 @@ build: [
 depends: [
   "ocaml" {>= "5.1.0"}
   "dune"   {>= "3.17.0"}
-  "ppxlib_ast" {= "0.33.0+ox"}
+  "ppxlib_ast" {>= "0.33.0" & < "0.36.0"}
 ]
 available: arch != "x86_32"
+conflicts: [
+  "oxcaml-compiler" {< "5.2.0minus39"}
+]
 synopsis: "Utilities for working with Jane Street AST constructs"
 description: "
 Part of the Jane Street's PPX rewriters collection.
