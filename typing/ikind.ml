@@ -896,12 +896,42 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
         *)
         )
     in
+    (* CLASS-A (stage 3, validate-only): a [Type_abstract Definition] decl with a
+       fresh [Tvar] manifest is the temporary declaration [Typedecl.enter_type]
+       enters for a (possibly recursive) type before its body is analyzed. Its
+       stored ikind is the user's DECLARED jkind; its manifest is a placeholder
+       type variable collecting usage constraints, NOT the real body. So a
+       from-scratch recompute -- which follows that fresh Tvar -- is not a valid
+       reference for this decl, and the validation harness keeps the stored
+       (declared) ikind even in the recompute reference.
+
+       Soundness (exhaustive case split; the stored value IS the declared jkind):
+       - enclosing type ACCEPTED => the decl kind-check proved [body <= declared],
+         so [stored(declared) >= true body kind] = over-approximation = sound
+         (over-reject only);
+       - [declared] too tight ([stored <= true]) => the decl kind-check FAILS and
+         the type is REJECTED => the tight stored is discarded, never
+         authoritatively accepts anything.
+       A too-tight declared jkind rejects the DEFINITION; it can never accept a
+       USE. *)
+    let is_def_tvar_temp_decl =
+      match type_decl.type_kind, type_decl.type_manifest with
+      | Types.Type_abstract Types.Definition, Some body_ty -> (
+        match Types.get_desc body_ty with Types.Tvar _ -> true | _ -> false)
+      | _ -> false
+    in
     (* Prefer a stored constructor ikind if one is present and enabled. *)
     let ikind =
       match type_decl.type_ikind with
       | Types.Constructor_ikind { base; coeffs }
         when !Clflags.ikinds && not !force_recompute_ikinds ->
         if !Clflags.ikinds_validate then incr stored_decl_ikind_hits;
+        Solver.Poly (base, coeffs)
+      | Types.Constructor_ikind { base; coeffs }
+        when !Clflags.ikinds && !force_recompute_ikinds && is_def_tvar_temp_decl
+        ->
+        (* CLASS-A: keep the stored (declared) ikind in the recompute reference;
+           the fresh Tvar manifest is a placeholder, not the body. *)
         Solver.Poly (base, coeffs)
       | Types.No_constructor_ikind reason ->
         if !Clflags.ikinds_debug then Format.eprintf "[ikind-miss] %s@." reason;
