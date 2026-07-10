@@ -54,8 +54,8 @@ type t : value mod local
 Line 1, characters 19-24:
 1 | type t : value mod local
                        ^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant:
-  "local" is the default bound on its axis, so it has no effect.
+Warning 211 [redundant-modifier]: This modifier is redundant
+  because "local" is the default bound on its axis, so it has no effect.
 
 type t
 |}]
@@ -65,8 +65,8 @@ type t : value mod unique
 Line 1, characters 19-25:
 1 | type t : value mod unique
                        ^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant:
-  "unique" is the default bound on its axis, so it has no effect.
+Warning 211 [redundant-modifier]: This modifier is redundant
+  because "unique" is the default bound on its axis, so it has no effect.
 
 type t
 |}]
@@ -76,8 +76,8 @@ type t : value mod uncontended
 Line 1, characters 19-30:
 1 | type t : value mod uncontended
                        ^^^^^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant:
-  "uncontended" is the default bound on its axis, so it has no effect.
+Warning 211 [redundant-modifier]: This modifier is redundant
+  because "uncontended" is the default bound on its axis, so it has no effect.
 
 type t
 |}]
@@ -87,8 +87,8 @@ type t : value mod internal
 Line 1, characters 19-27:
 1 | type t : value mod internal
                        ^^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant:
-  "internal" is the default bound on its axis, so it has no effect.
+Warning 211 [redundant-modifier]: This modifier is redundant
+  because "internal" is the default bound on its axis, so it has no effect.
 
 type t
 |}]
@@ -98,8 +98,8 @@ type t : value mod static
 Line 1, characters 19-25:
 1 | type t : value mod static
                        ^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant:
-  "static" is the default bound on its axis, so it has no effect.
+Warning 211 [redundant-modifier]: This modifier is redundant
+  because "static" is the default bound on its axis, so it has no effect.
 
 type t
 |}]
@@ -255,8 +255,8 @@ type t : value mod everything static
 Line 1, characters 30-36:
 1 | type t : value mod everything static
                                   ^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant:
-  "static" is the default bound on its axis, so it has no effect.
+Warning 211 [redundant-modifier]: This modifier is redundant
+  because "static" is the default bound on its axis, so it has no effect.
 
 type t : value mod everything
 |}]
@@ -266,8 +266,8 @@ type t : value mod static everything
 Line 1, characters 19-25:
 1 | type t : value mod static everything
                        ^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant:
-  "static" is the default bound on its axis, so it has no effect.
+Warning 211 [redundant-modifier]: This modifier is redundant
+  because "static" is the default bound on its axis, so it has no effect.
 
 type t : value mod everything
 |}]

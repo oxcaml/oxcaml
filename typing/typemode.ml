@@ -416,13 +416,16 @@ let transl_modality_atoms ~warn_redundant ~default ~loc ~annot_type
         let current_a = Const.proj ax m in
         (if Misc.Le_result.equal ~le:(Per_axis.le ax) a current_a
          then
-           let implied_by =
-             List.find_opt
-               (fun (p, _) -> Axis.compare p (Axis.P ax) = 0)
-               implied
-             |> Option.map snd
+           let reason : Warnings.redundant_modifier_reason =
+             match
+               List.find_opt
+                 (fun (p, _) -> Axis.compare p (Axis.P ax) = 0)
+                 implied
+             with
+             | Some (_, implying) -> Implied_by implying
+             | None -> Default_bound
            in
-           warn_redundant loc t ~implied_by);
+           warn_redundant loc t ~reason);
         let name = Format_doc.asprintf "%a" (Per_axis.print ax) a in
         let m = Const.set ax a m in
         List.fold_left
@@ -581,7 +584,8 @@ let transl_mod_bounds ?(warn = true) annots =
       if is_top && warn
       then
         Location.prerr_warning loc
-          (Warnings.Redundant_modifier { modifier = txt; implied_by = None });
+          (Warnings.Redundant_modifier
+             { modifier = txt; reason = Default_bound });
       if Option.is_some (Nonmodal_bounds.get ax nonmodal)
       then raise (Error (loc, Duplicated_axis (Modifier, axis)));
       Nonmodal_bounds.set ax (Some { txt = mode; loc }) nonmodal
@@ -654,12 +658,12 @@ let transl_mod_bounds ?(warn = true) annots =
     (* axes listed in the order of implication. *)
     nm, base, sort_dedup_modalities_with_locs (List.rev atoms)
   in
-  let warn_redundant loc (Modality.Atom (ax, a)) ~implied_by =
+  let warn_redundant loc (Modality.Atom (ax, a)) ~reason =
     if warn
     then
       let modifier = Format_doc.asprintf "%a" (Modality.Per_axis.print ax) a in
       Location.prerr_warning loc
-        (Warnings.Redundant_modifier { modifier; implied_by })
+        (Warnings.Redundant_modifier { modifier; reason })
   in
   let modality =
     transl_modality_atoms ~warn_redundant ~default:base_modality ~loc:bounds_loc

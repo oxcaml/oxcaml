@@ -55,6 +55,10 @@ type type_declaration_usage_warning =
   | Declaration
   | Alias
 
+type redundant_modifier_reason =
+  | Default_bound
+  | Implied_by of string
+
 type t =
   | Comment_start                           (*  1 *)
   | Comment_not_end                         (*  2 *)
@@ -155,7 +159,7 @@ type t =
   | Unboxing_impossible                     (* 210 *)
   | Redundant_modifier of
       { modifier : string;
-        implied_by : string option }          (* 211 *)
+        reason : redundant_modifier_reason }  (* 211 *)
   (* 212 taken *)
   (* 213 was [Modal_axis_specified_twice], now subsumed by
      [Redundant_modality] (220) *)
@@ -1496,14 +1500,14 @@ let message = function
       msg "This %a attribute cannot be used.@ \
            The type of this value does not allow unboxing."
         Style.inline_code "[@unboxed]"
-  | Redundant_modifier { modifier; implied_by } ->
-      (match implied_by with
-       | Some implying ->
+  | Redundant_modifier { modifier; reason } ->
+      (match reason with
+       | Implied_by implying ->
            msg "This modifier is redundant@ because it is implied by %a."
              Style.inline_code implying
-       | None ->
-           msg "This modifier is redundant:@ %a is the default bound on its@ \
-                axis, so it has no effect."
+       | Default_bound ->
+           msg "This modifier is redundant@ because %a is the default bound@ \
+                on its axis, so it has no effect."
              Style.inline_code modifier)
   (* 213 was [Modal_axis_specified_twice] *)
   | Atomic_float_record_boxed ->
