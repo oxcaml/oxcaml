@@ -1,3 +1,5 @@
+[@@@ocaml.flambda_o3]
+
 type 'a node =
   | Empty
   | Node of
