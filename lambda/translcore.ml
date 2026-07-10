@@ -2212,14 +2212,12 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
       match definition with
       | Kept _ ->
         if Types.is_atomic lbl.lbl_mut then
-          (* Should have been rejected during typechecking. Defensive check to
-             shield users from atomically accessing the result of nonatomic
-             shallow copy. *)
+          (* Rejected during typechecking to avoid need for
+             implicit atomic loads *)
           fatal_error
             "transl_record: update expr implicitly copies atomic field";
         cont
       | Overridden (_lid, expr) ->
-          (* CR-soon jkerrigan: do these Setfields need to be atomic aware? *)
           let upd =
             match repres with
               Record_boxed
@@ -2290,7 +2288,6 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
            match definition with
            | Kept (typ, mut, _) ->
                if Types.is_atomic lbl.lbl_mut then
-                 (* Defensive check to avoid emitting a nonatomic read. *)
                  fatal_error
                    "transl_record: update expr implicitly copies atomic field";
                let field_layout = layout env lbl.lbl_loc lbl_sort typ in

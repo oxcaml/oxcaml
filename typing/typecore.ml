@@ -3254,9 +3254,6 @@ let forbid_atomic_field_patterns loc penv (label_lid, label, pat) =
     raise (Error (loc, !!penv, Atomic_in_pattern label_lid.txt))
 
 let forbid_atomic_in_record_update loc env lbl =
-  (* Functional updates that implicitly load atomic fields are not allowed.
-     expect_type_record enforces this by calling this function on every field
-     copied from the old record.*)
   if Types.is_atomic lbl.lbl_mut then
     raise (Error (loc, env, Atomic_in_functional_update lbl.lbl_name))
 
