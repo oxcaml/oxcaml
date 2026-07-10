@@ -31,13 +31,6 @@ open Misc
    The .cmx file contains these infos (as an externed record) plus a MD5
    of these infos *)
 
-type int_width =
-  | Int64
-  | Int63
-  | Int32
-  | Int16
-  | Int8
-
 (* Declare machtype here to avoid depending on [Cmm]. *)
 type machtype_component =
   Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2

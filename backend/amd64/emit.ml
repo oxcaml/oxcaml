@@ -1682,8 +1682,8 @@ let emit_static_cast (cast : Cmm.static_cast) i =
     shift_right (int by) (res i 0)
   in
   match cast with
-  | Int_conv cast -> (
-    match Cmm.class_of_int_cast cast with
+  | Int_conv ic -> (
+    match Cmm.class_of_int_conv ic with
     | Identity -> if distinct then I.mov (arg i 0) (res i 0)
     | Sign_extend w -> (
       match w with

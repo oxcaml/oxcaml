@@ -17,7 +17,7 @@
 
 open! Int_replace_polymorphic_compare [@@warning "-66"]
 
-type int_width = Cmx_format.int_width =
+type int_width =
   | Int64
   | Int63
   | Int32
@@ -441,8 +441,14 @@ type reinterpret_cast =
   | V256_of_vec of vector_width
   | V512_of_vec of vector_width
 
+type int_conv =
+  { src : int_width;
+    dst : int_width;
+    signedness : Scalar.Signedness.t
+  }
+
 type static_cast =
-  | Int_conv of int_cast
+  | Int_conv of int_conv
   | Tagged_int_of_int64
   | Int64_of_tagged_int of { signedness : Scalar.Signedness.t }
   | Float_of_int64 of float_width
@@ -456,18 +462,12 @@ type static_cast =
   | V512_of_scalar of vec512_type
   | Scalar_of_v512 of vec512_type
 
-and int_cast =
-  { src : int_width;
-    dst : int_width;
-    signedness : Scalar.Signedness.t
-  }
-
-type int_cast_class =
+type int_conv_class =
   | Sign_extend of int_width
   | Zero_extend of int_width
   | Identity
 
-let class_of_int_cast { src; dst; signedness } =
+let class_of_int_conv { src; dst; signedness } =
   let src_bits = bits_of_int_width src in
   let dst_bits = bits_of_int_width dst in
   if src_bits = dst_bits

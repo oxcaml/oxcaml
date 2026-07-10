@@ -1268,7 +1268,11 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
       store_into_reg t i.res.(0) converted
     in
     match cast_op with
-    | Int_conv _ -> not_implemented_basic ~msg:"static cast" i
+    | Int_conv _ ->
+      (* CR-soon jrayman: I'm holding off on implementing until we get LLVM
+         working again or we start accepting garbage in the upper bits, which
+         ever comes first. *)
+      not_implemented_basic ~msg:"Int_conv static cast" i
     | Tagged_int_of_int64 ->
       let arg = load_reg_to_temp ~typ:T.i64 t i.arg.(0) in
       let shifted = emit_ins t (I.binary Shl ~arg1:arg ~arg2:(V.of_int 1)) in

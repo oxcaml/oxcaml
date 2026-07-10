@@ -1332,8 +1332,8 @@ let emit_static_cast (cast : Cmm.static_cast) i =
   let src = i.arg.(0) in
   let distinct = not (Reg.same_loc src dst) in
   match cast with
-  | Int_conv cast -> (
-    match Cmm.class_of_int_cast cast with
+  | Int_conv ic -> (
+    match Cmm.class_of_int_conv ic with
     | Identity -> if distinct then A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
     | Sign_extend w -> (
       match w with
