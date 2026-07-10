@@ -242,9 +242,24 @@ let check_for_generated_type_or_jkind ~funct_body env loc mty exn =
       raise (Error (loc, env, exn tj))
 
 (* Extract the signature and the mode of a functor's return, given the signature
-   [sig_acc] and mode [md_mode] of the functor argument. *)
-let extract_sig_functor_open funct_body env loc mty sig_acc md_mode =
+   [sig_acc] and mode [md_mode] of the functor argument. [funct_yielding] is the
+   yielding mode of the functor expression itself, or [None] when there is no
+   module expression (includes in signatures, which have no runtime
+   application). *)
+let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
+      ~funct_yielding =
   let sig_acc = List.rev sig_acc in
+  (* Applying the functor runs its body, which can perform a free effect if the
+     functor closes over a yielding value (its own mode) or if the enclosing
+     structure it is applied to is yielding (the argument's mode). *)
+  let yielding =
+    match funct_yielding with
+    | None -> Yielding.max |> Yielding.disallow_right
+    | Some funct_yielding ->
+      Yielding.join
+        [ funct_yielding;
+          Yielding.disallow_right (Value.proj_comonadic Yielding md_mode) ]
+  in
   match Mtype.scrape_alias env mty with
   | Mty_functor (Named (param, mty_param, mm_param),mty_result,mm_result)
     as mty_func ->
@@ -283,14 +298,15 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode =
               sig..end -> () -> sig..end *)
         match Mtype.scrape extended_env mty_result with
         | Mty_signature sg_result ->
-            Tincl_functor { input_coercion; input_repr }, sg_result, mm_result
+            Tincl_functor { input_coercion; input_repr; yielding }, sg_result,
+            mm_result
         | Mty_functor (Unit, mty_result, mm_result) -> begin
             check_for_generated_type_or_jkind ~funct_body env loc mty
               (fun tj -> Not_includable_in_functor_body tj);
             match Mtype.scrape extended_env mty_result with
             | Mty_signature sg_result ->
-              Tincl_gen_functor { input_coercion; input_repr }, sg_result,
-              mm_result
+              Tincl_gen_functor { input_coercion; input_repr; yielding },
+              sg_result, mm_result
             | sg -> raise (Error (loc,env,Signature_result_expected
                                             (Mty_functor (Unit,sg, mm_result))))
           end
@@ -2222,6 +2238,7 @@ and transl_signature ?(interface_toplevel = false) env
         Language_extension.assert_enabled ~loc Include_functor ();
         let sg, mode, incl_kind =
           extract_sig_functor_open false env smty.pmty_loc mty sig_acc md_mode
+            ~funct_yielding:None
         in
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
@@ -3680,9 +3697,14 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
       match sincl.pincl_kind with
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
+        let funct_yielding =
+          Value.proj_comonadic Yielding
+            (Typedtree.mode_without_locks_exn modl.mod_mode)
+        in
         let sg, mode, incl_kind =
           extract_sig_functor_open funct_body env smodl.pmod_loc
             modl.mod_type sig_acc md_mode
+            ~funct_yielding:(Some funct_yielding)
         in
         incl_kind, sg, Value.disallow_right mode
       | Structure ->

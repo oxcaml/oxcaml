@@ -1211,6 +1211,7 @@ and include_kind =
   | Tincl_functor of
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
+      ; yielding : Mode.Yielding.l
       }
       (* S1 -> S2 *)
       (* Since [Types.module_representation = Jkind.sort array], this could've
@@ -1220,8 +1221,15 @@ and include_kind =
   | Tincl_gen_functor of
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
+      ; yielding : Mode.Yielding.l
       }
       (* S1 -> () -> S2 *)
+      (* In both functor cases, the [Mode.Yielding.l] is the join of the
+         yielding modes of the functor and of the enclosing structure it is
+         applied to: if it is [Unyielding], the application can never perform a
+         free effect. For includes in signatures there is no module expression
+         (and no runtime application), so the field is a conservative
+         [Yielding.max]. *)
 
 and 'a include_infos =
     {

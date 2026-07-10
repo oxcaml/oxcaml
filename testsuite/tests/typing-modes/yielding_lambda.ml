@@ -1,5 +1,5 @@
 (* TEST
-   flags = "-dlambda -dno-unique-ids";
+   flags = "-dlambda -dno-unique-ids -extension include_functor";
    expect;
 *)
 
@@ -944,4 +944,77 @@ external pipe_y : 'a @ yielding -> ('a @ yielding -> 'b) @ yielding -> 'b
     yielding_pipe))
 val yielding_pipe : 'a @ yielding -> ('a @ yielding -> 'b) @ yielding -> 'b =
   <fun>
+|}]
+
+(* [include functor] applies the functor to the enclosing structure; both are
+   at legacy (unyielding) mode here, so the synthesized application is
+   unyielding. *)
+module type S = sig
+  type t
+  val x : t
+end
+module F (M : S) = struct
+  let y = M.x
+end
+module M = struct
+  type t = int
+  let x = 42
+  include functor F
+end
+[%%expect{|
+0
+module type S = sig type t val x : t end
+(apply[unyielding] (field_imm 1 (global Toploop!)) "F/853"
+  (function {nlocal = 0} M is_a_functor never_loop
+    (let (y = (field_imm 0 M)) (makeblock 0 y))))
+module F : functor (M : S) -> sig val y : M.t end
+(let (F =? (apply[unyielding] (field_imm 0 (global Toploop!)) "F/853"))
+  (apply[unyielding] (field_imm 1 (global Toploop!)) "M/861"
+    (let (x =[value<int>] 42 include = (apply[unyielding] F (makeblock 0 x)))
+      (makeblock 0 x (field_imm 0 include)))))
+module M : sig type t = int val x : int val y : int end
+|}]
+
+(* Conversely, [include functor] is a *yielding* application when the enclosing
+   structure is yielding: here it closes over the yielding [y] through [f]. The
+   functor's parameter must be [@ yielding] to accept it (see [Uf] above). *)
+module Gf (X : sig val f : unit -> unit end @ yielding) = struct
+  let g () = X.f ()
+end
+let () =
+  Yielding.with_ (fun y ->
+    let module M = struct
+      let f () = yield y
+      include functor Gf
+    end in
+    M.g ())
+[%%expect{|
+(apply[unyielding] (field_imm 1 (global Toploop!)) "Gf/868"
+  (function {nlocal = 0} X is_a_functor never_loop
+    (let
+      (g =
+         (function {nlocal = 0} param[value<int>] : int
+           (apply (field_imm 0 X) 0)))
+      (makeblock 0 g))))
+module Gf :
+  functor (X : sig val f : unit -> unit end @ yielding) ->
+    sig val g : unit -> unit end @ yielding
+(let
+  (yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
+   Gf =? (apply[unyielding] (field_imm 0 (global Toploop!)) "Gf/868")
+   Yielding =?
+     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295")
+   *match* =[value<int>]
+     (apply[unyielding] (field_imm 0 Yielding)
+       (function {nlocal = 0} y : int
+         (let
+           (M =
+              (let
+                (f =
+                   (function {nlocal = 0} param[value<int>] : int
+                     (apply yield y))
+                 include = (apply Gf (makeblock 0 f)))
+                (makeblock 0 f (field_imm 0 include))))
+           (apply (field_imm 1 M) 0)))))
+  0)
 |}]
