@@ -342,9 +342,9 @@ let oper_arg_types : operation -> expected_arg_types = function
   | Creinterpret_cast cast -> Args [Exactly (reinterpret_cast_arg_type cast)]
   | Cstatic_cast cast -> Args [Exactly (static_cast_arg_type cast)]
   | Craise _ ->
-    (* All arguments are GC-scannable; under [ge_component], [typ_val] accepts
-       exactly [Val] and [Int]. *)
-    Any_number_of (Exactly typ_val)
+    (* The exception, followed by the extra args of the innermost exception
+       handler on the trap stack, whose machtypes are not known here. *)
+    Args_then_any_number_of ([Exactly typ_val], Any_machtype)
   | Cprobe _ -> Any_number_of Any_machtype
   | Copaque -> Any_number_of Any_machtype
   | Cprobe_is_enabled _ | Cbeginregion | Cdls_get | Ctls_get | Cdomain_index
