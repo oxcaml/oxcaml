@@ -26,6 +26,8 @@ type int_width = Cmx_format.int_width =
 
 val string_of_int_width : int_width -> string
 
+val bits_of_int_width : int_width -> int
+
 type machtype_component = Cmx_format.machtype_component =
   | Val
   | Addr

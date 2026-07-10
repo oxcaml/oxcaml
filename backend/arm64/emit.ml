@@ -1332,6 +1332,41 @@ let emit_static_cast (cast : Cmm.static_cast) i =
   let src = i.arg.(0) in
   let distinct = not (Reg.same_loc src dst) in
   match cast with
+  | Int_conv cast -> (
+    let mov (src : Reg.t) =
+      if not (Reg.same_loc src dst)
+      then A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
+    in
+    let sign_extend (w : Cmm.int_width) ~(src : Reg.t) =
+      match w with
+      | Int8 | Int16 | Int32 | Int63 ->
+        A.ins4 SBFM (H.reg_x dst) (H.reg_x src) (O.imm_six 0)
+          (O.imm_six (Cmm.bits_of_int_width w - 1))
+      | Int64 -> mov src
+    in
+    let zero_extend (w : Cmm.int_width) ~(src : Reg.t) =
+      match w with
+      | Int8 | Int16 | Int63 ->
+        A.ins4 UBFM (H.reg_x dst) (H.reg_x src) (O.imm_six 0)
+          (O.imm_six (Cmm.bits_of_int_width w - 1))
+      | Int32 -> A.ins_mov_reg_w (H.reg_w dst) (H.reg_w src)
+      | Int64 -> mov src
+    in
+    match Cmm.class_of_int_cast cast with
+    | Identity -> mov src
+    | Sign_extend w -> sign_extend w ~src
+    | Zero_extend w -> zero_extend w ~src
+    | Zero_then_sign_extend { zero_extend_from; sign_extend_from } ->
+      zero_extend zero_extend_from ~src;
+      sign_extend sign_extend_from ~src:dst)
+  | Tagged_int_of_int64 ->
+    A.ins_lsl_immediate (H.reg_x dst) (H.reg_x src) ~shift_in_bits:1;
+    A.ins3 ORR_immediate (H.reg_x dst) (H.reg_x dst) (O.bitmask 1n)
+  | Int64_of_tagged_int { signedness } -> (
+    match signedness with
+    | Signed -> A.ins_asr_immediate (H.reg_x dst) (H.reg_x src) ~shift_in_bits:1
+    | Unsigned ->
+      A.ins_lsr_immediate (H.reg_x dst) (H.reg_x src) ~shift_in_bits:1)
   | Int64_of_float Float64 -> A.ins2 FCVTZS (H.reg_x dst) (H.reg_d src)
   | Int64_of_float Float32 -> A.ins2 FCVTZS (H.reg_x dst) (H.reg_s src)
   | Float_of_int64 Float64 -> A.ins2 SCVTF (H.reg_d dst) (H.reg_x src)

@@ -304,7 +304,8 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
            _, _))
     -> [||]
   | Op (Static_cast
-          (Int64_of_float _ | Float_of_int64 _
+          (Int_conv _ | Tagged_int_of_int64 | Int64_of_tagged_int _
+          | Int64_of_float _ | Float_of_int64 _
           | Float_of_float32|Float32_of_float))
     -> [||]
   | Op (Static_cast
@@ -527,7 +528,8 @@ let operation_supported : Cmm.operation -> bool = function
                        Float32_of_float | Float_of_float32 |
                        Float32_of_int32 | Int32_of_float32 |
                        V128_of_vec Vec128)
-  | Cstatic_cast (Float_of_float32 | Float32_of_float |
+  | Cstatic_cast (Int_conv _ | Tagged_int_of_int64 | Int64_of_tagged_int _ |
+                  Float_of_float32 | Float32_of_float |
                   Int64_of_float Float32 | Float_of_int64 Float32 |
                   Float_of_int64 Float64 | Int64_of_float Float64 |
                   V128_of_scalar _ | Scalar_of_v128 _) ->
