@@ -22,7 +22,7 @@ open Config
 open Clflags
 open Misc
 open Cmm
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module String = Misc.Stdlib.String
 
 type error =

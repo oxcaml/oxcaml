@@ -189,11 +189,10 @@ end) : S = struct
     let file_sections =
       let length =
         List.fold_left
-          (fun acc info ->
-            acc + Oxcaml_utils.File_sections.length info.ui_file_sections)
+          (fun acc info -> acc + File_sections.length info.ui_file_sections)
           0 (ui :: units)
       in
-      Oxcaml_utils.File_sections.Builder.create length
+      File_sections.Builder.create length
     in
     let ui_export_info =
       Flambda2_cmx.Flambda_cmx_format.pack ~sections:file_sections
@@ -235,8 +234,7 @@ end) : S = struct
         ui_zero_alloc_info;
         ui_external_symbols =
           union (List.map (fun info -> info.ui_external_symbols) units);
-        ui_file_sections =
-          Oxcaml_utils.File_sections.Builder.build file_sections
+        ui_file_sections = File_sections.Builder.build file_sections
       }
     in
     Compilenv.write_unit_info pkg_infos cmxfile

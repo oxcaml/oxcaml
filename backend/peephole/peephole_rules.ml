@@ -2,7 +2,7 @@
 [@@@ocaml.warning "+a-29-40-41-42-4"]
 
 open! Int_replace_polymorphic_compare
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module U = Peephole_utils
 
 let delete_fst_if_redundant ~fst ~snd ~(fst_val : Cfg.basic Cfg.instruction)
