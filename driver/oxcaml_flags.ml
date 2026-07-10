@@ -588,6 +588,9 @@ let cached_generic_functions_path =
 let dissector_assume_lld_without_64_bit_eh_frames = ref true
   (* -[no-]dissector-assume-lld-without-64-bit-eh-frames *)
 
+let dissector_max_linker_parallelism = ref Misc.Maybe_bounded.Unbounded
+  (* -dissector-max-linker-parallelism *)
+
 let manual_module_init = ref false
   (* -[no-]manual-module-init *)
 

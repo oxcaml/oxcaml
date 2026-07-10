@@ -27,6 +27,14 @@ let command cmdline =
 
 let run_command cmdline = ignore(command cmdline)
 
+let start_command ~spawn cmdline =
+  if !Clflags.verbose then begin
+    prerr_string "+ ";
+    prerr_string cmdline;
+    prerr_newline()
+  end;
+  spawn "/bin/sh" [| "/bin/sh"; "-c"; cmdline |]
+
 (* Build @responsefile to work around OS limitations on
    command-line length.
    Under Windows, the max length is 8187 minus the length of the

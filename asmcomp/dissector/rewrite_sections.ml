@@ -43,15 +43,14 @@ let int64_to_int value =
     Misc.fatal_errorf "Dissector: offset %Ld exceeds platform int range" value
   else Int64.to_int value
 
-let write_symbol ~cursor ~strtab sym =
-  let module SE = FRP.Symbol_entry in
+let write_symbol ~cursor ~strtab (sym : Elf.symbol) =
   Rela.write_sym_entry ~cursor
-    { st_name = Strtab.add strtab (SE.name sym);
-      st_info = SE.st_info sym;
-      st_other = SE.st_other sym;
-      st_shndx = SE.st_shndx sym;
-      st_value = SE.st_value sym;
-      st_size = SE.st_size sym
+    { st_name = Strtab.add strtab sym.name;
+      st_info = sym.st_info;
+      st_other = sym.st_other;
+      st_shndx = sym.st_shndx;
+      st_value = sym.st_value;
+      st_size = sym.st_size
     }
 
 (* When section_index >= SHN_LORESERVE, we must use SHN_XINDEX and store the
@@ -61,8 +60,8 @@ let write_synthetic_symbol ~cursor ~strtab ~name ~section_index ~offset ~size
   let section_index' = Rela.Section_index.of_int section_index in
   let st_shndx =
     if Rela.Section_index.needs_extended section_index'
-    then Rela.Section_index.(to_int xindex)
-    else section_index
+    then Rela.Section_index.xindex
+    else section_index'
   in
   Rela.write_sym_entry ~cursor
     { st_name = Strtab.add strtab name;
@@ -83,12 +82,11 @@ let write_rela ~cursor ~symbol_to_index ~r_offset ~symbol ~r_type ~r_addend =
   Rela.write_rela_entry ~cursor
     { r_offset = Int64.of_int r_offset; r_sym; r_type; r_addend }
 
-let execute_plan unix ~input_file ~output_file ~header ~sections
-    ~shstrtab_section ~igot_and_iplt ~plan =
+let execute_plan unix ~input_buf ~output_file ~header ~sections ~igot_and_iplt
+    ~plan =
   let module Unix = (val unix : Compiler_owee.Unix_intf.S) in
   let module SL = FRP.Section_layout in
   let module L = FRP.Layout in
-  let input_buf = Buf.map_binary (module Unix) input_file in
   let layout = FRP.layout plan in
   let output_buf =
     Buf.map_binary_write
@@ -225,18 +223,22 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
   | None, None -> ()
   | Some _, None ->
     Misc.fatal_error "SYMTAB_SHNDX in input but no layout allocated");
-  (* Write rewritten .rela.text* sections back to their original locations *)
+  (* Write the changed .rela.text* entries back to their original locations. The
+     unchanged entries are already in place, copied by the blit above. *)
   List.iter
     (fun rewritten_section ->
-      let cursor =
-        Buf.cursor output_buf
-          ~at:
-            (int64_to_int
-               (FRP.Rewritten_rela_section.section_offset rewritten_section))
+      let section_offset =
+        int64_to_int
+          (FRP.Rewritten_rela_section.section_offset rewritten_section)
       in
       List.iter
-        (fun e -> Rela.write_rela_entry ~cursor e)
-        (FRP.Rewritten_rela_section.entries rewritten_section))
+        (fun (index, e) ->
+          let cursor =
+            Buf.cursor output_buf
+              ~at:(section_offset + (index * Rela.rela_entry_size))
+          in
+          Rela.write_rela_entry ~cursor e)
+        (FRP.Rewritten_rela_section.changed_entries rewritten_section))
     (FRP.rewritten_rela_sections plan);
   Buf.Write.fixed_bytes
     (Buf.cursor output_buf ~at:(int64_to_int (SL.offset shstrtab_layout)))
@@ -351,44 +353,17 @@ let execute_plan unix ~input_file ~output_file ~header ~sections
   in
   Elf.write_elf output_buf new_header new_sections
 
-(* Find all sections with names starting with prefix *)
-let find_sections_with_prefix sections prefix =
-  Array.to_list sections
-  |> List.filter (fun (section : Elf.section) ->
-      String.starts_with ~prefix section.sh_name_str)
-
-let rewrite unix ~input_file ~output_file ~partition_kind ~igot_and_iplt
-    ~relocations =
-  let module Unix = (val unix : Compiler_owee.Unix_intf.S) in
-  let input_buf = Buf.map_binary (module Unix) input_file in
-  let header, sections = Elf.read_elf input_buf in
-  let symtab_section =
-    match
-      Array.find_opt
-        (fun (s : Elf.section) ->
-          Elf.Section_type.(equal (of_u32 s.sh_type) sht_symtab))
-        sections
-    with
-    | Some s -> s
-    | None -> Misc.fatal_error "rewrite_sections: no symbol table found"
-  in
-  let strtab_section = sections.(symtab_section.sh_link) in
-  (* Find all .rela.text* sections (handles function sections) *)
-  let rela_text_section_list =
-    find_sections_with_prefix sections ".rela.text"
-  in
-  let shstrtab_section = sections.(header.e_shstrndx) in
-  let symtab_body = Elf.section_body input_buf symtab_section in
-  let strtab_body = Elf.section_body input_buf strtab_section in
-  (* Build list of (section, body) pairs *)
-  let rela_text_sections =
-    List.map
-      (fun section -> section, Elf.section_body input_buf section)
-      rela_text_section_list
-  in
+let rewrite unix ~mapped_partition_file ~output_file ~partition_kind
+    ~igot_and_iplt ~relocations =
+  let module MPF = Extract_relocations.Mapped_object_file in
+  let header = MPF.header mapped_partition_file in
+  let sections = MPF.sections mapped_partition_file in
+  let symbols = MPF.symbols mapped_partition_file in
+  let rela_text_sections = MPF.rela_text_sections mapped_partition_file in
+  let input_buf = MPF.buf mapped_partition_file in
   let plan =
-    FRP.compute ~header ~sections ~symtab_body ~strtab_body ~rela_text_sections
-      ~partition_kind ~igot_and_iplt ~relocations
+    FRP.compute ~header ~sections ~symbols ~rela_text_sections ~partition_kind
+      ~igot_and_iplt ~relocations
   in
-  execute_plan unix ~input_file ~output_file ~header ~sections ~shstrtab_section
-    ~igot_and_iplt ~plan
+  execute_plan unix ~input_buf ~output_file ~header ~sections ~igot_and_iplt
+    ~plan

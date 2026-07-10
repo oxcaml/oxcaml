@@ -16,6 +16,17 @@
 
 open Import
 
+(* Eta-expansion gives [create_process] and [waitpid] the unannotated types
+   required by [Compiler_owee.Unix_intf.S]. *)
+module Unix_for_owee = struct
+  include Unix
+
+  let create_process prog args stdin stdout stderr =
+    Unix.create_process prog args stdin stdout stderr
+
+  let waitpid flags pid = Unix.waitpid flags pid
+end
+
 type evaluation_outcome = Result of Obj.t | Exception of exn
 
 let outcome_global : evaluation_outcome option ref = ref None
@@ -300,7 +311,7 @@ let jit_load_lambda ~phrase_name ppf (program : Lambda.program) =
       (Flambda2.lambda_to_cmm ~machine_width ~keep_symbol_tables:true)
   in
   Asmgen.compile_implementation
-    (module Unix : Compiler_owee.Unix_intf.S)
+    (module Unix_for_owee : Compiler_owee.Unix_intf.S)
     ~toplevel:need_symbol ~pipeline ~sourcefile:(Some filename)
     ~prefixname:filename ~ppf_dump:ppf program;
   match !outcome_global with

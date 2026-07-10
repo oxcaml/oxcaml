@@ -45,4 +45,26 @@ module type S = sig
     ('a, 'b, 'c) Stdlib.Bigarray.Genarray.t
 
   val getpid : unit -> int
+
+  val stdin : file_descr
+
+  val stdout : file_descr
+
+  val stderr : file_descr
+
+  val create_process :
+    string -> string array -> file_descr -> file_descr -> file_descr -> int
+
+  type wait_flag =
+      WNOHANG
+    | WUNTRACED
+
+  type process_status =
+      WEXITED of int
+    | WSIGNALED of int
+    | WSTOPPED of int
+
+  val waitpid : wait_flag list -> int -> int * process_status
+
+  val kill : int -> int -> unit
 end
