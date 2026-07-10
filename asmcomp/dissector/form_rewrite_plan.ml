@@ -335,13 +335,13 @@ let compute_file_layout ~original_data_end ~igot_and_iplt ~total_symbols
   let iplt_t = Build_igot_and_iplt.iplt igot_and_iplt in
   let igot = alloc 16 (Igot.section_size igot_t) in
   let rela_igot =
-    let count = List.length (Igot.relocations igot_t) in
-    alloc 8 (count * Rela.rela_entry_size)
+    (* One relocation per IGOT entry *)
+    alloc 8 (Igot.num_entries igot_t * Rela.rela_entry_size)
   in
   let iplt = alloc 16 (Iplt.section_size iplt_t) in
   let rela_iplt =
-    let count = List.length (Iplt.relocations iplt_t) in
-    alloc 8 (count * Rela.rela_entry_size)
+    (* One relocation per IPLT entry *)
+    alloc 8 (Iplt.num_entries iplt_t * Rela.rela_entry_size)
   in
   let symtab = alloc 8 (total_symbols * Rela.sym_entry_size) in
   (* Allocate SYMTAB_SHNDX section if input has one *)
