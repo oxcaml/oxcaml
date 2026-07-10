@@ -43,15 +43,14 @@ let int64_to_int value =
     Misc.fatal_errorf "Dissector: offset %Ld exceeds platform int range" value
   else Int64.to_int value
 
-let write_symbol ~cursor ~strtab sym =
-  let module SE = FRP.Symbol_entry in
+let write_symbol ~cursor ~strtab (sym : Elf.symbol) =
   Rela.write_sym_entry ~cursor
-    { st_name = Strtab.add strtab (SE.name sym);
-      st_info = SE.st_info sym;
-      st_other = SE.st_other sym;
-      st_shndx = SE.st_shndx sym;
-      st_value = SE.st_value sym;
-      st_size = SE.st_size sym
+    { st_name = Strtab.add strtab sym.name;
+      st_info = sym.st_info;
+      st_other = sym.st_other;
+      st_shndx = sym.st_shndx;
+      st_value = sym.st_value;
+      st_size = sym.st_size
     }
 
 (* When section_index >= SHN_LORESERVE, we must use SHN_XINDEX and store the

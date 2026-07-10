@@ -555,9 +555,18 @@ let find_symbol_table buf sections =
   | None -> None
   | Some symtab -> Some (Symbol_table.create [symtab])
 
-let iter_symbols ~symtab_body ~strtab_body ~f =
+type symbol = {
+  name : string;
+  st_info : int;
+  st_other : int;
+  st_shndx : int;
+  st_value : int64;
+  st_size : int64;
+}
+
+let read_symbols ~symtab_body ~strtab_body =
   let num_symbols = (size symtab_body) / Symbol_table.Symbol.struct_size in
-  for i = 0 to num_symbols - 1 do
+  Array.init num_symbols (fun i ->
     let sym_cursor = cursor symtab_body ~at:(i * Symbol_table.Symbol.struct_size) in
     let st_name_offset = Read.u32 sym_cursor in
     let st_info = Read.u8 sym_cursor in
@@ -574,8 +583,7 @@ let iter_symbols ~symtab_body ~strtab_body ~f =
         | Some s -> s
         | None -> ""
     in
-    f ~name ~st_info ~st_other ~st_shndx ~st_value ~st_size
-  done
+    { name; st_info; st_other; st_shndx; st_value; st_size })
 
 (* Extract section body as a string *)
 let section_body_string buf section =

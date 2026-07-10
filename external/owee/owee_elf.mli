@@ -242,21 +242,21 @@ end
     from the given ELF buffer and section array. *)
 val find_symbol_table : Owee_buf.t -> section array -> Symbol_table.t option
 
-(** [iter_symbols ~symtab_body ~strtab_body ~f] iterates over all symbols in
-    the symbol table, calling [f] with each symbol's name and raw fields.
-    This is a lower-level interface than Symbol_table for cases where you need
-    to process all symbols sequentially. *)
-val iter_symbols :
-  symtab_body:Owee_buf.t ->
-  strtab_body:Owee_buf.t ->
-  f:(name:string ->
-     st_info:int ->
-     st_other:int ->
-     st_shndx:int ->
-     st_value:int64 ->
-     st_size:int64 ->
-     unit) ->
-  unit
+(** A symbol table entry with its name resolved from the string table.
+    Symbols with a missing or unreadable name have [name = ""]. *)
+type symbol = {
+  name : string;
+  st_info : int;
+  st_other : int;
+  st_shndx : int;
+  st_value : int64;
+  st_size : int64;
+}
+
+(** [read_symbols ~symtab_body ~strtab_body] reads the whole symbol table
+    into an array, indexed by symbol index. *)
+val read_symbols :
+  symtab_body:Owee_buf.t -> strtab_body:Owee_buf.t -> symbol array
 
 (** Extract section body as a string. *)
 val section_body_string : Owee_buf.t -> section -> string

@@ -39,29 +39,6 @@ let align_up64 value alignment =
   let mask = Int64.sub alignment 1L in
   Int64.logand (Int64.add value mask) (Int64.lognot mask)
 
-module Symbol_entry = struct
-  type t =
-    { name : string;
-      st_info : int;
-      st_other : int;
-      st_shndx : int;
-      st_value : int64;
-      st_size : int64
-    }
-
-  let name s = s.name
-
-  let st_info s = s.st_info
-
-  let st_other s = s.st_other
-
-  let st_shndx s = s.st_shndx
-
-  let st_value s = s.st_value
-
-  let st_size s = s.st_size
-end
-
 module Section_layout = struct
   type t =
     { offset : int64;
@@ -121,7 +98,7 @@ module Rewritten_rela_section = struct
 end
 
 type t =
-  { original_symbols : Symbol_entry.t array;
+  { original_symbols : Elf.symbol array;
     symbol_to_index : int String.Tbl.t;
     total_symbols : int;
     rewritten_rela_sections : Rewritten_rela_section.t list;
@@ -200,20 +177,11 @@ let symtab_shndx_name_offset t = t.symtab_shndx_name_offset
 
 let layout t = t.layout
 
-let read_symbols ~symtab_body ~strtab_body =
-  let symbols = ref [] in
-  Elf.iter_symbols ~symtab_body ~strtab_body
-    ~f:(fun ~name ~st_info ~st_other ~st_shndx ~st_value ~st_size ->
-      symbols
-        := { Symbol_entry.name; st_info; st_other; st_shndx; st_value; st_size }
-           :: !symbols);
-  Array.of_list (List.rev !symbols)
-
 let build_symbol_index_map ~original_symbols ~igot_and_iplt strtab =
   let symbol_to_index = String.Tbl.create 256 in
   Array.iteri
-    (fun index sym ->
-      let name = Symbol_entry.name sym in
+    (fun index (sym : Elf.symbol) ->
+      let name = sym.name in
       if not (String.Tbl.mem symbol_to_index name)
       then String.Tbl.add symbol_to_index name index;
       ignore (Strtab.add strtab name))
@@ -403,7 +371,7 @@ let compute ~header ~sections ~symtab_body ~strtab_body ~rela_text_sections
     ~partition_kind ~igot_and_iplt ~relocations =
   log_verbose "forming rewrite plan for partition %s"
     (Partition.symbol_prefix partition_kind);
-  let original_symbols = read_symbols ~symtab_body ~strtab_body in
+  let original_symbols = Elf.read_symbols ~symtab_body ~strtab_body in
   let strtab = Strtab.create () in
   let symbol_to_index, total_symbols =
     build_symbol_index_map ~original_symbols ~igot_and_iplt strtab
