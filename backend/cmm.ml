@@ -38,11 +38,11 @@ let equal_int_width x y =
   | (Int64 | Int63 | Int32 | Int16 | Int8), _ -> false
 
 let string_of_int_width = function
-  | Int64 -> "Int64"
-  | Int63 -> "Int63"
-  | Int32 -> "Int32"
-  | Int16 -> "Int16"
-  | Int8 -> "Int8"
+  | Int64 -> "int64"
+  | Int63 -> "int63"
+  | Int32 -> "int32"
+  | Int16 -> "int16"
+  | Int8 -> "int8"
 
 type machtype_component = Cmx_format.machtype_component =
   | Val
