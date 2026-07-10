@@ -2158,11 +2158,22 @@ module Const = struct
               With_bounds.add type_ { relevant_axes } base.with_bounds
           }
         | Overapproximate_to_top ->
-          (* A [with]-bound can only raise the bounds of its base, so raising
-             them all to the top over-approximates it. *)
-          { base = base.base;
+          (* A with-bound weakens the mod-bounds, so a safe approximation is to
+             drop the with-bounds and raise the mod-bounds to [max]. *)
+          let expanded = Base_and_axes.fully_expand_aliases_const env base in
+          let base =
+            match expanded.base with
+            | Layout _ as b -> b
+            | Kconstr (_, sa) ->
+              (* However, we can't raise the mod-bounds of a truly-abstract
+                 [Kconstr] because its mod-bounds can be further narrowed by
+                 substitution. Instead, we approximate the layout as as [any].
+              *)
+              Layout (Layout.Const.Any sa)
+          in
+          { base;
             mod_bounds = Mod_bounds.max;
-            with_bounds = base.with_bounds
+            with_bounds = expanded.with_bounds
           }))
     | Pjk_default | Pjk_kind_of _ ->
       raise ~loc:jkind.pjka_loc Unimplemented_syntax
