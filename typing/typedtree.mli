@@ -1013,12 +1013,15 @@ and functor_parameter =
 and module_expr_desc =
     Tmod_ident of Path.t * Longident.t loc
   | Tmod_structure of structure
-  | Tmod_functor of functor_parameter * module_expr
+  | Tmod_functor of functor_parameter * module_expr * Mode.Staticity.r
+    (** The [Mode.Staticity.r] is the staticity of the functor. *)
   | Tmod_apply of
       module_expr * module_expr * module_coercion * Mode.Yielding.l
+      * Mode.Staticity.r
         (** The [Mode.Yielding.l] is the join of the yielding modes of the
             functor and its argument: if it is [Unyielding], applying the
-            functor can never perform a free effect. *)
+            functor can never perform a free effect. The [Mode.Staticity.r] is
+            the staticity of the application. *)
   | Tmod_apply_unit of module_expr * Mode.Yielding.l
   | Tmod_constraint of
       module_expr * Types.module_type * module_type_constraint * module_coercion

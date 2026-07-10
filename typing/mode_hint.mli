@@ -31,6 +31,7 @@ type pinpoint_desc =
   | Function  (** A function definition *)
   | Module  (** A module definition *)
   | Functor  (** A functor definition *)
+  | Functor_parameter  (** A functor parameter *)
   | Structure  (** A structure definition *)
   | Lazy  (** A lazy expression *)
   | Quote  (** A quoted expression *)
@@ -58,6 +59,7 @@ type mutable_part =
 type always_dynamic =
   | Application
   | Try_with
+  | Generative_functor
 
 type legacy =
   | Compilation_unit
@@ -170,6 +172,12 @@ type 'd morph =
      submode calls, each constructor only needs to store the info of its source
      pinpoint. *)
   | Crossing : ('l * 'r) morph
+  | Functor_to_parameter : Location.t -> ('l * 'r) morph
+      (** The identity morphism connecting a functor's staticity to its
+          parameter's. Carries the functor's location. *)
+  | Parameter_to_functor : Location.t -> ('l * 'r) morph
+      (** The identity morphism connecting a parameter's staticity to the
+          functor's. Carries the parameter's location. *)
   | Allocation_r : allocation -> (disallowed * 'r) morph
   | Allocation_l : allocation -> ('l * disallowed) morph
   | Allocation : allocation -> ('l * 'r) morph
