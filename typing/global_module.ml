@@ -164,7 +164,7 @@ end = struct
       Misc.fatal_errorf "Names of instance arguments must be unique:@ %a"
         (Fmt.compat print) { head; args }
 
-  let create_no_args head = create_exn head []
+  let create_no_args head = { head; args = [] }
 
   let of_parameter_name param = create_no_args param
 
