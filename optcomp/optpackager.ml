@@ -187,20 +187,18 @@ end) : S = struct
       Compilenv.build_unit_info ~main_module_block_format ~arg_descr:None
     in
     let file_sections =
-      Oxcaml_utils.File_sections.Builder.of_file_sections ui.ui_file_sections
-    in
-    let section_id_mapping =
-      List.map
-        (fun info ->
-          Oxcaml_utils.File_sections.Builder.add_all file_sections
-            info.ui_file_sections)
-        units
+      let length =
+        List.fold_left
+          (fun acc info ->
+            acc + Oxcaml_utils.File_sections.length info.ui_file_sections)
+          0 (ui :: units)
+      in
+      Oxcaml_utils.File_sections.Builder.create length
     in
     let ui_export_info =
-      List.fold_left2
-        (fun acc info map ->
-          Flambda2_cmx.Flambda_cmx_format.append acc (info.ui_export_info, map))
-        ui.ui_export_info units section_id_mapping
+      Flambda2_cmx.Flambda_cmx_format.pack ~sections:file_sections
+        (Compilenv.get_export_info ui
+        :: List.map Compilenv.get_export_info units)
     in
     let ui_zero_alloc_info = Zero_alloc_info.create () in
     List.iter

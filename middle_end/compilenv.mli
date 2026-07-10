@@ -36,6 +36,8 @@ val current_generic_fns : unit -> generic_fns
 val current_sections : unit -> Oxcaml_utils.File_sections.Builder.t
         (* Return the file sections builder for the unit being compiled. *)
 
+val get_export_info : unit_infos -> Flambda2_cmx.Flambda_cmx_format.t option
+
 val get_global_export_info : Compilation_unit.t
   -> Flambda2_cmx.Flambda_cmx_format.t option
         (* Means of getting the export info found in the

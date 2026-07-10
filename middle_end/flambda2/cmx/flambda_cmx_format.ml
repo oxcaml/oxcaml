@@ -36,11 +36,13 @@ type t0 =
     table_data : table_data
   }
 
-type raw = t0 list
+type raw = File_sections.Idx.t
 
-type t = raw * File_sections.t
+type t = t0 list * File_sections.t
 
-let from_raw ~sections t = t, sections
+let from_raw ~sections raw = Obj.obj (File_sections.get sections raw), sections
+
+let to_raw ~sections t = File_sections.Builder.add sections (Obj.repr t)
 
 let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
     ~sections =
@@ -91,13 +93,16 @@ let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
       ~add_section:(File_sections.Builder.add sections)
       all_code
   in
-  [ { original_compilation_unit = Compilation_unit.get_current_exn ();
-      final_typing_env;
-      all_code;
-      exported_offsets;
-      used_value_slots;
-      table_data
-    } ]
+  let t =
+    [ { original_compilation_unit = Compilation_unit.get_current_exn ();
+        final_typing_env;
+        all_code;
+        exported_offsets;
+        used_value_slots;
+        table_data
+      } ]
+  in
+  to_raw ~sections t
 
 module Make_importer (S : sig
   type t
@@ -206,24 +211,53 @@ let with_exported_offsets (t, sections) exported_offsets =
   | [] | _ :: _ :: _ ->
     Misc.fatal_error "Cannot set exported offsets on multiple units"
 
-let append t1_opt (t2_opt, idx_mapper) =
-  match t1_opt, t2_opt with
-  | None, None -> None
-  | Some _, None | None, Some _ ->
-    (* CR vlaviron: turn this into a proper user error *)
-    Misc.fatal_error
-      "Some pack units do not have their export info set.\n\
-       Flambda doesn't support packing opaque and normal units together."
-  | Some t1, Some t2 ->
-    let t2 =
-      List.map
-        (fun t0 ->
-          { t0 with
-            all_code = Exported_code.map_raw_index idx_mapper t0.all_code
-          })
-        t2
+let pack ~sections (units : t option list) =
+  (* CR vlaviron: turn this into a proper user error *)
+  match units with
+  | None :: _ ->
+    if List.for_all Option.is_none units
+    then None
+    else
+      Misc.fatal_error
+        "Some pack units do not have their export info set.\n\
+         Flambda doesn't support packing opaque and normal units together."
+  | _ ->
+    let t =
+      List.fold_right
+        (fun unit_opt t ->
+          let t2_old, unit_sections =
+            match unit_opt with
+            | Some unit -> unit
+            | None ->
+              Misc.fatal_error
+                "Some pack units do not have their export info set.\n\
+                 Flambda doesn't support packing opaque and normal units \
+                 together."
+          in
+          let idx_map = Hashtbl.create (File_sections.length unit_sections) in
+          let idx_mapper old_idx =
+            match Hashtbl.find_opt idx_map old_idx with
+            | Some new_idx -> new_idx
+            | None ->
+              let new_idx =
+                File_sections.Builder.add sections
+                  (File_sections.get unit_sections old_idx)
+              in
+              Hashtbl.add idx_map old_idx new_idx;
+              new_idx
+          in
+          let t2_new =
+            List.map
+              (fun t0 ->
+                { t0 with
+                  all_code = Exported_code.map_raw_index idx_mapper t0.all_code
+                })
+              t2_old
+          in
+          t2_new @ t)
+        units []
     in
-    Some (t1 @ t2)
+    Some (to_raw ~sections t)
 
 let print0 ~sections ~print_typing_env ~print_code ~print_offsets ppf t =
   Format.fprintf ppf "@[<hov>Original unit:@ %a@]@;"
