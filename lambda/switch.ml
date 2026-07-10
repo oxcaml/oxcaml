@@ -967,7 +967,9 @@ let rec pkey chan  = function
 
   let do_zyva loc kind (low,high) arg cases actions =
     let old_ok = !ok_inter in
-    ok_inter := (abs low <= inter_limit && abs high <= inter_limit) ;
+    ok_inter :=
+      -inter_limit <= low && low <= inter_limit
+      && -inter_limit <= high && high <= inter_limit ;
     if !ok_inter <> old_ok then Hashtbl.clear t ;
 
     let s = {cases=cases ; actions=actions} in

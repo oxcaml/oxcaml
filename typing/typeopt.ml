@@ -984,23 +984,9 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
         in
         (is_mutable, num_nodes_visited), fields
     in
-    let is_constant (cstr: Types.constructor_declaration) =
-      let all_void_opt sort =
-        match sort with
-        | Some sort -> Jkind.Sort.Const.all_void sort
-        | None ->
-          (* CR rtjoa: It's important to NOT treat constructors with
-             any-args-refined-to-void as constant, as those are represented as
-             blocks rather than immediates. This footgun should no longer exist
-             once we make all-void constructors no longer immediate. *)
-          false
-      in
-      match cstr.cd_args with
-      | Cstr_tuple [] -> true
-      | Cstr_tuple args ->
-        List.for_all (fun ca -> all_void_opt ca.ca_sort) args
-      | Cstr_record lbls ->
-        List.for_all (fun lbl -> all_void_opt lbl.ld_sort) lbls
+    let constant_runtime_tags =
+      Datarepr.constant_constructor_runtime_tags_for_boxed_variant cstrs
+        cstr_layouts
     in
     let rec mixed_block_shape_is_empty shape =
       Array.for_all mixed_block_element_is_empty shape
@@ -1010,17 +996,23 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       | _ -> false
     in
     let num_nodes_visited, raw_kind =
-    if List.for_all is_constant cstrs then
+    if Array.for_all Option.is_some constant_runtime_tags then
       (num_nodes_visited, Pintval)
     else
+      let add_const idx num_nodes_visited consts next_tag non_consts =
+        match constant_runtime_tags.(idx) with
+        | Some tag ->
+          let consts = tag :: consts in
+          Some (num_nodes_visited, consts, next_tag, non_consts)
+        | None -> Misc.fatal_error "Missing constant constructor tag"
+      in
       let _idx, result =
         List.fold_left
           (fun (idx, result) (constructor : Types.constructor_declaration) ->
           idx+1,
           match result with
           | None -> None
-          | Some (num_nodes_visited,
-                  next_const, consts, next_tag, non_consts) ->
+          | Some (num_nodes_visited, consts, next_tag, non_consts) ->
             let ~variable_repr, cstr_shape_opt, constructor =
               match cstr_layouts.(idx) with
               | Cstr_layout_known { shape; _ } ->
@@ -1048,9 +1040,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
                 else match fields with
                 | Constructor_uniform xs
                     when List.compare_length_with xs 0 = 0 ->
-                  let consts = next_const :: consts in
-                  Some (num_nodes_visited,
-                        next_const + 1, consts, next_tag, non_consts)
+                  add_const idx num_nodes_visited consts next_tag non_consts
                 | Constructor_mixed shape
                     when mixed_block_shape_is_empty shape
                          && not variable_repr ->
@@ -1059,21 +1049,18 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
                      constant, as those are represented as blocks rather than
                      immediates. This footgun should no longer exist once we
                      make all-void constructors no longer immediate. *)
-                  let consts = next_const :: consts in
-                  Some (num_nodes_visited,
-                        next_const + 1, consts, next_tag, non_consts)
+                  add_const idx num_nodes_visited consts next_tag non_consts
                 | Constructor_mixed _ | Constructor_uniform _ ->
                   let non_consts =
                     (next_tag, fields) :: non_consts
                   in
-                  Some (num_nodes_visited,
-                        next_const, consts, next_tag + 1, non_consts))
-          (0, Some (num_nodes_visited, 0, [], 0, []))
+                  Some (num_nodes_visited, consts, next_tag + 1, non_consts))
+          (0, Some (num_nodes_visited, [], 0, []))
           cstrs
       in
       begin match result with
       | None -> (num_nodes_visited, Pgenval)
-      | Some (num_nodes_visited, _, consts, _, non_consts) ->
+      | Some (num_nodes_visited, consts, _, non_consts) ->
         match non_consts with
         | [] ->
           (* CR rtjoa: An refined any-constructor shouldn't become constant.

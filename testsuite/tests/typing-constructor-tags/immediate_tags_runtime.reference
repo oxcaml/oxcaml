@@ -10,3 +10,42 @@ default
 I0
 mixed default
 mixed default
+Neg:-1:negative
+Zero:0:nonnegative
+High:4:nonnegative
+BRmin:-4611686018427387904
+BRmax:4611686018427387903
+boundary partial:boundary zero
+boundary partial:Match_failure
+VP:7
+VZ:0
+Sneg
+Szero
+Shigh
+Sblock 42
+Sneg:-2
+Szero:0
+Shigh:5
+partial:only Sneg
+partial:Match_failure
+partial:Match_failure
+partial:Match_failure
+sparse negative
+sparse default
+sparse high
+sparse default
+many negative
+many default
+many high
+many mixed negative
+many mixed default
+many mixed high
+many mixed block 42
+compare Oa Ob:1
+compare Ob Oc:-1
+compare Oc Oa:-1
+eq Oa Oa:true Oa Ob:false
+sort: Ob Oc Oa
+set: Ob Oc Oa
+hash Oa=hash 5:true Oa=hash Ob:false
+gadt:Gi:9 Gb:-2 Gu:0

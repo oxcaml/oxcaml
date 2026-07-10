@@ -7,8 +7,17 @@ type dense =
   | B
   | C [@tag 1]
 
+let int_of_dense (x : dense) : int = Obj.magic x
+
+let observed = List.map int_of_dense [ A; B; C ]
+
+let matched = List.map (function A -> "A" | B -> "B" | C -> "C") [ A; B; C ]
+
 [%%expect {|
 type dense = A [@tag 2] | B | C [@tag 1]
+val int_of_dense : dense -> int = <fun>
+val observed : int list = [2; 0; 1]
+val matched : string list = ["A"; "B"; "C"]
 |}]
 
 module Matching_annotation : sig
@@ -23,6 +32,36 @@ end
 
 [%%expect {|
 module Matching_annotation : sig type t = A | B end
+|}]
+
+module Mismatching_annotation : sig
+  type t =
+    | A
+    | B
+end = struct
+  type t =
+    | A [@tag 1]
+    | B
+end
+
+[%%expect {|
+Lines 5-9, characters 6-3:
+5 | ......struct
+6 |   type t =
+7 |     | A [@tag 1]
+8 |     | B
+9 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = A [@tag 1] | B end
+       is not included in
+         sig type t = A | B end
+       Type declarations do not match:
+         type t = A [@tag 1] | B
+       is not included in
+         type t = A | B
+       Their internal representations differ:
+       constructor "A" has tag 1 in the first declaration, but tag 0 in the second declaration.
 |}]
 
 type duplicate =
@@ -46,24 +85,112 @@ Line 2, characters 18-21:
 Error: The [@tag] attribute cannot be repeated
 |}]
 
-type negative = N [@tag (-1)]
+type signed_sparse =
+  | Neg [@tag (-1)]
+  | Zero
+  | High [@tag 4]
+
+let int_of_signed_sparse (x : signed_sparse) : int = Obj.magic x
+
+let signed_observed =
+  List.map int_of_signed_sparse [ Neg; Zero; High ]
+
+let signed_matched =
+  List.map
+    (function Neg -> "Neg" | Zero -> "Zero" | High -> "High")
+    [ Neg; Zero; High ]
 
 [%%expect {|
-Line 1, characters 18-29:
-1 | type negative = N [@tag (-1)]
-                      ^^^^^^^^^^^
-Error: Negative [@tag] constructor tags are not supported yet
+type signed_sparse = Neg [@tag -1] | Zero | High [@tag 4]
+val int_of_signed_sparse : signed_sparse -> int = <fun>
+val signed_observed : int list = [-1; 0; 4]
+val signed_matched : string list = ["Neg"; "Zero"; "High"]
 |}]
 
-type sparse =
-  | S0 [@tag 3]
-  | S1
+type printed_negative = PN [@tag -1]
 
 [%%expect {|
-Line 2, characters 7-15:
-2 |   | S0 [@tag 3]
-           ^^^^^^^^
-Error: This [@tag] constructor tag is sparse; in this version tags must form the dense range 0 to 1
+type printed_negative = PN [@tag -1]
+|}]
+
+type boundary =
+  | Min [@tag (-4611686018427387904)]
+  | Max [@tag 4611686018427387903]
+
+let int_of_boundary (x : boundary) : int = Obj.magic x
+
+let boundary_observed = List.map int_of_boundary [ Min; Max ]
+
+[%%expect {|
+type boundary =
+    Min
+  [@tag -4611686018427387904]
+  | Max
+  [@tag 4611686018427387903]
+val int_of_boundary : boundary -> int = <fun>
+val boundary_observed : int list =
+  [-4611686018427387904; 4611686018427387903]
+|}]
+
+module Matching_signed_sparse_annotation : sig
+  type t =
+    | Neg [@tag (-1)]
+    | Zero
+    | High [@tag 4]
+end = struct
+  type t =
+    | Neg [@tag -1]
+    | Zero
+    | High [@tag 4]
+end
+
+[%%expect {|
+module Matching_signed_sparse_annotation :
+  sig type t = Neg [@tag -1] | Zero | High [@tag 4] end
+|}]
+
+module Mismatching_signed_sparse_annotation : sig
+  type t =
+    | Neg [@tag (-1)]
+    | Zero
+    | High [@tag 4]
+end = struct
+  type t =
+    | Neg [@tag (-1)]
+    | Zero [@tag 4]
+    | High
+end
+
+[%%expect {|
+Lines 6-11, characters 6-3:
+ 6 | ......struct
+ 7 |   type t =
+ 8 |     | Neg [@tag (-1)]
+ 9 |     | Zero [@tag 4]
+10 |     | High
+11 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = Neg [@tag -1] | Zero [@tag 4] | High end
+       is not included in
+         sig type t = Neg [@tag -1] | Zero | High [@tag 4] end
+       Type declarations do not match:
+         type t = Neg [@tag -1] | Zero [@tag 4] | High
+       is not included in
+         type t = Neg [@tag -1] | Zero | High [@tag 4]
+       Their internal representations differ:
+       constructor "Zero" has tag 4 in the first declaration, but tag 0 in the second declaration.
+|}]
+
+type duplicate_negative =
+  | DN0 [@tag (-1)]
+  | DN1 [@tag (-1)]
+
+[%%expect {|
+Line 3, characters 8-19:
+3 |   | DN1 [@tag (-1)]
+            ^^^^^^^^^^^
+Error: Two constructors cannot use the same [@tag] value -1
 |}]
 
 type bad_payload = Bad [@tag "not an int"]

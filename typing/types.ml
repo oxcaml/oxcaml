@@ -485,7 +485,7 @@ and ('lbl, 'lbl_flat, 'cstr) type_kind =
   | Type_open
 
 and tag = Ordinary of {src_index: int;     (* Unique name (per type) *)
-                       runtime_tag: int}   (* The runtime tag *)
+                       runtime_tag: int}   (* Untagged immediate or block tag *)
         | Extension of Path.t
         | Null
 
