@@ -995,6 +995,10 @@ module type S = sig
         and are suitable for storing in a cmi file. *)
     val copy_for_saving : copy_scope:copy_scope -> ('l * 'r) t -> ('l * 'r) t
 
+    (** Deeply copies a mode variable and all its children, preserving levels.
+        The copies receive positive ids. *)
+    val copy_for_restoring : copy_scope:copy_scope -> ('l * 'r) t -> ('l * 'r) t
+
     (** Copies a mode variable and its submodes whose levels are at or above
         [current_level] and below [generic_level], preserving levels, and then
         generalizes the copy. *)

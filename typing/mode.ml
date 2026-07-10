@@ -5475,7 +5475,12 @@ module Comonadic_gen (Obj : Obj) = struct
   let copy_for_saving ~copy_scope a =
     let copy_from_level = 0 in
     let copy_below_level = generic_level + 1 in
-    S.copy ~copy_scope ~copy_from_level ~copy_below_level ~persistent:true obj a
+    S.copy ~copy_scope ~copy_from_level ~copy_below_level ~cause:`Save obj a
+
+  let copy_for_restoring ~copy_scope a =
+    let copy_from_level = 0 in
+    let copy_below_level = generic_level + 1 in
+    S.copy ~copy_scope ~copy_from_level ~copy_below_level ~cause:`Restore obj a
 
   let copy_then_generalize ~copy_scope ~current_level a =
     let copy_from_level = current_level in
@@ -5661,7 +5666,12 @@ module Monadic_gen (Obj : Obj) = struct
   let copy_for_saving ~copy_scope a =
     let copy_from_level = 0 in
     let copy_below_level = generic_level + 1 in
-    S.copy ~copy_scope ~copy_from_level ~copy_below_level ~persistent:true obj a
+    S.copy ~copy_scope ~copy_from_level ~copy_below_level ~cause:`Save obj a
+
+  let copy_for_restoring ~copy_scope a =
+    let copy_from_level = 0 in
+    let copy_below_level = generic_level + 1 in
+    S.copy ~copy_scope ~copy_from_level ~copy_below_level ~cause:`Restore obj a
 
   let copy_then_generalize ~copy_scope ~current_level a =
     let copy_from_level = current_level in
@@ -7033,6 +7043,12 @@ module Value_with (Areality : Areality) = struct
       =
     let monadic1 = Monadic.copy_for_saving ~copy_scope monadic0 in
     let comonadic1 = Comonadic.copy_for_saving ~copy_scope comonadic0 in
+    { monadic = monadic1; comonadic = comonadic1 }
+
+  let copy_for_restoring ~copy_scope
+      { monadic = monadic0; comonadic = comonadic0 } =
+    let monadic1 = Monadic.copy_for_restoring ~copy_scope monadic0 in
+    let comonadic1 = Comonadic.copy_for_restoring ~copy_scope comonadic0 in
     { monadic = monadic1; comonadic = comonadic1 }
 
   let copy_then_generalize ~copy_scope ~current_level
