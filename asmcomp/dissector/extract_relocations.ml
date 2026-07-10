@@ -44,6 +44,79 @@ module Relocation_entry = struct
   let offset t = t.offset
 end
 
+(* A partition's partially-linked object file. *)
+module Mapped_object_file = struct
+  type t =
+    { filename : string;
+      buf : Buf.t;
+      header : Elf.header;
+      sections : Elf.section array;
+      symbols : Elf.symbol array;
+      rela_text_sections : (Elf.section * Buf.t) list
+    }
+
+  let filename t = t.filename
+
+  let buf t = t.buf
+
+  let header t = t.header
+
+  let sections t = t.sections
+
+  let symbols t = t.symbols
+
+  let rela_text_sections t = t.rela_text_sections
+
+  (* Find all sections with names starting with prefix *)
+  let find_sections_with_prefix sections prefix =
+    Array.to_list sections
+    |> List.filter (fun (section : Elf.section) ->
+        String.starts_with ~prefix section.sh_name_str)
+
+  (* Find the symbol table section *)
+  let find_symtab_section sections =
+    Array.find_opt
+      (fun (section : Elf.section) ->
+        Elf.Section_type.(equal (of_u32 section.sh_type) sht_symtab))
+      sections
+
+  let read (unix : (module Compiler_owee.Unix_intf.S)) ~filename =
+    let module Unix = (val unix) in
+    log_verbose "extracting relocations from %s" filename;
+    let buf = Buf.map_binary (module Unix) filename in
+    let header, sections = Elf.read_elf buf in
+    (* Find all .rela.text* sections (handles function sections: .rela.text,
+       .rela.text.foo, .rela.text.bar, etc.) *)
+    let rela_text_sections = find_sections_with_prefix sections ".rela.text" in
+    (match rela_text_sections with
+    | [] -> log_verbose "  no .rela.text* sections found"
+    | _ ->
+      log_verbose "  found %d .rela.text* sections"
+        (List.length rela_text_sections));
+    (* Find symbol table *)
+    let symtab_section =
+      match find_symtab_section sections with
+      | Some section -> section
+      | None ->
+        Misc.fatal_errorf "Dissector: no symbol table found in %s" filename
+    in
+    (* Find string table (sh_link of symtab points to it) *)
+    let strtab_index = symtab_section.sh_link in
+    if strtab_index >= Array.length sections
+    then
+      Misc.fatal_errorf "Dissector: symtab sh_link out of range in %s" filename;
+    let strtab_section = sections.(strtab_index) in
+    let symtab_body = Elf.section_body buf symtab_section in
+    let strtab_body = Elf.section_body buf strtab_section in
+    let symbols = Elf.read_symbols ~symtab_body ~strtab_body in
+    let rela_text_sections =
+      List.map
+        (fun (section : Elf.section) -> section, Elf.section_body buf section)
+        rela_text_sections
+    in
+    { filename; buf; header; sections; symbols; rela_text_sections }
+end
+
 type t =
   { convert_to_plt : Relocation_entry.t list;
     convert_to_got : Relocation_entry.t list;
@@ -147,79 +220,6 @@ let parse_rela_section ~rela_body ~symbols =
   let convert_to_plt, num_plt = rev_and_count !convert_to_plt in
   let convert_to_got, num_got = rev_and_count !convert_to_got in
   { convert_to_plt; convert_to_got; num_plt; num_got }
-
-(* A partition's partially-linked object file. *)
-module Mapped_object_file = struct
-  type t =
-    { filename : string;
-      buf : Buf.t;
-      header : Elf.header;
-      sections : Elf.section array;
-      symbols : Elf.symbol array;
-      rela_text_sections : (Elf.section * Buf.t) list
-    }
-
-  let filename t = t.filename
-
-  let buf t = t.buf
-
-  let header t = t.header
-
-  let sections t = t.sections
-
-  let symbols t = t.symbols
-
-  let rela_text_sections t = t.rela_text_sections
-
-  (* Find all sections with names starting with prefix *)
-  let find_sections_with_prefix sections prefix =
-    Array.to_list sections
-    |> List.filter (fun (section : Elf.section) ->
-        String.starts_with ~prefix section.sh_name_str)
-
-  (* Find the symbol table section *)
-  let find_symtab_section sections =
-    Array.find_opt
-      (fun (section : Elf.section) ->
-        Elf.Section_type.(equal (of_u32 section.sh_type) sht_symtab))
-      sections
-
-  let read (unix : (module Compiler_owee.Unix_intf.S)) ~filename =
-    let module Unix = (val unix) in
-    log_verbose "extracting relocations from %s" filename;
-    let buf = Buf.map_binary (module Unix) filename in
-    let header, sections = Elf.read_elf buf in
-    (* Find all .rela.text* sections (handles function sections: .rela.text,
-       .rela.text.foo, .rela.text.bar, etc.) *)
-    let rela_text_sections = find_sections_with_prefix sections ".rela.text" in
-    (match rela_text_sections with
-    | [] -> log_verbose "  no .rela.text* sections found"
-    | _ ->
-      log_verbose "  found %d .rela.text* sections"
-        (List.length rela_text_sections));
-    (* Find symbol table *)
-    let symtab_section =
-      match find_symtab_section sections with
-      | Some section -> section
-      | None ->
-        Misc.fatal_errorf "Dissector: no symbol table found in %s" filename
-    in
-    (* Find string table (sh_link of symtab points to it) *)
-    let strtab_index = symtab_section.sh_link in
-    if strtab_index >= Array.length sections
-    then
-      Misc.fatal_errorf "Dissector: symtab sh_link out of range in %s" filename;
-    let strtab_section = sections.(strtab_index) in
-    let symtab_body = Elf.section_body buf symtab_section in
-    let strtab_body = Elf.section_body buf strtab_section in
-    let symbols = Elf.read_symbols ~symtab_body ~strtab_body in
-    let rela_text_sections =
-      List.map
-        (fun (section : Elf.section) -> section, Elf.section_body buf section)
-        rela_text_sections
-    in
-    { filename; buf; header; sections; symbols; rela_text_sections }
-end
 
 let extract_from_rela_text_sections ~symbols sections =
   List.fold_left

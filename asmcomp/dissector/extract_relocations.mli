@@ -44,22 +44,6 @@ module Relocation_entry : sig
   val offset : t -> int64
 end
 
-(** The result of extracting relocations from object files. *)
-type t
-
-(** Returns relocations with type R_X86_64_PLT32 that need PLT entries. *)
-val convert_to_plt : t -> Relocation_entry.t list
-
-(** Returns relocations with type R_X86_64_REX_GOTPCRELX that need GOT entries.
-*)
-val convert_to_got : t -> Relocation_entry.t list
-
-(** Returns the number of PLT relocations (O(1)). *)
-val num_plt : t -> int
-
-(** Returns the number of GOT relocations (O(1)). *)
-val num_got : t -> int
-
 (** A partition's partially-linked object file. *)
 module Mapped_object_file : sig
   type t
@@ -90,6 +74,22 @@ module Mapped_object_file : sig
   val rela_text_sections :
     t -> (Compiler_owee.Owee_elf.section * Compiler_owee.Owee_buf.t) list
 end
+
+(** The result of extracting relocations from object files. *)
+type t
+
+(** Returns relocations with type R_X86_64_PLT32 that need PLT entries. *)
+val convert_to_plt : t -> Relocation_entry.t list
+
+(** Returns relocations with type R_X86_64_REX_GOTPCRELX that need GOT entries.
+*)
+val convert_to_got : t -> Relocation_entry.t list
+
+(** Returns the number of PLT relocations (O(1)). *)
+val num_plt : t -> int
+
+(** Returns the number of GOT relocations (O(1)). *)
+val num_got : t -> int
 
 (** [extract input] scans the .rela.text* sections of [input] for relocations
     that need to be converted for the medium code model.
