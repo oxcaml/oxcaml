@@ -1197,9 +1197,9 @@ and modexp : Typedtree.module_expr -> term_judg =
       path pth
     | Tmod_structure s ->
       structure s
-    | Tmod_functor (_, e) ->
+    | Tmod_functor (_, e, _) ->
       modexp e << Delay
-    | Tmod_apply (f, p, _) ->
+    | Tmod_apply (f, p, _, _) ->
       join [
         modexp f << Dereference;
         modexp p << Dereference;

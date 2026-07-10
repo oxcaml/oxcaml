@@ -543,7 +543,7 @@ let merge_functors ~scopes mexp coercion root_path =
   let rec merge ~scopes mexp coercion path acc inline_attribute =
     let finished = acc, mexp, path, coercion, inline_attribute in
     match mexp.mod_desc with
-    | Tmod_functor (param, body) ->
+    | Tmod_functor (param, body, _) ->
       let inline_attribute' =
         Translattribute.get_inline_attribute mexp.mod_attributes
       in
@@ -639,7 +639,7 @@ and transl_module ~scopes cc rootpath mexp =
   | Tmod_functor _ ->
       oo_wrap mexp.mod_env true (fun () ->
         compile_functor ~scopes mexp cc rootpath loc) ()
-  | Tmod_apply(funct, arg, ccarg) ->
+  | Tmod_apply(funct, arg, ccarg, _) ->
       let translated_arg = transl_module ~scopes ccarg None arg in
       transl_apply ~scopes ~loc ~cc mexp.mod_env funct translated_arg
   | Tmod_apply_unit funct ->
