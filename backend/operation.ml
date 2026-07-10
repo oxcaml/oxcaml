@@ -358,7 +358,7 @@ let is_pure = function
   | Static_cast _ -> true
   (* Conservative to ensure valueofint/intofvalue are not eliminated before
      emit. *)
-  | Reinterpret_cast (Value_of_int | Int_of_value) -> false
+  | Reinterpret_cast (Value_of_int64 | Int64_of_value) -> false
   | Probe_is_enabled _ -> true
   | Opaque -> false
   | Begin_region -> false

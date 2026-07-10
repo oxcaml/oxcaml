@@ -310,8 +310,8 @@ val machtype_of_memory_chunk : memory_chunk -> machtype
 (* These casts compile to a single move instruction. If the operands are
    assigned the same physical register, the move will be omitted entirely. *)
 type reinterpret_cast =
-  | Int_of_value
-  | Value_of_int
+  | Int64_of_value
+  | Value_of_int64
   | Float_of_float32
     (* Only writes the bottom 32 bits of the target float register. All other
        bits are unspecified. *)
@@ -329,8 +329,8 @@ type reinterpret_cast =
 (* These casts may require a particular value-preserving operation, e.g.
    truncating a float to an int. *)
 type static_cast =
-  | Float_of_int of float_width
-  | Int_of_float of float_width
+  | Float_of_int64 of float_width
+  | Int64_of_float of float_width
   | Float_of_float32
   | Float32_of_float
   | V128_of_scalar of vec128_type

@@ -230,8 +230,8 @@ let reinterpret_cast : Cmm.reinterpret_cast -> string = function
   | V128_of_vec w -> Printf.sprintf "%s as vec128" (vector_width w)
   | V256_of_vec w -> Printf.sprintf "%s as vec256" (vector_width w)
   | V512_of_vec w -> Printf.sprintf "%s as vec512" (vector_width w)
-  | Value_of_int -> "int as value"
-  | Int_of_value -> "value as int"
+  | Value_of_int64 -> "int64 as value"
+  | Int64_of_value -> "value as int64"
   | Float32_of_float -> "float as float32"
   | Float_of_float32 -> "float32 as float"
   | Float_of_int64 -> "int64 as float"
@@ -240,10 +240,10 @@ let reinterpret_cast : Cmm.reinterpret_cast -> string = function
   | Int32_of_float32 -> "float32 as int32"
 
 let static_cast : Cmm.static_cast -> string = function
-  | Int_of_float Float64 -> "float->int"
-  | Float_of_int Float64 -> "int->float"
-  | Int_of_float Float32 -> "float32->int"
-  | Float_of_int Float32 -> "int->float32"
+  | Int64_of_float Float64 -> "float->int64"
+  | Float_of_int64 Float64 -> "int64->float"
+  | Int64_of_float Float32 -> "float32->int64"
+  | Float_of_int64 Float32 -> "int64->float32"
   | Float32_of_float -> "float->float32"
   | Float_of_float32 -> "float32->float"
   | Scalar_of_v128 ty -> Printf.sprintf "%s->scalar" (vec128_name ty)
