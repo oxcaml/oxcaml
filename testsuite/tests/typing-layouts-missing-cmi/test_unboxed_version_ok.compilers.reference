@@ -1,0 +1,5 @@
+File "test_unboxed_version_ok.ml", line 22, characters 18-20:
+22 | let _f : Defs.z = ""
+                       ^^
+Error: This constant has type string but an expression was expected of type
+         Defs.z

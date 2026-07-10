@@ -1,0 +1,3 @@
+File "test_unboxed_version.ml", line 1:
+Error: In the signature of Defs.Make(Defs.Arg): The type Unloaded.Record.t
+       has no unboxed version.
