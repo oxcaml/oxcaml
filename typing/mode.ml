@@ -6342,69 +6342,9 @@ type ('mo, 'como) monadic_comonadic =
     comonadic : 'como
   }
 
-module Zap_scope = struct
-  module ModeIdMap = Hashtbl.Make (Int)
-
-  type job = unit -> unit
-
-  type job_list = job list
-
-  type zap_scope =
-    { zap_to_floor_map : job_list ModeIdMap.t;
-      zap_to_ceil_map : job_list ModeIdMap.t;
-      zap_to_legacy_map : job ModeIdMap.t
-    }
-
-  let create () =
-    { zap_to_floor_map = ModeIdMap.create 17;
-      zap_to_ceil_map = ModeIdMap.create 17;
-      zap_to_legacy_map = ModeIdMap.create 17
-    }
-
-  let add_job_to_map map i job =
-    match ModeIdMap.find_opt map i with
-    | Some jobs -> ModeIdMap.replace map i (job :: jobs)
-    | None -> ModeIdMap.add map i [job]
-
-  let add_zap_to_floor_to_zap_scope i zap_to_floor zap_to_legacy zs =
-    if ModeIdMap.mem zs.zap_to_legacy_map i
-    then ()
-    else
-      begin if ModeIdMap.mem zs.zap_to_ceil_map i
-      then begin
-        ModeIdMap.remove zs.zap_to_ceil_map i;
-        ModeIdMap.add zs.zap_to_legacy_map i zap_to_legacy
-      end
-      else add_job_to_map zs.zap_to_floor_map i zap_to_floor
-      end
-
-  let add_zap_to_ceil_to_zap_scope i zap_to_ceil zap_to_legacy zs =
-    if ModeIdMap.mem zs.zap_to_legacy_map i
-    then ()
-    else
-      begin if ModeIdMap.mem zs.zap_to_floor_map i
-      then begin
-        ModeIdMap.remove zs.zap_to_floor_map i;
-        ModeIdMap.add zs.zap_to_legacy_map i zap_to_legacy
-      end
-      else add_job_to_map zs.zap_to_ceil_map i zap_to_ceil
-      end
-
-  let resolve_zap_scope { zap_to_floor_map; zap_to_ceil_map; zap_to_legacy_map }
-      =
-    ModeIdMap.iter (fun _ f -> f ()) zap_to_legacy_map;
-    ModeIdMap.iter
-      (fun _ jobs -> List.iter (fun f -> f ()) jobs)
-      zap_to_floor_map;
-    ModeIdMap.iter
-      (fun _ jobs -> List.iter (fun f -> f ()) jobs)
-      zap_to_ceil_map
-end
-
 module Value_with (Areality : Areality) = struct
   module Comonadic = Comonadic_with (Areality)
   module Monadic = Monadic
-  module Z = Zap_scope
 
   type 'd t = ('d Monadic.t, 'd Comonadic.t) monadic_comonadic
 
@@ -7193,11 +7133,6 @@ module Value_with (Areality : Areality) = struct
   let zap_to_legacy m =
     if check_generic m then None else Some (zap_to_legacy_force m)
 
-  type zap_scope =
-    { variables : Z.zap_scope;
-      visible : (allowed * allowed) t list ref
-    }
-
   let zap_to_legacy_obj : type a.
       a C.obj -> (a, allowed * allowed) S.mode -> unit =
    fun obj mode ->
@@ -7234,6 +7169,97 @@ module Value_with (Areality : Areality) = struct
     S.mode_iter Comonadic.Obj.obj m
       { iter = (fun obj msrc -> zap_to_legacy_obj obj msrc) }
 
+  module Zap_scope = struct
+    module ModeIdMap = Hashtbl.Make (Int)
+
+    type 'd packed_mode =
+      | Pco of 'd Comonadic.t
+      | Pmon of 'd Monadic.t
+
+    let disallow_left : type l r.
+        (l * r) packed_mode -> (disallowed * r) packed_mode = function
+      | Pco m -> Pco (Comonadic.disallow_left m)
+      | Pmon m -> Pmon (Monadic.disallow_left m)
+
+    let disallow_right : type l r.
+        (l * r) packed_mode -> (l * disallowed) packed_mode = function
+      | Pco m -> Pco (Comonadic.disallow_right m)
+      | Pmon m -> Pmon (Monadic.disallow_right m)
+
+    type zap_scope =
+      { zap_to_floor_map : (allowed * disallowed) packed_mode list ModeIdMap.t;
+        zap_to_ceil_map : (disallowed * allowed) packed_mode list ModeIdMap.t;
+        zap_to_legacy_map : (disallowed * disallowed) packed_mode ModeIdMap.t
+      }
+
+    let create () =
+      { zap_to_floor_map = ModeIdMap.create 17;
+        zap_to_ceil_map = ModeIdMap.create 17;
+        zap_to_legacy_map = ModeIdMap.create 17
+      }
+
+    let add_packed_to_map map i p =
+      match ModeIdMap.find_opt map i with
+      | Some ps -> ModeIdMap.replace map i (p :: ps)
+      | None -> ModeIdMap.add map i [p]
+
+    let add_zap_to_floor_to_zap_scope i p zs =
+      if ModeIdMap.mem zs.zap_to_legacy_map i
+      then ()
+      else
+        begin if ModeIdMap.mem zs.zap_to_ceil_map i
+        then begin
+          ModeIdMap.remove zs.zap_to_ceil_map i;
+          ModeIdMap.add zs.zap_to_legacy_map i (disallow_left p)
+        end
+        else add_packed_to_map zs.zap_to_floor_map i p
+        end
+
+    let add_zap_to_ceil_to_zap_scope i p zs =
+      if ModeIdMap.mem zs.zap_to_legacy_map i
+      then ()
+      else
+        begin if ModeIdMap.mem zs.zap_to_floor_map i
+        then begin
+          ModeIdMap.remove zs.zap_to_floor_map i;
+          ModeIdMap.add zs.zap_to_legacy_map i (disallow_right p)
+        end
+        else add_packed_to_map zs.zap_to_ceil_map i p
+        end
+
+    let resolve_zap_scope
+        { zap_to_floor_map; zap_to_ceil_map; zap_to_legacy_map } =
+      ModeIdMap.iter
+        (fun _ p ->
+          match p with
+          | Pmon m -> zap_to_legacy_src_var_monadic m
+          | Pco m -> zap_to_legacy_src_var_comonadic m)
+        zap_to_legacy_map;
+      ModeIdMap.iter
+        (fun _ ps ->
+          List.iter
+            (function
+              | Pmon m -> Monadic.zap_to_floor_force m |> ignore
+              | Pco m -> Comonadic.zap_to_floor_force m |> ignore)
+            ps)
+        zap_to_floor_map;
+      ModeIdMap.iter
+        (fun _ ps ->
+          List.iter
+            (function
+              | Pmon m -> Monadic.zap_to_ceil_force m |> ignore
+              | Pco m -> Comonadic.zap_to_ceil_force m |> ignore)
+            ps)
+        zap_to_ceil_map
+  end
+
+  module Z = Zap_scope
+
+  type zap_scope =
+    { variables : Z.zap_scope;
+      visible : (allowed * allowed) t list ref
+    }
+
   let add_covariant_to_zap_scope { monadic; comonadic } scope =
     let comonadic_upper =
       Comonadic.Guts.get_floor comonadic |> Comonadic.of_const
@@ -7241,20 +7267,16 @@ module Value_with (Areality : Areality) = struct
     let monadic_upper = Monadic.Guts.get_floor monadic |> Monadic.of_const in
     Monadic.iter_covariant monadic (fun ~id ~level m ->
         if level <> generic_level
-        then begin
-          let zap_to_legacy () = zap_to_legacy_src_var_monadic m in
-          let m = Monadic.join [monadic_upper; m] in
-          let zap_to_floor () = Monadic.zap_to_floor_force m |> ignore in
-          Z.add_zap_to_ceil_to_zap_scope id zap_to_floor zap_to_legacy scope
-        end);
+        then
+          Z.add_zap_to_floor_to_zap_scope id
+            (Z.Pmon (Monadic.join [monadic_upper; m]))
+            scope);
     Comonadic.iter_covariant comonadic (fun ~id ~level m ->
         if level <> generic_level
-        then begin
-          let zap_to_legacy () = zap_to_legacy_src_var_comonadic m in
-          let m = Comonadic.join [comonadic_upper; m] in
-          let zap_to_floor () = Comonadic.zap_to_floor_force m |> ignore in
-          Z.add_zap_to_floor_to_zap_scope id zap_to_floor zap_to_legacy scope
-        end)
+        then
+          Z.add_zap_to_floor_to_zap_scope id
+            (Z.Pco (Comonadic.join [comonadic_upper; m]))
+            scope)
 
   let add_contravariant_to_zap_scope { monadic; comonadic } scope =
     let comonadic_upper =
@@ -7263,20 +7285,16 @@ module Value_with (Areality : Areality) = struct
     let monadic_lower = Monadic.Guts.get_ceil monadic |> Monadic.of_const in
     Monadic.iter_contravariant monadic (fun ~id ~level m ->
         if level <> generic_level
-        then begin
-          let zap_to_legacy () = zap_to_legacy_src_var_monadic m in
-          let m = Monadic.meet [monadic_lower; m] in
-          let zap_to_ceil () = Monadic.zap_to_ceil_force m |> ignore in
-          Z.add_zap_to_floor_to_zap_scope id zap_to_ceil zap_to_legacy scope
-        end);
+        then
+          Z.add_zap_to_ceil_to_zap_scope id
+            (Z.Pmon (Monadic.meet [monadic_lower; m]))
+            scope);
     Comonadic.iter_contravariant comonadic (fun ~id ~level m ->
         if level <> generic_level
-        then begin
-          let zap_to_legacy () = zap_to_legacy_src_var_comonadic m in
-          let m = Comonadic.meet [comonadic_upper; m] in
-          let zap_to_ceil () = Comonadic.zap_to_ceil m |> ignore in
-          Z.add_zap_to_ceil_to_zap_scope id zap_to_ceil zap_to_legacy scope
-        end)
+        then
+          Z.add_zap_to_ceil_to_zap_scope id
+            (Z.Pco (Comonadic.meet [comonadic_upper; m]))
+            scope)
 
   let add_mode_to_zap_scope m { visible } = visible := m :: !visible
 
