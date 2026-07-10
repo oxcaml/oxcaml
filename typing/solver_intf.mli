@@ -344,7 +344,7 @@ module type Solver_mono = sig
     copy_from_level:int ->
     copy_below_level:int ->
     ?copy_to_level:int ->
-    ?persistent:bool ->
+    ?cause:[`Save | `Restore | `Neither] ->
     'a obj ->
     ('a, 'l * 'r) mode ->
     ('a, 'l * 'r) mode
