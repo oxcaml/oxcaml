@@ -365,13 +365,11 @@ let rename_section ~(partition_kind : Partition.kind) name =
 (* [rela_text_sections] is a list of (section, body) pairs for all .rela.text*
    sections in the input file. Each section's relocations will be rewritten to
    use the synthetic IGOT/IPLT symbols. *)
-let compute ~header ~sections ~symtab_body ~strtab_body ~rela_text_sections
-    ~partition_kind ~igot_and_iplt ~relocations =
+let compute ~header ~sections ~symbols ~rela_text_sections ~partition_kind
+    ~igot_and_iplt ~relocations =
   log_verbose "forming rewrite plan for partition %s"
     (Partition.symbol_prefix partition_kind);
-  (* CR sspies: This is inefficient. We should read the symbols only once. This
-     read will be removed in a subsequent change. *)
-  let original_symbols = Elf.read_symbols ~symtab_body ~strtab_body in
+  let original_symbols = symbols in
   let strtab = Strtab.create () in
   let symbol_to_index, total_symbols =
     build_symbol_index_map ~original_symbols ~igot_and_iplt strtab

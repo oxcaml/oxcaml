@@ -176,12 +176,14 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
         let kind = Partition.kind (Partition.Linked.partition linked) in
         let prefix = Partition.symbol_prefix kind in
         let input_file = Partition.Linked.linked_object linked in
-        let relocations =
+        let mapped_partition_file, relocations =
           Profile.record_call ~accumulate:true "dissector/extract_relocations"
             (fun () ->
-              Extract_relocations.extract
-                (Extract_relocations.Mapped_object_file.read unix
-                   ~filename:input_file))
+              let file =
+                Extract_relocations.Mapped_object_file.read unix
+                  ~filename:input_file
+              in
+              file, Extract_relocations.extract file)
         in
         let n_plt = Extract_relocations.num_plt relocations in
         let n_got = Extract_relocations.num_got relocations in
@@ -192,7 +194,7 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
           prefix;
         let output_file = input_file ^ ".rewritten" in
         Profile.record_call ~accumulate:true "dissector/rewrite" (fun () ->
-            Rewrite_sections.rewrite unix ~input_file ~output_file
+            Rewrite_sections.rewrite unix ~mapped_partition_file ~output_file
               ~partition_kind:kind ~igot_and_iplt ~relocations);
         log "rewrote %s -> %s" input_file output_file;
         plt_acc + n_plt, got_acc + n_got)
