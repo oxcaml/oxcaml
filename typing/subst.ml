@@ -40,7 +40,7 @@ type kind_replacement =
 type additional_action =
   | Prepare_for_saving of
       { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind;
-        prepare_mode : Mode.Alloc.lr -> Mode.Alloc.lr;
+        prepare_mode : For_copy.copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr;
         prepare_modality : Mode.Modality.t -> Mode.Modality.t
       }
     (* The [prepare_jkind] function should be applied to all jkinds when
@@ -301,10 +301,10 @@ let with_additional_action =
         in
         (* CR-someday zqian: preserve the hints *)
         (* modes and modalities should have been zapped already *)
-        (* if a mode is generic we leave it as is *)
-        let prepare_mode mode =
+        (* if a mode is generic we copy it persistently for saving *)
+        let prepare_mode copy_scope mode =
           if Mode.Alloc.check_generic mode
-          then mode
+          then For_copy.mode_copy_for_saving copy_scope mode
           else Mode.Alloc.(mode |> to_const_exn |> of_const)
         in
         let prepare_modality modality =
@@ -748,13 +748,13 @@ let rec typexp copy_scope s ty =
       | Tarrow ((label, marg, mret), arg, ret, comm) ->
           let marg, mret =
             if get_id ty < 0 then
-              For_copy.mode_copy_generic copy_scope marg,
-              For_copy.mode_copy_generic copy_scope mret
+              For_copy.mode_copy_for_restoring copy_scope marg,
+              For_copy.mode_copy_for_restoring copy_scope mret
             else
             match s.additional_action with
             | Prepare_for_saving { prepare_mode; _ } ->
-              For_copy.mode_copy_generic copy_scope (prepare_mode marg),
-              For_copy.mode_copy_generic copy_scope (prepare_mode mret)
+              prepare_mode copy_scope marg,
+              prepare_mode copy_scope mret
             | Duplicate_variables ->
               For_copy.mode_copy_generic copy_scope marg,
               For_copy.mode_copy_generic copy_scope mret
