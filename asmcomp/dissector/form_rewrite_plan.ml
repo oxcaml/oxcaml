@@ -240,18 +240,16 @@ let build_symbol_rewrite_map ~igot_and_iplt ~relocations =
 
    - PLT32: function calls -> PC32 to IPLT entry - GOTPCRELX: GOT references ->
    PC32 to IGOT entry *)
-let rewrite_rela_section ~rela_body ~symtab_body ~strtab_body ~symbol_to_index
-    ~plt_rewrite_map ~got_rewrite_map =
+let rewrite_rela_section ~rela_body ~symbols ~symbol_to_index ~plt_rewrite_map
+    ~got_rewrite_map =
   let entries = ref [] in
   Rela.iter_rela_entries ~rela_body ~f:(fun entry ->
       let new_entry =
-        (* Look up the original symbol name for this relocation *)
-        let sym_name_opt =
-          Rela.read_symbol_name ~symtab_body ~strtab_body ~sym_index:entry.r_sym
-        in
-        match sym_name_opt with
+        (* Look up the original symbol for this relocation *)
+        match Elf.symbol_table_lookup symbols ~sym_index:entry.r_sym with
         | None -> entry
-        | Some sym_name -> (
+        | Some sym -> (
+          let sym_name = sym.Elf.name in
           (* Check if this relocation type/symbol should be rewritten *)
           let rewrite_to =
             if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
@@ -385,7 +383,7 @@ let compute ~header ~sections ~symtab_body ~strtab_body ~rela_text_sections
       (fun (section, rela_body) ->
         log_verbose "  rewriting section %s" section.Elf.sh_name_str;
         let entries =
-          rewrite_rela_section ~rela_body ~symtab_body ~strtab_body
+          rewrite_rela_section ~rela_body ~symbols:original_symbols
             ~symbol_to_index ~plt_rewrite_map ~got_rewrite_map
         in
         { Rewritten_rela_section.section_offset = section.Elf.sh_offset;

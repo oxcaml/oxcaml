@@ -585,6 +585,11 @@ let read_symbols ~symtab_body ~strtab_body =
     in
     { name; st_info; st_other; st_shndx; st_value; st_size })
 
+let symbol_table_lookup symbols ~sym_index =
+  if sym_index >= 0 && sym_index < Array.length symbols
+  then Some symbols.(sym_index)
+  else None
+
 (* Extract section body as a string *)
 let section_body_string buf section =
   let body = section_body buf section in

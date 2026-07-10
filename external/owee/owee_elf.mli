@@ -258,6 +258,10 @@ type symbol = {
 val read_symbols :
   symtab_body:Owee_buf.t -> strtab_body:Owee_buf.t -> symbol array
 
+(** [symbol_table_lookup symbols ~sym_index] returns the symbol at
+    [sym_index], or [None] if the index is out of range. *)
+val symbol_table_lookup : symbol array -> sym_index:int -> symbol option
+
 (** Extract section body as a string. *)
 val section_body_string : Owee_buf.t -> section -> string
 
