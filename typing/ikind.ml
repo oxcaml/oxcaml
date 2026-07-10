@@ -46,6 +46,17 @@ let validate_checks = ref 0
 
 let validate_mismatches = ref 0
 
+(* Benign class (stage 3): a divergence where the stored derivation is a
+   conservative OVER-approximation of the recompute ([recompute <= stored]). The
+   L-jkind carrying with-bounds is always the SUB of a [sub <= super] check
+   ([Ldd.leq_with_reason sub super]; see [compute_subcheck_polys] below), so a
+   larger stored value can only make the check HARDER -- conservative
+   over-rejection, never an unsound acceptance. Divergences in the OTHER
+   direction ([stored <= recompute], stored strictly tighter) are NOT
+   whitelisted: they stay hard mismatches and are a genuine-soundness-finding
+   trigger. Counted and reported separately. *)
+let validate_benign = ref 0
+
 (* Counts, in the normal (non-forced) path, how many constructor lookups used a
    stored decl ikind vs fell back to recompute. *)
 let stored_decl_ikind_hits = ref 0
@@ -57,10 +68,10 @@ let () =
       if !Clflags.ikinds_validate
       then
         Format.eprintf
-          "[ikind-validate] summary: checks=%d mismatches=%d; decl-ikind \
-           stored=%d recomputed=%d@."
-          !validate_checks !validate_mismatches !stored_decl_ikind_hits
-          !recomputed_decl_ikind)
+          "[ikind-validate] summary: checks=%d mismatches=%d benign=%d; \
+           decl-ikind stored=%d recomputed=%d@."
+          !validate_checks !validate_mismatches !validate_benign
+          !stored_decl_ikind_hits !recomputed_decl_ikind)
 
 module Ldd = Types.Ldd
 
@@ -1071,6 +1082,14 @@ let ldd_semantically_equal (a : Ldd.node) (b : Ldd.node) : bool =
   (match Ldd.leq_with_reason a b with [] -> true | _ -> false)
   && match Ldd.leq_with_reason b a with [] -> true | _ -> false
 
+(* One-directional [a <= b], modulo unknown-atom identity (same canonicalization
+   as [ldd_semantically_equal]). *)
+let ldd_leq (a : Ldd.node) (b : Ldd.node) : bool =
+  Ldd.solve_pending ();
+  let a = canonicalize_unknowns a in
+  let b = canonicalize_unknowns b in
+  match Ldd.leq_with_reason a b with [] -> true | _ -> false
+
 (* Derive the ikind of [jkind] in [mode], either using stored decl ikinds
    ([use_stored:true]) or forcing a full recompute from each declaration
    ([use_stored:false]). Allocates its own solver context, so it must only be
@@ -1089,8 +1108,8 @@ let derive_ikind ~(use_stored : bool) ~(mode : Solver.mode) env
 
 (* Assert that the stored-ikind derivation of [jkind] agrees with a full
    recompute, in both solver modes. Inert unless [ikinds_validate] is set. *)
-let validate_ikind ~(origin : string option) env (jkind : ('l * 'r) Types.jkind)
-    : unit =
+let validate_ikind ~(in_sub_position : bool) ~(origin : string option) env
+    (jkind : ('l * 'r) Types.jkind) : unit =
   if !Clflags.ikinds_validate
   then
     List.iter
@@ -1099,16 +1118,31 @@ let validate_ikind ~(origin : string option) env (jkind : ('l * 'r) Types.jkind)
         let recomputed = derive_ikind ~use_stored:false ~mode env jkind in
         incr validate_checks;
         if not (ldd_semantically_equal stored recomputed)
-        then (
-          incr validate_mismatches;
+        then
           let mode_s =
             match mode with
             | Solver.Normal -> "normal"
             | Solver.Round_up -> "round_up"
           in
-          Format.eprintf
-            "[ikind-validate] MISMATCH%s mode=%s@;@;stored=%s@;recompute=%s@."
-            (origin_suffix_of origin) mode_s (Ldd.pp stored) (Ldd.pp recomputed)))
+          (* Classify (see [validate_benign]): [recomputed <= stored] is the
+             conservative over-approximation direction, but it is sound to
+             whitelist ONLY in the SUB (LHS) position of [leq_with_reason sub
+             super]. A larger stored SUB makes the check harder (over-reject,
+             never unsound accept). In the SUPER (RHS) position a larger stored
+             instead EASES the check -- and [sub_jkind_l] takes [super] as a
+             [jkind_l], which can carry a with-bound and therefore diverge -- and
+             [crossing_of_jkind] is not a subsumption check at all. So over-
+             approximation at a super/crossing site is NOT provably benign;
+             restrict the whitelist to [in_sub_position] and keep every
+             super/crossing divergence a hard mismatch regardless of direction. *)
+          if in_sub_position && ldd_leq recomputed stored
+          then incr validate_benign
+          else (
+            incr validate_mismatches;
+            Format.eprintf
+              "[ikind-validate] MISMATCH%s mode=%s@;@;stored=%s@;recompute=%s@."
+              (origin_suffix_of origin) mode_s (Ldd.pp stored)
+              (Ldd.pp recomputed)))
       [Solver.Normal; Solver.Round_up]
 
 let compute_subcheck_polys ~context:_ env (sub : ('l1 * 'r1) Types.jkind)
@@ -1172,8 +1206,8 @@ let sub_jkind_l ?allow_any_crossing ?origin
     let () =
       if !Clflags.ikinds_validate
       then (
-        validate_ikind ~origin env sub;
-        validate_ikind ~origin env super)
+        validate_ikind ~in_sub_position:true ~origin env sub;
+        validate_ikind ~in_sub_position:false ~origin env super)
     in
     (* Check layouts first; if that fails, print both sides with full
        info and return the error. *)
@@ -1235,7 +1269,9 @@ let crossing_of_jkind ~(context : Jkind.jkind_context) env
   else
     let () =
       if !Clflags.ikinds_validate
-      then validate_ikind ~origin:(Some "crossing") env jkind
+      then
+        validate_ikind ~in_sub_position:false ~origin:(Some "crossing") env
+          jkind
     in
     let with_bounds_is_empty : type l r. (l * r) Types.with_bounds -> bool =
       function
@@ -1402,8 +1438,8 @@ let sub_or_intersect ?origin
   else (
     if !Clflags.ikinds_validate
     then (
-      validate_ikind ~origin env t1;
-      validate_ikind ~origin env t2);
+      validate_ikind ~in_sub_position:true ~origin env t1;
+      validate_ikind ~in_sub_position:false ~origin env t2);
     if fast_sub ~context env t1 t2
     then (
       (if !Clflags.ikinds_debug
@@ -1426,8 +1462,8 @@ let sub_or_error ?origin
     let () =
       if !Clflags.ikinds_validate
       then (
-        validate_ikind ~origin env t1;
-        validate_ikind ~origin env t2)
+        validate_ikind ~in_sub_position:true ~origin env t1;
+        validate_ikind ~in_sub_position:false ~origin env t2)
     in
     (* The ikind engine decides the accept/reject verdict: first the layout
        subcheck (which the axis polynomials do not capture), then the modal-axis
