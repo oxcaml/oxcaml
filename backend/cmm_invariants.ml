@@ -624,6 +624,11 @@ let check_machtypes (fundecl : fundecl) =
       return_type = Some fundecl.fun_ret_type
     }
   in
-  check_machtype ~dbg:fundecl.fun_dbg ~expected:fundecl.fun_ret_type
-    ~what:(fun () -> Printf.sprintf "the body of %s" fundecl.fun_name.sym_name)
-    (infer_machtype env fundecl.fun_body)
+  try
+    check_machtype ~dbg:fundecl.fun_dbg ~expected:fundecl.fun_ret_type
+      ~what:(fun () ->
+        Printf.sprintf "the body of %s" fundecl.fun_name.sym_name)
+      (infer_machtype env fundecl.fun_body)
+  with Misc.Fatal_error ->
+    Misc.fatal_errorf "Error happened while typechecking function %s; body:\n%a"
+      fundecl.fun_name.sym_name Printcmm.expression fundecl.fun_body
