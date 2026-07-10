@@ -178,3 +178,159 @@ Line 2, characters 20-53:
 Error: Invalid [@repr] declaration:
        [@repr pointer] requires a payload that is definitely a non-null pointer.
 |}]
+
+(* --- inline-record payload rejection --- *)
+
+(* [@repr immediate] requires a unary tuple constructor, not an inline record. *)
+type imm_inline = N [@repr null] | A of { x : int } [@repr immediate]
+
+[%%expect{|
+Line 1, characters 0-69:
+1 | type imm_inline = N [@repr null] | A of { x : int } [@repr immediate]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Invalid [@repr] declaration:
+       [@repr immediate] requires a unary tuple constructor.
+|}]
+
+(* [@repr pointer] requires a unary tuple constructor, not an inline record. *)
+type ptr_inline = N [@repr null] | A of { x : int } [@repr pointer]
+
+[%%expect{|
+Line 1, characters 0-67:
+1 | type ptr_inline = N [@repr null] | A of { x : int } [@repr pointer]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Invalid [@repr] declaration:
+       [@repr pointer] requires a unary tuple constructor.
+|}]
+
+(* --- [@repr] on extensible variants / exceptions is accepted and silently
+   ignored: these never receive an erased representation, so there is no
+   soundness concern.  (Batch compilation additionally emits Warning 53
+   [misplaced-attribute]; the toplevel driving this test does not.) *)
+
+exception Exn_repr of int [@repr immediate]
+
+[%%expect{|
+exception Exn_repr of int
+|}]
+
+type ext = ..
+type ext += Ext_repr of int [@repr immediate]
+
+[%%expect{|
+type ext = ..
+type ext += Ext_repr of int
+|}]
+
+(* --- GADT constructors may carry [@repr] --- *)
+type _ gadt =
+  | Code : int -> int gadt [@repr immediate]
+  | Text : string -> string gadt [@repr pointer]
+
+[%%expect{|
+type _ gadt = Code : int -> int gadt | Text : string -> string gadt
+|}]
+
+(* --- module inclusion: [@repr] is part of the representation, so signature
+   and implementation must agree on it --- *)
+
+(* Exploit (soundness): a [@repr immediate] signature constructor is
+   payload-unboxed, but a plain implementation constructor is a boxed block.
+   Without comparing the erased representations this was accepted and a client
+   read the block pointer as a tagged int. *)
+module M_imm_boxed : sig
+  type t = N [@repr null] | A of int [@repr immediate]
+end = struct
+  type t = N [@repr null] | A of int
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = N [@repr null] | A of int
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = N | A of int end
+       is not included in
+         sig type t = N | A of int end
+       Type declarations do not match:
+         type t = N | A of int
+       is not included in
+         type t = N | A of int
+       Their internal representations differ:
+       constructor A uses the ordinary boxed representation in the first declaration but [@repr immediate] in the second declaration.
+|}]
+
+(* The other direction (signature boxed, implementation [@repr immediate]) is
+   equally rejected. *)
+module M_boxed_imm : sig
+  type t = N [@repr null] | A of int
+end = struct
+  type t = N [@repr null] | A of int [@repr immediate]
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = N [@repr null] | A of int [@repr immediate]
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = N | A of int end
+       is not included in
+         sig type t = N | A of int end
+       Type declarations do not match:
+         type t = N | A of int
+       is not included in
+         type t = N | A of int
+       Their internal representations differ:
+       constructor A uses [@repr immediate] in the first declaration but the ordinary boxed representation in the second declaration.
+|}]
+
+(* [@repr pointer] versus a plain boxed implementation is also rejected. *)
+module M_ptr_boxed : sig
+  type t = N [@repr null] | A of string [@repr pointer]
+end = struct
+  type t = N [@repr null] | A of string
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = N [@repr null] | A of string
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = N | A of string end
+       is not included in
+         sig type t = N | A of string end
+       Type declarations do not match:
+         type t = N | A of string
+       is not included in
+         type t = N | A of string
+       Their internal representations differ:
+       constructor A uses the ordinary boxed representation in the first declaration but [@repr pointer] in the second declaration.
+|}]
+
+(* Positive: identical [@repr immediate] on both sides is accepted. *)
+module M_imm_ok : sig
+  type t = N [@repr null] | A of int [@repr immediate]
+end = struct
+  type t = N [@repr null] | A of int [@repr immediate]
+end
+
+[%%expect{|
+module M_imm_ok : sig type t = N | A of int end
+|}]
+
+(* Positive: identical [@repr pointer] on both sides is accepted. *)
+module M_ptr_ok : sig
+  type t = N [@repr null] | A of string [@repr pointer]
+end = struct
+  type t = N [@repr null] | A of string [@repr pointer]
+end
+
+[%%expect{|
+module M_ptr_ok : sig type t = N | A of string end
+|}]

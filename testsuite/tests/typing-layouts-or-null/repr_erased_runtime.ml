@@ -102,3 +102,35 @@ let () =
    | Im n -> assert (n = 99)
    | N | Pt _ -> assert false)
 ;;
+
+(* Polymorphic [compare] and [Hashtbl] over erased-representation values:
+   the payload-unboxed constructors participate correctly (the runtime
+   distinguishes immediate from pointer payloads by [isint]). *)
+let () =
+  assert (compare (Small 3) (Small 3) = 0);
+  assert (compare (Small 3) (Small 4) < 0);
+  assert (compare (Small 4) (Small 3) > 0);
+  assert (compare (Big "a") (Big "a") = 0);
+  assert (compare (I 1) (E "x") <> 0);
+  let h = Hashtbl.create 8 in
+  Hashtbl.replace h (I 7) "seven";
+  Hashtbl.replace h (E "hi") "greeting";
+  assert (Hashtbl.find h (I 7) = "seven");
+  assert (Hashtbl.find h (E "hi") = "greeting");
+  assert (Hashtbl.hash (I 7) = Hashtbl.hash (I 7));
+  assert (Hashtbl.hash (E "hi") = Hashtbl.hash (E "hi"))
+;;
+
+(* A GADT whose constructors carry [@repr immediate] / [@repr pointer]:
+   construction and matching behave correctly at run time. *)
+type _ gadt =
+  | G_code : int -> int gadt [@repr immediate]
+  | G_text : string -> string gadt [@repr pointer]
+
+let gadt_int : int gadt -> int = function G_code n -> n
+let gadt_str : string gadt -> string = function G_text s -> s
+
+let () =
+  assert (gadt_int (G_code 42) = 42);
+  assert (gadt_str (G_text "hi") = "hi")
+;;
