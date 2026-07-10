@@ -105,7 +105,7 @@ static void dynamic_stack_free(dynamic_stack_t stack)
 }
 
 // Returns false if allocation fails.
-static bool dynamic_stack_dup(dynamic_stack_t dst, dynamic_stack_t src)
+static bool dynamic_stack_copy(dynamic_stack_t dst, dynamic_stack_t src)
 {
   dst->capacity = src->capacity;
   dst->count = src->count;
@@ -407,7 +407,7 @@ CAMLexport bool caml_dynamic_table_copy(dynamic_table_t dst, dynamic_table_t src
     }
 
     for(size_t i = 0; i < capacity; ++i) {
-      if(!dynamic_stack_dup(&dst->bindings[i], &src->bindings[i])) {
+      if(!dynamic_stack_copy(&dst->bindings[i], &src->bindings[i])) {
         for(size_t j = 0; j < i; ++j) {
           dynamic_stack_free(&dst->bindings[j]);
         }
