@@ -1374,9 +1374,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     decr persistent_id;
     id
 
-  let fresh ?(persistent = false) ?upper ?upper_hint ?lower ?lower_hint ?vlower
-      ?vupper ~level obj =
-    let id = if persistent then next_persistent_id () else next_live_id () in
+  let fresh ?(neg = false) ?upper ?upper_hint ?lower ?lower_hint ?vlower ?vupper
+      ~level obj =
+    let id = if neg then next_persistent_id () else next_live_id () in
     let upper, upper_hint =
       match upper, upper_hint with
       | None, None -> C.max obj, Comp_hint.Max
@@ -1623,13 +1623,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       copy_from_level:int ->
       copy_below_level:int ->
       copy_to_level:int option ->
-      persistent:bool ->
+      cause:[`Save | `Restore | `Neither] ->
       a C.obj ->
       a var ->
       a var =
-   fun ~copy_scope ~copy_from_level ~copy_below_level ~copy_to_level ~persistent
-       obj v ->
+   fun ~copy_scope ~copy_from_level ~copy_below_level ~copy_to_level ~cause obj
+       v ->
     let in_window = v.level >= copy_from_level && v.level < copy_below_level in
+    if cause = `Restore then assert (v.id < 0);
     if not in_window
     then v
     else
@@ -1644,7 +1645,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         | Some v' -> v'
         | None ->
           let copy =
-            fresh ~persistent ~upper:v.upper ~lower:v.lower ~level:v.level obj
+            fresh ~neg:(cause = `Save) ~upper:v.upper ~lower:v.lower
+              ~level:v.level obj
           in
           set_optcopy ~changes:copy_scope obj ~target_level v (Some copy);
           let vupper =
@@ -1653,7 +1655,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
                 let src = C.src obj f in
                 let ucopy =
                   copy_v ~copy_scope ~copy_from_level ~copy_below_level
-                    ~copy_to_level ~persistent src u
+                    ~copy_to_level ~cause src u
                 in
                 let x = Amorphvar (ucopy, f, f_hint) in
                 VarMap.add (get_key obj x) x acc)
@@ -1665,7 +1667,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
                 let src = C.src obj f in
                 let ucopy =
                   copy_v ~copy_scope ~copy_from_level ~copy_below_level
-                    ~copy_to_level ~persistent src u
+                    ~copy_to_level ~cause src u
                 in
                 let x = Amorphvar (ucopy, f, f_hint) in
                 VarMap.add (get_key obj x) x acc)
@@ -1678,8 +1680,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       end
 
   let copy (type a l r) ~copy_scope ~copy_from_level ~copy_below_level
-      ?copy_to_level ?(persistent = false) (obj : a C.obj) (a : (a, l * r) mode)
-      : (a, l * r) mode =
+      ?copy_to_level ?(cause = `Neither) (obj : a C.obj) (a : (a, l * r) mode) :
+      (a, l * r) mode =
     (* We never want to copy variables above [generic_level]. *)
     assert (copy_below_level <= generic_level + 1);
     Option.iter
@@ -1695,7 +1697,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       let obj = C.src obj f in
       let vcopy =
         copy_v ~copy_scope ~copy_from_level ~copy_below_level ~copy_to_level
-          ~persistent obj v
+          ~cause obj v
       in
       if vcopy == v then a else Amodevar (Amorphvar (vcopy, f, f_hint))
     | Amode _ -> a
@@ -1706,7 +1708,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             let src = C.src obj f in
             let vcopy =
               copy_v ~copy_scope ~copy_from_level ~copy_below_level
-                ~copy_to_level ~persistent src v
+                ~copy_to_level ~cause src v
             in
             let x = Amorphvar (vcopy, f, f_hint) in
             VarMap.add (get_key obj x) x acc)
@@ -1720,7 +1722,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             let src = C.src obj f in
             let vcopy =
               copy_v ~copy_scope ~copy_from_level ~copy_below_level
-                ~copy_to_level ~persistent src v
+                ~copy_to_level ~cause src v
             in
             let x = Amorphvar (vcopy, f, f_hint) in
             VarMap.add (get_key obj x) x acc)

@@ -259,6 +259,11 @@ module For_copy : sig
         (* Deeply copies a mode variable without changing its level, giving
            the copies negative (persistent) ids, for storing in a cmi file. *)
 
+  val mode_copy_for_restoring :
+    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+        (* Deeply copies a mode variable without changing its level.
+           Asserts that the original has negative ids. *)
+
   val mode_copy_then_generalize :
     copy_scope -> current_level:int -> Mode.Alloc.lr -> Mode.Alloc.lr
         (* Copies the parts of a mode variable whose levels lie within
