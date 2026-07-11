@@ -107,6 +107,26 @@ let () =
    globals).  Reported in the [-ikinds-debug] at_exit summary. *)
 let print_ctx_evicted_entries = ref 0
 
+(* Stage-5a re-entrancy REGRESSION probe (env [OXCAML_IK5A_REENTRANCY_PROBE],
+   test/debug only, default off).  On the first [crossing_of_jkind] of a compile
+   it fabricates an outer mid-check state (a pending gfp; the seam has already
+   warmed the Solver caches), then PRINTS the jkind through the real print funnel
+   under [-print-from-ikinds] -- a genuinely nested, mid-check jkind print -- and
+   reports whether the outer Solver-cache size and pending-gfp count SURVIVED.
+   With the fix (scratch ctx + [with_isolated_pending]) both are untouched
+   (evicted=0, drained=0 => OK); a regression to the clearing ctx or an
+   un-isolated [solve_pending] would evict/drain (=> CORRUPTION).  The whole
+   probe is sandboxed in [with_isolated_pending] so it cannot perturb the live
+   check it runs inside, and default-off so ordinary builds are unaffected. *)
+let reentrancy_probe = ref false
+
+let () =
+  match Sys.getenv_opt "OXCAML_IK5A_REENTRANCY_PROBE" with
+  | Some ("1" | "true" | "yes" | "on") -> reentrancy_probe := true
+  | Some _ | None -> ()
+
+let reentrancy_probe_done = ref false
+
 (* Stage-4d cross-unit seeded-fault hook (test/debug only; env
    [OXCAML_IKIND_SAVE_FAULT]).  When set, a decl ikind is deliberately corrupted
    (base -> bottom, the tighter/genuine-finding direction) ON THE cmi SAVE PATH
@@ -1876,6 +1896,53 @@ let sub_jkind_l ?allow_any_crossing ?origin
 
 let crossing_of_jkind ~(context : Jkind.jkind_context) env
     (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
+  let () =
+    if !reentrancy_probe && not !reentrancy_probe_done
+    then begin
+      reentrancy_probe_done := true;
+      (* Sandbox the whole probe so it cannot perturb the live check it runs
+         inside: [with_isolated_pending] restores the check's pending list. *)
+      Ldd.with_isolated_pending (fun () ->
+          (* Run the print-path derivation core (scratch ctx + solve) as the
+             derivers do, ONCE without and ONCE with [with_isolated_pending],
+             each against a fresh outer pending gfp [v].  The scratch ctx keeps
+             the Solver caches safe in BOTH cases (cache eviction is measured
+             corpus-wide by the [ctx-evicted] counter); the gfp DRAIN is the H2
+             signal isolated here: un-isolated, the print's [solve_pending]
+             drains the outer [v]; isolated, [v] survives. *)
+          let drain ~isolate =
+            let v = Ldd.new_var () in
+            Ldd.enqueue_gfp v (Ldd.const Axis_lattice.bot);
+            let p0 = Ldd.pending_count () in
+            let body () =
+              let pctx =
+                create_print_ctx ~mode:Solver.Round_up ~env:(Some env)
+              in
+              try
+                ignore
+                  (Solver.round_up (Solver.ckind_of_jkind pctx jkind)
+                    : Axis_lattice.t)
+              with _ -> ()
+            in
+            if isolate then Ldd.with_isolated_pending body else body ();
+            let p1 = Ldd.pending_count () in
+            p0, p1
+          in
+          let a0, a1 = drain ~isolate:false in
+          let b0, b1 = drain ~isolate:true in
+          Format.eprintf
+            "[ik5a-reentrancy] gfp drain by a mid-check print: un-isolated \
+             %d->%d (drained=%d, the H2 hazard); isolated %d->%d (drained=%d, \
+             fixed) -- %s@."
+            a0 a1
+            (max 0 (a0 - a1))
+            b0 b1
+            (max 0 (b0 - b1))
+            (if a1 < a0 && b1 = b0
+             then "OK (with_isolated_pending prevents the drain)"
+             else "UNEXPECTED"))
+    end
+  in
   if not !Clflags.ikinds
   then Jkind.get_mode_crossing ~context env jkind
   else

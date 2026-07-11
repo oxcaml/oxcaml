@@ -151,15 +151,23 @@ through the render/floor seam). at_exit summary:
   `with box/279[1].1 & param[N] @ [..]`; with-bounds-free `w`/`x` render
   byte-identical floors (`immutable_data` / `mutable_data`). Render path healthy.
 
-### H2 (gfp_pending) disposition
+### H2 (gfp_pending) — APPROVED IN SCOPE, FIXED
 
-H2 requires isolating the LDD-global `gfp_pending` (ldd.ml), which is ik5b's
-file per the ownership boundary. Flagged to team-lead as a scope finding beyond
-STAGE4C's Solver-cache-only MUST-FIX; deferred pending adjudication. The
-mandated fix (Solver-cache scratch ctx) is entirely in ikind.ml and drives
-`ctx-evicted` to 0 on its own; that is the acceptance-(b) evidence
-("before N / after 0"). H2 closure (with_isolated_pending) lands only if
-team-lead approves the ldd touch / coordinates with ik5b.
+Team-lead adjudicated H2 IN scope (the gfp drain is corruption, worse than the
+cache wipe) and granted the ldd.ml boundary (ik5b frozen). Fix: `Ldd.with_
+isolated_pending` (ldd.ml, exception-safe via Fun.protect) swaps in a fresh
+empty pending list for the print derivation and restores the caller's list,
+wired into both derivers. gfp-drain probe (env OXCAML_IK5A_REENTRANCY_PROBE, a
+mid-check print at the first crossing_of_jkind):
+
+    [ik5a-reentrancy] gfp drain by a mid-check print: un-isolated 1->0
+      (drained=1, the H2 hazard); isolated 1->1 (drained=0, fixed)
+      -- OK (with_isolated_pending prevents the drain)
+
+before (un-isolated): the print's solve_pending drains the outer pending gfp
+(1->0). after (isolated): the outer gfp survives (1->1). Both cases use the
+scratch ctx, so the caches are safe in both; the drain is the isolated H2
+signal.
 
 ### Fix (after), scratch-ctx commit
 
