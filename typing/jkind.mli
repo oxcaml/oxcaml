@@ -315,6 +315,17 @@ module Const : sig
     { derive : 'l 'r. Env.t -> ('l * 'r) t -> Mod_bounds.t option }
 
   val set_floor_from_ikind : floor_from_ikind -> unit
+
+  (** Stage-4c print-from-ikind (full rendering): under [-print-from-ikinds],
+      render the entire jkind (with normalized [with]-clauses) from its ikind.
+      [Ikind] installs it; default renders nothing. Returns [None] for the
+      with-bounds-free case (handled byte-identically elsewhere) and on failure.
+  *)
+  type render_from_ikind =
+    { render : 'l 'r. Env.t -> ('l * 'r) t -> Outcometree.out_jkind_const option
+    }
+
+  val set_render_from_ikind : render_from_ikind -> unit
 end
 
 module Builtin : sig

@@ -1699,6 +1699,21 @@ module Const = struct
 
   let set_floor_from_ikind f = floor_from_ikind := f
 
+  (* Stage-4c print-from-ikind (full rendering): under [-print-from-ikinds],
+     render the ENTIRE jkind from its ikind, including [with]-clauses NORMALIZED
+     from the LDD terms (constructor-atom paths + param references).  Installed
+     by [Ikind]; returns [None] for the with-bounds-FREE case (the byte-identical
+     floor path via [convert_with_base] handles those) and on any failure, and
+     [Some] only for with-bounds jkinds under the flag -- whose normalized
+     rendering intentionally diverges from legacy surface syntax (opt-in). *)
+  type render_from_ikind =
+    { render : 'l 'r. Env.t -> ('l * 'r) t -> Outcometree.out_jkind_const option
+    }
+
+  let render_from_ikind = ref { render = (fun _ _ -> None) }
+
+  let set_render_from_ikind f = render_from_ikind := f
+
   module To_out_jkind_const : sig
     (** Convert a [t] into a [Outcometree.out_jkind_const]. If [verbosity] is
         [Not_verbose], the jkind is written in terms of the built-in jkind that
@@ -1895,65 +1910,40 @@ module Const = struct
       | [] -> None
 
     let convert ~(verbosity : Format_verbosity.t) env (jkind : _ t) =
-      let jkind =
-        match verbosity with
-        | Not_verbose -> jkind
-        | Expanded | Expanded_with_all_mod_bounds ->
-          Base_and_axes.fully_expand_aliases_const env jkind
-      in
-      (* For each primitive jkind, we try to print the jkind in terms of it
+      match !render_from_ikind.render env jkind with
+      | Some out -> out
+      | None ->
+        let jkind =
+          match verbosity with
+          | Not_verbose -> jkind
+          | Expanded | Expanded_with_all_mod_bounds ->
+            Base_and_axes.fully_expand_aliases_const env jkind
+        in
+        (* For each primitive jkind, we try to print the jkind in terms of it
          (this is possible if the primitive is a subjkind of it). We then choose
          the "simplest". The "simplest" is taken to mean the one with the least
          number of modes that need to follow the [mod]. *)
-      let simplest =
-        match verbosity with
-        | Not_verbose ->
-          Builtin.common_jkinds
-          |> List.filter_map (fun base ->
-              convert_with_base env ~verbosity ~base jkind)
-          |> select_simplest
-        | Expanded | Expanded_with_all_mod_bounds -> None
-      in
-      let { base; scannable_axes; modal_bounds; printable_with_bounds } =
-        match simplest with
-        | Some simplest -> simplest
-        | None -> (
-          (* CR layouts v2.8: sometimes there is no valid way to build a jkind
+        let simplest =
+          match verbosity with
+          | Not_verbose ->
+            Builtin.common_jkinds
+            |> List.filter_map (fun base ->
+                convert_with_base env ~verbosity ~base jkind)
+            |> select_simplest
+          | Expanded | Expanded_with_all_mod_bounds -> None
+        in
+        let { base; scannable_axes; modal_bounds; printable_with_bounds } =
+          match simplest with
+          | Some simplest -> simplest
+          | None -> (
+            (* CR layouts v2.8: sometimes there is no valid way to build a jkind
              from a built-in abbreviation. For now, we just pretend that the
              layout name is a valid jkind abbreviation whose modal bounds are
              all max, even though this is a lie. Internal ticket 3284. *)
-          let layout_to_string =
-            match (verbosity : Format_verbosity.t) with
-            | Expanded_with_all_mod_bounds -> Layout.Const.to_string_verbose
-            | Not_verbose | Expanded -> Layout.Const.to_string
-          in
-          let out_jkind_verbose =
-            convert_with_base ~verbosity env
-              ~base:
-                { jkind =
-                    { base = jkind.base;
-                      mod_bounds = Mod_bounds.max;
-                      with_bounds = No_with_bounds;
-                      ikind_carrier = None
-                    };
-                  name = Base.to_string layout_to_string jkind.base
-                }
-              jkind
-          in
-          match out_jkind_verbose with
-          | Some out_jkind -> out_jkind
-          | None ->
-            (* If we fail, try again with nullable/maybe-separable
-               jkinds. *)
-            let expanded = Base_and_axes.fully_expand_aliases_const env jkind in
-            let layout_str =
-              match (expanded.base : Layout.Const.t jkind_base) with
-              | Layout (Base (Scannable, _)) ->
-                (* As a special case, we'd still like to print in terms
-                   of the value_or_null alias, even if we're printing an
-                   expanded jkind. *)
-                "value_or_null"
-              | _ -> Base.to_string layout_to_string expanded.base
+            let layout_to_string =
+              match (verbosity : Format_verbosity.t) with
+              | Expanded_with_all_mod_bounds -> Layout.Const.to_string_verbose
+              | Not_verbose | Expanded -> Layout.Const.to_string
             in
             let out_jkind_verbose =
               convert_with_base ~verbosity env
@@ -1964,26 +1954,58 @@ module Const = struct
                         with_bounds = No_with_bounds;
                         ikind_carrier = None
                       };
-                    name = layout_str
+                    name = Base.to_string layout_to_string jkind.base
                   }
                 jkind
             in
-            (* convert_with_base is guaranteed to succeed since the
+            match out_jkind_verbose with
+            | Some out_jkind -> out_jkind
+            | None ->
+              (* If we fail, try again with nullable/maybe-separable
+               jkinds. *)
+              let expanded =
+                Base_and_axes.fully_expand_aliases_const env jkind
+              in
+              let layout_str =
+                match (expanded.base : Layout.Const.t jkind_base) with
+                | Layout (Base (Scannable, _)) ->
+                  (* As a special case, we'd still like to print in terms
+                   of the value_or_null alias, even if we're printing an
+                   expanded jkind. *)
+                  "value_or_null"
+                | _ -> Base.to_string layout_to_string expanded.base
+              in
+              let out_jkind_verbose =
+                convert_with_base ~verbosity env
+                  ~base:
+                    { jkind =
+                        { base = jkind.base;
+                          mod_bounds = Mod_bounds.max;
+                          with_bounds = No_with_bounds;
+                          ikind_carrier = None
+                        };
+                      name = layout_str
+                    }
+                  jkind
+              in
+              (* convert_with_base is guaranteed to succeed since the
                layout matches and the modal bounds are all max *)
-            Option.get out_jkind_verbose)
-      in
-      let base = Outcometree.Ojkind_const_abbreviation (base, scannable_axes) in
-      (* Add on [mod] bounds, if there are any *)
-      let base =
-        if modal_bounds = []
-        then base
-        else Outcometree.Ojkind_const_mod (Some base, modal_bounds)
-      in
-      (* Finally, add on the [with]-types and their modalities *)
-      List.fold_left
-        (fun jkind (ty, modalities) ->
-          Outcometree.Ojkind_const_with (jkind, ty, modalities))
-        base printable_with_bounds
+              Option.get out_jkind_verbose)
+        in
+        let base =
+          Outcometree.Ojkind_const_abbreviation (base, scannable_axes)
+        in
+        (* Add on [mod] bounds, if there are any *)
+        let base =
+          if modal_bounds = []
+          then base
+          else Outcometree.Ojkind_const_mod (Some base, modal_bounds)
+        in
+        (* Finally, add on the [with]-types and their modalities *)
+        List.fold_left
+          (fun jkind (ty, modalities) ->
+            Outcometree.Ojkind_const_with (jkind, ty, modalities))
+          base printable_with_bounds
   end
 
   let to_out_jkind_const jkind =

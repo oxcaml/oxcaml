@@ -309,3 +309,83 @@ corruption or divergence. Cleared for stage 4c (flag default off; deriver never
 runs in normal builds). FLAGGED for stage 5: when the flag flips on by default,
 the derivation must either be proven non-re-entrant or use a non-cache-clearing
 context (a per-print scratch ctx that does not touch the globals).
+
+---
+
+## EXPANDED SCOPE (user decision, 2026-07-11): full ikind rendering under the flag
+
+User resolved the stage-5 representation question as PRINT-ONLY SIDECAR (default
+printing stays byte-identical forever) AND directed `-print-from-ikinds` to
+render the ENTIRE jkind from the ikind: floor as before PLUS with-clauses
+NORMALIZED from the LDD terms. Normalized divergence from legacy surface syntax
+is ACCEPTED under the flag (opt-in). ik4d also requested `of_terms` (below).
+
+### Ldd `of_terms` + canonical `to_terms` (commit)
+
+- `of_terms : (Axis_lattice.t * Name.t list) list -> node` — algebraic inverse
+  of `to_terms`: each term read as `coeff ⊓ ⊓names`, all joined. Total,
+  order-insensitive, duplicate name-sets joined (never raises), `Unknown` Uids
+  preserved (re-interned by the deterministic name hash, no re-mint). Edges:
+  `of_terms [] = bot`, `of_terms [(c,[])] = const c`.
+- `to_terms` now sorts each term's `Name.t` list by `Name.compare` (canonical,
+  byte-reproducible); terms stay in ZDD-walk order. `to_terms bot = []`,
+  `to_terms top = [(top,[])]`.
+- Round-trip property test `oxcaml/tests/typing/ldd_terms_roundtrip_test.ml`
+  (in the suite's dune): `of_terms (to_terms n)` semantically-equal to `n`,
+  `to_terms (of_terms ts)` idempotent on canonical lists, edge/dup/sort cases.
+  PASSES.
+
+### Full rendering (jkind.ml `render_from_ikind` ref + Ikind.render_jkind_from_ikind)
+
+`convert` consults `render_from_ikind` first. It returns `None` for
+with-bounds-FREE jkinds (they keep the byte-identical floor-seam path) and on
+any derivation failure; `Some` only for with-bounds jkinds under the flag. For
+those it derives the ikind, `to_terms`-decomposes it, renders the base
+(names=[]) term via the normal path on a synthetic with-bounds-free jkind (so
+the layout/abbreviation/floor matches legacy), and folds each non-base term
+`(coeff, names)` as `with (name1 & name2 … @ coeff)` (an `Otyp_stuff`),
+mirroring the LDD algebra.
+
+### Sample legacy → normalized pairs (measured, `expect` tool, flag off vs on)
+
+    immutable_data with 'a
+      -> immutable_data with param[4014] @ [0,0,0,3,0,0,0,0,3,0,0]
+
+    immutable_data with T.t            (inside a functor result)
+      -> immutable_data with T/467[16].t.0 @ [0,0,1,3,3,1,1,3,3,0,0]
+         (the Atom {constr=T.t; arg_index=0} rendered as a path.index reference)
+
+    value mod contended with 'a with 'b
+      -> value mod contended with param[5742] @ [0,0,0,3,0,0,0,0,0,0,0]
+                            with param[5743] @ [0,0,0,3,0,0,0,0,0,0,0]
+
+    value mod portable external_ with 'a @@ external_
+      -> value mod portable external_ with param[295] @ [0,0,0,0,3,0,0,0,0,0,0]
+
+    value mod contended with 'a        ('a : immutable_data)
+      -> value mod contended
+         (the with-bound is semantically redundant on the contended axis, so the
+          ikind absorbs it into the floor — the normalized form is MORE precise
+          than the legacy syntactic `with 'a`)
+
+Notes: the FLOOR (`value mod contended`, `immutable_data`, layout+abbreviation)
+is byte-identical to legacy in every pair; only the `with`-clauses are
+normalized. `param[N]` = a type-var reference (N is the type_expr id);
+`path.index` = a constructor-atom projection; `@ [..]` = the term's
+`Axis_lattice` coefficient (the per-axis contribution). Readable and faithful to
+the LDD terms; divergence from legacy surface syntax is by design under the flag.
+
+### Revised acceptance (measured)
+
+- (a) flag-OFF byte-identical: typing-jkind-bounds 72/72, typing-modules 54/54,
+  typing-layouts 45/45 (re-confirmed 72/72 after adding the convert hook).
+- (b) flag-ON with-bounds-FREE render byte-identical: structurally guaranteed
+  (`render_from_ikind` returns None for `No_with_bounds`, floor-seam proven
+  byte-identical) and observed — files printing only with-bounds-free jkinds
+  pass flag-on (e.g. modalities.ml: 4414 floor derivations, passes).
+- (c) flag-ON with-bounds render normalized: 27/72 typing-jkind-bounds files
+  diverge, ALL on `with`-clause lines only (bases unchanged); samples above.
+- (d) coverage counters: floor derivations, with-bounds rendered, render
+  fallbacks (genuinely-underivable = derivation raised) — in the `-ikinds-debug`
+  at_exit summary.
+- (e) seeded fault (OXCAML_PRINT_FLOOR_FAULT) still fires on the floor path.

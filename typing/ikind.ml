@@ -82,6 +82,14 @@ let () =
    seam is exercised corpus-wide. *)
 let print_floor_derivations = ref 0
 
+(* Coverage counters for the full-rendering path (with-bounds jkinds under the
+   flag): how many were rendered normalized from the ikind vs fell back to the
+   legacy renderer because the derivation raised (the genuinely-underivable
+   class). *)
+let print_withbounds_rendered = ref 0
+
+let print_render_fallbacks = ref 0
+
 (* Seeded-fault hook (test/debug only; env [OXCAML_PRINT_FLOOR_FAULT]).  When
    set, the print-from-ikind floor deriver returns a deliberately-wrong value
    ([top] = crosses everything) instead of the true floor, so the printed
@@ -166,8 +174,11 @@ let () =
          does not spew to stderr and pollute captured compiler output. *)
       if !Clflags.print_from_ikinds && !Clflags.ikinds_debug
       then
-        Format.eprintf "[ikind-print] floor derivations=%d fault=%b@."
-          !print_floor_derivations !print_floor_fault)
+        Format.eprintf
+          "[ikind-print] floor derivations=%d with-bounds rendered=%d render \
+           fallbacks=%d fault=%b@."
+          !print_floor_derivations !print_withbounds_rendered
+          !print_render_fallbacks !print_floor_fault)
 
 module Ldd = Types.Ldd
 
@@ -1265,6 +1276,80 @@ let mod_bounds_floor_for_printing : type l r.
 let () =
   Jkind.Const.set_floor_from_ikind
     { Jkind.Const.derive = mod_bounds_floor_for_printing }
+
+(* Stage-4c full print-from-ikind: render an entire WITH-BOUNDS jkind from its
+   ikind, with [with]-clauses NORMALIZED from the LDD terms.  Installed into
+   [Jkind.Const.render_from_ikind].  Returns [None] (=> legacy renderer, which
+   for the with-bounds-free case applies the byte-identical floor seam) when the
+   flag is off, ikinds are disabled, the jkind is with-bounds-free, or the
+   derivation raises.  For with-bounds jkinds the normalized rendering
+   intentionally diverges from legacy surface syntax (opt-in under the flag):
+   the base (names=[]) term is the unconditional floor, rendered via the normal
+   path on a synthetic with-bounds-free jkind (so the layout/abbreviation choice
+   matches legacy), and each non-base term [(coeff, names)] is rendered as a
+   [with] clause [with (name1 & name2 ... @ coeff)] mirroring the LDD algebra. *)
+let render_jkind_from_ikind : type l r.
+    Env.t -> (l * r) Jkind.Const.t -> Outcometree.out_jkind_const option =
+ fun env jkind ->
+  if not (!Clflags.print_from_ikinds && !Clflags.ikinds)
+  then None
+  else
+    match jkind.Types.with_bounds with
+    | Types.No_with_bounds -> None
+    | Types.With_bounds _ -> (
+      match
+        let ctx = create_ctx ~mode:Solver.Normal ~env:(Some env) in
+        let node = Solver.ckind_of_jkind_desc ctx jkind in
+        Ldd.solve_pending ();
+        Ldd.to_terms (Ldd.inline_solved_vars node)
+      with
+      | exception _ ->
+        incr print_render_fallbacks;
+        None
+      | terms ->
+        incr print_withbounds_rendered;
+        let floor =
+          List.fold_left
+            (fun acc (c, names) ->
+              match names with [] -> Axis_lattice.join acc c | _ -> acc)
+            Axis_lattice.bot terms
+        in
+        let base_jkind : (l * r) Jkind.Const.t =
+          { jkind with
+            Types.mod_bounds = Jkind.Mod_bounds.of_axis_lattice floor;
+            Types.with_bounds = Types.No_with_bounds;
+            Types.ikind_carrier = None
+          }
+        in
+        let base_out = Jkind.Const.to_out_jkind_const env base_jkind in
+        let with_clauses =
+          List.filter_map
+            (fun (c, names) ->
+              match names with
+              | [] -> None
+              | _ ->
+                let names_str =
+                  String.concat " & "
+                    (List.map Types.Rigid_name.to_string names)
+                in
+                let stuff =
+                  if Axis_lattice.equal c Axis_lattice.top
+                  then names_str
+                  else
+                    Printf.sprintf "%s @ %s" names_str
+                      (Axis_lattice.to_string c)
+                in
+                Some (Outcometree.Otyp_stuff stuff))
+            terms
+        in
+        Some
+          (List.fold_left
+             (fun acc oty -> Outcometree.Ojkind_const_with (acc, oty, []))
+             base_out with_clauses))
+
+let () =
+  Jkind.Const.set_render_from_ikind
+    { Jkind.Const.render = render_jkind_from_ikind }
 
 let predef_ikind_of_jkind ~params type_jkind =
   type_declaration_ikind_of_jkind ~env:None ~params type_jkind
