@@ -243,6 +243,19 @@ let residue_neutralized = ref 0
 
 let imported_residues = ref 0
 
+(* Stage-5c transition validation (STAGE5-DESIGN.md sec. C.2 item 2): before the
+   legacy mod_bounds-floor fast path in [compute_subcheck_polys] is dropped,
+   prove (validate-gated) it verdict-equivalent to the full ikind-derived sub
+   polynomial.  [floor_fastpath_checks] counts the seams where the fast path
+   fires; [floor_fastpath_mismatches] counts any whose fast-vs-slow
+   [leq_with_reason] VIOLATING-AXIS SET disagrees (the axis set -- not merely
+   accept/reject -- because [sub_or_intersect] derives its failure reasons from
+   it).  Must stay 0 corpus-wide to license the deletion.  Transitional: dies
+   with the fast path. *)
+let floor_fastpath_checks = ref 0
+
+let floor_fastpath_mismatches = ref 0
+
 let () =
   at_exit (fun () ->
       if !Clflags.ikinds_validate
@@ -251,12 +264,14 @@ let () =
           "[ikind-validate] summary: checks=%d mismatches=%d benign=%d \
            class_b=%d residue_trusted=%d; decl-ikind stored=%d recomputed=%d; \
            imported-foreign-params=%d param-id-collisions=%d; \
-           residue-neutralized=%d imported-residues=%d@."
+           residue-neutralized=%d imported-residues=%d; floor-fastpath \
+           checks=%d mismatches=%d@."
           !validate_checks !validate_mismatches !validate_benign
           !validate_class_b !residue_trusted !stored_decl_ikind_hits
           !recomputed_decl_ikind
           (Hashtbl.length imported_foreign_param_ids)
-          !param_id_collisions !residue_neutralized !imported_residues)
+          !param_id_collisions !residue_neutralized !imported_residues
+          !floor_fastpath_checks !floor_fastpath_mismatches)
 
 let () =
   at_exit (fun () ->
@@ -1732,6 +1747,37 @@ let compute_subcheck_polys ~context:_ env (sub : ('l1 * 'r1) Types.jkind)
     in
     match floor_fast_path with
     | Some lhs_floor ->
+      (* Stage-5c transition validation (sec. C.2): the fast path answers with the
+         legacy mod_bounds floor [lhs_floor] as the lhs of [leq].  Before 5c
+         drops it, prove (under validate) that the full ikind-derived sub
+         polynomial -- computed exactly as the [None] arm does (Round_up, super
+         constant) -- gives the SAME [leq_with_reason] verdict against
+         [super_poly], comparing the full violating-axis SET (not just
+         accept/reject).  Wrapped in [with_isolated_pending] so the extra
+         derivation's gfp solves cannot perturb the [lhs_floor]/[super_poly]
+         nodes this call returns.  0 mismatches corpus-wide licenses the drop. *)
+      if !Clflags.ikinds_validate
+      then
+        Ldd.with_isolated_pending (fun () ->
+            let slow_ctx = Solver.reset_for_mode ctx ~mode:Solver.Round_up in
+            let sub_poly = Solver.ckind_of_jkind slow_ctx sub in
+            let fast_axes = Ldd.leq_with_reason lhs_floor super_poly in
+            let slow_axes = Ldd.leq_with_reason sub_poly super_poly in
+            incr floor_fastpath_checks;
+            if not (String.equal (pp_axes fast_axes) (pp_axes slow_axes))
+            then (
+              incr floor_fastpath_mismatches;
+              Format.eprintf
+                "[ikind-validate] FLOOR-FASTPATH-MISMATCH@;\
+                 @;\
+                 fast=[%s]@;\
+                 slow=[%s]@;\
+                 @;\
+                 lhs_floor=%s@;\
+                 sub_poly=%s@;\
+                 super=%s@."
+                (pp_axes fast_axes) (pp_axes slow_axes) (Ldd.pp lhs_floor)
+                (Ldd.pp sub_poly) (Ldd.pp super_poly)));
       { lhs_for_leq = lhs_floor;
         rhs_for_leq = super_poly;
         fast_path = Lhs_mod_bounds_floor_fast_path
