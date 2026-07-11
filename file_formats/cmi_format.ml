@@ -40,32 +40,13 @@ let dehydrate_ikind (e : Types.type_ikind) : Types.type_ikind =
   | Types.No_constructor_ikind _ | Types.Saved_ikind _ -> e
 
 (* Deserialize side: Saved_ikind -> Constructor_ikind, rehydrating the LDD from
-   the named-terms payload.  Coexistence-window differential (validate only,
-   STAGE5-DESIGN.md C.1): the rehydrated LDD must equal the raw-DAG legacy node
-   that rode the SAME cmi -- 0 HARD is required before the raw-DAG path is
-   deleted in the follow-up commit. *)
+   the named-terms payload via [Ldd.of_terms].  The named-terms payload is now
+   the sole wire (the coexistence-window raw-DAG cross-check was validated
+   0 HARD and removed, STAGE5-DESIGN.md C.1). *)
 let rehydrate_ikind (e : Types.type_ikind) : Types.type_ikind =
   match e with
   | Types.Saved_ikind s ->
-    let ci = Types.constructor_ikind_of_saved s in
-    (if !Clflags.ikinds_validate
-     then
-       match s.saved_legacy with
-       | None -> ()
-       | Some legacy ->
-         let eq a b =
-           Types.Ldd.leq_with_reason a b = []
-           && Types.Ldd.leq_with_reason b a = []
-         in
-         let coeffs_eq =
-           Array.length ci.coeffs = Array.length legacy.coeffs
-           && Array.for_all2 eq ci.coeffs legacy.coeffs
-         in
-         if not (eq ci.base legacy.base && coeffs_eq)
-         then
-           Misc.fatal_error
-             "cmi ikind: named-terms payload disagrees with raw-DAG legacy");
-    Types.Constructor_ikind ci
+    Types.Constructor_ikind (Types.constructor_ikind_of_saved s)
   | Types.Constructor_ikind _ | Types.No_constructor_ikind _ -> e
 
 type pers_flags =

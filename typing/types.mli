@@ -172,7 +172,6 @@ type ikind_term = Axis_lattice.t * Rigid_name.t list
 type saved_constructor_ikind =
   { saved_base : ikind_term list;
     saved_coeffs : ikind_term list array;
-    saved_legacy : constructor_ikind option;
   }
 
 type constructor_ikind_entry =

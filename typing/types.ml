@@ -114,12 +114,6 @@ type ikind_term = Axis_lattice.t * Rigid_name.t list
 type saved_constructor_ikind =
   { saved_base : ikind_term list;
     saved_coeffs : ikind_term list array;
-    saved_legacy : constructor_ikind option;
-      (* Coexistence window (STAGE5-DESIGN.md C.1): the raw-DAG node form,
-         carried ALONGSIDE the named-terms payload so both load paths ride the
-         SAME cmi.  Deserialize rehydrates from the terms and, under validate,
-         cross-checks it against this legacy node (0 HARD).  The follow-up
-         commit drops the raw-DAG path, leaving terms the sole wire. *)
   }
 
 type constructor_ikind_entry =
@@ -145,7 +139,6 @@ let constructor_ikind_to_saved (ci : constructor_ikind) :
     saved_constructor_ikind =
   { saved_base = Ldd.to_terms ci.base;
     saved_coeffs = Array.map Ldd.to_terms ci.coeffs;
-    saved_legacy = Some ci;
   }
 
 let constructor_ikind_of_saved (s : saved_constructor_ikind) :
