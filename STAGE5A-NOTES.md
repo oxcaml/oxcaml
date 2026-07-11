@@ -129,4 +129,38 @@ refuses to rely on).
 
 ## Measurements
 
-(filled in as commits land)
+### Probe (before fix), commit adding the counter
+
+Boot compiler at the probe commit. Source `/tmp/ik5a_probe_src.ml`: eight type
+decls mixing with-bounds-free (`w`, `x`) and with-bounds (`box`, `t`, `u`, `v`,
+`big`, `nested`) jkinds. Compiled `-extension layouts_beta -print-from-ikinds
+-ikinds-debug -i` (the `-i` inferred-signature print forces every decl's jkind
+through the render/floor seam). at_exit summary:
+
+    [ikind-print] floor derivations=336 with-bounds rendered=6 render       fallbacks=0 fault=false ctx-evicted=22
+
+- `ctx-evicted=22`: print-path `create_ctx` calls evicted 22 warm global Solver
+  cache entries during printing. N > 0 => hazard H1 is real and reachable on the
+  print path (a print DOES clear a warm cache). Same 22 with
+  `OXCAML_IKINDS_VALIDATE=1` (ikind checking on, so the warm entries include
+  genuine checker computations, not only prior prints).
+- Flag OFF (control): no `[ikind-print]` summary at all -- the print seam never
+  runs, output byte-identical to base. Confirms the counter measures only the
+  print path.
+- Smoke (acceptance c): with-bounds jkinds render `with param[N] @ [..]` and
+  `with box/279[1].1 & param[N] @ [..]`; with-bounds-free `w`/`x` render
+  byte-identical floors (`immutable_data` / `mutable_data`). Render path healthy.
+
+### H2 (gfp_pending) disposition
+
+H2 requires isolating the LDD-global `gfp_pending` (ldd.ml), which is ik5b's
+file per the ownership boundary. Flagged to team-lead as a scope finding beyond
+STAGE4C's Solver-cache-only MUST-FIX; deferred pending adjudication. The
+mandated fix (Solver-cache scratch ctx) is entirely in ikind.ml and drives
+`ctx-evicted` to 0 on its own; that is the acceptance-(b) evidence
+("before N / after 0"). H2 closure (with_isolated_pending) lands only if
+team-lead approves the ldd touch / coordinates with ik5b.
+
+### Fix (after), scratch-ctx commit
+
+(filled in after the fix builds)

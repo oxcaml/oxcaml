@@ -104,6 +104,13 @@ let () =
   | Some ("1" | "true" | "yes" | "on") -> print_floor_fault := true
   | Some _ | None -> ()
 
+(* Stage-5a re-entrancy probe: global Solver-cache entries a print-path context
+   creation EVICTS.  With the pre-fix clearing [create_ctx] this counts the warm
+   cache a mid-print [create_ctx] wipes (hazard H1); after the scratch-ctx fix it
+   stays 0 (the scratch ctx allocates fresh tables and never touches the
+   globals).  Reported in the [-ikinds-debug] at_exit summary. *)
+let print_ctx_evicted_entries = ref 0
+
 (* Stage-4d cross-unit seeded-fault hook (test/debug only; env
    [OXCAML_IKIND_SAVE_FAULT]).  When set, a decl ikind is deliberately corrupted
    (base -> bottom, the tighter/genuine-finding direction) ON THE cmi SAVE PATH
@@ -255,9 +262,9 @@ let () =
       then
         Format.eprintf
           "[ikind-print] floor derivations=%d with-bounds rendered=%d render \
-           fallbacks=%d fault=%b@."
+           fallbacks=%d fault=%b ctx-evicted=%d@."
           !print_floor_derivations !print_withbounds_rendered
-          !print_render_fallbacks !print_floor_fault)
+          !print_render_fallbacks !print_floor_fault !print_ctx_evicted_entries)
 
 module Ldd = Types.Ldd
 
@@ -334,6 +341,12 @@ module Solver = struct
       ty_to_kind = global_ty_to_kind;
       constr_to_coeffs = global_constr_to_coeffs
     }
+
+  (* Stage-5a probe: total live entries in the two GLOBAL caches.  A print-path
+     [create_ctx] clears both, evicting exactly this many; measured to quantify
+     the re-entrancy hazard H1 (STAGE5A-NOTES.md). *)
+  let global_cache_size () : int =
+    TyTbl.length global_ty_to_kind + ConstrTbl.length global_constr_to_coeffs
 
   let reset_for_mode (ctx : ctx) ~(mode : mode) : ctx = { ctx with mode }
 
@@ -1266,6 +1279,16 @@ let create_ctx ~(mode : Solver.mode) ~(env : Env.t option) =
   Solver.create_ctx ~mode ~env ~lookup_of_env:(fun env path ->
       lookup_of_env ~env path)
 
+(* Stage-5a: context-creation helper for the two print-from-ikind derivations.
+   PROBE FORM (pre-fix): still uses the global-clearing [create_ctx], but first
+   records how many warm global-cache entries that clear evicts -- the
+   re-entrancy hazard H1, measured across the corpus.  The scratch-ctx fix
+   replaces the body with a non-clearing fresh-table context so this stays 0. *)
+let create_print_ctx ~(mode : Solver.mode) ~(env : Env.t option) =
+  print_ctx_evicted_entries
+    := !print_ctx_evicted_entries + Solver.global_cache_size ();
+  create_ctx ~mode ~env
+
 let normalize ~(env : Env.t option) (jkind : Types.jkind_l) : Ldd.node =
   let ctx = create_ctx ~mode:Solver.Normal ~env in
   Solver.normalize (Solver.ckind_of_jkind ctx jkind)
@@ -1417,7 +1440,7 @@ let mod_bounds_floor_for_printing : type l r.
     | Types.With_bounds _ -> None
     | Types.No_with_bounds -> (
       match
-        let ctx = create_ctx ~mode:Solver.Normal ~env:(Some env) in
+        let ctx = create_print_ctx ~mode:Solver.Normal ~env:(Some env) in
         Solver.round_up (Solver.ckind_of_jkind_desc ctx jkind)
       with
       | exception _ -> None
@@ -1451,7 +1474,7 @@ let render_jkind_from_ikind : type l r.
     | Types.No_with_bounds -> None
     | Types.With_bounds _ -> (
       match
-        let ctx = create_ctx ~mode:Solver.Normal ~env:(Some env) in
+        let ctx = create_print_ctx ~mode:Solver.Normal ~env:(Some env) in
         let node = Solver.ckind_of_jkind_desc ctx jkind in
         Ldd.solve_pending ();
         Ldd.to_terms (Ldd.inline_solved_vars node)
