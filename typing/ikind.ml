@@ -243,19 +243,6 @@ let residue_neutralized = ref 0
 
 let imported_residues = ref 0
 
-(* Stage-5c transition validation (STAGE5-DESIGN.md sec. C.2 item 2): before the
-   legacy mod_bounds-floor fast path in [compute_subcheck_polys] is dropped,
-   prove (validate-gated) it verdict-equivalent to the full ikind-derived sub
-   polynomial.  [floor_fastpath_checks] counts the seams where the fast path
-   fires; [floor_fastpath_mismatches] counts any whose fast-vs-slow
-   [leq_with_reason] VIOLATING-AXIS SET disagrees (the axis set -- not merely
-   accept/reject -- because [sub_or_intersect] derives its failure reasons from
-   it).  Must stay 0 corpus-wide to license the deletion.  Transitional: dies
-   with the fast path. *)
-let floor_fastpath_checks = ref 0
-
-let floor_fastpath_mismatches = ref 0
-
 let () =
   at_exit (fun () ->
       if !Clflags.ikinds_validate
@@ -264,14 +251,12 @@ let () =
           "[ikind-validate] summary: checks=%d mismatches=%d benign=%d \
            class_b=%d residue_trusted=%d; decl-ikind stored=%d recomputed=%d; \
            imported-foreign-params=%d param-id-collisions=%d; \
-           residue-neutralized=%d imported-residues=%d; floor-fastpath \
-           checks=%d mismatches=%d@."
+           residue-neutralized=%d imported-residues=%d@."
           !validate_checks !validate_mismatches !validate_benign
           !validate_class_b !residue_trusted !stored_decl_ikind_hits
           !recomputed_decl_ikind
           (Hashtbl.length imported_foreign_param_ids)
-          !param_id_collisions !residue_neutralized !imported_residues
-          !floor_fastpath_checks !floor_fastpath_mismatches)
+          !param_id_collisions !residue_neutralized !imported_residues)
 
 let () =
   at_exit (fun () ->
@@ -638,42 +623,6 @@ module Solver = struct
 
   and ckind_of_jkind : type l r. ctx -> (l * r) Types.jkind -> Ldd.node =
    fun ctx jkind -> ckind_of_jkind_desc ctx jkind.jkind
-
-  and mod_bounds_floor_of_jkind_desc : type a l r.
-      ctx -> (a, l * r) Types.base_and_axes -> Ldd.node option =
-   fun ctx jkind_desc ->
-    let mod_bounds, unresolved_base =
-      let rec expand : type b.
-          (b, l * r) Types.base_and_axes -> Types.mod_bounds * Path.t option =
-       fun jkind_desc ->
-        match ctx.env with
-        | None ->
-          let unresolved_base =
-            match jkind_desc.base with
-            | Types.Layout _ -> None
-            | Types.Kconstr (path, _) -> Some path
-          in
-          jkind_desc.mod_bounds, unresolved_base
-        | Some env -> (
-          match Jkind.Const.expand_once env jkind_desc with
-          | Some jkind_const -> expand jkind_const
-          | None ->
-            let unresolved_base =
-              match jkind_desc.base with
-              | Types.Layout _ -> None
-              | Types.Kconstr (path, _) -> Some path
-            in
-            jkind_desc.mod_bounds, unresolved_base)
-      in
-      expand jkind_desc
-    in
-    match unresolved_base with
-    | Some _ -> None
-    | None -> Some (Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds))
-
-  and mod_bounds_floor_of_jkind : type l r.
-      ctx -> (l * r) Types.jkind -> Ldd.node option =
-   fun ctx jkind -> mod_bounds_floor_of_jkind_desc ctx jkind.jkind
 
   (** Compute the kind for [t]. *)
   and kind ?(check_principality = true) ~use_tables (ctx : ctx)
@@ -1571,7 +1520,6 @@ let () = Predef.set_ikind_of_jkind predef_ikind_of_jkind
 type subcheck_fast_path =
   | No_fast_path
   | Rhs_top_fast_path
-  | Lhs_mod_bounds_floor_fast_path
 
 type subcheck_polys =
   { lhs_for_leq : Ldd.node;
@@ -1730,69 +1678,21 @@ let compute_subcheck_polys ~context:_ env (sub : ('l1 * 'r1) Types.jkind)
       fast_path = Rhs_top_fast_path
     }
   else
-    let floor_fast_path =
+    (* Stage-5c: the legacy [mod_bounds]-floor fast path is gone (§C.2
+       differential proved it verdict-equivalent to this full derivation
+       corpus-wide).  When [super] is constant we derive the sub polynomial in
+       [Round_up] mode, exactly as before; the LDD is now the sole answering
+       engine for the floor. *)
+    let sub_ctx =
       if super_is_constant
-      then
-        match Solver.mod_bounds_floor_of_jkind ctx sub with
-        | None -> None
-        | Some lhs_floor ->
-          let lhs_floor_or_super = Ldd.join lhs_floor super_poly in
-          if
-            Axis_lattice.equal
-              (Ldd.round_up lhs_floor_or_super)
-              Axis_lattice.top
-          then Some lhs_floor
-          else None
-      else None
+      then Solver.reset_for_mode ctx ~mode:Solver.Round_up
+      else ctx
     in
-    match floor_fast_path with
-    | Some lhs_floor ->
-      (* Stage-5c transition validation (sec. C.2): the fast path answers with the
-         legacy mod_bounds floor [lhs_floor] as the lhs of [leq].  Before 5c
-         drops it, prove (under validate) that the full ikind-derived sub
-         polynomial -- computed exactly as the [None] arm does (Round_up, super
-         constant) -- gives the SAME [leq_with_reason] verdict against
-         [super_poly], comparing the full violating-axis SET (not just
-         accept/reject).  Wrapped in [with_isolated_pending] so the extra
-         derivation's gfp solves cannot perturb the [lhs_floor]/[super_poly]
-         nodes this call returns.  0 mismatches corpus-wide licenses the drop. *)
-      if !Clflags.ikinds_validate
-      then
-        Ldd.with_isolated_pending (fun () ->
-            let slow_ctx = Solver.reset_for_mode ctx ~mode:Solver.Round_up in
-            let sub_poly = Solver.ckind_of_jkind slow_ctx sub in
-            let fast_axes = Ldd.leq_with_reason lhs_floor super_poly in
-            let slow_axes = Ldd.leq_with_reason sub_poly super_poly in
-            incr floor_fastpath_checks;
-            if not (String.equal (pp_axes fast_axes) (pp_axes slow_axes))
-            then (
-              incr floor_fastpath_mismatches;
-              Format.eprintf
-                "[ikind-validate] FLOOR-FASTPATH-MISMATCH@;\
-                 @;\
-                 fast=[%s]@;\
-                 slow=[%s]@;\
-                 @;\
-                 lhs_floor=%s@;\
-                 sub_poly=%s@;\
-                 super=%s@."
-                (pp_axes fast_axes) (pp_axes slow_axes) (Ldd.pp lhs_floor)
-                (Ldd.pp sub_poly) (Ldd.pp super_poly)));
-      { lhs_for_leq = lhs_floor;
-        rhs_for_leq = super_poly;
-        fast_path = Lhs_mod_bounds_floor_fast_path
-      }
-    | None ->
-      let sub_ctx =
-        if super_is_constant
-        then Solver.reset_for_mode ctx ~mode:Solver.Round_up
-        else ctx
-      in
-      let sub_poly = Solver.ckind_of_jkind sub_ctx sub in
-      { lhs_for_leq = sub_poly;
-        rhs_for_leq = super_poly;
-        fast_path = No_fast_path
-      }
+    let sub_poly = Solver.ckind_of_jkind sub_ctx sub in
+    { lhs_for_leq = sub_poly;
+      rhs_for_leq = super_poly;
+      fast_path = No_fast_path
+    }
 
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
@@ -1837,7 +1737,6 @@ let sub_jkind_l ?allow_any_crossing ?origin
            match fast_path with
            | No_fast_path -> "none"
            | Rhs_top_fast_path -> "rhs_top"
-           | Lhs_mod_bounds_floor_fast_path -> "lhs_mod_bounds_floor"
          in
          Format.eprintf
            "[ikind-subjkind] call%s allow_any=false fast_path=%s@;\
