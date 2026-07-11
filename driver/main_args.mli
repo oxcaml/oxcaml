@@ -25,6 +25,7 @@ module type Common_options = sig
   val _i_variance : unit -> unit
   val _no_ikinds : unit -> unit
   val _ikinds_debug : unit -> unit
+  val _print_from_ikinds : unit -> unit
   val _I : string -> unit
   val _Ix : string -> unit
   val _H : string -> unit

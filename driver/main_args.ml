@@ -829,6 +829,10 @@ let mk_no_ikinds f =
 let mk_ikinds_debug f =
   "-ikinds-debug", Arg.Unit f, " Enable ikinds debug logging"
 
+let mk_print_from_ikinds f =
+  "-print-from-ikinds", Arg.Unit f,
+  " Derive jkind printing from the ikind representation (dev)"
+
 let mk_extension f =
   let available_extensions =
     Language_extension.Exist.(List.concat_map to_command_line_strings all)
@@ -1143,6 +1147,7 @@ module type Common_options = sig
   val _i_variance : unit -> unit
   val _no_ikinds : unit -> unit
   val _ikinds_debug : unit -> unit
+  val _print_from_ikinds : unit -> unit
   val _I : string -> unit
   val _Ix : string -> unit
   val _H : string -> unit
@@ -1500,6 +1505,7 @@ struct
     mk_disable_all_extensions F._disable_all_extensions;
     mk_no_ikinds F._no_ikinds;
     mk_ikinds_debug F._ikinds_debug;
+    mk_print_from_ikinds F._print_from_ikinds;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_dllib F._dllib;
     mk_dllpath F._dllpath;
@@ -1661,6 +1667,7 @@ struct
     mk_disable_all_extensions F._disable_all_extensions;
     mk_no_ikinds F._no_ikinds;
     mk_ikinds_debug F._ikinds_debug;
+    mk_print_from_ikinds F._print_from_ikinds;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_extension F._extension;
     mk_no_extension F._no_extension;
@@ -1771,6 +1778,7 @@ struct
     mk_disable_all_extensions F._disable_all_extensions;
     mk_no_ikinds F._no_ikinds;
     mk_ikinds_debug F._ikinds_debug;
+    mk_print_from_ikinds F._print_from_ikinds;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_extension F._extension;
     mk_no_extension F._no_extension;
@@ -2000,6 +2008,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_disable_all_extensions F._disable_all_extensions;
     mk_no_ikinds F._no_ikinds;
     mk_ikinds_debug F._ikinds_debug;
+    mk_print_from_ikinds F._print_from_ikinds;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_extension F._extension;
     mk_no_extension F._no_extension;
@@ -2387,6 +2396,7 @@ module Default = struct
     let _alert = Warnings.parse_alert_option
     let _no_ikinds = clear Clflags.ikinds
     let _ikinds_debug = set Clflags.ikinds_debug
+    let _print_from_ikinds = set Clflags.print_from_ikinds
     let _alias_deps = clear no_alias_deps
     let _app_funct = set applicative_functors
     let _i_variance = set print_variance

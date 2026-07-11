@@ -216,6 +216,7 @@ let llvm_backend = ref false            (* -llvm-backend *)
 let ikinds = ref true                   (* -no-ikinds *)
 let ikinds_debug = ref false            (* -ikinds-debug *)
 let ikinds_validate = ref false         (* OXCAML_IKINDS_VALIDATE *)
+let print_from_ikinds = ref false       (* -print-from-ikinds *)
 let default_timings_precision  = 3
 let timings_precision = ref default_timings_precision (* -dtimings-precision *)
 let profile_columns : profile_column list ref = ref [] (* -dprofile/-dtimings/-dcounters *)
