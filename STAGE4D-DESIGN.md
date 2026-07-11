@@ -311,3 +311,190 @@ persistence is load-bearing and where the fault surfaces.)
 `OXCAML_IKIND_SAVE_FAULT` cross-unit seeded fault (`typing/ikind.ml`,
 `typing/subst.ml`, +mlis; +37/-3). Validate/debug-only, default off. No cmi
 format change, no magic bump. Boot-green; flag-off byte-identical.
+
+### Part 3.5: cross-unit Param-id collision DETECTOR (shipped).
+
+A validate-only, read-side detector that converts the collision hazard (below)
+from silent to observable WITHOUT the stage-5 redesign and WITHOUT touching the
+persistence format or CLASS-B. Mechanism: `imported_foreign_param_ids` records
+every foreign `Param` id seen in an IMPORTED stored decl ikind — recorded at the
+load/lookup site (`lookup_of_env`, gated on `Ident.is_global (Path.head path)`),
+which is BEFORE interning, so the id's persisted origin is known without any
+post-intern marker (this is precisely why the detector does NOT need the
+residue-marker redesign that D1 would). Each live `Param` mint (`Solver.rigid`)
+checks membership and counts overlaps (`param_id_collisions`). Surfaced in the
+validate summary; default-off `OXCAML_IKIND_COLLISION_FAULT` is a seeded negative
+control proving the counter can increment.
+
+Verified: consuming the mixmod5 cmi shows `imported-foreign-params=1` (a residue
+`Param` id arrives from the cmi) with `param-id-collisions=0` (no natural
+collision); with the seeded control, `param-id-collisions=14` (fires). Validate
+off ⇒ no summary, byte-identical. A natural collision is NOT source-constructible
+(`type_expr` id allocation is not controllable), so the counter reads 0 in
+practice — but the hazard is now observable if it ever occurs. Over-approximate
+by design (flags numeric overlap even absent a shared `decompose`); acceptable
+for a detector.
+
+---
+
+## KNOWN SOUNDNESS RISK (stage-5 MUST-FIX gate)
+
+**Foreign-`Param` stale-id collision in `decompose_into_linear_terms`.** A
+persisted (imported) decl ikind residue carries a foreign `Param id` whose `id`
+is a stale live-`type_expr` id from the DEFINING unit. Rigid vars intern by
+`stable_hash(name)`, so `Param n` from the imported residue and `Param n` freshly
+minted by the importer for one of its OWN type variables (`get_id = n`) are the
+SAME rigid var. If the importer computes a parametric decl whose body references
+the imported residue, `decompose_into_linear_terms ~universe:{importer's own
+param ids}` does `assign_bot`/`assign_top` over each universe id; a shared id
+conflates the residue's unconditional contribution with the argument's, factoring
+it into the positional coeff. On a small (non-saturating) argument the residue's
+contribution then vanishes → the importer's decl ikind UNDER-approximates →
+potential unsound ACCEPT.
+
+Properties: **real** (structural, worked through), **narrow** (needs an exact
+numeric `type_expr`-id collision AND a parametric decl referencing an imported
+residue), **unexhibited** (id allocation not source-controllable; the detector
+above reads 0 naturally), **pre-existing** (foreign `Param`s have crossed cmis
+verbatim since stage 2 made decl ikinds authoritative — stage 4d did not
+introduce it). It is an unsound-accept SHAPE, so it is a **MUST-FIX gate for
+stage 5** (not a soft note): stage 5 cannot delete the legacy fields (removing
+the recompute-from-legacy safety net) while a persisted residue can silently
+alias a live id. The fix is the named-terms residue representation (below): on
+import, a residue's Names are remapped to unit-unique atoms, so no stale id
+survives to collide.
+
+---
+
+## D1 experiment (verbatim — PRIMARY stage-5 design input)
+
+D1 = neutralize foreign `Param` → fresh globally-unique `Unknown` on the cmi save
+path. It is verdict-preserving (the solver treats `Param`/`Unknown` identically
+as free rigids, `ikind.ml` `rigid_name`) and collision-safe (`Unknown` uids are
+globally unique). **Built and measured on a cross-unit residue consumer** (`type
+wrap : immutable_data with Mixmod5_mod.LamF.exp0`):
+
+- **pre-D1 (baseline):** importer classifies the imported-residue divergence as
+  CLASS-B (`residue_trusted=1`), **0 HARD**.
+- **post-D1:** the same consumer produces a **HARD MISMATCH**.
+
+**Mechanism: marker erasure.** Stage-4b's CLASS-B recognizes a residue by the
+foreign `Param` marker (`stored_ikind_has_foreign_param`, `ikind.ml`).
+Neutralizing to `Unknown` removes the marker, so the (still tighter-stored)
+divergence no longer routes to CLASS-B and falls through to HARD. So D1
+(collision-safety) and CLASS-B (residue recognition) are in DIRECT TENSION: full
+collision-safety needs a globally-unique id, which erases recognizability. This
+is why D1 is NOT shipped and NOT patched with a CLASS-B extension (recognizing
+neutralized residues would mean inventing a residue marker — D2's redesign done
+hackily, with over-broad-trust risk). Resolving both cleanly requires a dedicated
+residue-atom representation = the named-terms format (below). This experiment is
+the primary reason the named-terms persistence redesign is stage 5's content.
+
+---
+
+## Stage-5 named-terms persistence design (the deliverable)
+
+USER DECISION (stage-5 gate): **print-only sidecar**. Consequences baked in
+below.
+
+### What the stage-5 cmi carries, per decl
+
+1. **AUTHORITATIVE: the decl ikind, as an explicit named-terms payload.** Replace
+   today's raw-`Obj.t`-DAG marshal of `constructor_ikind.{base,coeffs}` with
+   ik4c's `to_terms : node -> (Axis_lattice.t * Name.t list) list` (base term =
+   the `names=[]` element; other terms = `(coeff, atom-set)`), one term-list per
+   `base` and per `coeffs.(i)`. Decouples the cmi from `node_block`/`Axis_lattice`
+   internal layout (the §3b `Obj.t`-coupling robustness concern) and gives an
+   explicit place to remap atoms on import. Rehydrate on load with `of_terms`
+   (the canonical inverse; contract agreed with ik4c: `of_terms` interprets each
+   term as `coeff ⊓ ⊓Names` and joins them, `of_terms [] = bot`, joins duplicate
+   name-sets, within-term Names sorted by `Name.compare` for byte-reproducible
+   cmis, does not re-mint `Unknown` uids).
+2. **PRINT SIDECAR: the demoted `with_bounds` `type_expr`s.** Per the user
+   decision, `with_bounds` survives stage 5 DEMOTED to print-only (ik4c proved
+   surface `with`-clause syntax is irrecoverable from the LDD — `ckind_of_jkind`
+   discards the `type_expr` and constructor head). They persist through the
+   ORDINARY `Subst` type machinery exactly as today (they ARE `type_expr`s, so
+   they remap on import via the normal type substitution, NOT via LDD-Name
+   remapping). The `-print-from-ikinds` flag renders normalized from the LDD
+   instead; the sidecar is only consulted by the default (faithful) printer.
+3. **DELETED: `mod_bounds`.** Fully removed; derivable from the LDD for printing
+   (ik4c P1). No sidecar needed.
+
+### Name/path remap on import (the crux the format enables)
+
+Each persisted term is `(coeff, Name.t list)`. On import, remap each `Name`:
+- **`Atom {constr; arg_index}` / `KAtom path`:** remap `path` through the import
+  substitution exactly as `substitute_decl_ikind_with_lookup` does today
+  (`type_path`/`jkind_path` → local-to-persistent path rewriting). Already
+  correct; the named-terms form just makes it explicit (remap the Name list, then
+  `of_terms`).
+- **`Unknown uid`:** globally unique, no remap. (Fixed at decl time; stable.)
+- **`Param id` (foreign residue):** THE MUST-FIX. The stale id must be replaced
+  on import by a unit-unique atom so it cannot alias a live id (the collision
+  above). Options for stage 5: (a) map each imported foreign `Param` to a fresh
+  `Unknown uid` AT IMPORT (not save) — collision-safe, but see the CLASS-B tension
+  (the importer must then recognize it as a residue by ORIGIN, which it can at
+  import time, unlike D1's save-time erasure — this is the key asymmetry that
+  makes an import-side fix viable where the save-side D1 was not); or (b) a
+  dedicated `Residue`/unit-qualified atom kind in `Rigid_name.t` carrying the
+  defining unit, so residues are both collision-free (unit-qualified) and
+  recognizable (a distinct constructor). (b) is the cleaner end state and is the
+  residue-marker the D1 experiment showed is needed.
+
+### Magic-number plan
+
+Bump `Config.cmi_magic_number` at stage 5 (prototyped `Caml1999I581 → 582`). The
+format changes (named-terms payload replaces raw DAG; residue atoms remapped), so
+old cmis must be rejected, not silently mixed. cmi compat is waived (user), so the
+build system rebuilds the world. NB: a cmi-magic bump forces a full STDLIB rebuild
+(the compiler rejects the old stdlib cmis) — so the bump lands WITH the format
+change, not before.
+
+### Transition validation (proving persisted == recomputed before deleting legacy)
+
+Stage 5 deletes the legacy `mod_bounds`/`with_bounds`, removing the
+recompute-from-legacy reference the stage-1-4 harness compares against. Before
+deletion, prove the persisted LDD is a faithful substitute:
+1. **Round-trip:** `of_terms (to_terms n)` semantically-equal `n` for every stored
+   decl ikind (per-decl assertion under validate).
+2. **Cross-unit:** the existing flag-on validate harness over a cross-unit corpus
+   (this stage's `cross_unit_ikinds` test + the mixmod5 residue consumer) shows
+   0 HARD with the named-terms load path — i.e. importer's LDD (rehydrated from
+   the named-terms payload, atoms remapped) matches a from-legacy recompute WHILE
+   both still exist. This is the last window where both representations coexist;
+   run it before the delete commit.
+3. **Collision detector at 0:** part-3.5's `param-id-collisions` must read 0 across
+   the corpus once residues are import-remapped to unit-unique atoms (it should,
+   by construction — no stale ids survive). A non-zero reading gates the delete.
+
+### Residues-in-batch invariant + boundary conditions (corrected)
+
+CORRECTION to the earlier "residues are toplevel-only" hypothesis: **foreign-Param
+residues DO reach cmis in batch `-c` compilation** — the save-path scan found 11
+foreign `Param` atoms in `mixmod5` compiled as a batch module, and an importer's
+CLASS-B/`residue_trusted` fires on the imported residue. So the invariant is NOT
+"residues never cross the boundary"; it is the opposite, and it is why the
+must-fix and detector exist. Nuance: residues arise from specific recursive-module
+fixpoint shapes (mixmod5's polymorphic-variant recursive-object fixpoint
+produces them; a plain `< exp : exp0 >` object recursion in the probe did NOT),
+so they are rare but real. Boundary conditions that stage 5 must keep in view
+(each can only ADD residue-carrying cmis, never remove the need to handle them):
+toplevel-produced artifacts, `-pack`, module aliases, and functor result
+signatures — any path that saves a signature containing a recursive-module
+fixpoint decl. Stage 5's import-remap must therefore handle foreign `Param`s
+unconditionally, not assume they are absent.
+
+### Cheap inert plumbing NOW? (cost/benefit)
+
+Considered landing the cmi field/format scaffolding now with an empty payload so
+stage 5 only flips content. **Recommend NOT doing the format half now**, because
+(a) there is no separate cmi "field" to add — the ikind already rides inside the
+marshaled `signature_item`, so an "empty payload + magic bump" would still be a
+full format change (magic bump ⇒ full stdlib rebuild) for zero behavior, i.e. all
+of stage 5's format cost with none of its value; and (b) the named-terms payload
+is only well-defined once `to_terms`/`of_terms` land (ik4c, stage 5) and the
+import-remap is designed. The inert plumbing that IS worth having now — the
+`~for_saving` seam and the collision detector — is already shipped this stage. So
+the stage-5 diff is not meaningfully shrunk by pre-landing format scaffolding; the
+seam + detector are the right amount of forward investment.

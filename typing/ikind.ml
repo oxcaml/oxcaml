@@ -122,6 +122,39 @@ let () =
   | Some ("1" | "true" | "yes" | "on") -> save_fault := true
   | Some _ | None -> ()
 
+(* Stage-4d cross-unit [Param]-id collision DETECTOR (validate-only, read-side
+   bookkeeping; no persistence-format or CLASS-B change).  A foreign [Param] in
+   a persisted (imported) decl ikind keys off a stale live-[type_expr] id from
+   the defining unit; if it numerically collides with a [Param] id the importer
+   mints for one of its OWN live type variables (rigids intern by [stable_hash
+   name]), [decompose_into_linear_terms] can conflate them and mis-attribute the
+   residue's contribution -- a narrow, pre-existing potential unsound accept
+   (STAGE4D-DESIGN.md, stage-5 MUST-FIX).  Until the stage-5 residue
+   representation removes the stale id, this converts the hazard from silent to
+   OBSERVABLE: [imported_foreign_param_ids] records every foreign [Param] id seen
+   in an IMPORTED stored decl ikind (recorded at the load/lookup site, BEFORE
+   interning, so no post-intern marker is needed to tell persisted-origin ids
+   apart), and each live [Param] mint checks membership, counting overlaps.
+   Over-approximate (flags numeric overlap even absent a shared [decompose]) --
+   acceptable for a detector.  Gated on [ikinds_validate]; ordinary builds pay
+   nothing and are byte-identical. *)
+let imported_foreign_param_ids : (int, unit) Hashtbl.t = Hashtbl.create 16
+
+let param_id_collisions = ref 0
+
+(* Seeded negative control (env [OXCAML_IKIND_COLLISION_FAULT]): inject a
+   synthetic collision by recording each live-minted [Param] id into the
+   imported set just before the membership check, so the very next check on that
+   id fires.  Proves the counter can increment (a real numeric collision is not
+   source-constructible -- [type_expr] id allocation is not controllable).
+   Default off. *)
+let collision_fault = ref false
+
+let () =
+  match Sys.getenv_opt "OXCAML_IKIND_COLLISION_FAULT" with
+  | Some ("1" | "true" | "yes" | "on") -> collision_fault := true
+  | Some _ | None -> ()
+
 let validate_checks = ref 0
 
 let validate_mismatches = ref 0
@@ -181,10 +214,13 @@ let () =
         Format.eprintf
           "[ikind-validate] summary: checks=%d mismatches=%d benign=%d \
            class_b=%d residue_trusted=%d; carrier checks=%d mismatches=%d \
-           benign=%d; decl-ikind stored=%d recomputed=%d@."
+           benign=%d; decl-ikind stored=%d recomputed=%d; \
+           imported-foreign-params=%d param-id-collisions=%d@."
           !validate_checks !validate_mismatches !validate_benign
           !validate_class_b !residue_trusted !carrier_checks !carrier_mismatches
-          !carrier_benign !stored_decl_ikind_hits !recomputed_decl_ikind)
+          !carrier_benign !stored_decl_ikind_hits !recomputed_decl_ikind
+          (Hashtbl.length imported_foreign_param_ids)
+          !param_id_collisions)
 
 let () =
   at_exit (fun () ->
@@ -284,6 +320,14 @@ module Solver = struct
   (** A rigid variable corresponding to a type parameter [t]. *)
   let rigid (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
     let param_id = Types.get_id ty in
+    if !Clflags.ikinds_validate
+    then (
+      (* Detector: seeded control injects a collision, then check overlap with
+          ids recorded from imported (persisted) decl ikinds. *)
+      if !collision_fault
+      then Hashtbl.replace imported_foreign_param_ids param_id ();
+      if Hashtbl.mem imported_foreign_param_ids param_id
+      then incr param_id_collisions);
     rigid_name ctx (Ldd.Name.param param_id)
 
   let type_may_be_circular (ty : Types.type_expr) : bool =
@@ -886,6 +930,23 @@ let stored_ikind_has_foreign_param ~(own_params : Types.type_expr list)
   Array.iter (fun c -> ignore (Ldd.map_rigid visit c : Ldd.node)) coeffs;
   !found
 
+(* Stage-4d detector: record every foreign [Param] id carried by a persisted
+   (imported) decl ikind into [imported_foreign_param_ids].  Called at the
+   load/lookup site, so the id's persisted origin is known WITHOUT a post-intern
+   marker.  Validate-only. *)
+let record_imported_foreign_params ~(own_params : Types.type_expr list)
+    (base : Ldd.node) (coeffs : Ldd.node array) : unit =
+  let own_ids = List.map Types.get_id own_params in
+  let visit (name : Ldd.Name.t) : Ldd.node =
+    (match name with
+    | Ldd.Name.Param id when not (List.mem id own_ids) ->
+      Hashtbl.replace imported_foreign_param_ids id ()
+    | _ -> ());
+    Ldd.node_of_var (Ldd.rigid name)
+  in
+  ignore (Ldd.map_rigid visit base : Ldd.node);
+  Array.iter (fun c -> ignore (Ldd.map_rigid visit c : Ldd.node)) coeffs
+
 (* Lookup function supplied to the solver.
    We prefer a stored ikind (when present) and otherwise recompute from the
    type declaration in [env]. *)
@@ -1084,6 +1145,12 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
       | Types.Constructor_ikind { base; coeffs }
         when !Clflags.ikinds && not !force_recompute_ikinds ->
         if !Clflags.ikinds_validate then incr stored_decl_ikind_hits;
+        (* Detector: an IMPORTED decl's stored ikind (persistent path head) may
+           carry a foreign [Param] with a stale live id; record it. *)
+        if !Clflags.ikinds_validate && Ident.is_global (Path.head path)
+        then
+          record_imported_foreign_params ~own_params:type_decl.type_params base
+            coeffs;
         Solver.Poly (base, coeffs)
       | Types.Constructor_ikind { base; coeffs }
         when !Clflags.ikinds && !force_recompute_ikinds && is_def_tvar_temp_decl
