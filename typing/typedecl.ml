@@ -1757,6 +1757,10 @@ let narrow_to_manifest_jkind env loc path decl =
     let type_ikind =
       Ikind.type_declaration_ikind_gated ~env:(Some env) ~path
     in
+    (* Stage-4a: populate the carrier on the finalized manifest jkind so it is
+       relabeled at instance_declaration/Subst copies (inert -- validated, not
+       consulted). *)
+    let manifest_jkind = Ikind.jkind_with_carrier ~env manifest_jkind in
     { decl with type_jkind = manifest_jkind; type_ikind }
 
 (* Check that the type expression (if present) is compatible with the kind.

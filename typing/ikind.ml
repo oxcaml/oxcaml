@@ -1060,6 +1060,31 @@ let type_declaration_ikind_of_manifest ~(env : Env.t option)
           (Ldd.pp payload.base) (pp_coeffs payload.coeffs);
       payload)
 
+(* Stage-4a: populate a jkind's [ikind_carrier] with its derived ikind,
+   inlined to rigid-only form so it is marshal-safe and comparable (exactly
+   like [type_ikind]).  The carrier is BEHAVIORALLY INERT in stage 4a -- it is
+   relabeled across copy/Subst and validated against a fresh recompute, but no
+   verdict consults it.  No-op when ikinds are disabled or the derivation
+   fails; a [None] carrier simply means "recompute". *)
+let jkind_with_carrier ~(env : Env.t) (jkind : ('l * 'r) Types.jkind) :
+    ('l * 'r) Types.jkind =
+  (* Gated on [ikinds_validate] so normal builds stay byte-identical and pay no
+     derivation cost: the carrier exists (and relabel/validation run) only under
+     the validation harness this stage.  Stage 5 populates unconditionally. *)
+  if not (!Clflags.ikinds && !Clflags.ikinds_validate)
+  then jkind
+  else
+    match
+      let ctx = create_ctx ~mode:Solver.Normal ~env:(Some env) in
+      let node = Solver.ckind_of_jkind ctx jkind in
+      Ldd.solve_pending ();
+      Ldd.inline_solved_vars node
+    with
+    | exception _ -> jkind
+    | node ->
+      let jd = jkind.Types.jkind in
+      { jkind with Types.jkind = { jd with Types.ikind_carrier = Some node } }
+
 let predef_ikind_of_jkind ~params type_jkind =
   type_declaration_ikind_of_jkind ~env:None ~params type_jkind
 

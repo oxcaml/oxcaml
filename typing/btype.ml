@@ -1277,8 +1277,91 @@ module Jkind0 = struct
       | Layout l ->
         Layout (Jkind_types.Layout.Const.meet_root_scannable_axes l sa)
 
+    (* Stage-4a Param-relabel.  When the with-bound [type_expr]s of a jkind are
+       copied/substituted by [f], the [ikind_carrier]'s free [Param] atoms --
+       which key off those types' variable ids -- must move in lockstep.
+       [pairs] is (original, image) for each with-bound; we recover the
+       type-variable id correspondence by a bounded parallel walk and rewrite
+       each [Param id].  A [Param] whose variable was INSTANTIATED to a
+       non-variable (or that the walk cannot match structurally) cannot be
+       expressed by relabeling one atom, so we DROP the carrier to [None] and
+       let it be recomputed -- never keep a stale ikind.  This is the rename-
+       vs-instantiation rule of STAGE4A-DESIGN.md. *)
+    let relabel_ikind_carrier pairs carrier =
+      match carrier with
+      | None -> None
+      | Some node ->
+        let idmap : (int, int) Hashtbl.t = Hashtbl.create 8 in
+        let rec corr depth a b =
+          if depth > 30
+          then ()
+          else
+            match get_desc a, get_desc b with
+            | (Tvar _ | Tunivar _), (Tvar _ | Tunivar _) ->
+              Hashtbl.replace idmap (get_id a) (get_id b)
+            | (Tvar _ | Tunivar _), _ ->
+              (* variable instantiated to a non-variable: leave uncovered so
+                 the carrier is dropped. *)
+              ()
+            | _ ->
+              let child ty =
+                List.rev (fold_type_expr (fun acc t -> t :: acc) [] ty)
+              in
+              let ca = child a and cb = child b in
+              if List.compare_lengths ca cb = 0
+              then List.iter2 (corr (depth + 1)) ca cb
+        in
+        List.iter (fun (a, b) -> corr 0 a b) pairs;
+        (* Reject a NON-INJECTIVE map: if two distinct source [Param]s map to a
+           single target id (e.g. a substitution that identifies two
+           variables), the carried node would MERGE their coefficients -- a
+           strict coarsening (over-rejection) of the properly-relabeled node.
+           Detection alone is not enough (at stage 5 the harness is off in
+           production), so drop the carrier to [None] and recompute, same as
+           the instantiation case. *)
+        let collision = ref false in
+        let seen_targets : (int, unit) Hashtbl.t = Hashtbl.create 8 in
+        Hashtbl.iter
+          (fun _src tgt ->
+            if Hashtbl.mem seen_targets tgt
+            then collision := true
+            else Hashtbl.add seen_targets tgt ())
+          idmap;
+        if !collision
+        then None
+        else
+        let dropped = ref false in
+        let node' =
+          Ldd.map_rigid
+            (fun name ->
+              match (name : Ldd.Name.t) with
+              | Rigid_name.Param i -> (
+                match Hashtbl.find_opt idmap i with
+                | Some j -> Ldd.node_of_var (Ldd.rigid (Ldd.Name.param j))
+                | None ->
+                  dropped := true;
+                  Ldd.node_of_var (Ldd.rigid name))
+              | _ -> Ldd.node_of_var (Ldd.rigid name))
+            node
+        in
+        if !dropped then None else Some node'
+
     let map_type_expr f t =
-      { t with with_bounds = With_bounds.map_type_expr f t.with_bounds }
+      match t.ikind_carrier with
+      | None ->
+        { t with with_bounds = With_bounds.map_type_expr f t.with_bounds }
+      | Some _ ->
+        let pairs = ref [] in
+        let f' ty =
+          let ty' = f ty in
+          pairs := (ty, ty') :: !pairs;
+          ty'
+        in
+        let with_bounds = With_bounds.map_type_expr f' t.with_bounds in
+        { t with
+          with_bounds;
+          ikind_carrier = relabel_ikind_carrier !pairs t.ikind_carrier
+        }
 
     let try_allow_l :
         type l r.

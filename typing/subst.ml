@@ -770,6 +770,16 @@ and jkind : 'l 'r. _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
   in
   (* CR-soon layouts aivaskovic: get rid of map_type_expr *)
   let jkind = Jkind.map_type_expr (typexp copy_scope s) jkind in
+  (* Stage-4a: the [ikind_carrier]'s free [Param] atoms key off live
+     [type_expr] ids, which are not stable across compilation units, so it must
+     not ride into a .cmi.  Drop it on the save path; clients recompute.  (cmi
+     serialization of a stable residue is stage 4c/4d.) *)
+  let jkind =
+    match s.additional_action with
+    | Prepare_for_saving _ ->
+      { jkind with jkind = { jkind.jkind with ikind_carrier = None } }
+    | Duplicate_variables | No_action -> jkind
+  in
   let jkind_desc = jkind_desc s jkind.jkind in
   if jkind_desc == jkind.jkind then jkind
   else { jkind with jkind = jkind_desc }
