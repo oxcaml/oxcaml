@@ -1432,18 +1432,22 @@ let type_declaration_ikind_of_manifest ~(env : Env.t option)
 
 (* Stage-4c print-from-ikind: derive a WITH-BOUNDS-FREE const jkind's mod-bounds
    floor from its ikind (round_up of the derived LDD), installed into
-   [Jkind.Const.floor_from_ikind].  Returns [None] -- printing then falls back
-   to the legacy [mod_bounds] field -- when [-print-from-ikinds] is off, ikinds
-   are disabled, the jkind carries with-bounds (whose surface [with]-clause
-   syntax the LDD cannot reconstruct, see STAGE4C-DESIGN.md P2), or the
-   derivation raises.  For the with-bounds-free case the ikind is a pure floor
-   (a const, or a const meet a KAtom that rounds up to top), so [round_up]
-   returns exactly [to_axis_lattice mod_bounds] and [of_axis_lattice] round-trips
-   it to the floor -- i.e. byte-identical to the legacy read. *)
+   [Jkind.Const.floor_from_ikind].  Stage-5c: this fires on the DEFAULT print
+   path (ikinds on), not just under [-print-from-ikinds] -- the floor is now
+   read from the ikind rather than the legacy [mod_bounds] field.  Re-entrancy-
+   safe by construction: 5a re-homed it onto a scratch ctx + isolated pending.
+   Returns [None] -- printing then falls back to the legacy [mod_bounds] field
+   -- when ikinds are disabled, the jkind carries with-bounds (whose surface
+   [with]-clause syntax the LDD cannot reconstruct, see STAGE4C-DESIGN.md P2, so
+   the floor keeps reading [mod_bounds] there), or the derivation raises.  For
+   the with-bounds-free case the ikind is a pure floor (a const, or a const meet
+   a KAtom that rounds up to top), so [round_up] returns exactly
+   [to_axis_lattice mod_bounds] and [of_axis_lattice] round-trips it to the
+   floor -- i.e. byte-identical to the legacy read (STAGE4C P1, corpus-proven). *)
 let mod_bounds_floor_for_printing : type l r.
     Env.t -> (l * r) Jkind.Const.t -> Jkind.Mod_bounds.t option =
  fun env jkind ->
-  if not (!Clflags.print_from_ikinds && !Clflags.ikinds)
+  if not !Clflags.ikinds
   then None
   else
     match jkind.Types.with_bounds with

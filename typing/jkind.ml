@@ -1679,9 +1679,10 @@ module Const = struct
      keeps the field polymorphic in the allowance; [Ikind] installs it at
      startup (Jkind is below Ikind in the module DAG, so this is the same
      ref-injection pattern as [outcometrees_of_types]).  The installed function
-     returns [None] -- printing falls back to the legacy field -- when
-     [-print-from-ikinds] is off, ikinds are disabled, the jkind has with-bounds
-     (whose surface syntax the LDD cannot reconstruct), or derivation fails. *)
+     returns [None] -- printing falls back to the legacy field -- when ikinds
+     are disabled, the jkind has with-bounds (whose surface syntax the LDD
+     cannot reconstruct), or derivation fails.  Stage-5c: this fires on the
+     DEFAULT print path, not only under [-print-from-ikinds]. *)
   type floor_from_ikind =
     { derive : 'l 'r. Env.t -> ('l * 'r) t -> Mod_bounds.t option }
 
@@ -1828,7 +1829,7 @@ module Const = struct
           (get_scannable_axes_of_fully_expanded actual)
       in
       let actual_mod_bounds =
-        (* Stage-4c: under [-print-from-ikinds], derive the floor from the
+        (* Stage-5c: on the default print path, derive the floor from the
            ikind for with-bounds-free jkinds; [None] => legacy fallback. *)
         match !floor_from_ikind.derive env actual with
         | Some mod_bounds -> mod_bounds
