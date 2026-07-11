@@ -27,12 +27,6 @@ val type_declaration_ikind_of_manifest :
   Types.type_expr ->
   Types.type_ikind
 
-(* Stage-4a: return [jkind] with its [ikind_carrier] populated (derived ikind,
-   rigid-inlined).  Inert -- carrier is validated/relabeled but not consulted
-   for verdicts.  No-op if ikinds are off or derivation fails. *)
-val jkind_with_carrier :
-  env:Env.t -> ('l * 'r) Types.jkind -> ('l * 'r) Types.jkind
-
 val sub_jkind_l :
   ?allow_any_crossing:bool ->
   ?origin:string ->

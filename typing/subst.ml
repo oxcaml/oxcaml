@@ -586,8 +586,7 @@ let jkind_desc s jkind =
       let const =
         { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
           mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
-          with_bounds = jkind.with_bounds;
-          ikind_carrier = None }
+          with_bounds = jkind.with_bounds }
       in
       Jkind.Base_and_axes.map_layout Jkind_types.Layout.of_const const
     end
@@ -609,8 +608,7 @@ let jkind_const_desc s
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds; _ } ->
       { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
         mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
-        with_bounds = jkind.with_bounds;
-        ikind_carrier = None }
+        with_bounds = jkind.with_bounds }
     end
   | Layout _ -> jkind
 
@@ -772,16 +770,6 @@ and jkind : 'l 'r. _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
   in
   (* CR-soon layouts aivaskovic: get rid of map_type_expr *)
   let jkind = Jkind.map_type_expr (typexp copy_scope s) jkind in
-  (* Stage-4a: the [ikind_carrier]'s free [Param] atoms key off live
-     [type_expr] ids, which are not stable across compilation units, so it must
-     not ride into a .cmi.  Drop it on the save path; clients recompute.  (cmi
-     serialization of a stable residue is stage 4c/4d.) *)
-  let jkind =
-    match s.additional_action with
-    | Prepare_for_saving _ ->
-      { jkind with jkind = { jkind.jkind with ikind_carrier = None } }
-    | Duplicate_variables | No_action -> jkind
-  in
   let jkind_desc = jkind_desc s jkind.jkind in
   if jkind_desc == jkind.jkind then jkind
   else { jkind with jkind = jkind_desc }
