@@ -83,6 +83,14 @@ module type S = sig
       print-from-ikind and cmi save/load. *)
   val to_terms : node -> (Axis_lattice.t * Name.t list) list
 
+  (** [of_terms ts] is the algebraic inverse of [to_terms]: each term
+      [(coeff, names)] is read as [coeff \u2293 \u2293names] and all are
+      [join]ed. Total and order-insensitive; duplicate name-sets are joined
+      (never an error); [Unknown] atoms keep their fixed [Uid] (no re-mint).
+      [of_terms [] = bot], [of_terms [(c, [])] = const c].
+      [of_terms (to_terms n)] is semantically equal to [n]. *)
+  val of_terms : (Axis_lattice.t * Name.t list) list -> node
+
   (** [filter_out_pure_terms drop n] rebuilds [n] dropping every non-base term
       whose rigid atoms ALL satisfy [drop]; the base term and any term with at
       least one non-[drop] atom are kept exactly. *)

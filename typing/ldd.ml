@@ -573,9 +573,13 @@ module Make (V : Ordered) = struct
      [V.to_string].  The node must be rigid-inlined (this calls
      [inline_solved_vars]); an [Unsolved] var raises, since it has no [Name] to
      preserve (a rigid-inlined stored/derived node never has one).  Terms are
-     returned in ZDD-walk order; the base (varless) term is the element with an
-     empty name list.  This is the residue form [base \u2294 \u03a3 (coeff \u2293 names)]
-     consumed by print-from-ikind and by cmi save/load. *)
+     returned in ZDD-walk order; WITHIN each term the [Name.t]s are sorted by
+     [V.compare] (canonical, so the residue is byte-reproducible independent of
+     the internal variable/intern order); the base (varless) term is the element
+     with an empty name list.  This is the residue form
+     [base \u2294 \u03a3 (coeff \u2293 names)] consumed by print-from-ikind and by cmi
+     save/load; [of_terms] is its inverse.  Edge: [to_terms bot = []],
+     [to_terms top = [(top, [])]]. *)
   let to_terms (node : node) : (Axis_lattice.t * V.t list) list =
     let rec aux (acc_vars : V.t list) (node : node)
         (acc_terms : (Axis_lattice.t * V.t list) list) =
@@ -584,7 +588,7 @@ module Make (V : Ordered) = struct
         let c = Unsafe.leaf_value node in
         if Axis_lattice.equal c Axis_lattice.bot
         then acc_terms
-        else (c, acc_vars) :: acc_terms
+        else (c, List.sort V.compare acc_vars) :: acc_terms
       else
         let block = Unsafe.node_block node in
         let acc_terms = aux acc_vars block.lo acc_terms in
@@ -599,6 +603,28 @@ module Make (V : Ordered) = struct
         aux (name :: acc_vars) block.hi acc_terms
     in
     aux [] (inline_solved_vars node) [] |> List.rev
+
+  (* Algebraic inverse of [to_terms]: interpret each term [(coeff, names)] as
+     [coeff \u2293 \u2293names] and [join] them all (base [\u2294 \u03a3]).  Total and
+     order-insensitive: [meet]/[join] are commutative+associative so within-term
+     [Name] order is irrelevant, and DUPLICATE name-sets are simply joined (their
+     coeffs meet-into-place via the join), never an error.  Rigid atoms are
+     re-interned by [rigid] through the deterministic name hash, so [Unknown]
+     atoms keep their fixed decl-time [Uid] (no re-mint).  Edge: [of_terms [] =
+     bot], [of_terms [(c, [])] = const c].  [of_terms (to_terms n)] is
+     semantically equal to [n]; [to_terms (of_terms ts)] is [ts] up to the
+     canonical form ([to_terms]'s within-term [V.compare] sort + duplicate
+     name-set coeff-join). *)
+  let of_terms (terms : (Axis_lattice.t * V.t list) list) : node =
+    List.fold_left
+      (fun acc (c, names) ->
+        let term =
+          List.fold_left
+            (fun t name -> meet t (node_of_var (rigid name)))
+            (const c) names
+        in
+        join acc term)
+      bot terms
 
   (* Rebuild [node] dropping every non-base term whose rigid atoms ALL satisfy
      [drop]. A term is one ZDD path (a leaf and the set of hi-edge vars taken
