@@ -298,17 +298,25 @@ stage flips it to derive fully once the sidecar exists.
 
 ## KNOWN RISK (documented, cleared for this stage; matters for stage 5)
 
-`mod_bounds_floor_for_printing` calls `create_ctx`, which CLEARS the global
-solver caches (`global_ty_to_kind`/`global_constr_to_coeffs`, ikind.ml:239-240).
-If jkind printing ever ran while an outer ikind derivation was on the stack, the
-clear would corrupt that outer computation. In practice printing happens during
-error/signature FORMATTING, after the checking operation has raised and unwound,
-so it is not re-entrant with a live derivation -- and the flag-on sweeps
-(171/171 byte-identical, incl. recursive-module and layout tests) show no
-corruption or divergence. Cleared for stage 4c (flag default off; deriver never
-runs in normal builds). FLAGGED for stage 5: when the flag flips on by default,
-the derivation must either be proven non-re-entrant or use a non-cache-clearing
-context (a per-print scratch ctx that does not touch the globals).
+BOTH print-from-ikind derivations -- `mod_bounds_floor_for_printing` (floor,
+with-bounds-free path) AND `render_jkind_from_ikind` (full with-bounds
+rendering) -- call `create_ctx`, which CLEARS the global solver caches
+(`global_ty_to_kind`/`global_constr_to_coeffs`, ikind.ml:239-240), and
+`solve_pending`. If jkind printing ever ran while an outer ikind derivation was
+on the stack, the clear would corrupt that outer computation. In practice
+printing happens during error/signature FORMATTING, after the checking operation
+has raised and unwound, and the flag-on sweeps (all byte-identical for the
+with-bounds-free class, incl. recursive-module and layout tests) show no
+corruption. Cleared for stage 4c (flag default off; neither derivation runs in
+normal builds).
+
+STAGE-5 MUST-FIX (unconditional, not "prove non-re-entrant"): when the flag
+flips on by default, BOTH derivations must switch to a non-cache-clearing
+per-print scratch ctx that does not touch the global tables. The
+"printing-only-after-unwind" argument is too optimistic to rely on -- warnings,
+`-i`, and `-dtypes` can print jkinds MID-check, so a re-entrant clear is
+reachable once printing is on the default path. Do not attempt to prove
+non-re-entrancy; just give the print path its own scratch context.
 
 ---
 
