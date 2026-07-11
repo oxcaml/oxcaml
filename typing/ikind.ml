@@ -221,6 +221,16 @@ let carrier_benign = ref 0
 
 let carrier_mismatches = ref 0
 
+(* Stage-5b telemetry (validate/debug only): [residue_neutralized] counts foreign
+   [Param] residues rewritten to unit-qualified [Residue] on the cmi save path;
+   [imported_residues] counts [Residue] atoms seen in imported stored decl ikinds.
+   Corroboration for the coexistence-window: residues cross the cmi as [Residue]
+   (imported-residues > 0) and [param-id-collisions] stays 0 (no live-[Param] can
+   alias a [Residue] -- collision-free by construction). *)
+let residue_neutralized = ref 0
+
+let imported_residues = ref 0
+
 let () =
   at_exit (fun () ->
       if !Clflags.ikinds_validate
@@ -229,12 +239,13 @@ let () =
           "[ikind-validate] summary: checks=%d mismatches=%d benign=%d \
            class_b=%d residue_trusted=%d; carrier checks=%d mismatches=%d \
            benign=%d; decl-ikind stored=%d recomputed=%d; \
-           imported-foreign-params=%d param-id-collisions=%d@."
+           imported-foreign-params=%d param-id-collisions=%d; \
+           residue-neutralized=%d imported-residues=%d@."
           !validate_checks !validate_mismatches !validate_benign
           !validate_class_b !residue_trusted !carrier_checks !carrier_mismatches
           !carrier_benign !stored_decl_ikind_hits !recomputed_decl_ikind
           (Hashtbl.length imported_foreign_param_ids)
-          !param_id_collisions)
+          !param_id_collisions !residue_neutralized !imported_residues)
 
 let () =
   at_exit (fun () ->
@@ -388,7 +399,7 @@ module Solver = struct
            [c] are kept rigid to avoid infinite expansion. *)
         let instantiate (name : Ldd.Name.t) : Ldd.node =
           match name with
-          | Param _ | Unknown _ -> rigid_name ctx name
+          | Param _ | Unknown _ | Residue _ -> rigid_name ctx name
           | KAtom kpath -> (
             match ctx.env with
             | None -> rigid_name ctx name
@@ -906,7 +917,8 @@ let make_gadt_payload_projector ~(decl_params : Types.type_expr list)
                   | Some bound -> bound
                   | None -> Ldd.const Axis_lattice.top
                 else Solver.node_of_name ctx name)
-            | Ldd.Name.Unknown _ | Ldd.Name.Atom _ | Ldd.Name.KAtom _ ->
+            | Ldd.Name.Unknown _ | Ldd.Name.Atom _ | Ldd.Name.KAtom _
+            | Ldd.Name.Residue _ ->
               Solver.node_of_name ctx name
           in
           fun ty ->
@@ -933,6 +945,10 @@ let stored_ikind_has_foreign_param ~(own_params : Types.type_expr list)
   let visit (name : Ldd.Name.t) : Ldd.node =
     (match name with
     | Ldd.Name.Param id when not (List.mem id own_ids) -> found := true
+    (* An imported residue is a [Residue] atom (neutralized on save, stage 5b);
+       the distinct constructor IS the CLASS-B marker -- recognize it here so
+       residue recognition survives the save-path neutralization. *)
+    | Ldd.Name.Residue _ -> found := true
     | _ -> ());
     Ldd.node_of_var (Ldd.rigid name)
   in
@@ -951,6 +967,9 @@ let record_imported_foreign_params ~(own_params : Types.type_expr list)
     (match name with
     | Ldd.Name.Param id when not (List.mem id own_ids) ->
       Hashtbl.replace imported_foreign_param_ids id ()
+    (* A neutralized residue arrives as a [Residue] atom, not a foreign [Param];
+       count it separately (telemetry) -- it can never alias a live [Param]. *)
+    | Ldd.Name.Residue _ -> incr imported_residues
     | _ -> ());
     Ldd.node_of_var (Ldd.rigid name)
   in
@@ -1522,7 +1541,8 @@ let canonicalize_unknowns (n : Ldd.node) : Ldd.node =
     (fun (name : Ldd.Name.t) ->
       match name with
       | Ldd.Name.Unknown _ -> canonical_unknown_node
-      | Ldd.Name.Param _ | Ldd.Name.Atom _ | Ldd.Name.KAtom _ ->
+      | Ldd.Name.Param _ | Ldd.Name.Atom _ | Ldd.Name.KAtom _
+      | Ldd.Name.Residue _ ->
         Ldd.node_of_var (Ldd.rigid name))
     n
 
@@ -1650,7 +1670,7 @@ let validate_ikind ~(in_sub_position : bool) ~(origin : string option) env
 let is_constructor_atom (name : Ldd.Name.t) : bool =
   match name with
   | Ldd.Name.Atom _ | Ldd.Name.KAtom _ -> true
-  | Ldd.Name.Param _ | Ldd.Name.Unknown _ -> false
+  | Ldd.Name.Param _ | Ldd.Name.Unknown _ | Ldd.Name.Residue _ -> false
 
 let validate_carrier ~(origin : string option) env
     (jkind : ('l * 'r) Types.jkind) : unit =
@@ -2077,6 +2097,13 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
   in
   base, Array.of_list coeffs
 
+(* Full path of the unit currently being compiled/saved, used to unit-qualify
+   [Residue] atoms on the cmi save path (stage 5b).  Same identity the stage-4d
+   import detector uses ([full_path_as_string]). *)
+let current_unit_full_path () : string =
+  Compilation_unit.full_path_as_string
+    (Compilation_unit.get_current_or_dummy ())
+
 let substitute_decl_ikind_with_lookup
     ~(lookup_type : Path.t -> Subst.Ikind_substitution.type_lookup_result)
     ~(lookup_jkind : Path.t -> Subst.Ikind_substitution.jkind_lookup_result)
@@ -2096,8 +2123,24 @@ let substitute_decl_ikind_with_lookup
       Ldd.map_rigid (map_name expanding) poly
     and map_name (expanding : Path.Set.t) (name : Ldd.Name.t) : Ldd.node =
       match name with
+      | Param id when for_saving ->
+        (* Stage 5b soundness gate: neutralize a foreign [Param] residue to a
+           unit-qualified [Residue] on the cmi save path ONLY.  Stored decl
+           ikinds are otherwise Param-free (own params are factored positionally
+           by [decompose_into_linear_terms]), so any [Param] reaching a save is a
+           recursive-module fixpoint residue carrying a stale live-[type_expr] id.
+           Tagging it with the defining unit makes it collision-free BY
+           CONSTRUCTION (an importer's live [Param n] can never alias
+           [Residue {unit; n}]) and keeps it recognizable for CLASS-B (a distinct
+           constructor).  Within-unit ([for_saving]=false) the [Param] is kept --
+           the fixpoint value is meaningful there (stage 4b). *)
+        if !Clflags.ikinds_validate || !Clflags.ikinds_debug
+        then incr residue_neutralized;
+        Ldd.node_of_var
+          (Ldd.rigid (Ldd.Name.residue (current_unit_full_path ()) id))
       | Param _ -> Ldd.node_of_var (Ldd.rigid name)
       | Unknown _ -> Ldd.node_of_var (Ldd.rigid name)
+      | Residue _ -> Ldd.node_of_var (Ldd.rigid name)
       | KAtom path -> (
         match lookup_jkind path with
         | Subst.Ikind_substitution.Lookup_jkind_identity ->

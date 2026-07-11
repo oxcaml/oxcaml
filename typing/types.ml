@@ -29,6 +29,18 @@ module Rigid_name = struct
     | KAtom of Path.t
     | Param of int
     | Unknown of unknown_id
+    | Residue of
+        { defining_unit : string;
+          id : int
+        }
+      (* A recursive-module fixpoint residue, produced on the cmi SAVE path by
+         neutralizing a foreign [Param] (stage 5b): [defining_unit] is the
+         saving unit's [full_path_as_string] and [id] the original stale
+         [type_expr] id. Unit-qualified so two units' residues are distinct
+         atoms and a residue can never alias an importer's live [Param]
+         (collision-free BY CONSTRUCTION); a
+         distinct constructor so CLASS-B residue recognition survives (the D1
+         marker-erasure lesson). *)
 
   let compare a b =
     if a == b
@@ -40,13 +52,18 @@ module Rigid_name = struct
         if h != 0 then h else Int.compare a1.arg_index a2.arg_index
       | KAtom p1, KAtom p2 -> Path.compare p1 p2
       | Param x, Param y -> Int.compare x y
+      | Unknown x, Unknown y -> Shape.Uid.compare x y
+      | Residue r1, Residue r2 ->
+        let h = String.compare r1.defining_unit r2.defining_unit in
+        if h != 0 then h else Int.compare r1.id r2.id
       | Atom _, _ -> -1
       | _, Atom _ -> 1
       | KAtom _, _ -> -1
       | _, KAtom _ -> 1
-      | Unknown x, Unknown y -> Shape.Uid.compare x y
-      | Unknown _, _ -> 1
-      | _, Unknown _ -> -1
+      | Param _, _ -> -1
+      | _, Param _ -> 1
+      | Unknown _, _ -> -1
+      | _, Unknown _ -> 1
 
   let to_string = function
     | Atom { constr; arg_index } ->
@@ -58,6 +75,8 @@ module Rigid_name = struct
     | Param i -> Printf.sprintf "param[%d]" i
     | Unknown id ->
       Format.asprintf "unknown[%a]" Shape.Uid.print id
+    | Residue { defining_unit; id } ->
+      Printf.sprintf "residue[%s.%d]" defining_unit id
 
   let atomic constr arg_index = Atom { constr; arg_index }
 
@@ -66,6 +85,8 @@ module Rigid_name = struct
   let param i = Param i
 
   let unknown uid = Unknown uid
+
+  let residue defining_unit id = Residue { defining_unit; id }
 end
 
 module Ldd = struct

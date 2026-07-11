@@ -116,6 +116,17 @@ module Rigid_name : sig
             ikinds. This is used when we couldn't compute a precise ikind,
             e.g. for a polymorphic variant with conjunctive type --
             `Constr of (a & b & ...) *)
+    | Residue of
+        { defining_unit : string;
+          id : int
+        }
+        (** A recursive-module fixpoint residue, produced on the cmi SAVE path
+            (stage 5b) by neutralizing a foreign [Param]. Unit-qualified
+            ([defining_unit] = the saving unit's [full_path_as_string], [id] the
+            original stale [type_expr] id) so residues from distinct units are
+            distinct atoms and a residue can never alias an importer's live
+            [Param] -- collision-free by construction -- while a distinct
+            constructor keeps residues recognizable for CLASS-B. *)
 
   (** Ordering on rigid names used in the LDD to order the nodes. *)
   val compare : t -> t -> int
@@ -129,6 +140,8 @@ module Rigid_name : sig
   val param : int -> t
 
   val unknown : Shape.Uid.t -> t
+
+  val residue : string -> int -> t
 
 end
 
