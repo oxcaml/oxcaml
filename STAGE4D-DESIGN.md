@@ -309,8 +309,16 @@ persistence is load-bearing and where the fault surfaces.)
 
 `~for_saving` plumbing through `substitute_decl_ikind_with_lookup` +
 `OXCAML_IKIND_SAVE_FAULT` cross-unit seeded fault (`typing/ikind.ml`,
-`typing/subst.ml`, +mlis; +37/-3). Validate/debug-only, default off. No cmi
+`typing/subst.ml`, +mlis). Validate/debug-only, default off. No cmi
 format change, no magic bump. Boot-green; flag-off byte-identical.
+
+**"Byte-identical" scope (clarification).** "Byte-identical" means the COMPILE
+PATH with the detector/faults OFF (validate off, faults off) is unchanged from
+base — the shipped code is entirely under `!Clflags.ikinds_validate` /
+env-guarded. It does NOT mean a residue unit's cmi bytes are identical across
+flag settings: flag-on and flag-off already produce DIFFERENT cmis for residue
+units (pre-existing since 4b's per-derivation `Unknown` uid-minting, not a 4d
+change). So do not over-read "byte-identical" as cmi-stability across flags.
 
 ### Part 3.5: cross-unit Param-id collision DETECTOR (shipped).
 
@@ -334,6 +342,26 @@ off ⇒ no summary, byte-identical. A natural collision is NOT source-constructi
 practice — but the hazard is now observable if it ever occurs. Over-approximate
 by design (flags numeric overlap even absent a shared `decompose`); acceptable
 for a detector.
+
+**Fix-round corrections (rev_ik1 FIX-FIRST).**
+- **Blind spot closed (item 1):** the original gate `Ident.is_global (Path.head
+  path)` missed ALIASED imports (`module L = Foo; L.LamF.exp0` → the path head is
+  the LOCAL alias, not global → imported-foreign-params=0 while the residue IS
+  consumed), and likewise functor-param / local-bind imports. Fixed by keying on
+  the decl's OWN uid origin (`decl_is_imported`: compare the decl `type_uid`'s
+  `comp_unit` against the current unit) rather than the syntactic access path.
+  Verified: direct, aliased, AND functor-arg imports ALL now record
+  imported-foreign-params=1 for the mixmod5 residue (aliased was 0 before).
+- **Check-site asymmetry closed (item 3):** the harm site is
+  `decompose_into_linear_terms`, whose universe params are minted via `Ldd.rigid`
+  directly (bypassing `Solver.rigid`). The check (`check_live_param_id`) is now
+  called at ALL live-`Param` mint sites — `Solver.rigid` AND the three
+  `decompose` universe-mint sites — so the harm site is covered, not just the
+  general mint. Seeded control fires there (collisions counted).
+- **Claim tempered:** "converts silent to observable" holds for the import shapes
+  the detector covers. After the item-1 fix it covers direct/aliased/functor-arg;
+  it remains best-effort telemetry, NOT a soundness proof (see the stage-5 gate
+  re-point — the sound fix is unit-qualified `Residue` atoms, option (b)).
 
 ---
 
@@ -430,17 +458,20 @@ Each persisted term is `(coeff, Name.t list)`. On import, remap each `Name`:
   correct; the named-terms form just makes it explicit (remap the Name list, then
   `of_terms`).
 - **`Unknown uid`:** globally unique, no remap. (Fixed at decl time; stable.)
-- **`Param id` (foreign residue):** THE MUST-FIX. The stale id must be replaced
-  on import by a unit-unique atom so it cannot alias a live id (the collision
-  above). Options for stage 5: (a) map each imported foreign `Param` to a fresh
-  `Unknown uid` AT IMPORT (not save) — collision-safe, but see the CLASS-B tension
-  (the importer must then recognize it as a residue by ORIGIN, which it can at
-  import time, unlike D1's save-time erasure — this is the key asymmetry that
-  makes an import-side fix viable where the save-side D1 was not); or (b) a
-  dedicated `Residue`/unit-qualified atom kind in `Rigid_name.t` carrying the
-  defining unit, so residues are both collision-free (unit-qualified) and
-  recognizable (a distinct constructor). (b) is the cleaner end state and is the
-  residue-marker the D1 experiment showed is needed.
+- **`Param id` (foreign residue):** THE MUST-FIX. The stale id must not survive
+  import to alias a live id (the collision above). **PRIMARY FIX = option (b):**
+  a dedicated unit-qualified `Residue` atom kind in `Rigid_name.t` carrying the
+  defining compilation unit, so residues are collision-free BY CONSTRUCTION (the
+  unit qualifier makes two units' residues distinct atoms, and a residue can
+  never equal a live `Param`) AND recognizable (a distinct constructor — exactly
+  the residue-marker the D1 experiment proved is needed for CLASS-B). This is a
+  soundness-by-construction fix, not a detect-and-hope one, which is why it, not
+  the detector, is the deletion gate. Fallback option (a), retained only as a
+  contingency: map each imported foreign `Param` to a fresh `Unknown uid` AT
+  IMPORT (not save) — collision-safe, and viable where save-side D1 was not
+  because the importer can recognize the residue by ORIGIN at import time (the
+  key save-vs-import asymmetry) — but it loses the residue's structure and is
+  weaker than (b).
 
 ### Magic-number plan
 
@@ -464,9 +495,14 @@ deletion, prove the persisted LDD is a faithful substitute:
    the named-terms payload, atoms remapped) matches a from-legacy recompute WHILE
    both still exist. This is the last window where both representations coexist;
    run it before the delete commit.
-3. **Collision detector at 0:** part-3.5's `param-id-collisions` must read 0 across
-   the corpus once residues are import-remapped to unit-unique atoms (it should,
-   by construction — no stale ids survive). A non-zero reading gates the delete.
+3. **Collision detector as CORROBORATING TELEMETRY, not a sound gate.** part-3.5's
+   `param-id-collisions` reading 0 does NOT by itself license deletion — a
+   detector observes collisions only on import shapes it covers, and "0" is
+   consistent with both "no collision" and "collision on an uncovered shape". The
+   SOUND guarantee must come from the REPRESENTATION (option (b) below: unit-
+   qualified `Residue` atoms are collision-free BY CONSTRUCTION — no stale id can
+   survive to alias a live id). The detector then corroborates (should stay 0
+   post-fix) and catches regressions, but it is telemetry, not the proof.
 
 ### Residues-in-batch invariant + boundary conditions (corrected)
 

@@ -155,6 +155,20 @@ let () =
   | Some ("1" | "true" | "yes" | "on") -> collision_fault := true
   | Some _ | None -> ()
 
+(* Detector check at a live [Param] mint: [id] is a [type_expr] id the current
+   unit is turning into a [Param] rigid.  If it numerically matches an id
+   recorded from an imported (persisted) decl ikind, count the overlap.  Called
+   at EVERY live-param mint, including the [decompose_into_linear_terms] universe
+   sites (the actual collision-harm site -- see STAGE4D-DESIGN.md), not just
+   [Solver.rigid].  Validate-gated. *)
+let check_live_param_id (id : int) : unit =
+  if !Clflags.ikinds_validate
+  then (
+    (* Seeded control ([OXCAML_IKIND_COLLISION_FAULT]) injects a collision by
+       recording the id first, so the check then fires. *)
+    if !collision_fault then Hashtbl.replace imported_foreign_param_ids id ();
+    if Hashtbl.mem imported_foreign_param_ids id then incr param_id_collisions)
+
 let validate_checks = ref 0
 
 let validate_mismatches = ref 0
@@ -320,14 +334,7 @@ module Solver = struct
   (** A rigid variable corresponding to a type parameter [t]. *)
   let rigid (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
     let param_id = Types.get_id ty in
-    if !Clflags.ikinds_validate
-    then (
-      (* Detector: seeded control injects a collision, then check overlap with
-          ids recorded from imported (persisted) decl ikinds. *)
-      if !collision_fault
-      then Hashtbl.replace imported_foreign_param_ids param_id ();
-      if Hashtbl.mem imported_foreign_param_ids param_id
-      then incr param_id_collisions);
+    check_live_param_id param_id;
     rigid_name ctx (Ldd.Name.param param_id)
 
   let type_may_be_circular (ty : Types.type_expr) : bool =
@@ -425,7 +432,10 @@ module Solver = struct
         ConstrTbl.add ctx.constr_to_coeffs path (base_poly, coeffs_poly);
         let rigid_vars =
           List.map
-            (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty)))
+            (fun ty ->
+              let id = Types.get_id ty in
+              check_live_param_id id;
+              Ldd.rigid (Ldd.Name.param id))
             params
         in
         (* We add the parameters to the TyTbl so that they will refer to
@@ -947,6 +957,35 @@ let record_imported_foreign_params ~(own_params : Types.type_expr list)
   ignore (Ldd.map_rigid visit base : Ldd.node);
   Array.iter (fun c -> ignore (Ldd.map_rigid visit c : Ldd.node)) coeffs
 
+(* Stage-4d detector: is [uid] a decl minted in a DIFFERENT compilation unit
+   (i.e. imported from a cmi)?  Keys on the decl's OWN uid origin, not the
+   syntactic access path, so a module ALIAS / functor-param / local bind
+   ([module L = Foo; L.t]) is still recognized as imported -- the syntactic
+   [Path.head]/[Ident.is_global] gate missed those (reviewer blind-spot repro).
+   [comp_unit] is [Compilation_unit.full_path_as_string] of the defining unit
+   (see [Shape.Uid.mk]); compare against the current unit's, computed the same
+   way. *)
+let decl_is_imported (uid : Types.Uid.t) : bool =
+  let current =
+    match Env.get_current_unit () with
+    | Some ui ->
+      Some (Compilation_unit.full_path_as_string (Unit_info.modname ui))
+    | None -> None
+  in
+  match uid with
+  | Types.Uid.Item { comp_unit; _ } | Types.Uid.Compilation_unit comp_unit -> (
+    match current with
+    | Some cur -> not (String.equal comp_unit cur)
+    (* No current unit (toplevel / special tools): there is no cmi-import
+       boundary to police, so treat as NOT imported.  [None -> true] here would
+       flag every same-session decl as imported and produce massive false-
+       positive self-collisions in the toplevel (the detector is over-approximate
+       but must not fire on a single in-memory session). Batch compilation -- the
+       real cross-cmi scenario -- always has [Some] current unit. *)
+    | None -> false)
+  | Types.Uid.Predef _ | Types.Uid.Internal | Types.Uid.Unboxed_version _ ->
+    false
+
 (* Lookup function supplied to the solver.
    We prefer a stored ikind (when present) and otherwise recompute from the
    type declaration in [env]. *)
@@ -1147,7 +1186,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
         if !Clflags.ikinds_validate then incr stored_decl_ikind_hits;
         (* Detector: an IMPORTED decl's stored ikind (persistent path head) may
            carry a foreign [Param] with a stale live id; record it. *)
-        if !Clflags.ikinds_validate && Ident.is_global (Path.head path)
+        if !Clflags.ikinds_validate && decl_is_imported type_decl.type_uid
         then
           record_imported_foreign_params ~own_params:type_decl.type_params base
             coeffs;
@@ -1250,7 +1289,12 @@ let type_declaration_ikind_of_jkind ~(env : Env.t option)
   with_ikinds_enabled (fun () ->
       let poly = normalize ~env type_jkind in
       let rigid_vars =
-        List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
+        List.map
+          (fun ty ->
+            let id = Types.get_id ty in
+            check_live_param_id id;
+            Ldd.rigid (Ldd.Name.param id))
+          params
       in
       let base, coeffs =
         Ldd.decompose_into_linear_terms ~universe:rigid_vars poly
@@ -1276,7 +1320,12 @@ let type_declaration_ikind_of_manifest ~(env : Env.t option)
   with_ikinds_enabled (fun () ->
       let ctx = create_ctx ~mode:Solver.Normal ~env in
       let rigid_vars =
-        List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
+        List.map
+          (fun ty ->
+            let id = Types.get_id ty in
+            check_live_param_id id;
+            Ldd.rigid (Ldd.Name.param id))
+          params
       in
       List.iter2
         (fun ty var ->
