@@ -37,6 +37,14 @@ let () =
   | Some ("1" | "true" | "yes" | "on") -> Clflags.ikinds_validate := true
   | Some _ | None -> ()
 
+(* Env alias for [-print-from-ikinds], so the full expect-test suite can be run
+   flag-on through the real [make test-one] runner (which fixes the compiler's
+   command-line flags) without a rebuild.  Same idiom as OXCAML_IKINDS_VALIDATE. *)
+let () =
+  match Sys.getenv_opt "OXCAML_PRINT_FROM_IKINDS" with
+  | Some ("1" | "true" | "yes" | "on") -> Clflags.print_from_ikinds := true
+  | Some _ | None -> ()
+
 (* When set, [lookup_of_env] ignores any stored [Constructor_ikind] and takes
    the recompute-from-declaration fallback. Used only by the validation harness
    to obtain the "derived on the fly" reference. *)
@@ -67,6 +75,25 @@ let residue_fault = ref false
 let () =
   match Sys.getenv_opt "OXCAML_IKIND_RESIDUE_FAULT" with
   | Some ("1" | "true" | "yes" | "on") -> residue_fault := true
+  | Some _ | None -> ()
+
+(* Counts how many times the print-from-ikind floor deriver actually fired
+   (a with-bounds-free jkind printed under [-print-from-ikinds]).  Evidence the
+   seam is exercised corpus-wide. *)
+let print_floor_derivations = ref 0
+
+(* Seeded-fault hook (test/debug only; env [OXCAML_PRINT_FLOOR_FAULT]).  When
+   set, the print-from-ikind floor deriver returns a deliberately-wrong value
+   ([top] = crosses everything) instead of the true floor, so the printed
+   mod-bounds diverge from the legacy value.  This proves the flag-on
+   differential (expect corpus, flag on) can FIRE: with the fault on, at least
+   one printed kind must change.  Default off, so flag-on output is otherwise
+   byte-identical. *)
+let print_floor_fault = ref false
+
+let () =
+  match Sys.getenv_opt "OXCAML_PRINT_FLOOR_FAULT" with
+  | Some ("1" | "true" | "yes" | "on") -> print_floor_fault := true
   | Some _ | None -> ()
 
 let validate_checks = ref 0
@@ -132,6 +159,15 @@ let () =
           !validate_checks !validate_mismatches !validate_benign
           !validate_class_b !residue_trusted !carrier_checks !carrier_mismatches
           !carrier_benign !stored_decl_ikind_hits !recomputed_decl_ikind)
+
+let () =
+  at_exit (fun () ->
+      (* Gated on [-ikinds-debug] (not the flag itself) so [-print-from-ikinds]
+         does not spew to stderr and pollute captured compiler output. *)
+      if !Clflags.print_from_ikinds && !Clflags.ikinds_debug
+      then
+        Format.eprintf "[ikind-print] floor derivations=%d fault=%b@."
+          !print_floor_derivations !print_floor_fault)
 
 module Ldd = Types.Ldd
 
@@ -1221,7 +1257,10 @@ let mod_bounds_floor_for_printing : type l r.
         Solver.round_up (Solver.ckind_of_jkind_desc ctx jkind)
       with
       | exception _ -> None
-      | lat -> Some (Jkind.Mod_bounds.of_axis_lattice lat))
+      | lat ->
+        incr print_floor_derivations;
+        let lat = if !print_floor_fault then Axis_lattice.top else lat in
+        Some (Jkind.Mod_bounds.of_axis_lattice lat))
 
 let () =
   Jkind.Const.set_floor_from_ikind

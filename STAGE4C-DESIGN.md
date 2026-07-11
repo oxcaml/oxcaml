@@ -249,3 +249,49 @@ base = ([0,0,1,3,3,1,1,3,3,0,0] ⊓ param[82]) ⊔ [2,1,0,0,0,0,0,0,0,1,2]; coef
 - A with-bounds-FREE jkind dumps as a pure constant leaf, e.g.
   `base = [2,1,0,0,0,0,0,0,0,1,2]; coeffs = []`. `round_up` returns that leaf and
   `Mod_bounds.of_axis_lattice` round-trips it exactly. Confirms P1 empirically.
+
+---
+
+## AS-BUILT (commits on ik/stage4c-print, off 981db01fb)
+
+1. `14854d40e` design doc.
+2. `9ad1d0fa4` `Ldd.to_terms` primitive (Ldd_intf.S + ldd.ml). `to_named_terms`
+   left unchanged (kept separate, not re-expressed) so its Unsolved-placeholder
+   debug rendering stays byte-identical.
+3. `f10253f92` `-print-from-ikinds` flag (Clflags + main_args, all 4 tools),
+   default off.
+4. `3614f6bb5` the seam: `jkind.ml` `Const.floor_from_ikind` deriver ref
+   (polymorphic-record field for the allowance phantom), consulted in
+   `convert_with_base`; `Ikind.mod_bounds_floor_for_printing` installs it.
+   O1 resolved to option (a) (ref set from Ikind, like `outcometrees_of_types`).
+5. `68e027fdd` test hooks: `OXCAML_PRINT_FROM_IKINDS` env alias (run the real
+   suite flag-on with no rebuild), `print_floor_derivations` counter + at_exit
+   summary GATED ON `-ikinds-debug` (so the flag never pollutes captured output;
+   this bug was caught by the first flag-on `make test-one`, which surfaced the
+   at_exit line as a 2-test diff), and the `OXCAML_PRINT_FLOOR_FAULT` seeded
+   fault (forces the floor to top).
+
+## RESULTS (real `make test-one`, _install)
+
+| suite | flag-off | flag-on | seeded fault |
+|---|---|---|---|
+| typing-jkind-bounds | 72/72 | 72/72 | 33/72 FAIL (fires) |
+| typing-modules | 54/54 | 54/54 | -- |
+| typing-layouts | (see report) | (see report) | -- |
+
+- Flag-on byte-identical corpus-wide; the deriver is genuinely exercised
+  (`modalities.ml` alone: 4414 floor derivations, all matching the legacy read).
+- O2 confirmed non-vacuous: the seam calls Ikind on the print path and the
+  derived floor is used for the printed value; the seeded fault proves a wrong
+  derivation would be caught (33/72 diverge). It is the honest maximum given P2
+  (with-bounds surface syntax irrecoverable) and exactly the subset stage 5 can
+  delete `mod_bounds` for. Files that print only with-bounds jkinds (e.g.
+  `printing.ml`, `basics.ml`) show 0 derivations -> correct legacy fallback.
+
+## STOP-AND-SCOPE disposition (with-bounds printing)
+
+Adjudicated by team-lead/user (task #170): stage 5 keeps a PRINT-ONLY SIDECAR
+of the with-bound type_exprs on the carrier, so `with`-clause printing is
+restored there. Stage 4c correctly does NOT attempt it (would change output or
+representation). The `-print-from-ikinds` flag is the migration seam; a later
+stage flips it to derive fully once the sidecar exists.
