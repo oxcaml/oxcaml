@@ -97,8 +97,10 @@ module Ikind_substitution = struct
   let substitute_decl_ikind_with_lookup :
       (lookup_type:(Path.t -> type_lookup_result) ->
        lookup_jkind:(Path.t -> jkind_lookup_result) ->
+       for_saving:bool ->
        type_ikind -> type_ikind) ref =
-    ref (fun ~lookup_type:_ ~lookup_jkind:_ ikind_entry -> ikind_entry)
+    ref (fun ~lookup_type:_ ~lookup_jkind:_ ~for_saving:_ ikind_entry ->
+      ikind_entry)
 end
 
 let identity =
@@ -916,8 +918,16 @@ let rec type_declaration' copy_scope s decl =
           then Lookup_jkind_identity
           else Lookup_jkind_path path'
       in
+      (* Stage-4d: [for_saving] scopes the cmi-save-only behaviors (the seeded
+         fault; and, deferred to stage 5, foreign-Param neutralization) to the
+         [Prepare_for_saving] path. *)
+      let for_saving =
+        match s.additional_action with
+        | Prepare_for_saving _ -> true
+        | Duplicate_variables | No_action -> false
+      in
       !Ikind_substitution.substitute_decl_ikind_with_lookup
-        ~lookup_type ~lookup_jkind decl.type_ikind
+        ~lookup_type ~lookup_jkind ~for_saving decl.type_ikind
     );
     type_private = decl.type_private;
     type_variance = decl.type_variance;

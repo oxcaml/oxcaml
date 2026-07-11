@@ -104,6 +104,24 @@ let () =
   | Some ("1" | "true" | "yes" | "on") -> print_floor_fault := true
   | Some _ | None -> ()
 
+(* Stage-4d cross-unit seeded-fault hook (test/debug only; env
+   [OXCAML_IKIND_SAVE_FAULT]).  When set, a decl ikind is deliberately corrupted
+   (base -> bottom, the tighter/genuine-finding direction) ON THE cmi SAVE PATH
+   only.  The defining unit compiles unaffected (the corruption happens while
+   preparing the signature for saving, after its own checks); the corruption
+   rides into the .cmi, so an importing unit loads a wrong stored ikind while the
+   defining unit's legacy jkind fields (from which the importer recomputes the
+   reference) stay intact.  Under [OXCAML_IKINDS_VALIDATE] the importer's harness
+   then sees stored < recompute and escalates to a HARD mismatch -- demonstrating
+   that the cmi boundary is not a validation blind spot.  Default off, so
+   ordinary builds (flag-on and flag-off) are byte-identical. *)
+let save_fault = ref false
+
+let () =
+  match Sys.getenv_opt "OXCAML_IKIND_SAVE_FAULT" with
+  | Some ("1" | "true" | "yes" | "on") -> save_fault := true
+  | Some _ | None -> ()
+
 let validate_checks = ref 0
 
 let validate_mismatches = ref 0
@@ -1946,7 +1964,7 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
 let substitute_decl_ikind_with_lookup
     ~(lookup_type : Path.t -> Subst.Ikind_substitution.type_lookup_result)
     ~(lookup_jkind : Path.t -> Subst.Ikind_substitution.jkind_lookup_result)
-    (ikind_entry : Types.type_ikind) : Types.type_ikind =
+    ~(for_saving : bool) (ikind_entry : Types.type_ikind) : Types.type_ikind =
   (* Inline type functions in an identity environment (no Env). *)
   match ikind_entry with
   | No_constructor_ikind _ -> ikind_entry
@@ -2012,6 +2030,10 @@ let substitute_decl_ikind_with_lookup
     in
     let base_poly = map_poly Path.Set.empty payload.base in
     let coeffs_poly = Array.map (map_poly Path.Set.empty) payload.coeffs in
+    (* Stage-4d cross-unit seeded fault: corrupt the persisted ikind (base ->
+       bottom) so an importer loads a wrong stored value while the defining
+       unit's legacy fields stay intact.  See [save_fault]. *)
+    let base_poly = if for_saving && !save_fault then Ldd.bot else base_poly in
     let payload = constructor_ikind ~base:base_poly ~coeffs:coeffs_poly in
     Types.Constructor_ikind payload
 

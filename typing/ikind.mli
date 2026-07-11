@@ -78,5 +78,6 @@ val sub_or_error :
 val substitute_decl_ikind_with_lookup :
   lookup_type:(Path.t -> Subst.Ikind_substitution.type_lookup_result) ->
   lookup_jkind:(Path.t -> Subst.Ikind_substitution.jkind_lookup_result) ->
+  for_saving:bool ->
   Types.type_ikind ->
   Types.type_ikind
