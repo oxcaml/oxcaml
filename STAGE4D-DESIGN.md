@@ -337,7 +337,16 @@ control proving the counter can increment.
 Verified: consuming the mixmod5 cmi shows `imported-foreign-params=1` (a residue
 `Param` id arrives from the cmi) with `param-id-collisions=0` (no natural
 collision); with the seeded control, `param-id-collisions=14` (fires). Validate
-off ⇒ no summary, byte-identical. A natural collision is NOT source-constructible
+off ⇒ no summary, byte-identical.
+
+> **POST-5b counter reading (2026-07-11):** after the `Residue` atom (commit
+> `e409e1d9f`) a saved residue arrives as a `Residue`, not a foreign `Param`, so
+> this detector now reads `imported-foreign-params=0` with the NEW telemetry
+> counter `imported-residues=N` (mixmod5 consumer: `imported-residues=9`).
+> `param-id-collisions` stays 0 (now collision-free by construction, not merely
+> unexhibited). The detector is demoted from soundness-gate to corroborating
+> telemetry, as planned. No committed test pins these counters (the
+> `residue_import_ikinds` test is `compile_only`). A natural collision is NOT source-constructible
 (`type_expr` id allocation is not controllable), so the counter reads 0 in
 practice — but the hazard is now observable if it ever occurs. Over-approximate
 by design (flags numeric overlap even absent a shared `decompose`); acceptable
@@ -366,6 +375,21 @@ for a detector.
 ---
 
 ## KNOWN SOUNDNESS RISK (stage-5 MUST-FIX gate)
+
+> **RESOLVED in stage 5b (2026-07-11), commit `e409e1d9f`.** The fix shipped is
+> the unit-qualified `Rigid_name.Residue` atom (option (b), below), NOT the
+> named-terms remap: on the cmi SAVE path every foreign `Param id` is rewritten
+> to `Residue {defining_unit; id}`. A `Residue` is a DISTINCT constructor from
+> `Param`, so `compare` never equates them and `decompose_into_linear_terms`
+> (whose universe is the importer's own `Param` vars) can never factor a
+> `Residue` — the stale-id collision is impossible BY CONSTRUCTION, not merely
+> undetected. CLASS-B recognition is preserved because the distinct constructor
+> IS the marker (this is exactly what the D1 fresh-`Unknown` neutralization
+> destroyed). Verified: residue_import consumer shows `imported-residues=9`,
+> `imported-foreign-params=0`, `param-id-collisions=0`, 0 HARD; save-fault → 8
+> HARD. So the MUST-FIX gate for 5d is CLOSED independently of the named-terms
+> format (which moves to the 5c/5d format-lock-in slice). The original analysis
+> is kept below for the record.
 
 **Foreign-`Param` stale-id collision in `decompose_into_linear_terms`.** A
 persisted (imported) decl ikind residue carries a foreign `Param id` whose `id`
