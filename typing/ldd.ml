@@ -568,6 +568,52 @@ module Make (V : Ordered) = struct
           failwith "solved vars should not appear after inline_solved_vars")
       node
 
+  (* Rebuild [node] dropping every non-base term whose rigid atoms ALL satisfy
+     [drop]. A term is one ZDD path (a leaf and the set of hi-edge vars taken
+     to reach it, semantics [lo \u2294 (v \u2293 hi)]); it is dropped iff it is
+     non-empty and every var on it is [Rigid] with a [Name] satisfying [drop].
+     The base (varless) term and any term carrying a non-[drop] atom (or an
+     [Unsolved] var) are reconstructed exactly. Used by the stage-4a carrier
+     validation to strip pure constructor-atom (Atom/KAtom) terms so an
+     abstract-with-manifest scope divergence is distinguishable from a Param
+     relabel bug (which always leaves a Param on the divergent term). *)
+  (* No memoization: this is validation-only and runs on small rigid-inlined
+     carrier nodes, so the plain recursive walk is fine. *)
+  let filter_out_pure_terms (drop : Name.t -> bool) (node : node) : node =
+    let rec aux (has_var : bool) (all_drop : bool) (acc : node) (node : node) :
+        node =
+      if is_leaf node
+      then
+        let c = Unsafe.leaf_value node in
+        if Axis_lattice.equal c Axis_lattice.bot
+        then bot
+        else if has_var && all_drop
+        then bot
+        else meet (const c) acc
+      else
+        let block = Unsafe.node_block node in
+        let lo = aux has_var all_drop acc block.lo in
+        let this_drop =
+          match block.v.state with
+          | Rigid name -> drop name
+          | Unsolved -> false
+          (* [Unsolved -> keep] (drop=false) is conservative: an [Unsolved]
+             var makes its term non-pure so the term is retained and compared,
+             never silently dropped. It should not appear on a rigid-inlined
+             carrier, but keeping it is the safe default if one does. *)
+          | Solved _ ->
+            failwith
+              "filter_out_pure_terms: solved var after inline_solved_vars"
+        in
+        let hi =
+          aux true (all_drop && this_drop)
+            (meet acc (node_of_var block.v))
+            block.hi
+        in
+        join lo hi
+    in
+    aux false true top (inline_solved_vars node)
+
   let pp (w : node) : string =
     let pp_coeff = Axis_lattice.to_string in
     (* Aggregate duplicate rigid var-sets by join on coefficients. *)

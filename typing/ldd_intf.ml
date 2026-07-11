@@ -75,6 +75,11 @@ module type S = sig
 
   val map_rigid : (Name.t -> node) -> node -> node
 
+  (** [filter_out_pure_terms drop n] rebuilds [n] dropping every non-base term
+      whose rigid atoms ALL satisfy [drop]; the base term and any term with at
+      least one non-[drop] atom are kept exactly. *)
+  val filter_out_pure_terms : (Name.t -> bool) -> node -> node
+
   (** Pretty printers and checks. *)
   val pp : node -> string
 

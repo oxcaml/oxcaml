@@ -63,15 +63,28 @@ let stored_decl_ikind_hits = ref 0
 
 let recomputed_decl_ikind = ref 0
 
+(* Stage-4a carrier validation: compare a jkind's populated+relabeled
+   [ikind_carrier] against a fresh same-env derivation.  [carrier_benign] is
+   the same directional CLASS-C tolerance as [validate_benign] (over-approx in
+   the SUB position); a relabel BUG surfaces as a non-directional
+   [carrier_mismatches]. *)
+let carrier_checks = ref 0
+
+let carrier_benign = ref 0
+
+let carrier_mismatches = ref 0
+
 let () =
   at_exit (fun () ->
       if !Clflags.ikinds_validate
       then
         Format.eprintf
           "[ikind-validate] summary: checks=%d mismatches=%d benign=%d; \
-           decl-ikind stored=%d recomputed=%d@."
-          !validate_checks !validate_mismatches !validate_benign
-          !stored_decl_ikind_hits !recomputed_decl_ikind)
+           carrier checks=%d mismatches=%d benign=%d; decl-ikind stored=%d \
+           recomputed=%d@."
+          !validate_checks !validate_mismatches !validate_benign !carrier_checks
+          !carrier_mismatches !carrier_benign !stored_decl_ikind_hits
+          !recomputed_decl_ikind)
 
 module Ldd = Types.Ldd
 
@@ -1200,6 +1213,55 @@ let validate_ikind ~(in_sub_position : bool) ~(origin : string option) env
               (Ldd.pp recomputed)))
       [Solver.Normal; Solver.Round_up]
 
+(* Stage-4a: validate a jkind's [ikind_carrier] (populated at typedecl,
+   relabeled across copy/Subst) against a fresh same-env derivation.  Normal
+   mode ONLY: the carrier is mode-agnostic, so a Round_up comparison
+   false-positives (STAGE3-DESIGN.md methodology caveat).  A relabel bug shows
+   as a non-directional mismatch; scope/precision divergence (4b's domain)
+   shows as the SUB-position directional over-approx, whitelisted exactly as
+   [validate_ikind]'s CLASS-C.  Inert: reads the carrier, never a verdict. *)
+(* A rigid atom is a with-bound CONSTRUCTOR reference ([Atom]/[KAtom]) rather
+   than a type parameter. The Param-relabel only ever rewrites [Param] atoms, so
+   any relabel bug (wrong id, stale, dropped, or collision-merged) necessarily
+   leaves a [Param] on the divergent term; a divergence confined to
+   constructor-atom terms is therefore NOT a relabel bug but the abstract-with-
+   manifest scope/precision class (4b's domain). *)
+let is_constructor_atom (name : Ldd.Name.t) : bool =
+  match name with
+  | Ldd.Name.Atom _ | Ldd.Name.KAtom _ -> true
+  | Ldd.Name.Param _ | Ldd.Name.Unknown _ -> false
+
+let validate_carrier ~(origin : string option) env
+    (jkind : ('l * 'r) Types.jkind) : unit =
+  if !Clflags.ikinds_validate
+  then
+    match jkind.Types.jkind.Types.ikind_carrier with
+    | None -> ()
+    | Some carried ->
+      let derived =
+        derive_ikind ~use_stored:true ~mode:Solver.Normal env jkind
+      in
+      incr carrier_checks;
+      if not (ldd_semantically_equal carried derived)
+      then
+        (* NON-directional: any carried<>derived is HARD (the carrier will be
+           authoritative in every position at stage 5, so the sub-only over-
+           approx tolerance does not transfer; this also closes the non-
+           injective-map absorption). The ONE tolerated class is a divergence
+           attributable purely to constructor-atom terms: strip every pure
+           [Atom]/[KAtom]-headed term from both sides and, if they then agree,
+           the residual carried no [Param] -> the abstract-with-manifest scope
+           divergence (4b), not a relabel bug. Keyed to atom-kind provenance,
+           never direction. *)
+        let strip = Ldd.filter_out_pure_terms is_constructor_atom in
+        if ldd_semantically_equal (strip carried) (strip derived)
+        then incr carrier_benign
+        else (
+          incr carrier_mismatches;
+          Format.eprintf
+            "[ikind-validate] CARRIER-MISMATCH%s@;@;carried=%s@;derived=%s@."
+            (origin_suffix_of origin) (Ldd.pp carried) (Ldd.pp derived))
+
 let compute_subcheck_polys ~context:_ env (sub : ('l1 * 'r1) Types.jkind)
     (super : ('l2 * 'r2) Types.jkind) : subcheck_polys =
   let ctx = create_ctx ~mode:Solver.Normal ~env:(Some env) in
@@ -1262,7 +1324,9 @@ let sub_jkind_l ?allow_any_crossing ?origin
       if !Clflags.ikinds_validate
       then (
         validate_ikind ~in_sub_position:true ~origin env sub;
-        validate_ikind ~in_sub_position:false ~origin env super)
+        validate_ikind ~in_sub_position:false ~origin env super;
+        validate_carrier ~origin env sub;
+        validate_carrier ~origin env super)
     in
     (* Check layouts first; if that fails, print both sides with full
        info and return the error. *)
@@ -1326,7 +1390,8 @@ let crossing_of_jkind ~(context : Jkind.jkind_context) env
       if !Clflags.ikinds_validate
       then
         validate_ikind ~in_sub_position:false ~origin:(Some "crossing") env
-          jkind
+          jkind;
+      validate_carrier ~origin:(Some "crossing") env jkind
     in
     let with_bounds_is_empty : type l r. (l * r) Types.with_bounds -> bool =
       function
@@ -1496,7 +1561,9 @@ let sub_or_intersect ?origin
     if !Clflags.ikinds_validate
     then (
       validate_ikind ~in_sub_position:true ~origin env t1;
-      validate_ikind ~in_sub_position:false ~origin env t2);
+      validate_ikind ~in_sub_position:false ~origin env t2;
+      validate_carrier ~origin env t1;
+      validate_carrier ~origin env t2);
     if fast_sub ~context env t1 t2
     then (
       (if !Clflags.ikinds_debug
@@ -1520,7 +1587,9 @@ let sub_or_error ?origin
       if !Clflags.ikinds_validate
       then (
         validate_ikind ~in_sub_position:true ~origin env t1;
-        validate_ikind ~in_sub_position:false ~origin env t2)
+        validate_ikind ~in_sub_position:false ~origin env t2;
+        validate_carrier ~origin env t1;
+        validate_carrier ~origin env t2)
     in
     (* The ikind engine decides the accept/reject verdict: first the layout
        subcheck (which the axis polynomials do not capture), then the modal-axis
