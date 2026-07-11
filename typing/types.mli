@@ -397,7 +397,8 @@ and ('layout, 'd) base_and_axes =
     with_bounds : 'd with_bounds;
     ikind_carrier : Ldd.node option
     (* Stage-4a carrier: the future SOLE ikind representation (stage 5 deletes
-       [mod_bounds]/[with_bounds]).  Behaviorally INERT in stage 4a -- populated,
+       [mod_bounds]/[with_bounds]).  Behaviorally INERT in stage 4a --
+       populated,
        relabeled across copy/Subst, and validated, but never consulted for a
        verdict.  [None] = not populated (recompute from the legacy pair).  When
        [Some], it is a rigid-inlined [Ldd.node] (marshal-safe like

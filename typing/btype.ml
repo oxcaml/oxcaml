@@ -493,7 +493,8 @@ let type_iterators_without_type_expr =
     | Some { base = Kconstr (p, _); mod_bounds = _;
              with_bounds = No_with_bounds; _ } ->
       it.it_path p
-    | Some { base = Layout _; mod_bounds = _; with_bounds = No_with_bounds; _ } ->
+    | Some { base = Layout _; mod_bounds = _;
+             with_bounds = No_with_bounds; _ } ->
       ()
   and it_functor_param it = function
     | Unit -> ()
@@ -1371,12 +1372,14 @@ module Jkind0 = struct
       match With_bounds.try_allow_l with_bounds with
       | None -> None
       | Some with_bounds ->
-        Some { base; mod_bounds = Obj.magic mod_bounds; with_bounds; ikind_carrier }
+        Some { base; mod_bounds = Obj.magic mod_bounds; with_bounds;
+               ikind_carrier }
 
     let try_allow_r { base; mod_bounds; with_bounds; ikind_carrier } =
       match With_bounds.try_allow_r with_bounds with
       | Some with_bounds ->
-        Some { base; mod_bounds = Obj.magic mod_bounds; with_bounds; ikind_carrier }
+        Some { base; mod_bounds = Obj.magic mod_bounds; with_bounds;
+               ikind_carrier }
       | None -> None
   end
 
@@ -1446,7 +1449,8 @@ module Jkind0 = struct
 
       let mk_jkind ~crossing ~externality (layout : Layout.Const.t) =
         let mod_bounds = Mod_bounds.create crossing ~externality in
-        { base = Layout layout; mod_bounds; with_bounds = No_with_bounds; ikind_carrier = None }
+        { base = Layout layout; mod_bounds; with_bounds = No_with_bounds;
+          ikind_carrier = None }
 
       let any =
         { jkind =

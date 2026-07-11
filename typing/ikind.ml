@@ -45,18 +45,20 @@ let force_recompute_ikinds = ref false
 (* When set (together with [force_recompute_ikinds]), [lookup_of_env] keeps the
    stored ikind for a recursive-module fixpoint residue (a [Type_abstract
    Definition] decl whose stored ikind carries a foreign [Param]).  Only the
-   validation harness sets it, to build the CLASS-B residue-trusting reference. *)
+   validation harness sets it, to build the CLASS-B residue-trusting
+   reference. *)
 let trust_residue_stored = ref false
 
 (* Seeded-fault hook (test/debug only; env [OXCAML_IKIND_RESIDUE_FAULT]).  When
    set, the residue-trusting reference derivation returns a deliberately-wrong
-   (top-joined) value for a residue instead of its stored ikind.  This leaves the
-   compile path and the stored/coarse derivations untouched -- so the SAME
-   divergences are detected -- but makes [recomputed_residue] disagree with
-   [stored], demonstrating that (a) every residue-trust decision is still COUNTED
-   under [residue_trusted] (the tag fires; the trust boundary is not a blind
-   spot), and (b) a residue-trust value that does not match the stored fixpoint
-   value is NOT silently classified CLASS-B -- it escalates to a HARD mismatch.
+   (top-joined) value for a residue instead of its stored ikind.  This leaves
+   the compile path and the stored/coarse derivations untouched -- so the
+   SAME divergences are detected -- but makes [recomputed_residue] disagree with
+   [stored], demonstrating that (a) every residue-trust decision is still
+   COUNTED under [residue_trusted] (the tag fires; the trust boundary is not
+   a blind spot), and (b) a residue-trust value that does not match the
+   stored fixpoint value is NOT silently classified CLASS-B -- it escalates
+   to a HARD mismatch.
    Gated so it can only ever perturb the validation harness -- default off, so
    ordinary builds (flag-on and flag-off) are byte-identical.  See
    STAGE4B-DESIGN.md. *)
@@ -796,7 +798,8 @@ let make_gadt_payload_projector ~(decl_params : Types.type_expr list)
           "ikind: expected GADT constructor result to be a type constructor")
 
 (* A stored constructor ikind for a [Type_abstract Definition] decl that carries
-   a [Param] atom foreign to the decl's own type parameters is a recursive-module
+   a [Param] atom foreign to the decl's own type parameters is a
+   recursive-module
    fixpoint residue: the declaration-time fixpoint (in the module-type-body
    scope) gated a recursive sibling's contribution on a symbolic atom that a
    from-scratch recompute cannot reproduce -- recompute resolves the closed
@@ -1003,7 +1006,8 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
     in
     (* Stage 4b: a recursive-module fixpoint residue gets the same
        reference-exclusion as CLASS-A, detected by a foreign [Param] in the
-       stored ikind rather than a fresh-[Tvar] manifest. See STAGE4B-DESIGN.md. *)
+       stored ikind rather than a fresh-[Tvar] manifest. See
+       STAGE4B-DESIGN.md. *)
     let is_def_abstract =
       match type_decl.type_kind with
       | Types.Type_abstract Types.Definition -> true
@@ -1027,12 +1031,14 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
              && is_def_abstract
              && stored_ikind_has_foreign_param ~own_params:type_decl.type_params
                   base coeffs ->
-        (* CLASS-B (stage 4b, residue-trusting reference only): a recursive-module
+        (* CLASS-B (stage 4b, residue-trusting reference only): a
+           recursive-module
            fixpoint residue -- a [Type_abstract Definition] whose stored ikind
            carries a foreign [Param].  A from-scratch recompute cannot reproduce
            the declaration-time recursive-module fixpoint, so it is not a valid
            independent reference; the validation harness re-derives with this
-           branch enabled and COUNTS the resulting agreement under CLASS-B rather
+           branch enabled and COUNTS the resulting agreement under CLASS-B
+           rather
            than hard-failing.  Never fires at compile time (guarded by
            [force_recompute_ikinds], set only by the harness). *)
         incr residue_trusted;
@@ -1307,7 +1313,8 @@ let validate_ikind ~(in_sub_position : bool) ~(origin : string option) env
                recursive-module fixpoint-residue trust?  Re-derive the reference
                trusting the stored ikind ONLY for [Type_abstract Definition]
                decls whose stored ikind carries a foreign [Param].  If that
-               residue-trusting reference matches the stored derivation, the whole
+               residue-trusting reference matches the stored derivation, the
+               whole
                divergence is residue-caused -- a from-scratch reference cannot
                reconstruct the declaration-time recursive-module fixpoint, so it
                is not a valid independent reference (the same trust boundary as

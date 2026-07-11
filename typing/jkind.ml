@@ -2699,7 +2699,8 @@ let apply_modality_r modality jk =
       (Axis_set.complement relevant_axes)
   in
   (* Stage-4a: this changes mod_bounds, so reset the ikind_carrier (symmetric
-     with [apply_modality_l]); a stale carrier must never ride a bounds change. *)
+     with [apply_modality_l]); a stale carrier must never ride a bounds
+     change. *)
   { jk with jkind = { jk.jkind with mod_bounds; ikind_carrier = None } }
   |> disallow_left
 
