@@ -24,7 +24,15 @@ let atoms =
     N.atomic (p "t") 1;
     N.katom (p "k");
     N.unknown uid1;
-    N.unknown uid2 ]
+    N.unknown uid2;
+    (* Unit-qualified [Residue] atoms (stage 5b soundness gate). Load-bearing
+       once named-terms marshals via [to_terms]: a residue must survive the
+       [of_terms]/[to_terms] round-trip like any other atom, and two residues
+       differing only in [defining_unit] or [id] must stay DISTINCT (the
+       collision-free-by-construction property the cmi format relies on). *)
+    N.residue "Unit_a" 3;
+    N.residue "Unit_a" 4;
+    N.residue "Unit_b" 3 ]
 
 let node_of name = L.node_of_var (L.rigid name)
 
@@ -136,4 +144,20 @@ let () =
   check_sem "distinct Unknown atoms preserved"
     (L.of_terms (L.to_terms (L.join u1 u2)))
     (L.join u1 u2);
+  (* Distinct Residue atoms stay distinct through of_terms: residues differing
+     in [id] (r1 vs r2) or in [defining_unit] (r1 vs r3) must not collapse --
+     this is the collision-free-by-construction property the cmi format relies
+     on (a residue can never alias another unit's residue or a live Param). *)
+  let r1 = node_of (N.residue "Unit_a" 3)
+  and r2 = node_of (N.residue "Unit_a" 4)
+  and r3 = node_of (N.residue "Unit_b" 3) in
+  if
+    sem_eq (L.of_terms (L.to_terms (L.join r1 r2))) (L.of_terms (L.to_terms r1))
+  then failwith "of_terms collapsed two Residue atoms differing in id";
+  if
+    sem_eq (L.of_terms (L.to_terms (L.join r1 r3))) (L.of_terms (L.to_terms r1))
+  then failwith "of_terms collapsed two Residue atoms differing in unit";
+  check_sem "distinct Residue atoms preserved"
+    (L.of_terms (L.to_terms (L.join (L.join r1 r2) r3)))
+    (L.join (L.join r1 r2) r3);
   print_string "ldd_terms_roundtrip_test: OK\n"
