@@ -348,6 +348,22 @@ module Solver = struct
   let global_cache_size () : int =
     TyTbl.length global_ty_to_kind + ConstrTbl.length global_constr_to_coeffs
 
+  (* Stage-5a re-entrancy fix: a per-print SCRATCH context.  Unlike [create_ctx]
+     it allocates FRESH cache tables and neither clears nor reuses the globals,
+     so a derivation run for PRINTING cannot evict or corrupt the cache an outer
+     solve is using mid-flight.  Behaviourally identical to the cleared-global
+     ctx for the derivation itself: [create_ctx] already cleared the globals on
+     every call, so the cache was always a per-derivation memo; this just makes
+     that memo genuinely private instead of a shared table it wipes. *)
+  let create_scratch_ctx ~(mode : mode) ~(env : Env.t option)
+      ~(lookup_of_env : Env.t -> Path.t -> constr_decl) =
+    { env;
+      lookup_of_env;
+      mode;
+      ty_to_kind = TyTbl.create 1;
+      constr_to_coeffs = ConstrTbl.create 1
+    }
+
   let reset_for_mode (ctx : ctx) ~(mode : mode) : ctx = { ctx with mode }
 
   let rigid_name (ctx : ctx) (name : Ldd.Name.t) : Ldd.node =
@@ -1279,15 +1295,24 @@ let create_ctx ~(mode : Solver.mode) ~(env : Env.t option) =
   Solver.create_ctx ~mode ~env ~lookup_of_env:(fun env path ->
       lookup_of_env ~env path)
 
+let create_scratch_ctx ~(mode : Solver.mode) ~(env : Env.t option) =
+  Solver.create_scratch_ctx ~mode ~env ~lookup_of_env:(fun env path ->
+      lookup_of_env ~env path)
+
 (* Stage-5a: context-creation helper for the two print-from-ikind derivations.
-   PROBE FORM (pre-fix): still uses the global-clearing [create_ctx], but first
-   records how many warm global-cache entries that clear evicts -- the
-   re-entrancy hazard H1, measured across the corpus.  The scratch-ctx fix
-   replaces the body with a non-clearing fresh-table context so this stays 0. *)
+   The print path builds a SCRATCH context (fresh tables, globals untouched) so
+   it is re-entrant by construction -- a print mid-check cannot wipe the outer
+   solve's cache.  Eviction is still measured FAITHFULLY (global cache size
+   immediately before vs after the context creation): the probe counter summed
+   >0 with the old clearing [create_ctx] and must now stay 0, so the counter is
+   a live regression guard, not a value hard-coded to 0. *)
 let create_print_ctx ~(mode : Solver.mode) ~(env : Env.t option) =
+  let before = Solver.global_cache_size () in
+  let ctx = create_scratch_ctx ~mode ~env in
+  let after = Solver.global_cache_size () in
   print_ctx_evicted_entries
-    := !print_ctx_evicted_entries + Solver.global_cache_size ();
-  create_ctx ~mode ~env
+    := !print_ctx_evicted_entries + max 0 (before - after);
+  ctx
 
 let normalize ~(env : Env.t option) (jkind : Types.jkind_l) : Ldd.node =
   let ctx = create_ctx ~mode:Solver.Normal ~env in

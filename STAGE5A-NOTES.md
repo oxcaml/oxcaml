@@ -163,4 +163,18 @@ team-lead approves the ldd touch / coordinates with ik5b.
 
 ### Fix (after), scratch-ctx commit
 
-(filled in after the fix builds)
+Same source + flags, boot compiler at the scratch-ctx commit:
+
+    [ikind-print] floor derivations=336 with-bounds rendered=6 render \
+      fallbacks=0 fault=false ctx-evicted=0
+
+- `ctx-evicted=0` (was 22): the print path no longer evicts ANY global cache
+  entry -- hazard H1 closed. The counter is measured faithfully (global size
+  before vs after the print-ctx creation), so 0 means real: not a hard-coded
+  value. Left in place as a permanent regression guard.
+- `floor derivations=336`, `with-bounds rendered=6`, `render fallbacks=0`
+  UNCHANGED, and the rendered `-i` signature is byte-for-byte identical to the
+  before-fix output. Proof that the scratch ctx changes only re-entrancy safety,
+  not derivation results (as expected: `create_ctx` already cleared the globals
+  every call, so the cache was always a per-derivation memo; a fresh private
+  table computes the same values).
