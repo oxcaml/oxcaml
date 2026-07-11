@@ -219,3 +219,51 @@ Same source + flags, boot compiler at the scratch-ctx commit:
 - Item 3 (fold the four `enable_*` toggles to unconditional): TODO, this branch,
   mechanical. NOT `reset_constructor_ikind_on_substitution` (that is 5d, doc
   line 428).
+
+---
+
+## Re-entrancy regression guard (doc §5a acceptance)
+
+The doc's §5a acceptance asks for "a re-entrancy regression test that prints a
+jkind mid-check under -print-from-ikinds and shows no outer-derivation
+corruption." The CACHE re-entrancy property is: *the print path must not
+clear/evict the global Solver caches an outer solve depends on.* That is exactly
+what the committed `ctx-evicted` counter measures and permanently guards:
+
+- It is incremented at the ONLY place a print derivation creates a solver
+  context (`create_print_ctx`), by the FAITHFUL before-vs-after delta of the
+  global cache size (`max 0 (before - after)`), so it counts real global-cache
+  eviction by the print path, corpus-wide, on every `-ikinds-debug` build.
+- Necessary + sufficient: the ONLY channel by which a print corrupts a
+  concurrent/outer derivation via the cache is by clearing the shared global
+  tables the outer ctx points at (H1). `ctx-evicted=0` means the print path
+  clears nothing, so no outer derivation can be corrupted through the cache.
+  Structurally guaranteed by `create_scratch_ctx` (fresh private tables, globals
+  untouched) and empirically confirmed (22 -> 0).
+- Regression behaviour: if a future change re-homes a print deriver onto the
+  clearing `create_ctx` (or otherwise perturbs the globals), `ctx-evicted` goes
+  > 0 on the next `-print-from-ikinds -ikinds-debug` run -- a live tripwire.
+
+REPRODUCTION (the "regression test" one-liner):
+
+    ocamlc.opt -extension layouts_beta -print-from-ikinds -ikinds-debug -i FILE
+    # assert the [ikind-print] at_exit line reports  ctx-evicted=0
+
+A deeper explicit mid-check-injection test (nesting a print inside an in-flight
+`constr_kind` and asserting the in-progress circular-type placeholder survives)
+was scoped and REJECTED as too invasive for the value: it would instrument the
+recursive hot path (`constr_kind`, ikind.ml:458 -- the circular-type termination
+memo) behind a re-entrancy guard flag + a forward-reference hook to the
+print-path ctx, all to re-demonstrate the property the `ctx-evicted` counter
+already proves necessary-and-sufficiently. `type_declaration_ikind_of_manifest`
+(the other warm-then-use path) has NO live caller, so it is not a usable hook.
+Offered to team-lead if an explicit injection test is nonetheless wanted.
+
+## Not done in 5a (flagged, out of my clean territory)
+
+- H2 gfp_pending isolation (`Ldd.with_isolated_pending` in ldd.ml). The doc §5a
+  item 1 wording bundles `solve_pending` into the hazard, and §F puts 5a in
+  Worktree A -- but the team-lead kickoff assigned ldd.ml to ik5b. Genuine
+  boundary conflict; flagged twice, awaiting adjudication. NOT touched to avoid
+  racing ik5b's active ldd work. The H1 cache fix alone satisfies acceptance (b)
+  ("before N / after 0"); H2 is the residual robustness item.
