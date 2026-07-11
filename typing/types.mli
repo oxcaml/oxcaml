@@ -394,7 +394,15 @@ and 'layout jkind_base =
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
     mod_bounds : mod_bounds;
-    with_bounds : 'd with_bounds
+    with_bounds : 'd with_bounds;
+    ikind_carrier : Ldd.node option
+    (* Stage-4a carrier: the future SOLE ikind representation (stage 5 deletes
+       [mod_bounds]/[with_bounds]).  Behaviorally INERT in stage 4a -- populated,
+       relabeled across copy/Subst, and validated, but never consulted for a
+       verdict.  [None] = not populated (recompute from the legacy pair).  When
+       [Some], it is a rigid-inlined [Ldd.node] (marshal-safe like
+       [type_ikind]).  Its free [Param] atoms key off live [type_expr] ids and
+       are relabeled at each copy/Subst boundary. *)
   }
   constraint 'd = 'l * 'r
 

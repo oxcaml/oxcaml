@@ -3131,7 +3131,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
   | None -> ()
   | Some { base = Layout _; _ } -> ()
   | Some ({ base = Kconstr (kpath, _); mod_bounds = _;
-            with_bounds = No_with_bounds }
+            with_bounds = No_with_bounds; _ }
           as manifest) ->
     if not (Path.exists_free recmod_ids kpath) then ()
     else
@@ -3158,7 +3158,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
         else
           match (Env.find_jkind current env).jkind_manifest with
           | Some ({ base = Kconstr (next, _); mod_bounds = _;
-                    with_bounds = No_with_bounds } as m) ->
+                    with_bounds = No_with_bounds; _ } as m) ->
             follow next ((steps_of current m) @ acc) (current :: visited)
           | Some { base = Layout _; _ } | None -> None
           | exception Not_found -> None
@@ -5358,7 +5358,7 @@ module Reaching_path = struct
   (* Format a jkind manifest without expanding Kconstr paths, to avoid infinite
      loops on the very cycles we're reporting. *)
   let pp_kind_manifest ppf
-        ({ base; mod_bounds; with_bounds = No_with_bounds}
+        ({ base; mod_bounds; with_bounds = No_with_bounds; _ }
          : jkind_const_desc_lr ) =
     let pp_base ppf = function
       | Types.Layout l -> Fmt.fprintf ppf "%s" (Jkind.Layout.Const.to_string l)

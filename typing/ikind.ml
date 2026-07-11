@@ -1385,7 +1385,8 @@ let fast_sub : type r1 l2.
                  nullability = Jkind_axis.Nullability.Maybe_null
                } ));
       mod_bounds;
-      with_bounds = Types.No_with_bounds
+      with_bounds = Types.No_with_bounds;
+      _
     } ->
     fast_sub_of_sort_super super_sort mod_bounds sub
   | { base =
@@ -1395,7 +1396,8 @@ let fast_sub : type r1 l2.
                nullability = Jkind_axis.Nullability.Maybe_null
              });
       mod_bounds;
-      with_bounds = Types.No_with_bounds
+      with_bounds = Types.No_with_bounds;
+      _
     } ->
     fast_sub_of_any_super mod_bounds sub
   | _ -> false

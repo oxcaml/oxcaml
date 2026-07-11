@@ -787,7 +787,7 @@ module Base_and_axes = struct
   let jkind_desc_of_const const =
     { const with base = Base.map_layout ~f:Layout.of_const const.base }
 
-  let debug_print format_layout ppf { base; mod_bounds; with_bounds } =
+  let debug_print format_layout ppf { base; mod_bounds; with_bounds; _ } =
     Format.fprintf ppf "{ base = %a;@ mod_bounds = %a;@ with_bounds = %a }"
       (Base.format format_layout)
       base Mod_bounds.debug_print mod_bounds With_bounds.debug_print with_bounds
@@ -835,7 +835,8 @@ module Base_and_axes = struct
           Expanded
             { base = meet_scannable_axes jkind.base sa;
               mod_bounds;
-              with_bounds = t.with_bounds
+              with_bounds = t.with_bounds;
+              ikind_carrier = None
             })
 
   let rec fully_expand_aliases_const env t : _ jkind_const_desc =
@@ -925,12 +926,14 @@ module Base_and_axes = struct
     | { with_bounds = With_bounds tys; _ } as t
       when Axis_set.equal skip_axes Axis_set.all
            || With_bounds_types.is_empty tys ->
-      { t with with_bounds = No_with_bounds }, Sufficient_fuel
+      ( { t with with_bounds = No_with_bounds; ikind_carrier = None },
+        Sufficient_fuel )
     | _
       when (not t_has_abstract_base)
            && Mod_bounds.is_max_within_set t.mod_bounds
                 (Axis_set.complement skip_axes) ->
-      { t with with_bounds = No_with_bounds }, Sufficient_fuel
+      ( { t with with_bounds = No_with_bounds; ikind_carrier = None },
+        Sufficient_fuel )
     | _ ->
       (* Sadly, it seems hard (impossible?) to be sure to expand all types
          here without using a fuel parameter to stop infinite regress. Here
@@ -1351,7 +1354,7 @@ module Base_and_axes = struct
       let normalized_t : (_, l * r) base_and_axes =
         match mode, ctl.fuel_status with
         | Require_best, Sufficient_fuel | Ignore_best, _ ->
-          { t with mod_bounds; with_bounds }
+          { t with mod_bounds; with_bounds; ikind_carrier = None }
         | Require_best, Ran_out_of_fuel ->
           (* Note [Ran out of fuel when requiring best]
              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1412,7 +1415,11 @@ module Jkind_desc = struct
 
   let unsafely_set_bounds env t ~from =
     let from = Base_and_axes.fully_expand_aliases env from in
-    { t with mod_bounds = from.mod_bounds; with_bounds = from.with_bounds }
+    { t with
+      mod_bounds = from.mod_bounds;
+      with_bounds = from.with_bounds;
+      ikind_carrier = None
+    }
 
   let expand_pair env t1 t2 =
     match
@@ -1434,13 +1441,15 @@ module Jkind_desc = struct
   let rec equate_or_equal ~allow_mutation env t1 t2 =
     let { base = base1;
           mod_bounds = mod_bounds1;
-          with_bounds = (No_with_bounds : (allowed * allowed) with_bounds)
+          with_bounds = (No_with_bounds : (allowed * allowed) with_bounds);
+          _
         } =
       t1
     in
     let { base = base2;
           mod_bounds = mod_bounds2;
-          with_bounds = (No_with_bounds : (allowed * allowed) with_bounds)
+          with_bounds = (No_with_bounds : (allowed * allowed) with_bounds);
+          _
         } =
       t2
     in
@@ -1459,9 +1468,9 @@ module Jkind_desc = struct
       | Some (t1, t2) -> equate_or_equal ~allow_mutation env t1 t2)
 
   let sub_expanded (type l r)
-      ({ base = base1; mod_bounds = bounds1; with_bounds = with_bounds1 } :
+      ({ base = base1; mod_bounds = bounds1; with_bounds = with_bounds1; _ } :
         (allowed * r) jkind_desc)
-      ({ base = base2; mod_bounds = bounds2; with_bounds = No_with_bounds } :
+      ({ base = base2; mod_bounds = bounds2; with_bounds = No_with_bounds; _ } :
         (l * allowed) jkind_desc) =
     (* Rather than carefully expanding only as much as needed, this assumes both
        kinds are fully expanded, and that [sub] is Ignore_best normalized. See
@@ -1521,15 +1530,16 @@ module Jkind_desc = struct
     sub_expanded sub super
 
   let rec intersection env
-      ({ base = base1; mod_bounds = mod_bounds1; with_bounds = with_bounds1 } as
-       t1)
-      ({ base = base2; mod_bounds = mod_bounds2; with_bounds = with_bounds2 } as
-       t2) =
+      ({ base = base1; mod_bounds = mod_bounds1; with_bounds = with_bounds1; _ }
+       as t1)
+      ({ base = base2; mod_bounds = mod_bounds2; with_bounds = with_bounds2; _ }
+       as t2) =
     let make_intersection base =
       Intersection
         { base;
           mod_bounds = Mod_bounds.meet mod_bounds1 mod_bounds2;
-          with_bounds = With_bounds.meet with_bounds1 with_bounds2
+          with_bounds = With_bounds.meet with_bounds1 with_bounds2;
+          ikind_carrier = None
         }
     in
     match base1, base2 with
@@ -1570,7 +1580,8 @@ module Jkind_desc = struct
     let layout, sort = Layout.of_new_sort_var ~level sa in
     ( { base = Layout layout;
         mod_bounds = Mod_bounds.max;
-        with_bounds = No_with_bounds
+        with_bounds = No_with_bounds;
+        ikind_carrier = None
       },
       sort )
 
@@ -1578,7 +1589,8 @@ module Jkind_desc = struct
     let layout = Layout.Sort (Sort.Univar univar, Scannable_axes.max) in
     { base = Layout layout;
       mod_bounds = Mod_bounds.max;
-      with_bounds = No_with_bounds
+      with_bounds = No_with_bounds;
+      ikind_carrier = None
     }
 
   let get t = Base_and_axes.map_layout Layout.get t
@@ -1899,7 +1911,8 @@ module Const = struct
                 { jkind =
                     { base = jkind.base;
                       mod_bounds = Mod_bounds.max;
-                      with_bounds = No_with_bounds
+                      with_bounds = No_with_bounds;
+                      ikind_carrier = None
                     };
                   name = Base.to_string layout_to_string jkind.base
                 }
@@ -1926,7 +1939,8 @@ module Const = struct
                   { jkind =
                       { base = jkind.base;
                         mod_bounds = Mod_bounds.max;
-                        with_bounds = No_with_bounds
+                        with_bounds = No_with_bounds;
+                        ikind_carrier = None
                       };
                     name = layout_str
                   }
@@ -2028,7 +2042,7 @@ module Const = struct
       =
     let folder (type l r) (layouts_acc, mod_bounds_acc, with_bounds_acc)
         (kind : (l * r) t) =
-      let { base; mod_bounds; with_bounds } =
+      let { base; mod_bounds; with_bounds; _ } =
         Base_and_axes.fully_expand_aliases_const env kind
       in
       let layout =
@@ -2047,7 +2061,8 @@ module Const = struct
     in
     { base = Layout (Layout.Const.Product (List.rev layouts));
       mod_bounds;
-      with_bounds
+      with_bounds;
+      ikind_carrier = None
     }
 
   let transl_scannable_axis ({ txt; loc } : string Location.loc) =
@@ -2088,7 +2103,11 @@ module Const = struct
         Typemode.transl_mod_bounds modifiers
       in
       let mod_bounds = Mod_bounds.meet base.mod_bounds mod_bounds in
-      { base = base.base; mod_bounds; with_bounds = No_with_bounds }
+      { base = base.base;
+        mod_bounds;
+        with_bounds = No_with_bounds;
+        ikind_carrier = None
+      }
       (* For scannable axes in mod bounds, we do not print redundancy warnings,
          as scannable axes in mod bounds will be deprecated anyway *)
       |> apply_scannable_axis ~warn env
@@ -2143,7 +2162,8 @@ module Const = struct
         in
         { base = base.base;
           mod_bounds = base.mod_bounds;
-          with_bounds = With_bounds.add type_ { relevant_axes } base.with_bounds
+          with_bounds = With_bounds.add type_ { relevant_axes } base.with_bounds;
+          ikind_carrier = None
         })
     | Pjk_default | Pjk_kind_of _ ->
       raise ~loc:jkind.pjka_loc Unimplemented_syntax
@@ -2388,7 +2408,8 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
   fresh_jkind_poly
     { base = jkind.jkind.base;
       mod_bounds = Mod_bounds.min;
-      with_bounds = With_bounds with_bounds_types
+      with_bounds = With_bounds with_bounds_types;
+      ikind_carrier = None
     }
     ~annotation:None ~why:Abbreviation
 
@@ -2410,7 +2431,8 @@ let for_open_boxed_row =
              ( Base Scannable,
                { nullability = Non_null; separability = Non_float } ));
       mod_bounds;
-      with_bounds = No_with_bounds
+      with_bounds = No_with_bounds;
+      ikind_carrier = None
     }
     ~annotation:None ~why:(Value_creation Polymorphic_variant)
 
@@ -2456,7 +2478,8 @@ let for_arrow =
              ( Base Scannable,
                { nullability = Non_null; separability = Non_float } ));
       mod_bounds = Mod_bounds.for_arrow;
-      with_bounds = No_with_bounds
+      with_bounds = No_with_bounds;
+      ikind_carrier = None
     }
     ~annotation:None ~why:(Value_creation Arrow)
   |> mark_best
@@ -2485,7 +2508,8 @@ let for_object =
                { nullability = Non_null; separability = Non_float } ));
       mod_bounds =
         Mod_bounds.create { comonadic; monadic } ~externality:Externality.max;
-      with_bounds = No_with_bounds
+      with_bounds = No_with_bounds;
+      ikind_carrier = None
     }
     ~annotation:None ~why:(Value_creation Object)
 
@@ -2607,7 +2631,8 @@ let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
        this function is mainly used for mode crossing or optimizations, we don't
        expect this to come up much. *)
     Mod_bounds.max
-  | { base = Kconstr _ | Layout _; with_bounds = No_with_bounds; mod_bounds } ->
+  | { base = Kconstr _ | Layout _; with_bounds = No_with_bounds; mod_bounds; _ }
+    ->
     mod_bounds
   | { base = Layout _; with_bounds = With_bounds _; _ } ->
     Misc.fatal_error
@@ -2662,7 +2687,9 @@ let apply_modality_l modality jk =
         { relevant_axes = Axis_set.intersection ti.relevant_axes relevant_axes })
       jk.jkind.with_bounds
   in
-  { jk with jkind = { jk.jkind with mod_bounds; with_bounds } }
+  { jk with
+    jkind = { jk.jkind with mod_bounds; with_bounds; ikind_carrier = None }
+  }
   |> disallow_right
 
 let apply_modality_r modality jk =
@@ -2671,7 +2698,10 @@ let apply_modality_r modality jk =
     Mod_bounds.set_max_in_set jk.jkind.mod_bounds
       (Axis_set.complement relevant_axes)
   in
-  { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
+  (* Stage-4a: this changes mod_bounds, so reset the ikind_carrier (symmetric
+     with [apply_modality_l]); a stale carrier must never ride a bounds change. *)
+  { jk with jkind = { jk.jkind with mod_bounds; ikind_carrier = None } }
+  |> disallow_left
 
 let apply_or_null_l env jkind =
   let jkind =
@@ -3740,7 +3770,11 @@ let round_up (type l r) ~context env (t : (allowed * r) jkind) :
   | No_with_bounds ->
     Some
       { t with
-        jkind = { normalized.jkind with with_bounds = No_with_bounds };
+        jkind =
+          { normalized.jkind with
+            with_bounds = No_with_bounds;
+            ikind_carrier = None
+          };
         quality =
           Not_best (* As required by the fact that this is a [jkind_r] *)
       }
@@ -3872,8 +3906,11 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) env sub super
           })
     in
     match sub with
-    | { base = _; mod_bounds = sub_upper_bounds; with_bounds = No_with_bounds }
-      ->
+    | { base = _;
+        mod_bounds = sub_upper_bounds;
+        with_bounds = No_with_bounds;
+        _
+      } ->
       let* () =
         (* MB_MODE : verify that the remaining upper_bounds from sub are <=
            super's bounds *)
@@ -3893,20 +3930,22 @@ let is_obviously_max (t : (_ * allowed) jkind) =
   (* This doesn't do any mutation because mutating a sort variable can't make it
      any, and modal upper bounds are constant. *)
   | { jkind =
-        { base = Layout (Any sa); mod_bounds; with_bounds = No_with_bounds };
+        { base = Layout (Any sa); mod_bounds; with_bounds = No_with_bounds; _ };
       _
     } ->
     Scannable_axes.(equal sa max) && Mod_bounds.is_max mod_bounds
-  | { jkind = { base = Layout _ | Kconstr _; mod_bounds = _; with_bounds = _ };
+  | { jkind =
+        { base = Layout _ | Kconstr _; mod_bounds = _; with_bounds = _; _ };
       _
     } ->
     false
 
 let mod_bounds_are_obviously_max (type l r) (t : (l * r) jkind) =
   match t with
-  | { jkind = { base = _; mod_bounds; with_bounds = No_with_bounds }; _ } ->
+  | { jkind = { base = _; mod_bounds; with_bounds = No_with_bounds; _ }; _ } ->
     Mod_bounds.is_max mod_bounds
-  | { jkind = { base = _; mod_bounds = _; with_bounds = With_bounds _ }; _ } ->
+  | { jkind = { base = _; mod_bounds = _; with_bounds = With_bounds _; _ }; _ }
+    ->
     false
 
 let fully_expand_aliases env ({ jkind; _ } as jk) =
@@ -4197,7 +4236,7 @@ module Debug_printers = struct
       (match q with Best -> "Best" | Not_best -> "Not_best")
 
   module Const = struct
-    let t ppf ({ base; mod_bounds; with_bounds } : _ Const.t) =
+    let t ppf ({ base; mod_bounds; with_bounds; _ } : _ Const.t) =
       fprintf ppf
         "@[<v 2>{ base = %a@,; mod_bounds = %a@,; with_bounds = %a@, }@]"
         (Base.format Layout.Const.Debug_printers.t)

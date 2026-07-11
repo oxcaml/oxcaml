@@ -580,11 +580,12 @@ let jkind_desc s jkind =
       if Path.compare p' p = 0 then jkind else
         { jkind with base = Kconstr (p', sa) }
     | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
-    | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
+    | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds; _ } ->
       let const =
         { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
           mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
-          with_bounds = jkind.with_bounds }
+          with_bounds = jkind.with_bounds;
+          ikind_carrier = None }
       in
       Jkind.Base_and_axes.map_layout Jkind_types.Layout.of_const const
     end
@@ -594,7 +595,7 @@ let jkind_desc s jkind =
     else { jkind with base = Layout l' }
 
 let jkind_const_desc s
-      ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
+      ({ with_bounds = No_with_bounds; _ } as jkind : jkind_const_desc_lr) =
   match jkind.base with
   | Kconstr (p, sa) ->
     begin match Path.Map.find p s.jkinds with
@@ -603,10 +604,11 @@ let jkind_const_desc s
       if Path.compare p' p = 0 then jkind else
         { jkind with base = Kconstr (p', sa) }
     | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
-    | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
+    | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds; _ } ->
       { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
         mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
-        with_bounds = jkind.with_bounds }
+        with_bounds = jkind.with_bounds;
+        ikind_carrier = None }
     end
   | Layout _ -> jkind
 
