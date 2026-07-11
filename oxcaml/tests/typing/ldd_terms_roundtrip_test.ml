@@ -9,6 +9,13 @@
 module L = Types.Ldd
 module N = Types.Rigid_name
 
+(* Two DISTINCT Unknown atoms with distinct Uids: exercises that [of_terms]
+   preserves an [Unknown]'s [Uid] (never re-mints or merges distinct ones) --
+   the load-bearing stage-5 cmi property. *)
+let uid1 = Shape.Uid.mk ~current_unit:None
+
+let uid2 = Shape.Uid.mk ~current_unit:None
+
 let atoms =
   let p name = Path.Pident (Ident.create_local name) in
   [ N.param 1;
@@ -16,7 +23,9 @@ let atoms =
     N.param 7;
     N.atomic (p "t") 0;
     N.atomic (p "t") 1;
-    N.katom (p "k") ]
+    N.katom (p "k");
+    N.unknown uid1;
+    N.unknown uid2 ]
 
 let node_of name = L.node_of_var (L.rigid name)
 
@@ -47,12 +56,28 @@ let sample_nodes () =
         (L.join (L.const Axis_lattice.mutable_data) (node_of (List.nth atoms 2)))
         (L.meet (node_of (List.nth atoms 3)) (node_of (List.nth atoms 4))) ]
   in
+  (* A deeper node: a term meeting many atoms (incl. both Unknowns), summed with
+     several other multi-atom terms -- exceeds the shallow ~3-term corpus. *)
+  let deep =
+    let big_term =
+      List.fold_left
+        (fun acc a -> L.meet acc (node_of a))
+        (L.const Axis_lattice.immutable_data) atoms
+    in
+    List.fold_left L.join big_term
+      [ L.meet (node_of (List.nth atoms 6)) (node_of (List.nth atoms 7));
+        L.meet
+          (L.const Axis_lattice.mutable_data)
+          (L.meet (node_of (List.nth atoms 0)) (node_of (List.nth atoms 6)));
+        L.meet (node_of (List.nth atoms 5)) (node_of (List.nth atoms 7)) ]
+  in
   List.concat
     [ [L.bot; L.const Axis_lattice.bot; L.const Axis_lattice.top];
       List.map (fun c -> L.const c) coeffs;
       singles;
       pairs;
-      sums ]
+      sums;
+      [deep] ]
 
 let () =
   (* Edge contracts. *)
@@ -96,4 +121,14 @@ let () =
       then failwith "to_terms within-term names not sorted")
     (L.to_terms
        (L.meet (node_of (List.nth atoms 4)) (node_of (List.nth atoms 0))));
+  (* Distinct Unknown Uids stay distinct through of_terms (no merge/re-mint):
+     a node with both differs from one with only the first. *)
+  let u1 = node_of (N.unknown uid1) and u2 = node_of (N.unknown uid2) in
+  if sem_eq
+       (L.of_terms (L.to_terms (L.join u1 u2)))
+       (L.of_terms (L.to_terms u1))
+  then failwith "of_terms collapsed two distinct Unknown atoms";
+  check_sem "distinct Unknown atoms preserved"
+    (L.of_terms (L.to_terms (L.join u1 u2)))
+    (L.join u1 u2);
   print_string "ldd_terms_roundtrip_test: OK\n"
