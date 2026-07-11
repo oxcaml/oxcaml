@@ -154,14 +154,36 @@ rounds to ⊤" of stage 4b is the Round_up SUB-RHS derivation, not crossing.)
 
 ## Decisions
 
-### D1. Neutralize foreign `Param`s in decl ikinds on the cmi save path. **BUILD.**
+### D1. Neutralize foreign `Param`s in decl ikinds on the cmi save path. **STOP-AND-SCOPE → stage 5 (revised after building it).**
 
-Thread `~for_saving:bool` into `substitute_decl_ikind_with_lookup` (the
-`Subst.Ikind_substitution` ref); `subst.jkind`/`type_declaration'` pass `true`
-iff `additional_action = Prepare_for_saving`. In the `Param` branch, when
-`for_saving`, return `node_of_var (rigid (Unknown (fresh_unknown_uid ())))`
-instead of keeping the `Param`. This removes every dangling/colliding live
-`type_expr` id from cmis while preserving verdicts.
+Original plan: thread `~for_saving:bool` into `substitute_decl_ikind_with_lookup`;
+in the `Param` branch, when `for_saving`, return a fresh `Unknown` instead of the
+`Param`, removing every dangling/colliding live id from cmis while preserving
+verdicts.
+
+**Built and measured — it regresses the working residue validation.** The
+neutralization IS verdict-preserving and collision-safe as designed, but the
+fresh `Unknown` erases the marker that stage-4b's CLASS-B residue-trust uses to
+RECOGNIZE a recursive-module fixpoint residue on import
+(`stored_ikind_has_foreign_param`, `ikind.ml:810`). Measured on a cross-unit
+residue consumer (`type wrap : immutable_data with Mixmod5_mod.LamF.exp0`):
+
+| | pristine (no D1) | with D1 (neutralize) |
+|---|---|---|
+| importer classification | CLASS-B, `residue_trusted=1`, **0 HARD** | **HARD MISMATCH** |
+
+So D1 (collision-safety) and CLASS-B (residue recognition) are in direct tension:
+full collision-safety needs a globally-unique id, which erases recognizability;
+preserving BOTH needs a dedicated residue-atom representation — which is exactly
+the explicit named-terms residue form (D2). D1, D2, and the residue-atom design
+are one coherent piece and belong in stage 5, where the ikind becomes the sole
+representation and the residue form is redesigned anyway. Shipping the half-fix
+now would regress `mixmod5`-style cross-unit validation from clean CLASS-B to
+HARD. **Deferred, with the tension documented as the primary design input for
+stage 5's residue representation.**
+
+The `~for_saving` PLUMBING is retained (it is uncontroversial and needed by D4);
+only the neutralization SEMANTICS are deferred.
 
 ### D2. Full named-terms *explicit on-disk format* (Obj.t-decoupling). **STOP-AND-SCOPE → stage 5.**
 
@@ -202,13 +224,14 @@ escalates the corrupted-imported vs recompute divergence to a HARD mismatch —
 proving the cross-unit boundary is not a validation blind spot. Default off;
 ordinary builds byte-identical.
 
-### Magic bump.
+### Magic bump. **NOT NEEDED for stage 4d (D1 deferred).**
 
-D1 changes cmi *content* (no more foreign `Param`s in decl ikinds; `Unknown`s in
-their place). Old cmis carry foreign `Param`s a D1 compiler would not emit. No
-back-compat ⇒ bump `Config.cmi_magic_number` (`Caml1999I581` → next) so a stale
-cmi is rejected rather than silently mixed. Full-world rebuild via the build
-system (user decision).
+The shipped stage-4d change (D4 + plumbing) does not alter cmi content — the
+seeded fault is default-off and byte-identical when off. No format change ⇒ no
+magic bump this stage. (A bump was prototyped for D1: `Caml1999I581` → `582`;
+recorded for stage 5, where D1/D2 land and the format changes for real. Note the
+bump forces a full stdlib rebuild — the whole world must be reinstalled — so it
+belongs with the stage that actually changes the format.)
 
 ---
 
@@ -235,5 +258,56 @@ system (user decision).
    probe shows 0 `Param` in cmis; verdicts preserved.
 2. D4 cross-unit seeded fault. Boot-green; fault-off byte-identical.
 3. Cross-unit expect/regression test pinning the residue-import behavior.
-4. Doc: append 4d disposition to `../IKIND-REFACTOR.md` §4 (D2/D3 deferred to
+4. Doc: append 4d disposition to `../IKIND-REFACTOR.md` §4 (D1/D2/D3 deferred to
    stage 5 with evidence).
+
+---
+
+## RESULTS (measured on `ik/stage4d-cmi`)
+
+### Cross-unit persistence works today (acceptance #1).
+
+`liba` (`'a box : immutable_data with 'a`, `('a,'b) pair`) consumed by `libb`:
+`decl-ikind stored=38 recomputed=7`, `mismatches=0`. A mixmod5-shaped module
+consumed by a residue consumer: CLASS-B, `residue_trusted=1`, **0 HARD**. Decl
+ikinds (incl. foreign-`Param` residues) cross the cmi and are consumed
+consistently.
+
+### The foreign-`Param` residue crosses the cmi (crux characterized).
+
+Save-path probe: 11 foreign `Param` atoms reach saved decl ikinds when mixmod5 is
+compiled as a batch module (`-c`). They keep stale live-`type_expr` ids. Sound in
+isolation (sub-position + constant super + monotone ⇒ sup-invariant; crossing
+reads a free rigid as ⊥ = safe under-claim). Latent decompose collision risk
+(§analysis) — real, narrow, unexhibited, pre-existing.
+
+### D1 built and refuted as a 4d deliverable (see D1).
+
+Neutralizing foreign `Param` → fresh `Unknown` on save turns the cross-unit
+residue consumer from clean CLASS-B into a HARD mismatch (breaks stage-4b's
+residue recognition). Deferred to stage 5 with the collision-vs-recognition
+tension as the design input.
+
+### Seeded fault fires cross-unit (acceptance #3).
+
+`OXCAML_IKIND_SAVE_FAULT` corrupts a decl ikind (`base → ⊥`) on the cmi save path
+only (default off, byte-identical when off). Corrupting a persisted residue and
+consuming it in another unit:
+
+| | clean cmi | faulted cmi |
+|---|---|---|
+| residue consumer (`wrap`) | CLASS-B, 0 HARD | **8 HARD mismatches** |
+
+So a deliberately-wrong persisted ikind is CAUGHT by the importer's harness, not
+silently trusted — the cmi boundary and the residue-trust boundary are not
+validation blind spots. (Sub-finding: SIMPLE decls like `box` are RECOMPUTED by
+the importer, so their corrupted stored ikind is harmless/masked; RESIDUE decls
+are authoritatively trusted from the stored ikind, which is exactly where
+persistence is load-bearing and where the fault surfaces.)
+
+### Shipped (stage 4d).
+
+`~for_saving` plumbing through `substitute_decl_ikind_with_lookup` +
+`OXCAML_IKIND_SAVE_FAULT` cross-unit seeded fault (`typing/ikind.ml`,
+`typing/subst.ml`, +mlis; +37/-3). Validate/debug-only, default off. No cmi
+format change, no magic bump. Boot-green; flag-off byte-identical.
