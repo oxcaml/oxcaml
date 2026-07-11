@@ -75,6 +75,14 @@ module type S = sig
 
   val map_rigid : (Name.t -> node) -> node -> node
 
+  (** [to_terms n] decomposes [n] into its ZDD terms, each a coefficient and the
+      set of rigid atom [Name.t]s on that term; the base term is the one with an
+      empty name list. [n] must be rigid-inlined (this calls
+      [inline_solved_vars]); raises on an unsolved var. Name-preserving analog
+      of the internal polynomial pretty-printer; the residue form used for
+      print-from-ikind and cmi save/load. *)
+  val to_terms : node -> (Axis_lattice.t * Name.t list) list
+
   (** [filter_out_pure_terms drop n] rebuilds [n] dropping every non-base term
       whose rigid atoms ALL satisfy [drop]; the base term and any term with at
       least one non-[drop] atom are kept exactly. *)

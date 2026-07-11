@@ -568,6 +568,38 @@ module Make (V : Ordered) = struct
           failwith "solved vars should not appear after inline_solved_vars")
       node
 
+  (* Name-preserving analog of [to_named_terms]: the same ZDD walk, but each
+     term keeps its atoms as [Name.t] rather than stringifying them via
+     [V.to_string].  The node must be rigid-inlined (this calls
+     [inline_solved_vars]); an [Unsolved] var raises, since it has no [Name] to
+     preserve (a rigid-inlined stored/derived node never has one).  Terms are
+     returned in ZDD-walk order; the base (varless) term is the element with an
+     empty name list.  This is the residue form [base \u2294 \u03a3 (coeff \u2293 names)]
+     consumed by print-from-ikind and by cmi save/load. *)
+  let to_terms (node : node) : (Axis_lattice.t * V.t list) list =
+    let rec aux (acc_vars : V.t list) (node : node)
+        (acc_terms : (Axis_lattice.t * V.t list) list) =
+      if is_leaf node
+      then
+        let c = Unsafe.leaf_value node in
+        if Axis_lattice.equal c Axis_lattice.bot
+        then acc_terms
+        else (c, acc_vars) :: acc_terms
+      else
+        let block = Unsafe.node_block node in
+        let acc_terms = aux acc_vars block.lo acc_terms in
+        let name =
+          match block.v.state with
+          | Rigid name -> name
+          | Unsolved ->
+            failwith "Ldd.to_terms: unsolved var (node not rigid-inlined)"
+          | Solved _ ->
+            failwith "solved vars should not appear after inline_solved_vars"
+        in
+        aux (name :: acc_vars) block.hi acc_terms
+    in
+    aux [] (inline_solved_vars node) [] |> List.rev
+
   (* Rebuild [node] dropping every non-base term whose rigid atoms ALL satisfy
      [drop]. A term is one ZDD path (a leaf and the set of hi-edge vars taken
      to reach it, semantics [lo \u2294 (v \u2293 hi)]); it is dropped iff it is
