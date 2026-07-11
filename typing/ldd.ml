@@ -507,6 +507,17 @@ module Make (V : Ordered) = struct
 
   let solve_pending () : unit = solve_pending_gfps ()
 
+  let pending_count () : int = List.length !gfp_pending
+
+  (* See [Ldd_intf.S.with_isolated_pending] for the contract and the isolation
+     boundary (only [gfp_pending] is swapped; rigid interning + the monotonic
+     id counter stay shared, deliberately). Exception-safe: a raising [f] still
+     restores the caller's pending list. *)
+  let with_isolated_pending (type a) (f : unit -> a) : a =
+    let saved = !gfp_pending in
+    gfp_pending := [];
+    Fun.protect ~finally:(fun () -> gfp_pending := saved) f
+
   (** Decompose into linear terms over [universe]. *)
   let decompose_into_linear_terms ~(universe : var list) (n : node) =
     (* Successive restriction over [universe]. *)

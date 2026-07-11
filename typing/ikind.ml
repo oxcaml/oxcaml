@@ -1461,8 +1461,12 @@ let mod_bounds_floor_for_printing : type l r.
     | Types.With_bounds _ -> None
     | Types.No_with_bounds -> (
       match
-        let ctx = create_print_ctx ~mode:Solver.Normal ~env:(Some env) in
-        Solver.round_up (Solver.ckind_of_jkind_desc ctx jkind)
+        (* Scratch ctx (fresh caches) + isolated pending: a print mid-check
+           perturbs neither the outer solve's Solver caches nor its pending
+           gfps. *)
+        Ldd.with_isolated_pending (fun () ->
+            let ctx = create_print_ctx ~mode:Solver.Normal ~env:(Some env) in
+            Solver.round_up (Solver.ckind_of_jkind_desc ctx jkind))
       with
       | exception _ -> None
       | lat ->
@@ -1495,10 +1499,14 @@ let render_jkind_from_ikind : type l r.
     | Types.No_with_bounds -> None
     | Types.With_bounds _ -> (
       match
-        let ctx = create_print_ctx ~mode:Solver.Normal ~env:(Some env) in
-        let node = Solver.ckind_of_jkind_desc ctx jkind in
-        Ldd.solve_pending ();
-        Ldd.to_terms (Ldd.inline_solved_vars node)
+        (* Scratch ctx (fresh caches) + isolated pending: this derivation's
+           solve_pending drains only its OWN gfps, never an outer mid-check
+           solve's pending. *)
+        Ldd.with_isolated_pending (fun () ->
+            let ctx = create_print_ctx ~mode:Solver.Normal ~env:(Some env) in
+            let node = Solver.ckind_of_jkind_desc ctx jkind in
+            Ldd.solve_pending ();
+            Ldd.to_terms (Ldd.inline_solved_vars node))
       with
       | exception _ ->
         incr print_render_fallbacks;
