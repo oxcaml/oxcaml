@@ -267,11 +267,24 @@ already proves necessary-and-sufficiently. `type_declaration_ikind_of_manifest`
 (the other warm-then-use path) has NO live caller, so it is not a usable hook.
 Offered to team-lead if an explicit injection test is nonetheless wanted.
 
-## Not done in 5a (flagged, out of my clean territory)
+## Final acceptance (item 1 = H1 cache + H2 gfp; item 3 = toggles)
 
-- H2 gfp_pending isolation (`Ldd.with_isolated_pending` in ldd.ml). The doc §5a
-  item 1 wording bundles `solve_pending` into the hazard, and §F puts 5a in
-  Worktree A -- but the team-lead kickoff assigned ldd.ml to ik5b. Genuine
-  boundary conflict; flagged twice, awaiting adjudication. NOT touched to avoid
-  racing ik5b's active ldd work. The H1 cache fix alone satisfies acceptance (b)
-  ("before N / after 0"); H2 is the residual robustness item.
+Team-lead adjudicated H2 IN scope and granted the ldd.ml boundary (ik5b frozen).
+Both hazards are now closed and the package re-froze green:
+
+- BOOT-GREEN per commit (7 code commits; every `make boot-compiler -j8` exit 0).
+- FLAG-OFF byte-identical (real `make test-one`, after H2): typing-jkind-bounds
+  74/74, typing-modules 54/54, typing-layouts 45/45.
+- H1 cache: ctx-evicted 22 -> 0 (committed counter); render byte-identical.
+- H2 gfp: mid-check-print probe -- un-isolated drained=1, isolated drained=0, OK.
+- RENDER smoke: with-bounds `with param[N] @ [..]` etc.; redundant-absorb; floors
+  byte-identical. floor derivations=336, with-bounds rendered=6, fallbacks=0.
+- mixmod5 flag-on: HARD=0; class_b=10 (base-context, accepted by team-lead).
+- `ocamlformat --check` clean on ikind.ml / ldd.ml / ldd_intf.ml.
+- Re-entrancy REGRESSION coverage for BOTH hazards: cache = the corpus-wide
+  ctx-evicted=0 counter (tripwire); gfp = the OXCAML_IK5A_REENTRANCY_PROBE
+  mid-check-print probe (drained=0 with isolation, >0 without).
+
+Diff: typing/ikind.ml, typing/ldd.ml, typing/ldd_intf.ml, STAGE5A-NOTES.md. No
+jkind.ml; ldd.ml touched only in the gfp_pending region (team-lead-granted;
+ik5b's Residue work is in the Name/atom area -- no semantic overlap).
