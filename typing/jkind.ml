@@ -1684,6 +1684,21 @@ module Const = struct
       (Base_and_axes.jkind_desc_of_const t1)
       (Base_and_axes.jkind_desc_of_const t2)
 
+  (* Stage-4c print-from-ikind: derive a with-bounds-free jkind's mod-bounds
+     floor from its ikind instead of the legacy [mod_bounds] field.  The record
+     keeps the field polymorphic in the allowance; [Ikind] installs it at
+     startup (Jkind is below Ikind in the module DAG, so this is the same
+     ref-injection pattern as [outcometrees_of_types]).  The installed function
+     returns [None] -- printing falls back to the legacy field -- when
+     [-print-from-ikinds] is off, ikinds are disabled, the jkind has with-bounds
+     (whose surface syntax the LDD cannot reconstruct), or derivation fails. *)
+  type floor_from_ikind =
+    { derive : 'l 'r. Env.t -> ('l * 'r) t -> Mod_bounds.t option }
+
+  let floor_from_ikind = ref { derive = (fun _ _ -> None) }
+
+  let set_floor_from_ikind f = floor_from_ikind := f
+
   module To_out_jkind_const : sig
     (** Convert a [t] into a [Outcometree.out_jkind_const]. If [verbosity] is
         [Not_verbose], the jkind is written in terms of the built-in jkind that
@@ -1807,9 +1822,16 @@ module Const = struct
           ~base:(get_scannable_axes_of_fully_expanded base_jkind)
           (get_scannable_axes_of_fully_expanded actual)
       in
+      let actual_mod_bounds =
+        (* Stage-4c: under [-print-from-ikinds], derive the floor from the
+           ikind for with-bounds-free jkinds; [None] => legacy fallback. *)
+        match !floor_from_ikind.derive env actual with
+        | Some mod_bounds -> mod_bounds
+        | None -> actual.mod_bounds
+      in
       let modal_bounds =
         get_modal_bounds ~verbosity ~base:base_jkind.mod_bounds
-          actual.mod_bounds
+          actual_mod_bounds
       in
       let printable_with_bounds =
         (* This match statement is a bit of a hack. One usage of this function

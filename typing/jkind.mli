@@ -306,6 +306,15 @@ module Const : sig
     ('l * allowed) t
 
   val expand_once : Env.t -> (_, 'd) Types.base_and_axes -> 'd t option
+
+  (** Stage-4c print-from-ikind: a wrapper (needed to keep the allowance
+      polymorphic in a ref) around a function deriving a jkind's mod-bounds
+      floor from its ikind. [Ikind] installs it at startup; default derives
+      nothing. *)
+  type floor_from_ikind =
+    { derive : 'l 'r. Env.t -> ('l * 'r) t -> Mod_bounds.t option }
+
+  val set_floor_from_ikind : floor_from_ikind -> unit
 end
 
 module Builtin : sig

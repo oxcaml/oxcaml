@@ -1197,6 +1197,36 @@ let jkind_with_carrier ~(env : Env.t) (jkind : ('l * 'r) Types.jkind) :
       let jd = jkind.Types.jkind in
       { jkind with Types.jkind = { jd with Types.ikind_carrier = Some node } }
 
+(* Stage-4c print-from-ikind: derive a WITH-BOUNDS-FREE const jkind's mod-bounds
+   floor from its ikind (round_up of the derived LDD), installed into
+   [Jkind.Const.floor_from_ikind].  Returns [None] -- printing then falls back
+   to the legacy [mod_bounds] field -- when [-print-from-ikinds] is off, ikinds
+   are disabled, the jkind carries with-bounds (whose surface [with]-clause
+   syntax the LDD cannot reconstruct, see STAGE4C-DESIGN.md P2), or the
+   derivation raises.  For the with-bounds-free case the ikind is a pure floor
+   (a const, or a const meet a KAtom that rounds up to top), so [round_up]
+   returns exactly [to_axis_lattice mod_bounds] and [of_axis_lattice] round-trips
+   it to the floor -- i.e. byte-identical to the legacy read. *)
+let mod_bounds_floor_for_printing : type l r.
+    Env.t -> (l * r) Jkind.Const.t -> Jkind.Mod_bounds.t option =
+ fun env jkind ->
+  if not (!Clflags.print_from_ikinds && !Clflags.ikinds)
+  then None
+  else
+    match jkind.Types.with_bounds with
+    | Types.With_bounds _ -> None
+    | Types.No_with_bounds -> (
+      match
+        let ctx = create_ctx ~mode:Solver.Normal ~env:(Some env) in
+        Solver.round_up (Solver.ckind_of_jkind_desc ctx jkind)
+      with
+      | exception _ -> None
+      | lat -> Some (Jkind.Mod_bounds.of_axis_lattice lat))
+
+let () =
+  Jkind.Const.set_floor_from_ikind
+    { Jkind.Const.derive = mod_bounds_floor_for_printing }
+
 let predef_ikind_of_jkind ~params type_jkind =
   type_declaration_ikind_of_jkind ~env:None ~params type_jkind
 
