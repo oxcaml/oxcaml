@@ -203,3 +203,12 @@ Flag-off default (validate off) is the default suite configuration above;
   recompute-from-legacy reference (stage 5d). The named-terms cmi is the
   prerequisite this slice locks in; the recompute reference still exists and the
   §C.1 differential above depends on it.
+
+## Review amendment (A2, integration): scope of "sole wire"
+
+"Named-terms is the sole wire" holds for the CMI only. The raw `Ldd` node DAG
+is still marshaled inside cmt/cms binary annotations (the typed tree written by
+`cmt_format.ml` embeds live `Constructor_ikind` values, bypassing the cmi
+serialize/deserialize boundary). Not a soundness issue (magic-locked, same
+binary reads it back; a leaked `Saved_ikind` is impossible on that path), but
+any future `Ldd` layout change still couples to cmt/cms — relevant to stage 5d.

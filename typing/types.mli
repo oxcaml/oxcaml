@@ -166,9 +166,8 @@ type constructor_ikind =
 type ikind_term = Axis_lattice.t * Rigid_name.t list
 
 (* The named-terms cmi payload for a decl ikind: [base]/[coeffs.(i)] decomposed
-   by [Ldd.to_terms].  [saved_legacy] carries the raw-DAG node form during the
-   coexistence window (STAGE5-DESIGN.md C.1); it is dropped once the named-terms
-   load path is validated. *)
+   by [Ldd.to_terms].  This is the sole cmi wire form; the raw-DAG coexistence
+   window (STAGE5-DESIGN.md C.1) was validated and then removed. *)
 type saved_constructor_ikind =
   { saved_base : ikind_term list;
     saved_coeffs : ikind_term list array;

@@ -150,3 +150,18 @@ fast path in 3b. Standing down on the race rather than clobbering is per
 `AGENTS.md` house rule (verify sole ownership before writing).
 
 ## Status: FROZEN for adversarial review. Not pushed.
+
+## Review amendment (A1, integration): env-description corrections
+
+Reviewer (rev_ik1) corrections to the environment caveat above:
+(a) `Stdlib_upstream_compatible` IS installed in this worktree
+(`_install/lib/ocaml`) and resolves via direct `-I` compile under both
+`-ikinds` and `-no-ikinds`; the real symptom is the expect-test harness
+failing to bring it into scope under `-ikinds` (worktree-local harness gap,
+present at base, persists across a fresh `install_for_test`).
+(b) `basics.ml` is NOT in the failing set (listed above in error).
+(c) Definitive attribution (reviewer built and ran BASE 6b3ae002e): the same
+4 tests fail at base and HEAD — annots_ikinds, rectypes_ikinds, row_ikinds,
+variants_ikinds — with byte-identical row/variants `.corrected` outputs, so
+5c introduces zero regressions; the row/variants accept-flips are sound
+precision improvements pre-existing at base (ticket 6481 promotion debt).
