@@ -42,6 +42,31 @@ let () =
    to obtain the "derived on the fly" reference. *)
 let force_recompute_ikinds = ref false
 
+(* When set (together with [force_recompute_ikinds]), [lookup_of_env] keeps the
+   stored ikind for a recursive-module fixpoint residue (a [Type_abstract
+   Definition] decl whose stored ikind carries a foreign [Param]).  Only the
+   validation harness sets it, to build the CLASS-B residue-trusting reference. *)
+let trust_residue_stored = ref false
+
+(* Seeded-fault hook (test/debug only; env [OXCAML_IKIND_RESIDUE_FAULT]).  When
+   set, the residue-trusting reference derivation returns a deliberately-wrong
+   (top-joined) value for a residue instead of its stored ikind.  This leaves the
+   compile path and the stored/coarse derivations untouched -- so the SAME
+   divergences are detected -- but makes [recomputed_residue] disagree with
+   [stored], demonstrating that (a) every residue-trust decision is still COUNTED
+   under [residue_trusted] (the tag fires; the trust boundary is not a blind
+   spot), and (b) a residue-trust value that does not match the stored fixpoint
+   value is NOT silently classified CLASS-B -- it escalates to a HARD mismatch.
+   Gated so it can only ever perturb the validation harness -- default off, so
+   ordinary builds (flag-on and flag-off) are byte-identical.  See
+   STAGE4B-DESIGN.md. *)
+let residue_fault = ref false
+
+let () =
+  match Sys.getenv_opt "OXCAML_IKIND_RESIDUE_FAULT" with
+  | Some ("1" | "true" | "yes" | "on") -> residue_fault := true
+  | Some _ | None -> ()
+
 let validate_checks = ref 0
 
 let validate_mismatches = ref 0
@@ -56,6 +81,26 @@ let validate_mismatches = ref 0
    whitelisted: they stay hard mismatches and are a genuine-soundness-finding
    trigger. Counted and reported separately. *)
 let validate_benign = ref 0
+
+(* CLASS-B (stage 4b): a divergence fully explained by recursive-module
+   fixpoint-residue trust -- the stored ikind of a [Type_abstract Definition]
+   decl carrying a foreign [Param] is TRUSTED rather than independently
+   validated, because a from-scratch reference cannot reconstruct the
+   declaration-time recursive-module fixpoint (the same trust boundary as
+   CLASS-A's fresh-[Tvar] temp decls).  We do NOT hard-fail these, but we COUNT
+   and LOG every one so the trust decision stays auditable -- a deliberately
+   wrong residue stored ikind still lands here (the tag fires), never silently
+   absorbed. *)
+let validate_class_b = ref 0
+
+(* Lookup-level audit tag: counts every residue-trust DECISION -- each time the
+   residue-trusting reference derivation keeps a residue's stored ikind instead
+   of recomputing it.  Fires regardless of whether that stored value is correct,
+   so it is the visibility guarantee the trust boundary needs: a wrong residue
+   stored ikind (e.g. under [OXCAML_IKIND_RESIDUE_FAULT]) is still counted here,
+   never a silent blind spot.  Only ever incremented in the harness (guarded by
+   [force_recompute_ikinds] && [trust_residue_stored]). *)
+let residue_trusted = ref 0
 
 (* Counts, in the normal (non-forced) path, how many constructor lookups used a
    stored decl ikind vs fell back to recompute. *)
@@ -79,12 +124,12 @@ let () =
       if !Clflags.ikinds_validate
       then
         Format.eprintf
-          "[ikind-validate] summary: checks=%d mismatches=%d benign=%d; \
-           carrier checks=%d mismatches=%d benign=%d; decl-ikind stored=%d \
-           recomputed=%d@."
-          !validate_checks !validate_mismatches !validate_benign !carrier_checks
-          !carrier_mismatches !carrier_benign !stored_decl_ikind_hits
-          !recomputed_decl_ikind)
+          "[ikind-validate] summary: checks=%d mismatches=%d benign=%d \
+           class_b=%d residue_trusted=%d; carrier checks=%d mismatches=%d \
+           benign=%d; decl-ikind stored=%d recomputed=%d@."
+          !validate_checks !validate_mismatches !validate_benign
+          !validate_class_b !residue_trusted !carrier_checks !carrier_mismatches
+          !carrier_benign !stored_decl_ikind_hits !recomputed_decl_ikind)
 
 module Ldd = Types.Ldd
 
@@ -750,6 +795,29 @@ let make_gadt_payload_projector ~(decl_params : Types.type_expr list)
         failwith
           "ikind: expected GADT constructor result to be a type constructor")
 
+(* A stored constructor ikind for a [Type_abstract Definition] decl that carries
+   a [Param] atom foreign to the decl's own type parameters is a recursive-module
+   fixpoint residue: the declaration-time fixpoint (in the module-type-body
+   scope) gated a recursive sibling's contribution on a symbolic atom that a
+   from-scratch recompute cannot reproduce -- recompute resolves the closed
+   manifest coarsely (e.g. an object to [object_legacy]) instead. Stored decl
+   ikinds are otherwise free of foreign [Param] atoms (parameter dependence is
+   captured positionally in the coeff array), so this is a precise signature of
+   the residue. See STAGE4B-DESIGN.md. *)
+let stored_ikind_has_foreign_param ~(own_params : Types.type_expr list)
+    (base : Ldd.node) (coeffs : Ldd.node array) : bool =
+  let own_ids = List.map Types.get_id own_params in
+  let found = ref false in
+  let visit (name : Ldd.Name.t) : Ldd.node =
+    (match name with
+    | Ldd.Name.Param id when not (List.mem id own_ids) -> found := true
+    | _ -> ());
+    Ldd.node_of_var (Ldd.rigid name)
+  in
+  ignore (Ldd.map_rigid visit base : Ldd.node);
+  Array.iter (fun c -> ignore (Ldd.map_rigid visit c : Ldd.node)) coeffs;
+  !found
+
 (* Lookup function supplied to the solver.
    We prefer a stored ikind (when present) and otherwise recompute from the
    type declaration in [env]. *)
@@ -933,6 +1001,14 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
         match Types.get_desc body_ty with Types.Tvar _ -> true | _ -> false)
       | _ -> false
     in
+    (* Stage 4b: a recursive-module fixpoint residue gets the same
+       reference-exclusion as CLASS-A, detected by a foreign [Param] in the
+       stored ikind rather than a fresh-[Tvar] manifest. See STAGE4B-DESIGN.md. *)
+    let is_def_abstract =
+      match type_decl.type_kind with
+      | Types.Type_abstract Types.Definition -> true
+      | _ -> false
+    in
     (* Prefer a stored constructor ikind if one is present and enabled. *)
     let ikind =
       match type_decl.type_ikind with
@@ -946,6 +1022,23 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
         (* CLASS-A: keep the stored (declared) ikind in the recompute reference;
            the fresh Tvar manifest is a placeholder, not the body. *)
         Solver.Poly (base, coeffs)
+      | Types.Constructor_ikind { base; coeffs }
+        when !Clflags.ikinds && !force_recompute_ikinds && !trust_residue_stored
+             && is_def_abstract
+             && stored_ikind_has_foreign_param ~own_params:type_decl.type_params
+                  base coeffs ->
+        (* CLASS-B (stage 4b, residue-trusting reference only): a recursive-module
+           fixpoint residue -- a [Type_abstract Definition] whose stored ikind
+           carries a foreign [Param].  A from-scratch recompute cannot reproduce
+           the declaration-time recursive-module fixpoint, so it is not a valid
+           independent reference; the validation harness re-derives with this
+           branch enabled and COUNTS the resulting agreement under CLASS-B rather
+           than hard-failing.  Never fires at compile time (guarded by
+           [force_recompute_ikinds], set only by the harness). *)
+        incr residue_trusted;
+        if !residue_fault
+        then Solver.Poly (Ldd.join base (Ldd.const Axis_lattice.top), coeffs)
+        else Solver.Poly (base, coeffs)
       | Types.No_constructor_ikind reason ->
         if !Clflags.ikinds_debug then Format.eprintf "[ikind-miss] %s@." reason;
         if !Clflags.ikinds_validate && not !force_recompute_ikinds
@@ -1162,12 +1255,16 @@ let ldd_leq (a : Ldd.node) (b : Ldd.node) : bool =
    ([use_stored:true]) or forcing a full recompute from each declaration
    ([use_stored:false]). Allocates its own solver context, so it must only be
    called at a top-level seam entry, never inside another derivation. *)
-let derive_ikind ~(use_stored : bool) ~(mode : Solver.mode) env
-    (jkind : ('l * 'r) Types.jkind) : Ldd.node =
+let derive_ikind ~(use_stored : bool) ?(trust_residue = false)
+    ~(mode : Solver.mode) env (jkind : ('l * 'r) Types.jkind) : Ldd.node =
   let saved = !force_recompute_ikinds in
+  let saved_tr = !trust_residue_stored in
   force_recompute_ikinds := not use_stored;
+  trust_residue_stored := trust_residue;
   Fun.protect
-    ~finally:(fun () -> force_recompute_ikinds := saved)
+    ~finally:(fun () ->
+      force_recompute_ikinds := saved;
+      trust_residue_stored := saved_tr)
     (fun () ->
       let ctx = create_ctx ~mode ~env:(Some env) in
       let node = Solver.ckind_of_jkind ctx jkind in
@@ -1205,12 +1302,41 @@ let validate_ikind ~(in_sub_position : bool) ~(origin : string option) env
              super/crossing divergence a hard mismatch regardless of direction. *)
           if in_sub_position && ldd_leq recomputed stored
           then incr validate_benign
-          else (
-            incr validate_mismatches;
-            Format.eprintf
-              "[ikind-validate] MISMATCH%s mode=%s@;@;stored=%s@;recompute=%s@."
-              (origin_suffix_of origin) mode_s (Ldd.pp stored)
-              (Ldd.pp recomputed)))
+          else
+            (* Stage 4b CLASS-B: is the divergence fully explained by
+               recursive-module fixpoint-residue trust?  Re-derive the reference
+               trusting the stored ikind ONLY for [Type_abstract Definition]
+               decls whose stored ikind carries a foreign [Param].  If that
+               residue-trusting reference matches the stored derivation, the whole
+               divergence is residue-caused -- a from-scratch reference cannot
+               reconstruct the declaration-time recursive-module fixpoint, so it
+               is not a valid independent reference (the same trust boundary as
+               CLASS-A).  Count and log it (auditable) rather than hard-fail; a
+               deliberately-wrong residue stored ikind still lands here. *)
+            let recomputed_residue =
+              derive_ikind ~use_stored:false ~trust_residue:true ~mode env jkind
+            in
+            if ldd_semantically_equal stored recomputed_residue
+            then (
+              incr validate_class_b;
+              Format.eprintf
+                "[ikind-validate] CLASS-B%s mode=%s (recursive-module \
+                 fixpoint-residue: stored trusted, not independently \
+                 validated)@;\
+                 @;\
+                 stored=%s@;\
+                 recompute=%s@."
+                (origin_suffix_of origin) mode_s (Ldd.pp stored)
+                (Ldd.pp recomputed))
+            else (
+              incr validate_mismatches;
+              Format.eprintf
+                "[ikind-validate] MISMATCH%s mode=%s@;\
+                 @;\
+                 stored=%s@;\
+                 recompute=%s@."
+                (origin_suffix_of origin) mode_s (Ldd.pp stored)
+                (Ldd.pp recomputed)))
       [Solver.Normal; Solver.Round_up]
 
 (* Stage-4a: validate a jkind's [ikind_carrier] (populated at typedecl,
