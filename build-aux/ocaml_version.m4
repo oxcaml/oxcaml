@@ -110,7 +110,11 @@ AC_DEFUN([DEFINE_MAGIC_NUMBER],
 
 m4_define(EXEC__FORMAT, [X])
 DEFINE_MAGIC_NUMBER([EXEC], EXEC__FORMAT)
-DEFINE_MAGIC_NUMBER([CMI], [I])
+# Stage-5 ikind format lock-in: the cmi now carries the decl ikind as an
+# explicit named-terms payload (was a raw Ldd node DAG), so a pre-stage-5
+# compiler must REJECT these cmis.  Bump ONLY the cmi version (581 -> 582): the
+# .cmt/.cmo/.cmx node marshaling is unchanged, so their versions stay at 581.
+m4_define([CMI__MAGIC_NUMBER], [MAGIC_NUMBER__PREFIX[]I[]582])
 DEFINE_MAGIC_NUMBER([CMO], [O])
 DEFINE_MAGIC_NUMBER([CMA], [A])
 DEFINE_MAGIC_NUMBER([CMX], [Y])

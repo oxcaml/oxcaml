@@ -15,6 +15,59 @@
 
 open Misc
 
+(* Stage-5 format lock-in: the decl ikind rides the cmi as an explicit
+   named-terms payload ([Types.Saved_ikind]) instead of the raw [Ldd] node DAG.
+   [Constructor_ikind] is converted to [Saved_ikind] on serialize and back on
+   deserialize, so live code only ever observes [Constructor_ikind]; the
+   named-terms form exists solely in the marshaled bytes.  This decouples the
+   cmi from the [Ldd] node block / [Axis_lattice] internal layout. *)
+
+(* Map the [type_ikind] of a decl (and its unboxed version) through [f]. *)
+let rec map_type_declaration_ikind
+    (f : Types.type_ikind -> Types.type_ikind)
+    (td : Types.type_declaration) : Types.type_declaration =
+  { td with
+    type_ikind = f td.type_ikind;
+    type_unboxed_version =
+      Option.map (map_type_declaration_ikind f) td.type_unboxed_version;
+  }
+
+(* Serialize side: Constructor_ikind -> Saved_ikind (named-terms + raw-DAG). *)
+let dehydrate_ikind (e : Types.type_ikind) : Types.type_ikind =
+  match e with
+  | Types.Constructor_ikind ci ->
+    Types.Saved_ikind (Types.constructor_ikind_to_saved ci)
+  | Types.No_constructor_ikind _ | Types.Saved_ikind _ -> e
+
+(* Deserialize side: Saved_ikind -> Constructor_ikind, rehydrating the LDD from
+   the named-terms payload.  Coexistence-window differential (validate only,
+   STAGE5-DESIGN.md C.1): the rehydrated LDD must equal the raw-DAG legacy node
+   that rode the SAME cmi -- 0 HARD is required before the raw-DAG path is
+   deleted in the follow-up commit. *)
+let rehydrate_ikind (e : Types.type_ikind) : Types.type_ikind =
+  match e with
+  | Types.Saved_ikind s ->
+    let ci = Types.constructor_ikind_of_saved s in
+    (if !Clflags.ikinds_validate
+     then
+       match s.saved_legacy with
+       | None -> ()
+       | Some legacy ->
+         let eq a b =
+           Types.Ldd.leq_with_reason a b = []
+           && Types.Ldd.leq_with_reason b a = []
+         in
+         let coeffs_eq =
+           Array.length ci.coeffs = Array.length legacy.coeffs
+           && Array.for_all2 eq ci.coeffs legacy.coeffs
+         in
+         if not (eq ci.base legacy.base && coeffs_eq)
+         then
+           Misc.fatal_error
+             "cmi ikind: named-terms payload disagrees with raw-DAG legacy");
+    Types.Constructor_ikind ci
+  | Types.Constructor_ikind _ | Types.No_constructor_ikind _ -> e
+
 type pers_flags =
   | Rectypes
   | Alerts of alerts
@@ -89,8 +142,19 @@ module Deserialize = Types.Map_wrapped(Serialized)(Subst.Lazy)
 
 let deserialize data =
   (* Values are offsets into `data` *)
+  let rehydrate_item (item : Subst.Lazy.signature_item) :
+      Subst.Lazy.signature_item =
+    match item with
+    | Subst.Lazy.Sig_type (id, td, rs, vis) ->
+      Subst.Lazy.Sig_type
+        (id, map_type_declaration_ikind rehydrate_ikind td, rs, vis)
+    | item -> item
+  in
   let map_signature fn n =
-    lazy(Marshal.from_bytes data n |> List.map (Deserialize.signature_item fn))
+    lazy
+      (Marshal.from_bytes data n
+      |> List.map (Deserialize.signature_item fn)
+      |> List.map rehydrate_item)
     |> Subst.Lazy.of_lazy
   in
   let map_type_expr _ n =
@@ -132,9 +196,18 @@ let serialize oc base =
     Marshal.to_channel oc x [];
     Int64.to_int (Int64.sub pos base)
   in
+  let dehydrate_item (item : Serialized.signature_item) :
+      Serialized.signature_item =
+    match item with
+    | Serialized.Sig_type (id, td, rs, vis) ->
+      Serialized.Sig_type
+        (id, map_type_declaration_ikind dehydrate_ikind td, rs, vis)
+    | item -> item
+  in
   let map_signature fn sg =
     Subst.Lazy.force_signature_once sg
     |> List.map (Serialize.signature_item fn)
+    |> List.map dehydrate_item
     |> marshal
   in
   let map_type_expr _ ty = Subst.Lazy.force_type_expr ty |> marshal in

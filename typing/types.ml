@@ -101,9 +101,35 @@ type constructor_ikind =
     coeffs : Ldd.node array;
   }
 
+(* A single ZDD term of a decl ikind polynomial: a coefficient meet the
+   canonically-sorted rigid atoms of the term.  This is [Ldd.to_terms]'s
+   element type -- the explicit, node-layout-independent wire form of a
+   [constructor_ikind] on the cmi (stage-5 format lock-in). *)
+type ikind_term = Axis_lattice.t * Rigid_name.t list
+
+(* The named-terms cmi payload for a decl ikind (stage-5 format lock-in): each
+   of [base]/[coeffs.(i)] is decomposed by [Ldd.to_terms] into a term list.
+   Decouples the cmi from the [Ldd] node block / [Axis_lattice] internal layout
+   and gives an explicit place to remap atoms on import. *)
+type saved_constructor_ikind =
+  { saved_base : ikind_term list;
+    saved_coeffs : ikind_term list array;
+    saved_legacy : constructor_ikind option;
+      (* Coexistence window (STAGE5-DESIGN.md C.1): the raw-DAG node form,
+         carried ALONGSIDE the named-terms payload so both load paths ride the
+         SAME cmi.  Deserialize rehydrates from the terms and, under validate,
+         cross-checks it against this legacy node (0 HARD).  The follow-up
+         commit drops the raw-DAG path, leaving terms the sole wire. *)
+  }
+
 type constructor_ikind_entry =
   | Constructor_ikind of constructor_ikind
   | No_constructor_ikind of string
+  | Saved_ikind of saved_constructor_ikind
+      (* On-disk only: exists transiently between the cmi serialize/deserialize
+         boundary (file_formats/cmi_format.ml).  Live code never observes it --
+         serialize maps Constructor_ikind -> Saved_ikind, deserialize maps back
+         -- so every in-memory consumer sees Constructor_ikind. *)
 
 type type_ikind = constructor_ikind_entry
 
@@ -111,6 +137,22 @@ let ikinds_todo (message : string) : type_ikind =
   if !Clflags.ikinds_debug then
     Format.eprintf "[ikinds-todo] %s@." message;
   No_constructor_ikind message
+
+(* Explicit named-terms cmi encode/decode (stage-5 format lock-in).  Pure: the
+   validate-gated faithfulness cross-check lives at the cmi boundary
+   (file_formats/cmi_format.ml), which holds the [Clflags] gate. *)
+let constructor_ikind_to_saved (ci : constructor_ikind) :
+    saved_constructor_ikind =
+  { saved_base = Ldd.to_terms ci.base;
+    saved_coeffs = Array.map Ldd.to_terms ci.coeffs;
+    saved_legacy = Some ci;
+  }
+
+let constructor_ikind_of_saved (s : saved_constructor_ikind) :
+    constructor_ikind =
+  { base = Ldd.of_terms s.saved_base;
+    coeffs = Array.map Ldd.of_terms s.saved_coeffs;
+  }
 
 type atomic =
   | Nonatomic

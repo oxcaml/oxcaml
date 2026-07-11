@@ -1289,6 +1289,12 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
         if !Clflags.ikinds_validate && not !force_recompute_ikinds
         then incr recomputed_decl_ikind;
         fallback ()
+      | Types.Saved_ikind _ ->
+        (* Invariant: the cmi deserialize boundary rehydrates every persisted
+           Saved_ikind to a Constructor_ikind before any consumer runs, so a
+           Saved_ikind here is a bug (stage-5 format lock-in). *)
+        Misc.fatal_error
+          "ikind: unrehydrated Saved_ikind reached the decl lookup"
     in
     (if !Clflags.ikinds_debug
      then
@@ -2230,6 +2236,11 @@ let substitute_decl_ikind_with_lookup
   (* Inline type functions in an identity environment (no Env). *)
   match ikind_entry with
   | No_constructor_ikind _ -> ikind_entry
+  | Saved_ikind _ ->
+    (* Live code only ever holds Constructor_ikind (deserialize rehydrates);
+       a Saved_ikind reaching subst is a stage-5 format-lock-in bug. *)
+    Misc.fatal_error
+      "ikind: Saved_ikind reached substitute_decl_ikind_with_lookup"
   | Constructor_ikind _ when reset_constructor_ikind_on_substitution ->
     Types.ikinds_todo "ikind substitution reset"
   | Constructor_ikind packed ->

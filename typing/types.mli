@@ -161,9 +161,26 @@ type constructor_ikind =
   }
 
 
+(* A single ZDD term of a decl ikind polynomial (stage-5 named-terms cmi form):
+   a coefficient meet the canonically-sorted rigid atoms of the term. *)
+type ikind_term = Axis_lattice.t * Rigid_name.t list
+
+(* The named-terms cmi payload for a decl ikind: [base]/[coeffs.(i)] decomposed
+   by [Ldd.to_terms].  [saved_legacy] carries the raw-DAG node form during the
+   coexistence window (STAGE5-DESIGN.md C.1); it is dropped once the named-terms
+   load path is validated. *)
+type saved_constructor_ikind =
+  { saved_base : ikind_term list;
+    saved_coeffs : ikind_term list array;
+    saved_legacy : constructor_ikind option;
+  }
+
 type constructor_ikind_entry =
   | Constructor_ikind of constructor_ikind
   | No_constructor_ikind of string
+  | Saved_ikind of saved_constructor_ikind
+      (** On-disk only: exists transiently at the cmi serialize/deserialize
+          boundary; live code always observes [Constructor_ikind]. *)
 
 type type_ikind = constructor_ikind_entry
 
@@ -467,6 +484,10 @@ and jkind_declaration =
   }
 
 val ikinds_todo : string -> type_ikind
+
+(* Explicit named-terms cmi encode/decode (stage-5 format lock-in). *)
+val constructor_ikind_to_saved : constructor_ikind -> saved_constructor_ikind
+val constructor_ikind_of_saved : saved_constructor_ikind -> constructor_ikind
 (* A map from [type_expr] to [With_bounds_type_info.t], specifically defined with a
    (best-effort) semantic comparison function on types to be used in the with-bounds of a
    jkind.
