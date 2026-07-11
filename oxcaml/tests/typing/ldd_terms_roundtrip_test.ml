@@ -1,10 +1,9 @@
 (* Round-trip property test for [Ldd.to_terms]/[Ldd.of_terms] (stage 4c). These
    are the cmi-residue marshaling vehicle (stage 5), so the contract is
-   load-bearing:
-   - [of_terms (to_terms n)] is semantically equal to [n];
-   - [to_terms (of_terms ts)] returns [ts] up to the canonical form (within-term
-     [Name.compare] sort + duplicate name-set coeff-join);
-   - edge cases: bot/top, const, duplicate name-sets, Unknown-atom Uid stability. *)
+   load-bearing: - [of_terms (to_terms n)] is semantically equal to [n]; -
+   [to_terms (of_terms ts)] returns [ts] up to the canonical form (within-term
+   [Name.compare] sort + duplicate name-set coeff-join); - edge cases: bot/top,
+   const, duplicate name-sets, Unknown-atom Uid stability. *)
 
 module L = Types.Ldd
 module N = Types.Rigid_name
@@ -35,7 +34,9 @@ let sem_eq a b = L.leq_with_reason a b = [] && L.leq_with_reason b a = []
 
 let check_sem label a b =
   if not (sem_eq a b)
-  then failwith (Format.asprintf "ldd round-trip (%s): not semantically equal" label)
+  then
+    failwith
+      (Format.asprintf "ldd round-trip (%s): not semantically equal" label)
 
 (* Build a variety of nodes: constants, single/multi-atom terms, sums. *)
 let sample_nodes () =
@@ -53,7 +54,9 @@ let sample_nodes () =
   let sums =
     [ L.join (L.const Axis_lattice.immutable_data) (node_of (List.nth atoms 0));
       L.join
-        (L.join (L.const Axis_lattice.mutable_data) (node_of (List.nth atoms 2)))
+        (L.join
+           (L.const Axis_lattice.mutable_data)
+           (node_of (List.nth atoms 2)))
         (L.meet (node_of (List.nth atoms 3)) (node_of (List.nth atoms 4))) ]
   in
   (* A deeper node: a term meeting many atoms (incl. both Unknowns), summed with
@@ -62,7 +65,8 @@ let sample_nodes () =
     let big_term =
       List.fold_left
         (fun acc a -> L.meet acc (node_of a))
-        (L.const Axis_lattice.immutable_data) atoms
+        (L.const Axis_lattice.immutable_data)
+        atoms
     in
     List.fold_left L.join big_term
       [ L.meet (node_of (List.nth atoms 6)) (node_of (List.nth atoms 7));
@@ -84,8 +88,8 @@ let () =
   if L.to_terms L.bot <> [] then failwith "to_terms bot <> []";
   check_sem "of_terms [] = bot" (L.of_terms []) L.bot;
   (match L.to_terms (L.const Axis_lattice.top) with
-   | [(c, [])] when Axis_lattice.equal c Axis_lattice.top -> ()
-   | _ -> failwith "to_terms top <> [(top, [])]");
+  | [(c, [])] when Axis_lattice.equal c Axis_lattice.top -> ()
+  | _ -> failwith "to_terms top <> [(top, [])]");
   check_sem "of_terms [(c,[])] = const c"
     (L.of_terms [Axis_lattice.immutable_data, []])
     (L.const Axis_lattice.immutable_data);
@@ -95,7 +99,9 @@ let () =
     (L.of_terms
        [Axis_lattice.immutable_data, [a0]; Axis_lattice.mutable_data, [a0]])
     (L.of_terms
-       [Axis_lattice.join Axis_lattice.immutable_data Axis_lattice.mutable_data, [a0]]);
+       [ ( Axis_lattice.join Axis_lattice.immutable_data
+             Axis_lattice.mutable_data,
+           [a0] ) ]);
   (* of_terms (to_terms n) == n, semantically, on a corpus. *)
   List.iteri
     (fun i n ->
@@ -121,12 +127,11 @@ let () =
       then failwith "to_terms within-term names not sorted")
     (L.to_terms
        (L.meet (node_of (List.nth atoms 4)) (node_of (List.nth atoms 0))));
-  (* Distinct Unknown Uids stay distinct through of_terms (no merge/re-mint):
-     a node with both differs from one with only the first. *)
+  (* Distinct Unknown Uids stay distinct through of_terms (no merge/re-mint): a
+     node with both differs from one with only the first. *)
   let u1 = node_of (N.unknown uid1) and u2 = node_of (N.unknown uid2) in
-  if sem_eq
-       (L.of_terms (L.to_terms (L.join u1 u2)))
-       (L.of_terms (L.to_terms u1))
+  if
+    sem_eq (L.of_terms (L.to_terms (L.join u1 u2))) (L.of_terms (L.to_terms u1))
   then failwith "of_terms collapsed two distinct Unknown atoms";
   check_sem "distinct Unknown atoms preserved"
     (L.of_terms (L.to_terms (L.join u1 u2)))
