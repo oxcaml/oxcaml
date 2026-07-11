@@ -277,7 +277,7 @@ base = ([0,0,1,3,3,1,1,3,3,0,0] ⊓ param[82]) ⊔ [2,1,0,0,0,0,0,0,0,1,2]; coef
 |---|---|---|---|
 | typing-jkind-bounds | 72/72 | 72/72 | 33/72 FAIL (fires) |
 | typing-modules | 54/54 | 54/54 | -- |
-| typing-layouts | (see report) | (see report) | -- |
+| typing-layouts | 45/45 | 45/45 | -- |
 
 - Flag-on byte-identical corpus-wide; the deriver is genuinely exercised
   (`modalities.ml` alone: 4414 floor derivations, all matching the legacy read).
@@ -295,3 +295,17 @@ of the with-bound type_exprs on the carrier, so `with`-clause printing is
 restored there. Stage 4c correctly does NOT attempt it (would change output or
 representation). The `-print-from-ikinds` flag is the migration seam; a later
 stage flips it to derive fully once the sidecar exists.
+
+## KNOWN RISK (documented, cleared for this stage; matters for stage 5)
+
+`mod_bounds_floor_for_printing` calls `create_ctx`, which CLEARS the global
+solver caches (`global_ty_to_kind`/`global_constr_to_coeffs`, ikind.ml:239-240).
+If jkind printing ever ran while an outer ikind derivation was on the stack, the
+clear would corrupt that outer computation. In practice printing happens during
+error/signature FORMATTING, after the checking operation has raised and unwound,
+so it is not re-entrant with a live derivation -- and the flag-on sweeps
+(171/171 byte-identical, incl. recursive-module and layout tests) show no
+corruption or divergence. Cleared for stage 4c (flag default off; deriver never
+runs in normal builds). FLAGGED for stage 5: when the flag flips on by default,
+the derivation must either be proven non-re-entrant or use a non-cache-clearing
+context (a per-print scratch ctx that does not touch the globals).
