@@ -178,3 +178,44 @@ Same source + flags, boot compiler at the scratch-ctx commit:
   not derivation results (as expected: `create_ctx` already cleared the globals
   every call, so the cache was always a per-derivation memo; a fresh private
   table computes the same values).
+
+---
+
+## Acceptance (item 1: scratch print ctx)
+
+- (a) flag-off byte-identical suites (`make test-one DIR=...`, real _install):
+  typing-jkind-bounds 74/74, typing-modules 54/54, typing-layouts 45/45 -- all
+  pass, 0 failures. (Counts match the stage-4 tip; +2 over STAGE4C's 72 is base
+  growth, not churn.)
+- (b) probe before/after: ctx-evicted 22 -> 0 (committed counter, faithful
+  before/after eviction measurement; permanent regression guard).
+- (c) render smoke: with-bounds render `with param[N] @ [..]` /
+  `with box/..[..].1 & param[N] @ [..]`; with-bounds-free floors byte-identical;
+  redundant-absorb sample also confirmed (below). floor derivations=336,
+  with-bounds rendered=6, fallbacks=0.
+- (d) boot-green per commit: design, probe, fix all `make boot-compiler -j8`
+  exit 0.
+- (e) flag-on mixmod5 validate picture: measured on THIS branch (stage-4 tip +
+  scratch ctx), via `tools/expect -ikinds-debug` under `OXCAML_IKINDS_VALIDATE=1`:
+  `checks=2826 mismatches=0 (HARD=0) class_b=10 residue_trusted=10`. HARD=0 is
+  the soundness-critical figure and is satisfied. class_b=10 (not the mandate's
+  9): the "9" is ik5b's Residue-branch figure (STAGE5-DESIGN AS-BUILT line 302 =
+  class_b=9 on ik/stage5b-residue-cmi, whose Residue atom changes CLASS-B
+  recognition); the stage-4 tip is 10. My change is print-path-only and gated on
+  `print_from_ikinds` (off here), so it is provably inert to this count -- the
+  full base..HEAD diff touches only the counter, the at_exit summary, two new
+  unused Solver helpers, `create_print_ctx`, and the two print derivers. So the
+  picture is UNCHANGED by my work; the 9 vs 10 is a base-context difference, not
+  a regression. Flagged to team-lead.
+
+## §5a scope (from STAGE5-DESIGN.md, now readable)
+
+- Item 1 (scratch print ctx): DONE for the cache axis (this branch). The doc's
+  wording (line 208-210) bundles `solve_pending` -- my hazard H2. H2 isolation
+  lands in ldd.ml (`with_isolated_pending`), an ik5b-owned file; pending
+  team-lead's boundary call. Doc also asks for a re-entrancy regression test.
+- Item 2 (Param-projection/relabel): MOOT -- Q1 adjudicated DELETE-carrier
+  (doc line 224: "If the carrier is DELETED ... these are MOOT").
+- Item 3 (fold the four `enable_*` toggles to unconditional): TODO, this branch,
+  mechanical. NOT `reset_constructor_ikind_on_substitution` (that is 5d, doc
+  line 428).
