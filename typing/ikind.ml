@@ -15,14 +15,10 @@
 (* Global feature toggles for ikinds. These are intended to be easy to flip
    while iterating on performance or correctness. *)
 (* CR jujacobs: remove toggles in the final version. *)
-let enable_crossing = true
-
-let enable_sub_jkind_l = true
-
-let enable_sub_or_intersect = true
-
-let enable_sub_or_error = true
-
+(* Stage-5a: the four [enable_*] seam toggles were all [true]; folded to
+   unconditional (the seams now branch only on [!Clflags.ikinds]) as prep for
+   the 5d [-no-ikinds] deletion. [reset_constructor_ikind_on_substitution]
+   stays -- its removal is a 5d item. *)
 let reset_constructor_ikind_on_substitution = false
 
 (* Stage-1 validation harness (see STAGE1-DESIGN.md). When
@@ -1806,7 +1802,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
     ~(context : Jkind.jkind_context) env (sub : Types.jkind_l)
     (super : Types.jkind_l) : (unit, Jkind.Violation.t) result =
   let open Misc.Stdlib.Monad.Result.Syntax in
-  if not (enable_sub_jkind_l && !Clflags.ikinds)
+  if not !Clflags.ikinds
   then Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context env sub super
   else
     let () =
@@ -1872,7 +1868,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
 
 let crossing_of_jkind ~(context : Jkind.jkind_context) env
     (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
-  if not (enable_crossing && !Clflags.ikinds)
+  if not !Clflags.ikinds
   then Jkind.get_mode_crossing ~context env jkind
   else
     let () =
@@ -2044,7 +2040,7 @@ let sub_or_intersect ?origin
         in
         Jkind.May_have_intersection reasons)
   in
-  if not (enable_sub_or_intersect && !Clflags.ikinds)
+  if not !Clflags.ikinds
   then Jkind.sub_or_intersect ~type_equal ~context env t1 t2
   else (
     if !Clflags.ikinds_validate
@@ -2069,7 +2065,7 @@ let sub_or_error ?origin
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) :
     (unit, Jkind.Violation.t) result =
-  if not (enable_sub_or_error && !Clflags.ikinds)
+  if not !Clflags.ikinds
   then Jkind.sub_or_error ~type_equal ~context env t1 t2
   else
     let () =
