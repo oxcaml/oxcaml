@@ -664,7 +664,7 @@ Line 7, characters 13-29:
                  ^^^^^^^^^^^^^^^^
 Error: This type "int or_null smth" should be an instance of type
          "('a : immediate)"
-       The kind of int or_null smth is immediate with int or_null
+       The kind of int or_null smth is value non_pointer
          because of the definition of smth at line 1, characters 0-50.
        But the kind of int or_null smth must be a subkind of immediate
          because of the definition of bounded at line 3, characters 0-29.
@@ -888,7 +888,9 @@ Error: The constant "5." has type "float" but an expression was expected of type
        The layout of float is value
          because it is the primitive type float.
        But the layout of float must be a sublayout of value non_float
-         because the type argument of or_null has layout value.
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
 |}]

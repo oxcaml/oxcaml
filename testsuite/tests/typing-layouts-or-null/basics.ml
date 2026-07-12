@@ -30,7 +30,7 @@ Error: This pattern matches values of type "t_any_mod_separable"
        The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
        But the layout of t_any_mod_separable must be representable
-         because argument or result of a function type.
+         because we must know concretely how to pass a function argument.
 |}]
 
 type t = { x : t_any_mod_separable }
@@ -90,7 +90,7 @@ Error: This expression has type "t_any_mod_separable"
        The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
        But the layout of t_any_mod_separable must be representable
-         because argument or result of a function type.
+         because we must know concretely how to return a function result.
 |}]
 
 (* [value_or_null] is representable *)
