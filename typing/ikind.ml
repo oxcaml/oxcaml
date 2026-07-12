@@ -263,6 +263,19 @@ let sub_or_error_fault = Sys.getenv_opt "OXCAML_IK5D_SUBERR_FAULT" <> None
    the (slow) full validate harness. The detector is otherwise validate-gated. *)
 let sub_or_error_measure = Sys.getenv_opt "OXCAML_IK5D_MEASURE" <> None
 
+(* Stage-5d S3: validate-gated coexistence differential proving that, in the
+   layout-fail branch of sub_or_intersect, the ikind-native class
+   ([may_have_intersection]) equals the legacy Disjoint/May classification.
+   Behaviour is unchanged (the legacy value is still returned); the switch
+   itself rides with the M5 error-text project. *)
+let soi_class_checks = ref 0
+
+let soi_class_disjoint = ref 0
+
+let soi_class_may = ref 0
+
+let soi_class_mismatches = ref 0
+
 let () =
   at_exit (fun () ->
       if !Clflags.ikinds_validate
@@ -294,6 +307,17 @@ let () =
       then
         Format.eprintf "[ikind-sub-or-error-overturn] rejects=%d overturns=%d@."
           !sub_or_error_rejects !sub_or_error_overturns)
+
+let () =
+  at_exit (fun () ->
+      if
+        (!Clflags.ikinds_validate || sub_or_error_measure)
+        && !soi_class_checks > 0
+      then
+        Format.eprintf
+          "[ikind-soi-class] checks=%d disjoint=%d may=%d mismatches=%d@."
+          !soi_class_checks !soi_class_disjoint !soi_class_may
+          !soi_class_mismatches)
 
 let () =
   at_exit (fun () ->
@@ -1994,9 +2018,26 @@ let sub_or_intersect ?origin
        2) if layouts are compatible, decide based on ikind polynomials *)
     match Jkind.sub_layout_or_error ~context env t1 t2 with
     | Error _ -> (
-      (* Keep Jkind as the source of Disjoint vs May_have_intersection
-         classification when layouts fail. *)
-      match Jkind.sub_or_intersect ~type_equal ~context env t1 t2 with
+      (* Layouts are incompatible, so the legacy sub necessarily fails and the
+         class is exactly [may_have_intersection] (Disjoint otherwise).  We
+         still RETURN the legacy classification (its failure-reason list feeds
+         the error printer -- M5-owned); the S3 differential below proves the
+         ikind-native class agrees, so the switch is ready for the M5 project. *)
+      let legacy = Jkind.sub_or_intersect ~type_equal ~context env t1 t2 in
+      if !Clflags.ikinds_validate || sub_or_error_measure
+      then begin
+        incr soi_class_checks;
+        let ikind_may = Jkind.may_have_intersection env t1 t2 in
+        match legacy with
+        | Jkind.Disjoint _ ->
+          incr soi_class_disjoint;
+          if ikind_may then incr soi_class_mismatches
+        | Jkind.May_have_intersection _ ->
+          incr soi_class_may;
+          if not ikind_may then incr soi_class_mismatches
+        | Jkind.Sub -> incr soi_class_mismatches
+      end;
+      match legacy with
       | Jkind.Disjoint _ as disjoint ->
         debug_polys ~outcome:"Disjoint" ();
         disjoint
