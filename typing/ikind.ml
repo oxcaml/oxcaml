@@ -248,34 +248,6 @@ let crossing_reroute_checks = ref 0
 
 let crossing_reroute_mismatches = ref 0
 
-(* Stage-5d S2: sub_or_error trusts the ikind reject verdict (overturns measured
-   0x, STAGE5D-MIGRATION.md). Permanent validate-gated overturn detector: counts
-   how often ikind rejects but the legacy engine would ACCEPT. Seeded fault
-   [OXCAML_IK5D_SUBERR_FAULT] forces the ikind reject to prove the detector is
-   non-vacuous. *)
-let sub_or_error_rejects = ref 0
-
-let sub_or_error_overturns = ref 0
-
-let sub_or_error_fault = Sys.getenv_opt "OXCAML_IK5D_SUBERR_FAULT" <> None
-
-(* Cheap measurement escape hatch: count/print the overturn detector without
-   the (slow) full validate harness. The detector is otherwise validate-gated. *)
-let sub_or_error_measure = Sys.getenv_opt "OXCAML_IK5D_MEASURE" <> None
-
-(* Stage-5d S3: validate-gated coexistence differential proving that, in the
-   layout-fail branch of sub_or_intersect, the ikind-native class
-   ([may_have_intersection]) equals the legacy Disjoint/May classification.
-   Behaviour is unchanged (the legacy value is still returned); the switch
-   itself rides with the M5 error-text project. *)
-let soi_class_checks = ref 0
-
-let soi_class_disjoint = ref 0
-
-let soi_class_may = ref 0
-
-let soi_class_mismatches = ref 0
-
 let () =
   at_exit (fun () ->
       if !Clflags.ikinds_validate
@@ -298,26 +270,6 @@ let () =
         Format.eprintf "[ikind-crossing-reroute] checks=%d mismatches=%d@."
           !crossing_reroute_checks
           !crossing_reroute_mismatches)
-
-let () =
-  at_exit (fun () ->
-      if
-        (!Clflags.ikinds_validate || sub_or_error_measure)
-        && !sub_or_error_rejects > 0
-      then
-        Format.eprintf "[ikind-sub-or-error-overturn] rejects=%d overturns=%d@."
-          !sub_or_error_rejects !sub_or_error_overturns)
-
-let () =
-  at_exit (fun () ->
-      if
-        (!Clflags.ikinds_validate || sub_or_error_measure)
-        && !soi_class_checks > 0
-      then
-        Format.eprintf
-          "[ikind-soi-class] checks=%d disjoint=%d may=%d mismatches=%d@."
-          !soi_class_checks !soi_class_disjoint !soi_class_may
-          !soi_class_mismatches)
 
 let () =
   at_exit (fun () ->
@@ -2060,36 +2012,21 @@ let sub_or_intersect ?origin
        1) gate on env-aware layout subchecking
        2) if layouts are compatible, decide based on ikind polynomials *)
     match Jkind.sub_layout_or_error ~context env t1 t2 with
-    | Error _ -> (
-      (* Layouts are incompatible, so the legacy sub necessarily fails and the
-         class is exactly [may_have_intersection] (Disjoint otherwise).  We
-         still RETURN the legacy classification (its failure-reason list feeds
-         the error printer -- M5-owned); the S3 differential below proves the
-         ikind-native class agrees, so the switch is ready for the M5 project. *)
-      let legacy = Jkind.sub_or_intersect ~type_equal ~context env t1 t2 in
-      if !Clflags.ikinds_validate || sub_or_error_measure
-      then begin
-        incr soi_class_checks;
-        let ikind_may = Jkind.may_have_intersection env t1 t2 in
-        match legacy with
-        | Jkind.Disjoint _ ->
-          incr soi_class_disjoint;
-          if ikind_may then incr soi_class_mismatches
-        | Jkind.May_have_intersection _ ->
-          incr soi_class_may;
-          if not ikind_may then incr soi_class_mismatches
-        | Jkind.Sub -> incr soi_class_mismatches
-      end;
-      match legacy with
-      | Jkind.Disjoint _ as disjoint ->
-        debug_polys ~outcome:"Disjoint" ();
-        disjoint
-      | Jkind.May_have_intersection _ as maybe ->
+    | Error _ ->
+      (* Layouts are incompatible, so the sub necessarily fails.  Classify
+         Disjoint vs May_have_intersection via [may_have_intersection] (a [Base]
+         intersection question) and build the failure reason ikind-natively: a
+         layout disagreement is what a layout-incompatible pair fails on. *)
+      let reasons : Jkind.Sub_failure_reason.t Misc.Nonempty_list.t =
+        [Jkind.Sub_failure_reason.Layout_disagreement]
+      in
+      if Jkind.may_have_intersection env t1 t2
+      then (
         debug_polys ~outcome:"May_have_intersection" ();
-        maybe
-      | Jkind.Sub ->
-        debug_polys ~outcome:"Sub" ();
-        Jkind.Sub)
+        Jkind.May_have_intersection reasons)
+      else (
+        debug_polys ~outcome:"Disjoint" ();
+        Jkind.Disjoint reasons)
     | Ok () -> (
       let subcheck = compute_subcheck_polys ~context env t1 t2 in
       let sub_poly = subcheck.lhs_for_leq in
@@ -2147,72 +2084,23 @@ let sub_or_error ?origin
         validate_ikind ~in_sub_position:true ~origin env t1;
         validate_ikind ~in_sub_position:false ~origin env t2)
     in
-    (* The ikind engine decides the accept/reject verdict: first the layout
-       subcheck (which the axis polynomials do not capture), then the modal-axis
-       subcheck via [leq_with_reason]. On rejection we delegate to [Jkind] for
-       the detailed error message so it is identical to the legacy path. *)
-    let ikind_ok =
-      if sub_or_error_fault
-      then (* seeded fault: force the ikind reject to exercise the detector *)
-        false
-      else
-        match Jkind.sub_layout_or_error ~context env t1 t2 with
-        | Error _ -> false
-        | Ok () -> (
-          let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; _ } =
-            compute_subcheck_polys ~context env t1 t2
-          in
-          match Ldd.leq_with_reason sub_poly super_poly with
-          | [] -> true
-          | _ -> false)
-    in
-    if ikind_ok
-    then (
-      (* Safety net: in debug builds, dual-run the legacy engine and flag any
-         disagreement on the accept/reject verdict (error text is expected to
-         differ, so we do not compare it). *)
-      (if !Clflags.ikinds_debug
-       then
-         match Jkind.sub_or_error ~type_equal ~context env t1 t2 with
-         | Ok () -> ()
-         | Error _ ->
-           Format.eprintf
-             "[ikind-sub-or-error] VERDICT DISAGREEMENT%s: ikind=accept \
-              legacy=reject@."
-             (origin_suffix_of origin));
-      Ok ())
-    else begin
-      if !Clflags.ikinds_validate || sub_or_error_measure
-      then incr sub_or_error_rejects;
-      (* Stage-5d S2: the ikind verdict is authoritative (overturns measured 0x).
-         For the detailed message we still call the legacy path (byte-identical,
-         M5-owned).  If legacy would ACCEPT, that is an overturn -- trust the
-         ikind reject anyway, record it (permanent validate-gated detector), and
-         synthesize the reject from the ikind's violating axes. *)
-      match Jkind.sub_or_error ~type_equal ~context env t1 t2 with
-      | Error _ as err -> err
-      | Ok () ->
-        if !Clflags.ikinds_validate || sub_or_error_measure
-        then incr sub_or_error_overturns;
-        if !Clflags.ikinds_debug
-        then
-          Format.eprintf
-            "[ikind-sub-or-error] VERDICT DISAGREEMENT%s: ikind=reject \
-             legacy=accept (trusting ikind)@."
-            (origin_suffix_of origin);
-        let reasons =
-          match Jkind.sub_layout_or_error ~context env t1 t2 with
-          | Error _ -> []
-          | Ok () ->
-            let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; _ } =
-              compute_subcheck_polys ~context env t1 t2
-            in
-            axis_disagreement_reasons (Ldd.leq_with_reason sub_poly super_poly)
-        in
+    (* The ikind engine owns the verdict AND the error.  Layout check first: on
+       failure return that layout violation (as [sub_jkind_l] does).  Otherwise
+       the modal-axis subcheck decides; a non-empty violating-axes list is the
+       reject, synthesized ikind-natively into [Not_a_subjkind]. *)
+    match Jkind.sub_layout_or_error ~context env t1 t2 with
+    | Error _ as layout_err -> layout_err
+    | Ok () -> (
+      let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; _ } =
+        compute_subcheck_polys ~context env t1 t2
+      in
+      match Ldd.leq_with_reason sub_poly super_poly with
+      | [] -> Ok ()
+      | violating_axes ->
+        let reasons = axis_disagreement_reasons violating_axes in
         Error
           (Jkind.Violation.of_ ~context env
-             (Jkind.Violation.Not_a_subjkind (t1, t2, reasons)))
-    end
+             (Jkind.Violation.Not_a_subjkind (t1, t2, reasons))))
 
 (** Substitute constructor ikinds according to [lookup] without requiring Env.
 *)
