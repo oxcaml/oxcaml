@@ -106,8 +106,52 @@ validate-gated differential comparing the legacy Less/Not_le/Equal to the
 ikind verdict (via the `Jkind`→`Ikind` hook), counting agreement. The selected
 history feeds error text, so the switch itself rides with M5.
 
-Evidence: <FILL: history-order differential checks/agreements/mismatches; expect
-mismatches=0>.
+**STATUS: NOT DONE — frozen for a fresh finisher (handoff spec below).** S1-S3
+are banked and verified; S4 was deliberately deferred at this point because it
+is the highest-error-surface slice (a new cross-module hook + a hot path) and
+this implementation session had run very long — per the team-lead's
+freeze-when-degrading guidance, banking S1-S3 and handing S4 off loses nothing
+(it is a self-contained differential).
+
+### S4 handoff spec (differential ONLY, zero behaviour change)
+
+Goal: prove that switching `combine_histories`' history ordering from the legacy
+`Jkind_desc.sub` to the ikind sub would select the IDENTICAL history on every
+combine (which is the zero-churn condition, since the chosen history feeds error
+text). Do NOT switch — only measure.
+
+Site: `typing/jkind.ml`, `combine_histories` → `choose_subjkind_history`
+(the `Jkind_desc.sub ~type_equal ~sub_previously_ran_out_of_fuel:roofdn_a
+~context env k_a k_b` call, ~jkind.ml:3724). It maps `Less`→history_a,
+`Not_le`→history_b, `Equal`→higher-scored.
+
+Hook (mirror the existing `set_floor_from_ikind`/`set_render_from_ikind`
+pattern): in `jkind.ml` add
+`let sub_verdict_from_ikind : (Env.t -> _ jkind -> _ jkind -> Misc.Le_result.t)
+option ref = ref None` + a setter. In `ikind.ml`'s init (where the other
+setters are called) install a function that computes the ikind verdict for two
+jkinds: build both sub polynomials and use `Ldd.leq_with_reason` both directions
+→ `Less` (a≤b ∧ ¬b≤a), `Equal` (both), `Not_le` (¬a≤b). Reuse
+`compute_subcheck_polys` / the `sub_jkind_l` leq machinery; run in an isolated
+scratch ctx (`create_scratch_ctx` + `Ldd.with_isolated_pending`, the 5a helpers)
+so the differential cannot perturb an outer solve — combine_histories runs
+mid-check.
+
+Differential: in `choose_subjkind_history`, gate on
+`!Clflags.ikinds_validate || <measure-env>` (cheap-hatch, same
+`OXCAML_IK5D_MEASURE` convention as S1-S3): call the hook, compare its
+`Le_result.t` to the legacy `Jkind_desc.sub` result, and count
+checks / agreements / mismatches (report which-transition on mismatch:
+Less/Equal/Not_le a-vs-b). Add an `[ikind-combine-history]` at_exit summary. The
+default path is UNCHANGED (still uses the legacy result to choose).
+
+Acceptance: boot-green; run `OXCAML_IK5D_MEASURE` over the seam corpus →
+checks>0, mismatches=0 (byte-identity of selection); behaviour unchanged so
+suites are byte-identical by construction. If mismatches>0, that is the "history
+selection diverges" case: DO NOT switch in the M5 project without reconciling —
+record the divergent transitions here. Beware: combine_histories is HOT (~267k
+calls, STAGE5D-MIGRATION.md), so the hook must be no-op-cheap when the gate is
+off (guard the call itself, not just the counting).
 
 ## Deletability map (as amended)
 
@@ -124,6 +168,9 @@ mismatches=0>.
 - S1: crossing-reroute 234/0 (validate); suites 73/45/54.
 - S2: overturn 0 corpus-wide (0 natural rejects — accept-path seam);
   seeded-fault non-vacuous (8/8); suites 73/45/54.
-- S3/S4: <FILL> differentials green (mismatches=0), zero behaviour change.
+- S3: classification differential green — checks=88831 disjoint=1466 may=87365
+  mismatches=0; zero behaviour change.
+- S4: NOT DONE — frozen for a fresh finisher (handoff spec above); self-contained
+  differential, no loss from the S1-S3 commits.
 - Wave A frozen for adversarial review; NOT pushed. Physical legacy-engine
   deletion (PAYOFF-1..4) queued for the user (S9 + M5).
