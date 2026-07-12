@@ -1637,6 +1637,13 @@ module Const = struct
       Env.t ->
       'd t ->
       Outcometree.out_jkind_const
+
+    (** Render a set of axes [ignored] by a with-bound's modality as the
+        [out_modality] strings a [with]-clause carries (e.g. [portable]). Used
+        by the ikind-derived printer to reconstruct [@@ modality] clauses from
+        LDD coefficients. Mirrors the legacy per-with-bound modality path. *)
+    val out_modalities_of_ignored_axes :
+      Jkind_axis.Axis_set.t -> Outcometree.out_modality list
   end = struct
     type printable_jkind =
       { base : string;
@@ -1914,10 +1921,26 @@ module Const = struct
           (fun jkind (ty, modalities) ->
             Outcometree.Ojkind_const_with (jkind, ty, modalities))
           base printable_with_bounds
+
+    let out_modalities_of_ignored_axes axes_ignored =
+      let modal_modality, nonmodal_axes =
+        modalities_of_ignored_axes axes_ignored
+      in
+      let modal = !outcometree_of_modalities Types.Immutable modal_modality in
+      let nonmodal =
+        List.map
+          (fun (Axis.Pack axis) ->
+            Fmt.asprintf "%a" (Per_axis.print axis) (Per_axis.min axis))
+          nonmodal_axes
+      in
+      modal @ nonmodal
   end
 
   let to_out_jkind_const jkind =
     To_out_jkind_const.convert ~verbosity:(Format_verbosity.default ()) jkind
+
+  let out_modalities_of_ignored_axes =
+    To_out_jkind_const.out_modalities_of_ignored_axes
 
   let format ~verbosity env ppf jkind =
     To_out_jkind_const.convert ~verbosity env jkind

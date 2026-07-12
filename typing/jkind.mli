@@ -326,6 +326,13 @@ module Const : sig
     }
 
   val set_render_from_ikind : render_from_ikind -> unit
+
+  (** Render the axes [ignored] by a with-bound's modality as the [out_modality]
+      strings a [with]-clause carries (e.g. [portable]). Used by the
+      ikind-derived printer ([Ikind.render_jkind_from_ikind]) to reconstruct
+      [@@ modality] clauses from LDD coefficients. *)
+  val out_modalities_of_ignored_axes :
+    Jkind_axis.Axis_set.t -> Outcometree.out_modality list
 end
 
 module Builtin : sig

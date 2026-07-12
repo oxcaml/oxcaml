@@ -1434,6 +1434,208 @@ let () =
    path on a synthetic with-bounds-free jkind (so the layout/abbreviation choice
    matches legacy), and each non-base term [(coeff, names)] is rendered as a
    [with] clause [with (name1 & name2 ... @ coeff)] mirroring the LDD algebra. *)
+
+(* ------------------------------------------------------------------------- *)
+(* print-design: human-readable rendering of a with-bounds jkind from its LDD *)
+(* term decomposition. See PRINT-DESIGN.md for the algorithm + gaps. *)
+(* ------------------------------------------------------------------------- *)
+
+let oide_of_path (path : Path.t) : Outcometree.out_ident =
+  Outcometree.Oide_ident { Outcometree.printed_name = Path.name path }
+
+(* Deterministic 'a, 'b, ... naming for [Param] atoms, assigned in
+   ascending [get_id] order across the whole jkind. For a standard
+   declaration the param ids are ascending in source order, so this
+   coincides with the decl's own variable letters (see PRINT-DESIGN.md
+   GAP-2 for the resolver upgrade path). *)
+let synthetic_param_naming (terms : Types.ikind_term list) : int -> string =
+  let ids =
+    List.concat_map
+      (fun (_, names) ->
+        List.filter_map
+          (function Types.Rigid_name.Param id -> Some id | _ -> None)
+          names)
+      terms
+    |> List.sort_uniq Int.compare
+  in
+  let tbl = Hashtbl.create 8 in
+  List.iteri (fun i id -> Hashtbl.replace tbl id (Misc.letter_of_int i)) ids;
+  fun id -> match Hashtbl.find_opt tbl id with Some s -> s | None -> "_"
+
+(* Render a single non-constructor atom as an out_type payload. *)
+let out_type_of_payload ~name_of (name : Types.Rigid_name.t) :
+    Outcometree.out_type =
+  match name with
+  | Types.Rigid_name.Param id -> Outcometree.Otyp_var (false, name_of id)
+  | Types.Rigid_name.KAtom path ->
+    Outcometree.Otyp_constr (oide_of_path path, [])
+  | Types.Rigid_name.Atom { constr; arg_index = 0 } ->
+    Outcometree.Otyp_constr (oide_of_path constr, [])
+  | Types.Rigid_name.Atom { constr; arg_index = _ } ->
+    Outcometree.Otyp_constr (oide_of_path constr, [Outcometree.Otyp_stuff "_"])
+  | Types.Rigid_name.Residue _ | Types.Rigid_name.Unknown _ ->
+    Outcometree.Otyp_stuff "_"
+
+(* Honest string form of an atom for the non-parsing [&]-product fallback. *)
+let string_of_atom ~name_of (name : Types.Rigid_name.t) : string =
+  match name with
+  | Types.Rigid_name.Param id -> "'" ^ name_of id
+  | Types.Rigid_name.KAtom path -> Path.name path
+  | Types.Rigid_name.Atom { constr; arg_index = 0 } -> Path.name constr
+  | Types.Rigid_name.Atom { constr; arg_index = _ } -> "_ " ^ Path.name constr
+  | Types.Rigid_name.Residue _ | Types.Rigid_name.Unknown _ -> "_"
+
+(* [Param]s default to jkind [value]; the identity-modality reference for
+   a with-bound is thus [value] minus the base floor. Axes non-bot here
+   but bot in a term's coefficient were suppressed by a modality (GAP-6:
+   an annotated non-value payload can perturb this). *)
+let modalities_of_coeff ~(reference : Axis_lattice.t) (coeff : Axis_lattice.t) :
+    Outcometree.out_modality list =
+  let coeff_axes = Axis_lattice.non_bot_axes coeff in
+  let ignored =
+    List.filter
+      (fun a -> not (List.mem a coeff_axes))
+      (Axis_lattice.non_bot_axes reference)
+  in
+  match ignored with
+  | [] -> []
+  | _ ->
+    let axis_set =
+      List.fold_left
+        (fun acc n ->
+          let (Jkind_axis.Axis.Pack axis) =
+            Axis_lattice.axis_number_to_axis_packed n
+          in
+          Jkind_axis.Axis_set.add acc axis)
+        Jkind_axis.Axis_set.empty ignored
+    in
+    Jkind.Const.out_modalities_of_ignored_axes axis_set
+
+(* The single constructor atom of a term, if it has exactly one (so it is
+   a clean fragment of one constructor application: a base [Atom(c,0)] or
+   one argument slot [Atom(c,i)]). Terms with 0 or >=2 constructor atoms
+   are rendered standalone (a simple payload or an honest [&]-product). *)
+let single_ctor_atom (names : Types.Rigid_name.t list) : (Path.t * int) option =
+  match
+    List.filter_map
+      (function
+        | Types.Rigid_name.Atom { constr; arg_index } -> Some (constr, arg_index)
+        | _ -> None)
+      names
+  with
+  | [ca] -> Some ca
+  | _ -> None
+
+let render_terms_readable env (terms : Types.ikind_term list)
+    (base_out : Outcometree.out_jkind_const) (floor : Axis_lattice.t) :
+    Outcometree.out_jkind_const =
+  let name_of = synthetic_param_naming terms in
+  let reference = Axis_lattice.co_sub Axis_lattice.value floor in
+  let named = List.filter (fun (_, names) -> names <> []) terms in
+  (* Split into single-constructor-application fragments (grouped by path, in
+     first-appearance order) and standalone terms. *)
+  let group_order = ref [] in
+  let groups : (Path.t, Types.ikind_term list) Hashtbl.t = Hashtbl.create 8 in
+  let standalone = ref [] in
+  List.iter
+    (fun ((_, names) as term) ->
+      match single_ctor_atom names with
+      | Some (c, _) ->
+        if not (Hashtbl.mem groups c)
+        then (
+          Hashtbl.replace groups c [];
+          group_order := c :: !group_order);
+        Hashtbl.replace groups c (term :: Hashtbl.find groups c)
+      | None -> standalone := term :: !standalone)
+    named;
+  let payloads_of names =
+    List.filter (function Types.Rigid_name.Atom _ -> false | _ -> true) names
+  in
+  (* One [with] clause for a constructor-application group. *)
+  let clause_of_group c terms =
+    let terms = List.rev terms in
+    let arity =
+      List.fold_left
+        (fun acc (_, names) ->
+          match single_ctor_atom names with
+          | Some (_, i) -> max acc i
+          | None -> acc)
+        0 terms
+    in
+    let coeff =
+      List.fold_left
+        (fun acc (c, _) -> Axis_lattice.join acc c)
+        Axis_lattice.bot terms
+    in
+    let arg pos =
+      let ps =
+        List.concat_map
+          (fun (_, names) ->
+            match single_ctor_atom names with
+            | Some (_, i) when i = pos -> payloads_of names
+            | _ -> [])
+          terms
+      in
+      match ps with
+      | [] -> Outcometree.Otyp_stuff "_"
+      | [p] -> out_type_of_payload ~name_of p
+      | _ ->
+        Outcometree.Otyp_stuff
+          (String.concat " & " (List.map (string_of_atom ~name_of) ps))
+    in
+    let args = List.init arity (fun i -> arg (i + 1)) in
+    let ty = Outcometree.Otyp_constr (oide_of_path c, args) in
+    ty, modalities_of_coeff ~reference coeff
+  in
+  (* One [with] clause for a standalone term. *)
+  let clause_of_standalone (coeff, names) =
+    let ty =
+      match payloads_of names with
+      | [p] -> out_type_of_payload ~name_of p
+      | ps ->
+        Outcometree.Otyp_stuff
+          (String.concat " & " (List.map (string_of_atom ~name_of) ps))
+    in
+    ty, modalities_of_coeff ~reference coeff
+  in
+  let group_clauses =
+    List.rev_map
+      (fun c -> clause_of_group c (Hashtbl.find groups c))
+      !group_order
+  in
+  let standalone_clauses = List.rev_map clause_of_standalone !standalone in
+  ignore env;
+  List.fold_left
+    (fun acc (ty, modalities) ->
+      Outcometree.Ojkind_const_with (acc, ty, modalities))
+    base_out
+    (group_clauses @ standalone_clauses)
+
+(* Legacy debug rendering: raw atoms + coefficient vectors, under
+   [-ikinds-debug]. *)
+let render_terms_debug (terms : Types.ikind_term list)
+    (base_out : Outcometree.out_jkind_const) : Outcometree.out_jkind_const =
+  let with_clauses =
+    List.filter_map
+      (fun (c, names) ->
+        match names with
+        | [] -> None
+        | _ ->
+          let names_str =
+            String.concat " & " (List.map Types.Rigid_name.to_string names)
+          in
+          let stuff =
+            if Axis_lattice.equal c Axis_lattice.top
+            then names_str
+            else Printf.sprintf "%s @ %s" names_str (Axis_lattice.to_string c)
+          in
+          Some (Outcometree.Otyp_stuff stuff))
+      terms
+  in
+  List.fold_left
+    (fun acc oty -> Outcometree.Ojkind_const_with (acc, oty, []))
+    base_out with_clauses
+
 let render_jkind_from_ikind : type l r.
     Env.t -> (l * r) Jkind.Const.t -> Outcometree.out_jkind_const option =
  fun env jkind ->
@@ -1471,30 +1673,10 @@ let render_jkind_from_ikind : type l r.
           }
         in
         let base_out = Jkind.Const.to_out_jkind_const env base_jkind in
-        let with_clauses =
-          List.filter_map
-            (fun (c, names) ->
-              match names with
-              | [] -> None
-              | _ ->
-                let names_str =
-                  String.concat " & "
-                    (List.map Types.Rigid_name.to_string names)
-                in
-                let stuff =
-                  if Axis_lattice.equal c Axis_lattice.top
-                  then names_str
-                  else
-                    Printf.sprintf "%s @ %s" names_str
-                      (Axis_lattice.to_string c)
-                in
-                Some (Outcometree.Otyp_stuff stuff))
-            terms
-        in
         Some
-          (List.fold_left
-             (fun acc oty -> Outcometree.Ojkind_const_with (acc, oty, []))
-             base_out with_clauses))
+          (if !Clflags.ikinds_debug
+           then render_terms_debug terms base_out
+           else render_terms_readable env terms base_out floor))
 
 let () =
   Jkind.Const.set_render_from_ikind
