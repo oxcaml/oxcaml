@@ -1392,7 +1392,7 @@ let type_declaration_ikind_of_manifest ~(env : Env.t option)
    read from the ikind rather than the legacy [mod_bounds] field.  Re-entrancy-
    safe by construction: 5a re-homed it onto a scratch ctx + isolated pending.
    Returns [None] -- printing then falls back to the legacy [mod_bounds] field
-   -- when ikinds are disabled, the jkind carries with-bounds (whose surface
+   -- when the jkind carries with-bounds (whose surface
    [with]-clause syntax the LDD cannot reconstruct, see STAGE4C-DESIGN.md P2, so
    the floor keeps reading [mod_bounds] there), or the derivation raises.  For
    the with-bounds-free case the ikind is a pure floor (a const, or a const meet

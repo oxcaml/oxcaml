@@ -74,7 +74,12 @@ the ikind verdict — so their deletion is coupled to the print-changing switch 
    `combine_histories` — i.e. delete the whole upper chain above, plus the S1
    crossing tripwire + `crossing_reroute` counters, minus `Jkind_desc.{sub,
    sub_expanded}` and `Base.sub_expanded`.
-4. **RECUT-PLAN.md** (this file).
+4. **Stale doc-comment fixes** (`typing/types.mli`, `typing/ikind.ml`): the two
+   comments referencing the now-deleted `Jkind.sub`/`Jkind.sub_jkind_l` and the
+   removed `-no-ikinds` mode (from the original amendments commit). Logically
+   PR1's — they would dangle against symbols PR1 deletes if deferred to PR2.
+   Comments only; output-neutral.
+5. **RECUT-PLAN.md** (this file).
 
 ### PR2 `ik/pr2-print-deletions` (rebuilt on PR1 tip) — print-changing
 
@@ -90,7 +95,8 @@ the ikind verdict — so their deletion is coupled to the print-changing switch 
 8. **CI promotions** (20 `[%%expect]` promotions in 13 `typing-layouts-*` dirs): the
    same M4 history-selection churn, in the wider testsuite.
 9. **Campaign docs** (`STAGE5M-*.md`, `STAGE5D-MIGRATION.md`, `STAGE5E-EXIT.md`, …):
-   kept on PR2 to avoid polluting PR1.
+   kept on PR2 to avoid polluting PR1. (The source-comment part of the original
+   amendments commit moved to PR1 item 4.)
 
 ## Acceptance
 

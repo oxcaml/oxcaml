@@ -438,8 +438,9 @@ and jkind_desc_packed = Pack_jkind_desc : ('l * 'r) jkind_desc -> jkind_desc_pac
 (** The "quality" of a jkind indicates whether we are able to learn more about the jkind
     later.
 
-    We can never learn more about a [Best] jkind to make it "lower" (according to
-    [Jkind.sub] / [Jkind.sub_jkind_l]). A [Not_best], jkind, however, might have more
+    We can never learn more about a [Best] jkind to make it "lower" (according
+    to the ikind subkind order, [Ikind.sub_jkind_l]). A [Not_best] jkind,
+    however, might have more
     information provided about it later that makes it lower.
 
     Note that only left jkinds can be [Best] (meaning we can never compare less than or
