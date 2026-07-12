@@ -21,7 +21,9 @@ Wave A therefore delivers the honest, reachable goal: **the ikind engine is the
 sole answering engine on the default (ikinds-on) path**, with legacy quarantined
 behind `-no-ikinds`, the M5 error-text call, and validate tripwires — plus
 machine-checked differentials over the remaining two seams: S3 (classification)
-proves switch-ready; S4 (history ordering) proves DIVERGENT and routes into M5.
+confirms the class BIT is equivalent-by-construction (a tautology — it does NOT
+prove the reason-list switch-ready; that is uncovered M5 risk); S4 (history
+ordering) proves DIVERGENT and routes into M5.
 
 ## Slices
 
@@ -60,43 +62,61 @@ deference changed. Permanent validate-gated overturn detector
 seeded fault `OXCAML_IK5D_SUBERR_FAULT`.
 
 Evidence:
-- **Seeded-fault non-vacuity:** forcing the ikind reject on typing-jkind-bounds
-  (8 genuine accepts) → detector reports rejects=8 **overturns=8** — it fires.
-- **Overturn re-run** (`OXCAML_IK5D_MEASURE`, 11 seam dirs: jkind-bounds,
-  layouts, layouts-or-null, layouts-products, modules, modal-kinds, modes,
-  gadts, kind, recmod, abstract-kinds) + the pre-S2 7-dir sweep: **0 nonzero
-  overturns**.
-- **GEM (materially de-risks the S9/M5 decision):** across all 11 seam dirs the
-  natural `sub_or_error` reject count is **0** — the seam is entirely
-  accept-path in the corpus (genuine rejects route through `sub_jkind_l` or fail
-  earlier at the layout check). So the flipped branch is never taken naturally;
-  S2 changes zero corpus behaviour, and the ikind-vs-legacy verdict can only
-  diverge on a shape the corpus does not exercise (and the soundness invariant —
-  ikind ⊇ legacy accepts — forbids the unsound direction anyway).
+- **Seeded-fault non-vacuity** (validate-gated): forcing the ikind reject on
+  typing-jkind-bounds (8 genuine accepts) → detector reports rejects=8
+  **overturns=8** — it fires.
+- **Corrected-gating overturn re-run** (`OXCAML_IK5D_MEASURE`, 11 seam dirs:
+  jkind-bounds, layouts, layouts-or-null, layouts-products, modules, modal-kinds,
+  modes, gadts, kind, recmod, abstract-kinds): **overturns = 0 in EVERY dir** (no
+  nonzero overturn anywhere), with **rejects clearly NONZERO** — measured ≥71 by
+  a distinct-process lower bound (gadts 31, modules 26, layouts 8,
+  layouts-or-null 6). The counter fires under the measure hatch only after the F2
+  gating fix (below). The authoritative reject count is the pre-S2 §3 full-corpus
+  measurement: **106 rejects / 0 overturns**.
 - Zero suite churn: 73/0, 45/0, 54/0. Boot-green; ocamlformat clean.
+
+**Correction (wave-A review): the earlier "GEM" was FALSE and is retracted.** It
+claimed the natural `sub_or_error` reject count is 0 (an "accept-path-only"
+seam). It is NOT: the reject branch IS taken naturally (§3: ~106×; the reviewer
+reproduced one with a value-kinded existential where a value kind meets an
+immediate bound). The 0-rejects reading was an ARTEFACT — the S2 reject/overturn
+counters were gated on `!Clflags.ikinds_validate` ONLY, so the
+`OXCAML_IK5D_MEASURE` re-run silently recorded 0 (a dead hatch; fixed in F2,
+which mirrors the `validate || measure` gate S3/S4 already used). The
+decision-relevant fact SURVIVES, with the correct reason: **what is 0 is the
+OVERTURN sub-case** (ikind-reject ∧ legacy-accept), not the rejects. On every one
+of the ~106 natural rejects the legacy engine AGREES (0 overturns), so S2's
+deference flip changes nothing observable; and the soundness invariant (ikind ⊇
+legacy accepts) forbids the unsound direction regardless.
 
 Note: S2 does NOT free `Jkind_desc.sub` — `sub_or_error` still calls the legacy
 path for error text (M5), and the `-no-ikinds` fallbacks remain (S9). S2 is a
 pure default-path verdict migration.
 
-### S3 — classification coexistence differential (switch deferred to M5)
-DIFFERENTIAL ONLY, zero behaviour change. In `sub_or_intersect`'s layout-FAIL
-branch the legacy `Jkind.sub_or_intersect` can only return Disjoint/May (never
-Sub — layouts are already incompatible), and its class is *exactly*
-`may_have_intersection`. So the class migration is equivalent BY CONSTRUCTION;
-the only real content is the failure-reason LIST, which feeds the error printer
-(M5-owned). We keep returning the legacy classification and add a validate-gated
-differential (`[ikind-soi-class]`) proving the ikind-native class
-(`Jkind.may_have_intersection`) agrees with the legacy Disjoint/May, breaking
-the count down by outcome. The actual switch (reason-list reproduction) rides
-with the M5 project.
+### S3 — classification coexistence "differential" (a BY-CONSTRUCTION tautology)
+DIFFERENTIAL ONLY, zero behaviour change — but, per the wave-A review, the
+original "coexistence differential proving switch-ready" framing OVERCLAIMED and
+is corrected here. In `sub_or_intersect`'s layout-FAIL branch the legacy
+`Jkind.sub_or_intersect` computes its Disjoint-vs-May class **via the exact call**
+`may_have_intersection env t1 t2` (jkind.ml:3902 — `if may_have_intersection ...
+then May_have_intersection reason else Disjoint reason`). The S3 differential
+(`[ikind-soi-class]`) compares the legacy class against
+`Jkind.may_have_intersection env t1 t2` — the SAME function on the same args — so
+agreement is a TAUTOLOGY: `checks=88831 mismatches=0` is guaranteed by
+construction and empirically empty (it re-derives one bit and compares it to
+itself). It does NOT independently show the seam is switch-ready.
 
-Evidence (`OXCAML_IK5D_MEASURE`, 9 seam dirs): `[ikind-soi-class]`
-**checks=88831 disjoint=1466 may=87365 mismatches=0** — the ikind-native class
-agrees with the legacy Disjoint/May on every layout-fail classification (the
-1466/87365 split matches the pre-S2 baseline 1472/87469). Boot-green; ocamlformat
-clean; behaviour unchanged (legacy value still returned) so suites are
-byte-identical by construction.
+The classification BIT is genuinely equivalent by construction (a `Base`
+intersection question, kept as-is in M3). What the differential does NOT cover —
+and what the real M5 switch content is — is the failure-REASON LIST attached to
+Disjoint/May (`reason`), which feeds the error printer (M5-owned). The M3 switch
+must reproduce that reason list ikind-natively; it has **ZERO differential
+coverage** and is the actual M5 risk at this seam.
+
+Behaviour unchanged (legacy value still returned) so suites are byte-identical by
+construction; boot-green; ocamlformat clean. (The 88831 is retained only as the
+classification-branch call VOLUME — ~88941 in the pre-S2 §3 measurement, split
+~1472 Disjoint / ~87469 May — not as evidence of a proven switch.)
 
 ### S4 — combine_histories coexistence differential (switch deferred to M5)
 DIFFERENTIAL ONLY, zero behaviour change. `combine_histories`
@@ -218,7 +238,7 @@ off (guard the call itself, not just the counting).
 
 | §5d target | deletable after |
 |---|---|
-| `Jkind_desc.sub` + `Mod_bounds`/`With_bounds` subsumption ops | S9 (delete `-no-ikinds` fallbacks) + M5 (sub_or_error + classification reason error-text + combine_histories history ordering) — S3 proves its seam switch-ready; **S4 is DIVERGENT (~57%)** so the history ordering must be reconciled in M5 before the switch |
+| `Jkind_desc.sub` + `Mod_bounds`/`With_bounds` subsumption ops | S9 (delete `-no-ikinds` fallbacks) + M5 (sub_or_error + classification reason error-text + combine_histories history ordering) — S3 proves only the class BIT equivalent (by construction; the reason list is UNCOVERED M5 risk); **S4 is DIVERGENT (~57%)** so the history ordering must be reconciled in M5; neither seam is a mechanical switch |
 | `Base_and_axes.normalize` + `Jkind.normalize` + `get_mode_crossing` | M5 (error-text + decl-norm + round_up migrated off normalize); S1 already moved crossing off it on the default path |
 | `mod_bounds : Mode.Crossing.t` field | after normalize is gone |
 | `-no-ikinds` surface + dual-engine differential | S9 (40 twin tests) |
@@ -227,10 +247,16 @@ off (guard the call itself, not just the counting).
 
 - Per-commit boot-green; ocamlformat clean on every touched enforced file.
 - S1: crossing-reroute 234/0 (validate); suites 73/45/54.
-- S2: overturn 0 corpus-wide (0 natural rejects — accept-path seam);
-  seeded-fault non-vacuous (8/8); suites 73/45/54.
-- S3: classification differential green — checks=88831 disjoint=1466 may=87365
-  mismatches=0; zero behaviour change.
+- S2: **overturns 0 corpus-wide** — on ~106 natural rejects (§3; the reject
+  branch IS taken, correcting the retracted "0 natural rejects" GEM), the
+  corrected-gating 11-dir re-run finds 0 overturns / rejects≥71 (lower bound).
+  Seeded-fault non-vacuous (8/8, validate-gated); suites 73/45/54.
+- S3: classification differential green (checks=88831 mismatches=0) but a
+  BY-CONSTRUCTION TAUTOLOGY — legacy classifies via the same
+  `may_have_intersection` call the differential compares against (jkind.ml:3902),
+  so it proves only the class BIT (equivalent by construction), NOT the
+  failure-reason list (the real M5 risk, zero differential coverage). Zero
+  behaviour change.
 - S4: DONE but **DIVERGENT** — differential green + zero behaviour change, but
   ikind-vs-legacy history selection diverges ~57% corpus-wide (ikind collapses to
   `Equal`; robust across two implementations). M4 switch routed into M5 (not

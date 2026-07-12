@@ -2182,7 +2182,8 @@ let sub_or_error ?origin
              (origin_suffix_of origin));
       Ok ())
     else begin
-      if !Clflags.ikinds_validate then incr sub_or_error_rejects;
+      if !Clflags.ikinds_validate || sub_or_error_measure
+      then incr sub_or_error_rejects;
       (* Stage-5d S2: the ikind verdict is authoritative (overturns measured 0x).
          For the detailed message we still call the legacy path (byte-identical,
          M5-owned).  If legacy would ACCEPT, that is an overturn -- trust the
@@ -2191,7 +2192,8 @@ let sub_or_error ?origin
       match Jkind.sub_or_error ~type_equal ~context env t1 t2 with
       | Error _ as err -> err
       | Ok () ->
-        if !Clflags.ikinds_validate then incr sub_or_error_overturns;
+        if !Clflags.ikinds_validate || sub_or_error_measure
+        then incr sub_or_error_overturns;
         if !Clflags.ikinds_debug
         then
           Format.eprintf
