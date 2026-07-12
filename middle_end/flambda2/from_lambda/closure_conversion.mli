@@ -110,5 +110,5 @@ val close_program :
   exn_continuation:Continuation.t ->
   toplevel_my_region:Ident.t ->
   toplevel_my_ghost_region:Ident.t ->
-  sections:Oxcaml_utils.File_sections.Builder.t ->
+  sections:File_sections.Builder.t ->
   'mode close_program_result
