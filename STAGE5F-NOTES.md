@@ -142,7 +142,7 @@ precedent (maps onto the standing "keep honest `k & 'a`, no pattern-recovery"
 decision; byte-identity waived). Gallery rows: `_tmp/gal_ext_abstract.mli`. If
 the user prefers the concise form, ANNOTATION-ECHO (below) restores it.
 
-## C1 (fix in progress): Equal-tiebreak false provenance
+## C1 (fixed): Equal-tiebreak false provenance
 
 **Codex HIGH / verified real M4 regression (4/4 spot-checked sites vs base
 aa4e74b14).** `resolve_flattened_history` (typing/jkind.ml), on an ikind verdict
@@ -153,15 +153,29 @@ kind is imposed. Signature: the "must be <stronger>" line cited the SAME history
 as the "is <weaker>" line (e.g. an `any` annotation cited as why a var "must be
 representable"; both `any` and required `value` citing the same declaration).
 
-**Fix (lead-directed implication filter):** thread the kind being formatted
-(`target = t.jkind`, available at the `format_flattened_history` call site) into
-`resolve_flattened_history`; before the score tiebreak, drop any candidate branch
-whose desc cannot imply `target` (`verdict d target ∈ {Less, Equal}` via the
-lazy ikind sub-verdict). No target / ikinds-unlinked / verdict-unavailable leaves
-the branch eligible (safe fallback = prior behavior). Cold path only (format
-time), so the ~267k-call combine path stays untouched. Only the user-visible
-`format_flattened_history` call passes `target`; the Missing_cmi lookup at the
-other caller is unchanged.
+**Root cause (proven by debug, NOT C2).** The stored Interact descs are accurate
+at format time (not converged): d1.base=`value_or_null`, d2.base=`value`,
+tgt.base=`value`. The bug is that the ikind sub-verdict is **layout-blind** — it
+compares only the modal axes, so it returns `Equal` for `value_or_null` vs
+`value` and `any` vs `value` (which differ only in LAYOUT). With the verdict
+unable to tell the branches apart, selection fell to the score tiebreak, which
+prefers the (more specific) annotation reason.
+
+**Fix (lead's layout-level filter; filter-first).** Thread the kind being
+formatted (`target = t.jkind`, available at the `format_flattened_history` call
+site) into `resolve_flattened_history`. A branch's history may explain the
+requirement only if the branch's kind IMPLIES `target` in BOTH axes:
+`Sub_result.is_le (Jkind_desc.sub_layout env d tgt)` (the layout discriminator
+the verdict misses) AND the modal verdict `∈ {Less, Equal}`. This filter is the
+PRIMARY discriminator — applied BEFORE the verdict orientation (which otherwise
+picks a sub/super side directly and bypasses the filter). When it cannot decide
+(both or neither imply, e.g. no target / verdict unavailable / pure-modal
+violation where layouts are equal) it falls back to the prior oriented-verdict +
+score tiebreak, so pre-existing correct selections are unchanged. Cold path only
+(format time); the ~267k-call combine path stays untouched. Only the
+user-visible `format_flattened_history` call passes `target`; the Missing_cmi
+lookup at the other caller is unchanged. Both §3a repros restored to the exact
+pre-M4 provenance.
 
 **Re-churn:** the ~25 M4-promoted expects carrying the false provenance are
 re-churned to the corrected (pre-M4-equivalent) text. Tally: _pending build +

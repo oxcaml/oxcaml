@@ -2871,7 +2871,7 @@ let set_sub_verdict_from_ikind f = sub_verdict_from_ikind := Some f
    tiebreak over the resolved sub-histories -- matching the pre-defer M4
    selection.  Sub-histories are resolved before scoring so the tiebreak sees
    real [Creation] reasons (as the eager code did). *)
-let rec resolve_flattened_history env history =
+let rec resolve_flattened_history ?target env history =
   match history with
   | Creation _ -> history
   | Interact
@@ -2881,34 +2881,56 @@ let rec resolve_flattened_history env history =
         history2;
         reason = _
       } -> (
-    (* Resolve both sides then keep the higher [score_reason], preferring [ha]
-       on ties (as the eager [choose_higher_scored] preferred its first arg). *)
-    let scored ha hb =
-      let ra = resolve_flattened_history env ha in
-      let rb = resolve_flattened_history env hb in
-      if score_reason ra >= score_reason rb then ra else rb
+    let verdict : type la ra lb rb.
+        (la * ra) jkind_desc -> (lb * rb) jkind_desc -> Misc.Le_result.t option
+        =
+     fun a b ->
+      match !sub_verdict_from_ikind with
+      | None -> None
+      | Some { verdict } -> verdict env a b
     in
-    if history1 == history2
-    then (* both branches would pick the same history; skip the verdict *)
-      resolve_flattened_history env history1
-    else
-      let verdict a b =
-        match !sub_verdict_from_ikind with
-        | None -> None
-        | Some { verdict } -> verdict env a b
+    (* C1: a candidate history may only be chosen to explain the requirement
+       being formatted ([target]) if the kind it establishes actually implies
+       that requirement -- i.e. its desc is a subkind of [target].  Without this
+       the pure [score_reason] tiebreak could cite, e.g., an [any] annotation as
+       the reason a variable "must be representable".  No [target] (or ikinds
+       unlinked / verdict unavailable) leaves the branch eligible. *)
+    let implies : type l r. (l * r) jkind_desc -> bool =
+     fun d ->
+      match target with
+      | None -> true
+      | Some (Pack_jkind_desc tgt) -> (
+        (* [d]'s kind implies the requirement [tgt] iff it is a subkind of it in
+           BOTH the layout and the modal axes.  The ikind [verdict] compares only
+           the modal axes (it is layout-blind: it returns [Equal] for
+           [value_or_null] vs [value] / [any] vs [value]), so we also require the
+           layout to be a sublayout -- that is the axis on which these
+           false-provenance candidates actually differ. *)
+        Sub_result.is_le (Jkind_desc.sub_layout env d tgt)
+        &&
+        match verdict d tgt with
+        | Some (Misc.Le_result.Less | Misc.Le_result.Equal) -> true
+        | Some Misc.Le_result.Not_le | None -> false)
+    in
+    let impl1 = implies d1 and impl2 = implies d2 in
+    (* Fallback when the implication filter cannot decide: orient the two jkinds
+       exactly as the eager [combine_histories] did (via [try_allow_*]) and pick
+       the oriented sub/super side by the lazy ikind verdict; [Equal]/no verdict
+       falls to the [score_reason] tiebreak. *)
+    let by_verdict () =
+      let scored ha hb =
+        let ra = resolve_flattened_history ?target env ha in
+        let rb = resolve_flattened_history ?target env hb in
+        if score_reason ra >= score_reason rb then ra else rb
       in
-      (* [sub_hist]/[super_hist] follow the oriented verdict [sub <= super]. *)
       let pick ~sub_hist ~super_hist v =
         match v with
-        | Some Misc.Le_result.Less -> resolve_flattened_history env sub_hist
-        | Some Misc.Le_result.Not_le -> resolve_flattened_history env super_hist
+        | Some Misc.Le_result.Less ->
+          resolve_flattened_history ?target env sub_hist
+        | Some Misc.Le_result.Not_le ->
+          resolve_flattened_history ?target env super_hist
         | Some Misc.Le_result.Equal | None -> scored sub_hist super_hist
       in
-      (* Orient the two jkinds exactly as the eager [combine_histories] did (via
-         [try_allow_*]), but lazily -- so the ikind sub-verdict runs only when a
-         history is actually formatted into an error, never on the hot combine
-         path.  When neither orientation holds there is no verdict, only the
-         score tiebreak. *)
       match Base_and_axes.(try_allow_l d1, try_allow_r d2) with
       | Some _, Some _ ->
         pick ~sub_hist:history1 ~super_hist:history2 (verdict d1 d2)
@@ -2916,7 +2938,22 @@ let rec resolve_flattened_history env history =
         match Base_and_axes.(try_allow_r d1, try_allow_l d2) with
         | Some _, Some _ ->
           pick ~sub_hist:history2 ~super_hist:history1 (verdict d2 d1)
-        | _ -> scored history1 history2))
+        | _ -> scored history1 history2)
+    in
+    if history1 == history2
+    then (* both branches would pick the same history; skip the verdict *)
+      resolve_flattened_history ?target env history1
+    else
+      (* C1: the implication filter is the PRIMARY discriminator -- a branch may
+         explain [target] only if the kind it establishes implies it.  This must
+         precede the verdict orientation, which otherwise picks a sub/super side
+         directly and can select a non-implying history.  When the filter cannot
+         decide (both or neither imply, e.g. no target / verdict unavailable) we
+         fall back to the oriented verdict + score tiebreak. *)
+      match impl1, impl2 with
+      | true, false -> resolve_flattened_history ?target env history1
+      | false, true -> resolve_flattened_history ?target env history2
+      | true, true | false, false -> by_verdict ())
 
 (* This module is just to keep all the helper functions more locally
    scoped. *)
@@ -3269,7 +3306,9 @@ module Format_history = struct
        node; resolve it to the winning flat [Creation] before formatting (see
        [resolve_flattened_history]).  [is_informative] runs on the resolved
        history so an [Imported] winner stays silent, as in the eager code. *)
-    let history = resolve_flattened_history env t.history in
+    let history =
+      resolve_flattened_history ~target:(Pack_jkind_desc t.jkind) env t.history
+    in
     fprintf ppf "@[<v 2>%t" intro;
     (match history with
     | Creation reason ->
