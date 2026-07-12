@@ -749,9 +749,7 @@ Error: This expression has type "('a array, 'a) idx_mut"
          because it is the primitive type or_null.
        But the layout of non_sep must be a sublayout of
            value_or_null non_float
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         because it's the type argument to the array type.
 |}]
 
 type abstract
@@ -821,9 +819,7 @@ Error: This expression has type "('a iarray, 'a) idx_imm"
          because it is the primitive type or_null.
        But the layout of non_sep must be a sublayout of
            value_or_null non_float
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         because it's the type argument to the array type.
 |}]
 
 type abstract

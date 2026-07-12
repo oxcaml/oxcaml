@@ -664,7 +664,7 @@ Error: The value "m1" has type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
        But the layout of t_untagged_immediate must be a value layout
-         because it's the type of a variable captured in an object.
+         because argument or result of a function type.
 |}];;
 
 let f12_14 (m1 : t_untagged_immediate) (m2 : t_untagged_immediate) = object

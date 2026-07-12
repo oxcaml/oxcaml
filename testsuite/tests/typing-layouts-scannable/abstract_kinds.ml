@@ -107,7 +107,7 @@ Line 5, characters 10-46:
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The universal type variable 'a was declared to have kind k separable.
        But it was inferred to have kind k non_float
-         because of the definition of a at line 3, characters 2-28.
+         because of the annotation on the universal variable 'a.
 |}]
 
 (* Substitution *)
@@ -298,7 +298,7 @@ Line 4, characters 10-46:
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The universal type variable 'a was declared to have kind k separable.
        But it was inferred to have kind k separable non_null
-         because of the definition of a at line 3, characters 2-30.
+         because of the annotation on the universal variable 'a.
 |}]
 
 (* Recursive jkind cycle reporting *)

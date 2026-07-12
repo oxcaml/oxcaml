@@ -645,7 +645,7 @@ Error: The value "m1" has type "('a : value_or_null)"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
        But the layout of t_bits8 must be a value layout
-         because it's the type of a variable captured in an object.
+         because argument or result of a function type.
 |}];;
 
 let f12_14 (m1 : t_bits8) (m2 : t_bits8) = object
