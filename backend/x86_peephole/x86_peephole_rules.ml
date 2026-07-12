@@ -3,7 +3,7 @@
 open! Int_replace_polymorphic_compare [@@warning "-66"]
 open X86_ast
 open X86_ast_utils
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module U = X86_peephole_utils
 
 type peephole_stats =

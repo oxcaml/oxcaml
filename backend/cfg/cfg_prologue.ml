@@ -1,6 +1,6 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 (* Before this pass, the CFG should not contain any prologues/epilogues. Iterate
    over the CFG and make sure that this is the case. *)
