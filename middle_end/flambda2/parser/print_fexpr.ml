@@ -538,8 +538,13 @@ let value_slots expr_or_static ppf = function
   | Some ces ->
     Format.fprintf ppf "@ @[<hv2>%twith%t {" expr_or_static Flambda_colours.pop;
     pp_list ~sep:";"
-      (fun ppf ({ var; value } : one_value_slot) ->
-        Format.fprintf ppf "@ @[<hv2>%a =@ %a@]" value_slot var simple value)
+      (fun ppf ({ var; value; kind } : one_value_slot) ->
+        match kind with
+        | None ->
+          Format.fprintf ppf "@ @[<hv2>%a =@ %a@]" value_slot var simple value
+        | Some kind ->
+          Format.fprintf ppf "@ @[<hv2>%a :@ %a =@ %a@]" value_slot var
+            naked_number_kind kind simple value)
       ppf ces;
     Format.fprintf ppf "@;<1 -2>}@]"
 

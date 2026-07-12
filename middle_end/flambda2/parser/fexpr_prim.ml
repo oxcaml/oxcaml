@@ -803,7 +803,10 @@ let untag_immediate =
   D.(unary "%untag_imm" ~params:param0 (fun _ () -> P.Untag_immediate))
 
 let project_value_slot =
-  (* CR mshinwell: support non-value kinds *)
+  (* CR mshinwell: support non-value kinds in the projection syntax. Note that
+     if the value slot's definition (in a "with" clause, where kinds are
+     supported) has already been parsed, the slot registered under this name
+     will have the correct kind and the kind here is ignored. *)
   let kind = Flambda_kind.value in
   D.(
     unary "%project_value_slot"
