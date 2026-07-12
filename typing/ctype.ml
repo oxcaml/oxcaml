@@ -6247,25 +6247,20 @@ let crossing_of_ty env ?modalities ty =
         let jkind = type_jkind_purely env ty in
         crossing_of_jkind env jkind
       in
-      if !Clflags.ikinds
-      then (
-        let ikind_crossing = Ikind.crossing_of_type env ty in
-        if debug_ikind_crossing_mismatch then (
-          let old_jkind_crossing = jkind_crossing () in
-          if not (Crossing.equal ikind_crossing old_jkind_crossing)
-          then
-            Format.eprintf
-              "@[<v>[ikind-crossing-mismatch]@ \
-               type=%a@ \
-               ikind=%a@ \
-               jkind=%a@]@."
-              !Btype.print_raw ty
-              (Format_doc.compat Crossing.print) ikind_crossing
-              (Format_doc.compat Crossing.print) old_jkind_crossing
-        );
-        ikind_crossing)
-      else
-        jkind_crossing ()
+      let ikind_crossing = Ikind.crossing_of_type env ty in
+      if debug_ikind_crossing_mismatch then (
+        let old_jkind_crossing = jkind_crossing () in
+        if not (Crossing.equal ikind_crossing old_jkind_crossing)
+        then
+          Format.eprintf
+            "@[<v>[ikind-crossing-mismatch]@ \
+             type=%a@ \
+             ikind=%a@ \
+             jkind=%a@]@."
+            !Btype.print_raw ty
+            (Format_doc.compat Crossing.print) ikind_crossing
+            (Format_doc.compat Crossing.print) old_jkind_crossing);
+      ikind_crossing
   in
   match modalities with
   | None -> crossing

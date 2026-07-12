@@ -12,12 +12,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Global feature toggles for ikinds. These are intended to be easy to flip
-   while iterating on performance or correctness. *)
-(* CR jujacobs: remove toggles in the final version. *)
-(* Stage-5a: the four [enable_*] seam toggles were all [true]; folded to
-   unconditional (the seams now branch only on [!Clflags.ikinds]) as prep for
-   the 5d [-no-ikinds] deletion. *)
+(* Stage-5m: the ikind engine is the sole kind checker.  The [enable_*] seam
+   toggles (stage-5a) and the [-no-ikinds] legacy fallback (stage-5d/5m) are
+   gone; the seams are unconditional. *)
 
 (* Stage-1 validation harness (see STAGE1-DESIGN.md). When
    [Clflags.ikinds_validate] (env var OXCAML_IKINDS_VALIDATE) is set, each kind
@@ -779,9 +776,7 @@ let pp_coeffs (coeffs : Ldd.node array) : string =
 
 let with_ikinds_enabled (f : unit -> Types.constructor_ikind) : Types.type_ikind
     =
-  if not !Clflags.ikinds
-  then Types.ikinds_todo "ikinds disabled"
-  else Types.Constructor_ikind (f ())
+  Types.Constructor_ikind (f ())
 
 let origin_suffix_of = function None -> "" | Some o -> " origin=" ^ o
 
@@ -1211,7 +1206,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
     let ikind =
       match type_decl.type_ikind with
       | Types.Constructor_ikind { base; coeffs }
-        when !Clflags.ikinds && not !force_recompute_ikinds ->
+        when not !force_recompute_ikinds ->
         if !Clflags.ikinds_validate then incr stored_decl_ikind_hits;
         (* Detector: an IMPORTED decl's stored ikind (persistent path head) may
            carry a foreign [Param] with a stale live id; record it. *)
@@ -1221,14 +1216,12 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
             coeffs;
         Solver.Poly (base, coeffs)
       | Types.Constructor_ikind { base; coeffs }
-        when !Clflags.ikinds && !force_recompute_ikinds && is_def_tvar_temp_decl
-        ->
+        when !force_recompute_ikinds && is_def_tvar_temp_decl ->
         (* CLASS-A: keep the stored (declared) ikind in the recompute reference;
            the fresh Tvar manifest is a placeholder, not the body. *)
         Solver.Poly (base, coeffs)
       | Types.Constructor_ikind { base; coeffs }
-        when !Clflags.ikinds && !force_recompute_ikinds && !trust_residue_stored
-             && is_def_abstract
+        when !force_recompute_ikinds && !trust_residue_stored && is_def_abstract
              && stored_ikind_has_foreign_param ~own_params:type_decl.type_params
                   base coeffs ->
         (* CLASS-B (stage 4b, residue-trusting reference only): a
@@ -1424,25 +1417,22 @@ let type_declaration_ikind_of_manifest ~(env : Env.t option)
 let mod_bounds_floor_for_printing : type l r.
     Env.t -> (l * r) Jkind.Const.t -> Jkind.Mod_bounds.t option =
  fun env jkind ->
-  if not !Clflags.ikinds
-  then None
-  else
-    match jkind.Types.with_bounds with
-    | Types.With_bounds _ -> None
-    | Types.No_with_bounds -> (
-      match
-        (* Scratch ctx (fresh caches) + isolated pending: a print mid-check
+  match jkind.Types.with_bounds with
+  | Types.With_bounds _ -> None
+  | Types.No_with_bounds -> (
+    match
+      (* Scratch ctx (fresh caches) + isolated pending: a print mid-check
            perturbs neither the outer solve's Solver caches nor its pending
            gfps. *)
-        Ldd.with_isolated_pending (fun () ->
-            let ctx = create_print_ctx ~mode:Solver.Normal ~env:(Some env) in
-            Solver.round_up (Solver.ckind_of_jkind_desc ctx jkind))
-      with
-      | exception _ -> None
-      | lat ->
-        incr print_floor_derivations;
-        let lat = if !print_floor_fault then Axis_lattice.top else lat in
-        Some (Jkind.Mod_bounds.of_axis_lattice lat))
+      Ldd.with_isolated_pending (fun () ->
+          let ctx = create_print_ctx ~mode:Solver.Normal ~env:(Some env) in
+          Solver.round_up (Solver.ckind_of_jkind_desc ctx jkind))
+    with
+    | exception _ -> None
+    | lat ->
+      incr print_floor_derivations;
+      let lat = if !print_floor_fault then Axis_lattice.top else lat in
+      Some (Jkind.Mod_bounds.of_axis_lattice lat))
 
 let () =
   Jkind.Const.set_floor_from_ikind
@@ -1462,7 +1452,7 @@ let () =
 let render_jkind_from_ikind : type l r.
     Env.t -> (l * r) Jkind.Const.t -> Outcometree.out_jkind_const option =
  fun env jkind ->
-  if not (!Clflags.print_from_ikinds && !Clflags.ikinds)
+  if not !Clflags.print_from_ikinds
   then None
   else
     match jkind.Types.with_bounds with
@@ -1723,98 +1713,92 @@ let sub_verdict_for_history : type la ra lb rb.
     (lb * rb) Types.jkind ->
     Misc.Le_result.t option =
  fun ~context:_ env a b ->
-  if not !Clflags.ikinds
-  then None
-  else
-    match
-      Ldd.with_isolated_pending (fun () ->
-          (* Derive both polynomials in ONE scratch ctx (Normal mode) so shared
+  match
+    Ldd.with_isolated_pending (fun () ->
+        (* Derive both polynomials in ONE scratch ctx (Normal mode) so shared
              type params get identical rigid names, then raw [leq_with_reason]
              both directions -- the ordering comparison M4 would use, without the
              one-directional sub-check fast paths (Rhs_top/round-up) that would
              coarsen an order into spurious Equals. *)
-          let ctx = create_scratch_ctx ~mode:Solver.Normal ~env:(Some env) in
-          let a_poly = Solver.ckind_of_jkind ctx a in
-          let b_poly = Solver.ckind_of_jkind ctx b in
-          Ldd.solve_pending ();
-          let leq x y =
-            match Ldd.leq_with_reason x y with [] -> true | _ -> false
-          in
-          leq a_poly b_poly, leq b_poly a_poly)
-    with
-    | exception _ -> None
-    | true, true -> Some Misc.Le_result.Equal
-    | true, false -> Some Misc.Le_result.Less
-    | false, _ -> Some Misc.Le_result.Not_le
+        let ctx = create_scratch_ctx ~mode:Solver.Normal ~env:(Some env) in
+        let a_poly = Solver.ckind_of_jkind ctx a in
+        let b_poly = Solver.ckind_of_jkind ctx b in
+        Ldd.solve_pending ();
+        let leq x y =
+          match Ldd.leq_with_reason x y with [] -> true | _ -> false
+        in
+        leq a_poly b_poly, leq b_poly a_poly)
+  with
+  | exception _ -> None
+  | true, true -> Some Misc.Le_result.Equal
+  | true, false -> Some Misc.Le_result.Less
+  | false, _ -> Some Misc.Le_result.Not_le
 
 let () =
   Jkind.set_sub_verdict_from_ikind { Jkind.verdict = sub_verdict_for_history }
 
 let sub_jkind_l ?allow_any_crossing ?origin
-    ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
+    ~type_equal:(_ : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) env (sub : Types.jkind_l)
     (super : Types.jkind_l) : (unit, Jkind.Violation.t) result =
   let open Misc.Stdlib.Monad.Result.Syntax in
-  if not !Clflags.ikinds
-  then Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context env sub super
-  else
-    let () =
-      if !Clflags.ikinds_validate
-      then (
-        validate_ikind ~in_sub_position:true ~origin env sub;
-        validate_ikind ~in_sub_position:false ~origin env super)
-    in
-    (* Check layouts first; if that fails, print both sides with full
-       info and return the error. *)
-    let* () =
-      match Jkind.sub_layout_or_error ~context env sub super with
-      | Ok () -> Ok ()
-      | Error v -> Error v
-    in
-    let allow_any =
-      match allow_any_crossing with Some true -> true | _ -> false
-    in
-    if allow_any
+  let () =
+    if !Clflags.ikinds_validate
     then (
-      (if !Clflags.ikinds_debug
-       then
-         let origin_suffix = origin_suffix_of origin in
-         Format.eprintf "[ikind-subjkind] call%s allow_any=true@." origin_suffix);
-      Ok ())
-    else
-      let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; fast_path } =
-        compute_subcheck_polys ~context env sub super
+      validate_ikind ~in_sub_position:true ~origin env sub;
+      validate_ikind ~in_sub_position:false ~origin env super)
+  in
+  (* Check layouts first; if that fails, print both sides with full
+       info and return the error. *)
+  let* () =
+    match Jkind.sub_layout_or_error ~context env sub super with
+    | Ok () -> Ok ()
+    | Error v -> Error v
+  in
+  let allow_any =
+    match allow_any_crossing with Some true -> true | _ -> false
+  in
+  if allow_any
+  then (
+    (if !Clflags.ikinds_debug
+     then
+       let origin_suffix = origin_suffix_of origin in
+       Format.eprintf "[ikind-subjkind] call%s allow_any=true@." origin_suffix);
+    Ok ())
+  else
+    let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; fast_path } =
+      compute_subcheck_polys ~context env sub super
+    in
+    let violating_axes = Ldd.leq_with_reason sub_poly super_poly in
+    (if !Clflags.ikinds_debug
+     then
+       let origin_suffix = origin_suffix_of origin in
+       let fast_path =
+         match fast_path with
+         | No_fast_path -> "none"
+         | Rhs_top_fast_path -> "rhs_top"
+       in
+       Format.eprintf
+         "[ikind-subjkind] call%s allow_any=false fast_path=%s@;\
+          @;\
+          sub_poly=%s@;\
+          super_poly=%s@."
+         origin_suffix fast_path (Ldd.pp sub_poly) (Ldd.pp super_poly));
+    match violating_axes with
+    | [] -> Ok ()
+    | _ ->
+      let () =
+        if !Clflags.ikinds_debug
+        then
+          let axes = pp_axes violating_axes in
+          Format.eprintf "[ikind-subjkind] failure on axes: %s@." axes
       in
-      let violating_axes = Ldd.leq_with_reason sub_poly super_poly in
-      (if !Clflags.ikinds_debug
-       then
-         let origin_suffix = origin_suffix_of origin in
-         let fast_path =
-           match fast_path with
-           | No_fast_path -> "none"
-           | Rhs_top_fast_path -> "rhs_top"
-         in
-         Format.eprintf
-           "[ikind-subjkind] call%s allow_any=false fast_path=%s@;\
-            @;\
-            sub_poly=%s@;\
-            super_poly=%s@."
-           origin_suffix fast_path (Ldd.pp sub_poly) (Ldd.pp super_poly));
-      match violating_axes with
-      | [] -> Ok ()
-      | _ ->
-        let () =
-          if !Clflags.ikinds_debug
-          then
-            let axes = pp_axes violating_axes in
-            Format.eprintf "[ikind-subjkind] failure on axes: %s@." axes
-        in
-        (* Do not try to adjust allowances; Violation.Not_a_subjkind
+      (* Do not try to adjust allowances; Violation.Not_a_subjkind
            accepts an r-jkind. *)
-        let axis_reasons = axis_disagreement_reasons violating_axes in
-        Error
-          (Jkind.Violation.of_ ~context env
-             (Jkind.Violation.Not_a_subjkind (sub, super, axis_reasons)))
+      let axis_reasons = axis_disagreement_reasons violating_axes in
+      Error
+        (Jkind.Violation.of_ ~context env
+           (Jkind.Violation.Not_a_subjkind (sub, super, axis_reasons)))
 
 let crossing_of_jkind ~(context : Jkind.jkind_context) env
     (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
@@ -1865,41 +1849,37 @@ let crossing_of_jkind ~(context : Jkind.jkind_context) env
              else "UNEXPECTED"))
     end
   in
-  if not !Clflags.ikinds
-  then Jkind.get_mode_crossing ~context env jkind
-  else
-    let () =
-      if !Clflags.ikinds_validate
-      then
-        validate_ikind ~in_sub_position:false ~origin:(Some "crossing") env
-          jkind
-    in
-    let with_bounds_is_empty : type l r. (l * r) Types.with_bounds -> bool =
-      function
-      | No_with_bounds -> true
-      | With_bounds _ -> false
-    in
-    match jkind.jkind.base with
-    | Types.Layout _ when with_bounds_is_empty jkind.jkind.with_bounds ->
-      (* Stage-5d S1: the mode crossing of a with-bounds-free jkind is the
+  let () =
+    if !Clflags.ikinds_validate
+    then
+      validate_ikind ~in_sub_position:false ~origin:(Some "crossing") env jkind
+  in
+  let with_bounds_is_empty : type l r. (l * r) Types.with_bounds -> bool =
+    function
+    | No_with_bounds -> true
+    | With_bounds _ -> false
+  in
+  match jkind.jkind.base with
+  | Types.Layout _ when with_bounds_is_empty jkind.jkind.with_bounds ->
+    (* Stage-5d S1: the mode crossing of a with-bounds-free jkind is the
          crossing of its lattice floor -- the ikind const base, which STAGE5C
          proved equals [to_axis_lattice mod_bounds] for this class.  Read it
          directly (no legacy [normalize], no LDD build).  Under validate,
          re-assert equivalence against the legacy [get_mode_crossing]. *)
-      let floor = Jkind.Mod_bounds.to_axis_lattice jkind.jkind.mod_bounds in
-      let crossing = Axis_lattice.to_mode_crossing floor in
-      if !Clflags.ikinds_validate
-      then begin
-        incr crossing_reroute_checks;
-        let legacy = Jkind.get_mode_crossing ~context env jkind in
-        if not (Mode.Crossing.equal crossing legacy)
-        then incr crossing_reroute_mismatches
-      end;
-      crossing
-    | _ ->
-      let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
-      let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
-      Axis_lattice.to_mode_crossing lat
+    let floor = Jkind.Mod_bounds.to_axis_lattice jkind.jkind.mod_bounds in
+    let crossing = Axis_lattice.to_mode_crossing floor in
+    if !Clflags.ikinds_validate
+    then begin
+      incr crossing_reroute_checks;
+      let legacy = Jkind.get_mode_crossing ~context env jkind in
+      if not (Mode.Crossing.equal crossing legacy)
+      then incr crossing_reroute_mismatches
+    end;
+    crossing
+  | _ ->
+    let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
+    let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
+    Axis_lattice.to_mode_crossing lat
 
 let round_up_type env (ty : Types.type_expr) : Axis_lattice.t =
   let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
@@ -1988,7 +1968,7 @@ let fast_sub : type r1 l2.
   | _ -> false
 
 let sub_or_intersect ?origin
-    ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
+    ~type_equal:(_ : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) env
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) : sub_or_intersect =
@@ -2052,55 +2032,49 @@ let sub_or_intersect ?origin
         in
         Jkind.May_have_intersection reasons)
   in
-  if not !Clflags.ikinds
-  then Jkind.sub_or_intersect ~type_equal ~context env t1 t2
-  else (
-    if !Clflags.ikinds_validate
-    then (
-      validate_ikind ~in_sub_position:true ~origin env t1;
-      validate_ikind ~in_sub_position:false ~origin env t2);
-    if fast_sub ~context env t1 t2
-    then (
-      (if !Clflags.ikinds_debug
-       then
-         let origin_suffix = origin_suffix_of origin in
-         Format.eprintf "[ikind-sub-or-intersect] outcome=Sub%s fast_sub=true@."
-           origin_suffix);
-      Jkind.Sub)
-    else generic_sub_or_intersect ())
+  if !Clflags.ikinds_validate
+  then (
+    validate_ikind ~in_sub_position:true ~origin env t1;
+    validate_ikind ~in_sub_position:false ~origin env t2);
+  if fast_sub ~context env t1 t2
+  then (
+    (if !Clflags.ikinds_debug
+     then
+       let origin_suffix = origin_suffix_of origin in
+       Format.eprintf "[ikind-sub-or-intersect] outcome=Sub%s fast_sub=true@."
+         origin_suffix);
+    Jkind.Sub)
+  else generic_sub_or_intersect ()
 
 let sub_or_error ?origin
-    ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
+    ~type_equal:(_ : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) env
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) :
     (unit, Jkind.Violation.t) result =
-  if not !Clflags.ikinds
-  then Jkind.sub_or_error ~type_equal ~context env t1 t2
-  else
-    let () =
-      if !Clflags.ikinds_validate
-      then (
-        validate_ikind ~in_sub_position:true ~origin env t1;
-        validate_ikind ~in_sub_position:false ~origin env t2)
-    in
-    (* The ikind engine owns the verdict AND the error.  Layout check first: on
+  let () =
+    if !Clflags.ikinds_validate
+    then (
+      validate_ikind ~in_sub_position:true ~origin env t1;
+      validate_ikind ~in_sub_position:false ~origin env t2)
+  in
+  (* The ikind engine owns the verdict AND the error.  Layout check first: on
        failure return that layout violation (as [sub_jkind_l] does).  Otherwise
        the modal-axis subcheck decides; a non-empty violating-axes list is the
        reject, synthesized ikind-natively into [Not_a_subjkind]. *)
-    match Jkind.sub_layout_or_error ~context env t1 t2 with
-    | Error _ as layout_err -> layout_err
-    | Ok () -> (
-      let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; _ } =
-        compute_subcheck_polys ~context env t1 t2
-      in
-      match Ldd.leq_with_reason sub_poly super_poly with
-      | [] -> Ok ()
-      | violating_axes ->
-        let reasons = axis_disagreement_reasons violating_axes in
-        Error
-          (Jkind.Violation.of_ ~context env
-             (Jkind.Violation.Not_a_subjkind (t1, t2, reasons))))
+  match Jkind.sub_layout_or_error ~context env t1 t2 with
+  | Error _ as layout_err -> layout_err
+  | Ok () -> (
+    let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; _ } =
+      compute_subcheck_polys ~context env t1 t2
+    in
+    match Ldd.leq_with_reason sub_poly super_poly with
+    | [] -> Ok ()
+    | violating_axes ->
+      let reasons = axis_disagreement_reasons violating_axes in
+      Error
+        (Jkind.Violation.of_ ~context env
+           (Jkind.Violation.Not_a_subjkind (t1, t2, reasons))))
 
 (** Substitute constructor ikinds according to [lookup] without requiring Env.
 *)

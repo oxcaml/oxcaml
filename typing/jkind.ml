@@ -3451,24 +3451,6 @@ module Violation = struct
            @[Note: The kinds mutable_data, immutable_data, and sync_data have@ \
            the layout value non_float.@]"
 
-  let report_fuel ppf violation =
-    let report_fuel_for_type which =
-      fprintf ppf
-        "@;\
-         @[Note: I gave up trying to find the simplest kind for the %s,@,\
-         as it is very large or deeply recursive.@]"
-        which
-    in
-    let first_ran_out, second_ran_out =
-      match violation with
-      | Not_a_subjkind (k1, k2, _) ->
-        k1.ran_out_of_fuel_during_normalize, k2.ran_out_of_fuel_during_normalize
-      | No_intersection (k1, k2) ->
-        k1.ran_out_of_fuel_during_normalize, k2.ran_out_of_fuel_during_normalize
-    in
-    if first_ran_out then report_fuel_for_type "first";
-    if second_ran_out then report_fuel_for_type "second"
-
   let categorize_mismatch env t =
     let expand k1 k2 =
       (* We fully expand aliases here so that we can:
@@ -3641,8 +3623,7 @@ module Violation = struct
     report_missing_cmis ppf missing_cmis;
     report_reason ppf t.violation;
     (* otherwise, we get notes for layout abbreviations that get omitted. *)
-    report_layout_notes env ppf t.violation mismatch_type ~print_as_value_layout;
-    if not !Clflags.ikinds then report_fuel ppf t.violation
+    report_layout_notes env ppf t.violation mismatch_type ~print_as_value_layout
 
   let pp_t ppf x = fprintf ppf "%t" x
 
