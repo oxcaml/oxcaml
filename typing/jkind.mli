@@ -889,6 +889,22 @@ val sub_jkind_l :
   Types.jkind_l ->
   (unit, Violation.t) result
 
+(** Stage-5d S4: hook installed by [Ikind] returning the ikind sub verdict
+    ([Less]/[Equal]/[Not_le]) for two jkinds, used by [combine_histories]'
+    history- ordering coexistence differential. [None] result means the ikind
+    derivation was skipped (ikinds disabled) or raised. *)
+type sub_verdict_from_ikind =
+  { verdict :
+      'la 'ra 'lb 'rb.
+      context:jkind_context ->
+      Env.t ->
+      ('la * 'ra) Types.jkind ->
+      ('lb * 'rb) Types.jkind ->
+      Misc.Le_result.t option
+  }
+
+val set_sub_verdict_from_ikind : sub_verdict_from_ikind -> unit
+
 (** "round up" a [jkind_l] to a [jkind_r] such that the input is less than the
     output. If the base is abstract, it may not be possible to eliminate the
     with bounds, in which case this returns [None]. *)

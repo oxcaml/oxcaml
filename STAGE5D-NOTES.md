@@ -19,8 +19,9 @@ error-text path), both queued for the user.**
 
 Wave A therefore delivers the honest, reachable goal: **the ikind engine is the
 sole answering engine on the default (ikinds-on) path**, with legacy quarantined
-behind `-no-ikinds`, the M5 error-text call, and validate tripwires — and
-machine-checked proofs that the remaining two seams are switch-ready.
+behind `-no-ikinds`, the M5 error-text call, and validate tripwires — plus
+machine-checked differentials over the remaining two seams: S3 (classification)
+proves switch-ready; S4 (history ordering) proves DIVERGENT and routes into M5.
 
 ## Slices
 
@@ -106,12 +107,72 @@ validate-gated differential comparing the legacy Less/Not_le/Equal to the
 ikind verdict (via the `Jkind`→`Ikind` hook), counting agreement. The selected
 history feeds error text, so the switch itself rides with M5.
 
-**STATUS: NOT DONE — frozen for a fresh finisher (handoff spec below).** S1-S3
-are banked and verified; S4 was deliberately deferred at this point because it
-is the highest-error-surface slice (a new cross-module hook + a hot path) and
-this implementation session had run very long — per the team-lead's
-freeze-when-degrading guidance, banking S1-S3 and handing S4 off loses nothing
-(it is a self-contained differential).
+**STATUS: DONE — S4 is DIVERGENT** (implemented by the S4 finisher; the
+handoff spec is retained below for provenance). The differential is boot-green
+with ZERO behaviour change (byte-identical suites), but the ikind-vs-legacy
+history selection **DIVERGES corpus-wide (~57%)**, so the M4 switch is NOT
+zero-churn and is routed firmly into the M5 error-text project. A divergent
+differential is a valid wave-A result: it converts "is M4 a mechanical switch?"
+from an assumption into a measured NO.
+
+#### S4 as-built (differential — DIVERGENT)
+
+Hook (`jkind.ml`, mirroring `set_floor_from_ikind`): `set_sub_verdict_from_ikind`
+installs an `Ikind` function that, for two jkinds `a`/`b`, derives both ikind
+polynomials in ONE scratch ctx (Normal mode) under `Ldd.with_isolated_pending`
+and returns `Less`/`Equal`/`Not_le` via raw `Ldd.leq_with_reason` both directions
+(`Less` = a≤b ∧ ¬b≤a, `Equal` = both, `Not_le` = ¬a≤b). `combine_histories`'
+`choose_subjkind_history` computes the legacy `Jkind_desc.sub` result as before —
+**it still chooses the history, behaviour UNCHANGED** — and, only under the gate
+(`ikinds_validate || OXCAML_IK5D_MEASURE`), compares the ikind verdict to it,
+counting checks/agreements/mismatches (`[ikind-combine-history]` at_exit summary;
+each mismatch logs its `legacy=_ ikind=_` transition). Hot-path discipline: when
+the gate is off, `ikind_verdict_of` returns `None` BEFORE the hook is called, so
+the ~267k-call combine path never touches the ikind engine — confirmed by the
+byte-identical suites below.
+
+**Result (OXCAML_IK5D_MEASURE, 7 seam dirs — jkind-bounds, abstract-kinds{,
+-missing-cmi}, layouts, layouts-or-null, layouts-products, modules): DIVERGENT.**
+checks are order-of-100k (~154k by raw mismatch-line scale; ≥22.4k as a
+distinct-process lower bound) with a **~57% mismatch rate corpus-wide**. Per dir:
+jkind-bounds 32%, abstract-kinds 53%, layouts 73%, layouts-or-null 53%,
+layouts-products 65%, modules 52% (abstract-kinds-missing-cmi 0%, but only 5
+checks). The mismatch transitions are near-uniformly the **ikind verdict
+collapsing to `Equal`**: `legacy=Not_le ikind=Equal` (95.8%), `legacy=Less
+ikind=Equal` (4.2%), `legacy=Not_le ikind=Less` (4 total). I.e. the two combine
+operands have EQUAL ikind denotations (mutually `leq`) while legacy
+`Jkind_desc.sub` reports them incomparable or strictly-ordered.
+
+**Robustness / not a harness artifact.** An alternate implementation routing the
+two directions through the full `sub_jkind_l`/`compute_subcheck_polys` verdict
+machinery (Rhs_top fast path + round-up) produced **byte-identical numbers**
+(3176/356/2 on jkind-bounds either way), so the divergence is a genuine property
+of the ikind polynomials, not an artifact of the poly-derivation choice. The
+ikind derivation runs BEFORE the legacy `Jkind_desc.sub` (evaluated as the call
+argument), so it is not a post-mutation effect either.
+
+**Mechanism (hypothesis).** `combine_histories` orders the two INTERSECTION
+OPERANDS (jkind.ml passes `t1`/`t2`, not the intersection result), which are
+frequently incomparable AS KINDS — that is why they are being intersected — yet
+share an ikind floor. Legacy `Jkind_desc.sub` here is on acknowledged-wrong
+footing (the in-code CR: "this will be wrong if we ever have a non-trivial meet
+in the kind lattice -- which is now! So this is actually wrong."). So the ikind
+`Equal` is arguably the more-correct answer, but it still SELECTS A DIFFERENT
+HISTORY than legacy on ~57% of combines, and the chosen history is displayed
+error text.
+
+**Consequence.** The M4 switch (combine_histories off legacy `Jkind_desc.sub`)
+is NOT zero-churn and cannot be mechanical. It is routed into the M5 error-text
+project, which must decide the history-ordering semantics (keep the legacy
+ordering for display, or accept the ikind ordering and re-bless the ~57% of
+error-text histories that change). **PAYOFF 1 (deleting legacy `Jkind_desc.sub`)
+is therefore gated on M4's reconciliation inside M5, not on a clean S4.**
+
+Non-vacuity: the differential fires on ~88k natural mismatches — strictly
+stronger evidence that it catches a wrong history choice than an artificial seed;
+no seeded fault was added (commits are seed-marker-free). Boot-green; ZERO suite
+churn (typing-jkind-bounds 73/0, typing-layouts 45/0, typing-modules 54/0, before
+== after); ocamlformat clean.
 
 ### S4 handoff spec (differential ONLY, zero behaviour change)
 
@@ -157,7 +218,7 @@ off (guard the call itself, not just the counting).
 
 | §5d target | deletable after |
 |---|---|
-| `Jkind_desc.sub` + `Mod_bounds`/`With_bounds` subsumption ops | S9 (delete `-no-ikinds` fallbacks) + M5 (sub_or_error + classification reason error-text) — the S3/S4 differentials prove the seams switch-ready |
+| `Jkind_desc.sub` + `Mod_bounds`/`With_bounds` subsumption ops | S9 (delete `-no-ikinds` fallbacks) + M5 (sub_or_error + classification reason error-text + combine_histories history ordering) — S3 proves its seam switch-ready; **S4 is DIVERGENT (~57%)** so the history ordering must be reconciled in M5 before the switch |
 | `Base_and_axes.normalize` + `Jkind.normalize` + `get_mode_crossing` | M5 (error-text + decl-norm + round_up migrated off normalize); S1 already moved crossing off it on the default path |
 | `mod_bounds : Mode.Crossing.t` field | after normalize is gone |
 | `-no-ikinds` surface + dual-engine differential | S9 (40 twin tests) |
@@ -170,7 +231,9 @@ off (guard the call itself, not just the counting).
   seeded-fault non-vacuous (8/8); suites 73/45/54.
 - S3: classification differential green — checks=88831 disjoint=1466 may=87365
   mismatches=0; zero behaviour change.
-- S4: NOT DONE — frozen for a fresh finisher (handoff spec above); self-contained
-  differential, no loss from the S1-S3 commits.
+- S4: DONE but **DIVERGENT** — differential green + zero behaviour change, but
+  ikind-vs-legacy history selection diverges ~57% corpus-wide (ikind collapses to
+  `Equal`; robust across two implementations). M4 switch routed into M5 (not
+  zero-churn); PAYOFF 1 gated on that reconciliation. Suites 73/45/54; boot-green.
 - Wave A frozen for adversarial review; NOT pushed. Physical legacy-engine
   deletion (PAYOFF-1..4) queued for the user (S9 + M5).

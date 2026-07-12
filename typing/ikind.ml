@@ -1755,6 +1755,49 @@ let compute_subcheck_polys ~context:_ env (sub : ('l1 * 'r1) Types.jkind)
       fast_path = No_fast_path
     }
 
+(* Stage-5d S4: ikind sub verdict for [combine_histories]' history-ordering
+   differential, installed into [Jkind.set_sub_verdict_from_ikind].  Returns the
+   ikind verdict [Less]/[Equal]/[Not_le] for [a] vs [b] by deriving both
+   polynomials and comparing them with [Ldd.leq_with_reason] in both directions
+   (M4's intended replacement for the legacy [Jkind_desc.sub] there).
+   [combine_histories] runs mid-check, so the derivation uses a SCRATCH ctx +
+   [with_isolated_pending] (the 5a re-entrancy helpers) and cannot perturb the
+   outer solve.  Returns [None] (=> the differential skips this combine) when
+   ikinds are disabled or the derivation raises. *)
+let sub_verdict_for_history : type la ra lb rb.
+    context:Jkind.jkind_context ->
+    Env.t ->
+    (la * ra) Types.jkind ->
+    (lb * rb) Types.jkind ->
+    Misc.Le_result.t option =
+ fun ~context:_ env a b ->
+  if not !Clflags.ikinds
+  then None
+  else
+    match
+      Ldd.with_isolated_pending (fun () ->
+          (* Derive both polynomials in ONE scratch ctx (Normal mode) so shared
+             type params get identical rigid names, then raw [leq_with_reason]
+             both directions -- the ordering comparison M4 would use, without the
+             one-directional sub-check fast paths (Rhs_top/round-up) that would
+             coarsen an order into spurious Equals. *)
+          let ctx = create_scratch_ctx ~mode:Solver.Normal ~env:(Some env) in
+          let a_poly = Solver.ckind_of_jkind ctx a in
+          let b_poly = Solver.ckind_of_jkind ctx b in
+          Ldd.solve_pending ();
+          let leq x y =
+            match Ldd.leq_with_reason x y with [] -> true | _ -> false
+          in
+          leq a_poly b_poly, leq b_poly a_poly)
+    with
+    | exception _ -> None
+    | true, true -> Some Misc.Le_result.Equal
+    | true, false -> Some Misc.Le_result.Less
+    | false, _ -> Some Misc.Le_result.Not_le
+
+let () =
+  Jkind.set_sub_verdict_from_ikind { Jkind.verdict = sub_verdict_for_history }
+
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) env (sub : Types.jkind_l)
