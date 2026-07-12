@@ -1595,10 +1595,15 @@ let render_terms_readable env (terms : Types.ikind_term list)
     let ty = Outcometree.Otyp_constr (oide_of_path c, args) in
     ty, modalities_of_coeff ~reference coeff
   in
-  (* One [with] clause for a standalone term. *)
+  (* One [with] clause for a standalone term (0 or >=2 constructor atoms,
+     so not a single-ctor-application fragment). Render ALL names as the
+     payload: a lone payload keeps its parseable [out_type]; a product of
+     atoms (e.g. an abstract with-bound whose own with-bound flattened it
+     to [u & t]) is the honest [&]-form. Using [payloads_of] here dropped
+     bare constructor atoms and emitted an empty [with ]. *)
   let clause_of_standalone (coeff, names) =
     let ty =
-      match payloads_of names with
+      match names with
       | [p] -> out_type_of_payload ~name_of p
       | ps ->
         Outcometree.Otyp_stuff
