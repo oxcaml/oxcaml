@@ -34,6 +34,7 @@
 #include "caml/prims.h"
 #include "caml/signals.h"
 #include "caml/fiber.h"
+#include "caml/dynamic.h"
 #include "caml/domain.h"
 #include "caml/globroots.h"
 #include "caml/startup.h"
@@ -1505,28 +1506,6 @@ do_resume: {
       goto do_resume;
     }
 
-    Instruct(WITH_STACK_BIND): {
-      value valuec = accu;
-      value exnc = sp[0];
-      value effc = sp[1];
-      value dyn = sp[2];
-      value bind = sp[3];
-      Setup_for_c_call;
-      accu = caml_alloc_stack_bind(valuec, exnc, effc, dyn, bind);
-      Restore_after_c_call;
-      CAMLnoalloc;
-      resume_fn = sp[4];
-      resume_arg = sp[5];
-      resume_tail = NULL;
-      sp += 6 /* args */ - 5 /* values to be pushed */;
-      sp[0] = Val_long(domain_state->trap_sp_off);
-      sp[1] = Val_long(0);
-      sp[2] = (value)pc;
-      sp[3] = env;
-      sp[4] = Val_long(extra_args);
-      goto do_resume;
-    }
-
     Instruct(WITH_STACK_PREEMPTIBLE): {
       value valuec = accu;
       value exnc = sp[0];
@@ -1540,30 +1519,6 @@ do_resume: {
       resume_arg = sp[4];
       resume_tail = NULL;
       sp += 5 /* args */ - 5 /* values to be pushed */;
-      sp[0] = Val_long(domain_state->trap_sp_off);
-      sp[1] = Val_long(0);
-      sp[2] = (value)pc;
-      sp[3] = env;
-      sp[4] = Val_long(extra_args);
-      goto do_resume;
-    }
-
-    Instruct(WITH_STACK_BIND_PREEMPTIBLE): {
-      value valuec = accu;
-      value exnc = sp[0];
-      value effc = sp[1];
-      value htick = sp[2];
-      value dyn = sp[3];
-      value bind = sp[4];
-      Setup_for_c_call;
-      accu = caml_alloc_stack_bind_preemptible(valuec, exnc, effc,
-                                               htick, dyn, bind);
-      Restore_after_c_call;
-      CAMLnoalloc;
-      resume_fn = sp[5];
-      resume_arg = sp[6];
-      resume_tail = NULL;
-      sp += 7 /* args */ - 5 /* values to be pushed */;
       sp[0] = Val_long(domain_state->trap_sp_off);
       sp[1] = Val_long(0);
       sp[2] = (value)pc;

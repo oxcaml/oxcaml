@@ -1150,24 +1150,11 @@ let close_effect_primitive acc env ~dbg exn_continuation
   | Pwith_stack, [[valuec]; [exnc]; [effc]; [f]; [arg]] ->
     let call_kind = C.effect_ (E.with_stack ~valuec ~exnc ~effc ~f ~arg) in
     close call_kind
-  | Pwith_stack_bind, [[valuec]; [exnc]; [effc]; [dyn]; [bind]; [f]; [arg]] ->
-    let call_kind =
-      C.effect_ (E.with_stack_bind ~valuec ~exnc ~effc ~dyn ~bind ~f ~arg)
-    in
-    close call_kind
   | ( Pwith_stack_preemptible,
       [[valuec]; [exnc]; [effc]; [handle_tick]; [f]; [arg]] ) ->
     let call_kind =
       C.effect_
         (E.with_stack_preemptible ~valuec ~exnc ~effc ~handle_tick ~f ~arg)
-    in
-    close call_kind
-  | ( Pwith_stack_bind_preemptible,
-      [[valuec]; [exnc]; [effc]; [handle_tick]; [dyn]; [bind]; [f]; [arg]] ) ->
-    let call_kind =
-      C.effect_
-        (E.with_stack_bind_preemptible ~valuec ~exnc ~effc ~handle_tick ~dyn
-           ~bind ~f ~arg)
     in
     close call_kind
   | Presume, [[cont]; [f]; [arg]] ->
@@ -1301,11 +1288,10 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pjoin_vec256 | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
       | Preinterpret_tuple_as_boxed_vector _ | Pmake_unboxed_product _
       | Punboxed_product_field _ | Parray_element_size_in_bytes _
-      | Pget_header _ | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible
-      | Pwith_stack_bind_preemptible | Pperform | Presume | Preperform
-      | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
-      | Pidx_deepen _ | Pget_idx _ | Pset_idx _ | Pget_ptr _ | Pset_ptr _
-      | Pget_ext_ptr _ | Pset_ext_ptr _ | Patomic_exchange_field _
+      | Pget_header _ | Pwith_stack | Pwith_stack_preemptible | Pperform
+      | Presume | Preperform | Pmake_idx_field _ | Pmake_idx_mixed_field _
+      | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _ | Pset_idx _ | Pget_ptr _
+      | Pset_ptr _ | Pget_ext_ptr _ | Pset_ext_ptr _ | Patomic_exchange_field _
       | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
       | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
       | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field | Pdls_get
@@ -1317,8 +1303,7 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
         assert false
     in
     k acc [Named.create_simple (Simple.symbol sym)]
-  | ( ( Pperform | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible
-      | Pwith_stack_bind_preemptible | Presume | Preperform ),
+  | ( (Pperform | Pwith_stack | Pwith_stack_preemptible | Presume | Preperform),
       args ) ->
     let exn_continuation =
       match exn_continuation with

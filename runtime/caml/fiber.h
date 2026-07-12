@@ -24,6 +24,7 @@
 #include <stdbool.h>
 #include "misc.h"
 #include "mlvalues.h"
+#include "dynamic.h"
 #include "roots.h"
 #include "platform.h"
 
@@ -71,10 +72,8 @@ struct stack_info {
   void* local_top;
   intnat local_limit;
 
-  /* Temporary dynamic binding, applying only in this fiber */
-  /* TODO: Consider making this a table of bindings */
-  value dyn;
-  value val;
+  /* Temporary dynamic bindings, applying only in this fiber */
+  struct dynamic_table_s dyn;
 };
 
 #ifdef STACK_GUARD_PAGES
@@ -200,7 +199,7 @@ struct c_stack_link {
  *  -----------
  *
  * In native compilation the stack switching primitives
- * Pwith_stack/Pwith_stack_bind, Pperform, Preperform and Presume make use of
+ * Pwith_stack/Pwith_stack_preemptible, Pperform, Preperform and Presume make use of
  * corresponding functions implemented in the assembly files for an architecture
  * (such as runtime/amd64.S).
  *
@@ -248,10 +247,6 @@ struct c_stack_link {
  *   WITH_STACK allocates a new stack (with provided effect, return, and
  *   exception handlers) and calls a provided function with a provided argument
  *   as the first function on that stack.
- *
- *  Pwith_stack_bind -> WITH_STACK_BIND
- *   As per WITH_STACK, except it also binds a single dynamic variable within
- *   the scope of the stack.
  *
  *  Presume -> RESUME (& RESUMETERM if a tail call)
  *   RESUME checks that the continuation has not already been resumed. The
@@ -317,17 +312,9 @@ void caml_scan_stack(
   struct stack_info* stack, value* v_gc_regs);
 
 value caml_alloc_stack(value hval, value hexn, value heff);
-value caml_alloc_stack_bind(value hval, value hexn, value heff, value dyn,
-                            value bind);
-value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
-                                   value htick);
-value caml_alloc_stack_bind_preemptible(value hval, value hexn, value heff,
-                                        value htick, value dyn,
-                                        value bind);
+value caml_alloc_stack_preemptible(value hval, value hexn, value heff, value htick);
 struct stack_info* caml_alloc_stack_noexc(mlsize_t wosize, value hval,
-                                          value hexn, value heff,
-                                          value dyn, value bind,
-                                          int64_t id);
+                                          value hexn, value heff, int64_t id);
 /* try to grow the stack until at least required_size words are available.
    returns nonzero on success */
 CAMLextern int caml_try_realloc_stack (asize_t required_wsize);
@@ -390,26 +377,6 @@ CAMLnoret CAMLextern void caml_raise_continuation_already_resumed (void);
 CAMLnoret CAMLextern void caml_raise_unhandled_effect (value effect);
 
 value caml_make_unhandled_effect_exn (value effect);
-
-typedef struct dynamic_cache_s *dynamic_cache_t;
-
-/* Create a new dynamic cache */
-extern dynamic_cache_t caml_dynamic_cache_new(void);
-
-/* Delete a dynamic cache */
-extern void caml_dynamic_cache_delete(dynamic_cache_t);
-
-/* Install a new dynamic cache for this thread */
-extern void caml_dynamic_cache_enter_thread(dynamic_cache_t);
-
-/* Clear the cache. Used when switching fibers. */
-extern void caml_dynamic_cache_flush(dynamic_cache_t);
-
-/* Apply a GC scanning action to the roots in a dynamic cache. */
-extern void caml_dynamic_cache_scan_roots(dynamic_cache_t,
-                                          scanning_action,
-                                          scanning_action_flags,
-                                          void *);
 
 #endif /* CAML_INTERNALS */
 

@@ -132,9 +132,7 @@ type instruction =
   | Kresumeterm of int
   | Kreperformterm of int
   | Kwith_stack
-  | Kwith_stack_bind
   | Kwith_stack_preemptible
-  | Kwith_stack_bind_preemptible
   | Kstop
 
 let immed_min = -0x40000000
