@@ -686,21 +686,6 @@ module Base = struct
   (* This is only correct on bases that have been fully expanded or that come
      from the output of [Base.expand_until_comparable]. See comment on
      that function. *)
-  let sub_expanded base1 base2 =
-    match base1, base2 with
-    | Layout l1, Layout l2 -> Layout.sub l1 l2
-    | Kconstr (k1, sa1), Kconstr (k2, sa2) when Path.same k1 k2 -> (
-      match Scannable_axes.less_or_equal sa1 sa2 with
-      | Equal -> Sub_result.Equal
-      | Less -> Sub_result.Less
-      | Not_le -> Sub_result.Not_le [Layout_disagreement])
-    | Kconstr (_, sa_k), Layout (Layout.Any sa_any) -> (
-      match Scannable_axes.less_or_equal sa_k sa_any with
-      | Equal | Less -> Sub_result.Less
-      | Not_le -> Sub_result.Not_le [Layout_disagreement])
-    | Kconstr _, Layout _ | Layout _, Kconstr _ | Kconstr _, Kconstr _ ->
-      Sub_result.Not_le [Layout_disagreement]
-
   (* This is only correct on bases that come from the output of
      [Base.expand_until_comparable]. See comment on that function. *)
   let has_intersection_expanded base1 base2 =
@@ -1455,68 +1440,6 @@ module Jkind_desc = struct
       match expand_pair env t1 t2 with
       | None -> false
       | Some (t1, t2) -> equate_or_equal ~allow_mutation env t1 t2)
-
-  let sub_expanded (type l r)
-      ({ base = base1; mod_bounds = bounds1; with_bounds = with_bounds1; _ } :
-        (allowed * r) jkind_desc)
-      ({ base = base2; mod_bounds = bounds2; with_bounds = No_with_bounds; _ } :
-        (l * allowed) jkind_desc) =
-    (* Rather than carefully expanding only as much as needed, this assumes both
-       kinds are fully expanded, and that [sub] is Ignore_best normalized. See
-       comment about [axes_max_on_right] in [sub] just below for why we do it
-       this way. *)
-    let bases = Base.sub_expanded base1 base2 in
-    match with_bounds1 with
-    | No_with_bounds ->
-      let bounds = Mod_bounds.less_or_equal bounds1 bounds2 in
-      Sub_result.combine bases bounds
-    | With_bounds _ -> (
-      (* Ignore_best normalization guarantees this only happens when the sub's
-         base is abstract after expansion. We punt: only succeeding if the rhs
-         is fully max. It's not sufficient to check that the bases are
-         comparable, because if the rhs has an abstract base its with bounds may
-         have been normalized away.
-
-         It's possible to do a bit better in he future, with help from
-         normalize. For example, we could allow [k mod contended with int < any
-         mod contended]. *)
-      match base2 with
-      | Layout (Any sa)
-        when Mod_bounds.is_max bounds2
-             && Scannable_axes.equal sa Scannable_axes.max ->
-        Sub_result.Less
-      | _ -> Sub_result.combine bases (Sub_result.Not_le [With_bounds_on_left]))
-
-  let sub (type l r) ~type_equal:_ ~context env ~sub_previously_ran_out_of_fuel
-      (sub : (allowed * r) jkind_desc) (super : (l * allowed) jkind_desc) =
-    let super =
-      (* The [axes_max_on_right] optimization just below is massively important
-         for the speed of the compiler. In a quick test in Nov 2025, it brought
-         the time to compile the compiler itself from 2:06 to 1:21. However, we
-         can't do the optimization without fully expanding [super], because a
-         kind alias may be hiding a mod bound. So, we eagerly fully expand
-         [super].
-
-         Possibly the normalization of [sub] should somehow be interleaved with
-         the expansion of [super] to avoid needing this, but we leave that
-         question for the in-progress rework of normalization. *)
-      Base_and_axes.fully_expand_aliases env super
-    in
-    let axes_max_on_right =
-      (* Optimization: if the upper_bound is max on the right, then that axis is
-         irrelevant - the left will always satisfy the right along that
-         axis. But we can only do this optimization for a concrete base, as an
-         abstract base may later be filled in with lower bounds. *)
-      match super.base with
-      | Layout _ -> Mod_bounds.get_max_axes super.mod_bounds
-      | Kconstr _ -> Axis_set.empty
-    in
-    let sub, _ =
-      Base_and_axes.normalize ~skip_axes:axes_max_on_right
-        ~previously_ran_out_of_fuel:sub_previously_ran_out_of_fuel
-        ~mode:Ignore_best ~context env sub
-    in
-    sub_expanded sub super
 
   let rec intersection env
       ({ base = base1; mod_bounds = mod_bounds1; with_bounds = with_bounds1; _ }
@@ -2860,6 +2783,105 @@ let display_histories = true
    during debugging. *)
 let flattened_histories = true
 
+(* Not all jkind history reasons are created equal. Some are more helpful than
+   others.  This function encodes that information.
+
+    The reason with higher score should get preserved when combined with one of
+    lower score. *)
+let score_reason = function
+  (* error_message annotated by the user should always take priority *)
+  | Creation (Annotated (With_error_message _, _)) -> 1
+  (* Internal / dummy histories that print "please notify the Jane Street
+     compilers group" are never useful to a user; a real reason should always be
+     preferred over them when combining histories. *)
+  | Creation
+      ( Any_creation
+          ( Initial_typedecl_env | Wildcard | Unification_var | Dummy_jkind
+          | Type_expression_call )
+      | Scannable_creation Dummy_jkind
+      | Value_or_null_creation Probe
+      | Value_creation
+          (Row_variable | Tfield | Tnil | Debug_printer_argument | Unknown _) )
+    ->
+    -2
+  (* Concrete creation is quite vague, prefer more specific reasons *)
+  | Creation (Concrete_creation _ | Concrete_legacy_creation _) -> -1
+  | _ -> 0
+
+(* Stage-5m: [Ikind] installs the ikind sub verdict here; [combine_histories]
+   defers it (see [resolve_flattened_history]) so the derivation runs only when
+   a history is formatted into an error, never on the hot ~267k-call combine
+   path.  [None] means the derivation was skipped (ikinds not linked) or raised.
+   Only the two jkind descs are needed (the ikind derivation ignores the rest of
+   the [jkind]). *)
+type sub_verdict_from_ikind =
+  { verdict :
+      'la 'ra 'lb 'rb.
+      Env.t ->
+      ('la * 'ra) jkind_desc ->
+      ('lb * 'rb) jkind_desc ->
+      Misc.Le_result.t option
+  }
+
+let sub_verdict_from_ikind : sub_verdict_from_ikind option ref = ref None
+
+let set_sub_verdict_from_ikind f = sub_verdict_from_ikind := Some f
+
+(* Stage-5m perf: [combine_histories] records both candidate histories in an
+   [Interact] node (oriented [jkind1 <= jkind2]) rather than eagerly running the
+   ikind sub-verdict that orders them.  This resolves such a node to its winning
+   flat [Creation] history at display time: [Less] keeps [history1], [Not_le]
+   keeps [history2], and [Equal]/unavailable falls back to the [score_reason]
+   tiebreak over the resolved sub-histories -- matching the pre-defer M4
+   selection.  Sub-histories are resolved before scoring so the tiebreak sees
+   real [Creation] reasons (as the eager code did). *)
+let rec resolve_flattened_history env history =
+  match history with
+  | Creation _ -> history
+  | Interact
+      { jkind1 = Pack_jkind_desc d1;
+        history1;
+        jkind2 = Pack_jkind_desc d2;
+        history2;
+        reason = _
+      } -> (
+    (* Resolve both sides then keep the higher [score_reason], preferring [ha]
+       on ties (as the eager [choose_higher_scored] preferred its first arg). *)
+    let scored ha hb =
+      let ra = resolve_flattened_history env ha in
+      let rb = resolve_flattened_history env hb in
+      if score_reason ra >= score_reason rb then ra else rb
+    in
+    if history1 == history2
+    then (* both branches would pick the same history; skip the verdict *)
+      resolve_flattened_history env history1
+    else
+      let verdict a b =
+        match !sub_verdict_from_ikind with
+        | None -> None
+        | Some { verdict } -> verdict env a b
+      in
+      (* [sub_hist]/[super_hist] follow the oriented verdict [sub <= super]. *)
+      let pick ~sub_hist ~super_hist v =
+        match v with
+        | Some Misc.Le_result.Less -> resolve_flattened_history env sub_hist
+        | Some Misc.Le_result.Not_le -> resolve_flattened_history env super_hist
+        | Some Misc.Le_result.Equal | None -> scored sub_hist super_hist
+      in
+      (* Orient the two jkinds exactly as the eager [combine_histories] did (via
+         [try_allow_*]), but lazily -- so the ikind sub-verdict runs only when a
+         history is actually formatted into an error, never on the hot combine
+         path.  When neither orientation holds there is no verdict, only the
+         score tiebreak. *)
+      match Base_and_axes.(try_allow_l d1, try_allow_r d2) with
+      | Some _, Some _ ->
+        pick ~sub_hist:history1 ~super_hist:history2 (verdict d1 d2)
+      | _ -> (
+        match Base_and_axes.(try_allow_r d1, try_allow_l d2) with
+        | Some _, Some _ ->
+          pick ~sub_hist:history2 ~super_hist:history1 (verdict d2 d1)
+        | _ -> scored history1 history2))
+
 (* This module is just to keep all the helper functions more locally
    scoped. *)
 module Format_history = struct
@@ -3207,10 +3229,15 @@ module Format_history = struct
 
   let format_flattened_history ~intro ~layout_or_kind env ppf t =
     let jkind_desc = Jkind_desc.get t.jkind in
+    (* Stage-5m: [combine_histories] defers history ordering into an [Interact]
+       node; resolve it to the winning flat [Creation] before formatting (see
+       [resolve_flattened_history]).  [is_informative] runs on the resolved
+       history so an [Imported] winner stays silent, as in the eager code. *)
+    let history = resolve_flattened_history env t.history in
     fprintf ppf "@[<v 2>%t" intro;
-    (match t.history with
+    (match history with
     | Creation reason ->
-      if History.is_informative t
+      if History.is_informative { t with history }
       then (
         fprintf ppf "@ because %a"
           (format_creation_reason ~layout_or_kind)
@@ -3222,7 +3249,7 @@ module Format_history = struct
     | Interact _ ->
       Misc.fatal_error "Non-flat history in format_flattened_history");
     fprintf ppf ".";
-    (match t.history with
+    (match history with
     | Creation (Annotated (With_error_message (message, _), _)) ->
       fprintf ppf "@ @[%s@]" message
     | _ -> ());
@@ -3548,7 +3575,7 @@ module Violation = struct
         let missing_cmi =
           match missing_cmi with
           | None -> (
-            match k1.history with
+            match resolve_flattened_history env k1.history with
             | Creation (Missing_cmi p) -> Some p
             | Creation (Any_creation (Missing_cmi p)) -> Some p
             | _ -> None)
@@ -3652,113 +3679,24 @@ let equal env t1 t2 = equate_or_equal ~allow_mutation:true env t1 t2
 
 let equate env t1 t2 = equate_or_equal ~allow_mutation:true env t1 t2
 
-(* Not all jkind history reasons are created equal. Some are more helpful than
-   others.  This function encodes that information.
-
-    The reason with higher score should get preserved when combined with one of
-    lower score. *)
-let score_reason = function
-  (* error_message annotated by the user should always take priority *)
-  | Creation (Annotated (With_error_message _, _)) -> 1
-  (* Internal / dummy histories that print "please notify the Jane Street
-     compilers group" are never useful to a user; a real reason should always be
-     preferred over them when combining histories. *)
-  | Creation
-      ( Any_creation
-          ( Initial_typedecl_env | Wildcard | Unification_var | Dummy_jkind
-          | Type_expression_call )
-      | Scannable_creation Dummy_jkind
-      | Value_or_null_creation Probe
-      | Value_creation
-          (Row_variable | Tfield | Tnil | Debug_printer_argument | Unknown _) )
-    ->
-    -2
-  (* Concrete creation is quite vague, prefer more specific reasons *)
-  | Creation (Concrete_creation _ | Concrete_legacy_creation _) -> -1
-  | _ -> 0
-
-(* Stage-5m M4: the ikind sub verdict is the history-ordering SELECTOR in
-   [combine_histories], replacing the legacy [Jkind_desc.sub].  [Ikind] cannot be
-   named here (it depends on [Jkind]), so it installs [verdict] via
-   [set_sub_verdict_from_ikind]; [combine_histories] calls it to order the two
-   histories.  When the hook is unset (ikinds not linked) or the derivation
-   raises, [verdict] returns [None] and we fall back to the legacy [Jkind_desc.sub]
-   ordering (that fallback dies with the legacy engine).  The chosen history feeds
-   error text only (byte-identity waived); the switch changes ~57% of displayed
-   histories corpus-wide (STAGE5D-NOTES.md S4), promoted as churn. *)
-type sub_verdict_from_ikind =
-  { verdict :
-      'la 'ra 'lb 'rb.
-      context:jkind_context ->
-      Env.t ->
-      ('la * 'ra) jkind ->
-      ('lb * 'rb) jkind ->
-      Misc.Le_result.t option
-  }
-
-let sub_verdict_from_ikind : sub_verdict_from_ikind option ref = ref None
-
-let set_sub_verdict_from_ikind f = sub_verdict_from_ikind := Some f
-
-let combine_histories ~type_equal ~context env reason (Pack_jkind k1)
+let combine_histories
+    ~type_equal:(_ : Types.type_expr -> Types.type_expr -> bool)
+    ~context:(_ : jkind_context) (_env : Env.t) reason (Pack_jkind k1)
     (Pack_jkind k2) =
-  if flattened_histories
-  then
-    let choose_higher_scored_history history_a history_b =
-      if score_reason history_a >= score_reason history_b
-      then history_a
-      else history_b
-    in
-    (* The ikind sub verdict for the two FULL jkinds being combined
-       ([jkind_a] <= [jkind_b]).  Returns [None] when ikinds are not linked or the
-       derivation raises, in which case [choose_subjkind_history] falls back to
-       the legacy ordering. *)
-    let ikind_verdict_of : type la ra lb rb.
-        (la * ra) jkind -> (lb * rb) jkind -> Misc.Le_result.t option =
-     fun jkind_a jkind_b ->
-      match !sub_verdict_from_ikind with
-      | None -> None
-      | Some { verdict } -> verdict ~context env jkind_a jkind_b
-    in
-    let choose_subjkind_history ~ikind_verdict k_a history_a roofdn_a k_b
-        history_b =
-      let verdict : Misc.Le_result.t =
-        match ikind_verdict with
-        | Some v -> v
-        | None -> (
-          (* ikinds not linked / derivation raised: legacy ordering.  This
-             fallback dies with the legacy [Jkind_desc.sub]. *)
-          match
-            Jkind_desc.sub ~type_equal ~sub_previously_ran_out_of_fuel:roofdn_a
-              ~context env k_a k_b
-          with
-          | Less -> Misc.Le_result.Less
-          | Equal -> Misc.Le_result.Equal
-          | Not_le _ -> Misc.Le_result.Not_le)
-      in
-      match verdict with
-      | Less -> history_a
-      | Not_le -> history_b
-      | Equal -> choose_higher_scored_history history_a history_b
-    in
-    match Base_and_axes.(try_allow_l k1.jkind, try_allow_r k2.jkind) with
-    | Some k1_l, Some k2_r ->
-      choose_subjkind_history ~ikind_verdict:(ikind_verdict_of k1 k2) k1_l
-        k1.history k1.ran_out_of_fuel_during_normalize k2_r k2.history
-    | _ -> (
-      match Base_and_axes.(try_allow_r k1.jkind, try_allow_l k2.jkind) with
-      | Some k1_r, Some k2_l ->
-        choose_subjkind_history ~ikind_verdict:(ikind_verdict_of k2 k1) k2_l
-          k2.history k2.ran_out_of_fuel_during_normalize k1_r k1.history
-      | _ -> choose_higher_scored_history k1.history k2.history)
-  else
-    Interact
-      { reason;
-        jkind1 = Pack_jkind_desc k1.jkind;
-        history1 = k1.history;
-        jkind2 = Pack_jkind_desc k2.jkind;
-        history2 = k2.history
-      }
+  (* Stage-5m perf: record both histories in an [Interact] node and do NOTHING
+     else.  All ordering -- orientation, the ikind sub-verdict, and the score
+     tiebreak -- is deferred to [resolve_flattened_history], which runs only
+     when a history is formatted into an error (cold path).  The hot ~267k-call
+     combine path therefore does zero ikind work.  (The same node serves both
+     the flattened display, which resolves it, and the tree display, which walks
+     it.) *)
+  Interact
+    { reason;
+      jkind1 = Pack_jkind_desc k1.jkind;
+      history1 = k1.history;
+      jkind2 = Pack_jkind_desc k2.jkind;
+      history2 = k2.history
+    }
 
 let may_have_intersection env t1 t2 =
   (* Need to check only the bases: all the axes have bottom elements.

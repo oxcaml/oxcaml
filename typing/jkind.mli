@@ -843,17 +843,18 @@ val sub_layout_or_error :
   ('l2 * 'r2) Types.jkind ->
   (unit, Violation.t) result
 
-(** Stage-5d S4: hook installed by [Ikind] returning the ikind sub verdict
-    ([Less]/[Equal]/[Not_le]) for two jkinds, used by [combine_histories]'
-    history- ordering coexistence differential. [None] result means the ikind
-    derivation was skipped (ikinds disabled) or raised. *)
+(** Stage-5m: hook installed by [Ikind] returning the ikind sub verdict
+    ([Less]/[Equal]/[Not_le]) for two jkind descs, used by [combine_histories]
+    to order the two histories it combines. The verdict is deferred to
+    error-display time (see [resolve_flattened_history] in [jkind.ml]), so it
+    never runs on the hot combine path. [None] result means the ikind derivation
+    was skipped (ikinds not linked) or raised. *)
 type sub_verdict_from_ikind =
   { verdict :
       'la 'ra 'lb 'rb.
-      context:jkind_context ->
       Env.t ->
-      ('la * 'ra) Types.jkind ->
-      ('lb * 'rb) Types.jkind ->
+      ('la * 'ra) Types.jkind_desc ->
+      ('lb * 'rb) Types.jkind_desc ->
       Misc.Le_result.t option
   }
 

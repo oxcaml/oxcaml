@@ -1692,22 +1692,24 @@ let compute_subcheck_polys ~context:_ env (sub : ('l1 * 'r1) Types.jkind)
    outer solve.  Returns [None] (=> the differential skips this combine) when
    ikinds are disabled or the derivation raises. *)
 let sub_verdict_for_history : type la ra lb rb.
-    context:Jkind.jkind_context ->
     Env.t ->
-    (la * ra) Types.jkind ->
-    (lb * rb) Types.jkind ->
+    (la * ra) Types.jkind_desc ->
+    (lb * rb) Types.jkind_desc ->
     Misc.Le_result.t option =
- fun ~context:_ env a b ->
+ fun env a b ->
   match
     Ldd.with_isolated_pending (fun () ->
         (* Derive both polynomials in ONE scratch ctx (Normal mode) so shared
              type params get identical rigid names, then raw [leq_with_reason]
-             both directions -- the ordering comparison M4 would use, without the
+             both directions -- the ordering comparison M4 uses, without the
              one-directional sub-check fast paths (Rhs_top/round-up) that would
-             coarsen an order into spurious Equals. *)
+             coarsen an order into spurious Equals.  Stage-5m: called lazily from
+             [Jkind.resolve_flattened_history] at error-display time (not on the
+             hot combine path), on the two jkind descs recorded in the deferred
+             [Interact] node. *)
         let ctx = create_scratch_ctx ~mode:Solver.Normal ~env:(Some env) in
-        let a_poly = Solver.ckind_of_jkind ctx a in
-        let b_poly = Solver.ckind_of_jkind ctx b in
+        let a_poly = Solver.ckind_of_jkind_desc ctx a in
+        let b_poly = Solver.ckind_of_jkind_desc ctx b in
         Ldd.solve_pending ();
         let leq x y =
           match Ldd.leq_with_reason x y with [] -> true | _ -> false
