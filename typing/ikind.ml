@@ -248,6 +248,21 @@ let crossing_reroute_checks = ref 0
 
 let crossing_reroute_mismatches = ref 0
 
+(* Stage-5d S2: sub_or_error trusts the ikind reject verdict (overturns measured
+   0x, STAGE5D-MIGRATION.md). Permanent validate-gated overturn detector: counts
+   how often ikind rejects but the legacy engine would ACCEPT. Seeded fault
+   [OXCAML_IK5D_SUBERR_FAULT] forces the ikind reject to prove the detector is
+   non-vacuous. *)
+let sub_or_error_rejects = ref 0
+
+let sub_or_error_overturns = ref 0
+
+let sub_or_error_fault = Sys.getenv_opt "OXCAML_IK5D_SUBERR_FAULT" <> None
+
+(* Cheap measurement escape hatch: count/print the overturn detector without
+   the (slow) full validate harness. The detector is otherwise validate-gated. *)
+let sub_or_error_measure = Sys.getenv_opt "OXCAML_IK5D_MEASURE" <> None
+
 let () =
   at_exit (fun () ->
       if !Clflags.ikinds_validate
@@ -270,6 +285,15 @@ let () =
         Format.eprintf "[ikind-crossing-reroute] checks=%d mismatches=%d@."
           !crossing_reroute_checks
           !crossing_reroute_mismatches)
+
+let () =
+  at_exit (fun () ->
+      if
+        (!Clflags.ikinds_validate || sub_or_error_measure)
+        && !sub_or_error_rejects > 0
+      then
+        Format.eprintf "[ikind-sub-or-error-overturn] rejects=%d overturns=%d@."
+          !sub_or_error_rejects !sub_or_error_overturns)
 
 let () =
   at_exit (fun () ->
@@ -2044,15 +2068,19 @@ let sub_or_error ?origin
        subcheck via [leq_with_reason]. On rejection we delegate to [Jkind] for
        the detailed error message so it is identical to the legacy path. *)
     let ikind_ok =
-      match Jkind.sub_layout_or_error ~context env t1 t2 with
-      | Error _ -> false
-      | Ok () -> (
-        let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; _ } =
-          compute_subcheck_polys ~context env t1 t2
-        in
-        match Ldd.leq_with_reason sub_poly super_poly with
-        | [] -> true
-        | _ -> false)
+      if sub_or_error_fault
+      then (* seeded fault: force the ikind reject to exercise the detector *)
+        false
+      else
+        match Jkind.sub_layout_or_error ~context env t1 t2 with
+        | Error _ -> false
+        | Ok () -> (
+          let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; _ } =
+            compute_subcheck_polys ~context env t1 t2
+          in
+          match Ldd.leq_with_reason sub_poly super_poly with
+          | [] -> true
+          | _ -> false)
     in
     if ikind_ok
     then (
@@ -2069,22 +2097,36 @@ let sub_or_error ?origin
               legacy=reject@."
              (origin_suffix_of origin));
       Ok ())
-    else
-      (* ikind found a violation. Delegate to Jkind for detailed error reporting
-         so error messages are identical to the legacy path. This also serves as
-         the dual-run safety net: if the legacy engine accepts (which should not
-         happen, as ikinds are at least as permissive), we defer to it and, in
-         debug builds, flag the disagreement. *)
+    else begin
+      if !Clflags.ikinds_validate then incr sub_or_error_rejects;
+      (* Stage-5d S2: the ikind verdict is authoritative (overturns measured 0x).
+         For the detailed message we still call the legacy path (byte-identical,
+         M5-owned).  If legacy would ACCEPT, that is an overturn -- trust the
+         ikind reject anyway, record it (permanent validate-gated detector), and
+         synthesize the reject from the ikind's violating axes. *)
       match Jkind.sub_or_error ~type_equal ~context env t1 t2 with
       | Error _ as err -> err
-      | Ok () as ok ->
+      | Ok () ->
+        if !Clflags.ikinds_validate then incr sub_or_error_overturns;
         if !Clflags.ikinds_debug
         then
           Format.eprintf
             "[ikind-sub-or-error] VERDICT DISAGREEMENT%s: ikind=reject \
-             legacy=accept@."
+             legacy=accept (trusting ikind)@."
             (origin_suffix_of origin);
-        ok
+        let reasons =
+          match Jkind.sub_layout_or_error ~context env t1 t2 with
+          | Error _ -> []
+          | Ok () ->
+            let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; _ } =
+              compute_subcheck_polys ~context env t1 t2
+            in
+            axis_disagreement_reasons (Ldd.leq_with_reason sub_poly super_poly)
+        in
+        Error
+          (Jkind.Violation.of_ ~context env
+             (Jkind.Violation.Not_a_subjkind (t1, t2, reasons)))
+    end
 
 (** Substitute constructor ikinds according to [lookup] without requiring Env.
 *)
