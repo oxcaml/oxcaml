@@ -499,6 +499,128 @@ module Pattern_matching_wildcard :
   end
 |}]
 
+(* We disallow functional updates that perform implicit loads of atomic fields. *)
+
+module Functional_update_error = struct
+  type t = { x : int ; mutable y : int [@atomic] }
+
+  (* The update performs an implicit atomic load of y. Not allowed! *)
+  let forbidden t = { t with x = 42 }
+end
+[%%expect{|
+Line 5, characters 22-23:
+5 |   let forbidden t = { t with x = 42 }
+                          ^
+Error: Functional updates that implicitly read atomic fields (here "y")
+       are forbidden. Hint: if you intend to copy the value
+       of an atomic field, do so explicitly: "{ t with y = t.y }"
+|}]
+
+(* Updates that overwrite all of the old record's atomic fields are allowed. *)
+
+module Functional_update_ok = struct
+  type t = { x : int ; mutable y : int [@atomic] }
+
+  (* The update performs no implicit atomic loads. Allowed! *)
+  let allowed t = { t with y = 42 }
+end
+[%%expect{|
+(apply (field_imm 1 (global Toploop!)) "Functional_update_ok/479"
+  (let
+    (allowed =
+       (function {nlocal = 0} t
+         (makemutable 0 (value<int>,value<int>) (field_int 0 t) 42)))
+    (makeblock 0 allowed)))
+module Functional_update_ok :
+  sig
+    type t = { x : int; mutable y : int [@atomic]; }
+    val allowed : t -> t
+  end
+|}]
+
+module Functional_update_copy_ok = struct
+  type t = { x : int ; mutable y : int [@atomic] }
+
+  (* The update performs an explicit atomic load. Allowed! *)
+  let allowed t = { t with y = t.y }
+end
+[%%expect{|
+(apply (field_imm 1 (global Toploop!)) "Functional_update_copy_ok/487"
+  (let
+    (allowed =
+       (function {nlocal = 0} t
+         (makemutable 0 (value<int>,value<int>) (field_int 0 t)
+           (atomic_load_field_imm t 1))))
+    (makeblock 0 allowed)))
+module Functional_update_copy_ok :
+  sig
+    type t = { x : int; mutable y : int [@atomic]; }
+    val allowed : t -> t
+  end
+|}]
+
+module Functional_update_multi_error = struct
+  type t = { x : int ; mutable y : int [@atomic]; mutable z : int [@atomic] }
+
+  let forbidden t = { t with y = 42 } (* implicit atomic load of z *)
+end
+[%%expect{|
+Line 4, characters 22-23:
+4 |   let forbidden t = { t with y = 42 } (* implicit atomic load of z *)
+                          ^
+Error: Functional updates that implicitly read atomic fields (here "z")
+       are forbidden. Hint: if you intend to copy the value
+       of an atomic field, do so explicitly: "{ t with z = t.z }"
+|}]
+
+module Functional_update_multi_ok = struct
+  type t = { x : int ; mutable y : int [@atomic]; mutable z : int [@atomic] }
+
+  let allowed t = { t with y = 42; z = 67 } (* no implicit atomic loads *)
+end
+[%%expect{|
+(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_ok/503"
+  (let
+    (allowed =
+       (function {nlocal = 0} t
+         (makemutable 0 (value<int>,value<int>,value<int>) (field_int 0 t) 42
+           67)))
+    (makeblock 0 allowed)))
+module Functional_update_multi_ok :
+  sig
+    type t = {
+      x : int;
+      mutable y : int [@atomic];
+      mutable z : int [@atomic];
+    }
+    val allowed : t -> t
+  end
+|}]
+
+module Functional_update_multi_copy_ok = struct
+  type t = { x : int ; mutable y : int [@atomic]; mutable z : int [@atomic] }
+
+  let allowed t = { t with y = t.y; z = t.z } (* no implicit atomic loads *)
+end
+[%%expect{|
+(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_copy_ok/512"
+  (let
+    (allowed =
+       (function {nlocal = 0} t
+         (makemutable 0 (value<int>,value<int>,value<int>) (field_int 0 t)
+           (atomic_load_field_imm t 1) (atomic_load_field_imm t 2))))
+    (makeblock 0 allowed)))
+module Functional_update_multi_copy_ok :
+  sig
+    type t = {
+      x : int;
+      mutable y : int [@atomic];
+      mutable z : int [@atomic];
+    }
+    val allowed : t -> t
+  end
+|}]
+
 (* Test atomic record fields in mixed blocks *)
 
 module Mixed_blocks = struct
