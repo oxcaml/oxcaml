@@ -2864,13 +2864,24 @@ let sub_verdict_from_ikind : sub_verdict_from_ikind option ref = ref None
 let set_sub_verdict_from_ikind f = sub_verdict_from_ikind := Some f
 
 (* Stage-5m perf: [combine_histories] records both candidate histories in an
-   [Interact] node (oriented [jkind1 <= jkind2]) rather than eagerly running the
-   ikind sub-verdict that orders them.  This resolves such a node to its winning
-   flat [Creation] history at display time: [Less] keeps [history1], [Not_le]
-   keeps [history2], and [Equal]/unavailable falls back to the [score_reason]
-   tiebreak over the resolved sub-histories -- matching the pre-defer M4
-   selection.  Sub-histories are resolved before scoring so the tiebreak sees
-   real [Creation] reasons (as the eager code did). *)
+   [Interact] node (from the commutative [intersection], so not truly oriented)
+   rather than eagerly running the ikind sub-verdict that orders them.  This
+   resolves such a node to a winning flat [Creation] history at display time:
+   candidates whose kind cannot imply [target] (the kind being formatted) are
+   dropped first (C1 -- see the filter below); otherwise the node is oriented via
+   [try_allow_*] and the ikind verdict picks [Less]->[history1] /
+   [Not_le]->[history2], with [Equal]/unavailable falling to the [score_reason]
+   tiebreak.
+
+   Codex C2 (live-descriptor hazard, DE-MERGED from C1, backlog #60): the descs
+   stored in the [Interact] are the live mutable descriptors and are re-read here
+   at format time, so unification after the combine could in principle change the
+   selection versus an eager choice.  This does NOT reproduce the eager choice
+   identically; it is corpus-identical in practice, and the C1 investigation
+   proved the descs are still accurate at format time for the failing cases (the
+   post-failure unification had not poisoned them).  The standing hardening
+   (snapshot at violation creation) is backlogged, documented rather than claimed
+   away. *)
 let rec resolve_flattened_history ?target env history =
   match history with
   | Creation _ -> history
