@@ -699,7 +699,7 @@ Error: This definition has type "'b t -> 'b" which is less general than
        The layout of 'a is any
          because of the annotation on the universal variable 'a.
        But the layout of 'a must be representable
-         because we must know concretely how to pass a function argument.
+         because of the definition of t at line 1, characters 0-40.
 |}]
 
 (* CR layouts v7.2: once we allow record declarations with unknown kind
@@ -720,7 +720,7 @@ Error: This definition has type "'b -> 'b t" which is less general than
        The layout of 'a is any
          because of the annotation on the universal variable 'a.
        But the layout of 'a must be representable
-         because we must know concretely how to pass a function argument.
+         because of the annotation on the universal variable 'a.
 |}]
 
 

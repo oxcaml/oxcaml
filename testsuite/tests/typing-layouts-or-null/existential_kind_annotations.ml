@@ -147,5 +147,5 @@ Error: This pattern matches values of type "a"
        The layout of a is value_or_null
          because of the annotation on the existential variable a.
        But the layout of a must be a sublayout of value
-         because of the definition of packed at line 1, characters 0-44.
+         because of the annotation on the existential variable a.
 |}]

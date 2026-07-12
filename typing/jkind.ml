@@ -3660,18 +3660,32 @@ let equate env t1 t2 = equate_or_equal ~allow_mutation:true env t1 t2
 let score_reason = function
   (* error_message annotated by the user should always take priority *)
   | Creation (Annotated (With_error_message _, _)) -> 1
+  (* Internal / dummy histories that print "please notify the Jane Street
+     compilers group" are never useful to a user; a real reason should always be
+     preferred over them when combining histories. *)
+  | Creation
+      ( Any_creation
+          ( Initial_typedecl_env | Wildcard | Unification_var | Dummy_jkind
+          | Type_expression_call )
+      | Scannable_creation Dummy_jkind
+      | Value_or_null_creation Probe
+      | Value_creation
+          (Row_variable | Tfield | Tnil | Debug_printer_argument | Unknown _) )
+    ->
+    -2
   (* Concrete creation is quite vague, prefer more specific reasons *)
   | Creation (Concrete_creation _ | Concrete_legacy_creation _) -> -1
   | _ -> 0
 
-(* Stage-5d S4: hook + validate/measure-gated differential proving the ikind
-   sub verdict selects the IDENTICAL history as the legacy [Jkind_desc.sub] in
-   [combine_histories] (the M4 zero-churn condition; the chosen history feeds
-   error text, so the switch itself rides with the M5 project).  BEHAVIOUR IS
-   UNCHANGED: the legacy result still chooses the history; the ikind verdict runs
-   only under the gate and is compared.  [Ikind] installs [verdict]; when unset
-   (ikinds not linked) or when the gate is off the differential is a no-op -- no
-   ikind computation on the ~267k-call combine path. *)
+(* Stage-5m M4: the ikind sub verdict is the history-ordering SELECTOR in
+   [combine_histories], replacing the legacy [Jkind_desc.sub].  [Ikind] cannot be
+   named here (it depends on [Jkind]), so it installs [verdict] via
+   [set_sub_verdict_from_ikind]; [combine_histories] calls it to order the two
+   histories.  When the hook is unset (ikinds not linked) or the derivation
+   raises, [verdict] returns [None] and we fall back to the legacy [Jkind_desc.sub]
+   ordering (that fallback dies with the legacy engine).  The chosen history feeds
+   error text only (byte-identity waived); the switch changes ~57% of displayed
+   histories corpus-wide (STAGE5D-NOTES.md S4), promoted as churn. *)
 type sub_verdict_from_ikind =
   { verdict :
       'la 'ra 'lb 'rb.
@@ -3686,26 +3700,6 @@ let sub_verdict_from_ikind : sub_verdict_from_ikind option ref = ref None
 
 let set_sub_verdict_from_ikind f = sub_verdict_from_ikind := Some f
 
-let combine_history_measure = Sys.getenv_opt "OXCAML_IK5D_MEASURE" <> None
-
-let combine_history_checks = ref 0
-
-let combine_history_agreements = ref 0
-
-let combine_history_mismatches = ref 0
-
-let () =
-  at_exit (fun () ->
-      if
-        (!Clflags.ikinds_validate || combine_history_measure)
-        && !combine_history_checks > 0
-      then
-        Format.eprintf
-          "[ikind-combine-history] checks=%d agreements=%d mismatches=%d@."
-          !combine_history_checks
-          !combine_history_agreements
-          !combine_history_mismatches)
-
 let combine_histories ~type_equal ~context env reason (Pack_jkind k1)
     (Pack_jkind k2) =
   if flattened_histories
@@ -3715,57 +3709,36 @@ let combine_histories ~type_equal ~context env reason (Pack_jkind k1)
       then history_a
       else history_b
     in
-    (* Stage-5d S4: the ikind sub verdict for the two FULL jkinds being combined
-       ([jkind_a] <= [jkind_b]), computed only under the gate.  When the gate is
-       off (the common case) this returns [None] without touching the ikind
-       engine, so the ~267k-call combine path is unperturbed. *)
+    (* The ikind sub verdict for the two FULL jkinds being combined
+       ([jkind_a] <= [jkind_b]).  Returns [None] when ikinds are not linked or the
+       derivation raises, in which case [choose_subjkind_history] falls back to
+       the legacy ordering. *)
     let ikind_verdict_of : type la ra lb rb.
         (la * ra) jkind -> (lb * rb) jkind -> Misc.Le_result.t option =
      fun jkind_a jkind_b ->
-      if !Clflags.ikinds_validate || combine_history_measure
-      then
-        match !sub_verdict_from_ikind with
-        | None -> None
-        | Some { verdict } -> verdict ~context env jkind_a jkind_b
-      else None
+      match !sub_verdict_from_ikind with
+      | None -> None
+      | Some { verdict } -> verdict ~context env jkind_a jkind_b
     in
     let choose_subjkind_history ~ikind_verdict k_a history_a roofdn_a k_b
         history_b =
-      let result =
-        Jkind_desc.sub ~type_equal ~sub_previously_ran_out_of_fuel:roofdn_a
-          ~context env k_a k_b
-      in
-      (* S4 differential: compare the ikind verdict to the legacy [result]; the
-         legacy value still chooses the history below (behaviour unchanged). *)
-      (match ikind_verdict with
-      | None -> ()
-      | Some ikind ->
-        incr combine_history_checks;
-        let to_string (le : Misc.Le_result.t) =
-          match le with
-          | Misc.Le_result.Less -> "Less"
-          | Misc.Le_result.Equal -> "Equal"
-          | Misc.Le_result.Not_le -> "Not_le"
-        in
-        let legacy : Misc.Le_result.t =
-          match result with
+      let verdict : Misc.Le_result.t =
+        match ikind_verdict with
+        | Some v -> v
+        | None -> (
+          (* ikinds not linked / derivation raised: legacy ordering.  This
+             fallback dies with the legacy [Jkind_desc.sub]. *)
+          match
+            Jkind_desc.sub ~type_equal ~sub_previously_ran_out_of_fuel:roofdn_a
+              ~context env k_a k_b
+          with
           | Less -> Misc.Le_result.Less
           | Equal -> Misc.Le_result.Equal
-          | Not_le _ -> Misc.Le_result.Not_le
-        in
-        if String.equal (to_string legacy) (to_string ikind)
-        then incr combine_history_agreements
-        else begin
-          incr combine_history_mismatches;
-          Format.eprintf "[ikind-combine-history] MISMATCH legacy=%s ikind=%s@."
-            (to_string legacy) (to_string ikind)
-        end);
-      match result with
+          | Not_le _ -> Misc.Le_result.Not_le)
+      in
+      match verdict with
       | Less -> history_a
-      | Not_le _ ->
-        (* CR layouts: this will be wrong if we ever have a non-trivial meet in
-           the kind lattice -- which is now! So this is actually wrong. *)
-        history_b
+      | Not_le -> history_b
       | Equal -> choose_higher_scored_history history_a history_b
     in
     match Base_and_axes.(try_allow_l k1.jkind, try_allow_r k2.jkind) with

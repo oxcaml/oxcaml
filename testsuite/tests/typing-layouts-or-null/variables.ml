@@ -91,7 +91,7 @@ Error: Signature mismatch:
        The layout of 'a is value_or_null
          because of the definition of t at line 1, characters 39-66.
        But the layout of 'a must be a sublayout of value
-         because of the definition of t at line 1, characters 18-27.
+         because of the definition of t at line 1, characters 39-66.
 |}]
 
 (* Ttype parameters default to [value] for abstract types with equalities. *)

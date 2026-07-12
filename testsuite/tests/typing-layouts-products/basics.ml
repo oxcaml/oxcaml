@@ -607,7 +607,7 @@ Error: The value "utup" has type "('a : value_or_null)"
            '_representable_layout_7 & '_representable_layout_8
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a value layout
-         because it's the type of a variable captured in an object.
+         because argument or result of a function type.
 |}];;
 
 (* Unboxed records version of the same test *)
@@ -779,7 +779,7 @@ Error: The value "utup" has type "('a : value_or_null)"
        The layout of capture_record is value non_pointer & value non_pointer
          because of the definition of capture_record at line 1, characters 0-43.
        But the layout of capture_record must be a value layout
-         because it's the type of a variable captured in an object.
+         because argument or result of a function type.
        Note: The layout of immediate is value non_pointer.
 |}];;
 
@@ -2197,7 +2197,7 @@ Error: The value "x" has type "a" but an expression was expected of type
        The layout of a is value
          because it is or unifies with an unannotated universal variable.
        But the layout of a must be representable
-         because we must know concretely how to pass a function argument.
+         because of the annotation on the universal variable 'a.
 |}]
 
 (****************************************************)

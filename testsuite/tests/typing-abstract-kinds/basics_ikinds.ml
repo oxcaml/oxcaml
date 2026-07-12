@@ -126,7 +126,7 @@ Error: This pattern matches values of type "t"
        The kind of t is k
          because of the definition of t at line 3, characters 0-10.
        But the kind of t must be representable
-         because we must know concretely how to pass a function argument.
+         because argument or result of a function type.
 |}]
 
 let _ = let x : ('a : k) = assert false in ()

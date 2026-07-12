@@ -40,8 +40,7 @@ Error: The type constraints are not consistent.
        The layout of 'a is void
          because of the definition of t at line 10, characters 2-20.
        But the layout of 'a must be a value layout
-         because it instantiates an unannotated type parameter of t,
-         chosen to have layout value.
+         because the type argument of list has layout value_or_null.
 |}];;
 
 module type S1'' = S1 with type s = t_void;;

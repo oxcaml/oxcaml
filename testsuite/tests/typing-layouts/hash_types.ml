@@ -1343,7 +1343,7 @@ Error: This pattern matches values of type "'a array#"
        The layout of 'a array# is any
          because it is the unboxed version of the primitive type array.
        But the layout of 'a array# must be representable
-         because we must know concretely how to pass a function argument.
+         because argument or result of a function type.
 |}]
 
 let bad (_ : 'a iarray#) = ()
@@ -1357,7 +1357,7 @@ Error: This pattern matches values of type "'a iarray#"
        The layout of 'a iarray# is any
          because it is the unboxed version of the primitive type iarray.
        But the layout of 'a iarray# must be representable
-         because we must know concretely how to pass a function argument.
+         because argument or result of a function type.
 |}]
 
 (* [array#] is invariant in its parameter, like [array]. *)

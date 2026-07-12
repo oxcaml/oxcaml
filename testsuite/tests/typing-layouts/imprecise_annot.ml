@@ -69,7 +69,7 @@ Line 2, characters 10-58:
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The universal type variable 'a was declared to have kind any.
        But it was inferred to have kind value
-         because of the annotation on the type variable 'a.
+         because of the annotation on the universal variable 'a.
 |}]
 
 (*********************************************************)
@@ -231,7 +231,7 @@ Error: This pattern matches values of type "a"
        The layout of a is any
          because of the annotation on the abstract type declaration for a.
        But the layout of a must be representable
-         because we must know concretely how to pass a function argument.
+         because argument or result of a function type.
 |}]
 
 (*********************************************************)

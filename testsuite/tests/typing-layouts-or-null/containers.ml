@@ -95,7 +95,7 @@ Error: The constant "3.4" has type "float" but an expression was expected of typ
        The layout of float is value
          because it is the primitive type float.
        But the layout of float must be a sublayout of value non_float
-         because it's the type of an array element.
+         because the type argument of or_null has layout value.
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
 |}]
@@ -191,7 +191,7 @@ Error: The constant "3.4" has type "float" but an expression was expected of typ
        The layout of float is value
          because it is the primitive type float.
        But the layout of float must be a sublayout of value non_float
-         because it's the type of an array element.
+         because the type argument of or_null has layout value.
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
 |}]
