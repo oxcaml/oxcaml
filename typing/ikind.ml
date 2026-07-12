@@ -1647,44 +1647,41 @@ let render_terms_debug (terms : Types.ikind_term list)
 let render_jkind_from_ikind : type l r.
     Env.t -> (l * r) Jkind.Const.t -> Outcometree.out_jkind_const option =
  fun env jkind ->
-  if not !Clflags.print_from_ikinds
-  then None
-  else
-    match jkind.Types.with_bounds with
-    | Types.No_with_bounds -> None
-    | Types.With_bounds _ -> (
-      match
-        (* Scratch ctx (fresh caches) + isolated pending: this derivation's
+  match jkind.Types.with_bounds with
+  | Types.No_with_bounds -> None
+  | Types.With_bounds _ -> (
+    match
+      (* Scratch ctx (fresh caches) + isolated pending: this derivation's
            solve_pending drains only its OWN gfps, never an outer mid-check
            solve's pending. *)
-        Ldd.with_isolated_pending (fun () ->
-            let ctx = create_print_ctx ~mode:Solver.Normal ~env:(Some env) in
-            let node = Solver.ckind_of_jkind_desc ctx jkind in
-            Ldd.solve_pending ();
-            Ldd.to_terms (Ldd.inline_solved_vars node))
-      with
-      | exception _ ->
-        incr print_render_fallbacks;
-        None
-      | terms ->
-        incr print_withbounds_rendered;
-        let floor =
-          List.fold_left
-            (fun acc (c, names) ->
-              match names with [] -> Axis_lattice.join acc c | _ -> acc)
-            Axis_lattice.bot terms
-        in
-        let base_jkind : (l * r) Jkind.Const.t =
-          { jkind with
-            Types.mod_bounds = Jkind.Mod_bounds.of_axis_lattice floor;
-            Types.with_bounds = Types.No_with_bounds
-          }
-        in
-        let base_out = Jkind.Const.to_out_jkind_const env base_jkind in
-        Some
-          (if !Clflags.ikinds_debug
-           then render_terms_debug terms base_out
-           else render_terms_readable env terms base_out floor))
+      Ldd.with_isolated_pending (fun () ->
+          let ctx = create_print_ctx ~mode:Solver.Normal ~env:(Some env) in
+          let node = Solver.ckind_of_jkind_desc ctx jkind in
+          Ldd.solve_pending ();
+          Ldd.to_terms (Ldd.inline_solved_vars node))
+    with
+    | exception _ ->
+      incr print_render_fallbacks;
+      None
+    | terms ->
+      incr print_withbounds_rendered;
+      let floor =
+        List.fold_left
+          (fun acc (c, names) ->
+            match names with [] -> Axis_lattice.join acc c | _ -> acc)
+          Axis_lattice.bot terms
+      in
+      let base_jkind : (l * r) Jkind.Const.t =
+        { jkind with
+          Types.mod_bounds = Jkind.Mod_bounds.of_axis_lattice floor;
+          Types.with_bounds = Types.No_with_bounds
+        }
+      in
+      let base_out = Jkind.Const.to_out_jkind_const env base_jkind in
+      Some
+        (if !Clflags.ikinds_debug
+         then render_terms_debug terms base_out
+         else render_terms_readable env terms base_out floor))
 
 let () =
   Jkind.Const.set_render_from_ikind
