@@ -8716,8 +8716,7 @@ let constrain_decl_jkind env decl jkind =
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in
     match
-      (* Use Ikind when enabled so axis constraints are checked; it falls
-         back to [Jkind.sub_or_error] when ikinds are disabled. *)
+      (* Use Ikind so axis constraints are checked. *)
       Ikind.sub_or_error ~type_equal ~context env
         decl.type_jkind jkind
     with

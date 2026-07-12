@@ -580,10 +580,6 @@ module With_bounds = struct
       Axis_set.complement relevant_axes
   end
 
-  let to_best_eff_map = function
-    | No_with_bounds -> With_bounds_types.empty
-    | With_bounds bounds -> bounds
-
   let to_list : type d. d with_bounds -> _ = function
     | No_with_bounds -> []
     | With_bounds tys -> tys |> With_bounds_types.to_seq |> List.of_seq
@@ -2661,12 +2657,6 @@ let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
     Misc.fatal_error
       "Jkind.get_mod_crossing: violated Ignore_best normalize invariant."
 
-let get_mode_crossing (type l r) ~context env (jk : (l * r) jkind) =
-  let mod_bounds =
-    get_mod_bounds ~context ~skip_axes:Axis_set.all_nonmodal_axes env jk
-  in
-  Mod_bounds.crossing mod_bounds
-
 let to_unsafe_mode_crossing jkind =
   { unsafe_mod_bounds = Mod_bounds.to_mode_crossing jkind.jkind.mod_bounds;
     unsafe_with_bounds = jkind.jkind.with_bounds
@@ -3858,39 +3848,10 @@ let round_up (type l r) ~context env (t : (allowed * r) jkind) :
       }
   | With_bounds _ -> None
 
-(* this is hammered on; it must be fast! *)
-let check_sub ~context env sub super =
-  Jkind_desc.sub ~context env sub.jkind super.jkind
-
-let sub_with_reason ~type_equal ~context env sub super =
-  Sub_result.require_le
-    (check_sub ~type_equal
-       ~sub_previously_ran_out_of_fuel:sub.ran_out_of_fuel_during_normalize
-       ~context env sub super)
-
-let sub ~type_equal ~context env sub super =
-  Result.is_ok (sub_with_reason ~type_equal ~context env sub super)
-
 type sub_or_intersect =
   | Sub
   | Disjoint of Violation.Sub_failure_reason.t Nonempty_list.t
   | May_have_intersection of Violation.Sub_failure_reason.t Nonempty_list.t
-
-let sub_or_intersect ~type_equal ~context env t1 t2 =
-  match sub_with_reason ~type_equal ~context env t1 t2 with
-  | Ok () -> Sub
-  | Error reason ->
-    if may_have_intersection env t1 t2
-    then May_have_intersection reason
-    else Disjoint reason
-
-let sub_or_error ~type_equal ~context env t1 t2 =
-  match sub_or_intersect ~type_equal ~context env t1 t2 with
-  | Sub -> Ok ()
-  | Disjoint reason | May_have_intersection reason ->
-    Error
-      (Violation.of_ ~context env
-         (Violation.Not_a_subjkind (t1, t2, Nonempty_list.to_list reason)))
 
 let sub_layout_or_error ~context env t1 t2 =
   match Jkind_desc.sub_layout env t1.jkind t2.jkind with
@@ -3899,109 +3860,6 @@ let sub_layout_or_error ~context env t1 t2 =
     Error
       (Violation.of_ ~context env
          (Violation.Not_a_subjkind (t1, t2, Nonempty_list.to_list reason)))
-
-let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) env sub super
-    =
-  (* This function implements the "SUB" judgement from kind-inference.md. *)
-  let open Misc.Stdlib.Monad.Result.Syntax in
-  let require_le sub_result =
-    Sub_result.require_le sub_result
-    |> Result.map_error (fun reasons ->
-        (* When we report an error, we want to show the best-normalized
-              version of sub, but the original super. When this check fails, it
-              is usually the case that the super was written by the user and the
-              sub was inferred. Thus, we should display the user-written jkind,
-              but simplify the inferred one, since the inferred one is probably
-              overly complex. *)
-        (* CR layouts v2.8: It would be useful report to the user why this
-              violation occurred, specifically which axes the violation is
-              along. Internal ticket 5100. *)
-        let best_sub = normalize ~mode:Require_best ~context env sub in
-        Violation.of_ ~context env
-          (Not_a_subjkind (best_sub, super, Nonempty_list.to_list reasons)))
-  in
-  let sub_jkind = Base_and_axes.fully_expand_aliases env sub.jkind in
-  let super_jkind = Base_and_axes.fully_expand_aliases env super.jkind in
-  let* () =
-    (* Validate layouts *)
-    require_le (Base.sub_expanded sub_jkind.base super_jkind.base)
-  in
-  match allow_any_crossing with
-  | true -> Ok ()
-  | false -> (
-    let best_super, _ =
-      (* MB_EXPAND_R *)
-      Base_and_axes.normalize ~context ~skip_axes:Axis_set.empty
-        ~mode:Require_best ~previously_ran_out_of_fuel:false env super_jkind
-    in
-    let right_bounds = With_bounds.to_best_eff_map best_super.with_bounds in
-    let axes_max_on_right =
-      (* If the upper_bound is max on the right, then that axis is irrelevant -
-         the left will always satisfy the right along that axis. This is an
-         optimization, not necessary for correctness *)
-      Mod_bounds.get_max_axes best_super.mod_bounds
-    in
-    let right_bounds_seq = right_bounds |> With_bounds_types.to_seq in
-    let sub, _ =
-      (* MB_EXPAND_L *)
-      (* Here we progressively expand types on the left.
-
-         Every time we see a type [ty] on the left, we first look to see if [ty]
-         occurs on the right. If it does, then we can skip* [ty]. There is an *
-         on skip because we can actually only skip on a per-axis basis - if [ty]
-         is relevant only along the portability axis on the right, then [ty] is
-         no longer relevant to portability on the left, but it is still relevant
-         to all other axes. So really, we subtract the axes that are relevant to
-         the right from the axes that are relevant to the left.  We can also
-         skip [ty] on any axes that are max on the right since anything is <=
-         max. Hence, we can also subtract [axes_max_on_right].
-
-         After finding which axes [ty] is relevant along, we lookup [ty]'s jkind
-         and join it with the [mod_bounds] along the relevant axes. *)
-      (* [Jkind_desc.map_normalize] handles the stepping, jkind lookups, and
-         joining.  [map_type_info] handles looking for [ty] on the right and
-         removing irrelevant axes. *)
-      Base_and_axes.normalize env sub_jkind ~skip_axes:axes_max_on_right
-        ~previously_ran_out_of_fuel:sub.ran_out_of_fuel_during_normalize
-        ~context ~mode:Ignore_best
-        ~map_type_info:(fun ty { relevant_axes = left_relevant_axes } ->
-          let right_relevant_axes =
-            (* Look for [ty] on the right. There may be multiple occurrences of
-               it on the right; if so, we union together the relevant axes. *)
-            right_bounds_seq
-            (* CR layouts v2.8: maybe it's worth memoizing using a best-effort
-               type map? Internal ticket 5086. *)
-            |> Seq.fold_left
-                 (fun acc (ty2, ti) ->
-                   match type_equal ty ty2 with
-                   | true ->
-                     Axis_set.union acc ti.With_bounds_type_info.relevant_axes
-                   | false -> acc)
-                 Axis_set.empty
-          in
-          (* MB_WITH : drop types from the left that appear on the right *)
-          { relevant_axes = Axis_set.diff left_relevant_axes right_relevant_axes
-          })
-    in
-    match sub with
-    | { base = _;
-        mod_bounds = sub_upper_bounds;
-        with_bounds = No_with_bounds;
-        _
-      } ->
-      let* () =
-        (* MB_MODE : verify that the remaining upper_bounds from sub are <=
-           super's bounds *)
-        let super_lower_bounds = best_super.mod_bounds in
-        require_le
-          (Mod_bounds.less_or_equal sub_upper_bounds super_lower_bounds)
-      in
-      Ok ()
-    | { base = Kconstr _; with_bounds = With_bounds _; _ } ->
-      require_le (Not_le [With_bounds_on_left])
-    | { base = Layout _; with_bounds = With_bounds _; _ } ->
-      Misc.fatal_error
-        "Jkind.sub_jkind_l: Ignore_best normalize invariant violation.")
 
 let is_obviously_max (t : (_ * allowed) jkind) =
   match t with

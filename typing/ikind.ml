@@ -238,13 +238,6 @@ let residue_neutralized = ref 0
 
 let imported_residues = ref 0
 
-(* Stage-5d S1: validate-gated re-assertion that the crossing re-route
-   (ikind lattice floor) equals the legacy [get_mode_crossing] for
-   with-bounds-free jkinds (STAGE5C floor equivalence, at the crossing seam). *)
-let crossing_reroute_checks = ref 0
-
-let crossing_reroute_mismatches = ref 0
-
 let () =
   at_exit (fun () ->
       if !Clflags.ikinds_validate
@@ -259,14 +252,6 @@ let () =
           !recomputed_decl_ikind
           (Hashtbl.length imported_foreign_param_ids)
           !param_id_collisions !residue_neutralized !imported_residues)
-
-let () =
-  at_exit (fun () ->
-      if !Clflags.ikinds_validate && !crossing_reroute_checks > 0
-      then
-        Format.eprintf "[ikind-crossing-reroute] checks=%d mismatches=%d@."
-          !crossing_reroute_checks
-          !crossing_reroute_mismatches)
 
 let () =
   at_exit (fun () ->
@@ -1800,7 +1785,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
         (Jkind.Violation.of_ ~context env
            (Jkind.Violation.Not_a_subjkind (sub, super, axis_reasons)))
 
-let crossing_of_jkind ~(context : Jkind.jkind_context) env
+let crossing_of_jkind ~context:(_ : Jkind.jkind_context) env
     (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
   let () =
     if !reentrancy_probe && not !reentrancy_probe_done
@@ -1864,18 +1849,9 @@ let crossing_of_jkind ~(context : Jkind.jkind_context) env
     (* Stage-5d S1: the mode crossing of a with-bounds-free jkind is the
          crossing of its lattice floor -- the ikind const base, which STAGE5C
          proved equals [to_axis_lattice mod_bounds] for this class.  Read it
-         directly (no legacy [normalize], no LDD build).  Under validate,
-         re-assert equivalence against the legacy [get_mode_crossing]. *)
+         directly (no legacy [normalize], no LDD build). *)
     let floor = Jkind.Mod_bounds.to_axis_lattice jkind.jkind.mod_bounds in
-    let crossing = Axis_lattice.to_mode_crossing floor in
-    if !Clflags.ikinds_validate
-    then begin
-      incr crossing_reroute_checks;
-      let legacy = Jkind.get_mode_crossing ~context env jkind in
-      if not (Mode.Crossing.equal crossing legacy)
-      then incr crossing_reroute_mismatches
-    end;
-    crossing
+    Axis_lattice.to_mode_crossing floor
   | _ ->
     let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
     let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in

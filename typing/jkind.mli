@@ -636,10 +636,6 @@ val get_layout : Env.t -> 'd Types.jkind -> Layout.Const.t option
     [Error p] if the kind is abstract (and its layout is therefore unknown). *)
 val extract_layout : Env.t -> 'd Types.jkind -> (Sort.t Layout.t, Path.t) result
 
-(** Gets the mode crossing for types of this jkind. *)
-val get_mode_crossing :
-  context:jkind_context -> Env.t -> 'd Types.jkind -> Mode.Crossing.t
-
 val to_unsafe_mode_crossing : Types.jkind_l -> Types.unsafe_mode_crossing
 
 val get_externality_upper_bound :
@@ -829,16 +825,6 @@ val intersection_or_error :
   ('l2 * allowed) Types.jkind ->
   (('l1 * allowed) Types.jkind, Violation.t) Result.t
 
-(** [sub t1 t2] says whether [t1] is a subjkind of [t2]. Might update either
-    [t1] or [t2] to make their layouts equal.*)
-val sub :
-  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:jkind_context ->
-  Env.t ->
-  (allowed * 'r) Types.jkind ->
-  ('l * allowed) Types.jkind ->
-  bool
-
 type sub_or_intersect =
   | Sub  (** The first jkind is a subjkind of the second. *)
   | Disjoint of Sub_failure_reason.t Misc.Nonempty_list.t
@@ -846,26 +832,6 @@ type sub_or_intersect =
   | May_have_intersection of Sub_failure_reason.t Misc.Nonempty_list.t
       (** The first jkind is not a subjkind of the second, but the two jkinds
           may have an intersection: try harder. *)
-
-(** [sub_or_intersect t1 t2] does a subtype check, returning a
-    [sub_or_intersect]; see comments there for more info. *)
-val sub_or_intersect :
-  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:jkind_context ->
-  Env.t ->
-  (allowed * 'r) Types.jkind ->
-  ('l * allowed) Types.jkind ->
-  sub_or_intersect
-
-(** [sub_or_error t1 t2] does a subtype check, returning an appropriate
-    [Violation.t] upon failure. *)
-val sub_or_error :
-  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:jkind_context ->
-  Env.t ->
-  (allowed * 'r) Types.jkind ->
-  ('l * allowed) Types.jkind ->
-  (unit, Violation.t) result
 
 (** [sub_layout t1 t2] says whether [t1]'s layout is a sublayout of [t2]s. Might
     update either [t1] or [t2] to make their layouts equal. Does not check
@@ -875,18 +841,6 @@ val sub_layout_or_error :
   Env.t ->
   (allowed * 'r1) Types.jkind ->
   ('l2 * 'r2) Types.jkind ->
-  (unit, Violation.t) result
-
-(** Like [sub], but compares a left jkind against another left jkind.
-    Pre-condition: the super jkind must be fully settled; no variables which
-    might be filled in later. *)
-val sub_jkind_l :
-  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:jkind_context ->
-  ?allow_any_crossing:bool ->
-  Env.t ->
-  Types.jkind_l ->
-  Types.jkind_l ->
   (unit, Violation.t) result
 
 (** Stage-5d S4: hook installed by [Ikind] returning the ikind sub verdict
