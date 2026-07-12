@@ -1529,7 +1529,15 @@ let single_ctor_atom (names : Types.Rigid_name.t list) : (Path.t * int) option =
 let render_terms_readable env (terms : Types.ikind_term list)
     (base_out : Outcometree.out_jkind_const) (floor : Axis_lattice.t) :
     Outcometree.out_jkind_const =
-  let name_of = synthetic_param_naming terms in
+  (* Prefer the decl's own variable letter from the live type-printer
+     table (PRINT-DESIGN.md 4.1 resolver); fall back to synthetic naming
+     in annotation contexts with no live table. *)
+  let synthetic = synthetic_param_naming terms in
+  let name_of id =
+    match Jkind.Const.resolve_param_name id with
+    | Some name -> name
+    | None -> synthetic id
+  in
   let reference = Axis_lattice.co_sub Axis_lattice.value floor in
   let named = List.filter (fun (_, names) -> names <> []) terms in
   (* Split into single-constructor-application fragments (grouped by path, in

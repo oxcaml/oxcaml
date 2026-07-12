@@ -1624,6 +1624,19 @@ module Const = struct
 
   let set_render_from_ikind f = render_from_ikind := f
 
+  (* param_name_resolver (PRINT-DESIGN.md 4.1): the live type-printer
+     variable-name table, keyed by [Types.get_id].  [Out_type] installs it
+     during type printing so the ikind with-clause renderer prints a decl's
+     OWN variable letters (e.g. [with 'b] on [type ('a, 'b) u : _ with 'b])
+     rather than a synthetic name derived from LDD-term order.  Returns
+     [None] when there is no live table (annotation contexts), where the
+     renderer falls back to its own synthetic naming. *)
+  let param_name_resolver = ref (fun (_ : int) -> (None : string option))
+
+  let set_param_name_resolver f = param_name_resolver := f
+
+  let resolve_param_name id = !param_name_resolver id
+
   module To_out_jkind_const : sig
     (** Convert a [t] into a [Outcometree.out_jkind_const]. If [verbosity] is
         [Not_verbose], the jkind is written in terms of the built-in jkind that

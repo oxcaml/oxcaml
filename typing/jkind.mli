@@ -327,6 +327,15 @@ module Const : sig
 
   val set_render_from_ikind : render_from_ikind -> unit
 
+  (** [param_name_resolver] (PRINT-DESIGN.md 4.1): the live type-printer
+      variable-name table keyed by [Types.get_id]. [Out_type] installs it during
+      type printing so the ikind with-clause renderer resolves a param atom to
+      the decl's own variable letter; unresolved ids fall back to the renderer's
+      synthetic naming. *)
+  val set_param_name_resolver : (int -> string option) -> unit
+
+  val resolve_param_name : int -> string option
+
   (** Render the axes [ignored] by a with-bound's modality as the [out_modality]
       strings a [with]-clause carries (e.g. [portable]). Used by the
       ikind-derived printer ([Ikind.render_jkind_from_ikind]) to reconstruct
