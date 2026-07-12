@@ -17,9 +17,7 @@
 (* CR jujacobs: remove toggles in the final version. *)
 (* Stage-5a: the four [enable_*] seam toggles were all [true]; folded to
    unconditional (the seams now branch only on [!Clflags.ikinds]) as prep for
-   the 5d [-no-ikinds] deletion. [reset_constructor_ikind_on_substitution]
-   stays -- its removal is a 5d item. *)
-let reset_constructor_ikind_on_substitution = false
+   the 5d [-no-ikinds] deletion. *)
 
 (* Stage-1 validation harness (see STAGE1-DESIGN.md). When
    [Clflags.ikinds_validate] (env var OXCAML_IKINDS_VALIDATE) is set, each kind
@@ -2096,8 +2094,6 @@ let substitute_decl_ikind_with_lookup
        a Saved_ikind reaching subst is a stage-5 format-lock-in bug. *)
     Misc.fatal_error
       "ikind: Saved_ikind reached substitute_decl_ikind_with_lookup"
-  | Constructor_ikind _ when reset_constructor_ikind_on_substitution ->
-    Types.ikinds_todo "ikind substitution reset"
   | Constructor_ikind packed ->
     let payload = packed in
     let memo : (Path.t, Ldd.node * Ldd.node array) Hashtbl.t =
