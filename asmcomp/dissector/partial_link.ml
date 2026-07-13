@@ -97,6 +97,10 @@ module Link_job : sig
 
   (* Waits for the child process to exit. *)
   val wait : t -> exit_condition
+
+  (* Sends SIGTERM to the child process; does not wait for it. Must not be
+     called after [wait] has returned: the pid may have been recycled. *)
+  val kill : t -> unit
 end = struct
   type t =
     { unix : (module Compiler_owee.Unix_intf.S);
@@ -147,6 +151,10 @@ end = struct
     | WEXITED exit_code -> Failed { exit_code }
     | WSIGNALED signal | WSTOPPED signal ->
       Killed_or_stopped_by_signal { signal }
+
+  let kill { unix; pid; _ } =
+    let module Unix = (val unix) in
+    Unix.kill pid Sys.sigterm
 end
 
 let start unix ~temp_dir ~partition_index partition =
@@ -187,8 +195,98 @@ let wait job =
 let link_one_partition unix ~temp_dir ~partition_index partition =
   wait (start unix ~temp_dir ~partition_index partition)
 
-let link_partitions unix ~temp_dir partitions =
-  List.mapi
-    (fun partition_index partition ->
-      link_one_partition unix ~temp_dir ~partition_index partition)
-    partitions
+(* A window of concurrently running partial links over the partitions. Links are
+   started in partition order and their results are returned in partition
+   order. *)
+module Link_window = struct
+  type t =
+    { bound : Misc.Maybe_bounded.t;
+      mutable in_flight : Link_job.t list; (* oldest link first *)
+      mutable unstarted : (int * Partition.t) list;
+      start_link : int * Partition.t -> Link_job.t;
+      wait_link : Link_job.t -> Partition.Linked.t
+    }
+
+  (* No links are started yet; see [start_linking]. *)
+  let create ~bound ~start_link ~wait_link partitions =
+    { bound;
+      in_flight = [];
+      unstarted =
+        List.mapi (fun partition_index p -> partition_index, p) partitions;
+      start_link;
+      wait_link
+    }
+
+  (* Starts the links of the first [bound] partitions. *)
+  let start_linking t =
+    let first_window, unstarted =
+      List.partition
+        (fun (partition_index, _) ->
+          Misc.Maybe_bounded.is_in_bounds partition_index t.bound)
+        t.unstarted
+    in
+    t.unstarted <- unstarted;
+    List.iter
+      (fun next -> t.in_flight <- t.in_flight @ [t.start_link next])
+      first_window
+
+  (* Waits for the oldest in-flight link, then refills the window by starting
+     the next unstarted link. The refill happens only after the wait returns, so
+     at most [bound] children run at any time. [None] once every partition has
+     been linked. The oldest link is popped before the wait, which reaps it
+     whether it returns or raises; [kill_and_reap_in_flight] must not see it. *)
+  let next_linked t =
+    match t.in_flight with
+    | [] -> None
+    | oldest :: in_flight ->
+      t.in_flight <- in_flight;
+      let linked = t.wait_link oldest in
+      (match t.unstarted with
+      | [] -> ()
+      | next :: unstarted ->
+        t.unstarted <- unstarted;
+        t.in_flight <- t.in_flight @ [t.start_link next]);
+      Some linked
+
+  (* Best-effort cleanup when linking is aborted: kill (SIGTERM) and reap the
+     in-flight children, so that none outlives the failing compilation, and
+     remove their response files. *)
+  let kill_and_reap_in_flight t =
+    let jobs = t.in_flight in
+    t.in_flight <- [];
+    List.iter (fun job -> try Link_job.kill job with _ -> ()) jobs;
+    List.iter
+      (fun job ->
+        (match Link_job.wait job with
+        | (_ : Link_job.exit_condition) -> ()
+        | exception _ -> ());
+        Misc.remove_file (Link_job.response_file job))
+      jobs
+
+  (* [fold_linked ~init ~f window] starts the links of [window], whose links
+     must not have been started yet, and folds [f] over the linked partitions in
+     partition order. *)
+  let fold_linked ~init ~f window =
+    start_linking window;
+    let rec aux acc =
+      match next_linked window with
+      | None -> acc
+      | Some linked -> aux (f acc linked)
+    in
+    aux init
+end
+
+let link_all unix ~temp_dir ~max_parallelism ~init ~f partitions =
+  let start_link (partition_index, partition) =
+    start unix ~temp_dir ~partition_index partition
+  in
+  let wait_link job =
+    Profile.record_call ~accumulate:true "dissector/partial_link_wait"
+      (fun () -> wait job)
+  in
+  let window =
+    Link_window.create ~bound:max_parallelism ~start_link ~wait_link partitions
+  in
+  Misc.try_finally
+    ~always:(fun () -> Link_window.kill_and_reap_in_flight window)
+    (fun () -> Link_window.fold_linked ~init ~f window)

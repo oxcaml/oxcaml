@@ -65,4 +65,6 @@ module type S = sig
     | WSTOPPED of int
 
   val waitpid : wait_flag list -> int -> int * process_status
+
+  val kill : int -> int -> unit
 end

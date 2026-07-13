@@ -100,6 +100,7 @@ module type Oxcaml_options = sig
   val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
   val dissector_partition_size : float -> unit
+  val dissector_max_linker_parallelism : string -> unit
   val ddissector : unit -> unit
   val ddissector_sizes : unit -> unit
   val ddissector_verbose : unit -> unit

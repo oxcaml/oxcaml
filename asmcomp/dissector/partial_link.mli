@@ -65,11 +65,21 @@ val link_one_partition :
   Partition.t ->
   Partition.Linked.t
 
-(** [link_partitions unix ~temp_dir partitions] partially links each partition
-    in sequence, as for [link_one_partition], returning the linked partitions in
-    order. *)
-val link_partitions :
+(** [link_all unix ~temp_dir ~max_parallelism ~init ~f partitions] partially
+    links each partition as for [link_one_partition] and folds [f] over the
+    linked partitions, in partition order, as their links complete.
+
+    Up to [max_parallelism] linker child processes run concurrently; [f] runs in
+    the driver while the started links proceed in the background. Raises [Error]
+    if a link fails. If a link fails or [f] raises, the in-flight children are
+    killed (SIGTERM) and reaped before the exception propagates.
+
+    @param temp_dir Directory for temporary and output files *)
+val link_all :
   (module Compiler_owee.Unix_intf.S) ->
   temp_dir:string ->
+  max_parallelism:Misc.Maybe_bounded.t ->
+  init:'acc ->
+  f:('acc -> Partition.Linked.t -> 'acc) ->
   Partition.t list ->
-  Partition.Linked.t list
+  'acc
