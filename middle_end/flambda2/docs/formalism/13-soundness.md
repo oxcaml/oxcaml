@@ -299,6 +299,27 @@ claim elsewhere seems too clean.
      `to_cmm/to_cmm_expr.ml#let_cont_inlined` (via `Env.add_inline_cont`) then
      inlines it at its unique use site. The chapter-01 wording is accurate.
 
+7. **OPEN soundness bug: int→float32 constant folding double-rounds.** Folding a
+   `Num_conv` into `Naked_float32`
+   (`middle_end/flambda2/simplify/number_adjuncts.ml`, the four `to_naked_float32`
+   functions: `For_int64s` / `For_nativeints` / `For_tagged_immediates` /
+   `For_naked_immediates`) computes `Float32_by_bit_pattern.create (X.to_float t)`
+   = `Int32.bits_of_float (Int64.to_float t)`, i.e. int → `float64` → `float32`, a
+   **double rounding**. The generated code single-rounds via `cvtsi2ss`
+   (`backend/cmm_helpers.ml#Scalar_type.static_cast`, `Integral→Float`;
+   `backend/amd64/emit.ml`, `Float_of_int Float32`). The fold is not gated on
+   `-flambda2-float-const-prop` (`simplify/simplify_unary_primitive.ml#Make_simplify_int_conv`),
+   so it fires by default. Witness: `Float32.of_int 9007199791611905` folds to
+   float32 bits `0x5a000000` but computes `0x5a000001` at run time — an observable
+   miscompilation of a conversion that has no undefined behaviour, so it violates
+   coupling point (i) of `INV.Rewrite.Local` (`P.Unary.NumConv` as implemented is
+   unsound). Confined to the `Naked_float32` destination with sources wider than
+   `float64`'s exact range; `Naked_float` and `int32`→`float32` are exact. This is
+   the live form of Open Question #3 in
+   [`05-primitives-scalar.md`](05-primitives-scalar.md); it is a **code** bug (the
+   fix is to single-round in `to_naked_float32`), not a documentation error. See
+   [`14-validation/float32_double_round.md`](14-validation/float32_double_round.md).
+
 ## 5. Validation summary
 
 The formalism is validated by *prediction*, not by post-hoc reading. The
@@ -317,7 +338,7 @@ the formalism, never by silently editing the prediction to match.** When a case
 study contradicts a rule, the rule is corrected and the correction is noted in
 the case study and here in §4.
 
-There are **32 case studies**:
+There are **33 case studies**:
 
 - **14 from existing testsuite tests** — verdicts: **12 MATCH**, **1 PARTIAL**
   ([`cse_immutable_array_load.md`](14-validation/cse_immutable_array_load.md):
@@ -332,6 +353,10 @@ There are **32 case studies**:
   `BooleanNot` rewrite).
 - **4 mixed-block** (`mixed-01`…`mixed-04`) — verdicts: **4/4 MATCH**, covering
   construction, load, mutable set and join of mixed blocks.
+- **1 soundness-bug witness** (`float32_double_round`) — verdict: **MISMATCH**,
+  an open compiler soundness bug (int→float32 constant folding double-rounds; §4
+  item 7), demonstrated by a runtime A/B where the folded and run-time results of
+  the same conversion differ.
 - **6 loopification** (`loopify-01`…`loopify-06`) — verdicts: **6/6 MATCH**,
   covering the `S.Rewrite.Loopify.*` chain end to end: an escaping
   purely-tail-recursive function surviving only as a continuation-loop wrapper,
@@ -340,10 +365,13 @@ There are **32 case studies**:
   self tail call collapsing back via `S.Rewrite.LetCont.Demote`, and a
   provably-dead loop leaving a non-recursive residue).
 
-The one MISMATCH was not a soundness failure — the compiler was correct and the
+The CSE MISMATCH was not a soundness failure — the compiler was correct and the
 *document* was wrong — but it is exactly the kind of finding the prediction-first
 protocol is designed to surface: a rule (`S.Rewrite.CSE.Eligible`) that read
-plausibly but did not match the code. The remaining case studies confirmed,
+plausibly but did not match the code. The second MISMATCH
+(`float32_double_round`) is the opposite: the *compiler* is wrong (int→float32
+folding double-rounds; §4 item 7), an open soundness bug the same protocol
+surfaced. The remaining case studies confirmed,
 among other things, the cost-model constants of chapter [`11`](11-inlining.md)
 (`inlining_cost_of_primitive_on_parameters`), the nullability handling of the
 n-way join (`n_way_join_null`, `n_way_join_preserves_null`), and the

@@ -14,7 +14,9 @@ synthesized program); (2) predict the output and cite rules before looking;
 resolved by **fixing the formalism, never by editing the prediction** — the one
 MISMATCH below drove a correction to `S.Rewrite.CSE.Eligible`.
 
-**Verdicts:** 32 case studies — 30 MATCH, 1 PARTIAL, 1 MISMATCH (now fixed).
+**Verdicts:** 33 case studies — 30 MATCH, 1 PARTIAL, 2 MISMATCH (1 drove a
+formalism fix; 1 — [`float32_double_round`](float32_double_round.md) — witnesses
+an open **compiler soundness bug**: int→float32 constant folding double-rounds).
 
 **Synthesized tests in the testsuite.** The 12 synthesized case studies (the
 "Synthesized" and "Mixed blocks" tables below) have their programs checked into
@@ -73,6 +75,12 @@ These case studies use synthesized programs; each is checked into the testsuite
 | [`mixed-02-static`](mixed-02-static.md) | statically-allocated mixed record | MATCH | [`formalism/mixed_static`](../../../../../testsuite/tests/flambda2/examples/formalism/mixed_static.ml) | `P.Static.MixedBlock` |
 | [`mixed-03-mutable-set`](mixed-03-mutable-set.md) | mutable mixed field, write then read | MATCH | [`formalism/mixed_mutable_set`](../../../../../testsuite/tests/flambda2/examples/formalism/mixed_mutable_set.ml) | `P.Binary.BlockSet.Mixed`, `P.Unary.BlockLoad.Mixed`, `P.Effects.ReadingFromBlock` |
 | [`mixed-04-join`](mixed-04-join.md) | join two mixed blocks of equal shape | MATCH | [`formalism/mixed_join`](../../../../../testsuite/tests/flambda2/examples/formalism/mixed_join.ml) | `T.Meet.BlockShape` |
+
+## Soundness bug witness (1)
+
+| Case study | Target | Verdict | Testsuite test | Primary rules |
+|---|---|---|---|---|
+| [`float32_double_round`](float32_double_round.md) | int→float32 const-fold double-rounds vs backend `cvtsi2ss` | MISMATCH (compiler bug) | [`formalism/float32_double_round`](../../../../../testsuite/tests/flambda2/examples/formalism/float32_double_round.ml) | `P.Unary.NumConv`, `S.Rewrite.Prim.ConstFold`, `INV.Rewrite.Local` |
 
 ## Loopification (6)
 

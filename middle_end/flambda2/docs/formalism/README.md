@@ -46,11 +46,14 @@ yet checked against the code). Counts and per-chapter breakdown are regenerated
 in [`rule-index.md`](rule-index.md).
 
 Chapters 01-12 were adversarially verified against the code, and the whole
-system was validated against **32 case studies** in
+system was validated against **33 case studies** in
 [`14-validation/`](14-validation/) using a prediction-first protocol (predict the
 Simplify output and cite rules *before* reading the actual output): **30 MATCH,
-1 PARTIAL, 1 MISMATCH** — the single mismatch (immutable array loads *are*
-CSE-eligible) was resolved by fixing the formalism, not the prediction. Chapter
+1 PARTIAL, 2 MISMATCH**. One mismatch (immutable array loads *are* CSE-eligible)
+was resolved by fixing the formalism; the other
+([`float32_double_round`](14-validation/float32_double_round.md)) witnesses an
+open **compiler soundness bug** — int→float32 constant folding double-rounds
+where the backend single-rounds. Chapter
 [`13-soundness.md`](13-soundness.md) states the (claimed, empirically validated,
 unproved) soundness property and records the known discrepancies between this
 document, its companion prose, and the code.
