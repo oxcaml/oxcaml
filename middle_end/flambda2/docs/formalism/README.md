@@ -233,7 +233,21 @@ When code under `middle_end/flambda2/` changes:
    surface it, don't silently rewrite.
 3. Re-run any validation case studies listed under `VERIFIED` for affected
    rules; update `14-validation/` and the index.
-4. Keep `rule-index.md` in sync with rule additions/removals.
+4. Regenerate `rule-index.md` (and refresh the counts in this README's "Status
+   & validation" section) by building the Dune alias, from the repository
+   root:
+
+   ```
+   dune build --root=. --workspace=duneconf/main.ws \
+     @middle_end/flambda2/docs/formalism/regen-rule-index --auto-promote
+   ```
+
+   The rule (see [`dune`](dune)) runs `tools/regen_rule_index.py`, which
+   rescans the ```` ```rule ```` blocks and reruns the consistency checks; it
+   fails (recording the failures in the index) on duplicate IDs, rules with
+   no anchor, or unresolvable anchors. `--auto-promote` copies the
+   regenerated files back into the source tree. The alias is not part of the
+   default build. Never hand-edit `rule-index.md`.
 
 When answering questions or synthesizing tests: find candidate rules in
 `rule-index.md`, read the owning chapter section, and trust `normative` rules;
