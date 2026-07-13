@@ -133,7 +133,7 @@
       (echo "module MenhirLib = CamlinternalMenhirLib")
       (run cat %{input-file})))
     parser)))
- (library_flags -linkall)
+ ;(library_flags -linkall)
  (libraries flambda2_floats)
  (modules_without_implementation
   annot
