@@ -101,8 +101,9 @@ let () = Prim.register_named_value "Effect.Preemption" Preemption
 (* Retrieve the stack from a [cont]inuation, update its handlers, and resume it.
 
    FIXME: There's a race condition here - if multiple threads call one of these
-   on the same continuation at once, they could be interleaved, causing a
-   segfault rather than an exception. *)
+   on the same continuation at once with handlers that return different types,
+   they could be interleaved, causing a segfault rather than an exception. *)
+
 let continue_with_handler cont valuec exnc (effc : 'a. ('a, _, _) effc) tickc
     v =
   Prim.continue (Prim.update_cont_handler_noexc cont valuec exnc effc tickc) v
