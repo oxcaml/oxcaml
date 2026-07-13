@@ -475,9 +475,16 @@ Post-push codex round-2 (verified by rev-ik5fmt) on the Phase-2 range.
   renders both sides as each other's kind; :158 single-param). NOT localized:
   `synthetic` first-appearance was tried and STILL inverts (LDD terms are not
   source-ordered); correct letters need the decls' `type_params`, which the
-  `Violation.t` does not carry. Fix approach pending team-lead ruling (thread
-  decl param order into the Violation, vs preserve param identity in
-  check_decl_jkind's copy).
+  `Violation.t` does not carry. FIXED (team-lead-ruled (A), minimized; (B)
+  copy-semantics change rejected): `report_with_name`/`report_general` gained an
+  optional per-side `param_name_hints` (id→letter map for the offending kind and
+  the required kind); `report_general` renders k1 under hint1 and k2 under hint2
+  via a new `Jkind.Const.with_param_name_resolver`; includecore's `Jkind` error
+  variant carries the hints, built at the `check_decl_jkind` site from
+  `decl1.type_params`/`decl2.type_params`. No hint ⇒ resolver unchanged (every
+  other `Violation.of_` site). Sweep: the ONLY churn is modalities_ikinds
+  (:158 `with 'a`→`with 'b`; :344 each side now matches its own decl),
+  param-letter restorations, 0 verdict flips; GAP-2 `-i` repros unchanged.
 - **Z2 [fixed] — `&`-product string fallback used raw `Path.name`.** A2 fixed
   only the single-atom out_type path; `string_of_atom` (ikind.ml, the multi-atom
   `&`-product + ctor-arg string fallback) still emitted raw `Path.name`. Routed
