@@ -20,6 +20,96 @@ let usage = "Usage: ocamlopt <options> <files>\nOptions are:"
 module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
+(* Opt-in GC pacing for the compiler process itself, intended to be set by
+   the build system (e.g. -X gc-space-overhead=200 -X gc-idle-floor=512M).
+   The compiler is allocation-heavy and short-lived, so a laxer major-GC
+   pace trades bounded extra peak heap for materially less GC work; the
+   idle floor additionally lets small compilations finish without doing
+   any major-GC marking at all (see runtime/major_gc.c, Idle phase).
+   Both knobs are inert unless set. Explicit user settings in
+   OCAMLRUNPARAM/CAMLRUNPARAM take precedence, so a single invocation can
+   always be re-paced by hand when investigating time or memory issues. *)
+module Gc_pacing = struct
+  (* The floor is applied through the [caml_gc_set_idle_floor] primitive
+     (sets the small_heap_limit tweak AND re-arms the current cycle's
+     floor), which the bootstrap toolchain's runtime does not provide; the
+     final executables (driver/oxcaml_main.ml) install it here. The
+     bootstrap build never passes -X gc-idle-floor, so the failing default
+     is unreachable there. *)
+  let set_idle_floor_hook : (int -> unit) ref =
+    ref (fun _ ->
+      Compenv.fatal
+        "-X gc-idle-floor is not supported by this executable")
+
+  let space_overhead =
+    Oxcaml_args.Extra_options.int __LOC__ "gc-space-overhead" 0
+
+  let idle_floor =
+    Oxcaml_args.Extra_options.string __LOC__ "gc-idle-floor" ""
+
+  (* Mirror the runtime's OCAMLRUNPARAM parsing (runtime/startup_aux.c):
+     the active variable is OCAMLRUNPARAM if set at all, else CAMLRUNPARAM;
+     fields are comma-separated and identified by their leading
+     characters. *)
+  let env_field_present ~prefix =
+    let param =
+      match Sys.getenv_opt "OCAMLRUNPARAM" with
+      | Some _ as p -> p
+      | None -> Sys.getenv_opt "CAMLRUNPARAM"
+    in
+    match param with
+    | None -> false
+    | Some s ->
+      String.split_on_char ',' s
+      |> List.exists (fun field ->
+        String.length field >= String.length prefix
+        && String.sub field 0 (String.length prefix) = prefix)
+
+  (* Size in bytes: a decimal integer with an optional K/M/G binary
+     suffix. *)
+  let parse_size_bytes s =
+    let n = String.length s in
+    if n = 0 then None
+    else begin
+      let mult, digits =
+        match s.[n - 1] with
+        | 'k' | 'K' -> 1024, String.sub s 0 (n - 1)
+        | 'm' | 'M' -> 1024 * 1024, String.sub s 0 (n - 1)
+        | 'g' | 'G' -> 1024 * 1024 * 1024, String.sub s 0 (n - 1)
+        | _ -> 1, s
+      in
+      match int_of_string_opt digits with
+      | Some i when i >= 0 -> Some (i * mult)
+      | _ -> None
+    end
+
+  (* Runs after argument parsing and before any compilation. Late enough
+     that both -X and OCAMLPARAM have been read; early enough that no real
+     GC work has happened (space_overhead is re-read continuously and the
+     idle floor re-arms at every sweep-phase start, so mid-startup changes
+     take full effect). *)
+  let apply () =
+    begin match space_overhead () with
+    | 0 -> ()
+    | n ->
+      if not (env_field_present ~prefix:"o") then
+        Gc.set { (Gc.get ()) with Gc.space_overhead = n }
+    end;
+    match idle_floor () with
+    | "" -> ()
+    | s ->
+      if not (env_field_present ~prefix:"Xsmall_heap_limit=") then begin
+        match parse_size_bytes s with
+        | Some bytes ->
+          (* The primitive takes words. *)
+          !set_idle_floor_hook ((bytes + 7) / 8)
+        | None ->
+          Compenv.fatal
+            ("-X gc-idle-floor expects a byte count with an optional "
+             ^ "K/M/G suffix, got: " ^ s)
+      end
+end
+
 let main unix argv ppf ~flambda2 =
   native_code := true;
   let columns =
@@ -61,6 +151,7 @@ let main unix argv ppf ~flambda2 =
     Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
     Compenv.parse_arguments (ref argv) Compenv.anonymous "ocamlopt";
     Compmisc.read_clflags_from_env ();
+    Gc_pacing.apply ();
     (* Set platform-appropriate DWARF fission default when oxcaml-dwarf is
        enabled *)
     if Config.oxcaml_dwarf &&
