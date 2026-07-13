@@ -430,3 +430,33 @@ jkind.ml:1238/1452/1493/1322/…, absorbed by the shim), BUT it is a
 write / 36 read sites, for low value while normalize survives (cosmetic floor-
 representation unification; does not delete normalize). Disposition pending
 team-lead ruling (memory records DEFER; task #62 records PROCEED — flagged).
+
+## A1 known limitation — `-i` signature output of some with-bounds is not recompilable (USER-RULED ship-with-doc)
+
+**USER RULING 2026-07-13:** `-i` round-trippability of jkind with-bounds is NOT
+required. We ship the current renderer output and DOCUMENT the limitation; no
+renderer behavior change was made for A1.
+
+Three with-bound atom classes render, in `-i` signature output, a kind spelling
+that does not parse back as a valid kind annotation (copy-pasting the printed
+signature into source will not recompile the with-clause):
+
+1. **transitive-abstract product `u & t`** — when an abstract with-bound `t`
+   itself carries a with-bound `u`, the honest LDD closure prints `with u & t`
+   (the `&`-product of the flattened atoms). `&` is not with-clause surface
+   syntax (see the F2 transitive-with-bound-expansion class above).
+2. **residue `_`** — atom classes the renderer cannot name (poly-variant,
+   first-class module, anonymous type argument, open row) print as `with _`.
+   `_` is not a legal with-bound.
+3. **bare `KAtom`** — a constructor-atom path is rendered as a bare type
+   constructor; where the source kind was written differently (or the path
+   needs arguments/qualification the LDD did not retain), the printed form is
+   not a faithful re-parseable annotation.
+
+These are display-only: the LDD (the authoritative kind) and all verdicts are
+unaffected — only the human-readable `-i` text is non-round-trippable. **Designed
+future fix: ANNOTATION-ECHO** (see the design note above): retain the user's
+literal source kind annotation on the syntactic construct and prefer it for
+display, restoring source-faithful, recompilable bounds for annotated decls
+(inferred kinds still reconstruct from the LDD). ANNOTATION-ECHO is the same
+mechanism that would let the with_bounds print sidecar retire.
