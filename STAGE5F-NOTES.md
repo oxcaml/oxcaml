@@ -505,3 +505,29 @@ Post-push codex round-2 (verified by rev-ik5fmt) on the Phase-2 range.
   `ctype.ml:4705` fatal is PRE-EXISTING (not introduced by this range), and the
   lossy `-i` forms (`k1 ... with k1`, `_` residue, `'b & 'a t` grouping) are the
   already-documented + USER-ruled A1 known-limitation classes, not new defects.
+
+## Codex round-3 fix-forward (W1-W3, on top of dfdec85e6)
+
+Round-3 on the Z-fixes (Z3 came back clean). W1 verified as a real regression;
+all three fixed, full suite 2330/0 (zero churn — no existing test exercised
+these shapes).
+
+- **W1 [HIGH regression, fixed] — Z1 discarded explicit param names.** The Z1
+  hint builder forced `letter_of_int` by position, so `type ('left,'right) t`
+  rendered its violation kinds with `'a`/`'b` (VERIFIED vs the 92035033e legacy
+  binary, which prints `'left`/`'right`). Fix: hint uses the param `Tvar` name
+  when present, `letter_of_int` fallback for anonymous. Named repro now == legacy;
+  alphabetic case unchanged.
+- **W2 [MED, fixed] — Z2 didn't escape keyword idents.** `string_of_oide`
+  concatenated `printed_name` raw, so a type named `and` printed `with and & t`
+  not `with \#and & t`. Fix: render via `Format_doc.asprintf "%a"
+  !Oprint.out_ident` (authoritative Oprint escaping). Byte-identical for ordinary
+  idents. **Residual caveat (codex's subtler point):** `out_ident` names are
+  mutable so later path discoveries retroactively disambiguate earlier names;
+  stringifying in the `&`-product fallback freezes the name at render time, so a
+  disambiguation FIRST discovered after this fallback ran would be missed. This
+  is inherent to rendering the honest non-parseable `&`-product as a STRING (vs
+  a live `out_type`); it only affects that already-non-round-trippable A1 fallback
+  form, not the single-atom paths. Left as-is (display-only, A1-class).
+- **W3 [LOW, fixed] — Z4 backtrack not exception-safe.** `pure_implies` skipped
+  `Btype.backtrack` if `implies` raised. Fix: `Fun.protect ~finally`.
