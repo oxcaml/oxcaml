@@ -273,7 +273,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Name_for_debugger _
       | Probe_is_enabled _ | Opaque | Begin_region | End_region | Dls_get
       | Tls_get | Domain_index | Poll | Pause | Alloc _ )
-  | Op (Reinterpret_cast (Int64_of_value | Value_of_int64))
+  | Op
+      (Reinterpret_cast (Int64_of_value | Value_of_int64 | Tagged_int_of_value))
   | Op
       (Specific
          ( Isextend32 | Izextend32 | Ilea _

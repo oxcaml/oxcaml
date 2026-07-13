@@ -1296,9 +1296,9 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
       not_implemented_basic ~msg:"static cast" i)
   | Reinterpret_cast cast_op -> (
     match cast_op with
-    | Int64_of_value | Value_of_int64 | Float_of_int64 | Int64_of_float
-    | Float32_of_int32 | Int32_of_float32 | Float_of_float32 | Float32_of_float
-      ->
+    | Int64_of_value | Value_of_int64 | Tagged_int_of_value | Float_of_int64
+    | Int64_of_float | Float32_of_int32 | Int32_of_float32 | Float_of_float32
+    | Float32_of_float ->
       let arg = load_reg_to_temp t i.arg.(0) in
       let converted =
         emit_ins t (I.convert Bitcast ~arg ~to_:(T.of_reg i.res.(0)))

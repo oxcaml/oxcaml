@@ -232,6 +232,7 @@ let reinterpret_cast : Cmm.reinterpret_cast -> string = function
   | V512_of_vec w -> Printf.sprintf "%s as vec512" (vector_width w)
   | Value_of_int64 -> "int64 as value"
   | Int64_of_value -> "value as int64"
+  | Tagged_int_of_value -> "value as tagged_int"
   | Float32_of_float -> "float as float32"
   | Float_of_float32 -> "float32 as float"
   | Float_of_int64 -> "int64 as float"

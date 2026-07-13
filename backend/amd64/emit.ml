@@ -1651,7 +1651,7 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
   let open Simd_instrs in
   let distinct = not (Reg.same_loc i.arg.(0) i.res.(0)) in
   match cast with
-  | Int64_of_value | Value_of_int64 ->
+  | Int64_of_value | Value_of_int64 | Tagged_int_of_value ->
     if distinct then I.mov (arg i 0) (res i 0)
   | Float_of_float32 | Float32_of_float ->
     if distinct then movss (arg i 0) (res i 0)

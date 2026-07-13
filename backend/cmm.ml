@@ -431,6 +431,7 @@ let machtype_of_memory_chunk : memory_chunk -> machtype = function
 type reinterpret_cast =
   | Int64_of_value
   | Value_of_int64
+  | Tagged_int_of_value
   | Float_of_float32
   | Float32_of_float
   | Float_of_int64
@@ -1043,6 +1044,7 @@ let equal_reinterpret_cast (left : reinterpret_cast) (right : reinterpret_cast)
   match left, right with
   | Int64_of_value, Int64_of_value -> true
   | Value_of_int64, Value_of_int64 -> true
+  | Tagged_int_of_value, Tagged_int_of_value -> true
   | Float_of_float32, Float_of_float32 -> true
   | Float32_of_float, Float32_of_float -> true
   | Float_of_int64, Float_of_int64 -> true
@@ -1053,9 +1055,9 @@ let equal_reinterpret_cast (left : reinterpret_cast) (right : reinterpret_cast)
   | V256_of_vec w1, V256_of_vec w2
   | V512_of_vec w1, V512_of_vec w2 ->
     equal_vector_width w1 w2
-  | ( ( Int64_of_value | Value_of_int64 | Float_of_float32 | Float32_of_float
-      | Float_of_int64 | Int64_of_float | Float32_of_int32 | Int32_of_float32
-      | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ),
+  | ( ( Int64_of_value | Value_of_int64 | Tagged_int_of_value | Float_of_float32
+      | Float32_of_float | Float_of_int64 | Int64_of_float | Float32_of_int32
+      | Int32_of_float32 | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ),
       _ ) ->
     false
 

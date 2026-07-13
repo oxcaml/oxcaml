@@ -323,6 +323,7 @@ val machtype_of_memory_chunk : memory_chunk -> machtype
 type reinterpret_cast =
   | Int64_of_value
   | Value_of_int64
+  | Tagged_int_of_value
   | Float_of_float32
     (* Only writes the bottom 32 bits of the target float register. All other
        bits are unspecified. *)
