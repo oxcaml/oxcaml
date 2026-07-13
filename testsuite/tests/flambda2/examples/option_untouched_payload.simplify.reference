@@ -1,0 +1,119 @@
+let code passthrough_option_0 deleted in
+let code passthrough_custom_1 deleted in
+let code caller_option_2 deleted in
+let code caller_custom_3 deleted in
+let code is_none_option_4 deleted in
+let code is_none_custom_5 deleted in
+let code inline(never) loopify(never) size(6) newer_version_of(passthrough_option_0)
+      passthrough_option_0_1 (h : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  apply h (0) -> k * k1
+in
+let $camlOption_untouched_payload__passthrough_option_6 =
+  closure passthrough_option_0_1 @passthrough_option
+in
+let code inline(never) loopify(never) size(6) newer_version_of(passthrough_custom_1)
+      passthrough_custom_1_1 (h : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  apply h (0) -> k * k1
+in
+let $camlOption_untouched_payload__passthrough_custom_7 =
+  closure passthrough_custom_1_1 @passthrough_custom
+in
+let code inline(never) loopify(never) size(19) newer_version_of(caller_option_2)
+      caller_option_2_1 (h : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(passthrough_option_0_1)
+    ($camlOption_untouched_payload__passthrough_option_6
+     : _ -> [ 0 | 0 of imm tagged ])
+      (h)
+      -> k2 * k1
+    where k2 (`*match*` : [ 0 | 0 of imm tagged ]) =
+      let prim = %is_int (`*match*`) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let Pfield = %block_load.[`0`] (`*match*`) in
+           let int_add = %int_barith.add (Pfield, 1) in
+           cont k (int_add))
+in
+let $camlOption_untouched_payload__caller_option_8 =
+  closure caller_option_2_1 @caller_option
+in
+let code inline(never) loopify(never) size(19) newer_version_of(caller_custom_3)
+      caller_custom_3_1 (h : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(passthrough_custom_1_1)
+    ($camlOption_untouched_payload__passthrough_custom_7
+     : _ -> [ 0 | 0 of val ])
+      (h)
+      -> k2 * k1
+    where k2 (`*match*` : [ 0 | 0 of val ]) =
+      let prim = %is_int (`*match*`) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let Pfield = %block_load.[`0`] (`*match*`) in
+           let int_add = %int_barith.add (Pfield, 1) in
+           cont k (int_add))
+in
+let $camlOption_untouched_payload__caller_custom_9 =
+  closure caller_custom_3_1 @caller_custom
+in
+let code inline(never) loopify(never) size(21) newer_version_of(is_none_option_4)
+      is_none_option_4_1 (p : imm tagged, h : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let untagged = %untag_imm (p) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k2 (0))
+    where k3 =
+      apply h (0) -> k2 * k1
+    where k2 (o : val) =
+      let prim = %is_int (o) in
+      let Pisint = %tag_imm (prim) in
+      cont k (Pisint)
+in
+let $camlOption_untouched_payload__is_none_option_10 =
+  closure is_none_option_4_1 @is_none_option
+in
+let code inline(never) loopify(never) size(21) newer_version_of(is_none_custom_5)
+      is_none_custom_5_1 (p : imm tagged, h : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let untagged = %untag_imm (p) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k2 (0))
+    where k3 =
+      apply h (0) -> k2 * k1
+    where k2 (o : [ 0 | 0 of val ]) =
+      let prim = %is_int (o) in
+      let Pisint = %tag_imm (prim) in
+      cont k (Pisint)
+in
+let $camlOption_untouched_payload__is_none_custom_11 =
+  closure is_none_custom_5_1 @is_none_custom
+in
+let $camlOption_untouched_payload =
+  Block 0 ($camlOption_untouched_payload__passthrough_option_6,
+           $camlOption_untouched_payload__passthrough_custom_7,
+           $camlOption_untouched_payload__caller_option_8,
+           $camlOption_untouched_payload__caller_custom_9,
+           $camlOption_untouched_payload__is_none_option_10,
+           $camlOption_untouched_payload__is_none_custom_11)
+in
+cont done ($camlOption_untouched_payload)
