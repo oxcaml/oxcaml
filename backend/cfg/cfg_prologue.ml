@@ -92,6 +92,19 @@ module Instruction_requirements = struct
       (* Allocations and polls are implemented by calling a function when
          emitted, and therefore need a prologue for the function call. *)
       | Op (Alloc _ | Poll) -> Requirements Requires_prologue
+      (* The prologue must already be on the stack when a trap frame is pushed:
+         [can_place_prologues] refuses to add a prologue at a non-zero stack
+         offset (the frame would be allocated on top of the trap frame), so no
+         prologue can be added later on the path; and the trap handler runs with
+         the frame state of the [Pushtrap] point, while handlers must execute
+         with the frame allocated (see the trap-handler check in [validate], and
+         [Lentertrap] under frame pointers). Since every path to a trap handler
+         goes through a matching [Pushtrap], this requirement also guarantees
+         that handlers are only reachable with a prologue on the stack.
+         [Poptrap] needs no requirement: it only occurs inside a trap region,
+         where the requirement on [Pushtrap] already forces the prologue to be
+         on the stack. *)
+      | Pushtrap _ -> Requirements Requires_prologue
       | Op
           ( Move | Spill | Reload | Const_int _ | Const_float32 _
           | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
@@ -100,7 +113,7 @@ module Instruction_requirements = struct
           | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
           | Begin_region | End_region | Specific _ | Name_for_debugger _
           | Dls_get | Tls_get | Domain_index | Pause )
-      | Pushtrap _ | Poptrap _ | Reloadretaddr | Stack_check _ ->
+      | Poptrap _ | Reloadretaddr | Stack_check _ ->
         Requirements No_requirements
 end
 
