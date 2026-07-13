@@ -128,10 +128,17 @@ module Directive = struct
             && Int64.compare n (-0x8000_0000L) >= 0
           then Buffer.add_string buf (Int64.to_string n)
           else bprintf buf "0x%Lx" n)
-      | Unsigned_int n ->
-        (* We can use the printer for [Signed_int] since we always print as an
-           unsigned hex representation. *)
-        print_aux_subterm ~force_decimal buf (Signed_int (Uint64.to_int64 n))
+      | Unsigned_int n -> (
+        (* Small values print in decimal like [Signed_int]; larger ones (e.g.
+           bit-packed words and biased suffix-jump offsets) print in hex for
+           readability. *)
+        let i = Uint64.to_int64 n in
+        if force_decimal || Int64.compare i 0xFFFFL <= 0
+        then print_aux_subterm ~force_decimal buf (Signed_int i)
+        else
+          match TS.assembler () with
+          | MASM -> bprintf buf "0%LxH" i
+          | MacOS | GAS_like -> bprintf buf "0x%Lx" i)
       | Add (c1, c2) ->
         bprintf buf "(%a + %a)"
           (print_aux_subterm ~force_decimal)
@@ -1172,7 +1179,14 @@ let between_this_and_label_offset_32bit_expr ~upper ~offset_upper =
         Asm_label.print upper Asm_section.print upper_section Asm_section.print
         this_section);
   let offset_upper = Targetint.to_int64 offset_upper in
-  let expr = Add (Sub (Label upper, This), Signed_int offset_upper) in
+  let offset_const =
+    (* [Unsigned_int] so that large offsets (bit-packed record words, biased
+       suffix-jump offsets) print in hex. *)
+    if Int64.compare offset_upper 0xFFFFL > 0
+    then Unsigned_int (Uint64.of_nonnegative_int64_exn offset_upper)
+    else Signed_int offset_upper
+  in
+  let expr = Add (Sub (Label upper, This), offset_const) in
   const expr Thirty_two
 
 let between_symbol_in_current_unit_and_label_offset ?comment:_comment ~upper

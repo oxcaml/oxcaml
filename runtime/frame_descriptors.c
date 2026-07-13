@@ -505,12 +505,11 @@ static void accumulate_frametable_stats(intnat *frametable,
   debuginfo_high = Align_to(debuginfo_high, uintnat);
   stats->total_codesize += (stats->max_retaddr - stats->min_retaddr);
   stats->total_ft_size += (stats->max_descr - stats->min_descr);
-  /* Debuginfo bytes = the record words (each record is two uint32, counted
-     by debuginfo_count) plus the name_info/name_and_loc_info struct span.
-     The deduped filename/defname strings live in a separate section and are
-     not attributed to a frametable here. */
-  stats->total_debuginfo_size += debuginfo_count * 2 * sizeof(uint32_t)
-                                 + (debuginfo_high - debuginfo_low);
+  /* Debuginfo bytes = the span bracketing the record and jump words and the
+     name_info/name_and_loc_info structs (counting record words would multiply
+     out suffix sharing). The deduped filename/defname strings live in a
+     separate section and are not attributed to a frametable here. */
+  stats->total_debuginfo_size += (debuginfo_high - debuginfo_low);
   stats->total_descrs += stats->descrs;
   stats->total_debuginfo += debuginfo_count;
   if (stats->min_retaddr) {

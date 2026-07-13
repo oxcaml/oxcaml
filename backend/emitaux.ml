@@ -463,53 +463,82 @@ let emit_frames a =
               (shift_left (of_int end_line) 26)
               (add (shift_left (of_int kind) 1) (of_int has_next)))))
   in
+  (* Chain suffixes already emitted in this unit, keyed by their emitted content
+     (per element: name-struct label and packed info word); the value is a label
+     on the suffix's first element. A chain whose tail matches an emitted suffix
+     ends with a 4-byte jump word to it instead of repeating the elements (see
+     the jump-word comment in runtime/backtrace_nat.c). *)
+  let emitted_suffixes = Hashtbl.create 7 in
   let emit_debuginfo (rs, dbg) lbl =
     let rdbg = dbg |> Debuginfo.Dbg.to_list |> List.rev in
     (* Due to inlined functions, a single debuginfo may have multiple locations.
        These are represented sequentially in memory (innermost frame first),
        with the low bit of the packed debuginfo being 0 on the last entry. *)
+    let rec contents rs ds =
+      match ds with
+      | [] -> []
+      | d :: rest ->
+        let open Debuginfo in
+        let defname =
+          Scoped_location.string_of_scopes ~include_zero_alloc:false
+            d.dinfo_scopes
+        in
+        let char_end = d.dinfo_char_end + d.dinfo_start_bol - d.dinfo_end_bol in
+        let is_fully_packable =
+          d.dinfo_line <= 0xFFF
+          && d.dinfo_end_line - d.dinfo_line <= 0x7
+          && d.dinfo_char_start <= 0x3F && char_end <= 0x7F
+          && d.dinfo_end_bol - d.dinfo_start_bol <= 0x1FF
+        in
+        let info =
+          if is_fully_packable
+          then fully_pack_info rs d (not (Misc.Stdlib.List.is_empty rest))
+          else partially_pack_info rs d (not (Misc.Stdlib.List.is_empty rest))
+        in
+        let loc =
+          if is_fully_packable
+          then None
+          else
+            Some
+              ( Int.min 0xFFFF d.dinfo_char_start,
+                (* start_chr *)
+                Int.min 0xFFFF char_end,
+                (* end_chr *)
+                Int.min 0x3FFFFFFF d.dinfo_char_end )
+          (* end_offset *)
+        in
+        (label_defname d.dinfo_file defname loc, info) :: contents false rest
+    in
+    let elts = contents rs rdbg in
+    assert (not (Misc.Stdlib.List.is_empty elts));
     a.efa_align 4;
     a.efa_def_label lbl;
-    let rec emit rs d rest =
-      let open Debuginfo in
-      let defname =
-        Scoped_location.string_of_scopes ~include_zero_alloc:false
-          d.dinfo_scopes
-      in
-      let char_end = d.dinfo_char_end + d.dinfo_start_bol - d.dinfo_end_bol in
-      let is_fully_packable =
-        d.dinfo_line <= 0xFFF
-        && d.dinfo_end_line - d.dinfo_line <= 0x7
-        && d.dinfo_char_start <= 0x3F && char_end <= 0x7F
-        && d.dinfo_end_bol - d.dinfo_start_bol <= 0x1FF
-      in
-      let info =
-        if is_fully_packable
-        then fully_pack_info rs d (not (Misc.Stdlib.List.is_empty rest))
-        else partially_pack_info rs d (not (Misc.Stdlib.List.is_empty rest))
-      in
-      let loc =
-        if is_fully_packable
-        then None
-        else
-          Some
-            ( Int.min 0xFFFF d.dinfo_char_start,
-              (* start_chr *)
-              Int.min 0xFFFF char_end,
-              (* end_chr *)
-              Int.min 0x3FFFFFFF d.dinfo_char_end )
-        (* end_offset *)
-      in
-      a.efa_label_rel
-        (label_defname d.dinfo_file defname loc)
-        (Int64.to_int32 info);
-      (* We use [efa_i32] directly here instead of [emit_i32] to avoid a
-         round-trip via [int], which would break on 32-bit platforms. The right
-         shift ensures that the integer is in range of [int32]. *)
-      a.efa_i32 (Int64.to_int32 (Int64.shift_right info 32));
-      match rest with [] -> () | d :: rest -> emit false d rest
+    let rec emit_elts start_lbl elts =
+      match elts with
+      | [] -> ()
+      | (name_lbl, info) :: rest -> (
+        match Hashtbl.find_opt emitted_suffixes elts with
+        | Some target ->
+          (* The whole remaining suffix was already emitted: jump to it. *)
+          a.efa_label_rel target 0x0300_0000l
+        | None ->
+          let start_lbl =
+            match start_lbl with
+            | Some l -> l
+            | None ->
+              let l = Cmm.new_label () in
+              a.efa_def_label l;
+              l
+          in
+          Hashtbl.add emitted_suffixes elts start_lbl;
+          a.efa_label_rel name_lbl (Int64.to_int32 info);
+          (* We use [efa_i32] directly here instead of [emit_i32] to avoid a
+             round-trip via [int], which would break on 32-bit platforms. The
+             right shift ensures that the integer is in range of [int32]. *)
+          a.efa_i32 (Int64.to_int32 (Int64.shift_right info 32));
+          emit_elts None rest)
     in
-    match rdbg with [] -> assert false | d :: rest -> emit rs d rest
+    emit_elts (Some lbl) elts
   in
   (* Descriptors are recorded in increasing return-address order (calls inline
      as they are emitted; allocations and polls when their out-of-line GC stub
@@ -549,7 +578,8 @@ let emit_frames a =
   ignore (List.fold_left emit_descr None descrs);
   Label_table.iter emit_debuginfo debuginfos;
   (* The name structs are kept near the debuginfo words that reference them (a
-     24-bit, +/-64 MB offset). Emitting them also populates [defstrings]. *)
+     23-bit, 32 MB offset; bit 25 above it flags a suffix-sharing jump word).
+     Emitting them also populates [defstrings]. *)
   Hashtbl.iter emit_defname defnames;
   a.efa_align Arch.size_addr;
   (* Strings go into a mergeable string section to be de-duped by the linker *)
