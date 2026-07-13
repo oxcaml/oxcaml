@@ -416,7 +416,9 @@ type type_mismatch =
   | Extensible_representation of position
   | With_null_representation of position
   | Fixed_representation of position
-  | Jkind of Jkind.Violation.t
+  | Jkind of
+      Jkind.Violation.t
+      * ((int -> string option) * (int -> string option)) option
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
 type jkind_mismatch =
@@ -839,9 +841,8 @@ let report_type_mismatch first second decl env ppf err =
       pr "Their internal representations differ:@ %s %s %s."
          (choose ord first second) decl
          "has a fixed representation while the other varies"
-  | Jkind v ->
-      Jkind.Violation.report_with_name ~name:first
-        env ppf v
+  | Jkind (v, param_name_hints) ->
+      Jkind.Violation.report_with_name ?param_name_hints ~name:first env ppf v
   | Unsafe_mode_crossing mismatch ->
     pr "They have different unsafe mode crossing behavior:@,@[<v 2>%a@]"
       (fun ppf (first, second, mismatch) ->
@@ -1685,7 +1686,24 @@ let type_declarations ?(equality = false) ~loc env ~mark name
           (* Note that [decl2.type_jkind] is an upper bound *)
           match Ctype.check_decl_jkind env decl1 decl2.type_jkind with
            | Ok _ -> None
-           | Error v -> Some (Jkind v)
+           | Error v ->
+             (* Z1: hand the renderer each decl's source parameter order
+                (param-id -> variable letter) so the two sides of the kind
+                mismatch print in their own decl's namespace instead of the
+                copied ikind param ids. *)
+             let param_name_hint params =
+               let tbl = Hashtbl.create 8 in
+               List.iteri
+                 (fun i p ->
+                   Hashtbl.replace tbl (Types.get_id p) (Misc.letter_of_int i))
+                 params;
+               fun id -> Hashtbl.find_opt tbl id
+             in
+             let hints =
+               ( param_name_hint decl1.type_params,
+                 param_name_hint decl2.type_params )
+             in
+             Some (Jkind (v, Some hints))
         else None
     | (Type_variant (cstrs1, rep1, umc1), Type_variant (cstrs2, rep2, umc2)) -> begin
         if mark then begin

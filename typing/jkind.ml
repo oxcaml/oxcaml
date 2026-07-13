@@ -1637,6 +1637,14 @@ module Const = struct
 
   let resolve_param_name id = !param_name_resolver id
 
+  (* Z1: temporarily install [f] as the param-name resolver for the duration
+     of [k] (restoring on exit), so a two-sided error can render each jkind
+     against its OWN decl's param table (see [Violation.report_general]). *)
+  let with_param_name_resolver f k =
+    let old = !param_name_resolver in
+    param_name_resolver := f;
+    Fun.protect ~finally:(fun () -> param_name_resolver := old) k
+
   (* path_oide_resolver (A2 fix): a with-bound constructor atom is a [Path.t];
      the default renders it as a raw [Path.name] flat identifier, which
      bypasses [Out_type]'s conflict-aware path printer and prints the WRONG
@@ -3687,7 +3695,7 @@ module Violation = struct
      an error message that drills down into two products to find the first
      conflicing component. Note reporting should be adjusted
      appropriately. *)
-  let report_general env preamble pp_former former ppf t =
+  let report_general ?param_name_hints env preamble pp_former former ppf t =
     let mismatch_type, print_as_value_layout, missing_cmis =
       categorize_mismatch env t
     in
@@ -3714,6 +3722,29 @@ module Violation = struct
         | Ok l -> fprintf ppf "%t%a" indent Layout.format l
         | Error p -> fprintf ppf "the abstract kind %s" (Path.name p))
     in
+    (* Z1: render each side of the violation against its own decl's param
+       table (an id->letter hint threaded from the construction site that held
+       the decls). Without a hint, [None], the resolver is unchanged (today's
+       behavior). k1 = the offending kind (first), k2 = the required kind. *)
+    let hint1, hint2 =
+      match param_name_hints with
+      | Some (h1, h2) -> Some h1, Some h2
+      | None -> None, None
+    in
+    let format_k1 : type l r. _ -> (l * r) jkind -> unit =
+     fun ppf jk ->
+      match hint1 with
+      | None -> format_base_or_kind ppf jk
+      | Some h ->
+        Const.with_param_name_resolver h (fun () -> format_base_or_kind ppf jk)
+    in
+    let format_k2 : type l r. _ -> (l * r) jkind -> unit =
+     fun ppf jk ->
+      match hint2 with
+      | None -> format_base_or_kind ppf jk
+      | Some h ->
+        Const.with_param_name_resolver h (fun () -> format_base_or_kind ppf jk)
+    in
     let subjkind_format verb k2 =
       if has_sort_var (get k2).base
       then dprintf "%s representable" verb
@@ -3721,8 +3752,7 @@ module Violation = struct
       then
         (* avoid printing "a sublayout of a value layout" *)
         dprintf "%s@ a value layout" verb
-      else
-        dprintf "%s a sub%s of@ %a" verb layout_or_kind format_base_or_kind k2
+      else dprintf "%s a sub%s of@ %a" verb layout_or_kind format_k2 k2
     in
     let Pack_jkind k1, Pack_jkind k2, fmt_k1, fmt_k2, missing_cmis =
       match t with
@@ -3740,7 +3770,7 @@ module Violation = struct
         | None ->
           ( Pack_jkind k1,
             Pack_jkind k2,
-            dprintf "%s@ %a" layout_or_kind format_base_or_kind k1,
+            dprintf "%s@ %a" layout_or_kind format_k1 k1,
             subjkind_format "is not" k2,
             missing_cmis )
         | Some p ->
@@ -3754,11 +3784,11 @@ module Violation = struct
         let fmt_k2 =
           if print_as_value_layout
           then dprintf "is not@ a value layout"
-          else dprintf "does not overlap with@ %a" format_base_or_kind k2
+          else dprintf "does not overlap with@ %a" format_k2 k2
         in
         ( Pack_jkind k1,
           Pack_jkind k2,
-          dprintf "%s@ %a" layout_or_kind format_base_or_kind k1,
+          dprintf "%s@ %a" layout_or_kind format_k1 k1,
           fmt_k2,
           missing_cmis )
     in
@@ -3772,15 +3802,14 @@ module Violation = struct
         else
           match t.violation with
           | Not_a_subjkind _ ->
-            dprintf "be a sub%s of@ %a" layout_or_kind format_base_or_kind k2
-          | No_intersection _ ->
-            dprintf "overlap with@ %a" format_base_or_kind k2
+            dprintf "be a sub%s of@ %a" layout_or_kind format_k2 k2
+          | No_intersection _ -> dprintf "overlap with@ %a" format_k2 k2
       in
       fprintf ppf "@[<v>%a@;%a@]"
         (Format_history.format_history
            ~intro:
              (dprintf "@[<hov 2>The %s of %a is@ %a@]" layout_or_kind pp_former
-                former format_base_or_kind k1)
+                former format_k1 k1)
            ~layout_or_kind env)
         k1
         (Format_history.format_history
@@ -3806,7 +3835,8 @@ module Violation = struct
   let report_with_offender_sort ~offender env =
     report_general env "A representable layout was expected, but " pp_t offender
 
-  let report_with_name ~name env = report_general env "" pp_print_string name
+  let report_with_name ?param_name_hints ~name env =
+    report_general ?param_name_hints env "" pp_print_string name
 end
 
 (******************************)

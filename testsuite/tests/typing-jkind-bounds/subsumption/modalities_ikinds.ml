@@ -155,7 +155,7 @@ Error: In this "with" constraint, the new definition of "t"
          type ('a, 'b) t = ('a, 'b) t
        is not included in
          type ('a, 'b) t : value mod portable
-       The kind of the first is value mod portable with 'a
+       The kind of the first is value mod portable with 'b
          because of the definition of t at line 1, characters 0-77.
        But the kind of the first must be a subkind of value mod portable
          because of the definition of t at line 4, characters 2-38.
@@ -342,10 +342,10 @@ Error: Signature mismatch:
          type ('a, 'b) t
            : immutable_data with 'a @@ portable with 'b @@ contended
        The kind of the first is
-           immutable_data with 'a @@ portable with 'b @@ contended
+           immutable_data with 'a @@ contended with 'b @@ portable
          because of the definition of t at line 4, characters 2-75.
        But the kind of the first must be a subkind of
-           immutable_data with 'a @@ contended with 'b @@ portable
+           immutable_data with 'a @@ portable with 'b @@ contended
          because of the definition of t at line 2, characters 2-75.
 
        The first mode-crosses less than the second along:

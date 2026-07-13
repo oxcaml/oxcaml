@@ -270,9 +270,18 @@ module Violation : sig
     unit
 
   (** Simpler version of [report_with_offender] for when the thing that had an
-      unexpected jkind is available as a string. *)
+      unexpected jkind is available as a string. [param_name_hints] optionally
+      supplies a per-side param-id -> variable-letter map (first = offending
+      kind, second = required kind) so a two-sided violation renders each kind
+      against its own decl's parameter names (Z1); omitted at sites without decl
+      context (default naming). *)
   val report_with_name :
-    name:string -> Env.t -> Format_doc.formatter -> t -> unit
+    ?param_name_hints:(int -> string option) * (int -> string option) ->
+    name:string ->
+    Env.t ->
+    Format_doc.formatter ->
+    t ->
+    unit
 end
 
 (******************************)
