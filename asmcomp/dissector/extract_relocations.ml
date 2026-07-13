@@ -121,33 +121,6 @@ let num_plt t = t.num_plt
 
 let num_got t = t.num_got
 
-(* Accumulator for efficient merging - stores lists in reverse order *)
-type accumulator =
-  { acc_plt : Relocatable_symbol_name.t list;
-    acc_got : Relocatable_symbol_name.t list;
-    acc_num_plt : int;
-    acc_num_got : int
-  }
-
-let empty_accumulator =
-  { acc_plt = []; acc_got = []; acc_num_plt = 0; acc_num_got = 0 }
-
-(* Add entries to accumulator - O(n) where n is size of entries being added *)
-let accumulate acc entries =
-  { acc_plt = List.rev_append entries.plt_symbols acc.acc_plt;
-    acc_got = List.rev_append entries.got_symbols acc.acc_got;
-    acc_num_plt = acc.acc_num_plt + entries.num_plt;
-    acc_num_got = acc.acc_num_got + entries.num_got
-  }
-
-(* Finalize accumulator into result - reverses the lists *)
-let finalize acc =
-  { plt_symbols = List.rev acc.acc_plt;
-    got_symbols = List.rev acc.acc_got;
-    num_plt = acc.acc_num_plt;
-    num_got = acc.acc_num_got
-  }
-
 (* Parse RELA entries and extract PLT32 and REX_GOTPCRELX relocations for
    undefined symbols (st_shndx = SHN_UNDEF). Only undefined symbols need PLT/GOT
    entries since defined symbols can be resolved directly.
@@ -158,9 +131,7 @@ let finalize acc =
 
    PC32 relocations to undefined symbols are an error. They occur when code is
    compiled with -nodynlink, which is incompatible with the dissector. *)
-let parse_rela_section ~rela_body ~symbols =
-  let plt_symbols = ref [] in
-  let got_symbols = ref [] in
+let parse_rela_section ~rela_body ~symbols ~record_plt ~record_got =
   Rela.iter_rela_entries ~rela_body ~f:(fun entry ->
       (* Check for PC32 relocations to undefined symbols - these are an error *)
       if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.pc32
@@ -197,26 +168,35 @@ let parse_rela_section ~rela_body ~symbols =
           log_verbose "  reloc %s at 0x%Lx -> %s (UNDEF)"
             (Rela.Reloc_type.name entry.r_type)
             entry.r_offset symbol_name;
-          let name = Relocatable_symbol_name.of_string symbol_name in
           if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
-          then plt_symbols := name :: !plt_symbols
-          else got_symbols := name :: !got_symbols);
-  let rev_and_count lst =
-    List.fold_left (fun (acc, n) x -> x :: acc, n + 1) ([], 0) lst
-  in
-  let plt_symbols, num_plt = rev_and_count !plt_symbols in
-  let got_symbols, num_got = rev_and_count !got_symbols in
-  { plt_symbols; got_symbols; num_plt; num_got }
+          then record_plt ~symbol_name
+          else record_got ~symbol_name)
 
 let extract_from_rela_text_sections ~symbols sections =
-  List.fold_left
-    (fun acc ((rela_section : Elf.section), rela_body) ->
+  let plt_symbols = ref [] in
+  let got_symbols = ref [] in
+  let num_plt = ref 0 in
+  let num_got = ref 0 in
+  let record_plt ~symbol_name =
+    incr num_plt;
+    plt_symbols := Relocatable_symbol_name.of_string symbol_name :: !plt_symbols
+  in
+  let record_got ~symbol_name =
+    incr num_got;
+    got_symbols := Relocatable_symbol_name.of_string symbol_name :: !got_symbols
+  in
+  List.iter
+    (fun ((rela_section : Elf.section), rela_body) ->
       log_verbose "  processing section %s" rela_section.sh_name_str;
-      accumulate acc (parse_rela_section ~rela_body ~symbols))
-    empty_accumulator sections
+      parse_rela_section ~rela_body ~symbols ~record_plt ~record_got)
+    sections;
+  { plt_symbols = List.rev !plt_symbols;
+    got_symbols = List.rev !got_symbols;
+    num_plt = !num_plt;
+    num_got = !num_got
+  }
 
 let extract (input : Mapped_object_file.t) =
   let symbols = Mapped_object_file.symbols input in
-  finalize
-    (extract_from_rela_text_sections ~symbols
-       (Mapped_object_file.rela_text_sections input))
+  extract_from_rela_text_sections ~symbols
+    (Mapped_object_file.rela_text_sections input)
