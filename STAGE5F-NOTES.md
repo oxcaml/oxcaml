@@ -284,16 +284,17 @@ Zero-behavior differential (`OXCAML_IKINDS_VALIDATE`, both computed, fatal on
 validate over typing-layouts-void/-layouts/-products/-or-null/typing-abstract-kinds
 = 787 summaries, all `mismatches=0`, 0 disagreements.
 
-### 3b(i) — delete get_mod_bounds + the 3a differential (commit a58aba4c0)
-`get_externality_upper_bound` returns the ikind value directly. Deleted
-`get_mod_bounds` (sole caller was the differential legacy branch; not in the
-mli), `all_except_externality`, and the differential branch. `[None]`
-(ikinds-unlinked) is now `fatal_error` — safe, both callers run in the
-typechecker where Ikind is linked. Removes the type-op externality read from the
-`Base_and_axes.normalize` fixpoint's callers.
-
-Full-suite gate at a58aba4c0: **2330 passed / 0 failed** (the +1 vs the
-pre-slice-3 baseline is the void promotion).
+### 3b(i) — get_mod_bounds differential kept PERMANENT (commits a58aba4c0, then reverted)
+First landed as a deletion of `get_mod_bounds` + the differential (a58aba4c0,
+full-suite gate 2330/0). Reverted per team-lead ruling: since the
+`Base_and_axes.normalize` fixpoint SURVIVES for the decl-normalize path (S7
+residual, below), the externality differential costs nothing to keep and is
+retained as a PERMANENT validate-only detector (defense-in-depth, S2
+overturn-detector precedent): `get_externality_upper_bound` ANSWERS from the
+ikind floor, and under `OXCAML_IKINDS_VALIDATE` also computes the legacy
+`get_mod_bounds`/normalize value and `Misc.fatal_errorf`s on any `Externality`
+mismatch. Keeps the seeded-fault positive control reproducible and catches
+future ikind/legacy drift. Net code delta over 3a: none (3a state preserved).
 
 ### S7 / S5 residual — the Base_and_axes.normalize fixpoint STAYS (documented)
 The fixpoint's remaining callers all feed the STORED decl `type_jkind` (⇒ `.cmi`

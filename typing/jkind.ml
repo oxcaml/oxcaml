@@ -2599,10 +2599,17 @@ let sort_of_jkind env (t : jkind_l) : sort =
 (* Slice-3: [Ikind] installs the ikind-native externality upper-bound read
    here. [get_externality_upper_bound] (the separability + representation
    typing consumers) reads the externality axis of the ikind [round_up] floor
-   instead of the legacy [Ignore_best normalize] path (differential-proven
-   equal under [OXCAML_IKINDS_VALIDATE], zero behavior change; slice 3a). The
-   [Base_and_axes.normalize] fixpoint survives only for the decl-normalize path
-   ([Typedecl.normalize_decl_jkinds]); these type-op reads no longer use it.
+   as its ANSWER, instead of the legacy [Ignore_best normalize] path
+   ([get_mod_bounds]). The two are differential-proven equal under
+   [OXCAML_IKINDS_VALIDATE] (zero behavior change; slice 3a).
+
+   The legacy [get_mod_bounds] read is KEPT as a PERMANENT validate-only
+   differential (defense-in-depth; same role as the S2 overturn detector): it
+   runs only under [OXCAML_IKINDS_VALIDATE], costs nothing in normal builds,
+   keeps the seeded-fault positive-control reproducible, and would catch any
+   future drift between the ikind floor and the legacy engine. It costs nothing
+   to keep because [Base_and_axes.normalize] survives regardless for the
+   decl-normalize path ([Typedecl.normalize_decl_jkinds], the S7 residual).
    [None] only if ikinds are unlinked (never in the typechecker). *)
 type externality_from_ikind =
   { externality_read : 'l 'r. Env.t -> ('l * 'r) jkind -> Externality.t }
@@ -2611,17 +2618,57 @@ let externality_from_ikind : externality_from_ikind option ref = ref None
 
 let set_externality_from_ikind f = externality_from_ikind := Some f
 
+let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
+  let jk, _ =
+    Base_and_axes.normalize ~mode:Ignore_best ~skip_axes
+      ~previously_ran_out_of_fuel:jk.ran_out_of_fuel_during_normalize ~context
+      env jk.jkind
+  in
+  match jk with
+  | { base = Kconstr _; with_bounds = With_bounds _; _ } ->
+    (* We could do something more precise here, only setting axes that have
+       with_bounds to max. But as such kinds already aren't representable, and
+       this function is mainly used for mode crossing or optimizations, we don't
+       expect this to come up much. *)
+    Mod_bounds.max
+  | { base = Kconstr _ | Layout _; with_bounds = No_with_bounds; mod_bounds; _ }
+    ->
+    mod_bounds
+  | { base = Layout _; with_bounds = With_bounds _; _ } ->
+    Misc.fatal_error
+      "Jkind.get_mod_crossing: violated Ignore_best normalize invariant."
+
 let to_unsafe_mode_crossing jkind =
   { unsafe_mod_bounds = Mod_bounds.to_mode_crossing jkind.jkind.mod_bounds;
     unsafe_with_bounds = jkind.jkind.with_bounds
   }
 
-let get_externality_upper_bound ~context:_ env jk =
+let all_except_externality =
+  Axis_set.singleton (Nonmodal Externality) |> Axis_set.complement
+
+let get_externality_upper_bound ~context env jk =
+  let legacy () =
+    let mod_bounds =
+      get_mod_bounds ~context ~skip_axes:all_except_externality env jk
+    in
+    Mod_bounds.get mod_bounds ~axis:(Nonmodal Externality)
+  in
   match !externality_from_ikind with
-  | Some { externality_read } -> externality_read env jk
-  | None ->
-    Misc.fatal_error
-      "Jkind.get_externality_upper_bound: ikind hook not installed"
+  | None -> legacy ()
+  | Some { externality_read } ->
+    let from_ikind = externality_read env jk in
+    if !Clflags.ikinds_validate
+    then begin
+      let l = legacy () in
+      if not (Externality.equal l from_ikind)
+      then
+        Misc.fatal_errorf
+          "get_externality_upper_bound: ikind externality %s disagrees with \
+           legacy normalize %s"
+          (Externality.to_string from_ikind)
+          (Externality.to_string l)
+    end;
+    from_ikind
 
 let set_externality_upper_bound jk externality_upper_bound =
   { jk with
