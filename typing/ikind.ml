@@ -2072,9 +2072,18 @@ let () =
   Jkind.set_externality_from_ikind
     { Jkind.externality_read =
         (fun env jkind ->
-          let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
-          let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
-          Axis_lattice.externality lat)
+          (* Z3: this SEMANTIC read (separability + representation typing) can
+             run mid-solve, so it must not perturb the outer solve. Use a
+             SCRATCH ctx (fresh tables, global Solver caches untouched) inside
+             [with_isolated_pending] (round_up would otherwise drain the global
+             pending-GFP queue) -- the same isolation boundary the print path
+             uses (ikind.ml [mod_bounds_floor_for_printing]). *)
+          Ldd.with_isolated_pending (fun () ->
+              let ctx =
+                create_scratch_ctx ~mode:Solver.Round_up ~env:(Some env)
+              in
+              let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
+              Axis_lattice.externality lat))
     }
 
 type sub_or_intersect = Jkind.sub_or_intersect
