@@ -9,7 +9,7 @@ title: Syntax
 [overview]: ../intro
 [manual]: https://ocaml.org/manual/language.html
 [unboxed types]: ../../unboxed-types/intro
-[nullability]: ../non-modal#nullability
+[nullability]: ../../unboxed-types/intro#nullability
 [externality]: ../non-modal#externality
 
 This page describes user-facing concerns about kind annotations. You may
