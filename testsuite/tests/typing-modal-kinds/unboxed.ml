@@ -238,14 +238,7 @@ Lines 1-2, characters 0-43:
 1 | type 'a t : value & value mod portable =
 2 |   #{ x : 'a contended; y : 'a @@ portable }
 Error: The kind of type "t" is
-           value mod everything
-             mod dynamic
-             with 'a @@ portable
-             with 'a contended
-           & value mod everything
-               mod dynamic
-               with 'a @@ portable
-               with 'a contended
+           value mod everything with 'a & value mod everything with 'a
          because it is an unboxed record.
        But the kind of type "t" must be a subkind of
            value mod portable & value mod portable
@@ -263,14 +256,7 @@ Lines 1-2, characters 0-40:
 1 | type 'a t : value & value mod portable =
 2 |   #{ x : 'a contended; y : 'a portable }
 Error: The kind of type "t" is
-           value mod everything
-             mod dynamic
-             with 'a contended
-             with 'a portable
-           & value mod everything
-               mod dynamic
-               with 'a contended
-               with 'a portable
+           value mod everything with 'a & value mod everything with 'a
          because it is an unboxed record.
        But the kind of type "t" must be a subkind of
            value mod portable & value mod portable

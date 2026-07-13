@@ -324,7 +324,7 @@ Line 1, characters 40-47:
                                             ^^^^^^^
 Warning 220 [redundant-modality]: This modality is redundant.
 
-type 'a t : immediate with 'a @@ global
+type 'a t : immediate with 'a @@ global unforkable
 |}]
 
 (* Multiple with bounds, one redundant *)

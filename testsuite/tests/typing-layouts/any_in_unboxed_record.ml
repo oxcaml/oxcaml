@@ -27,7 +27,7 @@ Error: This pattern matches values of type "a t#"
        The layout of a t# is any & any
          because it is an unboxed record.
        But the layout of a t# must be representable
-         because argument or result of a function type.
+         because we must know concretely how to pass a function argument.
 |}]
 
 let fst (t : int t#) = t.#fst

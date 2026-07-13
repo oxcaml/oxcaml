@@ -110,7 +110,7 @@ Error: This expression has type "t_any" but an expression was expected of type
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-18.
        But the layout of t_any must be representable
-         because argument or result of a function type.
+         because we must know concretely how to return a function result.
 |}];;
 
 let f1 (x : t_any) = ();;
@@ -124,7 +124,7 @@ Error: This pattern matches values of type "t_any"
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-18.
        But the layout of t_any must be representable
-         because argument or result of a function type.
+         because we must know concretely how to pass a function argument.
 |}];;
 
 (*****************************************************)
@@ -559,7 +559,8 @@ Error: The type constraints are not consistent.
        The layout of void_unboxed_record is void
          because of the definition of void_unboxed_record at line 12, characters 0-60.
        But the layout of void_unboxed_record must be a value layout
-         because it's the type of the field of a polymorphic variant.
+         because it instantiates an unannotated type parameter of t,
+         chosen to have layout value.
 |}];;
 
 module type S8_5 = sig
@@ -674,7 +675,8 @@ Error: The type constraints are not consistent.
        The layout of void_unboxed_record is void
          because of the definition of void_unboxed_record at line 12, characters 0-60.
        But the layout of void_unboxed_record must be a value layout
-         because it's the type of a tuple element.
+         because it instantiates an unannotated type parameter of t,
+         chosen to have layout value.
 |}];;
 
 module type S9_7 = sig

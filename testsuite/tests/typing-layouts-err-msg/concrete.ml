@@ -127,7 +127,7 @@ Error: This pattern matches values of type "t_any"
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.
        But the layout of t_any must be representable
-         because argument or result of a function type.
+         because we must know concretely how to pass a function argument.
 |}]
 
 (* Function_result *)
@@ -142,7 +142,7 @@ Error: This expression has type "t_any" but an expression was expected of type
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.
        But the layout of t_any must be representable
-         because argument or result of a function type.
+         because we must know concretely how to return a function result.
 |}]
 
 (* Structure_item_expression *)

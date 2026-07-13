@@ -886,7 +886,7 @@ Line 1, characters 10-15:
               ^^^^^
 Error: This type "int t" should be an instance of type
          "('a : value mod contended)"
-       The kind of int t is immutable_data with int
+       The kind of int t is value non_float
          because of the definition of t at line 1, characters 0-32.
        But the kind of int t must be a subkind of value mod contended
          because of the definition of require_contended at line 1, characters 0-49.
@@ -911,7 +911,7 @@ Line 1, characters 10-19:
               ^^^^^^^^^
 Error: This type "int ref t" should be an instance of type
          "('a : value mod contended)"
-       The kind of int ref t is immutable_data with int ref
+       The kind of int ref t is value non_float
          because of the definition of t at line 1, characters 0-32.
        But the kind of int ref t must be a subkind of value mod contended
          because of the definition of require_contended at line 1, characters 0-49.
@@ -934,8 +934,7 @@ Line 1, characters 10-19:
               ^^^^^^^^^
 Error: This type "int t ref" should be an instance of type
          "('a : value mod contended)"
-       The kind of int t ref is
-           mutable_data with int t @@ forkable unyielding many.
+       The kind of int t ref is value non_float mod forkable unyielding many.
        But the kind of int t ref must be a subkind of value mod contended
          because of the definition of require_contended at line 1, characters 0-49.
 

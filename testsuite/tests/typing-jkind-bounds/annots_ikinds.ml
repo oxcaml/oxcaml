@@ -281,7 +281,7 @@ Line 1, characters 21-23:
                          ^^
 Error: This alias is bound to type "int list"
        but is used as an instance of type "('a : value mod global)"
-       The kind of int list is immutable_data with int
+       The kind of int list is value non_float
          because it's a boxed variant type.
        But the kind of int list must be a subkind of value mod global
          because of the annotation on the type variable 'a.
@@ -601,7 +601,7 @@ Error: This definition has type "'b -> 'b" which is less general than
        The layout of 'a is any
          because of the annotation on the universal variable 'a.
        But the layout of 'a must be representable
-         because of the annotation on the universal variable 'a.
+         because we must know concretely how to pass a function argument.
 |}]
 (* CR layouts v2.9: This error message is not great. Check later if layout history
    is able to improve it. *)
@@ -852,7 +852,7 @@ Error: This pattern matches values of type "a"
        The layout of a is any
          because of the annotation on the abstract type declaration for a.
        But the layout of a must be representable
-         because argument or result of a function type.
+         because we must know concretely how to pass a function argument.
 |}]
 
 (****************************************)

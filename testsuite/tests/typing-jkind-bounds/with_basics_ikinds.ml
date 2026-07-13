@@ -585,7 +585,8 @@ type ('a : mutable_data) t : immutable_data = { x : 'a }
 Line 1, characters 0-56:
 1 | type ('a : mutable_data) t : immutable_data = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
+Error: The kind of type "t" is
+           immutable_data with 'a @@ unyielding many stateless
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
@@ -757,7 +758,7 @@ Error: This value is "nonportable" but is expected to be "portable".
 (*********************)
 type ('a : immutable_data) t : value mod contended with 'a
 [%%expect {|
-type ('a : immutable_data) t : value mod contended with 'a
+type ('a : immutable_data) t : value mod contended
 |}]
 
 type 'a t_test = 'a t require_contended
@@ -770,7 +771,7 @@ Line 1, characters 17-21:
                      ^^^^
 Error: This type "'a t" should be an instance of type
          "('b : value mod contended)"
-       The kind of 'a t is value mod contended with 'a
+       The kind of 'a t is value
          because of the definition of t at line 1, characters 0-58.
        But the kind of 'a t must be a subkind of value mod contended
          because of the definition of require_contended at line 6, characters 0-49.
@@ -812,7 +813,7 @@ Line 1, characters 14-26:
                   ^^^^^^^^^^^^
 Error: This type "(int, int) t" should be an instance of type
          "('a : value mod contended)"
-       The kind of (int, int) t is value mod contended with int
+       The kind of (int, int) t is value
          because of the definition of t at line 1, characters 0-53.
        But the kind of (int, int) t must be a subkind of value mod contended
          because of the definition of require_contended at line 6, characters 0-49.
@@ -825,7 +826,7 @@ Line 1, characters 23-33:
                            ^^^^^^^^^^
 Error: This type "('a, 'b) t" should be an instance of type
          "('c : value mod contended)"
-       The kind of ('a, 'b) t is value mod contended with 'a with 'b
+       The kind of ('a, 'b) t is value
          because of the definition of t at line 1, characters 0-53.
        But the kind of ('a, 'b) t must be a subkind of value mod contended
          because of the definition of require_contended at line 6, characters 0-49.

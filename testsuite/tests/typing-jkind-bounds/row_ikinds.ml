@@ -136,7 +136,7 @@ end
 module type S =
   sig
     type 'a polyvar = private [< `A of 'a | `B of int ref | `C ]
-    type 'a abstract : immutable_data with 'a polyvar
+    type 'a abstract : immutable_data with _
   end
 |}]
 
@@ -144,10 +144,7 @@ module type S =
 module type S2 = S with type 'a polyvar = [ `C ]
 [%%expect{|
 module type S2 =
-  sig
-    type 'a polyvar = [ `C ]
-    type 'a abstract : immutable_data with 'a polyvar
-  end
+  sig type 'a polyvar = [ `C ] type 'a abstract : immutable_data end
 |}]
 
 (* CR layouts v2.8: ['a abstract] should get the kind [immutable_data with 'a polyvar]

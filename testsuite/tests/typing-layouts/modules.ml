@@ -65,7 +65,8 @@ Error: The type constraints are not consistent.
        The layout of 'a is float64
          because of the definition of t at line 2, characters 2-23.
        But the layout of 'a must be a value layout
-         because the type argument of list has layout value_or_null.
+         because it instantiates an unannotated type parameter of t,
+         chosen to have layout value.
 |}];;
 
 module type S1f'' = S1f with type s = t_float64;;
@@ -814,7 +815,7 @@ Error: Signature mismatch:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-19.
        But the layout of 'a must be a value layout
-         because of the definition of t at line 2, characters 2-19.
+         because of the definition of t at line 4, characters 2-11.
 |}]
 
 
@@ -852,7 +853,7 @@ Error: Signature mismatch:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-19.
        But the layout of 'a must be a value layout
-         because of the definition of t at line 2, characters 2-19.
+         because of the definition of t at line 4, characters 2-16.
 |}]
 
 
@@ -915,7 +916,7 @@ Error: Signature mismatch:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-24.
        But the layout of 'a must be a value layout
-         because of the definition of t at line 2, characters 2-24.
+         because of the definition of t at line 4, characters 2-26.
 |}]
 
 module M : sig
@@ -957,7 +958,7 @@ Error: Signature mismatch:
        The layout of 'a is any
          because of the definition of t2 at line 2, characters 2-20.
        But the layout of 'a must be a value layout
-         because of the definition of t2 at line 2, characters 2-20.
+         because of the definition of t2 at line 6, characters 2-29.
 |}]
 
 module M : sig
@@ -994,7 +995,7 @@ Error: Signature mismatch:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-38.
        But the layout of 'a must be a value layout
-         because of the definition of t at line 2, characters 2-38.
+         because of the definition of t at line 4, characters 2-40.
 |}]
 
 module M : sig
@@ -1031,7 +1032,7 @@ Error: Signature mismatch:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-38.
        But the layout of 'a must be a value layout
-         because of the definition of t at line 2, characters 2-38.
+         because of the definition of t at line 4, characters 2-40.
 |}]
 
 module M : sig
@@ -1068,7 +1069,7 @@ Error: Signature mismatch:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-44.
        But the layout of 'a must be a value layout
-         because of the definition of t at line 2, characters 2-44.
+         because of the definition of t at line 4, characters 2-46.
 |}]
 
 module M : sig
@@ -1105,7 +1106,7 @@ Error: Signature mismatch:
        The layout of _ is any
          because of the definition of t at line 2, characters 2-40.
        But the layout of _ must be a value layout
-         because of the definition of t at line 2, characters 2-40.
+         because of the definition of t at line 4, characters 2-32.
 |}]
 
 module M : sig
@@ -1369,7 +1370,7 @@ Error: Signature mismatch:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-32.
        But the layout of 'a must be a value layout
-         because of the definition of t at line 2, characters 2-32.
+         because of the definition of t at line 4, characters 2-26.
 |}]
 
 module M : sig
@@ -1406,7 +1407,7 @@ Error: Signature mismatch:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-32.
        But the layout of 'a must be a value layout
-         because of the definition of t at line 2, characters 2-32.
+         because of the definition of t at line 4, characters 2-34.
 |}]
 
 type ('a : any) iddy = private 'a
@@ -1449,5 +1450,5 @@ Error: Signature mismatch:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-32.
        But the layout of 'a must be a value layout
-         because of the definition of t at line 2, characters 2-32.
+         because of the definition of t at line 4, characters 2-31.
 |}]

@@ -625,7 +625,7 @@ Line 1, characters 28-58:
                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The universal type variable 'a was declared to have kind any.
        But it was inferred to have kind value_or_null
-         because of the annotation on the universal variable 'a.
+         because the type argument of list has kind value_or_null.
 |}]
 
 (* Test this when sorts can be inside unboxed records *)

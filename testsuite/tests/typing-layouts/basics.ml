@@ -377,7 +377,7 @@ Error: This expression has type "t_any" but an expression was expected of type
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
        But the layout of t_any must be representable
-         because argument or result of a function type.
+         because we must know concretely how to return a function result.
 |}];;
 
 let f1 (x : t_any) = ();;
@@ -391,7 +391,7 @@ Error: This pattern matches values of type "t_any"
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
        But the layout of t_any must be representable
-         because argument or result of a function type.
+         because we must know concretely how to pass a function argument.
 |}];;
 
 (*****************************************************)
@@ -764,7 +764,8 @@ Error: The type constraints are not consistent.
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
        But the layout of t_float64 must be a value layout
-         because it's the type of the field of a polymorphic variant.
+         because it instantiates an unannotated type parameter of t,
+         chosen to have layout value.
 |}];;
 
 module type S8_5f = sig
@@ -860,7 +861,8 @@ Error: The type constraints are not consistent.
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
        But the layout of t_float64 must be a value layout
-         because it's the type of a tuple element.
+         because it instantiates an unannotated type parameter of t,
+         chosen to have layout value.
 |}];;
 
 module type S9_7f = sig
@@ -2091,7 +2093,7 @@ Error: Signature mismatch:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-24.
        But the layout of 'a must be a value layout
-         because of the definition of t at line 2, characters 2-24.
+         because of the definition of t at line 4, characters 2-26.
 |}]
 
 module M3 : sig
@@ -2118,7 +2120,7 @@ Error: Signature mismatch:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-30.
        But the layout of 'a must be a value layout
-         because of the definition of t at line 2, characters 2-30.
+         because of the definition of t at line 4, characters 2-22.
 |}]
 
 module M4 : sig
@@ -2255,7 +2257,7 @@ Error: Signature mismatch:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-37.
        But the layout of 'a must be a value layout
-         because of the definition of t at line 2, characters 2-37.
+         because of the definition of t at line 4, characters 2-29.
 |}]
 
 module M9 : sig
