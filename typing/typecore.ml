@@ -246,6 +246,7 @@ type error =
   | Invalid_atomic_loc_payload
   | Label_not_atomic of Longident.t
   | Atomic_in_pattern of Longident.t
+  | Atomic_in_functional_update of label
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string
@@ -3252,6 +3253,10 @@ let forbid_atomic_field_patterns loc penv (label_lid, label, pat) =
   if Types.is_atomic label.lbl_mut && not (wildcard pat) then
     raise (Error (loc, !!penv, Atomic_in_pattern label_lid.txt))
 
+let forbid_atomic_in_record_update loc env lbl =
+  if Types.is_atomic lbl.lbl_mut then
+    raise (Error (loc, env, Atomic_in_functional_update lbl.lbl_name))
+
 (** [type_pat] propagates the expected type, and
     unification may update the typing environment. *)
 let rec type_pat
@@ -3502,12 +3507,21 @@ and type_pat_aux
         pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_unpack name ->
       let t = instance expected_ty in
+      let pat_extra = [
+        Tpat_unpack, name.loc, sp.ppat_attributes;
+        (* [t] is intentionally not instantiated here, as it is still refined
+           e.g. in [map_half_typed_cases]. Ideally, we'd copy it after that.
+           However, at that point it is required to be closed, and hence
+           hopefully nothing surprising happens to it. *)
+        Tpat_inspected_type (Module_pack t), loc, []
+        ]
+      in
       begin match name.txt with
       | None ->
           rvp {
             pat_desc = Tpat_any;
             pat_loc = sp.ppat_loc;
-            pat_extra=[Tpat_unpack, name.loc, sp.ppat_attributes];
+            pat_extra;
             pat_type = t;
             pat_attributes = [];
             pat_env = !!penv;
@@ -3526,7 +3540,7 @@ and type_pat_aux
             pat_desc = Tpat_var { id; name = v; uid; sort;
                                   mode = alloc_mode.mode };
             pat_loc = sp.ppat_loc;
-            pat_extra=[Tpat_unpack, loc, sp.ppat_attributes];
+            pat_extra;
             pat_type = t;
             pat_attributes = [];
             pat_env = !!penv;
@@ -6677,6 +6691,7 @@ and type_expect_
                 unify_exp_types record_loc env (instance ty_expected) ty_res2);
               check_project_mutability ~loc:extended_expr_loc ~env
                 (Record_field lbl.lbl_name) lbl.lbl_mut mode;
+              forbid_atomic_in_record_update extended_expr_loc env lbl;
               let is_contained_by : Mode.Hint.is_contained_by =
                 { containing = Record (lbl.lbl_name, Modality);
                   container = (extended_expr_loc, Expression) }
@@ -8264,12 +8279,17 @@ and type_expect_
               raise (Error (loc, env, Not_a_packed_module ty_expected))
           in
           let (modl, pack') = !type_package env m pack in
+          let exp_type = newty (Tpackage pack') in
+          let exp_extra =
+            Texp_inspected_type (Module_pack (Ctype.instance exp_type))
+          in
           let mode = Typedtree.mode_without_locks_exn modl.mod_mode in
           submode ~loc ~env mode expected_mode;
           rue {
             exp_desc = Texp_pack modl;
-            exp_loc = loc; exp_extra = [];
-            exp_type = newty (Tpackage pack');
+            exp_loc = loc;
+            exp_extra = [exp_extra, loc, []];
+            exp_type;
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
       end
@@ -12926,6 +12946,13 @@ let report_error ~loc env =
          will happen during pattern matching:@ the field may be read@ \
          zero, one or several times depending on the patterns around it."
         quoted_longident lid
+  | Atomic_in_functional_update l ->
+      Location.errorf ~loc
+        "Functional updates that implicitly read atomic fields (here %a)@ \
+         are forbidden. @{<hint>Hint@}: if you intend to copy the value@ \
+         of an atomic field, do so explicitly:@ %a"
+        Style.inline_code l
+        Style.inline_code ("{ t with " ^ l ^ " = t." ^ l ^ " }")
   | Literal_overflow ty ->
       Location.errorf ~loc
         "Integer literal exceeds the range of representable integers of type %a"

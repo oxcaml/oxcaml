@@ -39,7 +39,7 @@ let code loopify(never) size(9) newer_version_of(g_1)
         -> k * k1
         : imm tagged =
   let x = g_into_my_closure_field_x in
-  apply h (0) -> k2 * k1
+  apply h (poison.val.reaper_unused_argument) -> k2 * k1
     where k2 (apply_result : imm tagged) =
       let int_add = %int_barith.add (x, apply_result) in
       cont k (int_add)

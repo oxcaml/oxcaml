@@ -190,9 +190,7 @@ type primitive =
   | Pidx_deepen of unit mixed_block_element * int list
   (* Context switches *)
   | Pwith_stack
-  | Pwith_stack_bind
   | Pwith_stack_preemptible
-  | Pwith_stack_bind_preemptible
   | Pperform
   | Presume
   | Preperform
@@ -2570,8 +2568,8 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pjoin_vec256 | Psplit_vec256 ->
     (* Aborts in bytecode, unboxed in native code *)
     None
-  | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible
-  | Pwith_stack_bind_preemptible | Presume | Pperform | Preperform
+  | Pwith_stack | Pwith_stack_preemptible
+  | Presume | Pperform | Preperform
     (* CR mshinwell: check *)
   | Ppoll ->
     Some alloc_heap
@@ -2771,8 +2769,8 @@ let primitive_can_raise prim =
   | Patomic_compare_set_field _ | Patomic_fetch_add_field  | Patomic_add_field
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
   | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
-  | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible
-  | Pwith_stack_bind_preemptible | Pperform | Presume
+  | Pwith_stack | Pwith_stack_preemptible
+  | Pperform | Presume
   | Preperform -> true (* XXX! *)
   | Pdls_get | Ptls_get | Pdomain_index | Ppoll | Pcpu_relax
   | Preinterpret_tagged_int63_as_unboxed_int64
@@ -3211,8 +3209,8 @@ let primitive_result_layout (p : primitive) =
     layout_any_value
   | (Parray_to_iarray | Parray_of_iarray) -> layout_any_value
   | Pget_header _ -> layout_boxed_int Boxed_nativeint
-  | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible
-  | Pwith_stack_bind_preemptible | Presume | Pperform | Preperform ->
+  | Pwith_stack | Pwith_stack_preemptible
+  | Presume | Pperform | Preperform ->
     layout_any_value
   | Patomic_load_field { immediate_or_pointer = Immediate } ->
     layout_int_or_null

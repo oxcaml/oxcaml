@@ -342,9 +342,7 @@ let emit_instr = function
   | Kresumeterm n -> out opRESUMETERM; out_int n
   | Kreperformterm n -> out opREPERFORMTERM; out_int n
   | Kwith_stack -> out opWITH_STACK
-  | Kwith_stack_bind -> out opWITH_STACK_BIND
   | Kwith_stack_preemptible -> out opWITH_STACK_PREEMPTIBLE
-  | Kwith_stack_bind_preemptible -> out opWITH_STACK_BIND_PREEMPTIBLE
   | Kstop -> out opSTOP
 
 (* Emission of a list of instructions. Include some peephole optimization. *)

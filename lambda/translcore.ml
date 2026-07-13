@@ -2210,7 +2210,13 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
       let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
       (* CR layouts v5: allow more unboxed types here. *)
       match definition with
-      | Kept _ -> cont
+      | Kept _ ->
+        if Types.is_atomic lbl.lbl_mut then
+          (* Rejected during typechecking to avoid need for
+             implicit atomic loads *)
+          fatal_error
+            "transl_record: update expr implicitly copies atomic field";
+        cont
       | Overridden (_lid, expr) ->
           let upd =
             match repres with
@@ -2281,6 +2287,9 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
            let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
            match definition with
            | Kept (typ, mut, _) ->
+               if Types.is_atomic lbl.lbl_mut then
+                 fatal_error
+                   "transl_record: update expr implicitly copies atomic field";
                let field_layout = layout env lbl.lbl_loc lbl_sort typ in
                let sem =
                  if Types.is_mutable mut then Reads_vary else Reads_agree

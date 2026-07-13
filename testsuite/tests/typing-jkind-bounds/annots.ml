@@ -1,10 +1,10 @@
 (* TEST
  include stdlib_upstream_compatible;
  {
-   flags = "-no-ikinds";
+   flags = "-no-ikinds -w -181";
    expect;
  }{
-   flags = "-extension layouts_beta -no-ikinds";
+   flags = "-extension layouts_beta -no-ikinds -w -181";
    expect;
  }
 *)

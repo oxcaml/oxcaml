@@ -63,6 +63,7 @@ typedef cpuset_t cpu_set_t;
 #include "caml/runtime_events.h"
 #include "caml/fail.h"
 #include "caml/fiber.h"
+#include "caml/dynamic.h"
 #include "caml/finalise.h"
 #include "caml/gc_ctrl.h"
 #include "caml/globroots.h"

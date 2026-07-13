@@ -145,7 +145,7 @@ G(name):
 #define Dynamic_cache            0 /* offset of cache in dynamic_cache_t */
 #define Dynamic_binding_size     (2*8) /* dyn, val */
 #define Dynamic_binding_var      0 /* offset of var within a single binding */
-#define Dynamic_cache_entries    8 /* must match DYNAMIC_CACHE_SIZE in fiber.c */
+#define Dynamic_cache_entries    8 /* must match DYNAMIC_CACHE_SIZE in dynamic.c */
 
 /* struct c_stack_link */
 #if defined(SYS_mingw64) || defined (SYS_cygwin)
@@ -716,7 +716,6 @@ Make_call_realloc_stack(_avx512, ZMM)
 #define Make_call_gc(suffix, simd)                   \
     FUNCTION(caml_call_gc##suffix) ;                 \
     CFI_STARTPROC                     ;              \
-        CFI_SIGNAL_FRAME;                            \
         ENTER_FUNCTION;                              \
 LBL(caml_call_gc ## suffix):                         \
         SAVE_ALL_REGS(simd);                         \
@@ -732,6 +731,7 @@ Make_call_gc(_avx512, ZMM)
 
 FUNCTION(caml_do_call_gc)
 CFI_STARTPROC
+        CFI_SIGNAL_FRAME
         ENTER_FUNCTION
         movq    %r15, Caml_state(gc_regs)
         TSAN_ENTER_FUNCTION(0)
@@ -1469,6 +1469,7 @@ END_FUNCTION(caml_reperform)
 */
 FUNCTION(caml_preempt)
 CFI_STARTPROC
+        CFI_SIGNAL_FRAME
         /* Restore the young_ptr that was saved at the beginning of
            SAVE_ALL_REGS, in caml_call_gc */
         movq Caml_state(young_ptr), %r15

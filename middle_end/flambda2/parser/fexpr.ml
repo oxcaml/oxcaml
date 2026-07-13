@@ -328,7 +328,9 @@ and value_slots = one_value_slot list
 
 and one_value_slot =
   { var : value_slot;
-    value : simple
+    value : simple;
+    kind : Flambda_kind.Naked_number_kind.t option
+        (* [None] means kind [Value]. *)
   }
 
 and let_ =

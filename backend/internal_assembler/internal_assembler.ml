@@ -28,7 +28,7 @@ open! Int_replace_polymorphic_compare
 module String = Misc.Stdlib.String
 module Section_name = X86_proc.Section_name
 module StringMap = X86_binary_emitter.StringMap
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 let isprefix s1 s2 =
   String.length s1 <= String.length s2
