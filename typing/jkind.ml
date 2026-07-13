@@ -2978,7 +2978,21 @@ let rec resolve_flattened_history ?target env history =
         | Some (Misc.Le_result.Less | Misc.Le_result.Equal) -> true
         | Some Misc.Le_result.Not_le | None -> false)
     in
-    let impl1 = implies d1 and impl2 = implies d2 in
+    (* Z4: [implies] -> [sub_layout] -> [Layout.sub] -> [Sort.equate] can
+       INSTANTIATE sort variables. This filter runs at error-FORMAT time, so it
+       must not mutate shared type/sort state: otherwise checking candidate 1
+       could instantiate the shared target before candidate 2 is tested
+       (evaluation-order-dependent provenance), and in a recovering toplevel a
+       printed error would leave type state changed for later phrases. Snapshot
+       + backtrack around EACH check so it is pure and independent (the sort
+       change log is wired into [Btype.backtrack] via [types.ml]). *)
+    let pure_implies d =
+      let snap = Btype.snapshot () in
+      let r = implies d in
+      Btype.backtrack snap;
+      r
+    in
+    let impl1 = pure_implies d1 and impl2 = pure_implies d2 in
     (* Fallback when the implication filter cannot decide: orient the two jkinds
        exactly as the eager [combine_histories] did (via [try_allow_*]) and pick
        the oriented sub/super side by the lazy ikind verdict; [Equal]/no verdict
