@@ -519,6 +519,13 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
            are jumping "inside" the loop directly, which in turn means the loop
            is no longer natural. This is acceptable if we are past the last use
            of the loop information. *)
+        (* CR-someday xclerc for xclerc: unlike the terminator-copy case below,
+           this rewrite is not disabled for the entry block. If the skipped
+           (empty) successor is the destination of a [Tailcall_self], the
+           rewrite breaks the invariant that the tailrec block is the entry
+           block or the only successor of the entry block (reported by
+           [Cfg_invariants] when -dcfg-invariants is enabled; the generated
+           code remains correct). *)
         if
           !Oxcaml_flags.cfg_value_propagation
           && is_after_regalloc && cfg.allowed_to_be_irreducible
