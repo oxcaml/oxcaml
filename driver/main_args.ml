@@ -828,7 +828,8 @@ let mk_ikinds_debug f =
 
 let mk_print_from_ikinds f =
   "-print-from-ikinds", Arg.Unit f,
-  " Derive jkind printing from the ikind representation (dev)"
+  " With -ikinds-debug, print an at-exit summary of ikind print-path \
+   counters (dev; jkind rendering from the ikind is always on)"
 
 let mk_extension f =
   let available_extensions =
