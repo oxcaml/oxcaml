@@ -1483,13 +1483,14 @@ let out_type_of_payload ~name_of (name : Types.Rigid_name.t) :
 (* Z2: stringify a conflict-aware [out_ident] (mirrors [oide_of_path]) so the
    [&]-product / ctor-arg string fallback disambiguates shadowed paths (e.g.
    [X/2.t]) instead of the raw [Path.name] that denotes the wrong path. *)
-let rec string_of_oide (oid : Outcometree.out_ident) : string =
-  match oid with
-  | Outcometree.Oide_ident { Outcometree.printed_name } -> printed_name
-  | Outcometree.Oide_dot (p, s) -> string_of_oide p ^ "." ^ s
-  | Outcometree.Oide_apply (a, b) ->
-    string_of_oide a ^ "(" ^ string_of_oide b ^ ")"
-  | Outcometree.Oide_hash a -> string_of_oide a ^ "#"
+(* W2: render the [out_ident] exactly as [Oprint] would, so keyword and [::]
+   identifiers are escaped (e.g. [\#and]) identically to the single-atom
+   [out_type_of_payload] path and to legacy. A hand-rolled concatenation of
+   [printed_name] dropped that escaping, breaking the [&]-product string
+   fallback for raw identifiers. Byte-identical to the concatenation for
+   ordinary idents. *)
+let string_of_oide (oid : Outcometree.out_ident) : string =
+  Format_doc.asprintf "%a" !Oprint.out_ident oid
 
 (* Honest string form of an atom for the non-parsing [&]-product fallback. *)
 let string_of_atom ~name_of (name : Types.Rigid_name.t) : string =
