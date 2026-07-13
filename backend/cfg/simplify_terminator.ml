@@ -268,22 +268,29 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
         remove_destroyed instr
       in
       match instr.desc with
-      | Op (Const_int c) -> replace instr.res.(0) (Const_int c)
+      | Op (Const_int c) ->
+        replace instr.res.(0) (Const_int c);
+        remove_destroyed instr
       | Op (Const_float32 c) ->
         if !Oxcaml_flags.cfg_value_propagation_float
         then replace instr.res.(0) (Const_float32 c)
+        else remove instr.res.(0);
+        remove_destroyed instr
       | Op (Const_float c) ->
         if !Oxcaml_flags.cfg_value_propagation_float
         then replace instr.res.(0) (Const_float c)
-      | Op Move -> (
+        else remove instr.res.(0);
+        remove_destroyed instr
+      | Op Move ->
         (* CR xclerc for xclerc: double check the "magic" / conversions behind
            moves in `Emit` will not result in invalid tracking here. *)
-        match find_opt instr.arg.(0) with
+        (match find_opt instr.arg.(0) with
         | Some value
           when Cmm.equal_machtype_component instr.res.(0).typ instr.arg.(0).typ
           ->
           replace instr.res.(0) value
-        | Some _ | None -> remove instr.res.(0))
+        | Some _ | None -> remove instr.res.(0));
+        remove_destroyed instr
       | Op (Intop_imm (op, imm)) ->
         apply_int_op op (Some (Nativeint.of_int imm))
       | Op (Intop op) ->
