@@ -607,7 +607,7 @@ Error: The value "utup" has type "('a : value_or_null)"
            '_representable_layout_7 & '_representable_layout_8
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a value layout
-         because argument or result of a function type.
+         because it's the type of a variable captured in an object.
 |}];;
 
 (* Unboxed records version of the same test *)
@@ -779,7 +779,7 @@ Error: The value "utup" has type "('a : value_or_null)"
        The layout of capture_record is value non_pointer & value non_pointer
          because of the definition of capture_record at line 1, characters 0-43.
        But the layout of capture_record must be a value layout
-         because argument or result of a function type.
+         because it's the type of a variable captured in an object.
        Note: The layout of immediate is value non_pointer.
 |}];;
 
@@ -2065,9 +2065,7 @@ Line 1, characters 19-27:
                        ^^^^^^^^
 Error: This type "string t" = "#(string u * string u)"
        should be an instance of type "('a : any mod global)"
-       The kind of string t is
-           value mod everything non_float mod dynamic with string u
-           & value mod everything non_float mod dynamic with string u
+       The kind of string t is value non_float & value non_float
          because it is an unboxed tuple.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2100,9 +2098,7 @@ Line 3, characters 9-30:
 Error: This type "#(int * string * int)" should be an instance of type
          "('a : any mod external_)"
        The kind of #(int * string * int) is
-           immediate mod dynamic with int with string
-           & value mod everything non_float mod dynamic with int with string
-           & immediate mod dynamic with int with string
+           value non_pointer & value non_float & value non_pointer
          because it is an unboxed tuple.
        But the kind of #(int * string * int) must be a subkind of
            any mod external_

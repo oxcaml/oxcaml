@@ -611,7 +611,7 @@ Error: This definition has type "'b t# -> 'b" which is less general than
        The layout of 'a is any
          because of the annotation on the universal variable 'a.
        But the layout of 'a must be representable
-         because of the definition of t at line 1, characters 0-39.
+         because we must know concretely how to pass a function argument.
 |}]
 
 let f = fun a -> #{ x = 1; y = a }
@@ -636,7 +636,7 @@ Error: This definition has type "'b -> 'b t#" which is less general than
        The layout of 'a is any
          because of the annotation on the universal variable 'a.
        But the layout of 'a must be representable
-         because of the annotation on the universal variable 'a.
+         because we must know concretely how to pass a function argument.
 |}]
 
 

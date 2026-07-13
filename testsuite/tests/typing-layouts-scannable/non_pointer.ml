@@ -520,7 +520,7 @@ Error: Signature mismatch:
        The layout of 'a is value
          because of the definition of t at line 2, characters 2-29.
        But the layout of 'a must be a sublayout of value non_pointer
-         because of the definition of t at line 2, characters 2-29.
+         because of the definition of t at line 4, characters 2-39.
        Note: The layout of immediate is value non_pointer.
 |}]
 
