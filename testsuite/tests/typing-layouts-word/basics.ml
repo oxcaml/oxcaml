@@ -651,7 +651,7 @@ Error: The value "m1" has type "('a : value_or_null)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
        But the layout of t_word must be a value layout
-         because argument or result of a function type.
+         because it's the type of a variable captured in an object.
 |}];;
 
 let f12_14 (m1 : t_word) (m2 : t_word) = object

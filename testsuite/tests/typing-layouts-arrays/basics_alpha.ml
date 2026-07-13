@@ -289,7 +289,7 @@ Error: This constant has type "float#" but an expression was expected of type
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
        But the layout of float# must be a value layout
-         because it's the type of the recursive variable x.
+         because it's the type of an array element.
 |}]
 
 let _ =
@@ -305,7 +305,7 @@ Error: This constant has type "int32#" but an expression was expected of type
        The layout of int32# is bits32
          because it is the unboxed version of the primitive type int32.
        But the layout of int32# must be a value layout
-         because it's the type of the recursive variable x.
+         because it's the type of an array element.
 |}]
 
 let _ =
@@ -321,7 +321,7 @@ Error: This constant has type "int64#" but an expression was expected of type
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
        But the layout of int64# must be a value layout
-         because it's the type of the recursive variable x.
+         because it's the type of an array element.
 |}]
 
 let _ =
@@ -337,7 +337,7 @@ Error: This constant has type "nativeint#"
        The layout of nativeint# is word
          because it is the unboxed version of the primitive type nativeint.
        But the layout of nativeint# must be a value layout
-         because it's the type of the recursive variable x.
+         because it's the type of an array element.
 |}]
 
 let _ =
@@ -353,7 +353,7 @@ Error: This constant has type "float32#" but an expression was expected of type
        The layout of float32# is float32
          because it is the unboxed version of the primitive type float32.
        But the layout of float32# must be a value layout
-         because it's the type of the recursive variable x.
+         because it's the type of an array element.
 |}]
 
 (* Test 8: makearraydynamic_uninit *)
