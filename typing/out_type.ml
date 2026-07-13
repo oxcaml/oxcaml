@@ -1161,6 +1161,13 @@ end
    param-name resolver (PRINT-DESIGN.md 4.1). *)
 let () = Jkind.Const.set_param_name_resolver Variable_names.resolve_param_id
 
+(* A2: install the namespaced, conflict-aware path printer as the ikind
+   with-clause renderer's constructor-atom resolver, so shadowed with-bound
+   paths disambiguate (e.g. [with X/2.t]) rather than printing a raw
+   [Path.name] that denotes the wrong path. *)
+let () =
+  Jkind.Const.set_path_oide_resolver (fun p -> tree_of_path (Some Type) p)
+
 module Aliases = struct
   let visited_objects = ref ([] : transient_expr list)
   let aliased = ref ([] : transient_expr list)

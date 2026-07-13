@@ -819,7 +819,7 @@ end
 Line 2, characters 2-35:
 2 |   type r : value mod portable = X.s
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "X/2.s" is value mod portable with X.t
+Error: The kind of type "X/2.s" is value mod portable with X/2.t
          because of the definition of s at line 4, characters 2-36.
        But the kind of type "X/2.s" must be a subkind of value mod portable
          because of the definition of r at line 2, characters 2-35.

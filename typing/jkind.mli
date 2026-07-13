@@ -336,6 +336,15 @@ module Const : sig
 
   val resolve_param_name : int -> string option
 
+  (** [path_oide_resolver] (A2 fix): [Out_type] installs a resolver that renders
+      a with-bound constructor-atom [Path.t] through its namespaced, conflict-
+      aware path printer, so shadowed paths disambiguate (e.g. [X/2.t]) instead
+      of printing the raw [Path.name] (which denotes the wrong path under
+      shadowing). The default preserves the raw [Path.name] rendering. *)
+  val set_path_oide_resolver : (Path.t -> Outcometree.out_ident) -> unit
+
+  val resolve_path_oide : Path.t -> Outcometree.out_ident
+
   (** Render the axes [ignored] by a with-bound's modality as the [out_modality]
       strings a [with]-clause carries (e.g. [portable]). Used by the
       ikind-derived printer ([Ikind.render_jkind_from_ikind]) to reconstruct

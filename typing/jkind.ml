@@ -1637,6 +1637,21 @@ module Const = struct
 
   let resolve_param_name id = !param_name_resolver id
 
+  (* path_oide_resolver (A2 fix): a with-bound constructor atom is a [Path.t];
+     the default renders it as a raw [Path.name] flat identifier, which
+     bypasses [Out_type]'s conflict-aware path printer and prints the WRONG
+     name under shadowing (e.g. [with X.t] where legacy prints [with X/2.t]).
+     [Out_type] installs a resolver routing through its namespaced
+     [tree_of_path] so shadowed paths disambiguate; the default preserves the
+     raw behavior for contexts with no live printer. *)
+  let path_oide_resolver : (Path.t -> Outcometree.out_ident) ref =
+    ref (fun p ->
+        Outcometree.Oide_ident { Outcometree.printed_name = Path.name p })
+
+  let set_path_oide_resolver f = path_oide_resolver := f
+
+  let resolve_path_oide path = !path_oide_resolver path
+
   module To_out_jkind_const : sig
     (** Convert a [t] into a [Outcometree.out_jkind_const]. If [verbosity] is
         [Not_verbose], the jkind is written in terms of the built-in jkind that

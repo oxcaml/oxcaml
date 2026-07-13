@@ -1441,7 +1441,11 @@ let () =
 (* ------------------------------------------------------------------------- *)
 
 let oide_of_path (path : Path.t) : Outcometree.out_ident =
-  Outcometree.Oide_ident { Outcometree.printed_name = Path.name path }
+  (* A2: route through [Out_type]'s namespaced, conflict-aware path printer
+     (installed into [Jkind.Const.path_oide_resolver]) so a shadowed with-bound
+     path disambiguates (e.g. [X/2.t]) instead of printing the raw [Path.name],
+     which under shadowing denotes the WRONG path. Default = raw [Path.name]. *)
+  Jkind.Const.resolve_path_oide path
 
 (* Deterministic 'a, 'b, ... naming for [Param] atoms, assigned in
    ascending [get_id] order across the whole jkind. For a standard
