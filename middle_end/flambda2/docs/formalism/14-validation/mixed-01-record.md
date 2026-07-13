@@ -1,5 +1,7 @@
 # mixed-01: build and read a mixed record
 
+**Testsuite:** [`testsuite/tests/flambda2/examples/formalism/mixed_record.ml`](../../../../../testsuite/tests/flambda2/examples/formalism/mixed_record.ml) (reference: `formalism/mixed_record.simplify.reference`) — run with `make -s test-one-no-rebuild TEST=flambda2/examples/formalism/mixed_record.ml`.
+
 Targets `P.Variadic.MakeBlock.Mixed`, `P.Unary.BlockLoad.Mixed`,
 `P.MixedShape.FieldKinds` (ch. 06) and `WF.Prim.MakeBlockMixed` (ch. 03): a
 record with one value field and two unboxed flat-suffix fields builds a mixed

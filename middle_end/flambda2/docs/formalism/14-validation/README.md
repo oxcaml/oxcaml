@@ -16,6 +16,17 @@ MISMATCH below drove a correction to `S.Rewrite.CSE.Eligible`.
 
 **Verdicts:** 32 case studies — 30 MATCH, 1 PARTIAL, 1 MISMATCH (now fixed).
 
+**Synthesized tests in the testsuite.** The 12 synthesized case studies (the
+"Synthesized" and "Mixed blocks" tables below) have their programs checked into
+the `testsuite/tests/flambda2/examples/formalism/` subdirectory, each paired
+with a `.simplify.reference` capturing the Simplify fexpr dump. CI runs them
+automatically (the examples directory is picked up with no test-list entry), so
+the predicted behavior each case study witnesses is pinned against regressions.
+Run one with `make -s test-one-no-rebuild TEST=flambda2/examples/formalism/<topic>.ml`
+and update its reference with the matching `promote-one-no-rebuild`. Each case
+study links to its test at the top; the inline Source sections remain as the
+historical prediction record.
+
 ## From existing testsuite tests (14)
 
 | Case study | Source test | Verdict | Primary rules |
@@ -37,25 +48,31 @@ MISMATCH below drove a correction to `S.Rewrite.CSE.Eligible`.
 
 ## Synthesized (8)
 
-| Case study | Target | Verdict | Primary rules |
-|---|---|---|---|
-| [`new-01-constfold`](new-01-constfold.md) | integer constant-folding chain | MATCH | `S.Rewrite.Prim.ConstFold` |
-| [`new-02-known-switch`](new-02-known-switch.md) | switch on a known constructor | MATCH | `S.Rewrite.Switch.ArmPrune`, `S.Rewrite.Switch.Merge` |
-| [`new-03-letcont-inline`](new-03-letcont-inline.md) | single-use continuation inlining | MATCH | `S.Rewrite.LetCont.Inline` |
-| [`new-04-cse`](new-04-cse.md) | CSE of a repeated pure primitive | MATCH | `S.Rewrite.CSE.Replace`, `S.Rewrite.CSE.Extend` |
-| [`new-05-inline-fold`](new-05-inline-fold.md) | inline then constant-fold | MATCH | `S.Inline.Substitute`, `S.Rewrite.Prim.ConstFold` |
-| [`new-06-trap`](new-06-trap.md) | trap actions preserved around opaque call | MATCH | `OS.ApplyCont.TrapPush`, `OS.ApplyCont.TrapPop` |
-| [`new-07-float-unbox`](new-07-float-unbox.md) | float accumulator unboxed across a loop | MATCH | `S.Unbox.ContParam.Rewrite`, `S.Unbox.Mutable.Rewrite`, `S.Unbox.Optimistic.Number` |
-| [`new-08-nested-switch`](new-08-nested-switch.md) | unreachable arm pruned via refined type | MATCH | `S.Rewrite.Switch.ArmPrune`, `S.Rewrite.Switch.BooleanNot` |
+These case studies use synthesized programs; each is checked into the testsuite
+(see "Synthesized tests in the testsuite" below).
+
+| Case study | Target | Verdict | Testsuite test | Primary rules |
+|---|---|---|---|---|
+| [`new-01-constfold`](new-01-constfold.md) | integer constant-folding chain | MATCH | [`formalism/constfold`](../../../../../testsuite/tests/flambda2/examples/formalism/constfold.ml) | `S.Rewrite.Prim.ConstFold` |
+| [`new-02-known-switch`](new-02-known-switch.md) | switch on a known constructor | MATCH | [`formalism/known_switch`](../../../../../testsuite/tests/flambda2/examples/formalism/known_switch.ml) | `S.Rewrite.Switch.ArmPrune`, `S.Rewrite.Switch.Merge` |
+| [`new-03-letcont-inline`](new-03-letcont-inline.md) | single-use continuation inlining | MATCH | [`formalism/letcont_inline`](../../../../../testsuite/tests/flambda2/examples/formalism/letcont_inline.ml) | `S.Rewrite.LetCont.Inline` |
+| [`new-04-cse`](new-04-cse.md) | CSE of a repeated pure primitive | MATCH | [`formalism/cse`](../../../../../testsuite/tests/flambda2/examples/formalism/cse.ml) | `S.Rewrite.CSE.Replace`, `S.Rewrite.CSE.Extend` |
+| [`new-05-inline-fold`](new-05-inline-fold.md) | inline then constant-fold | MATCH | [`formalism/inline_fold`](../../../../../testsuite/tests/flambda2/examples/formalism/inline_fold.ml) | `S.Inline.Substitute`, `S.Rewrite.Prim.ConstFold` |
+| [`new-06-trap`](new-06-trap.md) | trap actions preserved around opaque call | MATCH | [`formalism/trap`](../../../../../testsuite/tests/flambda2/examples/formalism/trap.ml) | `OS.ApplyCont.TrapPush`, `OS.ApplyCont.TrapPop` |
+| [`new-07-float-unbox`](new-07-float-unbox.md) | float accumulator unboxed across a loop | MATCH | [`formalism/float_unbox`](../../../../../testsuite/tests/flambda2/examples/formalism/float_unbox.ml) | `S.Unbox.ContParam.Rewrite`, `S.Unbox.Mutable.Rewrite`, `S.Unbox.Optimistic.Number` |
+| [`new-08-nested-switch`](new-08-nested-switch.md) | unreachable arm pruned via refined type | MATCH | [`formalism/nested_switch`](../../../../../testsuite/tests/flambda2/examples/formalism/nested_switch.ml) | `S.Rewrite.Switch.ArmPrune`, `S.Rewrite.Switch.BooleanNot` |
 
 ## Mixed blocks (4)
 
-| Case study | Target | Verdict | Primary rules |
-|---|---|---|---|
-| [`mixed-01-record`](mixed-01-record.md) | build and read a mixed record | MATCH | `P.Variadic.MakeBlock.Mixed`, `P.Unary.BlockLoad.Mixed`, `P.MixedShape.FieldKinds`, `WF.Prim.MakeBlockMixed` |
-| [`mixed-02-static`](mixed-02-static.md) | statically-allocated mixed record | MATCH | `P.Static.MixedBlock` |
-| [`mixed-03-mutable-set`](mixed-03-mutable-set.md) | mutable mixed field, write then read | MATCH | `P.Binary.BlockSet.Mixed`, `P.Unary.BlockLoad.Mixed`, `P.Effects.ReadingFromBlock` |
-| [`mixed-04-join`](mixed-04-join.md) | join two mixed blocks of equal shape | MATCH | `T.Meet.BlockShape` |
+These case studies use synthesized programs; each is checked into the testsuite
+(see "Synthesized tests in the testsuite" below).
+
+| Case study | Target | Verdict | Testsuite test | Primary rules |
+|---|---|---|---|---|
+| [`mixed-01-record`](mixed-01-record.md) | build and read a mixed record | MATCH | [`formalism/mixed_record`](../../../../../testsuite/tests/flambda2/examples/formalism/mixed_record.ml) | `P.Variadic.MakeBlock.Mixed`, `P.Unary.BlockLoad.Mixed`, `P.MixedShape.FieldKinds`, `WF.Prim.MakeBlockMixed` |
+| [`mixed-02-static`](mixed-02-static.md) | statically-allocated mixed record | MATCH | [`formalism/mixed_static`](../../../../../testsuite/tests/flambda2/examples/formalism/mixed_static.ml) | `P.Static.MixedBlock` |
+| [`mixed-03-mutable-set`](mixed-03-mutable-set.md) | mutable mixed field, write then read | MATCH | [`formalism/mixed_mutable_set`](../../../../../testsuite/tests/flambda2/examples/formalism/mixed_mutable_set.ml) | `P.Binary.BlockSet.Mixed`, `P.Unary.BlockLoad.Mixed`, `P.Effects.ReadingFromBlock` |
+| [`mixed-04-join`](mixed-04-join.md) | join two mixed blocks of equal shape | MATCH | [`formalism/mixed_join`](../../../../../testsuite/tests/flambda2/examples/formalism/mixed_join.ml) | `T.Meet.BlockShape` |
 
 ## Loopification (6)
 

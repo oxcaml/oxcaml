@@ -1,5 +1,7 @@
 # new-07: float accumulator unboxed across a loop
 
+**Testsuite:** [`testsuite/tests/flambda2/examples/formalism/float_unbox.ml`](../../../../../testsuite/tests/flambda2/examples/formalism/float_unbox.ml) (reference: `formalism/float_unbox.simplify.reference`) — run with `make -s test-one-no-rebuild TEST=flambda2/examples/formalism/float_unbox.ml`.
+
 Targets `S.Unbox.ContParam.*` and `S.Unbox.Mutable.*` (ch. 12): a `float ref`
 accumulator loop drives the recursive loop continuation to a naked-`float`
 parameter, with `Box_number` only on the loop-exit edge.

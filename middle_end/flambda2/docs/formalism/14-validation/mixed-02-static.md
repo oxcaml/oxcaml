@@ -1,5 +1,7 @@
 # mixed-02: statically-allocated mixed record
 
+**Testsuite:** [`testsuite/tests/flambda2/examples/formalism/mixed_static.ml`](../../../../../testsuite/tests/flambda2/examples/formalism/mixed_static.ml) (reference: `formalism/mixed_static.simplify.reference`) — run with `make -s test-one-no-rebuild TEST=flambda2/examples/formalism/mixed_static.ml`.
+
 Targets `P.Static.MixedBlock` (ch. 06): a toplevel immutable mixed record
 constant is lifted to a static `Block` whose fields include raw naked scalars,
 which only a `Mixed_record` scannable shape can hold.

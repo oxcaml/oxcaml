@@ -1,5 +1,7 @@
 # new-02: switch on a known constant-constructor scrutinee
 
+**Testsuite:** [`testsuite/tests/flambda2/examples/formalism/known_switch.ml`](../../../../../testsuite/tests/flambda2/examples/formalism/known_switch.ml) (reference: `formalism/known_switch.simplify.reference`) — run with `make -s test-one-no-rebuild TEST=flambda2/examples/formalism/known_switch.ml`.
+
 Targets `S.Rewrite.Switch.ArmPrune` + `S.Rewrite.Switch.Merge` (ch. 10): a match
 whose scrutinee is a statically-known constructor keeps no `switch`.
 

@@ -1,5 +1,7 @@
 # mixed-04: joining two mixed blocks of equal shape
 
+**Testsuite:** [`testsuite/tests/flambda2/examples/formalism/mixed_join.ml`](../../../../../testsuite/tests/flambda2/examples/formalism/mixed_join.ml) (reference: `formalism/mixed_join.simplify.reference`) — run with `make -s test-one-no-rebuild TEST=flambda2/examples/formalism/mixed_join.ml`.
+
 Targets `T.Meet.BlockShape` (ch. 08): two `if`/`else` branches build mixed
 blocks of the *same* shape; at the join the block type keeps that shape (equal
 shapes ⟹ keep σ), which in turn lets the flat-suffix field be unboxed across the

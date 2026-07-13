@@ -1,5 +1,7 @@
 # new-06: trap actions preserved around an opaque call
 
+**Testsuite:** [`testsuite/tests/flambda2/examples/formalism/trap.ml`](../../../../../testsuite/tests/flambda2/examples/formalism/trap.ml) (reference: `formalism/trap.simplify.reference`) — run with `make -s test-one-no-rebuild TEST=flambda2/examples/formalism/trap.ml`.
+
 Targets `OS.ApplyCont.TrapPush` / `OS.ApplyCont.TrapPop` (ch. 04): a `try…with`
 around a call to an unknown function keeps its push/pop trap actions — they must
 NOT be optimized away.

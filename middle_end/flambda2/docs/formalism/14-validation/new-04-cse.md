@@ -1,5 +1,7 @@
 # new-04: CSE of a repeated pure primitive
 
+**Testsuite:** [`testsuite/tests/flambda2/examples/formalism/cse.ml`](../../../../../testsuite/tests/flambda2/examples/formalism/cse.ml) (reference: `formalism/cse.simplify.reference`) — run with `make -s test-one-no-rebuild TEST=flambda2/examples/formalism/cse.ml`.
+
 Targets `S.Rewrite.CSE.Replace` (+ `.Extend`, `.Eligible`) (ch. 10): two
 identical `String.length` reads collapse to one.
 

@@ -1,5 +1,7 @@
 # new-01: integer constant-folding chain
 
+**Testsuite:** [`testsuite/tests/flambda2/examples/formalism/constfold.ml`](../../../../../testsuite/tests/flambda2/examples/formalism/constfold.ml) (reference: `formalism/constfold.simplify.reference`) — run with `make -s test-one-no-rebuild TEST=flambda2/examples/formalism/constfold.ml`.
+
 Targets `S.Rewrite.Prim.ConstFold` (ch. 10): a nested arithmetic expression on
 constants folds to a single constant.
 

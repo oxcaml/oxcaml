@@ -1,5 +1,7 @@
 # new-03: single-use continuation inlining
 
+**Testsuite:** [`testsuite/tests/flambda2/examples/formalism/letcont_inline.ml`](../../../../../testsuite/tests/flambda2/examples/formalism/letcont_inline.ml) (reference: `formalism/letcont_inline.simplify.reference`) — run with `make -s test-one-no-rebuild TEST=flambda2/examples/formalism/letcont_inline.ml`.
+
 Targets `S.Rewrite.LetCont.Inline` (ch. 10): a non-recursive continuation used
 exactly once in tail position is inlined and its binder disappears.
 

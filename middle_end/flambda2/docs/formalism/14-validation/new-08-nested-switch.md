@@ -1,5 +1,7 @@
 # new-08: unreachable arm pruned via refined scrutinee type
 
+**Testsuite:** [`testsuite/tests/flambda2/examples/formalism/nested_switch.ml`](../../../../../testsuite/tests/flambda2/examples/formalism/nested_switch.ml) (reference: `formalism/nested_switch.simplify.reference`) — run with `make -s test-one-no-rebuild TEST=flambda2/examples/formalism/nested_switch.ml`.
+
 Targets `S.Rewrite.Switch.ArmPrune` and `S.Rewrite.Invalid.Propagate` (ch. 10):
 a match on a value already known (from an enclosing match) to be a specific
 constructor prunes the impossible inner arm.

@@ -1,5 +1,7 @@
 # mixed-03: mutable mixed field, write then read
 
+**Testsuite:** [`testsuite/tests/flambda2/examples/formalism/mixed_mutable_set.ml`](../../../../../testsuite/tests/flambda2/examples/formalism/mixed_mutable_set.ml) (reference: `formalism/mixed_mutable_set.simplify.reference`) — run with `make -s test-one-no-rebuild TEST=flambda2/examples/formalism/mixed_mutable_set.ml`.
+
 Targets `P.Binary.BlockSet.Mixed` and `P.Unary.BlockLoad.Mixed` +
 `P.Effects.ReadingFromBlock` (ch. 06): a write to a mutable flat-suffix field
 followed by a read of the same field does not fold the read to the just-written

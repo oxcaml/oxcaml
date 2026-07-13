@@ -1,5 +1,7 @@
 # new-05: function inlining then constant folding
 
+**Testsuite:** [`testsuite/tests/flambda2/examples/formalism/inline_fold.ml`](../../../../../testsuite/tests/flambda2/examples/formalism/inline_fold.ml) (reference: `formalism/inline_fold.simplify.reference`) — run with `make -s test-one-no-rebuild TEST=flambda2/examples/formalism/inline_fold.ml`.
+
 Targets `S.Inline.Substitute` (ch. 11) + `S.Rewrite.Prim.ConstFold` (ch. 10): a
 small function applied to a constant is inlined and the body folds.
 
