@@ -29,6 +29,14 @@ open! Int_replace_polymorphic_compare
 module C = Cfg
 module Dll = Oxcaml_utils.Doubly_linked_list
 
+(* Maximum immediate value used when a [Switch] is rewritten as an [Int_test]
+   below. Selection normally guarantees, via `is_immediate`, that `Int_test`
+   immediates are encodable on the target; this rewrite bypasses selection, so
+   it conservatively stays within what all targets can encode (arm64's `cmp`
+   immediate is limited to 0..4095, and `emit_cmpimm` does not split larger
+   values). *)
+let max_int_test_imm = 0xFFF
+
 (* Convert simple [Switch] to branches. *)
 let simplify_switch (block : C.basic_block) labels =
   let len = Array.length labels in
@@ -52,7 +60,7 @@ let simplify_switch (block : C.basic_block) labels =
     (* All labels are the same and equal to l *)
     block.terminator
       <- { block.terminator with desc = Always l; arg = [||]; res = [||] }
-  | [(l0, n); (ln, k)] ->
+  | [(l0, n); (ln, k)] when n <= max_int_test_imm ->
     assert (Label.equal labels.(0) l0);
     assert (Label.equal labels.(n) ln);
     assert (len = n + k);
@@ -61,7 +69,8 @@ let simplify_switch (block : C.basic_block) labels =
         { is_signed = Unsigned; imm = Some n; lt = l0; eq = ln; gt = ln }
     in
     block.terminator <- { block.terminator with desc }
-  | [(l0, m); (l1, 1); (l2, n)] when Label.equal l0 l2 ->
+  | [(l0, m); (l1, 1); (l2, n)] when Label.equal l0 l2 && m <= max_int_test_imm
+    ->
     assert (Label.equal labels.(0) l0);
     assert (Label.equal labels.(m) l1);
     assert (Label.equal labels.(m + 1) l2);
