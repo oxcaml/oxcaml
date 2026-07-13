@@ -929,6 +929,39 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           (List.map (fun (ld : Types.label_declaration) ->
              { ld with ld_type = instantiate ld.ld_type }) lds)
     in
+    (* Fast path for [Cstr_layout_variable] constructors: if a cheap jkind
+       estimate (which never expands abbreviations) already shows that every
+       argument is scannable, the constructor is an ordinary uniform value
+       block and we can skip
+       [Typedecl.update_constructor_representation_and_arg_sorts]. That
+       function computes precise argument jkinds by deeply expanding the
+       argument types, which can be very expensive: the expansion may load
+       many cmis that the compilation unit otherwise never needs. The
+       estimate is an upper bound on the precise jkind and every sublayout of
+       a scannable layout is scannable, so whenever the estimate is
+       concretely scannable, the slow path would also have returned
+       [Constructor_uniform_value]. *)
+    let all_args_are_scannable (cd_args : Types.constructor_arguments) =
+      let scannable ty =
+        let jkind = Ctype.estimate_type_jkind env ty in
+        match
+          (Jkind.get_layout_defaulting_to_scannable env jkind
+           : Jkind_types.Layout.Const.t option)
+        with
+        | Some (Base (Scannable, _)) -> true
+        | Some (Any _ | Base _ | Product _ | Univar _ | Genvar _) | None ->
+          false
+      in
+      match cd_args with
+      | Types.Cstr_tuple cas ->
+        List.for_all
+          (fun (ca : Types.constructor_argument) -> scannable ca.ca_type)
+          cas
+      | Types.Cstr_record lds ->
+        List.for_all
+          (fun (ld : Types.label_declaration) -> scannable ld.ld_type)
+          lds
+    in
     let for_one_uniform_value_constructor fields ~field_to_type ~depth
           ~num_nodes_visited =
       let num_nodes_visited, shape =
@@ -1030,6 +1063,11 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
                  | exception Ctype.Cannot_apply ->
                    ~variable_repr:true, None, constructor
                  | cd_args ->
+                   if all_args_are_scannable cd_args then
+                     ~variable_repr:true,
+                     Some Types.Constructor_uniform_value,
+                     { constructor with cd_args }
+                   else
                    let cd_args, _all_void, repr, _arg_sorts =
                      Typedecl.update_constructor_representation_and_arg_sorts
                        env loc cd_args ~is_extension_constructor:false
