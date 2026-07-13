@@ -67,6 +67,9 @@ val build : prefix:string -> symbols:string list -> t
 (** Returns the list of entries in the IGOT. *)
 val entries : t -> Entry.t list
 
+(** Returns the number of entries in the IGOT (O(1)). *)
+val num_entries : t -> int
+
 (** Returns the section data (zero-initialized). *)
 val section_data : t -> bytes
 
