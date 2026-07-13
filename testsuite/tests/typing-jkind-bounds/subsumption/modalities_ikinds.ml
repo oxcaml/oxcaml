@@ -466,47 +466,67 @@ Error: This value is "contended"
        However, the highlighted expression is expected to be "uncontended".
 |}]
 
-(* Regression test (W1): a two-sided kind mismatch on a decl with EXPLICITLY
-   NAMED type parameters must render each side against its own decl's parameter
-   names ('left / 'right), matching the printed headers and legacy output —
-   not synthetic 'a / 'b letters. *)
+(* Regression test (W1/V1): two-sided kind mismatch, DIFFERENT explicit param
+   names per side. Guards (a) real decl names, not synthetic 'a/'b (the Z1
+   regression), and (b) byte-identity with the legacy renderer: the headers
+   render each side's own names, but "The kind of the first is" renders through
+   the POST-UNIFY type_exprs — module inclusion has aliased the impl params to
+   the signature's, so it shows the SIG names ('sigleft/'sigright). Verified
+   identical to the 92035033e legacy binary. *)
 module M : sig
-  type ('left, 'right) t : immutable_data with 'left @@ portable with 'right @@ contended
+  type ('sigleft, 'sigright) t
+    : immutable_data with 'sigleft @@ portable with 'sigright @@ contended
 end = struct
-  type ('left, 'right) t : immutable_data with 'left @@ contended with 'right @@ portable
+  type ('implleft, 'implright) t
+    : immutable_data with 'implleft @@ contended with 'implright @@ portable
 end
 [%%expect {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type ('left, 'right) t : immutable_data with 'left @@ contended with 'right @@ portable
-5 | end
+Lines 4-7, characters 6-3:
+4 | ......struct
+5 |   type ('implleft, 'implright) t
+6 |     : immutable_data with 'implleft @@ contended with 'implright @@ portable
+7 | end
 Error: Signature mismatch:
        Modules do not match:
          sig
-           type ('left, 'right) t
-             : immutable_data with 'left @@ contended with 'right @@ portable
+           type ('implleft, 'implright) t
+             : immutable_data
+                 with 'implleft @@ contended
+                 with 'implright @@ portable
          end
        is not included in
          sig
-           type ('left, 'right) t
-             : immutable_data with 'left @@ portable with 'right @@ contended
+           type ('sigleft, 'sigright) t
+             : immutable_data
+                 with 'sigleft @@ portable
+                 with 'sigright @@ contended
          end
        Type declarations do not match:
-         type ('left, 'right) t
-           : immutable_data with 'left @@ contended with 'right @@ portable
+         type ('implleft, 'implright) t
+           : immutable_data
+               with 'implleft @@ contended
+               with 'implright @@ portable
        is not included in
-         type ('left, 'right) t
-           : immutable_data with 'left @@ portable with 'right @@ contended
+         type ('sigleft, 'sigright) t
+           : immutable_data
+               with 'sigleft @@ portable
+               with 'sigright @@ contended
        The kind of the first is
-           immutable_data with 'left @@ contended with 'right @@ portable
-         because of the definition of t at line 4, characters 2-89.
+           immutable_data
+             with 'sigleft @@ contended
+             with 'sigright @@ portable
+         because of the definition of t at lines 5-6, characters 2-76.
        But the kind of the first must be a subkind of
-           immutable_data with 'left @@ portable with 'right @@ contended
-         because of the definition of t at line 2, characters 2-89.
+           immutable_data
+             with 'sigleft @@ portable
+             with 'sigright @@ contended
+         because of the definition of t at lines 2-3, characters 2-74.
 
        The first mode-crosses less than the second along:
-         contention: mod contended with 'right ≰ mod contended with 'left
-         portability: mod portable with 'left ≰ mod portable with 'right
+         contention: mod contended with 'sigright ≰
+           mod contended with 'sigleft
+         portability: mod portable with 'sigleft ≰
+           mod portable with 'sigright
 |}]
 
 (* Regression test (W4): a KEYWORD-named type parameter in a with-bound must be
@@ -517,4 +537,54 @@ Error: Signature mismatch:
 type ('\#and, 'b) u : value mod portable with '\#and
 [%%expect {|
 type ('\#and, 'b) u : value mod portable with '\#and
+|}]
+
+(* Regression test (W4/V2): a KEYWORD-named param reaching the MULTI-atom
+   [&]-product string fallback (string_of_atom, the branch W4 changed) must be
+   escaped ('\#and). Unlike the single-atom guard above, this module-mismatch
+   with a t1/t2 product drives string_of_atom directly. *)
+module type S = sig
+  type '\#and t1
+  type '\#and t2
+  type '\#and t : immutable_data with '\#and t1 t2 * unit t2
+end
+module M2 : S = struct
+  type '\#and t1
+  type '\#and t2
+  type '\#and t = '\#and t2 t1 * unit t1
+end
+[%%expect {|
+module type S =
+  sig
+    type '\#and t1
+    type '\#and t2
+    type '\#and t
+      : immutable_data with _ t1 & _ t2 & '\#and with t1 & _ t2 with t2
+  end
+Lines 6-10, characters 16-3:
+ 6 | ................struct
+ 7 |   type '\#and t1
+ 8 |   type '\#and t2
+ 9 |   type '\#and t = '\#and t2 t1 * unit t1
+10 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type '\#and t1
+           type '\#and t2
+           type '\#and t = '\#and t2 t1 * unit t1
+         end
+       is not included in
+         S
+       Type declarations do not match:
+         type '\#and t = '\#and t2 t1 * unit t1
+       is not included in
+         type '\#and t
+           : immutable_data with _ t1 & _ t2 & '\#and with t1 & _ t2 with t2
+       The kind of the first is
+           immutable_data with _ t1 & _ t2 & '\#and with _ t1 & t2 with t1
+         because it's a tuple type.
+       But the kind of the first must be a subkind of
+           immutable_data with _ t1 & _ t2 & '\#and with t1 & _ t2 with t2
+         because of the definition of t at line 4, characters 2-60.
 |}]

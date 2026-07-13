@@ -518,6 +518,16 @@ these shapes).
   binary, which prints `'left`/`'right`). Fix: hint uses the param `Tvar` name
   when present, `letter_of_int` fallback for anonymous. Named repro now == legacy;
   alphabetic case unchanged.
+  **V1 clarification (round-4, verified byte-identical vs legacy):** the hints
+  are built AFTER `Ctype.unify` (includecore), so with DIFFERENT names per side
+  the impl params are aliased to the signature's; "The kind of the first is"
+  then renders the impl's kind with the SIG names — and LEGACY does exactly the
+  same (it renders the same post-unify `type_expr`s). So this is NOT a further
+  regression and needs no pre-unify capture: W1 is correct "up to unification
+  aliasing", matching legacy. The earlier phrasing "each kind reads in its own
+  decl's namespace" was imprecise — accurate is "reproduces legacy's post-unify
+  rendering" (which fixes the Z1 synthetic-letter swap and keeps the aliased
+  names legacy shows). Pinned by the different-names regression test.
 - **W2 [MED, fixed] — Z2 didn't escape keyword idents.** `string_of_oide`
   concatenated `printed_name` raw, so a type named `and` printed `with and & t`
   not `with \#and & t`. Fix: render via `Format_doc.asprintf "%a"
