@@ -606,6 +606,7 @@ END_FUNCTION(caml_call_gc)
 */
 FUNCTION(caml_preempt)
         CFI_STARTPROC
+        CFI_SIGNAL_FRAME
     /* Inherit caml_call_gc's frame */
         CFI_ADJUST(16)
         CFI_OFFSET(29, -16)
@@ -695,6 +696,7 @@ END_FUNCTION(caml_allocN)
 FUNCTION(caml_call_local_realloc)
         CFI_STARTPROC
 L(caml_call_local_realloc):
+        CFI_SIGNAL_FRAME
     /* Save return address and frame pointer */
         ENTER_FUNCTION
     /* Store all registers (including ALLOC_PTR & TRAP_PTR) */
