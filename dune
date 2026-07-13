@@ -662,6 +662,7 @@
   cfg_stack_checks
   cfg_polling
   cfg_simplify
+  cfg_branch_fold
   cfg_prologue
   cfg_merge_blocks
   extra_debug
