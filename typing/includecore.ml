@@ -1695,7 +1695,16 @@ let type_declarations ?(equality = false) ~loc env ~mark name
                let tbl = Hashtbl.create 8 in
                List.iteri
                  (fun i p ->
-                   Hashtbl.replace tbl (Types.get_id p) (Misc.letter_of_int i))
+                   (* W1: preserve the decl's EXPLICIT parameter name (e.g.
+                      'left) so the violation matches the printed header and
+                      modality explanation; fall back to positional letters for
+                      anonymous params, matching the header printer. *)
+                   let name =
+                     match Types.get_desc p with
+                     | Types.Tvar { name = Some n; _ } -> n
+                     | _ -> Misc.letter_of_int i
+                   in
+                   Hashtbl.replace tbl (Types.get_id p) name)
                  params;
                fun id -> Hashtbl.find_opt tbl id
              in
