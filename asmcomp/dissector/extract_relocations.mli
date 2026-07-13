@@ -29,20 +29,9 @@
 
 (** Extract relocations from partially-linked object files.
 
-    This module reads ELF object files and extracts relocations that need to be
-    converted to use an intermediate PLT or GOT when linking with the dissector
-    code model. *)
-
-(** Information about a single relocation that needs conversion. *)
-module Relocation_entry : sig
-  type t
-
-  (** Returns the symbol name for the relocation. *)
-  val symbol_name : t -> string
-
-  (** Returns the offset of the relocation within the section. *)
-  val offset : t -> int64
-end
+    This module reads ELF object files and extracts the symbols whose
+    relocations need to be converted to use an intermediate PLT or GOT when
+    linking with the dissector code model. *)
 
 (** A partition's partially-linked object file. *)
 module Mapped_object_file : sig
@@ -78,12 +67,13 @@ end
 (** The result of extracting relocations from object files. *)
 type t
 
-(** Returns relocations with type R_X86_64_PLT32 that need PLT entries. *)
-val convert_to_plt : t -> Relocation_entry.t list
+(** Returns the symbol name of each relocation with type R_X86_64_PLT32 that
+    needs a PLT entry (one element per relocation site). *)
+val plt_symbols : t -> Relocatable_symbol_name.t list
 
-(** Returns relocations with type R_X86_64_REX_GOTPCRELX that need GOT entries.
-*)
-val convert_to_got : t -> Relocation_entry.t list
+(** Returns the symbol name of each relocation with type R_X86_64_REX_GOTPCRELX
+    that needs a GOT entry (one element per relocation site). *)
+val got_symbols : t -> Relocatable_symbol_name.t list
 
 (** Returns the number of PLT relocations (O(1)). *)
 val num_plt : t -> int
@@ -94,5 +84,6 @@ val num_got : t -> int
 (** [extract input] scans the .rela.text* sections of [input] for relocations
     that need to be converted for the medium code model.
 
-    Returns the lists of PLT32 and REX_GOTPCRELX relocations found. *)
+    Returns the symbol names of the PLT32 and REX_GOTPCRELX relocations found.
+*)
 val extract : Mapped_object_file.t -> t

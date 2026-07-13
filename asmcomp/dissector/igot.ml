@@ -69,7 +69,8 @@ let build ~prefix ~symbols =
   let by_original_symbol = String.Tbl.create 256 in
   let rev_entries, num_entries =
     List.fold_left
-      (fun (rev_entries, index) original_symbol ->
+      (fun (rev_entries, index) symbol ->
+        let original_symbol = Relocatable_symbol_name.to_string symbol in
         if String.Tbl.mem by_original_symbol original_symbol
         then rev_entries, index
         else
@@ -96,7 +97,9 @@ let section_data t = t.section_data
 
 let section_size t = Bytes.length t.section_data
 
-let find_entry t ~symbol = String.Tbl.find_opt t.by_original_symbol symbol
+let find_entry t ~symbol =
+  String.Tbl.find_opt t.by_original_symbol
+    (Relocatable_symbol_name.to_string symbol)
 
 module Relocation = struct
   type t =

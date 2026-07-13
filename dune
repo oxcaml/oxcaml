@@ -571,6 +571,7 @@
   partial_link
   partition
   partition_object_files
+  relocatable_symbol_name
   rewrite_sections
   ;; backend/
   afl_instrument

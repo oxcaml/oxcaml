@@ -33,17 +33,6 @@ module Rela = Compiler_owee.Owee_elf_relocation
 
 let log_verbose = Dissector_log.log_verbose
 
-module Relocation_entry = struct
-  type t =
-    { symbol_name : string;
-      offset : int64
-    }
-
-  let symbol_name t = t.symbol_name
-
-  let offset t = t.offset
-end
-
 (* A partition's partially-linked object file. *)
 module Mapped_object_file = struct
   type t =
@@ -118,15 +107,15 @@ module Mapped_object_file = struct
 end
 
 type t =
-  { convert_to_plt : Relocation_entry.t list;
-    convert_to_got : Relocation_entry.t list;
+  { plt_symbols : Relocatable_symbol_name.t list;
+    got_symbols : Relocatable_symbol_name.t list;
     num_plt : int;
     num_got : int
   }
 
-let convert_to_plt t = t.convert_to_plt
+let plt_symbols t = t.plt_symbols
 
-let convert_to_got t = t.convert_to_got
+let got_symbols t = t.got_symbols
 
 let num_plt t = t.num_plt
 
@@ -134,8 +123,8 @@ let num_got t = t.num_got
 
 (* Accumulator for efficient merging - stores lists in reverse order *)
 type accumulator =
-  { acc_plt : Relocation_entry.t list;
-    acc_got : Relocation_entry.t list;
+  { acc_plt : Relocatable_symbol_name.t list;
+    acc_got : Relocatable_symbol_name.t list;
     acc_num_plt : int;
     acc_num_got : int
   }
@@ -145,16 +134,16 @@ let empty_accumulator =
 
 (* Add entries to accumulator - O(n) where n is size of entries being added *)
 let accumulate acc entries =
-  { acc_plt = List.rev_append entries.convert_to_plt acc.acc_plt;
-    acc_got = List.rev_append entries.convert_to_got acc.acc_got;
+  { acc_plt = List.rev_append entries.plt_symbols acc.acc_plt;
+    acc_got = List.rev_append entries.got_symbols acc.acc_got;
     acc_num_plt = acc.acc_num_plt + entries.num_plt;
     acc_num_got = acc.acc_num_got + entries.num_got
   }
 
 (* Finalize accumulator into result - reverses the lists *)
 let finalize acc =
-  { convert_to_plt = List.rev acc.acc_plt;
-    convert_to_got = List.rev acc.acc_got;
+  { plt_symbols = List.rev acc.acc_plt;
+    got_symbols = List.rev acc.acc_got;
     num_plt = acc.acc_num_plt;
     num_got = acc.acc_num_got
   }
@@ -170,8 +159,8 @@ let finalize acc =
    PC32 relocations to undefined symbols are an error. They occur when code is
    compiled with -nodynlink, which is incompatible with the dissector. *)
 let parse_rela_section ~rela_body ~symbols =
-  let convert_to_plt = ref [] in
-  let convert_to_got = ref [] in
+  let plt_symbols = ref [] in
+  let got_symbols = ref [] in
   Rela.iter_rela_entries ~rela_body ~f:(fun entry ->
       (* Check for PC32 relocations to undefined symbols - these are an error *)
       if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.pc32
@@ -208,18 +197,16 @@ let parse_rela_section ~rela_body ~symbols =
           log_verbose "  reloc %s at 0x%Lx -> %s (UNDEF)"
             (Rela.Reloc_type.name entry.r_type)
             entry.r_offset symbol_name;
-          let reloc_entry =
-            { Relocation_entry.symbol_name; offset = entry.r_offset }
-          in
+          let name = Relocatable_symbol_name.of_string symbol_name in
           if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
-          then convert_to_plt := reloc_entry :: !convert_to_plt
-          else convert_to_got := reloc_entry :: !convert_to_got);
+          then plt_symbols := name :: !plt_symbols
+          else got_symbols := name :: !got_symbols);
   let rev_and_count lst =
     List.fold_left (fun (acc, n) x -> x :: acc, n + 1) ([], 0) lst
   in
-  let convert_to_plt, num_plt = rev_and_count !convert_to_plt in
-  let convert_to_got, num_got = rev_and_count !convert_to_got in
-  { convert_to_plt; convert_to_got; num_plt; num_got }
+  let plt_symbols, num_plt = rev_and_count !plt_symbols in
+  let got_symbols, num_got = rev_and_count !got_symbols in
+  { plt_symbols; got_symbols; num_plt; num_got }
 
 let extract_from_rela_text_sections ~symbols sections =
   List.fold_left

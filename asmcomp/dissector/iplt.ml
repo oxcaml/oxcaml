@@ -93,7 +93,8 @@ let build ~prefix ~igot ~symbols =
   let by_original_symbol = String.Tbl.create 256 in
   let rev_entries, num_entries =
     List.fold_left
-      (fun (rev_entries, index) original_symbol ->
+      (fun (rev_entries, index) symbol ->
+        let original_symbol = Relocatable_symbol_name.to_string symbol in
         if String.Tbl.mem by_original_symbol original_symbol
         then rev_entries, index
         else
@@ -102,7 +103,7 @@ let build ~prefix ~igot ~symbols =
             Igot.igot_symbol_name ~prefix ~symbol:original_symbol
           in
           (* Verify the IGOT entry exists *)
-          (match Igot.find_entry igot ~symbol:original_symbol with
+          (match Igot.find_entry igot ~symbol with
           | None ->
             Misc.fatal_errorf "IPLT: no IGOT entry for symbol %s"
               original_symbol
@@ -135,7 +136,9 @@ let section_data t = t.section_data
 
 let section_size t = Bytes.length t.section_data
 
-let find_entry t ~symbol = String.Tbl.find_opt t.by_original_symbol symbol
+let find_entry t ~symbol =
+  String.Tbl.find_opt t.by_original_symbol
+    (Relocatable_symbol_name.to_string symbol)
 
 module Relocation = struct
   type t =

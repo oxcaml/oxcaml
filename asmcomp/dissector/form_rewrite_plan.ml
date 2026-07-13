@@ -216,22 +216,22 @@ let build_symbol_rewrite_map ~igot_and_iplt ~relocations =
         Build_igot_and_iplt.iplt_symbol_for_plt_reloc igot_and_iplt entry
       with
       | Some sym ->
-        let orig_sym = Extract_relocations.Relocation_entry.symbol_name entry in
+        let orig_sym = Relocatable_symbol_name.to_string entry in
         if not (String.Tbl.mem plt_map orig_sym)
         then String.Tbl.add plt_map orig_sym sym
       | None -> ())
-    (Extract_relocations.convert_to_plt relocations);
+    (Extract_relocations.plt_symbols relocations);
   List.iter
     (fun entry ->
       match
         Build_igot_and_iplt.igot_symbol_for_got_reloc igot_and_iplt entry
       with
       | Some sym ->
-        let orig_sym = Extract_relocations.Relocation_entry.symbol_name entry in
+        let orig_sym = Relocatable_symbol_name.to_string entry in
         if not (String.Tbl.mem got_map orig_sym)
         then String.Tbl.add got_map orig_sym sym
       | None -> ())
-    (Extract_relocations.convert_to_got relocations);
+    (Extract_relocations.got_symbols relocations);
   plt_map, got_map
 
 (* Rewrite a single .rela.text* section. Looks up each relocation's target

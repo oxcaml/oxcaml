@@ -25,35 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* CR mshinwell: This file needs to be code reviewed *)
+type t = string
 
-type t =
-  { igot : Igot.t;
-    iplt : Iplt.t
-  }
+let of_string name = name
 
-let igot t = t.igot
-
-let iplt t = t.iplt
-
-let build ~prefix relocations =
-  let plt_syms = Extract_relocations.plt_symbols relocations in
-  let got_only_symbols = Extract_relocations.got_symbols relocations in
-  (* IGOT needs entries for both PLT symbols (PLT jumps through GOT) and
-     GOT-only symbols. Combine the lists - Igot.build will deduplicate. *)
-  let all_got_symbols = plt_syms @ got_only_symbols in
-  (* Build IGOT first (IPLT depends on it) *)
-  let igot = Igot.build ~prefix ~symbols:all_got_symbols in
-  (* Build IPLT for PLT symbols only *)
-  let iplt = Iplt.build ~prefix ~igot ~symbols:plt_syms in
-  { igot; iplt }
-
-let igot_symbol_for_got_reloc t symbol =
-  match Igot.find_entry t.igot ~symbol with
-  | None -> None
-  | Some entry -> Some (Igot.Entry.igot_symbol entry)
-
-let iplt_symbol_for_plt_reloc t symbol =
-  match Iplt.find_entry t.iplt ~symbol with
-  | None -> None
-  | Some entry -> Some (Iplt.Entry.iplt_symbol entry)
+let to_string name = name
