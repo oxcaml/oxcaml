@@ -399,6 +399,8 @@ module type Solver_mono = sig
 
   val mode_iter : 'a obj -> ('a, 'l * 'r) mode -> var_iterator -> unit
 
+  type 'b packed_morph = Packed_morph : ('a, 'b, 'd) morph -> 'b packed_morph
+
   (** Applies an iterator over every reachable covariant (left-) constraint
       variable. The iterator is only applied to constraint variables at level 0,
       and exposes the int identifier of the constraint variable. WARNING: the
@@ -407,7 +409,11 @@ module type Solver_mono = sig
   val iter_covariant :
     'a obj ->
     ('a, allowed * 'r) mode ->
-    (id:int -> level:int -> ('a, allowed * disallowed) mode -> unit) ->
+    (id:int ->
+    level:int ->
+    morph:'a packed_morph ->
+    ('a, allowed * disallowed) mode ->
+    unit) ->
     unit
 
   (** Applies an iterator over every reachable contravariant (right-) constraint
@@ -418,7 +424,11 @@ module type Solver_mono = sig
   val iter_contravariant :
     'a obj ->
     ('a, 'l * allowed) mode ->
-    (id:int -> level:int -> ('a, disallowed * allowed) mode -> unit) ->
+    (id:int ->
+    level:int ->
+    morph:'a packed_morph ->
+    ('a, disallowed * allowed) mode ->
+    unit) ->
     unit
 
   (** Apply a monotone morphism explained by an optional hint *)

@@ -604,10 +604,17 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Amodejoin (_, _, mvs) -> VarMap.iter (fun _ mv -> iter_morphvar mv) mvs
     | Amodemeet (_, _, mvs) -> VarMap.iter (fun _ mv -> iter_morphvar mv) mvs
 
+  type 'b packed_morph =
+    | Packed_morph : ('a, 'b, 'd) C.morph -> 'b packed_morph
+
   let rec iter_covariant_morphvar : type a r.
       visited:(int, unit) Hashtbl.t ->
       a C.obj ->
-      (id:int -> level:int -> (a, allowed * disallowed) mode -> unit) ->
+      (id:int ->
+      level:int ->
+      morph:a packed_morph ->
+      (a, allowed * disallowed) mode ->
+      unit) ->
       (a, allowed * r) morphvar ->
       unit =
    fun ~visited dst iter (Amorphvar (v, f, f_hint)) ->
@@ -623,7 +630,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (Comp_hint.Morph_hint.disallow_right f_hint, g_hint)
           in
           let mu = Amorphvar (u, fg, fg_hint) in
-          iter ~id:u.id ~level:u.level (Amodevar mu);
+          iter ~id:u.id ~level:u.level ~morph:(Packed_morph fg) (Amodevar mu);
           iter_covariant_morphvar ~visited dst iter mu)
         v.vlower
     end
@@ -631,7 +638,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let iter_covariant : type a r.
       a C.obj ->
       (a, allowed * r) mode ->
-      (id:int -> level:int -> (a, allowed * disallowed) mode -> unit) ->
+      (id:int ->
+      level:int ->
+      morph:a packed_morph ->
+      (a, allowed * disallowed) mode ->
+      unit) ->
       unit =
    fun dst m iter ->
     match m with
@@ -646,7 +657,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let rec iter_contravariant_morphvar : type a l.
       visited:(int, unit) Hashtbl.t ->
       a C.obj ->
-      (id:int -> level:int -> (a, disallowed * allowed) mode -> unit) ->
+      (id:int ->
+      level:int ->
+      morph:a packed_morph ->
+      (a, disallowed * allowed) mode ->
+      unit) ->
       (a, l * allowed) morphvar ->
       unit =
    fun ~visited dst iter (Amorphvar (v, f, f_hint)) ->
@@ -662,7 +677,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (Comp_hint.Morph_hint.disallow_left f_hint, g_hint)
           in
           let mu = Amorphvar (u, fg, fg_hint) in
-          iter ~id:u.id ~level:u.level (Amodevar mu);
+          iter ~id:u.id ~level:u.level ~morph:(Packed_morph fg) (Amodevar mu);
           iter_contravariant_morphvar ~visited dst iter mu)
         v.vupper
     end
@@ -670,7 +685,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let iter_contravariant : type a l.
       a C.obj ->
       (a, l * allowed) mode ->
-      (id:int -> level:int -> (a, disallowed * allowed) mode -> unit) ->
+      (id:int ->
+      level:int ->
+      morph:a packed_morph ->
+      (a, disallowed * allowed) mode ->
+      unit) ->
       unit =
    fun dst m iter ->
     match m with

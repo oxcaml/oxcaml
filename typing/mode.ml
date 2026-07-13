@@ -7197,9 +7197,30 @@ module Value_with (Areality : Areality) = struct
       | Pco m -> Pco (Comonadic.disallow_right m)
       | Pmon m -> Pmon (Monadic.disallow_right m)
 
+    type packed_morph =
+      | Pmorph_mon : ('a, Monadic.Obj.const, 'd) C.morph -> packed_morph
+      | Pmorph_co : ('a, Comonadic.Obj.const, 'd) C.morph -> packed_morph
+
+    let morph_key_mon (S.Packed_morph f) = Pmorph_mon f
+
+    let morph_key_co (S.Packed_morph f) = Pmorph_co f
+
+    module MorphMap = Map.Make (struct
+      type t = packed_morph
+
+      let compare k1 k2 =
+        match k1, k2 with
+        | Pmorph_mon m1, Pmorph_mon m2 -> C.compare_morph Monadic.Obj.obj m1 m2
+        | Pmorph_co m1, Pmorph_co m2 -> C.compare_morph Comonadic.Obj.obj m1 m2
+        | Pmorph_mon _, Pmorph_co _ -> -1
+        | Pmorph_co _, Pmorph_mon _ -> 1
+    end)
+
     type zap_scope =
-      { zap_to_floor_map : (allowed * disallowed) packed_mode list ModeIdMap.t;
-        zap_to_ceil_map : (disallowed * allowed) packed_mode list ModeIdMap.t;
+      { zap_to_floor_map :
+          (allowed * disallowed) packed_mode MorphMap.t ModeIdMap.t;
+        zap_to_ceil_map :
+          (disallowed * allowed) packed_mode MorphMap.t ModeIdMap.t;
         zap_to_legacy_map : (disallowed * disallowed) packed_mode ModeIdMap.t
       }
 
@@ -7209,12 +7230,15 @@ module Value_with (Areality : Areality) = struct
         zap_to_legacy_map = ModeIdMap.create 17
       }
 
-    let add_packed_to_map map i p =
-      match ModeIdMap.find_opt map i with
-      | Some ps -> ModeIdMap.replace map i (p :: ps)
-      | None -> ModeIdMap.add map i [p]
+    let add_to_morph_map map id morph mode =
+      let morphs =
+        match ModeIdMap.find_opt map id with
+        | Some morphs -> morphs
+        | None -> MorphMap.empty
+      in
+      ModeIdMap.replace map id (MorphMap.add morph mode morphs)
 
-    let add_zap_to_floor_to_zap_scope i p zs =
+    let add_zap_to_floor_to_zap_scope i k p zs =
       if ModeIdMap.mem zs.zap_to_legacy_map i
       then ()
       else
@@ -7223,10 +7247,10 @@ module Value_with (Areality : Areality) = struct
           ModeIdMap.remove zs.zap_to_ceil_map i;
           ModeIdMap.add zs.zap_to_legacy_map i (disallow_left p)
         end
-        else add_packed_to_map zs.zap_to_floor_map i p
+        else add_to_morph_map zs.zap_to_floor_map i k p
         end
 
-    let add_zap_to_ceil_to_zap_scope i p zs =
+    let add_zap_to_ceil_to_zap_scope i k p zs =
       if ModeIdMap.mem zs.zap_to_legacy_map i
       then ()
       else
@@ -7235,7 +7259,7 @@ module Value_with (Areality : Areality) = struct
           ModeIdMap.remove zs.zap_to_floor_map i;
           ModeIdMap.add zs.zap_to_legacy_map i (disallow_right p)
         end
-        else add_packed_to_map zs.zap_to_ceil_map i p
+        else add_to_morph_map zs.zap_to_ceil_map i k p
         end
 
     let resolve_zap_scope
@@ -7247,20 +7271,22 @@ module Value_with (Areality : Areality) = struct
           | Pco m -> zap_to_legacy_src_var_comonadic m)
         zap_to_legacy_map;
       ModeIdMap.iter
-        (fun _ ps ->
-          List.iter
-            (function
+        (fun _ mm ->
+          MorphMap.iter
+            (fun _ p ->
+              match p with
               | Pmon m -> Monadic.zap_to_floor_force m |> ignore
               | Pco m -> Comonadic.zap_to_floor_force m |> ignore)
-            ps)
+            mm)
         zap_to_floor_map;
       ModeIdMap.iter
-        (fun _ ps ->
-          List.iter
-            (function
+        (fun _ mm ->
+          MorphMap.iter
+            (fun _ p ->
+              match p with
               | Pmon m -> Monadic.zap_to_ceil_force m |> ignore
               | Pco m -> Comonadic.zap_to_ceil_force m |> ignore)
-            ps)
+            mm)
         zap_to_ceil_map
   end
 
@@ -7276,16 +7302,16 @@ module Value_with (Areality : Areality) = struct
       Comonadic.Guts.get_floor comonadic |> Comonadic.of_const
     in
     let monadic_upper = Monadic.Guts.get_floor monadic |> Monadic.of_const in
-    Monadic.iter_covariant monadic (fun ~id ~level m ->
+    Monadic.iter_covariant monadic (fun ~id ~level ~morph m ->
         if level <> generic_level
         then
-          Z.add_zap_to_floor_to_zap_scope id
+          Z.add_zap_to_floor_to_zap_scope id (Z.morph_key_mon morph)
             (Z.Pmon (Monadic.join [monadic_upper; m]))
             scope);
-    Comonadic.iter_covariant comonadic (fun ~id ~level m ->
+    Comonadic.iter_covariant comonadic (fun ~id ~level ~morph m ->
         if level <> generic_level
         then
-          Z.add_zap_to_floor_to_zap_scope id
+          Z.add_zap_to_floor_to_zap_scope id (Z.morph_key_co morph)
             (Z.Pco (Comonadic.join [comonadic_upper; m]))
             scope)
 
@@ -7294,16 +7320,16 @@ module Value_with (Areality : Areality) = struct
       Comonadic.Guts.get_ceil comonadic |> Comonadic.of_const
     in
     let monadic_lower = Monadic.Guts.get_ceil monadic |> Monadic.of_const in
-    Monadic.iter_contravariant monadic (fun ~id ~level m ->
+    Monadic.iter_contravariant monadic (fun ~id ~level ~morph m ->
         if level <> generic_level
         then
-          Z.add_zap_to_ceil_to_zap_scope id
+          Z.add_zap_to_ceil_to_zap_scope id (Z.morph_key_mon morph)
             (Z.Pmon (Monadic.meet [monadic_lower; m]))
             scope);
-    Comonadic.iter_contravariant comonadic (fun ~id ~level m ->
+    Comonadic.iter_contravariant comonadic (fun ~id ~level ~morph m ->
         if level <> generic_level
         then
-          Z.add_zap_to_ceil_to_zap_scope id
+          Z.add_zap_to_ceil_to_zap_scope id (Z.morph_key_co morph)
             (Z.Pco (Comonadic.meet [comonadic_upper; m]))
             scope)
 
