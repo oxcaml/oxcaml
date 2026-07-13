@@ -14,7 +14,7 @@ synthesized program); (2) predict the output and cite rules before looking;
 resolved by **fixing the formalism, never by editing the prediction** — the one
 MISMATCH below drove a correction to `S.Rewrite.CSE.Eligible`.
 
-**Verdicts:** 26 case studies — 24 MATCH, 1 PARTIAL, 1 MISMATCH (now fixed).
+**Verdicts:** 32 case studies — 30 MATCH, 1 PARTIAL, 1 MISMATCH (now fixed).
 
 ## From existing testsuite tests (14)
 
@@ -56,3 +56,14 @@ MISMATCH below drove a correction to `S.Rewrite.CSE.Eligible`.
 | [`mixed-02-static`](mixed-02-static.md) | statically-allocated mixed record | MATCH | `P.Static.MixedBlock` |
 | [`mixed-03-mutable-set`](mixed-03-mutable-set.md) | mutable mixed field, write then read | MATCH | `P.Binary.BlockSet.Mixed`, `P.Unary.BlockLoad.Mixed`, `P.Effects.ReadingFromBlock` |
 | [`mixed-04-join`](mixed-04-join.md) | join two mixed blocks of equal shape | MATCH | `T.Meet.BlockShape` |
+
+## Loopification (6)
+
+| Case study | Target | Verdict | Primary rules |
+|---|---|---|---|
+| [`loopify-01-escaping-tailrec`](loopify-01-escaping-tailrec.md) | escaping purely-tailrec function survives only as wrapper | MATCH | `S.Rewrite.Loopify.Body`, `S.Rewrite.Loopify.SelfTailCall`, `S.Rewrite.Code.RecursiveRecompute` |
+| [`loopify-02-local-inlined`](loopify-02-local-inlined.md) | local loopified function inlined away entirely | MATCH | `S.Rewrite.Loopify.Body`, `S.Rewrite.Code.RecursiveRecompute`, `S.Inline.DeclDecision` |
+| [`loopify-03-not-purely-tailrec`](loopify-03-not-purely-tailrec.md) | non-tail self-recursion is not loopified | MATCH | `S.Rewrite.Loopify.Attribute`, `S.Rewrite.Loopify.AttributeUpdate` |
+| [`loopify-04-loop-attr-no-tailcall`](loopify-04-loop-attr-no-tailcall.md) | `[@loop]` with no self tail call: wrapper collapses back | MATCH | `S.Rewrite.LetCont.Demote`, `S.Rewrite.LetCont.Inline` |
+| [`loopify-05-dead-loop`](loopify-05-dead-loop.md) | loopified loop proven dead leaves non-recursive residue | MATCH | `S.Rewrite.Loopify.Body`, `S.Rewrite.Switch.ArmPrune`, `S.Rewrite.LetCont.Demote` |
+| [`loopify-06-mutual-and-mixed`](loopify-06-mutual-and-mixed.md) | mutual recursion untouched; `[@loop]` redirects only self tail calls | MATCH | `S.Rewrite.Loopify.Attribute`, `S.Rewrite.Loopify.SelfTailCall` |

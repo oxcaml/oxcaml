@@ -871,6 +871,166 @@ and is otherwise **conjectured**/out of detailed scope. Method and effect calls
 (`Call_kind.Method`, `Call_kind.Effect`) are rebuilt without arity conversion and
 are out of scope per the [§01](01-overview.md) scope ledger.
 
+## Loopification
+
+A function whose only self-references are tail calls can have its recursion
+turned into a *continuation* loop, so the loop no longer goes through the
+function-call machinery at all. Unlike inlining, this is not an oracle-guided
+decision: the choice is an attribute computed once at closure conversion, and
+Simplify obeys it unconditionally. The architectural placement (the
+`loopify_state` component of `denv`, the body being simplified as a recursive
+`Let_cont`) is `S.Struct.Loopify` in [§09](09-simplify-structure.md); the rules
+here are the rewrites themselves. Together they entail that a purely
+self-tail-recursive function can never survive Simplify in its original,
+`Apply`-recursive form: such a function always gets the attribute
+(`Loopify.Attribute`), the wrap is unconditional (`Loopify.Body`), every one of
+its self-references qualifies for redirection (`Loopify.SelfTailCall`), and the
+emitted code — if any escapes inlining and dead-code elimination at all — is
+`Non_recursive` (`Code.RecursiveRecompute`). The `loopify-*` case studies in
+[`14-validation/`](14-validation/) verify this end to end, including its
+boundaries.
+
+```rule
+RULE S.Rewrite.Loopify.Attribute
+STATUS normative
+CODE middle_end/flambda2/from_lambda/closure_conversion.ml#close_one_function
+CODE middle_end/flambda2/from_lambda/closure_conversion_aux.ml#Acc.add_name_to_free_names
+VERIFIED 14-validation/loopify-03-not-purely-tailrec.md
+---
+Closure conversion emits Code c for a source function f
+--------------------------------------------------
+metadata(c).loopify =
+  Always_loopify                   if f's loop attribute is Always_loop ([@loop])
+  Never_loopify                    if f's loop attribute is Never_loop
+  Default_loopify_and_tailrec      if f is the sole function of its recursive
+                                     group and every occurrence of my_closure in
+                                     its body is as the callee of a tail call
+  Default_loopify_and_not_tailrec  otherwise
+NOTES: The "purely tail-recursive" test (is_purely_tailrec) starts true only for
+  a single-function let rec and is falsified by any occurrence of my_closure
+  that is not a tail-call callee (add_name_to_free_names /
+  add_free_names_and_check_my_closure_use). Mutual recursion therefore never
+  gets Default_loopify_and_tailrec, and neither does a function whose body uses
+  my_closure other than as a tail-call callee (passing or returning itself) —
+  though the closure escaping the *defining scope* (e.g. an exported toplevel
+  function) is irrelevant. This is the only place
+  the loopify decision is made; Simplify consumes it via should_loopify
+  (Loopify_attribute.should_loopify: true exactly for Always_loopify and
+  Default_loopify_and_tailrec).
+```
+
+```rule
+RULE S.Rewrite.Loopify.Body
+STATUS normative
+CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_function_body
+CODE middle_end/flambda2/simplify/loopify_state.mli
+CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function_body
+VERIFIED 14-validation/loopify-01-escaping-tailrec.md
+---
+should_loopify(metadata(c).loopify)      (⇔ Always_loopify | Default_loopify_and_tailrec)
+k fresh (named "self")
+terms are being rebuilt (not speculative inlining)
+--------------------------------------------------
+E ⊢ Code c = λ⟨ret,exn⟩ p̄ ⟨my_closure,…⟩. e
+  ⇝ let_cont rec k p̄ = e in apply_cont k p̄
+NOTES: Unconditional given the attribute — there is no cost model or oracle
+  here. The wrapped term becomes the function's body: the handler re-binds p̄
+  (shadowing the function's parameters), while the entry apply_cont's arguments
+  refer to the function's parameters. loopify_state(denv) is set to Loopify k
+  for the traversal of e (Simplify_set_of_closures.simplify_function_body
+  creates k and sets the state; Simplify_expr.simplify_function_body builds the
+  wrapper and simplifies it via simplify_as_recursive_let_cont). The original,
+  unwrapped body never reaches the rebuilt output: what is emitted for this
+  function is the simplification of the wrapper, in which the self tail calls
+  have been redirected (S.Rewrite.Loopify.SelfTailCall).
+```
+
+```rule
+RULE S.Rewrite.Loopify.SelfTailCall
+STATUS normative
+CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#loopify_decision_for_call
+CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_self_tail_call
+VERIFIED 14-validation/loopify-06-mutual-and-mixed.md
+---
+loopify_state(denv) = Loopify k      (we are inside a body wrapped by S.Rewrite.Loopify.Body)
+canon(callee) = canon(my_closure)    (canonical simples, coercions stripped)
+the apply's return continuation is the function's return continuation, or Never_returns
+the apply's exn continuation is the function's exn continuation, with no extra args
+terms are being rebuilt (loopification is disabled during speculative inlining)
+--------------------------------------------------
+E ⊢ apply callee ā ⟨ret,exn⟩ ⇝ apply_cont k ā
+NOTES: The self-call test is semantic, not syntactic: the callee is compared to
+  my_closure after canonicalization through the typing environment and dropping
+  coercions, so aliases of the closure qualify, including calls that only become
+  self tail calls during simplification. The rec_info coercion on the callee is
+  discarded with the Apply, which is what removes my_depth from the body's free
+  names (see S.Rewrite.Code.RecursiveRecompute). An exn continuation carrying
+  extra args disqualifies the call. During speculative inlining the rewrite is
+  disabled because flow analysis would not see the self continuation
+  (loopify_decision_for_call's do_not_rebuild_terms case); nothing from such a
+  traversal is kept, so no unloopified body escapes this way.
+```
+
+```rule
+RULE S.Rewrite.Loopify.AttributeUpdate
+STATUS normative
+CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function0
+VERIFIED 14-validation/loopify-01-escaping-tailrec.md
+---
+Simplify rebuilds Code c (input attribute a = metadata(c).loopify)
+--------------------------------------------------
+the emitted code's loopify attribute is:
+  a                    if a ∈ {Always_loopify, Never_loopify, Already_loopified}
+  Already_loopified    if a = Default_loopify_and_tailrec
+  Never_loopify        if a = Default_loopify_and_not_tailrec
+NOTES: The Default_* values exist only between closure conversion and the first
+  simplification of the code. Since should_loopify is false for every output
+  value except Always_loopify, loopification is idempotent: a later round (or
+  cross-unit import) re-loopifies only [@loop]-annotated code.
+```
+
+```rule
+RULE S.Rewrite.Code.RecursiveRecompute
+STATUS normative
+CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function_body
+VERIFIED 14-validation/loopify-01-escaping-tailrec.md
+---
+Simplify rebuilds Code c with simplified body e′
+--------------------------------------------------
+the emitted code's recursive flag is:
+  Recursive       if my_depth ∈ free_names(e′)
+  Non_recursive   otherwise
+NOTES: Not loopify-specific — this recompute applies to every code binding — but
+  it is what makes loopification pay off: self-Applys are the only mentions of
+  my_depth (via their rec_info coercions), so a function whose self tail calls
+  were all redirected by S.Rewrite.Loopify.SelfTailCall and which had no other
+  self-calls comes out Non_recursive, making it eligible for Small_function
+  inlining ([§11](11-inlining.md)) where the recursive original was not. A
+  function with surviving non-tail self-calls (Always_loopify on a
+  not-purely-tailrec function) stays Recursive.
+```
+
+```rule
+RULE S.Rewrite.LetCont.Demote
+STATUS normative
+CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#sort_handlers
+VERIFIED 14-validation/loopify-04-loop-attr-no-tailcall.md
+---
+let_cont rec k̄ = h̄ in e   (a declared-recursive group)
+after the downwards traversal, handler k's recorded uses place it in no SCC
+  loop of the group's use graph (sort_handlers classifies it No_loop)
+--------------------------------------------------
+k is rebuilt as a non-recursive let_cont (in dependency order), and becomes
+eligible for the non-recursive rules: S.Rewrite.LetCont.Inline (its single-use
+detection runs on the demoted handler), .DeadHandler, .Shortcut
+NOTES: A general continuation rule, stated here because loopification is its
+  chief client: a loopified body whose self continuation ends up with no
+  recursive uses (e.g. [@loop] on a function with no self tail calls, or a loop
+  whose recursive branch is proven dead) is demoted and then collapses back via
+  LetCont.Inline — this is the one way a should_loopify function's body can
+  emerge without the wrapper, and it can only happen when the loop is gone.
+```
+
 ## Invalid propagation
 
 `Invalid` is Simplify's representation of unreachable code ([§04](04-opsem.md)). Many
@@ -915,7 +1075,9 @@ Switch: `S.Rewrite.Switch.ArmPrune`, `.Merge`, `.Identity`, `.BooleanNot`,
 `.Invalid`.
 Let: `S.Rewrite.Let.DeadBinding`, `.DeadRegion`, `.Phantom`, `.Invalid`.
 Continuations: `S.Rewrite.LetCont.Inline`, `.DeadHandler`, `.Shortcut`,
-`.UnusedParam`, `.AliasedParam`, `.InvalidHandler`, `.Specialize`.
+`.UnusedParam`, `.AliasedParam`, `.InvalidHandler`, `.Specialize`, `.Demote`.
 Apply: `S.Rewrite.Apply.IndirectToDirect`, `.OverApplication`,
 `.PartialApplication`, `.Invalid`.
+Loopification: `S.Rewrite.Loopify.Attribute`, `.Body`, `.SelfTailCall`,
+`.AttributeUpdate`; `S.Rewrite.Code.RecursiveRecompute`.
 Invalid: `S.Rewrite.Invalid.Propagate`.

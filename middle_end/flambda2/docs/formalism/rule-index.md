@@ -294,7 +294,7 @@ copies the regenerated files back into the source tree.
 
 ## S — Simplify structure, rewrites, inlining, unboxing (ch. 09-12)
 
-94 rules.
+100 rules.
 
 | Rule ID | Status | Chapter | Code anchors | Verified |
 |---|---|---|---|---|
@@ -325,7 +325,7 @@ copies the regenerated files back into the source tree.
 | `S.Struct.Lift.EmptyAtEnd` | normative | 09-simplify-structure.md | `middle_end/flambda2/simplify/simplify.ml#run` | — |
 | `S.Struct.InlineResimplify` | normative | 09-simplify-structure.md | `middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_full_application`<br>`middle_end/flambda2/simplify/inlining/inlining_transforms.ml` | — |
 | `S.Struct.Resimplify` | descriptive | 09-simplify-structure.md | `middle_end/flambda2/simplify/simplify_expr.ml#simplify_toplevel_common`<br>`middle_end/flambda2/simplify/env/upwards_acc.ml#set_resimplify`<br>`middle_end/flambda2/simplify/simplify_set_of_closures.ml` | — |
-| `S.Struct.Loopify` | descriptive | 09-simplify-structure.md | `middle_end/flambda2/simplify/simplify_expr.ml#simplify_function_body`<br>`middle_end/flambda2/simplify/loopify_state.mli` | — |
+| `S.Struct.Loopify` | normative | 09-simplify-structure.md | `middle_end/flambda2/simplify/simplify_expr.ml#simplify_function_body`<br>`middle_end/flambda2/simplify/loopify_state.mli` | 14-validation/loopify-01-escaping-tailrec.md |
 | `S.Rewrite.Prim.Transfer` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive`<br>`middle_end/flambda2/simplify/simplify_named.ml#simplify_named0` | — |
 | `S.Rewrite.Prim.ArgKindMismatch` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_primitive.ml#arg_kind_mismatch`<br>`middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive` | — |
 | `S.Rewrite.Prim.Relational` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_relational_primitive`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_is_int`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_get_tag` | — |
@@ -364,6 +364,12 @@ copies the regenerated files back into the source tree.
 | `S.Rewrite.Apply.OverApplication` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_over_application`<br>`middle_end/flambda2/simplify/simplify_common.ml#split_direct_over_application` | — |
 | `S.Rewrite.Apply.PartialApplication` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_partial_application` | — |
 | `S.Rewrite.Apply.Invalid` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_apply_expr.ml#replace_apply_by_invalid`<br>`middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_function_call` | — |
+| `S.Rewrite.Loopify.Attribute` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/from_lambda/closure_conversion.ml#close_one_function`<br>`middle_end/flambda2/from_lambda/closure_conversion_aux.ml#Acc.add_name_to_free_names` | 14-validation/loopify-03-not-purely-tailrec.md |
+| `S.Rewrite.Loopify.Body` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_expr.ml#simplify_function_body`<br>`middle_end/flambda2/simplify/loopify_state.mli`<br>`middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function_body` | 14-validation/loopify-01-escaping-tailrec.md |
+| `S.Rewrite.Loopify.SelfTailCall` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_apply_expr.ml#loopify_decision_for_call`<br>`middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_self_tail_call` | 14-validation/loopify-06-mutual-and-mixed.md |
+| `S.Rewrite.Loopify.AttributeUpdate` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function0` | 14-validation/loopify-01-escaping-tailrec.md |
+| `S.Rewrite.Code.RecursiveRecompute` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function_body` | 14-validation/loopify-01-escaping-tailrec.md |
+| `S.Rewrite.LetCont.Demote` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_let_cont_expr.ml#sort_handlers` | 14-validation/loopify-04-loop-attr-no-tailcall.md |
 | `S.Rewrite.Invalid.Propagate` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/expr_builder.ml#rebuild_invalid`<br>`middle_end/flambda2/simplify/simplify_expr.ml#simplify_expr` | — |
 | `S.Inline.ModeMismatchInvalid` | normative | 11-inlining.md | `middle_end/flambda2/simplify/inlining/inlining_transforms.ml#inline` | — |
 | `S.Inline.Substitute` | normative | 11-inlining.md | `middle_end/flambda2/simplify/inlining/inlining_transforms.ml#inline`<br>`middle_end/flambda2/simplify/inlining/inlining_transforms.ml#make_inlined_body`<br>`middle_end/flambda2/simplify_shared/inlining_helpers.ml#make_inlined_body`<br>`middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_full_application` | 14-validation/new-05-inline-fold.md |
@@ -408,8 +414,8 @@ copies the regenerated files back into the source tree.
 
 _Generated by scanning chapters 02-13._
 
-- **Total rules:** 312
-- **By status:** normative 214, descriptive 65, conjectured 33
+- **Total rules:** 318
+- **By status:** normative 221, descriptive 64, conjectured 33
 - **By chapter:**
   - 02-syntax.md: 13
   - 03-kinds.md: 27
@@ -419,7 +425,7 @@ _Generated by scanning chapters 02-13._
   - 07-types-domain.md: 27
   - 08-meet-join.md: 25
   - 09-simplify-structure.md: 28
-  - 10-simplify-rewrites.md: 39
+  - 10-simplify-rewrites.md: 45
   - 11-inlining.md: 10
   - 12-unboxing.md: 17
   - 13-soundness.md: 4

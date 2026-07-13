@@ -317,7 +317,7 @@ the formalism, never by silently editing the prediction to match.** When a case
 study contradicts a rule, the rule is corrected and the correction is noted in
 the case study and here in §4.
 
-There are **22 case studies**:
+There are **32 case studies**:
 
 - **14 from existing testsuite tests** — verdicts: **12 MATCH**, **1 PARTIAL**
   ([`cse_immutable_array_load.md`](14-validation/cse_immutable_array_load.md):
@@ -330,6 +330,15 @@ There are **22 case studies**:
   preservation around an opaque call, float-accumulator unboxing across a loop,
   and refined-scrutinee arm pruning (which additionally exposed a chained
   `BooleanNot` rewrite).
+- **4 mixed-block** (`mixed-01`…`mixed-04`) — verdicts: **4/4 MATCH**, covering
+  construction, load, mutable set and join of mixed blocks.
+- **6 loopification** (`loopify-01`…`loopify-06`) — verdicts: **6/6 MATCH**,
+  covering the `S.Rewrite.Loopify.*` chain end to end: an escaping
+  purely-tail-recursive function surviving only as a continuation-loop wrapper,
+  a local one being inlined away entirely, the negative cases (non-tail and
+  mutual recursion untouched), and the two boundary cases (`[@loop]` with no
+  self tail call collapsing back via `S.Rewrite.LetCont.Demote`, and a
+  provably-dead loop leaving a non-recursive residue).
 
 The one MISMATCH was not a soundness failure — the compiler was correct and the
 *document* was wrong — but it is exactly the kind of finding the prediction-first

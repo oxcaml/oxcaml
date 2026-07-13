@@ -662,19 +662,27 @@ re-run is driven from the set-of-closures / function-body machinery.
 
 ```rule
 RULE S.Struct.Loopify
-STATUS descriptive
+STATUS normative
 CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_function_body
 CODE middle_end/flambda2/simplify/loopify_state.mli
+VERIFIED 14-validation/loopify-01-escaping-tailrec.md
 ---
-A self-recursive function may be "loopified": its body is wrapped in a recursive
-continuation and the self-tail-calls become continuation calls, so the loop is
-optimized without going through the function-call machinery. loopify_state (in
-denv) records Do_not_loopify or Loopify cont; when Loopify cont, the body is
-simplified as a recursive Let_cont (simplify_as_recursive_let_cont).
+A function whose loopify attribute satisfies should_loopify — an attribute fixed
+deterministically at closure conversion (S.Rewrite.Loopify.Attribute,
+[§10](10-simplify-rewrites.md)), not chosen by a cost oracle — is
+unconditionally "loopified": its body is wrapped in a recursive continuation and
+the self-tail-calls become continuation calls, so the loop is optimized without
+going through the function-call machinery. loopify_state (in denv) records
+Do_not_loopify or Loopify cont; when Loopify cont, the body is simplified as a
+recursive Let_cont (simplify_as_recursive_let_cont).
 --------------------------------------------------
-Unrolling and other recursion controls are driven by rec_info on the recursive
-call; details are [§11](11-inlining.md). Loopification interacts with recursive-continuation
-handling (§3): the loopified body is exactly the recursive-continuation case.
+The rewrites themselves are S.Rewrite.Loopify.Body and
+S.Rewrite.Loopify.SelfTailCall ([§10](10-simplify-rewrites.md)); together they
+entail that a purely self-tail-recursive function never survives in its
+original Apply-recursive form. Unrolling and other recursion controls are driven by
+rec_info on the recursive call; details are [§11](11-inlining.md).
+Loopification interacts with recursive-continuation handling (§3): the
+loopified body is exactly the recursive-continuation case.
 ```
 
 ## 7. Diagram: dacc/uacc flow over a Let / Let_cont nest
