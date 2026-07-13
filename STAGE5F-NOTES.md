@@ -531,3 +531,13 @@ these shapes).
   form, not the single-atom paths. Left as-is (display-only, A1-class).
 - **W3 [LOW, fixed] — Z4 backtrack not exception-safe.** `pure_implies` skipped
   `Btype.backtrack` if `implies` raised. Fix: `Fun.protect ~finally`.
+- **W4 [fixed] — `&`-product string fallback's Param branch didn't escape
+  tyvars.** After W1, a named param reaching `string_of_atom`'s Param branch was
+  emitted raw (`"'" ^ name`); a keyword-named param would render `'and` not
+  `'\#and`, unlike the single-atom `Otyp_var`/Oprint route. Fix: route through
+  `Pprintast.tyvar_of_name` (Oprint's `ty_var` escaper). Byte-identical for
+  ordinary/synthetic names. Guard: `type ('\#and, 'b) u : value mod portable
+  with '\#and` in modalities_ikinds.ml (single-atom keyword-param — the accepted
+  fallback: W4's multi-atom branch uses the same escaper but is only reachable
+  via a finicky module-mismatch+`&`-product, since single-decl `&`-products
+  render synthetic non-keyword letters).
