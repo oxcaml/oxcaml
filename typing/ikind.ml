@@ -1480,13 +1480,26 @@ let out_type_of_payload ~name_of (name : Types.Rigid_name.t) :
   | Types.Rigid_name.Residue _ | Types.Rigid_name.Unknown _ ->
     Outcometree.Otyp_stuff "_"
 
+(* Z2: stringify a conflict-aware [out_ident] (mirrors [oide_of_path]) so the
+   [&]-product / ctor-arg string fallback disambiguates shadowed paths (e.g.
+   [X/2.t]) instead of the raw [Path.name] that denotes the wrong path. *)
+let rec string_of_oide (oid : Outcometree.out_ident) : string =
+  match oid with
+  | Outcometree.Oide_ident { Outcometree.printed_name } -> printed_name
+  | Outcometree.Oide_dot (p, s) -> string_of_oide p ^ "." ^ s
+  | Outcometree.Oide_apply (a, b) ->
+    string_of_oide a ^ "(" ^ string_of_oide b ^ ")"
+  | Outcometree.Oide_hash a -> string_of_oide a ^ "#"
+
 (* Honest string form of an atom for the non-parsing [&]-product fallback. *)
 let string_of_atom ~name_of (name : Types.Rigid_name.t) : string =
   match name with
   | Types.Rigid_name.Param id -> "'" ^ name_of id
-  | Types.Rigid_name.KAtom path -> Path.name path
-  | Types.Rigid_name.Atom { constr; arg_index = 0 } -> Path.name constr
-  | Types.Rigid_name.Atom { constr; arg_index = _ } -> "_ " ^ Path.name constr
+  | Types.Rigid_name.KAtom path -> string_of_oide (oide_of_path path)
+  | Types.Rigid_name.Atom { constr; arg_index = 0 } ->
+    string_of_oide (oide_of_path constr)
+  | Types.Rigid_name.Atom { constr; arg_index = _ } ->
+    "_ " ^ string_of_oide (oide_of_path constr)
   | Types.Rigid_name.Residue _ | Types.Rigid_name.Unknown _ -> "_"
 
 (* [Param]s default to jkind [value]; the identity-modality reference for
