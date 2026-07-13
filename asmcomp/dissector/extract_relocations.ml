@@ -121,6 +121,18 @@ let num_plt t = t.num_plt
 
 let num_got t = t.num_got
 
+(* Record a relocation; we only care about which symbols relocations occur
+   against, not their frequency, so we use a bitmap to deduplicate. *)
+let record_relocation ~seen ~acc ~num ~sym_index ~symbol_name =
+  (* [num] counts every site, not deduplicated symbols: it feeds the
+     per-partition log summary in [Dissector.run]. *)
+  incr num;
+  if not (Misc.Bitmap.get seen sym_index)
+  then begin
+    Misc.Bitmap.set seen sym_index;
+    acc := Relocatable_symbol_name.of_string symbol_name :: !acc
+  end
+
 (* Parse RELA entries and extract PLT32 and REX_GOTPCRELX relocations for
    undefined symbols (st_shndx = SHN_UNDEF). Only undefined symbols need PLT/GOT
    entries since defined symbols can be resolved directly.
@@ -169,27 +181,35 @@ let parse_rela_section ~rela_body ~symbols ~record_plt ~record_got =
             (Rela.Reloc_type.name entry.r_type)
             entry.r_offset symbol_name;
           if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
-          then record_plt ~symbol_name
-          else record_got ~symbol_name)
+          then record_plt ~sym_index:entry.r_sym ~symbol_name
+          else record_got ~sym_index:entry.r_sym ~symbol_name)
 
 let extract_from_rela_text_sections ~symbols sections =
+  (* Symbols are deduplicated, keyed on the symbol table index. One "seen"
+     bitmap per list: a symbol may need both an IPLT and an IGOT entry. *)
+  let num_symbols = Array.length symbols in
+  let plt_seen = Misc.Bitmap.make num_symbols in
+  let got_seen = Misc.Bitmap.make num_symbols in
   let plt_symbols = ref [] in
   let got_symbols = ref [] in
   let num_plt = ref 0 in
   let num_got = ref 0 in
-  let record_plt ~symbol_name =
-    incr num_plt;
-    plt_symbols := Relocatable_symbol_name.of_string symbol_name :: !plt_symbols
+  let record_plt ~sym_index ~symbol_name =
+    record_relocation ~seen:plt_seen ~acc:plt_symbols ~num:num_plt ~sym_index
+      ~symbol_name
   in
-  let record_got ~symbol_name =
-    incr num_got;
-    got_symbols := Relocatable_symbol_name.of_string symbol_name :: !got_symbols
+  let record_got ~sym_index ~symbol_name =
+    record_relocation ~seen:got_seen ~acc:got_symbols ~num:num_got ~sym_index
+      ~symbol_name
   in
   List.iter
     (fun ((rela_section : Elf.section), rela_body) ->
       log_verbose "  processing section %s" rela_section.sh_name_str;
       parse_rela_section ~rela_body ~symbols ~record_plt ~record_got)
     sections;
+  (* CR sspies: The reversal here affects the order in which entries are written
+     into the respective tables. The order should not matter, so we can
+     eventually remove this reversal as well. *)
   { plt_symbols = List.rev !plt_symbols;
     got_symbols = List.rev !got_symbols;
     num_plt = !num_plt;

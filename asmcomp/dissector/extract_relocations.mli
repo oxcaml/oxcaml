@@ -68,17 +68,20 @@ end
 type t
 
 (** Returns the symbol name of each relocation with type R_X86_64_PLT32 that
-    needs a PLT entry (one element per relocation site). *)
+    needs a PLT entry. The names are unique, in order of first appearance; this
+    order determines IPLT entry order in [Build_igot_and_iplt]. *)
 val plt_symbols : t -> Relocatable_symbol_name.t list
 
 (** Returns the symbol name of each relocation with type R_X86_64_REX_GOTPCRELX
-    that needs a GOT entry (one element per relocation site). *)
+    that needs a GOT entry. The names are unique, in order of first appearance;
+    they may overlap with [plt_symbols], and together the two lists determine
+    IGOT entry order in [Build_igot_and_iplt]. *)
 val got_symbols : t -> Relocatable_symbol_name.t list
 
-(** Returns the number of PLT relocations (O(1)). *)
+(** Returns the number of PLT relocation sites (not deduplicated; O(1)). *)
 val num_plt : t -> int
 
-(** Returns the number of GOT relocations (O(1)). *)
+(** Returns the number of GOT relocation sites (not deduplicated; O(1)). *)
 val num_got : t -> int
 
 (** [extract input] scans the .rela.text* sections of [input] for relocations
