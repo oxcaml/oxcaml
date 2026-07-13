@@ -34,7 +34,7 @@ let print_dyn d = print_null (Dynamic.get d)
 let () =
   let d = Dynamic.make () in
   let parent = (Bytes.unsafe_to_string (Bytes.make 4 'x')) in
-  Dynamic.with_temporarily d parent ~f:(fun () ->
+  Dynamic.with_temporarily d parent ~f:(fun () -> exclave_
     let finished = ref false in
     let r = allocate_bytes finished in
     (try
@@ -44,12 +44,13 @@ let () =
           [d -> child], then allocate until the finaliser raises [Sys.Break]
           asynchronously, unwinding out of this async exn handler. *)
         let child = (Bytes.unsafe_to_string (Bytes.make 4 'y')) in
-        Dynamic.with_temporarily d child ~f:(fun () ->
+        Dynamic.with_temporarily d child ~f:(fun () -> exclave_
           Printf.printf "in fiber [expect %s]: %s\n%!" child (print_dyn d);
           while true do
             let _ @ global = Sys.opaque_identity (42, Random.int 42) in
             ()
-          done))
+          done;
+          ()) [@nontail])
     with
     | Sys.Break -> assert !finished
     | _ -> assert false);
