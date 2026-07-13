@@ -360,6 +360,26 @@ payoff is **ikind→jkind with_bounds/base reconstruction** (re-implement normal
 on the ikind), which re-opens the prior PAYOFF-2 USER DECISION and was NOT taken
 here. `Mod_bounds.less_or_equal` STAYS (const printer, per plan).
 
+### Perf A/B (slice-3 regression gate)
+Interleaved `_tmp/perf_time.py` (records+plain, prep corpus), base = c3bcfdb2f
+(ik5prep `_prefix` full-install binary = slice-2 endstate, so the delta isolates
+EXACTLY slices 3-4), final = ik5m `_install` (a58aba4c0 — perf-equivalent to HEAD:
+the later commits are the validate-only differential restore + docs, inert on the
+non-validate hot path). Box NOT quiet (load ~6-11); MIN is the robust figure.
+
+| cell | base min | final min | Δmin | median Δ (2 runs) |
+|---|---|---|---|---|
+| perf_records | 223.67 / 224.24 | 226.17 / 222.92 | −0.6%..+1.1% | +0.85%, +1.05% |
+| perf_plain | 1057.3 / 1040.7 | 1045.2 / 1046.2 | +0.5% / −1.1% | −1.17%, −0.40% |
+
+WASH — no >1% regression on the robust min (records final ≈ base, both directions
+<1%); the median bounces ±1% from box load (records/plain move in OPPOSITE
+directions run-to-run = noise signature, not a real regression). Gate PASSED.
+Note: this is the slices-3-4 delta (the regression-relevant measurement for this
+slice). The whole-PR figure (HEAD vs 92035033e) would ADD slice-2's separately-
+validated renderer cost and needs a ~40-min baseline build — available on request;
+it does not change the freeze decision (slice-2 accepted + 3-4 wash).
+
 ## FREEZE-LEDGER ITEM — the only route to actually delete normalize (Q3, user-gated)
 
 Deleting the `Base_and_axes.normalize` fixpoint requires the stored decl
