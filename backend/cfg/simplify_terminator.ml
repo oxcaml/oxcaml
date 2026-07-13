@@ -187,6 +187,16 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
        infer the tested temporary is equal to zero at the start of the block. *)
     (* CR-someday xclerc for xclerc: that could be extended to multiple
     predecessors, if all lead to the same inference. *)
+    (* Note that [block.predecessors] may be stale here: [run] rewrites
+       terminators during its fold over blocks and recomputes predecessors only
+       at the end. This is currently sound: edges removed by earlier rewrites
+       can only make the single-predecessor check below conservative, or make
+       it consider an already-rewritten terminator (e.g. [Always]) that matches
+       none of the cases below; and edges added by earlier rewrites are always
+       derived from evaluating or copying the terminator of an existing
+       predecessor, so a fact inferred from that terminator also holds along
+       the new edges. Any new rewrite in this module (or new inference below)
+       must preserve this property. *)
     begin match Label.Set.cardinal block.predecessors with
     | 1 ->
       let predecessor_block =
