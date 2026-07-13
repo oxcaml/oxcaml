@@ -177,10 +177,31 @@ user-visible `format_flattened_history` call passes `target`; the Missing_cmi
 lookup at the other caller is unchanged. Both §3a repros restored to the exact
 pre-M4 provenance.
 
-**Re-churn:** the ~25 M4-promoted expects carrying the false provenance are
-re-churned to the corrected (pre-M4-equivalent) text. Tally: _pending build +
-re-churn_. Each corrected expect reads like the BEFORE column of the verification
-table (correct provenance restored).
+**Re-churn:** the M4-promoted expects carrying false provenance are re-churned to
+the corrected (pre-M4-equivalent) text. Validation per dir: `git diff aa4e74b14
+-- <dir> | grep because` == 0 confirms provenance byte-identical to pre-M4. The
+fix restores provenance across the WHOLE corpus (broader than codex's enumerated
+~25 — M4 regressed more sites) EXCEPT the residual class below.
+
+**Residual class (documented, backlog #60): representable-sort-var target.**
+When the violated requirement is "must be representable" (the target layout has
+an unconstrained sort variable, e.g. `_representable_layout_N separable & value`)
+the layout filter cannot discriminate: every layout is `<=` an unconstrained sort
+var (and `Layout.sub` would unify it), so the non-implying `any`-annotation
+branch is not dropped and the score tiebreak still wins. Affected sites:
+`typing-layouts-products/basics.ml:2200` + `typing-layouts-scannable`
+(non_pointer.ml:523, abstract_kinds.ml:110/301) — they stay at the M4 text.
+A timeboxed (one boot iteration) non-unifying representability refinement was
+attempted (branch-layout-is-`any` ⇒ can't explain representability) in two forms:
+REPLACE (repr_required ? not-`any` : sub_layout) fixed products:2200 but
+regressed the annots case (its function-arg branch's own desc is `any`); ADDITIVE
+(sub_layout && not-`any`) fixed annots but regressed products (sub_layout of the
+func-arg branch vs the product sort-var target is Not_le). No single non-unifying
+predicate cleaned both, so per the timebox we shipped (B) (the sub_layout-only
+fix, 07b21181d) + this documented residual. Honest ledger: codex C1 ~22-24/25
+fixed + broad extra restorations; residual = the representable-sort-var sites.
+Precision path (backlog #60): snapshot the branch layouts at combine time (C2
+territory) or a non-unifying representability sub in the layout engine.
 
 ## ANNOTATION-ECHO — design note (NOT built this wave; user "(maybe)")
 
