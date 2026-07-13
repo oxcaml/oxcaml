@@ -2995,10 +2995,12 @@ let rec resolve_flattened_history ?target env history =
        + backtrack around EACH check so it is pure and independent (the sort
        change log is wired into [Btype.backtrack] via [types.ml]). *)
     let pure_implies d =
+      (* W3: exception-safe — if [implies] raises after mutating a sort var,
+         [Btype.backtrack] must still run (matches other printing snapshots). *)
       let snap = Btype.snapshot () in
-      let r = implies d in
-      Btype.backtrack snap;
-      r
+      Fun.protect
+        ~finally:(fun () -> Btype.backtrack snap)
+        (fun () -> implies d)
     in
     let impl1 = pure_implies d1 and impl2 = pure_implies d2 in
     (* Fallback when the implication filter cannot decide: orient the two jkinds
