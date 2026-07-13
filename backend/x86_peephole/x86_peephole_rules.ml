@@ -3,7 +3,7 @@
 open! Int_replace_polymorphic_compare [@@warning "-66"]
 open X86_ast
 open X86_ast_utils
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module U = X86_peephole_utils
 
 type peephole_stats =
@@ -31,7 +31,10 @@ let peephole_stats_to_counters stats =
    d2 Rewrite: addq $(n1+n2), %rsp; .cfi_adjust_cfa_offset (d1+d2)
 
    This only applies when d1 = -n1 and d2 = -n2 (i.e., the CFI offsets correctly
-   track the stack adjustment). *)
+   track the stack adjustment).
+
+   The rewrite does not preserve the flags, so we only apply it when we can
+   prove the flags are unobserved. *)
 let combine_add_rsp stats cell =
   match U.get_cells cell 4 with
   | [cell1; cell2; cell3; cell4] -> (
@@ -43,7 +46,8 @@ let combine_add_rsp stats cell =
           (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d1),
         Ins (ADD (Imm n2, Reg64 RSP)),
         Directive
-          (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d2) ) ->
+          (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d2) )
+      when U.flags_never_observed cell4 ->
       if
         not
           (Int64.equal (Int64.of_int d1) (Int64.neg n1)
@@ -89,7 +93,10 @@ let combine_add_rsp stats cell =
 
    This is safe when x is a register that is not read before the next write to x
    within the same basic block, and either A or B is a register, as memory to
-   memory moves don't exist.
+   memory moves don't exist. B must also not use x in its addressing expression:
+   the rewrite would compute the address from a stale value of x (since we are
+   deleting the write of A to x). A may use x, since its read happens at the
+   same program point in both versions.
 
    We restrict x to Reg64 to avoid issues with aliasing or zeroed bits. *)
 let remove_mov_to_dead_register stats cell =
@@ -97,8 +104,9 @@ let remove_mov_to_dead_register stats cell =
   | [cell1; cell2] -> (
     match DLL.value cell1, DLL.value cell2 with
     | Ins (MOV (src1, Reg64 dst1)), Ins (MOV (Reg64 src2, dst2))
-      when equal_reg64 dst1 src2 && (U.is_register src1 || U.is_register dst2)
-      ->
+      when equal_reg64 dst1 src2
+           && (U.is_register src1 || U.is_register dst2)
+           && not (U.arg_contains_reg64 dst1 dst2) ->
       if
         (* Pattern: mov A, x; mov x, B *)
         U.reg64_is_never_read dst1 cell2
@@ -132,7 +140,7 @@ let find_redundant_cmp src dst start_cell =
           | CMP (src2, dst2) when equal_args src src2 && equal_args dst dst2 ->
             Some cell
           | _ ->
-            if U.writes_flags instr
+            if U.maybe_writes_flags instr
             then None
             else if
               U.writes_to_reg64 (U.underlying_reg64 src |> Option.get) instr

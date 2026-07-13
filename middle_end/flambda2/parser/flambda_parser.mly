@@ -593,7 +593,11 @@ with_value_slots_opt:
 ;
 
 value_slot:
-  | var = value_slot_for_projection; EQUAL; value = simple; { { var; value; } }
+  | var = value_slot_for_projection; EQUAL; value = simple;
+    { { var; value; kind = None } }
+  | var = value_slot_for_projection; COLON; kind = naked_number_kind;
+    EQUAL; value = simple;
+    { { var; value; kind = Some kind } }
 ;
 
 fun_decl:

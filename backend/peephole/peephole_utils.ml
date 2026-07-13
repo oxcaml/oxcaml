@@ -1,4 +1,4 @@
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 open! Int_replace_polymorphic_compare
 
 let are_equal_regs (reg1 : Reg.t) (reg2 : Reg.t) =

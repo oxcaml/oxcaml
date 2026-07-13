@@ -851,14 +851,22 @@ let get_type_param_jkind env path styp =
     Jkind.of_annotation env ~use_abstract_jkinds:false ~warn:false
       ~context:(Type_parameter (path, name)) jkind
   in
+  let legacy_sort () =
+    let level = get_current_level () in
+    Jkind.of_new_legacy_sort ~why:(Unannotated_type_parameter path) ~level
+  in
   match styp.ptyp_desc with
   | Ptyp_any (Some jkind) ->
       of_annotation jkind None
   | Ptyp_var (name, Some jkind) ->
       of_annotation jkind (Some name)
+  | Ptyp_var (name, None) ->
+      begin match Env.find_implicit_jkind name env with
+      | Some jkind -> jkind
+      | None -> legacy_sort ()
+      end
   | _ ->
-      let level = get_current_level () in
-      Jkind.of_new_legacy_sort ~why:(Unannotated_type_parameter path) ~level
+      legacy_sort ()
 
 let get_type_param_name styp =
   (* We don't need to check for jkinds here, just to get the name. *)
