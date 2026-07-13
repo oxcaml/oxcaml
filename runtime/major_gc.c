@@ -776,8 +776,11 @@ atomic_uintnat caml_percent_free = Percent_free_def;
 /* Idle-phase floor (upstream #14365): at the end of sweeping, do not
    switch to marking until total_work_completed has advanced by at least
    this many (sweep-work-unit) words since the start of the sweep phase.
-   Plain uintnat: set only via the Xsmall_heap_limit gc-tweak at startup. */
-uintnat caml_small_heap_limit = Small_heap_limit_def;
+   _Atomic (as upstream): written at run time via the Xsmall_heap_limit
+   gc-tweak / pacing primitive, read concurrently by GC pacing code. The
+   gc-tweaks table stores a cast pointer; the startup parser writes
+   before any domain runs. */
+_Atomic uintnat caml_small_heap_limit = Small_heap_limit_def;
 atomic_uintnat caml_max_percent_free = Max_percent_free_def;
 
 /* Custom blocks allocations (e.g. Bigarray) cause the GC to accelerate.
@@ -2244,7 +2247,12 @@ static void major_collection_slice(intnat howmuch,
       /* Idle phase: do nothing but commit to the work counter. */
       intnat todo = diffmod (atomic_load (&total_work_incurred), wkcnt);
       todo = min2 (max2 (todo, 0), idle);
-      if (todo > 0) commit_major_slice_sweepwork (todo);
+      /* Commit even when todo == 0: beyond the counters, the commit also
+         clears [requested_global_major_slice] once the slice target is
+         met (compare the opportunistic early-out above); skipping it
+         would leave an idle domain re-triggering global major-slice
+         STWs. */
+      commit_major_slice_sweepwork (todo);
       want_mark = (todo == idle);
     }
     if (want_mark){
