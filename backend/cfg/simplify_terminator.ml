@@ -535,9 +535,13 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
           (* If we jump to a block that is empty, we can copy the terminator
              from the successor to the current block. There might be size
              considerations, so we currently do so only for "tests" and return.
-             The optimization is disabled because of a CFG invariant expecting
-             "the tailrec block to be the entry block or the only successor of
-             the entry block". *)
+             Copying is also only correct for terminators that do not destroy
+             any register (cf. [Proc.destroyed_at_terminator]): copying e.g. a
+             [Switch] would introduce a clobber (rax and rdx on amd64) at a
+             point where register allocation did not account for it. The
+             optimization is disabled for the entry block because of a CFG
+             invariant expecting "the tailrec block to be the entry block or the
+             only successor of the entry block". *)
           match successor_block.terminator.desc with
           | Parity_test _ | Truth_test _ | Int_test _ | Float_test _ | Return ->
             block.terminator
