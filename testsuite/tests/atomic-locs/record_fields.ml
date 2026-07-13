@@ -609,7 +609,6 @@ module Pattern_matching_wildcard :
 |}]
 
 (* We disallow functional updates that perform implicit loads of atomic fields. *)
-k
 module Functional_update_error = struct
   type t = { x : int ; mutable y : int [@atomic] }
 
@@ -634,7 +633,7 @@ module Functional_update_ok = struct
   let allowed t = { t with y = 42 }
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_ok/479"
+(apply (field_imm 1 (global Toploop!)) "Functional_update_ok/549"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -654,7 +653,7 @@ module Functional_update_copy_ok = struct
   let allowed t = { t with y = t.y }
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_copy_ok/487"
+(apply (field_imm 1 (global Toploop!)) "Functional_update_copy_ok/557"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -688,7 +687,7 @@ module Functional_update_multi_ok = struct
   let allowed t = { t with y = 42; z = 67 } (* no implicit atomic loads *)
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_ok/503"
+(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_ok/573"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -712,7 +711,7 @@ module Functional_update_multi_copy_ok = struct
   let allowed t = { t with y = t.y; z = t.z } (* no implicit atomic loads *)
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_copy_ok/512"
+(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_copy_ok/582"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -762,7 +761,7 @@ Line 5, characters 14-19:
 Warning 9 [missing-record-field-pattern]: the following labels are not bound
   in this record pattern: "y".
   Either bind these labels explicitly or add "; _" to the pattern.
-(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/600"
+(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/606"
   (let
     (warning =
        (function {nlocal = 0} param : unboxed_int64
@@ -795,7 +794,7 @@ end
 
 let project (t : Mixed_blocks.t) = t.field
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Mixed_blocks/540" (makeblock 0))
+(apply (field_imm 1 (global Toploop!)) "Mixed_blocks/613" (makeblock 0))
 module Mixed_blocks :
   sig
     type t = { padding : #(int * int * int); mutable field : int [@atomic]; }
@@ -833,7 +832,7 @@ end
 
 let project (t : Mixed_blocks_2.t) = t.field
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Mixed_blocks_2/553" (makeblock 0))
+(apply (field_imm 1 (global Toploop!)) "Mixed_blocks_2/626" (makeblock 0))
 module Mixed_blocks_2 :
   sig
     type t = { mutable field : int [@atomic]; padding : #(int * int * int); }
@@ -875,7 +874,7 @@ module Mixed_blocks_rec = struct
 end
 
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Mixed_blocks_rec/569" (makeblock 0))
+(apply (field_imm 1 (global Toploop!)) "Mixed_blocks_rec/642" (makeblock 0))
 module Mixed_blocks_rec :
   sig
     type t = { padding : u; mutable field : int [@atomic]; }
