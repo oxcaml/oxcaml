@@ -22,6 +22,13 @@
 
 val command: string -> int
 val run_command: string -> unit
+
+(** [start_command ~spawn cmdline] starts [cmdline] through the shell, as
+    [command] does, but without waiting for it to finish. [spawn prog argv]
+    must create the process and return its pid; the caller is responsible for
+    waiting on it and for applying [command]'s convention that exit code 127
+    means the command could not be run. Unix only. *)
+val start_command: spawn:(string -> string array -> int) -> string -> int
 val compile_file:
   ?output:string -> ?opt:string -> ?stable_name:string -> string -> int
 val create_archive: string -> string list -> int

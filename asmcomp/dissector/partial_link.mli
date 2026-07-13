@@ -47,15 +47,29 @@ exception Error of error
 (** Pretty-print a partial linking error. *)
 val report_error : Format_doc.formatter -> error -> unit
 
-(** [link_partitions ~temp_dir partitions] partially links each partition into a
-    single relocatable object file.
+(** [link_one_partition unix ~temp_dir ~partition_index partition] partially
+    links [partition] into a single relocatable object file.
 
-    For each partition, creates a response file listing the input files, then
-    invokes the linker with:
+    Creates a response file listing the input files, then invokes the linker
+    with:
     {v   ld --whole-archive @<response_file> --relocatable -o <output.o> v}
 
-    Returns the list of linked partitions with paths to the output .o files.
+    Returns the linked partition with the path to the output .o file. Raises
+    [Error] if the link fails.
 
     @param temp_dir Directory for temporary and output files *)
+val link_one_partition :
+  (module Compiler_owee.Unix_intf.S) ->
+  temp_dir:string ->
+  partition_index:int ->
+  Partition.t ->
+  Partition.Linked.t
+
+(** [link_partitions unix ~temp_dir partitions] partially links each partition
+    in sequence, as for [link_one_partition], returning the linked partitions in
+    order. *)
 val link_partitions :
-  temp_dir:string -> Partition.t list -> Partition.Linked.t list
+  (module Compiler_owee.Unix_intf.S) ->
+  temp_dir:string ->
+  Partition.t list ->
+  Partition.Linked.t list

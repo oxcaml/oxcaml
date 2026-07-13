@@ -163,7 +163,7 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
   let linked_partitions =
     try
       Profile.record_call "dissector/partial_link" (fun () ->
-          Partial_link.link_partitions ~temp_dir partitions)
+          Partial_link.link_partitions unix ~temp_dir partitions)
     with Partial_link.Error err -> raise (Error (Partial_link_error err))
   in
   log "partially linked %d partition(s)" (List.length linked_partitions);
