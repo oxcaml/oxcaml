@@ -460,3 +460,41 @@ literal source kind annotation on the syntactic construct and prefer it for
 display, restoring source-faithful, recompilable bounds for annotated decls
 (inferred kinds still reconstruct from the LDD). ANNOTATION-ECHO is the same
 mechanism that would let the with_bounds print sidecar retire.
+
+## Codex round-2 fix-forward (Z1-Z5, on top of ff83f52da)
+
+Post-push codex round-2 (verified by rev-ik5fmt) on the Phase-2 range.
+
+- **Z1 [HIGH, wrong output] — param letters reversed in the two-sided Violation
+  render.** `format_base_or_kind k1/k2` (jkind.ml) renders "The kind of the first
+  is X / must be a subkind of Y"; for a module-inclusion check the compared decls
+  are COPIES, so k1/k2's LDD `Param` ids (= param `type_expr` `get_id`, ikind.ml)
+  are absent from the live printer `!names` → `resolve_param_name` fails →
+  `synthetic` (id-sort) assigns letters, and the copy's source-'a can have a
+  higher id than source-'b ⇒ inversion (subsumption/modalities_ikinds.ml:344
+  renders both sides as each other's kind; :158 single-param). NOT localized:
+  `synthetic` first-appearance was tried and STILL inverts (LDD terms are not
+  source-ordered); correct letters need the decls' `type_params`, which the
+  `Violation.t` does not carry. Fix approach pending team-lead ruling (thread
+  decl param order into the Violation, vs preserve param identity in
+  check_decl_jkind's copy).
+- **Z2 [fixed] — `&`-product string fallback used raw `Path.name`.** A2 fixed
+  only the single-atom out_type path; `string_of_atom` (ikind.ml, the multi-atom
+  `&`-product + ctor-arg string fallback) still emitted raw `Path.name`. Routed
+  through `oide_of_path` + a `string_of_oide` mirroring `Oprint.print_ident`.
+  Non-shadowed output byte-identical; shadowed paths gain `/2`.
+- **Z3 [fixed] — semantic externality read not solver-reentrant.**
+  `externality_read` (ikind.ml) ran on a shared `create_ctx` + `Solver.round_up`
+  (drains global pending-GFP) with no isolation. Wrapped in `create_scratch_ctx`
+  + `Ldd.with_isolated_pending`, mirroring the print path. Differential
+  unchanged (182 checks / 0 mismatch; positive control still fires).
+- **Z4 [fixed] — C1 `implies` mutated layouts at format time.**
+  `implies`→`sub_layout`→`Layout.sub`→`Sort.equate` instantiates sort vars while
+  formatting. Wrapped each check in `Btype.snapshot`/`backtrack` (sort change log
+  wired via types.ml:1213/1704) ⇒ pure, independent, no eval-order-dependent
+  provenance, no toplevel-recovery leakage.
+- **Z5 [REFUTED] — no action.** Codex lead: a `ctype.ml:4705` fatal + several
+  promoted outputs flagged as lossy/contradictory. Refuted by rev-ik5fmt: the
+  `ctype.ml:4705` fatal is PRE-EXISTING (not introduced by this range), and the
+  lossy `-i` forms (`k1 ... with k1`, `_` residue, `'b & 'a t` grouping) are the
+  already-documented + USER-ruled A1 known-limitation classes, not new defects.
