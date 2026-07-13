@@ -247,3 +247,88 @@ Risk concentrated in (2) (applied-type substitution of the source AST) and in
 deciding precedence when the annotation is looser than the inferred/best kind
 (the echo would then UNDER-report — needs a "annotation is at least best" guard
 or a fall-through to reconstruction).
+
+## Slice 2-tail — typing-layouts-void promotion (commit 2ce315ac9)
+
+Missed by the slice-2 sweep (absent from SLICE2-HANDOFF §5). The gate-flip churned
+its error-embedded kind text; expects were never re-promoted → sole red on the
+full-suite gate at ba1591d0f. All 4 kind-text changes round-trip-verified
+kind-equivalent (paired-mli LDD, `origin=typedecl:normalize` block, param-id
+normalized; negative control `immediate` vs `immediate with key` discriminates):
+
+| legacy spelling | new spelling | verdict |
+|---|---|---|
+| `immediate with key` | `immediate with key @@ external_` | PASS |
+| `immediate with key with unit_u` | `immediate with key @@ external_` | PASS |
+| `immediate with unit_u with v1 with v2` | `immediate with v1 @@ external_ with v2 @@ external_` | PASS |
+| `immediate with v1` | `immediate with v1 @@ external_` | PASS |
+
+Mechanism: `unit_u : void mod everything` crosses every axis ⇒ redundant with-bound
+elided (approved class 1); plain-void `key`/`v1`/`v2` carry externality, rendered
+as `@@ external_` modality (approved GAP-6). Verdict-preserving. Post: dir 13/13.
+**New GAP-6 exercised shape:** void-as-with-bound (externality-carrying void
+payload), round-trip count 4/4.
+
+## Slice 3 — normalize-engine deletion (as-built)
+
+### 3a — externality re-route (commit 82a0cf4ef)
+`get_externality_upper_bound` (the SEMANTIC read used by
+`typedecl_separability.msig_of_external_type` + `typeopt`) now reads the
+externality axis of the ikind `round_up` floor (`Solver.round_up ∘
+ckind_of_jkind → Axis_lattice.externality`, modeled on `crossing_of_jkind`)
+instead of the legacy `Ignore_best normalize` fixpoint. Bridged via a new
+`Jkind.externality_from_ikind` hook (mirrors `sub_verdict_from_ikind`).
+Zero-behavior differential (`OXCAML_IKINDS_VALIDATE`, both computed, fatal on
+`Externality` mismatch): positive control (forced `External64`) fires the fatal
+(non-vacuity proven); synthetic corpus 182 checks / 0 mismatch; testsuite under
+validate over typing-layouts-void/-layouts/-products/-or-null/typing-abstract-kinds
+= 787 summaries, all `mismatches=0`, 0 disagreements.
+
+### 3b(i) — delete get_mod_bounds + the 3a differential (commit a58aba4c0)
+`get_externality_upper_bound` returns the ikind value directly. Deleted
+`get_mod_bounds` (sole caller was the differential legacy branch; not in the
+mli), `all_except_externality`, and the differential branch. `[None]`
+(ikinds-unlinked) is now `fatal_error` — safe, both callers run in the
+typechecker where Ikind is linked. Removes the type-op externality read from the
+`Base_and_axes.normalize` fixpoint's callers.
+
+Full-suite gate at a58aba4c0: **2330 passed / 0 failed** (the +1 vs the
+pre-slice-3 baseline is the void promotion).
+
+### S7 / S5 residual — the Base_and_axes.normalize fixpoint STAYS (documented)
+The fixpoint's remaining callers all feed the STORED decl `type_jkind` (⇒ `.cmi`
++ cross-unit + semantic queries), not just print — so this is NOT promotable
+print churn, and the ikind cannot reconstruct their output:
+
+- **normalize_decl_jkinds (typedecl.ml:3540, S7):** `decl.type_jkind =
+  normalized_jkind` is the authoritative stored decl kind (annotation-subkind
+  check `Ikind.sub_jkind_l` at typedecl.ml:3568, `to_unsafe_mode_crossing` on
+  the `allow_any_crossing` path, cross-decl recursive lookup, `.cmi`). PRINT half
+  is resolved (slice-2 renderer renders decl kinds from the ikind LDD terms, not
+  from `jkind.with_bounds`). SEMANTIC half is NOT: the stored jkind's
+  `with_bounds` cannot be reconstructed from the ikind LDD (which carries
+  rigid-name/param atoms + coeff vectors and has discarded the with-bound
+  `type_expr` surface form). Neither team-lead criterion holds — (a) stored jkind
+  is not unchanged if normalize is dropped (`with_bounds` differs, `.cmi`
+  diverges), (b) downstream is not all-ikind (`to_unsafe_mode_crossing` reads
+  `mod_bounds`+`with_bounds` directly). ⇒ STAYS. Matches the prior finale
+  finding (byte-identity needs re-implementing normalize; PAYOFF 2/3 not taken).
+- **round_up (jkind.ml:3826, S5):** its result feeds ctype `intersect_type_jkind`
+  and — decl-coupled — `nondep_type_decl`'s covariant fallback (ctype.ml:8433),
+  which becomes the stored `type_jkind` ⇒ `.cmi`. The result is `with_bounds`-free
+  so the with-bounds blocker does not apply, BUT the result BASE is the
+  post-`Ignore_best`-normalize expanded base, which the ikind lattice does not
+  carry; reconstructing it risks `.cmi` divergence. Re-routing buys nothing (the
+  fixpoint survives via normalize_decl_jkinds) at real `.cmi` risk ⇒ STAYS.
+- **Violation.of_ (jkind.ml:3372/3375/3380):** error-display normalize. Could be
+  re-routed under approved error-text churn, but the fixpoint survives regardless,
+  so it would be cosmetic caller-count reduction at churn cost; `report_reason`
+  also reads `mod_bounds`/`with_bounds` structurally. ⇒ STAYS this slice (can be
+  isolated later if the full deletion is pursued).
+
+**Net:** slice 3 deleted the type-op externality path (3a) + `get_mod_bounds`
+(3b-i). The `Base_and_axes.normalize` fixpoint SURVIVES, pinned by the
+decl-`type_jkind` consumers. The gating item for the full "delete normalize"
+payoff is **ikind→jkind with_bounds/base reconstruction** (re-implement normalize
+on the ikind), which re-opens the prior PAYOFF-2 USER DECISION and was NOT taken
+here. `Mod_bounds.less_or_equal` STAYS (const printer, per plan).
