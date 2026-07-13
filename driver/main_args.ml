@@ -210,7 +210,12 @@ let mk_I_manifest f =
   \    by the compiler, <actual_path> is where this file is in the\n\
   \    filesystem (relative to [$MANIFEST_FILES_ROOT]). The manifest file\n\
   \    passed to the [-I-manifest] flag should itself be relative to\n\
-  \    [$MANIFEST_FILES_ROOT]."
+  \    [$MANIFEST_FILES_ROOT]. When linking, files given on the command\n\
+  \    line by their bare names (e.g. 'foo.cmx' or 'lib.cmxa') are also\n\
+  \    resolved through manifest entries; if the entry's <actual_path> does\n\
+  \    not retain the extension, the companion object files ('foo.o',\n\
+  \    'lib.a') are resolved the same way and must therefore be listed as\n\
+  \    separate manifest entries."
 
 let mk_H_manifest f =
   "-H-manifest", Arg.String f, "<file>  Same as -I-manifest, but adds given\n\
