@@ -84,7 +84,7 @@ let r_sym_of_info r_info = Int64.to_int (Int64.shift_right_logical r_info 32)
 (* Extract relocation type from r_info (lower 32 bits) *)
 let r_type_of_info r_info = Int64.logand r_info 0xFFFFFFFFL
 
-let iter_rela_entries ~rela_body ~f =
+let iteri_rela_entries ~rela_body ~f =
   let size = Owee_buf.size rela_body in
   if size mod rela_entry_size <> 0
   then
@@ -94,7 +94,7 @@ let iter_rela_entries ~rela_body ~f =
   let num_entries = size / rela_entry_size in
   (* A single cursor advances through the whole section. *)
   let cursor = Owee_buf.cursor rela_body in
-  for _ = 1 to num_entries do
+  for i = 0 to num_entries - 1 do
     let r_offset = Owee_buf.Read.u64 cursor in
     let r_info = Owee_buf.Read.u64 cursor in
     let r_addend = Owee_buf.Read.u64 cursor in
@@ -105,7 +105,7 @@ let iter_rela_entries ~rela_body ~f =
         r_addend
       }
     in
-    f entry
+    f ~index:i entry
   done
 
 (* Construct r_info from symbol index and relocation type *)

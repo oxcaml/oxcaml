@@ -86,8 +86,11 @@ module Rewritten_rela_section : sig
   (** Original file offset of this section. *)
   val section_offset : t -> int64
 
-  (** The rewritten relocation entries. *)
-  val entries : t -> Compiler_owee.Owee_elf_relocation.rela_entry list
+  (** The rewritten relocation entries, each with its index within the section
+      (the entry lies at byte offset [index * rela_entry_size] within the
+      section). Entries not listed are unchanged. *)
+  val changed_entries :
+    t -> (int * Compiler_owee.Owee_elf_relocation.rela_entry) list
 end
 
 (** A rewrite plan for an ELF file. *)

@@ -223,18 +223,22 @@ let execute_plan unix ~input_buf ~output_file ~header ~sections ~igot_and_iplt
   | None, None -> ()
   | Some _, None ->
     Misc.fatal_error "SYMTAB_SHNDX in input but no layout allocated");
-  (* Write rewritten .rela.text* sections back to their original locations *)
+  (* Write the changed .rela.text* entries back to their original locations. The
+     unchanged entries are already in place, copied by the blit above. *)
   List.iter
     (fun rewritten_section ->
-      let cursor =
-        Buf.cursor output_buf
-          ~at:
-            (int64_to_int
-               (FRP.Rewritten_rela_section.section_offset rewritten_section))
+      let section_offset =
+        int64_to_int
+          (FRP.Rewritten_rela_section.section_offset rewritten_section)
       in
       List.iter
-        (fun e -> Rela.write_rela_entry ~cursor e)
-        (FRP.Rewritten_rela_section.entries rewritten_section))
+        (fun (index, e) ->
+          let cursor =
+            Buf.cursor output_buf
+              ~at:(section_offset + (index * Rela.rela_entry_size))
+          in
+          Rela.write_rela_entry ~cursor e)
+        (FRP.Rewritten_rela_section.changed_entries rewritten_section))
     (FRP.rewritten_rela_sections plan);
   Buf.Write.fixed_bytes
     (Buf.cursor output_buf ~at:(int64_to_int (SL.offset shstrtab_layout)))

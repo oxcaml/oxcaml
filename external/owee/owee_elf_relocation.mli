@@ -109,9 +109,11 @@ type rela_entry =
     (** Addend for the relocation. *)
   }
 
-(** [iter_rela_entries ~rela_body ~f] iterates over all RELA entries in
-    the given section body, calling [f] for each entry. *)
-val iter_rela_entries : rela_body:Owee_buf.t -> f:(rela_entry -> unit) -> unit
+(** [iteri_rela_entries ~rela_body ~f] iterates over all RELA entries in
+    the given section body, calling [f] with each entry and its index within
+    the section (the entry lies at byte offset [index * rela_entry_size]). *)
+val iteri_rela_entries :
+  rela_body:Owee_buf.t -> f:(index:int -> rela_entry -> unit) -> unit
 
 (** {1 Entry Sizes} *)
 

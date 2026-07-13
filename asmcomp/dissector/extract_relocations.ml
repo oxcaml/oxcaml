@@ -144,7 +144,7 @@ let record_relocation ~seen ~acc ~num ~sym_index ~symbol_name =
    PC32 relocations to undefined symbols are an error. They occur when code is
    compiled with -nodynlink, which is incompatible with the dissector. *)
 let parse_rela_section ~rela_body ~symbols ~record_plt ~record_got =
-  Rela.iter_rela_entries ~rela_body ~f:(fun entry ->
+  Rela.iteri_rela_entries ~rela_body ~f:(fun ~index:_ entry ->
       (* Check for PC32 relocations to undefined symbols - these are an error *)
       if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.pc32
       then
