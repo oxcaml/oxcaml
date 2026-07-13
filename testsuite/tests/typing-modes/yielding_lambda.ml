@@ -13,18 +13,18 @@ end
 let[@inline never] yield (_ : Yielding.t @ yielding) = ()
 let[@inline never] add x y = x + y
 [%%expect{|
-(apply[unyielding] (field_imm 1 (global Toploop!)) "Yielding/295"
-  (let (with_ = (function {nlocal = 0} f never_inline (apply f 0)))
+(apply (field_imm 1 (global Toploop!)) "Yielding/295"
+  (let (with_ = (function {nlocal = 0} f never_inline (apply[yielding] f 0)))
     (makeblock 0 with_)))
 module Yielding : sig type t val with_ : (t @ yielding -> 'r) -> 'r end
 (let (yield = (function {nlocal = 0} param never_inline : int 0))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "yield" yield))
+  (apply (field_imm 1 (global Toploop!)) "yield" yield))
 val yield : Yielding.t @ yielding -> unit = <fun>
 (let
   (add =
      (function {nlocal = 0} x[value<int>] y[value<int>] never_inline : int
        (%int_add x y)))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "add" add))
+  (apply (field_imm 1 (global Toploop!)) "add" add))
 val add : int -> int -> int = <fun>
 |}]
 
@@ -36,18 +36,16 @@ let () = Yielding.with_ (fun y ->
   yield y;
   let _ = add 4 4 in
   ())
-(* Note the [unyielding] on every apply except [yield] *)
+(* Note the [yielding] marker only on the call to [yield] *)
 [%%expect{|
 (let
-  (add =? (apply[unyielding] (field_imm 0 (global Toploop!)) "add")
-   yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
-   Yielding =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295")
+  (add =? (apply (field_imm 0 (global Toploop!)) "add")
+   yield =? (apply (field_imm 0 (global Toploop!)) "yield")
+   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/295")
    *match* =[value<int>]
-     (apply[unyielding] (field_imm 0 Yielding)
+     (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
-         (seq (apply[unyielding] add 2 2) (apply yield y)
-           (apply[unyielding] add 4 4) 0))))
+         (seq (apply add 2 2) (apply[yielding] yield y) (apply add 4 4) 0))))
   0)
 |}]
 
@@ -56,17 +54,16 @@ let () = Yielding.with_ (fun y ->
 let () = Yielding.with_ (fun y ->
   let _ = add 2 2 in
   yield y[@tail])
-(* Note the [unyielding] on every apply except [yield] *)
+(* Note the [yielding] marker only on the call to [yield] *)
 [%%expect{|
 (let
-  (add =? (apply[unyielding] (field_imm 0 (global Toploop!)) "add")
-   yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
-   Yielding =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295")
+  (add =? (apply (field_imm 0 (global Toploop!)) "add")
+   yield =? (apply (field_imm 0 (global Toploop!)) "yield")
+   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/295")
    *match* =[value<int>]
-     (apply[unyielding] (field_imm 0 Yielding)
+     (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
-         (seq (apply[unyielding] add 2 2) (apply yield y)))))
+         (seq (apply add 2 2) (apply[yielding] yield y)))))
   0)
 |}]
 
@@ -74,17 +71,16 @@ let () = Yielding.with_ (fun y ->
 let () = Yielding.with_ (fun y ->
   let _ = add 2 2 in
   yield y[@nontail])
-(* Note the [unyielding] on every apply except [yield] *)
+(* Note the [yielding] marker only on the call to [yield] *)
 [%%expect{|
 (let
-  (add =? (apply[unyielding] (field_imm 0 (global Toploop!)) "add")
-   yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
-   Yielding =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295")
+  (add =? (apply (field_imm 0 (global Toploop!)) "add")
+   yield =? (apply (field_imm 0 (global Toploop!)) "yield")
+   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/295")
    *match* =[value<int>]
-     (apply[unyielding] (field_imm 0 Yielding)
+     (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
-         (seq (apply[unyielding] add 2 2) (applynontail yield y)))))
+         (seq (apply add 2 2) (applynontail[yielding] yield y)))))
   0)
 |}]
 
@@ -92,17 +88,15 @@ let (_ : int) = Yielding.with_ (fun y ->
   let _ = add 2 2 in
   yield y;
   add 4 4 [@nontail])
-(* Note the [unyielding] on every apply except [yield] *)
+(* Note the [yielding] marker only on the call to [yield] *)
 [%%expect{|
 (let
-  (add =? (apply[unyielding] (field_imm 0 (global Toploop!)) "add")
-   yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
-   Yielding =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295"))
-  (apply[unyielding] (field_imm 0 Yielding)
+  (add =? (apply (field_imm 0 (global Toploop!)) "add")
+   yield =? (apply (field_imm 0 (global Toploop!)) "yield")
+   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/295"))
+  (apply (field_imm 0 Yielding)
     (function {nlocal = 0} y : int
-      (seq (apply[unyielding] add 2 2) (apply yield y)
-        (applynontail[unyielding] add 4 4)))))
+      (seq (apply add 2 2) (apply[yielding] yield y) (applynontail add 4 4)))))
 - : int = 8
 |}]
 
@@ -125,7 +119,7 @@ end = struct
   ;;
 end
 [%%expect{|
-(apply[unyielding] (field_imm 1 (global Toploop!)) "List/397"
+(apply (field_imm 1 (global Toploop!)) "List/397"
   (letrec
     (map
        (function {nlocal = 2} f[L]
@@ -142,7 +136,8 @@ end
                                            value<
                                             (consts (0))
                                              (non_consts ([0: ?, *]))>]))>)
-             (apply f (field_imm 0 param)) (apply map f (field_imm 1 param)))
+             (apply[yielding] f (field_imm 0 param))
+             (apply[yielding] map f (field_imm 1 param)))
            0)))
     (let
       (init =
@@ -166,10 +161,11 @@ end
                                                        (consts (0))
                                                         (non_consts (
                                                         [0: ?, *]))>]))>)
-                        (apply f i) (apply loop (%int_sub i 1)))
+                        (apply[yielding] f i)
+                        (apply[yielding] loop (%int_sub i 1)))
                       0)))
-               (applytail[unyielding] (field_imm 10 (global Stdlib__List!))
-                 (apply loop i))))))
+               (applytail (field_imm 10 (global Stdlib__List!))
+                 (apply[yielding] loop i))))))
       (makeblock 0 map init))))
 module List :
   sig
@@ -180,16 +176,15 @@ module List :
 
 let f (l : int list) =
   Yielding.with_ (fun y ->
-    (* CR aspsmith: It would be nice if the first application of List.map also
-       got [unyielding] *)
+    (* CR aspsmith: It would be nice if the first application of List.map were
+       also unyielding *)
     let (_ : int list) = List.map (fun x -> x + 7) l in
     List.map (fun x -> yield y; x + 4) l) [@nontail]
 [%%expect{|
 (let
-  (yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
-   List =? (apply[unyielding] (field_imm 0 (global Toploop!)) "List/397")
-   Yielding =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295")
+  (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
+   List =? (apply (field_imm 0 (global Toploop!)) "List/397")
+   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/295")
    f =
      (function {nlocal = 0}
        l[value<
@@ -197,22 +192,22 @@ let f (l : int list) =
            (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
        : (consts (0))
           (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))
-       (applynontail[unyielding] (field_imm 0 Yielding)
+       (applynontail (field_imm 0 Yielding)
          (function {nlocal = 0} y
            : (consts (0))
               (non_consts ([0: ?,
                             value<(consts (0)) (non_consts ([0: ?, *]))>]))
            (region
              (seq
-               (apply (field_imm 0 List)
+               (apply[yielding] (field_imm 0 List)
                  (function[L] {nlocal = 1} x[value<int>] : int
                    (%int_add x 7))
                  l)
-               (applytail (field_imm 0 List)
+               (applytail[yielding] (field_imm 0 List)
                  (function {nlocal = 0} x[value<int>] : int
-                   (seq (apply yield y) (%int_add x 4)))
+                   (seq (apply[yielding] yield y) (%int_add x 4)))
                  l)))))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "f" f))
+  (apply (field_imm 1 (global Toploop!)) "f" f))
 val f : int list -> int list = <fun>
 |}]
 
@@ -226,37 +221,36 @@ let () =
     don't_yield();
     do_yield();
     ignore (List.init (fun _ -> do_yield ()) 10);
-    (* CR aspsmith: It would be nice if the application of List.init here also got
-       [unyielding] *)
+    (* CR aspsmith: It would be nice if the application of List.init here were
+       also unyielding *)
     ignore (List.init (fun _ -> don't_yield ()) 10))
 [%%expect{|
 (let
-  (yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
-   List =? (apply[unyielding] (field_imm 0 (global Toploop!)) "List/397")
-   Yielding =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295")
+  (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
+   List =? (apply (field_imm 0 (global Toploop!)) "List/397")
+   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/295")
    *match* =[value<int>]
-     (apply[unyielding] (field_imm 0 Yielding)
+     (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
          (region
            (let
              (do_yield =
                 (function[L] {nlocal = 1} param[value<int>] : int
-                  (applynontail yield y))
+                  (applynontail[yielding] yield y))
               don't_yield =
                 (function[L] {nlocal = 1} param[value<int>] never_inline
                   : int (opaque 0)))
-             (seq (apply do_yield 0) (apply[unyielding] don't_yield 0)
-               (apply do_yield 0)
+             (seq (apply[yielding] do_yield 0) (apply don't_yield 0)
+               (apply[yielding] do_yield 0)
                (ignore
-                 (apply (field_imm 1 List)
+                 (apply[yielding] (field_imm 1 List)
                    (function[L] {nlocal = 1} param[value<int>] : int
-                     (apply do_yield 0))
+                     (apply[yielding] do_yield 0))
                    10))
                (ignore
-                 (apply (field_imm 1 List)
+                 (apply[yielding] (field_imm 1 List)
                    (function[L] {nlocal = 1} param[value<int>] : int
-                     (apply[unyielding] don't_yield 0))
+                     (apply don't_yield 0))
                    10))))))))
   0)
 |}]
@@ -298,7 +292,7 @@ let () =
           (let (tag =a[value<int>] (caml_obj_tag lazy_val))
             (if (%int_equal tag 250) (field_mut 0 lazy_val)
               (if (|| (%int_equal tag 246) (%int_equal tag 244))
-                (apply[unyielding] (field_imm 1 (global CamlinternalLazy!))
+                (apply (field_imm 1 (global CamlinternalLazy!))
                   (opaque lazy_val) never_inline)
                 lazy_val))))
        (if (%eq n 4) 0
@@ -319,27 +313,25 @@ end
 [%%expect{|
 (let
   (A =
-     (apply[unyielding] (field_imm 0 (global CamlinternalMod!)) [0: "" 1 44]
-       [0: [0: 0]])
+     (apply (field_imm 0 (global CamlinternalMod!)) [0: "" 1 44] [0: [0: 0]])
    B =
-     (apply[unyielding] (field_imm 0 (global CamlinternalMod!)) [0: "" 4 37]
-       [0: [0: 0]]))
+     (apply (field_imm 0 (global CamlinternalMod!)) [0: "" 4 37] [0: [0: 0]]))
   (seq
-    (apply[unyielding] (field_imm 1 (global CamlinternalMod!)) [0: [0: 0]] A
+    (apply (field_imm 1 (global CamlinternalMod!)) [0: [0: 0]] A
       (let
         (f =
            (function {nlocal = 0} n[value<int>] : int
              (if (%int_lessequal n 0) 0
-               (apply[unyielding] (field_imm 0 B) (%int_sub n 1)))))
+               (apply (field_imm 0 B) (%int_sub n 1)))))
         (makeblock 0 f)))
-    (apply[unyielding] (field_imm 1 (global CamlinternalMod!)) [0: [0: 0]] B
+    (apply (field_imm 1 (global CamlinternalMod!)) [0: [0: 0]] B
       (let
         (g =
            (function {nlocal = 0} n[value<int>] : int
-             (apply[unyielding] (field_imm 0 A) n)))
+             (apply (field_imm 0 A) n)))
         (makeblock 0 g)))
-    (apply[unyielding] (field_imm 1 (global Toploop!)) "A" A)
-    (apply[unyielding] (field_imm 1 (global Toploop!)) "B" B)))
+    (apply (field_imm 1 (global Toploop!)) "A" A)
+    (apply (field_imm 1 (global Toploop!)) "B" B)))
 module rec A : sig val f : int -> int end
 and B : sig val g : int -> int end
 |}]
@@ -358,10 +350,10 @@ let f x =
        (let (l =? (caml_alloc_dummy_lazy 0))
          (seq
            (caml_update_dummy_lazy l
-             (apply[unyielding] (field_imm 3 (global CamlinternalLazy!))
+             (apply (field_imm 3 (global CamlinternalLazy!))
                (makeforwardblock x)))
            l))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "f" f))
+  (apply (field_imm 1 (global Toploop!)) "f" f))
 val f : 'a -> 'a lazy_t = <fun>
 |}]
 
@@ -378,39 +370,34 @@ end
    o =
      (let
        (class =?
-          (opaque
-            (apply[unyielding] (field_imm 15 (global CamlinternalOO!))
-              shared))
+          (opaque (apply (field_imm 15 (global CamlinternalOO!)) shared))
         obj_init =
           (let
             (ids =?
                (opaque
-                 (apply[unyielding] (field_imm 3 (global CamlinternalOO!))
-                   class shared (opaque [0: #"x"])))
+                 (apply (field_imm 3 (global CamlinternalOO!)) class shared
+                   (opaque [0: #"x"])))
              with_x =o? (field_mut 0 ids)
              x =o? (field_mut 1 ids))
             (seq
               (opaque
-                (apply[unyielding] (field_imm 9 (global CamlinternalOO!))
-                  class with_x
+                (apply (field_imm 9 (global CamlinternalOO!)) class with_x
                   (function {nlocal = 0} self-1 n[value<int>]
                     (let
                       (copy =
-                         (apply[unyielding]
-                           (field_imm 21 (global CamlinternalOO!)) self-1))
+                         (apply (field_imm 21 (global CamlinternalOO!))
+                           self-1))
                       (seq (setfield_imm_computed copy x n) copy)))))
               (function {nlocal = 0} env
                 (let
                   (self =?
                      (opaque
-                       (apply[unyielding]
-                         (field_imm 23 (global CamlinternalOO!)) 0 class)))
+                       (apply (field_imm 23 (global CamlinternalOO!)) 0
+                         class)))
                   (seq (setfield_imm_computed self x 1) self))))))
-       (seq
-         (opaque
-           (apply[unyielding] (field_imm 16 (global CamlinternalOO!)) class))
-         (opaque (apply[unyielding] obj_init 0)))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "o" o))
+       (seq (opaque (apply (field_imm 16 (global CamlinternalOO!)) class))
+         (opaque (apply obj_init 0)))))
+  (apply (field_imm 1 (global Toploop!)) "o" o))
 val o : < with_x : int -> 'a > as 'a = <obj>
 |}]
 
@@ -418,9 +405,9 @@ val o : < with_x : int -> 'a > as 'a = <obj>
 (* A recursive binding whose definition isn't a literal [fun] -- here
    [let g = fun ... in g] -- is compiled by [Value_rec_compiler] through an
    eta-expanding wrapper [fun x -> <lifted f> x]. The wrapper forwards to [f],
-   so its call is [unyielding] exactly when [f] is; here [f] is unyielding,
-   so we get [apply[unyielding]]. (This relies on threading the closure's
-   yielding mode through [Lambda.lfunction].) *)
+   so its call is unyielding exactly when [f] is; here [f] is unyielding, so
+   the apply is unmarked. (This relies on threading the closure's yielding
+   mode through [Lambda.lfunction].) *)
 let rec f =
   let g = fun x -> if x <= 0 then 0 else f (x - 1) in
   g
@@ -429,16 +416,15 @@ let rec f =
   (letrec
     (f
        (function {nlocal = 0} x[value<int>] stub : int
-         (apply[unyielding] (field_imm 0 letrec_function_context) x)))
+         (apply (field_imm 0 letrec_function_context) x)))
     (seq
       (caml_update_dummy letrec_function_context
         (let
           (g =
              (function {nlocal = 0} x[value<int>] : int
-               (if (%int_lessequal x 0) 0
-                 (apply[unyielding] f (%int_sub x 1)))))
+               (if (%int_lessequal x 0) 0 (apply f (%int_sub x 1)))))
           (makeblock 0 g)))
-      (apply[unyielding] (field_imm 1 (global Toploop!)) "f" f))))
+      (apply (field_imm 1 (global Toploop!)) "f" f))))
 val f : int -> int = <fun>
 |}]
 
@@ -462,19 +448,19 @@ let (_ : int) =
   (letrec
     (f
        (function {nlocal = 0} x[value<int>] stub : int
-         (apply[unyielding] (field_imm 0 letrec_function_context) x)))
+         (apply (field_imm 0 letrec_function_context) x)))
     (seq
       (caml_update_dummy letrec_function_context
         (let
           (g =
              (function {nlocal = 0} x[value<int>] : int
                (if (%int_lessequal x 0) 0
-                 (apply[unyielding] (field_imm 1 h) (%int_sub x 1)))))
+                 (apply (field_imm 1 h) (%int_sub x 1)))))
           (makeblock 0 g)))
       (caml_update_dummy h
         (makeblock 0 3505894
-          (function {nlocal = 0} x[value<int>] : int (apply[unyielding] f x))))
-      (apply[unyielding] f 5))))
+          (function {nlocal = 0} x[value<int>] : int (apply f x))))
+      (apply f 5))))
 - : int = 0
 |}]
 
@@ -497,10 +483,8 @@ let (_ : int) =
   end
 ;;
 [%%expect{|
-(let
-  (Yielding =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295"))
-  (apply[unyielding] (field_imm 0 Yielding)
+(let (Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/295"))
+  (apply (field_imm 0 Yielding)
     (function {nlocal = 0} y : int
       (let
         (letrec_function_context =? (caml_alloc_dummy 1)
@@ -508,19 +492,20 @@ let (_ : int) =
         (letrec
           (f
              (function {nlocal = 2} y? x[value<int>] stub : int
-               (apply (field_imm 0 letrec_function_context) y x)))
+               (apply[yielding] (field_imm 0 letrec_function_context) y x)))
           (seq
             (caml_update_dummy letrec_function_context
               (let
                 (g =
                    (function {nlocal = 2} y? x[value<int>] : int
                      (if (%int_lessequal x 0) 0
-                       (apply (field_imm 1 h) y (%int_sub x 1)))))
+                       (apply[yielding] (field_imm 1 h) y (%int_sub x 1)))))
                 (makeblock 0 g)))
             (caml_update_dummy h
               (makeblock 0 3505894
-                (function {nlocal = 2} y? x[value<int>] : int (apply f y x))))
-            (apply f y 5)))))))
+                (function {nlocal = 2} y? x[value<int>] : int
+                  (apply[yielding] f y x))))
+            (apply[yielding] f y 5)))))))
 - : int = 0
 |}]
 
@@ -544,10 +529,9 @@ let (_ : int) =
     f 5)
 [%%expect{|
 (let
-  (yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
-   Yielding =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295"))
-  (apply[unyielding] (field_imm 0 Yielding)
+  (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
+   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/295"))
+  (apply (field_imm 0 Yielding)
     (function {nlocal = 0} y : int
       (let
         (letrec_function_context =? (caml_alloc_dummy 1)
@@ -555,21 +539,21 @@ let (_ : int) =
         (letrec
           (f
              (function {nlocal = 0} x[value<int>] stub : int
-               (apply (field_imm 0 letrec_function_context) x)))
+               (apply[yielding] (field_imm 0 letrec_function_context) x)))
           (seq
             (caml_update_dummy letrec_function_context
               (let
                 (g =
                    (function {nlocal = 0} x[value<int>] : int
-                     (seq (apply yield y)
+                     (seq (apply[yielding] yield y)
                        (if (%int_lessequal x 0) 0
-                         (apply (field_imm 1 h) (%int_sub x 1))))))
+                         (apply[yielding] (field_imm 1 h) (%int_sub x 1))))))
                 (makeblock 0 g)))
             (caml_update_dummy h
               (makeblock 0 3505894
                 (function {nlocal = 0} x[value<int>] : int
-                  (seq (apply yield y) (apply f x)))))
-            (apply f 5)))))))
+                  (seq (apply[yielding] yield y) (apply[yielding] f x)))))
+            (apply[yielding] f 5)))))))
 - : int = 0
 |}]
 
@@ -588,11 +572,10 @@ let () =
     f y)
 [%%expect{|
 (let
-  (yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
-   Yielding =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295")
+  (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
+   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/295")
    *match* =[value<int>]
-     (apply[unyielding] (field_imm 0 Yielding)
+     (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
          (let
            (letrec_function_context =? (caml_alloc_dummy 1)
@@ -600,18 +583,20 @@ let () =
            (letrec
              (f
                 (function {nlocal = 0} yarg stub : int
-                  (apply (field_imm 0 letrec_function_context) yarg)))
+                  (apply[yielding] (field_imm 0 letrec_function_context)
+                    yarg)))
              (seq
                (caml_update_dummy letrec_function_context
                  (let
                    (g =
                       (function {nlocal = 0} yarg : int
-                        (apply (field_imm 1 h) yarg)))
+                        (apply[yielding] (field_imm 1 h) yarg)))
                    (makeblock 0 g)))
                (caml_update_dummy h
                  (makeblock 0 3505894
-                   (function {nlocal = 0} yarg : int (apply yield yarg))))
-               (apply f y)))))))
+                   (function {nlocal = 0} yarg : int
+                     (apply[yielding] yield yarg))))
+               (apply[yielding] f y)))))))
   0)
 |}]
 
@@ -623,18 +608,17 @@ module F (X : sig val n : int end) = struct let m = X.n + 1 end
 module N = struct let n = 41 end
 module R = F(N)
 [%%expect{|
-(apply[unyielding] (field_imm 1 (global Toploop!)) "F/692"
+(apply (field_imm 1 (global Toploop!)) "F/692"
   (function {nlocal = 0} X is_a_functor never_loop
     (let (m =[value<int>] (%int_add (field_imm 0 X) 1)) (makeblock 0 m))))
 module F : functor (X : sig val n : int end) -> sig val m : int end
-(apply[unyielding] (field_imm 1 (global Toploop!)) "N/697"
+(apply (field_imm 1 (global Toploop!)) "N/697"
   (let (n =[value<int>] 41) (makeblock 0 n)))
 module N : sig val n : int end
 (let
-  (N =? (apply[unyielding] (field_imm 0 (global Toploop!)) "N/697")
-   F =? (apply[unyielding] (field_imm 0 (global Toploop!)) "F/692"))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "R/699"
-    (apply[unyielding] F N)))
+  (N =? (apply (field_imm 0 (global Toploop!)) "N/697")
+   F =? (apply (field_imm 0 (global Toploop!)) "F/692"))
+  (apply (field_imm 1 (global Toploop!)) "R/699" (apply F N)))
 module R : sig val m : int end
 |}]
 
@@ -645,12 +629,12 @@ module Yf (X : sig val f : unit -> unit end @ yielding) = struct
   let g () = X.f ()
 end
 [%%expect{|
-(apply[unyielding] (field_imm 1 (global Toploop!)) "Yf/705"
+(apply (field_imm 1 (global Toploop!)) "Yf/705"
   (function {nlocal = 0} X is_a_functor never_loop
     (let
       (g =
          (function {nlocal = 0} param[value<int>] : int
-           (apply (field_imm 0 X) 0)))
+           (apply[yielding] (field_imm 0 X) 0)))
       (makeblock 0 g))))
 module Yf :
   functor (X : sig val f : unit -> unit end @ yielding) ->
@@ -662,27 +646,26 @@ let () =
     R.g ())
 [%%expect{|
 (let
-  (yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
-   Yf =? (apply[unyielding] (field_imm 0 (global Toploop!)) "Yf/705")
-   Yielding =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295")
+  (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
+   Yf =? (apply (field_imm 0 (global Toploop!)) "Yf/705")
+   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/295")
    *match* =[value<int>]
-     (apply[unyielding] (field_imm 0 Yielding)
+     (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
          (let
            (R =
-              (apply Yf
+              (apply[yielding] Yf
                 (let
                   (f =
                      (function {nlocal = 0} param[value<int>] : int
-                       (apply yield y)))
+                       (apply[yielding] yield y)))
                   (makeblock 0 f))))
-           (apply (field_imm 0 R) 0)))))
+           (apply[yielding] (field_imm 0 R) 0)))))
   0)
 |}]
 
 (* Precision: the same [@ yielding]-parameter functor, applied to an
-   *unyielding* argument, is an [unyielding] application -- we use the
+   *unyielding* argument, is an unyielding application -- we use the
    argument's actual mode, not the (yielding) parameter mode it is checked
    against. (The body call [R.g ()] still may yield, since [R]'s result mode is
    yielding.) *)
@@ -691,17 +674,17 @@ let h () =
   let module R = Yf (M) in
   R.g ()
 [%%expect{|
-(apply[unyielding] (field_imm 1 (global Toploop!)) "M/718"
+(apply (field_imm 1 (global Toploop!)) "M/718"
   (let (f = (function {nlocal = 0} param[value<int>] : int 0))
     (makeblock 0 f)))
 module M : sig val f : unit -> unit end
 (let
-  (M =? (apply[unyielding] (field_imm 0 (global Toploop!)) "M/718")
-   Yf =? (apply[unyielding] (field_imm 0 (global Toploop!)) "Yf/705")
+  (M =? (apply (field_imm 0 (global Toploop!)) "M/718")
+   Yf =? (apply (field_imm 0 (global Toploop!)) "Yf/705")
    h =
      (function {nlocal = 0} param[value<int>] : int
-       (let (R = (apply[unyielding] Yf M)) (apply (field_imm 0 R) 0))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "h" h))
+       (let (R = (apply Yf M)) (apply[yielding] (field_imm 0 R) 0))))
+  (apply (field_imm 1 (global Toploop!)) "h" h))
 val h : unit -> unit = <fun>
 |}]
 
@@ -714,12 +697,12 @@ let () =
     let module R = Uf (struct let f () = yield y end) in
     R.g ())
 [%%expect{|
-(apply[unyielding] (field_imm 1 (global Toploop!)) "Uf/729"
+(apply (field_imm 1 (global Toploop!)) "Uf/729"
   (function {nlocal = 0} X is_a_functor never_loop
     (let
       (g =
          (function {nlocal = 0} param[value<int>] : int
-           (apply[unyielding] (field_imm 0 X) 0)))
+           (apply (field_imm 0 X) 0)))
       (makeblock 0 g))))
 module Uf :
   functor (X : sig val f : unit -> unit end) -> sig val g : unit -> unit end
@@ -747,14 +730,15 @@ let () =
     ())
 [%%expect{|
 (let
-  (yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
-   Yielding =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295")
+  (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
+   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/295")
    *match* =[value<int>]
-     (apply[unyielding] (field_imm 0 Yielding)
+     (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
          (let
-           (M = (let (*match* =[value<int>] (apply yield y)) (makeblock 0)))
+           (M =
+              (let (*match* =[value<int>] (apply[yielding] yield y))
+                (makeblock 0)))
            0))))
   0)
 |}]
@@ -831,8 +815,8 @@ Error: The value "y" is "yielding"
 |}]
 
 (* Since object code can never yield, [new] and ancestor-method calls are
-   [unyielding]. (Look for [apply[unyielding]] on [field_mut 0 c] -- the [new]
-   call -- and on [m self] -- the [super#m] call.) *)
+   unyielding. (The applies on [field_mut 0 c] -- the [new] call -- and on
+   [m self] -- the [super#m] call -- carry no [yielding] marker.) *)
 class c = object method m = 0 end
 let mk () = new c
 class d = object inherit c as super method n = super#m end
@@ -845,30 +829,27 @@ class d = object inherit c as super method n = super#m end
             (let
               (m =?
                  (opaque
-                   (apply[unyielding] (field_imm 6 (global CamlinternalOO!))
-                     class #"m")))
+                   (apply (field_imm 6 (global CamlinternalOO!)) class #"m")))
               (seq
                 (opaque
-                  (apply[unyielding] (field_imm 10 (global CamlinternalOO!))
-                    class (opaque (makeblock 0 m 0 0))))
+                  (apply (field_imm 10 (global CamlinternalOO!)) class
+                    (opaque (makeblock 0 m 0 0))))
                 (function {nlocal = 0} env self?
                   (opaque
-                    (apply[unyielding]
-                      (field_imm 23 (global CamlinternalOO!)) self class)))))))
+                    (apply (field_imm 23 (global CamlinternalOO!)) self
+                      class)))))))
        (opaque
-         (apply[unyielding] (field_imm 18 (global CamlinternalOO!))
-           (opaque [0: #"m"]) c_init))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "c/777" c))
+         (apply (field_imm 18 (global CamlinternalOO!)) (opaque [0: #"m"])
+           c_init))))
+  (apply (field_imm 1 (global Toploop!)) "c/777" c))
 class c : object method m : int end
 (let
-  (c =? (apply[unyielding] (field_imm 0 (global Toploop!)) "c/777")
-   mk =
-     (function {nlocal = 0} param[value<int>]
-       (apply[unyielding] (field_mut 0 c) 0)))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "mk" mk))
+  (c =? (apply (field_imm 0 (global Toploop!)) "c/777")
+   mk = (function {nlocal = 0} param[value<int>] (apply (field_mut 0 c) 0)))
+  (apply (field_imm 1 (global Toploop!)) "mk" mk))
 val mk : unit -> c = <fun>
 (let
-  (c =? (apply[unyielding] (field_imm 0 (global Toploop!)) "c/777")
+  (c =? (apply (field_imm 0 (global Toploop!)) "c/777")
    shared =a (opaque [0: #"m"])
    shared =a (opaque [0: #"n" #"m"])
    d =?
@@ -878,37 +859,33 @@ val mk : unit -> c = <fun>
             (let
               (ids =?
                  (opaque
-                   (apply[unyielding] (field_imm 7 (global CamlinternalOO!))
-                     class shared))
+                   (apply (field_imm 7 (global CamlinternalOO!)) class
+                     shared))
                n =o? (field_mut 0 ids)
                inh =[value<genarray>]
                  (opaque
-                   (apply[unyielding] (field_imm 17 (global CamlinternalOO!))
-                     class 0 0 shared c 1))
+                   (apply (field_imm 17 (global CamlinternalOO!)) class 0 0
+                     shared c 1))
                obj_init =o? (field_mut 0 inh)
                m =o? (field_mut 1 inh))
               (seq
                 (opaque
-                  (apply[unyielding] (field_imm 9 (global CamlinternalOO!))
-                    class n
-                    (function {nlocal = 0} self-7 : int
-                      (apply[unyielding] m self-7))))
+                  (apply (field_imm 9 (global CamlinternalOO!)) class n
+                    (function {nlocal = 0} self-7 : int (apply m self-7))))
                 (function {nlocal = 0} env self?
                   (let
                     (self =?
                        (opaque
-                         (apply[unyielding]
-                           (field_imm 23 (global CamlinternalOO!)) self
+                         (apply (field_imm 23 (global CamlinternalOO!)) self
                            class)))
-                    (seq (opaque (apply[unyielding] obj_init self))
+                    (seq (opaque (apply obj_init self))
                       (opaque
-                        (apply[unyielding]
-                          (field_imm 25 (global CamlinternalOO!)) self self
-                          class)))))))))
+                        (apply (field_imm 25 (global CamlinternalOO!)) self
+                          self class)))))))))
        (opaque
-         (apply[unyielding] (field_imm 18 (global CamlinternalOO!))
+         (apply (field_imm 18 (global CamlinternalOO!))
            (opaque [0: #"m" #"n"]) d_init))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "d/805" d))
+  (apply (field_imm 1 (global Toploop!)) "d/805" d))
 class d : object method m : int method n : int end
 |}]
 
@@ -921,10 +898,8 @@ let std_pipe = ( |> )
 [%%expect{|
 0
 external ( |> ) : 'a -> ('a -> 'b) -> 'b = "%revapply"
-(let
-  (std_pipe =
-     (function {nlocal = 0} prim prim stub (apply[unyielding] prim prim)))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "std_pipe" std_pipe))
+(let (std_pipe = (function {nlocal = 0} prim prim stub (apply prim prim)))
+  (apply (field_imm 1 (global Toploop!)) "std_pipe" std_pipe))
 val std_pipe : 'a -> ('a -> 'b) -> 'b = <fun>
 |}]
 
@@ -939,9 +914,9 @@ let yielding_pipe = pipe_y
 external pipe_y : 'a @ yielding -> ('a @ yielding -> 'b) @ yielding -> 'b
   = "%revapply"
 (let
-  (yielding_pipe = (function {nlocal = 0} prim prim stub (apply prim prim)))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "yielding_pipe"
-    yielding_pipe))
+  (yielding_pipe =
+     (function {nlocal = 0} prim prim stub (apply[yielding] prim prim)))
+  (apply (field_imm 1 (global Toploop!)) "yielding_pipe" yielding_pipe))
 val yielding_pipe : 'a @ yielding -> ('a @ yielding -> 'b) @ yielding -> 'b =
   <fun>
 |}]
@@ -964,13 +939,13 @@ end
 [%%expect{|
 0
 module type S = sig type t val x : t end
-(apply[unyielding] (field_imm 1 (global Toploop!)) "F/853"
+(apply (field_imm 1 (global Toploop!)) "F/853"
   (function {nlocal = 0} M is_a_functor never_loop
     (let (y = (field_imm 0 M)) (makeblock 0 y))))
 module F : functor (M : S) -> sig val y : M.t end
-(let (F =? (apply[unyielding] (field_imm 0 (global Toploop!)) "F/853"))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "M/861"
-    (let (x =[value<int>] 42 include = (apply[unyielding] F (makeblock 0 x)))
+(let (F =? (apply (field_imm 0 (global Toploop!)) "F/853"))
+  (apply (field_imm 1 (global Toploop!)) "M/861"
+    (let (x =[value<int>] 42 include = (apply F (makeblock 0 x)))
       (makeblock 0 x (field_imm 0 include)))))
 module M : sig type t = int val x : int val y : int end
 |}]
@@ -989,32 +964,31 @@ let () =
     end in
     M.g ())
 [%%expect{|
-(apply[unyielding] (field_imm 1 (global Toploop!)) "Gf/868"
+(apply (field_imm 1 (global Toploop!)) "Gf/868"
   (function {nlocal = 0} X is_a_functor never_loop
     (let
       (g =
          (function {nlocal = 0} param[value<int>] : int
-           (apply (field_imm 0 X) 0)))
+           (apply[yielding] (field_imm 0 X) 0)))
       (makeblock 0 g))))
 module Gf :
   functor (X : sig val f : unit -> unit end @ yielding) ->
     sig val g : unit -> unit end @ yielding
 (let
-  (yield =? (apply[unyielding] (field_imm 0 (global Toploop!)) "yield")
-   Gf =? (apply[unyielding] (field_imm 0 (global Toploop!)) "Gf/868")
-   Yielding =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "Yielding/295")
+  (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
+   Gf =? (apply (field_imm 0 (global Toploop!)) "Gf/868")
+   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/295")
    *match* =[value<int>]
-     (apply[unyielding] (field_imm 0 Yielding)
+     (apply (field_imm 0 Yielding)
        (function {nlocal = 0} y : int
          (let
            (M =
               (let
                 (f =
                    (function {nlocal = 0} param[value<int>] : int
-                     (apply yield y))
-                 include = (apply Gf (makeblock 0 f)))
+                     (apply[yielding] yield y))
+                 include = (apply[yielding] Gf (makeblock 0 f)))
                 (makeblock 0 f (field_imm 0 include))))
-           (apply (field_imm 1 M) 0)))))
+           (apply[yielding] (field_imm 1 M) 0)))))
   0)
 |}]

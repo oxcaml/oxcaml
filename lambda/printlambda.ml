@@ -1279,8 +1279,8 @@ let rec lam ppf = function
       let form = apply_kind "apply" ap.ap_region_close ap.ap_mode in
       let form =
         match ap.ap_yielding with
-        | May_yield -> form
-        | Unyielding -> form ^ "[unyielding]"
+        | May_yield -> form ^ "[yielding]"
+        | Unyielding -> form
       in
       fprintf ppf "@[<2>(%s@ %a%a%a%a%a%a)@]" form
         lam ap.ap_func lams ap.ap_args

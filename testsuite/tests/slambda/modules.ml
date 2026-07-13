@@ -14,17 +14,17 @@ end
 { c = (missing)
 ; r =
   ⟪(let (one =[value<int>] 1)
-     (apply[unyielding] (field_imm 1 (global Toploop!)) "one" one))⟫ }
+     (apply (field_imm 1 (global Toploop!)) "one" one))⟫ }
 val one : int = 1
 { c = (missing)
 ; r =
   ⟪(let (two =[value<int>] 2)
-     (apply[unyielding] (field_imm 1 (global Toploop!)) "two" two))⟫ }
+     (apply (field_imm 1 (global Toploop!)) "two" two))⟫ }
 val two : int = 2
 { c = (missing)
 ; r =
   ⟪(let (two_u =[int] #2m)
-     (apply[unyielding] (field_imm 1 (global Toploop!)) "two_u" two_u))⟫ }
+     (apply (field_imm 1 (global Toploop!)) "two_u" two_u))⟫ }
 val two_u : int# = <abstr>
 { c = (missing); r = ⟪0⟫ }
 module type S = sig val a : int val b : int end
@@ -38,18 +38,16 @@ end : S)
 { c =
   (let
     (two =
-       { c = (missing)
-       ; r = ⟪(apply[unyielding] (field_imm 0 (global Toploop!)) "two")⟫ }
+       { c = (missing); r = ⟪(apply (field_imm 0 (global Toploop!)) "two")⟫ }
      one =
-       { c = (missing)
-       ; r = ⟪(apply[unyielding] (field_imm 0 (global Toploop!)) "one")⟫ }
+       { c = (missing); r = ⟪(apply (field_imm 0 (global Toploop!)) "one")⟫ }
      a = { c = one.c; r = ⟪one⟫ }
      b = { c = two.c; r = ⟪two⟫ })
     [ a.c; b.c; ])
 ; r =
   ⟪(let
-     (two =? (apply[unyielding] (field_imm 0 (global Toploop!)) "two")
-      one =? (apply[unyielding] (field_imm 0 (global Toploop!)) "one")
+     (two =? (apply (field_imm 0 (global Toploop!)) "two")
+      one =? (apply (field_imm 0 (global Toploop!)) "one")
       a =[value<int>] one
       b =[value<int>] two)
      (makeblock 0 a b))⟫ }
@@ -66,10 +64,9 @@ M.a
   (let
     (two_u =
        { c = (missing)
-       ; r = ⟪(apply[unyielding] (field_imm 0 (global Toploop!)) "two_u")⟫ }
+       ; r = ⟪(apply (field_imm 0 (global Toploop!)) "two_u")⟫ }
      one =
-       { c = (missing)
-       ; r = ⟪(apply[unyielding] (field_imm 0 (global Toploop!)) "one")⟫ }
+       { c = (missing); r = ⟪(apply (field_imm 0 (global Toploop!)) "one")⟫ }
      M =
        { c =
          (let (a = { c = one.c; r = ⟪one⟫ } b = { c = two_u.c; r = ⟪two_u⟫ })
@@ -80,8 +77,8 @@ M.a
     M.c.0)
 ; r =
   ⟪(let
-     (two_u =? (apply[unyielding] (field_imm 0 (global Toploop!)) "two_u")
-      one =? (apply[unyielding] (field_imm 0 (global Toploop!)) "one")
+     (two_u =? (apply (field_imm 0 (global Toploop!)) "two_u")
+      one =? (apply (field_imm 0 (global Toploop!)) "one")
       M =
         (let (a =[value<int>] one b =[int] two_u)
           (makeblock 0 (?,untagged_immediate) a b)))
@@ -101,8 +98,7 @@ in K.N.a
 { c =
   (let
     (one =
-       { c = (missing)
-       ; r = ⟪(apply[unyielding] (field_imm 0 (global Toploop!)) "one")⟫ }
+       { c = (missing); r = ⟪(apply (field_imm 0 (global Toploop!)) "one")⟫ }
      M =
        { c =
          (let (N =
@@ -115,7 +111,7 @@ in K.N.a
     M.c.0.0)
 ; r =
   ⟪(let
-     (one =? (apply[unyielding] (field_imm 0 (global Toploop!)) "one")
+     (one =? (apply (field_imm 0 (global Toploop!)) "one")
       M =
         (let (N = (let (a =[value<int>] one) (makeblock 0 a)))
           (makeblock 0 N)))
@@ -151,11 +147,9 @@ Warning 191 [unused-kind-declaration]: unused kind "l".
 { c =
   (let
     (two =
-       { c = (missing)
-       ; r = ⟪(apply[unyielding] (field_imm 0 (global Toploop!)) "two")⟫ }
+       { c = (missing); r = ⟪(apply (field_imm 0 (global Toploop!)) "two")⟫ }
      one =
-       { c = (missing)
-       ; r = ⟪(apply[unyielding] (field_imm 0 (global Toploop!)) "one")⟫ }
+       { c = (missing); r = ⟪(apply (field_imm 0 (global Toploop!)) "one")⟫ }
      M =
        { c =
          (let
@@ -172,13 +166,13 @@ Warning 191 [unused-kind-declaration]: unused kind "l".
             H =
               { c = (missing)
               ; r =
-                ⟪(apply[unyielding] (field_imm 0 (global CamlinternalMod!))
-                   [0: "" 12 21] [0: [0]])⟫ }
+                ⟪(apply (field_imm 0 (global CamlinternalMod!)) [0: "" 12 21]
+                   [0: [0]])⟫ }
             I =
               { c = (missing)
               ; r =
-                ⟪(apply[unyielding] (field_imm 0 (global CamlinternalMod!))
-                   [0: "" 12 35] [0: [0]])⟫ }
+                ⟪(apply (field_imm 0 (global CamlinternalMod!)) [0: "" 12 35]
+                   [0: [0]])⟫ }
             j =
               { c = (missing)
               ; r =
@@ -188,12 +182,10 @@ Warning 191 [unused-kind-declaration]: unused kind "l".
                       (function {nlocal = 0} class?
                         (function {nlocal = 0} env self?
                           (opaque
-                            (apply[unyielding]
-                              (field_imm 23 (global CamlinternalOO!)) self
-                              class)))))
+                            (apply (field_imm 23 (global CamlinternalOO!))
+                              self class)))))
                    (opaque
-                     (apply[unyielding]
-                       (field_imm 18 (global CamlinternalOO!)) 0 j_init)))⟫ }
+                     (apply (field_imm 18 (global CamlinternalOO!)) 0 j_init)))⟫ }
             include = { c = H.c; r = ⟪H⟫ })
            [ a.c; D.c; E.c; F.c; H.c; I.c; j.c; ])
        ; r =
@@ -204,16 +196,14 @@ Warning 191 [unused-kind-declaration]: unused kind "l".
                E = (makeblock_unique 248 "E" (caml_fresh_oo_id 0))
                F = (let (fa =[value<int>] two) (makeblock 0 fa))
                H =
-                 (apply[unyielding] (field_imm 0 (global CamlinternalMod!))
-                   [0: "" 12 21] [0: [0]])
+                 (apply (field_imm 0 (global CamlinternalMod!)) [0: "" 12 21]
+                   [0: [0]])
                I =
-                 (apply[unyielding] (field_imm 0 (global CamlinternalMod!))
-                   [0: "" 12 35] [0: [0]]))
+                 (apply (field_imm 0 (global CamlinternalMod!)) [0: "" 12 35]
+                   [0: [0]]))
               (seq
-                (apply[unyielding] (field_imm 1 (global CamlinternalMod!))
-                  [0: [0]] H H)
-                (apply[unyielding] (field_imm 1 (global CamlinternalMod!))
-                  [0: [0]] I I)
+                (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] H H)
+                (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] I I)
                 (let
                   (j =?
                      (let
@@ -222,19 +212,19 @@ Warning 191 [unused-kind-declaration]: unused kind "l".
                           (function {nlocal = 0} class?
                             (function {nlocal = 0} env self?
                               (opaque
-                                (apply[unyielding]
+                                (apply
                                   (field_imm 23 (global CamlinternalOO!))
                                   self class)))))
                        (opaque
-                         (apply[unyielding]
-                           (field_imm 18 (global CamlinternalOO!)) 0 j_init)))
+                         (apply (field_imm 18 (global CamlinternalOO!)) 0
+                           j_init)))
                    include =a H)
                   (makeblock 0 a D E F H I j)))))⟫ })
     M.c.0)
 ; r =
   ⟪(let
-     (two =? (apply[unyielding] (field_imm 0 (global Toploop!)) "two")
-      one =? (apply[unyielding] (field_imm 0 (global Toploop!)) "one")
+     (two =? (apply (field_imm 0 (global Toploop!)) "two")
+      one =? (apply (field_imm 0 (global Toploop!)) "one")
       M =
         (seq one
           (let
@@ -243,16 +233,13 @@ Warning 191 [unused-kind-declaration]: unused kind "l".
              E = (makeblock_unique 248 "E" (caml_fresh_oo_id 0))
              F = (let (fa =[value<int>] two) (makeblock 0 fa))
              H =
-               (apply[unyielding] (field_imm 0 (global CamlinternalMod!))
-                 [0: "" 12 21] [0: [0]])
+               (apply (field_imm 0 (global CamlinternalMod!)) [0: "" 12 21]
+                 [0: [0]])
              I =
-               (apply[unyielding] (field_imm 0 (global CamlinternalMod!))
-                 [0: "" 12 35] [0: [0]]))
-            (seq
-              (apply[unyielding] (field_imm 1 (global CamlinternalMod!))
-                [0: [0]] H H)
-              (apply[unyielding] (field_imm 1 (global CamlinternalMod!))
-                [0: [0]] I I)
+               (apply (field_imm 0 (global CamlinternalMod!)) [0: "" 12 35]
+                 [0: [0]]))
+            (seq (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] H H)
+              (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] I I)
               (let
                 (j =?
                    (let
@@ -261,12 +248,11 @@ Warning 191 [unused-kind-declaration]: unused kind "l".
                         (function {nlocal = 0} class?
                           (function {nlocal = 0} env self?
                             (opaque
-                              (apply[unyielding]
-                                (field_imm 23 (global CamlinternalOO!)) self
-                                class)))))
+                              (apply (field_imm 23 (global CamlinternalOO!))
+                                self class)))))
                      (opaque
-                       (apply[unyielding]
-                         (field_imm 18 (global CamlinternalOO!)) 0 j_init)))
+                       (apply (field_imm 18 (global CamlinternalOO!)) 0
+                         j_init)))
                  include =a H)
                 (makeblock 0 a D E F H I j))))))
      (field_imm 0 M))⟫ }

@@ -18,16 +18,14 @@ type record = { x : string; y : string @@ many aliased; }
 let aliased_use x = x
 [%%expect{|
 (let (aliased_use/0 = (function {nlocal = 0} x/0? x/0))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "aliased_use"
-    aliased_use/0))
+  (apply (field_imm 1 (global Toploop!)) "aliased_use" aliased_use/0))
 val aliased_use : 'a -> 'a = <fun>
 |}]
 
 let unique_use (x @ unique) = x
 [%%expect{|
 (let (unique_use/0 = (function {nlocal = 0} x/1? x/1))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "unique_use"
-    unique_use/0))
+  (apply (field_imm 1 (global Toploop!)) "unique_use" unique_use/0))
 val unique_use : 'a @ unique -> 'a = <fun>
 |}]
 
@@ -38,8 +36,7 @@ let proj_aliased r =
   (r, y)
 [%%expect{|
 (let
-  (aliased_use/0 =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "aliased_use")
+  (aliased_use/0 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    proj_aliased/0 =
      (function {nlocal = 0} r/0[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
@@ -47,11 +44,10 @@ let proj_aliased r =
        (let
          (y/0 = (field_imm 1 r/0)
           r/1 =[value<(consts ()) (non_consts ([0: *, *]))>]
-            (apply[unyielding] aliased_use/0 r/0))
+            (apply aliased_use/0 r/0))
          (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/1
            y/0))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "proj_aliased"
-    proj_aliased/0))
+  (apply (field_imm 1 (global Toploop!)) "proj_aliased" proj_aliased/0))
 val proj_aliased : record -> record * string = <fun>
 |}]
 
@@ -61,8 +57,7 @@ let proj_unique r =
   (r, y)
 [%%expect{|
 (let
-  (unique_use/0 =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "unique_use")
+  (unique_use/0 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    proj_unique/0 =
      (function {nlocal = 0} r/2[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
@@ -70,11 +65,10 @@ let proj_unique r =
        (let
          (y/1 = (field_mut 1 r/2)
           r/3 =[value<(consts ()) (non_consts ([0: *, *]))>]
-            (apply[unyielding] unique_use/0 r/2))
+            (apply unique_use/0 r/2))
          (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/3
            y/1))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "proj_unique"
-    proj_unique/0))
+  (apply (field_imm 1 (global Toploop!)) "proj_unique" proj_unique/0))
 val proj_unique : record @ unique -> record * string = <fun>
 |}]
 
@@ -87,19 +81,17 @@ let match_aliased r =
     (r, y)
 [%%expect{|
 (let
-  (aliased_use/0 =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "aliased_use")
+  (aliased_use/0 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    match_aliased/0 =
      (function {nlocal = 0} r/4[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
        (let
          (r/5 =[value<(consts ()) (non_consts ([0: *, *]))>]
-            (apply[unyielding] aliased_use/0 r/4))
+            (apply aliased_use/0 r/4))
          (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/5
            (field_imm 1 r/4)))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "match_aliased"
-    match_aliased/0))
+  (apply (field_imm 1 (global Toploop!)) "match_aliased" match_aliased/0))
 val match_aliased : record -> record * string = <fun>
 |}]
 
@@ -111,8 +103,7 @@ let match_unique r =
     (r, y)
 [%%expect{|
 (let
-  (unique_use/0 =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "unique_use")
+  (unique_use/0 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    match_unique/0 =
      (function {nlocal = 0} r/6[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
@@ -120,11 +111,10 @@ let match_unique r =
        (let
          (y/2 =o? (field_mut 1 r/6)
           r/7 =[value<(consts ()) (non_consts ([0: *, *]))>]
-            (apply[unyielding] unique_use/0 r/6))
+            (apply unique_use/0 r/6))
          (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/7
            y/2))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "match_unique"
-    match_unique/0))
+  (apply (field_imm 1 (global Toploop!)) "match_unique" match_unique/0))
 val match_unique : record @ unique -> record * string = <fun>
 |}]
 
@@ -138,8 +128,7 @@ let match_mini_anf_aliased r =
   (r, y)
 [%%expect{|
 (let
-  (aliased_use/0 =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "aliased_use")
+  (aliased_use/0 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    match_mini_anf_aliased/0 =
      (function {nlocal = 0} r/8[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
@@ -147,10 +136,10 @@ let match_mini_anf_aliased r =
        (let
          (*match*/0 =[value<int>] 1
           r/9 =[value<(consts ()) (non_consts ([0: *, *]))>]
-            (apply[unyielding] aliased_use/0 r/8))
+            (apply aliased_use/0 r/8))
          (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/9
            (field_imm 1 r/8)))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "match_mini_anf_aliased"
+  (apply (field_imm 1 (global Toploop!)) "match_mini_anf_aliased"
     match_mini_anf_aliased/0))
 val match_mini_anf_aliased : record -> record * string = <fun>
 |}]
@@ -165,8 +154,7 @@ let match_mini_anf_unique r =
   (r, y)
 [%%expect{|
 (let
-  (unique_use/0 =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "unique_use")
+  (unique_use/0 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    match_mini_anf_unique/0 =
      (function {nlocal = 0} r/10[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
@@ -175,10 +163,10 @@ let match_mini_anf_unique r =
          (y/3 =o? (field_mut 1 r/10)
           *match*/1 =[value<int>] 1
           r/11 =[value<(consts ()) (non_consts ([0: *, *]))>]
-            (apply[unyielding] unique_use/0 r/10))
+            (apply unique_use/0 r/10))
          (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/11
            y/3))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "match_mini_anf_unique"
+  (apply (field_imm 1 (global Toploop!)) "match_mini_anf_unique"
     match_mini_anf_unique/0))
 val match_mini_anf_unique : record @ unique -> record * string = <fun>
 |}]
@@ -193,8 +181,7 @@ let match_anf_aliased r =
   (r, y)
 [%%expect{|
 (let
-  (aliased_use/0 =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "aliased_use")
+  (aliased_use/0 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    match_anf_aliased/0 =
      (function {nlocal = 0} r/12[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
@@ -206,10 +193,10 @@ let match_anf_aliased r =
         with (21 y/5)
          (let
            (r/13 =[value<(consts ()) (non_consts ([0: *, *]))>]
-              (apply[unyielding] aliased_use/0 r/12))
+              (apply aliased_use/0 r/12))
            (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/13
              y/5)))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "match_anf_aliased"
+  (apply (field_imm 1 (global Toploop!)) "match_anf_aliased"
     match_anf_aliased/0))
 val match_anf_aliased : record -> record * string = <fun>
 |}]
@@ -225,8 +212,7 @@ let match_anf_unique r =
   (r, y)
 [%%expect{|
 (let
-  (unique_use/0 =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "unique_use")
+  (unique_use/0 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    match_anf_unique/0 =
      (function {nlocal = 0} r/14[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
@@ -239,10 +225,10 @@ let match_anf_unique r =
         with (29 y/8)
          (let
            (r/15 =[value<(consts ()) (non_consts ([0: *, *]))>]
-              (apply[unyielding] unique_use/0 r/14))
+              (apply unique_use/0 r/14))
            (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*) r/15
              y/8)))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "match_anf_unique"
+  (apply (field_imm 1 (global Toploop!)) "match_anf_unique"
     match_anf_unique/0))
 val match_anf_unique : record @ unique -> record * string = <fun>
 |}]
@@ -385,8 +371,7 @@ let swap_inner (t : tree) =
                (exit 36)))
            (exit 36))
         with (36) t/0)))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "swap_inner"
-    swap_inner/0))
+  (apply (field_imm 1 (global Toploop!)) "swap_inner" swap_inner/0))
 val swap_inner : tree -> tree = <fun>
 |}]
 
@@ -416,10 +401,8 @@ let match_guard r =
     (r, y)
 [%%expect{|
 (let
-  (unique_use/0 =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "unique_use")
-   aliased_use/0 =?
-     (apply[unyielding] (field_imm 0 (global Toploop!)) "aliased_use")
+  (unique_use/0 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
+   aliased_use/0 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
    match_guard/0 =
      (function {nlocal = 0} r/16[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
@@ -428,17 +411,16 @@ let match_guard r =
          (if (caml_string_equal y/9 "")
            (let
              (r/17 =[value<(consts ()) (non_consts ([0: *, *]))>]
-                (apply[unyielding] aliased_use/0 r/16))
+                (apply aliased_use/0 r/16))
              (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*)
                r/17 y/9))
            (let
              (y/10 =o? (field_mut 1 r/16)
               r/18 =[value<(consts ()) (non_consts ([0: *, *]))>]
-                (apply[unyielding] unique_use/0 r/16))
+                (apply unique_use/0 r/16))
              (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*)
                r/18 y/10))))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "match_guard"
-    match_guard/0))
+  (apply (field_imm 1 (global Toploop!)) "match_guard" match_guard/0))
 val match_guard : record @ unique -> record * string = <fun>
 |}]
 

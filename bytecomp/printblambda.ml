@@ -88,8 +88,8 @@ let rec blambda ppf = function
     fprintf ppf "@[<2>(apply%s%s@ %a %a)@]"
       (if nontail then " nontail" else "")
       (match yielding with
-      | Lambda.May_yield -> ""
-      | Lambda.Unyielding -> " unyielding")
+      | Lambda.May_yield -> " yielding"
+      | Lambda.Unyielding -> "")
       blambda func
       (pp_print_list ~pp_sep:pp_print_space blambda)
       args

@@ -24,7 +24,7 @@ let f (b : bool) (x : int) =
            (opt =[value<(consts (0)) (non_consts ([0: value<int>]))>]
               (if b 0 (makelocalblock 0 (value<int>) x)))
            (if opt (field_imm 0 opt) 1)))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "f" f))
+  (apply (field_imm 1 (global Toploop!)) "f" f))
 val f : bool -> int -> int = <fun>
 |}]
 
@@ -46,7 +46,7 @@ let g (b : bool) (x : float#) =
            (opt =[value<(consts (0)) (non_consts ([0: float64]))>]
               (if b 0 (makelocalblock 0 (float64) x)))
            (if opt (%float_of_float# (mixedfield 0  (float64) opt)) 0.0)))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "g" g))
+  (apply (field_imm 1 (global Toploop!)) "g" g))
 val g : bool -> float# -> float = <fun>
 |}]
 
@@ -54,7 +54,7 @@ val g : bool -> float# -> float = <fun>
 let opaque (type a : any) (r : a t) = r
 [%%expect{|
 (let (opaque = (function {nlocal = 0} r r))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "opaque" opaque))
+  (apply (field_imm 1 (global Toploop!)) "opaque" opaque))
 val opaque : ('a : any). 'a t -> 'a t = <fun>
 |}]
 
@@ -68,7 +68,6 @@ let containing_void (r : unit# t) = r
      (function {nlocal = 0}
        r[value<(consts (0)) (non_consts ([0: product ]))>]
        : (consts (0)) (non_consts ([0: product ])) r))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "containing_void"
-    containing_void))
+  (apply (field_imm 1 (global Toploop!)) "containing_void" containing_void))
 val containing_void : unit# t -> unit# t = <fun>
 |}]
