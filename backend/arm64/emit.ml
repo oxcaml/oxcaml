@@ -1325,13 +1325,37 @@ let emit_reinterpret_cast env (cast : Cmm.reinterpret_cast) i =
     then A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
   | V128_of_vec (Vec256 | Vec512) | V256_of_vec _ | V512_of_vec _ ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
-  | Int64_of_value | Value_of_int64 -> move env src dst
+  | Int64_of_value | Value_of_int64 | Tagged_int_of_value -> move env src dst
 
 let emit_static_cast (cast : Cmm.static_cast) i =
   let dst = i.res.(0) in
   let src = i.arg.(0) in
   let distinct = not (Reg.same_loc src dst) in
   match cast with
+  | Int_conv ic -> (
+    match Cmm.class_of_int_conv ic with
+    | Identity -> if distinct then A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
+    | Sign_extend w -> (
+      match w with
+      | Int8 | Int16 | Int32 | Int63 ->
+        A.ins4 SBFM (H.reg_x dst) (H.reg_x src) (O.imm_six 0)
+          (O.imm_six (Cmm.bits_of_int_width w - 1))
+      | Int64 -> Misc.fatal_error "unexpected Sign_extend Int64")
+    | Zero_extend w -> (
+      match w with
+      | Int8 | Int16 | Int63 ->
+        A.ins4 UBFM (H.reg_x dst) (H.reg_x src) (O.imm_six 0)
+          (O.imm_six (Cmm.bits_of_int_width w - 1))
+      | Int32 -> A.ins_mov_reg_w (H.reg_w dst) (H.reg_w src)
+      | Int64 -> Misc.fatal_error "unexpected Zero_extend Int64"))
+  | Tagged_int_of_int64 ->
+    A.ins_lsl_immediate (H.reg_x dst) (H.reg_x src) ~shift_in_bits:1;
+    A.ins3 ORR_immediate (H.reg_x dst) (H.reg_x dst) (O.bitmask 1n)
+  | Int64_of_tagged_int { signedness } -> (
+    match signedness with
+    | Signed -> A.ins_asr_immediate (H.reg_x dst) (H.reg_x src) ~shift_in_bits:1
+    | Unsigned ->
+      A.ins_lsr_immediate (H.reg_x dst) (H.reg_x src) ~shift_in_bits:1)
   | Int64_of_float Float64 -> A.ins2 FCVTZS (H.reg_x dst) (H.reg_d src)
   | Int64_of_float Float32 -> A.ins2 FCVTZS (H.reg_x dst) (H.reg_s src)
   | Float_of_int64 Float64 -> A.ins2 SCVTF (H.reg_d dst) (H.reg_x src)

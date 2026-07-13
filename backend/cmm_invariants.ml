@@ -208,6 +208,7 @@ let machtype_of_vec512_scalar : vec512_type -> machtype = function
 let reinterpret_cast_arg_type : reinterpret_cast -> machtype = function
   | Int64_of_value -> typ_val
   | Value_of_int64 -> typ_int
+  | Tagged_int_of_value -> typ_int
   | Float_of_float32 -> typ_float32
   | Float32_of_float -> typ_float
   | Float_of_int64 -> typ_int
@@ -218,6 +219,9 @@ let reinterpret_cast_arg_type : reinterpret_cast -> machtype = function
     machtype_of_vector_width width
 
 let static_cast_arg_type : static_cast -> machtype = function
+  | Int_conv _ -> typ_int
+  | Tagged_int_of_int64 -> typ_int
+  | Int64_of_tagged_int _ -> typ_int
   | Float_of_int64 (_ : float_width) -> typ_int
   | Int64_of_float width -> machtype_of_float_width width
   | Float_of_float32 -> typ_float32

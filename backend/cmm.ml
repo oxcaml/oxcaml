@@ -17,6 +17,33 @@
 
 open! Int_replace_polymorphic_compare [@@warning "-66"]
 
+type int_width =
+  | Int64
+  | Int63
+  | Int32
+  | Int16
+  | Int8
+
+let bits_of_int_width = function
+  | Int64 -> 64
+  | Int63 -> 63
+  | Int32 -> 32
+  | Int16 -> 16
+  | Int8 -> 8
+
+let equal_int_width x y =
+  match x, y with
+  | Int64, Int64 | Int63, Int63 | Int32, Int32 | Int16, Int16 | Int8, Int8 ->
+    true
+  | (Int64 | Int63 | Int32 | Int16 | Int8), _ -> false
+
+let string_of_int_width = function
+  | Int64 -> "int64"
+  | Int63 -> "int63"
+  | Int32 -> "int32"
+  | Int16 -> "int16"
+  | Int8 -> "int8"
+
 type machtype_component = Cmx_format.machtype_component =
   | Val
   | Addr
@@ -404,6 +431,7 @@ let machtype_of_memory_chunk : memory_chunk -> machtype = function
 type reinterpret_cast =
   | Int64_of_value
   | Value_of_int64
+  | Tagged_int_of_value
   | Float_of_float32
   | Float32_of_float
   | Float_of_int64
@@ -414,7 +442,16 @@ type reinterpret_cast =
   | V256_of_vec of vector_width
   | V512_of_vec of vector_width
 
+type int_conv =
+  { src : int_width;
+    dst : int_width;
+    signedness : Scalar.Signedness.t
+  }
+
 type static_cast =
+  | Int_conv of int_conv
+  | Tagged_int_of_int64
+  | Int64_of_tagged_int of { signedness : Scalar.Signedness.t }
   | Float_of_int64 of float_width
   | Int64_of_float of float_width
   | Float_of_float32
@@ -425,6 +462,20 @@ type static_cast =
   | Scalar_of_v256 of vec256_type
   | V512_of_scalar of vec512_type
   | Scalar_of_v512 of vec512_type
+
+type int_conv_class =
+  | Sign_extend of int_width
+  | Zero_extend of int_width
+  | Identity
+
+let class_of_int_conv { src; dst; signedness } =
+  let src_bits = bits_of_int_width src in
+  let dst_bits = bits_of_int_width dst in
+  if src_bits = dst_bits
+  then Identity
+  else if src_bits > dst_bits
+  then Sign_extend dst
+  else match signedness with Signed -> Identity | Unsigned -> Zero_extend src
 
 module Alloc_mode = struct
   type t =
@@ -993,6 +1044,7 @@ let equal_reinterpret_cast (left : reinterpret_cast) (right : reinterpret_cast)
   match left, right with
   | Int64_of_value, Int64_of_value -> true
   | Value_of_int64, Value_of_int64 -> true
+  | Tagged_int_of_value, Tagged_int_of_value -> true
   | Float_of_float32, Float_of_float32 -> true
   | Float32_of_float, Float32_of_float -> true
   | Float_of_int64, Float_of_int64 -> true
@@ -1003,14 +1055,22 @@ let equal_reinterpret_cast (left : reinterpret_cast) (right : reinterpret_cast)
   | V256_of_vec w1, V256_of_vec w2
   | V512_of_vec w1, V512_of_vec w2 ->
     equal_vector_width w1 w2
-  | ( ( Int64_of_value | Value_of_int64 | Float_of_float32 | Float32_of_float
-      | Float_of_int64 | Int64_of_float | Float32_of_int32 | Int32_of_float32
-      | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ),
+  | ( ( Int64_of_value | Value_of_int64 | Tagged_int_of_value | Float_of_float32
+      | Float32_of_float | Float_of_int64 | Int64_of_float | Float32_of_int32
+      | Int32_of_float32 | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ),
       _ ) ->
     false
 
 let equal_static_cast (left : static_cast) (right : static_cast) =
   match left, right with
+  | ( Int_conv { src = src1; dst = dst1; signedness = s1 },
+      Int_conv { src = src2; dst = dst2; signedness = s2 } ) ->
+    equal_int_width src1 src2 && equal_int_width dst1 dst2
+    && Scalar.Signedness.equal s1 s2
+  | Tagged_int_of_int64, Tagged_int_of_int64 -> true
+  | ( Int64_of_tagged_int { signedness = s1 },
+      Int64_of_tagged_int { signedness = s2 } ) ->
+    Scalar.Signedness.equal s1 s2
   | Float32_of_float, Float32_of_float -> true
   | Float_of_float32, Float_of_float32 -> true
   | Float_of_int64 f1, Float_of_int64 f2 -> equal_float_width f1 f2
@@ -1021,7 +1081,8 @@ let equal_static_cast (left : static_cast) (right : static_cast) =
   | V256_of_scalar v1, V256_of_scalar v2 -> equal_vec256_type v1 v2
   | Scalar_of_v512 v1, Scalar_of_v512 v2 -> equal_vec512_type v1 v2
   | V512_of_scalar v1, V512_of_scalar v2 -> equal_vec512_type v1 v2
-  | ( ( Float32_of_float | Float_of_float32 | Float_of_int64 _
+  | ( ( Int_conv _ | Tagged_int_of_int64 | Int64_of_tagged_int _
+      | Float32_of_float | Float_of_float32 | Float_of_int64 _
       | Int64_of_float _ | Scalar_of_v128 _ | V128_of_scalar _
       | Scalar_of_v256 _ | V256_of_scalar _ | Scalar_of_v512 _
       | V512_of_scalar _ ),

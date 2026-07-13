@@ -232,6 +232,7 @@ let reinterpret_cast : Cmm.reinterpret_cast -> string = function
   | V512_of_vec w -> Printf.sprintf "%s as vec512" (vector_width w)
   | Value_of_int64 -> "int64 as value"
   | Int64_of_value -> "value as int64"
+  | Tagged_int_of_value -> "value as tagged_int"
   | Float32_of_float -> "float as float32"
   | Float_of_float32 -> "float32 as float"
   | Float_of_int64 -> "int64 as float"
@@ -240,6 +241,20 @@ let reinterpret_cast : Cmm.reinterpret_cast -> string = function
   | Int32_of_float32 -> "float32 as int32"
 
 let static_cast : Cmm.static_cast -> string = function
+  | Int_conv { src; dst; signedness } ->
+    let unsigned_sigil =
+      match signedness with Signed -> "" | Unsigned -> "U"
+    in
+    Printf.sprintf "%s%s->%s%s" unsigned_sigil
+      (Cmm.string_of_int_width src)
+      unsigned_sigil
+      (Cmm.string_of_int_width dst)
+  | Tagged_int_of_int64 -> "int64->tagged_int"
+  | Int64_of_tagged_int { signedness } ->
+    let unsigned_sigil =
+      match signedness with Signed -> "" | Unsigned -> "U"
+    in
+    Printf.sprintf "tagged_%sint->%sint64" unsigned_sigil unsigned_sigil
   | Int64_of_float Float64 -> "float->int64"
   | Float_of_int64 Float64 -> "int64->float"
   | Int64_of_float Float32 -> "float32->int64"

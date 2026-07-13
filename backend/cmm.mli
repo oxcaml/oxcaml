@@ -17,6 +17,17 @@
 
 [@@@ocaml.warning "+a-40-41-42"]
 
+type int_width =
+  | Int64
+  | Int63
+  | Int32
+  | Int16
+  | Int8
+
+val string_of_int_width : int_width -> string
+
+val bits_of_int_width : int_width -> int
+
 type machtype_component = Cmx_format.machtype_component =
   | Val
   | Addr
@@ -312,6 +323,7 @@ val machtype_of_memory_chunk : memory_chunk -> machtype
 type reinterpret_cast =
   | Int64_of_value
   | Value_of_int64
+  | Tagged_int_of_value
   | Float_of_float32
     (* Only writes the bottom 32 bits of the target float register. All other
        bits are unspecified. *)
@@ -326,9 +338,19 @@ type reinterpret_cast =
   | V256_of_vec of vector_width
   | V512_of_vec of vector_width
 
+(* Converts between naked integers. *)
+type int_conv =
+  { src : int_width;
+    dst : int_width;
+    signedness : Scalar.Signedness.t
+  }
+
 (* These casts may require a particular value-preserving operation, e.g.
    truncating a float to an int. *)
 type static_cast =
+  | Int_conv of int_conv
+  | Tagged_int_of_int64
+  | Int64_of_tagged_int of { signedness : Scalar.Signedness.t }
   | Float_of_int64 of float_width
   | Int64_of_float of float_width
   | Float_of_float32
@@ -339,6 +361,16 @@ type static_cast =
   | Scalar_of_v256 of vec256_type
   | V512_of_scalar of vec512_type
   | Scalar_of_v512 of vec512_type
+
+(* Describes how to perform an [Int_conv] cast. This is separate from [int_conv]
+   so the convention on upper bits of small ints is encapsulated in a single
+   function: [class_of_int_conv]. *)
+type int_conv_class =
+  | Sign_extend of int_width
+  | Zero_extend of int_width
+  | Identity
+
+val class_of_int_conv : int_conv -> int_conv_class
 
 module Alloc_mode : sig
   type t =

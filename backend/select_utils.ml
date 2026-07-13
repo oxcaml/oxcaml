@@ -211,8 +211,12 @@ let oper_result_type = function
   | Creinterpret_cast (V512_of_vec _) -> typ_vec512
   | Creinterpret_cast (Float_of_int64 | Float_of_float32) -> typ_float
   | Creinterpret_cast (Float32_of_int32 | Float32_of_float) -> typ_float32
-  | Creinterpret_cast (Int64_of_value | Int64_of_float | Int32_of_float32) ->
-    typ_int
+  | Creinterpret_cast (Int64_of_value | Int64_of_float) -> typ_int
+  | Creinterpret_cast Tagged_int_of_value -> typ_int
+  | Creinterpret_cast Int32_of_float32 -> typ_int
+  | Cstatic_cast (Int_conv _) -> typ_int
+  | Cstatic_cast Tagged_int_of_int64 -> typ_int
+  | Cstatic_cast (Int64_of_tagged_int _) -> typ_int
   | Cstatic_cast (Float_of_float32 | Float_of_int64 Float64) -> typ_float
   | Cstatic_cast (Float32_of_float | Float_of_int64 Float32) -> typ_float32
   | Cstatic_cast (Int64_of_float (Float64 | Float32)) -> typ_int

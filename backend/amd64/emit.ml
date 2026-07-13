@@ -1651,7 +1651,7 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
   let open Simd_instrs in
   let distinct = not (Reg.same_loc i.arg.(0) i.res.(0)) in
   match cast with
-  | Int64_of_value | Value_of_int64 ->
+  | Int64_of_value | Value_of_int64 | Tagged_int_of_value ->
     if distinct then I.mov (arg i 0) (res i 0)
   | Float_of_float32 | Float32_of_float ->
     if distinct then movss (arg i 0) (res i 0)
@@ -1676,7 +1676,46 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
 let emit_static_cast (cast : Cmm.static_cast) i =
   let open Simd_instrs in
   let distinct = not (Reg.same_loc i.arg.(0) i.res.(0)) in
+  let extend_using_shift ~by ~shift_right =
+    if distinct then I.mov (arg i 0) (res i 0);
+    I.sal (int by) (res i 0);
+    shift_right (int by) (res i 0)
+  in
   match cast with
+  | Int_conv ic -> (
+    match Cmm.class_of_int_conv ic with
+    | Identity -> if distinct then I.mov (arg i 0) (res i 0)
+    | Sign_extend w -> (
+      match w with
+      | Int8 -> extend_using_shift ~by:56 ~shift_right:I.sar
+      | Int16 -> extend_using_shift ~by:48 ~shift_right:I.sar
+      | Int32 -> I.movsxd (arg32 i 0) (res i 0)
+      | Int63 -> extend_using_shift ~by:1 ~shift_right:I.sar
+      | Int64 -> Misc.fatal_error "unexpected Sign_extend Int64")
+    | Zero_extend w -> (
+      match w with
+      | Int8 -> extend_using_shift ~by:56 ~shift_right:I.shr
+      | Int16 -> extend_using_shift ~by:48 ~shift_right:I.shr
+      | Int32 -> I.mov (arg32 i 0) (res32 i 0)
+      | Int63 -> extend_using_shift ~by:1 ~shift_right:I.shr
+      | Int64 -> Misc.fatal_error "unexpected Zero_extend Int64"))
+  | Tagged_int_of_int64 ->
+    let r =
+      (* CR jrayman: Should we have this check or change
+         [regalloc_stack_operands.ml]? *)
+      if Reg.is_stack i.arg.(0)
+      then (
+        I.mov (arg i 0) (res i 0);
+        reg64 i.res.(0))
+      else arg64 i 0
+    in
+    I.lea (mem64 NONE ~base:r 1 (Scalar r)) (res i 0)
+  | Int64_of_tagged_int { signedness } ->
+    if distinct then I.mov (arg i 0) (res i 0);
+    begin match signedness with
+    | Signed -> I.sar (int 1) (res i 0)
+    | Unsigned -> I.shr (int 1) (res i 0)
+    end
   | Float_of_int64 Float64 ->
     sse_or_avx_dst cvtsi2sd_X_r64m64 vcvtsi2sd_X_X_r64m64 (arg i 0) (res i 0)
   | Int64_of_float Float64 ->
