@@ -129,11 +129,14 @@
  *       uint8 num_allocs;
  *       uint8 alloc[num_allocs];
  *
- *   If frame_has_debug(), debug info follows (32-bit aligned):
- *       int32 debug_info[frame_has_allocs() ? num_allocs : 1];
+ *   If frame_has_debug(), debug info follows:
+ *       uint32 debug_info[frame_has_allocs() ? num_allocs : 1];
  *
- * Each debug info is a signed relative offset, in bytes, from its own
- * address to a debuginfo structure. */
+ * Each debug word is the byte offset, from its own address, of a
+ * debuginfo record chain or suffix-sharing jump word (see
+ * runtime/backtrace_nat.c); these are emitted after the descriptors,
+ * so the offset is positive. In an allocating frame a zero word means
+ * that allocation has no debuginfo. */
 
 typedef unsigned char frame_descr;
 
