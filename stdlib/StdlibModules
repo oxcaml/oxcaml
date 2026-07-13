@@ -43,6 +43,8 @@ STDLIB_MODULE_BASENAMES = \
   type \
   atomic \
   camlinternalLazy \
+  context \
+  dynamic \
   lazy \
   seq \
   option \

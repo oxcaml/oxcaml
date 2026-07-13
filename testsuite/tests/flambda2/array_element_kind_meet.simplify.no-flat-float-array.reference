@@ -15,16 +15,16 @@ let code loopify(never) size(49) newer_version_of(sum_0)
       let prim_1 = %untag_imm (for_stop) in
       let for_stop_naked = %num_conv.[`imm`].[`int64`] (prim_1) in
       (cont k2 (0L, 0)
-         where rec k2 (for_counter_naked : int64, r_441_unboxed0) =
+         where rec k2 (for_counter_naked : int64, r_442_unboxed0) =
            let prim_2 = %num_conv.[`int64`].[`imm`] (for_counter_naked) in
            let i = %tag_imm (prim_2) in
            let Parrayrefu = %array_load.mut (Pfield, i) in
            ((let prim_3 = %is_int (Parrayrefu) in
              switch prim_3
                | 0 -> k4
-               | 1 -> k3 (r_441_unboxed0)
+               | 1 -> k3 (r_442_unboxed0)
                where k4 =
-                 let int_add = %int_barith.add (r_441_unboxed0, 1) in
+                 let int_add = %int_barith.add (r_442_unboxed0, 1) in
                  cont k3 (int_add))
               where k3 (return_val0) =
                 let for_next_naked =
