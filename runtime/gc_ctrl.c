@@ -447,11 +447,11 @@ struct gc_tweak {
   uintnat initial_value;
 };
 
-extern uintnat caml_small_heap_limit; /* see major_gc.c */
+extern _Atomic uintnat caml_small_heap_limit; /* see major_gc.c */
 
 static struct gc_tweak gc_tweaks[] = {
   { "custom_work_max_multiplier", &caml_custom_work_max_multiplier, 0 },
-  { "small_heap_limit", &caml_small_heap_limit, 0 },
+  { "small_heap_limit", (uintnat *) &caml_small_heap_limit, 0 },
   { "prelinking_in_use", &caml_prelinking_in_use, 0 },
   { "compaction", &caml_compaction_algorithm, 0 },
   { "compact_unmap", &caml_compact_unmap, 0 },
@@ -499,7 +499,12 @@ uintnat* caml_lookup_gc_tweak(const char* name, uintnat len)
 /* Set the idle-phase floor (in words) and re-arm it for the current
    cycle; [Gc.Tweak.set "small_heap_limit"] alone only takes effect from
    the next sweep phase. Used by the compiler driver for
-   -X gc-idle-floor. */
+   -X gc-idle-floor.
+
+   Contract: single-domain, process-startup use only (the driver calls it
+   during argument parsing). The re-arm reads STW-written pacing state and
+   may withdraw a pending mark request, neither of which is coordinated
+   with concurrently running domains. */
 CAMLprim value caml_gc_set_idle_floor(value words)
 {
   caml_small_heap_limit = Long_val(words);

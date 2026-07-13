@@ -66,7 +66,12 @@ module Gc_pacing = struct
         && String.sub field 0 (String.length prefix) = prefix)
 
   (* Size in bytes: a decimal integer with an optional K/M/G binary
-     suffix. *)
+     suffix. Guarded against multiply overflow, and capped at 1 TiB: a
+     floor beyond that disables major-GC marking outright on any real
+     compilation (unbounded heap growth), and such values are far more
+     likely a suffix typo (512G for 512M) than intent. *)
+  let max_size_bytes = 1 lsl 40
+
   let parse_size_bytes s =
     let n = String.length s in
     if n = 0 then None
@@ -79,18 +84,25 @@ module Gc_pacing = struct
         | _ -> 1, s
       in
       match int_of_string_opt digits with
-      | Some i when i >= 0 -> Some (i * mult)
+      | Some i when i >= 0 && i <= max_size_bytes / mult ->
+        Some (i * mult)
       | _ -> None
     end
 
   (* Runs after argument parsing and before any compilation. Late enough
-     that both -X and OCAMLPARAM have been read; early enough that no real
-     GC work has happened (space_overhead is re-read continuously and the
-     idle floor re-arms at every sweep-phase start, so mid-startup changes
-     take full effect). *)
+     that -X and OCAMLPARAM's "before" section have been read (knobs in
+     OCAMLPARAM's per-file "after" section are NOT honoured: it is only
+     read per compilation unit, after this point); early enough that no
+     real GC work has happened. Also note [-depend] runs and exits during
+     argument parsing, i.e. unpaced, which is fine (it compiles
+     nothing). *)
   let apply () =
     begin match space_overhead () with
-    | 0 -> ()
+    | 0 -> ()  (* the "unset" sentinel: 0 cannot be requested explicitly *)
+    | n when n < 0 ->
+      Compenv.fatal
+        (Printf.sprintf "-X gc-space-overhead expects a positive integer, \
+got: %d" n)
     | n ->
       if not (env_field_present ~prefix:"o") then
         Gc.set { (Gc.get ()) with Gc.space_overhead = n }
@@ -101,7 +113,8 @@ module Gc_pacing = struct
       if not (env_field_present ~prefix:"Xsmall_heap_limit=") then begin
         match parse_size_bytes s with
         | Some bytes ->
-          (* The primitive takes words. *)
+          (* The primitive takes words; bytes <= 1 TiB so this cannot
+             overflow. *)
           !set_idle_floor_hook ((bytes + 7) / 8)
         | None ->
           Compenv.fatal
