@@ -525,7 +525,7 @@ module Functional_update_ok = struct
   let allowed t = { t with y = 42 }
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_ok/479"
+(apply (field_imm 1 (global Toploop!)) "Functional_update_ok/480"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -545,7 +545,7 @@ module Functional_update_copy_ok = struct
   let allowed t = { t with y = t.y }
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_copy_ok/487"
+(apply (field_imm 1 (global Toploop!)) "Functional_update_copy_ok/488"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -579,7 +579,7 @@ module Functional_update_multi_ok = struct
   let allowed t = { t with y = 42; z = 67 } (* no implicit atomic loads *)
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_ok/503"
+(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_ok/504"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -603,7 +603,7 @@ module Functional_update_multi_copy_ok = struct
   let allowed t = { t with y = t.y; z = t.z } (* no implicit atomic loads *)
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_copy_ok/512"
+(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_copy_ok/513"
   (let
     (allowed =
        (function {nlocal = 0} t
