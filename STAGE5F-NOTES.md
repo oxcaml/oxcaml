@@ -296,10 +296,35 @@ ikind floor, and under `OXCAML_IKINDS_VALIDATE` also computes the legacy
 mismatch. Keeps the seeded-fault positive control reproducible and catches
 future ikind/legacy drift. Net code delta over 3a: none (3a state preserved).
 
-### S7 / S5 residual — the Base_and_axes.normalize fixpoint STAYS (documented)
-The fixpoint's remaining callers all feed the STORED decl `type_jkind` (⇒ `.cmi`
-+ cross-unit + semantic queries), not just print — so this is NOT promotable
-print churn, and the ikind cannot reconstruct their output:
+### S7 / S5 residual — the Base_and_axes.normalize fixpoint STAYS (evidence-backed)
+
+**Skip-normalize experiment (2026-07-13).** normalize_decl_jkinds (typedecl.ml:3540)
+temporarily patched to store `decl.type_jkind` UN-normalized; boot-built; compared
+against the normalized `_install` compiler. Classification:
+- **PRINT churn: ZERO.** `-i` decl output byte-identical (the slice-2 renderer
+  renders from the ikind LDD, normalize-independent).
+- **SEMANTIC churn: PRESENT and broad.** The stored decl `type_jkind` .cmi is
+  BYTE-DIFFERENT for every decl whose kind normalize would fold — NOT just
+  explicit-`with`-bound decls: `type r : immutable_data = { a : int }` (folds to a
+  with-bounds-free floor) ALSO diverges, because normalize is what performs the
+  fold. `-ikinds-debug` stored forms differ. ⇒ dropping normalize changes .cmi
+  hashes codebase-wide (cross-unit-visible), and the direct-`with_bounds` reader
+  `to_unsafe_mode_crossing` would diverge. This is exactly team-lead's
+  ".cmi-shape divergence" trigger → KEEP.
+- **Bounding finding (cross-unit .cmi probe):** unit B reading A's .cmi and doing
+  subkind/crossing derives the SAME ikind and gets IDENTICAL verdicts regardless
+  of A.cmi shape (ikind is normalize-independent). So the ikind-based TYPING
+  behavior is stable — the risk of deletion is confined to the stored
+  representation, .cmi hashes, and direct-`with_bounds` reads, not verdict flips.
+  (This is why criterion (b) partially holds but NOT cleanly — the .cmi surface is
+  not ikind-mediated.)
+
+**Verdict: KEEP normalize for the decl path. Semantic churn present (broad
+.cmi-shape divergence) ⇒ team-lead decision rule = KEEP. PAYOFF 2 stays
+not-taken** (a recorded USER decision; re-opening it is the user's call). The
+fixpoint's remaining callers all feed the STORED decl `type_jkind` (⇒ `.cmi` +
+cross-unit + semantic queries), not just print — NOT promotable print churn, and
+the ikind cannot reconstruct their stored output:
 
 - **normalize_decl_jkinds (typedecl.ml:3540, S7):** `decl.type_jkind =
   normalized_jkind` is the authoritative stored decl kind (annotation-subkind
