@@ -328,8 +328,9 @@ the ikind cannot reconstruct their stored output:
 
 - **normalize_decl_jkinds (typedecl.ml:3540, S7):** `decl.type_jkind =
   normalized_jkind` is the authoritative stored decl kind (annotation-subkind
-  check `Ikind.sub_jkind_l` at typedecl.ml:3568, `to_unsafe_mode_crossing` on
-  the `allow_any_crossing` path, cross-decl recursive lookup, `.cmi`). PRINT half
+  check `Ikind.sub_jkind_l` at typedecl.ml:3568, `to_unsafe_mode_crossing`
+  (jkind.ml:2641) on the `allow_any_crossing` path (typedecl.ml:3588-3591),
+  cross-decl recursive lookup, `.cmi`). PRINT half
   is resolved (slice-2 renderer renders decl kinds from the ikind LDD terms, not
   from `jkind.with_bounds`). SEMANTIC half is NOT: the stored jkind's
   `with_bounds` cannot be reconstructed from the ikind LDD (which carries
@@ -339,7 +340,7 @@ the ikind cannot reconstruct their stored output:
   diverges), (b) downstream is not all-ikind (`to_unsafe_mode_crossing` reads
   `mod_bounds`+`with_bounds` directly). ⇒ STAYS. Matches the prior finale
   finding (byte-identity needs re-implementing normalize; PAYOFF 2/3 not taken).
-- **round_up (jkind.ml:3826, S5):** its result feeds ctype `intersect_type_jkind`
+- **round_up (jkind.ml:3873, S5):** its result feeds ctype `intersect_type_jkind`
   and — decl-coupled — `nondep_type_decl`'s covariant fallback (ctype.ml:8433),
   which becomes the stored `type_jkind` ⇒ `.cmi`. The result is `with_bounds`-free
   so the with-bounds blocker does not apply, BUT the result BASE is the
@@ -358,3 +359,48 @@ decl-`type_jkind` consumers. The gating item for the full "delete normalize"
 payoff is **ikind→jkind with_bounds/base reconstruction** (re-implement normalize
 on the ikind), which re-opens the prior PAYOFF-2 USER DECISION and was NOT taken
 here. `Mod_bounds.less_or_equal` STAYS (const printer, per plan).
+
+## FREEZE-LEDGER ITEM — the only route to actually delete normalize (Q3, user-gated)
+
+Deleting the `Base_and_axes.normalize` fixpoint requires the stored decl
+`type_jkind` to be produced WITHOUT normalize — i.e. an **ikind→jkind
+reconstruction** that rebuilds a semantically-and-.cmi-equivalent normalized
+jkind from the ikind LDD. This re-opens the recorded PAYOFF-2 USER DECISION and
+is NOT ours to take; logged here for the freeze report so the user can rule.
+
+Why it is the ONLY route: the H2 boundary is definitional — the ikind LDD stores
+the floor as rigid-name/param atoms + coeff vectors and, by design, discards the
+with-bound `type_expr` surface form. normalize is what folds `with`-bounds into
+the floor and produces the stored jkind. So either normalize survives (today), or
+something reconstructs its output from the LDD.
+
+Rough shape / cost of the reconstruction effort (separate design, not a slice):
+1. **with_bounds reconstruction** — map LDD abstract atoms back to `type_expr`
+   with-bounds. The LDD→type_expr direction is lossy today (atoms are rigid
+   names/paths, not the original `type_expr`); needs either a side-table from
+   derivation time (atom → source `type_expr`) or a canonical reconstruction that
+   downstream + `.cmi` accept as equivalent.
+2. **base reconstruction** — round_up's result base is the post-`Ignore_best`
+   expanded base, not carried by the lattice; needs the expanded layout recovered
+   from the ikind/env.
+3. **equivalence bar** — must be `.cmi`-byte-stable (or a deliberate,
+   cmi-magic-bumped format change accepted fleet-wide) AND preserve every semantic
+   reader (`to_unsafe_mode_crossing`, `sub_jkind_l`-vs-annotation, cross-unit).
+   The skip-normalize experiment shows a naive drop is broadly .cmi-divergent, so
+   the bar is real work, not a re-route.
+4. **payoff** — deletes normalize (PAYOFF 2) and unblocks the S8 field retype
+   (PAYOFF 3), since the stored floor would then be ikind-native.
+Estimate: medium-to-large, concentrated in (1). Risk: `.cmi` equivalence across
+the whole fleet. Recommend a dedicated design pass, not folded into this PR.
+
+## S8 status (census in "Slice 3 boundary" report; see message log)
+
+S8 (mod_bounds field → `ikind_floor : Axis_lattice.t`) is mechanically feasible
+via the thin-shim even with normalize surviving (normalize writes mod_bounds
+through the `Mod_bounds` API: create/meet/max/min/set_max_in_set at
+jkind.ml:1238/1452/1493/1322/…, absorbed by the shim), BUT it is a
+`.cmi`-serialized representation change ⇒ needs a 2nd cmi magic bump
+(build-aux/ocaml_version.m4 + autoconf27 reconfigure) + 87 `Mod_bounds.*` / 26
+write / 36 read sites, for low value while normalize survives (cosmetic floor-
+representation unification; does not delete normalize). Disposition pending
+team-lead ruling (memory records DEFER; task #62 records PROCEED — flagged).
