@@ -1495,7 +1495,10 @@ let string_of_oide (oid : Outcometree.out_ident) : string =
 (* Honest string form of an atom for the non-parsing [&]-product fallback. *)
 let string_of_atom ~name_of (name : Types.Rigid_name.t) : string =
   match name with
-  | Types.Rigid_name.Param id -> "'" ^ name_of id
+  (* W4: escape the tyvar via the authoritative [Pprintast.tyvar_of_name]
+     (keyword → ['\#and], leading-quote guard), matching the single-atom
+     [Otyp_var]/Oprint route so both spellings stay consistent. *)
+  | Types.Rigid_name.Param id -> Pprintast.tyvar_of_name (name_of id)
   | Types.Rigid_name.KAtom path -> string_of_oide (oide_of_path path)
   | Types.Rigid_name.Atom { constr; arg_index = 0 } ->
     string_of_oide (oide_of_path constr)

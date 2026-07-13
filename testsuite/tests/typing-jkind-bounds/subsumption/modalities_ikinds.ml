@@ -508,3 +508,13 @@ Error: Signature mismatch:
          contention: mod contended with 'right ≰ mod contended with 'left
          portability: mod portable with 'left ≰ mod portable with 'right
 |}]
+
+(* Regression test (W4): a KEYWORD-named type parameter in a with-bound must be
+   escaped ('\#and, not the unparseable 'and). Single-atom guard: the multi-atom
+   [&]-product branch W4 fixed routes through the same Pprintast.tyvar_of_name
+   escaper, but is only reachable via a finicky module-mismatch-with-&-product
+   combination (single-decl &-products render synthetic non-keyword letters). *)
+type ('\#and, 'b) u : value mod portable with '\#and
+[%%expect {|
+type ('\#and, 'b) u : value mod portable with '\#and
+|}]
