@@ -68,10 +68,17 @@ fixpoint (+ `Jkind.normalize` wrapper + `round_up`) remains. Order:
 - **C1 validation shortcut**: `git diff aa4e74b14 -- <dir> | grep because` == 0
   proves provenance byte-identical to pre-M4 (catches reason-text AND location
   deltas) with zero collateral.
-- **GAP-6 round-trip**: use `ik5prep-work/_tmp/rtgate.sh` (extracts the
-  `origin=ctype:decl sub_poly`, compares modulo param-id). ik5prep's
+- **GAP-6 round-trip**: paired single-decl `.mli` method (`rtgate.sh` lives at
+  `ik5m-work/_tmp/rtgate.sh`, gitignored — NOT ik5prep-work): write two files, one
+  with the OLD spelling and one with the NEW spelling of the same decl, compile
+  both with `-ikinds-debug -i`, extract the decl's LDD (`sub_poly`/`super_poly`)
+  and compare modulo param-id (`param[N]`→`param[]`). PASS = identical = kind-
+  equivalent. If the decl only appears in a REJECTED (error) context there is no
+  `origin=ctype:decl` witness — wrap the same kind in a minimal ACCEPTED abstract
+  decl (`type tgt : <kind>`) and compare its `origin=typedecl:normalize` block
+  instead (the void promotion used this; see `_tmp/verify/void_h*.mli`). ik5prep's
   `roundtrip.py` has a parse bug on kind-annotated-param decls (its naive `" : "`
-  split cuts at the param annotation) — use rtgate.sh instead, or fix the split.
+  split cuts at the param annotation) — use the paired-mli method, or fix the split.
 - `TMPDIR=$PWD/_tmp`, `-j8`. Commit prefix `ikind: pr2 -- `. NEVER push.
 
 ## Q&A
