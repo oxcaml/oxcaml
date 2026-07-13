@@ -28,9 +28,8 @@ let[@tail_mod_cons] rec map f = function
                                                 value<
                                                  (consts (0))
                                                   (non_consts ([0: ?, *]))>]))>)
-                (apply[unyielding] f (field_imm 0 param)) 24029))
-           (seq (apply[unyielding] map_dps block 1 f (field_imm 1 param))
-             block))
+                (apply f (field_imm 0 param)) 24029))
+           (seq (apply map_dps block 1 f (field_imm 1 param)) block))
          0))
     map_dps
       (function {nlocal = 0} dst offset[value<int>] f
@@ -43,7 +42,7 @@ let[@tail_mod_cons] rec map f = function
            (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))
         (if param
           (let
-            (block0_arg0 =? (apply[unyielding] f (field_imm 0 param))
+            (block0_arg0 =? (apply f (field_imm 0 param))
              block =
                (makemutable 0 (?,value<
                                   (consts (0))
@@ -53,10 +52,9 @@ let[@tail_mod_cons] rec map f = function
                                                    (non_consts ([0: ?, *]))>]))>)
                  block0_arg0 24029))
             (seq (setfield_ptr(heap-init)_computed dst offset block)
-              (apply[unyielding] map_dps block 1 f
-                (field_imm 1 param) tailcall)))
+              (apply map_dps block 1 f (field_imm 1 param) tailcall)))
           (setfield_ptr(heap-init)_computed dst offset 0))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "map" map))
+  (apply (field_imm 1 (global Toploop!)) "map" map))
 val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
 |}]
 
@@ -89,10 +87,8 @@ let[@tail_mod_cons] rec rec_map f = function
              (let
                (block =
                   (makemutable 0 (*,value<(consts (0)) (non_consts ([0: ?]))>)
-                    (apply[unyielding] f (field_imm 0 *match*)) 24029))
-               (seq
-                 (apply[unyielding] rec_map_dps block 1 f
-                   (field_imm 1 *match*))
+                    (apply f (field_imm 0 *match*)) 24029))
+               (seq (apply rec_map_dps block 1 f (field_imm 1 *match*))
                  block))))
          0))
     rec_map_dps
@@ -102,7 +98,7 @@ let[@tail_mod_cons] rec rec_map f = function
         (if param
           (let
             (*match* =a? (field_imm 0 param)
-             block1_arg0 =? (apply[unyielding] f (field_imm 0 *match*))
+             block1_arg0 =? (apply f (field_imm 0 *match*))
              block =
                (makemutable 0 (*,value<(consts (0)) (non_consts ([0: ?]))>)
                  block1_arg0 24029))
@@ -115,10 +111,9 @@ let[@tail_mod_cons] rec rec_map f = function
                                                (consts (0))
                                                 (non_consts ([0: ?]))>]))>)
                   block))
-              (apply[unyielding] rec_map_dps block 1 f
-                (field_imm 1 *match*) tailcall)))
+              (apply rec_map_dps block 1 f (field_imm 1 *match*) tailcall)))
           (setfield_ptr(heap-init)_computed dst offset 0))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "rec_map" rec_map))
+  (apply (field_imm 1 (global Toploop!)) "rec_map" rec_map))
 val rec_map : ('a -> 'b) -> 'a rec_list -> 'b rec_list = <fun>
 |}]
 
@@ -166,9 +161,7 @@ let[@tail_mod_cons] rec trip = function
                                       value<
                                        (consts (0)) (non_consts ([0: ?, *]))>]))>)
                       (makeblock 0 (?,value<int>) x 2) 24029))
-                 (seq
-                   (apply[unyielding] trip_dps block 1 (field_imm 1 param))
-                   block)))))
+                 (seq (apply trip_dps block 1 (field_imm 1 param)) block)))))
          0))
     trip_dps
       (function {nlocal = 0} dst offset[value<int>]
@@ -212,10 +205,9 @@ let[@tail_mod_cons] rec trip = function
                                     value<
                                      (consts (0)) (non_consts ([0: ?, *]))>]))>)
                     block1_arg0 block)))
-              (apply[unyielding] trip_dps block 1
-                (field_imm 1 param) tailcall)))
+              (apply trip_dps block 1 (field_imm 1 param) tailcall)))
           (setfield_ptr(heap-init)_computed dst offset 0))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "trip" trip))
+  (apply (field_imm 1 (global Toploop!)) "trip" trip))
 val trip : 'a list -> ('a * int) list = <fun>
 |}]
 
@@ -245,7 +237,7 @@ let[@tail_mod_cons] rec effects f = function
                                            value<
                                             (consts (0))
                                              (non_consts ([0: ?, *]))>]))>)
-             (apply[unyielding] f (field_imm 0 *match*))
+             (apply f (field_imm 0 *match*))
              (let
                (block =
                   (makemutable 0 (?,value<
@@ -254,11 +246,8 @@ let[@tail_mod_cons] rec effects f = function
                                                     value<
                                                      (consts (0))
                                                       (non_consts ([0: ?, *]))>]))>)
-                    (apply[unyielding] f (field_imm 1 *match*)) 24029))
-               (seq
-                 (apply[unyielding] effects_dps block 1 f
-                   (field_imm 1 param))
-                 block))))
+                    (apply f (field_imm 1 *match*)) 24029))
+               (seq (apply effects_dps block 1 f (field_imm 1 param)) block))))
          0))
     effects_dps
       (function {nlocal = 0} dst offset[value<int>] f
@@ -272,8 +261,8 @@ let[@tail_mod_cons] rec effects f = function
         (if param
           (let
             (*match* =a? (field_imm 0 param)
-             block0_arg0 =? (apply[unyielding] f (field_imm 0 *match*))
-             block1_arg0 =? (apply[unyielding] f (field_imm 1 *match*))
+             block0_arg0 =? (apply f (field_imm 0 *match*))
+             block1_arg0 =? (apply f (field_imm 1 *match*))
              block =
                (makemutable 0 (?,value<
                                   (consts (0))
@@ -291,10 +280,9 @@ let[@tail_mod_cons] rec effects f = function
                                                  (consts (0))
                                                   (non_consts ([0: ?, *]))>]))>)
                   block0_arg0 block))
-              (apply[unyielding] effects_dps block 1 f
-                (field_imm 1 param) tailcall)))
+              (apply effects_dps block 1 f (field_imm 1 param) tailcall)))
           (setfield_ptr(heap-init)_computed dst offset 0))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "effects" effects))
+  (apply (field_imm 1 (global Toploop!)) "effects" effects))
 val effects : ('a -> 'b) -> ('a * 'a) list -> 'b list = <fun>
 |}]
 
@@ -323,7 +311,7 @@ let[@tail_mod_cons] rec map_stutter f xs =
                          (non_consts ([0: ?,
                                        value<
                                         (consts (0)) (non_consts ([0: ?, *]))>]))>)
-         (apply[unyielding] f 0)
+         (apply f 0)
          (if xs
            (let
              (block =
@@ -333,10 +321,8 @@ let[@tail_mod_cons] rec map_stutter f xs =
                                                   value<
                                                    (consts (0))
                                                     (non_consts ([0: ?, *]))>]))>)
-                  (apply[unyielding] f (makeblock 0 (field_imm 0 xs))) 24029))
-             (seq
-               (apply[unyielding] map_stutter_dps block 1 f (field_imm 1 xs))
-               block))
+                  (apply f (makeblock 0 (field_imm 0 xs))) 24029))
+             (seq (apply map_stutter_dps block 1 f (field_imm 1 xs)) block))
            0)))
     map_stutter_dps
       (function {nlocal = 0} dst offset[value<int>] f
@@ -348,7 +334,7 @@ let[@tail_mod_cons] rec map_stutter f xs =
         : (consts (0))
            (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))
         (let
-          (block0_arg0 =? (apply[unyielding] f 0)
+          (block0_arg0 =? (apply f 0)
            block =
              (makemutable 0 (?,value<
                                 (consts (0))
@@ -360,8 +346,7 @@ let[@tail_mod_cons] rec map_stutter f xs =
           (seq (setfield_ptr(heap-init)_computed dst offset block)
             (if xs
               (let
-                (block0_arg0 =?
-                   (apply[unyielding] f (makeblock 0 (field_imm 0 xs)))
+                (block0_arg0 =? (apply f (makeblock 0 (field_imm 0 xs)))
                  block =
                    (makemutable 0 (?,value<
                                       (consts (0))
@@ -371,11 +356,9 @@ let[@tail_mod_cons] rec map_stutter f xs =
                                                        (non_consts ([0: ?, *]))>]))>)
                      block0_arg0 24029))
                 (seq (setfield_ptr(heap-init)_computed block 1 block)
-                  (apply[unyielding] map_stutter_dps block 1 f
-                    (field_imm 1 xs) tailcall)))
+                  (apply map_stutter_dps block 1 f (field_imm 1 xs) tailcall)))
               (setfield_ptr(heap-init)_computed block 1 0))))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "map_stutter"
-    map_stutter))
+  (apply (field_imm 1 (global Toploop!)) "map_stutter" map_stutter))
 val map_stutter : ('a option -> 'b) -> 'a list -> 'b list = <fun>
 |}]
 
@@ -408,9 +391,9 @@ type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
                                          value<
                                           (consts (0))
                                            (non_consts ([0: ?, *]))>]))>)
-           (apply[unyielding] f 0)
+           (apply f 0)
            (let
-             (v =? (apply[unyielding] f (makeblock 0 (*) (field_imm 0 xs)))
+             (v =? (apply f (makeblock 0 (*) (field_imm 0 xs)))
               block =
                 (makemutable 0 (?,value<
                                    (consts (0))
@@ -420,8 +403,8 @@ type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
                                                     (non_consts ([0: ?, *]))>]))>)
                   v 24029))
              (seq
-               (apply[unyielding] smap_stutter_dps block 1 f
-                 (apply[unyielding] (field_imm 1 xs) 0) (%int_sub n 1))
+               (apply smap_stutter_dps block 1 f (apply (field_imm 1 xs) 0)
+                 (%int_sub n 1))
                block)))))
     smap_stutter_dps
       (function {nlocal = 0} dst offset[value<int>] f
@@ -431,8 +414,8 @@ type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
            (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))
         (if (%eq n 0) (setfield_ptr(heap-init)_computed dst offset 0)
           (let
-            (block0_arg0 =? (apply[unyielding] f 0)
-             v =? (apply[unyielding] f (makeblock 0 (*) (field_imm 0 xs)))
+            (block0_arg0 =? (apply f 0)
+             v =? (apply f (makeblock 0 (*) (field_imm 0 xs)))
              block =
                (makemutable 0 (?,value<
                                   (consts (0))
@@ -450,10 +433,8 @@ type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
                                                  (consts (0))
                                                   (non_consts ([0: ?, *]))>]))>)
                   block0_arg0 block))
-              (apply[unyielding] smap_stutter_dps block 1 f
-                (apply[unyielding] (field_imm 1 xs) 0)
+              (apply smap_stutter_dps block 1 f (apply (field_imm 1 xs) 0)
                 (%int_sub n 1) tailcall))))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "smap_stutter"
-    smap_stutter))
+  (apply (field_imm 1 (global Toploop!)) "smap_stutter" smap_stutter))
 val smap_stutter : ('a option -> 'b) -> 'a stream -> int -> 'b list = <fun>
 |}]

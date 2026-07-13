@@ -53,7 +53,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
                      (makeblock 0 (getpredef Match_failure/0!!) [0: "" 4 2])))))
              1))
          0)))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "f" f/0))
+  (apply (field_imm 1 (global Toploop!)) "f" f/0))
 
 val f : t -> int = <fun>
 |}]
@@ -78,7 +78,7 @@ type t = { a : bool; mutable b : int option; }
      (function {nlocal = 0} x/1 : int
        (let (*match*/2 =o? (field_mut 1 x/1))
          (if *match*/2 (field_imm 0 *match*/2) 1))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "simple" simple/0))
+  (apply (field_imm 1 (global Toploop!)) "simple" simple/0))
 val simple : t -> int = <fun>
 |}]
 
@@ -116,7 +116,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
                    (makeblock 0 (getpredef Match_failure/0!!) [0: "" 2 2]))
                  1))))
          0)))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "f" f/1))
+  (apply (field_imm 1 (global Toploop!)) "f" f/1))
 
 val f : t -> int = <fun>
 |}]
@@ -168,7 +168,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
                        (makeblock 0 (getpredef Match_failure/0!!)
                          [0: "" 2 2]))))
                  3)))))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "f" f/2))
+  (apply (field_imm 1 (global Toploop!)) "f" f/2))
 
 val f : int option ref -> int = <fun>
 |}]
@@ -193,7 +193,7 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
      (function {nlocal = 0}
        param/0[value<(consts (0)) (non_consts ([0: ?]))>] : int
        (if param/0 (field_imm 0 (field_imm 0 param/0)) 0)))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "test" test/0))
+  (apply (field_imm 1 (global Toploop!)) "test" test/0))
 val test : int t option -> int = <fun>
 |}]
 
@@ -215,7 +215,7 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
      (function {nlocal = 0} param/1 : int
        (let (*match*/8 =o? (field_mut 0 param/1))
          (if *match*/8 (field_imm 0 (field_imm 0 *match*/8)) 0))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "test" test/1))
+  (apply (field_imm 1 (global Toploop!)) "test" test/1))
 val test : int t option ref -> int = <fun>
 |}]
 
@@ -261,7 +261,7 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
                (if *match*/11 (field_imm 0 (field_imm 1 *match*/10))
                  (%int_neg (field_imm 0 (field_imm 1 *match*/10)))))
              3)))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "test" test/2))
+  (apply (field_imm 1 (global Toploop!)) "test" test/2))
 val test : 'a -> int = <fun>
 |}]
 
@@ -319,7 +319,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
                        (makeblock 0 (getpredef Match_failure/0!!)
                          [0: "" 2 2]))))
                  3)))))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "deep" deep/0))
+  (apply (field_imm 1 (global Toploop!)) "deep" deep/0))
 
 val deep : (unit * int option) ref -> int = <fun>
 |}]
@@ -354,7 +354,7 @@ type _ t = Bool : bool t | Int : int t | Char : char t
          (if (%int_greaterequal (field_imm 0 param/2) 2) (exit 24)
            (if (%int_greaterequal (field_imm 1 param/2) 2) (exit 24) 0))
         with (24) 0)))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "test" test/3))
+  (apply (field_imm 1 (global Toploop!)) "test" test/3))
 val test : 'a t * 'a t -> unit = <fun>
 |}];;
 
@@ -393,7 +393,7 @@ type t = A | B | C of nothing
             case int 0: 4
             case int 1: (exit 27)))
         with (27) 5)))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "f" f/3))
+  (apply (field_imm 1 (global Toploop!)) "f" f/3))
 val f : bool * t -> int = <fun>
 |}];;
 
@@ -437,8 +437,8 @@ type t = A of int | B of string | C of string | D of string
           case tag 0:
            (switch t2/0
             case tag 0:
-             (apply[unyielding] (field_imm 8 (global Stdlib__Int!))
-               (field_imm 0 t1/0) (field_imm 0 t2/0))
+             (apply (field_imm 8 (global Stdlib__Int!)) (field_imm 0 t1/0)
+               (field_imm 0 t2/0))
             default: -1)
           case tag 1:
            (catch
@@ -465,7 +465,7 @@ type t = A of int | B of string | C of string | D of string
              (caml_string_compare (field_imm 0 t1/0) (field_imm 0 t2/0))))
         with (31) (switch* t2/0 case tag 0: 1
                                 case tag 1: 1))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "compare" compare/0))
+  (apply (field_imm 1 (global Toploop!)) "compare" compare/0))
 val compare : t -> t -> int = <fun>
 |}];;
 
@@ -502,7 +502,7 @@ let f x y =
            (if (isint y/0) (if (%int_notequal y/0 19898) (exit 42) 2)
              (exit 42)))
         with (42) 3)))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "f" f/4))
+  (apply (field_imm 1 (global Toploop!)) "f" f/4))
 val f : [< `X1 | `X2 | `X3 ] -> [< `Y1 | `Y2 | `Y3 ] -> int = <fun>
 |}];;
 
@@ -529,7 +529,7 @@ let check_results r1 r2 =
                                        value<
                                         (consts ()) (non_consts ([1: ?]
                                          [0: ?]))>]))>]
-            (apply[unyielding] r1/0 r2/0))
+            (apply r1/0 r2/0))
          (catch
            (catch
              (let (r/2 =a? (field_imm 0 *match*/16))
@@ -556,8 +556,7 @@ let check_results r1 r2 =
             with (50 r/3[value<(consts ()) (non_consts ([1: ?] [0: ?]))>])
              r/3)
           with (51 r/4[value<(consts ()) (non_consts ([1: ?] [0: ?]))>]) r/4))))
-  (apply[unyielding] (field_imm 1 (global Toploop!)) "check_results"
-    check_results/0))
+  (apply (field_imm 1 (global Toploop!)) "check_results" check_results/0))
 val check_results :
   ('a -> ('b, [< `A | `B ]) result * ('b, [< `A | `B ]) result) ->
   'a -> ('b, [> `A | `B ]) result = <fun>
