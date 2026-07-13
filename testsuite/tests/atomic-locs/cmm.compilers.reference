@@ -42,23 +42,23 @@
  addr G:"caml_curry2"
  int 180143985094819847
  addr G:"camlCmm__standard_atomic_get_1_8_code")
-(function camlCmm__standard_atomic_get_1_8_code (r: val v: val) : int
+(function camlCmm__standard_atomic_get_1_8_code (r: val v: val) : int64
  (extcall "caml_atomic_exchange_field" r 1 v ->val) 1 )
 
 (function camlCmm__get_2_9_code (r: val) : val
  (load_mut_atomic val (+a r 8)) )
 
-(function camlCmm__set_3_10_code (r: val v: val) : int
+(function camlCmm__set_3_10_code (r: val v: val) : int64
  (extcall "caml_atomic_exchange_field" r 3 v ->val) 1 )
 
-(function camlCmm__get_imm_4_11_code (r: val) : int
+(function camlCmm__get_imm_4_11_code (r: val) : int64
  (load_mut_atomic int (+a r 8)) )
 
-(function camlCmm__set_imm_5_12_code (r: val v: int) : int
+(function camlCmm__set_imm_5_12_code (r: val v: tagged_int) : int64
  (atomic exchange v (+a r 8)) 1 )
 
-(function camlCmm__cas_6_13_code (r: val oldv: val newv: val) : int
- (extcall "caml_atomic_cas_field" r 3 oldv newv ->int) )
+(function camlCmm__cas_6_13_code (r: val oldv: val newv: val) : int64
+ (extcall "caml_atomic_cas_field" r 3 oldv newv ->tagged_int) )
 
 (function no_cse reduce_code_size linscan camlCmm__entry () : val
  (catch (exit 13 G:"camlCmm") with(13 *ret*: val) 1) )

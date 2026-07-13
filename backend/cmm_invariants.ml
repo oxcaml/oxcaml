@@ -191,38 +191,38 @@ let machtype_of_vec128_scalar : vec128_type -> machtype = function
   | Float64x2 -> typ_float
   | Float32x4 -> typ_float32
   | Float16x8 -> Misc.fatal_error "float16x8: scalar type not supported"
-  | Int8x16 | Int16x8 | Int32x4 | Int64x2 -> typ_int
+  | Int8x16 | Int16x8 | Int32x4 | Int64x2 -> typ_int64
 
 let machtype_of_vec256_scalar : vec256_type -> machtype = function
   | Float64x4 -> typ_float
   | Float32x8 -> typ_float32
   | Float16x16 -> Misc.fatal_error "float16x16: scalar type not supported"
-  | Int8x32 | Int16x16 | Int32x8 | Int64x4 -> typ_int
+  | Int8x32 | Int16x16 | Int32x8 | Int64x4 -> typ_int64
 
 let machtype_of_vec512_scalar : vec512_type -> machtype = function
   | Float64x8 -> typ_float
   | Float32x16 -> typ_float32
   | Float16x32 -> Misc.fatal_error "float16x32: scalar type not supported"
-  | Int8x64 | Int16x32 | Int32x16 | Int64x8 -> typ_int
+  | Int8x64 | Int16x32 | Int32x16 | Int64x8 -> typ_int64
 
 let reinterpret_cast_arg_type : reinterpret_cast -> machtype = function
   | Int64_of_value -> typ_val
-  | Value_of_int64 -> typ_int
-  | Tagged_int_of_value -> typ_int
+  | Value_of_int64 -> typ_int64
+  | Tagged_int_of_value -> typ_val
   | Float_of_float32 -> typ_float32
   | Float32_of_float -> typ_float
-  | Float_of_int64 -> typ_int
+  | Float_of_int64 -> typ_int64
   | Int64_of_float -> typ_float
-  | Float32_of_int32 -> typ_int
+  | Float32_of_int32 -> typ_int32
   | Int32_of_float32 -> typ_float32
   | V128_of_vec width | V256_of_vec width | V512_of_vec width ->
     machtype_of_vector_width width
 
 let static_cast_arg_type : static_cast -> machtype = function
-  | Int_conv _ -> typ_int
-  | Tagged_int_of_int64 -> typ_int
-  | Int64_of_tagged_int _ -> typ_int
-  | Float_of_int64 (_ : float_width) -> typ_int
+  | Int_conv { src; dst = _; signedness = _ } -> machtype_of_int_width src
+  | Tagged_int_of_int64 -> typ_int64
+  | Int64_of_tagged_int _ -> typ_tagged_int
+  | Float_of_int64 (_ : float_width) -> typ_int64
   | Int64_of_float width -> machtype_of_float_width width
   | Float_of_float32 -> typ_float32
   | Float32_of_float -> typ_float
@@ -283,7 +283,7 @@ let oper_arg_types : operation -> expected_arg_types = function
       | Alloc_block_kind_float | Alloc_block_kind_float_array ->
         Exactly typ_float
       | Alloc_block_kind_int_u_array | Alloc_block_kind_int64_u_array ->
-        Exactly typ_int
+        Exactly typ_int64
       | Alloc_block_kind_vec128_u_array -> Exactly typ_vec128
       | Alloc_block_kind_vec256_u_array -> Exactly typ_vec256
       | Alloc_block_kind_vec512_u_array -> Exactly typ_vec512
@@ -299,40 +299,31 @@ let oper_arg_types : operation -> expected_arg_types = function
     in
     Args_then_any_number_of ([Any_machtype (* header *)], field)
   | Cstore (memory_chunk, _) ->
-    let value =
-      match memory_chunk with
-      | Word_int ->
-        (* A raw word slot is not scanned, so it accepts any word in a
-           general-purpose register, including derived pointers. *)
-        Exactly typ_addr
-      | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_val | Single _ | Double
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
-      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-      | Fivetwelve_aligned ->
-        Exactly (machtype_of_memory_chunk memory_chunk)
-    in
-    Args [Any_machtype; value]
+    Args [Any_machtype; Exactly (machtype_of_memory_chunk memory_chunk)]
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor | Clsl
   | Clsr | Casr | Ccmpi _ ->
-    (* Under [ge_component], [typ_addr] accepts any word in a general-purpose
-       register ([Int], [Val] or [Addr]): classic machtypes cannot distinguish
-       tagged values from untagged words, and word operations are applied to
-       both (e.g. physical equality on values, untagging a scrutinee). *)
-    Args [Exactly typ_addr; Exactly typ_addr]
-  | Cclz | Cctz | Cpopcnt | Cbswap _ -> Args [Exactly typ_addr]
+    (* Integer operations work on register-width naked integers; applying them
+       to other machtypes (e.g. physical equality on values, untagging a
+       scrutinee) requires making the conversion explicit. *)
+    Args [Exactly typ_int64; Exactly typ_int64]
+  | Cclz | Cctz | Cpopcnt | Cbswap _ -> Args [Exactly typ_int64]
   | Caddi128 | Csubi128 ->
-    Args [Exactly typ_int; Exactly typ_int; Exactly typ_int; Exactly typ_int]
-  | Cmuli64 _ -> Args [Exactly typ_int; Exactly typ_int]
-  | Ccsel ty -> Args [Exactly typ_int; Exactly ty; Exactly ty]
+    Args
+      [ Exactly typ_int64;
+        Exactly typ_int64;
+        Exactly typ_int64;
+        Exactly typ_int64 ]
+  | Cmuli64 _ -> Args [Exactly typ_int64; Exactly typ_int64]
+  | Ccsel ty -> Args [Exactly typ_int64; Exactly ty; Exactly ty]
   | Cprefetch _ -> Args [Any_machtype]
-  | Catomic
-      { op = Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange; _ } ->
-    Args [Exactly typ_int; Any_machtype (* address *)]
+  | Catomic { op = Fetch_and_add | Add | Sub | Land | Lor | Lxor; _ } ->
+    Args [Exactly typ_tagged_int; Any_machtype (* address *)]
+  | Catomic { op = Exchange; _ } ->
+    Args [Exactly typ_val; Any_machtype (* address *)]
   | Catomic { op = Compare_set | Compare_exchange; _ } ->
-    Args [Exactly typ_int; Exactly typ_int; Any_machtype (* address *)]
-  | Caddv -> Args [Exactly typ_val; Exactly typ_int]
-  | Cadda -> Args [Exactly typ_addr; Exactly typ_int]
+    Args [Exactly typ_val; Exactly typ_val; Any_machtype (* address *)]
+  | Caddv -> Args [Exactly typ_val; Exactly typ_int64]
+  | Cadda -> Args [Exactly typ_addr; Exactly typ_int64]
   | Cnegf width | Cabsf width -> Args [Exactly (machtype_of_float_width width)]
   | Caddf width | Csubf width | Cmulf width | Cdivf width ->
     let ty = machtype_of_float_width width in
@@ -347,14 +338,14 @@ let oper_arg_types : operation -> expected_arg_types = function
   | Cstatic_cast cast -> Args [Exactly (static_cast_arg_type cast)]
   | Craise _ ->
     (* All arguments are GC-scannable; under [ge_component], [typ_val] accepts
-       exactly [Val] and [Int]. *)
+       exactly [Val] and [Tagged_int]. *)
     Any_number_of (Exactly typ_val)
   | Cprobe _ -> Any_number_of Any_machtype
   | Copaque -> Any_number_of Any_machtype
   | Cprobe_is_enabled _ | Cbeginregion | Cdls_get | Ctls_get | Cdomain_index
   | Cpoll | Cpause ->
     Args []
-  | Cendregion -> Args [Exactly typ_int]
+  | Cendregion -> Args [Exactly typ_tagged_int]
   | Ctuple_field (_, fields_ty) ->
     Args [Exactly (Array.concat (Array.to_list fields_ty))]
 
@@ -376,19 +367,12 @@ let check_machtype ~dbg ~what ~expected (actual : inferred_machtype) =
   | Never_returns -> ()
   | Machtype actual ->
     let compatible =
-      Array.length expected = Array.length actual
-      && Array.for_all2
-           (fun expected_comp actual_comp ->
-             (* The compiler types statically-known tagged immediates as [Int]
-                while generic loads and calls produce them as [Val], so [Val]
-                flows into [Int] positions routinely. *)
-             (equal_machtype_component expected_comp Int
-             && equal_machtype_component actual_comp Val)
-             ||
-             (* [ge_component] is fatal on incomparable components *)
-             (try ge_component expected_comp actual_comp
-              with Misc.Fatal_error -> false))
-           expected actual
+      Array.length expected = Array.length actual &&
+      Array.for_all2
+        (fun expected_comp actual_comp ->
+           try ge_component expected_comp actual_comp
+           with Misc.Fatal_error -> false)
+        expected actual
     in
     if not compatible
     then
@@ -430,11 +414,7 @@ let concat_inferred_machtypes tys =
 
 let rec infer_machtype env (expr : expression) : inferred_machtype =
   match expr with
-  | Cconst_int _ | Cconst_natint _ | Cconst_symbol _ ->
-    (* Integer literals and statically-allocated symbols are non-heap words;
-       [Int] is below [Val], so they are also accepted where values are
-       expected. *)
-    Machtype typ_int
+  | Cconst_int _ | Cconst_natint _ | Cconst_symbol _ -> Machtype typ_int64
   | Cconst_float _ -> Machtype typ_float
   | Cconst_float32 _ -> Machtype typ_float32
   | Cconst_vec128 _ -> Machtype typ_vec128
@@ -465,7 +445,7 @@ let rec infer_machtype env (expr : expression) : inferred_machtype =
     let cond_ty = infer_machtype env cond in
     check_machtype ~dbg
       ~what:(fun () -> "if-then-else condition")
-      ~expected:typ_int cond_ty;
+      ~expected:typ_int64 cond_ty;
     let branches_ty =
       join_inferred_machtypes ~dbg (infer_machtype env ifso)
         (infer_machtype env ifnot)
@@ -477,7 +457,7 @@ let rec infer_machtype env (expr : expression) : inferred_machtype =
     let scrutinee_ty = infer_machtype env scrutinee in
     check_machtype ~dbg
       ~what:(fun () -> "switch scrutinee")
-      ~expected:typ_int scrutinee_ty;
+      ~expected:typ_int64 scrutinee_ty;
     let cases_ty =
       join_all_inferred_machtypes ~dbg
         (Array.to_list

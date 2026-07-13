@@ -177,15 +177,15 @@ let oper_result_type = function
   | Cstore (_c, _) -> typ_void
   | Cdls_get -> typ_val
   | Ctls_get -> typ_val
-  | Cdomain_index -> typ_int
+  | Cdomain_index -> typ_tagged_int
   | Cprefetch _ -> typ_void
   | Catomic
       { op = Fetch_and_add | Compare_set | Exchange | Compare_exchange; _ } ->
-    typ_int
+    typ_tagged_int
   | Catomic { op = Add | Sub | Land | Lor | Lxor; _ } -> typ_void
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor | Clsl
   | Clsr | Casr | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
-    typ_int
+    typ_int64
   | Caddi128 | Csubi128 | Cmuli64 _ -> typ_int128
   | Caddv -> typ_val
   | Cadda -> typ_addr
@@ -211,45 +211,46 @@ let oper_result_type = function
   | Creinterpret_cast (V512_of_vec _) -> typ_vec512
   | Creinterpret_cast (Float_of_int64 | Float_of_float32) -> typ_float
   | Creinterpret_cast (Float32_of_int32 | Float32_of_float) -> typ_float32
-  | Creinterpret_cast (Int64_of_value | Int64_of_float) -> typ_int
-  | Creinterpret_cast Tagged_int_of_value -> typ_int
-  | Creinterpret_cast Int32_of_float32 -> typ_int
-  | Cstatic_cast (Int_conv _) -> typ_int
-  | Cstatic_cast Tagged_int_of_int64 -> typ_int
-  | Cstatic_cast (Int64_of_tagged_int _) -> typ_int
+  | Creinterpret_cast (Int64_of_value | Int64_of_float) -> typ_int64
+  | Creinterpret_cast Tagged_int_of_value -> typ_tagged_int
+  | Creinterpret_cast Int32_of_float32 -> typ_int32
+  | Cstatic_cast (Int_conv { src = _; dst; signedness = _ }) ->
+    machtype_of_int_width dst
+  | Cstatic_cast Tagged_int_of_int64 -> typ_tagged_int
+  | Cstatic_cast (Int64_of_tagged_int _) -> typ_int64
   | Cstatic_cast (Float_of_float32 | Float_of_int64 Float64) -> typ_float
   | Cstatic_cast (Float32_of_float | Float_of_int64 Float32) -> typ_float32
-  | Cstatic_cast (Int64_of_float (Float64 | Float32)) -> typ_int
+  | Cstatic_cast (Int64_of_float (Float64 | Float32)) -> typ_int64
   | Cstatic_cast (V128_of_scalar _) -> typ_vec128
   | Cstatic_cast (Scalar_of_v128 Float64x2) -> typ_float
   | Cstatic_cast (Scalar_of_v128 Float32x4) -> typ_float32
   | Cstatic_cast (Scalar_of_v128 Float16x8) ->
     Misc.fatal_error "float16x8: scalar type not supported"
   | Cstatic_cast (Scalar_of_v128 (Int8x16 | Int16x8 | Int32x4 | Int64x2)) ->
-    typ_int
+    typ_int64
   | Cstatic_cast (V256_of_scalar _) -> typ_vec256
   | Cstatic_cast (Scalar_of_v256 Float64x4) -> typ_float
   | Cstatic_cast (Scalar_of_v256 Float32x8) -> typ_float32
   | Cstatic_cast (Scalar_of_v256 Float16x16) ->
     Misc.fatal_error "float16x16: scalar type not supported"
   | Cstatic_cast (Scalar_of_v256 (Int8x32 | Int16x16 | Int32x8 | Int64x4)) ->
-    typ_int
+    typ_int64
   | Cstatic_cast (V512_of_scalar _) -> typ_vec512
   | Cstatic_cast (Scalar_of_v512 Float64x8) -> typ_float
   | Cstatic_cast (Scalar_of_v512 Float32x16) -> typ_float32
   | Cstatic_cast (Scalar_of_v512 Float16x32) ->
     Misc.fatal_error "float16x32: scalar type not supported"
   | Cstatic_cast (Scalar_of_v512 (Int8x64 | Int16x32 | Int32x16 | Int64x8)) ->
-    typ_int
+    typ_int64
   | Craise _ -> typ_void
   | Cprobe _ -> typ_void
-  | Cprobe_is_enabled _ -> typ_int
+  | Cprobe_is_enabled _ -> typ_tagged_int
   | Copaque -> typ_val
   | Cpoll | Cpause -> typ_void
   | Cbeginregion ->
     (* This must not be typ_val; the begin-region operation returns a naked
        pointer into the local allocation stack. *)
-    typ_int
+    typ_tagged_int
   | Cendregion -> typ_void
   | Ctuple_field (field, fields_ty) -> fields_ty.(field)
 
@@ -260,9 +261,11 @@ let oper_result_type = function
    dependencies, because it uses [Arch]. *)
 let size_component : machtype_component -> int = function
   | Val | Addr -> Arch.size_addr
-  | Int ->
+  | Tagged_int | Naked_int (Int64 | Int63 | Int32 | Int16 | Int8) ->
     assert (Int.equal Arch.size_int Arch.size_addr);
     Arch.size_int
+    (* CR jrayman: Should [Naked_int w] instead return [bits_of_int_width w]?
+       Also see the CR under [| Float32 ->]. *)
   | Float -> Arch.size_float
   | Float32 ->
     (* CR layouts v5.1: reconsider when float32 fields are efficiently packed.
