@@ -227,12 +227,23 @@ RULE T.Grammar.RowLike.Index
 STATUS normative
 CODE middle_end/flambda2/types/grammar/type_grammar.mli#row_like_index_domain
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#row_like_index_domain
+CODE middle_end/flambda2/types/grammar/type_grammar.ml#check_field_tys
+CODE middle_end/flambda2/types/grammar/more_type_creators.ml#unknown_from_shape
 ---
 A row-like index is Known x (the singleton {x}) or At_least x (every index y
 with x ⊆ y). Block cases are indexed by (Tag, Block_size, Block_shape) and map
 to a field-type array; closure cases are indexed by (Function_slot,
 Set_of_closures_contents) and map to a closures_entry. Each case additionally
 carries an env_extension (§5).
+NOTES: The Block_shape ([§03](03-kinds.md)) on a block index is Scannable Value_only,
+Scannable (Mixed_record σ), or Float_record. It fixes the kind of each field
+type in the maps_to array: check_field_tys requires field i's type to have kind
+Block_shape.element_kind(shape, i) — Value for a Value_only field or a mixed
+value-prefix field, and the naked-number kind of the corresponding
+flat_suffix_element for a mixed flat-suffix field (so a mixed block's suffix
+fields carry naked-number types, not Value types), and Naked_float for a
+Float_record field. unknown_from_shape(shape, i) builds the top type of that
+per-field kind, used to fill fields whose type is otherwise Unknown.
 ```
 
 Only the *contents* of a Row_like case (field types, slot component types) are

@@ -46,7 +46,7 @@ runtime value grammar. This chapter refines the heap-object grammar `o`:
 ```
 o ::= Block(t, μ, v̄)          scannable block: tag t : Tag.Scannable, mutability μ, fields v̄
     | FloatBlock(μ, f̄)         naked-float block (runtime Double_array_tag), floats f̄
-    | MixedBlock(t, μ, σ, v̄)   mixed block: value prefix then flat suffix, shape σ
+    | MixedBlock(t, μ, σ, v̄)   mixed block: scannable tag t, shape σ, logical fields v̄
     | Array(ak, μ, v̄)          array of kind ak (unarized element sequence v̄)
     | Bytes(μ, b̄)              string/bytes: byte sequence b̄
     | Bigstring(b̄)             off-heap byte buffer (always mutable)
@@ -80,13 +80,24 @@ chapter uses, read off `flambda_primitive.mli`:
 
 - **`Block_access_kind`** (`Values {tag; size; field_kind}` | `Naked_floats
   {size}` | `Mixed {tag; size; field_kind; shape}`) tags the block's runtime
-  representation for a `Block_load`/`Block_set`. `tag`/`size` are `Or_unknown`
-  refinements used by the type system; `field_kind ∈ {Any_value, Immediate}`
-  records whether the field is a scannable value or a tagged immediate. For
-  `Block_load` the `field_kind` is always `Any_value` (noted in the code).
+  representation for a `Block_load`/`Block_set`. In every case `tag :
+  Tag.Scannable Or_unknown` and `size : Target_ocaml_int Or_unknown` are
+  refinements used by the type system. For `Values`, `field_kind ∈ {Any_value,
+  Immediate}` records whether the field is a scannable value or a tagged
+  immediate (for `Block_load` it is always `Any_value`, noted in the code). For
+  `Mixed`, `field_kind : Mixed_block_access_field_kind` is either `Value_prefix
+  bfk` (with `bfk ∈ {Any_value, Immediate}`) for a prefix field or `Flat_suffix
+  e` (with `e` a `flat_suffix_element`, [§03](03-kinds.md)) for a suffix field,
+  and `shape : Mixed_block_shape` is the full block shape σ. The derived
+  `element_kind_for_load`/`element_subkind_for_load` map the field kind to the
+  loaded value's kind: `Value_prefix _ ↦ Value` (subkind `tagged_immediate` for
+  `Immediate`, else `any_value`) and `Flat_suffix e ↦` the naked-number kind of
+  `e` (`flambda_primitive.ml#Block_access_kind.element_kind_for_load`,
+  `#element_subkind_for_load`).
 - **`Block_kind`** (`Values (tag, κ̂ list)` | `Naked_floats` | `Mixed (tag,
-  shape)`) is the corresponding descriptor for `Make_block`; it fixes the tag
-  and the kinds of all fields.
+  σ)`) is the corresponding descriptor for `Make_block`; it fixes the tag and
+  the kinds of all fields. For `Mixed` the shape σ (`Mixed_block_shape.t`)
+  determines the per-field kinds via `field_kinds(σ)` (see § Mixed blocks).
 - **`Array_kind`** enumerates the element representation: `Immediates`,
   `Values`, `Gc_ignorable_values`, `Naked_floats`, `Naked_float32s`,
   `Naked_ints`, `Naked_int8s`/`16s`/`32s`/`64s`, `Naked_nativeints`,
@@ -112,9 +123,76 @@ chapter uses, read off `flambda_primitive.mli`:
   `Two_fifty_six`, `Five_twelve`, the vector ones carrying `{aligned}`) gives
   the width of a string/bytes/bigstring element access.
 
-Mixed blocks are treated **coarsely** here: `MixedBlock` records the shape `σ`
-opaquely and the load/store rules index it abstractly. The precise flat-suffix
-layout (`Flambda_kind.Mixed_block_shape`) is not modelled.
+### Mixed blocks
+
+A **mixed block** is a scannable block whose fields split into a *value prefix*
+(ordinary GC-scanned `Value` fields) followed by a *flat suffix* of unboxed
+scalars the GC does not scan. Its layout is fixed by a
+`Flambda_kind.Mixed_block_shape.t`
+
+```
+σ ::= ⟨ value_prefix_size = p,  flat_suffix = ē = e₁ … e_m ⟩
+e ::= Naked_float | Naked_float32 | Naked_int8 | Naked_int16 | Naked_int32
+    | Naked_int64 | Naked_nativeint | Naked_immediate
+    | Naked_vec128 | Naked_vec256 | Naked_vec512      (flat_suffix_element, [§03](03-kinds.md))
+```
+
+where `p ≥ 0` is the number of value-prefix fields and `ē` is the array of
+flat-suffix element descriptors. Tagged immediates never appear in `ē` (the
+suffix holds only unboxed scalars; `flambda_kind.ml` comment on
+`flat_suffix_element`). A mixed block has `p + m` **logical fields**, indexed
+`0 … p+m−1`.
+
+```rule
+RULE P.MixedShape.FieldKinds
+STATUS normative
+CODE middle_end/flambda2/kinds/flambda_kind.ml#Mixed_block_shape.from_prefix_size_and_suffix_elements
+CODE middle_end/flambda2/kinds/flambda_kind.ml#Scannable_block_shape.element_kind
+CODE middle_end/flambda2/kinds/flambda_kind.mli#Mixed_block_shape.field_kinds
+VERIFIED 14-validation/mixed-01-record.md
+---
+field_kinds(σ) = [ Value, … (p copies) …, kind(e₁), …, kind(e_m) ]
+field_kinds(σ)(i) = Value                     if 0 ≤ i < p
+field_kinds(σ)(i) = kind(e_{i−p})             if p ≤ i < p + m
+--------------------------------------------------
+The kind of logical field i of a block of shape σ. The prefix fields are of kind
+Value; each suffix field has the naked-number kind of its flat_suffix_element
+(Flat_suffix_element.kind: Naked_float ↦ Naked_number Naked_float, etc.).
+NOTES: field_kinds(σ) is stored on the shape and is uniquely determined by
+(p, ē). It is the description used throughout Flambda 2; the flat_suffix array
+itself is only needed to compute physical offsets for to_cmm (see
+P.MixedShape.Offset).
+```
+
+```rule
+RULE P.MixedShape.Offset
+STATUS normative
+CODE middle_end/flambda2/kinds/flambda_kind.ml#Mixed_block_shape.offset_in_words
+CODE middle_end/flambda2/kinds/flambda_kind.ml#Flat_suffix_element0.size_in_words
+CODE middle_end/flambda2/kinds/flambda_kind.ml#Mixed_block_shape.size_in_words
+---
+size_in_words(e) = 1  for scalar e;  = 2 (vec128) | 4 (vec256) | 8 (vec512)
+offset_in_words(σ, i) = i                              if 0 ≤ i ≤ p
+offset_in_words(σ, i) = p + Σ_{0 ≤ j < i−p} size_in_words(e_j)   if i > p
+size_in_words(σ) = p + Σ_{0 ≤ j < m} size_in_words(e_j)
+--------------------------------------------------
+The physical word offset of logical field i. Prefix fields occupy one word each,
+so their logical index and word offset coincide; each suffix element occupies
+size_in_words words, so once a wide vector appears in ē the logical field index
+and the physical word offset diverge.
+NOTES: This word-offset arithmetic is a to_cmm concern, not part of the abstract
+machine: the operational semantics below indexes MixedBlock by *logical* field,
+and offset_in_words / size_in_words are cited only to ground the machine model in
+the real layout. to_cmm_primitive.ml uses get/set_field_unboxed at
+offset_in_words for suffix accesses, and to_cmm_static.ml emits the block header
+with size size_in_words(σ) and scannable_prefix_len p.
+```
+
+The heap object built from such a shape is `MixedBlock(t, μ, σ, v̄)` (§ Heap
+objects) with `|v̄| = p + m` logical fields, field i of kind
+`field_kinds(σ)(i)`. The machine stores one runtime value per logical field; the
+value-prefix/flat-suffix *physical* split is a to_cmm concern grounded by
+`P.MixedShape.Offset`, not represented in `H`.
 
 ---
 
@@ -341,17 +419,28 @@ NOTES: Runtime representation uses Double_array_tag.
 
 ```rule
 RULE P.Variadic.MakeBlock.Mixed
-STATUS conjectured
+STATUS normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#Block_kind
+CODE middle_end/flambda2/terms/flambda_primitive.ml#args_kind_of_variadic_primitive
+CODE middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive
 CODE middle_end/flambda2/kinds/flambda_kind.mli#Mixed_block_shape
+VERIFIED 14-validation/mixed-01-record.md
 ---
-p = Make_block(Mixed(t, σ), μ, mode)      v̄ = v₁ … vₙ conforming to shape σ
+prim = Make_block(Mixed(t, σ), μ, mode)      σ = ⟨p, ē⟩,  p + |ē| = n
+v̄ = v₁ … vₙ      kind(vᵢ) = field_kinds(σ)(i−1)  for each i  (P.MixedShape.FieldKinds)
 alloc(MixedBlock(t, μ, σ, v̄), H) = (ℓ, H′)
 --------------------------------------------------
-⟦p⟧(v̄; H) = (ptr ℓ, H′)
-NOTES: Coarse: the value prefix / flat suffix split described by σ is not
-modelled. Fields must conform to σ (value prefix are scannable values, flat
-suffix are unboxed scalars); a nonconforming field is ill-formed by kinding.
+⟦prim⟧(v̄; H) = (ptr ℓ, H′)
+NOTES: Allocates a mixed block with scannable tag t, mutability μ, shape σ, and
+the n logical fields in order. The argument kinds are given by
+args_kind_of_variadic_primitive = Variadic_mixed σ; simplify_primitive.ml expands
+this to the per-argument kind list field_kinds(σ) (via List.combine with
+Mixed_block_shape.field_kinds) and checks each argument against it. Effects and
+coeffects are those of allocation (P.Effects.Allocation), identical to the
+Values case: (Only_generative_effects μ, Coeffects, Strict,
+Can't_move_before_any_branch) with Coeffects = Has_coeffects iff mode = Local.
+A field whose kind disagrees with field_kinds(σ) is ill-formed by kinding
+([§03](03-kinds.md), WF.Prim.MakeBlockMixed), not undef.
 ```
 
 ### Make_array
@@ -371,6 +460,35 @@ logical length is n/m. The empty array (n = 0) is allowed for every kind; there
 is no separate empty-array primitive. With the float-array optimisation, a
 Values array must never hold floats (that is a Naked_floats array instead) —
 an invariant the frontend maintains, not checked here.
+```
+
+### Static mixed blocks
+
+A mixed block can also be *statically allocated* as a `Static_const.t`, installed
+once by `OS.Let.Static` ([§04](04-opsem.md)) rather than by a `Make_block`
+primitive. Static blocks reuse the ordinary `Block` static const, whose shape
+field is a `Scannable_block_shape` (`Value_only` or `Mixed_record σ`).
+
+```rule
+RULE P.Static.MixedBlock
+STATUS normative
+CODE middle_end/flambda2/terms/static_const.ml#t
+CODE middle_end/flambda2/terms/static_const.ml#block_field_kind
+CODE middle_end/flambda2/to_cmm/to_cmm_static.ml#static_const0
+VERIFIED 14-validation/mixed-02-static.md
+---
+sc = Block(t, μ, Mixed_record σ, [s₀ … sₙ₋₁])      n = p + |ē|
+kind(sᵢ) = field_kinds(σ)(i)  for each i  (block_field_kind = Scannable_block_shape.element_kind)
+μ = Immutable ∨ μ = Immutable_unique
+--------------------------------------------------
+OS.Let.Static installs MixedBlock(t, μ, σ, [v₀ … vₙ₋₁]) at the bound symbol,
+where vᵢ is the value of the Simple.With_debuginfo sᵢ (constant or ρ(x))
+NOTES: A mutable static mixed block is REJECTED at to_cmm (to_cmm_static.ml:
+"the GC does not currently support mutable fields in statically-allocated
+values"), so statically-allocated mixed blocks are effectively immutable. The
+emitted Cmm header carries size size_in_words(σ) (physical words, not the logical
+field count n) and scannable_prefix_len = p (P.MixedShape.Offset). This grounds
+the static case; the machine object is the same MixedBlock as for Make_block.
 ```
 
 ### Region delimiters (augmented judgment)
@@ -434,8 +552,9 @@ pointer to a block, if i is out of range, or if the block's representation does
 not match `kind` (e.g. loading a value field from a Naked_floats block). The
 `mut` field records the mutability *assumed for this load* and drives the
 coeffect (P.Effects.ReadingFromBlock): an Immutable load is CSE-able. For
-Naked_floats blocks the loaded value is a naked float; for Mixed blocks the
-result kind is read from the shape (coarse). Block_load is a genuine projection
+Naked_floats blocks the loaded value is a naked float; for Mixed blocks see
+P.Unary.BlockLoad.Mixed (result kind = field_kinds(σ) at the field index).
+Block_load is a genuine projection
 and is therefore NOT eligible for CSE (projections propagate through types, not
 CSE) — see unary_primitive_eligible_for_cse.
 ```
@@ -449,6 +568,31 @@ p = Block_load { kind = Naked_floats _; mut; field = i }
 H(ℓ) = FloatBlock(μ, [f₀ … fₙ₋₁])      0 ≤ i < n
 --------------------------------------------------
 ⟦p⟧(ptr ℓ; H) = (fᵢ, H)
+```
+
+```rule
+RULE P.Unary.BlockLoad.Mixed
+STATUS normative
+CODE middle_end/flambda2/terms/flambda_primitive.mli#Mixed_block_access_field_kind
+CODE middle_end/flambda2/terms/flambda_primitive.ml#Block_access_kind.element_kind_for_load
+CODE middle_end/flambda2/terms/flambda_primitive.ml#Block_access_kind.from_block_shape
+VERIFIED 14-validation/mixed-01-record.md
+---
+p = Block_load { kind = Mixed { shape = σ; field_kind = fk; … }; mut; field = i }
+H(ℓ) = MixedBlock(t, μ, σ, [v₀ … vₙ₋₁])      0 ≤ i < n = p + |ē|
+fk = from_block_shape(Scannable (Mixed_record σ), i)     (see NOTES)
+--------------------------------------------------
+⟦p⟧(ptr ℓ; H) = (vᵢ, H)
+NOTES: Reads logical field i of a mixed block. The field kind fk must be the one
+selected by from_block_shape for shape σ and index i: Value_prefix bfk when
+i < p and Flat_suffix e_{i−p} when i ≥ p. The loaded value's kind is then
+element_kind_for_load(kind) = field_kinds(σ)(i) (P.MixedShape.FieldKinds): a
+Value for a prefix field (subkind tagged_immediate if bfk = Immediate, else
+any_value) and the naked-number value of e_{i−p} for a suffix field. The mut
+field drives the coeffect exactly as for Values blocks
+(P.Effects.ReadingFromBlock); like every Block_load it is a projection and NOT
+CSE-eligible. undef if the argument is not a pointer to a mixed block of shape σ,
+if i is out of range, or if fk disagrees with from_block_shape(σ, i).
 ```
 
 ### Block_set
@@ -474,6 +618,29 @@ range, or representation mismatch. Storing into a genuinely immutable field is a
 frontend error, not modelled as undef here.
 ```
 
+```rule
+RULE P.Binary.BlockSet.Mixed
+STATUS normative
+CODE middle_end/flambda2/terms/flambda_primitive.mli#Mixed_block_access_field_kind
+CODE middle_end/flambda2/terms/flambda_primitive.ml#Block_access_kind.from_block_shape
+CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_block_set
+VERIFIED 14-validation/mixed-03-mutable-set.md
+---
+p = Block_set { kind = Mixed { shape = σ; field_kind = fk; … }; init; field = i }
+H(ℓ) = MixedBlock(t, μ, σ, [v₀ … vₙ₋₁])      0 ≤ i < n = p + |ē|      μ ≠ Immutable
+kind(v) = field_kinds(σ)(i)      fk = from_block_shape(Scannable (Mixed_record σ), i)
+H′ = H[ℓ ↦ MixedBlock(t, μ, σ, [v₀ … vᵢ₋₁, v, vᵢ₊₁ … vₙ₋₁])]
+--------------------------------------------------
+⟦p⟧(ptr ℓ, v; H) = (tagged_imm 0, H′)
+NOTES: Writes logical field i of a mixed block, returning unit. The new value v
+must have kind field_kinds(σ)(i); fk is selected by from_block_shape as in
+P.Unary.BlockLoad.Mixed. init is Init_or_assign exactly as for Values (the
+Assignment mode drives the write barrier for a prefix (value) field; suffix
+fields hold unboxed scalars and need no barrier). writing_to_a_block classifies
+it (Arbitrary_effects, No_coeffects, …). undef if not a mixed-block pointer of
+shape σ, i out of range, or fk/kind disagreement.
+```
+
 ### Duplicate_block / Duplicate_array
 
 ```rule
@@ -491,6 +658,24 @@ May not change tag or mutability (stated in the mli). Classified
 (Only_generative_effects Mutable, Has_coeffects, …): the copy reads the source's
 fields (which are assumed possibly-mutable, hence Has_coeffects) so it cannot be
 moved past a write to the source.
+```
+
+```rule
+RULE P.Unary.DuplicateBlock.Mixed
+STATUS normative
+CODE middle_end/flambda2/terms/flambda_primitive.mli#Duplicate_block_kind
+CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive
+---
+p = Duplicate_block { kind = Mixed }
+H(ℓ) = MixedBlock(t, μ, σ, v̄)
+alloc(MixedBlock(t, μ, σ, v̄), H) = (ℓ′, H′)
+--------------------------------------------------
+⟦p⟧(ptr ℓ; H) = (ptr ℓ′, H′)
+NOTES: Special case of P.Unary.DuplicateBlock for a mixed block. The
+Duplicate_block_kind.Mixed constructor carries *no* tag/length/shape payload (the
+mli notes the other cases' fields are used only for printing), so the semantics
+copies the underlying MixedBlock — tag, shape σ and all logical fields —
+wholesale. Same classification as the general rule.
 ```
 
 ```rule
@@ -1149,12 +1334,16 @@ Effects/coeffects: `P.Effects.Classification`, `P.Effects.NoEffects`,
 `P.Effects.Placement`, `P.Effects.Validity`, `P.Effects.Pure`,
 `P.Effects.ReadingFromBlock`, `P.Effects.Writing`, `P.Effects.Allocation`.
 
+Mixed-block shape: `P.MixedShape.FieldKinds`, `P.MixedShape.Offset`.
+
 Variadic: `P.Variadic.MakeBlock.Values`, `P.Variadic.MakeBlock.NakedFloats`,
-`P.Variadic.MakeBlock.Mixed`, `P.Variadic.MakeArray`, `P.Variadic.BeginRegion`,
-`P.Variadic.BeginTryRegion`.
+`P.Variadic.MakeBlock.Mixed`, `P.Variadic.MakeArray`, `P.Static.MixedBlock`,
+`P.Variadic.BeginRegion`, `P.Variadic.BeginTryRegion`.
 
 Unary: `P.Unary.BlockLoad`, `P.Unary.BlockLoad.NakedFloats`,
-`P.Unary.DuplicateBlock`, `P.Unary.DuplicateArray`, `P.Unary.IsInt.Immediate`,
+`P.Unary.BlockLoad.Mixed`, `P.Unary.DuplicateBlock`,
+`P.Unary.DuplicateBlock.Mixed`, `P.Unary.DuplicateArray`,
+`P.Unary.IsInt.Immediate`,
 `P.Unary.IsInt.Pointer`, `P.Unary.IsNull`, `P.Unary.GetTag`, `P.Unary.GetHeader`,
 `P.Unary.ArrayLength`, `P.Unary.StringLength`, `P.Unary.BigarrayLength`,
 `P.Unary.ProjectFunctionSlot`, `P.Unary.ProjectValueSlot`, `P.Unary.IsBoxedFloat`,
@@ -1162,7 +1351,7 @@ Unary: `P.Unary.BlockLoad`, `P.Unary.BlockLoad.NakedFloats`,
 `P.Unary.OpaqueIdentity`, `P.Unary.MakeLazy`, `P.Unary.IntAsPointer`,
 `P.Unary.Peek`.
 
-Binary: `P.Binary.BlockSet`, `P.Binary.ArrayLoad`,
+Binary: `P.Binary.BlockSet`, `P.Binary.BlockSet.Mixed`, `P.Binary.ArrayLoad`,
 `P.Binary.StringOrBigstringLoad`, `P.Binary.PhysEqual`, `P.Binary.BigarrayLoad`,
 `P.Binary.BigarrayGetAlignment`, `P.Binary.AtomicLoadField`, `P.Binary.Poke`,
 `P.Binary.ReadOffset`.

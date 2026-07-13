@@ -39,16 +39,16 @@ the sync protocol below says what to do.
 
 ## Status & validation
 
-As of 2026-07-13 the formalism has **304 rules** across chapters 02-13:
-**205 normative** (the code must satisfy them), **65 descriptive** (current
-algorithms/heuristics that may change), and **34 conjectured** (believed but not
+As of 2026-07-13 the formalism has **312 rules** across chapters 02-13:
+**214 normative** (the code must satisfy them), **65 descriptive** (current
+algorithms/heuristics that may change), and **33 conjectured** (believed but not
 yet checked against the code). Counts and per-chapter breakdown are regenerated
 in [`rule-index.md`](rule-index.md).
 
 Chapters 01-12 were adversarially verified against the code, and the whole
-system was validated against **22 case studies** in
+system was validated against **26 case studies** in
 [`14-validation/`](14-validation/) using a prediction-first protocol (predict the
-Simplify output and cite rules *before* reading the actual output): **20 MATCH,
+Simplify output and cite rules *before* reading the actual output): **24 MATCH,
 1 PARTIAL, 1 MISMATCH** — the single mismatch (immutable array loads *are*
 CSE-eligible) was resolved by fixing the formalism, not the prediction. Chapter
 [`13-soundness.md`](13-soundness.md) states the (claimed, empirically validated,

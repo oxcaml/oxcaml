@@ -146,7 +146,7 @@ given rules; "out of scope" means it is not treated here at all.
 | Algebraic-effect call kinds (`Call_kind.Effect`: `Perform`/`Reperform`/`With_stack`/`Resume`) | out of scope | — |
 | Probes (`Probe_is_enabled`, `Enter_inlined_apply`) | out of scope | — |
 | SIMD vector primitives (128/256/512-bit accessors, `Reinterpret_boxed_vector`) | out of scope | — |
-| Mixed-block detailed layout (`Mixed_block_shape`, value-prefix/flat-suffix split) | out of scope | 06 models `MixedBlock` coarsely |
+| Mixed-block detailed layout (`Mixed_block_shape`, value-prefix/flat-suffix split) | formalized | 06 (`P.MixedShape.*`, `P.Variadic.MakeBlock.Mixed`, `P.Unary.BlockLoad.Mixed`, `P.Binary.BlockSet.Mixed`, `P.Static.MixedBlock`); 03 (`WF.Prim.MakeBlockMixed`, shape grammar); 07/08 (block-shape typing, `T.Meet.BlockShape`) |
 | Bigarrays (`Bigarray_load`/`_set`/`_length`, kinds/layouts) | coarse / descriptive | 06 (element decode & multi-dim indexing out of scope) |
 | Flambda invariant checks (`Flambda_features.check_invariants`) | out of scope | — |
 
@@ -155,7 +155,7 @@ call kinds in `middle_end/flambda2/terms/call_kind.mli` (`Method`, `Effect`),
 and the primitives in `middle_end/flambda2/terms/flambda_primitive.mli`
 (`nullary_primitive` for probes; `string_accessor_width`'s `One_twenty_eight` /
 `Two_fifty_six` / `Five_twelve` and `Reinterpret_boxed_vector` for SIMD; the
-`Mixed` cases; the `Bigarray_*` cases). They are listed here so their absence
+`Bigarray_*` cases). They are listed here so their absence
 from later chapters is a deliberate omission, not an oversight. The operational
 semantics (04) covers `Function` and `C_call` application; `Method` and `Effect`
 applications are noted there as unformalized. A later phase may promote any of

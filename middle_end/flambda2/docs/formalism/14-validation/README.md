@@ -14,7 +14,7 @@ synthesized program); (2) predict the output and cite rules before looking;
 resolved by **fixing the formalism, never by editing the prediction** — the one
 MISMATCH below drove a correction to `S.Rewrite.CSE.Eligible`.
 
-**Verdicts:** 22 case studies — 20 MATCH, 1 PARTIAL, 1 MISMATCH (now fixed).
+**Verdicts:** 26 case studies — 24 MATCH, 1 PARTIAL, 1 MISMATCH (now fixed).
 
 ## From existing testsuite tests (14)
 
@@ -47,3 +47,12 @@ MISMATCH below drove a correction to `S.Rewrite.CSE.Eligible`.
 | [`new-06-trap`](new-06-trap.md) | trap actions preserved around opaque call | MATCH | `OS.ApplyCont.TrapPush`, `OS.ApplyCont.TrapPop` |
 | [`new-07-float-unbox`](new-07-float-unbox.md) | float accumulator unboxed across a loop | MATCH | `S.Unbox.ContParam.Rewrite`, `S.Unbox.Mutable.Rewrite`, `S.Unbox.Optimistic.Number` |
 | [`new-08-nested-switch`](new-08-nested-switch.md) | unreachable arm pruned via refined type | MATCH | `S.Rewrite.Switch.ArmPrune`, `S.Rewrite.Switch.BooleanNot` |
+
+## Mixed blocks (4)
+
+| Case study | Target | Verdict | Primary rules |
+|---|---|---|---|
+| [`mixed-01-record`](mixed-01-record.md) | build and read a mixed record | MATCH | `P.Variadic.MakeBlock.Mixed`, `P.Unary.BlockLoad.Mixed`, `P.MixedShape.FieldKinds`, `WF.Prim.MakeBlockMixed` |
+| [`mixed-02-static`](mixed-02-static.md) | statically-allocated mixed record | MATCH | `P.Static.MixedBlock` |
+| [`mixed-03-mutable-set`](mixed-03-mutable-set.md) | mutable mixed field, write then read | MATCH | `P.Binary.BlockSet.Mixed`, `P.Unary.BlockLoad.Mixed`, `P.Effects.ReadingFromBlock` |
+| [`mixed-04-join`](mixed-04-join.md) | join two mixed blocks of equal shape | MATCH | `T.Meet.BlockShape` |

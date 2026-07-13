@@ -259,6 +259,34 @@ NOTES: get_tag is met *inside* meet_disjunction because reductions it triggers
 ```
 
 ```rule
+RULE T.Meet.BlockShape
+STATUS normative
+CODE middle_end/flambda2/types/meet_and_join.ml#meet_row_like_for_blocks
+CODE middle_end/flambda2/types/meet_and_join.ml#join_row_like_for_blocks
+CODE middle_end/flambda2/types/grammar/more_type_creators.ml#unknown_from_shape
+CODE middle_end/flambda2/kinds/flambda_kind.ml#Block_shape.equal
+VERIFIED 14-validation/mixed-04-join.md
+---
+meeting two block cases with shapes σ₁, σ₂ (as part of the Row_like block meet):
+  Block_shape.equal σ₁ σ₂  ⟹  the met index keeps shape σ₁ (fields met pointwise)
+  ¬ Block_shape.equal σ₁ σ₂ ⟹  the two cases do not meet (that index pair is ⊥)
+joining two block cases:
+  Block_shape.equal σ₁ σ₂  ⟹  the joined index keeps shape σ₁
+  ¬ Block_shape.equal σ₁ σ₂ ⟹  the shape is Unknown for that index
+--------------------------------------------------
+Block-case meet/join require equal Block_shape (incl. equal Mixed_record σ);
+otherwise meet yields ⊥ for that case and join drops to Unknown shape.
+NOTES: meet_row_like_for_blocks passes meet_shape = (fun σ₁ σ₂ -> if
+Block_shape.equal σ₁ σ₂ then Ok σ₁ else Bottom); join_row_like_for_blocks passes
+join_shape = (fun σ₁ σ₂ -> if Block_shape.equal σ₁ σ₂ then Known σ₁ else Unknown).
+When join keeps a shape but a field join is Unknown, join_int_indexed_product
+fills that field with unknown_from_shape(σ, i) (the per-field top of the shape's
+element kind, [§07](07-types-domain.md)) rather than a bare Unknown, so the field-kind discipline
+of the shape is preserved. Block_shape.equal is exact (no subshaping): two mixed
+shapes differing in prefix size or any flat_suffix_element are incompatible.
+```
+
+```rule
 RULE T.Meet.Relational
 STATUS descriptive
 CODE middle_end/flambda2/types/meet_and_join.ml#reduce_inverse_relations
@@ -681,7 +709,7 @@ precisely to confirm this is bottom rather than a bogus empty-kind array.
 Meet: `T.Meet.Dispatch`, `T.Meet.Sound`, `T.Meet.Bottom`,
 `T.Meet.GreatestLowerBound`, `T.Meet.AliasAlias`, `T.Meet.AliasConcrete`,
 `T.Meet.NakedNumber`, `T.Meet.ValueHeadIncompatible`, `T.Meet.Variant`,
-`T.Meet.Relational`, `T.Meet.Terminates`.
+`T.Meet.BlockShape`, `T.Meet.Relational`, `T.Meet.Terminates`.
 
 Join: `T.Join.Sound`, `T.Join.SharedAlias`, `T.Join.Head`, `T.Join.Cutoff`,
 `T.Join.Levels`, `T.Join.Existentials`, `T.Join.RecursiveParamsUnknown`.

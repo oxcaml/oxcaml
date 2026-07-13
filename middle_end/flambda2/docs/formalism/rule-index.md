@@ -40,9 +40,9 @@ table per namespace plus the consistency-check section below. The extraction
 and check scripts used for the current revision live only in the generating
 agent's scratch space; the procedure above is the source of truth.
 
-## WF — Kinding and well-formedness (ch. 02-03)
+## WF — Kinding and well-formedness (ch. 03)
 
-39 rules.
+40 rules.
 
 | Rule ID | Status | Chapter | Code anchors | Verified |
 |---|---|---|---|---|
@@ -50,7 +50,7 @@ agent's scratch space; the procedure above is the source of truth.
 | `WF.Syntax.LetKindUniform` | normative | 02-syntax.md | `middle_end/flambda2/bound_identifiers/bound_pattern.mli#t` | — |
 | `WF.Syntax.SingletonNotSetOfClosures` | normative | 02-syntax.md | `middle_end/flambda2/bound_identifiers/bound_pattern.mli#t` | — |
 | `WF.Syntax.SwitchScrutinee` | normative | 02-syntax.md | `middle_end/flambda2/terms/switch_expr.mli#t`<br>`middle_end/flambda2/terms/switch_expr.mli#create` | — |
-| `WF.Syntax.SwitchMinArms` | normative | 02-syntax.md | `middle_end/flambda2/terms/switch_expr.mli#t`<br>`middle_end/flambda2/from_lambda/closure_conversion.ml#close_switch`<br>`middle_end/flambda2/simplify/expr_builder.ml#create_switch`<br>`middle_end/flambda2/terms/flambda.mli#Invalid.t` | `14-validation/gadt_simplified_switch.md` |
+| `WF.Syntax.SwitchMinArms` | normative | 02-syntax.md | `middle_end/flambda2/terms/switch_expr.mli#t`<br>`middle_end/flambda2/from_lambda/closure_conversion.ml#close_switch`<br>`middle_end/flambda2/simplify/expr_builder.ml#create_switch`<br>`middle_end/flambda2/terms/flambda.mli#Invalid.t` | 14-validation/gadt_simplified_switch.md |
 | `WF.Syntax.ExnHandlerNonRecursive` | normative | 02-syntax.md | `middle_end/flambda2/terms/flambda.mli#Continuation_handler`<br>`middle_end/flambda2/terms/flambda.mli#Let_cont_expr` | — |
 | `WF.Syntax.ExnHandlerFirstParamBucket` | conjectured | 02-syntax.md | `middle_end/flambda2/terms/exn_continuation.mli#arity`<br>`middle_end/flambda2/terms/flambda.mli#Continuation_handler` | — |
 | `WF.Syntax.EffectCalleeNone` | normative | 02-syntax.md | `middle_end/flambda2/terms/call_kind.mli#Effect`<br>`middle_end/flambda2/terms/apply_expr.mli#create` | — |
@@ -74,6 +74,7 @@ agent's scratch space; the procedure above is the source of truth.
 | `WF.Named.Simple` | normative | 03-kinds.md | `terms/flambda.ml#Named.kind` | — |
 | `WF.Named.RecInfo` | normative | 03-kinds.md | `terms/flambda.ml#Named.kind` | — |
 | `WF.Prim.ArgKinds` | normative | 03-kinds.md | `terms/flambda_primitive.mli#arg_kind_of_unary_primitive`<br>`terms/flambda_primitive.mli#args_kind_of_binary_primitive`<br>`terms/flambda_primitive.mli#args_kind_of_variadic_primitive` | — |
+| `WF.Prim.MakeBlockMixed` | normative | 03-kinds.md | `terms/flambda_primitive.ml#args_kind_of_variadic_primitive`<br>`middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive`<br>`kinds/flambda_kind.mli#Mixed_block_shape.field_kinds` | 14-validation/mixed-01-record.md |
 | `WF.Switch.Scrutinee` | normative | 03-kinds.md | `terms/switch_expr.ml#t`<br>`simplify/simplify_switch_expr.ml#simplify_arm` | — |
 | `WF.Switch.NonEmpty` | normative | 03-kinds.md | `simplify/simplify_switch_expr.ml`<br>`simplify/expr_builder.ml`<br>`terms/flambda.mli#Invalid` | — |
 | `WF.ApplyCont.Arity` | normative | 03-kinds.md | `terms/apply_cont_expr.mli#create`<br>`bound_identifiers/bound_parameters.mli#arity`<br>`bound_identifiers/bound_parameter.mli#kind`<br>`simplify/env/continuation_uses.ml#add_use`<br>`simplify/simplify_apply_cont_expr.ml#inline_linearly_used_continuation` | — |
@@ -104,8 +105,8 @@ agent's scratch space; the procedure above is the source of truth.
 | `OS.ApplyCont` | normative | 04-opsem.md | `middle_end/flambda2/terms/apply_cont_expr.mli#create`<br>`middle_end/flambda2/terms/flambda.mli#Continuation_handler` | — |
 | `OS.ApplyCont.Return` | normative | 04-opsem.md | `middle_end/flambda2/terms/apply_expr.mli#Result_continuation`<br>`middle_end/flambda2/terms/flambda.mli#Function_params_and_body` | — |
 | `OS.ApplyCont.ExnBoundary` | normative | 04-opsem.md | `middle_end/flambda2/terms/exn_continuation.mli#t`<br>`middle_end/flambda2/terms/exn_continuation.mli#extra_args` | — |
-| `OS.ApplyCont.TrapPush` | normative | 04-opsem.md | `middle_end/flambda2/terms/trap_action.mli#t`<br>`middle_end/flambda2/from_lambda/lambda_to_flambda.ml#cps` | `14-validation/new-06-trap.md` |
-| `OS.ApplyCont.TrapPop` | normative | 04-opsem.md | `middle_end/flambda2/terms/trap_action.mli#t`<br>`middle_end/flambda2/terms/apply_cont_expr.ml#is_raise` | `14-validation/new-06-trap.md` |
+| `OS.ApplyCont.TrapPush` | normative | 04-opsem.md | `middle_end/flambda2/terms/trap_action.mli#t`<br>`middle_end/flambda2/from_lambda/lambda_to_flambda.ml#cps` | 14-validation/new-06-trap.md |
+| `OS.ApplyCont.TrapPop` | normative | 04-opsem.md | `middle_end/flambda2/terms/trap_action.mli#t`<br>`middle_end/flambda2/terms/apply_cont_expr.ml#is_raise` | 14-validation/new-06-trap.md |
 | `OS.ApplyCont.Raise` | normative | 04-opsem.md | `middle_end/flambda2/terms/apply_cont_expr.ml#is_raise`<br>`middle_end/flambda2/from_lambda/closure_conversion.ml#close_raise0`<br>`middle_end/flambda2/terms/trap_action.mli#Raise_kind` | — |
 | `OS.Switch` | normative | 04-opsem.md | `middle_end/flambda2/terms/switch_expr.mli#create`<br>`middle_end/flambda2/terms/switch_expr.mli#arms` | — |
 | `OS.Switch.Undef` | normative | 04-opsem.md | `middle_end/flambda2/terms/switch_expr.mli#create`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#switch` | — |
@@ -124,7 +125,7 @@ agent's scratch space; the procedure above is the source of truth.
 
 ## P — Primitive denotations (ch. 05-06)
 
-87 rules.
+93 rules.
 
 | Rule ID | Status | Chapter | Code anchors | Verified |
 |---|---|---|---|---|
@@ -158,6 +159,8 @@ agent's scratch space; the procedure above is the source of truth.
 | `P.Effects.PureScalars` | normative | 05-primitives-scalar.md | `middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive`<br>`middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_binary_primitive` | — |
 | `P.Effects.FloatRoundingMode` | normative | 05-primitives-scalar.md | `middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive`<br>`middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_binary_primitive` | — |
 | `P.Effects.BoxNumber` | normative | 05-primitives-scalar.md | `middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive` | — |
+| `P.MixedShape.FieldKinds` | normative | 06-primitives-memory.md | `middle_end/flambda2/kinds/flambda_kind.ml#Mixed_block_shape.from_prefix_size_and_suffix_elements`<br>`middle_end/flambda2/kinds/flambda_kind.ml#Scannable_block_shape.element_kind`<br>`middle_end/flambda2/kinds/flambda_kind.mli#Mixed_block_shape.field_kinds` | 14-validation/mixed-01-record.md |
+| `P.MixedShape.Offset` | normative | 06-primitives-memory.md | `middle_end/flambda2/kinds/flambda_kind.ml#Mixed_block_shape.offset_in_words`<br>`middle_end/flambda2/kinds/flambda_kind.ml#Flat_suffix_element0.size_in_words`<br>`middle_end/flambda2/kinds/flambda_kind.ml#Mixed_block_shape.size_in_words` | — |
 | `P.Effects.Classification` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/effects_and_coeffects.ml`<br>`middle_end/flambda2/terms/effects.ml`<br>`middle_end/flambda2/terms/coeffects.ml` | — |
 | `P.Effects.NoEffects` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/effects.ml#t` | — |
 | `P.Effects.OnlyGenerative` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/effects.ml#t` | — |
@@ -171,14 +174,18 @@ agent's scratch space; the procedure above is the source of truth.
 | `P.Effects.Allocation` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_variadic_primitive`<br>`middle_end/flambda2/terms/flambda_primitive.ml#coeffects_of_mode` | — |
 | `P.Variadic.MakeBlock.Values` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#Block_kind`<br>`middle_end/flambda2/simplify/simplify_variadic_primitive.ml#simplify_make_block` | — |
 | `P.Variadic.MakeBlock.NakedFloats` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#Block_kind` | — |
-| `P.Variadic.MakeBlock.Mixed` | conjectured | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#Block_kind`<br>`middle_end/flambda2/kinds/flambda_kind.mli#Mixed_block_shape` | — |
+| `P.Variadic.MakeBlock.Mixed` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#Block_kind`<br>`middle_end/flambda2/terms/flambda_primitive.ml#args_kind_of_variadic_primitive`<br>`middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive`<br>`middle_end/flambda2/kinds/flambda_kind.mli#Mixed_block_shape` | 14-validation/mixed-01-record.md |
 | `P.Variadic.MakeArray` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#variadic_primitive`<br>`middle_end/flambda2/simplify/simplify_variadic_primitive.ml#simplify_make_array` | — |
+| `P.Static.MixedBlock` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/static_const.ml#t`<br>`middle_end/flambda2/terms/static_const.ml#block_field_kind`<br>`middle_end/flambda2/to_cmm/to_cmm_static.ml#static_const0` | 14-validation/mixed-02-static.md |
 | `P.Variadic.BeginRegion` | conjectured | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#variadic_primitive`<br>`middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_begin_region` | — |
 | `P.Variadic.BeginTryRegion` | conjectured | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#variadic_primitive` | — |
 | `P.Unary.BlockLoad` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_immutable_block_load`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_mutable_block_load` | — |
 | `P.Unary.BlockLoad.NakedFloats` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#Block_access_kind` | — |
+| `P.Unary.BlockLoad.Mixed` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#Mixed_block_access_field_kind`<br>`middle_end/flambda2/terms/flambda_primitive.ml#Block_access_kind.element_kind_for_load`<br>`middle_end/flambda2/terms/flambda_primitive.ml#Block_access_kind.from_block_shape` | 14-validation/mixed-01-record.md |
 | `P.Binary.BlockSet` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_block_set` | — |
+| `P.Binary.BlockSet.Mixed` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#Mixed_block_access_field_kind`<br>`middle_end/flambda2/terms/flambda_primitive.ml#Block_access_kind.from_block_shape`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_block_set` | 14-validation/mixed-03-mutable-set.md |
 | `P.Unary.DuplicateBlock` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive` | — |
+| `P.Unary.DuplicateBlock.Mixed` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#Duplicate_block_kind`<br>`middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive` | — |
 | `P.Unary.DuplicateArray` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive`<br>`middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive` | — |
 | `P.Unary.IsInt.Immediate` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_is_int` | — |
 | `P.Unary.IsInt.Pointer` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_is_int` | — |
@@ -218,15 +225,15 @@ agent's scratch space; the procedure above is the source of truth.
 
 ## T — Abstract domain, meet/join, provers, reification (ch. 07-08)
 
-51 rules.
+52 rules.
 
 | Rule ID | Status | Chapter | Code anchors | Verified |
 |---|---|---|---|---|
 | `T.Role.SinglePass` | normative | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_grammar.mli#t` | — |
 | `T.Grammar.TypeDescr` | normative | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_descr.mli#Descr.t`<br>`middle_end/flambda2/types/grammar/type_descr.mli#descr` | — |
 | `T.Grammar.Variant` | normative | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_value_non_null`<br>`middle_end/flambda2/types/grammar/type_grammar.ml#create_variant` | — |
-| `T.Grammar.RowLike.Index` | normative | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_grammar.mli#row_like_index_domain`<br>`middle_end/flambda2/types/grammar/type_grammar.ml#row_like_index_domain` | — |
-| `T.Grammar.NakedImmediate.Relational` | normative | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_naked_immediate`<br>`middle_end/flambda2/types/grammar/type_grammar.ml#is_int_for_scrutinee`<br>`middle_end/flambda2/types/grammar/type_grammar.ml#get_tag_for_block` | `14-validation/issue5721.md`<br>`14-validation/naked_immediates_many_relations.md` |
+| `T.Grammar.RowLike.Index` | normative | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_grammar.mli#row_like_index_domain`<br>`middle_end/flambda2/types/grammar/type_grammar.ml#row_like_index_domain`<br>`middle_end/flambda2/types/grammar/type_grammar.ml#check_field_tys`<br>`middle_end/flambda2/types/grammar/more_type_creators.ml#unknown_from_shape` | — |
+| `T.Grammar.NakedImmediate.Relational` | normative | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_naked_immediate`<br>`middle_end/flambda2/types/grammar/type_grammar.ml#is_int_for_scrutinee`<br>`middle_end/flambda2/types/grammar/type_grammar.ml#get_tag_for_block` | 14-validation/issue5721.md<br>14-validation/naked_immediates_many_relations.md |
 | `T.Grammar.NakedNumber.NonEmptySet` | normative | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_naked_float`<br>`middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_naked_float` | — |
 | `T.Grammar.RecInfoRegion.Trivial` | normative | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_region`<br>`middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_rec_info` | — |
 | `T.Env.Canonical.Least` | normative | 07-types-domain.md | `middle_end/flambda2/types/env/aliases.mli#get_canonical_element_exn`<br>`middle_end/flambda2/types/env/binding_time.ml#consts`<br>`middle_end/flambda2/types/env/aliases.mli#Alias_set.find_best` | — |
@@ -240,7 +247,7 @@ agent's scratch space; the procedure above is the source of truth.
 | `T.Gamma.Kind` | conjectured | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_grammar.mli#kind` | — |
 | `T.Gamma.TopBottom` | conjectured | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_descr.mli#unknown`<br>`middle_end/flambda2/types/grammar/type_descr.mli#bottom` | — |
 | `T.Gamma.Alias` | conjectured | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_grammar.mli#alias_type_of`<br>`middle_end/flambda2/types/grammar/type_grammar.ml#get_alias_exn` | — |
-| `T.Gamma.Value.Nullability` | conjectured | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_value` | `14-validation/n_way_join_preserves_null.md` |
+| `T.Gamma.Value.Nullability` | conjectured | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_value` | 14-validation/n_way_join_preserves_null.md |
 | `T.Gamma.Value.Variant` | conjectured | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_value_non_null` | — |
 | `T.Gamma.Value.RowLikeBlocks` | conjectured | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_grammar.mli#row_like_for_blocks` | — |
 | `T.Gamma.Value.Boxed` | conjectured | 07-types-domain.md | `middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_value_non_null` | — |
@@ -258,9 +265,10 @@ agent's scratch space; the procedure above is the source of truth.
 | `T.Meet.NakedNumber` | normative | 08-meet-join.md | `middle_end/flambda2/types/meet_and_join.ml#meet_expanded_head0`<br>`middle_end/flambda2/types/meet_and_join.ml#set_meet` | — |
 | `T.Meet.ValueHeadIncompatible` | normative | 08-meet-join.md | `middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null` | — |
 | `T.Meet.Variant` | normative | 08-meet-join.md | `middle_end/flambda2/types/meet_and_join.ml#meet_variant`<br>`middle_end/flambda2/types/meet_and_join.ml#meet_relation` | — |
+| `T.Meet.BlockShape` | normative | 08-meet-join.md | `middle_end/flambda2/types/meet_and_join.ml#meet_row_like_for_blocks`<br>`middle_end/flambda2/types/meet_and_join.ml#join_row_like_for_blocks`<br>`middle_end/flambda2/types/grammar/more_type_creators.ml#unknown_from_shape`<br>`middle_end/flambda2/kinds/flambda_kind.ml#Block_shape.equal` | 14-validation/mixed-04-join.md |
 | `T.Meet.Relational` | descriptive | 08-meet-join.md | `middle_end/flambda2/types/meet_and_join.ml#reduce_inverse_relations`<br>`middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_naked_immediate` | — |
 | `T.Meet.Terminates` | descriptive | 08-meet-join.md | `middle_end/flambda2/types/env/meet_env.ml#adding_equation_for_name`<br>`middle_end/flambda2/types/meet_and_join.ml#meet` | — |
-| `T.Join.Sound` | normative | 08-meet-join.md | `middle_end/flambda2/types/meet_and_join.ml#join`<br>`middle_end/flambda2/types/join_levels.ml#cut_and_n_way_join` | `14-validation/n_way_join_null.md`<br>`14-validation/n_way_join_preserves_null.md` |
+| `T.Join.Sound` | normative | 08-meet-join.md | `middle_end/flambda2/types/meet_and_join.ml#join`<br>`middle_end/flambda2/types/join_levels.ml#cut_and_n_way_join` | 14-validation/n_way_join_null.md<br>14-validation/n_way_join_preserves_null.md |
 | `T.Join.SharedAlias` | normative | 08-meet-join.md | `middle_end/flambda2/types/meet_and_join.ml#join` | — |
 | `T.Join.Head` | descriptive | 08-meet-join.md | `middle_end/flambda2/types/meet_and_join.ml#join_expanded_head`<br>`middle_end/flambda2/types/meet_and_join.ml#join_head_of_kind_value_non_null` | — |
 | `T.Join.Cutoff` | descriptive | 08-meet-join.md | `middle_end/flambda2/types/meet_and_join.ml#join`<br>`middle_end/flambda2/ui/flambda_features.ml#join_depth` | — |
@@ -312,53 +320,53 @@ agent's scratch space; the procedure above is the source of truth.
 | `S.Rewrite.Prim.ArgKindMismatch` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_primitive.ml#arg_kind_mismatch`<br>`middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive` | — |
 | `S.Rewrite.Prim.Relational` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_relational_primitive`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_is_int`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_get_tag` | — |
 | `S.Rewrite.Alias.Canonicalize` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_simple.ml#simplify_simple0`<br>`middle_end/flambda2/types/env/typing_env.ml#type_simple_in_term_exn` | — |
-| `S.Rewrite.Prim.ConstFold` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_binary_primitive.ml#Binary_arith_like`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_unary_primitive` | `14-validation/new-01-constfold.md`<br>`14-validation/new-05-inline-fold.md` |
+| `S.Rewrite.Prim.ConstFold` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_binary_primitive.ml#Binary_arith_like`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_unary_primitive` | 14-validation/new-01-constfold.md<br>14-validation/new-05-inline-fold.md |
 | `S.Rewrite.Prim.ConstFold.Float` | descriptive | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#Make_simplify_float_arith_op`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#Float_ops_for_binary_arith_gen` | — |
 | `S.Rewrite.Prim.ConstFold.PartialUndef` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_arith`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#Binary_arith_like` | — |
 | `S.Rewrite.Prim.Reify` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_named.ml#simplify_named0`<br>`middle_end/flambda2/simplify/lifting/reification.ml#try_to_reify` | — |
 | `S.Rewrite.Prim.IntIdentity` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_arith`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_shift` | — |
 | `S.Rewrite.Prim.FloatIdentity` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_binary_primitive.ml#Float_ops_for_binary_arith_gen` | — |
-| `S.Rewrite.Prim.UntagTag` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_untag_immediate`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_unbox_number` | `14-validation/code_size_of_boolean_not_switch.md` |
+| `S.Rewrite.Prim.UntagTag` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_untag_immediate`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_unbox_number` | 14-validation/code_size_of_boolean_not_switch.md |
 | `S.Rewrite.Prim.Projection` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_immutable_block_load0`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_value_slot`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load` | — |
 | `S.Rewrite.Prim.PhysEqual` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_phys_equal`<br>`middle_end/flambda2/types/provers.ml#prove_physical_equality` | — |
 | `S.Rewrite.Prim.CompareRecovery` | descriptive | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_binary_primitive.ml#recover_comparison_primitive`<br>`middle_end/flambda2/simplify/comparison_result.ml#convert_result_compared_to_tagged_zero` | — |
 | `S.Rewrite.Prim.ObjDupElide` | descriptive | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_obj_dup` | — |
-| `S.Rewrite.CSE.Eligible` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/terms/flambda_primitive.ml#Eligible_for_cse.create`<br>`middle_end/flambda2/terms/flambda_primitive.ml#unary_primitive_eligible_for_cse`<br>`middle_end/flambda2/terms/flambda_primitive.ml#binary_primitive_eligible_for_cse` | `14-validation/cse_immutable_array_load_var_index.md`<br>`14-validation/cse_immutable_array_load.md` |
-| `S.Rewrite.CSE.Replace` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_primitive.ml#try_cse`<br>`middle_end/flambda2/simplify/simplify_primitive.ml#apply_cse` | `14-validation/cse_immutable_array_load.md`<br>`14-validation/cse_immutable_array_load_var_index.md`<br>`14-validation/issue5721.md`<br>`14-validation/new-04-cse.md` |
-| `S.Rewrite.CSE.Extend` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_primitive.ml#try_cse`<br>`middle_end/flambda2/simplify/common_subexpression_elimination.ml#T0.add` | `14-validation/new-04-cse.md` |
-| `S.Rewrite.Switch.ArmPrune` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_switch_expr.ml#simplify_arm` | `14-validation/array_element_kind_meet.md`<br>`14-validation/new-02-known-switch.md`<br>`14-validation/new-08-nested-switch.md` |
-| `S.Rewrite.Switch.Merge` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch`<br>`middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_arm` | `14-validation/new-02-known-switch.md` |
-| `S.Rewrite.Switch.Identity` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch` | `14-validation/n_way_join_null.md` |
-| `S.Rewrite.Switch.BooleanNot` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch` | `14-validation/code_size_of_boolean_not_switch.md`<br>`14-validation/new-08-nested-switch.md` |
+| `S.Rewrite.CSE.Eligible` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/terms/flambda_primitive.ml#Eligible_for_cse.create`<br>`middle_end/flambda2/terms/flambda_primitive.ml#unary_primitive_eligible_for_cse`<br>`middle_end/flambda2/terms/flambda_primitive.ml#binary_primitive_eligible_for_cse` | 14-validation/cse_immutable_array_load_var_index.md<br>14-validation/cse_immutable_array_load.md |
+| `S.Rewrite.CSE.Replace` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_primitive.ml#try_cse`<br>`middle_end/flambda2/simplify/simplify_primitive.ml#apply_cse` | 14-validation/cse_immutable_array_load.md<br>14-validation/cse_immutable_array_load_var_index.md<br>14-validation/issue5721.md<br>14-validation/new-04-cse.md |
+| `S.Rewrite.CSE.Extend` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_primitive.ml#try_cse`<br>`middle_end/flambda2/simplify/common_subexpression_elimination.ml#T0.add` | 14-validation/new-04-cse.md |
+| `S.Rewrite.Switch.ArmPrune` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_switch_expr.ml#simplify_arm` | 14-validation/array_element_kind_meet.md<br>14-validation/new-02-known-switch.md<br>14-validation/new-08-nested-switch.md |
+| `S.Rewrite.Switch.Merge` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch`<br>`middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_arm` | 14-validation/new-02-known-switch.md |
+| `S.Rewrite.Switch.Identity` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch` | 14-validation/n_way_join_null.md |
+| `S.Rewrite.Switch.BooleanNot` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch` | 14-validation/code_size_of_boolean_not_switch.md<br>14-validation/new-08-nested-switch.md |
 | `S.Rewrite.Switch.Invalid` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch` | — |
-| `S.Rewrite.Let.DeadBinding` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let`<br>`middle_end/flambda2/terms/flambda_primitive.ml#at_most_generative_effects` | `14-validation/array_element_kind_meet.md` |
+| `S.Rewrite.Let.DeadBinding` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let`<br>`middle_end/flambda2/terms/flambda_primitive.ml#at_most_generative_effects` | 14-validation/array_element_kind_meet.md |
 | `S.Rewrite.Let.DeadRegion` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let` | — |
 | `S.Rewrite.Let.Phantom` | descriptive | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let` | — |
 | `S.Rewrite.Let.Invalid` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_let_expr.ml#simplify_let0`<br>`middle_end/flambda2/simplify/simplify_named.ml#simplify_named0` | — |
-| `S.Rewrite.LetCont.Inline` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/join_points.ml#compute_handler_env`<br>`middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler`<br>`middle_end/flambda2/simplify/simplify_apply_cont_expr.ml#inline_linearly_used_continuation` | `14-validation/new-03-letcont-inline.md` |
+| `S.Rewrite.LetCont.Inline` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/join_points.ml#compute_handler_env`<br>`middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler`<br>`middle_end/flambda2/simplify/simplify_apply_cont_expr.ml#inline_linearly_used_continuation` | 14-validation/new-03-letcont-inline.md |
 | `S.Rewrite.LetCont.DeadHandler` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_handlers`<br>`middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_let_cont` | — |
 | `S.Rewrite.LetCont.Shortcut` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler`<br>`middle_end/flambda2/simplify/continuation_shortcut.ml#apply`<br>`middle_end/flambda2/simplify/expr_builder.ml#apply_continuation_shortcuts` | — |
 | `S.Rewrite.LetCont.UnusedParam` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_let_cont_expr.ml#decide_param_usage_non_recursive`<br>`middle_end/flambda2/simplify/simplify_let_cont_expr.ml#decide_param_usage_recursive`<br>`middle_end/flambda2/simplify/flow/flow_analysis.ml#analyze` | — |
 | `S.Rewrite.LetCont.AliasedParam` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/flow/flow_types.mli#Continuation_param_aliases`<br>`middle_end/flambda2/simplify/simplify_let_cont_expr.ml#add_lets_around_handler` | — |
 | `S.Rewrite.LetCont.InvalidHandler` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler`<br>`middle_end/flambda2/simplify/simplify_apply_cont_expr.ml#rebuild_apply_cont` | — |
 | `S.Rewrite.LetCont.Specialize` | descriptive | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_let_cont_expr.ml#specialize_continuation_if_needed`<br>`middle_end/flambda2/simplify/simplify_apply_cont_expr.ml#rebuild_apply_cont` | — |
-| `S.Rewrite.Apply.IndirectToDirect` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_function_call`<br>`middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_function_call`<br>`middle_end/flambda2/types/provers.ml#meet_single_closures_entry` | `14-validation/naked_immediates_many_relations.md` |
+| `S.Rewrite.Apply.IndirectToDirect` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_function_call`<br>`middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_function_call`<br>`middle_end/flambda2/types/provers.ml#meet_single_closures_entry` | 14-validation/naked_immediates_many_relations.md |
 | `S.Rewrite.Apply.OverApplication` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_over_application`<br>`middle_end/flambda2/simplify/simplify_common.ml#split_direct_over_application` | — |
 | `S.Rewrite.Apply.PartialApplication` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_partial_application` | — |
 | `S.Rewrite.Apply.Invalid` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_apply_expr.ml#replace_apply_by_invalid`<br>`middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_function_call` | — |
 | `S.Rewrite.Invalid.Propagate` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/expr_builder.ml#rebuild_invalid`<br>`middle_end/flambda2/simplify/simplify_expr.ml#simplify_expr` | — |
 | `S.Inline.ModeMismatchInvalid` | normative | 11-inlining.md | `middle_end/flambda2/simplify/inlining/inlining_transforms.ml#inline` | — |
-| `S.Inline.Substitute` | normative | 11-inlining.md | `middle_end/flambda2/simplify/inlining/inlining_transforms.ml#inline`<br>`middle_end/flambda2/simplify/inlining/inlining_transforms.ml#make_inlined_body`<br>`middle_end/flambda2/simplify_shared/inlining_helpers.ml#make_inlined_body`<br>`middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_full_application` | `14-validation/new-05-inline-fold.md` |
+| `S.Inline.Substitute` | normative | 11-inlining.md | `middle_end/flambda2/simplify/inlining/inlining_transforms.ml#inline`<br>`middle_end/flambda2/simplify/inlining/inlining_transforms.ml#make_inlined_body`<br>`middle_end/flambda2/simplify_shared/inlining_helpers.ml#make_inlined_body`<br>`middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_full_application` | 14-validation/new-05-inline-fold.md |
 | `S.Inline.Substitute.Region` | normative | 11-inlining.md | `middle_end/flambda2/simplify_shared/inlining_helpers.ml#make_inlined_body` | — |
 | `S.Inline.Substitute.ExnExtraArgs` | normative | 11-inlining.md | `middle_end/flambda2/simplify_shared/inlining_helpers.ml#wrap_inlined_body_for_exn_extra_args` | — |
-| `S.Inline.DeclDecision` | descriptive | 11-inlining.md | `middle_end/flambda2/simplify_shared/function_decl_inlining_decision.ml#make_decision0`<br>`middle_end/flambda2/terms/function_decl_inlining_decision_type.ml#behaviour` | `14-validation/code_size_of_single_arg_switch.md` |
-| `S.Inline.Decision` | descriptive | 11-inlining.md | `middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision0`<br>`middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision`<br>`middle_end/flambda2/simplify_shared/call_site_inlining_decision_type.ml#can_inline` | `14-validation/missing_code.md` |
-| `S.Inline.Speculative` | descriptive | 11-inlining.md | `middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#might_inline`<br>`middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#speculative_inlining`<br>`middle_end/flambda2/terms/cost_metrics.ml#evaluate` | `14-validation/inlining_cost_of_primitive_on_parameters.md`<br>`14-validation/removed_operations_of_switch.md`<br>`14-validation/speculative_inlining_lifted_constants.md` |
+| `S.Inline.DeclDecision` | descriptive | 11-inlining.md | `middle_end/flambda2/simplify_shared/function_decl_inlining_decision.ml#make_decision0`<br>`middle_end/flambda2/terms/function_decl_inlining_decision_type.ml#behaviour` | 14-validation/code_size_of_single_arg_switch.md |
+| `S.Inline.Decision` | descriptive | 11-inlining.md | `middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision0`<br>`middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision`<br>`middle_end/flambda2/simplify_shared/call_site_inlining_decision_type.ml#can_inline` | 14-validation/missing_code.md |
+| `S.Inline.Speculative` | descriptive | 11-inlining.md | `middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#might_inline`<br>`middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#speculative_inlining`<br>`middle_end/flambda2/terms/cost_metrics.ml#evaluate` | 14-validation/inlining_cost_of_primitive_on_parameters.md<br>14-validation/removed_operations_of_switch.md<br>14-validation/speculative_inlining_lifted_constants.md |
 | `S.Inline.DepthLimit` | descriptive | 11-inlining.md | `middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision0`<br>`middle_end/flambda2/terms/inlining_state.ml#is_depth_exceeded`<br>`middle_end/flambda2/simplify/simplify_rec_info_expr.ml#depth_may_exceed`<br>`middle_end/flambda2/simplify/env/downwards_env.ml#enter_inlined_apply` | — |
 | `S.Inline.Unroll.Begin` | descriptive | 11-inlining.md | `middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision0`<br>`middle_end/flambda2/simplify/inlining/inlining_transforms.ml#make_inlined_body`<br>`middle_end/flambda2/term_basics/coercion.ml#change_depth` | — |
 | `S.Inline.Unroll.Continue` | descriptive | 11-inlining.md | `middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision0`<br>`middle_end/flambda2/simplify/simplify_rec_info_expr.ml#known_remaining_unrolling_depth` | — |
 | `S.Unbox.ContParam.Hook` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/simplify_let_cont_expr.ml#prepare_dacc_for_handlers`<br>`middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_single_recursive_handler`<br>`middle_end/flambda2/simplify/unboxing/unbox_continuation_params.ml#make_decisions` | — |
-| `S.Unbox.Optimistic.Number` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_number_decision`<br>`middle_end/flambda2/simplify/unboxing/unboxers.ml` | `14-validation/new-07-float-unbox.md` |
+| `S.Unbox.Optimistic.Number` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_number_decision`<br>`middle_end/flambda2/simplify/unboxing/unboxers.ml` | 14-validation/new-07-float-unbox.md |
 | `S.Unbox.Optimistic.Block` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_decision`<br>`middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_fields` | — |
 | `S.Unbox.Optimistic.Closure` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_vars_within_closure` | — |
 | `S.Unbox.Depth` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_decision`<br>`driver/oxcaml_flags.ml#Flambda2.Expert` | — |
@@ -371,11 +379,11 @@ agent's scratch space; the procedure above is the source of truth.
 | `S.Unbox.Variant.Discriminator` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#compute_extra_args_for_variant`<br>`middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#extra_args_for_const_ctor_of_variant` | — |
 | `S.Unbox.FunParam.Wrapper` | descriptive | 12-unboxing.md | `middle_end/flambda2/from_lambda/lambda_to_flambda.ml#cps_function`<br>`middle_end/flambda2/from_lambda/closure_conversion.ml#compute_body_of_unboxed_function`<br>`middle_end/flambda2/from_lambda/closure_conversion.ml#make_unboxed_function_wrapper` | — |
 | `S.Unbox.Denv.Equation` | normative | 12-unboxing.md | `middle_end/flambda2/simplify/unboxing/build_unboxing_denv.ml#denv_of_decision`<br>`middle_end/flambda2/simplify/unboxing/build_unboxing_denv.ml#add_equation_on_var` | — |
-| `S.Unbox.ContParam.Rewrite` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#add_extra_params_and_args`<br>`middle_end/flambda2/simplify/apply_cont_rewrite.ml#create`<br>`middle_end/flambda2/simplify/expr_builder.ml#rewrite_apply_cont`<br>`middle_end/flambda2/simplify/simplify_let_cont_expr.ml#compute_extra_params_and_args` | `14-validation/new-07-float-unbox.md` |
+| `S.Unbox.ContParam.Rewrite` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#add_extra_params_and_args`<br>`middle_end/flambda2/simplify/apply_cont_rewrite.ml#create`<br>`middle_end/flambda2/simplify/expr_builder.ml#rewrite_apply_cont`<br>`middle_end/flambda2/simplify/simplify_let_cont_expr.ml#compute_extra_params_and_args` | 14-validation/new-07-float-unbox.md |
 | `S.Unbox.Mutable.Candidate` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/flow/mutable_unboxing.ml#blocks_to_unbox`<br>`middle_end/flambda2/simplify/flow/mutable_unboxing.ml#escaping` | — |
-| `S.Unbox.Mutable.Rewrite` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/flow/mutable_unboxing.ml#Fold_prims.apply_prim`<br>`middle_end/flambda2/simplify/flow/mutable_unboxing.ml#compute_rewrites` | `14-validation/new-07-float-unbox.md` |
+| `S.Unbox.Mutable.Rewrite` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/flow/mutable_unboxing.ml#Fold_prims.apply_prim`<br>`middle_end/flambda2/simplify/flow/mutable_unboxing.ml#compute_rewrites` | 14-validation/new-07-float-unbox.md |
 
-## INV — Global invariants and soundness (ch. 13)
+## INV — Global invariants (ch. 13)
 
 4 rules.
 
@@ -390,16 +398,16 @@ agent's scratch space; the procedure above is the source of truth.
 
 _Generated 2026-07-13 by scanning chapters 02-13._
 
-- **Total rules:** 304
-- **By status:** normative 205, descriptive 65, conjectured 34
+- **Total rules:** 312
+- **By status:** normative 214, descriptive 65, conjectured 33
 - **By chapter:**
   - 02-syntax.md: 13
-  - 03-kinds.md: 26
+  - 03-kinds.md: 27
   - 04-opsem.md: 29
   - 05-primitives-scalar.md: 30
-  - 06-primitives-memory.md: 57
+  - 06-primitives-memory.md: 63
   - 07-types-domain.md: 27
-  - 08-meet-join.md: 24
+  - 08-meet-join.md: 25
   - 09-simplify-structure.md: 28
   - 10-simplify-rewrites.md: 39
   - 11-inlining.md: 10

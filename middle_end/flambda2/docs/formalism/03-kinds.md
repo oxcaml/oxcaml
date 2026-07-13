@@ -154,6 +154,41 @@ descriptive because it documents the current classification, not a semantic
 invariant the code must preserve across changes.
 ```
 
+### Block shapes
+
+Both the `Variant` subkind above and the block primitives ([§06](06-primitives-memory.md))
+describe a block's field layout with a **block shape**. A shape is either
+value-only, a mixed record (a scanned value prefix followed by a flat suffix of
+unboxed scalars), or an all-naked-float record:
+
+```
+block_shape ::= Scannable scannable_shape
+              | Float_record
+scannable_shape ::= Value_only
+                  | Mixed_record σ
+σ (mixed_block_shape) ::= ⟨ value_prefix_size = p,  flat_suffix = e₁ … e_m,
+                            field_kinds = κ̄ ⟩
+e (flat_suffix_element) ::= Naked_float | Naked_float32
+                          | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64
+                          | Naked_nativeint | Naked_immediate
+                          | Naked_vec128 | Naked_vec256 | Naked_vec512
+```
+
+CODE: `kinds/flambda_kind.mli#Block_shape`,
+`kinds/flambda_kind.mli#Scannable_block_shape`,
+`kinds/flambda_kind.mli#Mixed_block_shape`,
+`kinds/flambda_kind.mli#flat_suffix_element`.
+
+A mixed shape's `field_kinds` array is derived from `(p, ē)` and is the kind of
+each of its `p + m` logical fields: `Value` for the first `p`, then the
+naked-number kind of each `eⱼ`. [§06](06-primitives-memory.md) (rules
+`P.MixedShape.FieldKinds`, `P.MixedShape.Offset`) owns the layout semantics —
+`field_kinds`, `size_in_words` and `offset_in_words` — since they matter for the
+memory primitives; here the grammar exists so the `Variant` subkind and the
+`Make_block(Mixed …)` kinding rule can name it. Tagged immediates are never
+flat_suffix_elements. `Block_shape.equal` treats distinct shapes as
+incompatible (no subshaping), which [§08](08-meet-join.md) relies on.
+
 ## 3. Arities and unarization
 
 An arity describes the layout of an ordered list of parameters (or results). It
@@ -421,6 +456,27 @@ NOTES: The expected kinds come from `arg_kind_of_unary_primitive`,
 `Variadic_mixed shape`, or `Variadic_unboxed_product κs`). This is the general
 rule; the concrete tables per primitive are given in chapters 05 (scalar) and
 06 (memory). Enforcement in practice is limited — see §6.
+```
+
+```rule
+RULE WF.Prim.MakeBlockMixed
+STATUS normative
+CODE terms/flambda_primitive.ml#args_kind_of_variadic_primitive
+CODE middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive
+CODE kinds/flambda_kind.mli#Mixed_block_shape.field_kinds
+VERIFIED 14-validation/mixed-01-record.md
+---
+p = Make_block(Mixed(t, σ), μ, mode) applied to s₁ … sₙ       σ = ⟨p₀, ē⟩
+args_kind_of_variadic_primitive(p) = Variadic_mixed σ
+n = p₀ + |ē|          Γ ⊢ sᵢ : field_kinds(σ)(i−1)   for each i
+--------------------------------------------------
+the mixed Make_block application is kind-correct
+NOTES: The specialisation of WF.Prim.ArgKinds for mixed blocks: the `Variadic_mixed σ`
+result is expanded pointwise to the kind list `field_kinds(σ)` (the p₀ prefix
+fields at kind Value, then one naked-number kind per flat_suffix_element), and
+each argument is checked against its position's kind. `simplify_primitive.ml`
+does the expansion with `List.combine arg_tys (Mixed_block_shape.field_kinds σ)`.
+See [§06](06-primitives-memory.md) `P.Variadic.MakeBlock.Mixed` for the denotation.
 ```
 
 ### 5.3 Switch
