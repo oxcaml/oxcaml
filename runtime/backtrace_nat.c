@@ -294,6 +294,24 @@ CAMLprim value caml_get_continuation_callstack (value cont, value max_frames)
   return alloc_callstack(trace, slots);
 }
 
+/* Debuginfo suffix-sharing jump words. A chain element whose first 32-bit
+   word has bit 25 set is not a record but a 4-byte jump to a suffix shared
+   with an earlier chain: the word holds (target - here) + 0x03000000, which
+   for -2^24 <= target - here < 2^24 lies in [0x02000000, 0x03FFFFFF],
+   keeping bit 25 set. A record's bit 25 is always 0, just above its 23-bit name-struct
+   offset field (see the format comment in caml_debuginfo_location). */
+#define Debuginfo_jump_bit  ((uint32_t)1 << 25)
+#define Debuginfo_jump_bias ((uint32_t)0x03000000)
+
+Caml_inline debuginfo debuginfo_resolve_jumps(debuginfo dbg)
+{
+  for (;;) {
+    uint32_t w = caml_read_unaligned_uint32(dbg);
+    if ((w & Debuginfo_jump_bit) == 0) return dbg;
+    dbg = (debuginfo)((char *)dbg + (int32_t)(w - Debuginfo_jump_bias));
+  }
+}
+
 static debuginfo debuginfo_extract(frame_descr *d, ptrdiff_t alloc_idx)
 {
   unsigned char* infoptr;
@@ -337,7 +355,7 @@ static debuginfo debuginfo_extract(frame_descr *d, ptrdiff_t alloc_idx)
   }
   /* read offset to debuginfo */
   debuginfo_offset = caml_read_unaligned_uint32(infoptr);
-  return (debuginfo)(infoptr + debuginfo_offset);
+  return debuginfo_resolve_jumps((debuginfo)(infoptr + debuginfo_offset));
 }
 
 debuginfo caml_debuginfo_extract(backtrace_slot slot)
@@ -363,7 +381,7 @@ debuginfo caml_debuginfo_next(debuginfo dbg)
     return NULL;
   else
     /* Next debuginfo is after the two packed info fields */
-    return (debuginfo*)(infoptr + 2);
+    return debuginfo_resolve_jumps((debuginfo)(infoptr + 2));
 }
 
 /* the filename and defname are stored out of line, as offsets
@@ -405,21 +423,24 @@ void caml_debuginfo_location(debuginfo dbg, /*out*/ struct caml_loc_info * li)
   /* Format of the two info words:
      Two possible formats based on value of bit 63:
      Partially packed format
-       |------------- info2 ------------||------------- info1 -------------|
-       1 lllllllllllllllllll mmmmmmmmmmmmmmmmmm ffffffffffffffffffffffff k n
-      63                  44                 26                        2 1 0
-     Fully packed format:
-       |-------------- info2 --------------||------------- info1 -------------|
-       0 llllllllllll mmm aaaaaa bbbbbbb ooooooooo ffffffffffffffffffffffff k n
-      63           51  48     42      35        26                        2 1 0
+   |------------- info2 ------------||--------------- info1 ------------|
+   1 lllllllllllllllllll mmmmmmmmmmmmmmmmmm 0 fffffffffffffffffffffff k n
+  63                  44                 26 25                      2 1 0
+   Fully packed format:
+   |-------------- info2 --------------||--------------- info1 ------------|
+   0 llllllllllll mmm aaaaaa bbbbbbb ooooooooo 0 fffffffffffffffffffffff k n
+  63           51  48     42      35        26 25                      2 1 0
      n (    1 bit ): 0 if this is the final debuginfo
                      1 if there's another following this one
      k (    1 bit ): 0 if it's a call
                      1 if it's a raise
-     f (   24 bits): offset (in 4-byte words) of struct relative to dbg. For
+     f (   23 bits): offset (in 4-byte words) of struct relative to dbg. For
                      partially packed format, f is struct name_and_loc_info;
                      for fully packed format, f is struct name_info.
-     m ( 17/3 bits): difference between start line and end line
+                     Bit 25, just above f, is always 0 in a record: it
+                     distinguishes records from suffix-sharing jump words
+                     (see debuginfo_resolve_jumps).
+     m ( 18/3 bits): difference between start line and end line
      o (  0/9 bits): difference between start bol and end bol
      a (  0/6 bits): beginning of character range (relative to start bol)
      b (  0/7 bits): end of character range (relative to end bol)
@@ -430,7 +451,7 @@ void caml_debuginfo_location(debuginfo dbg, /*out*/ struct caml_loc_info * li)
   li->loc_is_inlined = caml_debuginfo_next(dbg) != NULL;
   if (info2 & 0x80000000) {
     struct name_and_loc_info * name_and_loc_info =
-      (struct name_and_loc_info*)((char *) dbg + (info1 & 0x3FFFFFC));
+      (struct name_and_loc_info*)((char *) dbg + (info1 & 0x1FFFFFC));
     li->loc_defname =
       (char *)name_and_loc_info
       + caml_read_unaligned_int32(&name_and_loc_info->defname_offs);
@@ -445,7 +466,7 @@ void caml_debuginfo_location(debuginfo dbg, /*out*/ struct caml_loc_info * li)
       caml_read_unaligned_int32(&name_and_loc_info->end_offset);
   } else {
     struct name_info * name_info =
-      (struct name_info*)((char *) dbg + (info1 & 0x3FFFFFC));
+      (struct name_info*)((char *) dbg + (info1 & 0x1FFFFFC));
     li->loc_defname =
       (char *)name_info
       + caml_read_unaligned_int32(&name_info->defname_offs);
@@ -499,10 +520,10 @@ void caml_debuginfo_measure(debuginfo dbg)
   uint32_t info1, info2;
 
   /* Control flow to match caml_debuginfo_location. For each debuginfo record
-     we bump the record count and bracket the referenced
-     name_info/name_and_loc_info struct into [debuginfo_low, debuginfo_high).
-     The debuginfo words themselves are accounted for by the count (each record
-     is two 32-bit words); only the structs contribute to the low/high span.
+     we bump the record count and bracket the record words, any jump words
+     traversed, and the referenced name_info/name_and_loc_info struct into
+     [debuginfo_low, debuginfo_high). These are all emitted contiguously per
+     unit, so the span is the physical size of the frametable's debuginfo.
      The defname and filename strings are not measured: they are de-duped by the
      linker, so cannot be attributed to a single frametable. */
   if (dbg == NULL) {
@@ -510,18 +531,28 @@ void caml_debuginfo_measure(debuginfo dbg)
   }
 
   do {
-    info1 = caml_read_unaligned_uint32(dbg);
+    /* The chain entry, and each next step, may land on suffix-sharing jump
+       words. */
+    for (;;) {
+      info1 = caml_read_unaligned_uint32(dbg);
+      if ((info1 & Debuginfo_jump_bit) == 0) break;
+      include_low((char *)dbg);
+      include_high((char *)dbg + sizeof(uint32_t));
+      dbg = (debuginfo)((char *)dbg + (int32_t)(info1 - Debuginfo_jump_bias));
+    }
     info2 = caml_read_unaligned_uint32((const uint32_t *)dbg + 1);
     ++debuginfo_count;
+    include_low((char *)dbg);
+    include_high((char *)dbg + 2 * sizeof(uint32_t));
 
     if (info2 & 0x80000000) {
       struct name_and_loc_info * name_and_loc_info =
-        (struct name_and_loc_info*)((char *) dbg + (info1 & 0x3FFFFFC));
+        (struct name_and_loc_info*)((char *) dbg + (info1 & 0x1FFFFFC));
       include_low((char*)name_and_loc_info);
       include_high((char*)name_and_loc_info + sizeof(struct name_and_loc_info));
     } else {
       struct name_info * name_info =
-        (struct name_info*)((char *) dbg + (info1 & 0x3FFFFFC));
+        (struct name_info*)((char *) dbg + (info1 & 0x1FFFFFC));
       include_low((char*)name_info);
       include_high((char*)name_info + sizeof(struct name_info));
     }
