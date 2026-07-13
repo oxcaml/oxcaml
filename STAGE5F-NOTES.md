@@ -188,9 +188,12 @@ When the violated requirement is "must be representable" (the target layout has
 an unconstrained sort variable, e.g. `_representable_layout_N separable & value`)
 the layout filter cannot discriminate: every layout is `<=` an unconstrained sort
 var (and `Layout.sub` would unify it), so the non-implying `any`-annotation
-branch is not dropped and the score tiebreak still wins. Affected sites:
-`typing-layouts-products/basics.ml:2200` + `typing-layouts-scannable`
-(non_pointer.ml:523, abstract_kinds.ml:110/301) — they stay at the M4 text.
+branch is not dropped and the score tiebreak still wins. Affected sites (3, per
+adversarial-review A4 recount): `typing-layouts-products/basics.ml:2200` +
+`typing-layouts-scannable/abstract_kinds.ml:110` and `:301` — they stay at the M4
+text. (`typing-layouts-scannable/non_pointer.ml:523` was earlier listed here as a
+4th residual but the reviewer verified it is FULLY RESTORED by the sub_layout
+filter — the fix restored more than originally claimed.)
 A timeboxed (one boot iteration) non-unifying representability refinement was
 attempted (branch-layout-is-`any` ⇒ can't explain representability) in two forms:
 REPLACE (repr_required ? not-`any` : sub_layout) fixed products:2200 but
