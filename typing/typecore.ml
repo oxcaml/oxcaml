@@ -247,6 +247,8 @@ type error =
   | Label_not_atomic of Longident.t
   | Atomic_in_pattern of Longident.t
   | Atomic_in_functional_update of label
+  | Mixed_record_atomic_access of Longident.t
+  | Mixed_record_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string
@@ -1307,6 +1309,44 @@ let mode_spliced =
 let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
     submode ~loc ~env mode (mode_project_mutable mut_name)
+
+(* Does this record representation permit atomic field usage? *)
+let allows_atomic_field_usage = function
+  | Record_boxed -> true
+  | Record_inlined (_tag, ctor_repres, _variant_repres) -> (
+      match ctor_repres with
+      | Constructor_uniform_value -> true
+      | Constructor_mixed _ -> false
+      (* At this point, we should know the constructor representation. *)
+      | Constructor_variable -> false)
+  (* Reads/writes of atomic record fields are currently only supported for
+     labels whose logical offset matches the physical field position. To support
+     mixed records, we will add atomic primitives to lambda that consider mixed
+     block field reordering. *)
+  | Record_mixed _ -> false
+  (* The remaining cases should be unreachable. *)
+  (* [@@unboxed] already prohibits mutable (and therefore atomic) fields. *)
+  | Record_unboxed
+  (* [@atomic] fields disable the float record optimization. *)
+  | Record_float | Record_ufloat
+  (* At this point, we should know the record representation. *)
+  | Record_dummy _ | Record_variable ->
+      false
+
+(* CR-soon jkerrigan: simplify after we allow access of atomic fields in mixed
+   records. *)
+type atomic_field_use = Access | Loc
+
+(* Raises if we try to use an atomic field from a mixed record. *)
+let check_atomic_field_usage ~usage ~loc ~env record_repres mutability lid =
+  if Types.is_atomic mutability && not (allows_atomic_field_usage record_repres)
+  then
+    let err =
+      match usage with
+      | Access -> Mixed_record_atomic_access lid
+      | Loc -> Mixed_record_atomic_loc lid
+    in
+    raise (Error (loc, env, err))
 
 (* Represents information about an array type inferred using type-directed
    disambiguation. *)
@@ -5176,7 +5216,7 @@ let rec is_nonexpansive exp =
            | Kept _ -> true)
         fields
       && is_nonexpansive_opt (Option.map fst extended_expression)
-  | Texp_atomic_loc(exp, _, _, _, _) -> is_nonexpansive exp
+  | Texp_atomic_loc { record = exp; _ } -> is_nonexpansive exp
   | Texp_field { record = exp; _ } -> is_nonexpansive exp
   | Texp_unboxed_field { record = exp; _ } -> is_nonexpansive exp
   | Texp_idx (ba, _uas) ->
@@ -7458,6 +7498,8 @@ and type_expect_
       in
       check_project_mutability ~loc:record.exp_loc ~env
         (Record_field label.lbl_name) label.lbl_mut mode;
+      check_atomic_field_usage ~usage:Access ~loc:record.exp_loc ~env
+        record_repres label.lbl_mut lid.txt;
       let is_contained_by : Mode.Hint.is_contained_by =
         { containing = Record (label.lbl_name, Modality);
           container = (record.exp_loc, Expression) }
@@ -7587,6 +7629,8 @@ and type_expect_
           ~why:Field_assignment
           ~containing_type:ty_record
       in
+      check_atomic_field_usage ~usage:Access ~loc ~env record_repres
+        label.lbl_mut lid.txt;
       rue {
         exp_desc = Texp_setfield {
           record;
@@ -8485,10 +8529,13 @@ and type_expect_
                     { pexp_desc = Pexp_field (srecord, lid); _ } as sexp, _
                   )
                } ] ->
-          let record, record_sort, _, rmode, label, ambiguity, ty_arg, _ =
+          let record, record_sort, _, rmode, label, ambiguity, ty_arg,
+              record_repres =
             solve_Pexp_field ~label_usage:Env.Mutation loc env sexp srecord
               Legacy lid
           in
+          check_atomic_field_usage ~usage:Loc ~loc:record.exp_loc ~env
+            record_repres label.lbl_mut lid.txt;
           Env.mark_label_used Env.Projection label.lbl_uid;
           if (not (Types.is_atomic label.lbl_mut))
           then raise (Error (loc, env, Label_not_atomic lid.txt));
@@ -8508,14 +8555,23 @@ and type_expect_
               (Texp_inspected_type (Label_disambiguation ambiguity), loc, [])
                 :: record.exp_extra }
           in
-          rue {
-            exp_desc =
-              Texp_atomic_loc
-                (record, record_sort, lid, label, alloc_mode);
-            exp_loc = loc; exp_extra = [];
-            exp_type = instance (Predef.type_atomic_loc ty_arg);
-            exp_attributes = sexp.pexp_attributes;
-            exp_env = env }
+          rue
+            {
+              exp_desc =
+                Texp_atomic_loc {
+                  record;
+                  record_sort;
+                  record_repres;
+                  lid;
+                  label;
+                  alloc_mode
+                };
+              exp_loc = loc;
+              exp_extra = [];
+              exp_type = instance (Predef.type_atomic_loc ty_arg);
+              exp_attributes = sexp.pexp_attributes;
+              exp_env = env;
+            }
       | _ ->
           raise (Error (loc, env, Invalid_atomic_loc_payload))
       end
@@ -12953,6 +13009,16 @@ let report_error ~loc env =
          of an atomic field, do so explicitly:@ %a"
         Style.inline_code l
         Style.inline_code ("{ t with " ^ l ^ " = t." ^ l ^ " }")
+  | Mixed_record_atomic_access lid ->
+      Location.errorf ~loc
+        "Accessing atomic fields (here %a) of mixed records is not yet@ \
+         supported."
+        quoted_longident lid
+  | Mixed_record_atomic_loc lid ->
+      Location.errorf ~loc
+        "Use of %a with mixed record fields (here %a) is forbidden."
+        Style.inline_code "[%atomic.loc]"
+        quoted_longident lid
   | Literal_overflow ty ->
       Location.errorf ~loc
         "Integer literal exceeds the range of representable integers of type %a"
