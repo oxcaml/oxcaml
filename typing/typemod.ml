@@ -2795,8 +2795,9 @@ and nongen_signature_item env f g = function
       nongen_modtype env f g md.md_type
   | _ -> None
 
-let check_nongen_modtype env loc mty =
-  nongen_modtype env Ctype.nongen_vars_in_schema (fun _ _ -> ()) mty
+let check_nongen_modtype ~zap_scope env loc mty =
+  nongen_modtype env (Ctype.nongen_vars_in_schema ~zap_scope) (fun _ _ -> ())
+    mty
   |> Option.iter (fun (vars, item) ->
       let vars = Btype.TypeSet.elements vars in
       let error =
@@ -2805,10 +2806,10 @@ let check_nongen_modtype env loc mty =
       raise(Error(loc, env, error))
     )
 
-let check_nongen_signature_item env sig_item =
+let check_nongen_signature_item ~zap_scope env sig_item =
   match sig_item with
     Sig_value(_id, vd, _) ->
-      Ctype.nongen_vars_in_schema env vd.val_type
+      Ctype.nongen_vars_in_schema ~zap_scope env vd.val_type
       |> Option.iter (fun vars ->
           let vars = Btype.TypeSet.elements vars in
           let error =
@@ -2817,11 +2818,12 @@ let check_nongen_signature_item env sig_item =
           raise (Error (vd.val_loc, env, error))
         )
   | Sig_module (_id, _, md, _, _) ->
-      check_nongen_modtype env md.md_loc md.md_type
+      check_nongen_modtype ~zap_scope env md.md_loc md.md_type
   | _ -> ()
 
 let check_nongen_signature env sg =
-  List.iter (check_nongen_signature_item env) sg
+  Mode.Alloc.with_zap_scope (fun ~zap_scope ->
+      List.iter (check_nongen_signature_item ~zap_scope env) sg)
 
 let remove_functor_mode_variables ~zap_scope = function
   | Mty_functor (arg_opt, _, mres) ->
@@ -4224,7 +4226,8 @@ let type_module_type_of env smod =
   in
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
   (* PR#5036: must not contain non-generalized type variables *)
-  check_nongen_modtype env smod.pmod_loc mty;
+  Mode.Alloc.with_zap_scope (fun ~zap_scope ->
+      check_nongen_modtype ~zap_scope env smod.pmod_loc mty);
   let zap_modality = Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable in
   let mty =
     remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty

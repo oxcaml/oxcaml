@@ -8227,15 +8227,14 @@ let add_nongen_vars_in_schema =
           fold_type_expr (loop env) (fun a _ -> a) (visited, weak_set) ty
     end
   in
-  fun env acc ty ->
-    Alloc.with_zap_scope (fun ~zap_scope ->
-      remove_mode_and_jkind_variables ~zap_scope ty);
+  fun zap_scope env acc ty ->
+    remove_mode_and_jkind_variables ~zap_scope ty;
     let _, result = loop env (TypeSet.empty, acc) ty in
     result
 
 (* Return all non-generic variables of [ty]. *)
-let nongen_vars_in_schema env ty =
-  let result = add_nongen_vars_in_schema env TypeSet.empty ty in
+let nongen_vars_in_schema ~zap_scope env ty =
+  let result = add_nongen_vars_in_schema zap_scope env TypeSet.empty ty in
   if TypeSet.is_empty result
   then None
   else Some result
@@ -8243,44 +8242,45 @@ let nongen_vars_in_schema env ty =
 (* Check that all type variables are generalizable *)
 (* Use Env.empty to prevent expansion of recursively defined object types;
    cf. typing-poly/poly.ml *)
-let nongen_class_type =
-  let add_nongen_vars_in_schema' ty weak_set =
-    add_nongen_vars_in_schema Env.empty weak_set ty
+let nongen_class_type zap_scope =
+  let add_nongen_vars_in_schema' zap_scope ty weak_set =
+    add_nongen_vars_in_schema zap_scope Env.empty weak_set ty
   in
-  let add_nongen_vars_in_schema_fold fold m weak_set =
+  let add_nongen_vars_in_schema_fold fold zap_scope m weak_set =
     let f _key (_,_,ty) weak_set =
-      add_nongen_vars_in_schema Env.empty weak_set ty
+      add_nongen_vars_in_schema zap_scope Env.empty weak_set ty
     in
     fold f m weak_set
   in
-  let rec nongen_class_type cty weak_set =
+  let rec nongen_class_type zap_scope cty weak_set =
     match cty with
     | Cty_constr (_, params, _) ->
         List.fold_left
-          (add_nongen_vars_in_schema Env.empty)
+          (add_nongen_vars_in_schema zap_scope Env.empty)
           weak_set
           params
     | Cty_signature sign ->
         weak_set
-        |> add_nongen_vars_in_schema' sign.csig_self
-        |> add_nongen_vars_in_schema' sign.csig_self_row
-        |> add_nongen_vars_in_schema_fold Meths.fold sign.csig_meths
-        |> add_nongen_vars_in_schema_fold Vars.fold sign.csig_vars
+        |> add_nongen_vars_in_schema' zap_scope sign.csig_self
+        |> add_nongen_vars_in_schema' zap_scope sign.csig_self_row
+        |> add_nongen_vars_in_schema_fold Meths.fold zap_scope sign.csig_meths
+        |> add_nongen_vars_in_schema_fold Vars.fold zap_scope sign.csig_vars
     | Cty_arrow (_, ty, cty) ->
-        add_nongen_vars_in_schema' ty weak_set
-        |> nongen_class_type cty
+        add_nongen_vars_in_schema' zap_scope ty weak_set
+        |> nongen_class_type zap_scope cty
   in
-  nongen_class_type
+  nongen_class_type zap_scope
 
-let nongen_class_declaration cty =
+let nongen_class_declaration zap_scope cty =
   List.fold_left
-    (add_nongen_vars_in_schema Env.empty)
+    (add_nongen_vars_in_schema zap_scope Env.empty)
     TypeSet.empty
     cty.cty_params
-  |> nongen_class_type cty.cty_type
+  |> nongen_class_type zap_scope cty.cty_type
 
 let nongen_vars_in_class_declaration cty =
-  let result = nongen_class_declaration cty in
+  let result = Mode.Alloc.with_zap_scope (fun ~zap_scope ->
+    nongen_class_declaration zap_scope cty) in
   if TypeSet.is_empty result
   then None
   else Some result
