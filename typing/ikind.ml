@@ -2059,6 +2059,20 @@ let crossing_of_type env (ty : Types.type_expr) : Mode.Crossing.t =
   let lat = round_up_type env ty in
   Axis_lattice.to_mode_crossing lat
 
+(* Slice-3: install the ikind-native externality upper-bound read into
+   [Jkind.get_externality_upper_bound] (separability + representation typing),
+   replacing the legacy [Ignore_best normalize] [get_mod_bounds] path. Mirrors
+   [crossing_of_jkind]: [round_up] the derived ikind floor, read its
+   externality axis. *)
+let () =
+  Jkind.set_externality_from_ikind
+    { Jkind.externality_read =
+        (fun env jkind ->
+          let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
+          let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
+          Axis_lattice.externality lat)
+    }
+
 type sub_or_intersect = Jkind.sub_or_intersect
 
 let with_bounds_is_empty : type l r. (l * r) Types.with_bounds -> bool =

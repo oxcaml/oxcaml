@@ -876,6 +876,17 @@ type sub_verdict_from_ikind =
 
 val set_sub_verdict_from_ikind : sub_verdict_from_ikind -> unit
 
+(** Slice-3: hook installed by [Ikind] returning the ikind-native externality
+    upper bound of a jkind (the externality axis of its [round_up] floor), used
+    by [get_externality_upper_bound] in place of the legacy [normalize]-based
+    [get_mod_bounds] read. [None] means ikinds are not linked. *)
+type externality_from_ikind =
+  { externality_read :
+      'l 'r. Env.t -> ('l * 'r) Types.jkind -> Jkind_axis.Externality.t
+  }
+
+val set_externality_from_ikind : externality_from_ikind -> unit
+
 (** "round up" a [jkind_l] to a [jkind_r] such that the input is less than the
     output. If the base is abstract, it may not be possible to eliminate the
     with bounds, in which case this returns [None]. *)

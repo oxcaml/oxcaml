@@ -2596,6 +2596,20 @@ let sort_of_jkind env (t : jkind_l) : sort =
   | Some sort -> sort
   | None -> Misc.fatal_error "Jkind.sort_of_jkind: layout is any"
 
+(* Slice-3: [Ikind] installs the ikind-native externality upper-bound read
+   here. [get_externality_upper_bound] (the separability + representation
+   typing consumers) previously read the externality floor via the legacy
+   [Ignore_best] [normalize] fixpoint ([get_mod_bounds]); the externality axis
+   of the ikind [round_up] floor equals that value (differential-proven under
+   [OXCAML_IKINDS_VALIDATE], zero behavior change), retiring the fixpoint.
+   [None] only if ikinds are unlinked (never in the typechecker). *)
+type externality_from_ikind =
+  { externality_read : 'l 'r. Env.t -> ('l * 'r) jkind -> Externality.t }
+
+let externality_from_ikind : externality_from_ikind option ref = ref None
+
+let set_externality_from_ikind f = externality_from_ikind := Some f
+
 let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
   let jk, _ =
     Base_and_axes.normalize ~mode:Ignore_best ~skip_axes
@@ -2625,10 +2639,28 @@ let all_except_externality =
   Axis_set.singleton (Nonmodal Externality) |> Axis_set.complement
 
 let get_externality_upper_bound ~context env jk =
-  let mod_bounds =
-    get_mod_bounds ~context ~skip_axes:all_except_externality env jk
+  let legacy () =
+    let mod_bounds =
+      get_mod_bounds ~context ~skip_axes:all_except_externality env jk
+    in
+    Mod_bounds.get mod_bounds ~axis:(Nonmodal Externality)
   in
-  Mod_bounds.get mod_bounds ~axis:(Nonmodal Externality)
+  match !externality_from_ikind with
+  | None -> legacy ()
+  | Some { externality_read } ->
+    let from_ikind = externality_read env jk in
+    if !Clflags.ikinds_validate
+    then begin
+      let l = legacy () in
+      if not (Externality.equal l from_ikind)
+      then
+        Misc.fatal_errorf
+          "get_externality_upper_bound: ikind externality %s disagrees with \
+           legacy normalize %s"
+          (Externality.to_string from_ikind)
+          (Externality.to_string l)
+    end;
+    from_ikind
 
 let set_externality_upper_bound jk externality_upper_bound =
   { jk with
