@@ -465,3 +465,46 @@ Error: This value is "contended"
          which is expected to be "portable".
        However, the highlighted expression is expected to be "uncontended".
 |}]
+
+(* Regression test (W1): a two-sided kind mismatch on a decl with EXPLICITLY
+   NAMED type parameters must render each side against its own decl's parameter
+   names ('left / 'right), matching the printed headers and legacy output —
+   not synthetic 'a / 'b letters. *)
+module M : sig
+  type ('left, 'right) t : immutable_data with 'left @@ portable with 'right @@ contended
+end = struct
+  type ('left, 'right) t : immutable_data with 'left @@ contended with 'right @@ portable
+end
+[%%expect {|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type ('left, 'right) t : immutable_data with 'left @@ contended with 'right @@ portable
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type ('left, 'right) t
+             : immutable_data with 'left @@ contended with 'right @@ portable
+         end
+       is not included in
+         sig
+           type ('left, 'right) t
+             : immutable_data with 'left @@ portable with 'right @@ contended
+         end
+       Type declarations do not match:
+         type ('left, 'right) t
+           : immutable_data with 'left @@ contended with 'right @@ portable
+       is not included in
+         type ('left, 'right) t
+           : immutable_data with 'left @@ portable with 'right @@ contended
+       The kind of the first is
+           immutable_data with 'left @@ contended with 'right @@ portable
+         because of the definition of t at line 4, characters 2-89.
+       But the kind of the first must be a subkind of
+           immutable_data with 'left @@ portable with 'right @@ contended
+         because of the definition of t at line 2, characters 2-89.
+
+       The first mode-crosses less than the second along:
+         contention: mod contended with 'right ≰ mod contended with 'left
+         portability: mod portable with 'left ≰ mod portable with 'right
+|}]
