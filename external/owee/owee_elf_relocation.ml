@@ -92,9 +92,9 @@ let iter_rela_entries ~rela_body ~f =
       "RELA section size %d is not a multiple of entry size %d" size
       rela_entry_size;
   let num_entries = size / rela_entry_size in
-  for i = 0 to num_entries - 1 do
-    let entry_offset = i * rela_entry_size in
-    let cursor = Owee_buf.cursor rela_body ~at:entry_offset in
+  (* A single cursor advances through the whole section. *)
+  let cursor = Owee_buf.cursor rela_body in
+  for _ = 1 to num_entries do
     let r_offset = Owee_buf.Read.u64 cursor in
     let r_info = Owee_buf.Read.u64 cursor in
     let r_addend = Owee_buf.Read.u64 cursor in
