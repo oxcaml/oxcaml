@@ -447,11 +447,11 @@ struct gc_tweak {
   uintnat initial_value;
 };
 
-extern _Atomic uintnat caml_small_heap_limit; /* see major_gc.c */
+extern uintnat caml_small_heap_limit; /* see major_gc.c */
 
 static struct gc_tweak gc_tweaks[] = {
   { "custom_work_max_multiplier", &caml_custom_work_max_multiplier, 0 },
-  { "small_heap_limit", (uintnat *) &caml_small_heap_limit, 0 },
+  { "small_heap_limit", &caml_small_heap_limit, 0 },
   { "prelinking_in_use", &caml_prelinking_in_use, 0 },
   { "compaction", &caml_compaction_algorithm, 0 },
   { "compact_unmap", &caml_compact_unmap, 0 },

@@ -776,11 +776,13 @@ atomic_uintnat caml_percent_free = Percent_free_def;
 /* Idle-phase floor (upstream #14365): at the end of sweeping, do not
    switch to marking until total_work_completed has advanced by at least
    this many (sweep-work-unit) words since the start of the sweep phase.
-   _Atomic (as upstream): written at run time via the Xsmall_heap_limit
-   gc-tweak / pacing primitive, read concurrently by GC pacing code. The
-   gc-tweaks table stores a cast pointer; the startup parser writes
-   before any domain runs. */
-_Atomic uintnat caml_small_heap_limit = Small_heap_limit_def;
+   Plain uintnat, matching every other entry in the gc-tweaks table: the
+   startup parser writes it before any domain runs, and a runtime
+   [Gc.Tweak.set] has the same benign-race caveat as all sibling tweaks.
+   (Upstream types it _Atomic with a fully atomic tweak table; if this
+   tree's table is ever atomicized -- see the TODO on [struct gc_tweak]
+   -- this variable should join it.) */
+uintnat caml_small_heap_limit = Small_heap_limit_def;
 atomic_uintnat caml_max_percent_free = Max_percent_free_def;
 
 /* Custom blocks allocations (e.g. Bigarray) cause the GC to accelerate.
@@ -1950,6 +1952,11 @@ static void cycle_major_heap_from_stw_single(
   work_counter_at_sweep_start = atomic_load (&total_work_completed);
   work_counter_min_before_mark =
     work_counter_at_sweep_start + caml_small_heap_limit;
+  CAML_GC_MESSAGE (MAJOR,
+                   "Sweep start: work counter %" CAML_PRIuNAT
+                   ", idle floor armed at %" CAML_PRIuNAT "\n",
+                   work_counter_at_sweep_start,
+                   work_counter_min_before_mark);
   atomic_store(&caml_gc_mark_phase_requested, 0);
   caml_atomic_counter_init(&ephe_round_info.num_domains_todo,
                            num_domains_in_stw);
@@ -2254,6 +2261,8 @@ static void major_collection_slice(intnat howmuch,
          STWs. */
       commit_major_slice_sweepwork (todo);
       want_mark = (todo == idle);
+      CAML_GC_MESSAGE (SLICE, "Idle phase: %" CAML_PRIdNAT "%s\n",
+                       todo, want_mark ? " [finished]" : "");
     }
     if (want_mark){
       /* We do not immediately trigger a minor GC, but instead wait for
