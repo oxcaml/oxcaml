@@ -8,10 +8,6 @@
    (acquire) or a cpu-relax hint, since that would effectively hoist the load
    above the barrier.
 
-   The expected output for [load_across_atomic_get] below captures the
-   current, incorrect behaviour: the load following [Atomic.get] is merged
-   with the load preceding it.
-
    The fence intrinsics ("caml_load_fence" etc.) cannot be tested here: this
    machinery executes each phrase in a native toplevel, and those externals
    have no C implementation in the process (they are only rewritten to fence
@@ -29,27 +25,26 @@ no_barrier:
   ret
 |}]
 
-(* The load after [Atomic.get] must not be merged with the one before. The
-   expected output below shows the current, incorrect behaviour: there is a
-   single load, and the sum is computed as [a + a]
-   ([leaq -1(%rax,%rax)]). *)
+(* The load after [Atomic.get] must not be merged with the one before. *)
 let load_across_atomic_get (r : int ref) (flag : int Atomic.t) =
   let a = !r in
   if Atomic.get flag = 1 then a + !r else a
 [%%expect_asm X86_64{|
 load_across_atomic_get:
-  movq  (%rax), %rax
+  movq  %rax, %rdi
+  movq  (%rdi), %rax
   movq  (%rbx), %rbx
   cmpq  $3, %rbx
   jne   .L0
-  leaq  -1(%rax,%rax), %rax
+  movq  (%rdi), %rbx
+  leaq  -1(%rax,%rbx), %rax
   ret
 .L0:
   ret
 |}]
 
 (* [cpu_relax] is used to spin on a memory location, so the load after it
-   must not be merged with the one before (which is already the case). *)
+   must not be merged with the one before. *)
 let load_across_cpu_relax (r : int ref) =
   let a = !r in
   cpu_relax ();
