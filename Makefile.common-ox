@@ -90,6 +90,7 @@ boot_targets = \
   $(boot_ocamlmklib) \
   $(boot_ocamldep) \
   $(boot_ocamlobjinfo) \
+  tools/cfg/cfg_tool.exe \
   ocamltest/ocamltest.native
 
 boot-compiler: _build/_bootinstall
@@ -120,6 +121,7 @@ compiler: runtime-stdlib
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
           $(dune) build $(ws_main) \
           --only-package=ocaml @install \
+          tools/cfg/cfg_tool.exe \
           tools/regalloc/regalloc.exe \
           oxcaml/testsuite/tools/expect.exe \
           oxcaml/testsuite/tools/expectnat.exe \
