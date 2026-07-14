@@ -254,7 +254,8 @@ let static_cast : Cmm.static_cast -> string = function
   | V512_of_scalar ty -> Printf.sprintf "scalar->%s" (vec512_name ty)
 
 let operation d = function
-  | Capply { result_type = _ty; region = _; callees = _ } -> "app" ^ location d
+  | Capply { result_type = _ty; region = _; callees = _; returns = _ } ->
+    "app" ^ location d
   | Cextcall { func = lbl; _ } ->
     Printf.sprintf "extcall \"%s\"%s" lbl (location d)
   | Cload { memory_chunk; mutability; is_atomic } -> (
@@ -400,7 +401,9 @@ let rec expr ppf = function
         fprintf ppf "@[<2>(%s" (operation dbg op);
         List.iter (fun e -> fprintf ppf "@ %a" expr e) el;
         (match[@warning "-4"] op with
-        | Capply { result_type = mty; _ } -> fprintf ppf "@ %a" machtype mty
+        | Capply { result_type = mty; returns; _ } ->
+          fprintf ppf "@ %a" machtype mty;
+          if not returns then fprintf ppf "@ ->."
         | Cextcall
             { ty;
               ty_args;
