@@ -939,6 +939,8 @@ let constrain_type_jkind = ref (fun _ _ _ -> assert false)
 
 let check_well_formed_module = ref (fun _ -> assert false)
 
+let scope_local_equations = ref (fun _ _ -> assert false)
+
 (* Helper to decide whether to report an identifier shadowing
    by some 'open'. For labels and constructors, we do not report
    if the two elements are from the same re-exported declaration.
@@ -1001,6 +1003,9 @@ let is_in_signature env = env.flags land in_signature_flag <> 0
 
 let has_local_constraints env =
   not (StagedPath.Map.is_empty env.local_constraints)
+
+let is_local_type_constraint path env =
+  StagedPath.Map.mem (path_at_current_stage env path) env.local_constraints
 
 let is_ext cda =
   match cda.cda_description with
@@ -2934,6 +2939,7 @@ let components_of_functor_appl ~loc ~f_path ~f_comp ~arg env =
        because of the call to [check_well_formed_module]. *)
     let mty = Subst.modtype (Rescope (Path.scope p)) sub f_comp.fcomp_res in
     let addr = Lazy_backtrack.create_failed Not_found in
+    !scope_local_equations env mty;
     !check_well_formed_module env loc
       ("the signature of " ^ Path.name p) mty;
     let shape_arg =

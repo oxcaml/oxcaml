@@ -457,9 +457,21 @@ let scrape env mty =
       Subst.Lazy.force_modtype (scrape_lazy env (Subst.Lazy.of_modtype mty))
   | _ -> mty
 
+let scope_local_equations env mty =
+  if Env.has_local_constraints env then begin
+    let open Btype in
+    with_type_mark begin fun mark ->
+      let it =
+        Ctype.iterator_scope_local_equations env (type_iterators mark)
+      in
+      it.it_module_type it mty
+    end
+  end
+
 let () =
   Out_type.expand_module_type := expand ;
-  Env.scrape_alias := scrape_alias_lazy
+  Env.scrape_alias := scrape_alias_lazy;
+  Env.scope_local_equations := scope_local_equations
 
 let find_type_of_module ~strengthen ~aliasable env path =
   if strengthen then

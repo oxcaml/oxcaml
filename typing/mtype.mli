@@ -98,3 +98,8 @@ module Contains_type_or_jkind : sig
 end
 
 val lower_nongen: int -> module_type -> unit
+
+(* Correct a signature's scopes, as a signature built by substitution could
+   have incorrect scopes if a constructor being substituted in depended on
+   local equations. *)
+val scope_local_equations: Env.t -> module_type -> unit

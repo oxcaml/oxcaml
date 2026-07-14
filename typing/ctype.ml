@@ -4181,6 +4181,17 @@ let find_expansion_scope env path =
   | { type_manifest = None ; _ } | exception Not_found -> generic_level
   | decl -> decl.type_expansion_scope
 
+let iterator_scope_local_equations env super =
+  let it_do_type_expr it ty =
+    begin match get_desc ty with
+    | Tconstr (path, _, _) when Env.is_local_type_constraint path env ->
+      update_scope (find_expansion_scope env path) ty
+    | _ -> ()
+    end;
+    super.it_do_type_expr it ty
+  in
+  { super with it_do_type_expr }
+
 let non_aliasable p decl =
   (* in_pervasives p ||  (subsumed by in_current_module) *)
   in_current_module p && not decl.type_is_newtype
