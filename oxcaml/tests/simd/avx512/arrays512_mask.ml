@@ -103,18 +103,23 @@ let () =
    non-scannable [Unboxed_vec512] array tag during GC. *)
 let () =
   let a =
-    [| vec 0L 1L 2L 3L 4L 5L 6L 7L;
-       vec 1L 2L 3L 4L 5L 6L 7L 8L;
-       vec 2L 3L 4L 5L 6L 7L 8L 9L;
-       vec 3L 4L 5L 6L 7L 8L 9L 10L;
-       vec 4L 5L 6L 7L 8L 9L 10L 11L;
-       vec 5L 6L 7L 8L 9L 10L 11L 12L;
-       vec 6L 7L 8L 9L 10L 11L 12L 13L;
-       vec 7L 8L 9L 10L 11L 12L 13L 14L |]
+    (* Assure the array is not statically allocated *)
+    let[@inline never] mk x =
+      [| vec x 1L 2L 3L 4L 5L 6L 7L;
+         vec 1L 2L 3L 4L 5L 6L 7L 8L;
+         vec 2L 3L 4L 5L 6L 7L 8L 9L;
+         vec 3L 4L 5L 6L 7L 8L 9L 10L;
+         vec 4L 5L 6L 7L 8L 9L 10L 11L;
+         vec 5L 6L 7L 8L 9L 10L 11L 12L;
+         vec 6L 7L 8L 9L 10L 11L 12L 13L;
+         vec 7L 8L 9L 10L 11L 12L 13L 14L |]
+    in
+    mk 0L
   in
   for _ = 1 to 1000 do
-    ignore (Sys.opaque_identity (Array.make 32 0))
+    Gc.minor ()
   done;
+  Gc.compact ();
   for i = 0 to v_len a - 1 do
     let b = Int64.of_int i in
     check_vec
@@ -183,12 +188,17 @@ let () =
 (* Masks kept live across minor collections in a (non-scannable) mask array. *)
 let () =
   let a =
-    [| m 0L; m 1L; m 2L; m 3L; m 4L; m 5L; m 6L; m 7L;
-       m 8L; m 9L; m 10L; m 11L; m 12L; m 13L; m 14L; m 15L |]
+    (* Assure the array is not statically allocated *)
+    let[@inline never] mk x =
+      [| m x; m 1L; m 2L; m 3L; m 4L; m 5L; m 6L; m 7L;
+         m 8L; m 9L; m 10L; m 11L; m 12L; m 13L; m 14L; m 15L |]
+    in
+    mk 0L
   in
   for _ = 1 to 1000 do
-    ignore (Sys.opaque_identity (Array.make 32 0))
+    Gc.minor ()
   done;
+  Gc.compact ();
   for i = 0 to m_len a - 1 do
     eqi (bits_of (m_get a i)) (Int64.of_int i)
   done
