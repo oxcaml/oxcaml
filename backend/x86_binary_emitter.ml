@@ -47,6 +47,7 @@ let print_old_arg ppf = function
   | Reg32 _ -> Format.fprintf ppf "Reg32"
   | Reg64 _ -> Format.fprintf ppf "Reg64"
   | Regf _ -> Format.fprintf ppf "Regf"
+  | Regmask _ -> Format.fprintf ppf "Regmask"
   | Mem _ -> Format.fprintf ppf "Mem"
   | Mem64_RIP _ -> Format.fprintf ppf "Mem64_RIP"
   | Sym _ -> Format.fprintf ppf "Sym"
@@ -437,7 +438,7 @@ let buf_sym b sym offset =
       record_reloc b (Buffer.length b.buf) (Relocation.Kind.DIR32 (lbl, offset));
       buf_int32L b 0L
 
-let emit_prefix_modrm b opcodes rm reg ~prefix =
+let emit_prefix_modrm b opcodes rm reg ~prefix ~evex =
   (* When required for a particular instruction, the REX / REXW flag is added in
      [emit_mod_rm_reg]. This function otherwise assumes [~rex:0] for Reg32,
      Reg64, Regf, and addressing modes. *)
@@ -469,6 +470,10 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
       prefix b ~rex:0 ~rexr:(rexr_reg reg) ~rexb:(rexb_rm rm) ~rexx:0;
       buf_opcodes b opcodes;
       buf_int8 b (mod_rm_reg 0b11 rm reg)
+  | Regmask rm ->
+      prefix b ~rex:0 ~rexr:(rexr_reg reg) ~rexb:(rexb_rm rm) ~rexx:0;
+      buf_opcodes b opcodes;
+      buf_int8 b (mod_rm_reg 0b11 rm reg)
   (* 64 bits memory access *)
   | Mem64_RIP (_, symbol, offset) ->
       prefix b ~rex:0 ~rexr:(rexr_reg reg) ~rexb:0 ~rexx:0;
@@ -482,7 +487,9 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
         let displ = Int64.of_int displ in
         match sym with
         | None ->
-            if is_imm8L displ then OImm8 displ
+            (* EVEX scales OImm8 by the memory operand width. *)
+            if is_imm8L displ && (not evex || Int64.equal displ 0L)
+            then OImm8 displ
             else if is_imm32L displ then OImm32 (None, displ)
             else assert false
         | Some s -> OImm32 (Some s, displ)
@@ -589,8 +596,9 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
     here does not mean that no REX prefix will be emitted: [emit_prefix_modrm]
     can still request REX.R, REX.B or REX.X for the operands. *)
 let emit_mod_rm_reg b rex_always opcodes rm reg =
-  emit_prefix_modrm b opcodes rm reg ~prefix:(fun b ~rex ~rexr ~rexb ~rexx ->
-    emit_rex b (rex_always lor rex lor rexr lor rexb lor rexx))
+  emit_prefix_modrm b opcodes rm reg ~evex:false
+    ~prefix:(fun b ~rex ~rexr ~rexb ~rexx ->
+      emit_rex b (rex_always lor rex lor rexr lor rexb lor rexx))
 
 let emit_bsf b ~dst ~src =
   match (dst, src) with
@@ -710,7 +718,7 @@ let emit_vex buf ~rexr ~rexx ~rexb ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p =
   else
     emit_vex3 buf ~rexr ~rexx ~rexb ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p
 
-let vex_prefix_adaptor f =
+let rex_prefix_adaptor f =
   fun b ~rex:_ ~rexr ~rexb ~rexx ->
     let rexr = if rexr <> 0 then 1 else 0 in
     let rexb = if rexb <> 0 then 1 else 0 in
@@ -719,12 +727,42 @@ let vex_prefix_adaptor f =
 
 let emit_vex_rm_reg b ops rm reg ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p =
   let vex_w, vex_l = Bool.to_int vex_w, Bool.to_int vex_l in
-  emit_prefix_modrm b ops rm reg ~prefix:(vex_prefix_adaptor (fun b ~rexr ~rexx ~rexb ->
-    emit_vex b ~rexr ~rexx ~rexb ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p))
+  emit_prefix_modrm b ops rm reg ~evex:false ~prefix:(rex_prefix_adaptor
+    (fun b ~rexr ~rexx ~rexb -> emit_vex b ~rexr ~rexx ~rexb
+                                           ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p))
+
+let emit_evex buf ~rexr ~rexx ~rexb ~evex_m ~evex_w ~evex_v ~evex_ll
+                                    ~evex_p ~evex_z ~evex_b ~evex_a =
+  buf_int8 buf 0x62;
+  buf_int8 buf (((rexr lxor 1) lsl 7) lor
+                ((rexx lxor 1) lsl 6) lor
+                ((rexb lxor 1) lsl 5) lor
+                (1 lsl 4) lor (* CR-soon mslater: support 32 regs *)
+                evex_m);
+  buf_int8 buf ((evex_w lsl 7) lor
+                ((evex_v lxor 15) lsl 3) lor
+                (1 lsl 2) lor
+                evex_p);
+  buf_int8 buf ((evex_z lsl 7) lor
+                (evex_ll lsl 5) lor
+                (evex_b lsl 4) lor
+                (1 lsl 3) lor (* CR-soon mslater: support 32 regs *)
+                evex_a)
+
+let emit_evex_rm_reg b ops rm reg ~evex_m ~evex_w ~evex_v ~evex_ll ~evex_p
+    ~evex_z ~evex_b ~evex_a =
+  let evex_w = Bool.to_int evex_w in
+  let evex_b = Bool.to_int evex_b in
+  let evex_z = Bool.to_int evex_z in
+  emit_prefix_modrm b ops rm reg ~evex:true
+    ~prefix:(rex_prefix_adaptor (fun b ~rexr ~rexx ~rexb ->
+              emit_evex b ~rexr ~rexx ~rexb ~evex_m ~evex_w ~evex_v ~evex_ll
+                                            ~evex_p ~evex_z ~evex_b ~evex_a))
 
 let rd_of_reg = function
   | Regf reg -> rd_of_regf reg
   | Reg16 reg | Reg32 reg | Reg64 reg -> rd_of_reg64 reg
+  | Regmask k -> k
   | _ -> assert false
 
 let emit_simd b (instr : Amd64_simd_instrs.instr) args =
@@ -735,6 +773,14 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
     | Imm_spec | Imm_reg ->
       Some args.(0), Array.sub args 1 (n - 1)
     | Imm_none -> None, args
+  in
+  let evex_a, args =
+    if Amd64_simd_defs.instr_expects_mask instr then
+       (match args.(0) with
+        | Regmask k -> k
+        | _ -> failwith instr.mnemonic),
+        Array.sub args 1 (Array.length args - 1)
+    else 0, args
   in
   let enc i =
     match instr.res with
@@ -824,6 +870,21 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
     | Prx_F3 -> 2
     | Prx_F2 -> 3
   in
+  let evex_len = function
+    | L128 -> 0
+    | L256 -> 1
+    | L512 -> 2
+  in
+  let evex_rnd = function
+    | Rnd_near -> 0
+    | Rnd_down -> 1
+    | Rnd_up -> 2
+    | Rnd_zero -> 3
+  in
+  let evex_len_rnd = function
+    | Ll_len len -> evex_len len
+    | Ll_round rnd -> evex_rnd rnd
+  in
   (match instr.enc.rm_reg, instr.enc.prefix with
   | Spec rmod, Legacy { prefix; rex; escape; operand_size_override } ->
     let rm = rm_only () in
@@ -840,7 +901,17 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
   | Spec rmod, Vex { vex_m; vex_w; vex_l; vex_p } ->
     let rm, vex_v = rm_vexv () in
     emit_vex_rm_reg b [instr.enc.opcode] rm rmod
-      ~vex_m:(vex_map vex_m) ~vex_w ~vex_v ~vex_l ~vex_p:(vex_prefix vex_p));
+      ~vex_m:(vex_map vex_m) ~vex_w ~vex_v ~vex_l ~vex_p:(vex_prefix vex_p)
+  | Reg, Evex { evex_m; evex_w; evex_ll; evex_p; evex_b; evex_z } ->
+    let rm, evex_v, reg = rm_vexv_reg () in
+    emit_evex_rm_reg b [instr.enc.opcode] rm reg ~evex_m:(vex_map evex_m)
+      ~evex_w ~evex_v ~evex_ll:(evex_len_rnd evex_ll)
+      ~evex_p:(vex_prefix evex_p) ~evex_z:evex_z ~evex_b ~evex_a
+  | Spec rmod, Evex { evex_m; evex_w; evex_ll; evex_p; evex_b; evex_z } ->
+    let rm, evex_v = rm_vexv () in
+    emit_evex_rm_reg b [instr.enc.opcode] rm rmod ~evex_m:(vex_map evex_m)
+      ~evex_w ~evex_v ~evex_ll:(evex_len_rnd evex_ll)
+      ~evex_p:(vex_prefix evex_p) ~evex_z:evex_z ~evex_b ~evex_a);
   match imm with
   | Some (Imm imm) -> buf_int8 b (Int64.to_int imm)
   | Some (Regf (XMM n | YMM n | ZMM n)) -> buf_int8 b (n lsl 4)
@@ -1036,6 +1107,7 @@ let emit_test b dst src =
         | Reg32 r -> Printf.sprintf "Reg32 %s" (string_of_reg64 r)
         | Reg64 r -> Printf.sprintf "Reg64 %s" (string_of_reg64 r)
         | Regf r -> Printf.sprintf "Regf %s" (string_of_regf r)
+        | Regmask k -> Printf.sprintf "Regmask %d" k
         | Mem _ -> "Mem _"
         | Mem64_RIP (_, s, d) -> Printf.sprintf "Mem64_RIP(%s, %d)" s d
       in

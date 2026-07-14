@@ -37,6 +37,10 @@ module Extension : sig
     | F16C
     | FMA
     | AVX512F
+    | AVX512DQ
+    | AVX512CD
+    | AVX512BW
+    | AVX512VL
 
   val name : t -> string
 

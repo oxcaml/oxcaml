@@ -519,7 +519,7 @@ let res32 i n = emit_subreg reg_low_32_name DWORD i.res.(n)
 
 let narrow_to_xmm : X86_ast.arg -> X86_ast.arg = function
   | Regf (YMM r | ZMM r) -> Regf (XMM r)
-  | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
+  | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regmask _
     | Regf (XMM _)
     | Mem _ | Mem64_RIP _ ) as res ->
     res
@@ -528,8 +528,8 @@ let arg_idx i n : X86_ast.reg_idx =
   match arg i n with
   | Reg64 reg -> Scalar reg
   | Regf reg -> Vector reg
-  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Mem _ | Mem64_RIP _
-    ->
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Regmask _ | Mem _
+  | Mem64_RIP _ ->
     assert false
 
 let argX i n = narrow_to_xmm (reg i.arg.(n))
@@ -832,27 +832,27 @@ let instr_for_intop = function
 let instr_for_floatop (width : Cmm.float_width) op =
   let open Simd_instrs in
   match width, op with
-  | Float64, Iaddf -> sse_or_avx3 addsd vaddsd
-  | Float64, Isubf -> sse_or_avx3 subsd vsubsd
-  | Float64, Imulf -> sse_or_avx3 mulsd vmulsd
-  | Float64, Idivf -> sse_or_avx3 divsd vdivsd
-  | Float32, Iaddf -> sse_or_avx3 addss vaddss
-  | Float32, Isubf -> sse_or_avx3 subss vsubss
-  | Float32, Imulf -> sse_or_avx3 mulss vmulss
-  | Float32, Idivf -> sse_or_avx3 divss vdivss
+  | Float64, Iaddf -> sse_or_avx3 addsd vaddsd_X_X_Xm64
+  | Float64, Isubf -> sse_or_avx3 subsd vsubsd_X_X_Xm64
+  | Float64, Imulf -> sse_or_avx3 mulsd vmulsd_X_X_Xm64
+  | Float64, Idivf -> sse_or_avx3 divsd vdivsd_X_X_Xm64
+  | Float32, Iaddf -> sse_or_avx3 addss vaddss_X_X_Xm32
+  | Float32, Isubf -> sse_or_avx3 subss vsubss_X_X_Xm32
+  | Float32, Imulf -> sse_or_avx3 mulss vmulss_X_X_Xm32
+  | Float32, Idivf -> sse_or_avx3 divss vdivss_X_X_Xm32
   | (Float32 | Float64), (Inegf | Iabsf | Icompf _) -> assert false
 
 let instr_for_floatarithmem (width : Cmm.float_width) op =
   let open Simd_instrs in
   match width, op with
-  | Float64, Ifloatadd -> sse_or_avx3 addsd vaddsd
-  | Float64, Ifloatsub -> sse_or_avx3 subsd vsubsd
-  | Float64, Ifloatmul -> sse_or_avx3 mulsd vmulsd
-  | Float64, Ifloatdiv -> sse_or_avx3 divsd vdivsd
-  | Float32, Ifloatadd -> sse_or_avx3 addss vaddss
-  | Float32, Ifloatsub -> sse_or_avx3 subss vsubss
-  | Float32, Ifloatmul -> sse_or_avx3 mulss vmulss
-  | Float32, Ifloatdiv -> sse_or_avx3 divss vdivss
+  | Float64, Ifloatadd -> sse_or_avx3 addsd vaddsd_X_X_Xm64
+  | Float64, Ifloatsub -> sse_or_avx3 subsd vsubsd_X_X_Xm64
+  | Float64, Ifloatmul -> sse_or_avx3 mulsd vmulsd_X_X_Xm64
+  | Float64, Ifloatdiv -> sse_or_avx3 divsd vdivsd_X_X_Xm64
+  | Float32, Ifloatadd -> sse_or_avx3 addss vaddss_X_X_Xm32
+  | Float32, Ifloatsub -> sse_or_avx3 subss vsubss_X_X_Xm32
+  | Float32, Ifloatmul -> sse_or_avx3 mulss vmulss_X_X_Xm32
+  | Float32, Ifloatdiv -> sse_or_avx3 divss vdivss_X_X_Xm32
 
 let cond : Operation.integer_comparison -> X86_ast.condition = function
   | Ceq -> E
@@ -892,8 +892,10 @@ let emit_float_test (width : Cmm.float_width) (cmp : Cmm.float_comparison) i
   let open Simd_instrs in
   let ucomi, comi =
     match width with
-    | Float64 -> sse_or_avx ucomisd vucomisd, sse_or_avx comisd vcomisd
-    | Float32 -> sse_or_avx ucomiss vucomiss, sse_or_avx comiss vcomiss
+    | Float64 ->
+      sse_or_avx ucomisd vucomisd_X_Xm64, sse_or_avx comisd vcomisd_X_Xm64
+    | Float32 ->
+      sse_or_avx ucomiss vucomiss_X_Xm32, sse_or_avx comiss vcomiss_X_Xm32
   in
   match cmp with
   | CFeq when equal_arg (arg i 1) (arg i 0) ->
@@ -1135,7 +1137,7 @@ let prefer_load_form (src : X86_ast.arg) (dst : X86_ast.arg) =
     (* otherwise load form needs 3-byte VEX *)
     && regf_index s <= 7
   | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
-      | Mem _ | Mem64_RIP _ ),
+      | Mem _ | Mem64_RIP _ | Regmask _ ),
       _ ) ->
     false
 
@@ -1389,7 +1391,7 @@ end = struct
     | Mem64_RIP (ty, sym, displ), offset ->
       I.lea (Mem64_RIP (ty, sym, displ + offset)) dest
     | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
-        | Regf _ ),
+        | Regf _ | Regmask _ ),
         offset ) ->
       I.lea src dest;
       if offset <> 0 then I.add (int offset) dest
@@ -1479,7 +1481,7 @@ end = struct
     | Mem { idx = Scalar register'; base = Some register''; _ } ->
       equal_reg64 register register' || equal_reg64 register register''
     | Mem { idx = Vector _; _ }
-    | Regf _ | Imm _ | Sym _ | Reg8H _
+    | Regf _ | Imm _ | Sym _ | Reg8H _ | Regmask _
     | Mem64_RIP (_, _, _) ->
       false
 
@@ -1689,8 +1691,10 @@ let emit_static_cast (cast : Cmm.static_cast) i =
     sse_or_avx_dst cvtsi2ss_X_r64m64 vcvtsi2ss_X_X_r64m64 (arg i 0) (res i 0)
   | Int_of_float Float32 ->
     sse_or_avx cvttss2si_r64_Xm32 vcvttss2si_r64_Xm32 (arg i 0) (res i 0)
-  | Float_of_float32 -> sse_or_avx_dst cvtss2sd vcvtss2sd (arg i 0) (res i 0)
-  | Float32_of_float -> sse_or_avx_dst cvtsd2ss vcvtsd2ss (arg i 0) (res i 0)
+  | Float_of_float32 ->
+    sse_or_avx_dst cvtss2sd vcvtss2sd_X_X_Xm32 (arg i 0) (res i 0)
+  | Float32_of_float ->
+    sse_or_avx_dst cvtsd2ss vcvtsd2ss_X_X_Xm64 (arg i 0) (res i 0)
   | Scalar_of_v128 Float64x2 | Scalar_of_v256 Float64x4 ->
     if distinct then movsd (argX i 0) (res i 0)
   | V128_of_scalar Float64x2 | V256_of_scalar Float64x4 ->
@@ -1797,14 +1801,14 @@ let to_arg_with_width loc instr i =
   | Some R8 -> arg8 instr i
   | Some R16 -> arg16 instr i
   | Some R32 -> arg32 instr i
-  | Some (R64 | R128 | R256) | None -> arg instr i
+  | Some (R64 | R128 | R256 | R512) | None -> arg instr i
 
 let to_res_with_width loc instr i =
   match Simd.loc_register_width loc with
   | Some R8 -> res8 instr i
   | Some R16 -> res16 instr i
   | Some R32 -> res32 instr i
-  | Some (R64 | R128 | R256) | None -> res instr i
+  | Some (R64 | R128 | R256 | R512) | None -> res instr i
 
 let to_addr_width loc : X86_ast.data_type =
   match Simd.loc_memory_width loc with
@@ -1814,7 +1818,8 @@ let to_addr_width loc : X86_ast.data_type =
   | M64 -> QWORD
   | M128 -> VEC128
   | M256 -> VEC256
-  | M32X | M32Y | M64X | M64Y ->
+  | M512 -> VEC512
+  | M32X | M32Y | M32Z | M64X | M64Y | M64Z ->
     (* Will not be used by the assembler. *)
     NONE
 
@@ -1830,8 +1835,9 @@ let emit_simd_sanitize ~address ~instr ~loc ~kind =
       (* Conservatively assumes unaligned memory; generates slower checks. *)
       | M128 -> Some Onetwentyeight_unaligned
       | M256 -> Some Twofiftysix_unaligned
+      | M512 -> Some Fivetwelve_unaligned
       (* We do not sanitize gather/scatter instructions. *)
-      | M32X | M32Y | M64X | M64Y -> None
+      | M32X | M32Y | M32Z | M64X | M64Y | M64Z -> None
     in
     match chunk with
     | None -> ()
@@ -1869,7 +1875,7 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
       Array.fold_left
         (fun (idx, acc) ({ loc; enc } : Simd.arg) ->
           match enc with
-          | Implicit | Immediate -> idx, acc
+          | Implicit | Immediate | Mask -> idx, acc
           | RM_r | RM_rm | Vex_v ->
             idx + 1, to_res_with_width loc instr idx :: acc)
         (0, args) rr
@@ -2143,7 +2149,7 @@ let emit_instr ~first ~last ~fallthrough i =
       (* CR-soon mslater: avx512 *)
       Misc.fatal_error "avx512 instructions not yet implemented"
     | Single { reg = Float64 } ->
-      load ~dest:(res i 0) REAL4 (sse_or_avx_dst cvtss2sd vcvtss2sd)
+      load ~dest:(res i 0) REAL4 (sse_or_avx_dst cvtss2sd vcvtss2sd_X_X_Xm32)
     | Single { reg = Float32 } -> load ~dest:(res i 0) REAL4 movss
     | Double -> load ~dest:(res i 0) REAL8 movsd)
   | Lop (Store (chunk, addr, is_modify)) -> (
@@ -2174,7 +2180,7 @@ let emit_instr ~first ~last ~fallthrough i =
       Misc.fatal_error "avx512 instructions not yet implemented"
     | Single { reg = Float64 } ->
       let src = arg i 0 in
-      sse_or_avx_dst cvtsd2ss vcvtsd2ss src xmm15;
+      sse_or_avx_dst cvtsd2ss vcvtsd2ss_X_X_Xm64 src xmm15;
       let address = addressing addr REAL4 i 1 in
       Address_sanitizer.emit_sanitize ~dependencies:[| src; xmm15 |] ~instr:i
         ~address chunk memory_access;
@@ -2334,14 +2340,14 @@ let emit_instr ~first ~last ~fallthrough i =
     let cond, need_swap = float_cond_and_need_swap cmp in
     let r0, r1 = res i 0, res i 1 in
     let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-    cmp_sse_or_avx cmpsd vcmpsd cond a1 a0 r1;
+    cmp_sse_or_avx cmpsd vcmpsd_X_X_Xm64 cond a1 a0 r1;
     movq r1 r0;
     I.neg r0
   | Lop (Floatop (Float32, Icompf cmp)) ->
     let cond, need_swap = float_cond_and_need_swap cmp in
     let r0, r0_32, r1 = res i 0, res32 i 0, res i 1 in
     let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-    cmp_sse_or_avx cmpss vcmpss cond a1 a0 r1;
+    cmp_sse_or_avx cmpss vcmpss_X_X_Xm32 cond a1 a0 r1;
     movd r1 r0_32;
     (* CMPSS only sets the bottom 32 bits of the result, so we sign-extend to
        copy the result to the top 32 bits. *)
