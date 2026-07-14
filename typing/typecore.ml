@@ -9156,7 +9156,11 @@ and type_ident env ?(recarg=Rejected) lid =
            register_allocation_mode (Alloc.max_with_comonadic Areality mode)
        | _ -> ()
        end;
-       [], ty, Id_prim (Option.map Locality.disallow_right mode, sort)
+       let yielding =
+         prim_params_yielding env ty ~arity:prim.prim_arity
+       in
+       [], ty,
+       Id_prim (Option.map Locality.disallow_right mode, sort, yielding)
     | _ ->
        let lvars = Lpoly.get_exn desc.val_lpoly in
        begin match lvars with

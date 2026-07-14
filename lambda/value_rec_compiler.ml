@@ -623,9 +623,6 @@ let rec split_static_function lfun block_var local_idents lam :
         ap_result_layout = lfun.return;
         ap_region_close = Rc_normal;
         ap_mode = lfun.ret_mode;
-        (* This wrapper fully applies [lfun], so the call yields exactly when
-           fully applying [lfun] does -- which is what [lfun.yielding]
-           records (closure mode joined with all parameter modes). *)
         ap_yielding = lfun.yielding;
         ap_probe = None;
       }

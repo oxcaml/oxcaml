@@ -37,6 +37,7 @@ val transl_primitive :
   Types.type_expr ->
   poly_mode:Mode.Locality.l option ->
   poly_sort:Jkind.Sort.t option ->
+  yielding:Mode.Yielding.l ->
   Path.t option ->
   Lambda.lambda
 

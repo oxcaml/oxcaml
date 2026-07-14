@@ -346,8 +346,9 @@ let rec iter_exn_names f pat =
 
 let transl_ident loc env ty path desc kind =
   match desc.val_kind, kind with
-  | Val_prim p, Id_prim (poly_mode, poly_sort) ->
-      Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort (Some path)
+  | Val_prim p, Id_prim (poly_mode, poly_sort, yielding) ->
+      Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding
+        (Some path)
   | Val_anc _, Id_value ->
       raise(Error(to_location loc, Free_super_var))
   | (Val_reg _ | Val_self _), Id_value ->
@@ -455,7 +456,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         ~yielding:(transl_yielding_mode_l yielding)
   | Texp_apply({ exp_desc = Texp_ident { path;
                                         desc = {val_kind = Val_prim p};
-                                        kind = Id_prim (pmode, psort); _ };
+                                        kind = Id_prim (pmode, psort, _); _ };
                  exp_type = prim_type; } as funct,
                oargs, pos, ap_mode, ap_yielding, zero_alloc)
     when can_apply_primitive p pmode pos oargs ->

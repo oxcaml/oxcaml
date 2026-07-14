@@ -144,10 +144,12 @@ let rec apply_coercion loc strict restr arg =
         [{name = param; debug_uid = param_duid; layout = Lambda.layout_module;
           attributes = Lambda.default_param_attribute; mode = alloc_heap}]
         [carg] cc_res
-  | Tcoerce_primitive { pc_desc; pc_env; pc_type; pc_poly_mode; pc_poly_sort } ->
+  | Tcoerce_primitive { pc_desc; pc_env; pc_type; pc_poly_mode; pc_poly_sort;
+                        pc_yielding } ->
       Translprim.transl_primitive loc pc_desc pc_env pc_type
         ~poly_mode:pc_poly_mode
         ~poly_sort:pc_poly_sort
+        ~yielding:pc_yielding
         None
   | Tcoerce_alias (env, path, cc) ->
       let lam = transl_module_path loc env path in
@@ -735,6 +737,7 @@ and transl_structure ~scopes loc
                             loc p.pc_desc p.pc_env p.pc_type
                             ~poly_mode:p.pc_poly_mode
                             ~poly_sort:p.pc_poly_sort
+                            ~yielding:p.pc_yielding
                             None
                       | _ -> apply_coercion loc Strict cc (get_field pos))
                     pos_cc_list, loc)

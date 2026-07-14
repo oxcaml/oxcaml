@@ -496,11 +496,8 @@ and expression_desc =
         alloc_mode : alloc_mode;
         (* Mode at which the closure is allocated *)
         yielding : Mode.Yielding.l;
-        (* [Unyielding] if *fully applying* this function can never perform a
-           free effect: it neither closes over a yielding value (its own mode)
-           nor is given any yielding argument (its parameter modes). Consumed
-           by [Value_rec_compiler]'s eta-expanding wrapper, which is exactly a
-           full application. *)
+        (* Whether fully applying this function can perform a free effect. This
+           is the closure's own mode joined with its parameter modes. *)
         zero_alloc : Zero_alloc.t;
         (* zero-alloc attributes *)
       }
@@ -828,7 +825,11 @@ and function_cases =
 
 and ident_kind =
   | Id_value
-  | Id_prim of Mode.Locality.l option * Jkind.Sort.t option
+  | Id_prim of
+      Mode.Locality.l option * Jkind.Sort.t option * Mode.Yielding.l
+      (** The [Mode.Yielding.l] is the join of the yielding modes of the
+          primitive's parameters, for when the primitive is closed over rather
+          than directly applied. *)
 
 and block_access =
   | Baccess_field of
@@ -1123,6 +1124,8 @@ and primitive_coercion =
     pc_type: Types.type_expr;
     pc_poly_mode: Mode.Locality.l option;
     pc_poly_sort: Jkind.Sort.t option;
+    pc_yielding: Mode.Yielding.l;
+    (** As the [Mode.Yielding.l] in [Id_prim]. *)
     pc_env: Env.t;
     pc_loc : Location.t;
   }

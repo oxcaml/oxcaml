@@ -94,11 +94,6 @@ let is_function_type env ty =
   | Some (Tarrow (_, lhs, rhs, _)) -> Some (lhs, rhs)
   | _ -> None
 
-let is_function_type_with_arg_mode env ty =
-  match scrape env ty with
-  | Some (Tarrow ((_, marg, _), lhs, rhs, _)) -> Some (lhs, rhs, marg)
-  | _ -> None
-
 let is_base_type env ty base_ty_path =
   match scrape env ty with
   | Some (Tconstr(p, _, _)) -> Path.same p base_ty_path
