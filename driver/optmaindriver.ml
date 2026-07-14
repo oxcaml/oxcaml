@@ -89,6 +89,53 @@ module Gc_pacing = struct
       | _ -> None
     end
 
+  (* Physical memory in bytes, for %-terms. Read only when a %-term is
+     present, so machine-dependent behaviour is opt-in and visible in
+     the flag value. *)
+  let physical_memory_bytes () =
+    match open_in "/proc/meminfo" with
+    | exception _ -> None
+    | ic ->
+      let rec find () =
+        match input_line ic with
+        | exception _ -> None
+        | line ->
+          if String.length line > 9 && String.sub line 0 9 = "MemTotal:"
+          then Scanf.sscanf_opt line "MemTotal: %d kB" (fun kb -> kb * 1024)
+          else find ()
+      in
+      let r = find () in
+      close_in_noerr ic;
+      r
+
+  (* The flag value is the MIN of comma-separated terms; a term is
+     either an absolute SIZE or PERCENT'%' of physical memory.  E.g.
+     [1G,1.5%] = 1 GiB, but at most 1.5% of RAM -- the full value on
+     large build machines, proportionally less on small development
+     ones, with the whole policy explicit in the (build-system-provided)
+     flag rather than implicit in the compiler. *)
+  let parse_floor_spec s =
+    let parse_term t =
+      let n = String.length t in
+      if n > 1 && t.[n - 1] = '%' then
+        match float_of_string_opt (String.sub t 0 (n - 1)) with
+        | Some pct when pct > 0. && pct <= 100. ->
+          (match physical_memory_bytes () with
+           | Some mem -> Some (int_of_float (float_of_int mem *. pct /. 100.))
+           | None -> None)
+        | _ -> None
+      else parse_size_bytes t
+    in
+    match String.split_on_char ',' s with
+    | [] -> None
+    | terms ->
+      List.fold_left
+        (fun acc t ->
+           match acc, parse_term t with
+           | Some a, Some b -> Some (Stdlib.min a b)
+           | _ -> None)
+        (Some max_int) terms
+
   (* Runs after argument parsing and before any compilation. Late enough
      that -X and OCAMLPARAM's "before" section have been read (knobs in
      OCAMLPARAM's per-file "after" section are NOT honoured: it is only
@@ -111,15 +158,16 @@ got: %d" n)
     | "" -> ()
     | s ->
       if not (env_field_present ~prefix:"Xsmall_heap_limit=") then begin
-        match parse_size_bytes s with
-        | Some bytes ->
+        match parse_floor_spec s with
+        | Some bytes when bytes < max_int ->
           (* The primitive takes words; bytes <= 1 TiB so this cannot
              overflow. *)
           !set_idle_floor_hook ((bytes + 7) / 8)
-        | None ->
+        | _ ->
           Compenv.fatal
-            ("-X gc-idle-floor expects a byte count with an optional "
-             ^ "K/M/G suffix, got: " ^ s)
+            ("-X gc-idle-floor expects a comma-separated min-expression "
+             ^ "of sizes (512M, 1G) and/or percentages of physical "
+             ^ "memory (1.5%), got: " ^ s)
       end
 end
 
