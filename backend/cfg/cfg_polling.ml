@@ -27,7 +27,8 @@ exception Error of error
 
 (* "Might_not_poll" means there exists a path from the function entry to a
    Potentially Recursive Tail Call (an Itailcall_ind or Itailcall_imm to a
-   forward function) that does not go through an Ialloc or Ipoll instruction.
+   forward function) that does not go through an Ialloc (heap allocation) or
+   Ipoll instruction.
 
    "Always_polls", therefore, means the function always polls (via Ialloc or
    Ipoll) before doing a PRTC. *)
@@ -114,15 +115,16 @@ let () =
     | _ -> None)
 
 (* Compututation of the "safe" map, which is a map from labels to booleans where
-   `true` indicates the block contains a safe point such as a poll or an alloc
-   instruction. *)
+   `true` indicates the block contains a safe point such as a poll or a heap
+   allocation instruction. (Local allocations do not call the GC, and are hence
+   not safe points.) *)
 
 (* CR-soon xclerc for xclerc: given how we use the safe map below, it is not
    clear taking into accounts terminator makes a difference; maybe matching over
    the terminator to always return `false` would be better. *)
 
 let is_safe_basic : Cfg.basic Cfg.instruction -> bool =
- fun instr -> Cfg.is_alloc instr || Cfg.is_poll instr
+ fun instr -> Cfg.is_heap_alloc instr || Cfg.is_poll instr
 
 let is_safe_terminator : Cfg.terminator Cfg.instruction -> bool =
  fun term ->
@@ -157,11 +159,11 @@ let safe_map_of_cfg : Cfg.t -> bool Label.Tbl.t =
 
    "Might_not_poll" means there exists a path from the function entry to a
    Potentially Recursive Tail Call (a Tailcall_self of Tailcall_func which is
-   either indirect or to a forward function) that does not go through an Alloc
-   or Poll instruction.
+   either indirect or to a forward function) that does not go through a heap
+   allocation or Poll instruction.
 
-   "Always_polls", therefore, means the function always polls (via Alloc or
-   Poll) before doing a PRTC. *)
+   "Always_polls", therefore, means the function always polls (via a heap
+   allocation or Poll) before doing a PRTC. *)
 
 module Polls_before_prtc_domain = struct
   type t = Polls_before_prtc.t
@@ -191,7 +193,11 @@ module Polls_before_prtc_transfer = struct
       if InstructionId.equal instr.id optimistic_prologue_poll_instr_id
       then Ok dom
       else Ok Always_polls
-    | Op (Alloc _) -> Ok Always_polls
+    | Op (Alloc { mode = Heap; bytes = _; dbginfo = _ }) -> Ok Always_polls
+    | Op (Alloc { mode = Local; bytes = _; dbginfo = _ }) ->
+      (* A local allocation does not call the GC, and is hence not a polling
+         point. *)
+      Ok dom
     | Op
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
         | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
