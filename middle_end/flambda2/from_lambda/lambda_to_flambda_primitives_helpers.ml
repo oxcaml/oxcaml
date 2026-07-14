@@ -493,7 +493,7 @@ and bind_rec_primitive acc exn_cont ~register_const0 (prim : simple_or_prim)
     in
     bind_recs acc exn_cont ~register_const0 p dbg cont
 
-let convert_block_access_field_kind_from_value_kind
+let block_access_field_kind_of_value_kind
     ({ raw_kind; nullable = _ } : L.value_kind) : P.Block_access_field_kind.t =
   match raw_kind with
   | Pintval -> Immediate
@@ -510,7 +510,7 @@ let mixed_block_access_field_kind
     P.Mixed_block_access_field_kind.t =
   match elt with
   | Value value_kind ->
-    Value_prefix (convert_block_access_field_kind_from_value_kind value_kind)
+    Value_prefix (block_access_field_kind_of_value_kind value_kind)
   | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
     | Vec512 | Word | Untagged_immediate ) as mixed_block_element ->
     Flat_suffix
