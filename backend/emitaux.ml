@@ -51,6 +51,21 @@ type frame_descr =
 
 let frame_descriptors = ref ([] : frame_descr list)
 
+(* The epoch bumps at each text-section change. It prepares for a compact
+   frame-descriptor format in which a return address is a delta from the
+   previous descriptor's -- an assembly-time constant only when both lie in the
+   same section -- so descriptors will record the epoch to decide where delta
+   chains must break. *)
+let frame_section_epoch = ref 0
+
+let current_code_section = ref ""
+
+let enter_code_section name =
+  if not (String.equal name !current_code_section)
+  then (
+    current_code_section := name;
+    incr frame_section_epoch)
+
 let is_none_dbg d = Debuginfo.Dbg.is_none (Debuginfo.get_dbg d)
 
 let get_flags debuginfo =
@@ -374,10 +389,14 @@ let with_snapshot ~f =
   let saved_file_pos_nums = !file_pos_nums in
   let saved_file_pos_num_cnt = !file_pos_num_cnt in
   let saved_frame_descriptors = !frame_descriptors in
+  let saved_frame_section_epoch = !frame_section_epoch in
+  let saved_current_code_section = !current_code_section in
   let result = f () in
   file_pos_nums := saved_file_pos_nums;
   file_pos_num_cnt := saved_file_pos_num_cnt;
   frame_descriptors := saved_frame_descriptors;
+  frame_section_epoch := saved_frame_section_epoch;
+  current_code_section := saved_current_code_section;
   result
 
 let get_file_num ~file_emitter file_name =
