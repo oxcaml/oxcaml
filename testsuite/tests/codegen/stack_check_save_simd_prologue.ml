@@ -10,12 +10,11 @@
    block is also the lowest common dominator of the two call-containing
    sub-branches, so the stack check is inserted at its start, before the
    [Prologue] instruction and before the last use of [x]. The stack-realloc
-   handler must therefore preserve xmm registers, i.e. call
-   [caml_call_realloc_stack_sse]. However, [Cfg_stack_checks] currently
-   recovers the block's live-in from the [Prologue] instruction, whose [live]
-   field does not account for registers dying at the following instruction, so
-   the captured assembly below exhibits the bug: the plain
-   [caml_call_realloc_stack] (which saves no xmm register) is called. *)
+   handler must therefore preserve xmm registers: it must call
+   [caml_call_realloc_stack_sse], not the plain [caml_call_realloc_stack].
+   This is a regression test for [Cfg_stack_checks] recovering the block's
+   live-in by skipping the [Prologue] instruction, whose [live] field does not
+   account for registers dying at the following instruction. *)
 
 external to_float : float# -> float = "%box_float"
 
@@ -94,7 +93,7 @@ f:
   jmp   .L2
 .L11:
   push  $34
-  call  caml_call_realloc_stack@PLT
+  call  caml_call_realloc_stack_sse@PLT
   addq  $8, %rsp
   jmp   .L0
 |}]
