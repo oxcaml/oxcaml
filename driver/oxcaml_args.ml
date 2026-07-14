@@ -866,6 +866,13 @@ let mk_flambda2_expert_cont_lifting_budget f =
       " Set the limit of extra parameters introduced\n\
       \ when lifting continuations (per function)" )
 
+let mk_flambda2_expert_cont_spec_budget f =
+  ( "-flambda2-expert-cont-spec-budget",
+    Arg.Int f,
+    Printf.sprintf
+      " Set the limit on the number of specialized continuations \n\
+      \ generated during match-in-match (per function)" )
+
 let mk_flambda2_expert_cont_spec_threshold f =
   ( "-flambda2-expert-cont-specialization-threshold",
     Arg.Float f,
@@ -1405,6 +1412,7 @@ module type Oxcaml_options = sig
   val flambda2_expert_shorten_symbol_names : unit -> unit
   val no_flambda2_expert_shorten_symbol_names : unit -> unit
   val flambda2_expert_cont_lifting_budget : int -> unit
+  val flambda2_expert_cont_spec_budget : int -> unit
   val flambda2_expert_cont_spec_threshold : float -> unit
   val flambda2_debug_concrete_types_only_on_canonicals : unit -> unit
   val no_flambda2_debug_concrete_types_only_on_canonicals : unit -> unit
@@ -1614,6 +1622,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_flambda2_expert_shorten_symbol_names;
       mk_flambda2_expert_cont_lifting_budget
         F.flambda2_expert_cont_lifting_budget;
+      mk_flambda2_expert_cont_spec_budget F.flambda2_expert_cont_spec_budget;
       mk_flambda2_expert_cont_spec_threshold
         F.flambda2_expert_cont_spec_threshold;
       mk_flambda2_debug_concrete_types_only_on_canonicals
@@ -2100,6 +2109,9 @@ module Oxcaml_options_impl = struct
   let flambda2_expert_cont_lifting_budget budget =
     Flambda2.Expert.cont_lifting_budget := Oxcaml_flags.Set budget
 
+  let flambda2_expert_cont_spec_budget budget =
+    Flambda2.Expert.cont_spec_budget := Oxcaml_flags.Set budget
+
   let flambda2_expert_cont_spec_threshold threshold =
     Flambda2.Expert.cont_spec_threshold := Oxcaml_flags.Set threshold
 
@@ -2583,7 +2595,12 @@ module Extra_params = struct
         | Some i -> Flambda2.Expert.cont_lifting_budget := Oxcaml_flags.Set i
         | None -> ());
         true
-    | "flambda2-expert-cont-specialization-threshold" ->
+    | "flambda2-expert-cont-spec-budget" ->
+        (match Compenv.check_int ppf name v with
+        | Some i -> Flambda2.Expert.cont_spec_budget := Oxcaml_flags.Set i
+        | None -> ());
+        true
+    | "flambda2-expert-cont-spec-threshold" ->
         (match Compenv.check_int ppf name v with
         | Some i ->
             Flambda2.Expert.cont_spec_threshold :=
