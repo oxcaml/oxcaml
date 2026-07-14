@@ -1379,9 +1379,9 @@ and jkind_annotation_desc =
   | Pjk_abbreviation of Longident.t loc
   (** [Pjk_abbreviation A] represents an abbreviation [A] (like [value]) *)
   | Pjk_operator of jkind_annotation * string loc list
-  (** [Pjk_operator(K, [SA1; ...; SAn])] represents the layout
-      [K SA1 ... SAn] where [K] is an arbitrary kind and each [SAi] is a
-      scannable axis annotation (like [non_pointer]). *)
+  (** [Pjk_operator(K, [OP1; ...; OPn])] represents the kind
+      [K OP1 ... OPn] where [K] is an arbitrary kind and each [OPi] is a kind
+      operator (like [non_pointer] or [addressable]). *)
   (* CR layouts v2.8: [mod] can have only layouts on the left, not
      full kind annotations. We may want to narrow this type some.
      Internal ticket 5085. *)

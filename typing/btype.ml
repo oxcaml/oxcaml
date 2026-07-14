@@ -1284,16 +1284,18 @@ module Jkind0 = struct
         type l r.
         ('layout, l * r) base_and_axes ->
         ('layout, Allowance.allowed * r) base_and_axes option =
-     fun { base; mod_bounds; with_bounds } ->
+     fun { base; addressability; mod_bounds; with_bounds } ->
       match With_bounds.try_allow_l with_bounds with
       | None -> None
       | Some with_bounds ->
-        Some { base; mod_bounds = Obj.magic mod_bounds; with_bounds }
+        Some { base; addressability; mod_bounds = Obj.magic mod_bounds;
+          with_bounds }
 
-    let try_allow_r { base; mod_bounds; with_bounds } =
+    let try_allow_r { base; addressability; mod_bounds; with_bounds } =
       match With_bounds.try_allow_r with_bounds with
       | Some with_bounds ->
-        Some { base; mod_bounds = Obj.magic mod_bounds; with_bounds }
+        Some { base; addressability; mod_bounds = Obj.magic mod_bounds;
+          with_bounds }
       | None -> None
   end
 
@@ -1308,12 +1310,14 @@ module Jkind0 = struct
 
     let of_path path =
       { base = Kconstr (path, Jkind_types.Scannable_axes.max);
+        addressability = Jkind_types.Addressability.Not_addressable;
         mod_bounds = Mod_bounds.max;
         with_bounds = No_with_bounds
       }
 
     let max =
       { base = Layout Jkind_types.Layout.Const.max;
+        addressability = Jkind_types.Addressability.Not_addressable;
         mod_bounds = Mod_bounds.max;
         with_bounds = No_with_bounds
       }
@@ -1335,14 +1339,19 @@ module Jkind0 = struct
       match t1_t2 with
       | None -> false
       | Some (t1, t2) -> (
+        let equally_addressable =
+          Jkind_types.Addressability.equal t1.addressability t2.addressability
+        in
         match t1.base, t2.base with
         | Kconstr (p1, sa1), Kconstr (p2, sa2) ->
           Path.same p1 p2 &&
           Jkind_types.Scannable_axes.equal sa1 sa2 &&
+          equally_addressable &&
           Mod_bounds.equal t1.mod_bounds t2.mod_bounds
         | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
         | Layout l1, Layout l2 ->
           Jkind_types.Layout.Const.equal l1 l2 &&
+          equally_addressable &&
           Mod_bounds.equal t1.mod_bounds t2.mod_bounds
       )
 
@@ -1363,7 +1372,11 @@ module Jkind0 = struct
 
       let mk_jkind ~crossing ~externality (layout : Layout.Const.t) =
         let mod_bounds = Mod_bounds.create crossing ~externality in
-        { base = Layout layout; mod_bounds; with_bounds = No_with_bounds }
+        { base = Layout layout;
+          addressability = Addressability.Not_addressable;
+          mod_bounds;
+          with_bounds = No_with_bounds
+        }
 
       let any =
         { jkind =
@@ -1466,6 +1479,7 @@ module Jkind0 = struct
                   (Base
                     (Scannable,
                       { nullability = Non_null; separability = Non_float }));
+              addressability = Addressability.Not_addressable;
               mod_bounds = immutable_data_mod_bounds;
               with_bounds = No_with_bounds
             };
@@ -1479,6 +1493,7 @@ module Jkind0 = struct
                   (Base
                     (Scannable,
                       { nullability = Maybe_null; separability = Non_float }));
+              addressability = Addressability.Not_addressable;
               mod_bounds = immutable_data_mod_bounds;
               with_bounds = No_with_bounds
             };
@@ -1493,6 +1508,7 @@ module Jkind0 = struct
                   (Base
                     (Scannable,
                       { nullability = Non_null; separability = Non_float }));
+              addressability = Addressability.Not_addressable;
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:false
@@ -1522,6 +1538,7 @@ module Jkind0 = struct
                   (Base
                     (Scannable,
                       { nullability = Non_null; separability = Non_float }));
+              addressability = Addressability.Not_addressable;
               mod_bounds = sync_data_mod_bounds;
               with_bounds = No_with_bounds
             };
@@ -1535,6 +1552,7 @@ module Jkind0 = struct
                   (Base
                     (Scannable,
                       { nullability = Maybe_null; separability = Non_float }));
+              addressability = Addressability.Not_addressable;
               mod_bounds = sync_data_mod_bounds;
               with_bounds = No_with_bounds
             };
@@ -1557,6 +1575,7 @@ module Jkind0 = struct
                   (Base
                     (Scannable,
                       { nullability = Non_null; separability = Non_float }));
+              addressability = Addressability.Not_addressable;
               mod_bounds = mutable_data_mod_bounds;
               with_bounds = No_with_bounds
             };
@@ -1570,6 +1589,7 @@ module Jkind0 = struct
                   (Base
                     (Scannable,
                       { nullability = Maybe_null; separability = Non_float }));
+              addressability = Addressability.Not_addressable;
               mod_bounds = mutable_data_mod_bounds;
               with_bounds = No_with_bounds
             };
@@ -1975,7 +1995,11 @@ module Jkind0 = struct
             With_bounds.add_modality ~type_expr ~modality bounds)
           tys_modalities No_with_bounds
       in
-      { base; mod_bounds; with_bounds }
+      { base;
+        addressability = Jkind_types.Addressability.Not_addressable;
+        mod_bounds;
+        with_bounds
+      }
 
     let get_const t =
       Base_and_axes.map_layout_option Jkind_types.Layout.get_const t
@@ -2198,6 +2222,7 @@ module Jkind0 = struct
         in
         let desc : _ jkind_desc =
           { base = Layout layout;
+            addressability = Jkind_types.Addressability.Not_addressable;
             mod_bounds = Mod_bounds.max;
             with_bounds = No_with_bounds }
         in
@@ -2303,6 +2328,7 @@ module Jkind0 = struct
               (Sort
                  (Base Scannable,
                   { nullability = Non_null; separability = Non_float }));
+          addressability = Jkind_types.Addressability.Not_addressable;
           mod_bounds;
           with_bounds = No_with_bounds
         }
@@ -2573,6 +2599,7 @@ module Jkind0 = struct
               (Sort
                  (Base Scannable,
                   { nullability = Non_null; separability = Separable }));
+          addressability = Jkind_types.Addressability.Not_addressable;
           mod_bounds;
           with_bounds = No_with_bounds
         }
@@ -2583,6 +2610,7 @@ module Jkind0 = struct
       fresh_jkind
         { base = Layout (Sort (Base Scannable, { nullability = Non_null;
                                                  separability = Separable }));
+          addressability = Jkind_types.Addressability.Not_addressable;
           mod_bounds = Mod_bounds.for_arrow;
           with_bounds = No_with_bounds
         }
@@ -2598,6 +2626,7 @@ module Jkind0 = struct
         { base =
             Layout
               (Any { nullability = Maybe_null; separability = Separable });
+          addressability = Jkind_types.Addressability.Not_addressable;
           mod_bounds;
           with_bounds = No_with_bounds
         }
@@ -2615,6 +2644,7 @@ module Jkind0 = struct
                  (Base Scannable,
                   { nullability = Non_null;
                     separability = Maybe_separable }));
+          addressability = Jkind_types.Addressability.Not_addressable;
           mod_bounds;
           with_bounds = No_with_bounds
         }

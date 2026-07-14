@@ -130,6 +130,19 @@ module Scannable_axes : sig
   val meet : t -> t -> t
 end
 
+module Addressability : sig
+  (** Whether the [addressable] operator has been explicitly applied. Kinds with
+      inherently-addressable layouts do not need to carry [Addressable]. *)
+  type t =
+    | Addressable
+    | Not_addressable
+
+  val equal : t -> t -> bool
+
+  (** Compose two applications of the operator. *)
+  val apply : t -> t -> t
+end
+
 module Layout : sig
   (** Note that:
 

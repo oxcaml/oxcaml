@@ -1147,30 +1147,37 @@ let fast_sub : type r1 l2.
     bool =
  fun ~context:_ _env (sub : (Allowance.allowed * r1) Types.jkind)
      (super : (l2 * Allowance.allowed) Types.jkind) ->
-  match super.jkind with
-  | { base =
-        (* CR rtjoa for jujacobs: I guessed you want [max] here? *)
-        Types.Layout
-          (Jkind_types.Layout.Sort
-             ( super_sort,
+  if
+    Jkind_types.Addressability.equal sub.jkind.addressability
+      Jkind_types.Addressability.Addressable
+    || Jkind_types.Addressability.equal super.jkind.addressability
+         Jkind_types.Addressability.Addressable
+  then false
+  else
+    match super.jkind with
+    | { base =
+          (* CR rtjoa for jujacobs: I guessed you want [max] here? *)
+          Types.Layout
+            (Jkind_types.Layout.Sort
+               ( super_sort,
+                 { separability = Jkind_axis.Separability.Maybe_separable;
+                   nullability = Jkind_axis.Nullability.Maybe_null
+                 } ));
+        mod_bounds;
+        with_bounds = Types.No_with_bounds
+      } ->
+      fast_sub_of_sort_super super_sort mod_bounds sub
+    | { base =
+          Types.Layout
+            (Jkind_types.Layout.Any
                { separability = Jkind_axis.Separability.Maybe_separable;
                  nullability = Jkind_axis.Nullability.Maybe_null
-               } ));
-      mod_bounds;
-      with_bounds = Types.No_with_bounds
-    } ->
-    fast_sub_of_sort_super super_sort mod_bounds sub
-  | { base =
-        Types.Layout
-          (Jkind_types.Layout.Any
-             { separability = Jkind_axis.Separability.Maybe_separable;
-               nullability = Jkind_axis.Nullability.Maybe_null
-             });
-      mod_bounds;
-      with_bounds = Types.No_with_bounds
-    } ->
-    fast_sub_of_any_super mod_bounds sub
-  | _ -> false
+               });
+        mod_bounds;
+        with_bounds = Types.No_with_bounds
+      } ->
+      fast_sub_of_any_super mod_bounds sub
+    | _ -> false
 
 let sub_or_intersect ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)

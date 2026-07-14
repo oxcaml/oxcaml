@@ -247,6 +247,8 @@ and 'layout jkind_base =
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
+    (** Explicit application of the [addressable] kind operator. *)
+    addressability : Jkind_types.Addressability.t;
     mod_bounds : mod_bounds;
     with_bounds : 'd with_bounds
   }

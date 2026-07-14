@@ -1006,6 +1006,22 @@ module Scannable_axes = struct
     }
 end
 
+module Addressability = struct
+  type t =
+    | Addressable
+    | Not_addressable
+
+  let equal t1 t2 =
+    match t1, t2 with
+    | Addressable, Addressable | Not_addressable, Not_addressable -> true
+    | Addressable, Not_addressable | Not_addressable, Addressable -> false
+
+  let apply t1 t2 =
+    match t1, t2 with
+    | Addressable, _ | _, Addressable -> Addressable
+    | Not_addressable, Not_addressable -> Not_addressable
+end
+
 module Layout = struct
   open Jkind_axis
 

@@ -580,9 +580,13 @@ let jkind_desc s jkind =
       if Path.compare p' p = 0 then jkind else
         { jkind with base = Kconstr (p', sa) }
     | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
-    | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
+    | Jkind_const
+        { base; addressability; mod_bounds; with_bounds = No_with_bounds } ->
       let const =
         { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
+          addressability =
+            Jkind_types.Addressability.apply addressability
+              jkind.addressability;
           mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
           with_bounds = jkind.with_bounds }
       in
@@ -603,8 +607,11 @@ let jkind_const_desc s
       if Path.compare p' p = 0 then jkind else
         { jkind with base = Kconstr (p', sa) }
     | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
-    | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
+    | Jkind_const
+        { base; addressability; mod_bounds; with_bounds = No_with_bounds } ->
       { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
+        addressability =
+          Jkind_types.Addressability.apply addressability jkind.addressability;
         mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
         with_bounds = jkind.with_bounds }
     end
