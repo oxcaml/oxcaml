@@ -899,3 +899,172 @@ single commit on 9ce70e139; it was delta-checked (INTEGRATE) and is PUSHED -- PR
 c265d91e2. (This paragraph is a notes-only child commit correcting a stale intermediate-SHA
 self-citation; per the standing rule, a delta-checked/pushed SHA is immutable, so corrections
 ride as child commits, never amends.)
+
+---
+
+# DELETION-WAVE-2 (2026-07-14, ik5f7) — reopened by 2 USER rulings
+
+USER: (1) "-principal doesn't particularly matter" (divergence NOT a blocker);
+(2) "the round_up difference sounds like a bug." Team-lead ruling: adopt
+Solver.round_up + a leq differential; 0-verdict-flips gate load-bearing.
+
+## round_up re-route — ROOT CAUSE (OVERTURNS the "Stage C round_up ENGINE-DIVERGENCE
+## finding" above) + FIX. Committed (Step 1b/2).
+
+Verify-first via IK_RUP_DEBUG instrumentation on Jkind.round_up + an ikind
+lowering-dump hook; corpus = pinned repro, ast-invariants/test.ml (18 Parsetree
+sites), full bootstrap (14575 round_up calls, 242 with-bound). The prior finding's
+"ikind under-computes / is UNSOUND (violates t <= round_up t)" conclusion is
+WRONG and is hereby reattributed. MISTAKE-CLASS (recorded honestly per lead):
+ik5f6 treated the INCUMBENT's (legacy normalize's) output as ground truth and
+concluded the challenger (ikind) was unsound; in fact legacy was the wrong one.
+Same error-shape as taking any incumbent as an oracle.
+
+TWO mechanisms, neither an ikind lowering gap:
+ 1. C(ii)'s OWN DERIVATION BUG (abstract with-bounds; 177/242 corpus). C(ii) built
+    the node NORMAL-mode and required ALL to_terms name-free else None. Abstract
+    with-bound payloads lower to a SURVIVING NAMED atom, so C(ii) returned None
+    where legacy returns Some. Solver.round_up (Round_up-mode collapse to top)
+    reproduces legacy's floor BYTE-EXACT on all 177 abstracts.
+ 2. LEGACY FUEL-EXHAUSTION OVER-APPROXIMATION (concrete recursive with-bounds;
+    65/242, all 18 ast-invariants sites; payloads = Parsetree.structure_item /
+    core_type / module_type / attribute / payload). *** FIRST-CLASS FINDING ***
+    Legacy round_up = normalize ~mode:Ignore_best is FUEL-LIMITED (Loop_control).
+    On deep recursive with-bounds the loop hits `Stop` (out of fuel) and, at
+    jkind.ml:1305-1307, does exactly "out of fuel, so assume [ty] has the worst
+    possible bounds" -> Mod_bounds.max -> the with-bound contributes its full mask
+    -> floor [2,1,1,3,3,1,1,3,3,1,2]. So legacy silently DEGRADES (over-approximates
+    to top) on deep recursive types. The ikind LFP/GFP fixpoint (no fuel) computes
+    the true, tighter crossing [2,1,0,0,0,0,0,0,0,1,2]. Proof it's fuel and not
+    "concrete folds to top": a shallow concrete payload (int; a concrete
+    immutable_data record) is NOT inflated -- legacy folds it precisely and AGREES.
+Both are sound upper bounds (t <= round_up t); the ikind is strictly TIGHTER.
+
+FIX: Jkind.round_up derives its floor via a round_up_from_ikind hook (installed by
+Ikind) = Solver.round_up(ckind_of_jkind Round_up-mode). Legacy Ignore_best-normalize
+kept as a validate-only differential, RELAXED to LEQ: Some/Some => ikind_floor <=
+legacy_floor (per-axis Axis_lattice.leq); Some/None and None/Some fatal both ways;
+ikind>legacy fatal (unsound). Exact-equal (C(ii)'s original) would fatal on all 18
+ast-invariants sites; leq holds clean.
+
+NONE-DETECTION (CORRECTS the C(ii) note's "round_up None path is unreachable from
+surface syntax" claim — it IS reachable). round_up returns None when the base is
+ABSTRACT (Base_and_axes.fully_expand_aliases base = Kconstr) with surviving
+with-bounds, mirroring legacy's t_has_abstract_base conservatism (jkind.ml:902-908).
+Reached by `functor(X:sig type t end) -> sig kind_ k type t : k with X.t end`
+applied; Ctype.nondep_type_decl (ctype.ml:8433) relies on that None. The naive
+always-Some re-route CRASHED "nondep_supertype not included in original module type"
+(typemod.ml:3553). Pinned: testsuite/tests/typing-jkind-bounds/
+nondep_abstract_kind_roundup_ikinds.ml (crash -> clean "cannot be eliminated").
+
+GATES: boot-green; ocamlformat 0.29.0 clean; FULL SUITE 2333/0/0 == baseline
+c265d91e2 (ZERO verdict flips). leq differential non-vacuity (validate + stats):
+ast-invariants Some/Some strict(ikind<legacy)=6, equal=6; nondep repro None/None
+agree=1. Seeded faults BOTH fire: OXCAML_ROUNDUP_FAULT (ikind floor joined top ->
+ikind>legacy) trips the leq fatal; OXCAML_ROUNDUP_FORCE_SOME (skip None-detection ->
+Some on a legacy-None input) trips the None/Some fatal. Pins: round_up_gadt_equation
+_ikinds.ml (re-verified: success-text-only, expect unchanged post-re-route, comment
+updated) + nondep_abstract_kind_roundup_ikinds.ml (new None-path guard).
+
+## AMENDMENT to the skip-normalize "PRINT churn: ZERO / -i byte-identical" record (S7)
+
+That finding is INCORRECT as stated. The slice-2 renderer's BASE floor is rendered
+from the stored ikind_floor, which Require_best normalize UPDATES (jkind.ml:1349);
+the fold-stop stores the RAW ikind_floor, so the rendered base DOES change in NORMAL
+(non-principal) mode (e.g. subsumption/basics: immutable_data non_pointer -> immediate;
+mutable_data with 'a -> immutable_data with 'a). "normalize-independent" holds only
+for the with-bounds atoms, NOT the base floor. The fold-stop (Step 3) therefore
+produces non-principal decl-kind/.cmi churn (0 verdict flips). Root-cause of the
+Require_best base-widening is IN PROGRESS (is it load-bearing for checking, pure
+precision loss, or kind-equivalent respelling?) before any promotion — see Step 3.
+
+---
+
+# DELETION-WAVE-2 CLOSING (2026-07-14, ik5f7) — option 4: land round_up, DEFER fold-stop
+
+Team-lead ruling: normal-mode verdict flips + a crash are outside every user waiver; the
+fold-stop's regressions are a designed campaign, not a promotion pass. Wave-2 lands what is
+solid. FINAL wave-2 chain: c265d91e2 (pushed) -> 1e276769f (docs) -> 958a34869 (round_up
+re-route, this wave's shipping commit). Fold-stop / normalize-fixpoint deletion DEFERRED.
+
+## (i) DISPLAY RECONSTRUCTION -- SOLVED (the former "PAYOFF-2 crux" is dead as a blocker)
+The decl-display half of the ikind->jkind reconstruction is DONE and bounded. Mechanism
+(patch: _tmp/step3_displayfix_plus_probes.patch, in render_jkind_from_ikind, ikind.ml):
+ 1. STRIP base_jkind's stale Kconstr base to its underlying Layout (loop Jkind.Const.
+    expand_once until the base is a Layout), so convert's abbreviation matcher chooses from
+    the evaluated floor's layout+mod-bounds instead of the raw declared Kconstr name;
+ 2. DISABLE floor_from_ikind's re-derivation around the base_out render (Fun.protect,
+    reset to mod_bounds_floor_for_printing) so the stored (folded) ikind_floor is
+    authoritative rather than re-lowered from the stale base.
+RESULT: `immediate with string` -> `immutable_data non_pointer`; `immutable_data with 'a ref`
+-> `mutable_data with 'a @@ unyielding many`; BOTH == legacy normalize EXACTLY; subsumption/
+basics PASSES. KEY FINDING behind it: the ikind Normal-mode SOLVE already reproduces
+normalize's MOD-BOUNDS floor exactly, and the layout fold is NOMINAL (the two floors agree
+on the non-modal coords 0-1 and 9-10; the difference is which abbreviation the matcher picks,
+not a lattice value the ikind lacks). So there is NO layout-reconstruction wall.
+
+## (ii) FOLD-STOP -- REAL normal-mode regression shapes (the deferred campaign's work items)
+The fold-stop (typedecl.ml normalize_decl_jkind storing the RAW decl jkind + annotation
+sub-check via Ikind.sub_jkind_l on raw; patch _tmp/step3_foldstop_current.patch / clean
+_tmp/step3_foldstop.patch) introduces, on top of 958a34869, these NORMAL-mode regressions
+(typing-jkind-bounds, NOT display, NOT -principal-only):
+ 1. recursive_ikinds (My_list): baseline SUCCESS -> fold-stop ERROR; the error text is X<=X
+    garbage "The kind of 'a My_list.t is immutable_data with 'a ... must be a subkind of
+    immutable_data with 'a" (never-garbage class).
+ 2. gadt_ikinds (existential_abstract): baseline SUCCESS -> fold-stop ERROR (sub_jkind_l-on
+    -raw failure). NOTE: this CONTRADICTS ik5f6's recorded "existential_abstract is
+    -principal-ONLY, 0 normal-mode flips". See taxonomy (iii): BOTH ik5f6's claim AND my
+    earlier "0 flips" restatement are flawed-check-suspect; the honest record is UNVERIFIED
+    pending a rigorous fold-stop-vs-958a34869-baseline direct output compare (both legs).
+ 3. with_basics: NONDEP CRASH "Fatal error: nondep_supertype not included in original module
+    type" on `type t : immutable_data = Value.t` (new site, distinct from the functor/
+    abstract-kind_ nondep None case that round_up's None-detection already fixed). CONFIRMED
+    fold-stop-induced, committed head UNAFFECTED: typing-jkind-bounds is 44/44 (part of the
+    2334/0 full suite) on 958a34869; the crash appears only with the fold-stop applied.
+ 4. quality_ikinds: `: value` annotation churn on abstract `type t` (fold-stop's stored raw
+    jkind flips is_value_for_printing).
+Each shape needs its own root-cause; that is the scoped fold-stop campaign, not this wave.
+
+## (iii) FLAWED-CHECK TAXONOMY (record honestly; two instances this campaign)
+ A. `.corrected` diff artifact (wave-2, ik5f7): the ocaml expect tool writes actual output to
+    `<file>.corrected`, NOT in place. Checking non-principal churn by running the tool on a
+    copy and diffing the (unchanged) input .ml gives an ALWAYS-EMPTY diff = a FALSE "clean".
+    This produced my wrong "fold-stop = 0 normal-mode flips" report. CORRECT method: diff vs
+    `<file>.corrected` (or use the harness's check-program-output). Cost: a full wrong
+    disposition until caught.
+ B. principal-claim doubt (wave-1, ik5f6): ik5f6's "existential_abstract -principal-ONLY"
+    now looks flawed-check-suspect given (ii.2). Treat any pre-existing fold-stop normal-mode
+    cleanliness claim as UNVERIFIED until a rigorous baseline-vs-foldstop compare is run.
+ (See also the earlier "incumbent-as-ground-truth" mistake-class from the round_up finding:
+ three distinct verification-method failures logged this campaign.)
+
+## (iv) SCOPED DESIGN INPUT for the deferred fold-stop / normalize-deletion effort
+Starting material: (a) the DISPLAY fix is done (patch above) -- fold it in once the semantic
+path is clean; (b) the four regression classes in (ii) ARE the work items, each with a repro
+in testsuite/tests/typing-jkind-bounds/ (recursive_ikinds, gadt_ikinds, with_basics,
+quality_ikinds); (c) FIRST task is the rigorous fold-stop-vs-958a34869 direct output compare
+(both legs) to establish the true normal-mode delta -- do NOT trust any prior "0 flips" claim;
+(d) the round_up None-detection pattern (abstract base -> None, ctype.ml nondep relies on it)
+is the template for the with_basics nondep crash fix.
+
+## (v) PERF A/B (endgame) — WASH, no regression; PERF GATE PASSED
+HEAD 28af0adb1 (round_up re-route) vs baseline c265d91e2 (fresh build in
+prwork/ik5f7-base: autoconf27 + configure + make install). Interleaved perf_time.py
+(ik5prep-work/_tmp/perf; records+plain), 17 reps, THREE replicates. Box load ~10-18
+(moderate; the transient ~2.5 quiet window closed before the run).
+  R1: perf_records median -3.01% / min -0.25%;  perf_plain median -0.87% / min -0.19%
+  R2: perf_records median -1.52% / min +0.19%;  perf_plain median +0.64% / min +0.96%
+  R3: perf_records median +1.00% / min -0.34%;  perf_plain median +0.01% / min -0.29%
+BOTH cells SIGN-FLIP across the three replicates on median AND min (all |Δ|<1.1%; the
+robust MIN figures are within +-0.4% [records] / +-1% [plain] and change sign run-to-run)
+=> within noise. No consistent-sign >1% regression => the STOP threshold is NOT crossed. Consistent with the change profile:
+round_up fires on only the ~few round_up calls per compile (intersect_type_jkind GADT
+equations + nondep), which the perf corpus (ordinary compiles) barely exercises, so the
+ikind-lowering cost is cold-path. PERF GATE PASSED. (Load was moderate; a perfectly-quiet
+re-measure would tighten the number but the sign-flip already rules out a real regression.)
+
+WAVE-2 FREEZE: chain c265d91e2 (pushed) -> 1e276769f (docs) -> 28af0adb1 (round_up
+re-route + STAGE5F-final). round_up engine fix (user ruling delivered) + leq differential
++ 2 new regression pins (round_up_gadt_equation_ikinds, nondep_abstract_kind_roundup_ikinds).
+Fold-stop / normalize-fixpoint deletion DEFERRED (see closing sections i-iv). Review/push
+handled above ik5f7.

@@ -95,6 +95,19 @@ let () =
   | Some ("1" | "true" | "yes" | "on") -> print_floor_fault := true
   | Some _ | None -> ()
 
+(* Seeded-fault hook (test/debug only; env [OXCAML_ROUNDUP_FAULT]).  When set, the
+   ikind round_up floor deriver joins [top] into its result, so the ikind floor
+   EXCEEDS the legacy [Ignore_best normalize] floor.  This proves the round_up
+   leq-differential (validate only) can FIRE: with the fault on, the [ikind <=
+   legacy] check must trip on at least one with-bound decl.  Default off, so the
+   shipped floor is otherwise the true tight value. *)
+let roundup_fault = ref false
+
+let () =
+  match Sys.getenv_opt "OXCAML_ROUNDUP_FAULT" with
+  | Some ("1" | "true" | "yes" | "on") -> roundup_fault := true
+  | Some _ | None -> ()
+
 (* Stage-5a re-entrancy probe: global Solver-cache entries a print-path context
    creation EVICTS.  With the pre-fix clearing [create_ctx] this counts the warm
    cache a mid-print [create_ctx] wipes (hazard H1); after the scratch-ctx fix it
@@ -2139,6 +2152,35 @@ let () =
                   Axis_lattice.bot terms
               in
               Axis_lattice.to_mode_crossing floor))
+    }
+
+(* Deletion-wave-2 (Step 1b/2): install the ikind-native round_up floor into
+   [Jkind.round_up]. Build the node in Round_up mode (rigid with-bound names
+   collapse to top), solve, and [Solver.round_up] to a constant floor -- the true
+   crossing via LFP/GFP fixpoint, TIGHTER than (but [<=]) legacy [Ignore_best
+   normalize]'s fuel-limited over-approximation on deep recursive with-bounds. The
+   irreducible ([None]) case -- an ABSTRACT base with surviving with-bounds, which
+   legacy keeps unfolded -- is decided by [Jkind.round_up] itself (it has the
+   [fully_expand_aliases] base check); this hook is only invoked for the reducible
+   case and always yields [Some]. Scratch ctx + isolated pending keep this read
+   from perturbing an outer solve. *)
+let () =
+  Jkind.set_round_up_from_ikind
+    { Jkind.round_up_floor =
+        (fun env jkind ->
+          Ldd.with_isolated_pending (fun () ->
+              let ctx =
+                create_scratch_ctx ~mode:Solver.Round_up ~env:(Some env)
+              in
+              let node = Solver.ckind_of_jkind ctx jkind in
+              Ldd.solve_pending ();
+              let floor = Solver.round_up (Ldd.inline_solved_vars node) in
+              let floor =
+                if !roundup_fault
+                then Axis_lattice.join floor Axis_lattice.top
+                else floor
+              in
+              Some floor))
     }
 
 type sub_or_intersect = Jkind.sub_or_intersect

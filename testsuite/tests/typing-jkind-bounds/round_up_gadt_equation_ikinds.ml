@@ -1,22 +1,22 @@
 (* TEST flags = "-extension layouts_alpha"; expect;
 *)
 
-(* REGRESSION PIN for the Stage C round_up engine-divergence (STAGE5F-NOTES.md, "Stage C
-   round_up re-route: ENGINE-DIVERGENCE finding").
+(* REGRESSION PIN for the round_up GADT-equation shape (deletion-wave-2 resolution of the
+   former "Stage C round_up ENGINE-DIVERGENCE finding", STAGE5F-NOTES.md).
 
    A GADT equation over a recursive with-bound type drives [Ctype.add_gadt_equation] ->
    [add_jkind_equation] -> [intersect_type_jkind] -> [Jkind.round_up] on the
-   [jkind_of_abstract_type_declaration] equation jkind. On this class the legacy
-   [Ignore_best normalize] [round_up] folds the with- bounds UP into a bounds-free floor,
-   which the ikind engine ([ckind_of_jkind] in NORMAL or ROUND_UP mode) does NOT reproduce
-   (it yields the with-bounds- EXCLUDED base). So [round_up] was NOT re-routed to ikind in
-   this wave; it keeps calling legacy [normalize], and [Base_and_axes.normalize] survives
-   for it.
+   [jkind_of_abstract_type_declaration] equation jkind. [round_up] is now derived by the
+   ikind engine ([Solver.round_up] in Round_up mode). The earlier "ikind under-computes"
+   reading was mistaken: legacy [Ignore_best normalize] OVER-approximates deep-recursive
+   with-bounds to top via fuel exhaustion, while the ikind computes the true (tighter)
+   crossing; both are sound upper bounds ([t <= round_up t]) and the ikind is [<=] legacy.
+   Under OXCAML_IKINDS_VALIDATE the leq-differential confirms [ikind_floor <= legacy_floor]
+   on this shape.
 
-   This test pins the shape so a future attempt to derive [round_up] in the ikind engine
-   has a concrete, minimal reproduction. It must keep PASSING with legacy [round_up]. If
-   someone re-routes [round_up] and this compiles clean under OXCAML_IKINDS_VALIDATE with
-   the differential re-armed, that's the signal the engine now reproduces the fold. *)
+   This test pins the shape: it must keep compiling clean, and clean under
+   OXCAML_IKINDS_VALIDATE (leq-differential no disagreement). A regression that makes the
+   ikind round_up EXCEED legacy (unsound) would trip the differential. *)
 
 type 'a tree =
   | Leaf of 'a

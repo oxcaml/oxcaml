@@ -920,6 +920,16 @@ type crossing_from_ikind =
 
 val set_crossing_from_ikind : crossing_from_ikind -> unit
 
+(** Hook installed by [Ikind] to derive a jkind's rounded-up floor through the
+    ikind engine, used by [round_up]. [Some floor] iff the with_bounds reduce to
+    a floor (always, via the solver's round_up); [None] iff irreducible. *)
+type round_up_from_ikind =
+  { round_up_floor :
+      'l 'r. Env.t -> ('l * 'r) Types.jkind -> Axis_lattice.t option
+  }
+
+val set_round_up_from_ikind : round_up_from_ikind -> unit
+
 (** "round up" a [jkind_l] to a [jkind_r] such that the input is less than the
     output. If the base is abstract, it may not be possible to eliminate the
     with bounds, in which case this returns [None]. *)

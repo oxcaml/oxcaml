@@ -2685,6 +2685,48 @@ let crossing_from_ikind : crossing_from_ikind option ref = ref None
 
 let set_crossing_from_ikind f = crossing_from_ikind := Some f
 
+(* Deletion-wave-2 (Step 1b/2): the ikind-native round_up floor. [round_up_floor]
+   returns [Some floor] iff the ikind engine can round the jkind to a with-bounds-
+   free floor (it always can via [Solver.round_up]: names collapse to top), else
+   [None] (irreducible, unreachable in practice). *)
+type round_up_from_ikind =
+  { round_up_floor : 'l 'r. Env.t -> ('l * 'r) jkind -> Axis_lattice.t option }
+
+let round_up_from_ikind : round_up_from_ikind option ref = ref None
+
+let set_round_up_from_ikind f = round_up_from_ikind := Some f
+
+(* Non-vacuity counters for the round_up leq-differential (validate only). The
+   leq branch is only meaningful if STRICT (<) cases actually occur; equality-only
+   would prove nothing about the relaxed branch. [OXCAML_ROUNDUP_STATS] prints an
+   at-exit summary. *)
+let roundup_leq_strict = ref 0
+
+let roundup_leq_equal = ref 0
+
+let roundup_none_agree = ref 0
+
+let () =
+  match Sys.getenv_opt "OXCAML_ROUNDUP_STATS" with
+  | Some ("1" | "true" | "yes" | "on") ->
+    at_exit (fun () ->
+        Printf.eprintf
+          "[round_up-stats] Some/Some strict(ikind<legacy)=%d equal=%d; \
+           None/None agree=%d\n\
+           %!"
+          !roundup_leq_strict !roundup_leq_equal !roundup_none_agree)
+  | Some _ | None -> ()
+
+(* Seeded-fault control (test/debug only; env [OXCAML_ROUNDUP_FORCE_SOME]). When
+   set, [round_up] SKIPS the abstract-base [None] detection, forcing a [Some] floor
+   even when legacy [normalize] leaves with-bounds ([None]). This drives the
+   [None]/[Some] arm of the option-structure differential fatal, proving that
+   direction is live. Default off. *)
+let roundup_force_some =
+  match Sys.getenv_opt "OXCAML_ROUNDUP_FORCE_SOME" with
+  | Some ("1" | "true" | "yes" | "on") -> true
+  | Some _ | None -> false
+
 let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
   let jk, _ =
     Base_and_axes.normalize ~mode:Ignore_best ~skip_axes
@@ -4022,18 +4064,86 @@ let intersection_or_error ~type_equal ~context ~reason env t1 t2 =
 
 let round_up (type l r) ~context env (t : (allowed * r) jkind) :
     (l * allowed) jkind option =
-  let normalized =
-    normalize ~mode:Ignore_best ~context env (t |> disallow_right)
+  let legacy () : (l * allowed) jkind option =
+    let normalized =
+      normalize ~mode:Ignore_best ~context env (t |> disallow_right)
+    in
+    match normalized.jkind.with_bounds with
+    | No_with_bounds ->
+      Some
+        { t with
+          jkind = { normalized.jkind with with_bounds = No_with_bounds };
+          quality =
+            Not_best (* As required by the fact that this is a [jkind_r] *)
+        }
+    | With_bounds _ -> None
   in
-  match normalized.jkind.with_bounds with
-  | No_with_bounds ->
-    Some
-      { t with
-        jkind = { normalized.jkind with with_bounds = No_with_bounds };
-        quality =
-          Not_best (* As required by the fact that this is a [jkind_r] *)
-      }
-  | With_bounds _ -> None
+  match !round_up_from_ikind with
+  | None -> legacy ()
+  | Some { round_up_floor } ->
+    (* Deletion-wave-2: derive the rounded-up floor from the ikind engine. The
+       ikind is the true crossing (LFP/GFP fixpoint), which on deep recursive
+       with-bounds is TIGHTER than legacy [Ignore_best normalize] (whose fuel
+       limit over-approximates to top). Both are sound upper bounds; the ikind is
+       the precise one. *)
+    let from_ikind : (l * allowed) jkind option =
+      (* Legacy [Ignore_best normalize] conservatively KEEPS with-bounds over an
+         ABSTRACT base (jkind.ml [t_has_abstract_base]) rather than folding them
+         into an unknown floor, so [round_up] is irreducible ([None]) there. This
+         is reachable (functor + abstract [kind_] + with-bound) and
+         [nondep_type_decl] relies on it, so reproduce it before consulting the
+         ikind floor. *)
+      let base_is_abstract =
+        match (Base_and_axes.fully_expand_aliases env t.jkind).base with
+        | Layout _ -> false
+        | Kconstr _ -> true
+      in
+      let has_with_bounds =
+        match t.jkind.with_bounds with
+        | No_with_bounds -> false
+        | With_bounds _ -> true
+      in
+      if has_with_bounds && base_is_abstract && not roundup_force_some
+      then None
+      else
+        match round_up_floor env (t |> disallow_right) with
+        | None -> None
+        | Some floor ->
+          Some
+            { t with
+              jkind =
+                { t.jkind with
+                  ikind_floor = floor;
+                  with_bounds = No_with_bounds
+                };
+              quality = Not_best
+            }
+    in
+    (if !Clflags.ikinds_validate
+     then
+       (* Differential: the ikind floor must be a SOUND upper bound, i.e. [<=]
+          the legacy floor (legacy over-approximates via fuel exhaustion; the
+          ikind is tighter). A Some/None structural disagreement, or an ikind
+          floor that EXCEEDS legacy (ikind > legacy) is fatal -- the latter would
+          mean the ikind is looser/unsound, which must never happen. *)
+       match legacy (), from_ikind with
+       | None, None -> incr roundup_none_agree
+       | Some a, Some b ->
+         if not (Axis_lattice.leq b.jkind.ikind_floor a.jkind.ikind_floor)
+         then
+           Misc.fatal_errorf
+             "round_up: ikind-derived floor is NOT <= legacy normalize floor \
+              (ikind looser than legacy -- unsound)"
+         else if Axis_lattice.equal b.jkind.ikind_floor a.jkind.ikind_floor
+         then incr roundup_leq_equal
+         else incr roundup_leq_strict
+       | Some _, None ->
+         Misc.fatal_errorf
+           "round_up: ikind derivation is None but legacy normalize is Some"
+       | None, Some _ ->
+         Misc.fatal_errorf
+           "round_up: ikind derivation is Some but legacy normalize is None");
+    from_ikind
 
 type sub_or_intersect =
   | Sub
