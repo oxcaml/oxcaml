@@ -17,10 +17,6 @@
 
 val is_function_type :
       Env.t -> Types.type_expr -> (Types.type_expr * Types.type_expr) option
-(* Like [is_function_type], but also returns the argument mode of the arrow. *)
-val is_function_type_with_arg_mode :
-      Env.t -> Types.type_expr ->
-      (Types.type_expr * Types.type_expr * Mode.Alloc.lr) option
 val is_base_type : Env.t -> Types.type_expr -> Path.t -> bool
 
 val maybe_pointer_type : Env.t -> Types.type_expr

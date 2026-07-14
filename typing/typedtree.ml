@@ -423,7 +423,8 @@ and expression_desc =
 
 and ident_kind =
   | Id_value
-  | Id_prim of Mode.Locality.l option * Jkind.Sort.t option
+  | Id_prim of
+      Mode.Locality.l option * Jkind.Sort.t option * Mode.Yielding.l
 
 and meth =
   | Tmeth_name of string
@@ -727,6 +728,7 @@ and primitive_coercion =
     pc_type: type_expr;
     pc_poly_mode: Mode.Locality.l option;
     pc_poly_sort: Jkind.Sort.t option;
+    pc_yielding: Mode.Yielding.l;
     pc_env: Env.t;
     pc_loc : Location.t;
   }

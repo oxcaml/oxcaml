@@ -2692,6 +2692,22 @@ let try_expand_safe_opt env ty =
 let expand_head_opt env ty =
   try try_expand_head try_expand_safe_opt env ty with Cannot_expand -> ty
 
+let prim_params_yielding env ty ~arity =
+  let rec arg_yieldings acc ty n =
+    if n <= 0 then Some acc
+    else
+      match get_desc (expand_head_opt env ty) with
+      | Tarrow ((_, marg, _), _, ret, _) ->
+        let yielding =
+          Yielding.disallow_right (Alloc.proj_comonadic Yielding marg)
+        in
+        arg_yieldings (yielding :: acc) ret (n - 1)
+      | _ -> None
+  in
+  match arg_yieldings [] ty arity with
+  | None | Some [] -> Yielding.disallow_right Yielding.max
+  | Some (_ :: _ as yieldings) -> Yielding.join yieldings
+
 let is_principal ty =
   not !Clflags.principal || get_level ty = generic_level
 
