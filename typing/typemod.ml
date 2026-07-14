@@ -242,23 +242,19 @@ let check_for_generated_type_or_jkind ~funct_body env loc mty exn =
       raise (Error (loc, env, exn tj))
 
 (* Extract the signature and the mode of a functor's return, given the signature
-   [sig_acc] and mode [md_mode] of the functor argument. [funct_yielding] is the
-   yielding mode of the functor expression itself, or [None] when there is no
-   module expression (includes in signatures, which have no runtime
-   application). *)
+   [sig_acc] and mode [md_mode] of the functor argument. [funct_mode] is the
+   mode of the functor expression itself. *)
 let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
-      ~funct_yielding =
+      ~funct_mode =
   let sig_acc = List.rev sig_acc in
   (* Applying the functor runs its body, which can perform a free effect if the
      functor closes over a yielding value (its own mode) or if the enclosing
      structure it is applied to is yielding (the argument's mode). *)
   let yielding =
-    match funct_yielding with
-    | None -> Yielding.max |> Yielding.disallow_right
-    | Some funct_yielding ->
-      Yielding.join
-        [ funct_yielding;
-          Yielding.disallow_right (Value.proj_comonadic Yielding md_mode) ]
+    let yielding m =
+      Yielding.disallow_right (Value.proj_comonadic Yielding m)
+    in
+    Yielding.join [yielding funct_mode; yielding md_mode]
   in
   match Mtype.scrape_alias env mty with
   | Mty_functor (Named (param, mty_param, mm_param),mty_result,mm_result)
@@ -2236,9 +2232,10 @@ and transl_signature ?(interface_toplevel = false) env
       match sincl.pincl_kind with
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
+        let funct_mode = Value.disallow_right Value.max in
         let sg, mode, incl_kind =
           extract_sig_functor_open false env smty.pmty_loc mty sig_acc md_mode
-            ~funct_yielding:None
+            ~funct_mode
         in
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
@@ -3445,15 +3442,11 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
     funct_body env (funct, funct_shape) app_view =
   (* Applying a functor runs its body, which can perform a free effect if the
      functor closes over a yielding value (its own mode) or is given a yielding
-     argument (the argument's mode). [arg] is [None] for [F ()]. *)
-  let functor_application_yielding ~funct ~arg =
+     argument (the argument's mode). *)
+  let functor_application_yielding ~funct ~arg_mode =
     let yielding m = Value.proj_comonadic Yielding m in
     Yielding.join
-      (yielding (mode_without_locks_exn funct.mod_mode)
-       ::
-       (match arg with
-        | None -> []
-        | Some arg -> [yielding (fst arg.mod_mode)]))
+      [yielding (mode_without_locks_exn funct.mod_mode); yielding arg_mode]
   in
   (* CR modes: Apply currying constraints if the application is partial
      and returns a functor, similar to constraints for functions.
@@ -3498,7 +3491,9 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
         ~mode_arg:None;
       { mod_desc =
           Tmod_apply_unit
-            (funct, functor_application_yielding ~funct ~arg:None);
+            (funct,
+             functor_application_yielding ~funct
+               ~arg_mode:(Value.disallow_right Value.legacy));
         mod_type = mty_res;
         mod_mode = alloc_as_value (Alloc.disallow_right mm_res), None;
         mod_env = env;
@@ -3590,7 +3585,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       { mod_desc =
           Tmod_apply
             (funct, arg, coercion,
-             functor_application_yielding ~funct ~arg:(Some arg));
+             functor_application_yielding ~funct
+               ~arg_mode:(fst arg.mod_mode));
         mod_type = mty_appl;
         mod_mode = Value.disallow_right mm_res, None;
         mod_env = env;
@@ -3697,14 +3693,10 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
       match sincl.pincl_kind with
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
-        let funct_yielding =
-          Value.proj_comonadic Yielding
-            (Typedtree.mode_without_locks_exn modl.mod_mode)
-        in
+        let funct_mode = Typedtree.mode_without_locks_exn modl.mod_mode in
         let sg, mode, incl_kind =
           extract_sig_functor_open funct_body env smodl.pmod_loc
-            modl.mod_type sig_acc md_mode
-            ~funct_yielding:(Some funct_yielding)
+            modl.mod_type sig_acc md_mode ~funct_mode
         in
         incl_kind, sg, Value.disallow_right mode
       | Structure ->
