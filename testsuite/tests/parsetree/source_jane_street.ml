@@ -891,7 +891,8 @@ let unary_minus_plus () =
 Line 4, characters 17-22:
 4 |   let b = stack_ (-42) in
                      ^^^^^
-Error: This expression is not an allocation site.
+Error: Stack allocating literals is not supported;
+       they are not allocated at runtime.
 |}]
 
 (**********)
