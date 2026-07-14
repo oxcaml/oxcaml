@@ -551,3 +551,195 @@ these shapes).
   fallback: W4's multi-atom branch uses the same escaper but is only reachable
   via a finicky module-mismatch+`&`-product, since single-decl `&`-products
   render synthetic non-keyword letters).
+
+---
+
+## Stage C round_up re-route: ENGINE-DIVERGENCE finding (case (b), NOT shipped)
+
+**Outcome:** the Stage C(ii) attempt to re-route `Jkind.round_up` off legacy
+`Base_and_axes.normalize` onto the ikind engine was REVERTED (rebase-dropped;
+was commit 036fcf989). `round_up` keeps calling legacy `normalize ~mode:Ignore_best`.
+The `Base_and_axes.normalize` fixpoint SURVIVES. (NOTE: this entry was written when
+only C(ii) had been reverted; C(i) fold-stop and C(iii) Violation-display were
+subsequently reverted too, so the fixpoint is now live on ALL its original callers
+-- normalize_decl_jkinds, round_up, Violation.of_, and get_mod_bounds. See the
+FINAL LEDGER below.)
+
+**The divergence.** `round_up`'s legacy `Some` floor folds the with-bounds UP into
+a bounds-free floor. On the GADT-equation input class it disagrees with every ikind
+derivation tried:
+- Input class: the jkind produced by `Ctype.add_jkind_equation` <-
+  `add_gadt_equation` (`jkind_of_abstract_type_declaration` on the local abstract
+  type) over a RECURSIVE with-bound type. Concrete site: `ast-invariants/test.ml`,
+  GADT `type _ kind = Implem : Parsetree.structure kind | Interf : Parsetree.signature kind`,
+  matched by `let parse : type a. a kind -> ...`. Reached via
+  `round_up <- intersect_type_jkind (ctype.ml:3589) <- add_jkind_equation (4654)
+  <- add_gadt_equation (4710) <- unify3`. 18 occurrences, 1 shape, corpus-wide
+  (whole testsuite); minimal `int list` / recursive-record GADTs do NOT reproduce.
+- Floors (Axis_lattice, 11 axes): legacy `[2,1,1,3,3,1,1,3,3,1,2]` (with-bounds
+  folded up on the 7 modal axes) vs ikind `[2,1,0,0,0,0,0,0,0,1,2]` (bare
+  immutable_data base = SLICE34-PREP §4's with-bounds-EXCLUDED base poly, modal
+  axes at bot). ikind <= legacy on every axis, strictly below on the 7 modal ones
+  -> UNSOUND for `round_up` (violates `t <= round_up(t)`).
+- BOTH ikind modes give the SAME `[2,1,0,...]`: NORMAL-mode `to_terms` name-free
+  join AND ROUND_UP-mode `Solver.round_up` (the `crossing_of_jkind` primitive).
+  So it is not a floor-primitive choice: `ckind_of_jkind` on the equation-jkind
+  does not surface the recursive with-bound contributions that legacy
+  `Ignore_best normalize` expands/folds. Reproducing legacy's fold = rebuilding
+  normalize inside the ikind engine = the expensive branch, declined and deferred
+  to the user as a follow-up (pinned by the regression test below).
+
+**Error-taxonomy lesson.** The first fix attempt was itself instructive: when I
+noticed `Solver.round_up` (Round_up mode) collapses abstract with-bounds to top
+and thus loses `round_up`'s load-bearing `None` (irreducible) path, I OVER-
+CORRECTED — abandoning `Solver.round_up` for the floor ENTIRELY and using the
+name-free const-base idiom (correct only for crossing/print, where with-bounds are
+carried separately). That produced the bounds-EXCLUDED base, byte-identical to the
+documented base poly — a mechanism, not a coincidence. Lesson: rescue the ONE part
+that needs it (None-detection), don't discard the primitive that was right for the
+FLOOR. (In the end even the correct primitive under-computed — genuine engine
+divergence, case (b).)
+
+**Detector coverage.** The armed round_up validate-differential CAUGHT this on real
+code (ast-invariants) that two synthetic corpora + a fired seeded-fault had all
+passed — the value of gating the re-route with the differential + running the real
+suite. With the re-route reverted, that differential is gone; `round_up` fidelity
+is now just "it still calls legacy," and the surviving Stage-B crossing differential
++ externality differential + OXCAML_IKINDS_VALIDATE recompute harness cover the rest.
+
+## Gotchas for successors
+
+- **`ocamlformat --check` exit code via a pipe is a LIE.** `ocamlformat ... --check
+  f | head` (or `| tail`) makes `$?` reflect `head`, not ocamlformat, so a DIRTY
+  file reads as clean. Verify the exit code DIRECTLY: `ocamlformat ... --check f &&
+  echo CLEAN || echo DIRTY`. (This masked Stage A/B leaving jkind/ikind dirty;
+  fixed in the fmt-hygiene commit. ocamlformat version is pinned `0.29.0` in
+  `typing/.ocamlformat`.)
+- **`/tmp` is a SEPARATE 4G filesystem** (`/dev/mapper/vg01-tmp`), distinct from
+  the 500G+ `/usr/local/home`. A full `make compiler`/`make test` default-TMPDIRs
+  to `/tmp` and fills it -> `Error: I/O error: No space left on device` even though
+  `df .` shows hundreds of GB free. Route builds/tests to the big fs:
+  `TMPDIR=<worktree>/_tmp/ttmp make ...`. Stray `_tmp/bundled_*.s` (262M each) and
+  `_runtest/` accumulate; both are regenerable and safe to delete from your own
+  worktree.
+
+## Stage C fold-stop (C(i)): SECOND engine-divergence finding (-principal), REVERTED
+
+The Stage C(i) fold-stop -- `normalize_decl_jkinds` storing the RAW decl jkind
+instead of the `Require_best`-normalized one -- was REVERTED (rebase-dropped, was
+commit 7a3708c6b) per USER RULING, on evidence of a -principal verdict flip.
+
+- Symptom: the full non-validate suite showed 0 NORMAL-mode flips (run-expect green
+  corpus-wide) but 29 tests failing check-program-output under -PRINCIPAL, all in
+  jkind/kind dirs.
+- Attribution chain: Stage A (e224e71e8) proven clean by the wave's own full-suite
+  gate (2330/0, includes check-program-output); Stage B (0d1f58d3f) built and
+  targeted-run CLEAN on gadt_ikinds incl. -principal; HEAD-with-C(i) FAILS the same
+  -principal check. C(iii) is display-only and cannot cause success->error. => C(i).
+- Mechanism: C(i) runs the annotation sub-check `Ikind.sub_jkind_l` on the RAW decl
+  jkind (typedecl.ml:3609 raise site). The sub-check was ALREADY ikind-native, so
+  this is NOT a missed-consumer re-route; what changed is raw-vs-`Require_best`-folded
+  INPUT. Under -principal the raw inferred kind `value non_float mod portable` FAILS
+  the annotation `value mod portable with (type : value mod portable) abstract`, which
+  the folded jkind passed. Class: existential + `with (type:...) abstract`
+  (gadt_ikinds `existential_abstract`). Regression-pinned (see below).
+
+## UNIFIED PATTERN (the real deliverable of what Stage C did NOT ship)
+
+Two independent ikind-engine divergences, same root, found on two different stricter
+paths -- the ikind engine ANSWERING FROM RAW with-bound forms is WEAKER than the
+legacy `Base_and_axes.normalize` FOLD on complex with-bound shapes:
+
+  1. round_up (C(ii)): on the GADT-equation jkind (add_gadt_equation ->
+     intersect_type_jkind), the ikind derivation yields the with-bounds-EXCLUDED
+     const base [2,1,0,0,0,0,0,0,0,1,2] where legacy folds them up to
+     [2,1,1,3,3,1,1,3,3,1,2]. Both NORMAL and ROUND_UP ikind modes give the base.
+  2. sub-check (C(i)): under -principal, sub_jkind_l on the RAW decl jkind rejects
+     `value non_float mod portable` vs `... with (type:...) abstract` where the
+     folded jkind is accepted.
+
+Turning "delete the normalize fold" from a plausible-sounding task into a
+precisely-scoped ENGINE workstream: to delete the fold, the ikind engine must
+reproduce, on raw with-bound forms, what `Ignore_best`/`Require_best normalize`
+computes by folding -- for the round_up floor AND the -principal sub-check. Until
+then the fixpoint must stay. Both shapes are pinned as regression tests
+(round_up_gadt_equation_ikinds.ml; the gadt_ikinds existential_abstract case).
+
+## Probe/harness preservation
+
+The fold-stop cross-unit probe sources (unit A foldable/param/allow_any decls +
+unit B crossing/subkind/representation exercises) and the round_up floor-dump
+instrumentation are preserved under `_tmp/probe/`, `_tmp/flip/`, `_tmp/synth*/` in
+the ik5m-work worktree -- the harness for whoever retries fold-stop after the engine
+work. (They die with the code revert but the SOURCES are kept.)
+
+## STAGE5F FINAL LEDGER (PAYOFF-2+3 deletion wave)
+
+SHIPS (on branch ik/pr2-print-deletions, FINAL chain: Stage A -> Stage B -> fmt ->
+knowledge):
+  - Stage A: base_and_axes floor field retype mod_bounds -> ikind_floor :
+    Axis_lattice.t; cmi magic CMI-override 582 -> 583 (shared VERSION untouched at
+    581), rejection-tested both directions.
+  - Stage B: to_unsafe_mode_crossing re-routed to the ikind engine (name-free const
+    floor; with-bounds carried separately) + permanent validate differential;
+    seeded-fault-proven, blast-radius clean.
+  - fmt hygiene (ocamlformat 0.29.0; formats the Stage A retype + Stage B hook
+    jkind/ikind lines).
+  - knowledge: this ledger + the two engine-divergence entries + two regression
+    pins (round_up_gadt_equation_ikinds.ml, foldstop_principal_subcheck_ikinds.ml).
+
+REVERTED (all of Stage C's semantic deletions; documented + regression-pinned where
+applicable; engine-workstream follow-up):
+  - C(i) fold-stop (write-path): -principal sub_jkind_l divergence on raw vs folded
+    decl jkind (existential + with-(type:...)-abstract). Engine evidence.
+  - C(ii) round_up re-route: GADT-equation floor divergence (ikind base vs legacy
+    fold). Engine evidence.
+  - C(iii) Violation.of_ display off normalize: NOT an engine divergence -- it is
+    display-quality. Under -principal the un-normalized annotation rendered
+    self-contradictory diagnostics (`mod uncontended <= mod uncontended` etc.),
+    garbage-class under the promotion doctrine (deliberate/justified, NEVER wrong-on-
+    its-face) and outside the user's error-text waiver. Its justification was the
+    fold deletion, which died on engine evidence; per the uniformity-breakage
+    doctrine C(iii) dies with it rather than being re-accommodated (a normalize-for-
+    display refinement would be the pre-C(iii) state with extra steps).
+
+RESIDUAL: the `Base_and_axes.normalize` fixpoint SURVIVES, fully live on BOTH the
+write path (normalize_decl_jkinds fold, restored by the C(i) revert) and the read
+path (round_up via legacy; get_mod_bounds feeding the externality validate
+differential; Violation.of_ display, restored by the C(iii) revert). `Require_best`
+mode is live again.
+
+LOC NET: POSITIVE (the wave ADDS code net) -- the honest outcome. The headline
+"delete the normalize fixpoint" did NOT happen: ALL THREE of Stage C's changes that
+touched the fold (C(i)/C(ii)/C(iii)) were reverted -- the first two on engine-
+divergence evidence, the third on a display-quality regression whose justification
+died with them. What ships is the S8 retype (field + boundary conversions) and the
+crossing re-route + its differential -- both ADD/move code; nothing structural was
+deleted. The deliverable is (a) the retype/crossing-re-route groundwork and (b) the
+two precisely-characterized, regression-pinned engine divergences that turn "delete
+normalize" into a scoped engine workstream: the ikind engine must reproduce, on RAW
+with-bound forms, what the legacy fold computes -- for the round_up floor AND the
+-principal sub-check -- before the fold can be removed from any path.
+
+## PERF A/B (endgame) -- recorded honestly, box was loaded
+
+Interleaved (perf_time.py, ik5prep-work/_tmp/perf) base = c97be81e9 (built+installed
+in prwork/ik5f6-legacybase) vs final = reduced chain (A+B) @ 87fdb2967. ocamlc.opt
+boot binaries, each using its own _prefix stdlib (base I582, final I583).
+
+  RUN 1 (reps 11): perf_records median 326.44 -> 333.45 = +2.15% (min 311.88 -> 312.50 = +0.20%);
+                   perf_plain   median 1495.72 -> 1491.52 = -0.28% (min 1446.20 -> 1448.23 = +0.12%)
+  RUN 2 (reps 17): perf_records median 331.41 -> 327.72 = -1.11% (min 305.70 -> 314.11 = +2.75%);
+                   perf_plain   median 1489.36 -> 1518.56 = +1.96% (min 1421.82 -> 1438.38 = +1.16%)
+  Box load (uptime 1/5/15-min) ~ 31-51 throughout (prep baseline was taken at 7-14).
+
+CONCLUSION: the Δ SIGN FLIPS between runs on BOTH cells (records +2.15% -> -1.11%;
+plain -0.28% -> +1.96%), so there is no consistent-sign regression -- the wave's
+impact is BELOW the measurement noise floor at the available box load (~45).
+A consistent-sign >1% regression is ruled out. Sub-1% precision was NOT achievable
+this window (load too high); this is NOT a claim of "<1%", it is "below noise floor,
+no consistent regression." Consistent with the shipped surface being cold-path
+(Stage A field retype: hot ikind reads drop a to_axis_lattice + a couple boundary
+conversions; Stage B crossing re-route only on the rare allow_any_crossing decl path
++ a validate-only differential). A quiet-box re-measure (17+ reps, load <10) is
+queued as a pre-push backstop; a consistent-sign >1% there = STOP-before-push.
