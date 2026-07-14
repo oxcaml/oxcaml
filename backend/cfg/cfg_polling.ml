@@ -116,7 +116,7 @@ let () =
 
 (* Compututation of the "safe" map, which is a map from labels to booleans where
    `true` indicates the block contains a safe point such as a poll or a heap
-   allocation instruction. (Local allocations do not check the young limit, and
+   allocation instruction. (Local allocations do not call the GC, and
    are hence not safe points.) *)
 
 (* CR-soon xclerc for xclerc: given how we use the safe map below, it is not
@@ -195,7 +195,7 @@ module Polls_before_prtc_transfer = struct
       else Ok Always_polls
     | Op (Alloc { mode = Heap; bytes = _; dbginfo = _ }) -> Ok Always_polls
     | Op (Alloc { mode = Local; bytes = _; dbginfo = _ }) ->
-      (* A local allocation does not check the young limit, and is hence not a
+      (* A local allocation does not call the GC, and is hence not a
          polling point. *)
       Ok dom
     | Op

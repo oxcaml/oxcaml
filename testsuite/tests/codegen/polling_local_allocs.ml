@@ -86,7 +86,7 @@ heap_alloc_loop:
 |}]
 
 (* A loop whose only allocation is local gets a poll on its back edge: a
-   local allocation does not check [young_limit] (neither on its fast path,
+   local allocation does not call the GC (neither on its fast path,
    which only involves [local_sp]/[local_limit], nor in
    [caml_local_realloc]), and is therefore not a safe point. *)
 let[@inline never] local_alloc_loop n =
