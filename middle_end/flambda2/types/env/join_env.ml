@@ -1769,6 +1769,9 @@ let import_type t ty : t =
 
 let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join
     types_in_target_env inverse_relations =
+  let number_of_joined_envs =
+    Index.Set.cardinal (Joined_envs.keys t.joined_envs)
+  in
   Name_in_target_env.Map.fold
     (fun name types (types_in_target_env, inverse_relations, t) ->
       if
@@ -1778,37 +1781,93 @@ let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join
         Misc.fatal_errorf
           "Processing join of %a but we already have a type for it."
           Name_in_target_env.print name;
-      let heads =
-        (Index.Map.bindings (Joined_envs.expand_heads t.joined_envs types)
-          : (Index.t * Type_in_one_joined_env.t) list
-          :> (Index.t * TG.t) list)
-      in
-      let[@local] regular_join () =
-        match n_way_join_type t heads with
-        | Unknown, t -> types_in_target_env, inverse_relations, t
-        | Known ty, t ->
-          let ty, inverse_relations =
-            recover_inverse_relations inverse_relations (name :> Name.t) ty
-          in
-          let ty = Type_in_target_env.create ty in
-          ( Name_in_target_env.Map.add name ty types_in_target_env,
-            inverse_relations,
-            t )
-      in
-      match heads with
-      | [] -> regular_join ()
-      | (_, t1) :: ts ->
-        if List.for_all (fun (_, t2) -> t1 == t2) ts
-        then
-          let t = import_type t t1 in
-          let t1, inverse_relations =
-            recover_inverse_relations inverse_relations (name :> Name.t) t1
-          in
-          let ty = Type_in_target_env.create t1 in
-          ( Name_in_target_env.Map.add name ty types_in_target_env,
-            inverse_relations,
-            t )
-        else regular_join ())
+      if Index.Map.cardinal types < number_of_joined_envs
+      then
+        (* [name] (a local variable or existential created during the join) only
+           exists in a strict subset of the joined environments. Such entries
+           can arise from [alias_types_of_local_var] for imported variables, and
+           from [These_canonicals] bindings created from positions that only
+           involve a subset of the environments (e.g. the fields or relation
+           variables of a variant whose shape differs across the joined
+           environments).
+
+           An environment in which [name] does not exist provides no information
+           about it, i.e. contributes [Unknown] to the join, so the join of this
+           entry is [Unknown] and we must not record any top-level equation for
+           [name].
+
+           Joining only across the environments where [name] is defined and
+           recording the result unconditionally would be unsound: the joined
+           type can relate [name] to names that exist in all of the joined
+           environments (through [Is_int]/[Get_tag]/[Is_null] relations, or
+           through env extensions), thereby restricting the possible values of
+           those names on all paths, including the paths coming from
+           environments where [name] does not exist. For instance recording [x :
+           (Naked_immediate (Is_int y))], where [y] exists in all of the joined
+           environments, forces [y] to be 0 or 1 even on paths where [x] does
+           not exist and [y] can take other values. (This also guards the
+           physical-equality fast path below, which would otherwise import such
+           relational types verbatim, and prevents [recover_inverse_relations]
+           from stamping the corresponding reverse relations onto the related
+           names.)
+
+           Occurrences of [name] within joined types are still fine: they are
+           only placed in positions guarded by conditions that select exactly
+           the environments where [name] is defined (e.g. the field types of a
+           block shape apply only when the scrutinee is a block, which can only
+           happen along the paths whose environments contributed that block
+           shape).
+
+           Note that the old binary join instead joined such variables with
+           Bottom for the environments where they are not defined (on the
+           grounds that they are existentially quantified in the result), i.e.
+           it kept the join across only the defining environments. That was
+           sound for a type grammar in which a type for [name] could not
+           restrict the possible values of *other* names, but it is not sound in
+           the presence of the relations and env extensions described above.
+
+           TODO: instead of dropping the equation entirely, we could restore the
+           old behaviour soundly by keeping a weakened version of the subset
+           join for [name]: erase anything that can constrain other names
+           (relations and env extensions -- including those nested inside e.g.
+           block field types), keeping only structural information such as
+           immediates/blocks shapes and field aliases. Any such type is
+           inhabited whatever the values of the other names, so it is sound for
+           a variable that is existentially quantified in the result. No such
+           weakening operation on types currently exists. *)
+        types_in_target_env, inverse_relations, t
+      else
+        let heads =
+          (Index.Map.bindings (Joined_envs.expand_heads t.joined_envs types)
+            : (Index.t * Type_in_one_joined_env.t) list
+            :> (Index.t * TG.t) list)
+        in
+        let[@local] regular_join () =
+          match n_way_join_type t heads with
+          | Unknown, t -> types_in_target_env, inverse_relations, t
+          | Known ty, t ->
+            let ty, inverse_relations =
+              recover_inverse_relations inverse_relations (name :> Name.t) ty
+            in
+            let ty = Type_in_target_env.create ty in
+            ( Name_in_target_env.Map.add name ty types_in_target_env,
+              inverse_relations,
+              t )
+        in
+        match heads with
+        | [] -> regular_join ()
+        | (_, t1) :: ts ->
+          if List.for_all (fun (_, t2) -> t1 == t2) ts
+          then
+            let t = import_type t t1 in
+            let t1, inverse_relations =
+              recover_inverse_relations inverse_relations (name :> Name.t) t1
+            in
+            let ty = Type_in_target_env.create t1 in
+            ( Name_in_target_env.Map.add name ty types_in_target_env,
+              inverse_relations,
+              t )
+          else regular_join ())
     equations_to_join
     (types_in_target_env, inverse_relations, t)
 
