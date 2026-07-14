@@ -2642,6 +2642,13 @@ let externality_from_ikind : externality_from_ikind option ref = ref None
 
 let set_externality_from_ikind f = externality_from_ikind := Some f
 
+type crossing_from_ikind =
+  { crossing_read : 'l 'r. Env.t -> ('l * 'r) jkind -> Mode.Crossing.t }
+
+let crossing_from_ikind : crossing_from_ikind option ref = ref None
+
+let set_crossing_from_ikind f = crossing_from_ikind := Some f
+
 let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
   let jk, _ =
     Base_and_axes.normalize ~mode:Ignore_best ~skip_axes
@@ -2662,10 +2669,33 @@ let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
     Misc.fatal_error
       "Jkind.get_mod_crossing: violated Ignore_best normalize invariant."
 
-let to_unsafe_mode_crossing jkind =
-  { unsafe_mod_bounds = Mod_bounds.to_mode_crossing (Mod_bounds.of_axis_lattice jkind.jkind.ikind_floor);
-    unsafe_with_bounds = jkind.jkind.with_bounds
-  }
+let to_unsafe_mode_crossing env jkind =
+  (* Stage B: derive the mode-crossing floor through the ikind engine rather
+     than reading the stored [ikind_floor] field directly, decoupling this last
+     semantic reader from the legacy decl-normalize path. Under
+     [OXCAML_IKINDS_VALIDATE] the ikind-derived crossing is checked against the
+     stored-floor crossing (fatal on disagreement). *)
+  let legacy () =
+    Mod_bounds.to_mode_crossing
+      (Mod_bounds.of_axis_lattice jkind.jkind.ikind_floor)
+  in
+  let unsafe_mod_bounds =
+    match !crossing_from_ikind with
+    | None -> legacy ()
+    | Some { crossing_read } ->
+      let from_ikind = crossing_read env jkind in
+      if !Clflags.ikinds_validate
+      then begin
+        let l = legacy () in
+        if not (Mode.Crossing.equal l from_ikind)
+        then
+          Misc.fatal_errorf
+            "to_unsafe_mode_crossing: ikind-derived crossing disagrees with \
+             legacy stored-floor crossing"
+      end;
+      from_ikind
+  in
+  { unsafe_mod_bounds; unsafe_with_bounds = jkind.jkind.with_bounds }
 
 let all_except_externality =
   Axis_set.singleton (Nonmodal Externality) |> Axis_set.complement

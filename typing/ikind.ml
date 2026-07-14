@@ -2103,6 +2103,37 @@ let () =
               Axis_lattice.externality lat))
     }
 
+(* Stage B: install the ikind-native mode-crossing derivation into
+   [Jkind.to_unsafe_mode_crossing] (the allow_any_crossing decl path). The
+   crossing floor is the CONST base of the derived ikind LDD -- the join of its
+   name-free terms -- NOT [round_up]: [to_unsafe_mode_crossing] carries the
+   with-bounds separately in [unsafe_with_bounds], so folding them into the
+   crossing (as [round_up] does) would double-count them. The const floor is
+   exactly what the stored floor field held (the print path derives its floor
+   the same way, see [render_jkind_from_ikind]). Scratch ctx + isolated pending
+   keep this semantic read from perturbing an outer solve. *)
+let () =
+  Jkind.set_crossing_from_ikind
+    { Jkind.crossing_read =
+        (fun env jkind ->
+          Ldd.with_isolated_pending (fun () ->
+              let ctx =
+                create_scratch_ctx ~mode:Solver.Normal ~env:(Some env)
+              in
+              let node = Solver.ckind_of_jkind ctx jkind in
+              Ldd.solve_pending ();
+              let terms = Ldd.to_terms (Ldd.inline_solved_vars node) in
+              let floor =
+                List.fold_left
+                  (fun acc (c, names) ->
+                    match names with
+                    | [] -> Axis_lattice.join acc c
+                    | _ -> acc)
+                  Axis_lattice.bot terms
+              in
+              Axis_lattice.to_mode_crossing floor))
+    }
+
 type sub_or_intersect = Jkind.sub_or_intersect
 
 let with_bounds_is_empty : type l r. (l * r) Types.with_bounds -> bool =
