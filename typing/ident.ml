@@ -354,7 +354,8 @@ let rec find_previous_or_null id = function
     None ->
       Null
   | Some k ->
-      if same id k.ident then This k.data else find_previous_or_null id k.previous
+      if same id k.ident then This k.data
+      else find_previous_or_null id k.previous
 
 let rec find_same_or_null id = function
     Empty ->
