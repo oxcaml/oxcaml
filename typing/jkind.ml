@@ -2496,6 +2496,8 @@ let for_object =
     }
     ~annotation:None ~why:(Value_creation Object)
 
+let for_empty_object = Builtin.immutable_data ~why:Object
+
 let for_array_element_sort ~level =
   let jkind_desc, sort =
     Jkind_desc.of_new_sort_var ~level
