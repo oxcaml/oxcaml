@@ -200,14 +200,25 @@ end) = struct
   let rec equal_local_env t1 t2 =
     (* Physical-equality fast path: the evaluator's memoization makes normal
        forms (and the environments and delayed thunks they contain) heavily
-       shared, so the same pair of sub-objects is compared repeatedly.  Without
+       shared, so identical sub-objects are compared repeatedly.  Without
        these [==] short circuits [equal] re-traverses shared sub-terms as a
-       tree, which is exponential on functor-heavy signatures. *)
+       tree, which is exponential on functor-heavy signatures.
+
+       INVARIANT (load-bearing for every [==] below, here and in
+       [equal_delayed_nf] and [equal_nf]): [x == y] must imply the
+       structural equality being short-circuited, which holds only while
+       all of those equalities are REFLEXIVE.  Every comparator currently
+       reachable (Ident, String, Uid, DeBruijn_index, Predef, Layout,
+       Item, integers) is.  If a field compared with a non-reflexive
+       equality is ever added (e.g. a float compared with polymorphic
+       [=], where [nan <> nan]), the [==] paths silently diverge from the
+       structural answer -- remove them or special-case that field. *)
     t1 == t2 ||
     (t1.depth = t2.depth &&
     Ident.Map.equal (Option.equal equal_delayed_nf) t1.subst t2.subst)
 
   and equal_delayed_nf t1 t2 =
+    (* [==] sound by the reflexivity invariant in [equal_local_env]. *)
     t1 == t2 ||
     match t1, t2 with
     | Thunk (l1, t1), Thunk (l2, t2) ->
@@ -290,6 +301,7 @@ end) = struct
         | NRec_var _ | NUnknown_type | NAt_layout _ ), _ ) -> false
 
   and equal_nf t1 t2 =
+    (* [==] sound by the reflexivity invariant in [equal_local_env]. *)
     t1 == t2 ||
     (Option.equal Uid.equal t1.uid t2.uid && equal_nf_desc t1.desc t2.desc)
 
