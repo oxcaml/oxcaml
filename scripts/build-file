@@ -48,7 +48,7 @@ try_target() {
 }
 
 # 1) Try top-level unwrapped libraries (ocamlcommon, ocamloptcomp, etc.)
-for lib in ocamlcommon ocamloptcomp ocamlbytecomp ocamljcomp oxcaml_common; do
+for lib in ocamlparsing ocamlcommon ocamloptcomp ocamlbytecomp ocamljcomp oxcaml_common; do
   if [ "$ext" = "cmx" ]; then
     target=".${lib}.objs/native/${base}.cmx"
   else

@@ -3,8 +3,16 @@
 version = "@VERSION@"
 description = "compiler-libs support library"
 
-package "common" (
+package "parsing" (
   requires = "compiler-libs"
+  version = "@VERSION@"
+  description = "Compiler utilities and parsing"
+  archive(byte) = "ocamlparsing.cma"
+  archive(native) = "ocamlparsing.cmxa"
+)
+
+package "common" (
+  requires = "compiler-libs compiler-libs.parsing"
   version = "@VERSION@"
   description = "Common compiler routines"
   archive(byte) = "ocamlcommon.cma"

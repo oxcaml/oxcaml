@@ -312,6 +312,7 @@ let native unix
     (* These are the dependencies of otherlibs/eval. *)
     let extra_libraries_for_eval =
       [ "unix/unix";
+        "compiler-libs/ocamlparsing";
         "compiler-libs/ocamlcommon";
         "compiler-libs/ocamloptcomp";
         "dynlink/dynlink";

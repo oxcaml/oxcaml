@@ -2818,7 +2818,7 @@ end = struct
     | Pdot _ as p ->
       Some
         (match root_module_name p with
-        | "Location" | "Longident" -> "ocamlcommon"
+        | "Location" | "Longident" -> "ocamlparsing"
         | mn ->
           mn |> String.lowercase_ascii |> delete_trailing_double_underscore)
     | Pident _ | Papply _ | Pextra_ty _ -> None
