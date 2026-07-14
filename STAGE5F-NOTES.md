@@ -678,8 +678,20 @@ work. (They die with the code revert but the SOURCES are kept.)
 SHIPS (on branch ik/pr2-print-deletions, FINAL chain: Stage A -> Stage B -> fmt ->
 knowledge):
   - Stage A: base_and_axes floor field retype mod_bounds -> ikind_floor :
-    Axis_lattice.t; cmi magic CMI-override 582 -> 583 (shared VERSION untouched at
-    581), rejection-tested both directions.
+    Axis_lattice.t. MAGIC: the retype changes the MARSHALLED Types shape, which is
+    embedded in the cmi AND in every typed-tree/signature-bearing format -- crucially
+    the bin-annot .cmt/.cmti/.cms (they marshal base_and_axes), plus cmo/cmx/exec.
+    So the SHARED MAGIC_NUMBER__VERSION is bumped 581 -> 582 (invalidates cmt/cms/
+    cmo/cmx/exec; over-inclusive but safe -- artifacts rebuilt every roll), and the
+    CMI keeps its own override at I583 (one ahead, for the earlier named-terms cmi
+    wire change). REJECTION-TESTED BOTH DIRECTIONS: (a) a stale I582 cmi is rejected
+    by the new compiler ("not a compiled interface for this version"); (b) a stale
+    T581 bin-annot .cmt (T-magic-headed, codex's garbage-decode path) is now rejected
+    by the cmt reader ("compiled typedtree file (cmt) for an older version") instead
+    of decoding the old boxed mod_bounds record as a garbage Axis_lattice int. [The
+    F1 review must-fix: the initial bump was cmi-only (I583, shared 581), which left
+    the T-headed .cmt at T581 = cross-version-matching and garbage-decoding; the
+    shared bump fixes it.]
   - Stage B: to_unsafe_mode_crossing re-routed to the ikind engine (name-free const
     floor; with-bounds carried separately) + permanent validate differential;
     seeded-fault-proven, blast-radius clean.
