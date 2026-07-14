@@ -228,6 +228,8 @@ module type Float_by_bit_pattern = sig
 
   val to_bits : t -> bits
 
+  val of_int64 : int64 -> t
+
   val of_string : string -> t
 
   val to_float : t -> float
@@ -256,6 +258,11 @@ module Float_by_bit_pattern_gen (Bits : sig
 
   val float_of_bits : t -> float
 
+  (* Convert an [int64] to a float of this precision, returned as its bit
+     pattern. Important do this directly in the [float32] case to avoid double
+     rounding. *)
+  val of_int64 : int64 -> t
+
   val of_string : string -> t
 
   val compare : t -> t -> int
@@ -272,6 +279,8 @@ struct
   let of_bits bits = bits
 
   let to_bits bits = bits
+
+  let of_int64 i = Bits.of_int64 i
 
   let of_string str = Bits.of_string str
 
@@ -334,6 +343,8 @@ end
 module Float_by_bit_pattern = Float_by_bit_pattern_gen (struct
   include Int64
 
+  let of_int64 i = bits_of_float (Int64.to_float i)
+
   let of_string str = bits_of_float (float_of_string str)
 
   module IEEE_semantics = struct
@@ -368,6 +379,8 @@ end)
 module Float32_by_bit_pattern = Float_by_bit_pattern_gen (struct
   include Int32
   module F32 = Flambda2_floats.Float32
+
+  let of_int64 i = F32.to_bits (F32.of_int64 i)
 
   let of_string str = F32.to_bits (F32.of_string str)
 

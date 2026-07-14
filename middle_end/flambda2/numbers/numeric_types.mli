@@ -150,6 +150,8 @@ module type Float_by_bit_pattern = sig
 
   val to_bits : t -> bits
 
+  val of_int64 : int64 -> t
+
   val of_string : string -> t
 
   val to_float : t -> float
