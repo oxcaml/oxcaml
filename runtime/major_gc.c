@@ -773,15 +773,10 @@ static void adopt_orphaned_work (int expected_status)
 /* Default speed setting for the major GC */
 atomic_uintnat caml_percent_free = Percent_free_def;
 
-/* Idle-phase floor (upstream #14365): at the end of sweeping, do not
-   switch to marking until total_work_completed has advanced by at least
-   this many (sweep-work-unit) words since the start of the sweep phase.
-   Plain uintnat, matching every other entry in the gc-tweaks table: the
-   startup parser writes it before any domain runs, and a runtime
-   [Gc.Tweak.set] has the same benign-race caveat as all sibling tweaks.
-   (Upstream types it _Atomic with a fully atomic tweak table; if this
-   tree's table is ever atomicized -- see the TODO on [struct gc_tweak]
-   -- this variable should join it.) */
+/* Idle-phase floor (upstream #14365): after sweeping, marking is
+   deferred until this much (in sweep-work words) has been allocated
+   this cycle.  Plain like the other gc tweaks; upstream makes it
+   _Atomic together with its whole tweak table. */
 uintnat caml_small_heap_limit = Small_heap_limit_def;
 atomic_uintnat caml_max_percent_free = Max_percent_free_def;
 
@@ -1953,8 +1948,8 @@ static void cycle_major_heap_from_stw_single(
   work_counter_min_before_mark =
     work_counter_at_sweep_start + caml_small_heap_limit;
   CAML_GC_MESSAGE (MAJOR,
-                   "Sweep start: work counter %" CAML_PRIuNAT
-                   ", idle floor armed at %" CAML_PRIuNAT "\n",
+                   "Sweep start: work counter "F_U
+                   ", idle floor armed at "F_U"\n",
                    work_counter_at_sweep_start,
                    work_counter_min_before_mark);
   atomic_store(&caml_gc_mark_phase_requested, 0);
@@ -2254,14 +2249,12 @@ static void major_collection_slice(intnat howmuch,
       /* Idle phase: do nothing but commit to the work counter. */
       intnat todo = diffmod (atomic_load (&total_work_incurred), wkcnt);
       todo = min2 (max2 (todo, 0), idle);
-      /* Commit even when todo == 0: beyond the counters, the commit also
-         clears [requested_global_major_slice] once the slice target is
-         met (compare the opportunistic early-out above); skipping it
-         would leave an idle domain re-triggering global major-slice
-         STWs. */
+      /* Commit even when todo == 0: the commit also clears
+         [requested_global_major_slice] (as the opportunistic early-out
+         above does). */
       commit_major_slice_sweepwork (todo);
       want_mark = (todo == idle);
-      CAML_GC_MESSAGE (SLICE, "Idle phase: %" CAML_PRIdNAT "%s\n",
+      CAML_GC_MESSAGE (SLICE, "Idle phase: "F_D"%s\n",
                        todo, want_mark ? " [finished]" : "");
     }
     if (want_mark){
