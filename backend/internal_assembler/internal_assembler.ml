@@ -181,10 +181,19 @@ let assemble_one_section ~name instructions =
     }
 
 let get_sections ~delayed sections =
+  X86_binary_emitter.clear_cross_section_labels ();
   let get acc sections =
+    (* Assemble text-like sections first: data sections may contain
+       [Delta_uleb128] label differences that resolve only once the text
+       sections holding those labels have been assembled. *)
+    let text, others =
+      List.partition
+        (fun (name, _) -> Section_name.is_text_like name)
+        sections
+    in
     List.fold_left (fun acc (name, instructions) ->
       Section_name.Map.add name (assemble_one_section ~name instructions) acc)
-      acc sections
+      acc (text @ others)
   in
   (* DWARF sections must be emitted after .text and .data because they
      contain information that is produced when .text and .data are emitted.
