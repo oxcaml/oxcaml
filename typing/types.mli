@@ -421,7 +421,7 @@ and 'layout jkind_base =
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
-    mod_bounds : mod_bounds;
+    ikind_floor : Axis_lattice.t;
     with_bounds : 'd with_bounds
   }
   constraint 'd = 'l * 'r

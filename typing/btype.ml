@@ -490,10 +490,10 @@ let type_iterators_without_type_expr =
   and it_jkind_declaration it jkd =
     match jkd.jkind_manifest with
     | None -> ()
-    | Some { base = Kconstr (p, _); mod_bounds = _;
+    | Some { base = Kconstr (p, _); ikind_floor = _;
              with_bounds = No_with_bounds; _ } ->
       it.it_path p
-    | Some { base = Layout _; mod_bounds = _;
+    | Some { base = Layout _; ikind_floor = _;
              with_bounds = No_with_bounds; _ } ->
       ()
   and it_functor_param it = function
@@ -1285,16 +1285,16 @@ module Jkind0 = struct
         type l r.
         ('layout, l * r) base_and_axes ->
         ('layout, Allowance.allowed * r) base_and_axes option =
-     fun { base; mod_bounds; with_bounds } ->
+     fun { base; ikind_floor; with_bounds } ->
       match With_bounds.try_allow_l with_bounds with
       | None -> None
       | Some with_bounds ->
-        Some { base; mod_bounds = Obj.magic mod_bounds; with_bounds }
+        Some { base; ikind_floor = Obj.magic ikind_floor; with_bounds }
 
-    let try_allow_r { base; mod_bounds; with_bounds } =
+    let try_allow_r { base; ikind_floor; with_bounds } =
       match With_bounds.try_allow_r with_bounds with
       | Some with_bounds ->
-        Some { base; mod_bounds = Obj.magic mod_bounds; with_bounds }
+        Some { base; ikind_floor = Obj.magic ikind_floor; with_bounds }
       | None -> None
   end
 
@@ -1309,13 +1309,13 @@ module Jkind0 = struct
 
     let of_path path =
       { base = Kconstr (path, Jkind_types.Scannable_axes.max);
-        mod_bounds = Mod_bounds.max;
+        ikind_floor = Mod_bounds.to_axis_lattice Mod_bounds.max;
         with_bounds = No_with_bounds
       }
 
     let max =
       { base = Layout Jkind_types.Layout.Const.max;
-        mod_bounds = Mod_bounds.max;
+        ikind_floor = Mod_bounds.to_axis_lattice Mod_bounds.max;
         with_bounds = No_with_bounds
       }
 
@@ -1340,11 +1340,15 @@ module Jkind0 = struct
         | Kconstr (p1, sa1), Kconstr (p2, sa2) ->
           Path.same p1 p2 &&
           Jkind_types.Scannable_axes.equal sa1 sa2 &&
-          Mod_bounds.equal t1.mod_bounds t2.mod_bounds
+          Mod_bounds.equal
+            (Mod_bounds.of_axis_lattice t1.ikind_floor)
+            (Mod_bounds.of_axis_lattice t2.ikind_floor)
         | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
         | Layout l1, Layout l2 ->
           Jkind_types.Layout.Const.equal l1 l2 &&
-          Mod_bounds.equal t1.mod_bounds t2.mod_bounds
+          Mod_bounds.equal
+            (Mod_bounds.of_axis_lattice t1.ikind_floor)
+            (Mod_bounds.of_axis_lattice t2.ikind_floor)
       )
 
     (* CR layouts: Remove this once we have a better story for printing with
@@ -1364,7 +1368,10 @@ module Jkind0 = struct
 
       let mk_jkind ~crossing ~externality (layout : Layout.Const.t) =
         let mod_bounds = Mod_bounds.create crossing ~externality in
-        { base = Layout layout; mod_bounds; with_bounds = No_with_bounds }
+        { base = Layout layout;
+          ikind_floor = Mod_bounds.to_axis_lattice mod_bounds;
+          with_bounds = No_with_bounds
+        }
 
       let any =
         { jkind =
@@ -1467,7 +1474,8 @@ module Jkind0 = struct
                   (Base
                     (Scannable,
                       { nullability = Non_null; separability = Non_float }));
-              mod_bounds = immutable_data_mod_bounds;
+              ikind_floor =
+                Mod_bounds.to_axis_lattice immutable_data_mod_bounds;
               with_bounds = No_with_bounds
             };
           name = "immutable_data"
@@ -1480,7 +1488,8 @@ module Jkind0 = struct
                   (Base
                     (Scannable,
                       { nullability = Maybe_null; separability = Non_float }));
-              mod_bounds = immutable_data_mod_bounds;
+              ikind_floor =
+                Mod_bounds.to_axis_lattice immutable_data_mod_bounds;
               with_bounds = No_with_bounds
             };
           name = "immutable_data_or_null"
@@ -1494,7 +1503,7 @@ module Jkind0 = struct
                   (Base
                     (Scannable,
                       { nullability = Non_null; separability = Non_float }));
-              mod_bounds =
+              ikind_floor = Mod_bounds.to_axis_lattice
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:false
                      ~portability:true ~forkable:false ~yielding:false
@@ -1523,7 +1532,7 @@ module Jkind0 = struct
                   (Base
                     (Scannable,
                       { nullability = Non_null; separability = Non_float }));
-              mod_bounds = sync_data_mod_bounds;
+              ikind_floor = Mod_bounds.to_axis_lattice sync_data_mod_bounds;
               with_bounds = No_with_bounds
             };
           name = "sync_data"
@@ -1536,7 +1545,7 @@ module Jkind0 = struct
                   (Base
                     (Scannable,
                       { nullability = Maybe_null; separability = Non_float }));
-              mod_bounds = sync_data_mod_bounds;
+              ikind_floor = Mod_bounds.to_axis_lattice sync_data_mod_bounds;
               with_bounds = No_with_bounds
             };
           name = "sync_data_or_null"
@@ -1558,7 +1567,7 @@ module Jkind0 = struct
                   (Base
                     (Scannable,
                       { nullability = Non_null; separability = Non_float }));
-              mod_bounds = mutable_data_mod_bounds;
+              ikind_floor = Mod_bounds.to_axis_lattice mutable_data_mod_bounds;
               with_bounds = No_with_bounds
             };
           name = "mutable_data"
@@ -1571,7 +1580,7 @@ module Jkind0 = struct
                   (Base
                     (Scannable,
                       { nullability = Maybe_null; separability = Non_float }));
-              mod_bounds = mutable_data_mod_bounds;
+              ikind_floor = Mod_bounds.to_axis_lattice mutable_data_mod_bounds;
               with_bounds = No_with_bounds
             };
           name = "mutable_data_or_null"
@@ -1931,8 +1940,8 @@ module Jkind0 = struct
            having to add them to our with bounds only to be normalized away
            later. *)
         { t with
-          mod_bounds =
-            Mod_bounds.join t.mod_bounds
+          ikind_floor = Mod_bounds.to_axis_lattice @@
+            Mod_bounds.join (Mod_bounds.of_axis_lattice t.ikind_floor)
               (Mod_bounds.set_min_in_set Mod_bounds.for_arrow
                  (Jkind_axis.Axis_set.complement
                     (Mod_bounds.relevant_axes_of_modality ~modality)))
@@ -1976,7 +1985,7 @@ module Jkind0 = struct
             With_bounds.add_modality ~type_expr ~modality bounds)
           tys_modalities No_with_bounds
       in
-      { base; mod_bounds; with_bounds }
+      { base; ikind_floor = Mod_bounds.to_axis_lattice mod_bounds; with_bounds }
 
     let get_const t =
       Base_and_axes.map_layout_option Jkind_types.Layout.get_const t
@@ -2199,7 +2208,7 @@ module Jkind0 = struct
         in
         let desc : _ jkind_desc =
           { base = Layout layout;
-            mod_bounds = Mod_bounds.max;
+            ikind_floor = Mod_bounds.to_axis_lattice Mod_bounds.max;
             with_bounds = No_with_bounds }
         in
         fresh_jkind_poly desc ~annotation:None ~why:(Product_creation why)
@@ -2304,7 +2313,7 @@ module Jkind0 = struct
               (Sort
                  (Base Scannable,
                   { nullability = Non_null; separability = Non_float }));
-          mod_bounds;
+          ikind_floor = Mod_bounds.to_axis_lattice mod_bounds;
           with_bounds = No_with_bounds
         }
         ~annotation:None ~why:(Value_creation why)
@@ -2574,7 +2583,7 @@ module Jkind0 = struct
               (Sort
                  (Base Scannable,
                   { nullability = Non_null; separability = Separable }));
-          mod_bounds;
+          ikind_floor = Mod_bounds.to_axis_lattice mod_bounds;
           with_bounds = No_with_bounds
         }
         ~annotation:None ~why:(Primitive ident)
@@ -2584,7 +2593,7 @@ module Jkind0 = struct
       fresh_jkind
         { base = Layout (Sort (Base Scannable, { nullability = Non_null;
                                                  separability = Separable }));
-          mod_bounds = Mod_bounds.for_arrow;
+          ikind_floor = Mod_bounds.to_axis_lattice Mod_bounds.for_arrow;
           with_bounds = No_with_bounds
         }
         ~annotation:None ~why:(Value_creation Quoted_expression)
@@ -2599,7 +2608,7 @@ module Jkind0 = struct
         { base =
             Layout
               (Any { nullability = Maybe_null; separability = Separable });
-          mod_bounds;
+          ikind_floor = Mod_bounds.to_axis_lattice mod_bounds;
           with_bounds = No_with_bounds
         }
         ~annotation:None ~why:(Any_creation Array_type_argument)
@@ -2616,7 +2625,7 @@ module Jkind0 = struct
                  (Base Scannable,
                   { nullability = Non_null;
                     separability = Maybe_separable }));
-          mod_bounds;
+          ikind_floor = Mod_bounds.to_axis_lattice mod_bounds;
           with_bounds = No_with_bounds
         }
         ~annotation:None ~why:(Value_creation why)

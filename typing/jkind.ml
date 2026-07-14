@@ -768,10 +768,10 @@ module Base_and_axes = struct
   let jkind_desc_of_const const =
     { const with base = Base.map_layout ~f:Layout.of_const const.base }
 
-  let debug_print format_layout ppf { base; mod_bounds; with_bounds; _ } =
+  let debug_print format_layout ppf { base; ikind_floor; with_bounds; _ } =
     Format.fprintf ppf "{ base = %a;@ mod_bounds = %a;@ with_bounds = %a }"
       (Base.format format_layout)
-      base Mod_bounds.debug_print mod_bounds With_bounds.debug_print with_bounds
+      base Mod_bounds.debug_print (Mod_bounds.of_axis_lattice ikind_floor) With_bounds.debug_print with_bounds
 
   type 'a expand_result =
     | Expanded of 'a
@@ -794,10 +794,10 @@ module Base_and_axes = struct
       | { jkind_manifest = Some ({ with_bounds = No_with_bounds; _ } as jkind);
           _
         } ->
-        let mod_bounds = Mod_bounds.meet t.mod_bounds jkind.mod_bounds in
+        let mod_bounds = Mod_bounds.meet (Mod_bounds.of_axis_lattice t.ikind_floor) (Mod_bounds.of_axis_lattice jkind.ikind_floor) in
         if
           With_bounds.is_empty t.with_bounds
-          && Mod_bounds.equal mod_bounds jkind.mod_bounds
+          && Mod_bounds.equal mod_bounds (Mod_bounds.of_axis_lattice jkind.ikind_floor)
           &&
           let sa_won't_strengthen_jkind =
             match jkind.base with
@@ -815,7 +815,7 @@ module Base_and_axes = struct
         else
           Expanded
             { base = meet_scannable_axes jkind.base sa;
-              mod_bounds;
+              ikind_floor = Mod_bounds.to_axis_lattice mod_bounds;
               with_bounds = t.with_bounds
             })
 
@@ -909,7 +909,7 @@ module Base_and_axes = struct
       { t with with_bounds = No_with_bounds }, Sufficient_fuel
     | _
       when (not t_has_abstract_base)
-           && Mod_bounds.is_max_within_set t.mod_bounds
+           && Mod_bounds.is_max_within_set (Mod_bounds.of_axis_lattice t.ikind_floor)
                 (Axis_set.complement skip_axes) ->
       { t with with_bounds = No_with_bounds }, Sufficient_fuel
     | _ ->
@@ -1309,7 +1309,7 @@ module Base_and_axes = struct
                   (* must expand aliases before trusting b_jkind's mod_bounds *)
                   fully_expand_aliases env b_jkind.jkind
                 in
-                (found_jkind_for_ty ctl b_jkind_jkind.mod_bounds
+                (found_jkind_for_ty ctl (Mod_bounds.of_axis_lattice b_jkind_jkind.ikind_floor)
                    b_jkind_jkind.with_bounds b_jkind.quality skippable_axes
                  [@nontail])
               | None ->
@@ -1319,7 +1319,7 @@ module Base_and_axes = struct
                 found_jkind_for_ty ctl Mod_bounds.max No_with_bounds Not_best
                   skippable_axes [@nontail])))
       in
-      let mod_bounds = Mod_bounds.set_max_in_set t.mod_bounds skip_axes in
+      let mod_bounds = Mod_bounds.set_max_in_set (Mod_bounds.of_axis_lattice t.ikind_floor) skip_axes in
       let mod_bounds, with_bounds, ctl =
         match t.with_bounds with
         | No_with_bounds -> mod_bounds, No_with_bounds, Loop_control.starting
@@ -1332,7 +1332,7 @@ module Base_and_axes = struct
       let normalized_t : (_, l * r) base_and_axes =
         match mode, ctl.fuel_status with
         | Require_best, Sufficient_fuel | Ignore_best, _ ->
-          { t with mod_bounds; with_bounds }
+          { t with ikind_floor = Mod_bounds.to_axis_lattice mod_bounds; with_bounds }
         | Require_best, Ran_out_of_fuel ->
           (* Note [Ran out of fuel when requiring best]
              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1393,7 +1393,7 @@ module Jkind_desc = struct
 
   let unsafely_set_bounds env t ~from =
     let from = Base_and_axes.fully_expand_aliases env from in
-    { t with mod_bounds = from.mod_bounds; with_bounds = from.with_bounds }
+    { t with ikind_floor = from.ikind_floor; with_bounds = from.with_bounds }
 
   let expand_pair env t1 t2 =
     match
@@ -1414,14 +1414,14 @@ module Jkind_desc = struct
 
   let rec equate_or_equal ~allow_mutation env t1 t2 =
     let { base = base1;
-          mod_bounds = mod_bounds1;
+          ikind_floor = mod_bounds1;
           with_bounds = (No_with_bounds : (allowed * allowed) with_bounds);
           _
         } =
       t1
     in
     let { base = base2;
-          mod_bounds = mod_bounds2;
+          ikind_floor = mod_bounds2;
           with_bounds = (No_with_bounds : (allowed * allowed) with_bounds);
           _
         } =
@@ -1430,11 +1430,11 @@ module Jkind_desc = struct
     match base1, base2 with
     | Layout l1, Layout l2 ->
       Layout.equate_or_equal ~allow_mutation l1 l2
-      && Mod_bounds.equal mod_bounds1 mod_bounds2
+      && Mod_bounds.equal (Mod_bounds.of_axis_lattice mod_bounds1) (Mod_bounds.of_axis_lattice mod_bounds2)
     | Kconstr (p1, sa1), Kconstr (p2, sa2)
       when Path.same p1 p2
            && Scannable_axes.equal sa1 sa2
-           && Mod_bounds.equal mod_bounds1 mod_bounds2 ->
+           && Mod_bounds.equal (Mod_bounds.of_axis_lattice mod_bounds1) (Mod_bounds.of_axis_lattice mod_bounds2) ->
       true
     | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
@@ -1442,14 +1442,14 @@ module Jkind_desc = struct
       | Some (t1, t2) -> equate_or_equal ~allow_mutation env t1 t2)
 
   let rec intersection env
-      ({ base = base1; mod_bounds = mod_bounds1; with_bounds = with_bounds1; _ }
+      ({ base = base1; ikind_floor = mod_bounds1; with_bounds = with_bounds1; _ }
        as t1)
-      ({ base = base2; mod_bounds = mod_bounds2; with_bounds = with_bounds2; _ }
+      ({ base = base2; ikind_floor = mod_bounds2; with_bounds = with_bounds2; _ }
        as t2) =
     let make_intersection base =
       Intersection
         { base;
-          mod_bounds = Mod_bounds.meet mod_bounds1 mod_bounds2;
+          ikind_floor = Mod_bounds.to_axis_lattice (Mod_bounds.meet (Mod_bounds.of_axis_lattice mod_bounds1) (Mod_bounds.of_axis_lattice mod_bounds2));
           with_bounds = With_bounds.meet with_bounds1 with_bounds2
         }
     in
@@ -1490,7 +1490,7 @@ module Jkind_desc = struct
   let of_new_sort_var ~level sa =
     let layout, sort = Layout.of_new_sort_var ~level sa in
     ( { base = Layout layout;
-        mod_bounds = Mod_bounds.max;
+        ikind_floor = Mod_bounds.to_axis_lattice Mod_bounds.max;
         with_bounds = No_with_bounds
       },
       sort )
@@ -1498,7 +1498,7 @@ module Jkind_desc = struct
   let of_sort_univar univar =
     let layout = Layout.Sort (Sort.Univar univar, Scannable_axes.max) in
     { base = Layout layout;
-      mod_bounds = Mod_bounds.max;
+      ikind_floor = Mod_bounds.to_axis_lattice Mod_bounds.max;
       with_bounds = No_with_bounds
     }
 
@@ -1795,10 +1795,10 @@ module Const = struct
            ikind for with-bounds-free jkinds; [None] => legacy fallback. *)
         match !floor_from_ikind.derive env actual with
         | Some mod_bounds -> mod_bounds
-        | None -> actual.mod_bounds
+        | None -> Mod_bounds.of_axis_lattice actual.ikind_floor
       in
       let modal_bounds =
-        get_modal_bounds ~verbosity ~base:base_jkind.mod_bounds
+        get_modal_bounds ~verbosity ~base:(Mod_bounds.of_axis_lattice base_jkind.ikind_floor)
           actual_mod_bounds
       in
       let printable_with_bounds =
@@ -1820,7 +1820,7 @@ module Const = struct
             (fun (_, type_info) out_type ->
               let axes_ignored_by_modalities =
                 With_bounds.Type_info.axes_ignored_by_modalities
-                  ~mod_bounds:actual.mod_bounds ~type_info
+                  ~mod_bounds:(Mod_bounds.of_axis_lattice actual.ikind_floor) ~type_info
               in
               let modal_modality, nonmodal_axes =
                 modalities_of_ignored_axes axes_ignored_by_modalities
@@ -1903,7 +1903,7 @@ module Const = struct
                 ~base:
                   { jkind =
                       { base = jkind.base;
-                        mod_bounds = Mod_bounds.max;
+                        ikind_floor = Mod_bounds.to_axis_lattice Mod_bounds.max;
                         with_bounds = No_with_bounds
                       };
                     name = Base.to_string layout_to_string jkind.base
@@ -1932,7 +1932,7 @@ module Const = struct
                   ~base:
                     { jkind =
                         { base = jkind.base;
-                          mod_bounds = Mod_bounds.max;
+                          ikind_floor = Mod_bounds.to_axis_lattice Mod_bounds.max;
                           with_bounds = No_with_bounds
                         };
                       name = layout_str
@@ -2053,7 +2053,7 @@ module Const = struct
       =
     let folder (type l r) (layouts_acc, mod_bounds_acc, with_bounds_acc)
         (kind : (l * r) t) =
-      let { base; mod_bounds; with_bounds; _ } =
+      let { base; ikind_floor; with_bounds; _ } =
         Base_and_axes.fully_expand_aliases_const env kind
       in
       let layout =
@@ -2064,14 +2064,14 @@ module Const = struct
         | Layout l -> l
       in
       ( layout :: layouts_acc,
-        Mod_bounds.join mod_bounds mod_bounds_acc,
+        Mod_bounds.join (Mod_bounds.of_axis_lattice ikind_floor) mod_bounds_acc,
         With_bounds.join with_bounds with_bounds_acc )
     in
     let layouts, mod_bounds, with_bounds =
       List.fold_left folder ([], Mod_bounds.min, No_with_bounds) jkinds
     in
     { base = Layout (Layout.Const.Product (List.rev layouts));
-      mod_bounds;
+      ikind_floor = Mod_bounds.to_axis_lattice mod_bounds;
       with_bounds
     }
 
@@ -2112,8 +2112,8 @@ module Const = struct
       let mod_bounds, (nullability, separability) =
         Typemode.transl_mod_bounds modifiers
       in
-      let mod_bounds = Mod_bounds.meet base.mod_bounds mod_bounds in
-      { base = base.base; mod_bounds; with_bounds = No_with_bounds }
+      let mod_bounds = Mod_bounds.meet (Mod_bounds.of_axis_lattice base.ikind_floor) mod_bounds in
+      { base = base.base; ikind_floor = Mod_bounds.to_axis_lattice mod_bounds; with_bounds = No_with_bounds }
       (* For scannable axes in mod bounds, we do not print redundancy warnings,
          as scannable axes in mod bounds will be deprecated anyway *)
       |> apply_scannable_axis ~warn env
@@ -2167,7 +2167,7 @@ module Const = struct
             if is_top then axes else Axis_set.remove axes (Nonmodal Externality)
         in
         { base = base.base;
-          mod_bounds = base.mod_bounds;
+          ikind_floor = base.ikind_floor;
           with_bounds = With_bounds.add type_ { relevant_axes } base.with_bounds
         })
     | Pjk_default | Pjk_kind_of _ ->
@@ -2412,7 +2412,7 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
   in
   fresh_jkind_poly
     { base = jkind.jkind.base;
-      mod_bounds = Mod_bounds.min;
+      ikind_floor = Mod_bounds.to_axis_lattice Mod_bounds.min;
       with_bounds = With_bounds with_bounds_types
     }
     ~annotation:None ~why:Abbreviation
@@ -2434,7 +2434,7 @@ let for_open_boxed_row =
           (Sort
              ( Base Scannable,
                { nullability = Non_null; separability = Non_float } ));
-      mod_bounds;
+      ikind_floor = Mod_bounds.to_axis_lattice mod_bounds;
       with_bounds = No_with_bounds
     }
     ~annotation:None ~why:(Value_creation Polymorphic_variant)
@@ -2480,7 +2480,7 @@ let for_arrow =
           (Sort
              ( Base Scannable,
                { nullability = Non_null; separability = Non_float } ));
-      mod_bounds = Mod_bounds.for_arrow;
+      ikind_floor = Mod_bounds.to_axis_lattice Mod_bounds.for_arrow;
       with_bounds = No_with_bounds
     }
     ~annotation:None ~why:(Value_creation Arrow)
@@ -2508,8 +2508,9 @@ let for_object =
           (Sort
              ( Base Scannable,
                { nullability = Non_null; separability = Non_float } ));
-      mod_bounds =
-        Mod_bounds.create { comonadic; monadic } ~externality:Externality.max;
+      ikind_floor =
+        Mod_bounds.to_axis_lattice
+          (Mod_bounds.create { comonadic; monadic } ~externality:Externality.max);
       with_bounds = No_with_bounds
     }
     ~annotation:None ~why:(Value_creation Object)
@@ -2654,15 +2655,15 @@ let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
        this function is mainly used for mode crossing or optimizations, we don't
        expect this to come up much. *)
     Mod_bounds.max
-  | { base = Kconstr _ | Layout _; with_bounds = No_with_bounds; mod_bounds; _ }
+  | { base = Kconstr _ | Layout _; with_bounds = No_with_bounds; ikind_floor; _ }
     ->
-    mod_bounds
+    Mod_bounds.of_axis_lattice ikind_floor
   | { base = Layout _; with_bounds = With_bounds _; _ } ->
     Misc.fatal_error
       "Jkind.get_mod_crossing: violated Ignore_best normalize invariant."
 
 let to_unsafe_mode_crossing jkind =
-  { unsafe_mod_bounds = Mod_bounds.to_mode_crossing jkind.jkind.mod_bounds;
+  { unsafe_mod_bounds = Mod_bounds.to_mode_crossing (Mod_bounds.of_axis_lattice jkind.jkind.ikind_floor);
     unsafe_with_bounds = jkind.jkind.with_bounds
   }
 
@@ -2697,8 +2698,10 @@ let set_externality_upper_bound jk externality_upper_bound =
   { jk with
     jkind =
       { jk.jkind with
-        mod_bounds =
-          Mod_bounds.set_externality externality_upper_bound jk.jkind.mod_bounds
+        ikind_floor =
+          Mod_bounds.to_axis_lattice
+            (Mod_bounds.set_externality externality_upper_bound
+               (Mod_bounds.of_axis_lattice jk.jkind.ikind_floor))
       }
   }
 
@@ -2713,7 +2716,7 @@ let set_layout jk layout =
 let apply_modality_l modality jk =
   let relevant_axes = Mod_bounds.relevant_axes_of_modality ~modality in
   let mod_bounds =
-    Mod_bounds.set_min_in_set jk.jkind.mod_bounds
+    Mod_bounds.set_min_in_set (Mod_bounds.of_axis_lattice jk.jkind.ikind_floor)
       (Axis_set.complement relevant_axes)
   in
   let with_bounds =
@@ -2722,16 +2725,16 @@ let apply_modality_l modality jk =
         { relevant_axes = Axis_set.intersection ti.relevant_axes relevant_axes })
       jk.jkind.with_bounds
   in
-  { jk with jkind = { jk.jkind with mod_bounds; with_bounds } }
+  { jk with jkind = { jk.jkind with ikind_floor = Mod_bounds.to_axis_lattice mod_bounds; with_bounds } }
   |> disallow_right
 
 let apply_modality_r modality jk =
   let relevant_axes = Mod_bounds.relevant_axes_of_modality ~modality in
   let mod_bounds =
-    Mod_bounds.set_max_in_set jk.jkind.mod_bounds
+    Mod_bounds.set_max_in_set (Mod_bounds.of_axis_lattice jk.jkind.ikind_floor)
       (Axis_set.complement relevant_axes)
   in
-  { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
+  { jk with jkind = { jk.jkind with ikind_floor = Mod_bounds.to_axis_lattice mod_bounds } } |> disallow_left
 
 let apply_or_null_l env jkind =
   let jkind =
@@ -3505,7 +3508,7 @@ module Violation = struct
             (fun (_, type_info) ->
               let axes_ignored_by_modalities =
                 With_bounds.Type_info.axes_ignored_by_modalities
-                  ~mod_bounds:jkind.jkind.mod_bounds ~type_info
+                  ~mod_bounds:(Mod_bounds.of_axis_lattice jkind.jkind.ikind_floor) ~type_info
               in
               not (Axis_set.is_empty axes_ignored_by_modalities))
             (With_bounds.to_list jkind.jkind.with_bounds)
@@ -3521,7 +3524,7 @@ module Violation = struct
         Axis_set.to_list disagreeing_axes
         |> List.iter (fun (Pack axis : Axis.packed) ->
             let pp_bound ppf jkind =
-              let mod_bound = Mod_bounds.get ~axis jkind.mod_bounds in
+              let mod_bound = Mod_bounds.get ~axis (Mod_bounds.of_axis_lattice jkind.ikind_floor) in
               let with_bounds =
                 match Per_axis.(le axis (max axis) mod_bound) with
                 | true ->
@@ -3964,21 +3967,21 @@ let is_obviously_max (t : (_ * allowed) jkind) =
   (* This doesn't do any mutation because mutating a sort variable can't make it
      any, and modal upper bounds are constant. *)
   | { jkind =
-        { base = Layout (Any sa); mod_bounds; with_bounds = No_with_bounds; _ };
+        { base = Layout (Any sa); ikind_floor; with_bounds = No_with_bounds; _ };
       _
     } ->
-    Scannable_axes.(equal sa max) && Mod_bounds.is_max mod_bounds
+    Scannable_axes.(equal sa max) && Mod_bounds.is_max (Mod_bounds.of_axis_lattice ikind_floor)
   | { jkind =
-        { base = Layout _ | Kconstr _; mod_bounds = _; with_bounds = _; _ };
+        { base = Layout _ | Kconstr _; ikind_floor = _; with_bounds = _; _ };
       _
     } ->
     false
 
 let mod_bounds_are_obviously_max (type l r) (t : (l * r) jkind) =
   match t with
-  | { jkind = { base = _; mod_bounds; with_bounds = No_with_bounds; _ }; _ } ->
-    Mod_bounds.is_max mod_bounds
-  | { jkind = { base = _; mod_bounds = _; with_bounds = With_bounds _; _ }; _ }
+  | { jkind = { base = _; ikind_floor; with_bounds = No_with_bounds; _ }; _ } ->
+    Mod_bounds.is_max (Mod_bounds.of_axis_lattice ikind_floor)
+  | { jkind = { base = _; ikind_floor = _; with_bounds = With_bounds _; _ }; _ }
     ->
     false
 
@@ -4270,11 +4273,11 @@ module Debug_printers = struct
       (match q with Best -> "Best" | Not_best -> "Not_best")
 
   module Const = struct
-    let t ppf ({ base; mod_bounds; with_bounds; _ } : _ Const.t) =
+    let t ppf ({ base; ikind_floor; with_bounds; _ } : _ Const.t) =
       fprintf ppf
         "@[<v 2>{ base = %a@,; mod_bounds = %a@,; with_bounds = %a@, }@]"
         (Base.format Layout.Const.Debug_printers.t)
-        base Mod_bounds.debug_print mod_bounds With_bounds.debug_print
+        base Mod_bounds.debug_print (Mod_bounds.of_axis_lattice ikind_floor) With_bounds.debug_print
         with_bounds
   end
 end

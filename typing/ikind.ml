@@ -567,20 +567,20 @@ module Solver = struct
       | None ->
         let expand : type b.
             (b, l * r) Types.base_and_axes ->
-            Types.mod_bounds * (l * r) Types.with_bounds * Path.t option =
+            Axis_lattice.t * (l * r) Types.with_bounds * Path.t option =
          fun jkind_desc ->
           let unresolved_base =
             match jkind_desc.base with
             | Types.Layout _ -> None
             | Types.Kconstr (path, _) -> Some path
           in
-          jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
+          jkind_desc.ikind_floor, jkind_desc.with_bounds, unresolved_base
         in
         expand
       | Some env ->
         let rec expand : type b.
             (b, l * r) Types.base_and_axes ->
-            Types.mod_bounds * (l * r) Types.with_bounds * Path.t option =
+            Axis_lattice.t * (l * r) Types.with_bounds * Path.t option =
          fun jkind_desc ->
           match Jkind.Const.expand_once env jkind_desc with
           | Some jkind_const -> expand jkind_const
@@ -590,13 +590,13 @@ module Solver = struct
               | Types.Layout _ -> None
               | Types.Kconstr (path, _) -> Some path
             in
-            jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
+            jkind_desc.ikind_floor, jkind_desc.with_bounds, unresolved_base
         in
         expand
     in
     let mod_bounds, with_bounds, unresolved_base = expand jkind_desc in
     let base_mod_bounds =
-      Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds)
+      Ldd.const mod_bounds
     in
     let base =
       match unresolved_base with
@@ -1699,7 +1699,7 @@ let render_jkind_from_ikind : type l r.
       in
       let base_jkind : (l * r) Jkind.Const.t =
         { jkind with
-          Types.mod_bounds = Jkind.Mod_bounds.of_axis_lattice floor;
+          Types.ikind_floor = floor;
           Types.with_bounds = Types.No_with_bounds
         }
       in
@@ -2065,7 +2065,7 @@ let crossing_of_jkind ~context:(_ : Jkind.jkind_context) env
          crossing of its lattice floor -- the ikind const base, which STAGE5C
          proved equals [to_axis_lattice mod_bounds] for this class.  Read it
          directly (no legacy [normalize], no LDD build). *)
-    let floor = Jkind.Mod_bounds.to_axis_lattice jkind.jkind.mod_bounds in
+    let floor = jkind.jkind.ikind_floor in
     Axis_lattice.to_mode_crossing floor
   | _ ->
     let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
@@ -2118,32 +2118,32 @@ let fast_sub_of_value_sub : type r.
   else if not (with_bounds_is_empty sub.jkind.with_bounds)
   then false
   else
-    let sub_lat = Jkind.Mod_bounds.to_axis_lattice sub.jkind.mod_bounds in
+    let sub_lat = sub.jkind.ikind_floor in
     Axis_lattice.leq sub_lat super_lat
 
 let fast_sub_of_any_super : type r.
-    Types.mod_bounds -> (Allowance.allowed * r) Types.jkind -> bool =
- fun mod_bounds sub ->
+    Axis_lattice.t -> (Allowance.allowed * r) Types.jkind -> bool =
+ fun floor sub ->
   match sub.jkind.base with
   | Types.Layout
       (Jkind_types.Layout.Sort (_sub_sort, { nullability = _; separability = _ }))
     ->
-    fast_sub_of_value_sub (Jkind.Mod_bounds.to_axis_lattice mod_bounds) sub
+    fast_sub_of_value_sub floor sub
   | Types.Layout _ | Types.Kconstr _ -> false
 
 let fast_sub_of_sort_super : type r.
     Jkind_types.Sort.t ->
-    Types.mod_bounds ->
+    Axis_lattice.t ->
     (Allowance.allowed * r) Types.jkind ->
     bool =
- fun super_sort mod_bounds sub ->
+ fun super_sort floor sub ->
   match sub.jkind.base with
   | Types.Layout
       (Jkind_types.Layout.Sort (sub_sort, { nullability = _; separability = _ }))
     ->
     if not (Jkind_types.Sort.equate sub_sort super_sort)
     then false
-    else fast_sub_of_value_sub (Jkind.Mod_bounds.to_axis_lattice mod_bounds) sub
+    else fast_sub_of_value_sub floor sub
   | Types.Layout _ | Types.Kconstr _ -> false
 
 let fast_sub : type r1 l2.
@@ -2163,22 +2163,22 @@ let fast_sub : type r1 l2.
                { separability = Jkind_axis.Separability.Maybe_separable;
                  nullability = Jkind_axis.Nullability.Maybe_null
                } ));
-      mod_bounds;
+      ikind_floor;
       with_bounds = Types.No_with_bounds;
       _
     } ->
-    fast_sub_of_sort_super super_sort mod_bounds sub
+    fast_sub_of_sort_super super_sort ikind_floor sub
   | { base =
         Types.Layout
           (Jkind_types.Layout.Any
              { separability = Jkind_axis.Separability.Maybe_separable;
                nullability = Jkind_axis.Nullability.Maybe_null
              });
-      mod_bounds;
+      ikind_floor;
       with_bounds = Types.No_with_bounds;
       _
     } ->
-    fast_sub_of_any_super mod_bounds sub
+    fast_sub_of_any_super ikind_floor sub
   | _ -> false
 
 let sub_or_intersect ?origin
