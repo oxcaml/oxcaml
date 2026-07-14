@@ -18,6 +18,15 @@
 
    NB: Due to internal state in the compiler, calling [main] twice during
    the same process is unsupported. *)
+(* See [Gc_pacing] in the implementation: the final executables install
+   the [caml_gc_set_idle_floor] primitive here so that -X gc-idle-floor
+   works; the bootstrap compiler (whose runtime lacks the primitive)
+   leaves it unset. *)
+module Gc_pacing : sig
+  val set_idle_floor_hook : (int -> unit) ref
+  val phys_mem_hook : (unit -> int) ref
+end
+
 val main
    : (module Compiler_owee.Unix_intf.S)
   -> string array

@@ -64,6 +64,7 @@ void caml_finish_major_cycle(int compaction_mode);
  * example, after any synchronous major collection.
  */
 void caml_init_major_pacing(void);
+void caml_rearm_idle_floor(void);
 void caml_reset_major_pacing(bool add_overhead);
 #ifdef DEBUG
 int caml_mark_stack_is_empty(void);

@@ -880,6 +880,27 @@ void caml_init_major_pacing (void)
     atomic_load (&total_work_completed) + caml_small_heap_limit;
 }
 
+/* Re-arm the idle floor for the CURRENT cycle after caml_small_heap_limit
+   has been changed at run time (the floor is otherwise only read at the
+   start of each sweep phase). Meant for process-startup configuration
+   (e.g. the compiler driver applying -X gc-idle-floor); the store is
+   benign if marking has already started, since the floor is only
+   consulted at the end of sweeping. */
+void caml_rearm_idle_floor (void)
+{
+  work_counter_min_before_mark =
+    work_counter_at_sweep_start + caml_small_heap_limit;
+  /* The previous (smaller) floor may already have been crossed and a mark
+     request left pending; if the raised floor is no longer reached,
+     withdraw the request so the re-arm actually takes effect for the
+     current cycle. Contract (see the primitive in gc_ctrl.c): called
+     from a single running domain before any marking has started. */
+  if (caml_gc_phase == Phase_sweep_main
+      && diffmod (work_counter_min_before_mark,
+                  atomic_load (&total_work_completed)) > 0)
+    atomic_store_release (&caml_gc_mark_phase_requested, 0);
+}
+
 /* add_overhead is true if the latest collection was synchronous (with
    caml_gc_full_major) and thus the sweep phase counted only the live
    data (with no floating garbage). */

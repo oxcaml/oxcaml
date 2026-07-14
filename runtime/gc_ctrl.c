@@ -33,6 +33,9 @@
 #include "caml/frame_descriptors.h"
 #endif
 #include "caml/domain.h"
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 #include "caml/fiber.h"
 #include "caml/globroots.h"
 #include "caml/signals.h"
@@ -494,6 +497,34 @@ uintnat* caml_lookup_gc_tweak(const char* name, uintnat len)
     }
   }
   return NULL;
+}
+
+/* Set the idle-phase floor (in words) and re-arm it for the current
+   cycle; [Gc.Tweak.set "small_heap_limit"] alone only takes effect from
+   the next sweep phase. Used by the compiler driver for
+   -X gc-idle-floor.
+
+   Contract: single-domain, process-startup use only (the driver calls it
+   during argument parsing). The re-arm reads STW-written pacing state and
+   may withdraw a pending mark request, neither of which is coordinated
+   with concurrently running domains. */
+CAMLprim value caml_gc_set_idle_floor(value words)
+{
+  caml_small_heap_limit = Long_val(words);
+  caml_rearm_idle_floor();
+  return Val_unit;
+}
+
+/* Physical memory in bytes, 0 if unknown; for -X gc-idle-floor %-terms. */
+CAMLprim value caml_gc_pacing_phys_mem(value unit)
+{
+#if defined(_SC_PHYS_PAGES) && defined(_SC_PAGE_SIZE)
+  long pages = sysconf(_SC_PHYS_PAGES);
+  long psize = sysconf(_SC_PAGE_SIZE);
+  if (pages > 0 && psize > 0 && (uintnat) pages < Max_long / (uintnat) psize)
+    return Val_long((intnat) pages * (intnat) psize);
+#endif
+  return Val_long(0);
 }
 
 CAMLprim value caml_gc_tweak_get(value name)
