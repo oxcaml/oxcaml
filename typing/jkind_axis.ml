@@ -135,6 +135,7 @@ module Axis = struct
 
   type packed = Pack : 'a t -> packed [@@unboxed]
 
+  (* CR quoted-modes jbachurski: Should [ArealityQuoted] be here? *)
   let all =
     [ Pack (Modal (Comonadic Areality));
       Pack (Modal (Monadic Uniqueness));
@@ -255,6 +256,7 @@ module Axis_set = struct
 
   let[@inline] axis_index (type a) : a Axis.t -> _ = function
     | Modal (Comonadic Areality) -> 0
+    | Modal (Comonadic ArealityQuoted) -> failwith "ArealityQuoted"
     | Modal (Monadic Uniqueness) -> 1
     | Modal (Comonadic Linearity) -> 2
     | Modal (Monadic Contention) -> 3

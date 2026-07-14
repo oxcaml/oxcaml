@@ -1288,12 +1288,22 @@ let mode_quoted : expected_mode = mode_default mode_in_quotes
     Note: we must have that [mode_quoted <= mode_splice] for soundness. *)
 and mode_splice : Value.l = Value.disallow_right mode_in_quotes
 
-(** Lower bound for the mode of a quoted expression that
-    might have side-effects. *)
-let mode_computation_quoted : Value.l =
+(** Lower bound for the mode of a quoted value. *)
+let mode_value_quote : Value.l = Value.of_const Value.Const.min
+
+(** Lower bound for the mode of a quoted computation. *)
+let mode_computation_quote : Value.l =
   let open Mode_hint in
   { Value.Const.min with linearity = Once }
   |> Value.of_const ~hint_comonadic:Quoted_computation
+
+(** Upper bound for the mode of values captured by a quote.
+    Quotes are always heap-allocated, so they must only capture globals. **)
+(* CR quoted-modes jbachurski: If we are confident, we can make quotes cross
+   locality. Since quotes ([expr]s) can only same-stage-capture other quotes,
+   this would mean this upper bound never really matters. *)
+let mode_quote_max : Value.r =
+  { Value.Const.max with areality = Global } |> Value.of_const
 
 (** The [expected_mode] of a quoted expression value when it is spliced. *)
 let mode_spliced =
@@ -5358,95 +5368,76 @@ let maybe_expansive e = not (is_nonexpansive e)
     Potentially expensive or side-effectful computations should return [true],
     and only syntactic values should return [false]. **)
 let rec maybe_computation exp =
-  match exp.exp_desc with
+  match exp.pexp_desc with
   (* Return [false] for syntactic values *)
-  | Texp_ident _ ->
+  | Pexp_ident _ ->
     false
-  | Texp_constant _ ->
+  | Pexp_constant _ ->
     false
-  | Texp_function _ ->
+  | Pexp_function _ ->
     false
-  | Texp_unboxed_unit ->
+  | Pexp_unboxed_unit ->
     false
-  | Texp_unboxed_bool _ ->
+  | Pexp_unboxed_bool _ ->
     false
-  | Texp_tuple (exps, _) ->
+  | Pexp_tuple exps ->
     List.exists (fun (_, exp) -> maybe_computation exp) exps
-  | Texp_unboxed_tuple exps ->
-    List.exists (fun (_, exp, _) -> maybe_computation exp) exps
-  | Texp_construct (_, _, _, exps, _) ->
+  | Pexp_unboxed_tuple exps ->
     List.exists (fun (_, exp) -> maybe_computation exp) exps
-  | Texp_variant (_, Some (exp, _)) ->
+  | Pexp_construct (_, Some exp) | Pexp_variant (_, Some exp) ->
     maybe_computation exp
-  | Texp_variant (_, None) ->
+  | Pexp_construct (_, None) | Pexp_variant (_, None) ->
     false
-  | Texp_record { fields; extended_expression = None; _ } ->
-    Array.exists
-      (function
-      | (_, _, Overridden (_, exp)) -> maybe_computation exp
-      | (_, _, Kept _) -> false)
-      fields
-  | Texp_record { extended_expression = Some _; _ } ->
+  | Pexp_record (fields, None) | Pexp_record_unboxed_product (fields, None) ->
+    List.exists (fun (_, exp) -> maybe_computation exp) fields
+  | Pexp_record (_, Some _) | Pexp_record_unboxed_product (_, Some _) ->
     true
-  | Texp_record_unboxed_product { fields; extended_expression = None; _ } ->
-    Array.exists
-      (function
-      | (_, _, Overridden (_, exp)) -> maybe_computation exp
-      | (_, _, Kept _) -> false)
-      fields
-  | Texp_record_unboxed_product { extended_expression = Some _; _ } ->
-    true
-  | Texp_field { record = exp; _ } ->
+  | Pexp_field (exp, _) ->
     maybe_computation exp
-  | Texp_unboxed_field { record = exp; _ } ->
+  | Pexp_unboxed_field (exp, _) ->
     maybe_computation exp
-  | Texp_array (_, _, exps, _) ->
+  | Pexp_array (_, exps) ->
     List.exists maybe_computation exps
-  | Texp_hole _ ->
+  | Pexp_hole ->
     false
-  | Texp_quotation exp ->
+  | Pexp_constraint (e, _, _) | Pexp_coerce (e, _, _) ->
+    maybe_computation e
+  | Pexp_quote exp ->
     (* Approximate quote values as quotes of values.
        Note that splices are always considered computations. *)
     maybe_computation exp
   (* it is always safe to approximate [maybe_computation] as [true]. *)
-  | Texp_let _
-  | Texp_letmutable _
-  | Texp_apply _
-  | Texp_match _
-  | Texp_try _
-  | Texp_atomic_loc _
-  | Texp_setfield _
-  | Texp_idx _
-  | Texp_list_comprehension _
-  | Texp_array_comprehension _
-  | Texp_ifthenelse _
-  | Texp_sequence _
-  | Texp_while _
-  | Texp_for _
-  | Texp_send _
-  | Texp_new _
-  | Texp_instvar _
-  | Texp_mutvar _
-  | Texp_setinstvar _
-  | Texp_setmutvar _
-  | Texp_override _
-  | Texp_letmodule _
-  | Texp_letexception _
-  | Texp_assert _
-  | Texp_lazy _
-  | Texp_object _
-  | Texp_pack _
-  | Texp_letop _
-  | Texp_unreachable
-  | Texp_extension_constructor _
-  | Texp_open _
-  | Texp_probe _
-  | Texp_probe_is_enabled _
-  | Texp_exclave _
-  | Texp_src_pos
-  | Texp_overwrite _
-  | Texp_antiquotation _
-  | Texp_apply_layout _
+  | Pexp_let _
+  | Pexp_apply _
+  | Pexp_match _
+  | Pexp_try _
+  | Pexp_setfield _
+  | Pexp_idx _
+  | Pexp_comprehension _
+  | Pexp_ifthenelse _
+  | Pexp_sequence _
+  | Pexp_while _
+  | Pexp_for _
+  | Pexp_send _
+  | Pexp_new _
+  | Pexp_setvar _
+  | Pexp_override _
+  | Pexp_letmodule _
+  | Pexp_letexception _
+  | Pexp_assert _
+  | Pexp_lazy _
+  | Pexp_object _
+  | Pexp_pack _
+  | Pexp_letop _
+  | Pexp_unreachable
+  | Pexp_extension _
+  | Pexp_open _
+  | Pexp_overwrite _
+  | Pexp_newtype _
+  | Pexp_poly _
+  | Pexp_stack _
+  | Pexp_borrow _
+  | Pexp_splice _
     -> true
 
 (* Returns true if, for every [Texp_ident x] occurring in the expression,
@@ -8700,11 +8691,20 @@ and type_expect_
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         raise (Typetexp.Error (loc, env,
                                Unsupported_extension Runtime_metaprogramming));
-      let expected_comonadic_mode = (as_single_mode expected_mode).comonadic in
-      let new_env =
-        env
-        |> Env.enter_quotation
-        |> Env.add_closure_lock (loc, Quote) expected_comonadic_mode
+      let mode_quote, expected_mode =
+        if maybe_computation exp then
+          mode_computation_quote, expected_mode
+        else
+          mode_value_quote,
+          mode_morph
+            (fun mode ->
+              Value.imply_const_with Linearity Linearity.Const.Many mode)
+            expected_mode
+      in
+      let expected_mode =
+        mode_morph
+          (fun mode -> Mode.Value.meet [mode; mode_quote_max])
+          expected_mode
       in
       let ty = newgenvar (Jkind.Builtin.any ~why:Inside_quote) in
       let expr_ty = Predef.type_code (newgenty (Tquote ty)) in
@@ -8719,9 +8719,16 @@ and type_expect_
         then mode_default Value.max
         else mode_quoted
       in
-      let arg = type_expect new_env mode_quoted exp (mk_expected ty) in
-      if maybe_computation arg then
-        submode ~loc ~env ~reason:Other mode_computation_quoted expected_mode;
+      let quote_env = begin
+          if Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes
+          then Env.enter_quotation env
+          else
+            let { comonadic; _ } = as_single_mode expected_mode in
+            Env.add_quotation_lock ~loc comonadic env
+        end
+      in
+      let arg = type_expect quote_env mode_quoted exp (mk_expected ty) in
+      submode ~loc ~env mode_quote expected_mode;
       re {
         exp_desc = Texp_quotation arg;
         exp_loc = loc; exp_extra = [];
@@ -8739,11 +8746,14 @@ and type_expect_
       let magic_staged_modes =
         Builtin_attributes.has_magic_staged_modes sexp.pexp_attributes
       in
-      if not magic_staged_modes then
+      let mode, _ = Value.newvar_below (as_single_mode mode_spliced) in
+      if not magic_staged_modes then begin
         submode ~loc ~env ~reason:Other mode_splice expected_mode;
+        Env.splice_closure_mode mode.comonadic env
+      end;
       let new_env = Env.enter_splice ~loc env in
       let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
-      let arg = type_expect new_env mode_spliced exp (mk_expected ty) in
+      let arg = type_expect new_env (mode_default mode) exp (mk_expected ty) in
       re {
         exp_desc = Texp_antiquotation arg;
         exp_loc = loc; exp_extra = [];

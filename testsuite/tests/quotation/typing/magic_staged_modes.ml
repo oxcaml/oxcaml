@@ -62,25 +62,20 @@ fun x -> <[ M.free ($x [@magic_staged_modes]) ]>
 Line 1, characters 38-39:
 1 | <[ fun (x @ local) -> $(M.of_local <[ x ]>) ]>
                                           ^
-Error: This value is "local" to the parent region
+Error: The value "x" is "local" to the parent region
        but is expected to be "global"
-         because it is a quoted expression's result and thus always at the legacy modes.
+         because it is used inside the quoted expression at line 1, characters 35-42
+         which is expected to be "global".
 |}];;
 (* but we can delay the mode checks on [x] until generation *)
 <[ fun (x @ local) -> $(M.of_local (<[ x ]> [@magic_staged_modes])) ]>
 [%%expect{|
 - : <[$('a) @ local -> unit]> expr = <[fun (x : _ @ local) -> ()]>
 |}];;
-(* however, the mode checks on the capture of [x] remain *)
+(* including the mode checks on the capture of [x] *)
 <[ fun (x @ local) -> $(M.of_global (<[ x ]> [@magic_staged_modes])) ]>
 [%%expect{|
-Line 1, characters 40-41:
-1 | <[ fun (x @ local) -> $(M.of_global (<[ x ]> [@magic_staged_modes])) ]>
-                                            ^
-Error: The value "x" is "local" to the parent region
-       but is expected to be "global"
-         because it is used inside the quoted expression at line 1, characters 36-67
-         which is expected to be "global".
+- : <[$('a) @ local -> unit]> expr = <[fun (x : _ @ local) -> ()]>
 |}];;
 
 (* The attribute is quoted appropriately *)
