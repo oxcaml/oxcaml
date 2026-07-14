@@ -2103,22 +2103,33 @@ let () =
 
 (* Stage B: install the ikind-native mode-crossing derivation into
    [Jkind.to_unsafe_mode_crossing] (the allow_any_crossing decl path). The
-   crossing floor is the CONST base of the derived ikind LDD -- the join of its
-   name-free terms -- NOT [round_up]: [to_unsafe_mode_crossing] carries the
-   with-bounds separately in [unsafe_with_bounds], so folding them into the
-   crossing (as [round_up] does) would double-count them. The const floor is
-   exactly what the stored floor field held (the print path derives its floor
-   the same way, see [render_jkind_from_ikind]). Scratch ctx + isolated pending
-   keep this semantic read from perturbing an outer solve. *)
+   crossing floor is the BASE-ONLY floor: [to_unsafe_mode_crossing] carries
+   the with-bounds separately in [unsafe_with_bounds], and the stored floor
+   field it replaces held the bounds-EXCLUDED base. We therefore STRIP the
+   with-bounds before lowering (see [crossing_read] below); lowering them too
+   would fold CONCRETE bounds -- which resolve to name-free constants -- into
+   the name-free join and double-count them against [unsafe_with_bounds]. This
+   is the OPPOSITE contract from [round_up] (externality_from_ikind above),
+   whose floor is bounds-FOLDED; neither contract may be "fixed" into the
+   other. Scratch ctx + isolated pending keep this semantic read from
+   perturbing an outer solve. *)
 let () =
   Jkind.set_crossing_from_ikind
     { Jkind.crossing_read =
         (fun env jkind ->
           Ldd.with_isolated_pending (fun () ->
+              (* base-only floor: strip with-bounds before lowering (they
+                 travel in [unsafe_with_bounds]; see block comment above) *)
+              let base_only =
+                { jkind with
+                  jkind =
+                    { jkind.jkind with with_bounds = Types.No_with_bounds }
+                }
+              in
               let ctx =
                 create_scratch_ctx ~mode:Solver.Normal ~env:(Some env)
               in
-              let node = Solver.ckind_of_jkind ctx jkind in
+              let node = Solver.ckind_of_jkind ctx base_only in
               Ldd.solve_pending ();
               let terms = Ldd.to_terms (Ldd.inline_solved_vars node) in
               let floor =

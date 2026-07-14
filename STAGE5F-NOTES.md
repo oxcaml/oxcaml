@@ -692,13 +692,17 @@ knowledge):
     F1 review must-fix: the initial bump was cmi-only (I583, shared 581), which left
     the T-headed .cmt at T581 = cross-version-matching and garbage-decoding; the
     shared bump fixes it.]
-  - Stage B: to_unsafe_mode_crossing re-routed to the ikind engine (name-free const
-    floor; with-bounds carried separately) + permanent validate differential;
-    seeded-fault-proven, blast-radius clean.
+  - Stage B: to_unsafe_mode_crossing re-routed to the ikind engine (BASE-ONLY
+    floor -- with-bounds STRIPPED before lowering, carried separately in
+    unsafe_with_bounds) + permanent validate differential; seeded-fault-proven,
+    blast-radius clean. [The initial re-route lowered the WHOLE jkind and
+    double-counted CONCRETE bounds -- the W-1 verdict flip; fixed fix-forward,
+    see the W-1 section.]
   - fmt hygiene (ocamlformat 0.29.0; formats the Stage A retype + Stage B hook
     jkind/ikind lines).
-  - knowledge: this ledger + the two engine-divergence entries + two regression
-    pins (round_up_gadt_equation_ikinds.ml, foldstop_principal_subcheck_ikinds.ml).
+  - knowledge: this ledger + the two engine-divergence entries + three regression
+    pins (round_up_gadt_equation_ikinds.ml, foldstop_principal_subcheck_ikinds.ml,
+    reexport_unsafe_crossing_ikinds.ml [W-1]).
 
 REVERTED (all of Stage C's semantic deletions; documented + regression-pinned where
 applicable; engine-workstream follow-up):
@@ -755,3 +759,78 @@ no consistent regression." Consistent with the shipped surface being cold-path
 conversions; Stage B crossing re-route only on the rare allow_any_crossing decl path
 + a validate-only differential). A quiet-box re-measure (17+ reps, load <10) is
 queued as a pre-push backstop; a consistent-sign >1% there = STOP-before-push.
+
+## W-1 fix-forward (crossing_read concrete-bound double-count) -- CONFIRMED verdict flip on the pushed head
+
+DEFECT. Stage B's crossing_read (ikind.ml) lowered the WHOLE jkind through the
+solver and took the join of its name-free const terms as the crossing floor.
+That was correct ONLY for name-CARRYING with-bounds (which stay as named terms
+and are skipped by the [names = []] join). But a CONCRETE with-bound -- [int],
+[int ref], [int list] -- resolves through the solver to a NAME-FREE constant, so
+it landed in the join and was folded INTO the floor. [to_unsafe_mode_crossing]
+ALSO carries the with-bounds separately in [unsafe_with_bounds] (jkind.ml). Net:
+concrete bounds were DOUBLE-COUNTED -- once in the inflated floor, once in
+unsafe_with_bounds. (The original Stage-B no-double-count argument held only for
+name-carrying bounds.)
+
+TWO CONFIRMED CONSEQUENCES (codex W-1; rev-ik5fmt reproduced both):
+  1. Under OXCAML_IKINDS_VALIDATE, a VALID decl -- [type t : value mod
+     everything with int ref = A of string [@@unsafe_allow_any_mode_crossing]]
+     -- goes FATAL ("ikind-derived crossing disagrees with legacy stored-floor
+     crossing"): the buggy read inflates the floor, the legacy stored floor
+     (bounds-excluded) does not, so the differential trips on a decl that is fine.
+  2. VERDICT FLIP: the buggy pushed head ACCEPTS a re-export
+     (equal_unsafe_mode_crossing, types.ml) that the pre-ikind compiler
+     c97be81e9 REJECTS -- the inflated M1.t floor swamps a real crossing
+     difference so the two crossings compare equal, WEAKENING the unsafe-crossing
+     guardrail. (CI does not run VALIDATE, so consequence 2 is what actually
+     reached the pushed head; the pin below catches it without VALIDATE.)
+
+FIX (one commit on a0c9ea09e). crossing_read now STRIPS with-bounds
+([with_bounds = No_with_bounds]) before lowering, so the floor is BASE-ONLY --
+exactly what the legacy stored [ikind_floor] held. Contract, now recorded in the
+code (ikind.ml block comment + jkind.mli doc): umc floor = bounds-EXCLUDED
+(bounds travel in unsafe_with_bounds) vs round_up floor = bounds-FOLDED. OPPOSITE
+contracts, so neither may be "fixed" into the other later.
+
+WHY THE STAGE-B GATES MISSED IT (the real lesson). Stage B's differential and
+seeded-fault were exercised on name-CARRYING with-bound shapes (the round_up
+divergence family), where the name-free join genuinely excludes the bounds -- so
+the buggy read AGREED with legacy there and the differential stayed clean. The
+bug lives on a DIFFERENT shape (concrete, name-free bounds) that the Stage-B
+corpus never fed in. A differential is only as strong as the shapes fed to it --
+the same lesson as this campaign's earlier false-GEM (a "verified" result that
+held only on the shapes probed, not on the shape that mattered). The fix's gate
+is therefore SHAPE-TARGETED at the missing class.
+
+GATE (non-vacuous this time; proven BOTH directions; corpus in _tmp/w1gate/:
+value/immutable_data/mutable_data mod ... with int / int ref / int list,
+allow_any, single-decl AND cross-module re-export):
+  - FIXED binary, single_decls under VALIDATE: checks=38 mismatches=0, exit 0
+    (CLEAN). reexport: REJECTS (exit 2) with the guardrail error BYTE-IDENTICAL
+    to base c97be81e9; validate clean (checks=18 mismatches=0).
+  - BUGGY binary (crossing_read body reverted to the whole-jkind lowering, boot
+    rebuilt): single_decls under VALIDATE goes FATAL (FIRES); reexport ACCEPTS
+    (exit 0 = the flip).
+  So the corpus DISTINGUISHES buggy from fixed -- the positive control fires on
+  the unfixed binary and is clean on the fixed one. (rev's repro (a),
+  _tmp/rev5/w1_validate.ml, is the same positive control, independently proven
+  firing.)
+
+REGRESSION PIN (CI-visible, no VALIDATE needed):
+testsuite/tests/typing-jkind-bounds/reexport_unsafe_crossing_ikinds.ml -- the
+re-export is REJECTED by the equal_unsafe_mode_crossing guardrail (M1.t and M2.t
+have different unsafe mode crossing). A future crossing_read that folds concrete
+bounds back in would make it compile, re-flipping the verdict; the pin catches
+that in ordinary CI (this is the guard the pushed head lacked).
+
+W-2 (no code action; note only). The Stage-B validate differential (kept
+permanent) is only an ACTIVE guard for shapes actually compiled under
+OXCAML_IKINDS_VALIDATE, which CI does not run. Wiring the concrete-bound corpus
+(_tmp/w1gate/) into a VALIDATE-armed CI lane would turn it from a manual gate
+into an active guard; recorded as a follow-up.
+
+W-3 (folded into this commit). The m4 magic comment now names the LOAD-BEARING
+formats (cmi + cmt/cmti bin-annot, which actually marshal base_and_axes) vs the
+over-inclusive-but-safe cmo/cmx/exec bump. No magic-value change (shared 582,
+cmi I583 unchanged).

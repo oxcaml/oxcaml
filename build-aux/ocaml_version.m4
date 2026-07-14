@@ -118,6 +118,10 @@ DEFINE_MAGIC_NUMBER([EXEC], EXEC__FORMAT)
 # decode the old boxed [mod_bounds] record as a garbage [Axis_lattice.t] int, so
 # ALL of them must be invalidated: the SHARED MAGIC_NUMBER__VERSION is bumped
 # 581 -> 582 (over-inclusive but safe; cmis/artifacts are rebuilt every roll).
+# The LOAD-BEARING formats -- those that actually marshal [base_and_axes] and
+# would garbage-decode a stale artifact -- are the cmi and the cmt/cmti bin-annot
+# (both carry the typed tree / signature, confirmed); the shared bump also
+# invalidates cmo/cmx/exec, which is the over-inclusive-but-safe part.
 # The cmi additionally carries the decl ikind directly (was a raw Ldd node DAG),
 # so it keeps its OWN override one ahead of the shared version.  History:
 #   shared 581 -> 582 : ikind_floor retype changes the marshalled Types shape

@@ -908,11 +908,13 @@ val set_externality_from_ikind : externality_from_ikind -> unit
 
 (** Hook installed by [Ikind] to derive a jkind's mode-crossing floor through
     the ikind engine, used by [to_unsafe_mode_crossing] in place of a direct
-    read of the stored floor field. The derived floor is the CONST base of the
-    jkind's ikind LDD (the join of its name-free terms), NOT its [round_up]:
+    read of the stored floor field. The derived floor is BASE-ONLY: the
+    implementation STRIPS the with-bounds before lowering, because
     [to_unsafe_mode_crossing] carries the with-bounds separately in
-    [unsafe_with_bounds], so folding them into the crossing (as [round_up]
-    would) double-counts them. [None] means ikinds are not linked. *)
+    [unsafe_with_bounds]. Lowering the bounds too would fold CONCRETE bounds
+    (which resolve to name-free constants) into the floor and double-count them.
+    This is the OPPOSITE contract from [round_up], whose floor is bounds-FOLDED.
+    [None] means ikinds are not linked. *)
 type crossing_from_ikind =
   { crossing_read : 'l 'r. Env.t -> ('l * 'r) Types.jkind -> Mode.Crossing.t }
 
