@@ -914,9 +914,7 @@ val set_externality_from_ikind : externality_from_ikind -> unit
     [unsafe_with_bounds], so folding them into the crossing (as [round_up]
     would) double-counts them. [None] means ikinds are not linked. *)
 type crossing_from_ikind =
-  { crossing_read :
-      'l 'r. Env.t -> ('l * 'r) Types.jkind -> Mode.Crossing.t
-  }
+  { crossing_read : 'l 'r. Env.t -> ('l * 'r) Types.jkind -> Mode.Crossing.t }
 
 val set_crossing_from_ikind : crossing_from_ikind -> unit
 

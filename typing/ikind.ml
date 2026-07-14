@@ -595,9 +595,7 @@ module Solver = struct
         expand
     in
     let mod_bounds, with_bounds, unresolved_base = expand jkind_desc in
-    let base_mod_bounds =
-      Ldd.const mod_bounds
-    in
+    let base_mod_bounds = Ldd.const mod_bounds in
     let base =
       match unresolved_base with
       | None -> base_mod_bounds
@@ -2126,9 +2124,7 @@ let () =
               let floor =
                 List.fold_left
                   (fun acc (c, names) ->
-                    match names with
-                    | [] -> Axis_lattice.join acc c
-                    | _ -> acc)
+                    match names with [] -> Axis_lattice.join acc c | _ -> acc)
                   Axis_lattice.bot terms
               in
               Axis_lattice.to_mode_crossing floor))
