@@ -95,19 +95,6 @@ let remove_useless_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
     can be expressed as <op2 const3> or <op2 const2> can be expressed as <op1
     const3> *)
 
-let power_of_two_immediate_for_mul shift_imm =
-  (* [shift_imm] is guaranteed to be within bounds for [Ilsl], but [1 lsl
-     shift_imm] is computed with host integers and overflows for [shift_imm >=
-     Sys.int_size - 1] (e.g. [1 lsl 63] evaluates to [0], which would
-     incorrectly fold the multiplication to [0]). The result may also not be
-     within bounds for [Imul]. *)
-  U.assert_within_range Ilsl shift_imm;
-  if shift_imm >= Sys.int_size - 1
-  then None
-  else
-    let imm = 1 lsl shift_imm in
-    if U.is_immediate_for_intop Imul imm then Some imm else None
-
 let are_compatible op1 op2 imm1 imm2 :
     (Operation.integer_operation * int) option =
   match
@@ -142,14 +129,12 @@ let are_compatible op1 op2 imm1 imm2 :
     if imm1 >= imm2
     then U.sub_immediates Isub imm1 imm2
     else U.sub_immediates Iadd imm2 imm1
-  | Ilsl, Imul -> (
-    match power_of_two_immediate_for_mul imm1 with
-    | Some imm1 -> U.mul_immediates Imul imm1 imm2
-    | None -> None)
-  | Imul, Ilsl -> (
-    match power_of_two_immediate_for_mul imm2 with
-    | Some imm2 -> U.mul_immediates Imul imm1 imm2
-    | None -> None)
+  | Ilsl, Imul ->
+    (* [(x lsl imm1) * imm2] is [x * (imm2 lsl imm1)]. *)
+    U.lsl_immediates Imul imm2 imm1
+  | Imul, Ilsl ->
+    (* [(x * imm1) lsl imm2] is [x * (imm1 lsl imm2)]. *)
+    U.lsl_immediates Imul imm1 imm2
   | Imul, Imul -> U.mul_immediates op1 imm1 imm2
   (* CR-soon gtulba-lecu: check this last case | Imod, Imod -> if imm1 mod imm2
      = 0 then Some (Imod, imm2) else None
