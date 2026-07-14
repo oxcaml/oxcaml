@@ -319,6 +319,11 @@ claim elsewhere seems too clean.
    [`05-primitives-scalar.md`](05-primitives-scalar.md); it is a **code** bug (the
    fix is to single-round in `to_naked_float32`), not a documentation error. See
    [`14-validation/float32_double_round.md`](14-validation/float32_double_round.md).
+   The `to_cmm` Stage-2 model localizes this precisely: `to_cmm` emits a single
+   `Cstatic_cast (Float_of_int Float32)` (one rounding;
+   [`18-to-cmm-data.md`](18-to-cmm-data.md) `TC.Prim.NumConv`,
+   [`20-to-cmm-soundness.md`](20-to-cmm-soundness.md) §5), so the double rounding is
+   unambiguously in the Simplify constant fold, not the lowering.
 
 ## 5. Validation summary
 

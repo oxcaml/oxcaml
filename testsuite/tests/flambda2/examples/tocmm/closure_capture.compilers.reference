@@ -1,0 +1,25 @@
+(data global "camlClosure_capture__gc_roots": int 0)
+(data
+ int 1792
+ global "camlClosure_capture":
+ addr G:"camlClosure_capture__adder_2")
+(data
+ int 3063
+ global "camlClosure_capture__adder_2":
+ addr G:"camlClosure_capture__adder_0_2_code"
+ int 108086391056891909)
+(function{closure_capture.ml:11,25-53} camlClosure_capture__adder_0_2_code
+     (x/0: int) : val
+ (alloc{closure_capture.ml:12,8-17} 3319
+   L:"camlClosure_capture__fn[closure_capture.ml:12,8--17]_1_3_code"
+   108086391056891911 x/0) )
+
+(function{closure_capture.ml:12,8-17}
+ camlClosure_capture__fn[closure_capture.ml:12,8--17]_1_3_code
+     (y/0: int my_closure/0: val) : int
+ (+ (+ (load val (+a my_closure/0 16)) y/0) -1) )
+
+(function no_cse reduce_code_size linscan camlClosure_capture__entry 
+ () : val (catch (exit 3 G:"camlClosure_capture") with(3 *ret*/0: val) 1) )
+
+(data)

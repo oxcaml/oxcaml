@@ -35,28 +35,46 @@ the sync protocol below says what to do.
 | [`12-unboxing.md`](12-unboxing.md) | Unboxing of continuation parameters, function parameters and results |
 | [`13-soundness.md`](13-soundness.md) | The (claimed, unproved) soundness statement tying Simplify to the operational semantics; global invariants; known discrepancies |
 | [`14-validation/`](14-validation/) | Case studies: for each validated test, the predicted outcome (with rules cited), the actual outcome, and a verdict |
+| [`15-cmm.md`](15-cmm.md) | Core Cmm: the target-language syntax fragment and its small-step abstract machine (control constructs; 64-bit little-endian) |
+| [`16-to-cmm-control.md`](16-to-cmm-control.md) | `to_cmm` Stage 1: control-flow translation (continuations, traps, switch, apply, invalid) and the control simulation lemma |
+| [`17-representation.md`](17-representation.md) | `to_cmm` Stage 2: the representation relation `≈` (tagging, headers, blocks, closures, boxed numbers) between abstract heap and concrete memory |
+| [`18-to-cmm-data.md`](18-to-cmm-data.md) | `to_cmm` Stage 2: data/primitive lowering, each commuting with `≈`; let-substitution; the int→float32 single-cast finding |
+| [`19-cmm-memory-gc.md`](19-cmm-memory-gc.md) | Cmm allocation (heap/local), regions, and the moving GC + `Addr`-invalidation discipline |
+| [`20-to-cmm-soundness.md`](20-to-cmm-soundness.md) | The (claimed, unproved) `to_cmm` cross-language forward simulation; composition with Simplify soundness; known discrepancies |
 | [`rule-index.md`](rule-index.md) | Machine-greppable table of every rule: ID → chapter → code anchors → verification status |
 
 ## Status & validation
 
-As of 2026-07-13 the formalism has **318 rules** across chapters 02-13:
-**221 normative** (the code must satisfy them), **64 descriptive** (current
-algorithms/heuristics that may change), and **33 conjectured** (believed but not
+As of 2026-07-14 the formalism has **394 rules** across chapters 02-20:
+**287 normative** (the code must satisfy them), **66 descriptive** (current
+algorithms/heuristics that may change), and **41 conjectured** (believed but not
 yet checked against the code). Counts and per-chapter breakdown are regenerated
 in [`rule-index.md`](rule-index.md).
 
-Chapters 01-12 were adversarially verified against the code, and the whole
-system was validated against **33 case studies** in
+Chapters 01-20 were adversarially verified against the code, and the whole
+system was validated against **39 case studies** in
 [`14-validation/`](14-validation/) using a prediction-first protocol (predict the
-Simplify output and cite rules *before* reading the actual output): **30 MATCH,
-1 PARTIAL, 2 MISMATCH**. One mismatch (immutable array loads *are* CSE-eligible)
-was resolved by fixing the formalism; the other
+output and cite rules *before* reading the actual output): **35 MATCH,
+1 PARTIAL, 3 MISMATCH**. Two mismatches were resolved by fixing the formalism
+(immutable array loads *are* CSE-eligible; a closure's unscanned `int` capture sits
+below `startenv`); the third
 ([`float32_double_round`](14-validation/float32_double_round.md)) witnesses an
 open **compiler soundness bug** — int→float32 constant folding double-rounds
 where the backend single-rounds. Chapter
 [`13-soundness.md`](13-soundness.md) states the (claimed, empirically validated,
 unproved) soundness property and records the known discrepancies between this
 document, its companion prose, and the code.
+
+Chapters 15-20 extend the formalism *past* Simplify to the **`to_cmm`** lowering
+(the biggest former "context only" gap): a core Cmm machine
+([`15`](15-cmm.md)/[`19`](19-cmm-memory-gc.md)), the two-stage translation
+(control [`16`](16-to-cmm-control.md), data [`18`](18-to-cmm-data.md)), the
+representation relation `≈` ([`17`](17-representation.md)), and a cross-language
+forward-simulation soundness statement ([`20`](20-to-cmm-soundness.md)) that
+composes with Simplify's to cover `source → Simplify → to_cmm → Cmm`. Scope is
+64-bit little-endian (matching the code, which rejects 32-bit); the Stage-2
+representation model localizes the `float32_double_round` bug to Simplify's fold
+rather than the lowering ([`18`](18-to-cmm-data.md), [`20`](20-to-cmm-soundness.md) §5).
 
 Companion prose (not part of the formalism, but authoritative background) lives
 in the parent directory: [`../types.md`](../types.md),
@@ -222,7 +240,10 @@ rule block, not prose.
 | `S.Rewrite.*` | local rewrites (e.g. `S.Rewrite.Switch.KnownScrutinee`) | 10 |
 | `S.Inline.*` | inlining | 11 |
 | `S.Unbox.*` | unboxing | 12 |
-| `INV.*` | global invariants | 13 |
+| `INV.*` | global invariants (Simplify soundness `INV.Simplify.*`; to_cmm soundness `INV.ToCmm.*`) | 13, 20 |
+| `CM.*` | core Cmm operational semantics (machine, control, allocation, GC) | 15, 19 |
+| `TC.*` | to_cmm translation (`TC.LetCont.*`, `TC.ApplyCont.*`, `TC.Prim.*`, `TC.Let.*`) | 16, 18 |
+| `R.*` | representation relation (`R.Val.*`, `R.Obj.*`, `R.Header`, `R.Heap`) | 17 |
 
 ## Sync protocol (for agents)
 

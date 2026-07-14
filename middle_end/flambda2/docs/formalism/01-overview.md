@@ -70,7 +70,7 @@ changes calling conventions, and performs cross-function and closure unboxing.
 Its model is described in `docs/reaper.md`. The Reaper is **context only** here:
 it is described but not formalized, and it is off by default.
 
-### 4. to_cmm (context only)
+### 4. to_cmm (formalized in chapters 15–20)
 
 `To_cmm.unit` (`middle_end/flambda2/to_cmm/to_cmm.ml#unit`) lowers optimized
 Flambda to `Cmm`. It makes concrete what Flambda kept abstract: tagging/boxing
@@ -79,10 +79,16 @@ memory operations, continuations become either inlined sequential code (for
 non-recursive continuations used exactly once) or `Cmm` static jump/catch, and
 closure/value slots are assigned concrete offsets. Crucially, `to_cmm` relies on
 Simplify having already done all desired unboxing; it introduces box/unbox only
-as forced by kinds. Its design is described in `docs/to_cmm.md`. There is a
-parallel exit, `To_jsir.unit` (`middle_end/flambda2/to_jsir/to_jsir.ml#unit`),
-that lowers to js_of_ocaml's IR instead; see `to_jsir/README.md`. Both are
-**context only**.
+as forced by kinds. Its design is described in `docs/to_cmm.md`, and it is
+**formalized** in chapters [`15`](15-cmm.md)–[`20`](20-to-cmm-soundness.md): a
+core Cmm machine, the control ([`16`](16-to-cmm-control.md)) and data
+([`18`](18-to-cmm-data.md)) translation, the representation relation `≈`
+([`17`](17-representation.md)), the concrete allocation/region/GC model
+([`19`](19-cmm-memory-gc.md)), and a cross-language soundness statement
+([`20`](20-to-cmm-soundness.md)) — for a 64-bit little-endian target
+([`15`](15-cmm.md) §0). There is a parallel exit, `To_jsir.unit`
+(`middle_end/flambda2/to_jsir/to_jsir.ml#unit`), that lowers to js_of_ocaml's IR
+instead; see `to_jsir/README.md`. `to_jsir` remains **context only**.
 
 ### -Oclassic mode
 
@@ -137,7 +143,8 @@ given rules; "out of scope" means it is not treated here at all.
 | CPS conversion (`from_lambda/`) | context only | 01 |
 | Closure conversion | context only | 01 |
 | Reaper (interprocedural DCE + unboxing) | context only | 01, `docs/reaper.md` |
-| to_cmm lowering | context only | 01, `docs/to_cmm.md` |
+| to_cmm: Cmm target machine (control + memory ops); control-flow translation; representation relation; data/primitive lowering; allocation/regions/GC; cross-language soundness | formalized (64-bit little-endian) | 15–20; `docs/to_cmm.md` |
+| to_cmm: 32-bit / big-endian targets; instruction selection below Cmm; SIMD/probe/method/effect lowering; bigarray element decode | out of scope | — (15 §0; 20 §5) |
 | to_jsir lowering | context only | 01, `to_jsir/README.md` |
 | -Oclassic mode | context only | 01 |
 | cmx import/export (`Flambda_cmx`, cross-module info) | context only | 01; 07 §6 |

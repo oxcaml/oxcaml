@@ -1,7 +1,7 @@
 # Rule index
 
 Machine-greppable index of every formal rule in the Flambda 2 formalism
-(chapters 02-13; chapter 01 has none). Each
+(chapters 02-20; chapter 01 has none). Each
 row corresponds to one ```` ```rule ```` block in a chapter. See
 [`README.md`](README.md) ("Rule blocks" and "Rule ID namespaces") for the
 block format and the meaning of each namespace prefix.
@@ -399,9 +399,102 @@ copies the regenerated files back into the source tree.
 | `S.Unbox.Mutable.Candidate` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/flow/mutable_unboxing.ml#blocks_to_unbox`<br>`middle_end/flambda2/simplify/flow/mutable_unboxing.ml#escaping` | — |
 | `S.Unbox.Mutable.Rewrite` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/flow/mutable_unboxing.ml#Fold_prims.apply_prim`<br>`middle_end/flambda2/simplify/flow/mutable_unboxing.ml#compute_rewrites` | 14-validation/new-07-float-unbox.md |
 
-## INV — Global invariants (ch. 13)
+## CM — Core Cmm operational semantics (ch. 15, 19)
 
-4 rules.
+27 rules.
+
+| Rule ID | Status | Chapter | Code anchors | Verified |
+|---|---|---|---|---|
+| `CM.Syntax.Fragment` | descriptive | 15-cmm.md | `backend/cmm.mli#expression`<br>`backend/cmm.mli#operation`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr` | — |
+| `CM.Mem.LoadStore` | normative | 15-cmm.md | `backend/cmm.mli#memory_chunk`<br>`backend/cmm.mli#size_of_memory_chunk`<br>`backend/cmm_helpers.ml#mk_load_immut` | — |
+| `CM.Context` | descriptive | 15-cmm.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr`<br>`backend/cmm.mli#expression` | — |
+| `CM.Op.Pure` | normative | 15-cmm.md | `backend/cmm.mli#operation`<br>`backend/cmm_helpers.ml#add_int`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_simple` | — |
+| `CM.Op.TupleField` | normative | 15-cmm.md | `backend/cmm.mli#Ctuple_field`<br>`backend/cmm_helpers.ml#tuple_field`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_external_call` | — |
+| `CM.Load` | normative | 15-cmm.md | `backend/cmm.mli#Cload`<br>`backend/cmm_helpers.ml#mk_load_immut` | — |
+| `CM.Store` | normative | 15-cmm.md | `backend/cmm.mli#Cstore`<br>`backend/cmm_helpers.ml#setfield_computed` | — |
+| `CM.If` | normative | 15-cmm.md | `backend/cmm.mli#Cifthenelse`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#switch` | — |
+| `CM.Switch` | normative | 15-cmm.md | `backend/cmm.mli#Cswitch`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#switch`<br>`backend/cmm_helpers.ml#transl_switch_clambda` | — |
+| `CM.Catch.NonRec` | normative | 15-cmm.md | `backend/cmm.mli#Ccatch`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_not_inlined`<br>`backend/cmm_helpers.ml#create_ccatch` | — |
+| `CM.Catch.Rec` | normative | 15-cmm.md | `backend/cmm.mli#Ccatch`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_rec` | — |
+| `CM.Exit` | normative | 15-cmm.md | `backend/cmm.mli#Cexit`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_jump_to_continuation` | — |
+| `CM.Exit.Trap` | normative | 15-cmm.md | `backend/cmm.mli#trap_action`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_jump_to_continuation`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_raise` | — |
+| `CM.Exit.Return` | normative | 15-cmm.md | `backend/cmm.mli#exit_label`<br>`backend/cmm_helpers.ml#trap_return` | — |
+| `CM.Catch.Exn` | normative | 15-cmm.md | `backend/cmm.mli#Exn_handler`<br>`backend/cmm_helpers.ml#trywith`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_exn_handler` | — |
+| `CM.Raise` | normative | 15-cmm.md | `backend/cmm.mli#Craise`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_raise`<br>`backend/cmm_helpers.ml#raise_prim` | — |
+| `CM.Apply` | normative | 15-cmm.md | `backend/cmm.mli#Capply`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_apply0` | — |
+| `CM.Extcall` | normative | 15-cmm.md | `backend/cmm.mli#Cextcall`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_external_call` | — |
+| `CM.Invalid` | normative | 15-cmm.md | `backend/cmm.mli#Cinvalid`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#invalid`<br>`middle_end/flambda2/to_cmm/to_cmm_shared.ml#invalid` | — |
+| `CM.Unit.Final` | normative | 15-cmm.md | `middle_end/flambda2/to_cmm/to_cmm.ml#unit`<br>`backend/cmm.mli#Cdata` | — |
+| `CM.Alloc.Heap` | normative | 19-cmm-memory-gc.md | `backend/cmm.mli#Calloc`<br>`backend/cmm_helpers.ml#make_alloc_generic` | — |
+| `CM.Region.Begin` | normative | 19-cmm-memory-gc.md | `backend/cmm.mli#Cbeginregion`<br>`middle_end/flambda2/terms/flambda_primitive.mli#Begin_region` | — |
+| `CM.Alloc.Local` | normative | 19-cmm-memory-gc.md | `backend/cmm.mli#Calloc`<br>`backend/cmm_helpers.ml#local_block_header`<br>`middle_end/flambda2/to_cmm/to_cmm_shared.ml#alloc_mode_for_allocations_to_cmm` | — |
+| `CM.Region.End` | normative | 19-cmm-memory-gc.md | `backend/cmm.mli#Cendregion`<br>`middle_end/flambda2/terms/flambda_primitive.mli#End_region` | — |
+| `CM.Alloc.GC` | conjectured | 19-cmm-memory-gc.md | `backend/cmm_helpers.ml#make_alloc_generic`<br>`backend/cmm.mli#machtype_component` | — |
+| `CM.Addr.NoSurvive` | normative | 19-cmm-memory-gc.md | `backend/cmm.mli#machtype_component`<br>`backend/cmm_helpers.ml#field_address`<br>`backend/cmm_helpers.ml#setfield_computed` | — |
+| `CM.Alloc.Exhaustion` | normative | 19-cmm-memory-gc.md | `backend/cmm_helpers.ml#make_alloc_generic` | — |
+
+## TC — to_cmm translation (ch. 16, 18)
+
+31 rules.
+
+| Rule ID | Status | Chapter | Code anchors | Verified |
+|---|---|---|---|---|
+| `TC.Expr.Dispatch` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr` | — |
+| `TC.LetCont.Classify` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont`<br>`middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_continuation_handler` | — |
+| `TC.LetCont.Inline` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_inlined`<br>`middle_end/flambda2/to_cmm/to_cmm_env.ml#add_inline_cont` | — |
+| `TC.LetCont.Jump` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_not_inlined`<br>`middle_end/flambda2/to_cmm/to_cmm_env.ml#add_jump_cont` | — |
+| `TC.LetCont.Exn` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_exn_handler`<br>`backend/cmm_helpers.ml#trywith` | — |
+| `TC.LetCont.Rec` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_rec` | — |
+| `TC.ApplyCont.Jump` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_jump_to_continuation` | — |
+| `TC.ApplyCont.Return` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_jump_to_return_continuation`<br>`backend/cmm_helpers.ml#trap_return` | — |
+| `TC.ApplyCont.Inline` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#apply_cont` | — |
+| `TC.ApplyCont.Raise` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_raise`<br>`backend/cmm_helpers.ml#raise_prim` | — |
+| `TC.Apply.Call` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_apply0` | — |
+| `TC.Apply.Return` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#apply_expr` | — |
+| `TC.Switch` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#switch`<br>`backend/cmm_helpers.ml#transl_switch_clambda`<br>`backend/cmm_helpers.ml#ite` | — |
+| `TC.Invalid` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#invalid`<br>`middle_end/flambda2/to_cmm/to_cmm_shared.ml#invalid` | — |
+| `TC.Simple` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_shared.ml#simple`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#bind_var_to_simple` | — |
+| `TC.Prim.Sound` | conjectured | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_simple`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_complex`<br>`middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects` | — |
+| `TC.Let.Simple` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_expr0`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#bind_var_to_simple` | — |
+| `TC.Let.Prim` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_prim`<br>`middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_let_binding` | — |
+| `TC.Let.Subst` | conjectured | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_env.ml#flush_delayed_lets`<br>`middle_end/flambda2/to_cmm/to_cmm_env.ml#bind_variable`<br>`middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects` | — |
+| `TC.Let.SetOfClosures` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#let_dynamic_set_of_closures` | — |
+| `TC.Let.Static` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_static.ml#static_consts`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_expr0` | — |
+| `TC.Prim.TagUntag` | normative | 18-to-cmm-data.md | `backend/cmm_helpers.ml#tag_int`<br>`backend/cmm_helpers.ml#untag_int`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#arithmetic_conversion` | — |
+| `TC.Prim.BoxUnbox` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#box_number`<br>`backend/cmm_helpers.ml#box_int_gen`<br>`backend/cmm_helpers.ml#unbox_int` | — |
+| `TC.Prim.MakeBlock` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block`<br>`backend/cmm_helpers.ml#make_alloc_generic` | — |
+| `TC.Prim.BlockLoad` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#block_load`<br>`backend/cmm_helpers.ml#get_field_computed`<br>`backend/cmm_helpers.ml#field_address` | — |
+| `TC.Prim.BlockSet` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#block_set`<br>`backend/cmm_helpers.ml#setfield_computed` | — |
+| `TC.Prim.ProjectFunctionSlot` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_simple`<br>`backend/cmm_helpers.ml#infix_field_address` | — |
+| `TC.Prim.ProjectValueSlot` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_simple`<br>`backend/cmm_helpers.ml#get_field_computed` | — |
+| `TC.Prim.NumConv` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#arithmetic_conversion`<br>`backend/cmm_helpers.ml#float32_of_int`<br>`backend/cmm.mli#static_cast` | — |
+| `TC.Prim.StringLoad` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#string_like_load`<br>`backend/cmm_helpers.ml#unaligned_load_16` | — |
+| `TC.Prim.ArrayAccess` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_set0`<br>`backend/cmm_helpers.ml#array_indexing` | — |
+
+## R — Representation relation (ch. 17)
+
+14 rules.
+
+| Rule ID | Status | Chapter | Code anchors | Verified |
+|---|---|---|---|---|
+| `R.Val.Imm` | normative | 17-representation.md | `backend/cmm_helpers.ml#tag_int`<br>`backend/cmm_helpers.ml#untag_int`<br>`middle_end/flambda2/kinds/flambda_kind.ml#t` | — |
+| `R.Val.NakedNumber` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unbox_number`<br>`backend/cmm_helpers.ml#sign_extend`<br>`backend/cmm.mli#machtype_component` | — |
+| `R.Val.Pointer` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#block_load`<br>`backend/cmm_helpers.ml#field_address` | — |
+| `R.Val.Clos` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#fill_slot`<br>`middle_end/flambda2/simplify_shared/slot_offsets.ml#Layout`<br>`backend/cmm_helpers.ml#infix_field_address` | — |
+| `R.Header` | normative | 17-representation.md | `backend/cmm_helpers.ml#block_header`<br>`backend/cmm_helpers.ml#Mixed_block_support`<br>`backend/cmm_helpers.ml#caml_black` | — |
+| `R.Obj.Block` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block`<br>`backend/cmm_helpers.ml#make_alloc_generic` | — |
+| `R.Obj.FloatBlock` | normative | 17-representation.md | `backend/cmm_helpers.ml#float_header`<br>`backend/cmm_helpers.ml#make_float_alloc`<br>`backend/cmm_helpers.ml#floatarray_header` | — |
+| `R.Obj.MixedBlock` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block`<br>`backend/cmm_helpers.ml#make_mixed_alloc`<br>`middle_end/flambda2/kinds/flambda_kind.ml#Mixed_block_shape.offset_in_words` | — |
+| `R.Obj.Array` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block`<br>`backend/cmm_helpers.ml#array_indexing`<br>`backend/cmm_helpers.ml#Unboxed_or_untagged_array_tags`<br>`backend/cmm_helpers.ml#unboxed_or_untagged_packed_array_length` | — |
+| `R.Obj.Bytes` | normative | 17-representation.md | `backend/cmm_helpers.ml#string_header` | — |
+| `R.Obj.Boxed` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#box_number`<br>`backend/cmm_helpers.ml#float_header`<br>`backend/cmm_helpers.ml#boxedint64_header` | — |
+| `R.Obj.Closures` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#fill_slot`<br>`backend/cmm_helpers.ml#pack_closure_info`<br>`backend/cmm_helpers.ml#infix_header`<br>`middle_end/flambda2/simplify_shared/slot_offsets.ml#Layout` | — |
+| `R.Heap` | conjectured | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm.ml#unit` | — |
+| `R.Observe` | normative | 17-representation.md | `middle_end/flambda2/terms/flambda_unit.mli#module_symbol`<br>`middle_end/flambda2/to_cmm/to_cmm.ml#unit` | — |
+
+## INV — Global invariants and to_cmm soundness (ch. 13, 20)
+
+8 rules.
 
 | Rule ID | Status | Chapter | Code anchors | Verified |
 |---|---|---|---|---|
@@ -409,13 +502,17 @@ copies the regenerated files back into the source tree.
 | `INV.Rewrite.Local` | conjectured | 13-soundness.md | `middle_end/flambda2/simplify/simplify_expr.ml#simplify_expr`<br>`middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive`<br>`middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects` | — |
 | `INV.NameMode.Coherent` | conjectured | 13-soundness.md | `middle_end/flambda2/nominal/name_mode.ml#can_be_in_terms`<br>`middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let` | — |
 | `INV.KindChecks.Gated` | descriptive | 13-soundness.md | `middle_end/flambda2/ui/flambda_features.ml#kind_checks`<br>`driver/oxcaml_args.ml`<br>`middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_apply_shared` | — |
+| `INV.ToCmm.Control` | conjectured | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr`<br>`middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_continuation_handler` | — |
+| `INV.ToCmm.Simulates` | conjectured | 20-to-cmm-soundness.md | `middle_end/flambda2/to_cmm/to_cmm.ml#unit`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr` | — |
+| `INV.ToCmm.EndToEnd` | conjectured | 20-to-cmm-soundness.md | `middle_end/flambda2/flambda2.ml#flambda_to_flambda0`<br>`middle_end/flambda2/to_cmm/to_cmm.ml#unit` | — |
+| `INV.ToCmm.InvalidUnreached` | conjectured | 20-to-cmm-soundness.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#invalid`<br>`backend/cmm.mli#Cinvalid` | — |
 
 ## Consistency check results
 
-_Generated by scanning chapters 02-13._
+_Generated by scanning chapters 02-20._
 
-- **Total rules:** 318
-- **By status:** normative 221, descriptive 64, conjectured 33
+- **Total rules:** 394
+- **By status:** normative 287, descriptive 66, conjectured 41
 - **By chapter:**
   - 02-syntax.md: 13
   - 03-kinds.md: 27
@@ -429,6 +526,12 @@ _Generated by scanning chapters 02-13._
   - 11-inlining.md: 10
   - 12-unboxing.md: 17
   - 13-soundness.md: 4
+  - 15-cmm.md: 20
+  - 16-to-cmm-control.md: 15
+  - 17-representation.md: 14
+  - 18-to-cmm-data.md: 17
+  - 19-cmm-memory-gc.md: 7
+  - 20-to-cmm-soundness.md: 3
 - **Duplicate rule IDs:** none.
 - **Rules with no code anchor:** none (all rules have ≥ 1 `CODE`).
 

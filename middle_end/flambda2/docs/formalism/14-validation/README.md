@@ -14,9 +14,14 @@ synthesized program); (2) predict the output and cite rules before looking;
 resolved by **fixing the formalism, never by editing the prediction** — the one
 MISMATCH below drove a correction to `S.Rewrite.CSE.Eligible`.
 
-**Verdicts:** 33 case studies — 30 MATCH, 1 PARTIAL, 2 MISMATCH (1 drove a
-formalism fix; 1 — [`float32_double_round`](float32_double_round.md) — witnesses
-an open **compiler soundness bug**: int→float32 constant folding double-rounds).
+**Verdicts:** 39 case studies — 35 MATCH, 1 PARTIAL, 3 MISMATCH (2 drove formalism
+fixes — the `S.Rewrite.CSE.Eligible` correction and the `R.Obj.Closures`
+scanned/unscanned split; 1 — [`float32_double_round`](float32_double_round.md) —
+witnesses an open **compiler soundness bug**: int→float32 constant folding
+double-rounds). The 6 `to_cmm` case studies (chapters 15–20) validate the emitted
+Cmm against the representation relation using real `-dcmm` output; the adversarial
+sweep of chapters 15–20 (see below) found the `R.Obj.Closures`, `R.Obj.Array`, and
+`CM.Addr.NoSurvive` imprecisions now corrected.
 
 **Synthesized tests in the testsuite.** The 12 synthesized case studies (the
 "Synthesized" and "Mixed blocks" tables below) have their programs checked into
@@ -92,3 +97,22 @@ These case studies use synthesized programs; each is checked into the testsuite
 | [`loopify-04-loop-attr-no-tailcall`](loopify-04-loop-attr-no-tailcall.md) | `[@loop]` with no self tail call: wrapper collapses back | MATCH | `S.Rewrite.LetCont.Demote`, `S.Rewrite.LetCont.Inline` |
 | [`loopify-05-dead-loop`](loopify-05-dead-loop.md) | loopified loop proven dead leaves non-recursive residue | MATCH | `S.Rewrite.Loopify.Body`, `S.Rewrite.Switch.ArmPrune`, `S.Rewrite.LetCont.Demote` |
 | [`loopify-06-mutual-and-mixed`](loopify-06-mutual-and-mixed.md) | mutual recursion untouched; `[@loop]` redirects only self tail calls | MATCH | `S.Rewrite.Loopify.Attribute`, `S.Rewrite.Loopify.SelfTailCall` |
+
+## to_cmm lowering (6)
+
+These validate the `to_cmm` chapters (15–20) by prediction against real `-dcmm`
+output, checking the emitted Cmm against the representation relation `≈` (ch. 17)
+and the translation rules (ch. 16, 18). Each program is checked into
+`testsuite/tests/flambda2/examples/tocmm/`, paired with a `.compilers.reference`
+capturing `-dcmm -dcanonical-ids` (canonical ids keep the reference stable); CI
+runs them automatically. Run one with
+`make -s test-one TEST=flambda2/examples/tocmm/<name>.ml`.
+
+| Case study | Target | Verdict | Primary rules |
+|---|---|---|---|
+| [`tocmm-01-tagging-blocks`](tocmm-01-tagging-blocks.md) | tagging, block build/load, static closure layout | MATCH | `R.Val.Imm`, `R.Header`, `R.Obj.Block`, `R.Obj.Closures`, `TC.Prim.MakeBlock`, `TC.Prim.BlockLoad` |
+| [`tocmm-02-switch`](tocmm-02-switch.md) | multi-arm switch → `Cswitch`, untagged scrutinee, range guard | MATCH | `TC.Switch`, `CM.Switch`, `TC.Prim.TagUntag` |
+| [`tocmm-03-trywith-region`](tocmm-03-trywith-region.md) | try/with: exn handler, trap push/pop, raise, region | MATCH | `TC.LetCont.Exn`, `TC.ApplyCont.Raise`, `CM.Catch.Exn`, `CM.Exit.Trap`, `CM.Raise`, `CM.Region.Begin`, `INV.ToCmm.Control` |
+| [`tocmm-04-closure-capture`](tocmm-04-closure-capture.md) | closure alloc + value-slot projection | MATCH | `R.Obj.Closures`, `TC.Prim.ProjectValueSlot`, `TC.Let.SetOfClosures` |
+| [`tocmm-05-block-set-barrier`](tocmm-05-block-set-barrier.md) | immediate store vs. `caml_modify` barrier; array indexing | MATCH | `TC.Prim.BlockSet`, `TC.Prim.ArrayAccess`, `CM.Store` |
+| [`tocmm-06-closure-unscanned`](tocmm-06-closure-unscanned.md) | unscanned (`int`) capture sits below `startenv` | MISMATCH (drove `R.Obj.Closures` fix) | `R.Obj.Closures`, `R.Val.Clos`, `TC.Prim.ProjectFunctionSlot` |
