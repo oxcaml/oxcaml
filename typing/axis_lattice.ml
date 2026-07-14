@@ -121,13 +121,21 @@ let leq (a : t) (b : t) : bool = a land b = a
    [equate_or_equal]) to avoid materializing two [Mode.Crossing] records per
    comparison. The equivalence rests on a CANONICITY invariant: [t] is
    [private int] and every value is built only through this module's constructors
-   ([bot], [create], [set_axis], [join] = [lor], [meet] = [land]), each of which
-   keeps the bits within [axis_mask] using the per-axis prefix-ones / diamond
-   encoding -- so equal integers <=> equal per-axis levels, and [of_axis_lattice]
-   (total, reads every axis) is injective. If a future axis is added with a
-   NON-canonical encoding (distinct bit patterns for the same level, or bits
-   outside [axis_mask]), structural int equality would diverge from
-   [Mod_bounds.equal] and those call sites must be revisited. *)
+   ([bot], [create], [set_axis], [join] = [lor], [meet] = [land], [co_sub],
+   [of_axis_set]), each of which keeps the bits within [axis_mask] using the
+   per-axis prefix-ones / diamond encoding -- so equal integers <=> equal per-axis
+   levels, and [of_axis_lattice] (total, reads every axis) is injective. If a
+   future axis is added with a NON-canonical encoding (distinct bit patterns for
+   the same level, or bits outside [axis_mask]), structural int equality would
+   diverge from [Mod_bounds.equal] and those call sites must be revisited.
+
+   Caveat: [Marshal] bypasses [private int], so a corrupted or forged
+   same-magic artifact could carry non-canonical bits (e.g. a chain [10]
+   decoding like [01]) that record-equal would treat as equal but int-equal
+   will not -- a false NEGATIVE only, never a false positive. Compiler-produced
+   artifacts are always canonical, and marshalled compiler files are already
+   trusted inputs (a forged cmi can do far worse), so this is not a soundness
+   concern. *)
 let equal (a : t) (b : t) : bool = a = b
 
 let hash = Hashtbl.hash

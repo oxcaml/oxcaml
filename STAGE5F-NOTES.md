@@ -894,6 +894,8 @@ MEASURED (interleaved 17-rep, base vs mitigated-final):
 CORRECTNESS: ocamlformat-clean; boot-green; typing-jkind-bounds 44/44 and typing-layouts 45/45,
 then FULL SUITE 2333 passed / 0 failed / 0 unexpected / 204 skipped / 2537 considered (the +1
 vs the frozen wave's 2332 is the W-1 reexport regression pin). 0 verdict change.
-COMMITTED @ 1f65c035e (perf mitigation + W-3 cms comment fold). Lead holds the push; the W-1
-push script (a0c9ea09e..9ce70e139) does NOT include this commit -- move TIP to 1f65c035e to
-push the mitigation too.
+The perf-mitigation commit is c265d91e2 (native Axis_lattice.equal + W-3 cms comment fold), a
+single commit on 9ce70e139; it was delta-checked (INTEGRATE) and is PUSHED -- PR #6460 head =
+c265d91e2. (This paragraph is a notes-only child commit correcting a stale intermediate-SHA
+self-citation; per the standing rule, a delta-checked/pushed SHA is immutable, so corrections
+ride as child commits, never amends.)
