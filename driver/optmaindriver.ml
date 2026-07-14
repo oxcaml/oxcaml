@@ -109,11 +109,16 @@ module Gc_pacing = struct
       r
 
   (* The flag value is the MIN of comma-separated terms; a term is
-     either an absolute SIZE or PERCENT'%' of physical memory.  E.g.
-     [1G,1.5%] = 1 GiB, but at most 1.5% of RAM -- the full value on
-     large build machines, proportionally less on small development
-     ones, with the whole policy explicit in the (build-system-provided)
-     flag rather than implicit in the compiler. *)
+     either an absolute SIZE or PERCENT'%' of physical memory PER CORE.
+     Per core because the floor is a per-process allowance and the worst
+     case is one compiler per core: a term of P% bounds the aggregate
+     floor allowance of a core-saturating build at P% of the machine's
+     memory, uniformly across machines with very different
+     memory-to-core ratios.  E.g. [1G,50%] = 1 GiB, but at most half the
+     per-core memory -- the full value on large build machines,
+     proportionally less on small development ones, with the whole
+     policy explicit in the (build-system-provided) flag rather than
+     implicit in the compiler. *)
   let parse_floor_spec s =
     let parse_term t =
       let n = String.length t in
@@ -121,7 +126,11 @@ module Gc_pacing = struct
         match float_of_string_opt (String.sub t 0 (n - 1)) with
         | Some pct when pct > 0. && pct <= 100. ->
           (match physical_memory_bytes () with
-           | Some mem -> Some (int_of_float (float_of_int mem *. pct /. 100.))
+           | Some mem ->
+             let cores = max 1 (Domain.recommended_domain_count ()) in
+             Some
+               (int_of_float
+                  (float_of_int (mem / cores) *. pct /. 100.))
            | None -> None)
         | _ -> None
       else parse_size_bytes t
@@ -166,8 +175,8 @@ got: %d" n)
         | _ ->
           Compenv.fatal
             ("-X gc-idle-floor expects a comma-separated min-expression "
-             ^ "of sizes (512M, 1G) and/or percentages of physical "
-             ^ "memory (1.5%), got: " ^ s)
+             ^ "of sizes (512M, 1G) and/or percentages of per-core "
+             ^ "physical memory (50%), got: " ^ s)
       end
 end
 
