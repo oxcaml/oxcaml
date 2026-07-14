@@ -115,6 +115,19 @@ let meet (a : t) (b : t) : t = a land b
 
 let leq (a : t) (b : t) : bool = a land b = a
 
+(* [equal] is structural equality on the packed integer encoding. It is a SOUND
+   stand-in for [Mod_bounds.equal (of_axis_lattice a) (of_axis_lattice b)] -- and
+   is used that way at the hot jkind-equality sites (btype.ml, jkind.ml
+   [equate_or_equal]) to avoid materializing two [Mode.Crossing] records per
+   comparison. The equivalence rests on a CANONICITY invariant: [t] is
+   [private int] and every value is built only through this module's constructors
+   ([bot], [create], [set_axis], [join] = [lor], [meet] = [land]), each of which
+   keeps the bits within [axis_mask] using the per-axis prefix-ones / diamond
+   encoding -- so equal integers <=> equal per-axis levels, and [of_axis_lattice]
+   (total, reads every axis) is injective. If a future axis is added with a
+   NON-canonical encoding (distinct bit patterns for the same level, or bits
+   outside [axis_mask]), structural int equality would diverge from
+   [Mod_bounds.equal] and those call sites must be revisited. *)
 let equal (a : t) (b : t) : bool = a = b
 
 let hash = Hashtbl.hash

@@ -1446,15 +1446,13 @@ module Jkind_desc = struct
     match base1, base2 with
     | Layout l1, Layout l2 ->
       Layout.equate_or_equal ~allow_mutation l1 l2
-      && Mod_bounds.equal
-           (Mod_bounds.of_axis_lattice mod_bounds1)
-           (Mod_bounds.of_axis_lattice mod_bounds2)
+      (* perf: packed-lattice equality; faithful to Mod_bounds.equal on the
+         materialized records, no Mode.Crossing allocation *)
+      && Axis_lattice.equal mod_bounds1 mod_bounds2
     | Kconstr (p1, sa1), Kconstr (p2, sa2)
       when Path.same p1 p2
            && Scannable_axes.equal sa1 sa2
-           && Mod_bounds.equal
-                (Mod_bounds.of_axis_lattice mod_bounds1)
-                (Mod_bounds.of_axis_lattice mod_bounds2) ->
+           && Axis_lattice.equal mod_bounds1 mod_bounds2 ->
       true
     | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with

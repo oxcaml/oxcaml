@@ -834,3 +834,66 @@ W-3 (folded into this commit). The m4 magic comment now names the LOAD-BEARING
 formats (cmi + cmt/cmti bin-annot, which actually marshal base_and_axes) vs the
 over-inclusive-but-safe cmo/cmx/exec bump. No magic-value change (shared 582,
 cmi I583 unchanged).
+
+## QUIET-BOX PERF RE-MEASURE (backstop, 2026-07-14, load 2.04) -- final = W-1-fixed @ 9ce70e139
+Interleaved perf_time.py, base c97be81e9 (ik5f6-legacybase) vs final W-1-fixed, reps 17:
+  RUN Q1 (load 1min=2.04): perf_records median 288.14 -> 292.96 = +1.67% (min 283.48 -> 286.68 = +1.13%);
+                           perf_plain   median 1330.17 -> 1339.77 = +0.72% (min 1318.57 -> 1330.25 = +0.89%)
+  FLAG: perf_records is CONSISTENT-SIGN (median AND min both regressions) and BOTH >1% -- crosses the
+  backstop STOP threshold. perf_plain consistent-sign but both <1%. Confirming replicate below.
+  RUN Q2 (load 1min=1.93): perf_records median 290.55 -> 294.92 = +1.50% (min 287.53 -> 290.34 = +0.98%);
+                           perf_plain   median 1342.34 -> 1348.97 = +0.49% (min 1329.95 -> 1344.32 = +1.08%)
+
+QUIET-BOX CONCLUSION (REVERSES the earlier loaded-box "below noise floor" call):
+At load ~2 the perf_records Δ does NOT sign-flip across two 17-rep replicates -- it is a CONSISTENT
+regression: median +1.67% / +1.50%, min +1.13% / +0.98%. That crosses the backstop STOP threshold
+(consistent-sign >1%, Q1 has both median AND min >1%). perf_plain is a smaller consistent regression
+(~+0.5% median, min +0.89%/+1.08%). The earlier high-load runs sign-flipped only because noise (~±2% at
+load ~45) swamped a real ~1.5% signal. Cold-path note: the W-1 crossing_read fix is NOT exercised by the
+perf corpus (ordinary compiles, no allow_any decls), so the source is the Stage A field retype on the HOT
+ikind read path, not Stage B/W-1. => STOP-BEFORE-PUSH raised to team-lead.
+
+## TRACK 2 — Stage-A perf regression: attribution + mitigation (2026-07-14, load ~2-10)
+
+ATTRIBUTION (perf record -F 1999, 40 interleaved perf_records compiles, base c97be81e9 vs
+final; perf diff aligned per-symbol). The regression is Stage A's boundary conversions, NOT
+W-1 (W-1 crossing_read is allow_any-only, not in the corpus). Top perf diff movers (base% ->
++delta):
+  Axis_lattice.get_axis        0.04% -> +0.51%
+  Axis_lattice.to_mode_crossing 0.05% -> +0.37%
+  Btype.to_axis_lattice         0     -> +0.16%
+  (= ~+1.04% of the ~1.5%; remainder is spread/GC noise)
+X4 WAS NOT THE MOVER. The X4 backlog item (#58, "hoist ikind-floor derivation out of the
+common_jkinds candidate loop") was the a-priori suspect, but common_jkinds does NOT appear in
+the perf diff -- the cost is entirely the equality-SITE conversions above, not the floor
+derivation in that loop. So #58 does NOT inherit any urgency from this regression; it stays a
+plain (unrelated) backlog optimization.
+MECHANISM: Stage A retyped the decl floor field mod_bounds:Mod_bounds.t -> ikind_floor:
+Axis_lattice.t. Readers that want a Mod_bounds.t (crossing+externality record) -- which used
+to be a direct field read -- now call Mod_bounds.of_axis_lattice = to_mode_crossing (11x
+get_axis + a Mode.Crossing alloc) + externality. The hot drivers are the jkind EQUALITY sites
+that do [Mod_bounds.equal (of_axis_lattice a) (of_axis_lattice b)] -- materializing TWO records
+per comparison just to compare them.
+
+MITIGATION (cheapest; "hot readers consume Axis_lattice natively"): rewrite the 4 hot equality
+sites to [Axis_lattice.equal a b] on the packed lattices directly:
+  btype.ml (Kconstr + Layout jkind-equality, 2 sites); jkind.ml equate_or_equal (Layout +
+  Kconstr, 2 sites).
+PROVABLY EQUIVALENT: Axis_lattice.t = private int, canonically constructed (set_axis clears to
+axis_mask; join=lor, meet=land stay within top; no stray bits), of_axis_lattice reads ALL axes
+faithfully, Mod_bounds.equal compares all axes -> Axis_lattice.equal (int =) === Mod_bounds.equal
+(of_axis_lattice ...). Same value-faithfulness the ikind engine already relies on. Single int
+compare replaces 22 get_axis + 2 record allocs per call.
+
+MEASURED (interleaved 17-rep, base vs mitigated-final):
+  RUN M1 (load 13): perf_records median -1.22% (min -0.89%); perf_plain -0.17% (min +0.58%)
+  RUN M2 (load 10): perf_records median -1.37% (min +0.75%); perf_plain +0.56% (min -0.57%)
+  => the +1.5-1.67% records regression is GONE; final is now neutral-to-slightly-FASTER than
+  base on records (plausible: base compared Mod_bounds RECORDS; mitigation compares single ints,
+  beating even the pre-Stage-A baseline). perf_plain ~neutral (+-0.5%).
+CORRECTNESS: ocamlformat-clean; boot-green; typing-jkind-bounds 44/44 and typing-layouts 45/45,
+then FULL SUITE 2333 passed / 0 failed / 0 unexpected / 204 skipped / 2537 considered (the +1
+vs the frozen wave's 2332 is the W-1 reexport regression pin). 0 verdict change.
+COMMITTED @ 1f65c035e (perf mitigation + W-3 cms comment fold). Lead holds the push; the W-1
+push script (a0c9ea09e..9ce70e139) does NOT include this commit -- move TIP to 1f65c035e to
+push the mitigation too.

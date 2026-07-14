@@ -1340,15 +1340,17 @@ module Jkind0 = struct
         | Kconstr (p1, sa1), Kconstr (p2, sa2) ->
           Path.same p1 p2 &&
           Jkind_types.Scannable_axes.equal sa1 sa2 &&
-          Mod_bounds.equal
-            (Mod_bounds.of_axis_lattice t1.ikind_floor)
-            (Mod_bounds.of_axis_lattice t2.ikind_floor)
+          (* perf: compare the packed lattices directly; equal to
+             [Mod_bounds.equal] on the materialized records (of_axis_lattice is
+             faithful) without allocating two Mode.Crossing records *)
+          Axis_lattice.equal t1.ikind_floor t2.ikind_floor
         | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
         | Layout l1, Layout l2 ->
           Jkind_types.Layout.Const.equal l1 l2 &&
-          Mod_bounds.equal
-            (Mod_bounds.of_axis_lattice t1.ikind_floor)
-            (Mod_bounds.of_axis_lattice t2.ikind_floor)
+          (* perf: compare the packed lattices directly; equal to
+             [Mod_bounds.equal] on the materialized records (of_axis_lattice is
+             faithful) without allocating two Mode.Crossing records *)
+          Axis_lattice.equal t1.ikind_floor t2.ikind_floor
       )
 
     (* CR layouts: Remove this once we have a better story for printing with
