@@ -2,22 +2,43 @@
   include ocamlcommon;
   setup-ocamlopt.opt-build-env;
   ocamlopt.opt;
-  output = "test_generated.ml";
-  run;
-  unset stdout; unset stderr; unset libraries;
-  flags = " -O3 -I ocamlopt.opt";
-  flags += " -cfg-prologue-shrink-wrap";
-  flags += " -x86-peephole-optimize";
-  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
-  flags += " -regalloc-param AFFINITY:on -regalloc irc";
-  test_file = "test_generated.ml";
-  run-expectnat;
-  reference = "${test_source_directory}/test.ml";
-  check-program-output;
+  {
+    output = "static_cast_generated.ml";
+    arguments = "static_cast";
+    run;
+
+    unset stdout; unset stderr; unset libraries;
+    flags = " -O3 -I ocamlopt.opt";
+    flags += " -cfg-prologue-shrink-wrap";
+    flags += " -x86-peephole-optimize";
+    flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+    flags += " -regalloc-param AFFINITY:on -regalloc irc";
+
+    test_file = "static_cast_generated.ml";
+    run-expectnat;
+    reference = "${test_source_directory}/static_cast.ml";
+    check-program-output;
+  }{
+    output = "int_add_generated.ml";
+    arguments = "int_add";
+    run;
+
+    unset stdout; unset stderr; unset libraries;
+    flags = " -O3 -I ocamlopt.opt";
+    flags += " -cfg-prologue-shrink-wrap";
+    flags += " -x86-peephole-optimize";
+    flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+    flags += " -regalloc-param AFFINITY:on -regalloc irc";
+
+    test_file = "int_add_generated.ml";
+    run-expectnat;
+    reference = "${test_source_directory}/int_add.ml";
+    check-program-output;
+  }
 *)
 
-let type_declaration_of_operation : _ Scalar.Operation.t -> string =
-  function
+let type_declaration_of_operation (op : _ Scalar.Operation.t) =
+  match op with
   | Unary (Integral (t, _)) ->
     Printf.sprintf "%s -> %s"
       (Scalar.Integral.to_string t)
@@ -68,8 +89,10 @@ let type_declaration_of_operation : _ Scalar.Operation.t -> string =
       (Scalar.Floating.to_string t)
       (Scalar.Floating.to_string t)
 
-let params_of_operation : _ Scalar.Operation.t -> string =
-  function Unary _ -> "x" | Binary _ -> "x y"
+let params_of_operation (op : _ Scalar.Operation.t) =
+  match op with
+  | Unary _ -> "x"
+  | Binary _ -> "x y"
 
 let test_of_operation operation =
   let mangle_sigils s = String.split_on_char '#' s |> String.concat "_u" in
@@ -86,15 +109,45 @@ let test_of_operation operation =
     val_name
     (params_of_operation operation)
 
+let description_of_operation (op : _ Scalar.Operation.t) =
+  (* CR jrayman: split _u *)
+  match op with
+  | Unary (Integral (_, (Neg | Succ | Pred | Bswap as op))) ->
+    "int_" ^ Scalar.Operation.Unary.Int_op.to_string op
+  | Unary (Floating (_, (Neg | Abs as op))) ->
+    "float_" ^ Scalar.Operation.Unary.Float_op.to_string op
+  | Unary (Static_cast _) -> "static_cast"
+    (* CR jrayman: split casts *)
+  | Binary (Integral (_, (Add | Sub | Mul | And | Or | Xor as op))) ->
+    "int_" ^ Scalar.Operation.Binary.Int_op.to_string op
+  | Binary (Integral (_, Div _)) -> "int_div"
+  | Binary (Integral (_, Mod _)) -> "int_mod"
+  | Binary (Shift _) -> "shift"
+    (* CR jrayman: split shifts *)
+  | Binary (Floating (_, (Add | Sub | Mul | Div as op))) ->
+    "float_" ^ Scalar.Operation.Binary.Float_op.to_string op
+  | Binary (Icmp _) -> "int_cmp"
+  | Binary (Fcmp _) -> "float_cmp"
+  | Binary (Three_way_compare_int _) -> "int_compare"
+  | Binary (Three_way_compare_float _) -> "float_compare"
+
 let () =
-  let sorted_ops =
+  let desc_to_test = Sys.argv.(1) in
+  let ops_to_test =
+    List.filter
+      (fun op -> String.equal (description_of_operation op) desc_to_test)
+      Scalar.Operation.all
+  in
+  if List.is_empty ops_to_test
+  then failwith ("Invalid description " ^ desc_to_test);
+  let sorted_ops_to_test =
     List.sort
       (fun op1 op2 ->
          String.compare
            (Scalar.Operation.to_string op1)
            (Scalar.Operation.to_string op2))
-      Scalar.Operation.all
+      ops_to_test
   in
   print_string
     (String.concat "\n"
-      (List.map test_of_operation sorted_ops))
+      (List.map test_of_operation sorted_ops_to_test))
