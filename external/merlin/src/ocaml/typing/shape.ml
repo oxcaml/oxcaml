@@ -108,11 +108,7 @@ module Uid = struct
 
   let internal_not_actually_unique = Internal
 
-  let unboxed_version t =
-    match t with
-    | Unboxed_version _ ->
-      Misc.fatal_error "Shape.unboxed_version"
-    | _ -> Unboxed_version t
+  let unboxed_version t = Unboxed_version t
 
   let for_actual_declaration = function
     | Item _ -> true

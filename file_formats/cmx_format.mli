@@ -77,7 +77,7 @@ type unit_infos =
     ui_requires_metaprogramming: bool;
                                   (* Requires metaprogramming libs *)
     ui_external_symbols: string list; (* Set of external symbols *)
-    ui_file_sections: Oxcaml_utils.File_sections.t;
+    ui_file_sections: File_sections.t;
   }
 
 type unit_infos_raw =

@@ -762,6 +762,8 @@ module Digraph = struct
         |> numbered types
     | Types.Tof_kind _ ->
         mk "[Kind]"
+    | Types.Tbox t ->
+        mk "[Box]" |> std_edge t
   and variant params id0 (elts,main,fields) (name,rf)  =
     let id = Index.subnode ~name id0 in
     let fnode = Node id in

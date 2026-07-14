@@ -4,7 +4,7 @@
 *)
 
 
-type nonrec ('a : any) array = 'a array
+type nonrec ('a : any mod separable) array = 'a array
 
 type t1 = int64# array
 type t2 = float32# array

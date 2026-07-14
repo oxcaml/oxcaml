@@ -296,6 +296,9 @@ type error =
   | Invalid_atomic_loc_payload
   | Label_not_atomic of Longident.t
   | Atomic_in_pattern of Longident.t
+  | Atomic_in_functional_update of label
+  | Mixed_record_atomic_access of Longident.t
+  | Mixed_record_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string

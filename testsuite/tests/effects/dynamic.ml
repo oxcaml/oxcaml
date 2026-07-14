@@ -8,38 +8,62 @@
    OxCaml stdlib, only the runtime support for it, so testing that requires faking a bit
    more infrastructure here in the test case. *)
 
-module Dynamic : sig
+module type Dynamic_S = sig
   type 'a t
 
   val make : unit -> 'a t
   val get : 'a t -> 'a or_null
 
   val with_temporarily : 'a t -> 'a -> f: (unit -> 'b) -> 'b
+end
 
-end = struct
-  type last_fiber : immediate
-  type (-'a, +'b) cont
+module Dynamic : Dynamic_S = struct
   type 'a t
-
-  external reperform :
-    'a Effect.t -> ('a, 'b) cont -> last_fiber -> 'b = "%reperform"
-
-  external with_stack_bind :
-    ('a -> 'b) ->
-    (exn -> 'b) ->
-    ('c Effect.t -> ('c, 'b) cont -> last_fiber -> 'b) ->
-    'd t ->
-    'd ->
-    ('e -> 'a) ->
-    'e ->
-    'b = "%with_stack_bind"
 
   external make : unit -> 'a t = "caml_dynamic_make"
   external get : 'a t -> 'a or_null = "caml_dynamic_get"
+  external push : 'a t -> 'a -> unit  = "caml_dynamic_push"
+  external pop : 'a t -> unit = "caml_dynamic_pop"
 
   let with_temporarily d v ~f =
-    let effc eff k last_fiber = reperform eff k last_fiber in
-    with_stack_bind (fun x -> x) (fun e -> raise e) effc d v f ()
+    push d v;
+    Fun.protect f ~finally:(fun () -> pop d)
+end
+
+module Dynamic_inside_fiber : Dynamic_S = struct
+  type 'a t
+
+  external make : unit -> 'a t = "caml_dynamic_make"
+  external get : 'a t -> 'a or_null = "caml_dynamic_get"
+  external push : 'a t -> 'a -> unit  = "caml_dynamic_push"
+  external pop : 'a t -> unit = "caml_dynamic_pop"
+
+  let with_temporarily d v ~f =
+    Effect.Deep.match_with
+      (fun () ->
+        push d v;
+        Fun.protect f ~finally:(fun () -> pop d)) ()
+      { retc = (fun v -> v);
+        exnc = (fun e -> raise e);
+        effc = (fun (type a) (_ : a Effect.t) -> None) }
+end
+
+module Dynamic_outside_fiber : Dynamic_S = struct
+  type 'a t
+
+  external make : unit -> 'a t = "caml_dynamic_make"
+  external get : 'a t -> 'a or_null = "caml_dynamic_get"
+  external push : 'a t -> 'a -> unit  = "caml_dynamic_push"
+  external pop : 'a t -> unit = "caml_dynamic_pop"
+
+  let with_temporarily d v ~f =
+    push d v;
+    Fun.protect (fun () ->
+      Effect.Deep.match_with f ()
+        { retc = (fun v -> v);
+          exnc = (fun e -> raise e);
+          effc = (fun (type a) (_ : a Effect.t) -> None) })
+      ~finally:(fun () -> pop d)
 end
 
 type _ Effect.t += E : unit -> unit Effect.t
@@ -83,115 +107,127 @@ let print_null = function
   | This x -> Int.to_string x
   | Null -> "null"
 
-let print_dyn d = print_null (Dynamic.get d)
-
 (* Actual Dynamic.t tests from here on *)
 
-(* `get` should return null
-   - on the same thread;
-   - on another thread;
-*)
+module Test_with_temp (Dynamic : Dynamic_S) = struct
 
-let _ =
-  print_endline "\n# Test 1";
-  let d = Dynamic.make () in
-  Printf.printf "get [expect null]: %s\n" (print_dyn d);
-  Thread.create (fun () -> Printf.printf "get on other thread [expect null]: %s\n" (print_dyn d)) ()
-  |> Thread.join
+  let print_dyn d = print_null (Dynamic.get d)
 
-(* `with_temporarily` should change the value seen:
-   - within its dynamic extent;
-   - but not on some other thread while it is running;
-   - or after it returns;
-*)
+  (* `get` should return null
+    - on the same thread;
+    - on another thread;
+  *)
 
-let test_with_temp d outside n =
-  let (wait, go) = trigger () in
-  let t = Thread.create (fun () ->
-    (wait ();
-     Printf.printf "In other thread during with_temporarily [expect null]: %s\n"
-       (print_dyn d))) () in
-  (Dynamic.with_temporarily d n
-     ~f:(fun () -> (Printf.printf "with_temporarily [expect %d]: %s\n" n (print_dyn d);
-                    go (); Thread.join t;
-                    Printf.printf "with_temporarily still [expect %d]: %s\n" n (print_dyn d))));
-  Printf.printf "after with_temporarily [expect %s]: %s\n" (print_null outside) (print_dyn d)
+  let _ =
+    print_endline "\n# Test 1";
+    let d = Dynamic.make () in
+    Printf.printf "get [expect null]: %s\n" (print_dyn d);
+    Thread.create (fun () -> Printf.printf "get on other thread [expect null]: %s\n" (print_dyn d)) ()
+    |> Thread.join
 
-let _ =
-  print_endline "\n# Test 2";
-  let d = Dynamic.make () in
-  (test_with_temp d Null 8)
+  (* `with_temporarily` should change the value seen:
+    - within its dynamic extent;
+    - but not on some other thread while it is running;
+    - or after it returns;
+  *)
 
-(* Does with_temporarily work correctly in effect handlers? *)
+  let test_with_temp d outside n =
+    let (wait, go) = trigger () in
+    let t = Thread.create (fun () ->
+      (wait ();
+      Printf.printf "In other thread during with_temporarily [expect null]: %s\n"
+        (print_dyn d))) () in
+    (Dynamic.with_temporarily d n
+      ~f:(fun () -> (Printf.printf "with_temporarily [expect %d]: %s\n" n (print_dyn d);
+                      go (); Thread.join t;
+                      Printf.printf "with_temporarily still [expect %d]: %s\n" n (print_dyn d))));
+    Printf.printf "after with_temporarily [expect %s]: %s\n" (print_null outside) (print_dyn d)
 
-let _ =
-  print_endline "\n# Test 3";
-  let n = 20 in
-  let d = Dynamic.make () in
-  let check_other_thread, finish =
-    sync_thread (fun () ->
-      Printf.printf "In pre-existing thread [expect null]: %s\n"
-        (print_dyn d)) in
+  let _ =
+    print_endline "\n# Test 2";
+    let d = Dynamic.make () in
+    (test_with_temp d Null 8)
 
-  let f () =
-    (Printf.printf "In fiber [expect %d]: %s\n" n (print_dyn d);
-     check_other_thread();
-     Dynamic.with_temporarily d (n+1) ~f:(fun () ->
-       Effect.perform (E ());
-       Printf.printf "In continuation [expect %d]: %s\n" (n+1) (print_dyn d))) in
+  (* Does with_temporarily work correctly in effect handlers? *)
 
-  let h : type a. a Effect.t -> ((a, 'b) Effect.Deep.continuation -> 'b) option = function
-    | E () -> Some (fun k ->
-      Printf.printf "in handler [expect %d]: %s\n" n (print_dyn d);
-      test_with_temp d (This n) (n+2);
+  let _ =
+    print_endline "\n# Test 3";
+    let n = 20 in
+    let d = Dynamic.make () in
+    let check_other_thread, finish =
+      sync_thread (fun () ->
+        Printf.printf "In pre-existing thread [expect null]: %s\n"
+          (print_dyn d)) in
+
+    let f () =
+      (Printf.printf "In fiber [expect %d]: %s\n" n (print_dyn d);
       check_other_thread();
-      Dynamic.with_temporarily d (n+3) ~f:(fun () ->
-        Effect.Deep.continue k ();
-        Printf.printf "after continuation [expect %d]: %s\n" (n+3) (print_dyn d)))
-    | e -> None in
+      Dynamic.with_temporarily d (n+1) ~f:(fun () ->
+        Effect.perform (E ());
+        Printf.printf "In continuation [expect %d]: %s\n" (n+1) (print_dyn d))) in
 
-  (Dynamic.with_temporarily d n ~f:(fun () ->
-   Effect.Deep.match_with f ()
-     { retc = (fun () ->
-         (Printf.printf "after fiber [expect %d]: %s\n" (n+3) (print_dyn d);
-          check_other_thread()));
-       exnc = (fun e -> raise e);
-       effc = h };
-   finish()))
+    let h : type a. a Effect.t -> ((a, 'b) Effect.Deep.continuation -> 'b) option = function
+      | E () -> Some (fun k ->
+        Printf.printf "in handler [expect %d]: %s\n" n (print_dyn d);
+        test_with_temp d (This n) (n+2);
+        check_other_thread();
+        Dynamic.with_temporarily d (n+3) ~f:(fun () ->
+          Effect.Deep.continue k ();
+          Printf.printf "after continuation [expect %d]: %s\n" (n+3) (print_dyn d)))
+      | e -> None in
 
-(* Does with_temporarily work inside effect contexts? This usefully tests that effects are
-   passed up through the with_temporarily context to the outer effect context (testing the
-   `reperform` in the implementation of `with_temporarily`. *)
+    (Dynamic.with_temporarily d n ~f:(fun () ->
+    Effect.Deep.match_with f ()
+      { retc = (fun () ->
+          (Printf.printf "after fiber [expect %d]: %s\n" (n+3) (print_dyn d);
+            check_other_thread()));
+        exnc = (fun e -> raise e);
+        effc = h };
+    finish()))
 
-let _ =
-  print_endline "\n# Test 4";
-  let n = 40 in
-  let d = Dynamic.make () in
-  let check_other_thread, finish =
-    sync_thread (fun () -> Printf.printf "In pre-existing thread [expect null]: %s\n" (print_dyn d)) in
+  (* Does with_temporarily work inside effect contexts? This usefully tests that effects are
+    passed up through the with_temporarily context to the outer effect context (testing the
+    `reperform` in the implementation of `with_temporarily`. *)
 
-  let f () =
-    (Printf.printf "In fiber [expect %d]: %s\n" n (print_dyn d);
-     Dynamic.with_temporarily d (n+1)
-     ~f:(fun () -> (check_other_thread();
-                    Printf.printf "with_temporarily in fiber [expect %d]: %s\n" (n+1) (print_dyn d);
-                    Effect.perform (E ());
-                    Printf.printf "continuing in with_temporarily [expect %d]: %s\n" (n+1) (print_dyn d)));
-     Printf.printf "still in continuation, after with_temporarily [expect %d]: %s\n" (n+3) (print_dyn d)) in
+  let _ =
+    print_endline "\n# Test 4";
+    let n = 40 in
+    let d = Dynamic.make () in
+    let check_other_thread, finish =
+      sync_thread (fun () -> Printf.printf "In pre-existing thread [expect null]: %s\n" (print_dyn d)) in
 
-  let h : type a. a Effect.t -> ((a, 'b) Effect.Deep.continuation -> 'b) option = function
-    | E () -> Some (fun k ->
-      Printf.printf "in handler [expect %d]: %s\n" n (print_dyn d);
-      Dynamic.with_temporarily d (n+3) ~f:(fun () ->
-        Effect.Deep.continue k ();
-        Printf.printf "after continuation returns [expect %d]: %s\n" (n+3) (print_dyn d)))
-    | e -> None in
+    let f () =
+      (Printf.printf "In fiber [expect %d]: %s\n" n (print_dyn d);
+      Dynamic.with_temporarily d (n+1)
+      ~f:(fun () -> (check_other_thread();
+                      Printf.printf "with_temporarily in fiber [expect %d]: %s\n" (n+1) (print_dyn d);
+                      Effect.perform (E ());
+                      Printf.printf "continuing in with_temporarily [expect %d]: %s\n" (n+1) (print_dyn d)));
+      Printf.printf "still in continuation, after with_temporarily [expect %d]: %s\n" (n+3) (print_dyn d)) in
 
-  (Dynamic.with_temporarily d n ~f:(fun () ->
-   Effect.Deep.match_with f ()
-     { retc = (fun () -> (Printf.printf "after fiber [expect %d]: %s\n" (n+3) (print_dyn d);
-                          check_other_thread();
-                          test_with_temp d (This (n+3)) (n+5)));
-       exnc = (fun e -> raise e);
-       effc = h };
-   finish()))
+    let h : type a. a Effect.t -> ((a, 'b) Effect.Deep.continuation -> 'b) option = function
+      | E () -> Some (fun k ->
+        Printf.printf "in handler [expect %d]: %s\n" n (print_dyn d);
+        Dynamic.with_temporarily d (n+3) ~f:(fun () ->
+          Effect.Deep.continue k ();
+          Printf.printf "after continuation returns [expect %d]: %s\n" (n+3) (print_dyn d)))
+      | e -> None in
+
+    (Dynamic.with_temporarily d n ~f:(fun () ->
+    Effect.Deep.match_with f ()
+      { retc = (fun () -> (Printf.printf "after fiber [expect %d]: %s\n" (n+3) (print_dyn d);
+                            check_other_thread();
+                            test_with_temp d (This (n+3)) (n+5)));
+        exnc = (fun e -> raise e);
+        effc = h };
+    finish()))
+end
+
+let () =
+  Printf.printf "\n[Dynamic]\n";
+  let module _ = Test_with_temp (Dynamic) in
+  Printf.printf "\n[Dynamic_outside_fiber]\n";
+  let module _ = Test_with_temp (Dynamic_outside_fiber) in
+  Printf.printf "\n[Dynamic_inside_fiber]\n";
+  let module _ = Test_with_temp (Dynamic_inside_fiber) in
+  ()

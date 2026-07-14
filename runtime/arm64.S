@@ -200,7 +200,7 @@ G(name):
 #define Dynamic_cache            0 /* offset of cache in dynamic_cache_t */
 #define Dynamic_binding_size     (2*8) /* dyn, val */
 #define Dynamic_binding_var      0 /* offset of var within a single binding */
-#define Dynamic_cache_entries    8 /* must match DYNAMIC_CACHE_SIZE in fiber.c */
+#define Dynamic_cache_entries    8 /* must match DYNAMIC_CACHE_SIZE in dynamic.c */
 
 /* struct stack_handler */
 #define Handler_value(reg)      [reg]
@@ -606,6 +606,7 @@ END_FUNCTION(caml_call_gc)
 */
 FUNCTION(caml_preempt)
         CFI_STARTPROC
+        CFI_SIGNAL_FRAME
     /* Inherit caml_call_gc's frame */
         CFI_ADJUST(16)
         CFI_OFFSET(29, -16)
@@ -695,6 +696,7 @@ END_FUNCTION(caml_allocN)
 FUNCTION(caml_call_local_realloc)
         CFI_STARTPROC
 L(caml_call_local_realloc):
+        CFI_SIGNAL_FRAME
     /* Save return address and frame pointer */
         ENTER_FUNCTION
     /* Store all registers (including ALLOC_PTR & TRAP_PTR) */

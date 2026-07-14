@@ -209,13 +209,17 @@ let prim env (p : Flambda_primitive.t) : Fexpr.prim =
 let value_slots env map =
   List.map
     (fun (var, value) ->
-      let kind = Value_slot.kind var in
-      if not (Flambda_kind.equal kind Flambda_kind.value)
-      then
-        Misc.fatal_errorf "Value slot %a not of kind Value" Simple.print value;
+      let kind : Flambda_kind.Naked_number_kind.t option =
+        match Value_slot.kind var with
+        | Value -> None
+        | Naked_number naked_number_kind -> Some naked_number_kind
+        | (Region | Rec_info) as kind ->
+          Misc.fatal_errorf "Value slot %a of unexpected kind %a" Simple.print
+            value Flambda_kind.print kind
+      in
       let var = Env.translate_value_slot env var in
       let value = simple env value in
-      { Fexpr.var; value })
+      { Fexpr.var; value; kind })
     (map |> Value_slot.Map.bindings)
 
 let function_declaration env code_id function_slot alloc : Fexpr.fun_decl =

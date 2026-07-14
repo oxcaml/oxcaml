@@ -132,7 +132,9 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
   let passthrough_files = ccobjs @ runtime_libs in
   (* Measure file sizes for partitioning *)
   let file_sizes =
-    try MOF.measure_files unix ~files:files_to_measure
+    try
+      Profile.record_call "dissector/measure" (fun () ->
+          MOF.measure_files unix ~files:files_to_measure)
     with MOF.Error err -> raise (Error (Measure_error err))
   in
   (* Dump sizes if requested *)
@@ -159,31 +161,41 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
   log "%d passthrough file(s) (will bypass partial linking)"
     (List.length passthrough_files);
   let linked_partitions =
-    try Partial_link.link_partitions ~temp_dir partitions
+    try
+      Profile.record_call "dissector/partial_link" (fun () ->
+          Partial_link.link_partitions ~temp_dir partitions)
     with Partial_link.Error err -> raise (Error (Partial_link_error err))
   in
   log "partially linked %d partition(s)" (List.length linked_partitions);
-  let relocations =
-    Extract_relocations.extract_from_linked_partitions unix linked_partitions
+  (* For each partition, we extract the relocations and then rewrite it
+     immediately. This avoids holding on to relocations (of other partitions)
+     for longer than necessary. *)
+  let total_plt, total_got =
+    List.fold_left
+      (fun (plt_acc, got_acc) linked ->
+        let kind = Partition.kind (Partition.Linked.partition linked) in
+        let prefix = Partition.symbol_prefix kind in
+        let input_file = Partition.Linked.linked_object linked in
+        let relocations =
+          Profile.record_call ~accumulate:true "dissector/extract_relocations"
+            (fun () -> Extract_relocations.extract unix ~filename:input_file)
+        in
+        let n_plt = Extract_relocations.num_plt relocations in
+        let n_got = Extract_relocations.num_got relocations in
+        let igot_and_iplt = Build_igot_and_iplt.build ~prefix relocations in
+        log "built IGOT with %d entries, IPLT with %d entries (prefix=%s)"
+          (Igot.num_entries (Build_igot_and_iplt.igot igot_and_iplt))
+          (Iplt.num_entries (Build_igot_and_iplt.iplt igot_and_iplt))
+          prefix;
+        let output_file = input_file ^ ".rewritten" in
+        Profile.record_call ~accumulate:true "dissector/rewrite" (fun () ->
+            Rewrite_sections.rewrite unix ~input_file ~output_file
+              ~partition_kind:kind ~igot_and_iplt ~relocations);
+        log "rewrote %s -> %s" input_file output_file;
+        plt_acc + n_plt, got_acc + n_got)
+      (0, 0) linked_partitions
   in
-  log "found %d PLT relocations and %d GOT relocations"
-    (List.length (Extract_relocations.convert_to_plt relocations))
-    (List.length (Extract_relocations.convert_to_got relocations));
-  List.iter
-    (fun linked ->
-      let kind = Partition.kind (Partition.Linked.partition linked) in
-      let prefix = Partition.symbol_prefix kind in
-      let igot_and_iplt = Build_igot_and_iplt.build ~prefix relocations in
-      log "built IGOT with %d entries, IPLT with %d entries (prefix=%s)"
-        (List.length (Igot.entries (Build_igot_and_iplt.igot igot_and_iplt)))
-        (List.length (Iplt.entries (Build_igot_and_iplt.iplt igot_and_iplt)))
-        prefix;
-      let input_file = Partition.Linked.linked_object linked in
-      let output_file = input_file ^ ".rewritten" in
-      Rewrite_sections.rewrite unix ~input_file ~output_file
-        ~partition_kind:kind ~igot_and_iplt ~relocations;
-      log "rewrote %s -> %s" input_file output_file)
-    linked_partitions;
+  log "total: %d PLT relocations, %d GOT relocations" total_plt total_got;
   let existing_script = extract_linker_script_from_ccopts !Clflags.all_ccopts in
   (match existing_script with
   | Some path -> log "found existing linker script: %s" path

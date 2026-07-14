@@ -140,6 +140,11 @@ type t =
   | Degraded_to_partial_match               (* 74 *)
   | Unnecessarily_partial_tuple_pattern     (* 75 *)
 (* Oxcaml specific warnings: numbers should go down from 199 *)
+  | Imprecise_kind_annotation of {
+      name : string;
+      annotated : string;
+      inferred : string;
+    }                                       (* 181 *)
   | Untagged_external_small_int_return      (* 182 *)
   | Redundant_kind_modifier of string       (* 183 *)
   | Ignored_kind_modifier of string * string list (* 184 *)

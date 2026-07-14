@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension layouts_beta -w -220";
+ flags = "-extension layouts_beta -w -181-220";
  expect;
 *)
 

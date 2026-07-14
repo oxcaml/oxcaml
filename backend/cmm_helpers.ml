@@ -5483,28 +5483,6 @@ let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg =
         arg ],
       dbg )
 
-let with_stack_bind ~dbg ~valuec ~exnc ~effc ~dyn ~bind ~f ~arg =
-  let sym = Cmm.global_symbol "caml_runstack" in
-  Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
-      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
-        Cop
-          ( Cextcall
-              { func = "caml_alloc_stack_bind";
-                ty = typ_val;
-                alloc = true;
-                builtin = false;
-                returns = true;
-                effects = Arbitrary_effects;
-                coeffects = Has_coeffects;
-                ty_args = [XInt; XInt; XInt; XInt; XInt]
-              },
-            [valuec; exnc; effc; dyn; bind],
-            dbg );
-        f;
-        arg ],
-      dbg )
-
 let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg =
   let sym = Cmm.global_symbol "caml_runstack" in
   Cop
@@ -5522,29 +5500,6 @@ let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg =
                 ty_args = [XInt; XInt; XInt; XInt]
               },
             [valuec; exnc; effc; handle_tick],
-            dbg );
-        f;
-        arg ],
-      dbg )
-
-let with_stack_bind_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~dyn ~bind
-    ~f ~arg =
-  let sym = Cmm.global_symbol "caml_runstack" in
-  Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
-      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
-        Cop
-          ( Cextcall
-              { func = "caml_alloc_stack_bind_preemptible";
-                ty = typ_val;
-                alloc = true;
-                builtin = false;
-                returns = true;
-                effects = Arbitrary_effects;
-                coeffects = Has_coeffects;
-                ty_args = [XInt; XInt; XInt; XInt; XInt; XInt]
-              },
-            [valuec; exnc; effc; handle_tick; dyn; bind],
             dbg );
         f;
         arg ],

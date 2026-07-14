@@ -106,13 +106,21 @@ val update_constructor_representation:
     loc:Location.t -> is_extension_constructor:bool ->
     (Types.constructor_representation, unrepresentable_constructor) Result.t
 
+(* Same as above, but also computes sorts of arguments *)
+val update_constructor_representation_and_arg_sorts :
+  Env.t -> Location.t -> Types.constructor_arguments ->
+  is_extension_constructor:bool ->
+  Types.constructor_arguments * constant:bool *
+  (Types.constructor_representation, unrepresentable_constructor) Result.t *
+  Jkind.Sort.Const.t array option
+
 type unrepresentable_record =
   | Unrepresentable_field of string
 
 (* Update the representation of a record whose representation at declaration
-   time was [None] because it has a field of kind [any]. *)
+   time was variable because it has a field of kind [any] *)
 val update_record_representation:
-    why:Jkind_intf.History.concrete_creation_reason ->
+    why:Jkind_intf.History.concrete_creation_reason -> old_repres:'rep ->
     Env.t -> Location.t -> 'rep Data_types.record_form ->
     (Types.label_declaration * Types.type_expr) list ->
     (Jkind.Sort.Const.t list * 'rep, unrepresentable_record) Result.t
@@ -248,6 +256,7 @@ type error =
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
+  | Missing_immediate_all_void_constructor_attribute of string
 
 exception Error of Location.t * error
 

@@ -276,9 +276,24 @@ let set_of_closures env fun_decls value_slots =
   in
   let value_slots = Option.value value_slots ~default:[] in
   let value_slots : Simple.t Value_slot.Map.t =
-    let convert ({ var; value } : Fexpr.one_value_slot) =
-      (* CR mshinwell: support non-value kinds *)
-      fresh_or_existing_value_slot env var Flambda_kind.value, simple env value
+    let convert ({ var; value; kind } : Fexpr.one_value_slot) =
+      let kind =
+        match kind with
+        | None -> Flambda_kind.value
+        | Some naked_number_kind -> Flambda_kind.naked_number naked_number_kind
+      in
+      let value_slot = fresh_or_existing_value_slot env var kind in
+      if not (Flambda_kind.equal (Value_slot.kind value_slot) kind)
+      then
+        (* This can happen if an occurrence of the value slot, such as a
+           projection (which assumes kind [Value], see [Fexpr_prim]), was
+           encountered before this definition. *)
+        Misc.fatal_errorf
+          "Value slot %s: kind %a does not match kind %a of a previous \
+           occurrence of this slot"
+          var.txt Flambda_kind.print kind Flambda_kind.print
+          (Value_slot.kind value_slot);
+      value_slot, simple env value
     in
     List.map convert value_slots |> Value_slot.Map.of_list
   in

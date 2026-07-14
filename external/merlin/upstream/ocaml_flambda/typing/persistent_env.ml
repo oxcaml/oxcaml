@@ -959,6 +959,22 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
 let read penv modname a =
   read_pers_struct penv true modname a
 
+let read_cmi_file penv filename =
+  let cmi = read_cmi_lazy filename in
+  let unit_name = cmi.cmi_name in
+  let modname = CU.Name.to_global_name unit_name in
+  add_import penv unit_name;
+  (* Register as hidden so that direct user-code references to the module
+     are still reported as unbound; only transitive lookups can reach it. *)
+  let pers_sig =
+    { Persistent_signature.filename; cmi; visibility = Load_path.Hidden }
+  in
+  let import = acknowledge_import penv ~check:true unit_name pers_sig in
+  let pers_name =
+    acknowledge_pers_name penv true modname import ~allow_excess_args:false
+  in
+  modname, pers_name.pn_sign
+
 let find ~allow_hidden penv f name ~allow_excess_args =
   (find_pers_struct ~allow_hidden ~allow_excess_args penv f ~check:true
      name).ps_val

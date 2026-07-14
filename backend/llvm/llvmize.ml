@@ -35,7 +35,7 @@ module List = struct
 end
 
 module CL = Cfg_with_layout
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module LL = Llvm_ir
 module V = LL.Value
 module T = LL.Type
