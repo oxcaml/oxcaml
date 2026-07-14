@@ -1806,6 +1806,29 @@ let string_or_bytes_checks (size : Flambda_primitive.string_accessor_width)
       ( ~len:(Flambda_primitive.byte_width_of_string_accessor_width size),
         ~align:0 )
 
+let mixed_field_index_and_kind ~machine_width ~prim_name index shape =
+  let shape =
+    Mixed_block_shape.of_mixed_block_elements shape
+      ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+  in
+  let field_index =
+    match Mixed_block_shape.lookup_path_producing_new_indexes shape [index] with
+    | [index] -> index
+    | _ ->
+      Misc.fatal_errorf "%s: expected exactly one flattened index" prim_name
+  in
+  let field_kind =
+    match (Mixed_block_shape.flattened_reordered_shape shape).(field_index) with
+    | Value vk -> H.block_access_field_kind_of_value_kind vk
+    | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+    | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+      Misc.fatal_errorf "%s: expected mixed block element to be a value"
+        prim_name
+  in
+  let imm = Target_ocaml_int.of_int machine_width field_index in
+  check_non_negative_imm imm prim_name;
+  imm, field_kind
+
 (* Primitive conversion *)
 let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     (prim : L.primitive) (args : Simple.t list list) (dbg : Debuginfo.t)
@@ -3173,12 +3196,30 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             (convert_block_access_field_kind immediate_or_pointer),
           atomic,
           field ) ]
+  | Patomic_load_mixed_field { index; shape }, [[atomic]] ->
+    let imm, field_kind =
+      mixed_field_index_and_kind ~machine_width
+        ~prim_name:"Patomic_load_mixed_field" index shape
+    in
+    [ Binary
+        (Atomic_load_field field_kind, atomic, H.Simple (Simple.const_int imm))
+    ]
   | Patomic_set_field { immediate_or_pointer }, [[atomic]; [field]; [new_value]]
     ->
     [ Ternary
         ( Atomic_set_field (convert_block_access_field_kind immediate_or_pointer),
           atomic,
           field,
+          new_value ) ]
+  | Patomic_set_mixed_field { index; shape }, [[atomic]; [new_value]] ->
+    let imm, field_kind =
+      mixed_field_index_and_kind ~machine_width
+        ~prim_name:"Patomic_set_mixed_field" index shape
+    in
+    [ Ternary
+        ( Atomic_set_field field_kind,
+          atomic,
+          H.Simple (Simple.const_int imm),
           new_value ) ]
   | ( Patomic_exchange_field { immediate_or_pointer },
       [[atomic]; [field]; [new_value]] ) ->
@@ -3318,7 +3359,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Pobj_dup | Pobj_magic _ | Punbox_vector _ | Punbox_unit
       | Pbox_vector (_, _)
       | Punboxed_product_field _ | Pget_header _ | Pufloatfield _
-      | Patomic_load_field _ | Pmixedfield _
+      | Patomic_load_field _ | Patomic_load_mixed_field _ | Pmixedfield _
       | Preinterpret_unboxed_int64_as_tagged_int63
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_boxed_vector_as_tuple _
@@ -3361,7 +3402,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             | Punspecializedarray_ref _ ),
             _,
             _ )
-      | Patomic_load_field _ | Ppoke _ | Pphys_equal _
+      | Patomic_load_field _ | Patomic_set_mixed_field _ | Ppoke _
+      | Pphys_equal _
       | Pscalar (Binary _)
       | Pget_idx _ | Pset_ptr _ | Pset_ext_ptr _ ),
       ( []

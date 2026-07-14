@@ -1,5 +1,16 @@
 #include <caml/mlvalues.h>
 
+static int called_total_atomic = 0;
+CAMLprim value total_atomic_calls()
+{
+  return Val_int(called_total_atomic);
+}
+CAMLprim value total_atomic_reset()
+{
+  called_total_atomic = 0;
+  return Val_unit;
+}
+
 #define P(...) __VA_ARGS__
 #define TRACK(name, arg_tys, args)             \
   static int called_##name = 0;                \
@@ -7,10 +18,16 @@
   {                                            \
     return Val_int(called_##name);             \
   }                                            \
+  CAMLprim value name##_reset()                \
+  {                                            \
+    called_##name = 0;                         \
+    return Val_unit;                           \
+  }                                            \
   CAMLextern void __real_caml_##name(arg_tys); \
   CAMLprim void __wrap_caml_##name(arg_tys)    \
   {                                            \
     called_##name++;                           \
+    called_total_atomic++;                       \
     __real_caml_##name(args);                  \
   }
 

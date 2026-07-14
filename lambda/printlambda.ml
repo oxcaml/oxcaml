@@ -845,10 +845,18 @@ let primitive ppf = function
       (match immediate_or_pointer with
         | Immediate -> fprintf ppf "atomic_load_field_imm"
         | Pointer -> fprintf ppf "atomic_load_field_ptr")
+  | Patomic_load_mixed_field { index ; shape } ->
+      fprintf ppf "atomic_load_mixed_field %a %a"
+        pp_print_int index
+        (mixed_block_shape (fun _ () -> ())) shape
   | Patomic_set_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
         | Immediate -> fprintf ppf "atomic_set_field_imm"
         | Pointer -> fprintf ppf "atomic_set_field_ptr")
+  | Patomic_set_mixed_field { index ; shape } ->
+      fprintf ppf "atomic_set_mixed_field %a %a"
+        pp_print_int index
+        (mixed_block_shape (fun _ () -> ())) shape
   | Patomic_exchange_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
         | Immediate -> fprintf ppf "atomic_exchange_field_imm"
@@ -1049,10 +1057,12 @@ let name_of_primitive = function
       (match immediate_or_pointer with
         | Immediate -> "atomic_load_field_imm"
         | Pointer -> "atomic_load_field_ptr")
+  | Patomic_load_mixed_field _ -> "atomic_load_mixed_field"
   | Patomic_set_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
         | Immediate -> "atomic_set_field_imm"
         | Pointer -> "atomic_set_field_ptr")
+  | Patomic_set_mixed_field _ -> "atomic_set_mixed_field"
   | Patomic_exchange_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
         | Immediate -> "atomic_exchange_field_imm"

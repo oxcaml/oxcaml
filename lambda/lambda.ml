@@ -371,7 +371,15 @@ type primitive =
   | Pint_as_pointer of locality_mode
   (* Atomic operations *)
   | Patomic_load_field of {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_load_mixed_field of {
+    index : int;
+    shape : mixed_block_shape;
+  }
   | Patomic_set_field of {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_set_mixed_field of {
+    index : int;
+    shape : mixed_block_shape;
+  }
   | Patomic_exchange_field of {immediate_or_pointer : immediate_or_pointer}
   | Patomic_compare_exchange_field of
     {immediate_or_pointer : immediate_or_pointer}
@@ -2578,7 +2586,9 @@ let primitive_may_allocate : primitive -> locality_mode option = function
     Some alloc_heap
   | Pcpu_relax -> if Config.poll_insertion then None else Some alloc_heap
   | Patomic_load_field _
+  | Patomic_load_mixed_field _
   | Patomic_set_field _
+  | Patomic_set_mixed_field _
   | Patomic_exchange_field _
   | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _
@@ -2771,7 +2781,8 @@ let primitive_can_raise prim =
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _ | Patomic_fetch_add_field  | Patomic_add_field
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
-  | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
+  | Patomic_lxor_field  | Patomic_load_field _ | Patomic_load_mixed_field _
+  | Patomic_set_field _ | Patomic_set_mixed_field _ -> false
   | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace
@@ -2864,6 +2875,27 @@ let extern_repr_involves_unboxed_products extern_repr =
     Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected univar"
   | Same_as_ocaml_repr (Genvar _) ->
     Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected genvar"
+
+let strip_locality_mode shape =
+  let rec strip_elt elt =
+    match elt with
+    | Float_boxed _ -> Float_boxed ()
+    | Product elts -> Product (Array.map strip_elt elts)
+    | Value vk -> Value vk
+    | Float64 -> Float64
+    | Float32 -> Float32
+    | Bits8 -> Bits8
+    | Bits16 -> Bits16
+    | Bits32 -> Bits32
+    | Bits64 -> Bits64
+    | Vec128 -> Vec128
+    | Vec256 -> Vec256
+    | Vec512 -> Vec512
+    | Word -> Word
+    | Untagged_immediate -> Untagged_immediate
+    | Splice_variable id -> Splice_variable id
+  in
+  Array.map strip_elt shape
 
 let rec layout_of_scannable_kinds kinds =
   Punboxed_product (List.map layout_of_scannable_kind kinds)
@@ -3221,7 +3253,9 @@ let primitive_result_layout (p : primitive) =
     layout_int_or_null
   | Patomic_load_field { immediate_or_pointer = Pointer } ->
     layout_any_value
-  | Patomic_set_field _ -> layout_unit
+  | Patomic_load_mixed_field { index ; shape } ->
+    layout_of_mixed_block_shape shape ~path:[index]
+  | Patomic_set_field _ | Patomic_set_mixed_field _ -> layout_unit
   | Patomic_exchange_field { immediate_or_pointer = Immediate } ->
     layout_int_or_null
   | Patomic_exchange_field { immediate_or_pointer = Pointer } ->

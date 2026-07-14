@@ -169,6 +169,18 @@ Line 1, characters 48-77:
 Error: The record field "regular_field" is not atomic
 |}]
 
+(* Test Label_not_atomic for an unusual record representation *)
+
+type float_record = { mutable f : float } (* Record_float *)
+let test_non_atomic_float_field (r : float_record) = [%atomic.loc r.f]
+[%%expect{|
+type float_record = { mutable f : float; }
+Line 2, characters 53-70:
+2 | let test_non_atomic_float_field (r : float_record) = [%atomic.loc r.f]
+                                                         ^^^^^^^^^^^^^^^^^
+Error: The record field "f" is not atomic
+|}]
+
 (* Test Invalid_atomic_loc_payload errors *)
 
 (* Empty payload *)
