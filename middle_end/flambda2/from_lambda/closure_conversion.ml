@@ -53,14 +53,18 @@ type close_functions_result =
       * Alloc_mode.For_allocations.t
       * Env.value_approximation Function_slot.Map.t
 
-let manufacture_symbol acc proposed_name =
-  let acc, linkage_name =
+let manufacture_symbol ?(dbg = Debuginfo.none) acc proposed_name =
+  let acc, name =
     if Flambda_features.Expert.shorten_symbol_names ()
-    then Acc.manufacture_symbol_short_name acc
-    else acc, Linkage_name.of_string proposed_name
+    then
+      let acc, linkage_name = Acc.manufacture_symbol_short_name acc in
+      acc, Linkage_name.to_string linkage_name
+    else acc, proposed_name
   in
   let symbol =
-    Symbol.create (Compilation_unit.get_current_exn ()) linkage_name
+    Symbol.create_for_current_scheme ~dbg
+      (Compilation_unit.get_current_exn ())
+      ~name
   in
   acc, symbol
 
@@ -75,13 +79,13 @@ let declare_symbol_for_function_slot env acc ident function_slot :
   in
   env, acc, symbol
 
-let register_const0 acc constant name =
+let register_const0 ?(dbg = Debuginfo.none) acc constant name =
   match Static_const.Map.find constant (Acc.shareable_constants acc) with
   | exception Not_found ->
     (* Create a variable to ensure uniqueness of the symbol. *)
     let var = Variable.create name K.value in
     let acc, symbol =
-      manufacture_symbol acc
+      manufacture_symbol ~dbg acc
         (* CR mshinwell: this Variable.rename looks to be redundant *)
         (Variable.unique_name (Variable.rename var))
     in
@@ -95,7 +99,7 @@ let register_const0 acc constant name =
   | symbol -> acc, symbol
 
 let register_const acc dbg constant name =
-  let acc, symbol = register_const0 acc constant name in
+  let acc, symbol = register_const0 ~dbg acc constant name in
   acc, Simple.With_debuginfo.create (Simple.symbol symbol) dbg, name
 
 let rec declare_const acc dbg (const : Lambda.structured_constant) =
@@ -1317,8 +1321,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       ~let_bound_ids_with_kinds k
   | prim, args ->
     Lambda_to_flambda_primitives.convert_and_bind acc exn_continuation
-      ~big_endian:(Env.big_endian env) ~register_const0 prim ~args dbg
-      ~current_region ~current_ghost_region k
+      ~big_endian:(Env.big_endian env) ~register_const0:(register_const0 ~dbg)
+      prim ~args dbg ~current_region ~current_ghost_region k
 
 let close_trap_action_opt trap_action =
   Option.map
@@ -1344,7 +1348,8 @@ let close_named acc env ~let_bound_ids_with_kinds (named : IR.named)
     let prim : Lambda_to_flambda_primitives_helpers.expr_primitive =
       Unary (Tag_immediate, Prim (Unary (Get_tag, Simple named)))
     in
-    Lambda_to_flambda_primitives_helpers.bind_recs acc None ~register_const0
+    Lambda_to_flambda_primitives_helpers.bind_recs acc None
+      ~register_const0:(register_const0 ~dbg:Debuginfo.none)
       prim Debuginfo.none k
   | Begin_region { is_try_region; ghost; parent_region } ->
     let prim : Lambda_to_flambda_primitives_helpers.expr_primitive =
@@ -1359,7 +1364,8 @@ let close_named acc env ~let_bound_ids_with_kinds (named : IR.named)
            else Begin_region { ghost }),
           arg )
     in
-    Lambda_to_flambda_primitives_helpers.bind_recs acc None ~register_const0
+    Lambda_to_flambda_primitives_helpers.bind_recs acc None
+      ~register_const0:(register_const0 ~dbg:Debuginfo.none)
       prim Debuginfo.none k
   | End_region { is_try_region; region; ghost } ->
     let named = find_simple_from_id env region in
@@ -1370,7 +1376,8 @@ let close_named acc env ~let_bound_ids_with_kinds (named : IR.named)
            else End_region { ghost }),
           Simple named )
     in
-    Lambda_to_flambda_primitives_helpers.bind_recs acc None ~register_const0
+    Lambda_to_flambda_primitives_helpers.bind_recs acc None
+      ~register_const0:(register_const0 ~dbg:Debuginfo.none)
       prim Debuginfo.none k
   | Prim { prim; args; loc; exn_continuation; region; ghost_region } ->
     let get_region_ident region =
@@ -1586,7 +1593,9 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
             in
             match fields_kind with
             | Constant _ ->
-              let acc, sym = register_const0 acc static_const (Ident.name id) in
+              let acc, sym =
+                register_const0 ~dbg acc static_const (Ident.name id)
+              in
               let body_env =
                 Env.add_simple_to_substitute body_env id (Simple.symbol sym)
                   kind
@@ -1598,7 +1607,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                  through [register_const0]. The definition must be placed right
                  away. *)
               let acc, symbol =
-                manufacture_symbol acc (Variable.unique_name var)
+                manufacture_symbol ~dbg acc (Variable.unique_name var)
               in
               let static_consts =
                 [Static_const_or_code.create_static_const static_const]
@@ -1649,7 +1658,9 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                && Env.at_toplevel env
                && Flambda_features.classic_mode () ->
           (* Special case to lift toplevel exception declarations *)
-          let acc, symbol = manufacture_symbol acc (Variable.unique_name var) in
+          let acc, symbol =
+            manufacture_symbol ~dbg acc (Variable.unique_name var)
+          in
           let transform_arg arg = Simple.With_debuginfo.create arg dbg in
           (* This is an inconstant statically-allocated value, so cannot go
              through [register_const0]. The definition must be placed right

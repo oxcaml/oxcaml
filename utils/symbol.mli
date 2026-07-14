@@ -38,6 +38,10 @@ val for_structured_mangling_path :
     suffix:string ->
     t
 
+(** Symbol of the given unit's toplevel module block (the block holding its
+    toplevel values). It is a pure function of the unit, identical on the
+    defining side and at every reference, and always uses the flat mangling
+    scheme regardless of [-name-mangling-scheme]. *)
 val for_compilation_unit : Compilation_unit.t -> t
 val for_current_unit : unit -> t
 val for_new_const_in_current_unit : unit -> t
