@@ -116,11 +116,10 @@ type 'a tbl
 val empty: 'a tbl
 val add: t -> 'a -> 'a tbl -> 'a tbl
 val find_same: t -> 'a tbl -> 'a
-val find_same_opt: t -> 'a tbl -> 'a option
-(* Zero-allocation variant of [find_same_opt]: under OxCaml [@@or_null]
-   gives an unboxed immediate-or-pointer representation (no [Some] box);
-   under upstream OCaml the attribute is ignored and this is an ordinary
-   two-constructor variant. *)
+(* Non-raising, zero-allocation variant of [find_same]: under OxCaml
+   [@@or_null] gives an unboxed immediate-or-pointer representation (no
+   [Some] box); under upstream OCaml the attribute is ignored and this is
+   an ordinary two-constructor variant. *)
 type 'a or_null = Null | This of 'a [@@or_null]
 val find_same_or_null: t -> 'a tbl -> 'a or_null
 val find_name: string -> 'a tbl -> t * 'a
