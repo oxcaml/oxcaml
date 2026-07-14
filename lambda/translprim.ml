@@ -1146,7 +1146,10 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%with_stack_preemptible" -> Primitive (Pwith_stack_preemptible, 6)
     | "%reperform" -> Primitive (Preperform, 3)
     | "%perform" -> Primitive (Pperform, 1)
-    | "%resume" -> Primitive (Presume, 3)
+    | "%continue" -> Primitive (Pcontinue, 2)
+    | "%discontinue" -> Primitive (Pdiscontinue, 2)
+    | "%discontinue_with_backtrace" ->
+      Primitive (Pdiscontinue_with_backtrace, 3)
     | "%dls_get" -> Primitive (Pdls_get, 1)
     | "%tls_get" -> Primitive (Ptls_get, 1)
     | "%domain_index" -> Primitive (Pdomain_index, 1)
@@ -2538,7 +2541,8 @@ let lambda_primitive_needs_event_after = function
   | Pget_ptr _ | Pset_ptr _
   | Pget_ext_ptr _ | Pset_ext_ptr _
   | Pwith_stack | Pwith_stack_preemptible
-  | Pperform | Preperform | Presume
+  | Pperform | Preperform
+  | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
   | Ppoll | Pobj_dup | Pget_header _ -> true
   (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
      bytecode, because int64# is actually represented as a boxed value. *)

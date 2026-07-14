@@ -1247,11 +1247,17 @@ val with_stack_preemptible :
   arg:expression ->
   expression
 
-val resume :
+val continue :
+  dbg:Debuginfo.t -> cont:expression -> value:expression -> expression
+
+val discontinue :
+  dbg:Debuginfo.t -> cont:expression -> exn:expression -> expression
+
+val discontinue_with_backtrace :
   dbg:Debuginfo.t ->
   cont:expression ->
-  f:expression ->
-  arg:expression ->
+  exn:expression ->
+  bt:expression ->
   expression
 
 val reperform :
