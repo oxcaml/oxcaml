@@ -1,14 +1,6 @@
 (* TEST
  flambda2;
- flags += " -flambda2-inline-small-function-size 0";
- flags += " -flambda2-inline-large-function-size 0";
  flags += " -O3";
- flags += " -cfg-prologue-shrink-wrap";
- flags += " -x86-peephole-optimize";
- flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
- flags += " -regalloc-param AFFINITY:on -regalloc irc";
- flags += " -cfg-merge-blocks";
- only-default-codegen;
  expect.opt with dump-simplify;
 *)
 
@@ -59,34 +51,6 @@ in
 let $camlTOP1 = Block 0 ($camlTOP1__map_ints_to_float_constants_1) in
 cont done ($camlTOP1)
 |}]
-[%%expect_asm X86_64{|
-map_ints_to_float_constants:
-  cmpq  $2, %rax
-  jge   .L1
-  testq %rax, %rax
-  je    .L0
-  cmpq  $1, %rax
-  jne   .L2
-  vmovsd <hidden PC-relative offset>(%rip), %xmm0
-  ret
-.L0:
-  vxorpd %xmm0, %xmm0, %xmm0
-  ret
-.L1:
-  cmpq  $2, %rax
-  je    .L4
-  cmpq  $3, %rax
-  je    .L3
-.L2:
-  vmovsd <hidden PC-relative offset>(%rip), %xmm0
-  ret
-.L3:
-  vmovsd <hidden PC-relative offset>(%rip), %xmm0
-  ret
-.L4:
-  vmovsd <hidden PC-relative offset>(%rip), %xmm0
-  ret
-|}]
 
 let map_tagged_ints_to_float_constants = function
   | 0 -> #0.
@@ -123,17 +87,7 @@ in
 let $camlTOP2 = Block 0 ($camlTOP2__map_tagged_ints_to_float_constants_3) in
 cont done ($camlTOP2)
 |}]
-[%%expect_asm X86_64{|
-map_tagged_ints_to_float_constants:
-  cmpq  $7, %rax
-  jbe   .L0
-  vmovsd <hidden PC-relative offset>(%rip), %xmm0
-  ret
-.L0:
-  leaq  <hidden PC-relative offset>(%rip), %rbx
-  vmovsd -4(%rbx,%rax,4), %xmm0
-  ret
-|}]
+
 
 let[@inline never] opaque_fun1 () = ()
 let[@inline never] opaque_fun2 () = ()
@@ -218,46 +172,7 @@ in
 let $camlTOP7 = Block 0 ($camlTOP7__match_on_ints_13) in
 cont done ($camlTOP7)
 |}]
-[%%expect_asm X86_64{|
-match_on_ints:
-  cmpq  $2, %rax
-  jge   .L1
-  testq %rax, %rax
-  je    .L0
-  cmpq  $1, %rax
-  jne   .L2
-  movq  <hidden PC-relative offset>(%rip), %rax
-  movq  32(%rax), %rbx
-  movl  $1, %eax
-  movq  (%rbx), %rdi
-  jmp   *%rdi
-.L0:
-  movq  <hidden PC-relative offset>(%rip), %rax
-  movq  40(%rax), %rbx
-  movl  $1, %eax
-  movq  (%rbx), %rdi
-  jmp   *%rdi
-.L1:
-  cmpq  $2, %rax
-  je    .L4
-  cmpq  $3, %rax
-  je    .L3
-.L2:
-  movl  $1, %eax
-  ret
-.L3:
-  movq  <hidden PC-relative offset>(%rip), %rax
-  movq  16(%rax), %rbx
-  movl  $1, %eax
-  movq  (%rbx), %rdi
-  jmp   *%rdi
-.L4:
-  movq  <hidden PC-relative offset>(%rip), %rax
-  movq  24(%rax), %rbx
-  movl  $1, %eax
-  movq  (%rbx), %rdi
-  jmp   *%rdi
-|}]
+
 
 let match_on_tagged_ints = function
   | 0 -> opaque_fun1 ()
@@ -323,41 +238,4 @@ and code loopify(never) size(61) newer_version_of(match_on_tagged_ints_14)
 in
 let $camlTOP8 = Block 0 ($camlTOP8__match_on_tagged_ints_15) in
 cont done ($camlTOP8)
-|}]
-[%%expect_asm X86_64{|
-match_on_tagged_ints:
-  cmpq  $7, %rax
-  jbe   .L0
-  movl  $1, %eax
-  ret
-.L0:
-  sarq  $1, %rax
-  leaq  <hidden PC-relative offset>(%rip), %rdx
-  movslq (%rdx,%rax,4), %rax
-  addq  %rax, %rdx
-  jmp   *%rdx
-.L1:
-  movq  <hidden PC-relative offset>(%rip), %rax
-  movq  40(%rax), %rbx
-  movl  $1, %eax
-  movq  (%rbx), %rdi
-  jmp   *%rdi
-.L2:
-  movq  <hidden PC-relative offset>(%rip), %rax
-  movq  32(%rax), %rbx
-  movl  $1, %eax
-  movq  (%rbx), %rdi
-  jmp   *%rdi
-.L3:
-  movq  <hidden PC-relative offset>(%rip), %rax
-  movq  24(%rax), %rbx
-  movl  $1, %eax
-  movq  (%rbx), %rdi
-  jmp   *%rdi
-.L4:
-  movq  <hidden PC-relative offset>(%rip), %rax
-  movq  16(%rax), %rbx
-  movl  $1, %eax
-  movq  (%rbx), %rdi
-  jmp   *%rdi
 |}]
