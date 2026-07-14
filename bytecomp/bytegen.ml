@@ -564,7 +564,7 @@ and comp_expr stack_info env exp sz cont =
   | Context_switch (Reperform, args) ->
     let nargs = List.length args - 1 in
     assert (nargs = 2);
-    check_stack stack_info (sz + 3);
+    check_stack stack_info 4;
     if is_tailcall cont
     then
       comp_args stack_info env args sz
@@ -572,9 +572,9 @@ and comp_expr stack_info env exp sz cont =
     else fatal_error "Reperform used in non-tail position"
   | Context_switch (Perform, args) ->
     let nargs = List.length args - 1 in
-    comp_args stack_info env args sz
-      (check_stack stack_info (sz + nargs - 1 + 4);
-       Kperform :: cont)
+    assert (nargs = 0);
+    check_stack stack_info (sz + 4);
+    comp_args stack_info env args sz (Kperform :: cont)
   | Prim (p, args) ->
     let nargs = List.length args - 1 in
     comp_args stack_info env args sz
