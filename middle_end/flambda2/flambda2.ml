@@ -266,7 +266,7 @@ let flambda_to_flambda ~ppf_dump ~prefixname ~machine_width ~code_slot_offsets
 let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
     (program : Lambda.program) =
   (* CR mvellacott: Placeholder should be removed once LTO is implemented. *)
-  if Flambda_features.support_lto () then Printf.eprintf "LTO enabled";
+  if Flambda_features.support_lto () then Printf.eprintf "LTO enabled\n";
   let module_repr =
     Lambda.main_module_representation program.main_module_block_format
   in
