@@ -605,3 +605,20 @@ Error: This constant has type "float#" but an expression was expected of type
        But the layout of float# must be a value layout
          because of the definition of f at lines 4-6, characters 8-5.
 |}]
+
+(* Computing the representation at a use site inside a GADT match must not
+   persist jkind-estimation side effects that use the local equation (see the
+   snapshotting in [Typedecl.update_record_representation] and the analogous
+   test in typing-local/crossing.ml); otherwise this fails with a spurious
+   equation-scope-escape error. *)
+
+type _ t_gadt = Int : int t_gadt
+type ('a : any) t_rec = { fld : 'a; fld2 : int }
+[%%expect {|
+|}]
+
+let f (type a) (x : a t_gadt) (y : a) =
+  match x with
+    Int -> { fld = y; fld2 = 0 }.fld
+[%%expect {|
+|}]
