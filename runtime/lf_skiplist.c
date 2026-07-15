@@ -48,6 +48,7 @@
 #include "caml/memory.h"
 #include "caml/misc.h"
 #include <stddef.h>
+#include <assert.h>
 
 /* Size of struct lf_skipcell, in bytes, without the forward array */
 #define SIZEOF_LF_SKIPCELL sizeof(struct lf_skipcell)
@@ -465,11 +466,34 @@ int caml_lf_skiplist_remove(struct lf_skiplist *sk, uintnat key) {
   }
 }
 
+static bool has_marked_node(struct lf_skiplist *sk) {
+  for (int level = NUM_LEVELS - 1; level >= 0; level--) {
+    struct lf_skipcell *curr = sk->head;
+
+    while (curr != sk->tail) {
+      int is_marked;
+      struct lf_skipcell *succ;
+
+      LF_SK_EXTRACT(curr->forward[level], is_marked, succ);
+
+      if (is_marked)
+        return true;
+
+      curr = succ;
+    }
+  }
+  return false;
+}
+
 /* Collects freed nodes from the skiplist. This must be called periodically from
    a single thread at a time when there can be no concurrent access to this
    skiplist */
 
 void caml_lf_skiplist_free_garbage(struct lf_skiplist *sk) {
+  /* At the point of freeing garbage there should be no marked forward pointers
+     in the skiplist. */
+  assert(!has_marked_node(sk));
+
   struct lf_skipcell *curr = atomic_load_acquire(&sk->garbage_head);
 
   const struct lf_skipcell *head = sk->head;
