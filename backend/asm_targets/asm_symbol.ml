@@ -102,6 +102,17 @@ let encode { name; already_encoded } =
     let symbol_prefix = symbol_prefix () in
     to_escaped_string ~symbol_prefix name
 
+let encode_without_prefix { name; already_encoded } =
+  if already_encoded
+  then
+    (* Remove the prefix, if any, on a best-effort basis. *)
+    let prefix = symbol_prefix () in
+    let prefix_len = String.length prefix in
+    if prefix_len > 0 && String.starts_with ~prefix name
+    then String.sub name prefix_len (String.length name - prefix_len)
+    else name
+  else to_escaped_string ~symbol_prefix:"" name
+
 (* Comparison and hashing are based on the encoded form, so two symbols that
    produce the same assembly output are considered equal regardless of how they
    were constructed. *)
