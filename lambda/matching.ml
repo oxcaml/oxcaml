@@ -2975,6 +2975,43 @@ let make_test_sequence value_kind loc fail size arg const_lambda_list =
   in
   hs (make_test_sequence const_lambda_list)
 
+(* [make_switch_on_tagged_int loc kind arg cases acts] builds an [Lswitch] on
+   [arg], which must be a tagged immediate lying within
+   [0, Array.length cases - 1].
+
+   The [acts] array can contain arbitrary terms.
+   If several entries in the [cases] array point to the same action,
+   we must share it to avoid duplicating terms.
+   See PR#11893 on Github for an example where the other de-duplication
+   mechanisms do not apply. *)
+let make_switch_on_tagged_int loc kind arg cases acts =
+  let act_uses = Array.make (Array.length acts) 0 in
+  for i = 0 to Array.length cases - 1 do
+    act_uses.(cases.(i)) <- act_uses.(cases.(i)) + 1
+  done;
+  let wrapper = ref (fun lam -> lam) in
+  for j = 0 to Array.length acts - 1 do
+    if act_uses.(j) > 1 then begin
+      let nfail, wrap = make_catch_delayed kind acts.(j) in
+      acts.(j) <- make_exit nfail;
+      let prev_wrapper = !wrapper in
+      wrapper := (fun lam -> wrap (prev_wrapper lam))
+    end;
+  done;
+  let l = ref [] in
+  for i = Array.length cases - 1 downto 0 do
+    l := (i, acts.(cases.(i))) :: !l
+  done;
+  !wrapper (Lswitch
+    ( arg,
+      { sw_numconsts = Array.length cases;
+        sw_consts = !l;
+        sw_numblocks = 0;
+        sw_blocks = [];
+        sw_failaction = None
+      },
+      loc, kind ))
+
 module SArg = struct
   type primitive = Lambda.primitive
 
@@ -3035,38 +3072,115 @@ module SArg = struct
 
   let make_if kind cond ifso ifnot = Lifthenelse (cond, ifso, ifnot, kind)
 
+  let make_switch = make_switch_on_tagged_int
+
+  let make_catch kind handler =
+    make_catch_delayed kind handler
+
+  let make_exit i = make_exit i
+end
+
+(* Switch argument for matching on unboxed integers whose values may not all
+   fit in a tagged immediate (currently [int64#] and [nativeint#]; the other
+   integral types are converted to tagged immediates up front, see
+   [combine_constant]).
+
+   The decision tree produced by [Switch.Make] -- equality and ordering
+   tests, interval checks, offsets -- is generated at the full width of the
+   scrutinee, so it never loses information. Only the scrutinee of a dense
+   jump-table switch is converted to a tagged immediate, as [Lswitch]
+   requires; this is exact because by the time control reaches the switch,
+   the tests guarantee that the (offset) scrutinee lies within the bounds of
+   the jump table, which are small non-negative integers.
+
+   Note that [Switch.Make] and [as_interval] manipulate case values as host
+   [int]s. Callers must ensure that all matched constants are exactly
+   representable as such, and fall back to [make_test_sequence] otherwise.
+   Constants of magnitude greater than [inter_limit] (see switch.ml) never
+   give rise to interval checks or jump tables, so the interval arithmetic
+   below, which can wrap around at the width of the scrutinee, always
+   produces offset values that are either exact or far outside any interval
+   checked against. *)
+(* CR claude: The last paragraph above is wrong about jump
+   tables: clustering is gated by density ([dense]/[particular_case] in
+   switch.ml), not by magnitude, so constants above [inter_limit] do form
+   jump tables (any few consecutive keys, however large). The in-bounds
+   guarantee actually comes from every dense cluster being flanked by fail
+   intervals tested at full width -- which is exactly what fails for keys
+   at host [min_int]/[max_int]; see the CR on [int_of_int64]. Please
+   rewrite this comment together with that fix. *)
+module SArg_unboxed_int (Size : sig
+  val size : Lambda.locality_mode Scalar.Integral.t
+
+  val layout : Lambda.layout
+end) =
+struct
+  type primitive = Lambda.primitive
+
+  let cmp_size = Scalar.Integral.ignore_locality Size.size
+
+  let pintcomp cmp = Pscalar (Binary (Icmp (cmp_size, cmp)))
+
+  let eqint = pintcomp Ceq
+
+  let neint = pintcomp Cne
+
+  let leint = pintcomp Cle
+
+  let ltint = pintcomp Clt
+
+  let geint = pintcomp Cge
+
+  let gtint = pintcomp Cgt
+
+  type loc = Lambda.scoped_location
+  type arg = Lambda.lambda
+  type test = Lambda.lambda
+  type act = Lambda.lambda
+
+  type layout = Lambda.layout
+
+  let make_prim loc p args = Lprim (p, args, loc)
+
+  let make_const _loc i = const_scalar Size.size i
+
+  let make_offset loc arg n =
+    match n with
+    | 0 -> arg
+    | _ -> Lambda.add Size.size arg (make_const loc n) ~loc
+
+  let bind arg body =
+    let newvar, newvar_duid, newarg =
+      match arg with
+      | Lvar v -> (v, Lambda.debug_uid_none, arg)
+      | _ ->
+          let newvar = Ident.create_local "switcher" in
+          let newvar_duid = Lambda.debug_uid_none in
+          (newvar, newvar_duid, Lvar newvar)
+    in
+    bind_with_layout Alias (newvar, newvar_duid, Size.layout) arg (body newarg)
+
+  (* Like [Pisout]: [arg] is outside [0, h] iff [h] is unsigned-less-than
+     [arg]. *)
+  let make_isout loc h arg = icmp Cult cmp_size h arg ~loc
+
+  let make_isin loc h arg = Lprim (Pnot, [ make_isout loc h arg ], loc)
+
+  let make_is_nonzero loc arg = icmp Cne cmp_size arg (make_const loc 0) ~loc
+
+  let arg_as_test arg = make_is_nonzero Loc_unknown arg
+
+  let make_if kind cond ifso ifnot = Lifthenelse (cond, ifso, ifnot, kind)
+
   let make_switch loc kind arg cases acts =
-    (* The [acts] array can contain arbitrary terms.
-       If several entries in the [cases] array point to the same action,
-       we must share it to avoid duplicating terms.
-       See PR#11893 on Github for an example where the other de-duplication
-       mechanisms do not apply. *)
-    let act_uses = Array.make (Array.length acts) 0 in
-    for i = 0 to Array.length cases - 1 do
-      act_uses.(cases.(i)) <- act_uses.(cases.(i)) + 1
-    done;
-    let wrapper = ref (fun lam -> lam) in
-    for j = 0 to Array.length acts - 1 do
-      if act_uses.(j) > 1 then begin
-        let nfail, wrap = make_catch_delayed kind acts.(j) in
-        acts.(j) <- make_exit nfail;
-        let prev_wrapper = !wrapper in
-        wrapper := (fun lam -> wrap (prev_wrapper lam))
-      end;
-    done;
-    let l = ref [] in
-    for i = Array.length cases - 1 downto 0 do
-      l := (i, acts.(cases.(i))) :: !l
-    done;
-    !wrapper (Lswitch
-      ( arg,
-        { sw_numconsts = Array.length cases;
-          sw_consts = !l;
-          sw_numblocks = 0;
-          sw_blocks = [];
-          sw_failaction = None
-        },
-        loc, kind ))
+    (* When control reaches the switch, the (offset) scrutinee is known to
+       lie within [0, Array.length cases - 1], so the conversion to a tagged
+       immediate is exact. *)
+    let arg =
+      static_cast ~src:(Scalar.integral cmp_size) ~dst:(Scalar.integral int)
+        arg ~loc
+    in
+    make_switch_on_tagged_int loc kind arg cases acts
 
   let make_catch kind handler =
     make_catch_delayed kind handler
@@ -3155,6 +3269,21 @@ let reintroduce_fail sw =
   | Some _ -> sw
 
 module Switcher = Switch.Make (SArg)
+
+module Unboxed_int64_switcher = Switch.Make (SArg_unboxed_int (struct
+  let size : Lambda.locality_mode Scalar.Integral.t =
+    Naked (Boxable (Int64 Any_locality_mode))
+
+  let layout = Punboxed_or_untagged_integer Unboxed_int64
+end))
+
+module Unboxed_nativeint_switcher = Switch.Make (SArg_unboxed_int (struct
+  let size : Lambda.locality_mode Scalar.Integral.t =
+    Naked (Boxable (Nativeint Any_locality_mode))
+
+  let layout = Punboxed_or_untagged_integer Unboxed_nativeint
+end))
+
 open Switch
 
 let rec last def = function
@@ -3484,6 +3613,40 @@ let mk_failaction_pos arg_partial seen ctx defs =
     (None, fails, jumps)
   )
 
+(* [Switch.Make] and [as_interval] manipulate matched constants as host [int]
+   values; the conversions below return [None] when a constant is not exactly
+   representable as one, in which case the caller falls back to a test
+   sequence. *)
+let int_of_int32 n =
+  let i = Int32.to_int n in
+  if Int32.equal (Int32.of_int i) n then Some i else None
+
+(* CR claude: [int_of_int64] and [int_of_nativeint] must also
+   reject host [min_int] and [max_int]. [as_interval] tiles exactly
+   [min_int, max_int], while an [int64#]/[nativeint#] scrutinee ranges over
+   all 64-bit values, so a key at a host-int boundary loses its flanking
+   fail interval and the decision tree tests only one side of it:
+
+     match (x : int64#) with #0x3FFFFFFFFFFFFFFFL -> a | _ -> b
+
+   compiles to [if x >= 0x3FFFFFFFFFFFFFFF then a else b], sending every
+   [x >= 2^62] (for example [#0x4000000000000000L]) to [a]. Worse, with
+   several consecutive keys ending at the boundary, the dense cluster
+   becomes a jump table guarded only from below, so [x = 2^62] indexes past
+   the end of the [Lswitch] (undefined behavior). A [min_int] key also
+   makes [ok_inter] spuriously true in [do_zyva] (switch.ml), since
+   [abs min_int] is negative. Rejecting the two boundary values here
+   (falling back to the test sequence) restores fail intervals on both
+   sides of every key, so every jump table is guarded on both sides at full
+   width. *)
+let int_of_int64 n =
+  let i = Int64.to_int n in
+  if Int64.equal (Int64.of_int i) n then Some i else None
+
+let int_of_nativeint n =
+  let i = Nativeint.to_int n in
+  if Nativeint.equal (Nativeint.of_int i) n then Some i else None
+
 let combine_constant value_kind loc arg cst partial ctx def
     (const_lambda_list, total, _pats) =
   let fail, local_jumps = mk_failaction_neg partial ctx def in
@@ -3491,6 +3654,29 @@ let combine_constant value_kind loc arg cst partial ctx def
     make_test_sequence value_kind loc fail
       scalar
       arg const_lambda_list
+  in
+  (* A scrutinee of an integral type all of whose values fit in a tagged
+     immediate is converted (exactly, by [tagged_arg]) to a tagged immediate,
+     and dispatched with a switch like [int] constants are. *)
+  let call_switcher_as_tagged_int ?low ?high tagged_arg int_lambda_list =
+    let v = Ident.create_local "switcher" in
+    bind_with_layout Alias (v, Lambda.debug_uid_none, layout_int) tagged_arg
+      (call_switcher value_kind loc fail (Lvar v) ?low ?high int_lambda_list)
+  in
+  let cast_to_tagged_int (src : Scalar.any_locality_mode Scalar.Integral.t) =
+    static_cast ~src:(Scalar.integral src) ~dst:(Scalar.integral int) arg ~loc
+  in
+  (* For unboxed integers wider than a tagged immediate, the switch decision
+     tree instead runs at the full width of the scrutinee; see
+     [SArg_unboxed_int]. *)
+  let call_unboxed_switcher zyva int_lambda_list =
+    let edges, (cases, actions) = as_interval fail int_lambda_list in
+    zyva loc value_kind edges arg cases actions
+  in
+  let unboxed_int_keys to_int =
+    Misc.Stdlib.List.map_option
+      (fun (c, act) -> Option.map (fun n -> (n, act)) (to_int c))
+      const_lambda_list
   in
   let lambda1 =
     match cst with
@@ -3569,22 +3755,107 @@ let combine_constant value_kind loc arg cst partial ctx def
         make_scalar_test_sequence
           (Scalar.integral (Value (Boxable (Nativeint Any_locality_mode))))
     | Const_untagged_char _ ->
-        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int8)))
+        let int_lambda_list =
+          List.map
+            (function
+              | Const_untagged_char c, l -> (Char.code c, l)
+              | _ -> assert false)
+            const_lambda_list
+        in
+        (* A [char#] is numerically its character code reinterpreted as a
+           signed [int8#], so characters from '\128' onwards have negative
+           values. Converting to a tagged immediate and zero-extending
+           recovers the character code, matching the keys above. *)
+        let code =
+          Lambda.and_ int
+            (cast_to_tagged_int (Naked (Taggable Int8)))
+            (tagged_immediate 0xff) ~loc
+        in
+        call_switcher_as_tagged_int ~low:0 ~high:255 code int_lambda_list
     | Const_untagged_int _ ->
-        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int)))
+        let int_lambda_list =
+          List.map
+            (function
+              | Const_untagged_int n, l -> (n, l)
+              | _ -> assert false)
+            const_lambda_list
+        in
+        call_switcher_as_tagged_int
+          (cast_to_tagged_int (Naked (Taggable Int)))
+          int_lambda_list
     | Const_untagged_int8 _ ->
-        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int8)))
+        let int_lambda_list =
+          List.map
+            (function
+              | Const_untagged_int8 n, l -> (n, l)
+              | _ -> assert false)
+            const_lambda_list
+        in
+        let max_excl = 1 lsl 7 in
+        call_switcher_as_tagged_int ~low:(-max_excl) ~high:(max_excl - 1)
+          (cast_to_tagged_int (Naked (Taggable Int8)))
+          int_lambda_list
     | Const_untagged_int16 _ ->
-        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int16)))
-    | Const_unboxed_int32 _ ->
-        make_scalar_test_sequence
-          (Scalar.integral (Naked (Boxable (Int32 Any_locality_mode))))
-    | Const_unboxed_int64 _ ->
-        make_scalar_test_sequence
-          (Scalar.integral (Naked (Boxable (Int64 Any_locality_mode))))
-    | Const_unboxed_nativeint _ ->
-        make_scalar_test_sequence
-          (Scalar.integral (Naked (Boxable (Nativeint Any_locality_mode))))
+        let int_lambda_list =
+          List.map
+            (function
+              | Const_untagged_int16 n, l -> (n, l)
+              | _ -> assert false)
+            const_lambda_list
+        in
+        let max_excl = 1 lsl 15 in
+        call_switcher_as_tagged_int ~low:(-max_excl) ~high:(max_excl - 1)
+          (cast_to_tagged_int (Naked (Taggable Int16)))
+          int_lambda_list
+    | Const_unboxed_int32 _ -> (
+        let keys =
+          unboxed_int_keys (function
+            | Const_unboxed_int32 n -> int_of_int32 n
+            | _ -> assert false)
+        in
+        match keys with
+        | Some int_lambda_list ->
+            (* CR claude: [int_of_int32] guarantees that the keys
+               fit in a host [int] but nothing checks the scrutinee: on a
+               32-bit host (31-bit [int]; configure permits such builds via
+               --enable-stack-allocation=no, and ocamlc has no 64-bit
+               guard), [cast_to_tagged_int] truncates, so matching
+               [#0x80000000l] (Int32.min_int) against a [#0l] key takes the
+               [#0l] branch. Take this path only when the host [int] can
+               hold every [int32] (Sys.int_size > 32), not merely every
+               key. *)
+            call_switcher_as_tagged_int
+              (cast_to_tagged_int (Naked (Boxable (Int32 Any_locality_mode))))
+              int_lambda_list
+        | None ->
+            (* Only on hosts whose [int] cannot hold every [int32]. *)
+            make_scalar_test_sequence
+              (Scalar.integral (Naked (Boxable (Int32 Any_locality_mode)))))
+    | Const_unboxed_int64 _ -> (
+        let keys =
+          unboxed_int_keys (function
+            | Const_unboxed_int64 n -> int_of_int64 n
+            | _ -> assert false)
+        in
+        match keys with
+        | Some int_lambda_list ->
+            call_unboxed_switcher Unboxed_int64_switcher.zyva int_lambda_list
+        | None ->
+            make_scalar_test_sequence
+              (Scalar.integral (Naked (Boxable (Int64 Any_locality_mode)))))
+    | Const_unboxed_nativeint _ -> (
+        let keys =
+          unboxed_int_keys (function
+            | Const_unboxed_nativeint n -> int_of_nativeint n
+            | _ -> assert false)
+        in
+        match keys with
+        | Some int_lambda_list ->
+            call_unboxed_switcher Unboxed_nativeint_switcher.zyva
+              int_lambda_list
+        | None ->
+            make_scalar_test_sequence
+              (Scalar.integral (Naked (Boxable (Nativeint Any_locality_mode)))))
   in
   (lambda1, Jumps.union local_jumps total)
 

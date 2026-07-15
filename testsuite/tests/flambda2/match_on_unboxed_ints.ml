@@ -4,8 +4,6 @@
  expect.opt with dump-simplify;
 *)
 
-(* CR lambda/flambda: Improve match compilation when matching unboxed ints. *)
-
 let map_ints_to_float_constants = function
   | #0n -> #0.
   | #1n -> #1.
@@ -15,35 +13,28 @@ let map_ints_to_float_constants = function
 ;;
 [%%expect_fexpr Simplify{|
 let code map_ints_to_float_constants_0 deleted in
-let code loopify(never) size(60) newer_version_of(map_ints_to_float_constants_0)
+let $camlTOP1__switch_block29 =
+  Float_array [|0x0p+0;
+  0x1p+0;
+  0x1p+1;
+  0x1.8p+1|]
+in
+let code loopify(never) size(17) newer_version_of(map_ints_to_float_constants_0)
       map_ints_to_float_constants_0_1 (param : nativeint)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : float =
-  let prim = %int_comp.`nativeint`.lt (param, 2n) in
+  let prim = %int_comp.`nativeint`.unsigned.lt (3n, param) in
   switch prim
     | 0 -> k2
-    | 1 -> k3
-    where k3 =
-      let prim_1 = %int_comp.`nativeint`.ne (param, 0n) in
-      (switch prim_1
-         | 0 -> k (0x0p+0)
-         | 1 -> k3
-         where k3 =
-           let prim_2 = %int_comp.`nativeint`.ne (param, 1n) in
-           switch prim_2
-             | 0 -> k (0x1p+0)
-             | 1 -> k (0x1p+2))
+    | 1 -> k (0x1p+2)
     where k2 =
-      let prim_1 = %int_comp.`nativeint`.ne (param, 2n) in
-      (switch prim_1
-         | 0 -> k (0x1p+1)
-         | 1 -> k2
-         where k2 =
-           let prim_2 = %int_comp.`nativeint`.ne (param, 3n) in
-           switch prim_2
-             | 0 -> k (0x1.8p+1)
-             | 1 -> k (0x1p+2))
+      let prim_1 = %num_conv.[`nativeint`].[`imm`] (param) in
+      let tagged_scrutinee = %tag_imm (prim_1) in
+      let arg =
+        %array_load.`float` ($camlTOP1__switch_block29, tagged_scrutinee)
+      in
+      cont k (arg)
 in
 let $camlTOP1__map_ints_to_float_constants_1 =
   closure map_ints_to_float_constants_0_1 @map_ints_to_float_constants
@@ -61,7 +52,7 @@ let map_tagged_ints_to_float_constants = function
 ;;
 [%%expect_fexpr Simplify{|
 let code map_tagged_ints_to_float_constants_2 deleted in
-let $camlTOP2__switch_block102 =
+let $camlTOP2__switch_block81 =
   Float_array [|0x0p+0;
   0x1p+0;
   0x1p+1;
@@ -77,7 +68,7 @@ let code loopify(never) size(14) newer_version_of(map_tagged_ints_to_float_const
     | 0 -> k2
     | 1 -> k (0x1p+2)
     where k2 =
-      let arg = %array_load.`float` ($camlTOP2__switch_block102, param) in
+      let arg = %array_load.`float` ($camlTOP2__switch_block81, param) in
       cont k (arg)
 in
 let $camlTOP2__map_tagged_ints_to_float_constants_3 =
@@ -109,7 +100,7 @@ let opaque_fun2 = %block_load.[`0`] ($TOP4.camlTOP4) in
 let opaque_fun1 = %block_load.[`0`] ($TOP3.camlTOP3) in
 let $camlTOP7__match_on_ints_13 =
   closure match_on_ints_12_1 @match_on_ints
-and code loopify(never) size(88) newer_version_of(match_on_ints_12)
+and code loopify(never) size(61) newer_version_of(match_on_ints_12)
       match_on_ints_12_1 (param : nativeint)
         my_closure _region _ghost_region my_depth
         -> k * k1
@@ -130,38 +121,25 @@ and code loopify(never) size(88) newer_version_of(match_on_ints_12)
     %project_value_slot.[match_on_ints].[opaque_fun4]
       ($camlTOP7__match_on_ints_13)
   in
-  let prim = %int_comp.`nativeint`.lt (param, 2n) in
+  let prim = %int_comp.`nativeint`.unsigned.lt (3n, param) in
   switch prim
     | 0 -> k2
-    | 1 -> k3
-    where k3 =
-      let prim_1 = %int_comp.`nativeint`.ne (param, 0n) in
-      (switch prim_1
-         | 0 -> k3
-         | 1 -> k4
-         where k4 =
-           let prim_2 = %int_comp.`nativeint`.ne (param, 1n) in
-           (switch prim_2
-              | 0 -> k4
-              | 1 -> k (0)
-              where k4 =
-                apply opaque_fun2_1 (0) -> k * k1)
-         where k3 =
-           apply opaque_fun1_1 (0) -> k * k1)
+    | 1 -> k (0)
     where k2 =
-      let prim_1 = %int_comp.`nativeint`.ne (param, 2n) in
+      let prim_1 = %num_conv.[`nativeint`].[`imm`] (param) in
       (switch prim_1
          | 0 -> k2
          | 1 -> k3
+         | 2 -> k4
+         | 3 -> k5
+         where k5 =
+           apply opaque_fun4_1 (0) -> k * k1
+         where k4 =
+           apply opaque_fun3_1 (0) -> k * k1
          where k3 =
-           let prim_2 = %int_comp.`nativeint`.ne (param, 3n) in
-           (switch prim_2
-              | 0 -> k3
-              | 1 -> k (0)
-              where k3 =
-                apply opaque_fun4_1 (0) -> k * k1)
+           apply opaque_fun2_1 (0) -> k * k1
          where k2 =
-           apply opaque_fun3_1 (0) -> k * k1)
+           apply opaque_fun1_1 (0) -> k * k1)
   with {
     opaque_fun1 = opaque_fun1;
     opaque_fun2 = opaque_fun2;
