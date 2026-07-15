@@ -65,6 +65,33 @@ type basic_block =
            trap stack. *)
   }
 
+type phantom_defining_expr = private
+  | Cphantom_const_int of Targetint.t
+  | Cphantom_const_symbol of Cmm.symbol
+  | Cphantom_var of Backend_var.t
+  | Cphantom_offset_var of
+      { var : Backend_var.t;
+        offset_in_words : int
+      }
+  | Cphantom_read_field of
+      { var : Backend_var.t;
+        field : int
+      }
+  | Cphantom_read_symbol_field of
+      { sym : Cmm.symbol;
+        field : int
+      }
+  | Cphantom_block of
+      { tag : int;
+        fields : Backend_var.t list
+      }
+  | Cphantom_optimised_out
+
+val phantom_defining_expr_of_cmm :
+  Cmm.phantom_defining_expr -> phantom_defining_expr
+
+val phantom_optimised_out : phantom_defining_expr
+
 (* Subset of Cmm.codegen_option. *)
 type codegen_option =
   | Reduce_code_size
@@ -114,6 +141,10 @@ type t =
     fun_ret_type : Cmm.machtype;
         (** Function return type. As in [fun_args], this value is not used when
             starting from Linear. *)
+    fun_phantom_lets :
+      (Backend_var.Provenance.t option * phantom_defining_expr)
+      Backend_var.Map.t;
+        (** Phantom variables and their defining expressions *)
     mutable allowed_to_be_irreducible : bool;
         (* Whether rewrites are allowed to make the CFG irreducible (if the CFG
            is irreducible, the information about loops cannot be trusted). *)
@@ -132,10 +163,16 @@ val create :
   fun_poll:Lambda.poll_attribute ->
   next_instruction_id:InstructionId.sequence ->
   fun_ret_type:Cmm.machtype ->
+  fun_phantom_lets:
+    (Backend_var.Provenance.t option * phantom_defining_expr) Backend_var.Map.t ->
   allowed_to_be_irreducible:bool ->
   t
 
 val fun_name : t -> string
+
+val fun_phantom_lets :
+  t ->
+  (Backend_var.Provenance.t option * phantom_defining_expr) Backend_var.Map.t
 
 val entry_label : t -> Label.t
 
@@ -228,6 +265,7 @@ val make_instruction :
   id:InstructionId.t ->
   ?available_before:Reg_availability_set.t ->
   ?available_across:Reg_availability_set.t ->
+  ?phantom_available_before:Backend_var.Set.t option ->
   unit ->
   'a instruction
 
