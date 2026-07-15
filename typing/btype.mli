@@ -264,12 +264,6 @@ module For_copy : sig
         (* Deeply copies a mode variable without changing its level.
            Asserts that the original has negative ids. *)
 
-  val mode_copy_then_generalize :
-    copy_scope -> current_level:int -> Mode.Alloc.lr -> Mode.Alloc.lr
-        (* Copies the parts of a mode variable whose levels lie within
-           [[current_level, generic_level)], preserving levels, then
-           generalizes the copy *)
-
   val with_scope: (copy_scope -> 'a) -> 'a
         (* [with_scope f] calls [f] and restores saved type descriptions
            before returning its result. *)
