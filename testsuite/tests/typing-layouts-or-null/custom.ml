@@ -266,6 +266,110 @@ Error: The kind of type "nonportable_payload" is
          because of the annotation on the declaration of the type nonportable_payload.
 |}]
 
+(* A custom [@@or_null] type gets the same kind as the builtin ['a or_null]:
+   it crosses everything modulo a with-bound on its payload. *)
+
+type 'a crosses_like_or_null
+  : value_or_null mod many forkable portable contended unyielding with 'a =
+  | Cross_some of 'a
+  | Cross_none
+[@@or_null]
+
+[%%expect{|
+Lines 1-5, characters 0-11:
+1 | type 'a crosses_like_or_null
+2 |   : value_or_null mod many forkable portable contended unyielding with 'a =
+3 |   | Cross_some of 'a
+4 |   | Cross_none
+5 | [@@or_null]
+Error: The kind of type "crosses_like_or_null" is value_or_null
+         because an [@@or_null] type gets its kind by applying or_null to its
+         payload kind.
+       But the kind of type "crosses_like_or_null" must be a subkind of
+           value_or_null
+             mod forkable unyielding many portable contended
+             with 'a
+         because of the annotation on the declaration of the type crosses_like_or_null.
+|}]
+
+(* [int crosses_like_or_null] crosses contention, like [int or_null]. *)
+
+let cross_contention (x : int crosses_like_or_null @ contended) =
+  (x : _ @ uncontended)
+
+[%%expect{|
+Line 1, characters 30-50:
+1 | let cross_contention (x : int crosses_like_or_null @ contended) =
+                                  ^^^^^^^^^^^^^^^^^^^^
+Error: Unbound type constructor "crosses_like_or_null"
+|}]
+
+(* But the crossing depends on the payload: [int ref crosses_like_or_null]
+   does not cross contention. *)
+
+let bad_cross_contention (x : int ref crosses_like_or_null @ contended) =
+  (x : _ @ uncontended)
+
+[%%expect{|
+Line 1, characters 38-58:
+1 | let bad_cross_contention (x : int ref crosses_like_or_null @ contended) =
+                                          ^^^^^^^^^^^^^^^^^^^^
+Error: Unbound type constructor "crosses_like_or_null"
+|}]
+
+(* A payload under a modality contributes its with-bound under that modality:
+   ['a @@ contended] makes the type cross contention regardless of 'a. *)
+
+type 'a contended_payload =
+  | Contended_none
+  | Contended_some of 'a @@ contended
+[@@or_null]
+
+[%%expect{|
+type 'a contended_payload =
+    Contended_none
+  | Contended_some of 'a @@ contended [@@or_null]
+|}]
+
+let cross_contention_modality (x : int ref contended_payload @ contended) =
+  (x : _ @ uncontended)
+
+[%%expect{|
+val cross_contention_modality :
+  int ref contended_payload @ contended -> int ref contended_payload = <fun>
+|}]
+
+(* The precise kind is available for signature inclusion. *)
+
+module M_crosses : sig
+  type 'a t : value_or_null mod many portable contended with 'a
+end = struct
+  type 'a t = Mk_some of 'a | Mk_none [@@or_null]
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type 'a t = Mk_some of 'a | Mk_none [@@or_null]
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t = Mk_some of 'a | Mk_none [@@or_null] end
+       is not included in
+         sig
+           type 'a t : value_or_null mod many portable contended with 'a
+         end
+       Type declarations do not match:
+         type 'a t = Mk_some of 'a | Mk_none [@@or_null]
+       is not included in
+         type 'a t : value_or_null mod many portable contended with 'a
+       The kind of the first is value_or_null
+         because of the definition of t at line 4, characters 2-49.
+       But the kind of the first must be a subkind of
+           value_or_null mod many portable contended with 'a
+         because of the definition of t at line 2, characters 2-63.
+|}]
+
 type probe_result : value =
   | Probe_none
   | Probe_some of int
