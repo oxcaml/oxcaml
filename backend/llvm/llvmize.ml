@@ -1647,7 +1647,8 @@ let make_temp_data_symbol =
   let idx = ref 0 in
   fun () ->
     let module_name =
-      Compilation_unit.(get_current_or_dummy () |> name |> Name.to_string)
+      Compilation_unit.(
+        Current_unit.get_cu_or_dummy () |> name |> Name.to_string)
     in
     let res = Format.asprintf "temp.%s.%d" module_name !idx in
     incr idx;
@@ -1981,7 +1982,9 @@ let write_module_metadata t =
   let module_name =
     if t.is_startup
     then "_startup" (* LLVM will put the "caml" in front *)
-    else Compilation_unit.(get_current_or_dummy () |> name |> Name.to_string)
+    else
+      Compilation_unit.(
+        Current_unit.get_cu_or_dummy () |> name |> Name.to_string)
   in
   F.pp_line t.ppf "";
   F.pp_line t.ppf {|!0 = !{ i32 1, !"oxcaml_module", !"%s" }|} module_name;

@@ -710,21 +710,3 @@ let name_mangling_scheme_for_current_unit () =
   match !name_mangling_scheme_override with
   | Some scheme -> scheme
   | None -> Config.name_mangling_scheme
-
-let fwd_get_current : (unit -> t option) ref = ref (fun () -> assert false)
-
-let get_current () = !fwd_get_current ()
-
-let get_current_or_dummy () = Option.value (get_current ()) ~default:dummy
-
-let get_current_exn () =
-  match get_current () with
-  | Some t -> t
-  | None -> Misc.fatal_error "No compilation unit set"
-
-let is_current t =
-  match get_current () with None -> false | Some t' -> equal t t'
-
-module Private = struct
-  let fwd_get_current = fwd_get_current
-end

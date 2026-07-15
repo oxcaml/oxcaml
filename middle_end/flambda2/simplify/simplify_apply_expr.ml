@@ -463,7 +463,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
   in
   let wrapper_var = Variable.create "partial_app" K.value in
   let wrapper_var_duid = Flambda_debug_uid.none in
-  let compilation_unit = Compilation_unit.get_current_exn () in
+  let compilation_unit = Current_unit.get_cu_exn () in
   let wrapper_function_slot =
     Function_slot.create compilation_unit ~name:"partial_app_closure"
       ~is_always_immediate:false K.value
@@ -702,7 +702,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                ~name
         in
         let code_id =
-          Code_id.create ~name ~debug:dbg (Compilation_unit.get_current_exn ())
+          Code_id.create ~name ~debug:dbg (Current_unit.get_cu_exn ())
         in
         (* We could create better result types by combining the types for the
            first arguments with the result types from the called function.

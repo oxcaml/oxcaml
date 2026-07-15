@@ -154,7 +154,7 @@ let find state ~compilation_unit_proto_die (dbg : Debuginfo.t) =
   DS.Debug.log "found comp unit %a\n%!"
     (Format_doc.compat Compilation_unit.print)
     dbg_comp_unit;
-  let this_comp_unit = Compilation_unit.get_current_exn () in
+  let this_comp_unit = Current_unit.get_cu_exn () in
   if Compilation_unit.equal dbg_comp_unit this_comp_unit
   then (
     DS.Debug.log "looking in function_abstract_instances for %a\n%!"

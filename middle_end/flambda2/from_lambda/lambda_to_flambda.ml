@@ -1493,7 +1493,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     else
       let unboxed_function_slot =
         Function_slot.create
-          (Compilation_unit.get_current_exn ())
+          (Current_unit.get_cu_exn ())
           ~name:(Ident.name fid ^ "_unboxed")
           ~is_always_immediate:false Flambda_kind.value
       in
@@ -1556,7 +1556,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
   in
   let function_slot =
     Function_slot.create
-      (Compilation_unit.get_current_exn ())
+      (Current_unit.get_cu_exn ())
       ~name:(Ident.name fid) ~is_always_immediate:false Flambda_kind.value
   in
   let unboxed_products = ref Ident.Map.empty in

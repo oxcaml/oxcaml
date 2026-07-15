@@ -359,7 +359,7 @@ let invalid res ~message =
     | None ->
       let message_sym =
         Symbol.create
-          (Compilation_unit.get_current_exn ())
+          (Current_unit.get_cu_exn ())
           (Linkage_name.of_string
              (Variable.unique_name
                 (Variable.create "invalid" Flambda_kind.value)))

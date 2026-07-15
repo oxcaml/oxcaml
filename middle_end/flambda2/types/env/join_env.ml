@@ -1282,7 +1282,7 @@ end = struct
     then
       if
         not
-          (Compilation_unit.is_current
+          (Current_unit.is_current
              (Variable.compilation_unit
                 (var : Variable_in_one_joined_env.t :> Variable.t)))
       then

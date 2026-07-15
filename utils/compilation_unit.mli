@@ -311,15 +311,3 @@ val set_name_mangling_scheme_override : Config.name_mangling_scheme -> unit
     compiled and serialised with its [.cmx], so when reading another unit we
     never need to know which scheme it was compiled under. *)
 val name_mangling_scheme_for_current_unit : unit -> Config.name_mangling_scheme
-
-val get_current : unit -> t option
-
-val get_current_or_dummy : unit -> t
-
-val get_current_exn : unit -> t
-
-val is_current : t -> bool
-
-module Private : sig
-  val fwd_get_current : (unit -> t option) ref
-end
