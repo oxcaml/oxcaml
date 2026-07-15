@@ -387,3 +387,10 @@ let equal_addressing_mode_without_displ (addressing_mode_1: addressing_mode)
 let addressing_offset_in_bytes (_addressing_mode_1: addressing_mode)
       (_addressing_mode_2 : addressing_mode) ~arg_offset_in_bytes:_ _ _ =
   None
+
+(* If [addr] is a single base register plus a constant displacement, return that
+   displacement in bytes; otherwise [None].  Used to describe immutable field
+   projections (e.g. closure value slots) for DWARF call site information. *)
+let addressing_displacement_in_bytes = function
+  | Iindexed v -> Some (Validated_mem_offset.offset v)
+  | Ibased _ -> None

@@ -167,12 +167,17 @@ module Vars = struct
     let create _fundecl reg ~start_insn:_ =
       match RD.debug_info reg with
       | None -> None
-      | Some debug_info ->
-        let var = RD.Debug_info.holds_value_of debug_info in
-        let provenance = RD.Debug_info.provenance debug_info in
-        let is_parameter = RD.Debug_info.is_parameter debug_info in
-        let t = { provenance; is_parameter } in
-        Some (var, t)
+      | Some debug_info -> (
+        match RD.Debug_info.holds_value_of debug_info with
+        | Const_int _ | Const_naked_float _ | Const_symbol _ | Projection _ ->
+          (* Constants and projections are tracked for call site information
+             only; they do not give rise to available ranges for variables. *)
+          None
+        | Var var ->
+          let provenance = RD.Debug_info.provenance debug_info in
+          let is_parameter = RD.Debug_info.is_parameter debug_info in
+          let t = { provenance; is_parameter } in
+          Some (var, t))
 
     let provenance t = t.provenance
 
