@@ -2439,3 +2439,7 @@ module Colours = struct
 
   let none ppf = push ppf
 end
+
+module Or_null = struct
+  type 'a t = Null | This of 'a [@@or_null]
+end

@@ -330,44 +330,29 @@ let rec remove id = function
       else
         let rr = remove id r in if r == rr then m else balance l k rr
 
-let rec find_previous id = function
-    None ->
-      raise Not_found
-  | Some k ->
-      if same id k.ident then k.data else find_previous id k.previous
-
-let rec find_same id = function
-    Empty ->
-      raise Not_found
-  | Node(l, k, r, _) ->
-      let c = String.compare (name id) (name k.ident) in
-      if c = 0 then
-        if same id k.ident
-        then k.data
-        else find_previous id k.previous
-      else
-        find_same id (if c < 0 then l else r)
-
-type 'a or_null = Null | This of 'a [@@or_null]
-
 let rec find_previous_or_null id = function
     None ->
-      Null
+      Misc.Or_null.Null
   | Some k ->
-      if same id k.ident then This k.data
+      if same id k.ident then Misc.Or_null.This k.data
       else find_previous_or_null id k.previous
 
 let rec find_same_or_null id = function
     Empty ->
-      Null
+      Misc.Or_null.Null
   | Node(l, k, r, _) ->
       let c = String.compare (name id) (name k.ident) in
       if c = 0 then
         if same id k.ident
-        then This k.data
+        then Misc.Or_null.This k.data
         else find_previous_or_null id k.previous
       else
         find_same_or_null id (if c < 0 then l else r)
+
+let find_same id tbl =
+  match find_same_or_null id tbl with
+  | This data -> data
+  | Null -> raise Not_found
 
 let rec find_name n = function
     Empty ->

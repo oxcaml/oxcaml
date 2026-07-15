@@ -1357,3 +1357,9 @@ module Colours : sig
       setting when [f] returns (or raises). *)
   val without_colours : f:(unit -> 'a) -> 'a
 end
+
+(** Nullable values, unboxed via [@@or_null]: [This v] is [v] itself and [Null]
+    a null pointer, so the type allocates nothing and cannot be nested. *)
+module Or_null : sig
+  type 'a t = Null | This of 'a [@@or_null]
+end
