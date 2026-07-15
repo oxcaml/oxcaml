@@ -559,3 +559,37 @@ let project_int_via_index (t : _ t2) =
 [%%expect {|
 val project_int_via_index : 'a t2 -> int = <fun>
 |}]
+
+(* Constructing a record with an [any] field of undetermined sort must pin
+   the sort, which the representation depends on. Wrapped in modules so the
+   refining application is in the same phrase. *)
+
+module M = struct
+  type ('a : any) t3 = { x : 'a; y : int }
+
+  let f x =
+    let t = { x; y = 15 } in
+    t.y
+
+  let _ = f #3.14
+end
+[%%expect {|
+>> Fatal error: Layout is not a value
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+module M = struct
+  type ('a : any) t3 = A of { x : 'a; y : int }
+
+  let f x =
+    let (A { y; _ }) = A { x; y = 15 } in
+    y
+
+  let _ = f #3.14
+end
+[%%expect {|
+>> Fatal error: Layout is not a value
+Uncaught exception: Misc.Fatal_error
+
+|}]
