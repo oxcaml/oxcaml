@@ -1,8 +1,9 @@
 (* TEST
  flambda2;
- no-flat-float-array;
  {
    bytecode;
+ } {
+   native;
  }
 *)
 
