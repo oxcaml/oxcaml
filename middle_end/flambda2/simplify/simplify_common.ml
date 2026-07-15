@@ -312,7 +312,8 @@ let split_direct_over_application apply ~callee's_code_id
     Let.create
       (Bound_pattern.singleton
          (Bound_var.create region region_duid Name_mode.normal
-            ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var))
+            ~dbg:Debuginfo.none
+            ~is_parameter:Bound_var.Is_parameter.implicit_parameter))
       (Named.create_prim
          (Variadic (Begin_region { ghost = false }, []))
          (Apply.dbg apply))
@@ -321,7 +322,7 @@ let split_direct_over_application apply ~callee's_code_id
            (Bound_pattern.singleton
               (Bound_var.create ghost_region ghost_region_duid Name_mode.normal
                  ~dbg:Debuginfo.none
-                 ~is_parameter:Bound_var.Is_parameter.local_var))
+                 ~is_parameter:Bound_var.Is_parameter.implicit_parameter))
            (Named.create_prim
               (Variadic (Begin_region { ghost = false }, []))
               (Apply.dbg apply))

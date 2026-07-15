@@ -47,7 +47,8 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
          a set of closures. *)
       DE.add_variable denv
         (Bound_var.create my_closure my_closure_duid NM.normal
-           ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var)
+           ~dbg:Debuginfo.none
+           ~is_parameter:Bound_var.Is_parameter.implicit_parameter)
         (T.unknown K.value)
     | Some function_slot -> (
       match
@@ -64,7 +65,8 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
         let name = Bound_name.name name in
         DE.add_variable denv
           (Bound_var.create my_closure my_closure_duid NM.normal
-             ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var)
+             ~dbg:Debuginfo.none
+             ~is_parameter:Bound_var.Is_parameter.implicit_parameter)
           (T.alias_type_of K.value (Simple.name name)))
   in
   let denv =
@@ -74,13 +76,15 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
       let my_region_duid = Flambda_debug_uid.none in
       let my_region =
         Bound_var.create my_region my_region_duid Name_mode.normal
-          ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
+          ~dbg:Debuginfo.none
+          ~is_parameter:Bound_var.Is_parameter.implicit_parameter
       in
       let denv = DE.add_variable denv my_region (T.unknown K.region) in
       let my_ghost_region_duid = Flambda_debug_uid.none in
       let my_ghost_region =
         Bound_var.create my_ghost_region my_ghost_region_duid Name_mode.normal
-          ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
+          ~dbg:Debuginfo.none
+          ~is_parameter:Bound_var.Is_parameter.implicit_parameter
       in
       DE.add_variable denv my_ghost_region (T.unknown K.region)
   in
@@ -88,7 +92,8 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
   let denv =
     let my_depth =
       Bound_var.create my_depth my_depth_duid Name_mode.normal
-        ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
+        ~dbg:Debuginfo.none
+        ~is_parameter:Bound_var.Is_parameter.implicit_parameter
     in
     DE.add_variable denv my_depth (T.unknown K.rec_info)
   in
