@@ -50,6 +50,12 @@ struct
   module HT = Hashtbl.Make (struct
     type t = int
 
+    (* Ids are structured small integers, and [Hashtbl] selects buckets by
+       masking low bits, so id structure must be avalanched into the low bits.
+       This is the standard xorshift-multiply finalizer (multiplier from
+       xxHash): bijective on [int] (no full-width collisions) and empirically
+       uniform on this table's id patterns.  It replaces a per-lookup C call
+       ([caml_hash]) that showed up in profiles. *)
     let hash (t : t) =
       let h = t lxor (t lsr 31) * 0x27d4eb2f in
       h lxor (h lsr 29)
