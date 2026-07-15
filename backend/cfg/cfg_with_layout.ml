@@ -99,6 +99,12 @@ let remove_blocks t labels_to_remove =
              DLL.delete_curr cell;
              incr num_removed))
      with Found_all -> ());
+    if !num_removed <> num_to_remove
+    then
+      Misc.fatal_errorf
+        "Cfg_with_layout.remove_blocks: %d block(s) to remove were not found \
+         in the layout"
+        (num_to_remove - !num_removed);
     (* remove from the section table, which is also keyed by label *)
     Label.Set.iter
       (fun label -> Hashtbl.remove t.sections label)
