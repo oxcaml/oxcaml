@@ -2528,7 +2528,8 @@ let rec update_decl_jkind env dpath decl =
             cstrs
         in
         begin match
-          Jkind.for_or_null_variant env ~payload_type:ty ~modality jkind
+          Jkind.for_or_null_variant env ~payload_type:ty ~modality
+            ~payload_jkind:jkind
         with
         | Ok type_jkind ->
           let type_jkind =

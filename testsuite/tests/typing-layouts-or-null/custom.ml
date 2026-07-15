@@ -337,6 +337,113 @@ module M_crosses :
   sig type 'a t : value_or_null mod many portable contended with 'a end
 |}]
 
+(* The kind is a subkind of weaker kinds. The declaration below carries no
+   kind annotation, so the equations check the computed kind. ['a] staying
+   unconstrained in the printed outputs is part of the test: the checker
+   could otherwise satisfy the annotations by strengthening the parameter's
+   kind. *)
+
+type 'a plain = Plain_some of 'a | Plain_none [@@or_null]
+
+type 'a sub_top : value_or_null = 'a plain
+
+type 'a sub_portable : value_or_null mod portable with 'a = 'a plain
+
+[%%expect{|
+type 'a plain = Plain_some of 'a | Plain_none [@@or_null]
+type 'a sub_top = 'a plain
+type 'a sub_portable = 'a plain
+|}]
+
+(* ... but not of non-null kinds. *)
+
+type 'a sub_value : value = 'a plain
+
+[%%expect{|
+Line 1, characters 0-36:
+1 | type 'a sub_value : value = 'a plain
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "'a plain" is value_or_null
+         because of the definition of plain at line 1, characters 0-57.
+       But the layout of type "'a plain" must be a sublayout of value
+         because of the definition of sub_value at line 1, characters 0-36.
+|}]
+
+(* A kind constraint on the type parameter strengthens the with-bound, so
+   the declaration's kind can cross an axis without mentioning ['a]. *)
+
+type ('a : value mod portable) constrained_param : value_or_null mod portable =
+  | Constrained_some of 'a
+  | Constrained_none
+[@@or_null]
+
+[%%expect{|
+type ('a : value mod portable) constrained_param =
+    Constrained_some of 'a
+  | Constrained_none [@@or_null]
+|}]
+
+(* Custom [@@or_null] variants without a type parameter cross according to
+   their payload. *)
+
+type mono = Mono_none | Mono_some of int [@@or_null]
+
+let cross_mono (x : mono @ contended) = (x : _ @ uncontended)
+
+[%%expect{|
+type mono = Mono_none | Mono_some of int [@@or_null]
+val cross_mono : mono @ contended -> mono = <fun>
+|}]
+
+(* ... and a monomorphic payload that doesn't cross blocks the crossing. *)
+
+type mono_ref = Mono_ref_none | Mono_ref_some of int ref [@@or_null]
+
+let bad_cross_mono (x : mono_ref @ contended) = (x : _ @ uncontended)
+
+[%%expect{|
+type mono_ref = Mono_ref_none | Mono_ref_some of int ref [@@or_null]
+Line 3, characters 49-50:
+3 | let bad_cross_mono (x : mono_ref @ contended) = (x : _ @ uncontended)
+                                                     ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+(* An [@@unboxed] wrapper carrying a modality as the payload: the wrapper's
+   modality provides the crossing. *)
+
+type portable_box = { portable_field : (unit -> unit) @@ portable }
+[@@unboxed]
+
+type fn_or_null = Fn_none | Fn_some of portable_box [@@or_null]
+
+let cross_fn (x : fn_or_null @ nonportable) = (x : _ @ portable)
+
+[%%expect{|
+type portable_box = { portable_field : unit -> unit @@ portable; } [@@unboxed]
+type fn_or_null = Fn_none | Fn_some of portable_box [@@or_null]
+val cross_fn : fn_or_null -> fn_or_null = <fun>
+|}]
+
+(* ... and the reverse nesting: a custom [@@or_null] as the field of an
+   [@@unboxed] wrapper carrying a modality. *)
+
+type fn_or_null_plain =
+  | Plain_fn_none
+  | Plain_fn_some of (unit -> unit)
+[@@or_null]
+
+type wrapped_or_null = { wrapped_field : fn_or_null_plain @@ portable }
+[@@unboxed]
+
+let cross_wrapped (x : wrapped_or_null @ nonportable) = (x : _ @ portable)
+
+[%%expect{|
+type fn_or_null_plain = Plain_fn_none | Plain_fn_some of (unit -> unit) [@@or_null]
+type wrapped_or_null = { wrapped_field : fn_or_null_plain @@ portable; } [@@unboxed]
+val cross_wrapped : wrapped_or_null -> wrapped_or_null = <fun>
+|}]
+
 type probe_result : value =
   | Probe_none
   | Probe_some of int

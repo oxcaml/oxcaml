@@ -2722,15 +2722,22 @@ let apply_or_null_r env jkind =
   | None ->
     Misc.fatal_error "or_null applied to a type without a scannable layout"
 
-let for_or_null_variant env ~payload_type ~modality jkind =
-  match apply_or_null_l env jkind with
+let for_or_null_variant env ~payload_type ~modality ~payload_jkind =
+  match apply_or_null_l env payload_jkind with
   | Error () -> Error ()
   | Ok jkind ->
     (* A value of the type is either null, which mode-crosses everything the
        builtin ['a or_null]'s null does, or the payload under its modality.
        So the type gets the builtin's mod-bounds together with a with-bound
        on the payload, like [or_null_jkind] in [Predef]; only the layout
-       (computed by [apply_or_null_l] above) comes from the payload's kind. *)
+       (computed by [apply_or_null_l] above) comes from the payload's kind.
+
+       We drop the payload kind's own mod- and with-bounds rather than keep
+       them: they describe the payload's mode-crossing, and the with-bound on
+       [payload_type] added below already accounts for that, at least as
+       precisely (the payload kind may be a conservative bound, e.g. [value]
+       for a type parameter, while normalizing the with-bound sees the
+       instantiated payload type). *)
     let mod_bounds =
       Const.Builtin.value_or_null_mod_everything.jkind.mod_bounds
     in
