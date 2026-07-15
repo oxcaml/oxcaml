@@ -1,15 +1,3 @@
-(* Test that link inputs given by their bare names ('foo.cmx', 'lib.cmxa') are
-   resolved through manifest files (-I-manifest), including when the manifest
-   maps them to content-addressed paths that do not retain the extension. In
-   that case the companion object files ('foo.o', 'lib.a') must be listed as
-   separate manifest entries and are resolved through the load path too.
-
-   See link.sh for the details: it moves all compilation artifacts into a
-   simulated content-addressed store (extensionless blob names), writes a
-   manifest, and links the program by bare names only. It also checks that a
-   missing '.a' entry is an error for a non-empty archive, and is accepted for
-   an empty archive. *)
-
 (* TEST
  readonly_files = "helper.ml lib_a.ml lib_b.ml link.sh";
  {
@@ -54,6 +42,18 @@
    check-program-output;
  }
 *)
+
+(* Test that link inputs given by their bare names ('foo.cmx', 'lib.cmxa') are
+   resolved through manifest files (-I-manifest), including when the manifest
+   maps them to content-addressed paths that do not retain the extension. In
+   that case the companion object files ('foo.o', 'lib.a') must be listed as
+   separate manifest entries and are resolved through the load path too.
+
+   See link.sh for the details: it moves all compilation artifacts into a
+   simulated content-addressed store (extensionless blob names), writes a
+   manifest, and links the program by bare names only. It also checks that a
+   missing '.a' entry is an error for a non-empty archive, and is accepted for
+   an empty archive. *)
 
 let () =
   print_endline (Helper.greeting ());
