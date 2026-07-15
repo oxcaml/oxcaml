@@ -15,7 +15,9 @@ type t : value non_float mod forkable unyielding many stateless immutable
 
 type t : immediate
 [%%expect {|
-type t : value non_pointer mod global many stateless immutable external_
+type t
+  : value non_pointer
+      mod global quote_global many stateless immutable external_
 |}]
 
 type t : float64

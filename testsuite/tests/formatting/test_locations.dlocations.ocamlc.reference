@@ -100,15 +100,15 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
         pattern (test_locations.ml[17,534+8]..test_locations.ml[17,534+11])
           Tpat_var "fib"
           sort value
-          value_mode global,many,portable,forkable,unyielding,stateful;meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#4[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+          value_mode global,quote_global,many,portable,forkable,unyielding,stateful;meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#4[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
         expression (test_locations.ml[17,534+14]..test_locations.ml[19,572+34])
           Texp_function
-          alloc_mode global,many,portable,forkable,unyielding,stateful;id(modevar#a[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
-          global,many,nonportable,forkable,unyielding,stateful;aliased,uncontended,read_write,dynamic
+          alloc_mode global,quote_global,many,portable,forkable,unyielding,stateful;id(modevar#a[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+          global,quote_global,many,nonportable,forkable,unyielding,stateful;aliased,uncontended,read_write,dynamic
           []
           []
           Tfunction_cases (test_locations.ml[17,534+14]..test_locations.ml[19,572+34])
-            alloc_mode global,many,nonportable,forkable,unyielding,stateful;aliased,uncontended,read_write,dynamic
+            alloc_mode global,quote_global,many,nonportable,forkable,unyielding,stateful;aliased,uncontended,read_write,dynamic
             value
             [
               <case>
@@ -124,7 +124,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                 pattern (test_locations.ml[19,572+4]..test_locations.ml[19,572+5])
                   Tpat_var "n"
                   sort value
-                  value_mode global,many,portable,forkable,unyielding,stateless;unique,uncontended,read_write,dynamic
+                  value_mode global,quote_global,many,portable,forkable,unyielding,stateless;unique,uncontended,read_write,dynamic
                 expression (test_locations.ml[19,572+9]..test_locations.ml[19,572+34])
                   Texp_apply
                   apply_mode Tail

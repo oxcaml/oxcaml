@@ -902,8 +902,6 @@ module Lattices = struct
        that this type cannot be equal to other datatypes. *)
     type 'a t = 'a quoted = Quote of 'a [@@unboxed]
 
-    val return : 'a -> 'a t
-
     module Make (L : sig
       include Const
 
@@ -915,8 +913,6 @@ module Lattices = struct
     end
   end = struct
     type 'a t = 'a quoted = Quote of 'a [@@unboxed]
-
-    let[@inline] return x = Quote x
 
     let[@inline] lift f (Quote x) (Quote y) = Quote (f x y)
 
@@ -7952,11 +7948,11 @@ module Crossing = struct
         ~forkable:(Atom.Modality (Meet_const forkable))
         ~yielding:(Atom.Modality (Meet_const yielding))
         ~statefulness:(Atom.Modality (Meet_const statefulness)) =
-      let areality_quoted = C.Quote.return areality in
+      (* CR quoted-modes jbachurski: We never cross quoted-areality. *)
       Modality
         (Meet_const
            { areality;
-             areality_quoted;
+             areality_quoted = C.ArealityQuoted.max;
              linearity;
              portability;
              statefulness;

@@ -24,6 +24,7 @@ type t
           portable
           contended
           local
+          quote_local
           unique
           static
           internal
@@ -34,6 +35,7 @@ type t : immediate
 type t
   : value non_pointer non_null
       mod global
+          quote_global
           many
           stateless
           immutable
@@ -52,6 +54,7 @@ type t
   : float64
       mod external_
           local
+          quote_local
           unforkable
           yielding
           once
@@ -68,6 +71,7 @@ type t : any
 type t
   : any
       mod local
+          quote_local
           unforkable
           yielding
           once
@@ -86,6 +90,7 @@ type t
   : value separable non_null
       mod portable
           local
+          quote_local
           unforkable
           yielding
           once
@@ -104,6 +109,7 @@ type t
       mod stateless
           portable
           local
+          quote_local
           unforkable
           yielding
           once
@@ -126,6 +132,7 @@ type 'a t
           portable
           contended
           local
+          quote_local
           unique
           static
           internal
@@ -144,6 +151,7 @@ type ('a
              portable
              contended
              local
+             quote_local
              unique
              static
              internal)
@@ -157,6 +165,7 @@ type ('a
          mod stateless
              portable
              local
+             quote_local
              unforkable
              yielding
              once
@@ -175,6 +184,7 @@ type 'a t
       mod portable
           external_
           local
+          quote_local
           unforkable
           yielding
           once
@@ -192,6 +202,7 @@ type 'a t
   : value separable non_null
       mod external_
           local
+          quote_local
           unforkable
           yielding
           once
@@ -215,6 +226,7 @@ type 'a t
           portable
           contended
           local
+          quote_local
           unique
           static
           internal

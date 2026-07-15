@@ -1441,7 +1441,7 @@ Line 1, characters 42-52:
                                               ^^^^^^^^^^
 Error: This expression has type "<  >" but an expression was expected of type
          "('a : value mod portable)"
-       The kind of <  > is value non_float mod global many
+       The kind of <  > is value non_float mod global quote_global many
          because it's the type of an object.
        But the kind of <  > must be a subkind of value mod portable
          because of the annotation on the wildcard _ at line 1, characters 19-37.
@@ -1454,7 +1454,7 @@ Line 1, characters 43-53:
                                                ^^^^^^^^^^
 Error: This expression has type "<  >" but an expression was expected of type
          "('a : value mod contended)"
-       The kind of <  > is value non_float mod global many
+       The kind of <  > is value non_float mod global quote_global many
          because it's the type of an object.
        But the kind of <  > must be a subkind of value mod contended
          because of the annotation on the wildcard _ at line 1, characters 19-38.
@@ -1467,7 +1467,7 @@ Line 1, characters 43-53:
                                                ^^^^^^^^^^
 Error: This expression has type "<  >" but an expression was expected of type
          "('a : value mod external_)"
-       The kind of <  > is value non_float mod global many
+       The kind of <  > is value non_float mod global quote_global many
          because it's the type of an object.
        But the kind of <  > must be a subkind of value mod external_
          because of the annotation on the wildcard _ at line 1, characters 19-38.
