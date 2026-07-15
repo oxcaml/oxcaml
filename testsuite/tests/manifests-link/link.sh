@@ -91,3 +91,48 @@ if [ "$EXT" = "cmx" ]; then
     exit 1
   fi
 fi
+
+if [ "$EXT" = "cmx" ] && [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
+  # The dissector (-dissector) inserts an extra link-time pass that reads
+  # every link input; it must classify inputs by their content (magic bytes),
+  # not their file names, to work with manifest-resolved blob paths.
+  #
+  # Also give a second empty archive a '.a' companion sharing one blob with
+  # the first, as happens in a content-addressed store (identical files, one
+  # path). The dissector must tolerate the repeated path instead of rejecting
+  # it as a duplicate input.
+  compile -a -o empty2.$LIBEXT
+  mv empty2.$LIBEXT cas/blob_empty2
+  printf '!<arch>\n' > cas/blob_shared_empty_a
+  cat >> manifest.txt <<MANIFEST
+file empty2.$LIBEXT cas/blob_empty2
+file empty.a cas/blob_shared_empty_a
+file empty2.a cas/blob_shared_empty_a
+MANIFEST
+
+  compile "$@" -dissector -I-manifest manifest.txt \
+    helper.$EXT mylib.$LIBEXT empty.$LIBEXT empty2.$LIBEXT link_manifest.$EXT \
+    -o dissected.exe
+  ./link_manifest.exe > expected.out
+  ./dissected.exe > dissected.out
+  diff expected.out dissected.out
+
+  # Negative test: a link input that is neither an ELF object nor an ar
+  # archive must be a hard error; silently skipping it would drop its code
+  # from the final link.
+  echo "this is not an object file" > cas/blob_text
+  sed 's|^file mylib\.a .*|file mylib.a cas/blob_text|' manifest.txt \
+    > manifest_bad_kind.txt
+  if compile "$@" -dissector -I-manifest manifest_bad_kind.txt \
+       helper.$EXT mylib.$LIBEXT empty.$LIBEXT empty2.$LIBEXT link_manifest.$EXT \
+       -o should_fail_kind.exe 2> negative_kind.err; then
+    echo "ERROR: dissected link unexpectedly succeeded with a bogus mylib.a" >&2
+    exit 1
+  fi
+  if ! grep -q "neither an ELF object file nor an ar archive" negative_kind.err
+  then
+    echo "ERROR: expected an unrecognized-input error, got:" >&2
+    cat negative_kind.err >&2
+    exit 1
+  fi
+fi

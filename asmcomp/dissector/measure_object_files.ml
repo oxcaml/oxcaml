@@ -31,15 +31,23 @@ module String = Misc.Stdlib.String
 
 type error =
   | File_not_found of string
-  | Duplicate_file of string
+  | Unrecognized_input of
+      { filename : string;
+        magic : string
+      }
 
 exception Error of error
 
 let report_error ppf = function
   | File_not_found filename ->
     Format_doc.fprintf ppf "Dissector: file not found: %s" filename
-  | Duplicate_file filename ->
-    Format_doc.fprintf ppf "Dissector: duplicate file in link: %s" filename
+  | Unrecognized_input { filename; magic } ->
+    Format_doc.fprintf ppf
+      "Dissector: input file %s is neither an ELF object file nor an ar \
+       archive (leading bytes: %S). Refusing to continue, since skipping a \
+       link input would silently drop its code from the final executable or \
+       shared object."
+      filename magic
 
 let () =
   Location.register_error_of_exn (function
@@ -80,17 +88,37 @@ let analyze_elf_buf buf =
 (* Check if a string is a linker option (starts with '-') rather than a file *)
 let is_linker_option s = String.length s > 0 && String.get s 0 = '-'
 
-(* Check for duplicate files in the input list, ignoring linker options *)
-let check_for_duplicates files =
-  let seen = String.Tbl.create 256 in
-  List.iter
-    (fun file ->
-      if is_linker_option file
-      then ()
-      else if String.Tbl.mem seen file
-      then raise (Error (Duplicate_file file))
-      else String.Tbl.add seen file ())
-    files
+type file_kind =
+  | Elf_object
+  | Ar_archive
+
+let elf_magic = "\x7fELF"
+
+let ar_magic = "!<arch>\n"
+
+(* Classify an input file as an ELF relocatable object or an ar archive by its
+   leading magic bytes. We must not classify by filename extension: link inputs
+   may be resolved through manifest files (see [-I-manifest]) to
+   content-addressed paths that carry no meaningful file name. Anything that is
+   neither kind is a hard error; silently skipping an input would drop its code
+   from the final link. *)
+let classify_file filename =
+  if not (Sys.file_exists filename) then raise (Error (File_not_found filename));
+  let magic =
+    let ic = open_in_bin filename in
+    Fun.protect
+      ~finally:(fun () -> close_in_noerr ic)
+      (fun () ->
+        let len = min (String.length ar_magic) (in_channel_length ic) in
+        really_input_string ic len)
+  in
+  if
+    String.length magic >= String.length elf_magic
+    && String.equal (String.sub magic 0 (String.length elf_magic)) elf_magic
+  then Elf_object
+  else if String.equal magic ar_magic
+  then Ar_archive
+  else raise (Error (Unrecognized_input { filename; magic }))
 
 module File_size = struct
   type t =
@@ -110,8 +138,11 @@ module File_size = struct
 end
 
 let measure_files (unix : (module Compiler_owee.Unix_intf.S)) ~files =
-  (* Check for duplicates in the input list first (extract just filenames) *)
-  check_for_duplicates (List.map fst files);
+  (* Note that duplicate entries in [files] are deduplicated (via [analyzed]
+     below) rather than rejected. Beyond the same file legitimately being listed
+     twice, distinct libraries can resolve to the same content-addressed path
+     when their companion archives are byte-identical (e.g. empty archives), see
+     [-I-manifest]. Measuring (and linking) such a file once is correct. *)
   let module Unix = (val unix) in
   (* Open output file if -ddissector-inputs is set *)
   let out_channel = Option.map open_out !Clflags.ddissector_inputs in
@@ -155,9 +186,10 @@ let measure_files (unix : (module Compiler_owee.Unix_intf.S)) ~files =
   in
   (* Track which files we've already analyzed to avoid double-counting *)
   let analyzed = String.Tbl.create 256 in
-  (* Analyze a single file based on its extension, return list of file_size
-     records. Linker options (starting with '-') are ignored. The origin is
-     propagated to the resulting entries. *)
+  (* Analyze a single file based on its leading magic bytes (see
+     [classify_file]), return list of file_size records. Linker options
+     (starting with '-') are ignored. The origin is propagated to the resulting
+     entries. *)
   let analyze_one ~indent (filename, origin) =
     if is_linker_option filename
     then (
@@ -171,25 +203,20 @@ let measure_files (unix : (module Compiler_owee.Unix_intf.S)) ~files =
       [])
     else (
       String.Tbl.add analyzed filename ();
-      if Filename.check_suffix filename ".o"
-      then (
+      match classify_file filename with
+      | Elf_object ->
         let size, has_probes = analyze_object_file filename in
         log "%sInput: %s (%s)\n" indent filename (string_of_origin origin);
         log "%s  -> %s (%Ld bytes, has_probes=%b)\n" indent filename size
           has_probes;
-        [{ File_size.filename; size; has_probes; origin }])
-      else if Filename.check_suffix filename ".a"
-      then (
+        [{ File_size.filename; size; has_probes; origin }]
+      | Ar_archive ->
         let size, has_probes, member_names = analyze_archive_file filename in
         log "%sInput: %s (%s)\n" indent filename (string_of_origin origin);
         log "%s  -> %s (%Ld bytes, has_probes=%b)\n" indent filename size
           has_probes;
         log "%s  Members: %s\n" indent (String.concat ", " member_names);
         [{ File_size.filename; size; has_probes; origin }])
-      else (
-        log "%sInput: %s (%s) [unknown extension, skipped]\n" indent filename
-          (string_of_origin origin);
-        []))
   in
   let result = List.concat_map (analyze_one ~indent:"") files in
   Gc.compact ();

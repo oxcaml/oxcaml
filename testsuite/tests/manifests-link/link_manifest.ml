@@ -53,7 +53,14 @@
    simulated content-addressed store (extensionless blob names), writes a
    manifest, and links the program by bare names only. It also checks that a
    missing '.a' entry is an error for a non-empty archive, and is accepted for
-   an empty archive. *)
+   an empty archive.
+
+   On Linux/x86-64, link.sh additionally links the program with -dissector:
+   the dissector reads every link input, so it must classify them by content
+   rather than by file name, tolerate distinct inputs resolving to the same
+   content-addressed path (byte-identical archives), and reject inputs that
+   are neither ELF objects nor ar archives instead of silently skipping
+   them. *)
 
 let () =
   print_endline (Helper.greeting ());

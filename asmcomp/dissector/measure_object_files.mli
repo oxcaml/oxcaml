@@ -35,7 +35,16 @@
 (** Errors that can occur when measuring object files. *)
 type error =
   | File_not_found of string
-  | Duplicate_file of string
+  | Unrecognized_input of
+      { filename : string;
+        magic : string
+      }
+      (** The file is neither an ELF relocatable object nor an ar archive.
+          Inputs are classified by their leading magic bytes rather than by
+          filename extension, because build systems may supply link inputs via
+          manifest files (see [-I-manifest]) that resolve to content-addressed
+          paths without meaningful file names. Silently skipping such a file
+          would drop its code from the final link, so this is a hard error. *)
 
 (** Exception wrapper for measurement errors. *)
 exception Error of error
