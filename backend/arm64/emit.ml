@@ -1267,11 +1267,9 @@ let emit_named_text_section func_name =
     D.unsafe_set_internal_section_ref Text)
   else (
     D.text ();
-    (* Mach-O assemblers refuse to fold label differences across atoms (each
-       non-private symbol starts one) and .uleb128 has no relocated form, so
-       function boundaries must remain delta boundaries there. *)
-    Emitaux.enter_code_section
-      (if macosx then ".text." ^ func_name else ".text"))
+    (* On Mach-O, [frame_descr_delta] evaluates cross-atom deltas via .set, so
+       function boundaries need not break delta chains. *)
+    Emitaux.enter_code_section ".text")
 
 (* Emit code to load an emitted literal *)
 

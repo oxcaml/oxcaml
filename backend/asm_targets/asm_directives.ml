@@ -295,6 +295,15 @@ module Directive = struct
 
   let bprintf = Printf.bprintf
 
+  (* Fresh names for Mach-O [Frame_descr_delta] .set temporaries. Never reset:
+     uniqueness within each emitted file is all that is required. *)
+  let macho_delta_counter = ref 0
+
+  let new_macho_delta_var () =
+    let id = !macho_delta_counter in
+    incr macho_delta_counter;
+    Printf.sprintf "Lfd_delta%d" id
+
   let string_of_substring_literal ~start:k ~length:n s =
     let between x low high =
       Char.compare x low >= 0 && Char.compare x high <= 0
@@ -420,11 +429,20 @@ module Directive = struct
       | _, _ -> print_ascii_string_gas ~chunk_size:80 buf str);
       bprintf buf "%s" (gas_comment_opt comment)
     | Comment s -> if emit_comments () then bprintf buf "\t\t\t\t/* %s */" s
-    | Frame_descr_delta { delta } ->
+    | Frame_descr_delta { delta } -> (
       (* The delta is a difference of two same-section labels. Emit as ULEB128
          so the assembler can compute it. Always positive, so it never starts
          with a 0 byte *)
-      bprintf buf "\t.uleb128 (%a)" Constant.print delta
+      match TS.assembler () with
+      | MacOS ->
+        (* Mach-O assemblers refuse a cross-atom label difference emitted
+           inline, but accept one bound with .set, which forces assembly-time
+           evaluation (compare [Direct_assignment]). The L prefix keeps the
+           temporary assembler-local. *)
+        let temp = new_macho_delta_var () in
+        bprintf buf "\t.set %s, (%a)\n\t.uleb128 %s" temp Constant.print delta
+          temp
+      | _ -> bprintf buf "\t.uleb128 (%a)" Constant.print delta)
     | Global sym -> bprintf buf "\t.globl\t%s" (Asm_symbol.encode sym)
     | New_label (Label lbl, _typ) -> bprintf buf "%s:" (Asm_label.encode lbl)
     | New_label (Symbol sym, _typ) -> bprintf buf "%s:" (Asm_symbol.encode sym)
