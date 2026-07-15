@@ -748,7 +748,7 @@ let make_constructor
                    ~expected:(Ctype.newconstr type_path type_params)]
               in
               Error.log_and_raise sret_type.ptyp_loc
-                (Constraint_failed(env, Errortrace.unification_error ~trace))
+                (Constraint_failed (env, Errortrace.unification_error ~trace))
           end;
           (targs, tret_type, args, ret_type, univar_list)
         end
@@ -769,8 +769,8 @@ let verify_unboxed_attr unboxed_attr sdecl =
   | (None | Some false) -> ()
   | Some true ->
     let bad msg =
-      Error.log_and_raise sdecl.ptype_loc (Bad_unboxed_attribute msg)
-    in
+      Error.log_and_raise sdecl.ptype_loc
+        (Bad_unboxed_attribute msg) in
     match sdecl.ptype_kind with
     | Ptype_abstract    -> bad "it is abstract"
     | Ptype_open        -> bad "extensible variant types cannot be unboxed"
@@ -1080,7 +1080,7 @@ let transl_declaration env sdecl (id, uid) =
         if List.length
             (List.filter (fun cd -> cd.pcd_args <> Pcstr_tuple []) scstrs)
            > (Config.max_tag + 1) then
-          Error.log_and_raise sdecl.ptype_loc (Too_many_constructors);
+          Error.log_and_raise sdecl.ptype_loc Too_many_constructors;
         let make_cstr scstr =
           let name = Ident.create_local scstr.pcd_name.txt in
           let attributes = scstr.pcd_attributes in
@@ -1515,7 +1515,8 @@ let rec check_constraints_rec env loc visited ty =
       let decl =
         try Env.find_type path env
         with Not_found ->
-          Error.log_and_raise loc (Unavailable_type_constructor path) in
+          Error.log_and_raise loc (Unavailable_type_constructor path)
+      in
       let ty' = Ctype.newconstr path (Ctype.instance_list decl.type_params) in
       begin
         (* We don't expand the error trace because that produces types that
@@ -1524,7 +1525,7 @@ let rec check_constraints_rec env loc visited ty =
            twice.  This is generally true for constraint errors. *)
         match Ctype.matches ~expand_error_trace:false env ty ty' with
         | Unification_failure err ->
-            Error.log_and_raise loc (Constraint_failed (env, err))
+          Error.log_and_raise loc (Constraint_failed (env, err))
         | Jkind_mismatch { original_jkind; inferred_jkind; ty } ->
           let context = Ctype.mk_jkind_context_always_principal env in
           let violation =
@@ -2728,8 +2729,8 @@ let rec update_decl_jkind env dpath decl =
   with
   | Ok () -> new_decl
   | Error err ->
-      Error.log_and_raise decl.type_loc
-        (Jkind_mismatch_of_path (env, dpath, err))
+    Error.log_and_raise decl.type_loc
+      (Jkind_mismatch_of_path (env, dpath, err))
 
 let update_decls_jkind_reason decls =
   List.map
@@ -2794,8 +2795,8 @@ let update_decls_jkind env order decls =
              if allow_any_crossing then begin
                match decl.type_kind with
                | Type_abstract _ | Type_open ->
-                   Error.log_and_raise
-                     decl.type_loc Unsafe_mode_crossing_on_invalid_type_kind
+                 Error.log_and_raise
+                   decl.type_loc Unsafe_mode_crossing_on_invalid_type_kind
                | _ -> ()
              end;
              update_decl_jkind env (Pident id) decl, allow_any_crossing)
@@ -3135,8 +3136,8 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
       in
       match follow kpath (steps_of path manifest) [path] with
       | Some reaching_path ->
-          Error.log_and_raise loc
-            (Recursive_jkind_definition (path, env, reaching_path))
+        Error.log_and_raise loc
+          (Recursive_jkind_definition (path, env, reaching_path))
       | None -> ()
 
 (* We only allow recursion in unboxed product types to occur through boxes,
@@ -3242,8 +3243,8 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
     | Expanded_to ty', parents ->
       visit parents (Expands_to(ty,ty') :: trace) ty'
     | Is_cyclic, _ ->
-        Error.log_and_raise loc
-          (Unboxed_recursion (path0, abs_env, List.rev trace))
+      Error.log_and_raise loc
+        (Unboxed_recursion (path0, abs_env, List.rev trace))
   in
   Ctype.wrap_trace_gadt_instances env (visit Path.Set.empty []) ty0
 
@@ -3364,7 +3365,8 @@ let check_regularity ~abs_env env loc path decl to_check =
               begin
                 try List.iter2 (Ctype.unify abs_env) args' params
                 with Ctype.Unify err ->
-                  Error.log_and_raise loc (Constraint_failed (abs_env, err));
+                  Error.log_and_raise loc
+                    (Constraint_failed (abs_env, err));
               end;
               check_regular path' args
                 (path' :: prev_exp) (Expands_to (ty,body) :: trace)
@@ -3578,8 +3580,8 @@ let normalize_decl_jkinds env decls =
           { decl with type_jkind; type_kind; type_ikind }
         else decl
       | Error err ->
-          Error.log_and_raise decl.type_loc
-            (Jkind_mismatch_of_path (env, path, err))
+        Error.log_and_raise decl.type_loc
+          (Jkind_mismatch_of_path (env, path, err))
     end
     else decl
   in
@@ -3786,9 +3788,9 @@ let transl_type_decl env rec_flag sdecl_list =
           let err = Errortrace.unification_error ~trace:[Bad_jkind (ty,err)] in
           Error.log_and_raise loc (Type_clash (new_env, err))
         | Ok _ ->
-            Error.log_and_raise loc
-              (Jkind_mismatch_due_to_bad_inference
-                 (env, ty, err, Delayed_checks))
+          Error.log_and_raise loc
+            (Jkind_mismatch_due_to_bad_inference
+               (env, ty, err, Delayed_checks))
         end)
       checks)
     delayed_jkind_checks;
@@ -3942,12 +3944,12 @@ let transl_extension_constructor ~scope env type_path type_params
           cdescr.cstr_tag ~res:cstr_res ~args locks with
         | Ok _ -> ()
         | Error e ->
-            Error.log_and_raise lid.loc (Constructor_submode_failed e));
+          Error.log_and_raise lid.loc (Constructor_submode_failed e));
         (match Ctype.check_constructor_crossing_destruction env lid
           cdescr.cstr_tag ~res:cstr_res ~args locks with
         | Ok _ -> ()
         | Error e ->
-            Error.log_and_raise lid.loc (Constructor_submode_failed e));
+          Error.log_and_raise lid.loc (Constructor_submode_failed e));
         (* Ensure that constructor's type matches the type being extended *)
         let cstr_res_type_path = Data_types.cstr_res_type_path cdescr in
         let cstr_res_type_params =
@@ -4081,7 +4083,7 @@ let transl_type_extension extend env loc styext =
   begin match err with
   | None -> ()
   | Some err ->
-      Error.log_and_raise loc (Extension_mismatch (type_path, env, err))
+    Error.log_and_raise loc (Extension_mismatch (type_path, env, err))
   end;
   let ttype_params, _type_params, constructors =
     (* Note: it would be incorrect to call [create_scope] *after*
@@ -4875,7 +4877,8 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
     List.iter2 (fun (cty, _) tparam ->
       try Ctype.unify_var env cty.ctyp_type tparam
       with Ctype.Unify err ->
-        Error.log_and_raise cty.ctyp_loc (Inconsistent_constraint (env, err))
+        Error.log_and_raise cty.ctyp_loc
+          (Inconsistent_constraint (env, err))
     ) tparams sig_decl.type_params;
   List.iter (fun (cty, cty', loc) ->
     (* Note: constraints must also be enforced in [sig_env] because

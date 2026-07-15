@@ -1558,7 +1558,8 @@ and transl_fields env ~policy ~row_context o fields =
             end
         | Tvar _, Some p ->
             Error.log_and_raise sty.ptyp_loc env (Undefined_type_constructor p)
-        | _ -> Error.log_and_raise sty.ptyp_loc env (Not_an_object t)
+        | _ ->
+            Error.log_and_raise sty.ptyp_loc env (Not_an_object t)
       end in
     { of_desc; of_loc; of_attributes; }
   in
