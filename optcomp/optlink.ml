@@ -89,6 +89,16 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       Library (file_name, infos)
     else raise (Linkenv.Error (Not_an_object_file file_name))
 
+  (* The result of [find_companion_object_file], below. *)
+  type companion_object_file =
+    | Adjacent of string
+        (* The object file's path, obtained by replacing the artifact extension
+           in the artifact's resolved path. *)
+    | Found_in_load_path of string
+        (* The object file's path, as resolved through the load path. *)
+    | Not_found_in_load_path of string
+        (* The object file's name, which could not be resolved. *)
+
   (* Locate the object file ([.o] or [.a]/[.lib]) that accompanies a compilation
      artifact ([.cmx] or [.cmxa]).
 
@@ -106,14 +116,15 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
   let find_companion_object_file ~requested_name ~resolved_name ~artifact_ext
       ~object_ext =
     if Filename.check_suffix resolved_name artifact_ext
-    then `Adjacent (Filename.chop_suffix resolved_name artifact_ext ^ object_ext)
+    then
+      Adjacent (Filename.chop_suffix resolved_name artifact_ext ^ object_ext)
     else
       let object_name =
         Filename.chop_suffix requested_name artifact_ext ^ object_ext
       in
       match Load_path.find object_name with
-      | object_path -> `Found_in_load_path object_path
-      | exception Not_found -> `Not_found object_name
+      | object_path -> Found_in_load_path object_path
+      | exception Not_found -> Not_found_in_load_path object_name
 
   let scan_file linkenv ~shared genfns file
       (full_paths, objfiles, tolink, cached_genfns_imports) =
@@ -155,8 +166,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             ~resolved_name:file_name ~artifact_ext:Backend.ext_flambda_obj
             ~object_ext:Backend.ext_obj
         with
-        | `Adjacent object_file | `Found_in_load_path object_file -> object_file
-        | `Not_found object_name ->
+        | Adjacent object_file | Found_in_load_path object_file -> object_file
+        | Not_found_in_load_path object_name ->
           raise (Linkenv.Error (File_not_found object_name))
       in
       Profile.record_call ~accumulate:true "link/scan/check_consistency"
@@ -198,7 +209,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             ~resolved_name:file_name ~artifact_ext:Backend.ext_flambda_lib
             ~object_ext:Backend.ext_lib
         with
-        | `Adjacent obj_file ->
+        | Adjacent obj_file ->
           (* MSVC doesn't support empty .lib files, and macOS struggles to make
              them (#6550), so there shouldn't be one if the cmxa contains no
              units. The file_exists check is added to be ultra-defensive for the
@@ -206,8 +217,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           if infos.lib_units = [] && not (Sys.file_exists obj_file)
           then objfiles
           else obj_file :: objfiles
-        | `Found_in_load_path obj_file -> obj_file :: objfiles
-        | `Not_found obj_name ->
+        | Found_in_load_path obj_file -> obj_file :: objfiles
+        | Not_found_in_load_path obj_name ->
           (* The archive was resolved through a manifest with no entry for the
              corresponding [.a]/[.lib] file. This is only legitimate when the
              archive contains no units (see the comment above about empty .lib

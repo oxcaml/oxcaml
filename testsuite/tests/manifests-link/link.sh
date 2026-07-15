@@ -6,7 +6,7 @@
 # Arguments: $1=build_dir $2=ocamlrun $3=compiler $4=stdlib $5=runtime_dir
 #            $6=ext (cmx or cmo) $7...=extra flags (optional)
 
-set -e
+set -eu
 
 BUILD_DIR="$1"
 OCAMLRUN="$2"
