@@ -545,6 +545,7 @@
   ;; middle_end/
   backend_var
   compilenv
+  is_parameter
   ;; asmcomp/
   asmgen
   binary_emitter_verify
@@ -701,7 +702,6 @@
   compute_ranges
   compute_ranges_intf
   inlined_frame_ranges
-  is_parameter
   reg_availability_set
   reg_with_debug_info
   stack_reg_offset
