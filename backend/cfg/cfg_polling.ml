@@ -488,7 +488,7 @@ let instrument_fundecl :
       cfg.fun_contains_calls || added_poll || contains_polls cfg
     in
     let cfg = { cfg with fun_contains_calls = new_contains_calls } in
-    Cfg_with_layout.create cfg ~layout:(Cfg_with_layout.layout cfg_with_layout)
+    Cfg_with_layout.with_cfg cfg_with_layout cfg
 
 let requires_prologue_poll :
     future_funcnames:Misc.Stdlib.String.Set.t ->

@@ -33,6 +33,11 @@ val create : Cfg.t -> layout:layout -> t
 
 val cfg : t -> Cfg.t
 
+(** [with_cfg t cfg] returns a value that shares the layout and section table of
+    [t], but holds [cfg]. It is intended for updates to function-level fields of
+    the cfg: the graph itself is expected to be unchanged. *)
+val with_cfg : t -> Cfg.t -> t
+
 val layout : t -> layout
 
 val set_layout : t -> layout -> unit
