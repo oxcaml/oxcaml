@@ -1164,10 +1164,8 @@ let foo () =
 val foo : unit -> int = <fun>
 |}]
 
-(* tail-calling local-returning functions make the current function
-   local-returning as well; mode-crossing is irrelavent here. Whether or not the
-   function actually allocates in parent-region is also irrelavent here, but we
-   allocate just to demonstrate the potential leaking. *)
+(* Tail-calling local-returning functions must use [exclave_] to return their
+   result, even when the result type can cross modes. *)
 let foo () = exclave_
   let _ = local_ (52, 24) in
   42
@@ -1179,7 +1177,13 @@ let bar () =
   let _x = 52 in
   foo ()
 [%%expect{|
-val bar : unit -> int @ local = <fun>
+Line 3, characters 2-8:
+3 |   foo ()
+      ^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 (* if not at tail, then not affected *)
@@ -1195,6 +1199,42 @@ let bar' () =
   foo () [@nontail]
 [%%expect{|
 val bar' : unit -> int = <fun>
+|}]
+
+(* A type constraint on the tail call must not re-open the areality crossing:
+   the tail forward is still rejected even though [int] crosses locality. *)
+let bar_constr () = (foo () : int)
+[%%expect{|
+Line 1, characters 21-27:
+1 | let bar_constr () = (foo () : int)
+                         ^^^^^^
+Error: This application is local-returning, but is at the tail
+       position of a function that is not local-returning.
+       Hint: Use exclave_ to return a local value.
+|}]
+
+(* Same for a return-type annotation on the enclosing function. *)
+let bar_annot () : int = foo ()
+[%%expect{|
+Line 1, characters 25-31:
+1 | let bar_annot () : int = foo ()
+                             ^^^^^^
+Error: This application is local-returning, but is at the tail
+       position of a function that is not local-returning.
+       Hint: Use exclave_ to return a local value.
+|}]
+
+(* The fix: use [exclave_] (accepted, and the function is local-returning). *)
+let bar_exclave () = exclave_ foo ()
+[%%expect{|
+val bar_exclave : unit -> int @ local = <fun>
+|}]
+
+(* Returning a local *value* whose type crosses locality is still fine: this is
+   not a tail call, so it is unaffected by the restriction. *)
+let cross_value (local_ n : int) : int = (n : int)
+[%%expect{|
+val cross_value : int @ local -> int = <fun>
 |}]
 
 (* Parameter modes must be matched by the type *)
@@ -2092,13 +2132,19 @@ Error: This value is "local"
          because it is an argument in a tail call.
 |}]
 
-(* boolean operator when at tail of function makes the function local-returning
-   if its RHS is local-returning *)
+(* boolean operator at tail of a function is a tail forward: if its RHS is
+   local-returning it must use [exclave_], even though [bool] crosses locality
+   (the crossing must not silently re-open the areality of the tail forward) *)
 let foo () = exclave_ let local_ _x = "hello" in true
 let testboo3 () =  true && (foo ())
 [%%expect{|
 val foo : unit -> bool @ local = <fun>
-val testboo3 : unit -> bool @ local = <fun>
+Line 2, characters 27-35:
+2 | let testboo3 () =  true && (foo ())
+                               ^^^^^^^^
+Error: This application is local-returning, but is at the tail
+       position of a function that is not local-returning.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* Test from Nathanaëlle Courant.

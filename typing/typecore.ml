@@ -507,13 +507,19 @@ let position_and_mode env (expected_mode : expected_mode) sexp
 (* ap_mode is the return mode of the current application *)
 let check_tail_call_local_returning loc env ap_mode {region_mode; _} =
   match region_mode with
-  | Some region_mode -> begin
-    (* This application will be performed after the current region is closed; if
-       ap_mode is local, the application allocates in the outer
-       region, and thus [region_mode] needs to be marked local as well*)
+  | Some _ -> begin
+    (* This application is in tail position, so if it is local-returning it
+       allocates in the caller's region and makes the caller local-returning
+       too. We require that to be requested explicitly with [exclave_] (which
+       puts the application in non-tail position, i.e. [region_mode = None]),
+       so reject a local-returning tail call here. This check keys on [ap_mode]
+       and [region_mode], neither of which is affected by an enclosing type
+       constraint or return annotation: those only relax the return submode's
+       expected side (see [expect_mode_cross]), which would otherwise mask a
+       local tail forward even when the result type crosses locality. *)
       match
         Regionality.submode ~pp:(loc, Expression)
-          (locality_as_regionality ap_mode) region_mode
+          (locality_as_regionality ap_mode) Regionality.global
       with
       | Ok () -> ()
       | Error _ -> raise (Error (loc, env, Tail_call_local_returning))
@@ -7274,7 +7280,22 @@ and type_expect_
       in
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = Alloc.proj_comonadic Areality mode_ret in
-      let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
+      let crossing = crossing_of_ty env ty_ret in
+      let crossing =
+        match pm.region_mode with
+        | None -> crossing
+        | Some _ ->
+          (* The application is in tail position, so if it returns local, it
+             allocates in the caller's region, and this info must be preserved
+             even if [ty_ret] crosses locality: forwarding the region to the
+             callee requires an explicit [exclave_]. Hence, we prevent mode
+             crossing on the areality axis. *)
+          Crossing.set
+            (Crossing.Axis.Comonadic Areality)
+            (Crossing.Per_axis.max (Crossing.Axis.Comonadic Areality))
+            crossing
+      in
+      let mode_ret = Crossing.apply_left crossing (alloc_as_value mode_ret) in
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
           ~on_application:true
@@ -13318,7 +13339,8 @@ let report_error ~loc env =
   | Tail_call_local_returning ->
       Location.errorf ~loc
         "@[This application is local-returning, but is at the tail@ \
-          position of a function that is not local-returning.@]"
+          position of a function that is not local-returning.@ \
+          Hint: Use exclave_ to return a local value.@]"
   | Unboxed_int_literals_not_supported ->
       Location.errorf ~loc
         "@[Unboxed int literals aren't supported yet.@]"
