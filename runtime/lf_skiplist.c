@@ -374,7 +374,7 @@ int caml_lf_skiplist_insert(struct lf_skiplist *sk, uintnat key, uintnat data) {
         atomic_store_relaxed(&sk->search_level, top_level);
       }
 
-      return 1;
+      return 0;
     }
   }
 }
