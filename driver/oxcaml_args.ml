@@ -727,6 +727,22 @@ let mk_no_reaper_change_calling_conventions f =
        functions%s (Flambda2 only)"
       (format_not_default Flambda2.Default.reaper_change_calling_conventions) )
 
+let mk_support_lto f =
+  ( "-support-lto",
+    Arg.Unit f,
+    Printf.sprintf
+      " Enable link time dead code elimination (unimplemented)%s (Flambda2 \
+       only)"
+      (format_default Flambda2.Default.support_lto) )
+
+let mk_no_support_lto f =
+  ( "-no-support-lto",
+    Arg.Unit f,
+    Printf.sprintf
+      " Disable link time dead code elimination (unimplemented)%s (Flambda2 \
+       only)"
+      (format_not_default Flambda2.Default.support_lto) )
+
 let mk_flambda2_match_in_match f =
   ( "-flambda2-match-in-match",
     Arg.Unit f,
@@ -1387,6 +1403,8 @@ module type Oxcaml_options = sig
   val reaper_max_unbox_size : int -> unit
   val reaper_change_calling_conventions : unit -> unit
   val no_reaper_change_calling_conventions : unit -> unit
+  val support_lto : unit -> unit
+  val no_support_lto : unit -> unit
   val flambda2_match_in_match : unit -> unit
   val no_flambda2_match_in_match : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
@@ -1585,6 +1603,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_reaper_change_calling_conventions F.reaper_change_calling_conventions;
       mk_no_reaper_change_calling_conventions
         F.no_reaper_change_calling_conventions;
+      mk_support_lto F.support_lto;
+      mk_no_support_lto F.no_support_lto;
       mk_flambda2_match_in_match F.flambda2_match_in_match;
       mk_no_flambda2_match_in_match F.no_flambda2_match_in_match;
       mk_flambda2_expert_fallback_inlining_heuristic
@@ -2057,6 +2077,9 @@ module Oxcaml_options_impl = struct
 
   let no_reaper_change_calling_conventions =
     clear Flambda2.reaper_change_calling_conventions
+
+  let support_lto = set Flambda2.support_lto
+  let no_support_lto = clear Flambda2.support_lto
 
   let flambda2_expert_fallback_inlining_heuristic =
     set Flambda2.Expert.fallback_inlining_heuristic
@@ -2693,6 +2716,7 @@ module Extra_params = struct
     | "reaper-unbox" -> set Flambda2.reaper_unbox
     | "reaper-change-calling-conventions" ->
         set Flambda2.reaper_change_calling_conventions
+    | "support-lto" -> set Flambda2.support_lto
     | "dissector" -> set' Clflags.dissector
     | "dissector-partition-size" -> (
         match float_of_string_opt v with

@@ -265,6 +265,7 @@ let flambda_to_flambda ~ppf_dump ~prefixname ~machine_width ~code_slot_offsets
 
 let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
     (program : Lambda.program) =
+  if Flambda_features.support_lto () then prerr_endline "LTO enabled";
   let module_repr =
     Lambda.main_module_representation program.main_module_block_format
   in
