@@ -1,5 +1,5 @@
 (* TEST
- include ocamlcommon;
+ include ocamlfrontend;
  readonly_files = "source.ml source_jane_street.ml";
 *)
 

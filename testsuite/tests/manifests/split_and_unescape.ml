@@ -1,5 +1,5 @@
 (* TEST
-  include ocamlcommon;
+  include ocamlfrontend;
 *)
 
 let buffer = lazy (Buffer.create 16)

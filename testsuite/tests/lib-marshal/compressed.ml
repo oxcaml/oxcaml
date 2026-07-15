@@ -1,7 +1,7 @@
 (* CR ocaml 5 compressed-marshal: re-enable this test
 
 (* TEST
-   include ocamlcommon;
+   include ocamlfrontend;
 *)
 
 (* Test for compressed marshaling / unmarshaling *)

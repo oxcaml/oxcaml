@@ -1,5 +1,5 @@
 (* TEST
- include ocamlcommon;
+ include ocamlfrontend;
 *)
 
 module Fmt = Format_doc

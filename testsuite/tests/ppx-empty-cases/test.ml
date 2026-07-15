@@ -37,7 +37,7 @@ let non_empty_cases_accepting_float64 : float# -> t = function _ -> assert false
 
 (* TEST
  readonly_files = "ppx_empty_cases.ml";
- include ocamlcommon;
+ include ocamlfrontend;
  setup-ocamlc.byte-build-env;
  program = "${test_build_directory}/ppx_empty_cases.exe";
  all_modules = "ppx_empty_cases.ml";

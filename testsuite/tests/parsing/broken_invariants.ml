@@ -43,7 +43,7 @@ let _ = [%mutable_let_ppat_any];;
  setup-ocamlc.byte-build-env;
  all_modules = "illegal_ppx.ml";
  program = "ppx.exe";
- ocamlc.byte with ocamlcommon;
+ ocamlc.byte with ocamlfrontend;
  all_modules = "broken_invariants.ml";
  flags = "-ppx '${ocamlrun} ${test_build_directory_prefix}/ocamlc.byte/ppx.exe'";
  toplevel;
