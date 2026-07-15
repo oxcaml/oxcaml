@@ -13,7 +13,7 @@
 (**************************************************************************)
 
 (* warn on fragile matches *)
-[@@@warning "+4"]
+[@@@warning "+4+9"]
 
 open Allowance
 open Solver_intf
@@ -1070,6 +1070,7 @@ module Lattices = struct
 
     let le m1 m2 =
       let { areality = areality1;
+            areality_quoted = areality_quoted1;
             linearity = linearity1;
             portability = portability1;
             forkable = forkable1;
@@ -1079,6 +1080,7 @@ module Lattices = struct
         m1
       in
       let { areality = areality2;
+            areality_quoted = areality_quoted2;
             linearity = linearity2;
             portability = portability2;
             forkable = forkable2;
@@ -1088,6 +1090,7 @@ module Lattices = struct
         m2
       in
       Areality.le areality1 areality2
+      && ArealityQuoted.le areality_quoted1 areality_quoted2
       && Linearity.le linearity1 linearity2
       && Portability.le portability1 portability2
       && Forkable.le forkable1 forkable2
@@ -1096,6 +1099,7 @@ module Lattices = struct
 
     let equal m1 m2 =
       let { areality = areality1;
+            areality_quoted = areality_quoted1;
             linearity = linearity1;
             portability = portability1;
             forkable = forkable1;
@@ -1105,6 +1109,7 @@ module Lattices = struct
         m1
       in
       let { areality = areality2;
+            areality_quoted = areality_quoted2;
             linearity = linearity2;
             portability = portability2;
             forkable = forkable2;
@@ -1114,6 +1119,7 @@ module Lattices = struct
         m2
       in
       Areality.equal areality1 areality2
+      && ArealityQuoted.equal areality_quoted1 areality_quoted2
       && Linearity.equal linearity1 linearity2
       && Portability.equal portability1 portability2
       && Forkable.equal forkable1 forkable2
@@ -1200,10 +1206,10 @@ module Lattices = struct
       }
 
     let print ppf m =
-      Fmt.fprintf ppf "%a,%a,%a,%a,%a,%a" Areality.print m.areality
-        Linearity.print m.linearity Portability.print m.portability
-        Forkable.print m.forkable Yielding.print m.yielding Statefulness.print
-        m.statefulness
+      Fmt.fprintf ppf "%a,%a,%a,%a,%a,%a,%a" Areality.print m.areality
+        ArealityQuoted.print m.areality_quoted Linearity.print m.linearity
+        Portability.print m.portability Forkable.print m.forkable Yielding.print
+        m.yielding Statefulness.print m.statefulness
   end
   [@@inline]
 
@@ -6705,6 +6711,7 @@ module Value_with (Areality : Areality) = struct
 
       let print ppf
           { areality;
+            areality_quoted;
             uniqueness;
             linearity;
             portability;
@@ -6719,9 +6726,11 @@ module Value_with (Areality : Areality) = struct
           | None -> Fmt.fprintf ppf "None"
           | Some a -> Fmt.fprintf ppf "Some %a" print a
         in
-        Fmt.fprintf ppf "%a,%a,%a,%a,%a,%a,%a,%a,%a,%a"
+        Fmt.fprintf ppf "%a,%a,%a,%a,%a,%a,%a,%a,%a,%a,%a"
           (option_print Areality.Const.print)
           areality
+          (option_print ArealityQuoted.Const.print)
+          areality_quoted
           (option_print Linearity.Const.print)
           linearity
           (option_print Uniqueness.Const.print)
