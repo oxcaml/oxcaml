@@ -615,6 +615,7 @@ let remove_blocks t labels_to_remove =
       then (
         assert (Label.Set.is_empty b.predecessors);
         assert (Label.Set.is_empty (successor_labels b ~normal:true ~exn:false));
+        assert (Option.is_none b.exn);
         if b.is_trap_handler
         then removed_trap_handlers := Label.Set.add l !removed_trap_handlers;
         removed_labels := Label.Set.add l !removed_labels;
@@ -626,6 +627,22 @@ let remove_blocks t labels_to_remove =
   then
     Misc.fatal_errorf "Cfg.remove_blocks: not found blocks %a" Label.Set.print
       labels_not_found;
+  (* Check that no surviving block still references a removed block. *)
+  Label.Tbl.iter
+    (fun label block ->
+      let check_no_dangling set what =
+        let dangling = Label.Set.inter set labels_to_remove in
+        if not (Label.Set.is_empty dangling)
+        then
+          Misc.fatal_errorf
+            "Cfg.remove_blocks: block %a still has removed %s %a" Label.format
+            label what Label.Set.print dangling
+      in
+      check_no_dangling block.predecessors "predecessor(s)";
+      check_no_dangling
+        (successor_labels ~normal:true ~exn:true block)
+        "successor(s)")
+    t.blocks;
   remove_trap_instructions t !removed_trap_handlers
 
 let equal_basic left right =
