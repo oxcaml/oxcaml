@@ -1068,3 +1068,43 @@ re-route + STAGE5F-final). round_up engine fix (user ruling delivered) + leq dif
 + 2 new regression pins (round_up_gadt_equation_ikinds, nondep_abstract_kind_roundup_ikinds).
 Fold-stop / normalize-fixpoint deletion DEFERRED (see closing sections i-iv). Review/push
 handled above ik5f7.
+
+---
+
+# WAVE-3 HARDENING FIX-FORWARD (2026-07-15, ik5f7) — codex wave-3 triage, on abfbbb3d3
+
+Codex wave-3 (rev-ik5fmt verified; /tmp/codex-review-6460-wave3.md). Pushed head NOT broken
+(no revert); hardening round before anything leans further on round_up. New commit on
+abfbbb3d3.
+
+## X-3 (CONFIRMED FOOTGUN — must-fix) — seeded faults were LIVE in production
+Both round_up seeded-fault hooks were gated on their env var ONLY, not on
+[Clflags.ikinds_validate]. rev reproduced the nondep CRASH with OXCAML_ROUNDUP_FORCE_SOME=1
+and validate OFF: FORCE_SOME skipped the abstract-base None-detection, so round_up returned
+Some on a legacy-None input in a NORMAL compile, crashing nondep_type_decl. FIX: gate BOTH
+faults on [&& !Clflags.ikinds_validate] (roundup_force_some jkind.ml; roundup_fault
+ikind.ml) so they can ONLY perturb the validate-only differential. VERIFIED: FORCE_SOME
+validate-OFF -> nondep repro clean "cannot be eliminated" (no crash); FAULT validate-OFF ->
+inert; both still FIRE under validate (None/Some fatal; leq fatal).
+
+## X-1 (latent inconsistency — cheap insurance, fixed) — result base was the raw t.jkind
+round_up's [Some] result was built from the ORIGINAL t.jkind, so a reducible [Kconstr] base
+survived into the jkind_r; a later [fully_expand_aliases] could meet the folded bound
+contribution back out. Not reproducible-to-harm (rev's 4 targeted shapes all clean), but the
+fix is what legacy did anyway: build from [Base_and_axes.fully_expand_aliases env t.jkind]
+(base = [Layout], stable under re-expansion). Reuses the same expansion base_is_abstract
+already computes.
+
+## X-2 (differential UPGRADE — supersedes the strict=>max note) — contract t <= result
+Added a validate-only semantic check that round_up's CONTRACT [t <= returned_jkind] holds,
+via the subkind relation (Jkind_desc.sub_layout for the layout axis + the ikind
+[sub_verdict_from_ikind] modal verdict) -- NOT recursing through round_up. This directly
+verifies the contract, catches an ikind floor UNDER-count (which legacy's fuel
+over-approximation would mask), and gives X-1's inconsistency class observability. The
+existing leq-vs-legacy + Some/None arms are kept. EXERCISED: ast-invariants under validate =
+12 contract checks (6 strict + 6 equal Some cases), 0 violations; counter [roundup_sub_ok] in
+the OXCAML_ROUNDUP_STATS at-exit line.
+
+GATES: boot-green; ocamlformat 0.29.0 clean; nondep + round_up pins green; both seeded faults
+fire under validate + inert without (footgun closed); ast-invariants validate = X-2 arm
+exercised 12x, 0 fatal; FULL SUITE 2334 passed / 0 failed / 0 unexpected (== the frozen baseline; the hardening is behavior-preserving in normal mode -- X-1 changed no verdict, X-2/X-3 are validate-only). AMENDED-FREEZE tip = <wave3 SHA>.

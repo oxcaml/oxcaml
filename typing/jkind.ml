@@ -2700,6 +2700,8 @@ let set_round_up_from_ikind f = round_up_from_ikind := Some f
    leq branch is only meaningful if STRICT (<) cases actually occur; equality-only
    would prove nothing about the relaxed branch. [OXCAML_ROUNDUP_STATS] prints an
    at-exit summary. *)
+let roundup_sub_ok = ref 0
+
 let roundup_leq_strict = ref 0
 
 let roundup_leq_equal = ref 0
@@ -2712,9 +2714,10 @@ let () =
     at_exit (fun () ->
         Printf.eprintf
           "[round_up-stats] Some/Some strict(ikind<legacy)=%d equal=%d; \
-           None/None agree=%d\n\
+           None/None agree=%d; contract t<=result ok=%d\n\
            %!"
-          !roundup_leq_strict !roundup_leq_equal !roundup_none_agree)
+          !roundup_leq_strict !roundup_leq_equal !roundup_none_agree
+          !roundup_sub_ok)
   | Some _ | None -> ()
 
 (* Seeded-fault control (test/debug only; env [OXCAML_ROUNDUP_FORCE_SOME]). When
@@ -4093,17 +4096,25 @@ let round_up (type l r) ~context env (t : (allowed * r) jkind) :
          is reachable (functor + abstract [kind_] + with-bound) and
          [nondep_type_decl] relies on it, so reproduce it before consulting the
          ikind floor. *)
+      (* X-1: build the result from the FULLY-EXPANDED descriptor so its base is a
+         [Layout] (stable under re-expansion). Keeping the original reducible
+         [Kconstr] base would let a later [fully_expand_aliases] meet the folded
+         bound contribution back out. *)
+      let expanded = Base_and_axes.fully_expand_aliases env t.jkind in
       let base_is_abstract =
-        match (Base_and_axes.fully_expand_aliases env t.jkind).base with
-        | Layout _ -> false
-        | Kconstr _ -> true
+        match expanded.base with Layout _ -> false | Kconstr _ -> true
       in
       let has_with_bounds =
         match t.jkind.with_bounds with
         | No_with_bounds -> false
         | With_bounds _ -> true
       in
-      if has_with_bounds && base_is_abstract && not roundup_force_some
+      (* X-3: the [roundup_force_some] seeded fault only perturbs the (validate-
+         only) differential; gate it on [ikinds_validate] so it is INERT in
+         production (else forcing [Some] on a legacy-[None] input changes the
+         shipped result and can crash [nondep_type_decl]). *)
+      let force_some = roundup_force_some && !Clflags.ikinds_validate in
+      if has_with_bounds && base_is_abstract && not force_some
       then None
       else
         match round_up_floor env (t |> disallow_right) with
@@ -4112,7 +4123,7 @@ let round_up (type l r) ~context env (t : (allowed * r) jkind) :
           Some
             { t with
               jkind =
-                { t.jkind with
+                { expanded with
                   ikind_floor = floor;
                   with_bounds = No_with_bounds
                 };
@@ -4143,6 +4154,34 @@ let round_up (type l r) ~context env (t : (allowed * r) jkind) :
        | None, Some _ ->
          Misc.fatal_errorf
            "round_up: ikind derivation is Some but legacy normalize is None");
+    (* X-2: directly verify round_up's contract [t <= returned_jkind] via the
+       subkind relation (layout + the ikind modal sub-verdict). This does NOT
+       recurse through round_up, and catches an ikind UNDER-count of the floor
+       (which legacy's fuel over-approximation would hide). Validate-only. *)
+    (if !Clflags.ikinds_validate
+     then
+       match from_ikind with
+       | None -> ()
+       | Some b -> (
+         let td = (t |> disallow_right).jkind in
+         let layout_le =
+           Sub_result.is_le (Jkind_desc.sub_layout env td b.jkind)
+         in
+         match !sub_verdict_from_ikind with
+         | None -> ()
+         | Some { verdict } -> (
+           match verdict env td b.jkind with
+           | Some (Misc.Le_result.Less | Misc.Le_result.Equal) when layout_le ->
+             incr roundup_sub_ok
+           | Some (Misc.Le_result.Less | Misc.Le_result.Equal) ->
+             Misc.fatal_errorf
+               "round_up: t's LAYOUT is not <= returned jkind (contract t <= \
+                round_up t violated)"
+           | Some Misc.Le_result.Not_le ->
+             Misc.fatal_errorf
+               "round_up: t is NOT <= returned jkind (contract t <= round_up t \
+                violated -- ikind floor under-counts t)"
+           | None -> ())));
     from_ikind
 
 type sub_or_intersect =

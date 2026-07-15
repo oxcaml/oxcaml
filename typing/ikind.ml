@@ -2175,8 +2175,12 @@ let () =
               let node = Solver.ckind_of_jkind ctx jkind in
               Ldd.solve_pending ();
               let floor = Solver.round_up (Ldd.inline_solved_vars node) in
+              (* X-3: the [roundup_fault] seeded fault only exercises the
+                 (validate-only) leq-differential; gate it on [ikinds_validate]
+                 so it is INERT in production (else it would inflate the SHIPPED
+                 round_up floor to top). *)
               let floor =
-                if !roundup_fault
+                if !roundup_fault && !Clflags.ikinds_validate
                 then Axis_lattice.join floor Axis_lattice.top
                 else floor
               in
