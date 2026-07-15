@@ -54,9 +54,9 @@ CAMLprim value cardinal_skiplist(value val) {
   CAMLreturn(Val_long(r));
 }
 
-static int get_len(struct  lf_skipcell *p, struct lf_skipcell *end) {
+static int get_len(struct  lf_skipcell *p) {
   int len = 0 ;
-  for ( ; p != end; p = atomic_load(&p->garbage_next)) len++ ;
+  for ( ; p != NULL; p = atomic_load(&p->garbage_next)) len++ ;
   return len ;
 }
 
@@ -82,7 +82,7 @@ CAMLprim value clean_skiplist(value val) {
 
   assert (count_marks(&the_list) == 0) ;
   {
-    int len = get_len(atomic_load(&the_list.garbage_head),the_list.head) ;
+    int len = get_len(atomic_load(&the_list.garbage_head)) ;
     if (v >= 0) {
       if (len != v) {
         fprintf(stderr,"len=%d, and v=%" FMT "d differ, space leak detected\n",
@@ -91,7 +91,7 @@ CAMLprim value clean_skiplist(value val) {
     }
   }
   caml_lf_skiplist_free_garbage(&the_list);
-  assert(get_len(atomic_load(&the_list.garbage_head),the_list.head) == 0) ;
+  assert(get_len(atomic_load(&the_list.garbage_head)) == 0) ;
   CAMLreturn(Val_unit);
 }
 
