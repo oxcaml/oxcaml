@@ -930,9 +930,9 @@ module Lattices = struct
     struct
       type nonrec t = L.t t
 
-      let min = Quote L.max
+      let min = Quote L.min
 
-      let max = Quote L.min
+      let max = Quote L.max
 
       let legacy = Quote L.legacy
 
