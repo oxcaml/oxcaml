@@ -529,7 +529,7 @@ module For_int8s : Int_number_kind = struct
 
     let rem x y = of_int (Int.rem (to_int x) (to_int y))
 
-    let rem_unsigned x y =
+    let unsigned_rem x y =
       of_int (Int.rem (unsigned_to_int x) (unsigned_to_int y))
 
     let logand x y = of_int (Int.logand (to_int x) (to_int y))
@@ -560,7 +560,7 @@ module For_int8s : Int_number_kind = struct
 
     let mod_ = checked_div ~f:rem
 
-    let unsigned_mod = checked_div ~f:rem_unsigned
+    let unsigned_mod = checked_div ~f:unsigned_rem
 
     let shift_left t shift =
       with_shift shift (of_int 0)
@@ -652,7 +652,7 @@ module For_int16s : Int_number_kind = struct
 
     let rem x y = of_int (Int.rem (to_int x) (to_int y))
 
-    let rem_unsigned x y =
+    let unsigned_rem x y =
       of_int (Int.rem (unsigned_to_int x) (unsigned_to_int y))
 
     let logand x y = of_int (Int.logand (to_int x) (to_int y))
@@ -683,7 +683,7 @@ module For_int16s : Int_number_kind = struct
 
     let mod_ = checked_div ~f:rem
 
-    let unsigned_mod = checked_div ~f:rem_unsigned
+    let unsigned_mod = checked_div ~f:unsigned_rem
 
     let shift_left t shift =
       with_shift shift Int16.zero

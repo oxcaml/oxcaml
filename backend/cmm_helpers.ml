@@ -4352,6 +4352,10 @@ let div_int_caml arg1 arg2 dbg =
        (untag_int arg2 dbg) dbg)
     dbg
 
+(* CR-someday jrayman: Since Ocaml ints are 63 bits, there is always a valid set
+   of division parameters with [a = false]. [udivimm_parameters] finds
+   parameters for 64-bit division, so it sometimes generates worse code with the
+   [a = true] fixup. A divisor of 7 is such a case. *)
 let unsigned_div_int_caml arg1 arg2 dbg =
   tag_int
     (unsigned_div_int
