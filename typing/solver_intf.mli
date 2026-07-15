@@ -298,9 +298,12 @@ module type Solver_mono = sig
 
   (** Creates a new mode variable below the given mode and returns [true]. In
       the speical case where the given mode is bottom, returns the constant
-      bottom and [false]. *)
+      bottom and [false]. This might mutate the given mode. *)
   val newvar_below :
-    'a obj -> ('a, 'l_ * allowed) mode -> ('a, 'l * 'r) mode * bool
+    'a obj ->
+    ('a, 'l_ * allowed) mode ->
+    log:changes ref option ->
+    ('a, 'l * 'r) mode * bool
 
   (** Returns the join of the list of modes. *)
   val join : 'a obj -> ('a, allowed * 'r) mode list -> ('a, left_only) mode
