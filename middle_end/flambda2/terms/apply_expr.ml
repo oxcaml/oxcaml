@@ -77,6 +77,7 @@ type t =
     return_arity : [`Unarized] Flambda_arity.t;
     call_kind : Call_kind.t;
     return_mode : Alloc_mode.For_applications.t;
+    alloc_checks : Alloc_checks.t;
     dbg : Debuginfo.t;
     inlined : Inlined_attribute.t;
     inlining_state : Inlining_state.t;
@@ -92,7 +93,7 @@ let [@ocamlformat "disable"] print_inlining_paths ppf relative_history =
 
 let [@ocamlformat "disable"] print_normal ppf
     { callee; continuation; exn_continuation; args; args_arity;
-      return_arity; call_kind; return_mode; dbg; inlined; inlining_state; probe;
+      return_arity; call_kind; return_mode; alloc_checks; dbg; inlined; inlining_state; probe;
       position; relative_history } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(%a\u{3008}%a\u{3009}\u{300a}%a\u{300b}\
@@ -101,6 +102,7 @@ let [@ocamlformat "disable"] print_normal ppf
       @[<hov 1>(return_arity@ %a)@]@ \
       @[<hov 1>(call_kind@ %a)@]@ \
       @[<hov 1>(return_mode@ %a)@]@ \
+      @[<hov 1>(alloc_checks@ %a)@]@ \
       @[<hov 1>%t(dbg@ %a)%t@]@ \
       @[<hov 1>(inline@ %a)@]@ \
       @[<hov 1>(inlining_state@ %a)@]@ \
@@ -116,6 +118,7 @@ let [@ocamlformat "disable"] print_normal ppf
     Flambda_arity.print return_arity
     Call_kind.print call_kind
     Alloc_mode.For_applications.print return_mode
+    Alloc_checks.print alloc_checks
     Flambda_colours.debuginfo
     Debuginfo.print_compact dbg
     Flambda_colours.pop
@@ -131,17 +134,19 @@ let [@ocamlformat "disable"] print_normal ppf
 
 let [@ocamlformat "disable"] print_effect ppf
     { callee = _; continuation; exn_continuation; args = _; args_arity = _;
-      return_arity = _; call_kind; return_mode; dbg; inlined = _; inlining_state = _;
+      return_arity = _; call_kind; return_mode; alloc_checks; dbg; inlined = _; inlining_state = _;
       probe = _; position; relative_history = _ } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>%a@]@ \
       @[<hov 1>(return_mode %a)@]@ \
+      @[<hov 1>(alloc_checks %a)@]@ \
       @[<hov 1>\u{3008}%a\u{3009}\u{300a}%a\u{300b}@]@ \
       @[<hov 1>%t(dbg@ %a)%t@]@ \
       @[<hov 1>(position@ %a)@]\
       )@]"
     Call_kind.print call_kind
     Alloc_mode.For_applications.print return_mode
+    Alloc_checks.print alloc_checks
     Result_continuation.print continuation
     Exn_continuation.print exn_continuation
     Flambda_colours.debuginfo
@@ -167,6 +172,7 @@ let invariant
        return_arity;
        call_kind;
        return_mode = _;
+       alloc_checks = _;
        dbg = _;
        inlined = _;
        inlining_state = _;
@@ -213,8 +219,8 @@ let invariant
       "Length of argument and arity lists disagree in [Apply]:@ %a" print t
 
 let create ~callee ~continuation exn_continuation ~args ~args_arity
-    ~return_arity ~(call_kind : Call_kind.t) ~return_mode dbg ~inlined
-    ~inlining_state ~probe ~position ~relative_history =
+    ~return_arity ~(call_kind : Call_kind.t) ~return_mode ~alloc_checks dbg
+    ~inlined ~inlining_state ~probe ~position ~relative_history =
   let t =
     { callee;
       continuation;
@@ -224,6 +230,7 @@ let create ~callee ~continuation exn_continuation ~args ~args_arity
       return_arity;
       call_kind;
       return_mode;
+      alloc_checks;
       dbg;
       inlined;
       inlining_state;
@@ -247,6 +254,8 @@ let call_kind t = t.call_kind
 
 let return_mode t = t.return_mode
 
+let alloc_checks t = t.alloc_checks
+
 let dbg t = t.dbg
 
 let inlined t = t.inlined
@@ -266,6 +275,7 @@ let free_names_without_exn_continuation
       return_arity = _;
       call_kind;
       return_mode;
+      alloc_checks = _;
       dbg = _;
       inlined = _;
       inlining_state = _;
@@ -291,6 +301,7 @@ let free_names_except_callee
       return_arity = _;
       call_kind;
       return_mode;
+      alloc_checks = _;
       dbg = _;
       inlined = _;
       inlining_state = _;
@@ -321,6 +332,7 @@ let apply_renaming
        return_arity;
        call_kind;
        return_mode;
+       alloc_checks;
        dbg;
        inlined;
        inlining_state;
@@ -361,6 +373,7 @@ let apply_renaming
       return_arity;
       call_kind = call_kind';
       return_mode = return_mode';
+      alloc_checks;
       dbg;
       inlined;
       inlining_state;
@@ -378,6 +391,7 @@ let ids_for_export
       return_arity = _;
       call_kind;
       return_mode;
+      alloc_checks = _;
       dbg = _;
       inlined = _;
       inlining_state = _;
@@ -421,6 +435,9 @@ let with_call_kind t call_kind =
   t
 
 let with_args t args ~args_arity = { t with args; args_arity }
+
+let with_return_mode_and_checks t ~return_mode ~alloc_checks =
+  { t with return_mode; alloc_checks }
 
 let inlining_arguments t = inlining_state t |> Inlining_state.arguments
 

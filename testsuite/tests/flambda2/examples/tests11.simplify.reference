@@ -6,7 +6,7 @@ let code loopify(never) size(1) newer_version_of(`fn[tests11.ml:23,39--51]_3`)
       `fn[tests11.ml:23,39--51]_3_1` (x)
         my_closure &my_alloc_region my_depth
         -> k * k1 =
-  cont k (x)
+  cont k close[normal] my_alloc_region (x)
 in
 let $`camlTests11__fn[tests11.ml:23,39--51]_7` =
   closure `fn[tests11.ml:23,39--51]_3_1` @`fn[tests11.ml:23,39--51]`
@@ -17,7 +17,7 @@ let code loopify(never) size(1) newer_version_of(`fn[tests11.ml:23,52--67]_2`)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 | 0 of val * val ] =
-  cont k (0)
+  cont k close[normal] my_alloc_region (0)
 in
 let $`camlTests11__fn[tests11.ml:23,52--67]_6` =
   closure `fn[tests11.ml:23,52--67]_2_1` @`fn[tests11.ml:23,52--67]`
@@ -30,7 +30,7 @@ let code loopify(never) size(7) newer_version_of(`fn[tests11.ml:23,2--70]_1`)
   let map_foo =
     %project_value_slot.[`fn[tests11.ml:23,2--70]`].[map_foo] (my_closure)
   in
-  apply &my_alloc_region inlined(never)
+  apply &my_alloc_region inlined(never) [close close close close]
     map_foo
       ($`camlTests11__fn[tests11.ml:23,39--51]_7`,
        $`camlTests11__fn[tests11.ml:23,52--67]_6`,
@@ -44,12 +44,12 @@ and code rec loopify(never) size(69) newer_version_of(map_foo_4)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 | 0 of val * val ] =
-  apply &my_alloc_region seq (0) -> k2 * k1
+  apply &my_alloc_region [forward close close close] seq (0) -> k2 * k1
     where k2 (`*match*` : [ 0 | 0 of val * val ]) =
       let prim = %is_int (`*match*`) in
       (switch prim
          | 0 -> k2
-         | 1 -> k (0)
+         | 1 -> k close[normal] my_alloc_region (0)
          where k2 =
            ((let Popaque = %opaque (0) in
              (let untagged = %untag_imm (Popaque) in
@@ -78,19 +78,20 @@ and code rec loopify(never) size(69) newer_version_of(map_foo_4)
                  cont k2 (`fn[tests11.ml:23,2--70]`))
               where k2 (staticcatch_result : val) =
                 ((let Pfield = %block_load.[`0`] (`*match*`) in
-                  apply &my_alloc_region f (Pfield) -> k2 * k1)
+                  apply &my_alloc_region [forward close close close]
+                    f (Pfield) -> k2 * k1)
                    where k2 (apply_result : val) =
                      let Pmakeblock =
                        %block.[`0`].my_alloc_region
                          (apply_result, staticcatch_result)
                      in
-                     cont k (Pmakeblock))))
+                     cont k close[normal] my_alloc_region (Pmakeblock))))
 and code loopify(never) size(4) newer_version_of(`fn[tests11.ml:23,2--70]_1_1`)
       `fn[tests11.ml:23,2--70]_1_2` (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1 =
   apply direct(map_foo_4_1 &my_alloc_region) inlined(never)
-         inlining_state(depth(1))
+         inlining_state(depth(1)) [close close close close]
     $camlTests11__map_foo_8 ~ depth do_not_inline -> do_not_inline
       ($`camlTests11__fn[tests11.ml:23,39--51]_7`,
        $`camlTests11__fn[tests11.ml:23,52--67]_6`,
@@ -101,12 +102,13 @@ and code loopify(never) size(4) newer_version_of(`fn[tests11.ml:23,2--70]_1_1`)
         my_closure &my_alloc_region my_depth
         -> k * k1 =
   apply direct(map_foo_4_1 &my_alloc_region) inlined(never)
-         inlining_state(depth(1))
+         inlining_state(depth(1)) [close close close close]
     $camlTests11__map_foo_8 ~ depth do_not_inline -> do_not_inline
       ($`camlTests11__fn[tests11.ml:23,39--51]_7`,
        $`camlTests11__fn[tests11.ml:23,52--67]_6`,
        0)
       -> k * k1
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTests11 = Block 0 ($camlTests11__map_foo_8) in
 cont done ($camlTests11)

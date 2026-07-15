@@ -4,7 +4,7 @@
          -> k1 * k2
          : [ 0 | 0 of val ] =
    let Pmakeblock = %block.[`0`].my_alloc_region (x) in
-   cont k1 (Pmakeblock)
+   cont k1 close[normal] my_alloc_region (Pmakeblock)
  in
  let code size(21)
        f_1 (x)
@@ -13,12 +13,17 @@
          : [ 0 of [ 0 | 0 of val ] * [ 0 | 0 of val ] ] =
    let a = %block.[`0`].my_alloc_region (x) in
    (let inlined_dbg = %inlined_apply () in
+    let my_alloc_region_1 =
+      %new_alloc_region.[`normal`[`forward`, transfer], `exn`[`close`,
+        transfer], `notrace`[`close`, transfer], div[`close`, transfer]]
+        (my_alloc_region)
+    in
     let x_1 = x in
-    let Pmakeblock = %block.[`0`].my_alloc_region (x_1) in
-    cont k3 (Pmakeblock))
+    let Pmakeblock = %block.[`0`].my_alloc_region_1 (x_1) in
+    cont k3 close[normal] my_alloc_region_1 (Pmakeblock))
      where k3 (b : [ 0 | 0 of val ]) =
        let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
-       cont k1 (Pmakeblock)
+       cont k1 close[normal] my_alloc_region (Pmakeblock)
  in
  let code size(21)
        g_2 (x)
@@ -26,13 +31,18 @@
          -> k1 * k2
          : [ 0 of [ 0 | 0 of val ] * [ 0 | 0 of val ] ] =
    (let inlined_dbg = %inlined_apply () in
+    let my_alloc_region_1 =
+      %new_alloc_region.[`normal`[`forward`, transfer], `exn`[`close`,
+        transfer], `notrace`[`close`, transfer], div[`close`, transfer]]
+        (my_alloc_region)
+    in
     let x_1 = x in
-    let Pmakeblock = %block.[`0`].my_alloc_region (x_1) in
-    cont k3 (Pmakeblock))
+    let Pmakeblock = %block.[`0`].my_alloc_region_1 (x_1) in
+    cont k3 close[normal] my_alloc_region_1 (Pmakeblock))
      where k3 (a : [ 0 | 0 of val ]) =
        let b = %block.[`0`].my_alloc_region (x) in
        let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
-       cont k1 (Pmakeblock)
+       cont k1 close[normal] my_alloc_region (Pmakeblock)
  in
  let $camlCross_function_cse_a__s0 =
    closure some_0 @some &toplevel.alloc_region
@@ -44,7 +54,7 @@
             $camlCross_function_cse_a__s1,
             $camlCross_function_cse_a__s2)
  in
- cont k ($camlCross_function_cse_a__s3))
+ cont k close[normal] toplevel.alloc_region ($camlCross_function_cse_a__s3))
   where k define_root_symbol (module_block) =
     let field_0 = $camlCross_function_cse_a__s0 in
     let field_1 = $camlCross_function_cse_a__s1 in

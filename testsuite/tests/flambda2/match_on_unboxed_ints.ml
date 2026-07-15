@@ -27,28 +27,29 @@ let code loopify(never) size(60) newer_version_of(map_ints_to_float_constants_0)
     where k3 =
       let prim_1 = %int_comp.`nativeint`.ne (param, 0n) in
       (switch prim_1
-         | 0 -> k (0x0p+0)
+         | 0 -> k close[normal] my_alloc_region (0x0p+0)
          | 1 -> k3
          where k3 =
            let prim_2 = %int_comp.`nativeint`.ne (param, 1n) in
            switch prim_2
-             | 0 -> k (0x1p+0)
-             | 1 -> k (0x1p+2))
+             | 0 -> k close[normal] my_alloc_region (0x1p+0)
+             | 1 -> k close[normal] my_alloc_region (0x1p+2))
     where k2 =
       let prim_1 = %int_comp.`nativeint`.ne (param, 2n) in
       (switch prim_1
-         | 0 -> k (0x1p+1)
+         | 0 -> k close[normal] my_alloc_region (0x1p+1)
          | 1 -> k2
          where k2 =
            let prim_2 = %int_comp.`nativeint`.ne (param, 3n) in
            switch prim_2
-             | 0 -> k (0x1.8p+1)
-             | 1 -> k (0x1p+2))
+             | 0 -> k close[normal] my_alloc_region (0x1.8p+1)
+             | 1 -> k close[normal] my_alloc_region (0x1p+2))
 in
 let $camlTOP1__map_ints_to_float_constants_1 =
   closure map_ints_to_float_constants_0_1 @map_ints_to_float_constants
     &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTOP1 = Block 0 ($camlTOP1__map_ints_to_float_constants_1) in
 cont done ($camlTOP1)
 |}]
@@ -62,7 +63,7 @@ let map_tagged_ints_to_float_constants = function
 ;;
 [%%expect_fexpr Simplify{|
 let code map_tagged_ints_to_float_constants_2 deleted in
-let $camlTOP2__switch_block111 =
+let $camlTOP2__switch_block115 =
   Float_array [|0x0p+0;
   0x1p+0;
   0x1p+1;
@@ -76,15 +77,16 @@ let code loopify(never) size(14) newer_version_of(map_tagged_ints_to_float_const
   let prim = %int_comp.unsigned.lt (3, param) in
   switch prim
     | 0 -> k2
-    | 1 -> k (0x1p+2)
+    | 1 -> k close[normal] my_alloc_region (0x1p+2)
     where k2 =
-      let arg = %array_load.`float` ($camlTOP2__switch_block111, param) in
-      cont k (arg)
+      let arg = %array_load.`float` ($camlTOP2__switch_block115, param) in
+      cont k close[normal] my_alloc_region (arg)
 in
 let $camlTOP2__map_tagged_ints_to_float_constants_3 =
   closure map_tagged_ints_to_float_constants_2_1
     @map_tagged_ints_to_float_constants &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTOP2 = Block 0 ($camlTOP2__map_tagged_ints_to_float_constants_3) in
 cont done ($camlTOP2)
 |}]
@@ -144,11 +146,13 @@ and code loopify(never) size(88) newer_version_of(match_on_ints_12)
            let prim_2 = %int_comp.`nativeint`.ne (param, 1n) in
            (switch prim_2
               | 0 -> k4
-              | 1 -> k (0)
+              | 1 -> k close[normal] my_alloc_region (0)
               where k4 =
-                apply &my_alloc_region opaque_fun2_1 (0) -> k * k1)
+                apply &my_alloc_region [close close close close]
+                  opaque_fun2_1 (0) -> k * k1)
          where k3 =
-           apply &my_alloc_region opaque_fun1_1 (0) -> k * k1)
+           apply &my_alloc_region [close close close close]
+             opaque_fun1_1 (0) -> k * k1)
     where k2 =
       let prim_1 = %int_comp.`nativeint`.ne (param, 2n) in
       (switch prim_1
@@ -158,11 +162,13 @@ and code loopify(never) size(88) newer_version_of(match_on_ints_12)
            let prim_2 = %int_comp.`nativeint`.ne (param, 3n) in
            (switch prim_2
               | 0 -> k3
-              | 1 -> k (0)
+              | 1 -> k close[normal] my_alloc_region (0)
               where k3 =
-                apply &my_alloc_region opaque_fun4_1 (0) -> k * k1)
+                apply &my_alloc_region [close close close close]
+                  opaque_fun4_1 (0) -> k * k1)
          where k2 =
-           apply &my_alloc_region opaque_fun3_1 (0) -> k * k1)
+           apply &my_alloc_region [close close close close]
+             opaque_fun3_1 (0) -> k * k1)
   with {
     opaque_fun1 = opaque_fun1;
     opaque_fun2 = opaque_fun2;
@@ -170,6 +176,7 @@ and code loopify(never) size(88) newer_version_of(match_on_ints_12)
     opaque_fun4 = opaque_fun4
   }
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTOP7 = Block 0 ($camlTOP7__match_on_ints_13) in
 cont done ($camlTOP7)
 |}]
@@ -215,7 +222,7 @@ and code loopify(never) size(61) newer_version_of(match_on_tagged_ints_14)
   let prim = %int_comp.unsigned.lt (3, param) in
   switch prim
     | 0 -> k2
-    | 1 -> k (0)
+    | 1 -> k close[normal] my_alloc_region (0)
     where k2 =
       ((let untagged = %untag_imm (param) in
         switch untagged
@@ -224,13 +231,17 @@ and code loopify(never) size(61) newer_version_of(match_on_tagged_ints_14)
           | 2 -> k4
           | 3 -> k5)
          where k5 =
-           apply &my_alloc_region opaque_fun4_1 (0) -> k * k1
+           apply &my_alloc_region [close close close close]
+             opaque_fun4_1 (0) -> k * k1
          where k4 =
-           apply &my_alloc_region opaque_fun3_1 (0) -> k * k1
+           apply &my_alloc_region [close close close close]
+             opaque_fun3_1 (0) -> k * k1
          where k3 =
-           apply &my_alloc_region opaque_fun2_1 (0) -> k * k1
+           apply &my_alloc_region [close close close close]
+             opaque_fun2_1 (0) -> k * k1
          where k2 =
-           apply &my_alloc_region opaque_fun1_1 (0) -> k * k1)
+           apply &my_alloc_region [close close close close]
+             opaque_fun1_1 (0) -> k * k1)
   with {
     opaque_fun1 = opaque_fun1;
     opaque_fun2 = opaque_fun2;
@@ -238,6 +249,7 @@ and code loopify(never) size(61) newer_version_of(match_on_tagged_ints_14)
     opaque_fun4 = opaque_fun4
   }
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTOP8 = Block 0 ($camlTOP8__match_on_tagged_ints_15) in
 cont done ($camlTOP8)
 |}]

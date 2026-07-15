@@ -14,7 +14,7 @@ let code loopify(never) size(82) newer_version_of(maxson_0)
   let int_add_2 = %int_barith.add (i31, 1) in
   let prim = %int_comp.lt (int_add_2, l) in
   switch prim
-    | 0 -> k (0)
+    | 0 -> k close[normal] my_alloc_region (0)
     | 1 -> k2
     where k2 =
       ((let prim_1 = %array_length.`float` (a) in
@@ -34,18 +34,25 @@ let code loopify(never) size(82) newer_version_of(maxson_0)
                 let prim_3 = %array_load.`float`.mut (a, i31) in
                 let Parrayrefs_1 = %box_num.`float`.my_alloc_region (prim_3)
                 in
-                (apply &my_alloc_region
+                (apply &my_alloc_region [forward close close close]
                    cmp (Parrayrefs_1, Parrayrefs) -> k4 * k1
                    where k4 (return_val0 : imm tagged) =
                      let prim_4 = %int_comp.lt (return_val0, 0) in
                      switch prim_4
-                       | 0 -> k (0)
-                       | 1 -> k (int_add_2))
+                       | 0 -> k close[normal] my_alloc_region (0)
+                       | 1 -> k close[normal] my_alloc_region (int_add_2))
               where k3 =
-                cont k1 pop(regular k1) ($camlF__block32))
+                cont k1
+                       pop(regular k1)
+                       close[exn] my_alloc_region
+                       ($camlF__block32))
          where k2 =
-           cont k1 pop(regular k1) ($camlF__block32))
+           cont k1
+                  pop(regular k1)
+                  close[exn] my_alloc_region
+                  ($camlF__block32))
 in
 let $camlF__maxson_1 = closure maxson_0_1 @maxson &toplevel.alloc_region in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlF = Block 0 ($camlF__maxson_1) in
 cont done ($camlF)

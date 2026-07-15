@@ -6,7 +6,9 @@ let code loopify(never) size(1) newer_version_of(a_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : float32 boxed =
-  cont k ($camlInt_to_float32_conv__float32_of_int35)
+  cont k
+         close[normal] my_alloc_region
+         ($camlInt_to_float32_conv__float32_of_int35)
 in
 let $camlInt_to_float32_conv__a_2 = closure a_0_1 @a &toplevel.alloc_region
 in
@@ -16,10 +18,13 @@ let code loopify(never) size(1) newer_version_of(b_1)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : float32 boxed =
-  cont k ($camlInt_to_float32_conv__float32_of_int45)
+  cont k
+         close[normal] my_alloc_region
+         ($camlInt_to_float32_conv__float32_of_int45)
 in
 let $camlInt_to_float32_conv__b_3 = closure b_1_1 @b &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlInt_to_float32_conv =
   Block 0 ($camlInt_to_float32_conv__a_2, $camlInt_to_float32_conv__b_3)
 in

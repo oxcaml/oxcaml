@@ -35,7 +35,7 @@ let $camlSymbol_projections3__immstring11 = "FOO" in
            $camlSymbol_projections3__g_3,
            $camlSymbol_projections3__block_to_lift65)
       in
-      cont k (Pmakeblock)
+      cont k close[normal] my_alloc_region (Pmakeblock)
     and set_of_closures
           $camlSymbol_projections3__g_3 =
           closure g_1_1 @g &toplevel.alloc_region
@@ -51,14 +51,15 @@ let $camlSymbol_projections3__immstring11 = "FOO" in
       in
       (let untagged = %untag_imm (foo_2) in
        switch untagged
-         | 0 -> k (y)
+         | 0 -> k close[normal] my_alloc_region (y)
          | 1 -> k2)
         where k2 =
           let int_add = %int_barith.add (y, y) in
-          cont k (int_add)
+          cont k close[normal] my_alloc_region (int_add)
     and $camlSymbol_projections3__block_to_lift65 =
       Block 0 (foo_1, foo_1)
     in
+    let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
     let $camlSymbol_projections3 =
       Block 0 (foo, $camlSymbol_projections3__f_2)
     in

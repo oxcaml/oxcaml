@@ -10,10 +10,10 @@ let code inline(always) loopify(never) size(31) newer_version_of(test_0)
      | 0 -> k2
      | 1 -> k3)
     where k3 =
-      apply ccall
+      apply ccall [close close close close]
         ($`*extern*`.caml_lessthan : val * val -> val) (x, y) -> k * k1
     where k2 =
-      apply ccall
+      apply ccall [close close close close]
         ($`*extern*`.caml_greaterthan : val * val -> val) (x, y) -> k * k1
 in
 let $camlNested_switch__test_2 =
@@ -27,12 +27,13 @@ let code loopify(never) size(21) newer_version_of(f_1)
   (let untagged = %untag_imm (foo) in
    switch untagged
      | 0 -> k2
-     | 1 -> k (0))
+     | 1 -> k close[normal] my_alloc_region (0))
     where k2 =
-      apply ccall inlining_state(depth(1))
+      apply ccall inlining_state(depth(1)) [close close close close]
         ($`*extern*`.caml_greaterthan : val * val -> val) (x, y) -> k * k1
 in
 let $camlNested_switch__f_3 = closure f_1_1 @f &toplevel.alloc_region in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlNested_switch =
   Block 0 ($camlNested_switch__test_2, $camlNested_switch__f_3)
 in

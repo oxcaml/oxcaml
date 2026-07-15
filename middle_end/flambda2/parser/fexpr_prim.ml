@@ -858,6 +858,38 @@ let make_lazy =
     unary "%lazy" ~params:(param2 lazy_tag alloc_region)
       (fun _ (lazy_tag, alloc_region) -> P.Make_lazy { lazy_tag; alloc_region }))
 
+let close_alloc_region_type =
+  D.(
+    constructor_flag
+      Check_action.["normal", Normal; "exn", Exn; "notrace", Notrace])
+
+let alloc_region_checks : P.alloc_region_checks param_cons =
+  let open D in
+  let alloc_check =
+    constructor_flag Alloc_checks.["forward", Forward; "close", Close]
+  in
+  let alloc_check_action =
+    constructor_flag P.["transfer", Transfer; "check", Check; "discard", Discard]
+  in
+  let check = param2 alloc_check alloc_check_action in
+  D.maps
+    (param4 (labeled "normal" check) (labeled "exn" check)
+       (labeled "notrace" check) (labeled "div" check))
+    ~to_:(fun _env { Alloc_checks.normal; exn; notrace; div } ->
+      normal, exn, notrace, div)
+    ~from:(fun _env (normal, exn, notrace, div) ->
+      { Alloc_checks.normal; exn; notrace; div })
+
+let close_alloc_region =
+  D.(
+    unary "%close_alloc_region" ~params:(positional close_alloc_region_type)
+      (fun _ kind -> P.Close_alloc_region kind))
+
+let new_alloc_region =
+  D.(
+    unary "%new_alloc_region" ~params:(positional alloc_region_checks)
+      (fun _ alloc_checks -> P.New_alloc_region alloc_checks))
+
 let opaque_identity =
   D.(
     unary "%opaque" ~params:param0 (fun _ () ->
@@ -1373,6 +1405,8 @@ module OfFlambda = struct
     | Peek standard_int_or_float -> peek env standard_int_or_float
     | Duplicate_block { kind; alloc_region } ->
       duplicate_block env (kind, alloc_region)
+    | Close_alloc_region kind -> close_alloc_region env kind
+    | New_alloc_region alloc_checks -> new_alloc_region env alloc_checks
 
   let binop env (op : P.binary_primitive) =
     match op with

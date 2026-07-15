@@ -5,16 +5,18 @@ let code loopify(never) size(5) newer_version_of(always_0_0)
         -> k * k1
         : imm tagged =
   apply direct(hidden_identity_0 &my_alloc_region) inlined(never)
+         [forward close close close]
     ($Hidden_identity.camlHidden_identity__hidden_identity_1
      : _ -> imm tagged)
       (0)
       -> k2 * k1
     where k2 (param_1) =
-      cont k (0)
+      cont k close[normal] my_alloc_region (0)
 in
 let $camlResult_types_of_identity__always_0_1 =
   closure always_0_0_1 @always_0 &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlResult_types_of_identity =
   Block 0 ($camlResult_types_of_identity__always_0_1)
 in

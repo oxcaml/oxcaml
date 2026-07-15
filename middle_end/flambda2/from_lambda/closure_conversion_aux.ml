@@ -352,6 +352,7 @@ module Acc = struct
     { code_id : Code_id.t;
       return_continuation : Continuation.t;
       exn_continuation : Exn_continuation.t;
+      my_alloc_region : Variable.t;
       my_closure : Variable.t;
       is_purely_tailrec : bool;
       slot_offsets_at_definition : Slot_offsets.t
@@ -359,6 +360,12 @@ module Acc = struct
              rather a property of its point of definition (i.e. the state of the
              slot_offsets right before we entered the current closure). It's
              mainly stored here for efficiency reasons. *)
+    }
+
+  type alloc_region =
+    { region : Variable.t;
+      normal_continuation : Continuation.t;
+      exn_continuation : Continuation.t
     }
 
   type t =
@@ -378,6 +385,7 @@ module Acc = struct
       slot_offsets : Slot_offsets.t;
       code_slot_offsets : Slot_offsets.t Code_id.Map.t;
       closure_infos : closure_info list;
+      alloc_regions : alloc_region list;
       symbol_short_name_counter : int
     }
 
@@ -457,7 +465,8 @@ module Acc = struct
         externals := Symbol.Map.add symbol approx !externals;
         approx
 
-  let create ~cmx_loader ~machine_width =
+  let create ~cmx_loader ~machine_width ~toplevel_return_continuation
+      ~toplevel_exn_continuation ~toplevel_my_alloc_region =
     { machine_width;
       declared_symbols = [];
       lifted_sets_of_closures = [];
@@ -476,6 +485,11 @@ module Acc = struct
       slot_offsets = Slot_offsets.empty;
       code_slot_offsets = Code_id.Map.empty;
       closure_infos = [];
+      alloc_regions =
+        [ { region = toplevel_my_alloc_region;
+            normal_continuation = toplevel_return_continuation;
+            exn_continuation = toplevel_exn_continuation
+          } ];
       symbol_short_name_counter = 0
     }
 
@@ -723,14 +737,60 @@ module Acc = struct
     | [] -> None
     | closure_info :: _ -> Some closure_info
 
+  let current_alloc_exit_context t =
+    match t.alloc_regions with
+    | [] -> Misc.fatal_error "No current allocation region"
+    | { region; normal_continuation; exn_continuation } :: _ ->
+      region, normal_continuation, exn_continuation
+
+  let push_alloc_region t ~alloc_region ~normal_continuation ~exn_continuation =
+    { t with
+      alloc_regions =
+        { region = alloc_region; normal_continuation; exn_continuation }
+        :: t.alloc_regions
+    }
+
+  let pop_alloc_region t ~alloc_region:region =
+    match t.alloc_regions with
+    | [] -> Misc.fatal_error "No allocation region to pop"
+    | alloc_region :: alloc_regions ->
+      if not (Variable.equal alloc_region.region region)
+      then
+        Misc.fatal_errorf
+          "Trying to pop allocation region %a, but current region is %a"
+          Variable.print region Variable.print alloc_region.region;
+      { t with alloc_regions }
+
+  let close_alloc_region_action t ~exit =
+    let region, _, _ = current_alloc_exit_context t in
+    Check_action.Close_alloc_region { region; exit }
+
+  let raise_check_actions t ~raise_kind exn_handler =
+    let _, _, function_exn_continuation = current_alloc_exit_context t in
+    if Continuation.equal exn_handler function_exn_continuation
+    then
+      let exit =
+        match (raise_kind : Lambda.raise_kind) with
+        | Raise_regular | Raise_reraise -> Check_action.Exn
+        | Raise_notrace -> Check_action.Notrace
+      in
+      [close_alloc_region_action t ~exit]
+    else []
+
   let push_closure_info t ~return_continuation ~exn_continuation ~my_closure
-      ~is_purely_tailrec ~code_id =
+      ~my_alloc_region ~is_purely_tailrec ~code_id =
+    let t =
+      push_alloc_region t ~alloc_region:my_alloc_region
+        ~normal_continuation:return_continuation
+        ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
+    in
     { t with
       slot_offsets = Slot_offsets.empty;
       closure_infos =
         { code_id;
           return_continuation;
           exn_continuation;
+          my_alloc_region;
           my_closure;
           is_purely_tailrec;
           slot_offsets_at_definition = t.slot_offsets
@@ -747,6 +807,7 @@ module Acc = struct
     let code_slot_offsets =
       Code_id.Map.add closure_info.code_id t.slot_offsets t.code_slot_offsets
     in
+    let t = pop_alloc_region t ~alloc_region:closure_info.my_alloc_region in
     let closure_infos =
       match closure_infos with
       | [] -> []
@@ -1069,8 +1130,10 @@ module Expr_with_acc = struct
 end
 
 module Apply_cont_with_acc = struct
-  let create acc ?trap_action ?args_approx cont ~args ~dbg =
-    let apply_cont = Apply_cont.create ?trap_action cont ~args ~dbg in
+  let create acc ?trap_action ?check_actions ?args_approx cont ~args ~dbg =
+    let apply_cont =
+      Apply_cont.create ?trap_action ?check_actions cont ~args ~dbg
+    in
     let acc = Acc.add_continuation_application ~cont args_approx acc in
     let acc =
       Acc.add_free_names_and_check_my_closure_use

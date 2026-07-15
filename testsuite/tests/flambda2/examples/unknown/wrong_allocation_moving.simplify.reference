@@ -9,19 +9,19 @@ let code loopify(never) size(2) newer_version_of(`fn[wrong_allocation_moving.ml:
     %project_value_slot.[`fn[wrong_allocation_moving.ml:21,15--28]`].[y]
       (my_closure)
   in
-  cont k (y)
+  cont k close[normal] my_alloc_region (y)
 in
 let code loopify(never) size(57) newer_version_of(f_0)
       f_0_1 (x : float boxed, foo : val)
         my_closure &my_alloc_region my_depth
         -> k * k1 =
-  apply ccall
+  apply ccall [forward close close close]
     ($`*extern*`.caml_gc_minor_words_unboxed : val -> float) (0) -> k2 * k1
     where k2 (before : float) =
       let prim = %unbox_num.`float` (x) in
       let prim_1 = %bfloat_arith.mul (prim, 0x1p+1) in
       let y = %box_num.`float`.my_alloc_region (prim_1) in
-      (apply ccall
+      (apply ccall [forward close close close]
          ($`*extern*`.caml_gc_minor_words_unboxed : val -> float)
            (0)
            -> k2 * k1
@@ -34,7 +34,7 @@ let code loopify(never) size(57) newer_version_of(f_0)
            with { y = y }
            in
            let Pmakeblock = %block.[`0`].my_alloc_region (y) in
-           apply &my_alloc_region
+           apply &my_alloc_region [close close close close]
              foo
                (Pmakeblock, `fn[wrong_allocation_moving.ml:21,15--28]`, diff)
                -> k * k1)
@@ -42,6 +42,7 @@ in
 let $camlWrong_allocation_moving__f_2 =
   closure f_0_1 @f &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlWrong_allocation_moving =
   Block 0 ($camlWrong_allocation_moving__f_2)
 in

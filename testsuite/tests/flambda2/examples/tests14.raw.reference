@@ -6,7 +6,7 @@ let $camlTests14__first_const = Block 0 () in
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
    let Psetfield = %block_set.`imm`.[`0`] (t, 42) in
-   cont k1 (Psetfield)
+   cont k1 close[normal] my_alloc_region (Psetfield)
  in
  let code size(7)
        nth_char_1 (s : val, n : imm tagged)
@@ -17,7 +17,7 @@ let $camlTests14__first_const = Block 0 () in
    let prim = %num_conv.[tagged_imm].[`nativeint`] (n) in
    let prim_1 = %string_load.[`8`] (s, prim) in
    let Pstringrefu = %tag_imm (prim_1) in
-   cont k1 (Pstringrefu)
+   cont k1 close[normal] my_alloc_region (Pstringrefu)
  in
  let code size(32)
        needs_try_region_2 (param : imm tagged)
@@ -42,13 +42,13 @@ let $camlTests14__first_const = Block 0 () in
           (let untagged = %untag_imm (eq) in
            switch untagged
              | 0 -> k5
-             | 1 -> k1 (0))
+             | 1 -> k1 close[normal] my_alloc_region (0))
             where k5 =
               cont k4)
            where k4 =
-             cont k2 pop(reraise k2) (`exn`)))
+             cont k2 pop(reraise k2) close[exn] my_alloc_region (`exn`)))
      where k3 (n : imm tagged) =
-       cont k1 (1)
+       cont k1 close[normal] my_alloc_region (1)
  in
  let code size(12)
        gadt_match_3 (x : [ 0 |1 | 0 of imm tagged ], n : val)
@@ -58,11 +58,11 @@ let $camlTests14__first_const = Block 0 () in
    let next_depth = rec_info (succ my_depth) in
    (let untagged = %untag_imm (x) in
     switch untagged
-      | 0 -> k1 (n)
+      | 0 -> k1 close[normal] my_alloc_region (n)
       | 1 -> k3)
      where k3 =
        let Popaque = %opaque (n) in
-       cont k1 (Popaque)
+       cont k1 close[normal] my_alloc_region (Popaque)
  in
  let set = closure set_0 @set &toplevel.alloc_region in
  let nth_char = closure nth_char_1 @nth_char &toplevel.alloc_region in
@@ -73,7 +73,7 @@ let $camlTests14__first_const = Block 0 () in
  let Pmakeblock =
    %block.[`0`].`toplevel` (set, nth_char, needs_try_region, gadt_match)
  in
- cont k (Pmakeblock))
+ cont k close[normal] toplevel.alloc_region (Pmakeblock))
   where k define_root_symbol (module_block) =
     let field_0 = %block_load.tag[`0`].`size`[`4`].[`0`] (module_block) in
     let field_1 = %block_load.tag[`0`].`size`[`4`].[`1`] (module_block) in

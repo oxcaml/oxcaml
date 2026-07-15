@@ -9,7 +9,7 @@ let code loopify(never) size(52) newer_version_of(sum_0)
   let for_stop = %int_barith.sub (Parraylength, 1) in
   let prim = %int_comp.le (0, for_stop) in
   switch prim
-    | 0 -> k (0)
+    | 0 -> k close[normal] my_alloc_region (0)
     | 1 -> k2
     where k2 =
       let prim_1 = %untag_imm (for_stop) in
@@ -34,12 +34,13 @@ let code loopify(never) size(52) newer_version_of(sum_0)
                   %int_comp.`int64`.le (for_next_naked, for_stop_naked)
                 in
                 switch prim_3
-                  | 0 -> k (return_val0)
+                  | 0 -> k close[normal] my_alloc_region (return_val0)
                   | 1 -> k2 (for_next_naked, return_val0)))
 in
 let $camlArray_element_kind_meet__sum_2 =
   closure sum_0_1 @sum &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlArray_element_kind_meet =
   Block 0 ($camlArray_element_kind_meet__sum_2)
 in

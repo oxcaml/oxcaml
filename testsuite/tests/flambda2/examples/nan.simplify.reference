@@ -1,3 +1,4 @@
 let $camlNan__nan17 = nan in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlNan = Block 0 ($camlNan__nan17) in
 cont done ($camlNan)

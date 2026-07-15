@@ -14,10 +14,10 @@ in
 let Popaque = %opaque ($camlData_flow_bug__immstring21) in
 (let Popaque_1 = %opaque (1) in
  let untagged = %untag_imm (Popaque_1) in
- let $camlData_flow_bug__Pmakeblock106 = Block 0 (906850200, Popaque) in
+ let $camlData_flow_bug__Pmakeblock108 = Block 0 (906850200, Popaque) in
  switch untagged
    | 0 -> k (-453122489)
-   | 1 -> k ($camlData_flow_bug__Pmakeblock106))
+   | 1 -> k ($camlData_flow_bug__Pmakeblock108))
   where k (fix : val) =
     ((let prim = %is_int (fix) in
       switch prim
@@ -73,6 +73,7 @@ let Popaque = %opaque ($camlData_flow_bug__immstring21) in
                                 | 1 -> k
                                 where k1 =
                                   (apply ccall noalloc
+                                          [forward close close close]
                                      ($`*extern*`.caml_string_notequal
                                       : val * val -> val)
                                        (Popaque,
@@ -131,6 +132,7 @@ let Popaque = %opaque ($camlData_flow_bug__immstring21) in
                                                            in
                                                            (apply ccall
                                                                    inlining_state(depth(10))
+                                                                   [forward close close close]
                                                               ($`*extern*`.caml_compare
                                                                : val * val ->
                                                                  val
@@ -161,7 +163,10 @@ let Popaque = %opaque ($camlData_flow_bug__immstring21) in
                                                where k1 =
                                                  cont error
                                                         pop(regular error)
+                                                        close[exn] toplevel.alloc_region
                                                         ($camlData_flow_bug__block67)))))))))
        where k =
+         let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region)
+         in
          let $camlData_flow_bug = Block 0 () in
          cont done ($camlData_flow_bug))

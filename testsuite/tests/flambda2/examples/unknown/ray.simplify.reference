@@ -10,8 +10,8 @@ let code inline(always) loopify(never) size(14) newer_version_of(min_0)
   let prim_1 = %unbox_num.`float` (x) in
   let prim_2 = %float_comp.le (prim_1, prim) in
   switch prim_2
-    | 0 -> k (y)
-    | 1 -> k (x)
+    | 0 -> k close[normal] my_alloc_region (y)
+    | 1 -> k close[normal] my_alloc_region (x)
 in
 let $camlRay__min_4 = closure min_0_1 @min &toplevel.alloc_region in
 let code inline(always) loopify(never) size(14) newer_version_of(max_1)
@@ -23,8 +23,8 @@ let code inline(always) loopify(never) size(14) newer_version_of(max_1)
   let prim_1 = %unbox_num.`float` (x) in
   let prim_2 = %float_comp.ge (prim_1, prim) in
   switch prim_2
-    | 0 -> k (y)
-    | 1 -> k (x)
+    | 0 -> k close[normal] my_alloc_region (y)
+    | 1 -> k close[normal] my_alloc_region (x)
 in
 let $camlRay__max_5 = closure max_1_1 @max &toplevel.alloc_region in
 let code loopify(never) size(222) newer_version_of(aabb_hit_2)
@@ -74,7 +74,7 @@ let code loopify(never) size(222) newer_version_of(aabb_hit_2)
            let prim_9 = %float_comp.le (unboxed_float_1, unboxed_float) in
            (switch prim_9
               | 0 -> k2
-              | 1 -> k (0)
+              | 1 -> k close[normal] my_alloc_region (0)
               where k2 =
                 let prim_10 = %block_load.`float`.[`1`] (Pfield) in
                 let prim_11 = %block_load.`float`.[`1`] (Pfield_1) in
@@ -117,7 +117,7 @@ let code loopify(never) size(222) newer_version_of(aabb_hit_2)
                           in
                           (switch prim_19
                              | 0 -> k2
-                             | 1 -> k (0)
+                             | 1 -> k close[normal] my_alloc_region (0)
                              where k2 =
                                let prim_20 =
                                  %block_load.`float`.[`2`] (Pfield)
@@ -193,11 +193,14 @@ let code loopify(never) size(222) newer_version_of(aabb_hit_2)
                                            %boolean_not
                                              (float_ordered_and_lessequal)
                                          in
-                                         cont k (Pnot))))))))
+                                         cont k
+                                                close[normal] my_alloc_region
+                                                (Pnot))))))))
 in
 let $camlRay__aabb_hit_6 =
   closure aabb_hit_2_1 @aabb_hit &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlRay =
   Block 0 ($camlRay__min_4, $camlRay__max_5, $camlRay__aabb_hit_6)
 in

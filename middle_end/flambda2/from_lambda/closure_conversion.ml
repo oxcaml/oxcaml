@@ -431,7 +431,7 @@ module Inlining = struct
   let make_inlined_body acc ~callee ~called_code_id ~region_inlined_into ~params
       ~args ~my_closure ~my_alloc_mode ~my_depth ~body ~free_names_of_body
       ~exn_continuation ~return_continuation ~apply_exn_continuation
-      ~apply_return_continuation ~apply_depth ~apply_dbg =
+      ~apply_return_continuation ~apply_depth ~apply_dbg ~alloc_checks =
     let my_depth_duid = Flambda_debug_uid.none in
     let my_closure_duid = Flambda_debug_uid.none in
     let rec_info =
@@ -456,6 +456,19 @@ module Inlining = struct
         (Named.create_rec_info rec_info)
         ~body
     in
+    let bind_alloc_region ~my_alloc_region ~alloc_region ~alloc_checks
+        ~body:(acc, body) =
+      let alloc_checks =
+        P.alloc_region_checks_with_action alloc_checks ~action:P.Transfer
+      in
+      Let_with_acc.create acc
+        (Bound_pattern.singleton
+           (VB.create my_alloc_region Flambda_debug_uid.none Name_mode.normal))
+        (Named.create_prim
+           (P.Unary (New_alloc_region alloc_checks, Simple.var alloc_region))
+           apply_dbg)
+        ~body
+    in
     let apply_renaming (acc, body) renaming =
       let acc =
         Acc.with_free_names
@@ -470,7 +483,8 @@ module Inlining = struct
         ~my_closure:(my_closure, my_closure_duid)
         ~my_alloc_mode ~my_depth ~rec_info ~body:(acc, body) ~exn_continuation
         ~return_continuation ~apply_exn_continuation ~apply_return_continuation
-        ~bind_params ~bind_depth ~apply_renaming
+        ~alloc_checks ~bind_params ~bind_depth ~bind_alloc_region
+        ~apply_renaming
     in
     let inlined_debuginfo =
       Inlined_debuginfo.create ~called_code_id ~apply_dbg
@@ -545,6 +559,7 @@ module Inlining = struct
             ~params:(Bound_parameters.vars_and_uids params)
             ~args ~my_closure ~my_alloc_mode ~my_depth ~body ~free_names_of_body
             ~exn_continuation ~return_continuation ~apply_depth ~apply_dbg
+            ~alloc_checks:(Apply.alloc_checks apply)
         in
         let acc = Acc.with_free_names Name_occurrences.empty acc in
         let acc = Acc.increment_metrics cost_metrics acc in
@@ -724,6 +739,58 @@ let unarize_extern_repr ~machine_width alloc_mode
         return_transformer = Some P.Tag_immediate
       } ]
 
+let normal_check_actions acc continuation =
+  let _, return_continuation, _ = Acc.current_alloc_exit_context acc in
+  if Continuation.equal continuation return_continuation
+  then [Acc.close_alloc_region_action acc ~exit:Normal]
+  else []
+
+let alloc_checks_for_continuations acc ~continuation ~exn_handler =
+  let _, return_continuation, function_exn_continuation =
+    Acc.current_alloc_exit_context acc
+  in
+  let close_if condition =
+    if condition then Alloc_checks.Close else Alloc_checks.Forward
+  in
+  let normal = close_if (Continuation.equal continuation return_continuation) in
+  let exn =
+    close_if (Continuation.equal exn_handler function_exn_continuation)
+  in
+  Alloc_checks.{ normal; exn; notrace = exn; div = Close }
+
+let alloc_checks_for_apply acc ~continuation
+    (exn_continuation : IR.exn_continuation) =
+  alloc_checks_for_continuations acc ~continuation
+    ~exn_handler:exn_continuation.exn_handler
+
+let close_new_alloc_region acc env ~alloc_region ~actions ~normal_continuation
+    ~exn_continuation ~body =
+  let parent_region, _, _ = Acc.current_alloc_exit_context acc in
+  let alloc_checks =
+    P.alloc_region_checks_with_actions
+      (alloc_checks_for_continuations acc ~continuation:normal_continuation
+         ~exn_handler:exn_continuation)
+      ~actions
+  in
+  let env, alloc_region_var =
+    Env.add_var_like env alloc_region Not_user_visible K.With_subkind.region
+  in
+  let acc =
+    Acc.push_alloc_region acc ~alloc_region:alloc_region_var
+      ~normal_continuation ~exn_continuation
+  in
+  let acc, body = body acc env in
+  let acc = Acc.pop_alloc_region acc ~alloc_region:alloc_region_var in
+  (* [alloc_regions] never correspond to runtime code, so no debug uids or
+     debuginfo are needed. *)
+  Let_with_acc.create acc
+    (Bound_pattern.singleton
+       (VB.create alloc_region_var Flambda_debug_uid.none Name_mode.normal))
+    (Named.create_prim
+       (P.Unary (New_alloc_region alloc_checks, Simple.var parent_region))
+       Debuginfo.none)
+    ~body
+
 let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
     (({ prim_name;
         prim_arity;
@@ -807,7 +874,7 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
       (fun { return_transformer; _ } -> Option.is_some return_transformer)
       unarized_results
   in
-  let return_continuation, needs_wrapper =
+  let return_continuation, return_check_actions, needs_wrapper =
     match Expr.descr body with
     | Apply_cont apply_cont
       when Simple.List.equal
@@ -815,8 +882,9 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
              (Simple.vars (List.map fst let_bound_vars))
            && Option.is_none (Apply_cont_expr.trap_action apply_cont)
            && not need_return_transformer ->
-      Apply_cont_expr.continuation apply_cont, false
-    | _ -> Continuation.create (), true
+      let check_actions = Apply_cont_expr.check_actions apply_cont in
+      Apply_cont_expr.continuation apply_cont, check_actions, false
+    | _ -> Continuation.create (), [], true
   in
   (* Unlike for OCaml function calls, we don't preserve unboxed product arity
      information here, as there is no partial application etc. *)
@@ -863,6 +931,7 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
             let bindable = Bound_pattern.singleton result' in
             let acc, return_result =
               Apply_cont_with_acc.create acc return_continuation
+                ~check_actions:return_check_actions
                 ~args:[Simple.var result]
                 ~dbg
             in
@@ -892,10 +961,34 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
     | _ ->
       let callee = Simple.symbol call_symbol in
       let apply =
+        (* [normal_check_actions] should produce the exact same check_actions as
+           [return_check_actions] (which were taken from the return [Apply_cont]
+           of the body, when there is one). *)
+        (let expected_check_actions =
+           normal_check_actions acc return_continuation
+         in
+         if
+           not
+             (Misc.Stdlib.List.equal Check_action.equal return_check_actions
+                expected_check_actions)
+         then
+           Misc.fatal_errorf
+             "Check actions on the return [Apply_cont] of the C call to %s@ \
+              (%a)@ do not match those implied by the current allocation \
+              region context@ (%a)"
+             prim_name
+             (Format.pp_print_list Check_action.print)
+             return_check_actions
+             (Format.pp_print_list Check_action.print)
+             expected_check_actions);
+        let alloc_checks =
+          alloc_checks_for_continuations acc ~continuation:return_continuation
+            ~exn_handler:(Exn_continuation.exn_handler exn_continuation)
+        in
         Apply.create ~callee:(Some callee)
           ~continuation:(Return return_continuation) exn_continuation ~args
           ~args_arity:param_arity ~return_arity ~call_kind
-          ~return_mode:alloc_mode_app dbg ~inlined:Default_inlined
+          ~return_mode:alloc_mode_app ~alloc_checks dbg ~inlined:Default_inlined
           ~inlining_state:(Inlining_state.default ~round:0)
           ~probe:None ~position:Normal
           ~relative_history:(Env.relative_history_from_scoped ~loc env)
@@ -1069,6 +1162,7 @@ let close_exn_continuation acc env (exn_continuation : IR.exn_continuation) =
 let close_raise0 acc env ~raise_kind ~arg ~dbg exn_continuation =
   let acc, exn_cont = close_exn_continuation acc env exn_continuation in
   let exn_handler = Exn_continuation.exn_handler exn_cont in
+  let check_actions = Acc.raise_check_actions acc ~raise_kind exn_handler in
   let args =
     (* CR mshinwell: Share with [Lambda_to_flambda_primitives_helpers] *)
     let extra_args =
@@ -1081,7 +1175,8 @@ let close_raise0 acc env ~raise_kind ~arg ~dbg exn_continuation =
   let raise_kind = Some (Trap_action.Raise_kind.from_lambda raise_kind) in
   let trap_action = Trap_action.Pop { exn_handler; raise_kind } in
   let acc, apply_cont =
-    Apply_cont_with_acc.create acc ~trap_action exn_handler ~args ~dbg
+    Apply_cont_with_acc.create acc ~trap_action ~check_actions exn_handler ~args
+      ~dbg
   in
   (* Since raising of an exception doesn't terminate, we don't call [k]. *)
   Expr_with_acc.create_apply_cont acc apply_cont
@@ -1125,6 +1220,10 @@ let close_effect_primitive acc env ~dbg exn_continuation
   in
   let close call_kind =
     let apply acc =
+      let alloc_checks =
+        alloc_checks_for_continuations acc ~continuation
+          ~exn_handler:(Exn_continuation.exn_handler exn_continuation)
+      in
       Apply_expr.create ~callee:None ~continuation:(Return continuation)
         exn_continuation ~args:[] ~args_arity:Flambda_arity.nullary
         ~return_arity:
@@ -1134,7 +1233,7 @@ let close_effect_primitive acc env ~dbg exn_continuation
         ~return_mode:
           (Alloc_mode.For_applications.not_alloc_stack
              ~alloc_region:current_alloc_region)
-        dbg ~inlined:Never_inlined
+        ~alloc_checks dbg ~inlined:Never_inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal
         ~relative_history:Inlining_history.Relative.empty
@@ -1872,6 +1971,9 @@ let close_exact_or_unknown_apply acc env
     close_exn_continuation acc env exn_continuation
   in
   let acc, args = find_simples acc env args in
+  let alloc_checks =
+    alloc_checks_for_apply acc ~continuation exn_continuation
+  in
   let inlined_call = Inlined_attribute.from_lambda inlined in
   let probe = Probe.from_lambda probe in
   let position =
@@ -1883,7 +1985,7 @@ let close_exact_or_unknown_apply acc env
     Apply.create
       ~callee:(if can_erase_callee then None else Some callee)
       ~continuation:(Return continuation) apply_exn_continuation ~args
-      ~args_arity ~return_arity ~call_kind ~return_mode:mode dbg
+      ~args_arity ~return_arity ~call_kind ~return_mode:mode ~alloc_checks dbg
       ~inlined:inlined_call
       ~inlining_state:(Inlining_state.default ~round:0)
       ~probe ~position
@@ -1922,9 +2024,11 @@ let close_exact_or_unknown_apply acc env
 let close_apply_cont acc env ~dbg cont trap_action args : Expr_with_acc.t =
   let acc, args = find_simples acc env args in
   let trap_action = close_trap_action_opt trap_action in
+  let check_actions = normal_check_actions acc cont in
   let args_approx = List.map (find_value_approximation env) args in
   let acc, apply_cont =
-    Apply_cont_with_acc.create acc ?trap_action ~args_approx cont ~args ~dbg
+    Apply_cont_with_acc.create acc ?trap_action ~check_actions ~args_approx cont
+      ~args ~dbg
   in
   Expr_with_acc.create_apply_cont acc apply_cont
 
@@ -1952,11 +2056,12 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
     List.fold_left_map
       (fun acc (case, cont, dbg, trap_action, args) ->
         let trap_action = close_trap_action_opt trap_action in
+        let check_actions = normal_check_actions acc cont in
         let acc, args = find_simples acc env args in
         let args_approx = List.map (find_value_approximation env) args in
         let action acc =
-          Apply_cont_with_acc.create acc ?trap_action ~args_approx cont ~args
-            ~dbg
+          Apply_cont_with_acc.create acc ?trap_action ~check_actions
+            ~args_approx cont ~args ~dbg
         in
         acc, (Target_ocaml_int.of_int (Acc.machine_width acc) case, action))
       acc sw.consts
@@ -1985,7 +2090,9 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
     let acc, default_action =
       let acc, args = find_simples acc env default_args in
       let trap_action = close_trap_action_opt default_trap_action in
-      Apply_cont_with_acc.create acc ?trap_action default_action ~args ~dbg
+      let check_actions = normal_check_actions acc default_action in
+      Apply_cont_with_acc.create acc ?trap_action ~check_actions default_action
+        ~args ~dbg
     in
     let acc, switch =
       let scrutinee = Simple.var comparison_result in
@@ -2008,6 +2115,7 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
       match sw.failaction with
       | None -> acc, Target_ocaml_int.Map.of_list arms
       | Some (default, dbg, trap_action, args) ->
+        let check_actions = normal_check_actions acc default in
         Numeric_types.Int.Set.fold
           (fun case (acc, cases) ->
             let case = Target_ocaml_int.of_int (Acc.machine_width acc) case in
@@ -2017,7 +2125,8 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
               let acc, args = find_simples acc env args in
               let trap_action = close_trap_action_opt trap_action in
               let default acc =
-                Apply_cont_with_acc.create acc ?trap_action default ~args ~dbg
+                Apply_cont_with_acc.create acc ?trap_action ~check_actions
+                  default ~args ~dbg
               in
               acc, Target_ocaml_int.Map.add case default cases)
           (Numeric_types.Int.zero_to_n (sw.numconsts - 1))
@@ -2213,6 +2322,9 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
       let acc, body = body acc in
       acc, body, return, return_continuation
     | Some (k, _) ->
+      (* CR ncourant: this closes the alloc_region earlier than we would like:
+         we close it at the normal return of the function, instead of after the
+         unboxing primitives at the end. *)
       let vars_with_kinds = variables_for_unboxing "result" k in
       let unboxed_return_continuation =
         Continuation.create ~sort:Return ~name:"unboxed_return" ()
@@ -2385,7 +2497,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
              (fun kind -> Flambda_arity.Component_for_creation.Singleton kind)
              args_arity) ]
   in
-  let make_body cont =
+  let make_body ~is_tail cont =
     let main_application =
       Apply_expr.create
         ~callee:(Some (Simple.var main_closure))
@@ -2398,6 +2510,12 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
              (Function_decl.result_mode decl)
              ~current_alloc_region:my_alloc_region ~current_region:my_region
              ~current_ghost_region:my_ghost_region)
+        ~alloc_checks:
+          { normal = (if is_tail then Close else Forward);
+            exn = Close;
+            notrace = Close;
+            div = Close
+          }
         Debuginfo.none ~inlined:Inlined_attribute.Default_inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal
@@ -2431,7 +2549,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
   in
   let make_return_wrapper box_result =
     let cont = Continuation.create () in
-    let body, free_names_of_body = make_body cont in
+    let body, free_names_of_body = make_body ~is_tail:false cont in
     let handler, free_names_of_handler =
       let unboxed_returns =
         Bound_parameters.create
@@ -2450,6 +2568,9 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
         let boxed_return_duid = Flambda_debug_uid.none in
         let return_apply_cont =
           Apply_cont.create return_continuation
+            ~check_actions:
+              [ Check_action.Close_alloc_region
+                  { region = my_alloc_region; exit = Normal } ]
             ~args:[Simple.var boxed_return]
             ~dbg:Debuginfo.none
         in
@@ -2491,7 +2612,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
   in
   let body, free_names_of_body =
     match unboxed_return with
-    | None -> make_body return_continuation
+    | None -> make_body ~is_tail:true return_continuation
     | Some (k, alloc_mode) ->
       let alloc_mode =
         Alloc_mode.For_allocations.from_lambda alloc_mode
@@ -2606,10 +2727,6 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     | Recursive, [_] -> true
     | Recursive, ([] | _ :: _ :: _) -> false
     | Non_recursive, _ -> false
-  in
-  let acc =
-    Acc.push_closure_info acc ~return_continuation ~exn_continuation ~my_closure
-      ~is_purely_tailrec:is_single_recursive_function ~code_id
   in
   let my_alloc_region = Function_decl.my_alloc_region decl in
   let my_region = Function_decl.my_region decl in
@@ -2744,6 +2861,11 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         Some ghost_region,
         Alloc_mode.For_applications.maybe_alloc_stack ~alloc_region ~region
           ~ghost_region )
+  in
+  let acc =
+    Acc.push_closure_info acc ~return_continuation ~exn_continuation ~my_closure
+      ~my_alloc_region:alloc_region
+      ~is_purely_tailrec:is_single_recursive_function ~code_id
   in
   let closure_env = Env.with_depth closure_env my_depth in
   let closure_env, absolute_history, relative_history =
@@ -3523,8 +3645,9 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     in
     let body acc env =
       let arg = find_simple_from_id env wrapper_id in
+      let check_actions = normal_check_actions acc apply_continuation in
       let acc, apply_cont =
-        Apply_cont_with_acc.create acc
+        Apply_cont_with_acc.create acc ~check_actions
           ~args_approx:[find_value_approximation env arg]
           apply_continuation ~args:[arg] ~dbg:Debuginfo.none
       in
@@ -3545,6 +3668,10 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
   in
   let acc, remaining = find_simples acc env remaining in
   let apply_dbg = Debuginfo.from_location apply.loc in
+  let original_alloc_checks =
+    alloc_checks_for_apply acc ~continuation:apply.continuation
+      apply.exn_continuation
+  in
   let needs_region =
     match
       (apply.mode : Lambda.return_mode), (result_mode : Lambda.return_mode)
@@ -3589,13 +3716,21 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
       | None -> apply_return_continuation
       | Some (_, _, cont) -> Apply.Result_continuation.Return cont
     in
+    let alloc_checks =
+      match original_alloc_checks.normal with
+      | Forward -> original_alloc_checks
+      | Close ->
+        if Option.is_some needs_region
+        then { original_alloc_checks with normal = Alloc_checks.Forward }
+        else original_alloc_checks
+    in
     let over_application =
       Apply.create
         ~callee:(Some (Simple.var returned_func))
         ~continuation apply_exn_continuation ~args:remaining
         ~args_arity:remaining_arity ~return_arity:apply.return_arity
         ~call_kind:Call_kind.indirect_function_call_unknown_arity ~return_mode
-        apply_dbg ~inlined
+        ~alloc_checks apply_dbg ~inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe ~position
         ~relative_history:(Env.relative_history_from_scoped ~loc:apply.loc env)
@@ -3618,7 +3753,8 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
       let handler acc =
         let acc, call_return_continuation =
           let acc, apply_cont_expr =
-            Apply_cont_with_acc.create acc apply.continuation
+            let check_actions = normal_check_actions acc apply.continuation in
+            Apply_cont_with_acc.create acc apply.continuation ~check_actions
               ~args:(List.map BP.simple over_application_results)
               ~dbg:apply_dbg
           in
@@ -4123,7 +4259,11 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     Env.add_var_like env toplevel_my_alloc_region Not_user_visible
       Flambda_kind.With_subkind.region
   in
-  let acc = Acc.create ~cmx_loader ~machine_width in
+  let acc =
+    Acc.create ~cmx_loader ~machine_width
+      ~toplevel_return_continuation:prog_return_cont
+      ~toplevel_exn_continuation:exn_continuation ~toplevel_my_alloc_region
+  in
   let acc, body =
     wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
       ~return_cont ~module_symbol

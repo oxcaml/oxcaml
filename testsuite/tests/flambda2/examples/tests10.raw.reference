@@ -10,11 +10,11 @@ let $camlTests10__first_const = Block 0 () in
        (my_closure ~ depth my_depth -> next_depth,
         my_closure ~ depth my_depth -> next_depth)
    in
-   cont k1 (Pmakeblock)
+   cont k1 close[normal] my_alloc_region (Pmakeblock)
  in
  let f = closure f_0 @f &toplevel.alloc_region in
  let Pmakeblock = %block.[`0`].`toplevel` (f) in
- cont k (Pmakeblock))
+ cont k close[normal] toplevel.alloc_region (Pmakeblock))
   where k define_root_symbol (module_block) =
     let field_0 = %block_load.tag[`0`].`size`[`1`].[`0`] (module_block) in
     let $camlTests10 = Block 0 (field_0) in

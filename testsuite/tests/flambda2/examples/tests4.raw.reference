@@ -35,7 +35,7 @@
        let prim_3 = %unbox_num.`float` (float_of_int) in
        let prim_4 = %bfloat_arith.sub (prim_3, prim_2) in
        let float_sub = %box_num.`float`.my_alloc_region (prim_4) in
-       cont k1 (float_sub)
+       cont k1 close[normal] my_alloc_region (float_sub)
  in
  let code size(54)
        pr2162_2_1 (z : imm tagged, x : imm tagged, y : float boxed)
@@ -72,7 +72,7 @@
        let prim_3 = %unbox_num.`float` (float_of_int) in
        let prim_4 = %bfloat_arith.sub (prim_3, prim_2) in
        let float_sub = %box_num.`float`.my_alloc_region (prim_4) in
-       cont k1 (float_sub)
+       cont k1 close[normal] my_alloc_region (float_sub)
  in
  let code size(70)
        pr2162_3_2 (z : imm tagged, x : imm tagged, y : float boxed)
@@ -113,7 +113,7 @@
        let prim_3 = %unbox_num.`float` (float_of_int) in
        let prim_4 = %bfloat_arith.sub (prim_3, prim_2) in
        let float_sub = %box_num.`float`.my_alloc_region (prim_4) in
-       cont k1 (float_sub)
+       cont k1 close[normal] my_alloc_region (float_sub)
  in
  let $camlTests4__int64104 = 0L in
  let $camlTests4__int32110 = 2l in
@@ -181,7 +181,7 @@
        let int64_sub = %box_num.`int64`.my_alloc_region (prim_9) in
        let Pmakeblock = %block.[`0`].my_alloc_region (int64_sub, int32_sub)
        in
-       cont k1 (Pmakeblock)
+       cont k1 close[normal] my_alloc_region (Pmakeblock)
  in
  let pr2162_2_first =
    closure pr2162_2_first_0 @pr2162_2_first &toplevel.alloc_region
@@ -195,7 +195,7 @@
    %block.[`0`].`toplevel`
      (pr2162_2_first, pr2162_2, pr2162_3, pr2162_3_as_int64)
  in
- cont k (Pmakeblock))
+ cont k close[normal] toplevel.alloc_region (Pmakeblock))
   where k define_root_symbol (module_block) =
     let field_0 = %block_load.tag[`0`].`size`[`4`].[`0`] (module_block) in
     let field_1 = %block_load.tag[`0`].`size`[`4`].[`1`] (module_block) in

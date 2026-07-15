@@ -1307,6 +1307,12 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
     (* CR alloc_regions: propagate alloc_regions to CMM. *)
     let tag = Tag.to_int (P.Lazy_block_tag.to_tag lazy_tag) in
     None, res, C.make_alloc ~mode:Heap dbg ~tag [arg]
+  | Close_alloc_region _ ->
+    (* CR alloc_regions: propagate to CMM. *)
+    None, res, C.unit ~dbg
+  | New_alloc_region _ ->
+    (* CR alloc_regions: propagate to CMM. *)
+    None, res, C.unit ~dbg
 
 let binary_primitive env dbg f (_x_simple : Simple.t option)
     (_y_simple : Simple.t option) (x : Cmm.expression) (y : Cmm.expression) =

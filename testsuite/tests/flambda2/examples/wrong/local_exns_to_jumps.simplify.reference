@@ -4,7 +4,7 @@ let code f3_2 deleted in
 let code f4_3 deleted in
 let $camlLocal_exns_to_jumps__immstring147 = "Local_exns_to_jumps.Exit2" in
 let $camlLocal_exns_to_jumps__immstring7 = "Local_exns_to_jumps.Exit" in
-apply ccall noalloc
+apply ccall noalloc [forward close close close]
   ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
   where k (Pccall) =
     let $camlLocal_exns_to_jumps__Exit214 =
@@ -24,7 +24,7 @@ apply ccall noalloc
              where rec k3 (r_unboxed0 : imm tagged) =
                let prim = %int_comp.lt (r_unboxed0, 42) in
                (switch prim
-                  | 0 -> k pop(k2) (0)
+                  | 0 -> k pop(k2) close[normal] my_alloc_region (0)
                   | 1 -> k4
                   where k4 =
                     (apply &my_alloc_region g (r_unboxed0) -> k6 * k2
@@ -47,8 +47,8 @@ apply ccall noalloc
           let unit_1 = %end_try_ghost_region (try_ghost_region) in
           let prim = %phys_eq (`exn`, $camlLocal_exns_to_jumps__Exit214) in
           switch prim
-            | 0 -> k1 pop(reraise k1) (`exn`)
-            | 1 -> k (42)
+            | 0 -> k1 pop(reraise k1) close[exn] my_alloc_region (`exn`)
+            | 1 -> k close[normal] my_alloc_region (42)
     in
     let $camlLocal_exns_to_jumps__f1_4 =
       closure f1_0_1 @f1 &toplevel.alloc_region
@@ -64,7 +64,7 @@ apply ccall noalloc
         where rec k3 (r_unboxed0 : imm tagged) =
           let prim = %int_comp.lt (r_unboxed0, 42) in
           (switch prim
-             | 0 -> k (0)
+             | 0 -> k close[normal] my_alloc_region (0)
              | 1 -> k4
              where k4 =
                ((let try_region_1 = %begin_try_region () in
@@ -97,7 +97,7 @@ apply ccall noalloc
         where k2 =
           let `unit` = %end_try_region (try_region) in
           let unit_1 = %end_try_ghost_region (try_ghost_region) in
-          cont k (42)
+          cont k close[normal] my_alloc_region (42)
     in
     let $camlLocal_exns_to_jumps__f2_5 =
       closure f2_1_1 @f2 &toplevel.alloc_region
@@ -113,7 +113,7 @@ apply ccall noalloc
         where rec k3 (r_unboxed0 : imm tagged) =
           let prim = %int_comp.lt (r_unboxed0, 42) in
           (switch prim
-             | 0 -> k (0)
+             | 0 -> k close[normal] my_alloc_region (0)
              | 1 -> k4
              where k4 =
                ((let try_region_1 = %begin_try_region () in
@@ -146,12 +146,12 @@ apply ccall noalloc
         where k2 =
           let `unit` = %end_try_region (try_region) in
           let unit_1 = %end_try_ghost_region (try_ghost_region) in
-          cont k (42)
+          cont k close[normal] my_alloc_region (42)
     in
     let $camlLocal_exns_to_jumps__f3_6 =
       closure f3_2_1 @f3 &toplevel.alloc_region
     in
-    (apply ccall noalloc
+    (apply ccall noalloc [forward close close close]
        ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
        where k (Pccall_1) =
          let $camlLocal_exns_to_jumps__Exit2399 =
@@ -169,7 +169,7 @@ apply ccall noalloc
              where rec k3 (r_unboxed0 : imm tagged) =
                let prim = %int_comp.lt (r_unboxed0, 42) in
                (switch prim
-                  | 0 -> k (0)
+                  | 0 -> k close[normal] my_alloc_region (0)
                   | 1 -> k4
                   where k4 =
                     ((let try_region_1 = %begin_try_region () in
@@ -214,10 +214,12 @@ apply ccall noalloc
                let `unit` = %end_try_region (try_region) in
                let unit_1 = %end_try_ghost_region (try_ghost_region) in
                let int_add_2 = %int_barith.add (cse_param_1, cse_param) in
-               cont k (int_add_2)
+               cont k close[normal] my_alloc_region (int_add_2)
          in
          let $camlLocal_exns_to_jumps__f4_7 =
            closure f4_3_1 @f4 &toplevel.alloc_region
+         in
+         let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region)
          in
          let $camlLocal_exns_to_jumps =
            Block 0 ($camlLocal_exns_to_jumps__Exit214,

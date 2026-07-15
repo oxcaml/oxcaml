@@ -150,6 +150,7 @@ let rec simple env (s : Fexpr.simple) : Simple.t =
     | Some var -> Simple.var var)
   | Const c -> Simple.const (const c)
   | Symbol sym -> Simple.symbol (get_symbol env sym)
+  | Region r -> Simple.var (find_region env r)
   | Coerce (s, co) -> Simple.apply_coercion_exn (simple env s) (coercion env co)
 
 let field_of_block env (v : Fexpr.field_of_block) =
@@ -306,7 +307,8 @@ let set_of_closures env fun_decls value_slots =
   in
   Set_of_closures.create ~value_slots fun_decls
 
-let apply_cont env acc ({ cont; args; trap_action } : Fexpr.apply_cont) =
+let apply_cont env acc
+    ({ cont; args; trap_action; check_actions } : Fexpr.apply_cont) =
   let trap_action : Trap_action.t option =
     trap_action
     |> Option.map (fun (ta : Fexpr.trap_action) : Trap_action.t ->
@@ -329,7 +331,17 @@ let apply_cont env acc ({ cont; args; trap_action } : Fexpr.apply_cont) =
      in
      Misc.fatal_errorf "wrong continuation arity %s" cont_str);
   let args = List.map (simple env) args in
-  acc, Flambda.Apply_cont.create c ~args ~dbg:Debuginfo.none ?trap_action
+  let check_actions =
+    List.map
+      (fun (action : Fexpr.check_action) : Check_action.t ->
+        match action with
+        | Close_alloc_region { exit; region } ->
+          Close_alloc_region { exit; region = find_region env region })
+      check_actions
+  in
+  ( acc,
+    Flambda.Apply_cont.create c ~args ~dbg:Debuginfo.none ?trap_action
+      ~check_actions )
 
 let continuation_sort (sort : Fexpr.continuation_sort) : Continuation.Sort.t =
   match sort with
@@ -840,6 +852,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
       { func;
         call_kind;
         alloc_mode;
+        alloc_checks;
         inlined;
         inlining_state;
         continuation;
@@ -945,8 +958,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         ~callee:(Option.map (simple env) func)
         ~continuation exn_continuation
         ~args:((List.map (simple env)) args)
-        ~args_arity ~return_arity ~call_kind ~return_mode Debuginfo.none
-        ~inlined ~inlining_state ~probe:None ~position:Normal
+        ~args_arity ~return_arity ~call_kind ~return_mode ~alloc_checks
+        Debuginfo.none ~inlined ~inlining_state ~probe:None ~position:Normal
         ~relative_history:Inlining_history.Relative.empty
     in
     acc, Flambda.Expr.create_apply apply

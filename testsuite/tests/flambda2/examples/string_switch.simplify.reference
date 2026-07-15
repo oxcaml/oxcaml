@@ -16,37 +16,38 @@ let code loopify(never) size(60) newer_version_of(of_string_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  apply ccall noalloc
+  apply ccall noalloc [forward close close close]
     ($`*extern*`.caml_string_notequal : val * val -> val)
       (str, $camlString_switch__immstring11)
       -> k2 * k1
     where k2 (Pccall) =
       ((let untagged = %untag_imm (Pccall) in
         switch untagged
-          | 0 -> k (1)
+          | 0 -> k close[normal] my_alloc_region (1)
           | 1 -> k2)
          where k2 =
-           (apply ccall noalloc
+           (apply ccall noalloc [forward close close close]
               ($`*extern*`.caml_string_notequal : val * val -> val)
                 (str, $camlString_switch__immstring16)
                 -> k2 * k1
               where k2 (Pccall_1) =
                 ((let untagged = %untag_imm (Pccall_1) in
                   switch untagged
-                    | 0 -> k (2)
+                    | 0 -> k close[normal] my_alloc_region (2)
                     | 1 -> k2)
                    where k2 =
-                     (apply ccall noalloc
+                     (apply ccall noalloc [forward close close close]
                         ($`*extern*`.caml_string_notequal : val * val -> val)
                           (str, $camlString_switch__immstring21)
                           -> k2 * k1
                         where k2 (Pccall_2) =
                           ((let untagged = %untag_imm (Pccall_2) in
                             switch untagged
-                              | 0 -> k (3)
+                              | 0 -> k close[normal] my_alloc_region (3)
                               | 1 -> k2)
                              where k2 =
                                (apply ccall noalloc
+                                       [forward close close close]
                                   ($`*extern*`.caml_string_notequal
                                    : val * val -> val)
                                     (str, $camlString_switch__immstring26)
@@ -54,14 +55,17 @@ let code loopify(never) size(60) newer_version_of(of_string_0)
                                   where k2 (Pccall_3) =
                                     let untagged = %untag_imm (Pccall_3) in
                                     switch untagged
-                                      | 0 -> k (0)
+                                      | 0 ->
+                                        k close[normal] my_alloc_region (0)
                                       | 1 ->
                                         k1
                                           pop(regular k1)
+                                          close[exn] my_alloc_region
                                           ($camlString_switch__Pmakeblock37)))))))
 in
 let $camlString_switch__of_string_1 =
   closure of_string_0_1 @of_string &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlString_switch = Block 0 ($camlString_switch__of_string_1) in
 cont done ($camlString_switch)

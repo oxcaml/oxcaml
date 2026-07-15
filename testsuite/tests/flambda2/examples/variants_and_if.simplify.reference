@@ -1,6 +1,6 @@
 let code f_0 deleted in
 let $camlVariants_and_if__immstring7 = "Variants_and_if.Foo" in
-apply ccall noalloc
+apply ccall noalloc [forward close close close]
   ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
   where k (Pccall) =
     let $camlVariants_and_if__Foo30 =
@@ -20,15 +20,20 @@ apply ccall noalloc
           let prim = %is_int (t) in
           switch prim
             | 0 -> k2
-            | 1 -> k1 pop(regular k1) ($camlVariants_and_if__Foo30)
+            | 1 ->
+              k1
+                pop(regular k1)
+                close[exn] my_alloc_region
+                ($camlVariants_and_if__Foo30)
         where k2 =
           let prim = %is_int (t) in
           switch prim
-            | 0 -> k (2)
-            | 1 -> k (1)
+            | 0 -> k close[normal] my_alloc_region (2)
+            | 1 -> k close[normal] my_alloc_region (1)
     in
     let $camlVariants_and_if__f_1 = closure f_0_1 @f &toplevel.alloc_region
     in
+    let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
     let $camlVariants_and_if =
       Block 0 ($camlVariants_and_if__Foo30, $camlVariants_and_if__f_1)
     in

@@ -1,3 +1,4 @@
 let $camlFob__infinity17 = infinity in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlFob = Block 0 ($camlFob__infinity17) in
 cont done ($camlFob)

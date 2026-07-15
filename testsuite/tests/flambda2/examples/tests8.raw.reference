@@ -5,7 +5,7 @@ let $camlTests8__first_const = Block 0 () in
          -> k1 * k2
          : [ 0 | 0 of val * val ] =
    let next_depth = rec_info (succ my_depth) in
-   cont k1 (0)
+   cont k1 close[normal] my_alloc_region (0)
  in
  let code size(1)
        `fn[tests8.ml:20,49--61]_3` (x : val)
@@ -13,7 +13,7 @@ let $camlTests8__first_const = Block 0 () in
          -> k1 * k2
          : val =
    let next_depth = rec_info (succ my_depth) in
-   cont k1 (x)
+   cont k1 close[normal] my_alloc_region (x)
  in
  let code size(21)
        `fn[tests8.ml:20,12--80]_1` (param : imm tagged)
@@ -34,6 +34,7 @@ let $camlTests8__first_const = Block 0 () in
        &my_alloc_region
    in
    apply direct(map_foo_0 &my_alloc_region) inlined(never)
+          [close close close close]
      (map_foo : _ -> [ 0 | 0 of val * val ])
        (`fn[tests8.ml:20,49--61]`, `fn[tests8.ml:20,62--77]`, 0)
        -> k1 * k2
@@ -43,14 +44,14 @@ let $camlTests8__first_const = Block 0 () in
          -> k1 * k2
          : [ 0 | 0 of val * val ] =
    let next_depth = rec_info (succ my_depth) in
-   apply &my_alloc_region seq (0) -> k3 * k2
+   apply &my_alloc_region [forward close close close] seq (0) -> k3 * k2
      where k3 (`*match*` : [ 0 | 0 of val * val ]) =
        ((let prim = %is_int (`*match*`) in
          let Pisint = %tag_imm (prim) in
          (let untagged = %untag_imm (Pisint) in
           switch untagged
             | 0 -> k4
-            | 1 -> k1 (0))
+            | 1 -> k1 close[normal] my_alloc_region (0))
            where k4 =
              cont k3)
           where k3 =
@@ -60,17 +61,18 @@ let $camlTests8__first_const = Block 0 () in
             with { my_closure = my_closure ~ depth my_depth -> next_depth }
             in
             ((let Pfield = %block_load.[`0`] (`*match*`) in
-              apply &my_alloc_region f (Pfield) -> k3 * k2)
+              apply &my_alloc_region [forward close close close]
+                f (Pfield) -> k3 * k2)
                where k3 (apply_result : val) =
                  let Pmakeblock =
                    %block.[`0`].my_alloc_region
                      (apply_result, `fn[tests8.ml:20,12--80]`)
                  in
-                 cont k1 (Pmakeblock)))
+                 cont k1 close[normal] my_alloc_region (Pmakeblock)))
  in
  let map_foo = closure map_foo_0 @map_foo &toplevel.alloc_region in
  let Pmakeblock = %block.[`0`].`toplevel` (map_foo) in
- cont k (Pmakeblock))
+ cont k close[normal] toplevel.alloc_region (Pmakeblock))
   where k define_root_symbol (module_block) =
     let field_0 = %block_load.tag[`0`].`size`[`1`].[`0`] (module_block) in
     let $camlTests8 = Block 0 (field_0) in

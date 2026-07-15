@@ -26,7 +26,7 @@ let code loopify(never) size(34) newer_version_of(pr2162_2_first_0)
       let prim = %num_conv.[`imm`].[`float`] (naked_immediate) in
       let prim_1 = %bfloat_arith.sub (prim, unboxed_float) in
       let float_sub = %box_num.`float`.my_alloc_region (prim_1) in
-      cont k (float_sub)
+      cont k close[normal] my_alloc_region (float_sub)
 in
 let $camlTests4__pr2162_2_first_4 =
   closure pr2162_2_first_0_1 @pr2162_2_first &toplevel.alloc_region
@@ -55,7 +55,7 @@ let code loopify(never) size(34) newer_version_of(pr2162_2_1)
       let prim = %num_conv.[`imm`].[`float`] (naked_immediate) in
       let prim_1 = %bfloat_arith.sub (prim, unboxed_float) in
       let float_sub = %box_num.`float`.my_alloc_region (prim_1) in
-      cont k (float_sub)
+      cont k close[normal] my_alloc_region (float_sub)
 in
 let $camlTests4__pr2162_2_5 =
   closure pr2162_2_1_1 @pr2162_2 &toplevel.alloc_region
@@ -84,7 +84,7 @@ let code loopify(never) size(34) newer_version_of(pr2162_3_2)
       let prim = %num_conv.[`imm`].[`float`] (naked_immediate) in
       let prim_1 = %bfloat_arith.sub (prim, unboxed_float) in
       let float_sub = %box_num.`float`.my_alloc_region (prim_1) in
-      cont k (float_sub)
+      cont k close[normal] my_alloc_region (float_sub)
 in
 let $camlTests4__pr2162_3_6 =
   closure pr2162_3_2_1 @pr2162_3 &toplevel.alloc_region
@@ -122,11 +122,12 @@ let code loopify(never) size(49) newer_version_of(pr2162_3_as_int64_3)
       let prim_3 = %int_barith.`int64`.sub (prim_2, unboxed_int64) in
       let int64_sub = %box_num.`int64`.my_alloc_region (prim_3) in
       let Pmakeblock = %block.[`0`].my_alloc_region (int64_sub, int32_sub) in
-      cont k (Pmakeblock)
+      cont k close[normal] my_alloc_region (Pmakeblock)
 in
 let $camlTests4__pr2162_3_as_int64_7 =
   closure pr2162_3_as_int64_3_1 @pr2162_3_as_int64 &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTests4 =
   Block 0 ($camlTests4__pr2162_2_first_4,
            $camlTests4__pr2162_2_5,

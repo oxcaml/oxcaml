@@ -4,7 +4,7 @@ let $camlBigarrays__block24 =
 in
 (let `region` = %begin_region () in
  (let Pmakearray = %array.`imm`.mut.`toplevel`.local[`region`] (3, 3) in
-  apply ccall inlining_state(depth(10))
+  apply ccall inlining_state(depth(10)) [forward close close close]
     ($`*extern*`.caml_ba_create : val * val * val -> val)
       (8, 0, Pmakearray)
       -> k1 * error)
@@ -36,6 +36,7 @@ in
                    ($Stdlib.camlStdlib__print_int_136)
                in
                (apply ccall inlining_state(depth(20))
+                       [forward close close close]
                   ($`*extern*`.caml_format_int : val * val -> val)
                     ($Stdlib.camlStdlib__immstring204, i)
                     -> k2 * error
@@ -43,6 +44,7 @@ in
                     let prim_4 = %string_length (apply_result) in
                     let Pstringlength = %tag_imm (prim_4) in
                     (apply ccall inlining_state(depth(20))
+                            [forward close close close]
                        ($`*extern*`.caml_ml_output
                         : val * val * val * val -> val)
                          (stdout, apply_result, 0, Pstringlength)
@@ -50,7 +52,11 @@ in
                        where k2 (param) =
                          cont k)))
         where k1 =
-          cont error pop(regular error) ($camlBigarrays__block24)))
+          cont error
+                 pop(regular error)
+                 close[exn] toplevel.alloc_region
+                 ($camlBigarrays__block24)))
   where k =
+    let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
     let $camlBigarrays = Block 0 () in
     cont done ($camlBigarrays)

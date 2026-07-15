@@ -826,11 +826,14 @@ let reaper_produce_invalid_when_never_returns =
   Sys.getenv_opt "REAPER_INVALIDS" <> None
 
 let make_apply_wrapper env
-    (make_apply : continuation:Apply_expr.Result_continuation.t -> Apply_expr.t)
-    apply_continuation return_decisions =
+    (make_apply :
+      continuation:Apply_expr.Result_continuation.t ->
+      alloc_checks:Alloc_checks.t ->
+      Apply_expr.t) apply_continuation (alloc_checks : Alloc_checks.t)
+    return_decisions =
   match (apply_continuation : Apply_expr.Result_continuation.t) with
   | Never_returns ->
-    let apply = make_apply ~continuation:Never_returns in
+    let apply = make_apply ~continuation:Never_returns ~alloc_checks in
     RE.from_expr ~expr:(Expr.create_apply apply)
       ~free_names:(Apply.free_names apply) ~code_size:(Code_size.apply apply)
   | Return return_cont -> (
@@ -838,8 +841,6 @@ let make_apply_wrapper env
     let apply_decisions =
       Continuation.Map.find return_cont env.cont_params_to_keep
     in
-    let return_cont_wrapper = Continuation.rename return_cont in
-    let apply = make_apply ~continuation:(Return return_cont_wrapper) in
     let rev_args_or_invalid =
       List.fold_left2
         (fun (rev_args_or_invalid : _ Or_invalid.t) apply_decision func_decision
@@ -853,7 +854,8 @@ let make_apply_wrapper env
                 Misc.fatal_errorf
                   "Inconsistent apply (%a) and func (%a) decisions:@ %a@."
                   print_param_decision apply_decision print_param_decision
-                  func_decision Apply.print apply
+                  func_decision Apply.print
+                  (make_apply ~continuation:(Return return_cont) ~alloc_checks)
               in
               (* let direct_or_indirect = match Apply.call_kind apply with |
                  Function { function_call = Direct _; _ } -> error () | Function
@@ -887,6 +889,36 @@ let make_apply_wrapper env
         apply_decisions return_decisions
     in
     let return_parameters = get_parameters return_decisions in
+    let make_wrapped_apply () =
+      let return_cont_wrapper = Continuation.rename return_cont in
+      let alloc_checks, need_close_alloc_region =
+        match alloc_checks.normal with
+        | Forward -> alloc_checks, false
+        | Close -> { alloc_checks with normal = Alloc_checks.Forward }, true
+      in
+      let apply =
+        make_apply ~continuation:(Return return_cont_wrapper) ~alloc_checks
+      in
+      ( return_cont_wrapper,
+        apply,
+        fun body ->
+          if need_close_alloc_region
+          then
+            RE.create_let
+              (Bound_pattern.singleton
+                 (Bound_var.create
+                    (Variable.create "close_region" K.value)
+                    Flambda_debug_uid.none Name_mode.normal))
+              (Named.create_prim
+                 (Flambda_primitive.Unary
+                    ( Close_alloc_region Normal,
+                      Simple.var
+                        (Alloc_mode.For_applications.alloc_region
+                           (Apply.return_mode apply)) ))
+                 (Apply.dbg apply))
+              ~size_of_defining_expr:Code_size.zero ~body
+          else body )
+    in
     match rev_args_or_invalid with
     | Ok (_, rev_args) ->
       let args = List.rev rev_args in
@@ -929,11 +961,14 @@ let make_apply_wrapper env
            can only happen because the uses of [g] do not match those of [f],
            which would be the case if a loop of tail calls between them
            existed. *)
-        let apply = make_apply ~continuation:(Return return_cont) in
+        let apply =
+          make_apply ~continuation:(Return return_cont) ~alloc_checks
+        in
         RE.from_expr ~expr:(Expr.create_apply apply)
           ~free_names:(Apply.free_names apply)
           ~code_size:(Code_size.apply apply)
       else
+        let return_cont_wrapper, apply, wrap_handler = make_wrapped_apply () in
         let apply_expr = Expr.create_apply apply in
         let handler =
           let apply_cont =
@@ -944,6 +979,7 @@ let make_apply_wrapper env
             ~free_names:(Apply_cont_expr.free_names apply_cont)
             ~code_size:(Code_size.apply_cont apply_cont)
         in
+        let handler = wrap_handler handler in
         let cont_handler =
           RE.create_continuation_handler
             (Bound_parameters.create return_parameters)
@@ -969,6 +1005,7 @@ let make_apply_wrapper env
          would blow up the stack. *)
       if reaper_produce_invalid_when_never_returns
       then
+        let return_cont_wrapper, apply, wrap_handler = make_wrapped_apply () in
         let handler =
           RE.from_expr
             ~expr:
@@ -979,6 +1016,7 @@ let make_apply_wrapper env
                        (Option.get (Apply.callee apply)))))
             ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
         in
+        let handler = wrap_handler handler in
         let cont_handler =
           RE.create_continuation_handler
             (Bound_parameters.create return_parameters)
@@ -991,7 +1029,7 @@ let make_apply_wrapper env
         in
         RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
       else
-        let apply = make_apply ~continuation:Never_returns in
+        let apply = make_apply ~continuation:Never_returns ~alloc_checks in
         RE.from_expr ~expr:(Expr.create_apply apply)
           ~free_names:(Apply.free_names apply)
           ~code_size:(Code_size.apply apply))
@@ -1263,7 +1301,7 @@ let rebuild_apply env apply =
             (Flambda_arity.unarized_components return_arity)
         in
         make_apply_wrapper env make_apply (Apply.continuation apply)
-          func_decisions)
+          (Apply.alloc_checks apply) func_decisions)
     | Changing_calling_convention code_id ->
       (* Format.eprintf "CHANGING CALLING CONVENTION %a %a@." Code_id.print
          code_id Apply.print apply; *)
@@ -1392,7 +1430,7 @@ let rebuild_apply env apply =
           ~relative_history:(Apply.relative_history apply)
       in
       make_apply_wrapper env make_apply (Apply.continuation apply)
-        return_decisions
+        (Apply.alloc_checks apply) return_decisions
 
 let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
     ~hole =

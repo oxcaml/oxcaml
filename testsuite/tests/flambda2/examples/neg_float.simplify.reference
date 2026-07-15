@@ -7,7 +7,7 @@ let code loopify(never) size(1) newer_version_of(make_pos_float_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : float boxed =
-  cont k ($camlNeg_float__float_sub48)
+  cont k close[normal] my_alloc_region ($camlNeg_float__float_sub48)
 in
 let $camlNeg_float__make_pos_float_2 =
   closure make_pos_float_0_1 @make_pos_float &toplevel.alloc_region
@@ -18,11 +18,12 @@ let code loopify(never) size(1) newer_version_of(make_neg_float_1)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : float boxed =
-  cont k ($camlNeg_float__float_sub59)
+  cont k close[normal] my_alloc_region ($camlNeg_float__float_sub59)
 in
 let $camlNeg_float__make_neg_float_3 =
   closure make_neg_float_1_1 @make_neg_float &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlNeg_float =
   Block 0 ($camlNeg_float__float5,
            $camlNeg_float__make_pos_float_2,

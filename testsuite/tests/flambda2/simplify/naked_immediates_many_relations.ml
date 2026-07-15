@@ -36,10 +36,10 @@ let r =
   let y = if Sys.opaque_identity true then A g else B f in
   (k[@inlined]) x y
 [%%expect_fexpr Simplify{|
-let $camlTOP3__immstring59 = "" in
-let $camlTOP3__const_block61 = Block 0 ($camlTOP3__immstring59, 27, 11) in
-let $camlTOP3__Pmakeblock64 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTOP3__const_block61)
+let $camlTOP3__immstring67 = "" in
+let $camlTOP3__const_block69 = Block 0 ($camlTOP3__immstring67, 27, 11) in
+let $camlTOP3__Pmakeblock72 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTOP3__const_block69)
 in
 (let Popaque = %opaque (1) in
  let untagged = %untag_imm (Popaque) in
@@ -58,13 +58,22 @@ in
             | 1 -> k2
             where k2 =
               switch tag_1
-                | 0 -> error pop(regular error) ($camlTOP3__Pmakeblock64)
+                | 0 ->
+                  error
+                    pop(regular error)
+                    close[exn] toplevel.alloc_region
+                    ($camlTOP3__Pmakeblock72)
                 | 1 -> k
             where k1 =
               switch tag_1
                 | 0 -> k
-                | 1 -> error pop(regular error) ($camlTOP3__Pmakeblock64)))
+                | 1 ->
+                  error
+                    pop(regular error)
+                    close[exn] toplevel.alloc_region
+                    ($camlTOP3__Pmakeblock72)))
   where k =
+    let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
     let $camlTOP3 = Block 0 (0) in
     cont done ($camlTOP3)
 |}]

@@ -14,7 +14,7 @@ let code loopify(never) size(7) newer_version_of(`fn[unbox_closure.ml:12,12--25]
   in
   let int_add = %int_barith.add (x, y) in
   let int_add_1 = %int_barith.add (int_add, z) in
-  cont k (int_add_1)
+  cont k close[normal] my_alloc_region (int_add_1)
 in
 let code loopify(never) size(18) newer_version_of(bar_1)
       bar_1_1 (y : imm tagged)
@@ -28,7 +28,7 @@ let code loopify(never) size(18) newer_version_of(bar_1)
       @`fn[unbox_closure.ml:12,12--25]` &my_alloc_region
   with { x = x; y = y }
   in
-  cont k (`fn[unbox_closure.ml:12,12--25]`)
+  cont k close[normal] my_alloc_region (`fn[unbox_closure.ml:12,12--25]`)
 in
 let code loopify(never) size(53) newer_version_of(foobar_0)
       foobar_0_1 (b : imm tagged, x : imm tagged)
@@ -44,15 +44,18 @@ let code loopify(never) size(53) newer_version_of(foobar_0)
      | 0 -> k3
      | 1 -> k4)
     where k4 =
-      apply direct(bar_1_1 &my_alloc_region) (bar : _ -> val) (3) -> k2 * k1
+      apply direct(bar_1_1 &my_alloc_region) [forward close close close]
+        (bar : _ -> val) (3) -> k2 * k1
     where k3 =
-      apply direct(bar_1_1 &my_alloc_region) (bar : _ -> val) (42) -> k2 * k1
+      apply direct(bar_1_1 &my_alloc_region) [forward close close close]
+        (bar : _ -> val) (42) -> k2 * k1
     where k2 (f : val) =
       let `unit` = %end_region (`region`) in
-      apply &my_alloc_region f (x) -> k * k1
+      apply &my_alloc_region [close close close close] f (x) -> k * k1
 in
 let $camlUnbox_closure__foobar_3 =
   closure foobar_0_1 @foobar &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlUnbox_closure = Block 0 ($camlUnbox_closure__foobar_3) in
 cont done ($camlUnbox_closure)

@@ -11,11 +11,11 @@ let code loopify(never) size(16) newer_version_of(f_2)
   let r = %project_value_slot.[f].[r] (my_closure) in
   (let untagged = %untag_imm (a) in
    switch untagged
-     | 0 -> k (0)
+     | 0 -> k close[normal] my_alloc_region (0)
      | 1 -> k2)
     where k2 =
       let int_add = %int_barith.add (r, x) in
-      cont k (int_add)
+      cont k close[normal] my_alloc_region (int_add)
 in
 let code loopify(never) size(20) newer_version_of(g_3)
       g_3_1 (x : imm tagged, y : imm tagged)
@@ -26,12 +26,12 @@ let code loopify(never) size(20) newer_version_of(g_3)
   let s = %project_value_slot.[g].[s] (my_closure) in
   (let untagged = %untag_imm (b) in
    switch untagged
-     | 0 -> k (0)
+     | 0 -> k close[normal] my_alloc_region (0)
      | 1 -> k2)
     where k2 =
       let int_mul = %int_barith.mul (x, y) in
       let int_add = %int_barith.add (s, int_mul) in
-      cont k (int_add)
+      cont k close[normal] my_alloc_region (int_add)
 in
 let code rec loopify(never) size(39) newer_version_of(h_4)
       h_4_1 (x : imm tagged, y : imm tagged)
@@ -47,7 +47,7 @@ let code rec loopify(never) size(39) newer_version_of(h_4)
      | 0 -> k2 (0)
      | 1 -> k3)
     where k3 =
-      apply direct(g_3_1 &my_alloc_region)
+      apply direct(g_3_1 &my_alloc_region) [forward close close close]
         (g ~ depth my_depth -> succ my_depth : _ -> imm tagged)
           (x, y)
           -> k2 * k1
@@ -58,7 +58,7 @@ let code rec loopify(never) size(39) newer_version_of(h_4)
           | 1 -> k3)
          where k3 =
            let int_add = %int_barith.add (x, y) in
-           apply direct(f_2_1 &my_alloc_region)
+           apply direct(f_2_1 &my_alloc_region) [forward close close close]
              (f ~ depth my_depth -> succ my_depth : _ -> imm tagged)
                (int_add)
                -> k2 * k1
@@ -66,7 +66,7 @@ let code rec loopify(never) size(39) newer_version_of(h_4)
            let int_add =
              %int_barith.add (staticcatch_result_1, staticcatch_result)
            in
-           cont k (int_add))
+           cont k close[normal] my_alloc_region (int_add))
 in
 let code inline(always) loopify(never) size(101) newer_version_of(inline_0)
       inline_0_1 (a : imm tagged, b : imm tagged)
@@ -74,14 +74,14 @@ let code inline(always) loopify(never) size(101) newer_version_of(inline_0)
         -> k * k1
         : val =
   apply direct(partial_apply1_44 &my_alloc_region) inlined(never)
-         inlining_state(depth(10))
+         inlining_state(depth(10)) [forward close close close]
     ($Stdlib__Random.camlStdlib__Random__partial_apply1_104 : _ -> imm tagged
      )
       (10)
       -> k2 * k1
     where k2 (r : imm tagged) =
       (apply direct(partial_apply1_44 &my_alloc_region) inlined(never)
-              inlining_state(depth(10))
+              inlining_state(depth(10)) [forward close close close]
          ($Stdlib__Random.camlStdlib__Random__partial_apply1_104
           : _ -> imm tagged)
            (10)
@@ -92,19 +92,19 @@ let code inline(always) loopify(never) size(101) newer_version_of(inline_0)
            and h = closure h_4_1 @h &my_alloc_region
            with { a = a; b = b; r = r; s = s }
            in
-           cont k (h))
+           cont k close[normal] my_alloc_region (h))
 in
 let $camlOffset__inline_5 =
   closure inline_0_1 @`inline` &toplevel.alloc_region
 in
 apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
-       inlining_state(depth(11))
+       inlining_state(depth(11)) [forward close close close]
   ($Stdlib__Random.camlStdlib__Random__partial_apply1_104 : _ -> imm tagged)
     (10)
     -> k * error
   where k (r : imm tagged) =
     (apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
-            inlining_state(depth(11))
+            inlining_state(depth(11)) [forward close close close]
        ($Stdlib__Random.camlStdlib__Random__partial_apply1_104
         : _ -> imm tagged)
          (10)
@@ -115,7 +115,7 @@ apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
                  my_closure &my_alloc_region my_depth
                  -> k * k1
                  : imm tagged =
-           cont k (0)
+           cont k close[normal] my_alloc_region (0)
          in
          let $camlOffset__f_7 =
            closure f_2_2 @f &toplevel.alloc_region
@@ -123,17 +123,20 @@ apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
            closure g_3_2 @g &toplevel.alloc_region
          and $camlOffset__h_9 =
            closure h_4_2 @h &toplevel.alloc_region
-         and code rec loopify(never) size(6) newer_version_of(h_4_1)
+         and code rec loopify(never) size(7) newer_version_of(h_4_1)
                h_4_2 (x : imm tagged, y : imm tagged)
                  my_closure &my_alloc_region my_depth
                  -> k * k1
                  : imm tagged =
-           let int_add = %int_barith.add (x, y) in
-           apply direct(f_2_2 &my_alloc_region) inlining_state(depth(1))
-             ($camlOffset__f_7 ~ depth my_depth -> succ my_depth
-              : _ -> imm tagged)
-               (int_add)
-               -> k * k1
+           (let int_add = %int_barith.add (x, y) in
+            apply direct(f_2_2 &my_alloc_region) inlining_state(depth(1))
+                   [forward close close close]
+              ($camlOffset__f_7 ~ depth my_depth -> succ my_depth
+               : _ -> imm tagged)
+                (int_add)
+                -> k2 * k1)
+             where k2 (staticcatch_result : imm tagged) =
+               cont k close[normal] my_alloc_region (staticcatch_result)
          and code loopify(never) size(4) newer_version_of(f_2_1)
                f_2_2 (x : imm tagged)
                  my_closure &my_alloc_region my_depth
@@ -141,11 +144,12 @@ apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
                  : imm tagged =
            let r_1 = %project_value_slot.[f].[r] ($camlOffset__f_7) in
            let int_add = %int_barith.add (r_1, x) in
-           cont k (int_add)
+           cont k close[normal] my_alloc_region (int_add)
            with { a = 1; b = 0; r = r; s = s }
          in
          (apply direct(partial_apply1_44 &toplevel.alloc_region)
                  inlined(never) inlining_state(depth(11))
+                 [forward close close close]
             ($Stdlib__Random.camlStdlib__Random__partial_apply1_104
              : _ -> imm tagged)
               (10)
@@ -153,6 +157,7 @@ apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
             where k (r_1 : imm tagged) =
               (apply direct(partial_apply1_44 &toplevel.alloc_region)
                       inlined(never) inlining_state(depth(11))
+                      [forward close close close]
                  ($Stdlib__Random.camlStdlib__Random__partial_apply1_104
                   : _ -> imm tagged)
                    (10)
@@ -163,21 +168,21 @@ apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
                            my_closure &my_alloc_region my_depth
                            -> k * k1
                            : imm tagged =
-                     cont k (0)
+                     cont k close[normal] my_alloc_region (0)
                    in
                    let code loopify(never) size(0) newer_version_of(g_3_1)
                          g_3_3 (x : imm tagged, y : imm tagged)
                            my_closure &my_alloc_region my_depth
                            -> k * k1
                            : imm tagged =
-                     cont k (0)
+                     cont k close[normal] my_alloc_region (0)
                    in
                    let code loopify(never) size(0) newer_version_of(h_4_1)
                          h_4_3 (x : imm tagged, y : imm tagged)
                            my_closure &my_alloc_region my_depth
                            -> k * k1
                            : imm tagged =
-                     cont k (0)
+                     cont k close[normal] my_alloc_region (0)
                    in
                    let $camlOffset__f_10 =
                      closure f_2_3 @f &toplevel.alloc_region
@@ -186,6 +191,9 @@ apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
                    and $camlOffset__h_12 =
                      closure h_4_3 @h &toplevel.alloc_region
                      with { a = 0; b = 0; r = r_1; s = s_1 }
+                   in
+                   let `unit` =
+                     %close_alloc_region.[`normal`] (toplevel.alloc_region)
                    in
                    let $camlOffset =
                      Block 0 ($camlOffset__inline_5,

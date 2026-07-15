@@ -5,14 +5,14 @@ let $camlTests12__first_const = Block 0 () in
          -> k1 * k2
          : [ 0 | 0 of val * val ] =
    let next_depth = rec_info (succ my_depth) in
-   cont k1 (0)
+   cont k1 close[normal] my_alloc_region (0)
  in
  let code size(1)
        `fn[tests12.ml:25,39--51]_3` (x)
          my_closure &my_alloc_region my_depth
          -> k1 * k2 =
    let next_depth = rec_info (succ my_depth) in
-   cont k1 (x)
+   cont k1 close[normal] my_alloc_region (x)
  in
  let code size(23)
        `fn[tests12.ml:25,2--70]_1` (param : imm tagged)
@@ -30,7 +30,7 @@ let $camlTests12__first_const = Block 0 () in
      closure `fn[tests12.ml:25,39--51]_3` @`fn[tests12.ml:25,39--51]`
        &my_alloc_region
    in
-   apply &my_alloc_region inlined(never)
+   apply &my_alloc_region inlined(never) [close close close close]
      map_foo
        (`fn[tests12.ml:25,39--51]`, `fn[tests12.ml:25,52--67]`, 0)
        -> k1 * k2
@@ -46,7 +46,7 @@ let $camlTests12__first_const = Block 0 () in
        &my_alloc_region
    with { map_foo = map_foo }
    in
-   cont k1 (`fn[tests12.ml:25,2--70]`)
+   cont k1 close[normal] my_alloc_region (`fn[tests12.ml:25,2--70]`)
  in
  let code rec size(64)
        map_foo_4 (f : val, seq : val, param : imm tagged)
@@ -55,14 +55,14 @@ let $camlTests12__first_const = Block 0 () in
          : [ 0 | 0 of val * val ] =
    let next_depth = rec_info (succ my_depth) in
    let bar = %project_value_slot.[map_foo].[bar] (my_closure) in
-   apply &my_alloc_region seq (0) -> k3 * k2
+   apply &my_alloc_region [forward close close close] seq (0) -> k3 * k2
      where k3 (`*match*` : [ 0 | 0 of val * val ]) =
        ((let prim = %is_int (`*match*`) in
          let Pisint = %tag_imm (prim) in
          (let untagged = %untag_imm (Pisint) in
           switch untagged
             | 0 -> k4
-            | 1 -> k1 (0))
+            | 1 -> k1 close[normal] my_alloc_region (0))
            where k4 =
              cont k3)
           where k3 =
@@ -77,32 +77,37 @@ let $camlTests12__first_const = Block 0 () in
                   cont k5)
                where k5 =
                  apply direct(bar_0 &my_alloc_region)
+                        [forward close close close]
                    (bar : _ -> val)
                      (my_closure ~ depth my_depth -> next_depth)
                      -> k3 * k2
                where k4 =
                  apply direct(bar_0 &my_alloc_region)
+                        [forward close close close]
                    (bar : _ -> val)
                      (my_closure ~ depth my_depth -> next_depth)
                      -> k3 * k2
                where k3 (g : val) =
-                 (apply &my_alloc_region inlined(always) g (0) -> k3 * k2
+                 (apply &my_alloc_region inlined(always)
+                         [forward close close close]
+                    g (0) -> k3 * k2
                     where k3 (g_result : [ 0 | 0 of val * val ]) =
                       let Popaque = %opaque (g_result) in
                       ((let Pfield = %block_load.[`0`] (`*match*`) in
-                        apply &my_alloc_region f (Pfield) -> k3 * k2)
+                        apply &my_alloc_region [forward close close close]
+                          f (Pfield) -> k3 * k2)
                          where k3 (apply_result : val) =
                            let Pmakeblock =
                              %block.[`0`].my_alloc_region (apply_result, g)
                            in
-                           cont k1 (Pmakeblock)))))
+                           cont k1 close[normal] my_alloc_region (Pmakeblock)))))
  in
  let bar = closure bar_0 @bar &toplevel.alloc_region in
  let map_foo = closure map_foo_4 @map_foo &toplevel.alloc_region
  with { bar = bar }
  in
  let Pmakeblock = %block.[`0`].`toplevel` (bar, map_foo) in
- cont k (Pmakeblock))
+ cont k close[normal] toplevel.alloc_region (Pmakeblock))
   where k define_root_symbol (module_block) =
     let field_0 = %block_load.tag[`0`].`size`[`2`].[`0`] (module_block) in
     let field_1 = %block_load.tag[`0`].`size`[`2`].[`1`] (module_block) in

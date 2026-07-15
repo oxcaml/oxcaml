@@ -32,8 +32,10 @@ let $camlSymbol_projections6__immstring11 = "FOO" in
             : val =
       let untagged = %untag_imm (b) in
       switch untagged
-        | 0 -> k ($camlSymbol_projections6__h_4)
-        | 1 -> k ($camlSymbol_projections6__g_5)
+        | 0 ->
+          k close[normal] my_alloc_region ($camlSymbol_projections6__h_4)
+        | 1 ->
+          k close[normal] my_alloc_region ($camlSymbol_projections6__g_5)
     and set_of_closures
           $camlSymbol_projections6__h_4 =
           closure h_1_1 @h &toplevel.alloc_region
@@ -64,7 +66,7 @@ let $camlSymbol_projections6__immstring11 = "FOO" in
                 let Pmakeblock_1 =
                   %block.[`0`].my_alloc_region (Pmakeblock, foo_2)
                 in
-                cont k (Pmakeblock_1)))
+                cont k close[normal] my_alloc_region (Pmakeblock_1)))
         where k2 =
           let Pmakeblock =
             %block.[`1`].my_alloc_region
@@ -72,7 +74,7 @@ let $camlSymbol_projections6__immstring11 = "FOO" in
           in
           let Pmakeblock_1 = %block.[`0`].my_alloc_region (Pmakeblock, foo_2)
           in
-          cont k (Pmakeblock_1)
+          cont k close[normal] my_alloc_region (Pmakeblock_1)
     and set_of_closures
           $camlSymbol_projections6__g_5 =
           closure g_2_1 @g &toplevel.alloc_region
@@ -103,7 +105,7 @@ let $camlSymbol_projections6__immstring11 = "FOO" in
                 let Pmakeblock_1 =
                   %block.[`0`].my_alloc_region (Pmakeblock, foo_2)
                 in
-                cont k (Pmakeblock_1)))
+                cont k close[normal] my_alloc_region (Pmakeblock_1)))
         where k2 =
           let Pmakeblock =
             %block.[`1`].my_alloc_region
@@ -111,8 +113,9 @@ let $camlSymbol_projections6__immstring11 = "FOO" in
           in
           let Pmakeblock_1 = %block.[`0`].my_alloc_region (Pmakeblock, foo_2)
           in
-          cont k (Pmakeblock_1)
+          cont k close[normal] my_alloc_region (Pmakeblock_1)
     in
+    let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
     let $camlSymbol_projections6 =
       Block 0 (foo, $camlSymbol_projections6__f_3)
     in

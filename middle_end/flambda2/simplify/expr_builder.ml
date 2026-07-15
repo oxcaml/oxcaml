@@ -65,6 +65,29 @@ let add_set_of_closures_offsets ~is_phantom named uacc =
   Named.fold_code_and_sets_of_closures named ~init:uacc
     ~f_code:add_offsets_from_code ~f_set:add_offsets_from_set
 
+let fold_check_action_into_apply_cont (bound_vars : Bound_pattern.t)
+    (defining_expr : Named.t) ~free_names_of_body ~body =
+  match defining_expr with
+  | Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _ -> None
+  | Prim (prim, _dbg) -> (
+    match P.is_check_action prim with
+    | None -> None
+    | Some check_action -> (
+      let bound_var = Bound_pattern.must_be_singleton bound_vars in
+      if Name_occurrences.mem_var free_names_of_body (VB.var bound_var)
+      then
+        Misc.fatal_errorf
+          "[fold_check_action_into_apply_cont]: check actions are supposed to \
+           be unit-returning, so the bound pattern %a must never appear in the \
+           body %a"
+          Bound_pattern.print bound_vars
+          (RE.print Are_rebuilding_terms.are_rebuilding)
+          body;
+      match RE.to_apply_cont body with
+      | Some apply_cont ->
+        Some (Apply_cont.prepend_check_actions apply_cont [check_action])
+      | None -> None))
+
 let create_let uacc (bound_vars : Bound_pattern.t) (defining_expr : Named.t)
     ~free_names_of_defining_expr ~body ~cost_metrics_of_defining_expr =
   (* The name occurrences component of [uacc] is expected to be in the state
@@ -72,36 +95,48 @@ let create_let uacc (bound_vars : Bound_pattern.t) (defining_expr : Named.t)
   let name_mode = Bound_pattern.name_mode bound_vars in
   let is_phantom = Name_mode.is_phantom name_mode in
   let free_names_of_body = UA.name_occurrences uacc in
-  let free_names_of_defining_expr =
-    if not is_phantom
-    then free_names_of_defining_expr
-    else
-      Name_occurrences.downgrade_occurrences_at_strictly_greater_name_mode
-        free_names_of_defining_expr name_mode
-  in
-  let free_names_of_let =
-    let without_bound_vars =
-      Bound_pattern.fold_all_bound_vars bound_vars ~init:free_names_of_body
-        ~f:(fun free_names bound_var ->
-          Name_occurrences.remove_var free_names ~var:(VB.var bound_var))
+  match
+    fold_check_action_into_apply_cont bound_vars defining_expr
+      ~free_names_of_body ~body
+  with
+  | Some apply_cont ->
+    let uacc =
+      UA.with_name_occurrences uacc
+        ~name_occurrences:(Apply_cont.free_names apply_cont)
     in
-    Name_occurrences.union without_bound_vars free_names_of_defining_expr
-  in
-  let uacc =
-    UA.add_cost_metrics_and_with_name_occurrences uacc
-      (Cost_metrics.increase_due_to_let_expr ~is_phantom
-         ~cost_metrics_of_defining_expr)
-      free_names_of_let
-  in
-  let uacc =
-    if Are_rebuilding_terms.do_not_rebuild_terms (UA.are_rebuilding_terms uacc)
-    then uacc
-    else add_set_of_closures_offsets ~is_phantom defining_expr uacc
-  in
-  ( RE.create_let
-      (UA.are_rebuilding_terms uacc)
-      bound_vars defining_expr ~body ~free_names_of_body,
-    uacc )
+    RE.create_apply_cont apply_cont, uacc
+  | None ->
+    let free_names_of_defining_expr =
+      if not is_phantom
+      then free_names_of_defining_expr
+      else
+        Name_occurrences.downgrade_occurrences_at_strictly_greater_name_mode
+          free_names_of_defining_expr name_mode
+    in
+    let free_names_of_let =
+      let without_bound_vars =
+        Bound_pattern.fold_all_bound_vars bound_vars ~init:free_names_of_body
+          ~f:(fun free_names bound_var ->
+            Name_occurrences.remove_var free_names ~var:(VB.var bound_var))
+      in
+      Name_occurrences.union without_bound_vars free_names_of_defining_expr
+    in
+    let uacc =
+      UA.add_cost_metrics_and_with_name_occurrences uacc
+        (Cost_metrics.increase_due_to_let_expr ~is_phantom
+           ~cost_metrics_of_defining_expr)
+        free_names_of_let
+    in
+    let uacc =
+      if
+        Are_rebuilding_terms.do_not_rebuild_terms (UA.are_rebuilding_terms uacc)
+      then uacc
+      else add_set_of_closures_offsets ~is_phantom defining_expr uacc
+    in
+    ( RE.create_let
+        (UA.are_rebuilding_terms uacc)
+        bound_vars defining_expr ~body ~free_names_of_body,
+      uacc )
 
 let create_let_binding uacc bound_vars defining_expr
     ~free_names_of_defining_expr ~body ~cost_metrics_of_defining_expr =
@@ -168,6 +203,25 @@ let create_coerced_singleton_let uacc var defining_expr
         outer
       in
       generate_outer_binding (Bound_var.name_mode var)
+
+let check_action_bindings uacc ~dbg check_actions =
+  let machine_width = UE.machine_width (UA.uenv uacc) in
+  List.map
+    (fun check_action ->
+      let named = Named.create_prim (P.of_check_action check_action) dbg in
+      let let_bound =
+        Bound_var.create
+          (Variable.create "unit" Flambda_kind.value)
+          Flambda_debug_uid.none Name_mode.normal
+        |> Bound_pattern.singleton
+      in
+      Keep_binding
+        { let_bound;
+          simplified_defining_expr =
+            Simplified_named.create ~machine_width named;
+          original_defining_expr = Some named
+        })
+    check_actions
 
 let make_new_let_bindings uacc ~bindings_outermost_first ~body =
   (* The name occurrences component of [uacc] is expected to be in the state
@@ -550,10 +604,13 @@ let apply_continuation_shortcuts uenv apply_cont =
   with
   | None -> apply_cont
   | Some shortcut ->
-    let cont, args =
+    let cont, args, check_actions =
       Continuation_shortcut.apply shortcut (Apply_cont.args apply_cont)
     in
-    Apply_cont.with_continuation_and_args apply_cont cont ~args
+    let apply_cont =
+      Apply_cont.with_continuation_and_args apply_cont cont ~args
+    in
+    Apply_cont.add_check_actions apply_cont check_actions
 
 let apply_continuation_aliases uenv cont =
   match UE.find_continuation_shortcut uenv cont with

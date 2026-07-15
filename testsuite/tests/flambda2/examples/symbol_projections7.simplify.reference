@@ -13,9 +13,10 @@ and code loopify(never) size(4) newer_version_of(`fn[symbol_projections7.ml:20,4
       ($`camlSymbol_projections7__fn[symbol_projections7.ml:20,4--18]_2`)
   in
   let int_add = %int_barith.add (x, y_1) in
-  cont k (int_add)
+  cont k close[normal] my_alloc_region (int_add)
   with { y = y }
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlSymbol_projections7 =
   Block 0 ($`camlSymbol_projections7__fn[symbol_projections7.ml:20,4--18]_2`)
 in

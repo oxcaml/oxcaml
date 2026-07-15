@@ -8,7 +8,7 @@ let code loopify(never) size(2) newer_version_of(`!_0`)
         -> k * k1
         : val =
   let Pfield = %block_load.mut.[`0`] (param) in
-  cont k (Pfield)
+  cont k close[normal] my_alloc_region (Pfield)
 in
 let $`camlFrom_odoc_texi__!_2` = closure `!_0_1` @`!` &toplevel.alloc_region
 in
@@ -16,7 +16,7 @@ let esc_8bits = %block.mut.[`0`].`toplevel` (0) in
 let code inline(never) loopify(never) size(1) newer_version_of(foo_1)
       foo_1_1 (x : val) my_closure &my_alloc_region my_depth -> k * k1 : val =
   let Popaque = %opaque (x) in
-  cont k (Popaque)
+  cont k close[normal] my_alloc_region (Popaque)
 in
 let $camlFrom_odoc_texi__foo_3 = closure foo_1_1 @foo &toplevel.alloc_region
 in
@@ -27,6 +27,7 @@ in
     | 1 -> k1)
    where k1 =
      (apply direct(foo_1_1 &toplevel.alloc_region)
+             [forward close close close]
         ($camlFrom_odoc_texi__foo_3 : _ -> val)
           ($camlFrom_odoc_texi__immstring24)
           -> k1 * error
@@ -38,6 +39,7 @@ in
           let Pmakeblock_1 = %block.[`0`].`toplevel` (Pmakeblock, 0) in
           cont k (Pmakeblock_1)))
   where k (y : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+    let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
     let $camlFrom_odoc_texi =
       Block 0 ($`camlFrom_odoc_texi__!_2`,
                esc_8bits,

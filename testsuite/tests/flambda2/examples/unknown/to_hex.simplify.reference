@@ -16,7 +16,7 @@ let $camlTo_hex__immstring11 = "Pervasives.array_bound_error" in
 let $camlTo_hex__Pmakeblock180 =
   Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlTo_hex__immstring8)
 in
-apply ccall
+apply ccall [forward close close close]
   ($`*extern*`.caml_register_named_value : val * val -> val)
     ($camlTo_hex__immstring11, $camlTo_hex__Pmakeblock180)
     -> k1 * error
@@ -31,7 +31,7 @@ apply ccall
       let Pmakeblock =
         %block.[`0`].my_alloc_region ($`*predef*`.caml_exn_Failure, s)
       in
-      cont k1 pop(regular k1) (Pmakeblock)
+      cont k1 pop(regular k1) close[exn] my_alloc_region (Pmakeblock)
     in
     let $camlTo_hex__failwith_8 =
       closure failwith_0_1 @failwith &toplevel.alloc_region
@@ -45,12 +45,12 @@ apply ccall
         %block.[`0`].my_alloc_region
           ($`*predef*`.caml_exn_Invalid_argument, s)
       in
-      cont k1 pop(regular k1) (Pmakeblock)
+      cont k1 pop(regular k1) close[exn] my_alloc_region (Pmakeblock)
     in
     let $camlTo_hex__invalid_arg_9 =
       closure invalid_arg_1_1 @invalid_arg &toplevel.alloc_region
     in
-    (apply ccall noalloc
+    (apply ccall noalloc [forward close close close]
        ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
        where k (Pccall) =
          let $camlTo_hex__Exit201 =
@@ -62,15 +62,15 @@ apply ccall
                  my_closure &my_alloc_region my_depth
                  -> k * k1
                  : val =
-           apply ccall
+           apply ccall [forward close close close]
              ($`*extern*`.caml_lessequal : val * val -> val)
                (x, y)
                -> k2 * k1
              where k2 (Pccall_1) =
                let untagged = %untag_imm (Pccall_1) in
                switch untagged
-                 | 0 -> k (y)
-                 | 1 -> k (x)
+                 | 0 -> k close[normal] my_alloc_region (y)
+                 | 1 -> k close[normal] my_alloc_region (x)
          in
          let $camlTo_hex__min_10 =
            closure min_2_1 @min &toplevel.alloc_region
@@ -80,15 +80,15 @@ apply ccall
                  my_closure &my_alloc_region my_depth
                  -> k * k1
                  : val =
-           apply ccall
+           apply ccall [forward close close close]
              ($`*extern*`.caml_greaterequal : val * val -> val)
                (x, y)
                -> k2 * k1
              where k2 (Pccall_1) =
                let untagged = %untag_imm (Pccall_1) in
                switch untagged
-                 | 0 -> k (y)
-                 | 1 -> k (x)
+                 | 0 -> k close[normal] my_alloc_region (y)
+                 | 1 -> k close[normal] my_alloc_region (x)
          in
          let $camlTo_hex__max_11 =
            closure max_3_1 @max &toplevel.alloc_region
@@ -101,10 +101,10 @@ apply ccall
            let prim = %int_comp.ge (x, 0) in
            switch prim
              | 0 -> k2
-             | 1 -> k (x)
+             | 1 -> k close[normal] my_alloc_region (x)
              where k2 =
                let int_neg = %int_barith.sub (0, x) in
-               cont k (int_neg)
+               cont k close[normal] my_alloc_region (int_neg)
          in
          let $camlTo_hex__abs_12 =
            closure abs_4_1 @abs &toplevel.alloc_region
@@ -115,7 +115,7 @@ apply ccall
                  -> k * k1
                  : imm tagged =
            let int_xor = %int_barith.xor (x, -1) in
-           cont k (int_xor)
+           cont k close[normal] my_alloc_region (int_xor)
          in
          let $camlTo_hex__lnot_13 =
            closure lnot_5_1 @lnot &toplevel.alloc_region
@@ -154,7 +154,7 @@ apply ccall
               | 1 -> k2 (48))
              where k2 (staticcatch_result : imm tagged) =
                let int_add = %int_barith.add (n, staticcatch_result) in
-               cont k (int_add)
+               cont k close[normal] my_alloc_region (int_add)
          in
          let $camlTo_hex__char_hex_14 =
            closure char_hex_6_1 @char_hex &toplevel.alloc_region
@@ -172,12 +172,13 @@ apply ccall
               | 1 -> k3
               where k3 =
                 apply direct(invalid_arg_1_1 &my_alloc_region)
+                       [forward close close close]
                   ($camlTo_hex__invalid_arg_9 : _ -> imm tagged)
                     ($camlTo_hex__immstring130)
                     -> never * k1)
              where k2 (prim : imm) =
                let cse_param = prim in
-               (apply ccall
+               (apply ccall [forward close close close]
                   ($`*extern*`.caml_create_bytes : val -> val)
                     (32)
                     -> k2 * k1
@@ -209,6 +210,7 @@ apply ccall
                               let x = %tag_imm (prim_3) in
                               ((let int_lsr = %int_shift.lsr (x, 4i) in
                                 apply direct(char_hex_6_1 &my_alloc_region)
+                                       [forward close close close]
                                   ($camlTo_hex__char_hex_14 : _ -> imm tagged
                                    )
                                     (int_lsr)
@@ -232,6 +234,7 @@ apply ccall
                                      apply
                                             direct(char_hex_6_1
                                             &my_alloc_region)
+                                            [forward close close close]
                                        ($camlTo_hex__char_hex_14
                                         : _ -> imm tagged)
                                          (int_and)
@@ -261,13 +264,21 @@ apply ccall
                                             (for_next_naked, 15L)
                                         in
                                         switch prim_8
-                                          | 0 -> k (result)
+                                          | 0 ->
+                                            k
+                                              close[normal] my_alloc_region
+                                              (result)
                                           | 1 -> k2 (for_next_naked)))
                             where k3 =
-                              cont k1 pop(regular k1) ($camlTo_hex__block151))))
+                              cont k1
+                                     pop(regular k1)
+                                     close[exn] my_alloc_region
+                                     ($camlTo_hex__block151))))
          in
          let $camlTo_hex__to_hex_15 =
            closure to_hex_7_1 @to_hex &toplevel.alloc_region
+         in
+         let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region)
          in
          let $camlTo_hex =
            Block 0 ($camlTo_hex__Pmakeblock256,

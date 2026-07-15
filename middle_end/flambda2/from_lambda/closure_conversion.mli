@@ -58,6 +58,16 @@ val close_let_cont :
 
 val close_apply : Acc.t -> Env.t -> IR.apply -> Expr_with_acc.t
 
+val close_new_alloc_region :
+  Acc.t ->
+  Env.t ->
+  alloc_region:Ident.t ->
+  actions:Flambda_primitive.alloc_check_actions ->
+  normal_continuation:Continuation.t ->
+  exn_continuation:Continuation.t ->
+  body:(Acc.t -> Env.t -> Expr_with_acc.t) ->
+  Expr_with_acc.t
+
 val close_apply_cont :
   Acc.t ->
   Env.t ->

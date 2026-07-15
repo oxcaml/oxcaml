@@ -52,14 +52,14 @@ let code loopify(never) size(77) newer_version_of(true_at_level0_4)
                 let eq = %tag_imm (prim) in
                 cont k3 (eq)))
     where k3 (body_result : imm tagged) =
-      cont k pop(k2) (body_result)
+      cont k pop(k2) close[normal] my_alloc_region (body_result)
     where k2 exn (`exn` : val) =
       let `unit` = %end_try_region (try_region) in
       let unit_1 = %end_try_ghost_region (try_ghost_region) in
       let prim = %phys_eq (`exn`, UndecidedLit) in
       switch prim
-        | 0 -> k1 pop(reraise k1) (`exn`)
-        | 1 -> k (0)
+        | 0 -> k1 pop(reraise k1) close[exn] my_alloc_region (`exn`)
+        | 1 -> k close[normal] my_alloc_region (0)
 in
 let code inline(always) loopify(never) size(56) newer_version_of(eval_level_3)
       eval_level_3_1 (_st, a : val)
@@ -79,21 +79,25 @@ let code inline(always) loopify(never) size(56) newer_version_of(eval_level_3)
     where k3 =
       ((let prim = %int_comp.ge (lvl, 0) in
         switch prim
-          | 0 -> k1 pop(regular k1) ($camlPhantom__Pmakeblock58)
+          | 0 ->
+            k1
+              pop(regular k1)
+              close[exn] my_alloc_region
+              ($camlPhantom__Pmakeblock58)
           | 1 -> k3)
          where k3 =
            let Pmakeblock = %block.[`0`].my_alloc_region (1, lvl) in
-           cont k (Pmakeblock))
+           cont k close[normal] my_alloc_region (Pmakeblock))
     where k2 =
       let Pfield_2 = %block_load.[`2`] (a) in
       let Pfield_3 = %block_load.mut.[`3`] (Pfield_2) in
       ((let untagged = %untag_imm (Pfield_3) in
         switch untagged
-          | 0 -> k1 pop(reraise k1) (UndecidedLit)
+          | 0 -> k1 pop(reraise k1) close[exn] my_alloc_region (UndecidedLit)
           | 1 -> k2)
          where k2 =
            let Pmakeblock = %block.[`0`].my_alloc_region (0, lvl) in
-           cont k (Pmakeblock))
+           cont k close[normal] my_alloc_region (Pmakeblock))
 in
 let code inline(always) loopify(never) size(3) newer_version_of(is_false_2)
       is_false_2_1 (a : val)
@@ -102,7 +106,7 @@ let code inline(always) loopify(never) size(3) newer_version_of(is_false_2)
         : imm tagged =
   let Pfield = %block_load.[`2`] (a) in
   let Pfield_1 = %block_load.mut.[`3`] (Pfield) in
-  cont k (Pfield_1)
+  cont k close[normal] my_alloc_region (Pfield_1)
 in
 let $camlPhantom__is_false_8 =
   closure is_false_2_1 @is_false &toplevel.alloc_region
@@ -113,14 +117,14 @@ let code inline(always) loopify(never) size(2) newer_version_of(is_true_1)
         -> k * k1
         : imm tagged =
   let Pfield = %block_load.mut.[`3`] (a) in
-  cont k (Pfield)
+  cont k close[normal] my_alloc_region (Pfield)
 in
 let $camlPhantom__is_true_7 =
   closure is_true_1_1 @is_true &toplevel.alloc_region
 in
 let code inline(always) loopify(never) size(176) newer_version_of(Make_0)
       Make_0_1 (F : val) my_closure &my_alloc_region my_depth -> k * k1 : val =
-  apply ccall noalloc
+  apply ccall noalloc [forward close close close]
     ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k2 * k1
     where k2 (Pccall) =
       let UndecidedLit =
@@ -146,7 +150,7 @@ let code inline(always) loopify(never) size(176) newer_version_of(Make_0)
            eval_level,
            true_at_level0)
       in
-      cont k (Pmakeblock)
+      cont k close[normal] my_alloc_region (Pmakeblock)
 in
 let $camlPhantom__Make_6 = closure Make_0_1 @Make &toplevel.alloc_region in
 let code loopify(never) size(77) newer_version_of(true_at_level0_4_1)
@@ -190,14 +194,14 @@ let code loopify(never) size(77) newer_version_of(true_at_level0_4_1)
                 let eq = %tag_imm (prim) in
                 cont k3 (eq)))
     where k3 (body_result : imm tagged) =
-      cont k pop(k2) (body_result)
+      cont k pop(k2) close[normal] my_alloc_region (body_result)
     where k2 exn (`exn` : val) =
       let `unit` = %end_try_region (try_region) in
       let unit_1 = %end_try_ghost_region (try_ghost_region) in
       let prim = %phys_eq (`exn`, UndecidedLit) in
       switch prim
-        | 0 -> k1 pop(reraise k1) (`exn`)
-        | 1 -> k (0)
+        | 0 -> k1 pop(reraise k1) close[exn] my_alloc_region (`exn`)
+        | 1 -> k close[normal] my_alloc_region (0)
 in
 let code inline(always) loopify(never) size(56) newer_version_of(eval_level_3_1)
       eval_level_3_2 (_st, a : val)
@@ -217,28 +221,32 @@ let code inline(always) loopify(never) size(56) newer_version_of(eval_level_3_1)
     where k3 =
       ((let prim = %int_comp.ge (lvl, 0) in
         switch prim
-          | 0 -> k1 pop(regular k1) ($camlPhantom__Pmakeblock58)
+          | 0 ->
+            k1
+              pop(regular k1)
+              close[exn] my_alloc_region
+              ($camlPhantom__Pmakeblock58)
           | 1 -> k3)
          where k3 =
            let Pmakeblock = %block.[`0`].my_alloc_region (1, lvl) in
-           cont k (Pmakeblock))
+           cont k close[normal] my_alloc_region (Pmakeblock))
     where k2 =
       let Pfield_2 = %block_load.[`2`] (a) in
       let Pfield_3 = %block_load.mut.[`3`] (Pfield_2) in
       ((let untagged = %untag_imm (Pfield_3) in
         switch untagged
-          | 0 -> k1 pop(reraise k1) (UndecidedLit)
+          | 0 -> k1 pop(reraise k1) close[exn] my_alloc_region (UndecidedLit)
           | 1 -> k2)
          where k2 =
            let Pmakeblock = %block.[`0`].my_alloc_region (0, lvl) in
-           cont k (Pmakeblock))
+           cont k close[normal] my_alloc_region (Pmakeblock))
 in
 let code inline(always) loopify(never) size(176) newer_version_of(Make2_5)
       Make2_5_1 (F : val)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : val =
-  apply ccall noalloc inlining_state(depth(1))
+  apply ccall noalloc inlining_state(depth(1)) [forward close close close]
     ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k2 * k1
     where k2 (Pccall) =
       let UndecidedLit =
@@ -264,9 +272,10 @@ let code inline(always) loopify(never) size(176) newer_version_of(Make2_5)
            eval_level,
            true_at_level0)
       in
-      cont k (Pmakeblock)
+      cont k close[normal] my_alloc_region (Pmakeblock)
 in
 let $camlPhantom__Make2_9 = closure Make2_5_1 @Make2 &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlPhantom = Block 0 ($camlPhantom__Make_6, $camlPhantom__Make2_9) in
 cont done ($camlPhantom)

@@ -7,7 +7,7 @@ let code loopify(never) size(9) newer_version_of(h_0)
         : imm tagged =
   let int_mul = %int_barith.mul (x, x) in
   let int_mul_1 = %int_barith.mul (int_mul, x) in
-  cont k (int_mul_1)
+  cont k close[normal] my_alloc_region (int_mul_1)
 in
 let $camlInlining_arguments_meet__h_2 =
   closure h_0_1 @h &toplevel.alloc_region
@@ -21,7 +21,7 @@ let code loopify(never) size(17) newer_version_of(g_with_code_size_between_11_an
   let int_mul_1 = %int_barith.mul (int_mul, y) in
   let int_mul_2 = %int_barith.mul (int_mul_1, y) in
   let int_mul_3 = %int_barith.mul (int_mul_2, y) in
-  cont k (int_mul_3)
+  cont k close[normal] my_alloc_region (int_mul_3)
 in
 let $camlInlining_arguments_meet__g_with_code_size_between_11_and_20_3 =
   closure g_with_code_size_between_11_and_20_3
@@ -37,11 +37,12 @@ let code loopify(never) size(17) newer_version_of(q_1)
   let int_mul_1 = %int_barith.mul (int_mul, x) in
   let int_mul_2 = %int_barith.mul (int_mul_1, x) in
   let int_mul_3 = %int_barith.mul (int_mul_2, x) in
-  cont k (int_mul_3)
+  cont k close[normal] my_alloc_region (int_mul_3)
 in
 let $camlInlining_arguments_meet__q_4 =
   closure q_1_1 @q &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlInlining_arguments_meet =
   Block 0 ($camlInlining_arguments_meet__h_2,
            $camlInlining_arguments_meet__g_with_code_size_between_11_and_20_3,
