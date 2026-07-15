@@ -1,23 +1,23 @@
-let $camlData_flow_bug__string63 = "index out of bounds" in
-let $camlData_flow_bug__block65 =
+let $camlData_flow_bug__string65 = "index out of bounds" in
+let $camlData_flow_bug__block67 =
   Block 0 ($`*predef*`.caml_exn_Invalid_argument,
-           $camlData_flow_bug__string63)
+           $camlData_flow_bug__string65)
 in
-let $camlData_flow_bug__immstring19 = "" in
-let $camlData_flow_bug__const_block10 = Block 0 (126, 0) in
-let $camlData_flow_bug__const_block12 =
-  Block 0 (63, $camlData_flow_bug__const_block10)
-in
+let $camlData_flow_bug__immstring21 = "" in
+let $camlData_flow_bug__const_block12 = Block 0 (126, 0) in
 let $camlData_flow_bug__const_block14 =
-  Block 0 (33, $camlData_flow_bug__const_block12)
+  Block 0 (63, $camlData_flow_bug__const_block12)
 in
-let Popaque = %opaque ($camlData_flow_bug__immstring19) in
+let $camlData_flow_bug__const_block16 =
+  Block 0 (33, $camlData_flow_bug__const_block14)
+in
+let Popaque = %opaque ($camlData_flow_bug__immstring21) in
 (let Popaque_1 = %opaque (1) in
  let untagged = %untag_imm (Popaque_1) in
- let $camlData_flow_bug__Pmakeblock101 = Block 0 (906850200, Popaque) in
+ let $camlData_flow_bug__Pmakeblock106 = Block 0 (906850200, Popaque) in
  switch untagged
    | 0 -> k (-453122489)
-   | 1 -> k ($camlData_flow_bug__Pmakeblock101))
+   | 1 -> k ($camlData_flow_bug__Pmakeblock106))
   where k (fix : val) =
     ((let prim = %is_int (fix) in
       switch prim
@@ -76,7 +76,7 @@ let Popaque = %opaque ($camlData_flow_bug__immstring19) in
                                      ($`*extern*`.caml_string_notequal
                                       : val * val -> val)
                                        (Popaque,
-                                        $camlData_flow_bug__immstring19)
+                                        $camlData_flow_bug__immstring21)
                                        -> k1 * error
                                      where k1 (Pccall) =
                                        ((let untagged = %untag_imm (Pccall)
@@ -108,7 +108,7 @@ let Popaque = %opaque ($camlData_flow_bug__immstring19) in
                                                    %tag_imm (prim)
                                                  in
                                                  (cont `self`
-                                                         ($camlData_flow_bug__const_block14)
+                                                         ($camlData_flow_bug__const_block16)
                                                     where rec `self`
                                                                 (param :
                                                                    [ 0
@@ -161,7 +161,7 @@ let Popaque = %opaque ($camlData_flow_bug__immstring19) in
                                                where k1 =
                                                  cont error
                                                         pop(regular error)
-                                                        ($camlData_flow_bug__block65)))))))))
+                                                        ($camlData_flow_bug__block67)))))))))
        where k =
          let $camlData_flow_bug = Block 0 () in
          cont done ($camlData_flow_bug))

@@ -1125,7 +1125,11 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   match (f : P.unary_primitive) with
   | Block_load { kind; mut; field } ->
     None, res, block_load ~dbg kind mut ~field ~block:arg
-  | Duplicate_array _ | Duplicate_block _ | Obj_dup ->
+  | Duplicate_array { alloc_region; _ }
+  | Duplicate_block { alloc_region; _ }
+  | Obj_dup { alloc_region } ->
+    (* CR alloc_regions: propagate alloc_regions to CMM. *)
+    let () = ignore alloc_region in
     ( None,
       res,
       (C.extcall ~dbg ~alloc:true ~returns:true ~is_c_builtin:false
@@ -1171,6 +1175,7 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   | Unbox_number kind -> None, res, unbox_number ~dbg kind arg
   | Untag_immediate -> Some (Env.Untag arg), res, C.untag_int arg dbg
   | Box_number (kind, alloc_mode) ->
+    (* CR alloc_regions: propagate alloc_regions to CMM. *)
     None, res, box_number ~dbg kind alloc_mode arg
   | Tag_immediate ->
     (* We could return [Env.Tag] here, but probably unnecessary at the
@@ -1251,7 +1256,8 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
       |> C.memory_chunk_of_kind
     in
     None, res, C.load ~dbg memory_chunk Mutable ~addr:arg
-  | Make_lazy lazy_tag ->
+  | Make_lazy { lazy_tag; alloc_region = _ } ->
+    (* CR alloc_regions: propagate alloc_regions to CMM. *)
     let tag = Tag.to_int (P.Lazy_block_tag.to_tag lazy_tag) in
     None, res, C.make_alloc ~mode:Heap dbg ~tag [arg]
 
@@ -1372,8 +1378,12 @@ let variadic_primitive _env dbg f args =
     C.beginregion ~dbg
   | Begin_region { ghost = true } | Begin_try_region { ghost = true } ->
     C.int ~dbg 0
-  | Make_block (kind, _mut, alloc_mode) -> make_block ~dbg kind alloc_mode args
-  | Make_array (kind, _mut, alloc_mode) -> make_array ~dbg kind alloc_mode args
+  | Make_block (kind, _mut, alloc_mode) ->
+    (* CR alloc_regions: propagate alloc_regions to CMM. *)
+    make_block ~dbg kind alloc_mode args
+  | Make_array (kind, _mut, alloc_mode) ->
+    (* CR alloc_regions: propagate alloc_regions to CMM. *)
+    make_array ~dbg kind alloc_mode args
 
 let arg ?consider_inlining_effectful_expressions ~dbg env res simple =
   C.simple ?consider_inlining_effectful_expressions ~dbg env res simple
