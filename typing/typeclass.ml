@@ -230,7 +230,7 @@ let raise_add_method_failure loc env label sign failure =
 let raise_add_instance_variable_failure loc env label failure =
   match (failure : Ctype.add_instance_variable_failure) with
   | Ctype.Mutability_mismatch mut ->
-      Error.log_and_raise loc env (Mutability_mismatch(label, mut))
+      Error.log_and_raise loc env (Mutability_mismatch (label, mut))
   | Ctype.Type_mismatch trace ->
       Error.log_and_raise loc env
         (Field_type_mismatch("instance variable", label, trace))
@@ -265,7 +265,8 @@ let inherit_class_type ~strict loc env sign1 cty2 =
   let sign2 =
     match Btype.scrape_class_type cty2 with
     | Cty_signature sign2 -> sign2
-    | _ -> Error.log_and_raise loc env (Structure_expected cty2)
+    | _ ->
+        Error.log_and_raise loc env (Structure_expected cty2)
   in
   inherit_class_signature ~strict loc env sign1 sign2
 
@@ -273,8 +274,7 @@ let unify_delayed_method_type loc env label ty expected_ty=
   match Ctype.unify env ty expected_ty with
   | () -> ()
   | exception Ctype.Unify trace ->
-      Error.log_and_raise loc env
-        (Field_type_mismatch ("method", label, trace))
+      Error.log_and_raise loc env (Field_type_mismatch ("method", label, trace))
 
 let type_constraint val_env sty sty' loc =
   let cty  = transl_simple_type ~new_var_jkind:Any val_env ~closed:false Alloc.Const.legacy sty in
@@ -659,7 +659,7 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
                       (cname :: VarSet.elements over_vals));
            | Override ->
                if MethSet.is_empty over_meths && VarSet.is_empty over_vals then
-                 Error.log_and_raise loc val_env (No_overriding ("",""))
+                 Error.log_and_raise loc val_env (No_overriding ("", ""))
            end;
            let concrete_vals = VarSet.union new_concrete_vals concrete_vals in
            let concrete_meths =
@@ -1219,7 +1219,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
          }
   | Pcl_fun (l, Some default, spat, sbody) ->
       if Typecore.has_poly_constraint spat then
-        Error.log_and_raise spat.ppat_loc val_env (Polymorphic_class_parameter);
+        Error.log_and_raise spat.ppat_loc val_env Polymorphic_class_parameter;
       let loc = default.pexp_loc in
       let open Ast_helper in
       let scases = [
@@ -1262,7 +1262,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
   | Pcl_fun (l, None, spat, scl') ->
       let l, spat = Typetexp.transl_label_from_pat l spat in
       if Typecore.has_poly_constraint spat then
-        Error.log_and_raise spat.ppat_loc val_env (Polymorphic_class_parameter);
+        Error.log_and_raise spat.ppat_loc val_env Polymorphic_class_parameter;
       let (pat, pv, val_env', met_env) =
         Ctype.with_local_level_generalize_structure_if_principal
           (fun () ->
@@ -1804,8 +1804,8 @@ let class_infos define_class kind
     begin try
       List.iter2 (Ctype.unify env) cl_params cl_params'
     with Ctype.Unify _ ->
-      (Error.log_and_raise cl.pci_loc env
-         (Bad_class_type_parameters (ty_id, cl_params, cl_params')))
+      Error.log_and_raise cl.pci_loc env
+        (Bad_class_type_parameters (ty_id, cl_params, cl_params'))
     end;
     begin try
       Ctype.unify env ty cl_ty
@@ -1952,8 +1952,7 @@ let final_decl env define_class
           Format_doc.doc_printf "%a"
             (Printtyp.Doc.cltype_declaration id) cltydef
       in
-      Error.log_and_raise cl.pci_loc env
-        (Unbound_type_var(printer, reason))
+      Error.log_and_raise cl.pci_loc env (Unbound_type_var(printer, reason))
   end;
   { id; clty; ty_id; cltydef; obj_id; obj_abbr; arity;
     pub_meths; coe;
