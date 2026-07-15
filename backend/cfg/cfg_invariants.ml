@@ -53,6 +53,13 @@ let lookup_block t ~kind ~referrer label =
       Label.print label Label.print referrer;
     None
 
+(* [Proc.types_are_compatible] can itself fatal-error on register types that are
+   invalid for the target (e.g. 256/512-bit vectors on arm64). Treat such
+   registers as incompatible so that the problem is reported by the caller
+   instead of crashing the checker. *)
+let types_are_compatible left right =
+  try Proc.types_are_compatible left right with Misc.Fatal_error -> false
+
 let print_layout ppf layout =
   Format.(
     pp_print_list ~pp_sep:pp_print_space Label.print ppf (layout |> DLL.to_list))
@@ -264,7 +271,7 @@ let check_basic_arity t label (instr : Cfg.basic Cfg.instruction) =
       if
         Array.length args = 1
         && Array.length res = 1
-        && not (Proc.types_are_compatible args.(0) res.(0))
+        && not (types_are_compatible args.(0) res.(0))
       then
         report t "%a (instr %a): %s uses incompatible registers %a -> %a"
           Label.print label InstructionId.print instr.id desc Printreg.reg
@@ -314,14 +321,14 @@ let check_basic_arity t label (instr : Cfg.basic Cfg.instruction) =
         report t "%a (instr %a): %s with %d argument(s), expected at least 3"
           Label.print label InstructionId.print instr.id desc len_args;
       check ~expected_args:[] ~expected_res:[1];
-      if Array.length res = 1
+      if len_args >= 3 && Array.length res = 1
       then
         let ifso = args.(len_args - 2) in
         let ifnot = args.(len_args - 1) in
         let res0 = res.(0) in
         if
-          (not (Proc.types_are_compatible res0 ifso))
-          || not (Proc.types_are_compatible res0 ifnot)
+          (not (types_are_compatible res0 ifso))
+          || not (types_are_compatible res0 ifnot)
         then
           report t
             "%a (instr %a): %s result type mismatches selected values %a/%a"
@@ -343,7 +350,7 @@ let check_basic_arity t label (instr : Cfg.basic Cfg.instruction) =
           label InstructionId.print instr.id desc len_args len_res
       else
         for i = 0 to len_args - 1 do
-          if not (Proc.types_are_compatible args.(i) res.(i))
+          if not (types_are_compatible args.(i) res.(i))
           then
             report t "%a (instr %a): %s uses incompatible opaque pair %a -> %a"
               Label.print label InstructionId.print instr.id desc Printreg.reg
@@ -351,7 +358,12 @@ let check_basic_arity t label (instr : Cfg.basic Cfg.instruction) =
         done
     | Begin_region -> check ~expected_args:[0] ~expected_res:[1]
     | End_region -> check ~expected_args:[1] ~expected_res:[0]
-    | Specific _ -> ()
+    | Specific _ ->
+      (* CR-soon xclerc for xclerc: [Specific] operations are currently not
+         checked at all (neither arity nor register types). This catch-all is a
+         recurring weak point across CFG passes; consider adding a per-target
+         hook to validate at least the memory-operand forms. *)
+      ()
     | Name_for_debugger _ -> check ~expected_args:[0] ~expected_res:[0]
     | Dls_get | Tls_get | Domain_index ->
       check ~expected_args:[0] ~expected_res:[1]
@@ -622,6 +634,63 @@ let check_instruction_ids t =
       "next_instruction_id %a is not greater than the largest id in use %a"
       InstructionId.print next_id InstructionId.print !max_id
 
+(* Check that every block is reachable from the entry block, or from a block
+   with no predecessors. With the default flags, all blocks are expected to be
+   reachable from the entry block; unreachable blocks can however occur when
+   [-no-cfg-eliminate-dead-trap-handlers] is passed (a trap handler whose region
+   contains no instruction that can raise is then kept, although it has no
+   incoming edge). If dead blocks were to form a cycle in which every block has
+   a predecessor, passes building dominators (e.g. through [check_reducibility],
+   or [Cfg_polling]) would fatal-error while looking for the roots of the
+   dominator forest; hence the check below. *)
+let check_dead_cycles t =
+  let num_blocks = Label.Tbl.length t.cfg.blocks in
+  let visited = Label.Tbl.create num_blocks in
+  let rec visit label =
+    if not (Label.Tbl.mem visited label)
+    then
+      match Cfg.get_block t.cfg label with
+      | None ->
+        (* Dangling label: already reported by [check_block]. *)
+        ()
+      | Some block ->
+        Label.Tbl.replace visited label ();
+        Label.Set.iter visit (Cfg.successor_labels ~normal:true ~exn:true block)
+  in
+  let find_unvisited_pseudo_entry () =
+    Cfg.fold_blocks t.cfg ~init:None ~f:(fun label block acc ->
+        match acc with
+        | Some _ -> acc
+        | None ->
+          if
+            (not (Label.Tbl.mem visited label))
+            && Label.Set.is_empty block.predecessors
+          then Some label
+          else None)
+  in
+  let rec visit_all () =
+    if Label.Tbl.length visited < num_blocks
+    then
+      match find_unvisited_pseudo_entry () with
+      | Some label ->
+        visit label;
+        visit_all ()
+      | None ->
+        let remaining =
+          Cfg.fold_blocks t.cfg ~init:Label.Set.empty
+            ~f:(fun label (_ : Cfg.basic_block) acc ->
+              if Label.Tbl.mem visited label
+              then acc
+              else Label.Set.add label acc)
+        in
+        report t
+          "blocks %a are not reachable from the entry block or from a block \
+           with no predecessors (dead blocks form a cycle)"
+          Label.Set.print remaining
+  in
+  visit t.cfg.entry_label;
+  visit_all ()
+
 let run ppf cfg_with_layout =
   let cfg = CL.cfg cfg_with_layout in
   let layout = CL.layout cfg_with_layout in
@@ -637,7 +706,15 @@ let run ppf cfg_with_layout =
   Cfg.iter_blocks ~f:(check_block t) cfg;
   check_instruction_ids t;
   check_tailrec_position t;
-  let cfg_with_infos = Cfg_with_infos.make cfg_with_layout in
-  check_reducibility t cfg_with_infos;
-  check_liveness t cfg_with_infos;
+  check_dead_cycles t;
+  (* The checks below force analyses (liveness, and dominators for the
+     reducibility check) that assume a structurally sound CFG: they look up
+     blocks with [Cfg.get_block_exn], and would fatal-error on e.g. a dangling
+     label or an isolated cycle of dead blocks. Skip them if a violation has
+     already been reported, so that the checker reports instead of crashing. *)
+  if not t.result
+  then (
+    let cfg_with_infos = Cfg_with_infos.make cfg_with_layout in
+    check_reducibility t cfg_with_infos;
+    check_liveness t cfg_with_infos);
   t.result
