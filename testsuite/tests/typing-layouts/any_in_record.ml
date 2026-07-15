@@ -615,10 +615,13 @@ Error: This constant has type "float#" but an expression was expected of type
 type _ t_gadt = Int : int t_gadt
 type ('a : any) t_rec = { fld : 'a; fld2 : int }
 [%%expect {|
+type _ t_gadt = Int : int t_gadt
+type ('a : any) t_rec = { fld : 'a; fld2 : int; }
 |}]
 
 let f (type a) (x : a t_gadt) (y : a) =
   match x with
     Int -> { fld = y; fld2 = 0 }.fld
 [%%expect {|
+val f : 'a t_gadt -> 'a -> 'a = <fun>
 |}]
