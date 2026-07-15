@@ -103,9 +103,65 @@ type error =
       old_source_file : Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+  | Cannot_remove_nondep_dependency of string
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
+
+(* The [-nondep Foo] flag erases a global module [Foo] from a generated [.cmi]:
+   the two functions below remove it from, respectively, the signature and the
+   [cmi_globals] of the saved interface. They are meant to be used together. *)
+
+(* Rewrite [sg] so that it no longer mentions any of the global modules named by
+   [-nondep], using [Mtype.nondep_sig] to erase references by expansion. Raises
+   a hard error if a reference cannot be erased. *)
+let remove_nondep_dependencies env ~sourcefile sg =
+  match !Clflags.nondep_globals with
+  | [] -> sg
+  | names ->
+      let ids =
+        List.map
+          (fun name ->
+             Ident.create_global (Global_module.Name.create_no_args name))
+          names
+      in
+      (try Mtype.nondep_sig env ids sg
+       with Ctype.Nondep_cannot_erase id ->
+         raise
+           (Error (Location.in_file sourcefile, env,
+                   Cannot_remove_nondep_dependency (Ident.name id))))
+
+(* Drop from [cmi] any reference to a module named by [-nondep]: once its
+   references have been erased from the signature (see above) the unit no longer
+   needs to remember it, either as an incomplete global in [cmi_globals] (used
+   for substitution) or as an import in [cmi_crcs] (used for consistency
+   checking). Applied as a transform at save time so that the live [penv] used
+   by code generation is left untouched. *)
+let remove_nondep_from_cmi (cmi : Cmi_format.cmi_infos_lazy)
+  : Cmi_format.cmi_infos_lazy =
+  match !Clflags.nondep_globals with
+  | [] -> cmi
+  | names ->
+      let nondep = List.map Global_module.Name.create_no_args names in
+      let keep_global (global, _precision) =
+        not (List.exists
+               (fun name ->
+                  Global_module.Name.equal name (Global_module.to_name global))
+               nondep)
+      in
+      let cmi_globals =
+        Array.of_list (List.filter keep_global (Array.to_list cmi.cmi_globals))
+      in
+      let import_names = List.map Compilation_unit.Name.of_string names in
+      let keep_import import =
+        not (List.exists
+               (fun name -> Import_info.has_name import ~name)
+               import_names)
+      in
+      let cmi_crcs =
+        Array.of_list (List.filter keep_import (Array.to_list cmi.cmi_crcs))
+      in
+      { cmi with cmi_globals; cmi_crcs }
 
 let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   let mode = Mode.Value.newvar () in
@@ -4627,9 +4683,13 @@ let type_implementation target modulename initial_env ast =
             let kind =
               Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = arg_type }
             in
+            let cmi_sg =
+              remove_nondep_dependencies finalenv ~sourcefile simple_sg
+            in
             let cmi =
               Profile.record_call "save_cmi" (fun () ->
-                Env.save_signature ~alerts (simple_sg, Staticity.Dynamic)
+                Env.save_signature_with_transform remove_nondep_from_cmi
+                  ~alerts (cmi_sg, Staticity.Dynamic)
                   name kind (Unit_info.cmi target))
             in
             Profile.record_call "save_cmt" (fun () ->
@@ -4693,7 +4753,8 @@ let type_interface ~sourcefile modulename env ast =
   ignore (check_argument_type_if_given env sourcefile ~actual_staticity
             sg.sig_type arg_type
           : Typedtree.argument_interface option);
-  sg
+  { sg with
+    sig_type = remove_nondep_dependencies env ~sourcefile sg.sig_type }
 
 (* "Packaging" of several compilation units into one unit
    having them as sub-modules.  *)
@@ -5155,6 +5216,11 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "This instance has multiple arguments with the name %a."
         (Style.as_inline_code Global_module.Parameter_name.print) name
+  | Cannot_remove_nondep_dependency name ->
+      Location.errorf ~loc
+        "Cannot remove all references to module %a@ requested by -nondep:@ \
+         it is used in a position that cannot be erased."
+        Style.inline_code name
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env ~error:true env
