@@ -727,20 +727,22 @@ let mk_no_reaper_change_calling_conventions f =
        functions%s (Flambda2 only)"
       (format_not_default Flambda2.Default.reaper_change_calling_conventions) )
 
+(* CR mvellacott: Update -[no-]-support-lto help text once implemented. *)
+
 let mk_support_lto f =
   ( "-support-lto",
     Arg.Unit f,
     Printf.sprintf
-      " Enable link time dead code elimination (unimplemented)%s (Flambda2 \
-       only)"
+      " Build metadata for use in link time optimisation (unimplemented)%s \
+       (Flambda2 only)"
       (format_default Flambda2.Default.support_lto) )
 
 let mk_no_support_lto f =
   ( "-no-support-lto",
     Arg.Unit f,
     Printf.sprintf
-      " Disable link time dead code elimination (unimplemented)%s (Flambda2 \
-       only)"
+      " Don't build metadata for use in link time optimisation \
+       (unimplemented)%s (Flambda2 only)"
       (format_not_default Flambda2.Default.support_lto) )
 
 let mk_flambda2_match_in_match f =
