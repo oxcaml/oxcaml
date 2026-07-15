@@ -309,7 +309,16 @@ int caml_lf_skiplist_insert(struct lf_skiplist *sk, uintnat key, uintnat data) {
     struct lf_skipcell *succ;
 
     if (found) {
-      /* Already present; update data */
+      /* Already present; update data
+
+         At the point when the below [atomic_store_relaxed] takes effect, the
+         node may actually have been removed from the skiplist and/or there can
+         be multiple concurrent inserts to the same `data` field.
+
+         This does not break linearizability -- if the node was removed, then
+         all concurrent inserts would linearize to the point just before the
+         removal.  However, this does mean that the consensus number of insert
+         is 1. */
       atomic_store_relaxed((atomic_uintnat*)&succs[0]->data, data);
       return 1;
     } else {
