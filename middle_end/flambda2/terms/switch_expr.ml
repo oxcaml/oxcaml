@@ -69,7 +69,16 @@ let print ppf { condition_dbg; scrutinee; arms } =
     Flambda_colours.debuginfo Debuginfo.print_compact condition_dbg
     Flambda_colours.pop print_arms arms
 
-let create ~condition_dbg ~scrutinee ~arms = { condition_dbg; scrutinee; arms }
+let create ~condition_dbg ~scrutinee ~arms =
+  (* Switch discriminants are non-negative by construction. *)
+  Target_ocaml_int.Map.iter
+    (fun discr _action ->
+      if not (Target_ocaml_int.is_non_negative discr)
+      then
+        Misc.fatal_errorf "Switch discriminant must be non-negative:@ %a"
+          Target_ocaml_int.print discr)
+    arms;
+  { condition_dbg; scrutinee; arms }
 
 let if_then_else ~machine_width ~condition_dbg ~scrutinee ~if_true ~if_false =
   let arms =

@@ -818,8 +818,18 @@ let simplify_obj_dup dbg dacc ~original_term ~arg ~arg_ty ~result_var =
         ~try_reify:true dacc)
   | Unknown -> (
     match T.prove_strings typing_env arg_ty with
-    | Proved _ -> elide_primitive ()
-    | Unknown -> SPR.create_unknown dacc ~result_var K.value ~original_term)
+    | Proved strs
+      when String_info.Set.for_all
+             (fun info ->
+               match String_info.contents info with
+               | String_info.Contents _ -> true
+               | String_info.Unknown_or_mutable -> false)
+             strs ->
+      (* Only elide when the contents are statically known immutable; a mutable
+         string (or one whose contents are unknown) must be duplicated. *)
+      elide_primitive ()
+    | Proved _ | Unknown ->
+      SPR.create_unknown dacc ~result_var K.value ~original_term)
 
 let simplify_get_header ~original_prim dacc ~original_term ~arg:_ ~arg_ty:_
     ~result_var =
