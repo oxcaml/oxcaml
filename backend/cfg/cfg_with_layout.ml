@@ -415,10 +415,17 @@ let insert_block :
   let dbg, fdo, live, stack_offset, available_before, available_across =
     match DLL.last body with
     | None ->
-      ( Debuginfo.none,
-        Fdo_info.none,
+      (* The debuginfo (and FDO information) of the predecessor's terminator is
+         propagated to the new block's terminator, so that instructions
+         subsequently inserted into the new block whose debuginfo is derived
+         from that of the terminator (e.g. reloads inserted after a call, cf.
+         [Regalloc_split]) can be attributed to the relevant position in the
+         predecessor. *)
+      ( predecessor_block.terminator.dbg,
+        predecessor_block.terminator.fdo,
         Reg.Set.empty,
         predecessor_block.terminator.stack_offset,
+        (* CR mshinwell: should these be propagated from the predecessor? *)
         Reg_availability_set.Unreachable,
         Reg_availability_set.Unreachable )
     | Some
