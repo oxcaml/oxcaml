@@ -248,8 +248,8 @@ let flags_never_observed start_cell =
           true
         (* Instructions that write only some flags or leave some undefined: keep
            scanning. *)
-        | INC _ | DEC _ | MUL _ | IMUL _ | IDIV _ | BSF _ | BSR _ | SAL _
-        | SAR _ | SHR _ ->
+        | INC _ | DEC _ | MUL _ | IMUL _ | IDIV _ | DIV _ | BSF _ | BSR _
+        | SAL _ | SAR _ | SHR _ ->
           loop (DLL.next cell)
         (* Instructions that don't touch the flags. *)
         | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | CDQ
