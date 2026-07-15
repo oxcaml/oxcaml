@@ -423,20 +423,23 @@ let insert_block :
     Misc.fatal_errorf
       "Cannot insert a block after block %a: it has no successors" Label.print
       predecessor_block.start;
-  let dbg, fdo, live, stack_offset, available_before, available_across =
+  let dbg, fdo, live, available_before, available_across =
     match DLL.last body with
     | None ->
       ( Debuginfo.none,
         Fdo_info.none,
         Reg.Set.empty,
-        predecessor_block.terminator.stack_offset,
         Reg_availability_set.Unreachable,
         Reg_availability_set.Unreachable )
-    | Some
-        { dbg; fdo; live; stack_offset; available_before; available_across; _ }
-      ->
-      dbg, fdo, live, stack_offset, available_before, available_across
+    | Some { dbg; fdo; live; available_before; available_across; _ } ->
+      dbg, fdo, live, available_before, available_across
   in
+  (* The inserted blocks sit on edges out of [predecessor_block], so the offset
+     after their body must be the offset at the edge, i.e. at the predecessor's
+     terminator. (An instruction's [stack_offset] field is the offset before the
+     instruction executes, so the last body instruction's field would be wrong
+     whenever that instruction changes the offset.) *)
+  let stack_offset = predecessor_block.terminator.stack_offset in
   let copy (i : Cfg.basic Cfg.instruction) : Cfg.basic Cfg.instruction =
     { i with id = InstructionId.get_and_incr cfg.next_instruction_id }
   in
@@ -474,7 +477,7 @@ let insert_block :
             };
           (* The [predecessor_block] is the only predecessor. *)
           predecessors = Label.Set.singleton predecessor_block.start;
-          stack_offset = predecessor_block.terminator.stack_offset;
+          stack_offset;
           exn = None;
           can_raise = false;
           is_trap_handler = false;
