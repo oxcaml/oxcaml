@@ -686,21 +686,6 @@ module Base = struct
   (* This is only correct on bases that have been fully expanded or that come
      from the output of [Base.expand_until_comparable]. See comment on
      that function. *)
-  let sub_expanded base1 base2 =
-    match base1, base2 with
-    | Layout l1, Layout l2 -> Layout.sub l1 l2
-    | Kconstr (k1, sa1), Kconstr (k2, sa2) when Path.same k1 k2 -> (
-      match Scannable_axes.less_or_equal sa1 sa2 with
-      | Equal -> Sub_result.Equal
-      | Less -> Sub_result.Less
-      | Not_le -> Sub_result.Not_le [Layout_disagreement])
-    | Kconstr (_, sa_k), Layout (Layout.Any sa_any) -> (
-      match Scannable_axes.less_or_equal sa_k sa_any with
-      | Equal | Less -> Sub_result.Less
-      | Not_le -> Sub_result.Not_le [Layout_disagreement])
-    | Kconstr _, Layout _ | Layout _, Kconstr _ | Kconstr _, Kconstr _ ->
-      Sub_result.Not_le [Layout_disagreement]
-
   (* This is only correct on bases that come from the output of
      [Base.expand_until_comparable]. See comment on that function. *)
   let has_intersection_expanded base1 base2 =
@@ -783,10 +768,12 @@ module Base_and_axes = struct
   let jkind_desc_of_const const =
     { const with base = Base.map_layout ~f:Layout.of_const const.base }
 
-  let debug_print format_layout ppf { base; mod_bounds; with_bounds; _ } =
+  let debug_print format_layout ppf { base; ikind_floor; with_bounds; _ } =
     Format.fprintf ppf "{ base = %a;@ mod_bounds = %a;@ with_bounds = %a }"
       (Base.format format_layout)
-      base Mod_bounds.debug_print mod_bounds With_bounds.debug_print with_bounds
+      base Mod_bounds.debug_print
+      (Mod_bounds.of_axis_lattice ikind_floor)
+      With_bounds.debug_print with_bounds
 
   type 'a expand_result =
     | Expanded of 'a
@@ -809,10 +796,15 @@ module Base_and_axes = struct
       | { jkind_manifest = Some ({ with_bounds = No_with_bounds; _ } as jkind);
           _
         } ->
-        let mod_bounds = Mod_bounds.meet t.mod_bounds jkind.mod_bounds in
+        let mod_bounds =
+          Mod_bounds.meet
+            (Mod_bounds.of_axis_lattice t.ikind_floor)
+            (Mod_bounds.of_axis_lattice jkind.ikind_floor)
+        in
         if
           With_bounds.is_empty t.with_bounds
-          && Mod_bounds.equal mod_bounds jkind.mod_bounds
+          && Mod_bounds.equal mod_bounds
+               (Mod_bounds.of_axis_lattice jkind.ikind_floor)
           &&
           let sa_won't_strengthen_jkind =
             match jkind.base with
@@ -830,7 +822,7 @@ module Base_and_axes = struct
         else
           Expanded
             { base = meet_scannable_axes jkind.base sa;
-              mod_bounds;
+              ikind_floor = Mod_bounds.to_axis_lattice mod_bounds;
               with_bounds = t.with_bounds
             })
 
@@ -924,7 +916,8 @@ module Base_and_axes = struct
       { t with with_bounds = No_with_bounds }, Sufficient_fuel
     | _
       when (not t_has_abstract_base)
-           && Mod_bounds.is_max_within_set t.mod_bounds
+           && Mod_bounds.is_max_within_set
+                (Mod_bounds.of_axis_lattice t.ikind_floor)
                 (Axis_set.complement skip_axes) ->
       { t with with_bounds = No_with_bounds }, Sufficient_fuel
     | _ ->
@@ -1324,7 +1317,8 @@ module Base_and_axes = struct
                   (* must expand aliases before trusting b_jkind's mod_bounds *)
                   fully_expand_aliases env b_jkind.jkind
                 in
-                (found_jkind_for_ty ctl b_jkind_jkind.mod_bounds
+                (found_jkind_for_ty ctl
+                   (Mod_bounds.of_axis_lattice b_jkind_jkind.ikind_floor)
                    b_jkind_jkind.with_bounds b_jkind.quality skippable_axes
                  [@nontail])
               | None ->
@@ -1334,7 +1328,11 @@ module Base_and_axes = struct
                 found_jkind_for_ty ctl Mod_bounds.max No_with_bounds Not_best
                   skippable_axes [@nontail])))
       in
-      let mod_bounds = Mod_bounds.set_max_in_set t.mod_bounds skip_axes in
+      let mod_bounds =
+        Mod_bounds.set_max_in_set
+          (Mod_bounds.of_axis_lattice t.ikind_floor)
+          skip_axes
+      in
       let mod_bounds, with_bounds, ctl =
         match t.with_bounds with
         | No_with_bounds -> mod_bounds, No_with_bounds, Loop_control.starting
@@ -1347,7 +1345,10 @@ module Base_and_axes = struct
       let normalized_t : (_, l * r) base_and_axes =
         match mode, ctl.fuel_status with
         | Require_best, Sufficient_fuel | Ignore_best, _ ->
-          { t with mod_bounds; with_bounds }
+          { t with
+            ikind_floor = Mod_bounds.to_axis_lattice mod_bounds;
+            with_bounds
+          }
         | Require_best, Ran_out_of_fuel ->
           (* Note [Ran out of fuel when requiring best]
              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1408,7 +1409,7 @@ module Jkind_desc = struct
 
   let unsafely_set_bounds env t ~from =
     let from = Base_and_axes.fully_expand_aliases env from in
-    { t with mod_bounds = from.mod_bounds; with_bounds = from.with_bounds }
+    { t with ikind_floor = from.ikind_floor; with_bounds = from.with_bounds }
 
   let expand_pair env t1 t2 =
     match
@@ -1429,14 +1430,14 @@ module Jkind_desc = struct
 
   let rec equate_or_equal ~allow_mutation env t1 t2 =
     let { base = base1;
-          mod_bounds = mod_bounds1;
+          ikind_floor = mod_bounds1;
           with_bounds = (No_with_bounds : (allowed * allowed) with_bounds);
           _
         } =
       t1
     in
     let { base = base2;
-          mod_bounds = mod_bounds2;
+          ikind_floor = mod_bounds2;
           with_bounds = (No_with_bounds : (allowed * allowed) with_bounds);
           _
         } =
@@ -1445,88 +1446,38 @@ module Jkind_desc = struct
     match base1, base2 with
     | Layout l1, Layout l2 ->
       Layout.equate_or_equal ~allow_mutation l1 l2
-      && Mod_bounds.equal mod_bounds1 mod_bounds2
+      (* perf: packed-lattice equality; faithful to Mod_bounds.equal on the
+         materialized records, no Mode.Crossing allocation *)
+      && Axis_lattice.equal mod_bounds1 mod_bounds2
     | Kconstr (p1, sa1), Kconstr (p2, sa2)
       when Path.same p1 p2
            && Scannable_axes.equal sa1 sa2
-           && Mod_bounds.equal mod_bounds1 mod_bounds2 ->
+           && Axis_lattice.equal mod_bounds1 mod_bounds2 ->
       true
     | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
       | None -> false
       | Some (t1, t2) -> equate_or_equal ~allow_mutation env t1 t2)
 
-  let sub_expanded (type l r)
-      ({ base = base1; mod_bounds = bounds1; with_bounds = with_bounds1; _ } :
-        (allowed * r) jkind_desc)
-      ({ base = base2; mod_bounds = bounds2; with_bounds = No_with_bounds; _ } :
-        (l * allowed) jkind_desc) =
-    (* Rather than carefully expanding only as much as needed, this assumes both
-       kinds are fully expanded, and that [sub] is Ignore_best normalized. See
-       comment about [axes_max_on_right] in [sub] just below for why we do it
-       this way. *)
-    let bases = Base.sub_expanded base1 base2 in
-    match with_bounds1 with
-    | No_with_bounds ->
-      let bounds = Mod_bounds.less_or_equal bounds1 bounds2 in
-      Sub_result.combine bases bounds
-    | With_bounds _ -> (
-      (* Ignore_best normalization guarantees this only happens when the sub's
-         base is abstract after expansion. We punt: only succeeding if the rhs
-         is fully max. It's not sufficient to check that the bases are
-         comparable, because if the rhs has an abstract base its with bounds may
-         have been normalized away.
-
-         It's possible to do a bit better in he future, with help from
-         normalize. For example, we could allow [k mod contended with int < any
-         mod contended]. *)
-      match base2 with
-      | Layout (Any sa)
-        when Mod_bounds.is_max bounds2
-             && Scannable_axes.equal sa Scannable_axes.max ->
-        Sub_result.Less
-      | _ -> Sub_result.combine bases (Sub_result.Not_le [With_bounds_on_left]))
-
-  let sub (type l r) ~type_equal:_ ~context env ~sub_previously_ran_out_of_fuel
-      (sub : (allowed * r) jkind_desc) (super : (l * allowed) jkind_desc) =
-    let super =
-      (* The [axes_max_on_right] optimization just below is massively important
-         for the speed of the compiler. In a quick test in Nov 2025, it brought
-         the time to compile the compiler itself from 2:06 to 1:21. However, we
-         can't do the optimization without fully expanding [super], because a
-         kind alias may be hiding a mod bound. So, we eagerly fully expand
-         [super].
-
-         Possibly the normalization of [sub] should somehow be interleaved with
-         the expansion of [super] to avoid needing this, but we leave that
-         question for the in-progress rework of normalization. *)
-      Base_and_axes.fully_expand_aliases env super
-    in
-    let axes_max_on_right =
-      (* Optimization: if the upper_bound is max on the right, then that axis is
-         irrelevant - the left will always satisfy the right along that
-         axis. But we can only do this optimization for a concrete base, as an
-         abstract base may later be filled in with lower bounds. *)
-      match super.base with
-      | Layout _ -> Mod_bounds.get_max_axes super.mod_bounds
-      | Kconstr _ -> Axis_set.empty
-    in
-    let sub, _ =
-      Base_and_axes.normalize ~skip_axes:axes_max_on_right
-        ~previously_ran_out_of_fuel:sub_previously_ran_out_of_fuel
-        ~mode:Ignore_best ~context env sub
-    in
-    sub_expanded sub super
-
   let rec intersection env
-      ({ base = base1; mod_bounds = mod_bounds1; with_bounds = with_bounds1; _ }
-       as t1)
-      ({ base = base2; mod_bounds = mod_bounds2; with_bounds = with_bounds2; _ }
-       as t2) =
+      ({ base = base1;
+         ikind_floor = mod_bounds1;
+         with_bounds = with_bounds1;
+         _
+       } as t1)
+      ({ base = base2;
+         ikind_floor = mod_bounds2;
+         with_bounds = with_bounds2;
+         _
+       } as t2) =
     let make_intersection base =
       Intersection
         { base;
-          mod_bounds = Mod_bounds.meet mod_bounds1 mod_bounds2;
+          ikind_floor =
+            Mod_bounds.to_axis_lattice
+              (Mod_bounds.meet
+                 (Mod_bounds.of_axis_lattice mod_bounds1)
+                 (Mod_bounds.of_axis_lattice mod_bounds2));
           with_bounds = With_bounds.meet with_bounds1 with_bounds2
         }
     in
@@ -1567,7 +1518,7 @@ module Jkind_desc = struct
   let of_new_sort_var ~level sa =
     let layout, sort = Layout.of_new_sort_var ~level sa in
     ( { base = Layout layout;
-        mod_bounds = Mod_bounds.max;
+        ikind_floor = Mod_bounds.to_axis_lattice Mod_bounds.max;
         with_bounds = No_with_bounds
       },
       sort )
@@ -1575,7 +1526,7 @@ module Jkind_desc = struct
   let of_sort_univar univar =
     let layout = Layout.Sort (Sort.Univar univar, Scannable_axes.max) in
     { base = Layout layout;
-      mod_bounds = Mod_bounds.max;
+      ikind_floor = Mod_bounds.to_axis_lattice Mod_bounds.max;
       with_bounds = No_with_bounds
     }
 
@@ -1701,6 +1652,42 @@ module Const = struct
 
   let set_render_from_ikind f = render_from_ikind := f
 
+  (* param_name_resolver (PRINT-DESIGN.md 4.1): the live type-printer
+     variable-name table, keyed by [Types.get_id].  [Out_type] installs it
+     during type printing so the ikind with-clause renderer prints a decl's
+     OWN variable letters (e.g. [with 'b] on [type ('a, 'b) u : _ with 'b])
+     rather than a synthetic name derived from LDD-term order.  Returns
+     [None] when there is no live table (annotation contexts), where the
+     renderer falls back to its own synthetic naming. *)
+  let param_name_resolver = ref (fun (_ : int) -> (None : string option))
+
+  let set_param_name_resolver f = param_name_resolver := f
+
+  let resolve_param_name id = !param_name_resolver id
+
+  (* Z1: temporarily install [f] as the param-name resolver for the duration
+     of [k] (restoring on exit), so a two-sided error can render each jkind
+     against its OWN decl's param table (see [Violation.report_general]). *)
+  let with_param_name_resolver f k =
+    let old = !param_name_resolver in
+    param_name_resolver := f;
+    Fun.protect ~finally:(fun () -> param_name_resolver := old) k
+
+  (* path_oide_resolver (A2 fix): a with-bound constructor atom is a [Path.t];
+     the default renders it as a raw [Path.name] flat identifier, which
+     bypasses [Out_type]'s conflict-aware path printer and prints the WRONG
+     name under shadowing (e.g. [with X.t] where legacy prints [with X/2.t]).
+     [Out_type] installs a resolver routing through its namespaced
+     [tree_of_path] so shadowed paths disambiguate; the default preserves the
+     raw behavior for contexts with no live printer. *)
+  let path_oide_resolver : (Path.t -> Outcometree.out_ident) ref =
+    ref (fun p ->
+        Outcometree.Oide_ident { Outcometree.printed_name = Path.name p })
+
+  let set_path_oide_resolver f = path_oide_resolver := f
+
+  let resolve_path_oide path = !path_oide_resolver path
+
   module To_out_jkind_const : sig
     (** Convert a [t] into a [Outcometree.out_jkind_const]. If [verbosity] is
         [Not_verbose], the jkind is written in terms of the built-in jkind that
@@ -1714,6 +1701,13 @@ module Const = struct
       Env.t ->
       'd t ->
       Outcometree.out_jkind_const
+
+    (** Render a set of axes [ignored] by a with-bound's modality as the
+        [out_modality] strings a [with]-clause carries (e.g. [portable]). Used
+        by the ikind-derived printer to reconstruct [@@ modality] clauses from
+        LDD coefficients. Mirrors the legacy per-with-bound modality path. *)
+    val out_modalities_of_ignored_axes :
+      Jkind_axis.Axis_set.t -> Outcometree.out_modality list
   end = struct
     type printable_jkind =
       { base : string;
@@ -1829,10 +1823,11 @@ module Const = struct
            ikind for with-bounds-free jkinds; [None] => legacy fallback. *)
         match !floor_from_ikind.derive env actual with
         | Some mod_bounds -> mod_bounds
-        | None -> actual.mod_bounds
+        | None -> Mod_bounds.of_axis_lattice actual.ikind_floor
       in
       let modal_bounds =
-        get_modal_bounds ~verbosity ~base:base_jkind.mod_bounds
+        get_modal_bounds ~verbosity
+          ~base:(Mod_bounds.of_axis_lattice base_jkind.ikind_floor)
           actual_mod_bounds
       in
       let printable_with_bounds =
@@ -1854,7 +1849,8 @@ module Const = struct
             (fun (_, type_info) out_type ->
               let axes_ignored_by_modalities =
                 With_bounds.Type_info.axes_ignored_by_modalities
-                  ~mod_bounds:actual.mod_bounds ~type_info
+                  ~mod_bounds:(Mod_bounds.of_axis_lattice actual.ikind_floor)
+                  ~type_info
               in
               let modal_modality, nonmodal_axes =
                 modalities_of_ignored_axes axes_ignored_by_modalities
@@ -1937,7 +1933,7 @@ module Const = struct
                 ~base:
                   { jkind =
                       { base = jkind.base;
-                        mod_bounds = Mod_bounds.max;
+                        ikind_floor = Mod_bounds.to_axis_lattice Mod_bounds.max;
                         with_bounds = No_with_bounds
                       };
                     name = Base.to_string layout_to_string jkind.base
@@ -1966,7 +1962,8 @@ module Const = struct
                   ~base:
                     { jkind =
                         { base = jkind.base;
-                          mod_bounds = Mod_bounds.max;
+                          ikind_floor =
+                            Mod_bounds.to_axis_lattice Mod_bounds.max;
                           with_bounds = No_with_bounds
                         };
                       name = layout_str
@@ -1991,10 +1988,26 @@ module Const = struct
           (fun jkind (ty, modalities) ->
             Outcometree.Ojkind_const_with (jkind, ty, modalities))
           base printable_with_bounds
+
+    let out_modalities_of_ignored_axes axes_ignored =
+      let modal_modality, nonmodal_axes =
+        modalities_of_ignored_axes axes_ignored
+      in
+      let modal = !outcometree_of_modalities Types.Immutable modal_modality in
+      let nonmodal =
+        List.map
+          (fun (Axis.Pack axis) ->
+            Fmt.asprintf "%a" (Per_axis.print axis) (Per_axis.min axis))
+          nonmodal_axes
+      in
+      modal @ nonmodal
   end
 
   let to_out_jkind_const jkind =
     To_out_jkind_const.convert ~verbosity:(Format_verbosity.default ()) jkind
+
+  let out_modalities_of_ignored_axes =
+    To_out_jkind_const.out_modalities_of_ignored_axes
 
   let format ~verbosity env ppf jkind =
     To_out_jkind_const.convert ~verbosity env jkind
@@ -2071,7 +2084,7 @@ module Const = struct
       =
     let folder (type l r) (layouts_acc, mod_bounds_acc, with_bounds_acc)
         (kind : (l * r) t) =
-      let { base; mod_bounds; with_bounds; _ } =
+      let { base; ikind_floor; with_bounds; _ } =
         Base_and_axes.fully_expand_aliases_const env kind
       in
       let layout =
@@ -2082,14 +2095,14 @@ module Const = struct
         | Layout l -> l
       in
       ( layout :: layouts_acc,
-        Mod_bounds.join mod_bounds mod_bounds_acc,
+        Mod_bounds.join (Mod_bounds.of_axis_lattice ikind_floor) mod_bounds_acc,
         With_bounds.join with_bounds with_bounds_acc )
     in
     let layouts, mod_bounds, with_bounds =
       List.fold_left folder ([], Mod_bounds.min, No_with_bounds) jkinds
     in
     { base = Layout (Layout.Const.Product (List.rev layouts));
-      mod_bounds;
+      ikind_floor = Mod_bounds.to_axis_lattice mod_bounds;
       with_bounds
     }
 
@@ -2130,8 +2143,13 @@ module Const = struct
       let mod_bounds, (nullability, separability) =
         Typemode.transl_mod_bounds modifiers
       in
-      let mod_bounds = Mod_bounds.meet base.mod_bounds mod_bounds in
-      { base = base.base; mod_bounds; with_bounds = No_with_bounds }
+      let mod_bounds =
+        Mod_bounds.meet (Mod_bounds.of_axis_lattice base.ikind_floor) mod_bounds
+      in
+      { base = base.base;
+        ikind_floor = Mod_bounds.to_axis_lattice mod_bounds;
+        with_bounds = No_with_bounds
+      }
       (* For scannable axes in mod bounds, we do not print redundancy warnings,
          as scannable axes in mod bounds will be deprecated anyway *)
       |> apply_scannable_axis ~warn env
@@ -2185,7 +2203,7 @@ module Const = struct
             if is_top then axes else Axis_set.remove axes (Nonmodal Externality)
         in
         { base = base.base;
-          mod_bounds = base.mod_bounds;
+          ikind_floor = base.ikind_floor;
           with_bounds = With_bounds.add type_ { relevant_axes } base.with_bounds
         })
     | Pjk_default | Pjk_kind_of _ ->
@@ -2430,7 +2448,7 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
   in
   fresh_jkind_poly
     { base = jkind.jkind.base;
-      mod_bounds = Mod_bounds.min;
+      ikind_floor = Mod_bounds.to_axis_lattice Mod_bounds.min;
       with_bounds = With_bounds with_bounds_types
     }
     ~annotation:None ~why:Abbreviation
@@ -2452,7 +2470,7 @@ let for_open_boxed_row =
           (Sort
              ( Base Scannable,
                { nullability = Non_null; separability = Non_float } ));
-      mod_bounds;
+      ikind_floor = Mod_bounds.to_axis_lattice mod_bounds;
       with_bounds = No_with_bounds
     }
     ~annotation:None ~why:(Value_creation Polymorphic_variant)
@@ -2498,7 +2516,7 @@ let for_arrow =
           (Sort
              ( Base Scannable,
                { nullability = Non_null; separability = Non_float } ));
-      mod_bounds = Mod_bounds.for_arrow;
+      ikind_floor = Mod_bounds.to_axis_lattice Mod_bounds.for_arrow;
       with_bounds = No_with_bounds
     }
     ~annotation:None ~why:(Value_creation Arrow)
@@ -2526,8 +2544,9 @@ let for_object =
           (Sort
              ( Base Scannable,
                { nullability = Non_null; separability = Non_float } ));
-      mod_bounds =
-        Mod_bounds.create { comonadic; monadic } ~externality:Externality.max;
+      ikind_floor =
+        Mod_bounds.to_axis_lattice
+          (Mod_bounds.create { comonadic; monadic } ~externality:Externality.max);
       with_bounds = No_with_bounds
     }
     ~annotation:None ~why:(Value_creation Object)
@@ -2637,6 +2656,80 @@ let sort_of_jkind env (t : jkind_l) : sort =
   | Some sort -> sort
   | None -> Misc.fatal_error "Jkind.sort_of_jkind: layout is any"
 
+(* Slice-3: [Ikind] installs the ikind-native externality upper-bound read
+   here. [get_externality_upper_bound] (the separability + representation
+   typing consumers) reads the externality axis of the ikind [round_up] floor
+   as its ANSWER, instead of the legacy [Ignore_best normalize] path
+   ([get_mod_bounds]). The two are differential-proven equal under
+   [OXCAML_IKINDS_VALIDATE] (zero behavior change; slice 3a).
+
+   The legacy [get_mod_bounds] read is KEPT as a PERMANENT validate-only
+   differential (defense-in-depth; same role as the S2 overturn detector): it
+   runs only under [OXCAML_IKINDS_VALIDATE], costs nothing in normal builds,
+   keeps the seeded-fault positive-control reproducible, and would catch any
+   future drift between the ikind floor and the legacy engine. It costs nothing
+   to keep because [Base_and_axes.normalize] survives regardless for the
+   decl-normalize path ([Typedecl.normalize_decl_jkinds], the S7 residual).
+   [None] only if ikinds are unlinked (never in the typechecker). *)
+type externality_from_ikind =
+  { externality_read : 'l 'r. Env.t -> ('l * 'r) jkind -> Externality.t }
+
+let externality_from_ikind : externality_from_ikind option ref = ref None
+
+let set_externality_from_ikind f = externality_from_ikind := Some f
+
+type crossing_from_ikind =
+  { crossing_read : 'l 'r. Env.t -> ('l * 'r) jkind -> Mode.Crossing.t }
+
+let crossing_from_ikind : crossing_from_ikind option ref = ref None
+
+let set_crossing_from_ikind f = crossing_from_ikind := Some f
+
+(* Deletion-wave-2 (Step 1b/2): the ikind-native round_up floor. [round_up_floor]
+   returns [Some floor] iff the ikind engine can round the jkind to a with-bounds-
+   free floor (it always can via [Solver.round_up]: names collapse to top), else
+   [None] (irreducible, unreachable in practice). *)
+type round_up_from_ikind =
+  { round_up_floor : 'l 'r. Env.t -> ('l * 'r) jkind -> Axis_lattice.t option }
+
+let round_up_from_ikind : round_up_from_ikind option ref = ref None
+
+let set_round_up_from_ikind f = round_up_from_ikind := Some f
+
+(* Non-vacuity counters for the round_up leq-differential (validate only). The
+   leq branch is only meaningful if STRICT (<) cases actually occur; equality-only
+   would prove nothing about the relaxed branch. [OXCAML_ROUNDUP_STATS] prints an
+   at-exit summary. *)
+let roundup_sub_ok = ref 0
+
+let roundup_leq_strict = ref 0
+
+let roundup_leq_equal = ref 0
+
+let roundup_none_agree = ref 0
+
+let () =
+  match Sys.getenv_opt "OXCAML_ROUNDUP_STATS" with
+  | Some ("1" | "true" | "yes" | "on") ->
+    at_exit (fun () ->
+        Printf.eprintf
+          "[round_up-stats] Some/Some strict(ikind<legacy)=%d equal=%d; \
+           None/None agree=%d; contract t<=result ok=%d\n\
+           %!"
+          !roundup_leq_strict !roundup_leq_equal !roundup_none_agree
+          !roundup_sub_ok)
+  | Some _ | None -> ()
+
+(* Seeded-fault control (test/debug only; env [OXCAML_ROUNDUP_FORCE_SOME]). When
+   set, [round_up] SKIPS the abstract-base [None] detection, forcing a [Some] floor
+   even when legacy [normalize] leaves with-bounds ([None]). This drives the
+   [None]/[Some] arm of the option-structure differential fatal, proving that
+   direction is live. Default off. *)
+let roundup_force_some =
+  match Sys.getenv_opt "OXCAML_ROUNDUP_FORCE_SOME" with
+  | Some ("1" | "true" | "yes" | "on") -> true
+  | Some _ | None -> false
+
 let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
   let jk, _ =
     Base_and_axes.normalize ~mode:Ignore_best ~skip_axes
@@ -2650,33 +2743,79 @@ let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
        this function is mainly used for mode crossing or optimizations, we don't
        expect this to come up much. *)
     Mod_bounds.max
-  | { base = Kconstr _ | Layout _; with_bounds = No_with_bounds; mod_bounds; _ }
-    ->
-    mod_bounds
+  | { base = Kconstr _ | Layout _;
+      with_bounds = No_with_bounds;
+      ikind_floor;
+      _
+    } ->
+    Mod_bounds.of_axis_lattice ikind_floor
   | { base = Layout _; with_bounds = With_bounds _; _ } ->
     Misc.fatal_error
       "Jkind.get_mod_crossing: violated Ignore_best normalize invariant."
 
-let to_unsafe_mode_crossing jkind =
-  { unsafe_mod_bounds = Mod_bounds.to_mode_crossing jkind.jkind.mod_bounds;
-    unsafe_with_bounds = jkind.jkind.with_bounds
-  }
+let to_unsafe_mode_crossing env jkind =
+  (* Stage B: derive the mode-crossing floor through the ikind engine rather
+     than reading the stored [ikind_floor] field directly, decoupling this last
+     semantic reader from the legacy decl-normalize path. Under
+     [OXCAML_IKINDS_VALIDATE] the ikind-derived crossing is checked against the
+     stored-floor crossing (fatal on disagreement). *)
+  let legacy () =
+    Mod_bounds.to_mode_crossing
+      (Mod_bounds.of_axis_lattice jkind.jkind.ikind_floor)
+  in
+  let unsafe_mod_bounds =
+    match !crossing_from_ikind with
+    | None -> legacy ()
+    | Some { crossing_read } ->
+      let from_ikind = crossing_read env jkind in
+      if !Clflags.ikinds_validate
+      then begin
+        let l = legacy () in
+        if not (Mode.Crossing.equal l from_ikind)
+        then
+          Misc.fatal_errorf
+            "to_unsafe_mode_crossing: ikind-derived crossing disagrees with \
+             legacy stored-floor crossing"
+      end;
+      from_ikind
+  in
+  { unsafe_mod_bounds; unsafe_with_bounds = jkind.jkind.with_bounds }
 
 let all_except_externality =
   Axis_set.singleton (Nonmodal Externality) |> Axis_set.complement
 
 let get_externality_upper_bound ~context env jk =
-  let mod_bounds =
-    get_mod_bounds ~context ~skip_axes:all_except_externality env jk
+  let legacy () =
+    let mod_bounds =
+      get_mod_bounds ~context ~skip_axes:all_except_externality env jk
+    in
+    Mod_bounds.get mod_bounds ~axis:(Nonmodal Externality)
   in
-  Mod_bounds.get mod_bounds ~axis:(Nonmodal Externality)
+  match !externality_from_ikind with
+  | None -> legacy ()
+  | Some { externality_read } ->
+    let from_ikind = externality_read env jk in
+    if !Clflags.ikinds_validate
+    then begin
+      let l = legacy () in
+      if not (Externality.equal l from_ikind)
+      then
+        Misc.fatal_errorf
+          "get_externality_upper_bound: ikind externality %s disagrees with \
+           legacy normalize %s"
+          (Externality.to_string from_ikind)
+          (Externality.to_string l)
+    end;
+    from_ikind
 
 let set_externality_upper_bound jk externality_upper_bound =
   { jk with
     jkind =
       { jk.jkind with
-        mod_bounds =
-          Mod_bounds.set_externality externality_upper_bound jk.jkind.mod_bounds
+        ikind_floor =
+          Mod_bounds.to_axis_lattice
+            (Mod_bounds.set_externality externality_upper_bound
+               (Mod_bounds.of_axis_lattice jk.jkind.ikind_floor))
       }
   }
 
@@ -2691,7 +2830,8 @@ let set_layout jk layout =
 let apply_modality_l modality jk =
   let relevant_axes = Mod_bounds.relevant_axes_of_modality ~modality in
   let mod_bounds =
-    Mod_bounds.set_min_in_set jk.jkind.mod_bounds
+    Mod_bounds.set_min_in_set
+      (Mod_bounds.of_axis_lattice jk.jkind.ikind_floor)
       (Axis_set.complement relevant_axes)
   in
   let with_bounds =
@@ -2700,16 +2840,27 @@ let apply_modality_l modality jk =
         { relevant_axes = Axis_set.intersection ti.relevant_axes relevant_axes })
       jk.jkind.with_bounds
   in
-  { jk with jkind = { jk.jkind with mod_bounds; with_bounds } }
+  { jk with
+    jkind =
+      { jk.jkind with
+        ikind_floor = Mod_bounds.to_axis_lattice mod_bounds;
+        with_bounds
+      }
+  }
   |> disallow_right
 
 let apply_modality_r modality jk =
   let relevant_axes = Mod_bounds.relevant_axes_of_modality ~modality in
   let mod_bounds =
-    Mod_bounds.set_max_in_set jk.jkind.mod_bounds
+    Mod_bounds.set_max_in_set
+      (Mod_bounds.of_axis_lattice jk.jkind.ikind_floor)
       (Axis_set.complement relevant_axes)
   in
-  { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
+  { jk with
+    jkind =
+      { jk.jkind with ikind_floor = Mod_bounds.to_axis_lattice mod_bounds }
+  }
+  |> disallow_left
 
 let apply_or_null_l env jkind =
   let jkind =
@@ -2859,6 +3010,169 @@ let display_histories = true
    The alternative is to print out all the data, which may be useful
    during debugging. *)
 let flattened_histories = true
+
+(* Not all jkind history reasons are created equal. Some are more helpful than
+   others.  This function encodes that information.
+
+    The reason with higher score should get preserved when combined with one of
+    lower score. *)
+let score_reason = function
+  (* error_message annotated by the user should always take priority *)
+  | Creation (Annotated (With_error_message _, _)) -> 1
+  (* Internal / dummy histories that print "please notify the Jane Street
+     compilers group" are never useful to a user; a real reason should always be
+     preferred over them when combining histories. *)
+  | Creation
+      ( Any_creation
+          ( Initial_typedecl_env | Wildcard | Unification_var | Dummy_jkind
+          | Type_expression_call )
+      | Scannable_creation Dummy_jkind
+      | Value_or_null_creation Probe
+      | Value_creation
+          (Row_variable | Tfield | Tnil | Debug_printer_argument | Unknown _) )
+    ->
+    -2
+  (* Concrete creation is quite vague, prefer more specific reasons *)
+  | Creation (Concrete_creation _ | Concrete_legacy_creation _) -> -1
+  | _ -> 0
+
+(* Stage-5m: [Ikind] installs the ikind sub verdict here; [combine_histories]
+   defers it (see [resolve_flattened_history]) so the derivation runs only when
+   a history is formatted into an error, never on the hot ~267k-call combine
+   path.  [None] means the derivation was skipped (ikinds not linked) or raised.
+   Only the two jkind descs are needed (the ikind derivation ignores the rest of
+   the [jkind]). *)
+type sub_verdict_from_ikind =
+  { verdict :
+      'la 'ra 'lb 'rb.
+      Env.t ->
+      ('la * 'ra) jkind_desc ->
+      ('lb * 'rb) jkind_desc ->
+      Misc.Le_result.t option
+  }
+
+let sub_verdict_from_ikind : sub_verdict_from_ikind option ref = ref None
+
+let set_sub_verdict_from_ikind f = sub_verdict_from_ikind := Some f
+
+(* Stage-5m perf: [combine_histories] records both candidate histories in an
+   [Interact] node (from the commutative [intersection], so not truly oriented)
+   rather than eagerly running the ikind sub-verdict that orders them.  This
+   resolves such a node to a winning flat [Creation] history at display time:
+   candidates whose kind cannot imply [target] (the kind being formatted) are
+   dropped first (C1 -- see the filter below); otherwise the node is oriented via
+   [try_allow_*] and the ikind verdict picks [Less]->[history1] /
+   [Not_le]->[history2], with [Equal]/unavailable falling to the [score_reason]
+   tiebreak.
+
+   Codex C2 (live-descriptor hazard, DE-MERGED from C1, backlog #60): the descs
+   stored in the [Interact] are the live mutable descriptors and are re-read here
+   at format time, so unification after the combine could in principle change the
+   selection versus an eager choice.  This does NOT reproduce the eager choice
+   identically; it is corpus-identical in practice, and the C1 investigation
+   proved the descs are still accurate at format time for the failing cases (the
+   post-failure unification had not poisoned them).  The standing hardening
+   (snapshot at violation creation) is backlogged, documented rather than claimed
+   away. *)
+let rec resolve_flattened_history ?target env history =
+  match history with
+  | Creation _ -> history
+  | Interact
+      { jkind1 = Pack_jkind_desc d1;
+        history1;
+        jkind2 = Pack_jkind_desc d2;
+        history2;
+        reason = _
+      } -> (
+    let verdict : type la ra lb rb.
+        (la * ra) jkind_desc -> (lb * rb) jkind_desc -> Misc.Le_result.t option
+        =
+     fun a b ->
+      match !sub_verdict_from_ikind with
+      | None -> None
+      | Some { verdict } -> verdict env a b
+    in
+    (* C1: a candidate history may only be chosen to explain the requirement
+       being formatted ([target]) if the kind it establishes actually implies
+       that requirement -- i.e. its desc is a subkind of [target].  Without this
+       the pure [score_reason] tiebreak could cite, e.g., an [any] annotation as
+       the reason a variable "must be representable".  No [target] (or ikinds
+       unlinked / verdict unavailable) leaves the branch eligible. *)
+    let implies : type l r. (l * r) jkind_desc -> bool =
+     fun d ->
+      match target with
+      | None -> true
+      | Some (Pack_jkind_desc tgt) -> (
+        (* [d]'s kind implies the requirement [tgt] iff it is a subkind of it in
+           BOTH the layout and the modal axes.  The ikind [verdict] compares only
+           the modal axes (it is layout-blind: it returns [Equal] for
+           [value_or_null] vs [value] / [any] vs [value]), so we also require the
+           layout to be a sublayout -- that is the axis on which these
+           false-provenance candidates actually differ. *)
+        Sub_result.is_le (Jkind_desc.sub_layout env d tgt)
+        &&
+        match verdict d tgt with
+        | Some (Misc.Le_result.Less | Misc.Le_result.Equal) -> true
+        | Some Misc.Le_result.Not_le | None -> false)
+    in
+    (* Z4: [implies] -> [sub_layout] -> [Layout.sub] -> [Sort.equate] can
+       INSTANTIATE sort variables. This filter runs at error-FORMAT time, so it
+       must not mutate shared type/sort state: otherwise checking candidate 1
+       could instantiate the shared target before candidate 2 is tested
+       (evaluation-order-dependent provenance), and in a recovering toplevel a
+       printed error would leave type state changed for later phrases. Snapshot
+       + backtrack around EACH check so it is pure and independent (the sort
+       change log is wired into [Btype.backtrack] via [types.ml]). *)
+    let pure_implies d =
+      (* W3: exception-safe — if [implies] raises after mutating a sort var,
+         [Btype.backtrack] must still run (matches other printing snapshots). *)
+      let snap = Btype.snapshot () in
+      Fun.protect
+        ~finally:(fun () -> Btype.backtrack snap)
+        (fun () -> implies d)
+    in
+    let impl1 = pure_implies d1 and impl2 = pure_implies d2 in
+    (* Fallback when the implication filter cannot decide: orient the two jkinds
+       exactly as the eager [combine_histories] did (via [try_allow_*]) and pick
+       the oriented sub/super side by the lazy ikind verdict; [Equal]/no verdict
+       falls to the [score_reason] tiebreak. *)
+    let by_verdict () =
+      let scored ha hb =
+        let ra = resolve_flattened_history ?target env ha in
+        let rb = resolve_flattened_history ?target env hb in
+        if score_reason ra >= score_reason rb then ra else rb
+      in
+      let pick ~sub_hist ~super_hist v =
+        match v with
+        | Some Misc.Le_result.Less ->
+          resolve_flattened_history ?target env sub_hist
+        | Some Misc.Le_result.Not_le ->
+          resolve_flattened_history ?target env super_hist
+        | Some Misc.Le_result.Equal | None -> scored sub_hist super_hist
+      in
+      match Base_and_axes.(try_allow_l d1, try_allow_r d2) with
+      | Some _, Some _ ->
+        pick ~sub_hist:history1 ~super_hist:history2 (verdict d1 d2)
+      | _ -> (
+        match Base_and_axes.(try_allow_r d1, try_allow_l d2) with
+        | Some _, Some _ ->
+          pick ~sub_hist:history2 ~super_hist:history1 (verdict d2 d1)
+        | _ -> scored history1 history2)
+    in
+    if history1 == history2
+    then (* both branches would pick the same history; skip the verdict *)
+      resolve_flattened_history ?target env history1
+    else
+      (* C1: the implication filter is the PRIMARY discriminator -- a branch may
+         explain [target] only if the kind it establishes implies it.  This must
+         precede the verdict orientation, which otherwise picks a sub/super side
+         directly and can select a non-implying history.  When the filter cannot
+         decide (both or neither imply, e.g. no target / verdict unavailable) we
+         fall back to the oriented verdict + score tiebreak. *)
+      match impl1, impl2 with
+      | true, false -> resolve_flattened_history ?target env history1
+      | false, true -> resolve_flattened_history ?target env history2
+      | true, true | false, false -> by_verdict ())
 
 (* This module is just to keep all the helper functions more locally
    scoped. *)
@@ -3207,10 +3521,17 @@ module Format_history = struct
 
   let format_flattened_history ~intro ~layout_or_kind env ppf t =
     let jkind_desc = Jkind_desc.get t.jkind in
+    (* Stage-5m: [combine_histories] defers history ordering into an [Interact]
+       node; resolve it to the winning flat [Creation] before formatting (see
+       [resolve_flattened_history]).  [is_informative] runs on the resolved
+       history so an [Imported] winner stays silent, as in the eager code. *)
+    let history =
+      resolve_flattened_history ~target:(Pack_jkind_desc t.jkind) env t.history
+    in
     fprintf ppf "@[<v 2>%t" intro;
-    (match t.history with
+    (match history with
     | Creation reason ->
-      if History.is_informative t
+      if History.is_informative { t with history }
       then (
         fprintf ppf "@ because %a"
           (format_creation_reason ~layout_or_kind)
@@ -3222,7 +3543,7 @@ module Format_history = struct
     | Interact _ ->
       Misc.fatal_error "Non-flat history in format_flattened_history");
     fprintf ppf ".";
-    (match t.history with
+    (match history with
     | Creation (Annotated (With_error_message (message, _), _)) ->
       fprintf ppf "@ @[%s@]" message
     | _ -> ());
@@ -3313,7 +3634,9 @@ module Violation = struct
             (fun (_, type_info) ->
               let axes_ignored_by_modalities =
                 With_bounds.Type_info.axes_ignored_by_modalities
-                  ~mod_bounds:jkind.jkind.mod_bounds ~type_info
+                  ~mod_bounds:
+                    (Mod_bounds.of_axis_lattice jkind.jkind.ikind_floor)
+                  ~type_info
               in
               not (Axis_set.is_empty axes_ignored_by_modalities))
             (With_bounds.to_list jkind.jkind.with_bounds)
@@ -3329,7 +3652,10 @@ module Violation = struct
         Axis_set.to_list disagreeing_axes
         |> List.iter (fun (Pack axis : Axis.packed) ->
             let pp_bound ppf jkind =
-              let mod_bound = Mod_bounds.get ~axis jkind.mod_bounds in
+              let mod_bound =
+                Mod_bounds.get ~axis
+                  (Mod_bounds.of_axis_lattice jkind.ikind_floor)
+              in
               let with_bounds =
                 match Per_axis.(le axis (max axis) mod_bound) with
                 | true ->
@@ -3505,7 +3831,7 @@ module Violation = struct
      an error message that drills down into two products to find the first
      conflicing component. Note reporting should be adjusted
      appropriately. *)
-  let report_general env preamble pp_former former ppf t =
+  let report_general ?param_name_hints env preamble pp_former former ppf t =
     let mismatch_type, print_as_value_layout, missing_cmis =
       categorize_mismatch env t
     in
@@ -3532,6 +3858,29 @@ module Violation = struct
         | Ok l -> fprintf ppf "%t%a" indent Layout.format l
         | Error p -> fprintf ppf "the abstract kind %s" (Path.name p))
     in
+    (* Z1: render each side of the violation against its own decl's param
+       table (an id->letter hint threaded from the construction site that held
+       the decls). Without a hint, [None], the resolver is unchanged (today's
+       behavior). k1 = the offending kind (first), k2 = the required kind. *)
+    let hint1, hint2 =
+      match param_name_hints with
+      | Some (h1, h2) -> Some h1, Some h2
+      | None -> None, None
+    in
+    let format_k1 : type l r. _ -> (l * r) jkind -> unit =
+     fun ppf jk ->
+      match hint1 with
+      | None -> format_base_or_kind ppf jk
+      | Some h ->
+        Const.with_param_name_resolver h (fun () -> format_base_or_kind ppf jk)
+    in
+    let format_k2 : type l r. _ -> (l * r) jkind -> unit =
+     fun ppf jk ->
+      match hint2 with
+      | None -> format_base_or_kind ppf jk
+      | Some h ->
+        Const.with_param_name_resolver h (fun () -> format_base_or_kind ppf jk)
+    in
     let subjkind_format verb k2 =
       if has_sort_var (get k2).base
       then dprintf "%s representable" verb
@@ -3539,8 +3888,7 @@ module Violation = struct
       then
         (* avoid printing "a sublayout of a value layout" *)
         dprintf "%s@ a value layout" verb
-      else
-        dprintf "%s a sub%s of@ %a" verb layout_or_kind format_base_or_kind k2
+      else dprintf "%s a sub%s of@ %a" verb layout_or_kind format_k2 k2
     in
     let Pack_jkind k1, Pack_jkind k2, fmt_k1, fmt_k2, missing_cmis =
       match t with
@@ -3548,7 +3896,7 @@ module Violation = struct
         let missing_cmi =
           match missing_cmi with
           | None -> (
-            match k1.history with
+            match resolve_flattened_history env k1.history with
             | Creation (Missing_cmi p) -> Some p
             | Creation (Any_creation (Missing_cmi p)) -> Some p
             | _ -> None)
@@ -3558,7 +3906,7 @@ module Violation = struct
         | None ->
           ( Pack_jkind k1,
             Pack_jkind k2,
-            dprintf "%s@ %a" layout_or_kind format_base_or_kind k1,
+            dprintf "%s@ %a" layout_or_kind format_k1 k1,
             subjkind_format "is not" k2,
             missing_cmis )
         | Some p ->
@@ -3572,11 +3920,11 @@ module Violation = struct
         let fmt_k2 =
           if print_as_value_layout
           then dprintf "is not@ a value layout"
-          else dprintf "does not overlap with@ %a" format_base_or_kind k2
+          else dprintf "does not overlap with@ %a" format_k2 k2
         in
         ( Pack_jkind k1,
           Pack_jkind k2,
-          dprintf "%s@ %a" layout_or_kind format_base_or_kind k1,
+          dprintf "%s@ %a" layout_or_kind format_k1 k1,
           fmt_k2,
           missing_cmis )
     in
@@ -3590,15 +3938,14 @@ module Violation = struct
         else
           match t.violation with
           | Not_a_subjkind _ ->
-            dprintf "be a sub%s of@ %a" layout_or_kind format_base_or_kind k2
-          | No_intersection _ ->
-            dprintf "overlap with@ %a" format_base_or_kind k2
+            dprintf "be a sub%s of@ %a" layout_or_kind format_k2 k2
+          | No_intersection _ -> dprintf "overlap with@ %a" format_k2 k2
       in
       fprintf ppf "@[<v>%a@;%a@]"
         (Format_history.format_history
            ~intro:
              (dprintf "@[<hov 2>The %s of %a is@ %a@]" layout_or_kind pp_former
-                former format_base_or_kind k1)
+                former format_k1 k1)
            ~layout_or_kind env)
         k1
         (Format_history.format_history
@@ -3624,7 +3971,8 @@ module Violation = struct
   let report_with_offender_sort ~offender env =
     report_general env "A representable layout was expected, but " pp_t offender
 
-  let report_with_name ~name env = report_general env "" pp_print_string name
+  let report_with_name ?param_name_hints ~name env =
+    report_general ?param_name_hints env "" pp_print_string name
 end
 
 (******************************)
@@ -3652,140 +4000,24 @@ let equal env t1 t2 = equate_or_equal ~allow_mutation:true env t1 t2
 
 let equate env t1 t2 = equate_or_equal ~allow_mutation:true env t1 t2
 
-(* Not all jkind history reasons are created equal. Some are more helpful than
-   others.  This function encodes that information.
-
-    The reason with higher score should get preserved when combined with one of
-    lower score. *)
-let score_reason = function
-  (* error_message annotated by the user should always take priority *)
-  | Creation (Annotated (With_error_message _, _)) -> 1
-  (* Concrete creation is quite vague, prefer more specific reasons *)
-  | Creation (Concrete_creation _ | Concrete_legacy_creation _) -> -1
-  | _ -> 0
-
-(* Stage-5d S4: hook + validate/measure-gated differential proving the ikind
-   sub verdict selects the IDENTICAL history as the legacy [Jkind_desc.sub] in
-   [combine_histories] (the M4 zero-churn condition; the chosen history feeds
-   error text, so the switch itself rides with the M5 project).  BEHAVIOUR IS
-   UNCHANGED: the legacy result still chooses the history; the ikind verdict runs
-   only under the gate and is compared.  [Ikind] installs [verdict]; when unset
-   (ikinds not linked) or when the gate is off the differential is a no-op -- no
-   ikind computation on the ~267k-call combine path. *)
-type sub_verdict_from_ikind =
-  { verdict :
-      'la 'ra 'lb 'rb.
-      context:jkind_context ->
-      Env.t ->
-      ('la * 'ra) jkind ->
-      ('lb * 'rb) jkind ->
-      Misc.Le_result.t option
-  }
-
-let sub_verdict_from_ikind : sub_verdict_from_ikind option ref = ref None
-
-let set_sub_verdict_from_ikind f = sub_verdict_from_ikind := Some f
-
-let combine_history_measure = Sys.getenv_opt "OXCAML_IK5D_MEASURE" <> None
-
-let combine_history_checks = ref 0
-
-let combine_history_agreements = ref 0
-
-let combine_history_mismatches = ref 0
-
-let () =
-  at_exit (fun () ->
-      if
-        (!Clflags.ikinds_validate || combine_history_measure)
-        && !combine_history_checks > 0
-      then
-        Format.eprintf
-          "[ikind-combine-history] checks=%d agreements=%d mismatches=%d@."
-          !combine_history_checks
-          !combine_history_agreements
-          !combine_history_mismatches)
-
-let combine_histories ~type_equal ~context env reason (Pack_jkind k1)
+let combine_histories
+    ~type_equal:(_ : Types.type_expr -> Types.type_expr -> bool)
+    ~context:(_ : jkind_context) (_env : Env.t) reason (Pack_jkind k1)
     (Pack_jkind k2) =
-  if flattened_histories
-  then
-    let choose_higher_scored_history history_a history_b =
-      if score_reason history_a >= score_reason history_b
-      then history_a
-      else history_b
-    in
-    (* Stage-5d S4: the ikind sub verdict for the two FULL jkinds being combined
-       ([jkind_a] <= [jkind_b]), computed only under the gate.  When the gate is
-       off (the common case) this returns [None] without touching the ikind
-       engine, so the ~267k-call combine path is unperturbed. *)
-    let ikind_verdict_of : type la ra lb rb.
-        (la * ra) jkind -> (lb * rb) jkind -> Misc.Le_result.t option =
-     fun jkind_a jkind_b ->
-      if !Clflags.ikinds_validate || combine_history_measure
-      then
-        match !sub_verdict_from_ikind with
-        | None -> None
-        | Some { verdict } -> verdict ~context env jkind_a jkind_b
-      else None
-    in
-    let choose_subjkind_history ~ikind_verdict k_a history_a roofdn_a k_b
-        history_b =
-      let result =
-        Jkind_desc.sub ~type_equal ~sub_previously_ran_out_of_fuel:roofdn_a
-          ~context env k_a k_b
-      in
-      (* S4 differential: compare the ikind verdict to the legacy [result]; the
-         legacy value still chooses the history below (behaviour unchanged). *)
-      (match ikind_verdict with
-      | None -> ()
-      | Some ikind ->
-        incr combine_history_checks;
-        let to_string (le : Misc.Le_result.t) =
-          match le with
-          | Misc.Le_result.Less -> "Less"
-          | Misc.Le_result.Equal -> "Equal"
-          | Misc.Le_result.Not_le -> "Not_le"
-        in
-        let legacy : Misc.Le_result.t =
-          match result with
-          | Less -> Misc.Le_result.Less
-          | Equal -> Misc.Le_result.Equal
-          | Not_le _ -> Misc.Le_result.Not_le
-        in
-        if String.equal (to_string legacy) (to_string ikind)
-        then incr combine_history_agreements
-        else begin
-          incr combine_history_mismatches;
-          Format.eprintf "[ikind-combine-history] MISMATCH legacy=%s ikind=%s@."
-            (to_string legacy) (to_string ikind)
-        end);
-      match result with
-      | Less -> history_a
-      | Not_le _ ->
-        (* CR layouts: this will be wrong if we ever have a non-trivial meet in
-           the kind lattice -- which is now! So this is actually wrong. *)
-        history_b
-      | Equal -> choose_higher_scored_history history_a history_b
-    in
-    match Base_and_axes.(try_allow_l k1.jkind, try_allow_r k2.jkind) with
-    | Some k1_l, Some k2_r ->
-      choose_subjkind_history ~ikind_verdict:(ikind_verdict_of k1 k2) k1_l
-        k1.history k1.ran_out_of_fuel_during_normalize k2_r k2.history
-    | _ -> (
-      match Base_and_axes.(try_allow_r k1.jkind, try_allow_l k2.jkind) with
-      | Some k1_r, Some k2_l ->
-        choose_subjkind_history ~ikind_verdict:(ikind_verdict_of k2 k1) k2_l
-          k2.history k2.ran_out_of_fuel_during_normalize k1_r k1.history
-      | _ -> choose_higher_scored_history k1.history k2.history)
-  else
-    Interact
-      { reason;
-        jkind1 = Pack_jkind_desc k1.jkind;
-        history1 = k1.history;
-        jkind2 = Pack_jkind_desc k2.jkind;
-        history2 = k2.history
-      }
+  (* Stage-5m perf: record both histories in an [Interact] node and do NOTHING
+     else.  All ordering -- orientation, the ikind sub-verdict, and the score
+     tiebreak -- is deferred to [resolve_flattened_history], which runs only
+     when a history is formatted into an error (cold path).  The hot ~267k-call
+     combine path therefore does zero ikind work.  (The same node serves both
+     the flattened display, which resolves it, and the tree display, which walks
+     it.) *)
+  Interact
+    { reason;
+      jkind1 = Pack_jkind_desc k1.jkind;
+      history1 = k1.history;
+      jkind2 = Pack_jkind_desc k2.jkind;
+      history2 = k2.history
+    }
 
 let may_have_intersection env t1 t2 =
   (* Need to check only the bases: all the axes have bottom elements.
@@ -3835,18 +4067,122 @@ let intersection_or_error ~type_equal ~context ~reason env t1 t2 =
 
 let round_up (type l r) ~context env (t : (allowed * r) jkind) :
     (l * allowed) jkind option =
-  let normalized =
-    normalize ~mode:Ignore_best ~context env (t |> disallow_right)
+  let legacy () : (l * allowed) jkind option =
+    let normalized =
+      normalize ~mode:Ignore_best ~context env (t |> disallow_right)
+    in
+    match normalized.jkind.with_bounds with
+    | No_with_bounds ->
+      Some
+        { t with
+          jkind = { normalized.jkind with with_bounds = No_with_bounds };
+          quality =
+            Not_best (* As required by the fact that this is a [jkind_r] *)
+        }
+    | With_bounds _ -> None
   in
-  match normalized.jkind.with_bounds with
-  | No_with_bounds ->
-    Some
-      { t with
-        jkind = { normalized.jkind with with_bounds = No_with_bounds };
-        quality =
-          Not_best (* As required by the fact that this is a [jkind_r] *)
-      }
-  | With_bounds _ -> None
+  match !round_up_from_ikind with
+  | None -> legacy ()
+  | Some { round_up_floor } ->
+    (* Deletion-wave-2: derive the rounded-up floor from the ikind engine. The
+       ikind is the true crossing (LFP/GFP fixpoint), which on deep recursive
+       with-bounds is TIGHTER than legacy [Ignore_best normalize] (whose fuel
+       limit over-approximates to top). Both are sound upper bounds; the ikind is
+       the precise one. *)
+    let from_ikind : (l * allowed) jkind option =
+      (* Legacy [Ignore_best normalize] conservatively KEEPS with-bounds over an
+         ABSTRACT base (jkind.ml [t_has_abstract_base]) rather than folding them
+         into an unknown floor, so [round_up] is irreducible ([None]) there. This
+         is reachable (functor + abstract [kind_] + with-bound) and
+         [nondep_type_decl] relies on it, so reproduce it before consulting the
+         ikind floor. *)
+      (* X-1: build the result from the FULLY-EXPANDED descriptor so its base is a
+         [Layout] (stable under re-expansion). Keeping the original reducible
+         [Kconstr] base would let a later [fully_expand_aliases] meet the folded
+         bound contribution back out. *)
+      let expanded = Base_and_axes.fully_expand_aliases env t.jkind in
+      let base_is_abstract =
+        match expanded.base with Layout _ -> false | Kconstr _ -> true
+      in
+      let has_with_bounds =
+        match t.jkind.with_bounds with
+        | No_with_bounds -> false
+        | With_bounds _ -> true
+      in
+      (* X-3: the [roundup_force_some] seeded fault only perturbs the (validate-
+         only) differential; gate it on [ikinds_validate] so it is INERT in
+         production (else forcing [Some] on a legacy-[None] input changes the
+         shipped result and can crash [nondep_type_decl]). *)
+      let force_some = roundup_force_some && !Clflags.ikinds_validate in
+      if has_with_bounds && base_is_abstract && not force_some
+      then None
+      else
+        match round_up_floor env (t |> disallow_right) with
+        | None -> None
+        | Some floor ->
+          Some
+            { t with
+              jkind =
+                { expanded with
+                  ikind_floor = floor;
+                  with_bounds = No_with_bounds
+                };
+              quality = Not_best
+            }
+    in
+    (if !Clflags.ikinds_validate
+     then
+       (* Differential: the ikind floor must be a SOUND upper bound, i.e. [<=]
+          the legacy floor (legacy over-approximates via fuel exhaustion; the
+          ikind is tighter). A Some/None structural disagreement, or an ikind
+          floor that EXCEEDS legacy (ikind > legacy) is fatal -- the latter would
+          mean the ikind is looser/unsound, which must never happen. *)
+       match legacy (), from_ikind with
+       | None, None -> incr roundup_none_agree
+       | Some a, Some b ->
+         if not (Axis_lattice.leq b.jkind.ikind_floor a.jkind.ikind_floor)
+         then
+           Misc.fatal_errorf
+             "round_up: ikind-derived floor is NOT <= legacy normalize floor \
+              (ikind looser than legacy -- unsound)"
+         else if Axis_lattice.equal b.jkind.ikind_floor a.jkind.ikind_floor
+         then incr roundup_leq_equal
+         else incr roundup_leq_strict
+       | Some _, None ->
+         Misc.fatal_errorf
+           "round_up: ikind derivation is None but legacy normalize is Some"
+       | None, Some _ ->
+         Misc.fatal_errorf
+           "round_up: ikind derivation is Some but legacy normalize is None");
+    (* X-2: directly verify round_up's contract [t <= returned_jkind] via the
+       subkind relation (layout + the ikind modal sub-verdict). This does NOT
+       recurse through round_up, and catches an ikind UNDER-count of the floor
+       (which legacy's fuel over-approximation would hide). Validate-only. *)
+    (if !Clflags.ikinds_validate
+     then
+       match from_ikind with
+       | None -> ()
+       | Some b -> (
+         let td = (t |> disallow_right).jkind in
+         let layout_le =
+           Sub_result.is_le (Jkind_desc.sub_layout env td b.jkind)
+         in
+         match !sub_verdict_from_ikind with
+         | None -> ()
+         | Some { verdict } -> (
+           match verdict env td b.jkind with
+           | Some (Misc.Le_result.Less | Misc.Le_result.Equal) when layout_le ->
+             incr roundup_sub_ok
+           | Some (Misc.Le_result.Less | Misc.Le_result.Equal) ->
+             Misc.fatal_errorf
+               "round_up: t's LAYOUT is not <= returned jkind (contract t <= \
+                round_up t violated)"
+           | Some Misc.Le_result.Not_le ->
+             Misc.fatal_errorf
+               "round_up: t is NOT <= returned jkind (contract t <= round_up t \
+                violated -- ikind floor under-counts t)"
+           | None -> ())));
+    from_ikind
 
 type sub_or_intersect =
   | Sub
@@ -3866,21 +4202,22 @@ let is_obviously_max (t : (_ * allowed) jkind) =
   (* This doesn't do any mutation because mutating a sort variable can't make it
      any, and modal upper bounds are constant. *)
   | { jkind =
-        { base = Layout (Any sa); mod_bounds; with_bounds = No_with_bounds; _ };
+        { base = Layout (Any sa); ikind_floor; with_bounds = No_with_bounds; _ };
       _
     } ->
-    Scannable_axes.(equal sa max) && Mod_bounds.is_max mod_bounds
+    Scannable_axes.(equal sa max)
+    && Mod_bounds.is_max (Mod_bounds.of_axis_lattice ikind_floor)
   | { jkind =
-        { base = Layout _ | Kconstr _; mod_bounds = _; with_bounds = _; _ };
+        { base = Layout _ | Kconstr _; ikind_floor = _; with_bounds = _; _ };
       _
     } ->
     false
 
 let mod_bounds_are_obviously_max (type l r) (t : (l * r) jkind) =
   match t with
-  | { jkind = { base = _; mod_bounds; with_bounds = No_with_bounds; _ }; _ } ->
-    Mod_bounds.is_max mod_bounds
-  | { jkind = { base = _; mod_bounds = _; with_bounds = With_bounds _; _ }; _ }
+  | { jkind = { base = _; ikind_floor; with_bounds = No_with_bounds; _ }; _ } ->
+    Mod_bounds.is_max (Mod_bounds.of_axis_lattice ikind_floor)
+  | { jkind = { base = _; ikind_floor = _; with_bounds = With_bounds _; _ }; _ }
     ->
     false
 
@@ -4172,12 +4509,13 @@ module Debug_printers = struct
       (match q with Best -> "Best" | Not_best -> "Not_best")
 
   module Const = struct
-    let t ppf ({ base; mod_bounds; with_bounds; _ } : _ Const.t) =
+    let t ppf ({ base; ikind_floor; with_bounds; _ } : _ Const.t) =
       fprintf ppf
         "@[<v 2>{ base = %a@,; mod_bounds = %a@,; with_bounds = %a@, }@]"
         (Base.format Layout.Const.Debug_printers.t)
-        base Mod_bounds.debug_print mod_bounds With_bounds.debug_print
-        with_bounds
+        base Mod_bounds.debug_print
+        (Mod_bounds.of_axis_lattice ikind_floor)
+        With_bounds.debug_print with_bounds
   end
 end
 

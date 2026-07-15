@@ -270,9 +270,18 @@ module Violation : sig
     unit
 
   (** Simpler version of [report_with_offender] for when the thing that had an
-      unexpected jkind is available as a string. *)
+      unexpected jkind is available as a string. [param_name_hints] optionally
+      supplies a per-side param-id -> variable-letter map (first = offending
+      kind, second = required kind) so a two-sided violation renders each kind
+      against its own decl's parameter names (Z1); omitted at sites without decl
+      context (default naming). *)
   val report_with_name :
-    name:string -> Env.t -> Format_doc.formatter -> t -> unit
+    ?param_name_hints:(int -> string option) * (int -> string option) ->
+    name:string ->
+    Env.t ->
+    Format_doc.formatter ->
+    t ->
+    unit
 end
 
 (******************************)
@@ -326,6 +335,31 @@ module Const : sig
     }
 
   val set_render_from_ikind : render_from_ikind -> unit
+
+  (** [param_name_resolver] (PRINT-DESIGN.md 4.1): the live type-printer
+      variable-name table keyed by [Types.get_id]. [Out_type] installs it during
+      type printing so the ikind with-clause renderer resolves a param atom to
+      the decl's own variable letter; unresolved ids fall back to the renderer's
+      synthetic naming. *)
+  val set_param_name_resolver : (int -> string option) -> unit
+
+  val resolve_param_name : int -> string option
+
+  (** [path_oide_resolver] (A2 fix): [Out_type] installs a resolver that renders
+      a with-bound constructor-atom [Path.t] through its namespaced, conflict-
+      aware path printer, so shadowed paths disambiguate (e.g. [X/2.t]) instead
+      of printing the raw [Path.name] (which denotes the wrong path under
+      shadowing). The default preserves the raw [Path.name] rendering. *)
+  val set_path_oide_resolver : (Path.t -> Outcometree.out_ident) -> unit
+
+  val resolve_path_oide : Path.t -> Outcometree.out_ident
+
+  (** Render the axes [ignored] by a with-bound's modality as the [out_modality]
+      strings a [with]-clause carries (e.g. [portable]). Used by the
+      ikind-derived printer ([Ikind.render_jkind_from_ikind]) to reconstruct
+      [@@ modality] clauses from LDD coefficients. *)
+  val out_modalities_of_ignored_axes :
+    Jkind_axis.Axis_set.t -> Outcometree.out_modality list
 end
 
 module Builtin : sig
@@ -636,7 +670,8 @@ val get_layout : Env.t -> 'd Types.jkind -> Layout.Const.t option
     [Error p] if the kind is abstract (and its layout is therefore unknown). *)
 val extract_layout : Env.t -> 'd Types.jkind -> (Sort.t Layout.t, Path.t) result
 
-val to_unsafe_mode_crossing : Types.jkind_l -> Types.unsafe_mode_crossing
+val to_unsafe_mode_crossing :
+  Env.t -> Types.jkind_l -> Types.unsafe_mode_crossing
 
 val get_externality_upper_bound :
   context:jkind_context -> Env.t -> 'd Types.jkind -> Jkind_axis.Externality.t
@@ -843,21 +878,57 @@ val sub_layout_or_error :
   ('l2 * 'r2) Types.jkind ->
   (unit, Violation.t) result
 
-(** Stage-5d S4: hook installed by [Ikind] returning the ikind sub verdict
-    ([Less]/[Equal]/[Not_le]) for two jkinds, used by [combine_histories]'
-    history- ordering coexistence differential. [None] result means the ikind
-    derivation was skipped (ikinds disabled) or raised. *)
+(** Stage-5m: hook installed by [Ikind] returning the ikind sub verdict
+    ([Less]/[Equal]/[Not_le]) for two jkind descs, used by [combine_histories]
+    to order the two histories it combines. The verdict is deferred to
+    error-display time (see [resolve_flattened_history] in [jkind.ml]), so it
+    never runs on the hot combine path. [None] result means the ikind derivation
+    was skipped (ikinds not linked) or raised. *)
 type sub_verdict_from_ikind =
   { verdict :
       'la 'ra 'lb 'rb.
-      context:jkind_context ->
       Env.t ->
-      ('la * 'ra) Types.jkind ->
-      ('lb * 'rb) Types.jkind ->
+      ('la * 'ra) Types.jkind_desc ->
+      ('lb * 'rb) Types.jkind_desc ->
       Misc.Le_result.t option
   }
 
 val set_sub_verdict_from_ikind : sub_verdict_from_ikind -> unit
+
+(** Slice-3: hook installed by [Ikind] returning the ikind-native externality
+    upper bound of a jkind (the externality axis of its [round_up] floor), used
+    by [get_externality_upper_bound] in place of the legacy [normalize]-based
+    [get_mod_bounds] read. [None] means ikinds are not linked. *)
+type externality_from_ikind =
+  { externality_read :
+      'l 'r. Env.t -> ('l * 'r) Types.jkind -> Jkind_axis.Externality.t
+  }
+
+val set_externality_from_ikind : externality_from_ikind -> unit
+
+(** Hook installed by [Ikind] to derive a jkind's mode-crossing floor through
+    the ikind engine, used by [to_unsafe_mode_crossing] in place of a direct
+    read of the stored floor field. The derived floor is BASE-ONLY: the
+    implementation STRIPS the with-bounds before lowering, because
+    [to_unsafe_mode_crossing] carries the with-bounds separately in
+    [unsafe_with_bounds]. Lowering the bounds too would fold CONCRETE bounds
+    (which resolve to name-free constants) into the floor and double-count them.
+    This is the OPPOSITE contract from [round_up], whose floor is bounds-FOLDED.
+    [None] means ikinds are not linked. *)
+type crossing_from_ikind =
+  { crossing_read : 'l 'r. Env.t -> ('l * 'r) Types.jkind -> Mode.Crossing.t }
+
+val set_crossing_from_ikind : crossing_from_ikind -> unit
+
+(** Hook installed by [Ikind] to derive a jkind's rounded-up floor through the
+    ikind engine, used by [round_up]. [Some floor] iff the with_bounds reduce to
+    a floor (always, via the solver's round_up); [None] iff irreducible. *)
+type round_up_from_ikind =
+  { round_up_floor :
+      'l 'r. Env.t -> ('l * 'r) Types.jkind -> Axis_lattice.t option
+  }
+
+val set_round_up_from_ikind : round_up_from_ikind -> unit
 
 (** "round up" a [jkind_l] to a [jkind_r] such that the input is less than the
     output. If the base is abstract, it may not be possible to eliminate the

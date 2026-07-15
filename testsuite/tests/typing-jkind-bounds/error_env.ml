@@ -121,8 +121,7 @@ Line 5, characters 19-30:
                        ^^^^^^^^^^^
 Error: This expression has type "unit * 'a t_with_bound"
        but an expression was expected of type "('b : value mod portable)"
-       The kind of unit * 'a t_with_bound is
-           immutable_data with 'a t_with_bound with unit
+       The kind of unit * 'a t_with_bound is value non_float
          because it's a tuple type.
        But the kind of unit * 'a t_with_bound must be a subkind of
            value mod portable

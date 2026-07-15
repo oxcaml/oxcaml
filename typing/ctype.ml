@@ -3297,9 +3297,9 @@ let constrain_type_jkind ~fixed env ty jkind =
                   (Jkind.format_verbose ~verbosity env))
                jkind
                Jkind.Mod_bounds.debug_print
-               ty's_jkind.jkind.mod_bounds
+               (Jkind.Mod_bounds.of_axis_lattice ty's_jkind.jkind.ikind_floor)
                Jkind.Mod_bounds.debug_print
-               jkind.jkind.mod_bounds
+               (Jkind.Mod_bounds.of_axis_lattice jkind.jkind.ikind_floor)
                Jkind.With_bounds.debug_print
                ty's_jkind.jkind.with_bounds
                Jkind.With_bounds.debug_print

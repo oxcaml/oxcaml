@@ -2065,9 +2065,7 @@ Line 1, characters 19-27:
                        ^^^^^^^^
 Error: This type "string t" = "#(string u * string u)"
        should be an instance of type "('a : any mod global)"
-       The kind of string t is
-           value mod everything non_float mod dynamic with string u
-           & value mod everything non_float mod dynamic with string u
+       The kind of string t is value non_float & value non_float
          because it is an unboxed tuple.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2100,9 +2098,7 @@ Line 3, characters 9-30:
 Error: This type "#(int * string * int)" should be an instance of type
          "('a : any mod external_)"
        The kind of #(int * string * int) is
-           immediate mod dynamic with int with string
-           & value mod everything non_float mod dynamic with int with string
-           & immediate mod dynamic with int with string
+           value non_pointer & value non_float & value non_pointer
          because it is an unboxed tuple.
        But the kind of #(int * string * int) must be a subkind of
            any mod external_
@@ -2197,7 +2193,7 @@ Error: The value "x" has type "a" but an expression was expected of type
        The layout of a is value
          because it is or unifies with an unannotated universal variable.
        But the layout of a must be representable
-         because we must know concretely how to pass a function argument.
+         because of the annotation on the universal variable 'a.
 |}]
 
 (****************************************************)

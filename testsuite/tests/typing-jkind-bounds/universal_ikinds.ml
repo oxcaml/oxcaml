@@ -46,7 +46,7 @@ Line 2, characters 32-33:
                                     ^
 Error: The value "v" has type "'a t" but an expression was expected of type
          "('b : immutable_data)"
-       The kind of 'a t is immutable_data with 'b. 'b t
+       The kind of 'a t is value non_float
          because of the definition of t at line 1, characters 0-28.
        But the kind of 'a t must be a subkind of immutable_data
          because of the definition of require_immutable_data at line 2, characters 27-58.
@@ -87,7 +87,7 @@ val f : t -> unit = <fun>
 Line 1, characters 0-75:
 1 | type t : immutable_data with Abs.t = { foo : 'a. (Abs.t * 'a ignore_type) }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with Abs.t
+Error: The kind of type "t" is value non_float
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of immutable_data with Abs.t
          because of the annotation on the declaration of the type t.

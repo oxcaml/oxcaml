@@ -181,15 +181,15 @@ Error: Signature mismatch:
        Modules do not match:
          sig type 'a t : mutable_data with 'a end
        is not included in
-         sig type 'a t : mutable_data with 'a @@ forkable unyielding many end
+         sig type 'a t : mutable_data with 'a @@ unyielding many end
        Type declarations do not match:
          type 'a t : mutable_data with 'a
        is not included in
-         type 'a t : mutable_data with 'a @@ forkable unyielding many
+         type 'a t : mutable_data with 'a @@ unyielding many
        The kind of the first is mutable_data with 'a
          because of the definition of t at line 4, characters 2-34.
        But the kind of the first must be a subkind of
-           mutable_data with 'a @@ forkable unyielding many
+           mutable_data with 'a @@ unyielding many
          because of the definition of t at line 2, characters 2-40.
 
        The first mode-crosses less than the second along:
@@ -204,8 +204,7 @@ end = struct
   type 'a t : mutable_data with 'a @@ many unyielding forkable
 end
 [%%expect {|
-module M :
-  sig type 'a t : mutable_data with 'a @@ forkable unyielding many end
+module M : sig type 'a t : mutable_data with 'a @@ unyielding many end
 |}]
 
 (* CR layouts v2.8: 'a u's kind should get normalized to just immutable_data.
@@ -217,7 +216,7 @@ end
 [%%expect {|
 module M :
   sig
-    type ('a : immutable_data) u : immutable_data with 'a
+    type ('a : immutable_data) u : immutable_data
     type ('a : immutable_data) t = 'a u
   end
 |}]
@@ -251,7 +250,7 @@ type q : value mod portable with t = { x : v }
 [%%expect {|
 type u
 type t : value mod portable with u
-type v : value mod portable with t
+type v : value mod portable with u & t
 type q = { x : v; }
 |}]
 
@@ -381,13 +380,7 @@ end
 module Foo :
   sig
     type ('a, 'b) u : value mod portable with 'b
-    type ('a, 'b, 'c) t
-      : value
-          mod portable
-          with 'a
-          with 'b
-          with ('a * 'b, 'c) u
-          with ('b, 'c) u
+    type ('a, 'b, 'c) t : value mod portable with 'a with 'b with (_, 'c) u
   end
 |}]
 
@@ -433,7 +426,7 @@ module type S =
   sig
     type 'a t1
     type 'a t2
-    type 'a t : immutable_data with 'a t1 t2 with unit t1
+    type 'a t : immutable_data with _ t1 & _ t2 & 'a with t1 with t2
   end
 module M : S
 |}]
@@ -456,7 +449,7 @@ module type S =
   sig
     type 'a t1
     type 'a t2
-    type 'a t : immutable_data with 'a t1 t2 with unit t2
+    type 'a t : immutable_data with _ t1 & _ t2 & 'a with t1 & _ t2 with t2
   end
 Lines 7-11, characters 15-3:
  7 | ...............struct
@@ -472,11 +465,13 @@ Error: Signature mismatch:
        Type declarations do not match:
          type 'a t = 'a t2 t1 * unit t1
        is not included in
-         type 'a t : immutable_data with 'a t1 t2 with unit t2
-       The kind of the first is immutable_data with 'a t2 t1 with unit t1
+         type 'a t
+           : immutable_data with _ t1 & _ t2 & 'a with t1 & _ t2 with t2
+       The kind of the first is
+           immutable_data with _ t1 & _ t2 & 'a with _ t1 & t2 with t1
          because it's a tuple type.
        But the kind of the first must be a subkind of
-           immutable_data with 'a t1 t2 with unit t2
+           immutable_data with _ t1 & _ t2 & 'a with t1 & _ t2 with t2
          because of the definition of t at line 4, characters 2-52.
 |}]
 
@@ -494,7 +489,11 @@ module M : S = struct
 end
 [%%expect{|
 module type S =
-  sig type 'a t1 type 'a t2 type 'a t : immutable_data with 'a t1 t2 end
+  sig
+    type 'a t1
+    type 'a t2
+    type 'a t : immutable_data with _ t1 & _ t2 & 'a with t1 & _ t2 with t2
+  end
 Lines 7-11, characters 15-3:
  7 | ...............struct
  8 |   type 'a t1
@@ -509,7 +508,8 @@ Error: Signature mismatch:
        Type declarations do not match:
          type 'a t = 'a t2 t1
        is not included in
-         type 'a t : immutable_data with 'a t1 t2
+         type 'a t
+           : immutable_data with _ t1 & _ t2 & 'a with t1 & _ t2 with t2
        The layout of the first is value
          because of the definition of t1 at line 8, characters 2-12.
        But the layout of the first must be a sublayout of value non_float

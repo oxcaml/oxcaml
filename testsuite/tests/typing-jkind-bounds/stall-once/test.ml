@@ -33,12 +33,7 @@ Line 1, characters 52-53:
                                                         ^
 Error: The value "t" has type "int list list list t"
        but an expression was expected of type "('a : value mod portable)"
-       The kind of int list list list t is
-           immutable_data
-             with int list list list
-             with int list list list list list list list list list list list list list
-                    @@
-                    portable
+       The kind of int list list list t is value non_float
          because of the definition of t at lines 1-4, characters 0-3.
        But the kind of int list list list t must be a subkind of
            value mod portable
@@ -67,12 +62,7 @@ Line 1, characters 56-57:
                                                             ^
 Error: The value "t" has type "int list list list Foo.t"
        but an expression was expected of type "('a : value mod portable)"
-       The kind of int list list list Foo.t is
-           immutable_data
-             with int list list list
-             with int list list list list list list list list list list list list list
-                    @@
-                    portable.
+       The kind of int list list list Foo.t is value non_float.
        But the kind of int list list list Foo.t must be a subkind of
            value mod portable
          because of the definition of require_portable at line 2, characters 21-56.

@@ -582,10 +582,14 @@ let jkind_desc s jkind =
       if Path.compare p' p = 0 then jkind else
         { jkind with base = Kconstr (p', sa) }
     | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
-    | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds; _ } ->
+    | Jkind_const { base; ikind_floor; with_bounds = No_with_bounds; _ } ->
       let const =
         { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
-          mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
+          ikind_floor =
+            Jkind.Mod_bounds.to_axis_lattice
+              (Jkind.Mod_bounds.meet
+                 (Jkind.Mod_bounds.of_axis_lattice ikind_floor)
+                 (Jkind.Mod_bounds.of_axis_lattice jkind.ikind_floor));
           with_bounds = jkind.with_bounds }
       in
       Jkind.Base_and_axes.map_layout Jkind_types.Layout.of_const const
@@ -605,9 +609,13 @@ let jkind_const_desc s
       if Path.compare p' p = 0 then jkind else
         { jkind with base = Kconstr (p', sa) }
     | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
-    | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds; _ } ->
+    | Jkind_const { base; ikind_floor; with_bounds = No_with_bounds; _ } ->
       { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
-        mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
+        ikind_floor =
+          Jkind.Mod_bounds.to_axis_lattice
+            (Jkind.Mod_bounds.meet
+               (Jkind.Mod_bounds.of_axis_lattice ikind_floor)
+               (Jkind.Mod_bounds.of_axis_lattice jkind.ikind_floor));
         with_bounds = jkind.with_bounds }
     end
   | Layout _ -> jkind

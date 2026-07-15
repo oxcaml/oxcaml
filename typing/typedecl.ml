@@ -3130,7 +3130,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
   match decl.Types.jkind_manifest with
   | None -> ()
   | Some { base = Layout _; _ } -> ()
-  | Some ({ base = Kconstr (kpath, _); mod_bounds = _;
+  | Some ({ base = Kconstr (kpath, _); ikind_floor = _;
             with_bounds = No_with_bounds; _ }
           as manifest) ->
     if not (Path.exists_free recmod_ids kpath) then ()
@@ -3141,7 +3141,10 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
            to use the "a contains b" language rather than "a = b". In the
            future, we'll have more ways for [Contains] to show up (e.g., product
            kinds). *)
-        match Typemode.untransl_mod_bounds manifest.mod_bounds with
+        match
+          Typemode.untransl_mod_bounds
+            (Jkind.Mod_bounds.of_axis_lattice manifest.ikind_floor)
+        with
         | [] -> [expand]
         | _ :: _ ->
           (match manifest.base with
@@ -3157,7 +3160,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
           None
         else
           match (Env.find_jkind current env).jkind_manifest with
-          | Some ({ base = Kconstr (next, _); mod_bounds = _;
+          | Some ({ base = Kconstr (next, _); ikind_floor = _;
                     with_bounds = No_with_bounds; _ } as m) ->
             follow next ((steps_of current m) @ acc) (current :: visited)
           | Some { base = Layout _; _ } | None -> None
@@ -3588,7 +3591,7 @@ let normalize_decl_jkinds env decls =
             Jkind.unsafely_set_bounds env ~from:original_decl.type_jkind
               decl.type_jkind
           in
-          let umc = Some (Jkind.to_unsafe_mode_crossing type_jkind) in
+          let umc = Some (Jkind.to_unsafe_mode_crossing env type_jkind) in
           let type_kind =
             match decl.type_kind with
             | Type_abstract _ | Type_open -> assert false (* Checked above *)
@@ -5358,7 +5361,7 @@ module Reaching_path = struct
   (* Format a jkind manifest without expanding Kconstr paths, to avoid infinite
      loops on the very cycles we're reporting. *)
   let pp_kind_manifest ppf
-        ({ base; mod_bounds; with_bounds = No_with_bounds; _ }
+        ({ base; ikind_floor; with_bounds = No_with_bounds; _ }
          : jkind_const_desc_lr ) =
     let pp_base ppf = function
       | Types.Layout l -> Fmt.fprintf ppf "%s" (Jkind.Layout.Const.to_string l)
@@ -5370,7 +5373,8 @@ module Reaching_path = struct
              (String.concat " " sa_strs))
     in
     let mod_strings =
-      Typemode.untransl_mod_bounds mod_bounds
+      Typemode.untransl_mod_bounds
+        (Jkind.Mod_bounds.of_axis_lattice ikind_floor)
       |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
     in
     match mod_strings with

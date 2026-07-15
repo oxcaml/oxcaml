@@ -880,12 +880,28 @@ end
 module M = F(struct type t end)
     [%%expect{|
 module F :
-  functor (X : sig type t end) -> sig kind_ k type t : k with X.t end
+  functor (X : sig type t end) ->
+    sig
+      kind_ k
+      type t
+        : k
+            mod global many stateless immutable dynamic external_
+            with X.t
+            with k
+    end
 Line 6, characters 11-31:
 6 | module M = F(struct type t end)
                ^^^^^^^^^^^^^^^^^^^^
 Error: This functor has type
-       "functor (X : sig type t end) -> sig kind_ k type t : k with X.t end"
+       "functor (X : sig type t end) ->
+         sig
+           kind_ k
+           type t
+             : k
+                 mod global many stateless immutable dynamic external_
+                 with X.t
+                 with k
+         end"
        The parameter cannot be eliminated in the result type.
        Please bind the argument to a module identifier.
 |}]
@@ -1383,7 +1399,7 @@ type ('a : k1) require_k1
 type a : k1 with t1
 type b = a require_k1
 [%%expect{|
-type a : k1 with t1
+type a : k1 mod global many stateless immutable dynamic external_ with k1
 type b = a require_k1
 |}]
 
@@ -1392,12 +1408,17 @@ type a : k1 with t2
 type b = a require_k1
 
 [%%expect{|
-type a : k1 with t2
+type a
+  : k1 mod global many stateless immutable dynamic external_ with k1 with t2
 Line 2, characters 9-10:
 2 | type b = a require_k1
              ^
 Error: This type "a" should be an instance of type "('a : k1)"
-       The kind of a is k1 with t2
+       The kind of a is
+           k1
+             mod global many stateless immutable dynamic external_
+             with k1
+             with t2
          because of the definition of a at line 1, characters 0-19.
        But the kind of a must be a subkind of k1
          because of the definition of require_k1 at line 5, characters 0-25.
@@ -1407,12 +1428,17 @@ Error: This type "a" should be an instance of type "('a : k1)"
 type a : k2 with t1 with t2
 type b = a require_k1
 [%%expect{|
-type a : k2 with t1 with t2
+type a
+  : k2 mod global many stateless immutable dynamic external_ with k2 with t1
 Line 2, characters 9-10:
 2 | type b = a require_k1
              ^
 Error: This type "a" should be an instance of type "('a : k1)"
-       The kind of a is k2 with t1 with t2
+       The kind of a is
+           k2
+             mod global many stateless immutable dynamic external_
+             with k2
+             with t1
          because of the definition of a at line 1, characters 0-27.
        But the kind of a must be a subkind of k1
          because of the definition of require_k1 at line 5, characters 0-25.

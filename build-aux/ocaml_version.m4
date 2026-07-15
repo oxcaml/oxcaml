@@ -97,7 +97,7 @@ m4_define([OCAML__RELEASE_EXTRA],
 # - A 3-bytes version number
 
 m4_define([MAGIC_NUMBER__PREFIX], [Caml1999])
-m4_define([MAGIC_NUMBER__VERSION], [581])
+m4_define([MAGIC_NUMBER__VERSION], [582])
 
 # The following macro is used to define all our magic numbers
 # Its first argument is the name of the file type described by that
@@ -110,11 +110,27 @@ AC_DEFUN([DEFINE_MAGIC_NUMBER],
 
 m4_define(EXEC__FORMAT, [X])
 DEFINE_MAGIC_NUMBER([EXEC], EXEC__FORMAT)
-# Stage-5 ikind format lock-in: the cmi now carries the decl ikind as an
-# explicit named-terms payload (was a raw Ldd node DAG), so a pre-stage-5
-# compiler must REJECT these cmis.  Bump ONLY the cmi version (581 -> 582): the
-# .cmt/.cmo/.cmx node marshaling is unchanged, so their versions stay at 581.
-m4_define([CMI__MAGIC_NUMBER], [MAGIC_NUMBER__PREFIX[]I[]582])
+# Stage-5 ikind format lock-in.  The [ikind_floor] field retype of [base_and_axes]
+# changes the MARSHALLED [Types] shape, which is embedded not only in the cmi but
+# in every format that serializes typed-tree / signature data -- notably the
+# bin-annot outputs (.cmt/.cmti/.cms marshal the typed tree, hence [base_and_axes])
+# and the cmo/cmx/exec signature data.  A stale artifact of any such format would
+# decode the old boxed [mod_bounds] record as a garbage [Axis_lattice.t] int, so
+# ALL of them must be invalidated: the SHARED MAGIC_NUMBER__VERSION is bumped
+# 581 -> 582 (over-inclusive but safe; cmis/artifacts are rebuilt every roll).
+# The LOAD-BEARING formats -- those that actually marshal [base_and_axes] and
+# would garbage-decode a stale artifact -- are the cmi and the cmt/cmti/cms
+# bin-annot (all carry the typed tree / signature; cms via the [Env.t] it
+# conditionally marshals, whose summaries hold [type_declaration]s reaching
+# [base_and_axes] -- cms_format.ml, confirmed); the shared bump also invalidates
+# cmo/cmx/exec, which is the over-inclusive-but-safe part.
+# The cmi additionally carries the decl ikind directly (was a raw Ldd node DAG),
+# so it keeps its OWN override one ahead of the shared version.  History:
+#   shared 581 -> 582 : ikind_floor retype changes the marshalled Types shape
+#                       (cmi + cmt/cmti/cms bin-annot + cmo/cmx/exec).
+#   cmi override -> I583 : the earlier named-terms cmi wire change (582), carried
+#                          forward one past the new shared 582.
+m4_define([CMI__MAGIC_NUMBER], [MAGIC_NUMBER__PREFIX[]I[]583])
 DEFINE_MAGIC_NUMBER([CMO], [O])
 DEFINE_MAGIC_NUMBER([CMA], [A])
 DEFINE_MAGIC_NUMBER([CMX], [Y])

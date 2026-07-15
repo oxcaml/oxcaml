@@ -1001,6 +1001,11 @@ module Variable_names : sig
   (* Refresh the weak variable map in the toplevel; for [print_items], which is
      itself for the toplevel *)
   val refresh_weak : unit -> unit
+
+  (* Resolve a with-bound param atom (keyed by [Types.get_id]) to the
+     variable letter the live print is using for that type var, if any.
+     Consumed by the ikind with-clause renderer via [Jkind.Const]. *)
+  val resolve_param_id : int -> string option
 end = struct
   (* We map from types to names, but not directly; we also store a substitution,
      which maps from types to types.  The lookup process is
@@ -1142,7 +1147,26 @@ end = struct
   let reserve ty =
     normalize_type ty;
     add_named_vars ty
+
+  let resolve_param_id id =
+    List.find_map
+      (fun (t, name) ->
+        if Types.get_id (Transient_expr.type_expr t) = id
+        then Some name
+        else None)
+      !names
 end
+
+(* Install the live variable-name table as the ikind with-clause renderer's
+   param-name resolver (PRINT-DESIGN.md 4.1). *)
+let () = Jkind.Const.set_param_name_resolver Variable_names.resolve_param_id
+
+(* A2: install the namespaced, conflict-aware path printer as the ikind
+   with-clause renderer's constructor-atom resolver, so shadowed with-bound
+   paths disambiguate (e.g. [with X/2.t]) rather than printing a raw
+   [Path.name] that denotes the wrong path. *)
+let () =
+  Jkind.Const.set_path_oide_resolver (fun p -> tree_of_path (Some Type) p)
 
 module Aliases = struct
   let visited_objects = ref ([] : transient_expr list)

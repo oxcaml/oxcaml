@@ -51,7 +51,7 @@ module Recursive_boxed_variant_with_bounded_parameter :
     module Variable :
       sig
         type ('v : value mod portable contended) t
-          : value mod portable contended with 'v
+          : value mod portable contended
       end
     module Record_t :
       sig
@@ -242,7 +242,7 @@ module F :
     end
 module Arg1 : sig type t1 = int -> int type t2 = string end
 module M1 : sig type t3 = F(Arg1).t3 type t4 = F(Arg1).t4 end
->> Fatal error: Abstract kind with [with]: value mod portable with Arg1.t2
+>> Fatal error: Abstract kind with [with]: value mod portable
 Uncaught exception: Misc.Fatal_error
 
 |}]
@@ -420,8 +420,7 @@ end = struct
 end
 [%%expect{|
 val foo : existential_abstract -> unit = <fun>
-module M :
-  sig type t : immutable_data with (type : value mod portable) abstract end
+module M : sig type t : immutable_data with _ abstract @@ portable end
 |}]
 
 module M : sig
@@ -430,7 +429,7 @@ end = struct
   type t = P : ('a : immediate). 'a abstract -> t
 end
 [%%expect{|
-module M : sig type t : immutable_data with (type : value) abstract end
+module M : sig type t : immutable_data with _ abstract @@ portable end
 |}]
 
 (* Some hard recursive types with existentials *)

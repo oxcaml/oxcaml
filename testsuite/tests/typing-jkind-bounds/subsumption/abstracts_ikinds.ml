@@ -73,7 +73,7 @@ module M : S = struct
 end
 [%%expect{|
 type t1 : value mod portable
-module type S = sig type t : value mod portable with t1 end
+module type S = sig type t : value mod portable end
 module M : S
 |}]
 
@@ -103,7 +103,7 @@ module M : S = struct
 end
 [%%expect{|
 type t1 : value mod portable
-module type S = sig type t : value mod portable with t1 end
+module type S = sig type t : value mod portable end
 module M : S
 |}]
 

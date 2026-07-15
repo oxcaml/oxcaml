@@ -664,7 +664,7 @@ Line 7, characters 13-29:
                  ^^^^^^^^^^^^^^^^
 Error: This type "int or_null smth" should be an instance of type
          "('a : immediate)"
-       The kind of int or_null smth is immediate with int or_null
+       The kind of int or_null smth is value non_pointer
          because of the definition of smth at line 1, characters 0-50.
        But the kind of int or_null smth must be a subkind of immediate
          because of the definition of bounded at line 3, characters 0-29.

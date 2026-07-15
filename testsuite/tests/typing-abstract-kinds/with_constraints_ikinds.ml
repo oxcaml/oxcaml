@@ -790,12 +790,12 @@ module F1 :
     (X : sig
            kind_ k = immediate
            type t : immediate
-           type s : value mod portable with t
+           type s : value mod portable
          end)
     -> sig type r = X.s end
 module F2 :
-  functor (X : sig type t : immediate type s : value mod portable with t end)
-    -> sig type r = X.s end
+  functor (X : sig type t : immediate type s : value mod portable end) ->
+    sig type r = X.s end
 |}]
 
 module F1(X : S with kind_ k = value) = struct

@@ -81,7 +81,7 @@ Line 1, characters 14-24:
                   ^^^^^^^^^^
 Error: This type "int option" should be an instance of type
          "('a : value mod portable)"
-       The kind of int option is immutable_data with int
+       The kind of int option is value non_float
          because it's a boxed variant type.
        But the kind of int option must be a subkind of value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
@@ -105,7 +105,7 @@ Line 1, characters 14-35:
                   ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "(unit -> unit) option" should be an instance of type
          "('a : value mod portable)"
-       The kind of (unit -> unit) option is immutable_data with unit -> unit
+       The kind of (unit -> unit) option is value non_float
          because it's a boxed variant type.
        But the kind of (unit -> unit) option must be a subkind of
            value mod portable
@@ -129,7 +129,7 @@ Line 1, characters 14-24:
                   ^^^^^^^^^^
 Error: This type "int option" should be an instance of type
          "('a : value mod global)"
-       The kind of int option is immutable_data with int
+       The kind of int option is value non_float
          because it's a boxed variant type.
        But the kind of int option must be a subkind of value mod global
          because of the definition of require_global at line 7, characters 0-43.
@@ -176,8 +176,7 @@ type 'a t : mutable_data = 'a ref
 Line 1, characters 0-33:
 1 | type 'a t : mutable_data = 'a ref
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a ref" is
-           mutable_data with 'a @@ forkable unyielding many.
+Error: The kind of type "'a ref" is mutable_data with 'a @@ unyielding many.
        But the kind of type "'a ref" must be a subkind of mutable_data
          because of the definition of t at line 1, characters 0-33.
 
@@ -200,8 +199,7 @@ Line 1, characters 14-21:
                   ^^^^^^^
 Error: This type "int ref" should be an instance of type
          "('a : value mod portable)"
-       The kind of int ref is
-           mutable_data with int @@ forkable unyielding many.
+       The kind of int ref is value non_float mod forkable unyielding many.
        But the kind of int ref must be a subkind of value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
 
@@ -225,8 +223,7 @@ Line 1, characters 14-21:
                   ^^^^^^^
 Error: This type "int ref" should be an instance of type
          "('a : value mod contended)"
-       The kind of int ref is
-           mutable_data with int @@ forkable unyielding many.
+       The kind of int ref is value non_float mod forkable unyielding many.
        But the kind of int ref must be a subkind of value mod contended
          because of the definition of require_contended at line 9, characters 0-49.
 
@@ -302,7 +299,7 @@ Line 1, characters 14-22:
                   ^^^^^^^^
 Error: This type "int list" should be an instance of type
          "('a : value mod portable)"
-       The kind of int list is immutable_data with int
+       The kind of int list is value non_float
          because it's a boxed variant type.
        But the kind of int list must be a subkind of value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
@@ -326,7 +323,7 @@ Line 1, characters 14-33:
                   ^^^^^^^^^^^^^^^^^^^
 Error: This type "(unit -> unit) list" should be an instance of type
          "('a : value mod portable)"
-       The kind of (unit -> unit) list is immutable_data with unit -> unit
+       The kind of (unit -> unit) list is value non_float
          because it's a boxed variant type.
        But the kind of (unit -> unit) list must be a subkind of
            value mod portable
@@ -350,7 +347,7 @@ Line 1, characters 14-22:
                   ^^^^^^^^
 Error: This type "int list" should be an instance of type
          "('a : value mod global)"
-       The kind of int list is immutable_data with int
+       The kind of int list is value non_float
          because it's a boxed variant type.
        But the kind of int list must be a subkind of value mod global
          because of the definition of require_global at line 7, characters 0-43.
@@ -418,7 +415,7 @@ Line 1, characters 14-23:
                   ^^^^^^^^^
 Error: This type "int array" should be an instance of type
          "('a : value mod portable)"
-       The kind of int array is mutable_data with int
+       The kind of int array is value non_float
          because it is the primitive value type array.
        But the kind of int array must be a subkind of value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
@@ -441,7 +438,7 @@ Line 1, characters 14-23:
                   ^^^^^^^^^
 Error: This type "int array" should be an instance of type
          "('a : value mod contended)"
-       The kind of int array is mutable_data with int
+       The kind of int array is value non_float
          because it is the primitive value type array.
        But the kind of int array must be a subkind of value mod contended
          because of the definition of require_contended at line 9, characters 0-49.
@@ -513,7 +510,7 @@ Line 1, characters 14-24:
                   ^^^^^^^^^^
 Error: This type "int iarray" should be an instance of type
          "('a : value mod portable)"
-       The kind of int iarray is immutable_data with int
+       The kind of int iarray is value non_float
          because it is the primitive value type iarray.
        But the kind of int iarray must be a subkind of value mod portable
          because of the definition of require_portable at line 10, characters 0-47.
@@ -537,7 +534,7 @@ Line 1, characters 14-35:
                   ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "(unit -> unit) iarray" should be an instance of type
          "('a : value mod portable)"
-       The kind of (unit -> unit) iarray is immutable_data with unit -> unit
+       The kind of (unit -> unit) iarray is value non_float
          because it is the primitive value type iarray.
        But the kind of (unit -> unit) iarray must be a subkind of
            value mod portable
@@ -561,7 +558,7 @@ Line 1, characters 14-24:
                   ^^^^^^^^^^
 Error: This type "int iarray" should be an instance of type
          "('a : value mod global)"
-       The kind of int iarray is immutable_data with int
+       The kind of int iarray is value non_float
          because it is the primitive value type iarray.
        But the kind of int iarray must be a subkind of value mod global
          because of the definition of require_global at line 7, characters 0-43.

@@ -157,15 +157,15 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t : value mod portable end
        is not included in
-         sig type t : value mod portable contended with M.t end
+         sig type t : value mod portable contended with a end
        Type declarations do not match:
          type t : value mod portable
        is not included in
-         type t : value mod portable contended with M.t
+         type t : value mod portable contended with a
        The kind of the first is value mod portable
          because of the definition of t at line 13, characters 2-29.
        But the kind of the first must be a subkind of
-           value mod portable contended with M.t
+           value mod portable contended with a
          because of the definition of t at line 11, characters 2-48.
 |}]
 
@@ -197,15 +197,15 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t : value mod portable end
        is not included in
-         sig type t : value mod portable contended with M.u end
+         sig type t : value mod portable contended with a end
        Type declarations do not match:
          type t : value mod portable
        is not included in
-         type t : value mod portable contended with M.u
+         type t : value mod portable contended with a
        The kind of the first is value mod portable
          because of the definition of t at line 15, characters 2-29.
        But the kind of the first must be a subkind of
-           value mod portable contended with M.u
+           value mod portable contended with a
          because of the definition of t at line 13, characters 2-48.
 |}]
 
@@ -264,18 +264,17 @@ Error: Signature mismatch:
        is not included in
          sig
            type 'a u = 'a constraint 'a = [< `a of string | `b ]
-           type 'a t : value mod global with [< `a of string | `b ] u
+           type 'a t : value mod global with _
              constraint 'a = [< `a of string | `b ]
          end
        Type declarations do not match:
          type 'a t constraint 'a = [< `a of string | `b ]
        is not included in
-         type 'a t : value mod global with [< `a of string | `b ] u
+         type 'a t : value mod global with _
            constraint 'a = [< `a of string | `b ]
        The kind of the first is value
          because of the definition of t at line 6, characters 2-49.
-       But the kind of the first must be a subkind of
-           value mod global with [< `a of string | `b ] u
+       But the kind of the first must be a subkind of value mod global with _
          because of the definition of t at line 3, characters 2-40.
 |}]
 
@@ -301,18 +300,18 @@ Error: Signature mismatch:
        is not included in
          sig
            type 'a u = 'a constraint 'a = [< `a of int -> int | `b ]
-           type 'a t : value mod portable with [< `a of int -> int | `b ] u
+           type 'a t : value mod portable with _
              constraint 'a = [< `a of int -> int | `b ]
          end
        Type declarations do not match:
          type 'a t constraint 'a = [< `a of int -> int | `b ]
        is not included in
-         type 'a t : value mod portable with [< `a of int -> int | `b ] u
+         type 'a t : value mod portable with _
            constraint 'a = [< `a of int -> int | `b ]
        The kind of the first is value
          because of the definition of t at line 6, characters 2-55.
        But the kind of the first must be a subkind of
-           value mod portable with [< `a of int -> int | `b ] u
+           value mod portable with _
          because of the definition of t at line 3, characters 2-42.
 |}]
 
@@ -338,18 +337,18 @@ Error: Signature mismatch:
        is not included in
          sig
            type 'a u = 'a constraint 'a = [> `a of string | `b ]
-           type 'a t : value mod portable with [> `a of string | `b ] u
+           type 'a t : value mod portable with _
              constraint 'a = [> `a of string | `b ]
          end
        Type declarations do not match:
          type 'a t constraint 'a = [> `a of string | `b ]
        is not included in
-         type 'a t : value mod portable with [> `a of string | `b ] u
+         type 'a t : value mod portable with _
            constraint 'a = [> `a of string | `b ]
        The kind of the first is value
          because of the definition of t at line 6, characters 2-49.
        But the kind of the first must be a subkind of
-           value mod portable with [> `a of string | `b ] u
+           value mod portable with _
          because of the definition of t at line 3, characters 2-42.
 |}]
 
@@ -371,14 +370,14 @@ Error: Signature mismatch:
        Modules do not match:
          sig type a = < value : string > type t end
        is not included in
-         sig type a = < value : string > type t : value mod global with a end
+         sig type a = < value : string > type t : value mod global end
        Type declarations do not match:
          type t
        is not included in
-         type t : value mod global with a
+         type t : value mod global
        The kind of the first is value
          because of the definition of t at line 6, characters 2-8.
-       But the kind of the first must be a subkind of value mod global with a
+       But the kind of the first must be a subkind of value mod global
          because of the definition of t at line 3, characters 2-34.
 |}]
 
@@ -536,15 +535,15 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t end
        is not included in
-         sig type t : value mod portable with s end
+         sig type t : value mod portable with _ end
        Type declarations do not match:
          type t
        is not included in
-         type t : value mod portable with s
+         type t : value mod portable with _
        The kind of the first is value
          because of the definition of t at line 8, characters 2-8.
        But the kind of the first must be a subkind of
-           value mod portable with s
+           value mod portable with _
          because of the definition of t at line 6, characters 2-36.
 |}]
 
