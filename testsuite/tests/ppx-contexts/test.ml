@@ -1,6 +1,6 @@
 (* TEST
  readonly_files = "myppx.ml";
- include ocamlcommon;
+ include ocamlfrontend;
  setup-ocamlc.byte-build-env;
  program = "${test_build_directory}/myppx.exe";
  all_modules = "myppx.ml";

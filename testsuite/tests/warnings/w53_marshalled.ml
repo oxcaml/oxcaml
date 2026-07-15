@@ -1,6 +1,6 @@
 (* TEST
  readonly_files = "marshall_for_w53.ml w53.ml w53_zero_alloc_all.ml";
- include ocamlcommon;
+ include ocamlfrontend;
  setup-ocamlc.byte-build-env;
  program = "${test_build_directory}/marshall_for_w53.exe";
  all_modules = "marshall_for_w53.ml";

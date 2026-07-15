@@ -33,7 +33,7 @@
    (:include %{project_root}/ocamlopt_flags.sexp)
    -O3))
  (libraries
-  ocamlcommon
+  ocamlfrontend
   ocamloptcomp
   jsoo_imports
   flambda2_bound_identifiers

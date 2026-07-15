@@ -111,7 +111,7 @@
   --inspection))
 
 (library
- (name ocamlparsing)
+ (name ocamlcommon)
  (wrapped false)
  (flags
   (:standard
@@ -208,7 +208,7 @@
   global_module))
 
 (library
- (name ocamlcommon)
+ (name ocamlfrontend)
  (wrapped false)
  (flags
   (:standard
@@ -223,7 +223,7 @@
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (library_flags -linkall)
- (libraries flambda2_floats ocamlparsing)
+ (libraries flambda2_floats ocamlcommon)
  (modules_without_implementation
   annot
   value_rec_types
@@ -237,7 +237,7 @@
  (modules
   ;; UTILS
   ;; profile_counters_functions stays here (rather than moving to
-  ;; ocamlparsing with the rest of utils/) because it depends on typing/
+  ;; ocamlcommon with the rest of utils/) because it depends on typing/
   profile_counters_functions
   ;; TYPING
   path
@@ -398,7 +398,7 @@
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
- (libraries ocamlcommon)
+ (libraries ocamlfrontend)
  (modules
   ;; bytecomp/
   blambda
@@ -422,7 +422,7 @@
  (modes byte)
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (libraries ocamlbytecomp ocamlcommon)
+ (libraries ocamlbytecomp ocamlfrontend)
  (modules main))
 
 (executable
@@ -430,7 +430,7 @@
  (modes native)
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (libraries ocamlbytecomp ocamlcommon)
+ (libraries ocamlbytecomp ocamlfrontend)
  (modules main_native))
 
 (library
@@ -440,7 +440,7 @@
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
- (libraries ocamlcommon flambda2)
+ (libraries ocamlfrontend flambda2)
  (modules jsmaindriver jscompile jslibrarian))
 
 (executable
@@ -448,7 +448,7 @@
  (modes native)
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (libraries ocamljcomp ocamlcommon flambda2)
+ (libraries ocamljcomp ocamlfrontend flambda2)
  (modules boot_ocamlj))
 
 ; Disabled since there can be only one (data_only_dirs) declaration
@@ -532,14 +532,14 @@
 (install
  (files
   (ocamlbytecomp.a as compiler-libs/ocamlbytecomp.a)
+  (ocamlfrontend.a as compiler-libs/ocamlfrontend.a)
   (ocamlcommon.a as compiler-libs/ocamlcommon.a)
-  (ocamlparsing.a as compiler-libs/ocamlparsing.a)
   (ocamlbytecomp.cmxa as compiler-libs/ocamlbytecomp.cmxa)
+  (ocamlfrontend.cmxa as compiler-libs/ocamlfrontend.cmxa)
   (ocamlcommon.cmxa as compiler-libs/ocamlcommon.cmxa)
-  (ocamlparsing.cmxa as compiler-libs/ocamlparsing.cmxa)
   (ocamlbytecomp.cma as compiler-libs/ocamlbytecomp.cma)
-  (ocamlcommon.cma as compiler-libs/ocamlcommon.cma)
-  (ocamlparsing.cma as compiler-libs/ocamlparsing.cma))
+  (ocamlfrontend.cma as compiler-libs/ocamlfrontend.cma)
+  (ocamlcommon.cma as compiler-libs/ocamlcommon.cma))
  (section lib)
  (package ocaml))
 
@@ -769,7 +769,7 @@
   ; be tricky because it has a different name...
   )
  (libraries
-  ocamlcommon
+  ocamlfrontend
   oxcaml_common
   flambda2_identifiers
   flambda2_cmx
@@ -784,7 +784,7 @@
  (name oxcaml_common)
  (wrapped false)
  (modes byte native)
- ; same flags as for ocamlcommon library
+ ; same flags as for ocamlfrontend library
  (flags
   (:standard
    -strict-sequence
@@ -800,7 +800,7 @@
  (instrumentation
   (backend bisect_ppx))
  (libraries
-  ocamlcommon
+  ocamlfrontend
   dwarf_flags
   asm_targets
   arm64_ast
@@ -819,7 +819,7 @@
   flambda2_to_cmm
   gc_timings
   ocamloptcomp
-  ocamlcommon
+  ocamlfrontend
   unix)
  (modules oxcaml_main))
 
@@ -842,7 +842,7 @@
   flambda2_to_cmm
   gc_timings
   ocamloptcomp
-  ocamlcommon
+  ocamlfrontend
   unix)
  (modules oxcaml_main_native))
 
@@ -862,7 +862,7 @@
   flambda2_ui
   flambda2_to_cmm
   ocamloptcomp
-  ocamlcommon)
+  ocamlfrontend)
  (modules boot_ocamlopt))
 
 ; The input archives (.a, .cma and .cmxa) to the following three rules
@@ -1041,10 +1041,10 @@
   (glob_files *.mli)
   (glob_files .ocamlbytecomp.objs/byte/*.{cmi,cmo,cmt,cmti})
   (glob_files .ocamlbytecomp.objs/native/*.cmx)
+  (glob_files .ocamlfrontend.objs/byte/*.{cmi,cmo,cmt,cmti})
+  (glob_files .ocamlfrontend.objs/native/*.cmx)
   (glob_files .ocamlcommon.objs/byte/*.{cmi,cmo,cmt,cmti})
   (glob_files .ocamlcommon.objs/native/*.cmx)
-  (glob_files .ocamlparsing.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files .ocamlparsing.objs/native/*.cmx)
   (glob_files .ocamloptcomp.objs/byte/*.{cmi,cmo,cmt,cmti})
   (glob_files .ocamloptcomp.objs/native/*.cmx)
   (glob_files
@@ -1095,12 +1095,12 @@
   (include compiler-libs-installation.sexp)))
 
 ; This is entirely redundant, but without it, each target in these libraries
-; and their dependencies waits until ocamlcommon is built, including those
+; and their dependencies waits until ocamlfrontend is built, including those
 ; targets that don't actually depend on it. This produces severe bottlenecking,
 ; costing about 15 seconds when building in dev mode. It's not immediately clear
 ; why Dune fails to parallelise here. Going by the progress indicator, my best
 ; guess is that targets in subdirectories aren't even discovered until
-; ocamlcommon is built, unless something in the subdirectory is explicitly made
+; ocamlfrontend is built, unless something in the subdirectory is explicitly made
 ; a dependency.
 
 (alias

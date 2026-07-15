@@ -164,8 +164,8 @@ let init () =
     (fun (name, archives) ->
       register_modifiers name (compilerlibs_archives archives))
     [
-      "ocamlparsing", ["ocamlparsing"];
-      "ocamlcommon", ["ocamlparsing"; "ocamlcommon"];
+      "ocamlcommon", ["ocamlcommon"];
+      "ocamlfrontend", ["ocamlcommon"; "ocamlfrontend"];
       "ocamlbytecomp", ["ocamlbytecomp"];
       "ocamlmiddleend", ["ocamlmiddleend"];
       "ocamloptcomp", ["ocamloptcomp"];

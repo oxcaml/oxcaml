@@ -7,7 +7,7 @@
 ; (library
 ;  (name ocamlmiddleend)
 ;  (wrapped false)
-;  (libraries ocamlcommon)
+;  (libraries ocamlfrontend)
 ;  (modules_without_implementation
 ;    cmx_format cmxs_format backend_intf inlining_decision_intf
 ;    simplify_boxed_integer_ops_intf)
@@ -18,7 +18,7 @@
 (library
  (name ocamloptcomp)
  (wrapped false)
- (libraries ocamlcommon)
+ (libraries ocamlfrontend)
  (modules_without_implementation x86_ast emitenv
    cmx_format cmxs_format backend_intf inlining_decision_intf
    simplify_boxed_integer_ops_intf branch_relaxation_intf)
@@ -87,7 +87,7 @@
    -strict-sequence -absname -w +67
    -bin-annot -safe-string -strict-formats
  ))
- (libraries ocamloptcomp ocamlcommon)
+ (libraries ocamloptcomp ocamlfrontend)
  (modules optmain_native))
 
 (install

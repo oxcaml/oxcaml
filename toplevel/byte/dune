@@ -18,7 +18,7 @@
  (name ocamltoplevel)
  (wrapped false)
  (modes byte)
- (libraries ocamlcommon ocamlbytecomp)
+ (libraries ocamlfrontend ocamlbytecomp)
  (modules :standard \ topstart expunge))
 
 (rule

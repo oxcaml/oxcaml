@@ -2,7 +2,7 @@
  {
    setup-ocamlc.byte-build-env;
    module = "link_ocamloptcomp.ml";
-   ocamlc.byte with ocamlcommon;
+   ocamlc.byte with ocamlfrontend;
    module = "";
    flags = "-linkall";
    all_modules = "";
@@ -13,7 +13,7 @@
  }{
    setup-ocamlopt.byte-build-env;
    module = "link_ocamloptcomp.ml";
-   ocamlopt.byte with ocamlcommon;
+   ocamlopt.byte with ocamlfrontend;
    module = "";
    flags = "-linkall";
    all_modules = "";

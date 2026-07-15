@@ -16,7 +16,7 @@
   (name objinfo)
   (modes byte native)
   (modules objinfo)
-  (libraries ocamlcommon ocamlbytecomp ocamloptcomp))
+  (libraries ocamlfrontend ocamlbytecomp ocamloptcomp))
 
 (install
  (files
@@ -38,7 +38,7 @@
   (name ocamldep)
   (modes byte native)
   (modules ocamldep)
-  (libraries ocamlcommon ocamlbytecomp))
+  (libraries ocamlfrontend ocamlbytecomp))
 
 (install
   (files
@@ -67,7 +67,7 @@
   (name dumpobj)
   (modes byte)
   (modules dumpobj)
-  (libraries ocamlcommon ocamlbytecomp opnames))
+  (libraries ocamlfrontend ocamlbytecomp opnames))
 
 (install
   (files
@@ -81,7 +81,7 @@
   (name cmpbyt)
   (modes byte)
   (modules cmpbyt)
-  (libraries ocamlcommon ocamlbytecomp))
+  (libraries ocamlfrontend ocamlbytecomp))
 
 (executable
   (name ocamlmklib)
@@ -89,7 +89,7 @@
   (modules ocamlmklib)
   ; FIXME Fix warning 32
   (flags (:standard -w -32))
-  (libraries ocamlcommon ocamlbytecomp))
+  (libraries ocamlfrontend ocamlbytecomp))
 
 (install
   (files
@@ -103,7 +103,7 @@
   (name ocamlmktop)
   (modes byte native)
   (modules ocamlmktop)
-  (libraries ocamlcommon ocamlbytecomp))
+  (libraries ocamlfrontend ocamlbytecomp))
 
 (install
   (files
@@ -116,7 +116,7 @@
 (library
   (name debug_printers)
   (modes byte)
-  (libraries ocamlcommon)
+  (libraries ocamlfrontend)
   (modules debug_printers))
 
 (rule
@@ -140,7 +140,7 @@
  ; FIXME Fix warnings 27 and 33 and 60
  (flags
   (:standard -w -27-33-60-69-70))
- (libraries ocamlcommon ocamloptcomp unix memtrace))
+ (libraries ocamlfrontend ocamloptcomp unix memtrace))
 
 (install
  (files generate_cached_generic_functions.exe)
@@ -154,7 +154,7 @@
  ; FIXME Fix warning 27
  (flags
   (:standard -w -27))
- (libraries ocamlcommon ocamlbytecomp ocamloptcomp))
+ (libraries ocamlfrontend ocamlbytecomp ocamloptcomp))
 
 (executable
  (name gen_compiler_libs_installation)
@@ -165,7 +165,7 @@
  (name ocamlfilt)
  (modes byte native)
  (modules ocamlfilt)
- (libraries ocamlcommon))
+ (libraries ocamlfrontend))
 
 (install
  (files

@@ -3,7 +3,7 @@
  setup-ocamlc.byte-build-env;
  all_modules = "empty_ppx.ml";
  program = "ppx.exe";
- ocamlc.byte with ocamlcommon;
+ ocamlc.byte with ocamlfrontend;
  all_modules = "${test_file}";
  flags = "-ppx '${ocamlrun} ${test_build_directory_prefix}/ocamlc.byte/ppx.exe'";
  toplevel;

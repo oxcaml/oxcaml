@@ -8,5 +8,5 @@
   (ocamlopt_flags
    (:standard
     (:include %{project_root}/ocamlopt_flags.sexp)))
-  (libraries ocamlcommon dwarf_flags)
+  (libraries ocamlfrontend dwarf_flags)
 )
