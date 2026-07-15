@@ -472,7 +472,7 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
       let my_closure_duid = Flambda_debug_uid.none in
       let my_closure_param =
         Bound_parameter.create my_closure Flambda_kind.With_subkind.any_value
-          my_closure_duid
+          my_closure_duid ~dbg:Debuginfo.none
       in
       Bound_parameters.append params
         (Bound_parameters.create [my_closure_param])
@@ -776,7 +776,10 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
   in
   let soc_var = Variable.create "*set_of_closures*" Flambda_kind.value in
   let soc_var_duid = Flambda_debug_uid.none in
-  let soc_var = Bound_var.create soc_var soc_var_duid Name_mode.normal in
+  let soc_var =
+    Bound_var.create soc_var soc_var_duid Name_mode.normal ~dbg:Debuginfo.none
+      ~is_parameter:Bound_var.Is_parameter.local_var
+  in
   let defining_expr = Env.simple csoc free_vars in
   let env, res =
     Env.bind_variable_to_primitive env res soc_var ~inline:Env.Do_not_inline

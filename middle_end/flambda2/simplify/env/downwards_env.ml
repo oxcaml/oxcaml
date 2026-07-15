@@ -188,7 +188,7 @@ let define_variable0 ~extra t var kind =
           Lifted_cont_params.new_param ~replay_history
             variables_defined_in_current_continuation
             (Bound_parameter.create (Bound_var.var var) kind
-               (Bound_var.debug_uid var))
+               (Bound_var.debug_uid var) ~dbg:Debuginfo.none)
         in
         variables_defined_in_current_continuation :: r
   in
@@ -253,10 +253,12 @@ let create ~round ~machine_width ~(resolver : resolver)
   let my_ghost_region_duid = Flambda_debug_uid.none in
   define_variable
     (define_variable t
-       (Bound_var.create toplevel_my_region my_region_duid Name_mode.normal)
+       (Bound_var.create toplevel_my_region my_region_duid Name_mode.normal
+          ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var)
        K.region)
     (Bound_var.create toplevel_my_ghost_region my_ghost_region_duid
-       Name_mode.normal)
+       Name_mode.normal ~dbg:Debuginfo.none
+       ~is_parameter:Bound_var.Is_parameter.local_var)
     K.region
 
 let all_code t = t.all_code
@@ -379,7 +381,8 @@ let define_name t name kind =
         (Bound_var.create var Flambda_debug_uid.none
            (* CR sspies: In the future, improve the debug UID propagation
               here. *)
-           (Bound_name.name_mode name))
+           (Bound_name.name_mode name)
+           ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var)
         kind)
     ~symbol:(fun[@inline] sym -> (define_symbol [@inlined hint]) t sym kind)
 
@@ -403,7 +406,8 @@ let add_name t name ty =
         (Bound_var.create var Flambda_debug_uid.none
            (* CR sspies: In the future, improve the debug UID propagation
               here. *)
-           (Bound_name.name_mode name))
+           (Bound_name.name_mode name)
+           ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var)
         ty)
     ~symbol:(fun[@inline] sym -> add_symbol t sym ty)
 
@@ -444,7 +448,10 @@ let define_parameters ~extra t ~params =
   List.fold_left
     (fun t param ->
       let param_var, param_duid = BP.var_and_uid param in
-      let var = Bound_var.create param_var param_duid Name_mode.normal in
+      let var =
+        Bound_var.create param_var param_duid Name_mode.normal
+          ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
+      in
       define_variable0 ~extra t var (K.With_subkind.kind (BP.kind param)))
     t
     (Bound_parameters.to_list params)
@@ -463,7 +470,10 @@ let add_parameters ~extra ?(name_mode = Name_mode.normal) t params ~param_types
   List.fold_left2
     (fun t param param_type ->
       let param_var, param_duid = BP.var_and_uid param in
-      let var = Bound_var.create param_var param_duid name_mode in
+      let var =
+        Bound_var.create param_var param_duid name_mode ~dbg:Debuginfo.none
+          ~is_parameter:Bound_var.Is_parameter.local_var
+      in
       add_variable0 ~extra t var param_type)
     t params param_types
 

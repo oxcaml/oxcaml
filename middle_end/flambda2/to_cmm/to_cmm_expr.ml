@@ -1175,7 +1175,10 @@ and apply_expr env res apply =
       match handler_params with
       | [param] ->
         let param_var, param_uid = Bound_parameter.var_and_uid param in
-        let var = Bound_var.create param_var param_uid Name_mode.normal in
+        let var =
+          Bound_var.create param_var param_uid Name_mode.normal
+            ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
+        in
         let env, res =
           Env.bind_variable env res var
             ~effects_and_coeffects_of_defining_expr:effs ~defining_expr:call
@@ -1275,6 +1278,8 @@ and apply_cont env res apply_cont =
                 let param_var, param_uid = Bound_parameter.var_and_uid param in
                 let var =
                   Bound_var.create param_var param_uid Name_mode.normal
+                    ~dbg:Debuginfo.none
+                    ~is_parameter:Bound_var.Is_parameter.local_var
                 in
                 bind_var_to_simple ~dbg_with_inlined env res var
                   ~num_normal_occurrences_of_bound_vars:
