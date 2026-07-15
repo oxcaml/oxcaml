@@ -82,8 +82,20 @@ module Lvalue = struct
     @ [O.DW_op_dup]
     @ OB.conditional ~if_zero:[]
         ~if_nonzero:
-          ([O.DW_op_swap; O.DW_op_drop] @ OB.add_unsigned_const offset_in_bytes)
+          ([O.DW_op_swap; O.DW_op_drop] @ OB.add_signed_const offset_in_bytes)
         ~at_join:[] ()
+
+  let read_field_unguarded ~block ~field =
+    let offset_in_bytes =
+      Targetint.mul field Targetint.size_in_bytes_as_targetint
+    in
+    block @ OB.add_unsigned_const offset_in_bytes
+
+  let offset_pointer_unguarded t ~offset_in_words =
+    let offset_in_bytes =
+      Targetint.mul offset_in_words Targetint.size_in_bytes_as_targetint
+    in
+    t @ OB.add_signed_const offset_in_bytes
 
   let location_from_another_die ~die_label ~compilation_unit_header_label =
     [OB.call ~die_label ~compilation_unit_header_label]
@@ -110,6 +122,8 @@ module Rvalue = struct
   let float_const i = [OB.float_const i]
 
   let const_symbol symbol = [OB.value_of_symbol ~symbol]
+
+  let address_of_label label = [OB.address_of_label ~label]
 
   let in_register ~dwarf_reg_number = [OB.contents_of_register ~dwarf_reg_number]
 
@@ -138,11 +152,35 @@ module Rvalue = struct
           @ [O.DW_op_deref])
         ~at_join:[] ()
 
+  let read_field_unguarded ~block ~field =
+    let offset_in_bytes =
+      Targetint.mul field Targetint.size_in_bytes_as_targetint
+    in
+    block @ OB.add_unsigned_const offset_in_bytes @ [O.DW_op_deref]
+
+  let offset_pointer t ~offset_in_words =
+    let offset_in_bytes =
+      Targetint.mul offset_in_words Targetint.size_in_bytes_as_targetint
+    in
+    (* Guarded like [read_field] above: if evaluation of [t] fails (e.g. the
+       base pointer is unavailable, so the [DW_OP_call*] does nothing to the
+       stack) the result is left empty rather than underflowing the stack or
+       offsetting a junk value. *)
+    (OB.signed_int_const Targetint.zero :: t)
+    @ [O.DW_op_dup]
+    @ OB.conditional ~if_zero:[]
+        ~if_nonzero:
+          ([O.DW_op_swap; O.DW_op_drop] @ OB.add_signed_const offset_in_bytes)
+        ~at_join:[] ()
+
   let read_symbol_field symbol ~field =
     read_field ~block:(const_symbol symbol) ~field
 
   let location_from_another_die ~die_label ~compilation_unit_header_label =
     [OB.call ~die_label ~compilation_unit_header_label]
+
+  let entry_value_of_register ~dwarf_reg_number dwarf_version =
+    [OB.entry_value_of_register ~dwarf_reg_number dwarf_version]
 
   let implicit_pointer ~offset_in_bytes ~die_label dwarf_version =
     [OB.implicit_pointer ~offset_in_bytes ~die_label dwarf_version]
