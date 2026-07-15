@@ -2,7 +2,7 @@ let $camlApp_unarized_to_single_kind__first_const_0 = Block 0 () in
 (let code size(1)
        f_0 (x) my_closure &my_alloc_region my_depth -> k1 * k2 : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   cont k1 (x)
+   cont k1 close[normal] my_alloc_region (x)
  in
  let code size(6)
        g_1 (f : val, x)
@@ -10,20 +10,21 @@ let $camlApp_unarized_to_single_kind__first_const_0 = Block 0 () in
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   apply &my_alloc_region f (x) -> k1 * k2
+   apply &my_alloc_region [close close close close] f (x) -> k1 * k2
  in
  let code size(6)
        h_2 (x) my_closure &my_alloc_region my_depth -> k1 * k2 : imm tagged =
    let next_depth = rec_info (succ my_depth) in
    let f = %project_value_slot.[h].[f] (my_closure) in
    let g = %project_value_slot.[h].[g] (my_closure) in
-   apply direct(g_1 &my_alloc_region) (g : _ -> imm tagged) (f, x) -> k1 * k2
+   apply direct(g_1 &my_alloc_region) [close close close close]
+     (g : _ -> imm tagged) (f, x) -> k1 * k2
  in
  let f = closure f_0 @f &toplevel.alloc_region in
  let g = closure g_1 @g &toplevel.alloc_region in
  let h = closure h_2 @h &toplevel.alloc_region with { f = f; g = g } in
  let Pmakeblock = %block.[`0`].`toplevel` (f, g, h) in
- cont k (Pmakeblock))
+ cont k close[normal] toplevel.alloc_region (Pmakeblock))
   where k define_root_symbol (module_block) =
     let field_0 = %block_load.tag[`0`].`size`[`3`].[`0`] (module_block) in
     let field_1 = %block_load.tag[`0`].`size`[`3`].[`1`] (module_block) in

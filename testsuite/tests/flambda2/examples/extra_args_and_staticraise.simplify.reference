@@ -6,7 +6,7 @@ let code loopify(never) size(31) newer_version_of(f_0)
         : imm tagged =
   let prim = %int_comp.le (0, x) in
   switch prim
-    | 0 -> k (init)
+    | 0 -> k close[normal] my_alloc_region (init)
     | 1 -> k2
     where k2 =
       let prim_1 = %untag_imm (x) in
@@ -22,12 +22,13 @@ let code loopify(never) size(31) newer_version_of(f_0)
            let prim_3 = %int_comp.`int64`.le (for_next_naked, for_stop_naked)
            in
            switch prim_3
-             | 0 -> k (int_add)
+             | 0 -> k close[normal] my_alloc_region (int_add)
              | 1 -> k2 (for_next_naked, int_add))
 in
 let $camlExtra_args_and_staticraise__f_1 =
   closure f_0_1 @f &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlExtra_args_and_staticraise =
   Block 0 ($camlExtra_args_and_staticraise__f_1)
 in

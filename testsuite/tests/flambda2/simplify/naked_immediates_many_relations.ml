@@ -58,13 +58,22 @@ in
             | 1 -> k2
             where k2 =
               switch tag_1
-                | 0 -> error pop(regular error) ($camlTOP3__Pmakeblock_4)
+                | 0 ->
+                  error
+                    pop(regular error)
+                    close[exn] toplevel.alloc_region
+                    ($camlTOP3__Pmakeblock_4)
                 | 1 -> k
             where k1 =
               switch tag_1
                 | 0 -> k
-                | 1 -> error pop(regular error) ($camlTOP3__Pmakeblock_4)))
+                | 1 ->
+                  error
+                    pop(regular error)
+                    close[exn] toplevel.alloc_region
+                    ($camlTOP3__Pmakeblock_4)))
   where k =
+    let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
     let $camlTOP3 = Block 0 (0) in
     cont done ($camlTOP3)
 |}]

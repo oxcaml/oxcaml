@@ -55,6 +55,11 @@ let inline_linearly_used_continuation uacc ~params:params' ~handler
             original_defining_expr = Some named
           })
   in
+  let bindings_outermost_first =
+    EB.check_action_bindings uacc ~dbg:(AC.debuginfo apply_cont)
+      (AC.check_actions apply_cont)
+    @ bindings_outermost_first
+  in
   let expr, uacc =
     let uacc =
       UA.with_name_occurrences uacc ~name_occurrences:free_names_of_handler
@@ -150,6 +155,12 @@ let rebuild_apply_cont apply_cont ~args ~rewrite_id uacc ~after_rebuild =
   create_apply_cont ~apply_cont_to_expr
 
 let simplify_apply_cont dacc apply_cont ~down_to_up =
+  let apply_cont =
+    AC.with_check_actions apply_cont
+      (Simplify_common.rewrite_check_actions_for_removed_alloc_regions
+         (DA.denv dacc)
+         (AC.check_actions apply_cont))
+  in
   let { S.simples = args; simple_tys = arg_types } =
     S.simplify_simples dacc (AC.args apply_cont)
   in
@@ -162,12 +173,13 @@ let simplify_apply_cont dacc apply_cont ~down_to_up =
       use_kind ~env_at_use:(DA.denv dacc) ~arg_types
   in
   let dacc =
-    let record_args_for_data_flow data_flow =
+    let record_for_data_flow data_flow =
       Flow.Acc.add_apply_cont_args
         (AC.continuation apply_cont)
         ~rewrite_id args data_flow
+      |> Flow.Acc.add_check_actions (AC.check_actions apply_cont)
     in
-    DA.map_flow_acc dacc ~f:record_args_for_data_flow
+    DA.map_flow_acc dacc ~f:record_for_data_flow
   in
   let dbg = AC.debuginfo apply_cont in
   let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in

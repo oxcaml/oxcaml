@@ -41,6 +41,7 @@ let keyword_table =
     "self", KWD_SELF;
     "public", KWD_PUBLIC;
     "cached", KWD_CACHED;
+    "close", KWD_CLOSE;
     "closure", KWD_CLOSURE;
     "code", KWD_CODE;
     "cont", KWD_CONT;
@@ -56,6 +57,7 @@ let keyword_table =
     "exn", KWD_EXN;
     "float", KWD_FLOAT;
     "float32", KWD_FLOAT32;
+    "forward", KWD_FORWARD;
     "halt_and_catch_fire", KWD_HCF;
     "hint", KWD_HINT;
     "id", KWD_ID;
@@ -80,6 +82,7 @@ let keyword_table =
     "never", KWD_NEVER;
     "newer_version_of", KWD_NEWER_VERSION_OF;
     "noalloc", KWD_NOALLOC;
+    "normal", KWD_NORMAL;
     "notrace", KWD_NOTRACE;
     "null", KWD_NULL;
     "of", KWD_OF;

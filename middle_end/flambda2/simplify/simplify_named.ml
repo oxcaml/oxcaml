@@ -184,6 +184,9 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
             in
             Simplified_named.Simplified result))
   | Set_of_closures (set_of_closures, alloc_mode) ->
+    let alloc_mode =
+      Simplify_common.simplify_alloc_mode (DA.denv dacc) alloc_mode
+    in
     ok
       (Simplify_set_of_closures.simplify_non_lifted_set_of_closures dacc
          bound_pattern set_of_closures alloc_mode ~simplify_function_body)

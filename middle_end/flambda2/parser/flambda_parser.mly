@@ -124,6 +124,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_SELF  [@symbol "self"]
 %token KWD_PUBLIC  [@symbol "public"]
 %token KWD_CACHED  [@symbol "cached"]
+%token KWD_CLOSE  [@symbol "close"]
 %token KWD_CLOSURE  [@symbol "closure"]
 %token KWD_CODE  [@symbol "code"]
 %token KWD_CONT  [@symbol "cont"]
@@ -139,6 +140,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_EXN   [@symbol "exn"]
 %token KWD_FLOAT [@symbol "float"]
 %token KWD_FLOAT32 [@symbol "float32"]
+%token KWD_FORWARD [@symbol "forward"]
 %token KWD_HCF   [@symbol "halt_and_catch_fire"]
 %token KWD_HINT  [@symbol "hint"]
 %token KWD_ID    [@symbol "id"]
@@ -163,6 +165,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_NEVER  [@symbol "never"]
 %token KWD_NEWER_VERSION_OF [@symbol "newer_version_of"]
 %token KWD_NOALLOC [@symbol "noalloc"]
+%token KWD_NORMAL [@symbol "normal"]
 %token KWD_NOTRACE [@symbol "notrace"]
 %token KWD_NULL [@symbol "null"]
 %token KWD_OF     [@symbol "of"]
@@ -234,6 +237,10 @@ let make_boxed_const_int (i, m) : static_data =
 %type <Fexpr.rec_info> rec_info
 %type <Fexpr.rec_info> rec_info_atom
 %type <Fexpr.region> region
+%type <Fexpr.region> toplevel_region
+%type <Fexpr.check_action> check_action
+%type <Check_action.close_alloc_region_type> close_alloc_region_type
+%type <Alloc_checks.t> alloc_checks
 %type <Fexpr.special_continuation> special_continuation
 %type <Fexpr.static_data> static_data
 %type <Fexpr.static_data_binding> static_data_binding
@@ -629,6 +636,7 @@ apply_expr:
   | call_kind_and_alloc_mode = call_kind;
     inlined = option(inlined);
     inlining_state = option(inlining_state);
+    alloc_checks = alloc_checks;
     func = func_name_with_optional_arities;
     args = simple_args;
     MINUSGREATER
@@ -641,6 +649,7 @@ apply_expr:
           args = args;
           call_kind;
           alloc_mode;
+          alloc_checks;
           inlined;
           inlining_state;
           arities;
@@ -669,6 +678,19 @@ call_kind:
     { (Method { kind; obj },
         (Not_alloc_stack { alloc_region }
           : region alloc_mode_for_applications)) }
+;
+
+alloc_check:
+  | KWD_FORWARD { Alloc_checks.Forward }
+  | KWD_CLOSE { Alloc_checks.Close }
+;
+
+(* In normal/exn/notrace/div order *)
+alloc_checks:
+  | LBRACK; c1 = alloc_check; c2 = alloc_check;
+    c3 = alloc_check; c4 = alloc_check; RBRACK
+    { { Alloc_checks.normal = c1; exn = c2; notrace = c3; div = c4 } }
+  | (* empty *) { Alloc_checks.{ normal = Forward; exn = Forward; notrace = Forward; div = Close } }
 ;
 
 inline:
@@ -711,10 +733,14 @@ loopify:
 
 region:
   | v = variable { Named v }
+  | r = toplevel_region { r }
+;
+
+toplevel_region:
+  | KWD_TOPLEVEL; DOT; KWD_REGION { Toplevel_region }
   | KWD_TOPLEVEL; DOT; i = IDENT {
     match i with
     | "alloc_region" -> Toplevel_alloc_region
-    | "region" -> Toplevel_region
     | "ghost_region" -> Toplevel_ghost_region
     | _ -> Misc.fatal_errorf "toplevel. must be followed \
       by alloc_region, region or ghost_region" }
@@ -726,8 +752,20 @@ result_continuation:
 ;
 
 apply_cont_expr:
-  | cont = continuation; trap_action = option(trap_action); args = simple_args
-    { { cont; args; trap_action } }
+  | cont = continuation; trap_action = option(trap_action);
+    check_actions = list(check_action); args = simple_args
+    { { cont; args; trap_action; check_actions } }
+;
+
+check_action:
+  | KWD_CLOSE; LBRACK; exit = close_alloc_region_type; RBRACK; r = region
+    { Close_alloc_region { exit; region = r } }
+;
+
+close_alloc_region_type:
+  | KWD_NORMAL { Normal }
+  | KWD_EXN { Exn }
+  | KWD_NOTRACE { Notrace }
 ;
 
 trap_action:
@@ -949,6 +987,7 @@ simple:
   | s = symbol { Symbol s }
   | v = variable { Var v }
   | c = const { Const c }
+  | r = toplevel_region { Region r }
   | s = simple; TILDE; c = coercion { Coerce (s, c) }
 ;
 
