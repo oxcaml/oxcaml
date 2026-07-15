@@ -401,6 +401,15 @@ let adjust_stack_offset body (block : Cfg.basic_block)
     ~(prev_block : Cfg.basic_block) =
   let block_stack_offset = block.stack_offset in
   let prev_stack_offset = prev_block.terminator.stack_offset in
+  if block_stack_offset = Cfg.invalid_stack_offset
+  then
+    Misc.fatal_errorf "Cfg_to_linear: block %a has an invalid stack offset"
+      Label.format block.start;
+  if prev_stack_offset = Cfg.invalid_stack_offset
+  then
+    Misc.fatal_errorf
+      "Cfg_to_linear: the terminator of block %a has an invalid stack offset"
+      Label.format prev_block.start;
   if block_stack_offset = prev_stack_offset
   then body
   else
