@@ -27,6 +27,16 @@ kind_ k
 type t_abstract_addressable : k addressable
 |}]
 
+(* Addressability does not affect a type's standalone representation. *)
+
+type t : bits8 addressable
+let f (t : t) = t
+
+[%%expect{|
+type t : bits8 addressable
+val f : t -> t = <fun>
+|}]
+
 (* The inherently-addressable kinds are subkinds of [any addressable]. *)
 
 type ('a : any addressable) require_addressable
