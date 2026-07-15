@@ -230,12 +230,53 @@ let simplify_function_body context ~outer_dacc function_slot_opt
         return_continuation
     in
     let free_names_of_body = UA.name_occurrences uacc in
+    (* [my_closure] may be used in the body at [Normal] mode (a genuine runtime
+       use), only at [Phantom] mode (for example by the [Project_value_slot] and
+       [Project_function_slot] bindings that keep captured variables visible to
+       the debugger), or not at all. In the [Phantom]-only case we do not need
+       [my_closure] at runtime, so we report it as unused but rebind it (the
+       same variable) to [Optimised_out] using a phantom let, from which the
+       phantom projections then read. *)
+    let is_my_closure_used, body, uacc =
+      match NO.greatest_name_mode_var free_names_of_body my_closure with
+      | Absent -> false, body, uacc
+      | Present Normal -> true, body, uacc
+      | Present In_types ->
+        Misc.fatal_errorf
+          "[my_closure] (%a) unexpectedly occurs at mode [In_types] in a \
+           function body; Flambda types do not occur in terms"
+          Variable.print my_closure
+      | Present Phantom ->
+        let machine_width = UE.machine_width (UA.uenv uacc) in
+        let var =
+          Bound_var.create my_closure my_closure_duid Name_mode.phantom
+            ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
+        in
+        let let_bound = Bound_pattern.singleton var in
+        let prim = Flambda_primitive.(Nullary (Optimised_out K.value)) in
+        let named = Named.create_prim prim Debuginfo.none in
+        let simplified_defining_expr =
+          Simplified_named.create ~machine_width named
+        in
+        let binding =
+          EB.Keep_binding
+            { let_bound;
+              simplified_defining_expr;
+              original_defining_expr = Some named
+            }
+        in
+        let body, uacc =
+          EB.make_new_let_bindings uacc ~bindings_outermost_first:[binding]
+            ~body
+        in
+        false, body, uacc
+    in
+    let free_names_of_body = UA.name_occurrences uacc in
     let params_and_body =
       RE.Function_params_and_body.create ~free_names_of_body
         ~return_continuation ~exn_continuation params ~body ~my_closure
         ~my_alloc_mode ~my_depth
     in
-    let is_my_closure_used = NO.mem_var free_names_of_body my_closure in
     let previously_free_depth_variables =
       NO.create_variables (C.previously_free_depth_variables context) NM.normal
     in
