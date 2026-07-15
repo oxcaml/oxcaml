@@ -74,7 +74,7 @@ let assign_blocks_to_section t labels name =
       | Some new_name ->
         Misc.fatal_errorf
           "Cannot add %a->%s section mapping, already have %a->%s" Label.format
-          label name Label.format label new_name ()
+          label name Label.format label new_name
       | None -> Hashtbl.replace t.sections label name)
     labels
 
