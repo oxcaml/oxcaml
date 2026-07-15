@@ -13,7 +13,7 @@ CAMLprim value test_skiplist_serial(value val) {
   caml_lf_skiplist_init(&list);
 
   for (int c = 1; c < 10000; c++) {
-    assert(caml_lf_skiplist_insert(&list, c, c));
+    assert(!caml_lf_skiplist_insert(&list, c, c));
   }
 
   for (int c = 1; c < 10000; c++) {
@@ -28,7 +28,7 @@ CAMLprim value test_skiplist_serial(value val) {
 
   for (int c = 1; c < 10000; c++) {
     uintnat j = 0;
-    assert(caml_lf_skiplist_insert(&list, c, c));
+    assert(!caml_lf_skiplist_insert(&list, c, c));
     caml_lf_skiplist_find(&list, c, &j);
     assert(j == c);
     assert(caml_lf_skiplist_remove(&list, c));
@@ -102,7 +102,7 @@ CAMLprim value hammer_skiplist(value domain_id_val) {
 
   for (int i = 0; i < 100; i++) {
     for (int c = 10000 * domain_id + 1; c < 10000 * (domain_id + 1); c++) {
-      assert(caml_lf_skiplist_insert(&the_list, c, c));
+      assert(!caml_lf_skiplist_insert(&the_list, c, c));
     }
 
     for (int c = 10000 * domain_id + 1; c < 10000 * (domain_id + 1); c++) {
@@ -117,7 +117,7 @@ CAMLprim value hammer_skiplist(value domain_id_val) {
 
     for (int c = 10000 * domain_id + 1; c < 10000 * (domain_id + 1); c++) {
       uintnat j = 0;
-      assert(caml_lf_skiplist_insert(&the_list, c, c));
+      assert(!caml_lf_skiplist_insert(&the_list, c, c));
       caml_lf_skiplist_find(&the_list, c, &j);
       assert(j == c);
       assert(caml_lf_skiplist_remove(&the_list, c));
@@ -138,8 +138,7 @@ CAMLprim value insert_skiplist(value turn_val,value ndoms_val,value domain_id_va
   uintnat k = calc_key(domain_id,turn) ;
   uintnat v =  calc_value(domain_id) ;
   //  fprintf(stderr,"I: %" FMT "u -> %" FMT "u\n",k,v);
-  int r = caml_lf_skiplist_insert(&the_list, k, v) ;
-  assert(r);
+  caml_lf_skiplist_insert(&the_list, k, v) ;
   CAMLreturn(Val_unit);
 }
 
