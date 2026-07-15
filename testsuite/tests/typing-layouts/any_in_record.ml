@@ -574,9 +574,15 @@ module M = struct
   let _ = f #3.14
 end
 [%%expect {|
->> Fatal error: Layout is not a value
-Uncaught exception: Misc.Fatal_error
-
+Line 8, characters 12-17:
+8 |   let _ = f #3.14
+                ^^^^^
+Error: This constant has type "float#" but an expression was expected of type
+         "('a : value_or_null)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a value layout
+         because of the definition of f at lines 4-6, characters 8-7.
 |}]
 
 module M = struct
@@ -589,7 +595,13 @@ module M = struct
   let _ = f #3.14
 end
 [%%expect {|
->> Fatal error: Layout is not a value
-Uncaught exception: Misc.Fatal_error
-
+Line 8, characters 12-17:
+8 |   let _ = f #3.14
+                ^^^^^
+Error: This constant has type "float#" but an expression was expected of type
+         "('a : value_or_null)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a value layout
+         because of the definition of f at lines 4-6, characters 8-5.
 |}]
