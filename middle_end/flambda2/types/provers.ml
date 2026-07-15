@@ -1165,6 +1165,41 @@ let prove_alloc_mode_of_boxed_number_value _env
 let prove_alloc_mode_of_boxed_number env t =
   gen_value_to_proof prove_alloc_mode_of_boxed_number_value env t
 
+let prove_alloc_mode env (value : TG.t) :
+    Alloc_mode.For_types.t proof_of_property =
+  match expand_head env value with
+  | Value
+      (Ok
+         { is_null = _;
+           non_null =
+             Ok
+               ( Boxed_float32 (_, alloc_mode)
+               | Boxed_float (_, alloc_mode)
+               | Boxed_int32 (_, alloc_mode)
+               | Boxed_int64 (_, alloc_mode)
+               | Boxed_nativeint (_, alloc_mode)
+               | Boxed_vec128 (_, alloc_mode)
+               | Boxed_vec256 (_, alloc_mode)
+               | Boxed_vec512 (_, alloc_mode)
+               | Variant { blocks = Known { alloc_mode; _ }; _ }
+               | Mutable_block { alloc_mode }
+               | Array { alloc_mode; _ }
+               | Closures { alloc_mode; _ } )
+         }) ->
+    Proved alloc_mode
+  | Value
+      ( Ok
+          { is_null = _;
+            non_null =
+              Ok (Variant { blocks = Unknown; _ } | String _) | Unknown | Bottom
+          }
+      | Unknown | Bottom )
+  | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
+  | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
+  | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _ | Region _
+    ->
+    Unknown
+
 let never_holds_locally_allocated_values env var : _ proof_of_property =
   let ty = TE.find env (Name.var var) None in
   match expand_head env ty with
