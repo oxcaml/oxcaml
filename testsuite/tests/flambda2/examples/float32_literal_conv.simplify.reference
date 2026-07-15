@@ -1,0 +1,24 @@
+let $camlFloat32_literal_conv__float329 = 0x1.000002p+53s in
+let code a_0 deleted in
+let $camlFloat32_literal_conv__float3216 = 0x1.000002p+55s in
+let code b_1 deleted in
+let code loopify(never) size(1) newer_version_of(a_0)
+      a_0_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float32 boxed =
+  cont k ($camlFloat32_literal_conv__float329)
+in
+let $camlFloat32_literal_conv__a_2 = closure a_0_1 @a in
+let code loopify(never) size(1) newer_version_of(b_1)
+      b_1_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float32 boxed =
+  cont k ($camlFloat32_literal_conv__float3216)
+in
+let $camlFloat32_literal_conv__b_3 = closure b_1_1 @b in
+let $camlFloat32_literal_conv =
+  Block 0 ($camlFloat32_literal_conv__a_2, $camlFloat32_literal_conv__b_3)
+in
+cont done ($camlFloat32_literal_conv)
