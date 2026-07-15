@@ -3845,11 +3845,11 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
            which is [offset_stage_r stage_offset]. *)
         | Const_closure_lock (_, closure_context, comonadic) ->
             const_closure_mode pp vmode closure_context
-              (Mode.Value.Comonadic.const_offset_stage_r
+              (Mode.const_offset_stage_r
                 stage_offset comonadic)
         | Closure_lock (closure_context, comonadic) ->
             closure_mode pp vmode closure_context
-              (Mode.Value.Comonadic.offset_stage_r
+              (Mode.offset_stage_r
                 stage_offset comonadic)
         | Exclave_lock ->
             exclave_mode ~errors ~env ~pp vmode

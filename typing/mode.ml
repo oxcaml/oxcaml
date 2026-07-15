@@ -7151,6 +7151,10 @@ let value_to_alloc_r2l { comonadic; monadic } =
     monadic = Alloc.Monadic.apply_hint Skip monadic
   }
 
+let offset_stage_r = Value.Comonadic.offset_stage_r
+
+let const_offset_stage_r = Value.Comonadic.const_offset_stage_r
+
 module Modality = struct
   (* Inferred modalities
 

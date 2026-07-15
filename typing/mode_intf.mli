@@ -661,10 +661,6 @@ module type S = sig
       end
 
       val max_with : 'a Axis.t -> ('a, 'l * 'r) mode -> (disallowed * 'r) t
-
-      val offset_stage_r : int -> r -> r
-
-      val const_offset_stage_r : int -> Const.t -> Const.t
     end
 
     module Axis : sig
@@ -890,6 +886,11 @@ module type S = sig
     ?allocation:Hint.allocation ->
     ('l * 'r) Value.t ->
     (disallowed * 'r) Alloc.t
+
+  val offset_stage_r : int -> Value.Comonadic.r -> Value.Comonadic.r
+
+  val const_offset_stage_r :
+    int -> Value.Comonadic.Const.t -> Value.Comonadic.Const.t
 
   module Modality : sig
     module Comonadic : sig
