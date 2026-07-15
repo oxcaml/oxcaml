@@ -119,6 +119,8 @@ let contents_of_domainstate_slot ~offset_in_bytes
 
 let value_of_symbol ~symbol : O.t = DW_op_addr (Symbol symbol)
 
+let address_of_label ~label : O.t = DW_op_addr (Label label)
+
 let signed_int_const i : O.t = DW_op_consts (Targetint.to_int64 i)
 
 let add_unsigned_const i : O.t list =
@@ -129,6 +131,13 @@ let add_unsigned_const i : O.t list =
   if Targetint.compare i Targetint.zero = 0
   then []
   else [DW_op_plus_uconst (Targetint.nonnegative_to_uint64_exn i)]
+
+let add_signed_const i : O.t list =
+  if Targetint.compare i Targetint.zero = 0
+  then []
+  else if Targetint.compare i Targetint.zero > 0
+  then add_unsigned_const i
+  else [O.DW_op_consts (Targetint.to_int64 i); O.DW_op_plus]
 
 let float_const f : O.t = DW_op_const8s f
 
