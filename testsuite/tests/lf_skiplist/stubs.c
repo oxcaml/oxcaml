@@ -127,6 +127,69 @@ CAMLprim value hammer_skiplist(value domain_id_val) {
   CAMLreturn(Val_unit);
 }
 
+extern CAMLprim value caml_atomic_load (value ref);
+extern CAMLprim value caml_atomic_fetch_add (value ref, value incr);
+extern CAMLprim value caml_atomic_exchange (value ref, value incr);
+
+CAMLprim value barrier_await(value v_barrier_waiters, value v_barrier_passed, value v_n_domains) {
+  CAMLparam3(v_barrier_waiters, v_barrier_passed, v_n_domains);
+
+  int winner =
+    Int_val(caml_atomic_fetch_add(v_barrier_passed, Val_long(1))) ==
+    (Int_val(v_n_domains) - 1);
+
+  if (winner) {
+    caml_atomic_exchange(v_barrier_passed, Val_int(0));
+    caml_atomic_exchange(v_barrier_waiters, Val_int(0));
+  }
+
+  while (caml_atomic_load(v_barrier_waiters) == v_n_domains) { }
+
+  caml_atomic_fetch_add(v_barrier_waiters, Val_int(1));
+  while (caml_atomic_load(v_barrier_waiters) < v_n_domains) { }
+
+  CAMLreturn(Val_long(winner));
+}
+
+/* This randomly performs both insert and remove operations in a small range.  The
+   intention is that this is run in parallel and the goal is to try to provoke bad
+   interleavings.  The range must not be "trivial", i.e. operations should access
+   multiple different nodes close to each other. */
+CAMLprim value hammer_skiplist_randomly_in_range(value v_barrier_waiters, value v_barrier_passed, value v_n_domains) {
+  CAMLparam3(v_barrier_waiters, v_barrier_passed, v_n_domains);
+
+  const int range_mask = 15;
+
+  for (int round = 0; round < 100000; round++) {
+    barrier_await(v_barrier_waiters, v_barrier_passed, v_n_domains);
+
+    for (int i = 0; i < 100; i++) {
+      int r = rand();
+      uintnat key = (r >> 1) & range_mask;
+      bool remove = r & 1;
+      if (remove) {
+        caml_lf_skiplist_remove(&the_list, key);
+      } else {
+        caml_lf_skiplist_insert(&the_list, key, key);
+      }
+    }
+
+    if (barrier_await(v_barrier_waiters, v_barrier_passed, v_n_domains) == Val_long(1)) {
+      clean_skiplist(Val_long(-1));
+    }
+  }
+
+  if (barrier_await(v_barrier_waiters, v_barrier_passed, v_n_domains) == Val_long(1)) {
+    for (uintnat key=0; key <= range_mask; key++) {
+      caml_lf_skiplist_remove(&the_list, key);
+    }
+
+    clean_skiplist(Val_long(-1));
+  }
+
+  CAMLreturn(Val_unit);
+}
+
 inline static uintnat calc_value(uintnat id) { return id; }
 inline static uintnat calc_key(uintnat id,uintnat turn) { return 1024*id+turn+1; }
 inline static uintnat calc_right(uintnat id,uintnat turn,uintnat ndoms) { return (id+turn) % ndoms; }
