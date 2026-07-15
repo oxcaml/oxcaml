@@ -264,6 +264,8 @@ module Dbg = struct
        if c <> 0 then c else
        let c = Option.compare String.compare d1.dinfo_dir d2.dinfo_dir in
        if c <> 0 then c else
+       let c = Option.compare String.compare d1.dinfo_uid d2.dinfo_uid in
+       if c <> 0 then c else
        loop ds1 ds2
     in
     loop dbg1 dbg2
