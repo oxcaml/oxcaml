@@ -1214,8 +1214,10 @@ let mk_gdwarf_max_function_complexity f =
 let mk_gdwarf_compression f =
   ( "-gdwarf-compression",
     Arg.String f,
-    Format.sprintf " Set the DWARF compression format (default %s)"
-      !Dwarf_flags.gdwarf_compression )
+    Format.sprintf
+      " Set the DWARF compression format (default %s for\n\
+      \     -gno-upstream-dwarf or -gdwarf-inlined-frames, none otherwise)"
+      Dwarf_flags.default_gdwarf_compression )
 
 let mk_gdwarf_fission f =
   ( "-gdwarf-fission",
@@ -2302,7 +2304,7 @@ module Debugging_options_impl = struct
     Debugging.dwarf_max_function_complexity := c
 
   let gdwarf_compression value =
-    Debugging.gdwarf_compression := String.lowercase_ascii value
+    Debugging.gdwarf_compression := Some (String.lowercase_ascii value)
 
   let gdwarf_fission value =
     match String.lowercase_ascii value with

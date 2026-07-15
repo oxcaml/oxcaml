@@ -87,7 +87,11 @@ val dwarf_inlined_frames : bool ref
 
 val default_gdwarf_compression : string
 
-val gdwarf_compression : string ref
+(** DWARF compression format set on the command line. [None] means use the
+    default. The default is no compression for upstream DWARF. The default is
+    [default_gdwarf_compression] when [dwarf_inlined_frames] is enabled or
+    [restrict_to_upstream_dwarf] is disabled. *)
+val gdwarf_compression : string option ref
 
 val ddwarf_metrics : bool ref
 
