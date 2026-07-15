@@ -1,3 +1,1 @@
-var changed after backtrack:
-before: id(modevar#0[global .. local]{})
-after:  id(modevar#0[global .. local]{id(modevar#1[global .. local]{})})
+var unchanged after backtrack

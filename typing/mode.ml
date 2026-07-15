@@ -5422,7 +5422,7 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let newvar_above m = S.newvar_above obj m
 
-  let newvar_below m = S.newvar_below obj m
+  let newvar_below m = with_log (S.newvar_below obj m)
 
   let submode_log ?(pp = (Location.none, Unknown : Hint.pinpoint)) a b ~log =
     S.submode pp obj a b ~log
@@ -5522,7 +5522,7 @@ module Monadic_gen (Obj : Obj) = struct
 
   let max : lr = S.allow_right (S.min obj)
 
-  let newvar_above m = S.newvar_below obj m
+  let newvar_above m = with_log (S.newvar_below obj m)
 
   let newvar_below m = S.newvar_above obj m
 
