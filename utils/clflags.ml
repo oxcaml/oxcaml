@@ -241,6 +241,7 @@ let force_slash = ref false             (* for ocamldep *)
 let clambda_checks = ref false          (* -clambda-checks *)
 let cmm_invariants =
   ref Config.with_cmm_invariants        (* -dcmm-invariants *)
+let check_machtypes = ref true          (* -dcmm-[no-]check-machtypes *)
 
 let parsetree_ghost_loc_invariant = ref false
   (* -dparsetree-ghost-loc-invariant *)

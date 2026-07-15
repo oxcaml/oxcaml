@@ -456,6 +456,7 @@ let read_one_param ppf position name v =
     set_flambda_invariants ppf ~name v flambda_invariant_checks
   | "cmm-invariants" ->
       set "cmm-invariants" [ cmm_invariants ] v
+  | "cmm-check-machtypes" -> set "cmm-check-machtypes" [ check_machtypes ] v
   | "linscan" ->
       set "linscan" [ use_linscan ] v
   | "insn-sched" -> set "insn-sched" [ insn_sched ] v

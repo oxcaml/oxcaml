@@ -990,6 +990,14 @@ let mk_dcamlprimc f =
 let mk_dcmm_invariants f =
   "-dcmm-invariants", Arg.Unit f, " Extra sanity checks on Cmm"
 
+let mk_dcmm_check_machtypes f =
+  "-dcmm-check-machtypes", Arg.Unit f,
+  " Check that machtypes are used consistently in Cmm (default)"
+
+let mk_dcmm_no_check_machtypes f =
+  "-dcmm-no-check-machtypes", Arg.Unit f,
+  " Do not check that machtypes are used consistently in Cmm"
+
 let mk_dcmm f =
   "-dcmm", Arg.Unit f, " (undocumented)"
 
@@ -1378,6 +1386,8 @@ module type Optcommon_options = sig
   val _drawclambda : unit -> unit
   val _dclambda : unit -> unit
   val _dcmm_invariants : unit -> unit
+  val _dcmm_check_machtypes : unit -> unit
+  val _dcmm_no_check_machtypes : unit -> unit
   val _dcmm : unit -> unit
   val _dcse : unit -> unit
   val _dlinear :  unit -> unit
@@ -1915,6 +1925,8 @@ struct
     mk_drawclambda F._drawclambda;
     mk_dclambda F._dclambda;
     mk_dcmm_invariants F._dcmm_invariants;
+    mk_dcmm_check_machtypes F._dcmm_check_machtypes;
+    mk_dcmm_no_check_machtypes F._dcmm_no_check_machtypes;
     mk_dflambda F._dflambda;
     mk_drawflambda F._drawflambda;
     mk_dflambda_invariants F._dflambda_invariants;
@@ -2080,6 +2092,8 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_drawclambda F._drawclambda;
     mk_dclambda F._dclambda;
     mk_dcmm_invariants F._dcmm_invariants;
+    mk_dcmm_check_machtypes F._dcmm_check_machtypes;
+    mk_dcmm_no_check_machtypes F._dcmm_no_check_machtypes;
     mk_drawflambda F._drawflambda;
     mk_dflambda F._dflambda;
     mk_dcmm F._dcmm;
@@ -2487,6 +2501,8 @@ module Default = struct
     let _dcmm = set dump_cmm
     let _dcse = set dump_cse
     let _dcmm_invariants = set cmm_invariants
+    let _dcmm_check_machtypes = set check_machtypes
+    let _dcmm_no_check_machtypes = clear check_machtypes
     let _dcse = set dump_cse
     let _dflambda = set dump_flambda
     let _dflambda_heavy_invariants () =

@@ -4043,7 +4043,7 @@ let intermediate_curry_functions ~nlocal ~arity result =
           fun_codegen_options = [];
           fun_dbg;
           fun_poll = Default_poll;
-          fun_ret_type = result
+          fun_ret_type = typ_val
         }
       ::
       (if has_nary
