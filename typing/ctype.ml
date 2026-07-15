@@ -1100,11 +1100,8 @@ let rec copy_spine copy_scope ty =
       let copy_rec = copy_spine copy_scope in
       let desc' = match desc with
       | Tarrow ((lbl, marg, mret), ty1, ty2, _) ->
-          let copy_mode =
-            For_copy.mode_copy_then_generalize copy_scope ~current_level
-          in
           Tarrow
-            ((lbl, copy_mode marg, copy_mode mret),
+            ((lbl, marg, mret),
              copy_rec ty1,
              copy_rec ty2,
              commu_ok)

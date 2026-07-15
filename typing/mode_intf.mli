@@ -999,12 +999,6 @@ module type S = sig
         The copies receive positive ids. *)
     val copy_for_restoring : copy_scope:copy_scope -> ('l * 'r) t -> ('l * 'r) t
 
-    (** Copies a mode variable and its submodes whose levels are at or above
-        [current_level] and below [generic_level], preserving levels, and then
-        generalizes the copy. *)
-    val copy_then_generalize :
-      copy_scope:copy_scope -> current_level:int -> ('l * 'r) t -> ('l * 'r) t
-
     module Guts : sig
       (** Returns [Some c] if the given mode has been constrained to constant
           [c]. see notes on [get_floor] in [solver_intf.mli] for cautions. *)

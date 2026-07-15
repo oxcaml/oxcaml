@@ -653,9 +653,6 @@ module For_copy : sig
 
   val mode_copy_for_restoring : copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
 
-  val mode_copy_then_generalize :
-    copy_scope -> current_level:int -> Mode.Alloc.lr -> Mode.Alloc.lr
-
   val with_scope: (copy_scope -> 'a) -> 'a
 end = struct
   type copy_scope = {
@@ -684,10 +681,6 @@ end = struct
   let mode_copy_for_restoring copy_scope m =
     let copy_scope = copy_scope.saved_mode_changes in
     Mode.Alloc.copy_for_restoring ~copy_scope m
-
-  let mode_copy_then_generalize copy_scope ~current_level m =
-    let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.copy_then_generalize ~copy_scope ~current_level m
 
   (* Restore type descriptions. *)
   let cleanup { saved_desc; _ } =
