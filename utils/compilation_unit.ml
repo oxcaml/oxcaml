@@ -700,6 +700,17 @@ let print_debug ppf t =
 
 let print_as_inline_code = Misc.Style.as_inline_code print
 
+let name_mangling_scheme_override : Config.name_mangling_scheme option ref =
+  ref None
+
+let set_name_mangling_scheme_override scheme =
+  name_mangling_scheme_override := Some scheme
+
+let name_mangling_scheme_for_current_unit () =
+  match !name_mangling_scheme_override with
+  | Some scheme -> scheme
+  | None -> Config.name_mangling_scheme
+
 let fwd_get_current : (unit -> t option) ref = ref (fun () -> assert false)
 
 let get_current () = !fwd_get_current ()
@@ -713,17 +724,6 @@ let get_current_exn () =
 
 let is_current t =
   match get_current () with None -> false | Some t' -> equal t t'
-
-let name_mangling_scheme_override : Config.name_mangling_scheme option ref =
-  ref None
-
-let set_name_mangling_scheme_override scheme =
-  name_mangling_scheme_override := Some scheme
-
-let name_mangling_scheme_for_current_unit () =
-  match !name_mangling_scheme_override with
-  | Some scheme -> scheme
-  | None -> Config.name_mangling_scheme
 
 module Private = struct
   let fwd_get_current = fwd_get_current
