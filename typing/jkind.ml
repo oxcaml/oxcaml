@@ -2722,6 +2722,25 @@ let apply_or_null_r env jkind =
   | None ->
     Misc.fatal_error "or_null applied to a type without a scannable layout"
 
+let for_or_null_variant env ~payload_type ~modality jkind =
+  match apply_or_null_l env jkind with
+  | Error () -> Error ()
+  | Ok jkind ->
+    (* A value of the type is either null, which mode-crosses everything the
+       builtin ['a or_null]'s null does, or the payload under its modality.
+       So the type gets the builtin's mod-bounds together with a with-bound
+       on the payload, like [or_null_jkind] in [Predef]; only the layout
+       (computed by [apply_or_null_l] above) comes from the payload's kind. *)
+    let mod_bounds =
+      Const.Builtin.value_or_null_mod_everything.jkind.mod_bounds
+    in
+    Ok
+      ({ jkind with
+         jkind = { jkind.jkind with mod_bounds; with_bounds = No_with_bounds }
+       }
+      |> add_with_bounds ~modality ~type_expr:payload_type
+      |> mark_best)
+
 let get_annotation jk = jk.annotation
 
 let decompose_product env jk =
@@ -3026,9 +3045,9 @@ module Format_history = struct
         !printtyp_path parent_path layout_or_kind
     | Or_null_payload _parent_path ->
       fprintf ppf
-        "an [@@@@or_null] type gets its %s by applying or_null to its@ payload \
-         %s"
-        layout_or_kind layout_or_kind
+        "an [@@@@or_null] type gets the %s of or_null@ applied to its payload \
+         type"
+        layout_or_kind
     | Recmod_fun_arg ->
       fprintf ppf
         "it's the type of the first argument to a function in a recursive \
