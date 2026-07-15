@@ -144,6 +144,8 @@ module type Float_by_bit_pattern = sig
 
   include Container_types.S
 
+  (* Be careful when writing things like [create (Int64.to_float i)], as this is
+     a double-rounding bug in the float32 case. *)
   val create : float -> t
 
   val of_bits : bits -> t

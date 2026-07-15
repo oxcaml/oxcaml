@@ -258,9 +258,6 @@ module Float_by_bit_pattern_gen (Bits : sig
 
   val float_of_bits : t -> float
 
-  (* Convert an [int64] to a float of this precision, returned as its bit
-     pattern. Important do this directly in the [float32] case to avoid double
-     rounding. *)
   val of_int64 : int64 -> t
 
   val of_string : string -> t
@@ -380,6 +377,7 @@ module Float32_by_bit_pattern = Float_by_bit_pattern_gen (struct
   include Int32
   module F32 = Flambda2_floats.Float32
 
+  (* Carefully avoid double rounding. *)
   let of_int64 i = F32.to_bits (F32.of_int64 i)
 
   let of_string str = F32.to_bits (F32.of_string str)
