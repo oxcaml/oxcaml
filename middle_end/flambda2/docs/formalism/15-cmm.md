@@ -476,16 +476,19 @@ CODE backend/cmm.mli#Craise
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_raise
 CODE backend/cmm_helpers.ml#raise_prim
 ---
-e_c = Cop(Craise raise_kind, [v_exn], dbg)      -- extra args passed via mutable slots
+e_c = Cop(Craise raise_kind, v_exn :: v̄_extra, dbg)
 TT = lbl_h :: TT′
 χ(lbl_h) = CHandler ⟨x_exn :: x̄_extra, e_h, ce_def, χ_def, d, Exn_handler⟩
 --------------------------------------------------
-⟨e_c, ce, χ, M, TT, RR⟩ ⟶c ⟨e_h, ce_def[x_exn ↦ v_exn, x̄_extra ↦ …], χ_def, M, TT′, RR⟩
+⟨e_c, ce, χ, M, TT, RR⟩ ⟶c ⟨e_h, ce_def[x_exn ↦ v_exn, x̄_extra ↦ v̄_extra], χ_def, M, TT′, RR⟩
 NOTES: Raise pops the top trap frame and enters its handler with the exception
 value, mirroring OS.ApplyCont.Raise. `to_cmm` compiles a Flambda raise (an
 Apply_cont to an exn handler with a Pop trap action) to `raise_prim`
-(translate_raise). The extra args are conveyed through the mutable slots the
-handler reads (backend_exceptions.md); raise_kind affects only the backtrace.
+(translate_raise). The exception value is the first `Cop` operand and the extra
+handler args are the remaining operands (`arg :: extra_args`); cfg_selectgen
+(emit_expr_raise) later places them into distinguished per-handler registers —
+`Proc.loc_exn_bucket` for the exception value plus the extra-arg registers from
+`env_find_regs_for_exception_extra_args`. raise_kind affects only the backtrace.
 ```
 
 ## 8. Application

@@ -296,14 +296,25 @@ VERIFIED 14-validation/naked_immediates_many_relations.md
 A Naked_immediate type is a finite set of immediate values (or Unknown) together
 with a map from relations (Is_null, Is_int, Get_tag) to sets of Names. An entry
 R ↦ N asserts that this immediate value equals R applied to each name in N
-(%is_int / %get_tag / %is_null). Constants short-circuit: %is_int and %is_null
-of a constant reduce to a concrete boolean (Relation.of_const), and %get_tag of
-a constant is Bottom.
-NOTES: types.md ("Relational domains and reduction") describes storing this
-relation in one direction only. The current code additionally stores a forward
-link (the is_int/get_tag Variable.t option fields on the Variant head), so the
-relation is now represented at both ends. Conjectured that the two are kept
-consistent by the meet-time reduction ([§08](08-meet-join.md)).
+(%is_int / %get_tag / %is_null). Constants short-circuit differently at
+construction versus meet-time reduction. The construction helpers special-case a
+constant scrutinee: is_null builds `= RWC.is_null const`, is_int_for_scrutinee
+builds `= true` UNCONDITIONALLY (even for a null constant), and get_tag_for_block
+builds Unknown (NOT Bottom — deliberately loose, since get_tag relations may be
+created on things not known to be blocks). Separately, the meet-time reducer
+(reduce_head_of_kind_naked_immediate, [§08](08-meet-join.md)) resolves a relation
+whose name is a constant via Relation.of_const (Is_int ↦ not is_null, Is_null ↦
+is_null, Get_tag ↦ Bottom); a Bottom result is DELIBERATELY DISCARDED (the
+relation is dropped, the immediate set kept) rather than making the type Bottom,
+because inverse relations such as get_tag may have been recorded for non-blocks.
+NOTES: is_int_for_scrutinee (construction, `= true`) and Relation.of_const (meet
+reduction, `= false` for null) disagree for a null constant; only is_int is thus
+anomalous, is_null agreeing with of_const by construction. types.md ("Relational
+domains and reduction") describes storing this relation in one direction only.
+The current code additionally stores a forward link (the is_int/get_tag
+Variable.t option fields on the Variant head), so the relation is now represented
+at both ends. Conjectured that the two are kept consistent by the meet-time
+reduction ([§08](08-meet-join.md)).
 ```
 
 The other naked-number heads (`head_of_kind_naked_float`, `…_int8/16/32/64`,

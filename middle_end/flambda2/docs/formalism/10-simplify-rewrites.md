@@ -327,21 +327,41 @@ RULE S.Rewrite.Prim.Projection
 STATUS normative
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_immutable_block_load0
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_value_slot
+CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_function_slot
+CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_array_length
+CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_string_length
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load
 ---
 p reads a field of an immutable aggregate at a known position:
   Block_load(imm, x, i)  |  Project_value_slot(w, x)  |  Project_function_slot(f, x)
   |  Array_load(imm array, x, i)  |  Array_length(x)  |  String_length(x)
 E proves x's type records the field/slot/length as a Simple s (or constant)
-  (meet_block_field_simple / meet_project_value_slot_simple / prove_is_immutable_array …)
+  (meet_block_field_simple / meet_project_value_slot_simple /
+   meet_project_function_slot_simple / prove_is_immutable_array /
+   T.array_of_length shape-meet / meet_strings)
 --------------------------------------------------
-E ⊢ (let r = Prim(p) in e) ⇝ (let r = s in e)
+E ⊢ (let r = Prim(p) in e) ⇝ (let r = s in e)     [fast-path group only]
 NOTES: Reading a component of a *provably immutable* aggregate at compile time.
   Immutability is essential: mutable block/array loads (`simplify_mutable_block_
   load`) never fold. For `Array_load` the index must also be a proven constant
   and in bounds (out of bounds ⇒ Invalid). Closure value/function slots are always
   immutable. Sound because γ_E pins the aggregate's contents, and immutability
   guarantees the runtime component equals the recorded s.
+
+  Two distinct mechanisms hide under this rule; only the first literally binds
+  `let r = s`:
+  (a) Fast-path alias binding (Known_result → Named.create_simple s): block_load,
+      project_value_slot, project_function_slot. These are the ops that match the
+      conclusion above.
+  (b) Refine-and-reify (KEEP the primitive, refine r's type, fold only later via
+      S.Rewrite.Prim.Reify): array_load and array_length (both go through
+      Simplify_common.simplify_projection's Ok branch, SPR.create original_term
+      ~try_reify:true, setting r's type to the element type / a length alias) and
+      string_length (SPR.create original_term with r's type set to a set of naked
+      immediates, T.these_naked_immediates). For string_length the immediate set
+      may have several elements and thus never fold to a constant. For these ops
+      the blanket conclusion `let r = s` does not hold directly; the constant, if
+      any, appears only after reify.
 ```
 
 ```rule
@@ -350,13 +370,16 @@ STATUS normative
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_phys_equal
 CODE middle_end/flambda2/types/provers.ml#prove_physical_equality
 ---
-p = phys_equal(x, y)
+p = phys_equal(op, x, y)   where op ∈ {Eq, Neq}
 prove_physical_equality proves the two values definitely equal or definitely distinct → b
 --------------------------------------------------
-E ⊢ (let r = Prim(phys_equal(x, y)) in e) ⇝ (let r = b in e)
+E ⊢ (let r = Prim(phys_equal(op, x, y)) in e) ⇝ (let r = (b if op = Eq else ¬b) in e)
 NOTES: The prover only concludes when the addresses provably coincide (same
-  canonical simple) or provably differ; otherwise the primitive is kept. Sound
-  because physical equality is referential identity, which the prover respects.
+  canonical simple) or provably differ; otherwise the primitive is kept. Both
+  Eq and Neq (Lambda `!=`) are dispatched into simplify_phys_equal, which folds
+  `result = match op with Eq -> b | Neq -> not b`; Phys_equal Neq is the boolean
+  negation, mirroring the ch06 P.Binary.PhysEqual NOTE. Sound because physical
+  equality is referential identity, which the prover respects.
 ```
 
 ```rule

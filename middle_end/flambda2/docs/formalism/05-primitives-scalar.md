@@ -281,13 +281,17 @@ determines the domain of `a`):
     value, then `wrap_W` (`of_int (to_int t)`; `to_int` is signed).
   - from `Naked_int32`/`Naked_int64`/`Naked_nativeint`: `wrap_W` of the signed
     value (`of_int32`/`of_int64`/`of_targetint`, "modulo the target word size").
-  - from `Naked_float`/`Naked_float32`: `wrap_W(⌊a⌋)` **if** `⌊a⌋ ∈ [−2^{W−1},
-    2^{W−1}−1]`, else `undef` (`of_float`; the `mli`: "undefined if, after
-    truncation, the number is outside the range").
+  - from `Naked_float`/`Naked_float32`: `wrap_W(⌊a⌋)` (= `sign_extend_W` of
+    `Int64.of_float f` / `Int32.of_float f`) **if** `⌊a⌋ ∈ ℤ_{Wₙ}`, else `undef`.
+    The folder wraps through the `Wₙ`-wide host `Int64`/`Int32` conversion (`of_float`
+    = `sign_extend (I.of_float …)`, `One_bit_fewer.Make.of_float`), so it is
+    defined (and backend-matching) on the whole native range `ℤ_{Wₙ}`, not just
+    `ℤ_W`. (The `mli` doc under-states this as `ℤ_W`.)
 - **to `Naked_int8` / `Naked_int16`** (`to_naked_int8/16`): `wrap_8`/`wrap_16`
-  of the signed value; from floats, `wrap_·(⌊a⌋)` (with the same out-of-range
-  `undef` as above for the float case, inherited from `Int8.of_float` /
-  `Int16.of_float`).
+  of the signed value; from floats, `wrap_·(⌊a⌋)`, `undef` only for `±∞`/NaN or
+  `⌊a⌋` outside the host `int` range (`of_int (Float.to_int f)`,
+  `numeric_types.ml#Short_int`; the boundary is the host `int` width `63`, not
+  `W` — see NOTES).
 - **to `Naked_int32`** (`to_naked_int32`): the low 32 bits, i.e. `wrap_32` of the
   signed value; from `Naked_int64`/`Naked_nativeint`, `Int64.to_int32` /
   `Targetint.to_int32` (top bits dropped); from floats, `wrap_32(⌊a⌋)`
@@ -312,22 +316,30 @@ CODE middle_end/flambda2/numbers/numeric_types.ml#Short_int
 CODE middle_end/flambda2/simplify/number_adjuncts.ml#Num_common
 ---
 src ∈ {Naked_float, Naked_float32};  a ∈ 𝔽
-u(dst) = w(dst) for dst ∈ {Tagged_immediate, Naked_immediate, Naked_int32,
-         Naked_int64, Naked_nativeint};  u(dst) = W for dst ∈ {Naked_int8, Naked_int16}
+u(dst) = Wₙ for dst ∈ {Tagged_immediate, Naked_immediate};
+         u(dst) = w(dst) for dst ∈ {Naked_int32, Naked_int64, Naked_nativeint};
+         u(dst) = 63 (the host `int` width) for dst ∈ {Naked_int8, Naked_int16}
 ⌊a⌋ ∉ ℤ_{u(dst)}  (in particular a = ±∞ or a is NaN)
 --------------------------------------------------
 ⟦Num_conv{src; dst}⟧(val_src(a); H) = undef
 NOTES: The undef boundary is the range of the conversion the folder actually
-calls, NOT always the destination's own width. To the immediates it is
-`Target_ocaml_int.of_float`, undefined outside `ℤ_W`; to `Naked_int32`/`_int64`/
-`_nativeint` it is the stdlib `Int32.of_float`/`Int64.of_float`/
-`Targetint.of_float`, undefined outside that type's range (= `w(dst)`). BUT to
-`Naked_int8`/`Naked_int16` the folder computes `Int8/Int16.of_float f =
-of_int (Float.to_int f)` (`numeric_types.ml#Short_int`): the host `Float.to_int`
-is undefined only for NaN/±∞ or `⌊a⌋ ∉ ℤ_W`, after which `of_int` *wraps* mod
+calls, NOT always the destination's own width — and, for the immediates, NOT `W`.
+To the immediates it is `Target_ocaml_int.of_float` = `sign_extend_W(Int64.of_float f)`
+(via `One_bit_fewer.Make.of_float`), which wraps through the `Wₙ`-wide host
+`Int64`/`Int32` conversion: it is DEFINED (deterministic, backend-matching) for
+every `⌊a⌋ ∈ ℤ_{Wₙ}` and undefined only outside `ℤ_{Wₙ}`, so `u = Wₙ`, not `W`.
+E.g. `Num_conv{Naked_float; Tagged_immediate}(4.6e18)` (with `⌊a⌋ ∈ ℤ_{Wₙ}\ℤ_W`)
+folds to the specific negative tagged immediate the backend's `cvttsd2si` also
+produces, not `undef`. To `Naked_int32`/`_int64`/`_nativeint` it is the stdlib
+`Int32.of_float`/`Int64.of_float`/`Targetint.of_float`, undefined outside that
+type's range (= `w(dst)`). BUT to `Naked_int8`/`Naked_int16` the folder computes
+`Int8/Int16.of_float f = of_int (Float.to_int f)` (`numeric_types.ml#Short_int`):
+the host `Float.to_int` is undefined only for NaN/±∞ or `⌊a⌋` outside the host
+`int` range (width `Sys.int_size = 63`), after which `of_int` *wraps* mod
 `2^8`/`2^16`. So e.g. `Num_conv{Naked_float; Naked_int8}(200.0)` is the defined
-wrapping result `−56`, not `undef` — only `⌊a⌋ ∉ ℤ_W` (hence `u = W`) is undef
-for these two kinds. number_adjuncts.ml top comment records that xclerc/mshinwell
+wrapping result `−56`, not `undef` — only `⌊a⌋ ∉ ℤ_63` (hence `u = 63`, the host
+`int` width, which equals `W` only on 64-bit targets) is undef for these two
+kinds. number_adjuncts.ml top comment records that xclerc/mshinwell
 checked the OCaml backend emits the same instructions as the C runtime
 float-conversion functions, so where the result *is* undef it is
 target-processor-defined (not portable) rather than a compile/run divergence.

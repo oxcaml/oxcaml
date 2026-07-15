@@ -283,7 +283,7 @@ CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_let_cont0
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#after_downwards_traversal_of_body
 ---
 To simplify (let_cont k params = handler in body):
-  1. save-and-clear the lifted constants and the continuation_uses_env;
+  1. save-and-clear the lifted constants;
   2. traverse body downwards, during which every (apply_cont k args) records a
      use of k carrying (env_at_use, arg_types);
   3. form the handler's entry environment from the recorded uses (join, below);
@@ -293,6 +293,14 @@ To simplify (let_cont k params = handler in body):
 The uses of k are read from the continuation_uses_env after the body has been
 traversed (Continuation_uses_env.get_continuation_uses). If k has no uses, its
 handler is not traversed at all and the Let_cont is dropped.
+
+The continuation_uses_env is *not* cleared before the body: the body is
+traversed with the ambient CUE intact, so uses of enclosing in-scope
+continuations recorded in the body propagate upward. The only clear-to-empty
+happens per-handler at the start of step 4 (simplify_handler:
+DA.with_continuation_uses_env ~cont_uses_env:CUE.empty), not before the body.
+(A stale comment in simplify_let_cont0 claims the CUE is reset before the body;
+that is a code-comment issue, not the actual behaviour.)
 ```
 
 Continuation scopes are bumped so the join happens at a well-defined level: for a
@@ -407,13 +415,23 @@ CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
 For a recursive group with invariant params p̄ and, per continuation kᵢ, variant
 params q̄ᵢ:
   - invariant params p̄ get the n-way join of the invariant arguments over the
-    uses recorded during the body traversal (compute_handler_env, is_recursive);
+    uses recorded during the body traversal (compute_handler_env, is_recursive)
+    — but ONLY when joining is enabled, i.e. Flambda_features.join_points ()
+    holds OR there are ≤ 1 recorded body uses (the should_do_join gate). Under
+    default flags (join_points = false) a recursive group entered from ≥ 2 body
+    sites instead gives the invariant params unknown_with_subkind of their
+    declared subkind (add_parameters_with_unknown_types), exactly as
+    S.Struct.NoJoinUnknown;
   - each kᵢ's variant params q̄ᵢ get unknown_with_subkind types (their declared
     subkinds only).
 --------------------------------------------------
 simplify_single_recursive_handler builds the handler env with
 DE.add_parameters_with_unknown_types for q̄ᵢ. Only invariant params carry types
 across the recursive edge, and those come from a single pass over the body.
+The invariant params share the identical compute_handler_env gate described in
+S.Struct.JoinParams / S.Struct.NoJoinUnknown (they flow through
+prepare_dacc_for_handlers → compute_handler_env with ~is_recursive:true), so
+under default flags the join in the first bullet is not taken.
 NOTES: This is what makes the single-pass treatment sound: an invariant
 parameter is by construction passed the same value at every (including
 recursive) call, so a type valid at the body's entry uses remains valid; a

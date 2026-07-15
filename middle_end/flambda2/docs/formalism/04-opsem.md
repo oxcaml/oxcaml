@@ -257,9 +257,13 @@ NOTES: A `No_effects` primitive leaves the observable world unchanged (H′ = H
 except possibly for fresh allocation of an immutable result), may be duplicated
 or dropped; an `Only_generative_effects` primitive may allocate (so H′ extends H)
 but is otherwise pure. The two are handled by the same transition; the
-distinction matters only to Simplify (chapters 09–10). Region-affecting
-primitives `Begin_region`/`End_region` also match here but additionally update
-`R`; see [§06](06-primitives-memory.md) for their `⟦·⟧` and the corresponding `R` update.
+distinction matters only to Simplify (chapters 09–10). The region-*opening*
+primitives `Begin_region`/`Begin_try_region` (`Only_generative_effects`) also
+match here but additionally push a fresh region handle `ι` onto `R`; see
+[§06](06-primitives-memory.md) for their `⟦·⟧` and the corresponding `R` update.
+The region-*closing* primitives `End_region`/`End_try_region` are instead
+`Arbitrary_effects` (they must not be deleted regardless of prior uses of the
+region) and so match OS.Let.Prim.Effect, not this rule.
 ```
 
 ### 3.3 Let of an effectful primitive
@@ -276,7 +280,11 @@ p has Arbitrary_effects
 --------------------------------------------------
 ⟨Let (x = Prim (p, dbg)) e, ρ, K, H, T, R⟩ ⟶ ⟨e, ρ[x ↦ v], K, H′, T, R⟩
 NOTES: Same transition as OS.Let.Prim.Pure; separated because Simplify may
-neither drop nor duplicate an `Arbitrary_effects` application. If `⟦p⟧(v̄;H) =
+neither drop nor duplicate an `Arbitrary_effects` application. The region-closing
+primitives `End_region`/`End_try_region` are `Arbitrary_effects` and match here
+(not OS.Let.Prim.Pure); like the region-opening primitives they additionally
+update `R`, popping the region stack down to (and discarding) the named handle;
+see [§06](06-primitives-memory.md) for their `⟦·⟧` and the corresponding `R` update. If `⟦p⟧(v̄;H) =
 undef` the machine is stuck (undefined behaviour), matching an out-of-bounds
 access or similar; see [§06](06-primitives-memory.md). Primitives do not change control flow: a
 primitive never itself jumps to a continuation. (A primitive that "can raise",
@@ -469,14 +477,21 @@ CODE middle_end/flambda2/terms/exn_continuation.mli#extra_args
 ---
 e = Apply_cont k_exn (s_b)          -- raised bucket, plus possibly extra args already in s̄
 K(k_exn) = Exn ⟨x_b, k_x, v̄_extra, K_c, T_c, R_c⟩
+T_c = k_x :: T′                     -- k_x is the innermost caller handler = top of T_c
 v_b = ⟦s_b⟧ρ
 --------------------------------------------------
-⟨e, ρ, K, H, T, R⟩ ⟶ ⟨Apply_cont k_x (values (v_b :: v̄_extra)), _, K_c, H, T_c, R_c⟩
+⟨e, ρ, K, H, T, R⟩ ⟶ ⟨Apply_cont k_x (values (v_b :: v̄_extra)), _, K_c, H, T′, R_c⟩
 NOTES: An exception escaping the callee reaches the callee's exn continuation
 `k_exn`; control transfers to the caller's handler `k_x` with the exception
 bucket followed by the caller's extra arguments `v̄_extra` (evaluated in the
-caller's `ρ` at the call site — see §4.3), and with the caller's trap/region
-stacks restored. Ordering `(bucket :: extra_args)` matches `close_raise0` and the
+caller's `ρ` at the call site — see §4.3), and with the caller's region stack
+restored. The caller's handler frame `k_x` — always the top of the stored trap
+stack `T_c`, since an `Apply`'s `exn_continuation.exn_handler` is the innermost
+enclosing handler (`lambda_to_flambda_env.ml#add_continuation`) — is popped
+before the jump, so `k_x`'s handler body runs at the same trap depth `|T′|` as it
+would after a *direct* raise (OS.ApplyCont.Raise), preserving the §1.7 depth
+invariant. (At toplevel this pops `k_exn⁰` and reaches `Halt_exn` at depth 0 by
+both paths.) Ordering `(bucket :: extra_args)` matches `close_raise0` and the
 try-with handler parameters in `lambda_to_flambda.ml`.
 ```
 
@@ -578,13 +593,22 @@ n ∉ dom(arms)
 ⟨e, ρ, K, H, T, R⟩ is stuck (undefined behaviour)
 NOTES: There is no default case (`switch_expr.mli`). A well-typed, well-formed
 program guarantees the discriminant is always one of the arms; if not, behaviour
-is undefined, exactly as for OS.Invalid. This is confirmed by the to_cmm
-lowering (`to_cmm_expr.ml#switch`): it builds an index table over
-`[0, max_discriminant]`, and any gap (a value below the maximum with no arm)
-is directed to an explicit `Cmm` "unreachable switch case" invalid; a value
-*above* the maximum discriminant is out of the jump table entirely (genuine
-UB). Neither is a control transfer to a real handler, matching "stuck". Simplify
-may replace a `Switch` whose scrutinee is known to miss all arms with `Invalid`.
+is undefined, exactly as for OS.Invalid. The to_cmm lowering
+(`to_cmm_expr.ml#switch`) realizes this UB differently depending on the arm
+count. For a switch with **three or more** arms (the `| n ->` general branch) it
+builds an index table over `[0, max_discriminant]`, and any gap (a value below
+the maximum with no arm) is directed to an explicit `Cmm` "unreachable switch
+case" invalid, while a value *above* the maximum discriminant is out of the jump
+table entirely (genuine UB); neither is a control transfer to a real handler,
+matching "stuck". A **two-arm** switch (the `| 2 ->` branch) instead lowers to
+`C.ite scrutinee …` (when one arm's discriminant is `0`) or
+`C.ite (C.eq (C.int x) scrutinee) …` — with no jump table and no invalid — so an
+out-of-arms discriminant silently flows into one of the two arms rather than
+hitting an invalid. This is still consistent with the normative "stuck/UB"
+conclusion above, which is what the model observes: well-formedness guarantees
+the discriminant hits an arm, so the silent fall-through is never reached in a
+well-formed program. Simplify may replace a `Switch` whose scrutinee is known to
+miss all arms with `Invalid`.
 ```
 
 ## 6. Application

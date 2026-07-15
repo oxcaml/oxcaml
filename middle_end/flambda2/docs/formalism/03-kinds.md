@@ -455,7 +455,10 @@ NOTES: The expected kinds come from `arg_kind_of_unary_primitive`,
 (whose result is `Variadic_all_of_kind κ`, `Variadic_zero_or_one κ`,
 `Variadic_mixed shape`, or `Variadic_unboxed_product κs`). This is the general
 rule; the concrete tables per primitive are given in chapters 05 (scalar) and
-06 (memory). Enforcement in practice is limited — see §6.
+06 (memory). This agreement is enforced dynamically during Simplify at
+`simplify/simplify_primitive.ml#arg_kind_mismatch` (matching
+`WF.Prim.MakeBlockMixed`'s anchor): gated by `Flambda_features.kind_checks ()`,
+it is fatal when the flag is on and rewrites to `Invalid` when off — see §6.
 ```
 
 ```rule
@@ -540,8 +543,12 @@ kinds are given by `Bound_parameter.kind`. Unlike the Apply-expression checks in
 by `-flambda2-kind-checks`: every recorded use goes through
 `Continuation_uses.add_use`, which computes the use's arity from its argument
 types (`T.arity_of_list`) and `Misc.fatal_error`s unless it is
-`equal_ignoring_subkinds` to the continuation's recorded arity (and
-`Continuation_uses.union` does likewise when merging use sets). Separately, when a
+`equal_ignoring_subkinds` to the continuation's recorded arity. Only this
+per-use check in `Continuation_uses.add_use` is ungated (always fatal);
+`Continuation_uses.union`, invoked when merging use sets, performs an analogous
+arity check but that one *is* gated by `-flambda2-kind-checks`
+(`Flambda_features.kind_checks ()`) — benign, since every use in either operand
+was already validated ungated by `add_use` against the same arity. Separately, when a
 continuation is inlined at an `Apply_cont`, the param/arg list *lengths* are
 checked (`simplify_apply_cont_expr.ml`, fatal on mismatch). Before Simplify,
 agreement is maintained by construction. Trap actions are covered by
@@ -683,7 +690,8 @@ which `Rec_info` defining expressions and coercions are interpreted.
 Flambda 2 has **no standalone kind-checking / invariant pass** over whole terms.
 The `invariant`-named code in `terms/flambda.ml` concerns `invariant_params` of
 recursive continuations, not kinds. Kind agreement is instead checked
-opportunistically inside Simplify, and only at application expressions.
+opportunistically inside Simplify, at application expressions and at primitive
+applications.
 
 ```rule
 RULE WF.Check.Gated
@@ -712,14 +720,22 @@ Consequences:
   (`Application_argument_kind_mismatch`, `Direct_application_parameter_kind_mismatch`,
   `Application_result_kind_mismatch`, `Partial_application_mode_mismatch`,
   `Calling_local_returning_closure_with_normal_apply`, and the never-returns
-  variants) in `terms/flambda.mli#Invalid` enumerate exactly the kind/arity/mode
-  conditions Simplify actively checks. See [§04](04-opsem.md) for the semantics of
-  `Invalid`.
-- The `Let`, `Apply_cont`, `Switch`-scrutinee and primitive-argument agreements
-  above (§5.1–5.4) are maintained *by construction* — CPS conversion, closure
-  conversion and the type-directed rewrites produce kind-correct terms — rather
-  than re-checked. The corresponding rules describe intended invariants; only
-  those routed through the `kind_checks` machinery are dynamically enforced.
+  variants) in `terms/flambda.mli#Invalid` name the Apply-specific kind/arity/mode
+  conditions Simplify actively checks. They do *not* enumerate every
+  actively-checked kind condition: a primitive argument-kind mismatch is also
+  actively checked (below) but surfaces as the generic `Flambda.Invalid` reason
+  `Defining_expr_of_let` (via `Simplified_named.Invalid`), not a dedicated named
+  constructor. See [§04](04-opsem.md) for the semantics of `Invalid`.
+- The `Let`, `Apply_cont` and `Switch`-scrutinee agreements above (§5.1–5.3) are
+  maintained *by construction* — CPS conversion, closure conversion and the
+  type-directed rewrites produce kind-correct terms — rather than re-checked. The
+  corresponding rules describe intended invariants; only those routed through the
+  `kind_checks` machinery are dynamically enforced.
+- Primitive-argument agreements (§5.2) are *not* merely by-construction: they are
+  re-checked during Simplify via `Flambda_features.kind_checks ()` in
+  `simplify_primitive.ml#arg_kind_mismatch` — fatal when the flag is on, and
+  rewritten to an `Invalid` when off — exactly like the Apply checks
+  (`WF.Check.Gated`).
 - Dump-based validation (`-drawfexpr`, `-dfexpr`) shows kinds on binders and
   arities, so kind disagreements are usually caught by reading IR dumps in the
   test suite rather than by an in-compiler checker.
@@ -751,9 +767,10 @@ known kind, which is a small window into what "kind-correct" means operationally
 
 1. *(Resolved — `WF.ApplyCont.Arity` promoted to normative.)* `Apply_cont`
    argument agreement *is* enforced dynamically during Simplify, ungated by
-   `-flambda2-kind-checks`: `Continuation_uses.add_use` (and `.union`)
-   `fatal_error` when a recorded use's arity is not `equal_ignoring_subkinds` to
-   the continuation's recorded arity.
+   `-flambda2-kind-checks`: `Continuation_uses.add_use` `fatal_error`s when a
+   recorded use's arity is not `equal_ignoring_subkinds` to the continuation's
+   recorded arity. (`Continuation_uses.union` runs an analogous arity check on
+   merge, but that one is gated by `Flambda_features.kind_checks ()`.)
 2. *(Resolved — `WF.Let.SetOfClosures`.)* Set-of-closures-bound variables are
    created and defined at kind Value by closure conversion and Simplify
    (`simplify_set_of_closures.ml`); the pattern records no kinds, so this holds

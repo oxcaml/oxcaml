@@ -487,7 +487,7 @@ STATUS descriptive
 CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#add_extra_params_and_args
 CODE middle_end/flambda2/simplify/apply_cont_rewrite.ml#create
 CODE middle_end/flambda2/simplify/expr_builder.ml#rewrite_apply_cont
-CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#compute_extra_params_and_args
+CODE middle_end/flambda2/simplify/unboxing/unbox_continuation_params.ml#compute_extra_params_and_args
 VERIFIED 14-validation/new-07-float-unbox.md
 ---
 Unbox?(x, uses) → Unbox U with component parameters x₁…xₙ (flattened from U)
@@ -681,16 +681,13 @@ Reaper pass performs a further, cross-function unboxing that is out of scope her
 
 Open questions / conjectures to verify:
 
-1. `S.Unbox.ContParam.Rewrite` is `conjectured` — it needs a validation case
-   study checking the exact form of the rewritten `Let_cont` and `Apply_cont`s,
-   including which original parameters `decide_param_usage` drops.
-2. Whether the "beneficial" criterion (§3.3) can ever demote a decision whose
+1. Whether the "beneficial" criterion (§3.3) can ever demote a decision whose
    handler-side equation was already installed in the denv, and if so whether the
    denv equation is harmlessly redundant or must be rolled back. The code
    installs the denv from the *filtered* decision (`denv_of_decision` is called
    after `filter_non_beneficial_decisions`), so this appears consistent, but it
    is worth confirming.
-3. The precise interaction between continuation lifting (extra params added for
+2. The precise interaction between continuation lifting (extra params added for
    lifted continuations) and unboxing decisions on recursive vs non-recursive
    continuations — the `Rec`/`Non_rec` split in
    `compute_extra_params_and_args` and the comments there suggest a subtlety

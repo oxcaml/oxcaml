@@ -117,7 +117,7 @@ semantics).
 ### `Apply`
 
 ```
-ap ::= { callee = s?;                     -- None for algebraic-effect call kinds  [apply_expr.mli#create]
+ap ::= { callee = s?;                     -- None for Effect, or Direct calls with erased callee  [apply_expr.mli#create]
          args = s̄;
          result_continuation = rc;
          exn_continuation = ec;
@@ -136,8 +136,11 @@ external, sending its result to the *result continuation* `rc` and any raised
 exception to the *exception continuation* `ec`. `rc` is `Never_returns` for
 calls that provably do not return (`apply_expr.mli#returns` is then `false`);
 Simplify may turn such an `Apply` into `Invalid`
-(`Application_never_returns`). The `callee` is optional: it is `None` exactly for
-the algebraic-effect call kinds (WF.Syntax.EffectCalleeNone). `args_arity` is a
+(`Application_never_returns`). The `callee` is optional: `callee = None` is
+permitted iff the call kind is `Effect` (WF.Syntax.EffectCalleeNone) or
+`Function { function_call = Direct _ }` (a direct call whose callee has been
+erased — see `closure_conversion.ml`, classic mode with an unused
+`my_closure`). `args_arity` is a
 `` [`Complex] `` arity (before unarization); `return_arity` is `` [`Unarized] ``.
 `alloc_mode` is an `Alloc_mode.For_applications.t` — `Heap`, or `Local {region;
 ghost_region}` naming the region in which the result must be allocated.

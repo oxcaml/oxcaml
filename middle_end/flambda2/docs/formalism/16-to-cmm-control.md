@@ -140,7 +140,9 @@ lbl fresh;  Θ_x = Θ with Φ[k ↦ Exn ⟨lbl⟩]
 NOTES: An exception-handler continuation becomes a `Ccatch` with flag `Exn_handler`,
 built by the `trywith` smart constructor (let_cont_exn_handler) — there is NO distinct
 `Ctrywith` machine node (CM.Catch.Exn). The first parameter is the exception value,
-the rest are extra args conveyed via mutable slots (backend_exceptions.md). Steps to
+the rest are extra args; at raise sites they are passed as the remaining `Craise`
+operands and threaded through distinguished per-handler registers by cfg_selectgen
+(env_find_regs_for_exception_extra_args), not mutable slots. Steps to
 CM.Catch.Exn / CM.Raise. The trap-stack PUSH is not part of this catch: it is a
 `Push lbl` trap action on the `Cexit` entering the try body (translated from the
 Flambda Push trap action; TC.ApplyCont.Jump), with a matching `Pop` on the normal exit.
@@ -239,11 +241,16 @@ e = Apply_cont k (s̄);  k is an exn handler (Env.is_exn_handler);  s̄ = s_exn 
 trap_action(e) = Some (Pop { raise_kind; … })   (else fatal)
 Θ ⊢ s_exn ⤳ᵥ v_exn ;  Θ ⊢ s̄_extra ⤳ᵥ v̄_extra ;  flush(Θ) Flush_everything
 --------------------------------------------------
-Θ ⊢ e ⤳ Cop(Craise raise_kind, [v_exn], dbg)      -- extra args via mutable slots
+Θ ⊢ e ⤳ Cop(Craise (if !Clflags.debug then raise_kind else Raise_notrace), v_exn :: v̄_extra, dbg)
 NOTES: A raise (an Apply_cont to an exn handler carrying a Pop) becomes
-`raise_prim` (translate_raise); the exception value is the first argument, the
-extras go through mutable slots. Cmm image of OS.ApplyCont.Raise; steps to
-CM.Raise. Reaching an exn handler *without* a Pop is a fatal to_cmm error.
+`raise_prim` (translate_raise); the exception value is the first `Cop` operand
+and the extra handler args are the remaining operands, later threaded through
+distinguished per-handler registers by cfg_selectgen (emit_expr_raise), not
+mutable slots. `raise_prim` preserves the source `raise_kind` only under
+`!Clflags.debug` (-g); in the default build the operator is `Raise_notrace`.
+This affects only backtrace recording, not control flow. Cmm image of
+OS.ApplyCont.Raise; steps to CM.Raise. Reaching an exn handler *without* a Pop
+is a fatal to_cmm error.
 ```
 
 ## 5. Translating applications (`Apply`)

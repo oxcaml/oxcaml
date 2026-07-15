@@ -337,7 +337,7 @@ copies the regenerated files back into the source tree.
 | `S.Rewrite.Prim.IntIdentity` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_arith`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_shift` | — |
 | `S.Rewrite.Prim.FloatIdentity` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_binary_primitive.ml#Float_ops_for_binary_arith_gen` | — |
 | `S.Rewrite.Prim.UntagTag` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_untag_immediate`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_unbox_number` | 14-validation/code_size_of_boolean_not_switch.md |
-| `S.Rewrite.Prim.Projection` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_immutable_block_load0`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_value_slot`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load` | — |
+| `S.Rewrite.Prim.Projection` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_immutable_block_load0`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_value_slot`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_function_slot`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_array_length`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_string_length`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load` | — |
 | `S.Rewrite.Prim.PhysEqual` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_phys_equal`<br>`middle_end/flambda2/types/provers.ml#prove_physical_equality` | — |
 | `S.Rewrite.Prim.CompareRecovery` | descriptive | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_binary_primitive.ml#recover_comparison_primitive`<br>`middle_end/flambda2/simplify/comparison_result.ml#convert_result_compared_to_tagged_zero` | — |
 | `S.Rewrite.Prim.ObjDupElide` | descriptive | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_obj_dup` | — |
@@ -395,7 +395,7 @@ copies the regenerated files back into the source tree.
 | `S.Unbox.Variant.Discriminator` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#compute_extra_args_for_variant`<br>`middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#extra_args_for_const_ctor_of_variant` | — |
 | `S.Unbox.FunParam.Wrapper` | descriptive | 12-unboxing.md | `middle_end/flambda2/from_lambda/lambda_to_flambda.ml#cps_function`<br>`middle_end/flambda2/from_lambda/closure_conversion.ml#compute_body_of_unboxed_function`<br>`middle_end/flambda2/from_lambda/closure_conversion.ml#make_unboxed_function_wrapper` | — |
 | `S.Unbox.Denv.Equation` | normative | 12-unboxing.md | `middle_end/flambda2/simplify/unboxing/build_unboxing_denv.ml#denv_of_decision`<br>`middle_end/flambda2/simplify/unboxing/build_unboxing_denv.ml#add_equation_on_var` | — |
-| `S.Unbox.ContParam.Rewrite` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#add_extra_params_and_args`<br>`middle_end/flambda2/simplify/apply_cont_rewrite.ml#create`<br>`middle_end/flambda2/simplify/expr_builder.ml#rewrite_apply_cont`<br>`middle_end/flambda2/simplify/simplify_let_cont_expr.ml#compute_extra_params_and_args` | 14-validation/new-07-float-unbox.md |
+| `S.Unbox.ContParam.Rewrite` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#add_extra_params_and_args`<br>`middle_end/flambda2/simplify/apply_cont_rewrite.ml#create`<br>`middle_end/flambda2/simplify/expr_builder.ml#rewrite_apply_cont`<br>`middle_end/flambda2/simplify/unboxing/unbox_continuation_params.ml#compute_extra_params_and_args` | 14-validation/new-07-float-unbox.md |
 | `S.Unbox.Mutable.Candidate` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/flow/mutable_unboxing.ml#blocks_to_unbox`<br>`middle_end/flambda2/simplify/flow/mutable_unboxing.ml#escaping` | — |
 | `S.Unbox.Mutable.Rewrite` | descriptive | 12-unboxing.md | `middle_end/flambda2/simplify/flow/mutable_unboxing.ml#Fold_prims.apply_prim`<br>`middle_end/flambda2/simplify/flow/mutable_unboxing.ml#compute_rewrites` | 14-validation/new-07-float-unbox.md |
 
@@ -426,9 +426,9 @@ copies the regenerated files back into the source tree.
 | `CM.Invalid` | normative | 15-cmm.md | `backend/cmm.mli#Cinvalid`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#invalid`<br>`middle_end/flambda2/to_cmm/to_cmm_shared.ml#invalid` | — |
 | `CM.Unit.Final` | normative | 15-cmm.md | `middle_end/flambda2/to_cmm/to_cmm.ml#unit`<br>`backend/cmm.mli#Cdata` | — |
 | `CM.Alloc.Heap` | normative | 19-cmm-memory-gc.md | `backend/cmm.mli#Calloc`<br>`backend/cmm_helpers.ml#make_alloc_generic` | — |
-| `CM.Region.Begin` | normative | 19-cmm-memory-gc.md | `backend/cmm.mli#Cbeginregion`<br>`middle_end/flambda2/terms/flambda_primitive.mli#Begin_region` | — |
+| `CM.Region.Begin` | normative | 19-cmm-memory-gc.md | `backend/cmm.mli#Cbeginregion`<br>`middle_end/flambda2/terms/flambda_primitive.mli#Begin_region`<br>`middle_end/flambda2/terms/flambda_primitive.mli#Begin_try_region`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#variadic_primitive` | — |
 | `CM.Alloc.Local` | normative | 19-cmm-memory-gc.md | `backend/cmm.mli#Calloc`<br>`backend/cmm_helpers.ml#local_block_header`<br>`middle_end/flambda2/to_cmm/to_cmm_shared.ml#alloc_mode_for_allocations_to_cmm` | — |
-| `CM.Region.End` | normative | 19-cmm-memory-gc.md | `backend/cmm.mli#Cendregion`<br>`middle_end/flambda2/terms/flambda_primitive.mli#End_region` | — |
+| `CM.Region.End` | normative | 19-cmm-memory-gc.md | `backend/cmm.mli#Cendregion`<br>`middle_end/flambda2/terms/flambda_primitive.mli#End_region`<br>`middle_end/flambda2/terms/flambda_primitive.mli#End_try_region`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive` | — |
 | `CM.Alloc.GC` | conjectured | 19-cmm-memory-gc.md | `backend/cmm_helpers.ml#make_alloc_generic`<br>`backend/cmm.mli#machtype_component` | — |
 | `CM.Addr.NoSurvive` | normative | 19-cmm-memory-gc.md | `backend/cmm.mli#machtype_component`<br>`backend/cmm_helpers.ml#field_address`<br>`backend/cmm_helpers.ml#setfield_computed` | — |
 | `CM.Alloc.Exhaustion` | normative | 19-cmm-memory-gc.md | `backend/cmm_helpers.ml#make_alloc_generic` | — |
@@ -457,7 +457,7 @@ copies the regenerated files back into the source tree.
 | `TC.Prim.Sound` | conjectured | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_simple`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_complex`<br>`middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects` | — |
 | `TC.Let.Simple` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_expr0`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#bind_var_to_simple` | — |
 | `TC.Let.Prim` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_prim`<br>`middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_let_binding` | — |
-| `TC.Let.Subst` | conjectured | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_env.ml#flush_delayed_lets`<br>`middle_end/flambda2/to_cmm/to_cmm_env.ml#bind_variable`<br>`middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects` | — |
+| `TC.Let.Subst` | conjectured | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_env.ml#flush_delayed_lets`<br>`middle_end/flambda2/to_cmm/to_cmm_env.ml#bind_variable`<br>`middle_end/flambda2/to_cmm/to_cmm_env.ml#add_binding_to_env`<br>`middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects` | — |
 | `TC.Let.SetOfClosures` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#let_dynamic_set_of_closures` | — |
 | `TC.Let.Static` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_static.ml#static_consts`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_expr0` | — |
 | `TC.Prim.TagUntag` | normative | 18-to-cmm-data.md | `backend/cmm_helpers.ml#tag_int`<br>`backend/cmm_helpers.ml#untag_int`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#arithmetic_conversion` | — |
@@ -505,7 +505,7 @@ copies the regenerated files back into the source tree.
 | `INV.ToCmm.Control` | conjectured | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr`<br>`middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_continuation_handler` | — |
 | `INV.ToCmm.Simulates` | conjectured | 20-to-cmm-soundness.md | `middle_end/flambda2/to_cmm/to_cmm.ml#unit`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr` | — |
 | `INV.ToCmm.EndToEnd` | conjectured | 20-to-cmm-soundness.md | `middle_end/flambda2/flambda2.ml#flambda_to_flambda0`<br>`middle_end/flambda2/to_cmm/to_cmm.ml#unit` | — |
-| `INV.ToCmm.InvalidUnreached` | conjectured | 20-to-cmm-soundness.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#invalid`<br>`backend/cmm.mli#Cinvalid` | — |
+| `INV.ToCmm.InvalidUnreached` | conjectured | 20-to-cmm-soundness.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#invalid`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#nullary_primitive`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive`<br>`backend/cmm.mli#Cinvalid` | — |
 
 ## Consistency check results
 

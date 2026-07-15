@@ -308,8 +308,12 @@ CODE middle_end/flambda2/terms/validity.ml#t
 Can_move_anywhere: no constraint from control flow.
 Can't_move_before_any_branch: must not be hoisted above a preceding branch
 (e.g. a read whose safety a preceding test established).
-Control_flow_point: a barrier; nothing may be moved across it (used for Poll,
-Probe_is_enabled, Invalid — things that must stay put in program order).
+Control_flow_point: a genuine branch point that can refine types/shapes (e.g. a
+GADT match) or check preconditions; nothing may be moved across it. Produced only
+by `effects_and_coeffects.all`, attached in to_cmm to function/external calls,
+switches, and effect-handler ops (perform/reperform/resume) — any call may hide
+such a point. (Poll, Probe_is_enabled and Invalid are NOT Control_flow_point;
+they are Can't_move_before_any_branch — see P.Nullary.ControlBarriers.)
 NOTES: join is the max in the order Can_move_anywhere < Can't_move_before_any_branch
 < Control_flow_point. Almost every memory primitive uses
 Can't_move_before_any_branch, reflecting that the frontend inserts a bounds
@@ -604,7 +608,7 @@ CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_block_set
 ---
 p = Block_set { kind; init; field = i }
-H(ℓ) = Block(t, μ, [v₀ … vₙ₋₁])      0 ≤ i < n      μ ≠ Immutable  (see NOTES)
+H(ℓ) = Block(t, μ, [v₀ … vₙ₋₁])      0 ≤ i < n
 H′ = H[ℓ ↦ Block(t, μ, [v₀ … vᵢ₋₁, v, vᵢ₊₁ … vₙ₋₁])]
 --------------------------------------------------
 ⟦p⟧(ptr ℓ, v; H) = (tagged_imm 0, H′)
@@ -614,8 +618,12 @@ Initialization is the initial store during construction (mutable arrays/blocks
 built field-by-field, or the initializing writes into an immutable block that
 Flambda still treats as a Block_set); Assignment(mode) is a true assignment and
 mode drives the write barrier for the GC. undef if not a block pointer, i out of
-range, or representation mismatch. Storing into a genuinely immutable field is a
-frontend error, not modelled as undef here.
+range, or representation mismatch. There is no operational mutability check: the
+store proceeds regardless of μ (`simplify_block_set` ignores both kind and init).
+`μ ≠ Immutable` is a frontend-guaranteed invariant for `init = Assignment` stores,
+not an operational precondition; Initialization writes into an immutable block are
+expected. Storing into a genuinely immutable field via Assignment is a frontend
+error, not modelled as undef here.
 ```
 
 ```rule
@@ -627,7 +635,7 @@ CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_block_se
 VERIFIED 14-validation/mixed-03-mutable-set.md
 ---
 p = Block_set { kind = Mixed { shape = σ; field_kind = fk; … }; init; field = i }
-H(ℓ) = MixedBlock(t, μ, σ, [v₀ … vₙ₋₁])      0 ≤ i < n = p + |ē|      μ ≠ Immutable
+H(ℓ) = MixedBlock(t, μ, σ, [v₀ … vₙ₋₁])      0 ≤ i < n = p + |ē|
 kind(v) = field_kinds(σ)(i)      fk = from_block_shape(Scannable (Mixed_record σ), i)
 H′ = H[ℓ ↦ MixedBlock(t, μ, σ, [v₀ … vᵢ₋₁, v, vᵢ₊₁ … vₙ₋₁])]
 --------------------------------------------------
@@ -638,7 +646,9 @@ P.Unary.BlockLoad.Mixed. init is Init_or_assign exactly as for Values (the
 Assignment mode drives the write barrier for a prefix (value) field; suffix
 fields hold unboxed scalars and need no barrier). writing_to_a_block classifies
 it (Arbitrary_effects, No_coeffects, …). undef if not a mixed-block pointer of
-shape σ, i out of range, or fk/kind disagreement.
+shape σ, i out of range, or fk/kind disagreement. As in P.Binary.BlockSet,
+`μ ≠ Immutable` is a frontend invariant for Assignment stores, not an operational
+precondition; the store proceeds regardless of μ.
 ```
 
 ### Duplicate_block / Duplicate_array

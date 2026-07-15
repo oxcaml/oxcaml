@@ -111,20 +111,36 @@ RULE TC.Let.Subst
 STATUS conjectured
 CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#flush_delayed_lets
 CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#bind_variable
+CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#add_binding_to_env
 CODE middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects
 ---
-Delayed bindings in D are held in "stages": a stage is a set of bindings that
-commute (a set of co-effect-only bindings, or one effectful binding). Substituting
+Delayed bindings in D are held in TWO parallel "stage" stacks (add_binding_to_env
+threads a binding onto both): an effect_stages stack — a stage is a set of
+co-effect-only bindings, or one effectful binding — and a validity_stages stack,
+whose stages are `Depend_on_control_flow` (a set of bindings that must not be
+hoisted above a preceding branch) or `Control_flow_point` (a barrier). Substituting
 a delayed binding at its use site, dropping an unused pure binding, and flushing D
 to Cmm `Clet`s at branch/loop/apply points all preserve observable behaviour,
-PROVIDED the reordering respects the effects/coeffects quadruple (06,
-P.Effects.*): a No_effects/No_coeffects binding may move freely; a coeffect-only
+PROVIDED the reordering respects the effects/coeffects/placement/VALIDITY quadruple
+(06, P.Effects.*, in particular the normative P.Effects.Validity): a coeffect-only
 binding may not cross a write; an effectful binding is a barrier and is placed
-exactly once; nothing substitutable crosses into a recursive continuation.
+exactly once; a Can't_move_before_any_branch binding (which includes essentially
+all pure memory reads and tagged-int ops — a pure binding is off effect_stages but
+ON validity_stages) must not be hoisted above a preceding branch; a
+Control_flow_point is a hard barrier that nothing crosses; nothing substitutable
+crosses into a recursive continuation.
 --------------------------------------------------
 The delayed-binding discipline is a behaviour-preserving reordering of the
 evaluation of Let-bound primitives.
-NOTES: STATUS conjectured — this is the one genuinely subtle Stage-2 argument, and
+NOTES: A No_effects/No_coeffects binding is NOT free to move arbitrarily — it is
+still validity-constrained (validity.mli: moving a tagged-int op before a GADT
+match can produce garbage we mistake for a legal OCaml value, causing a segfault);
+this is why the code keeps a separate validity_stages stack (add_to_validity_stages)
+keyed on Ece.validity alongside effect_stages (add_to_effect_stages), and
+can_substitute requires respecting BOTH. The substitution-time validity check is
+gated by the `cmm_safe_subst` flag (off by default), but validity_stages
+maintenance and flush-time validity branching are unconditional.
+STATUS conjectured — this is the one genuinely subtle Stage-2 argument, and
 the part of to_cmm "most sensitive to changes" (to_cmm.md). It reuses the
 effects/coeffects theory the abstract semantics already has (06); the flush modes
 (Flush_everything / Branching_point / Entering_loop) are where the environment is

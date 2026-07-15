@@ -111,19 +111,32 @@ simulation itself holds for any well-formed optimized Flambda.
 RULE INV.ToCmm.InvalidUnreached
 STATUS conjectured
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#invalid
+CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#nullary_primitive
+CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
 CODE backend/cmm.mli#Cinvalid
 ---
 If a Flambda configuration is unreachable-when-Invalid in U′ (13: a correct
-Simplify never steps a reachable config to OS.Invalid), then the ≈cfg-related Cmm
-configuration never reaches CM.Invalid (Cinvalid) either.
+Simplify never steps a reachable config to OS.Invalid), and Simplify/Slot_offsets
+slot-liveness holds (a live Project_function_slot/Project_value_slot never targets
+a slot dropped from the closure layout), then the ≈cfg-related Cmm configuration
+never reaches CM.Invalid (Cinvalid) either.
 --------------------------------------------------
-Reachable Cmm states never hit Cinvalid, because TC.Invalid maps exactly Flambda
-Invalid to Cmm Cinvalid and the unreachable-switch-case Cinvalid sits at
-discriminants OS.Switch.Undef already calls undefined (16, TC.Switch; CM.Switch).
+Reachable Cmm states never hit Cinvalid. `to_cmm` emits Cmm Cinvalid from four
+site-classes, each discharged: (a) the Flambda Invalid *expression* (TC.Invalid,
+to_cmm_expr#invalid); (b) an unreachable switch case, sitting at discriminants
+OS.Switch.Undef already calls undefined (16, TC.Switch; CM.Switch); (c) the nullary
+Invalid *primitive* (to_cmm_primitive#nullary_primitive), folded into the Flambda
+Invalid ⇒ Cmm Cinvalid clause and discharged by the same reachable-never-Invalid
+argument as OS.Invalid (05 §60, cross-ref); and (d) the dead closure-slot
+projections (to_cmm_primitive#unary_primitive, the `Dead_function_slot` /
+`Dead_value_slot` arms), unreachable by slot-liveness: a live projection never
+targets a slot dropped from the layout, so those arms are never taken.
 NOTES: STATUS conjectured. The Cmm `Cinvalid` (which lowers to caml_flambda2_invalid,
 aborting) is reached only from states the Flambda machine already calls undefined,
 so it does not widen the set of undefined behaviours. Inherits the discharge of
-"reachable ⇏ Invalid" from 13.
+"reachable ⇏ Invalid" from 13, plus the Slot_offsets slot-liveness invariant: the
+offset *layout* appears in 17/18, but the *liveness* discharge for the dead-slot
+arms is stated only here.
 ```
 
 ## 4. Validation summary

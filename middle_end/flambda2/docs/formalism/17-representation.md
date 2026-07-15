@@ -241,7 +241,9 @@ where, per array kind:
   vec128/256/512 → w = 16/32/64, prefix = 1;
   unboxed products → the n·m component scalars packed.
 For the PACKED/unboxed kinds the header tag is LENGTH-DEPENDENT — a base tag plus
-(n mod k) (int32#/float32#: k = 2; int16#: k = 4; int8#: k = 8) — and prefix = 1
+the last-word padding (k − n mod k) mod k (the number of unused element slots in the
+final word; 0 when k divides n) (int32#/float32#: k = 2; int16#: k = 4; int8#: k = 8)
+— and prefix = 1
 (a MIXED header with scannable_prefix 0, so the header's top byte reads p+1 = 1).
 The GC-scanned value/float arrays use a plain (non-mixed) header with prefix = 0.
 --------------------------------------------------
@@ -316,8 +318,15 @@ H ⊢ Closures(funs, env) @ a ≈ₒ M    iff
   M[a−8] = hdr(closure_tag, total_size, col, 0)
   and for each function slot f at offset off(f):
     if off(f) > 0:  M[a + 8·off(f) − 8] = infix_header(off(f))       -- infix tag + slot offset
-    M[a + 8·off(f)]     = the code pointer for funs(f)
-    M[a + 8·off(f) + 8] = pack_closure_info(arity, startenv − off(f), is_last)
+    for a 2-word slot (Full_application_only; Curried arity ≤ 1):
+      M[a + 8·off(f)]     = the code pointer for funs(f)
+      M[a + 8·off(f) + 8] = pack_closure_info(arity, startenv − off(f), is_last)
+    for a 3-word slot (Full_and_partial_application; Curried arity ≥ 2 or Tupled):
+      M[a + 8·off(f)]      = the generic partial-application entry (caml_curryN via
+                             C.curry_function_sym, or C.fail_if_called_indirectly_sym
+                             when only_full_applications)
+      M[a + 8·off(f) + 8]  = pack_closure_info(arity, startenv − off(f), is_last)
+      M[a + 8·off(f) + 16] = the code pointer for funs(f)
   and for each value slot w (Slot_offsets.Layout carries an is_scanned flag):
     if w is scanned:    off(w) ≥ startenv (in the GC-scanned environment),
                         M[a + 8·off(w)] = a Word_val representing env(w)
@@ -343,6 +352,11 @@ slots. Slot offsets from Slot_offsets / Exported_offsets, assigned once across t
 unit (to_cmm.md, closure offsets; 07 §6). Cmm image of OS.Let.SetOfClosures /
 P.Unary.ProjectFunctionSlot / ProjectValueSlot(06). Exact per-arity slot width
 (2- vs 3-word function slots) is as assigned by Slot_offsets and not re-derived here.
+The 2-word layout has the funs(f) code pointer at word 0; the 3-word layout puts the
+generic curry/apply entry at word 0 and the funs(f) code pointer at word 2, with the
+closinfo word at +8 in both (to_cmm_set_of_closures `fill_slot`, `List.rev acc`). All
+existing closure case studies use 2-word slots; a 3-word closure case study (Curried
+arity ≥ 2 or Tupled) is still needed to witness the word-2 code pointer.
 ```
 
 `Code(cid ↦ code)` objects are not heap-represented as data: code becomes a

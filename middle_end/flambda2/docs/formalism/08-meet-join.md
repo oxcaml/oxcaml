@@ -642,13 +642,18 @@ CODE middle_end/flambda2/types/provers.ml#never_holds_locally_allocated_values
 ---
 reify considers lifting a block/array with fields that are variables
 --------------------------------------------------
-a field variable x is allowed only if x is defined at toplevel (or is a symbol
-  projection) AND, for a Local/Heap_or_local alloc mode, x provably never holds
-  locally-allocated values (never_holds_locally_allocated_values)
-NOTES: Lifting a Local allocation to a static constant would extend the lifetime
-  of any local value reachable from it past its region, so it is gated. Heap
-  allocations are always liftable (the OCaml type system validated them). Fields
-  under a non-identity coercion are not yet lifted.
+a field variable x is allowed only if x ∈ allowed_if_free_vars_defined_in (TE.mem
+  at min_name_mode) AND (x is a symbol projection, OR (x is defined at toplevel
+  AND, for a Local/Heap_or_local alloc mode, x provably never holds
+  locally-allocated values (never_holds_locally_allocated_values)))
+NOTES: A symbol projection bypasses BOTH the toplevel requirement and the
+  local-allocation guard: it projects from a heap symbol (static data), so it
+  cannot reach a locally-allocated value. Only the membership conjunct
+  (allowed_if_free_vars_defined_in) gates every case. Lifting a Local allocation
+  to a static constant would extend the lifetime of any local value reachable
+  from it past its region, so it is gated. Heap allocations are always liftable
+  (the OCaml type system validated them). Fields under a non-identity coercion
+  are not yet lifted.
 ```
 
 Both `expand_head` and `reify` are read-only: neither adds equations to `E`.

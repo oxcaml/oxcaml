@@ -54,14 +54,22 @@ RULE CM.Region.Begin
 STATUS normative
 CODE backend/cmm.mli#Cbeginregion
 CODE middle_end/flambda2/terms/flambda_primitive.mli#Begin_region
+CODE middle_end/flambda2/terms/flambda_primitive.mli#Begin_try_region
+CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#variadic_primitive
 ---
 e_c = Cop(Cbeginregion, [], dbg);   ι fresh
 --------------------------------------------------
 ⟨e_c, ce, χ, M, TT, RR⟩ ⟶c ⟨word ι, ce, χ, M, TT, ι :: RR⟩
 NOTES: Pushes a fresh local-allocation region and returns its handle. Cmm image
-of the Flambda Begin_region primitive (06; region stack R, 04 §1.8). `to_cmm`
-emits Cbeginregion/Cendregion only when stack allocation is enabled; otherwise the
-region primitives are erased (let_expr0, is_begin_or_end_region).
+of a non-ghost Flambda Begin_region / Begin_try_region primitive (06; region stack
+R, 04 §1.8), which lower identically to `Cbeginregion`. `to_cmm` emits
+`Cbeginregion` only when stack allocation is enabled AND the primitive is not ghost.
+There are two distinct erasure paths: when stack allocation is disabled the binding
+is dropped in to_cmm_expr (let_expr0, is_begin_or_end_region); and a ghost region
+(`Begin_region { ghost = true }` / `Begin_try_region { ghost = true }`, pervasive —
+one per local function, bound_for_function.ml `my_ghost_region`) lowers in
+variadic_primitive to `Cconst_int 0`, leaving RR unchanged. That ghost `Cconst_int
+0` is already a Cmm value (word 0) and is not stepped by this region rule at all.
 ```
 
 ```rule
@@ -89,13 +97,21 @@ RULE CM.Region.End
 STATUS normative
 CODE backend/cmm.mli#Cendregion
 CODE middle_end/flambda2/terms/flambda_primitive.mli#End_region
+CODE middle_end/flambda2/terms/flambda_primitive.mli#End_try_region
+CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
 ---
 e_c = Cop(Cendregion, [word ι], dbg);   RR = ι₀ :: … :: ι :: RR₀
 M′ = M with every block allocated in ι (or in a region above it in RR) reclaimed
 --------------------------------------------------
 ⟨e_c, ce, χ, M, TT, RR⟩ ⟶c ⟨word 1 (unit), ce, χ, M′, TT, RR₀⟩
 NOTES: Pops down to and discards region ι, reclaiming everything allocated in it.
-Cmm image of the Flambda End_region primitive (06; the R-update of 04 §1.8). A
+Cmm image of a non-ghost Flambda End_region / End_try_region primitive (06; the
+R-update of 04 §1.8), which lower identically to `Cendregion`. As with
+CM.Region.Begin, `Cendregion` is emitted only when stack allocation is enabled AND
+the primitive is not ghost: stack-alloc-disabled drops the binding in to_cmm_expr
+(is_begin_or_end_region), while a ghost `End_region { ghost = true }` /
+`End_try_region { ghost = true }` lowers in unary_primitive to unit (word 1) with
+RR unchanged, not stepped by this rule. A
 value that escaped a region (returned past its End_region) would be a dangling
 pointer — the type system / Simplify's alloc-mode discipline prevents this, and
 to_cmm's End_region flush (18, TC.Let.Subst NOTES) stops immutable loads of

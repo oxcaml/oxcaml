@@ -149,7 +149,8 @@ Inline?(apply, …, E) = inline    extra_args(κ_exn) = ā (nonempty)
 k1 fresh (exn handler)    k_pop fresh    k_push fresh
 --------------------------------------------------
 E ⊢ apply ⇝
-  let_cont_exn k1 (exn) = Apply_cont exn_handler(κ_exn) (exn :: ā) in
+  let_cont_exn k1 (exn) =
+    Apply_cont ⟨pop exn_handler(κ_exn), Reraise⟩ exn_handler(κ_exn) (exn :: ā) in
   let_cont k_pop (r̄) = Apply_cont ⟨pop k1⟩ κ_ret r̄ in
   let_cont k_push () = ⟨inlined body of S.Inline.Substitute, with κ_exn ↦ k1
                        and κ_ret ↦ Return k_pop⟩ in
