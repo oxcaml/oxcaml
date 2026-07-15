@@ -416,7 +416,17 @@ let insert_block :
   let successors =
     match only_successor with
     | None -> Cfg.successor_labels ~normal:true ~exn:false predecessor_block
-    | Some only_successor -> Label.Set.singleton only_successor.start
+    | Some only_successor ->
+      if
+        not
+          (Label.Set.mem only_successor.start
+             (Cfg.successor_labels ~normal:true ~exn:false predecessor_block))
+      then
+        Misc.fatal_errorf
+          "Cannot insert a block between block %a and block %a: the latter is \
+           not a normal successor of the former"
+          Label.print predecessor_block.start Label.print only_successor.start;
+      Label.Set.singleton only_successor.start
   in
   if Label.Set.cardinal successors = 0
   then
