@@ -89,15 +89,16 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       Library (file_name, infos)
     else raise (Linkenv.Error (Not_an_object_file file_name))
 
-  (* The result of [find_companion_object_file], below. *)
+  (* The result of [find_companion_object_file], below. [Adjacent] and
+     [Found_in_load_path] carry the object file's path: the former is obtained
+     by replacing the artifact extension in the artifact's resolved path, the
+     latter by resolving the object file's name through the load path.
+     [Not_found_in_load_path] carries the object file's name, which could not be
+     resolved. *)
   type companion_object_file =
     | Adjacent of string
-        (* The object file's path, obtained by replacing the artifact extension
-           in the artifact's resolved path. *)
     | Found_in_load_path of string
-        (* The object file's path, as resolved through the load path. *)
     | Not_found_in_load_path of string
-        (* The object file's name, which could not be resolved. *)
 
   (* Locate the object file ([.o] or [.a]/[.lib]) that accompanies a compilation
      artifact ([.cmx] or [.cmxa]).
@@ -116,8 +117,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
   let find_companion_object_file ~requested_name ~resolved_name ~artifact_ext
       ~object_ext =
     if Filename.check_suffix resolved_name artifact_ext
-    then
-      Adjacent (Filename.chop_suffix resolved_name artifact_ext ^ object_ext)
+    then Adjacent (Filename.chop_suffix resolved_name artifact_ext ^ object_ext)
     else
       let object_name =
         Filename.chop_suffix requested_name artifact_ext ^ object_ext
