@@ -79,18 +79,10 @@ let check_floatu ~init ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
     assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)));
-    (* float# arrays use Double_array_tag (254) when non-empty, tag 0 when empty.
-       In bytecode without flat-float-array, [%makearray_dynamic] falls through
-       to [caml_array_make] which produces tag 0 in that configuration. *)
+    (* float# arrays are flat [Double_array_tag] blocks when non-empty,
+       in all backends and configurations. *)
     let tag = Obj.tag (Obj.repr x) in
-    let expected_tag =
-      if n = 0 then 0
-      else
-        match Sys.backend_type with
-        | Native -> 254
-        | Bytecode -> if Config.flat_float_array then 254 else 0
-        | Other _ -> failwith "Don't know what to do"
-    in
+    let expected_tag = if n = 0 then 0 else 254 in
     assert (tag = expected_tag)
   in
   List.iter check_one array_sizes_to_check
