@@ -107,9 +107,14 @@ let add_block t (block : Cfg.basic_block) ~after =
     DLL.find_cell_opt t.layout ~f:(fun label -> Label.equal label after)
   with
   | None -> Misc.fatal_error "Cfg set_layout: 'after' block is not present"
-  | Some cell ->
+  | Some cell -> (
     DLL.insert_after cell block.start;
-    Cfg.add_block_exn t.cfg block
+    Cfg.add_block_exn t.cfg block;
+    (* The new block inherits the section of the [after] block, so that the
+       section table remains total on blocks when sections are in use. *)
+    match Hashtbl.find_opt t.sections after with
+    | None -> ()
+    | Some section_name -> Hashtbl.replace t.sections block.start section_name)
 
 let is_trap_handler t label =
   let block = Cfg.get_block_exn t.cfg label in
