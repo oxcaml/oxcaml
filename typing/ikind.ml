@@ -1009,12 +1009,26 @@ let compute_subcheck_polys ~context:_ env (sub : ('l1 * 'r1) Types.jkind)
         fast_path = No_fast_path
       }
 
+let has_explicit_addressability env (jkind : ('l * 'r) Types.jkind) =
+  match jkind.jkind.addressability with
+  | Jkind_types.Addressability.Addressable -> true
+  | Jkind_types.Addressability.Not_addressable -> (
+    match jkind.jkind.base with
+    | Types.Layout _ -> false
+    | Types.Kconstr _ ->
+      let jkind = Jkind.fully_expand_aliases env jkind in
+      Jkind_types.Addressability.equal jkind.jkind.addressability
+        Jkind_types.Addressability.Addressable)
+
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) env (sub : Types.jkind_l)
     (super : Types.jkind_l) : (unit, Jkind.Violation.t) result =
   let open Misc.Stdlib.Monad.Result.Syntax in
-  if not (enable_sub_jkind_l && !Clflags.ikinds)
+  if
+    (not (enable_sub_jkind_l && !Clflags.ikinds))
+    || has_explicit_addressability env sub
+    || has_explicit_addressability env super
   then Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context env sub super
   else
     (* Check layouts first; if that fails, print both sides with full
@@ -1242,7 +1256,10 @@ let sub_or_intersect ?origin
         in
         Jkind.May_have_intersection reasons)
   in
-  if not (enable_sub_or_intersect && !Clflags.ikinds)
+  if
+    (not (enable_sub_or_intersect && !Clflags.ikinds))
+    || has_explicit_addressability env t1
+    || has_explicit_addressability env t2
   then Jkind.sub_or_intersect ~type_equal ~context env t1 t2
   else if fast_sub ~context env t1 t2
   then (

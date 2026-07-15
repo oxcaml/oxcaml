@@ -472,6 +472,12 @@ module Addressability = struct
     | Layout layout -> is_layout_addressable layout
     | Kconstr _ -> false
 
+  let is_base_addressability_unknown (base : Sort.t Layout.t jkind_base) =
+    match base with
+    | Layout (Layout.Sort (sort, _)) -> (
+      match Sort.get sort with Sort.Var _ -> true | _ -> false)
+    | Layout (Layout.Any _ | Layout.Product _) | Kconstr _ -> false
+
   let effective_for_const_base base addressability =
     is_addressable addressability || is_const_base_addressable base
 
@@ -736,31 +742,37 @@ module Base = struct
         Printf.sprintf "%s %s" (Path.name p) (String.concat " " sa_strs))
 
   (* This is only correct on fully-expanded bases. *)
+  let sub_layout_expanded (base1 : Sort.t Layout.t jkind_base)
+      (base2 : Sort.t Layout.t jkind_base) =
+    match base1, base2 with
+    | Layout l1, Layout l2 -> Layout.sub l1 l2
+    | Kconstr (k1, sa1), Kconstr (k2, sa2) when Path.same k1 k2 -> (
+      match Scannable_axes.less_or_equal sa1 sa2 with
+      | Equal -> Sub_result.Equal
+      | Less -> Sub_result.Less
+      | Not_le -> Sub_result.Not_le [Layout_disagreement])
+    | Kconstr (_, sa_k), Layout (Layout.Any sa_any) -> (
+      match Scannable_axes.less_or_equal sa_k sa_any with
+      | Equal | Less -> Sub_result.Less
+      | Not_le -> Sub_result.Not_le [Layout_disagreement])
+    | Kconstr _, Layout _ | Layout _, Kconstr _ | Kconstr _, Kconstr _ ->
+      Sub_result.Not_le [Layout_disagreement]
+
+  (* This is only correct on fully-expanded bases. *)
   let sub_expanded ~addressability1 ~addressability2
       (base1 : Sort.t Layout.t jkind_base) (base2 : Sort.t Layout.t jkind_base)
       =
-    let layout_sub =
-      match base1, base2 with
-      | Layout l1, Layout l2 -> Layout.sub l1 l2
-      | Kconstr (k1, sa1), Kconstr (k2, sa2) when Path.same k1 k2 -> (
-        match Scannable_axes.less_or_equal sa1 sa2 with
-        | Equal -> Sub_result.Equal
-        | Less -> Sub_result.Less
-        | Not_le -> Sub_result.Not_le [Layout_disagreement])
-      | Kconstr (_, sa_k), Layout (Layout.Any sa_any) -> (
-        match Scannable_axes.less_or_equal sa_k sa_any with
-        | Equal | Less -> Sub_result.Less
-        | Not_le -> Sub_result.Not_le [Layout_disagreement])
-      | Kconstr _, Layout _ | Layout _, Kconstr _ | Kconstr _, Kconstr _ ->
-        Sub_result.Not_le [Layout_disagreement]
+    let addressability_is_unknown =
+      Addressability.is_base_addressability_unknown base2
     in
+    let layout_sub = sub_layout_expanded base1 base2 in
     let addressable1 =
       Addressability.effective_for_base base1 addressability1
     in
     let addressable2 =
       Addressability.effective_for_base base2 addressability2
     in
-    if Bool.equal addressable1 addressable2
+    if addressability_is_unknown || Bool.equal addressable1 addressable2
     then layout_sub
     else if
       addressable1
@@ -1566,6 +1578,12 @@ module Jkind_desc = struct
          mod_bounds = mod_bounds2;
          with_bounds = with_bounds2
        } as t2) =
+    let addressability1_is_unknown =
+      Addressability.is_base_addressability_unknown base1
+    in
+    let addressability2_is_unknown =
+      Addressability.is_base_addressability_unknown base2
+    in
     let make_intersection base addressability =
       Intersection
         { base;
@@ -1583,7 +1601,11 @@ module Jkind_desc = struct
       let addressable2 =
         Addressability.effective_for_base base2 addressability2
       in
-      if Bool.equal addressable1 addressable2
+      if addressability1_is_unknown
+      then make_intersection base addressability2
+      else if addressability2_is_unknown
+      then make_intersection base addressability1
+      else if Bool.equal addressable1 addressable2
       then
         make_intersection base
           (if addressable1
@@ -1616,8 +1638,7 @@ module Jkind_desc = struct
   let sub_layout env t1 t2 =
     let t1 = Base_and_axes.fully_expand_aliases env t1 in
     let t2 = Base_and_axes.fully_expand_aliases env t2 in
-    Base.sub_expanded ~addressability1:t1.addressability
-      ~addressability2:t2.addressability t1.base t2.base
+    Base.sub_layout_expanded t1.base t2.base
 
   let of_new_sort_var ~level sa =
     let layout, sort = Layout.of_new_sort_var ~level sa in
