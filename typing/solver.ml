@@ -2442,7 +2442,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     Amodevar (Amorphvar (u, C.id, Id))
 
   let newvar_above (type a r) (obj : a C.obj) (level : int)
-      (m : (a, allowed * r) mode) =
+      (m : (a, allowed * r) mode) ~log =
     match disallow_right m with
     | Amode (a, a_hint_lower, _a_hint_upper) ->
       if C.le obj (C.max obj) a
@@ -2473,7 +2473,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         let u = fresh ~level obj in
         let mu = Amorphvar (u, C.id, Id) in
         let ok =
-          submode_mvmv ~allow_rigid:false ~log:None H.Pinpoint.unknown obj mv mu
+          submode_mvmv ~allow_rigid:false ~log H.Pinpoint.unknown obj mv mu
         in
         assert (Result.is_ok ok);
         allow_right (Amodevar mu), true
@@ -2490,21 +2490,19 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       else
         let u = fresh ~level obj in
         let mu = Amorphvar (u, C.id, Id) in
-        submode_cmv ~allow_rigid:false H.Pinpoint.unknown obj ~log:None a a_hint
-          mu
+        submode_cmv ~allow_rigid:false H.Pinpoint.unknown obj ~log a a_hint mu
         |> Result.get_ok;
         VarMap.iter
           (fun _ mv ->
             let ok =
-              submode_mvmv ~allow_rigid:false ~log:None H.Pinpoint.unknown obj
-                mv mu
+              submode_mvmv ~allow_rigid:false ~log H.Pinpoint.unknown obj mv mu
             in
             assert (Result.is_ok ok))
           mvs;
         allow_right (Amodevar mu), true
 
   let newvar_below (type a l) (obj : a C.obj) (level : int)
-      (m : (a, l * allowed) mode) =
+      (m : (a, l * allowed) mode) ~log =
     match disallow_left m with
     | Amode (a, _a_hint_lower, a_hint_upper) ->
       if C.le obj a (C.min obj)
@@ -2534,7 +2532,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       else
         let u = fresh ~level obj in
         let mu = Amorphvar (u, C.id, Id) in
-        submode_mvmv ~allow_rigid:false H.Pinpoint.unknown obj ~log:None mu mv
+        submode_mvmv ~allow_rigid:false H.Pinpoint.unknown obj ~log mu mv
         |> Result.get_ok;
         allow_left (Amodevar mu), true
     | Amodemeet (a, a_hint, mvs) ->
@@ -2550,13 +2548,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       else
         let u = fresh ~level obj in
         let mu = Amorphvar (u, C.id, Id) in
-        submode_mvc ~allow_rigid:false H.Pinpoint.unknown obj ~log:None mu a
-          a_hint
+        submode_mvc ~allow_rigid:false H.Pinpoint.unknown obj ~log mu a a_hint
         |> Result.get_ok;
         VarMap.iter
           (fun _ mv ->
-            submode_mvmv ~allow_rigid:false H.Pinpoint.unknown obj ~log:None mu
-              mv
+            submode_mvmv ~allow_rigid:false H.Pinpoint.unknown obj ~log mu mv
             |> Result.get_ok)
           mvs;
         allow_left (Amodevar mu), true
