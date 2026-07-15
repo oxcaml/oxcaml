@@ -1194,9 +1194,8 @@ let recover_comparison_primitive dacc (prim : P.binary_primitive) ~arg1 ~arg2 =
                   match DE.find_comparison_result (DA.denv dacc) var with
                   | None -> None
                   | Some comp ->
-                    Some
-                      (Comparison_result.convert_result_compared_to_tagged_zero
-                         comp op))
+                    Comparison_result.convert_result_compared_to_tagged_zero
+                      comp op)
             | _ -> None)
       in
       match try_one_direction arg1 arg2 op with
