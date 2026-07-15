@@ -1,6 +1,5 @@
 (* TEST
  modules = "block_checks.ml";
- include ocamlcommon;
  flambda2;
  stack-allocation;
  {
