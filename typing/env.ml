@@ -2917,8 +2917,18 @@ let components_of_functor_appl ~loc ~f_path ~f_comp ~arg env =
        because of the call to [check_well_formed_module]. *)
     let mty = Subst.modtype (Rescope (Path.scope p)) sub f_comp.fcomp_res in
     let addr = Lazy_backtrack.create_failed Not_found in
-    !check_well_formed_module env loc
-      ("the signature of " ^ Path.name p) mty;
+    let can_load_cmis =
+      match Persistent_env.can_load_cmis !persistent_env with
+      | Persistent_env.Can_load_cmis -> true
+      | Persistent_env.Cannot_load_cmis _ -> false
+    in
+    (* If cmis cannot be loaded (e.g. when the printer of another error forces
+       this application), lookups made by the well-formedness check can fail
+       spuriously. In that case, we skip the check and don't cache the
+       components so that the check runs on a later forcing. *)
+    if can_load_cmis then
+      !check_well_formed_module env loc
+        ("the signature of " ^ Path.name p) mty;
     let shape_arg =
       shape_of_path ~namespace:Shape.Sig_component_kind.Module env arg
     in
@@ -2930,7 +2940,7 @@ let components_of_functor_appl ~loc ~f_path ~f_comp ~arg env =
         env Subst.identity p addr (Subst.Lazy.of_modtype mty)
         fcomp_res_mode shape
     in
-    Hashtbl.add f_comp.fcomp_cache arg comps;
+    if can_load_cmis then Hashtbl.add f_comp.fcomp_cache arg comps;
     comps
 
 (* Define forward functions *)
