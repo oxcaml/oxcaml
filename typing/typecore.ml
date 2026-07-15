@@ -360,7 +360,7 @@ end = struct
      duplication. *)
 
   let deep_copy_desc copy = function
-    | Tvar _ | Tnil | Tunivar _ as desc -> desc
+    | Tvar _ | Tnil | Tunivar _ | Tof_kind _ as desc -> desc
     | Tvariant _ as desc ->
         (* The row_desc does contain some type exprs, but:
            - the absence of specific handling hasn't been reported as
@@ -388,14 +388,11 @@ end = struct
         let (pack_path, pack_cstrs) =
           deep_copy_package copy pack_path pack_cstrs in
         Tpackage {pack_path; pack_cstrs}
-    | Tlink _ | Tsubst _ -> assert false
-    (* TODO: Maybe not safe like Tlink and TSubst *)
     | Tquote t -> Tquote (copy t)
     | Tsplice t -> Tsplice (copy t)
     | Tquote_eval t -> Tquote_eval (copy t)
-    (* TODO: Not sure about the way to deep copy the following. *)
-    | (Trepr _ | Tof_kind _) as desc -> desc
-
+    | Trepr (t, tl) -> Trepr (copy t, tl)
+    | Tlink _ | Tsubst _ -> assert false
 
   (* Typing_recovery: deep copy types in errors, to keep them meaningful after
      backtracking *)
