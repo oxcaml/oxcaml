@@ -104,3 +104,20 @@ let () =
     clean_skiplist (nturns*(npar/2)) ;
   done ;
   ()
+
+external hammer_skiplist_randomly_in_range_setup : int -> unit
+  = "hammer_skiplist_randomly_in_range_setup"
+
+external hammer_skiplist_randomly_in_range : unit -> unit
+  = "hammer_skiplist_randomly_in_range"
+
+let () =
+  let n_domains = 4 in
+  hammer_skiplist_randomly_in_range_setup n_domains;
+  let domains_list =
+    List.init n_domains (fun i -> Domain.spawn (fun () ->
+      hammer_skiplist_randomly_in_range ()))
+  in
+  ignore(List.iter Domain.join domains_list);
+  assert (cardinal_skiplist() = 0);
+  clean_skiplist (-1)
