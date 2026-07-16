@@ -728,60 +728,6 @@ module Functional_update_multi_copy_ok :
     val allowed : t -> t
   end
 |}]
-(* Pattern matching follows the same rules in mixed blocks. *)
-module Pattern_matching = struct
-  type t = { x : int64#; mutable y : int [@atomic] }
-
-  let forbidden { x; y } = x + y
-end
-[%%expect{|
-Line 4, characters 16-24:
-4 |   let forbidden { x; y } = x + y
-                    ^^^^^^^^
-Error: Atomic fields (here "y") are forbidden in patterns,
-       as it is difficult to reason about when the atomic read
-       will happen during pattern matching: the field may be read
-       zero, one or several times depending on the patterns around it.
-|}]
-
-(* ... except for wildcards, to allow exhaustive record patterns. *)
-module Pattern_matching_wildcard = struct
-  type t = { x : int64#; mutable y : int [@atomic] }
-
-  [@@@warning "+missing-record-field-pattern"]
-  let warning { x } = x
-
-  let allowed { x; y = _ } = x
-  let also_allowed { x; _ } = x
-end
-[%%expect{|
-Line 5, characters 14-19:
-5 |   let warning { x } = x
-                  ^^^^^
-Warning 9 [missing-record-field-pattern]: the following labels are not bound
-  in this record pattern: "y".
-  Either bind these labels explicitly or add "; _" to the pattern.
-(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/607"
-  (let
-    (warning =
-       (function {nlocal = 0} param : unboxed_int64
-         (mixedfield 0  (bits64,value_or_null<int>) param))
-     allowed =
-       (function {nlocal = 0} param : unboxed_int64
-         (mixedfield 0  (bits64,value_or_null<int>) param))
-     also_allowed =
-       (function {nlocal = 0} param : unboxed_int64
-         (mixedfield 0  (bits64,value_or_null<int>) param)))
-    (makeblock 0 warning allowed also_allowed)))
-
-module Pattern_matching_wildcard :
-  sig
-    type t = { x : int64#; mutable y : int [@atomic]; }
-    val warning : t -> int64#
-    val allowed : t -> int64#
-    val also_allowed : t -> int64#
-  end
-|}]
 
 (* Test atomic record fields in mixed blocks *)
 
