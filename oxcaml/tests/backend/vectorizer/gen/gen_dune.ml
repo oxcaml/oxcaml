@@ -193,6 +193,10 @@ let () =
      allocated block, must not be vectorized (the allocation is tracked so the
      read-after-write dependency is recorded). *)
   print_test ~filter_exit_code:1 "test_alloc_raw";
+  (* regression test: a load through statically allocated memory must be
+     recorded in the [unknown] partition, so that the read-after-write
+     dependency on an aliasing store is not missed. *)
+  print_test ~filter_exit_code:1 "test_static_raw";
   ()
 
 let () =

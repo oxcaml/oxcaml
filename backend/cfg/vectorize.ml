@@ -1452,6 +1452,17 @@ end = struct
           operations = Instruction.Id.Map.empty
         }
 
+      let non_empty_or_unknown set =
+        (* A points-to or access set that comes out empty may still involve
+           statically allocated memory: the result of a [Const_*] instruction
+           (which has no argument), and the address of an access whose
+           addressing mode has no register argument (e.g. [Ibased]), must be
+           mapped to [unknown]. Mapping them to the empty set would unsoundly
+           record the access against no partition at all, hiding memory
+           dependencies from the rest of the analysis. The empty set is reserved
+           for clobbered registers. *)
+        if Partition.Set.is_empty set then Partition.Set.unknown else set
+
       (* let partitions t = t.partitions *)
 
       let accesses t = t.accesses
@@ -1495,7 +1506,7 @@ end = struct
         let may_access_partitions =
           if may_access_any_partition
           then Partitions.all t.partitions
-          else Aliases.get_regs addr_args t.aliases
+          else non_empty_or_unknown (Aliases.get_regs addr_args t.aliases)
         in
         let value_to_store = Operation.non_address_args op in
         let may_point_to_partitions =
@@ -1514,7 +1525,8 @@ end = struct
         | None ->
           (* propagates from args to res *)
           let args_may_point_to_partitions =
-            Aliases.get_regs (Instruction.arguments instruction) t.aliases
+            non_empty_or_unknown
+              (Aliases.get_regs (Instruction.arguments instruction) t.aliases)
           in
           update_aliases t instruction args_may_point_to_partitions
         | Some op -> (
@@ -1539,7 +1551,9 @@ end = struct
               Aliases.get_regs non_address_args t.aliases
             in
             let addr_args = Operation.address_args op in
-            let may_access_partitions = Aliases.get_regs addr_args t.aliases in
+            let may_access_partitions =
+              non_empty_or_unknown (Aliases.get_regs addr_args t.aliases)
+            in
             update t ~may_access_partitions ~may_point_to_partitions ~is_atomic
               instruction op
           | Write _ ->
