@@ -35,77 +35,6 @@
 
 typedef int sync_retcode;
 
-#ifdef CAML_BARE_METAL
-
-Caml_inline int sync_mutex_create(sync_mutex * res)
-{
-  sync_mutex m = caml_stat_alloc_noexc(1);
-  if (m == NULL) return ENOMEM;
-  *res = m;
-  return 0;
-}
-
-Caml_inline int sync_mutex_destroy(sync_mutex m)
-{
-  caml_stat_free(m);
-  return 0;
-}
-
-Caml_inline int sync_mutex_lock(sync_mutex m)
-{
-  (void)m;
-  return 0;
-}
-
-#define MUTEX_PREVIOUSLY_UNLOCKED 0
-#define MUTEX_ALREADY_LOCKED EBUSY
-
-Caml_inline int sync_mutex_trylock(sync_mutex m)
-{
-  (void)m;
-  return MUTEX_PREVIOUSLY_UNLOCKED;
-}
-
-Caml_inline int sync_mutex_unlock(sync_mutex m)
-{
-  (void)m;
-  return 0;
-}
-
-Caml_inline int sync_condvar_create(sync_condvar * res)
-{
-  sync_condvar c = caml_stat_alloc_noexc(1);
-  if (c == NULL) return ENOMEM;
-  *res = c;
-  return 0;
-}
-
-Caml_inline int sync_condvar_destroy(sync_condvar c)
-{
-  caml_stat_free(c);
-  return 0;
-}
-
-Caml_inline int sync_condvar_signal(sync_condvar c)
-{
-  (void)c;
-  return 0;
-}
-
-Caml_inline int sync_condvar_broadcast(sync_condvar c)
-{
-  (void)c;
-  return 0;
-}
-
-Caml_inline int sync_condvar_wait(sync_condvar c, sync_mutex m)
-{
-  (void)c;
-  (void)m;
-  return 0;
-}
-
-#else /* !CAML_BARE_METAL */
 
 /* Mutexes */
 
@@ -270,6 +199,5 @@ Caml_inline int sync_condvar_wait(sync_condvar c, sync_mutex m)
   return custom_condvar_wait(c, m);
 }
 
-#endif /* CAML_BARE_METAL */
 
 #endif /* CAML_SYNC_POSIX_H */

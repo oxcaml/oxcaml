@@ -949,6 +949,9 @@ fail_domain:
   caml_plat_unlock(&all_domains_lock);
 }
 
+/* Fork support; only reachable via [caml_atfork_hook] from the unix
+   library's fork.  No processes on bare metal, so not compiled there. */
+#ifndef CAML_BARE_METAL
 CAMLexport void caml_reset_domain_lock(void)
 {
   dom_internal* self = domain_self;
@@ -972,6 +975,7 @@ CAMLexport void caml_reset_domain_lock(void)
 
   return;
 }
+#endif /* !CAML_BARE_METAL */
 
 /* minor heap initialization and resizing */
 
@@ -2341,9 +2345,9 @@ static bool tick_thread_wait(void)
 
 #ifndef CAML_BARE_METAL
 static int tick_thread_open_fds(void) { return 0; }
-#endif
 static int tick_thread_close_fds(void) { return 0; }
 static void tick_thread_wake(void) {}
+#endif
 
 #endif
 
@@ -2383,8 +2387,8 @@ CAMLextern void caml_stop_tick_thread(void)
   }
   caml_plat_unlock(&tick_thread.mutex);
 }
-#endif /* !CAML_BARE_METAL */
 
+/* Fork support (see caml_atfork_default); no fork on bare metal. */
 static void tick_thread_reset(void)
 {
   /* Reset the state of the tick thread in the child process after fork().
@@ -2403,6 +2407,7 @@ static void tick_thread_reset(void)
     caml_start_tick_thread();
   }
 }
+#endif /* !CAML_BARE_METAL */
 
 /* Compute the interval at which the tick thread will tick. */
 CAMLextern uintnat caml_effective_tick_interval_usec(void) {
@@ -2578,12 +2583,16 @@ CAMLprim value caml_enable_tick_thread(value v_enable)
 CAMLprim intnat caml_domain_set_tick_interval_usec(intnat interval_usec)
 {
   atomic_store_relaxed(&domain_self->tick_interval_usec, interval_usec);
+#ifndef CAML_BARE_METAL
+  /* No tick thread on bare metal: the request is recorded but no ticks
+     will ever be delivered. */
   if (interval_usec != 0) {
     caml_start_tick_thread();
   }
   /* NOTE: We don't worry too much about spurious wakes here, since we assume
      changing the tick interval is uncommon */
   tick_thread_wake();
+#endif
 
   return 0;
 }
@@ -2665,7 +2674,10 @@ CAMLexport void caml_bt_exit_ocaml(void)
   }
 }
 
-/* default handler for unix_fork, will be called by unix_fork. */
+/* default handler for unix_fork, will be called by unix_fork.
+   No fork on bare metal: not compiled there (the hook is only invoked
+   from the unix library). */
+#ifndef CAML_BARE_METAL
 static void caml_atfork_default(void)
 {
   caml_reset_domain_lock();
@@ -2677,6 +2689,7 @@ static void caml_atfork_default(void)
 }
 
 CAMLexport void (*caml_atfork_hook)(void) = caml_atfork_default;
+#endif /* !CAML_BARE_METAL */
 
 static inline int domain_terminating(dom_internal *d) {
   return d->terminating;

@@ -26,8 +26,15 @@
 #include "caml/sys.h"
 #include "caml/runtime_events.h"
 
-/* System-dependent part */
+/* System-dependent part.  On bare metal there are no threads: the
+   [Mutex]/[Condition] machinery below is compiled out entirely (its
+   only runtime-internal users are in the MULTIDOMAIN spawn path), so a
+   program using those modules fails at link time.  Only
+   [caml_check_error] remains, as it is a generic error helper used
+   elsewhere in the runtime. */
+#ifndef CAML_BARE_METAL
 #include "sync_posix.h"
+#endif
 
 /* Reporting errors */
 
@@ -49,6 +56,8 @@ CAMLexport void caml_check_error(int retcode, char const * msg)
   memcpy(&Byte(str, msglen + 2), err, errlen);
   caml_raise_sys_error(str);
 }
+
+#ifndef CAML_BARE_METAL
 
 /* Mutex operations */
 
@@ -211,3 +220,5 @@ CAMLprim value caml_ml_condition_broadcast(value wrapper)
                  "Condition.broadcast");
   return Val_unit;
 }
+
+#endif /* !CAML_BARE_METAL */

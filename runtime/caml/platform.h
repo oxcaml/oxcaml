@@ -488,8 +488,6 @@ Caml_inline int caml_plat_try_lock(caml_plat_mutex* m)
   return 1;
 }
 
-CAMLextern void caml_plat_lock_non_blocking_actual(caml_plat_mutex* m);
-
 Caml_inline void caml_plat_lock_non_blocking(caml_plat_mutex* m)
 {
   caml_plat_try_lock(m);

@@ -75,36 +75,23 @@ void caml_plat_fatal_error(const char * action, int err)
 
 #ifdef CAML_BARE_METAL
 
+/* Single core, no threads: mutexes, condition variables and barrier
+   waits are no-ops -- this is the correct single-threaded
+   implementation, and these are called by the runtime core (GC, STW,
+   channels).  Helpers with no bare-metal caller (assertions, futexes,
+   mutex reinit for fork, the non-blocking slow path) are deliberately
+   not defined. */
+
 CAMLexport void caml_plat_mutex_init(caml_plat_mutex * m)
 {
   (void)m;
 }
 
-void caml_plat_assert_locked(caml_plat_mutex* m)
-{
-  (void)m;
-}
-
-CAMLexport CAMLthread_local int caml_lockdepth = 0;
-
 void caml_plat_assert_all_locks_unlocked(void)
 {
-#ifdef DEBUG
-  if (caml_lockdepth) caml_fatal_error("Locks still locked at termination");
-#endif
-}
-
-CAMLexport void caml_plat_lock_non_blocking_actual(caml_plat_mutex* m)
-{
-  (void)m;
 }
 
 void caml_plat_mutex_free(caml_plat_mutex* m)
-{
-  (void)m;
-}
-
-CAMLexport void caml_plat_mutex_reinit(caml_plat_mutex *m)
 {
   (void)m;
 }
@@ -133,29 +120,6 @@ void caml_plat_signal(caml_plat_cond* cond)
 void caml_plat_cond_free(caml_plat_cond* cond)
 {
   (void)cond;
-}
-
-void caml_plat_futex_wait(caml_plat_futex* futex,
-                          caml_plat_futex_value undesired)
-{
-  (void)futex;
-  (void)undesired;
-}
-
-void caml_plat_futex_wake_all(caml_plat_futex* futex)
-{
-  (void)futex;
-}
-
-void caml_plat_futex_init(caml_plat_futex* ftx,
-                          caml_plat_futex_value value)
-{
-  ftx->value = value;
-}
-
-void caml_plat_futex_free(caml_plat_futex* ftx)
-{
-  (void)ftx;
 }
 
 void caml_plat_latch_release(caml_plat_binary_latch* latch)

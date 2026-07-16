@@ -51,7 +51,9 @@
 
 CAMLexport atomic_uintnat caml_pending_signals[NSIG_WORDS];
 
+#ifndef CAML_BARE_METAL
 static caml_plat_mutex signal_install_mutex = CAML_PLAT_MUTEX_INITIALIZER;
+#endif
 
 /* Only used in signals_nat.c, but defined here to avoid link errors
    on bytecode builds */
@@ -789,7 +791,13 @@ void caml_terminate_signals(void)
 #endif
 }
 
-/* Installation of a signal handler (as per [Sys.signal]) */
+/* Installation of a signal handler (as per [Sys.signal]).
+
+   There are no OS signals on bare metal, so the installer is not
+   defined there: a program using [Sys.signal] fails at link time.  (An
+   application can still inject signals from its own interrupt handlers
+   via [caml_record_signal] and provide its own installer if wanted.) */
+#ifndef CAML_BARE_METAL
 
 static void handle_signal(int signal_number)
 {
@@ -885,3 +893,5 @@ CAMLprim value caml_install_signal_handler(value signal_number, value action)
   caml_plat_unlock(&signal_install_mutex);
   caml_sys_error(NO_ARG);
 }
+
+#endif /* !CAML_BARE_METAL */
