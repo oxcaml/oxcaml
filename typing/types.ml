@@ -28,6 +28,10 @@ module Rigid_name = struct
         }
     | KAtom of Path.t
     | Param of int
+    | Provenance of
+        { id : int;
+          ty : string
+        }
     | Unknown of unknown_id
 
   let compare a b =
@@ -40,13 +44,16 @@ module Rigid_name = struct
         if h != 0 then h else Int.compare a1.arg_index a2.arg_index
       | KAtom p1, KAtom p2 -> Path.compare p1 p2
       | Param x, Param y -> Int.compare x y
+      | Provenance x, Provenance y -> Int.compare x.id y.id
       | Atom _, _ -> -1
       | _, Atom _ -> 1
       | KAtom _, _ -> -1
       | _, KAtom _ -> 1
+      | Param _, _ -> -1
+      | _, Param _ -> 1
+      | Provenance _, _ -> -1
+      | _, Provenance _ -> 1
       | Unknown x, Unknown y -> Shape.Uid.compare x y
-      | Unknown _, _ -> 1
-      | _, Unknown _ -> -1
 
   let to_string = function
     | Atom { constr; arg_index } ->
@@ -56,6 +63,7 @@ module Rigid_name = struct
       let path_s = Format_doc.asprintf "%a" Path.print path in
       Printf.sprintf "katom[%s]" path_s
     | Param i -> Printf.sprintf "param[%d]" i
+    | Provenance { id; ty } -> Printf.sprintf "provenance[%d:%s]" id ty
     | Unknown id ->
       Format.asprintf "unknown[%a]" Shape.Uid.print id
 
@@ -64,6 +72,8 @@ module Rigid_name = struct
   let katom path = KAtom path
 
   let param i = Param i
+
+  let provenance ~id ~ty = Provenance { id; ty }
 
   let unknown uid = Unknown uid
 end

@@ -111,6 +111,14 @@ module Rigid_name : sig
         (** [Param id] only occurs in formulas for type constructors. Refers to
             a type-parameter of the constructor, where [id] is the
             [Types.get_id] of the type variable representing the parameter. *)
+    | Provenance of
+        { id : int;
+          ty : string
+        }
+        (** A provenance variable introduced while translating a type expression
+            for error reporting. The integer identifies the occurrence, and
+            [ty] describes the corresponding type expression. These variables
+            are diagnostic-only and must not appear in stored [type_ikind]s. *)
     | Unknown of unknown_id
         (** An unknown quantity with a given id. Used to model not-best in
             ikinds. This is used when we couldn't compute a precise ikind,
@@ -127,6 +135,8 @@ module Rigid_name : sig
   val katom : Path.t -> t
 
   val param : int -> t
+
+  val provenance : id:int -> ty:string -> t
 
   val unknown : Shape.Uid.t -> t
 
