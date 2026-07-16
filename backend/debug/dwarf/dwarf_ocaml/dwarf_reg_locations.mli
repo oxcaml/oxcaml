@@ -14,6 +14,7 @@
 
 (** Construction of DWARF location descriptions for registers. *)
 
+open! Dwarf_high
 open! Dwarf_low
 
 val reg_location_description :
@@ -21,3 +22,12 @@ val reg_location_description :
   offset:Stack_reg_offset.t option ->
   need_rvalue:bool ->
   Simple_location_description.t
+
+(** An rvalue whose value is the address of the given symbol, referencing the
+    symbol in the manner required by its visibility. (In particular, local
+    symbols are defined as assembler-temporary labels, not linker symbols, and
+    must be referenced as such.) *)
+val address_of_cmm_symbol_rvalue :
+  Cmm.symbol ->
+  Simple_location_description_lang.normal
+  Simple_location_description_lang.rvalue
