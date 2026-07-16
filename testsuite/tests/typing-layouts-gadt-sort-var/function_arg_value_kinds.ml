@@ -12,6 +12,53 @@ type 'a rep = Block : (int * int) rep | Int : int rep
 type 'a rep = Block : (int * int) rep | Int : int rep
 |}]
 
+(* The second parameter's kind must not be the (int * int) tuple kind from
+   the [Block] equation. *)
+let f : type a. a rep -> a -> int = fun Block (a, _b) -> a
+[%%expect{|
+(let
+  (f =
+     (function {nlocal = 0} param[value<int>]
+       param[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+       : int
+       (if param
+         (raise (makeblock 0 (getpredef Match_failure!!) [0: "" 1 40]))
+         (field_imm 0 param))))
+  (apply (field_imm 1 (global Toploop!)) "f" f))
+val f : 'a rep -> 'a -> int = <fun>
+|}]
+
+(* Same for a total match: the kind of [x] must not come from the [Block]
+   branch's pattern type. *)
+let g : type a. a rep -> a -> int = fun r x ->
+  match r, x with Block, (a, _b) -> a | Int, y -> y
+[%%expect{|
+(let
+  (g = (function {nlocal = 0} r[value<int>] x : int (if r x (field_imm 0 x))))
+  (apply (field_imm 1 (global Toploop!)) "g" g))
+val g : 'a rep -> 'a -> int = <fun>
+|}]
+
+(* [@local] functions: the same applies to the catch parameters' kinds. *)
+let h b =
+  let[@local] f : type a. a rep -> a -> int = fun Block (a, _b) -> a in
+  if b then f Block (1, 2) else f Int 0
+[%%expect{|
+(let
+  (h =
+     (function {nlocal = 0} b[value<int>] : int
+       (catch (if b (exit 9 0 [0: 1 2]) (exit 9 1 0))
+        with (9 param[value<int>] param[value<
+                                         (consts ())
+                                          (non_consts ([0: value<int>,
+                                                        value<int>]))>])
+         (if param
+           (raise (makeblock 0 (getpredef Match_failure!!) [0: "" 2 50]))
+           (field_imm 0 param)))))
+  (apply (field_imm 1 (global Toploop!)) "h" h))
+val h : bool -> int = <fun>
+|}]
+
 (* Control: no GADT narrowing involved. The parameter's kind must stay
    precise. *)
 let fst2 (p : int * int) = match p with a, _b -> a
@@ -35,6 +82,56 @@ let get (o : int option) = match o with Some x -> x | None -> 0
        : int (if o (field_imm 0 o) 0)))
   (apply (field_imm 1 (global Toploop!)) "get" get))
 val get : int option -> int = <fun>
+|}]
+
+(* Sound cases: the refinement below is implied by more than the matched
+   pattern. *)
+
+(* Sound: the function's own type already determines the argument type; no
+   GADT equation is needed for precision. *)
+let i : (int * int) rep -> int * int -> int = fun Block (a, _b) -> a
+[%%expect{|
+(let
+  (i =
+     (function {nlocal = 0} param[value<int>]
+       param[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+       : int (field_imm 0 param)))
+  (apply (field_imm 1 (global Toploop!)) "i" i))
+val i : (int * int) rep -> int * int -> int = <fun>
+|}]
+
+(* Sound: the equation from matching [r] is established before the inner
+   closures are built, so it holds for every call of those closures. *)
+let j (type a) (r : a rep) : a -> int =
+  match r with Block -> (fun (a, _b) -> a) | Int -> fun x -> x
+[%%expect{|
+(let
+  (j =
+     (function {nlocal = 0} r[value<int>]
+       (if r (function {nlocal = 0} x[value<int>] : int x)
+         (function {nlocal = 0}
+           param[value<
+                  (consts ()) (non_consts ([0: value<int>, value<int>]))>]
+           : int (field_imm 0 param)))))
+  (apply (field_imm 1 (global Toploop!)) "j" j))
+val j : 'a rep -> 'a -> int = <fun>
+|}]
+
+(* Sound: a single-constructor GADT; every caller's instantiation satisfies
+   the equation, and the total match lets the kind stay precise. *)
+type _ only = Only : (int * int) only
+
+let k : type a. a only -> a -> int = fun Only (a, _b) -> a
+[%%expect{|
+0
+type _ only = Only : (int * int) only
+(let
+  (k =
+     (function {nlocal = 0} param[value<int>]
+       param[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+       : int (field_imm 0 param)))
+  (apply (field_imm 1 (global Toploop!)) "k" k))
+val k : 'a only -> 'a -> int = <fun>
 |}]
 
 (* Sound: a total multi-case GADT match; the parameter's kind is the join of
@@ -135,4 +232,21 @@ type _ rep3 = RF : fa rep3 | RG : fb rep3
          (mixedfield 0  (value<int>,float64) (field_imm 1 param)))))
   (apply (field_imm 1 (global Toploop!)) "mixed_flat" mixed_flat))
 val mixed_flat : 'a rep3 * 'a -> int = <fun>
+|}]
+
+(* A parameter following a partial GADT match gets its kind from the
+   function's own type, which the caller must satisfy, rather than from the
+   pattern's environment, which contains the equations. *)
+let p : type a. a rep -> int * int -> int = fun Block (x, _y) -> x
+[%%expect{|
+(let
+  (p =
+     (function {nlocal = 0} param[value<int>]
+       param[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+       : int
+       (if param
+         (raise (makeblock 0 (getpredef Match_failure!!) [0: "" 1 48]))
+         (field_imm 0 param))))
+  (apply (field_imm 1 (global Toploop!)) "p" p))
+val p : 'a rep -> int * int -> int = <fun>
 |}]
