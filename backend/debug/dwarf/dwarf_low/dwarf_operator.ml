@@ -535,33 +535,6 @@ let opcode = function
   | DW_op_entry_value _ -> 0xa3
   | DW_op_GNU_entry_value _ -> 0xf3
 
-(* The size of an operator that may appear inside the block operand of
-   [DW_op_entry_value] / [DW_op_GNU_entry_value]. Such blocks hold a DWARF
-   expression, but only register location descriptions are currently supported:
-   the size of the block must be known up front in order to construct its
-   ULEB128 length prefix, and computing the size of an arbitrary nested
-   expression would require [size] itself, which is not available inside the
-   generic traversal below. *)
-let entry_value_block_operator_size t =
-  match t with
-  | DW_op_reg0 | DW_op_reg1 | DW_op_reg2 | DW_op_reg3 | DW_op_reg4 | DW_op_reg5
-  | DW_op_reg6 | DW_op_reg7 | DW_op_reg8 | DW_op_reg9 | DW_op_reg10
-  | DW_op_reg11 | DW_op_reg12 | DW_op_reg13 | DW_op_reg14 | DW_op_reg15
-  | DW_op_reg16 | DW_op_reg17 | DW_op_reg18 | DW_op_reg19 | DW_op_reg20
-  | DW_op_reg21 | DW_op_reg22 | DW_op_reg23 | DW_op_reg24 | DW_op_reg25
-  | DW_op_reg26 | DW_op_reg27 | DW_op_reg28 | DW_op_reg29 | DW_op_reg30
-  | DW_op_reg31 ->
-    (* Just the opcode; no operands. *)
-    I.one ()
-  | DW_op_regx { reg_number } ->
-    I.add (I.one ())
-      (V.size (V.uleb128 (Numbers.Uint64.of_nonnegative_int_exn reg_number)))
-  | _ ->
-    Misc.fatal_errorf
-      "Operator not currently supported inside the block of an entry-value \
-       operator: %s"
-      (opcode_name t)
-
 external caml_string_set32 : bytes -> index:int -> Int32.t -> unit
   = "%caml_string_set32"
 
@@ -580,6 +553,12 @@ module Make (M : sig
   val value : param -> V.t -> result
 
   val ( >>> ) : param -> result -> (unit -> result) -> result
+
+  (* The size of a DWARF expression (a list of operators), as needed to
+     construct the ULEB128 length prefixes of block operands. For the [Size]
+     instance below this is defined recursively; the other instances use
+     [size_of_expression]. *)
+  val size_of_expression : t list -> I.t
 end) =
 struct
   let rec run param t =
@@ -751,20 +730,38 @@ struct
       value (V.sleb128 ~comment:"offset in bytes" offset_in_bytes)
     | DW_op_entry_value { block } | DW_op_GNU_entry_value { block } ->
       (* The operand is a ULEB128-length-prefixed block holding a DWARF
-         expression, currently always a single register location description
-         (see [entry_value_block_operator_size]). The operators in the block are
-         printed, sized and emitted using the normal machinery, via the
-         recursive calls to [run]. *)
-      let block_size =
-        List.fold_left
-          (fun acc op -> I.add acc (entry_value_block_operator_size op))
-          (I.zero ()) block
-      in
+         expression. The operators in the block are printed, sized and emitted
+         using the normal machinery, via the recursive calls to [run]. *)
+      let block_size = M.size_of_expression block in
       List.fold_left
         (fun acc op -> acc >>> fun () -> run param op)
         (value (V.uleb128 ~comment:"block length" (I.to_uint64_exn block_size)))
         block
 end
+
+module rec Size : sig
+  val run : unit -> t -> I.t
+end = Make (struct
+  type param = unit
+
+  type result = I.t
+
+  let unit_result () = I.zero ()
+
+  let opcode () _ = I.one ()
+
+  let value () v = V.size v
+
+  let ( >>> ) () size f = I.add size (f ())
+
+  let size_of_expression ops =
+    List.fold_left (fun acc op -> I.add acc (Size.run () op)) (I.zero ()) ops
+end)
+
+let size t = Size.run () t
+
+let size_of_expression ops =
+  List.fold_left (fun acc op -> I.add acc (size op)) (I.zero ()) ops
 
 module Print = Make (struct
   type param = Format.formatter
@@ -780,20 +777,8 @@ module Print = Make (struct
   let ( >>> ) ppf () f =
     Format.pp_print_string ppf " ";
     f ()
-end)
 
-module Size = Make (struct
-  type param = unit
-
-  type result = I.t
-
-  let unit_result () = I.zero ()
-
-  let opcode () _ = I.one ()
-
-  let value () v = V.size v
-
-  let ( >>> ) () size f = I.add size (f ())
+  let size_of_expression = size_of_expression
 end)
 
 module Emit = Make (struct
@@ -811,10 +796,10 @@ module Emit = Make (struct
   let value asm_directives v = V.emit ~asm_directives v
 
   let ( >>> ) _asm_directives () f = f ()
+
+  let size_of_expression = size_of_expression
 end)
 
 let print ppf t = Print.run ppf t
-
-let size t = Size.run () t
 
 let emit ~asm_directives t = Emit.run asm_directives t
