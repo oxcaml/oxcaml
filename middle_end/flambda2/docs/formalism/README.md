@@ -45,8 +45,8 @@ the sync protocol below says what to do.
 
 ## Status & validation
 
-As of 2026-07-14 the formalism has **443 rules** across chapters 02-20:
-**293 normative** (the code must satisfy them), **65 descriptive** (current
+As of 2026-07-16 the formalism has **449 rules** across chapters 02-20:
+**298 normative** (the code must satisfy them), **66 descriptive** (current
 algorithms/heuristics that may change), and **85 conjectured** (believed but not
 yet checked against the code). Counts and per-chapter breakdown are regenerated
 in [`rule-index.md`](rule-index.md).
@@ -82,6 +82,17 @@ composes with Simplify's to cover `source → Simplify → to_cmm → Cmm`. Scop
 64-bit little-endian (matching the code, which rejects 32-bit); the Stage-2
 representation model localizes the `float32_double_round` bug to Simplify's fold
 rather than the lowering ([`18`](18-to-cmm-data.md), [`20`](20-to-cmm-soundness.md) §5).
+
+SIMD vectors are formalized end to end (promoted from "out of scope"
+2026-07-16): naked-vector values and constants ([`04`](04-opsem.md) §1.1),
+`Reinterpret_boxed_vector` ([`05`](05-primitives-scalar.md)), the 128/256/512-bit
+string/bytes/bigstring accessors and SIMD reinterpret array access with their
+frontend bounds/alignment checks ([`06`](06-primitives-memory.md)), and the
+Cmm-level story — vector machtypes/chunks/constants, the tag-0 all-flat
+boxed-vector layout, unaligned access discipline, and the fixed unboxed-vector
+array tags ([`15`](15-cmm.md)–[`18`](18-to-cmm-data.md)). Only the vector
+*arithmetic* intrinsics remain out of scope: they never appear as Flambda
+primitives ([`01`](01-overview.md), scope ledger).
 
 Companion prose (not part of the formalism, but authoritative background) lives
 in the parent directory: [`../types.md`](../types.md),
@@ -165,7 +176,8 @@ runtime value grammar, spelled with these canonical constructor names (owned by
 v ::= tagged_imm n        -- kind Value: an OCaml "int"
     | naked_imm n         -- kind Naked_immediate (tags, switch scrutinees)
     | naked_int8 n | naked_int16 n | naked_int32 n | naked_int64 n | naked_nativeint n
-    | naked_float f | naked_float32 f | naked_vec128 … | …
+    | naked_float f | naked_float32 f
+    | naked_vec128 b | naked_vec256 b | naked_vec512 b
     | ptr a               -- kind Value: pointer to the heap object at address a
     | clos ℓ f            -- kind Value: pointer to function slot f of a closure block
     | null                -- kind Value: the null pointer

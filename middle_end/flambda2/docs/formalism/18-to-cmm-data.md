@@ -209,20 +209,45 @@ STATUS normative
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#box_number
 CODE backend/cmm_helpers.ml#box_int_gen
 CODE backend/cmm_helpers.ml#unbox_int
+CODE backend/cmm_helpers.ml#box_vector
+CODE backend/cmm_helpers.ml#unbox_vector
 ---
 Box_number κ:   ⟦naked κ c⟧ ⤳ a Calloc of the boxed layout for κ (R.Obj.Boxed):
   float  → box_float  (double_tag block, value at offset 0)
   float32/int32/int64/nativeint → box_int_gen / box_float32 (custom block: ops word
     then payload; int32 stored sign-extended (LE) or ≪32 (BE))
+  vec128/256/512 → box_vecN (tag-0 all-flat mixed block: header then the bit
+    pattern; Alloc_block_kind_vecN)
 Unbox_number κ: ⟦ptr a⟧ ⤳ a load of the payload:
-  float → Cop(Cload Double,[a]);  others → Cop(Cload chunk,[Cadda(a, 8)])  (skip ops word)
+  float → Cop(Cload Double,[a]);  vec → Cop(Cload OnetwentyeightN_unaligned etc.,[a])
+  others → Cop(Cload chunk,[Cadda(a, 8)])  (skip ops word)
 --------------------------------------------------
 Commutes with ≈: Box_number allocates an object o = Boxed(κ, c) with o @ a ≈ₒ M′
 (R.Obj.Boxed) and returns ptr a; Unbox_number reads back c. undef-free.
 NOTES: unbox loads at offset size_addr = 8 for custom blocks (skipping the ops
-pointer), at 0 for a bare float. ENDIANNESS-DEPENDENT for int32 (box_int_gen). Cmm
-image of P.Unary.BoxNumber / UnboxNumber (06). Allocation detail (heap vs local,
-GC) in 19.
+pointer), at 0 for a bare float or a boxed vector (which has no ops word).
+Vector unboxing always uses the UNALIGNED chunk (boxed vectors are only
+word-aligned by the GC), and unbox_vector has two peepholes: a directly-nested
+matching Calloc cancels to its payload (box∘unbox elimination at the Cmm level),
+and a Cconst_symbol whose statically-boxed constant is known becomes a
+Cconst_vecN (structured_constant_of_sym). ENDIANNESS-DEPENDENT for int32
+(box_int_gen). Cmm image of P.Unary.BoxNumber / UnboxNumber (06). Allocation
+detail (heap vs local, GC) in 19.
+```
+
+```rule
+RULE TC.Prim.ReinterpretBoxedVector
+STATUS normative
+CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
+---
+Reinterpret_boxed_vector:  ⟦arg⟧ ⤳ arg
+--------------------------------------------------
+Commutes with ≈ trivially: the same Cmm value represents both readings, because a
+boxed vector and an all-flat tag-0 mixed tuple block of the same width are laid
+out identically (R.Obj.Boxed vector case vs. R.Obj.MixedBlock with p = 0).
+NOTES: The translation is literally the identity (`Reinterpret_boxed_vector ->
+None, res, arg`): no load, no allocation, no cast. Cmm image of
+P.Unary.ReinterpretBoxedVector (05).
 ```
 
 ## 4. Blocks
@@ -365,14 +390,19 @@ CODE backend/cmm_helpers.ml#unaligned_load_16
 String/Bytes/Bigstring load (width w, index j untagged):  ⟦str; j⟧ ⤳
   Cop(Cload{chunk(w)}, [add_int_ptr base j])   where base = str (heap) or the data
   pointer loaded from field 1 (bigstring, ptr_out_of_heap); chunk per width
-  (Byte_unsigned/…/unaligned_load_16/32/64/f32)
+  (Byte_unsigned/…/unaligned_load_16/32/64/f32; the vector widths select the
+  16/32/64-byte vector chunk, `_aligned` iff the width carries {aligned = true})
 --------------------------------------------------
-Commutes with ≈: reads the w-byte little-endian scalar at byte offset j of the
-byte sequence (R.Obj.Bytes; 06 P.Binary.StringOrBigstringLoad).
+Commutes with ≈: reads the w-byte little-endian scalar (or vector bit pattern) at
+byte offset j of the byte sequence (R.Obj.Bytes; 06 P.Binary.StringOrBigstringLoad).
 NOTES: Unaligned multi-byte loads split into byte loads when
 ¬Arch.allow_unaligned_access, byte order per Arch.big_endian (unaligned_load_16);
 here LE with unaligned access allowed, so a single Cload. Bigstrings index off-heap
-memory (not under L). Cmm image of P.Binary.StringOrBigstringLoad.
+memory (not under L). An `_aligned` vector chunk is undef on a misaligned address
+(CM.Mem.LoadStore) — the frontend only guards this for bigstrings (06,
+P.Unchecked.WideAccess). Bytes_or_bigstring_set is the store dual
+(bytes_or_bigstring_set_aux), chunk selection identical. Cmm image of
+P.Binary.StringOrBigstringLoad / P.Ternary.BytesOrBigstringSet.
 ```
 
 ```rule
@@ -393,6 +423,35 @@ NOTES: array_indexing takes the TAGGED index and folds the untag into the scale
 CSE-eligible (13 §4.4). Value stores use caml_modify (heap) / caml_modify_local
 (local) / caml_initialize (init). Cmm image of P.Binary.ArrayLoad / P.Ternary.ArraySet.
 Out-of-bounds is undef (06, checks inserted by the frontend, P.Unchecked.*).
+Vector load/set kinds take the separate path below. Array_length on an unboxed
+vector array reads the header size and shifts by log2(words per element)
+(unboxed_vecN_array_length; R.Obj.Array).
+```
+
+```rule
+RULE TC.Prim.ArrayAccess.Vector
+STATUS normative
+CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load_vector
+CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_set_vector
+CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load
+---
+Array_load (ak, Naked_vecNs, μ) (index i tagged):  ⟦arr; i⟧ ⤳
+  C.unaligned_load_{128|256|512}(arr, (untag_int i) ≪ log2(w(ak)))
+Array_set (ak, Naked_vecNs):  ⟦arr; i; v⟧ ⤳ C.unaligned_set_{…} at the same address
+--------------------------------------------------
+Commutes with ≈: reads/writes the 16/32/64 bytes at byte offset i·w(ak) of the
+array's packed element storage (R.Obj.Array), i.e. the m = ⌈w_v/w(ak)⌉ elements
+starting at index i (06, P.Binary.ArrayLoad.Vector / P.Ternary.ArraySet.Vector).
+NOTES: The byte offset is scaled by the SOURCE array's element width
+(element_width_log2: int8→0, int16→1, int32/float32→2,
+imm/int/int64/nativeint/float→3, vec128→4, vec256→5, vec512→6), while the chunk
+width follows the LOAD/SET kind — this is exactly what makes cross-kind
+reinterpret access work. Unlike scalar array access, the index is untagged then
+shifted (untag_int + lsl) rather than folded by array_indexing. ALWAYS the
+`_unaligned` chunk, even for same-width vector arrays (unboxed vector arrays are
+only word-aligned). Vector access to a Values / Gc_ignorable_values array is a
+fatal error in array_load/array_set0, as are Unboxed_product sources (except
+vec128 loads from 2/4-vec128 products).
 ```
 
 ```rule
@@ -451,11 +510,13 @@ Simples / schema: `TC.Simple`, `TC.Prim.Sound`.
 Let-forms: `TC.Let.Simple`, `TC.Let.Prim`, `TC.Let.Subst`, `TC.Let.SetOfClosures`,
 `TC.Let.Static`.
 
-Tagging/boxing: `TC.Prim.TagUntag`, `TC.Prim.BoxUnbox`.
+Tagging/boxing: `TC.Prim.TagUntag`, `TC.Prim.BoxUnbox`,
+`TC.Prim.ReinterpretBoxedVector`.
 
 Blocks: `TC.Prim.MakeBlock`, `TC.Prim.BlockLoad`, `TC.Prim.BlockSet`.
 
 Closures: `TC.Prim.ProjectFunctionSlot`, `TC.Prim.ProjectValueSlot`.
 
 Conversions / strings / arrays: `TC.Prim.NumConv`, `TC.Prim.StringLoad`,
-`TC.Prim.ArrayAccess`, `TC.Prim.BigarrayAccess`, `TC.Prim.BigarrayLength`.
+`TC.Prim.ArrayAccess`, `TC.Prim.ArrayAccess.Vector`, `TC.Prim.BigarrayAccess`,
+`TC.Prim.BigarrayLength`.

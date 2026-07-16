@@ -21,7 +21,7 @@ and continuations, exactly as the code does (`flambda.mli` says terms are
 "represented up to alpha-conversion of bound variables and continuations").
 
 Everything about algebraic effects (the `Effect` call kind and the fibre/stack
-machinery), probes, and SIMD vector values is **out of scope**; see the scope
+machinery) and probes is **out of scope**; see the scope
 ledger in [01](01-overview.md). Those forms are enumerated below but not given
 transitions.
 
@@ -30,9 +30,7 @@ transitions.
 ### 1.1 Values
 
 The machine manipulates *runtime values*. A value has a kind ([§03](03-kinds.md)); the
-grammar below groups the value forms the semantics needs. Naked vectors and the
-exotic array element kinds are elided (marked `…`); they behave like the other
-naked numbers for the purposes of this chapter.
+grammar below groups the value forms the semantics needs.
 
 ```
 address   a  ::= ℓ            -- a dynamically-allocated heap location
@@ -40,9 +38,11 @@ address   a  ::= ℓ            -- a dynamically-allocated heap location
 
 value     v  ::= tagged_imm n           -- kind Value: an OCaml "int"
                | naked_imm n            -- kind Naked_immediate (tags, switch scrutinees)
+               | naked_int8 n | naked_int16 n
                | naked_int32 n | naked_int64 n | naked_nativeint n
                | naked_float f | naked_float32 f
-               | naked_vec128 … | …     -- naked vectors (elided)
+               | naked_vec128 b | naked_vec256 b | naked_vec512 b
+                                        -- naked SIMD vectors: b a 128/256/512-bit pattern
                | ptr a                  -- kind Value: pointer to the heap object at a
                | clos ℓ f               -- kind Value: pointer to function slot f of the
                                         --   set-of-closures block at ℓ
@@ -50,6 +50,15 @@ value     v  ::= tagged_imm n           -- kind Value: an OCaml "int"
                | region ι               -- kind Region: a region handle
                | rec_info               -- an inert value standing for a Rec_info_expr.t
 ```
+
+A naked vector is an opaque bit pattern of 2/4/8 64-bit words (`word0` least
+significant; `Vector_types.Vec128.Bit_pattern` and friends,
+`middle_end/flambda2/numbers/vector_types.mli`). The machine gives vectors no
+arithmetic — Flambda has no vector operation primitives (SIMD arithmetic is done
+by intrinsic `extern`/C calls recognized below Cmm) — so vectors flow through
+this chapter exactly like the other naked numbers: they are boxed/unboxed
+([§05](05-primitives-scalar.md)), stored in blocks, arrays, and
+strings ([§06](06-primitives-memory.md)), and compared by nothing.
 
 `clos ℓ f` is a distinguished pointer form because an OCaml closure pointer
 targets a specific function slot within a (possibly multi-function) closure

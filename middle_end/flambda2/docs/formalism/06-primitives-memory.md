@@ -111,7 +111,11 @@ chapter uses, read off `flambda_primitive.mli`:
   (no `Unboxed_product`: a single unarized access is at one scalar kind). The
   set kind's `Values` case additionally carries `Init_or_assign` (initializing
   write vs assignment, the latter recording the assignment's alloc mode for the
-  write barrier).
+  write barrier). The load/set kind normally equals the array's element kind,
+  but the **vector** load/set kinds (`Naked_vec128s`/`256s`/`512s`) may pair
+  with an array of a *different* element kind: a SIMD reinterpret access that
+  reads/writes several consecutive elements as one vector
+  (P.Binary.ArrayLoad.Vector / P.Ternary.ArraySet.Vector below).
 - **`Array_kind_for_length`** (`Array_kind ak` | `Float_array_opt_dynamic`) is
   what `Array_length` carries; the dynamic case is for the float-array
   optimisation where the element kind is not known statically.
@@ -144,7 +148,12 @@ chapter uses, read off `flambda_primitive.mli`:
 - **`string_accessor_width`** (`Eight`, `Eight_signed`, `Sixteen`,
   `Sixteen_signed`, `Thirty_two`, `Single`, `Sixty_four`, `One_twenty_eight`,
   `Two_fifty_six`, `Five_twelve`, the vector ones carrying `{aligned}`) gives
-  the width of a string/bytes/bigstring element access.
+  the width of a string/bytes/bigstring element access. The accessed value's
+  kind follows the width (`result_kind_of_binary_primitive`):
+  `Eight`/`Sixteen` → `naked_immediate` (zero-extended), `Eight_signed` →
+  `naked_int8`, `Sixteen_signed` → `naked_int16`, `Thirty_two` → `naked_int32`,
+  `Single` → `naked_float32`, `Sixty_four` → `naked_int64`, and the three
+  vector widths (16/32/64 bytes) → `naked_vec128`/`256`/`512`.
 
 ### Mixed blocks
 
@@ -1053,7 +1062,7 @@ CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_lo
 ---
 p = Array_load(ak, lk, μ)
 H(ℓ) = Array(ak, μ, [v₀ … vₙ₋₁])      i = tagged_imm j      0 ≤ j < n
-lk consistent with ak
+lk = the (unarized) element kind of ak
 --------------------------------------------------
 ⟦p⟧(ptr ℓ, i; H) = (vⱼ, H)
 NOTES: Unarized load: the index j and load kind lk are in the *scalar*
@@ -1061,7 +1070,51 @@ NOTES: Unarized load: the index j and load kind lk are in the *scalar*
 consecutive scalar indices. Bounds are NOT checked here (see § Unchecked
 primitives); j out of range is undef. Coeffect from reading_from_an_array(μ): an
 Immutable array load is CSE-able, a Mutable one is not. undef on representation
-mismatch.
+mismatch. When lk is a vector kind DIFFERENT from ak's element kind, the load is
+a SIMD reinterpret access instead — P.Binary.ArrayLoad.Vector below; any other
+lk ≠ ak pairing is rejected at to_cmm (fatal error).
+```
+
+#### SIMD reinterpret array access
+
+A vector load/set kind may be applied to an array of scalar (or
+different-width vector) elements: one access moves `m` consecutive elements as
+a single 16/32/64-byte vector. The index remains in *element units of the
+underlying array*; the element bytes are those of the array's packed layout
+([§17](17-representation.md) R.Obj.Array), so e.g. a `Naked_vec128s` load from
+a `Naked_floats` array at index j returns the IEEE bit patterns of elements j
+and j+1, side by side little-endian.
+
+```rule
+RULE P.Binary.ArrayLoad.Vector
+STATUS normative
+CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
+CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load
+CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#array_vector_access_validity_condition
+CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load
+---
+p = Array_load(ak, lk, μ)      lk ∈ {Naked_vec128s, Naked_vec256s, Naked_vec512s}
+w_v = 16 | 32 | 64 (bytes, per lk)      w_e = the element byte width of ak (w(ak), R.Obj.Array)
+ak ∉ {Values, Gc_ignorable_values}      ak ≠ Unboxed_product _ (except 2 or 4 × Naked_vec128s, lk = Naked_vec128s)
+m = ⌈w_v / w_e⌉
+H(ℓ) = Array(ak, μ, [v₀ … vₙ₋₁])      i = tagged_imm j      0 ≤ j      j + m ≤ n
+--------------------------------------------------
+⟦p⟧(ptr ℓ, i; H) = (naked_vecN b, H)
+  where b = the w_v bytes of elements vⱼ … v_{j+m−1} under the array's packed
+  little-endian layout
+NOTES: Allowed source kinds: every scalar naked-number/immediate array kind and
+every vector array kind (so cross-width accesses like a vec256 load from a
+vec128 array, m = 2, are legal); loading a vector from a Values /
+Gc_ignorable_values array is a fatal error at to_cmm ("Attempted to load a SIMD
+vector from a value array"), as are Unboxed_product sources other than the
+2/4-vec128 special case. Effects/coeffects as P.Binary.ArrayLoad
+(reading_from_an_array μ). Bounds NOT checked here: undef unless all m elements
+are in range (the frontend's safe form checks j <u max(n − (m−1), 0),
+P.Unchecked.WideAccess). Alignment is NOT required — arrays are only
+word-aligned, and to_cmm always emits unaligned vector loads. Simplify's
+transfer function degrades to ⊤ whenever kind(lk) differs from ak's element
+kind (the kind-equality guard in simplify_array_load), so reinterpret loads are
+never constant-folded even from known immutable arrays.
 ```
 
 ### String / bigstring load
@@ -1080,9 +1133,16 @@ i = naked_nativeint j      0 ≤ j      j + w ≤ length(b̄)
 NOTES: Reads a w-byte little-endian scalar of the given width from byte offset j.
 The index kind is naked_nativeint (string_or_bigstring_index_kind). Coeffects:
 String load is Immutable (coeffect-free, CSE-able); Bytes and Bigstring loads are
-Mutable (Has_coeffects). Bounds NOT checked here; out-of-range is undef. The
-vector widths additionally require alignment for their `aligned` variants;
-misalignment is undef here (the frontend inserts an alignment check).
+Mutable (Has_coeffects). Bounds NOT checked here; out-of-range is undef (safe
+forms check j <u max(length − (w−1), 0), P.Unchecked.WideAccess). For the
+vector widths (w = 16/32/64), decode_width yields naked_vec128/256/512 of the w
+bytes (word0 least significant); the `aligned` variants additionally require the
+accessed address to be w-byte aligned — misalignment is undef here (the
+frontend inserts an alignment check for *bigstrings*, whose data is off-heap
+and can be aligned; heap strings/bytes are only word-aligned, so an aligned
+access to them is unchecked and simply undef if misaligned). Simplify never
+folds these loads at any width (simplify_string_or_bigstring_load returns ⊤,
+even for known strings).
 ```
 
 ### Phys_equal
@@ -1265,7 +1325,7 @@ STATUS normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive
 CODE middle_end/flambda2/simplify/simplify_ternary_primitive.ml#simplify_array_set
 ---
-p = Array_set(ak, sk)
+p = Array_set(ak, sk)      sk = the (unarized) element kind of ak
 H(ℓ) = Array(ak, Mutable, [v₀ … vₙ₋₁])      i = tagged_imm j      0 ≤ j < n
 H′ = H[ℓ ↦ Array(ak, Mutable, [v₀ … vⱼ₋₁, v, vⱼ₊₁ … vₙ₋₁])]
 --------------------------------------------------
@@ -1275,6 +1335,31 @@ the element representation; its Values case carries Init_or_assign whose
 Assignment mode drives the GC write barrier. Bounds NOT checked here (§ Unchecked
 primitives); j out of range is undef, as is storing into an immutable array or a
 representation mismatch. writing_to_an_array: (Arbitrary_effects, No_coeffects, …).
+A vector sk over a different element kind is the SIMD reinterpret store,
+P.Ternary.ArraySet.Vector below.
+```
+
+```rule
+RULE P.Ternary.ArraySet.Vector
+STATUS normative
+CODE middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive
+CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_set0
+CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#array_vector_access_validity_condition
+---
+p = Array_set(ak, sk)      sk ∈ {Naked_vec128s, Naked_vec256s, Naked_vec512s}
+w_v = 16 | 32 | 64 (bytes, per sk)      w_e = the element byte width of ak      m = ⌈w_v / w_e⌉
+ak ∉ {Values, Gc_ignorable_values}      ak ≠ Unboxed_product _
+H(ℓ) = Array(ak, Mutable, [v₀ … vₙ₋₁])      i = tagged_imm j      0 ≤ j      j + m ≤ n
+v = naked_vecN b
+H′ = H with elements j … j+m−1 replaced by the m elements whose packed bytes are b
+--------------------------------------------------
+⟦p⟧(ptr ℓ, i, v; H) = (tagged_imm 0, H′)
+NOTES: Store dual of P.Binary.ArrayLoad.Vector: writes the vector's w_v bytes
+over m consecutive elements of the array's packed layout (index in element
+units; no alignment requirement; unaligned store at to_cmm). Same source-kind
+restrictions (no value or unboxed-product arrays — fatal at to_cmm). Returns
+unit. writing_to_an_array: (Arbitrary_effects, No_coeffects, …); undef out of
+range or on an immutable array.
 ```
 
 ```rule
@@ -1290,9 +1375,10 @@ H′ = H with bytes b̄[j … j+w−1] set to the w-byte little-endian encoding 
 --------------------------------------------------
 ⟦p⟧(ptr ℓ, i, v; H) = (tagged_imm 0, H′)
 NOTES: Writes a w-byte scalar at byte offset j. Returns unit. Index kind
-naked_nativeint. Bounds NOT checked here; out-of-range or (for aligned vector
-widths) misaligned is undef. writing_to_bytes_or_bigstring: (Arbitrary_effects,
-No_coeffects, …).
+naked_nativeint. The payload kind follows the width as for loads (naked_vec128/
+256/512 for w = 16/32/64). Bounds NOT checked here; out-of-range or (for
+aligned vector widths) misaligned is undef. writing_to_bytes_or_bigstring:
+(Arbitrary_effects, No_coeffects, …).
 ```
 
 ```rule
@@ -1452,6 +1538,37 @@ not. Division/modulo get the analogous check_zero_division wrapper
 "already checked" behaviour, and the compiler may assume indices are in range.
 ```
 
+Accesses **wider than one element** — the vector string/bytes/bigstring widths
+and the SIMD reinterpret array accesses — need a stronger bound than
+`i <u length`, since the access covers several elements/bytes:
+
+```rule
+RULE P.Unchecked.WideAccess
+STATUS descriptive
+CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#actual_max_length_for_string_like_access_as_nativeint
+CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#array_vector_access_validity_condition
+CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#bigstring_alignment_validity_condition
+---
+A safe access touching m consecutive units (m = w for a w-byte string-like access,
+m = ⌈w_v / w_e⌉ elements for a vector array access) is guarded by
+  i <_u max(length − (m − 1), 0)
+computed branchlessly (max_with_zero: mask arithmetic, no conditional). A safe
+ALIGNED bigstring access additionally checks
+  Bigarray_get_alignment(b, w_v) — the data address + offset is w_v-byte aligned
+before running the unchecked primitive.
+--------------------------------------------------
+Wide safe accesses lower to the same Checked wrapper as
+P.Unchecked.FrontendInsertsChecks, with the shrunken bound (and, for aligned
+bigstring accesses, the extra alignment validity condition).
+NOTES: For string-like accesses the index is in bytes and length is
+String_length / the bigstring's Bigarray_length {dimension = 1}; for arrays the
+index is in elements of the underlying array kind. Descriptive: documents the
+from_lambda lowering (context, [§01](01-overview.md)), not a Flambda term
+rewrite. There is NO alignment check for aligned accesses to heap
+strings/bytes (which the GC keeps only word-aligned); such an access is undef
+if the address is misaligned (P.Binary.StringOrBigstringLoad).
+```
+
 ---
 
 ## Rule index for this chapter
@@ -1479,18 +1596,20 @@ Unary: `P.Unary.BlockLoad`, `P.Unary.BlockLoad.NakedFloats`,
 `P.Unary.Peek`.
 
 Binary: `P.Binary.BlockSet`, `P.Binary.BlockSet.Mixed`, `P.Binary.ArrayLoad`,
-`P.Binary.StringOrBigstringLoad`, `P.Binary.PhysEqual`, `P.Binary.BigarrayLoad`,
+`P.Binary.ArrayLoad.Vector`, `P.Binary.StringOrBigstringLoad`,
+`P.Binary.PhysEqual`, `P.Binary.BigarrayLoad`,
 `P.Binary.BigarrayGetAlignment`, `P.Binary.AtomicLoadField`, `P.Binary.Poke`,
 `P.Binary.ReadOffset`.
 
-Ternary: `P.Ternary.ArraySet`, `P.Ternary.BytesOrBigstringSet`,
+Ternary: `P.Ternary.ArraySet`, `P.Ternary.ArraySet.Vector`,
+`P.Ternary.BytesOrBigstringSet`,
 `P.Ternary.BigarraySet`, `P.Ternary.AtomicSetField`, `P.Ternary.WriteOffset`.
 
 Quaternary: `P.Quaternary.AtomicCompareAndSetField`.
 
 Nullary: `P.Nullary.StateAccessors`, `P.Nullary.ControlBarriers`.
 
-Unchecked: `P.Unchecked.FrontendInsertsChecks`.
+Unchecked: `P.Unchecked.FrontendInsertsChecks`, `P.Unchecked.WideAccess`.
 
 Bigarray lowering: `P.Bigarray.Indexing`.
 

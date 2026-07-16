@@ -475,6 +475,42 @@ tagged machine-word encoding `2i+1`. Inverse of the previous rule on tagged
 inputs.
 ```
 
+### Reinterpretation of boxed vectors
+
+`Reinterpret_boxed_vector` retypes a *boxed* SIMD vector as a boxed all-flat
+tuple of the same bit width, or vice versa, without touching the value. It is a
+parameterless unary primitive at kind `Value → Value`; the direction and the
+widths involved are **not** recorded in the term (they were only in the Lambda
+primitive it came from, `Preinterpret_boxed_vector_as_tuple` /
+`Preinterpret_tuple_as_boxed_vector`).
+
+```rule
+RULE P.Unary.ReinterpretBoxedVector
+STATUS normative
+CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
+CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#convert_lprim
+CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_reinterpret_boxed_vector
+CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
+---
+H(ℓ) = Boxed(Naked_vec128/256/512, b),  or  H(ℓ) a MixedBlock of tag 0 with no
+  value prefix whose flat suffix occupies exactly 16/32/64 bytes
+--------------------------------------------------
+⟦Reinterpret_boxed_vector⟧(ptr ℓ; H) = (ptr ℓ, H)
+NOTES: The identity on the runtime value: to_cmm lowers it to a no-op
+(`Reinterpret_boxed_vector -> None, res, arg`), sound because a boxed vector
+and an all-flat mixed tuple block of the same width have bit-identical layouts
+(tag 0, scannable prefix 0, 2/4/8 payload words; [§17](17-representation.md)
+R.Obj.Boxed). The abstract machine's object taxonomy does not retype H(ℓ):
+subsequent accesses under the other reading (Unbox_number vs. mixed
+Block_load) are grounded through the representation relation, not through this
+chapter. Pure (No_effects, No_coeffects) and CSE-eligible
+(`unary_primitive_eligible_for_cse`) — unusually, it is CSE-eligible yet never
+constant-folds: Simplify's transfer function is ⊤ at kind Value
+(simplify_reinterpret_boxed_vector discards the argument type), so nested
+reinterprets do not cancel and the boxed contents type is dropped. undef on
+anything other than the two layouts above.
+```
+
 ### Boxing and unboxing numbers
 
 `Box_number(κ, a)` is the only scalar primitive with an effect: it **allocates**
@@ -888,7 +924,8 @@ Unary: `P.Unary.IntArith.SwapByteEndianness`, `P.Unary.FloatArith`,
 `P.Unary.TagImmediate`, `P.Unary.UntagImmediate`,
 `P.Unary.Reinterpret64.Int64AsFloat64`, `P.Unary.Reinterpret64.Float64AsInt64`,
 `P.Unary.Reinterpret64.Int64AsTaggedInt63`,
-`P.Unary.Reinterpret64.TaggedInt63AsInt64`, `P.Unary.BoxNumber`,
+`P.Unary.Reinterpret64.TaggedInt63AsInt64`,
+`P.Unary.ReinterpretBoxedVector`, `P.Unary.BoxNumber`,
 `P.Unary.UnboxNumber`.
 
 Binary: `P.Binary.IntArith.Total`, `P.Binary.IntArith.DivMod`,

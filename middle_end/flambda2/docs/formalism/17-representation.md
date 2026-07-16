@@ -80,6 +80,9 @@ naked_int8 n      ≈ᵥ  word (sign_extend₈ n)
 naked_int16 n     ≈ᵥ  word (sign_extend₁₆ n)
 naked_float f     ≈ᵥ  flt f
 naked_float32 f   ≈ᵥ  flt32 f                     -- in a Float32 register
+naked_vec128 b    ≈ᵥ  vec128 b                    -- in a 128-bit vector register
+naked_vec256 b    ≈ᵥ  vec256 b
+naked_vec512 b    ≈ᵥ  vec512 b
 --------------------------------------------------
 Naked numbers are unboxed machine values (kind Naked_number nnk).
 NOTES: TARGET-DEPENDENT. On a 64-bit target int32 lives in a 64-bit register held
@@ -87,7 +90,10 @@ NOTES: TARGET-DEPENDENT. On a 64-bit target int32 lives in a 64-bit register hel
 int32 op; ch. 18). int8/int16 likewise. nativeint and int64 are full 64-bit words
 (they coincide on this target; they would differ at 32-bit, where int64 is split —
 deferred). `flt32` in a register is the Float32 machtype; when stored it becomes a
-`Single` chunk (CM.Mem.LoadStore).
+`Single` chunk (CM.Mem.LoadStore). Naked vectors carry the Vec128/256/512
+machtypes (machtype_of_kind, to_cmm_shared.ml); stored, they are the 16/32/64-byte
+vector chunks, little-endian with word0 first (CM.Mem.LoadStore). GC-ignored,
+like Float.
 ```
 
 ```rule
@@ -245,6 +251,10 @@ the last-word padding (k − n mod k) mod k (the number of unused element slots 
 final word; 0 when k divides n) (int32#/float32#: k = 2; int16#: k = 4; int8#: k = 8)
 — and prefix = 1
 (a MIXED header with scannable_prefix 0, so the header's top byte reads p+1 = 1).
+The vector kinds are never packed (an element is ≥ a word), so their tags are the
+CONSTANTS unboxed_vec128/256/512_array_tag = 6/7/8 and the size is n·(2/4/8) words;
+the element count is recovered from the header as size ≫ log2(words per element)
+(unboxed_vecN_array_length), which is how P.Unary.ArrayLength reads a vector array.
 The GC-scanned value/float arrays use a plain (non-mixed) header with prefix = 0.
 --------------------------------------------------
 An array; element addressing is a + (element_size · index) (array_indexing scales by
@@ -315,6 +325,7 @@ STATUS normative
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#box_number
 CODE backend/cmm_helpers.ml#float_header
 CODE backend/cmm_helpers.ml#boxedint64_header
+CODE backend/cmm_helpers.ml#boxedvec128_header
 ---
 H ⊢ Boxed(κ, c) @ a ≈ₒ M    iff, by κ:
   Naked_float:      M[a−8] = hdr(double_tag, 1, col, 0);  the 8 bytes at a decode to c
@@ -325,15 +336,27 @@ H ⊢ Boxed(κ, c) @ a ≈ₒ M    iff, by κ:
                       stores sign_extend₃₂ c — target endianness, here LE)
   Naked_int64:      M[a−8] = hdr(custom_tag, 2, col, 0);  M[a] = &caml_int64_ops;  M[a+8] = c
   Naked_nativeint:  M[a−8] = hdr(custom_tag, 2, col, 0);  M[a] = &caml_nativeint_ops; M[a+8] = c
+  Naked_vec128/256/512:
+                    M[a−8] = hdr(0, 2/4/8, col, 0)  (a MIXED header, scannable prefix 0,
+                      so the top byte reads 1);  the 16/32/64 bytes at a hold c
+                      (little-endian, word0 first).  NO ops word; payload at offset 0.
 --------------------------------------------------
-A boxed number: a double is a bare double_tag block; the others are custom blocks
-whose first word is the operations pointer and whose payload follows.
-NOTES: box_number → box_float / box_int_gen / box_float32. float_header =
-double_tag size size_float/size_addr = 1. The custom-block headers are custom_tag
-size 2 (boxedint64_header = 1 + 8/size_addr = 2 on 64-bit). unbox loads at offset
-size_addr (a+8), skipping the ops word (ch. 18). ENDIANNESS-DEPENDENT for int32
-(box_int_gen: big-endian stores in the high half). Cmm image of P.Unary.BoxNumber /
-UnboxNumber(06).
+A boxed number: a double is a bare double_tag block; the boxed ints/float32 are
+custom blocks whose first word is the operations pointer and whose payload
+follows; a boxed vector is a tag-0 all-flat mixed block holding just the bit
+pattern.
+NOTES: box_number → box_float / box_int_gen / box_float32 / box_vec128/256/512.
+float_header = double_tag size size_float/size_addr = 1. The custom-block headers
+are custom_tag size 2 (boxedint64_header = 1 + 8/size_addr = 2 on 64-bit). unbox
+loads at offset size_addr (a+8), skipping the ops word (ch. 18).
+ENDIANNESS-DEPENDENT for int32 (box_int_gen: big-endian stores in the high half).
+Boxed vectors are NOT custom blocks (no `caml_vec128_ops`): boxedvecN_header =
+block_header 0 (size_vecN/size_addr) with Mixed_block {scannable_prefix = 0}, and
+unbox_vector loads the payload at offset 0 with an UNALIGNED vector chunk ("Boxed
+vectors are not aligned by the GC"). This tag-0 all-flat layout is bit-identical
+to a mixed tuple block of the same width, which is what makes
+Reinterpret_boxed_vector a no-op (05, P.Unary.ReinterpretBoxedVector; ch. 18).
+Cmm image of P.Unary.BoxNumber / UnboxNumber(06).
 ```
 
 ```rule

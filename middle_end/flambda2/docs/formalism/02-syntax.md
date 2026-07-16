@@ -294,7 +294,13 @@ metavariable `c` is `Reg_width_const.t`, which is `Int_ids.Const`, per
 `identifiers/reg_width_const.mli`). A `Naked_immediate` is an untagged integer of
 `n − 1` bits (machine width `n`); a `Tagged_immediate` is the tagged form.
 `Null` is the null pointer; `Poison (κ, msg)` a deliberately-invalid value of
-kind `κ`.
+kind `κ`. A naked vector constant is a 128/256/512-bit pattern
+(`Vector_types.VecN.Bit_pattern.t`, 2/4/8 int64 words, `word0` least
+significant). Note an fexpr asymmetry: the printer emits naked vector constants
+(as `vec128[w0:w1]` etc.) and `Fexpr.const` can represent them, but the parser
+has no production for them in `simple`/term position — the `vecN[…]` literals
+are only parseable inside `Immutable_vecN_array` static data
+(`parser/flambda_parser.mly`).
 
 ### Coercions
 

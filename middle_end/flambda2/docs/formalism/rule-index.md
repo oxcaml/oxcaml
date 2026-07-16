@@ -141,7 +141,7 @@ copies the regenerated files back into the source tree.
 
 ## P — Primitive denotations (ch. 05-06)
 
-95 rules.
+99 rules.
 
 | Rule ID | Status | Chapter | Code anchors | Verified |
 |---|---|---|---|---|
@@ -158,6 +158,7 @@ copies the regenerated files back into the source tree.
 | `P.Unary.Reinterpret64.Float64AsInt64` | normative | 05-primitives-scalar.md | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#Simplify_reinterpret_unboxed_float64_as_unboxed_int64` | — |
 | `P.Unary.Reinterpret64.Int64AsTaggedInt63` | normative | 05-primitives-scalar.md | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#Simplify_reinterpret_unboxed_int64_as_tagged_int63` | — |
 | `P.Unary.Reinterpret64.TaggedInt63AsInt64` | normative | 05-primitives-scalar.md | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#Simplify_reinterpret_tagged_int63_as_unboxed_int64` | — |
+| `P.Unary.ReinterpretBoxedVector` | normative | 05-primitives-scalar.md | `middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive`<br>`middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#convert_lprim`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_reinterpret_boxed_vector`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive` | — |
 | `P.Unary.BoxNumber` | normative | 05-primitives-scalar.md | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_box_number`<br>`middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive` | — |
 | `P.Unary.UnboxNumber` | normative | 05-primitives-scalar.md | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_unbox_number`<br>`middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive` | — |
 | `P.Binary.IntArith.Total` | normative | 05-primitives-scalar.md | `middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_arith`<br>`middle_end/flambda2/simplify/number_adjuncts.ml#Num_common` | — |
@@ -222,6 +223,7 @@ copies the regenerated files back into the source tree.
 | `P.Unary.MakeLazy` | conjectured | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive` | — |
 | `P.Unary.IntAsPointer` | conjectured | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive` | — |
 | `P.Binary.ArrayLoad` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load` | — |
+| `P.Binary.ArrayLoad.Vector` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load`<br>`middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#array_vector_access_validity_condition`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load` | — |
 | `P.Binary.StringOrBigstringLoad` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_string_or_bigstring_load` | — |
 | `P.Binary.PhysEqual` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_phys_equal` | — |
 | `P.Bigarray.Indexing` | descriptive | 06-primitives-memory.md | `middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#bigarray_indexing`<br>`middle_end/flambda2/from_lambda/lambda_to_lambda_transforms.ml#transform_primitive` | 14-validation/bigarray_access.md |
@@ -232,6 +234,7 @@ copies the regenerated files back into the source tree.
 | `P.Binary.ReadOffset` | conjectured | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive` | — |
 | `P.Unary.Peek` | descriptive | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive` | — |
 | `P.Ternary.ArraySet` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive`<br>`middle_end/flambda2/simplify/simplify_ternary_primitive.ml#simplify_array_set` | — |
+| `P.Ternary.ArraySet.Vector` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_set0`<br>`middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#array_vector_access_validity_condition` | — |
 | `P.Ternary.BytesOrBigstringSet` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive`<br>`middle_end/flambda2/simplify/simplify_ternary_primitive.ml#simplify_bytes_or_bigstring_set` | — |
 | `P.Ternary.BigarraySet` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive`<br>`middle_end/flambda2/terms/flambda_primitive.ml#writing_to_a_bigarray`<br>`middle_end/flambda2/simplify/simplify_ternary_primitive.ml#simplify_bigarray_set` | 14-validation/bigarray_access.md |
 | `P.Ternary.AtomicSetField` | descriptive | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive` | — |
@@ -240,6 +243,7 @@ copies the regenerated files back into the source tree.
 | `P.Nullary.StateAccessors` | descriptive | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#nullary_primitive`<br>`middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_nullary_primitive` | — |
 | `P.Nullary.ControlBarriers` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#nullary_primitive`<br>`middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_nullary_primitive` | — |
 | `P.Unchecked.FrontendInsertsChecks` | normative | 06-primitives-memory.md | `middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#check_array_access`<br>`middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#check_bound`<br>`middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#checked_access`<br>`middle_end/flambda2/from_lambda/lambda_to_flambda_primitives_helpers.ml#bind_recs` | — |
+| `P.Unchecked.WideAccess` | descriptive | 06-primitives-memory.md | `middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#actual_max_length_for_string_like_access_as_nativeint`<br>`middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#array_vector_access_validity_condition`<br>`middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#bigstring_alignment_validity_condition` | — |
 
 ## T — Abstract domain, meet/join, provers, reification (ch. 07-08)
 
@@ -470,7 +474,7 @@ copies the regenerated files back into the source tree.
 
 ## TC — to_cmm translation (ch. 16, 18)
 
-33 rules.
+35 rules.
 
 | Rule ID | Status | Chapter | Code anchors | Verified |
 |---|---|---|---|---|
@@ -496,7 +500,8 @@ copies the regenerated files back into the source tree.
 | `TC.Let.SetOfClosures` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#let_dynamic_set_of_closures` | — |
 | `TC.Let.Static` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_static.ml#static_consts`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_expr0` | — |
 | `TC.Prim.TagUntag` | normative | 18-to-cmm-data.md | `backend/cmm_helpers.ml#tag_int`<br>`backend/cmm_helpers.ml#untag_int`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#arithmetic_conversion` | — |
-| `TC.Prim.BoxUnbox` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#box_number`<br>`backend/cmm_helpers.ml#box_int_gen`<br>`backend/cmm_helpers.ml#unbox_int` | — |
+| `TC.Prim.BoxUnbox` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#box_number`<br>`backend/cmm_helpers.ml#box_int_gen`<br>`backend/cmm_helpers.ml#unbox_int`<br>`backend/cmm_helpers.ml#box_vector`<br>`backend/cmm_helpers.ml#unbox_vector` | — |
+| `TC.Prim.ReinterpretBoxedVector` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive` | — |
 | `TC.Prim.MakeBlock` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block`<br>`backend/cmm_helpers.ml#make_alloc_generic` | — |
 | `TC.Prim.BlockLoad` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#block_load`<br>`backend/cmm_helpers.ml#get_field_computed`<br>`backend/cmm_helpers.ml#field_address` | — |
 | `TC.Prim.BlockSet` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#block_set`<br>`backend/cmm_helpers.ml#setfield_computed` | — |
@@ -505,6 +510,7 @@ copies the regenerated files back into the source tree.
 | `TC.Prim.NumConv` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#arithmetic_conversion`<br>`backend/cmm_helpers.ml#float32_of_int`<br>`backend/cmm.mli#static_cast` | — |
 | `TC.Prim.StringLoad` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#string_like_load`<br>`backend/cmm_helpers.ml#unaligned_load_16` | — |
 | `TC.Prim.ArrayAccess` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_set0`<br>`backend/cmm_helpers.ml#array_indexing` | — |
+| `TC.Prim.ArrayAccess.Vector` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load_vector`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_set_vector`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load` | — |
 | `TC.Prim.BigarrayAccess` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#bigarray_load_or_store`<br>`backend/cmm_helpers.ml#bigarray_load`<br>`backend/cmm_helpers.ml#bigarray_store` | 14-validation/bigarray_access.md |
 | `TC.Prim.BigarrayLength` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive`<br>`backend/cmm_helpers.ml#field_address` | 14-validation/bigarray_access.md |
 
@@ -525,7 +531,7 @@ copies the regenerated files back into the source tree.
 | `R.Obj.Array` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block`<br>`backend/cmm_helpers.ml#array_indexing`<br>`backend/cmm_helpers.ml#Unboxed_or_untagged_array_tags`<br>`backend/cmm_helpers.ml#unboxed_or_untagged_packed_array_length` | — |
 | `R.Obj.Bytes` | normative | 17-representation.md | `backend/cmm_helpers.ml#string_header` | — |
 | `R.Obj.Bigarray` | normative | 17-representation.md | `backend/cmm_helpers.ml#bigarray_load`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive` | 14-validation/bigarray_access.md |
-| `R.Obj.Boxed` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#box_number`<br>`backend/cmm_helpers.ml#float_header`<br>`backend/cmm_helpers.ml#boxedint64_header` | — |
+| `R.Obj.Boxed` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#box_number`<br>`backend/cmm_helpers.ml#float_header`<br>`backend/cmm_helpers.ml#boxedint64_header`<br>`backend/cmm_helpers.ml#boxedvec128_header` | — |
 | `R.Obj.Closures` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#fill_slot`<br>`backend/cmm_helpers.ml#pack_closure_info`<br>`backend/cmm_helpers.ml#infix_header`<br>`middle_end/flambda2/simplify_shared/slot_offsets.ml#Layout` | — |
 | `R.Heap` | conjectured | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm.ml#unit` | — |
 | `R.Observe` | normative | 17-representation.md | `middle_end/flambda2/terms/flambda_unit.mli#module_symbol`<br>`middle_end/flambda2/to_cmm/to_cmm.ml#unit` | — |
@@ -566,14 +572,14 @@ copies the regenerated files back into the source tree.
 
 _Generated by scanning chapters 02-20._
 
-- **Total rules:** 443
-- **By status:** normative 293, descriptive 65, conjectured 85
+- **Total rules:** 449
+- **By status:** normative 298, descriptive 66, conjectured 85
 - **By chapter:**
   - 02-syntax.md: 13
   - 03-kinds.md: 27
   - 04-opsem.md: 29
-  - 05-primitives-scalar.md: 30
-  - 06-primitives-memory.md: 65
+  - 05-primitives-scalar.md: 31
+  - 06-primitives-memory.md: 68
   - 07-types-domain.md: 30
   - 08-meet-join.md: 30
   - 09-simplify-structure.md: 37
@@ -584,7 +590,7 @@ _Generated by scanning chapters 02-20._
   - 15-cmm.md: 20
   - 16-to-cmm-control.md: 15
   - 17-representation.md: 15
-  - 18-to-cmm-data.md: 19
+  - 18-to-cmm-data.md: 21
   - 19-cmm-memory-gc.md: 7
   - 20-to-cmm-soundness.md: 12
 - **Duplicate rule IDs:** none.

@@ -40,15 +40,19 @@ throughout without further comment.
 ## 1. Syntax
 
 We model the fragment of `backend/cmm.mli` (`type expression`) that `to_cmm`
-emits for the in-scope Flambda fragment. Omitted: SIMD constants/casts, probes
+emits for the in-scope Flambda fragment. Omitted: SIMD *casts*
+(`Cstatic_cast`/`Creinterpret_cast` vector variants — emitted only by the
+arch-specific intrinsic lowering, not by the generic `to_cmm` paths), probes
 (`Cprobe`/`Cprobe_is_enabled`), phantom lets (`Cphantom_let` — debugging only),
 and the algebraic-effect operations — all out of scope per
-[`01`](01-overview.md).
+[`01`](01-overview.md). SIMD vector *constants, chunks and machtypes* are in
+scope.
 
 ```
 value_expr ce ::=
     Cconst_int n | Cconst_natint n            -- machine-word constants
   | Cconst_float f | Cconst_float32 f          -- FP constants
+  | Cconst_vec128 b | Cconst_vec256 b | Cconst_vec512 b   -- SIMD bit patterns
   | Cconst_symbol sym                          -- address of a symbol
   | Cvar x                                     -- x : Backend_var.t
   | Clet (x = ce₁) ce₂                          -- bind x to the value of ce₁ in ce₂
@@ -94,19 +98,27 @@ CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr
 ---
 The grammar above is the fragment of Cmm.expression / Cmm.operation that
 to_cmm_expr.ml#expr and to_cmm_primitive.ml emit for the in-scope Flambda
-fragment. SIMD, Cprobe(_is_enabled), Cphantom_let, and effect operations are
-omitted (out of scope, ch. 01).
+fragment. SIMD casts (the vector variants of Cstatic_cast/Creinterpret_cast),
+Cprobe(_is_enabled), Cphantom_let, and effect operations are omitted (out of
+scope, ch. 01).
 --------------------------------------------------
 This chapter's rules range over the above grammar.
-NOTES: `to_cmm` never emits `Cconst_vec*`, `Ctuple` other than for unboxed
-multi-value results, or `Cop(Cprobe …)` in the in-scope fragment. Ctuple arises
-only from unarized multi-value returns (translate_apply0, wrap).
+NOTES: `to_cmm` never emits `Ctuple` other than for unboxed multi-value
+results, or `Cop(Cprobe …)`, in the in-scope fragment; Ctuple arises only from
+unarized multi-value returns (translate_apply0, wrap). `Cconst_vecN` arises
+from unboxing a statically-boxed vector symbol (unbox_vector's
+structured_constant_of_sym shortcut, ch. 18). The SIMD casts belong to the
+arch-specific vector-intrinsic lowering, which stays out of scope; the vectors
+this fragment moves are untyped bit patterns ("SIMD vectors are untyped in the
+backend", cmm.mli).
 ```
 
 ## 2. Machine values and memory
 
-A Cmm value is a machine word or a floating-point number; the `machtype`
-(`Val`/`Int`/`Addr`/`Float`/`Float32`) is a *static* classification for register
+A Cmm value is a machine word, a floating-point number, or a SIMD vector; the
+`machtype`
+(`Val`/`Int`/`Addr`/`Float`/`Float32`/`Vec128`/`Vec256`/`Vec512`) is a *static*
+classification for register
 allocation and GC (`cmm.mli` header comment) and is not part of the runtime
 value, with one exception the GC cares about (`Addr`; [`19`](19-cmm-memory-gc.md)).
 
@@ -114,9 +126,14 @@ value, with one exception the GC cares about (`Addr`; [`19`](19-cmm-memory-gc.md
 cmm value  w ::= word n        -- a 64-bit machine word (0 ≤ n < 2⁶⁴, or its signed reading)
                | flt f          -- a 64-bit IEEE double
                | flt32 f        -- a single, when held in a register (Float32)
+               | vec128 b | vec256 b | vec512 b   -- untyped SIMD bit patterns, in vector registers
 
 memory     M : Addr ⇀ Byte      -- byte-addressed; Addr = machine words used as addresses
 ```
+
+Vector machtypes are GC-ignored (same class as `Float`) and never LUB-combine
+with any other component — `Cmm.lub_component` is a fatal error on any
+cross-width or vector/scalar mix, so a join point cannot mix vector widths.
 
 Memory is **byte-addressed** and little-endian. Multi-byte access is defined by
 
@@ -128,15 +145,20 @@ CODE backend/cmm.mli#size_of_memory_chunk
 CODE backend/cmm_helpers.ml#mk_load_immut
 ---
 For a chunk κ of width b = size_of_memory_chunk κ bytes (Byte=1, Sixteen=2,
-Thirtytwo/Single=4, Word_int/Word_val/Double=8):
+Thirtytwo/Single=4, Word_int/Word_val/Double=8,
+Onetwentyeight_*=16, Twofiftysix_*=32, Fivetwelve_*=64):
   read(M, a, κ)  = the little-endian b-byte integer/float at M[a … a+b−1],
                    sign- or zero-extended to a word per κ's signedness
                    (Byte_signed/Sixteen_signed/Thirtytwo_signed sign-extend;
-                    the _unsigned chunks zero-extend; Double/Single decode IEEE)
+                    the _unsigned chunks zero-extend; Double/Single decode IEEE;
+                    the vector chunks read/write the raw b-byte bit pattern)
   write(M, a, κ, w) = M with the low b bytes of w stored little-endian at a
 --------------------------------------------------
 read/write are the meaning of Cload/Cstore (§6); undefined (undef) if a is
-unmapped or misaligned beyond what Arch.allow_unaligned_access permits.
+unmapped or misaligned beyond what Arch.allow_unaligned_access permits. The
+vector chunks come in `_aligned`/`_unaligned` pairs: the `_aligned` chunks are
+undef unless a is 16/32/64-byte aligned; the `_unaligned` chunks require only
+what the target's unaligned access allows (nothing, on amd64).
 NOTES: 64-bit little-endian is baked in here (byte order, b = 8 for word chunks).
 Sign/zero extension follows the chunk, matching the int32 sign-extension and
 sub-word truncation discipline of to_cmm (ch. 18). `Single` decodes/【encodes a
