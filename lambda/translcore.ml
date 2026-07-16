@@ -47,6 +47,31 @@ let use_dup_for_constant_mutable_arrays_bigger_than = 4
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
+let pat_contains_gadt pat =
+  exists_pattern
+    (fun p ->
+      match p.pat_desc with
+      | Tpat_construct (_, cd, _, _, _) -> cd.cstr_generalized
+      | _ -> false)
+    pat
+
+let param_is_partial_gadt_match fp =
+  match fp.fp_kind with
+  | Tparam_pat pat -> (
+      match fp.fp_partial with
+      | Total -> false
+      | Partial -> pat_contains_gadt pat)
+  | Tparam_optional_default (pat, _, _) ->
+      (* The caller can omit an optional argument, so its pattern is
+         effectively partial even when it covers the payload: the omitted
+         case carries no GADT evidence. *)
+      pat_contains_gadt pat
+
+let cases_are_partial_gadt_match cases (partial : partial) =
+  match partial with
+  | Total -> false
+  | Partial -> List.exists (fun { c_lhs; _ } -> pat_contains_gadt c_lhs) cases
+
 let join_layout_of_cases sort cases =
   match cases with
   | [] -> None
@@ -56,6 +81,24 @@ let join_layout_of_cases sort cases =
            (fun acc { c_lhs; _ } ->
              Lambda.join_layout acc (layout_pat sort c_lhs))
            (layout_pat sort c_lhs) rest)
+
+(* The layout of a parameter whose pattern type may be narrowed by GADT
+   equations the caller need not satisfy is instead read from the function's
+   own type in the function's own environment: the contract the caller sees,
+   which contains no equations from the parameters' patterns.
+   [split_fun_ty] peels one parameter's type off that type. *)
+let split_fun_ty fun_ty =
+  match fun_ty with
+  | None -> (None, None)
+  | Some (env, ty) -> (
+      match Typeopt.is_function_type env ty with
+      | Some (arg_ty, res_ty) -> (Some (env, arg_ty), Some (env, res_ty))
+      | None -> (None, None))
+
+let layout_of_fun_arg_ty fun_arg_ty loc sort =
+  match fun_arg_ty with
+  | Some (env, ty) -> layout_or_sort env loc sort ty
+  | None -> layout_of_sort loc sort
 
 let field_offset_for_label lbl repres =
   match repres with
@@ -1706,7 +1749,8 @@ and transl_apply ~scopes
    [trans_curried_function]).
 *)
 and transl_function_without_attributes
-    ~scopes ~return_sort ~return_mode ~mode ~region loc repr params body =
+    ~scopes ~return_sort ~return_mode ~mode ~region ~fun_ty loc repr params
+    body =
   let return_layout =
     match body with
     | Tfunction_body exp ->
@@ -1717,15 +1761,16 @@ and transl_function_without_attributes
   in
   match
     transl_tupled_function ~scopes loc params body
-      ~return_mode ~return_layout ~mode ~region
+      ~return_mode ~return_layout ~mode ~region ~fun_ty
   with
   | Some result -> result
   | None ->
       transl_curried_function ~scopes loc repr params body
-        ~return_mode ~return_layout ~mode ~region
+        ~return_mode ~return_layout ~mode ~region ~fun_ty
 
 and transl_tupled_function
-      ~scopes ~return_mode ~return_layout ~mode ~region loc params body
+      ~scopes ~return_mode ~return_layout ~mode ~region ~fun_ty loc params
+      body
   =
   let eligible_cases =
     match params, body with
@@ -1784,14 +1829,27 @@ and transl_tupled_function
                  Argument should be a tuple, but couldn't get the kinds"
         in
         let value_kinds =
-          match cases with
-          | [] -> raise Matching.Cannot_flatten
-          | first :: rest ->
-              List.fold_left
-                (fun acc case ->
-                  List.map2 Lambda.join_value_kind acc
-                    (value_kinds_of_case case))
-                (value_kinds_of_case first) rest
+          if cases_are_partial_gadt_match cases partial
+          then
+            (* The tuple shape comes from the function's type, but the
+               components' kinds may not use the patterns' GADT equations:
+               the caller can still pass a missing constructor. Read the
+               kinds from the function's own type instead. *)
+            let fun_arg_ty, _ = split_fun_ty fun_ty in
+            (match
+               tuple_value_kinds (layout_of_fun_arg_ty fun_arg_ty loc arg_sort)
+             with
+             | Some kinds -> kinds
+             | None -> List.init size (fun _ -> Lambda.generic_value))
+          else
+            match cases with
+            | [] -> raise Matching.Cannot_flatten
+            | first :: rest ->
+                List.fold_left
+                  (fun acc case ->
+                    List.map2 Lambda.join_value_kind acc
+                      (value_kinds_of_case case))
+                  (value_kinds_of_case first) rest
         in
         let kinds = List.map (fun vk -> Pvalue vk) value_kinds in
         let tparams =
@@ -1874,7 +1932,7 @@ and add_type_shapes_of_patterns patterns =
   List.iter add_case patterns
 
 and transl_curried_function ~scopes loc repr params body
-    ~return_layout ~return_mode ~region ~mode
+    ~return_layout ~return_mode ~region ~mode ~fun_ty
   =
   let { nlocal } =
     let param_curries =
@@ -1888,6 +1946,19 @@ and transl_curried_function ~scopes loc repr params body
        | Tfunction_cases fc -> param_curries @ [ Final_arg, fc.fc_arg_mode ])
   in
   add_type_shapes_of_params params;
+  (* The layout of a parameter that comes after a partial match on a GADT
+     constructor must not be narrowed by the equations introduced by that
+     constructor, as the caller can still pass a missing constructor. Such
+     layouts are read from the function's own type instead. See
+     oxcaml/oxcaml#6356 *)
+  let (any_param_is_partial_gadt_match, fc_fun_ty), param_widening_info =
+    List.fold_left_map
+      (fun (seen, fun_ty) fp ->
+        let fun_arg_ty, fun_res_ty = split_fun_ty fun_ty in
+        ( (seen || param_is_partial_gadt_match fp, fun_res_ty),
+          (seen, fun_arg_ty) ))
+      (false, fun_ty) params
+  in
   let cases_param, body =
     match body with
     | Tfunction_body body ->
@@ -1897,15 +1968,18 @@ and transl_curried_function ~scopes loc repr params body
           fc_loc; fc_arg_sort; fc_arg_mode }
       ->
         let fc_arg_sort = Jkind.Sort.default_for_transl_and_get fc_arg_sort in
+        let fc_arg_ty, _ = split_fun_ty fc_fun_ty in
         let arg_layout =
-          match join_layout_of_cases fc_arg_sort fc_cases with
-          | Some arg_layout -> arg_layout
-          | None ->
-              (* ppxes can generate empty function cases, which compiles to
-                 a function that always raises Match_failure. We try less
-                 hard to calculate a detailed layout that the middle-end can
-                 use for optimizations. *)
-              layout_of_sort fc_loc fc_arg_sort
+          if any_param_is_partial_gadt_match
+             || cases_are_partial_gadt_match fc_cases fc_partial
+          then layout_of_fun_arg_ty fc_arg_ty fc_loc fc_arg_sort
+          else
+            match join_layout_of_cases fc_arg_sort fc_cases with
+            | Some arg_layout -> arg_layout
+            | None ->
+                (* ppxes can generate empty function cases, which compiles to
+                   a function that always raises Match_failure. *)
+                layout_of_fun_arg_ty fc_arg_ty fc_loc fc_arg_sort
         in
         let arg_mode = transl_alloc_mode_l fc_arg_mode in
         add_type_shapes_of_cases fc_cases;
@@ -1931,7 +2005,7 @@ and transl_curried_function ~scopes loc repr params body
   in
   let body, params =
     List.fold_right
-      (fun fp (body, params) ->
+      (fun (fp, (follows_partial_gadt, fun_arg_ty)) (body, params) ->
         let { fp_param; fp_param_debug_uid; fp_kind; fp_mode; fp_sort;
               fp_partial; fp_loc } = fp in
         let arg_env, arg_type, attributes =
@@ -1942,7 +2016,11 @@ and transl_curried_function ~scopes loc repr params body
               expr.exp_env, Predef.type_option expr.exp_type, Translattribute.transl_param_attributes pat
         in
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
-        let arg_layout = layout arg_env fp_loc fp_sort arg_type in
+        let arg_layout =
+          if follows_partial_gadt || param_is_partial_gadt_match fp
+          then layout_of_fun_arg_ty fun_arg_ty fp_loc fp_sort
+          else layout arg_env fp_loc fp_sort arg_type
+        in
         let arg_mode = transl_alloc_mode_l fp_mode.mode_modes in
         let param =
           { name = fp_param;
@@ -1974,7 +2052,7 @@ and transl_curried_function ~scopes loc repr params body
                 ~param:fp_param
         in
         body, param :: params)
-      params
+      (List.combine params param_widening_info)
       (body, Option.to_list cases_param)
     in
     (* chunk params according to Lambda.max_arity. If Lambda.max_arity = n and
@@ -2093,6 +2171,7 @@ and transl_function ~in_new_scope ~scopes e params body
       (function repr ->
          transl_function_without_attributes
            ~mode ~return_sort ~return_mode
+           ~fun_ty:(Some (e.exp_env, e.exp_type))
            ~scopes e.exp_loc repr ~region params body)
   in
   let zero_alloc : Lambda.zero_alloc_attribute =
@@ -2943,7 +3022,7 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
            let ghost_loc = { loc with loc_ghost = true } in
            transl_function_without_attributes ~scopes ~region:true
              ~return_sort:case_sort ~mode:alloc_heap ~return_mode
-             loc repr []
+             ~fun_ty:None loc repr []
              (Tfunction_cases
                 { fc_cases = [case]; fc_param = param;
                   fc_param_debug_uid = param_debug_uid; fc_partial = partial;
