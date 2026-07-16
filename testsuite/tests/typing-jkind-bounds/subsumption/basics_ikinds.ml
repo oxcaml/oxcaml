@@ -584,7 +584,7 @@ Line 3, characters 0-62:
 3 | type should_fail_too : immutable_data with r = [`A of int ref]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation immutable_data with r,
-       because int ref is not mod immutable.
+       because ref is not mod immutable.
 |}]
 
 module M : sig
@@ -599,7 +599,7 @@ Line 3, characters 2-42:
 3 |   type t : immutable_data with r = int ref
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation immutable_data with r,
-       because int ref is not mod immutable.
+       because ref is not mod immutable.
 |}]
 
 type should_likewise_fail : immutable_data = (int ref * (int -> int))
