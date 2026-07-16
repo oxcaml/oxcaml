@@ -553,15 +553,12 @@ module Make (M : sig
   val value : param -> V.t -> result
 
   val ( >>> ) : param -> result -> (unit -> result) -> result
-
-  (* The size of a DWARF expression (a list of operators), as needed to
-     construct the ULEB128 length prefixes of block operands. For the [Size]
-     instance below this is defined recursively; the other instances use
-     [size_of_expression]. *)
-  val size_of_expression : t list -> I.t
 end) =
 struct
-  let rec run param t =
+  (* [size_of_expression] is passed as an argument because the [size] function,
+     from which it is built, is itself defined in terms of this traversal (see
+     the bottom of this file). *)
+  let rec run ~size_of_expression param t =
     let unit_result = M.unit_result () in
     let opcode = M.opcode param in
     let value = M.value param in
@@ -732,36 +729,12 @@ struct
       (* The operand is a ULEB128-length-prefixed block holding a DWARF
          expression. The operators in the block are printed, sized and emitted
          using the normal machinery, via the recursive calls to [run]. *)
-      let block_size = M.size_of_expression block in
+      let block_size = size_of_expression block in
       List.fold_left
-        (fun acc op -> acc >>> fun () -> run param op)
+        (fun acc op -> acc >>> fun () -> run ~size_of_expression param op)
         (value (V.uleb128 ~comment:"block length" (I.to_uint64_exn block_size)))
         block
 end
-
-module rec Size : sig
-  val run : unit -> t -> I.t
-end = Make (struct
-  type param = unit
-
-  type result = I.t
-
-  let unit_result () = I.zero ()
-
-  let opcode () _ = I.one ()
-
-  let value () v = V.size v
-
-  let ( >>> ) () size f = I.add size (f ())
-
-  let size_of_expression ops =
-    List.fold_left (fun acc op -> I.add acc (Size.run () op)) (I.zero ()) ops
-end)
-
-let size t = Size.run () t
-
-let size_of_expression ops =
-  List.fold_left (fun acc op -> I.add acc (size op)) (I.zero ()) ops
 
 module Print = Make (struct
   type param = Format.formatter
@@ -777,8 +750,20 @@ module Print = Make (struct
   let ( >>> ) ppf () f =
     Format.pp_print_string ppf " ";
     f ()
+end)
 
-  let size_of_expression = size_of_expression
+module Size = Make (struct
+  type param = unit
+
+  type result = I.t
+
+  let unit_result () = I.zero ()
+
+  let opcode () _ = I.one ()
+
+  let value () v = V.size v
+
+  let ( >>> ) () size f = I.add size (f ())
 end)
 
 module Emit = Make (struct
@@ -796,10 +781,14 @@ module Emit = Make (struct
   let value asm_directives v = V.emit ~asm_directives v
 
   let ( >>> ) _asm_directives () f = f ()
-
-  let size_of_expression = size_of_expression
 end)
 
-let print ppf t = Print.run ppf t
+let rec size t = Size.run ~size_of_expression () t
 
-let emit ~asm_directives t = Emit.run asm_directives t
+(* The size of a DWARF expression: the sum of the sizes of its operators. *)
+and size_of_expression ops =
+  List.fold_left (fun acc op -> I.add acc (size op)) (I.zero ()) ops
+
+let print ppf t = Print.run ~size_of_expression ppf t
+
+let emit ~asm_directives t = Emit.run ~size_of_expression asm_directives t
