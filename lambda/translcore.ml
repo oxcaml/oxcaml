@@ -1750,17 +1750,17 @@ and transl_tupled_function
     match params, body with
     | [],
       Tfunction_cases
-        { fc_cases = { c_lhs; _ } :: _ as cases;
+        { fc_cases = first_case :: rest_cases;
           fc_partial; fc_arg_mode; fc_arg_sort } ->
         let fc_arg_sort = Jkind.Sort.default_for_transl_and_get fc_arg_sort in
-        Some (cases, fc_partial, c_lhs, fc_arg_mode, fc_arg_sort)
+        Some (first_case, rest_cases, fc_partial, fc_arg_mode, fc_arg_sort)
     | [{ fp_kind = Tparam_pat pat; fp_partial; fp_mode; fp_sort }],
       Tfunction_body body ->
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
         let case =
           { c_lhs = pat; c_cont = None; c_guard = None; c_rhs = body }
         in
-        Some ([ case ], fp_partial, pat, fp_mode.mode_modes, fp_sort)
+        Some (case, [], fp_partial, fp_mode.mode_modes, fp_sort)
     | _ -> None
   in
   (* Cases can be eligible for flattening if they belong to the only param
@@ -1769,13 +1769,14 @@ and transl_tupled_function
      thought it through. *)
   match eligible_cases with
   | Some
-      (cases, partial,
-       { pat_desc = Tpat_tuple pl }, arg_mode, arg_sort)
+      (({ c_lhs = { pat_desc = Tpat_tuple pl } } as first_case),
+       rest_cases, partial, arg_mode, arg_sort)
     when is_alloc_heap mode
       && is_alloc_heap (transl_alloc_mode_l arg_mode)
       && !Clflags.native_code
       && List.length pl <= (Lambda.max_arity ()) ->
       begin try
+        let cases = first_case :: rest_cases in
         let size = List.length pl in
         let pats_expr_list =
           List.map
@@ -1803,20 +1804,17 @@ and transl_tupled_function
                  Argument should be a tuple, but couldn't get the kinds"
         in
         let value_kinds =
-          match cases with
-          | [] -> raise Matching.Cannot_flatten
-          | first :: rest ->
-              let first_kinds = value_kinds_of_case first in
-              (* Only a GADT match makes the cases' types differ; otherwise
-                 the first case's value kinds are already the join. *)
-              if cases_contain_gadt cases
-              then
-                List.fold_left
-                  (fun acc case ->
-                    List.map2 Lambda.join_value_kind acc
-                      (value_kinds_of_case case))
-                  first_kinds rest
-              else first_kinds
+          let first_kinds = value_kinds_of_case first_case in
+          (* Only a GADT match makes the cases' types differ; otherwise
+             the first case's value kinds are already the join. *)
+          if cases_contain_gadt cases
+          then
+            List.fold_left
+              (fun acc case ->
+                List.map2 Lambda.join_value_kind acc
+                  (value_kinds_of_case case))
+              first_kinds rest_cases
+          else first_kinds
         in
         let kinds = List.map (fun vk -> Pvalue vk) value_kinds in
         let tparams =
