@@ -172,7 +172,10 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
   let expr =
     List.fold_right
       (fun (v, v_duid, defining_expr) body ->
-        let var_bind = Bound_var.create v v_duid Name_mode.normal in
+        let var_bind =
+          Bound_var.create v v_duid Name_mode.normal ~dbg:Debuginfo.none
+            ~is_parameter:Bound_var.Is_parameter.local_var
+        in
         Let.create
           (Bound_pattern.singleton var_bind)
           defining_expr ~body ~free_names_of_body:Unknown
@@ -354,7 +357,9 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
                   (fun denv kind result ->
                     let result_var, result_uid = BP.var_and_uid result in
                     DE.add_variable denv
-                      (VB.create result_var result_uid NM.in_types)
+                      (VB.create result_var result_uid NM.in_types
+                         ~dbg:Debuginfo.none
+                         ~is_parameter:VB.Is_parameter.local_var)
                       (T.unknown_with_subkind kind
                          ~alloc_mode:
                            (Apply.alloc_mode apply
@@ -521,7 +526,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
             (fun kind ->
               let param = Variable.create "param" (KS.kind kind) in
               let param_duid = Flambda_debug_uid.none in
-              Bound_parameter.create param kind param_duid)
+              Bound_parameter.create param kind param_duid ~dbg:Debuginfo.none)
             (Flambda_arity.unarize remaining_param_arity)
           |> Bound_parameters.create
         in
@@ -644,7 +649,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                   VB.create var Flambda_debug_uid.none
                     (* CR sspies: In the future, try improving the debugging UID
                        propagation here if possible. *)
-                    Name_mode.normal
+                    Name_mode.normal ~dbg:Debuginfo.none
+                    ~is_parameter:VB.Is_parameter.local_var
                 in
                 let prim =
                   P.Unary
@@ -758,6 +764,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       let expr =
         let wrapper_var =
           VB.create wrapper_var wrapper_var_duid Name_mode.normal
+            ~dbg:Debuginfo.none ~is_parameter:VB.Is_parameter.local_var
         in
         let bound_vars = [wrapper_var] in
         let bound = Bound_pattern.set_of_closures bound_vars in

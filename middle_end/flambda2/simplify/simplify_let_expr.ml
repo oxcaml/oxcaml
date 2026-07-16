@@ -205,12 +205,13 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
               let has_uses =
                 Name_mode.Or_absent.is_present greatest_name_mode
               in
-              let can_phantomise =
-                (not is_depth)
-                && Bound_pattern.exists_all_bound_vars bound_vars
-                     ~f:(fun bound_var ->
-                       Variable.user_visible (VB.var bound_var))
-              in
+              (* Phantomise even non-user-visible variables: they may be
+                 intermediates (for example the [my_closure] introduced when
+                 inlining, or temporaries) that are referenced by user-visible
+                 phantom lets -- e.g. [Project_value_slot] /
+                 [Project_function_slot] projections -- which would otherwise
+                 resolve to a deleted binding and display garbage. *)
+              let can_phantomise = not is_depth in
               let will_delete_binding =
                 if is_end_region_for_unused_region
                 then true
@@ -374,6 +375,17 @@ let update_data_flow dacc closure_info ~lifted_constants_from_defining_expr
 let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
     ~down_to_up bound_pattern ~body =
   let module L = Flambda.Let in
+  (* Rewrite the [Debuginfo.t] on the bound variable(s) to reflect the current
+     inlining stack, just as is done for the [Debuginfo.t] on defining
+     expressions (see e.g. [Simplify_named]). This must happen exactly once per
+     [Let], on the downwards traversal, where the inlining context is known
+     precisely. The rewritten values are used to determine which (possibly
+     inlined) frame each variable belongs to when generating debugging
+     information. *)
+  let bound_pattern =
+    Bound_pattern.add_inlined_debuginfo bound_pattern
+      (DE.inlined_debuginfo (DA.denv dacc))
+  in
   let original_dacc = dacc in
   (* Remember then clear the lifted constants memory in [DA] so we can easily
      find out which constants are generated during simplification of the
