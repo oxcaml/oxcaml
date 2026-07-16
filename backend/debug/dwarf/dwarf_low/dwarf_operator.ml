@@ -210,6 +210,8 @@ type t =
       { label : Asm_label.t;
         offset_in_bytes : Targetint.t
       }
+  | DW_op_entry_value of { block : t list }
+  | DW_op_GNU_entry_value of { block : t list }
 
 let opcode_name t =
   match t with
@@ -369,6 +371,8 @@ let opcode_name t =
   | DW_op_bit_piece _ -> "DW_op_bit_piece"
   | DW_op_implicit_pointer _ -> "DW_op_implicit_pointer"
   | DW_op_GNU_implicit_pointer _ -> "DW_op_GNU_implicit_pointer"
+  | DW_op_entry_value _ -> "DW_op_entry_value"
+  | DW_op_GNU_entry_value _ -> "DW_op_GNU_entry_value"
 
 (* DWARF-4 spec section 7.7.1. *)
 let opcode = function
@@ -528,6 +532,8 @@ let opcode = function
   | DW_op_bit_piece _ -> 0x9d
   | DW_op_implicit_pointer _ -> 0xa0
   | DW_op_GNU_implicit_pointer _ -> 0xf2
+  | DW_op_entry_value _ -> 0xa3
+  | DW_op_GNU_entry_value _ -> 0xf3
 
 external caml_string_set32 : bytes -> index:int -> Int32.t -> unit
   = "%caml_string_set32"
@@ -547,9 +553,15 @@ module Make (M : sig
   val value : param -> V.t -> result
 
   val ( >>> ) : param -> result -> (unit -> result) -> result
+
+  (* The size of a DWARF expression (a list of operators), as needed to
+     construct the ULEB128 length prefixes of block operands. For the [Size]
+     instance below this is defined recursively; the other instances use
+     [size_of_expression]. *)
+  val size_of_expression : t list -> I.t
 end) =
 struct
-  let run param t =
+  let rec run param t =
     let unit_result = M.unit_result () in
     let opcode = M.opcode param in
     let value = M.value param in
@@ -716,7 +728,40 @@ struct
       let offset_in_bytes = Targetint.to_int64 offset_in_bytes in
       value (V.offset_into_debug_info label) >>> fun () ->
       value (V.sleb128 ~comment:"offset in bytes" offset_in_bytes)
+    | DW_op_entry_value { block } | DW_op_GNU_entry_value { block } ->
+      (* The operand is a ULEB128-length-prefixed block holding a DWARF
+         expression. The operators in the block are printed, sized and emitted
+         using the normal machinery, via the recursive calls to [run]. *)
+      let block_size = M.size_of_expression block in
+      List.fold_left
+        (fun acc op -> acc >>> fun () -> run param op)
+        (value (V.uleb128 ~comment:"block length" (I.to_uint64_exn block_size)))
+        block
 end
+
+module rec Size : sig
+  val run : unit -> t -> I.t
+end = Make (struct
+  type param = unit
+
+  type result = I.t
+
+  let unit_result () = I.zero ()
+
+  let opcode () _ = I.one ()
+
+  let value () v = V.size v
+
+  let ( >>> ) () size f = I.add size (f ())
+
+  let size_of_expression ops =
+    List.fold_left (fun acc op -> I.add acc (Size.run () op)) (I.zero ()) ops
+end)
+
+let size t = Size.run () t
+
+let size_of_expression ops =
+  List.fold_left (fun acc op -> I.add acc (size op)) (I.zero ()) ops
 
 module Print = Make (struct
   type param = Format.formatter
@@ -732,20 +777,8 @@ module Print = Make (struct
   let ( >>> ) ppf () f =
     Format.pp_print_string ppf " ";
     f ()
-end)
 
-module Size = Make (struct
-  type param = unit
-
-  type result = I.t
-
-  let unit_result () = I.zero ()
-
-  let opcode () _ = I.one ()
-
-  let value () v = V.size v
-
-  let ( >>> ) () size f = I.add size (f ())
+  let size_of_expression = size_of_expression
 end)
 
 module Emit = Make (struct
@@ -763,10 +796,10 @@ module Emit = Make (struct
   let value asm_directives v = V.emit ~asm_directives v
 
   let ( >>> ) _asm_directives () f = f ()
+
+  let size_of_expression = size_of_expression
 end)
 
 let print ppf t = Print.run ppf t
-
-let size t = Size.run () t
 
 let emit ~asm_directives t = Emit.run asm_directives t
