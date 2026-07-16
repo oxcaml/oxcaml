@@ -47,15 +47,34 @@ let use_dup_for_constant_mutable_arrays_bigger_than = 4
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
+(* Mirrors [Typecore.contains_gadt]: [cstr_generalized] is the criterion the
+   type checker uses to decide when a match adds GADT equations. *)
+let pat_contains_gadt pat =
+  exists_pattern
+    (fun p ->
+      match p.pat_desc with
+      | Tpat_construct (_, cd, _, _, _) -> cd.cstr_generalized
+      | _ -> false)
+    pat
+
+let cases_contain_gadt cases =
+  List.exists (fun { c_lhs; _ } -> pat_contains_gadt c_lhs) cases
+
 let join_layout_of_cases sort cases =
   match cases with
   | [] -> None
   | { c_lhs; _ } :: rest ->
-      Some
-        (List.fold_left
-           (fun acc { c_lhs; _ } ->
-             Lambda.join_layout acc (layout_pat sort c_lhs))
-           (layout_pat sort c_lhs) rest)
+      let first_layout = layout_pat sort c_lhs in
+      (* Only a GADT match makes the cases' types differ; otherwise the first
+         case's layout is already the join. *)
+      if cases_contain_gadt cases
+      then
+        Some
+          (List.fold_left
+             (fun acc { c_lhs; _ } ->
+               Lambda.join_layout acc (layout_pat sort c_lhs))
+             first_layout rest)
+      else Some first_layout
 
 let field_offset_for_label lbl repres =
   match repres with
@@ -1787,11 +1806,17 @@ and transl_tupled_function
           match cases with
           | [] -> raise Matching.Cannot_flatten
           | first :: rest ->
-              List.fold_left
-                (fun acc case ->
-                  List.map2 Lambda.join_value_kind acc
-                    (value_kinds_of_case case))
-                (value_kinds_of_case first) rest
+              let first_kinds = value_kinds_of_case first in
+              (* Only a GADT match makes the cases' types differ; otherwise
+                 the first case's value kinds are already the join. *)
+              if cases_contain_gadt cases
+              then
+                List.fold_left
+                  (fun acc case ->
+                    List.map2 Lambda.join_value_kind acc
+                      (value_kinds_of_case case))
+                  first_kinds rest
+              else first_kinds
         in
         let kinds = List.map (fun vk -> Pvalue vk) value_kinds in
         let tparams =
