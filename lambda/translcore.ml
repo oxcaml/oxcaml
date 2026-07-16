@@ -47,6 +47,16 @@ let use_dup_for_constant_mutable_arrays_bigger_than = 4
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
+let join_layout_of_cases sort cases =
+  match cases with
+  | [] -> None
+  | { c_lhs; _ } :: rest ->
+      Some
+        (List.fold_left
+           (fun acc { c_lhs; _ } ->
+             Lambda.join_layout acc (layout_pat sort c_lhs))
+           (layout_pat sort c_lhs) rest)
+
 let field_offset_for_label lbl repres =
   match repres with
   | Record_boxed
@@ -1741,33 +1751,49 @@ and transl_tupled_function
   match eligible_cases with
   | Some
       (cases, partial,
-       ({ pat_desc = Tpat_tuple pl } as arg_pat), arg_mode, arg_sort)
+       { pat_desc = Tpat_tuple pl }, arg_mode, arg_sort)
     when is_alloc_heap mode
       && is_alloc_heap (transl_alloc_mode_l arg_mode)
       && !Clflags.native_code
       && List.length pl <= (Lambda.max_arity ()) ->
       begin try
-        let arg_layout = layout_pat arg_sort arg_pat in
         let size = List.length pl in
         let pats_expr_list =
           List.map
             (fun {c_lhs; c_guard; c_rhs} ->
               (Matching.flatten_pattern size c_lhs, c_guard, c_rhs))
             cases in
-        let kinds =
+        let tuple_value_kinds arg_layout =
           match arg_layout with
           | Pvalue {
               nullable = Non_nullable;
               raw_kind = Pvariant { consts = [];
-                               non_consts = [0, Constructor_uniform kinds] }} ->
+                               non_consts = [0, Constructor_uniform kinds] }}
+            when List.length kinds = size ->
               (* CR layouts v5: to change when we have non-value tuple
                  elements. *)
-              List.map (fun vk -> Pvalue vk) kinds
-          | _ ->
+              Some kinds
+          | _ -> None
+        in
+        let value_kinds_of_case { c_lhs; _ } =
+          match tuple_value_kinds (layout_pat arg_sort c_lhs) with
+          | Some kinds -> kinds
+          | None ->
               Misc.fatal_error
                 "Translcore.transl_tupled_function: \
                  Argument should be a tuple, but couldn't get the kinds"
         in
+        let value_kinds =
+          match cases with
+          | [] -> raise Matching.Cannot_flatten
+          | first :: rest ->
+              List.fold_left
+                (fun acc case ->
+                  List.map2 Lambda.join_value_kind acc
+                    (value_kinds_of_case case))
+                (value_kinds_of_case first) rest
+        in
+        let kinds = List.map (fun vk -> Pvalue vk) value_kinds in
         let tparams =
           List.map (fun kind -> {
                 name = Ident.create_local "param";
@@ -1872,9 +1898,9 @@ and transl_curried_function ~scopes loc repr params body
       ->
         let fc_arg_sort = Jkind.Sort.default_for_transl_and_get fc_arg_sort in
         let arg_layout =
-          match fc_cases with
-          | { c_lhs } :: _ -> layout_pat fc_arg_sort c_lhs
-          | [] ->
+          match join_layout_of_cases fc_arg_sort fc_cases with
+          | Some arg_layout -> arg_layout
+          | None ->
               (* ppxes can generate empty function cases, which compiles to
                  a function that always raises Match_failure. We try less
                  hard to calculate a detailed layout that the middle-end can

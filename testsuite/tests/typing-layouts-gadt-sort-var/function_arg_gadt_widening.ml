@@ -1,10 +1,6 @@
 (* TEST
  flags = "-w -8";
  {
-   (* Pre-fix, [g6] below segfaults in native code (the [Int6] call
-      projects through the [Block6] branch's tuple kind). Pin the
-      crash here; the fix removes this line. *)
-   exit_status = "-11";
    native;
  }{
    bytecode;
