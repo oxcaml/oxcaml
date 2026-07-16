@@ -122,6 +122,7 @@ let rec layout_is_representable : Jkind.Layout.Const.t -> bool = function
   | Base _ -> true
   | Product sorts ->
     List.for_all layout_is_representable sorts
+  | Addressable layout -> layout_is_representable layout
 
 (* CR layouts-scannable: calling [type_jkind] here in [typeopt] is not ideal.
    Removing this function requires more careful tracking of representable
@@ -194,7 +195,7 @@ type 'a classification =
 (* Classify a ty into a [classification]. Looks through synonyms, using
    [scrape_ty].  Returning [Any] is safe, though may skip some optimizations.
    See comment on [classification] above to understand [classify_product]. *)
-let classify ~classify_product env ty layout : _ classification =
+let rec classify ~classify_product env ty layout : _ classification =
   match (layout : Jkind.Layout.Const.t) with
   | Any _ -> Misc.fatal_error "classify called with non-representable layout"
   | Base (Scannable, _sa) -> begin
@@ -294,6 +295,7 @@ let classify ~classify_product env ty layout : _ classification =
   | Product c -> Product (classify_product ty c)
   | Univar _ -> Misc.fatal_error "classify: Univar"
   | Genvar _ -> Misc.fatal_error "classify: Genvar"
+  | Addressable layout -> classify ~classify_product env ty layout
 
 let rec scannable_product_array_kind elt_ty_for_error loc layouts =
   List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) layouts
@@ -318,6 +320,8 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
     Misc.fatal_error "sort_to_scannable_product_element_kind: Univar"
   | Genvar _ ->
     Misc.fatal_error "sort_to_scannable_product_element_kind: Genvar"
+  | Addressable layout ->
+    sort_to_scannable_product_element_kind elt_ty_for_error loc layout
 
 let rec ignorable_product_array_kind loc (sorts : Jkind.Layout.Const.t list) =
   match sorts with
@@ -353,6 +357,7 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Univar"
   | Genvar _ ->
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Genvar"
+  | Addressable layout -> sort_to_ignorable_product_element_kind loc layout
 
 let array_kind_of_elt env loc ty =
   let ty = match scrape_ty env ty with Some ty -> ty | None -> ty in
@@ -488,7 +493,7 @@ let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
   | _ ->
       (kind, layout)
 
-let value_kind_of_scannable_jkind env jkind =
+let rec value_kind_of_scannable_jkind env jkind =
   let layout = Jkind.get_layout_defaulting_to_scannable env jkind in
   (* In other places, we use [Ctype.type_jkind_purely_if_principal]. Here, we omit
      the principality check, as we're just trying to compute optimizations. *)
@@ -497,6 +502,9 @@ let value_kind_of_scannable_jkind env jkind =
     Jkind.get_externality_upper_bound ~context env jkind
   in
   match layout with
+  | Some (Addressable layout) ->
+    value_kind_of_scannable_jkind env
+      (Jkind.set_layout jkind (Jkind_types.Layout.of_const layout))
   | Some (Base (Scannable, { separability; _ })) -> (
     (* use the better of the two [immediate_or_pointer]s *)
     match pointerness_of_separability separability,

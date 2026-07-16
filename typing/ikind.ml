@@ -292,6 +292,14 @@ module Solver = struct
     in
     loop base args 0
 
+  (* The LDD solver tracks mode-crossing axes, not addressability.  The latter
+     is checked by the Jkind layout gate before solver results are used. *)
+  and unresolved_base_path : type a. a Types.jkind_base -> Path.t option =
+    function
+    | Types.Layout _ -> None
+    | Types.Kconstr (path, _) -> Some path
+    | Types.Addressable base -> unresolved_base_path base
+
   (* Converting surface jkinds to solver ckinds. *)
   and ckind_of_jkind_desc : type a l r.
       ctx -> (a, l * r) Types.base_and_axes -> Ldd.node =
@@ -303,12 +311,8 @@ module Solver = struct
             (b, l * r) Types.base_and_axes ->
             Types.mod_bounds * (l * r) Types.with_bounds * Path.t option =
          fun jkind_desc ->
-          let unresolved_base =
-            match jkind_desc.base with
-            | Types.Layout _ -> None
-            | Types.Kconstr (path, _) -> Some path
-          in
-          jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
+          let unresolved_path = unresolved_base_path jkind_desc.base in
+          jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_path
         in
         expand
       | Some env ->
@@ -319,21 +323,17 @@ module Solver = struct
           match Jkind.Const.expand_once env jkind_desc with
           | Some jkind_const -> expand jkind_const
           | None ->
-            let unresolved_base =
-              match jkind_desc.base with
-              | Types.Layout _ -> None
-              | Types.Kconstr (path, _) -> Some path
-            in
-            jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
+            let unresolved_path = unresolved_base_path jkind_desc.base in
+            jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_path
         in
         expand
     in
-    let mod_bounds, with_bounds, unresolved_base = expand jkind_desc in
+    let mod_bounds, with_bounds, unresolved_path = expand jkind_desc in
     let base_mod_bounds =
       Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds)
     in
     let base =
-      match unresolved_base with
+      match unresolved_path with
       | None -> base_mod_bounds
       | Some path ->
         let atom = rigid_name ctx (Ldd.Name.katom path) in
@@ -356,32 +356,24 @@ module Solver = struct
   and mod_bounds_floor_of_jkind_desc : type a l r.
       ctx -> (a, l * r) Types.base_and_axes -> Ldd.node option =
    fun ctx jkind_desc ->
-    let mod_bounds, unresolved_base =
+    let mod_bounds, unresolved_path =
       let rec expand : type b.
           (b, l * r) Types.base_and_axes -> Types.mod_bounds * Path.t option =
        fun jkind_desc ->
         match ctx.env with
         | None ->
-          let unresolved_base =
-            match jkind_desc.base with
-            | Types.Layout _ -> None
-            | Types.Kconstr (path, _) -> Some path
-          in
-          jkind_desc.mod_bounds, unresolved_base
+          let unresolved_path = unresolved_base_path jkind_desc.base in
+          jkind_desc.mod_bounds, unresolved_path
         | Some env -> (
           match Jkind.Const.expand_once env jkind_desc with
           | Some jkind_const -> expand jkind_const
           | None ->
-            let unresolved_base =
-              match jkind_desc.base with
-              | Types.Layout _ -> None
-              | Types.Kconstr (path, _) -> Some path
-            in
-            jkind_desc.mod_bounds, unresolved_base)
+            let unresolved_path = unresolved_base_path jkind_desc.base in
+            jkind_desc.mod_bounds, unresolved_path)
       in
       expand jkind_desc
     in
-    match unresolved_base with
+    match unresolved_path with
     | Some _ -> None
     | None -> Some (Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds))
 
@@ -1122,7 +1114,7 @@ let fast_sub_of_any_super : type r.
       (Jkind_types.Layout.Sort (_sub_sort, { nullability = _; separability = _ }))
     ->
     fast_sub_of_value_sub (Jkind.Mod_bounds.to_axis_lattice mod_bounds) sub
-  | Types.Layout _ | Types.Kconstr _ -> false
+  | Types.Layout _ | Types.Kconstr _ | Types.Addressable _ -> false
 
 let fast_sub_of_sort_super : type r.
     Jkind_types.Sort.t ->
@@ -1137,7 +1129,7 @@ let fast_sub_of_sort_super : type r.
     if not (Jkind_types.Sort.equate sub_sort super_sort)
     then false
     else fast_sub_of_value_sub (Jkind.Mod_bounds.to_axis_lattice mod_bounds) sub
-  | Types.Layout _ | Types.Kconstr _ -> false
+  | Types.Layout _ | Types.Kconstr _ | Types.Addressable _ -> false
 
 let fast_sub : type r1 l2.
     context:Jkind.jkind_context ->

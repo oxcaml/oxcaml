@@ -2006,7 +2006,10 @@ let report_error_doc loc env = function
                   ("a" :: Jkind.Scannable_axes.to_string_list sa)
               | Layout (Sort (Univar _, _)) ->
                 Misc.fatal_error "univar"
-              | Layout (Sort (Base _, _) | Any _ | Product _) | Kconstr _ ->
+              | Layout
+                  ( Sort ((Base _ | Addressable _), _)
+                  | Any _ | Product _ | Addressable _ )
+              | Kconstr _ | Addressable _ ->
                 fprintf ppf "kind %a" (Jkind.format env)
                   inferred_jkind)))
         inferred_jkind

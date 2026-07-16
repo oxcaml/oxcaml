@@ -235,9 +235,13 @@ module Type_shape = struct
 
   let unknown_shape_from_jkind jkind =
     let layout =
-      match jkind.Types.jkind.base with
-      | Kconstr _ -> None
-      | Layout l -> Jkind_types.Layout.get_const l
+      let rec get_layout = function
+        | Types.Kconstr _ -> None
+        | Types.Layout l -> Jkind_types.Layout.get_const l
+        | Types.Addressable base ->
+          Option.map Jkind_types.Layout.Const.addressable (get_layout base)
+      in
+      get_layout jkind.Types.jkind.base
     in
     let sort_opt = Option.bind layout Jkind_types.Layout.Const.get_sort in
     match sort_opt with

@@ -1252,24 +1252,31 @@ let out_jkind_of_const_jkind env jkind =
 
 (* CR layouts v2.8: This is just like [Jkind.format], and likely needs to
    be overhauled with [with]-types. Internal ticket 5096. *)
-let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
-  match desc.base with
-  | Layout (Sort (Var n, sa)) ->
-    Ojkind_var ("'_representable_layout_" ^
-                Int.to_string (Jkind.Sort.Var.get_print_number n),
-                Jkind.Scannable_axes.to_string_list sa)
-  (* Analyze a product before calling [get_const]: the machinery in
-     [Jkind.Const.to_out_jkind_const] works better for atomic layouts, not
-     products. *)
-  | Layout (Product lays) ->
-    Ojkind_product
-      (List.map
-         (fun layout ->
-            out_jkind_of_desc env { desc with base = Layout layout })
-         lays)
-  | _ -> match Jkind.Desc.get_const desc with
-    | Some c -> out_jkind_of_const_jkind env c
-    | None -> assert false (* handled above *)
+let out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
+  let rec loop (desc : 'd Jkind.Desc.t) =
+    match desc.base with
+    | Layout (Sort (Var n, sa)) ->
+      Ojkind_var
+        ( "'_representable_layout_"
+          ^ Int.to_string (Jkind.Sort.Var.get_print_number n),
+          Jkind.Scannable_axes.to_string_list sa )
+    (* Analyze a product before calling [get_const]: the machinery in
+       [Jkind.Const.to_out_jkind_const] works better for atomic layouts, not
+       products. *)
+    | Layout (Product lays) ->
+      Ojkind_product
+        (List.map
+           (fun layout ->
+             loop
+               (Jkind.Desc.for_product_element
+                  { desc with base = Layout layout }))
+           lays)
+    | _ -> (
+      match Jkind.Desc.get_const desc with
+      | Some c -> out_jkind_of_const_jkind env c
+      | None -> assert false (* handled above *))
+  in
+  loop desc
 
 let out_jkind_of_jkind env jkind = out_jkind_of_desc env (Jkind.get jkind)
 

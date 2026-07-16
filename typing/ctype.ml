@@ -3537,7 +3537,7 @@ let type_is_gc_ignorable_scannable env ty =
   let l =
     match scannable.jkind.base with
     | Layout l -> l
-    | Kconstr _ ->
+    | Kconstr _ | Addressable _ ->
       Misc.fatal_error "Ctype.type_is_gc_ignorable_scannable: abstract Kconstr"
   in
   let sep =
@@ -8282,7 +8282,13 @@ let clear_hash ()   =
 
 (* The [desc_of_const] parameter lets this work on both [jkind_desc]s and
    [jkind_const_desc]s. *)
-let rec nondep_jkind_desc_base env ids ~desc_of_const jkind_desc =
+let rec addressable_jkind_base addressable_layout = function
+  | Addressable base -> addressable_jkind_base addressable_layout base
+  | Layout layout -> Layout (addressable_layout layout)
+  | Kconstr _ as base -> Addressable base
+
+let rec nondep_jkind_desc_base env ids ~desc_of_const ~addressable_layout
+    jkind_desc =
   match jkind_desc.base with
   | Kconstr (p, _sa) -> begin
       match Path.find_free_opt ids p with
@@ -8291,18 +8297,29 @@ let rec nondep_jkind_desc_base env ids ~desc_of_const jkind_desc =
         match Jkind.Const.expand_once env jkind_desc with
         | None -> raise (Nondep_cannot_erase id)
         | Some jkind ->
-          nondep_jkind_desc_base env ids ~desc_of_const (desc_of_const jkind)
+          nondep_jkind_desc_base env ids ~desc_of_const ~addressable_layout
+            (desc_of_const jkind)
       end
   | Layout _ ->
     (* Nothing to do here because there are no paths in layouts (yet?). *)
     jkind_desc
+  | Addressable base ->
+    let jkind_desc =
+      nondep_jkind_desc_base env ids ~desc_of_const ~addressable_layout
+        { jkind_desc with base }
+    in
+    { jkind_desc with
+      base = addressable_jkind_base addressable_layout jkind_desc.base
+    }
 
 let nondep_jkind_const_desc_base env ids jkind_desc =
-  nondep_jkind_desc_base env ids ~desc_of_const:(fun x -> x) jkind_desc
+  nondep_jkind_desc_base env ids ~desc_of_const:(fun x -> x)
+    ~addressable_layout:Jkind_types.Layout.Const.addressable jkind_desc
 
 let nondep_jkind_desc_base env ids jkind_desc =
   nondep_jkind_desc_base env ids
-      ~desc_of_const:Jkind.Base_and_axes.jkind_desc_of_const jkind_desc
+    ~desc_of_const:Jkind.Base_and_axes.jkind_desc_of_const
+    ~addressable_layout:Jkind_types.Layout.addressable jkind_desc
 
 let nondep_jkind_base env ids jkind =
   let jkind_desc = nondep_jkind_desc_base env ids jkind.jkind in

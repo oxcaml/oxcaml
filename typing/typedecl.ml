@@ -1228,7 +1228,7 @@ let transl_declaration env sdecl (id, uid) =
       match kind with
       | Type_record_unboxed_product _ ->
         begin match Jkind.get_layout env jkind with
-        | Some (Any _) ->
+        | Some (Any _ | Addressable (Any _)) ->
           (* [jkind_default] has just what we need here *)
           let default_layout =
             match Jkind.extract_layout env jkind_default with
@@ -1998,6 +1998,7 @@ module Element_repr = struct
         |> Option.map (fun ts -> Unboxed_element (Product (Array.of_list ts)))
       | Univar _ -> Misc.fatal_error "sort_to_t: unexpected univar"
       | Genvar _ -> Misc.fatal_error "sort_to_t: unexpected genvar"
+      | Addressable layout -> layout_to_t layout
       in
       Option.bind layout layout_to_t
 
@@ -3101,47 +3102,53 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
      kinds) so it can just linearly traverse the kind definitions. In the future
      this function will need to be more like the type version to deal with more
      complex jkinds. *)
-  match decl.Types.jkind_manifest with
-  | None -> ()
-  | Some { base = Layout _; _ } -> ()
-  | Some ({ base = Kconstr (kpath, _); mod_bounds = _;
-            with_bounds = No_with_bounds }
-          as manifest) ->
-    if not (Path.exists_free recmod_ids kpath) then ()
+  let rec kconstr_path = function
+    | Kconstr (path, _) -> Some path
+    | Addressable base -> kconstr_path base
+    | Layout _ -> None
+  in
+  let steps_of kind_path (manifest : Types.jkind_const_desc_lr) =
+    let expand = Expands_to (kind_path, manifest) in
+    (* We check to see if we'd print any mod bounds, in which case we want
+       to use the "a contains b" language rather than "a = b". In the
+       future, we'll have more ways for [Contains] to show up (e.g., product
+       kinds). *)
+    match Typemode.untransl_mod_bounds manifest.mod_bounds with
+    | [] -> [expand]
+    | _ :: _ -> (
+      match kconstr_path manifest.base with
+      | Some base_path -> [Contains (manifest, base_path); expand]
+      | None -> [expand])
+  in
+  let rec follow current acc visited =
+    if Path.same current path then
+      Some (List.rev acc)
+    else if List.exists (Path.same current) visited then
+      (* This case may also be a cycle, but for a different path that will
+         be separately checked. *)
+      None
     else
-      let steps_of kind_path (manifest : Types.jkind_const_desc_lr) =
-        let expand = Expands_to (kind_path, manifest) in
-        (* We check to see if we'd print any mod bounds, in which case we want
-           to use the "a contains b" language rather than "a = b". In the
-           future, we'll have more ways for [Contains] to show up (e.g., product
-           kinds). *)
-        match Typemode.untransl_mod_bounds manifest.mod_bounds with
-        | [] -> [expand]
-        | _ :: _ ->
-          (match manifest.base with
-           | Kconstr (base_path, _) -> [Contains (manifest, base_path); expand]
-           | Layout _ -> assert false)
-      in
-      let rec follow current acc visited =
-        if Path.same current path then
-          Some (List.rev acc)
-        else if List.exists (Path.same current) visited then
-          (* This case may also be a cycle, but for a different path that will
-             be separately checked. *)
-          None
-        else
-          match (Env.find_jkind current env).jkind_manifest with
-          | Some ({ base = Kconstr (next, _); mod_bounds = _;
-                    with_bounds = No_with_bounds } as m) ->
-            follow next ((steps_of current m) @ acc) (current :: visited)
-          | Some { base = Layout _; _ } | None -> None
-          | exception Not_found -> None
-      in
+      match (Env.find_jkind current env).jkind_manifest with
+      | Some manifest -> (
+        match kconstr_path manifest.base with
+        | Some next ->
+          follow next (steps_of current manifest @ acc) (current :: visited)
+        | None -> None)
+      | None -> None
+      | exception Not_found -> None
+  in
+  let check manifest kpath =
+    if Path.exists_free recmod_ids kpath
+    then
       match follow kpath (steps_of path manifest) [path] with
       | Some reaching_path ->
         raise
           (Error (loc, Recursive_jkind_definition (path, env, reaching_path)))
       | None -> ()
+  in
+  match decl.Types.jkind_manifest with
+  | None -> ()
+  | Some manifest -> Option.iter (check manifest) (kconstr_path manifest.base)
 
 (* We only allow recursion in unboxed product types to occur through boxes,
    otherwise the type is uninhabitable and usually also infinite-size.
@@ -3204,6 +3211,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
       | Product l -> List.exists has_any l
       | Univar _ -> Misc.fatal_error "Unboxed_recursion: univar"
       | Genvar _ -> Misc.fatal_error "Unboxed_recursion: genvar"
+      | Addressable layout -> has_any layout
     in
     if has_any layout then tyl else []
   in
@@ -5321,14 +5329,15 @@ module Reaching_path = struct
   let pp_kind_manifest ppf
         ({ base; mod_bounds; with_bounds = No_with_bounds}
          : jkind_const_desc_lr ) =
-    let pp_base ppf = function
+    let rec pp_base ppf = function
       | Types.Layout l -> Fmt.fprintf ppf "%s" (Jkind.Layout.Const.to_string l)
       | Kconstr (p, sa) ->
         (match Jkind.Scannable_axes.to_string_list sa with
          | [] -> Printtyp.path ppf p
          | _ :: _ as sa_strs ->
-           Fmt.fprintf ppf "%a %s" Printtyp.path p
-             (String.concat " " sa_strs))
+             Fmt.fprintf ppf "%a %s" Printtyp.path p
+               (String.concat " " sa_strs))
+      | Addressable base -> Fmt.fprintf ppf "%a addressable" pp_base base
     in
     let mod_strings =
       Typemode.untransl_mod_bounds mod_bounds

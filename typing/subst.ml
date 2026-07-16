@@ -553,6 +553,9 @@ let rec sort s srt =
     let sorts' = Misc.Stdlib.List.map_sharing (sort s) sorts in
     if sorts == sorts' then srt
     else Product sorts'
+  | Addressable srt' ->
+    let srt'' = sort s srt' in
+    if srt' == srt'' then srt else Jkind_types.Sort.addressable srt''
   | Var var ->
     let var' = sort_var s var in
     if var == var' then srt
@@ -570,8 +573,21 @@ let rec layout s l =
     let sort_l' = sort s sort_l in
     if sort_l == sort_l' then l
     else Sort (sort_l', ax)
+  | Addressable l' ->
+    let l'' = layout s l' in
+    if l' == l'' then l else Jkind_types.Layout.addressable l''
 
-let jkind_desc s jkind =
+let rec addressable_base = function
+  | Layout layout -> Layout (Jkind_types.Layout.addressable layout)
+  | Kconstr _ as base -> Addressable base
+  | Addressable base -> addressable_base base
+
+let rec addressable_const_base = function
+  | Layout layout -> Layout (Jkind_types.Layout.Const.addressable layout)
+  | Kconstr _ as base -> Addressable base
+  | Addressable base -> addressable_const_base base
+
+let rec jkind_desc s jkind =
   match jkind.base with
   | Kconstr (p, sa) ->
     begin match Path.Map.find p s.jkinds with
@@ -592,8 +608,11 @@ let jkind_desc s jkind =
     let l' = layout s l in
     if l == l' then jkind
     else { jkind with base = Layout l' }
+  | Addressable base ->
+    let jkind = jkind_desc s { jkind with base } in
+    { jkind with base = addressable_base jkind.base }
 
-let jkind_const_desc s
+let rec jkind_const_desc s
       ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
   match jkind.base with
   | Kconstr (p, sa) ->
@@ -609,6 +628,9 @@ let jkind_const_desc s
         with_bounds = jkind.with_bounds }
     end
   | Layout _ -> jkind
+  | Addressable base ->
+    let jkind = jkind_const_desc s { jkind with base } in
+    { jkind with base = addressable_const_base jkind.base }
 
 (* Similar to [Ctype.nondep_type_rec]. *)
 let rec typexp copy_scope s ty =

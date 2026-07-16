@@ -490,11 +490,13 @@ let type_iterators_without_type_expr =
   and it_jkind_declaration it jkd =
     match jkd.jkind_manifest with
     | None -> ()
-    | Some { base = Kconstr (p, _); mod_bounds = _;
-             with_bounds = No_with_bounds } ->
-      it.it_path p
-    | Some { base = Layout _; mod_bounds = _; with_bounds = No_with_bounds } ->
-      ()
+    | Some { base; mod_bounds = _; with_bounds = No_with_bounds } ->
+      let rec iter_base = function
+        | Kconstr (p, _) -> it.it_path p
+        | Layout _ -> ()
+        | Addressable base -> iter_base base
+      in
+      iter_base base
   and it_functor_param it = function
     | Unit -> ()
     | Named (_, mt, _) -> it.it_module_type it mt
@@ -582,11 +584,14 @@ let instance_jkind (t : jkind_lr) : jkind_lr =
     | Any _ -> l
     | Sort (s, sa) -> Sort (Jkind_types.Sort.instance s, sa)
     | Product ts -> Product (List.map instance_layout ts)
+    | Addressable l -> Addressable (instance_layout l)
   in
-  match t.jkind.base with
-  | Kconstr _ -> t
-  | Layout l ->
-    { t with jkind = { t.jkind with base = Layout (instance_layout l) } }
+  let rec instance_base = function
+    | Kconstr _ as base -> base
+    | Layout l -> Layout (instance_layout l)
+    | Addressable base -> Addressable (instance_base base)
+  in
+  { t with jkind = { t.jkind with base = instance_base t.jkind.base } }
 
 let rec copy_type_desc ?(keep_names=false) f = function
     Tvar { name; jkind } ->
@@ -1259,23 +1264,32 @@ module Jkind0 = struct
 
     include Allow_disallow
 
+    let rec map_base f = function
+      | Kconstr _ as k -> k
+      | Layout l -> Layout (f l)
+      | Addressable base -> Addressable (map_base f base)
+
     let map_layout f t =
       match t.base with
-      | Kconstr _ as k -> { t with base = k }
-      | Layout l -> { t with base = Layout (f l) }
+      | base -> { t with base = map_base f base }
+
+    let rec map_base_option f = function
+      | Kconstr _ as k -> Some k
+      | Layout l -> Option.map (fun l -> Layout l) (f l)
+      | Addressable base ->
+        Option.map (fun base -> Addressable base) (map_base_option f base)
 
     let map_layout_option f t =
-      match t.base with
-      | Kconstr _ as k -> Some { t with base = k }
-      | Layout l -> (
-        match f l with None -> None | Some l -> Some { t with base = Layout l })
+      Option.map (fun base -> { t with base }) (map_base_option f t.base)
 
-    let meet_scannable_axes (base : Jkind_types.Layout.Const.t jkind_base) sa :
+    let rec meet_scannable_axes
+        (base : Jkind_types.Layout.Const.t jkind_base) sa :
         Jkind_types.Layout.Const.t jkind_base =
       match base with
       | Kconstr (p, sa') -> Kconstr (p, Jkind_types.Scannable_axes.meet sa sa')
       | Layout l ->
         Layout (Jkind_types.Layout.Const.meet_root_scannable_axes l sa)
+      | Addressable base -> Addressable (meet_scannable_axes base sa)
 
     let map_type_expr f t =
       { t with with_bounds = With_bounds.map_type_expr f t.with_bounds }
@@ -1335,16 +1349,16 @@ module Jkind0 = struct
       match t1_t2 with
       | None -> false
       | Some (t1, t2) -> (
-        match t1.base, t2.base with
-        | Kconstr (p1, sa1), Kconstr (p2, sa2) ->
-          Path.same p1 p2 &&
-          Jkind_types.Scannable_axes.equal sa1 sa2 &&
-          Mod_bounds.equal t1.mod_bounds t2.mod_bounds
-        | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
-        | Layout l1, Layout l2 ->
-          Jkind_types.Layout.Const.equal l1 l2 &&
-          Mod_bounds.equal t1.mod_bounds t2.mod_bounds
-      )
+        let rec equal_base base1 base2 =
+          match base1, base2 with
+          | Kconstr (p1, sa1), Kconstr (p2, sa2) ->
+            Path.same p1 p2 && Jkind_types.Scannable_axes.equal sa1 sa2
+          | Layout l1, Layout l2 -> Jkind_types.Layout.Const.equal l1 l2
+          | Addressable base1, Addressable base2 -> equal_base base1 base2
+          | (Kconstr _ | Layout _ | Addressable _), _ -> false
+        in
+        equal_base t1.base t2.base
+        && Mod_bounds.equal t1.mod_bounds t2.mod_bounds)
 
     (* CR layouts: Remove this once we have a better story for printing with
        jkind abbreviations. *)

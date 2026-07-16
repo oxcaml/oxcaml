@@ -58,6 +58,7 @@ module Sort : sig
       | Genvar of var (* generic sort variable, level = Ident.highest_scope *)
       | Univar of univar
       | Base of base
+      | Addressable of t
   end
 end
 
@@ -96,13 +97,16 @@ module Scannable_axes : sig
   val to_string_list : t -> string list
 end
 
-(* The layout of a type describes its memory layout. A layout is either the
-   indeterminate [Any] or a sort, which is a concrete memory layout. *)
+(* The layout of a type describes its memory layout plus addressability.  The
+   latter affects only a future boxed representation, not the representation at
+   this layout. A layout is either the indeterminate [Any] or a sort, which has
+   a concrete calling convention. *)
 module Layout : sig
   type 'sort t = 'sort Jkind_types.Layout.t =
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
     | Any of Scannable_axes.t
+    | Addressable of 'sort t
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
@@ -576,6 +580,10 @@ module Desc : sig
   val get_const : 'd t -> 'd Const.t option
 
   val of_const : 'd Const.t -> 'd t
+
+  (** View a product element without the [addressable] operator supplied
+      implicitly by the enclosing product. Used when printing product kinds. *)
+  val for_product_element : 'd t -> 'd t
 
   val format : Env.t -> Format_doc.formatter -> 'd t -> unit
 end

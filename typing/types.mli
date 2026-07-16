@@ -390,6 +390,9 @@ and 'd with_bounds =
 and 'layout jkind_base =
   | Layout of 'layout
   | Kconstr of Path.t * Jkind_types.Scannable_axes.t
+  | Addressable of 'layout jkind_base
+      (** Preserves addressability around an unresolved [Kconstr]. Concrete
+          layouts carry addressability in ['layout] instead. *)
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;

@@ -70,6 +70,12 @@ module Sort : sig
     | Var of var
     | Base of base
     | Product of t list
+        (** Products and their components are implicitly addressable. The
+            component nodes need not themselves contain [Addressable]. *)
+    | Addressable of t
+        (** An explicit addressability refinement. Smart constructors and
+            observers remove this node around intrinsically-addressable sorts,
+            products, and other [Addressable] nodes. *)
     | Univar of univar
 
   and var
@@ -110,6 +116,7 @@ module Sort : sig
       | Genvar of var
       | Univar of univar
       | Base of base
+      | Addressable of t
   end
 end
 
@@ -145,6 +152,9 @@ module Layout : sig
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
     | Any of Scannable_axes.t
+    | Addressable of 'sort t
+        (** Addressability for a layout that cannot carry it in its sort. In
+            canonical values this is [Addressable (Any _)]. *)
 
   module Const : sig
     type t =
@@ -158,6 +168,11 @@ module Layout : sig
               by slambda. The [var] is used only for physical identity; its
               contents are not consumed and its level must be
               [Ident.highest_scope]. *)
+      | Addressable of t
+          (** Explicit addressability on a layout that is not intrinsically
+              addressable. Unlike the live layout above, this constant form also
+              uses the constructor for representable atomic layouts, because
+              [Sort.Const.t] deliberately erases addressability. *)
 
     module Static : sig
       val of_base : Sort.base -> Scannable_axes.t -> t
@@ -167,6 +182,8 @@ module Layout : sig
 
     val max : t
 
+    (** Extracts the calling-convention sort, erasing addressability. Returns
+        [None] for [Any], including [Any addressable]. *)
     val get_sort : t -> Sort.Const.t option
 
     val is_scannable_or_any : t -> bool
@@ -182,6 +199,10 @@ module Layout : sig
     (** Meets [sa] into [t]'s root scannable axes (if [t] has meaningful ones;
         otherwise returns [t] unchanged). *)
     val meet_root_scannable_axes : t -> Scannable_axes.t -> t
+
+    val addressable : t -> t
+
+    val get_addressable : t -> t option
   end
 
   val of_const : Const.t -> Sort.t t
@@ -193,4 +214,8 @@ module Layout : sig
   val get_flat_const : Sort.Flat.t t -> Const.t option
 
   val product : 'a t list -> 'a t
+
+  val addressable : Sort.t t -> Sort.t t
+
+  val get_addressable : Sort.t t -> Sort.t t option
 end
