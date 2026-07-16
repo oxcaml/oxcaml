@@ -17,23 +17,25 @@
 
 module Int_arg_helper = Arg_helper.Make (struct
   module Key = struct
-    include Numbers.Int
+    type t = int
     let of_string = int_of_string
+    module Map = Map.Make(Stdlib.Int)
   end
 
   module Value = struct
-    include Numbers.Int
+    type t = int
     let of_string = int_of_string
   end
 end)
 module Float_arg_helper = Arg_helper.Make (struct
   module Key = struct
-    include Numbers.Int
+    type t = int
     let of_string = int_of_string
+    module Map = Map.Make(Stdlib.Int)
   end
 
   module Value = struct
-    include Numbers.Float
+    type t = float
     let of_string = float_of_string
   end
 end)
