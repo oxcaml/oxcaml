@@ -29,6 +29,14 @@ module V = Backend_var
 module VP = Backend_var.With_provenance
 open SU.Or_never_returns.Syntax
 
+let which_parameter_of_provenance provenance =
+  match (provenance : V.Provenance.t option) with
+  | None -> None
+  | Some provenance -> (
+    match V.Provenance.is_parameter provenance with
+    | Local -> None
+    | Parameter { index } -> Some index)
+
 type error = Builtin_not_recognized of string
 
 exception Error of error * Debuginfo.t
@@ -55,6 +63,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ctuple el -> List.for_all is_simple_expr el
     | Clet (_id, arg, body) -> is_simple_expr arg && is_simple_expr body
     | Cphantom_let (_var, _defining_expr, body) -> is_simple_expr body
+    | Cname_for_debugger (_, body) -> is_simple_expr body
     | Csequence (e1, e2) -> is_simple_expr e1 && is_simple_expr e2
     | Cop (op, args, _) -> (
       match op with
@@ -106,6 +115,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ctuple el -> EC.join_list_map el effects_of
     | Clet (_id, arg, body) -> EC.join (effects_of arg) (effects_of body)
     | Cphantom_let (_var, _defining_expr, body) -> effects_of body
+    | Cname_for_debugger (_, body) -> effects_of body
     | Csequence (e1, e2) -> EC.join (effects_of e1) (effects_of e2)
     | Cifthenelse (cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
       EC.join (effects_of cond) (EC.join (effects_of ifso) (effects_of ifnot))
@@ -188,7 +198,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     (if Option.is_some provenance
      then
        let naming_op =
-         SU.make_name_for_debugger ~ident:(VP.var v) ~which_parameter:None
+         SU.make_name_for_debugger ~ident:(VP.var v)
+           ~which_parameter:(which_parameter_of_provenance provenance)
            ~provenance ~regs:r1
        in
        SU.insert_debug env sub_cfg naming_op Debuginfo.none [||] [||]);
@@ -757,6 +768,20 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Ok r1 -> emit_expr (bind_let env sub_cfg v r1) sub_cfg e2 ~bound_name)
     | Cphantom_let (_var, _defining_expr, body) ->
       emit_expr env sub_cfg body ~bound_name
+    | Cname_for_debugger (var, body) -> (
+      match emit_expr env sub_cfg body ~bound_name with
+      | Never_returns -> Never_returns
+      | Ok regs ->
+        let provenance = VP.provenance var in
+        (if Option.is_some provenance
+         then
+           let ident = VP.var var in
+           let naming_op =
+             Operation.Name_for_debugger
+               { ident; provenance; which_parameter = None; regs }
+           in
+           insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]);
+        Ok regs)
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list -> (
       match emit_parts_list env sub_cfg exp_list with
@@ -807,6 +832,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Never_returns -> ()
       | Ok r1 -> emit_tail (bind_let env sub_cfg v r1) sub_cfg e2)
     | Cphantom_let (_var, _defining_expr, body) -> emit_tail env sub_cfg body
+    | Cname_for_debugger (_, body) -> emit_tail env sub_cfg body
     | Cop ((Capply { result_type = ty; region = Rc_normal; _ } as op), args, dbg)
       ->
       emit_tail_apply env sub_cfg ty op args dbg
@@ -897,10 +923,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           let provenance = VP.provenance bound_name in
           if Option.is_some provenance
           then
+            let which_parameter = which_parameter_of_provenance provenance in
             let bound_name = VP.var bound_name in
             let naming_op =
               Operation.Name_for_debugger
-                { ident = bound_name; provenance; which_parameter = None; regs }
+                { ident = bound_name; provenance; which_parameter; regs }
             in
             insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]
       in

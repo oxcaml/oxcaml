@@ -361,7 +361,8 @@ let gen_variable ~debug_uid v =
          be reworked soon *)
       Some
         (Backend_var.Provenance.create ~module_path:(Path.Pident v)
-           ~location:Debuginfo.none ~original_ident:v ~debug_uid)
+           ~location:Debuginfo.none ~original_ident:v ~debug_uid
+           ~is_parameter:Is_parameter.local)
   in
   Backend_var.With_provenance.create ?provenance v
 
@@ -471,8 +472,8 @@ let is_cmm_simple cmm =
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
   | Cvar _ ->
     true
-  | Clet _ | Cphantom_let _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _
-  | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
+  | Clet _ | Cphantom_let _ | Cname_for_debugger _ | Ctuple _ | Cop _
+  | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
     false
 
 (* Helper function to create bindings *)
