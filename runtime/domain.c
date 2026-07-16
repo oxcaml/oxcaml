@@ -3044,7 +3044,6 @@ CAMLprim value caml_recommended_domain_count(value unused)
     n = 1;
   else if (n > caml_params->max_domains)
     n = caml_params->max_domains;
-#else
 
   return (Val_long(n));
 }

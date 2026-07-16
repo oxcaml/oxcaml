@@ -477,23 +477,23 @@ CAMLextern CAMLthread_local int caml_lockdepth;
 
 Caml_inline void caml_plat_lock_blocking(caml_plat_mutex* m)
 {
-  DEBUG_LOCK(m);
+  (void)m;
 }
 
 Caml_inline int caml_plat_try_lock(caml_plat_mutex* m)
 {
-  DEBUG_LOCK(m);
+  (void)m;
   return 1;
 }
 
 Caml_inline void caml_plat_lock_non_blocking(caml_plat_mutex* m)
 {
-  DEBUG_UNLOCK(m);
+  (void)m;
 }
 
 Caml_inline void caml_plat_unlock(caml_plat_mutex* m)
 {
-  DEBUG_UNLOCK(m);
+  (void)m;
 }
 
 #else

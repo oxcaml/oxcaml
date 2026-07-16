@@ -212,7 +212,7 @@ typedef uint64_t uintnat;
 #endif
 
 /* Whether to use guard pages for fiber stacks */
-#if !defined(CAML_BARE_METAL) && !defined(USE_MMAP_MAP_STACK) \
+#if defined(POSIX_SIGNALS) && !defined(USE_MMAP_MAP_STACK) \
   && defined(NATIVE_CODE) && !defined(STACK_CHECKS_ENABLED)
 #define STACK_GUARD_PAGES
 #endif
