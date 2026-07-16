@@ -17,7 +17,7 @@ module Atomic = struct
   end
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Atomic/292"
+(apply (field_imm 1 (global Toploop!)) "Atomic/293"
   (let (Loc = (makeblock 0)) (makeblock 0 Loc)))
 module Atomic :
   sig
@@ -55,7 +55,7 @@ module Basic = struct
     Atomic.Loc.compare_and_set (get_loc r) oldv newv
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Basic/330"
+(apply (field_imm 1 (global Toploop!)) "Basic/331"
   (let
     (get = (function {nlocal = 0} r (atomic_load_field_ptr r 1))
      get_imm = (function {nlocal = 0} r : int (atomic_load_field_imm r 1))
@@ -189,7 +189,7 @@ end : sig
   type t = { mutable x : int [@atomic] }
 end)
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Ok/360" (makeblock 0))
+(apply (field_imm 1 (global Toploop!)) "Ok/361" (makeblock 0))
 module Ok : sig type t = { mutable x : int [@atomic]; } end
 |}];;
 
@@ -257,7 +257,7 @@ module Inline_record = struct
   let test : t -> int = fun (A r) -> r.x
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Inline_record/401"
+(apply (field_imm 1 (global Toploop!)) "Inline_record/402"
   (let
     (test =
        (function {nlocal = 0} param : int (atomic_load_field_imm param 0)))
@@ -279,7 +279,7 @@ module Extension_with_inline_record = struct
   let () = assert (test (A { x = 42 }) = 42)
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/409"
+(apply (field_imm 1 (global Toploop!)) "Extension_with_inline_record/410"
   (let
     (A =
        (makeblock_unique 248 "Extension_with_inline_record.A"
@@ -372,7 +372,7 @@ Warning 214 [atomic-float-record-boxed]: This record contains atomic float field
   which prevents the float record optimization.
   The fields of this record will be boxed instead of being
   represented as a flat float array.
-(apply (field_imm 1 (global Toploop!)) "Float_records/470"
+(apply (field_imm 1 (global Toploop!)) "Float_records/471"
   (let
     (mk_flat =
        (function {nlocal = 0} x[value<float>] y[value<float>]
@@ -592,7 +592,7 @@ Line 5, characters 14-19:
 Warning 9 [missing-record-field-pattern]: the following labels are not bound
   in this record pattern: "y".
   Either bind these labels explicitly or add "; _" to the pattern.
-(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/533"
+(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/534"
   (let
     (warning = (function {nlocal = 0} param : int (field_int 0 param))
      allowed = (function {nlocal = 0} param : int (field_int 0 param))
@@ -633,7 +633,7 @@ module Functional_update_ok = struct
   let allowed t = { t with y = 42 }
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_ok/549"
+(apply (field_imm 1 (global Toploop!)) "Functional_update_ok/550"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -653,7 +653,7 @@ module Functional_update_copy_ok = struct
   let allowed t = { t with y = t.y }
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_copy_ok/557"
+(apply (field_imm 1 (global Toploop!)) "Functional_update_copy_ok/558"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -687,7 +687,7 @@ module Functional_update_multi_ok = struct
   let allowed t = { t with y = 42; z = 67 } (* no implicit atomic loads *)
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_ok/573"
+(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_ok/574"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -711,7 +711,7 @@ module Functional_update_multi_copy_ok = struct
   let allowed t = { t with y = t.y; z = t.z } (* no implicit atomic loads *)
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_copy_ok/582"
+(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_copy_ok/583"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -761,7 +761,7 @@ Line 5, characters 14-19:
 Warning 9 [missing-record-field-pattern]: the following labels are not bound
   in this record pattern: "y".
   Either bind these labels explicitly or add "; _" to the pattern.
-(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/606"
+(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/607"
   (let
     (warning =
        (function {nlocal = 0} param : unboxed_int64
@@ -794,7 +794,7 @@ end
 
 let project (t : Mixed_blocks.t) = t.field
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Mixed_blocks/613" (makeblock 0))
+(apply (field_imm 1 (global Toploop!)) "Mixed_blocks/614" (makeblock 0))
 module Mixed_blocks :
   sig
     type t = { padding : #(int * int * int); mutable field : int [@atomic]; }
@@ -832,7 +832,7 @@ end
 
 let project (t : Mixed_blocks_2.t) = t.field
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Mixed_blocks_2/626" (makeblock 0))
+(apply (field_imm 1 (global Toploop!)) "Mixed_blocks_2/627" (makeblock 0))
 module Mixed_blocks_2 :
   sig
     type t = { mutable field : int [@atomic]; padding : #(int * int * int); }
@@ -874,7 +874,7 @@ module Mixed_blocks_rec = struct
 end
 
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Mixed_blocks_rec/642" (makeblock 0))
+(apply (field_imm 1 (global Toploop!)) "Mixed_blocks_rec/643" (makeblock 0))
 module Mixed_blocks_rec :
   sig
     type t = { padding : u; mutable field : int [@atomic]; }
