@@ -12,6 +12,18 @@ type t : sync_data =
 type t = { mutable x : int [@atomic]; mutable y : int [@atomic]; }
 |}]
 
+(* Records: atomic fields are not immutable_data. *)
+type t : immutable_data = { mutable x : int [@atomic] }
+[%%expect {|
+Line 1, characters 0-55:
+1 | type t : immutable_data = { mutable x : int [@atomic] }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is sync_data
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
+|}]
+
 (* Records: any non-atomic mutable field is not sync_data. *)
 type t : sync_data = { mutable x : int }
 [%%expect {|

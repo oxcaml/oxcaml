@@ -288,8 +288,7 @@ Lines 1-2, characters 0-25:
 1 | type 'a u : immutable_data =
 2 | | P1 : ('b, 'a) t -> 'a u
 Error: This type definition does not satisfy its kind annotation immutable_data,
-       because 'b is not mod many contended portable forkable unyielding
-                 stateless immutable.
+       because 'b is not mod forkable unyielding many stateless immutable.
 |}]
 
 (* CR layouts v2.8: It'd also be OK to infer or accept [immutable_data with 'y] here. Internal ticket 4973. *)
