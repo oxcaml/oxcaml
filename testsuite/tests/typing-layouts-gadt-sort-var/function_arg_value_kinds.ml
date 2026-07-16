@@ -66,14 +66,7 @@ let n : type a. a rep * a -> int = function
 [%%expect{|
 (let
   (n =
-     (function {nlocal = 0}
-       param[value<
-              (consts ())
-               (non_consts ([0: value<int>,
-                             value<
-                              (consts ())
-                               (non_consts ([0: value<int>, value<int>]))>]))>]
-       : int
+     (function {nlocal = 0} param : int
        (if (field_imm 0 param) (field_imm 1 param)
          (field_imm 0 (field_imm 1 param)))))
   (apply (field_imm 1 (global Toploop!)) "n" n))
