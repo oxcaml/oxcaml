@@ -71,6 +71,26 @@ let warn_unused () =
       Location.prerr_warning sloc.loc (Warnings.Misplaced_attribute sloc.txt))
       keys
 
+let warn_unused_alert_disables () =
+  let entries = Warnings.flush_unused_alert_disables () in
+  if not (compiler_stops_before_attributes_consumed ()) then begin
+    let entries =
+      List.sort
+        (fun (loc1, _, _) (loc2, _, _) -> Location.compare loc1 loc2)
+        entries
+    in
+    (* Each warning is emitted under the warning state in force when the
+       disabling attribute was processed, so that e.g. [[@@@warning "-221"]]
+       scopes over it as expected.  Treatment of warnings is similar to
+       [warn_unchecked_zero_alloc_attribute]. *)
+    let w_old = Warnings.backup () in
+    List.iter (fun (loc, name, state) ->
+      Warnings.restore state;
+      Location.prerr_warning loc (Warnings.Unused_alert_disable name))
+      entries;
+    Warnings.restore w_old
+  end
+
 (* These are the attributes that are tracked in the builtin_attrs table for
    misplaced attribute warnings. *)
 let builtin_attrs =
@@ -390,7 +410,7 @@ let warning_attribute ?(ppwarning = true) =
            }] ->
         begin
           mark_used name;
-          try Warnings.parse_alert_option s
+          try Warnings.parse_alert_option ~disable_loc:loc s
           with Arg.Bad msg -> warn_payload loc name.txt msg
         end
     | k ->
@@ -436,6 +456,7 @@ let warning_scope ?ppwarning attrs f =
   let prev = Warnings.backup () in
   try
     List.iter (warning_attribute ?ppwarning) (List.rev attrs);
+    Warnings.commit_alert_disable_snapshots ();
     let ret = f () in
     Warnings.restore prev;
     ret
