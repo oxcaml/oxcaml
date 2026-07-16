@@ -105,16 +105,17 @@ let () =
   done ;
   ()
 
-external hammer_skiplist_randomly_in_range : int Atomic.t -> int Atomic.t -> int -> unit
+external hammer_skiplist_randomly_in_range : int Atomic.t -> int Atomic.t -> int Atomic.t -> int -> unit
   = "hammer_skiplist_randomly_in_range"
 
 let () =
   let n_domains = 4 in
+  let counter = Atomic.make 0 in
   let barrier_waiters = Atomic.make n_domains in
   let barrier_passed = Atomic.make 0 in
   let domains_list =
     List.init n_domains (fun i -> Domain.spawn (fun () ->
-      hammer_skiplist_randomly_in_range barrier_waiters barrier_passed n_domains))
+      hammer_skiplist_randomly_in_range barrier_waiters barrier_passed counter n_domains))
   in
   ignore(List.iter Domain.join domains_list);
   assert (cardinal_skiplist() = 0);
