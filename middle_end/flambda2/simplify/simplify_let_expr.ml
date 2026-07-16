@@ -205,13 +205,21 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
               let has_uses =
                 Name_mode.Or_absent.is_present greatest_name_mode
               in
-              (* Phantomise even non-user-visible variables: they may be
-                 intermediates (for example the [my_closure] introduced when
-                 inlining, or temporaries) that are referenced by user-visible
+              (* A deleted binding may be phantomised if it binds a user-visible
+                 variable, or if it has at least one (phantom) use:
+                 non-user-visible intermediates (for example temporaries
+                 introduced when inlining) may be referenced by user-visible
                  phantom lets -- e.g. [Project_value_slot] /
-                 [Project_function_slot] projections -- which would otherwise
-                 resolve to a deleted binding and display garbage. *)
-              let can_phantomise = not is_depth in
+                 [Project_function_slot] projections -- and must not resolve to
+                 a deleted binding. Unreferenced non-user-visible temporaries,
+                 however, do not give rise to phantom lets. *)
+              let can_phantomise =
+                (not is_depth)
+                && (has_uses
+                   || Bound_pattern.exists_all_bound_vars bound_vars
+                        ~f:(fun bound_var ->
+                          Variable.user_visible (VB.var bound_var)))
+              in
               let will_delete_binding =
                 if is_end_region_for_unused_region
                 then true
