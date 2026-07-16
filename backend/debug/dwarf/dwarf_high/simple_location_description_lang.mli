@@ -179,6 +179,12 @@ module Rvalue : sig
     compilation_unit_header_label:Asm_label.t ->
     normal t
 
+  (** V is the value that the given register held upon entry to the current
+      function. The debugger recovers such values by virtually unwinding to the
+      call site. *)
+  val entry_value_of_register :
+    dwarf_reg_number:int -> Dwarf_version.t -> normal t
+
   (** V is an optimized-out pointer to a value whose contents are given by
       evaluating the location description (which must yield an rvalue) in the
       DIE at the given [die_label].
