@@ -1,0 +1,97 @@
+let code fa_0 deleted in
+let code callee_1 deleted in
+let code fc_2 deleted in
+let $camlExn_demotion__immstring6 = "Exn_demotion.E" in
+apply ccall noalloc
+  ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
+  where k (Pccall) =
+    let $camlExn_demotion__E69 =
+      Block immutable_unique
+      248 ($camlExn_demotion__immstring6, Pccall)
+    in
+    let code inline(never) loopify(never) size(21) newer_version_of(fa_0)
+          fa_0_1 (b : imm tagged, x : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let try_region = %begin_try_region () in
+      let try_ghost_region = %begin_try_ghost_region () in
+      (let untagged = %untag_imm (b) in
+       switch untagged
+         | 0 -> k3
+         | 1 -> k2)
+        where k3 =
+          let int_add = %int_barith.add (x, 1) in
+          cont k (int_add)
+        where k2 =
+          let `unit` = %end_try_region (try_region) in
+          let unit_1 = %end_try_ghost_region (try_ghost_region) in
+          let int_mul = %int_barith.mul (x, 2) in
+          cont k (int_mul)
+    in
+    let $camlExn_demotion__fa_3 = closure fa_0_1 @fa in
+    let code inline(never) loopify(never) size(3) newer_version_of(callee_1)
+          callee_1_1 (x : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let int_add = %int_barith.add (x, 1) in
+      cont k (int_add)
+    in
+    let $camlExn_demotion__callee_4 = closure callee_1_1 @callee in
+    let code inline(never) loopify(never) size(42) newer_version_of(fc_2)
+          fc_2_1 (b : imm tagged, x : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let try_region = %begin_try_region () in
+      let try_ghost_region = %begin_try_ghost_region () in
+      cont k4 push(k2)
+        where k4 =
+          ((let untagged = %untag_imm (b) in
+            switch untagged
+              | 0 -> k4
+              | 1 -> k5)
+             where k5 =
+               let int_mul = %int_barith.mul (x, 41) in
+               let int_add = %int_barith.add (int_mul, 1) in
+               let Pmakeblock =
+                 %block.[`0`] ($camlExn_demotion__E69, int_add)
+               in
+               cont k2 pop(regular k2) (Pmakeblock)
+             where k4 =
+               apply direct(callee_1_1)
+                 ($camlExn_demotion__callee_4 : _ -> imm tagged)
+                   (x)
+                   -> k3 * k2)
+        where k3 (body_result : imm tagged) =
+          cont k pop(k2) (body_result)
+        where k2 exn (`exn` : val) =
+          let `unit` = %end_try_region (try_region) in
+          let unit_1 = %end_try_ghost_region (try_ghost_region) in
+          cont k (0)
+    in
+    let $camlExn_demotion__fc_5 = closure fc_2_1 @fc in
+    ((let Popaque = %opaque (5) in
+      let Popaque_1 = %opaque (1) in
+      apply direct(fa_0_1)
+        ($camlExn_demotion__fa_3 : _ -> imm tagged)
+          (Popaque_1, Popaque)
+          -> k * error)
+       where k (r1 : imm tagged) =
+         ((let Popaque = %opaque (6) in
+           let Popaque_1 = %opaque (1) in
+           apply direct(fc_2_1)
+             ($camlExn_demotion__fc_5 : _ -> imm tagged)
+               (Popaque_1, Popaque)
+               -> k * error)
+            where k (r2 : imm tagged) =
+              let $camlExn_demotion =
+                Block 0 ($camlExn_demotion__E69,
+                         $camlExn_demotion__fa_3,
+                         $camlExn_demotion__callee_4,
+                         $camlExn_demotion__fc_5,
+                         r1,
+                         r2)
+              in
+              cont done ($camlExn_demotion)))

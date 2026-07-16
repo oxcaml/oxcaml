@@ -230,15 +230,55 @@ denv exposes add_variable / add_equation_on_* which extend E; there is no
 operation that weakens an existing equation during a straight-line descent.
 (Meet at control-flow merges — join points — is a separate operation, §3, and
 produces the *entry* type of a handler, not a weakening of an existing name.)
-NOTES: Partial positive evidence: the equation-mutating entry points
-(add_equation_on_variable / _symbol / _name and add_variable, all in
-downwards_env.ml) route through Typing_env.add_equation, which *meets* the new
-type onto the name's existing type — a refinement, never a weakening. What keeps
-this conjectured rather than proved is DE.with_typing_env (and the specialization
-/ replay paths), which can install a wholesale-replaced typing env for a name;
-those are not audited to be monotone. Conjectured pending the chapter-13 audit;
-it underpins the soundness argument that downwards facts remain valid deeper in
-scope.
+NOTES: Now SPLIT into two verified halves plus a caveat (this rule is retained as
+the umbrella intuition, but its universal γ-reading is REFUTED). The audit shows:
+(1) the ALGORITHMIC half — every downwards site refines by define/meet/extend —
+holds and is stated as S.Struct.EnvRefineOnly below; (2) the SEMANTIC half, that
+γ of a name only shrinks, holds for the ALIAS sub-domain
+(INV.Simplify.AliasesMonotoneDown, [§13](13-soundness.md)) but FAILS for stored
+concrete types at the non-GLB meet corner (T.Meet.MutableBlockMissedBottom:
+adding a Mutable_block fact to a field-precise Variant strictly ENLARGES its γ).
+Soundness is not threatened (types may soundly move up); the casualty is only the
+"a prover query that succeeded earlier still succeeds later" argument, which holds
+for constant/symbol (alias) witnesses but not for arbitrary concrete types.
+```
+
+```rule
+RULE S.Struct.EnvRefineOnly
+STATUS conjectured
+CODE middle_end/flambda2/simplify/env/downwards_env.ml#with_typing_env
+CODE middle_end/flambda2/types/env/meet_env.ml#add_concrete_equation_on_canonical
+CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null
+CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
+---
+E is the typing env at some downwards point; E' is the env installed by ANY
+DE.with_typing_env / DE.map_typing_env / DA.map_denv reachable in the downwards
+pass
+--------------------------------------------------
+(a) [algorithmic monotonicity] E' is obtained from the env it replaces
+    exclusively by: name/parameter definitions, add_equation /
+    add_env_extension(_with_extra_variables) (meets onto canonicals), or
+    code-age-relation extension — EXCEPT the two sites installing the env of a
+    DIFFERENT program point: the handler-entry env from a join (compute_handler_env)
+    and the recorded use-env lineage (incl. the replay path), both themselves
+    derived monotonically from the fork/recorded env.
+(b) [negative half] the SEMANTIC reading γ_{E'}(x) ⊆ γ_E(x) does NOT follow from
+    (a): add_concrete_equation_on_canonical stores the raw meet result, and meet
+    is not a lower bound in the Variant ⊓ Mutable_block corner
+    (T.Meet.MutableBlockMissedBottom), so a stored type's γ can strictly enlarge.
+NOTES: Audit of all with_typing_env / map_typing_env installation sites: the join
+fork+extension sites, the use-env lineage (define_parameters + equations-on-params,
+all meets), arg-kind meets, projection meets, per-arm switch meets (flow only into
+the recorded use, denv kept — S.Struct.Switch.ArmIsolation), unboxing-denv meets,
+lifted-constant add_env_extension, relational-primitive adds, and
+with_code_age_relation (code-age component only). The replay path does not touch
+the typing env. Part (b) is an operation-level non-guarantee: Nietzsche found no
+reachable Simplify trigger (Mutable_block types attach only to fresh names; shapes
+are never Mutable_block; the realizable Mutable_block ⊓ Variant-shape leaves the
+stored type unchanged), so it survives as an empirical per-run invariant when the
+GLB conjunct is made explicit. Composes: S.Struct.TypesMonotoneDown,
+INV.Simplify.AliasesMonotoneDown, T.Meet.GreatestLowerBound (refuted corner),
+T.Join.Levels.
 ```
 
 ### Set_of_closures is simplified eagerly
@@ -328,6 +368,39 @@ the use site so that a later Apply_cont_rewrite can adjust its arguments
 (S.Struct.ApplyContRewrite).
 ```
 
+A `Switch` arm records a continuation use whose environment is refined by the
+arm's discriminant, but that refinement is confined to the recorded use — it never
+escapes to the threaded dacc.
+
+```rule
+RULE S.Struct.Switch.ArmIsolation
+STATUS conjectured
+CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#simplify_arm
+CODE middle_end/flambda2/simplify/env/downwards_acc.ml#record_continuation_use
+CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
+---
+Switch on a scrutinee with arms {iᵢ ↦ actionᵢ}; simplify_arm folds over the arms
+with accumulator (arms, dacc)
+--------------------------------------------------
+(i) the meet of the scrutinee type with arm i's discriminant
+    (T.meet typing_env_at_use scrutinee_ty (this_naked_immediate i)) yields env_i,
+    recorded as arm i's continuation-use env — but NEVER installed in the threaded
+    dacc (record_continuation_use touches only continuation_uses_env; the arm's
+    args are simplified in a locally built DA whose denv is dropped);
+(ii) hence no fact conditional on arm i can influence arm j or any later traversal:
+    per-arm narrowing reaches program facts ONLY through the join of the
+    destination continuation's recorded uses (compute_handler_env);
+(iii) an arm whose meet is ⊥ is dropped WITHOUT recording a continuation use, so
+    statically-dead switch edges contribute nothing to any parameter join.
+NOTES: Isolation rests on three facts in three files — record_continuation_use
+leaves denv untouched, the fold keeps the outer dacc, and compute_handler_env is
+the sole consumer of env_i. A leak in any one would let an arm-conditional fact
+(env_i asserts scrutinee = i) escape its guard — a soundness bug. Corollary:
+typing outcomes are invariant under arm processing order. Arm-conditional facts DO
+reach the arm's own action (sound — the arm runs only under its condition).
+Composes: T.Meet.Bottom, T.Join.Levels, S.Struct.EnvRefineOnly.
+```
+
 ### Parameter types are the join of argument types
 
 ```rule
@@ -350,6 +423,38 @@ NOTES: -flambda2-join-points (Oxcaml_flags.Flambda2.join_points) gates the n-way
 join for the ≥2-use case. The join also runs the CSE join and, with the new
 join, introduces extra parameters for projections/aliases known in all uses
 (join_points.ml#add_extra_params_from_join_analysis).
+```
+
+```rule
+RULE S.Struct.JoinParams.AnalysisExtraParams
+STATUS conjectured
+CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
+CODE middle_end/flambda2/simplify/join_points.ml#add_extra_params_from_join_analysis
+CODE middle_end/flambda2/types/join_levels.ml#cut_and_n_way_join
+CODE driver/oxcaml_flags.ml#o2
+---
+continuation k reaches the general (not single-inlinable-use) branch of
+compute_handler_env
+--------------------------------------------------
+The n-way join-analysis extra-param path (add_extra_params_from_join_analysis) is
+EXERCISED for k IFF should_do_join (= Flambda_features.join_points() ∨ #uses ≤ 1)
+∧ Flambda_features.join_algorithm() ∈ {N_way, Checked}, since join_analysis is
+returned Some exactly by the N_way/Checked arms of cut_and_n_way_join (Binary ⇒
+None) and the whole path sits inside join, gated by should_do_join. ("Exercised",
+not "introduces": actual introduction additionally needs candidate variables with
+definitions at all uses — has_extra_arg_in_all_uses.)
+NOTES: Resolves the ch-09 open question affirmatively AND adds the join_algorithm
+conjunct ch-09 did not mention. Consequences: (a) -flambda2-join-points DOES gate
+extra-param introduction; (b) under every standard profile (default/-O2/-O3/-O4 all
+keep join_algorithm = Binary; only join_points flips at O2+) the machinery is INERT
+— it never fires without an explicit -flambda2-join-algorithm n-way; (c) with n-way
+selected, a SINGLE non-inlinable use also runs the analysis (should_do_join true for
+≤ 1 use even with join_points off), so extra params can appear on single-use conts.
+Hidden second entrance: -flambda2-match-in-match FORCES join_algorithm() = N_way
+(flambda_features.ml:66-74), but defaults false in every profile, so (b) stands.
+Same flag gate as T.Join.ConstAgreement (types side). Non-local: gate split across
+oxcaml_flags (profiles), join_levels (algorithm dispatch), join_points
+(should_do_join).
 ```
 
 ```rule
@@ -379,6 +484,46 @@ The result is marked is_single_inlinable_use = true.
 Such a continuation is a candidate to be inlined into (i.e. its handler spliced
 at) its single call site; the decision and mechanism are [§10](10-simplify-rewrites.md). Exception
 handlers are never marked single-inlinable.
+```
+
+The join at a merge point also joins the CSE tables of the predecessors; when a
+CSE-eligible primitive is available on every path but with a different value, the
+join synthesizes a phi node as a fresh continuation parameter.
+
+```rule
+RULE S.Struct.CSE.JoinPhi
+STATUS conjectured
+CODE middle_end/flambda2/simplify/common_subexpression_elimination.ml#join_one_cse_equation
+CODE middle_end/flambda2/simplify/common_subexpression_elimination.ml#cse_with_eligible_lhs
+CODE middle_end/flambda2/simplify/common_subexpression_elimination.ml#cut_cse_environment
+CODE middle_end/flambda2/simplify/join_points.ml#join
+---
+continuation k, joining enabled (S.Struct.JoinParams gate), uses u₁ … uₘ;
+p a CSE-eligible primitive (S.Rewrite.CSE.Eligible) such that for EVERY use uᵢ the
+  CSE equations between the fork and uᵢ (cut_cse_environment) map p — after
+  canonicalizing p's arguments per-use and rewriting them into fork scope through
+  k's params/extra-args (cse_with_eligible_lhs) — to a value bᵢ
+  (has_value_on_all_paths in join_one_cse_equation)
+--------------------------------------------------
+The handler env's CSE table maps p to: b when all bᵢ = b (a fork-scope simple);
+else a FRESH continuation parameter v ("cse_param") appended to k, with bᵢ passed
+as an extra argument at each use — a compiler-synthesized phi node (Is_int/Get_tag
+also re-establish their relational equation on v). An occurrence of p in k's
+handler is then replaced by v (S.Rewrite.CSE.Replace) — recomputation eliminated
+ACROSS the merge, no code motion. If the handler has no occurrence of p, v is
+unused and S.Rewrite.LetCont.UnusedParam removes it: the phi introduction is
+self-cleaning, its harmlessness UNDERWRITTEN by dead-param elimination.
+NOTES: Non-local three ways: availability is ∀-over-predecessors (one path lacking
+p kills it — has_value_on_all_paths); the phi rewires every call site via
+Apply_cont_rewrite; the introduction happens BEFORE the handler is simplified, so
+its safety is a theorem about a different subsystem. Precision boundaries: an
+argument of p canonicalizing at some use to a simple neither mappable to a
+param/extra-param nor in fork scope; a bᵢ canonicalizing to a fork param with no
+unique non-param alias (Alias_set.get_singleton — a known precision loss,
+CR-someday lmaurer); equations already at the fork (prev_cse) never re-join.
+Gating: the phi fires only when join_points is ON — -O2/-O3 set it true, so say
+"when join_points is off", not "by default". Composes: S.Rewrite.CSE.Eligible,
+S.Rewrite.CSE.Replace, S.Rewrite.LetCont.UnusedParam, S.Struct.JoinParams.
 ```
 
 ### Recursive continuations: no fixpoint
@@ -469,6 +614,94 @@ param actually free in the rebuilt handler was also marked required by the flow
 analysis.
 ```
 
+### Unreachable continuations cascade in one pass
+
+Because uses are recorded only from traversed code, and zero-use handlers are not
+traversed, the reachability of the continuation graph is a lazy fixpoint computed
+by the traversal itself: a single proven-constant scrutinee can delete a whole
+subgraph of continuations and the bindings feeding it, transitively, in one pass.
+
+```rule
+RULE S.Struct.LetCont.UnreachableClosure
+STATUS conjectured
+CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_handlers
+CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_recursive_handlers
+CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#simplify_arm
+CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_let_cont
+---
+Body B under downwards traversal. Define the residual jump graph J: nodes =
+{entry} ∪ continuations of B; an edge (site owner) → k′ for every apply_cont /
+switch-arm use of k′ actually RECORDED downwards — i.e. the site is in traversed
+code, its arm is not pruned by S.Rewrite.Switch.ArmPrune (simplify_arm's Bottom
+branch records neither a continuation use nor flow-acc args), and it is not cut off
+by S.Rewrite.Let.Invalid truncating traversal of its context
+--------------------------------------------------
+(1) a handler is downwards-traversed iff its continuation is reachable from entry
+    in J (non-recursive: the "Continuation unused, no need to traverse" branch of
+    simplify_handlers; recursive groups: the reachable_handlers_to_simplify worklist
+    in simplify_recursive_handlers, dropping whole unreachable sub-SCCs);
+(2) every continuation unreachable in J is deleted from the output this same pass
+    (S.Rewrite.LetCont.DeadHandler), its handler never simplified;
+(3) deadness is transitively closed within the pass: an untraversed handler
+    contributes nothing to the continuation-uses env NOR to flow_acc, so
+    continuations whose only uses sit in unreachable handlers are themselves
+    unreachable, and names whose only consumers sit there leave required_names and
+    die by S.Rewrite.Let.DeadBinding / S.Rewrite.LetCont.UnusedParam — no rewrite
+    iteration.
+NOTES: The closure is computed by the traversal: "use recording only from traversed
+code" + "zero-use handlers are skipped" is a lazy reachability fixpoint over J.
+Over-approximation boundary: uses killed only on the UPWARDS pass were already
+recorded downwards; occurrence-based decisions (rebuild_let_cont's zero-occurrence
+drop, rebuild_let's has_uses) read the REBUILT term inner-first and still fire, but
+required_names-based decisions (recursive params, lifted constants) can lag one
+round. The realizable lag mechanism is S.Rewrite.Switch.Merge: simplify_switch
+records the scrutinee into used_in_current_handler only when >1 arms survive
+downwards; if the arms then merge UPWARDS, the scrutinee occurrence evaporates after
+required_names was fixed — a recursive param feeding such a scrutinee survives one
+extra round while its own binding dies same-round. Composes: S.Rewrite.Switch.ArmPrune,
+S.Rewrite.LetCont.DeadHandler, S.Struct.Flow.RequiredNames.
+```
+
+### Continuation lifting is budgeted and leaf-decided
+
+Distinct from lifting *constants* to symbols (§5), Simplify can lift a nested
+continuation out of an enclosing handler (the "match-in-match" enabler). This is
+gated by a per-unit budget and five context reasons, and decided only at a switch
+leaf.
+
+```rule
+RULE S.Struct.LiftCont.Gate
+STATUS conjectured
+CODE middle_end/flambda2/simplify/are_lifting_conts.mli#t
+CODE middle_end/flambda2/simplify/env/downwards_acc.ml#get_continuation_lifting_budget
+CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#after_downwards_traversal_of_body_and_handlers
+CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#simplify_switch
+CODE driver/oxcaml_flags.ml#o2
+---
+let_cont k' is nested inside the handler of let_cont k
+--------------------------------------------------
+k' can be lifted out of k only if ALL of:
+  (a) budget > 0 ∧ lifting_cost ≤ budget; the budget is initialized from
+      Flambda_features.Expert.cont_lifting_budget(): 0 at default/-O1/-Oclassic
+      (mechanism INERT), 100 at -O2, 1000 at -O3, 3000 at -O4, and decrements by
+      lifting_cost per performed lift;
+  (b) the enclosing context carries none of the five no_lifting reasons
+      (are_lifting_conts.mli): At_toplevel, In_speculative_inlining,
+      In_continuation_specialization, In_recursive_continuation,
+      In_inlinable_continuation;
+  (c) the status has moved Analyzing{k} → Lifting_out_of{k} at a LEAF of k's
+      handler — EXCLUSIVELY in simplify_switch (lift_continuations_out_of has one
+      caller in the tree), never eagerly at the let_cont itself.
+NOTES: Fills a ch-09 gap (S.Struct.Dacc lists are_lifting_conts /
+lifted_continuations / continuation_lifting_budget with no rule). Corollary
+(loopify link): entering a recursive-continuation handler sets no_lifting
+In_recursive_continuation, so a continuation nested in a loopified self-loop
+handler is never lifted out of the loop (same for single-inlinable-use handlers and
+specialization replays). Descriptive-leaning: thresholds are heuristic, but the
+five-reason gate and leaf-decision architecture are structural. Composes:
+S.Struct.Dacc, S.Struct.SpeculativeSandbox.
+```
+
 ## 4. The turn: dataflow analysis
 
 Between the end of the downwards traversal of a function body (or the whole unit)
@@ -533,6 +766,58 @@ Non-recursive handlers instead use the exact free names of the rebuilt handler;
 the dataflow result serves there only as a consistency check.
 ```
 
+The dataflow closure removes loop-carried dead cycles *in toto* in the single
+upwards pass — cycles a purely local use-count could never break, because each
+member has syntactic occurrences (in the recursive apply_cont's args or a sibling
+binding).
+
+```rule
+RULE S.Struct.Flow.DeadLoopParam
+STATUS conjectured
+CODE middle_end/flambda2/simplify/flow/data_flow_graph.ml#required_names
+CODE middle_end/flambda2/simplify/flow/data_flow_graph.ml#add_continuation_info
+CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#decide_param_usage_recursive
+CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
+---
+a function body B analyzed at the turn; G = the flow dependency graph with edges
+  x → FN(defn of x) for at-most-generative bindings and direct aliases, and
+  pⱼ → FN(aⱼ) for the argument aⱼ supplied for parameter pⱼ at each apply_cont to a
+  non-(return/exn) continuation;
+U = unconditionally_used: free names of arbitrary-effects bindings, apply
+  callees/args, switch scrutinees, args to B's return/exn continuation,
+  exn-handler first params (+ value-slot deps, see blockers);
+X = a set of names of B closed under: no element of X is reachable from U in G
+  (X may contain cycles: params fed only by themselves/each other through pure
+  bindings)
+--------------------------------------------------
+In the single upwards pass following the turn: every continuation parameter in X is
+removed (recursive conts via decide_param_usage_recursive on required_names;
+non-recursive conts agree via the rebuilt handler's free names); every argument
+position for a removed parameter is dropped at every use site by the
+Apply_cont_rewrite; and every at-most-generative binding in X becomes
+occurrence-free and is deleted by S.Rewrite.Let.DeadBinding. required_names =
+reachability from U on the downwards-pass graph; its complement is removed all at
+once — cycles included — so no rewrite iteration or resimplification round is
+needed.
+NOTES: Non-local because every name in a dead cycle HAS syntactic occurrences;
+local use-counting can never remove the cycle — each deletion is licensed only by
+the others. The recursive-continuation rewrite is registered before handlers are
+rebuilt (make_rewrite_for_recursive_continuation), so in-handler recursive
+apply_conts drop arguments during the handler's own rebuild. The consistency check
+required_names ⊇ actual-uses cannot trip: dropping arguments only shrinks free
+names. Blocking conditions (when the over-approximation keeps X alive): (1) a
+consumer of x ∈ X with arbitrary effects; (2) x passed to B's return/exn
+continuation; (3) x the first param of an exn handler, or an exn-cont extra arg;
+(4) x captured in a value slot when used_value_slots is Unknown (any non-toplevel
+body); (5) x feeds a mutable-unboxing candidate prim, over-approximated
+pre-unboxing (fixed only by the resimplify round); (6) generate_phantom_lets ∧
+user_visible x (survives as phantom). The true multi-handler recursive-group case
+follows from the shared-required_names mechanism (rewrites for the whole group
+registered before any handler rebuilt) but is untestable via fexpr today
+(fexpr_to_flambda's recursive multi-handler path is unimplemented). Composes:
+S.Struct.Flow.RequiredNames, S.Struct.Flow.UnusedParams, S.Rewrite.Let.DeadBinding.
+```
+
 ```rule
 RULE S.Struct.Flow.Aliases
 STATUS descriptive
@@ -548,6 +833,42 @@ handler (lets_to_introduce).
 This recovers, across control flow, aliases that the straight-line downwards
 alias tracking could not (e.g. loop-carried aliases); discovering a useful one in
 a loop can trigger resimplification (§6).
+```
+
+The bucket (first) parameter of an exception handler is exempt from alias-based
+removal, and alias equations are oriented around it rather than through it.
+
+```rule
+RULE S.Struct.Flow.ExnFirstParam
+STATUS conjectured
+CODE middle_end/flambda2/simplify/flow/control_flow_graph.ml#minimize_extra_args_for_one_continuation
+CODE middle_end/flambda2/terms/exn_continuation.mli#t
+---
+k is an exception handler with first (bucket) parameter x_b that REMAINS an
+  exception handler through Simplify (not demoted per S.Rewrite.LetCont.DemoteExn —
+  a demoted handler is ordinary and the ordinary AliasedParam rules apply);
+the dominator/alias analysis proves x_b aliased to some simple s
+--------------------------------------------------
+x_b is NEVER placed in removed_aliased_params_and_extra_params — the bucket param
+always survives alias-based removal — and the alias info is used only restrictedly:
+  - s a symbol or poison: the fact is DISCARDED, and alias-based removal is disabled
+    for EVERY parameter of that handler ("we cannot remove the exn param, so even if
+    it is aliased to a symbol, we cannot make use of that information");
+  - s a variable a: rematerialization is INVERTED relative to ordinary params —
+    `let a = x_b` is introduced at the handler top (alias recovered FROM the bucket),
+    and any OTHER parameter of k whose alias is a is rerouted to alias x_b instead.
+NOTES: An undocumented WF constraint forced by a cross-chapter fact: the bucket
+arrives via the raise machinery (OS.ApplyCont.ExnBoundary; in Cmm the trywith
+handler binds it in a fixed location, TC.LetCont.Exn), not via a rewritable
+apply_cont argument list, so no Apply_cont_rewrite can drop or re-source it. Local
+reading of S.Rewrite.LetCont.AliasedParam ("a param pinned to one value is removed
+and rematerialized") is exactly wrong for exn handlers; this rule records the
+inversion. Caveat: no live trigger for the Aliased{var} branch was found —
+handlers reachable only from explicit raises tend to be DEMOTED first
+(S.Rewrite.LetCont.DemoteExn), and any Apply-exn edge makes the bucket its own
+dominator; the branch is defensive. All four branches code-exact
+(control_flow_graph.ml:244-337). Composes: S.Struct.Flow.Aliases,
+S.Rewrite.LetCont.DemoteExn.
 ```
 
 ```rule
@@ -653,6 +974,46 @@ in the current downwards pass:  simplify_expr dacc inlined ~down_to_up.
 The inlined code is therefore simplified in the calling context, with the caller's
 types in scope. This is re-simplification within the single pass, not a new round
 (cf. S.Struct.SingleRound). The inlining decision and cost model are [§11](11-inlining.md).
+```
+
+### The speculative-inlining sandbox is hermetic
+
+The inlining oracle may run the full Simplify machinery on a candidate body to
+measure its cost. That speculative traversal is hermetic: only cost metrics escape.
+
+```rule
+RULE S.Struct.SpeculativeSandbox
+STATUS conjectured
+CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#speculative_inlining
+CODE middle_end/flambda2/simplify/env/downwards_acc.ml#prepare_for_speculative_inlining
+CODE middle_end/flambda2/simplify/flow/flow_analysis.ml#analyze
+CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_full_application
+---
+an Apply reaches the inlining oracle and speculative_inlining runs the full
+Simplify machinery (down + up, including a private flow analysis) on the candidate
+inlined body
+--------------------------------------------------
+(1) Hermeticity: speculation contributes nothing to the real pass. It runs on a
+    COPY of dacc with a freshly-installed flow_acc (init_toplevel with a dummy
+    toplevel continuation); its flow analysis runs ~speculative:true with empty
+    code_age_relation, Unknown used_value_slots, empty code_ids_to_never_delete; the
+    speculative dacc/uacc are discarded after cost-metrics extraction — no
+    continuation use, flow edge, value-slot use, CSE equation or lifted constant
+    reaches the real accumulators (only cost metrics escape).
+(2) Flow-dependent rewrites are disabled inside the sandbox: loopification
+    (do_not_rebuild_terms — "flow analysis would not see the self continuation"),
+    continuation lifting (no_lifting In_speculative_inlining), nested INLINING
+    (set_do_not_rebuild_terms_and_disable_inlining), and term rebuild itself
+    (are_rebuilding_terms = false).
+(3) No speculative artifact is emitted: if the decision is Inline, the body is
+    re-simplified from scratch against the REAL dacc (S.Struct.InlineResimplify),
+    re-recording all uses/flow/slots.
+NOTES: The sole escape is Cost_metrics (plus lifted-const sizes); no other caller
+of analyze ~speculative:true exists. Benign leaks (fresh-name stamp counters,
+Profile counters, debug dumps) touch no compilation state. The loopify guard sits
+at the Apply conversion, and the CR gbury there admits speculation UNDERCOUNTS
+loopification benefit — a documented cost-model imprecision. Composes:
+S.Struct.InlineResimplify, S.Struct.LiftCont.Gate, S.Struct.Turn.
 ```
 
 ### Bounded per-function resimplification
@@ -788,11 +1149,14 @@ pass can still read everything the downwards pass knew.
 
 - **Rule IDs introduced** (`S.Struct.*`): `Run`, `Run.ClosedResult`,
   `Run.NoPendingConstants`, `SingleRound`, `TwoPhase`, `Dacc`, `Uacc`,
-  `TypesMonotoneDown`, `SetOfClosuresEager`, `LetCont.BodyFirst`, `ContUse`,
-  `JoinParams`, `NoJoinUnknown`, `SingleInlinableUse`, `Rec.NoFixpoint`,
-  `Rec.InvariantVsVariant`, `ApplyContRewrite`, `Turn`, `Flow.RequiredNames`,
-  `Flow.UnusedParams`, `Flow.Aliases`, `Flow.MutableUnboxing`, `Lift.Accumulate`,
-  `Lift.PlaceAtToplevel`, `Lift.EmptyAtEnd`, `InlineResimplify`, `Resimplify`,
+  `TypesMonotoneDown`, `EnvRefineOnly`, `SetOfClosuresEager`, `LetCont.BodyFirst`,
+  `ContUse`, `Switch.ArmIsolation`, `JoinParams`, `JoinParams.AnalysisExtraParams`,
+  `NoJoinUnknown`, `SingleInlinableUse`, `CSE.JoinPhi`, `Rec.NoFixpoint`,
+  `Rec.InvariantVsVariant`, `ApplyContRewrite`, `LetCont.UnreachableClosure`,
+  `LiftCont.Gate`, `Turn`, `Flow.RequiredNames`, `Flow.UnusedParams`,
+  `Flow.DeadLoopParam`, `Flow.Aliases`, `Flow.ExnFirstParam`,
+  `Flow.MutableUnboxing`, `Lift.Accumulate`, `Lift.PlaceAtToplevel`,
+  `Lift.EmptyAtEnd`, `InlineResimplify`, `Resimplify`, `SpeculativeSandbox`,
   `Loopify`.
 - **dacc / uacc composition**: recorded in `S.Struct.Dacc` and `S.Struct.Uacc`;
   crucially `uacc` embeds the creating `dacc` (`creation_dacc`), and the flow
@@ -802,14 +1166,19 @@ pass can still read everything the downwards pass knew.
   the join of invariant arguments over uses seen in the body (single pass);
   variant params get `Unknown` (subkind only); each handler is traversed once.
 - **Open questions / conjectured** (for chapter-6 verification):
-  - `S.Struct.TypesMonotoneDown` is `conjectured`; needs the chapter-13 audit to
-    confirm no downwards path weakens an existing equation.
-  - Exact interaction of `-flambda2-join-points` with the *new* n-way join's
-    extra-parameter introduction (`add_extra_params_from_join_analysis`) is only
-    sketched here; whether the flag also gates that path is worth checking.
+  - `S.Struct.TypesMonotoneDown` is split: the algorithmic half is
+    `S.Struct.EnvRefineOnly` (verified), the semantic half holds for aliases
+    (`INV.Simplify.AliasesMonotoneDown`, [§13](13-soundness.md)) and FAILS for
+    concrete types at the non-GLB corner (`T.Meet.MutableBlockMissedBottom`).
+  - RESOLVED: `-flambda2-join-points` DOES gate
+    `add_extra_params_from_join_analysis`, additionally conjoined with
+    `join_algorithm ∈ {N_way, Checked}` — see
+    `S.Struct.JoinParams.AnalysisExtraParams` (and `T.Join.ConstAgreement` from
+    the types side).
   - The precise set of uses feeding the invariant-param join for recursive
     groups (body uses only vs. any recursive uses) is stated as body-only from
     `simplify_handlers`; confirm no later path re-joins with in-handler uses.
   - `max_function_simplify_run` bound and whether resimplification can be
-    triggered by anything other than mutable unboxing / loop aliases.
+    triggered by anything other than mutable unboxing / loop aliases (see
+    `S.Rewrite.Loopify.ResimplifyIdempotent`, [§10](10-simplify-rewrites.md)).
 ```

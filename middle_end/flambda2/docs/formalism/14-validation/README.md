@@ -14,11 +14,13 @@ synthesized program); (2) predict the output and cite rules before looking;
 resolved by **fixing the formalism, never by editing the prediction** — the one
 MISMATCH below drove a correction to `S.Rewrite.CSE.Eligible`.
 
-**Verdicts:** 39 case studies — 35 MATCH, 1 PARTIAL, 3 MISMATCH (2 drove formalism
+**Verdicts:** 45 case studies — 40 MATCH, 1 PARTIAL, 4 MISMATCH (2 drove formalism
 fixes — the `S.Rewrite.CSE.Eligible` correction and the `R.Obj.Closures`
-scanned/unscanned split; 1 — [`float32_double_round`](float32_double_round.md) —
-witnesses an open **compiler soundness bug**: int→float32 constant folding
-double-rounds). The 6 `to_cmm` case studies (chapters 15–20) validate the emitted
+scanned/unscanned split; [`float32_double_round`](float32_double_round.md) witnesses
+an open **compiler soundness bug**: int→float32 constant folding double-rounds; and
+[`classic_physequal_box`](classic_physequal_box.md) witnesses an open **formalism
+bug**: `-Oclassic` `Box_number` duplication vs a deterministic `PhysEqual`). The 6
+`to_cmm` case studies (chapters 15–20) validate the emitted
 Cmm against the representation relation using real `-dcmm` output; the adversarial
 sweep of chapters 15–20 (see below) found the `R.Obj.Closures`, `R.Obj.Array`, and
 `CM.Addr.NoSurvive` imprecisions now corrected.
@@ -116,3 +118,22 @@ runs them automatically. Run one with
 | [`tocmm-04-closure-capture`](tocmm-04-closure-capture.md) | closure alloc + value-slot projection | MATCH | `R.Obj.Closures`, `TC.Prim.ProjectValueSlot`, `TC.Let.SetOfClosures` |
 | [`tocmm-05-block-set-barrier`](tocmm-05-block-set-barrier.md) | immediate store vs. `caml_modify` barrier; array indexing | MATCH | `TC.Prim.BlockSet`, `TC.Prim.ArrayAccess`, `CM.Store` |
 | [`tocmm-06-closure-unscanned`](tocmm-06-closure-unscanned.md) | unscanned (`int`) capture sits below `startenv` | MISMATCH (drove `R.Obj.Closures` fix) | `R.Obj.Closures`, `R.Val.Clos`, `TC.Prim.ProjectFunctionSlot` |
+
+## Adversarial consolidation (6)
+
+These case studies land the highest-value confirmed results of the
+believers/skeptics campaign (see the verdict ledger). The first is a second
+soundness-relevant MISMATCH — an over-specified formalism rule; the rest are MATCH
+witnesses of whole-body/whole-unit invariants. Three carry a checked-in testsuite
+program under `testsuite/tests/flambda2/examples/formalism/` (empty `.reference`
+until promoted); the other three are exercised through `meet_test.ml` or
+`-dcmm`/`-g`-differential runs rather than the fexpr-dump harness.
+
+| Case study | Target | Verdict | Testsuite test | Primary rules |
+|---|---|---|---|---|
+| [`classic_physequal_box`](classic_physequal_box.md) | `-Oclassic` `Box_number` duplication vs deterministic `PhysEqual` | MISMATCH (formalism bug) | — (`-dcmm`/runtime; classic skips Simplify) | `INV.ToCmm.Simulates`, `P.Effects.DelayDuplicable`, `INV.ToCmm.EffectLinear`, `P.Binary.PhysEqual` |
+| [`region_pair_atomic`](region_pair_atomic.md) | Begin_region + all End_regions live/die atomically (2 exits) | MATCH | [`formalism/region_pair_atomic`](../../../../../testsuite/tests/flambda2/examples/formalism/region_pair_atomic.ml) | `INV.Simplify.RegionPairAtomic`, `S.Rewrite.Let.DeadRegion`, `INV.Simplify.EffectfulDeletionInventory` |
+| [`dead_value_slot_coherence`](dead_value_slot_coherence.md) | captured var dropped when its slot is never projected | MATCH | [`formalism/dead_value_slot_coherence`](../../../../../testsuite/tests/flambda2/examples/formalism/dead_value_slot_coherence.ml) | `INV.Simplify.DeadValueSlotCoherence`, `S.Rewrite.Prim.Projection`, `INV.ToCmm.SlotLiveness` |
+| [`exn_demotion`](exn_demotion.md) | all-or-nothing exception-handler demotion | MATCH | [`formalism/exn_demotion`](../../../../../testsuite/tests/flambda2/examples/formalism/exn_demotion.ml) | `S.Rewrite.LetCont.DemoteExn`, `INV.Simplify.EffectfulDeletionInventory`, `S.Struct.Flow.ExnFirstParam` |
+| [`const_persistence_join_points`](const_persistence_join_points.md) | constant knowledge survives merges only when `join_points` on | MATCH | — (`meet_test.ml` witnesses) | `T.Join.ConstAgreement`, `T.Env.ConstCanonicalPersists`, `S.Struct.JoinParams.AnalysisExtraParams` |
+| [`loopify_trap_neutral`](loopify_trap_neutral.md) | loopified self-loops trap-depth-neutral (Pop, never Push) | MATCH | — (`.fl`/`-dcmm`/`-g` differential) | `INV.Loopify.TrapNeutral`, `S.Rewrite.Loopify.SelfTailCall`, `S.Rewrite.LetCont.DemoteExn` |

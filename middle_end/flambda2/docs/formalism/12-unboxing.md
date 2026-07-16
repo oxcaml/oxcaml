@@ -348,6 +348,57 @@ NOTES: Exception — Number Naked_immediate is always kept, since at worst it
   block/variant/closure, must show a beneficial component.
 ```
 
+### 3.4 Loopified boxed accumulators
+
+Continuation-parameter unboxing composes with loopification ([§10](10-simplify-rewrites.md)
+S.Rewrite.Loopify.Body) to determine exactly when a loop-carried boxed-number
+accumulator loses its per-iteration allocation.
+
+```rule
+RULE S.Unbox.Loopify.AccumBoxElim
+STATUS conjectured
+CODE middle_end/flambda2/simplify/unboxing/unbox_continuation_params.ml#make_decisions
+CODE middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_number_decision
+CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#decide_param_usage_recursive
+CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_single_recursive_handler
+---
+Code c is loopified (S.Rewrite.Loopify.Body), self continuation k;
+parameter pⱼ of k has a boxed-number declared subkind (boxed float / float32 /
+  int32 / int64 / nativeint / vec*);
+pⱼ is LOOP-VARYING: it is not eliminated by the alias/dominator analysis
+  (S.Rewrite.Loopify.InvariantArgElim / BERK-2 takes precedence — an invariant
+  boxed parameter is removed entirely, no thread of either kind, no allocation)
+--------------------------------------------------
+(1) the unboxing DECISION for pⱼ always fires, from the declared subkind alone: the
+    recursive path gives the param unknown_with_subkind
+    (S.Struct.Rec.InvariantVsVariant), on which prove_is_a_boxed_<nnk> is Proved
+    (S.Unbox.Optimistic.Number); use-site refinement and the benefit filter are
+    skipped for recursive continuations. For a loop-varying pⱼ the naked component
+    parameter survives in the emitted loop, with the entry edge projecting it once
+    from the boxed function parameter;
+(2) the BOXED parameter pⱼ′ itself — and with it the box allocation on every
+    back-edge — is eliminated IFF the handler, after rewriting under the
+    param = box(component) equation (S.Unbox.Denv.Equation), does not consume the
+    boxed value as a box on any path; in particular, returning a VARYING accumulator
+    at a loop exit (apply_cont ret pⱼ′) keeps pⱼ′ ∈ required_names, so the residual
+    loop threads BOTH the boxed and naked value and allocates a fresh box every
+    iteration. No exit-edge re-boxing is ever introduced to break this.
+NOTES: A performance-model theorem locating the exact loopification+unboxing payoff
+boundary, invisible to local reasoning: the retention condition is a whole-body
+required_names fact computed at the turn (S.Struct.Flow.RequiredNames →
+S.Struct.Flow.UnusedParams for recursive conts). Number unboxing is not subject to
+max_unboxing_depth (the depth check lives in the block/variant branch only) and
+unbox_numbers is hardcoded true, so the decision is purely additive when
+non-beneficial — a deliberate optimism worth recording. Witnessed both directions:
+`let rec f (acc:float) x = if x=0 then acc else f (acc+.1.) (x-1)` keeps the
+back-edge box (accumulator returned boxed at exit), while replacing the exit with
+`int_of_float acc` removes it. The loop-varying premise is load-bearing: without
+it, an invariant returned-boxed accumulator is eliminated WHOLESALE by
+InvariantArgElim (no thread, no allocation). Composes: S.Rewrite.Loopify.Body,
+S.Rewrite.Loopify.InvariantArgElim, S.Unbox.Optimistic.Number,
+S.Unbox.Denv.Equation, S.Unbox.ContParam.Rewrite, S.Struct.Rec.InvariantVsVariant.
+```
+
 ## 4. Variants
 
 A variant parameter is unboxed by synthesizing three kinds of extra parameter:
@@ -659,6 +710,7 @@ component parameter `unboxed_float`).
 | `S.Unbox.ExtraArg.Available` / `.Project` / `.Invalid` | how each component arg is obtained at a use |
 | `S.Unbox.Refine.Pass` | Filter vs Compute_all_extra_args two-pass structure |
 | `S.Unbox.Beneficial` | the benefit filter |
+| `S.Unbox.Loopify.AccumBoxElim` | loop-carried boxed-accumulator box elimination boundary |
 | `S.Unbox.Variant.Discriminator` | tag / is_int / ctor extra args at uses |
 | `S.Unbox.FunParam.Wrapper` | `[@unboxable]` wrapper set-up (from_lambda) |
 | `S.Unbox.Denv.Equation` | handler-side "param = box(components)" equation |

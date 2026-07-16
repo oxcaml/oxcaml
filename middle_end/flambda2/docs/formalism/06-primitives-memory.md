@@ -299,6 +299,39 @@ axes); it is not a candidate for delaying.
 NOTES: join(Delay, Strict) = Strict.
 ```
 
+Delay placement is the enabling condition for `to_cmm`'s duplicate-at-each-use
+lowering, so it carries a side condition on the other two axes that no assertion
+enforces but every producer respects.
+
+```rule
+RULE P.Effects.DelayDuplicable
+STATUS conjectured
+CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects
+CODE middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_let_binding
+---
+for every primitive p: placement(p) = Delay
+--------------------------------------------------
+coeffects(p) = No_coeffects  and  effects(p) ∈ { No_effects,
+  Only_generative_effects Immutable }. Delay-placed defining expressions are
+therefore safe to move to their (possibly multiple) use sites: they read no
+mutable state (no coeffect to invalidate) and their only effect is immutable
+allocation, whose duplication/dropping the semantics licenses.
+NOTES: A side condition TC.Let.Subst ([§18](18-to-cmm-data.md)) silently depends
+on: classify_let_binding maps ANY Delay binding with >1 occurrences to
+Must_inline_and_duplicate, re-evaluating the defining expression at each use with
+no effect/coeffect staging. Witnessed exhaustively — THREE Delay producers: two
+arms of flambda_primitive.ml#effects_and_coeffects (Project_function_slot /
+Project_value_slot = No_effects; Box_number Heap in classic mode =
+Only_generative_effects Immutable), plus Ece.pure_can_be_duplicated minted inside
+to_cmm, pure by construction. Box_number Local is deliberately Strict (local
+allocations have coeffects, must not move past begin/end region). Placement.join
+only demotes Delay→Strict. Enforced nowhere (no assertion); the classic-mode
+Box_number arm actively pushes the boundary — and is precisely what makes the
+headline INV.ToCmm.Simulates PhysEqual discrepancy possible
+([§20](20-to-cmm-soundness.md)). Composes: P.Effects.Placement,
+INV.ToCmm.EffectLinear.
+```
+
 ```rule
 RULE P.Effects.Validity
 STATUS normative

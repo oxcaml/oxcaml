@@ -458,6 +458,74 @@ NOTES: Guarded by a debug flag rather than always enforced, hence descriptive;
 it documents the intended representation invariant.
 ```
 
+Two consequences of this canonical/binding-time discipline are worth stating as
+rules, because neither is guaranteed by a single function: constant knowledge is
+indelible, and the aliases domain — not the stored `Equals` equations — is what
+expansion relies on.
+
+```rule
+RULE T.Env.ConstCanonicalPersists
+STATUS conjectured
+CODE middle_end/flambda2/types/env/meet_env.ml#add_alias_between_canonicals
+CODE middle_end/flambda2/types/env/aliases.mli#find_best
+CODE middle_end/flambda2/types/env/binding_time.ml#consts
+CODE middle_end/flambda2/types/env/meet_env.ml#record_demotion
+---
+canonical_E(x) = c for a constant c (x's alias class contains c);
+E' is obtained from E by any finite sequence of downwards-descent operations
+  (add_equation / add_env_extension / add_alias, definitions of new names,
+  T.meet calls) with no cut/join boundary crossed
+--------------------------------------------------
+Either E' is bottom (or x : Bottom in E'), or canonical_{E'}(x) = c. Moreover no
+alias class in any reachable E' contains two distinct constants: TE.add_alias on
+two distinct constant canonicals yields Bottom, mapped to a bottom env by
+add_alias_between_canonicals.
+NOTES: Composing T.Env.Canonical.Least + T.Meet.AliasAlias: (i) constants have
+binding time consts = 0, strictly least, and find_best prefers constants, so a
+constant in a class is always canonical; (ii) alias classes only merge; (iii) a
+merge either brings a non-constant canonical (demoted to c — record_demotion /
+the name-vs-const path fatals on "Unexpected demotion of constant") or a distinct
+constant c', whence add_alias_between_canonicals bottoms the env. Boundary:
+indelibility is for ALIAS-CLASS answers only — a non-constant Proved answer can
+still degrade Proved→Unknown through the non-GLB meet corner
+(T.Meet.GreatestLowerBound); and on a raise_on_bottom:false path a conflicting
+const equation is silently dropped rather than bottoming, keeping canonical = c.
+replace_concrete_equation normalizes a singleton concrete `x = c` into the
+indelible alias domain. Composes: T.Env.Canonical.Least, [§08](08-meet-join.md)
+meet. Witnessed in `middle_end/flambda2/tests/meet_test.ml`: `x = 3` then `x = 4`
+⟹ bottom; `y = 5` then `y = sym` ⟹ both typed `(= 5)`.
+```
+
+```rule
+RULE T.Env.AliasesAuthoritative
+STATUS conjectured
+CODE middle_end/flambda2/types/env/aliases.ml#add
+CODE middle_end/flambda2/types/env/meet_env.ml#record_demotion
+CODE middle_end/flambda2/types/expand_head.ml#expand_head0
+CODE middle_end/flambda2/types/env/typing_env.ml#invariant_for_alias
+---
+after any sequence of equation adds and alias demotions in a typing env
+--------------------------------------------------
+(a) the aliases domain is PATH-COMPRESSED: canonical_elements maps every
+    non-canonical member DIRECTLY to its class canonical (Aliases.add re-points
+    the whole demoted class on a merge);
+(b) the stored name→type Equals equations are NOT path-compressed: record_demotion
+    rewrites only the demoted name's own equation, so a stored Equals may target a
+    non-canonical name whose own stored type is itself Equals (a stored chain);
+(c) hence every read (expand_head0, type_simple_in_term_exn, all provers) resolves
+    through the aliases domain, and the one-step property of T.Expand.Head is a
+    consequence of (a) — NOT of the shape of the stored equations.
+NOTES: Ch-07 §3.1 hedges correctly ("pointing (eventually) at the canonical one")
+but T.Expand.Head's one-step termination rests on the compressed canonical_elements
+lookup plus T.Env.Canonical.NoEqualsOnCanonical, not on the stored graph (which
+does contain Equals-to-Equals edges). Consequence for tools/agents: never chase
+stored Equals targets to find a canonical (they can be stale); use
+get_canonical_simple. Witnessed by test_meet_chains_three_vars (checked-in
+meet_test.expected): stored var3:(= var1), var2:(= var1), var1:(= my_symbol) while
+canonical_elements maps var1/var2/var3 all directly to my_symbol. Composes:
+T.Env.Canonical.NoEqualsOnCanonical, T.Expand.Head, T.Meet.AliasAlias.
+```
+
 Resolving a `Simple` to its type therefore means: find the canonical element,
 look up its concrete type, and return an alias to the canonical. This is what
 `type_simple_in_term_exn` does — it returns `alias_type_of kind canonical`
@@ -685,9 +753,47 @@ CODE middle_end/flambda2/types/grammar/type_grammar.mli#closures_entry
 γ_E(Closures { by_function_slot }) = the set of closure pointers p such that p
 selects some function slot f present in known_closures, the closure block
 contains at least the function and value slots named by the case's
-Set_of_closures_contents, the code pointer for f matches the function_type's
-code_id, and each value/function slot component holds a value in γ_E of the
-corresponding component type.
+Set_of_closures_contents, the code pointer for f implements SOME code-age-related
+version of the function_type's code_id (the class of code_id under the
+newer_version_of preorder), NOT necessarily code_id exactly, and each
+value/function slot component holds a value in γ_E of the corresponding component
+type.
+NOTES: The code-pointer clause is loosened from exact-match to the version class
+per T.Gamma.Closures.CodeAgeLoose: Simplify legitimately assigns an old-cid
+closure type to a value that will carry the newer specialized code, so exact-match
+γ would make ordinary closure typing unsound before any meet.
+```
+
+```rule
+RULE T.Gamma.Closures.CodeAgeLoose
+STATUS conjectured
+CODE middle_end/flambda2/types/meet_and_join.ml#meet_code_id
+CODE middle_end/flambda2/types/env/code_age_relation.ml#meet
+CODE middle_end/flambda2/types/env/typing_env.ml#add_to_code_age_relation
+---
+the γ clause for Closures code pointers (T.Gamma.Value.Closures) must read the
+function_type's code_id up to the newer_version_of preorder, not exactly
+--------------------------------------------------
+The version-class reading is forced by two facts, not by T.Meet.Sound (which is
+⊇-only and so vacuously satisfied by a non-⊥ result on disjoint inputs):
+(a) meet_code_id distinguishes Bottom (provably unrelated cids) from Ok-newer
+    (version-related cids, resolved to the newer — code_age_relation.ml#meet:
+    "whichever is newer ... otherwise bottom"); under exact-match γ both
+    intersections are empty, so the distinction the code carefully draws would be
+    meaningless. Only the version-class γ makes it contentful.
+(b) Type-assignment soundness: Simplify assigns old-cid closure types to values
+    that carry the NEWER specialized code, unsound under exact γ before any meet.
+    add_to_code_age_relation records newer↦older exactly when Simplify
+    re-specializes the same function's code.
+NOTES: Descriptive finding: in the Unknown-relatedness case (e.g. missing .cmx)
+meet_code_id returns Both_inputs for UNEQUAL code ids, with the code comment "We
+are kind of lying here — using either input is correct, but might lose different
+information" — the Both_inputs protocol (inputs equally good) is deliberately
+abused, so which cid survives depends on the caller's combine plumbing. Sound
+under the version-class γ (either cid's version class over-approximates the value)
+but nondeterministically imprecise. A consistency constraint BETWEEN the ch-07
+concretization and the ch-08 algorithm; neither file alone shows it. Composes:
+T.Gamma.Value.Closures (corrected), [§08](08-meet-join.md) meet_code_id.
 ```
 
 ### 4.2 Naked-number concretization

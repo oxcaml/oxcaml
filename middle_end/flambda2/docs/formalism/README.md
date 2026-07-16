@@ -45,25 +45,32 @@ the sync protocol below says what to do.
 
 ## Status & validation
 
-As of 2026-07-14 the formalism has **394 rules** across chapters 02-20:
+As of 2026-07-14 the formalism has **439 rules** across chapters 02-20:
 **287 normative** (the code must satisfy them), **66 descriptive** (current
-algorithms/heuristics that may change), and **41 conjectured** (believed but not
+algorithms/heuristics that may change), and **86 conjectured** (believed but not
 yet checked against the code). Counts and per-chapter breakdown are regenerated
 in [`rule-index.md`](rule-index.md).
 
 Chapters 01-20 were adversarially verified against the code, and the whole
-system was validated against **39 case studies** in
+system was validated against **45 case studies** in
 [`14-validation/`](14-validation/) using a prediction-first protocol (predict the
-output and cite rules *before* reading the actual output): **35 MATCH,
-1 PARTIAL, 3 MISMATCH**. Two mismatches were resolved by fixing the formalism
+output and cite rules *before* reading the actual output): **40 MATCH,
+1 PARTIAL, 4 MISMATCH**. Two of the mismatches were resolved by fixing the formalism
 (immutable array loads *are* CSE-eligible; a closure's unscanned `int` capture sits
-below `startenv`); the third
-([`float32_double_round`](14-validation/float32_double_round.md)) witnesses an
-open **compiler soundness bug** — int→float32 constant folding double-rounds
-where the backend single-rounds. Chapter
-[`13-soundness.md`](13-soundness.md) states the (claimed, empirically validated,
-unproved) soundness property and records the known discrepancies between this
-document, its companion prose, and the code.
+below `startenv`); the other two witness soundness-relevant defects. The
+[`float32_double_round`](14-validation/float32_double_round.md) mismatch is an open
+**compiler soundness bug** — int→float32 constant folding double-rounds where the
+backend single-rounds. The [`classic_physequal_box`](14-validation/classic_physequal_box.md)
+mismatch is an open **formalism bug** — in `-Oclassic`, `Box_number` duplication
+plus a deterministic `PhysEqual` denotation contradict `INV.ToCmm.Simulates` for a
+program with no undefined behaviour ([`20-to-cmm-soundness.md`](20-to-cmm-soundness.md)
+§5.6). The latest batch of case studies and rules also lands the
+believers/skeptics adversarial campaign's confirmed whole-body/whole-unit invariants
+(dead-code flow closure, region-pair atomicity, dead value-slot coherence, loopify
+trap-neutrality, exn-handler demotion, and the `to_cmm` liveness/layout/linkage
+invariants). Chapter [`13-soundness.md`](13-soundness.md) states the (claimed,
+empirically validated, unproved) soundness property and records the known
+discrepancies between this document, its companion prose, and the code.
 
 Chapters 15-20 extend the formalism *past* Simplify to the **`to_cmm`** lowering
 (the biggest former "context only" gap): a core Cmm machine

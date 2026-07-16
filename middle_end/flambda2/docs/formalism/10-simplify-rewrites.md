@@ -491,6 +491,50 @@ NOTES: The CSE table is scoped (`by_scope`/`combined` in
   the bookkeeping half of S.Rewrite.CSE.Replace.
 ```
 
+Which sharing mechanism a pure projection uses — CSE, or the types domain — is
+determined by whether its access path is static (in the primitive payload) or
+dynamic (a Simple operand).
+
+```rule
+RULE S.Rewrite.Share.StaticDynamicSplit
+STATUS conjectured
+CODE middle_end/flambda2/terms/flambda_primitive.ml#unary_primitive_eligible_for_cse
+CODE middle_end/flambda2/terms/flambda_primitive.ml#binary_primitive_eligible_for_cse
+CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_immutable_block_load0
+CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load
+---
+p is a pure ((No_effects, No_coeffects)) projection primitive
+--------------------------------------------------
+Simplify's sharing mechanism for p is assigned by whether p's access path is
+STATIC (encoded in the primitive payload) or DYNAMIC (a Simple operand):
+(1) static path — Block_load (field a constant payload), Project_function_slot,
+    Project_value_slot, Unbox_number, Untag_immediate — NOT CSE-eligible; shared
+    exclusively through the types domain (meet_block_field_simple,
+    meet_project_*_simple, boxed/tagged-contents shape meets). Each additionally
+    installs an INVERSE-CONSTRUCTION CSE equation (Make_block ↦ block on a
+    fully-known block load; Box_number ↦ arg on unbox, GATED on alloc mode Proved
+    Heap; Tag_immediate ↦ arg on untag), sharing the re-construction;
+(2) dynamic index — Array_load (Immutable | Immutable_unique) — forward
+    CSE-eligible; the types domain recovers only constant-index instances;
+(3) discriminators — Is_int, Get_tag, Is_null — carried by BOTH forward CSE and
+    the relational types domain (a deliberate redundancy the code plans to retire).
+    Get_header rides ONLY CSE (simplify_get_header installs no relation);
+(4) orphan — String_or_bigstring_load: neither mechanism; immutable string loads
+    are never shared.
+NOTES: Sharpens the corrected S.Rewrite.CSE.Eligible into a design invariant WITH
+ITS REASON: types can carry only a projection whose path is a static index into a
+Row_like / product; CSE keys on the whole primitive so it can carry a variable
+operand. Observable: identical immutable BLOCK loads share via the TYPES domain
+(the first load's shape-meet writes field₀ = (= x) into the previously-Unknown
+block type — type-sharing needs no a-priori block type; no forward Block_load CSE
+equation appears, only the inverse Make_block one). Identical immutable ARRAY loads
+at a VARIABLE index still deduplicate (forward CSE; types cannot carry a variable
+index — witnessed by 14-validation/cse_immutable_array_load_var_index.md). Two
+construction-sharing channels: the inverse Make_block equation at the LOAD and the
+forward Immutable Make_block CSE equation at the ALLOCATION. Composes:
+S.Rewrite.CSE.Eligible, T.Prove.MeetShortcut, T.Grammar.RowLike.Index.
+```
+
 ## Switch simplification
 
 A `switch` scrutinizes a naked immediate against integer discriminants, each arm
@@ -619,6 +663,7 @@ NOTES: "At most generative effects" allows allocations (pure or immutable
 RULE S.Rewrite.Let.DeadRegion
 STATUS normative
 CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
+CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_end_region
 ---
 let x = End_region { region = ρ } in e   where ρ is not in required_names
 --------------------------------------------------
@@ -627,7 +672,15 @@ NOTES: An `End_region` for a region whose corresponding `Begin_region` was itsel
   eliminated (region unused) is dropped even though it is effectful, because with
   no allocations in the region there is nothing to pop. This is the one case where
   an effectful binding is deleted; it is handled specially via
-  `is_end_region_for_unused_region`.
+  `is_end_region_for_unused_region`. For an unused region, `will_delete_binding` is
+  TRUE unconditionally — each End_region is deleted even if its bound unit variable
+  has surviving uses. This is sound only because `simplify_end_region` PINS the
+  End's result type to exactly tagged 0 (simplify_unary_primitive.ml:689-694), so
+  any surviving use of the bound variable canonicalizes to that constant before the
+  rebuild. That result-type pinning is part of this rule's soundness and is why the
+  atomic Begin/End deletion of INV.Simplify.RegionPairAtomic ([§13](13-soundness.md))
+  never orphans a use. Only `End_region` (not `End_try_region`) takes this path;
+  see INV.Simplify.EffectfulDeletionInventory ([§13](13-soundness.md)).
 ```
 
 ```rule
@@ -695,6 +748,36 @@ NOTES: The single call is replaced by the handler with parameters bound to the
 ```
 
 ```rule
+RULE S.Rewrite.LetCont.InlineForcesElimination
+STATUS conjectured
+CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler
+CODE middle_end/flambda2/simplify/simplify_common.ml#apply_cont_use_kind
+CODE middle_end/flambda2/simplify/simplify_apply_cont_expr.ml#inline_linearly_used_continuation
+CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_let_cont
+---
+k non-recursive, not an exception handler, not cold;
+k's recorded uses list has length exactly 1, of kind Inlinable
+--------------------------------------------------
+The output term contains NO Let_cont binding k — unconditionally. Two terminal
+cases: (a) the use site survives the upwards rebuild: it is spliced with k's
+handler (inline_linearly_used_continuation; registration at
+rebuild_single_non_recursive_handler is unconditional given the classification),
+so the rebuilt body has zero occurrences of k and rebuild_let_cont drops the binder;
+(b) the use site dies during rebuild (rewritten to Invalid or erased): zero
+occurrences again, binder dropped.
+NOTES: The subtle content: no OTHER occurrence form of k can exist —
+apply_cont_use_kind makes switch-branch, trap-action-bearing, and return/exn-sort
+uses all Non_inlinable, so a single-Inlinable-use k occurs exactly once as a bare
+tail apply_cont; the CUE use-list length (downwards, already excluding
+unreachable/pruned code) and the upwards syntactic occurrence count provably agree.
+The not-cold condition is folded into is_single_inlinable_use. Shortcuts are never
+created for these continuations, so no rewrite re-introduces an occurrence. A
+must-disappear theorem: the classification alone forces the binder's elimination.
+Composes: S.Rewrite.LetCont.Inline, S.Rewrite.LetCont.DeadHandler,
+S.Struct.SingleInlinableUse.
+```
+
+```rule
 RULE S.Rewrite.LetCont.DeadHandler
 STATUS normative
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_handlers
@@ -726,6 +809,42 @@ NOTES: A continuation whose body is just a jump to another continuation becomes 
   Shortcuts are never created to a linearly-used-inlinable continuation, so they
   compose safely with S.Rewrite.LetCont.Inline. Sound because calling k always
   immediately calls k′ with the substituted arguments.
+```
+
+```rule
+RULE S.Rewrite.LetCont.ShortcutFlat
+STATUS conjectured
+CODE middle_end/flambda2/simplify/expr_builder.ml#apply_continuation_shortcuts
+CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler
+CODE middle_end/flambda2/simplify/continuation_shortcut.ml#apply
+CODE middle_end/flambda2/simplify/env/upwards_env.ml#add_continuation_shortcut
+---
+the upwards environment's continuation-shortcut map, at any point of the upwards
+rebuild
+--------------------------------------------------
+FLATNESS INVARIANT: a registered shortcut's target is never itself a shortcut.
+Consequently the single-step (non-looping) application in
+apply_continuation_shortcuts achieves FULL path compression: no emitted apply_cont
+targets a shortcut continuation, and a chain of n trampoline continuations
+(kₙ → kₙ₋₁ → … → k₀) collapses to direct jumps to k₀ in one pass, after which every
+intermediate kᵢ has zero occurrences and dies by S.Rewrite.LetCont.DeadHandler.
+Proof of flatness: (a) acyclicity by scoping — a shortcut handler is non-recursive,
+so its target is declared strictly OUTSIDE it (shortcut edges point outward, no
+cycles); (b) registration order — handlers are rebuilt BEFORE the bodies containing
+their uses, so when kᵢ's handler (a bare apply_cont) is rebuilt, its target's
+shortcut (registered strictly earlier) has already been applied to it; the
+behaviour check in rebuild_single_non_recursive_handler reads the ALREADY-REBUILT
+handler, so a shortcut is never registered for a would-be-inlinable target.
+NOTES: Non-local: flatness of a global map maintained across the whole rebuild;
+single-step application is correct only because of a registration ORDER spanning
+arbitrarily distant let_conts. Composition guarantee S.Rewrite.LetCont.Shortcut
+("shortcuts never created to a linearly-used-inlinable continuation") prevents the
+one interaction that could re-materialize a use. Site trap actions survive
+retargeting (the shortcut condition is on the HANDLER's apply_cont having no trap
+action, not the site's). Known precision (not soundness) leak (CR gbury):
+retargeting can lose kind/subkind info the intermediate continuation's params
+carried. Composes: S.Rewrite.LetCont.Shortcut, S.Rewrite.LetCont.DeadHandler,
+S.Rewrite.LetCont.InlineForcesElimination.
 ```
 
 ```rule
@@ -798,6 +917,64 @@ NOTES: A "match-in-match" style specialization: distinct call sites get distinct
   Descriptive because it is heuristic and budget-limited (`Specialization_cost`).
   Recursive continuations are never specialized. Sound because each copy is a
   faithful renaming of k simplified under a *weaker* (more specific) environment.
+```
+
+An exception handler with no *escaping* use is demoted to an ordinary
+continuation, its trap frame dissolved. This merges two verified findings (Leibniz
+T1 ExnDemotion and Berkeley BERK-10): the escaping gate and its `-g` sensitivity,
+the all-or-nothing trap-action erasure, the cross-rule enabling edges, and the
+bucket-pinning fact.
+
+```rule
+RULE S.Rewrite.LetCont.DemoteExn
+STATUS conjectured
+CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#prepare_dacc_for_handlers
+CODE middle_end/flambda2/simplify/env/downwards_acc.ml#demote_exn_handler
+CODE middle_end/flambda2/simplify/simplify_common.ml#apply_cont_use_kind
+CODE middle_end/flambda2/simplify/simplify_common.ml#clear_demoted_trap_action
+CODE middle_end/flambda2/simplify/simplify_common.ml#patch_unused_exn_bucket
+CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
+---
+let_cont k = h in e, k an exception handler (is_exn_handler);
+no recorded use of k is escaping (Non_inlinable { escaping = true }), which unfolds
+to: (a) no surviving Apply carries k as its exn continuation (every Apply-borne exn
+continuation use is recorded escaping = true), and (b) every raise targeting k
+(apply_cont with a Pop trap action) has raise_kind No_trace, OR
+Flambda_features.debug () is false (apply_cont_use_kind: Regular/Reraise raises are
+escaping = true exactly when debug info is on, mirroring Cmm_helpers.raise_prim);
+Push-carrying uses are always non-escaping and never block demotion
+--------------------------------------------------
+(1) k is demoted (DA.demote_exn_handler in dacc.demoted_exn_handlers, decided in
+    prepare_dacc_for_handlers after the body traversal has recorded all uses;
+    is_exn_handler = false thereafter);
+(2) all-or-nothing at a distance: on the way up, EVERY Push and Pop trap action
+    naming k, at every site in e, is erased (clear_demoted_trap_action); raises to k
+    become plain jumps. Either k stays an exn handler and every Push/Pop survives,
+    or it is demoted and every one is cleared;
+(3) demotion UNLOCKS the normal-continuation rule set previously forbidden on k:
+    parameter unboxing (the next step of prepare_dacc_for_handlers; the demoted
+    handler falls into the unboxing branch genuine exn handlers never reach),
+    single-use inlining, shortcuts — and the exn bucket loses its
+    unconditional-use marking, becoming ordinary dead-param-eligible.
+NOTES: -g DEPENDENCE: a local try…with (handler reachable only from direct raises)
+costs a runtime trap frame iff debug info is on — without -g it compiles to
+straight-line control flow, with -g the Push/Pop survive for backtraces;
+raise_notrace demotes regardless. Bucket-pinning (Leibniz, inverting the original
+claim): for a KEPT handler, flow_acc.enter_continuation UNCONDITIONALLY marks the
+exn bucket param, and the param→arg edge forces every raise's value into
+required_names — so the allocation feeding a raise to a kept handler always
+survives; dead raise-value elimination happens ONLY via the demotion route of (3).
+Consequently patch_unused_exn_bucket is DEAD CODE (kept handlers make
+exn_value_is_used always true; demoted handlers have their Pop stripped FIRST, and
+AC.is_raise requires a Pop) — it should be marked vestigial (see the code-hygiene
+note). Two further facts: the TRY-REGION pair SURVIVES demotion (all traps cleared
+but begin/end_try_region remain — a small missed optimization, consistent with
+End_try_region never being deleted); and from_lambda emits End_try_region only on
+the HANDLER path, so try regions must not be modelled as having an End at each exit.
+BERK-8 (S.Struct.Flow.ExnFirstParam) applies only to handlers that REMAIN exn
+handlers, i.e. not demoted here. Composes: S.Struct.Flow.ExnFirstParam,
+S.Rewrite.LetCont.Inline, S.Unbox.ContParam.Rewrite,
+INV.Simplify.EffectfulDeletionInventory ([§13](13-soundness.md)).
 ```
 
 ## Function application (non-inlining rewrites)
@@ -932,14 +1109,46 @@ metadata(c).loopify =
 NOTES: The "purely tail-recursive" test (is_purely_tailrec) starts true only for
   a single-function let rec and is falsified by any occurrence of my_closure
   that is not a tail-call callee (add_name_to_free_names /
-  add_free_names_and_check_my_closure_use). Mutual recursion therefore never
-  gets Default_loopify_and_tailrec, and neither does a function whose body uses
-  my_closure other than as a tail-call callee (passing or returning itself) —
-  though the closure escaping the *defining scope* (e.g. an exported toplevel
-  function) is irrelevant. This is the only place
-  the loopify decision is made; Simplify consumes it via should_loopify
-  (Loopify_attribute.should_loopify: true exactly for Always_loopify and
-  Default_loopify_and_tailrec).
+  add_free_names_and_check_my_closure_use), EXCEPT that a `let v =
+  Project_value_slot(f_slot, w) my_closure` binding does NOT falsify it — captured
+  variables read from the closure are exempt (S.Rewrite.Loopify.Attribute.ValueSlotExempt
+  below). Mutual recursion therefore never gets Default_loopify_and_tailrec, and
+  neither does a function whose body uses my_closure other than as a tail-call
+  callee or a value-slot projection (passing or returning itself) — though the
+  closure escaping the *defining scope* (e.g. an exported toplevel function) is
+  irrelevant. This is the only place the loopify decision is made; Simplify consumes
+  it via should_loopify (Loopify_attribute.should_loopify: true exactly for
+  Always_loopify and Default_loopify_and_tailrec).
+```
+
+```rule
+RULE S.Rewrite.Loopify.Attribute.ValueSlotExempt
+STATUS conjectured
+CODE middle_end/flambda2/from_lambda/closure_conversion_aux.ml#Let_with_acc.create
+CODE middle_end/flambda2/from_lambda/closure_conversion.ml#close_one_function
+---
+closure conversion of a single-function recursive group f that captures outer
+  variables; the converted body binds each captured variable at the top via
+  `let v = Project_value_slot(f_slot, w) my_closure`
+--------------------------------------------------
+These my_closure occurrences do NOT falsify is_purely_tailrec: Let_with_acc.create
+exempts Lets whose defining expression is a Project_value_slot primitive from
+add_free_names_and_check_my_closure_use (they go through plain add_free_names).
+Hence a CAPTURING local function whose self-references are all direct full tail
+calls still receives Default_loopify_and_tailrec, is loopified, and (per
+S.Rewrite.Loopify.TailrecEmitsNonRecursive) is emitted Non_recursive — while its
+body retains genuine non-callee my_closure uses (the projections), so
+is_my_closure_used stays true.
+NOTES: CORRECTS the S.Rewrite.Loopify.Attribute NOTES ("falsified by ANY occurrence
+of my_closure that is not a tail-call callee"). The exemption matches the PRIM
+SHAPE — any unary Project_value_slot, regardless of its argument — not specifically
+"argument is my_closure"; harmless because a projection cannot manufacture a
+self-application. Without it the common idiom `let g y = let rec loop x = … in
+loop 5` (every capturing loop projects from my_closure) would never loopify.
+Project_function_slot bindings are NOT exempt (moot: multi-function groups already
+excluded by the single-function premise). Non-local: the fact lives in the
+from_lambda accumulator plumbing, two files from the attribute decision.
+Composes: S.Rewrite.Loopify.Attribute, S.Rewrite.Loopify.TailrecEmitsNonRecursive.
 ```
 
 ```rule
@@ -1054,6 +1263,146 @@ NOTES: A general continuation rule, stated here because loopification is its
   emerge without the wrapper, and it can only happen when the loop is gone.
 ```
 
+```rule
+RULE S.Rewrite.Loopify.TailrecEmitsNonRecursive
+STATUS conjectured
+CODE middle_end/flambda2/from_lambda/closure_conversion_aux.ml#create_apply
+CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_full_application
+CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#loopify_decision_for_call
+CODE middle_end/flambda2/simplify/inlining/inlining_transforms.ml#make_inlined_body
+CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function_body
+---
+Code c enters Simplify with metadata(c).loopify = Default_loopify_and_tailrec;
+Simplify (Normal mode) rebuilds Code c′ for it (terms are being rebuilt)
+--------------------------------------------------
+my_depth ∉ free_names(body′) — the PRIMARY conclusion — hence
+(S.Rewrite.Code.RecursiveRecompute) metadata(c′).recursive = Non_recursive,
+UNCONDITIONALLY, including through unrolling/inlining of the self tail calls. Under
+this premise it follows additionally that no self-Apply (callee canonicalizing to
+c's my_closure) survives in body′; that equivalence needs the premise (a
+Non_recursive body can in principle contain a symbol-callee recursive Apply, just
+not under Default_loopify_and_tailrec).
+NOTES: Strengthens the S.Rewrite.Loopify.* prose from "the rules redirect self tail
+calls" to a universal output guarantee discharging the antecedent of
+S.Rewrite.Code.RecursiveRecompute's NOTES. Sketch: closure conversion guarantees
+every my_closure occurrence is either a Direct exact-arity tail-call callee with
+matching ret/exn conts (the SelfTailCall side conditions) or a Project_value_slot
+argument (S.Rewrite.Loopify.Attribute.ValueSlotExempt) — the latter carry no
+rec_info and never mention my_depth. Loopify.Body wraps the body; each surviving
+self-Apply hits simplify_direct_full_application and either redirects
+(SelfTailCall, dropping the coercion — the only my_depth mention) or is inlined
+(make_inlined_body renames ret/exn conts to the enclosing function's, re-traversed
+in-pass, induction on bounded unroll depth). Speculative traversals have
+do_not_rebuild_terms but none of their output is kept. Composes:
+S.Rewrite.Loopify.Attribute, S.Rewrite.Loopify.Body, S.Rewrite.Loopify.SelfTailCall,
+S.Rewrite.Code.RecursiveRecompute.
+```
+
+```rule
+RULE S.Rewrite.Loopify.InvariantArgElim
+STATUS conjectured
+CODE middle_end/flambda2/simplify/flow/dominator_graph.ml#dominator_analysis
+CODE middle_end/flambda2/simplify/flow/flow_types.mli#Continuation_param_aliases
+CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#add_lets_around_handler
+CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_self_tail_call
+---
+Code c is loopified (S.Rewrite.Loopify.Body wraps its body in let_cont rec k p̄′,
+  entry apply_cont k p̄ passing the function's parameters);
+for some index j, every self tail call in c's body passes, in position j, a simple
+  that canonicalizes to the function's j-th parameter pⱼ (loop-invariant)
+--------------------------------------------------
+In the emitted body, k's j-th parameter is eliminated from the loop: the dominator
+analysis maps pⱼ′ to pⱼ (its unique non-self dominator), pⱼ′ ∈
+removed_aliased_params_and_extra_params with `let pⱼ′ = pⱼ` in lets_to_introduce at
+the handler top, and no argument is passed at position j by the recursive
+apply_conts — the residual loop threads strictly fewer parameters than the source
+function's arity.
+NOTES: An optimization IMPOSSIBLE in Apply-recursive form (a call must pass all
+arity-many arguments each iteration) and invisible to any local rewrite: the entry
+use (arg = pⱼ) and recursive uses (arg = pⱼ′) are reconciled only by the whole-body
+dominator fixpoint at the turn. pⱼ′'s in-edges are {pⱼ (entry), pⱼ′ (each recursive
+site)}; self-edges do not defeat domination, and pⱼ — edgeless in the graph —
+dominates (variables CAN be dominator roots; the operative fact is pⱼ's
+edgelessness). Composes: S.Rewrite.Loopify.Body, S.Rewrite.Loopify.SelfTailCall,
+S.Struct.Flow.Aliases, S.Rewrite.LetCont.AliasedParam.
+```
+
+```rule
+RULE S.Rewrite.Loopify.SimplifyExposed
+STATUS conjectured
+CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#loopify_decision_for_call
+CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_function_body
+CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function0
+CODE middle_end/flambda2/flambda2.ml#flambda_to_flambda0
+---
+during simplification of Code c's body, an Apply becomes a self tail call
+  (canon(callee) = canon(my_closure), ret/exn conts = the function's) that was NOT
+  a self tail call in the source — e.g. exposed by inlining a mutual-recursion
+  partner into c's body
+--------------------------------------------------
+The exposed call is redirected to the loop continuation IFF
+should_loopify(metadata(c).loopify) — i.e. iff c carried [@loop] (Always_loopify)
+or was already purely self-tail-recursive at closure conversion — modulo
+SelfTailCall's side conditions. In particular:
+(1) NEGATIVE: a function not marked at closure conversion NEVER acquires a
+    continuation loop from Simplify. Mutual tail recursion collapsed to
+    self-recursion by inlining stays Apply-recursive and the code is emitted
+    Recursive (loopify_state is set only by Loopify.Body, which runs only under
+    should_loopify; AttributeUpdate freezes Default_loopify_and_not_tailrec to
+    Never_loopify; S.Struct.SingleRound means no later whole-unit chance).
+(2) POSITIVE: with [@loop], SelfTailCall's semantic canon test redirects calls that
+    only BECAME self tail calls mid-simplification, so [@loop] + partner inlining is
+    the one mechanism WITHIN SIMPLIFY (for Simplify-surviving Code) by which
+    multi-function recursion becomes a single continuation loop.
+NOTES: A phase-ordering completeness theorem: the decision predates all
+simplification and is never revisited, so loopification opportunities CREATED by
+Simplify are missed by design — the precise boundary of the ch10 prose "a purely
+self-tail-recursive function never survives in Apply-recursive form", which is
+false for functions that become purely self-tail-recursive DURING Simplify. Scope
+note: upstream of closure conversion, Lambda's simplify_local_functions contifies
+local non-escaping mutual recursion into staticcatch — arriving as recursive
+continuation groups with no loopify attribute; this rule is about recursion
+reaching Simplify as Code. Composes: S.Rewrite.Loopify.Body,
+S.Rewrite.Loopify.SelfTailCall, S.Rewrite.Loopify.AttributeUpdate.
+```
+
+```rule
+RULE S.Rewrite.Loopify.ResimplifyIdempotent
+STATUS conjectured
+CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function
+CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function0
+CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#sort_handlers
+---
+simplify_function's bounded resimplification loop re-runs simplify_function0
+  (run n+1) on the code emitted by run n (should_resimplify, count <
+  max_function_simplify_run)
+--------------------------------------------------
+(1) Run n+1's input attribute is run n's OUTPUT attribute, so re-wrapping
+    (Loopify.Body) occurs in run n+1 iff the attribute is Always_loopify:
+    Default_loopify_and_tailrec became Already_loopified after run 1 and is never
+    re-wrapped;
+(2) when Always_loopify code IS re-wrapped, the previously-created loop is just an
+    ordinary recursive Let_cont in the body — its apply_conts are not Applys, so
+    the fresh wrapper collects recursive uses only from self-Applys still present;
+    if none, the fresh wrapper collapses exactly (S.Rewrite.LetCont.Demote →
+    single-Inlinable entry → S.Rewrite.LetCont.Inline);
+(3) nesting splits by attribute: for Default_loopify_and_tailrec, exactly one wrap
+    ever happens (run 1), so wrappers never nest; for Always_loopify, each
+    resimplify run that NEWLY exposes a redirectable self tail call (e.g. via
+    mutable unboxing + alias rematerialization making a stored self-closure
+    canon-visible) adds ONE live wrapper — bounded by max_function_simplify_run
+    (default 2, so ≤ 3 runs / ≤ 3 live wrappers); a re-wrap exposing nothing
+    collapses exactly, adding none.
+NOTES: Non-local: needs the resimplify feed-forward (simplify_function's `run`
+recursion passes new_code, not the original), AttributeUpdate's lattice, Demote's
+SCC classification, and the Inline collapse. Rules out the wrapper accumulation a
+purely local reading of Loopify.Body (unconditional wrap) would suggest. The
+original "wrappers never nest or accumulate" was refuted by a two-field mutable
+record storing the function itself; leg (3) incorporates that mechanism and its
+bound. Composes: S.Rewrite.Loopify.Body, S.Rewrite.LetCont.Demote,
+S.Rewrite.LetCont.Inline, S.Struct.Resimplify.
+```
+
 ## Invalid propagation
 
 `Invalid` is Simplify's representation of unreachable code ([§04](04-opsem.md)). Many
@@ -1094,13 +1443,17 @@ Strength reduction: `S.Rewrite.Prim.IntIdentity`, `.FloatIdentity`,
 `S.Rewrite.Prim.UntagTag`, `.Projection`, `.PhysEqual`, `.CompareRecovery`,
 `.ObjDupElide`.
 CSE: `S.Rewrite.CSE.Eligible`, `.Replace`, `.Extend`.
+Sharing: `S.Rewrite.Share.StaticDynamicSplit`.
 Switch: `S.Rewrite.Switch.ArmPrune`, `.Merge`, `.Identity`, `.BooleanNot`,
 `.Invalid`.
 Let: `S.Rewrite.Let.DeadBinding`, `.DeadRegion`, `.Phantom`, `.Invalid`.
-Continuations: `S.Rewrite.LetCont.Inline`, `.DeadHandler`, `.Shortcut`,
-`.UnusedParam`, `.AliasedParam`, `.InvalidHandler`, `.Specialize`, `.Demote`.
+Continuations: `S.Rewrite.LetCont.Inline`, `.InlineForcesElimination`,
+`.DeadHandler`, `.Shortcut`, `.ShortcutFlat`, `.UnusedParam`, `.AliasedParam`,
+`.InvalidHandler`, `.Specialize`, `.Demote`, `.DemoteExn`.
 Apply: `S.Rewrite.Apply.IndirectToDirect`, `.OverApplication`,
 `.PartialApplication`, `.Invalid`.
-Loopification: `S.Rewrite.Loopify.Attribute`, `.Body`, `.SelfTailCall`,
-`.AttributeUpdate`; `S.Rewrite.Code.RecursiveRecompute`.
+Loopification: `S.Rewrite.Loopify.Attribute`, `.Attribute.ValueSlotExempt`,
+`.Body`, `.SelfTailCall`, `.AttributeUpdate`, `.TailrecEmitsNonRecursive`,
+`.InvariantArgElim`, `.SimplifyExposed`, `.ResimplifyIdempotent`;
+`S.Rewrite.Code.RecursiveRecompute`.
 Invalid: `S.Rewrite.Invalid.Propagate`.

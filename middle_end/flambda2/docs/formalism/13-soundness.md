@@ -213,6 +213,325 @@ mismatches into hard errors, which is a debugging aid, not a semantic change to
 correct programs.
 ```
 
+### Dead-code, flow-closure, and region invariants
+
+The following invariants are whole-body (or whole-unit) properties of Simplify's
+output that no local rewrite establishes; each is the composition of a flow
+analysis with the traversal, and several are non-local across subsystems. They
+underwrite the dead-code discipline `to_cmm` and the Reaper rely on.
+
+```rule
+RULE INV.Simplify.EffectfulDeletionInventory
+STATUS conjectured
+CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
+CODE middle_end/flambda2/terms/flambda_primitive.ml#is_end_region
+CODE middle_end/flambda2/simplify/named_rewrite.mli#Prim_rewrite
+CODE middle_end/flambda2/simplify/flow/mutable_unboxing.ml#make_result
+---
+e ⇝* e′ over a whole Simplify run; p a primitive application in e with
+  effects = Arbitrary_effects, in reachable code; p absent from e′
+--------------------------------------------------
+p is one of exactly two shapes, each licensed by a whole-body flow analysis:
+(a) End_region — and ONLY End_region, never End_try_region — on a region variable
+    ∉ required_names (S.Rewrite.Let.DeadRegion; gate is_end_region_for_unused_region
+    in rebuild_let), licensed by region liveness (uses of regions in End_region are
+    not counted as uses: flow_acc.record_let_binding). is_end_region matches only
+    Unary (End_region _, _); for End_try_region must_be_kept_for_its_effects is
+    always true; or
+(b) Block_set deleted (Remove_prim) or invalidated by mutable unboxing's
+    let_rewrites, licensed by the escape analysis proving the block non-escaping
+    (mutable_unboxing.ml; let_rewrites touch only Is_int/Get_tag/Make_block/
+    Block_load/Block_set, of which only Block_set is Arbitrary_effects).
+Every other deletion path requires Named.at_most_generative_effects.
+NOTES: A global quantification: no purely local rule of ch10 deletes an effect; the
+two effect-deleting rewrites are each justified by a non-local analysis (region
+liveness; escape). Scope: Simplify only; covers PRIMITIVE applications — effectful
+Apply exprs (extcalls) are simplify_extcall's type-licensed specialization,
+outside it; trap push/pop removal via exn-handler demotion (S.Rewrite.LetCont.DemoteExn)
+is control structure, not a primitive. Composes: S.Rewrite.Let.DeadRegion,
+INV.Simplify.RegionPairAtomic, S.Unbox.Mutable.Rewrite.
+```
+
+```rule
+RULE INV.Simplify.RegionPairAtomic
+STATUS conjectured
+CODE middle_end/flambda2/simplify/flow/flow_acc.ml#record_let_binding
+CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
+CODE middle_end/flambda2/terms/flambda_primitive.ml#is_end_region
+CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_begin_region
+CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_end_region
+---
+let ρ = Begin_region in a body B, with End_region ρ at each of its n ≥ 1 exits
+  (ordinary regions; NOT Begin_try_region/End_try_region)
+--------------------------------------------------
+After one Simplify pass over B, exactly one of:
+(i)  ρ ∈ required_names: the Begin_region binding and ALL n End_region bindings
+     survive (is_end_region_for_used_region forces each End kept);
+(ii) ρ ∉ required_names: ALL n End_region bindings are deleted
+     (S.Rewrite.Let.DeadRegion), whereupon Begin reaches zero occurrences and is
+     deleted too (eligible since Begin_region is Only_generative Mutable).
+Never a mixed outcome. Moreover ρ ∈ required_names iff some (conditionally) live
+non-End use of ρ exists, because flow_acc.record_let_binding explicitly does NOT
+count End_region's use of ρ as a use.
+NOTES: The seed pattern realized: the Begin's only surviving uses are the Ends, and
+each End's deletion is licensed by the same global fact ρ ∉ required_names. The
+non-counting of End uses is the deliberate coinductive cut breaking the circularity
+by which the pair would keep itself alive (flow_acc.ml:360-362). For an unused
+region will_delete_binding is TRUE unconditionally; sound because simplify_end_region
+PINS the End's result to tagged 0 (S.Rewrite.Let.DeadRegion). End_try_region is
+excluded twice over (is_end_region and the flow-acc use-skip both match only
+End_region); try-region deletion belongs to exn-handler demotion. Region simples are
+necessarily variables (no region constants), so is_end_region's non-Variable fatal
+is unreachable. One-round lag if the last allocation into ρ dies only upwards.
+Composes: S.Rewrite.Let.DeadRegion, INV.Simplify.RequiredNamesSound,
+INV.Simplify.EffectfulDeletionInventory.
+```
+
+```rule
+RULE INV.Simplify.RequiredNamesSound
+STATUS conjectured
+CODE middle_end/flambda2/simplify/flow/flow_analysis.ml#analyze
+CODE middle_end/flambda2/simplify/flow/dominator_graph.ml#create
+CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#decide_param_usage_non_recursive
+CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
+CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#filter_and_choose_alias
+CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#find_cse_simple
+---
+R = required_names as returned by Flow.Analysis.analyze (after the union of mutable
+  unboxing's additional_epa params); e′ = the rebuilt term for the analyzed body
+--------------------------------------------------
+free_variables(e′) at normal name mode ⊆ R (plus the exn-bucket exception: an exn
+handler's first param counts as used at zero occurrences). Splits in two:
+(a) downwards completeness: every occurrence in the INPUT is recorded in flow_acc
+    unconditionally or conditioned on a name that survives only if in R (EPAs are
+    registered wholesale per handler before the turn; New_let_binding args carry
+    their prim free names into conditional edges — so rewrite_apply_cont's
+    materialization is downwards completeness, not an upwards introducer);
+(b) upwards stability: every upwards occurrence-INTRODUCER draws only from names
+    already forced into R. Inventory (FIVE): (i) aliased-param lets_to_introduce and
+    extra args (dominator graph restricted to R by construction); (ii)
+    mutable-unboxing additional_epa (unioned into R wholesale by analyze); (iii)
+    mutable-unboxing Replace_by_binding (dominator representatives, R-restricted);
+    (iv) Switch.Merge argument selection (filter_and_choose_alias from R-filtered
+    alias sets); (v) the lookup-table/single-arg switch find_cse_simple (same R
+    filter).
+Hence R remains an over-approximation of actual free names at every point of the
+upwards rebuild — the precondition making the two runtime checks unfailing (the
+fatal in decide_param_usage_non_recursive; the fatal in rebuild_let).
+NOTES: Quantifies over every upwards rewrite in chapters 09-12; its content is the
+exhaustive enumeration of occurrence-introducers (the code comment at
+decide_param_usage_non_recursive states this as an UNCHECKED precondition). Freshly
+BOUND upwards variables (rebuild_switch's tagged_scrutinee) are exempt (not free in
+e′). Bonus lemma: the R-filter in (iv) never REFUSES a surviving arg — a surviving
+arg position belongs to a Used param, forcing the arg into R — so merge-refusal on
+that ground is dead code; the filter only chooses among aliases. Composes:
+S.Struct.Flow.RequiredNames, S.Struct.ApplyContRewrite, S.Struct.Flow.DeadLoopParam.
+```
+
+```rule
+RULE INV.Simplify.DeadCodeBodyLocal
+STATUS conjectured
+CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function_body
+CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#record_free_names_of_apply_as_used
+CODE middle_end/flambda2/simplify/flow/data_flow_graph.ml#add_continuation_info
+CODE middle_end/flambda2/simplify/flow/flow_analysis.ml#analyze
+---
+one Simplify pass; two distinct function bodies B_caller and B_callee related only
+by a surviving (non-inlined) Apply
+--------------------------------------------------
+Liveness-based deletion never crosses the Apply, in either direction:
+(1) caller→callee: Simplify never deletes/reorders a Code binding's parameters —
+    simplify_function_body returns the very `params` it received. An argument
+    computation is kept even if the callee ignores that parameter (the Apply's free
+    names are unconditionally used: record_free_names_of_apply_as_used);
+(2) callee→caller: a value feeding B_callee's return continuation is kept even if
+    every caller discards the result (args to the body's own return/exn continuation
+    are unconditionally used).
+The ONLY channels by which cross-body facts influence liveness-based deletion are
+exactly three: (a) inlining (merges the bodies into one flow domain); (b)
+used_value_slots (whole-unit, INV.Simplify.DeadValueSlotCoherence); (c)
+reachable_code_ids at unit toplevel (whole-Code deletion).
+NOTES: Flambda 2's dead-code elimination is intraprocedural plus
+closure-slot-global plus whole-code-granular, with inlining the sole fine-grained
+interprocedural lever. Forced by S.Struct.SetOfClosuresEager and S.Struct.Turn
+(analyze is per-function-body). Distinguish liveness from TYPES: cross-body type
+facts (code metadata, return types) can trigger folding/Invalid in the other body
+but never a liveness-based deletion. Corollary witnessed live: a dead accumulating
+parameter of a non-inlined, non-loopified recursive FUNCTION provably survives
+Simplify — contrast the loopified self-continuation case (S.Struct.Flow.DeadLoopParam).
+Composes: INV.Simplify.DeadValueSlotCoherence, S.Struct.SetOfClosuresEager.
+```
+
+```rule
+RULE INV.Simplify.LiftedConstGranularity
+STATUS conjectured
+CODE middle_end/flambda2/simplify/flow/flow_acc.ml#normalize_lifted_constant_aux
+CODE middle_end/flambda2/simplify/simplify_let_expr.ml#keep_lifted_constant_only_if_used
+CODE middle_end/flambda2/simplify/expr_builder.ml#create_let_symbol0
+CODE middle_end/flambda2/simplify/flow/data_flow_graph.ml#reachable_code_ids
+---
+L = a lifted constant (one "let symbol" group, possibly mutually recursive) binding
+  symbols s₁ … sₙ and code IDs c₁ … cₘ, floated to unit toplevel
+--------------------------------------------------
+Dead-code elimination on L operates at exactly TWO granularities:
+(1) SYMBOLS: all-or-nothing per group. Flow side: every definition's deps include
+    being_defined = {s₁ … sₙ} (normalize_lifted_constant_aux), so any reachable sᵢ
+    makes every sibling required. Keep side: placed iff ANY bound symbol ∈
+    required_names or any bound code is (ancestor-)reachable
+    (keep_lifted_constant_only_if_used) — never split;
+(2) CODE: per-definition. Code IDs are EXCLUDED from being_defined; their liveness
+    is the separate reachable_code_ids closure. Within a KEPT group, each code ID ∉
+    live_code_ids is emitted as Deleted_code (create_let_symbol0).
+Consequence: referencing ONE symbol of a group retains every sibling symbol, their
+closure blocks, AND the real code of every function slot in those blocks —
+record_lifted_function_slot_aux unions the set's function_decls free names (all
+slots' code IDs) into every closure symbol's deps (semantically forced: the closure
+block embeds every code ptr). Deleted_code strikes exactly code ids unreachable
+through the closure-block/function_decls edges — in practice newer_version_of
+ancestors.
+NOTES: Non-local twice: symbol liveness is a whole-unit reachability fact, and the
+two granularities are implemented in three files whose agreement is the invariant.
+The per-definition CODE granularity's bite is narrow: the closure-block edge (the
+function_decls flow channel) keeps all slot code of a live group; only
+version-chain-only code is deleted in practice. Caveat: with reachable_code_ids
+Unknown (non-toplevel, or speculative), the code side degrades to binds_code (keep
+everything). Composes: S.Struct.Lift.PlaceAtToplevel, S.Struct.Flow.RequiredNames.
+```
+
+```rule
+RULE INV.Simplify.DeadValueSlotCoherence
+STATUS conjectured
+CODE middle_end/flambda2/simplify/env/downwards_acc.ml#add_use_of_value_slot
+CODE middle_end/flambda2/simplify/flow/data_flow_graph.ml#add_continuation_info
+CODE middle_end/flambda2/simplify/expr_builder.ml#remove_unused_value_slots
+CODE middle_end/flambda2/simplify_shared/slot_offsets.ml#value_slot_is_used
+CODE middle_end/flambda2/cmx/exported_code.ml#prepare_for_export
+---
+U = dacc.used_value_slots: the value slots projected anywhere in the WHOLE unit
+  (accumulated across every function body and the toplevel; never save/restored).
+  Recorded by simplify_project_value_slot (DA.add_use_of_value_slot);
+w = a value slot defined by this unit with w ∉ U and Value_slot.is_imported w = false
+--------------------------------------------------
+(1) Dead-capture elimination, whole-unit and non-local: at the toplevel flow
+    analysis the capture edge closure_name → captured_contents(w) is gated on
+    is_value_slot_used (add_continuation_info), so a variable captured ONLY in such
+    slots leaves required_names and its binding is deleted — even when the closure
+    itself is live, escaping, or exported. The fate of a binding at the top of the
+    unit depends on the absence of projections at the bottom.
+(2) FIVE consumers prune with the SAME set U and must agree: (i) flow-graph capture
+    edges; (ii) term — STATIC sets of closures drop slot w
+    (expr_builder.remove_unused_value_slots, only from create_let_symbols); DYNAMIC
+    sets keep flambda-level slots, pruned only at (iii); (iii) layout — slot_offsets
+    omits w (value_slot_is_used), covering dynamic sets at to_cmm; (iv) cmx —
+    exported result types drop w (prepare_for_export → remove_unused_value_slots);
+    (v) exported CODE bodies pruned by the same set (the to_cmm side,
+    INV.ToCmm.SlotLiveness). Cross-module: another unit learns of w only through our
+    exported types (iv)/code (v), pruned consistently with the layout (iii); slots
+    of other units are protected everywhere by is_imported.
+--------------------------------------------------
+This is the Simplify SIDE of a MANDATORY merge with INV.ToCmm.SlotLiveness
+([§20](20-to-cmm-soundness.md)), the to_cmm side; they are two faces of ONE pruning
+event. There are THREE distinct value-slot accumulators: (1) build_run_result's
+final-term free_names (→ offsets + cmx type/code pruning); (2) the DOWNWARDS
+DA.add_use_of_value_slot → expr_builder.remove_unused_value_slots, pruning STATIC set
+captures only (imported slots exempt, value_slot_is_used_or_imported); (3) the
+UPWARDS snapshot barrier (cannot record).
+NOTES: DA.add_use_of_value_slot has a SOLE caller — simplify_project_value_slot's
+Need_meet branch. A projection resolved Known_result (the S.Rewrite.Prim.Projection
+fast path) deliberately does NOT record: the folded projection leaves no runtime
+load. This is the SURVIVAL ⇒ RECORDED lemma (premise P1 of INV.ToCmm.SlotLiveness),
+and it is ACCIDENTAL, not structural: unboxing's unbox_arg materializes a
+Project_value_slot extra-arg without recording into accumulator (1), and accumulator
+(3) cannot record — coherence holds only by the alignment survival ⇒ extra param
+Used ⇒ in-handler projection folded onto it ⇒ slot recorded via an in-unit Need_meet
+projection (imported slots exempt). If that alignment breaks, a REACHABLE projection
+gets a Dead offset entry ⇒ Cinvalid EXECUTED at runtime. A defensive
+DA.add_use_of_value_slot in unbox_arg would make it structural (see
+consolidation-code-hygiene.md). The second merge premise (P2, Exported_code inlinable
+bodies ⊆ final-term code bindings) lives on the to_cmm side. Composes:
+INV.ToCmm.SlotLiveness, S.Rewrite.Prim.Projection, S.Struct.Flow.DeadLoopParam
+(blocker 4).
+```
+
+```rule
+RULE INV.Simplify.AliasesMonotoneDown
+STATUS conjectured
+CODE middle_end/flambda2/types/env/aliases.mli#add
+CODE middle_end/flambda2/types/env/aliases.ml#add
+CODE middle_end/flambda2/simplify/env/downwards_env.ml#with_typing_env
+CODE middle_end/flambda2/types/env/binding_time.ml#consts
+---
+E₀ → E₁ → ⋯ → Eₙ is a straight-line descent lineage: each step is one of the
+S.Struct.EnvRefineOnly operations (definitions, add_equation / add_env_extension,
+code-age extension), excluding program-point switches (join handler entry, recorded
+use envs)
+--------------------------------------------------
+The alias equivalence relation only COARSENS along the lineage: classes merge and
+never split, no member is ever removed (the Aliases API has no removal operation),
+and each class's canonical only moves toward earlier binding times (constants, at
+binding time 0, absorbing — T.Env.ConstCanonicalPersists). Consequently every
+prover answer derived PURELY from aliasing has STABLE PROVED-NESS under further
+descent, with the witness monotonically UPGRADING toward earlier binding times
+(Proved(var) can become Proved(sym) or Proved(c) within the same class — not
+answer-stable). This is the semantically-monotone CORE of the refuted
+S.Struct.TypesMonotoneDown: the concrete-type half is only algorithmically monotone
+(its γ can grow — S.Struct.EnvRefineOnly (b)), but the alias half is genuinely
+γ-monotone (each merge only adds equality constraints).
+NOTES: Scope refinement: stability holds for CONSTANT and SYMBOL witnesses along the
+whole descent; VARIABLE witnesses additionally degrade Proved→Unknown at closure
+entry, because DE.enter_set_of_closures bumps min_binding_time (typing_env.ml:1037-38),
+forcing outer variables In_types where the T.Prove.SimpleModeBoundary mode floor
+filters them — and S.Struct.SetOfClosuresEager places closure bodies inside the
+descent. Suggested disposition of the old S.Struct.TypesMonotoneDown: (i)
+S.Struct.EnvRefineOnly (algorithmic), (ii) this rule (semantic, alias half), (iii) a
+note that semantic monotonicity of concrete types fails at the documented non-GLB
+corners (T.Meet.MutableBlockMissedBottom). Composes: S.Struct.EnvRefineOnly,
+T.Env.ConstCanonicalPersists, T.Prove.SimpleModeBoundary, T.Join.ConstAgreement.
+```
+
+```rule
+RULE INV.Loopify.TrapNeutral
+STATUS conjectured
+CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#loopify_decision_for_call
+CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_self_tail_call
+CODE middle_end/flambda2/from_lambda/lambda_to_flambda_env.ml#add_continuation
+CODE middle_end/flambda2/from_lambda/lambda_to_flambda.ml#compile_staticfail
+CODE middle_end/flambda2/simplify/expr_builder.ml#apply_continuation_shortcuts
+CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr
+---
+Code c is loopified (S.Rewrite.Loopify.Body), self continuation k
+--------------------------------------------------
+(a) the entry jump created by S.Rewrite.Loopify.Body and every redirect created by
+    S.Rewrite.Loopify.SelfTailCall (simplify_self_tail_call builds Apply_cont with
+    no trap action) are trap-action-FREE and sit where the trap stack equals the
+    function-entry stack;
+(b) EVERY apply_cont targeting k — including jumps retargeted at k by continuation
+    shortcuts (which PRESERVE the site's trap action) — is trap-DEPTH-neutral: the
+    trap stack AFTER its trap action equals the function-entry stack, so the handler
+    runs at entry depth;
+(c) under TC.LetCont.Rec / TC.ApplyCont.Jump the loop lowers to a recursive Ccatch
+    whose every Cexit is depth-matched; a Cexit to the loop label MAY carry a Pop (a
+    shortcut-retargeted try-exit) but NEVER a Push (Shortcut_to rejects trap-carrying
+    handlers, simplify_let_cont_expr.ml:741-45; the only Push creation site is the
+    trywith translation in lambda_to_flambda.ml, targeting the fresh try-body
+    continuation at CPS conversion — self continuations do not exist until Simplify,
+    which never creates Push actions);
+(d) self tail calls in a `with`-handler branch are loopifiable (the handler runs
+    after the Pop, at entry depth); self calls inside a `try` body are rejected
+    (they fail SelfTailCall's exn-continuation premise).
+NOTES: Connects three chapters. SelfTailCall's side condition "apply's exn
+continuation = the function's with no extra args" is, by the CPS discipline (an
+Apply's exn_handler is the innermost enclosing handler — lambda_to_flambda_env.
+add_continuation), exactly the statement that no trap handler pushed since function
+entry is still live at the call. Refuted at the letter as "every apply_cont to k
+carries no trap action": a try's normal-exit continuation can collapse onto the loop
+by Shortcut, yielding a Pop-carrying Cexit; the restatement weakens to legs
+(a)/(b)/(c). Falsification: a Cexit to a loopify loop label carrying a Push, or any
+jump to k whose post-trap-action depth ≠ entry depth, or a SelfTailCall redirect
+bearing a trap action. Composes: S.Rewrite.Loopify.Body, S.Rewrite.Loopify.SelfTailCall,
+S.Rewrite.LetCont.Shortcut, S.Rewrite.LetCont.DemoteExn.
+```
+
 ## 4. Known discrepancies and stale documentation
 
 A descriptive formalism is only useful if it says where it — or the companion
