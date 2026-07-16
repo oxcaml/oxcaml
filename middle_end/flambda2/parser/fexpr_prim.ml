@@ -83,8 +83,10 @@ let binary_int_arith_op =
       ([ "add", Add;
          "sub", Sub;
          "mul", Mul;
-         "div", Div;
-         "mod", Mod;
+         "div", Div Signed;
+         "mod", Mod Signed;
+         "udiv", Div Unsigned;
+         "umod", Mod Unsigned;
          "and", And;
          "or", Or;
          "xor", Xor ]

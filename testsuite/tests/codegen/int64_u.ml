@@ -91,56 +91,16 @@ div_by_constant:
   ret
 |}]
 
-(* CR ttebbi: These are way too many instructions. *)
 let unsigned_div x y = Int64_u.unsigned_div x y
 [%%expect_asm X86_64{|
 unsigned_div:
-  movq  %rax, %rdi
   movq  %rbx, %rcx
-  cmpq  $0, %rcx
-  jge   .L1
-  movabsq $-9223372036854775808, %rax
-  subq  %rax, %rcx
-  movabsq $-9223372036854775808, %rax
-  subq  %rax, %rdi
-  cmpq  %rcx, %rdi
-  jge   .L0
-  xorl  %eax, %eax
+  testq %rcx, %rcx
+  je    .L0
+  xorl  %edx, %edx
+  divq  %rcx
   ret
 .L0:
-  movl  $1, %eax
-  ret
-.L1:
-  testq %rcx, %rcx
-  je    .L5
-  movq  %rdi, %rbx
-  shrq  $1, %rbx
-  cmpq  $-1, %rcx
-  je    .L2
-  movq  %rbx, %rax
-  cqto
-  idivq %rcx
-  jmp   .L3
-.L2:
-  xorl  %eax, %eax
-  subq  %rbx, %rax
-.L3:
-  salq  $1, %rax
-  movabsq $-9223372036854775808, %rsi
-  movq  %rcx, %rbx
-  subq  %rsi, %rbx
-  movabsq $-9223372036854775808, %rdx
-  movq  %rax, %rsi
-  imulq %rcx, %rsi
-  subq  %rsi, %rdi
-  subq  %rdx, %rdi
-  cmpq  %rbx, %rdi
-  jge   .L4
-  ret
-.L4:
-  incq  %rax
-  ret
-.L5:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -171,93 +131,141 @@ rem:
   jmp   *%r11
 |}]
 
-(* CR ttebbi: These are way too many instructions. *)
 let unsigned_rem x y = Int64_u.unsigned_rem x y
 [%%expect_asm X86_64{|
 unsigned_rem:
-  movq  %rax, %rdi
   movq  %rbx, %rcx
-  cmpq  $0, %rcx
-  jge   .L1
-  movabsq $-9223372036854775808, %rbx
-  movq  %rcx, %rax
-  subq  %rbx, %rax
-  movabsq $-9223372036854775808, %rsi
-  movq  %rdi, %rbx
-  subq  %rsi, %rbx
-  cmpq  %rax, %rbx
-  jge   .L0
-  xorl  %ebx, %ebx
-  jmp   .L5
-.L0:
-  movl  $1, %ebx
-  jmp   .L5
-.L1:
   testq %rcx, %rcx
-  je    .L4
-  movq  %rdi, %rax
-  shrq  $1, %rax
-  cmpq  $-1, %rcx
-  je    .L2
-  cqto
-  idivq %rcx
-  movq  %rax, %rbx
-  jmp   .L3
-.L2:
-  xorl  %ebx, %ebx
-  subq  %rax, %rbx
-.L3:
-  salq  $1, %rbx
-  movabsq $-9223372036854775808, %rsi
-  movq  %rcx, %rax
-  subq  %rsi, %rax
-  movabsq $-9223372036854775808, %r8
-  movq  %rbx, %rsi
-  imulq %rcx, %rsi
-  movq  %rdi, %rdx
-  subq  %rsi, %rdx
-  subq  %r8, %rdx
-  cmpq  %rax, %rdx
-  jl    .L5
-  incq  %rbx
-  jmp   .L5
-.L4:
+  je    .L0
+  xorl  %edx, %edx
+  divq  %rcx
+  movq  %rdx, %rax
+  ret
+.L0:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L5:
-  imulq %rcx, %rbx
-  movq  %rdi, %rax
-  subq  %rbx, %rax
+|}]
+
+let unsafe_unsigned_div x y = Int64_u.unsafe_unsigned_div x y
+[%%expect_asm X86_64{|
+unsafe_unsigned_div:
+  movq  %rbx, %rcx
+  xorl  %edx, %edx
+  divq  %rcx
   ret
 |}]
 
-(* CR ttebbi: This could be just a bitwise and. *)
+let unsafe_unsigned_rem x y = Int64_u.unsafe_unsigned_rem x y
+[%%expect_asm X86_64{|
+unsafe_unsigned_rem:
+  movq  %rbx, %rcx
+  xorl  %edx, %edx
+  divq  %rcx
+  movq  %rdx, %rax
+  ret
+|}]
+
+let unsigned_div_1 x = Int64_u.unsigned_div x #1L
+[%%expect_asm X86_64{|
+unsigned_div_1:
+  ret
+|}]
+
+let unsigned_rem_1 x = Int64_u.unsigned_rem x #1L
+[%%expect_asm X86_64{|
+unsigned_rem_1:
+  xorl  %eax, %eax
+  ret
+|}]
+
+let unsigned_div_2 x = Int64_u.unsigned_div x #2L
+[%%expect_asm X86_64{|
+unsigned_div_2:
+  shrq  $1, %rax
+  ret
+|}]
+
 let unsigned_rem_2 x = Int64_u.unsigned_rem x #2L
 [%%expect_asm X86_64{|
 unsigned_rem_2:
+  andl  $1, %eax
+  ret
+|}]
+
+let unsigned_div_128 x = Int64_u.unsigned_div x #128L
+[%%expect_asm X86_64{|
+unsigned_div_128:
+  shrq  $7, %rax
+  ret
+|}]
+
+let unsigned_rem_128 x = Int64_u.unsigned_rem x #128L
+[%%expect_asm X86_64{|
+unsigned_rem_128:
+  andl  $127, %eax
+  ret
+|}]
+
+let unsigned_div_7 x = Int64_u.unsigned_div x #7L
+[%%expect_asm X86_64{|
+unsigned_div_7:
   movq  %rax, %rbx
+  movabsq $2635249153387078803, %rdi
+  movq  %rbx, %rax
+  mulq  %rdi
+  movq  %rdx, %rax
+  subq  %rax, %rbx
   shrq  $1, %rbx
+  leaq  (%rbx,%rdx), %rax
+  shrq  $2, %rax
+  ret
+|}]
+
+let unsigned_rem_7 x = Int64_u.unsigned_rem x #7L
+[%%expect_asm X86_64{|
+unsigned_rem_7:
+  movq  %rax, %rbx
+  movabsq $2635249153387078803, %rdi
+  movq  %rbx, %rax
+  mulq  %rdi
+  movq  %rdx, %rax
   movq  %rbx, %rdi
-  shrq  $63, %rdi
-  addq  %rdi, %rbx
-  sarq  $1, %rbx
-  salq  $1, %rbx
-  movabsq $-9223372036854775806, %rdx
-  movabsq $-9223372036854775808, %rcx
-  movq  %rbx, %rdi
-  salq  $1, %rdi
-  movq  %rax, %rsi
-  subq  %rdi, %rsi
-  subq  %rcx, %rsi
-  cmpq  %rdx, %rsi
-  jl    .L0
-  incq  %rbx
+  subq  %rax, %rdi
+  shrq  $1, %rdi
+  addq  %rdx, %rdi
+  shrq  $2, %rdi
+  imulq $7, %rdi
+  movq  %rbx, %rax
+  subq  %rdi, %rax
+  ret
+|}]
+
+(* CR ttebbi: Could instead start with [cmpq $-1, %rax] *)
+let unsigned_div_umaxint x = Int64_u.unsigned_div x (-#1L)
+[%%expect_asm X86_64{|
+unsigned_div_umaxint:
+  movq  $-1, %rbx
+  cmpq  %rbx, %rax
+  jne   .L0
+  movl  $1, %eax
+  ret
 .L0:
-  salq  $1, %rbx
-  subq  %rbx, %rax
+  xorl  %eax, %eax
+  ret
+|}]
+
+let unsigned_rem_umaxint x = Int64_u.unsigned_rem x (-#1L)
+[%%expect_asm X86_64{|
+unsigned_rem_umaxint:
+  movq  $-1, %rbx
+  cmpq  %rbx, %rax
+  jne   .L0
+  xorl  %eax, %eax
+  ret
+.L0:
   ret
 |}]
 
