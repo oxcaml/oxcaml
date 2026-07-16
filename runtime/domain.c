@@ -83,15 +83,6 @@ typedef cpuset_t cpu_set_t;
 #include "caml/weak.h"
 #include "sync_posix.h"
 
-#ifdef CAML_BARE_METAL
-#define pthread_self() ((pthread_t)0)
-
-/* Must be 0 ("not equal"): caml_bt_is_self must answer "no, you are not
-   the backup thread" -- there is no backup thread.  (A faithful
-   comparison would wrongly return "equal", since both sides are 0.) */
-#define pthread_equal(a, b) 0
-#endif
-
 /* Check that the domain_state structure was laid out without padding,
    since the runtime assumes this in computing offsets */
 static_assert(
@@ -2447,6 +2438,8 @@ static void caml_do_tick_all_domains(void)
     atomic_store_release(&d->state->requested_tick, true);
     interrupt_domain(d);
   }
+}
+
 static void* caml_tick(void *arg)
 {
   (void)arg;
@@ -2597,7 +2590,11 @@ CAMLexport int caml_bt_is_in_blocking_section(void)
 
 CAMLexport int caml_bt_is_self(void)
 {
+#ifdef CAML_BARE_METAL
+  return 0;
+#else
   return pthread_equal(domain_self->backup_thread, pthread_self());
+#endif
 }
 
 CAMLexport intnat caml_domain_is_multicore (void)
@@ -2658,10 +2655,8 @@ CAMLexport void caml_bt_exit_ocaml(void)
   }
 }
 
-/* default handler for unix_fork, will be called by unix_fork.
-   No fork on bare metal: not compiled there (the hook is only invoked
-   from the unix library). */
 #ifndef CAML_BARE_METAL
+/* default handler for unix_fork, will be called by unix_fork. */
 static void caml_atfork_default(void)
 {
   caml_reset_domain_lock();
@@ -2863,15 +2858,12 @@ void caml_domain_terminate(bool last)
     caml_atomic_counter_decr(&caml_num_domains_running);
 }
 
+#ifdef MULTIDOMAIN
 /* Try and terminate the currently running domain.
    This is only invoked when extra domains are left running while the
    main one is terminating. In this case, we are not in a state where
    we can safely release resources. The best we can do is cancel the
-   extra running threads.
-   Extra domains cannot exist in a single-domain runtime, so this is
-   only compiled under MULTIDOMAIN (the caller in startup_aux.c is
-   guarded accordingly). */
-#ifdef MULTIDOMAIN
+   extra running threads. */
 static void stw_terminate_domain(caml_domain_state *domain, void *data,
   int participating_count,
   caml_domain_state **participating)
@@ -3022,11 +3014,11 @@ CAMLprim value caml_domain_tls_get(value unused)
   return domain_root_get(&Caml_state->tls_state);
 }
 
+#ifdef MULTIDOMAIN
 CAMLprim value caml_recommended_domain_count(value unused)
 {
   intnat n = -1;
 
-#ifdef MULTIDOMAIN
 #if defined(HAS_GNU_GETAFFINITY_NP) || defined(HAS_BSD_GETAFFINITY_NP)
   cpu_set_t cpuset;
 
@@ -3053,11 +3045,15 @@ CAMLprim value caml_recommended_domain_count(value unused)
   else if (n > caml_params->max_domains)
     n = caml_params->max_domains;
 #else
-  n=1;
-#endif /* MULTIDOMAIN */
 
   return (Val_long(n));
 }
+#else
+CAMLprim value caml_recommended_domain_count(value unused)
+{
+  return (Val_long(1));
+}
+#endif /* MULTIDOMAIN */
 
 CAMLprim value caml_max_domain_count(value unused)
 {
