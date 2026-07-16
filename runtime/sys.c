@@ -573,7 +573,18 @@ void caml_sys_init(const char_os * exe_name, char_os **argv)
 #endif
 #endif
 
-#ifndef CAML_BARE_METAL
+#ifdef CAML_BARE_METAL
+
+extern uint64_t caml_bare_metal_time_ns(void);
+
+double caml_sys_time_include_children_unboxed(value include_children)
+{
+  /* The program owns the core, so time since boot is processor time. */
+  (void)include_children;
+  return (double)caml_bare_metal_time_ns() / 1e9;
+}
+
+#else
 #ifdef HAS_SYSTEM
 CAMLprim value caml_sys_system_command(value command)
 {
@@ -645,6 +656,7 @@ double caml_sys_time_include_children_unboxed(value include_children)
   #endif
 #endif
 }
+#endif
 
 CAMLprim value caml_sys_time_include_children(value include_children)
 {
@@ -663,6 +675,22 @@ CAMLprim value caml_sys_time(value unit)
 
 #ifdef _WIN32
 extern int caml_win32_random_seed(intnat data[16]);
+#elif defined(CAML_BARE_METAL)
+int caml_unix_random_seed(intnat data[16])
+{
+  /* Derive the seed from the application's time source, spread with
+     SplitMix64.  Same quality caveat as the time-based fallback below:
+     this is not real entropy. */
+  uint64_t x = caml_bare_metal_time_ns();
+  for (int i = 0; i < 16; i++) {
+    x += UINT64_C(0x9E3779B97F4A7C15);
+    uint64_t z = x;
+    z = (z ^ (z >> 30)) * UINT64_C(0xBF58476D1CE4E5B9);
+    z = (z ^ (z >> 27)) * UINT64_C(0x94D049BB133111EB);
+    data[i] = (intnat)(z ^ (z >> 31));
+  }
+  return 16;
+}
 #else
 int caml_unix_random_seed(intnat data[16])
 {
@@ -719,6 +747,7 @@ CAMLprim value caml_sys_random_seed(value unit)
   return res;
 }
 
+#ifndef CAML_BARE_METAL
 CAMLprim value caml_sys_const_big_endian(value unit)
 {
 #ifdef ARCH_BIG_ENDIAN
