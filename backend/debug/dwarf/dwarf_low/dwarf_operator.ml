@@ -549,7 +549,13 @@ module Make (M : sig
   val ( >>> ) : param -> result -> (unit -> result) -> result
 end) =
 struct
-  let run param t =
+  (* [size_of_expression] is used for operators that carry expression-block
+     operands (see the forthcoming entry-value operators), whose ULEB128 length
+     prefixes require the byte size of the enclosed expression to be known up
+     front. It is passed as an argument because [size], from which it is built,
+     is itself defined in terms of this traversal (see the bottom of this
+     file). *)
+  let run ~size_of_expression:_ param t =
     let unit_result = M.unit_result () in
     let opcode = M.opcode param in
     let value = M.value param in
@@ -765,8 +771,12 @@ module Emit = Make (struct
   let ( >>> ) _asm_directives () f = f ()
 end)
 
-let print ppf t = Print.run ppf t
+let rec size t = Size.run ~size_of_expression () t
 
-let size t = Size.run () t
+(* The size of a DWARF expression: the sum of the sizes of its operators. *)
+and size_of_expression ops =
+  List.fold_left (fun acc op -> I.add acc (size op)) (I.zero ()) ops
 
-let emit ~asm_directives t = Emit.run asm_directives t
+let print ppf t = Print.run ~size_of_expression ppf t
+
+let emit ~asm_directives t = Emit.run ~size_of_expression asm_directives t
