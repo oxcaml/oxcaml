@@ -85,6 +85,11 @@ val check_consistency :
 
 type error =
   | File_not_found of filepath
+  (* [Companion_object_file_not_found_via_manifest (object_file, artifact)]:
+     [artifact] (a [.cmx] or [.cmxa] link input) was resolved through a manifest
+     entry (see [-I-manifest]), but its accompanying object file [object_file]
+     has no manifest entry and was not found in the load path. *)
+  | Companion_object_file_not_found_via_manifest of filepath * filepath
   | Not_an_object_file of filepath
   | Missing_implementations of (Compilation_unit.t * string list) list
   | Inconsistent_interface of Compilation_unit.Name.t * filepath * filepath

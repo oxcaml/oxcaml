@@ -85,4 +85,9 @@ if [ "$EXT" = "cmx" ]; then
     cat negative.err >&2
     exit 1
   fi
+  if ! grep -q "manifest" negative.err; then
+    echo "ERROR: expected the error to mention manifests, got:" >&2
+    cat negative.err >&2
+    exit 1
+  fi
 fi
