@@ -458,3 +458,26 @@ Line 2, characters 17-24:
                      ^^^^^^^
 Error: This value is "dynamic" but is expected to be "static".
 |}]
+
+(* This is a regression test for a bug that constrained
+   static to dynamic under a constant lock (e.g. in a for-loop) *)
+let f (x @ static) =
+  for _i = 0 to 0 do
+    let _ @ static = x in
+    ()
+  done
+[%%expect{|
+val f : 'a -> unit = <fun>
+|}]
+
+let f (x @ dynamic) =
+  for _i = 0 to 0 do
+    let _ @ static = x in
+    ()
+  done
+[%%expect{|
+Line 3, characters 21-22:
+3 |     let _ @ static = x in
+                         ^
+Error: This value is "dynamic" but is expected to be "static".
+|}]

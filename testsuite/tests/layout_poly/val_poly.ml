@@ -467,3 +467,167 @@ module F :
         layout_ l. ('a : l mod contended) ('b : l mod contended). 'a -> 'b
     end
 |}]
+
+(* "val poly_" syntax tests *)
+
+(* Layout variables generated corresponding to free type variables *)
+module type S = sig
+  val poly_ foo1 : 'a -> 'b -> #('a * 'b)
+end
+[%%expect {|
+module type S =
+  sig val foo1 : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> #('a * 'b) end
+|}]
+
+(* When quantified and unconstrained, type variables still have kind value *)
+module type S = sig
+  val poly_ foo2 : 'a 'b. 'a -> 'b -> #('a * 'b)
+end
+[%%expect {|
+Line 2, characters 19-48:
+2 |   val poly_ foo2 : 'a 'b. 'a -> 'b -> #('a * 'b)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219: This value description has no layout-polymorphic type variables,
+  so "poly_" has no effect. Consider using a regular "val" instead.
+
+module type S = sig val foo2 : 'a -> 'b -> #('a * 'b) end
+|}]
+
+(* Type scheme with a subset of polymorphic type variables that are explicitly
+   forall-bound *)
+module type S = sig
+  val poly_ foo3 : 'a. 'a -> 'b -> #('a * 'b)
+end
+[%%expect {|
+module type S =
+  sig val foo3 : layout_ l. 'a ('b : l). 'a -> 'b -> #('a * 'b) end
+|}]
+
+(* Order of quantified type variables after typing a layout-polymorphic
+   [Ptyp_poly(vars, ty)] depends on the order of type variables in [ty]. *)
+module type S = sig
+  val poly_ foo4 : 'a. 'b -> 'a -> #('a * 'b)
+end
+[%%expect {|
+module type S =
+  sig val foo4 : layout_ l. ('b : l) 'a. 'b -> 'a -> #('a * 'b) end
+|}]
+
+(* Interaction between "val poly_" and "layout_". Currently errors.
+   CR-soon aivaskovic: allow combining them after deciding what order layout
+   variables should have inside "layout_". *)
+module type S = sig
+  val poly_ bar : layout_ x. ('b : x). 'a -> 'b -> #('a * 'b)
+end
+[%%expect {|
+Line 2, characters 18-61:
+2 |   val poly_ bar : layout_ x. ('b : x). 'a -> 'b -> #('a * 'b)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "layout_" keyword is not supported inside layout-polymorphic
+       value descriptions introduced using "val poly_".
+|}]
+
+(* Interaction with type variables that are explicitly constrained. *)
+module type S = sig
+  val poly_ baz1 : 'a ('b : immediate). 'a -> #('b * 'c) -> #('a * 'b * 'c)
+end
+[%%expect {|
+module type S =
+  sig
+    val baz1 :
+      layout_ l.
+        'a ('b : immediate) ('c : l). 'a -> #('b * 'c) -> #('a * 'b * 'c)
+  end
+|}]
+
+module type S = sig
+  val poly_ baz2 : ('a : immediate) 'b. 'a -> #('b * 'c) -> #('a * 'b * 'c)
+end
+[%%expect {|
+module type S =
+  sig
+    val baz2 :
+      layout_ l.
+        ('a : immediate) 'b ('c : l). 'a -> #('b * 'c) -> #('a * 'b * 'c)
+  end
+|}]
+
+module type S = sig
+  val poly_ baz3 : ('a : immediate) 'b. 'b -> #('a * 'c) -> #('b * 'a * 'c)
+end
+[%%expect {|
+module type S =
+  sig
+    val baz3 :
+      layout_ l.
+        'b ('a : immediate) ('c : l). 'b -> #('a * 'c) -> #('b * 'a * 'c)
+  end
+|}]
+
+module type S = sig
+  val poly_ baz4 : ('a : immediate) 'b 'c. 'b -> #('a * 'c) -> #('b * 'a * 'c)
+end
+[%%expect {|
+Line 2, characters 19-78:
+2 |   val poly_ baz4 : ('a : immediate) 'b 'c. 'b -> #('a * 'c) -> #('b * 'a * 'c)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 219: This value description has no layout-polymorphic type variables,
+  so "poly_" has no effect. Consider using a regular "val" instead.
+
+module type S =
+  sig
+    val baz4 : 'b ('a : immediate) 'c. 'b -> #('a * 'c) -> #('b * 'a * 'c)
+  end
+|}]
+
+module type S = sig
+  val poly_ baz5 : ('a : immediate). 'b -> #('a * 'c) -> #('b * 'a * 'c)
+end
+[%%expect {|
+module type S =
+  sig
+    val baz5 :
+      layout_ l l0.
+        ('b : l) ('a : immediate) ('c : l0).
+          'b -> #('a * 'c) -> #('b * 'a * 'c)
+  end
+|}]
+
+(* "value" is special and usually a default.
+   It is still a default when quantified in "val poly_" type schemes. *)
+module type S = sig
+  val poly_ baz6 : ('a : value) 'b. 'a -> #('a * 'b * 'c) -> #('a * 'b * 'c)
+end
+[%%expect {|
+module type S =
+  sig
+    val baz6 :
+      layout_ l. 'a 'b ('c : l). 'a -> #('a * 'b * 'c) -> #('a * 'b * 'c)
+  end
+|}]
+
+(* "value_or_null" stays the same. *)
+module type S = sig
+  val poly_ baz7 : ('a : value_or_null) 'b. 'a -> #('a * 'b * 'c) -> #('a * 'b * 'c)
+end
+[%%expect {|
+module type S =
+  sig
+    val baz7 :
+      layout_ l. 'a 'b ('c : l). 'a -> #('a * 'b * 'c) -> #('a * 'b * 'c)
+  end
+|}]
+
+(* On this branch [list] takes [any], so ['c list] does not force ['c] to be a
+   value and ['c] is layout-polymorphic. *)
+module type S = sig
+  val poly_ baz8 : 'a -> 'b -> 'c list -> #('a * 'b * 'c)
+end
+[%%expect {|
+module type S =
+  sig
+    val baz8 :
+      layout_ l l0 l1.
+        ('a : l) ('b : l0) ('c : l1). 'a -> 'b -> 'c list -> #('a * 'b * 'c)
+  end
+|}]

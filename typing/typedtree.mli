@@ -249,7 +249,7 @@ and 'k pattern_desc =
       lpoly: Types.Lpoly.t;
       (** The sort variables abstracted over by this compile-time function, and
       the allocation mode of the captured environment. [pending] during
-      type-checking; guaranteed [determined] of (potentially empty) generic sort
+      type-checking; guaranteed [determined] of a non-empty list of generic sort
       variables after [type_let] returns. *)
       env_alloc_mode: alloc_mode;
       (** The allocation mode of the environment captured by the layout
@@ -1253,6 +1253,10 @@ and core_type_desc =
   | Ttyp_splice of core_type
   | Ttyp_repr of string list * core_type
   | Ttyp_newlayout of string loc list * core_type
+      (** [Ttyp_newlayout (vars, ty)] represents layout-polymorphic types in
+          which [vars] are generalised sort variables.
+          A variable in [vars] may have no associated location if it is freshly
+          created during type inference for [val poly_] value descriptions. *)
   | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos
       (** [Ttyp_call_pos] represents the type of the value of a Position

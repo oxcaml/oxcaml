@@ -1,5 +1,5 @@
 let $camlTests15__immstring13 = "tests15.ml" in
-let $camlTests15__const_block15 = Block 0 ($camlTests15__immstring13, 10, 52)
+let $camlTests15__const_block15 = Block 0 ($camlTests15__immstring13, 18, 52)
 in
 let $camlTests15__Pmakeblock18 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests15__const_block15)

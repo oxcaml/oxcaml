@@ -13,6 +13,9 @@ jobs:
   check:
     name: check (${{ matrix.system }})
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      pull-requests: read
     strategy:
       matrix:
         include:
@@ -42,6 +45,23 @@ jobs:
       - name: 'Check for the "skip 80ch" PR tag'
         if: ${{ contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
         run: echo SKIP_80CH=y >> "$GITHUB_ENV"
+
+      - name: 'Check for the "skip 80ch" PR tag (merge queue)'
+        if: ${{ github.event_name == 'merge_group' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.event.merge_group.head_ref }}
+        run: |
+          # HEAD_REF looks like refs/heads/gh-readonly-queue/main/pr-<N>-<sha>
+          if [[ "$HEAD_REF" =~ /pr-([0-9]+)- ]]; then
+            pr_number="${BASH_REMATCH[1]}"
+            if gh pr view "$pr_number" --repo "$GITHUB_REPOSITORY" \
+                 --json labels --jq '.labels[].name' | grep -qxF 'skip 80ch'; then
+              echo SKIP_80CH=y >> "$GITHUB_ENV"
+            fi
+          else
+            echo "Could not parse PR number from '$HEAD_REF'; not skipping 80ch."
+          fi
 
       - name: Check OCaml Formatting
         run: opam exec -- bash tools/ci/actions/check-fmt.sh

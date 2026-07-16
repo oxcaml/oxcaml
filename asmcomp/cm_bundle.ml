@@ -72,15 +72,8 @@ let cmx_bundle ~quoted_cmx =
   CU.Set.iter find_all_cmxes quoted_cmx;
   ListLabels.map (CU.Tbl.to_list cmxes)
     ~f:(fun ((_, info) : CU.t * Cmx_format.unit_infos) ->
-      let raw_export_info, sections =
-        match info.ui_export_info with
-        | None -> None, Oxcaml_utils.File_sections.empty
-        | Some info ->
-          let info, sections = Flambda2_cmx.Flambda_cmx_format.to_raw info in
-          Some info, sections
-      in
       let serialized_sections, toc, total_length =
-        Oxcaml_utils.File_sections.serialize sections
+        Oxcaml_utils.File_sections.serialize info.ui_file_sections
       in
       let raw_info : Cmx_format.unit_infos_raw =
         { uir_unit = info.ui_unit;
@@ -92,7 +85,7 @@ let cmx_bundle ~quoted_cmx =
           uir_quoted_cmx = Array.of_list info.ui_quoted_cmx;
           uir_format = info.ui_format;
           uir_generic_fns = info.ui_generic_fns;
-          uir_export_info = raw_export_info;
+          uir_export_info = info.ui_export_info;
           uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
           uir_force_link = info.ui_force_link;
           uir_requires_metaprogramming = info.ui_requires_metaprogramming;

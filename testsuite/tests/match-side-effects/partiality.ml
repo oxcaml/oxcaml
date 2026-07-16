@@ -151,7 +151,9 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
   (f/2 =
      (function {nlocal = 0} r/0 : int
        (region
-         (let (*match*/5 = (makelocalblock 0 (*) r/0))
+         (let
+           (*match*/5 =[value<(consts (0)) (non_consts ([0: *]))>]
+              (makelocalblock 0 (*) r/0))
            (catch
              (if *match*/5
                (let (*match*/6 =o? (field_mut 0 (field_imm 0 *match*/5)))
@@ -188,8 +190,14 @@ let test = function
 type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
   (test/0 =
-     (function {nlocal = 0} param/0 : int
-       (if param/0 (field_imm 0 (field_imm 0 param/0)) 0)))
+     (function {nlocal = 0}
+       param/0[value<
+                (consts (0))
+                 (non_consts ([0:
+                               value<
+                                (consts ()) (non_consts ([1: value<int>]
+                                 [0: value<int>]))>]))>]
+       : int (if param/0 (field_imm 0 (field_imm 0 param/0)) 0)))
   (apply (field_imm 1 (global Toploop!)) "test" test/0))
 val test : int t option -> int = <fun>
 |}]
@@ -237,7 +245,11 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
      (function {nlocal = 0} n/0? : int
        (region
          (let
-           (*match*/9 =
+           (*match*/9 =[value<
+                         (consts (0))
+                          (non_consts ([0:
+                                        value<
+                                         (consts ()) (non_consts ([0: *, *]))>]))>]
               (makelocalblock 0 (value<
                                   (consts ())
                                    (non_consts ([0: *,
@@ -297,7 +309,9 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
   (deep/0 =
      (function {nlocal = 0} r/1 : int
        (region
-         (let (*match*/12 = (makelocalblock 0 (*) r/1))
+         (let
+           (*match*/12 =[value<(consts (0)) (non_consts ([0: *]))>]
+              (makelocalblock 0 (*) r/1))
            (catch
              (if *match*/12
                (let (*match*/13 =o? (field_mut 0 (field_imm 0 *match*/12)))

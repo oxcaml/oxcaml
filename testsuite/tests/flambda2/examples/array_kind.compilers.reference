@@ -1,9 +1,8 @@
 (let
-  (f/279 =
-     (function {nlocal = 0} a/281[value<addrarray>]
-       : (consts (0)) (non_consts ([0: ?]))
-       (array.get[gen indexed by int] a/281 0)))
-  (makeblock 0 f/279))
+  (f/0 =
+     (function {nlocal = 0} a/0[value<addrarray>]
+       (array.get[gen indexed by int] a/0 0)))
+  (makeblock 0 f/0))
 (data global "camlArray_kind__gc_roots": int 0)
 (data int 1792 global "camlArray_kind": addr G:"camlArray_kind__f_1")
 (data
@@ -22,15 +21,14 @@
  string "index out of bounds"
  skip 4
  byte 4)
-(function{array_kind.ml:27,6-59} camlArray_kind__f_0_1_code
-     (a/348: val) : val
+(function{array_kind.ml:34,6-59} camlArray_kind__f_0_1_code (a/1: val) : val
  (catch
-   (if (<u 1 (>>u (<< (load_mut int (+a a/348 -8)) 8) 17))
-     (load_mut val a/348) (exit 5))
+   (if (<u 1 (>>u (<< (load_mut int (+a a/1 -8)) 8) 17)) (load_mut val a/1)
+     (exit 5))
  with(5)(cold)
-   (raise_notrace{array_kind.ml:28,14-19} L:"camlArray_kind__block13")) )
+   (raise_notrace{array_kind.ml:35,14-19} L:"camlArray_kind__block13")) )
 
 (function no_cse reduce_code_size linscan camlArray_kind__entry () : val
- (catch (exit 4 G:"camlArray_kind") with(4 *ret*/346: val) 1) )
+ (catch (exit 4 G:"camlArray_kind") with(4 *ret*/0: val) 1) )
 
 (data)

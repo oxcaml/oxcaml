@@ -1143,6 +1143,34 @@ CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
   CAMLreturn (Val_unit);
 }
 
+CAMLprim value caml_get_ptr_bytecode(value ptr)
+{
+  value base = Field(ptr, 0);
+  if (Is_null(base))
+    caml_failwith("External ptrs are unimplemented on bytecode");
+  return caml_get_idx_bytecode(base, Field(ptr, 1));
+}
+
+CAMLprim value caml_set_ptr_bytecode(value ptr, value v)
+{
+  value base = Field(ptr, 0);
+  if (Is_null(base))
+    caml_failwith("External ptrs are unimplemented on bytecode");
+  return caml_set_idx_bytecode(base, Field(ptr, 1), v);
+}
+
+CAMLprim value caml_get_ext_ptr_bytecode(value idx)
+{
+  caml_failwith("External ptr primitives are unimplemented on bytecode");
+  return Val_unit;
+}
+
+CAMLprim value caml_set_ext_ptr_bytecode(value idx, value v)
+{
+  caml_failwith("External ptr primitives are unimplemented on bytecode");
+  return Val_unit;
+}
+
 /* Concatenates idx_prefix and idx_suffix */
 CAMLprim value caml_deepen_idx_bytecode(value idx_prefix, value idx_suffix) {
   mlsize_t prefix_depth = Wosize_val(idx_prefix);

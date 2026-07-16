@@ -1155,7 +1155,9 @@ void caml_alloc_small_dispatch (caml_domain_state * dom_st,
        promoted) by the GC before it is initialized. Fortunately, we do not need
        to maintain the invariant that there is enough room in the minor heap to
        re-do the allocation in this case, since we are about to preempt anyway,
-       so we can just return. */
+       so we can just return. (In the bytecode runtime [Caml_state->preemption]
+       is never set to a block, as this is only done by the native-only
+       [caml_domain_setup_preemption]). */
     if (Is_block(Caml_state->preemption)) {
       /* We should only see this case if we allocated from ocaml */
       CAMLassert(flags & CAML_FROM_CAML);

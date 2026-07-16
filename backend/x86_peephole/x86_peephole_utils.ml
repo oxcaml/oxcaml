@@ -10,7 +10,7 @@ type rule_result =
   | Matched of asm_line DLL.cell option
 
 let is_control_flow = function
-  | J _ | JMP _ | CALL _ | RET | HLT -> true
+  | J _ | JMP _ | CALL _ | RET | HLT | UD2 -> true
   | LEAVE | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _
   | ADD _ | SUB _ | IMUL _ | MUL _ | IDIV _ | AND _ | OR _ | XOR _ | SAL _
   | SAR _ | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO | SET _
@@ -129,7 +129,7 @@ let writes_to_reg64 target = function
   | RDTSC | RDPMC ->
     (* Rare instructions, let's be conservative. *)
     true
-  | J _ | JMP _ | CALL _ | RET | HLT ->
+  | J _ | JMP _ | CALL _ | RET | HLT | UD2 ->
     (* These are all control flow operations, there is no point in assuming
        anything. *)
     true
@@ -192,7 +192,7 @@ let reads_from_reg64 target = function
   | LEAVE -> equal_reg64 target RBP
   | CLDEMOTE arg -> arg_contains_reg64 target arg
   | PREFETCH (_, _, arg) -> arg_contains_reg64 target arg
-  | J _ | JMP _ | CALL _ | RET | HLT ->
+  | J _ | JMP _ | CALL _ | RET | HLT | UD2 ->
     (* These are all control flow operations, there is no point in assuming
        anything. *)
     true
@@ -230,7 +230,7 @@ let writes_flags = function
   | SET _ | CMOV _ | BSWAP _ | XCHG _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE
   | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | LEAVE ->
     false
-  | J _ | JMP _ | CALL _ | RET | HLT ->
+  | J _ | JMP _ | CALL _ | RET | HLT | UD2 ->
     (* These are all control flow operations, there is no point in assuming
        anything. *)
     true

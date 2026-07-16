@@ -11,7 +11,7 @@ let code inline(never) loopify(never) size(160) newer_version_of(f_0)
            [ 0 of [ 0 |1 | 0 of imm tagged * imm tagged |1 of imm tagged ] ])
         my_closure _region _ghost_region my_depth
         -> k * k1
-        : [ 0 | 0 of val ] =
+        : [ 0 | 0 of [ 0 of imm tagged * imm tagged ] ] =
   let `*match*` = %block_load.[`0`] (x) in
   let `*match*_1` = %block_load.[`0`] (y) in
   (let prim = %is_int (`*match*_1`) in
@@ -90,11 +90,12 @@ let code inline(never) loopify(never) size(160) newer_version_of(f_0)
 in
 let $camlIncludecore_repro__f_1 = closure f_0_1 @f in
 apply direct(f_0_1)
-  ($camlIncludecore_repro__f_1 : _ -> [ 0 | 0 of val ])
+  ($camlIncludecore_repro__f_1
+   : _ -> [ 0 | 0 of [ 0 of imm tagged * imm tagged ] ])
     ($camlIncludecore_repro__const_block61,
      $camlIncludecore_repro__const_block61)
     -> k1 * error
-  where k1 (param : [ 0 | 0 of val ]) =
+  where k1 (param : [ 0 | 0 of [ 0 of imm tagged * imm tagged ] ]) =
     cont k
   where k =
     let $camlIncludecore_repro = Block 0 ($camlIncludecore_repro__f_1) in
