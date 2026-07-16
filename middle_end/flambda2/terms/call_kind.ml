@@ -75,10 +75,18 @@ module Effect = struct
           f : Simple.t;
           arg : Simple.t
         }
-    | Resume of
+    | Continue of
         { cont : Simple.t;
-          f : Simple.t;
-          arg : Simple.t
+          value : Simple.t
+        }
+    | Discontinue of
+        { cont : Simple.t;
+          exn : Simple.t
+        }
+    | Discontinue_with_backtrace of
+        { cont : Simple.t;
+          exn : Simple.t;
+          bt : Simple.t
         }
 
   let print ppf t =
@@ -104,10 +112,20 @@ module Effect = struct
         Flambda_colours.effect_ Flambda_colours.pop Simple.print valuec
         Simple.print exnc Simple.print effc Simple.print handle_tick
         Simple.print f Simple.print arg
-    | Resume { cont; f; arg } ->
-      fprintf ppf "@[<hov 1>(%tResume%t (cont@ %a)@ (f@ %a)@ (arg@ %a))@]"
+    | Continue { cont; value } ->
+      fprintf ppf "@[<hov 1>(%tContinue%t (cont@ %a)@ (value@ %a))@]"
         Flambda_colours.effect_ Flambda_colours.pop Simple.print cont
-        Simple.print f Simple.print arg
+        Simple.print value
+    | Discontinue { cont; exn } ->
+      fprintf ppf "@[<hov 1>(%tDiscontinue%t (cont@ %a)@ (exn@ %a))@]"
+        Flambda_colours.effect_ Flambda_colours.pop Simple.print cont
+        Simple.print exn
+    | Discontinue_with_backtrace { cont; exn; bt } ->
+      fprintf ppf
+        "@[<hov 1>(%tDiscontinue_with_backtrace%t (cont@ %a)@ (exn@ %a)@ (bt@ \
+         %a))@]"
+        Flambda_colours.effect_ Flambda_colours.pop Simple.print cont
+        Simple.print exn Simple.print bt
 
   let perform ~eff = Perform { eff }
 
@@ -119,7 +137,12 @@ module Effect = struct
   let with_stack_preemptible ~valuec ~exnc ~effc ~handle_tick ~f ~arg =
     With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg }
 
-  let resume ~cont ~f ~arg = Resume { cont; f; arg }
+  let continue ~cont ~value = Continue { cont; value }
+
+  let discontinue ~cont ~exn = Discontinue { cont; exn }
+
+  let discontinue_with_backtrace ~cont ~exn ~bt =
+    Discontinue_with_backtrace { cont; exn; bt }
 
   let free_names t =
     match t with
@@ -142,9 +165,13 @@ module Effect = struct
                  (Simple.free_names handle_tick)
                  (Name_occurrences.union (Simple.free_names f)
                     (Simple.free_names arg)))))
-    | Resume { cont; f; arg } ->
+    | Continue { cont; value } ->
+      Name_occurrences.union (Simple.free_names cont) (Simple.free_names value)
+    | Discontinue { cont; exn } ->
+      Name_occurrences.union (Simple.free_names cont) (Simple.free_names exn)
+    | Discontinue_with_backtrace { cont; exn; bt } ->
       Name_occurrences.union (Simple.free_names cont)
-        (Name_occurrences.union (Simple.free_names f) (Simple.free_names arg))
+        (Name_occurrences.union (Simple.free_names exn) (Simple.free_names bt))
 
   let apply_renaming t renaming =
     match t with
@@ -192,13 +219,25 @@ module Effect = struct
             f = f';
             arg = arg'
           }
-    | Resume { cont; f; arg } ->
+    | Continue { cont; value } ->
       let cont' = Simple.apply_renaming cont renaming in
-      let f' = Simple.apply_renaming f renaming in
-      let arg' = Simple.apply_renaming arg renaming in
-      if cont == cont' && f == f' && arg == arg'
+      let value' = Simple.apply_renaming value renaming in
+      if cont == cont' && value == value'
       then t
-      else Resume { cont = cont'; f = f'; arg = arg' }
+      else Continue { cont = cont'; value = value' }
+    | Discontinue { cont; exn } ->
+      let cont' = Simple.apply_renaming cont renaming in
+      let exn' = Simple.apply_renaming exn renaming in
+      if cont == cont' && exn == exn'
+      then t
+      else Discontinue { cont = cont'; exn = exn' }
+    | Discontinue_with_backtrace { cont; exn; bt } ->
+      let cont' = Simple.apply_renaming cont renaming in
+      let exn' = Simple.apply_renaming exn renaming in
+      let bt' = Simple.apply_renaming bt renaming in
+      if cont == cont' && exn == exn' && bt == bt'
+      then t
+      else Discontinue_with_backtrace { cont = cont'; exn = exn'; bt = bt' }
 
   let ids_for_export t =
     match t with
@@ -231,12 +270,20 @@ module Effect = struct
                  (Ids_for_export.union
                     (Ids_for_export.from_simple f)
                     (Ids_for_export.from_simple arg)))))
-    | Resume { cont; f; arg } ->
+    | Continue { cont; value } ->
+      Ids_for_export.union
+        (Ids_for_export.from_simple cont)
+        (Ids_for_export.from_simple value)
+    | Discontinue { cont; exn } ->
+      Ids_for_export.union
+        (Ids_for_export.from_simple cont)
+        (Ids_for_export.from_simple exn)
+    | Discontinue_with_backtrace { cont; exn; bt } ->
       Ids_for_export.union
         (Ids_for_export.from_simple cont)
         (Ids_for_export.union
-           (Ids_for_export.from_simple f)
-           (Ids_for_export.from_simple arg))
+           (Ids_for_export.from_simple exn)
+           (Ids_for_export.from_simple bt))
 end
 
 type t =

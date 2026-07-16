@@ -446,7 +446,7 @@ let unary_prim_size ~machine_width prim =
   | Is_boxed_float -> 4 (* tag load + comparison *)
   | Is_flat_float_array -> 4 (* tag load + comparison *)
   | End_region { ghost } | End_try_region { ghost } -> if ghost then 0 else 1
-  | Obj_dup -> needs_caml_c_call_extcall_size + 1
+  | Obj_dup _ -> needs_caml_c_call_extcall_size + 1
   | Get_header -> 2
   | Peek _ -> 1
   | Make_lazy _ -> alloc_size + 1

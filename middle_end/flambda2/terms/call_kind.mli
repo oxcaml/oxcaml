@@ -68,10 +68,18 @@ module Effect : sig
           f : Simple.t;
           arg : Simple.t
         }
-    | Resume of
+    | Continue of
         { cont : Simple.t;
-          f : Simple.t;
-          arg : Simple.t
+          value : Simple.t
+        }
+    | Discontinue of
+        { cont : Simple.t;
+          exn : Simple.t
+        }
+    | Discontinue_with_backtrace of
+        { cont : Simple.t;
+          exn : Simple.t;
+          bt : Simple.t
         }
 
   include Contains_names.S with type t := t
@@ -97,7 +105,12 @@ module Effect : sig
     arg:Simple.t ->
     t
 
-  val resume : cont:Simple.t -> f:Simple.t -> arg:Simple.t -> t
+  val continue : cont:Simple.t -> value:Simple.t -> t
+
+  val discontinue : cont:Simple.t -> exn:Simple.t -> t
+
+  val discontinue_with_backtrace :
+    cont:Simple.t -> exn:Simple.t -> bt:Simple.t -> t
 end
 
 (* The allocation mode corresponds to the type of the function that is called:

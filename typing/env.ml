@@ -1231,23 +1231,7 @@ let components_of_module ~alerts ~uid env ps path addr mty mode shape =
     }
   }
 
-let mode_unit ~staticity =
-  let hint : _ Mode.Hint.const = Legacy Compilation_unit in
-  Mode.Value.of_const
-    { areality = Global;
-      linearity = Many;
-      uniqueness = Aliased;
-      portability = Nonportable;
-      contention = Uncontended;
-      forkable = Forkable;
-      yielding = Unyielding;
-      statefulness = Stateful;
-      visibility = Read_write;
-      staticity;
-    }
-    ~hint_monadic:hint ~hint_comonadic:hint
-
-let read_sign_of_cmi (sign, staticity) name uid ~shape ~address:addr ~flags =
+let read_sign_of_cmi (sign, mda_mode) name uid ~shape ~address:addr ~flags =
   let id = Ident.create_global name in
   let path = Pident id in
   let alerts =
@@ -1265,7 +1249,6 @@ let read_sign_of_cmi (sign, staticity) name uid ~shape ~address:addr ~flags =
   in
   let mda_address = Lazy_backtrack.create_forced addr in
   let mda_declaration = md in
-  let mda_mode = Mode.Value.disallow_right (mode_unit ~staticity) in
   let mda_shape = shape in
   let mda_components =
     let mty = md.md_type in
@@ -2934,8 +2917,18 @@ let components_of_functor_appl ~loc ~f_path ~f_comp ~arg env =
        because of the call to [check_well_formed_module]. *)
     let mty = Subst.modtype (Rescope (Path.scope p)) sub f_comp.fcomp_res in
     let addr = Lazy_backtrack.create_failed Not_found in
-    !check_well_formed_module env loc
-      ("the signature of " ^ Path.name p) mty;
+    let can_load_cmis =
+      match Persistent_env.can_load_cmis !persistent_env with
+      | Persistent_env.Can_load_cmis -> true
+      | Persistent_env.Cannot_load_cmis _ -> false
+    in
+    (* If cmis cannot be loaded (e.g. when the printer of another error forces
+       this application), lookups made by the well-formedness check can fail
+       spuriously. In that case, we skip the check and don't cache the
+       components so that the check runs on a later forcing. *)
+    if can_load_cmis then
+      !check_well_formed_module env loc
+        ("the signature of " ^ Path.name p) mty;
     let shape_arg =
       shape_of_path ~namespace:Shape.Sig_component_kind.Module env arg
     in
@@ -2947,7 +2940,7 @@ let components_of_functor_appl ~loc ~f_path ~f_comp ~arg env =
         env Subst.identity p addr (Subst.Lazy.of_modtype mty)
         fcomp_res_mode shape
     in
-    Hashtbl.add f_comp.fcomp_cache arg comps;
+    if can_load_cmis then Hashtbl.add f_comp.fcomp_cache arg comps;
     comps
 
 (* Define forward functions *)
@@ -3302,8 +3295,9 @@ let enter_unbound_module name reason env =
 
 (* Read a signature from a file *)
 let read_signature modname cmi =
-  let mty, staticity = read_pers_mod modname cmi in
-  Subst.Lazy.force_signature mty, staticity
+  let mty, mode = read_pers_mod modname cmi in
+  (* [mode] read from the cmi is always a constant *)
+  Subst.Lazy.force_signature mty, (Mode.Value.zap_to_floor mode).staticity
 
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname
@@ -3728,7 +3722,7 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
           (* The cmi is not loaded, so [cmi_staticity] is unknown.
              Conservatively fall back to [Dynamic]. *)
           Mode.Value.disallow_right
-            (mode_unit ~staticity:Mode.Staticity.Dynamic)
+            (Persistent_env.mode_pers_mod Dynamic)
       in
       path, (mode, locks), a
     end
@@ -4472,7 +4466,7 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
          fall back to [Dynamic]. *)
       path, Location.none,
         Mode.Value.disallow_right
-          (mode_unit ~staticity:Mode.Staticity.Dynamic)
+          (Persistent_env.mode_pers_mod Dynamic)
     else
       let path, (mda : module_data) =
         lookup_global_name_module_no_locks Load ~errors ~use ~loc name env

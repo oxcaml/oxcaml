@@ -5438,14 +5438,30 @@ let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg =
         arg ],
       dbg )
 
-let resume ~dbg ~cont ~f ~arg =
-  (* Rc_normal is required here, because there are some uses of effects with
-     repeated resumes, and these should consume O(1) stack space by tail-calling
-     caml_resume. *)
-  let sym = Cmm.global_symbol "caml_resume" in
+(* Rc_normal is required for [continue], [discontinue], and
+   [discontinue_with_backtrace], because there are some uses of effects with
+   repeated resumes, and these should consume O(1) stack space by tail-calling
+   the runtime resume function. *)
+
+let continue ~dbg ~cont ~value =
+  let sym = Cmm.global_symbol "caml_continue" in
   Cop
     ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
-      [Cconst_symbol (sym, dbg); cont; f; arg],
+      [Cconst_symbol (sym, dbg); cont; value],
+      dbg )
+
+let discontinue ~dbg ~cont ~exn =
+  let sym = Cmm.global_symbol "caml_discontinue" in
+  Cop
+    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+      [Cconst_symbol (sym, dbg); cont; exn],
+      dbg )
+
+let discontinue_with_backtrace ~dbg ~cont ~exn ~bt =
+  let sym = Cmm.global_symbol "caml_discontinue_with_backtrace" in
+  Cop
+    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+      [Cconst_symbol (sym, dbg); cont; exn; bt],
       dbg )
 
 let reperform ~dbg ~eff ~cont ~last_fiber =

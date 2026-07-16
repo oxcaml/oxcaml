@@ -316,8 +316,9 @@ let function_params_and_body_free_names fpb =
       in
       let regions =
         match (my_alloc_mode : Alloc_mode.For_applications.t) with
-        | Heap -> []
-        | Local { region; ghost_region } -> [region; ghost_region]
+        | Heap { alloc_region } -> [alloc_region]
+        | Local { alloc_region; region; ghost_region } ->
+          [alloc_region; region; ghost_region]
       in
       List.fold_left
         (fun f var -> Name_occurrences.remove_var f ~var)
@@ -1021,10 +1022,18 @@ let rewrite_call_kind env (call_kind : Call_kind.t) =
          ~exnc:(rewrite_simple exnc) ~effc:(rewrite_simple effc)
          ~handle_tick:(rewrite_simple handle_tick)
          ~f:(rewrite_simple f) ~arg:(rewrite_simple arg))
-  | Effect (Resume { cont; f; arg }) ->
+  | Effect (Continue { cont; value }) ->
     Call_kind.effect_
-      (Call_kind.Effect.resume ~cont:(rewrite_simple cont) ~f:(rewrite_simple f)
-         ~arg:(rewrite_simple arg))
+      (Call_kind.Effect.continue ~cont:(rewrite_simple cont)
+         ~value:(rewrite_simple value))
+  | Effect (Discontinue { cont; exn }) ->
+    Call_kind.effect_
+      (Call_kind.Effect.discontinue ~cont:(rewrite_simple cont)
+         ~exn:(rewrite_simple exn))
+  | Effect (Discontinue_with_backtrace { cont; exn; bt }) ->
+    Call_kind.effect_
+      (Call_kind.Effect.discontinue_with_backtrace ~cont:(rewrite_simple cont)
+         ~exn:(rewrite_simple exn) ~bt:(rewrite_simple bt))
 
 let decide_whether_apply_needs_calling_convention_change env apply =
   let call_kind = rewrite_call_kind env (Apply.call_kind apply) in
@@ -2186,8 +2195,9 @@ and rebuild_function_params_and_body (env : env) res code_metadata
   let rebuild_body () =
     let region_vars =
       match (my_alloc_mode : Alloc_mode.For_applications.t) with
-      | Heap -> []
-      | Local { region; ghost_region } -> [region; ghost_region]
+      | Heap { alloc_region } -> [alloc_region]
+      | Local { alloc_region; region; ghost_region } ->
+        [alloc_region; region; ghost_region]
     in
     let all_vars = region_vars @ (my_closure :: Bound_parameters.vars params) in
     match List.filter (is_dead_var env) all_vars with
