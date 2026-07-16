@@ -632,12 +632,11 @@ CAMLprim value caml_sys_system_command(value command)
 }
 #endif
 
+#ifndef CAML_BARE_METAL
+
 double caml_sys_time_include_children_unboxed(value include_children)
 {
-#ifdef CAML_BARE_METAL
-  (void)include_children;
-  return 0.;
-#elif defined(HAS_GETRUSAGE)
+#ifdef HAS_GETRUSAGE
   struct rusage ru;
   double sec = 0.;
 
@@ -697,10 +696,6 @@ extern int caml_win32_random_seed(intnat data[16]);
 #else
 int caml_unix_random_seed(intnat data[16])
 {
-#ifdef CAML_BARE_METAL
-  for (int i = 0; i < 16; i++) data[i] = i;
-  return 16;
-#else
   unsigned n = 0;
   unsigned char buffer[12];
   int nread = 0;
@@ -735,7 +730,6 @@ int caml_unix_random_seed(intnat data[16])
   if (n < 16) data[n++] = getpid();
   if (n < 16) data[n++] = getppid();
   return n;
-#endif
 }
 #endif
 
@@ -754,6 +748,8 @@ CAMLprim value caml_sys_random_seed(value unit)
   for (int i = 0; i < n; i++) Field(res, i) = Val_long(data[i]);
   return res;
 }
+
+#endif /* !CAML_BARE_METAL */
 
 CAMLprim value caml_sys_const_big_endian(value unit)
 {

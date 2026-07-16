@@ -422,7 +422,7 @@ CAMLprim value caml_runtime_variant (value unit)
 #elif defined (CAML_INSTR)
   return caml_copy_string ("i");
 #elif defined (CAML_BARE_METAL)
-  return caml_copy_string ("BARE_METAL");
+  return caml_copy_string ("baremetal");
 #else
   return caml_copy_string ("");
 #endif

@@ -41,9 +41,7 @@
 #include "caml/platform.h"
 
 #include <pthread.h>
-#ifndef CAML_BARE_METAL
 #include <sys/resource.h>
-#endif
 
 #ifdef _WIN32
 extern void caml_win32_unregister_overflow_detection (void);
@@ -79,9 +77,7 @@ static void init_startup_params(void)
 
   // Initial stack sizes only apply in native code with stack checks disabled.
 
-#ifdef CAML_BARE_METAL
-  caml_init_main_stack_wsz = Wsize_bsize(8192 * 1024);
-#else
+#ifdef HAS_GETRLIMIT
   struct rlimit rlimit;
   if (getrlimit(RLIMIT_STACK, &rlimit)) {
     // default value, retrieved from a recent system (May 2024)
@@ -93,6 +89,9 @@ static void init_startup_params(void)
       caml_init_main_stack_wsz = Wsize_bsize(rlimit.rlim_cur);
     }
   }
+#else
+  // default value, retrieved from a recent system (May 2024)
+  caml_init_main_stack_wsz = Wsize_bsize(8192 * 1024);
 #endif
   if (caml_init_main_stack_wsz > Max_stack_def) {
     caml_init_main_stack_wsz = Max_stack_def;
