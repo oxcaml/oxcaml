@@ -475,31 +475,25 @@ CAMLextern CAMLthread_local int caml_lockdepth;
 
 #ifdef CAML_BARE_METAL
 
-/* Single thread: every lock acquisition trivially succeeds.  These are
-   called pervasively by live runtime code (channels, GC, domains), so
-   they cannot be compiled out; being empty inlines, they cost nothing.
-   (No lock-depth tracking: there is no bare-metal DEBUG variant, and
-   caml_lockdepth is not defined there.) */
-
 Caml_inline void caml_plat_lock_blocking(caml_plat_mutex* m)
 {
-  (void)m;
+  DEBUG_LOCK(m);
 }
 
 Caml_inline int caml_plat_try_lock(caml_plat_mutex* m)
 {
-  (void)m;
+  DEBUG_LOCK(m);
   return 1;
 }
 
 Caml_inline void caml_plat_lock_non_blocking(caml_plat_mutex* m)
 {
-  (void)m;
+  DEBUG_UNLOCK(m);
 }
 
 Caml_inline void caml_plat_unlock(caml_plat_mutex* m)
 {
-  (void)m;
+  DEBUG_UNLOCK(m);
 }
 
 #else

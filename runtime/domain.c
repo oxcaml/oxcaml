@@ -84,35 +84,12 @@ typedef cpuset_t cpu_set_t;
 #include "sync_posix.h"
 
 #ifdef CAML_BARE_METAL
-/* Compiled in caml_bt_is_self, whose only remaining live use on bare
-   metal is in assertions. */
 #define pthread_self() ((pthread_t)0)
 
 /* Must be 0 ("not equal"): caml_bt_is_self must answer "no, you are not
    the backup thread" -- there is no backup thread.  (A faithful
    comparison would wrongly return "equal", since both sides are 0.) */
 #define pthread_equal(a, b) 0
-#endif
-
-#ifndef MULTIDOMAIN
-/* Single-domain replacements for the domain-spawning machinery (masked
-   out below): a single-domain runtime cannot spawn additional domains,
-   and the recommended domain count is necessarily 1 (the same answer
-   the multi-domain implementation gives once clamped to
-   [max_domains]). */
-
-CAMLprim value caml_domain_spawn(value callback, value term_sync)
-{
-  (void)callback;
-  (void)term_sync;
-  caml_failwith("Domain.spawn is not supported by a single-domain runtime");
-}
-
-CAMLprim value caml_recommended_domain_count(value unused)
-{
-  (void)unused;
-  return Val_long(1);
-}
 #endif
 
 /* Check that the domain_state structure was laid out without padding,
@@ -246,6 +223,7 @@ Caml_inline void domain_set_pending(dom_internal *d)
 { atomic_store_release(&d->pending, 1); }
 
 uintnat caml_tick_use_usleep = 0;
+#ifndef CAML_BARE_METAL
 static struct {
   /* This mutex protects mutation of `thread_id` and `running` */
   caml_plat_mutex mutex;
@@ -271,6 +249,7 @@ static struct {
   -1, -1, -1
 #endif
 };
+#endif /* !CAML_BARE_METAL */
 
 static struct {
   /* enter barrier for STW sections, participating domains arrive into
@@ -560,12 +539,10 @@ static void free_minor_heap(void) {
 
   check_minor_heap();
 
+#ifndef CAML_BARE_METAL
   /* free old minor heap.
      instead of unmapping the heap, we decommit it, so there's
-     no race whereby other code could attempt to reuse the memory.
-     On bare metal the reservation is real (malloc-backed) memory with
-     no reserve-vs-commit distinction, so there is nothing to do. */
-#ifndef CAML_BARE_METAL
+     no race whereby other code could attempt to reuse the memory. */
   caml_mem_decommit(
       (void*)domain_self->minor_heap_area_start,
       Bsize_wsize(domain_state->minor_heap_wsz),
@@ -595,7 +572,6 @@ static int allocate_minor_heap(asize_t wsize) {
                   ARCH_SIZET_PRINTF_FORMAT "uk words\n", wsize / 1024);
 
 #ifndef CAML_BARE_METAL
-  /* On bare metal the reservation is already committed (see above). */
   char name[32];
   snprintf(name, sizeof name, "minor heap %d", domain_self->id);
   if (!caml_mem_commit(
@@ -937,8 +913,6 @@ fail_domain:
   caml_plat_unlock(&all_domains_lock);
 }
 
-/* Fork support; only reachable via [caml_atfork_hook] from the unix
-   library's fork.  No processes on bare metal, so not compiled there. */
 #ifndef CAML_BARE_METAL
 CAMLexport void caml_reset_domain_lock(void)
 {
@@ -1559,6 +1533,13 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
   caml_plat_cond_free(&p.cond);
 
   CAMLreturn (Val_long(p.unique_id));
+}
+#else
+CAMLprim value caml_domain_spawn(value callback, value term_sync)
+{
+  (void)callback;
+  (void)term_sync;
+  caml_failwith("Domain.spawn is not supported by a single-domain runtime");
 }
 #endif /* MULTIDOMAIN */
 
@@ -2205,6 +2186,32 @@ void caml_handle_gc_interrupt(void)
    [false] argument. In this case, all tick requests will be ignored.
  */
 
+#ifdef CAML_BARE_METAL
+
+value caml_process_tick_exn(void)
+{
+  return Val_unit;
+}
+
+CAMLextern uintnat caml_effective_tick_interval_usec(void)
+{
+  return 0;
+}
+
+CAMLprim value caml_enable_tick_thread(value v_enable)
+{
+  (void)v_enable;
+  return Val_unit;
+}
+
+CAMLprim intnat caml_domain_set_tick_interval_usec(intnat interval_usec)
+{
+  (void)interval_usec;
+  return 0;
+}
+
+#else /* !CAML_BARE_METAL */
+
 #ifdef HAS_INTERRUPTIBLE_TICK
 
 /* Interruptible wait helpers for the tick thread.
@@ -2331,11 +2338,9 @@ static bool tick_thread_wait(void)
 
 #else /* !HAS_INTERRUPTIBLE_TICK */
 
-#ifndef CAML_BARE_METAL
 static int tick_thread_open_fds(void) { return 0; }
 static int tick_thread_close_fds(void) { return 0; }
 static void tick_thread_wake(void) {}
-#endif
 
 #endif
 
@@ -2359,7 +2364,6 @@ value caml_process_tick_exn(void)
   CAMLreturn(Val_unit);
 }
 
-#ifndef CAML_BARE_METAL
 CAMLextern void caml_stop_tick_thread(void)
 {
   caml_plat_lock_blocking(&tick_thread.mutex);
@@ -2376,7 +2380,6 @@ CAMLextern void caml_stop_tick_thread(void)
   caml_plat_unlock(&tick_thread.mutex);
 }
 
-/* Fork support (see caml_atfork_default); no fork on bare metal. */
 static void tick_thread_reset(void)
 {
   /* Reset the state of the tick thread in the child process after fork().
@@ -2395,7 +2398,6 @@ static void tick_thread_reset(void)
     caml_start_tick_thread();
   }
 }
-#endif /* !CAML_BARE_METAL */
 
 /* Compute the interval at which the tick thread will tick. */
 CAMLextern uintnat caml_effective_tick_interval_usec(void) {
@@ -2429,7 +2431,6 @@ CAMLprim value caml_effective_tick_interval_usec_bytecode(value v_unit) {
   return Val_long(caml_effective_tick_interval_usec());
 }
 
-#ifndef CAML_BARE_METAL
 static void caml_do_tick_all_domains(void)
 {
   /* See [caml_interrupt_all_signal_safe] for why reading from this array can
@@ -2446,8 +2447,6 @@ static void caml_do_tick_all_domains(void)
     atomic_store_release(&d->state->requested_tick, true);
     interrupt_domain(d);
   }
-}
-
 static void* caml_tick(void *arg)
 {
   (void)arg;
@@ -2547,17 +2546,10 @@ CAMLextern int caml_start_tick_thread(void)
 
   return 0;
 }
-#endif /* !CAML_BARE_METAL */
 
 CAMLprim value caml_enable_tick_thread(value v_enable)
 {
   bool enable = Long_val(v_enable) ? 1 : 0;
-
-#ifdef CAML_BARE_METAL
-  /* No tick thread on bare metal: the request is recorded but no ticks
-     will ever be delivered. */
-  atomic_store_release(&tick_thread.enabled, enable);
-#else
   bool was_enabled = atomic_exchange_explicit(&tick_thread.enabled, enable,
                                               memory_order_acq_rel);
 
@@ -2567,7 +2559,6 @@ CAMLprim value caml_enable_tick_thread(value v_enable)
   } else {
     caml_stop_tick_thread();
   }
-#endif
 
   return Val_unit;
 }
@@ -2578,16 +2569,12 @@ CAMLprim value caml_enable_tick_thread(value v_enable)
 CAMLprim intnat caml_domain_set_tick_interval_usec(intnat interval_usec)
 {
   atomic_store_relaxed(&domain_self->tick_interval_usec, interval_usec);
-#ifndef CAML_BARE_METAL
-  /* No tick thread on bare metal: the request is recorded but no ticks
-     will ever be delivered. */
   if (interval_usec != 0) {
     caml_start_tick_thread();
   }
   /* NOTE: We don't worry too much about spurious wakes here, since we assume
      changing the tick interval is uncommon */
   tick_thread_wake();
-#endif
 
   return 0;
 }
@@ -2597,6 +2584,8 @@ CAMLprim value caml_domain_set_tick_interval_usec_bytecode(value v_interval_usec
   caml_domain_set_tick_interval_usec(Long_val(v_interval_usec));
   CAMLreturn(Val_unit);
 }
+
+#endif /* !CAML_BARE_METAL */
 
 /* Backup thread */
 
@@ -3033,11 +3022,11 @@ CAMLprim value caml_domain_tls_get(value unused)
   return domain_root_get(&Caml_state->tls_state);
 }
 
-#ifdef MULTIDOMAIN
 CAMLprim value caml_recommended_domain_count(value unused)
 {
   intnat n = -1;
 
+#ifdef MULTIDOMAIN
 #if defined(HAS_GNU_GETAFFINITY_NP) || defined(HAS_BSD_GETAFFINITY_NP)
   cpu_set_t cpuset;
 
@@ -3063,10 +3052,12 @@ CAMLprim value caml_recommended_domain_count(value unused)
     n = 1;
   else if (n > caml_params->max_domains)
     n = caml_params->max_domains;
+#else
+  n=1;
+#endif /* MULTIDOMAIN */
 
   return (Val_long(n));
 }
-#endif /* MULTIDOMAIN */
 
 CAMLprim value caml_max_domain_count(value unused)
 {

@@ -39,9 +39,6 @@
 #endif
 
 #ifdef CAML_BARE_METAL
-/* An events ring needs an OS (files, mmap), so on bare metal the whole
-   producer (runtime_events.c) is compiled out and the emit points
-   compile to nothing, like CAML_EV_ALLOC without CAML_INSTR above. */
 #define CAML_EV_BEGIN(p)              /**/
 #define CAML_EV_END(p)                /**/
 #define CAML_EV_COUNTER(c,v)          /**/
