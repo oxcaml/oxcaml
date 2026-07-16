@@ -733,16 +733,16 @@ let mk_support_lto f =
   ( "-support-lto",
     Arg.Unit f,
     Printf.sprintf
-      " Build metadata for use in link time optimisation (unimplemented)%s \
-       (Flambda2 only)"
+      " Currently unimplemented. Will eventually be used to enable support for \
+       link time optimisation.%s (Flambda2 only)"
       (format_default Flambda2.Default.support_lto) )
 
 let mk_no_support_lto f =
   ( "-no-support-lto",
     Arg.Unit f,
     Printf.sprintf
-      " Don't build metadata for use in link time optimisation \
-       (unimplemented)%s (Flambda2 only)"
+      " Currently unimplemented. Will eventually be used to disable support \
+       for link time optimisation.%s (Flambda2 only)"
       (format_not_default Flambda2.Default.support_lto) )
 
 let mk_flambda2_match_in_match f =
