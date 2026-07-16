@@ -48,17 +48,9 @@ type 'a bad : value_or_null mod global  = #{ i : 'a or_null @@ portable }
 Line 1, characters 0-73:
 1 | type 'a bad : value_or_null mod global  = #{ i : 'a or_null @@ portable }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "bad" is
-           value_or_null mod everything with 'a @@ portable
-         because it is an unboxed record.
-       But the kind of type "bad" must be a subkind of value_or_null mod global
-         because of the annotation on the declaration of the type bad.
-
-       The first mode-crosses less than the second along:
-         locality: mod global with 'a ≰ mod global
-         uniqueness: mod aliased with 'a ≰ mod aliased
-         forkable: mod forkable with 'a ≰ mod forkable
-         yielding: mod unyielding with 'a ≰ mod unyielding
+Error: This type definition does not satisfy its kind annotation
+         value_or_null mod global,
+       because 'a is not mod global aliased forkable unyielding.
 |}]
 
 (* This is a regression test for an intermediate version of the bug fix that

@@ -172,10 +172,9 @@ type 'a t : immutable_data = Foo of 'a
 Line 1, characters 0-38:
 1 | type 'a t : immutable_data = Foo of 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because 'a is not mod many contended portable forkable unyielding
+                 stateless immutable.
 |}]
 
 type 'a t : immutable_data = Foo of { mutable x : 'a }
@@ -183,16 +182,10 @@ type 'a t : immutable_data = Foo of { mutable x : 'a }
 Line 1, characters 0-54:
 1 | type 'a t : immutable_data = Foo of { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
-
-       The first mode-crosses less than the second along:
-         contention: mod uncontended ≰ mod contended
-         portability: mod portable with 'a ≰ mod portable
-         statefulness: mod stateless with 'a ≰ mod stateless
-         visibility: mod read_write ≰ mod immutable
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because
+       - 'a is not mod contended portable stateless immutable
+       - mutable field x : 'a is not mod contended immutable
 |}]
 
 type t : immutable_data = Foo | Bar of int ref
@@ -200,10 +193,8 @@ type t : immutable_data = Foo | Bar of int ref
 Line 1, characters 0-46:
 1 | type t : immutable_data = Foo | Bar of int ref
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because int ref is not mod contended immutable.
 |}]
 
 type t : immutable_data = Foo of (unit -> unit)
@@ -211,10 +202,9 @@ type t : immutable_data = Foo of (unit -> unit)
 Line 1, characters 0-47:
 1 | type t : immutable_data = Foo of (unit -> unit)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value non_float mod immutable
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because unit -> unit is not mod many portable forkable unyielding
+                 stateless.
 |}]
 
 type 'a t : immutable_data = Foo of 'a option
@@ -222,10 +212,9 @@ type 'a t : immutable_data = Foo of 'a option
 Line 1, characters 0-45:
 1 | type 'a t : immutable_data = Foo of 'a option
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because 'a is not mod many contended portable forkable unyielding
+                 stateless immutable.
 |}]
 
 type t : immutable_data = Foo of int * int | Bar of { mutable z : int }
@@ -233,10 +222,8 @@ type t : immutable_data = Foo of int * int | Bar of { mutable z : int }
 Line 1, characters 0-71:
 1 | type t : immutable_data = Foo of int * int | Bar of { mutable z : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because mutable field z : int is not mod contended immutable.
 |}]
 
 type t : mutable_data = Foo of { x : unit -> unit }
@@ -244,10 +231,9 @@ type t : mutable_data = Foo of { x : unit -> unit }
 Line 1, characters 0-51:
 1 | type t : mutable_data = Foo of { x : unit -> unit }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value non_float mod immutable
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of mutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation mutable_data,
+       because unit -> unit is not mod many portable forkable unyielding
+                 stateless.
 |}]
 
 type ('a : value mod portable) t : value mod many = Foo of 'a
@@ -255,10 +241,8 @@ type ('a : value mod portable) t : value mod many = Foo of 'a
 Line 1, characters 0-61:
 1 | type ('a : value mod portable) t : value mod many = Foo of 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of value mod many
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod many,
+       because 'a is not mod many.
 |}]
 
 type ('a : value mod global) t : value mod global = Foo of 'a
@@ -266,10 +250,8 @@ type ('a : value mod global) t : value mod global = Foo of 'a
 Line 1, characters 0-61:
 1 | type ('a : value mod global) t : value mod global = Foo of 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of value mod global
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod global,
+       because this variant type is not mod global aliased.
 |}]
 
 type ('a : value mod aliased) t : value mod aliased = Foo of 'a
@@ -277,10 +259,8 @@ type ('a : value mod aliased) t : value mod aliased = Foo of 'a
 Line 1, characters 0-63:
 1 | type ('a : value mod aliased) t : value mod aliased = Foo of 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of value mod aliased
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod aliased,
+       because this variant type is not mod aliased.
 |}]
 
 type ('a : value mod external_) t : value mod external_ = Foo of 'a
@@ -288,10 +268,8 @@ type ('a : value mod external_) t : value mod external_ = Foo of 'a
 Line 1, characters 0-67:
 1 | type ('a : value mod external_) t : value mod external_ = Foo of 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of value mod external_
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod external_,
+       because this variant type is not mod external_.
 |}]
 
 type t : sync_data = Foo of { mutable x : int ref [@atomic] }
@@ -299,10 +277,8 @@ type t : sync_data = Foo of { mutable x : int ref [@atomic] }
 Line 1, characters 0-61:
 1 | type t : sync_data = Foo of { mutable x : int ref [@atomic] }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of sync_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation sync_data,
+       because int ref is not mod contended.
 |}]
 
 type ('a : mutable_data) t : sync_data = Foo of { mutable x : 'a [@atomic] }
@@ -310,13 +286,8 @@ type ('a : mutable_data) t : sync_data = Foo of { mutable x : 'a [@atomic] }
 Line 1, characters 0-76:
 1 | type ('a : mutable_data) t : sync_data = Foo of { mutable x : 'a [@atomic] }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is sync_data with 'a @@ forkable unyielding many
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of sync_data
-         because of the annotation on the declaration of the type t.
-
-       The first mode-crosses less than the second along:
-         contention: mod contended with 'a ≰ mod contended
+Error: This type definition does not satisfy its kind annotation sync_data,
+       because 'a is not mod contended.
 |}]
 
 (**** Test 2: Annotations with "with" are accepted when appropriate ****)
@@ -350,14 +321,8 @@ type 'a t : immutable_data with 'a = Foo of { mutable x : 'a }
 Line 1, characters 0-62:
 1 | type 'a t : immutable_data with 'a = Foo of { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data with 'a
-         because of the annotation on the declaration of the type t.
-
-       The first mode-crosses less than the second along:
-         contention: mod uncontended ≰ mod contended with 'a
-         visibility: mod read_write ≰ mod immutable with 'a
+Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+       because mutable field x : 'a is not mod contended immutable.
 |}]
 
 type 'a t : immutable_data with 'a = Foo of { x : 'a -> 'a }
@@ -365,10 +330,9 @@ type 'a t : immutable_data with 'a = Foo of { x : 'a -> 'a }
 Line 1, characters 0-60:
 1 | type 'a t : immutable_data with 'a = Foo of { x : 'a -> 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value non_float mod immutable
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data with 'a
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+       because 'a -> 'a is not mod many portable forkable unyielding
+                 stateless.
 |}]
 
 type 'a t : value mod global with 'a = Foo of 'a
@@ -376,10 +340,9 @@ type 'a t : value mod global with 'a = Foo of 'a
 Line 1, characters 0-48:
 1 | type 'a t : value mod global with 'a = Foo of 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of value mod global with 'a
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation
+         value mod global with 'a,
+       because this variant type is not mod global aliased.
 |}]
 
 type 'a t : value mod aliased with 'a = Foo of 'a
@@ -387,10 +350,9 @@ type 'a t : value mod aliased with 'a = Foo of 'a
 Line 1, characters 0-49:
 1 | type 'a t : value mod aliased with 'a = Foo of 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of value mod aliased with 'a
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation
+         value mod aliased with 'a,
+       because this variant type is not mod aliased.
 |}]
 
 type 'a t : value mod external_ with 'a = Foo of 'a
@@ -398,11 +360,9 @@ type 'a t : value mod external_ with 'a = Foo of 'a
 Line 1, characters 0-51:
 1 | type 'a t : value mod external_ with 'a = Foo of 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of
-           value mod external_ with 'a
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation
+         value mod external_ with 'a,
+       because this variant type is not mod external_.
 |}]
 
 (**** Test 3: Variant values cross when appropriate ****)

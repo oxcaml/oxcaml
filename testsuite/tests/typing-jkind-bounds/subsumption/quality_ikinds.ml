@@ -101,10 +101,9 @@ type u
 Line 4, characters 0-36:
 4 | type t : value mod global with a = u
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "u" is value
-         because of the definition of u at line 3, characters 0-6.
-       But the kind of type "u" must be a subkind of value mod global with a
-         because of the definition of t at line 4, characters 0-36.
+Error: This type definition does not satisfy its kind annotation
+         value mod global with a,
+       because u is not mod global aliased forkable unyielding.
 |}]
 
 module F (M : sig type t end) = struct

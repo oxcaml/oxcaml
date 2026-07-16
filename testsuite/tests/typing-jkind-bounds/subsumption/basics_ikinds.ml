@@ -125,11 +125,9 @@ type ('a, 'b) u : immutable_data with 'a with 'b
 Line 2, characters 0-53:
 2 | type ('a, 'b) t : immutable_data with 'a = ('a, 'b) u
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "('a, 'b) u" is immutable_data with 'a with 'b
-         because of the definition of u at line 1, characters 0-48.
-       But the kind of type "('a, 'b) u" must be a subkind of
-           immutable_data with 'a
-         because of the definition of t at line 2, characters 0-53.
+Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+       because 'b is not mod many contended portable forkable unyielding
+                 stateless immutable.
 |}]
 
 type ('a, 'b) t : immutable_data with 'a with 'b
@@ -586,11 +584,23 @@ type r
 Line 3, characters 0-62:
 3 | type should_fail_too : immutable_data with r = [`A of int ref]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[ `A of int ref ]" is mutable_data
-         because it's a polymorphic variant type.
-       But the kind of type "[ `A of int ref ]" must be a subkind of
-           immutable_data with r
-         because of the definition of should_fail_too at line 3, characters 0-62.
+Error: This type definition does not satisfy its kind annotation immutable_data with r,
+       because int ref is not mod contended immutable.
+|}]
+
+module M : sig
+  type r
+  type t : immutable_data with r = int ref
+end = struct
+  type r = int
+  type t = int ref
+end
+[%%expect{|
+Line 3, characters 2-42:
+3 |   type t : immutable_data with r = int ref
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation immutable_data with r,
+       because int ref is not mod contended immutable.
 |}]
 
 type should_likewise_fail : immutable_data = (int ref * (int -> int))
