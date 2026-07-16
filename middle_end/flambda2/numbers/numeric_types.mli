@@ -39,11 +39,7 @@ module Int8 : sig
 
   val of_int_exn : int -> t
 
-  val unsigned_of_int_exn : int -> t
-
   val of_int64_exn : Int64.t -> t
-
-  val unsigned_of_int64_exn : Int64.t -> t
 
   val to_int : t -> int
 
@@ -67,11 +63,7 @@ module Int16 : sig
 
   val of_int_exn : int -> t
 
-  val unsigned_of_int_exn : int -> t
-
   val of_int64_exn : Int64.t -> t
-
-  val unsigned_of_int64_exn : Int64.t -> t
 
   val to_int : t -> int
 
