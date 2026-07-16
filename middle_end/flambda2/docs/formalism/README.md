@@ -265,8 +265,15 @@ When code under `middle_end/flambda2/` changes:
 3. Re-run any validation case studies listed under `VERIFIED` for affected
    rules; update `14-validation/` and the index.
 4. Regenerate `rule-index.md` (and refresh the counts in this README's "Status
-   & validation" section) by building the Dune alias, from the repository
-   root:
+   & validation" section) from the repository root, most conveniently via the
+   Makefile target (which also generates the `duneconf/` workspace files the
+   alias needs):
+
+   ```
+   make regen-flambda2-formalism-rule-index
+   ```
+
+   or by building the Dune alias directly:
 
    ```
    dune build --root=. --workspace=duneconf/main.ws \

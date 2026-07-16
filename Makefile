@@ -230,6 +230,11 @@ regen-flambda2-test-dune-rules: $(dune_config_targets)
 	$(dune) build $(ws_boot) @middle_end/flambda2/tests/regen-dune-rules --auto-promote || true
 	$(dune) build $(ws_boot) @middle_end/flambda2/tests/regen-dune-rules
 
+.PHONY: regen-flambda2-formalism-rule-index
+regen-flambda2-formalism-rule-index: $(dune_config_targets)
+	$(dune) build $(ws_boot) @middle_end/flambda2/docs/formalism/regen-rule-index --auto-promote || true
+	$(dune) build $(ws_boot) @middle_end/flambda2/docs/formalism/regen-rule-index
+
 ## Build upstream compiler.
 .PHONY: build_upstream
 build_upstream: ocaml/config.status

@@ -36,6 +36,12 @@ This file is generated. Do not edit it by hand — from the repository root,
 run:
 
 ```
+make regen-flambda2-formalism-rule-index
+```
+
+or build the Dune alias directly:
+
+```
 dune build --root=. --workspace=duneconf/main.ws \
   @middle_end/flambda2/docs/formalism/regen-rule-index --auto-promote
 ```

@@ -25,7 +25,11 @@
 # Python 3 stdlib only. Runnable from any cwd: paths are resolved relative to
 # this script's own location.
 #
-# Usage (canonical, via the Dune alias — regenerates, checks, and promotes the
+# Usage (canonical, via the Makefile target — also generates the duneconf/
+# workspace files the alias needs):
+#   make regen-flambda2-formalism-rule-index
+#
+# or via the Dune alias directly (regenerates, checks, and promotes the
 # results into the tree in one step):
 #   dune build --root=. --workspace=duneconf/main.ws \
 #     @middle_end/flambda2/docs/formalism/regen-rule-index --auto-promote
@@ -230,6 +234,12 @@ def render_index(rules, duplicates, no_anchor, missing_file, missing_name):
     A("")
     A("This file is generated. Do not edit it by hand — from the repository root,")
     A("run:")
+    A("")
+    A("```")
+    A("make regen-flambda2-formalism-rule-index")
+    A("```")
+    A("")
+    A("or build the Dune alias directly:")
     A("")
     A("```")
     A("dune build --root=. --workspace=duneconf/main.ws \\")
