@@ -68,8 +68,7 @@ let param_is_partial_gadt_match fp =
       | Partial -> pat_contains_gadt pat)
   | Tparam_optional_default (pat, _, _) ->
       (* The caller can omit an optional argument, so its pattern is
-         effectively partial even when it covers the payload: the omitted
-         case carries no GADT evidence. *)
+         effectively partial *)
       pat_contains_gadt pat
 
 let cases_are_partial_gadt_match cases (partial : partial) =
@@ -93,11 +92,6 @@ let join_layout_of_cases sort cases =
              first_layout rest)
       else Some first_layout
 
-(* The layout of a parameter whose pattern type may be narrowed by GADT
-   equations the caller need not satisfy is instead read from the function's
-   own type in the function's own environment: the contract the caller sees,
-   which contains no equations from the parameters' patterns.
-   [split_fun_ty] peels one parameter's type off that type. *)
 let split_fun_ty fun_ty =
   match fun_ty with
   | None -> (None, None)
@@ -1840,10 +1834,9 @@ and transl_tupled_function
         let value_kinds =
           if cases_are_partial_gadt_match cases partial
           then
-            (* The tuple shape comes from the function's type, but the
-               components' kinds may not use the patterns' GADT equations:
-               the caller can still pass a missing constructor. Read the
-               kinds from the function's own type instead. *)
+            (* Under a partial GADT match, we can't rely on the pattern's
+               types as the caller can still pass a missing constructor, so we
+               compute kinds from the function's own type instead. *)
             let fun_arg_ty, _ = split_fun_ty fun_ty in
             (match
                tuple_value_kinds (layout_of_fun_arg_ty fun_arg_ty loc arg_sort)
