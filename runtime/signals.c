@@ -791,14 +791,8 @@ void caml_terminate_signals(void)
 #endif
 }
 
-/* Installation of a signal handler (as per [Sys.signal]).
-
-   There are no OS signals on bare metal, so the installer is not
-   defined there: a program using [Sys.signal] fails at link time.  (An
-   application can still inject signals from its own interrupt handlers
-   via [caml_record_signal] and provide its own installer if wanted.) */
 #ifndef CAML_BARE_METAL
-
+/* Installation of a signal handler (as per [Sys.signal]). */
 static void handle_signal(int signal_number)
 {
   int saved_errno;

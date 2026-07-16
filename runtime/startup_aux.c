@@ -296,8 +296,6 @@ CAMLexport void caml_shutdown(void)
   call_registered_value("Pervasives.do_at_exit");
   call_registered_value("Thread.at_shutdown");
 #ifdef MULTIDOMAIN
-  /* A single-domain runtime cannot have spawned other domains, so
-     domain 0 is necessarily alone at shutdown. */
   if (!caml_domain_alone()) {
     caml_gc_log("Some domains have not been joined prior to shutdown");
     caml_stop_all_domains();

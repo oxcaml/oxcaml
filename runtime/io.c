@@ -56,10 +56,6 @@
 #define lseek _lseeki64
 #endif
 
-/* The channel primitives in this file are retained by [Stdlib] (always
-   linked), so they must exist even on bare metal.  Only the standard
-   descriptors exist there (routed to the UART by caml_read_fd /
-   caml_write_fd in unix.c); close and seek fail honestly. */
 #ifdef CAML_BARE_METAL
 static int caml_bare_close(int fd)
 {
@@ -1142,8 +1138,6 @@ CAMLprim value caml_ml_input_scan_line(value vchannel)
   CAMLreturn (Val_long(res));
 }
 
-/* Only used by the compiler's own Terminfo module; not defined on bare
-   metal (no terminals). */
 #ifndef CAML_BARE_METAL
 CAMLprim value caml_terminfo_rows(value vchannel)
 {
