@@ -155,6 +155,7 @@ module Flambda2 : sig
     val reaper_unbox : bool
     val reaper_max_unbox_size : int
     val reaper_change_calling_conventions : bool
+    val support_lto : bool
     val unicode : bool
     val kind_checks : bool
     val match_in_match : bool
@@ -178,6 +179,7 @@ module Flambda2 : sig
     reaper_unbox : bool;
     reaper_max_unbox_size : int;
     reaper_change_calling_conventions : bool;
+    support_lto : bool;
     unicode : bool;
     kind_checks : bool;
     match_in_match : bool;
@@ -200,6 +202,7 @@ module Flambda2 : sig
   val reaper_unbox : bool or_default ref
   val reaper_max_unbox_size : int or_default ref
   val reaper_change_calling_conventions : bool or_default ref
+  val support_lto : bool or_default ref
   val unicode : bool or_default ref
   val kind_checks : bool or_default ref
   val match_in_match : bool or_default ref

@@ -192,6 +192,7 @@ module Flambda2 = struct
     let reaper_unbox = true
     let reaper_max_unbox_size = 10
     let reaper_change_calling_conventions = true
+    let support_lto = false
     let unicode = true
     let kind_checks = false
     let match_in_match = false
@@ -212,6 +213,7 @@ module Flambda2 = struct
     reaper_unbox : bool;
     reaper_max_unbox_size : int;
     reaper_change_calling_conventions : bool;
+    support_lto : bool;
     unicode : bool;
     kind_checks : bool;
     match_in_match : bool;
@@ -233,6 +235,7 @@ module Flambda2 = struct
     reaper_max_unbox_size = Default.reaper_max_unbox_size;
     reaper_change_calling_conventions =
       Default.reaper_change_calling_conventions;
+    support_lto = Default.support_lto;
     unicode = Default.unicode;
     kind_checks = Default.kind_checks;
     match_in_match = Default.match_in_match;
@@ -282,6 +285,7 @@ module Flambda2 = struct
   let reaper_unbox = ref Default
   let reaper_max_unbox_size = ref Default
   let reaper_change_calling_conventions = ref Default
+  let support_lto = ref Default
   let match_in_match = ref Default
 
   module Dump = struct
