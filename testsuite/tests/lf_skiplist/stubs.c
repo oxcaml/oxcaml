@@ -155,8 +155,11 @@ CAMLprim value barrier_await(value v_barrier_waiters, value v_barrier_passed, va
    intention is that this is run in parallel and the goal is to try to provoke bad
    interleavings.  The range must not be "trivial", i.e. operations should access
    multiple different nodes close to each other. */
-CAMLprim value hammer_skiplist_randomly_in_range(value v_barrier_waiters, value v_barrier_passed, value v_n_domains) {
-  CAMLparam3(v_barrier_waiters, v_barrier_passed, v_n_domains);
+CAMLprim value hammer_skiplist_randomly_in_range(value v_barrier_waiters,
+                                                 value v_barrier_passed,
+                                                 value v_counter,
+                                                 value v_n_domains) {
+  CAMLparam4(v_barrier_waiters, v_barrier_passed, v_counter, v_n_domains);
 
   const int range_mask = 15;
 
@@ -170,7 +173,8 @@ CAMLprim value hammer_skiplist_randomly_in_range(value v_barrier_waiters, value 
       if (remove) {
         caml_lf_skiplist_remove(&the_list, key);
       } else {
-        caml_lf_skiplist_insert(&the_list, key, key);
+        uintnat val = (uintnat)Long_val(caml_atomic_fetch_add(v_counter, Val_long(1)));
+        caml_lf_skiplist_insert(&the_list, key, val);
       }
     }
 
