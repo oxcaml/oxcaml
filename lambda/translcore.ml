@@ -1794,26 +1794,16 @@ and transl_tupled_function
               Some kinds
           | _ -> None
         in
-        let value_kinds_of_case { c_lhs; _ } =
-          match tuple_value_kinds (layout_pat arg_sort c_lhs) with
+        let value_kinds =
+          match
+            Option.bind (join_layout_of_cases arg_sort cases)
+              tuple_value_kinds
+          with
           | Some kinds -> kinds
           | None ->
               Misc.fatal_error
                 "Translcore.transl_tupled_function: \
                  Argument should be a tuple, but couldn't get the kinds"
-        in
-        let value_kinds =
-          let first_kinds = value_kinds_of_case first_case in
-          (* Only a GADT match makes the cases' types differ; otherwise
-             the first case's value kinds are already the join. *)
-          if cases_contain_gadt cases
-          then
-            List.fold_left
-              (fun acc case ->
-                List.map2 Lambda.join_value_kind acc
-                  (value_kinds_of_case case))
-              first_kinds rest_cases
-          else first_kinds
         in
         let kinds = List.map (fun vk -> Pvalue vk) value_kinds in
         let tparams =
