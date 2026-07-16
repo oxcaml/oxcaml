@@ -15,29 +15,28 @@
 
 (* Command-line parameters *)
 
-module Int_arg_helper = Arg_helper.Make (struct
-  module Key = struct
+(* Stripped down version of Numbers, as its dependencies are a lot of code *)
+module Numbers = struct
+  module Int = struct
     type t = int
-    let of_string = int_of_string
     module Map = Map.Make(Stdlib.Int)
-  end
-
-  module Value = struct
-    type t = int
     let of_string = int_of_string
   end
-end)
-module Float_arg_helper = Arg_helper.Make (struct
-  module Key = struct
-    type t = int
-    let of_string = int_of_string
-    module Map = Map.Make(Stdlib.Int)
-  end
-
-  module Value = struct
+  module Float = struct
     type t = float
     let of_string = float_of_string
   end
+end
+
+module Int_arg_helper = Arg_helper.Make (struct
+  module Key = Numbers.Int
+
+  module Value = Numbers.Int
+end)
+module Float_arg_helper = Arg_helper.Make (struct
+  module Key = Numbers.Int
+
+  module Value = Numbers.Float
 end)
 
 type open_arg =
