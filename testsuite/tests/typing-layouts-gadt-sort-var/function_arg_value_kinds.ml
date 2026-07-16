@@ -18,9 +18,7 @@ let f : type a. a rep -> a -> int = fun Block (a, _b) -> a
 [%%expect{|
 (let
   (f =
-     (function {nlocal = 0} param[value<int>]
-       param[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
-       : int
+     (function {nlocal = 0} param[value<int>] param : int
        (if param
          (raise (makeblock 0 (getpredef Match_failure!!) [0: "" 1 40]))
          (field_imm 0 param))))
@@ -48,10 +46,7 @@ let h b =
   (h =
      (function {nlocal = 0} b[value<int>] : int
        (catch (if b (exit 9 0 [0: 1 2]) (exit 9 1 0))
-        with (9 param[value<int>] param[value<
-                                         (consts ())
-                                          (non_consts ([0: value<int>,
-                                                        value<int>]))>])
+        with (9 param[value<int>] param)
          (if param
            (raise (makeblock 0 (getpredef Match_failure!!) [0: "" 2 50]))
            (field_imm 0 param)))))
