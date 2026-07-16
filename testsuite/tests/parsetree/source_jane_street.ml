@@ -820,6 +820,16 @@ Error: This value is "local"
          Hint: Use exclave_ to return a local value.
 |}]
 
+(**************)
+(* zero_alloc *)
+
+let f x y = zero_alloc_ (x, y)
+
+[%%expect{|
+val f : 'a -> 'b -> 'a * 'b = <fun>
+|}]
+
+
 type t = { a : int }
 let f a =
   let y = stack_ { a } in

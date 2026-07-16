@@ -1420,6 +1420,10 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
     let l = transl_exp ~scopes layout e in
     if Config.stack_allocation then Lexclave l
     else l
+  | Texp_zero_alloc e ->
+    (* CR dkalinichenko: verify the zero_alloc property of [e] using the
+       backend checker; for now, [zero_alloc_] is erased. *)
+    transl_exp ~scopes layout e
   | Texp_src_pos ->
       let pos = e.exp_loc.loc_start in
       let pos_fname = Clflags.prepend_directory pos.pos_fname in

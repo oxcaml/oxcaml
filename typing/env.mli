@@ -597,6 +597,10 @@ val add_closure_noalloc_lock : t -> t
 
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t
+
+(** Add a lock recording entry into a [zero_alloc_] expression: the allocation
+    axis is unconstrained across this lock in both directions. *)
+val add_zero_alloc_lock : loc:Location.t -> t -> t
 val add_unboxed_lock : t -> t
 val enter_quotation : t -> t
 val enter_splice : loc:Location.t -> t -> t

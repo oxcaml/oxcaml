@@ -864,6 +864,9 @@ and expression i ppf x =
   | Texp_exclave (e) ->
       line i ppf "Texp_exclave";
       expression i ppf e;
+  | Texp_zero_alloc (e) ->
+      line i ppf "Texp_zero_alloc";
+      expression i ppf e;
   | Texp_src_pos ->
       line i ppf "Texp_src_pos"
   | Texp_overwrite (e1, e2) ->

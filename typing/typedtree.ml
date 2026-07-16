@@ -408,6 +408,7 @@ and expression_desc =
   | Texp_probe of { name:string; handler:expression; enabled_at_init:bool; }
   | Texp_probe_is_enabled of { name:string }
   | Texp_exclave of expression
+  | Texp_zero_alloc of expression
   | Texp_src_pos
   | Texp_overwrite of expression * expression
   | Texp_hole of unique_use
@@ -1604,6 +1605,7 @@ let rec fold_antiquote_exp f  acc exp =
   | Texp_probe {handler;_} -> fold_antiquote_exp f acc handler
   | Texp_probe_is_enabled _ -> acc
   | Texp_exclave exp -> fold_antiquote_exp f acc exp
+  | Texp_zero_alloc exp -> fold_antiquote_exp f acc exp
   | Texp_src_pos -> acc
   | Texp_overwrite (exp1, exp2) ->
       let acc = fold_antiquote_exp f acc exp1 in

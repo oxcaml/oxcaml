@@ -264,7 +264,7 @@ let iter_on_occurrences
       | Texp_letmodule _ | Texp_letexception _ | Texp_assert _ | Texp_lazy _
       | Texp_object _ | Texp_pack _ | Texp_letop _ | Texp_unreachable
       | Texp_list_comprehension _ | Texp_array_comprehension _ | Texp_probe _
-      | Texp_probe_is_enabled _ | Texp_exclave _
+      | Texp_probe_is_enabled _ | Texp_exclave _ | Texp_zero_alloc _
       (* CR-someday let_mutable: maybe iterate on mutvar? *)
       | Texp_mutvar _ | Texp_setmutvar _
       | Texp_open _ | Texp_src_pos | Texp_overwrite _

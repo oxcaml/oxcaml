@@ -171,7 +171,8 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_letmodule (None, _, _, _, e)
     | Texp_sequence (_, _, e)
     | Texp_letexception (_, e)
-    | Texp_exclave e ->
+    | Texp_exclave e
+    | Texp_zero_alloc e ->
         classify_expression env e
 
     | Texp_construct (_, {cstr_repr = Variant_unboxed}, _, [_, e], _) ->
@@ -1094,6 +1095,7 @@ let rec expression : Typedtree.expression -> term_judg =
       expression handler << Dereference
     | Texp_probe_is_enabled _ -> empty
     | Texp_exclave e -> expression e
+    | Texp_zero_alloc e -> expression e
     | Texp_src_pos -> empty
     | Texp_overwrite (exp1, exp2) ->
       (* This is untested, since we currently mark Texp_overwrite as Dynamic and

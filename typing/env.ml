@@ -180,6 +180,7 @@ type lock =
   | Closure_noalloc_lock
   | Region_lock
   | Exclave_lock
+  | Zero_alloc_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
 
 type lock_or_stage =
@@ -3138,6 +3139,8 @@ let add_region_lock env = add_lock Region_lock env
 
 let add_exclave_lock env = add_lock Exclave_lock env
 
+let add_zero_alloc_lock ~loc:_ env = add_lock Zero_alloc_lock env
+
 let add_unboxed_lock env = add_lock Unboxed_lock env
 
 let enter_quotation env =
@@ -3796,22 +3799,54 @@ let unboxed_type ~errors ~env ~loc ty_and_lid =
     [None] when the function is used on modules and classes.
 
     [pp] is the pinpoint used in errors. *)
+(* [locks] is ordered from the definition site (outermost) to the use site
+   (innermost). If there is a [Zero_alloc_lock], returns [Some (outer, inner)]
+   where [outer] is everything up to and including the last such lock, and
+   [inner] is the locks pushed inside the innermost [zero_alloc_] region. *)
+let split_at_last_zero_alloc_lock locks =
+  (* Printf.eprintf "ZA locks: %d\n" (List.length locks); *)
+  let rec go acc = function
+    | [] -> None
+    | (Zero_alloc_lock as l) :: rest -> Some (List.rev (l :: acc), rest)
+    | l :: rest -> go (l :: acc) rest
+  in
+  go [] locks
+
 let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
-  List.fold_left
-    (fun vmode lock ->
-      match lock with
-      | Region_lock -> region_mode vmode
-      | Const_closure_lock (_, closure_context, comonadic) ->
-          const_closure_mode pp vmode closure_context comonadic
-      | Closure_lock (closure_context, comonadic) ->
-          closure_mode pp vmode closure_context comonadic
-      | Closure_noalloc_lock -> closure_noalloc_mode pp vmode
-      | Exclave_lock ->
-          exclave_mode ~errors ~env ~pp vmode
-      | Unboxed_lock ->
-          unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
-          vmode
-    ) mode locks
+  let walk_one vmode lock =
+    match lock with
+    | Region_lock -> region_mode vmode
+    | Const_closure_lock (_, closure_context, comonadic) ->
+        const_closure_mode pp vmode closure_context comonadic
+    | Closure_lock (closure_context, comonadic) ->
+        closure_mode pp vmode closure_context comonadic
+    | Closure_noalloc_lock -> closure_noalloc_mode pp vmode
+    | Exclave_lock ->
+        exclave_mode ~errors ~env ~pp vmode
+    | Zero_alloc_lock -> vmode
+    | Unboxed_lock ->
+        unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
+        vmode
+  in
+  match split_at_last_zero_alloc_lock locks with
+  | None -> List.fold_left walk_one mode locks
+  | Some (outer, inner) ->
+      (* Mask the allocation axis while walking the locks outside the [zero_alloc_] region:
+         the region neither constrains enclosing closures on that axis, nor is
+         constrained by them. The axis is then restored, so that the locks
+         inside the region still apply. *)
+      let masked =
+        Mode.Value.meet_const_with Allocation
+          Mode.Allocation.Const.Noalloc_strict mode
+      in
+      let vmode = List.fold_left walk_one masked outer in
+      let vmode =
+        Mode.Value.join
+          [ vmode;
+            Mode.Value.min_with_comonadic Allocation
+              (Mode.Value.proj_comonadic Allocation mode) ]
+      in
+      List.fold_left walk_one vmode inner
 
 (** Constrains every enclosing closure lock with the given minimum mode. *)
 let walk_locks_with_mode_constraint ~env pp ~mode =
@@ -3876,7 +3911,8 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           to be [local]. If [m0] is [local], that would trigger type error
           elsewhere, so what we return here doesn't matter. *)
           mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
-      | Const_closure_lock (true, _, _) | Closure_noalloc_lock ->
+      | Const_closure_lock (true, _, _) | Closure_noalloc_lock
+      | Zero_alloc_lock ->
           mode
       | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
           may_lookup_error errors loc env

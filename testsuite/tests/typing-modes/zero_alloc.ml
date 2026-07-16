@@ -1,5 +1,5 @@
 (* TEST
- flags+="-extension mode_alpha -extension comprehensions";
+ flags+="-extension mode_alpha -extension comprehensions -extension runtime_metaprogramming";
  expect;
 *)
 
@@ -2143,4 +2143,88 @@ Error: The allocation is "alloc"
        but is expected to be "noalloc_strict"
          because it is used inside the function at line 1, characters 32-50
          which is expected to be "noalloc_strict".
+|}]
+
+
+(** Test 8: the [zero_alloc_] escape hatch. The allocation axis is not
+    checked inside [zero_alloc_ e]; the zero_alloc property of [e] is
+    instead verified by the backend checker. *)
+
+(* An [alloc] value can be returned where [noalloc_strict] is expected. *)
+let za_direct (x : t @ alloc) : _ @ noalloc_strict = zero_alloc_ x
+[%%expect{|
+val za_direct : t -> t @ noalloc_strict = <fun>
+|}]
+
+(* Allocations inside a [noalloc_strict] / [noalloc] closure are allowed. *)
+let (za_alloc_ss @ noalloc_strict) () = zero_alloc_ { x = 1.; y = 2. }
+[%%expect{|
+val za_alloc_ss : unit -> record_t = <fun>
+|}]
+
+let (za_alloc_n @ noalloc) () = zero_alloc_ { x = 1.; y = 2. }
+[%%expect{|
+val za_alloc_n : unit -> record_t = <fun>
+|}]
+
+(* An [alloc] function can be called inside the region. *)
+let alloc_fun () = { x = 1.; y = 2. }
+let (za_call @ noalloc_strict) () = zero_alloc_ (alloc_fun ())
+[%%expect{|
+val alloc_fun : unit -> record_t = <fun>
+val za_call : unit -> record_t = <fun>
+|}]
+
+(* A closure defined inside the region is still checked. *)
+let (za_nested_closure @ noalloc_strict) () =
+  zero_alloc_ (let (g @ noalloc_strict) () = { x = 1.; y = 2. } in g ())
+[%%expect{|
+Line 2, characters 45-63:
+2 |   zero_alloc_ (let (g @ noalloc_strict) () = { x = 1.; y = 2. } in g ())
+                                                 ^^^^^^^^^^^^^^^^^^
+Error: The allocation is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 2, characters 40-63
+         which is expected to be "noalloc_strict".
+|}]
+
+(* The keyword binds loosely: the whole sequence to its right is inside
+   the region. *)
+let (za_seq @ noalloc_strict) (r : int ref) =
+  zero_alloc_ (incr r; { x = 1.; y = 2. })
+[%%expect{|
+val za_seq : int ref -> record_t = <fun>
+|}]
+
+(* [zero_alloc_] is a no-op in a context that already allows allocation. *)
+let za_noop () = zero_alloc_ { x = 1.; y = 2. }
+[%%expect{|
+val za_noop : unit -> record_t = <fun>
+|}]
+
+(* Nested regions. *)
+let (za_nested @ noalloc_strict) () =
+  zero_alloc_ (zero_alloc_ { x = 1.; y = 2. })
+[%%expect{|
+val za_nested : unit -> record_t = <fun>
+|}]
+
+(* [zero_alloc_] is transparent for type inference. *)
+let za_infer = zero_alloc_ (ref [])
+let () = za_infer := [1]
+let za_contents = !za_infer
+[%%expect{|
+val za_infer : 'a list ref = {contents = []}
+val za_contents : 'a list = [<poly>]
+|}]
+
+(* [zero_alloc_] under quotation. *)
+
+#syntax quotations on
+
+let za_quoted = <[ fun () -> zero_alloc_ (1, 2) ]>
+[%%expect{|
+>> Fatal error: Translquote [at Line 1, characters 29-47]: Texp_zero_alloc
+Uncaught exception: Misc.Fatal_error
+
 |}]

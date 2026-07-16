@@ -552,6 +552,9 @@ and expression_desc =
   | Pexp_extension of extension  (** [[%id]] *)
   | Pexp_unreachable  (** [.] *)
   | Pexp_stack of expression (** stack_ exp *)
+  | Pexp_zero_alloc of expression
+      (** [zero_alloc_ exp]: the allocation axis of [exp] is not checked;
+          the zero_alloc property is verified by the backend instead. *)
   | Pexp_comprehension of comprehension_expression
     (** [[? BODY ...CLAUSES... ?]], where:
           - [?] is either [""] (list), [:] (immutable array), or [|] (array).

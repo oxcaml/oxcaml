@@ -662,6 +662,18 @@ let mode_strictly_stack expected_mode =
     with strictly_stack = true
   }
 
+(** Take the expected mode of [zero_alloc_ exp], return the expected mode of
+    [exp]. The allocation axis is relaxed, since the zero_alloc property is
+    verified by the backend instead. *)
+let mode_zero_alloc expected_mode =
+  let crossing =
+    Crossing.create ~linearity:false ~portability:false
+      ~regionality:false ~uniqueness:false ~contention:false
+      ~statefulness:true ~visibility:false ~forkable:false ~yielding:false
+      ~staticity:false ~allocation:true
+  in
+  mode_morph (Crossing.apply_right crossing) expected_mode
+
 let is_not_alloc_mode expected_mode =
   let ceil =
     Allocation.Guts.get_loose_ceil
@@ -5275,6 +5287,8 @@ let rec is_nonexpansive exp =
   | Texp_extension_constructor _ ->
     false
   | Texp_exclave e -> is_nonexpansive e
+  (* A zero-alloc expression cannot create fresh mutable state: *)
+  | Texp_zero_alloc _ -> true
   (* The underlying mutation of exp1 can not be observed since we have the only reference
      to it. In fact, a completely valid model for Texp_overwrite would be to ignore exp1
      and just allocate a new cell for exp2: *)
@@ -5431,6 +5445,7 @@ let rec maybe_computation exp =
   | Texp_probe _
   | Texp_probe_is_enabled _
   | Texp_exclave _
+  | Texp_zero_alloc _
   | Texp_src_pos
   | Texp_overwrite _
   | Texp_antiquotation _
@@ -5847,7 +5862,7 @@ let check_partial_application ~statement exp =
             | Texp_construct _ | Texp_variant _ | Texp_record _
             | Texp_atomic_loc _
             | Texp_record_unboxed_product _ | Texp_unboxed_field _
-            | Texp_overwrite _ | Texp_hole _
+            | Texp_overwrite _ | Texp_hole _ | Texp_zero_alloc _
             | Texp_field _ | Texp_setfield _ | Texp_array _ | Texp_idx _
             | Texp_list_comprehension _ | Texp_array_comprehension _
             | Texp_while _ | Texp_for _ | Texp_instvar _
@@ -8563,6 +8578,22 @@ and type_expect_
            exp_type = instance ty_expected;
            exp_attributes = sexp.pexp_attributes;
            exp_env = env }
+  | Pexp_zero_alloc sbody ->
+      Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
+      (* [zero_alloc_ e] must be in the tail position of its region; the
+         allocation axis of [e] is unconstrained and its zero_alloc property
+         is verified by the backend checker instead. *)
+      let body_mode = mode_zero_alloc expected_mode in
+      let new_env = Env.add_zero_alloc_lock ~loc env in
+      let body =
+        type_expect ~recarg new_env body_mode sbody ty_expected_explained
+      in
+      { exp_desc = Texp_zero_alloc body;
+        exp_loc = loc;
+        exp_extra = [];
+        exp_type = body.exp_type;
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = env }
   | Pexp_stack e ->
       (* Allocation axis: suppress the axis lock-walk at the registration
           site *)
