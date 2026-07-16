@@ -73,3 +73,61 @@ let n : type a. a rep * a -> int = function
   (apply (field_imm 1 (global Toploop!)) "n" n))
 val n : 'a rep * 'a -> int = <fun>
 |}]
+
+(* Sound: the disagreeing component is a mixed block whose scannable field is
+   [int] (an immediate) in one branch and [string] (a pointer) in the other.
+   Both are scannable, so the join keeps the mixed shape -- including its
+   [float#] flat suffix -- and widens only that scannable slot. *)
+type im = { vi : int; d : float# }
+type sm = { vs : string; e : float# }
+type _ rep2 = RI : im rep2 | RS : sm rep2
+
+let mixed : type a. a rep2 * a -> int = function
+  | RI, x -> x.vi
+  | RS, x -> String.length x.vs
+[%%expect{|
+0
+type im = { vi : int; d : float#; }
+0
+type sm = { vs : string; e : float#; }
+0
+type _ rep2 = RI : im rep2 | RS : sm rep2
+(let
+  (mixed =
+     (function {nlocal = 0}
+       param[value<(consts ()) (non_consts ([0: value<int>, *]))>] : int
+       (if (field_imm 0 param)
+         (string.length (mixedfield 0  (*,float64) (field_imm 1 param)))
+         (mixedfield 0  (value<int>,float64) (field_imm 1 param)))))
+  (apply (field_imm 1 (global Toploop!)) "mixed" mixed))
+val mixed : 'a rep2 * 'a -> int = <fun>
+|}]
+
+(* Sound: two mixed blocks whose flat suffixes disagree ([float#] versus
+   [float32#]) cannot be joined -- their representations differ -- so the
+   whole component widens to a generic value even though the scannable
+   prefixes agree. *)
+type fa = { fx : int; fd : float# }
+type fb = { gx : int; ge : float32# }
+type _ rep3 = RF : fa rep3 | RG : fb rep3
+
+let mixed_flat : type a. a rep3 * a -> int = function
+  | RF, x -> x.fx
+  | RG, x -> x.gx
+[%%expect{|
+0
+type fa = { fx : int; fd : float#; }
+0
+type fb = { gx : int; ge : float32#; }
+0
+type _ rep3 = RF : fa rep3 | RG : fb rep3
+(let
+  (mixed_flat =
+     (function {nlocal = 0}
+       param[value<(consts ()) (non_consts ([0: value<int>, *]))>] : int
+       (if (field_imm 0 param)
+         (mixedfield 0  (value<int>,float32) (field_imm 1 param))
+         (mixedfield 0  (value<int>,float64) (field_imm 1 param)))))
+  (apply (field_imm 1 (global Toploop!)) "mixed_flat" mixed_flat))
+val mixed_flat : 'a rep3 * 'a -> int = <fun>
+|}]
