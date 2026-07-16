@@ -769,4 +769,8 @@ let print ppf t = Print.run ppf t
 
 let size t = Size.run () t
 
+(* The size of a DWARF expression: the sum of the sizes of its operators. *)
+let size_of_expression ops =
+  List.fold_left (fun acc op -> I.add acc (size op)) (I.zero ()) ops
+
 let emit ~asm_directives t = Emit.run asm_directives t
