@@ -35,7 +35,6 @@
 
 typedef int sync_retcode;
 
-
 /* Mutexes */
 
 Caml_inline int sync_mutex_create(sync_mutex * res)
@@ -198,6 +197,5 @@ Caml_inline int sync_condvar_wait(sync_condvar c, sync_mutex m)
 {
   return custom_condvar_wait(c, m);
 }
-
 
 #endif /* CAML_SYNC_POSIX_H */

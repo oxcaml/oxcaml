@@ -84,33 +84,14 @@ typedef cpuset_t cpu_set_t;
 #include "sync_posix.h"
 
 #ifdef CAML_BARE_METAL
-#define getpid() 0
-
-/* Compiled in caml_bt_is_self and caml_stop_all_domains. */
+/* Compiled in caml_bt_is_self, whose only remaining live use on bare
+   metal is in assertions. */
 #define pthread_self() ((pthread_t)0)
 
 /* Must be 0 ("not equal"): caml_bt_is_self must answer "no, you are not
    the backup thread" -- there is no backup thread.  (A faithful
    comparison would wrongly return "equal", since both sides are 0.) */
 #define pthread_equal(a, b) 0
-
-/* Compiled in stw_terminate_domain; only reachable when tearing down
-   extra domains, which cannot exist on bare metal. */
-#define pthread_cancel(t) (caml_fatal_error("pthread_cancel on bare metal"), 0)
-#define pthread_exit(result) caml_fatal_error("pthread_exit on bare metal")
-
-/* Bare-metal replacements for the tick thread (masked out below): with
-   no OS threads there is nothing to start, and the tick thread "starts"
-   trivially. */
-
-CAMLextern int caml_start_tick_thread(void)
-{
-  return 0;
-}
-
-CAMLextern void caml_stop_tick_thread(void)
-{
-}
 #endif
 
 #ifndef MULTIDOMAIN
@@ -581,11 +562,15 @@ static void free_minor_heap(void) {
 
   /* free old minor heap.
      instead of unmapping the heap, we decommit it, so there's
-     no race whereby other code could attempt to reuse the memory. */
+     no race whereby other code could attempt to reuse the memory.
+     On bare metal the reservation is real (malloc-backed) memory with
+     no reserve-vs-commit distinction, so there is nothing to do. */
+#ifndef CAML_BARE_METAL
   caml_mem_decommit(
       (void*)domain_self->minor_heap_area_start,
       Bsize_wsize(domain_state->minor_heap_wsz),
       "minor reservation");
+#endif
 
   domain_state->young_start   = NULL;
   domain_state->young_end     = NULL;
@@ -609,12 +594,15 @@ static int allocate_minor_heap(asize_t wsize) {
                   "Allocating minor heap: %"
                   ARCH_SIZET_PRINTF_FORMAT "uk words\n", wsize / 1024);
 
+#ifndef CAML_BARE_METAL
+  /* On bare metal the reservation is already committed (see above). */
   char name[32];
   snprintf(name, sizeof name, "minor heap %d", domain_self->id);
   if (!caml_mem_commit(
           (void*)domain_self->minor_heap_area_start, Bsize_wsize(wsize), name)) {
     return -1;
   }
+#endif
 
 #ifdef DEBUG
   {
@@ -2564,6 +2552,12 @@ CAMLextern int caml_start_tick_thread(void)
 CAMLprim value caml_enable_tick_thread(value v_enable)
 {
   bool enable = Long_val(v_enable) ? 1 : 0;
+
+#ifdef CAML_BARE_METAL
+  /* No tick thread on bare metal: the request is recorded but no ticks
+     will ever be delivered. */
+  atomic_store_release(&tick_thread.enabled, enable);
+#else
   bool was_enabled = atomic_exchange_explicit(&tick_thread.enabled, enable,
                                               memory_order_acq_rel);
 
@@ -2573,6 +2567,7 @@ CAMLprim value caml_enable_tick_thread(value v_enable)
   } else {
     caml_stop_tick_thread();
   }
+#endif
 
   return Val_unit;
 }
@@ -2883,7 +2878,11 @@ void caml_domain_terminate(bool last)
    This is only invoked when extra domains are left running while the
    main one is terminating. In this case, we are not in a state where
    we can safely release resources. The best we can do is cancel the
-   extra running threads. */
+   extra running threads.
+   Extra domains cannot exist in a single-domain runtime, so this is
+   only compiled under MULTIDOMAIN (the caller in startup_aux.c is
+   guarded accordingly). */
+#ifdef MULTIDOMAIN
 static void stw_terminate_domain(caml_domain_state *domain, void *data,
   int participating_count,
   caml_domain_state **participating)
@@ -2926,6 +2925,7 @@ void caml_stop_all_domains(void)
 
   caml_plat_assert_all_locks_unlocked();
 }
+#endif /* MULTIDOMAIN */
 
 bool caml_free_domains(void)
 {

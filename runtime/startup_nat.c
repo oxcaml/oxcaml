@@ -138,23 +138,20 @@ value caml_startup_common(char_os **argv, int pooling)
 #ifdef _WIN32
   caml_win32_overflow_detection();
 #endif
-
   caml_debugger_init (); /* force debugger.o stub to be linked */
-
 #ifdef CAML_BARE_METAL
   caml_sys_init("", argv);
 #else
   const char_os * exe_name, * proc_self_exe;
   exe_name = argv[0];
   if (exe_name == NULL) exe_name = T("");
-    proc_self_exe = caml_executable_name();
+  proc_self_exe = caml_executable_name();
   if (proc_self_exe != NULL)
     exe_name = proc_self_exe;
   else
     exe_name = caml_search_exe_in_path(exe_name);
   caml_sys_init(exe_name, argv);
 #endif
-
   caml_maybe_expand_stack();
   res = caml_start_program(Caml_state);
   /* ignore distinction between async and normal,
