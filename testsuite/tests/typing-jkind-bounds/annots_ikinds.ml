@@ -1119,10 +1119,8 @@ type t : value mod global = { x : int}
 Line 1, characters 0-38:
 1 | type t : value mod global = { x : int}
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod global
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod global,
+       because this record type is not mod global aliased.
 |}]
 
 type t : any mod portable = { x : float }
@@ -1156,10 +1154,10 @@ type t : value mod global = { x : t_value }
 Line 1, characters 0-43:
 1 | type t : value mod global = { x : t_value }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with t_value
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod global
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod global,
+       because
+       - this record type is not mod global aliased
+       - t_value is not mod global aliased forkable unyielding
 |}]
 
 type t : value mod aliased = { x : t_value }
@@ -1167,10 +1165,10 @@ type t : value mod aliased = { x : t_value }
 Line 1, characters 0-44:
 1 | type t : value mod aliased = { x : t_value }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with t_value
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod aliased
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod aliased,
+       because
+       - this record type is not mod aliased
+       - t_value is not mod aliased
 |}]
 
 type t : value mod many = { x : t_value }
@@ -1178,10 +1176,8 @@ type t : value mod many = { x : t_value }
 Line 1, characters 0-41:
 1 | type t : value mod many = { x : t_value }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with t_value
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod many
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod many,
+       because t_value is not mod many.
 |}]
 
 type t : value mod portable = { x : t_value }
@@ -1189,10 +1185,8 @@ type t : value mod portable = { x : t_value }
 Line 1, characters 0-45:
 1 | type t : value mod portable = { x : t_value }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with t_value
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod portable
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod portable,
+       because t_value is not mod portable.
 |}]
 
 type t : value mod contended = { x : t_value }
@@ -1200,10 +1194,44 @@ type t : value mod contended = { x : t_value }
 Line 1, characters 0-46:
 1 | type t : value mod contended = { x : t_value }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with t_value
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod contended
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod contended,
+       because t_value is not mod contended.
+|}]
+
+type t : value mod shareable = { x : t_value }
+[%%expect {|
+Line 1, characters 0-46:
+1 | type t : value mod shareable = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation value mod shareable,
+       because t_value is not mod shareable.
+|}]
+
+type t : value mod shared = { x : t_value }
+[%%expect {|
+Line 1, characters 0-43:
+1 | type t : value mod shared = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation value mod shared,
+       because t_value is not mod shared.
+|}]
+
+type t : value mod reading = { x : t_value }
+[%%expect {|
+Line 1, characters 0-44:
+1 | type t : value mod reading = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation value mod reading,
+       because t_value is not mod shareable reading.
+|}]
+
+type t : value mod read = { x : t_value }
+[%%expect {|
+Line 1, characters 0-41:
+1 | type t : value mod read = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation value mod read,
+       because t_value is not mod shared read.
 |}]
 
 type t : value mod external_ = { x : t_value }
@@ -1211,10 +1239,10 @@ type t : value mod external_ = { x : t_value }
 Line 1, characters 0-46:
 1 | type t : value mod external_ = { x : t_value }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with t_value
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod external_
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod external_,
+       because
+       - this record type is not mod external_
+       - t_value is not mod external_
 |}]
 
 (***************************************)
@@ -1237,10 +1265,8 @@ type t : value mod global = Foo of int
 Line 1, characters 0-38:
 1 | type t : value mod global = Foo of int
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of value mod global
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod global,
+       because this variant type is not mod global aliased.
 |}]
 
 type t : any mod portable = Foo of float
@@ -1295,10 +1321,10 @@ type t : value mod global = Foo of t_value
 Line 1, characters 0-42:
 1 | type t : value mod global = Foo of t_value
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with t_value
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of value mod global
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod global,
+       because
+       - this variant type is not mod global aliased
+       - t_value is not mod global aliased forkable unyielding
 |}]
 
 type t : value mod aliased = Foo of t_value
@@ -1306,10 +1332,10 @@ type t : value mod aliased = Foo of t_value
 Line 1, characters 0-43:
 1 | type t : value mod aliased = Foo of t_value
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with t_value
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of value mod aliased
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod aliased,
+       because
+       - this variant type is not mod aliased
+       - t_value is not mod aliased
 |}]
 
 type t : value mod many = Foo of t_value
@@ -1317,10 +1343,8 @@ type t : value mod many = Foo of t_value
 Line 1, characters 0-40:
 1 | type t : value mod many = Foo of t_value
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with t_value
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of value mod many
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod many,
+       because t_value is not mod many.
 |}]
 
 type t : value mod portable = Foo of t_value
@@ -1328,10 +1352,8 @@ type t : value mod portable = Foo of t_value
 Line 1, characters 0-44:
 1 | type t : value mod portable = Foo of t_value
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with t_value
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of value mod portable
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod portable,
+       because t_value is not mod portable.
 |}]
 
 type t : value mod contended = Foo of t_value
@@ -1339,10 +1361,8 @@ type t : value mod contended = Foo of t_value
 Line 1, characters 0-45:
 1 | type t : value mod contended = Foo of t_value
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with t_value
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of value mod contended
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod contended,
+       because t_value is not mod contended.
 |}]
 
 type t : value mod external_ = Foo of t_value
@@ -1350,10 +1370,10 @@ type t : value mod external_ = Foo of t_value
 Line 1, characters 0-45:
 1 | type t : value mod external_ = Foo of t_value
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with t_value
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of value mod external_
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod external_,
+       because
+       - this variant type is not mod external_
+       - t_value is not mod external_
 |}]
 
 (***************************************)

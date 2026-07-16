@@ -129,8 +129,6 @@ type t
 Line 4, characters 0-65:
 4 | type s : value mod shareable = { v : t @@ shareable } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "s" is value
-         because of the definition of t at line 1, characters 0-6.
-       But the kind of type "s" must be a subkind of value mod shareable
-         because of the annotation on the declaration of the type s.
+Error: This type definition does not satisfy its kind annotation value mod shareable,
+       because t is not mod shareable.
 |}]

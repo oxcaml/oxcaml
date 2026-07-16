@@ -574,10 +574,8 @@ type t : immutable_data = { mutable x : int}
 Line 1, characters 0-44:
 1 | type t : immutable_data = { mutable x : int}
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because mutable field x : int is not mod contended immutable.
 |}]
 
 type ('a : mutable_data) t : immutable_data = { x : 'a }
@@ -585,10 +583,8 @@ type ('a : mutable_data) t : immutable_data = { x : 'a }
 Line 1, characters 0-56:
 1 | type ('a : mutable_data) t : immutable_data = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because 'a is not mod contended immutable.
 |}]
 
 (***************)
@@ -1011,10 +1007,9 @@ type 'a u = Foo of { x : 'a; }
 Line 2, characters 0-53:
 2 | type 'a t : immutable_data = 'a u = Foo of { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because 'a is not mod many contended portable forkable unyielding
+                 stateless immutable.
 |}]
 
 (**********************************)
