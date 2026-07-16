@@ -210,8 +210,8 @@ type t =
       { label : Asm_label.t;
         offset_in_bytes : Targetint.t
       }
-  | DW_op_entry_value_of_register of { reg_number : int }
-  | DW_op_GNU_entry_value_of_register of { reg_number : int }
+  | DW_op_entry_value of { block : t list }
+  | DW_op_GNU_entry_value of { block : t list }
 
 let opcode_name t =
   match t with
@@ -371,8 +371,8 @@ let opcode_name t =
   | DW_op_bit_piece _ -> "DW_op_bit_piece"
   | DW_op_implicit_pointer _ -> "DW_op_implicit_pointer"
   | DW_op_GNU_implicit_pointer _ -> "DW_op_GNU_implicit_pointer"
-  | DW_op_entry_value_of_register _ -> "DW_op_entry_value"
-  | DW_op_GNU_entry_value_of_register _ -> "DW_op_GNU_entry_value"
+  | DW_op_entry_value _ -> "DW_op_entry_value"
+  | DW_op_GNU_entry_value _ -> "DW_op_GNU_entry_value"
 
 (* DWARF-4 spec section 7.7.1. *)
 let opcode = function
@@ -532,12 +532,35 @@ let opcode = function
   | DW_op_bit_piece _ -> 0x9d
   | DW_op_implicit_pointer _ -> 0xa0
   | DW_op_GNU_implicit_pointer _ -> 0xf2
-  | DW_op_entry_value_of_register _ -> 0xa3
-  | DW_op_GNU_entry_value_of_register _ -> 0xf3
+  | DW_op_entry_value _ -> 0xa3
+  | DW_op_GNU_entry_value _ -> 0xf3
 
-let uleb128_size_in_bytes i =
-  let rec loop i acc = if i < 0x80 then acc else loop (i lsr 7) (acc + 1) in
-  loop i 1
+(* The size of an operator that may appear inside the block operand of
+   [DW_op_entry_value] / [DW_op_GNU_entry_value]. Such blocks hold a DWARF
+   expression, but only register location descriptions are currently supported:
+   the size of the block must be known up front in order to construct its
+   ULEB128 length prefix, and computing the size of an arbitrary nested
+   expression would require [size] itself, which is not available inside the
+   generic traversal below. *)
+let entry_value_block_operator_size t =
+  match t with
+  | DW_op_reg0 | DW_op_reg1 | DW_op_reg2 | DW_op_reg3 | DW_op_reg4 | DW_op_reg5
+  | DW_op_reg6 | DW_op_reg7 | DW_op_reg8 | DW_op_reg9 | DW_op_reg10
+  | DW_op_reg11 | DW_op_reg12 | DW_op_reg13 | DW_op_reg14 | DW_op_reg15
+  | DW_op_reg16 | DW_op_reg17 | DW_op_reg18 | DW_op_reg19 | DW_op_reg20
+  | DW_op_reg21 | DW_op_reg22 | DW_op_reg23 | DW_op_reg24 | DW_op_reg25
+  | DW_op_reg26 | DW_op_reg27 | DW_op_reg28 | DW_op_reg29 | DW_op_reg30
+  | DW_op_reg31 ->
+    (* Just the opcode; no operands. *)
+    I.one ()
+  | DW_op_regx { reg_number } ->
+    I.add (I.one ())
+      (V.size (V.uleb128 (Numbers.Uint64.of_nonnegative_int_exn reg_number)))
+  | _ ->
+    Misc.fatal_errorf
+      "Operator not currently supported inside the block of an entry-value \
+       operator: %s"
+      (opcode_name t)
 
 external caml_string_set32 : bytes -> index:int -> Int32.t -> unit
   = "%caml_string_set32"
@@ -559,7 +582,7 @@ module Make (M : sig
   val ( >>> ) : param -> result -> (unit -> result) -> result
 end) =
 struct
-  let run param t =
+  let rec run param t =
     let unit_result = M.unit_result () in
     let opcode = M.opcode param in
     let value = M.value param in
@@ -726,34 +749,21 @@ struct
       let offset_in_bytes = Targetint.to_int64 offset_in_bytes in
       value (V.offset_into_debug_info label) >>> fun () ->
       value (V.sleb128 ~comment:"offset in bytes" offset_in_bytes)
-    | DW_op_entry_value_of_register { reg_number }
-    | DW_op_GNU_entry_value_of_register { reg_number } ->
-      (* The operand is a block holding a DWARF expression, here always a single
-         register location description. *)
-      if reg_number < 0
-      then
-        Misc.fatal_errorf "Negative DWARF register number %d for entry value"
-          reg_number;
-      if reg_number < 32
-      then
-        value
-          (V.uleb128 ~comment:"block length" (Uint64.of_nonnegative_int_exn 1))
-        >>> fun () ->
-        value
-          (V.uint8 ~comment:"DW_op_reg<n>"
-             (Uint8.of_nonnegative_int_exn (0x50 + reg_number)))
-      else
-        let block_length = 1 + uleb128_size_in_bytes reg_number in
-        value
-          (V.uleb128 ~comment:"block length"
-             (Uint64.of_nonnegative_int_exn block_length))
-        >>> fun () ->
-        value
-          (V.uint8 ~comment:"DW_op_regx" (Uint8.of_nonnegative_int_exn 0x90))
-        >>> fun () ->
-        value
-          (V.uleb128 ~comment:"DWARF reg number"
-             (Uint64.of_nonnegative_int_exn reg_number))
+    | DW_op_entry_value { block } | DW_op_GNU_entry_value { block } ->
+      (* The operand is a ULEB128-length-prefixed block holding a DWARF
+         expression, currently always a single register location description
+         (see [entry_value_block_operator_size]). The operators in the block are
+         printed, sized and emitted using the normal machinery, via the
+         recursive calls to [run]. *)
+      let block_size =
+        List.fold_left
+          (fun acc op -> I.add acc (entry_value_block_operator_size op))
+          (I.zero ()) block
+      in
+      List.fold_left
+        (fun acc op -> acc >>> fun () -> run param op)
+        (value (V.uleb128 ~comment:"block length" (I.to_uint64_exn block_size)))
+        block
 end
 
 module Print = Make (struct
