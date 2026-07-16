@@ -15,6 +15,8 @@
 
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
     (unit : Flambda_unit.t) =
+  (* CR mvellacott: Remove this testing code once -support-lto does useful
+     testable things. *)
   if Flambda_features.debug_reaper "confirm-run"
   then Format.eprintf "reaper: running@.";
   let load_code = Flambda_cmx.get_imported_code cmx_loader in

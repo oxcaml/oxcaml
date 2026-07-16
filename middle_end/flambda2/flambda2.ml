@@ -197,36 +197,47 @@ let flambda_to_flambda0 : type m.
         (Flambda_features.dump_fexpr (This_pass "simplify"))
         ppf flambda;
       dump_fexpr_annot ~prefixname "simplify" flambda;
-      let ( (flambda, free_names, all_code, slot_offsets, final_typing_env),
+      let ( flambda,
+            free_names,
+            all_code,
+            slot_offsets,
+            final_typing_env,
             last_pass_name ) =
         if Flambda_features.enable_reaper ()
         then (
-          let reaper_result =
+          let flambda, free_names, all_code, slot_offsets, final_typing_env =
             Profile.record_call ~accumulate:true "reaper" (fun () ->
                 Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
                   ~final_typing_env flambda)
           in
           (* Under -support-lto, run the reaper a second time. On already-reaped
              IR this is expected to be idempotent. *)
-          let reaper_result =
+          let flambda, free_names, all_code, slot_offsets, final_typing_env =
             if Flambda_features.support_lto ()
             then
-              let flambda, _, all_code, _, final_typing_env = reaper_result in
               (* CR mvellacott: do something else with reaper here *)
               Profile.record_call ~accumulate:true "pre_lto_reaper" (fun () ->
                   Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader
                     ~all_code ~final_typing_env flambda)
-            else reaper_result
+            else flambda, free_names, all_code, slot_offsets, final_typing_env
           in
-          let flambda, _, _, _, _ = reaper_result in
           print_flambda "reaper" (Flambda_features.dump_reaper ()) ppf flambda;
           print_fexpr "reaper"
             (Flambda_features.dump_fexpr (This_pass "reaper"))
             ppf flambda;
           dump_fexpr_annot ~prefixname "reaper" flambda;
-          reaper_result, "reaper")
+          ( flambda,
+            free_names,
+            all_code,
+            slot_offsets,
+            final_typing_env,
+            "reaper" ))
         else
-          ( (flambda, free_names, all_code, slot_offsets, final_typing_env),
+          ( flambda,
+            free_names,
+            all_code,
+            slot_offsets,
+            final_typing_env,
             last_pass_name )
       in
       print_flambda last_pass_name
