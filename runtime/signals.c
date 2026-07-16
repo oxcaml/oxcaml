@@ -792,7 +792,8 @@ void caml_terminate_signals(void)
 }
 
 #ifndef CAML_BARE_METAL
-/* Installation of a signal handler (as per [Sys.signal]). */
+/* Installation of a signal handler (as per [Sys.signal]) */
+
 static void handle_signal(int signal_number)
 {
   int saved_errno;

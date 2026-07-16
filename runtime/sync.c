@@ -27,7 +27,7 @@
 #include "caml/runtime_events.h"
 
 #ifndef CAML_BARE_METAL
-/* System-dependent part. */
+/* System-dependent part */
 #include "sync_posix.h"
 #endif
 

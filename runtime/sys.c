@@ -815,7 +815,7 @@ CAMLprim value caml_sys_read_directory(value path)
 }
 
 /* Return true if the value is a filedescriptor (int) that is
- * (presumably) open on an interactive terminal. */
+ * (presumably) open on an interactive terminal */
 CAMLprim value caml_sys_isatty(value chan)
 {
   int fd;

@@ -75,13 +75,6 @@ void caml_plat_fatal_error(const char * action, int err)
 
 #ifdef CAML_BARE_METAL
 
-/* Single core, no threads: mutexes, condition variables and barrier
-   waits are no-ops -- this is the correct single-threaded
-   implementation, and these are called by the runtime core (GC, STW,
-   channels).  Helpers with no bare-metal caller (assertions, futexes,
-   mutex reinit for fork, the non-blocking slow path) are deliberately
-   not defined. */
-
 CAMLexport void caml_plat_mutex_init(caml_plat_mutex * m)
 {
   (void)m;
@@ -537,7 +530,7 @@ void* caml_mem_map(uintnat size, uintnat flags, const char* name)
 
 /* Not compiled on bare metal: there is no reserve-vs-commit
    distinction there (caml_plat_mem_map returns real, malloc-backed
-   memory), and the callers in domain.c are guarded accordingly. */
+   memory). */
 #ifndef CAML_BARE_METAL
 void* caml_mem_commit(void* mem, uintnat size, const char* name)
 {
@@ -573,8 +566,7 @@ void caml_mem_unmap(void* mem, uintnat size)
 }
 
 /* Not compiled on bare metal: mapping names are debugging aids for OS
-   tools (/proc/PID/maps), and the only callers (fiber.c) are DEBUG- and
-   Linux-only. */
+   tools (/proc/PID/maps) */
 #ifndef CAML_BARE_METAL
 void caml_mem_name_map(void* mem, size_t length, const char* format, ...)
 {
