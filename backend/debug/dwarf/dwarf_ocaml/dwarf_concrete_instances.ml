@@ -111,6 +111,13 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
           ~function_symbol:start_sym
           ~function_proto_die:concrete_instance_proto_die available_ranges_vars)
       ~accumulate:true ());
+  if not !Clflags.restrict_to_upstream_dwarf
+  then
+    Profile.record "dwarf_call_sites"
+      (fun () ->
+        Dwarf_call_sites.dwarf state fundecl
+          ~function_proto_die:concrete_instance_proto_die)
+      ~accumulate:true ();
   (* CR mshinwell: When cross-referencing of DIEs across files is necessary we
      need to be careful about symbol table size. let name = Printf.sprintf
      "__concrete_instance_%s" fun_name in Proto_die.set_name
