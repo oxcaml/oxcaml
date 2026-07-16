@@ -555,9 +555,12 @@ module Make (M : sig
   val ( >>> ) : param -> result -> (unit -> result) -> result
 end) =
 struct
-  (* [size_of_expression] is passed as an argument because the [size] function,
-     from which it is built, is itself defined in terms of this traversal (see
-     the bottom of this file). *)
+  (* [size_of_expression] is used for operators that carry expression-block
+     operands (see the forthcoming entry-value operators), whose ULEB128 length
+     prefixes require the byte size of the enclosed expression to be known up
+     front. It is passed as an argument because [size], from which it is built,
+     is itself defined in terms of this traversal (see the bottom of this
+     file). *)
   let rec run ~size_of_expression param t =
     let unit_result = M.unit_result () in
     let opcode = M.opcode param in
