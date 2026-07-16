@@ -1109,16 +1109,18 @@ let mk_add_jkind add_jkind =
 let build_initial_env add_type add_extension add_jkind empty_env =
   let add_jkind = mk_add_jkind add_jkind in
   let add_extension id l =
-    List.iter (fun (_, sort) ->
-        let raise_error () = Misc.fatal_error
-            "sanity check failed: non-value jkind in predef extension \
-              constructor; should this have Constructor_mixed shape?" in
-        match (sort : Jkind_types.Sort.Const.t) with
-        | Base Scannable -> ()
-        | Base (Void | Untagged_immediate | Float32 | Float64 | Word | Bits8 |
-              Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
-        | Univar _ | Genvar _ | Product _ -> raise_error ())
-      l;
+    let rec check_sort (sort : Jkind_types.Sort.Const.t) =
+      match sort with
+      | Addressable sort -> check_sort sort
+      | Base Scannable -> ()
+      | Base (Void | Untagged_immediate | Float32 | Float64 | Word | Bits8 |
+            Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
+      | Univar _ | Genvar _ | Product _ ->
+        Misc.fatal_error
+          "sanity check failed: non-value jkind in predef extension \
+           constructor; should this have Constructor_mixed shape?"
+    in
+    List.iter (fun (_, sort) -> check_sort sort) l;
     add_extension id
       { ext_type_path = path_exn;
         ext_type_params = [];

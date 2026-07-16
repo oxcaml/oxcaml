@@ -437,7 +437,7 @@ let equal_native_repr nr1 nr2 =
     | Unpacked_product _), Repr_poly
     -> false
   | Same_as_ocaml_repr s1, Same_as_ocaml_repr s2 ->
-    Jkind_types.Sort.Const.equal s1 s2
+    Jkind_types.Sort.Const.equal_ignoring_addressability s1 s2
   | Same_as_ocaml_repr _,
     (Unboxed_float _ | Unboxed_or_untagged_integer _ |
      Unboxed_vector _ | Unpacked_product _) -> false
@@ -456,7 +456,7 @@ let equal_native_repr nr1 nr2 =
     (Same_as_ocaml_repr _ | Unboxed_float _ |
      Unboxed_vector _ | Unpacked_product _) -> false
   | Unpacked_product s1, Unpacked_product s2 ->
-    Jkind_types.Sort.Const.equal s1 s2
+    Jkind_types.Sort.Const.equal_ignoring_addressability s1 s2
   | Unpacked_product _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
      Unboxed_vector _ | Unboxed_or_untagged_integer _) -> false
@@ -499,16 +499,19 @@ module Repr_check = struct
 
   let any = fun _ -> []
 
-  let value_or_unboxed_or_untagged = function
+  let rec value_or_unboxed_or_untagged = function
     | Same_as_ocaml_repr (Base Scannable)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _ -> true
+    | Same_as_ocaml_repr (Addressable sort) ->
+      value_or_unboxed_or_untagged (Same_as_ocaml_repr sort)
     | Same_as_ocaml_repr _ | Repr_poly | Unpacked_product _ -> false
 
-  let sort_is_product : Jkind_types.Sort.Const.t -> bool = function
+  let rec sort_is_product : Jkind_types.Sort.Const.t -> bool = function
     | Product _ -> true
     | Base _ -> false
     | Univar _ -> Misc.fatal_error "sort_is_product: univar"
     | Genvar _ -> Misc.fatal_error "sort_is_product: genvar"
+    | Addressable sort -> sort_is_product sort
 
   let c_stub_arg_errors = function
     | Same_as_ocaml_repr s ->
@@ -516,7 +519,7 @@ module Repr_check = struct
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Unpacked_product _ | Repr_poly -> []
 
-  let c_stub_return_errors = function
+  let rec c_stub_return_errors = function
     | Same_as_ocaml_repr (Base _)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Repr_poly -> []
@@ -531,6 +534,8 @@ module Repr_check = struct
       Misc.fatal_error "c_stub_return_errors: univar"
     | Same_as_ocaml_repr (Genvar _) ->
       Misc.fatal_error "c_stub_return_errors: genvar"
+    | Same_as_ocaml_repr (Addressable sort) ->
+      c_stub_return_errors (Same_as_ocaml_repr sort)
 
   (* [checks = [check_arg1; check_arg2; ..; check_argn; check_ret]], where for
      each check, [check (repr : native_repr)] returns a [wrong_repr_error list].

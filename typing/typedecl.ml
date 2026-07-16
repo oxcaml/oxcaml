@@ -1830,7 +1830,7 @@ let update_label_sorts (type rep) env loc types ~(form : rep record_form) =
       let jkind = Ctype.type_jkind env ld_type in
       let sort = Jkind.sort_option_of_jkind env jkind in
       let ld_sort =
-        Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
+        Option.bind sort Jkind.Sort.default_for_transl_and_get_some
       in
       ld_sort, jkind
     ) types
@@ -1867,7 +1867,7 @@ let update_constructor_arguments_sorts env loc cd_args =
           let jkind = Ctype.type_jkind env ca_type in
           let sort = Jkind.sort_option_of_jkind env jkind in
           let ca_sort =
-            Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
+            Option.bind sort Jkind.Sort.default_for_transl_and_get_some
           in
           {arg with ca_sort}, jkind)
         args
@@ -2291,7 +2291,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     in
     let sort = Jkind.sort_option_of_jkind env jkind in
     let ld_sort =
-      Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
+      Option.bind sort Jkind.Sort.default_for_transl_and_get_some
     in
     let rep =
       (* Weirdly, we CAN give the record a representation even if its kind is
@@ -2511,7 +2511,7 @@ let rec update_decl_jkind env dpath decl =
             payload_arg = { ca_type = ty; ca_modalities = modality; _ } } ->
         let jkind = Ctype.type_jkind env ty in
         let sort = Jkind.sort_of_jkind env jkind in
-        let ca_sort = Jkind.Sort.default_to_scannable_and_get_some sort in
+        let ca_sort = Jkind.Sort.default_for_transl_and_get_some sort in
         let cstrs =
           List.map
             (fun (cstr : Types.constructor_declaration) ->
@@ -2552,7 +2552,7 @@ let rec update_decl_jkind env dpath decl =
             let jkind = Ctype.type_jkind env ty in
             let sort = Jkind.sort_option_of_jkind env jkind in
             let ca_sort =
-              Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
+              Option.bind sort Jkind.Sort.default_for_transl_and_get_some
             in
             if Option.is_none sort then assert_any_args_support loc;
             [{ cstr with Types.cd_args =
@@ -2563,7 +2563,7 @@ let rec update_decl_jkind env dpath decl =
             let jkind = Ctype.type_jkind env ld_type in
             let sort = Jkind.sort_option_of_jkind env jkind in
             let ld_sort =
-              Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
+              Option.bind sort Jkind.Sort.default_for_transl_and_get_some
             in
             if Option.is_none sort then assert_any_args_support loc;
             [{ cstr with Types.cd_args =
@@ -3107,48 +3107,50 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
     | Addressable base -> kconstr_path base
     | Layout _ -> None
   in
-  let steps_of kind_path (manifest : Types.jkind_const_desc_lr) =
-    let expand = Expands_to (kind_path, manifest) in
-    (* We check to see if we'd print any mod bounds, in which case we want
-       to use the "a contains b" language rather than "a = b". In the
-       future, we'll have more ways for [Contains] to show up (e.g., product
-       kinds). *)
-    match Typemode.untransl_mod_bounds manifest.mod_bounds with
-    | [] -> [expand]
-    | _ :: _ -> (
-      match kconstr_path manifest.base with
-      | Some base_path -> [Contains (manifest, base_path); expand]
-      | None -> [expand])
-  in
-  let rec follow current acc visited =
-    if Path.same current path then
-      Some (List.rev acc)
-    else if List.exists (Path.same current) visited then
-      (* This case may also be a cycle, but for a different path that will
-         be separately checked. *)
-      None
-    else
-      match (Env.find_jkind current env).jkind_manifest with
-      | Some manifest -> (
-        match kconstr_path manifest.base with
-        | Some next ->
-          follow next (steps_of current manifest @ acc) (current :: visited)
-        | None -> None)
-      | None -> None
-      | exception Not_found -> None
-  in
-  let check manifest kpath =
-    if Path.exists_free recmod_ids kpath
-    then
+  match decl.Types.jkind_manifest with
+  | None -> ()
+  | Some manifest -> (
+    match kconstr_path manifest.base with
+    | None -> ()
+    | Some kpath ->
+      if not (Path.exists_free recmod_ids kpath) then ()
+      else
+        let steps_of kind_path (manifest : Types.jkind_const_desc_lr) =
+          let expand = Expands_to (kind_path, manifest) in
+          (* We check to see if we'd print any mod bounds, in which case we want
+             to use the "a contains b" language rather than "a = b". In the
+             future, we'll have more ways for [Contains] to show up (e.g.,
+             product kinds). *)
+          match Typemode.untransl_mod_bounds manifest.mod_bounds with
+          | [] -> [expand]
+          | _ :: _ -> (
+            match kconstr_path manifest.base with
+            | Some base_path -> [Contains (manifest, base_path); expand]
+            | None -> [expand])
+        in
+        let rec follow current acc visited =
+          if Path.same current path then
+            Some (List.rev acc)
+          else if List.exists (Path.same current) visited then
+            (* This case may also be a cycle, but for a different path that will
+               be separately checked. *)
+            None
+          else
+            match (Env.find_jkind current env).jkind_manifest with
+            | Some manifest -> (
+              match kconstr_path manifest.base with
+              | Some next ->
+                follow next (steps_of current manifest @ acc)
+                  (current :: visited)
+              | None -> None)
+            | None -> None
+            | exception Not_found -> None
+        in
       match follow kpath (steps_of path manifest) [path] with
       | Some reaching_path ->
         raise
           (Error (loc, Recursive_jkind_definition (path, env, reaching_path)))
-      | None -> ()
-  in
-  match decl.Types.jkind_manifest with
-  | None -> ()
-  | Some manifest -> Option.iter (check manifest) (kconstr_path manifest.base)
+      | None -> ())
 
 (* We only allow recursion in unboxed product types to occur through boxes,
    otherwise the type is uninhabitable and usually also infinite-size.
@@ -4242,10 +4244,16 @@ let native_repr_of_type ~loc env kind ty sort_or_poly ~is_return =
     let is_scannable =
       match sort_or_poly with
       | Poly -> false
-      | Sort (Base Scannable) -> true
-      | Sort (Base _ | Product _) -> false
-      | Sort (Univar _) -> Misc.fatal_error "typedecl: Univar in native repr"
-      | Sort (Genvar _) -> Misc.fatal_error "typedecl: Genvar in native repr"
+      | Sort sort ->
+        let rec is_scannable (sort : Jkind.Sort.Const.t) =
+          match sort with
+          | Addressable sort -> is_scannable sort
+          | Base Scannable -> true
+          | Base _ | Product _ -> false
+          | Univar _ -> Misc.fatal_error "typedecl: Univar in native repr"
+          | Genvar _ -> Misc.fatal_error "typedecl: Genvar in native repr"
+        in
+        is_scannable sort
     in
     if is_immediate && is_non_nullable && is_scannable
     then Some (Unboxed_or_untagged_integer Untagged_int)
@@ -4365,13 +4373,16 @@ let make_native_repr
       in
       Sort sort
   in
-  match get_native_repr_attribute
-          core_type.ptyp_attributes ~global_repr,
-        sort_or_poly with
+  let native_repr_attribute =
+    get_native_repr_attribute core_type.ptyp_attributes ~global_repr
+  in
+  let rec make_native_repr sort_or_poly =
+    match native_repr_attribute, sort_or_poly with
+  | _, Sort (Addressable sort) -> make_native_repr (Sort sort)
   | Native_repr_attr_absent, Poly ->
     Repr_poly
   | Native_repr_attr_absent, Sort (Base (Scannable | Void) as base) ->
-    Same_as_ocaml_repr base
+    Same_as_ocaml_repr (Jkind.Sort.Const.erase_addressability base)
   | Native_repr_attr_absent, Sort (Univar _) ->
     Misc.fatal_error "typedecl: Univar in concrete type"
   | Native_repr_attr_absent, Sort (Genvar _) ->
@@ -4384,7 +4395,7 @@ let make_native_repr
       Location.prerr_warning core_type.ptyp_loc
         (Warnings.Incompatible_with_upstream
               (Warnings.Unboxed_attribute layout)));
-    Same_as_ocaml_repr c
+    Same_as_ocaml_repr (Jkind.Sort.Const.erase_addressability c)
   | Native_repr_attr_absent, (Sort ((Product _) as c)) ->
     (if Language_extension.erasable_extensions_only ()
      then
@@ -4400,7 +4411,7 @@ let make_native_repr
        Location.prerr_warning core_type.ptyp_loc
          (Warnings.Incompatible_with_upstream
             (Warnings.Non_value_sort sort)));
-    Same_as_ocaml_repr c
+    Same_as_ocaml_repr (Jkind.Sort.Const.erase_addressability c)
   | Native_repr_attr_present ((Unboxed | Untagged) as kind),
     (Poly | Sort (Base Scannable))
   | Native_repr_attr_present (Untagged as kind), Sort _ ->
@@ -4445,18 +4456,20 @@ let make_native_repr
       Location.prerr_warning core_type.ptyp_loc
         (Warnings.Incompatible_with_upstream
               (Warnings.Non_value_sort layout)));
-    Same_as_ocaml_repr c
+    Same_as_ocaml_repr (Jkind.Sort.Const.erase_addressability c)
   | Native_repr_attr_present Unpacked, Sort (Product _ as sort) ->
     (if Language_extension.erasable_extensions_only ()
      then
        Location.prerr_warning core_type.ptyp_loc
          (Warnings.Incompatible_with_upstream
             Warnings.Unpacked_attribute));
-    Unpacked_product sort
+    Unpacked_product (Jkind.Sort.Const.erase_addressability sort)
   | Native_repr_attr_present Unpacked, (Sort (Base _) | Poly) ->
     raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unpacked))
   | Native_repr_attr_present Unpacked, Sort (Univar _ | Genvar _) ->
     Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
+  in
+  make_native_repr sort_or_poly
 
 let prim_const_mode m =
   match Mode.Locality.Guts.check_const m with
@@ -5335,8 +5348,8 @@ module Reaching_path = struct
         (match Jkind.Scannable_axes.to_string_list sa with
          | [] -> Printtyp.path ppf p
          | _ :: _ as sa_strs ->
-             Fmt.fprintf ppf "%a %s" Printtyp.path p
-               (String.concat " " sa_strs))
+           Fmt.fprintf ppf "%a %s" Printtyp.path p
+             (String.concat " " sa_strs))
       | Addressable base -> Fmt.fprintf ppf "%a addressable" pp_base base
     in
     let mod_strings =

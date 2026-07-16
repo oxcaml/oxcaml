@@ -329,7 +329,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Print_as_value (* can interpret as a value and print *)
       | Print_as of string (* can't print *)
 
-    let print_sort : Jkind.Sort.Const.t -> _ = function
+    let rec print_sort : Jkind.Sort.Const.t -> _ = function
       | Base Scannable -> Print_as_value
       | Base Void -> Print_as "<void>"
       | Base (Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 |
@@ -338,6 +338,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Product _ -> Print_as "<unboxed product>"
       | Univar _ -> Print_as "<univar>"
       | Genvar _ -> Print_as "<genvar>"
+      | Addressable sort -> print_sort sort
 
     let print_sort_option : Jkind.Sort.Const.t option -> _ = function
       | None -> Print_as "<unknown>"

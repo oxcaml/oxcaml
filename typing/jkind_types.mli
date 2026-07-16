@@ -170,9 +170,7 @@ module Layout : sig
               [Ident.highest_scope]. *)
       | Addressable of t
           (** Explicit addressability on a layout that is not intrinsically
-              addressable. Unlike the live layout above, this constant form also
-              uses the constructor for representable atomic layouts, because
-              [Sort.Const.t] deliberately erases addressability. *)
+              addressable. *)
 
     module Static : sig
       val of_base : Sort.base -> Scannable_axes.t -> t
@@ -182,8 +180,8 @@ module Layout : sig
 
     val max : t
 
-    (** Extracts the calling-convention sort, erasing addressability. Returns
-        [None] for [Any], including [Any addressable]. *)
+    (** Extracts the constant sort, preserving addressability. Returns [None]
+        for [Any], including [Any addressable]. *)
     val get_sort : t -> Sort.Const.t option
 
     val is_scannable_or_any : t -> bool
@@ -218,4 +216,7 @@ module Layout : sig
   val addressable : Sort.t t -> Sort.t t
 
   val get_addressable : Sort.t t -> Sort.t t option
+
+  (** Return the scannable axes of [Any], looking through [Addressable]. *)
+  val get_any : 'sort t -> Scannable_axes.t option
 end

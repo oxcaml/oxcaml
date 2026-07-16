@@ -393,7 +393,13 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
       transl_ident (of_location ~scopes e.exp_loc)
         e.exp_env e.exp_type path desc kind
   | Texp_apply_layout (_, args) ->
-      let sorts = List.map Jkind.Sort.var_default_to_scannable_and_get args in
+      let sorts =
+        List.map
+          (fun sort ->
+            Jkind.Sort.var_default_to_scannable_and_get sort
+            |> Jkind.Sort.Const.erase_addressability)
+          args
+      in
       Misc.fatal_errorf
         "Translcore: translation of layout-polymorphic instantiation is not \
          yet supported@ (layout args: [%a])"
@@ -2183,7 +2189,7 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
 
 and transl_letmutable ~scopes ~return_layout
       {vb_pat=pat; vb_expr=expr; vb_attributes=attr; vb_loc; vb_sort} body =
-  let arg_sort = Jkind_types.Sort.default_to_scannable_and_get vb_sort in
+  let arg_sort = Jkind_types.Sort.default_for_transl_and_get vb_sort in
   let arg_layout = layout_exp arg_sort expr in
   let lam =
     transl_bound_exp ~scopes ~in_structure:false pat arg_layout expr vb_loc attr

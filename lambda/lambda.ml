@@ -2834,6 +2834,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Base Void -> layout_unboxed_product []
   | Product sorts ->
     layout_unboxed_product (List.map layout_of_const_sort sorts)
+  | Addressable sort -> layout_of_const_sort sort
   | Univar _ ->
     Misc.fatal_error "layout_of_const_sort: unexpected univar"
   | Genvar _ ->
@@ -2853,7 +2854,7 @@ let layout_of_extern_repr : extern_repr -> _ = function
     layout_boxed_int Boxed_nativeint
   | Same_as_ocaml_repr s -> layout_of_const_sort s
 
-let extern_repr_involves_unboxed_products extern_repr =
+let rec extern_repr_involves_unboxed_products extern_repr =
   match extern_repr with
   | Same_as_ocaml_repr (Product _)
   | Same_as_ocaml_repr (Base _)
@@ -2864,6 +2865,8 @@ let extern_repr_involves_unboxed_products extern_repr =
     Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected univar"
   | Same_as_ocaml_repr (Genvar _) ->
     Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected genvar"
+  | Same_as_ocaml_repr (Addressable sort) ->
+    extern_repr_involves_unboxed_products (Same_as_ocaml_repr sort)
 
 let rec layout_of_scannable_kinds kinds =
   Punboxed_product (List.map layout_of_scannable_kind kinds)

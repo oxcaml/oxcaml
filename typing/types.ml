@@ -952,7 +952,8 @@ let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
            | Cstr_layout_known { shape = s1; sorts = ss1 },
              Cstr_layout_known { shape = s2; sorts = ss2 } ->
              equal_constructor_representation_up_to_scannable_axes s1 s2
-             && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal ss1 ss2
+             && Misc.Stdlib.Array.equal
+                  Jkind_types.Sort.Const.equal_ignoring_addressability ss1 ss2
            | (Cstr_layout_known _ | Cstr_layout_variable), _ -> false)
         layouts1
         layouts2
@@ -1018,6 +1019,7 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Base Void -> Void
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
   | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
+  | Addressable sort -> mixed_block_element_of_const_sort sort
 
 let find_unboxed_type decl =
   match decl.type_kind with

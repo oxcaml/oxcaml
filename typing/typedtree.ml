@@ -1284,7 +1284,8 @@ type 'sort full_bound_ident_action =
    [~of_const_sort]. *)
 
 let for_transl f =
-  f ~of_sort:Jkind.Sort.default_for_transl_and_get ~of_const_sort:Fun.id
+  f ~of_sort:Jkind.Sort.default_for_transl_and_get
+    ~of_const_sort:Jkind.Sort.Const.erase_addressability
 
 let for_typing f =
   f ~of_sort:Fun.id ~of_const_sort:Jkind.Sort.of_const

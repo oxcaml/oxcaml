@@ -243,7 +243,10 @@ module Type_shape = struct
       in
       get_layout jkind.Types.jkind.base
     in
-    let sort_opt = Option.bind layout Jkind_types.Layout.Const.get_sort in
+    let sort_opt =
+      Option.bind layout Jkind_types.Layout.Const.get_sort
+      |> Option.map Jkind_types.Sort.Const.erase_addressability
+    in
     match sort_opt with
     | None -> Shape.unknown_type ()
     | Some layout -> Shape.at_layout (Shape.unknown_type ()) layout

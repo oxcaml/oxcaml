@@ -584,14 +584,12 @@ let instance_jkind (t : jkind_lr) : jkind_lr =
     | Any _ -> l
     | Sort (s, sa) -> Sort (Jkind_types.Sort.instance s, sa)
     | Product ts -> Product (List.map instance_layout ts)
-    | Addressable l -> Addressable (instance_layout l)
+    | Addressable l -> Jkind_types.Layout.addressable (instance_layout l)
   in
-  let rec instance_base = function
-    | Kconstr _ as base -> base
-    | Layout l -> Layout (instance_layout l)
-    | Addressable base -> Addressable (instance_base base)
-  in
-  { t with jkind = { t.jkind with base = instance_base t.jkind.base } }
+  match t.jkind.base with
+  | Kconstr _ | Addressable _ -> t
+  | Layout l ->
+    { t with jkind = { t.jkind with base = Layout (instance_layout l) } }
 
 let rec copy_type_desc ?(keep_names=false) f = function
     Tvar { name; jkind } ->
@@ -1269,9 +1267,7 @@ module Jkind0 = struct
       | Layout l -> Layout (f l)
       | Addressable base -> Addressable (map_base f base)
 
-    let map_layout f t =
-      match t.base with
-      | base -> { t with base = map_base f base }
+    let map_layout f t = { t with base = map_base f t.base }
 
     let rec map_base_option f = function
       | Kconstr _ as k -> Some k

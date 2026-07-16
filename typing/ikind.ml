@@ -311,8 +311,8 @@ module Solver = struct
             (b, l * r) Types.base_and_axes ->
             Types.mod_bounds * (l * r) Types.with_bounds * Path.t option =
          fun jkind_desc ->
-          let unresolved_path = unresolved_base_path jkind_desc.base in
-          jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_path
+          let unresolved_base = unresolved_base_path jkind_desc.base in
+          jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
         in
         expand
       | Some env ->
@@ -323,17 +323,17 @@ module Solver = struct
           match Jkind.Const.expand_once env jkind_desc with
           | Some jkind_const -> expand jkind_const
           | None ->
-            let unresolved_path = unresolved_base_path jkind_desc.base in
-            jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_path
+            let unresolved_base = unresolved_base_path jkind_desc.base in
+            jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
         in
         expand
     in
-    let mod_bounds, with_bounds, unresolved_path = expand jkind_desc in
+    let mod_bounds, with_bounds, unresolved_base = expand jkind_desc in
     let base_mod_bounds =
       Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds)
     in
     let base =
-      match unresolved_path with
+      match unresolved_base with
       | None -> base_mod_bounds
       | Some path ->
         let atom = rigid_name ctx (Ldd.Name.katom path) in
@@ -356,24 +356,24 @@ module Solver = struct
   and mod_bounds_floor_of_jkind_desc : type a l r.
       ctx -> (a, l * r) Types.base_and_axes -> Ldd.node option =
    fun ctx jkind_desc ->
-    let mod_bounds, unresolved_path =
+    let mod_bounds, unresolved_base =
       let rec expand : type b.
           (b, l * r) Types.base_and_axes -> Types.mod_bounds * Path.t option =
        fun jkind_desc ->
         match ctx.env with
         | None ->
-          let unresolved_path = unresolved_base_path jkind_desc.base in
-          jkind_desc.mod_bounds, unresolved_path
+          let unresolved_base = unresolved_base_path jkind_desc.base in
+          jkind_desc.mod_bounds, unresolved_base
         | Some env -> (
           match Jkind.Const.expand_once env jkind_desc with
           | Some jkind_const -> expand jkind_const
           | None ->
-            let unresolved_path = unresolved_base_path jkind_desc.base in
-            jkind_desc.mod_bounds, unresolved_path)
+            let unresolved_base = unresolved_base_path jkind_desc.base in
+            jkind_desc.mod_bounds, unresolved_base)
       in
       expand jkind_desc
     in
-    match unresolved_path with
+    match unresolved_base with
     | Some _ -> None
     | None -> Some (Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds))
 

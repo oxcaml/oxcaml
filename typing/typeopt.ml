@@ -493,7 +493,7 @@ let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
   | _ ->
       (kind, layout)
 
-let rec value_kind_of_scannable_jkind env jkind =
+let value_kind_of_scannable_jkind env jkind =
   let layout = Jkind.get_layout_defaulting_to_scannable env jkind in
   (* In other places, we use [Ctype.type_jkind_purely_if_principal]. Here, we omit
      the principality check, as we're just trying to compute optimizations. *)
@@ -501,10 +501,12 @@ let rec value_kind_of_scannable_jkind env jkind =
   let externality_upper_bound =
     Jkind.get_externality_upper_bound ~context env jkind
   in
-  match layout with
-  | Some (Addressable layout) ->
-    value_kind_of_scannable_jkind env
-      (Jkind.set_layout jkind (Jkind_types.Layout.of_const layout))
+  let rec strip_addressability (layout : Jkind.Layout.Const.t) =
+    match layout with
+    | Addressable layout -> strip_addressability layout
+    | (Any _ | Base _ | Product _ | Univar _ | Genvar _) as layout -> layout
+  in
+  match Option.map strip_addressability layout with
   | Some (Base (Scannable, { separability; _ })) -> (
     (* use the better of the two [immediate_or_pointer]s *)
     match pointerness_of_separability separability,
@@ -513,6 +515,7 @@ let rec value_kind_of_scannable_jkind env jkind =
     | Pointer, Pointer -> Pgenval)
   | None
   | Some ( Any _
+         | Addressable _
          | Product _
          | Univar _
          | Genvar _
@@ -1206,6 +1209,8 @@ let transl_mixed_block_element env loc ty mbe =
 
 let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
   : Jkind.Sort.Const.t -> _ = function
+  | Addressable sort ->
+    layout_of_const_sort_generic ~value_kind ~error sort
   | Base Scannable -> Lambda.Pvalue (Lazy.force value_kind)
   | Base Float64 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_float Unboxed_float64
@@ -1253,33 +1258,37 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
   | Genvar _ -> Misc.fatal_error "layout: unexpected genvar"
 
 let layout env loc sort ty =
+  let rec error (sort : Jkind.Sort.Const.t) =
+    match sort with
+    | Addressable sort -> error sort
+    | Base Scannable -> assert false
+    | Base Void as const ->
+      raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
+                                                 Alpha,
+                                                 Some ty)))
+    | Base Float32 as const ->
+      raise (Error (loc, Small_number_sort_without_extension
+                           (Jkind.Sort.of_const const, Some ty)))
+    | Base (Vec128 | Vec256 | Vec512) as const ->
+      raise (Error (loc, Simd_sort_without_extension
+                           (Jkind.Sort.of_const const, Some ty)))
+    | (Base (Float64 | Word | Untagged_immediate | Bits8 | Bits16 | Bits32 |
+             Bits64) | Product _)
+      as const ->
+      raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
+                                                 Stable,
+                                                 Some ty)))
+    | Univar _ -> assert false
+    | Genvar _ -> assert false
+  in
   layout_of_const_sort_generic sort
     ~value_kind:(lazy (value_kind env loc ty))
-    ~error:(function
-      | Base Scannable -> assert false
-      | Base Void as const ->
-        raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
-                                                   Alpha,
-                                                   Some ty)))
-      | Base Float32 as const ->
-        raise (Error (loc, Small_number_sort_without_extension
-                             (Jkind.Sort.of_const const, Some ty)))
-      | Base (Vec128 | Vec256 | Vec512) as const ->
-        raise (Error (loc, Simd_sort_without_extension
-                             (Jkind.Sort.of_const const, Some ty)))
-      | (Base (Float64 | Word | Untagged_immediate | Bits8 | Bits16 | Bits32 |
-               Bits64) | Product _)
-        as const ->
-        raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
-                                                   Stable,
-                                                   Some ty)))
-      | Univar _ -> assert false
-      | Genvar _ -> assert false
-    )
+    ~error
 
 let layout_of_sort loc sort =
-  layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)
-    ~error:(function
+  let rec error (sort : Jkind.Sort.Const.t) =
+    match sort with
+    | Addressable sort -> error sort
     | Base Scannable -> assert false
     | Base Void as const ->
       raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
@@ -1298,7 +1307,9 @@ let layout_of_sort loc sort =
                            (Jkind.Sort.of_const const, Stable, None)))
     | Univar _ -> assert false
     | Genvar _ -> assert false
-    )
+  in
+  layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)
+    ~error
 
 let layout_of_non_void_sort c =
   layout_of_const_sort_generic

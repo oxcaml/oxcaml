@@ -23,8 +23,8 @@ module type Sort = sig
      similarly layout - any) from "the discrete thing used for unification". *)
   (** A sort classifies how a type is represented at runtime and may also carry
       an addressability refinement used by the type checker. Every concrete
-      jkind has a sort. Addressability does not affect the calling convention;
-      it is erased from [Const.t] below. *)
+      jkind has a sort. Addressability does not affect the calling convention.
+  *)
   type t
 
   (** Rigid sort variables similiar to [Tunivar] for types. They can be
@@ -57,8 +57,7 @@ module type Sort = sig
   type var
 
   module Const : sig
-    (** Calling-convention sorts. Unlike [t], this type deliberately does not
-        record addressability. *)
+    (** Constant sorts: fully determined sorts without unification variables. *)
     type t =
       | Base of base
       | Product of t list
@@ -69,8 +68,23 @@ module type Sort = sig
               by slambda. The [var] is used only for physical identity; its
               contents are not consumed and its level must be
               [Ident.highest_scope]. *)
+      | Addressable of t
+
+    (** Apply the addressable kind operator. *)
+    val addressable : t -> t
+
+    (** If [t] is addressable, return the kind below its (possibly implicit)
+        addressable operator. *)
+    val get_addressable : t -> t option
+
+    (** Remove addressability, including from product components. This is the
+        explicit conversion from a constant sort to its calling convention. *)
+    val erase_addressability : t -> t
 
     val equal : t -> t -> bool
+
+    (** Equality of calling conventions. *)
+    val equal_ignoring_addressability : t -> t -> bool
 
     val format : Format_doc.formatter -> t -> unit
 
@@ -231,9 +245,8 @@ module type Sort = sig
 
   val format : Format_doc.formatter -> t -> unit
 
-  (** [default_to_scannable_and_get] extracts the calling-convention sort as a
-      [Const.t], erasing addressability. If it is a variable, it is set to
-      [scannable] first. *)
+  (** [default_to_scannable_and_get] extracts a [Const.t], preserving
+      addressability. If it is a variable, it is set to [scannable] first. *)
   val default_to_scannable_and_get : t -> Const.t
 
   (** Like [default_to_scannable_and_get] but returns a [Some] wrapping. Avoids
@@ -243,10 +256,14 @@ module type Sort = sig
 
   (* CR layouts v12: Default this to void. *)
 
-  (** [default_for_transl_and_get] extracts the sort as a `const`. If it's a
-      variable, it is set to [value] first. After we have support for [void],
-      this will default to [void] instead. *)
+  (** [default_for_transl_and_get] extracts the calling-convention sort as a
+      [Const.t], erasing addressability. If it is a variable, it is set to
+      [value] first. After we have support for [void], this will default to
+      [void] instead. *)
   val default_for_transl_and_get : t -> Const.t
+
+  (** Like [default_for_transl_and_get] but returns a [Some] wrapping. *)
+  val default_for_transl_and_get_some : t -> Const.t option
 
   (** Like [default_to_scannable_and_get] but operates directly on a [var]. *)
   val var_default_to_scannable_and_get : var -> Const.t

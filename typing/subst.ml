@@ -577,15 +577,16 @@ let rec layout s l =
     let l'' = layout s l' in
     if l' == l'' then l else Jkind_types.Layout.addressable l''
 
-let rec addressable_base = function
-  | Layout layout -> Layout (Jkind_types.Layout.addressable layout)
+let rec make_addressable_base addressable_layout = function
+  | Layout layout -> Layout (addressable_layout layout)
   | Kconstr _ as base -> Addressable base
-  | Addressable base -> addressable_base base
+  | Addressable base -> make_addressable_base addressable_layout base
 
-let rec addressable_const_base = function
-  | Layout layout -> Layout (Jkind_types.Layout.Const.addressable layout)
-  | Kconstr _ as base -> Addressable base
-  | Addressable base -> addressable_const_base base
+let addressable_base =
+  make_addressable_base Jkind_types.Layout.addressable
+
+let addressable_const_base =
+  make_addressable_base Jkind_types.Layout.Const.addressable
 
 let rec jkind_desc s jkind =
   match jkind.base with

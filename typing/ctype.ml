@@ -2077,7 +2077,7 @@ let instance_prim_layout env (desc : Primitive.description) ty =
   then ty, None
   else
   let new_sort = ref None in
-  let get_jkind jkind sa =
+  let get_jkind jkind ~addressable sa =
     let sort = match !new_sort with
     | Some sort -> sort
     | None ->
@@ -2085,7 +2085,13 @@ let instance_prim_layout env (desc : Primitive.description) ty =
       new_sort := Some sort;
       sort
     in
-    let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort (sort, sa)) in
+    let layout = Jkind.Layout.Sort (sort, sa) in
+    let layout =
+      if addressable
+      then Jkind_types.Layout.addressable layout
+      else layout
+    in
+    let jkind = Jkind.set_layout jkind layout in
     Jkind.History.update_reason
       jkind (Concrete_creation Layout_poly_in_external)
   in
@@ -2098,16 +2104,28 @@ let instance_prim_layout env (desc : Primitive.description) ty =
         begin match get_desc ty with
         | Tvar ({ jkind; _ } as r) -> (
           match Jkind.extract_layout env jkind with
-          | Ok (Any sa) ->
-            For_copy.redirect_desc copy_scope ty
-              (Tvar {r with jkind = get_jkind jkind sa})
-          | _ -> ())
+          | Ok layout -> (
+            match Jkind_types.Layout.get_any layout with
+            | None -> ()
+            | Some sa ->
+              let addressable =
+                Option.is_some (Jkind_types.Layout.get_addressable layout)
+              in
+              For_copy.redirect_desc copy_scope ty
+                (Tvar { r with jkind = get_jkind jkind ~addressable sa }))
+          | Error _ -> ())
         | Tunivar ({ jkind; _ } as r) -> (
           match Jkind.extract_layout env jkind with
-          | Ok (Any sa) ->
-            For_copy.redirect_desc copy_scope ty
-              (Tunivar {r with jkind = get_jkind jkind sa})
-          | _ -> ())
+          | Ok layout -> (
+            match Jkind_types.Layout.get_any layout with
+            | None -> ()
+            | Some sa ->
+              let addressable =
+                Option.is_some (Jkind_types.Layout.get_addressable layout)
+              in
+              For_copy.redirect_desc copy_scope ty
+                (Tunivar { r with jkind = get_jkind jkind ~addressable sa }))
+          | Error _ -> ())
         | _ -> ()
         end;
         iter_type_expr (inner mark) ty
@@ -3316,7 +3334,9 @@ let constrain_type_jkind ~fixed env ty jkind =
                         apply_jkind_wrapping_r ~env jkind ~unwrapped_ty
                       in
                       match Jkind.extract_layout env ty's_jkind with
-                      | Ok (Any _) ->
+                      | Ok layout
+                        when Option.is_some (Jkind_types.Layout.get_any layout)
+                        ->
                         (* We re-estimate in this case rather than reuse the
                            components of [ty's_jkind] because an unboxed record
                            with an [any] field has a product-of-[any]s kind on

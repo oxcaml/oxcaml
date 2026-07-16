@@ -12,11 +12,13 @@ type ('a : any addressable) require_addressable
 (* [addressable] does not change the calling convention of its argument. *)
 type t : bits8 addressable
 let f (t : t) = t
+external t_id : t -> t = "%identity"
 type check_t = t require_addressable
 
 [%%expect {|
 type t : bits8 addressable mod external_
 val f : t -> t = <fun>
+external t_id : t -> t = "%identity"
 type check_t = t require_addressable
 |}]
 
@@ -269,6 +271,28 @@ type 'a inferred_addressable = 'a require_addressable
 
 [%%expect {|
 type 'a inferred_addressable = 'a require_addressable
+|}]
+
+(* An addressability-constrained sort variable can subsequently become a
+   scannable sort; its scannable axes remain meaningful. *)
+type ('a : value_maybe_separable) require_maybe_separable_value
+type 'a inferred_addressable_value =
+  'a require_addressable * 'a require_maybe_separable_value
+
+[%%expect {|
+type ('a : value_maybe_separable) require_maybe_separable_value
+type 'a inferred_addressable_value =
+    'a require_addressable * 'a require_maybe_separable_value
+|}]
+
+(* Layout-polymorphic externals preserve an [any addressable] constraint when
+   replacing [any] with a fresh representable sort. *)
+external[@layout_poly] addressable_id :
+  ('a : any addressable). 'a -> 'a = "%identity"
+
+[%%expect {|
+external addressable_id : ('a : any addressable). 'a -> 'a = "%identity"
+  [@@layout_poly]
 |}]
 
 (* Regression: inferring ordinary value sorts must remain unaffected. *)
