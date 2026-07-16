@@ -1723,7 +1723,11 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         in
         Some [load; arith]
     | Isimd_mem _ ->
-      Misc.fatal_error "Unexpected simd operation with memory arguments"
+      (* SIMD instructions with memory operands are already vector instructions.
+         (This case is currently unreachable, because their memory access is
+         classified as [Arbitrary], which prevents grouping; see
+         [Vectorize_specific.memory_access].) *)
+      None
     | Ioffset_loc _ | Ibswap _ | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence
     | Ipackf32 | Isimd _ | Iprefetch _ | Icldemote _ ->
       None

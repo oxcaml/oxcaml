@@ -1176,6 +1176,90 @@
    (diff test_static_raw_vectorized.expected test_static_raw_vectorized.output)))
 
 (rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (targets test_simd_mem_runner.exe test_simd_mem.cmx.dump)
+ (deps test_simd_mem.mli test_simd_mem.ml stubs.c)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test_simd_mem_runner.exe))))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+  (with-outputs-to
+   test_simd_mem.output
+   (run ./test_simd_mem_runner.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+   (diff test_simd_mem.expected test_simd_mem.output)))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+  (copy test_simd_mem.ml test_simd_mem_vectorized.ml)))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+  (copy test_simd_mem.mli test_simd_mem_vectorized.mli)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (targets test_simd_mem_vectorized_runner.exe test_simd_mem_vectorized.cmx.dump)
+ (deps test_simd_mem_vectorized.mli test_simd_mem_vectorized.ml stubs.c)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test_simd_mem_vectorized_runner.exe))))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (target test_simd_mem_vectorized.cmx.dump.output)
+ (deps ./filter.sh test_simd_mem_vectorized.cmx.dump)
+ (action
+  (with-outputs-to
+   %{target}
+   (with-accepted-exit-codes 1
+    (run %{deps})))))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+   (diff test_simd_mem_vectorized.cmx.dump.expected test_simd_mem_vectorized.cmx.dump.output)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+  (with-outputs-to
+   test_simd_mem_vectorized.output
+   (run ./test_simd_mem_vectorized_runner.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+  (copy test_simd_mem.expected test_simd_mem_vectorized.expected)))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+   (diff test_simd_mem_vectorized.expected test_simd_mem_vectorized.output)))
+
+(rule
  (alias runtest)
  (enabled_if (= %{context_name} "main"))
  (action
