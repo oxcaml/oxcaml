@@ -113,12 +113,16 @@ module Rigid_name : sig
             [Types.get_id] of the type variable representing the parameter. *)
     | Provenance of
         { id : int;
-          ty : string
+          ty : string;
+          phrase : bool
         }
         (** A provenance variable introduced while translating a type expression
             for error reporting. The integer identifies the occurrence, and
-            [ty] describes the corresponding type expression. These variables
-            are diagnostic-only and must not appear in stored [type_ikind]s. *)
+            [ty] describes the corresponding type expression — or, when
+            [phrase] is true, a plural noun phrase describing a class of
+            contributions (e.g. "mutable fields") rather than a printed type
+            expression. These variables are diagnostic-only and must not
+            appear in stored [type_ikind]s. *)
     | Unknown of unknown_id
         (** An unknown quantity with a given id. Used to model not-best in
             ikinds. This is used when we couldn't compute a precise ikind,
@@ -136,7 +140,7 @@ module Rigid_name : sig
 
   val param : int -> t
 
-  val provenance : id:int -> ty:string -> t
+  val provenance : id:int -> ty:string -> phrase:bool -> t
 
   val unknown : Shape.Uid.t -> t
 

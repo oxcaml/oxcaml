@@ -50,7 +50,7 @@ Line 1, characters 0-73:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          value_or_null mod global,
-       because 'a is not mod global aliased forkable unyielding.
+       because 'a is not mod global.
 |}]
 
 (* This is a regression test for an intermediate version of the bug fix that

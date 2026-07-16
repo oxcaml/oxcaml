@@ -30,7 +30,8 @@ module Rigid_name = struct
     | Param of int
     | Provenance of
         { id : int;
-          ty : string
+          ty : string;
+          phrase : bool
         }
     | Unknown of unknown_id
 
@@ -63,7 +64,8 @@ module Rigid_name = struct
       let path_s = Format_doc.asprintf "%a" Path.print path in
       Printf.sprintf "katom[%s]" path_s
     | Param i -> Printf.sprintf "param[%d]" i
-    | Provenance { id; ty } -> Printf.sprintf "provenance[%d:%s]" id ty
+    | Provenance { id; ty; phrase = _ } ->
+      Printf.sprintf "provenance[%d:%s]" id ty
     | Unknown id ->
       Format.asprintf "unknown[%a]" Shape.Uid.print id
 
@@ -73,7 +75,7 @@ module Rigid_name = struct
 
   let param i = Param i
 
-  let provenance ~id ~ty = Provenance { id; ty }
+  let provenance ~id ~ty ~phrase = Provenance { id; ty; phrase }
 
   let unknown uid = Unknown uid
 end

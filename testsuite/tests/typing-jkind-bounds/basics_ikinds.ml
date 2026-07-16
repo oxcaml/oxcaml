@@ -717,8 +717,8 @@ Line 1, characters 0-40:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation any mod global,
        because
-       - this record type is not mod global aliased
-       - string is not mod global aliased
+       - boxed records are not mod global
+       - string is not mod global
 |}]
 
 type t : any mod aliased = { x : string }
@@ -728,7 +728,7 @@ Line 1, characters 0-41:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation any mod aliased,
        because
-       - this record type is not mod aliased
+       - boxed records are not mod aliased
        - string is not mod aliased
 |}]
 
@@ -739,7 +739,7 @@ Line 1, characters 0-43:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation any mod external_,
        because
-       - this record type is not mod external_
+       - boxed records are not mod external_
        - string is not mod external_
 |}]
 
@@ -787,9 +787,8 @@ Line 1, characters 0-65:
 Error: This type definition does not satisfy its kind annotation
          any mod global many portable contended,
        because
-       - this record type is not mod global aliased
-       - t_value is not mod global aliased many contended portable forkable
-           unyielding
+       - boxed records are not mod global
+       - t_value is not mod global many portable contended
 |}]
 
 type u : immediate
@@ -829,7 +828,7 @@ Line 1, characters 0-37:
 1 | type t : any mod global = { x : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation any mod global,
-       because this record type is not mod global aliased.
+       because boxed records are not mod global.
 |}]
 
 (* Fields failing on different axes produce one bullet each, each carrying
@@ -841,8 +840,8 @@ Line 1, characters 0-61:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation immutable_data,
        because
-       - mutable field a : int is not mod contended immutable
-       - int -> int is not mod many portable forkable unyielding stateless
+       - mutable fields are not mod immutable
+       - int -> int is not mod forkable unyielding many stateless
 |}]
 
 type t : any mod external_ = { x : int }
@@ -851,7 +850,7 @@ Line 1, characters 0-40:
 1 | type t : any mod external_ = { x : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation any mod external_,
-       because this record type is not mod external_.
+       because boxed records are not mod external_.
 |}]
 
 type t : any mod aliased = { x : int }
@@ -860,7 +859,7 @@ Line 1, characters 0-38:
 1 | type t : any mod aliased = { x : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation any mod aliased,
-       because this record type is not mod aliased.
+       because boxed records are not mod aliased.
 |}]
 
 type t : any mod global = { x : int } [@@unboxed]
@@ -908,7 +907,7 @@ Line 1, characters 0-47:
 1 | type t : any mod global = { x : u } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation any mod global,
-       because u is not mod global aliased forkable unyielding.
+       because u is not mod global.
 |}]
 
 type t : any mod portable = { x : u } [@@unboxed]
@@ -977,8 +976,8 @@ Line 1, characters 0-63:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod global,
        because
-       - this record type is not mod global aliased
-       - mutable field x : 'a is not mod global aliased
+       - boxed records are not mod global
+       - mutable fields are not mod global
 |}]
 
 type ('a : immediate) t : value mod aliased = { mutable x : 'a }
@@ -988,8 +987,8 @@ Line 1, characters 0-64:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod aliased,
        because
-       - this record type is not mod aliased
-       - mutable field x : 'a is not mod aliased
+       - boxed records are not mod aliased
+       - mutable fields are not mod aliased
 |}]
 
 type ('a : immediate) t : value mod contended = { mutable x : 'a }
@@ -998,7 +997,7 @@ Line 1, characters 0-66:
 1 | type ('a : immediate) t : value mod contended = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod contended,
-       because mutable field x : 'a is not mod contended.
+       because mutable fields are not mod contended.
 |}]
 
 type ('a : immediate) t : value mod external_ = { mutable x : 'a }
@@ -1008,8 +1007,8 @@ Line 1, characters 0-66:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod external_,
        because
-       - this record type is not mod external_
-       - mutable field x : 'a is not mod external_
+       - boxed records are not mod external_
+       - mutable fields are not mod external_
 |}]
 
 type ('a : immediate) t : value mod external64 = { mutable x : 'a }
@@ -1019,8 +1018,8 @@ Line 1, characters 0-67:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod external64,
        because
-       - this record type is not mod external64
-       - mutable field x : 'a is not mod external64
+       - boxed records are not mod external64
+       - mutable fields are not mod external64
 |}]
 
 (*************************************)
@@ -1056,7 +1055,7 @@ Line 1, characters 0-43:
 1 | type t : any mod aliased = Foo of int | Bar
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation any mod aliased,
-       because this variant type is not mod aliased.
+       because boxed variants are not mod aliased.
 |}]
 
 type t : any mod global = Foo of int | Bar
@@ -1065,7 +1064,7 @@ Line 1, characters 0-42:
 1 | type t : any mod global = Foo of int | Bar
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation any mod global,
-       because this variant type is not mod global aliased.
+       because boxed variants are not mod global.
 |}]
 
 
@@ -1075,7 +1074,7 @@ Line 1, characters 0-45:
 1 | type t : any mod external_ = Foo of int | Bar
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation any mod external_,
-       because this variant type is not mod external_.
+       because boxed variants are not mod external_.
 |}]
 
 type t : any mod portable = Foo of bool [@@unboxed]
@@ -1206,7 +1205,7 @@ Line 1, characters 0-53:
 1 | type 'a t : value mod aliased = { x : 'a @@ aliased }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod aliased,
-       because this record type is not mod aliased.
+       because boxed records are not mod aliased.
 |}]
 
 type 'a t : value mod global = { x : 'a @@ global }
@@ -1215,7 +1214,7 @@ Line 1, characters 0-51:
 1 | type 'a t : value mod global = { x : 'a @@ global }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod global,
-       because this record type is not mod global aliased.
+       because boxed records are not mod global.
 |}]
 
 (*****************************)
@@ -1494,7 +1493,7 @@ Line 1, characters 0-52:
 1 | type 'a t : value mod global = Foo of 'a [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod global,
-       because 'a is not mod global aliased forkable unyielding.
+       because 'a is not mod global.
 |}]
 (* CR layouts v2.8: this should be accepted; 'a should be inferred to have kind
   value mod global. Internal ticket 5120. *)
@@ -1506,8 +1505,8 @@ Line 1, characters 0-41:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod global,
        because
-       - this record type is not mod global aliased
-       - 'a is not mod global aliased forkable unyielding
+       - boxed records are not mod global
+       - 'a is not mod global
 |}]
 
 type 'a t : value mod many = { x : 'a }
@@ -1805,8 +1804,7 @@ Line 2, characters 0-49:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          immutable_data with 'a r,
-       because 'a is not mod many contended portable forkable unyielding
-                 stateless immutable.
+       because 'a is not mod forkable unyielding many stateless immutable.
 |}]
 
 type 'a r : immutable_data with 'a @@ portable
@@ -1818,8 +1816,7 @@ Line 2, characters 0-61:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          immutable_data with 'a r,
-       because 'a is not mod many contended forkable unyielding stateless
-                 immutable.
+       because 'a is not mod forkable unyielding many stateless immutable.
 |}]
 
 type 'a portable = { portable : 'a @@ portable }

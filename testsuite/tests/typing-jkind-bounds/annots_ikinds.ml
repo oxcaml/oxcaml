@@ -1120,7 +1120,7 @@ Line 1, characters 0-38:
 1 | type t : value mod global = { x : int}
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod global,
-       because this record type is not mod global aliased.
+       because boxed records are not mod global.
 |}]
 
 type t : any mod portable = { x : float }
@@ -1156,8 +1156,8 @@ Line 1, characters 0-43:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod global,
        because
-       - this record type is not mod global aliased
-       - t_value is not mod global aliased forkable unyielding
+       - boxed records are not mod global
+       - t_value is not mod global
 |}]
 
 type t : value mod aliased = { x : t_value }
@@ -1167,7 +1167,7 @@ Line 1, characters 0-44:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod aliased,
        because
-       - this record type is not mod aliased
+       - boxed records are not mod aliased
        - t_value is not mod aliased
 |}]
 
@@ -1222,7 +1222,7 @@ Line 1, characters 0-44:
 1 | type t : value mod reading = { x : t_value }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod reading,
-       because t_value is not mod shareable reading.
+       because t_value is not mod reading.
 |}]
 
 type t : value mod read = { x : t_value }
@@ -1231,7 +1231,27 @@ Line 1, characters 0-41:
 1 | type t : value mod read = { x : t_value }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod read,
-       because t_value is not mod shared read.
+       because t_value is not mod read.
+|}]
+
+type t : value mod read corrupted = { x : t_value }
+[%%expect {|
+Line 1, characters 0-51:
+1 | type t : value mod read corrupted = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod read corrupted,
+       because t_value is not mod read corrupted.
+|}]
+
+type t : value mod immutable corrupted = { x : t_value }
+[%%expect {|
+Line 1, characters 0-56:
+1 | type t : value mod immutable corrupted = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod immutable corrupted,
+       because t_value is not mod immutable corrupted.
 |}]
 
 type t : value mod external_ = { x : t_value }
@@ -1241,7 +1261,7 @@ Line 1, characters 0-46:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod external_,
        because
-       - this record type is not mod external_
+       - boxed records are not mod external_
        - t_value is not mod external_
 |}]
 
@@ -1266,7 +1286,7 @@ Line 1, characters 0-38:
 1 | type t : value mod global = Foo of int
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod global,
-       because this variant type is not mod global aliased.
+       because boxed variants are not mod global.
 |}]
 
 type t : any mod portable = Foo of float
@@ -1323,8 +1343,8 @@ Line 1, characters 0-42:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod global,
        because
-       - this variant type is not mod global aliased
-       - t_value is not mod global aliased forkable unyielding
+       - boxed variants are not mod global
+       - t_value is not mod global
 |}]
 
 type t : value mod aliased = Foo of t_value
@@ -1334,7 +1354,7 @@ Line 1, characters 0-43:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod aliased,
        because
-       - this variant type is not mod aliased
+       - boxed variants are not mod aliased
        - t_value is not mod aliased
 |}]
 
@@ -1372,7 +1392,7 @@ Line 1, characters 0-45:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod external_,
        because
-       - this variant type is not mod external_
+       - boxed variants are not mod external_
        - t_value is not mod external_
 |}]
 

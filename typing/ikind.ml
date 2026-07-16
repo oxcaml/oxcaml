@@ -38,22 +38,38 @@ let fresh_unknown_uid () : Types.Uid.t =
   in
   Types.Uid.mk ~current_unit
 
+let collapse_whitespace s =
+  let b = Buffer.create (String.length s) in
+  let pending_space = ref false in
+  String.iter
+    (function
+      | ' ' | '\n' | '\r' | '\t' ->
+        if Buffer.length b > 0 then pending_space := true
+      | c ->
+        if !pending_space
+        then (
+          Buffer.add_char b ' ';
+          pending_space := false);
+        Buffer.add_char b c)
+    s;
+  Buffer.contents b
+
 module Provenance = struct
   let next_id = ref 0
 
   let names : Ldd.Name.t list ref = ref []
 
-  let register_text ty : Ldd.Name.t =
+  let register_text ~phrase ty : Ldd.Name.t =
     let id = !next_id in
     next_id := id + 1;
-    let name = Ldd.Name.provenance ~id ~ty in
+    let name = Ldd.Name.provenance ~id ~ty ~phrase in
     names := name :: !names;
     name
 
   let register (ty : Types.type_expr) : Ldd.Name.t =
     Format_doc.asprintf "%a" Jkind.format_type_expr ty
-    |> String.map (function '\n' | '\r' | '\t' -> ' ' | c -> c)
-    |> register_text
+    |> collapse_whitespace
+    |> register_text ~phrase:false
 
   let reset () = names := []
 
@@ -146,7 +162,7 @@ module Solver = struct
     rigid_name ctx (Provenance.register ty)
 
   let provenance_text (ctx : ctx) (text : string) : Ldd.node =
-    rigid_name ctx (Provenance.register_text text)
+    rigid_name ctx (Provenance.register_text ~phrase:true text)
 
   let with_provenance_text (ctx : ctx) (text : unit -> string) (poly : Ldd.node)
       : Ldd.node =
@@ -624,22 +640,6 @@ let pp_axis_list_prose ppf (axes : Jkind_axis.Axis.packed list) =
          pp_axis_name)
       init pp_axis_name last
 
-let collapse_whitespace s =
-  let b = Buffer.create (String.length s) in
-  let pending_space = ref false in
-  String.iter
-    (function
-      | ' ' | '\n' | '\r' | '\t' ->
-        if Buffer.length b > 0 then pending_space := true
-      | c ->
-        if !pending_space
-        then (
-          Buffer.add_char b ' ';
-          pending_space := false);
-        Buffer.add_char b c)
-    s;
-  Buffer.contents b
-
 let remove_numeric_path_stamps s =
   let b = Buffer.create (String.length s) in
   let is_digit = function '0' .. '9' -> true | _ -> false in
@@ -724,35 +724,30 @@ type subjkind_error =
 
 type provenance_residual =
   { ty : string;
+    phrase : bool;
     mode_bounds : Axis_lattice.t;
     axes : Jkind_axis.Axis.packed list
   }
 
 let provenance_ty_of_name (name : Ldd.Name.t) =
   match name with
-  | Provenance { ty; _ } -> Some ty
+  | Provenance { ty; phrase; _ } -> Some (ty, phrase)
   | Atom _ | KAtom _ | Param _ | Unknown _ -> None
 
-let add_provenance_residual entries { ty; mode_bounds; axes } =
-  match List.partition (fun entry -> String.equal entry.ty ty) entries with
-  | [], rest -> { ty; mode_bounds; axes } :: rest
-  | matching, rest ->
-    let axes =
-      List.fold_left
-        (fun axes entry ->
-          List.fold_left
-            (fun axes axis ->
-              if List.exists (same_axis axis) axes then axes else axes @ [axis])
-            axes entry.axes)
-        axes matching
-    in
-    let mode_bounds =
-      List.fold_left
-        (fun mode_bounds entry ->
-          Axis_lattice.meet mode_bounds entry.mode_bounds)
-        mode_bounds matching
-    in
-    { ty; mode_bounds; axes } :: rest
+let add_provenance_residual entries ({ ty; phrase; mode_bounds; axes } as entry)
+    =
+  (* Deduplicate identical entries (e.g. two fields of type [int ref] under
+     the same bound), keeping first-occurrence order. Entries that merely
+     share a printed name (e.g. two constructor-local existentials both
+     rendered ['a]) can have different requirements and must stay separate. *)
+  let duplicate other =
+    String.equal other.ty ty
+    && Bool.equal other.phrase phrase
+    && Axis_lattice.equal other.mode_bounds mode_bounds
+    && List.length other.axes = List.length axes
+    && List.for_all (fun axis -> List.exists (same_axis axis) other.axes) axes
+  in
+  if List.exists duplicate entries then entries else entries @ [entry]
 
 let provenance_residuals ~provenance_names ~violating_axes ~sub_poly ~super_poly
     =
@@ -796,7 +791,7 @@ let provenance_residuals ~provenance_names ~violating_axes ~sub_poly ~super_poly
         else
           match provenance_ty_of_name name with
           | None -> None
-          | Some ty ->
+          | Some (ty, phrase) -> (
             let mode_bounds = Ldd.imply coeff super_poly |> Ldd.round_down in
             let non_top_bounds =
               Axis_lattice.co_sub Axis_lattice.top mode_bounds
@@ -809,60 +804,40 @@ let provenance_residuals ~provenance_names ~violating_axes ~sub_poly ~super_poly
                 |> List.map Axis_lattice.axis_number_to_axis_packed
                 |> axes_in_violation_order ~violating_axes
               in
-              Some { ty; mode_bounds; axes })
+              (* [round_down] under-approximation can leave a residual
+                 non-top only on non-violating axes; such an entry has no
+                 axes left to report. *)
+              match axes with
+              | [] -> None
+              | _ :: _ -> Some { ty; phrase; mode_bounds; axes }))
     |> List.fold_left add_provenance_residual []
-    |> List.rev |> Option.some
+    |> Option.some
 
-let string_of_required_bound required_bounds (Jkind_axis.Axis.Pack axis) =
-  match axis with
-  | Modal (Monadic Uniqueness) ->
-    Some
-      (Format_doc.asprintf "%a" Mode.Uniqueness.Const.print
-         (Axis_lattice.uniqueness required_bounds))
-  | Modal (Monadic Contention) ->
-    Some
-      (Format_doc.asprintf "%a" Mode.Contention.Const.print
-         (Axis_lattice.contention required_bounds))
-  | Modal (Monadic Visibility) ->
-    Some
-      (Format_doc.asprintf "%a" Mode.Visibility.Const.print
-         (Axis_lattice.visibility required_bounds))
-  | Modal (Monadic Staticity) ->
-    Some
-      (Format_doc.asprintf "%a" Mode.Staticity.Const.print
-         (Axis_lattice.staticity required_bounds))
-  | Modal (Comonadic Areality) ->
-    Some
-      (Format_doc.asprintf "%a" Mode.Regionality.Const.print
-         (Axis_lattice.areality required_bounds))
-  | Modal (Comonadic Linearity) ->
-    Some
-      (Format_doc.asprintf "%a" Mode.Linearity.Const.print
-         (Axis_lattice.linearity required_bounds))
-  | Modal (Comonadic Portability) ->
-    Some
-      (Format_doc.asprintf "%a" Mode.Portability.Const.print
-         (Axis_lattice.portability required_bounds))
-  | Modal (Comonadic Forkable) ->
-    Some
-      (Format_doc.asprintf "%a" Mode.Forkable.Const.print
-         (Axis_lattice.forkable required_bounds))
-  | Modal (Comonadic Yielding) ->
-    Some
-      (Format_doc.asprintf "%a" Mode.Yielding.Const.print
-         (Axis_lattice.yielding required_bounds))
-  | Modal (Comonadic Statefulness) ->
-    Some
-      (Format_doc.asprintf "%a" Mode.Statefulness.Const.print
-         (Axis_lattice.statefulness required_bounds))
-  | Nonmodal Externality ->
-    Some
-      (Format_doc.asprintf "%a" Jkind_axis.Externality.print
-         (Axis_lattice.externality required_bounds))
+let residual_mode_strings { mode_bounds; axes; _ } =
+  (* Restrict the required bounds to the reported axes (the residual can be
+     non-top on other axes; see [axes_in_violation_order]), then let
+     [Typemode] drop implied modes (e.g. [aliased] when [global] is
+     required) the same way jkind annotations are printed. *)
+  let reported =
+    List.fold_left
+      (fun set (Jkind_axis.Axis.Pack axis) -> Jkind_axis.Axis_set.add set axis)
+      Jkind_axis.Axis_set.empty axes
+  in
+  let restricted =
+    Axis_lattice.join mode_bounds
+      (Axis_lattice.of_axis_set (Jkind_axis.Axis_set.complement reported))
+  in
+  Jkind.Mod_bounds.of_axis_lattice restricted
+  |> Typemode.close_implied_mod_bounds
+  |> Typemode.untransl_mod_bounds ~verbose:false
+  |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
 
-let pp_provenance_residual ppf { ty; mode_bounds; axes; _ } =
-  let modes = List.filter_map (string_of_required_bound mode_bounds) axes in
-  Format_doc.fprintf ppf "@[<hov 2>%s is not mod %a@]" ty
+let pp_provenance_residual ppf ({ ty; phrase; _ } as residual) =
+  (* Phrase subjects ("mutable fields", "boxed records") are plural noun
+     phrases; type-expression subjects read as singular. *)
+  let verb = if phrase then "are" else "is" in
+  let modes = residual_mode_strings residual in
+  Format_doc.fprintf ppf "@[<hov 2>%s %s not mod %a@]" ty verb
     (Format_doc.pp_print_list
        ~pp_sep:(fun ppf () -> Format_doc.fprintf ppf "@ ")
        Format_doc.pp_print_string)
@@ -992,26 +967,14 @@ let validate_immutable_unboxed_label (lbl : Types.label_declaration) =
   | Mutable _ ->
     failwith "ikind: mutable fields in unboxed records are not supported"
 
-let format_type_expr_single_line ty =
-  Format_doc.asprintf "%a" Jkind.format_type_expr ty
-  |> String.map (function '\n' | '\r' | '\t' -> ' ' | c -> c)
-
 let label_mutability_provenance (ctx : Solver.ctx)
     (lbl : Types.label_declaration) (poly : Ldd.node) : Ldd.node =
   match lbl.ld_mutable with
   | Immutable -> poly
   | Mutable { atomic = Nonatomic; _ } ->
-    Solver.with_provenance_text ctx
-      (fun () ->
-        Format.sprintf "mutable field %s : %s" (Ident.name lbl.ld_id)
-          (format_type_expr_single_line lbl.ld_type))
-      poly
+    Solver.with_provenance_text ctx (fun () -> "mutable fields") poly
   | Mutable { atomic = Atomic; _ } ->
-    Solver.with_provenance_text ctx
-      (fun () ->
-        Format.sprintf "mutable field %s : %s [@atomic]" (Ident.name lbl.ld_id)
-          (format_type_expr_single_line lbl.ld_type))
-      poly
+    Solver.with_provenance_text ctx (fun () -> "atomic mutable fields") poly
 
 let decl_base_provenance (ctx : Solver.ctx) source poly =
   Solver.with_provenance_text ctx (fun () -> source) poly
@@ -1166,7 +1129,7 @@ let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
           (* CR box: This will no longer be [non_float] once we update the
              representation of singleton float64 records *)
           | _ -> Axis_lattice.immutable_data)
-        |> decl_base_provenance ctx "this record type"
+        |> decl_base_provenance ctx "boxed records"
       in
       sum_record_label_contributions ~base
         ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
@@ -1175,7 +1138,7 @@ let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
     | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
       let base =
         Ldd.const Axis_lattice.immediate
-        |> decl_base_provenance ctx "this unboxed record type"
+        |> decl_base_provenance ctx "unboxed records"
       in
       sum_record_label_contributions ~base
         ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
@@ -1220,7 +1183,7 @@ let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
             then Axis_lattice.immediate
             else Axis_lattice.immutable_data
         in
-        Ldd.const base_lat |> decl_base_provenance ctx "this variant type"
+        Ldd.const base_lat |> decl_base_provenance ctx "boxed variants"
       in
       let payload_kind_of_constructor =
         make_gadt_payload_projector ~decl_params:decl.type_params ctx
@@ -1455,10 +1418,10 @@ let compute_provenance_bound_polys env ~(lhs : Solver.ctx -> Ldd.node)
 let check_mode_crossing_polys ~origin ~sub_jkind ~super_jkind
     { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; fast_path } =
   let violating_axes = Ldd.leq_with_reason sub_poly super_poly in
-  let failing_poly = Ldd.sub_subsets sub_poly super_poly in
   match violating_axes with
   | [] -> Ok ()
   | _ ->
+    let failing_poly = Ldd.sub_subsets sub_poly super_poly in
     Error
       (Mode_crossing_error
          { origin;
@@ -1508,6 +1471,10 @@ let best_effort_provenance_error ?fallback_error ~origin ~sub_jkind ~super_jkind
     match make_polys () with
     | provenance_polys ->
       check_mode_crossing_polys ~origin ~sub_jkind ~super_jkind provenance_polys
+    | exception
+        ((Misc.Fatal_error | Stack_overflow | Out_of_memory | Sys.Break) as exn)
+      ->
+      raise exn
     | exception _ -> Ok ()
   in
   match provenance_check with

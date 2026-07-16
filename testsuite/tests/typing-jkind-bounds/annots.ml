@@ -1208,6 +1208,73 @@ Error: The kind of type "t" is immutable_data with t_value
          because of the annotation on the declaration of the type t.
 |}]
 
+type t : value mod shareable = { x : t_value }
+[%%expect {|
+Line 1, characters 0-46:
+1 | type t : value mod shareable = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with t_value
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod shareable
+         because of the annotation on the declaration of the type t.
+|}]
+
+type t : value mod shared = { x : t_value }
+[%%expect {|
+Line 1, characters 0-43:
+1 | type t : value mod shared = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with t_value
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod shared
+         because of the annotation on the declaration of the type t.
+|}]
+
+type t : value mod reading = { x : t_value }
+[%%expect {|
+Line 1, characters 0-44:
+1 | type t : value mod reading = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with t_value
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod reading
+         because of the annotation on the declaration of the type t.
+|}]
+
+type t : value mod read = { x : t_value }
+[%%expect {|
+Line 1, characters 0-41:
+1 | type t : value mod read = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with t_value
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod read
+         because of the annotation on the declaration of the type t.
+|}]
+
+type t : value mod read corrupted = { x : t_value }
+[%%expect {|
+Line 1, characters 0-51:
+1 | type t : value mod read corrupted = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with t_value
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod read corrupted
+         because of the annotation on the declaration of the type t.
+|}]
+
+type t : value mod immutable corrupted = { x : t_value }
+[%%expect {|
+Line 1, characters 0-56:
+1 | type t : value mod immutable corrupted = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with t_value
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of
+           value mod immutable corrupted
+         because of the annotation on the declaration of the type t.
+|}]
+
 type t : value mod external_ = { x : t_value }
 [%%expect {|
 Line 1, characters 0-46:

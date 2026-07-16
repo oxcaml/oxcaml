@@ -18,7 +18,7 @@ Line 1, characters 0-55:
 1 | type t : immutable_data = { mutable x : int [@atomic] }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation immutable_data,
-       because mutable field x : int [@atomic] is not mod immutable.
+       because atomic mutable fields are not mod immutable.
 |}]
 
 (* Records: any non-atomic mutable field is not sync_data. *)
@@ -28,7 +28,7 @@ Line 1, characters 0-40:
 1 | type t : sync_data = { mutable x : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation sync_data,
-       because mutable field x : int is not mod contended.
+       because mutable fields are not mod contended.
 |}]
 
 type t : sync_data =
@@ -38,7 +38,7 @@ Lines 1-2, characters 0-48:
 1 | type t : sync_data =
 2 |   { mutable x : int; mutable y : int [@atomic] }
 Error: This type definition does not satisfy its kind annotation sync_data,
-       because mutable field x : int is not mod contended.
+       because mutable fields are not mod contended.
 |}]
 
 (* Variants: atomic record payloads are sync_data. *)
@@ -54,7 +54,7 @@ Line 1, characters 0-49:
 1 | type t : sync_data = A of { mutable x : int } | B
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation sync_data,
-       because mutable field x : int is not mod contended.
+       because mutable fields are not mod contended.
 |}]
 
 type t : sync_data =
@@ -64,5 +64,5 @@ Lines 1-2, characters 0-53:
 1 | type t : sync_data =
 2 |   A of { mutable x : int; mutable y : int [@atomic] }
 Error: This type definition does not satisfy its kind annotation sync_data,
-       because mutable field x : int is not mod contended.
+       because mutable fields are not mod contended.
 |}]

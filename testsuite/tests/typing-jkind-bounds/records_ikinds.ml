@@ -144,8 +144,7 @@ Line 1, characters 0-39:
 1 | type 'a t : immutable_data = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation immutable_data,
-       because 'a is not mod many contended portable forkable unyielding
-                 stateless immutable.
+       because 'a is not mod forkable unyielding many stateless immutable.
 |}]
 
 type 'a t : immutable_data = { mutable x : 'a }
@@ -155,8 +154,8 @@ Line 1, characters 0-47:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation immutable_data,
        because
-       - 'a is not mod contended portable stateless immutable
-       - mutable field x : 'a is not mod contended immutable
+       - 'a is not mod stateless immutable
+       - mutable fields are not mod immutable
 |}]
 
 type t : immutable_data = { x : int ref }
@@ -165,7 +164,7 @@ Line 1, characters 0-41:
 1 | type t : immutable_data = { x : int ref }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation immutable_data,
-       because int ref is not mod contended immutable.
+       because int ref is not mod immutable.
 |}]
 
 type t : immutable_data = { x : unit -> unit }
@@ -174,8 +173,7 @@ Line 1, characters 0-46:
 1 | type t : immutable_data = { x : unit -> unit }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation immutable_data,
-       because unit -> unit is not mod many portable forkable unyielding
-                 stateless.
+       because unit -> unit is not mod forkable unyielding many stateless.
 |}]
 
 type 'a t : immutable_data = { x : 'a option }
@@ -184,8 +182,7 @@ Line 1, characters 0-46:
 1 | type 'a t : immutable_data = { x : 'a option }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation immutable_data,
-       because 'a is not mod many contended portable forkable unyielding
-                 stateless immutable.
+       because 'a is not mod forkable unyielding many stateless immutable.
 |}]
 
 type t : immutable_data = { x : int; y : int; mutable z : int }
@@ -194,7 +191,7 @@ Line 1, characters 0-63:
 1 | type t : immutable_data = { x : int; y : int; mutable z : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation immutable_data,
-       because mutable field z : int is not mod contended immutable.
+       because mutable fields are not mod immutable.
 |}]
 
 type t : mutable_data = { x : unit -> unit }
@@ -203,8 +200,7 @@ Line 1, characters 0-44:
 1 | type t : mutable_data = { x : unit -> unit }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation mutable_data,
-       because unit -> unit is not mod many portable forkable unyielding
-                 stateless.
+       because unit -> unit is not mod forkable unyielding many stateless.
 |}]
 
 type ('a : value mod portable) t : value mod many = { x : 'a }
@@ -222,7 +218,7 @@ Line 1, characters 0-62:
 1 | type ('a : value mod global) t : value mod global = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod global,
-       because this record type is not mod global aliased.
+       because boxed records are not mod global.
 |}]
 
 type ('a : value mod aliased) t : value mod aliased = { x : 'a }
@@ -231,7 +227,7 @@ Line 1, characters 0-64:
 1 | type ('a : value mod aliased) t : value mod aliased = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod aliased,
-       because this record type is not mod aliased.
+       because boxed records are not mod aliased.
 |}]
 
 type ('a : value mod external_) t : value mod external_ = { x : 'a }
@@ -240,7 +236,7 @@ Line 1, characters 0-68:
 1 | type ('a : value mod external_) t : value mod external_ = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation value mod external_,
-       because this record type is not mod external_.
+       because boxed records are not mod external_.
 |}]
 
 type t : sync_data = { mutable x : int ref [@atomic] }
@@ -295,7 +291,7 @@ Line 1, characters 0-55:
 1 | type 'a t : immutable_data with 'a = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
-       because mutable field x : 'a is not mod contended immutable.
+       because mutable fields are not mod immutable.
 |}]
 
 type 'a t : immutable_data with 'a = { x : 'a -> 'a }
@@ -304,8 +300,7 @@ Line 1, characters 0-53:
 1 | type 'a t : immutable_data with 'a = { x : 'a -> 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
-       because 'a -> 'a is not mod many portable forkable unyielding
-                 stateless.
+       because 'a -> 'a is not mod forkable unyielding many stateless.
 |}]
 
 type 'a t : value mod global with 'a = { x : 'a }
@@ -315,7 +310,7 @@ Line 1, characters 0-49:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          value mod global with 'a,
-       because this record type is not mod global aliased.
+       because boxed records are not mod global.
 |}]
 
 type 'a t : value mod aliased with 'a = { x : 'a }
@@ -325,7 +320,7 @@ Line 1, characters 0-50:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          value mod aliased with 'a,
-       because this record type is not mod aliased.
+       because boxed records are not mod aliased.
 |}]
 
 type 'a t : value mod external_ with 'a = { x : 'a }
@@ -335,7 +330,7 @@ Line 1, characters 0-52:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          value mod external_ with 'a,
-       because this record type is not mod external_.
+       because boxed records are not mod external_.
 |}]
 
 (**** Test 3: Record values cross when appropriate ****)
