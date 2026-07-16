@@ -95,7 +95,12 @@ type _ rep2 = RI : im rep2 | RS : sm rep2
 (let
   (mixed =
      (function {nlocal = 0}
-       param[value<(consts ()) (non_consts ([0: value<int>, *]))>] : int
+       param[value<
+              (consts ())
+               (non_consts ([0: value<int>,
+                             value<
+                              (consts ()) (non_consts ([0: *, float64]))>]))>]
+       : int
        (if (field_imm 0 param)
          (string.length (mixedfield 0  (*,float64) (field_imm 1 param)))
          (mixedfield 0  (value<int>,float64) (field_imm 1 param)))))
