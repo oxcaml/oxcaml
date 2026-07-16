@@ -144,7 +144,7 @@ given rules; "out of scope" means it is not treated here at all.
 | Closure conversion | context only | 01 |
 | Reaper (interprocedural DCE + unboxing) | context only | 01, `docs/reaper.md` |
 | to_cmm: Cmm target machine (control + memory ops); control-flow translation; representation relation; data/primitive lowering; allocation/regions/GC; cross-language soundness | formalized (64-bit little-endian) | 15–20; `docs/to_cmm.md` |
-| to_cmm: 32-bit / big-endian targets; instruction selection below Cmm; SIMD/probe/method/effect lowering; bigarray element decode | out of scope | — (15 §0; 20 §5) |
+| to_cmm: 32-bit / big-endian targets; instruction selection below Cmm; SIMD/probe/method/effect lowering | out of scope | — (15 §0; 20 §5) |
 | to_jsir lowering | context only | 01, `to_jsir/README.md` |
 | -Oclassic mode | context only | 01 |
 | cmx import/export (`Flambda_cmx`, cross-module info) | context only | 01; 07 §6 |
@@ -154,15 +154,15 @@ given rules; "out of scope" means it is not treated here at all.
 | Probes (`Probe_is_enabled`, `Enter_inlined_apply`) | out of scope | — |
 | SIMD vector primitives (128/256/512-bit accessors, `Reinterpret_boxed_vector`) | out of scope | — |
 | Mixed-block detailed layout (`Mixed_block_shape`, value-prefix/flat-suffix split) | formalized | 06 (`P.MixedShape.*`, `P.Variadic.MakeBlock.Mixed`, `P.Unary.BlockLoad.Mixed`, `P.Binary.BlockSet.Mixed`, `P.Static.MixedBlock`); 03 (`WF.Prim.MakeBlockMixed`, shape grammar); 07/08 (block-shape typing, `T.Meet.BlockShape`) |
-| Bigarrays (`Bigarray_load`/`_set`/`_length`, kinds/layouts) | coarse / descriptive | 06 (element decode & multi-dim indexing out of scope) |
+| Bigarrays (`Bigarray_load`/`_set`/`_length`/`_get_alignment`, kinds/layouts, element decode, multi-dim indexing) | formalized | 06 (`P.Binary.BigarrayLoad`, `P.Ternary.BigarraySet`, `P.Unary.BigarrayLength`, `P.Binary.BigarrayGetAlignment`, `P.Bigarray.Indexing`); 17 (`R.Obj.Bigarray`); 18 (`TC.Prim.BigarrayAccess`, `TC.Prim.BigarrayLength`) |
 | Flambda invariant checks (`Flambda_features.check_invariants`) | out of scope | — |
 
 Notes on the "out of scope" rows: these constructs all exist in the code — the
 call kinds in `middle_end/flambda2/terms/call_kind.mli` (`Method`, `Effect`),
 and the primitives in `middle_end/flambda2/terms/flambda_primitive.mli`
 (`nullary_primitive` for probes; `string_accessor_width`'s `One_twenty_eight` /
-`Two_fifty_six` / `Five_twelve` and `Reinterpret_boxed_vector` for SIMD; the
-`Bigarray_*` cases). They are listed here so their absence
+`Two_fifty_six` / `Five_twelve` and `Reinterpret_boxed_vector` for SIMD). They
+are listed here so their absence
 from later chapters is a deliberate omission, not an oversight. The operational
 semantics (04) covers `Function` and `C_call` application; `Method` and `Effect`
 applications are noted there as unformalized. A later phase may promote any of

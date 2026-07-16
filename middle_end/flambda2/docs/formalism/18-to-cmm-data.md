@@ -354,7 +354,7 @@ int→float64→float32); so `TC.Prim.NumConv` is SOUND and the bug is in
 The nativeint widening is a 64-bit-target detail.
 ```
 
-## 7. Strings and arrays
+## 7. Strings, arrays, and bigarrays
 
 ```rule
 RULE TC.Prim.StringLoad
@@ -395,6 +395,55 @@ CSE-eligible (13 §4.4). Value stores use caml_modify (heap) / caml_modify_local
 Out-of-bounds is undef (06, checks inserted by the frontend, P.Unchecked.*).
 ```
 
+```rule
+RULE TC.Prim.BigarrayAccess
+STATUS normative
+CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#bigarray_load_or_store
+CODE backend/cmm_helpers.ml#bigarray_load
+CODE backend/cmm_helpers.ml#bigarray_store
+VERIFIED 14-validation/bigarray_access.md
+---
+Bigarray_load (bk, flat offset i tagged):  ⟦ba; i⟧ ⤳
+  Cop(Cload{chunk(bk); Mutable}, [array_indexing{typ:Addr} log2(elt_size(bk)) data i])
+  where data = Cop(Cload{Word_int; Mutable}, [field_address ba 1])
+Bigarray_set (bk, …):  ⟦ba; i; v⟧ ⤳ the store dual at the same address
+--------------------------------------------------
+Commutes with ≈: element i of the off-heap storage at the data pointer, scaled
+by elt_size(bk) (R.Obj.Bigarray); loads yield decode_bk(ē[i]) ≈ᵥ ·, stores
+update the off-heap bytes (06 P.Binary.BigarrayLoad / P.Ternary.BigarraySet).
+NOTES: array_indexing takes the TAGGED offset and folds the untag into the
+scale, as for arrays. chunk(bk) per bigarray_word_kind: e.g. Byte_signed/
+Byte_unsigned (sign/zero extension done by the chunked load), Single{reg=
+Float64} for Float32 (widening) vs Single{reg=Float32} for Float32_t, Double,
+Word_int. Float16 loads Sixteen_unsigned then float_of_float16 (stores
+float16_of_float). Complex kinds do TWO loads at addr and addr + elt_size/2
+boxed with box_complex (allocates — the generative effect in 06); stores write
+complex_re/complex_im separately. The kind round-trips through
+Bigarray_kind.to_lambda before cmm_helpers re-derives elt_size/chunk, so
+Flambda's element_kind and Cmm's bigarray_word_kind tables are kept consistent
+only by convention. num_dimensions and layout are ignored here (already
+resolved by P.Bigarray.Indexing). Bigarray_get_alignment n lowers via
+bigstring_get_alignment: (n−1) land (data + i), data likewise loaded from
+field 1 (06 P.Binary.BigarrayGetAlignment).
+```
+
+```rule
+RULE TC.Prim.BigarrayLength
+STATUS normative
+CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
+CODE backend/cmm_helpers.ml#field_address
+VERIFIED 14-validation/bigarray_access.md
+---
+Bigarray_length {dimension = d}:  ⟦ba⟧ ⤳
+  Cop(Cload{Word_int; Mutable}, [field_address ba (4 + d)])
+--------------------------------------------------
+Commutes with ≈: reads dimension d from the bigarray descriptor
+(R.Obj.Bigarray field 4+d; 06 P.Unary.BigarrayLength).
+NOTES: A Mutable Word_int load of an ordinary block field — matching the
+reading_from_a_block(Mutable) classification in 06 (not CSE-able across
+effectful code).
+```
+
 ## 8. Summary of rules
 
 Simples / schema: `TC.Simple`, `TC.Prim.Sound`.
@@ -409,4 +458,4 @@ Blocks: `TC.Prim.MakeBlock`, `TC.Prim.BlockLoad`, `TC.Prim.BlockSet`.
 Closures: `TC.Prim.ProjectFunctionSlot`, `TC.Prim.ProjectValueSlot`.
 
 Conversions / strings / arrays: `TC.Prim.NumConv`, `TC.Prim.StringLoad`,
-`TC.Prim.ArrayAccess`.
+`TC.Prim.ArrayAccess`, `TC.Prim.BigarrayAccess`, `TC.Prim.BigarrayLength`.

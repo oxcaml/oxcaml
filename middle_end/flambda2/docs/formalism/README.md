@@ -45,14 +45,14 @@ the sync protocol below says what to do.
 
 ## Status & validation
 
-As of 2026-07-14 the formalism has **439 rules** across chapters 02-20:
-**287 normative** (the code must satisfy them), **66 descriptive** (current
-algorithms/heuristics that may change), and **86 conjectured** (believed but not
+As of 2026-07-14 the formalism has **443 rules** across chapters 02-20:
+**293 normative** (the code must satisfy them), **65 descriptive** (current
+algorithms/heuristics that may change), and **85 conjectured** (believed but not
 yet checked against the code). Counts and per-chapter breakdown are regenerated
 in [`rule-index.md`](rule-index.md).
 
 Chapters 01-20 were adversarially verified against the code, and the whole
-system was validated against **45 case studies** in
+system was validated against **46 case studies** in
 [`14-validation/`](14-validation/) using a prediction-first protocol (predict the
 output and cite rules *before* reading the actual output): **40 MATCH,
 1 PARTIAL, 4 MISMATCH**. Two of the mismatches were resolved by fixing the formalism

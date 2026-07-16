@@ -67,7 +67,7 @@ heap object o ::=
   | Array(ak, μ, v̄)                -- an array of element-kind ak
   | Bytes(μ, b̄)                    -- a string/bytes value (b̄ a byte sequence)
   | Code(cid ↦ code)               -- a piece of code (see §1.5)
-  | …                              -- FloatBlock, MixedBlock, Bigstring, Lazy: see [§06](06-primitives-memory.md)
+  | …                              -- FloatBlock, MixedBlock, Bigstring, Bigarray, Lazy: see [§06](06-primitives-memory.md)
 
 funs : Function_slot ⇀ (Code_id × arity-info)
 env  : Value_slot ⇀ value

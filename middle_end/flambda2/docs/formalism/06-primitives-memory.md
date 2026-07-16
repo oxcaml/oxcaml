@@ -50,6 +50,7 @@ o ::= Block(t, μ, v̄)          scannable block: tag t : Tag.Scannable, mutabil
     | Array(ak, μ, v̄)          array of kind ak (unarized element sequence v̄)
     | Bytes(μ, b̄)              string/bytes: byte sequence b̄
     | Bigstring(b̄)             off-heap byte buffer (always mutable)
+    | Bigarray(bk, layout, d̄, ē)  bigarray: element kind bk, layout, dims d̄ = [d₁ … dₙ], off-heap elements ē (always mutable)
     | Closures(…)              set of closures ([§04](04-opsem.md), built by OS.Let)
     | Boxed(κ, c)              boxed number of boxable kind κ holding constant c ([§05](05-primitives-scalar.md))
     | Lazy(t, v)               lazy/forward block, lazy_block_tag t ∈ {Lazy_tag, Forward_tag}
@@ -117,7 +118,29 @@ chapter uses, read off `flambda_primitive.mli`:
 - **`Bigarray_kind`** (`Float16`, `Float32`, `Float32_t`, `Float64`, `Sint8`,
   `Uint8`, `Sint16`, `Uint16`, `Int32`, `Int64`, `Int_width_int`,
   `Targetint_width_int`, `Complex32`, `Complex64`) and **`Bigarray_layout`**
-  (`C` | `Fortran`) describe bigarray element storage and index order.
+  (`C` | `Fortran`) describe bigarray element storage and index order. Each
+  kind fixes both a storage width and the Flambda kind elements are
+  loaded/stored at (`Bigarray_kind.element_kind`,
+  `backend/cmm_helpers.ml#bigarray_elt_size_in_bytes`):
+
+  | `Bigarray_kind` | storage (bytes) | access kind |
+  |---|---|---|
+  | `Float16` | 2 | `naked_float` (widen/narrow on access) |
+  | `Float32` | 4 | `naked_float` (widen/narrow on access) |
+  | `Float32_t` | 4 | `naked_float32` |
+  | `Float64` | 8 | `naked_float` |
+  | `Sint8`, `Uint8` | 1 | `naked_immediate` (sign-/zero-extend) |
+  | `Sint16`, `Uint16` | 2 | `naked_immediate` (sign-/zero-extend) |
+  | `Int32` | 4 | `naked_int32` |
+  | `Int64` | 8 | `naked_int64` |
+  | `Int_width_int` | word | `naked_immediate` |
+  | `Targetint_width_int` | word | `naked_nativeint` |
+  | `Complex32` | 8 (2×f32) | `value` (boxed complex; read allocates) |
+  | `Complex64` | 16 (2×f64) | `value` (boxed complex; read allocates) |
+
+  These are the only element kinds: `Lambda.bigarray_kind` additionally has
+  `Pbigarray_unknown` (and layout `Pbigarray_unknown_layout`), but those never
+  reach Flambda — see P.Bigarray.Indexing.
 - **`string_accessor_width`** (`Eight`, `Eight_signed`, `Sixteen`,
   `Sixteen_signed`, `Thirty_two`, `Single`, `Sixty_four`, `One_twenty_eight`,
   `Two_fifty_six`, `Five_twelve`, the vector ones carrying `{aligned}`) gives
@@ -851,10 +874,12 @@ RULE P.Unary.BigarrayLength
 STATUS normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive
+VERIFIED 14-validation/bigarray_access.md
 ---
 p = Bigarray_length { dimension = d }
+H(ℓ) = Bigarray(bk, layout, [d₁ … dₙ], ē)      1 ≤ d ≤ n
 --------------------------------------------------
-⟦p⟧(ptr ℓ; H) = (naked_imm size_d, H)
+⟦p⟧(ptr ℓ; H) = (naked_imm d_d, H)
 NOTES: Returns the size of dimension d of the bigarray (1 ≤ d ≤ 3, restricted by
 the frontend). Classified reading_from_a_block(Mutable) — Has_coeffects —
 because a bigarray's dimensions are read from a mutable descriptor field, unlike
@@ -1086,36 +1111,86 @@ Phys_equal is CSE-eligible.
 
 ### Bigarray_load, Bigarray_get_alignment
 
+Bigarray accesses reach Flambda with a single flat offset argument; the
+multi-dimensional surface form is lowered during `from_lambda`:
+
+```rule
+RULE P.Bigarray.Indexing
+STATUS descriptive
+CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#bigarray_indexing
+CODE middle_end/flambda2/from_lambda/lambda_to_lambda_transforms.ml#transform_primitive
+VERIFIED 14-validation/bigarray_access.md
+---
+Pbigarrayref/Pbigarrayset with known kind bk and layout, indices i₁ … iₙ
+--------------------------------------------------
+lowered to Bigarray_load/Bigarray_set(n, bk, layout) applied to the flat offset
+  C:       offset = (…((i₁·d₂ + i₂)·d₃ + i₃)…)·dₙ + iₙ
+  Fortran: offset = (…(((iₙ−1)·dₙ₋₁ + (iₙ₋₁−1))·dₙ₋₂ + …)…)·d₁ + (i₁−1)
+with, unless the access is unsafe, one bounds check per dimension
+(0 ≤ iₖ < dₖ for C; 1 ≤ iₖ ≤ dₖ for Fortran) guarding the access
+NOTES: The offset arithmetic is ordinary tagged-immediate Mul/Add, and each
+dimension size dₖ is a Bigarray_length {dimension = k} read — issued once in
+the bounds check and again in the offset computation (see the CR in
+bigarray_indexing about the duplicated length access). The loaded/stored value
+is boxed/tagged (resp. unboxed/untagged) around the primitive per
+element_kind(bk). Accesses whose Lambda kind or layout is *unknown*
+(Pbigarray_unknown/_unknown_layout) never become Flambda primitives: an earlier
+Lambda-to-Lambda pass rewrites them to caml_ba_get_N/caml_ba_set_N C calls
+(caml_ba_float32_get_N/_set_N for float32_t), supported for 1 ≤ N ≤ 3 only.
+Descriptive: this documents the from_lambda lowering (context, [§01](01-overview.md)),
+not a Flambda term rewrite.
+```
+
 ```rule
 RULE P.Binary.BigarrayLoad
-STATUS descriptive
+STATUS normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.ml#reading_from_a_bigarray
+CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_bigarray_load
+VERIFIED 14-validation/bigarray_access.md
 ---
 p = Bigarray_load(dims, bk, layout)
-H(ℓ) = a bigarray with element kind bk, layout, and dims dimensions
-i = a valid flat offset for the (already index-computed) access
+H(ℓ) = Bigarray(bk, layout, [d₁ … dₙ], ē)      n = dims
+i = tagged_imm j      0 ≤ j < d₁·…·dₙ
+bk ∉ {Complex32, Complex64}
 --------------------------------------------------
-⟦p⟧(ptr ℓ, i; H) = (element bk at offset i, H)
-NOTES: Coarse. The frontend has already lowered multi-dimensional indexing to a
-flat offset (bigarray_indexing) and inserted per-dimension bounds checks, so this
-primitive is a single unchecked element read. Coeffects: Has_coeffects for all
-kinds (bigarray storage is mutable); the Complex kinds additionally have
-Only_generative_effects Immutable because reading a complex allocates a boxed
-pair. Non-complex reads are (No_effects, Has_coeffects, …). Marked descriptive:
-the element decode and dimension arithmetic are not modelled precisely.
+⟦p⟧(ptr ℓ, i; H) = (decode_bk(ē[j]), H)
+NOTES: Unchecked single-element read at flat offset j (in element units, layout
+order); the frontend has already flattened multi-dimensional indexing and
+inserted per-dimension bounds checks (P.Bigarray.Indexing). The offset argument
+is a *tagged* immediate (bigarray_index_kind = value), unlike
+String_or_bigstring_load's naked_nativeint index. decode_bk yields a naked
+number of Bigarray_kind.element_kind(bk) per the taxonomy table: Float16/Float32
+widen the stored 16-/32-bit float to naked_float; Sint8/Sint16 sign-extend and
+Uint8/Uint16 zero-extend to naked_immediate; the remaining kinds read at their
+stored width. For bk ∈ {Complex32, Complex64} the result is instead (ptr ℓ′, H′)
+where (ℓ′, H′) = alloc(boxed complex of ē[j], H) — hence
+Only_generative_effects Immutable. Effects/coeffects
+(reading_from_a_bigarray): (No_effects, Has_coeffects, …) for non-complex
+kinds (bigarray storage is always mutable, so never CSE-able), plus the
+generative effect for complex kinds. undef on out-of-range j or representation
+mismatch. Simplify never const-folds these loads
+(simplify_bigarray_load returns unknown at element_kind(bk)).
 ```
 
 ```rule
 RULE P.Binary.BigarrayGetAlignment
-STATUS conjectured
+STATUS normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
+CODE backend/cmm_helpers.ml#bigstring_get_alignment
 ---
+p = Bigarray_get_alignment n      n a power of two
+H(ℓ) = Bigstring(b̄)      i = naked_imm j
 --------------------------------------------------
-⟦Bigarray_get_alignment n⟧(ptr ℓ, i; H) = (naked_imm ((base(ℓ) + i) mod n), H)
-NOTES: Returns the alignment of the data pointer plus offset, modulo n; used to
-decide whether an aligned vector access is legal. No_effects, No_coeffects.
-Conjectured.
+⟦p⟧(ptr ℓ, i; H) = (naked_imm ((data_ptr(ℓ) + j) land (n − 1)), H)
+NOTES: Returns the byte address of the bigstring's data pointer plus offset,
+modulo n (as a bit-mask; the lowering is (n−1) land (data + j)); zero means the
+access is n-byte aligned. Used by the frontend to guard aligned vector
+bigstring accesses (lambda_to_flambda_primitives.ml
+#bigstring_alignment_validity_condition); likewise, safe bigstring loads/sets
+bound-check against Bigarray_length {dimension = 1} — a bigstring is a 1-d
+Char bigarray. No_effects, No_coeffects, and CSE-eligible (the data pointer of
+a given bigstring never changes).
 ```
 
 ### Atomic_load_field, Poke, Read_offset
@@ -1222,18 +1297,27 @@ No_coeffects, …).
 
 ```rule
 RULE P.Ternary.BigarraySet
-STATUS descriptive
+STATUS normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.ml#writing_to_a_bigarray
+CODE middle_end/flambda2/simplify/simplify_ternary_primitive.ml#simplify_bigarray_set
+VERIFIED 14-validation/bigarray_access.md
 ---
-p = Bigarray_set(dims, bk, layout)      i a valid flat offset      v an element of kind bk
-H′ = H with the bk-element at flat offset i set to v
+p = Bigarray_set(dims, bk, layout)
+H(ℓ) = Bigarray(bk, layout, [d₁ … dₙ], ē)      n = dims
+i = tagged_imm j      0 ≤ j < d₁·…·dₙ
+v of kind element_kind(bk)
 --------------------------------------------------
-⟦p⟧(ptr ℓ, i, v; H) = (tagged_imm 0, H′)
-NOTES: Coarse counterpart of Bigarray_load; the frontend has flattened the index
-and inserted bounds checks. (Arbitrary_effects, No_coeffects, …) for every kind
-(the complex-element read that a complex write performs is of immutable fields,
-so it adds no observable coeffect). Descriptive.
+⟦p⟧(ptr ℓ, i, v; H) = (tagged_imm 0, H[ℓ ↦ Bigarray(bk, layout, d̄, ē[j ↦ encode_bk(v)])])
+NOTES: Write dual of P.Binary.BigarrayLoad; the frontend has flattened the
+index and inserted bounds checks (P.Bigarray.Indexing). encode_bk narrows to
+the storage width of the taxonomy table: Float16/Float32 round the naked_float
+to 16-/32-bit precision, Sint8/Uint8/Sint16/Uint16 truncate to the low bits;
+for bk ∈ {Complex32, Complex64}, v is a pointer to a boxed complex and both
+parts are stored (reading its fields is of immutable data, so it adds no
+observable coeffect). (Arbitrary_effects, No_coeffects, …) for every kind.
+undef on out-of-range j or representation mismatch. Simplify treats the result
+as opaque unit (simplify_bigarray_set).
 ```
 
 ### Atomic read-modify-write
@@ -1407,6 +1491,8 @@ Quaternary: `P.Quaternary.AtomicCompareAndSetField`.
 Nullary: `P.Nullary.StateAccessors`, `P.Nullary.ControlBarriers`.
 
 Unchecked: `P.Unchecked.FrontendInsertsChecks`.
+
+Bigarray lowering: `P.Bigarray.Indexing`.
 
 Note that `Block_set` is a Binary primitive (block + value; the field index is
 an immediate on the primitive), so its rule lives under `P.Binary.*`.

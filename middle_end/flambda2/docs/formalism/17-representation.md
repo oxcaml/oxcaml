@@ -280,6 +280,36 @@ P.Binary.StringOrBigstringLoad). LITTLE-ENDIAN baked in.
 ```
 
 ```rule
+RULE R.Obj.Bigarray
+STATUS normative
+CODE backend/cmm_helpers.ml#bigarray_load
+CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
+VERIFIED 14-validation/bigarray_access.md
+---
+H ⊢ Bigarray(bk, layout, [d₁ … dₙ], ē) @ a ≈ₒ M    iff
+  M[a−8] = hdr(custom_tag, size, col, 0)
+  M[a]      = the bigarray custom-operations pointer
+  M[a+8]    = data, a pointer to off-heap element storage (not under L)
+  M[a+16] = n (num_dims)      M[a+24] = flags (encoding bk and layout)
+  M[a+32] = proxy
+  M[a + 8·(4+d)] = d_d    for 1 ≤ d ≤ n
+  and element ē[j] occupies the elt_size(bk) bytes at data + j·elt_size(bk)
+  (little-endian; complex elements store re then im, each elt_size/2 bytes)
+--------------------------------------------------
+A bigarray: a custom block whose field 1 is the off-heap data pointer, with
+dimension d at field 4+d; elements are addressed off the data pointer, scaled
+by elt_size(bk).
+NOTES: The block mirrors struct caml_ba_array (runtime/caml/bigarray.h) after
+the ops word: data, num_dims, flags, proxy, dim[]. Bigarray_length {dimension=d}
+lowers to a Word_int Mutable load of field 4+d (ch. 18 TC.Prim.BigarrayLength);
+element access loads the data pointer from field 1 then indexes off-heap
+(TC.Prim.BigarrayAccess). A Bigstring(b̄) is exactly a 1-d Uint8 bigarray under
+this layout, which is why bigstring bounds checks read Bigarray_length
+{dimension = 1} (06, P.Binary.BigarrayGetAlignment NOTES). LITTLE-ENDIAN baked
+in.
+```
+
+```rule
 RULE R.Obj.Boxed
 STATUS normative
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#box_number
@@ -420,6 +450,6 @@ faithful to the code that exists ([`01`](01-overview.md); [`15`](15-cmm.md) §0)
 Values: `R.Val.Imm`, `R.Val.NakedNumber`, `R.Val.Pointer`, `R.Val.Clos`.
 
 Headers/objects: `R.Header`, `R.Obj.Block`, `R.Obj.FloatBlock`, `R.Obj.MixedBlock`,
-`R.Obj.Array`, `R.Obj.Bytes`, `R.Obj.Boxed`, `R.Obj.Closures`.
+`R.Obj.Array`, `R.Obj.Bytes`, `R.Obj.Bigarray`, `R.Obj.Boxed`, `R.Obj.Closures`.
 
 Whole-heap/observation: `R.Heap`, `R.Observe`.
