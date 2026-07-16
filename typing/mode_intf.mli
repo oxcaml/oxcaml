@@ -585,13 +585,6 @@ module type S = sig
     val noalloc : lr
 
     val alloc : lr
-
-    module Guts : sig
-      (** This module exposes some functions that allow callers to inspect modes
-          directly. *)
-
-      val get_loose_ceil : ('l * 'r) t -> Const.t
-    end
   end
 
   type 'a comonadic_with =

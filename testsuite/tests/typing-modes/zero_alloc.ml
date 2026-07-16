@@ -1657,6 +1657,47 @@ let (f_explicit_exclave @ noalloc) x = exclave_ fun y -> x
 val f_explicit_exclave : 'a -> ('b -> 'a) @ local = <fun>
 |}]
 
+(* Other variations to test whether we can detect different format of noalloc
+  annotation. *)
+let f_explicit: _ @ noalloc_strict = fun x -> (fun y -> x)
+[%%expect{|
+Line 1, characters 46-58:
+1 | let f_explicit: _ @ noalloc_strict = fun x -> (fun y -> x)
+                                                  ^^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+let f_explicit_exclave: _ @ noalloc_strict = fun x -> exclave_ (fun y -> x)
+[%%expect{|
+val f_explicit_exclave : 'a -> ('b -> 'a) @ local = <fun>
+|}]
+
+let f_explicit = (fun x -> (fun y -> x) : (int -> int -> int) @ noalloc_strict)
+[%%expect{|
+Line 1, characters 27-39:
+1 | let f_explicit = (fun x -> (fun y -> x) : (int -> int -> int) @ noalloc_strict)
+                               ^^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+let f_explicit_exclave = (fun x -> exclave_ (fun y -> x) : (int -> (int -> int) @ local) @ noalloc_strict)
+[%%expect{|
+val f_explicit_exclave : int -> (int -> int) @ local = <fun>
+|}]
+
+let f_explicit = (fun x -> (fun y -> x) : _ @ noalloc_strict)
+[%%expect{|
+Line 1, characters 27-39:
+1 | let f_explicit = (fun x -> (fun y -> x) : _ @ noalloc_strict)
+                               ^^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+let f_explicit_exclave = (fun x -> exclave_ (fun y -> x) : _ @ noalloc_strict)
+[%%expect{|
+val f_explicit_exclave : 'a -> ('b -> 'a) @ local = <fun>
+|}]
+
 (* Contrast: a single-argument function builds no inner closure.
   Its return type is not a closure, so it can be global. *)
 let (g @ noalloc_strict) x = x

@@ -456,6 +456,10 @@ type expected_mode =
     strictly_stack. However, if we do that, there would be uncaught exception
     in Test 5h in test typing-modes/zero_alloc.ml. We will review this later. *)
 
+    alloc_annot : Allocation.Const.t option;
+    (** [Some c] iff the function was directly annotated with the allocation
+    mode [c] on its binding (e.g. [let (f @ noalloc) x = ...]). *)
+
     tuple_modes : (Value.r * Location.t) list option;
     (** No invariant between this and [mode]. It is UNSOUND to ignore this
         field. If this is [Some [x0; x1; ..]]:
@@ -539,6 +543,7 @@ let mode_default mode =
     mode = Value.disallow_left mode;
     strictly_local = false;
     strictly_stack = false;
+    alloc_annot = None;
     tuple_modes = None }
 
 let mode_legacy = mode_default Value.legacy
@@ -661,13 +666,6 @@ let mode_strictly_stack expected_mode =
   { expected_mode
     with strictly_stack = true
   }
-
-let is_not_alloc_mode expected_mode =
-  let ceil =
-    Allocation.Guts.get_loose_ceil
-      (Value.proj_comonadic Allocation expected_mode.mode)
-  in
-  not (Allocation.Const.le Allocation.Const.max ceil)
 
 let mode_coerce mode expected_mode =
   mode_morph (fun m -> Value.meet [m; mode]) expected_mode
@@ -6283,9 +6281,10 @@ let split_function_ty
     | false -> env
     | true ->
         let env =
-          if is_not_alloc_mode expected_mode
-          then Env.add_closure_noalloc_lock env
-          else env
+          match expected_mode.alloc_annot with
+          | Some (Noalloc | Noalloc_strict) ->
+            Env.add_closure_noalloc_lock env
+          | Some Alloc | None -> env
         in
         let env =
           Env.add_closure_lock
@@ -6467,6 +6466,11 @@ let pat_modes ~env ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
       in
       Some env_alloc_mode, mode_default exp_mode
     else None, exp_mode
+  in
+  let exp_mode =
+    { exp_mode with
+      alloc_annot =
+      (mode_annots_from_pat spat).mode_modes.allocation }
   in
   attrs, pat_mode, env_alloc_mode, exp_mode, spat
 
@@ -11657,6 +11661,9 @@ and type_expect_mode ~loc ~env ~(modes : Alloc.Const.Option.t) expected_mode =
       match modes.areality with
       | Some Local -> mode_strictly_local expected_mode
       | _ -> expected_mode
+    in
+    let expected_mode =
+      { expected_mode with alloc_annot = modes.allocation }
     in
     expected_mode
 
