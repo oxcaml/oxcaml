@@ -841,7 +841,7 @@ Line 1, characters 0-61:
 Error: This type definition does not satisfy its kind annotation immutable_data,
        because
        - mutable fields are not mod immutable
-       - int -> int is not mod forkable unyielding many stateless
+       - functions are not mod forkable unyielding many stateless
 |}]
 
 type t : any mod external_ = { x : int }
@@ -1946,7 +1946,7 @@ Error: This type definition does not satisfy its kind annotation
          value mod portable contended,
        because
        - 'a is not mod portable
-       - 'a b is not mod portable
+       - b is not mod portable
 |}]
 
 type 'a t : value mod contended portable with 'a

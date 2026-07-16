@@ -67,9 +67,26 @@ module Provenance = struct
     name
 
   let register (ty : Types.type_expr) : Ldd.Name.t =
-    Format_doc.asprintf "%a" Jkind.format_type_expr ty
-    |> collapse_whitespace
-    |> register_text ~phrase:false
+    (* A surviving residual for an occurrence reflects only the head
+       constructor's own contribution (the decomposition zeroes anything
+       flowing through a separately-tracked inner type or parameter), so
+       name the head rather than the full type expression: the constructor
+       for [Tconstr], a class-of-types phrase for the built-in shapes. *)
+    let register_type ty =
+      Format_doc.asprintf "%a" Jkind.format_type_expr ty
+      |> collapse_whitespace
+      |> register_text ~phrase:false
+    in
+    match Types.get_desc ty with
+    | Types.Tarrow _ -> register_text ~phrase:true "functions"
+    | Types.Ttuple _ -> register_text ~phrase:true "tuples"
+    | Types.Tunboxed_tuple _ -> register_text ~phrase:true "unboxed tuples"
+    | Types.Tobject _ -> register_text ~phrase:true "objects"
+    | Types.Tvariant _ -> register_text ~phrase:true "polymorphic variants"
+    | Types.Tpackage _ -> register_text ~phrase:true "first-class modules"
+    | Types.Tconstr (path, _ :: _, _) ->
+      register_type (Btype.newgenty (Types.Tconstr (path, [], ref Types.Mnil)))
+    | _ -> register_type ty
 
   let reset () = names := []
 

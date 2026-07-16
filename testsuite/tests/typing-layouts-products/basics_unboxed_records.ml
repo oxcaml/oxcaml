@@ -765,9 +765,7 @@ Line 1, characters 0-61:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          any mod portable & any mod portable,
-       because
-       - int -> int is not mod portable
-       - int -> q is not mod portable
+       because functions are not mod portable.
 |}]
 (* CR layouts v2.8: That error message is incomprehensible without
    with-bounds. Internal ticket 5096. *)

@@ -2342,7 +2342,7 @@ Lines 1-6, characters 0-30:
 5 |     d : char }
 6 |   constraint 'b = int * string
 Error: This type definition does not satisfy its kind annotation value mod portable,
-       because bool -> bool is not mod portable.
+       because functions are not mod portable.
 |}]
 
 (****************************************************************************)

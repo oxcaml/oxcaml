@@ -640,6 +640,23 @@ Error: The kind of type "t" is immutable_data with 'a u
          because of the annotation on the declaration of the type t.
 |}]
 
+(* A residual for a type-constructor occurrence covers only the
+   constructor's own contribution: [w] is blamed for the axes it fails on
+   any instantiation, while the parameter's flow is blamed on ['a]. *)
+type 'a w = { mutable x : int; y : 'a }
+type 'a c : value mod portable contended = { f : 'a w }
+[%%expect {|
+type 'a w = { mutable x : int; y : 'a; }
+Line 2, characters 0-55:
+2 | type 'a c : value mod portable contended = { f : 'a w }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is mutable_data with 'a
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type c.
+|}]
+
 (* GADTs: only the offending constructor's payload is reported. *)
 type _ t : value mod contended =
   | I : int -> int t
