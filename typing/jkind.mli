@@ -712,6 +712,8 @@ val set_printtyp_path : (Format_doc.formatter -> Path.t -> unit) -> unit
     module. *)
 val set_print_type_expr : Types.type_expr Format_doc.printer -> unit
 
+val format_type_expr : Types.type_expr Format_doc.printer
+
 (** Provides the [raw_type_expr] formatter back up the dependency chain to this
     module. *)
 val set_raw_type_expr : (Format.formatter -> Types.type_expr -> unit) -> unit

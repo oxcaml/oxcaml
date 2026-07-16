@@ -27,6 +27,8 @@ val leq : t -> t -> bool
 
 val co_sub : t -> t -> t
 
+val imply : t -> t -> t
+
 val equal : t -> t -> bool
 
 val hash : t -> int
