@@ -719,10 +719,43 @@ and join_constructor_shape shape1 shape2 =
   | Constructor_uniform fields1, Constructor_uniform fields2
     when List.length fields1 = List.length fields2 ->
       Some (Constructor_uniform (List.map2 join_value_kind fields1 fields2))
-  | Constructor_mixed _, Constructor_mixed _
-    when equal_constructor_shape shape1 shape2 ->
-      Some shape1
+  | Constructor_mixed shape1, Constructor_mixed shape2 ->
+      Option.map
+        (fun shape -> Constructor_mixed shape)
+        (join_mixed_block_shape shape1 shape2)
   | (Constructor_uniform _ | Constructor_mixed _), _ -> None
+
+and join_mixed_block_shape shape1 shape2 =
+  if Array.length shape1 <> Array.length shape2 then None
+  else
+    Misc.Stdlib.Array.all_somes
+      (Array.map2 join_mixed_block_element shape1 shape2)
+
+and join_mixed_block_element (m1 : unit mixed_block_element)
+    (m2 : unit mixed_block_element) : unit mixed_block_element option =
+  match m1, m2 with
+  | Value v1, Value v2 -> Some (Value (join_value_kind v1 v2))
+  | Product es1, Product es2 when Array.length es1 = Array.length es2 ->
+      Option.map (fun es -> Product es) (join_mixed_block_shape es1 es2)
+  | Float_boxed (), Float_boxed () -> Some m1
+  | Float64, Float64
+  | Float32, Float32
+  | Bits8, Bits8
+  | Bits16, Bits16
+  | Bits32, Bits32
+  | Bits64, Bits64
+  | Vec128, Vec128
+  | Vec256, Vec256
+  | Vec512, Vec512
+  | Word, Word
+  | Untagged_immediate, Untagged_immediate -> Some m1
+  | Splice_variable id1, Splice_variable id2 when Ident.equal id1 id2 ->
+      Some m1
+  | ( ( Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
+      | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
+      | Untagged_immediate | Product _ | Splice_variable _ ),
+      _ ) ->
+      None
 
 and join_non_consts non_consts1 non_consts2 =
   let sorted = List.sort (fun (tag1, _) (tag2, _) -> Int.compare tag1 tag2) in
