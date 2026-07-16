@@ -209,4 +209,9 @@ type t =
 
 val print : Format.formatter -> t -> unit
 
+(** The size of a DWARF expression: the sum of the sizes of its operators. (See
+    also [Simple_location_description.size], which is expressed in terms of this
+    function.) *)
+val size_of_expression : t list -> Dwarf_int.t
+
 include Dwarf_emittable.S with type t := t
