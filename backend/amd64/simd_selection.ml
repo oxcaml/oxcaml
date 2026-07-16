@@ -1260,19 +1260,24 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
           ~res_count operation ]
   in
   let create_const_vec consts =
+    (* [consts] is in group order: the first scalar instruction of the group
+       accesses the lowest address, and must provide the least significant lane
+       of the vector. [word0] is the least significant word. *)
     let lows, highs = Misc.Stdlib.List.split_at (length / 2) consts in
     let pack_int64 nums =
       let mask =
         Int64.shift_right_logical Int64.minus_one (64 - width_in_bits)
       in
+      (* The fold places the last element of the list in the least significant
+         lane, hence the [List.rev]. *)
       List.fold_left
         (fun target num ->
           Int64.logor
             (Int64.shift_left target width_in_bits)
             (Int64.logand num mask))
-        0L nums
+        0L (List.rev nums)
     in
-    Operation.Const_vec128 { word0 = pack_int64 highs; word1 = pack_int64 lows }
+    Operation.Const_vec128 { word0 = pack_int64 lows; word1 = pack_int64 highs }
     |> make_default ~arg_count:0 ~res_count:1
   in
   let add_op =
@@ -1373,37 +1378,13 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       in
       Option.bind ops (fun (sse, avx) ->
           sse_or_avx sse avx |> make_default ~arg_count ~res_count)
-    | Icomp intcomp -> (
-      match intcomp with
-      | Ceq ->
-        let sse, avx =
-          match width_type with
-          | W512 -> assert false
-          | W256 -> assert false
-          | W128 -> assert false
-          | W64 -> pcmpeqq, vpcmpeqq_X_X_Xm128
-          | W32 -> pcmpeqd, vpcmpeqd_X_X_Xm128
-          | W16 -> pcmpeqw, vpcmpeqw_X_X_Xm128
-          | W8 -> pcmpeqb, vpcmpeqb_X_X_Xm128
-        in
-        sse_or_avx sse avx |> make_default ~arg_count ~res_count
-      | Cgt ->
-        let sse, avx =
-          match width_type with
-          | W512 -> assert false
-          | W256 -> assert false
-          | W128 -> assert false
-          | W64 -> pcmpgtq, vpcmpgtq_X_X_Xm128
-          | W32 -> pcmpgtd, vpcmpgtd_X_X_Xm128
-          | W16 -> pcmpgtw, vpcmpgtw_X_X_Xm128
-          | W8 -> pcmpgtb, vpcmpgtb_X_X_Xm128
-        in
-        sse_or_avx sse avx |> make_default ~arg_count ~res_count
-      | Cne | Clt | Cle | Cge | Cult | Cugt | Cule | Cuge ->
-        None
-        (* These instructions seem to not have a simd counterpart yet, could
-           also implement as a combination of other instructions if needed in
-           the future *))
+    | Icomp _ ->
+      (* The scalar instruction produces 0 or 1, whereas the vector comparison
+         instructions (the pcmpeq/pcmpgt families) produce a 0 or all-ones mask
+         per lane. In addition, for widths below 64 bits, the vector instruction
+         would compare truncated lanes, whereas the scalar instruction compares
+         full 64-bit registers. *)
+      None
     | Idiv | Imod | Iclz | Ictz | Ipopcnt -> None
   in
   match List.hd cfg_ops with
@@ -1742,7 +1723,11 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         in
         Some [load; arith]
     | Isimd_mem _ ->
-      Misc.fatal_error "Unexpected simd operation with memory arguments"
+      (* SIMD instructions with memory operands are already vector instructions.
+         (This case is currently unreachable, because their memory access is
+         classified as [Arbitrary], which prevents grouping; see
+         [Vectorize_specific.memory_access].) *)
+      None
     | Ioffset_loc _ | Ibswap _ | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence
     | Ipackf32 | Isimd _ | Iprefetch _ | Icldemote _ ->
       None

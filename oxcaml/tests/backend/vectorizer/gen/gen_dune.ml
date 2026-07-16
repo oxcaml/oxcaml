@@ -28,13 +28,13 @@ let rule ~subst template =
   Buffer.output_buffer Out_channel.stdout buf;
   Buffer.clear buf
 
-let compile ~enabled_if ~extra_flags name =
+let compile ~enabled_if ~extra_flags ?(extra_deps = []) name =
   let subst = function
     | "enabled_if" -> enabled_if
     | "flags" -> flags
     | "extra_flags" -> extra_flags
     | "runner" -> runner name
-    | "deps" -> String.concat " " [intf name; impl name]
+    | "deps" -> String.concat " " ([intf name; impl name] @ extra_deps)
     | "cmx_dump" -> cmx_dump name
     | _ -> assert false
   in
@@ -130,11 +130,11 @@ let copy_source_to_vectorize ~enabled_if name =
   copy_file ~enabled_if (name |> impl) (name |> vectorized |> impl);
   copy_file ~enabled_if (name |> intf) (name |> vectorized |> intf)
 
-let compile_no_vectorizer ~enabled_if name =
-  compile ~enabled_if ~extra_flags:"-no-vectorize" name
+let compile_no_vectorizer ~enabled_if ~extra_deps name =
+  compile ~enabled_if ~extra_flags:"-no-vectorize" ~extra_deps name
 
-let compile_with_vectorizer ~enabled_if name =
-  compile ~enabled_if ~extra_flags:"-vectorize" (vectorized name)
+let compile_with_vectorizer ~enabled_if ~extra_deps name =
+  compile ~enabled_if ~extra_flags:"-vectorize" ~extra_deps (vectorized name)
 
 let filter_vectorizer_dump ~enabled_if ~exit_code name =
   filter_dump ~enabled_if ~exit_code (name |> vectorized)
@@ -154,14 +154,15 @@ let diff_output_vectorized ~enabled_if name =
 let copy_expected_output ~enabled_if name =
   copy_file ~enabled_if (name |> expected) (name |> vectorized |> expected)
 
-let print_test ?(enabled_if = enabled_if_main) ?(filter_exit_code = 0) name =
+let print_test ?(enabled_if = enabled_if_main) ?(filter_exit_code = 0)
+    ?(extra_deps = []) name =
   (* check expected test output is up to date *)
-  compile_no_vectorizer ~enabled_if name;
+  compile_no_vectorizer ~enabled_if ~extra_deps name;
   run_no_vectorizer ~enabled_if name;
   diff_output_no_vectorizer ~enabled_if name;
   (* vectorizer *)
   copy_source_to_vectorize ~enabled_if name;
-  compile_with_vectorizer ~enabled_if name;
+  compile_with_vectorizer ~enabled_if ~extra_deps name;
   filter_vectorizer_dump name ~exit_code:filter_exit_code
     ~enabled_if:enabled_if_main_amd64;
   diff_vectorizer_dump name ~enabled_if:enabled_if_main_amd64;
@@ -180,12 +181,27 @@ let () =
   print_test ~enabled_if:enabled_if_main_amd64 "test_float32_unboxed";
   print_test "test_int32_unboxed";
   print_test "test_spill_valx2";
+  (* regression test: lane order of vector constants built from groups of
+     [Const_int] instructions with distinct values. *)
+  print_test "test_const";
   (* can't vectorize *)
   print_test ~filter_exit_code:1 "test_register_compatible";
+  (* regression test: integer comparisons must not be vectorized, because the
+     vector comparison instructions produce a 0 or all-ones mask instead of the
+     scalar 0 or 1. *)
+  print_test ~filter_exit_code:1 "test_cmp";
   (* regression test: a load of a field a previous store wrote, on a freshly
      allocated block, must not be vectorized (the allocation is tracked so the
      read-after-write dependency is recorded). *)
   print_test ~filter_exit_code:1 "test_alloc_raw";
+  (* regression test: a load through statically allocated memory must be
+     recorded in the [unknown] partition, so that the read-after-write
+     dependency on an aliasing store is not missed. *)
+  print_test ~filter_exit_code:1 "test_static_raw";
+  (* regression test: the SIMD load/store intrinsics ([Isimd_mem]) must be
+     accepted by the dependency analysis (they used to hit a fatal error). *)
+  print_test ~enabled_if:enabled_if_main_amd64 ~filter_exit_code:1
+    ~extra_deps:["stubs.c"] "test_simd_mem";
   ()
 
 let () =

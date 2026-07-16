@@ -1,0 +1,2 @@
+set_pair_consts { d0 = 123456789 ; d1 = abcdef012 }
+set_four_consts { e0 = 100000001 ; e1 = 200000002 ; e2 = 300000003 ; e3 = 400000004 }

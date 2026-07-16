@@ -1452,6 +1452,17 @@ end = struct
           operations = Instruction.Id.Map.empty
         }
 
+      let non_empty_or_unknown set =
+        (* A points-to or access set that comes out empty may still involve
+           statically allocated memory: the result of a [Const_*] instruction
+           (which has no argument), and the address of an access whose
+           addressing mode has no register argument (e.g. [Ibased]), must be
+           mapped to [unknown]. Mapping them to the empty set would unsoundly
+           record the access against no partition at all, hiding memory
+           dependencies from the rest of the analysis. The empty set is reserved
+           for clobbered registers. *)
+        if Partition.Set.is_empty set then Partition.Set.unknown else set
+
       (* let partitions t = t.partitions *)
 
       let accesses t = t.accesses
@@ -1495,7 +1506,7 @@ end = struct
         let may_access_partitions =
           if may_access_any_partition
           then Partitions.all t.partitions
-          else Aliases.get_regs addr_args t.aliases
+          else non_empty_or_unknown (Aliases.get_regs addr_args t.aliases)
         in
         let value_to_store = Operation.non_address_args op in
         let may_point_to_partitions =
@@ -1514,7 +1525,8 @@ end = struct
         | None ->
           (* propagates from args to res *)
           let args_may_point_to_partitions =
-            Aliases.get_regs (Instruction.arguments instruction) t.aliases
+            non_empty_or_unknown
+              (Aliases.get_regs (Instruction.arguments instruction) t.aliases)
           in
           update_aliases t instruction args_may_point_to_partitions
         | Some op -> (
@@ -1524,11 +1536,17 @@ end = struct
           in
           match Operation.desc op with
           | Alloc ->
+            (* The allocation is a GC safe point: record it as an access to all
+               previously known partitions, so that no write is delayed past it
+               (see [get_dependency_kind]). *)
+            let accesses =
+              Accesses.add_all t.accesses (Partitions.all t.partitions) op
+            in
             let fresh_partition = Partition.create ~allocation_site:id in
             let t =
               { t with
                 partitions = Partitions.add_node t.partitions fresh_partition;
-                accesses = Accesses.add t.accesses fresh_partition op
+                accesses = Accesses.add accesses fresh_partition op
               }
             in
             update_aliases t instruction
@@ -1539,7 +1557,9 @@ end = struct
               Aliases.get_regs non_address_args t.aliases
             in
             let addr_args = Operation.address_args op in
-            let may_access_partitions = Aliases.get_regs addr_args t.aliases in
+            let may_access_partitions =
+              non_empty_or_unknown (Aliases.get_regs addr_args t.aliases)
+            in
             update t ~may_access_partitions ~may_point_to_partitions ~is_atomic
               instruction op
           | Write _ ->
@@ -1618,10 +1638,19 @@ end = struct
            may write, then this is a [Data_dependencies], otherwise it is an
            [Order_constraint]. *)
         match Operation.desc src, Operation.desc dst with
-        | Alloc, _ ->
-          (* Currently, Alloc always starts a new partition, so it is the first
-             operation in the list of accesses of its partition. *)
-          Misc.fatal_error "Unexpected Alloc"
+        | Alloc, (Write _ | Read_and_write _ | Arbitrary | Alloc) ->
+          (* The allocation is a GC safe point: a write that precedes it must
+             not be delayed past it. In particular, an initializing store of a
+             previously allocated block must complete before the next
+             allocation, which may trigger a GC that would otherwise scan the
+             uninitialized block. *)
+          Order_constraint
+        | Alloc, Read { is_atomic; _ } ->
+          (* A (non-atomic) read may be delayed past an allocation: a GC
+             triggered by the allocation may move the block being read, but the
+             base register is updated by the GC and the contents are
+             preserved. *)
+          if is_atomic then Order_constraint else No_direct_dependency
         | (Read _ | Write _ | Read_and_write _ | Arbitrary), Alloc ->
           Order_constraint
         | Read { is_atomic = true; _ }, (Write _ | Read_and_write _ | Arbitrary)

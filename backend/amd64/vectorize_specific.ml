@@ -56,8 +56,10 @@ let memory_access : Arch.specific_operation -> Memory_access.t option =
        the moment. *)
     if Simd.is_pure_operation op then None else create Memory_access.Arbitrary
   | Isimd_mem _ ->
-    Misc.fatal_errorf
-      "Unexpected simd instruction with memory operands before vectorization"
+    (* Conservative: instruction selection produces [Isimd_mem] for the SIMD
+       load/store/arithmetic intrinsics, so these instructions do occur before
+       vectorization. Do not reorder anything around them. *)
+    create Memory_access.Arbitrary
   | Ilea _ | Ibswap _ | Isextend32 | Izextend32 -> None
   | Illvm_intrinsic intr ->
     Misc.fatal_errorf

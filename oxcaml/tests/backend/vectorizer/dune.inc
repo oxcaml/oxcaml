@@ -758,6 +758,90 @@
 (rule
  (alias   runtest)
  (enabled_if (= %{context_name} "main"))
+ (targets test_const_runner.exe test_const.cmx.dump)
+ (deps test_const.mli test_const.ml)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test_const_runner.exe))))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   test_const.output
+   (run ./test_const_runner.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff test_const.expected test_const.output)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy test_const.ml test_const_vectorized.ml)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy test_const.mli test_const_vectorized.mli)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (targets test_const_vectorized_runner.exe test_const_vectorized.cmx.dump)
+ (deps test_const_vectorized.mli test_const_vectorized.ml)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test_const_vectorized_runner.exe))))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (target test_const_vectorized.cmx.dump.output)
+ (deps ./filter.sh test_const_vectorized.cmx.dump)
+ (action
+  (with-outputs-to
+   %{target}
+   (with-accepted-exit-codes 0
+    (run %{deps})))))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+   (diff test_const_vectorized.cmx.dump.expected test_const_vectorized.cmx.dump.output)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   test_const_vectorized.output
+   (run ./test_const_vectorized_runner.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy test_const.expected test_const_vectorized.expected)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff test_const_vectorized.expected test_const_vectorized.output)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
  (targets test_register_compatible_runner.exe test_register_compatible.cmx.dump)
  (deps test_register_compatible.mli test_register_compatible.ml)
  (action
@@ -842,6 +926,90 @@
 (rule
  (alias   runtest)
  (enabled_if (= %{context_name} "main"))
+ (targets test_cmp_runner.exe test_cmp.cmx.dump)
+ (deps test_cmp.mli test_cmp.ml)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test_cmp_runner.exe))))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   test_cmp.output
+   (run ./test_cmp_runner.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff test_cmp.expected test_cmp.output)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy test_cmp.ml test_cmp_vectorized.ml)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy test_cmp.mli test_cmp_vectorized.mli)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (targets test_cmp_vectorized_runner.exe test_cmp_vectorized.cmx.dump)
+ (deps test_cmp_vectorized.mli test_cmp_vectorized.ml)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test_cmp_vectorized_runner.exe))))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (target test_cmp_vectorized.cmx.dump.output)
+ (deps ./filter.sh test_cmp_vectorized.cmx.dump)
+ (action
+  (with-outputs-to
+   %{target}
+   (with-accepted-exit-codes 1
+    (run %{deps})))))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+   (diff test_cmp_vectorized.cmx.dump.expected test_cmp_vectorized.cmx.dump.output)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   test_cmp_vectorized.output
+   (run ./test_cmp_vectorized_runner.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy test_cmp.expected test_cmp_vectorized.expected)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff test_cmp_vectorized.expected test_cmp_vectorized.output)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
  (targets test_alloc_raw_runner.exe test_alloc_raw.cmx.dump)
  (deps test_alloc_raw.mli test_alloc_raw.ml)
  (action
@@ -922,6 +1090,174 @@
  (enabled_if (= %{context_name} "main"))
  (action
    (diff test_alloc_raw_vectorized.expected test_alloc_raw_vectorized.output)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (targets test_static_raw_runner.exe test_static_raw.cmx.dump)
+ (deps test_static_raw.mli test_static_raw.ml)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test_static_raw_runner.exe))))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   test_static_raw.output
+   (run ./test_static_raw_runner.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff test_static_raw.expected test_static_raw.output)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy test_static_raw.ml test_static_raw_vectorized.ml)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy test_static_raw.mli test_static_raw_vectorized.mli)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (targets test_static_raw_vectorized_runner.exe test_static_raw_vectorized.cmx.dump)
+ (deps test_static_raw_vectorized.mli test_static_raw_vectorized.ml)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test_static_raw_vectorized_runner.exe))))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (target test_static_raw_vectorized.cmx.dump.output)
+ (deps ./filter.sh test_static_raw_vectorized.cmx.dump)
+ (action
+  (with-outputs-to
+   %{target}
+   (with-accepted-exit-codes 1
+    (run %{deps})))))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+   (diff test_static_raw_vectorized.cmx.dump.expected test_static_raw_vectorized.cmx.dump.output)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   test_static_raw_vectorized.output
+   (run ./test_static_raw_vectorized_runner.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy test_static_raw.expected test_static_raw_vectorized.expected)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff test_static_raw_vectorized.expected test_static_raw_vectorized.output)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (targets test_simd_mem_runner.exe test_simd_mem.cmx.dump)
+ (deps test_simd_mem.mli test_simd_mem.ml stubs.c)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test_simd_mem_runner.exe))))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+  (with-outputs-to
+   test_simd_mem.output
+   (run ./test_simd_mem_runner.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+   (diff test_simd_mem.expected test_simd_mem.output)))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+  (copy test_simd_mem.ml test_simd_mem_vectorized.ml)))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+  (copy test_simd_mem.mli test_simd_mem_vectorized.mli)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (targets test_simd_mem_vectorized_runner.exe test_simd_mem_vectorized.cmx.dump)
+ (deps test_simd_mem_vectorized.mli test_simd_mem_vectorized.ml stubs.c)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test_simd_mem_vectorized_runner.exe))))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (target test_simd_mem_vectorized.cmx.dump.output)
+ (deps ./filter.sh test_simd_mem_vectorized.cmx.dump)
+ (action
+  (with-outputs-to
+   %{target}
+   (with-accepted-exit-codes 1
+    (run %{deps})))))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+   (diff test_simd_mem_vectorized.cmx.dump.expected test_simd_mem_vectorized.cmx.dump.output)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+  (with-outputs-to
+   test_simd_mem_vectorized.output
+   (run ./test_simd_mem_vectorized_runner.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+  (copy test_simd_mem.expected test_simd_mem_vectorized.expected)))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+   (diff test_simd_mem_vectorized.expected test_simd_mem_vectorized.output)))
 
 (rule
  (alias runtest)
