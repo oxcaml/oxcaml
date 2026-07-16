@@ -1536,11 +1536,17 @@ end = struct
           in
           match Operation.desc op with
           | Alloc ->
+            (* The allocation is a GC safe point: record it as an access to all
+               previously known partitions, so that no write is delayed past it
+               (see [get_dependency_kind]). *)
+            let accesses =
+              Accesses.add_all t.accesses (Partitions.all t.partitions) op
+            in
             let fresh_partition = Partition.create ~allocation_site:id in
             let t =
               { t with
                 partitions = Partitions.add_node t.partitions fresh_partition;
-                accesses = Accesses.add t.accesses fresh_partition op
+                accesses = Accesses.add accesses fresh_partition op
               }
             in
             update_aliases t instruction
@@ -1632,10 +1638,19 @@ end = struct
            may write, then this is a [Data_dependencies], otherwise it is an
            [Order_constraint]. *)
         match Operation.desc src, Operation.desc dst with
-        | Alloc, _ ->
-          (* Currently, Alloc always starts a new partition, so it is the first
-             operation in the list of accesses of its partition. *)
-          Misc.fatal_error "Unexpected Alloc"
+        | Alloc, (Write _ | Read_and_write _ | Arbitrary | Alloc) ->
+          (* The allocation is a GC safe point: a write that precedes it must
+             not be delayed past it. In particular, an initializing store of a
+             previously allocated block must complete before the next
+             allocation, which may trigger a GC that would otherwise scan the
+             uninitialized block. *)
+          Order_constraint
+        | Alloc, Read { is_atomic; _ } ->
+          (* A (non-atomic) read may be delayed past an allocation: a GC
+             triggered by the allocation may move the block being read, but the
+             base register is updated by the GC and the contents are
+             preserved. *)
+          if is_atomic then Order_constraint else No_direct_dependency
         | (Read _ | Write _ | Read_and_write _ | Arbitrary), Alloc ->
           Order_constraint
         | Read { is_atomic = true; _ }, (Write _ | Read_and_write _ | Arbitrary)
