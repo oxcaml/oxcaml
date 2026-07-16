@@ -197,36 +197,36 @@ let flambda_to_flambda0 : type m.
         (Flambda_features.dump_fexpr (This_pass "simplify"))
         ppf flambda;
       dump_fexpr_annot ~prefixname "simplify" flambda;
-      let ( flambda,
-            free_names,
-            all_code,
-            slot_offsets,
-            final_typing_env,
+      let ( (flambda, free_names, all_code, slot_offsets, final_typing_env),
             last_pass_name ) =
         if Flambda_features.enable_reaper ()
         then (
-          let flambda, free_names, all_code, slot_offsets, final_typing_env =
+          let reaper_result =
             Profile.record_call ~accumulate:true "reaper" (fun () ->
                 Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
                   ~final_typing_env flambda)
           in
+          (* Under -support-lto, run the reaper a second time. On already-reaped
+             IR this is expected to be idempotent. *)
+          let reaper_result =
+            if Flambda_features.support_lto ()
+            then
+              let flambda, _, all_code, _, final_typing_env = reaper_result in
+              (* CR mvellacott: do something else with reaper here *)
+              Profile.record_call ~accumulate:true "pre_lto_reaper" (fun () ->
+                  Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader
+                    ~all_code ~final_typing_env flambda)
+            else reaper_result
+          in
+          let flambda, _, _, _, _ = reaper_result in
           print_flambda "reaper" (Flambda_features.dump_reaper ()) ppf flambda;
           print_fexpr "reaper"
             (Flambda_features.dump_fexpr (This_pass "reaper"))
             ppf flambda;
           dump_fexpr_annot ~prefixname "reaper" flambda;
-          ( flambda,
-            free_names,
-            all_code,
-            slot_offsets,
-            final_typing_env,
-            "reaper" ))
+          reaper_result, "reaper")
         else
-          ( flambda,
-            free_names,
-            all_code,
-            slot_offsets,
-            final_typing_env,
+          ( (flambda, free_names, all_code, slot_offsets, final_typing_env),
             last_pass_name )
       in
       print_flambda last_pass_name
@@ -265,8 +265,6 @@ let flambda_to_flambda ~ppf_dump ~prefixname ~machine_width ~code_slot_offsets
 
 let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
     (program : Lambda.program) =
-  (* CR mvellacott: Placeholder should be removed once LTO is implemented. *)
-  if Flambda_features.support_lto () then Printf.eprintf "LTO enabled\n";
   let module_repr =
     Lambda.main_module_representation program.main_module_block_format
   in

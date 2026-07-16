@@ -15,6 +15,8 @@
 
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
     (unit : Flambda_unit.t) =
+  if Flambda_features.debug_reaper "confirm-run"
+  then Format.eprintf "reaper: running@.";
   let load_code = Flambda_cmx.get_imported_code cmx_loader in
   let get_code_metadata code_id =
     Code_or_metadata.code_metadata
