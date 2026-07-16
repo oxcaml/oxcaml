@@ -56,6 +56,10 @@
 #define lseek _lseeki64
 #endif
 
+/* The channel primitives in this file are retained by [Stdlib] (always
+   linked), so they must exist even on bare metal.  Only the standard
+   descriptors exist there (routed to the UART by caml_read_fd /
+   caml_write_fd in unix.c); close and seek fail honestly. */
 #ifdef CAML_BARE_METAL
 static int caml_bare_close(int fd)
 {

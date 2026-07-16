@@ -67,6 +67,15 @@
 #include "caml/major_gc.h"
 #include "caml/shared_heap.h"
 
+/* On bare metal, only the primitives that every program retains (via
+   the [Stdlib] module, which is always linked) get a definition, and
+   they fail honestly: ENOSYS for file operations, "not a tty", "empty
+   environment".  Primitives for other OS functionality (file-system
+   inspection and manipulation, [Sys.command], [Sys.readdir], ...) are
+   deliberately not defined at all -- see the masked-out regions below
+   -- so a program using them fails at link time, and an application
+   that wants one must provide its own definition alongside its other
+   stubs. */
 #ifdef CAML_BARE_METAL
 static int caml_bare_syscall_error(void)
 {
@@ -82,48 +91,11 @@ static int caml_bare_open(const char_os *path, int flags, int perm)
   return caml_bare_syscall_error();
 }
 
-static int caml_bare_stat(const char_os *path, struct stat *st)
-{
-  (void)path;
-  (void)st;
-  return caml_bare_syscall_error();
-}
-
-static char_os *caml_bare_getcwd(char_os *buf, size_t size)
-{
-  (void)buf;
-  (void)size;
-  errno = ENOSYS;
-  return NULL;
-}
-
 #undef open_os
-#undef stat_os
-#undef rename_os
-#undef chdir_os
-#undef mkdir_os
-#undef getcwd_os
-#undef system_os
-#undef rmdir_os
-#undef caml_unlink
 #define open_os caml_bare_open
-#define stat_os caml_bare_stat
-#define rename_os(oldname, newname) \
-  ((void)(oldname), (void)(newname), caml_bare_syscall_error())
-#define chdir_os(path) ((void)(path), caml_bare_syscall_error())
-#define mkdir_os(path, perm) \
-  ((void)(path), (void)(perm), caml_bare_syscall_error())
-#define getcwd_os caml_bare_getcwd
-#define system_os(command) ((void)(command), caml_bare_syscall_error())
-#define rmdir_os(path) ((void)(path), caml_bare_syscall_error())
-#define caml_unlink(path) ((void)(path), caml_bare_syscall_error())
 #define close(fd) ((void)(fd), caml_bare_syscall_error())
-#define read(fd, buf, count) \
-  ((void)(fd), (void)(buf), (void)(count), caml_bare_syscall_error())
 #define isatty(fd) ((void)(fd), 0)
 #define getenv(var) ((void)(var), NULL)
-#define getpid() 0
-#define getppid() 0
 #endif
 
 CAMLexport char * caml_strerror(int errnum, char * buf, size_t buflen)
@@ -338,6 +310,12 @@ CAMLprim value caml_sys_close(value fd_v)
   return Val_unit;
 }
 
+/* File-system inspection and manipulation need an OS.  As for
+   [caml_sys_time] below, these primitives are deliberately not defined
+   on bare metal so that programs using them fail at link time; an
+   application can provide its own definitions if wanted. */
+#ifndef CAML_BARE_METAL
+
 static int caml_sys_file_mode(value name)
 {
 #ifdef _WIN32
@@ -480,6 +458,8 @@ CAMLprim value caml_sys_getcwd(value unit)
   return caml_copy_string_of_os(buff);
 }
 
+#endif /* !CAML_BARE_METAL */
+
 CAMLprim value caml_sys_unsafe_getenv(value var)
 {
   char_os * res, * p;
@@ -602,6 +582,8 @@ void caml_sys_init(const char_os * exe_name, char_os **argv)
 #endif
 #endif
 
+/* Not defined on bare metal (see the file-system primitives above). */
+#ifndef CAML_BARE_METAL
 #ifdef HAS_SYSTEM
 CAMLprim value caml_sys_system_command(value command)
 {
@@ -631,6 +613,7 @@ CAMLprim value caml_sys_system_command(value command)
   caml_invalid_argument("Sys.command not implemented");
 }
 #endif
+#endif /* !CAML_BARE_METAL */
 
 #ifndef CAML_BARE_METAL
 
@@ -843,6 +826,8 @@ CAMLprim value caml_sys_get_config(value unit)
   CAMLreturn (result);
 }
 
+/* Not defined on bare metal (see the file-system primitives above). */
+#ifndef CAML_BARE_METAL
 CAMLprim value caml_sys_read_directory(value path)
 {
   CAMLparam1(path);
@@ -867,6 +852,7 @@ CAMLprim value caml_sys_read_directory(value path)
   caml_ext_table_free(&tbl, 1);
   CAMLreturn(result);
 }
+#endif /* !CAML_BARE_METAL */
 
 /* Return true if the value is a filedescriptor (int) that is
  * (presumably) open on an interactive terminal */

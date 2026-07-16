@@ -91,6 +91,15 @@
 
 #ifdef CAML_BARE_METAL
 
+/* Bare metal defines only the osdeps functions that the runtime core
+   itself needs to start up and run: console IO, startup path lookup,
+   environment (empty), a time source, GC log formatting, and the
+   memory-mapping layer (malloc-backed).  OS functionality that only
+   optional features need -- dynamic loading (caml_dlopen & co.,
+   wanted by natdynlink) and directory reading -- is deliberately not
+   defined, so pulling in those features fails at link time; an
+   application that wants them must provide its own definitions. */
+
 /* Route the standard descriptors through newlib's read()/write(), which
    the BSP's syscall layer implements (typically UART). There is no way
    to obtain any other file descriptor on bare metal, so anything else
@@ -117,79 +126,9 @@ int caml_write_fd(int fd, int flags, void * buf, int n)
   return -1;
 }
 
-caml_stat_string caml_decompose_path(struct ext_table * tbl, char * path)
-{
-  char * p, * q;
-  size_t n;
-
-  if (path == NULL) return NULL;
-  p = caml_stat_strdup(path);
-  q = p;
-  while (1) {
-    for (n = 0; q[n] != 0 && q[n] != ':'; n++) /*nothing*/;
-    caml_ext_table_add(tbl, q);
-    q = q + n;
-    if (*q == 0) break;
-    *q = 0;
-    q += 1;
-  }
-  return p;
-}
-
-caml_stat_string caml_search_in_path(struct ext_table * path, const char * name)
-{
-  (void)path;
-  return caml_stat_strdup(name);
-}
-
 caml_stat_string caml_search_exe_in_path(const char * name)
 {
   return caml_stat_strdup(name);
-}
-
-caml_stat_string caml_search_dll_in_path(struct ext_table * path,
-                                         const char * name)
-{
-  (void)path;
-  return caml_stat_strconcat(2, name, ".so");
-}
-
-void * caml_dlopen(char * libname, int global)
-{
-  (void)libname;
-  (void)global;
-  return NULL;
-}
-
-void caml_dlclose(void * handle)
-{
-  (void)handle;
-}
-
-void * caml_dlsym(void * handle, const char * name)
-{
-  (void)handle;
-  (void)name;
-  return NULL;
-}
-
-void * caml_globalsym(const char * name)
-{
-  (void)name;
-  return NULL;
-}
-
-char * caml_dlerror(void)
-{
-  return "dynamic loading not supported on bare metal";
-}
-
-CAMLexport int caml_read_directory(char * dirname, struct ext_table * contents)
-{
-  (void)dirname;
-  (void)contents;
-  errno = ENOSYS;
-  return -1;
 }
 
 char * caml_executable_name(void)

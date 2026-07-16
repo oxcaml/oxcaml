@@ -98,6 +98,40 @@ typedef cpuset_t cpu_set_t;
    extra domains, which cannot exist on bare metal. */
 #define pthread_cancel(t) (caml_fatal_error("pthread_cancel on bare metal"), 0)
 #define pthread_exit(result) caml_fatal_error("pthread_exit on bare metal")
+
+/* Bare-metal replacements for the tick thread (masked out below): with
+   no OS threads there is nothing to start, and the tick thread "starts"
+   trivially. */
+
+CAMLextern int caml_start_tick_thread(void)
+{
+  return 0;
+}
+
+CAMLextern void caml_stop_tick_thread(void)
+{
+}
+#endif
+
+#ifndef MULTIDOMAIN
+/* Single-domain replacements for the domain-spawning machinery (masked
+   out below): a single-domain runtime cannot spawn additional domains,
+   and the recommended domain count is necessarily 1 (the same answer
+   the multi-domain implementation gives once clamped to
+   [max_domains]). */
+
+CAMLprim value caml_domain_spawn(value callback, value term_sync)
+{
+  (void)callback;
+  (void)term_sync;
+  caml_failwith("Domain.spawn is not supported by a single-domain runtime");
+}
+
+CAMLprim value caml_recommended_domain_count(value unused)
+{
+  (void)unused;
+  return Val_long(1);
+}
 #endif
 
 /* Check that the domain_state structure was laid out without padding,
@@ -1153,7 +1187,7 @@ struct domain_ml_values {
 #define Term_mutex(sync) (&Field(sync, 1))
 #define Term_condition(sync) (&Field(sync, 2))
 
-#ifndef CAML_BARE_METAL
+#ifdef MULTIDOMAIN
 static void init_domain_ml_values(struct domain_ml_values* ml_values,
                                   value callback, value term_sync)
 {
@@ -1169,7 +1203,6 @@ static void free_domain_ml_values(struct domain_ml_values* ml_values)
   caml_remove_generational_global_root(&ml_values->term_sync);
   caml_stat_free(ml_values);
 }
-#endif /* !CAML_BARE_METAL */
 
 /* This is the structure of the data exchanged between the parent
    domain and child domain during domain_spawn. Some fields are 'in'
@@ -1194,7 +1227,6 @@ struct domain_startup_params {
  * signalled and the backup thread wakes up to process the
  * interrupt. */
 
-#ifndef CAML_BARE_METAL
 static void* backup_thread_func(void* v)
 {
   dom_internal* di = (dom_internal*)v;
@@ -1274,7 +1306,7 @@ static void install_backup_thread (dom_internal* di)
     pthread_detach(di->backup_thread);
   }
 }
-#endif /* !CAML_BARE_METAL */
+#endif /* MULTIDOMAIN */
 
 static void terminate_backup_thread(dom_internal *di)
 {
@@ -1343,7 +1375,7 @@ CAMLexport void (*caml_domain_send_interrupt_hook)(caml_domain_state*) =
 CAMLexport _Atomic caml_timing_hook caml_domain_terminated_hook =
   (caml_timing_hook)NULL;
 
-#ifndef CAML_BARE_METAL
+#ifdef MULTIDOMAIN
 static value make_finished(caml_result result)
 {
   CAMLparam0();
@@ -1456,7 +1488,6 @@ static void* domain_thread_func(void* v)
 #endif
   return 0;
 }
-#endif /* !CAML_BARE_METAL */
 
 /* Note: [caml_domain_spawn] and [caml_domain_alone()].
 
@@ -1481,11 +1512,6 @@ static void* domain_thread_func(void* v)
 
 CAMLprim value caml_domain_spawn(value callback, value term_sync)
 {
-#ifdef CAML_BARE_METAL
-  (void)callback;
-  (void)term_sync;
-  caml_failwith("Domain.spawn is not supported on bare metal");
-#else
   CAMLparam2 (callback, term_sync);
   struct domain_startup_params p;
   pthread_t th;
@@ -1541,8 +1567,8 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
   caml_plat_cond_free(&p.cond);
 
   CAMLreturn (Val_long(p.unique_id));
-#endif
 }
+#endif /* MULTIDOMAIN */
 
 CAMLprim value caml_ml_domain_id(value unit)
 {
@@ -2341,11 +2367,9 @@ value caml_process_tick_exn(void)
   CAMLreturn(Val_unit);
 }
 
+#ifndef CAML_BARE_METAL
 CAMLextern void caml_stop_tick_thread(void)
 {
-#ifdef CAML_BARE_METAL
-  return;
-#else
   caml_plat_lock_blocking(&tick_thread.mutex);
   if (tick_thread.running) {
     tick_thread.running = false;
@@ -2358,8 +2382,8 @@ CAMLextern void caml_stop_tick_thread(void)
     atomic_store_release(&tick_thread.stop, false);
   }
   caml_plat_unlock(&tick_thread.mutex);
-#endif
 }
+#endif /* !CAML_BARE_METAL */
 
 static void tick_thread_reset(void)
 {
@@ -2482,13 +2506,9 @@ static void* caml_tick(void *arg)
 
   return NULL;
 }
-#endif /* !CAML_BARE_METAL */
 
 CAMLextern int caml_start_tick_thread(void)
 {
-#ifdef CAML_BARE_METAL
-  return 0;
-#else
   caml_plat_lock_non_blocking(&tick_thread.mutex);
   if (!atomic_load_acquire(&tick_thread.enabled)) {
     caml_plat_unlock(&tick_thread.mutex);
@@ -2533,8 +2553,8 @@ CAMLextern int caml_start_tick_thread(void)
   caml_plat_unlock(&tick_thread.mutex);
 
   return 0;
-#endif
 }
+#endif /* !CAML_BARE_METAL */
 
 CAMLprim value caml_enable_tick_thread(value v_enable)
 {
@@ -2752,9 +2772,13 @@ void caml_domain_terminate(bool last)
       /* Remove this domain from stw_domains. */
       remove_from_stw_domains(domain_self);
 
-#ifndef CAML_BARE_METAL
-      CAMLassert (backup_thread_running(domain_self));
-#endif
+      /* Backup threads are installed lazily: a spawned domain installs
+         its own in [domain_thread_func], and domain 0 only gets one
+         when it first spawns ([caml_domain_spawn]).  Spawned domains
+         ([last] is false) therefore always have one here, but domain 0
+         -- which reaches this point via [caml_domain_terminate(true)]
+         at shutdown -- has one only if the program ever spawned. */
+      CAMLassert (last || backup_thread_running(domain_self));
 
       /* We must signal domain termination before releasing [all_domains_lock]:
          after that, this domain will no longer take part in STWs and emitting
@@ -2996,12 +3020,9 @@ CAMLprim value caml_domain_tls_get(value unused)
   return domain_root_get(&Caml_state->tls_state);
 }
 
+#ifdef MULTIDOMAIN
 CAMLprim value caml_recommended_domain_count(value unused)
 {
-#ifdef CAML_BARE_METAL
-  (void)unused;
-  return Val_long(1);
-#else
   intnat n = -1;
 
 #if defined(HAS_GNU_GETAFFINITY_NP) || defined(HAS_BSD_GETAFFINITY_NP)
@@ -3031,8 +3052,8 @@ CAMLprim value caml_recommended_domain_count(value unused)
     n = caml_params->max_domains;
 
   return (Val_long(n));
-#endif
 }
+#endif /* MULTIDOMAIN */
 
 CAMLprim value caml_max_domain_count(value unused)
 {

@@ -43,6 +43,12 @@
 #include <unistd.h>
 #endif
 
+/* The caml_ev_* emit points are called from the runtime core (domains,
+   GC), so this file is always linked and its OS calls must resolve even
+   on bare metal.  The stubs below make every file/mapping operation
+   fail, so runtime events can never be started there ([Sys_error] at
+   [Runtime_events.start] / OCAMLRUNPARAM=e); the emit points then stay
+   inert. */
 #ifdef CAML_BARE_METAL
 #define getpid() 0
 #define open(path, flags, mode) (-1)
