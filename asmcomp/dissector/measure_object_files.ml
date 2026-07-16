@@ -92,33 +92,21 @@ type file_kind =
   | Elf_object
   | Ar_archive
 
-let elf_magic = "\x7fELF"
-
-let ar_magic = "!<arch>\n"
-
 (* Classify an input file as an ELF relocatable object or an ar archive by its
    leading magic bytes. We must not classify by filename extension: link inputs
    may be resolved through manifest files (see [-I-manifest]) to
    content-addressed paths that carry no meaningful file name. Anything that is
    neither kind is a hard error; silently skipping an input would drop its code
    from the final link. *)
-let classify_file filename =
-  if not (Sys.file_exists filename) then raise (Error (File_not_found filename));
-  let magic =
-    let ic = open_in_bin filename in
-    Fun.protect
-      ~finally:(fun () -> close_in_noerr ic)
-      (fun () ->
-        let len = min (String.length ar_magic) (in_channel_length ic) in
-        really_input_string ic len)
-  in
-  if
-    String.length magic >= String.length elf_magic
-    && String.equal (String.sub magic 0 (String.length elf_magic)) elf_magic
+let classify_file filename buf =
+  if Compiler_owee.Owee_elf.is_elf buf
   then Elf_object
-  else if String.equal magic ar_magic
+  else if Compiler_owee.Owee_archive.is_archive buf
   then Ar_archive
-  else raise (Error (Unrecognized_input { filename; magic }))
+  else
+    let magic_len = min 8 (Compiler_owee.Owee_buf.size buf) in
+    let magic = String.init magic_len (fun i -> Char.chr buf.{i}) in
+    raise (Error (Unrecognized_input { filename; magic }))
 
 module File_size = struct
   type t =
@@ -151,38 +139,31 @@ let measure_files (unix : (module Compiler_owee.Unix_intf.S)) ~files =
     | None -> Printf.ifprintf stderr fmt
     | Some oc -> Printf.fprintf oc fmt
   in
-  (* Analyze a single .o file, returning (size, has_probes) *)
-  let analyze_object_file filename =
+  (* Map an input file, checking that it exists first. *)
+  let map_input_file filename =
     if not (Sys.file_exists filename)
     then raise (Error (File_not_found filename))
-    else
-      let buf = Compiler_owee.Owee_buf.map_binary (module Unix) filename in
-      analyze_elf_buf buf
+    else Compiler_owee.Owee_buf.map_binary (module Unix) filename
   in
-  (* Analyze an archive (.a) file, returning (size, has_probes, member_names) *)
-  let analyze_archive_file filename =
-    if not (Sys.file_exists filename)
-    then raise (Error (File_not_found filename))
-    else
-      let buf = Compiler_owee.Owee_buf.map_binary (module Unix) filename in
-      let archive, members = Compiler_owee.Owee_archive.read buf in
-      let size, has_probes, member_names =
-        List.fold_left
-          (fun (acc_size, acc_probes, acc_names) member ->
-            let name = member.Compiler_owee.Owee_archive.name in
-            if Filename.check_suffix name ".o"
-            then
-              let member_buf =
-                Compiler_owee.Owee_archive.member_body archive member
-              in
-              let size, has_probes = analyze_elf_buf member_buf in
-              ( Int64.add acc_size size,
-                acc_probes || has_probes,
-                name :: acc_names )
-            else acc_size, acc_probes, acc_names)
-          (0L, false, []) members
-      in
-      size, has_probes, List.rev member_names
+  (* Analyze an archive (.a) buffer, returning (size, has_probes,
+     member_names) *)
+  let analyze_archive_buf buf =
+    let archive, members = Compiler_owee.Owee_archive.read buf in
+    let size, has_probes, member_names =
+      List.fold_left
+        (fun (acc_size, acc_probes, acc_names) member ->
+          let name = member.Compiler_owee.Owee_archive.name in
+          if Filename.check_suffix name ".o"
+          then
+            let member_buf =
+              Compiler_owee.Owee_archive.member_body archive member
+            in
+            let size, has_probes = analyze_elf_buf member_buf in
+            Int64.add acc_size size, acc_probes || has_probes, name :: acc_names
+          else acc_size, acc_probes, acc_names)
+        (0L, false, []) members
+    in
+    size, has_probes, List.rev member_names
   in
   (* Track which files we've already analyzed to avoid double-counting *)
   let analyzed = String.Tbl.create 256 in
@@ -203,15 +184,16 @@ let measure_files (unix : (module Compiler_owee.Unix_intf.S)) ~files =
       [])
     else (
       String.Tbl.add analyzed filename ();
-      match classify_file filename with
+      let buf = map_input_file filename in
+      match classify_file filename buf with
       | Elf_object ->
-        let size, has_probes = analyze_object_file filename in
+        let size, has_probes = analyze_elf_buf buf in
         log "%sInput: %s (%s)\n" indent filename (string_of_origin origin);
         log "%s  -> %s (%Ld bytes, has_probes=%b)\n" indent filename size
           has_probes;
         [{ File_size.filename; size; has_probes; origin }]
       | Ar_archive ->
-        let size, has_probes, member_names = analyze_archive_file filename in
+        let size, has_probes, member_names = analyze_archive_buf buf in
         log "%sInput: %s (%s)\n" indent filename (string_of_origin origin);
         log "%s  -> %s (%Ld bytes, has_probes=%b)\n" indent filename size
           has_probes;

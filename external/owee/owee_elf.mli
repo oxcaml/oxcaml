@@ -139,6 +139,11 @@ val make_symtab_shndx_section :
   sh_link:u32 ->
   section
 
+(** [is_elf buf] tells whether [buf] starts with the ELF magic number. It
+    validates nothing else about the contents (use [read_elf] for that) and
+    never raises. *)
+val is_elf : Owee_buf.t -> bool
+
 (** From a buffer pointing to an ELF image, [read_elf] decodes the header and
     section table. *)
 val read_elf : Owee_buf.t -> header * section array

@@ -2,16 +2,21 @@
 
 open Owee_buf
 
+let magic = "\x7fELF"
+
+let magic_matches buffer ~at =
+  buffer.{at + 0} = Char.code magic.[0]
+  && buffer.{at + 1} = Char.code magic.[1]
+  && buffer.{at + 2} = Char.code magic.[2]
+  && buffer.{at + 3} = Char.code magic.[3]
+
+let is_elf buffer =
+  size buffer >= String.length magic && magic_matches buffer ~at:0
+
 let read_magic t =
   ensure t 4 "Magic number truncated";
   let { buffer; position } = t in
-  let valid =
-    buffer.{position + 0} = 0x7f
-    && buffer.{position + 1} = Char.code 'E'
-    && buffer.{position + 2} = Char.code 'L'
-    && buffer.{position + 3} = Char.code 'F'
-  in
-  if not valid
+  if not (magic_matches buffer ~at:position)
   then
     invalid_format
       (Printf.sprintf "No ELF magic number (found %02x %02x %02x %02x)"

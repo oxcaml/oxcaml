@@ -135,4 +135,22 @@ MANIFEST
     cat negative_kind.err >&2
     exit 1
   fi
+
+  # Same for a zero-length input, which additionally exercises mapping an
+  # empty file.
+  : > cas/blob_empty_file
+  sed 's|^file mylib\.a .*|file mylib.a cas/blob_empty_file|' manifest.txt \
+    > manifest_empty_kind.txt
+  if compile "$@" -dissector -I-manifest manifest_empty_kind.txt \
+       helper.$EXT mylib.$LIBEXT empty.$LIBEXT empty2.$LIBEXT link_manifest.$EXT \
+       -o should_fail_empty.exe 2> negative_empty.err; then
+    echo "ERROR: dissected link unexpectedly succeeded with an empty mylib.a" >&2
+    exit 1
+  fi
+  if ! grep -q "neither an ELF object file nor an ar archive" negative_empty.err
+  then
+    echo "ERROR: expected an unrecognized-input error for an empty file, got:" >&2
+    cat negative_empty.err >&2
+    exit 1
+  fi
 fi
