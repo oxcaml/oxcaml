@@ -41,7 +41,7 @@
 typedef cpuset_t cpu_set_t;
 #endif
 #if defined(HAS_SYS_EPOLL_H) && defined(HAS_SYS_TIMERFD_H) \
-    && defined(HAS_SYS_EVENTFD_H) && !defined(CAML_BARE_METAL)
+    && defined(HAS_SYS_EVENTFD_H)
 #include <sys/epoll.h>
 #include <sys/timerfd.h>
 #include <sys/eventfd.h>
@@ -85,15 +85,19 @@ typedef cpuset_t cpu_set_t;
 
 #ifdef CAML_BARE_METAL
 #define getpid() 0
+
+/* Compiled in caml_bt_is_self and caml_stop_all_domains. */
 #define pthread_self() ((pthread_t)0)
+
+/* Must be 0 ("not equal"): caml_bt_is_self must answer "no, you are not
+   the backup thread" -- there is no backup thread.  (A faithful
+   comparison would wrongly return "equal", since both sides are 0.) */
 #define pthread_equal(a, b) 0
-#define pthread_detach(t) ((void)0)
-#define pthread_join(t, r) ((void)0)
-#define pthread_cancel(t) 0
-#define pthread_sigmask(how, set, oldset) ((void)0)
-#define sigfillset(set) ((void)0)
+
+/* Compiled in stw_terminate_domain; only reachable when tearing down
+   extra domains, which cannot exist on bare metal. */
+#define pthread_cancel(t) (caml_fatal_error("pthread_cancel on bare metal"), 0)
 #define pthread_exit(result) caml_fatal_error("pthread_exit on bare metal")
-#define usleep(usec) ((void)0)
 #endif
 
 /* Check that the domain_state structure was laid out without padding,
@@ -1227,9 +1231,7 @@ static void* backup_thread_func(void* v)
 
   return 0;
 }
-#endif /* !CAML_BARE_METAL */
 
-#ifndef CAML_BARE_METAL
 static void install_backup_thread (dom_internal* di)
 {
   int err;

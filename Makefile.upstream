@@ -1184,8 +1184,8 @@ runtime_BYTECODE_STATIC_LIBRARIES = $(addprefix runtime/, \
   ld.conf libcamlrun.$(A))
 runtime_BYTECODE_SHARED_LIBRARIES =
 runtime_NATIVE_STATIC_LIBRARIES = \
-  runtime/libasmrun.$(A) \
-  runtime/libasmrunBARE_METAL.$(A) runtime/libcomprmarsh.$(A)
+  runtime/libasmrun.$(A) runtime/libcomprmarsh.$(A) \
+  runtime/libasmrunBARE_METAL.$(A)
 runtime_NATIVE_SHARED_LIBRARIES =
 
 ifeq "$(RUNTIMED)" "true"
@@ -1505,13 +1505,11 @@ runtime_DEP_FILES := $(addsuffix .b, \
   $(basename $(runtime_BYTECODE_C_SOURCES) runtime/instrtrace))
 ifeq "$(NATIVE_COMPILER)" "true"
 runtime_DEP_FILES += $(addsuffix .n, $(basename $(runtime_NATIVE_C_SOURCES)))
+runtime_DEP_FILES += $(addsuffix .nbm, $(basename $(runtime_NATIVE_C_SOURCES)))
 endif
 runtime_DEP_FILES += $(addsuffix d, $(runtime_DEP_FILES)) \
              $(addsuffix i, $(runtime_DEP_FILES)) \
              $(addsuffix pic, $(runtime_DEP_FILES))
-ifeq "$(NATIVE_COMPILER)" "true"
-runtime_DEP_FILES += $(addsuffix .nbm, $(basename $(runtime_NATIVE_C_SOURCES)))
-endif
 runtime_DEP_FILES := $(addsuffix .$(D), $(runtime_DEP_FILES))
 
 ifeq "$(COMPUTE_DEPS)" "true"

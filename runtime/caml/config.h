@@ -150,6 +150,11 @@ typedef uint64_t uintnat;
 
 #if defined(CAML_BARE_METAL)
 #undef MULTIDOMAIN
+#undef HAS_SYS_SHM_H
+#undef HAS_SHMAT
+#undef HAS_SYS_EPOLL_H
+#undef HAS_SYS_TIMERFD_H
+#undef HAS_SYS_EVENTFD_H
 #endif
 
 /* Endianness of floats */

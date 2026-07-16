@@ -27,7 +27,7 @@
 unsigned char * caml_afl_area_ptr = NULL;
 uintnat caml_afl_prev_loc;
 
-#if defined(CAML_BARE_METAL) || !defined(HAS_SYS_SHM_H) || !defined(HAS_SHMAT)
+#if !defined(HAS_SYS_SHM_H) || !defined(HAS_SHMAT)
 
 CAMLexport value caml_setup_afl(value unit)
 {
