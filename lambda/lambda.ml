@@ -700,12 +700,49 @@ let join_nullable x y =
   | Non_nullable, Non_nullable -> Non_nullable
   | Nullable, _ | _, Nullable -> Nullable
 
-(* CR dkalinichenko: we could have a finer-grained join here,
-   but I don't think the complexity is worth it. *)
-let join_value_kind_non_null x y =
-  if equal_value_kind_non_null x y then x else Pgenval
+let rec join_value_kind_non_null x y =
+  if equal_value_kind_non_null x y then x
+  else
+    match x, y with
+    | Pvariant { consts = consts1; non_consts = non_consts1 },
+      Pvariant { consts = consts2; non_consts = non_consts2 } -> begin
+        match join_non_consts non_consts1 non_consts2 with
+        | Some non_consts ->
+            let consts = List.sort_uniq Int.compare (consts1 @ consts2) in
+            Pvariant { consts; non_consts }
+        | None -> Pgenval
+      end
+    | _, _ -> Pgenval
 
-let join_value_kind x y =
+and join_constructor_shape shape1 shape2 =
+  match shape1, shape2 with
+  | Constructor_uniform fields1, Constructor_uniform fields2
+    when List.length fields1 = List.length fields2 ->
+      Some (Constructor_uniform (List.map2 join_value_kind fields1 fields2))
+  | Constructor_mixed _, Constructor_mixed _
+    when equal_constructor_shape shape1 shape2 ->
+      Some shape1
+  | (Constructor_uniform _ | Constructor_mixed _), _ -> None
+
+and join_non_consts non_consts1 non_consts2 =
+  let sorted = List.sort (fun (tag1, _) (tag2, _) -> Int.compare tag1 tag2) in
+  let rec merge l1 l2 =
+    match l1, l2 with
+    | [], l | l, [] -> Some l
+    | (tag1, shape1) :: rest1, (tag2, shape2) :: rest2 ->
+        if tag1 < tag2 then
+          Option.map (fun l -> (tag1, shape1) :: l) (merge rest1 l2)
+        else if tag2 < tag1 then
+          Option.map (fun l -> (tag2, shape2) :: l) (merge l1 rest2)
+        else
+          match join_constructor_shape shape1 shape2 with
+          | Some shape ->
+              Option.map (fun l -> (tag1, shape) :: l) (merge rest1 rest2)
+          | None -> None
+  in
+  merge (sorted non_consts1) (sorted non_consts2)
+
+and join_value_kind x y =
   { raw_kind = join_value_kind_non_null x.raw_kind y.raw_kind;
     nullable = join_nullable x.nullable y.nullable;
   }
