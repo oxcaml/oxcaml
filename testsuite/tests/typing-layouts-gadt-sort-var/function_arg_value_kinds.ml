@@ -59,14 +59,15 @@ val m : 'a ab * 'a -> int = <fun>
 |}]
 
 (* Sound: a total multi-case GADT match whose branch kinds disagree; the
-   join widens the parameter's kind to a generic value. *)
+   join keeps the tuple shape and widens only the disagreeing component. *)
 let n : type a. a rep * a -> int = function
   | Block, (a, _b) -> a
   | Int, x -> x
 [%%expect{|
 (let
   (n =
-     (function {nlocal = 0} param : int
+     (function {nlocal = 0}
+       param[value<(consts ()) (non_consts ([0: value<int>, *]))>] : int
        (if (field_imm 0 param) (field_imm 1 param)
          (field_imm 0 (field_imm 1 param)))))
   (apply (field_imm 1 (global Toploop!)) "n" n))
