@@ -89,7 +89,7 @@ let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
       ~add_section:(File_sections.Builder.add sections)
       all_code
   in
-  [ { original_compilation_unit = Compilation_unit.get_current_exn ();
+  [ { original_compilation_unit = Current_unit.get_cu_exn ();
       final_typing_env;
       all_code;
       exported_offsets;

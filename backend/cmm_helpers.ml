@@ -4290,7 +4290,7 @@ let emit_float_array_constant symb fields cont =
 let make_symbol ?compilation_unit name =
   let compilation_unit =
     match compilation_unit with
-    | None -> Compilation_unit.get_current_exn ()
+    | None -> Current_unit.get_cu_exn ()
     | Some compilation_unit -> compilation_unit
   in
   (* CR sspies: [make_symbol] always uses flat name mangling. Structured

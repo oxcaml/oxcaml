@@ -2095,7 +2095,7 @@ let lambda_of_loc kind sloc =
   | Loc_FILE -> Lconst (Const_immstring file)
   | Loc_MODULE ->
     let filename = Filename.basename file in
-    let name = Compilation_unit.get_current () in
+    let name = Current_unit.get_cu () in
     let module_name =
       match name with
       | None -> "//"^filename^"//"

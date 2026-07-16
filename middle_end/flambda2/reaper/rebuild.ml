@@ -103,7 +103,7 @@ let is_used (env : env) cn = Analysis.has_use env.uses cn
 
 let is_code_id_used (env : env) code_id =
   is_used env (Code_id_or_name.code_id code_id)
-  || not (Compilation_unit.is_current (Code_id.get_compilation_unit code_id))
+  || not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
 
 let is_symbol_used (env : env) symbol =
   is_used env (Code_id_or_name.symbol symbol)
@@ -1079,8 +1079,7 @@ let decide_whether_apply_needs_calling_convention_change env apply =
           | No ->
             if
               not
-                (Compilation_unit.is_current
-                   (Code_id.get_compilation_unit code_id))
+                (Current_unit.is_current (Code_id.get_compilation_unit code_id))
             then call_kind
             else Call_kind.indirect_function_call_known_arity ~code_ids:Unknown
           | Auto ->
@@ -1831,9 +1830,7 @@ let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures
         (Cost_metrics.set_of_closures
            ~find_code_characteristics:(fun code_id ->
              let code_metadata =
-               if
-                 Compilation_unit.is_current
-                   (Code_id.get_compilation_unit code_id)
+               if Current_unit.is_current (Code_id.get_compilation_unit code_id)
                then
                  match Code_id.Map.find code_id res.all_code with
                  | exception Not_found ->
@@ -2402,8 +2399,7 @@ and rebuild_code env res
         (function_params_and_body_free_names params_and_body)
   in
   assert (
-    Compilation_unit.is_current
-      (Code_id.get_compilation_unit (Code.code_id code)));
+    Current_unit.is_current (Code_id.get_compilation_unit (Code.code_id code)));
   let res =
     { res with
       all_code = Code_id.Map.add (Code.code_id code) code res.all_code

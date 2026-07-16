@@ -59,9 +59,7 @@ let manufacture_symbol acc proposed_name =
     then Acc.manufacture_symbol_short_name acc
     else acc, Linkage_name.of_string proposed_name
   in
-  let symbol =
-    Symbol.create (Compilation_unit.get_current_exn ()) linkage_name
-  in
+  let symbol = Symbol.create (Current_unit.get_cu_exn ()) linkage_name in
   acc, symbol
 
 let declare_symbol_for_function_slot env acc ident function_slot :
@@ -2990,7 +2988,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
 
 let close_functions acc external_env ~current_alloc_region ~current_region
     function_declarations =
-  let compilation_unit = Compilation_unit.get_current_exn () in
+  let compilation_unit = Current_unit.get_cu_exn () in
   let value_slots_from_idents =
     Ident.Set.fold
       (fun id map ->
@@ -3363,7 +3361,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
   (* CR sspies: In the future, improve the debugging UIDs here if possible. *)
   let function_slot =
     Function_slot.create
-      (Compilation_unit.get_current_exn ())
+      (Current_unit.get_cu_exn ())
       ~name:(Ident.name wrapper_id) ~is_always_immediate:false K.value
   in
   let num_provided = Flambda_arity.num_params provided_arity in

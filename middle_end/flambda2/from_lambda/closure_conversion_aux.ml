@@ -177,7 +177,7 @@ module Env = struct
   let current_depth t = t.current_depth
 
   let create ~big_endian =
-    let current_unit = Compilation_unit.get_current_exn () in
+    let current_unit = Current_unit.get_cu_exn () in
     { variables = Ident.Map.empty;
       globals = Numeric_types.Int.Map.empty;
       simples_to_substitute = Ident.Map.empty;

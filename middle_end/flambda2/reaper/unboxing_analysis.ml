@@ -735,7 +735,7 @@ let perform_analysis db ~stats =
               | Set_of_closures l ->
                 let mk kind name =
                   Value_slot.create
-                    (Compilation_unit.get_current_exn ())
+                    (Current_unit.get_cu_exn ())
                     ~name ~is_always_immediate:false kind
                 in
                 let fields =
@@ -753,7 +753,7 @@ let perform_analysis db ~stats =
                     (fun acc (fs, _) ->
                       Function_slot.Map.add fs
                         (Function_slot.create
-                           (Compilation_unit.get_current_exn ())
+                           (Current_unit.get_cu_exn ())
                            ~name:(Function_slot.name fs)
                            ~is_always_immediate:false Flambda_kind.value)
                         acc)
@@ -788,5 +788,5 @@ let cannot_change_calling_convention_query =
 
 let cannot_change_calling_convention uses v =
   (not (Flambda_features.reaper_change_calling_conventions ()))
-  || (not (Compilation_unit.is_current (Code_id.get_compilation_unit v)))
+  || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
   || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db

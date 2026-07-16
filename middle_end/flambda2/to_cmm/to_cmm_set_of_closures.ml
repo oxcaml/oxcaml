@@ -702,7 +702,7 @@ let let_static_set_of_closures env res closure_symbols set ~prev_updates =
 let lift_set_of_closures env res ~body ~bound_vars layout set
     ~(translate_expr : translate_expr) ~num_normal_occurrences_of_bound_vars =
   (* Generate symbols for the set of closures, and each of the closures *)
-  let comp_unit = Compilation_unit.get_current_exn () in
+  let comp_unit = Current_unit.get_cu_exn () in
   let dbg = debuginfo_for_set_of_closures env set in
   let cids =
     Function_declarations.funs_in_order (Set_of_closures.function_decls set)
