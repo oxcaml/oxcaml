@@ -60,6 +60,12 @@ val layout :
 val layout_of_sort : Location.t -> Jkind.Sort.Const.t -> Lambda.layout
 val layout_of_non_void_sort : Jkind.Sort.Const.t -> Lambda.layout
 
+(* Like [layout], but falls back to [layout_of_sort] when the type's jkind
+   does not determine a kind (e.g. jkind [any], when only GADT equations in
+   scope at the type's uses determine the representation). *)
+val layout_or_sort :
+  Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
+
 (* Given a function type and the sort of its return type, compute the layout of
    its return type. *)
 val function_return_layout :
