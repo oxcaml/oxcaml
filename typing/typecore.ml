@@ -6241,11 +6241,11 @@ let split_function_ty
     env (expected_mode : expected_mode) ty_expected loc ~arg_label ~has_poly
     ~mode_annots ~ret_mode_annots ~in_function ~is_first_val_param ~is_final_val_param
   =
-    let alloc_mode, closed_over_mode =
+  let alloc_mode, closed_over_mode =
     register_closure_allocation ~env ~stack:expected_mode.strictly_stack ~loc
       (as_single_mode expected_mode)
   in
-    if expected_mode.strictly_local then
+  if expected_mode.strictly_local then
     Locality.submode_exn ~pp:(loc, Function) Locality.local
       (Alloc.proj_comonadic Areality alloc_mode);
   let { ty = ty_fun; explanation }, loc_fun = in_function in
