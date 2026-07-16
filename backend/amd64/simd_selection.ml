@@ -1378,37 +1378,13 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       in
       Option.bind ops (fun (sse, avx) ->
           sse_or_avx sse avx |> make_default ~arg_count ~res_count)
-    | Icomp intcomp -> (
-      match intcomp with
-      | Ceq ->
-        let sse, avx =
-          match width_type with
-          | W512 -> assert false
-          | W256 -> assert false
-          | W128 -> assert false
-          | W64 -> pcmpeqq, vpcmpeqq_X_X_Xm128
-          | W32 -> pcmpeqd, vpcmpeqd_X_X_Xm128
-          | W16 -> pcmpeqw, vpcmpeqw_X_X_Xm128
-          | W8 -> pcmpeqb, vpcmpeqb_X_X_Xm128
-        in
-        sse_or_avx sse avx |> make_default ~arg_count ~res_count
-      | Cgt ->
-        let sse, avx =
-          match width_type with
-          | W512 -> assert false
-          | W256 -> assert false
-          | W128 -> assert false
-          | W64 -> pcmpgtq, vpcmpgtq_X_X_Xm128
-          | W32 -> pcmpgtd, vpcmpgtd_X_X_Xm128
-          | W16 -> pcmpgtw, vpcmpgtw_X_X_Xm128
-          | W8 -> pcmpgtb, vpcmpgtb_X_X_Xm128
-        in
-        sse_or_avx sse avx |> make_default ~arg_count ~res_count
-      | Cne | Clt | Cle | Cge | Cult | Cugt | Cule | Cuge ->
-        None
-        (* These instructions seem to not have a simd counterpart yet, could
-           also implement as a combination of other instructions if needed in
-           the future *))
+    | Icomp _ ->
+      (* The scalar instruction produces 0 or 1, whereas the vector comparison
+         instructions (the pcmpeq/pcmpgt families) produce a 0 or all-ones mask
+         per lane. In addition, for widths below 64 bits, the vector instruction
+         would compare truncated lanes, whereas the scalar instruction compares
+         full 64-bit registers. *)
+      None
     | Idiv | Imod | Iclz | Ictz | Ipopcnt -> None
   in
   match List.hd cfg_ops with

@@ -185,6 +185,10 @@ let () =
   print_test "test_const";
   (* can't vectorize *)
   print_test ~filter_exit_code:1 "test_register_compatible";
+  (* regression test: integer comparisons must not be vectorized, because the
+     vector comparison instructions produce a 0 or all-ones mask instead of the
+     scalar 0 or 1. *)
+  print_test ~filter_exit_code:1 "test_cmp";
   (* regression test: a load of a field a previous store wrote, on a freshly
      allocated block, must not be vectorized (the allocation is tracked so the
      read-after-write dependency is recorded). *)

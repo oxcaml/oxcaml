@@ -1,0 +1,2 @@
+eq_pair { d0 = 1 ; d1 = 0 }
+gt_pair { d0 = 1 ; d1 = 0 }
