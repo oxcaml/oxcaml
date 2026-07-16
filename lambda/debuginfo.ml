@@ -247,24 +247,51 @@ module Dbg = struct
       | _ :: _, [] -> 1
       | [], _ :: _ -> -1
       | d1 :: ds1, d2 :: ds2 ->
-
-     let c = String.compare d1.dinfo_file d2.dinfo_file in
+       (* The record patterns below list every field explicitly, making it
+          clear which fields participate in the comparison.  The
+          [dinfo_scopes] and [dinfo_function_symbol] fields are deliberately
+          not compared. *)
+       let { dinfo_file = dinfo_file1;
+                            dinfo_line = dinfo_line1;
+                            dinfo_char_start = dinfo_char_start1;
+                            dinfo_char_end = dinfo_char_end1;
+                            dinfo_start_bol = dinfo_start_bol1;
+                            dinfo_end_bol = dinfo_end_bol1;
+                            dinfo_end_line = dinfo_end_line1;
+                            dinfo_scopes = _;
+                            dinfo_uid = dinfo_uid1;
+                            dinfo_function_symbol = _;
+                            dinfo_dir = dinfo_dir1 } = d1
+       in
+       let { dinfo_file = dinfo_file2;
+                            dinfo_line = dinfo_line2;
+                            dinfo_char_start = dinfo_char_start2;
+                            dinfo_char_end = dinfo_char_end2;
+                            dinfo_start_bol = dinfo_start_bol2;
+                            dinfo_end_bol = dinfo_end_bol2;
+                            dinfo_end_line = dinfo_end_line2;
+                            dinfo_scopes = _;
+                            dinfo_uid = dinfo_uid2;
+                            dinfo_function_symbol = _;
+                            dinfo_dir = dinfo_dir2 } = d2
+       in
+       let c = String.compare dinfo_file1 dinfo_file2 in
        if c <> 0 then c else
-       let c = Int.compare d1.dinfo_line d2.dinfo_line in
+       let c = Int.compare dinfo_line1 dinfo_line2 in
        if c <> 0 then c else
-       let c = Int.compare d1.dinfo_char_end d2.dinfo_char_end in
+       let c = Int.compare dinfo_char_end1 dinfo_char_end2 in
        if c <> 0 then c else
-       let c = Int.compare d1.dinfo_char_start d2.dinfo_char_start in
+       let c = Int.compare dinfo_char_start1 dinfo_char_start2 in
        if c <> 0 then c else
-       let c = Int.compare d1.dinfo_start_bol d2.dinfo_start_bol in
+       let c = Int.compare dinfo_start_bol1 dinfo_start_bol2 in
        if c <> 0 then c else
-       let c = Int.compare d1.dinfo_end_bol d2.dinfo_end_bol in
+       let c = Int.compare dinfo_end_bol1 dinfo_end_bol2 in
        if c <> 0 then c else
-       let c = Int.compare d1.dinfo_end_line d2.dinfo_end_line in
+       let c = Int.compare dinfo_end_line1 dinfo_end_line2 in
        if c <> 0 then c else
-       let c = Option.compare String.compare d1.dinfo_dir d2.dinfo_dir in
+       let c = Option.compare String.compare dinfo_dir1 dinfo_dir2 in
        if c <> 0 then c else
-       let c = Option.compare String.compare d1.dinfo_uid d2.dinfo_uid in
+       let c = Option.compare String.compare dinfo_uid1 dinfo_uid2 in
        if c <> 0 then c else
        loop ds1 ds2
     in
