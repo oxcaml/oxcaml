@@ -368,20 +368,54 @@ int caml_lf_skiplist_insert(struct lf_skiplist *sk, uintnat key, uintnat data) {
       for (int level = 1; level <= top_level; level++) {
         while (1) {
           pred = preds[level];
-          succ = succs[level];
+          succ = atomic_load_acquire(&new_cell->forward[level]);
 
-          /* If we were able to insert the node then we proceed to the next
-             level */
-          if (atomic_compare_exchange_strong(&pred->forward[level], &succ,
-                                             new_cell)) {
-            break;
+          /* We must not publish stale pointers, so we check `forward[level]`
+             agrees with `succs[level]`. */
+          if (succ != succs[level]) {
+            /* If `forward[level]` was marked it obviously means the `new_cell`
+               is already being removed or has been removed. */
+            if (LF_SK_IS_MARKED((uintnat)succ)) {
+              goto concurrently_removed;
+            }
+
+            /* Otherwise it means the skiplist was modified around us so we try to
+               update the `forward[level]` pointer. */
+            if (!atomic_compare_exchange_strong(&new_cell->forward[level],
+                                                &succ,
+                                                succs[level])) {
+              /* We have not yet linked `new_cell` at this `level` to the skiplist
+                 so the only reason it would be modified by someone else would be
+                 to mark it for removal. */
+              goto concurrently_removed;
+            }
+
+            succ = succs[level];
+          }
+
+          /* Before linking the node we must check that the successor has not been
+             marked for deletion. */
+          if (!LF_SK_IS_MARKED((uintnat)atomic_load_acquire(&succ->forward[level]))) {
+            if (atomic_compare_exchange_strong(&pred->forward[level], &succ,
+                                               new_cell)) {
+              /* If we were able to insert the node then we proceed to the next
+                 level.
+
+                 It is possible for `succ` to be marked for deletion before or
+                 after we linked our node to `pred->forward[level]`, but, because
+                 we succeeded, we know that it is no longer our responsibility
+                 to remove stale pointers to `succ`. */
+              break;
+            }
           }
 
           /* On the other hand if we failed it might be because the pointer was
              marked or because a new node was added between pred and succ nodes
              at level. In both cases we can fix things by calling
              [skiplist_find] and repopulating preds and succs */
-          skiplist_find(sk, key, preds, succs);
+          if (!skiplist_find(sk, key, preds, succs) || succs[0] != new_cell) {
+            goto concurrently_removed;
+          }
         }
       }
 
@@ -395,6 +429,10 @@ int caml_lf_skiplist_insert(struct lf_skiplist *sk, uintnat key, uintnat data) {
       return 0;
     }
   }
+
+  concurrently_removed:
+    skiplist_find(sk, key, preds, succs);
+    return 0;
 }
 
 /* Deletion in a skip list */
