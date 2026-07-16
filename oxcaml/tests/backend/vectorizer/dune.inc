@@ -758,6 +758,90 @@
 (rule
  (alias   runtest)
  (enabled_if (= %{context_name} "main"))
+ (targets test_const_runner.exe test_const.cmx.dump)
+ (deps test_const.mli test_const.ml)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test_const_runner.exe))))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   test_const.output
+   (run ./test_const_runner.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff test_const.expected test_const.output)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy test_const.ml test_const_vectorized.ml)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy test_const.mli test_const_vectorized.mli)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (targets test_const_vectorized_runner.exe test_const_vectorized.cmx.dump)
+ (deps test_const_vectorized.mli test_const_vectorized.ml)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test_const_vectorized_runner.exe))))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (target test_const_vectorized.cmx.dump.output)
+ (deps ./filter.sh test_const_vectorized.cmx.dump)
+ (action
+  (with-outputs-to
+   %{target}
+   (with-accepted-exit-codes 0
+    (run %{deps})))))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+   (diff test_const_vectorized.cmx.dump.expected test_const_vectorized.cmx.dump.output)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   test_const_vectorized.output
+   (run ./test_const_vectorized_runner.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy test_const.expected test_const_vectorized.expected)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff test_const_vectorized.expected test_const_vectorized.output)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
  (targets test_register_compatible_runner.exe test_register_compatible.cmx.dump)
  (deps test_register_compatible.mli test_register_compatible.ml)
  (action

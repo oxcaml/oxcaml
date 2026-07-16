@@ -1260,19 +1260,24 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
           ~res_count operation ]
   in
   let create_const_vec consts =
+    (* [consts] is in group order: the first scalar instruction of the group
+       accesses the lowest address, and must provide the least significant lane
+       of the vector. [word0] is the least significant word. *)
     let lows, highs = Misc.Stdlib.List.split_at (length / 2) consts in
     let pack_int64 nums =
       let mask =
         Int64.shift_right_logical Int64.minus_one (64 - width_in_bits)
       in
+      (* The fold places the last element of the list in the least significant
+         lane, hence the [List.rev]. *)
       List.fold_left
         (fun target num ->
           Int64.logor
             (Int64.shift_left target width_in_bits)
             (Int64.logand num mask))
-        0L nums
+        0L (List.rev nums)
     in
-    Operation.Const_vec128 { word0 = pack_int64 highs; word1 = pack_int64 lows }
+    Operation.Const_vec128 { word0 = pack_int64 lows; word1 = pack_int64 highs }
     |> make_default ~arg_count:0 ~res_count:1
   in
   let add_op =

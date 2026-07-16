@@ -1,0 +1,2 @@
+**** Vectorize selected computation: 2 groups, 4 scalar instructions, 2 vector instructions, cost = -2 (Test_const_vectorized.set_pair_consts)
+**** Vectorize selected computation: 4 groups, 8 scalar instructions, 4 vector instructions, cost = -4 (Test_const_vectorized.set_four_consts)

@@ -180,6 +180,9 @@ let () =
   print_test ~enabled_if:enabled_if_main_amd64 "test_float32_unboxed";
   print_test "test_int32_unboxed";
   print_test "test_spill_valx2";
+  (* regression test: lane order of vector constants built from groups of
+     [Const_int] instructions with distinct values. *)
+  print_test "test_const";
   (* can't vectorize *)
   print_test ~filter_exit_code:1 "test_register_compatible";
   (* regression test: a load of a field a previous store wrote, on a freshly
