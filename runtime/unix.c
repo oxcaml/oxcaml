@@ -91,20 +91,6 @@
 
 #ifdef CAML_BARE_METAL
 
-/* Bare metal defines only the osdeps functions that the runtime core
-   itself needs to start up and run: console IO, startup path lookup,
-   environment (empty), a time source, GC log formatting, and the
-   memory-mapping layer (malloc-backed).  OS functionality that only
-   optional features need -- dynamic loading (caml_dlopen & co.,
-   wanted by natdynlink) and directory reading -- is deliberately not
-   defined, so pulling in those features fails at link time; an
-   application that wants them must provide its own definitions. */
-
-/* Route the standard descriptors through newlib's read()/write(), which
-   the BSP's syscall layer implements (typically UART). There is no way
-   to obtain any other file descriptor on bare metal, so anything else
-   fails with ENOSYS. */
-
 Caml_inline int is_std_fd(int fd)
 {
   return fd >= 0 && fd <= 2;
@@ -113,64 +99,29 @@ Caml_inline int is_std_fd(int fd)
 int caml_read_fd(int fd, int flags, void * buf, int n)
 {
   (void)flags;
-  if (is_std_fd(fd)) return read(fd, buf, n);
-  errno = ENOSYS;
-  return -1;
+  if (is_std_fd(fd))
+    return read(fd, buf, n);
+  else {
+    errno = ENOSYS;
+    return -1;
+  }
 }
 
 int caml_write_fd(int fd, int flags, void * buf, int n)
 {
   (void)flags;
-  if (is_std_fd(fd)) return write(fd, buf, n);
-  errno = ENOSYS;
-  return -1;
-}
-
-caml_stat_string caml_search_exe_in_path(const char * name)
-{
-  return caml_stat_strdup(name);
-}
-
-char * caml_executable_name(void)
-{
-  return NULL;
+  if (is_std_fd(fd))
+    return write(fd, buf, n);
+  else {
+    errno = ENOSYS;
+    return -1;
+  }
 }
 
 char *caml_secure_getenv (char const *var)
 {
   (void)var;
   return NULL;
-}
-
-uint64_t caml_time_counter(void)
-{
-#if defined(__aarch64__)
-  /* Use the Armv8-A generic timer: readable from any exception level
-     without OS support (provided CNTKCTL/CNTHCTL grant access, which
-     bare-metal BSPs do by default). */
-  uint64_t cnt, freq;
-  __asm__ __volatile__("isb; mrs %0, cntvct_el0" : "=r"(cnt));
-  __asm__ __volatile__("mrs %0, cntfrq_el0" : "=r"(freq));
-  if (freq == 0) return cnt;
-  return (uint64_t)(((unsigned __int128)cnt * NSEC_PER_SEC) / freq);
-#else
-  /* No timesource: a monotonically increasing counter keeps GC pacing
-     and timestamps well-defined, if meaningless. */
-  static uint64_t counter = 0;
-  return ++counter;
-#endif
-}
-
-int caml_num_rows_fd(int fd)
-{
-  (void)fd;
-  return -1;
-}
-
-int caml_format_timestamp(char* buf, size_t sz, int formatted)
-{
-  (void)formatted;
-  return snprintf(buf, sz, "0.000000 ");
 }
 
 void caml_init_os_params(void)
@@ -180,15 +131,11 @@ void caml_init_os_params(void)
   caml_plat_hugepagesize = 0;
 }
 
-void caml_plat_mem_name_map(void *mem, size_t length, const char *name)
+void *caml_plat_mem_map(uintnat size, uintnat flags, const char* name)
 {
-  (void)mem;
-  (void)length;
+  (void)flags;
   (void)name;
-}
-
-static void *bare_aligned_alloc(uintnat size, uintnat alignment)
-{
+  uintnat alignment = caml_plat_mmap_alignment;
   uintptr_t raw, aligned;
   void **slot;
   if (alignment < sizeof(void *)) alignment = sizeof(void *);
@@ -198,27 +145,6 @@ static void *bare_aligned_alloc(uintnat size, uintnat alignment)
   slot = (void **)aligned;
   slot[-1] = (void *)raw;
   return (void *)aligned;
-}
-
-void *caml_plat_mem_map(uintnat size, uintnat flags, const char* name)
-{
-  (void)flags;
-  (void)name;
-  return bare_aligned_alloc(size, caml_plat_mmap_alignment);
-}
-
-void* caml_plat_mem_commit(void* mem, uintnat size, const char* name)
-{
-  (void)size;
-  (void)name;
-  return mem;
-}
-
-void caml_plat_mem_decommit(void* mem, uintnat size, const char* name)
-{
-  (void)mem;
-  (void)size;
-  (void)name;
 }
 
 void caml_plat_mem_unmap(void* mem, uintnat size)

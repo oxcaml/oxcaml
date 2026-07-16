@@ -38,12 +38,24 @@
 #define CAML_EV_ALLOC_FLUSH() /**/
 #endif
 
+#ifdef CAML_BARE_METAL
+/* An events ring needs an OS (files, mmap), so on bare metal the whole
+   producer (runtime_events.c) is compiled out and the emit points
+   compile to nothing, like CAML_EV_ALLOC without CAML_INSTR above. */
+#define CAML_EV_BEGIN(p)              /**/
+#define CAML_EV_END(p)                /**/
+#define CAML_EV_COUNTER(c,v)          /**/
+#define CAML_EV_LIFECYCLE(l,d)        /**/
+#define CAML_RUNTIME_EVENTS_INIT()    /**/
+#define CAML_RUNTIME_EVENTS_DESTROY() /**/
+#else
 #define CAML_EV_BEGIN(p) caml_ev_begin(p)
 #define CAML_EV_END(p) caml_ev_end(p)
 #define CAML_EV_COUNTER(c,v) caml_ev_counter(c,v)
 #define CAML_EV_LIFECYCLE(l,d) caml_ev_lifecycle(l,d)
 #define CAML_RUNTIME_EVENTS_INIT() caml_runtime_events_init()
 #define CAML_RUNTIME_EVENTS_DESTROY() caml_runtime_events_destroy()
+#endif
 typedef enum {
     EV_INTERNAL,
     EV_LIFECYCLE,

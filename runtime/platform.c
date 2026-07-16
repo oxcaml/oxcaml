@@ -577,7 +577,15 @@ void* caml_mem_commit(void* mem, uintnat size, const char* name)
   CAML_GC_MESSAGE(ADDRSPACE,
                   "commit %" ARCH_INTNAT_PRINTF_FORMAT "d"
                   " bytes at %p for %s\n", size, mem, name);
+#ifdef CAML_BARE_METAL
+  /* There is no reserve-vs-commit distinction on bare metal:
+     caml_plat_mem_map returns real (malloc-backed) memory, so
+     committing is the identity and there is nothing to give back on
+     decommit. */
+  return mem;
+#else
   return caml_plat_mem_commit(mem, size, name);
+#endif
 }
 
 void caml_mem_decommit(void* mem, uintnat size, const char* name)
@@ -586,7 +594,9 @@ void caml_mem_decommit(void* mem, uintnat size, const char* name)
     CAML_GC_MESSAGE(ADDRSPACE,
                     "decommit %" ARCH_INTNAT_PRINTF_FORMAT "d"
                     " bytes at %p for %s\n", size, mem, name);
+#ifndef CAML_BARE_METAL
     caml_plat_mem_decommit(mem, size, name);
+#endif
   }
 }
 
@@ -605,6 +615,13 @@ void caml_mem_unmap(void* mem, uintnat size)
 
 void caml_mem_name_map(void* mem, size_t length, const char* format, ...)
 {
+#ifdef CAML_BARE_METAL
+  /* Mapping names are debugging aids for OS tools (/proc/PID/maps);
+     there is no OS to give them to. */
+  (void)mem;
+  (void)length;
+  (void)format;
+#else
   va_list args;
   char mapping_name[64];
   va_start(args, format);
@@ -615,6 +632,7 @@ void caml_mem_name_map(void* mem, size_t length, const char* format, ...)
   /* if we successfully made a string, give it to the OS. */
   if ((n > 0) && (n < sizeof(mapping_name)))
     caml_plat_mem_name_map(mem, length, mapping_name);
+#endif
 }
 
 #define Min_sleep_nsec  (10 * NSEC_PER_USEC) /* 10 usec */

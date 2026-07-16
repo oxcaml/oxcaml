@@ -43,32 +43,12 @@
 #include <unistd.h>
 #endif
 
-/* The caml_ev_* emit points are called from the runtime core (domains,
-   GC), so this file is always linked and its OS calls must resolve even
-   on bare metal.  The stubs below make every file/mapping operation
-   fail, so runtime events can never be started there ([Sys_error] at
-   [Runtime_events.start] / OCAMLRUNPARAM=e); the emit points then stay
-   inert. */
-#ifdef CAML_BARE_METAL
-#define getpid() 0
-#define open(path, flags, mode) (-1)
-#define ftruncate(fd, length) (-1)
-#define close(fd) ((void)(fd))
-#define unlink(path) ((void)(path))
-#define mmap(addr, length, prot, flags, fd, offset) NULL
-#define munmap(addr, length) ((void)(addr), (void)(length))
-#ifndef O_RDWR
-#define O_RDWR 0
-#endif
-#ifndef O_CREAT
-#define O_CREAT 0
-#endif
-#ifndef PROT_READ
-#define PROT_READ 0
-#define PROT_WRITE 0
-#define MAP_SHARED 0
-#endif
-#endif
+/* An events ring needs an OS (files, mmap), so the whole producer is
+   compiled out on bare metal: the CAML_EV_* / CAML_RUNTIME_EVENTS_*
+   macros in runtime_events.h compile to nothing there, and the
+   primitives backing the [Runtime_events] module are not defined, so a
+   program using it fails at link time. */
+#ifndef CAML_BARE_METAL
 
 #define RUNTIME_EVENTS_VERSION 1
 
@@ -897,6 +877,8 @@ CAMLexport value caml_runtime_events_user_resolve(
 
   CAMLreturn (Val_none);
 }
+
+#endif /* !CAML_BARE_METAL */
 
 /* Linker compatibility with unused 4 stdlib externals */
 

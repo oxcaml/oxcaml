@@ -69,13 +69,13 @@
 
 /* On bare metal, only the primitives that every program retains (via
    the [Stdlib] module, which is always linked) get a definition, and
-   they fail honestly: ENOSYS for file operations, "not a tty", "empty
-   environment".  Primitives for other OS functionality (file-system
-   inspection and manipulation, [Sys.command], [Sys.readdir], ...) are
-   deliberately not defined at all -- see the masked-out regions below
-   -- so a program using them fails at link time, and an application
-   that wants one must provide its own definition alongside its other
-   stubs. */
+   they fail honestly: ENOSYS for file operations, "empty environment"
+   for getenv.  Primitives for other OS functionality (file-system
+   inspection and manipulation, [Sys.command], [Sys.readdir], isatty,
+   ...) are deliberately not defined at all -- see the masked-out
+   regions below -- so a program using them fails at link time, and an
+   application that wants one must provide its own definition alongside
+   its other stubs. */
 #ifdef CAML_BARE_METAL
 static int caml_bare_syscall_error(void)
 {
@@ -94,7 +94,6 @@ static int caml_bare_open(const char_os *path, int flags, int perm)
 #undef open_os
 #define open_os caml_bare_open
 #define close(fd) ((void)(fd), caml_bare_syscall_error())
-#define isatty(fd) ((void)(fd), 0)
 #define getenv(var) ((void)(var), NULL)
 #endif
 
@@ -855,7 +854,10 @@ CAMLprim value caml_sys_read_directory(value path)
 #endif /* !CAML_BARE_METAL */
 
 /* Return true if the value is a filedescriptor (int) that is
- * (presumably) open on an interactive terminal */
+ * (presumably) open on an interactive terminal.
+ * Only retained by [In_channel]/[Out_channel]; not defined on bare
+ * metal (no terminals). */
+#ifndef CAML_BARE_METAL
 CAMLprim value caml_sys_isatty(value chan)
 {
   int fd;
@@ -870,6 +872,7 @@ CAMLprim value caml_sys_isatty(value chan)
 
   return ret;
 }
+#endif /* !CAML_BARE_METAL */
 
 CAMLprim value caml_sys_const_naked_pointers_checked(value unit)
 {

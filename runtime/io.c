@@ -1142,7 +1142,11 @@ CAMLprim value caml_ml_input_scan_line(value vchannel)
   CAMLreturn (Val_long(res));
 }
 
+/* Only used by the compiler's own Terminfo module; not defined on bare
+   metal (no terminals). */
+#ifndef CAML_BARE_METAL
 CAMLprim value caml_terminfo_rows(value vchannel)
 {
   return Val_int(caml_num_rows_fd(Channel(vchannel)->fd));
 }
+#endif
