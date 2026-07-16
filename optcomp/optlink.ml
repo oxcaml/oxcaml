@@ -137,7 +137,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         Resolved_via_manifest_but_not_found_in_load_path object_filename
 
   let scan_file linkenv ~shared genfns requested_filename
-      (full_paths, objfiles, tolink, cached_genfns_imports) =
+      (full_paths, object_pathnames, tolink, cached_genfns_imports) =
     match read_file requested_filename with
     | Unit (resolved_pathname, info, crc) ->
       (* This is a cmx file. It must be linked in any case. *)
@@ -171,19 +171,19 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           dynunit
         }
       in
-      let object_file_name =
+      let object_pathname =
         match
           find_companion_object_file ~requested_filename ~resolved_pathname
             ~artifact_ext:Backend.ext_flambda_obj ~object_ext:Backend.ext_obj
         with
-        | Adjacent object_file
-        | Resolved_via_manifest_and_found_in_load_path object_file ->
-          object_file
+        | Adjacent object_pathname
+        | Resolved_via_manifest_and_found_in_load_path object_pathname ->
+          object_pathname
         | Resolved_via_manifest_but_not_found_in_load_path object_filename ->
           raise
             (Linkenv.Error
                (Companion_object_file_not_found_via_manifest
-                  (object_filename, requested_filename)))
+                  { object_filename; requested_filename }))
       in
       Profile.record_call ~accumulate:true "link/scan/check_consistency"
         (fun () ->
@@ -202,7 +202,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           (Linkenv.Error
              (Requires_metaprogramming_without_flag resolved_pathname));
       ( resolved_pathname :: full_paths,
-        object_file_name :: objfiles,
+        object_pathname :: object_pathnames,
         unit :: tolink,
         cached_genfns_imports )
     | Library (resolved_pathname, infos) ->
@@ -224,39 +224,42 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         raise
           (Linkenv.Error
              (Requires_metaprogramming_without_flag resolved_pathname));
-      let objfiles =
+      let object_pathnames =
         match
           find_companion_object_file ~requested_filename ~resolved_pathname
             ~artifact_ext:Backend.ext_flambda_lib ~object_ext:Backend.ext_lib
         with
-        | Adjacent obj_file ->
+        | Adjacent object_pathname ->
           (* MSVC doesn't support empty .lib files, and macOS struggles to make
              them (#6550), so there shouldn't be one if the cmxa contains no
              units. The file_exists check is added to be ultra-defensive for the
              case where a user has manually added things to the .a/.lib file *)
-          if List.is_empty infos.lib_units && not (Sys.file_exists obj_file)
-          then objfiles
-          else obj_file :: objfiles
-        | Resolved_via_manifest_and_found_in_load_path obj_file ->
-          obj_file :: objfiles
+          if
+            List.is_empty infos.lib_units
+            && not (Sys.file_exists object_pathname)
+          then object_pathnames
+          else object_pathname :: object_pathnames
+        | Resolved_via_manifest_and_found_in_load_path object_pathname ->
+          object_pathname :: object_pathnames
         | Resolved_via_manifest_but_not_found_in_load_path object_filename ->
           (* The archive was resolved through a manifest with no entry for the
              corresponding [.a]/[.lib] file. This is only legitimate when the
              archive contains no units (see the comment above about empty .lib
              files). *)
           if List.is_empty infos.lib_units
-          then objfiles
+          then object_pathnames
           else
             raise
               (Linkenv.Error
                  (Companion_object_file_not_found_via_manifest
-                    (object_filename, requested_filename)))
+                    { object_filename; requested_filename }))
       in
-      (* [resolved_pathname] is always returned irrespective of the [objfiles]
-         calculation above and the units calculation below: the aim is to know
-         the full set of files which were provided on the command line. *)
+      (* [resolved_pathname] is always returned irrespective of the
+         [object_pathnames] calculation above and the units calculation below:
+         the aim is to know the full set of files which were provided on the
+         command line. *)
       ( resolved_pathname :: full_paths,
-        objfiles,
+        object_pathnames,
         List.fold_right
           (fun info reqd ->
             let li_name = CU.name info.li_name in
