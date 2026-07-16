@@ -21,6 +21,22 @@ val type_declaration_ikind_of_jkind :
   Types.jkind_l ->
   Types.type_ikind
 
+type mode_crossing_error
+
+type subjkind_error =
+  | Jkind_error of Jkind.Violation.t
+  | Mode_crossing_error of mode_crossing_error
+
+val report_subjkind_error_with_offender :
+  offender:(Format_doc.formatter -> unit) ->
+  Env.t ->
+  Format_doc.formatter ->
+  subjkind_error ->
+  unit
+
+val report_subjkind_error_with_name :
+  name:string -> Env.t -> Format_doc.formatter -> subjkind_error -> unit
+
 val sub_jkind_l :
   ?allow_any_crossing:bool ->
   ?origin:string ->
@@ -29,7 +45,28 @@ val sub_jkind_l :
   Env.t ->
   Types.jkind_l ->
   Types.jkind_l ->
-  (unit, Jkind.Violation.t) result
+  (unit, subjkind_error) result
+
+val check_type_expr_bound :
+  ?origin:string ->
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
+  context:Jkind.jkind_context ->
+  Env.t ->
+  ty:Types.type_expr ->
+  actual:Types.jkind_l ->
+  bound:Types.jkind_l ->
+  (unit, subjkind_error) result
+
+val check_type_decl_bound :
+  ?allow_any_crossing:bool ->
+  ?origin:string ->
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
+  context:Jkind.jkind_context ->
+  Env.t ->
+  decl:Types.type_declaration ->
+  actual:Types.jkind_l ->
+  bound:Types.jkind_l ->
+  (unit, subjkind_error) result
 
 val crossing_of_jkind :
   context:Jkind.jkind_context ->
