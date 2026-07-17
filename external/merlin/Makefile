@@ -6,6 +6,8 @@ DUNE_OPTS := --workspace=$(PARENT)/duneconf/boot.ws
 # parent's workspace.
 include $(PARENT)/Makefile.config
 
+dune = $(opam exec) $(DUNE)
+
 export RUNTIME_DIR
 
 .DEFAULT_GOAL := build
@@ -19,7 +21,7 @@ parent-install:
 	$(MAKE) -C $(PARENT) install
 
 build: parent-boot-config
-	dune build $(DUNE_OPTS) $(ARGS)
+	$(dune) build $(DUNE_OPTS) $(ARGS)
 
 # If the caller didn't point us at an installed compiler, build and install
 # the parent ourselves before running the tests.
@@ -45,7 +47,7 @@ test test-promote: parent-boot-config
 	    | sort | sha256sum | awk '{print $$1}'); \
 	export MERLIN_TEST_OCAML_VERSION="$$version"; \
 	if [ -z "$(strip $(ARGS))" ]; then \
-	    dune build $(DUNE_OPTS) @runtest $(PROMOTE); \
+	    $(dune) build $(DUNE_OPTS) @runtest $(PROMOTE); \
 	else \
-	    dune build $(DUNE_OPTS) $(ARGS) $(PROMOTE); \
+	    $(dune) build $(DUNE_OPTS) $(ARGS) $(PROMOTE); \
 	fi
