@@ -5,6 +5,22 @@
 
 #syntax quotations on
 
+(* Main example: cross-stage accesses and [local]/[quote_local] matter *)
+(* CR quoted-modes jbachurski: Splices should constrain  modulo quoted modes. *)
+(* CR quoted-modes jbachurski: [Region_lock]/[Exclave_lock] should be staged. *)
+let ignore = <[ fun (_ @ local) -> () ]>
+let foo f = <[ fun (x @ local) -> $(f (<[$ignore x]>)) ]>
+let bar f (x @ quote_local) = <[$f (fun () -> $x)]>
+[%%expect{|
+val ignore : <[$('a) @ local -> unit]> expr = <[fun (_ : _ @ local) -> ()]>
+val foo :
+  (<[unit]> expr @ quote_regional once -> 'a expr) ->
+  <[$('b) @ local -> $('a)]> expr = <fun>
+val bar :
+  <[(unit -> $('a)) @ local -> $('b)]> expr ->
+  'a expr @ quote_local -> 'b expr @ quote_local once = <fun>
+|}];;
+
 (* local is different from <[local]> *)
 let f (x @ local quote_local) = x
 [%%expect{|
