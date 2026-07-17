@@ -132,19 +132,31 @@ type submode_reason =
   | Constructor of Longident.t
   | Other
 
-type unsupported_stack_allocation =
+type always_heap_allocation =
   | Lazy
   | Module
   | Object
   | List_comprehension
   | Array_comprehension
 
-let print_unsupported_stack_allocation ppf = function
+let print_always_heap_allocation ppf = function
   | Lazy -> Format_doc.fprintf ppf "lazy expressions"
   | Module -> Format_doc.fprintf ppf "modules"
   | Object -> Format_doc.fprintf ppf "objects"
   | List_comprehension -> Format_doc.fprintf ppf "list comprehensions"
   | Array_comprehension -> Format_doc.fprintf ppf "array comprehensions"
+
+type always_static_allocation =
+  | Constant
+  | Src_pos
+  | Unboxed_unit
+  | Unboxed_bool
+
+let print_always_static_allocation ppf = function
+  | Constant -> Format_doc.fprintf ppf "literals"
+  | Src_pos -> Format_doc.fprintf ppf "source position literals"
+  | Unboxed_unit -> Format_doc.fprintf ppf "unboxed unit literals"
+  | Unboxed_bool -> Format_doc.fprintf ppf "unboxed boolean literals"
 
 type mutable_restriction =
   | In_group
@@ -313,7 +325,8 @@ type error =
   | Indeterminate_constructor_layout of type_expr * string * int
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
-  | Unsupported_stack_allocation of unsupported_stack_allocation
+  | Always_heap_allocation of always_heap_allocation
+  | Always_static_allocation of always_static_allocation
   | Not_allocation
   | Impossible_function_jkind of
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
@@ -8586,8 +8599,11 @@ and type_expect_
            exp_env = env }
   | Pexp_stack e ->
       let exp = type_expect env expected_mode e ty_expected_explained in
-      let unsupported category =
-        raise (Error (exp.exp_loc, env, Unsupported_stack_allocation category))
+      let always_heap category =
+        raise (Error (exp.exp_loc, env, Always_heap_allocation category))
+      in
+      let always_static category =
+        raise (Error (exp.exp_loc, env, Always_static_allocation category))
       in
       begin match exp.exp_desc with
       | Texp_function { alloc_mode; _} | Texp_tuple (_, alloc_mode)
@@ -8607,13 +8623,17 @@ and type_expect_
           in
           Alloc.submode_err (exp.exp_loc, Allocation) local alloc_mode
         end
-      | Texp_list_comprehension _ -> unsupported List_comprehension
-      | Texp_array_comprehension _ -> unsupported Array_comprehension
-      | Texp_new _ -> unsupported Object
-      | Texp_override _ -> unsupported Object
-      | Texp_lazy _ -> unsupported Lazy
-      | Texp_object _ -> unsupported Object
-      | Texp_pack _ -> unsupported Module
+      | Texp_list_comprehension _ -> always_heap List_comprehension
+      | Texp_array_comprehension _ -> always_heap Array_comprehension
+      | Texp_new _ -> always_heap Object
+      | Texp_override _ -> always_heap Object
+      | Texp_lazy _ -> always_heap Lazy
+      | Texp_object _ -> always_heap Object
+      | Texp_pack _ -> always_heap Module
+      | Texp_constant _ -> always_static Constant
+      | Texp_src_pos -> always_static Src_pos
+      | Texp_unboxed_unit -> always_static Unboxed_unit
+      | Texp_unboxed_bool _ -> always_static Unboxed_bool
       | Texp_apply({ exp_desc =
           Texp_ident { desc = {val_kind = Val_prim _}; _ }}, _, _, _, _)
           (* [stack_ (prim foo)] will be checked by [transl_primitive_application]. *)
@@ -13391,9 +13411,16 @@ let report_error ~loc env =
          automatically if omitted. It cannot be passed with '?'.@]"
       Style.inline_code label
       Style.inline_code "[%call_pos]"
-  | Unsupported_stack_allocation category ->
-    Location.errorf ~loc "@[Stack allocating %a is unsupported yet.@]"
-      print_unsupported_stack_allocation category
+  | Always_heap_allocation category ->
+    Location.errorf ~loc
+      "@[Stack allocating %a is not yet supported;@ \
+         they are currently always heap allocated.@]"
+      print_always_heap_allocation category
+  | Always_static_allocation category ->
+    Location.errorf ~loc
+      "@[Stack allocating %a is not supported;@ \
+         they are not allocated at runtime. @]"
+      print_always_static_allocation category
   | Not_allocation ->
       Location.errorf ~loc "This expression is not an allocation site."
   | Impossible_function_jkind { some_args_ok; ty_fun; jkind } ->
