@@ -213,6 +213,11 @@ module Layout = struct
       | Base _ | Any _ | Univar _ | Genvar _ -> false
       | Product ts -> List.exists (has_component ~component) ts
 
+    let rec has_genvar = function
+      | Genvar _ -> true
+      | Product ts -> List.exists has_genvar ts
+      | Base _ | Any _ | Univar _ -> false
+
     module Debug_printers = struct
       open Format
 
