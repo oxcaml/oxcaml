@@ -38,12 +38,9 @@ let archive_magic_size = 8
 
 let is_archive buf =
   size buf >= archive_magic_size
-  &&
-  let matches = ref true in
-  String.iteri
-    (fun i c -> if buf.{i} <> Char.code c then matches := false)
-    archive_magic;
-  !matches
+  && String.equal
+       (Read.fixed_string (cursor buf) archive_magic_size)
+       archive_magic
 
 let header_size = 60
 

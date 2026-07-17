@@ -38,13 +38,7 @@ type error =
   | Unrecognized_input of
       { filename : string;
         magic : string
-      }
-      (** The file is neither an ELF relocatable object nor an ar archive.
-          Inputs are classified by their leading magic bytes rather than by
-          filename extension, because build systems may supply link inputs via
-          manifest files (see [-I-manifest]) that resolve to content-addressed
-          paths without meaningful file names. Silently skipping such a file
-          would drop its code from the final link, so this is a hard error. *)
+      }  (** The file is neither an ELF relocatable object nor an ar archive. *)
 
 (** Exception wrapper for measurement errors. *)
 exception Error of error
