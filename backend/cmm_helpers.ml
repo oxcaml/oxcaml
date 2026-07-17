@@ -1570,7 +1570,7 @@ let memory_chunk_width_in_bytes : memory_chunk -> int = function
   | Sixteen_unsigned | Sixteen_signed -> 2
   | Thirtytwo_unsigned | Thirtytwo_signed -> 4
   | Single { reg = Float64 | Float32 } -> 4
-  | Word_int -> size_int
+  | Word_int | Sixtyfour -> size_int
   | Word_val -> size_addr
   | Double -> size_float
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> size_vec128
@@ -2301,7 +2301,7 @@ let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
 
 (* CR layouts 5.1: When we pack int8/16/32s/float32s more efficiently, this code
    will need to change. *)
-let memory_chunk_size_in_words_for_mixed_block = function
+let memory_chunk_size_in_words_for_mixed_block : memory_chunk -> int = function
   | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
   | Thirtytwo_unsigned | Thirtytwo_signed ->
     (* small integers are currently stored using a whole word *)
@@ -2314,7 +2314,7 @@ let memory_chunk_size_in_words_for_mixed_block = function
         "Unable to compile mixed blocks on a platform where a float is not the \
          same width as a value.";
     1
-  | Word_int | Word_val -> 1
+  | Word_int | Sixtyfour | Word_val -> 1
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> 2
   | Twofiftysix_unaligned | Twofiftysix_aligned -> 4
   | Fivetwelve_unaligned | Fivetwelve_aligned -> 8
@@ -2328,7 +2328,7 @@ let alloc_generic_set_fn block ofs newval memory_chunk dbg =
   | Word_val ->
     (* Values must go through "caml_initialize" *)
     addr_array_initialize block ofs newval dbg
-  | Word_int -> generic_case ()
+  | Word_int | Sixtyfour -> generic_case ()
   (* Generic cases that may differ under big endian archs *)
   | Single _ | Double | Thirtytwo_unsigned | Thirtytwo_signed
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
@@ -2442,18 +2442,18 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
         if ofs < value_prefix_size
         then
           (* regular scanned part of a block *)
-          match memory_chunk with
+          match (memory_chunk : memory_chunk) with
           | Word_int | Word_val -> ok ()
-          | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-          | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Double
-          | Onetwentyeight_unaligned | Onetwentyeight_aligned
+          | Sixtyfour | Byte_unsigned | Byte_signed | Sixteen_unsigned
+          | Sixteen_signed | Thirtytwo_unsigned | Thirtytwo_signed | Single _
+          | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
           | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
           | Fivetwelve_aligned ->
             error "the value prefix of a mixed block"
         else
           (* flat suffix part of the block *)
-          match memory_chunk with
-          | Word_int | Thirtytwo_unsigned | Thirtytwo_signed | Double
+          match (memory_chunk : memory_chunk) with
+          | Word_int | Sixtyfour | Thirtytwo_unsigned | Thirtytwo_signed | Double
           | Onetwentyeight_unaligned | Onetwentyeight_aligned
           | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
           | Fivetwelve_aligned | Single _ | Byte_unsigned | Byte_signed
@@ -2548,8 +2548,8 @@ let bigarray_word_kind : Lambda.bigarray_kind -> memory_chunk = function
   | Pbigarray_sint16 -> Sixteen_signed
   | Pbigarray_uint16 -> Sixteen_unsigned
   | Pbigarray_int32 -> Thirtytwo_signed
-  | Pbigarray_int64 -> Word_int
-  | Pbigarray_caml_int -> Word_int
+  | Pbigarray_int64 -> Sixtyfour
+  | Pbigarray_caml_int -> Sixtyfour
   | Pbigarray_native_int -> Word_int
   | Pbigarray_complex32 -> Single { reg = Float64 }
   | Pbigarray_complex64 -> Double
@@ -2913,7 +2913,7 @@ let unaligned_set_64 ~ptr_out_of_heap ptr idx newval dbg =
   if Arch.allow_unaligned_access
   then
     Cop
-      ( Cstore (Word_int, Assignment),
+      ( Cstore (Sixtyfour, Assignment),
         [add_int_ptr ~ptr_out_of_heap ptr idx dbg; newval],
         dbg )
   else
