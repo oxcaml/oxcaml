@@ -667,6 +667,9 @@ let mode_strictly_stack expected_mode =
     with strictly_stack = true
   }
 
+let mode_alloc_annot expected_mode alloc_annot =
+  { expected_mode with alloc_annot }
+
 let mode_coerce mode expected_mode =
   mode_morph (fun m -> Value.meet [m; mode]) expected_mode
 
@@ -6468,9 +6471,8 @@ let pat_modes ~env ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
     else None, exp_mode
   in
   let exp_mode =
-    { exp_mode with
-      alloc_annot =
-      (mode_annots_from_pat spat).mode_modes.allocation }
+    mode_alloc_annot exp_mode
+      ((mode_annots_from_pat spat).mode_modes.allocation)
   in
   attrs, pat_mode, env_alloc_mode, exp_mode, spat
 
@@ -11662,9 +11664,7 @@ and type_expect_mode ~loc ~env ~(modes : Alloc.Const.Option.t) expected_mode =
       | Some Local -> mode_strictly_local expected_mode
       | _ -> expected_mode
     in
-    let expected_mode =
-      { expected_mode with alloc_annot = modes.allocation }
-    in
+    let expected_mode = mode_alloc_annot expected_mode modes.allocation in
     expected_mode
 
 and type_n_ary_function
