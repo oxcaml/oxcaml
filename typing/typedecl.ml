@@ -1977,21 +1977,21 @@ module Element_repr = struct
       let layout = Jkind.get_layout_defaulting_to_scannable env jkind in
       let rec layout_to_t : Jkind_types.Layout.Const.t -> t option = function
       | Any _ -> None
-      | Base (Scannable, sa) -> Some (Value_element sa)
-      | Base (Float64, _) -> Some (Unboxed_element Float64)
-      | Base (Float32, _) -> Some (Unboxed_element Float32)
-      | Base (Word, _) -> Some (Unboxed_element Word)
-      | Base (Bits8, _) -> Some (Unboxed_element Bits8)
-      | Base (Bits16, _) -> Some (Unboxed_element Bits16)
-      | Base (Bits32, _) -> Some (Unboxed_element Bits32)
-      | Base (Bits64, _) -> Some (Unboxed_element Bits64)
-      | Base (Untagged_immediate, _) ->
+      | Base (Scannable, sa, _) -> Some (Value_element sa)
+      | Base (Float64, _, _) -> Some (Unboxed_element Float64)
+      | Base (Float32, _, _) -> Some (Unboxed_element Float32)
+      | Base (Word, _, _) -> Some (Unboxed_element Word)
+      | Base (Bits8, _, _) -> Some (Unboxed_element Bits8)
+      | Base (Bits16, _, _) -> Some (Unboxed_element Bits16)
+      | Base (Bits32, _, _) -> Some (Unboxed_element Bits32)
+      | Base (Bits64, _, _) -> Some (Unboxed_element Bits64)
+      | Base (Untagged_immediate, _, _) ->
         Some (Unboxed_element Untagged_immediate)
-      | Base (Vec128, _) -> Some (Unboxed_element Vec128)
-      | Base (Vec256, _) -> Some (Unboxed_element Vec256)
-      | Base (Vec512, _) -> Some (Unboxed_element Vec512)
-      | Base (Void, _) -> Some Void
-      | Product l ->
+      | Base (Vec128, _, _) -> Some (Unboxed_element Vec128)
+      | Base (Vec256, _, _) -> Some (Unboxed_element Vec256)
+      | Base (Vec512, _, _) -> Some (Unboxed_element Vec512)
+      | Base (Void, _, _) -> Some Void
+      | Product (l, _) ->
         (* CR rtjoa: changed this bc of scannable axes *)
         Misc.Stdlib.List.some_if_all_elements_are_some
           (List.map layout_to_t l)
@@ -2321,7 +2321,9 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
                   match Jkind.extract_layout env jkind with
                   | Ok layout -> layout
                   | Error _ ->
-                      Jkind.Layout.Any Jkind_types.Scannable_axes.max
+                      Jkind.Layout.Any
+                        ( Jkind_types.Scannable_axes.max,
+                          Jkind_types.Addressability.max )
                 in
                 lbl, ty, layout)
             lbls jkinds
@@ -3104,7 +3106,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
   match decl.Types.jkind_manifest with
   | None -> ()
   | Some { base = Layout _; _ } -> ()
-  | Some ({ base = Kconstr (kpath, _); mod_bounds = _;
+  | Some ({ base = Kconstr (kpath, _, _); mod_bounds = _;
             with_bounds = No_with_bounds }
           as manifest) ->
     if not (Path.exists_free recmod_ids kpath) then ()
@@ -3119,7 +3121,8 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
         | [] -> [expand]
         | _ :: _ ->
           (match manifest.base with
-           | Kconstr (base_path, _) -> [Contains (manifest, base_path); expand]
+           | Kconstr (base_path, _, _) ->
+             [Contains (manifest, base_path); expand]
            | Layout _ -> assert false)
       in
       let rec follow current acc visited =
@@ -3131,7 +3134,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
           None
         else
           match (Env.find_jkind current env).jkind_manifest with
-          | Some ({ base = Kconstr (next, _); mod_bounds = _;
+          | Some ({ base = Kconstr (next, _, _); mod_bounds = _;
                     with_bounds = No_with_bounds } as m) ->
             follow next ((steps_of current m) @ acc) (current :: visited)
           | Some { base = Layout _; _ } | None -> None
@@ -3201,7 +3204,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
     let rec has_any : Jkind_types.Layout.Const.t -> bool = function
       | Any _ -> true
       | Base _ -> false
-      | Product l -> List.exists has_any l
+      | Product (l, _) -> List.exists has_any l
       | Univar _ -> Misc.fatal_error "Unboxed_recursion: univar"
       | Genvar _ -> Misc.fatal_error "Unboxed_recursion: genvar"
     in
@@ -3228,7 +3231,9 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
           let layout =
             match Jkind.get_layout env jkind with
             | None ->
-              Jkind_types.Layout.Const.Any Jkind_types.Scannable_axes.max
+              Jkind_types.Layout.Const.Any
+                ( Jkind_types.Scannable_axes.max,
+                  Jkind_types.Addressability.max )
             | Some l -> l
           in
           Contained (contained_parameters tyl layout), parents
@@ -5323,12 +5328,19 @@ module Reaching_path = struct
          : jkind_const_desc_lr ) =
     let pp_base ppf = function
       | Types.Layout l -> Fmt.fprintf ppf "%s" (Jkind.Layout.Const.to_string l)
-      | Kconstr (p, sa) ->
-        (match Jkind.Scannable_axes.to_string_list sa with
+      | Kconstr (p, sa, a) ->
+        let strs =
+          Jkind.Scannable_axes.to_string_list sa
+          @
+          match (a : Jkind.Addressability.t) with
+          | Addressable -> ["addressable"]
+          | Unaddressable | Maybe_addressable -> []
+        in
+        (match strs with
          | [] -> Printtyp.path ppf p
-         | _ :: _ as sa_strs ->
+         | _ :: _ as strs ->
            Fmt.fprintf ppf "%a %s" Printtyp.path p
-             (String.concat " " sa_strs))
+             (String.concat " " strs))
     in
     let mod_strings =
       Typemode.untransl_mod_bounds mod_bounds

@@ -96,20 +96,28 @@ module Scannable_axes : sig
   val to_string_list : t -> string list
 end
 
+module Addressability : sig
+  type t = Jkind_types.Addressability.t =
+    | Addressable
+    | Unaddressable
+    | Maybe_addressable
+end
+
 (* The layout of a type describes its memory layout. A layout is either the
    indeterminate [Any] or a sort, which is a concrete memory layout. *)
 module Layout : sig
   type 'sort t = 'sort Jkind_types.Layout.t =
-    | Sort of 'sort * Scannable_axes.t
-    | Product of 'sort t list
-    | Any of Scannable_axes.t
+    | Sort of 'sort * Scannable_axes.t * Addressability.t
+    | Product of 'sort t list * Addressability.t
+    | Any of Scannable_axes.t * Addressability.t
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
 
     val get_sort : t -> Sort.Const.t option
 
-    val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
+    val of_sort_const :
+      Sort.Const.t -> Scannable_axes.t -> Addressability.t -> t
 
     val to_string : t -> string
   end
@@ -576,6 +584,11 @@ module Desc : sig
   val get_const : 'd t -> 'd Const.t option
 
   val of_const : 'd Const.t -> 'd t
+
+  (** The addressability of the kind a (flattened) layout describes, insofar as
+      it is known; used to decide whether an [addressable] mark is worth
+      printing. *)
+  val layout_addressability : Sort.Flat.t Layout.t -> Addressability.t
 
   val format : Env.t -> Format_doc.formatter -> 'd t -> unit
 end

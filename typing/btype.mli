@@ -425,9 +425,14 @@ module Jkind0 : sig
       ('a -> 'b option) -> ('a, 'd) base_and_axes ->
       ('b, 'd) base_and_axes option
 
-    val meet_scannable_axes :
+    (** Applies the pending operations of an expanded [Kconstr] to its
+        manifest: the scannable axes are met, and a pending [addressable] mark
+        (the [Addressability.t] argument being [Addressable]) is applied to
+        the root. *)
+    val apply_pending_axes :
       Jkind_types.Layout.Const.t jkind_base ->
       Jkind_types.Scannable_axes.t ->
+      Jkind_types.Addressability.t ->
       Jkind_types.Layout.Const.t jkind_base
 
     val try_allow_l :

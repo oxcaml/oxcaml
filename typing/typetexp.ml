@@ -1829,7 +1829,7 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
         | Tvar { jkind; _ } ->
           let desc = jkind.jkind in
           (match desc.base with
-          | Kconstr (Pident id, sa) ->
+          | Kconstr (Pident id, sa, a) ->
             let v_opt =
               List.find_map
                 (fun (id', v) ->
@@ -1839,7 +1839,7 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
             (match v_opt with
             | Some v ->
               let base : Jkind_types.Sort.t Jkind_types.Layout.t jkind_base
-                = Layout (Sort (Var v, sa)) in
+                = Layout (Sort (Var v, sa, a)) in
               let desc = {desc with base} in
               let jkind = {jkind with jkind = desc} in
               Types.set_var_jkind t jkind
@@ -1999,14 +1999,15 @@ let report_error_doc loc env = function
           dprintf "But it was inferred to have %t"
             (fun ppf -> let desc = Jkind.get inferred_jkind in
               match desc.base with
-              | Layout (Sort (Var _, sa)) | Layout (Sort (Genvar _, sa)) ->
+              | Layout (Sort (Var _, sa, _)) | Layout (Sort (Genvar _, sa, _))
+                ->
                 fprintf ppf "%a representable kind"
                   (pp_print_list ~pp_sep:(fun f () -> fprintf f " ")
                     pp_print_string)
                   ("a" :: Jkind.Scannable_axes.to_string_list sa)
-              | Layout (Sort (Univar _, _)) ->
+              | Layout (Sort (Univar _, _, _)) ->
                 Misc.fatal_error "univar"
-              | Layout (Sort (Base _, _) | Any _ | Product _) | Kconstr _ ->
+              | Layout (Sort (Base _, _, _) | Any _ | Product _) | Kconstr _ ->
                 fprintf ppf "kind %a" (Jkind.format env)
                   inferred_jkind)))
         inferred_jkind

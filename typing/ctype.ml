@@ -2077,7 +2077,7 @@ let instance_prim_layout env (desc : Primitive.description) ty =
   then ty, None
   else
   let new_sort = ref None in
-  let get_jkind jkind sa =
+  let get_jkind jkind sa a =
     let sort = match !new_sort with
     | Some sort -> sort
     | None ->
@@ -2085,7 +2085,9 @@ let instance_prim_layout env (desc : Primitive.description) ty =
       new_sort := Some sort;
       sort
     in
-    let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort (sort, sa)) in
+    (* The scannable axes and addressability constraints of the [any] bound
+       carry over to the sort variable's layout. *)
+    let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort (sort, sa, a)) in
     Jkind.History.update_reason
       jkind (Concrete_creation Layout_poly_in_external)
   in
@@ -2098,15 +2100,15 @@ let instance_prim_layout env (desc : Primitive.description) ty =
         begin match get_desc ty with
         | Tvar ({ jkind; _ } as r) -> (
           match Jkind.extract_layout env jkind with
-          | Ok (Any sa) ->
+          | Ok (Any (sa, a)) ->
             For_copy.redirect_desc copy_scope ty
-              (Tvar {r with jkind = get_jkind jkind sa})
+              (Tvar {r with jkind = get_jkind jkind sa a})
           | _ -> ())
         | Tunivar ({ jkind; _ } as r) -> (
           match Jkind.extract_layout env jkind with
-          | Ok (Any sa) ->
+          | Ok (Any (sa, a)) ->
             For_copy.redirect_desc copy_scope ty
-              (Tunivar {r with jkind = get_jkind jkind sa})
+              (Tunivar {r with jkind = get_jkind jkind sa a})
           | _ -> ())
         | _ -> ()
         end;
@@ -2893,7 +2895,9 @@ let apply_layout_wrapping_l ~env
   let get_layout jkind =
     match Jkind.extract_layout env jkind with
     | Ok l -> l
-    | Error _ -> Jkind_types.Layout.Any Jkind_types.Scannable_axes.max
+    | Error _ ->
+      Jkind_types.Layout.Any
+        (Jkind_types.Scannable_axes.max, Jkind_types.Addressability.max)
   in
   match or_null with
   | Some { prev; _ } ->
@@ -8284,7 +8288,7 @@ let clear_hash ()   =
    [jkind_const_desc]s. *)
 let rec nondep_jkind_desc_base env ids ~desc_of_const jkind_desc =
   match jkind_desc.base with
-  | Kconstr (p, _sa) -> begin
+  | Kconstr (p, _sa, _) -> begin
       match Path.find_free_opt ids p with
       | None -> jkind_desc
       | Some id ->

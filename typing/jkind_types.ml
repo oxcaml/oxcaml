@@ -1006,39 +1006,123 @@ module Scannable_axes = struct
     }
 end
 
+(* Defined as [Addressability0] so that scopes under [open Jkind_axis] (which
+   shadows [Addressability] with the module this one extends) can still refer
+   to it. *)
+module Addressability0 = struct
+  include Jkind_axis.Addressability
+
+  (* The intrinsic addressability of each base sort: whether its types store
+     all of their information in the data portion of a block when boxed.
+     Kinds boxed as tagged immediates or as float blocks are unaddressable. *)
+  let of_base : Sort.base -> t = function
+    | Scannable | Word | Bits64 | Vec128 | Vec256 | Vec512 -> Addressable
+    | Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16 | Bits32 ->
+      Unaddressable
+
+  (* The intrinsic addressability of a sort, insofar as it is determined: the
+     addressability of an unfilled sort variable is not yet known. *)
+  let of_sort s =
+    let rec go : Sort.t -> t = function
+      | Base b -> of_base b
+      | Product sorts -> combine_product (List.map go sorts)
+      | Var _ | Univar _ -> Maybe_addressable
+    in
+    (* [Sort.get] is deep, so a returned [Var] is guaranteed unfilled. *)
+    go (Sort.get s)
+end
+
+module Addressability = Addressability0
+
 module Layout = struct
   open Jkind_axis
+  module Addressability = Addressability0
 
+  (* Each node carries an [Addressability.t] slot, tracking applications of
+     the [addressable] kind operator. Invariants on the stored slot:
+
+     - On a [Sort] of a base (and on [Const.Base]): [Addressable] when the
+       base is intrinsically addressable ([Addressability.of_base]; e.g.
+       [bits64 addressable] IS [bits64]) or when the [addressable] operator
+       was applied; [Unaddressable] for a plain unaddressable base (e.g. a
+       user-written [bits8]); [Maybe_addressable] in unconstrained-bound
+       positions (fresh sort variable bounds and product decompositions, the
+       analog of [Scannable_axes.max] there). A slot of [Unaddressable] never
+       appears together with an intrinsically addressable base.
+
+     - On a [Sort] of an unfilled variable: [Addressable] if constrained to
+       be addressable, otherwise [Maybe_addressable]. Never [Unaddressable]
+       (there is no operator that makes a kind unaddressable). The slot can go
+       stale in one direction: filling the variable with an intrinsically
+       addressable sort leaves a stored [Maybe_addressable] even though the
+       kind is known addressable, so readers refine the slot via
+       [Addressability.of_sort].
+
+     - On [Product]: [Addressable] when the whole product was marked (e.g.
+       [(bits8 & bits16) addressable] - distinct from marking the
+       components!); otherwise [Maybe_addressable], meaning the product's
+       addressability is derived from its components at read time (a product
+       of addressable kinds is addressable). Never [Unaddressable].
+
+     - On [Any]: [Addressable] for [any addressable], the top of all
+       addressable kinds; [Maybe_addressable] for [any]. Never
+       [Unaddressable]. *)
   type 'sort t =
-    | Sort of 'sort * Scannable_axes.t
-    | Product of 'sort t list
-    | Any of Scannable_axes.t
+    | Sort of 'sort * Scannable_axes.t * Addressability.t
+    | Product of 'sort t list * Addressability.t
+    | Any of Scannable_axes.t * Addressability.t
 
   module Const = struct
     type t =
-      | Any of Scannable_axes.t
-      | Base of Sort.base * Scannable_axes.t
-      | Product of t list
+      | Any of Scannable_axes.t * Addressability.t
+      | Base of Sort.base * Scannable_axes.t * Addressability.t
+      | Product of t list * Addressability.t
       | Univar of Sort.univar
       | Genvar of Sort.var
 
-    let max = Any Scannable_axes.max
+    let max = Any (Scannable_axes.max, Addressability.max)
+
+    (* The addressability of a constant layout: a [Maybe_addressable] slot on
+       a base is refined by the base's intrinsic addressability, and an
+       unmarked product derives its addressability from its components. *)
+    let rec addressability : t -> Addressability.t = function
+      | Base (b, _, a) -> (
+        match a with
+        | Maybe_addressable -> Addressability.of_base b
+        | Addressable | Unaddressable -> a)
+      | Any (_, a) -> a
+      | Product (ts, a) -> (
+        match a with
+        | Addressable -> a
+        | Maybe_addressable | Unaddressable ->
+          Addressability.combine_product (List.map addressability ts))
+      | Univar _ | Genvar _ -> Addressability.max
 
     let rec equal c1 c2 =
       match c1, c2 with
-      | Base (Scannable, sa1), Base (Scannable, sa2) ->
+      | Base (Scannable, sa1, _), Base (Scannable, sa2, _) ->
+        (* [Scannable] is intrinsically addressable, so the addressability
+           slots necessarily agree. *)
         Scannable_axes.equal sa1 sa2
-      | Base (b1, _), Base (b2, _) -> Sort.equal_base b1 b2
-      | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
-      | Product cs1, Product cs2 -> List.equal equal cs1 cs2
+      | (Base (b1, _, _) as c1), (Base (b2, _, _) as c2) ->
+        Sort.equal_base b1 b2
+        && Addressability.equal (addressability c1) (addressability c2)
+      | Any (sa1, a1), Any (sa2, a2) ->
+        Scannable_axes.equal sa1 sa2 && Addressability.equal a1 a2
+      | (Product (cs1, _) as c1), (Product (cs2, _) as c2) ->
+        List.equal equal cs1 cs2
+        (* Comparing the roots distinguishes a marked product of
+           unaddressable kinds from the unmarked product; marking a product
+           of addressable kinds does nothing. *)
+        && Addressability.equal (addressability c1) (addressability c2)
       | Univar uv1, Univar uv2 -> Sort.equal_univar_univar uv1 uv2
       | Genvar v1, Genvar v2 -> v1.id = v2.id
       | (Base _ | Any _ | Product _ | Univar _ | Genvar _), _ -> false
 
     let rec get_sort : t -> Sort.Const.t option = function
       | Any _ -> None
-      | Base (b, _) -> Sort.Const.some (Base b)
-      | Product ts ->
+      | Base (b, _, _) -> Sort.Const.some (Base b)
+      | Product (ts, _) ->
         Option.map
           (fun x -> Sort.Const.Product x)
           (Misc.Stdlib.List.map_option get_sort ts)
@@ -1046,10 +1130,11 @@ module Layout = struct
       | Genvar v -> Some (Sort.Const.Genvar v)
 
     let is_scannable_or_any = function
-      | Any _ | Base (Scannable, _) -> true
+      | Any _ | Base (Scannable, _, _) -> true
       | Base
           ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
             | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ),
+            _,
             _ ) ->
         false
       | Product _ -> false
@@ -1058,16 +1143,16 @@ module Layout = struct
 
     let get_root_scannable_axes t =
       match t with
-      | Any sa -> Some sa
-      | Base (_, sa) -> if is_scannable_or_any t then Some sa else None
+      | Any (sa, _) -> Some sa
+      | Base (_, sa, _) -> if is_scannable_or_any t then Some sa else None
       | Product _ -> None
       | Univar _ -> None
       | Genvar _ -> None
 
     let set_root_scannable_axes t sa =
       match t with
-      | Any _ -> Any sa
-      | Base (b, _) -> if is_scannable_or_any t then Base (b, sa) else t
+      | Any (_, a) -> Any (sa, a)
+      | Base (b, _, a) -> if is_scannable_or_any t then Base (b, sa, a) else t
       | Product _ -> t
       | Univar _ -> t
       | Genvar _ -> t
@@ -1077,85 +1162,116 @@ module Layout = struct
       | None -> t
       | Some sa' -> set_root_scannable_axes t (Scannable_axes.meet sa sa')
 
+    (* Apply the [addressable] kind operator: an override of the root slot to
+       [Addressable], not a meet. This does nothing to an already-addressable
+       kind. Like the scannable axes, applications to [Univar]/[Genvar]
+       layouts are dropped (these are alpha-gated). *)
+    let set_root_addressable t =
+      match t with
+      | Any (sa, _) -> Any (sa, Addressability.Addressable)
+      | Base (b, sa, _) -> Base (b, sa, Addressability.Addressable)
+      | Product (ts, _) -> Product (ts, Addressability.Addressable)
+      | Univar _ | Genvar _ -> t
+
     module Static = struct
       let scannable_non_null_non_pointer =
         Base
           ( Sort.Scannable,
-            { nullability = Non_null; separability = Non_pointer } )
+            { nullability = Non_null; separability = Non_pointer },
+            Addressable )
 
       let scannable_non_null_non_pointer64 =
         Base
           ( Sort.Scannable,
-            { nullability = Non_null; separability = Non_pointer64 } )
+            { nullability = Non_null; separability = Non_pointer64 },
+            Addressable )
 
       let scannable_non_null_non_float =
         Base
-          (Sort.Scannable, { nullability = Non_null; separability = Non_float })
+          ( Sort.Scannable,
+            { nullability = Non_null; separability = Non_float },
+            Addressable )
 
       let scannable_non_null_separable =
         Base
-          (Sort.Scannable, { nullability = Non_null; separability = Separable })
+          ( Sort.Scannable,
+            { nullability = Non_null; separability = Separable },
+            Addressable )
 
       let scannable_non_null_maybe_separable =
         Base
           ( Sort.Scannable,
-            { nullability = Non_null; separability = Maybe_separable } )
+            { nullability = Non_null; separability = Maybe_separable },
+            Addressable )
 
       let scannable_maybe_null_non_pointer =
         Base
           ( Sort.Scannable,
-            { nullability = Maybe_null; separability = Non_pointer } )
+            { nullability = Maybe_null; separability = Non_pointer },
+            Addressable )
 
       let scannable_maybe_null_non_pointer64 =
         Base
           ( Sort.Scannable,
-            { nullability = Maybe_null; separability = Non_pointer64 } )
+            { nullability = Maybe_null; separability = Non_pointer64 },
+            Addressable )
 
       let scannable_maybe_null_non_float =
         Base
           ( Sort.Scannable,
-            { nullability = Maybe_null; separability = Non_float } )
+            { nullability = Maybe_null; separability = Non_float },
+            Addressable )
 
       let scannable_maybe_null_separable =
         Base
           ( Sort.Scannable,
-            { nullability = Maybe_null; separability = Separable } )
+            { nullability = Maybe_null; separability = Separable },
+            Addressable )
 
       let scannable_maybe_null_maybe_separable =
         Base
           ( Sort.Scannable,
-            { nullability = Maybe_null; separability = Maybe_separable } )
+            { nullability = Maybe_null; separability = Maybe_separable },
+            Addressable )
 
       (* For all non-[Scannable] layouts, the scannable axes are ignored. We
-         have to pick something, though, so we pick [Scannable_axes.max]. *)
+         have to pick something, though, so we pick [Scannable_axes.max].
+         The addressability slot of these constants is the base's intrinsic
+         addressability ([Addressability.of_base]). *)
 
-      let void = Base (Sort.Void, Scannable_axes.max)
+      let void = Base (Sort.Void, Scannable_axes.max, Unaddressable)
 
-      let float64 = Base (Sort.Float64, Scannable_axes.max)
+      let float64 = Base (Sort.Float64, Scannable_axes.max, Unaddressable)
 
-      let float32 = Base (Sort.Float32, Scannable_axes.max)
+      let float32 = Base (Sort.Float32, Scannable_axes.max, Unaddressable)
 
-      let word = Base (Sort.Word, Scannable_axes.max)
+      let word = Base (Sort.Word, Scannable_axes.max, Addressable)
 
-      let untagged_immediate = Base (Sort.Untagged_immediate, Scannable_axes.max)
+      let untagged_immediate =
+        Base (Sort.Untagged_immediate, Scannable_axes.max, Unaddressable)
 
-      let bits8 = Base (Sort.Bits8, Scannable_axes.max)
+      let bits8 = Base (Sort.Bits8, Scannable_axes.max, Unaddressable)
 
-      let bits16 = Base (Sort.Bits16, Scannable_axes.max)
+      let bits16 = Base (Sort.Bits16, Scannable_axes.max, Unaddressable)
 
-      let bits32 = Base (Sort.Bits32, Scannable_axes.max)
+      let bits32 = Base (Sort.Bits32, Scannable_axes.max, Unaddressable)
 
-      let bits64 = Base (Sort.Bits64, Scannable_axes.max)
+      let bits64 = Base (Sort.Bits64, Scannable_axes.max, Addressable)
 
-      let vec128 = Base (Sort.Vec128, Scannable_axes.max)
+      let vec128 = Base (Sort.Vec128, Scannable_axes.max, Addressable)
 
-      let vec256 = Base (Sort.Vec256, Scannable_axes.max)
+      let vec256 = Base (Sort.Vec256, Scannable_axes.max, Addressable)
 
-      let vec512 = Base (Sort.Vec512, Scannable_axes.max)
+      let vec512 = Base (Sort.Vec512, Scannable_axes.max, Addressable)
 
-      let of_base (b : Sort.base) (sa : Scannable_axes.t) =
-        match b, sa with
-        | Scannable, sa -> (
+      let of_base (b : Sort.base) (sa : Scannable_axes.t) (a : Addressability.t)
+          =
+        (* The addressability slot is normalized to [Addressable] on
+           intrinsically addressable bases: applying [addressable] to such a
+           kind does nothing (e.g. [bits64 addressable] IS [bits64]), and a
+           [Maybe_addressable] slot on them describes no other kind. *)
+        match b, a with
+        | Scannable, _ -> (
           match sa with
           | { nullability = Nullability.Non_null;
               separability = Separability.Non_pointer
@@ -1197,69 +1313,78 @@ module Layout = struct
               separability = Separability.Maybe_separable
             } ->
             scannable_maybe_null_maybe_separable)
-        | Void, _ -> void
-        | Untagged_immediate, _ -> untagged_immediate
-        | Float64, _ -> float64
-        | Float32, _ -> float32
         | Word, _ -> word
-        | Bits8, _ -> bits8
-        | Bits16, _ -> bits16
-        | Bits32, _ -> bits32
         | Bits64, _ -> bits64
         | Vec128, _ -> vec128
         | Vec256, _ -> vec256
         | Vec512, _ -> vec512
+        | Void, Unaddressable -> void
+        | Untagged_immediate, Unaddressable -> untagged_immediate
+        | Float64, Unaddressable -> float64
+        | Float32, Unaddressable -> float32
+        | Bits8, Unaddressable -> bits8
+        | Bits16, Unaddressable -> bits16
+        | Bits32, Unaddressable -> bits32
+        | ( ( Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
+            | Bits32 ),
+            ((Addressable | Maybe_addressable) as a) ) ->
+          Base (b, Scannable_axes.max, a)
     end
 
-    let of_sort s sa =
-      let rec of_sort (s : Sort.t) sa =
+    let of_sort s sa a =
+      let rec of_sort (s : Sort.t) sa a =
         match s with
         | Var v when Sort.is_genvar v -> Some (Genvar v)
         | Var _ -> None
-        | Base b -> Some (Static.of_base b sa)
+        | Base b -> Some (Static.of_base b sa a)
         | Product sorts ->
           Option.map
-            (fun x -> Product x)
+            (fun x -> Product (x, a))
             (* [Sort.get] is deep, so no need to repeat it here *)
-            (* In all cases where sort products are turned into layout products,
-               [Scannable_axes.max] is used. The sort product doesn't store
-               enough information to make any other choice. *)
+            (* In all cases where sort products are turned into layout
+               products, [Scannable_axes.max] and
+               [Addressability.Maybe_addressable] are used for the components.
+               The sort product doesn't store enough information to make any
+               other choice. The node's addressability slot stays on the
+               product root: it marks the product as a whole, not its
+               components. *)
             (Misc.Stdlib.List.map_option
-               (fun s -> of_sort s Scannable_axes.max)
+               (fun s ->
+                 of_sort s Scannable_axes.max Addressability.Maybe_addressable)
                sorts)
         | Univar uv -> Some (Univar uv)
       in
-      of_sort (Sort.get s) sa
+      of_sort (Sort.get s) sa a
 
     let of_univar uv = Univar uv
 
-    let of_flat_sort (s : Sort.Flat.t) sa =
+    let of_flat_sort (s : Sort.Flat.t) sa a =
       match s with
       | Var _ -> None
       | Genvar v -> Some (Genvar v)
       | Univar uv -> Some (of_univar uv)
-      | Base b -> Some (Static.of_base b sa)
+      | Base b -> Some (Static.of_base b sa a)
   end
 
   let rec of_const (const : Const.t) : _ t =
     match const with
-    | Any sa -> Any sa
-    | Base (b, sa) -> Sort (Sort.of_base b, sa)
-    | Product cs -> Product (List.map of_const cs)
-    | Univar uv -> Sort (Sort.Univar uv, Scannable_axes.max)
-    | Genvar v -> Sort (Sort.Var v, Scannable_axes.max)
+    | Any (sa, a) -> Any (sa, a)
+    | Base (b, sa, a) -> Sort (Sort.of_base b, sa, a)
+    | Product (cs, a) -> Product (List.map of_const cs, a)
+    | Univar uv -> Sort (Sort.Univar uv, Scannable_axes.max, Addressability.max)
+    | Genvar v -> Sort (Sort.Var v, Scannable_axes.max, Addressability.max)
 
   let product = function
     | [] -> Misc.fatal_error "Layout.product: empty product"
     | [lay] -> lay
-    | lays -> Product lays
+    | lays -> Product (lays, Addressability.Maybe_addressable)
 
   let rec get_const of_sort : _ t -> Const.t option = function
-    | Any sa -> Some (Any sa)
-    | Sort (s, sa) -> of_sort s sa
-    | Product layouts ->
+    | Any (sa, a) -> Some (Any (sa, a))
+    | Sort (s, sa, a) -> of_sort s sa a
+    | Product (layouts, a) ->
       Option.map
-        (fun x -> Const.Product x)
+        (fun x -> Const.Product (x, a))
         (Misc.Stdlib.List.map_option (get_const of_sort) layouts)
 
   let get_flat_const t = get_const Const.of_flat_sort t
@@ -1268,5 +1393,5 @@ module Layout = struct
 
   let of_new_sort_var ~level sa =
     let sort = Sort.(of_var (new_var ~level)) in
-    Sort (sort, sa), sort
+    Sort (sort, sa, Addressability.Maybe_addressable), sort
 end

@@ -243,7 +243,8 @@ and 'd with_bounds =
 
 and 'layout jkind_base =
   | Layout of 'layout
-  | Kconstr of Path.t * Jkind_types.Scannable_axes.t
+  | Kconstr of
+      Path.t * Jkind_types.Scannable_axes.t * Jkind_types.Addressability.t
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;

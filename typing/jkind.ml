@@ -101,6 +101,21 @@ module Scannable_axes = struct
       Nullability.print nullability Separability.print separability
 end
 
+module Addressability = struct
+  include Jkind_types.Addressability
+
+  (* Like [Scannable_axes.to_string_list_diff]: the suffix words needed to
+     print [actual] in terms of a base with addressability [base], or [None]
+     if that's not possible (there is no word for unaddressability). *)
+  let to_string_list_diff ~base actual =
+    if equal actual base
+    then Some []
+    else
+      match actual with
+      | Addressable -> Some [to_string actual]
+      | Unaddressable | Maybe_addressable -> None
+end
+
 (* A *layout* of a type describes the way values of that type are stored at
    runtime, including details like width, register convention, calling
    convention, etc. A layout may be *representable* or *unrepresentable*.  The
@@ -111,26 +126,36 @@ module Layout = struct
   include Jkind_types.Layout
 
   type nonrec 'sort t = 'sort t =
-    | Sort of 'sort * Scannable_axes.t
-    | Product of 'sort t list
-    | Any of Scannable_axes.t
+    | Sort of 'sort * Scannable_axes.t * Addressability.t
+    | Product of 'sort t list * Addressability.t
+    | Any of Scannable_axes.t * Addressability.t
 
   module Const = struct
     include Jkind_types.Layout.Const
 
-    let rec of_sort_const (s : Sort.Const.t) sa =
+    let rec of_sort_const (s : Sort.Const.t) sa a =
       match s with
-      | Base b -> Static.of_base b sa
+      | Base b -> Static.of_base b sa a
       | Product consts ->
-        Product (List.map (fun s -> of_sort_const s sa) consts)
+        (* The addressability slot stays on the product root: it marks the
+           product as a whole, not its components. (The scannable axes are
+           pushed into the components, as before; they are ignored on
+           non-scannable layouts anyway.) *)
+        Product
+          ( List.map
+              (fun s -> of_sort_const s sa Addressability.Maybe_addressable)
+              consts,
+            a )
       | Univar uv -> Univar uv
       | Genvar v -> Genvar v
 
+    (* Ignores the scannable axes and the addressability slots, both of which
+       are printed as suffix words on the base abbreviation. *)
     let rec equal_up_to_scannable_axes c1 c2 =
       match c1, c2 with
-      | Base (b1, _), Base (b2, _) -> Sort.equal_base b1 b2
+      | Base (b1, _, _), Base (b2, _, _) -> Sort.equal_base b1 b2
       | Any _, Any _ -> true
-      | Product cs1, Product cs2 ->
+      | Product (cs1, _), Product (cs2, _) ->
         List.equal equal_up_to_scannable_axes cs1 cs2
       | Univar uv1, Univar uv2 ->
         (* [equal_up_to_scannable_axes] is only used to choose which
@@ -186,16 +211,49 @@ module Layout = struct
     let to_string t ~include_redundant_scannable_axes =
       let rec to_string nested (t : t) =
         match t with
-        | Any sa -> String.concat " " ("any" :: Scannable_axes.to_string_list sa)
-        | Base (Scannable, sa) ->
+        | Any (sa, a) ->
+          let addressable_words =
+            match a with
+            | Addressable -> [Addressability.to_string a]
+            | Unaddressable | Maybe_addressable -> []
+          in
+          String.concat " "
+            (("any" :: Scannable_axes.to_string_list sa) @ addressable_words)
+        | Base (Scannable, sa, _) ->
+          (* [Scannable] is intrinsically addressable; never print the
+             slot. *)
           String.concat " "
             (format_scannable_layout ~include_redundant_scannable_axes sa)
-        | Base (b, _) -> Sort.to_string_base b
-        | Product ts ->
-          String.concat ""
-            [ (if nested then "(" else "");
-              String.concat " & " (List.map (to_string true) ts);
-              (if nested then ")" else "") ]
+        | Base (b, _, a) -> (
+          let base = Sort.to_string_base b in
+          (* The slot is implied on intrinsically addressable bases. *)
+          match a, Addressability.of_base b with
+          | Addressable, Unaddressable ->
+            base ^ " " ^ Addressability.to_string a
+          | (Addressable | Unaddressable | Maybe_addressable), _ -> base)
+        | Product (ts, a) -> (
+          let components = String.concat " & " (List.map (to_string true) ts) in
+          let marked_and_informative =
+            (* A mark on a product of addressable kinds is a no-op; only
+               print it when it isn't implied by the components. *)
+            match a with
+            | Addressable -> (
+              match
+                Addressability.combine_product (List.map addressability ts)
+              with
+              | Addressable -> false
+              | Unaddressable | Maybe_addressable -> true)
+            | Unaddressable | Maybe_addressable -> false
+          in
+          match marked_and_informative with
+          | true ->
+            String.concat ""
+              ["("; components; ") "; Addressability.to_string Addressable]
+          | false ->
+            String.concat ""
+              [ (if nested then "(" else "");
+                components;
+                (if nested then ")" else "") ])
         | Univar { name = Some n } -> n
         | Univar { name = None } -> "_"
         | Genvar v -> Sort.to_string_genvar v
@@ -211,7 +269,7 @@ module Layout = struct
       ||
       match t with
       | Base _ | Any _ | Univar _ | Genvar _ -> false
-      | Product ts -> List.exists (has_component ~component) ts
+      | Product (ts, _) -> List.exists (has_component ~component) ts
 
     module Debug_printers = struct
       open Format
@@ -224,39 +282,54 @@ module Layout = struct
     open Format
 
     let rec t format_sort ppf = function
-      | Any sa ->
-        fprintf ppf "Any %a" (Fmt.compat Scannable_axes.debug_print) sa
-      | Sort (s, sa) ->
-        fprintf ppf "Sort (%a, %a)" format_sort s
+      | Any (sa, a) ->
+        fprintf ppf "Any (%a, %a)"
           (Fmt.compat Scannable_axes.debug_print)
           sa
-      | Product ts ->
-        fprintf ppf "Product [ %a ]"
+          (Fmt.compat Addressability.print)
+          a
+      | Sort (s, sa, a) ->
+        fprintf ppf "Sort (%a, %a, %a)" format_sort s
+          (Fmt.compat Scannable_axes.debug_print)
+          sa
+          (Fmt.compat Addressability.print)
+          a
+      | Product (ts, a) ->
+        fprintf ppf "Product ([ %a ], %a)"
           (pp_print_list
              ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
              (t format_sort))
           ts
+          (Fmt.compat Addressability.print)
+          a
   end
 
   let rec get : Sort.t t -> Sort.Flat.t t =
-    let rec flatten_sort (s : Sort.t) sa : Sort.Flat.t t =
+    let rec flatten_sort (s : Sort.t) sa a : Sort.Flat.t t =
       match s with
       | Var v ->
         (* [v.contents] guaranteed to be [None] *)
         if Sort.is_genvar v
-        then Sort (Genvar v, sa)
-        else Sort (Var (Sort.Var.get_id v), sa)
+        then Sort (Genvar v, sa, a)
+        else Sort (Var (Sort.Var.get_id v), sa, a)
       | Base b ->
-        Sort (Base b, sa)
+        Sort (Base b, sa, a)
         (* No need to call [Sort.get] here, because one [get] is deep. *)
       | Product sorts ->
-        Product (List.map (fun s -> flatten_sort s Scannable_axes.max) sorts)
-      | Univar x -> Sort (Univar x, sa)
+        (* The node's addressability slot stays on the product root. *)
+        Product
+          ( List.map
+              (fun s ->
+                flatten_sort s Scannable_axes.max
+                  Addressability.Maybe_addressable)
+              sorts,
+            a )
+      | Univar x -> Sort (Univar x, sa, a)
     in
     function
-    | Any sa -> Any sa
-    | Sort (s, sa) -> flatten_sort (Sort.get s) sa
-    | Product ts -> Product (List.map get ts)
+    | Any (sa, a) -> Any (sa, a)
+    | Sort (s, sa, a) -> flatten_sort (Sort.get s) sa a
+    | Product (ts, a) -> Product (List.map get ts, a)
 
   let sort_equal_result ~allow_mutation result =
     match (result : Sort.equate_result) with
@@ -268,10 +341,56 @@ module Layout = struct
     | Equal_mutated_both ->
       true
 
+  (* The addressability of the kind a layout describes, insofar as it is
+     known ([~intrinsic] gives the intrinsic addressability of a sort). A
+     [Maybe_addressable] slot is refined by the sort's intrinsic
+     addressability; this matters when a sort variable was filled after the
+     slot was created, e.g. [Sort (v, _, Maybe_addressable)] with [v] filled
+     by [bits64] IS [bits64], which is addressable. Use this for the left of
+     a subkind check and for equality. *)
+  let rec addressability_gen ~intrinsic : _ t -> Addressability.t = function
+    | Any (_, a) -> a
+    | Sort (s, _, a) -> (
+      match (a : Addressability.t) with
+      | Maybe_addressable -> intrinsic s
+      | Addressable | Unaddressable -> a)
+    | Product (ts, a) -> (
+      match (a : Addressability.t) with
+      | Addressable -> a
+      | Maybe_addressable | Unaddressable ->
+        Addressability.combine_product
+          (List.map (addressability_gen ~intrinsic) ts))
+
+  let addressability : Sort.t t -> Addressability.t =
+    addressability_gen ~intrinsic:Addressability.of_sort
+
+  (* The addressability constraint imposed by a layout used as a bound (the
+     right of a subkind check). Unlike [addressability], a [Maybe_addressable]
+     slot is not refined by the sort: a fresh sort-variable bound (e.g. from
+     [of_new_sort_var] or a product decomposition) admits any addressability,
+     even once the subkind check itself fills its sort variable. *)
+  let rec addressability_of_bound : _ t -> Addressability.t = function
+    | Any (_, a) -> a
+    | Sort (_, _, a) -> a
+    | Product (ts, a) -> (
+      match (a : Addressability.t) with
+      | Addressable -> a
+      | Maybe_addressable | Unaddressable ->
+        Addressability.combine_product (List.map addressability_of_bound ts))
+
   let rec equate_or_equal ~allow_mutation t1 t2 =
+    (* Both sides of an equality are descriptions of kinds, so both use the
+       refined [addressability] reading. The reads happen after the sort
+       equation, so filled variables refine, and two unfilled variables with
+       differing slots are (conservatively) unequal, mirroring the treatment
+       of scannable axes below. *)
+    let addressability_equal t1 t2 =
+      Addressability.equal (addressability t1) (addressability t2)
+    in
     match t1, t2 with
-    | Sort (s1, sa1), Sort (s2, sa2) ->
+    | Sort (s1, sa1, _), Sort (s2, sa2, _) ->
       sort_equal_result ~allow_mutation (Sort.equate_tracking_mutation s1 s2)
+      && addressability_equal t1 t2
       &&
       if
         Sort.is_scannable_or_var s1
@@ -284,57 +403,133 @@ module Layout = struct
             (conservatively) concludes that they are not equal. *)
       then Scannable_axes.equal sa1 sa2
       else true
-    | Product ts, Sort (sort, _) | Sort (sort, _), Product ts -> (
+    | (Product (ts, _) as prod), (Sort (sort, _, _) as srt)
+    | (Sort (sort, _, _) as srt), (Product (ts, _) as prod) -> (
       match Sort.decompose_into_product sort (List.length ts) with
       | None -> false
       | Some sorts ->
-        let sorts = List.map (fun x -> Sort (x, Scannable_axes.max)) sorts in
-        List.equal (equate_or_equal ~allow_mutation) ts sorts)
-    | Product ts1, Product ts2 ->
+        let sorts =
+          List.map
+            (fun x ->
+              Sort (x, Scannable_axes.max, Addressability.Maybe_addressable))
+            sorts
+        in
+        List.equal (equate_or_equal ~allow_mutation) ts sorts
+        && addressability_equal prod srt)
+    | (Product (ts1, _) as p1), (Product (ts2, _) as p2) ->
       List.equal (equate_or_equal ~allow_mutation) ts1 ts2
-    | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
+      (* Comparing the roots distinguishes a marked product of unaddressable
+         kinds from the unmarked product; marking a product of addressable
+         kinds does nothing. *)
+      && addressability_equal p1 p2
+    | Any (sa1, a1), Any (sa2, a2) ->
+      Scannable_axes.equal sa1 sa2 && Addressability.equal a1 a2
     | (Any _ | Sort _ | Product _), _ -> false
 
   let get_root_scannable_axes : _ t -> Scannable_axes.t option = function
-    | Any sa -> Some sa
-    | Sort (b, sa) -> if Sort.is_scannable_or_var b then Some sa else None
+    | Any (sa, _) -> Some sa
+    | Sort (b, sa, _) -> if Sort.is_scannable_or_var b then Some sa else None
     | Product _ -> None
 
   let is_scannable_or_var : _ t -> bool = function
     | Any _ -> false
-    | Sort (b, _) -> Sort.is_scannable_or_var b
+    | Sort (b, _, _) -> Sort.is_scannable_or_var b
     | Product _ -> false
 
   let set_root_nullability t nullability =
     match t with
-    | Any sa -> Any { sa with nullability }
-    | Sort (b, sa) ->
+    | Any (sa, a) -> Any ({ sa with nullability }, a)
+    | Sort (b, sa, a) ->
       if Sort.is_scannable_or_var b
-      then Sort (b, { sa with nullability })
+      then Sort (b, { sa with nullability }, a)
       else t
     | Product _ -> t
 
   let set_root_separability t separability =
     match t with
-    | Any sa -> Any { sa with separability }
-    | Sort (b, sa) ->
+    | Any (sa, a) -> Any ({ sa with separability }, a)
+    | Sort (b, sa, a) ->
       if Sort.is_scannable_or_var b
-      then Sort (b, { sa with separability })
+      then Sort (b, { sa with separability }, a)
       else t
     | Product _ -> t
 
   (* only meets at the root, meaning products are left unchanged. *)
   let meet_root_scannable_axes t sa =
     match t with
-    | Any sa' -> Any (Scannable_axes.meet sa sa')
-    | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
+    | Any (sa', a) -> Any (Scannable_axes.meet sa sa', a)
+    | Sort (s, sa', a) -> Sort (s, Scannable_axes.meet sa sa', a)
     | Product _ -> t
+
+  (* Apply the [addressable] kind operator: an override of the root slot to
+     [Addressable], not a meet. This does nothing to an already-addressable
+     kind. *)
+  let set_root_addressable t =
+    match t with
+    | Any (sa, _) -> Any (sa, Addressability.Addressable)
+    | Sort (s, sa, _) -> Sort (s, sa, Addressability.Addressable)
+    | Product (ts, _) -> Product (ts, Addressability.Addressable)
+
+  (* Meet [a] into [t]'s root addressability, for intersections; [None] means
+     the kinds are disjoint. Unlike [meet_root_scannable_axes] this handles
+     [Product]s, whose root slots are meaningful. The slot is first refined as
+     in [addressability]: constraining a kind whose sort has already resolved
+     to an unaddressable base to be addressable must fail, not mark it. *)
+  let meet_root_addressability t a =
+    match (a : Addressability.t) with
+    | Maybe_addressable ->
+      (* No constraint. *)
+      Some t
+    | Addressable | Unaddressable -> (
+      match t with
+      | Any (sa, a') ->
+        Option.map (fun a -> Any (sa, a)) (Addressability.meet a a')
+      | Sort (s, sa, _) ->
+        Option.map
+          (fun a -> Sort (s, sa, a))
+          (Addressability.meet a (addressability t))
+      | Product (ts, _) -> (
+        let current = addressability t in
+        match Addressability.meet a current with
+        | None -> None
+        | Some m ->
+          if Addressability.equal m current
+          then
+            (* No new information; in particular, don't turn a derived
+               addressability into a mark. *)
+            Some t
+          else
+            (* [m] is [Addressable] and [current] is [Maybe_addressable]:
+               record the constraint as a mark. *)
+            Some (Product (ts, Addressability.Addressable))))
 
   let sub t1 t2 =
     let rec sub t1 t2 : Misc.Le_result.t =
+      (* Addressability passes when the refined [addressability] of the left
+         is below the stored-slot [addressability_of_bound] of the right
+         (which is lenient for fresh sort-variable bounds), but reports
+         [Equal] only when the two kinds' refined readings agree: the
+         leniency of a bound must not make a comparison of equal kinds look
+         strict. These checks are placed after the sort equations, on which
+         the refined readings depend. *)
+      let addressability_sub t1 t2 : Misc.Le_result.t =
+        if
+          not
+            (Addressability.le (addressability t1) (addressability_of_bound t2))
+        then Not_le
+        else if Addressability.equal (addressability t1) (addressability t2)
+        then Equal
+        else Less
+      in
+      let addressability_le t1 t2 =
+        Misc.Le_result.is_le (addressability_sub t1 t2)
+      in
       match t1, t2 with
-      | Any sa1, Any sa2 -> Scannable_axes.less_or_equal sa1 sa2
-      | Sort (sort, sa1), Any sa2 ->
+      | Any (sa1, a1), Any (sa2, a2) ->
+        Misc.Le_result.combine
+          (Scannable_axes.less_or_equal sa1 sa2)
+          (Addressability.less_or_equal a1 a2)
+      | Sort (sort, sa1, _), Any (sa2, _) ->
         (* CR layouts-scannable: If [sort] has not been filled and
            [sa1] </= [sa2], we conservatively say that it is [Not_le].
            They can still become equal, though, in the case where [sort] is
@@ -343,68 +538,144 @@ module Layout = struct
            option could be to add to the [Layout_disagreement] type. *)
         if Sort.is_scannable_or_var sort && not (Scannable_axes.le sa1 sa2)
         then Not_le
-        else Less
-      | Product _, Any _ -> Less
+        else if addressability_le t1 t2
+        then Less
+        else Not_le
+      | Product _, Any _ ->
+        (* The root check is what makes [bits64 & value <= any addressable]
+           hold but [bits8 & value <= any addressable] fail. *)
+        if addressability_le t1 t2 then Less else Not_le
       | Any _, _ -> Not_le
-      | Sort (s1, sa1), Sort (s2, sa2) ->
+      | Sort (s1, sa1, _), Sort (s2, sa2, _) ->
         if Sort.equate s1 s2
         then
-          if Sort.is_scannable_or_var s1
-          then Scannable_axes.less_or_equal sa1 sa2
-          else Equal
+          Misc.Le_result.combine
+            (if Sort.is_scannable_or_var s1
+             then Scannable_axes.less_or_equal sa1 sa2
+             else Equal)
+            (addressability_sub t1 t2)
         else Not_le
-      | Product ts1, Product ts2 ->
+      | Product (ts1, _), Product (ts2, _) ->
         if List.compare_lengths ts1 ts2 = 0
-        then Misc.Le_result.combine_list (List.map2 sub ts1 ts2)
+        then
+          (* The components must be compared before the roots: their sort
+             equations refine the left's addressability reading. *)
+          let components =
+            Misc.Le_result.combine_list (List.map2 sub ts1 ts2)
+          in
+          Misc.Le_result.combine components (addressability_sub t1 t2)
         else Not_le
-      | Product ts1, Sort (s2, _) -> (
+      | Product (ts1, _), Sort (s2, _, _) -> (
         match Sort.decompose_into_product s2 (List.length ts1) with
         | None -> Not_le
         | Some ss2 ->
-          Misc.Le_result.combine_list
-            (List.map2
-               (fun t1 s2 -> sub t1 (Sort (s2, Scannable_axes.max)))
-               ts1 ss2))
-      | Sort (s1, _), Product ts2 -> (
+          let components =
+            Misc.Le_result.combine_list
+              (List.map2
+                 (fun t1 s2 ->
+                   sub t1
+                     (Sort
+                        ( s2,
+                          Scannable_axes.max,
+                          Addressability.Maybe_addressable )))
+                 ts1 ss2)
+          in
+          Misc.Le_result.combine components (addressability_sub t1 t2))
+      | Sort (s1, _, _), Product (ts2, _) -> (
         match Sort.decompose_into_product s1 (List.length ts2) with
         | None -> Not_le
         | Some ss1 ->
-          Misc.Le_result.combine_list
-            (List.map2
-               (fun s1 t2 -> sub (Sort (s1, Scannable_axes.max)) t2)
-               ss1 ts2))
+          (* The components must be compared before the roots: their sort
+             equations refine the left's addressability reading. *)
+          let components =
+            Misc.Le_result.combine_list
+              (List.map2
+                 (fun s1 t2 ->
+                   sub
+                     (Sort
+                        ( s1,
+                          Scannable_axes.max,
+                          Addressability.Maybe_addressable ))
+                     t2)
+                 ss1 ts2)
+          in
+          Misc.Le_result.combine components (addressability_sub t1 t2))
     in
     Sub_result.of_le_result (sub t1 t2) ~failure_reason:(fun () ->
         [Layout_disagreement])
 
   let rec intersection t1 t2 =
     (* pre-condition to [products]: [ts1] and [ts2] have the same length *)
-    let products ts1 ts2 =
+    let products ~root_addressability ts1 ts2 =
       let components = List.map2 intersection ts1 ts2 in
       Option.map
-        (fun x -> Product x)
+        (fun x -> Product (x, root_addressability))
         (Misc.Stdlib.List.some_if_all_elements_are_some components)
     in
+    (* The slot meets use the refined [addressability] readings of both
+       sides, taken before this operation equates any sorts: an unfilled
+       variable's [Maybe_addressable] slot is genuinely unconstrained, while
+       a previously filled one pins its sort's intrinsic addressability.
+       (Note that, as for the scannable axes in [sub], sorts equated by a
+       failing intersection stay equated.) *)
+    let meet_addressability t1 t2 =
+      Addressability.meet (addressability t1) (addressability t2)
+    in
+    (* The intersection of two products is marked addressable iff either
+       input is. An unmarked result derives its addressability from its
+       intersected components, which carry the inputs' component meets, so
+       stamping a merely-derived addressability as a mark would only lose
+       structure. *)
+    let product_root_slot a1 a2 : Addressability.t =
+      match (a1 : Addressability.t), (a2 : Addressability.t) with
+      | Addressable, _ | _, Addressable -> Addressable
+      | (Unaddressable | Maybe_addressable), (Unaddressable | Maybe_addressable)
+        ->
+        Maybe_addressable
+    in
     match t1, t2 with
-    | _, Any sa2 -> Some (meet_root_scannable_axes t1 sa2)
-    | Any sa1, _ -> Some (meet_root_scannable_axes t2 sa1)
-    | Sort (s1, sa1), Sort (s2, sa2) ->
-      if Sort.equate s1 s2
-      then Some (Sort (s1, Scannable_axes.meet sa1 sa2))
-      else None
-    | Product ts1, Product ts2 ->
-      if List.compare_lengths ts1 ts2 = 0 then products ts1 ts2 else None
-    | Product ts, Sort (sort, _) | Sort (sort, _), Product ts -> (
-      match Sort.decompose_into_product sort (List.length ts) with
+    | _, Any (sa2, a2) ->
+      Option.map
+        (fun t1 -> meet_root_scannable_axes t1 sa2)
+        (meet_root_addressability t1 a2)
+    | Any (sa1, a1), _ ->
+      Option.map
+        (fun t2 -> meet_root_scannable_axes t2 sa1)
+        (meet_root_addressability t2 a1)
+    | Sort (s1, sa1, _), Sort (s2, sa2, _) -> (
+      match meet_addressability t1 t2 with
       | None -> None
-      | Some sorts ->
-        products ts (List.map (fun x -> Sort (x, Scannable_axes.max)) sorts))
+      | Some a ->
+        if Sort.equate s1 s2
+        then Some (Sort (s1, Scannable_axes.meet sa1 sa2, a))
+        else None)
+    | Product (ts1, a1), Product (ts2, a2) ->
+      if List.compare_lengths ts1 ts2 = 0
+      then
+        match meet_addressability t1 t2 with
+        | None -> None
+        | Some _ ->
+          products ~root_addressability:(product_root_slot a1 a2) ts1 ts2
+      else None
+    | (Product (ts, pa) as prod), (Sort (sort, _, sa) as srt)
+    | (Sort (sort, _, sa) as srt), (Product (ts, pa) as prod) -> (
+      match meet_addressability prod srt with
+      | None -> None
+      | Some _ -> (
+        match Sort.decompose_into_product sort (List.length ts) with
+        | None -> None
+        | Some sorts ->
+          products ~root_addressability:(product_root_slot pa sa) ts
+            (List.map
+               (fun x ->
+                 Sort (x, Scannable_axes.max, Addressability.Maybe_addressable))
+               sorts)))
 
   let rec default_to_scannable_and_get : _ Layout.t -> Const.t = function
-    | Any sa -> Any sa
-    | Sort (s, sa) ->
-      Const.of_sort_const (Sort.default_to_scannable_and_get s) sa
-    | Product p -> Product (List.map default_to_scannable_and_get p)
+    | Any (sa, a) -> Any (sa, a)
+    | Sort (s, sa, a) ->
+      Const.of_sort_const (Sort.default_to_scannable_and_get s) sa a
+    | Product (p, a) -> Product (List.map default_to_scannable_and_get p, a)
 
   let format ppf layout =
     let pp_string_list ppf lst =
@@ -412,28 +683,64 @@ module Layout = struct
         ~pp_sep:(fun f () -> Fmt.fprintf f " ")
         Fmt.pp_print_string ppf lst
     in
+    (* Print the addressability slot only where it is informative: on a node
+       whose kind is not implied to be addressable anyway. *)
+    let addressable_words (a : Addressability.t) ~(implied : Addressability.t) =
+      match a, implied with
+      | Addressable, (Unaddressable | Maybe_addressable) ->
+        [Addressability.to_string a]
+      | Addressable, Addressable | (Unaddressable | Maybe_addressable), _ -> []
+    in
     let rec pp_element ~nested ppf : _ Layout.t -> unit = function
-      | Any sa -> pp_string_list ppf ("any" :: Scannable_axes.to_string_list sa)
-      | Sort (s, sa) -> (
+      | Any (sa, a) ->
+        pp_string_list ppf
+          (("any" :: Scannable_axes.to_string_list sa)
+          @ addressable_words a ~implied:Maybe_addressable)
+      | Sort (s, sa, a) -> (
         match Sort.get s with
         | Base Scannable ->
+          (* [Scannable] is intrinsically addressable; never print the
+             slot. *)
           pp_string_list ppf
             (Const.format_scannable_layout
                ~include_redundant_scannable_axes:false sa)
         | Var _ ->
           let sort_var_str = Fmt.asprintf "%a" Sort.format s in
-          pp_string_list ppf (sort_var_str :: Scannable_axes.to_string_list sa)
-        (* definitely never scannable *)
-        | Base _ | Product _ | Univar _ -> Fmt.fprintf ppf "%a" Sort.format s)
-      | Product ts ->
+          pp_string_list ppf
+            ((sort_var_str :: Scannable_axes.to_string_list sa)
+            @ addressable_words a ~implied:Maybe_addressable)
+        | Base b ->
+          (* definitely never scannable *)
+          pp_string_list ppf
+            (Fmt.asprintf "%a" Sort.format s
+            :: addressable_words a ~implied:(Addressability.of_base b))
+        | Product _ -> (
+          match addressable_words a ~implied:(Addressability.of_sort s) with
+          | [] -> Fmt.fprintf ppf "%a" Sort.format s
+          | words ->
+            Fmt.fprintf ppf "(%a) %s" Sort.format s (String.concat " " words))
+        | Univar _ ->
+          pp_string_list ppf
+            (Fmt.asprintf "%a" Sort.format s
+            :: addressable_words a ~implied:Maybe_addressable))
+      | Product (ts, a) -> (
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
-        Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+        let implied =
+          Addressability.combine_product (List.map addressability ts)
+        in
+        match addressable_words a ~implied with
+        | [] -> Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+        | words ->
+          Fmt.fprintf ppf "%t %s"
+            (fun ppf ->
+              Fmt.pp_nested_list ~nested:true ~pp_element ~pp_sep ppf ts)
+            (String.concat " " words))
     in
     pp_element ~nested:false ppf layout
 
   let rec generalize ~current_level : _ Layout.t -> unit = function
-    | Sort (sort, _) -> Sort.generalize ~current_level sort
-    | Product layouts -> List.iter (generalize ~current_level) layouts
+    | Sort (sort, _, _) -> Sort.generalize ~current_level sort
+    | Product (layouts, _) -> List.iter (generalize ~current_level) layouts
     | Any _ -> ()
 end
 
@@ -679,13 +986,22 @@ type jkind_context =
   }
 
 module Base = struct
+  (* The pending [addressable] mark on a [Kconstr] prints as a suffix word,
+     like its pending scannable axes. *)
+  let kconstr_suffix_strings sa (a : Addressability.t) =
+    Scannable_axes.to_string_list sa
+    @
+    match a with
+    | Addressable -> [Addressability.to_string a]
+    | Unaddressable | Maybe_addressable -> []
+
   let to_string layout_to_string = function
     | Layout l -> layout_to_string l
-    | Kconstr (p, sa) -> (
-      match Scannable_axes.to_string_list sa with
+    | Kconstr (p, sa, a) -> (
+      match kconstr_suffix_strings sa a with
       | [] -> Path.name p
-      | _ :: _ as sa_strs ->
-        Printf.sprintf "%s %s" (Path.name p) (String.concat " " sa_strs))
+      | _ :: _ as strs ->
+        Printf.sprintf "%s %s" (Path.name p) (String.concat " " strs))
 
   (* This is only correct on bases that have been fully expanded or that come
      from the output of [Base.expand_until_comparable]. See comment on
@@ -693,13 +1009,29 @@ module Base = struct
   let sub_expanded base1 base2 =
     match base1, base2 with
     | Layout l1, Layout l2 -> Layout.sub l1 l2
-    | Kconstr (k1, sa1), Kconstr (k2, sa2) when Path.same k1 k2 -> (
-      match Scannable_axes.less_or_equal sa1 sa2 with
-      | Equal -> Sub_result.Equal
-      | Less -> Sub_result.Less
-      | Not_le -> Sub_result.Not_le [Layout_disagreement])
-    | Kconstr (_, sa_k), Layout (Layout.Any sa_any) -> (
-      match Scannable_axes.less_or_equal sa_k sa_any with
+    | Kconstr (k1, sa1, a1), Kconstr (k2, sa2, a2) when Path.same k1 k2 -> (
+      if
+        (* Unlike the scannable axes, whose pending meets only narrow (so
+         [k non_null <= k]), the pending [addressable] mark is a modifier:
+         [k addressable] and [k] are incomparable unless [k] expands to an
+         addressable kind. So without expanding we require the marks to be
+         equal. *)
+        not (Addressability.equal a1 a2)
+      then Sub_result.Not_le [Layout_disagreement]
+      else
+        match Scannable_axes.less_or_equal sa1 sa2 with
+        | Equal -> Sub_result.Equal
+        | Less -> Sub_result.Less
+        | Not_le -> Sub_result.Not_le [Layout_disagreement])
+    | Kconstr (_, sa_k, a_k), Layout (Layout.Any (sa_any, a_any)) -> (
+      (* An unmarked abstract kind ([a_k] is [Maybe_addressable]) has unknown
+         addressability, so it is below [any addressable] only once expanded;
+         a marked one is below it outright. *)
+      match
+        Misc.Le_result.combine
+          (Scannable_axes.less_or_equal sa_k sa_any)
+          (Addressability.less_or_equal a_k a_any)
+      with
       | Equal | Less -> Sub_result.Less
       | Not_le -> Sub_result.Not_le [Layout_disagreement])
     | Kconstr _, Layout _ | Layout _, Kconstr _ | Kconstr _, Kconstr _ ->
@@ -716,27 +1048,28 @@ module Base = struct
     | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
 
   let map_layout ~f b =
-    match b with Layout l -> Layout (f l) | Kconstr (p, sa) -> Kconstr (p, sa)
+    match b with
+    | Layout l -> Layout (f l)
+    | Kconstr (p, sa, a) -> Kconstr (p, sa, a)
 
   let format format_layout ppf base =
     match base with
     | Layout l -> format_layout ppf l
-    | Kconstr (p, sa) -> (
-      let sa_strs = Scannable_axes.to_string_list sa in
-      match sa_strs with
+    | Kconstr (p, sa, a) -> (
+      match kconstr_suffix_strings sa a with
       | [] -> Format.fprintf ppf "%s" (Path.name p)
-      | _ :: _ ->
-        Format.fprintf ppf "%s %s" (Path.name p) (String.concat " " sa_strs))
+      | _ :: _ as strs ->
+        Format.fprintf ppf "%s %s" (Path.name p) (String.concat " " strs))
 
   let expand_once (type a) env (t : a jkind_base) :
       Layout.Const.t jkind_base option =
     match t with
     | Layout _ -> None
-    | Kconstr (p, sa) -> (
+    | Kconstr (p, sa, a) -> (
       match Env.find_jkind p env with
       | (exception Not_found) | { jkind_manifest = None; _ } -> None
       | { jkind_manifest = Some { base; _ }; _ } ->
-        Some (Jkind0.Base_and_axes.meet_scannable_axes base sa))
+        Some (Jkind0.Base_and_axes.apply_pending_axes base sa a))
 
   let expand_pair env t1 t2 =
     let of_const = map_layout ~f:Layout.of_const in
@@ -768,7 +1101,12 @@ module Base = struct
   let rec expand_until_comparable env t1 t2 =
     match t1, t2 with
     | Layout _, Layout _ -> Some (t1, t2)
-    | Kconstr (p1, _), Kconstr (p2, _) when Path.same p1 p2 -> Some (t1, t2)
+    | Kconstr (p1, _, a1), Kconstr (p2, _, a2)
+      when Path.same p1 p2 && Addressability.equal a1 a2 ->
+      (* If the pending [addressable] marks differ, we must keep expanding:
+         [k addressable] and [k] are only comparable once we know whether [k]
+         is addressable. *)
+      Some (t1, t2)
     | Kconstr _, Layout _ | Layout _, Kconstr _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
       | Some (t1, t2) -> expand_until_comparable env t1 t2
@@ -806,7 +1144,7 @@ module Base_and_axes = struct
       (l * r) jkind_const_desc expand_result =
     match t.base with
     | Layout _ -> Not_expanded
-    | Kconstr (p, sa) -> (
+    | Kconstr (p, sa, a) -> (
       match Env.find_jkind p env with
       | exception Not_found -> Missing_cmi p
       | { jkind_manifest = None; _ } -> Not_expanded
@@ -817,23 +1155,36 @@ module Base_and_axes = struct
         if
           With_bounds.is_empty t.with_bounds
           && Mod_bounds.equal mod_bounds jkind.mod_bounds
+          && (let sa_won't_strengthen_jkind =
+                match jkind.base with
+                | Kconstr (_, sa', _) -> Scannable_axes.le sa' sa
+                | Layout l -> (
+                  match Layout.Const.get_root_scannable_axes l with
+                  | None -> true
+                  | Some sa' -> Scannable_axes.le sa' sa)
+              in
+              sa_won't_strengthen_jkind)
           &&
-          let sa_won't_strengthen_jkind =
-            match jkind.base with
-            | Kconstr (_, sa') -> Scannable_axes.le sa' sa
-            | Layout l -> (
-              match Layout.Const.get_root_scannable_axes l with
-              | None -> true
-              | Some sa' -> Scannable_axes.le sa' sa)
+          let addressable_mark_won't_change_jkind =
+            match a with
+            | Unaddressable | Maybe_addressable -> true
+            | Addressable -> (
+              (* Marking is a no-op iff the manifest is already known
+                 addressable. *)
+              match jkind.base with
+              | Kconstr (_, _, a') -> Addressability.equal a' Addressable
+              | Layout l ->
+                Addressability.equal (Layout.Const.addressability l) Addressable
+              )
           in
-          sa_won't_strengthen_jkind
+          addressable_mark_won't_change_jkind
         then
           (* If the expanded base is equal to the original jkind, don't allocate
              a new one. *)
           Expanded jkind
         else
           Expanded
-            { base = meet_scannable_axes jkind.base sa;
+            { base = apply_pending_axes jkind.base sa a;
               mod_bounds;
               with_bounds = t.with_bounds
             })
@@ -1408,7 +1759,7 @@ module Jkind_desc = struct
   let get_scannable_axes_of_fully_expanded jk =
     match jk.base with
     | Layout l -> Layout.get_root_scannable_axes l
-    | Kconstr (_, sa) -> Some sa
+    | Kconstr (_, sa, _) -> Some sa
 
   let unsafely_set_bounds env t ~from =
     let from = Base_and_axes.fully_expand_aliases env from in
@@ -1448,9 +1799,10 @@ module Jkind_desc = struct
     | Layout l1, Layout l2 ->
       Layout.equate_or_equal ~allow_mutation l1 l2
       && Mod_bounds.equal mod_bounds1 mod_bounds2
-    | Kconstr (p1, sa1), Kconstr (p2, sa2)
+    | Kconstr (p1, sa1, a1), Kconstr (p2, sa2, a2)
       when Path.same p1 p2
            && Scannable_axes.equal sa1 sa2
+           && Addressability.equal a1 a2
            && Mod_bounds.equal mod_bounds1 mod_bounds2 ->
       true
     | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
@@ -1483,9 +1835,11 @@ module Jkind_desc = struct
          normalize. For example, we could allow [k mod contended with int < any
          mod contended]. *)
       match base2 with
-      | Layout (Any sa)
+      | Layout (Any (sa, a))
         when Mod_bounds.is_max bounds2
-             && Scannable_axes.equal sa Scannable_axes.max ->
+             && Scannable_axes.equal sa Scannable_axes.max
+             && Addressability.equal a Addressability.Maybe_addressable ->
+        (* [Any (_, Addressable)] ([any addressable]) is not the top kind. *)
         Sub_result.Less
       | _ -> Sub_result.combine bases (Sub_result.Not_le [With_bounds_on_left]))
 
@@ -1537,11 +1891,30 @@ module Jkind_desc = struct
       match Layout.intersection l1 l2 with
       | None -> No_intersection
       | Some l -> make_intersection (Layout l))
-    | Kconstr (p1, sa1), Kconstr (p2, sa2) when Path.same p1 p2 ->
-      make_intersection (Kconstr (p1, Scannable_axes.meet sa1 sa2))
-    | Kconstr (p, sa_k), Layout (Layout.Any sa_any)
-    | Layout (Layout.Any sa_any), Kconstr (p, sa_k) ->
-      make_intersection (Kconstr (p, Scannable_axes.meet sa_k sa_any))
+    | Kconstr (p1, sa1, a1), Kconstr (p2, sa2, a2)
+      when Path.same p1 p2 && Addressability.equal a1 a2 ->
+      (* When the pending [addressable] marks differ, we cannot combine
+         without expanding: [k /\ k addressable] is [k] if [k] expands to an
+         addressable kind but empty otherwise. The mismatched case falls
+         through to [expand_pair]. *)
+      make_intersection (Kconstr (p1, Scannable_axes.meet sa1 sa2, a1))
+    | Kconstr (p, sa_k, a_k), Layout (Layout.Any (sa_any, a_any))
+    | Layout (Layout.Any (sa_any, a_any)), Kconstr (p, sa_k, a_k) -> (
+      match (a_any : Addressability.t) with
+      | Unaddressable | Maybe_addressable ->
+        make_intersection (Kconstr (p, Scannable_axes.meet sa_k sa_any, a_k))
+      | Addressable -> (
+        match (a_k : Addressability.t) with
+        | Addressable ->
+          make_intersection (Kconstr (p, Scannable_axes.meet sa_k sa_any, a_k))
+        | Unaddressable | Maybe_addressable -> (
+          (* We must not just mark the [Kconstr]: [k /\ any addressable] is
+             empty when [k] expands to an unaddressable kind, whereas
+             [Kconstr (k, _, Addressable)] ([k addressable]) is not. Expand
+             instead. *)
+          match expand_pair env t1 t2 with
+          | None -> Unknown
+          | Some (t1, t2) -> intersection env t1 t2)))
     | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
       | None -> Unknown
@@ -1553,13 +1926,23 @@ module Jkind_desc = struct
     | Some (t1, t2) -> (
       match t1, t2 with
       | Layout l1, Layout l2 -> Layout.sub l1 l2
-      | Kconstr (_, sa1), Kconstr (_, sa2) -> (
-        match Scannable_axes.less_or_equal sa1 sa2 with
-        | Equal -> Sub_result.Equal
-        | Less -> Sub_result.Less
-        | Not_le -> Sub_result.Not_le [Layout_disagreement])
-      | Kconstr (_, sa_k), Layout (Layout.Any sa_any) -> (
-        match Scannable_axes.less_or_equal sa_k sa_any with
+      | Kconstr (_, sa1, a1), Kconstr (_, sa2, a2) -> (
+        if
+          (* [expand_until_comparable] only returns same-path [Kconstr]s with
+           equal pending marks, but be defensive and check. *)
+          not (Addressability.equal a1 a2)
+        then Sub_result.Not_le [Layout_disagreement]
+        else
+          match Scannable_axes.less_or_equal sa1 sa2 with
+          | Equal -> Sub_result.Equal
+          | Less -> Sub_result.Less
+          | Not_le -> Sub_result.Not_le [Layout_disagreement])
+      | Kconstr (_, sa_k, a_k), Layout (Layout.Any (sa_any, a_any)) -> (
+        match
+          Misc.Le_result.combine
+            (Scannable_axes.less_or_equal sa_k sa_any)
+            (Addressability.less_or_equal a_k a_any)
+        with
         | Equal | Less -> Sub_result.Less
         | Not_le -> Sub_result.Not_le [Layout_disagreement])
       | Kconstr _, Layout _ | Layout _, Kconstr _ ->
@@ -1575,7 +1958,9 @@ module Jkind_desc = struct
       sort )
 
   let of_sort_univar univar =
-    let layout = Layout.Sort (Sort.Univar univar, Scannable_axes.max) in
+    let layout =
+      Layout.Sort (Sort.Univar univar, Scannable_axes.max, Addressability.max)
+    in
     { base = Layout layout;
       mod_bounds = Mod_bounds.max;
       with_bounds = No_with_bounds
@@ -1653,7 +2038,13 @@ module Const = struct
   let get_scannable_axes_of_fully_expanded jk =
     match jk.base with
     | Layout l -> Layout.Const.get_root_scannable_axes l
-    | Kconstr (_, sa) -> Some sa
+    | Kconstr (_, sa, _) -> Some sa
+
+  (* Precondition as for [get_scannable_axes_of_fully_expanded]. *)
+  let get_addressability_of_fully_expanded jk =
+    match jk.base with
+    | Layout l -> Layout.Const.addressability l
+    | Kconstr (_, _, a) -> a
 
   let expand_once env t =
     match Base_and_axes.expand_base_once_const env t with
@@ -1664,13 +2055,14 @@ module Const = struct
    fun env t ->
     match t.base with
     | Layout l -> Ok l
-    | Kconstr (p, sa) -> (
+    | Kconstr (p, sa, a) -> (
       match Env.find_jkind_expansion p env with
       | exception Not_found -> Error p
       | jkind ->
-        (* Propagate the scannable axes upper bound. *)
+        (* Propagate the scannable axes upper bound and any pending
+           [addressable] mark. *)
         let jkind =
-          { jkind with base = Base_and_axes.meet_scannable_axes jkind.base sa }
+          { jkind with base = Base_and_axes.apply_pending_axes jkind.base sa a }
         in
         get_layout_result env jkind)
 
@@ -1793,14 +2185,25 @@ module Const = struct
       let actual = Base_and_axes.fully_expand_aliases_const env actual in
       let matching_layouts =
         match base_jkind.base, actual.base with
-        | Kconstr (p1, _), Kconstr (p2, _) -> Path.same p1 p2
+        | Kconstr (p1, _, _), Kconstr (p2, _, _) -> Path.same p1 p2
         | Layout l1, Layout l2 -> Layout.Const.equal_up_to_scannable_axes l1 l2
         | (Kconstr _ | Layout _), _ -> false
       in
       let scannable_axes =
-        get_scannable_axes_diff
-          ~base:(get_scannable_axes_of_fully_expanded base_jkind)
-          (get_scannable_axes_of_fully_expanded actual)
+        let sa_diff =
+          get_scannable_axes_diff
+            ~base:(get_scannable_axes_of_fully_expanded base_jkind)
+            (get_scannable_axes_of_fully_expanded actual)
+        in
+        let addressability_diff =
+          Addressability.to_string_list_diff
+            ~base:(get_addressability_of_fully_expanded base_jkind)
+            (get_addressability_of_fully_expanded actual)
+        in
+        match sa_diff, addressability_diff with
+        | Some sa_diff, Some addressability_diff ->
+          Some (sa_diff @ addressability_diff)
+        | None, _ | _, None -> None
       in
       let modal_bounds =
         get_modal_bounds ~verbosity ~base:base_jkind.mod_bounds
@@ -1920,7 +2323,7 @@ module Const = struct
             let expanded = Base_and_axes.fully_expand_aliases_const env jkind in
             let layout_str =
               match (expanded.base : Layout.Const.t jkind_base) with
-              | Layout (Base (Scannable, _)) ->
+              | Layout (Base (Scannable, _, _)) ->
                 (* As a special case, we'd still like to print in terms
                    of the value_or_null alias, even if we're printing an
                    expanded jkind. *)
@@ -1988,6 +2391,12 @@ module Const = struct
       Option.map (Location.map (fun x -> Separability x))
   end
 
+  let warn_redundant_kind_modifier ~loc (base, rev_axes) =
+    Location.prerr_warning loc
+      (Warnings.Redundant_kind_modifier
+         (Format.asprintf "%a%s" Pprintast.jkind_annotation base
+            (String.concat "" (List.rev_map (fun axis -> " " ^ axis) rev_axes))))
+
   let apply_scannable_axis ?prior_annot ~warn env
       (axis : Scannable_axis.t Location.loc option) t =
     match axis with
@@ -1996,18 +2405,14 @@ module Const = struct
       let update_sa sa =
         let sa' = Scannable_axis.lower_axes sa axis in
         (match prior_annot with
-        | Some (base, rev_axes) when warn && Scannable_axes.equal sa sa' ->
-          Location.prerr_warning loc
-            (Warnings.Redundant_kind_modifier
-               (Format.asprintf "%a%s" Pprintast.jkind_annotation base
-                  (String.concat ""
-                     (List.rev_map (fun axis -> " " ^ axis) rev_axes))))
+        | Some prior_annot when warn && Scannable_axes.equal sa sa' ->
+          warn_redundant_kind_modifier ~loc prior_annot
         | _ -> ());
         sa'
       in
       let t = Base_and_axes.fully_expand_aliases_const env t in
       match t.base with
-      | Kconstr (p, sa) -> { t with base = Kconstr (p, update_sa sa) }
+      | Kconstr (p, sa, a) -> { t with base = Kconstr (p, update_sa sa, a) }
       | Layout layout -> (
         match Layout.Const.get_root_scannable_axes layout with
         | None -> t
@@ -2018,9 +2423,36 @@ module Const = struct
                 (Layout.Const.set_root_scannable_axes layout (update_sa sa))
           }))
 
-  let warn_ignored_kind_modifier ~loc env base base_jkind sa_annot =
+  (* Apply the [addressable] kind operator from an annotation. This mirrors
+     [apply_scannable_axis], but marks the addressability slot rather than
+     lowering a scannable axis; applying it to an already-addressable kind
+     does nothing (and warns, like a redundant scannable axis). *)
+  let apply_addressable ?prior_annot ~warn env ~loc t =
+    let t = Base_and_axes.fully_expand_aliases_const env t in
+    let already_addressable =
+      Addressability.equal
+        (get_addressability_of_fully_expanded t)
+        Addressability.Addressable
+    in
+    if already_addressable
+    then (
+      (match prior_annot with
+      | Some prior_annot when warn ->
+        warn_redundant_kind_modifier ~loc prior_annot
+      | _ -> ());
+      t)
+    else
+      match t.base with
+      | Kconstr (p, sa, _) ->
+        { t with base = Kconstr (p, sa, Addressability.Addressable) }
+      | Layout layout ->
+        { t with base = Layout (Layout.Const.set_root_addressable layout) }
+
+  (* [words] must not include [addressable], which is meaningful on every
+     kind. *)
+  let warn_ignored_kind_modifier ~loc env base base_jkind words =
     if
-      sa_annot <> []
+      words <> []
       &&
       match get_layout_result env base_jkind with
       | Ok layout -> not (Layout.Const.is_scannable_or_any layout)
@@ -2029,7 +2461,7 @@ module Const = struct
       Location.prerr_warning loc
         (Warnings.Ignored_kind_modifier
            ( Format.asprintf "%a" Pprintast.jkind_annotation base,
-             List.map Location.get_txt sa_annot ))
+             List.map Location.get_txt words ))
 
   let jkind_of_product_annotations (type l r) ~loc env (jkinds : (l * r) t list)
       =
@@ -2052,23 +2484,38 @@ module Const = struct
     let layouts, mod_bounds, with_bounds =
       List.fold_left folder ([], Mod_bounds.min, No_with_bounds) jkinds
     in
-    { base = Layout (Layout.Const.Product (List.rev layouts));
+    { base =
+        Layout
+          (Layout.Const.Product
+             (List.rev layouts, Addressability.Maybe_addressable));
       mod_bounds;
       with_bounds
     }
 
-  let transl_scannable_axis ({ txt; loc } : string Location.loc) =
+  (* The interpretation of a postfix word in a [Pjk_operator] annotation. *)
+  type operator_word =
+    | Lower_scannable_axis of Scannable_axis.t
+    | Apply_addressable
+
+  let transl_operator_word ({ txt; loc } : string Location.loc) :
+      operator_word Location.loc =
+    let mk word = Location.mkloc word loc in
     match txt with
     | "non_pointer" ->
-      Location.mkloc (Scannable_axis.Separability Non_pointer) loc
+      mk (Lower_scannable_axis (Scannable_axis.Separability Non_pointer))
     | "non_pointer64" ->
-      Location.mkloc (Scannable_axis.Separability Non_pointer64) loc
-    | "non_float" -> Location.mkloc (Scannable_axis.Separability Non_float) loc
-    | "separable" -> Location.mkloc (Scannable_axis.Separability Separable) loc
+      mk (Lower_scannable_axis (Scannable_axis.Separability Non_pointer64))
+    | "non_float" ->
+      mk (Lower_scannable_axis (Scannable_axis.Separability Non_float))
+    | "separable" ->
+      mk (Lower_scannable_axis (Scannable_axis.Separability Separable))
     | "maybe_separable" ->
-      Location.mkloc (Scannable_axis.Separability Maybe_separable) loc
-    | "non_null" -> Location.mkloc (Scannable_axis.Nullability Non_null) loc
-    | "maybe_null" -> Location.mkloc (Scannable_axis.Nullability Maybe_null) loc
+      mk (Lower_scannable_axis (Scannable_axis.Separability Maybe_separable))
+    | "non_null" ->
+      mk (Lower_scannable_axis (Scannable_axis.Nullability Non_null))
+    | "maybe_null" ->
+      mk (Lower_scannable_axis (Scannable_axis.Nullability Maybe_null))
+    | "addressable" -> mk Apply_addressable
     | _ -> raise ~loc (Unknown_kind_modifier txt)
 
   let rec of_user_written_annotation_unchecked_level : type l r.
@@ -2102,20 +2549,44 @@ module Const = struct
            (Scannable_axis.annot_of_nullability_annot nullability)
       |> apply_scannable_axis ~warn env
            (Scannable_axis.annot_of_separability_annot separability)
-    | Pjk_operator (base, sa_annot) ->
+    | Pjk_operator (base, op_annot) ->
       let base_jkind =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
           env context base
       in
-      if warn then warn_ignored_kind_modifier ~loc env base base_jkind sa_annot;
+      let words_and_ops =
+        List.map (fun word -> word, transl_operator_word word) op_annot
+      in
+      (if warn
+       then
+         (* Only the scannable-axis words can be ignored; [addressable] is
+           meaningful on every kind. *)
+         let ignorable_words =
+           List.filter_map
+             (fun (word, (op : operator_word Location.loc)) ->
+               match op.txt with
+               | Lower_scannable_axis _ -> Some word
+               | Apply_addressable -> None)
+             words_and_ops
+         in
+         warn_ignored_kind_modifier ~loc env base base_jkind ignorable_words);
       let jkind, _ =
         List.fold_left
-          (fun (jkind, rev_axes) axis ->
-            ( apply_scannable_axis ~prior_annot:(base, rev_axes) ~warn env
-                (Some (transl_scannable_axis axis))
-                jkind,
-              axis.Location.txt :: rev_axes ))
-          (base_jkind, []) sa_annot
+          (fun (jkind, rev_axes)
+               ((word : string Location.loc), (op : operator_word Location.loc))
+             ->
+            let prior_annot = base, rev_axes in
+            let jkind =
+              match op.txt with
+              | Lower_scannable_axis axis ->
+                apply_scannable_axis ~prior_annot ~warn env
+                  (Some (Location.mkloc axis op.loc))
+                  jkind
+              | Apply_addressable ->
+                apply_addressable ~prior_annot ~warn env ~loc:op.loc jkind
+            in
+            jkind, word.txt :: rev_axes)
+          (base_jkind, []) words_and_ops
       in
       jkind
     | Pjk_product ts ->
@@ -2164,11 +2635,13 @@ module Const = struct
           let base =
             match expanded.base with
             | Layout _ as b -> b
-            | Kconstr (_, sa) ->
+            | Kconstr (_, sa, a) ->
               (* However, we can't raise the mod-bounds of a truly-abstract
                  [Kconstr] because its mod-bounds can be further narrowed by
-                 substitution. Instead, we approximate the layout as [any]. *)
-              Layout (Layout.Const.Any sa)
+                 substitution. Instead, we approximate the layout as [any]
+                 (keeping the pending scannable axes and [addressable] mark,
+                 which still bound the kind from above). *)
+              Layout (Layout.Const.Any (sa, a))
           in
           { base;
             mod_bounds = Mod_bounds.max;
@@ -2190,16 +2663,17 @@ module Const = struct
       | Base
           ( ( Scannable | Float64 | Float32 | Word | Bits8 | Bits16 | Bits32
             | Bits64 | Vec128 | Vec256 | Vec512 | Untagged_immediate ),
+            _,
             _ )
       | Any _ ->
         Stable
       | Univar _ -> Alpha
       | Genvar _ -> Alpha
-      | Product layouts ->
+      | Product (layouts, _) ->
         List.fold_left
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))
           Language_extension.Stable layouts
-      | Base (Void, _) -> Stable
+      | Base (Void, _, _) -> Stable
     in
     match jkind.base with
     | Kconstr _ -> Language_extension.Stable
@@ -2238,22 +2712,50 @@ module Desc = struct
   (* CR layouts v2.8: This will probably need to be overhauled with
      [with]-types. See also [Printtyp.out_jkind_of_desc], which uses the same
      algorithm. Internal ticket 5096. *)
+  let flat_sort_intrinsic_addressability : Sort.Flat.t -> Addressability.t =
+    function
+    | Base b -> Addressability.of_base b
+    | Var _ | Genvar _ | Univar _ -> Addressability.Maybe_addressable
+
+  let layout_addressability =
+    Layout.addressability_gen ~intrinsic:flat_sort_intrinsic_addressability
+
   let format_verbose ~verbosity env ppf t =
     let rec format_desc ~nested ppf (desc : _ t) =
       match desc.base with
-      | Layout (Sort (Var n, sa)) ->
+      | Layout (Sort (Var n, sa, a)) ->
         let sort_var_str = Fmt.asprintf "'s%d" (Sort.Var.get_print_number n) in
+        let addressable_words =
+          match (a : Addressability.t) with
+          | Addressable -> [Addressability.to_string a]
+          | Unaddressable | Maybe_addressable -> []
+        in
         (Fmt.pp_print_list
            ~pp_sep:(fun f () -> Fmt.fprintf f " ")
            Fmt.pp_print_string)
           ppf
-          (sort_var_str :: Scannable_axes.to_string_list sa)
+          ((sort_var_str :: Scannable_axes.to_string_list sa)
+          @ addressable_words)
       (* Analyze a product before calling [get_const]: the machinery in
          [Const.format] works better for atomic layouts, not products. *)
-      | Layout (Product lays) ->
-        let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
-        Fmt.pp_nested_list ~nested ~pp_element:format_desc ~pp_sep ppf
-          (List.map (fun layout -> { desc with base = Layout layout }) lays)
+      | Layout (Product (lays, a)) -> (
+        let pp_components ~nested ppf =
+          let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
+          Fmt.pp_nested_list ~nested ~pp_element:format_desc ~pp_sep ppf
+            (List.map (fun layout -> { desc with base = Layout layout }) lays)
+        in
+        let implied =
+          (* Whether the components already imply addressability, making a
+             root mark uninformative. *)
+          Addressability.combine_product (List.map layout_addressability lays)
+        in
+        match (a : Addressability.t), implied with
+        | Addressable, (Unaddressable | Maybe_addressable) ->
+          Fmt.fprintf ppf "%t %s"
+            (fun ppf -> pp_components ~nested:true ppf)
+            (Addressability.to_string a)
+        | Addressable, Addressable | (Unaddressable | Maybe_addressable), _ ->
+          pp_components ~nested ppf)
       | Layout _ | Kconstr _ -> (
         match get_const desc with
         | Some c -> Const.format ~verbosity env ppf c
@@ -2282,8 +2784,8 @@ let of_new_sort_var ~why ~level =
 let of_new_sort ~why ~level = fst (of_new_sort_var ~why ~level)
 
 let rec instance_layout : Sort.t Layout.t -> Sort.t Layout.t = function
-  | Sort (s, sa) -> Sort (Sort.instance s, sa)
-  | Product ls -> Product (List.map instance_layout ls)
+  | Sort (s, sa, a) -> Sort (Sort.instance s, sa, a)
+  | Product (ls, a) -> Product (List.map instance_layout ls, a)
   | Any _ as l -> l
 
 let instance jkind =
@@ -2415,7 +2917,8 @@ let for_open_boxed_row =
         Layout
           (Sort
              ( Base Scannable,
-               { nullability = Non_null; separability = Non_float } ));
+               { nullability = Non_null; separability = Non_float },
+               Addressable ));
       mod_bounds;
       with_bounds = No_with_bounds
     }
@@ -2461,7 +2964,8 @@ let for_arrow =
         Layout
           (Sort
              ( Base Scannable,
-               { nullability = Non_null; separability = Non_float } ));
+               { nullability = Non_null; separability = Non_float },
+               Addressable ));
       mod_bounds = Mod_bounds.for_arrow;
       with_bounds = No_with_bounds
     }
@@ -2489,7 +2993,8 @@ let for_object =
         Layout
           (Sort
              ( Base Scannable,
-               { nullability = Non_null; separability = Non_float } ));
+               { nullability = Non_null; separability = Non_float },
+               Addressable ));
       mod_bounds =
         Mod_bounds.create { comonadic; monadic } ~externality:Externality.max;
       with_bounds = No_with_bounds
@@ -2544,13 +3049,17 @@ let extract_layout : 'l 'r. _ -> ('l * 'r) jkind -> _ =
   (* Don't use [fully_expand_aliases] to avoid computing anything on bounds *)
   match t.jkind.base with
   | Layout l -> Ok l
-  | Kconstr (p, sa) -> (
+  | Kconstr (p, sa, a) -> (
     match Env.find_jkind_expansion p env with
     | exception Not_found -> Error p
     | jkind ->
       Const.get_layout_result env jkind
       |> Result.map Layout.of_const
-      |> Result.map (fun l -> Layout.meet_root_scannable_axes l sa))
+      |> Result.map (fun l ->
+          let l = Layout.meet_root_scannable_axes l sa in
+          match (a : Addressability.t) with
+          | Addressable -> Layout.set_root_addressable l
+          | Unaddressable | Maybe_addressable -> l))
 
 let extract_layout_opt env t = extract_layout env t |> Result.to_option
 
@@ -2580,8 +3089,12 @@ let sort_option_of_jkind env (t : jkind_l) : sort option =
   let rec sort_of_layout (t : _ Layout.t) =
     match t with
     | Any _ -> None
-    | Sort (s, _) -> Some s
-    | Product ls -> (
+    | Sort (s, _, _) ->
+      (* The addressability slot is dropped: addressability does not change
+         the representation of a value outside of a block, so e.g.
+         [bits8 addressable] has sort [bits8]. *)
+      Some s
+    | Product (ls, _) -> (
       match Misc.Stdlib.List.map_option sort_of_layout ls with
       | None -> None
       | Some sorts -> Some (Sort.Product sorts))
@@ -2732,7 +3245,12 @@ let decompose_product env jk =
     | Product sorts ->
       Some
         (List.map
-           (fun sort -> mk_jkind (Sort (sort, Scannable_axes.max)))
+           (fun sort ->
+             (* As with the scannable axes, the components are given
+                unconstrained ([Maybe_addressable]) slots; the sort product
+                doesn't store enough information for any other choice. *)
+             mk_jkind
+               (Sort (sort, Scannable_axes.max, Addressability.Maybe_addressable)))
            sorts)
     | Univar _ -> Misc.fatal_error "Jkind.decompose_product: Univar in product"
   in
@@ -2741,7 +3259,7 @@ let decompose_product env jk =
   | Ok layout -> (
     match layout with
     | Any _ -> None
-    | Product layouts ->
+    | Product (layouts, _) ->
       (* CR layouts v7.1: The histories here are wrong (we are giving each
          component the history of the whole product).  They don't show up in
          errors, so it's fine for now, but we'll probably need to fix this as
@@ -2749,7 +3267,7 @@ let decompose_product env jk =
          relevant bits of [Ctype.type_jkind_sub] to just work on layouts, or
          introduce product histories. *)
       Some (List.map mk_jkind layouts)
-    | Sort (s, _) -> deal_with_sort (Sort.get s))
+    | Sort (s, _, _) -> deal_with_sort (Sort.get s))
 
 (*********************************)
 (* pretty printing *)
@@ -3496,10 +4014,10 @@ module Violation = struct
       match mismatch_type with Kind -> "kind" | Layout -> "layout"
     in
     let rec has_sort_var_layout : Sort.Flat.t Layout.t -> bool = function
-      | Sort (Var _, _) -> true
-      | Sort (Univar _, _) | Sort (Genvar _, _) -> false
-      | Product layouts -> List.exists has_sort_var_layout layouts
-      | Sort (Base _, _) | Any _ -> false
+      | Sort (Var _, _, _) -> true
+      | Sort (Univar _, _, _) | Sort (Genvar _, _, _) -> false
+      | Product (layouts, _) -> List.exists has_sort_var_layout layouts
+      | Sort (Base _, _, _) | Any _ -> false
     in
     let has_sort_var : Sort.Flat.t Layout.t jkind_base -> bool = function
       | Kconstr _ -> false
@@ -3896,10 +4414,16 @@ let is_obviously_max (t : (_ * allowed) jkind) =
   (* This doesn't do any mutation because mutating a sort variable can't make it
      any, and modal upper bounds are constant. *)
   | { jkind =
-        { base = Layout (Any sa); mod_bounds; with_bounds = No_with_bounds };
+        { base = Layout (Any (sa, a));
+          mod_bounds;
+          with_bounds = No_with_bounds
+        };
       _
     } ->
-    Scannable_axes.(equal sa max) && Mod_bounds.is_max mod_bounds
+    Scannable_axes.(equal sa max)
+    (* [any addressable] is not the top kind. *)
+    && Addressability.(equal a max)
+    && Mod_bounds.is_max mod_bounds
   | { jkind = { base = Layout _ | Kconstr _; mod_bounds = _; with_bounds = _ };
       _
     } ->

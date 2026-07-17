@@ -120,7 +120,7 @@ let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 let rec layout_is_representable : Jkind.Layout.Const.t -> bool = function
   | Any _ | Univar _ | Genvar _ -> false
   | Base _ -> true
-  | Product sorts ->
+  | Product (sorts, _) ->
     List.for_all layout_is_representable sorts
 
 (* CR layouts-scannable: calling [type_jkind] here in [typeopt] is not ideal.
@@ -197,7 +197,7 @@ type 'a classification =
 let classify ~classify_product env ty layout : _ classification =
   match (layout : Jkind.Layout.Const.t) with
   | Any _ -> Misc.fatal_error "classify called with non-representable layout"
-  | Base (Scannable, _sa) -> begin
+  | Base (Scannable, _sa, _) -> begin
   (* CR layouts-scannable: Consider using the scannable axes here to avoid
      these calls. *)
   match scrape_ty env ty with
@@ -274,24 +274,24 @@ let classify ~classify_product env ty layout : _ classification =
   | Trepr _ ->
       assert false
   end
-  | Base (Float64, _) -> Unboxed_float Unboxed_float64
-  | Base (Float32, _) -> Unboxed_float Unboxed_float32
-  | Base (Bits8, _) -> Unboxed_int Untagged_int8
-  | Base (Bits16, _) -> Unboxed_int Untagged_int16
-  | Base (Bits32, _) -> Unboxed_int Unboxed_int32
-  | Base (Bits64, _) -> Unboxed_int Unboxed_int64
-  | Base (Vec128, _) -> Unboxed_vector Unboxed_vec128
-  | Base (Vec256, _) ->
+  | Base (Float64, _, _) -> Unboxed_float Unboxed_float64
+  | Base (Float32, _, _) -> Unboxed_float Unboxed_float32
+  | Base (Bits8, _, _) -> Unboxed_int Untagged_int8
+  | Base (Bits16, _, _) -> Unboxed_int Untagged_int16
+  | Base (Bits32, _, _) -> Unboxed_int Unboxed_int32
+  | Base (Bits64, _, _) -> Unboxed_int Unboxed_int64
+  | Base (Vec128, _, _) -> Unboxed_vector Unboxed_vec128
+  | Base (Vec256, _, _) ->
     if split_vectors
     then Product (Pgcignorableproductarray
                     [ Punboxedvector_ignorable Unboxed_vec128;
                       Punboxedvector_ignorable Unboxed_vec128 ])
     else Unboxed_vector Unboxed_vec256
-  | Base (Vec512, _) -> Unboxed_vector Unboxed_vec512
-  | Base (Word, _) -> Unboxed_int Unboxed_nativeint
-  | Base (Untagged_immediate, _) -> Unboxed_int Untagged_int
-  | Base (Void, _) -> Void
-  | Product c -> Product (classify_product ty c)
+  | Base (Vec512, _, _) -> Unboxed_vector Unboxed_vec512
+  | Base (Word, _, _) -> Unboxed_int Unboxed_nativeint
+  | Base (Untagged_immediate, _, _) -> Unboxed_int Untagged_int
+  | Base (Void, _, _) -> Void
+  | Product (c, _) -> Product (classify_product ty c)
   | Univar _ -> Misc.fatal_error "classify: Univar"
   | Genvar _ -> Misc.fatal_error "classify: Genvar"
 
@@ -303,16 +303,16 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
   match layout with
   | Any _ -> Misc.fatal_error "sort_to_scannable_product_element_kind called \
                                with non-representable layout"
-  | Base (Scannable, { separability; _ }) ->
+  | Base (Scannable, { separability; _ }, _) ->
       let open Jkind_axis.Separability in
       if le separability (upper_bound_if_is_always_gc_ignorable ())
         then Pint_scannable else Paddr_scannable
   | Base ((Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word |
-          Untagged_immediate | Vec128 | Vec256 | Vec512), _) as c ->
+          Untagged_immediate | Vec128 | Vec256 | Vec512), _, _) as c ->
     raise (Error (loc, Mixed_product_array (c, elt_ty_for_error)))
-  | Base (Void, _) ->
+  | Base (Void, _, _) ->
     raise (Error (loc, Unsupported_void_in_array))
-  | Product sorts ->
+  | Product (sorts, _) ->
     Pproduct_scannable (scannable_product_array_kind elt_ty_for_error loc sorts)
   | Univar _ ->
     Misc.fatal_error "sort_to_scannable_product_element_kind: Univar"
@@ -321,10 +321,11 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
 
 let rec ignorable_product_array_kind loc (sorts : Jkind.Layout.Const.t list) =
   match sorts with
-  | [Base (Vec128, _); Base (Vec128, _)] ->
+  | [Base (Vec128, _, _); Base (Vec128, _, _)] ->
     [ Punboxedvector_ignorable Unboxed_vec128;
       Punboxedvector_ignorable Unboxed_vec128 ]
-  | [Base (Vec128, _); Base (Vec128, _); Base (Vec128, _); Base (Vec128, _)] ->
+  | [ Base (Vec128, _, _); Base (Vec128, _, _); Base (Vec128, _, _);
+      Base (Vec128, _, _) ] ->
     [ Punboxedvector_ignorable Unboxed_vec128;
       Punboxedvector_ignorable Unboxed_vec128;
       Punboxedvector_ignorable Unboxed_vec128;
@@ -336,19 +337,21 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
   | Any _ -> Misc.fatal_error "sort_to_ignorable_product_element_kind called \
                                with non-representable layout"
   (* Scannable axes are irrelevant, since we already know we can ignore *)
-  | Base (Scannable, _sa) -> Pint_ignorable
-  | Base (Float64, _) -> Punboxedfloat_ignorable Unboxed_float64
-  | Base (Float32, _) -> Punboxedfloat_ignorable Unboxed_float32
-  | Base (Bits8, _) -> Punboxedoruntaggedint_ignorable Untagged_int8
-  | Base (Bits16, _) -> Punboxedoruntaggedint_ignorable Untagged_int16
-  | Base (Bits32, _) -> Punboxedoruntaggedint_ignorable Unboxed_int32
-  | Base (Bits64, _) -> Punboxedoruntaggedint_ignorable Unboxed_int64
-  | Base (Word, _) -> Punboxedoruntaggedint_ignorable Unboxed_nativeint
-  | Base (Untagged_immediate, _) -> Punboxedoruntaggedint_ignorable Untagged_int
-  | Base ((Vec128 | Vec256 | Vec512), _) ->
+  | Base (Scannable, _sa, _) -> Pint_ignorable
+  | Base (Float64, _, _) -> Punboxedfloat_ignorable Unboxed_float64
+  | Base (Float32, _, _) -> Punboxedfloat_ignorable Unboxed_float32
+  | Base (Bits8, _, _) -> Punboxedoruntaggedint_ignorable Untagged_int8
+  | Base (Bits16, _, _) -> Punboxedoruntaggedint_ignorable Untagged_int16
+  | Base (Bits32, _, _) -> Punboxedoruntaggedint_ignorable Unboxed_int32
+  | Base (Bits64, _, _) -> Punboxedoruntaggedint_ignorable Unboxed_int64
+  | Base (Word, _, _) -> Punboxedoruntaggedint_ignorable Unboxed_nativeint
+  | Base (Untagged_immediate, _, _) ->
+    Punboxedoruntaggedint_ignorable Untagged_int
+  | Base ((Vec128 | Vec256 | Vec512), _, _) ->
     raise (Error (loc, Unsupported_vector_in_product_array))
-  | Base (Void, _) -> raise (Error (loc, Unsupported_void_in_array))
-  | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
+  | Base (Void, _, _) -> raise (Error (loc, Unsupported_void_in_array))
+  | Product (sorts, _) ->
+    Pproduct_ignorable (ignorable_product_array_kind loc sorts)
   | Univar _ ->
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Univar"
   | Genvar _ ->
@@ -497,7 +500,7 @@ let value_kind_of_scannable_jkind env jkind =
     Jkind.get_externality_upper_bound ~context env jkind
   in
   match layout with
-  | Some (Base (Scannable, { separability; _ })) -> (
+  | Some (Base (Scannable, { separability; _ }, _)) -> (
     (* use the better of the two [immediate_or_pointer]s *)
     match pointerness_of_separability separability,
           pointerness_of_scannable_with_externality externality_upper_bound with
@@ -511,6 +514,7 @@ let value_kind_of_scannable_jkind env jkind =
          | Base ( ( Void | Untagged_immediate | Float64 | Float32 | Word
                   | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
                   | Vec512 ),
+                  _,
                   _ )) ->
     Misc.fatal_error "expected a layout of scannable"
 
@@ -1321,12 +1325,16 @@ let lazy_val_requires_forward env loc ty =
   let layout =
     Jkind.Layout.Const.of_sort_const
       Jkind.Sort.Const.for_lazy_body
-      (* The scannable axes don't matter for the rest of the computation, so
-         setting them to [max] is totally fine. *)
+      (* The scannable axes and addressability don't matter for the rest of
+         the computation, so setting them to [max] is totally fine. *)
       Jkind_types.Scannable_axes.max
+      Jkind_types.Addressability.max
   in
   let classify_product _ layouts =
-    let layout = Jkind_types.Layout.Const.Product layouts in
+    let layout =
+      Jkind_types.Layout.Const.Product
+        (layouts, Jkind_types.Addressability.Maybe_addressable)
+    in
     raise (Error (loc, Unsupported_product_in_lazy layout))
   in
   match classify ~classify_product env ty layout with

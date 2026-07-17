@@ -389,7 +389,13 @@ and 'd with_bounds =
 
 and 'layout jkind_base =
   | Layout of 'layout
-  | Kconstr of Path.t * Jkind_types.Scannable_axes.t
+  | Kconstr of
+      Path.t * Jkind_types.Scannable_axes.t * Jkind_types.Addressability.t
+      (** The scannable axes and addressability are pending operations,
+          applied to the manifest when the abstract kind is expanded. The
+          addressability is [Maybe_addressable] for the kind as declared, or
+          [Addressable] when the [addressable] kind operator was applied;
+          never [Unaddressable]. *)
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;

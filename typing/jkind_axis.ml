@@ -124,6 +124,64 @@ module Separability = struct
     else Non_pointer
 end
 
+module Addressability = struct
+  type t =
+    | Addressable
+    | Unaddressable
+    | Maybe_addressable
+
+  let max = Maybe_addressable
+
+  let equal a1 a2 =
+    match a1, a2 with
+    | Addressable, Addressable
+    | Unaddressable, Unaddressable
+    | Maybe_addressable, Maybe_addressable ->
+      true
+    | (Addressable | Unaddressable | Maybe_addressable), _ -> false
+
+  let less_or_equal a1 a2 : Misc.Le_result.t =
+    match a1, a2 with
+    | Addressable, Addressable
+    | Unaddressable, Unaddressable
+    | Maybe_addressable, Maybe_addressable ->
+      Equal
+    | (Addressable | Unaddressable), Maybe_addressable -> Less
+    | Maybe_addressable, (Addressable | Unaddressable)
+    | Addressable, Unaddressable
+    | Unaddressable, Addressable ->
+      Not_le
+
+  let le a1 a2 = Misc.Le_result.is_le (less_or_equal a1 a2)
+
+  let meet a1 a2 =
+    match a1, a2 with
+    | Maybe_addressable, a | a, Maybe_addressable -> Some a
+    | Addressable, Addressable -> Some Addressable
+    | Unaddressable, Unaddressable -> Some Unaddressable
+    | Addressable, Unaddressable | Unaddressable, Addressable -> None
+
+  let combine_product ts =
+    (* Note that the implicit order here ([Addressable] absorbed by
+       [Maybe_addressable] absorbed by [Unaddressable]) is not the subkind
+       order, under which [Addressable] and [Unaddressable] are
+       incomparable. *)
+    List.fold_left
+      (fun acc t ->
+        match acc, t with
+        | Unaddressable, _ | _, Unaddressable -> Unaddressable
+        | Maybe_addressable, _ | _, Maybe_addressable -> Maybe_addressable
+        | Addressable, Addressable -> Addressable)
+      Addressable ts
+
+  let to_string = function
+    | Addressable -> "addressable"
+    | Unaddressable -> "unaddressable"
+    | Maybe_addressable -> "maybe_addressable"
+
+  let print ppf t = Fmt.fprintf ppf "%s" (to_string t)
+end
+
 module Axis = struct
   module Nonmodal = struct
     type 'a t = Externality : Externality.t t

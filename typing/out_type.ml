@@ -1254,19 +1254,52 @@ let out_jkind_of_const_jkind env jkind =
    be overhauled with [with]-types. Internal ticket 5096. *)
 let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
   match desc.base with
-  | Layout (Sort (Var n, sa)) ->
+  | Layout (Sort (Var n, sa, a)) ->
+    let addressable_words =
+      match (a : Jkind.Addressability.t) with
+      | Addressable -> ["addressable"]
+      | Unaddressable | Maybe_addressable -> []
+    in
     Ojkind_var ("'_representable_layout_" ^
                 Int.to_string (Jkind.Sort.Var.get_print_number n),
-                Jkind.Scannable_axes.to_string_list sa)
+                Jkind.Scannable_axes.to_string_list sa @ addressable_words)
   (* Analyze a product before calling [get_const]: the machinery in
      [Jkind.Const.to_out_jkind_const] works better for atomic layouts, not
      products. *)
-  | Layout (Product lays) ->
-    Ojkind_product
-      (List.map
-         (fun layout ->
-            out_jkind_of_desc env { desc with base = Layout layout })
-         lays)
+  | Layout (Product (lays, a)) -> (
+    let unmarked () =
+      Ojkind_product
+        (List.map
+           (fun layout ->
+              out_jkind_of_desc env { desc with base = Layout layout })
+           lays)
+    in
+    let mark_is_informative =
+      (* A mark on a product whose components already imply addressability is
+         not worth printing. *)
+      match (a : Jkind.Addressability.t) with
+      | Unaddressable | Maybe_addressable -> false
+      | Addressable ->
+        List.exists
+          (fun l ->
+            match Jkind.Desc.layout_addressability l with
+            | Jkind.Addressability.Addressable -> false
+            | Unaddressable | Maybe_addressable -> true)
+          lays
+    in
+    if not mark_is_informative
+    then unmarked ()
+    else
+      (* A product informatively marked addressable as a whole: prefer the
+         constant printer, which can render the mark (e.g.
+         [(bits8 & bits16) addressable]); [Ojkind_product] cannot. *)
+      match Jkind.Desc.get_const desc with
+      | Some c -> out_jkind_of_const_jkind env c
+      | None ->
+        (* CR layouts: a marked product containing sort variables loses its
+           mark here. Such a layout can only arise from intersecting with
+           [any addressable], and this only affects printing. *)
+        unmarked ())
   | _ -> match Jkind.Desc.get_const desc with
     | Some c -> out_jkind_of_const_jkind env c
     | None -> assert false (* handled above *)
@@ -1283,7 +1316,7 @@ let out_jkind_option_of_jkind ~ignore_null env jkind =
   let elide =
     Jkind.is_value_for_printing ~ignore_null env jkind (* C2.1 *)
     || (match desc.base with
-        | Layout (Sort (Var _, _)) -> not !Clflags.verbose_types (* X1 *)
+        | Layout (Sort (Var _, _, _)) -> not !Clflags.verbose_types (* X1 *)
         | _ -> false)
   in
   if elide then None else Some (out_jkind_of_desc env desc)

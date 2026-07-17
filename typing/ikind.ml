@@ -306,7 +306,7 @@ module Solver = struct
           let unresolved_base =
             match jkind_desc.base with
             | Types.Layout _ -> None
-            | Types.Kconstr (path, _) -> Some path
+            | Types.Kconstr (path, _, _) -> Some path
           in
           jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
         in
@@ -322,7 +322,7 @@ module Solver = struct
             let unresolved_base =
               match jkind_desc.base with
               | Types.Layout _ -> None
-              | Types.Kconstr (path, _) -> Some path
+              | Types.Kconstr (path, _, _) -> Some path
             in
             jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
         in
@@ -365,7 +365,7 @@ module Solver = struct
           let unresolved_base =
             match jkind_desc.base with
             | Types.Layout _ -> None
-            | Types.Kconstr (path, _) -> Some path
+            | Types.Kconstr (path, _, _) -> Some path
           in
           jkind_desc.mod_bounds, unresolved_base
         | Some env -> (
@@ -375,7 +375,7 @@ module Solver = struct
             let unresolved_base =
               match jkind_desc.base with
               | Types.Layout _ -> None
-              | Types.Kconstr (path, _) -> Some path
+              | Types.Kconstr (path, _, _) -> Some path
             in
             jkind_desc.mod_bounds, unresolved_base)
       in
@@ -1119,8 +1119,11 @@ let fast_sub_of_any_super : type r.
  fun mod_bounds sub ->
   match sub.jkind.base with
   | Types.Layout
-      (Jkind_types.Layout.Sort (_sub_sort, { nullability = _; separability = _ }))
-    ->
+      (Jkind_types.Layout.Sort
+         (_sub_sort, { nullability = _; separability = _ }, _)) ->
+    (* Any addressability on the sub side is fine: these fast paths only
+       apply under supers whose addressability slot is [Maybe_addressable]
+       (see [fast_sub]). *)
     fast_sub_of_value_sub (Jkind.Mod_bounds.to_axis_lattice mod_bounds) sub
   | Types.Layout _ | Types.Kconstr _ -> false
 
@@ -1132,8 +1135,8 @@ let fast_sub_of_sort_super : type r.
  fun super_sort mod_bounds sub ->
   match sub.jkind.base with
   | Types.Layout
-      (Jkind_types.Layout.Sort (sub_sort, { nullability = _; separability = _ }))
-    ->
+      (Jkind_types.Layout.Sort
+         (sub_sort, { nullability = _; separability = _ }, _)) ->
     if not (Jkind_types.Sort.equate sub_sort super_sort)
     then false
     else fast_sub_of_value_sub (Jkind.Mod_bounds.to_axis_lattice mod_bounds) sub
@@ -1147,6 +1150,10 @@ let fast_sub : type r1 l2.
     bool =
  fun ~context:_ _env (sub : (Allowance.allowed * r1) Types.jkind)
      (super : (l2 * Allowance.allowed) Types.jkind) ->
+  (* The super-side patterns require an unconstrained addressability slot
+     ([Maybe_addressable]): [Any (_, Addressable)] ([any addressable]) is
+     NOT the top layout, and a constrained sort bound likewise rejects some
+     addressabilities. Those cases take the slow path. *)
   match super.jkind with
   | { base =
         (* CR rtjoa for jujacobs: I guessed you want [max] here? *)
@@ -1155,7 +1162,8 @@ let fast_sub : type r1 l2.
              ( super_sort,
                { separability = Jkind_axis.Separability.Maybe_separable;
                  nullability = Jkind_axis.Nullability.Maybe_null
-               } ));
+               },
+               Jkind_axis.Addressability.Maybe_addressable ));
       mod_bounds;
       with_bounds = Types.No_with_bounds
     } ->
@@ -1163,9 +1171,10 @@ let fast_sub : type r1 l2.
   | { base =
         Types.Layout
           (Jkind_types.Layout.Any
-             { separability = Jkind_axis.Separability.Maybe_separable;
-               nullability = Jkind_axis.Nullability.Maybe_null
-             });
+             ( { separability = Jkind_axis.Separability.Maybe_separable;
+                 nullability = Jkind_axis.Nullability.Maybe_null
+               },
+               Jkind_axis.Addressability.Maybe_addressable ));
       mod_bounds;
       with_bounds = Types.No_with_bounds
     } ->
