@@ -73,22 +73,24 @@ function directories_from_previous_import() {
   | xargs -n 1 printf "^%s\n"
 }
 
-files=$(new_files "$rev" | grep -f <(directories_from_previous_import))
+files=$(new_files "$rev" | grep -f <(directories_from_previous_import) || test "$?" = 1)
 
-echo "The script will attempt to import these files added to directories that had previously been imported:"
-echo "$files"
+if [ -n "$files" ]; then
+  echo "The script will attempt to import these files added to directories that had previously been imported:"
+  echo "$files"
 
-for file in $files; do
-  read -p "Import new file $file? [Y/n] " answer
-  case ${answer} in
-    y|Y|"" )
-      echo "Importing $file"
-      ocaml_flambda_file="${subtree_prefix}upstream/ocaml_flambda/${file}"
-      git show "$rev:$file" > "$ocaml_flambda_file"
-      cp "$ocaml_flambda_file" "${subtree_prefix}src/ocaml/$file"
-      ;;
-    * )
-      echo "Skipping $file; run '$0' again in order to make a different decision"
-      ;;
-  esac
-done
+  for file in $files; do
+    read -p "Import new file $file? [Y/n] " answer
+    case ${answer} in
+      y|Y|"" )
+        echo "Importing $file"
+        ocaml_flambda_file="${subtree_prefix}upstream/ocaml_flambda/${file}"
+        git show "$rev:$file" > "$ocaml_flambda_file"
+        cp "$ocaml_flambda_file" "${subtree_prefix}src/ocaml/$file"
+        ;;
+      * )
+        echo "Skipping $file; run '$0' again in order to make a different decision"
+        ;;
+    esac
+  done
+fi
