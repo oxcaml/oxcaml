@@ -55,6 +55,7 @@ let stack_allocation = false
 let with_cpp_mangling = false
 let probes = false
 let poll_insertion = false
+let faulting_safepoints = false
 let with_flambda_invariants = false
 let with_cmm_invariants = false
 let with_codegen_invariants = false
