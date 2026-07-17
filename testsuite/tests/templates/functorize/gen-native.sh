@@ -40,7 +40,6 @@ gen_native bad_deps/test_byte.ml bad_deps/test_native.ml
 gen_native bad_bundle_cmi_overwritten/test_byte.ml bad_bundle_cmi_overwritten/test_native.ml
 gen_native uses_plain/test_byte.ml uses_plain/test_native.ml
 gen_native input_ordering/test_byte.ml input_ordering/test_native.ml
-gen_native simple/test_byte.ml simple/test_native.ml
 gen_native module_alias/test_byte.ml module_alias/test_native.ml
 gen_native dunelike/test_byte.ml dunelike/test_native.ml
 gen_native partial_deps/test_byte.ml partial_deps/test_native.ml
@@ -48,4 +47,4 @@ gen_native arg_block_extract/test_byte.ml arg_block_extract/test_native.ml
 gen_native missing_impl/test_byte.ml missing_impl/test_native.ml
 gen_native cmifile/test_byte.ml cmifile/test_native.ml
 gen_native output_modes/test_byte.ml output_modes/test_native.ml
-gen_native type_sharing/test_byte.ml type_sharing/test_native.ml
+gen_native multi_instances/test_byte.ml multi_instances/test_native.ml
