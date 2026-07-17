@@ -60,7 +60,7 @@ fi
 function new_files() {
   comm -13 \
     <(sorted_files_at_committish "$(cat "${subtree_prefix}upstream/ocaml_flambda/base-rev.txt")" "$old_subdirectory") \
-    <(sorted_files_at_committish "$rev" "$subdirectory")
+    <(sorted_files_at_committish "$1" "$subdirectory")
 }
 
 function directories_from_previous_import() {
@@ -73,7 +73,7 @@ function directories_from_previous_import() {
   | xargs -n 1 printf "^%s\n"
 }
 
-files=$(new_files | grep -f <(directories_from_previous_import))
+files=$(new_files "$rev" | grep -f <(directories_from_previous_import))
 
 echo "The script will attempt to import these files added to directories that had previously been imported:"
 echo "$files"
