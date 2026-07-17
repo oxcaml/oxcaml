@@ -87,8 +87,8 @@ unsigned_div:
   ret
 .L0:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
+  movq  56(%r14), %rsp
+  popq  56(%r14)
   popq  %r11
   jmp   *%r11
 |}]
@@ -106,8 +106,8 @@ unsigned_rem:
   ret
 .L0:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
+  movq  56(%r14), %rsp
+  popq  56(%r14)
   popq  %r11
   jmp   *%r11
 |}]

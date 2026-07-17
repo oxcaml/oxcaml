@@ -49,6 +49,8 @@ let rax = Reg64 RAX
 
 let rbx = Reg64 RBX
 
+let rcx = Reg64 RCX
+
 let rdi = Reg64 RDI
 
 let rdx = Reg64 RDX
