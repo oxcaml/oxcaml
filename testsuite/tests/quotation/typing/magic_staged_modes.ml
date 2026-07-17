@@ -62,10 +62,10 @@ fun x -> <[ M.free ($x [@magic_staged_modes]) ]>
 Line 1, characters 38-39:
 1 | <[ fun (x @ local) -> $(M.of_local <[ x ]>) ]>
                                           ^
-Error: The value "x" is "local" to the parent region
-       but is expected to be "global"
+Error: The value "x" is "quote_regional"
+       but is expected to be "quote_global"
          because it is used inside the quoted expression at line 1, characters 35-42
-         which is expected to be "global".
+         which is expected to be "quote_global".
 |}];;
 (* but we can delay the mode checks on [x] until generation *)
 <[ fun (x @ local) -> $(M.of_local (<[ x ]> [@magic_staged_modes])) ]>
