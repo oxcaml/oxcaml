@@ -138,6 +138,9 @@ for file in $(git diff --no-ext-diff --name-only); do
       printf '\e[7mIgnoring changes to %s, inspect it manually.\e[0m\n' "$base"
       continue;;
 
+    base-rev.txt)
+      continue;;
+
     # Most cases are simple
     *) tgt=$base;;
   esac
