@@ -378,11 +378,23 @@ CAMLexport caml_domain_state* caml_get_domain_state(void)
 Caml_inline void interrupt_domain(dom_internal *d)
 {
   atomic_uintnat * interrupt_word = atomic_load_relaxed(&d->interrupt_word);
+#ifdef FAULTING_SAFEPOINTS
+  /* Also arm the safepoint trigger: compiled poll points load through
+     [safepoint_trigger] and do not test [young_limit]. [d->state] is
+     valid whenever [interrupt_word] is non-NULL, which callers ensure
+     (both are published together in domain_create). */
+  atomic_store_release(&d->state->safepoint_trigger,
+                       (uintnat) caml_safepoint_trigger_page);
+#endif
   atomic_store_release(interrupt_word, CAML_UINTNAT_MAX);
 }
 
 Caml_inline void interrupt_domain_local(caml_domain_state* dom_st)
 {
+#ifdef FAULTING_SAFEPOINTS
+  atomic_store_relaxed(&dom_st->safepoint_trigger,
+                       (uintnat) caml_safepoint_trigger_page);
+#endif
   atomic_store_relaxed(&dom_st->young_limit, CAML_UINTNAT_MAX);
 }
 
@@ -724,6 +736,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   caml_domain_lock_hook();
 
   domain_state->young_limit = 0;
+  /* Disarmed: any readable address will do, this domain_state is one. */
+  domain_state->safepoint_trigger = (uintnat) domain_state;
   domain_state->unique_id = d->unique_id;
   atomic_store_relaxed(&domain_state->requested_tick, false);
 
@@ -1996,9 +2010,27 @@ void caml_reset_young_limit(caml_domain_state * dom_st)
               (uintnat)dom_st->memprof_young_trigger);
   CAMLassert ((uintnat)dom_st->young_ptr >=
               (uintnat)dom_st->young_trigger);
+#ifdef FAULTING_SAFEPOINTS
+  /* Disarm the safepoint trigger. The exchange (an RMW) synchronises
+     with a concurrent arming in [interrupt_domain]: if the arming is
+     consumed here, the sender's earlier [domain_set_pending] is
+     visible to the [domain_has_pending] test below, which re-arms; if
+     it lands after the exchange, the trigger simply stays armed. */
+  atomic_exchange(&dom_st->safepoint_trigger, (uintnat)dom_st);
+#endif
   /* An interrupt might have been queued in the meanwhile; this
      achieves the proper synchronisation. */
   atomic_exchange(&dom_st->young_limit, (uintnat)trigger);
+#ifdef FAULTING_SAFEPOINTS
+  /* Polls do not compare [young_ptr] with [young_limit]; if the limit
+     just published is already reached (e.g. a memprof sample is due:
+     at sampling rate 1.0 [memprof_young_trigger] equals [young_ptr]),
+     re-arm the trigger so that the next poll delivers the attention,
+     as the comparison would under the old strategy. */
+  if ((uintnat)dom_st->young_ptr <= (uintnat)trigger)
+    atomic_store_relaxed(&dom_st->safepoint_trigger,
+                         (uintnat)caml_safepoint_trigger_page);
+#endif
 
   /* For non-delayable asynchronous actions, we immediately interrupt
      the domain again. */
