@@ -96,5 +96,12 @@ val instruction_with_print_reg :
     Blocks are visited in [Label.compare] order. *)
 val cfg : Format.formatter -> Cfg.t -> unit
 
+(** Like {!cfg}, but interleaves liveness information at each instruction. *)
+val cfg_with_liveness :
+  Format.formatter ->
+  Cfg.t ->
+  Cfg_liveness.Liveness.domain InstructionId.Tbl.t ->
+  unit
+
 (** Like {!cfg}, but visits blocks in the layout's order. *)
 val cfg_with_layout : Format.formatter -> Cfg_with_layout.t -> unit

@@ -664,6 +664,7 @@
   cfg_simplify
   cfg_prologue
   cfg_merge_blocks
+  push_pop_around_calls
   extra_debug
   label
   printcfg

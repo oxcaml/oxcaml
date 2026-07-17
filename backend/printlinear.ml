@@ -111,7 +111,7 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
     done;
     fprintf ppf "@,endswitch"
   | Lentertrap -> fprintf ppf "enter trap"
-  | Ladjust_stack_offset { delta_bytes } ->
+  | Ladjust_stack_offset { delta_bytes; pushed_slots = _ } ->
     fprintf ppf "adjust pseudo stack offset by %d bytes" delta_bytes
   | Lpushtrap { lbl_handler } -> fprintf ppf "push trap %a" label lbl_handler
   | Lpoptrap { lbl_handler } -> fprintf ppf "pop trap %a" label lbl_handler

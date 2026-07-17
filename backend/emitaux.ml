@@ -51,6 +51,23 @@ type frame_descr =
 
 let frame_descriptors = ref ([] : frame_descr list)
 
+(* Statistics for frame sizes at GC frame descriptor call sites. Accumulated by
+   [record_frame_descr] and read by [get_frame_counters]. The frame size passed
+   to [record_frame_descr] already includes any slots from push/pop around
+   calls, because the push/pop instructions adjust the stack offset. *)
+let frame_size_sum = ref 0
+
+let frame_descr_count = ref 0
+
+let reset_frame_counters () =
+  frame_size_sum := 0;
+  frame_descr_count := 0
+
+let get_frame_counters () =
+  Profile.Counters.create ()
+  |> Profile.Counters.set "frame_size_sum" !frame_size_sum
+  |> Profile.Counters.set "frame_descr" !frame_descr_count
+
 let is_none_dbg d = Debuginfo.Dbg.is_none (Debuginfo.get_dbg d)
 
 let get_flags debuginfo =
@@ -74,6 +91,8 @@ let is_long_stack_index n = is_long n
 
 let record_frame_descr ~label ~frame_size ~live_offset debuginfo =
   assert (frame_size land 3 = 0);
+  frame_size_sum := !frame_size_sum + frame_size;
+  incr frame_descr_count;
   let fd_long =
     is_long (frame_size + get_flags debuginfo)
     (* The checks below are redundant (if they fail, then frame size check above
@@ -374,10 +393,14 @@ let with_snapshot ~f =
   let saved_file_pos_nums = !file_pos_nums in
   let saved_file_pos_num_cnt = !file_pos_num_cnt in
   let saved_frame_descriptors = !frame_descriptors in
+  let saved_frame_size_sum = !frame_size_sum in
+  let saved_frame_descr_count = !frame_descr_count in
   let result = f () in
   file_pos_nums := saved_file_pos_nums;
   file_pos_num_cnt := saved_file_pos_num_cnt;
   frame_descriptors := saved_frame_descriptors;
+  frame_size_sum := saved_frame_size_sum;
+  frame_descr_count := saved_frame_descr_count;
   result
 
 let get_file_num ~file_emitter file_name =
@@ -535,13 +558,16 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
   let rec loop (i : Linear.instruction) fs max_fs nontail_flag =
     match i.desc with
     | Lend -> { max_frame_size = max_fs; contains_nontail_calls = nontail_flag }
-    | Ladjust_stack_offset { delta_bytes } ->
+    | Ladjust_stack_offset { delta_bytes; pushed_slots = _ } ->
       let s = fs + delta_bytes in
       loop i.next s (max s max_fs) nontail_flag
     | Lpushtrap _ ->
       let s = fs + trap_size in
       loop i.next s (max s max_fs) nontail_flag
     | Lpoptrap _ -> loop i.next (fs - trap_size) max_fs nontail_flag
+    | Lop (Specific op) ->
+      let fs = fs + Arch.specific_operation_stack_offset_delta op in
+      loop i.next fs (max fs max_fs) nontail_flag
     | Lop (Stackoffset n) ->
       let s = fs + n in
       loop i.next s (max s max_fs) nontail_flag
@@ -558,7 +584,7 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
         | Intop_atomic _
         | Floatop (_, _)
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-        | Specific _ | Name_for_debugger _ | Alloc _ )
+        | Name_for_debugger _ | Alloc _ )
     | Lcall_op (Ltailcall_ind | Ltailcall_imm _ | Lextcall _ | Lprobe _)
     | Lreloadretaddr | Lreturn | Llabel _ | Lbranch _ | Lcondbranch _
     | Lcondbranch3 _ | Lswitch _ | Lentertrap | Lraise _ ->

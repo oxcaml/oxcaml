@@ -210,6 +210,10 @@ val is_alloc : basic instruction -> bool
 
 val is_poll : basic instruction -> bool
 
+val is_reload : basic instruction -> bool
+
+val is_spill : basic instruction -> bool
+
 val is_end_region : basic -> bool
 
 val set_stack_offset : 'a instruction -> int -> unit

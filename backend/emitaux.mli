@@ -52,6 +52,14 @@ val record_frame_descr :
   (* Location, if any *)
   unit
 
+(** [reset_frame_counters ()] clears the accumulated frame size statistics that
+    are updated by [record_frame_descr]. *)
+val reset_frame_counters : unit -> unit
+
+(** [get_frame_counters ()] returns counters for the frame descriptors recorded
+    since the last [reset_frame_counters]. *)
+val get_frame_counters : unit -> Profile.Counters.t
+
 (** [with_snapshot f] runs [f] and returns its result, but also ensures that the
     state of this [Emitaux] module is unchanged after [f] returns. *)
 val with_snapshot : f:(unit -> 'a) -> 'a
