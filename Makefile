@@ -205,7 +205,7 @@ _compare/config.status: ocaml/config.status
 
 .PHONY: promote
 promote:
-	$(dune) promote $(ws_main)
+	$(dune) promotion apply $(ws_main)
 
 .PHONY: fmt
 fmt: $(dune_config_targets)
