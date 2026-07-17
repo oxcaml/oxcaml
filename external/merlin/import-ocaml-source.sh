@@ -16,10 +16,10 @@ Usage: $0 [COMMITISH [REPO [SUBDIRECTORY [OLD_SUBDIRECTORY]]]]
 
 Fetch the new compiler sources and patch Merlin to keep Merlin's local copies of
 things in sync. By default, this will pull in compiler changes from the local
-repo at the current revision. But you may pass an arbitrary commitish (branch,
-tag, full (not abbreviated!) commit hash, etc.) to important changes from. You
+repo at the current revision. But you may pass an arbitrary committish (branch,
+tag, full (not abbreviated!) commit hash, etc.) to import changes from. You
 may also fetch from a remote repository by specifying a REPO, and the
-subdirectory of the repo that the compiler is located in can be overriden by any
+subdirectory of the repo that the compiler is located in can be overridden by any
 path (including ".").
 
 This attempts to import new files from the compiler by running the
@@ -63,7 +63,7 @@ else
   exit 1
 fi
 
-if ! [ -z "$(git status --porcelain)" ]; then
+if [ -n "$(git status --porcelain)" ]; then
   echo "Working directory must be clean before using this script,"
   echo "but currently has the following changes:"
   git status
