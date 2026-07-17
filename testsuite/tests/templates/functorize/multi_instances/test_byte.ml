@@ -1,17 +1,23 @@
 (* TEST
  (* Type identity across bundle applications:
 
-    - [Bundle2] (transparent [type t = P.t]): intra-app sharing is
-       automatic; cross-app values also mix (both collapse to [int]).
+    - [Bundle2] (transparent [type t = P.t] in [Basic_transparent] and
+       [Util_transparent]): intra-app sharing is automatic; cross-app
+       values also mix (both collapse to [int]).
     - [Bundle_share] (abstract [t], sharing via [.mli] equation):
        intra-app [Util_share.t = Basic_share.t] holds; cross-app types
        are fresh so mixing values fails ([bad_mix_share]). *)
 
  readonly_files = "\
    basic_share.mli basic_share.ml util_share.mli util_share.ml \
-   basic2.ml util2.ml \
+   basic_transparent.ml util_transparent.ml \
+   basic_pfree.mli basic_pfree.ml \
+   p_int_alt.mli p_int_alt.ml \
    main_functorize_share.ml test_functorize_share.reference \
    main_functorize_type_share.ml test_functorize_type_share.reference \
+   main_instance_state.ml test_instance_state.reference \
+   main_intf_sig.ml test_intf_sig.reference \
+   bad_intf_sig_mismatch.ml bad_intf_sig_mismatch.reference \
    bad_mix_share.ml \
  ";
 
@@ -19,8 +25,9 @@
 
  set OCAMLPARAM = "";
 
- script = "mkdir p p_int basic_share util_share basic2 util2 \
-                 bundle_share bundle2";
+ script = "mkdir p p_int p_int_alt basic_share util_share \
+                 basic_transparent util_transparent \
+                 basic_pfree bundle_share bundle2 bundle_pfree";
  script;
 
  src = "${test_source_directory}/../p.mli \
@@ -42,12 +49,20 @@
  dst = "util_share/";
  copy;
 
- src = "basic2.ml";
- dst = "basic2/";
+ src = "basic_transparent.ml";
+ dst = "basic_transparent/";
  copy;
 
- src = "util2.ml";
- dst = "util2/";
+ src = "util_transparent.ml";
+ dst = "util_transparent/";
+ copy;
+
+ src = "basic_pfree.mli basic_pfree.ml";
+ dst = "basic_pfree/";
+ copy;
+
+ src = "p_int_alt.mli p_int_alt.ml";
+ dst = "p_int_alt/";
  copy;
 
  set flg = "-no-alias-deps -w -53";
@@ -73,6 +88,18 @@
  module = "p_int/p_int.mli p_int/p_int.ml";
  ocamlc.byte;
 
+ (* Second argument for P, distinct identity from [P_int]. *)
+
+ flags = "$flg -as-argument-for P -I p -I p_int_alt";
+ module = "p_int_alt/p_int_alt.mli p_int_alt/p_int_alt.ml";
+ ocamlc.byte;
+
+ (* [Basic_pfree]: P-parameterised, P-free sig. *)
+
+ flags = "$flg -parameter P -I p -I basic_pfree";
+ module = "basic_pfree/basic_pfree.mli basic_pfree/basic_pfree.ml";
+ ocamlc.byte;
+
  (* [Basic_share] (abstract [t] with counter). *)
 
  flags = "$flg -parameter P -I p -I basic_share";
@@ -85,14 +112,14 @@
  module = "util_share/util_share.mli util_share/util_share.ml";
  ocamlc.byte;
 
- (* [Basic2] and [Util2]: transparent [type t = P.t]. *)
+ (* [Basic_transparent] and [Util_transparent]: transparent [type t = P.t]. *)
 
  flags = "$flg -parameter P -I p";
- module = "basic2/basic2.ml";
+ module = "basic_transparent/basic_transparent.ml";
  ocamlc.byte;
 
  flags = "$flg -parameter P -I p";
- module = "util2/util2.ml";
+ module = "util_transparent/util_transparent.ml";
  ocamlc.byte;
 
  (* Bundle the two flavours. *)
@@ -104,15 +131,22 @@
  all_modules = "";
  ocamlc.byte;
 
- flags = "$flg -functorize -I p -I basic2 -I util2 Basic2 Util2";
+ flags = "$flg -functorize -I p -I basic_transparent -I util_transparent \
+   Basic_transparent Util_transparent";
  module = "";
  program = "bundle2/bundle2.cmo";
  all_modules = "";
  ocamlc.byte;
 
+ flags = "$flg -functorize -I p -I basic_pfree Basic_pfree";
+ module = "";
+ program = "bundle_pfree/bundle_pfree.cmo";
+ all_modules = "";
+ ocamlc.byte;
+
  (* (1) Positive: transparent sharing — within-app + cross-app value mix. *)
 
- flags = "$flg -I bundle2 -I p -I p_int -I basic2 -I util2";
+ flags = "$flg -I bundle2 -I p -I p_int -I basic_transparent -I util_transparent";
  module = "main_functorize_share.ml";
  ocamlc.byte;
 
@@ -120,8 +154,8 @@
  module = "";
  program = "$test_build_directory/test_functorize_share.bc";
  all_modules = "\
-   basic2/basic2.cmo \
-   util2/util2.cmo \
+   basic_transparent/basic_transparent.cmo \
+   util_transparent/util_transparent.cmo \
    p_int/p_int__.cmo \
    p_int/p_int.cmo \
    bundle2/bundle2.cmo \
@@ -137,8 +171,7 @@
  reference = "test_functorize_share.reference";
  check-program-output;
 
- (* (2) Positive: abstract+eq sharing — within-app share + counter
-    independence across applications. *)
+ (* (2) Positive: abstract+eq sharing — within-app share. *)
 
  flags = "$flg -I bundle_share -I p -I p_int -I basic_share -I util_share";
  module = "main_functorize_type_share.ml";
@@ -165,7 +198,74 @@
  reference = "test_functorize_type_share.reference";
  check-program-output;
 
- (* (3) Negative: cross-application value mixing fails for the abstract+eq
+ (* (3) Instance independence — each [Make] application has its own counter. *)
+
+ flags = "$flg -I bundle_share -I p -I p_int -I basic_share -I util_share";
+ module = "main_instance_state.ml";
+ ocamlc.byte;
+
+ flags = "";
+ module = "";
+ program = "$test_build_directory/test_instance_state.bc";
+ all_modules = "\
+   basic_share/basic_share.cmo \
+   util_share/util_share.cmo \
+   p_int/p_int__.cmo \
+   p_int/p_int.cmo \
+   bundle_share/bundle_share.cmo \
+   main_instance_state.cmo \
+ ";
+ ocamlc.byte;
+
+ stdout = "test_instance_state.output";
+ stderr = "test_instance_state.output";
+ output = "test_instance_state.output";
+ run;
+
+ reference = "test_instance_state.reference";
+ check-program-output;
+
+ (* (4) [Make(M0)()] satisfies [Intf(M1).S] when the bundle sig is P-free. *)
+
+ flags = "$flg -I bundle_pfree -I p -I p_int -I p_int_alt -I basic_pfree";
+ module = "main_intf_sig.ml";
+ ocamlc.byte;
+
+ flags = "";
+ module = "";
+ program = "$test_build_directory/test_intf_sig.bc";
+ all_modules = "\
+   basic_pfree/basic_pfree.cmo \
+   p_int/p_int__.cmo \
+   p_int/p_int.cmo \
+   p_int_alt/p_int_alt.cmo \
+   bundle_pfree/bundle_pfree.cmo \
+   main_intf_sig.cmo \
+ ";
+ ocamlc.byte;
+
+ stdout = "test_intf_sig.output";
+ stderr = "test_intf_sig.output";
+ output = "test_intf_sig.output";
+ run;
+
+ reference = "test_intf_sig.reference";
+ check-program-output;
+
+ (* (5) [Make(M0)()] does NOT satisfy [Intf(M1).S] when the bundle sig
+    references [P] (here [Basic_transparent.t = P.t]). *)
+
+ flags = "$flg -I bundle2 -I p -I p_int -I p_int_alt \
+   -I basic_transparent -I util_transparent";
+ module = "bad_intf_sig_mismatch.ml";
+ ocamlc_byte_exit_status = "2";
+ compiler_output = "bad_intf_sig_mismatch.output";
+ ocamlc.byte;
+
+ compiler_reference = "bad_intf_sig_mismatch.reference";
+ check-ocamlc.byte-output;
+
+ (* (6) Negative: cross-application value mixing fails for the abstract+eq
     bundle.  (The same conclusion holds for plain-abstract bundles, but is
     less interesting since there's no intra-bundle sharing to keep apart
     from cross-application freshness.) *)
