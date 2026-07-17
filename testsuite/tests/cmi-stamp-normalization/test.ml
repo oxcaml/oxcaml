@@ -42,5 +42,5 @@ bound_ident_stamps "ocamlc.byte/bar.cmi"
 ;;
 [%%expect {|
 val bound_ident_stamps : string -> string list = <fun>
-- : string list = ["t_288"; "y_289"]
+- : string list = ["t_1"; "y_2"]
 |}]
