@@ -150,7 +150,7 @@ inactive_dirs := $(if $(filter runtime4,$(RUNTIME_DIR)),runtime debugger,runtime
 # and build @runtest in each directory, excluding external/merlin and any
 # directories not in the dune workspace. (We can exclude external/ as a whole
 # since all the non-merlin directories in that folder are vendored anyways.)
-runtest_targets := $(sort $(addprefix @, $(addsuffix runtest, $(filter-out runtime4/ debugger4/ autom4te.cache/ build-aux/ external/ _%, $(dir $(wildcard */.))))))
+runtest_targets := $(sort $(addprefix @, $(addsuffix runtest, $(filter-out $(addsuffix /,$(inactive_dirs)) autom4te.cache/ build-aux/ external/ _%, $(dir $(wildcard */.))))))
 
 # CR dkalinichenko: [runtest] is built using the main profile,
 # which uses the boot compiler. Use the final compiler for [runtest],
