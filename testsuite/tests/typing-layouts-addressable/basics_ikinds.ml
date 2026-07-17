@@ -22,10 +22,8 @@ type t8 : bits8 addressable
 let f (t : t8) = t
 
 [%%expect{|
-Line 1, characters 16-27:
-1 | type t8 : bits8 addressable
-                    ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+type t8 : bits8 addressable
+val f : t8 -> t8 = <fun>
 |}]
 
 type tf : float64 addressable
@@ -34,10 +32,9 @@ type tv : void addressable
 let f2 (t : tf) = t
 
 [%%expect{|
-Line 1, characters 18-29:
-1 | type tf : float64 addressable
-                      ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+type tf : float64 addressable
+type tv : void addressable
+val f2 : tf -> tf = <fun>
 |}]
 
 (**********************************************************************)
@@ -50,7 +47,10 @@ type t_value : value addressable
 Line 1, characters 21-32:
 1 | type t_value : value addressable
                          ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "value".
+
+type t_value
 |}]
 
 type t_bits64 : bits64 addressable
@@ -59,7 +59,10 @@ type t_bits64 : bits64 addressable
 Line 1, characters 23-34:
 1 | type t_bits64 : bits64 addressable
                            ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits64".
+
+type t_bits64 : bits64
 |}]
 
 type t_word : word addressable
@@ -68,7 +71,10 @@ type t_word : word addressable
 Line 1, characters 19-30:
 1 | type t_word : word addressable
                        ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "word".
+
+type t_word : word
 |}]
 
 type t_vec : vec128 addressable
@@ -77,7 +83,10 @@ type t_vec : vec128 addressable
 Line 1, characters 20-31:
 1 | type t_vec : vec128 addressable
                         ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "vec128".
+
+type t_vec : vec128
 |}]
 
 type t_imm : immediate addressable
@@ -86,7 +95,10 @@ type t_imm : immediate addressable
 Line 1, characters 23-34:
 1 | type t_imm : immediate addressable
                            ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "immediate".
+
+type t_imm : immediate
 |}]
 
 (* The no-op collapse gives equal kinds: inclusion passes both ways. *)
@@ -107,7 +119,17 @@ end
 Line 4, characters 18-29:
 4 |   type t : bits64 addressable
                       ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits64".
+
+module M2a : sig type t : bits64 end
+Line 8, characters 18-29:
+8 |   type t : bits64 addressable
+                      ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits64".
+
+module M2b : sig type t : bits64 end
 |}]
 
 (**********************************************************************)
@@ -120,10 +142,23 @@ end = struct
 end
 
 [%%expect{|
-Line 4, characters 17-28:
+Lines 3-5, characters 6-3:
+3 | ......struct
 4 |   type t : bits8 addressable
-                     ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : bits8 addressable end
+       is not included in
+         sig type t : bits8 end
+       Type declarations do not match:
+         type t : bits8 addressable
+       is not included in
+         type t : bits8
+       The layout of the first is bits8 addressable
+         because of the definition of t at line 4, characters 2-28.
+       But the layout of the first must be a sublayout of bits8
+         because of the definition of t at line 2, characters 2-16.
 |}]
 
 module M3b : sig
@@ -133,10 +168,23 @@ end = struct
 end
 
 [%%expect{|
-Line 2, characters 17-28:
-2 |   type t : bits8 addressable
-                     ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t : bits8
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : bits8 end
+       is not included in
+         sig type t : bits8 addressable end
+       Type declarations do not match:
+         type t : bits8
+       is not included in
+         type t : bits8 addressable
+       The layout of the first is bits8
+         because of the definition of t at line 4, characters 2-16.
+       But the layout of the first must be a sublayout of bits8 addressable
+         because of the definition of t at line 2, characters 2-28.
 |}]
 
 type ('a : bits8) req8
@@ -144,10 +192,7 @@ type ('a : bits8 addressable) req8a
 
 [%%expect{|
 type ('a : bits8) req8
-Line 2, characters 17-28:
-2 | type ('a : bits8 addressable) req8a
-                     ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+type ('a : bits8 addressable) req8a
 |}]
 
 type bad = t8 req8
@@ -156,7 +201,11 @@ type bad = t8 req8
 Line 1, characters 11-13:
 1 | type bad = t8 req8
                ^^
-Error: Unbound type constructor "t8"
+Error: This type "t8" should be an instance of type "('a : bits8)"
+       The layout of t8 is bits8 addressable
+         because of the definition of t8 at line 1, characters 0-27.
+       But the layout of t8 must be a sublayout of bits8
+         because of the definition of req8 at line 1, characters 0-22.
 |}]
 
 type t8_plain : bits8
@@ -164,21 +213,21 @@ type bad = t8_plain req8a
 
 [%%expect{|
 type t8_plain : bits8
-Line 2, characters 20-25:
+Line 2, characters 11-19:
 2 | type bad = t8_plain req8a
-                        ^^^^^
-Error: Unbound type constructor "req8a"
-Hint:              Did you mean "req8"?
+               ^^^^^^^^
+Error: This type "t8_plain" should be an instance of type
+         "('a : bits8 addressable)"
+       The layout of t8_plain is bits8
+         because of the definition of t8_plain at line 1, characters 0-21.
+       But the layout of t8_plain must be a sublayout of bits8 addressable
+         because of the definition of req8a at line 2, characters 0-35.
 |}]
 
 type ok = t8 req8a
 
 [%%expect{|
-Line 1, characters 13-18:
-1 | type ok = t8 req8a
-                 ^^^^^
-Error: Unbound type constructor "req8a"
-Hint:              Did you mean "req8"?
+type ok = t8 req8a
 |}]
 
 (* Same for float64. *)
@@ -190,10 +239,23 @@ end = struct
 end
 
 [%%expect{|
-Line 4, characters 19-30:
+Lines 3-5, characters 6-3:
+3 | ......struct
 4 |   type t : float64 addressable
-                       ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : float64 addressable end
+       is not included in
+         sig type t : float64 end
+       Type declarations do not match:
+         type t : float64 addressable
+       is not included in
+         type t : float64
+       The layout of the first is float64 addressable
+         because of the definition of t at line 4, characters 2-30.
+       But the layout of the first must be a sublayout of float64
+         because of the definition of t at line 2, characters 2-18.
 |}]
 
 (**********************************************************************)
@@ -202,10 +264,7 @@ Error: Unknown kind modifier addressable
 type ('a : any addressable) reqa
 
 [%%expect{|
-Line 1, characters 15-26:
-1 | type ('a : any addressable) reqa
-                   ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+type ('a : any addressable) reqa
 |}]
 
 type ok1 = string reqa
@@ -214,31 +273,37 @@ type ok3 = nativeint# reqa
 type ok4 = t8 reqa
 
 [%%expect{|
-Line 1, characters 18-22:
-1 | type ok1 = string reqa
-                      ^^^^
-Error: Unbound type constructor "reqa"
-Hint:              Did you mean "req8"?
+type ok1 = string reqa
+type ok2 = int64# reqa
+type ok3 = nativeint# reqa
+type ok4 = t8 reqa
 |}]
 
 type bad1 = float# reqa
 
 [%%expect{|
-Line 1, characters 19-23:
+Line 1, characters 12-18:
 1 | type bad1 = float# reqa
-                       ^^^^
-Error: Unbound type constructor "reqa"
-Hint:              Did you mean "req8"?
+                ^^^^^^
+Error: This type "float#" should be an instance of type "('a : any addressable)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a sublayout of any addressable
+         because of the definition of reqa at line 1, characters 0-32.
 |}]
 
 type bad2 = t8_plain reqa
 
 [%%expect{|
-Line 1, characters 21-25:
+Line 1, characters 12-20:
 1 | type bad2 = t8_plain reqa
-                         ^^^^
-Error: Unbound type constructor "reqa"
-Hint:              Did you mean "req8"?
+                ^^^^^^^^
+Error: This type "t8_plain" should be an instance of type
+         "('a : any addressable)"
+       The layout of t8_plain is bits8
+         because of the definition of t8_plain at line 1, characters 0-21.
+       But the layout of t8_plain must be a sublayout of any addressable
+         because of the definition of reqa at line 1, characters 0-32.
 |}]
 
 type t_any : any
@@ -246,11 +311,14 @@ type bad3 = t_any reqa
 
 [%%expect{|
 type t_any : any
-Line 2, characters 18-22:
+Line 2, characters 12-17:
 2 | type bad3 = t_any reqa
-                      ^^^^
-Error: Unbound type constructor "reqa"
-Hint:              Did you mean "req8"?
+                ^^^^^
+Error: This type "t_any" should be an instance of type "('a : any addressable)"
+       The layout of t_any is any
+         because of the definition of t_any at line 1, characters 0-16.
+       But the layout of t_any must be a sublayout of any addressable
+         because of the definition of reqa at line 1, characters 0-32.
 |}]
 
 (* [any addressable] is not representable, like [any]. *)
@@ -258,10 +326,15 @@ Hint:              Did you mean "req8"?
 let f4 : ('a : any addressable). 'a -> 'a = fun x -> x
 
 [%%expect{|
-Line 1, characters 19-30:
+Line 1, characters 44-54:
 1 | let f4 : ('a : any addressable). 'a -> 'a = fun x -> x
-                       ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+                                                ^^^^^^^^^^
+Error: This definition has type "'b -> 'b" which is less general than
+         "('a : any addressable). 'a -> 'a"
+       The layout of 'a is any addressable
+         because of the annotation on the universal variable 'a.
+       But the layout of 'a must be representable
+         because we must know concretely how to pass a function argument.
 |}]
 
 (**********************************************************************)
@@ -273,10 +346,9 @@ type ('a : any) req_any
 type ok = taa req_any
 
 [%%expect{|
-Line 1, characters 15-26:
-1 | type taa : any addressable
-                   ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+type taa : any addressable
+type ('a : any) req_any
+type ok = taa req_any
 |}]
 
 module M5a : sig
@@ -286,10 +358,7 @@ end = struct
 end
 
 [%%expect{|
-Line 4, characters 15-26:
-4 |   type t : any addressable
-                   ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+module M5a : sig type t : any end
 |}]
 
 module M5b : sig
@@ -299,10 +368,23 @@ end = struct
 end
 
 [%%expect{|
-Line 2, characters 15-26:
-2 |   type t : any addressable
-                   ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t : any
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : any end
+       is not included in
+         sig type t : any addressable end
+       Type declarations do not match:
+         type t : any
+       is not included in
+         type t : any addressable
+       The layout of the first is any
+         because of the definition of t at line 4, characters 2-14.
+       But the layout of the first must be a sublayout of any addressable
+         because of the definition of t at line 2, characters 2-26.
 |}]
 
 (**********************************************************************)
@@ -315,11 +397,7 @@ type ok = p1 reqa
 
 [%%expect{|
 type p1 : bits64 & value
-Line 2, characters 13-17:
-2 | type ok = p1 reqa
-                 ^^^^
-Error: Unbound type constructor "reqa"
-Hint:              Did you mean "req8"?
+type ok = p1 reqa
 |}]
 
 (* A product with an unaddressable component is not. *)
@@ -329,11 +407,14 @@ type bad = p2 reqa
 
 [%%expect{|
 type p2 : bits8 & value
-Line 2, characters 14-18:
+Line 2, characters 11-13:
 2 | type bad = p2 reqa
-                  ^^^^
-Error: Unbound type constructor "reqa"
-Hint:              Did you mean "req8"?
+               ^^
+Error: This type "p2" should be an instance of type "('a : any addressable)"
+       The layout of p2 is bits8 & value
+         because of the definition of p2 at line 1, characters 0-23.
+       But the layout of p2 must be a sublayout of any addressable
+         because of the definition of reqa at line 1, characters 0-32.
 |}]
 
 (* ... unless that component is made addressable. *)
@@ -342,10 +423,8 @@ type p3 : bits8 addressable & value
 type ok = p3 reqa
 
 [%%expect{|
-Line 1, characters 16-27:
-1 | type p3 : bits8 addressable & value
-                    ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+type p3 : bits8 addressable & value
+type ok = p3 reqa
 |}]
 
 (* A whole product can be marked addressable. *)
@@ -354,10 +433,8 @@ type mp : (bits8 & bits16) addressable
 type ok = mp reqa
 
 [%%expect{|
-Line 1, characters 27-38:
-1 | type mp : (bits8 & bits16) addressable
-                               ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+type mp : (bits8 & bits16) addressable mod external_
+type ok = mp reqa
 |}]
 
 (* Marking a product is not the same as marking its components. *)
@@ -369,10 +446,24 @@ end = struct
 end
 
 [%%expect{|
-Line 4, characters 17-28:
+Lines 3-5, characters 6-3:
+3 | ......struct
 4 |   type t : bits8 addressable & bits16 addressable
-                     ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : bits8 addressable & bits16 addressable end
+       is not included in
+         sig type t : (bits8 & bits16) addressable mod external_ end
+       Type declarations do not match:
+         type t : bits8 addressable & bits16 addressable
+       is not included in
+         type t : (bits8 & bits16) addressable mod external_
+       The layout of the first is bits8 addressable & bits16 addressable
+         because of the definition of t at line 4, characters 2-49.
+       But the layout of the first must be a sublayout of
+           (bits8 & bits16) addressable
+         because of the definition of t at line 2, characters 2-39.
 |}]
 
 module M6b : sig
@@ -382,10 +473,24 @@ end = struct
 end
 
 [%%expect{|
-Line 4, characters 28-39:
+Lines 3-5, characters 6-3:
+3 | ......struct
 4 |   type t : (bits8 & bits16) addressable
-                                ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : (bits8 & bits16) addressable mod external_ end
+       is not included in
+         sig type t : bits8 addressable & bits16 addressable end
+       Type declarations do not match:
+         type t : (bits8 & bits16) addressable mod external_
+       is not included in
+         type t : bits8 addressable & bits16 addressable
+       The layout of the first is (bits8 & bits16) addressable
+         because of the definition of t at line 4, characters 2-39.
+       But the layout of the first must be a sublayout of
+           bits8 addressable & bits16 addressable
+         because of the definition of t at line 2, characters 2-49.
 |}]
 
 (* Marking a product of addressables is a no-op. *)
@@ -400,7 +505,10 @@ end
 Line 2, characters 28-39:
 2 |   type t : (bits64 & value) addressable
                                 ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits64 & value".
+
+module M6c : sig type t : bits64 & value end
 |}]
 
 (* Unboxed tuples are products of the component kinds. *)
@@ -408,21 +516,22 @@ Error: Unknown kind modifier addressable
 type ok = #(int64# * string) reqa
 
 [%%expect{|
-Line 1, characters 29-33:
-1 | type ok = #(int64# * string) reqa
-                                 ^^^^
-Error: Unbound type constructor "reqa"
-Hint:              Did you mean "req8"?
+type ok = #(int64# * string) reqa
 |}]
 
 type bad = #(float# * float#) reqa
 
 [%%expect{|
-Line 1, characters 30-34:
+Line 1, characters 11-29:
 1 | type bad = #(float# * float#) reqa
-                                  ^^^^
-Error: Unbound type constructor "reqa"
-Hint:              Did you mean "req8"?
+               ^^^^^^^^^^^^^^^^^^
+Error: This type "#(float# * float#)" should be an instance of type
+         "('a : any addressable)"
+       The layout of #(float# * float#) is float64 & float64
+         because it is an unboxed tuple.
+       But the layout of #(float# * float#) must be a sublayout of
+           any addressable
+         because of the definition of reqa at line 1, characters 0-32.
 |}]
 
 (**********************************************************************)
@@ -435,10 +544,8 @@ type ok = t7 req8a
 
 [%%expect{|
 kind_ kb8 = bits8
-Line 3, characters 14-25:
-3 | type t7 : kb8 addressable
-                  ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+type t7 : bits8 addressable
+type ok = t7 req8a
 |}]
 
 kind_ kb64 = bits64
@@ -450,7 +557,10 @@ kind_ kb64 = bits64
 Line 3, characters 16-27:
 3 | type t7' : kb64 addressable
                     ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "kb64".
+
+type t7' : bits64
 |}]
 
 kind_ k
@@ -460,10 +570,8 @@ type tk : k
 
 [%%expect{|
 kind_ k
-Line 3, characters 12-23:
-3 | type ta : k addressable
-                ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+type ta : k addressable
+type tk : k
 |}]
 
 (* [k addressable <= any addressable] holds without expanding [k]... *)
@@ -471,11 +579,7 @@ Error: Unknown kind modifier addressable
 type ok = ta reqa
 
 [%%expect{|
-Line 1, characters 13-17:
-1 | type ok = ta reqa
-                 ^^^^
-Error: Unbound type constructor "reqa"
-Hint:              Did you mean "req8"?
+type ok = ta reqa
 |}]
 
 (* ...but [k <= any addressable] does not hold for abstract [k]. *)
@@ -483,11 +587,14 @@ Hint:              Did you mean "req8"?
 type bad = tk reqa
 
 [%%expect{|
-Line 1, characters 14-18:
+Line 1, characters 11-13:
 1 | type bad = tk reqa
-                  ^^^^
-Error: Unbound type constructor "reqa"
-Hint:              Did you mean "req8"?
+               ^^
+Error: This type "tk" should be an instance of type "('a : any addressable)"
+       The kind of tk is k
+         because of the definition of tk at line 4, characters 0-11.
+       But the kind of tk must be a subkind of any addressable
+         because of the definition of reqa at line 1, characters 0-32.
 |}]
 
 (* [k addressable] and [k] are incomparable for abstract [k]. *)
@@ -499,10 +606,23 @@ end = struct
 end
 
 [%%expect{|
-Line 4, characters 13-24:
+Lines 3-5, characters 6-3:
+3 | ......struct
 4 |   type t : k addressable
-                 ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : k addressable end
+       is not included in
+         sig type t : k end
+       Type declarations do not match:
+         type t : k addressable
+       is not included in
+         type t : k
+       The kind of the first is k addressable
+         because of the definition of t at line 4, characters 2-24.
+       But the kind of the first must be a subkind of k
+         because of the definition of t at line 2, characters 2-12.
 |}]
 
 module M7b : sig
@@ -512,10 +632,23 @@ end = struct
 end
 
 [%%expect{|
-Line 2, characters 13-24:
-2 |   type t : k addressable
-                 ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t : k
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : k end
+       is not included in
+         sig type t : k addressable end
+       Type declarations do not match:
+         type t : k
+       is not included in
+         type t : k addressable
+       The kind of the first is k
+         because of the definition of t at line 4, characters 2-12.
+       But the kind of the first must be a subkind of k addressable
+         because of the definition of t at line 2, characters 2-24.
 |}]
 
 (* Matching kind_ declarations. *)
@@ -527,15 +660,7 @@ end = struct
 end
 
 [%%expect{|
-Line 4, characters 13-30:
-4 |   kind_ k' = bits8 addressable
-                 ^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "addressable" have no effect on the kind "bits8".
-
-Line 4, characters 19-30:
-4 |   kind_ k' = bits8 addressable
-                       ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+module M7c : sig kind_ k' = bits8 addressable end
 |}]
 
 module M7d : sig
@@ -545,15 +670,20 @@ end = struct
 end
 
 [%%expect{|
-Line 2, characters 13-30:
-2 |   kind_ k' = bits8 addressable
-                 ^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "addressable" have no effect on the kind "bits8".
-
-Line 2, characters 19-30:
-2 |   kind_ k' = bits8 addressable
-                       ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   kind_ k' = bits8
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig kind_ k' = bits8 end
+       is not included in
+         sig kind_ k' = bits8 addressable end
+       Kind declarations do not match:
+         kind_ k' = bits8
+       is not included in
+         kind_ k' = bits8 addressable
+       Their definitions are not equal.
 |}]
 
 module M7e : sig
@@ -563,15 +693,13 @@ end = struct
 end
 
 [%%expect{|
-Line 2, characters 13-31:
-2 |   kind_ k' = bits64 addressable
-                 ^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "addressable" have no effect on the kind "bits64".
-
 Line 2, characters 20-31:
 2 |   kind_ k' = bits64 addressable
                         ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits64".
+
+module M7e : sig kind_ k' = bits64 end
 |}]
 
 (**********************************************************************)
@@ -586,10 +714,20 @@ end = struct
 end
 
 [%%expect{|
-Line 1, characters 17-28:
+Line 1, characters 29-40:
 1 | type t8i : bits8 addressable addressable
-                     ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+                                 ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits8 addressable".
+
+type t8i : bits8 addressable
+Line 6, characters 29-40:
+6 |   type t : bits8 addressable addressable
+                                 ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits8 addressable".
+
+module M8 : sig type t : bits8 addressable end
 |}]
 
 (**********************************************************************)
@@ -598,29 +736,21 @@ Error: Unknown kind modifier addressable
 type t9a : bits8 addressable mod portable
 
 [%%expect{|
-Line 1, characters 17-28:
-1 | type t9a : bits8 addressable mod portable
-                     ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+type t9a : bits8 addressable mod portable
 |}]
 
 type t9b : any non_null addressable
 type t9c : any addressable non_null
 
 [%%expect{|
-Line 1, characters 24-35:
-1 | type t9b : any non_null addressable
-                            ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+type t9b : any non_null addressable
+type t9c : any non_null addressable
 |}]
 
 type t9d : k addressable non_pointer
 
 [%%expect{|
-Line 1, characters 13-24:
-1 | type t9d : k addressable non_pointer
-                 ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+type t9d : k non_pointer addressable
 |}]
 
 (* Unknown operator words still error. *)
@@ -645,5 +775,9 @@ type ('a : bits16) req16
 Line 2, characters 11-13:
 2 | type bad = t8 req16
                ^^
-Error: Unbound type constructor "t8"
+Error: This type "t8" should be an instance of type "('a : bits16)"
+       The layout of t8 is bits8 addressable
+         because of the definition of t8 at line 1, characters 0-27.
+       But the layout of t8 must be a sublayout of bits16
+         because of the definition of req16 at line 1, characters 0-24.
 |}]
