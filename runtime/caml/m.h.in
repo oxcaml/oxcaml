@@ -97,6 +97,8 @@
 
 #undef MULTIDOMAIN
 
+#undef FAULTING_SAFEPOINTS
+
 #undef HAS_POPCNT
 
 #undef HAS_LZCNT
