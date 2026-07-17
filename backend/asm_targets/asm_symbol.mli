@@ -61,7 +61,8 @@ val encode : t -> string
 (** Like [encode], but without the target-specific symbol prefix (e.g. the
     leading underscore on macOS). This is the form expected in DWARF attributes
     such as [DW_AT_linkage_name]: debuggers match such names against symbol
-    table entries from which any platform prefix has been stripped. *)
+    table entries from which any platform prefix has been stripped. Names of
+    symbols created with [create_without_encoding] are returned unchanged. *)
 val encode_without_prefix : t -> string
 
 val to_raw_string : t -> string
