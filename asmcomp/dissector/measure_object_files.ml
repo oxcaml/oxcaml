@@ -44,9 +44,7 @@ let report_error ppf = function
   | Unrecognized_input { filename; magic } ->
     Format_doc.fprintf ppf
       "Dissector: input file %s is neither an ELF object file nor an ar \
-       archive (leading bytes: %S). Refusing to continue, since skipping a \
-       link input would silently drop its code from the final executable or \
-       shared object."
+       archive (leading bytes: %S)"
       filename magic
 
 let () =
@@ -92,12 +90,8 @@ type file_kind =
   | Elf_object
   | Ar_archive
 
-(* Classify an input file as an ELF relocatable object or an ar archive by its
-   leading magic bytes. We must not classify by filename extension: link inputs
-   may be resolved through manifest files (see [-I-manifest]) to
-   content-addressed paths that carry no meaningful file name. Anything that is
-   neither kind is a hard error; silently skipping an input would drop its code
-   from the final link. *)
+(* Classify by magic bytes rather than file name: manifest-resolved link inputs
+   (see [-I-manifest]) may live at content-addressed paths. *)
 let classify_file filename buf =
   if Compiler_owee.Owee_elf.is_elf buf
   then Elf_object
@@ -126,11 +120,9 @@ module File_size = struct
 end
 
 let measure_files (unix : (module Compiler_owee.Unix_intf.S)) ~files =
-  (* Note that duplicate entries in [files] are deduplicated (via [analyzed]
-     below) rather than rejected. Beyond the same file legitimately being listed
-     twice, distinct libraries can resolve to the same content-addressed path
-     when their companion archives are byte-identical (e.g. empty archives), see
-     [-I-manifest]. Measuring (and linking) such a file once is correct. *)
+  (* Duplicate entries in [files] are deduplicated (via [analyzed] below): in a
+     content-addressed store, byte-identical inputs (e.g. empty archives from
+     distinct libraries) share a single path. *)
   let module Unix = (val unix) in
   (* Open output file if -ddissector-inputs is set *)
   let out_channel = Option.map open_out !Clflags.ddissector_inputs in
@@ -145,6 +137,8 @@ let measure_files (unix : (module Compiler_owee.Unix_intf.S)) ~files =
     then raise (Error (File_not_found filename))
     else Compiler_owee.Owee_buf.map_binary (module Unix) filename
   in
+  (* Analyze an object (.o) buffer, returning (size, has_probes) *)
+  let analyze_object_buf buf = analyze_elf_buf buf in
   (* Analyze an archive (.a) buffer, returning (size, has_probes,
      member_names) *)
   let analyze_archive_buf buf =
@@ -187,7 +181,7 @@ let measure_files (unix : (module Compiler_owee.Unix_intf.S)) ~files =
       let buf = map_input_file filename in
       match classify_file filename buf with
       | Elf_object ->
-        let size, has_probes = analyze_elf_buf buf in
+        let size, has_probes = analyze_object_buf buf in
         log "%sInput: %s (%s)\n" indent filename (string_of_origin origin);
         log "%s  -> %s (%Ld bytes, has_probes=%b)\n" indent filename size
           has_probes;
