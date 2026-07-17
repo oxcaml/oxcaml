@@ -132,12 +132,6 @@ for file in $(git diff --no-ext-diff --name-only); do
     lambda/mixed_product_bytes.ml*)
       tgt=${base/#lambda/typing};;
 
-    # We have to inspect these files by hand, we only care about a subset of the
-    # changes
-    utils/clflags.ml*|utils/config.ml*)
-      printf '\e[7mIgnoring changes to %s, inspect it manually.\e[0m\n' "$base"
-      continue;;
-
     base-rev.txt)
       continue;;
 
