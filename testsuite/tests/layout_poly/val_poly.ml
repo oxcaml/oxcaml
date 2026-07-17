@@ -619,6 +619,15 @@ module type S =
   sig val const : layout_ l l0. ('a : l0) ('b : l). 'a -> 'b -> 'a end
 |}]
 
+(* [l] is the top jkind of two type variables, not exactly one, so keep the
+   "layout_" form. *)
+module type S = sig
+  val shared : layout_ l. ('a : l) ('b : l). 'a -> 'b
+end
+[%%expect {|
+module type S = sig val shared : layout_ l. ('a : l) ('b : l). 'a -> 'b end
+|}]
+
 (* [l1] is declared but not the jkind of any type variable, so the shorthand
    (which omits the layout binders) can't represent it; keep the "layout_"
    form. *)
