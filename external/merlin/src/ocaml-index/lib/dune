@@ -6,7 +6,8 @@
   ocaml_utils
   merlin_utils
   merlin_analysis
-  merlin_index_format)
+  merlin_index_format
+  unix)
  (flags
   :standard
   -open Ocaml_typing
