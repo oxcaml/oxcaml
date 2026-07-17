@@ -151,8 +151,6 @@ for file in $(git diff --no-ext-diff --name-only); do
         -e 's!^|||||||$!& '"$parent_marker"'!' \
         -e 's!^>>>>>>>$!& '"$new_marker"'!'    \
         $tgt
-    echo "$err"
-  fi
     cat $tgt.out
   fi
   rm -f $tgt.orig $tgt.out
