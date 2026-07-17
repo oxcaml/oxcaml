@@ -2977,9 +2977,8 @@ let check_recmodule_inclusion env bindings =
       List.map check_inclusion bindings
     end
   in
-  (* Probe shallow unroll depths in order, accepting at the first that
-     succeeds; [n_max] is the completeness fallback and alone reports errors.
-     Depths at or past [n_max] are no-ops so the cascade stays uniform. *)
+  (* [n_max = List.length bindings] is taken from the upstream compiler.
+     It's still insufficient to check some cases, but we stop there. *)
   let n_max = List.length bindings in
   let check depth = check_incl true depth env Subst.identity in
   let attempt depth =
@@ -2990,8 +2989,11 @@ let check_recmodule_inclusion env bindings =
       | result -> Some result
       | exception (Out_of_memory | Stack_overflow | Sys.Break as exn) ->
         raise exn
+      (* Fall back to a more exhaustive check on compiler errors. *)
       | exception _ -> None
   in
+  (* Attempt depths 1 and 2 first to save on compilation time
+     in the successful case. *)
   match attempt 1 with
   | Some result -> result
   | None ->
