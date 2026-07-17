@@ -3161,8 +3161,9 @@ let enter_splice ~loc env =
 let add_quotation_lock ~loc comonadic env =
   let comonadic = Mode.Value.Comonadic.disallow_left comonadic in
   let env =
-    enter_quotation env
+    env
     |> add_lock (Closure_lock ((loc, Quote), comonadic))
+    |> enter_quotation
   in
   { env with last_quote_lock = (loc, comonadic) }
 
@@ -3755,12 +3756,14 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
       path, (mode, locks), a
     end
 
-let closure_mode pp {Mode.monadic; comonadic} closure_context comonadic0 =
+let closure_mode pp {Mode.monadic; comonadic}
+  closure_context comonadic0 stage_offset =
   let hint_comonadic : _ Mode.Hint.morph =
     Is_closed_by (Comonadic, {closure = closure_context; closed = pp})
   in
   Mode.Value.Comonadic.submode_err pp
-    comonadic (Mode.Value.Comonadic.apply_hint hint_comonadic comonadic0);
+    (Mode.offset_stage_l (-stage_offset) comonadic)
+    (Mode.Value.Comonadic.apply_hint hint_comonadic comonadic0);
   let hint_monadic : _ Mode.Hint.morph =
     Is_closed_by (Monadic, {closure = closure_context; closed = pp})
   in
@@ -3772,8 +3775,9 @@ let closure_mode pp {Mode.monadic; comonadic} closure_context comonadic0 =
   {Mode.monadic; comonadic}
 
 let const_closure_mode pp {Mode.monadic; comonadic}
-  closure_context comonadic0 =
-  Mode.Value.Comonadic.(submode_err pp comonadic
+  closure_context comonadic0 stage_offset =
+  Mode.Value.Comonadic.(submode_err pp
+    (Mode.offset_stage_l (-stage_offset) comonadic)
     (of_const ~hint:(Is_used_in closure_context) comonadic0));
   let monadic =
     Mode.Value.(Monadic.join
@@ -3825,6 +3829,7 @@ let unboxed_type ~errors ~env ~loc ty_and_lid =
 
     [pp] is the pinpoint used in errors. *)
 let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
+  (* Format.printf "@.walk@."; *)
   List.fold_left
     (fun (vmode, stage_offset) -> function
     (* We walk in direction from the introduction of a value towards its use.
@@ -3832,25 +3837,25 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
        stage offset from the current lock to the introduction ([stage_offset])
        and to the use ([-stage_offset]). *)
     | Stage_lock Quotation_lock ->
+      (* Format.printf "quote@."; *)
       vmode, stage_offset + 1
     | Stage_lock Splice_lock ->
+      (* Format.printf "splice@."; *)
       vmode, stage_offset - 1
     | Nonstage_lock lock ->
       let vmode =
+      (* Format.printf "lock stage_offset=%d@." stage_offset; *)
         match lock with
         | Region_lock ->
             region_mode vmode
         (* We want to offset the stage of [vmode] by [-stage_offset].
            It's easier to apply the right-adjoint to the [comonadic] bound,
-           which is [offset_stage_r stage_offset]. *)
+           which is [offset_stage_l stage_offset]. *)
         | Const_closure_lock (_, closure_context, comonadic) ->
-            const_closure_mode pp vmode closure_context
-              (Mode.const_offset_stage_r
-                stage_offset comonadic)
+            const_closure_mode pp vmode closure_context comonadic stage_offset
         | Closure_lock (closure_context, comonadic) ->
-            closure_mode pp vmode closure_context
-              (Mode.offset_stage_r
-                stage_offset comonadic)
+            (* Format.printf "offset(%d)(%a) <= %a@." stage_offset (Format_doc.compat (Mode.Value.Comonadic.print ())) vmode.Mode.comonadic (Format_doc.compat (Mode.Value.Comonadic.print ())) comonadic; *)
+            closure_mode pp vmode closure_context comonadic stage_offset
         | Exclave_lock ->
             exclave_mode ~errors ~env ~pp vmode
         | Unboxed_lock ->

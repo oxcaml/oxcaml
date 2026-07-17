@@ -72,6 +72,7 @@ module Mode_axis_pair = struct
     | "local" -> comonadic Areality Local
     (* "regional" is not supported *)
     | "global" -> comonadic Areality Global
+    (* CR quoted-modes jbachurski: Guard behind the [Runtime_metaprogramming] extension. *)
     | "quote_local" -> comonadic ArealityQuoted (Quote Local)
     | "quote_global" -> comonadic ArealityQuoted (Quote Global)
     | "unique" -> monadic Uniqueness Unique

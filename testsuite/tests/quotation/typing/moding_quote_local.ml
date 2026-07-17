@@ -36,36 +36,46 @@ Error: This value is "quote_local"
 
 (* Lower-stage local captures are <[local]> *)
 
-(* error: <[x]> is quote_local *)
-let e = <[ fun (x @ local) -> $((<[ x ]> :@ quote_global)) ]>
+let ignore = <[ fun (_ @ local) -> () ]>
 [%%expect{|
-Line 1, characters 36-37:
-1 | let e = <[ fun (x @ local) -> $((<[ x ]> :@ quote_global)) ]>
-                                        ^
-Error: The value "x" is "local" to the parent region
-       but is expected to be "global"
-         because it is used inside the quoted expression at line 1, characters 33-40
-         which is expected to be "global".
+val ignore : <[$('a) @ local -> unit]> expr = <[fun (_ : _ @ local) -> ()]>
+|}];;
+
+(* error: <[x]> is quote_local *)
+let e = <[ fun (x @ local) -> $((<[ $ignore x ]> :@ quote_global)) ]>
+[%%expect{|
+Line 1, characters 44-45:
+1 | let e = <[ fun (x @ local) -> $((<[ $ignore x ]> :@ quote_global)) ]>
+                                                ^
+Error: The value "x" is "quote_regional"
+       but is expected to be "quote_global"
+         because it is used inside the quoted expression at line 1, characters 33-48
+         which is expected to be "quote_global"
+         because it is used inside the quoted expression at line 1, characters 8-69
+         which is expected to be "quote_global".
 |}];;
 
 (* infers that [g] accepts a <[local]> *)
-let f g = <[ fun (x @ local) -> $(g <[ x ]>) ]>
+let f g = <[ fun (x @ local) -> $(g <[ $ignore x ]>) ]>
 [%%expect{|
-Line 1, characters 39-40:
-1 | let f g = <[ fun (x @ local) -> $(g <[ x ]>) ]>
-                                           ^
-Error: The value "x" is "local" to the parent region
-       but is expected to be "global"
-         because it is used inside the quoted expression at line 1, characters 36-43
-         which is expected to be "global".
+val f :
+  (<[unit]> expr @ quote_regional once -> 'a expr) ->
+  <[$('b) @ local -> $('a)]> expr = <fun>
 |}];;
 
 (* Higher-stage <[local]> captures are local *)
 
-(* error: <[x]> is quote_local *)
+(* <[x]> is quote_local, so the quoted closure is local *)
 let f (x @ quote_local) = <[ fun () -> $x ]>
 [%%expect{|
-val f : 'a expr @ quote_local -> <[unit -> $('a)]> expr @ quote_local = <fun>
+Line 1, characters 40-41:
+1 | let f (x @ quote_local) = <[ fun () -> $x ]>
+                                            ^
+Error: The value "x" is "local"
+       but is expected to be "global"
+         because it is used inside the function at line 1, characters 29-41
+         which is expected to be "global"
+         because it is a quoted expression's result and thus always at the legacy modes.
 |}];;
 
 (* Splice captures cross quoted modes like <[local]> *)

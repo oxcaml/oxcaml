@@ -887,9 +887,11 @@ module type S = sig
     ('l * 'r) Value.t ->
     (disallowed * 'r) Alloc.t
 
-  val offset_stage_r : int -> Value.Comonadic.r -> Value.Comonadic.r
+  val quoted_floor : Value.Comonadic.l -> Value.Comonadic.l
 
-  val const_offset_stage_r :
+  val offset_stage_l : int -> Value.Comonadic.l -> Value.Comonadic.l
+
+  val const_offset_stage_l :
     int -> Value.Comonadic.Const.t -> Value.Comonadic.Const.t
 
   module Modality : sig

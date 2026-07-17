@@ -52,7 +52,7 @@ fun (x @ local) -> <[ $x ]>
 Line 1, characters 23-24:
 1 | fun (x @ local) -> <[ $x ]>
                            ^
-Error: This value is "local" to the parent region
+Error: The value "x" is "local" to the parent region
        but is expected to be "global"
          because it is used inside the quoted expression at line 1, characters 19-27
          which is expected to be "global".
@@ -63,7 +63,7 @@ fun (x @ local) -> <[ Some $x ]>
 Line 1, characters 28-29:
 1 | fun (x @ local) -> <[ Some $x ]>
                                 ^
-Error: This value is "local" to the parent region
+Error: The value "x" is "local" to the parent region
        but is expected to be "global"
          because it is used inside the quoted expression at line 1, characters 19-32
          which is expected to be "global".
@@ -131,7 +131,13 @@ Error: This value is "nonportable"
 
 let foo (f : (_ -> _ @ global) @ local) = <[ $(f 42) + 1 ]>
 [%%expect{|
-val foo : (int -> <[int]> expr) @ local -> <[int]> expr @ once = <fun>
+Line 3, characters 47-48:
+3 | let foo (f : (_ -> _ @ global) @ local) = <[ $(f 42) + 1 ]>
+                                                   ^
+Error: The value "f" is "local" to the parent region
+       but is expected to be "global"
+         because it is used inside the quoted expression at line 3, characters 42-59
+         which is expected to be "global".
 |}];;
 
 let foo (f : (_ -> _ @ local) @ global) = exclave_ <[ $(f 42) + 1 ]>
@@ -201,7 +207,7 @@ fun (e @ local) -> <[ fun () -> $e ]>
 Line 1, characters 33-34:
 1 | fun (e @ local) -> <[ fun () -> $e ]>
                                      ^
-Error: This value is "local" to the parent region
+Error: The value "e" is "local" to the parent region
        but is expected to be "global"
          because it is used inside the quoted expression at line 1, characters 19-37
          which is expected to be "global".
@@ -211,7 +217,7 @@ fun (e @ local) -> exclave_ <[ fun () -> $e ]>
 Line 1, characters 42-43:
 1 | fun (e @ local) -> exclave_ <[ fun () -> $e ]>
                                               ^
-Error: This value is "local" to the parent region
+Error: The value "e" is "local"
        but is expected to be "global"
          because it is used inside the quoted expression at line 1, characters 28-46
          which is expected to be "global".
@@ -297,10 +303,10 @@ Error: This value is "contended"
 Line 12, characters 21-22:
 12 |   $(M.save <[let _ = x in ()]>; <[()]>)]>
                           ^
-Error: The value "x" is "local" because it is "stack_"-allocated.
-       However, the value "x" highlighted is expected to be "global"
+Error: The value "x" is "quote_local"
+       but is expected to be "quote_global"
          because it is used inside the quoted expression at line 12, characters 11-30
-         which is expected to be "global".
+         which is expected to be "quote_global".
 |}];;
 
 (* Unique in closure *)
@@ -344,10 +350,10 @@ Error: The value "x" is "once"
 Line 2, characters 13-14:
 2 |   $(M.send <[x := 0]>; <[!x]>)]>
                  ^
-Error: This value is "contended"
+Error: The value "x" is "nonportable"
+       but is expected to be "portable"
          because it is used inside the quoted expression at line 2, characters 11-21
          which is expected to be "portable".
-       However, the highlighted expression is expected to be "uncontended".
 |}];;
 
 (* Nonportable in closure *)
@@ -360,9 +366,7 @@ Line 3, characters 13-14:
 3 |   $(M.send <[f ()]>; <[()]>)]>
                  ^
 Error: The value "f" is "nonportable"
-         because it contains a usage (of the value "x" at line 2, characters 20-21)
-         which is expected to be "uncontended".
-       However, the value "f" highlighted is expected to be "portable"
+       but is expected to be "portable"
          because it is used inside the quoted expression at line 3, characters 11-19
          which is expected to be "portable".
 |}];;
@@ -525,7 +529,7 @@ fun (e @ local) -> <[ fun () -> $e ]>
 Line 1, characters 33-34:
 1 | fun (e @ local) -> <[ fun () -> $e ]>
                                      ^
-Error: This value is "local" to the parent region
+Error: The value "e" is "local" to the parent region
        but is expected to be "global"
          because it is used inside the quoted expression at line 1, characters 19-37
          which is expected to be "global".
@@ -577,32 +581,20 @@ module M : sig val quote_thunk : 'a expr @ once -> <[unit -> $('a)]> expr end
 
 <[ fun (e @ local) -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
 [%%expect{|
-Line 1, characters 58-59:
-1 | <[ fun (e @ local) -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
-                                                              ^
-Error: The value "e" is "local" to the parent region
-       but is expected to be "global"
-         because it is used inside the function at line 1, characters 32-61
-         which is expected to be "global".
+- : <[$('a) @ local -> unit]> expr = <[fun (e : _ @ local) -> ()]>
 |}];;
 
 <[ fun (e @ once) -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
 [%%expect{|
-Line 1, characters 57-58:
-1 | <[ fun (e @ once) -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
-                                                             ^
-Error: The value "e" is "once"
-       but is expected to be "many"
-         because it is used inside the function at line 1, characters 31-60
-         which is expected to be "many".
+- : <[$('a) @ once -> unit]> expr = <[fun (e : _ @ once) -> ()]>
 |}];;
-<[ fun (e @ unique) -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
 
+<[ fun (e @ unique) -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
 [%%expect{|
 - : <[$('a) @ unique -> unit]> expr = <[fun (e : _ @ unique) -> ()]>
 |}];;
-<[ fun (e @ portable) -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
 
+<[ fun (e @ portable) -> $(let _ = fun () -> <[(fun _ -> ()) e]> in <[()]>) ]>
 [%%expect{|
 - : <[$('a) @ portable -> unit]> expr = <[fun (e : _ @ portable) -> ()]>
 |}];;

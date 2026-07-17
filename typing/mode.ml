@@ -1026,6 +1026,40 @@ module Lattices = struct
         statefulness
       }
 
+    let unquoted_legacy_and_quoted_min =
+      let areality = Areality.legacy in
+      let areality_quoted = ArealityQuoted.min in
+      let linearity = Linearity.legacy in
+      let portability = Portability.legacy in
+      let forkable = Forkable.legacy in
+      let yielding = Yielding.legacy in
+      let statefulness = Statefulness.legacy in
+      { areality;
+        areality_quoted;
+        linearity;
+        portability;
+        forkable;
+        yielding;
+        statefulness
+      }
+
+    let unquoted_max_and_quoted_min =
+      let areality = Areality.max in
+      let areality_quoted = ArealityQuoted.min in
+      let linearity = Linearity.max in
+      let portability = Portability.max in
+      let forkable = Forkable.max in
+      let yielding = Yielding.max in
+      let statefulness = Statefulness.max in
+      { areality;
+        areality_quoted;
+        linearity;
+        portability;
+        forkable;
+        yielding;
+        statefulness
+      }
+
     (** All product values, including every combination of axis values. *)
     let all =
       lazy
@@ -6792,8 +6826,6 @@ module Comonadic_with (Areality : Areality) = struct
 
     let proj = Axis.proj
 
-    let offset_stage_r k c = if k < 0 then legacy else if k > 0 then max else c
-
     module Per_axis = struct
       let print ax ppf a =
         let obj = proj_obj ax in
@@ -6888,14 +6920,8 @@ module Comonadic_with (Areality : Areality) = struct
 
   let legacy = of_const Const.legacy
 
-  let offset_stage_r k m =
-    if k < 0
-    then of_const Const.legacy
-    else if k > 0
-    then of_const Const.max
-    else m
-
-  let const_offset_stage_r = Const.offset_stage_r
+  let unquoted_legacy_and_quoted_min =
+    of_const Const.unquoted_legacy_and_quoted_min
 
   type simple_error =
     | Error : 'a Axis.t * 'a Mode_intf.simple_error -> simple_error
@@ -7749,7 +7775,49 @@ module Value_with (Areality : Areality) = struct
 end
 [@@inline]
 
-module Value = Value_with (Regionality)
+module Value = struct
+  include Value_with (Regionality)
+
+  module Comonadic = struct
+    include Comonadic
+
+    let areality_quote_morph : _ C.morph =
+      Min_with_simple_proj
+        (ArealityQuoted, Quote_meta Id, Areality, Comonadic_with_regionality)
+
+    let areality_splice_morph : _ C.morph =
+      Min_with_simple_proj
+        (Areality, Meta_splice Id, ArealityQuoted, Comonadic_with_regionality)
+
+    let quote m =
+      join
+        [S.apply Obj.obj areality_quote_morph m; unquoted_legacy_and_quoted_min]
+
+    let splice m = S.apply Obj.obj areality_splice_morph m
+
+    let rec offset_stage_l k m =
+      if k < 0
+      then offset_stage_l (k + 1) (splice m)
+      else if k > 0
+      then offset_stage_l (k - 1) (quote m)
+      else m
+
+    let const_quote c =
+      C.meet Obj.obj
+        (C.apply Obj.obj areality_quote_morph c)
+        Const.unquoted_legacy_and_quoted_min
+
+    let const_splice c = C.apply Obj.obj areality_splice_morph c
+
+    let rec const_offset_stage_l k c =
+      if k < 0
+      then const_offset_stage_l (k + 1) (const_splice c)
+      else if k > 0
+      then const_offset_stage_l (k - 1) (const_quote c)
+      else c
+  end
+end
+
 module Alloc = Value_with (Locality)
 
 module Const = struct
@@ -7843,9 +7911,15 @@ let value_to_alloc_r2l { comonadic; monadic } =
     monadic = Alloc.Monadic.apply_hint Skip monadic
   }
 
-let offset_stage_r = Value.Comonadic.offset_stage_r
+let quoted_floor comonadic =
+  S.apply Value.Comonadic.Obj.obj
+    (Simple
+       (Meta (Meet_const Value.Comonadic.Const.unquoted_max_and_quoted_min)))
+    comonadic
 
-let const_offset_stage_r = Value.Comonadic.const_offset_stage_r
+let offset_stage_l = Value.Comonadic.offset_stage_l
+
+let const_offset_stage_l = Value.Comonadic.const_offset_stage_l
 
 module Modality = struct
   (* Inferred modalities
