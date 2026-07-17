@@ -177,6 +177,7 @@ type lock =
   | Const_closure_lock of bool * Mode.Hint.pinpoint *
       Mode.Value.Comonadic.Const.t
   | Closure_lock of Mode.Hint.pinpoint * Mode.Value.Comonadic.r
+  | Closure_noalloc_lock
   | Region_lock
   | Exclave_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
@@ -3131,6 +3132,8 @@ let add_closure_lock closure_context comonadic env =
   in
   add_lock lock env
 
+let add_closure_noalloc_lock env = add_lock Closure_noalloc_lock env
+
 let add_region_lock env = add_lock Region_lock env
 
 let add_exclave_lock env = add_lock Exclave_lock env
@@ -3732,6 +3735,14 @@ let closure_mode pp {Mode.monadic; comonadic} closure_context comonadic0 =
   in
   {Mode.monadic; comonadic}
 
+let closure_noalloc_mode (pp : Mode.Hint.pinpoint) vmode =
+  let _, pp_desc = pp in
+  match pp_desc with
+  | Mode.Hint.Allocation true ->
+    Mode.Value.meet_const_with Allocation Mode.Allocation.Const.Noalloc_strict
+      vmode
+  | _ -> vmode
+
 let const_closure_mode pp {Mode.monadic; comonadic}
   closure_context comonadic0 =
   Mode.Value.Comonadic.(submode_err pp comonadic
@@ -3794,6 +3805,7 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
           const_closure_mode pp vmode closure_context comonadic
       | Closure_lock (closure_context, comonadic) ->
           closure_mode pp vmode closure_context comonadic
+      | Closure_noalloc_lock -> closure_noalloc_mode pp vmode
       | Exclave_lock ->
           exclave_mode ~errors ~env ~pp vmode
       | Unboxed_lock ->
@@ -3805,10 +3817,9 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
 let walk_locks_with_mode_constraint ~env pp ~mode =
   let locks = IdTbl.get_all_locks env.values in
   let _stage_locks, locks = partition_locks locks in
-  ignore
-    (walk_locks ~errors:true ~env ~pp
-       (Mode.Value.disallow_right mode) None locks
-      : Mode.Value.l)
+  (walk_locks ~errors:true ~env ~pp
+      (Mode.Value.disallow_right mode) None locks
+    : Mode.Value.l)
 
 (** Registers a use of a construct that is at legacy comonadic modes,
     constraining every enclosing closure lock as if a legacy value defined at
@@ -3816,7 +3827,7 @@ let walk_locks_with_mode_constraint ~env pp ~mode =
     effect handlers) that force enclosing functions to be nonportable and
     stateful. *)
 let walk_locks_for_legacy_construct ~env pp =
-  walk_locks_with_mode_constraint ~env pp ~mode:Mode.Value.legacy
+  ignore (walk_locks_with_mode_constraint ~env pp ~mode:Mode.Value.legacy)
 
 (** Registers a use of an allocation, constraining every enclosing closure lock.
     Used for constructs with allocations that force enclosing functions to be
@@ -3824,8 +3835,17 @@ let walk_locks_for_legacy_construct ~env pp =
 (* CR shsong: currently it only considers noalloc_strict and alloc,
     need to customize this to support noalloc later *)
 let walk_locks_for_allocation ~env pp =
-  walk_locks_with_mode_constraint ~env pp
-    ~mode:(Mode.Value.min_with_comonadic Allocation Mode.Allocation.alloc)
+  let post_mode =
+    walk_locks_with_mode_constraint ~env pp
+      ~mode:(Mode.Value.min_with_comonadic Allocation Mode.Allocation.alloc)
+  in
+  match
+    Mode.Allocation.submode
+      (Mode.Value.proj_comonadic Allocation post_mode)
+      Mode.Allocation.noalloc
+  with
+  | Ok () -> true
+  | Error _ -> false
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
   and [locks] which is the locks between the declaration and the usage (either
@@ -3856,7 +3876,7 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           to be [local]. If [m0] is [local], that would trigger type error
           elsewhere, so what we return here doesn't matter. *)
           mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
-      | Const_closure_lock (true, _, _) ->
+      | Const_closure_lock (true, _, _) | Closure_noalloc_lock ->
           mode
       | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
           may_lookup_error errors loc env
