@@ -159,7 +159,9 @@ for file in $(git diff --no-ext-diff --name-only); do
         $tgt
     echo "$err"
   fi
-  rm -f $tgt.orig
+    cat $tgt.out
+  fi
+  rm -f $tgt.orig $tgt.out
 done
 
 git add .
