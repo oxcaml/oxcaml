@@ -1833,9 +1833,8 @@ let zap_qtvs_if_boring qtvs =
   then qtvs
   else []
 
-(* get the free variables with their jkinds; do this *after* converting the
-   type itself, so that the type names are available.
-   This implements Case (C3) from Note [When to print jkind annotations]. *)
+(* Extract the generalized free type variables of [tyl] with their jkinds, as
+   [(var, jkind)] pairs of the real representation, in order of appearance. *)
 let extract_qtvs tyl =
   let fvs = Ctype.free_non_row_variables_of_list tyl in
   (* The [Ctype.free*variables] family of functions returns the free
@@ -1843,8 +1842,12 @@ let extract_qtvs tyl =
   *)
   let fvs = List.rev fvs in
   let tfvs = List.map Transient_expr.repr fvs in
-  let vars_jkinds = tree_of_qtvs tfvs in
-  zap_qtvs_if_boring vars_jkinds
+  List.filter_map (fun v ->
+       match v.desc with
+       | Tvar { jkind } when v.level = generic_level -> Some (v, jkind)
+       | Tunivar { jkind } -> Some (v, jkind)
+       | _ -> None)
+    tfvs
 
 let param_jkind ty =
   match get_desc ty with
@@ -1888,8 +1891,14 @@ let extension_constructor_args_and_ret_type_subtree args ret_type =
   | Some res ->
       let out_ret = tree_of_typexp Type res in
       let out_args = tree_of_constructor_arguments args in
-      let qtvs = extract_qtvs (res :: tys_of_constr_args args) in
-      (out_args, Some (qtvs, out_ret))
+      let qtvs =
+        List.map
+          (fun (v, jkind) ->
+             Variable_names.name_of_type Variable_names.new_name v,
+             out_jkind_option_of_jkind ~ignore_null:true !printing_env jkind)
+          (extract_qtvs (res :: tys_of_constr_args args))
+      in
+      (out_args, Some (zap_qtvs_if_boring qtvs, out_ret))
 
 let tree_of_single_constructor ~all_void cd =
   let name = Ident.name cd.cd_id in
@@ -2246,6 +2255,35 @@ let prepared_extension_constructor id ppf ext =
   !Oprint.out_sig_item ppf
     (prepared_tree_of_extension_constructor id ext Text_first)
 
+let maybe_val_poly_shorthand lpoly_vars qtvs =
+  let module Sort_const = Jkind.Sort.Const in
+  let same_genvar a b =
+    Sort_const.equal (Sort_const.Genvar a) (Sort_const.Genvar b)
+  in
+  let top_genvar (_, jkind) =
+    match Jkind.get_layout !printing_env jkind with
+    | Some layout ->
+      (match Jkind.Layout.Const.get_sort layout with
+       | Some (Sort_const.Genvar v) -> Some v
+       | _ -> None)
+    | None -> None
+  in
+  let matched_genvars, unmatched =
+    List.partition_map
+      (fun q -> match top_genvar q with Some v -> Left v | None -> Right q)
+      qtvs
+  in
+  let no_genvar (_, jkind) =
+    match Jkind.get_layout !printing_env jkind with
+    | Some layout -> not (Jkind.Layout.Const.has_genvar layout)
+    | None -> true
+  in
+  if (not (List.is_empty lpoly_vars))
+     && List.equal same_genvar matched_genvars lpoly_vars
+     && List.for_all no_genvar unmatched
+  then Some unmatched
+  else None
+
 (* Print a value declaration *)
 
 let tree_of_value_description id decl =
@@ -2263,12 +2301,20 @@ let tree_of_value_description id decl =
       Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
         decl.val_modalities
   in
-  let qsvs, qtvs =
-    (* Important: process the fvs *after* the type; tree_of_type_scheme
-       resets the naming context. Both must be inside print_with_genvars
-       so that sort poly var names are registered when jkinds are printed. *)
-    Jkind_types.Sort.print_with_genvars (Lpoly.get_exn decl.val_lpoly)
-      (fun names -> names, extract_qtvs [decl.val_type])
+  let oval_poly, qsvs, qtvs =
+    let lpoly_vars = Lpoly.get_exn decl.val_lpoly in
+    let tree_of_qtv (v, jkind) =
+      Variable_names.name_of_type Variable_names.new_name v,
+      out_jkind_option_of_jkind ~ignore_null:true !printing_env jkind
+    in
+    let qtvs = extract_qtvs [decl.val_type] in
+    match maybe_val_poly_shorthand lpoly_vars qtvs with
+    | Some unmatched ->
+      true, [], List.map tree_of_qtv unmatched
+    | None ->
+      Jkind_types.Sort.print_with_genvars lpoly_vars
+        (fun names ->
+           false, names, zap_qtvs_if_boring (List.map tree_of_qtv qtvs))
   in
   let apparent_arity =
     let rec count n typ =
@@ -2307,6 +2353,7 @@ let tree_of_value_description id decl =
   let vd =
     { oval_name = id;
       oval_type = Otyp_newlayout(qsvs, Otyp_poly(qtvs, ty));
+      oval_poly;
       oval_modalities = tree_of_modalities Immutable moda;
       oval_prims = [];
       oval_attributes = attrs
