@@ -151,8 +151,8 @@ Error: Signature mismatch:
        is not included in
          val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
        The first is "stateful"
-         because it contains a usage (of the value "y" at line 11, characters 29-30)
-         which is expected to be "read_write".
+         because it closes over the value "ignore" at line 11, characters 21-27
+         which is "stateful".
        However, the second is "stateless".
 |}, Principal{|
 Lines 8-12, characters 33-5:
@@ -175,8 +175,8 @@ Error: Signature mismatch:
        is not included in
          val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
        The first is "stateful"
-         because it contains a usage (of the value "y" at line 11, characters 29-30)
-         which is expected to be "read_write".
+         because it closes over the value "ignore" at line 11, characters 21-27
+         which is "stateful".
        However, the second is "stateless".
 |}]
 

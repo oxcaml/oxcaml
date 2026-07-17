@@ -824,12 +824,12 @@ module type S = sig
     val zap_to_legacy : lr -> Const.t
 
     val comonadic_to_monadic_min :
-      ?hint:('r * disallowed) neg Hint.morph ->
-      ('l * 'r) Comonadic.t ->
-      ('r * disallowed) Monadic.t
+      ?hint:(allowed * disallowed) neg Hint.morph ->
+      ('l * allowed) Comonadic.t ->
+      (allowed * disallowed) Monadic.t
 
     val monadic_to_comonadic_max :
-      ('r * disallowed) Monadic.t -> (disallowed * 'r) Comonadic.t
+      (allowed * 'r) Monadic.t -> (disallowed * allowed) Comonadic.t
 
     (* The following two are about the scenario where we partially apply a
        function [A -> B -> C] to [A] and get back [B -> C]. The mode of the
