@@ -140,9 +140,6 @@ for file in $(git diff --no-ext-diff --name-only); do
   esac
   tgt=src/ocaml/$tgt
 
-  # Not all files are necessary
-  if [ ! -e $tgt ]; then continue; fi
-
   err=$(patch --merge=diff3 $tgt <(git diff --no-ext-diff -- $file))
   # ignore patch output if it worked
   if ! patch --merge=diff3 $tgt <(git diff --no-ext-diff -- $file) > $tgt.out; then
