@@ -11,8 +11,8 @@ immutable_load:
   testb $1, %al
   je    .L0
   movq  camlStdlib__List__Pmakeblock2573@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
+  movq  56(%r14), %rsp
+  popq  56(%r14)
   popq  %r11
   jmp   *%r11
 .L0:

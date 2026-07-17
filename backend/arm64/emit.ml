@@ -1176,9 +1176,28 @@ let assembly_code_for_poll0 ~far ~return_label =
   gc_lbl, gc_return_lbl
 
 let assembly_code_for_poll env i ~far ~return_label =
-  let gc_frame_lbl = record_frame_label env i.live (Dbg_alloc []) in
-  let gc_lbl, gc_return_lbl = assembly_code_for_poll0 ~far ~return_label in
-  Env.add_call_gc_site env { gc_lbl; gc_return_lbl; gc_frame_lbl }
+  if Config.faulting_safepoints
+  then (
+    (* A poll is a load through [Caml_state->safepoint_trigger], which faults
+       iff the runtime has armed the trigger by pointing it at an unmapped page.
+       The SEGV handler in the runtime makes the fault behave as a call to
+       caml_call_gc, so the frame descriptor is recorded after the load. The
+       handler relies on the exact encoding of the faulting load (ldr w16, [x16]
+       = 10 02 40 b9): a 32-bit load through x16 (= [reg_tmp1], which every poll
+       already clobbers). Unlike amd64, a payload in the load's immediate field
+       would cost no code size, but at present there is only one GC entry stub,
+       so no variant encodings are reserved. No branches are emitted, so [far]
+       is irrelevant and these polls never need relaxation. *)
+    A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_safepoint_trigger);
+    A.ins2 LDR (H.reg_w reg_tmp1) (H.mem reg_tmp1_base);
+    record_frame env i.live (Dbg_alloc []);
+    match return_label with
+    | None -> ()
+    | Some lbl -> A.ins1 B (local_label lbl))
+  else
+    let gc_frame_lbl = record_frame_label env i.live (Dbg_alloc []) in
+    let gc_lbl, gc_return_lbl = assembly_code_for_poll0 ~far ~return_label in
+    Env.add_call_gc_site env { gc_lbl; gc_return_lbl; gc_frame_lbl }
 
 (* Output the assembly code for a stack check. *)
 
