@@ -34,7 +34,7 @@ type tsl_item =
     string located list (* environment modifiers *)
   | Split of tsl_item list list (* alternative statement sequences *)
 
-type tsl_block = tsl_item list
+and tsl_block = tsl_item list
 
 type t = Ast of tsl_item list * t list
 
