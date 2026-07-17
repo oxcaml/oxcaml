@@ -95,7 +95,6 @@ for file in $(git ls-tree --name-only -r HEAD | grep -v base-rev.txt); do
   fi
   git show "$rev:$git_file" > "$file"
 done
-git add --intent-to-add .
 cd ../..
 
 # Annotations for diff3 regions; "@" would be more natural than ":" but confuses
