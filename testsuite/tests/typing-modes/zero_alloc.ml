@@ -2001,6 +2001,49 @@ Line 1, characters 32-51:
 Error: This value is "alloc" but is expected to be "noalloc_strict".
 |}]
 
+(** Test 6.4: Nested noalloc functions *)
+(* CR shsong: f cannot be implied as noalloc_strict unless explicitly annotated.
+    Analysis: In walk_locks_for_allocation, we force closures to be alloc until
+    we encounter a [Closure_noalloc_lock]. Everything outside [Closure_noalloc_lock]
+    will still be forced to be alloc.
+    An alternative implementation: loop over all locks and see whether there is a
+    [Closure_noalloc_lock] before adding any submode constraints.
+    Tradeoff:
+    1. the alternative implementation should allow us to accept the
+    [nested_noalloc_func_implicit] case. However, the current implementation is ok
+    if we expect user to always annotate functions if they want it them to be noalloc.
+    2. the alternative implementation avoids the current check on whether the
+    Allocation mode axis is changed while walking locks.
+    3. the alternative implementation requires iterate over the locks twice, which
+    affects the performance.
+*)
+let nested_noalloc_func_implicit () =
+  let f () = exclave_
+    let (g @ noalloc_strict) () = exclave_ (fun x -> x) in
+    g
+  in
+  (f : _ @ noalloc_strict)
+[%%expect{|
+Line 6, characters 3-4:
+6 |   (f : _ @ noalloc_strict)
+       ^
+Error: This value is "alloc"
+         because it closes over the allocation for closure at line 3, characters 29-55
+         which is "alloc".
+       However, the highlighted expression is expected to be "noalloc_strict".
+|}]
+
+let nested_noalloc_func_explicit () =
+  let (f @ noalloc_strict) () = exclave_
+    let (g @ noalloc_strict) () = exclave_ (fun x -> x) in
+    g
+  in
+  (f : _ @ noalloc_strict)
+[%%expect{|
+val nested_noalloc_func_explicit : unit -> unit -> (unit -> 'a -> 'a) @ local =
+  <fun>
+|}]
+
 (** Test 7: Misc *)
 
 type record_t = { x : float; y : float }
