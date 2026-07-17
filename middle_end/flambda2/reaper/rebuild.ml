@@ -2363,6 +2363,12 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       in
       Flambda_arity.create (List.map components_for params)
     in
+    let modes =
+      Misc.replicate_list
+        (Alloc_mode.For_types.unknown ())
+        (List.length params_from_closure)
+      @ modes
+    in
     let code_metadata =
       Code_metadata.with_params_arity params_arity
         (Code_metadata.with_param_modes modes code_metadata)
