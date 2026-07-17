@@ -40,6 +40,16 @@ DOMAIN_STATE(value*, young_trigger)
 DOMAIN_STATE(struct stack_info*, current_stack)
 /* Current stack */
 
+DOMAIN_STATE(atomic_uintnat, safepoint_trigger)
+/* Under faulting safepoints (FAULTING_SAFEPOINTS), a
+ * compiled poll point is a load through this pointer. It normally
+ * points to this domain_state; pointing it at
+ * [caml_safepoint_trigger_page] (a page with no access rights) makes
+ * the domain's next poll fault, upon which the SEGV handler enters the
+ * GC (see signals_nat.c). Like [young_limit] it may be armed at any
+ * time by any thread, and is reset only by the domain itself, via
+ * [caml_reset_young_limit]. */
+
 DOMAIN_STATE(void*, exn_handler)
 /* Pointer into the current stack */
 
