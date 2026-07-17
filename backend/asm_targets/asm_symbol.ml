@@ -105,12 +105,12 @@ let encode { name; already_encoded } =
 let encode_without_prefix { name; already_encoded } =
   if already_encoded
   then
-    (* Remove the prefix, if any, on a best-effort basis. *)
-    let prefix = symbol_prefix () in
-    let prefix_len = String.length prefix in
-    if prefix_len > 0 && String.starts_with ~prefix name
-    then String.sub name prefix_len (String.length name - prefix_len)
-    else name
+    (* The name was provided in its final assembly form, so it cannot reliably
+       be determined here whether it starts with the platform symbol prefix; it
+       is returned unchanged. Such symbols (currently only section names and
+       relocation targets in the binary emitters) do not flow into DWARF
+       attributes such as [DW_AT_linkage_name]. *)
+    name
   else to_escaped_string ~symbol_prefix:"" name
 
 (* Comparison and hashing are based on the encoded form, so two symbols that
