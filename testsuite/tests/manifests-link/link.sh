@@ -116,9 +116,10 @@ MANIFEST
 
   # Every manifest-resolved object blob must be measured, and nothing may be
   # skipped (except re-analyzing the shared blob).
-  for blob in cas/blob_helper_o cas/blob_main_o cas/blob_mylib_a \
-      cas/blob_shared_empty_a; do
-    if ! grep -Eq "^Input: $blob \([A-Za-z_]+\)\$" dissector.inputs; then
+  # Resolved paths are absolute: $MANIFEST_FILES_ROOT/cas/<blob>.
+  for blob in blob_helper_o blob_main_o blob_mylib_a blob_shared_empty_a; do
+    if ! grep -Eq "^Input: [^ ]*/cas/$blob \([A-Za-z_]+\)\$" dissector.inputs
+    then
       echo "ERROR: the dissector did not measure $blob:" >&2
       cat dissector.inputs >&2
       exit 1
