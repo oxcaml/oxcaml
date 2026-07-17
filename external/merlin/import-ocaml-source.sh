@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 subtree_prefix="$(git rev-parse --show-prefix)"
 
@@ -43,7 +44,7 @@ function repository-commit () {
   fi
 }
 
-case "$1" in
+case "${1-unused}" in
   -h|-help|--help|-\?)
     usage
     exit 0
