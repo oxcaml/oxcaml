@@ -1727,10 +1727,41 @@ let emit_instr env i =
     | Single { reg = Float64 } ->
       A.ins2 FCVT reg_s7 (H.reg_d src);
       A.ins2 STR_simd_and_fp reg_s7 addressing
-    | Word_int | Sixtyfour | Word_val ->
-      (* memory model barrier for non-initializing store *)
-      if assignment then A.ins0 (DMB ISHLD);
+    | Sixtyfour ->
+      (* Non-value 64-bit data (e.g. [Bytes.set_int64], [Bigarray] int64):
+         may be unaligned and needs no memory-model barrier. *)
       A.ins2 STR (H.reg_x src) addressing
+    | Word_int | Word_val ->
+      if assignment
+      then
+        (* OCaml 5 memory model: a non-initializing store to a mutable field or
+           array element needs load->store ordering.  By default emit it as a
+           store-release [stlr] (or [stlur] under -flrcpc2): this gives the
+           ordering in a single instruction and is far cheaper than a standalone
+           [dmb ishld] on modern cores.  [stlr] requires natural alignment
+           (guaranteed: unaligned 64-bit stores use the [Sixtyfour] chunk) and a
+           bare base register, so [Ibased] and -fbarrier-store keep the
+           [dmb ishld; str] barrier form. *)
+        (match !store_release, addr with
+        | true, Iindexed v ->
+          let ofs = Validated_mem_offset.offset v in
+          if Arch.Extension.enabled LRCPC2 && ofs >= -256 && ofs <= 255
+          then
+            (* FEAT_LRCPC2: store-release with an unscaled immediate offset, so
+               no separate address computation is needed. *)
+            A.ins2 STLUR (H.reg_x src)
+              (H.mem_offset_unscaled (H.gp_reg_of_reg base) ofs)
+          else if ofs = 0
+          then A.ins2 STLR (H.reg_x src) (H.mem (H.gp_reg_of_reg base))
+          else (
+            (if ofs >= 0
+            then emit_addimm reg_x_tmp1 (H.reg_x base) ofs
+            else emit_subimm reg_x_tmp1 (H.reg_x base) (-ofs));
+            A.ins2 STLR (H.reg_x src) (H.mem reg_tmp1_base))
+        | (false, _) | (_, Ibased _) ->
+          A.ins0 (DMB ISHLD);
+          A.ins2 STR (H.reg_x src) addressing)
+      else A.ins2 STR (H.reg_x src) addressing
     | Double -> A.ins2 STR_simd_and_fp (H.reg_d src) addressing
     | Single { reg = Float32 } ->
       A.ins2 STR_simd_and_fp (H.reg_s src) addressing
