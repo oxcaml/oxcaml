@@ -4,7 +4,7 @@
 *)
 
 let () =
-  Mode.For_testing.check_composition_jobs ~full:false ()
+  Mode.For_testing.check_composition_jobs ~full:true ()
   |> List.iter (fun job ->
     match job () with
     | Ok () -> ()
