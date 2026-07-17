@@ -151,14 +151,14 @@ let unboxing_through_select b x y =
 [%%expect_asm X86_64{|
 unboxing_through_select:
   subq  $8, %rsp
-  movq  64(%r14), %rcx
-  movq  64(%r14), %rsi
+  movq  72(%r14), %rcx
+  movq  72(%r14), %rsi
   subq  $48, %rsi
-  movq  %rsi, 64(%r14)
-  cmpq  80(%r14), %rsi
+  movq  %rsi, 72(%r14)
+  cmpq  88(%r14), %rsi
   jl    <hidden GC jump pad>
 .L0:
-  addq  72(%r14), %rsi
+  addq  80(%r14), %rsi
   addq  $8, %rsi
   addq  $24, %rsi
   movq  $3071, -8(%rsi)
@@ -172,7 +172,7 @@ unboxing_through_select:
   cmpq  $1, %rax
   cmovne %rdi, %rsi
   movq  8(%rsi), %rax
-  movq  %rcx, 64(%r14)
+  movq  %rcx, 72(%r14)
   addq  $8, %rsp
   ret
 |}]
