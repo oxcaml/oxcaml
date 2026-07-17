@@ -159,6 +159,11 @@ val gp_reg_of_reg : Reg.t -> [`GP of [`X]] Ast.Reg.t
 val mem :
   [`GP of [< `X | `SP]] Ast.Reg.t -> [`Mem of [> `Base_reg]] Ast.Operand.t
 
+val mem_offset_unscaled :
+  [`GP of [< `X | `SP]] Ast.Reg.t ->
+  int ->
+  [`Mem of [> `Offset_nine_signed_unscaled]] Ast.Operand.t
+
 val addressing :
   Arch.addressing_mode ->
   Reg.t ->
