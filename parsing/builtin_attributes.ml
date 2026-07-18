@@ -133,6 +133,7 @@ let builtin_attrs =
   ; "flatten_floats"
   ; "represent_as_float_array"
   ; "immediate_all_void_constructor"
+  ; "tag"
   ]
 
 let builtin_attrs =
@@ -474,6 +475,58 @@ let select_attribute p attributes =
       Some attr
   in
   attr
+
+type immediate_constructor_tag_attribute =
+  | Immediate_constructor_tag of int Location.loc
+  | Invalid_immediate_constructor_tag of Location.t
+  | Duplicate_immediate_constructor_tag of Location.t
+
+let parse_immediate_constructor_tag_expr loc exp =
+  let open Parsetree in
+  let parse_int sign i pexp_loc =
+      match int_of_string i with
+      | n -> Immediate_constructor_tag { txt = sign * n; loc }
+      | exception Failure _ -> Invalid_immediate_constructor_tag pexp_loc
+  in
+  match exp with
+  | { pexp_desc =
+        Pexp_constant { pconst_desc = Pconst_integer (i, None); _ };
+      pexp_loc;
+      _
+    } ->
+    parse_int 1 i pexp_loc
+  | { pexp_desc =
+        Pexp_apply
+          ( { pexp_desc =
+                Pexp_ident { txt = Longident.Lident ("-" | "~-"); _ };
+              _
+            },
+            [
+              Nolabel,
+              { pexp_desc =
+                  Pexp_constant { pconst_desc = Pconst_integer (i, None); _ };
+                pexp_loc;
+                _
+              };
+            ] );
+      _
+    } ->
+    parse_int (-1) i pexp_loc
+  | _ -> Invalid_immediate_constructor_tag loc
+
+let parse_immediate_constructor_tag_payload loc = function
+  | PStr [{ pstr_desc = Pstr_eval (exp, []); _ }] ->
+    parse_immediate_constructor_tag_expr loc exp
+  | _ -> Invalid_immediate_constructor_tag loc
+
+let immediate_constructor_tag attrs =
+  match select_attributes [ "tag", Return ] attrs with
+  | [] -> None
+  | [attr] ->
+    Some
+      (parse_immediate_constructor_tag_payload attr.attr_loc attr.attr_payload)
+  | _ :: { Parsetree.attr_name = { loc; _ }; _ } :: _ ->
+    Some (Duplicate_immediate_constructor_tag loc)
 
 let when_attribute_is nms attr ~f =
   if List.mem attr.attr_name.txt nms then begin

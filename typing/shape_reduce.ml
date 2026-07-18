@@ -479,7 +479,8 @@ end) = struct
             let name = Shape.Item.name item in
             (match List.find_opt (fun c -> String.equal c.name name)
                 constrs with
-            | Some { name = _; constr_uid; kind = _; args } ->
+            | Some { name = _; constr_uid; constant_runtime_tag = _; kind = _;
+                     args } ->
               let has_unnamed_field =
                 List.exists (fun { field_name; _ } ->
                   Option.is_none field_name) args in

@@ -43,6 +43,7 @@ type upstream_compat_warning =
   | Non_value_sort of string
   | Unboxed_attribute of string
   | Immediate_void_variant
+  | Immediate_constructor_tag
   | Separability_check
   | Unpacked_attribute
 

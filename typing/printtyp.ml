@@ -119,6 +119,7 @@ module Doc = struct
       ocstr_args = args;
       ocstr_return_type = ret;
       ocstr_all_void = false;
+      ocstr_attributes = [];
     }
 
   (* Print a signature body (used by -i when compiling a .ml) *)

@@ -11,6 +11,31 @@ let _ = f_simple_variant B
 let _ = f_simple_variant (C 42)
 let _ = f_simple_variant (D 3.14)
 
+(* Variants with explicitly assigned immediate constructor tags *)
+type immediate_tag_variant =
+  | IA [@tag 1]
+  | IB
+
+let[@inline never] [@local never] f_immediate_tag_variant
+    (x : immediate_tag_variant) =
+  x
+
+let _ = f_immediate_tag_variant IA
+let _ = f_immediate_tag_variant IB
+
+type immediate_tag_mixed_variant =
+  | MI0 [@tag 1]
+  | MBlock of int
+  | MI1
+
+let[@inline never] [@local never] f_immediate_tag_mixed_variant
+    (x : immediate_tag_mixed_variant) =
+  x
+
+let _ = f_immediate_tag_mixed_variant MI0
+let _ = f_immediate_tag_mixed_variant MI1
+let _ = f_immediate_tag_mixed_variant (MBlock 42)
+
 (* Complex variants with records *)
 type complex_variant =
   | Empty

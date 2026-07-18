@@ -316,6 +316,7 @@ and 'a complex_constructors = 'a complex_constructor list
 and 'a complex_constructor =
   { name : string;
     constr_uid: Uid.t option;
+    constant_runtime_tag : int option;
     kind : constructor_representation;
     args : 'a complex_constructor_argument list
   }

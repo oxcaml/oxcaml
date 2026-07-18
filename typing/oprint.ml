@@ -808,6 +808,7 @@ let constructor_of_extension_constructor
     ocstr_args = ext.oext_args;
     ocstr_return_type = ext.oext_ret_type;
     ocstr_all_void = false;
+    ocstr_attributes = [];
   }
 
 let rec print_out_module_type ppf = function
@@ -1060,13 +1061,15 @@ and print_out_constr ppf constr =
     ocstr_args = tyl;
     ocstr_return_type = return_type;
     ocstr_all_void;
+    ocstr_attributes = attributes;
   } = constr in
   let name =
     match name with
     | "::" -> "(::)"   (* #7200 *)
     | s -> s
   in
-  let print_all_void ppf =
+  let print_attrs ppf =
+    List.iter (fun a -> fprintf ppf "@ [@%s]" a.oattr_name) attributes;
     if ocstr_all_void
     then pp_print_string ppf " [@immediate_all_void_constructor]"
   in
@@ -1074,10 +1077,10 @@ and print_out_constr ppf constr =
   | None ->
       begin match tyl with
       | [] ->
-          pp_print_string ppf name
+          fprintf ppf "%s%t" name print_attrs
       | _ ->
           fprintf ppf "@[<2>%s of@ %a%t@]" name
-            print_out_constr_args tyl print_all_void
+            print_out_constr_args tyl print_attrs
       end
   | Some (vars_jkinds, ret_type) ->
       fprintf ppf "@[<2>%s :@ " name;
@@ -1087,11 +1090,11 @@ and print_out_constr ppf constr =
       end;
       begin match tyl with
       | [] ->
-          fprintf ppf "%a%t@]" print_simple_out_type ret_type print_all_void
+          fprintf ppf "%a%t@]" print_simple_out_type ret_type print_attrs
       | _ ->
           fprintf ppf "%a -> %a%t@]"
             print_out_constr_args tyl print_simple_out_type ret_type
-            print_all_void
+            print_attrs
       end
 
 and print_out_extension_constructor ppf ext =
