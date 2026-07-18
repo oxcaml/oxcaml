@@ -2782,10 +2782,23 @@ let unbox_once env ty =
         | Type_variant (cstrs, Variant_with_null, _) ->
           begin match Datarepr.find_variant_with_null_payload cstrs with
           | Some
-              { payload_arg = { ca_type; ca_modalities = modality; _ };
-                _ } ->
+              { payload_cstr = { cd_res; _ };
+                payload_arg = { ca_type; ca_modalities = modality; _ } } ->
+            (* A GADT [@@or_null] wrapper needs the same B1-B4 projection as
+               boxed and unboxed GADTs, projected onto the instantiated head
+               arguments of the wrapper type. This keeps the unwrapped
+               payload's jkind honest -- in particular a [float] payload stays
+               [maybe_separable] once wrapped, so it cannot enter a flat float
+               array. A non-GADT payload needs no projection. *)
+            let extra_substs =
+              Btype.Jkind0.variant_constructor_gadt_extra_substs
+                ~projected_params:args
+                ~cstr_res:cd_res
+                ~payload_tys:[ca_type]
+                ~get_free_vars:(free_variable_set_of_list env)
+            in
             Stepped
-              { ty = apply ca_type ~extra_substs:[];
+              { ty = apply ca_type ~extra_substs;
                 modality;
                 or_null = Some { decl; args; prev = ty } }
           | None ->
