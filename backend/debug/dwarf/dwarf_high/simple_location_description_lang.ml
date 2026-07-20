@@ -155,8 +155,10 @@ module Rvalue = struct
   let read_field_unguarded ~block ~field =
     (* The address computation is the same as in the lvalue case; the value is
        then obtained by dereferencing. (This does not work for [read_field],
-       above: on the failure path of the guard the stack is left empty, so the
-       dereference there has to happen inside the guarded branch.) *)
+       above: on the failure path of the guard the sentinel zero is left on the
+       stack, so a trailing dereference would read address 0. The dereference
+       there has to happen inside the guarded branch, where it only executes
+       when evaluation of [block] has succeeded.) *)
     Lvalue.read_field_unguarded ~block ~field @ [O.DW_op_deref]
 
   let offset_pointer t ~offset_in_words =
