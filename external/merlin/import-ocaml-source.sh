@@ -93,7 +93,12 @@ for file in $(git ls-tree --name-only -r HEAD | grep -v base-rev.txt); do
   else
     git_file="$subdirectory/$file"
   fi
-  git show "$rev:$git_file" > "$file"
+  if git cat-file -e "$rev:$git_file" 2> /dev/null; then
+    git show "$rev:$git_file" > "$file"
+  else
+    # The file was deleted from the compiler
+    rm "$file"
+  fi
 done
 cd ../..
 
@@ -140,16 +145,32 @@ for file in $(git diff --no-ext-diff --name-only); do
   esac
   tgt=src/ocaml/$tgt
 
-  # ignore patch output if it worked
-  if ! patch --merge=diff3 $tgt <(git diff --no-ext-diff -- $file) > $tgt.out; then
-    sed -i \
-        -e 's!^<<<<<<<$!& '"$old_marker"'!'    \
-        -e 's!^|||||||$!& '"$parent_marker"'!' \
-        -e 's!^>>>>>>>$!& '"$new_marker"'!'    \
-        $tgt
-    cat $tgt.out
+  if [ -e "$file" ]; then
+    # ignore patch output if it worked
+    if ! patch --merge=diff3 $tgt <(git diff --no-ext-diff -- $file) > $tgt.out; then
+      sed -i \
+          -e 's!^<<<<<<<$!& '"$old_marker"'!'    \
+          -e 's!^|||||||$!& '"$parent_marker"'!' \
+          -e 's!^>>>>>>>$!& '"$new_marker"'!'    \
+          $tgt
+      cat $tgt.out
+    fi
+    rm -f $tgt.orig $tgt.out
+  else
+    # The file was deleted from the compiler, so delete Merlin's copy too. If
+    # Merlin had local changes relative to the previously imported copy, record
+    # them in a .rej file so they aren't silently lost.
+    if git show "HEAD:${subtree_prefix}${file}" \
+        | diff -u --label "$parent_marker" --label "$old_marker" - "$tgt" > "$tgt.rej"
+    then
+      rm "$tgt.rej"
+      echo "Deleted $tgt (deleted from the compiler)"
+    else
+      echo "Deleted $tgt (deleted from the compiler);"
+      echo "local Merlin changes recorded in $tgt.rej"
+    fi
+    rm "$tgt"
   fi
-  rm -f $tgt.orig $tgt.out
 done
 
 git add .
