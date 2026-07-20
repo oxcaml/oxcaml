@@ -88,7 +88,8 @@ let add_root state ~parent ~demangled_name fun_symbol ~location_attributes =
     with
     | proto_die, _symbol ->
       (* See below in [find] *)
-      Proto_die.replace_all_attribute_values proto_die attribute_values
+      Proto_die.replace_all_attribute_values proto_die attribute_values;
+      proto_die
     | exception Not_found ->
       (* DWARF-5 specification section 3.3.8.1, page 82. *)
       Proto_die.create ~parent:(Some parent) ~tag:Subprogram ~attribute_values
