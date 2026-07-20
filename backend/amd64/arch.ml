@@ -664,6 +664,13 @@ let addressing_offset_in_bytes
   | Iscaled _, _ -> None
   | Iindexed2scaled _, _ -> None
 
+(* If [addr] is a single base register plus a constant displacement, return that
+   displacement in bytes; otherwise [None].  Used to describe immutable field
+   projections (e.g. closure value slots) for DWARF call site information. *)
+let addressing_displacement_in_bytes = function
+  | Iindexed n -> Some n
+  | Ibased _ | Iindexed2 _ | Iscaled _ | Iindexed2scaled _ -> None
+
 let isomorphic_specific_operation op1 op2 =
   match op1, op2 with
   | Ilea a1, Ilea a2 -> equal_addressing_mode_without_displ a1 a2
