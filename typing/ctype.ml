@@ -6287,18 +6287,27 @@ let cross_right_alloc env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in
   mode |> Alloc.disallow_left |> Crossing.apply_right_alloc crossing
 
+(* The locality axis of the return mode of an arrow cannot cross modes,
+   because a local-returning function might allocate in the caller's region,
+   and this info must be preserved. The [_ret] variants below cross modes on
+   all axes except locality and are to be used on return modes. *)
+
+let cross_left_alloc_ret env ?modalities ty mode =
+  let mode' = cross_left_alloc env ?modalities ty mode in
+  Alloc.join
+    [mode';
+     Alloc.min_with_comonadic Areality (Alloc.proj_comonadic Areality mode)]
+
+let cross_right_alloc_ret env ?modalities ty mode =
+  let mode' = cross_right_alloc env ?modalities ty mode in
+  Alloc.meet
+    [mode';
+     Alloc.max_with_comonadic Areality (Alloc.proj_comonadic Areality mode)]
+
 let submode_with_cross env ~is_ret ty l r =
-  let r' = cross_right_alloc env ty r in
   let r' =
-    if is_ret then
-      (* the locality axis of the return mode cannot cross modes, because a
-         local-returning function might allocate in the caller's region, and
-         this info must be preserved. *)
-      Alloc.meet
-        [r';
-         Alloc.max_with_comonadic Areality (Alloc.proj_comonadic Areality r)]
-    else
-      r'
+    if is_ret then cross_right_alloc_ret env ty r
+    else cross_right_alloc env ty r
   in
   Alloc.submode l r'
 
@@ -7472,10 +7481,6 @@ let build_submode_neg m =
   let c = if changed then Changed else Unchanged in
   m', c
 
-let build_submode posi m =
-  if posi then build_submode_pos (Alloc.allow_left m)
-  else build_submode_neg (Alloc.allow_right m)
-
 let rec build_subtype env (visited : transient_expr list)
     (loops : (int * type_expr) list) posi level t =
   match get_desc t with
@@ -7513,7 +7518,16 @@ let rec build_subtype env (visited : transient_expr list)
         end else a, Unchanged
       in
       let (r', c4) =
-        if level > 2 then build_submode posi r else r, Unchanged
+        if level > 2 then begin
+          (* As for the argument mode above, pick the smaller type. *)
+          if posi then begin
+            let r = cross_right_alloc_ret env t2' r in
+            build_submode_pos r
+          end else begin
+            let r = cross_left_alloc_ret env t2 r in
+            build_submode_neg r
+          end
+        end else r, Unchanged
       in
       let c = max_change c1 (max_change c2 (max_change c3 c4)) in
       if c > Unchanged
@@ -7763,9 +7777,8 @@ let rec subtype_rec env trace t1 t2 cstrs =
             cstrs
         in
         let a2 = cross_left_alloc env t2 a2 in
-         subtype_alloc_mode env trace a2 a1;
-        (* RHS mode of arrow types indicates allocation in the parent region
-           and is not subject to mode crossing *)
+        subtype_alloc_mode env trace a2 a1;
+        let r2 = cross_right_alloc_ret env u2 r2 in
         subtype_alloc_mode env trace r1 r2;
         subtype_rec
           env

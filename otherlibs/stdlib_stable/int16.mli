@@ -53,7 +53,7 @@ external div : int16 -> int16 -> int16 = "%int16_div"
     its arguments towards zero, as specified for {!Stdlib.(/)}.
     @raise Division_by_zero if the second argument is zero. *)
 
-val unsigned_div : int16 -> int16 -> int16
+external unsigned_div : int16 -> int16 -> int16 = "%int16_unsigned_div"
 (** Same as {!div}, except that arguments and result are interpreted as {e
     unsigned} integers. *)
 
@@ -61,7 +61,7 @@ external rem : int16 -> int16 -> int16 = "%int16_mod"
 (** Integer remainder. If [y] is not zero, [rem x y = sub x (mul (div x y)
     y)]. If [y] is zero, [rem x y] raises [Division_by_zero]. *)
 
-val unsigned_rem : int16 -> int16 -> int16
+external unsigned_rem : int16 -> int16 -> int16 = "%int16_unsigned_mod"
 (** Same as {!rem}, except that arguments and result are interpreted as {e
     unsigned} integers. *)
 

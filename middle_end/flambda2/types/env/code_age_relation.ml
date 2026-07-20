@@ -35,7 +35,7 @@ let rec has_older_version_in t ~resolver id candidates : _ Or_unknown.t =
     match Code_id.Map.find_or_null id t with
     | Null -> (
       let comp_unit = Code_id.get_compilation_unit id in
-      if Compilation_unit.equal comp_unit (Compilation_unit.get_current_exn ())
+      if Compilation_unit.equal comp_unit (Current_unit.get_cu_exn ())
       then Known false
       else
         match resolver comp_unit with

@@ -61,6 +61,7 @@ end
 
 type t =
   { entries : Entry.t list;
+    num_entries : int;
     by_original_symbol : Entry.t String.Tbl.t;
     section_data : bytes
   }
@@ -134,9 +135,11 @@ let build ~prefix ~igot ~symbols =
     Bytes.blit_string plt_entry_template 0 section_data (i * entry_size)
       entry_size
   done;
-  { entries; by_original_symbol; section_data }
+  { entries; num_entries; by_original_symbol; section_data }
 
 let entries t = t.entries
+
+let num_entries t = t.num_entries
 
 let section_data t = t.section_data
 

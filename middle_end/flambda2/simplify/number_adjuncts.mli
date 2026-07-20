@@ -98,6 +98,10 @@ module type Int_number_kind = sig
 
     val xor : t -> t -> t
 
+    val unsigned_div : t -> t -> t option
+
+    val unsigned_mod : t -> t -> t option
+
     val shift_left : t -> Target_ocaml_int.t -> t
 
     (* [shift_right] is arithmetic shift right, matching [Int32], [Int64],

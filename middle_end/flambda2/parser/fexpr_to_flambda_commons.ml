@@ -73,7 +73,9 @@ type env =
     error_continuation : Exn_continuation.t;
     continuations : (Continuation.t * int) CM.t;
     exn_continuations : Continuation.t CM.t;
+    toplevel_alloc_region : Variable.t;
     toplevel_region : Variable.t;
+    toplevel_ghost_region : Variable.t;
     variables : Variable.t VM.t;
     symbols : Symbol.t SM.t;
     code_ids : Code_id.t DM.t;
@@ -89,12 +91,20 @@ let init_env () =
   let error_continuation =
     Exn_continuation.create ~exn_handler ~extra_args:[]
   in
-  let toplevel_region = Variable.create "toplevel" Flambda_kind.region in
+  let toplevel_alloc_region =
+    Variable.create "toplevel_alloc_region" Flambda_kind.region
+  in
+  let toplevel_region = Variable.create "toplevel_region" Flambda_kind.region in
+  let toplevel_ghost_region =
+    Variable.create "toplevel_ghost_region" Flambda_kind.region
+  in
   { done_continuation;
     error_continuation;
     continuations = CM.empty;
     exn_continuations = CM.empty;
     toplevel_region;
+    toplevel_alloc_region;
+    toplevel_ghost_region;
     variables = VM.empty;
     symbols = SM.create 10;
     code_ids = DM.create 10;
@@ -105,7 +115,9 @@ let init_env () =
 let enter_code env =
   { continuations = CM.empty;
     exn_continuations = CM.empty;
+    toplevel_alloc_region = env.toplevel_alloc_region;
     toplevel_region = env.toplevel_region;
+    toplevel_ghost_region = env.toplevel_ghost_region;
     variables = env.variables;
     done_continuation = env.done_continuation;
     error_continuation = env.error_continuation;
@@ -143,8 +155,7 @@ let fresh_or_existing_code_id env { Fexpr.txt = name; loc = _ } =
   | Some code_id -> code_id
   | None ->
     let c =
-      Code_id.create ~name ~debug:Debuginfo.none
-        (Compilation_unit.get_current_exn ())
+      Code_id.create ~name ~debug:Debuginfo.none (Current_unit.get_cu_exn ())
     in
     DM.add env.code_ids name c;
     c
@@ -152,7 +163,7 @@ let fresh_or_existing_code_id env { Fexpr.txt = name; loc = _ } =
 let fresh_function_slot env { Fexpr.txt = name; loc = _ } =
   let c =
     Function_slot.create
-      (Compilation_unit.get_current_exn ())
+      (Current_unit.get_cu_exn ())
       ~name ~is_always_immediate:false Flambda_kind.value
   in
   UT.add env.function_slots name c;
@@ -166,7 +177,7 @@ let fresh_or_existing_function_slot env ({ Fexpr.txt = name; loc = _ } as id) =
 let fresh_value_slot env { Fexpr.txt = name; loc = _ } kind =
   let c =
     Value_slot.create
-      (Compilation_unit.get_current_exn ())
+      (Current_unit.get_cu_exn ())
       ~name ~is_always_immediate:false kind
   in
   WT.add env.vars_within_closures name c;
@@ -199,7 +210,7 @@ let declare_symbol (env : env) ({ Fexpr.txt = cu, name; loc } as symbol) =
     | None ->
       let cunit =
         match cu with
-        | None -> Compilation_unit.get_current_exn ()
+        | None -> Current_unit.get_cu_exn ()
         | Some cu -> compilation_unit cu
       in
       let symbol = Symbol.unsafe_create cunit (Linkage_name.of_string name) in
@@ -251,6 +262,10 @@ let find_var env v =
   find_with ~descr:"variable" ~find:VM.find_opt env.variables v
 
 let find_region env (r : Fexpr.region) =
-  match r with Toplevel -> env.toplevel_region | Named v -> find_var env v
+  match r with
+  | Toplevel_alloc_region -> env.toplevel_alloc_region
+  | Toplevel_region -> env.toplevel_region
+  | Toplevel_ghost_region -> env.toplevel_ghost_region
+  | Named v -> find_var env v
 
 let find_code_id env code_id = fresh_or_existing_code_id env code_id

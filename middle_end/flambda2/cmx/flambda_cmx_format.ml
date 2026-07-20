@@ -95,7 +95,7 @@ let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
       all_code
   in
   let t =
-    [ { original_compilation_unit = Compilation_unit.get_current_exn ();
+    [ { original_compilation_unit = Current_unit.get_cu_exn ();
         final_typing_env;
         all_code;
         exported_offsets;
