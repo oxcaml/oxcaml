@@ -361,7 +361,8 @@ let gen_variable ~debug_uid v =
          be reworked soon *)
       Some
         (Backend_var.Provenance.create ~module_path:(Path.Pident v)
-           ~location:Debuginfo.none ~original_ident:v ~debug_uid)
+           ~location:Debuginfo.none ~original_ident:v ~debug_uid
+           ~is_parameter:Is_parameter.local)
   in
   Backend_var.With_provenance.create ?provenance v
 
