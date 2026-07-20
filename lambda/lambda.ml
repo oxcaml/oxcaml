@@ -1616,15 +1616,17 @@ let make_key e =
         tr_rec (Ident.add x ex env) e
     | Llet ((Strict | StrictOpt),_k,x,_x_duid,ex,Lvar v) when Ident.same v x ->
         tr_rec env ex
-    | Llet (str,k,x,x_duid,ex,e) ->
-     (* Because of side effects, keep other lets with normalized names *)
+    | Llet (str,k,x,_x_duid,ex,e) ->
+     (* Because of side effects, keep other lets with normalized names.
+        Debug uids are erased, like locations, so that they do not get in
+        the way of sharing. *)
         let ex = tr_rec env ex in
         let y = make_key x in
-        Llet (str,k,y,x_duid,ex,tr_rec (Ident.add x (Lvar y) env) e)
-    | Lmutlet (k,x,x_duid,ex,e) ->
+        Llet (str,k,y,debug_uid_none,ex,tr_rec (Ident.add x (Lvar y) env) e)
+    | Lmutlet (k,x,_x_duid,ex,e) ->
         let ex = tr_rec env ex in
         let y = make_key x in
-        Lmutlet (k,y,x_duid,ex,tr_rec (Ident.add x (Lmutvar y) env) e)
+        Lmutlet (k,y,debug_uid_none,ex,tr_rec (Ident.add x (Lmutvar y) env) e)
     | Lprim (p,es,_) ->
         Lprim (p,tr_recs env es, Loc_unknown)
     | Lswitch (e,sw,loc,kind) ->
