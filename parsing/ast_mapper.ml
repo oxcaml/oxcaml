@@ -222,6 +222,8 @@ module T = struct
         of_kind ~loc ~attrs (sub.jkind_annotation sub jkind)
     | Ptyp_repr (lvars, t) ->
         repr ~loc ~attrs (List.map (map_loc sub) lvars) (sub.typ sub t)
+    | Ptyp_refinement (name, t, pred) ->
+        refinement ~loc ~attrs name (sub.typ sub t) (sub.expr sub pred)
     | Ptyp_newlayout (lvars, t) ->
         newlayout ~loc ~attrs (List.map (map_loc sub) lvars) (sub.typ sub t)
     | Ptyp_extension x -> extension ~loc ~attrs (sub.extension sub x)
@@ -410,6 +412,15 @@ module MT = struct
     let loc = sub.location sub loc in
     match desc with
     | Psig_value vd -> value ~loc (sub.value_description sub vd)
+    | Psig_theorem
+        {pthm_name; pthm_type; pthm_potential; pthm_attributes; pthm_loc} ->
+        theorem ~loc
+          (Thm.mk
+             (map_loc sub pthm_name)
+             (sub.typ sub pthm_type)
+             ~potential:pthm_potential
+             ~attrs:(sub.attributes sub pthm_attributes)
+             ~loc:(sub.location sub pthm_loc))
     | Psig_type (rf, l) ->
         type_ ~loc rf (List.map (sub.type_declaration sub) l)
     | Psig_typesubst l ->

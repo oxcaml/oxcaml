@@ -1164,6 +1164,7 @@ let to_lazy =
       val_kind = vd.val_kind;
       val_zero_alloc = vd.val_zero_alloc;
       val_attributes = vd.val_attributes;
+      val_refinement_spec = vd.val_refinement_spec;
       val_loc = vd.val_loc;
       val_uid = vd.val_uid;
     }
@@ -1213,6 +1214,7 @@ let rec subst_lazy_value_description s descr =
         Zero_alloc.create_const (Zero_alloc.get descr.val_zero_alloc)
       | _ -> descr.val_zero_alloc);
     val_attributes = attrs s descr.val_attributes;
+    val_refinement_spec = descr.val_refinement_spec;
     val_uid = descr.val_uid;
   }
 
@@ -1370,6 +1372,7 @@ and from_lazy =
       val_kind = vd.val_kind;
       val_zero_alloc = vd.val_zero_alloc;
       val_attributes = vd.val_attributes;
+      val_refinement_spec = vd.val_refinement_spec;
       val_loc = vd.val_loc;
       val_uid = vd.val_uid;
     }

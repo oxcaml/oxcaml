@@ -134,6 +134,23 @@ val transl_simple_type_delayed
 val transl_type_scheme:
         Env.t -> Parsetree.core_type -> valdecl_lpoly_flag ->
         Jkind_types.Sort.var list * Typedtree.core_type
+(* A single refinement position peeled off a theorem spec: an optional binder
+   name and an optional (untyped) predicate expression. *)
+type refinement_position =
+  { rp_binder : string option;
+    rp_predicate : Parsetree.expression option }
+
+(** [erase_theorem_spec spec] walks the arrow spine of a theorem [spec],
+    peeling an optional refinement off each argument and off the result
+    (decision 8). It returns the erased, refinement-free [core_type] (suitable
+    for the ordinary [transl_type]) together with the per-argument refinement
+    positions (left to right) and the result refinement position. Refinements
+    nested inside a base type are left in place and will be rejected by the
+    ordinary type translation. *)
+val erase_theorem_spec:
+  Parsetree.core_type ->
+  Parsetree.core_type * refinement_position list * refinement_position
+
 val transl_type_param:
   Env.t -> Path.t -> jkind_lr -> Parsetree.core_type ->
   Typedtree.core_type * jkind_lr option

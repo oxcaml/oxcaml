@@ -171,7 +171,7 @@ module Ast = struct
         end
     | Psig_typext _|Psig_open _|Psig_include _|Psig_class _|Psig_class_type _
     | Psig_attribute _|Psig_extension _ | Psig_typesubst _
-    | Psig_modsubst _ | Psig_modtypesubst _ -> map
+    | Psig_modsubst _ | Psig_modtypesubst _ | Psig_theorem _ -> map
 
   let add_items ~f path (inherits,map) items =
     (* module doc *)

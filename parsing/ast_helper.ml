@@ -85,6 +85,8 @@ module Typ = struct
   let repr ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_repr (a, b))
   let newlayout ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_newlayout (a, b))
   let of_kind ?loc ?attrs a = mk ?loc ?attrs (Ptyp_of_kind a)
+  let refinement ?loc ?attrs a b c =
+    mk ?loc ?attrs (Ptyp_refinement (a, b, c))
 
   let force_poly t =
     match t.ptyp_desc with
@@ -151,6 +153,8 @@ module Typ = struct
             Ptyp_of_kind (loop_jkind jkind)
         | Ptyp_repr (var_lst, core_type) ->
             Ptyp_repr (var_lst, loop core_type)
+        | Ptyp_refinement (name, core_type, pred) ->
+            Ptyp_refinement (name, loop core_type, pred)
         | Ptyp_newlayout (var_lst, core_type) ->
             Ptyp_newlayout (var_lst, loop core_type)
         | Ptyp_extension (s, arg) ->
@@ -348,6 +352,7 @@ module Sig = struct
   let mk ?(loc = !default_loc) d = {psig_desc = d; psig_loc = loc}
 
   let value ?loc a = mk ?loc (Psig_value a)
+  let theorem ?loc a = mk ?loc (Psig_theorem a)
   let type_ ?loc rec_flag a = mk ?loc (Psig_type (rec_flag, a))
   let type_subst ?loc a = mk ?loc (Psig_typesubst a)
   let type_extension ?loc a = mk ?loc (Psig_typext a)
@@ -502,6 +507,18 @@ module Val = struct
      pval_modalities = modalities;
      pval_loc = loc;
      pval_prim = prim;
+    }
+end
+
+module Thm = struct
+  let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
+        ?(potential = true) name typ =
+    {
+     pthm_name = name;
+     pthm_type = typ;
+     pthm_potential = potential;
+     pthm_attributes = add_docs_attrs docs attrs;
+     pthm_loc = loc;
     }
 end
 

@@ -264,6 +264,11 @@ let rec core_type i ppf x =
       core_type i ppf ct;
   | Ptyp_of_kind jkind ->
       line i ppf "Ptyp_of_kind %a\n" (jkind_annotation (i+1)) jkind
+  | Ptyp_refinement (name, ct, pred) ->
+      line i ppf "Ptyp_refinement\n";
+      option i string ppf name;
+      core_type i ppf ct;
+      expression i ppf pred
   | Ptyp_extension (s, arg) ->
       line i ppf "Ptyp_extension \"%s\"\n" s.txt;
       payload i ppf arg
@@ -666,6 +671,15 @@ and value_description i ppf x =
   modalities (i+1) ppf x.pval_modalities;
   )
 
+and theorem_description i ppf x =
+  with_location_mapping ~loc:x.pthm_loc ppf (fun () ->
+  line i ppf "theorem_description %a %a\n" fmt_string_loc
+       x.pthm_name fmt_location x.pthm_loc;
+  line (i+1) ppf "potential = %b\n" x.pthm_potential;
+  attributes i ppf x.pthm_attributes;
+  core_type (i+1) ppf x.pthm_type;
+  )
+
 and type_parameter i ppf (x, _variance) = core_type i ppf x
 
 and type_declaration i ppf x =
@@ -1002,6 +1016,9 @@ and signature_item i ppf x =
   | Psig_value vd ->
       line i ppf "Psig_value\n";
       value_description i ppf vd;
+  | Psig_theorem td ->
+      line i ppf "Psig_theorem\n";
+      theorem_description i ppf td;
   | Psig_type (rf, l) ->
       line i ppf "Psig_type %a\n" fmt_rec_flag rf;
       list i type_declaration ppf l;

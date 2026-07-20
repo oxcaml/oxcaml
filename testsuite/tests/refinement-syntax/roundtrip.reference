@@ -1,0 +1,22 @@
+== refinement round-trip ==
+named: PASS
+  val f : (x : int | x > 0) -> int
+anon: PASS
+  val g : (int | true) -> int
+anon-arrow: PASS
+  val h : (int -> int | true) -> int
+sugar: PASS
+  val k : (x : float | x >= 0.) -> {[ k1 = k1 ]}
+dependent-arrow: PASS
+  val s : (x : float | x < 1.) -> {[ (sqrt x) > x ]}
+nested-list: PASS
+  val t : (int | true) list -> int
+named-paren-arrow: PASS
+  val u : (x : (int -> int) | true) -> int
+
+== backward compatibility ==
+list-of-lists: let _ = [[1]; [2]]
+polyvar-simple: PASS
+  type v = [ `A ]
+polyvar-nested: PASS
+  type w = [ | [ `A ] | `B ]

@@ -944,8 +944,11 @@ and print_out_sig_item ppf =
            | Orec_next  -> "and")
           ppf td
   | Osig_value { oval_name; oval_type; oval_modalities;
-                 oval_prims; oval_attributes } ->
-      let kwd = if oval_prims = [] then "val" else "external" in
+                 oval_prims; oval_attributes; oval_theorem } ->
+      let kwd =
+        if oval_theorem then "thm_?"
+        else if oval_prims = [] then "val" else "external"
+      in
       let pr_prims ppf =
         function
           [] -> ()

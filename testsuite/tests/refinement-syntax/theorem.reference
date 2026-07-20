@@ -1,0 +1,21 @@
+== theorem round-trip ==
+sugar-spec: PASS
+  thm_? sqrt_1 : {[ (sqrt 1.) = 1. ]}
+refinement-arrow: PASS
+  thm_? small : (x : float | x < 1.) -> {[ (sqrt x) > x ]}
+plain-type: PASS
+  thm_? t1 : int -> int
+mixed: PASS
+  val sqrt : (x : float | x >= 0.) -> (y : float | y >= 0.)
+thm_? sqrt_1 : {[ (sqrt 1.) = 1. ]}
+thm_? sqrt_small : (x : float | x < 1.) -> {[ (sqrt x) > x ]}
+thm_? sqrt_big : (x : float | x > 1.) -> {[ (sqrt x) < x ]}
+
+== backward compatibility ==
+ident-let-thm: let thm = 1
+ident-val-thm: PASS
+  val thm : int
+
+== keyword / parse errors ==
+reserved-let-thm_: PASS (syntax error as expected)
+missing-question: PASS (syntax error as expected)

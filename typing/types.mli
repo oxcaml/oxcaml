@@ -1175,6 +1175,20 @@ module Lpoly : sig
     -> unit
 end
 
+(** A logical refinement spec attached to a theorem value. Each arrow-spine
+    position (argument or result) carries an optional source binder name and an
+    optional untyped predicate expression. The predicates are stored untyped and
+    used for theorem typechecking and [thm_?] printing; they are not compared at
+    inclusion (theorem inclusion is resolved by assumed implication). *)
+type refinement_spec =
+  { refn_args : refinement_clause list;  (** one per arrow arg, in order *)
+    refn_result : refinement_clause }    (** result position *)
+
+and refinement_clause =
+  { refc_binder : string option;
+    (** [None] predicate = no refinement at this position *)
+    refc_predicate : Parsetree.expression option }
+
 module type Wrapped = sig
   type 'a wrapped
 
@@ -1197,6 +1211,7 @@ module type Wrapped = sig
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
+      val_refinement_spec: refinement_spec option;
       val_uid: Uid.t;
     }
 

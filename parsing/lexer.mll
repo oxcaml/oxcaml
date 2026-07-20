@@ -104,6 +104,7 @@ let all_keywords =
     "stack_", STACK, oxcaml;
     "struct", STRUCT, always;
     "then", THEN, always;
+    "thm_", THM, oxcaml;
     "to", TO, always;
     "true", TRUE, always;
     "try", TRY, always;

@@ -96,6 +96,8 @@ module Typ :
     val splice : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
     val of_kind : ?loc:loc -> ?attrs:attrs -> jkind_annotation -> core_type
     val repr: ?loc:loc -> ?attrs:attrs -> str list -> core_type -> core_type
+    val refinement: ?loc:loc -> ?attrs:attrs -> string option -> core_type
+      -> expression -> core_type
     val newlayout:
       ?loc:loc -> ?attrs:attrs -> str list -> core_type -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> core_type
@@ -254,6 +256,13 @@ module Val:
       value_description
   end
 
+(** Theorem declarations *)
+module Thm:
+  sig
+    val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?potential:bool ->
+      str -> core_type -> theorem_description
+  end
+
 (** Type declarations *)
 module Type:
   sig
@@ -348,6 +357,7 @@ module Sig:
     val mk: ?loc:loc -> signature_item_desc -> signature_item
 
     val value: ?loc:loc -> value_description -> signature_item
+    val theorem: ?loc:loc -> theorem_description -> signature_item
     val type_: ?loc:loc -> rec_flag -> type_declaration list -> signature_item
     val type_subst: ?loc:loc -> type_declaration list -> signature_item
     val type_extension: ?loc:loc -> type_extension -> signature_item

@@ -173,6 +173,7 @@ module T = struct
     | Ptyp_of_kind jkind ->
         sub.jkind_annotation sub jkind
     | Ptyp_repr (_, t) -> sub.typ sub t
+    | Ptyp_refinement (_, t, pred) -> sub.typ sub t; sub.expr sub pred
     | Ptyp_newlayout (_, t) -> sub.typ sub t
     | Ptyp_extension x -> sub.extension sub x
 
@@ -343,6 +344,12 @@ module MT = struct
     sub.location sub loc;
     match desc with
     | Psig_value vd -> sub.value_description sub vd
+    | Psig_theorem
+        {pthm_name; pthm_type; pthm_potential = _; pthm_attributes; pthm_loc} ->
+        iter_loc sub pthm_name;
+        sub.typ sub pthm_type;
+        sub.location sub pthm_loc;
+        sub.attributes sub pthm_attributes
     | Psig_type (_, l)
     | Psig_typesubst l ->
       List.iter (sub.type_declaration sub) l

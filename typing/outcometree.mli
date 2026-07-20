@@ -244,7 +244,10 @@ and out_val_decl =
     oval_modalities : out_modality list;
     (* Modalities on value descriptions are always new, even for [global_] *)
     oval_prims: string list;
-    oval_attributes: out_attribute list }
+    oval_attributes: out_attribute list;
+    oval_theorem: bool
+    (* [true] for a [thm_?] theorem declaration; printed with the [thm_?]
+       keyword instead of [val]. *) }
 and out_rec_status =
   | Orec_not
   | Orec_first

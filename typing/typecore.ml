@@ -1397,6 +1397,7 @@ let type_continuation_pat env expected_ty sp =
           Types.val_loc = loc; val_attributes = [];
           val_modalities = Modality.undefined;
           val_zero_alloc = Zero_alloc.default;
+          val_refinement_spec = None;
           val_uid = Uid.mk ~current_unit:(Env.get_current_unit ()); }
       in
         Some (id, desc)
@@ -1684,6 +1685,7 @@ let add_pattern_variables ?check ?check_as env pv =
           Types.val_loc = pv_loc;
           val_attributes = pv_attributes; val_modalities = Modality.undefined;
           val_zero_alloc = Zero_alloc.default;
+          val_refinement_spec = None;
           val_uid = pv_uid
          } env
     )
@@ -4129,6 +4131,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.undefined
+            ; val_refinement_spec = None
             ; val_loc = pv_loc
             ; val_uid = pv_uid
             }
@@ -4142,6 +4145,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.undefined
+            ; val_refinement_spec = None
             ; val_loc = pv_loc
             ; val_uid = pv_uid
             }
@@ -10117,6 +10121,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
             val_attributes = [];
             val_zero_alloc = Zero_alloc.default;
             val_modalities = Modality.undefined;
+            val_refinement_spec = None;
             val_loc = Location.none;
             val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
           }

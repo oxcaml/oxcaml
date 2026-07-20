@@ -1125,6 +1125,7 @@ let maybe_pmod_constraint mode expr =
 %token SIG                    "sig"
 %token LAYOUT                 "layout_"
 %token STACK                  "stack_"
+%token THM                    "thm_"
 %token STAR                   "*"
 %token <string * Location.t * string option>
        STRING                 "\"hello\"" (* just an example *)
@@ -2135,7 +2136,9 @@ signature_item:
     )
     { $1 }
   | wrap_mksig_ext(
-      value_description
+      theorem_description
+        { (Psig_theorem $1, None) }
+    | value_description
         { psig_value $1 }
     | primitive_declaration
         { psig_value $1 }
@@ -3958,6 +3961,20 @@ value_description:
       ext }
 ;
 
+/* Theorem declarations */
+
+theorem_description:
+  THM
+  QUESTION
+  id = mkrhs(val_ident)
+  COLON
+  ty = possibly_poly(core_type)
+  attrs = post_item_attributes
+    { let loc = make_loc $sloc in
+      let docs = symbol_docs $sloc in
+      Thm.mk id ty ~potential:true ~attrs ~loc ~docs }
+;
+
 /* Primitive declarations */
 
 primitive_declaration:
@@ -4912,6 +4929,15 @@ tuple_type:
 delimited_type_supporting_local_open:
   | LPAREN type_ = core_type RPAREN
       { type_ }
+  | LPAREN name = LIDENT COLON type_ = atomic_type BAR pred = seq_expr RPAREN
+      { mktyp ~loc:$sloc (Ptyp_refinement (Some name, type_, pred)) }
+  | LPAREN type_ = core_type BAR pred = seq_expr RPAREN
+      { mktyp ~loc:$sloc (Ptyp_refinement (None, type_, pred)) }
+  | LBRACE LBRACKET pred = seq_expr RBRACKET RBRACE
+      { let unit_ty =
+          ghtyp ~loc:$sloc (Ptyp_constr (ghloc ~loc:$sloc (Lident "unit"), []))
+        in
+        mktyp ~loc:$sloc (Ptyp_refinement (None, unit_ty, pred)) }
   | LPAREN MODULE ext_attrs = ext_attributes package_type = package_type_ RPAREN
       { mktyp_attrs ~loc:$sloc (Ptyp_package package_type) ext_attrs }
   | mktyp(

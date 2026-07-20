@@ -93,6 +93,10 @@ let handle_extension ext =
   | _ ->
     ()
 
+(* Forward reference to [add_expr], set once it is defined, so that
+   refinement-type predicates can be traversed from [add_type]. *)
+let add_expr_fwd = ref (fun _bv _exp -> ())
+
 let rec add_type bv ty =
   match ty.ptyp_desc with
     Ptyp_any jkind
@@ -127,6 +131,7 @@ let rec add_type bv ty =
   | Ptyp_splice t -> add_type bv t
   | Ptyp_of_kind jkind -> add_jkind bv jkind
   | Ptyp_repr(_, t) -> add_type bv t
+  | Ptyp_refinement(_, t, pred) -> add_type bv t; !add_expr_fwd bv pred
   | Ptyp_newlayout(_, t) -> add_type bv t
   | Ptyp_extension e -> handle_extension e
 
@@ -506,6 +511,8 @@ and add_sig_item (bv, m) item =
   match item.psig_desc with
     Psig_value vd ->
       add_type bv vd.pval_type; (bv, m)
+  | Psig_theorem td ->
+      add_type bv td.pthm_type; (bv, m)
   | Psig_type (_, dcls)
   | Psig_typesubst dcls->
       List.iter (add_type_declaration bv) dcls; (bv, m)
@@ -765,3 +772,5 @@ and add_class_field bv pcf =
 
 and add_class_declaration bv decl =
   add_class_expr bv decl.pci_expr
+
+let () = add_expr_fwd := add_expr
