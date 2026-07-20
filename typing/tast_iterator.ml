@@ -650,7 +650,7 @@ let module_expr sub {mod_loc; mod_desc; mod_mode; mod_env; mod_attributes; _} =
   end;
   sub.env sub mod_env;
   match mod_desc with
-  | Tmod_ident (_, lid) -> iter_loc_lid sub lid
+  | Tmod_ident (_, lid, _) -> iter_loc_lid sub lid
   | Tmod_structure st -> sub.structure sub st
   | Tmod_functor (arg, mexpr) ->
       functor_parameter sub arg;

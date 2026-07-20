@@ -33,8 +33,10 @@ and not strictly enforced. The caller is reponsible to enforce mode constraint
 by inspecting the returned mode. *)
 (* CR zqian: Remove [?expected_mode] once we have mode error chain. *)
 
+(* CR dkalinichenko: explain this. *)
 val type_module:
   Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t
+(* CR dkalinichenko: explain this. *)
 val type_structure:
   Env.t -> Parsetree.structure ->
   Typedtree.structure * Types.signature * Mode.Value.lr * Signature_names.t *

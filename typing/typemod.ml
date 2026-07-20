@@ -243,7 +243,8 @@ let check_for_generated_type_or_jkind ~funct_body env loc mty exn =
 
 (* Extract the signature and the mode of a functor's return, given the signature
    [sig_acc] and mode [md_mode] of the functor argument. *)
-let extract_sig_functor_open funct_body env loc mty sig_acc md_mode =
+let extract_sig_functor_open ?arg_loc funct_body env loc mty
+    sig_acc md_mode =
   let sig_acc = List.rev sig_acc in
   match Mtype.scrape_alias env mty with
   | Mty_functor (Named (param, mty_param, mm_param),mty_result,mm_result)
@@ -254,6 +255,11 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode =
         | _ -> raise (Error (loc,env,Signature_parameter_expected mty_func))
       in
       let mm_param = mm_param |> alloc_as_value in
+      (* CR dkalinichenko: explain this. *)
+      let arg_loc = Option.value arg_loc ~default:loc in
+      Value.submode_err (arg_loc, Module)
+        Value.(of_const { Const.min with uniqueness = Aliased })
+        mm_param;
       let input_coercion =
         try
           Includemod.include_functor_signatures ~mark:true env
@@ -2221,7 +2227,8 @@ and transl_signature ?(interface_toplevel = false) env
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
         let sg, mode, incl_kind =
-          extract_sig_functor_open false env smty.pmty_loc mty sig_acc md_mode
+          extract_sig_functor_open ~arg_loc:sincl.pincl_loc false env
+            smty.pmty_loc mty sig_acc md_mode
         in
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
@@ -2744,7 +2751,7 @@ exception Not_a_path
 
 let rec path_of_module mexp =
   match mexp.mod_desc with
-  | Tmod_ident (p,_) -> p
+  | Tmod_ident (p,_,_) -> p
   | Tmod_apply(funct, arg, _coercion) when !Clflags.applicative_functors ->
       Papply(path_of_module funct, path_of_module arg)
   | Tmod_constraint (mexp, _, _, _) ->
@@ -3290,7 +3297,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       let exp =
         Ctype.with_local_level_generalize_structure_if_principal
           (fun () -> Typecore.type_exp env sexp
-            ~mode:(Value.disallow_left mode))
+            ~mode:(Value.disallow_left mode) ~check_uniqueness:false)
       in
       let mty =
         match get_desc (Ctype.expand_head env exp.exp_type) with
@@ -3339,7 +3346,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
 
 and type_module_path_aux ~alias ~hold_locks ~strengthen env path
   (mode, locks) (lid : _ loc) smod =
-  let mod_mode =
+  let mode, held_locks =
     if hold_locks then mode, Some (locks, lid.txt, lid.loc)
     else
       let vmode =
@@ -3347,7 +3354,16 @@ and type_module_path_aux ~alias ~hold_locks ~strengthen env path
       in
       vmode, None
   in
-  let md = { mod_desc = Tmod_ident (path, lid);
+  (* CR dkalinichenko: explain this. *)
+  let use_mode = Value.newvar () in
+  Value.submode_err (lid.loc, Module) mode use_mode;
+  let unique_use =
+    Uniqueness_analysis.mk_unique_use
+      ~submode:(Value.submode_err (lid.loc, Module))
+      (Value.disallow_right mode) (Value.disallow_left use_mode)
+  in
+  let mod_mode = Value.disallow_right use_mode, held_locks in
+  let md = { mod_desc = Tmod_ident (path, lid, unique_use);
              mod_type = Mty_alias path;
              mod_mode;
              mod_env = env;
@@ -3588,7 +3604,7 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
     let path, (mode, locks), newenv =
       type_open_ ?used_slot ?toplevel od.popen_override env loc lid
     in
-    let md = { mod_desc = Tmod_ident (path, lid);
+    let md = { mod_desc = Tmod_ident (path, lid, Typedtree.aliased_many_use);
                mod_type = Mty_alias path;
                mod_mode = mode, Some (locks, lid.txt, lid.loc);
                mod_env = env;
@@ -3664,8 +3680,8 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
         let sg, mode, incl_kind =
-          extract_sig_functor_open funct_body env smodl.pmod_loc
-            modl.mod_type sig_acc md_mode
+          extract_sig_functor_open ~arg_loc:sincl.pincl_loc funct_body env
+            smodl.pmod_loc modl.mod_type sig_acc md_mode
         in
         incl_kind, sg, Value.disallow_right mode
       | Structure ->
@@ -3712,12 +3728,14 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
              though for now the sort is used in the void safety check. *)
           Builtin_attributes.warning_scope attrs
             (fun () -> Typecore.type_representable_expression
-                         ~why:Structure_item_expression env sexpr)
+                         ~why:Structure_item_expression
+                         ~check_uniqueness:false env sexpr)
         in
         Tstr_eval (expr, sort, attrs), [], shape_map, env
     | Pstr_value (rec_flag, sdefs) ->
         let (defs, newenv) =
-          Typecore.type_binding env Immutable rec_flag ~force_toplevel sdefs in
+          Typecore.type_binding env Immutable rec_flag ~force_toplevel
+            ~check_uniqueness:false sdefs in
         let defs = match rec_flag with
           | Recursive -> Typecore.annotate_recursive_bindings env defs
           | Nonrecursive -> defs
@@ -4147,6 +4165,8 @@ let type_toplevel_phrase env sig_acc s =
   Typecore.reset_allocations ();
   let (str, sg, mode, to_remove_from_sg, shape, env) =
     type_structure ~toplevel:(Some sig_acc) ~funct_body:false None env s in
+  Uniqueness_analysis.check_structure str.str_items
+    ~exported:Uniqueness_analysis.Export_all;
   Value.submode_err (Location.none, Structure) mode toplevel_mode;
   remove_mode_and_jkind_variables env sg;
   remove_mode_and_jkind_variables_for_toplevel str;
@@ -4190,7 +4210,7 @@ let type_module_type_of env smod =
         let path, md, (mode, locks) =
           Env.lookup_module ~loc:smod.pmod_loc lid.txt env
         in
-          { mod_desc = Tmod_ident (path, lid);
+          { mod_desc = Tmod_ident (path, lid, Typedtree.aliased_many_use);
             mod_type = md.md_type;
             mod_mode = mode, Some (locks, lid.txt, lid.loc);
             mod_env = env;
@@ -4198,6 +4218,8 @@ let type_module_type_of env smod =
             mod_loc = smod.pmod_loc }
     | _ ->
         let me, _shape = type_module env smod in
+        (* CR dkalinichenko: explain this. *)
+        Uniqueness_analysis.check_uniqueness_module_expr me;
         me
   in
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
@@ -4270,9 +4292,9 @@ let type_package env m pack =
     | fl ->
       let type_path, env =
         match modl.mod_desc with
-        | Tmod_ident (mp,_)
+        | Tmod_ident (mp,_,_)
         | Tmod_constraint
-            ({mod_desc=Tmod_ident (mp,_)}, _, Tmodtype_implicit, _) ->
+            ({mod_desc=Tmod_ident (mp,_,_)}, _, Tmodtype_implicit, _) ->
           (* We special case these because interactions between
              strengthening of module types and packages can cause
              spurious escape errors. See examples from PR#6982 in the
@@ -4462,7 +4484,8 @@ let type_implementation target modulename initial_env ast =
       if !Clflags.as_parameter then
         error Cannot_compile_implementation_as_parameter;
       let (str, sg, mode, names, shape, finalenv) =
-        Profile.record_call "infer" (fun () -> type_structure initial_env ast)
+        Profile.record_call "infer"
+          (fun () -> type_structure initial_env ast)
       in
       Value.submode_err (Location.in_file sourcefile, Structure)
         mode (Persistent_env.mode_pers_mod Dynamic);
@@ -4482,6 +4505,8 @@ let type_implementation target modulename initial_env ast =
           remove_modality_and_zero_alloc_variables_sg finalenv ~zap_modality
             simple_sg
         in
+        Uniqueness_analysis.check_structure str.str_items
+          ~exported:(Uniqueness_analysis.Export_signature simple_sg);
         Typecore.force_delayed_checks ();
         Mode.erase_hints ();
         Typecore.optimise_allocations ();
@@ -4564,6 +4589,9 @@ let type_implementation target modulename initial_env ast =
             check_argument_type_if_given initial_env source_intf
               ~actual_staticity:staticity dclsig arg_type
           in
+          (* CR dkalinichenko: explain this. *)
+          Uniqueness_analysis.check_structure str.str_items
+            ~exported:(Uniqueness_analysis.Export_signature dclsig);
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
           Typecore.optimise_allocations ();
@@ -4613,6 +4641,8 @@ let type_implementation target modulename initial_env ast =
             check_argument_type_if_given initial_env sourcefile
               ~actual_staticity:Staticity.Dynamic simple_sg arg_type
           in
+          Uniqueness_analysis.check_structure str.str_items
+            ~exported:(Uniqueness_analysis.Export_signature simple_sg);
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
           Typecore.optimise_allocations ();
@@ -4653,6 +4683,13 @@ let type_implementation target modulename initial_env ast =
           in
           save_cmt_and_cms target annots initial_env None None)
       )
+
+(* CR dkalinichenko: explain this. *)
+let type_structure env sstr =
+  let (str, _, _, _, _, _) as result = type_structure env sstr in
+  Uniqueness_analysis.check_structure str.str_items
+    ~exported:Uniqueness_analysis.Export_all;
+  result
 
 let save_signature target modname tsg initial_env cmi =
   let decl_deps =

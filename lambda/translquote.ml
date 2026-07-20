@@ -3437,7 +3437,7 @@ and quote_function ~scopes ~transl stage loc fn extras =
 
 and quote_module_exp ~transl stage loc env mod_exp =
   match mod_exp.mod_desc with
-  | Tmod_ident (path, _) ->
+  | Tmod_ident (path, _, _) ->
     let m = module_for_path loc env path in
     Module.ident loc m |> Module.wrap
   | Tmod_apply (funct, arg, _) ->
@@ -3907,7 +3907,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
       let meth = quote_method loc meth in
       Exp_desc.send loc obj meth
     | Texp_open
-        ( { open_expr = { mod_desc = Tmod_ident (path, _) };
+        ( { open_expr = { mod_desc = Tmod_ident (path, _, _) };
             open_attributes = []
           },
           exp ) ->

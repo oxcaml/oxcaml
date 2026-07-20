@@ -86,6 +86,7 @@ open Mode
 open Typedtree
 module Uniqueness = Mode.Uniqueness
 module Linearity = Mode.Linearity
+module String_map = Misc.Stdlib.String.Map
 
 (* CR uniqueness: currently printing does not work.
    The debugger just returns <abstr> for all types. *)
@@ -302,6 +303,7 @@ module Aliased : sig
             access *)
     | Lifted_borrowed  (** aliased because lifted from explicit borrowing. *)
     | In_borrowing  (** aliased because it's a usage during active borrowing *)
+    | Exported
 
   (** The occurrence is only for future error messages. The share_reason must
       corresponds to the occurrence *)
@@ -321,6 +323,7 @@ end = struct
     | Lifted of Maybe_aliased.access
     | Lifted_borrowed
     | In_borrowing
+    | Exported
 
   type t = Occurrence.t * reason
 
@@ -340,6 +343,7 @@ end = struct
       | Lifted ma -> fprintf ppf "Lifted(%a)" Maybe_aliased.print_access ma
       | Lifted_borrowed -> fprintf ppf "Lifted_borrowed"
       | In_borrowing -> fprintf ppf "In_borrowing"
+      | Exported -> fprintf ppf "Exported"
     in
     fprintf ppf "(%a,%a)" Occurrence.print occ print_reason reason
 end
@@ -1056,6 +1060,7 @@ module Projection : sig
     | Variant_field of label
     | Array_index of int
     | Memory_address (* this is rendered as clubsuit in the ICFP'24 paper *)
+    | Module_field of string
 
   module Map : Map.S with type key = t
 
@@ -1073,6 +1078,7 @@ end = struct
       | Variant_field of label
       | Array_index of int
       | Memory_address
+      | Module_field of string
 
     let compare t1 t2 =
       match t1, t2 with
@@ -1085,37 +1091,45 @@ end = struct
       | Variant_field l1, Variant_field l2 -> String.compare l1 l2
       | Array_index i, Array_index j -> Int.compare i j
       | Memory_address, Memory_address -> 0
+      | Module_field l1, Module_field l2 -> String.compare l1 l2
       | ( Tuple_field _,
           ( Record_field _ | Record_unboxed_product_field _ | Construct_field _
-          | Variant_field _ | Array_index _ | Memory_address ) ) ->
+          | Variant_field _ | Array_index _ | Memory_address | Module_field _ )
+        ) ->
         -1
       | ( ( Record_field _ | Record_unboxed_product_field _ | Construct_field _
-          | Variant_field _ | Array_index _ | Memory_address ),
+          | Variant_field _ | Array_index _ | Memory_address | Module_field _ ),
           Tuple_field _ ) ->
         1
       | ( Record_field _,
           ( Record_unboxed_product_field _ | Construct_field _ | Variant_field _
-          | Array_index _ | Memory_address ) ) ->
+          | Array_index _ | Memory_address | Module_field _ ) ) ->
         -1
       | ( ( Record_unboxed_product_field _ | Construct_field _ | Variant_field _
-          | Array_index _ | Memory_address ),
+          | Array_index _ | Memory_address | Module_field _ ),
           Record_field _ ) ->
         1
       | ( Record_unboxed_product_field _,
-          (Construct_field _ | Variant_field _ | Array_index _ | Memory_address)
-        ) ->
+          ( Construct_field _ | Variant_field _ | Array_index _ | Memory_address
+          | Module_field _ ) ) ->
         -1
-      | ( (Construct_field _ | Variant_field _ | Array_index _ | Memory_address),
+      | ( ( Construct_field _ | Variant_field _ | Array_index _ | Memory_address
+          | Module_field _ ),
           Record_unboxed_product_field _ ) ->
         1
-      | Construct_field _, (Variant_field _ | Array_index _ | Memory_address) ->
+      | ( Construct_field _,
+          (Variant_field _ | Array_index _ | Memory_address | Module_field _) )
+        ->
         -1
-      | (Variant_field _ | Array_index _ | Memory_address), Construct_field _ ->
+      | ( (Variant_field _ | Array_index _ | Memory_address | Module_field _),
+          Construct_field _ ) ->
         1
-      | Variant_field _, (Array_index _ | Memory_address) -> -1
-      | (Array_index _ | Memory_address), Variant_field _ -> 1
-      | Array_index _, Memory_address -> -1
-      | Memory_address, Array_index _ -> 1
+      | Variant_field _, (Array_index _ | Memory_address | Module_field _) -> -1
+      | (Array_index _ | Memory_address | Module_field _), Variant_field _ -> 1
+      | Array_index _, (Memory_address | Module_field _) -> -1
+      | (Memory_address | Module_field _), Array_index _ -> 1
+      | Memory_address, Module_field _ -> -1
+      | Module_field _, Memory_address -> 1
   end
 
   include T
@@ -1132,6 +1146,7 @@ end = struct
     | Variant_field l -> fprintf ppf "Variant_field(%s)" l
     | Array_index n -> fprintf ppf "Array_index(%d)" n
     | Memory_address -> fprintf ppf "Memory_address"
+    | Module_field s -> fprintf ppf "Module_field(%s)" s
 
   let print_map print_value ppf map =
     let module M = Print_utils.Map (Map) in
@@ -1139,8 +1154,8 @@ end = struct
 end
 
 type boundary_reason =
-  | Paths_from_mod_class (* currently will never trigger *)
-  | Free_var_of_mod_class (* currently will never trigger *)
+  | Paths_from_mod_class
+  | Free_var_of_mod_class
   | Out_of_mod_class
 
 (** The relation between two nodes in a usage tree. Obviously the list must be
@@ -1425,6 +1440,27 @@ module Usage_forest : sig
     (** Create a fresh tree in the forest *)
     val fresh_root : unit -> t
 
+    type stamp
+
+    val current_stamp : unit -> stamp
+
+    module Root_set : sig
+      type t
+
+      val empty : t
+    end
+
+    val collect_root_since : stamp -> t -> Root_set.t -> Root_set.t
+
+    (* CR dkalinichenko: explain this. *)
+    type refresher
+
+    val refresher : Root_set.t -> refresher
+
+    val refresh : refresher -> t -> t
+
+    val refresh_set : refresher -> Root_set.t -> Root_set.t
+
     val print : Format.formatter -> t -> unit
   end
 
@@ -1492,6 +1528,7 @@ end = struct
 
     include T
     module Map = Map.Make (T)
+    module Set = Set.Make (T)
 
     let stamp = ref 0
 
@@ -1512,6 +1549,37 @@ end = struct
       rootid, Usage_tree.Path.child proj path
 
     let fresh_root () : t = Root_id.fresh (), Usage_tree.Path.root
+
+    type stamp = int
+
+    let current_stamp () = !Root_id.stamp
+
+    module Root_set = Root_id.Set
+
+    let collect_root_since stamp ((root, _) : t) set =
+      if root.Root_id.id >= stamp then Root_set.add root set else set
+
+    type refresher =
+      { roots : Root_set.t;
+        memo : (Root_id.t, Root_id.t) Hashtbl.t
+      }
+
+    let refresher roots = { roots; memo = Hashtbl.create 8 }
+
+    let refresh_root r root =
+      if Root_set.mem root r.roots
+      then (
+        match Hashtbl.find_opt r.memo root with
+        | Some root' -> root'
+        | None ->
+          let root' = Root_id.fresh () in
+          Hashtbl.add r.memo root root';
+          root')
+      else root
+
+    let refresh r ((root, path) : t) : t = refresh_root r root, path
+
+    let refresh_set r set = Root_set.map (refresh_root r) set
 
     let print ppf (root_id, path) =
       let open Format in
@@ -1642,6 +1710,8 @@ module Paths : sig
       where [gf] is the appropriate modality for mutability [mut]. *)
   val array_index : Types.mutability -> int -> t -> t
 
+  val module_field : string -> t -> t
+
   (** [memory_address t] is [child Projection.Memory_address t]. *)
   val memory_address : t -> t
 
@@ -1651,10 +1721,17 @@ module Paths : sig
 
   val choose : t -> t -> t
 
+  val collect_roots_since :
+    UF.Path.stamp -> t -> UF.Path.Root_set.t -> UF.Path.Root_set.t
+
+  val refresh : UF.Path.refresher -> t -> t
+
   val mark_implicit_borrow_memory_address :
     Occurrence.t -> Maybe_aliased.access -> t -> UF.t
 
   val mark_aliased : Occurrence.t -> Aliased.reason -> t -> UF.t
+
+  val mark_maybe_unique : unique_use -> Occurrence.t -> t -> UF.t
 
   (** Confine borrowed values by updating their usage in the usage forest *)
   val confine_borrow :
@@ -1697,6 +1774,8 @@ end = struct
 
   let variant_field s t = child (Projection.Variant_field s) t
 
+  let module_field s t = child (Projection.Module_field s) t
+
   let array_index mut i t =
     let modality = Typemode.mutable_modalities mut in
     modal_child modality (Projection.Array_index i) t
@@ -1708,6 +1787,13 @@ end = struct
 
   let fresh () = [UF.Path.fresh_root ()]
 
+  let collect_roots_since stamp t set =
+    List.fold_left
+      (fun set path -> UF.Path.collect_root_since stamp path set)
+      set t
+
+  let refresh r t = List.map (UF.Path.refresh r) t
+
   let mark_implicit_borrow_memory_address occ access paths =
     mark
       (Maybe_aliased (Maybe_aliased.singleton occ access))
@@ -1715,6 +1801,11 @@ end = struct
 
   let mark_aliased occ reason paths =
     mark (Usage.aliased occ reason) Learned_tags.empty Overwrites.empty paths
+
+  let mark_maybe_unique unique_use occ paths =
+    mark
+      (Usage.maybe_unique unique_use occ)
+      Learned_tags.empty Overwrites.empty paths
 
   let confine_borrow ~region_loc borrow_occ paths uf =
     List.fold_left
@@ -1779,6 +1870,9 @@ module Value : sig
   (** Mark the value as aliased_or_unique *)
   val mark_maybe_unique : t -> UF.t
 
+  (* CR dkalinichenko: explain this. *)
+  val maybe_unique_marker : t -> (Paths.t -> UF.t) option
+
   (** Mark the value's memory address as aliased_or_unique *)
   val mark_consumed_memory_address : t -> UF.t
 
@@ -1835,17 +1929,17 @@ end = struct
   let mark_maybe_unique = function
     | Fresh -> UF.unused
     | Existing { paths; unique_use; occ } ->
-      Paths.mark
-        (Usage.maybe_unique unique_use occ)
-        Learned_tags.empty Overwrites.empty paths
+      Paths.mark_maybe_unique unique_use occ paths
+
+  let maybe_unique_marker = function
+    | Fresh -> None
+    | Existing { unique_use; occ; _ } ->
+      Some (Paths.mark_maybe_unique unique_use occ)
 
   let mark_consumed_memory_address = function
     | Fresh -> UF.unused
     | Existing { paths; unique_use; occ } ->
-      Paths.mark
-        (Usage.maybe_unique unique_use occ)
-        Learned_tags.empty Overwrites.empty
-        (Paths.memory_address paths)
+      Paths.mark_maybe_unique unique_use occ (Paths.memory_address paths)
 
   let mark_aliased ~reason = function
     | Fresh -> UF.unused
@@ -1878,6 +1972,124 @@ end = struct
         paths Typedtree.print_unique_use unique_use Occurrence.print occ
 end
 
+module Entry : sig
+  (* CR dkalinichenko: explain this. *)
+  type t =
+    { paths : Paths.t;
+      components : t String_map.t;
+      internal : UF.Path.Root_set.t list
+    }
+
+  val value : Paths.t -> t
+
+  val module_ :
+    ?internal:UF.Path.Root_set.t list -> Paths.t -> t String_map.t -> t
+
+  val component : string -> t -> t
+
+  val choose : t -> t -> t
+
+  val mark_all : (Paths.t -> UF.t) -> t -> UF.t
+
+  val collect_roots_since :
+    UF.Path.stamp -> t -> UF.Path.Root_set.t -> UF.Path.Root_set.t
+
+  val refresh : UF.Path.refresher -> t String_map.t -> t String_map.t
+
+  val print : Format.formatter -> t -> unit
+end = struct
+  type t =
+    { paths : Paths.t;
+      components : t String_map.t;
+      internal : UF.Path.Root_set.t list
+    }
+
+  module Identity_tbl = Hashtbl.Make (struct
+    type nonrec t = t
+
+    let equal = ( == )
+
+    let hash = Hashtbl.hash
+  end)
+
+  let value paths = { paths; components = String_map.empty; internal = [] }
+
+  let module_ ?(internal = []) paths components =
+    { paths; components; internal }
+
+  let component name t =
+    match String_map.find_opt name t.components with
+    | Some entry -> entry
+    | None -> value (Paths.module_field name t.paths)
+
+  let rec choose t0 t1 =
+    { paths = Paths.choose t0.paths t1.paths;
+      components =
+        String_map.merge
+          (fun _name e0 e1 ->
+            match e0, e1 with
+            | None, None -> None
+            | Some e0, Some e1 -> Some (choose e0 e1)
+            | (Some _ as e), None | None, (Some _ as e) -> e)
+          t0.components t1.components;
+      internal = (if t0.internal == t1.internal then t0.internal else [])
+    }
+
+  let mark_all f t =
+    (* Memoize to avoid exponential re-visits *)
+    let visited = Identity_tbl.create 16 in
+    let rec go t =
+      if Identity_tbl.mem visited t
+      then UF.unused
+      else begin
+        Identity_tbl.add visited t ();
+        UF.pars
+          (f t.paths
+          :: List.map
+               (fun (_, entry) -> go entry)
+               (String_map.bindings t.components))
+      end
+    in
+    go t
+
+  let collect_roots_since stamp t set =
+    let visited = Identity_tbl.create 16 in
+    let rec go t set =
+      if Identity_tbl.mem visited t
+      then set
+      else begin
+        Identity_tbl.add visited t ();
+        let set = Paths.collect_roots_since stamp t.paths set in
+        String_map.fold (fun _name entry set -> go entry set) t.components set
+      end
+    in
+    go t set
+
+  let refresh refresher components =
+    let memo = Identity_tbl.create 16 in
+    let rec go t =
+      match Identity_tbl.find_opt memo t with
+      | Some t' -> t'
+      | None ->
+        let t' =
+          { paths = Paths.refresh refresher t.paths;
+            components = String_map.map go t.components;
+            internal = List.map (UF.Path.refresh_set refresher) t.internal
+          }
+        in
+        Identity_tbl.add memo t t';
+        t'
+    in
+    String_map.map go components
+
+  let rec print ppf t =
+    let module M = Print_utils.Map (String_map) in
+    Format.fprintf ppf "@[{ paths = %a;@ components = %a }@]" Paths.print
+      t.paths
+      (M.print ~key:Format.pp_print_string ~value:print)
+      t.components
+end
+
 module Ienv : sig
   module Extension : sig
     (** Extention to Ienv. Usually generated by a pattern *)
@@ -1893,11 +2105,17 @@ module Ienv : sig
     (** Similar to [conjunct] but lifted to lists *)
     val conjuncts : t list -> t
 
+    val shadow : t -> t -> t
+
     (** The empty extension *)
     val empty : t
 
     val singleton : Ident.t -> Paths.t -> t
     (* Constructing a mapping with only one mapping  *)
+
+    val singleton_entry : Ident.t -> Entry.t -> t
+
+    val bindings : t -> (Ident.t * Entry.t) list
 
     val print : Format.formatter -> t -> unit
   end
@@ -1912,20 +2130,19 @@ module Ienv : sig
   (** The empty mapping *)
   val empty : t
 
-  (** Find the list of paths corresponding to an identifier *)
-  val find_opt : Ident.t -> t -> Paths.t option
+  val find_opt : Ident.t -> t -> Entry.t option
 
   val print : Format.formatter -> t -> unit
 end = struct
   module Extension = struct
-    type t = Paths.t Ident.Map.t
+    type t = Entry.t Ident.Map.t
 
     let disjunct ienv0 ienv1 =
       Ident.Map.merge
         (fun _id locs0 locs1 ->
           match locs0, locs1 with
           | None, None -> None
-          | Some paths0, Some paths1 -> Some (Paths.choose paths0 paths1)
+          | Some entry0, Some entry1 -> Some (Entry.choose entry0 entry1)
           (* cannot bind variable only in one of the OR-patterns *)
           | _, _ -> assert false)
         ienv0 ienv1
@@ -1941,28 +2158,35 @@ end = struct
 
     let conjuncts = List.fold_left conjunct empty
 
-    let singleton id locs = Ident.Map.singleton id locs
+    let shadow ienv0 ienv1 =
+      Ident.Map.union (fun _id _entry0 entry1 -> Some entry1) ienv0 ienv1
+
+    let singleton id locs = Ident.Map.singleton id (Entry.value locs)
+
+    let singleton_entry id entry = Ident.Map.singleton id entry
+
+    let bindings = Ident.Map.bindings
 
     let print ppf t =
       let module M = Print_utils.Map (Ident.Map) in
-      M.print ~key:Ident.print ~value:Paths.print ppf t
+      M.print ~key:Ident.print ~value:Entry.print ppf t
   end
 
-  type t = Paths.t Ident.Map.t
+  type t = Entry.t Ident.Map.t
 
   let empty = Ident.Map.empty
 
   let extend t ex =
     Ident.Map.union
       (* the extension shadows the original *)
-      (fun _id _paths0 paths1 -> Some paths1)
+      (fun _id _entry0 entry1 -> Some entry1)
       t ex
 
   let find_opt = Ident.Map.find_opt
 
   let print ppf t =
     let module M = Print_utils.Map (Ident.Map) in
-    M.print ~key:Ident.print ~value:Paths.print ppf t
+    M.print ~key:Ident.print ~value:Entry.print ppf t
 end
 
 (* The fun algebraic stuff ends. Here comes the concrete mess *)
@@ -2191,46 +2415,75 @@ let comp_pattern_match pat value =
   | Some pat' -> pattern_match pat' value
   | None -> Ienv.Extension.empty, UF.unused
 
-(** Given some [ienv], find the [Value.t] corresponding to an identifier.
+(* CR dkalinichenko: explain this. *)
+let implicit_module_read occ paths =
+  let barrier = Unique_barrier.not_computed () in
+  Unique_barrier.enable barrier;
+  Paths.mark_implicit_borrow_memory_address occ (Read barrier) paths
 
-    There are two cases that it might be missing, both of which are related to
-    "module and class boundary" (see below):
-    - We are checking inside a module, and the identifier is refering to a value
-      defined outside of the module. In such case, we force this identifier to
-      [aliased].
-    - Another case is used by [open_variables]. See comments there. *)
-let value_of_ident ienv ?(force_missing = true) unique_use occ path =
-  match path with
+let rec entry_of_path ienv occ : Path.t -> (Entry.t * UF.t) option = function
   | Path.Pident id -> (
     match Ienv.find_opt id ienv with
     (* TODO: for better error message, we should record in ienv why some
        variables are not in it. *)
-    | None ->
-      if force_missing
-      then force_aliased_boundary ~reason:Out_of_mod_class unique_use occ;
-      None
-    | Some paths ->
-      let value = Value.existing paths unique_use occ in
-      Some value)
-  (* accessing a module, which is forced by typemod to be aliased and many.
-     Here we force it again just to be sure *)
-  | Path.Pdot _ ->
-    force_aliased_boundary ~reason:Paths_from_mod_class unique_use occ;
+    | None -> None
+    | Some entry -> Some (entry, UF.unused))
+  | Path.Pdot (prefix, name) -> (
+    match entry_of_path ienv occ prefix with
+    | None -> None
+    | Some (parent, uf) ->
+      let uf_read = implicit_module_read occ parent.Entry.paths in
+      Some (Entry.component name parent, UF.seq uf uf_read))
+  | Path.Papply _ ->
+    (* CR dkalinichenko: explain this. *)
     None
-  | Path.Papply _ | Path.Pextra_ty _ -> assert false
+  | Path.Pextra_ty _ -> assert false
 
-(* Module and class boundary
+let boundary_reason_of_path : Path.t -> boundary_reason = function
+  | Path.Pident _ -> Out_of_mod_class
+  | Path.Pdot _ | Path.Papply _ -> Paths_from_mod_class
+  | Path.Pextra_ty _ -> assert false
 
-   Currently we treat the boundary between modules/classes and their surrounding
-   environment coarsely. To be specific, all references in the modules/classes
-   pointing to the environment are treated as many and aliased. This translates
-   to enforcement on both ends:
-   - inside the module, those uses needs to be forced as many and aliased
+(** Given some [ienv], find the [Value.t] corresponding to an identifier,
+    together with the usage implied by reading through its path (see
+    [entry_of_path]).
+
+    There are two cases that it might be missing, both of which are related to
+    the "class boundary" (see below):
+    - We are checking inside a class (or a separate analysis scope, such as
+      another compilation unit), and the identifier refers to a value defined
+      outside of it. In such case, we force this identifier to [aliased].
+    - Another case is used by [mark_aliased_open_variables]. See comments there.
+*)
+let value_of_ident ienv ?(force_missing = true) unique_use occ path =
+  match entry_of_path ienv occ path with
+  | Some (entry, uf) ->
+    Some (Value.existing entry.Entry.paths unique_use occ, uf)
+  | None ->
+    if force_missing
+    then
+      force_aliased_boundary
+        ~reason:(boundary_reason_of_path path)
+        unique_use occ;
+    None
+
+(* Class boundary
+
+   Modules are tracked precisely (see [check_uniqueness_mod]), but we treat
+   the boundary between classes/objects and their surrounding environment
+   coarsely: all references in the classes pointing to the environment are
+   treated as many and aliased. This translates to enforcement on both ends:
+   - inside the class, those uses needs to be forced as many and aliased
    - need a UF.t which marks those uses as many and aliased, so that the
-     parent expression can detect conflict if any. *)
+     parent expression can detect conflict if any.
 
-(** Returns all open variables inside a module. *)
-let open_variables ienv f =
+   The same treatment applies to values referring to other compilation units
+   (or to enclosing toplevel phrases), whose identifiers are missing from
+   [ienv]. *)
+
+(** Marks all open variables (and open modules) inside a class/module as
+    aliased, as well as returning a UF reflecting all those aliased usages. *)
+let mark_aliased_open_variables ienv f _loc =
   let ll = ref [] in
   let iter =
     { Tast_iterator.default_iterator with
@@ -2248,24 +2501,29 @@ let open_variables ienv f =
               value_of_ident ienv ~force_missing:false unique_use occ path
             with
             | None -> ()
-            | Some value -> ll := value :: !ll)
+            | Some (value, uf_read) ->
+              let uf = Value.mark_aliased value ~reason:Free_var_of_mod_class in
+              ll := UF.seq uf_read uf :: !ll)
           | _ -> ());
-          Tast_iterator.default_iterator.expr self e)
+          Tast_iterator.default_iterator.expr self e);
+      module_expr =
+        (fun self m ->
+          (match m.mod_desc with
+          | Tmod_ident (path, _, unique_use) -> (
+            let occ = Occurrence.mk m.mod_loc in
+            match entry_of_path ienv occ path with
+            | None -> ()
+            | Some (entry, uf_read) ->
+              force_aliased_boundary ~reason:Free_var_of_mod_class unique_use
+                occ;
+              let uf = Entry.mark_all (Paths.mark_aliased occ Forced) entry in
+              ll := UF.seq uf_read uf :: !ll)
+          | _ -> ());
+          Tast_iterator.default_iterator.module_expr self m)
     }
   in
   f iter;
-  !ll
-
-(** Marks all open variables in a class/module as aliased, as well as returning
-    a UF reflecting all those aliased usage. *)
-let mark_aliased_open_variables ienv f _loc =
-  let ll = open_variables ienv f in
-  let ufs =
-    List.map
-      (fun value -> Value.mark_aliased value ~reason:Free_var_of_mod_class)
-      ll
-  in
-  UF.pars ufs
+  UF.pars !ll
 
 let lift_implicit_borrowing uf =
   UF.map
@@ -2314,6 +2572,91 @@ let descend proj overwrite =
   | None -> None
   | Some paths -> Some (Paths.child proj paths)
 
+type mod_value =
+  { mod_root : Value.t;
+    mod_components : Entry.t String_map.t;
+    mod_internal : UF.Path.Root_set.t list
+  }
+
+let fresh_mod_value =
+  { mod_root = Value.fresh;
+    mod_components = String_map.empty;
+    mod_internal = []
+  }
+
+let entry_of_mod_value { mod_root; mod_components; mod_internal } =
+  let paths =
+    match Value.paths mod_root with
+    | None -> Paths.fresh ()
+    | Some paths -> paths
+  in
+  Entry.module_ ~internal:mod_internal paths mod_components
+
+let ext_of_mod_binding id mv =
+  match id with
+  | None -> Ienv.Extension.empty
+  | Some id -> Ienv.Extension.singleton_entry id (entry_of_mod_value mv)
+
+let apply_mod_value mv_funct =
+  match mv_funct.mod_internal with
+  | [] -> mv_funct.mod_components, []
+  | internal :: rest ->
+    let refresher = UF.Path.refresher internal in
+    let components = Entry.refresh refresher mv_funct.mod_components in
+    components, List.map (UF.Path.refresh_set refresher) rest
+
+let functor_arg_demand (funct : module_expr) : unique_use option =
+  match Mtype.scrape_alias funct.mod_env funct.mod_type with
+  | Types.Mty_functor (Types.Named (_, _, mm_param), _, _) ->
+    let mode = Mode.alloc_as_value mm_param in
+    Some
+      ( Uniqueness.disallow_left (Mode.Value.proj_monadic Uniqueness mode),
+        Linearity.disallow_right (Mode.Value.proj_comonadic Linearity mode) )
+  | _ -> None
+
+(* CR dkalinichenko: explain this. *)
+let consume_mod_value ?fresh_demand ~loc mv =
+  let uf_root = Value.mark_maybe_unique mv.mod_root in
+  let occ = Occurrence.mk loc in
+  let mark_component =
+    match Value.maybe_unique_marker mv.mod_root with
+    | Some mark -> mark
+    | None -> (
+      match fresh_demand with
+      | Some unique_use -> Paths.mark_maybe_unique unique_use occ
+      | None -> Paths.mark_aliased occ Forced)
+  in
+  let uf_components =
+    List.map
+      (fun (_, entry) -> Entry.mark_all mark_component entry)
+      (String_map.bindings mv.mod_components)
+  in
+  UF.pars (uf_root :: uf_components)
+
+let value_and_module_ids sg =
+  List.filter_map
+    (function
+      | Types.Sig_value (id, _, _) | Types.Sig_module (id, _, _, _, _) ->
+        Some id
+      | _ -> None)
+    sg
+
+let ext_of_signature entry sg =
+  List.fold_left
+    (fun acc id ->
+      Ienv.Extension.shadow acc
+        (Ienv.Extension.singleton_entry id
+           (Entry.component (Ident.name id) entry)))
+    Ienv.Extension.empty (value_and_module_ids sg)
+
+let functor_param_names (me : module_expr) =
+  match Mtype.scrape_alias me.mod_env me.mod_type with
+  | Types.Mty_functor (Types.Named (_, mty_param, _), _, _) -> (
+    match Mtype.scrape me.mod_env mty_param with
+    | Types.Mty_signature sg -> List.map Ident.name (value_and_module_ids sg)
+    | _ -> [])
+  | _ -> []
+
 (* There are two modes our algorithm will work at.
 
    In the first mode, we care about if the expression can be considered as
@@ -2346,6 +2689,8 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
     check_uniqueness_comprehensions ~borrows
   in
   let check_uniqueness_binding_op = check_uniqueness_binding_op ~borrows in
+  let check_uniqueness_mod = check_uniqueness_mod ~borrows in
+  let check_uniqueness_open_decl = check_uniqueness_open_decl ~borrows in
   function
   | Texp_ident _ as exp_desc ->
     let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc exp_desc in
@@ -2605,12 +2950,9 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
       (List.map
          (fun (_, _, e) -> check_uniqueness_exp ~overwrite:None ienv e)
          ls)
-  | Texp_letmodule (_, _, _, mod_expr, body) ->
-    let uf_mod =
-      mark_aliased_open_variables ienv
-        (fun iter -> iter.module_expr iter mod_expr)
-        mod_expr.mod_loc
-    in
+  | Texp_letmodule (id, _, _, mod_expr, body) ->
+    let mv, uf_mod = check_uniqueness_mod ienv mod_expr in
+    let ienv = Ienv.extend ienv (ext_of_mod_binding id mv) in
     let uf_body = check_uniqueness_exp ~overwrite:None ienv body in
     UF.seq uf_mod uf_body
   | Texp_letexception (_, e) -> check_uniqueness_exp ~overwrite:None ienv e
@@ -2625,11 +2967,8 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
       (fun iter -> iter.class_structure iter cls_struc)
       loc
   | Texp_pack mod_expr ->
-    (* the module will be type-checked by Typemod which invokes uniqueness
-       analysis. *)
-    mark_aliased_open_variables ienv
-      (fun iter -> iter.module_expr iter mod_expr)
-      mod_expr.mod_loc
+    let mv, uf = check_uniqueness_mod ienv mod_expr in
+    UF.seq uf (consume_mod_value ~loc:mod_expr.mod_loc mv)
   | Texp_letop { let_; ands; body } ->
     let uf_let = check_uniqueness_binding_op ienv let_ in
     let uf_ands =
@@ -2643,12 +2982,8 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_unreachable -> UF.unused
   | Texp_extension_constructor _ -> UF.unused
   | Texp_open (open_decl, e) ->
-    let uf =
-      mark_aliased_open_variables ienv
-        (fun iter -> iter.open_declaration iter open_decl)
-        open_decl.open_loc
-    in
-    UF.seq uf (check_uniqueness_exp ~overwrite:None ienv e)
+    let ext, uf = check_uniqueness_open_decl ienv open_decl in
+    UF.seq uf (check_uniqueness_exp ~overwrite:None (Ienv.extend ienv ext) e)
   | Texp_probe { handler } -> check_uniqueness_exp ~overwrite:None ienv handler
   | Texp_probe_is_enabled _ -> UF.unused
   | Texp_exclave e -> check_uniqueness_exp ~overwrite:None ienv e
@@ -2671,9 +3006,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
     | None -> assert false
     | Some p ->
       let occ = Occurrence.mk loc in
-      Paths.mark
-        (Usage.maybe_unique use occ)
-        Learned_tags.empty Overwrites.empty p)
+      Paths.mark_maybe_unique use occ p)
   (* CR metaprogramming aivaskovic:
      it might be reasonable to treat `Texp_quotation e` as `e` *)
   | Texp_quotation e ->
@@ -2706,14 +3039,14 @@ and check_uniqueness_exp_desc_as_value ~borrows ienv ~loc : _ -> Value.t * UF.t
     = function
   | Texp_ident { path; unique_use; _ } ->
     let occ = Occurrence.mk loc in
-    let value =
+    let value, uf =
       match value_of_ident ienv unique_use occ path with
       | None ->
         (* cross module access - don't track *)
-        Value.untracked unique_use occ
-      | Some value -> value
+        Value.untracked unique_use occ, UF.unused
+      | Some (value, uf) -> value, uf
     in
-    value, UF.unused
+    value, uf
   | Texp_field { record = e; label = l; boxing = float; unique_barrier; _ } -> (
     let value, uf = check_uniqueness_exp_as_value ~borrows ienv e in
     match Value.paths value with
@@ -2735,10 +3068,7 @@ and check_uniqueness_exp_desc_as_value ~borrows ienv ~loc : _ -> Value.t * UF.t
         | Non_boxing unique_use ->
           UF.unused, Value.existing paths unique_use occ
         | Boxing (_, unique_use) ->
-          ( Paths.mark
-              (Usage.maybe_unique unique_use occ)
-              Learned_tags.empty Overwrites.empty paths,
-            Value.fresh )
+          Paths.mark_maybe_unique unique_use occ paths, Value.fresh
       in
       value, UF.seqs [uf; uf_read; uf_boxing])
   | Texp_unboxed_field { record = e; label = l; unique_use; _ } -> (
@@ -2930,11 +3260,181 @@ and check_uniqueness_binding_op ~borrows ienv bo =
   let occ = Occurrence.mk bo.bop_loc in
   let uf_path =
     match value_of_ident ienv aliased_many_use occ bo.bop_op_path with
-    | Some value -> Value.mark_maybe_unique value
+    | Some (value, uf) -> UF.seq uf (Value.mark_maybe_unique value)
     | None -> UF.unused
   in
   let uf_exp = check_uniqueness_exp ~borrows ~overwrite:None ienv bo.bop_exp in
   UF.par uf_path uf_exp
+
+and check_uniqueness_mod ~borrows ienv (me : module_expr) : mod_value * UF.t =
+  let loc = me.mod_loc in
+  match me.mod_desc with
+  | Tmod_ident (path, _, unique_use) -> (
+    let occ = Occurrence.mk loc in
+    match entry_of_path ienv occ path with
+    | Some (entry, uf_read) ->
+      ( { mod_root = Value.existing entry.Entry.paths unique_use occ;
+          mod_components = entry.Entry.components;
+          mod_internal = entry.Entry.internal
+        },
+        uf_read )
+    | None ->
+      force_aliased_boundary
+        ~reason:(boundary_reason_of_path path)
+        unique_use occ;
+      ( { fresh_mod_value with mod_root = Value.untracked unique_use occ },
+        UF.unused ))
+  | Tmod_structure str ->
+    let components, uf =
+      check_uniqueness_structure_items ~borrows ienv str.str_items
+    in
+    { fresh_mod_value with mod_components = components }, uf
+  | Tmod_functor (param, body) ->
+    (* CR dkalinichenko: explain this. *)
+    let stamp = UF.Path.current_stamp () in
+    let ienv =
+      match param with
+      | Unit | Named (None, _, _, _) -> ienv
+      | Named (Some id, _, _, _) ->
+        Ienv.extend ienv (Ienv.Extension.singleton id (Paths.fresh ()))
+    in
+    let mv_body, uf = check_uniqueness_mod ~borrows ienv body in
+    let internal =
+      String_map.fold
+        (fun _name entry set -> Entry.collect_roots_since stamp entry set)
+        mv_body.mod_components UF.Path.Root_set.empty
+    in
+    ( { fresh_mod_value with
+        mod_components = mv_body.mod_components;
+        mod_internal = internal :: mv_body.mod_internal
+      },
+      lift_implicit_borrowing uf )
+  | Tmod_apply (funct, arg, _) ->
+    let mv_funct, uf_funct = check_uniqueness_mod ~borrows ienv funct in
+    let mv_arg, uf_arg = check_uniqueness_mod ~borrows ienv arg in
+    let uf_consume_funct = Value.mark_maybe_unique mv_funct.mod_root in
+    let uf_consume_arg =
+      consume_mod_value ?fresh_demand:(functor_arg_demand funct)
+        ~loc:arg.mod_loc mv_arg
+    in
+    let components, internal = apply_mod_value mv_funct in
+    ( { fresh_mod_value with
+        mod_components = components;
+        mod_internal = internal
+      },
+      UF.seqs [uf_funct; uf_arg; uf_consume_funct; uf_consume_arg] )
+  | Tmod_apply_unit funct ->
+    let mv_funct, uf_funct = check_uniqueness_mod ~borrows ienv funct in
+    let components, internal = apply_mod_value mv_funct in
+    ( { fresh_mod_value with
+        mod_components = components;
+        mod_internal = internal
+      },
+      UF.seq uf_funct (Value.mark_maybe_unique mv_funct.mod_root) )
+  | Tmod_constraint (inner, _, _, coercion) -> (
+    let mv, uf = check_uniqueness_mod ~borrows ienv inner in
+    match coercion with
+    | Tcoerce_none | Tcoerce_alias _ -> mv, uf
+    | Tcoerce_invalid ->
+      Misc.fatal_error "check_uniqueness_mod: invalid coercion on a module"
+    | Tcoerce_structure _ | Tcoerce_functor _ | Tcoerce_primitive _ ->
+      let occ = Occurrence.mk loc in
+      let uf_read =
+        match Value.paths mv.mod_root with
+        | None -> UF.unused
+        | Some paths -> implicit_module_read occ paths
+      in
+      mv, UF.seq uf uf_read)
+  | Tmod_unpack (e, _) ->
+    let value, uf = check_uniqueness_exp_as_value ~borrows ienv e in
+    { fresh_mod_value with mod_root = value }, uf
+
+and check_uniqueness_structure_items ~borrows ienv items :
+    Entry.t String_map.t * UF.t =
+  let _ienv, names, rev_ufs =
+    List.fold_left
+      (fun (ienv, names, rev_ufs) item ->
+        let ext, uf =
+          check_uniqueness_structure_item ~borrows
+            ~preceding:(lazy names)
+            ienv item
+        in
+        let names =
+          match item.str_desc with
+          | Tstr_open _ -> names
+          | _ ->
+            List.fold_left
+              (fun acc (id, entry) -> String_map.add (Ident.name id) entry acc)
+              names
+              (Ienv.Extension.bindings ext)
+        in
+        Ienv.extend ienv ext, names, uf :: rev_ufs)
+      (ienv, String_map.empty, [])
+      items
+  in
+  names, UF.seqs (List.rev rev_ufs)
+
+and check_uniqueness_structure_item ~borrows ~preceding ienv item :
+    Ienv.Extension.t * UF.t =
+  match item.str_desc with
+  | Tstr_eval (e, _, _) ->
+    Ienv.Extension.empty, check_uniqueness_exp ~borrows ~overwrite:None ienv e
+  | Tstr_value (_, vbs) -> check_uniqueness_value_bindings ~borrows ienv vbs
+  | Tstr_module mb -> check_uniqueness_module_binding ~borrows ienv mb
+  | Tstr_recmodule mbs ->
+    (* CR dkalinichenko: explain this. *)
+    let exts, ufs =
+      List.split (List.map (check_uniqueness_module_binding ~borrows ienv) mbs)
+    in
+    Ienv.Extension.conjuncts exts, UF.pars ufs
+  | Tstr_open od -> check_uniqueness_open_decl ~borrows ienv od
+  | Tstr_include incl -> (
+    let mv, uf = check_uniqueness_mod ~borrows ienv incl.incl_mod in
+    let occ = Occurrence.mk item.str_loc in
+    match incl.incl_kind with
+    | Tincl_structure ->
+      let uf_read =
+        match Value.paths mv.mod_root with
+        | None -> UF.unused
+        | Some paths -> implicit_module_read occ paths
+      in
+      let ext = ext_of_signature (entry_of_mod_value mv) incl.incl_type in
+      ext, UF.seqs [uf; uf_read]
+    | Tincl_functor _ | Tincl_gen_functor _ ->
+      (* CR dkalinichenko: explain this. *)
+      let uf_apply = consume_mod_value ~loc:incl.incl_mod.mod_loc mv in
+      let uf_args =
+        List.filter_map
+          (fun name ->
+            Option.map
+              (Entry.mark_all (Paths.mark_aliased occ Forced))
+              (String_map.find_opt name (Lazy.force preceding)))
+          (functor_param_names incl.incl_mod)
+      in
+      let ext =
+        ext_of_signature
+          (Entry.module_ (Paths.fresh ()) String_map.empty)
+          incl.incl_type
+      in
+      ext, UF.seqs (uf :: uf_apply :: uf_args))
+  | Tstr_class cls ->
+    ( Ienv.Extension.empty,
+      mark_aliased_open_variables ienv
+        (fun iter ->
+          List.iter (fun (cd, _) -> iter.class_declaration iter cd) cls)
+        item.str_loc )
+  | Tstr_class_type _ | Tstr_primitive _ | Tstr_type _ | Tstr_typext _
+  | Tstr_exception _ | Tstr_modtype _ | Tstr_attribute _ | Tstr_jkind _ ->
+    Ienv.Extension.empty, UF.unused
+
+and check_uniqueness_module_binding ~borrows ienv mb : Ienv.Extension.t * UF.t =
+  let mv, uf = check_uniqueness_mod ~borrows ienv mb.mb_expr in
+  ext_of_mod_binding mb.mb_id mv, uf
+
+and check_uniqueness_open_decl ~borrows ienv od : Ienv.Extension.t * UF.t =
+  let mv, uf = check_uniqueness_mod ~borrows ienv od.open_expr in
+  let ext = ext_of_signature (entry_of_mod_value mv) od.open_bound_items in
+  ext, uf
 
 let check_uniqueness_exp exp =
   let uf = check_uniqueness_exp ~borrows:None ~overwrite:None Ienv.empty exp in
@@ -2945,6 +3445,91 @@ let check_uniqueness_value_bindings vbs =
   let _, uf = check_uniqueness_value_bindings ~borrows:None Ienv.empty vbs in
   UF.check_no_remaining_overwritten_as uf;
   ()
+
+let unique_extension_enabled () =
+  Language_extension.is_at_least Unique
+    Language_extension.maturity_of_unique_for_drf
+
+let mk_unique_use ~submode mode_l mode_r =
+  if not (unique_extension_enabled ())
+  then begin
+    (* if unique extension is not enabled, we will not run uniqueness analysis;
+       instead, we force all uses to be aliased and many. This is equivalent to
+       running a UA which forces everything *)
+    submode
+      (Mode.Value.disallow_right
+         Mode.Value.(of_const { Const.min with uniqueness = Aliased }))
+      mode_r;
+    submode mode_l
+      (Mode.Value.disallow_left
+         Mode.Value.(of_const { Const.max with linearity = Many }));
+    aliased_many_use
+  end
+  else
+    ( Uniqueness.disallow_left (Mode.Value.proj_monadic Uniqueness mode_r),
+      Linearity.disallow_right (Mode.Value.proj_comonadic Linearity mode_l) )
+
+let check_uniqueness_module_expr me =
+  if unique_extension_enabled ()
+  then begin
+    let _, uf = check_uniqueness_mod ~borrows:None Ienv.empty me in
+    UF.check_no_remaining_overwritten_as uf
+  end
+
+type export =
+  | Export_all
+  | Export_signature of Types.signature
+
+let check_structure items ~exported =
+  if unique_extension_enabled ()
+  then begin
+    let _ienv, uf, bound, opened =
+      List.fold_left
+        (fun (ienv, uf, bound, opened) item ->
+          let preceding = lazy (String_map.map fst bound) in
+          let ext, uf_item =
+            check_uniqueness_structure_item ~borrows:None ~preceding ienv item
+          in
+          UF.check_no_remaining_overwritten_as uf_item;
+          let occ = Occurrence.mk item.str_loc in
+          let bound, opened =
+            (* CR dkalinichenko: explain this. *)
+            match item.str_desc with
+            | Tstr_open _ ->
+              ( bound,
+                List.fold_left
+                  (fun opened (_, entry) -> (entry, occ) :: opened)
+                  opened
+                  (Ienv.Extension.bindings ext) )
+            | _ ->
+              ( List.fold_left
+                  (fun bound (id, entry) ->
+                    String_map.add (Ident.name id) (entry, occ) bound)
+                  bound
+                  (Ienv.Extension.bindings ext),
+                opened )
+          in
+          Ienv.extend ienv ext, UF.seq uf uf_item, bound, opened)
+        (Ienv.empty, UF.unused, String_map.empty, [])
+        items
+    in
+    let exported_entries =
+      match exported with
+      | Export_all -> List.map snd (String_map.bindings bound) @ opened
+      | Export_signature sg ->
+        List.filter_map
+          (fun id -> String_map.find_opt (Ident.name id) bound)
+          (value_and_module_ids sg)
+    in
+    let uf_exported =
+      UF.pars
+        (List.map
+           (fun (entry, occ) ->
+             Entry.mark_all (Paths.mark_aliased occ Exported) entry)
+           exported_entries)
+    in
+    ignore (UF.seq uf uf_exported : UF.t)
+  end
 
 let report_multi_use inner first_is_of_second =
   let { Usage.cannot_force = { occ; axis }; there; order } = inner in
@@ -2964,7 +3549,8 @@ let report_multi_use inner first_is_of_second =
         Maybe_aliased.string_of_access access
         ^ " in a closure that might be called later"
       | Lifted_borrowed -> "borrowed in a closure that might be called later"
-      | In_borrowing -> "used while being borrowed")
+      | In_borrowing -> "used while being borrowed"
+      | Exported -> "exported, and hence usable by other code")
     | _ -> "used"
   in
   let first, first_usage, second, second_usage, access_order, second_is_occ =
