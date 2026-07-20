@@ -306,7 +306,7 @@ let parse_contents ~fname contents =
   Parse.use_file lexbuf
 
 let current_arch_filter () =
-  match Target_system.architecture () with
+  match Target_system.Architecture.get () with
   | X86_64 -> Some X86_64
   | AArch64 | IA32 | ARM | POWER | Z | Riscv -> None
 

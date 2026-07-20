@@ -289,7 +289,7 @@ let kind_verbosity = ref 0             (* -kind-verbosity *)
 
 let supports_optimized_probes =
   Config.probes
-  && match Target_system.architecture () with
+  && match Target_system.Architecture.get () with
     | X86_64 -> true
     | IA32
     | ARM

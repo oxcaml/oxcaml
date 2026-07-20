@@ -53,7 +53,7 @@ let saved_x86_internal_assembler = ref None
 
 let register callback =
   current_callback := Some callback;
-  match Target_system.architecture () with
+  match Target_system.Architecture.get () with
   | X86_64 ->
     (* Save old x86 internal assembler and register our hook *)
     saved_x86_internal_assembler := !X86_proc.internal_assembler;
@@ -112,7 +112,7 @@ let register callback =
 
 let unregister () =
   current_callback := None;
-  match Target_system.architecture () with
+  match Target_system.Architecture.get () with
   | X86_64 ->
     X86_proc.internal_assembler := !saved_x86_internal_assembler;
     saved_x86_internal_assembler := None

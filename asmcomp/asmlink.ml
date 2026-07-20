@@ -313,7 +313,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
   let needs_objcopy_workflow =
     not_output_to_dev_null output_name
     && !Clflags.dwarf_fission = Clflags.Fission_objcopy
-    && (not (Target_system.is_macos ()))
+    && (not (Target_system.System.is_macos ()))
     && mode = Ccomp.Exe
     && not !Dwarf_flags.restrict_to_upstream_dwarf
   in
@@ -335,7 +335,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
     match !Clflags.dwarf_fission with
     | Fission_none -> ()
     | Fission_objcopy ->
-      if Target_system.is_macos ()
+      if Target_system.System.is_macos ()
       then raise (Error Dwarf_fission_objcopy_on_macos)
       else if needs_objcopy_workflow
       then (
@@ -379,7 +379,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
         Misc.remove_file link_output_name;
         if objcopy_exit <> 0 then raise (Error (Objcopy_error objcopy_exit)))
     | Fission_dsymutil ->
-      if not (Target_system.is_macos ())
+      if not (Target_system.System.is_macos ())
       then raise (Error Dwarf_fission_dsymutil_not_macos)
       else if
         not_output_to_dev_null output_name

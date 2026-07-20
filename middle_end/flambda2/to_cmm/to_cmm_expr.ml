@@ -165,7 +165,7 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
               (Naked_immediate | Naked_int64 | Naked_nativeint | Naked_float) ->
             ()
           | Naked_number (Naked_float32 | Naked_vec128) -> (
-            match Target_system.architecture () with
+            match Target_system.Architecture.get () with
             | AArch64 -> ()
             | X86_64 ->
               Misc.fatal_errorf
@@ -192,7 +192,7 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
 
          jvanburen: that seems to be what clang does:
          https://godbolt.org/z/snzEoME9h *)
-      (match Target_system.architecture () with
+      (match Target_system.Architecture.get () with
       | X86_64 -> ()
       | AArch64 ->
         let kinds = Flambda_kind.With_subkind.Set.of_list kinds in

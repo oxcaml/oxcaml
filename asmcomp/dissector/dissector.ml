@@ -113,10 +113,10 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
      relocations which are only emitted when dlcode=true. *)
   if not !Clflags.dlcode then raise (Error Nodynlink_incompatible);
   (* Check that we're targeting Linux *)
-  (match Target_system.system () with
+  (match Target_system.System.get () with
   | Linux -> ()
-  | Windows _ | MacOS_like | FreeBSD | NetBSD | OpenBSD | Generic_BSD | Solaris
-  | Dragonfly | GNU | BeOS | Unknown ->
+  | Windows _ | MacOS_like | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly
+  | GNU | BeOS | Unknown ->
     Misc.fatal_error "The dissector pass is only supported on Linux targets");
   (* Check that we're running on a 64-bit architecture. The dissector parses
      ELF64 files and uses int64 arithmetic extensively. *)

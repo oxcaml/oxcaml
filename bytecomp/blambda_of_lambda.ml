@@ -986,14 +986,14 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Preinterpret_tuple_as_boxed_vector _ ->
       simd_is_not_supported ()
     | Preinterpret_tagged_int63_as_unboxed_int64 ->
-      if Target_system.is_64_bit ()
+      if Target_system.Architecture.is_64_bit ()
       then unary (Ccall "caml_reinterpret_tagged_int63_as_unboxed_int64")
       else
         Misc.fatal_error
           "Preinterpret_tagged_int63_as_unboxed_int64 can only be used on \
            64-bit targets"
     | Preinterpret_unboxed_int64_as_tagged_int63 ->
-      if Target_system.is_64_bit ()
+      if Target_system.Architecture.is_64_bit ()
       then unary (Ccall "caml_reinterpret_unboxed_int64_as_tagged_int63")
       else
         Misc.fatal_error

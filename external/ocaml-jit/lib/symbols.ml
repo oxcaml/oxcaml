@@ -95,7 +95,7 @@ let find t name =
        on macOS before calling dlsym, since caml_globalsym expects unprefixed
        names *)
     let dlsym_name =
-      match Target_system.derived_system () with
+      match Target_system.System.get () with
       | MacOS_like when String.length name > 0 && String.get name 0 = '_' ->
         String.sub name 1 (String.length name - 1)
       | _ -> name

@@ -159,10 +159,11 @@ let load_sections (type a r)
         set_protection ~mprotect:Externals.mprotect_ro ~name address size)
 
 let symbol_prefix () =
-  match Target_system.derived_system () with
+  match Target_system.System.get () with
   | MacOS_like -> "_"
-  | Linux | Win32 | Win64 | MinGW_32 | MinGW_64 | Cygwin | FreeBSD | NetBSD
-  | OpenBSD | Generic_BSD | Solaris | BeOS | GNU | Dragonfly | Unknown ->
+  | Linux
+  | Windows (Cygwin | MinGW | Native)
+  | FreeBSD | NetBSD | OpenBSD | Solaris | BeOS | GNU | Dragonfly | Unknown ->
       ""
 
 let entry_points ~phrase_name symbols =

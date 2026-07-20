@@ -80,7 +80,9 @@ let create_label_for_local_symbol section symbol =
   create_string_unchecked section (Asm_symbol.encode symbol)
 
 let label_prefix =
-  match Target_system.assembler () with MacOS -> "L" | MASM | GAS_like -> ".L"
+  match Target_system.Assembler.get () with
+  | MacOS -> "L"
+  | MASM | GAS_like -> ".L"
 
 let encode (t : t) =
   match t.label with
