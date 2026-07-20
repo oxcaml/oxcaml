@@ -472,10 +472,17 @@ let rec is_cmm_simple cmm =
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
   | Cvar _ ->
     true
-  | Cphantom_let (_, _, body) | Cname_for_debugger (_, body) ->
-    (* These constructors are transparent for the purposes of deciding
-       simplicity: they generate no code beyond that of their body. *)
+  | Cname_for_debugger (_, body) ->
+    (* [Cname_for_debugger] is transparent for the purposes of deciding
+       simplicity: it binds nothing and generates no code beyond that of its
+       body. *)
     is_cmm_simple body
+  | Cphantom_let _ ->
+    (* A phantom let generates no code, but it cannot be deemed simple: simple
+       expressions may be duplicated, and duplicating a phantom let would
+       require the phantom-bound variable to be renamed in order to avoid
+       duplicate bindings. *)
+    false
   | Clet _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _
   | Ccatch _ | Cexit _ | Cinvalid _ ->
     false
