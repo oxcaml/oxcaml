@@ -29,6 +29,14 @@ open! Int_replace_polymorphic_compare
 module C = Cfg
 module Dll = Doubly_linked_list
 
+(* Maximum immediate value used when a [Switch] is rewritten as an [Int_test]
+   below. Selection normally guarantees, via `is_immediate`, that `Int_test`
+   immediates are encodable on the target; this rewrite bypasses selection, so
+   it conservatively stays within what all targets can encode (arm64's `cmp`
+   immediate is limited to 0..4095, and `emit_cmpimm` does not split larger
+   values). *)
+let max_int_test_imm = 0xFFF
+
 (* Convert simple [Switch] to branches. *)
 let simplify_switch (block : C.basic_block) labels =
   let len = Array.length labels in
@@ -52,7 +60,7 @@ let simplify_switch (block : C.basic_block) labels =
     (* All labels are the same and equal to l *)
     block.terminator
       <- { block.terminator with desc = Always l; arg = [||]; res = [||] }
-  | [(l0, n); (ln, k)] ->
+  | [(l0, n); (ln, k)] when n <= max_int_test_imm ->
     assert (Label.equal labels.(0) l0);
     assert (Label.equal labels.(n) ln);
     assert (len = n + k);
@@ -61,7 +69,12 @@ let simplify_switch (block : C.basic_block) labels =
         { is_signed = Unsigned; imm = Some n; lt = l0; eq = ln; gt = ln }
     in
     block.terminator <- { block.terminator with desc }
-  | [(l0, m); (l1, 1); (l2, _)] when Label.equal l0 l2 ->
+  | [(l0, m); (l1, 1); (l2, n)] when Label.equal l0 l2 && m <= max_int_test_imm
+    ->
+    assert (Label.equal labels.(0) l0);
+    assert (Label.equal labels.(m) l1);
+    assert (Label.equal labels.(m + 1) l2);
+    assert (len = m + 1 + n);
     let desc =
       C.Int_test
         { is_signed = Unsigned; imm = Some m; lt = l0; eq = l1; gt = l0 }
@@ -134,7 +147,7 @@ let find_unique_index : 'a array -> f:('a -> bool) -> int option =
       begin if f (Array.unsafe_get arr idx)
       then
         begin match acc with
-        | None -> find arr (idx - 1) f None
+        | None -> find arr (idx - 1) f (Some idx)
         | Some _ -> None
         end
       else find arr (idx - 1) f acc
@@ -174,23 +187,47 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
        infer the tested temporary is equal to zero at the start of the block. *)
     (* CR-someday xclerc for xclerc: that could be extended to multiple
     predecessors, if all lead to the same inference. *)
+    (* Note that [block.predecessors] may be stale here: [run] rewrites
+       terminators during its fold over blocks and recomputes predecessors only
+       at the end. This is currently sound: edges removed by earlier rewrites
+       can only make the single-predecessor check below conservative, or make
+       it consider an already-rewritten terminator (e.g. [Always]) that matches
+       none of the cases below; and edges added by earlier rewrites are always
+       derived from evaluating or copying the terminator of an existing
+       predecessor, so a fact inferred from that terminator also holds along
+       the new edges. Any new rewrite in this module (or new inference below)
+       must preserve this property. *)
     begin match Label.Set.cardinal block.predecessors with
     | 1 ->
       let predecessor_block =
         Cfg.get_block_exn cfg (Label.Set.choose block.predecessors)
       in
       let predecessor_terminator = predecessor_block.terminator in
+      let replace_if_not_destroyed reg value =
+        (* The expansion of the predecessor's terminator may clobber registers
+           after having read its arguments (e.g. an amd64 [Switch] destroys rax
+           and rdx), in which case the inferred fact about the argument does not
+           hold at the start of the block. *)
+        let destroyed =
+          Proc.destroyed_at_terminator predecessor_terminator.desc
+        in
+        if not (Array.exists (fun r -> Reg.same_loc r reg) destroyed)
+        then replace reg value
+      in
       begin[@ocaml.warning "-4"] match predecessor_terminator.desc with
       | Truth_test { ifso; ifnot } ->
         if Label.equal ifnot block.start && not (Label.equal ifso ifnot)
-        then replace predecessor_block.terminator.arg.(0) (Const_int 0n)
+        then
+          replace_if_not_destroyed
+            predecessor_block.terminator.arg.(0)
+            (Const_int 0n)
       | Int_test { lt; eq; gt; is_signed = Signed; imm = Some const } ->
         if
           Label.equal eq block.start
           && (not (Label.equal eq gt))
           && not (Label.equal eq lt)
         then
-          replace
+          replace_if_not_destroyed
             predecessor_terminator.arg.(0)
             (Const_int (Nativeint.of_int const))
       | Switch labels ->
@@ -201,7 +238,7 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
         begin match idx with
         | None -> ()
         | Some idx ->
-          replace
+          replace_if_not_destroyed
             predecessor_terminator.arg.(0)
             (Const_int (Nativeint.of_int idx))
         end
@@ -241,22 +278,29 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
         remove_destroyed instr
       in
       match instr.desc with
-      | Op (Const_int c) -> replace instr.res.(0) (Const_int c)
+      | Op (Const_int c) ->
+        replace instr.res.(0) (Const_int c);
+        remove_destroyed instr
       | Op (Const_float32 c) ->
         if !Oxcaml_flags.cfg_value_propagation_float
         then replace instr.res.(0) (Const_float32 c)
+        else remove instr.res.(0);
+        remove_destroyed instr
       | Op (Const_float c) ->
         if !Oxcaml_flags.cfg_value_propagation_float
         then replace instr.res.(0) (Const_float c)
-      | Op Move -> (
+        else remove instr.res.(0);
+        remove_destroyed instr
+      | Op Move ->
         (* CR xclerc for xclerc: double check the "magic" / conversions behind
            moves in `Emit` will not result in invalid tracking here. *)
-        match find_opt instr.arg.(0) with
+        (match find_opt instr.arg.(0) with
         | Some value
           when Cmm.equal_machtype_component instr.res.(0).typ instr.arg.(0).typ
           ->
           replace instr.res.(0) value
-        | Some _ | None -> remove instr.res.(0))
+        | Some _ | None -> remove instr.res.(0));
+        remove_destroyed instr
       | Op (Intop_imm (op, imm)) ->
         apply_int_op op (Some (Nativeint.of_int imm))
       | Op (Intop op) ->
@@ -475,6 +519,13 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
            are jumping "inside" the loop directly, which in turn means the loop
            is no longer natural. This is acceptable if we are past the last use
            of the loop information. *)
+        (* CR-someday xclerc for xclerc: unlike the terminator-copy case below,
+           this rewrite is not disabled for the entry block. If the skipped
+           (empty) successor is the destination of a [Tailcall_self], the
+           rewrite breaks the invariant that the tailrec block is the entry
+           block or the only successor of the entry block (reported by
+           [Cfg_invariants] when -dcfg-invariants is enabled; the generated
+           code remains correct). *)
         if
           !Oxcaml_flags.cfg_value_propagation
           && is_after_regalloc && cfg.allowed_to_be_irreducible
@@ -501,9 +552,13 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
           (* If we jump to a block that is empty, we can copy the terminator
              from the successor to the current block. There might be size
              considerations, so we currently do so only for "tests" and return.
-             The optimization is disabled because of a CFG invariant expecting
-             "the tailrec block to be the entry block or the only successor of
-             the entry block". *)
+             Copying is also only correct for terminators that do not destroy
+             any register (cf. [Proc.destroyed_at_terminator]): copying e.g. a
+             [Switch] would introduce a clobber (rax and rdx on amd64) at a
+             point where register allocation did not account for it. The
+             optimization is disabled for the entry block because of a CFG
+             invariant expecting "the tailrec block to be the entry block or the
+             only successor of the entry block". *)
           match successor_block.terminator.desc with
           | Parity_test _ | Truth_test _ | Int_test _ | Float_test _ | Return ->
             block.terminator
