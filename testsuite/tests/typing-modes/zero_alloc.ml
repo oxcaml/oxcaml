@@ -401,14 +401,13 @@ Error: This value is "alloc" but is expected to be "noalloc_strict".
 |}]
 
 
-(** Test 5.1: Allocation mode identifies all allocations and forces the proper
-    mode. For each kind of allocation the typechecker can see, we test a
-    [noalloc_strict] and a [noalloc] enclosing function side by side, and -- for
-    the allocations that [stack_] supports -- a [stack_]-marked pair as well. An
-    allocation currently forces the enclosing function to [alloc], which is
-    above both [noalloc] and [noalloc_strict], so the detected cases error for
-    both. For allocations that are moved to the stack by [stack_], no error
-    is expected. *)
+(** Test 5.1: When a function is anntoated with [noalloc_strict]/[noalloc],
+    Allocation mode identifies all allocations in the function and force them
+    to be local. *)
+(* CR shsong: Currently [noalloc_strict]/[noalloc] has the same requirement,
+    both force all allocations to be local, so test results for them should be
+    the same. We will add more tests to test difference between them after we
+    make [noalloc] ignore allocation on exception branches. *)
 
 type record_t5 = { x : float; y : float }
 type 'a variant_t5 = Nothing | Just of 'a
@@ -764,66 +763,147 @@ Line 3, characters 7-8:
 Error: This value is "local" but is expected to be "global".
 |}]
 
-(* A lazy block allocates on the heap *)
-let (alloc_lazy @ noalloc_strict) (a : int) = lazy a
+(* A partial application that omits an earlier labeled argument (here [~x], while
+    the later [~y] is given) forces the compiler to abstract over the omitted
+    parameter, allocating a closure in
+    [type_omitted_parameters_and_build_result_type].
+
+    This is a special case for closure allocation at partial application where we
+    force the closure allocation to be local at callee's call site, since
+    the compiler explicitly register allocation for it.
+    However, for other closure allocation at partial application, noalloc forces
+    the allocation to be local at the callee's definition site, since whether
+    there would be allocation at the call site might be unknown at typing stage. *)
+let partial_application_omit_earlier_arg (h : (x:int -> y:int -> int)) =
+  let (require_noalloc @ noalloc_strict) () =
+    (h ~y:1)
+  in
+  let _ = require_noalloc () in
+  ()
 [%%expect{|
-Line 1, characters 46-52:
-1 | let (alloc_lazy @ noalloc_strict) (a : int) = lazy a
-                                                  ^^^^^^
+Line 3, characters 4-12:
+3 |     (h ~y:1)
+        ^^^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
+|}]
+
+let partial_application_omit_earlier_arg (h : (x:int -> y:int -> int)) =
+  let (require_noalloc @ noalloc_strict) () = exclave_
+    (h ~y:1)
+  in
+  let _ = require_noalloc () in
+  ()
+[%%expect{|
+Line 5, characters 10-28:
+5 |   let _ = require_noalloc () in
+              ^^^^^^^^^^^^^^^^^^
+Warning 5 [ignored-partial-application]: this function application is partial,
+  maybe some arguments are missing.
+
+val partial_application_omit_earlier_arg :
+  (x:int -> y:int -> int) @ noalloc_strict -> unit = <fun>
+|}]
+
+(* A lazy block always allocates on the heap and cannot be made [local]. *)
+let (alloc_lazy @ noalloc_strict) (a : int) = let _ = lazy a in ()
+[%%expect{|
+Line 1, characters 54-60:
+1 | let (alloc_lazy @ noalloc_strict) (a : int) = let _ = lazy a in ()
+                                                          ^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
-let (alloc_lazy @ noalloc) (a : int) = lazy a
+let (alloc_lazy @ noalloc) (a : int) =  let _ = lazy a in ()
 [%%expect{|
-Line 1, characters 39-45:
-1 | let (alloc_lazy @ noalloc) (a : int) = lazy a
-                                           ^^^^^^
+Line 1, characters 48-54:
+1 | let (alloc_lazy @ noalloc) (a : int) =  let _ = lazy a in ()
+                                                    ^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
-(* [stack_] does not support lazy expressions. *)
-let (stack_lazy @ noalloc_strict) (a : int) = exclave_ stack_ (lazy a)
+let (alloc_lazy @ noalloc) (a : int) = exclave_ (lazy a)
 [%%expect{|
-Line 1, characters 62-70:
-1 | let (stack_lazy @ noalloc_strict) (a : int) = exclave_ stack_ (lazy a)
-                                                                  ^^^^^^^^
+Line 1, characters 48-56:
+1 | let (alloc_lazy @ noalloc) (a : int) = exclave_ (lazy a)
+                                                    ^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
-
-(* An object allocates. *)
-let (alloc_object @ noalloc_strict) () = object method m = 1 end
+(* An object always allocates on the heap and cannot be made [local]. *)
+let (alloc_object @ noalloc_strict) () =
+  let _ = object method m = 1 end in ()
 [%%expect{|
-Line 1, characters 41-64:
-1 | let (alloc_object @ noalloc_strict) () = object method m = 1 end
-                                             ^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 10-33:
+2 |   let _ = object method m = 1 end in ()
+              ^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
-let (alloc_object @ noalloc) () = object method m = 1 end
+let (alloc_object @ noalloc) () =
+  let _ = object method m = 1 end in ()
 [%%expect{|
-Line 1, characters 34-57:
-1 | let (alloc_object @ noalloc) () = object method m = 1 end
-                                      ^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 10-33:
+2 |   let _ = object method m = 1 end in ()
+              ^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
-(* [stack_] does not support objects; here the object's method closure is
-   itself a detected allocation, so the allocation-axis error fires on the
-   method body before the unsupported-[stack_] check is reached. *)
-let (stack_object @ noalloc_strict) () = exclave_ stack_ (object method m = 1 end)
+let (stack_object @ noalloc_strict) () = exclave_ (object method m = 1 end)
 [%%expect{|
-Line 1, characters 57-82:
-1 | let (stack_object @ noalloc_strict) () = exclave_ stack_ (object method m = 1 end)
-                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 50-75:
+1 | let (stack_object @ noalloc_strict) () = exclave_ (object method m = 1 end)
+                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
 (* An object with no allocating method (here only a value field) still
    allocates the object block itself. *)
-let (obj_no_alloc_method @ noalloc_strict) () = object val x = 0 end
+let (obj_no_alloc_method @ noalloc_strict) () =
+  let _ = object val x = 0 end in ()
 [%%expect{|
-Line 1, characters 48-68:
-1 | let (obj_no_alloc_method @ noalloc_strict) () = object val x = 0 end
-                                                    ^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 10-30:
+2 |   let _ = object val x = 0 end in ()
+              ^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+let (obj_no_alloc_method @ noalloc) () =
+  let _ = object val x = 0 end in ()
+[%%expect{|
+Line 2, characters 10-30:
+2 |   let _ = object val x = 0 end in ()
+              ^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+let (obj_no_alloc_method @ noalloc_strict) () = exclave_ object val x = 0 end
+[%%expect{|
+Line 1, characters 57-77:
+1 | let (obj_no_alloc_method @ noalloc_strict) () = exclave_ object val x = 0 end
+                                                             ^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+(* A functional-update override [{< ... >}] copies [self], which allocates.
+   Like an [object] block, the copy is registered as an allocation, so it is
+   forced [local] inside a noalloc function; since the object copy needs
+   [global], it is rejected. *)
+let f () =
+  object (self)
+    val y = 0
+    method bump =
+      let (require_noalloc @ noalloc_strict) () =
+        let _ = {< y = 1 >} in ()
+      in
+      require_noalloc ()
+  end
+[%%expect{|
+Line 6, characters 16-27:
+6 |         let _ = {< y = 1 >} in ()
+                    ^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
@@ -835,27 +915,18 @@ module Empty : S = struct end
 module type S = sig end
 module Empty : S @@ stateless noalloc_strict
 |}]
-let (alloc_first_class_module @ noalloc_strict) () = (module Empty : S)
+let (alloc_first_class_module @ noalloc_strict) () = let _ = (module Empty : S) in ()
 [%%expect{|
-Line 1, characters 61-66:
-1 | let (alloc_first_class_module @ noalloc_strict) () = (module Empty : S)
-                                                                 ^^^^^
+Line 1, characters 69-74:
+1 | let (alloc_first_class_module @ noalloc_strict) () = let _ = (module Empty : S) in ()
+                                                                         ^^^^^
 Error: Module cannot be "local".
 |}]
-let (alloc_first_class_module @ noalloc) () = (module Empty : S)
+let (alloc_first_class_module @ noalloc) () = let _ = (module Empty : S) in ()
 [%%expect{|
-Line 1, characters 54-59:
-1 | let (alloc_first_class_module @ noalloc) () = (module Empty : S)
-                                                          ^^^^^
-Error: Module cannot be "local".
-|}]
-
-(* [stack_] does not support first-class modules. *)
-let (stack_first_class_module @ noalloc_strict) () = exclave_ stack_ (module Empty : S)
-[%%expect{|
-Line 1, characters 77-82:
-1 | let (stack_first_class_module @ noalloc_strict) () = exclave_ stack_ (module Empty : S)
-                                                                                 ^^^^^
+Line 1, characters 62-67:
+1 | let (alloc_first_class_module @ noalloc) () = let _ = (module Empty : S) in ()
+                                                                  ^^^^^
 Error: Module cannot be "local".
 |}]
 
@@ -985,6 +1056,17 @@ Line 2, characters 2-20:
 Error: This value is "local" but is expected to be "global".
 |}]
 
+let (alloc_atomic_loc @ noalloc_strict) (r : atomic_record) = exclave_
+  [%atomic.loc r.af]
+[%%expect{|
+val alloc_atomic_loc : atomic_record -> string atomic_loc @ local = <fun>
+|}]
+let (alloc_atomic_loc @ noalloc) (r : atomic_record) = exclave_
+  [%atomic.loc r.af]
+[%%expect{|
+val alloc_atomic_loc : atomic_record -> string atomic_loc @ local = <fun>
+|}]
+
 (* Coercing a function with an optional argument to a plain arrow eta-expands
    it, allocating a closure. We receive both functions as parameters (in a
    tuple to avoid currying closures) so the only allocation is the coercion
@@ -992,59 +1074,52 @@ Error: This value is "local" but is expected to be "global".
 let (alloc_fun_coerce @ noalloc_strict)
       ((apply, opt) :
          (((unit -> int) -> int) * (?x:int -> unit -> int)) @ noalloc_strict) =
-  apply opt
+  let _ = apply opt in ()
 [%%expect{|
-Line 4, characters 8-11:
-4 |   apply opt
-            ^^^
+Line 4, characters 16-19:
+4 |   let _ = apply opt in ()
+                    ^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 let (alloc_fun_coerce @ noalloc)
       ((apply, opt) :
          (((unit -> int) -> int) * (?x:int -> unit -> int)) @ noalloc) =
-  apply opt
+  let _ = apply opt in ()
 [%%expect{|
-Line 4, characters 8-11:
-4 |   apply opt
-            ^^^
+Line 4, characters 16-19:
+4 |   let _ = apply opt in ()
+                    ^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
 (* A list/array comprehension allocates its result *)
-let (alloc_list_comprehension @ noalloc_strict) () = [ x for x = 1 to 10 ]
+let (alloc_list_comprehension @ noalloc_strict) () = let _ = [ x for x = 1 to 10 ] in ()
 [%%expect{|
-Line 1, characters 53-74:
-1 | let (alloc_list_comprehension @ noalloc_strict) () = [ x for x = 1 to 10 ]
-                                                         ^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 61-82:
+1 | let (alloc_list_comprehension @ noalloc_strict) () = let _ = [ x for x = 1 to 10 ] in ()
+                                                                 ^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
-let (alloc_list_comprehension @ noalloc) () = [ x for x = 1 to 10 ]
+let (alloc_list_comprehension @ noalloc) () = let _ = [ x for x = 1 to 10 ] in ()
 [%%expect{|
-Line 1, characters 46-67:
-1 | let (alloc_list_comprehension @ noalloc) () = [ x for x = 1 to 10 ]
-                                                  ^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" but is expected to be "global".
-|}]
-
-(* [stack_] does not support comprehensions. *)
-let (stack_comprehension @ noalloc_strict) () = exclave_ stack_ [ x for x = 1 to 10 ]
-[%%expect{|
-Line 1, characters 64-85:
-1 | let (stack_comprehension @ noalloc_strict) () = exclave_ stack_ [ x for x = 1 to 10 ]
-                                                                    ^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 54-75:
+1 | let (alloc_list_comprehension @ noalloc) () = let _ = [ x for x = 1 to 10 ] in ()
+                                                          ^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
 
-(* Only the first case below is a genuine bug introduced by routing the
-   lock-walk through [register_allocation_mode]. The others turned out NOT to be
-   problems and are kept for contrast. *)
+let (stack_comprehension @ noalloc_strict) () = exclave_ [ x for x = 1 to 10 ]
+[%%expect{|
+Line 1, characters 57-78:
+1 | let (stack_comprehension @ noalloc_strict) () = exclave_ [ x for x = 1 to 10 ]
+                                                             ^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+|}]
 
-(* CR shsong (false positive): array indexing uses the [%array_safe_get]
-   primitive, whose result is [@local_opt] (Prim_poly). It does NOT allocate, but
-   the Prim_poly registration in [type_ident] goes through
-   [register_allocation_mode], which now walks locks, so it is wrongly rejected
-   -- note the error is "The allocation is alloc". It should be accepted once the
-   Prim_poly site is exempted from walking. *)
+(* CR shsong: these case might be handled too conservatively since referecing a
+  primitive/operator as a value is captured and always considered as [alloc]. *)
+(* array indexing uses the [%array_safe_get] primitive, whose result is
+    [@local_opt] (Prim_poly). It does NOT allocate. *)
 let array_get_prim_poly (a : int array) (i : int) =
   let (f @ noalloc_strict) () = a.(i) in
   f ()
@@ -1058,12 +1133,8 @@ Error: The value "Array.get" is "alloc"
          which is expected to be "noalloc_strict".
 |}]
 
-(* NOT the Prim_poly bug: referencing a primitive/operator as a value is rejected
-   by the pre-existing capture rule (primitives are [alloc] by default) -- note
-   "The value ... is alloc", not "The allocation is alloc". Same conservative
-   behavior as the external/arithmetic tests above; independent of Prim_poly.
-   ([my_id]/[!] do not allocate, but referencing the value is conservatively
-   treated as [alloc].) *)
+(* [my_id] do not allocate, but referencing the value is conservatively
+   treated as [alloc]. *)
 external my_id : ('a[@local_opt]) -> ('a[@local_opt]) = "%identity"
 let (prim_value_captured @ noalloc_strict) (x : int) = my_id x
 [%%expect{|
@@ -1076,6 +1147,9 @@ Error: The value "my_id" is "alloc"
          because it is used inside the function at line 2, characters 43-62
          which is expected to be "noalloc_strict".
 |}]
+
+(* [!] does not allocate, but referencing the value is conservatively
+   treated as [alloc]. *)
 let (deref_value_captured @ noalloc_strict) (r : int ref) = !r
 [%%expect{|
 Line 1, characters 60-61:
@@ -1181,440 +1255,6 @@ Line 3, characters 34-40:
 3 |     let (h @ noalloc_strict) () = Just a in
                                       ^^^^^^
 Error: This value is "local" but is expected to be "global".
-|}]
-
-(** Test 5.3: [stack_] negative cases *)
-
-(* [stack_] on a non-allocation (a plain value) is rejected: it is not an
-   allocation. *)
-let (stack_non_alloc @ noalloc_strict) (a : int) = exclave_ stack_ a
-[%%expect{|
-Line 5, characters 67-68:
-5 | let (stack_non_alloc @ noalloc_strict) (a : int) = exclave_ stack_ a
-                                                                       ^
-Error: This expression is not an allocation site.
-|}]
-
-(** Test 5.4: [stack_] nested cases. *)
-
-(* Many tests below (Tests 5.4-5.7) rely on the following trick. If a function is
-   known to be noalloc when its body is type-checked, all inner allocations are
-   forced to be local (on the stack) and the allocation check is exempted -- which
-   would mask the very effect of [local_]/[exclave_]/[stack_] we want to observe.
-   So we do NOT annotate the function under test as noalloc directly; instead we
-   constrain it to be noalloc indirectly, by referencing it inside a separate
-   [require_noalloc @ noalloc_strict] function. That constraint arrives only after
-   the body has been type-checked, so inner allocations are not force-made local
-   and their genuine allocation behavior is observed. *)
-
-(* Nested: an inner allocation that is not itself [stack_]-marked still
-   allocates on the heap, even when an enclosing allocation is [stack_]-marked. *)
-let f () =
-  let stack_nested (a : int) = exclave_ stack_ (Just (Just a)) in
-  let (require_noalloc @ noalloc_strict) () =
-    let _ = stack_nested in ()
-  in
-  let _ = require_noalloc () in
-  ()
-[%%expect{|
-Line 18, characters 12-24:
-18 |     let _ = stack_nested in ()
-                 ^^^^^^^^^^^^
-Error: The value "stack_nested" is "alloc"
-         because it closes over the allocation at line 16, characters 53-61
-         which is "alloc".
-       However, the value "stack_nested" highlighted is expected to be "noalloc_strict"
-         because it is used inside the function at lines 17-18, characters 41-30
-         which is expected to be "noalloc_strict".
-|}]
-
-(* A [@@ global] field forces its value onto the heap even when the enclosing
-   record is [stack_]-allocated: the record block is exempt, but the global
-   field value [Just a] is a genuine heap allocation and is still rejected. This
-   is another way (besides plain nesting above) for a heap allocation to sit
-   inside a [stack_] one. *)
-type 'a global_field_rec = { gf : 'a @@ global; rest : int }
-[%%expect{|
-type 'a global_field_rec = { gf : 'a @@ global; rest : int; }
-|}]
-let f () =
-  let stack_global_field (a : int) =
-    exclave_ stack_ { gf = Just a; rest = a }
-  in
-  let (require_noalloc @ noalloc_strict) () =
-    let _ = stack_global_field in ()
-  in
-  let _ = require_noalloc () in
-  ()
-[%%expect{|
-Line 6, characters 12-30:
-6 |     let _ = stack_global_field in ()
-                ^^^^^^^^^^^^^^^^^^
-Error: The value "stack_global_field" is "alloc"
-         because it closes over the allocation at line 3, characters 27-33
-         which is "alloc".
-       However, the value "stack_global_field" highlighted is expected to be "noalloc_strict"
-         because it is used inside the function at lines 5-6, characters 41-36
-         which is expected to be "noalloc_strict".
-|}]
-
-
-(** Test 5.5: the allocation axis is exempted only by [stack_]
-    ([expected_mode.strictly_stack]), not by [local_]/[exclave_]
-    ([expected_mode.strictly_local]). The two flags are independent, so they are
-    NOT interchangeable:
-
-    - [strictly_stack] is set ONLY by the direct operand of [stack_], the
-      explicit, checked stack-allocation form. It can be [true] while
-      [strictly_local] is [false] -- e.g. a [stack_] in a plain [let] binding,
-      not under any [exclave_]/[local_]. Gating the walk on [strictly_local]
-      would WRONGLY REJECT such a legitimate [stack_] (see [stack_in_let]).
-    - [strictly_local] is set by [local_]/[exclave_], which only constrain the
-      *mode* to [local]. The current implementation does not treat them as
-      exempt (it conservatively requires the explicit, checked [stack_] marker),
-      so these still error (see [exclave_not_exempt]/[local_not_exempt]). *)
-
-(* [exclave_] alone (no [stack_]) does not exempt the allocation. *)
-let f () =
-  let exclave_not_exempt (a : int) = exclave_ (Just a) in
-  let (require_noalloc @ noalloc_strict) () =
-    let _  = exclave_not_exempt in ()
-  in
-  let _ = require_noalloc () in
-  ()
-[%%expect{|
-Line 20, characters 13-31:
-20 |     let _  = exclave_not_exempt in ()
-                  ^^^^^^^^^^^^^^^^^^
-Error: The value "exclave_not_exempt" is "alloc"
-         because it closes over the allocation at line 18, characters 46-54
-         which is "alloc".
-       However, the value "exclave_not_exempt" highlighted is expected to be "noalloc_strict"
-         because it is used inside the function at lines 19-20, characters 41-37
-         which is expected to be "noalloc_strict".
-|}]
-
-(* CR shsong: currently, [local_] does not exempt the allocation. *)
-let f () =
-  let local_not_exempt (a : int) =
-    let _x = local_ (Just a) in
-    ()
-  in
-  let (require_noalloc @ noalloc_strict) () =
-    let _  = local_not_exempt in ()
-  in
-  let _ = require_noalloc () in
-  ()
-[%%expect{|
-Line 7, characters 13-29:
-7 |     let _  = local_not_exempt in ()
-                 ^^^^^^^^^^^^^^^^
-Error: The value "local_not_exempt" is "alloc"
-         because it closes over the allocation at line 3, characters 20-28
-         which is "alloc".
-       However, the value "local_not_exempt" highlighted is expected to be "noalloc_strict"
-         because it is used inside the function at lines 6-7, characters 41-35
-         which is expected to be "noalloc_strict".
-|}]
-
-(* For contrast, the same allocation wrapped in [stack_] (sets [strictly_stack])
-   is exempt and accepted. *)
-let f () =
-  let stack_is_exempt (a : int) = exclave_ stack_ (Just a) in
-  let (require_noalloc @ noalloc_strict) () =
-    let _ = stack_is_exempt in ()
-  in
-  let _ = require_noalloc () in
-  ()
-[%%expect{|
-val f : unit -> unit = <fun>
-|}]
-
-(* The decisive case: a [stack_] in a plain [let] binding (no [exclave_]/[local_]
-   around it) has [strictly_stack = true] but [strictly_local = false]. It is
-   correctly accepted. Gating the walk on [strictly_local] would reject it, which
-   is why [strictly_stack] is required rather than reusing [strictly_local]. *)
-let f () =
-  let stack_in_let (a : int) =
-    let _x = stack_ (Just a) in
-    ()
-  in
-  let (require_noalloc @ noalloc_strict) () =
-    let _ = stack_in_let in ()
-  in
-  let _ = require_noalloc () in
-  ()
-[%%expect{|
-val f : unit -> unit = <fun>
-|}]
-
-
-(** Test 5.6: a transparent wrapper around the [stack_] operand should not defeat
-    the [stack_] exemption.
-
-    [stack_] sets [strictly_stack] on its operand.
-    Although we do not want [strictly_stack = true] for children allocations,
-    we should not use [mode_morph]/[mode_coerce] to reset [strictly_stack] for
-    children (while keeping [strictly_local]). *)
-
-(* A type annotation goes through [Pexp_constraint] -> [type_expect_mode]
-   -> [mode_coerce], which should not resets [strictly_stack] on the
-   inner allocation, i.e., the inner allocation is still on stack. *)
-let f () =
-  let stack_through_type_annot (a : int) =
-    exclave_ stack_ ((Just a : int variant_t5))
-  in
-  let (require_noalloc @ noalloc_strict) () =
-    let _ = stack_through_type_annot in ()
-  in
-  let _ = require_noalloc () in
-  ()
-[%%expect{|
-val f : unit -> unit = <fun>
-|}]
-
-(* Same via a mode annotation. *)
-let f () =
-  let stack_through_mode_annot (a : int) =
-    exclave_ stack_ ((Just a : _ @ local))
-  in
-  let (require_noalloc @ noalloc_strict) () =
-    let _ = stack_through_mode_annot in ()
-  in
-  let _ = require_noalloc () in
-  ()
-[%%expect{|
-val f : unit -> unit = <fun>
-|}]
-
-(* A coercion [:>] does NOT reset [strictly_stack]: the [stack_]
-   operand stays exempt and is correctly accepted. *)
-let f () =
-  let stack_through_coercion (a : int) =
-    exclave_ stack_ ((Just a :> int variant_t5))
-  in
-  let (require_noalloc @ noalloc_strict) () =
-    let _ = stack_through_coercion in ()
-  in
-  let _ = require_noalloc () in
-  ()
-[%%expect{|
-val f : unit -> unit = <fun>
-|}]
-
-(* An attribute on the allocation is also fine. *)
-let f () =
-  let stack_through_attribute (a : int) =
-    exclave_ stack_ ((Just a)[@inline])
-  in
-  let (require_noalloc @ noalloc_strict) () =
-    let _ = stack_through_attribute in ()
-  in
-  let _ = require_noalloc () in
-  ()
-[%%expect{|
-val f : unit -> unit = <fun>
-|}]
-
-(* [let open ... in] is also transparent, but here [stack_]
-   fails to even recognize the allocation site -- the [Pexp_stack]
-   allocation-site detection does not see through [Pexp_open] (this is a
-   detection gap, not the [strictly_stack] reset issue). *)
-let f () =
-  let stack_through_open (a : int) =
-    exclave_ stack_ (let open Stdlib in Just a)
-  in
-  let (require_noalloc @ noalloc_strict) () =
-    let _ = stack_through_open in ()
-  in
-  let _ = require_noalloc () in
-  ()
-[%%expect{|
-Line 3, characters 20-47:
-3 |     exclave_ stack_ (let open Stdlib in Just a)
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression is not an allocation site.
-|}]
-
-
-(** Test 5.7: a genuinely NEW inner allocation under a [stack_] outer is still
-    flagged. Unlike a transparent wrapper (Test 5.6), these inner expressions
-    introduce their own allocation, so the [stack_] exemption must NOT reach
-    them. It does not: [stack_] only marks its top operand, and every inner
-    allocation below is registered with [strictly_stack = false] -- either
-    because its mode is built by [mode_default] (constructor args, tuple
-    components, record fields, function bodies) or because [mode_morph] resets
-    [strictly_stack] for children (lazy thunk body, partial-application args). *)
-
-(* a new allocation captured as an argument of a function application.
-   With the indirect trick (no force-local), the outer [stack_] operand -- a full
-   application returning [int] -- is reached first and rejected as not an
-   allocation site, before the inner [Just a] is examined. *)
-let f () =
-  let stack_inner_function_application
-        (g : (int variant_t5 -> int -> int -> int) @ noalloc_strict) (a : int) =
-    exclave_ stack_ (g (Just a) 2 3)
-  in
-  let (require_noalloc @ noalloc_strict) () =
-    let _ = stack_inner_function_application in ()
-  in
-  let _ = require_noalloc () in
-  ()
-[%%expect{|
-Line 17, characters 20-36:
-17 |     exclave_ stack_ (g (Just a) 2 3)
-                         ^^^^^^^^^^^^^^^^
-Error: This expression is not an allocation site.
-|}]
-
-(* CR shsong: function partial application triggers allocation, and is not
-    considered to be on the stack even though it is annotated with [stack_].
-    Revisit this in the next PR. *)
-(* a new allocation captured as an argument of a partial application. With the
-   indirect trick (no force-local), the outer [stack_] operand -- a partial
-   application closure -- is reached first and rejected as not an allocation site
-   ([Pexp_stack] does not recognize partial applications), before the inner
-   [Just a] is examined. *)
-let f () =
-  let stack_inner_partial_application
-        (g : (int variant_t5 -> int -> int -> int) @ noalloc_strict) (a : int) =
-    exclave_ stack_ (g (Just a) 2)
-  in
-  let (require_noalloc @ noalloc_strict) () =
-    let _ = stack_inner_partial_application in ()
-  in
-  let _ = require_noalloc () in
-  ()
-[%%expect{|
-Line 4, characters 20-34:
-4 |     exclave_ stack_ (g (Just a) 2)
-                        ^^^^^^^^^^^^^^
-Error: This expression is not an allocation site.
-|}]
-
-(* a tuple component is a new allocation *)
-let f () =
-  let stack_inner_tuple (a : int) =
-    exclave_ stack_ (Just a, Just a)
-  in
-  let (require_noalloc @ noalloc_strict) () =
-    let _ = stack_inner_tuple in ()
-  in
-  let _ = require_noalloc () in
-  ()
-[%%expect{|
-Line 6, characters 12-29:
-6 |     let _ = stack_inner_tuple in ()
-                ^^^^^^^^^^^^^^^^^
-Error: The value "stack_inner_tuple" is "alloc"
-         because it closes over the allocation at line 3, characters 21-27
-         which is "alloc".
-       However, the value "stack_inner_tuple" highlighted is expected to be "noalloc_strict"
-         because it is used inside the function at lines 5-6, characters 41-35
-         which is expected to be "noalloc_strict".
-|}]
-
-(* a record field is a new allocation *)
-type stack_inner_rec = { sf1 : int variant_t5; sf2 : int }
-[%%expect{|
-type stack_inner_rec = { sf1 : int variant_t5; sf2 : int; }
-|}]
-let f () =
-  let stack_inner_field (a : int) =
-    exclave_ stack_ { sf1 = Just a; sf2 = a }
-  in
-  let (require_noalloc @ noalloc_strict) () =
-    let _ = stack_inner_field in ()
-  in
-  let _ = require_noalloc () in
-  ()
-[%%expect{|
-Line 6, characters 12-29:
-6 |     let _ = stack_inner_field in ()
-                ^^^^^^^^^^^^^^^^^
-Error: The value "stack_inner_field" is "alloc"
-         because it closes over the allocation at line 3, characters 28-34
-         which is "alloc".
-       However, the value "stack_inner_field" highlighted is expected to be "noalloc_strict"
-         because it is used inside the function at lines 5-6, characters 41-35
-         which is expected to be "noalloc_strict".
-|}]
-
-(* a function body has a new allocation *)
-let f () =
-  let stack_inner_funbody (a : int) =
-    exclave_ stack_ (fun () -> Just a)
-  in
-  let (require_noalloc @ noalloc_strict) () =
-    let _ = stack_inner_funbody in ()
-  in
-  let _ = require_noalloc () in
-  ()
-[%%expect{|
-Line 6, characters 12-31:
-6 |     let _ = stack_inner_funbody in ()
-                ^^^^^^^^^^^^^^^^^^^
-Error: The value "stack_inner_funbody" is "alloc"
-         because it closes over the allocation at line 3, characters 31-37
-         which is "alloc".
-       However, the value "stack_inner_funbody" highlighted is expected to be "noalloc_strict"
-         because it is used inside the function at lines 5-6, characters 41-37
-         which is expected to be "noalloc_strict".
-|}]
-
-
-(** Test 5.8: regression guard for making [stack_] set [strictly_local].
-
-    A [stack_] closure placed where a [global] value is required must report a
-    clean locality error, NOT crash. If the [Pexp_stack] handler is changed to
-    [mode_strictly_stack expected_mode |> mode_strictly_local], then
-    [split_function_ty] forces the closure areality with [Locality.submode_exn]
-    (line ~6237). That submode genuinely fails here (the closure must be global),
-    and the [_exn] form raises [Invalid_argument "result is Error _"] -- a
-    compiler crash -- instead of the graceful error below. With the handler left
-    as [mode_strictly_stack] only, all four error cleanly. *)
-
-(* stack_ closure stored in a ref (ref contents must be global) *)
-let stack_clo_in_ref = ref (stack_ (fun x -> x))
-[%%expect{|
-Line 13, characters 27-48:
-13 | let stack_clo_in_ref = ref (stack_ (fun x -> x))
-                                ^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
-|}]
-
-(* stack_ closure as the function in a tail call *)
-let stack_clo_tailcall () = (stack_ (fun x -> x)) 42
-[%%expect{|
-Line 1, characters 28-49:
-1 | let stack_clo_tailcall () = (stack_ (fun x -> x)) 42
-                                ^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "local" to the parent region or "global"
-         because it is the function in a tail call.
-|}]
-
-(* stack_ multi-argument closure stored in a ref *)
-let stack_clo_multiarg () = ref (stack_ (fun x y -> x : 'a -> 'a -> 'a))
-[%%expect{|
-Line 1, characters 32-72:
-1 | let stack_clo_multiarg () = ref (stack_ (fun x y -> x : 'a -> 'a -> 'a))
-                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
-|}]
-
-(* stack_ closure returned where a global function is expected *)
-let stack_clo_global_return () : int -> int = stack_ (fun x -> x)
-[%%expect{|
-Line 1, characters 46-65:
-1 | let stack_clo_global_return () : int -> int = stack_ (fun x -> x)
-                                                  ^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
 |}]
 
 
@@ -1876,14 +1516,12 @@ let (p_match @ noalloc_strict) o x =
 val p_match : 'a option -> ('b -> 'c -> 'b) @ local = <fun>
 |}]
 
-(* Record field via a modality ([mode_is_contained_by]); the record block is
-   [stack_]-allocated so the field closure is the only thing exercising the
-   propagation. *)
+(* Record field via a modality ([mode_is_contained_by]). *)
 type box = { g : unit -> int }
 [%%expect{|
 type box = { g : unit -> int; }
 |}]
-let (p_record @ noalloc_strict) (x : int) = exclave_ stack_ { g = (fun () -> x) }
+let (p_record @ noalloc_strict) (x : int) = exclave_ { g = (fun () -> x) }
 [%%expect{|
 val p_record : int -> box @ local = <fun>
 |}]
