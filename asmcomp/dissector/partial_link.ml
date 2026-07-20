@@ -56,6 +56,15 @@ let () =
 
 let write_response_file ~filename files =
   let oc = open_out filename in
+  (* The -u flags must precede the files: the linker only extracts an archive
+     member if its symbol is undefined when the archive is scanned, and it never
+     rescans an archive. *)
+  List.iter
+    (fun entry ->
+      List.iter
+        (fun symbol -> Printf.fprintf oc "-u %s\n" symbol)
+        (MOF.File_size.required_symbols entry))
+    files;
   List.iter
     (fun entry ->
       output_string oc (MOF.File_size.filename entry);
@@ -124,8 +133,7 @@ end = struct
       ~partition_index ~response_file ~output_file =
     (* Config.native_pack_linker is something like "ld -r -o " *)
     let cmd =
-      Printf.sprintf "%s%s --whole-archive @%s --no-whole-archive"
-        Config.native_pack_linker
+      Printf.sprintf "%s%s @%s" Config.native_pack_linker
         (Filename.quote output_file)
         (Filename.quote response_file)
     in

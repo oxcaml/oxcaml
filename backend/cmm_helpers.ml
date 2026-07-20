@@ -4492,6 +4492,12 @@ let make_symbol ?compilation_unit name =
   Symbol.for_name compilation_unit name
   |> Symbol.linkage_name |> Linkage_name.to_string
 
+(* The name of the module initialization ("entry") function of a compilation
+   unit. The definition site (To_cmm), the startup file's tables and the
+   dissector's -u linker flags must all agree on this name. *)
+let entry_symbol_name ?compilation_unit () =
+  make_symbol ?compilation_unit "entry"
+
 (* Failure function for closures that should never be called indirectly *)
 
 let fail_if_called_indirectly_function () =
@@ -4568,7 +4574,7 @@ let entry_point namelist =
     List.map
       (fun name ->
         Csymbol_address
-          (global_symbol (make_symbol ~compilation_unit:name "entry")))
+          (global_symbol (entry_symbol_name ~compilation_unit:name ())))
       namelist
   in
   let data = Cdefine_symbol table_symbol :: data in
@@ -4723,7 +4729,7 @@ let unit_deps_table units =
         let name = unit_name cu in
         let name_sym = StringMap.find name name_symbols in
         let entry_sym =
-          global_symbol (make_symbol ~compilation_unit:cu "entry")
+          global_symbol (entry_symbol_name ~compilation_unit:cu ())
         in
         let gc_roots_sym =
           global_symbol (make_symbol ~compilation_unit:cu "gc_roots")
