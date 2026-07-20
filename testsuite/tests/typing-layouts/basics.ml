@@ -1550,6 +1550,49 @@ val f : ('a. 'a t2_float) -> 'b t2_float = <fun>
 
 (* CR layouts v5: bring void version here from layouts_alpha *)
 
+let f : ?x:t_float64 -> unit -> unit = fun ?x () -> ignore x
+
+[%%expect{|
+Line 1, characters 11-20:
+1 | let f : ?x:t_float64 -> unit -> unit = fun ?x () -> ignore x
+               ^^^^^^^^^
+Error: Optional argument types must have layout value.
+       The layout of "t_float64" is float64
+         because of the definition of t_float64 at line 4, characters 0-24.
+       But the layout of "t_float64" must be a value layout
+         because it's the type of an optional argument.
+|}]
+
+let f (g : ?x:t_float64 -> unit) = g
+
+[%%expect{|
+Line 1, characters 14-23:
+1 | let f (g : ?x:t_float64 -> unit) = g
+                  ^^^^^^^^^
+Error: Optional argument types must have layout value.
+       The layout of "t_float64" is float64
+         because of the definition of t_float64 at line 4, characters 0-24.
+       But the layout of "t_float64" must be a value layout
+         because it's the type of an optional argument.
+|}]
+
+(* The next two are rejected by unification in [Typecore] rather than the
+   check in [Typetexp] *)
+
+let f ?x:(y : t_float64 option) () = ignore y
+
+[%%expect{|
+Line 1, characters 10-30:
+1 | let f ?x:(y : t_float64 option) () = ignore y
+              ^^^^^^^^^^^^^^^^^^^^
+Error: This pattern matches values of type "t_float64 option"
+       but a pattern was expected which matches values of type "'a option"
+       The layout of t_float64 is float64
+         because of the definition of t_float64 at line 4, characters 0-24.
+       But the layout of t_float64 must be a value layout
+         because it's the type of an optional argument.
+|}]
+
 let f (x : t_float64) =
   let _g ?(x2 = x) () = () in
   ()
