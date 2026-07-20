@@ -137,7 +137,7 @@ let add_signed_const i : O.t list =
   then []
   else if Targetint.compare i Targetint.zero > 0
   then add_unsigned_const i
-  else [O.DW_op_consts (Targetint.to_int64 i); O.DW_op_plus]
+  else [signed_int_const i; O.DW_op_plus]
 
 let float_const f : O.t = DW_op_const8s f
 
@@ -177,9 +177,9 @@ let jump_offset_of_int jump_offset =
    following function---their distance arguments may need updating! *)
 let conditional ?(at_join = [O.DW_op_nop]) ~if_zero ~if_nonzero () =
   (* Generates the following stack machine code:
-   * DW_OP_BRA size_of_if_zero # Jumps [size_of_if_zero] bytes if the popped value is 0
-   *                           # Therefore if the operand is non zero the next executed
-   *                           # instructions will be [if_nonzero]
+   * DW_OP_BRA size_of_if_zero # Jumps [size_of_if_zero] bytes if the popped
+   *                           # value is non-zero, thereby skipping the
+   *                           # [if_zero] branch and executing [if_nonzero]
    * ... if_zero ...
    * DW_op_skip size_of_nonzero_branch # Jumps [size_of_nonzero_branch] bytes
    *                                   # Skips over the non zero branch
