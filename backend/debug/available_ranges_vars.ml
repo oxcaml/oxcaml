@@ -57,7 +57,9 @@ module Vars = struct
     type t = { stack_offset : int }
 
     let create () =
-      { (* This does not include the [Proc.initial_stack_offset] (see below). *)
+      { (* Only the dynamic stack adjustment (pushtraps, [Lstackoffset]); the
+           [Proc.initial_stack_offset] is added by [Proc.frame_size] and
+           [Proc.slot_offset] when [Subrange_info.create] consults them. *)
         stack_offset = 0
       }
 
@@ -101,13 +103,14 @@ module Vars = struct
 
     let create reg subrange_state ~fun_contains_calls ~fun_num_stack_slots =
       let reg = RD.reg reg in
-      let initial_stack_offset =
-        Proc.initial_stack_offset ~contains_calls:fun_contains_calls
-          ~num_stack_slots:fun_num_stack_slots
-      in
-      let stack_offset =
-        Subrange_state.stack_offset subrange_state + initial_stack_offset
-      in
+      (* [Proc.frame_size] and [Proc.slot_offset] below already account for
+         [Proc.initial_stack_offset], so [stack_offset] must be only the dynamic
+         adjustment (pushtraps, [Lstackoffset]) at this program point -- exactly
+         what the emitter passes to those functions. Adding the initial offset
+         here as well double-counts it, which after 16-byte frame alignment
+         yields a CFA offset that is wrong by the alignment padding whenever the
+         initial offset is not itself a multiple of 16. *)
+      let stack_offset = Subrange_state.stack_offset subrange_state in
       let offset =
         match reg.loc with
         | Stack loc ->
@@ -164,12 +167,17 @@ module Vars = struct
     let create _fundecl reg ~start_insn:_ =
       match RD.debug_info reg with
       | None -> None
-      | Some debug_info ->
-        let var = RD.Debug_info.holds_value_of debug_info in
-        let provenance = RD.Debug_info.provenance debug_info in
-        let is_parameter = RD.Debug_info.is_parameter debug_info in
-        let t = { provenance; is_parameter } in
-        Some (var, t)
+      | Some debug_info -> (
+        match RD.Debug_info.holds_value_of debug_info with
+        | Const_int _ | Const_naked_float _ | Const_symbol _ | Projection _ ->
+          (* Constants and projections are tracked for call site information
+             only; they do not give rise to available ranges for variables. *)
+          None
+        | Var var ->
+          let provenance = RD.Debug_info.provenance debug_info in
+          let is_parameter = RD.Debug_info.is_parameter debug_info in
+          let t = { provenance; is_parameter } in
+          Some (var, t))
 
     let provenance t = t.provenance
 
@@ -186,10 +194,10 @@ module Vars = struct
   let availability_set_to_key_set (avail : Reg_availability_set.t) =
     Reg_availability_set.canonicalise avail
 
-  let available_before (insn : L.instruction) =
+  let available_before (_fundecl : L.fundecl) (insn : L.instruction) =
     Some (availability_set_to_key_set insn.available_before)
 
-  let available_across (insn : L.instruction) =
+  let available_across (_fundecl : L.fundecl) (insn : L.instruction) =
     Some (availability_set_to_key_set insn.available_across)
 end
 
