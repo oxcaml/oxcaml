@@ -856,8 +856,6 @@ type debug_uid = Shape.Uid.t
     WARNING: Unlike the name sugggests, these identifiers are not always unique.
     Instead, in many cases, we use [debug_uid_none] below, and multiple
     variables at the level of Lambda or below can use the same [debug_uid]. *)
-(* CR sspies: This comment is currently not accurate, since we do not yet
-  emit these ids into dwarf code. *)
 
 val debug_uid_none : debug_uid
 (** [debug_uid_none] should be used for those identifiers that are not

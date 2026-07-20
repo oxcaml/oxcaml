@@ -3841,17 +3841,6 @@ let transl_type_decl env rec_flag sdecl_list =
   let shapes = shape_declarations env decls in
   (* Compute the final environment with variance and immediacy *)
   let final_env = add_types_to_env ~shapes:(Some shapes) decls env in
-  (* Save the type shapes of the declarations in [Type_shape] for debug info. *)
-  if !Clflags.debug && !Clflags.shape_format = Clflags.Debugging_shapes then
-    List.iter (fun (sh, (_, decl)) ->
-      (* CR sspies: Adding the shapes to the table below is obsolete. The
-         information is now contained in the shapes themselves. Remove it in a
-         subsequent PR (and adjust the printing of the declarations as
-         appropriate).
-      *)
-      let uid = decl.type_uid in
-      Uid.Tbl.add Type_shape.all_type_decls uid sh
-    ) (List.combine shapes decls);
   (* Keep original declaration *)
   let final_decls =
     List.map2

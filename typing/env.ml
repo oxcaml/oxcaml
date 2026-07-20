@@ -3320,7 +3320,6 @@ let initial () =
         Type_shape.Type_decl_shape.of_type_declaration type_ident decl
           (shape_for_constr env)
       in
-      Uid.Tbl.add Type_shape.all_type_decls decl.type_uid shape;
       add_type type_ident ~shape decl env ~check:false
   in
   let initial_env =
