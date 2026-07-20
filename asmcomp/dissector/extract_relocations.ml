@@ -58,9 +58,10 @@ module Mapped_object_file = struct
 
   (* Find all sections with names starting with prefix *)
   let find_sections_with_prefix sections prefix =
-    Array.to_list sections
-    |> List.filter (fun (section : Elf.section) ->
+    Array.to_seq sections
+    |> Seq.filter (fun (section : Elf.section) ->
         String.starts_with ~prefix section.sh_name_str)
+    |> List.of_seq
 
   (* Find the symbol table section *)
   let find_symtab_section sections =
