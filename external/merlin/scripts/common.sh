@@ -2,19 +2,11 @@
 # be sourced (with the current directory at the root of the Merlin subtree),
 # not executed.
 
-# Succeeds if the file named $2 is listed in $1/.exclude.  Each line of the
-# .exclude file is a glob pattern; a pattern starting with "!" re-includes
-# files matched by an earlier pattern.  A missing .exclude file is treated as
-# an empty one.
+# Succeeds if the merlin-exclude gitattribute is set for the file named $2 in
+# directory $1.  The attributes are declared in
+# upstream/ocaml_flambda/.gitattributes; since git check-attr resolves paths
+# relative to the current directory, this must be called with the current
+# directory at upstream/ocaml_flambda.
 function is-excluded () {
-  local dir="$1" name="$2" pattern result=1
-  if [[ ! -f "$dir/.exclude" ]]; then return 1; fi
-  while IFS= read -r pattern; do
-    case "$pattern" in
-      ''|'#'*) ;;
-      '!'*) if [[ "$name" == ${pattern#!} ]]; then result=1; fi;;
-      *)    if [[ "$name" == $pattern    ]]; then result=0; fi;;
-    esac
-  done < "$dir/.exclude"
-  return $result
+  [[ "$(git check-attr merlin-exclude -- "$1/$2")" == *': merlin-exclude: set' ]]
 }

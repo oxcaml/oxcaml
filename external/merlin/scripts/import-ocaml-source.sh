@@ -21,16 +21,15 @@ may also fetch from a remote repository by specifying a REPO, and the
 subdirectory of the repo that the compiler is located in can be overriden by any
 path (including ".").
 
-Each directory in "upstream/ocaml_flambda/" can contain a ".exclude" file that
-explicitly lists the files from the corresponding compiler directory that we do
-not import (a missing ".exclude" file is treated as an empty one).  Each line
-is a glob pattern matched against the file names in that directory; a pattern
-starting with "!" re-includes files matched by an earlier pattern.  Files that
-are neither excluded nor already imported are offered interactively: importing
-such a file copies it into both "upstream/ocaml_flambda/" and "src/ocaml/",
-while declining records it in the ".exclude" file.  To start importing a
-previously ignored file, remove it from the ".exclude" file (or add a "!" entry
-for it) and re-run this script.
+The file "upstream/ocaml_flambda/.gitattributes" explicitly lists the compiler
+files that we do not import, by setting the "merlin-exclude" attribute on them
+(see gitattributes(5) for the pattern syntax; "-merlin-exclude" re-includes
+files matched by an earlier pattern).  Files that are neither excluded nor
+already imported are offered interactively: importing such a file copies it
+into both "upstream/ocaml_flambda/" and "src/ocaml/", while declining records
+it in the ".gitattributes" file.  To start importing a previously ignored
+file, remove its entry from the ".gitattributes" file (or add a
+"-merlin-exclude" entry for it) and re-run this script.
 
 The SUBDIRECTORY argument is useful when importing from a repository that buries
 the relevant compiler files inside a subdirectory. This used to be the case for
@@ -107,8 +106,8 @@ fi
 old_base_rev="$(cat upstream/ocaml_flambda/base-rev.txt)"
 current_head="$(git symbolic-ref --short HEAD)"
 
-# Get the new oxcaml sources and copy every file not listed in a .exclude file
-# into upstream/ocaml_flambda
+# Get the new oxcaml sources and copy every file without the merlin-exclude
+# attribute into upstream/ocaml_flambda
 if [ "$repository" != "." ]; then
   git fetch "$repository" "$commitish"
   rev=$(git rev-parse FETCH_HEAD)
@@ -141,9 +140,10 @@ for dir in */; do
           new_files+=("$file")
           ;;
         *)
-          echo "$name" >> "$dir/.exclude"
-          echo "Added $name to $dir/.exclude; remove it from there and re-run" \
-               "this script if you change your mind."
+          echo "$dir/$name merlin-exclude" >> .gitattributes
+          echo "Set the merlin-exclude attribute for $dir/$name in" \
+               "upstream/ocaml_flambda/.gitattributes; remove it from there" \
+               "and re-run this script if you change your mind."
           ;;
       esac
     fi
@@ -207,11 +207,11 @@ for file in "${new_files[@]}"; do
   cp "upstream/ocaml_flambda/$file" "$tgt"
 done
 
-# Commit any changes to the .exclude files separately from the import itself,
-# since they should be included in review.
-git add upstream/ocaml_flambda/*/.exclude
+# Commit any changes to the .gitattributes file separately from the import
+# itself, since they should be included in review.
+git add upstream/ocaml_flambda/.gitattributes
 if ! git diff --cached --quiet; then
-  git commit -m "Update .exclude files"
+  git commit -m "Update merlin-exclude attributes"
 fi
 
 git add .
