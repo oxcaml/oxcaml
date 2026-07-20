@@ -304,6 +304,11 @@ val between_labels_64_bit_with_offsets :
 val between_this_and_label_offset_32bit_expr :
   upper:Asm_label.t -> offset_upper:Targetint.t -> unit
 
+(** Like [between_this_and_label_offset_32bit_expr] but emits a 64-bit-wide
+    expression. *)
+val between_this_and_label_offset_64bit_expr :
+  upper:Asm_label.t -> offset_upper:Targetint.t -> unit
+
 (** Emit a machine-width reference giving the displacement between the [lower]
     symbol and the sum of the address of the [upper] label plus [offset_upper].
     The [lower] symbol must be in the current compilation unit. The [upper]
