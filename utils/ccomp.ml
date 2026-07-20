@@ -15,25 +15,20 @@
 
 (* Compiling C files and building C libraries *)
 
-let command cmdline =
+let echo_if_verbose cmdline =
   if !Clflags.verbose then begin
     prerr_string "+ ";
     prerr_string cmdline;
     prerr_newline()
-  end;
+  end
+
+let command cmdline =
+  echo_if_verbose cmdline;
   let res = Sys.command cmdline in
   if res = 127 then raise (Sys_error cmdline);
   res
 
 let run_command cmdline = ignore(command cmdline)
-
-let start_command ~spawn cmdline =
-  if !Clflags.verbose then begin
-    prerr_string "+ ";
-    prerr_string cmdline;
-    prerr_newline()
-  end;
-  spawn "/bin/sh" [| "/bin/sh"; "-c"; cmdline |]
 
 (* Build @responsefile to work around OS limitations on
    command-line length.

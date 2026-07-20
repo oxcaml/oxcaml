@@ -120,6 +120,12 @@ end = struct
 
   let output_file t = t.output_file
 
+  (* [/bin/sh] is hardcoded here as [shell] is in the [Unix] module (see
+     [otherlibs/unix]): running a command line means handing it to the shell,
+     [/bin/sh -c <cmd>]. This is exactly what [Unix.system] does, except that we
+     do not wait here, so the caller obtains the pid. *)
+  let shell = "/bin/sh"
+
   let start (unix : (module Compiler_owee.Unix_intf.S)) ~partition
       ~partition_index ~response_file ~output_file =
     (* Config.native_pack_linker is something like "ld -r -o " *)
@@ -130,10 +136,11 @@ end = struct
         (Filename.quote response_file)
     in
     let module Unix = (val unix) in
-    let spawn prog argv =
-      Unix.create_process prog argv Unix.stdin Unix.stdout Unix.stderr
+    Ccomp.echo_if_verbose cmd;
+    let pid =
+      Unix.create_process shell [| shell; "-c"; cmd |] Unix.stdin Unix.stdout
+        Unix.stderr
     in
-    let pid = Ccomp.start_command ~spawn cmd in
     { unix; pid; cmd; partition; partition_index; response_file; output_file }
 
   type exit_condition =
