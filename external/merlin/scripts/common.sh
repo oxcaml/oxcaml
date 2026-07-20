@@ -3,7 +3,7 @@
 # not executed.
 
 # Succeeds if the merlin-exclude gitattribute is set for the file named $2 in
-# directory $1.  The attributes are declared in
+# directory $1. The attributes are declared in
 # upstream/ocaml_flambda/.gitattributes; since git check-attr resolves paths
 # relative to the current directory, this must be called with the current
 # directory at upstream/ocaml_flambda.

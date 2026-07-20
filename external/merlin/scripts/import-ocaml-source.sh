@@ -24,10 +24,10 @@ path (including ".").
 The file "upstream/ocaml_flambda/.gitattributes" explicitly lists the compiler
 files that we do not import, by setting the "merlin-exclude" attribute on them
 (see gitattributes(5) for the pattern syntax; "-merlin-exclude" re-includes
-files matched by an earlier pattern).  Files that are neither excluded nor
+files matched by an earlier pattern). Files that are neither excluded nor
 already imported are offered interactively: importing such a file copies it
 into both "upstream/ocaml_flambda/" and "src/ocaml/", while declining records
-it in the ".gitattributes" file.  To start importing a previously ignored
+it in the ".gitattributes" file. To start importing a previously ignored
 file, remove its entry from the ".gitattributes" file (or add a
 "-merlin-exclude" entry for it) and re-run this script.
 
@@ -165,7 +165,7 @@ old_marker="Merlin:$current_head"
 parent_marker="Compiler:$old_base_rev"
 new_marker="Compiler:$commitish"
 
-# Then patch src/ocaml using the changes you just imported.  Newly-imported
+# Then patch src/ocaml using the changes you just imported. Newly-imported
 # files are still untracked at this point so they don't show up in the diff;
 # they are instead copied over verbatim below.
 for file in $(git diff --no-ext-diff --name-only); do
