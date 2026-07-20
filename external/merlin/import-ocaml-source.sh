@@ -153,4 +153,7 @@ for file in $(git diff --no-ext-diff --name-only); do
 done
 
 git add .
+# Also add any .rej files that were created by patch, even though they're
+# ignored.
+git add "*.rej" --force &> /dev/null || true
 git commit -m "Automated commit: Import compiler changes from $old_base_rev to $rev"
