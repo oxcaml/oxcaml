@@ -554,8 +554,9 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
                     | Some layout ->
                       type_shape_to_complex_shape ~cache ~rec_env arg layout
                     | None ->
-                      (* It's an [any] field with no fixed layout - must
-                         recompute *)
+                      (* It's an [any] field, so we must determine the layout
+                         from the shape (or fall back to [Rs.unknown Value] via
+                         the exception handler below) *)
                       type_shape_to_complex_shape_exn ~cache ~rec_env arg None ))
                 args
             in
@@ -574,9 +575,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
           constructors
       in
       runtime (RS.variant constructors)
-    with Layout_missing ->
-      runtime (RS.unknown Value)
-      (* should only be raised by [lay_out_into_mixed_block_exn] *))
+    with Layout_missing -> runtime (RS.unknown Value))
   | Variant _, Some ((Product _ | Base _) as ly) ->
     err_or_unknown_exn (fun f ->
         f "variant must have value layout, but got: %a" pp_layout ly)
