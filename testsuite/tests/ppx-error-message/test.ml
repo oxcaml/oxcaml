@@ -1,6 +1,6 @@
 (* TEST
  readonly_files = "ppx_error_message.ml";
- include ocamlfrontend;
+ include ocamlcommon;
  setup-ocamlc.byte-build-env;
  program = "${test_build_directory}/ppx_error_message.exe";
  all_modules = "ppx_error_message.ml";

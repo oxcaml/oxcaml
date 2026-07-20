@@ -1,5 +1,5 @@
 (* TEST
- include ocamlfrontend;
+ include ocamlcommon;
 *)
 
 let locs_to_string (locs : 'a Location.loc list) (f : 'a -> string) : string =

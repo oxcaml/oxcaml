@@ -1,5 +1,5 @@
 (* TEST
- include ocamlfrontend;
+ include ocamlcommon;
  include unix;
  arguments = "${ocamlsrcdir}";
  hasunix;

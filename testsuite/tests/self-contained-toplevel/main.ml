@@ -6,7 +6,7 @@
  ocaml_script_as_argument = "true";
  test_file = "gen_cached_cmi.ml";
  arguments = "cached_cmi.ml";
- ocaml with ocamlfrontend;
+ ocaml with ocamlcommon;
  module = "";
  program = "${test_build_directory}/main.exe";
  libraries += "ocamlbytecomp ocamltoplevel";

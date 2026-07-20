@@ -1,6 +1,6 @@
 (* TEST
  modules = "cstubs.c int_as_pointer_regions.ml int_as_pointer_regions_classic_mode.ml";
- include ocamlfrontend;
+ include ocamlcommon;
  stack-allocation;
  native;
 *)

@@ -1,6 +1,6 @@
 (* TEST
  flags = "-I ${ocamlsrcdir}/typing -I ${ocamlsrcdir}/parsing -I ${ocamlsrcdir}/utils";
- include ocamlfrontend;
+ include ocamlcommon;
  expect;
 *)
 

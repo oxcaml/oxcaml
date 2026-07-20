@@ -1,5 +1,5 @@
 (* TEST
- include ocamlfrontend;
+ include ocamlcommon;
 *)
 
 let () = Language_extension.enable Comprehensions ();;

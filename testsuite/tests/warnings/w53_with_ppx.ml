@@ -1,6 +1,6 @@
 (* TEST
  readonly_files = "w53_ppx.ml";
- include ocamlfrontend;
+ include ocamlcommon;
  setup-ocamlc.byte-build-env;
  program = "${test_build_directory}/w53_ppx.exe";
  all_modules = "w53_ppx.ml";
