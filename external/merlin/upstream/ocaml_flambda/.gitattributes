@@ -2,53 +2,30 @@
 # Setting the merlin-exclude attribute excludes a file; unsetting it with
 # "-merlin-exclude" re-includes a file matched by an earlier pattern.
 
-file_formats/cfg_format.ml merlin-exclude
-file_formats/cfg_format.mli merlin-exclude
+# Formatter configuration, build files and documentation are never imported,
+# from any directory.
+.ocamlformat* merlin-exclude
+dune merlin-exclude
+*.md merlin-exclude
+*.adoc merlin-exclude
+
+file_formats/cfg_format.ml* merlin-exclude
 file_formats/cmj_format.mli merlin-exclude
 
 lambda/** merlin-exclude
-lambda/mixed_product_bytes.ml -merlin-exclude
-lambda/mixed_product_bytes.mli -merlin-exclude
+lambda/mixed_product_bytes.ml* -merlin-exclude
 
-parsing/.ocamlformat merlin-exclude
-parsing/.ocamlformat-enable merlin-exclude
-parsing/CONFLICTS.md merlin-exclude
-parsing/HACKING.adoc merlin-exclude
-parsing/VIPs.md merlin-exclude
-parsing/dune merlin-exclude
-
-typing/.ocamlformat merlin-exclude
-typing/.ocamlformat-enable merlin-exclude
-typing/HACKING.adoc merlin-exclude
-typing/TODO.md merlin-exclude
 typing/cmt2annot.mli merlin-exclude
 
-utils/.ocamlformat merlin-exclude
-utils/.ocamlformat-enable merlin-exclude
-utils/HACKING.adoc merlin-exclude
-utils/arrayset.ml merlin-exclude
-utils/arrayset.mli merlin-exclude
-utils/config.common.ml.in merlin-exclude
-utils/config.fixed.ml merlin-exclude
-utils/config.generated.ml.in merlin-exclude
-utils/debug.ml merlin-exclude
-utils/debug.mli merlin-exclude
-utils/doubly_linked_list.ml merlin-exclude
-utils/doubly_linked_list.mli merlin-exclude
-utils/dune merlin-exclude
-utils/file_sections.ml merlin-exclude
-utils/file_sections.mli merlin-exclude
-utils/linkage_name.ml merlin-exclude
-utils/linkage_name.mli merlin-exclude
-utils/lru.ml merlin-exclude
-utils/lru.mli merlin-exclude
-utils/priority_queue.ml merlin-exclude
-utils/priority_queue.mli merlin-exclude
-utils/runtimetags.ml merlin-exclude
-utils/runtimetags.mli merlin-exclude
-utils/structured_mangling.ml merlin-exclude
-utils/structured_mangling.mli merlin-exclude
-utils/symbol.ml merlin-exclude
-utils/symbol.mli merlin-exclude
-utils/target_system.ml merlin-exclude
-utils/target_system.mli merlin-exclude
+utils/arrayset.ml* merlin-exclude
+utils/config.*.ml* merlin-exclude
+utils/debug.ml* merlin-exclude
+utils/doubly_linked_list.ml* merlin-exclude
+utils/file_sections.ml* merlin-exclude
+utils/linkage_name.ml* merlin-exclude
+utils/lru.ml* merlin-exclude
+utils/priority_queue.ml* merlin-exclude
+utils/runtimetags.ml* merlin-exclude
+utils/structured_mangling.ml* merlin-exclude
+utils/symbol.ml* merlin-exclude
+utils/target_system.ml* merlin-exclude
