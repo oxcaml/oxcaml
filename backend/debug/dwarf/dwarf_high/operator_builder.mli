@@ -53,6 +53,9 @@ val implicit_pointer :
   Dwarf_version.t ->
   Dwarf_operator.t
 
+val entry_value_of_register :
+  dwarf_reg_number:int -> Dwarf_version.t -> Dwarf_operator.t
+
 val call :
   die_label:Asm_label.t ->
   compilation_unit_header_label:Asm_label.t ->

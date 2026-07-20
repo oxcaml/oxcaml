@@ -203,6 +203,15 @@ type t =
       { label : Asm_label.t;
         offset_in_bytes : Targetint.t
       }
+  | DW_op_entry_value of { block : t list }
+      (** The DWARF-5 [DW_OP_entry_value] operator. The block operand holds a
+          DWARF expression describing a location (for example a register
+          location description). The operator pushes the value that this
+          location held upon entry to the current function; debuggers typically
+          recover such values by virtually unwinding to the call site. *)
+  | DW_op_GNU_entry_value of { block : t list }
+      (** As for [DW_op_entry_value], but using the pre-DWARF-5 GNU extension
+          opcode. *)
 
 val print : Format.formatter -> t -> unit
 
