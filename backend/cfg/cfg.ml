@@ -85,6 +85,42 @@ let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
       Use_regalloc_param params :: of_cmm_codegen_option tl
     | Cold -> Cold :: of_cmm_codegen_option tl)
 
+type phantom_defining_expr =
+  | Cphantom_const_int of Targetint.t
+  | Cphantom_const_symbol of Cmm.symbol
+  | Cphantom_var of Backend_var.t
+  | Cphantom_offset_var of
+      { var : Backend_var.t;
+        offset_in_words : int
+      }
+  | Cphantom_read_field of
+      { var : Backend_var.t;
+        field : int
+      }
+  | Cphantom_read_symbol_field of
+      { sym : Cmm.symbol;
+        field : int
+      }
+  | Cphantom_block of
+      { tag : int;
+        fields : Backend_var.t list
+      }
+  | Cphantom_optimised_out
+
+let phantom_defining_expr_of_cmm (expr : Cmm.phantom_defining_expr) =
+  match expr with
+  | Cphantom_const_int i -> Cphantom_const_int i
+  | Cphantom_const_symbol s -> Cphantom_const_symbol s
+  | Cphantom_var v -> Cphantom_var v
+  | Cphantom_offset_var { var; offset_in_words } ->
+    Cphantom_offset_var { var; offset_in_words }
+  | Cphantom_read_field { var; field } -> Cphantom_read_field { var; field }
+  | Cphantom_read_symbol_field { sym; field } ->
+    Cphantom_read_symbol_field { sym; field }
+  | Cphantom_block { tag; fields } -> Cphantom_block { tag; fields }
+
+let phantom_optimised_out = Cphantom_optimised_out
+
 type t =
   { blocks : basic_block Label.Tbl.t;
     fun_name : string;
@@ -98,13 +134,16 @@ type t =
     fun_poll : Lambda.poll_attribute;
     next_instruction_id : InstructionId.sequence;
     fun_ret_type : Cmm.machtype;
+    fun_phantom_lets :
+      (Backend_var.Provenance.t option * phantom_defining_expr)
+      Backend_var.Map.t;
     mutable allowed_to_be_irreducible : bool;
     mutable register_locations_are_set : bool
   }
 
 let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
     ~fun_num_stack_slots ~fun_poll ~next_instruction_id ~fun_ret_type
-    ~allowed_to_be_irreducible =
+    ~fun_phantom_lets ~allowed_to_be_irreducible =
   { fun_name;
     fun_args;
     fun_codegen_options;
@@ -118,6 +157,7 @@ let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
     fun_poll;
     next_instruction_id;
     fun_ret_type;
+    fun_phantom_lets;
     allowed_to_be_irreducible;
     register_locations_are_set = false
   }
@@ -233,6 +273,8 @@ let first_instruction_stack_offset (block : basic_block) : int =
   map_first_instruction block { f = (fun instr -> instr.stack_offset) }
 
 let fun_name t = t.fun_name
+
+let fun_phantom_lets t = t.fun_phantom_lets
 
 let entry_label t = t.entry_label
 
@@ -402,7 +444,8 @@ let set_live (instr : _ instruction) live = instr.live <- live
 let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     ?(fdo = Fdo_info.none) ?(live = Reg.Set.empty) ~stack_offset ~id
     ?(available_before = Reg_availability_set.Unreachable)
-    ?(available_across = Reg_availability_set.Unreachable) () =
+    ?(available_across = Reg_availability_set.Unreachable)
+    ?(phantom_available_before = None) () =
   { desc;
     arg;
     res;
@@ -412,21 +455,23 @@ let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     stack_offset;
     id;
     available_before;
-    available_across
+    available_across;
+    phantom_available_before
   }
 
 let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
-    ?(res = [||]) () =
+    ?(res = [||]) ?dbg () =
   { desc;
     arg;
     res;
-    dbg = copy.dbg;
+    dbg = (match dbg with None -> copy.dbg | Some dbg -> dbg);
     fdo = copy.fdo;
     live = copy.live;
     stack_offset = copy.stack_offset;
     id;
     available_before = copy.available_before;
-    available_across = copy.available_across
+    available_across = copy.available_across;
+    phantom_available_before = copy.phantom_available_before
   }
 
 let invalid_stack_offset = -1

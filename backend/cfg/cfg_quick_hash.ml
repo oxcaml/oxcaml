@@ -103,7 +103,8 @@ let basic_block : Cfg.basic_block -> int =
           live = _;
           stack_offset = _;
           available_before = _;
-          available_across = _
+          available_across = _;
+          phantom_available_before = _
         };
       predecessors = _;
       stack_offset = _;

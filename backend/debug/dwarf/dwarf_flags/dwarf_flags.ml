@@ -183,6 +183,8 @@ let gdwarf_may_alter_codegen_experimental = ref false
 
 let dwarf_inlined_frames = ref false
 
+let debug_avail_sets = ref false
+
 let default_gdwarf_compression = "zlib"
 
 let gdwarf_compression = ref default_gdwarf_compression
