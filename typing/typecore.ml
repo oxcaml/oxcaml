@@ -301,7 +301,6 @@ type error =
   | Block_access_bad_record of string
   | Block_index_modality_mismatch of
       { mut : bool; err : Modality.equate_error }
-  | Block_index_atomic_unsupported
   | Mutable_block_index_polymorphic_field of Longident.t
   | Submode_failed of Value.error * submode_reason
   | Curried_application_complete of
@@ -7854,14 +7853,14 @@ and type_expect_
       match ba with
       | Baccess_field (_, { lbl_mut = Immutable; _ }, _)
       | Baccess_block (Immutable, _) ->
-        false
+        Immutable
       | Baccess_field
           (_, { lbl_mut = Mutable { mode = _; atomic = Nonatomic }; _ }, _)
       | Baccess_block (Mutable, _) ->
-        true
+        Mutable { mode = Mode.Value.Comonadic.legacy; atomic = Nonatomic }
       | Baccess_field
           (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }, _) ->
-        raise (Error(loc, env, Block_index_atomic_unsupported))
+        Mutable { mode = Mode.Value.Comonadic.legacy; atomic = Atomic }
     in
     let (el_ty, modality), uas =
       List.fold_left_map
@@ -7880,19 +7879,25 @@ and type_expect_
         (el_ty, modality)
         uas
     in
-    if mut then check_index_not_to_poly_field ~env ba uas;
-    let expected_modality = Typemode.idx_expected_modalities ~mut in
+    if Types.is_mutable mut then check_index_not_to_poly_field ~env ba uas;
+    let expected_modality =
+      Typemode.idx_expected_modalities ~mut:(Types.is_mutable mut)
+    in
     begin
       match Modality.Const.equate modality expected_modality with
       | Ok () -> ()
       | Error err ->
-        raise (Error(loc, env, Block_index_modality_mismatch { mut; err }))
+        raise (Error(
+          loc, env,
+          Block_index_modality_mismatch { mut = Types.is_mutable mut; err }
+        ))
     end;
-    let ty =
-      if mut then
+    let ty = match mut with
+      | Immutable -> Predef.type_idx_imm base_ty el_ty
+      | Mutable { atomic = Nonatomic; mode = _ } ->
         Predef.type_idx_mut base_ty el_ty
-      else
-        Predef.type_idx_imm base_ty el_ty
+      | Mutable { atomic = Atomic; mode = _ } ->
+        Predef.type_idx_atomic base_ty el_ty
     in
     with_explanation (fun () ->
       unify_exp_types loc env ty (generic_instance ty_expected));
@@ -13412,9 +13417,6 @@ let report_error ~loc env =
       (if mut then "mutable" else "immutable")
       what_element_must_do
       (print_modality_doc "not") actual
-  | Block_index_atomic_unsupported ->
-    Location.error ~loc
-      "Block indices do not yet support [@atomic] record fields."
   | Mutable_block_index_polymorphic_field lid ->
     Location.errorf ~loc
       "Mutable block indices to polymorphic record fields@ (here %a) are \

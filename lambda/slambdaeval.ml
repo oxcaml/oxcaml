@@ -451,9 +451,11 @@ and eval_prim env prim =
   | Pget_idx (old_layout, mut) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then prim else Pget_idx (new_layout, mut)
-  | Pset_idx (old_layout, mode) ->
+  | Pset_idx (old_layout, mode, atomicity) ->
     let new_layout = eval_layout env old_layout in
-    if new_layout == old_layout then prim else Pset_idx (new_layout, mode)
+    if new_layout == old_layout
+    then prim
+    else Pset_idx (new_layout, mode, atomicity)
   | Pget_ptr (old_layout, mut) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then prim else Pget_ptr (new_layout, mut)
@@ -541,7 +543,7 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   | Popaque layout | Pobj_magic layout ->
     assert_layout_contains_no_splices layout
   | Pget_idx (layout, _)
-  | Pset_idx (layout, _)
+  | Pset_idx (layout, _, _)
   | Pget_ptr (layout, _)
   | Pset_ptr (layout, _)
   | Pget_ext_ptr (layout, _)

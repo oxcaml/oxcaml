@@ -1,0 +1,29 @@
+== Basic idx_atomic ==
+(.x) = 1
+(.y) = two
+(.x) <- 3
+(.y) <- "four"
+(.x) = 3
+(.y) = four
+== idx_atomic with unboxed singleton ==
+(.x.#y) = 1
+(.x.#y) <- 2
+(.x.#y) = 2
+== Basic idx_atomic (mixed record) ==
+(.x) = 42
+(.y) = two
+(.z) = 67
+(.y) <- "three"
+(.x) = 42
+(.y) = three
+(.z) = 67
+== Basic idx_atomic (float record) ==
+(.x) = 2.000000
+(.y) = 4.000000
+(.y) <- 6.0
+(.x) = 2.000000
+(.y) = 6.000000
+== Basic idx_atomic (void record) ==
+(.y) = hello
+(.y) <- "world"
+(.y) = world

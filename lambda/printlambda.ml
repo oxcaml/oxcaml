@@ -927,13 +927,20 @@ let primitive ppf = function
   | Ppoke layout ->
       fprintf ppf "(poke@ %a)"
         peek_or_poke layout
-  | Pget_idx (l, Mutable) ->
+  | Pget_idx (l, Atomic_access) ->
+      fprintf ppf "(get_idx_atomic@ %a)"
+        layout l
+  | Pget_idx (l, Mutable_access) ->
       fprintf ppf "(get_idx@ %a)"
         layout l
-  | Pget_idx (l, Immutable) ->
+  | Pget_idx (l, Immutable_access) ->
       fprintf ppf "(get_idx_imm@ %a)"
         layout l
-  | Pset_idx (l, mode) ->
+  | Pset_idx (l, mode, Atomic) ->
+      fprintf ppf "(set_idx_atomic%s@ %a)"
+        (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
+        layout l
+  | Pset_idx (l, mode, Nonatomic) ->
       fprintf ppf "(set_idx%s@ %a)"
         (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
         layout l

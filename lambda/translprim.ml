@@ -1187,15 +1187,21 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%get_idx_imm" ->
       (* This primitive requires the indexed data to be truly immutable,
          which the compiler will rely upon when performing optimizations *)
-      Primitive(Pget_idx (layout, Immutable), 2)
+      Primitive(Pget_idx (layout, Immutable_access), 2)
     | "%get_idx" ->
       (* Whenever it's safe to use the "_imm" counterpart to this primitive
-         (just above), it's also safe to use this one. Marking the primitive as
-         [Mutable] just restricts the optimizations that can be performed. *)
-      Primitive(Pget_idx (layout, Mutable), 2)
+         (just above), it's also safe to use this one. Marking the primitive
+         as [Mutable_access] just restricts the optimizations that can be
+         performed. *)
+      Primitive(Pget_idx (layout, Mutable_access), 2)
+    | "%get_idx_atomic" ->
+      Primitive(Pget_idx (layout, Atomic_access), 2)
     | "%set_idx" ->
       let layout = List.nth (get_arg_layouts ()) 2 in
-      Primitive(Pset_idx (layout, get_first_arg_mode ()), 3)
+      Primitive(Pset_idx (layout, get_first_arg_mode (), Nonatomic), 3)
+    | "%set_idx_atomic" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Primitive(Pset_idx (layout, get_first_arg_mode (), Atomic), 3)
     | "%unsafe_array_idx" ->
       Primitive(Pmake_idx_array
         (Punspecializedarray, Ptagged_int_index,
@@ -1917,9 +1923,9 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     (match fst (maybe_pointer_type env v) with
     | Pointer -> None
     | Immediate -> Some (Atomic (op, kind, Immediate)))
-  | Primitive (Pset_idx (_, m), arity), (_ :: _ :: p3 :: _) ->
+  | Primitive (Pset_idx (_, m, a), arity), (_ :: _ :: p3 :: _) ->
     let l = layout_of_ty_for_idx_set env loc p3 in
-    Some (Primitive (Pset_idx (l, m), arity))
+    Some (Primitive (Pset_idx (l, m, a), arity))
   | Primitive (Pset_ptr (_, m), arity), (_ :: p2 :: _) ->
     let l = layout_of_ty_for_idx_set env loc p2 in
     Some (Primitive (Pset_ptr (l, m), arity))

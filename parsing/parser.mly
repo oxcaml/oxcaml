@@ -3128,6 +3128,8 @@ block_access:
       match $2 with
       | "idx_imm" -> Baccess_block (Immutable, i)
       | "idx_mut" -> Baccess_block (Mutable, i)
+      | "idx_atomic" ->
+         raise Syntaxerr.(Error(Block_access_idx_atomic(make_loc $loc(_p))))
       | _ ->
         raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
     }

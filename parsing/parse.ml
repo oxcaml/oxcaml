@@ -205,6 +205,10 @@ let prepare_error err =
          @{<hint>Hint@}: If you really want a mutable function variable, \
          use the de-sugared syntax:\n  %a"
          Style.inline_code "let mutable f = fun x -> .."
+  | Block_access_idx_atomic loc ->
+      Location.errorf ~loc
+        "Syntax error: %a block accesses are not supported."
+        Style.inline_code ".idx_atomic"
   | Block_access_bad_paren loc ->
       Location.errorf ~loc
         "Syntax error: A parenthesis here can only follow %a or %a."

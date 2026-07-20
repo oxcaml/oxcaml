@@ -1795,25 +1795,18 @@ let block_index_access_offsets ~machine_width layout idx =
     in
     snd (List.fold_left_map f MPB.zero (L.mixed_block_element_leaves mbe))
 
-let write_offset write_offset_kind layout mode ~machine_width ~ptr ~idx
-    ~new_values =
-  let mode = Alloc_mode.For_assignments.from_lambda mode in
-  let offsets = block_index_access_offsets ~machine_width layout idx in
-  let kinds =
-    Flambda_arity.unarize
-      (Flambda_arity.from_lambda_list [layout] ~machine_width)
+(* [block_index_access_offests] produces untagged byte offsets, but
+   [Atomic_load_field] and [Atomic_set_field] expect a tagged word index. *)
+let tagged_field_index_of_offset ~machine_width offset : H.simple_or_prim =
+  let log2_size_addr =
+    H.simple_untagged_int ~machine_width
+      (Misc.log2 (Target_system.Machine_width.size_in_bytes machine_width))
   in
-  let writes =
-    Misc.Stdlib.List.map3
-      (fun kind offset new_value ->
-        H.Ternary
-          ( Write_offset (write_offset_kind, kind, mode),
-            ptr,
-            Prim offset,
-            new_value ))
-      kinds offsets new_values
+  let index =
+    H.Binary (Int_shift (Naked_int64, Lsr), Prim offset, log2_size_addr)
   in
-  [H.Sequence writes]
+  Prim
+    (Unary (Num_conv { src = Naked_int64; dst = Tagged_immediate }, Prim index))
 
 let string_or_bytes_checks (size : Flambda_primitive.string_accessor_width)
     unsafe =
@@ -1857,6 +1850,87 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     List.map (List.map (fun arg : H.simple_or_prim -> Simple arg)) args
   in
   let size_int = Target_system.Machine_width.size_in_bytes machine_width in
+  let access_mutability_of_mutable_flag = function
+    | Asttypes.Immutable -> Lambda.Immutable_access
+    | Asttypes.Mutable -> Lambda.Mutable_access
+  in
+  let check_single_value offsets kinds =
+    let offset =
+      match offsets with
+      | [offset] -> offset
+      | _ ->
+        Misc.fatal_error
+          "check_single_value: expected single element for atomic op"
+    in
+    let full_kind = List.hd kinds in
+    if not (K.is_value (K.With_subkind.kind full_kind))
+    then
+      (* defensive check: field index computation assumes data is word-sized *)
+      Misc.fatal_error "check_single_value: expected value for atomic op";
+    offset, full_kind
+  in
+  let convert_pget_indirect layout (mut : Lambda.access_mutability) ~ptr ~idx :
+      H.expr_primitive list =
+    needs_64_bit_target prim dbg;
+    let offsets = block_index_access_offsets ~machine_width layout idx in
+    let kinds =
+      Flambda_arity.unarize
+        (Flambda_arity.from_lambda_list [layout] ~machine_width)
+    in
+    begin match Lambda.access_atomicity mut with
+    | Nonatomic ->
+      let mut =
+        match mut with
+        | Immutable_access -> Asttypes.Immutable
+        | Mutable_access -> Asttypes.Mutable
+        | Atomic_access ->
+          Misc.fatal_error "convert_pget_indirect: expected nonatomic access"
+      in
+      let reads =
+        List.map2
+          (fun kind offset ->
+            H.Binary (Read_offset (kind, mut), ptr, Prim offset))
+          kinds offsets
+      in
+      [H.maybe_create_unboxed_product reads]
+    | Atomic ->
+      let offset, full_kind = check_single_value offsets kinds in
+      let field_kind = P.Block_access_field_kind.from_kind full_kind in
+      let field = tagged_field_index_of_offset ~machine_width offset in
+      [Binary (Atomic_load_field field_kind, ptr, field)]
+    end
+  in
+  let convert_pset_indirect write_offset_kind layout mode
+      (atomicity : Lambda.atomicity) ~ptr ~idx ~new_values :
+      H.expr_primitive list =
+    needs_64_bit_target prim dbg;
+    let mode = Alloc_mode.For_assignments.from_lambda mode in
+    let offsets = block_index_access_offsets ~machine_width layout idx in
+    let kinds =
+      Flambda_arity.unarize
+        (Flambda_arity.from_lambda_list [layout] ~machine_width)
+    in
+    begin match atomicity with
+    | Nonatomic ->
+      let writes =
+        Misc.Stdlib.List.map3
+          (fun kind offset new_value ->
+            H.Ternary
+              ( Write_offset (write_offset_kind, kind, mode),
+                ptr,
+                Prim offset,
+                new_value ))
+          kinds offsets new_values
+      in
+      [H.Sequence writes]
+    | Atomic ->
+      let offset, full_kind = check_single_value offsets kinds in
+      let field_kind = P.Block_access_field_kind.from_kind full_kind in
+      let field = tagged_field_index_of_offset ~machine_width offset in
+      let new_value = List.hd new_values in
+      [Ternary (Atomic_set_field field_kind, ptr, field, new_value)]
+    end
+  in
   match prim, args with
   | Pphys_equal eq, [[arg1]; [arg2]] ->
     let eq : P.equality_comparison = match eq with Eq -> Eq | Noteq -> Neq in
@@ -3323,32 +3397,21 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Ppoke layout, [[ptr]; [new_value]] ->
     let kind = standard_int_or_float_of_peek_or_poke layout in
     [Binary (Poke kind, ptr, new_value)]
-  | Pget_idx (layout, mut), [[ptr]; [idx]] | Pget_ptr (layout, mut), [[ptr; idx]]
-    ->
-    needs_64_bit_target prim dbg;
-    let offsets = block_index_access_offsets ~machine_width layout idx in
-    let kinds =
-      Flambda_arity.unarize
-        (Flambda_arity.from_lambda_list [layout] ~machine_width)
-    in
-    let reads =
-      List.map2
-        (fun kind offset ->
-          H.Binary (Read_offset (kind, mut), ptr, Prim offset))
-        kinds offsets
-    in
-    [H.maybe_create_unboxed_product reads]
+  | Pget_idx (layout, mut), [[ptr]; [idx]] ->
+    convert_pget_indirect layout mut ~ptr ~idx
+  | Pget_ptr (layout, mut), [[ptr; idx]] ->
+    convert_pget_indirect layout
+      (access_mutability_of_mutable_flag mut)
+      ~ptr ~idx
   | Pget_ptr _, [([] | [_] | _ :: _ :: _ :: _)] ->
     Misc.fatal_errorf
       "Closure_convertion.convert_primitive: The argument to Pget_ptr should \
        be an unboxed product of length 2"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
-  | Pset_idx (layout, mode), [[ptr]; [idx]; new_values] ->
-    needs_64_bit_target prim dbg;
-    write_offset Into_block layout mode ~machine_width ~ptr ~idx ~new_values
+  | Pset_idx (layout, mode, atomicity), [[ptr]; [idx]; new_values] ->
+    convert_pset_indirect Into_block layout mode atomicity ~ptr ~idx ~new_values
   | Pset_ptr (layout, mode), [[ptr; idx]; new_values] ->
-    needs_64_bit_target prim dbg;
-    write_offset Into_block_or_off_heap layout mode ~machine_width ~ptr ~idx
+    convert_pset_indirect Into_block_or_off_heap layout mode Nonatomic ~ptr ~idx
       ~new_values
   | Pset_ptr _, [([] | [_] | _ :: _ :: _ :: _); _] ->
     Misc.fatal_errorf
@@ -3356,24 +3419,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
        should be an unboxed product of length 2"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | Pget_ext_ptr (layout, mut), [[idx]] ->
-    needs_64_bit_target prim dbg;
     let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
-    let offsets = block_index_access_offsets ~machine_width layout idx in
-    let kinds =
-      Flambda_arity.unarize
-        (Flambda_arity.from_lambda_list [layout] ~machine_width)
-    in
-    let reads =
-      List.map2
-        (fun kind offset ->
-          H.Binary (Read_offset (kind, mut), null_base, Prim offset))
-        kinds offsets
-    in
-    [H.maybe_create_unboxed_product reads]
+    convert_pget_indirect layout
+      (access_mutability_of_mutable_flag mut)
+      ~ptr:null_base ~idx
   | Pset_ext_ptr (layout, mode), [[idx]; new_values] ->
-    needs_64_bit_target prim dbg;
     let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
-    write_offset Into_block_or_off_heap layout mode ~machine_width
+    convert_pset_indirect Into_block_or_off_heap layout mode Nonatomic
       ~ptr:null_base ~idx ~new_values
   | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf
