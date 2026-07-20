@@ -37,6 +37,7 @@ module Simd_int_cmp = Ast.Simd_int_cmp
 module Branch_cond = Ast.Branch_cond
 module A = Ast.DSL.Acc
 module D = Asm_targets.Asm_directives
+module DLL = Doubly_linked_list
 module H = Dsl_helpers
 module I = Ast.Instruction_name
 module L = Asm_targets.Asm_label
@@ -2116,6 +2117,153 @@ let rec emit_all env i =
     emit_instr env i;
     emit_all env i.next)
 
+(* The sink that directives from [D] are written to. [begin_assembly] installs
+   the real sink (binary emitter and text output); [fundecl] temporarily
+   redirects it to a buffer when the peephole optimizer or expect_asm tests are
+   active. *)
+let directive_sink : (D.Directive.t -> unit) ref =
+  ref (fun (_ : D.Directive.t) ->
+      Misc.fatal_error "Arm64 emitter: directive sink not initialised")
+
+(* These callbacks are just instrumentation for expect_asm tests. *)
+let expect_asm_callbacks = ref []
+
+let asm_collected_for_expect_asm = ref []
+
+let register_expect_asm_callback f =
+  (* Reset label counter to make assembly more predictable. *)
+  Label.reset ();
+  expect_asm_callbacks := f :: !expect_asm_callbacks
+
+let invoke_expect_asm_callbacks () =
+  let output =
+    "\n" ^ String.concat "\n" (List.rev !asm_collected_for_expect_asm)
+  in
+  let callbacks = !expect_asm_callbacks in
+  expect_asm_callbacks := [];
+  asm_collected_for_expect_asm := [];
+  List.iter (fun f -> f output) callbacks
+
+(* Format a buffered function body for expect_asm tests, mirroring
+   [X86_gas.format_asm_for_expect_asm]: labels defined in the body are
+   renumbered sequentially so that the output does not depend on label numbering
+   elsewhere in the unit, only instructions and labels are printed, and tabs are
+   converted to spaces. References to labels defined outside the body (e.g. GC
+   jump pads, which are emitted after the function body) are left as-is; they
+   are deterministic because [register_expect_asm_callback] resets the label
+   counter. *)
+let format_asm_for_expect_asm ~name
+    ~(body : Arm64_peephole.Peephole_utils.asm_line DLL.t) =
+  let module PU = Arm64_peephole.Peephole_utils in
+  let tab_stops = [| 2; 8 |] in
+  let tabs_to_spaces s =
+    let result = Buffer.create (String.length s) in
+    let col = ref 0 in
+    let tab_index = ref 0 in
+    String.iter
+      (fun c ->
+        if Char.equal c '\t' && !tab_index < Array.length tab_stops
+        then (
+          let target_col = tab_stops.(!tab_index) in
+          let spaces = max 1 (target_col - !col) in
+          for _ = 1 to spaces do
+            Buffer.add_char result ' '
+          done;
+          col := !col + spaces;
+          incr tab_index)
+        else (
+          Buffer.add_char result c;
+          incr col))
+      s;
+    Buffer.contents result
+  in
+  let label_map : (string, L.t) Hashtbl.t = Hashtbl.create 16 in
+  let next_id = ref 0 in
+  DLL.iter body ~f:(fun line ->
+      match[@warning "-4"] line with
+      | PU.Directive (New_label (Label l, _)) ->
+        Hashtbl.add label_map (L.encode l) (L.create_int (L.section l) !next_id);
+        incr next_id
+      | _ -> ());
+  let rewrite_label l =
+    match Hashtbl.find_opt label_map (L.encode l) with
+    | None -> l
+    | Some new_label -> new_label
+  in
+  (* Label references inside instructions (branch targets, [adr], ...) are
+     rewritten textually on the printed line: an exact-token replacement, where
+     a token may not be followed by an identifier character (so that e.g.
+     renumbering [.L1] does not corrupt [.L10]). *)
+  let is_ident_char c =
+    match c with
+    | 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' | '$' -> true
+    | _ -> false
+  in
+  let replace_token s old_tok new_tok =
+    let result = Buffer.create (String.length s) in
+    let len = String.length s in
+    let old_len = String.length old_tok in
+    let i = ref 0 in
+    while !i < len do
+      if
+        !i + old_len <= len
+        && String.equal (String.sub s !i old_len) old_tok
+        && (!i + old_len = len || not (is_ident_char s.[!i + old_len]))
+      then (
+        Buffer.add_string result new_tok;
+        i := !i + old_len)
+      else (
+        Buffer.add_char result s.[!i];
+        incr i)
+    done;
+    Buffer.contents result
+  in
+  let rewrite_label_references s =
+    Hashtbl.fold
+      (fun old_str new_label s -> replace_token s old_str (L.encode new_label))
+      label_map s
+  in
+  let buf = Buffer.create 1024 in
+  Buffer.add_string buf (name ^ ":\n");
+  DLL.iter body ~f:(fun line ->
+      match line with
+      | PU.Ins ins ->
+        let text = Format.asprintf "\t%a" Ast.Instruction.print ins in
+        Buffer.add_string buf (tabs_to_spaces (rewrite_label_references text));
+        Buffer.add_char buf '\n'
+      | PU.Directive d ->
+        let should_output =
+          match[@warning "-4"] d with New_label _ -> true | _ -> false
+        in
+        if should_output
+        then (
+          let line_buf = Buffer.create 128 in
+          D.Directive.print line_buf (D.Directive.map_new_label rewrite_label d);
+          Buffer.add_string buf (tabs_to_spaces (Buffer.contents line_buf));
+          Buffer.add_char buf '\n'));
+  Buffer.contents buf
+
+let record_for_expect_asm ~name ~debug_info ~body =
+  if
+    (not (List.is_empty !expect_asm_callbacks))
+    && (not (String.ends_with ~suffix:"__entry" name))
+    && not (String.starts_with ~prefix:"caml_curry" name)
+  then
+    let name =
+      match Debuginfo.to_items debug_info with
+      | item :: _ ->
+        (* CR-someday ttebbi: We could assign disambiguating names for multiple
+           anonymous functions *)
+        Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
+          item.dinfo_scopes
+        (* Remove the module name introduced by the toplevel eval loop. *)
+        |> Misc.Stdlib.String.split_first_exn ~split_on:'.'
+        |> snd
+      | [] -> name
+    in
+    let output = format_asm_for_expect_asm ~name ~body in
+    asm_collected_for_expect_asm := output :: !asm_collected_for_expect_asm
+
 (* Emission of a function declaration *)
 
 let fundecl fundecl =
@@ -2146,7 +2294,42 @@ let fundecl fundecl =
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
   let num_call_gc_sites = relax_branches env fundecl.fun_body in
-  emit_all env fundecl.fun_body;
+  let expect_asm = not (List.is_empty !expect_asm_callbacks) in
+  if !Oxcaml_flags.arm64_peephole_optimize || expect_asm
+  then (
+    (* Capture the function body (instructions from [A], directives and labels
+       from [D]) into a buffer, run the peephole optimizer over it, then flush:
+       replay each line through the original sinks, in order. The out-of-line
+       blocks below (GC calls, local realloc, stack realloc) are not captured,
+       mirroring amd64 where the peephole runs before they are emitted; each of
+       them starts with a label, which is a hard barrier for the rewrite rules
+       anyway. All rules shrink or keep code size and never create, move or
+       delete labels, so the branch displacements computed by [relax_branches]
+       above remain valid upper bounds. *)
+    let buffer : Arm64_peephole.Peephole_utils.asm_line DLL.t =
+      DLL.make_empty ()
+    in
+    let saved_directive_sink = !directive_sink in
+    (directive_sink
+       := fun d ->
+            DLL.add_end buffer (Arm64_peephole.Peephole_utils.Directive d));
+    Fun.protect
+      ~finally:(fun () -> directive_sink := saved_directive_sink)
+      (fun () ->
+        A.with_redirected_emit
+          ~emit_instruction:(fun i ->
+            DLL.add_end buffer (Arm64_peephole.Peephole_utils.Ins i))
+          ~f:(fun () -> emit_all env fundecl.fun_body));
+    if !Oxcaml_flags.arm64_peephole_optimize
+    then Arm64_peephole.Peephole_optimize.optimize buffer;
+    if expect_asm
+    then
+      record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
+        ~body:buffer;
+    DLL.iter buffer ~f:(function
+      | Arm64_peephole.Peephole_utils.Ins i -> A.emit_existing i
+      | Arm64_peephole.Peephole_utils.Directive d -> !directive_sink d))
+  else emit_all env fundecl.fun_body;
   List.iter emit_call_gc (Env.call_gc_sites env);
   List.iter emit_local_realloc (Env.local_realloc_sites env);
   emit_stack_realloc env;
@@ -2205,15 +2388,18 @@ let begin_assembly _unix =
      set *)
   let binary_emitter_callback = Binary_emitter_helpers.begin_emission () in
   let asm_line_buffer = Buffer.create 200 in
+  (directive_sink
+     := fun d ->
+          (* Emit to binary emitter if enabled *)
+          binary_emitter_callback d;
+          (* Emit to text *)
+          Buffer.clear asm_line_buffer;
+          D.Directive.print asm_line_buffer d;
+          Buffer.add_string asm_line_buffer "\n";
+          Emitaux.emit_buffer asm_line_buffer);
   D.initialize ~big_endian:Arch.big_endian
     ~emit_assembly_comments:!Oxcaml_flags.dasm_comments ~emit:(fun d ->
-      (* Emit to binary emitter if enabled *)
-      binary_emitter_callback d;
-      (* Emit to text *)
-      Buffer.clear asm_line_buffer;
-      D.Directive.print asm_line_buffer d;
-      Buffer.add_string asm_line_buffer "\n";
-      Emitaux.emit_buffer asm_line_buffer);
+      !directive_sink d);
   D.file ~file_num:None ~file_name:"";
   (* PR#7037 *)
   let data_begin = Cmm_helpers.make_symbol "data_begin" in
@@ -2236,9 +2422,6 @@ let begin_assembly _unix =
     D.align ~fill:Nop ~bytes:8);
   let code_end = Cmm_helpers.make_symbol "code_end" in
   Emitaux.Dwarf_helpers.begin_dwarf ~code_begin ~code_end ~file_emitter
-
-(* Not implemented for arm64 *)
-let register_expect_asm_callback (_ : string -> unit) = ()
 
 let end_assembly () =
   let code_end = Cmm_helpers.make_symbol "code_end" in
@@ -2304,5 +2487,6 @@ let end_assembly () =
   then Emitaux.Dwarf_helpers.emit_dwarf ();
   Probe_emission.emit_probe_notes ~add_def_symbol:(fun _ -> ());
   D.mark_stack_non_executable ();
+  invoke_expect_asm_callbacks ();
   (* Finalize binary emitter if enabled *)
   Binary_emitter_helpers.end_emission ()

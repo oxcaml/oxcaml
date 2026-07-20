@@ -3028,14 +3028,27 @@ module DSL = struct
 
     let clear_emit_instruction () = emit_instruction := None
 
-    let ins (type num a) (name : (num, a) Instruction_name.t)
-        (operands : (num, a) many) =
-      let instr = Instruction.create name ~operands in
+    let emit_existing instr =
       (* Emit to binary emitter if configured *)
       (match !emit_instruction with Some emit -> emit instr | None -> ());
       (* Emit to text if configured *)
       let str = Format.asprintf "\t%a\n" Instruction.print instr in
       match !emit_string with None -> () | Some emit_string -> emit_string str
+
+    let ins (type num a) (name : (num, a) Instruction_name.t)
+        (operands : (num, a) many) =
+      emit_existing (Instruction.create name ~operands)
+
+    let with_redirected_emit ~emit_instruction:capture ~f =
+      let saved_emit_string = !emit_string in
+      let saved_emit_instruction = !emit_instruction in
+      emit_string := None;
+      emit_instruction := Some capture;
+      Fun.protect
+        ~finally:(fun () ->
+          emit_string := saved_emit_string;
+          emit_instruction := saved_emit_instruction)
+        f
 
     type measurement =
       { count : int;

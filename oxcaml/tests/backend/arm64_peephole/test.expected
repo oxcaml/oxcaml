@@ -1,0 +1,393 @@
+==== str pair, ascending offsets (allocation-init shape)
+---- before
+	str	x1, [x0, #-8]
+	str	x2, [x0, #0]
+---- after
+	stp	x1, x2, [x0, #-8]
+==== ldr pair, descending sp offsets (reload shape)
+---- before
+	ldr	x0, [sp, #16]
+	ldr	x1, [sp, #8]
+---- after
+	ldp	x1, x0, [sp, #8]
+==== run of four stores fuses pairwise
+---- before
+	str	x1, [x0, #0]
+	str	x2, [x0, #8]
+	str	x3, [x0, #16]
+	str	x4, [x0, #24]
+---- after
+	stp	x1, x2, [x0, #0]
+	stp	x3, x4, [x0, #16]
+==== loc between the pair is dropped with the second instruction
+---- before
+	.loc	1	1	0
+	str	x1, [x0, #0]
+	.loc	1	2	0
+	str	x2, [x0, #8]
+---- after
+	.loc	1	1	0
+	stp	x1, x2, [x0, #0]
+==== str pair involving lr
+---- before
+	str	x1, [sp, #0]
+	str	lr, [sp, #8]
+---- after
+	stp	x1, lr, [sp, #0]
+==== no fuse: label between
+---- before
+	str	x1, [x0, #0]
+.L100:
+	str	x2, [x0, #8]
+---- after
+	str	x1, [x0, #0]
+.L100:
+	str	x2, [x0, #8]
+==== no fuse: offset gap of 16
+---- before
+	str	x1, [x0, #0]
+	str	x2, [x0, #16]
+---- after
+	str	x1, [x0, #0]
+	str	x2, [x0, #16]
+==== boundary: fused offset 504 is in range
+---- before
+	str	x1, [x0, #504]
+	str	x2, [x0, #512]
+---- after
+	stp	x1, x2, [x0, #504]
+==== no fuse: fused offset 512 is out of range
+---- before
+	str	x1, [x0, #512]
+	str	x2, [x0, #520]
+---- after
+	str	x1, [x0, #512]
+	str	x2, [x0, #520]
+==== no fuse: unaligned offsets
+---- before
+	str	x1, [x0, #4]
+	str	x2, [x0, #12]
+---- after
+	str	x1, [x0, #4]
+	str	x2, [x0, #12]
+==== no fuse: w registers
+---- before
+	str	w1, [x0, #0]
+	str	w2, [x0, #8]
+---- after
+	str	w1, [x0, #0]
+	str	w2, [x0, #8]
+==== no fuse: pre-indexed addressing
+---- before
+	str	x1, [x0, #0]!
+	str	x2, [x0, #8]
+---- after
+	str	x1, [x0, #0]!
+	str	x2, [x0, #8]
+==== no fuse: different bases
+---- before
+	str	x1, [x0, #0]
+	str	x2, [x3, #8]
+---- after
+	str	x1, [x0, #0]
+	str	x2, [x3, #8]
+==== no fuse: first load destination is the base
+---- before
+	ldr	x0, [x0, #0]
+	ldr	x1, [x0, #8]
+---- after
+	ldr	x0, [x0, #0]
+	ldr	x1, [x0, #8]
+==== fuse: second load destination is the base
+---- before
+	ldr	x1, [x0, #0]
+	ldr	x0, [x0, #8]
+---- after
+	ldp	x1, x0, [x0, #0]
+==== no fuse: equal load destinations
+---- before
+	ldr	x1, [x0, #0]
+	ldr	x1, [x0, #8]
+---- after
+	ldr	x1, [x0, #0]
+	ldr	x1, [x0, #8]
+==== add/add merge (comballoc shape)
+---- before
+	add	x2, x27, #8
+	add	x2, x2, #16
+---- after
+	add	x2, x27, #24
+==== chain of three adds folds fully
+---- before
+	add	x2, x27, #8
+	add	x2, x2, #16
+	add	x2, x2, #32
+---- after
+	add	x2, x27, #56
+==== add/sub merge with negative net
+---- before
+	add	x2, x27, #8
+	sub	x2, x2, #24
+---- after
+	sub	x2, x27, #16
+==== add/sub merge with zero net
+---- before
+	add	x2, x27, #8
+	sub	x2, x2, #8
+---- after
+	add	x2, x27, #0
+==== add with sp source
+---- before
+	add	x2, sp, #8
+	add	x2, x2, #8
+---- after
+	add	x2, sp, #16
+==== add with fp source and positive net
+---- before
+	add	x2, fp, #8
+	add	x2, x2, #8
+---- after
+	add	x2, fp, #16
+==== no merge: fp source with negative net (no sub fp form)
+---- before
+	add	x2, fp, #8
+	sub	x2, x2, #24
+---- after
+	add	x2, fp, #8
+	sub	x2, x2, #24
+==== merge: combined immediate 4096 encodable as shifted
+---- before
+	add	x2, x27, #4095
+	add	x2, x2, #1
+---- after
+	add	x2, x27, #4096
+==== no merge: combined immediate 4097 not encodable
+---- before
+	add	x2, x27, #4095
+	add	x2, x2, #2
+---- after
+	add	x2, x27, #4095
+	add	x2, x2, #2
+==== no merge: second source is not the first destination
+---- before
+	add	x2, x27, #8
+	add	x3, x3, #16
+---- after
+	add	x2, x27, #8
+	add	x3, x3, #16
+==== no merge: destinations differ
+---- before
+	add	x2, x27, #8
+	add	x3, x2, #16
+---- after
+	add	x2, x27, #8
+	add	x3, x2, #16
+==== no merge: label between (gc-return label shape)
+---- before
+	add	x2, x27, #8
+.L101:
+	add	x2, x2, #16
+---- after
+	add	x2, x27, #8
+.L101:
+	add	x2, x2, #16
+==== no merge: destination is sp
+---- before
+	add	sp, sp, #16
+	add	sp, sp, #16
+---- after
+	add	sp, sp, #16
+	add	sp, sp, #16
+==== redundant immediate compare across b.cond and store
+---- before
+	subs	xzr, x0, #1
+	b.ne	.L900
+	orr	x1, xzr, #3
+	str	x1, [sp, #64]
+	subs	xzr, x0, #1
+---- after
+	subs	xzr, x0, #1
+	b.ne	.L900
+	orr	x1, xzr, #3
+	str	x1, [sp, #64]
+==== redundant register compare
+---- before
+	subs	xzr, x0, x1
+	orr	x2, xzr, #7
+	subs	xzr, x0, x1
+---- after
+	subs	xzr, x0, x1
+	orr	x2, xzr, #7
+==== two redundant compares are both removed
+---- before
+	subs	xzr, x0, #1
+	orr	x1, xzr, #3
+	subs	xzr, x0, #1
+	orr	x2, xzr, #7
+	subs	xzr, x0, #1
+---- after
+	subs	xzr, x0, #1
+	orr	x1, xzr, #3
+	orr	x2, xzr, #7
+==== no removal: compared register written in between
+---- before
+	subs	xzr, x0, #1
+	add	x0, x0, #8
+	subs	xzr, x0, #1
+---- after
+	subs	xzr, x0, #1
+	add	x0, x0, #8
+	subs	xzr, x0, #1
+==== no removal: w0 written between compares on x0 (aliasing)
+---- before
+	subs	xzr, x0, #1
+	movz	w0, #5, lsl #0
+	subs	xzr, x0, #1
+---- after
+	subs	xzr, x0, #1
+	movz	w0, #5, lsl #0
+	subs	xzr, x0, #1
+==== no removal: flag writer in between
+---- before
+	subs	xzr, x0, #1
+	adds	x1, x2, #0
+	subs	xzr, x0, #1
+---- after
+	subs	xzr, x0, #1
+	adds	x1, x2, #0
+	subs	xzr, x0, #1
+==== no removal: label in between
+---- before
+	subs	xzr, x0, #1
+.L102:
+	subs	xzr, x0, #1
+---- after
+	subs	xzr, x0, #1
+.L102:
+	subs	xzr, x0, #1
+==== no removal: call in between
+---- before
+	subs	xzr, x0, #1
+	bl	.L901
+	subs	xzr, x0, #1
+---- after
+	subs	xzr, x0, #1
+	bl	.L901
+	subs	xzr, x0, #1
+==== no removal: width mismatch
+---- before
+	subs	wzr, w0, #1
+	orr	x1, xzr, #3
+	subs	xzr, x0, #1
+---- after
+	subs	wzr, w0, #1
+	orr	x1, xzr, #3
+	subs	xzr, x0, #1
+==== no removal: different immediate
+---- before
+	subs	xzr, x0, #1
+	orr	x1, xzr, #3
+	subs	xzr, x0, #3
+---- after
+	subs	xzr, x0, #1
+	orr	x1, xzr, #3
+	subs	xzr, x0, #3
+==== lsl 8 then lsr 18 (string-length shape)
+---- before
+	ubfm	x2, x2, #56, #55
+	ubfm	x2, x2, #18, #63
+---- after
+	ubfm	x2, x2, #10, #55
+==== lsl 8 then lsr 17 (mixed-block shape)
+---- before
+	ubfm	x2, x2, #56, #55
+	ubfm	x2, x2, #17, #63
+---- after
+	ubfm	x2, x2, #9, #55
+==== lsl 31 then asr 32
+---- before
+	ubfm	x2, x2, #33, #32
+	sbfm	x2, x2, #32, #63
+---- after
+	sbfm	x2, x2, #1, #32
+==== lsr 18 then lsl 18 becomes a mask
+---- before
+	ubfm	x2, x2, #18, #63
+	ubfm	x2, x2, #46, #45
+---- after
+	and	x2, x2, #-262144
+==== lsl 3 then lsl 4 add up
+---- before
+	ubfm	x2, x2, #61, #60
+	ubfm	x2, x2, #60, #59
+---- after
+	ubfm	x2, x2, #57, #56
+==== lsr 3 then lsr 4 add up
+---- before
+	ubfm	x2, x2, #3, #63
+	ubfm	x2, x2, #4, #63
+---- after
+	ubfm	x2, x2, #7, #63
+==== asr chain saturates at 63
+---- before
+	sbfm	x2, x2, #40, #63
+	sbfm	x2, x2, #40, #63
+---- after
+	sbfm	x2, x2, #63, #63
+==== first shift may have a distinct source
+---- before
+	ubfm	x2, x1, #56, #55
+	ubfm	x2, x2, #18, #63
+---- after
+	ubfm	x2, x1, #10, #55
+==== no compose: lsr then lsl with different amounts
+---- before
+	ubfm	x2, x2, #18, #63
+	ubfm	x2, x2, #61, #60
+---- after
+	ubfm	x2, x2, #18, #63
+	ubfm	x2, x2, #61, #60
+==== no compose: different registers
+---- before
+	ubfm	x2, x2, #56, #55
+	ubfm	x3, x3, #18, #63
+---- after
+	ubfm	x2, x2, #56, #55
+	ubfm	x3, x3, #18, #63
+==== no compose: unclassifiable bitfield move (uxtb shape)
+---- before
+	ubfm	x2, x2, #0, #7
+	ubfm	x2, x2, #18, #63
+---- after
+	ubfm	x2, x2, #0, #7
+	ubfm	x2, x2, #18, #63
+==== no compose: over-shifted lsl chain
+---- before
+	ubfm	x2, x2, #24, #23
+	ubfm	x2, x2, #34, #33
+---- after
+	ubfm	x2, x2, #24, #23
+	ubfm	x2, x2, #34, #33
+==== no compose: w-width shifts
+---- before
+	ubfm	w2, w2, #18, #63
+	ubfm	w2, w2, #18, #63
+---- after
+	ubfm	w2, w2, #18, #63
+	ubfm	w2, w2, #18, #63
+==== no compose: label between
+---- before
+	ubfm	x2, x2, #56, #55
+.L103:
+	ubfm	x2, x2, #18, #63
+---- after
+	ubfm	x2, x2, #56, #55
+.L103:
+	ubfm	x2, x2, #18, #63
+==== rule disabled by its flag
+---- before
+	str	x1, [x0, #0]
+	str	x2, [x0, #8]
+---- after
+	str	x1, [x0, #0]
+	str	x2, [x0, #8]

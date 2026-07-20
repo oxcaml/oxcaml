@@ -36,6 +36,12 @@ val x86_peephole_remove_mov_to_dead_register : bool ref
 val x86_peephole_remove_redundant_cmp : bool ref
 val x86_peephole_combine_add_rsp : bool ref
 
+val arm64_peephole_optimize : bool ref
+val arm64_peephole_fuse_memory_pairs : bool ref
+val arm64_peephole_merge_add_immediates : bool ref
+val arm64_peephole_remove_redundant_cmp : bool ref
+val arm64_peephole_compose_shift_pairs : bool ref
+
 val cfg_stack_checks : bool ref
 val cfg_stack_checks_threshold : int ref
 

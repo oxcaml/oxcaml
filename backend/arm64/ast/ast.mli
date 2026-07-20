@@ -1870,6 +1870,16 @@ module DSL : sig
         conditional branches. *)
     val with_measuring : f:(unit -> unit) -> measurement
 
+    (** Pass a previously-built instruction to the emission callbacks, exactly
+        as [ins] does for a newly-built one. *)
+    val emit_existing : Instruction.t -> unit
+
+    (** Execute [f] with text emission disabled and instructions redirected to
+        [emit_instruction], restoring the previous callbacks afterwards. Used to
+        buffer a function body for peephole optimization. *)
+    val with_redirected_emit :
+      emit_instruction:(Instruction.t -> unit) -> f:(unit -> 'a) -> 'a
+
     val ins1 : (singleton, 'a) Instruction_name.t -> 'a Operand.t -> unit
 
     val ins2 :

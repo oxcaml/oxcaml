@@ -1,0 +1,4 @@
+(tests
+ (names test)
+ (libraries arm64_peephole arm64_ast asm_targets ocamlcommon oxcaml_common)
+ (modules test))

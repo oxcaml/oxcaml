@@ -48,6 +48,12 @@ module type Oxcaml_options = sig
   val no_x86_peephole_remove_mov_to_dead_register : unit -> unit
   val no_x86_peephole_remove_redundant_cmp : unit -> unit
   val no_x86_peephole_combine_add_rsp : unit -> unit
+  val arm64_peephole_optimize : unit -> unit
+  val no_arm64_peephole_optimize : unit -> unit
+  val no_arm64_peephole_fuse_memory_pairs : unit -> unit
+  val no_arm64_peephole_merge_add_immediates : unit -> unit
+  val no_arm64_peephole_remove_redundant_cmp : unit -> unit
+  val no_arm64_peephole_compose_shift_pairs : unit -> unit
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit

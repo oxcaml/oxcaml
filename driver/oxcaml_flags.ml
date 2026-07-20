@@ -35,6 +35,12 @@ let x86_peephole_remove_mov_to_dead_register = ref true
 let x86_peephole_remove_redundant_cmp = ref true
 let x86_peephole_combine_add_rsp = ref true
 
+let arm64_peephole_optimize = ref false (* -[no-]arm64-peephole-optimize *)
+let arm64_peephole_fuse_memory_pairs = ref true
+let arm64_peephole_merge_add_immediates = ref true
+let arm64_peephole_remove_redundant_cmp = ref true
+let arm64_peephole_compose_shift_pairs = ref true
+
 let cfg_stack_checks = ref true         (* -[no-]cfg-stack-check *)
 let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
 

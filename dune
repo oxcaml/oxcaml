@@ -750,6 +750,7 @@
   compiler_owee
   gc_timings
   arm64_ast
+  arm64_peephole
   dwarf_low
   dwarf_high
   binary_emitter_intf))
@@ -856,6 +857,7 @@
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.a}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.a}
    %{dep:oxcaml_common.a}
+   %{dep:backend/arm64_peephole/arm64_peephole.a}
    %{dep:middle_end/flambda2/import/flambda2_import.a}
    %{dep:middle_end/flambda2/ui/flambda2_ui.a}
    %{dep:middle_end/flambda2/algorithms/flambda2_algorithms.a}
@@ -897,6 +899,7 @@
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cma}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cma}
    %{dep:oxcaml_common.cma}
+   %{dep:backend/arm64_peephole/arm64_peephole.cma}
    %{dep:middle_end/flambda2/import/flambda2_import.cma}
    %{dep:middle_end/flambda2/ui/flambda2_ui.cma}
    %{dep:middle_end/flambda2/algorithms/flambda2_algorithms.cma}
@@ -938,6 +941,7 @@
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cmxa}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cmxa}
    %{dep:oxcaml_common.cmxa}
+   %{dep:backend/arm64_peephole/arm64_peephole.cmxa}
    %{dep:middle_end/flambda2/import/flambda2_import.cmxa}
    %{dep:middle_end/flambda2/ui/flambda2_ui.cmxa}
    %{dep:middle_end/flambda2/algorithms/flambda2_algorithms.cmxa}
@@ -1029,6 +1033,9 @@
   (glob_files
    backend/arm64/ast/.arm64_ast.objs/byte/*.{cmi,cmo,cmt,cmti})
   (glob_files backend/arm64/ast/.arm64_ast.objs/native/*.cmx)
+  (glob_files
+   backend/arm64_peephole/.arm64_peephole.objs/byte/*.{cmi,cmo,cmt,cmti})
+  (glob_files backend/arm64_peephole/.arm64_peephole.objs/native/*.cmx)
   (glob_files
    backend/arm64/binary_emitter/.arm64_binary_emitter.objs/byte/*.{cmi,cmo,cmt,cmti})
   (glob_files

@@ -1,0 +1,7 @@
+(library
+ (name arm64_peephole)
+ (wrapped true)
+ (ocamlopt_flags
+  (:standard -w +4
+   (:include %{project_root}/ocamlopt_flags.sexp)))
+ (libraries ocamlcommon asm_targets arm64_ast oxcaml_common))
