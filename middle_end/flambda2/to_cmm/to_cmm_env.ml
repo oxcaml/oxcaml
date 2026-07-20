@@ -466,14 +466,18 @@ let complex_no_split cmm_expr free_vars = Split { cmm_expr; free_vars }
 
 let splittable_primitive dbg prim args = Splittable_prim { dbg; prim; args }
 
-let is_cmm_simple cmm =
+let rec is_cmm_simple cmm =
   match (cmm : Cmm.expression) with
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
   | Cvar _ ->
     true
-  | Clet _ | Cphantom_let _ | Cname_for_debugger _ | Ctuple _ | Cop _
-  | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
+  | Cphantom_let (_, _, body) | Cname_for_debugger (_, body) ->
+    (* These constructors are transparent for the purposes of deciding
+       simplicity: they generate no code beyond that of their body. *)
+    is_cmm_simple body
+  | Clet _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _
+  | Ccatch _ | Cexit _ | Cinvalid _ ->
     false
 
 (* Helper function to create bindings *)

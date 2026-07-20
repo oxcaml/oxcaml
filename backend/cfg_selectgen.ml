@@ -848,7 +848,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
            let ident = VP.var var in
            let naming_op =
              Operation.Name_for_debugger
-               { ident; provenance; which_parameter = None; regs }
+               { ident;
+                 provenance;
+                 which_parameter = which_parameter_of_provenance provenance;
+                 regs
+               }
            in
            insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]);
         Ok regs)
