@@ -298,6 +298,8 @@ type report_printer = {
 *)
 
 (* Support for flags that can also be set from an environment variable *)
+(* TODO This is not the natural home for these functions, but Clflags cannot
+        depend on Location *)
 val set_from_env : 'a option ref -> 'a Clflags.env_reader -> unit
 val read_clflags_from_env : unit -> unit
 

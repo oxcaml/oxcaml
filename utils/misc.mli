@@ -114,6 +114,7 @@ val create_hashtable: int -> ('a * 'b) list -> ('a, 'b) Hashtbl.t
        (** Create a hashtable with the given initial size and fills it
            with the given bindings. *)
 
+(* TODO Move this to Obj when the system compiler includes ocaml/ocaml/#14939 *)
 val hash_variant: string -> int
         (** Hash function for variant tags *)
 
