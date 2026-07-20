@@ -109,6 +109,16 @@ val stack_ptr_dwarf_register_number : int
 (** The DWARF register number corresponding to the domainstate pointer. *)
 val domainstate_ptr_dwarf_register_number : int
 
+(** For an external call ([Linear.Lextcall]), the number of bytes of machine
+    code that the emitter generates after the return address of the actual call
+    instruction within the sequence emitted for the external call. (In other
+    words, how many bytes must be subtracted from the address of the instruction
+    following the sequence in order to obtain the return address.) Returns
+    [None] if this is not known for the current architecture, in which case
+    DWARF call site information will not be generated for external calls. *)
+val extcall_code_size_after_return_address :
+  alloc:bool -> stack_ofs:int -> int option
+
 (* Calling the assembler *)
 val assemble_file : string -> string -> int
 
