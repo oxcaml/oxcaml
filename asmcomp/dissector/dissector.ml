@@ -122,10 +122,27 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
      ELF64 files and uses int64 arithmetic extensively. *)
   if Sys.word_size <> 64
   then Misc.fatal_error "The dissector requires a 64-bit host architecture";
+  (* An archive contributes only the members of required compilation units to
+     the link (unlike plain object files, which are always linked wholly); skip
+     archives that contribute none. *)
+  let ml_objfiles =
+    List.filter
+      (fun (file, required_symbols) ->
+        match required_symbols with
+        | _ :: _ -> true
+        | [] ->
+          let is_archive = Filename.check_suffix file ".a" in
+          if is_archive
+          then log "skipping archive with no required units: %s" file;
+          not is_archive)
+      ml_objfiles
+  in
   (* Collect files to analyze for partitioning. C stubs and runtime libraries
      are passthrough (passed directly to final linker, not partially linked). *)
   let files_to_measure =
-    List.map (fun f -> f, MOF.OCaml) ml_objfiles
+    List.map
+      (fun (file, required_symbols) -> file, MOF.OCaml { required_symbols })
+      ml_objfiles
     @ [startup_obj, MOF.Startup]
     @ match cached_genfns with None -> [] | Some f -> [f, MOF.Cached_genfns]
   in

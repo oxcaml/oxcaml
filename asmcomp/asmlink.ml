@@ -284,6 +284,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
       Build_linker_args.object_files args @ linker_flags, c_lib
     | None ->
       (* Normal mode: combine startup + ml_objfiles + ccobjs + runtime_lib *)
+      let file_list_rev = List.map (fun f -> f.Linkenv.path) file_list_rev in
       let file_list_rev =
         if !Oxcaml_flags.use_cached_generic_functions
         then !Oxcaml_flags.cached_generic_functions_path :: file_list_rev
@@ -397,6 +398,11 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
 
 (* Main entry point *)
 
+let entry_symbols units =
+  List.map
+    (fun compilation_unit -> Cmm_helpers.entry_symbol_name ~compilation_unit ())
+    units
+
 let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
     ~genfns ~units_tolink ~uses_eval ~quoted_cmi ~quoted_cmx ~ppf_dump : unit =
   if !Oxcaml_flags.internal_assembler
@@ -423,7 +429,8 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
   let ml_objfiles =
     match bundled_cm_obj with
     | None -> ml_objfiles
-    | Some bundled_cm_obj -> bundled_cm_obj :: ml_objfiles
+    | Some bundled_cm_obj ->
+      { Linkenv.path = bundled_cm_obj; units = [] } :: ml_objfiles
   in
   Asmgen.compile_unit unix ~output_prefix:output_name ~asm_filename:startup
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
@@ -443,11 +450,16 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
         else None
       in
       let temp_dir = mk_temp_dir "camldissector" "" in
+      let ml_objfiles_with_symbols =
+        List.map
+          (fun { Linkenv.path; units } -> path, entry_symbols units)
+          ml_objfiles
+      in
       let result =
         Profile.record_call "dissector" (fun () ->
-            Dissector.run ~unix ~temp_dir ~ml_objfiles ~startup_obj
-              ~ccobjs:(List.rev !Clflags.ccobjs) ~runtime_libs:(runtime_lib ())
-              ~cached_genfns)
+            Dissector.run ~unix ~temp_dir ~ml_objfiles:ml_objfiles_with_symbols
+              ~startup_obj ~ccobjs:(List.rev !Clflags.ccobjs)
+              ~runtime_libs:(runtime_lib ()) ~cached_genfns)
       in
       let linker_args = Build_linker_args.build result in
       (* Add EH frame registration object if the dissector generated one. This

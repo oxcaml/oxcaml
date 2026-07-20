@@ -86,7 +86,11 @@ end
 
     @param unix First-class Unix module for file operations
     @param temp_dir Directory for temporary and output files
-    @param ml_objfiles The OCaml object files (.o, .a derived from .cmx, .cmxa)
+    @param ml_objfiles
+      The OCaml object files (.o, .a derived from .cmx, .cmxa), each paired with
+      the entry symbols of the required compilation units it provides (see
+      {!Partial_link.link_one_partition}). Archives that provide no required
+      compilation units are skipped.
     @param startup_obj The startup object file
     @param ccobjs Extra C object files from -cclib (Clflags.ccobjs)
     @param runtime_libs Runtime libraries (from runtime_lib ())
@@ -101,7 +105,7 @@ end
 val run :
   unix:(module Compiler_owee.Unix_intf.S) ->
   temp_dir:string ->
-  ml_objfiles:string list ->
+  ml_objfiles:(string * string list) list ->
   startup_obj:string ->
   ccobjs:string list ->
   runtime_libs:string list ->
