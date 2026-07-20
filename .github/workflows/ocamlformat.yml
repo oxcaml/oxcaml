@@ -69,3 +69,7 @@ jobs:
       - name: Check for Conflict Markers
         if: ${{ !cancelled() }}
         run: bash tools/ci/actions/check-conflicts.sh
+
+      - name: Check for Committed Ignored Files
+        if: ${{ !cancelled() }}
+        run: bash tools/ci/actions/check-no-ignored-files.sh

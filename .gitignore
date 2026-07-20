@@ -87,8 +87,8 @@ _profile/
 /ocamlopt.opt
 /ocamlnat
 /dirs-to-ignore.inc
-/dune-project
 /*.sexp
+!/build_ocaml_compiler.sexp
 /_install
 /_runtest
 /_opam
@@ -370,7 +370,6 @@ ocaml/primitives.new
 /toplevel/byte/trace.mli
 /toplevel/byte/topmain.mli
 /toplevel/native/trace.mli
-/toplevel/native/topmain.mli
 
 /utils/config_boot.ml
 /utils/config_boot.mli
