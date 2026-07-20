@@ -2357,6 +2357,12 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       Code_metadata.with_params_arity params_arity
         (Code_metadata.with_param_modes modes code_metadata)
     in
+    (* We only change the calling convention if the analysis has shown there are
+       no partial applications. *)
+    let code_metadata =
+      Code_metadata.with_first_complex_local_param
+        First_complex_local_param.Never_partially_applied code_metadata
+    in
     let body, res = rebuild_body () in
     let code_metadata = update_size code_metadata body in
     (* Format.eprintf "REBUILD %a FREE %a@." Code_id.print code_id
