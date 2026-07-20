@@ -21,12 +21,11 @@ function prepare-is-excluded () {
   done < <(sed '/^$/d' | tr '\n' '\0' | git check-attr --stdin -z merlin-exclude)
 }
 
-# Succeeds if the merlin-exclude gitattribute is set for the file named $2 in
-# directory $1. The attributes are declared in
-# upstream/ocaml_flambda/.gitattributes; since git check-attr resolves paths
-# relative to the current directory, this must be called with the current
-# directory at upstream/ocaml_flambda. Before calling is-excluded, you must have
-# passed the given path into prepare-is-excluded.
+# Succeeds if the merlin-exclude gitattribute is set for the file named $1.
+# The attributes are declared in upstream/ocaml_flambda/.gitattributes; since
+# git check-attr resolves paths relative to the current directory, this must be
+# called with the current directory at upstream/ocaml_flambda. Before calling
+# is-excluded, you must have passed the given path into prepare-is-excluded.
 function is-excluded () {
-  [[ -n "${_merlin_excluded["$1"]}" ]]
+  [[ "${_merlin_excluded["$1"]}" == 1 ]]
 }

@@ -170,10 +170,10 @@ new_marker="Compiler:$commitish"
 # files are still untracked at this point so they don't show up in the diff;
 # they are instead copied over verbatim below.
 for file in $(git diff --no-ext-diff --name-only); do
-  if [[ "$file" = "upstream/ocaml_flambda/base-rev.txt" ]]; then continue; fi
-
   file=${file#${subtree_prefix}}
   base=${file#upstream/ocaml_flambda/}
+  if [[ "$base" = "base-rev.txt" ]]; then continue; fi
+
   tgt="$(merlin-target "$base")"
   tgt=src/ocaml/$tgt
 
