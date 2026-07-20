@@ -1018,7 +1018,7 @@ let pats_of_type env ty =
               labels
           in
           let fake_sorts =
-            List.map (fun _ -> fake_sort_const) labels
+            List.map (fun _ -> Jkind.Sort.of_const fake_sort_const) labels
             |> Array.of_list
             |> fun sorts -> Variable sorts
           in
@@ -1031,7 +1031,7 @@ let pats_of_type env ty =
               labels
           in
           let fake_sorts =
-            List.map (fun _ -> fake_sort_const) labels
+            List.map (fun _ -> Jkind.Sort.of_const fake_sort_const) labels
             |> Array.of_list
             |> fun sorts -> Variable sorts
           in

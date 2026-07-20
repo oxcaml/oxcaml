@@ -554,13 +554,15 @@ let set_private_row env loc p decl =
   in
   set_type_desc rv (Tconstr (p, decl.type_params, ref Mnil))
 
-(* Makes sure a type is representable. When called with a type variable, will
-   lower [any] to a sort variable if [allow_unboxed = true], and to [value]
-   if [allow_unboxed = false]. *)
-let constrain_to_representable ~why env loc kloc typ =
+(* Makes sure a type is representable, returning its sort. *)
+let representable_sort ~why env loc kloc typ =
   match Ctype.type_sort ~why ~fixed:false env typ with
-  | Ok _ -> ()
+  | Ok sort -> sort
   | Error err -> raise (Error (loc,Jkind_sort {env; kloc; typ; err}))
+
+(* Makes sure a type is representable. *)
+let constrain_to_representable ~why env loc kloc typ =
+  ignore (representable_sort ~why env loc kloc typ : Jkind.sort)
 
 let check_no_repr cty =
   match cty.ptyp_desc with
@@ -2401,12 +2403,12 @@ let update_record_inlined_kind env loc lbls jkinds tag vrep : _ Result.t =
       "Typedecl.update_record_kind: unexpected variant representation"
 
 (* Given a record with a variable representation, but updated labels, compute
-   the updated sorts and representation *)
+   the updated representation *)
 let update_record_kind (type rep) env loc (form : rep record_form)
       ~(old_repres : rep) lbls ~warn :
-    _ * (rep, _) Result.t =
+    (rep, _) Result.t =
   let types = List.map snd lbls in
-  let sorts, jkinds = update_label_sorts env loc types ~form in
+  let _sorts, jkinds = update_label_sorts env loc types ~form in
   let reprs, repr_summary = compute_repr_summary env lbls jkinds in
   let rep : (rep, _) Result.t =
     match form, old_repres with
@@ -2441,7 +2443,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
         Misc.fatal_error
           "Typedecl.update_record_kind: representation already determined"
   in
-  sorts, rep
+  rep
 
 let update_record_representation
       (type rep) ~why ~old_repres
@@ -2451,11 +2453,15 @@ let update_record_representation
     | Legacy -> Record { unboxed = false }
     | Unboxed_product -> Record_unboxed_product
   in
-  List.iter
-    (fun (_lbl, ld_type) ->
-       constrain_to_representable ~why env loc kloc ld_type)
-    lbls_and_types;
-  let sorts, rep =
+  (* We want to allow exactly one side effect here: force the type to be
+     representable, returning its sort from this function. Thus we get the
+     sort here rather than inside the snapshot/backtrack region below. *)
+  let sorts =
+    List.map
+      (fun (_lbl, ld_type) -> representable_sort ~why env loc kloc ld_type)
+      lbls_and_types
+  in
+  let rep =
     let warn =
       (* Only warn during initial typechecking rather than when updating at
          use sites, so that we only warn once and honour suppressed warnings *)
@@ -2473,13 +2479,7 @@ let update_record_representation
     Btype.backtrack snap;
     ans
   in
-  match rep with
-  | Ok rep ->
-    begin match Misc.Stdlib.List.some_if_all_elements_are_some sorts with
-    | Some sorts -> Ok (sorts, rep)
-    | None -> Misc.fatal_error "missing sort for representable field"
-    end
-  | Error _ as e -> e
+  Result.map (fun rep -> sorts, rep) rep
 
 (* This function updates jkind stored in kinds with more accurate jkinds.
    It is called after the circularity checks and the delayed jkind checks
