@@ -40,6 +40,7 @@ USAGE
 }
 
 # Maps a file under upstream/ocaml_flambda/ to its location in src/ocaml/.
+# Prints nothing for files that are not synced with Merlin.
 function merlin-target () {
   local base="$1"
   case $base in
@@ -66,6 +67,9 @@ function merlin-target () {
 
     lambda/mixed_product_bytes.ml*)
       echo "${base/#lambda/typing}";;
+
+    base-rev.txt) ;;
+    .gitattributes) ;;
 
     # Most cases are simple
     *) echo "$base";;
@@ -172,9 +176,10 @@ new_marker="Compiler:$commitish"
 for file in $(git diff --no-ext-diff --name-only); do
   file=${file#${subtree_prefix}}
   base=${file#upstream/ocaml_flambda/}
-  if [[ "$base" = "base-rev.txt" ]]; then continue; fi
-
   tgt="$(merlin-target "$base")"
+
+  if [ -z "$tgt" ]; then continue; fi
+
   tgt=src/ocaml/$tgt
 
   if [ -e "$file" ]; then
