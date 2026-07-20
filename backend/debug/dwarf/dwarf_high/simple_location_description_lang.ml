@@ -153,25 +153,18 @@ module Rvalue = struct
         ~at_join:[] ()
 
   let read_field_unguarded ~block ~field =
-    let offset_in_bytes =
-      Targetint.mul field Targetint.size_in_bytes_as_targetint
-    in
-    block @ OB.add_unsigned_const offset_in_bytes @ [O.DW_op_deref]
+    (* The address computation is the same as in the lvalue case; the value is
+       then obtained by dereferencing. (This does not work for [read_field],
+       above: on the failure path of the guard the stack is left empty, so the
+       dereference there has to happen inside the guarded branch.) *)
+    Lvalue.read_field_unguarded ~block ~field @ [O.DW_op_deref]
 
   let offset_pointer t ~offset_in_words =
-    let offset_in_bytes =
-      Targetint.mul offset_in_words Targetint.size_in_bytes_as_targetint
-    in
-    (* Guarded like [read_field] above: if evaluation of [t] fails (e.g. the
-       base pointer is unavailable, so the [DW_OP_call*] does nothing to the
-       stack) the result is left empty rather than underflowing the stack or
-       offsetting a junk value. *)
-    (OB.signed_int_const Targetint.zero :: t)
-    @ [O.DW_op_dup]
-    @ OB.conditional ~if_zero:[]
-        ~if_nonzero:
-          ([O.DW_op_swap; O.DW_op_drop] @ OB.add_signed_const offset_in_bytes)
-        ~at_join:[] ()
+    (* The operator sequence is identical to the lvalue case: the pointer value,
+       rather than an address, is what lies on the stack, but the offsetting
+       computation (and the guard against failed evaluation of [t]) is the same.
+       No dereference is involved: see the .mli. *)
+    Lvalue.offset_pointer t ~offset_in_words
 
   let read_symbol_field symbol ~field =
     read_field ~block:(const_symbol symbol) ~field

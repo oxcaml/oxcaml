@@ -29,8 +29,6 @@ type implicit_value =
   | Int of Targetint.t
   | Symbol of Asm_symbol.t
   | Label of Asm_label.t
-      (** For statically-allocated values whose defining symbols are
-          assembler-local labels rather than linker symbols. *)
 
 type t =
   | DW_op_lit0
