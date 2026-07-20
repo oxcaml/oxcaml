@@ -891,7 +891,7 @@ let simplify_direct_function_call ~simplify_expr dacc apply
       match Code_id.Set.get_singleton callee's_code_ids with
       | None -> callee's_code_id_from_type, callee's_code_metadata_from_type
       | Some callee's_code_id -> (
-        match DE.find_code_exn (DA.denv dacc) callee's_code_id with
+        match DE.find_code_metadata_exn (DA.denv dacc) callee's_code_id with
         | exception Not_found ->
           (* This can happen if we have a more precise code id from the call
              kind, but we don't have the metadata for it. This should be rare
@@ -899,9 +899,7 @@ let simplify_direct_function_call ~simplify_expr dacc apply
              this code id); in that case, we use the metadata that we do have
              available for the code id from the type. *)
           callee's_code_id_from_type, callee's_code_metadata_from_type
-        | callee's_code_or_metadata ->
-          ( callee's_code_id,
-            Code_or_metadata.code_metadata callee's_code_or_metadata ))
+        | callee's_code_metadata -> callee's_code_id, callee's_code_metadata)
     in
     let call_kind = Call_kind.direct_function_call callee's_code_id in
     let apply = Apply.with_call_kind apply call_kind in
@@ -1128,12 +1126,9 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
   | None -> (
     match call with
     | Direct callee's_code_id -> (
-      match DE.find_code_exn denv callee's_code_id with
+      match DE.find_code_metadata_exn denv callee's_code_id with
       | exception Not_found -> type_unavailable ()
-      | callee's_code_or_metadata ->
-        let callee's_code_metadata =
-          Code_or_metadata.code_metadata callee's_code_or_metadata
-        in
+      | callee's_code_metadata ->
         simplify_direct_full_application ~simplify_expr dacc apply None
           ~params_arity:(Code_metadata.params_arity callee's_code_metadata)
           ~result_arity:(Code_metadata.result_arity callee's_code_metadata)
@@ -1162,12 +1157,9 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
         | Indirect_known_arity _ | Indirect_unknown_arity -> true
       in
       let callee's_code_id_from_type = T.Function_type.code_id func_decl_type in
-      match DE.find_code_exn denv callee's_code_id_from_type with
+      match DE.find_code_metadata_exn denv callee's_code_id_from_type with
       | exception Not_found -> type_unavailable ()
-      | callee's_code_or_metadata ->
-        let callee's_code_metadata_from_type =
-          Code_or_metadata.code_metadata callee's_code_or_metadata
-        in
+      | callee's_code_metadata_from_type ->
         let must_be_detupled =
           call_must_be_detupled
             (Code_metadata.is_tupled callee's_code_metadata_from_type)
