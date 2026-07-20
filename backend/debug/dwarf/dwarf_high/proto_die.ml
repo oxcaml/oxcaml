@@ -109,8 +109,7 @@ let replace_all_attribute_values t attribute_values =
      list of children (and may already be referenced by other DIEs), so
      returning a functional copy would leave the old attribute values to be
      emitted. *)
-  t.attribute_values <- attribute_values_map attribute_values;
-  t
+  t.attribute_values <- attribute_values_map attribute_values
 
 let set_name t name = t.name <- Some name
 
