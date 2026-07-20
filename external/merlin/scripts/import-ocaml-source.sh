@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 subtree_prefix="$(git rev-parse --show-prefix)"
 source scripts/common.sh
@@ -15,10 +16,10 @@ Usage: $0 [COMMITISH [REPO [SUBDIRECTORY]]]
 
 Fetch the new compiler sources and patch Merlin to keep Merlin's local copies of
 things in sync. By default, this will pull in compiler changes from the local
-repo at the current revision. But you may pass an arbitrary commitish (branch,
+repo at the current revision. But you may pass an arbitrary committish (branch,
 tag, full (not abbreviated!) commit hash, etc.) to import changes from. You
 may also fetch from a remote repository by specifying a REPO, and the
-subdirectory of the repo that the compiler is located in can be overriden by any
+subdirectory of the repo that the compiler is located in can be overridden by any
 path (including ".").
 
 The file "upstream/ocaml_flambda/.gitattributes" explicitly lists the compiler
@@ -39,7 +40,6 @@ USAGE
 }
 
 # Maps a file under upstream/ocaml_flambda/ to its location in src/ocaml/.
-# Prints nothing for files whose changes have to be inspected manually.
 function merlin-target () {
   local base="$1"
   case $base in
@@ -67,16 +67,12 @@ function merlin-target () {
     lambda/mixed_product_bytes.ml*)
       echo "${base/#lambda/typing}";;
 
-    # We have to inspect these files by hand, we only care about a subset of the
-    # changes
-    utils/clflags.ml*|utils/config.ml*) ;;
-
     # Most cases are simple
     *) echo "$base";;
   esac
 }
 
-case "$1" in
+case "${1-unused}" in
   -h|-help|--help|-\?)
     usage
     exit 0
@@ -94,7 +90,7 @@ else
   exit 1
 fi
 
-if ! [ -z "$(git status --porcelain)" ]; then
+if [ -n "$(git status --porcelain)" ]; then
   echo "Working directory must be clean before using this script,"
   echo "but currently has the following changes:"
   git status
@@ -153,7 +149,7 @@ for dir in */; do
   for file in "$dir"/*; do
     name="${file#"$dir"/}"
     if ! printf '%s\n' $upstream_files | grep -qxF "$fetch_dir/$name"; then
-      echo "Warning: $file no longer exists upstream; consider deleting it."
+      rm "$file"
     fi
   done
 done
@@ -169,29 +165,39 @@ new_marker="Compiler:$commitish"
 # files are still untracked at this point so they don't show up in the diff;
 # they are instead copied over verbatim below.
 for file in $(git diff --no-ext-diff --name-only); do
+  if [[ "$file" = "upstream/ocaml_flambda/base-rev.txt" ]]; then continue fi
+
   file=${file#${subtree_prefix}}
   base=${file#upstream/ocaml_flambda/}
   tgt="$(merlin-target "$base")"
-  if [[ -z "$tgt" ]]; then
-    printf '\e[7mIgnoring changes to %s, inspect it manually.\e[0m\n' "$base"
-    continue
-  fi
   tgt=src/ocaml/$tgt
 
-  # Not all files are necessary
-  if [ ! -e $tgt ]; then continue; fi
-
-  err=$(patch --merge=diff3 $tgt <(git diff --no-ext-diff -- $file))
-  # ignore patch output if it worked
-  if [ $? != 0 ]; then
-    sed -i \
-        -e 's!^<<<<<<<$!& '"$old_marker"'!'    \
-        -e 's!^|||||||$!& '"$parent_marker"'!' \
-        -e 's!^>>>>>>>$!& '"$new_marker"'!'    \
-        $tgt
-    echo "$err"
+  if [ -e "$file" ]; then
+    # ignore patch output if it worked
+    if ! patch --merge=diff3 $tgt <(git diff --no-ext-diff -- $file) > $tgt.out; then
+      sed -i \
+          -e 's!^<<<<<<<$!& '"$old_marker"'!'    \
+          -e 's!^|||||||$!& '"$parent_marker"'!' \
+          -e 's!^>>>>>>>$!& '"$new_marker"'!'    \
+          $tgt
+      cat $tgt.out
+    fi
+    rm -f $tgt.orig $tgt.out
+  else
+    # The file was deleted from the compiler, so delete Merlin's copy too. If
+    # Merlin had local changes relative to the previously imported copy, record
+    # them in a .rej file so they aren't silently lost.
+    if git show "HEAD:${subtree_prefix}${file}" \
+        | diff -u --label "$parent_marker" --label "$old_marker" - "$tgt" > "$tgt.rej"
+    then
+      rm "$tgt.rej"
+      echo "Deleted $tgt (deleted from the compiler)"
+    else
+      echo "Deleted $tgt (deleted from the compiler);"
+      echo "local Merlin changes recorded in $tgt.rej"
+    fi
+    rm "$tgt"
   fi
-  rm -f $tgt.orig
 done
 
 # Copy any newly-imported files into src/ocaml
@@ -215,4 +221,7 @@ if ! git diff --cached --quiet; then
 fi
 
 git add .
+# Also add any .rej files that were created by patch, even though they're
+# ignored.
+git add "*.rej" --force &> /dev/null || true
 git commit -m "Automated commit: Import compiler changes from $old_base_rev to $rev"
