@@ -73,8 +73,8 @@ arr_sum:
   ret
 |}]
 
-(* CR ttebbi: The generated control flow branches two times on
-   should_continue. Additionally, we materialise the should_continue bit. *)
+(* CR ttebbi: We check [target < x] twice, even though the second branch is
+   redundant. *)
 let search ~target (start : int list) =
   let node = ref start in
   while
@@ -90,31 +90,27 @@ let search ~target (start : int list) =
 [%%expect_asm X86_64{|
 search:
   movq  %rax, %rdi
-  testb $1, %bl
-  je    .L1
+  movq  %rbx, %rax
+  testb $1, %al
+  je    .L2
+  jmp   .L1
 .L0:
-  xorl  %esi, %esi
+  testb $1, %al
+  je    .L2
+.L1:
   movl  $1, %eax
   jmp   .L4
-.L1:
-  movq  (%rbx), %rax
-  xorl  %esi, %esi
-  cmpq  %rax, %rdi
-  setl  %sil
-  testq %rsi, %rsi
-  je    .L2
-  movq  8(%rbx), %rax
-  testq %rsi, %rsi
-  jne   .L3
-  jmp   .L4
 .L2:
-  movq  %rbx, %rax
-  jmp   .L4
-.L3:
-  movq  %rax, %rbx
-  testb $1, %bl
-  je    .L1
+  movq  (%rax), %rbx
+  cmpq  %rbx, %rdi
+  jge   .L3
+  movq  8(%rax), %rax
+  cmpq  %rbx, %rdi
+  jge   .L4
   jmp   .L0
+.L3:
+  cmpq  %rbx, %rdi
+  jl    .L0
 .L4:
   ret
 |}]
@@ -151,8 +147,7 @@ learn_from_branch:
 |}]
 
 
-(* CR ttebbi: We shouldn't materialize the boolean and some branches are
-   imposssible to take. *)
+(* CR ttebbi: We repeat the same branch twice. *)
 let complex_branching_on_two_comparisons (x: int) (y: int) c1 c2 c3 =
  match x = 2, y = 2 with
  | true, true -> c1 ()
@@ -160,23 +155,19 @@ let complex_branching_on_two_comparisons (x: int) (y: int) c1 c2 c3 =
  | false, _ -> c3 ()
 [%%expect_asm X86_64{|
 complex_branching_on_two_comparisons:
-  movq  %rax, %rcx
-  movq  %rbx, %rax
+  movq  %rbx, %rcx
   movq  %rsi, %rbx
   cmpq  $5, %rax
-  sete  %al
-  movzbq %al, %rax
+  jne   .L0
   cmpq  $5, %rcx
   jne   .L0
-  testq %rax, %rax
-  je    .L0
   movl  $1, %eax
   movq  (%rdi), %rsi
   movq  %rdi, %rbx
   jmp   *%rsi
 .L0:
-  testq %rax, %rax
-  je    .L1
+  cmpq  $5, %rcx
+  jne   .L1
   movl  $1, %eax
   movq  (%rdx), %rdi
   movq  %rdx, %rbx

@@ -225,6 +225,16 @@ let mk_no_cfg_value_propagation_flow f =
     Arg.Unit f,
     " Do not propagate values across block to simplify CFG" )
 
+let mk_cfg_jump_threading f =
+  ( "-cfg-jump-threading",
+    Arg.Unit f,
+    " Fold conditional branches using reaching definitions" )
+
+let mk_no_cfg_jump_threading f =
+  ( "-no-cfg-jump-threading",
+    Arg.Unit f,
+    " Do not fold conditional branches using reaching definitions" )
+
 let mk_experimental_optimizations f =
   ( "-experimental-optimizations",
     Arg.Unit f,
@@ -1318,6 +1328,8 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_float : unit -> unit
   val cfg_value_propagation_flow : unit -> unit
   val no_cfg_value_propagation_flow : unit -> unit
+  val cfg_jump_threading : unit -> unit
+  val no_cfg_jump_threading : unit -> unit
   val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
@@ -1506,6 +1518,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_cfg_value_propagation_float F.no_cfg_value_propagation_float;
       mk_cfg_value_propagation_flow F.cfg_value_propagation_flow;
       mk_no_cfg_value_propagation_flow F.no_cfg_value_propagation_flow;
+      mk_cfg_jump_threading F.cfg_jump_threading;
+      mk_no_cfg_jump_threading F.no_cfg_jump_threading;
       mk_experimental_optimizations F.experimental_optimizations;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_basic_block_sections F.basic_block_sections;
@@ -1849,6 +1863,9 @@ module Oxcaml_options_impl = struct
   let no_cfg_value_propagation_flow =
     clear' Oxcaml_flags.cfg_value_propagation_flow
 
+  let cfg_jump_threading = set' Oxcaml_flags.cfg_jump_threading
+  let no_cfg_jump_threading = clear' Oxcaml_flags.cfg_jump_threading
+
   (* Bundle of experimental codegen optimizations enabled by
      [-experimental-optimizations]. *)
   let experimental_optimizations () =
@@ -1861,7 +1878,8 @@ module Oxcaml_options_impl = struct
     regalloc_param "IRC_INTERF_THRESHOLD:4096";
     cfg_merge_blocks ();
     cfg_eliminate_dead_trap_handlers ();
-    cfg_value_propagation_flow ()
+    cfg_value_propagation_flow ();
+    cfg_jump_threading ()
 
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
@@ -2422,6 +2440,7 @@ module Extra_params = struct
         set' Oxcaml_flags.cfg_value_propagation_float
     | "cfg-value-propagation-flow" ->
         set' Oxcaml_flags.cfg_value_propagation_flow
+    | "cfg-jump-threading" -> set' Oxcaml_flags.cfg_jump_threading
     | "experimental-optimizations" ->
         if Compenv.check_bool ppf name v then
           Oxcaml_options_impl.experimental_optimizations ();
