@@ -1120,6 +1120,14 @@ CAMLprim value caml_get_idx_bytecode(value base, value idx)
   CAMLreturn (res);
 }
 
+CAMLprim value caml_get_idx_atomic_bytecode(value base, value idx) {
+  CAMLparam2 (base, idx);
+  CAMLassert (Tag_val(idx) == 0);
+  CAMLassert (Wosize_val(idx) == 1); // Nested atomic accesses not supported
+  CAMLassert (Tag_val(base) != Double_array_tag);
+  CAMLreturn (caml_atomic_load_field(base, Field(idx, 0)));
+}
+
 CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
 {
   CAMLparam3 (base, idx, v);
@@ -1143,12 +1151,30 @@ CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
   CAMLreturn (Val_unit);
 }
 
+CAMLprim value caml_set_idx_atomic_bytecode(value base, value idx, value v)
+{
+  CAMLparam2 (base, idx);
+  CAMLassert (Tag_val(idx) == 0);
+  CAMLassert (Wosize_val(idx) == 1); // Nested atomic accesses not supported
+  CAMLassert (Tag_val(base) != Double_array_tag);
+  caml_atomic_exchange_field(base, Field(idx, 0), v);
+  CAMLreturn (Val_unit);
+}
+
 CAMLprim value caml_get_ptr_bytecode(value ptr)
 {
   value base = Field(ptr, 0);
   if (Is_null(base))
     caml_failwith("External ptrs are unimplemented on bytecode");
   return caml_get_idx_bytecode(base, Field(ptr, 1));
+}
+
+CAMLprim value caml_get_ptr_atomic_bytecode(value ptr)
+{
+  value base = Field(ptr, 0);
+  if (Is_null(base))
+    caml_failwith("External ptrs are unimplemented on bytecode");
+  return caml_get_idx_atomic_bytecode(base, Field(ptr, 1));
 }
 
 CAMLprim value caml_set_ptr_bytecode(value ptr, value v)
@@ -1159,13 +1185,33 @@ CAMLprim value caml_set_ptr_bytecode(value ptr, value v)
   return caml_set_idx_bytecode(base, Field(ptr, 1), v);
 }
 
+CAMLprim value caml_set_ptr_atomic_bytecode(value ptr, value v)
+{
+  value base = Field(ptr, 0);
+  if (Is_null(base))
+    caml_failwith("External ptrs are unimplemented on bytecode");
+  return caml_set_idx_atomic_bytecode(base, Field(ptr, 1), v);
+}
+
 CAMLprim value caml_get_ext_ptr_bytecode(value idx)
 {
   caml_failwith("External ptr primitives are unimplemented on bytecode");
   return Val_unit;
 }
 
+CAMLprim value caml_get_ext_ptr_atomic_bytecode(value idx)
+{
+  caml_failwith("External ptr primitives are unimplemented on bytecode");
+  return Val_unit;
+}
+
 CAMLprim value caml_set_ext_ptr_bytecode(value idx, value v)
+{
+  caml_failwith("External ptr primitives are unimplemented on bytecode");
+  return Val_unit;
+}
+
+CAMLprim value caml_set_ext_ptr_atomic_bytecode(value idx, value v)
 {
   caml_failwith("External ptr primitives are unimplemented on bytecode");
   return Val_unit;

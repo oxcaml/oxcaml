@@ -522,14 +522,45 @@ val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
 
 (*****************************************)
 (* Block indices to atomic record fields *)
-type atomic = { mutable i : int [@atomic] }
-let bad () = (.i)
+type atomic = { mutable i : int [@atomic]; mutable j : int [@atomic] }
+
+let idx_atomic_i = (.i)
 [%%expect{|
-type atomic = { mutable i : int [@atomic]; }
-Line 2, characters 13-17:
-2 | let bad () = (.i)
-                 ^^^^
-Error: Block indices do not yet support [@atomic] record fields.
+type atomic = { mutable i : int [@atomic]; mutable j : int [@atomic]; }
+val idx_atomic_i : (atomic, int) idx_atomic = <abstr>
+|}]
+
+let idx_atomic_j = (.j)
+[%%expect{|
+val idx_atomic_j : (atomic, int) idx_atomic = <abstr>
+|}]
+
+(* Block indices to unboxed singleton record *)
+type inner = { y: int }
+type outer = { mutable x: inner# [@atomic] }
+
+let unbox_idx_atomic = (.x.#y)
+[%%expect{|
+type inner = { y : int; }
+type outer = { mutable x : inner# [@atomic]; }
+val unbox_idx_atomic : (outer, int) idx_atomic = <abstr>
+|}]
+
+(* Block indices to mixed record *)
+type t = { x: int64#; mutable y: string [@atomic]; z: int64# }
+
+let mixed_idx_atomic = (.y)
+[%%expect{|
+type t = { x : int64#; mutable y : string [@atomic]; z : int64#; }
+val mixed_idx_atomic : (t, string) idx_atomic = <abstr>
+|}]
+
+(* Block indices to all-float record *)
+type floats = { x: float; mutable y: float [@atomic] } [@@warning "-214"]
+let float_idx_atomic = (.y)
+[%%expect{|
+type floats = { x : float; mutable y : float [@atomic]; }
+val float_idx_atomic : (floats, float) idx_atomic = <abstr>
 |}]
 
 (**************)

@@ -64,6 +64,7 @@ type abstract_non_value_type_constr = [
   | `Float32_u
   | `Idx_imm
   | `Idx_mut
+  | `Idx_atomic
   | `Int8x16
   | `Int16x8
   | `Int32x4
@@ -130,6 +131,7 @@ let base_type_constrs : type_constr list = [
   `Int64_u;
   `Idx_imm;
   `Idx_mut;
+  `Idx_atomic;
 ]
 
 let or_null_extension_type_constrs : type_constr list = [
@@ -225,6 +227,7 @@ and ident_float32_u = ident_create "float32_u"
 and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
 and ident_idx_mut = ident_create "idx_mut"
+and ident_idx_atomic = ident_create "idx_atomic"
 
 and ident_int8x16 = ident_create "int8x16"
 and ident_int16x8 = ident_create "int16x8"
@@ -283,6 +286,7 @@ let ident_of_type_constr : type_constr -> Ident.t = function
   | `Float32_u -> ident_float32_u
   | `Idx_imm -> ident_idx_imm
   | `Idx_mut -> ident_idx_mut
+  | `Idx_atomic -> ident_idx_atomic
   | `Int8x16 -> ident_int8x16
   | `Int16x8 -> ident_int16x8
   | `Int32x4 -> ident_int32x4
@@ -337,6 +341,7 @@ and path_int64_u = Pident ident_int64_u
 and path_float32_u = Pident ident_float32_u
 and path_idx_imm = Pident ident_idx_imm
 and path_idx_mut = Pident ident_idx_mut
+and path_idx_atomic = Pident ident_idx_atomic
 and path_code = Pident ident_code
 and path_eval = Pident ident_eval
 and path_box = Pident ident_box
@@ -448,6 +453,7 @@ and type_float32_u = tconstr path_float32_u []
 and type_or_null t = tconstr path_or_null [t]
 and type_idx_imm t1 t2 = tconstr path_idx_imm [t1; t2]
 and type_idx_mut t1 t2 = tconstr path_idx_mut [t1; t2]
+and type_idx_atomic t1 t2 = tconstr path_idx_atomic [t1; t2]
 
 and type_int8x16 = tconstr path_int8x16 []
 and type_int16x8 = tconstr path_int16x8 []
@@ -924,6 +930,21 @@ let decl_of_type_constr type_constr =
          }),
          Jkind.Builtin.any ~why:(Type_argument {
            parent_path = Path.Pident ident_idx_mut;
+           position = 2;
+           arity = 2;
+         }))
+       ~jkind:(builtin2 Jkind.Const.Builtin.kind_of_idx)
+       ()
+  | `Idx_atomic ->
+    decl2 ~variance:(Variance.full, Variance.full)
+       ~param_jkinds:(
+         Jkind.Builtin.value_or_null ~why:(Type_argument {
+           parent_path = Path.Pident ident_idx_atomic;
+           position = 1;
+           arity = 2;
+         }),
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_idx_atomic;
            position = 2;
            arity = 2;
          }))

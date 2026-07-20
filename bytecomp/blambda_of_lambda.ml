@@ -738,37 +738,65 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         let element_size = Prim (Lsrint, [word_size; tagged_immediate 3]) in
         Sequence (comp_expr arg, element_size)
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
-    | Pget_idx (layout, _) ->
+    | Pget_idx (layout, mut) ->
+      let prim =
+        match Lambda.access_atomicity mut with
+        | Nonatomic -> Ccall "caml_get_idx_bytecode"
+        | Atomic -> Ccall "caml_get_idx_atomic_bytecode"
+      in
       let elt = Lambda.mixed_block_element_of_layout layout in
-      copy_mixed_block_element elt (binary (Ccall "caml_get_idx_bytecode"))
-    | Pset_idx (layout, _) -> (
+      copy_mixed_block_element elt (binary prim)
+    | Pset_idx (layout, _, atomicity) -> (
       let elt = Lambda.mixed_block_element_of_layout layout in
       match args with
       | [arr; idx; value] ->
+        let prim =
+          match atomicity with
+          | Nonatomic -> Ccall "caml_set_idx_bytecode"
+          | Atomic -> Ccall "caml_set_idx_atomic_bytecode"
+        in
         let copied_value = copy_mixed_block_element elt (comp_expr value) in
-        Prim
-          ( Ccall "caml_set_idx_bytecode",
-            [comp_expr arr; comp_expr idx; copied_value] )
+        Prim (prim, [comp_expr arr; comp_expr idx; copied_value])
       | _ -> wrong_arity ~expected:3)
-    | Pget_ptr (layout, _) ->
+    | Pget_ptr (layout, mut) ->
+      let prim =
+        match Lambda.access_atomicity mut with
+        | Nonatomic -> Ccall "caml_get_ptr_bytecode"
+        | Atomic -> Ccall "caml_get_ptr_atomic_bytecode"
+      in
       let elt = Lambda.mixed_block_element_of_layout layout in
-      copy_mixed_block_element elt (unary (Ccall "caml_get_ptr_bytecode"))
-    | Pset_ptr (layout, _) -> (
+      copy_mixed_block_element elt (unary prim)
+    | Pset_ptr (layout, _, atomicity) -> (
       let elt = Lambda.mixed_block_element_of_layout layout in
       match args with
       | [ptr; value] ->
+        let prim =
+          match atomicity with
+          | Nonatomic -> Ccall "caml_set_ptr_bytecode"
+          | Atomic -> Ccall "caml_set_ptr_atomic_bytecode"
+        in
         let copied_value = copy_mixed_block_element elt (comp_expr value) in
-        Prim (Ccall "caml_set_ptr_bytecode", [comp_expr ptr; copied_value])
+        Prim (prim, [comp_expr ptr; copied_value])
       | _ -> wrong_arity ~expected:2)
-    | Pget_ext_ptr (layout, _) ->
+    | Pget_ext_ptr (layout, mut) ->
+      let prim =
+        match Lambda.access_atomicity mut with
+        | Nonatomic -> Ccall "caml_get_ext_ptr_bytecode"
+        | Atomic -> Ccall "caml_get_ext_ptr_atomic_bytecode"
+      in
       let elt = Lambda.mixed_block_element_of_layout layout in
-      copy_mixed_block_element elt (unary (Ccall "caml_get_ext_ptr_bytecode"))
-    | Pset_ext_ptr (layout, _) -> (
+      copy_mixed_block_element elt (unary prim)
+    | Pset_ext_ptr (layout, _, atomicity) -> (
       let elt = Lambda.mixed_block_element_of_layout layout in
       match args with
       | [ptr; value] ->
+        let prim =
+          match atomicity with
+          | Nonatomic -> Ccall "caml_set_ext_ptr_bytecode"
+          | Atomic -> Ccall "caml_set_ext_ptr_atomic_bytecode"
+        in
         let copied_value = copy_mixed_block_element elt (comp_expr value) in
-        Prim (Ccall "caml_set_ext_ptr_bytecode", [comp_expr ptr; copied_value])
+        Prim (prim, [comp_expr ptr; copied_value])
       | _ -> wrong_arity ~expected:2)
     | Pmake_idx_field pos ->
       Const (Const_block (0, [Const_base (Const_int pos)]))

@@ -98,7 +98,7 @@ let array_kind = function
     "ignorableproduct " ^ ignorable_product_element_kinds kinds
   | Punspecializedarray -> "unspecialized"
 
-let array_mut = function
+let array_mut (mut: mutable_flag) = match mut with
   | Mutable -> "array"
   | Immutable | Immutable_unique -> "iarray"
 
@@ -907,15 +907,25 @@ let primitive ppf = function
   | Ppoke layout ->
       fprintf ppf "(poke@ %a)"
         peek_or_poke layout
+  | Pget_idx (l, Atomic) ->
+      fprintf ppf "(get_idx_atomic@ %a)"
+        layout l
   | Pget_idx (l, Mutable) ->
       fprintf ppf "(get_idx@ %a)"
         layout l
   | Pget_idx (l, Immutable) ->
       fprintf ppf "(get_idx_imm@ %a)"
         layout l
-  | Pset_idx (l, mode) ->
+  | Pset_idx (l, mode, Atomic) ->
+      fprintf ppf "(set_idx_atomic%s@ %a)"
+        (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
+        layout l
+  | Pset_idx (l, mode, Nonatomic) ->
       fprintf ppf "(set_idx%s@ %a)"
         (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
+        layout l
+  | Pget_ptr (l, Atomic) ->
+      fprintf ppf "(get_ptr_atomic@ %a)"
         layout l
   | Pget_ptr (l, Mutable) ->
       fprintf ppf "(get_ptr@ %a)"
@@ -923,9 +933,16 @@ let primitive ppf = function
   | Pget_ptr (l, Immutable) ->
       fprintf ppf "(get_ptr_imm@ %a)"
         layout l
-  | Pset_ptr (l, mode) ->
+  | Pset_ptr (l, mode, Atomic) ->
+      fprintf ppf "(set_ptr_atomic%s@ %a)"
+        (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
+        layout l
+  | Pset_ptr (l, mode, Nonatomic) ->
       fprintf ppf "(set_ptr%s@ %a)"
         (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
+        layout l
+  | Pget_ext_ptr (l, Atomic) ->
+      fprintf ppf "(get_ext_ptr_atomic@ %a)"
         layout l
   | Pget_ext_ptr (l, Mutable) ->
       fprintf ppf "(get_ext_ptr@ %a)"
@@ -933,7 +950,11 @@ let primitive ppf = function
   | Pget_ext_ptr (l, Immutable) ->
       fprintf ppf "(get_ext_ptr_imm@ %a)"
         layout l
-  | Pset_ext_ptr (l, mode) ->
+  | Pset_ext_ptr (l, mode, Atomic) ->
+      fprintf ppf "(set_ext_ptr_atomic%s@ %a)"
+        (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
+        layout l
+  | Pset_ext_ptr (l, mode, Nonatomic) ->
       fprintf ppf "(set_ext_ptr%s@ %a)"
         (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
         layout l

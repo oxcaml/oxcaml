@@ -1,4 +1,5 @@
 (* TEST
+ include stdlib_stable;
  modules = "replace_caml_atomic.c";
  {
    not-macos;
@@ -28,6 +29,8 @@
    native;
  }
 *)
+
+open Stdlib_stable
 
 (* CR-someday mslater: this should also work on arm once atomics are builtins *)
 
@@ -219,35 +222,69 @@ let test_atomic_exchange_field = gen_test ~fn:"atomic_exchange_field"
                               ~reset_fn_calls:atomic_exchange_field_reset
 
 (* Patomic_set_field skips runtime call for immediates. *)
-type t = { mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+module Set_field = struct
+  type t = { mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
 
-let () =
-  let t = { imm = 1; ptr = "two"} in
-  test_atomic_exchange_field ~expected:0 (fun () ->
-    t.imm <- 3;
-    ignore (Sys.opaque_identity t)
-  )
-
-let () =
-  let t = { imm = 1; ptr = "two"} in
-  test_atomic_exchange_field ~expected:1 (fun () ->
-    t.ptr <- "four";
-    ignore (Sys.opaque_identity t)
-  )
+  let () =
+    let t = { imm = 1; ptr = "two"} in
+    test_atomic_exchange_field ~expected:0 (fun () ->
+      t.imm <- 3;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      t.ptr <- "four";
+      ignore (Sys.opaque_identity t)
+    )
+end
 
 (* Patomic_set_mixed_field skips runtime call for immediates. *)
-type mixed = { f : int64#; mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+module Set_field_mixed = struct
+  type t = { f : int64#; mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
 
-let () =
-  let m = { f = #42L; imm = 1; ptr = "two"} in
-  test_atomic_exchange_field ~expected:0 (fun () ->
-    m.imm <- 3;
-    ignore (Sys.opaque_identity m)
-  )
+  let () =
+    let t = { f = #42L; imm = 1; ptr = "two"} in
+    test_atomic_exchange_field ~expected:0 (fun () ->
+      t.imm <- 3;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      t.ptr <- "four";
+      ignore (Sys.opaque_identity t)
+    )
+end
 
-let () =
-  let m = { f = #42L; imm = 1; ptr = "two"} in
-  test_atomic_exchange_field ~expected:1 (fun () ->
-    m.ptr <- "four";
-    ignore (Sys.opaque_identity m)
-  )
+(* Idx_atomic.set skips runtime call for immediates. *)
+module Set_idx_atomic = struct
+  type t = { mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+
+  let () =
+    let t = { imm = 1; ptr = "two"} in
+    test_atomic_exchange_field ~expected:0 (fun () ->
+      let idx = (.imm) in
+      Idx_atomic.set t idx 3;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      let idx = (.ptr) in
+      Idx_atomic.set t idx "four";
+      ignore (Sys.opaque_identity t)
+    )
+end
+
+(* Idx_atomic.set on mixed field skips runtime call for immediates. *)
+module Set_idx_atomic_mixed = struct
+  type t = { f : int64#; mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+
+  let () =
+    let t = { f = #42L; imm = 1; ptr = "two"} in
+    test_atomic_exchange_field ~expected:0 (fun () ->
+      let idx = (.imm) in
+      Idx_atomic.set t idx 3;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      let idx = (.ptr) in
+      Idx_atomic.set t idx "four";
+      ignore (Sys.opaque_identity t)
+    )
+end
