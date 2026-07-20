@@ -382,7 +382,7 @@ bool caml_continuation_is_preemption(value cont);
    its [gc_regs] struct, or NULL otherwise */
 value* caml_continuation_gc_regs(value cont);
 
-value caml_tick_fiber_exn(struct stack_info* stack);
+caml_result caml_tick_fiber_res(struct stack_info* stack);
 
 CAMLnoret CAMLextern void caml_raise_continuation_already_resumed (void);
 

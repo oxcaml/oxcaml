@@ -351,7 +351,7 @@ let acknowledge_import penv ~check modname pers_sig =
         | Alerts _ -> ()
         | Opaque -> register_import_as_opaque penv modname)
     flags;
-  begin match kind, CU.get_current () with
+  begin match kind, Current_unit.get_cu () with
   | Normal { cmi_impl = imported_unit }, Some current_unit ->
       let access_allowed =
         CU.can_access_by_name imported_unit ~accessed_by:current_unit
@@ -498,7 +498,7 @@ let rec approximate_global_by_name penv global_name =
   global
 
 let current_unit_is_aux name ~allow_args =
-  match CU.get_current () with
+  match Current_unit.get_cu () with
   | None -> false
   | Some current ->
       match CU.to_global_name current with

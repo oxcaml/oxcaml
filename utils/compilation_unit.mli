@@ -297,14 +297,6 @@ type error = private
 (** The exception raised by conversion functions in this module. *)
 exception Error of error
 
-val get_current : unit -> t option
-
-val get_current_or_dummy : unit -> t
-
-val get_current_exn : unit -> t
-
-val is_current : t -> bool
-
 (** Set an override for the name mangling scheme used while compiling the
     current unit. Typically called by the driver when the
     [-name-mangling-scheme] command-line option is used. The override applies
@@ -319,7 +311,3 @@ val set_name_mangling_scheme_override : Config.name_mangling_scheme -> unit
     compiled and serialised with its [.cmx], so when reading another unit we
     never need to know which scheme it was compiled under. *)
 val name_mangling_scheme_for_current_unit : unit -> Config.name_mangling_scheme
-
-module Private : sig
-  val fwd_get_current : (unit -> t option) ref
-end

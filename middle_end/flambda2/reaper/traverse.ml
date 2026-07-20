@@ -363,7 +363,7 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
     in
     let callee = Apply.callee apply in
     let is_external =
-      not (Compilation_unit.is_current (Code_id.get_compilation_unit code_id))
+      not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
     in
     let[@local] add_apply acc ~only_if_closure_any_source =
       let callee, call_widget =
@@ -861,7 +861,7 @@ type result =
   }
 
 let create_symbol_and_add_any_source acc name =
-  let cu = Compilation_unit.get_current_exn () in
+  let cu = Current_unit.get_cu_exn () in
   let sym = Symbol.create cu (Linkage_name.of_string name) in
   Acc.add_any_source acc (Code_id_or_name.symbol sym);
   sym

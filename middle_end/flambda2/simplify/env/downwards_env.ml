@@ -242,7 +242,7 @@ let create ~round ~machine_width ~(resolver : resolver)
       all_code = Code_id.Map.empty;
       get_imported_code;
       inlining_history_tracker =
-        Inlining_history.Tracker.empty (Compilation_unit.get_current_exn ());
+        Inlining_history.Tracker.empty (Current_unit.get_cu_exn ());
       loopify_state = Loopify_state.do_not_loopify;
       replay_history = Replay_history.first_pass;
       specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
@@ -543,10 +543,7 @@ let find_code_exn t id =
     Exported_code.find_exn (t.get_imported_code ()) id
 
 let define_code t ~code_id ~code =
-  if
-    not
-      (Code_id.in_compilation_unit code_id
-         (Compilation_unit.get_current_exn ()))
+  if not (Code_id.in_compilation_unit code_id (Current_unit.get_cu_exn ()))
   then
     Misc.fatal_errorf "Cannot define code ID %a as it is from another unit:@ %a"
       Code_id.print code_id Code.print code;

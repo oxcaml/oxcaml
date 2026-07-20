@@ -2708,7 +2708,7 @@ and remove_unused_value_slots_and_shortcut_aliases_value_slot_indexed_product
         if
           (not
              (Value_slot.in_compilation_unit value_slot
-                (Compilation_unit.get_current_exn ())))
+                (Current_unit.get_cu_exn ())))
           || Value_slot.Set.mem value_slot used_value_slots
         then
           Some

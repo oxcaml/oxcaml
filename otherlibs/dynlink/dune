@@ -114,6 +114,7 @@
   ident
   path
   unit_info
+  current_unit
   shape
   shape_reduce
   allowance
@@ -389,6 +390,8 @@
 
 (copy_files ../../typing/persistent_env.ml)
 
+(copy_files ../../typing/current_unit.ml)
+
 (copy_files ../../typing/env.ml)
 
 (copy_files ../../lambda/debuginfo.ml)
@@ -589,6 +592,8 @@
 
 (copy_files ../../typing/persistent_env.mli)
 
+(copy_files ../../typing/current_unit.mli)
+
 (copy_files ../../typing/env.mli)
 
 (copy_files ../../lambda/debuginfo.mli)
@@ -740,6 +745,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd_intf.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Unit_info.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Current_unit.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Attr_helper.cmo
@@ -873,6 +879,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd_intf.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Unit_info.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Current_unit.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Attr_helper.cmx
