@@ -2,7 +2,7 @@
    readonly_files="foo.ml";
    setup-ocamlc.byte-build-env;
    {
-   include ocamlfrontend;
+   include ocamlcommon;
    program = "marshalled.byte";
    all_modules = "marshalled.ml";
    ocamlc.byte;

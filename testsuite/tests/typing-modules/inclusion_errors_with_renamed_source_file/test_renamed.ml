@@ -3,7 +3,7 @@
  setup-ocamlc.byte-build-env;
 
  (* Build parse_and_marshall.exe, which is used to create a serialized AST. *)
- include ocamlfrontend;
+ include ocamlcommon;
  program = "${test_build_directory}/parse_and_marshall.exe";
  all_modules = "parse_and_marshall.ml";
  ocamlc.byte;

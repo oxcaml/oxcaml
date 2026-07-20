@@ -1,6 +1,6 @@
 (* TEST
   subdirectories = "manifests";
-  include ocamlfrontend;
+  include ocamlcommon;
   expect;
 *)
 

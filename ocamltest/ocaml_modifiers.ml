@@ -164,8 +164,13 @@ let init () =
     (fun (name, archives) ->
       register_modifiers name (compilerlibs_archives archives))
     [
-      "ocamlcommon", ["ocamlcommon"];
-      "ocamlfrontend", ["ocamlcommon"; "ocamlfrontend"];
+      (* The compilerlibs split of ocamlcommon into ocamlcommon and
+         ocamlfrontend is specific to this repo.  To avoid updating every
+         test, the "ocamlcommon" modifier links both archives (there is
+         deliberately no "ocamlfrontend" modifier).  If the split is ever
+         upstreamed, this hack should go, with the tests then updated to
+         use the appropriate archives. *)
+      "ocamlcommon", ["ocamlcommon"; "ocamlfrontend"];
       "ocamlbytecomp", ["ocamlbytecomp"];
       "ocamlmiddleend", ["ocamlmiddleend"];
       "ocamloptcomp", ["ocamloptcomp"];

@@ -13,7 +13,7 @@
    }{
      program = "${test_build_directory}/loader.byte";
      flags = "-linkall";
-     include ocamlfrontend;
+     include ocamlcommon;
      libraries += "dynlink";
      all_modules = "loader.ml";
      ocamlc.byte;
@@ -34,7 +34,7 @@
    }{
      program = "${test_build_directory}/loader.exe";
      flags = "-linkall";
-     include ocamlfrontend;
+     include ocamlcommon;
      libraries += "dynlink";
      all_modules = "loader.ml";
      ocamlopt.byte;

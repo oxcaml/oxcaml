@@ -1,5 +1,5 @@
 (* TEST
- include ocamlfrontend;
+ include ocamlcommon;
  flags = "-I ${ocamlsrcdir}/parsing";
 *)
 
