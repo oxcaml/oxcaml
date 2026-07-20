@@ -60,6 +60,7 @@
    simd.c
    cpu.c
    blake2.c
+   zstd.c
    misc.c
    build_config.h sync_posix.h caml/jumptbl.h caml/domain_state.tbl
    ../Makefile.config
@@ -72,7 +73,7 @@
 (rule
  (targets libasmrun.a libasmrund.a libasmruni.a libasmrun_pic.a
     libasmrun_shared.so libcamlrun.a libcamlrund.a libcamlruni.a libcamlrun_pic.a
-    libcamlrun_shared.so ocamlrun ocamlrund ocamlruni ld.conf)
+    libcamlrun_shared.so libcomprmarsh.a ocamlrun ocamlrund ocamlruni ld.conf)
  (mode    fallback)
  (deps
    ../Makefile.config
@@ -100,7 +101,7 @@
      (bash "rm -f sak build_config.h")
      (bash "cd .. && make V=1 -j8 -f Makefile.upstream runtime/libasmrun.a runtime/libasmrund.a runtime/libasmruni.a runtime/libasmrun_pic.a \
     runtime/libasmrun_shared.so runtime/libcamlrun.a runtime/libcamlrund.a runtime/libcamlruni.a runtime/libcamlrun_pic.a \
-    runtime/libcamlrun_shared.so runtime/ocamlrun runtime/ocamlrund runtime/ocamlruni runtime/ld.conf COMPUTE_DEPS=false")))))
+    runtime/libcamlrun_shared.so runtime/libcomprmarsh.a runtime/ocamlrun runtime/ocamlrund runtime/ocamlruni runtime/ld.conf COMPUTE_DEPS=false")))))
 
 (install
   (files
@@ -131,6 +132,7 @@
     libasmruni.a
     libasmrun_pic.a
     libasmrun_shared.so
+    libcomprmarsh.a
   )
   (section lib)
   (package ocaml_runtime_stdlib))
@@ -150,4 +152,5 @@
     libasmrund.a
     libasmruni.a
     libasmrun_pic.a
-    libasmrun_shared.so))
+    libasmrun_shared.so
+    libcomprmarsh.a))
