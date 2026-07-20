@@ -1247,6 +1247,10 @@ runtime_CPPFLAGS = -DCAMLDLLIMPORT= -DIN_CAML_RUNTIME
 ocamlrund_CPPFLAGS = -DDEBUG
 ocamlruni_CPPFLAGS = -DCAML_INSTR
 ocamlrunbaremetal_CPPFLAGS = -DCAML_BARE_METAL
+ocamlrunbaremetal_CFLAGS = -std=gnu17
+ifneq (,$(findstring aarch64,$(TARGET)))
+  ocamlrunbaremetal_CFLAGS += -march=armv8-a -mtune=cortex-a72
+endif
 
 ## Runtime targets
 
@@ -1398,7 +1402,9 @@ $(DEPDIR)/runtime/%.ni.$(D): \
   OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlruni_CPPFLAGS)
 
 runtime/%.nbm.$(O): OC_CFLAGS += $(OC_NATIVE_CFLAGS)
-runtime/%.nbm.$(O): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlrunbaremetal_CPPFLAGS)
+runtime/%.nbm.$(O): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlrunbaremetal_CPPFLAGS) \
+  $(ocamlrunbaremetal_CFLAGS)
+
 $(DEPDIR)/runtime/%.nbm.$(D): \
   OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlrunbaremetal_CPPFLAGS)
 
