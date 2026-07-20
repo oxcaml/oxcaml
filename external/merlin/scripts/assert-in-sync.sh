@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 source scripts/common.sh
 
@@ -51,11 +52,13 @@ function error () {
 
 cd upstream/ocaml_flambda
 for dir in */; do
+  declare -A in_workspace
   dir="${dir%/}"
   compiler_files="$(files-in-workspace "$dir")"
+  prepare-is-excluded <<< "$compiler_files"
   for compiler_file in $compiler_files; do
-    name="${compiler_file#"$dir"/}"
-    if is-excluded "$dir" "$name"; then continue; fi
+    in_workspace["$compiler_file"]=1
+    if is-excluded "$compiler_file"; then continue; fi
     if [[ ! -e "$compiler_file" ]]; then
       error "$compiler_file exists in the compiler, but not in Merlin"
     elif ! cmp -s "$root/$compiler_file" "$compiler_file"; then
@@ -63,9 +66,8 @@ for dir in */; do
     fi
   done
   for file in "$dir"/*; do
-    name="${file#"$dir"/}"
-    if ! printf '%s\n' $compiler_files | grep -qxF "$dir/$name"; then
-      error "$compiler_file was deleted, but not in Merlin"
+    if [[ -z "${in_workspace["$file"]-}" ]]; then
+      error "$file was deleted from the compiler, but not from Merlin"
     fi
   done
 done

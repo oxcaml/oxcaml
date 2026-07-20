@@ -121,10 +121,15 @@ for dir in */; do
     fetch_dir="$subdirectory/$dir"
   fi
   upstream_files="$(git ls-tree --full-tree -r --name-only "$rev" "$fetch_dir")"
+  prepare-is-excluded < <(
+    for git_file in $upstream_files; do
+      echo "$dir/${git_file#"$fetch_dir"/}"
+    done
+  )
   for git_file in $upstream_files; do
     name="${git_file#"$fetch_dir"/}"
     file="$dir/$name"
-    if is-excluded "$dir" "$name"; then continue; fi
+    if is-excluded "$file"; then continue; fi
     if [[ -e "$file" ]]; then
       git show "$rev:$git_file" > "$file"
     else
@@ -165,7 +170,7 @@ new_marker="Compiler:$commitish"
 # files are still untracked at this point so they don't show up in the diff;
 # they are instead copied over verbatim below.
 for file in $(git diff --no-ext-diff --name-only); do
-  if [[ "$file" = "upstream/ocaml_flambda/base-rev.txt" ]]; then continue fi
+  if [[ "$file" = "upstream/ocaml_flambda/base-rev.txt" ]]; then continue; fi
 
   file=${file#${subtree_prefix}}
   base=${file#upstream/ocaml_flambda/}
