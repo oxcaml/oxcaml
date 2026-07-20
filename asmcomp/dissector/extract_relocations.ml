@@ -210,7 +210,7 @@ let extract_from_rela_text_sections ~symbols sections =
     sections;
   (* CR sspies: The reversal here affects the order in which entries are written
      into the respective tables. The order should not matter, so we can
-     eventually remove this reversal as well. *)
+     eventually remove this reversal as well. See #6447. *)
   { plt_symbols = List.rev !plt_symbols;
     got_symbols = List.rev !got_symbols;
     num_plt = !num_plt;
