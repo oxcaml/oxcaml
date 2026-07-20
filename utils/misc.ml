@@ -1004,6 +1004,17 @@ let create_hashtable size init =
   List.iter (fun (key, data) -> Hashtbl.add tbl key data) init;
   tbl
 
+(* This would be better in Obj, but we'd need upstream to do the same *)
+let hash_variant s =
+  let accu = ref 0 in
+  for i = 0 to String.length s - 1 do
+    accu := 223 * !accu + Char.code s.[i]
+  done;
+  (* reduce to 31 bits *)
+  accu := !accu land (1 lsl 31 - 1);
+  (* make it signed for 64 bits architectures *)
+  if !accu > 0x3FFFFFFF then !accu - (1 lsl 31) else !accu
+
 (* File copy *)
 
 let copy_file ic oc =
