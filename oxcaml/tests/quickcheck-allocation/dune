@@ -1,0 +1,29 @@
+; QuickCheck tester for the Allocation mode axis.
+;
+; The fuzz loop is a standalone executable behind the @quickcheck alias so it
+; never runs as part of `make test`. Run it on demand with:
+;
+;   dune build @oxcaml/tests/quickcheck-allocation/quickcheck
+;
+; (Later, minimized witnesses under seeds/ become compile-and-diff runtest
+; rules; those DO ride along in `make test`.)
+
+; No enabled_if on the executable: it must be enabled in the boot ("default")
+; context so ocamllsp/Merlin, which uses that context, can resolve the modules.
+; No library dependencies (stdlib only): the boot compiler cannot build unix/str
+; from this repo's sources, so depending on them would break the LSP.
+
+(executable
+ (name main)
+ (modules gen oracle shrink fuzzer main))
+
+; The fuzz loop, however, must run against the freshly-built "main" compiler
+; (the boot compiler lacks the Allocation axis), so the alias is gated to it.
+
+(rule
+ (alias quickcheck)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps main.exe)
+ (action
+  (run ./main.exe %{bin:ocamlopt.opt} -count 200)))
