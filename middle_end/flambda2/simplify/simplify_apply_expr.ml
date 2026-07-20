@@ -472,8 +472,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
      of the application. We check here that it is consistent with
      [first_complex_local_param]. *)
   let new_closure_alloc_mode_and_first_complex_local_param : _ Or_bottom.t =
-    if num_non_unarized_args <= first_complex_local_param
-    then
+    match (first_complex_local_param : First_complex_local_param.t) with
+    | Index index when num_non_unarized_args <= index ->
       (* At this point, we *have* to allocate the closure on the heap, even if
          the alloc_mode of the application was local. Indeed, consider a
          three-argument function, of type [string -> string -> string ->
@@ -492,11 +492,17 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       in
       Ok
         ( Alloc_mode.For_applications.heap ~alloc_region,
-          first_complex_local_param - num_non_unarized_args )
-    else
+          First_complex_local_param.Index (index - num_non_unarized_args) )
+    | Index _ -> (
       match Apply_expr.alloc_mode apply with
       | Heap _ -> (* This can happen in dead GADT match cases. *) Bottom
-      | Local _ as apply_alloc_mode -> Ok (apply_alloc_mode, 0)
+      | Local _ as apply_alloc_mode ->
+        Ok (apply_alloc_mode, First_complex_local_param.Index 0))
+    | Never_partially_applied ->
+      Misc.fatal_errorf
+        "Partial application of %a, whose code metadata states that it is \
+         never partially applied"
+        Apply.print apply
   in
   let expr, dacc =
     match new_closure_alloc_mode_and_first_complex_local_param with
