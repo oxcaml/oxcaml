@@ -650,8 +650,10 @@ and locality_mode i ppf m =
     (Format_doc.compat (Mode.Locality.print ())) m
 
 and yielding_mode i ppf m =
-  line i ppf "yielding_mode %a\n"
-    (Format_doc.compat (Mode.Yielding.print ())) m
+  line i ppf "yielding_mode %s\n"
+    (match Mode.Yielding.zap_to_floor m with
+     | Mode.Yielding.Const.Unyielding -> "unyielding"
+     | Mode.Yielding.Const.Yielding -> "yielding")
 
 and value_mode i ppf m =
   line i ppf "value_mode %a\n" (Format_doc.compat (Mode.Value.print ())) m
