@@ -33,39 +33,40 @@ type _ rvalue = t
 
 let empty = []
 
+let byte_offset_of_words offset_in_words =
+  Targetint.mul offset_in_words Targetint.size_in_bytes_as_targetint
+
 module Lvalue = struct
   type t = lvalue
 
   let in_register ~dwarf_reg_number = [OB.register_as_lvalue ~dwarf_reg_number]
 
   let in_stack_slot ~offset_in_words =
-    let offset_in_bytes =
-      Targetint.mul offset_in_words Targetint.size_in_bytes_as_targetint
-    in
+    let offset_in_bytes = byte_offset_of_words offset_in_words in
     OB.address_of_stack_slot ~offset_in_bytes
 
   let in_domainstate_slot ~offset_in_words
       ~domainstate_ptr_dwarf_register_number =
-    let offset_in_bytes =
-      Targetint.mul offset_in_words Targetint.size_in_bytes_as_targetint
-    in
+    let offset_in_bytes = byte_offset_of_words offset_in_words in
     OB.address_of_domainstate_slot ~offset_in_bytes
       ~domainstate_ptr_dwarf_register_number
 
   let in_symbol_field symbol ~field =
-    let offset_in_bytes =
-      Targetint.mul field Targetint.size_in_bytes_as_targetint
-    in
+    let offset_in_bytes = byte_offset_of_words field in
     OB.value_of_symbol ~symbol :: OB.add_unsigned_const offset_in_bytes
 
   let read_field ~block ~field =
-    let offset_in_bytes =
-      Targetint.mul field Targetint.size_in_bytes_as_targetint
-    in
+    let offset_in_bytes = byte_offset_of_words field in
     (* We emit special code to catch the case where evaluation of [block] fails
        (for example due to unavailability). In the event of an unavailability
        failure, the [DW_OP_call*] evaluation of [block] does nothing to the
        stack. *)
+    (* TODO: This guard scheme conflates a genuine value of zero computed by
+       [block] with failure to evaluate [block]: both leave the sentinel zero
+       as the result. The guard exists because failed evaluation of a location
+       description caused errors in GDB. We aim to fix LLDB so that failed
+       evaluation is not an issue there, at which point the guard (and with it
+       the conflation) can be removed. *)
     (OB.signed_int_const Targetint.zero :: block)
     @ [O.DW_op_dup]
     @ OB.conditional ~if_zero:[]
@@ -74,16 +75,22 @@ module Lvalue = struct
         ~at_join:[] ()
 
   let offset_pointer t ~offset_in_words =
-    let offset_in_bytes =
-      Targetint.mul offset_in_words Targetint.size_in_bytes_as_targetint
-    in
+    let offset_in_bytes = byte_offset_of_words offset_in_words in
     (* Similar to [read_field], above. *)
     (OB.signed_int_const Targetint.zero :: t)
     @ [O.DW_op_dup]
     @ OB.conditional ~if_zero:[]
         ~if_nonzero:
-          ([O.DW_op_swap; O.DW_op_drop] @ OB.add_unsigned_const offset_in_bytes)
+          ([O.DW_op_swap; O.DW_op_drop] @ OB.add_signed_const offset_in_bytes)
         ~at_join:[] ()
+
+  let read_field_unguarded ~block ~field =
+    let offset_in_bytes = byte_offset_of_words field in
+    block @ OB.add_unsigned_const offset_in_bytes
+
+  let offset_pointer_unguarded t ~offset_in_words =
+    let offset_in_bytes = byte_offset_of_words offset_in_words in
+    t @ OB.add_signed_const offset_in_bytes
 
   let location_from_another_die ~die_label ~compilation_unit_header_label =
     [OB.call ~die_label ~compilation_unit_header_label]
@@ -111,24 +118,20 @@ module Rvalue = struct
 
   let const_symbol symbol = [OB.value_of_symbol ~symbol]
 
+  let address_of_label label = [OB.address_of_label ~label]
+
   let in_register ~dwarf_reg_number = [OB.contents_of_register ~dwarf_reg_number]
 
   let in_stack_slot ~offset_in_words =
-    let offset_in_bytes =
-      Targetint.mul offset_in_words Targetint.size_in_bytes_as_targetint
-    in
+    let offset_in_bytes = byte_offset_of_words offset_in_words in
     OB.contents_of_stack_slot ~offset_in_bytes
 
   let in_domainstate_slot ~offset_in_words =
-    let offset_in_bytes =
-      Targetint.mul offset_in_words Targetint.size_in_bytes_as_targetint
-    in
+    let offset_in_bytes = byte_offset_of_words offset_in_words in
     OB.contents_of_domainstate_slot ~offset_in_bytes
 
   let read_field ~block ~field =
-    let offset_in_bytes =
-      Targetint.mul field Targetint.size_in_bytes_as_targetint
-    in
+    let offset_in_bytes = byte_offset_of_words field in
     (OB.signed_int_const Targetint.zero :: block)
     @ [O.DW_op_dup]
     @ OB.conditional ~if_zero:[]
@@ -137,6 +140,22 @@ module Rvalue = struct
           @ OB.add_unsigned_const offset_in_bytes
           @ [O.DW_op_deref])
         ~at_join:[] ()
+
+  let read_field_unguarded ~block ~field =
+    (* The address computation is the same as in the lvalue case; the value is
+       then obtained by dereferencing. (This does not work for [read_field],
+       above: on the failure path of the guard the sentinel zero is left on the
+       stack, so a trailing dereference would read address 0. The dereference
+       there has to happen inside the guarded branch, where it only executes
+       when evaluation of [block] has succeeded.) *)
+    Lvalue.read_field_unguarded ~block ~field @ [O.DW_op_deref]
+
+  let offset_pointer t ~offset_in_words =
+    (* The operator sequence is identical to the lvalue case: the pointer value,
+       rather than an address, is what lies on the stack, but the offsetting
+       computation (and the guard against failed evaluation of [t]) is the same.
+       No dereference is involved: see the .mli. *)
+    Lvalue.offset_pointer t ~offset_in_words
 
   let read_symbol_field symbol ~field =
     read_field ~block:(const_symbol symbol) ~field
