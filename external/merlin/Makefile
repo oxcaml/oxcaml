@@ -6,7 +6,7 @@ DUNE_OPTS := --workspace=$(PARENT)/duneconf/boot.ws
 # parent's workspace.
 include $(PARENT)/Makefile.config
 
-dune = $(opam exec) $(DUNE)
+dune = $(opam_exec) $(DUNE)
 
 export RUNTIME_DIR
 
