@@ -41,6 +41,16 @@
  (action (run ./generate_large_modules.exe mylib_b)))
 
 (rule
+ (target mylib_unused.ml)
+ (deps generate_large_modules.exe)
+ (action (run ./generate_large_modules.exe mylib_unused)))
+
+(rule
+ (target unusedlib.ml)
+ (deps generate_large_modules.exe)
+ (action (run ./generate_large_modules.exe unusedlib)))
+
+(rule
  (target cmxa_main.ml)
  (deps generate_large_modules.exe)
  (action (run ./generate_large_modules.exe cmxa_main)))
@@ -521,6 +531,18 @@
  (action
   (run %{bin:ocamlopt.opt} -c mylib_b.ml)))
 
+; mylib_unused is part of the archive but never referenced, so the dissector
+; must not link it into the executable
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")))
+ (targets mylib_unused.cmi mylib_unused.cmx mylib_unused.o)
+ (deps mylib_unused.ml)
+ (action
+  (run %{bin:ocamlopt.opt} -c %{deps})))
+
 ; Create the .cmxa archive
 (rule
  (enabled_if
@@ -528,21 +550,47 @@
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (targets mylib.cmxa mylib.a)
- (deps mylib_a.cmx mylib_a.o mylib_b.cmx mylib_b.o)
+ (deps mylib_a.cmx mylib_a.o mylib_b.cmx mylib_b.o mylib_unused.cmx
+       mylib_unused.o)
  (action
-  (run %{bin:ocamlopt.opt} -a mylib_a.cmx mylib_b.cmx -o mylib.cmxa)))
+  (run %{bin:ocamlopt.opt} -a mylib_a.cmx mylib_b.cmx mylib_unused.cmx
+       -o mylib.cmxa)))
 
-; Link with dissector using the .cmxa archive
+; unusedlib is an archive none of whose units are referenced, so the dissector
+; must skip the whole archive
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")))
+ (targets unusedlib.cmi unusedlib.cmx unusedlib.o)
+ (deps unusedlib.ml)
+ (action
+  (run %{bin:ocamlopt.opt} -c %{deps})))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")))
+ (targets unusedlib.cmxa unusedlib.a)
+ (deps unusedlib.cmx unusedlib.o)
+ (action
+  (run %{bin:ocamlopt.opt} -a unusedlib.cmx -o unusedlib.cmxa)))
+
+; Link with dissector using the .cmxa archives
 (rule
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
        (= %{system} "linux")))
  (target cmxa_test.exe)
- (deps mylib.cmxa mylib.a mylib_a.cmi mylib_a.cmx mylib_b.cmi mylib_b.cmx cmxa_main.ml)
+ (deps mylib.cmxa mylib.a mylib_a.cmi mylib_a.cmx mylib_b.cmi mylib_b.cmx
+       mylib_unused.cmi mylib_unused.cmx unusedlib.cmxa unusedlib.a
+       unusedlib.cmi unusedlib.cmx cmxa_main.ml)
  (action
   (run %{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.005
-       mylib.cmxa cmxa_main.ml -o %{target})))
+       mylib.cmxa unusedlib.cmxa cmxa_main.ml -o %{target})))
 
 (rule
  (enabled_if
@@ -573,6 +621,22 @@
  (action (progn
   (with-stdout-to cmxa_sections.txt (run readelf -S cmxa_test.exe))
   (bash "grep -q 'caml.p1' cmxa_sections.txt || (echo 'ERROR: no multiple partitions'; exit 1)"))))
+
+; Verify the unused archive member and the unused archive were not linked into
+; cmxa_test.exe (the dissector links only the required compilation units, like
+; a normal link)
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")))
+ (deps cmxa_test.exe)
+ (action (progn
+  (with-stdout-to cmxa_symbols.txt (run nm cmxa_test.exe))
+  (bash "grep -q 'Mylib_a' cmxa_symbols.txt || (echo 'ERROR: Mylib_a symbols missing'; exit 1)")
+  (bash "! grep -q 'Mylib_unused' cmxa_symbols.txt || (echo 'ERROR: unused unit Mylib_unused was linked'; exit 1)")
+  (bash "! grep -q 'Unusedlib' cmxa_symbols.txt || (echo 'ERROR: unused archive Unusedlib was linked'; exit 1)"))))
 
 ; Test 4: Linker flags (-cclib) should not be treated as files
 (rule
