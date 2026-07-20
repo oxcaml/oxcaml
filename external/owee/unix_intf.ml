@@ -52,6 +52,10 @@ module type S = sig
 
   val stderr : file_descr
 
+  (* CR sspies: [create_process] and [waitpid] carry OxCaml mode annotations on
+     their types in the [Unix] module, but this signature must not mention them.
+     Consequently, we state them without annotations and implementations of this
+     module eta-expand the implementations from the [Unix] module. *)
   val create_process :
     string -> string array -> file_descr -> file_descr -> file_descr -> int
 
@@ -61,10 +65,10 @@ module type S = sig
 
   type process_status =
       WEXITED of int
-    | WSIGNALED of int
-    | WSTOPPED of int
+    | WSIGNALED of Sys.signal
+    | WSTOPPED of Sys.signal
 
   val waitpid : wait_flag list -> int -> int * process_status
 
-  val kill : int -> int -> unit
+  val kill : int -> Sys.signal -> unit
 end
