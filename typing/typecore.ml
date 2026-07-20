@@ -7993,6 +7993,11 @@ and type_expect_
       let (cl_path, cl_decl, cl_mode) =
         Env.lookup_class ~loc:cl.loc cl.txt env
       in
+      (* Allocation axis: [new] allocates the object on the heap. This
+         registration is currently redundant -- [Env.lookup_class] above
+         already walks the locks and forces enclosing closures to [alloc] --
+         but we register it anyway so every allocation site is covered. *)
+      register_allocation_mode ~env ~loc Alloc.legacy;
       Value.submode_exn ~pp:(cl.loc, Ident {category = Class; lid = cl.txt})
         cl_mode Value.legacy;
       let pm = position_and_mode env expected_mode sexp in
@@ -9067,6 +9072,9 @@ and type_ident env ?(recarg=Rejected) lid =
   associative, the order of which we apply those join does not matter.
   *)
   (* CR modes: codify the above per-axis argument. *)
+  (* CR shsong: the allocation axis is treated conservatively here -- any value
+     referenced at [alloc] (in particular every primitive) forces the enclosing
+     closures to [alloc], even when no allocation actually happens. *)
   let actual_mode =
     Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some desc.val_type)
       (mode, locks)
@@ -9093,19 +9101,31 @@ and type_ident env ?(recarg=Rejected) lid =
   end;
   let layout_args, val_type, kind =
     match desc.val_kind with
+    (* Allocation axis: only [Val_prim] can allocate merely by being referenced
+       (the primitive's result). We register an allocation whenever one may
+       happen, not only for poly results as an optimization hint. *)
+    (* CR shsong: this check is currently masked by [walk_locks] above, which
+       already treats every primitive as [alloc]. *)
     | Val_prim prim ->
        if not @@ Lpoly.is_empty_exn desc.val_lpoly then
          Misc.fatal_error "type_ident: Val_prim with non-empty val_lpoly";
        let ty, mode, _, sort = instance_prim env prim desc.val_type in
        let ty = instance ty in
        begin match prim.prim_native_repr_res, mode with
-       (* if the locality of returned value of the primitive is poly
-          we then register allocation for further optimization *)
+       (* Poly result: register an allocation at the result's locality. *)
        | (Prim_poly, _), Some mode ->
-          (* CR shsong: Can this be local? *)
            register_allocation_mode ~env ~loc:lid.loc
              (Alloc.max_with_comonadic Areality mode)
-       | _ -> ()
+       | (Prim_poly, _), None ->
+           (* Unreachable: a poly result implies [mode = Some]. Conservatively
+              register a heap allocation rather than silently skip it. *)
+           register_allocation_mode ~env ~loc:lid.loc Alloc.legacy
+       (* Global result: register a heap allocation. *)
+       | (Prim_global, _), _ ->
+           register_allocation_mode ~env ~loc:lid.loc Alloc.legacy
+       (* Local result: a stack allocation, which does not count on the
+          allocation axis. *)
+       | (Prim_local, _), _ -> ()
        end;
        [], ty, Id_prim (Option.map Locality.disallow_right mode, sort)
     | _ ->

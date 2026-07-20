@@ -1133,6 +1133,63 @@ Error: The value "Array.get" is "alloc"
          which is expected to be "noalloc_strict".
 |}]
 
+(* [Prim_poly] result ([@local_opt]): [%makemutable] allocates. *)
+external mk_poly : 'a -> ('a ref[@local_opt]) = "%makemutable"
+let (prim_poly_result @ noalloc_strict) (x : int) = mk_poly x
+[%%expect{|
+external mk_poly : 'a -> ('a ref [@local_opt]) = "%makemutable"
+Line 2, characters 52-59:
+2 | let (prim_poly_result @ noalloc_strict) (x : int) = mk_poly x
+                                                        ^^^^^^^
+Error: The value "mk_poly" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 2, characters 40-61
+         which is expected to be "noalloc_strict".
+|}]
+
+(* [Prim_global] result: [%makemutable] allocates on the heap. *)
+external mk_global : 'a -> 'a ref = "%makemutable"
+let (prim_global_result @ noalloc_strict) (x : int) = mk_global x
+[%%expect{|
+external mk_global : 'a -> 'a ref = "%makemutable"
+Line 2, characters 54-63:
+2 | let (prim_global_result @ noalloc_strict) (x : int) = mk_global x
+                                                          ^^^^^^^^^
+Error: The value "mk_global" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 2, characters 42-65
+         which is expected to be "noalloc_strict".
+|}]
+
+(* [Prim_global] result with a [Prim_poly] argument: [%makemutable] allocates
+   on the heap. *)
+external mk_polyarg : ('a[@local_opt]) -> 'a ref = "%makemutable"
+let (prim_global_result_poly_arg @ noalloc_strict) (x : int) = mk_polyarg x
+[%%expect{|
+external mk_polyarg : ('a [@local_opt]) -> 'a ref = "%makemutable"
+Line 2, characters 63-73:
+2 | let (prim_global_result_poly_arg @ noalloc_strict) (x : int) = mk_polyarg x
+                                                                   ^^^^^^^^^^
+Error: The value "mk_polyarg" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 2, characters 51-75
+         which is expected to be "noalloc_strict".
+|}]
+
+(* [Prim_local] result: [%makemutable] allocates on the stack. *)
+external mk_local : 'a -> local_ 'a ref = "%makemutable"
+let (prim_local_result @ noalloc_strict) (x : int) = mk_local x
+[%%expect{|
+external mk_local : 'a -> 'a ref @ local = "%makemutable"
+Line 2, characters 53-61:
+2 | let (prim_local_result @ noalloc_strict) (x : int) = mk_local x
+                                                         ^^^^^^^^
+Error: The value "mk_local" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 2, characters 41-63
+         which is expected to be "noalloc_strict".
+|}]
+
 (* [my_id] do not allocate, but referencing the value is conservatively
    treated as [alloc]. *)
 external my_id : ('a[@local_opt]) -> ('a[@local_opt]) = "%identity"
