@@ -392,6 +392,8 @@ type primitive =
   | Punbox_unit
   | Punbox_vector of boxed_vector
   | Pbox_vector of boxed_vector * locality_mode
+  | Punbox_mask
+  | Pbox_mask of locality_mode
   | Pjoin_vec256
   | Psplit_vec256
   | Preinterpret_boxed_vector_as_tuple of boxed_vector
@@ -2580,6 +2582,8 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pobj_magic _ -> None
   | Punbox_vector _ -> None
   | Pbox_vector (_, m) -> Some m
+  | Punbox_mask -> None
+  | Pbox_mask m -> Some m
   | Punbox_unit -> None
   | Pjoin_vec256 | Psplit_vec256 ->
     (* Aborts in bytecode, unboxed in native code *)
@@ -2777,6 +2781,7 @@ let primitive_can_raise prim =
   | Pctconst _ | Pint_as_pointer _ | Popaque _
   | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _
   | Pbox_vector (_, _) | Punbox_vector _
+  | Pbox_mask _ | Punbox_mask
   | Pjoin_vec256 | Psplit_vec256
   | Punbox_unit | Pmake_unboxed_product _
   | Punboxed_product_field _ | Pget_header _ ->
@@ -3122,6 +3127,8 @@ let primitive_result_layout (p : primitive) =
   | Pufloatfield _ -> Punboxed_float Unboxed_float64
   | Pbox_vector (v, _) -> layout_boxed_vector v
   | Punbox_vector v -> layout_unboxed_vector (Primitive.unboxed_vector v)
+  | Pbox_mask _ -> layout_boxed_mask
+  | Punbox_mask -> layout_unboxed_mask
   | Pjoin_vec256 -> layout_unboxed_vector Unboxed_vec256
   | Psplit_vec256 ->
     Punboxed_product

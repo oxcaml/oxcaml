@@ -2374,6 +2374,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             ( Naked_vec512,
               Alloc_mode.For_allocations.from_lambda mode ~current_region ),
           arg ) ]
+  | Punbox_mask, [[arg]] -> [Unary (Unbox_number Naked_mask, arg)]
+  | Pbox_mask mode, [[arg]] ->
+    [ Unary
+        ( Box_number
+            ( Naked_mask,
+              Alloc_mode.For_allocations.from_lambda mode ~current_region ),
+          arg ) ]
   | Punbox_unit, [[_]] -> [Unboxed_product []]
   | Pfield_computed sem, [[obj]; [field]] ->
     (* We are reinterpreting a block(/object) as a value array, so it needs to
@@ -3268,8 +3275,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Poffsetref _ | Pisint _ | Pisnull | Pint_as_pointer _ | Pbigarraydim _
       | Pobj_dup | Pobj_magic _ | Punbox_vector _ | Punbox_unit
       | Pbox_vector (_, _)
-      | Punboxed_product_field _ | Pget_header _ | Pufloatfield _
-      | Patomic_load_field _ | Pmixedfield _
+      | Punbox_mask | Pbox_mask _ | Punboxed_product_field _ | Pget_header _
+      | Pufloatfield _ | Patomic_load_field _ | Pmixedfield _
       | Preinterpret_unboxed_int64_as_tagged_int63
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_boxed_vector_as_tuple _
