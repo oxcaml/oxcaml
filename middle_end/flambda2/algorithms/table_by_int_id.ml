@@ -50,12 +50,14 @@ struct
   module HT = Hashtbl.Make (struct
     type t = int
 
-    (* These ids are structured small integers. [Hashtbl] selects a bucket
-       using the low bits of the hash, so related ids could otherwise cluster
-       in the same buckets. This xorshift-multiply finalizer uses the multiplier
-       from xxHash; it is bijective on [int] (so introduces no full-width
-       collisions) and was measured to distribute this table's id patterns
-       uniformly. *)
+    (* These ids are structured small integers. [Hashtbl] selects a bucket using
+       the low bits of the hash, so ids whose hashes share low bits but differ
+       in higher bits could otherwise cluster in the same buckets. The current
+       [E.hash] implementations have suitable low-bit distributions, and
+       identity hashing performs similarly on current workloads. However, the
+       [E] interface does not guarantee this property. This defensive
+       xorshift-multiply finalizer mixes higher bits into the low bits and uses
+       the multiplier from xxHash. *)
     let hash (t : t) =
       let h = t lxor (t lsr 31) * 0x27d4eb2f in
       h lxor (h lsr 29)
