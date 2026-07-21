@@ -131,6 +131,12 @@ void caml_init_os_params(void)
   caml_plat_hugepagesize = 0;
 }
 
+/* Malloc-backed "memory mapping".  Two differences from anonymous mmap
+   to be aware of:
+   - the memory is *not* zeroed (the runtime does not rely on fresh
+     mappings being zeroed; debug builds even poison committed memory);
+   - there is no reserve-vs-commit distinction, so reservations are
+     physically allocated up front. */
 void *caml_plat_mem_map(uintnat size, uintnat flags, const char* name)
 {
   (void)flags;

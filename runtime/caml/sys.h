@@ -33,6 +33,10 @@ CAMLextern void caml_sys_init (const char_os * exe_name, char_os ** argv);
 
 CAMLnoret CAMLextern void caml_do_exit (int);
 
+#ifdef CAML_BARE_METAL
+CAMLextern uint64_t caml_bare_metal_time_ns(void);
+#endif
+
 #endif /* CAML_INTERNALS */
 
 #endif /* CAML_SYS_H */

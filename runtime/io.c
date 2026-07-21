@@ -60,8 +60,7 @@
 static int caml_bare_close(int fd)
 {
   (void)fd;
-  errno = ENOSYS;
-  return -1;
+  return 0;
 }
 
 static off_t caml_bare_lseek(int fd, off_t offset, int whence)

@@ -98,6 +98,7 @@ void caml_plat_wait(caml_plat_cond* cond, caml_plat_mutex* mut)
 {
   (void)cond;
   (void)mut;
+  caml_fatal_error("caml_plat_wait cannot be used on bare metal");
 }
 
 void caml_plat_broadcast(caml_plat_cond* cond)
@@ -122,7 +123,8 @@ void caml_plat_latch_release(caml_plat_binary_latch* latch)
 
 void caml_plat_latch_wait(caml_plat_binary_latch* latch)
 {
-  (void)latch;
+  if (caml_plat_latch_is_set(latch))
+    caml_fatal_error("caml_plat_latch_wait would deadlock on bare metal");
 }
 
 void caml_plat_barrier_flip(caml_plat_barrier* barrier,

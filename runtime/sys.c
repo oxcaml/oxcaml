@@ -575,8 +575,6 @@ void caml_sys_init(const char_os * exe_name, char_os **argv)
 
 #ifdef CAML_BARE_METAL
 
-extern uint64_t caml_bare_metal_time_ns(void);
-
 double caml_sys_time_include_children_unboxed(value include_children)
 {
   /* The program owns the core, so time since boot is processor time. */

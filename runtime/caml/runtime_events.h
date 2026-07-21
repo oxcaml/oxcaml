@@ -30,7 +30,7 @@
 
 #include "mlvalues.h"
 
-#if defined(CAML_INSTR) && !defined(CAML_BARE_METAL)
+#ifdef CAML_INSTR
 #define CAML_EV_ALLOC(s) caml_ev_alloc(s)
 #define CAML_EV_ALLOC_FLUSH() caml_ev_alloc_flush()
 #else
