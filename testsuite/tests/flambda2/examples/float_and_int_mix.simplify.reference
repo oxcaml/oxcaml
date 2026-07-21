@@ -1,5 +1,4 @@
 let code read_int_0 deleted in
-let $camlFloat_and_int_mix__float19 = 0x0p+0 in
 let code gasp_in_horror_1 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(read_int_0)
       read_int_0_1 (param : imm tagged)
@@ -11,19 +10,13 @@ in
 let $camlFloat_and_int_mix__read_int_2 =
   closure read_int_0_1 @read_int &toplevel.alloc_region
 in
-let code loopify(never) size(15) newer_version_of(gasp_in_horror_1)
+let code loopify(never) size(0) newer_version_of(gasp_in_horror_1)
       gasp_in_horror_1_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let Popaque = %opaque (1) in
-  (let untagged = %untag_imm (Popaque) in
-   switch untagged
-     | 0 -> k ($camlFloat_and_int_mix__float19)
-     | 1 -> k2)
-    where k2 =
-      apply direct(read_int_0_1 &my_alloc_region)
-        ($camlFloat_and_int_mix__read_int_2 : _ -> imm tagged) (0) -> k * k1
+  invalid "(Defining_expr_of_let (bound_pattern untagged/54N)\n (defining_expr ((Untag_imm Popaque/53N) float_and_int_mix.ml:25,5--25)))"
 in
 let $camlFloat_and_int_mix__gasp_in_horror_3 =
   closure gasp_in_horror_1_1 @gasp_in_horror &toplevel.alloc_region
