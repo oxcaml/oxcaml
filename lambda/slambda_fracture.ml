@@ -318,6 +318,15 @@ let rec fracture_lam lambda : slambda =
             sval_runtime =
               (if body_r == lam then lambda else Lregion (body_r, layout))
           })
+  | Lregion_close_return (lam, layout) ->
+    slet_local "body" lam (fun body_c body_r ->
+        SLhalves
+          { sval_comptime = body_c;
+            sval_runtime =
+              (if body_r == lam
+               then lambda
+               else Lregion_close_return (body_r, layout))
+          })
   | Lexclave body ->
     slet_local "body" body (fun body_c body_r ->
         SLhalves

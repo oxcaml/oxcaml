@@ -74,6 +74,23 @@ let _print_stack ppf stack =
        (fun ppf (_id, cont) -> Format.fprintf ppf "%a" Continuation.print cont))
     stack
 
+let end_region_and_ghost_region acc ccenv ~is_try_region ~region ~ghost_region
+    ~body =
+  CC.close_let acc ccenv
+    [ ( Ident.create_local "unit",
+        Flambda_debug_uid.none,
+        Flambda_kind.With_subkind.tagged_immediate ) ]
+    Not_user_visible
+    (End_region { is_try_region; region; ghost = false })
+    ~body:(fun acc ccenv ->
+      CC.close_let acc ccenv
+        [ ( Ident.create_local "unit",
+            Flambda_debug_uid.none,
+            Flambda_kind.With_subkind.tagged_immediate ) ]
+        Not_user_visible
+        (End_region { is_try_region; region = ghost_region; ghost = true })
+        ~body)
+
 (* Uses of [Lstaticfail] that jump out of try-with handlers need special care:
    the correct number of pop trap operations must be inserted. A similar thing
    is also necessary for closing local allocation regions. *)
@@ -143,21 +160,8 @@ let compile_staticfail acc env ccenv ~(continuation : Continuation.t) ~args :
         Env.Region_stack_element.ghost_region region_stack_elt
       in
       fun acc ccenv ->
-        CC.close_let acc ccenv
-          [ ( Ident.create_local "unit",
-              Flambda_debug_uid.none,
-              Flambda_kind.With_subkind.tagged_immediate ) ]
-          Not_user_visible
-          (End_region { is_try_region = false; region; ghost = false })
-          ~body:(fun acc ccenv ->
-            CC.close_let acc ccenv
-              [ ( Ident.create_local "unit",
-                  Flambda_debug_uid.none,
-                  Flambda_kind.With_subkind.tagged_immediate ) ]
-              Not_user_visible
-              (End_region
-                 { is_try_region = false; region = ghost_region; ghost = true })
-              ~body)
+        end_region_and_ghost_region acc ccenv ~is_try_region:false ~region
+          ~ghost_region ~body
     in
     let no_end_region after_everything = after_everything in
     match
@@ -289,21 +293,8 @@ let restore_continuation_context acc env ccenv cont ~close_current_region_early
       let ghost_region =
         Env.Region_stack_element.ghost_region region_stack_elt
       in
-      CC.close_let acc ccenv
-        [ ( Ident.create_local "unit",
-            Flambda_debug_uid.none,
-            Flambda_kind.With_subkind.tagged_immediate ) ]
-        Not_user_visible
-        (End_region { is_try_region = false; region; ghost = false })
-        ~body:(fun acc ccenv ->
-          CC.close_let acc ccenv
-            [ ( Ident.create_local "unit",
-                Flambda_debug_uid.none,
-                Flambda_kind.With_subkind.tagged_immediate ) ]
-            Not_user_visible
-            (End_region
-               { is_try_region = false; region = ghost_region; ghost = true })
-            ~body:(fun acc ccenv -> normal_case env acc ccenv))
+      end_region_and_ghost_region acc ccenv ~is_try_region:false ~region
+        ~ghost_region ~body:(fun acc ccenv -> normal_case env acc ccenv)
   else normal_case env acc ccenv
 
 let restore_continuation_context_for_switch_arm env cont =
@@ -433,30 +424,32 @@ let get_unarized_vars id env =
   | None -> [IR.Var id]
   | Some (_, fields) -> List.map (fun (id, _) -> IR.Var id) fields
 
+let insert_let_cont result_var_name layout (k : non_tail_continuation) acc env
+    ccenv body =
+  let arity_component =
+    Flambda_arity.Component_for_creation.from_lambda layout
+      ~machine_width:(Acc.machine_width acc)
+  in
+  let arity = Flambda_arity.create [arity_component] in
+  if Flambda_arity.cardinal_unarized arity < 1
+  then
+    let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler:false
+      ~params:[]
+      ~handler:(fun acc env ccenv -> k acc env ccenv [] arity_component)
+      ~body
+  else
+    let result_var = Ident.create_local result_var_name in
+    let result_var_duid = Lambda.debug_uid_none in
+    let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler:false
+      ~params:[result_var, result_var_duid, IR.Not_user_visible, layout]
+      ~handler:(fun acc env ccenv ->
+        k acc env ccenv (get_unarized_vars result_var env) arity_component)
+      ~body
+
 let maybe_insert_let_cont result_var_name layout k acc env ccenv body =
   match k with
   | Tail k -> body acc env ccenv k
-  | Non_tail k ->
-    let arity_component =
-      Flambda_arity.Component_for_creation.from_lambda layout
-        ~machine_width:(Acc.machine_width acc)
-    in
-    let arity = Flambda_arity.create [arity_component] in
-    if Flambda_arity.cardinal_unarized arity < 1
-    then
-      let_cont_nonrecursive_with_extra_params acc env ccenv
-        ~is_exn_handler:false ~params:[]
-        ~handler:(fun acc env ccenv -> k acc env ccenv [] arity_component)
-        ~body
-    else
-      let result_var = Ident.create_local result_var_name in
-      let result_var_duid = Lambda.debug_uid_none in
-      let_cont_nonrecursive_with_extra_params acc env ccenv
-        ~is_exn_handler:false
-        ~params:[result_var, result_var_duid, IR.Not_user_visible, layout]
-        ~handler:(fun acc env ccenv ->
-          k acc env ccenv (get_unarized_vars result_var env) arity_component)
-        ~body
+  | Non_tail k -> insert_let_cont result_var_name layout k acc env ccenv body
 
 let name_if_not_var acc ccenv name simple kind body =
   match simple with
@@ -941,21 +934,9 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
        be behind a branch. *)
     let ccenv = CCenv.set_not_at_toplevel ccenv in
     let handler k acc env ccenv =
-      CC.close_let acc ccenv
-        [ ( Ident.create_local "unit",
-            Flambda_debug_uid.none,
-            Flambda_kind.With_subkind.tagged_immediate ) ]
-        Not_user_visible
-        (End_region { is_try_region = true; region; ghost = false })
-        ~body:(fun acc ccenv ->
-          CC.close_let acc ccenv
-            [ ( Ident.create_local "unit",
-                Flambda_debug_uid.none,
-                Flambda_kind.With_subkind.tagged_immediate ) ]
-            Not_user_visible
-            (End_region
-               { is_try_region = true; region = ghost_region; ghost = true })
-            ~body:(fun acc ccenv -> cps_tail acc env ccenv handler k k_exn))
+      end_region_and_ghost_region acc ccenv ~is_try_region:true ~region
+        ~ghost_region
+        ~body:(fun acc ccenv -> cps_tail acc env ccenv handler k k_exn)
     in
     let region_stack_elt = Env.current_region env in
     let begin_try_region body =
@@ -1070,6 +1051,35 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
        by completely removing it (replacing by unit). *)
     Misc.fatal_error
       "[Lifused] should have been removed by [Simplif.simplify_lets]"
+  | Lregion_close_return (body, layout) ->
+    (match layout with
+    | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+    | Punboxed_vector _ | Punboxed_product _ ->
+      ()
+    | Ptop | Pbottom ->
+      Misc.fatal_error
+        "Lregion_close_return requires a concrete result layout"
+    | Psplicevar ident -> L.fatal_error_unevaluated_splice_var ident);
+    let close_region_and_return acc env ccenv result_args arity_component =
+      let current_region =
+        match Env.current_region env with
+        | Some region -> region
+        | None ->
+          Misc.fatal_error
+            "Lregion_close_return in a context with no current region"
+      in
+      let region = Env.Region_stack_element.region current_region in
+      let ghost_region =
+        Env.Region_stack_element.ghost_region current_region
+      in
+      let env = Env.leaving_region env in
+      end_region_and_ghost_region acc ccenv ~is_try_region:false ~region
+        ~ghost_region ~body:(fun acc ccenv ->
+          apply_cps_cont_simple k acc env ccenv result_args arity_component)
+    in
+    insert_let_cont "region_return" layout close_region_and_return acc env
+      ccenv (fun acc env ccenv return_continuation ->
+        cps_tail acc env ccenv body return_continuation k_exn)
   | Lregion (body, _) when not (Flambda_features.stack_allocation_enabled ()) ->
     cps acc env ccenv body k k_exn
   | Lexclave body ->
@@ -1080,23 +1090,10 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     in
     let region = Env.Region_stack_element.region current_region in
     let ghost_region = Env.Region_stack_element.ghost_region current_region in
-    CC.close_let acc ccenv
-      [ ( Ident.create_local "unit",
-          Flambda_debug_uid.none,
-          Flambda_kind.With_subkind.tagged_immediate ) ]
-      Not_user_visible
-      (End_region { is_try_region = false; region; ghost = false })
-      ~body:(fun acc ccenv ->
-        CC.close_let acc ccenv
-          [ ( Ident.create_local "unit",
-              Flambda_debug_uid.none,
-              Flambda_kind.With_subkind.tagged_immediate ) ]
-          Not_user_visible
-          (End_region
-             { is_try_region = false; region = ghost_region; ghost = true })
-          ~body:(fun acc ccenv ->
-            let env = Env.leaving_region env in
-            cps acc env ccenv body k k_exn))
+    end_region_and_ghost_region acc ccenv ~is_try_region:false ~region
+      ~ghost_region ~body:(fun acc ccenv ->
+        let env = Env.leaving_region env in
+        cps acc env ccenv body k k_exn)
   | Lregion (body, layout) ->
     (* Here we need to build the region closure continuation (see long comment
        above). Since we're not in tail position, we also need to have a new
@@ -1169,31 +1166,14 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                     in
                     cps_tail acc env ccenv body k k_exn)
                   ~handler:(fun acc env ccenv ->
-                    CC.close_let acc ccenv
-                      [ ( Ident.create_local "unit",
-                          Flambda_debug_uid.none,
-                          Flambda_kind.With_subkind.tagged_immediate ) ]
-                      Not_user_visible
-                      (End_region
-                         { is_try_region = false; region; ghost = false })
-                      ~body:(fun acc ccenv ->
-                        CC.close_let acc ccenv
-                          [ ( Ident.create_local "unit",
-                              Flambda_debug_uid.none,
-                              Flambda_kind.With_subkind.tagged_immediate ) ]
-                          Not_user_visible
-                          (End_region
-                             { is_try_region = false;
-                               region = ghost_region;
-                               ghost = true
-                             })
-                          ~body:(fun acc ccenv ->
-                            (* Both body and handler will continue at
-                               [return_continuation] by default.
-                               [restore_region_context] will intercept the
-                               [Lstaticraise] jump to this handler if needed. *)
-                            apply_cont_with_extra_args acc env ccenv ~dbg k None
-                              (get_unarized_vars wrap_return env)))))))
+                    end_region_and_ghost_region acc ccenv ~is_try_region:false
+                      ~region ~ghost_region ~body:(fun acc ccenv ->
+                        (* Both body and handler will continue at
+                           [return_continuation] by default.
+                           [restore_region_context] will intercept the
+                           [Lstaticraise] jump to this handler if needed. *)
+                        apply_cont_with_extra_args acc env ccenv ~dbg k None
+                          (get_unarized_vars wrap_return env))))))
   | Lsplice _ -> Lambda.fatal_error_invalid_constructor lam
 
 and cps_non_tail_simple :
@@ -1682,7 +1662,7 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
         | Lprim _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
         | Lstaticcatch _ | Ltrywith _ | Lifthenelse _ | Lsequence _ | Lwhile _
         | Lfor _ | Lassign _ | Lsend _ | Levent _ | Lifused _ | Lregion _
-        | Lexclave _ ->
+        | Lregion_close_return _ | Lexclave _ ->
           (* The continuations created here (and for failactions) are local. The
              bodies of the let_conts will not modify mutable variables. Hence,
              it is safe to exclude them from passing along the extra arguments

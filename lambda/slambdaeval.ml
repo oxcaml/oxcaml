@@ -288,6 +288,11 @@ and eval_lam_shallow env lam =
   | Lregion (body, old_layout) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then lam else Lregion (body, new_layout)
+  | Lregion_close_return (body, old_layout) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then lam
+    else Lregion_close_return (body, new_layout)
   | Lsplice (_loc, slam) ->
     let halves = eval_slam env slam |> expect_not_missing |> expect Thalves in
     halves.slv_runtime
@@ -584,7 +589,8 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lsend (_, _, _, _, _, _, _, layout) ->
     assert_layout_contains_no_splices layout
   | Levent _ | Lifused _ -> ()
-  | Lregion (_, layout) -> assert_layout_contains_no_splices layout
+  | Lregion (_, layout) | Lregion_close_return (_, layout) ->
+    assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
   | Lsplice _ -> raise Found_a_splice);
   Lambda.iter_head_constructor assert_no_splices lam

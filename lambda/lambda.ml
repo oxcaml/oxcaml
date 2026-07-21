@@ -975,6 +975,7 @@ type lambda =
   | Levent of lambda * lambda_event
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
+  | Lregion_close_return of lambda * layout
   | Lexclave of lambda
   | Lsplice of scoped_location * slambda
 
@@ -1101,6 +1102,7 @@ let rec try_to_find_location lam =
   | Lassign (_, lam)
   | Lifused (_, lam)
   | Lregion (lam, _)
+  | Lregion_close_return (lam, _)
   | Lexclave lam
   | Ltrywith (lam, _, _, _, _) ->
     try_to_find_location lam
@@ -1143,6 +1145,7 @@ let fatal_error_invalid_constructor lambda =
     | Levent _ -> "Levent"
     | Lifused _ -> "Lifused"
     | Lregion _ -> "Lregion"
+    | Lregion_close_return _ -> "Lregion_close_return"
     | Lexclave _ -> "Lexclave"
     | Lsplice _ -> "Lsplice"
   in
@@ -1541,6 +1544,8 @@ let make_key e =
         Lsend (m,tr_rec env e1,tr_rec env e2,tr_recs env es,pos,mo,Loc_unknown,layout)
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
+    | Lregion_close_return (e, layout) ->
+        Lregion_close_return (tr_rec env e, layout)
     | Lexclave e -> Lexclave (tr_rec env e)
     | Lletrec _|Lfunction _
     | Lfor _ | Lwhile _
@@ -1649,6 +1654,8 @@ let shallow_iter ~tail ~non_tail:f = function
       tail e
   | Lregion (e, _) ->
       f e
+  | Lregion_close_return (e, _) ->
+      f e
   | Lexclave e ->
       tail e
 
@@ -1740,6 +1747,8 @@ let rec free_variables = function
       (* Shouldn't v be considered a free variable ? *)
       free_variables e
   | Lregion (e, _) ->
+      free_variables e
+  | Lregion_close_return (e, _) ->
       free_variables e
   | Lexclave e ->
       free_variables e
@@ -2085,6 +2094,8 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         Lifused (id, subst s l e)
     | Lregion (e, layout) ->
         Lregion (subst s l e, layout)
+    | Lregion_close_return (e, layout) ->
+        Lregion_close_return (subst s l e, layout)
     | Lexclave e ->
         Lexclave (subst s l e)
     | Lsplice _ -> fatal_error_invalid_constructor lam
@@ -2300,6 +2311,9 @@ let shallow_map ~tail ~non_tail:f lam =
   | Lregion (old_e, layout) ->
       let new_e = f old_e in
       if old_e == new_e then lam else Lregion (new_e, layout)
+  | Lregion_close_return (old_e, layout) ->
+      let new_e = f old_e in
+      if old_e == new_e then lam else Lregion_close_return (new_e, layout)
   | Lexclave old_e ->
       let new_e = tail old_e in
       if old_e == new_e then lam else Lexclave new_e
@@ -3331,6 +3345,8 @@ let may_allocate_in_region lam =
        (* [body] might allocate in the parent region because of exclave, and thus
           [Lregion body] might allocate in the current region *)
       loop_region body
+    | Lregion_close_return (body, _layout) ->
+      loop body
     | Lexclave _body ->
       (* [_body] might do local allocations, but not in the current region;
         rather, it's in the parent region *)

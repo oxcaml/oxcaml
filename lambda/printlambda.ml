@@ -1436,6 +1436,9 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(ifused@ %a@ %a)@]" Ident.print id lam expr
   | Lregion (expr, _) ->
       fprintf ppf "@[<2>(region@ %a)@]" lam expr
+  | Lregion_close_return (expr, layout) ->
+      fprintf ppf "@[<2>(region-close-return@ %a@ %a)@]" layout_annotation
+        layout lam expr
   | Lexclave expr ->
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
   | Lsplice (_, slambda) ->

@@ -37,6 +37,7 @@ type ambiguous_arguments = {
 type error =
   | Ambiguous_constructor_arguments of ambiguous_arguments
   | Tmc_local_returning
+  | Tmc_unrepresentable_returning
 
 exception Error of Location.t * error
 
@@ -572,12 +573,20 @@ let llets lk vk bindings body =
 
 let find_candidate = function
   | Lfunction lfun when lfun.attr.tmc_candidate ->
-     (* TMC does not make sense for local-returning functions *)
+     (* TMC does not make sense for local-returning functions
+        or for any-returning functions. *)
      begin match lfun.ret_mode with
      | Alloc_local ->
        raise (Error (Debuginfo.Scoped_location.to_location lfun.loc,
                      Tmc_local_returning))
-     | Alloc_heap -> Some lfun
+     | Alloc_heap ->
+       match lfun.return with
+       | Ptop ->
+         raise (Error (Debuginfo.Scoped_location.to_location lfun.loc,
+                       Tmc_unrepresentable_returning))
+       | Pvalue _ | Pbottom | Punboxed_float _
+       | Punboxed_or_untagged_integer _ | Punboxed_vector _
+       | Punboxed_product _ | Psplicevar _ -> Some lfun
      end
   | _ -> None
 
@@ -682,6 +691,9 @@ let rec choice ctx t =
     | Lregion (lam, layout) ->
         let+ lam = choice ctx ~tail lam in
         Lregion (lam, layout)
+    | Lregion_close_return (lam, layout) ->
+        let+ lam = choice ctx ~tail lam in
+        Lregion_close_return (lam, layout)
     | Lexclave lam ->
         let+ lam = choice ctx ~tail lam in
         Lexclave lam
@@ -1166,6 +1178,10 @@ let () =
           Some (Location.errorf ~loc
                   "[@tail_mod_cons]: Functions cannot be both local-returning \
                    and [@tail_mod_cons]")
+      | Error (loc, Tmc_unrepresentable_returning) ->
+          Some (Location.errorf ~loc
+                  "[@tail_mod_cons]: Functions whose return layout is not \
+                   representable cannot be [@tail_mod_cons]")
       | _ ->
         None
     )

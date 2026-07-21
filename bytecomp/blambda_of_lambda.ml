@@ -390,7 +390,11 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     comp_expr (Matching.expand_stringswitch loc kind arg sw d)
   | Lassign (id, expr) -> Assign (id, comp_expr expr)
   | Levent (lam, lev) -> Event (comp_expr lam, lev)
-  | Lifused (_, exp) | Lregion (exp, _) | Lexclave exp -> comp_expr exp
+  | Lifused (_, exp)
+  | Lregion (exp, _)
+  | Lregion_close_return (exp, _)
+  | Lexclave exp ->
+    comp_expr exp
   | Lprim (primitive, args, loc) -> (
     let simd_is_not_supported () =
       let args = List.map comp_expr args in
