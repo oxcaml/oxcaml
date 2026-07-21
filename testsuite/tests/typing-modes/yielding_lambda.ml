@@ -721,6 +721,42 @@ Error: Modules do not match: sig val f : unit -> unit end @ yielding
      However, the second is "unyielding".
 |}]
 
+(* a functor that is *itself* yielding (it closes over [y]) applied to an
+   unyielding argument is a yielding application. (Applied twice so the
+   applications survive inlining of single-use functors.) *)
+let () =
+  Yielding.with_ (fun y ->
+    let module Cf (X : sig val f : unit -> unit end) = struct
+      let g () = X.f (); yield y
+    end in
+    let module R1 = Cf (M) in
+    let module R2 = Cf (M) in
+    R1.g ();
+    R2.g ())
+[%%expect{|
+(let
+  (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
+   M =? (apply (field_imm 0 (global Toploop!)) "M/719")
+   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/296")
+   *match* =[value<int>]
+     (apply (field_imm 0 Yielding)
+       (function {nlocal = 0} y : int
+         (let
+           (Cf =
+              (function {nlocal = 0} X is_a_functor never_loop
+                (let
+                  (g =
+                     (function {nlocal = 0} param[value<int>] : int
+                       (seq (apply (field_imm 0 X) 0)
+                         (apply[yielding] yield y))))
+                  (makeblock 0 g)))
+            R1 = (apply[yielding] Cf M)
+            R2 = (apply[yielding] Cf M))
+           (seq (apply[yielding] (field_imm 0 R1) 0)
+             (apply[yielding] (field_imm 0 R2) 0))))))
+  0)
+|}]
+
 (* Unlike objects (below), a module may close over a yielding value; the inner
    [yield] is correctly inferred as yielding. *)
 let () =
@@ -841,15 +877,15 @@ class d = object inherit c as super method n = super#m end
        (opaque
          (apply (field_imm 18 (global CamlinternalOO!)) (opaque [0: #"m"])
            c_init))))
-  (apply (field_imm 1 (global Toploop!)) "c/778" c))
+  (apply (field_imm 1 (global Toploop!)) "c/792" c))
 class c : object method m : int end
 (let
-  (c =? (apply (field_imm 0 (global Toploop!)) "c/778")
+  (c =? (apply (field_imm 0 (global Toploop!)) "c/792")
    mk = (function {nlocal = 0} param[value<int>] (apply (field_mut 0 c) 0)))
   (apply (field_imm 1 (global Toploop!)) "mk" mk))
 val mk : unit -> c = <fun>
 (let
-  (c =? (apply (field_imm 0 (global Toploop!)) "c/778")
+  (c =? (apply (field_imm 0 (global Toploop!)) "c/792")
    shared =a (opaque [0: #"m"])
    shared =a (opaque [0: #"n" #"m"])
    d =?
@@ -885,7 +921,7 @@ val mk : unit -> c = <fun>
        (opaque
          (apply (field_imm 18 (global CamlinternalOO!))
            (opaque [0: #"m" #"n"]) d_init))))
-  (apply (field_imm 1 (global Toploop!)) "d/806" d))
+  (apply (field_imm 1 (global Toploop!)) "d/820" d))
 class d : object method m : int method n : int end
 |}]
 
@@ -939,12 +975,12 @@ end
 [%%expect{|
 0
 module type S = sig type t val x : t end
-(apply (field_imm 1 (global Toploop!)) "F/854"
+(apply (field_imm 1 (global Toploop!)) "F/868"
   (function {nlocal = 0} M is_a_functor never_loop
     (let (y = (field_imm 0 M)) (makeblock 0 y))))
 module F : functor (M : S) -> sig val y : M.t end
-(let (F =? (apply (field_imm 0 (global Toploop!)) "F/854"))
-  (apply (field_imm 1 (global Toploop!)) "M/862"
+(let (F =? (apply (field_imm 0 (global Toploop!)) "F/868"))
+  (apply (field_imm 1 (global Toploop!)) "M/876"
     (let (x =[value<int>] 42 include = (apply F (makeblock 0 x)))
       (makeblock 0 x (field_imm 0 include)))))
 module M : sig type t = int val x : int val y : int end
@@ -964,7 +1000,7 @@ let () =
     end in
     M.g ())
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Gf/869"
+(apply (field_imm 1 (global Toploop!)) "Gf/883"
   (function {nlocal = 0} X is_a_functor never_loop
     (let
       (g =
@@ -976,7 +1012,7 @@ module Gf :
     sig val g : unit -> unit end @ yielding
 (let
   (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
-   Gf =? (apply (field_imm 0 (global Toploop!)) "Gf/869")
+   Gf =? (apply (field_imm 0 (global Toploop!)) "Gf/883")
    Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/296")
    *match* =[value<int>]
      (apply (field_imm 0 Yielding)

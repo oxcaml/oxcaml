@@ -28,7 +28,8 @@ let call_nontail () = f 41 + 1
 (* Unyielding tail call: expect "pseudo/unyielding-call(1)" at APPTERM. *)
 let rec loop n = match n with 0 -> 0 | _ -> loop (n + (-1))
 
-(* The call to [h] may yield: expect a plain "after/ret(1)". *)
+(* The call to [h] may yield: expect "pseudo/ret(1)" with no unyielding
+   marker. *)
 let call_yielding_arg (h : (unit -> int) @ yielding) =
   let r = h () in
   r + 1
@@ -40,6 +41,9 @@ let tail_yielding (h : (unit -> int) @ yielding) = h ()
 let add a b = a + b
 
 let inc = add 1
+
+(* Two-argument unyielding call: expect "after/unyielding-call(2)". *)
+let call_two_args () = add 3 4 + 1
 
 (* The function is a lambda, so typecore does not rewrite this into a plain
    application and it reaches the [%revapply] primitive path: expect
@@ -54,7 +58,7 @@ let () =
   let _ = opaque (call_nontail ()) in
   let _ = opaque (loop 3) in
   (* Call function that accepts a yielding argument with a yielding argument
-     (should have a plain ret debug event) *)
+     (a plain "after/ret(1)", with no unyielding marker) *)
   let _ = opaque (call_yielding_arg ((fun () -> 7) : _ @ yielding)) in
   let _ = opaque (tail_yielding ((fun () -> 8) : _ @ yielding)) in
   (* Call function that accepts a yielding argument with an unyielding
@@ -62,6 +66,7 @@ let () =
   let _ = opaque (call_yielding_arg (fun () -> 7)) in
   let _ = opaque (tail_yielding (fun () -> 8)) in
   let _ = opaque (inc 5) in
+  let _ = opaque (call_two_args ()) in
   let _ = opaque (revapply_nontail 1) in
   let _ = opaque (revapply_yielding 2) in
   ()

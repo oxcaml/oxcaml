@@ -1,4 +1,4 @@
-       0  BRANCH 94
+       0  BRANCH 103
 File "test.ml", line 29, characters 17-59:
 Event before/fun
        2  ACC0
@@ -15,197 +15,217 @@ File "test.ml", line 29, characters 35-36:
 Event before
       12  CONST0
       13  RETURN 1
-File "test.ml", line 63, characters 43-44:
+File "test.ml", line 67, characters 43-44:
 Event before/fun
       15  CONSTINT 8
       17  RETURN 1
-File "test.ml", line 62, characters 47-48:
+File "test.ml", line 66, characters 47-48:
 Event before/fun
       19  CONSTINT 7
       21  RETURN 1
-File "test.ml", line 59, characters 44-45:
+File "test.ml", line 63, characters 44-45:
 Event before/fun
       23  CONSTINT 8
       25  RETURN 1
-File "test.ml", line 58, characters 48-49:
+File "test.ml", line 62, characters 48-49:
 Event before/fun
       27  CONSTINT 7
       29  RETURN 1
-File "test.ml", line 51, characters 52-57:
+File "test.ml", line 55, characters 52-57:
 Event before/fun
       31  ACC0
       32  OFFSETINT 1
       34  RETURN 1
-File "test.ml", line 51, characters 26-62:
+File "test.ml", line 55, characters 26-62:
 Event before/fun
       36  ACC0
       37  PUSH
       38  CLOSURE 0, 31
-File "test.ml", line 51, characters 42-58:
+File "test.ml", line 55, characters 42-58:
 Event pseudo
       41  APPLY1
-File "test.ml", line 51, characters 26-58:
+File "test.ml", line 55, characters 26-58:
 Event after/ret(1)
       42  OFFSETINT 1
       44  RETURN 1
-File "test.ml", line 47, characters 41-46:
+File "test.ml", line 51, characters 41-46:
 Event before/fun
       46  ACC0
       47  OFFSETINT 1
       49  RETURN 1
-File "test.ml", line 47, characters 25-52:
+File "test.ml", line 51, characters 25-52:
 Event before/fun
       51  ACC0
       52  PUSH
       53  CLOSURE 0, 46
-File "test.ml", line 47, characters 31-47:
+File "test.ml", line 51, characters 31-47:
 Event pseudo
       56  APPLY1
-File "test.ml", line 47, characters 25-48:
+File "test.ml", line 51, characters 25-48:
 Event after/unyielding-call(1)
       57  OFFSETINT 1
       59  RETURN 1
-      61  RESTART
-      62  GRAB 1
-File "test.ml", line 40, characters 14-19:
+File "test.ml", line 46, characters 23-34:
 Event before/fun
-      64  ACC1
-      65  PUSHACC1
-      66  ADDINT
-      67  RETURN 2
-File "test.ml", line 37, characters 51-55:
+      61  CONSTINT 4
+      63  PUSHCONST3
+      64  PUSHENVACC2
+      65  APPLY2
+File "test.ml", line 46, characters 23-30:
+Event after/unyielding-call(2)
+      66  OFFSETINT 1
+      68  RETURN 1
+      70  RESTART
+      71  GRAB 1
+File "test.ml", line 41, characters 14-19:
 Event before/fun
-      69  CONST0
-      70  PUSHACC1
-      71  APPTERM1 2
-File "test.ml", line 33, characters 2-25:
-Event before/fun
-      73  CONST0
+      73  ACC1
       74  PUSHACC1
-      75  APPLY1
-File "test.ml", line 33, characters 10-14:
+      75  ADDINT
+      76  RETURN 2
+File "test.ml", line 38, characters 51-55:
+Event before/fun
+      78  CONST0
+      79  PUSHACC1
+      80  APPTERM1 2
+File "test.ml", line 34, characters 2-25:
+Event before/fun
+      82  CONST0
+      83  PUSHACC1
+      84  APPLY1
+File "test.ml", line 34, characters 10-14:
 Event pseudo/ret(1)
-      76  PUSHACC0
-File "test.ml", line 34, characters 2-7:
+      85  PUSHACC0
+File "test.ml", line 35, characters 2-7:
 Event before
-      77  OFFSETINT 1
-      79  RETURN 2
+      86  OFFSETINT 1
+      88  RETURN 2
 File "test.ml", line 26, characters 22-30:
 Event before/fun
-      81  CONSTINT 41
-      83  PUSHENVACC2
-      84  APPLY1
+      90  CONSTINT 41
+      92  PUSHENVACC2
+      93  APPLY1
 File "test.ml", line 26, characters 22-26:
 Event after/unyielding-call(1)
-      85  OFFSETINT 1
-      87  RETURN 1
+      94  OFFSETINT 1
+      96  RETURN 1
 File "test.ml", line 23, characters 10-15:
 Event before/fun
-      89  ACC0
-      90  OFFSETINT 1
-      92  RETURN 1
-      94  CLOSURE 0, 89
+      98  ACC0
+      99  OFFSETINT 1
+     101  RETURN 1
+     103  CLOSURE 0, 98
 File "test.ml", line 23, characters 6-15:
 Event pseudo
-      97  PUSHACC0
-      98  CLOSURE 1, 81
+     106  PUSHACC0
+     107  CLOSURE 1, 90
 File "test.ml", line 26, characters 17-30:
 Event pseudo
-     101  PUSH
-     102  CLOSUREREC 0, 2
-     106  CLOSURE 0, 73
-File "test.ml", line 32, characters 22-80:
+     110  PUSH
+     111  CLOSUREREC 0, 2
+     115  CLOSURE 0, 82
+File "test.ml", line 33, characters 22-80:
 Event pseudo
-     109  PUSH
-     110  CLOSURE 0, 69
-File "test.ml", line 37, characters 18-55:
+     118  PUSH
+     119  CLOSURE 0, 78
+File "test.ml", line 38, characters 18-55:
 Event pseudo
-     113  PUSH
-     114  CLOSURE 0, 62
-File "test.ml", line 40, characters 8-19:
+     122  PUSH
+     123  CLOSURE 0, 71
+File "test.ml", line 41, characters 8-19:
 Event pseudo
-     117  PUSHCONST1
-     118  PUSHACC1
-     119  APPLY1
-File "test.ml", line 42, characters 10-15:
+     126  PUSHCONST1
+     127  PUSHACC1
+     128  APPLY1
+File "test.ml", line 43, characters 10-15:
 Event after/unyielding-call(1)
-     120  PUSH
-     121  CLOSURE 0, 51
-File "test.ml", line 47, characters 21-52:
+     129  PUSHACC1
+     130  CLOSURE 1, 61
+File "test.ml", line 46, characters 18-34:
 Event pseudo
-     124  PUSH
-     125  CLOSURE 0, 36
-File "test.ml", line 51, characters 22-62:
+     133  PUSH
+     134  CLOSURE 0, 51
+File "test.ml", line 51, characters 21-52:
 Event pseudo
-     128  PUSHCONST0
-     129  PUSHACC 8
-     131  APPLY1
-File "test.ml", line 54, characters 17-34:
-Event after/unyielding-call(1)
-     132  CONST3
-     133  PUSHACC7
-     134  APPLY1
-File "test.ml", line 55, characters 17-25:
-Event after/unyielding-call(1)
-     135  CLOSURE 0, 27
-File "test.ml", line 58, characters 37-50:
+     137  PUSH
+     138  CLOSURE 0, 36
+File "test.ml", line 55, characters 22-62:
 Event pseudo
-     138  PUSHACC6
-     139  APPLY1
-File "test.ml", line 58, characters 17-67:
-Event after/ret(1)
-     140  CLOSURE 0, 23
-File "test.ml", line 59, characters 33-46:
-Event pseudo
-     143  PUSHACC5
+     141  PUSHCONST0
+     142  PUSHACC 9
      144  APPLY1
-File "test.ml", line 59, characters 17-63:
+File "test.ml", line 58, characters 17-34:
+Event after/unyielding-call(1)
+     145  CONST3
+     146  PUSHACC 8
+     148  APPLY1
+File "test.ml", line 59, characters 17-25:
+Event after/unyielding-call(1)
+     149  CLOSURE 0, 27
+File "test.ml", line 62, characters 37-50:
+Event pseudo
+     152  PUSHACC7
+     153  APPLY1
+File "test.ml", line 62, characters 17-67:
 Event after/ret(1)
-     145  CLOSURE 0, 19
-File "test.ml", line 62, characters 36-49:
+     154  CLOSURE 0, 23
+File "test.ml", line 63, characters 33-46:
 Event pseudo
-     148  PUSHACC6
-     149  APPLY1
-File "test.ml", line 62, characters 17-50:
-Event after/unyielding-call(1)
-     150  CLOSURE 0, 15
-File "test.ml", line 63, characters 32-45:
-Event pseudo
-     153  PUSHACC5
-     154  APPLY1
-File "test.ml", line 63, characters 17-46:
-Event after/unyielding-call(1)
-     155  CONSTINT 5
-     157  PUSHACC3
+     157  PUSHACC6
      158  APPLY1
-File "test.ml", line 64, characters 17-24:
+File "test.ml", line 63, characters 17-63:
+Event after/ret(1)
+     159  CLOSURE 0, 19
+File "test.ml", line 66, characters 36-49:
+Event pseudo
+     162  PUSHACC7
+     163  APPLY1
+File "test.ml", line 66, characters 17-50:
 Event after/unyielding-call(1)
-     159  CONST1
-     160  PUSHACC2
-     161  APPLY1
-File "test.ml", line 65, characters 17-37:
+     164  CLOSURE 0, 15
+File "test.ml", line 67, characters 32-45:
+Event pseudo
+     167  PUSHACC6
+     168  APPLY1
+File "test.ml", line 67, characters 17-46:
 Event after/unyielding-call(1)
-     162  CONST2
-     163  PUSHACC1
-     164  APPLY1
-File "test.ml", line 66, characters 17-38:
+     169  CONSTINT 5
+     171  PUSHACC4
+     172  APPLY1
+File "test.ml", line 68, characters 17-24:
 Event after/unyielding-call(1)
-     165  CONST0
-     166  PUSH
+     173  CONST0
+     174  PUSHACC3
+     175  APPLY1
+File "test.ml", line 69, characters 17-35:
+Event after/unyielding-call(1)
+     176  CONST1
+     177  PUSHACC2
+     178  APPLY1
+File "test.ml", line 70, characters 17-37:
+Event after/unyielding-call(1)
+     179  CONST2
+     180  PUSHACC1
+     181  APPLY1
+File "test.ml", line 71, characters 17-38:
+Event after/unyielding-call(1)
+     182  CONST0
+     183  PUSH
 File "test.ml", line 0, characters -1--1:
 Event pseudo
-     167  ACC1
-     168  PUSHACC3
-     169  PUSHACC5
-     170  PUSHACC7
-     171  PUSHACC 9
-     173  PUSHACC 11
-     175  PUSHACC 13
-     177  PUSHACC 15
-     179  PUSHACC 17
-     181  MAKEBLOCK 9, 0
+     184  ACC1
+     185  PUSHACC3
+     186  PUSHACC5
+     187  PUSHACC7
+     188  PUSHACC 9
+     190  PUSHACC 11
+     192  PUSHACC 13
+     194  PUSHACC 15
+     196  PUSHACC 17
+     198  PUSHACC 19
+     200  MAKEBLOCK 10, 0
 File "test.ml", line 0, characters -1--1:
 Event pseudo
-     184  POP 10
-     186  SETGLOBAL compilation unit Test
-     188  STOP
+     203  POP 11
+     205  SETGLOBAL compilation unit Test
+     207  STOP
