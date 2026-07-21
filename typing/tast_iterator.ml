@@ -627,7 +627,7 @@ let open_declaration sub {open_loc; open_expr; open_env; open_attributes; _} =
 
 let module_coercion sub = function
   | Tcoerce_none -> ()
-  | Tcoerce_functor (c1,c2) ->
+  | Tcoerce_functor (c1,c2,_) ->
       sub.module_coercion sub c1;
       sub.module_coercion sub c2
   | Tcoerce_alias (env, _, c1) ->

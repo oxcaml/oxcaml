@@ -136,14 +136,14 @@ let rec apply_coercion loc strict restr arg =
                 loc)
         in
         wrap_id_pos_list loc id_pos_list get_field get_layout lam)
-  | Tcoerce_functor(cc_arg, cc_res) ->
+  | Tcoerce_functor(cc_arg, cc_res, yielding) ->
       let param = Ident.create_local "funarg" in
       let param_duid = Lambda.debug_uid_none in
       let carg = apply_coercion loc Alias cc_arg (Lvar param) in
       apply_coercion_result loc strict arg
         [{name = param; debug_uid = param_duid; layout = Lambda.layout_module;
           attributes = Lambda.default_param_attribute; mode = alloc_heap}]
-        [carg] cc_res
+        [carg] yielding cc_res
   | Tcoerce_primitive { pc_desc; pc_env; pc_type; pc_poly_mode; pc_poly_sort;
                         pc_yielding } ->
       Translprim.transl_primitive loc pc_desc pc_env pc_type
@@ -160,9 +160,9 @@ let rec apply_coercion loc strict restr arg =
 and apply_coercion_field loc get_field (pos, cc) =
   apply_coercion loc Alias cc (get_field pos)
 
-and apply_coercion_result loc strict funct params args cc_res =
+and apply_coercion_result loc strict funct params args yielding cc_res =
   match cc_res with
-  | Tcoerce_functor(cc_arg, cc_res) ->
+  | Tcoerce_functor(cc_arg, cc_res, level_yielding) ->
     let param = Ident.create_local "funarg" in
     let param_duid = Lambda.debug_uid_none in
     let arg = apply_coercion loc Alias cc_arg (Lvar param) in
@@ -172,7 +172,9 @@ and apply_coercion_result loc strict funct params args cc_res =
          layout = Lambda.layout_module;
          attributes = Lambda.default_param_attribute;
          mode = alloc_heap } :: params)
-      (arg :: args) cc_res
+      (arg :: args)
+      (Mode.Yielding.join [yielding; level_yielding])
+      cc_res
   | _ ->
       name_lambda strict funct Lambda.layout_functor
         (fun id ->
@@ -197,10 +199,10 @@ and apply_coercion_result loc strict funct params args cc_res =
                       ap_result_layout=Lambda.layout_module;
                       ap_region_close=Rc_normal;
                       ap_mode=alloc_heap;
-                      (* Functor-coercion stub: [funct] is already lowered to
-                         lambda here, so its yielding mode is unavailable;
-                         conservatively may yield *)
-                      ap_yielding=May_yield;
+                      (* The stub fully applies the coerced functor, so the
+                         call yields if any traversed coercion level does. *)
+                      ap_yielding=
+                        Translmode.transl_yielding_mode_l yielding;
                       ap_tailcall=Default_tailcall;
                       ap_inlined=Default_inlined;
                       ap_specialised=Default_specialise;
@@ -270,9 +272,10 @@ let rec compose_coercions c1 c2 =
         ; pos_cc_list
         ; id_pos_list = ids1 @ ids2
         }
-  | (Tcoerce_functor(arg1, res1), Tcoerce_functor(arg2, res2)) ->
+  | (Tcoerce_functor(arg1, res1, y1), Tcoerce_functor(arg2, res2, y2)) ->
       Tcoerce_functor(compose_coercions arg2 arg1,
-                      compose_coercions res1 res2)
+                      compose_coercions res1 res2,
+                      Mode.Yielding.join [y1; y2])
   | (c1, Tcoerce_alias (env, path, c2)) ->
       Tcoerce_alias (env, path, compose_coercions c1 c2)
   | (_, _) ->
@@ -562,7 +565,7 @@ let merge_functors ~scopes mexp coercion root_path =
       let arg_coercion, res_coercion =
         match coercion with
         | Tcoerce_none -> Tcoerce_none, Tcoerce_none
-        | Tcoerce_functor (arg_coercion, res_coercion) ->
+        | Tcoerce_functor (arg_coercion, res_coercion, _) ->
           arg_coercion, res_coercion
         | _ -> fatal_error "Translmod.merge_functors: bad coercion"
       in
