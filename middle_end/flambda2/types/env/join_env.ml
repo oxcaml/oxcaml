@@ -1723,9 +1723,11 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
         n_way_join_delayed_equations env_next_round inverse_relations
           (new_equations_in_joined_envs env_next_round ~since:env_this_round)
     in
-    let rec n_way_join_loop env_this_round inverse_relations
+    let rec n_way_join_loop ~depth env_this_round inverse_relations
         existentials_this_round =
-      if Variable_in_target_env.Map.is_empty existentials_this_round
+      if
+        Variable_in_target_env.Map.is_empty existentials_this_round
+        || depth >= Flambda_features.join_depth ()
       then inverse_relations, env_this_round
       else
         let equations_in_joined_envs =
@@ -1739,7 +1741,7 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
           n_way_join_delayed_equations env_this_round inverse_relations
             equations_in_joined_envs
         in
-        n_way_join_loop env_next_round inverse_relations
+        n_way_join_loop ~depth:(depth + 1) env_next_round inverse_relations
           (new_definitions_of_existentials env_next_round ~since:env_this_round)
     in
     let inverse_relations, env =
@@ -1747,7 +1749,7 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
         (new_equations_in_joined_envs env ~since:empty_env)
     in
     let inverse_relations, env =
-      n_way_join_loop env inverse_relations
+      n_way_join_loop ~depth:0 env inverse_relations
         (new_definitions_of_existentials env ~since:empty_env)
     in
     let target_env, definitions =
