@@ -2266,7 +2266,7 @@ let record_for_expect_asm ~name ~debug_info ~body =
 
 (* Emission of a function declaration *)
 
-let fundecl fundecl =
+let emit_fundecl fundecl =
   let fun_end_label, fundecl =
     match Emitaux.Dwarf_helpers.record_dwarf_for_fundecl fundecl with
     | None -> None, fundecl
@@ -2359,6 +2359,16 @@ let fundecl fundecl =
   D.type_symbol ~ty:Function fun_sym;
   D.size fun_sym;
   emit_literals env
+
+let fundecl fundecl =
+  let start_count = A.emitted_instructions () in
+  let counter_f () =
+    Profile.Counters.set "emitted_instructions"
+      (A.emitted_instructions () - start_count)
+      (Profile.Counters.create ())
+  in
+  Profile.record_call_with_counters ~accumulate:true ~counter_f "arm64_emit"
+    (fun () -> emit_fundecl fundecl)
 
 (* Emission of data *)
 

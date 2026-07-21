@@ -5,11 +5,12 @@ module DLL = Doubly_linked_list
 module R = Peephole_rules
 module U = Peephole_utils
 
-let stats = R.create_peephole_stats ()
-
 (* Main optimization loop. Iterates through the buffered function body, applying
    rewrite rules and respecting hard barriers. *)
 let optimize buffer =
+  (* Fresh stats per call: [Profile] sums the [counter_f] results of successive
+     accumulated calls, so each call must report its own delta. *)
+  let stats = R.create_peephole_stats () in
   let counter_f () = R.peephole_stats_to_counters stats in
   Profile.record_with_counters ~accumulate:true ~counter_f "arm64_peephole"
     (fun () ->

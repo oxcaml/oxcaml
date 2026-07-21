@@ -1854,6 +1854,11 @@ module DSL : sig
     (** Clear the binary emission callback. *)
     val clear_emit_instruction : unit -> unit
 
+    (** Number of instructions actually emitted so far (excluding the measuring
+        and buffering passes). Monotonically increasing; callers interested in a
+        particular region should take deltas. *)
+    val emitted_instructions : unit -> int
+
     (** Passes the instruction to the function provided to [set_emit_string].
         Also passes to [set_emit_instruction] callback if set. (Can't directly
         reference [Emitaux] due to a circular dependency.) *)

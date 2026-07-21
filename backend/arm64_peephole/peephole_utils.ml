@@ -145,10 +145,10 @@ let effects (Instruction.I { name; operands }) : effects =
   | SCVTF_vector | SDIV | SHL | SMAX_vector | SMIN_vector | SMOV _ | SMULH
   | SMULL2_vector _ | SMULL_vector _ | SQADD_vector | SQSUB_vector | SQXTN _
   | SQXTN2 _ | SSHL_vector | SSHR | SUB_immediate | SUB_shifted_register
-  | SUB_vector | SXTL _ | UADDLP_vector | UBFM | UDIV | UMAX_vector | UMIN_vector
-  | UMOV _ | UMULH | UMULL2_vector _ | UMULL_vector _ | UQADD_vector
-  | UQSUB_vector | UQXTN _ | UQXTN2 _ | USHL_vector | USHR | UXTL _ | XTN _
-  | XTN2 _ | ZIP1 | ZIP2 ->
+  | SUB_vector | SXTL _ | UADDLP_vector | UBFM | UDIV | UMAX_vector
+  | UMIN_vector | UMOV _ | UMULH | UMULL2_vector _ | UMULL_vector _
+  | UQADD_vector | UQSUB_vector | UQXTN _ | UQXTN2 _ | USHL_vector | USHR
+  | UXTL _ | XTN _ | XTN2 _ | ZIP1 | ZIP2 ->
     { is_barrier = false;
       writes_flags = false;
       destinations = Known (dests_of_first_operand operands)
