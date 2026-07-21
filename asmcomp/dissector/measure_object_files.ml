@@ -47,7 +47,7 @@ let () =
     | _ -> None)
 
 type file_origin =
-  | OCaml of { required_symbols : string list }
+  | OCaml of { required_symbols : Asm_targets.Asm_symbol.t list }
   | Startup
   | Cached_genfns
 
