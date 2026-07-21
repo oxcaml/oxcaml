@@ -190,11 +190,11 @@ type primitive =
   | Pidx_deepen of unit mixed_block_element * int list
   (* Context switches *)
   | Pwith_stack
-  | Pwith_stack_bind
   | Pwith_stack_preemptible
-  | Pwith_stack_bind_preemptible
   | Pperform
-  | Presume
+  | Pcontinue
+  | Pdiscontinue
+  | Pdiscontinue_with_backtrace
   | Preperform
   (* External call *)
   | Pccall of external_call_description
@@ -695,6 +695,91 @@ and equal_constructor_shape x y =
       equal_mixed_block_shape shape1 shape2
   | (Constructor_uniform _ | Constructor_mixed _), _ -> false
 
+let join_nullable x y =
+  match x, y with
+  | Non_nullable, Non_nullable -> Non_nullable
+  | Nullable, _ | _, Nullable -> Nullable
+
+let rec join_value_kind_non_null x y =
+  if equal_value_kind_non_null x y then x
+  else
+    match x, y with
+    | Pvariant { consts = consts1; non_consts = non_consts1 },
+      Pvariant { consts = consts2; non_consts = non_consts2 } -> begin
+        match join_non_consts non_consts1 non_consts2 with
+        | Some non_consts ->
+            let consts = List.sort_uniq Int.compare (consts1 @ consts2) in
+            Pvariant { consts; non_consts }
+        | None -> Pgenval
+      end
+    | _, _ -> Pgenval
+
+and join_constructor_shape shape1 shape2 =
+  match shape1, shape2 with
+  | Constructor_uniform fields1, Constructor_uniform fields2
+    when List.length fields1 = List.length fields2 ->
+      Some (Constructor_uniform (List.map2 join_value_kind fields1 fields2))
+  | Constructor_mixed shape1, Constructor_mixed shape2 ->
+      Option.map
+        (fun shape -> Constructor_mixed shape)
+        (join_mixed_block_shape shape1 shape2)
+  | (Constructor_uniform _ | Constructor_mixed _), _ -> None
+
+and join_mixed_block_shape shape1 shape2 =
+  if Array.length shape1 <> Array.length shape2 then None
+  else
+    Misc.Stdlib.Array.all_somes
+      (Array.map2 join_mixed_block_element shape1 shape2)
+
+and join_mixed_block_element (m1 : unit mixed_block_element)
+    (m2 : unit mixed_block_element) : unit mixed_block_element option =
+  match m1, m2 with
+  | Value v1, Value v2 -> Some (Value (join_value_kind v1 v2))
+  | Product es1, Product es2 when Array.length es1 = Array.length es2 ->
+      Option.map (fun es -> Product es) (join_mixed_block_shape es1 es2)
+  | Float_boxed (), Float_boxed () -> Some m1
+  | Float64, Float64
+  | Float32, Float32
+  | Bits8, Bits8
+  | Bits16, Bits16
+  | Bits32, Bits32
+  | Bits64, Bits64
+  | Vec128, Vec128
+  | Vec256, Vec256
+  | Vec512, Vec512
+  | Word, Word
+  | Untagged_immediate, Untagged_immediate -> Some m1
+  | Splice_variable id1, Splice_variable id2 when Ident.equal id1 id2 ->
+      Some m1
+  | ( ( Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
+      | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
+      | Untagged_immediate | Product _ | Splice_variable _ ),
+      _ ) ->
+      None
+
+and join_non_consts non_consts1 non_consts2 =
+  let sorted = List.sort (fun (tag1, _) (tag2, _) -> Int.compare tag1 tag2) in
+  let rec merge l1 l2 =
+    match l1, l2 with
+    | [], l | l, [] -> Some l
+    | (tag1, shape1) :: rest1, (tag2, shape2) :: rest2 ->
+        if tag1 < tag2 then
+          Option.map (fun l -> (tag1, shape1) :: l) (merge rest1 l2)
+        else if tag2 < tag1 then
+          Option.map (fun l -> (tag2, shape2) :: l) (merge l1 rest2)
+        else
+          match join_constructor_shape shape1 shape2 with
+          | Some shape ->
+              Option.map (fun l -> (tag1, shape) :: l) (merge rest1 rest2)
+          | None -> None
+  in
+  merge (sorted non_consts1) (sorted non_consts2)
+
+and join_value_kind x y =
+  { raw_kind = join_value_kind_non_null x.raw_kind y.raw_kind;
+    nullable = join_nullable x.nullable y.nullable;
+  }
+
 let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
   match vks with
   | None -> All_value
@@ -729,6 +814,29 @@ let equal_layout x y =
   | Ptop, Ptop -> true
   | Pbottom, Pbottom -> true
   | _, _ -> false
+
+let rec join_layout x y =
+  match x, y with
+  | Pbottom, l | l, Pbottom -> l
+  | Ptop, _ | _, Ptop -> Ptop
+  | Pvalue kind1, Pvalue kind2 -> Pvalue (join_value_kind kind1 kind2)
+  | Punboxed_product layouts1, Punboxed_product layouts2
+    when List.length layouts1 = List.length layouts2 ->
+      Punboxed_product (List.map2 join_layout layouts1 layouts2)
+  | Punboxed_float f1, Punboxed_float f2
+    when Primitive.equal_unboxed_float f1 f2 ->
+      x
+  | Punboxed_or_untagged_integer i1, Punboxed_or_untagged_integer i2
+    when Primitive.equal_unboxed_or_untagged_integer i1 i2 ->
+      x
+  | Punboxed_vector v1, Punboxed_vector v2
+    when Primitive.equal_unboxed_vector v1 v2 ->
+      x
+  | Psplicevar id1, Psplicevar id2 when Ident.equal id1 id2 -> x
+  | ( ( Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+      | Punboxed_vector _ | Punboxed_product _ | Psplicevar _ ),
+      _ ) ->
+      Misc.fatal_error "Lambda.join_layout: layouts of different sorts"
 
 let rec equal_ignorable_product_element_kind k1 k2 =
   match k1, k2 with
@@ -2570,8 +2678,9 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pjoin_vec256 | Psplit_vec256 ->
     (* Aborts in bytecode, unboxed in native code *)
     None
-  | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible
-  | Pwith_stack_bind_preemptible | Presume | Pperform | Preperform
+  | Pwith_stack | Pwith_stack_preemptible
+  | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
+  | Pperform | Preperform
     (* CR mshinwell: check *)
   | Ppoll ->
     Some alloc_heap
@@ -2771,8 +2880,9 @@ let primitive_can_raise prim =
   | Patomic_compare_set_field _ | Patomic_fetch_add_field  | Patomic_add_field
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
   | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
-  | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible
-  | Pwith_stack_bind_preemptible | Pperform | Presume
+  | Pwith_stack | Pwith_stack_preemptible
+  | Pperform | Pcontinue | Pdiscontinue
+  | Pdiscontinue_with_backtrace
   | Preperform -> true (* XXX! *)
   | Pdls_get | Ptls_get | Pdomain_index | Ppoll | Pcpu_relax
   | Preinterpret_tagged_int63_as_unboxed_int64
@@ -3211,8 +3321,9 @@ let primitive_result_layout (p : primitive) =
     layout_any_value
   | (Parray_to_iarray | Parray_of_iarray) -> layout_any_value
   | Pget_header _ -> layout_boxed_int Boxed_nativeint
-  | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible
-  | Pwith_stack_bind_preemptible | Presume | Pperform | Preperform ->
+  | Pwith_stack | Pwith_stack_preemptible
+  | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
+  | Pperform | Preperform ->
     layout_any_value
   | Patomic_load_field { immediate_or_pointer = Immediate } ->
     layout_int_or_null

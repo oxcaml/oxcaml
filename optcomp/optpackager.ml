@@ -104,7 +104,7 @@ end) : S = struct
                avoid collisions with MSVC's link /lib in case of successive
                packs *)
             let name =
-              Symbol.for_current_unit () |> Symbol.linkage_name
+              Current_unit.symbol () |> Symbol.linkage_name
               |> Linkage_name.to_string
             in
             Filename.temp_file name Config.ext_obj
@@ -115,7 +115,7 @@ end) : S = struct
               match m.pm_kind with
               | PM_intf -> None
               | PM_impl _ ->
-                Some (CU.create_child (CU.get_current_exn ()) m.pm_name))
+                Some (CU.create_child (Current_unit.get_cu_exn ()) m.pm_name))
             members
         in
         let compilation_unit = Unit_info.Artifact.modname target in

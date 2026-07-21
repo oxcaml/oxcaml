@@ -623,9 +623,14 @@ and expression_desc =
               { fields = [| l1, Kept t1; l2 Override P2 |]; representation;
                 extended_expression = Some E0 }
           *)
-  | Texp_atomic_loc of
-      expression * Jkind.sort * Longident.t loc * Data_types.label_description *
-      alloc_mode
+  | Texp_atomic_loc of {
+      record : expression;
+      record_sort : Jkind.sort;
+      record_repres : Types.record_representation;
+      lid : Longident.t loc;
+      label : Data_types.label_description;
+      alloc_mode : alloc_mode;
+    }
   | Texp_field of {
       record : expression;
       record_sort : Jkind.sort;

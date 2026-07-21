@@ -169,11 +169,11 @@ type primitive =
   | Pidx_deepen of unit mixed_block_element * int list
   (* Context switches *)
   | Pwith_stack
-  | Pwith_stack_bind
   | Pwith_stack_preemptible
-  | Pwith_stack_bind_preemptible
   | Pperform
-  | Presume
+  | Pcontinue
+  | Pdiscontinue
+  | Pdiscontinue_with_backtrace
   | Preperform
   (* External call *)
   | Pccall of external_call_description
@@ -655,6 +655,11 @@ and raise_kind =
 val equal_raise_kind : raise_kind -> raise_kind -> bool
 
 val equal_value_kind : value_kind -> value_kind -> bool
+
+val join_value_kind : value_kind -> value_kind -> value_kind
+
+(** Join of two layouts, must be of the same kind. *)
+val join_layout : layout -> layout -> layout
 
 val equal_layout : layout -> layout -> bool
 

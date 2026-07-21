@@ -884,8 +884,9 @@ let phys_equal _env dbg op x y =
   | Eq -> C.eq ~dbg x y
   | Neq -> C.neq ~dbg x y
 
-let requires_sign_extended_operands : P.binary_int_arith_op -> bool = function
-  | Div | Mod ->
+let requires_sign_or_zero_extended_operands : P.binary_int_arith_op -> bool =
+  function
+  | Div (Signed | Unsigned) | Mod (Signed | Unsigned) ->
     (* Note that it would be wrong to apply [C.low_bits] to operands for div and
        mod.
 
@@ -923,7 +924,7 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
         C.Scalar_type.Integral.static_cast ~dbg ~src:kind ~dst:operator_type
           operand
       in
-      if requires_sign_extended_operands op
+      if requires_sign_or_zero_extended_operands op
       then operand
       else
         let bits =
@@ -944,26 +945,29 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
        sign-extensions, e.g. when chaining additions together. Also see comment
        below about [C.low_bits] in the [Div] and [Mod] cases. *)
   in
+  let unsigned_wrap f =
+    (* Since all operands are sign-extended, unsigned operators must have the
+       same width as their inputs. *)
+    wrap (C.Scalar_type.Integral.with_signedness kind ~signedness:Unsigned) f
+  in
   match kind with
   | Tagged _ -> (
-    let wrap f =
-      (* the operators below operate on tagged immediates directly *)
-      wrap tagged_immediate f
-    in
+    (* the operators below operate on tagged immediates directly *)
+    let wrap f = wrap tagged_immediate f in
     match op with
     | Add -> wrap C.add_int_caml
     | Sub -> wrap C.sub_int_caml
     | Mul -> wrap C.mul_int_caml
-    | Div -> wrap C.div_int_caml
-    | Mod -> wrap C.mod_int_caml
+    | Div Signed -> wrap C.div_int_caml
+    | Div Unsigned -> unsigned_wrap C.unsigned_div_int_caml
+    | Mod Signed -> wrap C.mod_int_caml
+    | Mod Unsigned -> unsigned_wrap C.unsigned_mod_int_caml
     | And -> wrap C.and_int_caml
     | Or -> wrap C.or_int_caml
     | Xor -> wrap C.xor_int_caml)
   | Untagged untagged -> (
-    let wrap f =
-      (* the operators below operate on register-width naked nativeints *)
-      wrap naked_nativeint f
-    in
+    (* the operators below operate on register-width naked nativeints *)
+    let wrap f = wrap naked_nativeint f in
     let dividend_cannot_be_min_int =
       C.Scalar_type.Integer.bit_width untagged < C.arch_bits
     in
@@ -971,8 +975,10 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     | Add -> wrap C.add_int
     | Sub -> wrap C.sub_int
     | Mul -> wrap C.mul_int
-    | Div -> wrap (C.div_int ~dividend_cannot_be_min_int)
-    | Mod -> wrap (C.mod_int ~dividend_cannot_be_min_int)
+    | Div Signed -> wrap (C.div_int ~dividend_cannot_be_min_int)
+    | Div Unsigned -> unsigned_wrap C.unsigned_div_int
+    | Mod Signed -> wrap (C.mod_int ~dividend_cannot_be_min_int)
+    | Mod Unsigned -> unsigned_wrap C.unsigned_mod_int
     | And -> wrap C.and_int
     | Or -> wrap C.or_int
     | Xor -> wrap C.xor_int)
@@ -1125,7 +1131,11 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   match (f : P.unary_primitive) with
   | Block_load { kind; mut; field } ->
     None, res, block_load ~dbg kind mut ~field ~block:arg
-  | Duplicate_array _ | Duplicate_block _ | Obj_dup ->
+  | Duplicate_array { alloc_region; _ }
+  | Duplicate_block { alloc_region; _ }
+  | Obj_dup { alloc_region } ->
+    (* CR alloc_regions: propagate alloc_regions to CMM. *)
+    let () = ignore alloc_region in
     ( None,
       res,
       (C.extcall ~dbg ~alloc:true ~returns:true ~is_c_builtin:false
@@ -1171,6 +1181,7 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   | Unbox_number kind -> None, res, unbox_number ~dbg kind arg
   | Untag_immediate -> Some (Env.Untag arg), res, C.untag_int arg dbg
   | Box_number (kind, alloc_mode) ->
+    (* CR alloc_regions: propagate alloc_regions to CMM. *)
     None, res, box_number ~dbg kind alloc_mode arg
   | Tag_immediate ->
     (* We could return [Env.Tag] here, but probably unnecessary at the
@@ -1251,7 +1262,8 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
       |> C.memory_chunk_of_kind
     in
     None, res, C.load ~dbg memory_chunk Mutable ~addr:arg
-  | Make_lazy lazy_tag ->
+  | Make_lazy { lazy_tag; alloc_region = _ } ->
+    (* CR alloc_regions: propagate alloc_regions to CMM. *)
     let tag = Tag.to_int (P.Lazy_block_tag.to_tag lazy_tag) in
     None, res, C.make_alloc ~mode:Heap dbg ~tag [arg]
 
@@ -1372,8 +1384,12 @@ let variadic_primitive _env dbg f args =
     C.beginregion ~dbg
   | Begin_region { ghost = true } | Begin_try_region { ghost = true } ->
     C.int ~dbg 0
-  | Make_block (kind, _mut, alloc_mode) -> make_block ~dbg kind alloc_mode args
-  | Make_array (kind, _mut, alloc_mode) -> make_array ~dbg kind alloc_mode args
+  | Make_block (kind, _mut, alloc_mode) ->
+    (* CR alloc_regions: propagate alloc_regions to CMM. *)
+    make_block ~dbg kind alloc_mode args
+  | Make_array (kind, _mut, alloc_mode) ->
+    (* CR alloc_regions: propagate alloc_regions to CMM. *)
+    make_array ~dbg kind alloc_mode args
 
 let arg ?consider_inlining_effectful_expressions ~dbg env res simple =
   C.simple ?consider_inlining_effectful_expressions ~dbg env res simple

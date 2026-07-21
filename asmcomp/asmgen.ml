@@ -104,19 +104,18 @@ let reset () =
     (fun pass (cfg_unit_info : Cfg_format.cfg_unit_info) ->
       if should_save_ir_after pass || should_save_ir_before pass
       then (
-        cfg_unit_info.unit <- Compilation_unit.get_current_or_dummy ();
+        cfg_unit_info.unit <- Current_unit.get_cu_or_dummy ();
         cfg_unit_info.items <- [];
-        cfg_before_regalloc_unit_info.unit
-          <- Compilation_unit.get_current_or_dummy ();
+        cfg_before_regalloc_unit_info.unit <- Current_unit.get_cu_or_dummy ();
         cfg_before_regalloc_unit_info.items <- []))
     pass_to_cfg;
   if should_save_before_emit ()
   then (
-    linear_unit_info.unit <- Compilation_unit.get_current_or_dummy ();
+    linear_unit_info.unit <- Current_unit.get_cu_or_dummy ();
     linear_unit_info.items <- []);
   if should_save_cfg_before_emit ()
   then (
-    cfg_unit_info.unit <- Compilation_unit.get_current_or_dummy ();
+    cfg_unit_info.unit <- Current_unit.get_cu_or_dummy ();
     cfg_unit_info.items <- [])
 
 let save_data dl =

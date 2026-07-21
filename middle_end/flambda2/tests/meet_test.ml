@@ -30,7 +30,7 @@ let test_meet_chains_two_vars () =
   let env = TE.add_equation env (Name.var var2) first_type_for_var2 in
   let symbol =
     Symbol.create
-      (Compilation_unit.get_current_exn ())
+      (Current_unit.get_cu_exn ())
       (Linkage_name.of_string "my_symbol")
   in
   let env = TE.add_definition env (Bound_name.create_symbol symbol) K.value in
@@ -68,7 +68,7 @@ let test_meet_chains_three_vars () =
   let env = TE.add_equation env (Name.var var3) first_type_for_var3 in
   let symbol =
     Symbol.create
-      (Compilation_unit.get_current_exn ())
+      (Current_unit.get_cu_exn ())
       (Linkage_name.of_string "my_symbol")
   in
   let env = TE.add_definition env (Bound_name.create_symbol symbol) K.value in

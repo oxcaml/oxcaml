@@ -242,7 +242,7 @@ let get_static_data comp_unit =
   end
 
 let which_cmx_file comp_unit =
-  CU.which_cmx_file comp_unit ~accessed_by:(CU.get_current_exn ())
+  CU.which_cmx_file comp_unit ~accessed_by:(Current_unit.get_cu_exn ())
 
 let get_global_export_info comp_unit =
   get_unit_export_info (which_cmx_file comp_unit)
@@ -372,7 +372,7 @@ let save_unit_info filename ~main_module_block_format ~arg_descr ~static_data =
   write_unit_info current_unit filename
 
 let new_const_symbol () =
-  Symbol.for_new_const_in_current_unit ()
+  Current_unit.symbol_for_new_const ()
   |> Symbol.linkage_name
   |> Linkage_name.to_string
 
