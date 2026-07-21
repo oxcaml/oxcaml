@@ -747,7 +747,7 @@ and join_mixed_block_element (m1 : unit mixed_block_element)
   | Vec512, Vec512
   | Word, Word
   | Untagged_immediate, Untagged_immediate -> Some m1
-  | Splice_variable id1, Splice_variable id2 when Ident.equal id1 id2 ->
+  | Splice_variable id1, Splice_variable id2 when Slambdaident.equal id1 id2 ->
       Some m1
   | ( ( Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
       | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
@@ -830,7 +830,7 @@ let rec join_layout x y =
   | Punboxed_vector v1, Punboxed_vector v2
     when Primitive.equal_unboxed_vector v1 v2 ->
       x
-  | Psplicevar id1, Psplicevar id2 when Ident.equal id1 id2 -> x
+  | Psplicevar id1, Psplicevar id2 when Slambdaident.equal id1 id2 -> x
   | ( ( Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
       | Punboxed_vector _ | Punboxed_product _ | Psplicevar _ ),
       _ ) ->
