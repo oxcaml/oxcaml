@@ -175,6 +175,17 @@ let mk_cfg_cse_optimize f =
 let mk_no_cfg_cse_optimize f =
   ("-no-cfg-cse-optimize", Arg.Unit f, " Do not apply CSE optimizations to CFG")
 
+let mk_cfg_cse_constants_across_calls f =
+  ( "-cfg-cse-constants-across-calls",
+    Arg.Unit f,
+    " Let CSE reuse expensive constants (e.g. symbol addresses) across \
+     function calls, instead of rematerializing them" )
+
+let mk_no_cfg_cse_constants_across_calls f =
+  ( "-no-cfg-cse-constants-across-calls",
+    Arg.Unit f,
+    " Do not let CSE reuse expensive constants across function calls" )
+
 let mk_cfg_zero_alloc_checker f =
   ("-cfg-zero-alloc-checker", Arg.Unit f, " Apply zero_alloc checker to CFG")
 
@@ -1349,6 +1360,8 @@ module type Oxcaml_options = sig
   val no_arm64_peephole_compose_shift_pairs : unit -> unit
   val arm64_fuse_frame_ops : unit -> unit
   val no_arm64_fuse_frame_ops : unit -> unit
+  val cfg_cse_constants_across_calls : unit -> unit
+  val no_cfg_cse_constants_across_calls : unit -> unit
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit
@@ -1548,6 +1561,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_arm64_peephole_compose_shift_pairs;
       mk_arm64_fuse_frame_ops F.arm64_fuse_frame_ops;
       mk_no_arm64_fuse_frame_ops F.no_arm64_fuse_frame_ops;
+      mk_cfg_cse_constants_across_calls F.cfg_cse_constants_across_calls;
+      mk_no_cfg_cse_constants_across_calls F.no_cfg_cse_constants_across_calls;
       mk_cfg_stack_checks F.cfg_stack_checks;
       mk_no_cfg_stack_checks F.no_cfg_stack_checks;
       mk_cfg_stack_checks_threshold F.cfg_stack_checks_threshold;
@@ -1892,6 +1907,13 @@ module Oxcaml_options_impl = struct
 
   let arm64_fuse_frame_ops = set' Oxcaml_flags.arm64_fuse_frame_ops
   let no_arm64_fuse_frame_ops = clear' Oxcaml_flags.arm64_fuse_frame_ops
+
+  let cfg_cse_constants_across_calls =
+    set' Oxcaml_flags.cfg_cse_constants_across_calls
+
+  let no_cfg_cse_constants_across_calls =
+    clear' Oxcaml_flags.cfg_cse_constants_across_calls
+
   let cfg_stack_checks = set' Oxcaml_flags.cfg_stack_checks
   let no_cfg_stack_checks = clear' Oxcaml_flags.cfg_stack_checks
 
@@ -1935,6 +1957,7 @@ module Oxcaml_options_impl = struct
     x86_peephole_optimize ();
     arm64_peephole_optimize ();
     arm64_fuse_frame_ops ();
+    cfg_cse_constants_across_calls ();
     regalloc_param "SPLIT_AROUND_LOOPS:on";
     regalloc_param "AFFINITY:on";
     regalloc_param "BIT_MATRIX_THRESHOLD:8192";
@@ -2493,6 +2516,8 @@ module Extra_params = struct
     | "x86-peephole-optimize" -> set' Oxcaml_flags.x86_peephole_optimize
     | "arm64-peephole-optimize" -> set' Oxcaml_flags.arm64_peephole_optimize
     | "arm64-fuse-frame-ops" -> set' Oxcaml_flags.arm64_fuse_frame_ops
+    | "cfg-cse-constants-across-calls" ->
+        set' Oxcaml_flags.cfg_cse_constants_across_calls
     | "cfg-stack-checks" -> set' Oxcaml_flags.cfg_stack_checks
     | "cfg-eliminate-dead-trap-handlers" ->
         set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers

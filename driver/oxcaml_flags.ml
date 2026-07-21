@@ -43,6 +43,9 @@ let arm64_peephole_compose_shift_pairs = ref true
 
 let arm64_fuse_frame_ops = ref false    (* -[no-]arm64-fuse-frame-ops *)
 
+let cfg_cse_constants_across_calls = ref false
+                                (* -[no-]cfg-cse-constants-across-calls *)
+
 let cfg_stack_checks = ref true         (* -[no-]cfg-stack-check *)
 let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
 
