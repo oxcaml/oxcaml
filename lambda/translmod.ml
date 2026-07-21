@@ -1498,7 +1498,7 @@ let cu_of_impl (gm : Global_module.t) : Compilation_unit.t =
   | Some cu -> cu
   | None ->
       Misc.fatal_errorf_doc
-        "transl_functorize: %a is a parameter module"
+        "transl_functorization: %a is a parameter module"
         Global_module.print gm
 
 (* [gm] must have been compiled with [-as-argument-for]. *)
@@ -1629,7 +1629,7 @@ and transl_local_instance ~(gm : Global_module.t) ~chain
 
 (* Bundle's [Make]: generative functor over [params @ [unit]] that
    let-binds each module in [modules] (and transitive deps). *)
-let transl_functorize_make ~params ~modules ~find_impl_by_name
+let transl_functorization_make ~params ~modules ~find_impl_by_name
     : lambda * Compilation_unit.Set.t =
   let mk_param layout name =
     { name;
@@ -1691,7 +1691,7 @@ let transl_functorize_make ~params ~modules ~find_impl_by_name
   (func, required_globals)
 
 (* Bundle's [Intf]: applicative functor with an empty runtime body. *)
-let transl_functorize_intf ~params =
+let transl_functorization_intf ~params =
   let func_params =
     List.map
       (fun p_name ->
@@ -1721,7 +1721,7 @@ let transl_functorize_intf ~params =
     ~attr:attrs
     ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:alloc_heap
 
-let transl_functorize compilation_unit
+let transl_functorization compilation_unit
       (params : Global_module.Parameter_name.t list)
       (modules : Global_module.t list)
       ~ext
@@ -1747,9 +1747,9 @@ let transl_functorize compilation_unit
           base required_by
   in
   let make_func, required_globals =
-    transl_functorize_make ~params ~modules ~find_impl_by_name
+    transl_functorization_make ~params ~modules ~find_impl_by_name
   in
-  let intf_func = transl_functorize_intf ~params in
+  let intf_func = transl_functorization_intf ~params in
   let code =
     apply_coercion Loc_unknown Strict coercion
       (Lprim
