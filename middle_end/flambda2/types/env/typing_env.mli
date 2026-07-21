@@ -196,3 +196,5 @@ val bump_current_level_scope : t -> t
 val compute_joined_aliases : t -> Name.Set.t -> t list -> t
 
 val defined_symbols : t -> Symbol.Set.t
+
+val binding_time_and_mode : t -> Name.t -> Binding_time.With_name_mode.t

@@ -546,23 +546,11 @@ let deduce_get_tag_simple ~machine_width blocks get_tag_var :
   | Unknown, Some var -> Ok (Simple.var var)
   | Unknown, None -> Unknown
 
-let n_way_join_simples env kind simples =
-  let canonical_simples =
-    List.map
-      (fun (id, simple) ->
-        ( id,
-          TE.get_canonical_simple_ignoring_name_mode
-            (Join_env.joined_env env id)
-            simple ))
-      simples
-  in
-  Join_env.n_way_join_simples env kind canonical_simples
-
 let n_way_join_relation_simples env simples_opt =
   match simples_opt with
   | None -> None, env
   | Some simples -> (
-    match n_way_join_simples env K.naked_immediate simples with
+    match Join_env.n_way_join_simples env K.naked_immediate simples with
     | Bottom, env -> None, env
     | Ok simple, env ->
       Simple.pattern_match' simple
@@ -1864,18 +1852,9 @@ and n_way_join env (ts : _ Join_env.join_arg list) : TG.t n_way_join_result =
       kind
   in
   let ts = List.filter (fun (_, ty) -> not (TG.is_obviously_bottom ty)) ts in
-  match
-    List.map
-      (fun (id, ty) ->
-        ( id,
-          TE.get_alias_then_canonical_simple_exn
-            ~min_name_mode:Name_mode.in_types
-            (Join_env.joined_env env id)
-            ty ))
-      ts
-  with
-  | canonical_simples -> (
-    match Join_env.n_way_join_simples env kind canonical_simples with
+  match List.map (fun (id, ty) -> id, TG.get_alias_exn ty) ts with
+  | simples -> (
+    match Join_env.n_way_join_simples env kind simples with
     | Bottom, join_env -> Known (MTC.bottom kind), join_env
     | Ok simple, join_env -> Known (TG.alias_type_of kind simple), join_env)
   | exception Not_found ->
@@ -2088,7 +2067,9 @@ and n_way_join_head_of_kind_value env
     | is_null_simples -> (
       (* Note: we ideally would use [n_way_join_relation_simples] here, but we
          need to store a [Not_null] constructor if the join is [false]. *)
-      match n_way_join_simples env K.naked_immediate is_null_simples with
+      match
+        Join_env.n_way_join_simples env K.naked_immediate is_null_simples
+      with
       | Bottom, env -> TG.Maybe_null { is_null = None }, env
       | Ok simple, env ->
         let is_null =
@@ -2979,35 +2960,64 @@ and n_way_join_value_slot_indexed_product env
 and n_way_join_int_indexed_product env shape
     (fields : TG.Product.Int_indexed.t Join_env.join_arg list) :
     TG.Product.Int_indexed.t * Join_env.t =
-  let length =
-    match fields with
-    | [] -> Misc.fatal_error "Join of empty int indexed product."
-    | (_, first_fields) :: other_fields ->
+  match fields with
+  | [] -> Misc.fatal_error "Join of empty int indexed product."
+  | (_, first_fields) :: other_fields ->
+    let length =
       List.fold_left
         (fun length (_, other_fields) -> min length (Array.length other_fields))
         (Array.length first_fields)
         other_fields
-  in
-  let fields, env =
-    let env_ref = ref env in
-    let fields =
-      Array.init length (fun index ->
-          (* CR bclement: if fields are all physically equal and only involve
-             variables defined in the central env, we should reuse the type. *)
-          let fields =
-            List.map (fun (id, fields) -> id, fields.(index)) fields
-          in
-          match n_way_join !env_ref fields with
-          | Unknown, env ->
-            env_ref := env;
-            MTC.unknown_from_shape shape index
-          | Known ty, env ->
-            env_ref := env;
-            ty)
     in
-    fields, !env_ref
-  in
-  TG.Product.Int_indexed.create_from_array fields, env
+    let all_phys_equal =
+      try
+        for index = 0 to length - 1 do
+          let first_field = Array.unsafe_get first_fields index in
+          if
+            List.exists
+              (fun (_, other_fields) ->
+                Array.unsafe_get other_fields index != first_field)
+              other_fields
+          then raise_notrace Exit
+        done;
+        true
+      with Exit -> false
+    in
+    if all_phys_equal
+    then
+      match
+        List.find_map
+          (fun (_, fields) ->
+            if Array.length fields = length then Some fields else None)
+          fields
+      with
+      | None -> assert false
+      | Some fields ->
+        ( TG.Product.Int_indexed.create_from_array fields,
+          Array.fold_left (fun env ty -> Join_env.import_type env ty) env fields
+        )
+    else
+      let fields, env =
+        let env_ref = ref env in
+        let fields =
+          Array.init length (fun index ->
+              (* CR bclement: if fields are all physically equal and only
+                 involve variables defined in the central env, we should reuse
+                 the type. *)
+              let fields =
+                List.map (fun (id, fields) -> id, fields.(index)) fields
+              in
+              match n_way_join !env_ref fields with
+              | Unknown, env ->
+                env_ref := env;
+                MTC.unknown_from_shape shape index
+              | Known ty, env ->
+                env_ref := env;
+                ty)
+        in
+        fields, !env_ref
+      in
+      TG.Product.Int_indexed.create_from_array fields, env
 
 and n_way_join_function_type (env : Join_env.t)
     (func_types : TG.Function_type.t Or_unknown.t Join_env.join_arg list) :
