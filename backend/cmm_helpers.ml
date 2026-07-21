@@ -3588,10 +3588,7 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
       let app =
         Cop
           ( Capply { result_type = result; region = Rc_normal; callees = None },
-            (* The code pointer and closure info of a closure are write-once;
-               reading them immutably is correct and lets the debugger describe
-               the call target (and closure projections) for call sites. *)
-            [ get_field_codepointer Asttypes.Immutable (Cvar clos) 0 (dbg ());
+            [ get_field_codepointer Asttypes.Mutable (Cvar clos) 0 (dbg ());
               Cvar arg;
               Cvar clos ],
             dbg () )
@@ -3611,7 +3608,7 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
           Cop
             ( Capply
                 { result_type = typ_val; region = Rc_normal; callees = None },
-              [ get_field_codepointer Asttypes.Immutable (Cvar clos) 0 (dbg ());
+              [ get_field_codepointer Asttypes.Mutable (Cvar clos) 0 (dbg ());
                 Cvar arg;
                 Cvar clos ],
               dbg () ),
@@ -3634,7 +3631,7 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
             ( Ccmpi Ceq,
               [ Cop
                   ( Casr,
-                    [ get_field_gen Asttypes.Immutable (Cvar clos) 1 (dbg ());
+                    [ get_field_gen Asttypes.Mutable (Cvar clos) 1 (dbg ());
                       Cconst_int (pos_arity_in_closinfo, dbg ()) ],
                     dbg () );
                 Cconst_int (List.length arity, dbg ()) ],
@@ -3642,7 +3639,7 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
           dbg (),
           Cop
             ( Capply { result_type = result; region = Rc_normal; callees = None },
-              get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
+              get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ())
               :: List.map (fun s -> Cvar s) all_args,
               dbg () ),
           dbg (),
@@ -3771,9 +3768,7 @@ let tuplify_function arity return =
       fun_body =
         Cop
           ( Capply { result_type = return; region = Rc_normal; callees = None },
-            (* The closure code pointer is write-once; see
-               [apply_function_body]. *)
-            get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
+            get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ())
             :: access_components 0
             @ [Cvar clos],
             dbg () );
@@ -3874,11 +3869,7 @@ let value_slot_given_machtype vs =
 
 let read_from_closure_given_machtype t clos base_offset dbg =
   let load chunk offset =
-    (* Closure value slots are write-once (a partial-application closure is
-       never back-patched), so these reads are immutable. Besides being correct,
-       this lets the debugger describe the recovered arguments as projections of
-       the closure for call site information. *)
-    Cop (mk_load_immut chunk, [field_address clos offset dbg], dbg)
+    Cop (mk_load_mut chunk, [field_address clos offset dbg], dbg)
   in
   let _, l =
     List.fold_left_map
@@ -3920,10 +3911,7 @@ let rec make_curry_apply result narity args_type args clos n =
   | [] ->
     Cop
       ( Capply { result_type = result; region = Rc_normal; callees = None },
-        (* Code pointer and chain links of a partial-application closure are
-           write-once; reading them immutably lets the debugger describe the
-           call target and the recovered arguments as closure projections. *)
-        (get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ()) :: args)
+        (get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ()) :: args)
         @ [Cvar clos],
         dbg () )
   | arg_type :: args_type ->
@@ -3932,7 +3920,7 @@ let rec make_curry_apply result narity args_type args clos n =
     let clos_pos = arg_pos + machtype_stored_size arg_type in
     Clet
       ( VP.create newclos,
-        get_field_gen Asttypes.Immutable (Cvar clos) clos_pos (dbg ()),
+        get_field_gen Asttypes.Mutable (Cvar clos) clos_pos (dbg ()),
         make_curry_apply result narity args_type
           (read_from_closure_given_machtype arg_type (Cvar clos) arg_pos
              (dbg ())

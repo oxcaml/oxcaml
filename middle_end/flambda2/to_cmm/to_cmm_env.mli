@@ -19,7 +19,7 @@
 type t
 
 (** Free names for cmm expressions *)
-type free_vars = Backend_var.Set.t
+type free_vars = To_cmm_free_vars.t
 
 (** Delayed symbol initializations *)
 module Symbol_inits : sig
@@ -45,6 +45,12 @@ type translation_result =
   { env : t;
     res : To_cmm_result.t;
     expr : expr_with_info
+  }
+
+type phantom_result =
+  { env : t;
+    res : To_cmm_result.t;
+    var : Backend_var.t option
   }
 
 (** Printing function *)
@@ -227,8 +233,12 @@ type simple = Simple
 
 type complex = Complex
 
+type phantom = Phantom
+
 (** Inlining decision of bound expressions *)
 type _ inline =
+  | Phantom : phantom inline
+  | Inlined : phantom inline
   | Do_not_inline : simple inline
   | May_inline_once : simple inline
   | Must_inline_once : complex inline
@@ -242,6 +252,11 @@ type _ bound_expr
 (** A simple cmm bound expression *)
 val simple : Cmm.expression -> free_vars -> simple bound_expr
 
+(** A phantom bound expression. [None] indicates that the value of the variable
+    cannot be described (e.g. it has been optimised out). *)
+val phantom :
+  Cmm.phantom_defining_expr option -> free_vars -> phantom bound_expr
+
 (** A bound expr that can be split if needed. This is used for primitives that
     must be inlined, but whose arguments may not be inlinable or duplicable, so
     that we can split the expression to be inlined from its arguments if/when
@@ -252,6 +267,14 @@ val splittable_primitive :
   Flambda_primitive.Without_args.t ->
   expr_with_info list ->
   complex bound_expr
+
+(** Bind a phantom variable to a phantom defining expression. *)
+val bind_phantom_variable :
+  t ->
+  To_cmm_result.t ->
+  Bound_var.t ->
+  phantom bound_expr ->
+  t * To_cmm_result.t
 
 (** Bind a variable, with support for splitting duplicatable primitives with
     non-duplicatable arguments. *)
@@ -268,6 +291,7 @@ val bind_variable_to_primitive :
 (** Bind a variable to the given Cmm expression, to allow for delaying the
     let-binding. *)
 val bind_variable :
+  mode:To_cmm_free_vars.Mode.t ->
   ?extra:extra_info ->
   t ->
   To_cmm_result.t ->
@@ -288,27 +312,6 @@ val add_alias :
 
 val add_symbol_init : t -> Backend_var.t -> Cmm.expression -> t
 
-(** Add a phantom let binding to the environment. This creates a backend
-    variable with proper provenance and registers it in the environment so it
-    can be referenced later. Returns the updated environment and the created
-    backend variable. *)
-val add_phantom_let_binding :
-  t ->
-  Variable.t ->
-  debug_uid:Flambda_debug_uid.t ->
-  dbg:Debuginfo.t ->
-  bv_is_parameter:Bound_var.Is_parameter.t ->
-  t * Backend_var.With_provenance.t
-
-(** Look up the Cmm expression to which the given variable is bound, if any,
-    without changing any state and without faulting on unbound variables.
-    Returns [None] for variables bound by (not yet flushed) delayed bindings.
-    For use when translating phantom lets, whose defining expressions may
-    legitimately reference variables that were never bound (for example
-    variables whose only uses are phantom, the defining expressions of which are
-    therefore not evaluated). *)
-val find_bound_expression : t -> Variable.t -> Cmm.expression option
-
 (** Try and inline an Flambda variable using the delayed let-bindings. *)
 val inline_variable :
   ?consider_inlining_effectful_expressions:bool ->
@@ -316,6 +319,13 @@ val inline_variable :
   To_cmm_result.t ->
   Variable.t ->
   translation_result
+
+(** Find the backend variable to use to refer to the given Flambda variable
+    within a phantom defining expression, if there is one. Unlike
+    [inline_variable] this never causes any inlining, and phantom variables may
+    be looked up. *)
+val get_variable_for_phantom_expr :
+  t -> To_cmm_result.t -> Variable.t -> phantom_result
 
 (** Look up the Cmm expression associated with a given Flambda variable in the
     delayed let-bindings, if any. Returns [None] if the variable is not present
