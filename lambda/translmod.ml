@@ -1490,15 +1490,15 @@ let transl_instance instance_unit ~runtime_args ~main_module_block_repr
     ~main_module_block_repr ~arg_block_idx
 
 let cu_of_impl (gm : Global_module.t) : Compilation_unit.t =
-  let cu, _params, _sig =
+  let impl, _params, _sig =
     Env.find_import ~chain:[]
       (Compilation_unit.Name.of_head_of_global_name (Global_module.to_name gm))
   in
-  match cu with
+  match impl with
   | Some cu -> cu
   | None ->
       Misc.fatal_errorf_doc
-        "transl_functorization: %a is a parameter module"
+        "cu_of_impl: %a has no implementation (parameter module)"
         Global_module.print gm
 
 (* [gm] must have been compiled with [-as-argument-for]. *)
