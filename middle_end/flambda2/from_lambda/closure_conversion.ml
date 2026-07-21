@@ -1534,9 +1534,21 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
               Variable.print var Flambda_kind.print kind Flambda_primitive.print
               prim Flambda_kind.print result_kind
         | Simple _ | Static_consts _ | Set_of_closures _ | Rec_info _ -> ());
+        let dbg =
+          (* The binding's own source location comes from its defining
+             expression. When the surrounding function is later inlined,
+             [Inlined_debuginfo.rewrite] prepends the call site (see
+             [Simplify_let_expr]), so that the variable can be attributed to the
+             correct (possibly inlined) frame, just as for function
+             parameters. *)
+          match defining_expr with
+          | Prim (_, dbg) -> dbg
+          | Simple _ | Static_consts _ | Set_of_closures _ | Rec_info _ ->
+            Debuginfo.none
+        in
         let bound_pattern =
           Bound_pattern.singleton
-            (VB.create var uid Name_mode.normal ~dbg:Debuginfo.none
+            (VB.create var uid Name_mode.normal ~dbg
                ~is_parameter:VB.Is_parameter.local_var)
         in
         let bind acc env =
