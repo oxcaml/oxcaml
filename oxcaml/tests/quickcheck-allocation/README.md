@@ -22,8 +22,9 @@ Flags:
   `-count 1 -seed <seed>`
 - `-mode soundness|completeness` -- generation bias (default `soundness`):
   `soundness` favors programs the frontend should accept (immediates,
-  `exclave_`), hunting FE-accept & BE-reject bugs; `completeness` favors
-  non-allocating computation the frontend may conservatively reject
+  `exclave_`, closures, partial application, optional arguments), hunting
+  FE-accept & BE-reject bugs; `completeness` favors non-allocating
+  computation the frontend may conservatively reject
 - `-out DIR` -- save witness .ml files to DIR (created if missing): every
   soundness suspect, plus the first-seen witness of each distinct
   frontend-rejection cause. File names embed the seed

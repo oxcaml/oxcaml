@@ -6,10 +6,24 @@
    terms, and a pretty-printer. A single program is emitted, carrying both
    annotations on the function under test (see [Sample]).
 
-   Tier A (milestone 2): construction of one layer -- tuples, records (int and
-   float), variants, lists, arrays -- plain vs [exclave_]-wrapped, plus
-   mode-crossing immediates, glued together with integer/float arithmetic,
-   comparisons, [let], and [if].
+   Tier A: construction of one layer -- tuples, records (int and float),
+   variants, lists, arrays -- plain vs [exclave_]-wrapped, plus mode-crossing
+   immediates, glued together with integer/float arithmetic, comparisons, [let],
+   and [if].
+
+   Tier B: closures, captures, and nesting -- arrow types can be [let]-bound and
+   returned, and lambda bodies freely reference enclosing bindings.
+
+   Tier C: application of in-scope functions, partial application, and labeled /
+   optional arguments (optionals both supplied and omitted; labeled and optional
+   parameters may be skipped and supplied later or passed out of order, since
+   they commute). Following the compiler's own representation, types stay
+   curried and binary ([Ty.Arrow], one labeled arrow per parameter) while
+   expressions carry the arity ([Expr.Lam] binds a list of parameters), so the
+   same arrow chain can be realized either as one n-ary function or as nested
+   unary closures -- same type, different allocation behavior. Argument labels
+   live in the type ([Arg_label]) and come from a small shared pool; binder
+   names are separate and always fresh, so shadowing is impossible.
 
    Per DESIGN.md, the generator does not predict allocation (the oracles decide
    ground truth); [Mode] only steers the distribution: [Soundness] biases toward
@@ -47,6 +61,28 @@ let prelude =
    type fr = { fx : float; fy : float }\n\
    type v = A | B of int\n\n"
 
+(* How an argument is passed, mirroring the compiler's [Asttypes.arg_label].
+   Part of the function type: it determines call-site syntax. For [Optional],
+   the arrow's payload type is the type behind the [?] (whether the *binder* has
+   a default is an expression-side property; see [Expr.param_kind]). *)
+module Arg_label = struct
+  type t =
+    | Nolabel (* t1 -> ... call: f e *)
+    | Labelled of string (* ~l:t1 -> ... call: f ~l:e *)
+    | Optional of string (* ?l:t1 -> ... call: f ~l:e, or omitted *)
+
+  let equal a b =
+    match a, b with
+    | Nolabel, Nolabel -> true
+    | Labelled l1, Labelled l2 | Optional l1, Optional l2 -> String.equal l1 l2
+    | (Nolabel | Labelled _ | Optional _), _ -> false
+
+  let to_string = function
+    | Nolabel -> ""
+    | Labelled l -> l ^ ":"
+    | Optional l -> "?" ^ l ^ ":"
+end
+
 module Ty = struct
   type t =
     | Int
@@ -57,6 +93,11 @@ module Ty = struct
     | Record_int (* r *)
     | Record_float (* fr *)
     | Variant (* v *)
+    | Arrow of
+        { label : Arg_label.t;
+          arg : t; (* payload type; for [Optional], the type behind the ? *)
+          ret : t (* possibly another [Arrow]: multi-parameter = a chain *)
+        }
 
   let rec equal t1 t2 =
     match t1, t2 with
@@ -65,8 +106,11 @@ module Ty = struct
       true
     | Pair (a1, b1), Pair (a2, b2) -> equal a1 a2 && equal b1 b2
     | List a, List b | Array a, Array b -> equal a b
+    | Arrow a1, Arrow a2 ->
+      Arg_label.equal a1.label a2.label
+      && equal a1.arg a2.arg && equal a1.ret a2.ret
     | ( ( Int | Float | Pair _ | List _ | Array _ | Record_int | Record_float
-        | Variant ),
+        | Variant | Arrow _ ),
         _ ) ->
       false
 
@@ -79,11 +123,25 @@ module Ty = struct
     | Record_int -> "r"
     | Record_float -> "fr"
     | Variant -> "v"
+    | Arrow { label; arg; ret } ->
+      "(" ^ Arg_label.to_string label ^ to_string arg ^ " -> " ^ to_string ret
+      ^ ")"
 
-  (* Types whose construction could plausibly be wrapped in [exclave_]. This is
-     distribution steering, not an allocation prediction. *)
+  (* The arrow chain of a function type: one (label, payload) per parameter,
+     outermost first, plus the final non-arrow result. *)
+  let rec arrows = function
+    | Arrow { label; arg; ret } ->
+      let params, result = arrows ret in
+      (label, arg) :: params, result
+    | ty -> [], ty
+
+  (* Types whose construction could plausibly be wrapped in [exclave_] (closures
+     are allocated too). This is distribution steering, not an allocation
+     prediction. *)
   let exclave_candidate = function
-    | Pair _ | List _ | Array _ | Record_int | Record_float | Variant -> true
+    | Pair _ | List _ | Array _ | Record_int | Record_float | Variant | Arrow _
+      ->
+      true
     | Int | Float -> false
 end
 
@@ -106,6 +164,38 @@ module Expr = struct
     | Constr_a (* A -- immediate *)
     | Constr_b of t (* B e -- boxed *)
     | Exclave of t (* exclave_ e; only ever placed in tail position *)
+    | Lam of
+        { params : param list;
+              (* n-ary: arity = length params. Function arity is syntactic since
+                 OCaml 5.2, so binding an arrow chain as one n-ary [Lam] (a
+                 single closure) or as nested unary [Lam]s (a closure allocating
+                 an inner closure per partial application) are different
+                 programs of the same type. *)
+          body : t
+        }
+    | App of
+        { f : t;
+          args : (Arg_label.t * t) list
+              (* in parameter order; an [Optional] parameter simply has no entry
+                 when omitted (it is erased when the following positional
+                 argument is applied) *)
+        }
+
+  and param =
+    { var : string;
+          (* binder, always fresh -- never shadows, and independent of the
+             type-side label *)
+      p_ty : Ty.t; (* payload type (matches the corresponding [Ty.Arrow.arg]) *)
+      kind : param_kind
+    }
+
+  and param_kind =
+    | Positional (* (var : t) *)
+    | Labelled of string (* ~label:(var : t) *)
+    | Opt of string * t option
+  (* [Some d]: ?label:(var = (d : t)), binder has type [t] in the body. [None]:
+     ?label:(var : t option) -- NOT generated yet: the binder would have type [t
+     option], which needs option types in [Ty]. *)
 
   (* Fully parenthesized: ugly but unambiguous, and shrinking (milestone 3) is
      the readability story, not the printer. *)
@@ -135,6 +225,29 @@ module Expr = struct
     | Constr_a -> "A"
     | Constr_b e -> "(B " ^ to_string e ^ ")"
     | Exclave e -> "exclave_ " ^ to_string e
+    | Lam { params; body } ->
+      "(fun "
+      ^ String.concat " " (List.map param_to_string params)
+      ^ " -> " ^ to_string body ^ ")"
+    | App { f; args } ->
+      "(" ^ to_string f ^ " "
+      ^ String.concat " " (List.map arg_to_string args)
+      ^ ")"
+
+  and param_to_string { var; p_ty; kind } =
+    match kind with
+    | Positional -> "(" ^ var ^ " : " ^ Ty.to_string p_ty ^ ")"
+    | Labelled l -> "~" ^ l ^ ":(" ^ var ^ " : " ^ Ty.to_string p_ty ^ ")"
+    | Opt (l, Some d) ->
+      "?" ^ l ^ ":(" ^ var ^ " = (" ^ to_string d ^ " : " ^ Ty.to_string p_ty
+      ^ "))"
+    | Opt (l, None) ->
+      "?" ^ l ^ ":(" ^ var ^ " : " ^ Ty.to_string p_ty ^ " option)"
+
+  and arg_to_string (label, e) =
+    match (label : Arg_label.t) with
+    | Nolabel -> to_string e
+    | Labelled l | Optional l -> "~" ^ l ^ ":" ^ to_string e
 end
 
 (* Generation context: PRNG state and a fresh-name supply. The typed environment
@@ -168,6 +281,51 @@ let small_ty ctx =
   choose ctx
     [(3, fun () -> Ty.Int); (2, fun () -> Ty.Float); (2, fun () -> Ty.Variant)]
 
+(* Function types, for [let]-bound and returned closures (Tiers B and C).
+   Components are leaf types, mirroring [small_ty]'s termination argument.
+   Parameter shapes come from a fixed list that respects the erasability
+   invariant: every [Optional] parameter is followed by a positional one
+   (otherwise it could never be omitted at a call site, and the definition trips
+   warning 16).
+
+   Labels come from a tiny fixed pool, distinct within a chain (duplicate labels
+   in one type would break argument matching) but deliberately shared across
+   function types: a partially-applied remainder with leftover labeled
+   parameters can then equal an independently generated goal type, which is what
+   makes label-skipping candidates reachable at all. Binders are separate from
+   labels, so this reuse cannot cause shadowing. *)
+let fun_ty ctx =
+  let shape =
+    choose ctx
+      [ (3, fun () -> [`P]);
+        (1, fun () -> [`L]);
+        (2, fun () -> [`P; `P]);
+        (1, fun () -> [`L; `P]);
+        (1, fun () -> [`P; `L]);
+        (1, fun () -> [`L; `L]);
+        (2, fun () -> [`O; `P]) ]
+  in
+  let l_idx = ref 0 in
+  let o_idx = ref 0 in
+  let labels =
+    List.map
+      (fun k ->
+        match k with
+        | `P -> Arg_label.Nolabel
+        | `L ->
+          let l = [| "la"; "lb" |].(!l_idx) in
+          incr l_idx;
+          Arg_label.Labelled l
+        | `O ->
+          let l = [| "oa"; "ob" |].(!o_idx) in
+          incr o_idx;
+          Arg_label.Optional l)
+      shape
+  in
+  List.fold_right
+    (fun label ret -> Ty.Arrow { label; arg = small_ty ctx; ret })
+    labels (small_ty ctx)
+
 let goal_ty ctx =
   let pair () = Ty.Pair (small_ty ctx, small_ty ctx) in
   match ctx.mode with
@@ -180,14 +338,18 @@ let goal_ty ctx =
         (2, fun () -> Ty.Record_float);
         (1, fun () -> Ty.Record_int);
         (1, fun () -> Ty.List (small_ty ctx));
-        (1, fun () -> Ty.Array (small_ty ctx)) ]
+        (1, fun () -> Ty.Array (small_ty ctx));
+        (* returning a closure is prime soundness bait: the closure (and its
+           captures) must be allocated *)
+        (2, fun () -> fun_ty ctx) ]
   | Mode.Completeness ->
     choose ctx
       [ (6, fun () -> Ty.Int);
         (2, fun () -> Ty.Float);
         (2, fun () -> Ty.Variant);
         1, pair;
-        (1, fun () -> Ty.List (small_ty ctx)) ]
+        (1, fun () -> Ty.List (small_ty ctx));
+        (1, fun () -> fun_ty ctx) ]
 
 let int_lit ctx = Expr.Int_lit (Random.State.int ctx.rng 13 - 3)
 
@@ -210,9 +372,11 @@ let rec gen_expr ctx env ty fuel =
     Expr.Var x
   in
   let let_in () =
-    (* CR shsong: Here let only allow bind with small_ty; we may need to allow
-       more flexibility here. *)
-    let bound_ty = small_ty ctx in
+    let bound_ty =
+      choose ctx
+        [ (4, fun () -> small_ty ctx);
+          ((if completeness then 1 else 2), fun () -> fun_ty ctx) ]
+    in
     let x = fresh ctx in
     let e1 = gen_expr ctx env bound_ty (fuel - 1) in
     let e2 = gen_expr ctx ((x, bound_ty) :: env) ty (fuel - 1) in
@@ -225,10 +389,114 @@ let rec gen_expr ctx env ty fuel =
     in
     Expr.If (c, gen_expr ctx env ty (fuel - 1), gen_expr ctx env ty (fuel - 1))
   in
+  (* Tier C: apply an in-scope function. Argument matching follows OCaml's
+     rules, so an application may skip parameters and supply them later: -
+     labeled / optional parameters commute: any subset of them may be supplied,
+     in any order relative to the rest; - positional parameters cannot be
+     reordered: the supplied ones must form a prefix of the function's
+     positional parameters; - a skipped [Optional] parameter is erased
+     (defaulted) if a positional argument matching a later parameter is
+     supplied, and otherwise remains in the result type. A candidate is a
+     function variable plus a nonempty parameter subset such that the type
+     remaining after the application equals the goal type; supplying fewer than
+     all parameters is partial application. Subsets are enumerated by bitmask,
+     which is fine while [fun_ty] chains stay short. *)
+  let app_candidates =
+    List.concat_map
+      (fun (x, ty') ->
+        match Ty.arrows ty' with
+        | [], _ -> []
+        | params, result ->
+          let n = List.length params in
+          let indices = List.init n (fun i -> i) in
+          let nth i = List.nth params i in
+          let is_positional i =
+            match fst (nth i) with
+            | Arg_label.Nolabel -> true
+            | Arg_label.Labelled _ | Arg_label.Optional _ -> false
+          in
+          List.filter_map
+            (fun mask ->
+              let in_set i = mask land (1 lsl i) <> 0 in
+              (* no positional parameter may be supplied after a skipped one *)
+              let positionals_form_prefix =
+                let rec ok seen_skipped = function
+                  | [] -> true
+                  | i :: rest ->
+                    if in_set i
+                    then (not seen_skipped) && ok false rest
+                    else ok true rest
+                in
+                ok false (List.filter is_positional indices)
+              in
+              if not positionals_form_prefix
+              then None
+              else begin
+                let erased i =
+                  (match fst (nth i) with
+                    | Arg_label.Optional _ -> not (in_set i)
+                    | Arg_label.Nolabel | Arg_label.Labelled _ -> false)
+                  && List.exists
+                       (fun j -> j > i && in_set j && is_positional j)
+                       indices
+                in
+                let remaining =
+                  List.fold_right
+                    (fun i acc ->
+                      if in_set i || erased i
+                      then acc
+                      else
+                        let label, arg = nth i in
+                        Ty.Arrow { label; arg; ret = acc })
+                    indices result
+                in
+                if Ty.equal remaining ty
+                then
+                  Some
+                    ( x,
+                      List.filter_map
+                        (fun i -> if in_set i then Some (nth i) else None)
+                        indices )
+                else None
+              end)
+            (List.init ((1 lsl n) - 1) (fun m -> m + 1)))
+      env
+  in
+  let apply () =
+    let f, supplied =
+      List.nth app_candidates
+        (Random.State.int ctx.rng (List.length app_candidates))
+    in
+    let args =
+      List.map
+        (fun ((label : Arg_label.t), arg_ty) ->
+          label, gen_expr ctx env arg_ty (fuel - 1))
+        supplied
+    in
+    (* Labeled arguments also commute syntactically: sometimes emit them ahead
+       of the positional ones (the relative order of positional arguments is
+       preserved either way). *)
+    let args =
+      if List.length args > 1 && Random.State.int ctx.rng 2 = 0
+      then begin
+        let labeled, positional =
+          List.partition
+            (fun ((l : Arg_label.t), _) ->
+              match l with Labelled _ | Optional _ -> true | Nolabel -> false)
+            args
+        in
+        labeled @ positional
+      end
+      else args
+    in
+    Expr.App { f = Expr.Var f; args }
+  in
   let generic =
     [ (if vars = [] then 0 else 3), use_var;
       deep 1, let_in;
-      deep (if completeness then 3 else 1), if_ ]
+      deep (if completeness then 3 else 1), if_;
+      ( (if app_candidates = [] then 0 else deep (if completeness then 2 else 3)),
+        apply ) ]
   in
   (* Productions specific to the goal type. *)
   let structural =
@@ -283,6 +551,73 @@ let rec gen_expr ctx env ty fuel =
         ((if completeness then 2 else 4), fun () -> Expr.Constr_a);
         (deep 2, fun () -> Expr.Constr_b (gen_expr ctx env Ty.Int (fuel - 1)))
       ]
+    (* Tier B: lambdas. Bind a prefix of [k] parameters in this [Lam]; k < chain
+       length leaves a function-typed body, i.e. nested closures, while k =
+       chain length is the n-ary single-closure form -- same type, different
+       allocation behavior, so both are generated. Split points where a bound
+       [Optional] parameter is not followed by a bound positional one are
+       excluded (the optional would be unerasable within this syntactic
+       function: warning 16). Parameter binders are fresh and independent of the
+       type-side labels; a default expression may refer to earlier parameters of
+       the same lambda. Not [deep]-gated: like construction, a lambda must be
+       available at exhausted fuel (its body then bottoms out in leaves, since
+       [fun_ty] components are leaf types). *)
+    | Ty.Arrow _ ->
+      [ ( 4,
+          fun () ->
+            let all, _result = Ty.arrows ty in
+            let total = List.length all in
+            let valid k =
+              let prefix = List.filteri (fun i _ -> i < k) all in
+              let rec ok = function
+                | [] -> true
+                | ((l : Arg_label.t), _) :: rest -> (
+                  match l with
+                  | Optional _ ->
+                    List.exists
+                      (fun ((l', _) : Arg_label.t * _) ->
+                        match l' with
+                        | Nolabel -> true
+                        | Labelled _ | Optional _ -> false)
+                      rest
+                    && ok rest
+                  | Nolabel | Labelled _ -> ok rest)
+              in
+              ok prefix
+            in
+            (* k = total is always valid thanks to [fun_ty]'s erasability
+               invariant, so [ks] is never empty. *)
+            let ks = List.filter valid (List.init total (fun i -> i + 1)) in
+            let k = List.nth ks (Random.State.int ctx.rng (List.length ks)) in
+            let prefix = List.filteri (fun i _ -> i < k) all in
+            let rec ret_after k chain =
+              if k = 0
+              then chain
+              else
+                match chain with
+                | Ty.Arrow { ret; _ } -> ret_after (k - 1) ret
+                | _ -> assert false
+            in
+            let rev_params, env' =
+              List.fold_left
+                (fun (params, env) ((label : Arg_label.t), arg_ty) ->
+                  let var = fresh ctx in
+                  let kind =
+                    match label with
+                    | Nolabel -> Expr.Positional
+                    | Labelled l -> Expr.Labelled l
+                    | Optional l ->
+                      (* always with a default for now; see [Expr.param_kind] *)
+                      Expr.Opt (l, Some (gen_expr ctx env arg_ty (fuel - 1)))
+                  in
+                  ( { Expr.var; p_ty = arg_ty; kind } :: params,
+                    (var, arg_ty) :: env ))
+                ([], env) prefix
+            in
+            Expr.Lam
+              { params = List.rev rev_params;
+                body = gen_expr ctx env' (ret_after k ty) (fuel - 1)
+              } ) ]
   in
   choose ctx (generic @ structural)
 
