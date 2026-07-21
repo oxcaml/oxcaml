@@ -1731,9 +1731,7 @@ Error: This binding has no layout variables, so "poly_" has no effect.
 
 let poly_ id = fun x -> x
 [%%expect{|
->> Fatal error: layout: unexpected genvar
-Uncaught exception: Misc.Fatal_error
-
+val id : layout_ l. ('a : l). 'a -> 'a = <lpoly>
 |}]
 
 let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
