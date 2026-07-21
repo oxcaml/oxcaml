@@ -46,7 +46,9 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
       (* This happens in the stub case, where we are only simplifying code, not
          a set of closures. *)
       DE.add_variable denv
-        (Bound_var.create my_closure my_closure_duid NM.normal)
+        (Bound_var.create my_closure my_closure_duid NM.normal
+           ~dbg:Debuginfo.none
+           ~is_parameter:Bound_var.Is_parameter.implicit_parameter)
         (T.unknown K.value)
     | Some function_slot -> (
       match
@@ -62,7 +64,9 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
       | name ->
         let name = Bound_name.name name in
         DE.add_variable denv
-          (Bound_var.create my_closure my_closure_duid NM.normal)
+          (Bound_var.create my_closure my_closure_duid NM.normal
+             ~dbg:Debuginfo.none
+             ~is_parameter:Bound_var.Is_parameter.implicit_parameter)
           (T.alias_type_of K.value (Simple.name name)))
   in
   let denv =
@@ -72,17 +76,25 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
       let my_region_duid = Flambda_debug_uid.none in
       let my_region =
         Bound_var.create my_region my_region_duid Name_mode.normal
+          ~dbg:Debuginfo.none
+          ~is_parameter:Bound_var.Is_parameter.implicit_parameter
       in
       let denv = DE.add_variable denv my_region (T.unknown K.region) in
       let my_ghost_region_duid = Flambda_debug_uid.none in
       let my_ghost_region =
         Bound_var.create my_ghost_region my_ghost_region_duid Name_mode.normal
+          ~dbg:Debuginfo.none
+          ~is_parameter:Bound_var.Is_parameter.implicit_parameter
       in
       DE.add_variable denv my_ghost_region (T.unknown K.region)
   in
   let my_depth_duid = Flambda_debug_uid.none in
   let denv =
-    let my_depth = Bound_var.create my_depth my_depth_duid Name_mode.normal in
+    let my_depth =
+      Bound_var.create my_depth my_depth_duid Name_mode.normal
+        ~dbg:Debuginfo.none
+        ~is_parameter:Bound_var.Is_parameter.implicit_parameter
+    in
     DE.add_variable denv my_depth (T.unknown K.rec_info)
   in
   let denv =
@@ -191,9 +203,9 @@ let simplify_function_body context ~outer_dacc function_slot_opt
     | Heap -> []
     | Local { region; ghost_region } ->
       [ Bound_parameter.create region Flambda_kind.With_subkind.region
-          my_region_duid;
+          my_region_duid ~dbg:Debuginfo.none;
         Bound_parameter.create ghost_region Flambda_kind.With_subkind.region
-          my_ghost_region_duid ]
+          my_ghost_region_duid ~dbg:Debuginfo.none ]
   in
   let my_closure_duid = Flambda_debug_uid.none in
   let my_depth_duid = Flambda_debug_uid.none in
@@ -203,9 +215,10 @@ let simplify_function_body context ~outer_dacc function_slot_opt
       ~implicit_params:
         (Bound_parameters.create
            ([ Bound_parameter.create my_closure
-                Flambda_kind.With_subkind.any_value my_closure_duid;
+                Flambda_kind.With_subkind.any_value my_closure_duid
+                ~dbg:Debuginfo.none;
               Bound_parameter.create my_depth Flambda_kind.With_subkind.rec_info
-                my_depth_duid ]
+                my_depth_duid ~dbg:Debuginfo.none ]
            @ region_params))
       ~loopify_state ~params
   with
@@ -217,12 +230,53 @@ let simplify_function_body context ~outer_dacc function_slot_opt
         return_continuation
     in
     let free_names_of_body = UA.name_occurrences uacc in
+    (* [my_closure] may be used in the body at [Normal] mode (a genuine runtime
+       use), only at [Phantom] mode (for example by the [Project_value_slot] and
+       [Project_function_slot] bindings that keep captured variables visible to
+       the debugger), or not at all. In the [Phantom]-only case we do not need
+       [my_closure] at runtime, so we report it as unused but rebind it (the
+       same variable) to [Optimised_out] using a phantom let, from which the
+       phantom projections then read. *)
+    let is_my_closure_used, body, uacc =
+      match NO.greatest_name_mode_var free_names_of_body my_closure with
+      | Absent -> false, body, uacc
+      | Present Normal -> true, body, uacc
+      | Present In_types ->
+        Misc.fatal_errorf
+          "[my_closure] (%a) unexpectedly occurs at mode [In_types] in a \
+           function body; Flambda types do not occur in terms"
+          Variable.print my_closure
+      | Present Phantom ->
+        let machine_width = UE.machine_width (UA.uenv uacc) in
+        let var =
+          Bound_var.create my_closure my_closure_duid Name_mode.phantom
+            ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
+        in
+        let let_bound = Bound_pattern.singleton var in
+        let prim = Flambda_primitive.(Nullary (Optimised_out K.value)) in
+        let named = Named.create_prim prim Debuginfo.none in
+        let simplified_defining_expr =
+          Simplified_named.create ~machine_width named
+        in
+        let binding =
+          EB.Keep_binding
+            { let_bound;
+              simplified_defining_expr;
+              original_defining_expr = Some named
+            }
+        in
+        let body, uacc =
+          EB.make_new_let_bindings uacc ~bindings_outermost_first:[binding]
+            ~body
+        in
+        false, body, uacc
+    in
+    let free_names_of_body = UA.name_occurrences uacc in
     let params_and_body =
       RE.Function_params_and_body.create ~free_names_of_body
         ~return_continuation ~exn_continuation params ~body ~my_closure
         ~my_alloc_mode ~my_depth
     in
-    let is_my_closure_used = NO.mem_var free_names_of_body my_closure in
     let previously_free_depth_variables =
       NO.create_variables (C.previously_free_depth_variables context) NM.normal
     in
@@ -381,7 +435,8 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
             (KS.kind kind_with_subkind)
         in
         let result_var_duid = Flambda_debug_uid.none in
-        BP.create result_var kind_with_subkind result_var_duid)
+        BP.create result_var kind_with_subkind result_var_duid
+          ~dbg:Debuginfo.none)
       (Flambda_arity.unarized_components result_arity)
     |> Bound_parameters.create
   in

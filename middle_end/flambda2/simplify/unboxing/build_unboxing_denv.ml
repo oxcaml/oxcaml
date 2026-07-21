@@ -27,7 +27,10 @@ let add_equation_on_var denv var shape =
 
 let denv_of_number_decision naked_kind shape param_var param_var_debug_uid
     naked_var denv : DE.t =
-  let naked_name = VB.create naked_var param_var_debug_uid Name_mode.normal in
+  let naked_name =
+    VB.create naked_var param_var_debug_uid Name_mode.normal ~dbg:Debuginfo.none
+      ~is_parameter:VB.Is_parameter.local_var
+  in
   let denv = DE.define_extra_variable denv naked_name naked_kind in
   add_equation_on_var denv param_var shape
 
@@ -40,7 +43,10 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
         (fun index denv
              ({ epa = { param = var; param_debug_uid; _ }; _ } :
                U.field_decision) ->
-          let v = VB.create var param_debug_uid Name_mode.normal in
+          let v =
+            VB.create var param_debug_uid Name_mode.normal ~dbg:Debuginfo.none
+              ~is_parameter:VB.Is_parameter.local_var
+          in
           DE.define_extra_variable denv v
             (K.Block_shape.element_kind shape index))
         denv fields
@@ -67,7 +73,10 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
         (fun _
              ({ epa = { param = var; param_debug_uid; _ }; kind; _ } :
                U.field_decision) denv ->
-          let v = VB.create var param_debug_uid Name_mode.normal in
+          let v =
+            VB.create var param_debug_uid Name_mode.normal ~dbg:Debuginfo.none
+              ~is_parameter:VB.Is_parameter.local_var
+          in
           DE.define_extra_variable denv v (K.With_subkind.kind kind))
         vars_within_closure denv
     in
@@ -88,7 +97,10 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
       vars_within_closure denv
   | Unbox (Variant { tag; const_ctors; fields_by_tag }) ->
     (* Adapt the denv for the tag *)
-    let tag_v = VB.create tag.param tag.param_debug_uid Name_mode.normal in
+    let tag_v =
+      VB.create tag.param tag.param_debug_uid Name_mode.normal
+        ~dbg:Debuginfo.none ~is_parameter:VB.Is_parameter.local_var
+    in
     let denv = DE.define_extra_variable denv tag_v K.naked_immediate in
     let denv =
       DE.map_typing_env denv ~f:(fun tenv ->
@@ -109,6 +121,7 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
       | At_least_one { is_int; _ } ->
         let is_int_v =
           VB.create is_int.param is_int.param_debug_uid Name_mode.normal
+            ~dbg:Debuginfo.none ~is_parameter:VB.Is_parameter.local_var
         in
         let denv = DE.define_extra_variable denv is_int_v K.naked_immediate in
         let denv =
@@ -134,6 +147,7 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
       | At_least_one { ctor = Unbox (Number (Naked_immediate, ctor_epa)); _ } ->
         let v =
           VB.create ctor_epa.param ctor_epa.param_debug_uid Name_mode.normal
+            ~dbg:Debuginfo.none ~is_parameter:VB.Is_parameter.local_var
         in
         let denv = DE.define_extra_variable denv v K.naked_immediate in
         let ty =
@@ -162,7 +176,10 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
             (fun index denv
                  ({ epa = { param = var; param_debug_uid; _ }; _ } :
                    U.field_decision) ->
-              let v = VB.create var param_debug_uid Name_mode.normal in
+              let v =
+                VB.create var param_debug_uid Name_mode.normal
+                  ~dbg:Debuginfo.none ~is_parameter:VB.Is_parameter.local_var
+              in
               DE.define_extra_variable denv v
                 (K.Block_shape.element_kind shape index))
             denv block_fields)

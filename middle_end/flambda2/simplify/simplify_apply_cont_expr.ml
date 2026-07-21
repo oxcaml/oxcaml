@@ -44,6 +44,7 @@ let inline_linearly_used_continuation uacc ~params:params' ~handler
         let let_bound =
           let param_var, param_uid = BP.var_and_uid param in
           Bound_var.create param_var param_uid Name_mode.normal
+            ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
           |> Bound_pattern.singleton
         in
         let named = Named.create_simple arg in

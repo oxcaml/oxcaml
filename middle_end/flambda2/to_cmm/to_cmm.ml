@@ -83,7 +83,7 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
     C.continuation_bound_parameters env
       (Bound_parameters.create
          [ Bound_parameter.create ret_var Flambda_kind.With_subkind.any_value
-             ret_var_duid ])
+             ret_var_duid ~dbg:Debuginfo.none ])
   in
   let return_cont, env =
     Env.add_jump_cont env
@@ -93,7 +93,9 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   (* See comment in [To_cmm_set_of_closures] about binding [my_region] *)
   let env, toplevel_region_var =
     Env.create_bound_parameter env
-      (Flambda_unit.toplevel_my_region flambda_unit, Flambda_debug_uid.none)
+      ( Flambda_unit.toplevel_my_region flambda_unit,
+        Flambda_debug_uid.none,
+        Debuginfo.none )
   in
   let r =
     R.create ~reachable_names
@@ -110,11 +112,11 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   let free_vars =
     To_cmm_shared.remove_var_with_provenance body_free_vars toplevel_region_var
   in
-  if not (Backend_var.Set.is_empty free_vars)
+  if not (To_cmm_free_vars.is_empty free_vars)
   then
     Misc.fatal_errorf
       "Unbound free_vars in module init code when translating to cmm: %a"
-      Backend_var.Set.print free_vars;
+      To_cmm_free_vars.print free_vars;
   (* CR mshinwell: This should at least be given a source file location. *)
   let dbg = Debuginfo.none in
   let body =

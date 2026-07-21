@@ -26,6 +26,7 @@ type t =
        [Symbol.t], e.g. module entry point names. *)
     module_symbol : Symbol.t;
     module_symbol_defined : bool;
+    defined_data_symbols : String.Set.t;
     invalid_message_symbols : Symbol.t String.Map.t
   }
 
@@ -38,6 +39,7 @@ let create ~module_symbol ~reachable_names =
     symbols = String.Map.empty;
     module_symbol;
     module_symbol_defined = false;
+    defined_data_symbols = String.Set.empty;
     invalid_message_symbols = String.Map.empty
   }
 
@@ -58,12 +60,19 @@ let raw_symbol res ~global:sym_global sym_name : t * Cmm.symbol =
       Misc.fatal_errorf "The symbol %s is declared as both local and global"
         sym_name
 
+(* CR mshinwell: we should only do this for a subset of symbols, e.g. ones
+   mentioned in phantom lets *)
+let symbol_must_be_global_for_dwarf ~sym_name:_ =
+  !Dwarf_flags.gdwarf_may_alter_codegen
+  && Flambda_features.Expert.phantom_lets ()
+
 let symbol res sym =
   let sym_name = Linkage_name.to_string (Symbol.linkage_name sym) in
   let sym_global =
     if
       Compilation_unit.is_current (Symbol.compilation_unit sym)
-      && not (Name_occurrences.mem_symbol res.reachable_names sym)
+      && (not (Name_occurrences.mem_symbol res.reachable_names sym))
+      && not (symbol_must_be_global_for_dwarf ~sym_name)
     then Cmm.Local
     else Cmm.Global
   in
@@ -85,7 +94,8 @@ let symbol_of_code_id res code_id ~currently_in_inlined_body : Cmm.symbol =
   let sym_global =
     if
       Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
-      && not (Name_occurrences.mem_code_id res.reachable_names code_id)
+      && (not (Name_occurrences.mem_code_id res.reachable_names code_id))
+      && not (symbol_must_be_global_for_dwarf ~sym_name)
     then Cmm.Local
     else Cmm.Global
   in
@@ -124,13 +134,30 @@ let add_to_data_list x l =
         Printcmm.data x;
     C.cdata x :: l
 
+let defined_data_symbols_of_data items acc =
+  List.fold_left
+    (fun acc (item : Cmm.data_item) ->
+      match item with
+      | Cdefine_symbol { sym_name; _ } -> String.Set.add sym_name acc
+      | Cint8 _ | Cint16 _ | Cint32 _ | Cint _ | Csingle _ | Cdouble _
+      | Cvec128 _ | Cvec256 _ | Cvec512 _ | Csymbol_address _ | Csymbol_offset _
+      | Cstring _ | Cskip _ | Calign _ ->
+        acc)
+    acc items
+
 let archive_data r =
   { r with
     current_data = [];
     data_list = add_to_data_list r.current_data r.data_list
   }
 
-let update_data r f = { r with current_data = f r.current_data }
+let update_data r f =
+  let current_data = f r.current_data in
+  { r with
+    current_data;
+    defined_data_symbols =
+      defined_data_symbols_of_data current_data r.defined_data_symbols
+  }
 
 let set_data r l =
   update_data r (function
@@ -140,7 +167,10 @@ let set_data r l =
         "about to lose some translated static data items")
 
 let add_archive_data_items r l =
-  { r with data_list = add_to_data_list l r.data_list }
+  { r with
+    data_list = add_to_data_list l r.data_list;
+    defined_data_symbols = defined_data_symbols_of_data l r.defined_data_symbols
+  }
 
 let add_gc_roots r l = { r with gc_roots = l @ r.gc_roots }
 
@@ -162,6 +192,9 @@ let define_module_symbol_if_missing r =
     let sym : Cmm.symbol = { sym_name = linkage_name; sym_global = Global } in
     let l = C.emit_block sym (C.black_block_header 0 0) [] in
     set_data r l
+
+let data_symbol_is_defined t (sym : Cmm.symbol) =
+  String.Set.mem sym.sym_name t.defined_data_symbols
 
 let add_invalid_message_symbol t symbol ~message =
   { t with

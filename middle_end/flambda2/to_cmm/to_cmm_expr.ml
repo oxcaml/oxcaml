@@ -51,9 +51,9 @@ let bind_var_to_simple ~dbg_with_inlined:dbg env res v
       C.simple ~dbg env res s
     in
     let env, res =
-      Env.bind_variable env res v ~effects_and_coeffects_of_defining_expr
-        ~defining_expr ~free_vars_of_defining_expr
-        ~num_normal_occurrences_of_bound_vars
+      Env.bind_variable ~mode:Normal env res v
+        ~effects_and_coeffects_of_defining_expr ~defining_expr
+        ~free_vars_of_defining_expr ~num_normal_occurrences_of_bound_vars
     in
     env, res
 
@@ -245,10 +245,10 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         C.simple ~dbg env res callee_simple
       in
       env, res, Some callee, callee_free_vars
-    | None -> env, res, None, Backend_var.Set.empty
+    | None -> env, res, None, To_cmm_free_vars.empty
   in
   let args, args_free_vars, env, res, _ = C.simple_list ~dbg env res args in
-  let free_vars = Backend_var.Set.union callee_free_vars args_free_vars in
+  let free_vars = To_cmm_free_vars.union callee_free_vars args_free_vars in
   let pos =
     match Apply.position apply with
     | Normal ->
@@ -394,7 +394,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           } =
       C.simple ~dbg env res obj
     in
-    let free_vars = Backend_var.Set.union free_vars obj_free_vars in
+    let free_vars = To_cmm_free_vars.union free_vars obj_free_vars in
     let kind = Call_kind.Method_kind.to_lambda kind in
     let alloc_mode =
       C.alloc_mode_for_applications_to_cmx (Apply_expr.alloc_mode apply)
@@ -406,7 +406,6 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       res,
       Ece.all )
   | Effect op -> (
-    let module BV = Backend_var in
     let open To_cmm_env in
     let[@inline] simple s = C.simple ~dbg s in
     match op with
@@ -425,7 +424,9 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       let { env; res; expr = { cmm = last_fiber; free_vars = fv2; effs = _ } } =
         simple env res last_fiber
       in
-      let free_vars = BV.Set.union (BV.Set.union fv0 fv1) fv2 in
+      let free_vars =
+        To_cmm_free_vars.union (To_cmm_free_vars.union fv0 fv1) fv2
+      in
       C.reperform ~dbg ~eff ~cont ~last_fiber, free_vars, env, res, Ece.all
     | With_stack { valuec; exnc; effc; f; arg } ->
       let { env; res; expr = { cmm = valuec; free_vars = fv0; effs = _ } } =
@@ -444,9 +445,9 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         simple env res arg
       in
       let free_vars =
-        BV.Set.union
-          (BV.Set.union fv0 (BV.Set.union fv1 fv2))
-          (BV.Set.union fv3 fv4)
+        To_cmm_free_vars.union
+          (To_cmm_free_vars.union fv0 (To_cmm_free_vars.union fv1 fv2))
+          (To_cmm_free_vars.union fv3 fv4)
       in
       ( C.with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg,
         free_vars,
@@ -476,11 +477,11 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         simple env res arg
       in
       let free_vars =
-        BV.Set.union
-          (BV.Set.union
-             (BV.Set.union fv0 (BV.Set.union fv1 fv2))
-             (BV.Set.union fv3 fv4))
-          (BV.Set.union fv5 fv6)
+        To_cmm_free_vars.union
+          (To_cmm_free_vars.union
+             (To_cmm_free_vars.union fv0 (To_cmm_free_vars.union fv1 fv2))
+             (To_cmm_free_vars.union fv3 fv4))
+          (To_cmm_free_vars.union fv5 fv6)
       in
       ( C.with_stack_bind ~dbg ~valuec ~exnc ~effc ~dyn ~bind ~f ~arg,
         free_vars,
@@ -508,9 +509,9 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         simple env res arg
       in
       let free_vars =
-        BV.Set.union
-          (BV.Set.union fv0 (BV.Set.union fv1 fv2))
-          (BV.Set.union fv3 (BV.Set.union fv4 fv5))
+        To_cmm_free_vars.union
+          (To_cmm_free_vars.union fv0 (To_cmm_free_vars.union fv1 fv2))
+          (To_cmm_free_vars.union fv3 (To_cmm_free_vars.union fv4 fv5))
       in
       ( C.with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg,
         free_vars,
@@ -545,11 +546,11 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         simple env res arg
       in
       let free_vars =
-        BV.Set.union
-          (BV.Set.union
-             (BV.Set.union fv0 (BV.Set.union fv1 fv2))
-             (BV.Set.union fv3 fv4))
-          (BV.Set.union fv5 (BV.Set.union fv6 fv7))
+        To_cmm_free_vars.union
+          (To_cmm_free_vars.union
+             (To_cmm_free_vars.union fv0 (To_cmm_free_vars.union fv1 fv2))
+             (To_cmm_free_vars.union fv3 fv4))
+          (To_cmm_free_vars.union fv5 (To_cmm_free_vars.union fv6 fv7))
       in
       ( C.with_stack_bind_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~dyn
           ~bind ~f ~arg,
@@ -567,7 +568,9 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       let { env; res; expr = { cmm = arg; free_vars = fv2; effs = _ } } =
         simple env res arg
       in
-      let free_vars = BV.Set.union (BV.Set.union fv0 fv1) fv2 in
+      let free_vars =
+        To_cmm_free_vars.union (To_cmm_free_vars.union fv0 fv1) fv2
+      in
       C.resume ~dbg ~cont ~f ~arg, free_vars, env, res, Ece.all)
 
 let translate_apply env res apply =
@@ -597,7 +600,7 @@ let translate_apply env res apply =
           in
           ( env,
             res,
-            Backend_var.Set.union free_vars free_vars',
+            To_cmm_free_vars.union free_vars free_vars',
             Ece.join effs effs',
             extra_arg :: extra_args_rev ))
         (env, res, free_vars, effs, [])
@@ -672,7 +675,7 @@ let translate_raise ~dbg_with_inlined:dbg env res apply exn_handler args =
     let extra, extra_free_vars, env, res, _ =
       C.simple_list ~dbg env res extra
     in
-    let free_vars = Backend_var.Set.union exn_free_vars extra_free_vars in
+    let free_vars = To_cmm_free_vars.union exn_free_vars extra_free_vars in
     let wrap, _, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
     let cmm = C.raise_prim raise_kind exn ~extra_args:extra dbg in
     let cmm, free_vars, symbol_inits =
@@ -751,14 +754,14 @@ let invalid env res ~message =
   in
   let cmm_invalid, res = C.invalid res ~message in
   let cmm, free_vars, symbol_inits =
-    wrap cmm_invalid Backend_var.Set.empty Env.Symbol_inits.empty
+    wrap cmm_invalid To_cmm_free_vars.empty Env.Symbol_inits.empty
   in
   cmm, free_vars, symbol_inits, res
 
 (* The main set of translation functions for expressions *)
 
 let rec expr env res e :
-    Cmm.expression * Backend_var.Set.t * Env.Symbol_inits.t * To_cmm_result.t =
+    Cmm.expression * To_cmm_free_vars.t * Env.Symbol_inits.t * To_cmm_result.t =
   match Expr.descr e with
   | Let e' -> let_expr env res e'
   | Let_cont e' -> let_cont env res e'
@@ -868,7 +871,7 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
         Env.flush_delayed_lets ~mode:Branching_point env res
       in
       let body, body_free_vars, symbol_inits, res = expr env res body in
-      let free_vars = Backend_var.Set.union free_vars body_free_vars in
+      let free_vars = To_cmm_free_vars.union free_vars body_free_vars in
       let cmm, free_vars, symbol_inits =
         wrap (C.sequence cmm body) free_vars symbol_inits
       in
@@ -880,6 +883,31 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
     Misc.fatal_errorf "Mismatch between pattern and defining expression:@ %a"
       Let.print let_expr
 
+and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
+  match[@warning "-4"] bound_pattern, Let.defining_expr let_expr with
+  | Singleton bound_var, Simple simple ->
+    let defining_expr, env, res, free_vars =
+      To_cmm_phantom.simple env res simple
+    in
+    let env, res =
+      Env.bind_phantom_variable env res bound_var
+        (Env.phantom defining_expr free_vars)
+    in
+    expr env res body
+  | Singleton bound_var, Prim (p, dbg) ->
+    let defining_expr, env, res, free_vars =
+      To_cmm_phantom.prim env res dbg p
+    in
+    let env, res =
+      Env.bind_phantom_variable env res bound_var
+        (Env.phantom defining_expr free_vars)
+    in
+    expr env res body
+  | _ ->
+    (* Other cases (e.g. sets of closures, rec info) cannot be usefully
+       described to the debugger at present. *)
+    expr env res body
+
 and let_expr env res let_expr =
   Let.pattern_match' let_expr
     ~f:(fun bound_pattern ~num_normal_occurrences_of_bound_vars ~body ->
@@ -887,7 +915,7 @@ and let_expr env res let_expr =
       | Normal ->
         let_expr0 env res let_expr bound_pattern
           ~num_normal_occurrences_of_bound_vars ~body
-      | Phantom -> expr env res body
+      | Phantom -> let_expr_phantom env res let_expr bound_pattern ~body
       | In_types ->
         Misc.fatal_errorf "Cannot bind In_types variables in terms:@ %a"
           Let.print let_expr)
@@ -963,7 +991,7 @@ and let_cont_not_inlined env res k handler body =
         Env.Symbol_inits.merge handler_symbol_inits body_symbol_inits
       in
       let free_vars =
-        Backend_var.Set.union free_vars_of_body
+        To_cmm_free_vars.union free_vars_of_body
           (C.remove_vars_with_machtype free_vars_of_handler vars)
       in
       ( C.create_ccatch ~rec_flag:false ~body
@@ -1007,7 +1035,7 @@ and let_cont_exn_handler env res k body vars handler free_vars_of_handler
     Env.Symbol_inits.merge handler_symbol_inits body_symbol_inits
   in
   let free_vars =
-    Backend_var.Set.union free_vars_of_body
+    To_cmm_free_vars.union free_vars_of_body
       (C.remove_vars_with_machtype free_vars_of_handler vars)
   in
   (* CR mshinwell: fix debuginfo *)
@@ -1077,7 +1105,7 @@ and let_cont_rec env res invariant_params conts body =
     Continuation.Map.fold
       (fun k (vars, handler, free_vars_of_handler) (handlers, free_vars) ->
         let free_vars =
-          Backend_var.Set.union free_vars
+          To_cmm_free_vars.union free_vars
             (C.remove_vars_with_machtype free_vars_of_handler vars)
         in
         let id = Env.get_cmm_continuation env k in
@@ -1175,9 +1203,12 @@ and apply_expr env res apply =
       match handler_params with
       | [param] ->
         let param_var, param_uid = Bound_parameter.var_and_uid param in
-        let var = Bound_var.create param_var param_uid Name_mode.normal in
+        let var =
+          Bound_var.create param_var param_uid Name_mode.normal
+            ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
+        in
         let env, res =
-          Env.bind_variable env res var
+          Env.bind_variable ~mode:Normal env res var
             ~effects_and_coeffects_of_defining_expr:effs ~defining_expr:call
             ~free_vars_of_defining_expr:free_vars
             ~num_normal_occurrences_of_bound_vars:handler_params_occurrences
@@ -1195,7 +1226,7 @@ and apply_expr env res apply =
         in
         let env, cmm_params =
           Env.create_bound_parameters env
-            (List.map Bound_parameter.var_and_uid params)
+            (List.map Bound_parameter.var_and_uid_and_debuginfo params)
         in
         let label = Lambda.next_raise_count () in
         let params_with_machtype =
@@ -1224,7 +1255,7 @@ and apply_expr env res apply =
             ~body:(C.cexit label [call] [])
         in
         let free_vars =
-          Backend_var.Set.union free_vars
+          To_cmm_free_vars.union free_vars
             (C.remove_vars_with_machtype free_vars_of_handler
                params_with_machtype)
         in
@@ -1275,6 +1306,8 @@ and apply_cont env res apply_cont =
                 let param_var, param_uid = Bound_parameter.var_and_uid param in
                 let var =
                   Bound_var.create param_var param_uid Name_mode.normal
+                    ~dbg:Debuginfo.none
+                    ~is_parameter:Bound_var.Is_parameter.local_var
                 in
                 bind_var_to_simple ~dbg_with_inlined env res var
                   ~num_normal_occurrences_of_bound_vars:
@@ -1377,8 +1410,8 @@ and switch env res switch =
     | ( (_, then_, then_free_vars, then_inits, then_dbg),
         (0, else_, else_free_vars, else_inits, else_dbg) ) ->
       let free_vars =
-        Backend_var.Set.union scrutinee_free_vars
-          (Backend_var.Set.union else_free_vars then_free_vars)
+        To_cmm_free_vars.union scrutinee_free_vars
+          (To_cmm_free_vars.union else_free_vars then_free_vars)
       in
       (* See comment below about symbol inits and branches *)
       let symbol_inits = Env.Symbol_inits.merge then_inits else_inits in
@@ -1394,8 +1427,8 @@ and switch env res switch =
     | ( (x, if_x, if_x_free_vars, if_x_symbol_inits, if_x_dbg),
         (_, if_not, if_not_free_vars, if_not_symbol_inits, if_not_dbg) ) ->
       let free_vars =
-        Backend_var.Set.union scrutinee_free_vars
-          (Backend_var.Set.union if_x_free_vars if_not_free_vars)
+        To_cmm_free_vars.union scrutinee_free_vars
+          (To_cmm_free_vars.union if_x_free_vars if_not_free_vars)
       in
       let expr =
         C.ite ~dbg
@@ -1434,7 +1467,7 @@ and switch env res switch =
           let symbol_inits =
             Env.Symbol_inits.merge symbol_inits action_symbol_inits
           in
-          let free_vars = Backend_var.Set.union free_vars action_free_vars in
+          let free_vars = To_cmm_free_vars.union free_vars action_free_vars in
           cases.(i) <- Some cmm_action;
           index.(d) <- i;
           i + 1, res, free_vars, symbol_inits)
