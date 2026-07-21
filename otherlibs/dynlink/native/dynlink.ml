@@ -38,21 +38,20 @@ type global_map = {
 module Native = struct
   type handle
 
-  (* mshinwell: We need something better than caml_sys_exit *)
   external ndl_open : string -> bool -> handle * Cmxs_format.dynheader
-    = "caml_sys_exit" "caml_natdynlink_open"
+    = "caml_no_bytecode_impl" "caml_natdynlink_open"
   external ndl_register : handle -> string array -> unit
-    = "caml_sys_exit" "caml_natdynlink_register"
+    = "caml_no_bytecode_impl" "caml_natdynlink_register"
   external ndl_run : handle -> string -> unit
-    = "caml_sys_exit" "caml_natdynlink_run"
+    = "caml_no_bytecode_impl" "caml_natdynlink_run"
   external ndl_getmap : unit -> global_map list
-    = "caml_sys_exit" "caml_natdynlink_getmap"
+    = "caml_no_bytecode_impl" "caml_natdynlink_getmap"
   external ndl_globals_inited : unit -> int
-    = "caml_sys_exit" "caml_natdynlink_globals_inited"
+    = "caml_no_bytecode_impl" "caml_natdynlink_globals_inited"
   external ndl_loadsym : string -> Obj.t
-    = "caml_sys_exit" "caml_natdynlink_loadsym"
+    = "caml_no_bytecode_impl" "caml_natdynlink_loadsym"
   external ndl_existssym : string -> bool
-    = "caml_sys_exit" "caml_natdynlink_existssym"
+    = "caml_no_bytecode_impl" "caml_natdynlink_existssym"
     [@@noalloc]
 
   module Unit_header = struct
