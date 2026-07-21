@@ -143,7 +143,7 @@ end = struct
       let field = P.infix_header ~function_slot_offset:(slot_offset + 1) ~dbg in
       ( field :: acc,
         rev_append_chunks ~for_static_sets [Cmm.Word_int] chunk_acc,
-        Backend_var.Set.empty,
+        To_cmm_free_vars.empty,
         slot_offset + 1,
         env,
         res,
@@ -267,7 +267,7 @@ end = struct
             rev_append_chunks ~for_static_sets
               [Cmm.Word_int; Cmm.Word_int]
               chunk_acc,
-            Backend_var.Set.empty,
+            To_cmm_free_vars.empty,
             slot_offset + size,
             env,
             res,
@@ -296,7 +296,7 @@ end = struct
             rev_append_chunks ~for_static_sets
               [Cmm.Word_int; Cmm.Word_int; Cmm.Word_int]
               chunk_acc,
-            Backend_var.Set.empty,
+            To_cmm_free_vars.empty,
             slot_offset + size,
             env,
             res,
@@ -330,7 +330,7 @@ end = struct
         in
         ( acc,
           chunk_acc,
-          Backend_var.Set.empty,
+          To_cmm_free_vars.empty,
           slot_offset + size,
           env,
           res,
@@ -372,7 +372,7 @@ end = struct
         fill_slot for_static_sets decls dbg ~startenv value_slots env res acc
           chunk_acc ~slot_offset updates slot
       in
-      let free_vars = Backend_var.Set.union free_vars slot_free_vars in
+      let free_vars = To_cmm_free_vars.union free_vars slot_free_vars in
       let effs = Ece.join eff effs in
       fill_layout0 for_static_sets decls dbg ~startenv value_slots env res effs
         acc chunk_acc updates ~free_vars ~starting_offset:next_offset slots
@@ -380,7 +380,7 @@ end = struct
   let fill_layout for_static_sets decls dbg ~startenv value_slots env res effs
       ~prev_updates slots =
     fill_layout0 for_static_sets decls dbg ~startenv value_slots env res effs []
-      [] prev_updates ~free_vars:Backend_var.Set.empty ~starting_offset:0 slots
+      [] prev_updates ~free_vars:To_cmm_free_vars.empty ~starting_offset:0 slots
 end
 
 (* Filling-up of dynamically-allocated sets of closures. *)
@@ -418,7 +418,7 @@ module Static = Make_layout_filler (struct
 
   let simple ~dbg:_ env res simple =
     let contents = C.simple_static res simple in
-    contents, Backend_var.Set.empty, env, res, Ece.pure
+    contents, To_cmm_free_vars.empty, env, res, Ece.pure
 
   let infix_header ~dbg:_ ~function_slot_offset =
     C.cint (C.infix_header function_slot_offset)
@@ -498,11 +498,13 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     | Local { region = my_region; ghost_region = my_ghost_region } ->
       let my_region_duid = Flambda_debug_uid.none in
       let env, region =
-        Env.create_bound_parameter env (my_region, my_region_duid)
+        Env.create_bound_parameter env
+          (my_region, my_region_duid, Debuginfo.none)
       in
       let my_ghost_region_duid = Flambda_debug_uid.none in
       let env, ghost_region =
-        Env.create_bound_parameter env (my_ghost_region, my_ghost_region_duid)
+        Env.create_bound_parameter env
+          (my_ghost_region, my_ghost_region_duid, Debuginfo.none)
       in
       env, Some region, Some ghost_region
   in
@@ -525,12 +527,12 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
          my_region_var)
       fun_params
   in
-  if not (Backend_var.Set.is_empty fun_free_vars)
+  if not (To_cmm_free_vars.is_empty fun_free_vars)
   then
     Misc.fatal_errorf
       "Unbound free_vars in function body when translating to cmm: %a@\n\
        function body: %a"
-      Backend_var.Set.print fun_free_vars Printcmm.expression fun_body;
+      To_cmm_free_vars.print fun_free_vars Printcmm.expression fun_body;
   let fun_body =
     if !Clflags.afl_instrument
     then Afl_instrument.instrument_function fun_body fun_dbg
@@ -664,12 +666,12 @@ let let_static_set_of_closures0 env res closure_symbols
     Misc.fatal_errorf
       "Broken internal invariant: Static sets of closures do not need a list \
        of memory chunks");
-  if not (Backend_var.Set.is_empty free_vars)
+  if not (To_cmm_free_vars.is_empty free_vars)
   then
     Misc.fatal_errorf
       "Non-empty set of free_vars for a static set of closures (*not* \
        including updates):@ %a"
-      Backend_var.Set.print free_vars;
+      To_cmm_free_vars.print free_vars;
   let block =
     match l with
     | _ :: _ ->
@@ -735,8 +737,8 @@ let lift_set_of_closures env res ~body ~bound_vars layout set
           C.symbol ~dbg
             (R.symbol res (Function_slot.Map.find cid closure_symbols))
         in
-        Env.bind_variable env res v ~defining_expr:sym
-          ~free_vars_of_defining_expr:Backend_var.Set.empty
+        Env.bind_variable ~mode:Normal env res v ~defining_expr:sym
+          ~free_vars_of_defining_expr:To_cmm_free_vars.empty
           ~num_normal_occurrences_of_bound_vars
           ~effects_and_coeffects_of_defining_expr:Ece.pure_can_be_duplicated)
       (env, res) cids bound_vars
@@ -819,7 +821,7 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
         match get_closure_by_offset env cid with
         | None -> env, res
         | Some (defining_expr, effects_and_coeffects_of_defining_expr) ->
-          Env.bind_variable env res v ~defining_expr
+          Env.bind_variable ~mode:Normal env res v ~defining_expr
             ~free_vars_of_defining_expr:s_free_vars
             ~num_normal_occurrences_of_bound_vars
             ~effects_and_coeffects_of_defining_expr)

@@ -19,7 +19,7 @@
 type t
 
 (** Free names for cmm expressions *)
-type free_vars = Backend_var.Set.t
+type free_vars = To_cmm_free_vars.t
 
 (** Delayed symbol initializations *)
 module Symbol_inits : sig
@@ -45,6 +45,12 @@ type translation_result =
   { env : t;
     res : To_cmm_result.t;
     expr : expr_with_info
+  }
+
+type phantom_result =
+  { env : t;
+    res : To_cmm_result.t;
+    var : Backend_var.t option
   }
 
 (** Printing function *)
@@ -155,12 +161,14 @@ val exported_offsets : t -> Exported_offsets.t
     the new environment and the created variable. Will produce a fatal error if
     the given variable is already bound. *)
 val create_bound_parameter :
-  t -> Variable.t * Flambda_debug_uid.t -> t * Backend_var.With_provenance.t
+  t ->
+  Variable.t * Flambda_debug_uid.t * Debuginfo.t ->
+  t * Backend_var.With_provenance.t
 
 (** Same as {!create_variable} but for a list of variables. *)
 val create_bound_parameters :
   t ->
-  (Variable.t * Flambda_debug_uid.t) list ->
+  (Variable.t * Flambda_debug_uid.t * Debuginfo.t) list ->
   t * Backend_var.With_provenance.t list
 
 (** {2 Delayed let-bindings}
@@ -225,8 +233,12 @@ type simple = Simple
 
 type complex = Complex
 
+type phantom = Phantom
+
 (** Inlining decision of bound expressions *)
 type _ inline =
+  | Phantom : phantom inline
+  | Inlined : phantom inline
   | Do_not_inline : simple inline
   | May_inline_once : simple inline
   | Must_inline_once : complex inline
@@ -240,6 +252,11 @@ type _ bound_expr
 (** A simple cmm bound expression *)
 val simple : Cmm.expression -> free_vars -> simple bound_expr
 
+(** A phantom bound expression. [None] indicates that the value of the variable
+    cannot be described (e.g. it has been optimised out). *)
+val phantom :
+  Cmm.phantom_defining_expr option -> free_vars -> phantom bound_expr
+
 (** A bound expr that can be split if needed. This is used for primitives that
     must be inlined, but whose arguments may not be inlinable or duplicable, so
     that we can split the expression to be inlined from its arguments if/when
@@ -250,6 +267,14 @@ val splittable_primitive :
   Flambda_primitive.Without_args.t ->
   expr_with_info list ->
   complex bound_expr
+
+(** Bind a phantom variable to a phantom defining expression. *)
+val bind_phantom_variable :
+  t ->
+  To_cmm_result.t ->
+  Bound_var.t ->
+  phantom bound_expr ->
+  t * To_cmm_result.t
 
 (** Bind a variable, with support for splitting duplicatable primitives with
     non-duplicatable arguments. *)
@@ -266,6 +291,7 @@ val bind_variable_to_primitive :
 (** Bind a variable to the given Cmm expression, to allow for delaying the
     let-binding. *)
 val bind_variable :
+  mode:To_cmm_free_vars.Mode.t ->
   ?extra:extra_info ->
   t ->
   To_cmm_result.t ->
@@ -293,6 +319,13 @@ val inline_variable :
   To_cmm_result.t ->
   Variable.t ->
   translation_result
+
+(** Find the backend variable to use to refer to the given Flambda variable
+    within a phantom defining expression, if there is one. Unlike
+    [inline_variable] this never causes any inlining, and phantom variables may
+    be looked up. *)
+val get_variable_for_phantom_expr :
+  t -> To_cmm_result.t -> Variable.t -> phantom_result
 
 (** Look up the Cmm expression associated with a given Flambda variable in the
     delayed let-bindings, if any. Returns [None] if the variable is not present

@@ -180,14 +180,14 @@ let atomic_op = function
 let phantom_defining_expr ppf defining_expr =
   match defining_expr with
   | Cphantom_const_int i -> Targetint.print ppf i
-  | Cphantom_const_symbol sym -> Format.pp_print_string ppf sym
+  | Cphantom_const_symbol sym -> Format.pp_print_string ppf sym.sym_name
   | Cphantom_var var -> V.print ppf var
   | Cphantom_offset_var { var; offset_in_words } ->
     Format.fprintf ppf "%a+(%d)" V.print var offset_in_words
   | Cphantom_read_field { var; field } ->
     Format.fprintf ppf "%a[%d]" V.print var field
   | Cphantom_read_symbol_field { sym; field } ->
-    Format.fprintf ppf "%s[%d]" sym field
+    Format.fprintf ppf "%s[%d]" sym.sym_name field
   | Cphantom_block { tag; fields } ->
     Format.fprintf ppf "[%d: " tag;
     List.iter (fun field -> Format.fprintf ppf "%a; " V.print field) fields;
@@ -385,6 +385,8 @@ let rec expr ppf = function
   | Cphantom_let (var, def, body) ->
     fprintf ppf "@[<2>(let?@ @[<2>%a@ %a@]@ %a)@]" VP.print var
       phantom_defining_expr_opt def sequence body
+  | Cname_for_debugger (var, body) ->
+    fprintf ppf "@[<2>(name_for_debugger@ %a@ %a)@]" VP.print var expr body
   | Ctuple el ->
     let tuple ppf el =
       let first = ref true in
