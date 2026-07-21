@@ -76,3 +76,129 @@ let rec free_names ~code_free_names approx =
       Name_occurrences.add_code_id free_names code_id Name_mode.normal
     in
     Name_occurrences.add_function_slot_in_types free_names function_slot
+
+module Standalone = struct
+  type 'code approx = 'code t
+
+  type compilation_unit =
+    { pack_prefix : string list;
+      name : string
+    }
+
+  type symbol =
+    { symbol_compilation_unit : compilation_unit;
+      linkage_name : string
+    }
+
+  type code_id =
+    { code_id_compilation_unit : compilation_unit;
+      code_id_name : string
+    }
+
+  type t =
+    | Unknown of Flambda_kind.t
+    | Value_symbol of symbol
+    | Value_const of Reg_width_const.Descr.t
+    | Closure_approximation of
+        { code_id : code_id;
+          function_slot : string;
+          symbol : symbol option
+        }
+    | Block_approximation of
+        Tag.Scannable.t
+        * Flambda_kind.Scannable_block_shape.t
+        * t array
+        * Alloc_mode.For_types.t
+
+  let create_compilation_unit compilation_unit : compilation_unit =
+    { pack_prefix =
+        Compilation_unit.for_pack_prefix compilation_unit
+        |> Compilation_unit.Prefix.to_list
+        |> List.map Compilation_unit.Name.to_string;
+      name = Compilation_unit.name_as_string compilation_unit
+    }
+
+  let create_symbol symbol : symbol =
+    { symbol_compilation_unit =
+        create_compilation_unit (Symbol.compilation_unit symbol);
+      linkage_name = Symbol.linkage_name_as_string symbol
+    }
+
+  let create_code_id code_id : code_id =
+    { code_id_compilation_unit =
+        create_compilation_unit (Code_id.get_compilation_unit code_id);
+      code_id_name = Code_id.name code_id
+    }
+
+  let rec create (approx : _ approx) : t =
+    match approx with
+    | Unknown kind -> Unknown kind
+    | Value_symbol symbol -> Value_symbol (create_symbol symbol)
+    | Value_const const -> Value_const (Reg_width_const.descr const)
+    | Closure_approximation { code_id; function_slot; code = _; symbol } ->
+      (* The code is not saved: at demarshalling time it can be looked up via
+         the symbol, when present (see [to_approximation]). *)
+      Closure_approximation
+        { code_id = create_code_id code_id;
+          function_slot = Function_slot.name function_slot;
+          symbol = Option.map create_symbol symbol
+        }
+    | Block_approximation (tag, shape, fields, alloc_mode) ->
+      Block_approximation (tag, shape, Array.map create fields, alloc_mode)
+
+  let to_compilation_unit { pack_prefix; name } =
+    let prefix =
+      match pack_prefix with
+      | [] -> Compilation_unit.Prefix.empty
+      | _ :: _ ->
+        Compilation_unit.Prefix.parse_for_pack (String.concat "." pack_prefix)
+    in
+    Compilation_unit.create prefix (Compilation_unit.Name.of_string name)
+
+  let to_symbol { symbol_compilation_unit; linkage_name } =
+    (* [Symbol.create] would prefix the compilation unit onto the linkage name,
+       but we saved the full linkage name, so [unsafe_create] is the faithful
+       reconstruction. *)
+    Symbol.unsafe_create
+      (to_compilation_unit symbol_compilation_unit)
+      (Linkage_name.of_string linkage_name)
+
+  let to_code_id { code_id_compilation_unit; code_id_name } =
+    Code_id.create ~name:code_id_name ~debug:Debuginfo.none
+      (to_compilation_unit code_id_compilation_unit)
+
+  let rec to_approximation t
+      ~(find_code :
+         code_id:Code_id.t ->
+         function_slot:Function_slot.t ->
+         symbol:Symbol.t option ->
+         'code option) : 'code approx =
+    match t with
+    | Unknown kind -> Unknown kind
+    | Value_symbol symbol -> Value_symbol (to_symbol symbol)
+    | Value_const descr -> Value_const (Reg_width_const.of_descr descr)
+    | Closure_approximation { code_id; function_slot; symbol } -> (
+      let code_id = to_code_id code_id in
+      let function_slot =
+        (* The function slot's own compilation unit was not saved; use the code
+           ID's. *)
+        Function_slot.create
+          (Code_id.get_compilation_unit code_id)
+          ~name:function_slot ~is_always_immediate:false Flambda_kind.value
+      in
+      let symbol = Option.map to_symbol symbol in
+      match find_code ~code_id ~function_slot ~symbol with
+      | None -> Unknown Flambda_kind.value
+      | Some code ->
+        Closure_approximation { code_id; function_slot; code; symbol })
+    | Block_approximation (tag, shape, fields, alloc_mode) ->
+      Block_approximation
+        ( tag,
+          shape,
+          Array.map (fun field -> to_approximation field ~find_code) fields,
+          alloc_mode )
+
+  let to_marshalled_string t = Marshal.to_string t []
+
+  let of_marshalled_string s : t = Marshal.from_string s 0
+end

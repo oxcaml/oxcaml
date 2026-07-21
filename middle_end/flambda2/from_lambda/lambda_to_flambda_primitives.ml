@@ -3440,7 +3440,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     Misc.fatal_errorf
       "[%a] should have been removed by [Lambda_to_flambda.transform_primitive]"
       Printlambda.primitive prim
-  | Pgetglobal _, _ | Pgetpredef _, _ ->
+  | Pgetglobal _, _ | Pgetpredef _, _ | Preify_approx, _ ->
     Misc.fatal_errorf
       "[%a] should have been handled by [Closure_conversion.close_primitive]"
       Printlambda.primitive prim

@@ -510,13 +510,26 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         ap_inlined;
         ap_specialised = _;
         ap_probe
-      } ->
-    (* Note that we don't need kind information about [ap_args] since we already
-       have it on the corresponding [Simple]s in the environment. *)
-    maybe_insert_let_cont "apply_result" ap_result_layout k acc env ccenv
-      (fun acc env ccenv k ->
-        cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode
-          ap_loc ap_inlined ap_probe ap_result_layout k k_exn)
+      } -> (
+    match[@ocaml.warning "-fragile-match"] ap_func with
+    | Lprim (Preify_approx, [], _) -> (
+      (* [%reify_approx] has arity zero (its type is ['a]), so an application
+         [reify_approx foo] appears as an [Lapply] whose function is the
+         primitive itself. Rewrite to a normal one-argument primitive
+         application, handled in [Closure_conversion.close_primitive]. *)
+      match ap_args with
+      | [arg] ->
+        cps acc env ccenv (L.Lprim (Preify_approx, [arg], ap_loc)) k k_exn
+      | [] | _ :: _ ->
+        Misc.fatal_error "%reify_approx must be applied to exactly one argument"
+      )
+    | _ ->
+      (* Note that we don't need kind information about [ap_args] since we
+         already have it on the corresponding [Simple]s in the environment. *)
+      maybe_insert_let_cont "apply_result" ap_result_layout k acc env ccenv
+        (fun acc env ccenv k ->
+          cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode
+            ap_loc ap_inlined ap_probe ap_result_layout k k_exn))
   | Lfunction func ->
     let id = Ident.create_local (name_for_function func) in
     let id_duid = Flambda_debug_uid.none in

@@ -140,6 +140,7 @@ type prim =
   | Send_cache of Lambda.region_close * Lambda.layout
   | Frame_pointers
   | Identity
+  | Reify_approx
   | Apply of Lambda.region_close * Lambda.layout
   | Revapply of Lambda.region_close * Lambda.layout
   | Atomic of atomic_op * atomic_kind * Lambda.immediate_or_pointer
@@ -1079,6 +1080,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%bswap_native" -> unary (Integral (nativeint, Bswap))
     | "%int_as_pointer" -> Primitive (Pint_as_pointer mode, 1)
     | "%opaque" -> Primitive (Popaque layout, 1)
+    | "%reify_approx" -> Reify_approx
     | "%sys_argv" -> Sys_argv
     | "%send" -> Send (pos, layout)
     | "%sendself" -> Send_self (pos, layout)
@@ -2274,6 +2276,26 @@ let lambda_of_prim prim_name prim loc args arg_exps =
         Lsend(Public, meth, obj, [], apos, alloc_heap, loc, layout)
   | Frame_pointers, [] ->
      (of_bool (!Clflags.native_code && Config.with_frame_pointers))
+  | Reify_approx, [] ->
+      if !Clflags.native_code then Lprim (Preify_approx, [], loc)
+      else
+        (* Approximations do not exist in bytecode: compile to a function
+           ignoring its argument and returning the empty string (which will
+           fail demarshalling, honestly reflecting that no approximation is
+           available). *)
+        lfunction
+          ~kind:(Curried {nlocal = 0})
+          ~params:[{ name = Ident.create_local "reify_approx_arg";
+                     debug_uid = Lambda.debug_uid_none;
+                     layout = Lambda.layout_any_value;
+                     attributes = Lambda.default_param_attribute;
+                     mode = alloc_heap }]
+          ~return:Lambda.layout_string
+          ~attr:default_stub_attribute
+          ~loc
+          ~body:(Lconst (Const_immstring ""))
+          ~mode:alloc_heap
+          ~ret_mode:alloc_heap
   | Identity, [arg] -> arg
   | Apply (pos, layout), [func; arg]
   | Revapply (pos, layout), [arg; func] ->
@@ -2318,7 +2340,7 @@ let lambda_of_prim prim_name prim loc args arg_exps =
   | (Raise _ | Raise_with_backtrace
     | Lazy_force _ | Loc _ | Primitive _ | Sys_argv | Comparison _
     | Send _ | Send_self _ | Send_cache _ | Frame_pointers | Identity
-    | Apply _ | Revapply _ | Peek _ | Poke _), _ ->
+    | Reify_approx | Apply _ | Revapply _ | Peek _ | Poke _), _ ->
       raise(Error(to_location loc, Wrong_arity_builtin_primitive prim_name))
 
 let check_primitive_arity loc p =
@@ -2350,7 +2372,7 @@ let check_primitive_arity loc p =
     | Loc _ -> p.prim_arity = 1 || p.prim_arity = 0
     | Send _ | Send_self _ -> p.prim_arity = 2
     | Send_cache _ -> p.prim_arity = 4
-    | Frame_pointers -> p.prim_arity = 0
+    | Frame_pointers | Reify_approx -> p.prim_arity = 0
     | Identity | Peek _ -> p.prim_arity = 1
     | Apply _ | Revapply _ | Poke _ -> p.prim_arity = 2
     | Atomic (op, kind, _) -> p.prim_arity = atomic_arity op kind
@@ -2583,7 +2605,7 @@ let lambda_primitive_needs_event_after = function
   | Patomic_add_field | Patomic_sub_field
   | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
   | Patomic_load_field _ | Patomic_set_field _
-  | Pcpu_relax | Pctconst _ | Pint_as_pointer _ | Popaque _
+  | Pcpu_relax | Pctconst _ | Pint_as_pointer _ | Popaque _ | Preify_approx
   | Pdls_get
   | Ptls_get
   | Pdomain_index
@@ -2607,7 +2629,7 @@ let primitive_needs_event_after = function
   | Lazy_force _ | Send _ | Send_self _ | Send_cache _
   | Apply _ | Revapply _ -> true
   | Raise _ | Raise_with_backtrace | Loc _ | Frame_pointers | Identity
-  | Peek _ | Poke _ | Atomic _ | Unsupported _ -> false
+  | Reify_approx | Peek _ | Poke _ | Atomic _ | Unsupported _ -> false
 
 let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
     path exp args arg_exps pos =

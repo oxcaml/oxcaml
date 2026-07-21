@@ -1309,11 +1309,30 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Ptls_get | Pdomain_index | Ppoll | Patomic_load_field _
       | Patomic_set_field _ | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
-      | Pscalar _ | Pphys_equal _ | Pcpu_relax ->
+      | Pscalar _ | Pphys_equal _ | Pcpu_relax | Preify_approx ->
         (* Inconsistent with outer match *)
         assert false
     in
     k acc [Named.create_simple (Simple.symbol sym)]
+  | Preify_approx, [[arg]] ->
+    (* [reify_approx foo] turns into a constant string literal giving the
+       marshalled [Value_approximation.Standalone.t] form of [foo]'s
+       approximation. *)
+    let approx = find_value_approximation_through_symbol acc env arg in
+    let marshalled =
+      Value_approximation.Standalone.to_marshalled_string
+        (Value_approximation.Standalone.create approx)
+    in
+    let acc, sym =
+      register_const0 acc
+        (Static_const.immutable_string marshalled)
+        "reified_approx"
+    in
+    k acc [Named.create_simple (Simple.symbol sym)]
+  | Preify_approx, ([] | _ :: _) ->
+    Misc.fatal_error
+      "%reify_approx must be applied to exactly one argument (and cannot be \
+       used as a first-class function)"
   | ( ( Pperform | Pwith_stack | Pwith_stack_preemptible | Pcontinue
       | Pdiscontinue | Pdiscontinue_with_backtrace | Preperform ),
       args ) ->

@@ -384,6 +384,10 @@ type primitive =
   | Patomic_lxor_field
   (* Inhibition of optimisation *)
   | Popaque of layout
+  (* Reification of classic-mode approximations (native code only); takes no
+     arguments, but see the special cases in [Translcore] and
+     [Lambda_to_flambda] concerning applications of this primitive. *)
+  | Preify_approx
   (* Statically-defined probes *)
   | Pprobe_is_enabled of { name: string; enabled_at_init: bool option }
   (* Primitives for [Obj] *)
@@ -2561,6 +2565,8 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pctconst _ -> None
   | Pint_as_pointer m -> Some m
   | Popaque _ -> None
+  (* The result of [Preify_approx] is a statically-allocated string. *)
+  | Preify_approx -> None
   | Pprobe_is_enabled _ -> None
   | Pobj_dup -> Some alloc_heap
   | Pobj_magic _ -> None
@@ -2761,7 +2767,7 @@ let primitive_can_raise prim =
   | Punboxed_int32_array_set_vec { unsafe = true; _ }
   | Punboxed_int64_array_set_vec { unsafe = true; _ }
   | Punboxed_nativeint_array_set_vec { unsafe = true; _ }
-  | Pctconst _ | Pint_as_pointer _ | Popaque _
+  | Pctconst _ | Pint_as_pointer _ | Popaque _ | Preify_approx
   | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _
   | Pbox_vector (_, _) | Punbox_vector _
   | Pjoin_vec256 | Psplit_vec256
@@ -3069,7 +3075,7 @@ let primitive_result_layout (p : primitive) =
      | Naked (Floating (Float32 Any_locality_mode)) ->
        layout_unboxed_float Unboxed_float32)
   | Popaque layout | Pobj_magic layout -> layout
-  | Pbytes_to_string | Pbytes_of_string -> layout_string
+  | Preify_approx | Pbytes_to_string | Pbytes_of_string -> layout_string
   | Pignore | Psetfield _ | Psetfield_computed _ | Psetfloatfield _ | Poffsetref _
   | Psetufloatfield _ | Psetmixedfield _
   | Pbytessetu | Pbytessets | Parraysetu _ | Parraysets _ | Pbigarrayset _

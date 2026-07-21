@@ -549,6 +549,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         (* in bytecode we only deal with boxed+tagged floats/ints/units *)
         comp_expr arg
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
+    | Preify_approx ->
+      (* [Translprim] compiles [%reify_approx] to a stub function in
+         bytecode; the primitive itself only occurs in native code. *)
+      Misc.fatal_error "Preify_approx should not occur in bytecode"
     | Punbox_unit -> (
       match args with
       | [x] -> comp_expr x

@@ -378,6 +378,10 @@ type primitive =
   | Patomic_lxor_field
   (* Inhibition of optimisation *)
   | Popaque of layout
+  (* Reification of classic-mode approximations (native code only); takes no
+     arguments, but see the special cases in [Translcore] and
+     [Lambda_to_flambda] concerning applications of this primitive. *)
+  | Preify_approx
   (* Statically-defined probes *)
   | Pprobe_is_enabled of { name: string; enabled_at_init: bool option }
   (* Primitives for [Obj] *)
