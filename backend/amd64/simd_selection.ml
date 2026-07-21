@@ -1418,9 +1418,10 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Specific _ | Alloc _
       | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_float32 _
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-      | Const_vec512 _ | Stackoffset _ | Int128op _ | Intop_atomic _ | Floatop _
-      | Csel _ | Probe_is_enabled _ | Opaque | Begin_region | End_region | Pause
-      | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll ->
+      | Const_vec512 _ | Const_mask _ | Stackoffset _ | Int128op _
+      | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
+      | Begin_region | End_region | Pause | Name_for_debugger _ | Dls_get
+      | Tls_get | Domain_index | Poll ->
         assert false
     in
     assert (arg_count = 0 && res_count = 1);
@@ -1473,10 +1474,10 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Move | Load _ | Store _ | Intop _ | Specific _ | Alloc _
       | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
       | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Int128op _
-      | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
-      | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
-      | Domain_index | Poll | Pause ->
+      | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _
+      | Int128op _ | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _
+      | Opaque | Begin_region | End_region | Name_for_debugger _ | Dls_get
+      | Tls_get | Domain_index | Poll | Pause ->
         assert false
     in
     let consts = List.map extract_intop_imm_int cfg_ops in
@@ -1516,10 +1517,10 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Alloc _
         | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
         | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-        | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Int128op _
-        | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
-        | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
-        | Domain_index | Poll | Pause ->
+        | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _
+        | Int128op _ | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _
+        | Opaque | Begin_region | End_region | Name_for_debugger _ | Dls_get
+        | Tls_get | Domain_index | Poll | Pause ->
           assert false
       in
       let get_scale op =
@@ -1649,10 +1650,11 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
           | Intop_imm _ | Move | Load _ | Store _ | Intop _ | Int128op _
           | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
           | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-          | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-          | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
-          | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
-          | Domain_index | Poll | Pause ->
+          | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
+          | Stackoffset _ | Intop_atomic _ | Floatop _ | Csel _
+          | Probe_is_enabled _ | Opaque | Begin_region | End_region
+          | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll
+          | Pause ->
             assert false
         in
         let consts = List.map extract_store_int_imm cfg_ops in
@@ -1755,7 +1757,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         intr)
   | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
   | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-  | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Int128op _
+  | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _ | Int128op _
   | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Pause
   | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
   | Domain_index | Poll ->

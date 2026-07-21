@@ -24,6 +24,7 @@ let operation_body ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf =
   | Const_vec512 { word0; word1; word2; word3; word4; word5; word6; word7 } ->
     fprintf ppf "%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx" word0
       word1 word2 word3 word4 word5 word6 word7
+  | Const_mask n -> fprintf ppf "%016Lx" n
   | Stackoffset n -> fprintf ppf "offset stack %i" n
   | Load { memory_chunk; addressing_mode; mutability = Immutable; is_atomic } ->
     fprintf ppf "%s%s[%a]"

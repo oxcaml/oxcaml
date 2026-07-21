@@ -131,12 +131,12 @@ let add_hard_mask_regs list ~f =
   if Arch.Extension.enabled_vec512 ()
   then f hard_mask_reg :: list else list
 
-let all_phys_regs =
+let all_phys_regs = lazy ((* To be forced after flags are parsed. *)
   [hard_int_reg; hard_float_reg; hard_float32_reg; hard_vec128_reg]
   |> add_hard_vec256_regs ~f:(fun regs -> regs)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
   |> add_hard_mask_regs ~f:(fun regs -> regs)
-  |> Array.concat
+  |> Array.concat)
 
 let phys_reg ty (phys_reg : Regs.Phys_reg.t) =
   let index_in_class = Regs.index_in_class phys_reg in
@@ -209,17 +209,20 @@ let calling_conventions
   in
   for i = 0 to Array.length arg - 1 do
     let ty : machtype_component = arg.(i) in
-    let registers, size =
+    let registers, size, ty =
       match ty with
-      | Val | Int | Addr -> int_registers, size_int
-      | Float | Float32 -> float_registers, size_float
-      | Vec128 -> float_registers, size_vec128
-      | Vec256 -> float_registers, size_vec256
-      | Vec512 -> float_registers, size_vec512
+      | Val | Int | Addr -> int_registers, size_int, ty
+      | Float | Float32 -> float_registers, size_float, ty
+      | Vec128 -> float_registers, size_vec128, ty
+      | Vec256 -> float_registers, size_vec256, ty
+      | Vec512 -> float_registers, size_vec512, ty
       | Mask -> (
         match mask_registers with
-        | Some mask_registers -> mask_registers, size_int
-        | None -> Misc.fatal_error "Unsupported machtype_component Mask")
+        | Some mask_registers -> mask_registers, size_int, ty
+        | None ->
+          (* The C ABI passes masks in GPRs. The location is typed [Int] so
+             that instruction selection inserts the mask<->GPR conversions. *)
+          int_registers, size_int, Int)
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
     in
     match !registers with
@@ -396,7 +399,7 @@ let int_regs_destroyed_at_c_call =
        Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9; R13; R10; R11|]
   else Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9;      R10; R11|]
 
-let destroyed_at_c_call_win64 =
+let destroyed_at_c_call_win64 = lazy ((* To be forced after flags are parsed. *)
   (* Win64: rbx, rbp, rsi, rdi, r12-r15, xmm6-xmm15 preserved *)
   [ Array.map (fun p -> phys_reg Int (P p)) int_regs_destroyed_at_c_call_win64;
     Array.sub hard_float_reg 0 6;
@@ -405,9 +408,9 @@ let destroyed_at_c_call_win64 =
   |> add_hard_vec256_regs ~f:(fun regs -> Array.sub regs 0 6)
   |> add_hard_vec512_regs ~f:(fun regs -> Array.sub regs 0 6)
   |> add_hard_mask_regs ~f:(fun regs -> regs)
-  |> Array.concat
+  |> Array.concat)
 
-let destroyed_at_c_call_unix =
+let destroyed_at_c_call_unix = lazy ((* To be forced after flags are parsed. *)
   (* Unix: rbx, rbp, r12-r15 preserved *)
   [ Array.map (fun p -> phys_reg Int (P p)) int_regs_destroyed_at_c_call;
     hard_float_reg;
@@ -416,7 +419,7 @@ let destroyed_at_c_call_unix =
   |> add_hard_vec256_regs ~f:(fun regs -> regs)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
   |> add_hard_mask_regs ~f:(fun regs -> regs)
-  |> Array.concat
+  |> Array.concat)
 
 let destroyed_at_c_call =
   (* C calling conventions preserve rbx, but it is clobbered
@@ -510,7 +513,7 @@ let destroyed_by_simd_mem_op (instr : Simd.Mem.operation) =
   match instr with
   | Load op | Store op -> destroyed_by_simd_op op
 
-let destroyed_at_raise = all_phys_regs
+let destroyed_at_raise () = Lazy.force all_phys_regs
 
 let destroyed_at_reloadretaddr = [| |]
 
@@ -570,7 +573,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         intr
   | Op (Move | Spill | Reload | Const_int _
        | Const_float _ | Const_float32 _ | Const_symbol _
-       | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+       | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
        | Stackoffset _
        | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr
                | Iasr | Ipopcnt | Iclz | Ictz
@@ -616,11 +619,15 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
                           stack_ofs; stack_align = _; effects = _; }; _} ->
     assert (stack_ofs >= 0);
-    if alloc || stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
+    if alloc || stack_ofs > 0
+    then Lazy.force all_phys_regs
+    else Lazy.force destroyed_at_c_call
   | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
     assert (stack_ofs >= 0);
-    if stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
-  | Call {op = Indirect _ | Direct _; _} -> all_phys_regs
+    if stack_ofs > 0
+    then Lazy.force all_phys_regs
+    else Lazy.force destroyed_at_c_call
+  | Call {op = Indirect _ | Direct _; _} -> Lazy.force all_phys_regs
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
    We current return `true` when `destroyed_at_terminator` returns
@@ -720,7 +727,7 @@ let clear_pending_jit_run () = ()
 (* Precolored_regs is not always the same as [all_phys_regs], as some physical registers
    may not be allocatable (e.g. rbp when frame pointers are enabled). *)
 let precolored_regs () =
-  let phys_regs = Reg.set_of_array all_phys_regs in
+  let phys_regs = Reg.set_of_array (Lazy.force all_phys_regs) in
   if fp then Reg.Set.remove rbp phys_regs else phys_regs
 
 let has_three_operand_float_ops () = Arch.Extension.enabled AVX
@@ -733,6 +740,8 @@ let operation_supported = function
   | Creinterpret_cast (V512_of_vec _ | V128_of_vec Vec512 | V256_of_vec Vec512)
   | Cstatic_cast (V512_of_scalar _ | Scalar_of_v512 _) ->
     Arch.Extension.enabled_vec512 ()
+  | Creinterpret_cast (Mask_of_int64 | Int64_of_mask) ->
+    Arch.Extension.enabled AVX512BW
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi

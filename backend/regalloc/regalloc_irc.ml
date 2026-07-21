@@ -96,7 +96,8 @@ let build : State.t -> Cfg_with_infos.t -> unit =
         let live = InstructionId.Tbl.find liveness first_id in
         Reg.Set.iter
           (fun reg1 ->
-            Array.iter (filter_unavailable Proc.destroyed_at_raise)
+            Array.iter
+              (filter_unavailable (Proc.destroyed_at_raise ()))
               ~f:(fun reg2 -> State.add_edge state reg1 reg2))
           (Reg.Set.remove Proc.loc_exn_bucket live.before))
 

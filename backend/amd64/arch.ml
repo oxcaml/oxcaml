@@ -147,10 +147,15 @@ module Extension = struct
     | SSE4_2, AVX
     | AVX, AVX2
     | AVX2, AVX512F
-    | AVX512F, AVX512DQ
+    (* AVX512F, CD, VL, DQ and BW are mutually required. *)
     | AVX512F, AVX512CD
+    | AVX512CD, AVX512F
+    | AVX512F, AVX512DQ
+    | AVX512DQ, AVX512F
     | AVX512F, AVX512BW
+    | AVX512BW, AVX512F
     | AVX512F, AVX512VL
+    | AVX512VL, AVX512F
     | BMI, BMI2 -> true
     | (POPCNT | LZCNT | PREFETCHW | PREFETCHWT1 | SSE3 | SSSE3 | SSE4_1 |
        SSE4_2 | CLMUL | BMI | BMI2 | AVX | AVX2 | F16C | FMA | AVX512F |
@@ -622,7 +627,8 @@ let equal_specific_operation left right =
     Simd.Mem.equal_operation l r && equal_addressing_mode al ar
   | Illvm_intrinsic l, Illvm_intrinsic r -> String.equal l r
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
-     Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
+     Isextend32 | Izextend32 |
+     Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
      Illvm_intrinsic _), _ ->
     false
@@ -734,7 +740,8 @@ let isomorphic_specific_operation op1 op2 =
     Simd.Mem.equal_operation l r && equal_addressing_mode_without_displ al ar
   | Illvm_intrinsic l, Illvm_intrinsic r -> String.equal l r
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
-     Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
+     Isextend32 | Izextend32 |
+     Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
      Illvm_intrinsic _), _ ->
     false
