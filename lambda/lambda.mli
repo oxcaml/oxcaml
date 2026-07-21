@@ -367,8 +367,8 @@ type primitive =
   | Patomic_load_field of { immediate_or_pointer : immediate_or_pointer }
   | Patomic_load_mixed_field of {
     index : int;
-    (** The field being accessed. This is an index into [shape], not a field
-        index. See [Pmixedfield] for more details. *)
+    (** The field being accessed. Like [Pmixedfield]'s path, this is an index
+        into [shape] -- not a field index. *)
     shape : mixed_block_shape;
   }
   | Patomic_set_field of { immediate_or_pointer : immediate_or_pointer }

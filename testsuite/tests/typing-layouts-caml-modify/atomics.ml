@@ -223,18 +223,31 @@ type t = { mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
 
 let () =
   let t = { imm = 1; ptr = "two"} in
-  test_atomic_exchange_field ~expected:1 (fun () ->
+  test_atomic_exchange_field ~expected:0 (fun () ->
     t.imm <- 3;
+    ignore (Sys.opaque_identity t)
+  )
+
+let () =
+  let t = { imm = 1; ptr = "two"} in
+  test_atomic_exchange_field ~expected:1 (fun () ->
     t.ptr <- "four";
     ignore (Sys.opaque_identity t)
   )
 
 (* Patomic_set_mixed_field skips runtime call for immediates. *)
 type mixed = { f : int64#; mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+
+let () =
+  let m = { f = #42L; imm = 1; ptr = "two"} in
+  test_atomic_exchange_field ~expected:0 (fun () ->
+    m.imm <- 3;
+    ignore (Sys.opaque_identity m)
+  )
+
 let () =
   let m = { f = #42L; imm = 1; ptr = "two"} in
   test_atomic_exchange_field ~expected:1 (fun () ->
-    m.imm <- 3;
     m.ptr <- "four";
     ignore (Sys.opaque_identity m)
   )

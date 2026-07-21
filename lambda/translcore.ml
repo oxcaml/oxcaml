@@ -823,7 +823,7 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
           in
           if Types.is_atomic lbl.lbl_mut then
             (* Patomic_load_mixed_field doesn't care about locality mode;
-               @@flatten_floats doesn't accept records with atomic fields. *)
+               [@@flatten_floats] doesn't accept records with atomic fields. *)
             let shape = strip_locality_mode shape in
             Some
               (Patomic_load_mixed_field { index = lbl.lbl_pos; shape }, [targ])
