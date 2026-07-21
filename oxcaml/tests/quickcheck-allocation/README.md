@@ -24,6 +24,12 @@ Flags:
   `soundness` favors programs the frontend should accept (immediates,
   `exclave_`), hunting FE-accept & BE-reject bugs; `completeness` favors
   non-allocating computation the frontend may conservatively reject
+- `-out DIR` -- save witness .ml files to DIR (created if missing): every
+  soundness suspect, plus the first-seen witness of each distinct
+  frontend-rejection cause. File names embed the seed
+  (`suspect_seed0042.ml`, `fe_reject_seed0007.ml`). Without this flag,
+  nothing is saved: programs live in temp files only for the duration of
+  their compiles, and results exist only on stdout
 
 Pass the compiler as an absolute path (it is invoked via the shell). The fuzz
 loop can also be run via its alias, which uses the just-built `ocamlopt.opt`

@@ -1,10 +1,10 @@
 (* Type-directed program generator. See DESIGN.md, "Generation".
 
-      Structure follows the in-repo precedent of
-   testsuite/tests/comprehensions/quickcheck_lists_arrays_haskell_python.ml: a typed AST
-   ([Expr]), a type-directed generator that only produces well-typed terms, and a
-   pretty-printer. A single program is emitted, carrying both annotations on the
-   function under test (see [Sample]).
+   Structure follows the in-repo precedent of
+   testsuite/tests/comprehensions/quickcheck_lists_arrays_haskell_python.ml: a
+   typed AST ([Expr]), a type-directed generator that only produces well-typed
+   terms, and a pretty-printer. A single program is emitted, carrying both
+   annotations on the function under test (see [Sample]).
 
    Tier A (milestone 2): construction of one layer -- tuples, records (int and
    float), variants, lists, arrays -- plain vs [exclave_]-wrapped, plus
@@ -210,6 +210,8 @@ let rec gen_expr ctx env ty fuel =
     Expr.Var x
   in
   let let_in () =
+    (* CR shsong: Here let only allow bind with small_ty; we may need to allow
+       more flexibility here. *)
     let bound_ty = small_ty ctx in
     let x = fresh ctx in
     let e1 = gen_expr ctx env bound_ty (fuel - 1) in
@@ -300,18 +302,17 @@ let generate ~mode ~seed =
   let env = ["x0", Ty.Int; "x1", Ty.Float] in
   let ty = goal_ty ctx in
   let body = maybe_exclave ctx ty (gen_expr ctx env ty initial_fuel) in
-    (* No return-type annotation is emitted since a plain [: ty] could interact with
-     mode inference. Both annotations go on the same function: [@ noalloc_strict]
-     drives the frontend check (and forces the body's allocations local), and
-     [@zero_alloc strict] makes the backend check exactly that typed program. *)
+  (* No return-type annotation is emitted since a plain [: ty] could interact
+     with mode inference. Both annotations go on the same function: [@
+     noalloc_strict] drives the frontend check (and forces the body's
+     allocations local), and [@zero_alloc strict] makes the backend check
+     exactly that typed program. *)
   let header = Printf.sprintf "(* goal: %s *)\n" (Ty.to_string ty) in
   let body_str = Expr.to_string body in
   let source =
     Printf.sprintf
-      "%s%slet[@zero_alloc strict] (f @ noalloc_strict) (x0 : int) (x1 : float) = %s\n"
-      prelude
-      header
-      body_str
+      "%s%slet[@zero_alloc strict] (f @ noalloc_strict) (x0 : int) (x1 : \
+       float) = %s\n"
+      prelude header body_str
   in
   { Sample.source }
-;;

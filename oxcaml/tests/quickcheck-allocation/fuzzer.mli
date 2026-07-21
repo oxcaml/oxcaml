@@ -44,3 +44,10 @@ val run :
   compiler:string -> count:int -> seed0:int -> mode:Gen.Mode.t -> Stats.t
 
 val report : Stats.t -> unit
+
+(* Save witness .ml files to [dir] (created if missing): every soundness
+   suspect, and the first-seen witness of each distinct frontend-rejection
+   cause. File names embed the seed (e.g. suspect_seed0042.ml,
+   fe_reject_seed0007.ml), so any witness can be re-run with
+   [-count 1 -seed N]. *)
+val save : Stats.t -> dir:string -> unit

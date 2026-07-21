@@ -81,6 +81,48 @@ let run ~compiler ~count ~seed0 ~mode =
   done;
   stats
 
+(* Keep header comments from being terminated early should a cause ever contain
+   "*)". *)
+let comment_safe s =
+  let buf = Buffer.create (String.length s) in
+  String.iteri
+    (fun i c ->
+      if c = ')' && i > 0 && s.[i - 1] = '*'
+      then Buffer.add_string buf " )"
+      else Buffer.add_char buf c)
+    s;
+  Buffer.contents buf
+
+let save stats ~dir =
+  if not (Sys.file_exists dir) then Sys.mkdir dir 0o755;
+  let saved = ref 0 in
+  let write name header source =
+    let oc = open_out (Filename.concat dir name) in
+    output_string oc header;
+    output_string oc source;
+    close_out oc;
+    incr saved
+  in
+  List.iter
+    (fun { Suspect.seed; sample; backend_error = _ } ->
+      write
+        (Printf.sprintf "suspect_seed%04d.ml" seed)
+        (Printf.sprintf "(* seed=%d; FE-accept & BE-reject *)\n" seed)
+        (Gen.Sample.to_string sample))
+    (Stats.suspects stats);
+  let seen_causes = Hashtbl.create 16 in
+  List.iter
+    (fun { Gap.seed; cause; sample } ->
+      if not (Hashtbl.mem seen_causes cause)
+      then (
+        Hashtbl.replace seen_causes cause ();
+        write
+          (Printf.sprintf "fe_reject_seed%04d.ml" seed)
+          (Printf.sprintf "(* seed=%d; %s *)\n" seed (comment_safe cause))
+          (Gen.Sample.to_string sample)))
+    (Stats.gaps stats);
+  Printf.printf "\nsaved %d witness files to %s\n" !saved dir
+
 let report stats =
   let suspects = Stats.suspects stats in
   let gaps = Stats.gaps stats in
