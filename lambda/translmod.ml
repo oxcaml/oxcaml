@@ -1551,10 +1551,10 @@ and transl_local_instance ~(gm : Global_module.t) ~chain
   in
   (* [gm]'s [visible_args] thread into inner runtime params. *)
   let visible_arg_map =
-    List.fold_left
-      (fun map (a : _ Global_module.Argument.t) ->
-        Global_module.Parameter_name.Map.add a.param a.value map)
-      Global_module.Parameter_name.Map.empty gm.visible_args
+    List.map
+      (fun (a : _ Global_module.Argument.t) -> (a.param, a.value))
+      gm.visible_args
+    |> Global_module.Parameter_name.Map.of_list
   in
   let process_one (rp : Lambda.runtime_param) module_ids ~k =
     match rp with
