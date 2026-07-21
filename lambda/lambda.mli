@@ -169,11 +169,11 @@ type primitive =
   | Pidx_deepen of unit mixed_block_element * int list
   (* Context switches *)
   | Pwith_stack
-  | Pwith_stack_bind
   | Pwith_stack_preemptible
-  | Pwith_stack_bind_preemptible
   | Pperform
-  | Presume
+  | Pcontinue
+  | Pdiscontinue
+  | Pdiscontinue_with_backtrace
   | Preperform
   (* External call *)
   | Pccall of external_call_description

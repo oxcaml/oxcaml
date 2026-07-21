@@ -3,7 +3,7 @@
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 module List = ListLabels
 module String = Misc.Stdlib.String
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 let function_is_assumed_to_never_poll func =
   String.begins_with ~prefix:"caml_apply" func
@@ -329,7 +329,9 @@ let instr_cfg_with_layout :
         let poll =
           { after.terminator with
             Cfg.id = next_instruction_id ();
-            Cfg.desc = Cfg.Op Poll
+            Cfg.desc = Cfg.Op Poll;
+            Cfg.arg = [||];
+            Cfg.res = [||]
           }
         in
         (match

@@ -61,6 +61,7 @@ type abstract_non_value_type_constr = [
   | `Nativeint_u
   | `Int32_u
   | `Int64_u
+  | `Float32_u
   | `Idx_imm
   | `Idx_mut
   | `Int8x16
@@ -166,6 +167,7 @@ let simd_alpha_extension_type_constrs : type_constr list = [
 
 let small_number_extension_type_constrs : type_constr list = [
   `Float32;
+  `Float32_u;
   `Int8;
   `Int16;
 ]
@@ -219,6 +221,7 @@ and ident_box = ident_create "box"
 and ident_nativeint_u = ident_create "nativeint_u"
 and ident_int32_u = ident_create "int32_u"
 and ident_int64_u = ident_create "int64_u"
+and ident_float32_u = ident_create "float32_u"
 and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
 and ident_idx_mut = ident_create "idx_mut"
@@ -277,6 +280,7 @@ let ident_of_type_constr : type_constr -> Ident.t = function
   | `Nativeint_u -> ident_nativeint_u
   | `Int32_u -> ident_int32_u
   | `Int64_u -> ident_int64_u
+  | `Float32_u -> ident_float32_u
   | `Idx_imm -> ident_idx_imm
   | `Idx_mut -> ident_idx_mut
   | `Int8x16 -> ident_int8x16
@@ -330,6 +334,7 @@ and path_lexing_position = Pident ident_lexing_position
 and path_nativeint_u = Pident ident_nativeint_u
 and path_int32_u = Pident ident_int32_u
 and path_int64_u = Pident ident_int64_u
+and path_float32_u = Pident ident_float32_u
 and path_idx_imm = Pident ident_idx_imm
 and path_idx_mut = Pident ident_idx_mut
 and path_code = Pident ident_code
@@ -439,6 +444,7 @@ and type_unboxed_int16 = tconstr path_unboxed_int16 []
 and type_nativeint_u = tconstr path_nativeint_u []
 and type_int32_u = tconstr path_int32_u []
 and type_int64_u = tconstr path_int64_u []
+and type_float32_u = tconstr path_float32_u []
 and type_or_null t = tconstr path_or_null [t]
 and type_idx_imm t1 t2 = tconstr path_idx_imm [t1; t2]
 and type_idx_mut t1 t2 = tconstr path_idx_mut [t1; t2]
@@ -616,6 +622,32 @@ let or_null_kind tvar =
 let decl_of_type_constr type_constr =
   let type_ident = ident_of_type_constr type_constr in
   let type_uid = Uid.of_predef_id type_ident in
+  (* The unboxed versions explicitly added to the predef are abstract, as they
+     are special-cased; other unboxed versions are automatically derived. *)
+  let mk_unboxed_version ~params ~variance ~separability
+      (unboxed_jkind : Jkind.Const.Builtin.t) =
+    let type_jkind =
+      Jkind.of_builtin ~why:(Unboxed_primitive type_ident) unboxed_jkind
+      |> Jkind.mark_best
+    in
+    { type_params = params;
+      type_arity = List.length params;
+      type_kind = Type_abstract Definition;
+      type_jkind;
+      type_ikind = ikind_of_jkind ~params type_jkind;
+      type_loc = Location.none;
+      type_private = Asttypes.Public;
+      type_manifest = None;
+      type_variance = variance;
+      type_separability = separability;
+      type_is_newtype = false;
+      type_expansion_scope = lowest_level;
+      type_attributes = [];
+      type_unboxed_default = false;
+      type_uid = Uid.unboxed_version type_uid;
+      type_unboxed_version = None;
+    }
+  in
   let decl0
       ?(kind = Type_abstract Definition)
       ~(jkind : jkind_l)
@@ -623,36 +655,10 @@ let decl_of_type_constr type_constr =
       ?manifest
       ()
     =
-    let type_unboxed_version = match unboxed_jkind with
-      | None -> None
-      | Some unboxed_jkind ->
-        let type_jkind =
-          Jkind.of_builtin ~why:(Unboxed_primitive type_ident) unboxed_jkind
-        in
-        let type_jkind = Jkind.mark_best type_jkind in
-        let type_ikind = ikind_of_jkind ~params:[] type_jkind in
-        (* All unboxed versions of types explicitly added in the predef are
-           abstract, as they are special cased. Other unboxed versions are
-           automatically derived. *)
-        let type_kind = Type_abstract Definition in
-        Some {
-          type_params = [];
-          type_arity = 0;
-          type_kind;
-          type_jkind;
-          type_ikind;
-          type_loc = Location.none;
-          type_private = Asttypes.Public;
-          type_manifest = None;
-          type_variance = [];
-          type_separability = [];
-          type_is_newtype = false;
-          type_expansion_scope = lowest_level;
-          type_attributes = [];
-          type_unboxed_default = false;
-          type_uid = Uid.unboxed_version type_uid;
-          type_unboxed_version = None;
-        }
+    let type_unboxed_version =
+      Option.map
+        (mk_unboxed_version ~params:[] ~variance:[] ~separability:[])
+        unboxed_jkind
     in
     let type_jkind = Jkind.mark_best jkind in
     let type_ikind = ikind_of_jkind ~params:[] type_jkind in
@@ -681,11 +687,18 @@ let decl_of_type_constr type_constr =
       ?(separability = Separability.Ind)
       ?(kind = fun _ -> Type_abstract Definition)
       ?manifest
+      ?(unboxed_jkind : Jkind.Const.Builtin.t option)
       ()
     =
     let param = newgenvar param_jkind in
     let base = decl0 ~jkind:(jkind param) ~kind:(kind param) () in
     let manifest = Option.map (fun f -> f param) manifest in
+    let type_unboxed_version =
+      Option.map
+        (mk_unboxed_version ~params:[param] ~variance:[variance]
+           ~separability:[separability])
+        unboxed_jkind
+    in
     { base with
       type_params = [param];
       type_arity = 1;
@@ -693,6 +706,7 @@ let decl_of_type_constr type_constr =
       type_variance = [variance];
       type_separability = [separability];
       type_manifest = manifest;
+      type_unboxed_version;
     }
   in
   let decl2
@@ -815,6 +829,7 @@ let decl_of_type_constr type_constr =
       ~jkind:(builtin2 Jkind.Const.Builtin.value) ()
   | `Array ->
     decl1 ~variance:Variance.full ~param_jkind:Jkind.for_array_argument
+       ~unboxed_jkind:Jkind.Const.Builtin.any
        ~jkind:(fun param ->
          Jkind.Builtin.mutable_data ~why:(Primitive ident_array) |>
          Jkind.add_with_bounds
@@ -834,6 +849,7 @@ let decl_of_type_constr type_constr =
   | `Iarray ->
       decl1 ~variance:Variance.covariant
        ~param_jkind:Jkind.for_array_argument
+       ~unboxed_jkind:Jkind.Const.Builtin.any
        ~jkind:(fun param ->
          Jkind.Builtin.immutable_data ~why:(Primitive ident_iarray) |>
          Jkind.add_with_bounds
@@ -880,6 +896,9 @@ let decl_of_type_constr type_constr =
   | `Int64_u ->
     decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int64)
       ~manifest:(tconstr (Path.unboxed_version path_int64) []) ()
+  | `Float32_u ->
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_float32)
+      ~manifest:(tconstr (Path.unboxed_version path_float32) []) ()
   | `Idx_imm ->
     decl2 ~variance:(Variance.full, Variance.covariant)
        ~param_jkinds:(

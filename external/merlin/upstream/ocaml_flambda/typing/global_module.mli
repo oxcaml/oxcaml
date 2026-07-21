@@ -11,20 +11,25 @@ module Parameter_name : sig
 end
 
 type 'value duplicate =
-  | Duplicate of { name : Parameter_name.t; value1 : 'value; value2 : 'value }
+  | Duplicate of
+      { name : Parameter_name.t;
+        value1 : 'value;
+        value2 : 'value
+      }
 
 module Argument : sig
-  type 'value t = {
-    param : Parameter_name.t;
-    value : 'value;
-  }
+  type 'value t =
+    { param : Parameter_name.t;
+      value : 'value
+    }
 end
 
 module Name : sig
-  type t = private {
-    head : string;
-    args : argument list;
-  }
+  type t = private
+    { head : string;
+      args : argument list
+    }
+
   and argument = t Argument.t
 
   include Identifiable.S with type t := t
@@ -78,22 +83,25 @@ end
     appear in [m.ml] and [m.cmi]. But further specialisation requires passing
     specifically a [Y[X:Foo]] rather than a [Y]. (Here, [Y[X:Foo]] stands for
     the record [{ head = Y; visible_args = [ X, Foo ]; hidden_args = [] }] of
-    type [t].)
-*)
-type t = private {
-  head : string;
-  visible_args : argument list;
-  hidden_args : argument list;
-}
+    type [t].) *)
+type t = private
+  { head : string;
+    visible_args : argument list;
+    hidden_args : argument list
+  }
+
 and argument = t Argument.t
 
 include Identifiable.S with type t := t
 
-val create
-   : string -> argument list -> hidden_args:Parameter_name.t list
-  -> (t, t duplicate) Result.t
+val create :
+  string ->
+  argument list ->
+  hidden_args:Parameter_name.t list ->
+  (t, t duplicate) Result.t
 
-val create_exn : string -> argument list -> hidden_args:Parameter_name.t list -> t
+val create_exn :
+  string -> argument list -> hidden_args:Parameter_name.t list -> t
 
 val to_string : t -> string
 
@@ -107,10 +115,10 @@ type subst = t Parameter_name.Map.t
 (** Apply a substitution to the given global. If it appears in the substitution
     directly (that is, its [Name.t] form is a key in the map), this simply
     performs a lookup. Otherwise, we perform a _revealing substitution_: if the
-    value of a hidden argument is a key in the substitution, the argument becomes
-    visible. Otherwise, substitution recurses into arguments (both hidden and
-    visible) as usual. See [global_test.ml] for examples. *)
-val subst : t -> subst -> t * [ `Changed | `Did_not_change ]
+    value of a hidden argument is a key in the substitution, the argument
+    becomes visible. Otherwise, substitution recurses into arguments (both
+    hidden and visible) as usual. See [global_test.ml] for examples. *)
+val subst : t -> subst -> t * [`Changed | `Did_not_change]
 
 (** Apply a substitution to the arguments and parameters in [t] but not to [t]
     itself. Useful if [subst] is constructed from some parameter-argument pairs
@@ -121,8 +129,8 @@ val subst_inside : t -> subst -> t
 
 val find_in_parameter_map : t -> 'a Parameter_name.Map.t -> 'a option
 
-(** Check that a substitution is a valid (possibly partial) instantiation of
-    a module with the given parameter list. Each name being substituted must
+(** Check that a substitution is a valid (possibly partial) instantiation of a
+    module with the given parameter list. Each name being substituted must
     appear in the list. *)
 val check : subst -> Parameter_name.t list -> bool
 
@@ -135,9 +143,8 @@ val check : subst -> Parameter_name.t list -> bool
     since a module can be declared to be an argument for up to one parameter.)
 
     CR lmaurer: Make sure we're checking for the user redundantly passing an
-    parameter as an argument. This should be accepted and ignored, lest we
-    count the parameter as filled and consider something completely
-    instantiated. *)
+    parameter as an argument. This should be accepted and ignored, lest we count
+    the parameter as filled and consider something completely instantiated. *)
 val is_complete : t -> bool
 
 (** Returns [true] if this name has at least one argument (either hidden or
@@ -146,10 +153,10 @@ val has_arguments : t -> bool
 
 module Precision : sig
   (** Whether a global's elaborated form is known exactly. For example, given
-      the elaborated form [Foo{Bar; Baz}], if we never loaded foo.cmi then
-      we don't actually know whether [Foo] takes [Bar] or [Baz]. *)
+      the elaborated form [Foo{Bar; Baz}], if we never loaded foo.cmi then we
+      don't actually know whether [Foo] takes [Bar] or [Baz]. *)
   type t =
-    | Exact (** The base module takes exactly the arguments being passed. *)
+    | Exact  (** The base module takes exactly the arguments being passed. *)
     | Approximate
         (** The base module takes some subset of the arguments being passed
             (possibly all of them). *)

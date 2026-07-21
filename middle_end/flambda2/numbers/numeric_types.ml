@@ -90,6 +90,8 @@ struct
 
     let to_int i = i
 
+    let unsigned_to_int i = i land Int64.to_int unsigned_max_int64
+
     let to_float = Float.of_int
 
     let of_float f = of_int (Float.to_int f)

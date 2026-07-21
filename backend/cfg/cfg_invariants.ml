@@ -28,7 +28,7 @@ open! Int_replace_polymorphic_compare
 [@@@ocaml.warning "+a-40-41-42"]
 
 module CL = Cfg_with_layout
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 type t =
   { mutable result : bool;
@@ -340,8 +340,7 @@ let check_basic_arity t label (instr : Cfg.basic Cfg.instruction) =
     | Begin_region -> check ~expected_args:[0] ~expected_res:[1]
     | End_region -> check ~expected_args:[1] ~expected_res:[0]
     | Specific _ -> ()
-    | Name_for_debugger { regs; _ } ->
-      check ~expected_args:[0; Array.length regs] ~expected_res:[0]
+    | Name_for_debugger _ -> check ~expected_args:[0] ~expected_res:[0]
     | Dls_get | Tls_get | Domain_index ->
       check ~expected_args:[0] ~expected_res:[1]
     | Poll | Pause -> check ~expected_args:[0] ~expected_res:[0]

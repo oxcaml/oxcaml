@@ -22,7 +22,12 @@ let applicative_functors = ref true
 
 let nopervasives        = ref false
 let strict_formats      = ref true
-let open_modules        = ref []
+
+type open_arg =
+  | Open of string
+  | Open_cmi of string
+
+let open_args           = ref ([] : open_arg list)
 let parameters          = ref ([] : string list)
 let as_parameter        = ref false
 let as_argument_for     = ref None

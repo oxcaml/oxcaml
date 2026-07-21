@@ -738,8 +738,10 @@ let of_jkind_annotation_desc : Parsetree.jkind_annotation_desc -> _ =
   in
   function
   | Pjk_default -> id_fold
-  | Pjk_abbreviation (_, scannable_axis_annotations) ->
-    list_fold of_scannable_axis_annotation scannable_axis_annotations
+  | Pjk_abbreviation _ -> id_fold
+  | Pjk_operator (jkind, scannable_axis_annotations) ->
+    of_jkind_annotation jkind
+    ** list_fold of_scannable_axis_annotation scannable_axis_annotations
   | Pjk_mod (jkind, mod_bounds) ->
     of_jkind_annotation jkind ** list_fold of_mod_bound mod_bounds
   | Pjk_with (jkind, ct, modalities) ->
