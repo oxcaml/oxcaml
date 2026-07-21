@@ -249,8 +249,16 @@ let iter_on_occurrences
           add_label ~namespace:Unboxed_label exp_env lid label_desc
       | Texp_idx (ba, uas) ->
           iter_block_access exp_env ba;
+<<<<<<< janestreet/merlin-jst:liam-merlin-5.4.0-ox3
           List.iter ~f:(iter_unboxed_access exp_env) uas
       | Texp_atomic_loc (_, _, lid, label_desc, _) ->
+||||||| oxcaml/oxcaml:172cba3614a4a1e8d621d88e3d11de4ad80bed33
+          List.iter (iter_unboxed_access exp_env) uas
+      | Texp_atomic_loc (_, _, lid, label_desc, _) ->
+=======
+          List.iter (iter_unboxed_access exp_env) uas
+      | Texp_atomic_loc { lid; label = label_desc; _ } ->
+>>>>>>> oxcaml/oxcaml:545a4d6de4632a2a5abb74eb300cd2f70c9f42cf
           add_label ~namespace:Label exp_env lid label_desc
       | Texp_new (path, lid, _, _) ->
           f ~namespace:Class exp_env path lid

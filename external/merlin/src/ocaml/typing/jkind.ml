@@ -1595,12 +1595,19 @@ end
 (*** constant jkinds ***)
 
 module Context_with_transl = struct
+  type transl_with_bound_types =
+    | Transl_type of (Parsetree.core_type -> Types.type_expr)
+    | Overapproximate_to_top
+        (** Instead of translating each [with]-bound's type, over-approximate it
+            by raising the bounds of its base to top. Used during the
+            recursive-module approximation pass. *)
+
   type 'd t =
     | Right_jkind :
         ('l * allowed) History.annotation_context
         -> ('l * allowed) t
     | Left_jkind :
-        (Parsetree.core_type -> Types.type_expr)
+        transl_with_bound_types
         * (allowed * disallowed) History.annotation_context
         -> (allowed * disallowed) t
 
@@ -1981,7 +1988,7 @@ module Const = struct
       Option.map (Location.map (fun x -> Separability x))
   end
 
-  let apply_scannable_axis ?prior_annot env
+  let apply_scannable_axis ?prior_annot ~warn env
       (axis : Scannable_axis.t Location.loc option) t =
     match axis with
     | None -> t
@@ -1989,7 +1996,7 @@ module Const = struct
       let update_sa sa =
         let sa' = Scannable_axis.lower_axes sa axis in
         (match prior_annot with
-        | Some (base, rev_axes) when Scannable_axes.equal sa sa' ->
+        | Some (base, rev_axes) when warn && Scannable_axes.equal sa sa' ->
           Location.prerr_warning loc
             (Warnings.Redundant_kind_modifier
                (Format.asprintf "%a%s" Pprintast.jkind_annotation base
@@ -2066,11 +2073,12 @@ module Const = struct
 
   let rec of_user_written_annotation_unchecked_level : type l r.
       use_abstract_jkinds:bool ->
+      warn:bool ->
       _ ->
       (l * r) Context_with_transl.t ->
       Parsetree.jkind_annotation ->
       (l * r) t =
-   fun ~use_abstract_jkinds env context jkind ->
+   fun ~use_abstract_jkinds ~warn env context jkind ->
     let loc = jkind.pjka_loc in
     match jkind.pjka_desc with
     | Pjk_abbreviation name ->
@@ -2078,8 +2086,8 @@ module Const = struct
       allow_left (of_path p) |> allow_right
     | Pjk_mod (base, modifiers) ->
       let base =
-        of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
-          context base
+        of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
+          env context base
       in
       (* for each mode, lower the corresponding modal bound to be that
          mode *)
@@ -2090,20 +2098,20 @@ module Const = struct
       { base = base.base; mod_bounds; with_bounds = No_with_bounds }
       (* For scannable axes in mod bounds, we do not print redundancy warnings,
          as scannable axes in mod bounds will be deprecated anyway *)
-      |> apply_scannable_axis env
+      |> apply_scannable_axis ~warn env
            (Scannable_axis.annot_of_nullability_annot nullability)
-      |> apply_scannable_axis env
+      |> apply_scannable_axis ~warn env
            (Scannable_axis.annot_of_separability_annot separability)
     | Pjk_operator (base, sa_annot) ->
       let base_jkind =
-        of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
-          context base
+        of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
+          env context base
       in
-      warn_ignored_kind_modifier ~loc env base base_jkind sa_annot;
+      if warn then warn_ignored_kind_modifier ~loc env base base_jkind sa_annot;
       let jkind, _ =
         List.fold_left
           (fun (jkind, rev_axes) axis ->
-            ( apply_scannable_axis ~prior_annot:(base, rev_axes) env
+            ( apply_scannable_axis ~prior_annot:(base, rev_axes) ~warn env
                 (Some (transl_scannable_axis axis))
                 jkind,
               axis.Location.txt :: rev_axes ))
@@ -2113,37 +2121,59 @@ module Const = struct
     | Pjk_product ts ->
       let jkinds =
         List.map
-          (of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
-             context)
+          (of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
+             env context)
           ts
       in
       jkind_of_product_annotations ~loc env jkinds
     | Pjk_with (base, type_, modalities) -> (
       let base =
-        of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
-          context base
+        of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
+          env context base
       in
       match context with
       | Right_jkind c -> raise ~loc:type_.ptyp_loc (With_on_right c)
-      | Left_jkind (transl_type, _) ->
-        let type_ = transl_type type_ in
-        let modality, externality =
-          Typemode.transl_with_bound_modifiers modalities
-        in
-        let relevant_axes =
-          let axes = Mod_bounds.relevant_axes_of_modality ~modality in
-          match externality with
-          | None -> axes
-          | Some ext ->
-            let is_top =
-              Per_axis.le (Nonmodal Externality) Externality.max ext
-            in
-            if is_top then axes else Axis_set.remove axes (Nonmodal Externality)
-        in
-        { base = base.base;
-          mod_bounds = base.mod_bounds;
-          with_bounds = With_bounds.add type_ { relevant_axes } base.with_bounds
-        })
+      | Left_jkind (transl_type, _) -> (
+        match transl_type with
+        | Transl_type transl_type ->
+          let type_ = transl_type type_ in
+          let modality, externality =
+            Typemode.transl_with_bound_modifiers modalities
+          in
+          let relevant_axes =
+            let axes = Mod_bounds.relevant_axes_of_modality ~modality in
+            match externality with
+            | None -> axes
+            | Some ext ->
+              let is_top =
+                Per_axis.le (Nonmodal Externality) Externality.max ext
+              in
+              if is_top
+              then axes
+              else Axis_set.remove axes (Nonmodal Externality)
+          in
+          { base = base.base;
+            mod_bounds = base.mod_bounds;
+            with_bounds =
+              With_bounds.add type_ { relevant_axes } base.with_bounds
+          }
+        | Overapproximate_to_top ->
+          (* A with-bound weakens the mod-bounds, so a safe approximation is to
+             drop the with-bounds and raise the mod-bounds to [max]. *)
+          let expanded = Base_and_axes.fully_expand_aliases_const env base in
+          let base =
+            match expanded.base with
+            | Layout _ as b -> b
+            | Kconstr (_, sa) ->
+              (* However, we can't raise the mod-bounds of a truly-abstract
+                 [Kconstr] because its mod-bounds can be further narrowed by
+                 substitution. Instead, we approximate the layout as [any]. *)
+              Layout (Layout.Const.Any sa)
+          in
+          { base;
+            mod_bounds = Mod_bounds.max;
+            with_bounds = expanded.with_bounds
+          }))
     | Pjk_default | Pjk_kind_of _ ->
       raise ~loc:jkind.pjka_loc Unimplemented_syntax
 
@@ -2177,11 +2207,11 @@ module Const = struct
        that needs a different extension level. *)
     | Layout l -> scan_layout l
 
-  let of_user_written_annotation ~use_abstract_jkinds env ~context
+  let of_user_written_annotation ~use_abstract_jkinds ~warn env ~context
       (annot : Parsetree.jkind_annotation) =
     Env.check_no_open_quotations annot.pjka_loc env Jkind_annotation_qt;
     let const =
-      of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
+      of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn env
         context annot
     in
     let required_layouts_level = get_required_layouts_level context const in
@@ -2191,8 +2221,9 @@ module Const = struct
         (Insufficient_level { jkind = annot; required_layouts_level });
     const
 
-  let of_annotation ?(use_abstract_jkinds = true) ~context env annot =
-    of_user_written_annotation env ~use_abstract_jkinds
+  let of_annotation ?(use_abstract_jkinds = true) ?(warn = true) ~context env
+      annot =
+    of_user_written_annotation env ~use_abstract_jkinds ~warn
       ~context:(Right_jkind context) annot
 end
 
@@ -2287,16 +2318,19 @@ let of_annotated_const ~context ~annotation ~const ~const_loc =
     ~why:(Annotated (context, const_loc))
     const ~quality:Not_best ~ran_out_of_fuel_during_normalize:false
 
-let of_annotation_lr ~use_abstract_jkinds ~context env
+let of_annotation_lr ~use_abstract_jkinds ~warn ~context env
     (annot : Parsetree.jkind_annotation) =
   let const =
-    Const.of_user_written_annotation ~use_abstract_jkinds ~context env annot
+    Const.of_user_written_annotation ~use_abstract_jkinds ~warn ~context env
+      annot
   in
   of_annotated_const ~annotation:(Some annot) ~const ~const_loc:annot.pjka_loc
     ~context
 
-let of_annotation ?(use_abstract_jkinds = true) ~context env annot =
-  of_annotation_lr ~use_abstract_jkinds ~context:(Right_jkind context) env annot
+let of_annotation ?(use_abstract_jkinds = true) ?(warn = true) ~context env
+    annot =
+  of_annotation_lr ~use_abstract_jkinds ~warn ~context:(Right_jkind context) env
+    annot
 
 let of_annotation_option_default ?use_abstract_jkinds ~default ~context env =
   function
@@ -2311,13 +2345,13 @@ let of_attribute ~context
   of_annotated_const ~context ~annotation:(mk_annot name) ~const
     ~const_loc:attribute.loc
 
-let of_type_decl ?(use_abstract_jkinds = true) ~context ~transl_type env
-    (decl : Parsetree.type_declaration) =
-  let context = Context_with_transl.Left_jkind (transl_type, context) in
+let of_type_decl_gen ?(use_abstract_jkinds = true) ?(warn = true) ~context
+    ~transl env (decl : Parsetree.type_declaration) =
+  let context = Context_with_transl.Left_jkind (transl, context) in
   let jkind_of_annotation =
     decl.ptype_jkind_annotation
     |> Option.map (fun annot ->
-        of_annotation_lr ~use_abstract_jkinds ~context env annot, annot)
+        of_annotation_lr ~use_abstract_jkinds ~warn ~context env annot, annot)
   in
   let jkind_of_attribute =
     Builtin_attributes.jkind decl.ptype_attributes
@@ -2332,36 +2366,16 @@ let of_type_decl ?(use_abstract_jkinds = true) ~context ~transl_type env
     raise ~loc:decl.ptype_loc
       (Multiple_jkinds { from_annotation; from_attribute })
 
+let of_type_decl ?use_abstract_jkinds ?warn ~context ~transl_type env decl =
+  of_type_decl_gen ?use_abstract_jkinds ?warn ~context
+    ~transl:(Context_with_transl.Transl_type transl_type) env decl
+
 let of_type_decl_overapproximate_unknown ~context env
     (decl : Parsetree.type_declaration) =
-  (* CR with-kinds: we could avoid this syntactic check and instead return
-     [None] if [transl_type] is ever called. However, then we end up parsing
-     the jkind annotation multiple times. We should refactor the code to
-     avoid passing the unparsed annotation around. *)
-  let rec has_with_bounds (jkind : Parsetree.jkind_annotation) =
-    match jkind.pjka_desc with
-    | Pjk_with _ -> true
-    | Pjk_mod (base, _) -> has_with_bounds base
-    | Pjk_operator (base, _) -> has_with_bounds base
-    | Pjk_product jkinds -> List.exists has_with_bounds jkinds
-    | Pjk_abbreviation _ -> false
-    | Pjk_default | Pjk_kind_of _ ->
-      raise ~loc:jkind.pjka_loc Unimplemented_syntax
-  in
-  let transl_type sty =
-    Misc.fatal_errorf
-      "@[Unexpected call to [transl_type] in \
-       [of_type_decl_overapproximate_unknown]. Please report this to the Jane \
-       Street OCaml Language team."
-      Pprintast.core_type sty
-  in
-  match decl.ptype_jkind_annotation with
-  | Some annot when has_with_bounds annot ->
-    (* CR with-kinds: we could still compute the layout here. *)
-    Some (Builtin.any ~why:Overapproximation_of_with_bounds)
-  | _ ->
-    of_type_decl ~use_abstract_jkinds:false ~context ~transl_type env decl
-    |> Option.map fst
+  (* Warnings are emitted in [of_type_decl] rather than here *)
+  of_type_decl_gen ~use_abstract_jkinds:false ~warn:false ~context
+    ~transl:Context_with_transl.Overapproximate_to_top env decl
+  |> Option.map fst
 
 let for_unboxed_record_with_updates lbls =
   let open Types in
@@ -2962,10 +2976,6 @@ module Format_history = struct
       fprintf ppf "the %stype argument of %a has %s any"
         (format_position ~arity position)
         !printtyp_path parent_path layout_or_kind
-    | Overapproximation_of_with_bounds ->
-      fprintf ppf
-        "the compiler failed to deduce its exact kind@ due to with-bound \
-         checking limitations"
     | Inside_quote ->
       fprintf ppf "it's the type of an expression inside of a quote"
     | Evaluated_quote -> fprintf ppf "it's the result of evaluating a quote"
@@ -4028,8 +4038,6 @@ module Debug_printers = struct
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
         (Fmt.compat !printtyp_path)
         parent_path
-    | Overapproximation_of_with_bounds ->
-      fprintf ppf "Overapproximation_of_with_bounds"
     | Inside_quote -> fprintf ppf "Inside_quote"
     | Evaluated_quote -> fprintf ppf "Evaluated_quote"
     | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"

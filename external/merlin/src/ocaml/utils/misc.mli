@@ -1379,6 +1379,35 @@ val split_path : string -> string list
         (* [split_path path] returns the components of [path],
           including implicit "." if path is not absolute.
           [split_path "a/b/c"] = ["."; "a"; "b"; "c"]
+<<<<<<< janestreet/merlin-jst:liam-merlin-5.4.0-ox3
           [split_path "/a/b/c"] = ["/"; "a"; "b"; "c"]
         FIXME: explain windows behavior
         *)
+||||||| oxcaml/oxcaml:172cba3614a4a1e8d621d88e3d11de4ad80bed33
+      setting when [f] returns (or raises). *)
+  val without_colours : f:(unit -> 'a) -> 'a
+end
+=======
+      setting when [f] returns (or raises). *)
+  val without_colours : f:(unit -> 'a) -> 'a
+end
+
+(** Nullable values, unboxed via [@@or_null]. Not a full [Stdlib.Monad.S]: a
+    flat or_null cannot nest, so there is no [join]. *)
+module Or_null : sig
+  type 'a t = Null | This of 'a [@@or_null]
+
+  val return : 'a -> 'a t
+  val bind : 'a t -> ('a -> 'b t) -> 'b t
+  val ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t
+  val map : ('a -> 'b) -> 'a t -> 'b t
+  val both : 'a t -> 'b t -> ('a * 'b) t
+
+  module Syntax : sig
+    val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
+    val ( and+ ) : 'a t -> 'b t -> ('a * 'b) t
+    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+    val ( and* ) : 'a t -> 'b t -> ('a * 'b) t
+  end
+end
+>>>>>>> oxcaml/oxcaml:545a4d6de4632a2a5abb74eb300cd2f70c9f42cf
