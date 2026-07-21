@@ -1,23 +1,11 @@
 (* TEST (* DO NOT EDIT. Instead edit partial_deps/test_byte.ml and run gen-native.sh. *)
- (* Bound_globals with parameterised arguments — two shapes:
-
-    1. [Nested_arg]'s [Foo_q(Q)(Q_impl)]: [visible_args] non-empty,
-       [hidden_args] empty at the top level but nested inside [Q_impl]
-       (has hidden [P]).
-
-    2. [Partial_pq]'s [Pair_pq[Q:Q_impl]]: [visible_args] and
-       [hidden_args] both non-empty ([P] still unfilled at the top).
-
-    Both bundle cleanly — the head and its parameterised argument are
-    pulled in transitively and the compound reference is specialised
-    in the bundle. *)
+ (* Bound_globals with parameterised arguments — see each case below. *)
 
  readonly_files = "\
    foo_q.mli foo_q.ml foo_q__.ml \
    nested_arg.mli nested_arg.ml nested_arg__.ml \
    pair_pq.mli pair_pq.ml pair_pq__.ml \
    partial_pq.mli partial_pq.ml partial_pq__.ml \
-   q_int.mli q_int.ml \
    main_nested_arg.ml test_functorize_nested_arg.reference \
    main_partial_pq.ml test_functorize_partial_pq.reference \
  ";
@@ -26,7 +14,7 @@
 
  set OCAMLPARAM = "";
 
- script = "mkdir p p_int q q_int q_impl foo_q nested_arg pair_pq \
+ script = "mkdir p p_int q q_impl foo_q nested_arg pair_pq \
                  partial_pq bundle_nested bundle_partial";
  script;
 
@@ -44,10 +32,6 @@
  src = "${test_source_directory}/../../dunelike/q.mli \
         ${test_source_directory}/../../dunelike/q__.ml";
  dst = "q/";
- copy;
-
- src = "q_int.mli q_int.ml";
- dst = "q_int/";
  copy;
 
  src = "${test_source_directory}/../../dunelike/q_impl.ml \
@@ -102,10 +86,6 @@
  module = "q/q.mli";
  ocamlopt.byte;
 
- flags = "$flg -as-argument-for Q -I q -I q_int";
- module = "q_int/q_int.mli q_int/q_int.ml";
- ocamlopt.byte;
-
  (* Q_impl: -parameter P -as-argument-for Q — a parameterised argument. *)
 
  flags = "$flg_int_iface";
@@ -117,9 +97,13 @@
  module = "q_impl/q_impl.ml";
  ocamlopt.byte;
 
- (* ===== Case 1: Nested_arg — Foo_q[Q:Q_impl{P}] (hidden P nested in arg) ===== *)
+ (* ===== Case 1: Nested_arg — Foo_q[Q:Q_impl{P}] =====
 
- (* Foo_q: parameterised by Q only. *)
+    Story: bundle a module whose bound_globals include a compound
+    reference where the top level has visible args only (no hidden),
+    but the arg itself is parameterised (has nested hidden args). *)
+
+ (* Step 1: build [Foo_q], a plain library parameterised by [Q]. *)
 
  flags = "$flg_int_iface -parameter Q -I q";
  module = "foo_q/foo_q__.ml";
@@ -129,17 +113,23 @@
  module = "foo_q/foo_q.mli foo_q/foo_q.ml";
  ocamlopt.byte;
 
- (* Nested_arg: parameterised by P and Q; uses [Foo_q(Q)(Q_impl)]. *)
+ (* Step 2: build [Nested_arg] (parameterised by [P]) whose body
+    references [Foo_q[Q:Q_impl{P}]] — [Foo_q] applied to the
+    parameterised argument [Q_impl].  This lands the compound
+    reference in [Nested_arg]'s bound_globals. *)
 
- flags = "$flg_int_iface -parameter P -parameter Q -I p -I q -I q_impl \
-   -I foo_q";
+ flags = "$flg_int_iface -parameter P -I p -I q -I q_impl -I foo_q";
  module = "nested_arg/nested_arg__.ml";
  ocamlopt.byte;
 
- flags = "$flg -parameter P -parameter Q -I p -I q -I q_impl -I foo_q \
+ flags = "$flg -parameter P -I p -I q -I q_impl -I foo_q \
    -I nested_arg -open Nested_arg__";
  module = "nested_arg/nested_arg.mli nested_arg/nested_arg.ml";
  ocamlopt.byte;
+
+ (* Step 3: bundle [Nested_arg].  The functorizer pulls in [Foo_q]
+    and [Q_impl] transitively and specialises the compound reference
+    in the bundle. *)
 
  flags = "$flg -functorize -I p -I q -I q_impl -I foo_q -I nested_arg \
    Nested_arg";
@@ -148,7 +138,11 @@
  all_modules = "";
  ocamlopt.byte;
 
- flags = "$flg -I bundle_nested -I p -I p_int -I q -I q_int -I q_impl \
+ (* Step 4: consume the bundle by applying [Bundle.Make (P_int) ()]
+    and printing [Inst.Nested_arg.describe] (which composes strings
+    from [Nested_arg] and, via the compound alias, [Foo_q]). *)
+
+ flags = "$flg -I bundle_nested -I p -I p_int -I q -I q_impl \
    -I foo_q -I nested_arg";
  module = "main_nested_arg.ml";
  ocamlopt.byte;
@@ -165,7 +159,6 @@
    nested_arg/nested_arg.cmx \
    p_int/p_int__.cmx \
    p_int/p_int.cmx \
-   q_int/q_int.cmx \
    bundle_nested/bundle.cmx \
    main_nested_arg.cmx \
  ";
@@ -179,9 +172,14 @@
  reference = "test_functorize_nested_arg.reference";
  check-program-output;
 
- (* ===== Case 2: Partial_pq — Pair_pq[Q:Q_impl]{P} (partial instance) ===== *)
+ (* ===== Case 2: Partial_pq — Pair_pq[Q:Q_impl{P}]{P} =====
 
- (* Pair_pq: parameterised by both P and Q. *)
+    Story: same as Case 1, but the compound reference now has BOTH
+    visible AND hidden args at the top level ([P] is unfilled at the
+    top too). *)
+
+ (* Step 1: build [Pair_pq], a plain library parameterised by both
+    [P] and [Q]. *)
 
  flags = "$flg_int_iface -parameter P -parameter Q -I p -I q";
  module = "pair_pq/pair_pq__.ml";
@@ -192,8 +190,9 @@
  module = "pair_pq/pair_pq.mli pair_pq/pair_pq.ml";
  ocamlopt.byte;
 
- (* Partial_pq: parameterised by P only; references [Pair_pq(Q)(Q_impl)],
-    yielding a partial instance in its bound_globals. *)
+ (* Step 2: build [Partial_pq] (parameterised by [P] only) whose body
+    references [Pair_pq[Q:Q_impl{P}]{P}] — [Pair_pq]'s [Q] is filled
+    by [Q_impl], but its [P] is left unfilled at the top. *)
 
  flags = "$flg_int_iface -parameter P -I p -I q -I q_impl -I pair_pq";
  module = "partial_pq/partial_pq__.ml";
@@ -204,12 +203,18 @@
  module = "partial_pq/partial_pq.mli partial_pq/partial_pq.ml";
  ocamlopt.byte;
 
+ (* Step 3: bundle [Partial_pq].  The functorizer pulls in [Pair_pq]
+    and [Q_impl] and specialises the compound reference. *)
+
  flags = "$flg -functorize -I p -I q -I q_impl -I pair_pq -I partial_pq \
    Partial_pq";
  module = "";
  program = "bundle_partial/bundle.cmx";
  all_modules = "";
  ocamlopt.byte;
+
+ (* Step 4: consume the bundle by applying [Bundle.Make (P_int) ()]
+    and printing [Inst.Partial_pq.describe]. *)
 
  flags = "$flg -I bundle_partial -I p -I p_int -I q -I q_impl -I pair_pq \
    -I partial_pq";
