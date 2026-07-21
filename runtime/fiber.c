@@ -611,12 +611,29 @@ next_chunk:
     CAMLassert(d);
     if (!frame_return_to_C(d)) {
       /* Scan the roots in this frame */
-      if (frame_is_long(d)) {
-        frame_descr_long *dl = frame_as_long(d);
-        uint32_t *p;
-        uint32_t n;
-        for (p = dl->live_ofs, n = dl->num_live; n > 0; n--, p++) {
-          uint32_t ofs = *p;
+      if (frame_is_short(d)) {
+        /* Short descriptor: live registers come from the hot-register
+         * bitmap, live stack slots from word offsets. */
+        struct frame_descr_decoded dec;
+        caml_decode_frame_descr(d, &dec);
+        if (dec.has_allocs) {
+          unsigned char bitmap = dec.short_reg_bitmap;
+          for (int i = 0; bitmap; i++, bitmap >>= 1) {
+            if (bitmap & 1) {
+              root = regs + caml_frame_hot_regs[i];
+              visit (f, fdata, locals, colors, root);
+            }
+          }
+        }
+        for (uint32_t k = 0; k < dec.num_live; k++) {
+          root = (value *)(sp + (uintnat)dec.short_live[k] * sizeof(value));
+          visit (f, fdata, locals, colors, root);
+        }
+      } else if (frame_is_long(d)) {
+        const unsigned char *p = d + Frame_long_live_ofs;
+        uint32_t n = caml_read_unaligned_uint32(d + Frame_long_num_live_ofs);
+        for (; n > 0; n--, p += sizeof(uint32_t)) {
+          uint32_t ofs = caml_read_unaligned_uint32(p);
           if (ofs & 1) {
             root = regs + (ofs >> 1);
           } else {
@@ -625,10 +642,10 @@ next_chunk:
           visit (f, fdata, locals, colors, root);
         }
       } else {
-        uint16_t *p;
-        uint16_t n;
-        for (p = d->live_ofs, n = d->num_live; n > 0; n--, p++) {
-          uint16_t ofs = *p;
+        const unsigned char *p = d + Frame_live_ofs;
+        uint16_t n = caml_read_unaligned_uint16(d + Frame_num_live_ofs);
+        for (; n > 0; n--, p += sizeof(uint16_t)) {
+          uint16_t ofs = caml_read_unaligned_uint16(p);
           if (ofs & 1) {
             root = regs + (ofs >> 1);
           } else {

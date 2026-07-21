@@ -562,4 +562,5 @@ module asm "  movq camlExtcalls__call_too_many_with_try_HIDE_STAMP.recover_rbp_v
 module asm "  jmpq *%rbx"
 
 !0 = !{ i32 1, !"oxcaml_module", !"Extcalls" }
-!llvm.module.flags = !{ !0 }
+!1 = !{ i32 1, !"oxcaml_short_frametables", i32 1 }
+!llvm.module.flags = !{ !0, !1 }

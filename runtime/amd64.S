@@ -1812,13 +1812,27 @@ G(caml_system__code_end):
         .align  EIGHT_ALIGN
 G(caml_system__frametable):
         .quad   2            /* two descriptors */
+        /* Each descriptor is preceded by a "delta" byte. These return-to-C
+           descriptors do not fit the "short" format, so each escapes: a 0
+           delta byte followed by a descriptor in the normal format (which
+           carries its own absolute return address). See frame_descriptors.h. */
+        .byte   0            /* escape: normal descriptor follows */
         .4byte  LBL(108) - . /* return address into callback */
         .value  -1           /* negative frame size => use callback link */
         .value  0            /* no roots here */
-        .align  EIGHT_ALIGN
+        .byte   0            /* escape: normal descriptor follows */
         .4byte  LBL(frame_runstack) - . /* return address into fiber_val_handler */
         .value  -1                      /* negative frame size => use callback link */
         .value  0                       /* no roots here */
+
+/* Contribute this hand-written frametable to the linker-collected
+   caml_all_frametables table, so the runtime "measure all frametables" pass
+   sees it alongside the compiler-emitted ones. ELF targets only. */
+#if !defined(SYS_macosx) && !defined(SYS_mingw64) && !defined(SYS_cygwin)
+        .section caml_all_frametables,"aw",@progbits
+        .align  EIGHT_ALIGN
+        .quad   G(caml_system__frametable)
+#endif
 
 #if defined(SYS_macosx)
         .literal16

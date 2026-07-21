@@ -46,10 +46,29 @@ type frame_descr =
     fd_frame_size : int; (* Size of stack frame *)
     fd_live_offset : int list; (* Offsets/regs of live addresses *)
     fd_debuginfo : frame_debuginfo; (* Location, if any *)
-    fd_long : bool (* Use 32 instead of 16 bit format. *)
+    fd_long : bool; (* Use 32 instead of 16 bit format. *)
+    fd_section : int
+        (* Identifies the text section the return address lives in. A "short"
+           descriptor's delta is the difference between two return-address
+           labels, which is only an assembly-time constant when both labels are
+           in the same section; descriptors whose section differs from the
+           previous one escape. *)
   }
 
 let frame_descriptors = ref ([] : frame_descr list)
+
+(* Bumped by the backends whenever they switch to a different text section, so
+   [record_frame_descr] can tag each descriptor with its section. *)
+let frame_section_epoch = ref 0
+
+let start_new_code_section () = incr frame_section_epoch
+
+(* Set by a backend before [emit_frames] when the short descriptor format cannot
+   be emitted in the current context: internal-assembler (which cannot resolve
+   the variable-length return-address delta directive) and ARM64 (where the
+   delta is not yet ported). Every descriptor then escapes to the normal
+   format. *)
+let disable_short_descriptors = ref false
 
 let is_none_dbg d = Debuginfo.Dbg.is_none (Debuginfo.get_dbg d)
 
@@ -88,7 +107,8 @@ let record_frame_descr ~label ~frame_size ~live_offset debuginfo =
          fd_frame_size = frame_size;
          fd_live_offset = List.sort_uniq ( - ) live_offset;
          fd_debuginfo = debuginfo;
-         fd_long
+         fd_long;
+         fd_section = !frame_section_epoch
        }
        :: !frame_descriptors
 
@@ -104,8 +124,18 @@ type emit_frame_actions =
     efa_word : int -> unit;
     efa_align : int -> unit;
     efa_label_rel : Label.t -> int32 -> unit;
+    efa_label_delta : Label.t -> Label.t -> unit;
+    (* [efa_label_delta upper lower] emits the variable-width return-address
+       delta of a "short" frame descriptor, as a ULEB128 constant. *)
     efa_def_label : Label.t -> unit;
-    efa_string : string -> unit
+    efa_string : string -> unit;
+    (* Switch to / from mergeable string section, used for debuginfo filename
+       and defname strings. While it is open, [efa_def_string_label] defines a
+       label and [efa_string] emits a string; references from frametables to
+       those labels use [efa_label_rel]. *)
+    efa_open_string_section : unit -> unit;
+    efa_close_string_section : unit -> unit;
+    efa_def_string_label : Label.t -> unit
   }
 
 let emit_frames a =
@@ -161,6 +191,16 @@ let emit_frames a =
       Hashtbl.add defnames (filename, defname, loc) (file_lbl, def_lbl);
       def_lbl
   in
+  (* defname strings, each emitted once into the mergeable string section and
+     referenced from the name_info / name_and_loc_info struct. *)
+  let defstrings = Hashtbl.create 7 in
+  let label_defstring defname =
+    try Hashtbl.find defstrings defname
+    with Not_found ->
+      let lbl = Cmm.new_label () in
+      Hashtbl.add defstrings defname lbl;
+      lbl
+  in
   let module Label_table = Hashtbl.Make (struct
     type t = bool * Debuginfo.Dbg.t
 
@@ -179,7 +219,27 @@ let emit_frames a =
       Label_table.add debuginfos key lbl;
       lbl
   in
-  let emit_frame fd =
+  (* Emit the debuginfo words. These are identical in the normal and short
+     descriptor layouts: present iff the debug flag is set, one word per
+     allocation for an alloc descriptor, otherwise one word. *)
+  let emit_debug_words fd =
+    match fd.fd_debuginfo with
+    | _ when get_flags fd.fd_debuginfo = 0 -> ()
+    | Dbg_other dbg -> a.efa_label_rel (label_debuginfos false dbg) Int32.zero
+    | Dbg_raise dbg -> a.efa_label_rel (label_debuginfos true dbg) Int32.zero
+    | Dbg_alloc dbg ->
+      if get_flags fd.fd_debuginfo = 3
+      then
+        List.iter
+          (fun Cmm.{ alloc_dbg; _ } ->
+            if is_none_dbg alloc_dbg
+            then emit_i32 0
+            else a.efa_label_rel (label_debuginfos false alloc_dbg) Int32.zero)
+          dbg
+  in
+  (* Emit one descriptor in the existing normal/long format, with no leading
+     delta byte. Used as the body following a 0 (escape) delta byte. *)
+  let emit_escaped_frame fd =
     let flags = get_flags fd.fd_debuginfo in
     a.efa_label_rel fd.fd_lbl 0l;
     (* For short format, the size is guaranteed to be less than the constant
@@ -187,21 +247,18 @@ let emit_frames a =
     if fd.fd_long
     then (
       emit_u16 Oxcaml_flags.max_long_frames_threshold;
-      a.efa_align 4);
+      (* Keep frame_data at offset 8 *)
+      emit_u16 0);
     let emit_unsigned_16_or_32 = if fd.fd_long then emit_u32 else emit_u16 in
     (* The live offsets are always unsigned. *)
     let emit_live_offset n = emit_unsigned_16_or_32 n in
     emit_unsigned_16_or_32 (fd.fd_frame_size + flags);
     emit_unsigned_16_or_32 (List.length fd.fd_live_offset);
     List.iter emit_live_offset fd.fd_live_offset;
-    (match fd.fd_debuginfo with
+    match fd.fd_debuginfo with
     | _ when flags = 0 -> ()
-    | Dbg_other dbg ->
-      a.efa_align 4;
-      a.efa_label_rel (label_debuginfos false dbg) Int32.zero
-    | Dbg_raise dbg ->
-      a.efa_align 4;
-      a.efa_label_rel (label_debuginfos true dbg) Int32.zero
+    | Dbg_other dbg -> a.efa_label_rel (label_debuginfos false dbg) Int32.zero
+    | Dbg_raise dbg -> a.efa_label_rel (label_debuginfos true dbg) Int32.zero
     | Dbg_alloc dbg ->
       assert (List.length dbg < 256);
       emit_u8 (List.length dbg);
@@ -215,19 +272,126 @@ let emit_frames a =
           emit_u8 (alloc_words - 2))
         dbg;
       if flags = 3
-      then (
-        a.efa_align 4;
+      then
         List.iter
           (fun Cmm.{ alloc_dbg; _ } ->
             if is_none_dbg alloc_dbg
             then emit_i32 0
             else a.efa_label_rel (label_debuginfos false alloc_dbg) Int32.zero)
-          dbg));
-    a.efa_align Arch.size_addr
+          dbg
   in
-  let emit_filename name lbl =
-    a.efa_def_label lbl;
-    a.efa_string name
+  let emit_merged_string str lbl =
+    a.efa_def_string_label lbl;
+    a.efa_string str
+  in
+  (* Partition live offsets into live registers (low bit 1, value >>1 is the
+     register number) and live stack-slot byte offsets (low bit 0). See
+     [compute_live_offset] in the backends. *)
+  let partition_live_offset live =
+    List.partition_map
+      (fun n -> if n land 1 = 1 then Either.Left (n lsr 1) else Either.Right n)
+      live
+  in
+  (* Register-number -> hot-bitmap-bit-index. This is the inverse of
+     [caml_frame_hot_regs] in runtime/caml/frame_descriptors.h; the compiler and
+     the runtime MUST agree exactly or the GC scans the wrong registers (silent
+     heap corruption). *)
+  let hot_regs = [| 0; 1; 2; 3; 4; 5; 6; 8 |] in
+  let hot_reg_bit reg =
+    let rec find i =
+      if i >= Array.length hot_regs
+      then None
+      else if hot_regs.(i) = reg
+      then Some i
+      else find (i + 1)
+    in
+    find 0
+  in
+  (* Compute the short-format encoding of a descriptor, or [None] if it must
+     escape. Result: [(size_units_minus_1, num_allocs, alloc_nibbles,
+     reg_bitmap, word_slots)] *)
+  let short_encoding fd =
+    let flags = get_flags fd.fd_debuginfo in
+    let has_alloc = flags land 2 <> 0 in
+    let size = fd.fd_frame_size in
+    if fd.fd_long || size <= 0 || size > 1024 || size land 15 <> 0
+    then None
+    else
+      let regs, slots = partition_live_offset fd.fd_live_offset in
+      let word_slots =
+        List.filter_map
+          (fun byte_ofs ->
+            if byte_ofs land (Arch.size_addr - 1) <> 0
+            then Some None
+            else
+              let w = byte_ofs / Arch.size_addr in
+              Some (if w > 255 then None else Some w))
+          slots
+      in
+      let bad_slot = List.exists Option.is_none word_slots in
+      let word_slots = List.filter_map Fun.id word_slots in
+      if bad_slot || List.length word_slots > 255
+      then None
+      else if (not has_alloc) && not (Misc.Stdlib.List.is_empty regs)
+      then None
+      else
+        let reg_bits =
+          List.fold_left
+            (fun acc reg ->
+              match acc with
+              | None -> None
+              | Some bits -> (
+                match hot_reg_bit reg with
+                | None -> None
+                | Some b -> Some (bits lor (1 lsl b))))
+            (Some 0) regs
+        in
+        match reg_bits with
+        | None -> None
+        | Some reg_bitmap ->
+          let num_allocs, alloc_nibbles =
+            match fd.fd_debuginfo with
+            | Dbg_alloc dbg ->
+              let sizes =
+                List.map (fun Cmm.{ alloc_words; _ } -> alloc_words - 2) dbg
+              in
+              List.length sizes, sizes
+            | Dbg_other _ | Dbg_raise _ -> 0, []
+          in
+          if
+            num_allocs > 255
+            || List.exists (fun s -> s < 0 || s > 15) alloc_nibbles
+          then None
+          else
+            Some
+              ( (size / 16) - 1,
+                num_allocs,
+                alloc_nibbles,
+                reg_bitmap,
+                word_slots )
+  in
+  (* Emit a short descriptor body (after its leading delta byte/bytes). *)
+  let emit_short_body fd
+      (size_units_minus_1, num_allocs, alloc_nibbles, reg_bitmap, word_slots) =
+    let flags = get_flags fd.fd_debuginfo in
+    let has_alloc = flags land 2 <> 0 in
+    emit_u8 ((size_units_minus_1 lsl 2) lor flags);
+    if has_alloc
+    then (
+      (* reg_bitmap, num_allocs, alloc sizes, num_live *)
+      emit_u8 reg_bitmap;
+      emit_u8 num_allocs;
+      let rec emit_nibbles = function
+        | [] -> ()
+        | [a] -> emit_u8 (a land 0xf)
+        | a :: b :: rest ->
+          emit_u8 (a land 0xf lor ((b land 0xf) lsl 4));
+          emit_nibbles rest
+      in
+      emit_nibbles alloc_nibbles);
+    emit_u8 (List.length word_slots);
+    List.iter emit_u8 word_slots;
+    emit_debug_words fd
   in
   let emit_defname (_filename, defname, loc) (file_lbl, lbl) =
     let emit_loc (start_chr, end_chr, end_offset) =
@@ -235,16 +399,16 @@ let emit_frames a =
       emit_u16 end_chr;
       emit_i32 end_offset
     in
-    (* These must be 32-bit aligned, both because they contain a 32-bit value,
-       and because emit_debuginfo assumes the low 2 bits of their addresses are
-       0. *)
+    (* The name_info / name_and_loc_info struct. Must be 32-bit aligned, because
+       the low 2 bits of its address are used for flags in debuginfo *)
     a.efa_align 4;
     a.efa_def_label lbl;
     a.efa_label_rel file_lbl 0l;
-    (* Include the additional 64-bits of location information which didn't pack
-       in the main 64-bit word *)
-    Option.iter emit_loc loc;
-    a.efa_string defname
+    (* [defname_offs] relative to the start of the struct, so offset by 4 *)
+    a.efa_label_rel (label_defstring defname) 4l;
+    (* Then the extra 64 bits of location info that didn't pack into the main
+       debuginfo word (name_and_loc_info only). *)
+    Option.iter emit_loc loc
   in
   let fully_pack_info fd_raise d has_next =
     (* See format in caml_debuginfo_location in runtime/backtrace-nat.c *)
@@ -333,12 +497,52 @@ let emit_frames a =
     in
     match rdbg with [] -> assert false | d :: rest -> emit rs d rest
   in
-  a.efa_word (List.length !frame_descriptors);
-  List.iter emit_frame !frame_descriptors;
+  (* Descriptors are recorded in increasing return-address order (calls inline
+     as they are emitted; allocations and polls when their out-of-line GC stub
+     is emitted), so the prepended list is in decreasing order. Reverse it to
+     emit the frame table in increasing return-address order. *)
+  let descrs = List.rev !frame_descriptors in
+  a.efa_word (List.length descrs);
+  (* Emit each descriptor preceded by retaddr delta. The first descriptor of the
+     frametable, and any descriptor that does not fit the short format, escapes:
+     a 0 delta byte followed by the existing normal/long descriptor (which
+     carries its own relative return address). A short descriptor is preceded by
+     its return-address delta from the previous descriptor, as ULEB128. *)
+  let emit_descr prev fd =
+    let escape () =
+      emit_u8 0;
+      emit_escaped_frame fd;
+      Some fd
+    in
+    if !disable_short_descriptors
+    then escape ()
+    else
+      match prev with
+      | Some prev_fd when prev_fd.fd_section = fd.fd_section -> (
+        (* Same text section as the previous descriptor, so the delta is an
+           assembly-time constant. *)
+        match short_encoding fd with
+        | Some enc ->
+          a.efa_label_delta fd.fd_lbl prev_fd.fd_lbl;
+          emit_short_body fd enc;
+          Some fd
+        | None -> escape ())
+      | Some _ | None ->
+        (* First descriptor of the frametable, or first of a new text section
+           (no same-section previous return address for a delta): escape. *)
+        escape ()
+  in
+  ignore (List.fold_left emit_descr None descrs);
   Label_table.iter emit_debuginfo debuginfos;
-  Hashtbl.iter emit_filename filenames;
+  (* The name structs are kept near the debuginfo words that reference them (a
+     24-bit, +/-64 MB offset). Emitting them also populates [defstrings]. *)
   Hashtbl.iter emit_defname defnames;
   a.efa_align Arch.size_addr;
+  (* Strings go into a mergeable string section to be de-duped by the linker *)
+  a.efa_open_string_section ();
+  Hashtbl.iter emit_merged_string filenames;
+  Hashtbl.iter emit_merged_string defstrings;
+  a.efa_close_string_section ();
   frame_descriptors := []
 
 (* Detection of functions that can be duplicated between a DLL and the main

@@ -116,7 +116,7 @@ let compute_label_offsets emitter ~all_sections =
       | Cfi_restore_state | Cfi_def_cfa_register _ | Comment _ | Const _
       | File _ | Indirect_symbol _ | Loc _ | New_line | Private_extern _
       | Section _ | Size _ | Sleb128 _ | Space _ | Type _ | Uleb128 _
-      | Protected _ | Hidden _ | External _ | Reloc _ ->
+      | Protected _ | Hidden _ | External _ | Reloc _ | Frame_descr_delta _ ->
         ())
 
 (* Second pass: emit machine code and data *)

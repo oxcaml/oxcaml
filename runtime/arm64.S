@@ -1619,14 +1619,18 @@ G(caml_system__code_end):
 /* Uses the same naming convention as ocamlopt generated modules. */
 OBJECT(CAMLSEP(system,frametable))
         .quad   2                   /* two descriptors */
+        /* Each descriptor is preceded by a "delta" byte. These return-to-C
+           descriptors do not fit the "short" format, so each escapes: a 0
+           delta byte followed by a descriptor in the normal format (which
+           carries its own absolute return address). See frame_descriptors.h. */
+        .byte   0                   /* escape: normal descriptor follows */
         .4byte  L(caml_retaddr) - . /* return address into callback */
         .short  -1                  /* negative frame size => use callback link */
         .short  0                   /* no roots */
-        .align  3
+        .byte   0                   /* escape: normal descriptor follows */
         .4byte  L(frame_runstack) - . /* return address into fiber handler */
         .short  -1                    /* negative frame size => use callback link */
         .short  0                     /* no roots here */
-        .align 3
         END_OBJECT(CAMLSEP(system,frametable))
 
         NONEXECSTACK_NOTE

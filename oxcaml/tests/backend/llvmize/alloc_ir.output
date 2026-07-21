@@ -1180,4 +1180,5 @@ declare i1 @llvm.expect.i1(i1, i1)
 
 
 !0 = !{ i32 1, !"oxcaml_module", !"Alloc" }
-!llvm.module.flags = !{ !0 }
+!1 = !{ i32 1, !"oxcaml_short_frametables", i32 1 }
+!llvm.module.flags = !{ !0, !1 }
