@@ -3,7 +3,6 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 subtree_prefix="$(git rev-parse --show-prefix)"
-source scripts/common.sh
 
 # Script arguments with their default values
 commitish=HEAD
@@ -117,50 +116,49 @@ fi
 new_files=()
 cd upstream/ocaml_flambda
 echo $rev > base-rev.txt
-for dir in */; do
-  dir="${dir%/}"
-  if [[ "$subdirectory" = "." ]]; then
-    fetch_dir="$dir"
+dirs=(*/)
+dirs=("${dirs[@]%/}")
+if [[ "$subdirectory" = "." ]]; then
+  fetch_prefix=""
+else
+  fetch_prefix="$subdirectory/"
+fi
+# The compiler files at $rev in the mirrored directories, as paths relative
+# to upstream/ocaml_flambda, minus those with the merlin-exclude attribute set
+# (git check-attr resolves the paths against the .gitattributes in the current
+# directory)
+upstream_files="$(git ls-tree --full-tree -r --name-only "$rev" \
+                    -- "${dirs[@]/#/$fetch_prefix}" \
+                  | sed "s|^$fetch_prefix||" \
+                  | git check-attr --stdin merlin-exclude \
+                  | sed -e '/: merlin-exclude: set$/d' \
+                        -e 's/: merlin-exclude: [a-z]*$//')"
+for file in $upstream_files; do
+  if [[ -e "$file" ]]; then
+    git show "$rev:$fetch_prefix$file" > "$file"
   else
-    fetch_dir="$subdirectory/$dir"
+    read -p "Import new file $file? [Y/n] " answer
+    case "$answer" in
+      y|Y|"")
+        echo "Importing $file"
+        git show "$rev:$fetch_prefix$file" > "$file"
+        new_files+=("$file")
+        ;;
+      *)
+        echo "$file merlin-exclude" >> .gitattributes
+        echo "Set the merlin-exclude attribute for $file in" \
+             "upstream/ocaml_flambda/.gitattributes; remove it from there" \
+             "and re-run this script if you change your mind."
+        ;;
+    esac
   fi
-  upstream_files="$(git ls-tree --full-tree -r --name-only "$rev" "$fetch_dir")"
-  prepare-is-excluded < <(
-    for git_file in $upstream_files; do
-      echo "$dir/${git_file#"$fetch_dir"/}"
-    done
-  )
-  for git_file in $upstream_files; do
-    name="${git_file#"$fetch_dir"/}"
-    file="$dir/$name"
-    if is-excluded "$file"; then continue; fi
-    if [[ -e "$file" ]]; then
-      git show "$rev:$git_file" > "$file"
-    else
-      read -p "Import new file $file? [Y/n] " answer
-      case "$answer" in
-        y|Y|"")
-          echo "Importing $file"
-          git show "$rev:$git_file" > "$file"
-          new_files+=("$file")
-          ;;
-        *)
-          echo "$dir/$name merlin-exclude" >> .gitattributes
-          echo "Set the merlin-exclude attribute for $dir/$name in" \
-               "upstream/ocaml_flambda/.gitattributes; remove it from there" \
-               "and re-run this script if you change your mind."
-          ;;
-      esac
-    fi
-  done
-  # Warn about files that were previously imported but no longer exist
-  # upstream, so they don't silently go stale.
-  for file in "$dir"/*; do
-    name="${file#"$dir"/}"
-    if ! printf '%s\n' $upstream_files | grep -qxF "$fetch_dir/$name"; then
-      rm "$file"
-    fi
-  done
+done
+# Remove files that are no longer imported (deleted upstream or newly
+# merlin-excluded), so they don't silently go stale.
+for file in */*; do
+  if ! grep -qxF "$file" <<< "$upstream_files"; then
+    rm "$file"
+  fi
 done
 cd ../..
 

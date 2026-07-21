@@ -2,7 +2,6 @@
 
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-source scripts/common.sh
 
 function usage () {
   cat <<USAGE
@@ -14,7 +13,7 @@ For each directory mirrored in external/merlin/upstream/ocaml_flambda, every
 compiler file in the working tree (not counting gitignored files) must either be
 imported with identical contents or have the "merlin-exclude" attribute set in
 external/merlin/upstream/ocaml_flambda/.gitattributes, and every imported file
-must still exist in the compiler.
+must still exist (and not be excluded) in the compiler.
 
 Exits non-zero if anything is out of sync; run
 external/merlin/scripts/import-ocaml-source.sh to bring the copies back in sync.
@@ -35,13 +34,13 @@ fi
 
 root="$(git rev-parse --show-toplevel)"
 
-# Lists the files under directory $1 in the compiler's working tree (tracked
-# or untracked, but not gitignored and not deleted from disk), as paths
-# relative to the repository root
+# Lists the files under the given directories in the compiler's working tree
+# (tracked or untracked, but not gitignored and not deleted from disk), as
+# paths relative to the repository root
 function files-in-workspace () {
   comm -23 \
-    <(git -C "$root" ls-files --cached --others --exclude-standard "$1" | sort) \
-    <(git -C "$root" ls-files --deleted "$1" | sort)
+    <(git -C "$root" ls-files --cached --others --exclude-standard "$@" | sort) \
+    <(git -C "$root" ls-files --deleted "$@" | sort)
 }
 
 errors=0
@@ -51,25 +50,27 @@ function error () {
 }
 
 cd upstream/ocaml_flambda
-for dir in */; do
-  declare -A in_workspace
-  dir="${dir%/}"
-  compiler_files="$(files-in-workspace "$dir")"
-  prepare-is-excluded <<< "$compiler_files"
-  for compiler_file in $compiler_files; do
-    in_workspace["$compiler_file"]=1
-    if is-excluded "$compiler_file"; then continue; fi
-    if [[ ! -e "$compiler_file" ]]; then
-      error "$compiler_file exists in the compiler, but not in Merlin"
-    elif ! cmp -s "$root/$compiler_file" "$compiler_file"; then
-      error "$compiler_file is out of sync with Merlin"
-    fi
-  done
-  for file in "$dir"/*; do
-    if [[ -z "${in_workspace["$file"]-}" ]]; then
-      error "$file was deleted from the compiler, but not from Merlin"
-    fi
-  done
+dirs=(*/)
+# The compiler files in the mirrored directories, minus those with the
+# merlin-exclude attribute set (git check-attr resolves the paths against the
+# .gitattributes in the current directory)
+compiler_files="$(files-in-workspace "${dirs[@]%/}" \
+  | git check-attr --stdin merlin-exclude \
+  | sed -e '/: merlin-exclude: set$/d' -e 's/: merlin-exclude: [a-z]*$//')"
+
+declare -A in_workspace
+for compiler_file in $compiler_files; do
+  in_workspace["$compiler_file"]=1
+  if [[ ! -e "$compiler_file" ]]; then
+    error "$compiler_file exists in the compiler, but not in Merlin"
+  elif ! cmp -s "$root/$compiler_file" "$compiler_file"; then
+    error "$compiler_file is out of sync with Merlin"
+  fi
+done
+for file in */*; do
+  if [[ -z "${in_workspace["$file"]-}" ]]; then
+    error "$file is in Merlin, but is deleted or merlin-excluded in the compiler"
+  fi
 done
 
 if [[ $errors -gt 0 ]]; then
