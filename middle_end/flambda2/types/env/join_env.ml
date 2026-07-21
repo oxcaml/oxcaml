@@ -1964,6 +1964,10 @@ let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_expanded_head
   target_env, join_analysis
 
 (* Exposed to the outside world with a different type *)
+let import_type env ty =
+  import_type_transitive env (Type_in_one_joined_env.create ty)
+
+(* Exposed to the outside world with a different type *)
 let n_way_join_simples t kind simples : _ Or_bottom.t * t =
   match simples with
   | [] -> Bottom, t
