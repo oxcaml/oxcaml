@@ -59,6 +59,8 @@ module Name = struct
   | Path.Pdot _ | Path.Papply _ | Path.Pextra_ty _ -> false
 end
 
+(* Merlin: the below functions are commented out because they are unused by the frontend
+
 let symbol_for_local_ident id =
   assert (not (Ident.is_global_or_predef id));
   let compilation_unit = get_cu_exn () in
@@ -72,3 +74,4 @@ let const_label = ref 0
 let symbol_for_new_const () =
   incr const_label;
   Symbol.for_name (get_cu_exn ()) (Int.to_string !const_label)
+*)

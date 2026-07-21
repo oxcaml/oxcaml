@@ -5663,12 +5663,6 @@ let () =
           None
     )
 
-let () =
-  let get_current_compilation_unit () =
-    Option.map Unit_info.modname (get_current_unit ())
-  in
-  Compilation_unit.Private.fwd_get_current := get_current_compilation_unit
-
 (* helper for merlin *)
 
 let check_state_consistency () =

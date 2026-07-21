@@ -4275,8 +4275,10 @@ let merlin_type_structure env sig_acc str =
   in
   str, sg, env
 let type_structure env = type_structure ~funct_body:false None env []
-let merlin_transl_signature env sig_acc sg = transl_signature ~keep_warnings:true env sig_acc sg
-let transl_signature env sg = transl_signature env [] sg
+let merlin_transl_signature ?interface_toplevel env sig_acc sg =
+  transl_signature ?interface_toplevel ~keep_warnings:true env sig_acc sg
+let transl_signature ?interface_toplevel env sg =
+  transl_signature ?interface_toplevel env [] sg
 
 (* Normalize types in a signature *)
 

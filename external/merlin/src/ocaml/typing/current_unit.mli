@@ -30,7 +30,10 @@ module Name : sig
   val is_path : Path.t -> bool
 end
 
+(* Merlin: the below functions are commented out because they are unused by the frontend
+
 (** It is assumed that the provided [Ident.t] is in the current unit. *)
 val symbol_for_local_ident : Ident.t -> Symbol.t
 val symbol : unit -> Symbol.t
 val symbol_for_new_const : unit -> Symbol.t
+*)
