@@ -1382,12 +1382,12 @@ let arg_list ?consider_inlining_effectful_expressions ~dbg env res l =
     let To_cmm_env.{ env; res; expr } =
       arg ?consider_inlining_effectful_expressions ~dbg env res x
     in
-    let free_vars = Backend_var.Set.union free_vars expr.free_vars in
+    let free_vars = To_cmm_free_vars.union free_vars expr.free_vars in
     expr.cmm :: list, free_vars, env, res, Ece.join expr.effs effs
   in
   let args, free_vars, env, res, effs =
     List.fold_left aux
-      ([], Backend_var.Set.empty, env, res, Ece.pure_can_be_duplicated)
+      ([], To_cmm_free_vars.empty, env, res, Ece.pure_can_be_duplicated)
       l
   in
   List.rev args, free_vars, env, res, effs
@@ -1474,7 +1474,7 @@ let prim_simple env res dbg p =
      order. This therefore matches the original source code. *)
   match (p : P.t) with
   | Nullary prim ->
-    let free_vars = Backend_var.Set.empty in
+    let free_vars = To_cmm_free_vars.empty in
     let extra, res, expr = nullary_primitive env res dbg prim in
     Env.simple expr free_vars, extra, env, res, Ece.pure
   | Unary (unary, x) ->
@@ -1484,7 +1484,7 @@ let prim_simple env res dbg p =
   | Binary (binary, x, y) ->
     let To_cmm_env.{ env; res; expr = x' } = arg env res x in
     let To_cmm_env.{ env; res; expr = y' } = arg env res y in
-    let free_vars = Backend_var.Set.union x'.free_vars y'.free_vars in
+    let free_vars = To_cmm_free_vars.union x'.free_vars y'.free_vars in
     let effs = Ece.join x'.effs y'.effs in
     let expr =
       binary_primitive env dbg binary (Some x) (Some y) x'.cmm y'.cmm
@@ -1495,8 +1495,8 @@ let prim_simple env res dbg p =
     let To_cmm_env.{ env; res; expr = y' } = arg env res y in
     let To_cmm_env.{ env; res; expr = z' } = arg env res z in
     let free_vars =
-      Backend_var.Set.union
-        (Backend_var.Set.union x'.free_vars y'.free_vars)
+      To_cmm_free_vars.union
+        (To_cmm_free_vars.union x'.free_vars y'.free_vars)
         z'.free_vars
     in
     let effs = Ece.join (Ece.join x'.effs y'.effs) z'.effs in
@@ -1511,9 +1511,9 @@ let prim_simple env res dbg p =
     let To_cmm_env.{ env; res; expr = z' } = arg env res z in
     let To_cmm_env.{ env; res; expr = w' } = arg env res w in
     let free_vars =
-      Backend_var.Set.union
-        (Backend_var.Set.union
-           (Backend_var.Set.union x'.free_vars y'.free_vars)
+      To_cmm_free_vars.union
+        (To_cmm_free_vars.union
+           (To_cmm_free_vars.union x'.free_vars y'.free_vars)
            z'.free_vars)
         w'.free_vars
     in

@@ -63,6 +63,10 @@ val add_function : t -> Cmm.fundecl -> t
     of whether the module block symbol for the current unit has been defined. *)
 val check_for_module_symbol : t -> Symbol.t -> t
 
+(** Whether a data item defining the given symbol has (yet) been recorded in the
+    given result structure. *)
+val data_symbol_is_defined : t -> Cmm.symbol -> bool
+
 (** Caching of symbols associated with [Invalid] messages. *)
 val add_invalid_message_symbol : t -> Symbol.t -> message:string -> t
 
