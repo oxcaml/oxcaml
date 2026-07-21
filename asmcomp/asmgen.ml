@@ -665,8 +665,6 @@ let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
     ~sourcefile;
   emit_begin_assembly ~sourcefile unix;
   ( make_cmm ()
-  ++ (fun x ->
-  if Clflags.should_stop_after Compiler_pass.Middle_end then exit 0 else x)
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cmm
   ++ Profile.record "compile_phrases" (compile_phrases ~ppf_dump)
   ++ fun () -> () );
@@ -710,8 +708,11 @@ let compile_implementation unix ?toplevel ~pipeline ~sourcefile ~prefixname
       match pipeline with
       | Direct_to_cmm direct_to_cmm ->
         let cmm_phrases = direct_to_cmm ~ppf_dump ~prefixname program in
-        end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
-            cmm_phrases))
+        if Clflags.should_stop_after Compiler_pass.Middle_end
+        then ()
+        else
+          end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
+              cmm_phrases))
 
 let linear_gen_implementation ~ppf_dump unix filename =
   let open Linear_format in
