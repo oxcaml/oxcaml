@@ -27,12 +27,13 @@ module Verdict = struct
     | Accept | Gen_error _ -> "unknown"
 end
 
-module Quadrant = struct
+module Outcome = struct
   type t =
-    | Agree_noalloc (* FE accept, BE pass *)
-    | Agree_alloc (* FE reject, BE reject *)
-    | Soundness_suspect (* FE accept, BE reject -- ambiguous, triage *)
-    | Precision_gap (* FE reject, BE pass -- trustworthy frontend gap *)
+    | Agree_noalloc (* FE accepts, BE passes -- agree *)
+    | Soundness_suspect of { backend_error : string }
+        (* FE accepts, BE rejects -- ambiguous, triage *)
+    | Fe_reject of { cause : string }
+        (* FE rejects -- possible precision gap; not confirmable by the backend *)
 end
 
 (* Run [compiler] with [args], returning (exit_code, captured_stderr). stdout is
@@ -69,18 +70,38 @@ let frontend_flags =
     "-error-style";
     "short" ]
 
-(* Low optimization level on purpose: keeps BE-pass close to the naive lowering
-   so precision gaps are attributable to fixable frontend conservatism. *)
+(* No -O flag: the default is the lowest optimization level (this compiler has
+   no -O0/-O1; only -O2/-O3 raise it). Keeping it low keeps BE-pass close to the
+   naive lowering, so precision gaps are attributable to fixable frontend
+   conservatism rather than to allocations flambda would optimize away.
+
+   The mode extension is needed here too: the backend run compiles the same
+   doubly-annotated source, which contains mode syntax. *)
 let backend_flags =
   [ "-c";
-    "-O0";
     "-zero-alloc-check";
     "default";
+    "-extension";
+    "mode_alpha";
     "-color";
     "never";
     "-error-style";
     "short" ]
 
+(* Does [text] contain [needle]? Substring search, stdlib only. *)
+let contains ~needle text =
+  let n = String.length text and k = String.length needle in
+  let rec loop i =
+    if i + k > n
+    then false
+    else if String.sub text i k = needle
+    then true
+    else loop (i + 1)
+  in
+  loop 0
+
+(* CR shsong: Frontend should distinguish allocation error from other error such
+   as local/global errors. *)
 let run_frontend ~compiler ~file =
   let code, text = run_compiler compiler (frontend_flags @ [file]) in
   (* CR shsong: a syntactically bad body would also give nonzero here; such
@@ -91,15 +112,25 @@ let run_frontend ~compiler ~file =
 
 let run_backend ~compiler ~file =
   let code, text = run_compiler compiler (backend_flags @ [file]) in
-  match code with
-  | 0 -> Verdict.Accept
-  | 2 -> Verdict.Reject text
-  | _ -> Verdict.Gen_error text
+  (* Exit 2 is OCaml's generic error code, not only a zero_alloc failure (e.g.
+     an unknown flag or a malformed body also exits 2). A genuine rejection must
+     carry the zero_alloc checker's signature; anything else is an unrelated
+     compile failure, i.e. a generator bug. *)
+  if code = 0
+  then Verdict.Accept
+  else if code = 2 && contains ~needle:"Annotation check for zero_alloc" text
+  then Verdict.Reject text
+  else Verdict.Gen_error text
 
-let classify ~frontend ~backend =
-  match frontend, backend with
-  | Verdict.Gen_error e, _ | _, Verdict.Gen_error e -> Error e
-  | Verdict.Accept, Verdict.Accept -> Ok Quadrant.Agree_noalloc
-  | Verdict.Reject _, Verdict.Reject _ -> Ok Quadrant.Agree_alloc
-  | Verdict.Accept, Verdict.Reject _ -> Ok Quadrant.Soundness_suspect
-  | Verdict.Reject _, Verdict.Accept -> Ok Quadrant.Precision_gap
+let check ~compiler ~file =
+  match run_frontend ~compiler ~file with
+  | Verdict.Gen_error e -> Error e
+  | Verdict.Reject _ as frontend ->
+    (* The program does not typecheck, so the backend check cannot run on it. *)
+    Ok (Outcome.Fe_reject { cause = Verdict.cause frontend })
+  | Verdict.Accept ->
+    (match run_backend ~compiler ~file with
+     | Verdict.Gen_error e -> Error e
+     | Verdict.Accept -> Ok Outcome.Agree_noalloc
+     | Verdict.Reject backend_error ->
+       Ok (Outcome.Soundness_suspect { backend_error }))

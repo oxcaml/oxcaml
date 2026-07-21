@@ -8,24 +8,51 @@ Property-based tester for the frontend `Allocation` mode axis, using the backend
 Requires a built compiler. From the repo root:
 
 ```sh
-dune build @oxcaml/tests/quickcheck-allocation/quickcheck
+COMP=$PWD/_build/install/main/bin/ocamlopt.opt
+
+dune exec oxcaml/tests/quickcheck-allocation/main.exe -- $COMP \
+  -count 200 -seed 0 -mode soundness
 ```
 
-This builds `main.exe` and runs the fuzz loop against the just-built
-`ocamlopt.opt`. It is behind its own alias, so `make test` never runs it.
+Flags:
 
-Run directly for more control (`<ocamlopt>` = path to the built `ocamlopt.opt`):
+- `-count N` -- number of programs to try (default 200)
+- `-seed S` -- starting PRNG seed (default 0); round `k` uses seed `S + k`, so
+  runs are reproducible and a single case can be re-run with
+  `-count 1 -seed <seed>`
+- `-mode soundness|completeness` -- generation bias (default `soundness`):
+  `soundness` favors programs the frontend should accept (immediates,
+  `exclave_`), hunting FE-accept & BE-reject bugs; `completeness` favors
+  non-allocating computation the frontend may conservatively reject
+
+Pass the compiler as an absolute path (it is invoked via the shell). The fuzz
+loop can also be run via its alias, which uses the just-built `ocamlopt.opt`
+and the default flags:
 
 ```sh
-dune exec oxcaml/tests/quickcheck-allocation/main.exe -- <ocamlopt> -count 200 -seed 0
+dune build @oxcaml/tests/quickcheck-allocation/quickcheck --force
 ```
 
-Flags: `-count N` (programs to try), `-seed S` (starting PRNG seed).
+(`--force` because dune caches the successful run; without it a second build
+does nothing.) The alias is not part of `make test`.
 
 ## Output
 
-A per-quadrant tally, a list of soundness suspects (FE-accept & BE-reject), and
-a frequency-ranked table of precision-gap causes (FE-reject & BE-pass).
+A tally line, e.g.:
+
+```
+agree(noalloc)=22 suspects=0 fe_rejects=38 gen_errors=0
+```
+
+- `agree(noalloc)` -- FE accepted and the backend `zero_alloc` check passed
+- `suspects` -- FE accepted but the backend rejected: potential soundness bugs.
+  Each is printed in full below the tally (seed, program, backend error)
+- `fe_rejects` -- FE rejected: completeness candidates, printed as a
+  frequency-ranked table of rejection causes (the frontend-improvement
+  backlog). Since the program carries both annotations, a rejected program
+  does not compile, so the backend cannot confirm these
+- `gen_errors` -- compile failures unrelated to either check, i.e. generator
+  bugs; should be 0
 
 ## Editor / ocamllsp tip
 
