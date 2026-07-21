@@ -156,6 +156,7 @@ module Env = struct
 
   type t =
     { variables : (Variable.t * Flambda_kind.With_subkind.t) Ident.Map.t;
+      var_debug_uids : Flambda_debug_uid.t Ident.Map.t;
       globals : Symbol.t Numeric_types.Int.Map.t;
       simples_to_substitute :
         (Simple.t * Flambda_kind.With_subkind.t) Ident.Map.t;
@@ -177,6 +178,7 @@ module Env = struct
   let create ~big_endian =
     let current_unit = Compilation_unit.get_current_exn () in
     { variables = Ident.Map.empty;
+      var_debug_uids = Ident.Map.empty;
       globals = Numeric_types.Int.Map.empty;
       simples_to_substitute = Ident.Map.empty;
       current_unit;
@@ -194,6 +196,7 @@ module Env = struct
 
   let clear_local_bindings
       { variables = _;
+        var_debug_uids = _;
         globals;
         simples_to_substitute;
         current_unit;
@@ -210,6 +213,7 @@ module Env = struct
         simples_to_substitute
     in
     { variables = Ident.Map.empty;
+      var_debug_uids = Ident.Map.empty;
       globals;
       simples_to_substitute;
       current_unit;
@@ -226,13 +230,17 @@ module Env = struct
   let add_var t id var kind =
     { t with variables = Ident.Map.add id (var, kind) t.variables }
 
+  let add_var_debug_uid t id debug_uid =
+    { t with var_debug_uids = Ident.Map.add id debug_uid t.var_debug_uids }
+
   let add_vars t ids vars =
     List.fold_left2 (fun t id (var, kind) -> add_var t id var kind) t ids vars
 
   let add_var_map t map =
     { t with variables = Ident.Map.union_right t.variables map }
 
-  let add_var_like t id (user_visible : IR.user_visible) kind =
+  let add_var_like t id (user_visible : IR.user_visible)
+      ?(debug_uid = Flambda_debug_uid.none) kind =
     let user_visible =
       match user_visible with
       | Not_user_visible -> None
@@ -242,7 +250,7 @@ module Env = struct
       Variable.create_with_same_name_as_ident ?user_visible id
         (Flambda_kind.With_subkind.kind kind)
     in
-    add_var t id var kind, var
+    add_var (add_var_debug_uid t id debug_uid) id var kind, var
 
   let add_vars_like t ids =
     let vars =
@@ -258,6 +266,9 @@ module Env = struct
             kind ))
         ids
     in
+    let t =
+      List.fold_left (fun t (id, uid, _, _) -> add_var_debug_uid t id uid) t ids
+    in
     add_vars t (List.map (fun (id, _, _, _) -> id) ids) vars, List.map fst vars
 
   let find_var t id =
@@ -268,6 +279,11 @@ module Env = struct
         (Printexc.raw_backtrace_to_string (Printexc.get_callstack 42))
 
   let find_var_exn t id = Ident.Map.find id t.variables
+
+  let find_var_debug_uid t id =
+    match Ident.Map.find id t.var_debug_uids with
+    | uid -> uid
+    | exception Not_found -> Flambda_debug_uid.none
 
   let find_name t id = Name.var (fst (find_var t id))
 

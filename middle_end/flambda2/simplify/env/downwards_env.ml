@@ -254,11 +254,12 @@ let create ~round ~machine_width ~(resolver : resolver)
   define_variable
     (define_variable t
        (Bound_var.create toplevel_my_region my_region_duid Name_mode.normal
-          ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var)
+          ~dbg:Debuginfo.none
+          ~is_parameter:Bound_var.Is_parameter.implicit_parameter)
        K.region)
     (Bound_var.create toplevel_my_ghost_region my_ghost_region_duid
        Name_mode.normal ~dbg:Debuginfo.none
-       ~is_parameter:Bound_var.Is_parameter.local_var)
+       ~is_parameter:Bound_var.Is_parameter.implicit_parameter)
     K.region
 
 let all_code t = t.all_code
@@ -634,6 +635,8 @@ let merge_inlined_debuginfo t ~from_apply_expr =
     inlined_debuginfo =
       Inlined_debuginfo.merge t.inlined_debuginfo ~from_apply_expr
   }
+
+let inlined_debuginfo t = t.inlined_debuginfo
 
 let add_inlined_debuginfo t dbg =
   Inlined_debuginfo.rewrite t.inlined_debuginfo dbg
