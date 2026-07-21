@@ -130,7 +130,7 @@ char *caml_secure_getenv (char const *var)
 int caml_format_timestamp(char* buf, size_t sz, int formatted)
 {
   uint64_t ns = caml_bare_metal_time_ns();
-  uint64_t sec = ns / 1000000000;
+  ARCH_UINT64_TYPE sec = (ARCH_UINT64_TYPE)(ns / 1000000000);
   unsigned usec = (unsigned)((ns % 1000000000) / 1000);
   if (formatted) {
     return snprintf(buf, sz, "[%" ARCH_INT64_PRINTF_FORMAT "u.%06u] ",
