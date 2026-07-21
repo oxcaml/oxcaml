@@ -1635,7 +1635,7 @@ let recover_inverse_relations ~exists_in_all_joined_envs inverse_relations name
      valid in all the joined environments.
 
      If we have a type [x : Variant (is_int = y)] for [x], but [x] only exists
-     in a subset of the joined environments, then the equation [y = %get_tag x]
+     in a subset of the joined environments, then the equation [y = %is_int x]
      is only valid in those environments -- in particular, if [y] exists in more
      environments than [x], it is unsound to include that equation in the target
      environment.
