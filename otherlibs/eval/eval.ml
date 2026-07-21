@@ -187,29 +187,77 @@ let build_injector_export_info (entries : CamlinternalQuote.Injector.entry list)
     Flambda2_cmx.Flambda_cmx.create_loader
       ~get_module_info:Compilenv.get_unit_export_info
   in
+  let debug =
+    match Sys.getenv_opt "OCAML_EVAL_DEBUG_INJECT" with
+    | Some ("true" | "1") -> true
+    | None | Some _ -> false
+  in
   let find_code ~code_id:_ ~code_id_linkage_name:_ ~function_slot:_ ~symbol =
     match symbol with
     | None ->
+      if debug then Format.eprintf "inject: no symbol, cannot recover code@.";
       (* CR mshinwell: look the code up by [code_id_linkage_name] in the cached
          units' exported code, to cover closures without symbols (see
          inject_plan.md, M2.3). *)
       None
     | Some symbol -> (
       match Flambda2_cmx.Flambda_cmx.load_symbol_approx cmx_loader symbol with
-      | Closure_approximation { code; _ } -> Some code
-      | Unknown _ | Value_symbol _ | Value_const _ | Block_approximation _ ->
+      | Closure_approximation { code; _ } ->
+        if debug
+        then
+          Format.eprintf "inject: code for %a: present %b@." F2_symbol.print
+            symbol
+            (Flambda2_terms.Code_or_metadata.code_present code);
+        Some code
+      | (Unknown _ | Value_symbol _ | Value_const _ | Block_approximation _) as
+        approx ->
+        if debug
+        then
+          Format.eprintf "inject: no closure approx for %a: %a@."
+            F2_symbol.print symbol VA.print approx;
         None)
+  in
+  (* The code IDs and function slots reconstructed from the standalone form have
+     fresh stamps, which would not meet the original ones appearing in the types
+     of the original units (e.g. via the closure types' aliases to the closures'
+     symbols). So, whenever a closure approximation has a symbol, replace it
+     wholesale by the authoritative approximation from the original unit's cmx
+     data. *)
+  let rec prefer_authoritative (approx : _ VA.t) : _ VA.t =
+    match approx with
+    | Closure_approximation { symbol = Some symbol; _ } -> (
+      match Flambda2_cmx.Flambda_cmx.load_symbol_approx cmx_loader symbol with
+      | Closure_approximation _ as authoritative -> authoritative
+      | Unknown _ | Value_symbol _ | Value_const _ | Block_approximation _ ->
+        approx)
+    | Block_approximation (tag, shape, fields, alloc_mode) ->
+      Block_approximation
+        (tag, shape, Array.map prefer_authoritative fields, alloc_mode)
+    | Unknown _ | Value_symbol _ | Value_const _
+    | Closure_approximation { symbol = None; _ } ->
+      approx
   in
   let field_approxs =
     List.map
       (fun (entry : CamlinternalQuote.Injector.entry) ->
         let unknown : _ VA.t = Unknown FK.value in
-        match entry.approx with
-        | "" -> unknown
-        | marshalled -> (
-          match VA.Standalone.of_marshalled_string marshalled with
-          | standalone -> VA.Standalone.to_approximation standalone ~find_code
-          | exception _ -> unknown))
+        let approx =
+          match entry.approx with
+          | "" -> unknown
+          | marshalled -> (
+            match VA.Standalone.of_marshalled_string marshalled with
+            | standalone ->
+              prefer_authoritative
+                (VA.Standalone.to_approximation standalone ~find_code)
+            | exception _ -> unknown)
+        in
+        if debug
+        then
+          Format.eprintf "inject: %s: marshalled %d bytes, approx %a@."
+            entry.name
+            (String.length entry.approx)
+            VA.print approx;
+        approx)
       entries
   in
   let module_symbol = F2_symbol.for_compilation_unit compilation_unit in
@@ -247,7 +295,7 @@ let build_injector_export_info (entries : CamlinternalQuote.Injector.entry list)
 let setup_injector_unit (injector : CamlinternalQuote.Injector.t) : unit =
   match CamlinternalQuote.Injector.contents injector with
   | [] -> ()
-  | entries ->
+  | entries -> (
     let cu_name = CamlinternalQuote.Injector.compilation_unit_name injector in
     let compilation_unit =
       Compilation_unit.create Compilation_unit.Prefix.empty
@@ -336,7 +384,47 @@ let setup_injector_unit (injector : CamlinternalQuote.Injector.t) : unit =
         ui_file_sections = file_sections
       }
     in
-    Compilenv.cache_unit_info unit_infos
+    Compilenv.cache_unit_info unit_infos;
+    match Sys.getenv_opt "OCAML_EVAL_DEBUG_INJECT" with
+    | Some ("true" | "1") -> (
+      let loader =
+        Flambda2_cmx.Flambda_cmx.create_loader
+          ~get_module_info:Compilenv.get_unit_export_info
+      in
+      match
+        Flambda2_cmx.Flambda_cmx.load_cmx_file_contents loader compilation_unit
+      with
+      | None ->
+        Format.eprintf "inject: self-check: no cmx contents for %s@." cu_name
+      | Some env ->
+        Format.eprintf "inject: self-check: typing env for %s:@ %a@." cu_name
+          Flambda2_types.Typing_env.Serializable.print env)
+    | None | Some _ -> ())
+
+(* Debugging aid: [OCAML_EVAL_DUMP] is a comma-separated list of intermediate
+   representations to dump (to stderr) during the runtime compilation of
+   evaluated quotes, e.g. OCAML_EVAL_DUMP=rawflambda,flambda. Supported entries:
+   "rawflambda" (Flambda 2 after closure conversion, which is the final Flambda
+   2 IR in classic mode); "flambda" (after simplification); "cmm". Useful e.g.
+   for checking whether the approximations of injected values are being used
+   (direct calls or inlining of injected functions rather than indirect
+   applications). *)
+let set_dump_flags_from_env () =
+  match Sys.getenv_opt "OCAML_EVAL_DUMP" with
+  | None | Some "" -> false
+  | Some spec ->
+    let enable_one name =
+      match name with
+      | "" -> ()
+      | "rawflambda" -> Clflags.dump_rawflambda := true
+      | "flambda" -> Clflags.dump_flambda := true
+      | "cmm" -> Clflags.dump_cmm := true
+      | _ ->
+        Printf.eprintf "Eval: ignoring unknown OCAML_EVAL_DUMP entry %S\n%!"
+          name
+    in
+    List.iter enable_one (String.split_on_char ',' spec);
+    true
 
 let counter = ref 0
 
@@ -437,8 +525,13 @@ let eval0 ~(injector : CamlinternalQuote.Injector.t option)
       raw_lambda
   in
   let program = { tlambda_program with code = lambda } in
-  (* TODO may want to revisit this formatter which appears to eat everything *)
-  let ppf = Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ()) in
+  let ppf =
+    if set_dump_flags_from_env ()
+    then Format.err_formatter
+    else
+      (* A formatter that eats everything, since no dumps are enabled. *)
+      Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ())
+  in
   (match Jit.jit_load_program ~phrase_name:input_name ppf program with
   | Result _ -> ()
   | Exception exn -> raise exn);
@@ -462,7 +555,15 @@ let compile_mutex = Mutex.create ()
 let protected_eval ~injector (code : CamlinternalQuote.Code.t) : Obj.t =
   Mutex.protect compile_mutex (fun () ->
       (* TODO: Consider if some warnings are important enough to show. *)
-      try Warnings.without_warnings (fun () -> eval0 ~injector code)
+      let without_warnings f =
+        (* Debugging aid: show the warnings of the runtime compilation of
+           evaluated quotes (e.g. warning 55 from [@inlined] on calls to
+           injected functions whose approximations are unknown). *)
+        match Sys.getenv_opt "OCAML_EVAL_SHOW_WARNINGS" with
+        | Some ("true" | "1") -> f ()
+        | None | Some _ -> Warnings.without_warnings f
+      in
+      try without_warnings (fun () -> eval0 ~injector code)
       with exn ->
         let backtrace = Printexc.get_raw_backtrace () in
         Location.report_exception Format.std_formatter exn;

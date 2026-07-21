@@ -393,6 +393,36 @@ treatment.
       code recovered via `Flambda_cmx.load_symbol_approx` against the
       Compilenv cache; `prepare_cmx_from_approx`.  Remaining CR: recover
       code by `code_id_linkage_name` for symbol-less closures.
+      Two consumption bugs found and fixed while verifying propagation
+      (2026-07-21):
+      1. The current unit must NOT be excluded from the reified-approx
+         quoted-cmx marking: approximations routinely reference the
+         program's own symbols, and the unit's cmx is resolved at link time
+         like any other, so excluding it left `find_code` unable to recover
+         the code at runtime.
+      2. Closure approximations must be replaced *wholesale* by the
+         authoritative ones from the original unit's cmx
+         (`prefer_authoritative` in eval.ml) whenever a symbol is
+         available: the code IDs and function slots reconstructed from the
+         standalone form have fresh stamps, which do not meet the original
+         ones referenced by the closure types of other units, silently
+         degrading the type to Unknown.
+- [x] Verification tooling and results (2026-07-21):
+      - `OCAML_EVAL_DUMP=rawflambda,flambda,cmm` dumps the IRs of the
+        runtime compilation of evaluated quotes to stderr;
+        `OCAML_EVAL_SHOW_WARNINGS=1` lets its warnings through (notably 55
+        from `[@inlined]`); `OCAML_EVAL_DEBUG_INJECT=1` traces the
+        approximation reconstruction and prints the injector unit's
+        exported typing env (self-check).
+      - Results: an injected constant constant-folds at eval time
+        (`$(inject n) + 1` becomes `43`); a call to an injected top-level
+        function under `[@inlined]` is inlined silently (the whole phrase
+        folds to a constant); `Sys.opaque_identity` control and symbol-less
+        local closures produce warning 55 as expected (the latter pending
+        the `code_id_linkage_name` lookup).  Regression test:
+        `testsuite/tests/quotation/eval/inject_inlining_test.ml` (runs with
+        `OCAML_EVAL_SHOW_WARNINGS`, expects the control's warning and the
+        top-level function's silence).
 - [x] M2.5: quoted-cmx marking for reified approximations:
       `Value_approximation.compilation_units` (shared helper) →
       `Acc.reified_approx_units` → `close_program_result` → `flambda2.ml`

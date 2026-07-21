@@ -340,8 +340,11 @@ let build_unit_info ~main_module_block_format ~arg_descr =
     ui_quoted_cmi = CU.Name.Set.to_list quoted_intfs_and_deps;
     ui_quoted_cmx =
       CU.Set.to_list
-        (CU.Set.union (Env.quoted_impls ())
-           (CU.Set.remove current_unit.uib_unit !reified_approx_units));
+        (* Note that the current unit may itself appear in
+           [reified_approx_units] (an approximation may refer to symbols of
+           the unit being compiled); its cmx is resolved at link time like
+           any other (see [Cm_bundle]). *)
+        (CU.Set.union (Env.quoted_impls ()) !reified_approx_units);
     ui_format = main_module_block_format;
     ui_generic_fns = current_unit.uib_generic_fns;
     ui_export_info = current_unit.uib_export_info;

@@ -1,0 +1,39 @@
+(* TEST
+ include eval;
+ set OCAML_EVAL_SHOW_WARNINGS = "1";
+ reference = "${test_source_directory}/inject_inlining_test.reference";
+ flags = "-extension runtime_metaprogramming -Oclassic -w -53";
+ native;
+*)
+
+(* Checks that the approximations of injected values propagate to the
+   runtime compilation of evaluated quotes: [@inlined] on a call to an
+   injected function succeeds silently when the approximation (and hence
+   the code) is known, and triggers warning 55 when it is not.  The control
+   case uses [Sys.opaque_identity] to guarantee an unknowable function. *)
+
+#syntax quotations on
+
+(* Warning 53 is disabled (in the TEST block above) because the first
+   (quote-building) compilation considers the [@inlined] attributes below
+   misplaced; they are nonetheless preserved in the quotes, where they
+   apply to the applications at evaluation time. *)
+
+let top_level_double x = x * 2
+
+let () =
+  (* Control: no approximation can be known; warning 55 expected. *)
+  let opaque = Sys.opaque_identity (fun x -> x + 1) in
+  let c : int =
+    Eval.eval_with_injector (fun injector ->
+        <[ ($(Eval.inject injector opaque) [@inlined]) 1 ]>)
+  in
+  (* Top-level function: approximation known; no warning expected. *)
+  let a : int =
+    Eval.eval_with_injector (fun injector ->
+        <[ ($(Eval.inject injector top_level_double) [@inlined]) 21 ]>)
+  in
+  (* The warnings are emitted via [Format.err_formatter]; flush it before
+     printing the results so that the interleaving is deterministic. *)
+  Format.pp_print_flush Format.err_formatter ();
+  Printf.printf "results: %d %d\n%!" c a
