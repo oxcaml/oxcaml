@@ -332,7 +332,7 @@ module Type_shape = struct
                 "Linking and substitution should not reach this stage. Found \
                  %s type in file %s."
                 str
-                (match Compilation_unit.get_current () with
+                (match Current_unit.get_cu () with
                 | None -> "<unknown>"
                 | Some cu -> Compilation_unit.full_path_as_string cu)
               (* We cannot access the type printer here, so this

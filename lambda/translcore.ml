@@ -47,6 +47,35 @@ let use_dup_for_constant_mutable_arrays_bigger_than = 4
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
+(* Mirrors [Typecore.contains_gadt]: [cstr_generalized] is the criterion the
+   type checker uses to decide when a match adds GADT equations. *)
+let pat_contains_gadt pat =
+  exists_pattern
+    (fun p ->
+      match p.pat_desc with
+      | Tpat_construct (_, cd, _, _, _) -> cd.cstr_generalized
+      | _ -> false)
+    pat
+
+let cases_contain_gadt cases =
+  List.exists (fun { c_lhs; _ } -> pat_contains_gadt c_lhs) cases
+
+let join_layout_of_cases sort cases =
+  match cases with
+  | [] -> None
+  | { c_lhs; _ } :: rest ->
+      let first_layout = layout_pat sort c_lhs in
+      (* Only a GADT match makes the cases' types differ; otherwise the first
+         case's layout is already the join. *)
+      if cases_contain_gadt cases
+      then
+        Some
+          (List.fold_left
+             (fun acc { c_lhs; _ } ->
+               Lambda.join_layout acc (layout_pat sort c_lhs))
+             first_layout rest)
+      else Some first_layout
+
 let field_offset_for_label lbl repres =
   match repres with
   | Record_boxed
@@ -724,7 +753,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         {fields; representation; extended_expression } ->
       transl_record_unboxed_product ~scopes e.exp_loc e.exp_env
         fields representation extended_expression
-  | Texp_atomic_loc (arg, arg_sort, _id, lbl, alloc_mode) ->
+  | Texp_atomic_loc { record = arg; record_sort = arg_sort; record_repres;
+                      lid = _; label = lbl; alloc_mode; } ->
       let shape =
         (Shape
             [| Value (Typeopt.value_kind arg.exp_env arg.exp_loc arg.exp_type);
@@ -732,12 +762,17 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             |])
       in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
-      let repres =
-        match lbl.lbl_repres with
-        | Record_variable | Record_inlined (_, Constructor_variable, _) ->
-            Misc.fatal_errorf "Texp_atomic_loc on record with [any] field %s"
-              lbl.lbl_name
-        | repres -> repres
+      let repres = match record_repres with
+        | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) ->
+            record_repres
+
+        (* Expect that usage of atomic.loc with mixed/variable records was
+           rejected during typechecking. *)
+        | Record_unboxed | Record_inlined (_, Constructor_variable, _)
+        | Record_inlined (_, Constructor_mixed _, _) | Record_float
+        | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_variable ->
+          Misc.fatal_error
+            "transl: Texp_atomic_loc got unexpected record representation"
       in
       let arg_layout = layout_exp arg_sort arg in
       let (arg, lbl) = transl_atomic_loc ~scopes arg arg_layout lbl repres in
@@ -1724,17 +1759,17 @@ and transl_tupled_function
     match params, body with
     | [],
       Tfunction_cases
-        { fc_cases = { c_lhs; _ } :: _ as cases;
+        { fc_cases = first_case :: rest_cases;
           fc_partial; fc_arg_mode; fc_arg_sort } ->
         let fc_arg_sort = Jkind.Sort.default_for_transl_and_get fc_arg_sort in
-        Some (cases, fc_partial, c_lhs, fc_arg_mode, fc_arg_sort)
+        Some (first_case, rest_cases, fc_partial, fc_arg_mode, fc_arg_sort)
     | [{ fp_kind = Tparam_pat pat; fp_partial; fp_mode; fp_sort }],
       Tfunction_body body ->
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
         let case =
           { c_lhs = pat; c_cont = None; c_guard = None; c_rhs = body }
         in
-        Some ([ case ], fp_partial, pat, fp_mode.mode_modes, fp_sort)
+        Some (case, [], fp_partial, fp_mode.mode_modes, fp_sort)
     | _ -> None
   in
   (* Cases can be eligible for flattening if they belong to the only param
@@ -1743,21 +1778,21 @@ and transl_tupled_function
      thought it through. *)
   match eligible_cases with
   | Some
-      (cases, partial,
-       ({ pat_desc = Tpat_tuple pl } as arg_pat), arg_mode, arg_sort)
+      (({ c_lhs = { pat_desc = Tpat_tuple pl } } as first_case),
+       rest_cases, partial, arg_mode, arg_sort)
     when is_alloc_heap mode
       && is_alloc_heap (transl_alloc_mode_l arg_mode)
       && !Clflags.native_code
       && List.length pl <= (Lambda.max_arity ()) ->
       begin try
-        let arg_layout = layout_pat arg_sort arg_pat in
+        let cases = first_case :: rest_cases in
         let size = List.length pl in
         let pats_expr_list =
           List.map
             (fun {c_lhs; c_guard; c_rhs} ->
               (Matching.flatten_pattern size c_lhs, c_guard, c_rhs))
             cases in
-        let kinds =
+        let tuple_value_kinds arg_layout =
           match arg_layout with
           | Pvalue {
               nullable = Non_nullable;
@@ -1765,12 +1800,21 @@ and transl_tupled_function
                                non_consts = [0, Constructor_uniform kinds] }} ->
               (* CR layouts v5: to change when we have non-value tuple
                  elements. *)
-              List.map (fun vk -> Pvalue vk) kinds
-          | _ ->
+              Some kinds
+          | _ -> None
+        in
+        let value_kinds =
+          match
+            Option.bind (join_layout_of_cases arg_sort cases)
+              tuple_value_kinds
+          with
+          | Some kinds -> kinds
+          | None ->
               Misc.fatal_error
                 "Translcore.transl_tupled_function: \
                  Argument should be a tuple, but couldn't get the kinds"
         in
+        let kinds = List.map (fun vk -> Pvalue vk) value_kinds in
         let tparams =
           List.map (fun kind -> {
                 name = Ident.create_local "param";
@@ -1875,9 +1919,9 @@ and transl_curried_function ~scopes loc repr params body
       ->
         let fc_arg_sort = Jkind.Sort.default_for_transl_and_get fc_arg_sort in
         let arg_layout =
-          match fc_cases with
-          | { c_lhs } :: _ -> layout_pat fc_arg_sort c_lhs
-          | [] ->
+          match join_layout_of_cases fc_arg_sort fc_cases with
+          | Some arg_layout -> arg_layout
+          | None ->
               (* ppxes can generate empty function cases, which compiles to
                  a function that always raises Match_failure. We try less
                  hard to calculate a detailed layout that the middle-end can
@@ -2216,7 +2260,13 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
       let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
       (* CR layouts v5: allow more unboxed types here. *)
       match definition with
-      | Kept _ -> cont
+      | Kept _ ->
+        if Types.is_atomic lbl.lbl_mut then
+          (* Rejected during typechecking to avoid need for
+             implicit atomic loads *)
+          fatal_error
+            "transl_record: update expr implicitly copies atomic field";
+        cont
       | Overridden (_lid, expr) ->
           let upd =
             match repres with
@@ -2287,6 +2337,9 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
            let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
            match definition with
            | Kept (typ, mut, _) ->
+               if Types.is_atomic lbl.lbl_mut then
+                 fatal_error
+                   "transl_record: update expr implicitly copies atomic field";
                let field_layout = layout env lbl.lbl_loc lbl_sort typ in
                let sem =
                  if Types.is_mutable mut then Reads_vary else Reads_agree

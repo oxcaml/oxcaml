@@ -81,9 +81,7 @@ let remove_unused_value_slots { closures; value_slots } ~used_value_slots =
   let value_slots =
     Value_slot.Set.filter
       (fun var ->
-        (not
-           (Value_slot.in_compilation_unit var
-              (Compilation_unit.get_current_exn ())))
+        (not (Value_slot.in_compilation_unit var (Current_unit.get_cu_exn ())))
         || Value_slot.Set.mem var used_value_slots)
       value_slots
   in

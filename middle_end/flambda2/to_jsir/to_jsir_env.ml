@@ -192,7 +192,7 @@ let get_external_symbol ~res symbol =
       var, To_jsir_result.add_instr_exn res (Let (var, expr)))
 
 let get_symbol t ~res symbol =
-  match Symbol.compilation_unit symbol |> Compilation_unit.is_current with
+  match Symbol.compilation_unit symbol |> Current_unit.is_current with
   | true -> Option.map (fun v -> v, res) (Symbol.Map.find_opt symbol t.symbols)
   | false -> Some (get_external_symbol ~res symbol)
 

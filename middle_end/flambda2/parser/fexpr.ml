@@ -49,7 +49,9 @@ type continuation_sort =
 
 type region =
   | Named of variable
-  | Toplevel
+  | Toplevel_alloc_region
+  | Toplevel_region
+  | Toplevel_ghost_region
 
 type tag_scannable = int
 
@@ -212,14 +214,18 @@ type simple =
 type cont_extra_arg = simple * kind_with_subkind
 
 type alloc_mode_for_allocations =
-  | Heap
-  | Local of { region : region }
-
-type alloc_mode_for_applications =
-  | Heap
+  | Heap of { alloc_region : region }
   | Local of
-      { region : region;
-        ghost_region : region
+      { alloc_region : region;
+        region : region
+      }
+
+type 'a alloc_mode_for_applications =
+  | Heap of { alloc_region : 'a }
+  | Local of
+      { alloc_region : 'a;
+        region : 'a;
+        ghost_region : 'a
       }
 
 type alloc_mode_for_assignments =
@@ -290,7 +296,7 @@ type apply =
     exn_continuation : continuation * cont_extra_arg list;
     args : simple list;
     call_kind : call_kind;
-    alloc_mode : alloc_mode_for_applications;
+    alloc_mode : region alloc_mode_for_applications;
     arities : function_arities option;
     inlined : inlined_attribute option;
     inlining_state : inlining_state option
@@ -328,7 +334,9 @@ and value_slots = one_value_slot list
 
 and one_value_slot =
   { var : value_slot;
-    value : simple
+    value : simple;
+    kind : Flambda_kind.Naked_number_kind.t option
+        (* [None] means kind [Value]. *)
   }
 
 and let_ =
@@ -407,8 +415,7 @@ and code_size = int
 and params_and_body =
   { params : kinded_parameter list;
     closure_var : variable;
-    region_var : variable;
-    ghost_region_var : variable;
+    region_vars : variable alloc_mode_for_applications;
     depth_var : variable;
     ret_cont : continuation_id;
     exn_cont : continuation_id;

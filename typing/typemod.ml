@@ -4424,8 +4424,8 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
                       Argument_for_non_parameter (arg_module, arg_filename)));
       let modes =
         Includecore.Specific
-          ((Env.mode_unit ~staticity:actual_staticity, None),
-           Env.mode_unit ~staticity:arg_staticity)
+          ((Persistent_env.mode_pers_mod actual_staticity, None),
+           Persistent_env.mode_pers_mod arg_staticity)
       in
       let coercion =
         Includemod.compunit_as_argument
@@ -4465,7 +4465,7 @@ let type_implementation target modulename initial_env ast =
         Profile.record_call "infer" (fun () -> type_structure initial_env ast)
       in
       Value.submode_err (Location.in_file sourcefile, Structure)
-        mode (Env.mode_unit ~staticity:Staticity.Dynamic);
+        mode (Persistent_env.mode_pers_mod Dynamic);
       let uid = Uid.of_compilation_unit_id modulename in
       let shape = Shape.set_uid_if_none shape uid in
       if !Clflags.binary_annotations_cms then
@@ -4547,7 +4547,8 @@ let type_implementation target modulename initial_env ast =
               Includemod.compunit
                 initial_env ~mark:true sourcefile
                 ~modes:(Includecore.Specific
-                  ((mode, None), Env.mode_unit ~staticity))
+                  ((mode, None),
+                   Persistent_env.mode_pers_mod staticity))
                 sg compiled_intf_file_name dclsig shape)
           in
           (* Check the _mli_ against the argument type, since the mli determines
@@ -4587,7 +4588,9 @@ let type_implementation target modulename initial_env ast =
             (* No [.mli], so the inferred signature has no file-level [@@]
                and is at [Dynamic] on both sides. *)
             let modes =
-              let mode = Env.mode_unit ~staticity:Staticity.Dynamic in
+              let mode =
+                Persistent_env.mode_pers_mod Dynamic
+              in
               Includecore.Specific ((mode, None), mode)
             in
             Profile.record_call "check_sig" (fun () ->
@@ -4777,7 +4780,7 @@ let package_units initial_env objfiles target_cmi modulename =
       (Staticity.of_const Staticity.Dynamic);
     let cc, _shape =
       let modes =
-        let mode = Env.mode_unit ~staticity:Staticity.Dynamic in
+        let mode = Persistent_env.mode_pers_mod Dynamic in
         Includecore.Specific ((mode, None), mode)
       in
       Includemod.compunit initial_env ~mark:true

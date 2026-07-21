@@ -3,7 +3,7 @@ let code max_1 deleted in
 let code aabb_hit_2 deleted in
 let code inline(always) loopify(never) size(14) newer_version_of(min_0)
       min_0_1 (x : float boxed, y : float boxed)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : float boxed =
   let prim = %unbox_num.`float` (y) in
@@ -13,10 +13,10 @@ let code inline(always) loopify(never) size(14) newer_version_of(min_0)
     | 0 -> k (y)
     | 1 -> k (x)
 in
-let $camlRay__min_4 = closure min_0_1 @min in
+let $camlRay__min_4 = closure min_0_1 @min &toplevel.alloc_region in
 let code inline(always) loopify(never) size(14) newer_version_of(max_1)
       max_1_1 (x : float boxed, y : float boxed)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : float boxed =
   let prim = %unbox_num.`float` (y) in
@@ -26,14 +26,14 @@ let code inline(always) loopify(never) size(14) newer_version_of(max_1)
     | 0 -> k (y)
     | 1 -> k (x)
 in
-let $camlRay__max_5 = closure max_1_1 @max in
+let $camlRay__max_5 = closure max_1_1 @max &toplevel.alloc_region in
 let code loopify(never) size(222) newer_version_of(aabb_hit_2)
       aabb_hit_2_1
         (aabb : [ 0 of float ^ 3 * float ^ 3 ],
          r : [ 0 of float ^ 3 * float ^ 3 ],
          tmin0 : float boxed,
          tmax0 : float boxed)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let Pfield = %block_load.[`1`] (r) in
@@ -195,7 +195,9 @@ let code loopify(never) size(222) newer_version_of(aabb_hit_2)
                                          in
                                          cont k (Pnot))))))))
 in
-let $camlRay__aabb_hit_6 = closure aabb_hit_2_1 @aabb_hit in
+let $camlRay__aabb_hit_6 =
+  closure aabb_hit_2_1 @aabb_hit &toplevel.alloc_region
+in
 let $camlRay =
   Block 0 ($camlRay__min_4, $camlRay__max_5, $camlRay__aabb_hit_6)
 in

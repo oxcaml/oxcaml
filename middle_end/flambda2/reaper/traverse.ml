@@ -199,6 +199,17 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     let name = Acc.simple_to_node acc ~denv arg in
     default_bp (fun to_ ->
         Acc.add_accessor_dep acc ~to_ Field.get_tag ~base:name)
+  | Unary (Box_number (bn, _alloc_mode), contents) ->
+    (* Boxed numbers are treated like blocks with a single field. Unlike blocks,
+       no [Is_int] or [Get_tag] fields are needed: those primitives arise from
+       matches on variants and are never applied to boxed numbers. *)
+    let from = Acc.simple_to_node acc ~denv contents in
+    default_bp (fun base ->
+        Acc.add_constructor_dep acc ~base (Field.boxed_number bn) ~from)
+  | Unary (Unbox_number bn, arg) ->
+    let name = Acc.simple_to_node acc ~denv arg in
+    default_bp (fun to_ ->
+        Acc.add_accessor_dep acc ~to_ (Field.boxed_number bn) ~base:name)
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
       | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax )
@@ -208,10 +219,9 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
         | Is_null | Array_length _ | Bigarray_length _ | String_length _
         | Int_as_pointer _ | Opaque_identity _ | Int_arith _ | Float_arith _
         | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
-        | Reinterpret_boxed_vector | Unbox_number _ | Box_number _
-        | Untag_immediate | Tag_immediate | Is_boxed_float | Is_flat_float_array
-        | End_region _ | End_try_region _ | Obj_dup | Get_header | Peek _
-        | Make_lazy _ ),
+        | Reinterpret_boxed_vector | Untag_immediate | Tag_immediate
+        | Is_boxed_float | Is_flat_float_array | End_region _ | End_try_region _
+        | Obj_dup _ | Get_header | Peek _ | Make_lazy _ ),
         _ )
   | Binary
       ( ( Block_set _ | Array_load _ | String_or_bigstring_load _
@@ -353,7 +363,7 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
     in
     let callee = Apply.callee apply in
     let is_external =
-      not (Compilation_unit.is_current (Code_id.get_compilation_unit code_id))
+      not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
     in
     let[@local] add_apply acc ~only_if_closure_any_source =
       let callee, call_widget =
@@ -476,23 +486,17 @@ let traverse_apply denv acc apply : rev_expr =
       List.iter (Acc.add_cond_any_usage acc ~denv) [eff; cont; last_fiber]
     | Effect (With_stack { valuec; exnc; effc; f; arg }) ->
       List.iter (Acc.add_cond_any_usage acc ~denv) [valuec; exnc; effc; f; arg]
-    | Effect (With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg }) ->
-      List.iter
-        (Acc.add_cond_any_usage acc ~denv)
-        [valuec; exnc; effc; dyn; bind; f; arg]
     | Effect
         (With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg }) ->
       List.iter
         (Acc.add_cond_any_usage acc ~denv)
         [valuec; exnc; effc; handle_tick; f; arg]
-    | Effect
-        (With_stack_bind_preemptible
-           { valuec; exnc; effc; handle_tick; dyn; bind; f; arg }) ->
-      List.iter
-        (Acc.add_cond_any_usage acc ~denv)
-        [valuec; exnc; effc; handle_tick; dyn; bind; f; arg]
-    | Effect (Resume { cont; f; arg }) ->
-      List.iter (Acc.add_cond_any_usage acc ~denv) [cont; f; arg]
+    | Effect (Continue { cont; value }) ->
+      List.iter (Acc.add_cond_any_usage acc ~denv) [cont; value]
+    | Effect (Discontinue { cont; exn }) ->
+      List.iter (Acc.add_cond_any_usage acc ~denv) [cont; exn]
+    | Effect (Discontinue_with_backtrace { cont; exn; bt }) ->
+      List.iter (Acc.add_cond_any_usage acc ~denv) [cont; exn; bt]
   in
   traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc;
   let expr = Apply apply in
@@ -783,8 +787,10 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
   Bound_parameters.iter (fun bp -> Acc.bound_parameter_kind acc bp) params;
   Acc.kind acc (Name.var my_closure) K.value;
   (match (my_alloc_mode : Alloc_mode.For_applications.t) with
-  | Heap -> ()
-  | Local { region; ghost_region } ->
+  | Heap { alloc_region } ->
+    Acc.kind acc (Name.var alloc_region) Flambda_kind.region
+  | Local { alloc_region; region; ghost_region } ->
+    Acc.kind acc (Name.var alloc_region) Flambda_kind.region;
     Acc.kind acc (Name.var region) Flambda_kind.region;
     Acc.kind acc (Name.var ghost_region) Flambda_kind.region);
   Acc.kind acc (Name.var my_depth) K.rec_info;
@@ -812,8 +818,9 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     any_source my_closure;
     any_source my_depth;
     (match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap -> ()
-    | Local { region; ghost_region } ->
+    | Heap { alloc_region } -> any_source alloc_region
+    | Local { alloc_region; region; ghost_region } ->
+      any_source alloc_region;
       any_source region;
       any_source ghost_region);
     List.iter any_source (code_dep.exn :: code_dep.return);
@@ -854,7 +861,7 @@ type result =
   }
 
 let create_symbol_and_add_any_source acc name =
-  let cu = Compilation_unit.get_current_exn () in
+  let cu = Current_unit.get_cu_exn () in
   let sym = Symbol.create cu (Linkage_name.of_string name) in
   Acc.add_any_source acc (Code_id_or_name.symbol sym);
   sym
