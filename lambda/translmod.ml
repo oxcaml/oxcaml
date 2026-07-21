@@ -1516,20 +1516,20 @@ let project_arg_block ~find_impl_by_name ~chain ~(gm : Global_module.t)
   Lprim (mod_field arg_block_idx main_repr, [main_block], Loc_unknown)
 
 let rec transl_local_instance ~(gm : Global_module.t) ~chain
-    ~find_impl_by_name ~param_ids ~module_ids ~k =
-  match Global_module.Map.find_opt gm module_ids with
-  | Some id -> k (Lvar id) module_ids
+    ~find_impl_by_name ~param_map ~module_map ~k =
+  match Global_module.Map.find_opt gm module_map with
+  | Some id -> k (Lvar id) module_map
   | None ->
-      bind_local_instance ~gm ~chain ~find_impl_by_name ~param_ids ~module_ids
+      bind_local_instance ~gm ~chain ~find_impl_by_name ~param_map ~module_map
         ~k
 
 and bind_local_instance ~(gm : Global_module.t) ~chain
-    ~find_impl_by_name ~param_ids ~module_ids ~k =
+    ~find_impl_by_name ~param_map ~module_map ~k =
   let cu = cu_of_impl gm in
   let ui_format, _arg_descr = find_impl_by_name ~chain cu in
   let chain = gm :: chain in
   let new_id = Ident.create_local (Global_module.to_string gm) in
-  let module_ids = Global_module.Map.add gm new_id module_ids in
+  let module_map = Global_module.Map.add gm new_id module_map in
   let runtime_params =
     match ui_format with
     | Mb_struct _ ->
@@ -1539,10 +1539,10 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
     | Mb_instantiating_functor { mb_runtime_params; _ } -> mb_runtime_params
   in
   let resolve_param (global : Global_module.t) =
-    match Global_module.find_in_parameter_map global param_ids with
+    match Global_module.find_in_parameter_map global param_map with
     | Some id -> id
     | None ->
-        Misc.fatal_errorf_doc "bind_local_instance: %a not in param_ids"
+        Misc.fatal_errorf_doc "bind_local_instance: %a not in param_map"
           Global_module.print global
   in
   let arg_params args =
@@ -1556,7 +1556,7 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
       gm.visible_args
     |> Global_module.Parameter_name.Map.of_list
   in
-  let process_one (rp : Lambda.runtime_param) module_ids ~k =
+  let process_one (rp : Lambda.runtime_param) module_map ~k =
     match rp with
     | Rp_main_module_block inner_gm ->
         let inner_gm =
@@ -1574,19 +1574,19 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
             Global_module.print inner_gm
             Global_module.print gm;
         transl_local_instance ~gm:inner_gm ~chain
-          ~find_impl_by_name ~param_ids ~module_ids
+          ~find_impl_by_name ~param_map ~module_map
           ~k
     | Rp_argument_block global ->
         (match Global_module.find_in_parameter_map global visible_arg_map with
          | Some arg_value ->
              transl_local_instance ~gm:arg_value ~chain
-               ~find_impl_by_name ~param_ids ~module_ids
-               ~k:(fun main_block module_ids ->
+               ~find_impl_by_name ~param_map ~module_map
+               ~k:(fun main_block module_map ->
                  let arg_block =
                    project_arg_block ~find_impl_by_name ~chain
                      ~gm:arg_value main_block
                  in
-                 k arg_block module_ids)
+                 k arg_block module_map)
          | None ->
              let global_name = Global_module.to_name global in
              if not
@@ -1597,12 +1597,12 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
                  "bind_local_instance: %a should have %a as a hidden_arg"
                  Global_module.print gm
                  Global_module.print global;
-             k (Lvar (resolve_param global)) module_ids)
+             k (Lvar (resolve_param global)) module_map)
     | Rp_unit ->
-        k lambda_unit module_ids
+        k lambda_unit module_map
   in
-  Stdlib.List.fold_left_map_cont process_one runtime_params module_ids
-    ~k:(fun ap_args module_ids ->
+  Stdlib.List.fold_left_map_cont process_one runtime_params module_map
+    ~k:(fun ap_args module_map ->
       let func =
         Lprim
           ( mod_field 0 (Module_value_only { field_count = 1 }),
@@ -1623,7 +1623,7 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
             ap_probe = None
           }
       in
-      let body, extra = k (Lvar new_id) module_ids in
+      let body, extra = k (Lvar new_id) module_map in
       ( Llet (Strict, layout_module, new_id, debug_uid_none, rhs, body),
         extra ))
 
@@ -1645,7 +1645,7 @@ let transl_functorization_make ~params ~modules ~find_impl_by_name
       inline = Always_inline
     }
   in
-  let param_ids, param_idents =
+  let param_map, param_idents =
     List.fold_left_map
       (fun map p_name ->
         let id =
@@ -1657,12 +1657,12 @@ let transl_functorization_make ~params ~modules ~find_impl_by_name
   in
   let body, required_globals =
     Stdlib.List.fold_left_map_cont
-      (fun gm module_ids ~k ->
+      (fun gm module_map ~k ->
         transl_local_instance ~gm ~chain:[]
-          ~find_impl_by_name ~param_ids ~module_ids ~k)
+          ~find_impl_by_name ~param_map ~module_map ~k)
       modules
       Global_module.Map.empty
-      ~k:(fun exposed_lambdas module_ids ->
+      ~k:(fun exposed_lambdas module_map ->
         let block =
           Lprim
             ( Pmakeblock (0, Immutable, All_value, alloc_heap),
@@ -1672,7 +1672,7 @@ let transl_functorization_make ~params ~modules ~find_impl_by_name
         let required_globals =
           Global_module.Map.fold
             (fun gm _id set -> Compilation_unit.Set.add (cu_of_impl gm) set)
-            module_ids Compilation_unit.Set.empty
+            module_map Compilation_unit.Set.empty
         in
         (block, required_globals))
   in
