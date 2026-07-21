@@ -699,7 +699,7 @@ and module_coercion =
       ; pos_cc_list : (int * module_coercion) list
       ; id_pos_list : (Ident.t * int * module_coercion) list
       }
-  | Tcoerce_functor of module_coercion * module_coercion
+  | Tcoerce_functor of module_coercion * module_coercion * Mode.Yielding.l
   | Tcoerce_primitive of primitive_coercion
   | Tcoerce_alias of Env.t * Path.t * module_coercion
   | Tcoerce_invalid

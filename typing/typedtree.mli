@@ -1082,7 +1082,9 @@ and module_coercion =
       (* [pos] (the [int]s in [pos_cc_list] and [id_pos_list]) is an index into
          the list of fields in the input module *)
       }
-  | Tcoerce_functor of module_coercion * module_coercion
+  | Tcoerce_functor of module_coercion * module_coercion * Mode.Yielding.l
+  (** The [Mode.Yielding.l] is the yielding of an application of the coerced
+      functor *)
   | Tcoerce_primitive of primitive_coercion
   (** External declaration coerced to a regular value.
       {[

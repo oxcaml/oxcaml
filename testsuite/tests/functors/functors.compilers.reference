@@ -57,7 +57,7 @@
          (function {nlocal = 0} funarg funarg is_a_functor stub
            (let
              (let =
-                (apply[yielding] F (makeblock 0 (field_imm 1 funarg))
+                (apply F (makeblock 0 (field_imm 1 funarg))
                   (makeblock 0 (field_imm 1 funarg))))
              (makeblock 0 (field_imm 1 let)))))))
   (makeblock 0 O F F1 F2 M))
