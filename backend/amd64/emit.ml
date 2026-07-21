@@ -2267,16 +2267,22 @@ let emit_instr ~first ~last ~fallthrough i =
       I.movzx al (res i 0)
     end
   | Lop (Intop_imm (Icomp cmp, n)) ->
+    let emit_cmp () =
+      match cmp, n with
+      | (Ceq | Cne), 0 -> output_test_zero i.arg.(0)
+      | (Ceq | Cne | Clt | Cgt | Cle | Cge | Cult | Cugt | Cule | Cuge), _ ->
+        I.cmp (int n) (arg i 0)
+    in
     if
       Reg.is_reg i.res.(0)
       && not (Reg.equal_location i.res.(0).loc i.arg.(0).loc)
     then begin
       I.xor (res32 i 0) (res32 i 0);
-      I.cmp (int n) (arg i 0);
+      emit_cmp ();
       I.set (cond cmp) (res8 i 0)
     end
     else begin
-      I.cmp (int n) (arg i 0);
+      emit_cmp ();
       I.set (cond cmp) al;
       I.movzx al (res i 0)
     end
