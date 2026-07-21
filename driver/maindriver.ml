@@ -113,13 +113,7 @@ let main argv ppf =
         Compenv.get_objfiles ~with_ocamlparam:false
         |> Functorizer.validate_inputs
       in
-      Functorizer.functorize input_module_names target
-        ~with_info:(Compile_common.with_info ~backend:Byte ~tool_name:"ocamlc")
-        ~impl_ext:"cmo"
-        ~read_format:(fun f ->
-          let cmo = Cmo_io.read_cmo f in
-          cmo.cu_format, cmo.cu_arg_descr)
-        ~compile_program:Compile.emit_lambda_program;
+      Bytefunctorizer.functorize input_module_names target;
       Warnings.check_fatal ();
     end
     else if not !Compenv.stop_early && !objfiles <> [] then begin
