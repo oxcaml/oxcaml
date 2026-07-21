@@ -463,7 +463,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
   in
   let wrapper_var = Variable.create "partial_app" K.value in
   let wrapper_var_duid = Flambda_debug_uid.none in
-  let compilation_unit = Compilation_unit.get_current_exn () in
+  let compilation_unit = Current_unit.get_cu_exn () in
   let wrapper_function_slot =
     Function_slot.create compilation_unit ~name:"partial_app_closure"
       ~is_always_immediate:false K.value
@@ -486,12 +486,16 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
          partial closure made by the first application. Due to this, the first
          application must have a closure allocated on the heap as well, even
          though it was with a local alloc_mode. *)
+      let alloc_region =
+        match Apply_expr.alloc_mode apply with
+        | Heap { alloc_region } | Local { alloc_region; _ } -> alloc_region
+      in
       Ok
-        ( Alloc_mode.For_applications.heap,
+        ( Alloc_mode.For_applications.heap ~alloc_region,
           first_complex_local_param - num_non_unarized_args )
     else
       match Apply_expr.alloc_mode apply with
-      | Heap -> (* This can happen in dead GADT match cases. *) Bottom
+      | Heap _ -> (* This can happen in dead GADT match cases. *) Bottom
       | Local _ as apply_alloc_mode -> Ok (apply_alloc_mode, 0)
   in
   let expr, dacc =
@@ -507,7 +511,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       | Local -> (
         match (new_closure_alloc_mode : Alloc_mode.For_applications.t) with
         | Local _ -> ()
-        | Heap ->
+        | Heap _ ->
           Misc.fatal_errorf
             "New closure alloc mode cannot be [Heap] when existing closure \
              alloc mode is [Local]: direct partial application:@ %a"
@@ -599,9 +603,12 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         let my_closure = Variable.create "my_closure" K.value in
         let my_alloc_mode =
           if contains_no_escaping_local_allocs
-          then Alloc_mode.For_applications.heap
+          then
+            Alloc_mode.For_applications.heap
+              ~alloc_region:(Variable.create "my_alloc_region" K.region)
           else
             Alloc_mode.For_applications.local
+              ~alloc_region:(Variable.create "my_alloc_region" K.region)
               ~region:(Variable.create "my_region" K.region)
               ~ghost_region:(Variable.create "my_ghost_region" K.region)
         in
@@ -695,7 +702,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                ~name
         in
         let code_id =
-          Code_id.create ~name ~debug:dbg (Compilation_unit.get_current_exn ())
+          Code_id.create ~name ~debug:dbg (Current_unit.get_cu_exn ())
         in
         (* We could create better result types by combining the types for the
            first arguments with the result types from the called function.
@@ -742,9 +749,10 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         in
         let new_closure_alloc_mode =
           match (new_closure_alloc_mode : Alloc_mode.For_applications.t) with
-          | Heap -> Alloc_mode.For_allocations.heap
-          | Local { region; ghost_region = _ } ->
-            Alloc_mode.For_allocations.local ~region
+          | Heap { alloc_region } ->
+            Alloc_mode.For_allocations.heap ~alloc_region
+          | Local { alloc_region; region; ghost_region = _ } ->
+            Alloc_mode.For_allocations.local ~alloc_region ~region
         in
         ( Set_of_closures.create ~value_slots function_decls,
           new_closure_alloc_mode,
@@ -1390,26 +1398,18 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
       E.with_stack ~valuec:(simplify_simple valuec) ~exnc:(simplify_simple exnc)
         ~effc:(simplify_simple effc) ~f:(simplify_simple f)
         ~arg:(simplify_simple arg)
-    | With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg } ->
-      E.with_stack_bind ~valuec:(simplify_simple valuec)
-        ~exnc:(simplify_simple exnc) ~effc:(simplify_simple effc)
-        ~dyn:(simplify_simple dyn) ~bind:(simplify_simple bind)
-        ~f:(simplify_simple f) ~arg:(simplify_simple arg)
     | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
       E.with_stack_preemptible ~valuec:(simplify_simple valuec)
         ~exnc:(simplify_simple exnc) ~effc:(simplify_simple effc)
         ~handle_tick:(simplify_simple handle_tick)
         ~f:(simplify_simple f) ~arg:(simplify_simple arg)
-    | With_stack_bind_preemptible
-        { valuec; exnc; effc; handle_tick; dyn; bind; f; arg } ->
-      E.with_stack_bind_preemptible ~valuec:(simplify_simple valuec)
-        ~exnc:(simplify_simple exnc) ~effc:(simplify_simple effc)
-        ~handle_tick:(simplify_simple handle_tick)
-        ~dyn:(simplify_simple dyn) ~bind:(simplify_simple bind)
-        ~f:(simplify_simple f) ~arg:(simplify_simple arg)
-    | Resume { cont; f; arg } ->
-      E.resume ~cont:(simplify_simple cont) ~f:(simplify_simple f)
-        ~arg:(simplify_simple arg)
+    | Continue { cont; value } ->
+      E.continue ~cont:(simplify_simple cont) ~value:(simplify_simple value)
+    | Discontinue { cont; exn } ->
+      E.discontinue ~cont:(simplify_simple cont) ~exn:(simplify_simple exn)
+    | Discontinue_with_backtrace { cont; exn; bt } ->
+      E.discontinue_with_backtrace ~cont:(simplify_simple cont)
+        ~exn:(simplify_simple exn) ~bt:(simplify_simple bt)
   in
   let apply = Apply.with_call_kind apply (Call_kind.effect_ op) in
   let dacc, use_id =

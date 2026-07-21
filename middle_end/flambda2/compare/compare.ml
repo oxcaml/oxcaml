@@ -1363,6 +1363,9 @@ and cont_handlers env handler1 handler2 =
 let flambda_units u1 u2 =
   let ret_cont = Continuation.create ~sort:Toplevel_return () in
   let exn_cont = Continuation.create () in
+  let toplevel_my_alloc_region =
+    Variable.create "toplevel_my_alloc_region" Flambda_kind.region
+  in
   let toplevel_my_region =
     Variable.create "toplevel_my_region" Flambda_kind.region
   in
@@ -1380,6 +1383,11 @@ let flambda_units u1 u2 =
       Renaming.add_fresh_continuation renaming
         (Flambda_unit.exn_continuation u)
         ~guaranteed_fresh:exn_cont
+    in
+    let renaming =
+      Renaming.add_fresh_variable renaming
+        (Flambda_unit.toplevel_my_alloc_region u)
+        ~guaranteed_fresh:toplevel_my_alloc_region
     in
     let renaming =
       Renaming.add_fresh_variable renaming
@@ -1401,4 +1409,5 @@ let flambda_units u1 u2 =
       let module_symbol = Flambda_unit.module_symbol u1 in
       Flambda_unit.create ~return_continuation:ret_cont
         ~exn_continuation:exn_cont ~body ~module_symbol
-        ~used_value_slots:Unknown ~toplevel_my_region ~toplevel_my_ghost_region)
+        ~used_value_slots:Unknown ~toplevel_my_alloc_region ~toplevel_my_region
+        ~toplevel_my_ghost_region)

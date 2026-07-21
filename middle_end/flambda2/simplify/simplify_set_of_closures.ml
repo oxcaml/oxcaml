@@ -72,8 +72,22 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
   in
   let denv =
     match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap -> denv
-    | Local { region = my_region; ghost_region = my_ghost_region } ->
+    | Heap { alloc_region = my_alloc_region } ->
+      let my_alloc_region_duid = Flambda_debug_uid.none in
+      let my_alloc_region =
+        Bound_var.create my_alloc_region my_alloc_region_duid Name_mode.normal
+      in
+      DE.add_variable denv my_alloc_region (T.unknown K.region)
+    | Local
+        { alloc_region = my_alloc_region;
+          region = my_region;
+          ghost_region = my_ghost_region
+        } ->
+      let my_alloc_region_duid = Flambda_debug_uid.none in
+      let my_alloc_region =
+        Bound_var.create my_alloc_region my_alloc_region_duid Name_mode.normal
+      in
+      let denv = DE.add_variable denv my_alloc_region (T.unknown K.region) in
       let my_region_duid = Flambda_debug_uid.none in
       let my_region =
         Bound_var.create my_region my_region_duid Name_mode.normal
@@ -95,6 +109,8 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
       (DA.get_lifted_constants outer_dacc)
     |> DE.enter_closure code_id ~return_continuation ~exn_continuation
          ~my_closure
+         ~my_alloc_region:
+           (Alloc_mode.For_applications.alloc_region my_alloc_mode)
     |> DE.set_loopify_state loopify_state
     |> DE.increment_continuation_scope
   in
@@ -189,13 +205,18 @@ let simplify_function_body context ~outer_dacc function_slot_opt
     Misc.fatal_errorf "Did not expect lifted constants in [dacc]:@ %a" DA.print
       dacc;
   assert (not (DE.at_unit_toplevel (DA.denv dacc)));
+  let my_alloc_region_duid = Flambda_debug_uid.none in
   let my_region_duid = Flambda_debug_uid.none in
   let my_ghost_region_duid = Flambda_debug_uid.none in
   let region_params =
     match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap -> []
-    | Local { region; ghost_region } ->
-      [ Bound_parameter.create region Flambda_kind.With_subkind.region
+    | Heap { alloc_region } ->
+      [ Bound_parameter.create alloc_region Flambda_kind.With_subkind.region
+          my_alloc_region_duid ]
+    | Local { alloc_region; region; ghost_region } ->
+      [ Bound_parameter.create alloc_region Flambda_kind.With_subkind.region
+          my_alloc_region_duid;
+        Bound_parameter.create region Flambda_kind.With_subkind.region
           my_region_duid;
         Bound_parameter.create ghost_region Flambda_kind.With_subkind.region
           my_ghost_region_duid ]
@@ -694,7 +715,7 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
           function_slot |> Function_slot.rename |> Function_slot.to_string
           |> Linkage_name.of_string
         in
-        Symbol.create (Compilation_unit.get_current_exn ()) name)
+        Symbol.create (Current_unit.get_cu_exn ()) name)
       (Function_declarations.funs_in_order function_decls)
   in
   let closure_symbols_map =

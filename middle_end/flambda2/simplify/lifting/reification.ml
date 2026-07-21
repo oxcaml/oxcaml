@@ -109,7 +109,7 @@ let lift dacc ty ~bound_to static_const : _ Or_invalid.t * DA.t =
     | None ->
       let symbol =
         Symbol.create
-          (Compilation_unit.get_current_exn ())
+          (Current_unit.get_cu_exn ())
           (Linkage_name.of_string (Variable.unique_name bound_to))
       in
       if not (K.equal (T.kind ty) K.value)

@@ -907,8 +907,9 @@ let rec choice ctx t =
     | Punbox_unit
 
     (* we don't handle effect or DLS primitives *)
-    | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible
-    | Pwith_stack_bind_preemptible | Pperform | Presume | Preperform
+    | Pwith_stack | Pwith_stack_preemptible
+    | Pperform | Pcontinue | Pdiscontinue
+    | Pdiscontinue_with_backtrace | Preperform
     | Pdls_get | Ptls_get | Pdomain_index
 
     (* we don't handle atomic primitives *)

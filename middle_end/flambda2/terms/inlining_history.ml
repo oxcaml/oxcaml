@@ -251,7 +251,7 @@ module Tracker = struct
   let unknown_call ~dbg ~relative { absolute; _ } =
     extend_absolute absolute
       (Relative.call ~dbg
-         ~callee:(Absolute.empty (Compilation_unit.get_current_exn ()))
+         ~callee:(Absolute.empty (Current_unit.get_cu_exn ()))
          relative)
 
   let call ~dbg ~callee ~relative { absolute; _ } =

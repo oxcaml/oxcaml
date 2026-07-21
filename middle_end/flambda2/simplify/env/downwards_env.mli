@@ -38,6 +38,7 @@ val create :
   unit_toplevel_return_continuation:Continuation.t ->
   toplevel_my_region:Variable.t ->
   toplevel_my_ghost_region:Variable.t ->
+  toplevel_my_alloc_region:Variable.t ->
   t
 
 val all_code : t -> Code.t Code_id.Map.t
@@ -62,6 +63,8 @@ val find_symbol_projection : t -> Variable.t -> Symbol_projection.t option
 val unit_toplevel_return_continuation : t -> Continuation.t
 
 val unit_toplevel_exn_continuation : t -> Continuation.t
+
+val unit_toplevel_alloc_region : t -> Variable.t
 
 val increment_continuation_scope : t -> t
 
@@ -201,6 +204,7 @@ val enter_closure :
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
   my_closure:Variable.t ->
+  my_alloc_region:Variable.t ->
   t ->
   t
 

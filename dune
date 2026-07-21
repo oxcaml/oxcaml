@@ -186,6 +186,9 @@
   language_extension
   zero_alloc_utils
   zero_alloc_annotations
+  doubly_linked_list
+  file_sections
+  lru
   ;; PARSING
   location
   longident
@@ -208,6 +211,7 @@
   ;; TYPING
   ident
   path
+  current_unit
   jkind
   scalar
   primitive
@@ -741,7 +745,6 @@
  (libraries
   ocamlcommon
   oxcaml_common
-  oxcaml_utils
   flambda2_identifiers
   flambda2_cmx
   compiler_owee
@@ -853,7 +856,6 @@
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.a}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.a}
    %{dep:oxcaml_common.a}
-   %{dep:utils/oxcaml_utils.a}
    %{dep:middle_end/flambda2/import/flambda2_import.a}
    %{dep:middle_end/flambda2/ui/flambda2_ui.a}
    %{dep:middle_end/flambda2/algorithms/flambda2_algorithms.a}
@@ -895,7 +897,6 @@
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cma}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cma}
    %{dep:oxcaml_common.cma}
-   %{dep:utils/oxcaml_utils.cma}
    %{dep:middle_end/flambda2/import/flambda2_import.cma}
    %{dep:middle_end/flambda2/ui/flambda2_ui.cma}
    %{dep:middle_end/flambda2/algorithms/flambda2_algorithms.cma}
@@ -937,7 +938,6 @@
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cmxa}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cmxa}
    %{dep:oxcaml_common.cmxa}
-   %{dep:utils/oxcaml_utils.cmxa}
    %{dep:middle_end/flambda2/import/flambda2_import.cmxa}
    %{dep:middle_end/flambda2/ui/flambda2_ui.cmxa}
    %{dep:middle_end/flambda2/algorithms/flambda2_algorithms.cmxa}

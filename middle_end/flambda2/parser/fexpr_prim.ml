@@ -83,8 +83,10 @@ let binary_int_arith_op =
       ([ "add", Add;
          "sub", Sub;
          "mul", Mul;
-         "div", Div;
-         "mod", Mod;
+         "div", Div Signed;
+         "mod", Mod Signed;
+         "udiv", Div Unsigned;
+         "umod", Mod Unsigned;
          "and", And;
          "or", Or;
          "xor", Xor ]
@@ -262,26 +264,76 @@ let alloc_mode_for_allocation =
   patterns
   @@
   let| local =
-    ( labeled "local" string,
-      fun env r ->
-        let region =
-          if String.equal (unwrap_loc r) "toplevel"
-          then env.toplevel_region
-          else Fexpr_to_flambda_commons.find_var env r
+    ( param2 string (labeled "local" string),
+      fun env (alloc_region, region) ->
+        let alloc_region =
+          if String.equal (unwrap_loc alloc_region) "toplevel"
+          then env.toplevel_alloc_region
+          else Fexpr_to_flambda_commons.find_var env alloc_region
         in
-        Alloc_mode.For_allocations.local ~region )
+        (* CR-someday ncourant: right now this is unable to produce ghost
+           regions at toplevel, which is a bit unfortunate *)
+        let region =
+          if String.equal (unwrap_loc region) "toplevel"
+          then env.toplevel_region
+          else Fexpr_to_flambda_commons.find_var env region
+        in
+        Alloc_mode.For_allocations.local ~alloc_region ~region )
   in
-  let| heap = param0, fun _ () -> Alloc_mode.For_allocations.heap in
+  let| heap =
+    ( string,
+      fun env alloc_region ->
+        let alloc_region =
+          if String.equal (unwrap_loc alloc_region) "toplevel"
+          then env.toplevel_alloc_region
+          else Fexpr_to_flambda_commons.find_var env alloc_region
+        in
+        Alloc_mode.For_allocations.heap ~alloc_region )
+  in
   return_either (fun alloc env ->
       match alloc with
-      | Alloc_mode.For_allocations.Local { region } ->
-        let r =
-          match Flambda_to_fexpr_commons.Env.find_region_exn env region with
-          | Fexpr.Toplevel -> wrap_loc "toplevel"
+      | Alloc_mode.For_allocations.Local { alloc_region; region } ->
+        let alloc_region =
+          match
+            Flambda_to_fexpr_commons.Env.find_region_exn env alloc_region
+          with
+          | Fexpr.Toplevel_alloc_region | Toplevel_region
+          | Toplevel_ghost_region ->
+            wrap_loc "toplevel"
           | Named s -> s
         in
-        local r env
-      | Alloc_mode.For_allocations.Heap -> heap () env)
+        let region =
+          match Flambda_to_fexpr_commons.Env.find_region_exn env region with
+          | Fexpr.Toplevel_alloc_region | Toplevel_region
+          | Toplevel_ghost_region ->
+            wrap_loc "toplevel"
+          | Named s -> s
+        in
+        local (alloc_region, region) env
+      | Alloc_mode.For_allocations.Heap { alloc_region } ->
+        let alloc_region =
+          match
+            Flambda_to_fexpr_commons.Env.find_region_exn env alloc_region
+          with
+          | Fexpr.Toplevel_alloc_region | Toplevel_region
+          | Toplevel_ghost_region ->
+            wrap_loc "toplevel"
+          | Named s -> s
+        in
+        heap alloc_region env)
+
+let alloc_region =
+  D.maps
+    ~to_:(fun env alloc_region ->
+      match Flambda_to_fexpr_commons.Env.find_region_exn env alloc_region with
+      | Fexpr.Toplevel_alloc_region | Toplevel_region | Toplevel_ghost_region ->
+        wrap_loc "toplevel"
+      | Named s -> s)
+    ~from:(fun env alloc_region ->
+      if String.equal (unwrap_loc alloc_region) "toplevel"
+      then env.toplevel_alloc_region
+      else Fexpr_to_flambda_commons.find_var env alloc_region)
+    D.string
 
 let alloc_mode_for_assignments =
   let open D in
@@ -699,7 +751,10 @@ let box_num =
 let tag_immediate =
   D.(unary "%tag_imm" ~params:param0 (fun _ () -> P.Tag_immediate))
 
-let obj_dup = D.(unary "%obj_dup" ~params:param0 (fun _ () -> P.Obj_dup))
+let obj_dup =
+  D.(
+    unary "%obj_dup" ~params:alloc_region (fun _ alloc_region ->
+        P.Obj_dup { alloc_region }))
 
 let get_header =
   D.(unary "%get_header" ~params:param0 (fun _ () -> P.Get_header))
@@ -740,10 +795,11 @@ let duplicate_array =
   D.(
     unary "%duplicate_array"
       ~params:
-        (param3 duplicate_array_kind (positional mutability)
-           (positional mutability))
-      (fun _ (kind, source_mutability, destination_mutability) ->
-        P.Duplicate_array { kind; source_mutability; destination_mutability }))
+        (param4 duplicate_array_kind (positional mutability)
+           (positional mutability) alloc_region)
+      (fun _ (kind, source_mutability, destination_mutability, alloc_region) ->
+        P.Duplicate_array
+          { kind; source_mutability; destination_mutability; alloc_region }))
 
 let int_as_pointer =
   D.(
@@ -779,7 +835,10 @@ let num_conv =
            (positional standard_int_or_float))
       (fun _ (src, dst) -> P.Num_conv { src; dst }))
 
-let make_lazy = D.(unary "%lazy" ~params:lazy_tag (fun _ lt -> P.Make_lazy lt))
+let make_lazy =
+  D.(
+    unary "%lazy" ~params:(param2 lazy_tag alloc_region)
+      (fun _ (lazy_tag, alloc_region) -> P.Make_lazy { lazy_tag; alloc_region }))
 
 let opaque_identity =
   D.(
@@ -803,7 +862,10 @@ let untag_immediate =
   D.(unary "%untag_imm" ~params:param0 (fun _ () -> P.Untag_immediate))
 
 let project_value_slot =
-  (* CR mshinwell: support non-value kinds *)
+  (* CR mshinwell: support non-value kinds in the projection syntax. Note that
+     if the value slot's definition (in a "with" clause, where kinds are
+     supported) has already been parsed, the slot registered under this name
+     will have the correct kind and the kind here is ignored. *)
   let kind = Flambda_kind.value in
   D.(
     unary "%project_value_slot"
@@ -867,8 +929,8 @@ let duplicate_block =
       | Naked_floats { length } -> floats length
       | Mixed -> mixed ())
   in
-  unary "%duplicate_block" ~params:kind (fun _ kind ->
-      P.Duplicate_block { kind })
+  unary "%duplicate_block" ~params:(param2 kind alloc_region)
+    (fun _ (kind, alloc_region) -> P.Duplicate_block { kind; alloc_region })
 
 (* Binaries *)
 let atomic_load_field =
@@ -1256,8 +1318,10 @@ module OfFlambda = struct
     | End_try_region { ghost = false } -> end_try_region env ()
     | End_region { ghost = true } -> end_ghost_region env ()
     | End_try_region { ghost = true } -> end_try_ghost_region env ()
-    | Duplicate_array { kind; source_mutability; destination_mutability } ->
-      duplicate_array env (kind, source_mutability, destination_mutability)
+    | Duplicate_array
+        { kind; source_mutability; destination_mutability; alloc_region } ->
+      duplicate_array env
+        (kind, source_mutability, destination_mutability, alloc_region)
     | Float_arith (w, o) -> ufloat_arith env (w, o)
     | Get_tag -> get_tag env ()
     | Is_boxed_float -> is_boxed_float env ()
@@ -1266,7 +1330,8 @@ module OfFlambda = struct
     | Is_flat_float_array -> is_flat_float_array env ()
     | Is_int _ -> is_int env () (* CR vlaviron: discuss *)
     | Is_null -> is_null env ()
-    | Make_lazy lt -> make_lazy env lt
+    | Make_lazy { lazy_tag; alloc_region } ->
+      make_lazy env (lazy_tag, alloc_region)
     | Num_conv { src; dst } -> num_conv env (src, dst)
     | Opaque_identity _ -> opaque_identity env ()
     | Unbox_number bk -> unbox_num env bk
@@ -1279,11 +1344,12 @@ module OfFlambda = struct
     | String_length String -> string_length env ()
     | String_length Bytes -> bytes_length env ()
     | Tag_immediate -> tag_immediate env ()
-    | Obj_dup -> obj_dup env ()
+    | Obj_dup { alloc_region } -> obj_dup env alloc_region
     | Get_header -> get_header env ()
     | Reinterpret_boxed_vector -> reinterpret_boxed_vector env ()
     | Peek standard_int_or_float -> peek env standard_int_or_float
-    | Duplicate_block { kind } -> duplicate_block env kind
+    | Duplicate_block { kind; alloc_region } ->
+      duplicate_block env (kind, alloc_region)
 
   let binop env (op : P.binary_primitive) =
     match op with

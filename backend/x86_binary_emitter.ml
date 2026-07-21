@@ -1086,6 +1086,13 @@ let emit_idiv b dst =
       emit_mod_rm_reg b rexw [ 0xF7 ] rm reg
   | _ -> assert false
 
+let emit_div b dst =
+  let reg = 6 in
+  match dst with
+  | (Reg64 _ | Reg32 _ | Mem _ | Mem64_RIP _) as rm ->
+      emit_mod_rm_reg b rexw [ 0xF7 ] rm reg
+  | _ -> assert false
+
 let emit_shift reg b dst src =
   match (dst, src) with
   | ((Reg64 _ | Reg32 _ | Mem _) as rm), Imm 1L ->
@@ -1448,6 +1455,7 @@ let assemble_instr b loc = function
   | IMUL (src, dst) -> emit_imul b dst src
   | MUL src -> emit_mul b ~src
   | IDIV dst -> emit_idiv b dst
+  | DIV dst -> emit_div b dst
   | J (condition, dst) -> emit_j b !loc condition dst
   | JMP dst -> emit_jmp b !loc dst
   | LEAVE -> emit_leave b
@@ -1639,7 +1647,7 @@ let assemble_line b loc ins =
     | Directive (D.Reloc _)
     | Directive (D.Sleb128 _)
     | Directive (D.Uleb128 _) ->
-      let dll = Oxcaml_utils.Doubly_linked_list.make_single ins in
+      let dll = Doubly_linked_list.make_single ins in
       X86_gas.generate_asm Out_channel.stderr dll;
       Misc.fatal_errorf "x86_binary_emitter: unsupported instruction"
   with e ->
@@ -1662,8 +1670,7 @@ let rec assemble_section arch section =
       "\nContext is: x86 binary emission of section %s:\n%!"
       (Section_name.to_string section.sec_name);
     let dll =
-      Oxcaml_utils.Doubly_linked_list.of_list
-        (Array.to_list section.sec_instrs)
+      Doubly_linked_list.of_list (Array.to_list section.sec_instrs)
     in
     X86_gas.generate_asm Out_channel.stderr dll;
     Printexc.raise_with_backtrace Misc.Fatal_error bt

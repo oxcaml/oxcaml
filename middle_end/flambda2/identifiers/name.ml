@@ -56,7 +56,7 @@ let compilation_unit t =
     ~symbol:(fun sym -> Symbol.compilation_unit sym)
 
 let is_imported t =
-  let current = Compilation_unit.get_current_exn () in
+  let current = Current_unit.get_cu_exn () in
   not (Compilation_unit.equal current (compilation_unit t))
 
 let must_be_var_opt t =

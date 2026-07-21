@@ -1178,6 +1178,11 @@ let mk_no_dwarf_inlined_frames f =
     Arg.Unit f,
     " Do not emit DWARF inlined frame information" )
 
+let mk_ddebug_avail_sets f =
+  ( "-ddebug-avail-sets",
+    Arg.Unit f,
+    " Print availability sets when dumping CFG and Linear" )
+
 let mk_dwarf_for_startup_file f =
   ( "-gstartup",
     Arg.Unit f,
@@ -1228,8 +1233,10 @@ let mk_gdwarf_max_function_complexity f =
 let mk_gdwarf_compression f =
   ( "-gdwarf-compression",
     Arg.String f,
-    Format.sprintf " Set the DWARF compression format (default %s)"
-      !Dwarf_flags.gdwarf_compression )
+    Format.sprintf
+      " Set the DWARF compression format (default %s for\n\
+      \     -gno-upstream-dwarf or -gdwarf-inlined-frames, none otherwise)"
+      Dwarf_flags.default_gdwarf_compression )
 
 let mk_gdwarf_fission f =
   ( "-gdwarf-fission",
@@ -2252,6 +2259,7 @@ module type Debugging_options = sig
   val no_restrict_to_upstream_dwarf : unit -> unit
   val dwarf_inlined_frames : unit -> unit
   val no_dwarf_inlined_frames : unit -> unit
+  val ddebug_avail_sets : unit -> unit
   val dwarf_for_startup_file : unit -> unit
   val no_dwarf_for_startup_file : unit -> unit
   val gdwarf_may_alter_codegen : unit -> unit
@@ -2271,6 +2279,7 @@ module Make_debugging_options (F : Debugging_options) = struct
       mk_no_restrict_to_upstream_dwarf F.no_restrict_to_upstream_dwarf;
       mk_dwarf_inlined_frames F.dwarf_inlined_frames;
       mk_no_dwarf_inlined_frames F.no_dwarf_inlined_frames;
+      mk_ddebug_avail_sets F.ddebug_avail_sets;
       mk_dwarf_for_startup_file F.dwarf_for_startup_file;
       mk_no_dwarf_for_startup_file F.no_dwarf_for_startup_file;
       mk_gdwarf_may_alter_codegen F.gdwarf_may_alter_codegen;
@@ -2301,6 +2310,7 @@ module Debugging_options_impl = struct
 
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
+  let ddebug_avail_sets () = Debugging.debug_avail_sets := true
   let dwarf_for_startup_file () = Debugging.dwarf_for_startup_file := true
   let no_dwarf_for_startup_file () = Debugging.dwarf_for_startup_file := false
   let gdwarf_may_alter_codegen () = Debugging.gdwarf_may_alter_codegen := true
@@ -2323,7 +2333,7 @@ module Debugging_options_impl = struct
     Debugging.dwarf_max_function_complexity := c
 
   let gdwarf_compression value =
-    Debugging.gdwarf_compression := String.lowercase_ascii value
+    Debugging.gdwarf_compression := Some (String.lowercase_ascii value)
 
   let gdwarf_fission value =
     match String.lowercase_ascii value with
@@ -2439,6 +2449,7 @@ module Extra_params = struct
         true
     | "dump-inlining-paths" -> set' Oxcaml_flags.dump_inlining_paths
     | "davail" -> set' Oxcaml_flags.davail
+    | "ddebug-avail-sets" -> set' Debugging.debug_avail_sets
     | "dranges" -> set' Oxcaml_flags.dranges
     | "ddebug-invariants" -> set' Dwarf_flags.ddebug_invariants
     | "ddebug-available-regs" -> set' Dwarf_flags.ddebug_available_regs

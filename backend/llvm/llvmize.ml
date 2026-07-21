@@ -35,7 +35,7 @@ module List = struct
 end
 
 module CL = Cfg_with_layout
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module LL = Llvm_ir
 module V = LL.Value
 module T = LL.Type
@@ -889,8 +889,10 @@ let int_op t (i : Cfg.basic Cfg.instruction) (op : Operation.integer_operation)
       else do_binary Sub
     | Imul -> do_binary Mul
     | Imulh { signed } -> do_imulh ~signed
-    | Idiv -> do_binary Sdiv
-    | Imod -> do_binary Srem
+    | Idiv { signed = true } -> do_binary Sdiv
+    | Idiv { signed = false } -> do_binary Udiv
+    | Imod { signed = true } -> do_binary Srem
+    | Imod { signed = false } -> do_binary Urem
     | Iand -> do_binary And
     | Ior -> do_binary Or
     | Ixor -> do_binary Xor
@@ -1647,7 +1649,8 @@ let make_temp_data_symbol =
   let idx = ref 0 in
   fun () ->
     let module_name =
-      Compilation_unit.(get_current_or_dummy () |> name |> Name.to_string)
+      Compilation_unit.(
+        Current_unit.get_cu_or_dummy () |> name |> Name.to_string)
     in
     let res = Format.asprintf "temp.%s.%d" module_name !idx in
     incr idx;
@@ -1981,7 +1984,9 @@ let write_module_metadata t =
   let module_name =
     if t.is_startup
     then "_startup" (* LLVM will put the "caml" in front *)
-    else Compilation_unit.(get_current_or_dummy () |> name |> Name.to_string)
+    else
+      Compilation_unit.(
+        Current_unit.get_cu_or_dummy () |> name |> Name.to_string)
   in
   F.pp_line t.ppf "";
   F.pp_line t.ppf {|!0 = !{ i32 1, !"oxcaml_module", !"%s" }|} module_name;

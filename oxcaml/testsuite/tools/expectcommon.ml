@@ -501,7 +501,14 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
       capture_everything buf ppf
         ~f:(fun () -> let (_, r, _, _) = exec_phrases phrases in r)
   in
-  { corrected_expectations; trailing_output }
+  let needs_principal =
+    List.exists chunks ~f:(fun chunk ->
+      List.exists chunk.expectations ~f:(fun expectation ->
+        match expectation.kind with
+        | Expect_toplevel -> true
+        | Expect_asm | Expect_fexpr -> false))
+  in
+  { corrected_expectations; trailing_output }, ~needs_principal
 
 let output_slice oc s a b =
   output_string oc (String.sub s ~pos:a ~len:(b - a))
@@ -546,8 +553,11 @@ let process_expect_file fname ~execute_phrase =
     | s           -> close_in ic; Misc.normalise_eol s
     | exception e -> close_in ic; raise e
   in
-  let correction = eval_expect_file fname ~file_contents ~execute_phrase in
-  write_corrected ~file:corrected_fname ~file_contents correction
+  let correction, ~needs_principal =
+    eval_expect_file fname ~file_contents ~execute_phrase
+  in
+  write_corrected ~file:corrected_fname ~file_contents correction;
+  needs_principal
 
 let repo_root = ref None
 let keep_original_error_size = ref false
@@ -607,8 +617,10 @@ let main (module Toplevel : Toplevel) fname =
       exit 2);
   (* We are in interactive mode and should record directive error on stdout *)
   Sys.interactive := true;
-  process_expect_file fname ~execute_phrase:Toplevel.execute_phrase;
-  exit 0
+  let needs_principal =
+    process_expect_file fname ~execute_phrase:Toplevel.execute_phrase
+  in
+  exit (if needs_principal then 3 else 0)
 
 let run ~read_anonymous_arg ~extra_args ~extra_init toplevel =
   let args =

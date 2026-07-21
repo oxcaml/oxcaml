@@ -79,9 +79,7 @@ let num_axes = Array.length axis_shapes
 
 (* widths[i] = 2 for chain-3/diamond axes, 1 for chain-2 axes *)
 let widths =
-  Array.map
-    (function Chain2 -> 1 | Chain3 | Diamond4 -> 2)
-    axis_shapes
+  Array.map (function Chain2 -> 1 | Chain3 | Diamond4 -> 2) axis_shapes
 
 (* consecutive packing offsets *)
 let offsets =
@@ -93,9 +91,7 @@ let offsets =
 (* 1 if axis i has a high bit (i.e. width=2), else 0 *)
 let has_hi =
   Array.init num_axes (fun i ->
-      match axis_shapes.(i) with
-      | Chain2 -> 0
-      | Chain3 | Diamond4 -> 1)
+      match axis_shapes.(i) with Chain2 -> 0 | Chain3 | Diamond4 -> 1)
 
 let lo_mask = Array.map (fun off -> 1 lsl off) offsets
 
@@ -195,7 +191,7 @@ let co_sub (a : t) (b : t) : t =
 let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
   let set : int = Obj.magic set in
   let lo =
-    (set land 0x001)
+    set land 0x001
     lor ((set land 0x00E) lsl 1)
     lor ((set land 0x010) lsl 2)
     lor ((set land 0x0E0) lsl 3)
@@ -207,8 +203,8 @@ let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
 
 (* IK-only: compute relevant axes of a constant modality, mirroring
    Jkind.relevant_axes_of_modality. *)
-let relevant_axes_of_modality
-    (modality : Mode.Modality.Const.t) : Jkind_axis.Axis_set.t =
+let relevant_axes_of_modality (modality : Mode.Modality.Const.t) :
+    Jkind_axis.Axis_set.t =
   Jkind_axis.Axis_set.create ~f:(fun ~axis:(Jkind_axis.Axis.Pack axis) ->
       match axis with
       | Modal axis ->
@@ -219,8 +215,7 @@ let relevant_axes_of_modality
           Mode.Modality.Const.proj axis_for_modality modality
         in
         not
-          (Mode.Modality.Per_axis.is_constant axis_for_modality
-             modality_on_axis)
+          (Mode.Modality.Per_axis.is_constant axis_for_modality modality_on_axis)
       | Nonmodal Externality -> true)
 
 (* Directly produce an axis-lattice mask from a constant modality. *)
@@ -427,63 +422,48 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
     Monadic.create
       ~uniqueness:
         (Monadic.Atom.Modality
-           (Mode.Modality.Monadic.Atom.Join_const
-              (uniqueness x)))
+           (Mode.Modality.Monadic.Atom.Join_const (uniqueness x)))
       ~contention:
         (Monadic.Atom.Modality
-           (Mode.Modality.Monadic.Atom.Join_const
-              (contention x)))
+           (Mode.Modality.Monadic.Atom.Join_const (contention x)))
       ~visibility:
         (Monadic.Atom.Modality
-           (Mode.Modality.Monadic.Atom.Join_const
-              (visibility x)))
+           (Mode.Modality.Monadic.Atom.Join_const (visibility x)))
       ~staticity:
         (Monadic.Atom.Modality
-           (Mode.Modality.Monadic.Atom.Join_const
-              (staticity x)))
+           (Mode.Modality.Monadic.Atom.Join_const (staticity x)))
   in
   let comonadic =
     Comonadic.create
       ~regionality:
         (Comonadic.Atom.Modality
-           (Mode.Modality.Comonadic.Atom.Meet_const
-              (areality x)))
+           (Mode.Modality.Comonadic.Atom.Meet_const (areality x)))
       ~linearity:
         (Comonadic.Atom.Modality
-           (Mode.Modality.Comonadic.Atom.Meet_const
-              (linearity x)))
+           (Mode.Modality.Comonadic.Atom.Meet_const (linearity x)))
       ~portability:
         (Comonadic.Atom.Modality
-           (Mode.Modality.Comonadic.Atom.Meet_const
-              (portability x)))
+           (Mode.Modality.Comonadic.Atom.Meet_const (portability x)))
       ~forkable:
         (Comonadic.Atom.Modality
-           (Mode.Modality.Comonadic.Atom.Meet_const
-              (forkable x)))
+           (Mode.Modality.Comonadic.Atom.Meet_const (forkable x)))
       ~yielding:
         (Comonadic.Atom.Modality
-           (Mode.Modality.Comonadic.Atom.Meet_const
-              (yielding x)))
+           (Mode.Modality.Comonadic.Atom.Meet_const (yielding x)))
       ~statefulness:
         (Comonadic.Atom.Modality
-           (Mode.Modality.Comonadic.Atom.Meet_const
-              (statefulness x)))
+           (Mode.Modality.Comonadic.Atom.Meet_const (statefulness x)))
   in
   { monadic; comonadic }
 
-let create ~areality ~linearity ~uniqueness ~portability ~contention
-    ~forkable ~yielding ~statefulness ~visibility ~staticity ~externality =
-  bot
-  |> set_areality areality
-  |> set_uniqueness uniqueness
-  |> set_linearity linearity
-  |> set_contention contention
+let create ~areality ~linearity ~uniqueness ~portability ~contention ~forkable
+    ~yielding ~statefulness ~visibility ~staticity ~externality =
+  bot |> set_areality areality |> set_uniqueness uniqueness
+  |> set_linearity linearity |> set_contention contention
   |> set_portability portability
-  |> set_forkable forkable
-  |> set_yielding yielding
+  |> set_forkable forkable |> set_yielding yielding
   |> set_statefulness statefulness
-  |> set_visibility visibility
-  |> set_staticity staticity
+  |> set_visibility visibility |> set_staticity staticity
   |> set_externality externality
 
 (* Canonical lattice constants used by ikinds. *)
@@ -564,8 +544,7 @@ let object_legacy : t =
         : Mode.Value.Comonadic.Const.t) =
     Mode.Value.Comonadic.Const.legacy
   in
-  create ~linearity ~areality
-    ~uniqueness:Mode.Uniqueness.Const.Aliased
+  create ~linearity ~areality ~uniqueness:Mode.Uniqueness.Const.Aliased
     ~portability ~contention:Mode.Contention.Const.Uncontended ~forkable
     ~yielding ~statefulness ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
