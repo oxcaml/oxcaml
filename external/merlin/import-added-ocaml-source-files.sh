@@ -7,8 +7,8 @@ subtree_prefix="$(git rev-parse --show-prefix)"
 cd "$(git rev-parse --show-toplevel)"
 
 # Script arguments with their default values
-commitish=main
-repository=https://github.com/ocaml-flambda/flambda-backend
+commitish=HEAD
+repository=.
 subdirectory=.
 old_subdirectory=.
 
@@ -49,14 +49,18 @@ function sorted_files_at_committish() {
   git ls-tree -r --name-only "$1" "$2" | sed "s#^$2/##" | sort
 }
 
-git fetch "$repository" "$(cat "${subtree_prefix}upstream/ocaml_flambda/base-rev.txt")"
-git fetch "$repository" "$commitish"
-rev=$(git rev-parse FETCH_HEAD)
+if [ "$repository" != "." ]; then
+  git fetch "$repository" "$(cat "${subtree_prefix}upstream/ocaml_flambda/base-rev.txt")"
+  git fetch "$repository" "$commitish"
+  rev=$(git rev-parse FETCH_HEAD)
+else
+  rev=$(git rev-parse "$commitish")
+fi
 
-function files_new_at_fetch_head() {
+function new_files() {
   comm -13 \
     <(sorted_files_at_committish "$(cat "${subtree_prefix}upstream/ocaml_flambda/base-rev.txt")" "$old_subdirectory") \
-    <(sorted_files_at_committish FETCH_HEAD "$subdirectory")
+    <(sorted_files_at_committish "$1" "$subdirectory")
 }
 
 function directories_from_previous_import() {
@@ -69,22 +73,24 @@ function directories_from_previous_import() {
   | xargs -n 1 printf "^%s\n"
 }
 
-files=$(files_new_at_fetch_head | grep -f <(directories_from_previous_import))
+files=$(new_files "$rev" | grep -f <(directories_from_previous_import) || test "$?" = 1)
 
-echo "The script will attempt to import these files added to directories that had previously been imported:"
-echo "$files"
+if [ -n "$files" ]; then
+  echo "The script will attempt to import these files added to directories that had previously been imported:"
+  echo "$files"
 
-for file in $files; do
-  read -p "Import new file $file? [Y/n] " answer
-  case ${answer} in
-    y|Y|"" )
-      echo "Importing $file"
-      ocaml_flambda_file="${subtree_prefix}upstream/ocaml_flambda/${file}"
-      git show "FETCH_HEAD:$file" > "$ocaml_flambda_file"
-      cp "$ocaml_flambda_file" "${subtree_prefix}src/ocaml/$file"
-      ;;
-    * )
-      echo "Skipping $file; run '$0' again in order to make a different decision"
-      ;;
-  esac
-done
+  for file in $files; do
+    read -p "Import new file $file? [Y/n] " answer
+    case ${answer} in
+      y|Y|"" )
+        echo "Importing $file"
+        ocaml_flambda_file="${subtree_prefix}upstream/ocaml_flambda/${file}"
+        git show "$rev:$file" > "$ocaml_flambda_file"
+        cp "$ocaml_flambda_file" "${subtree_prefix}src/ocaml/$file"
+        ;;
+      * )
+        echo "Skipping $file; run '$0' again in order to make a different decision"
+        ;;
+    esac
+  done
+fi
