@@ -161,6 +161,14 @@ typedef uint64_t uintnat;
 #undef HAS_LOCALE_H
 #undef HAS_XLOCALE_H
 #undef HAS_LOCALE
+
+#undef OCAML_OS_TYPE
+#define OCAML_OS_TYPE "none"
+
+#ifndef STACK_CHECKS_ENABLED
+#define STACK_CHECKS_ENABLED
+#endif
+
 #endif
 
 /* Endianness of floats */

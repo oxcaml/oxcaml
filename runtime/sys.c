@@ -82,9 +82,15 @@ static int caml_bare_open(const char_os *path, int flags, int perm)
   return caml_bare_syscall_error();
 }
 
+static int caml_bare_close(int fd)
+{
+  (void)fd;
+  return 0;
+}
+
 #undef open_os
 #define open_os caml_bare_open
-#define close(fd) ((void)(fd), caml_bare_syscall_error())
+#define close caml_bare_close
 #define getenv(var) ((void)(var), NULL)
 #endif
 
