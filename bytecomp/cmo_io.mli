@@ -27,6 +27,8 @@
 (* Low-level binary I/O for [.cmo] files, shared by the bytecode instantiator
    and functorizer. *)
 
+(* CR-soon zqian: reuse this function at several places that currently
+   inline the same cmo-reading logic. *)
 val read_cmo : Misc.filepath -> Cmo_format.compilation_unit_descr
 
 type error = Not_an_object_file of Misc.filepath
