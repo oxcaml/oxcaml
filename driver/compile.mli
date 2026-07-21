@@ -52,4 +52,4 @@ val emit_bytecode :
 val emit_lambda_program : Compile_common.info -> Lambda.program -> unit
 (** Lower a [Lambda.program] to bytecode and emit the .cmo, honouring
     [-stop-after lambda].  Used by [-functorize] after
-    [Translmod.transl_functorize]. *)
+    [Translmod.transl_functorization]. *)
