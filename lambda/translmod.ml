@@ -1515,15 +1515,15 @@ let project_arg_block ~find_impl_by_name ~chain ~(gm : Global_module.t)
   in
   Lprim (mod_field arg_block_idx main_repr, [main_block], Loc_unknown)
 
-let rec maybe_transl_local_instance ~(gm : Global_module.t) ~chain
+let rec transl_local_instance ~(gm : Global_module.t) ~chain
     ~find_impl_by_name ~param_ids ~module_ids ~k =
   match Global_module.Map.find_opt gm module_ids with
   | Some id -> k (Lvar id) module_ids
   | None ->
-      transl_local_instance ~gm ~chain ~find_impl_by_name ~param_ids ~module_ids
+      bind_local_instance ~gm ~chain ~find_impl_by_name ~param_ids ~module_ids
         ~k
 
-and transl_local_instance ~(gm : Global_module.t) ~chain
+and bind_local_instance ~(gm : Global_module.t) ~chain
     ~find_impl_by_name ~param_ids ~module_ids ~k =
   let cu = cu_of_impl gm in
   let ui_format, _arg_descr = find_impl_by_name ~chain cu in
@@ -1534,7 +1534,7 @@ and transl_local_instance ~(gm : Global_module.t) ~chain
     match ui_format with
     | Mb_struct _ ->
         Misc.fatal_errorf_doc
-          "transl_local_instance: %a is not a parameterised module"
+          "bind_local_instance: %a is not a parameterised module"
           Global_module.print gm
     | Mb_instantiating_functor { mb_runtime_params; _ } -> mb_runtime_params
   in
@@ -1542,7 +1542,7 @@ and transl_local_instance ~(gm : Global_module.t) ~chain
     match Global_module.find_in_parameter_map global param_ids with
     | Some id -> id
     | None ->
-        Misc.fatal_errorf_doc "transl_local_instance: %a not in param_ids"
+        Misc.fatal_errorf_doc "bind_local_instance: %a not in param_ids"
           Global_module.print global
   in
   let arg_params args =
@@ -1570,16 +1570,16 @@ and transl_local_instance ~(gm : Global_module.t) ~chain
                 (arg_params gm.hidden_args))
         then
           Misc.fatal_errorf_doc
-            "transl_local_instance: %a's hidden_args are not a subset of %a's"
+            "bind_local_instance: %a's hidden_args are not a subset of %a's"
             Global_module.print inner_gm
             Global_module.print gm;
-        maybe_transl_local_instance ~gm:inner_gm ~chain
+        transl_local_instance ~gm:inner_gm ~chain
           ~find_impl_by_name ~param_ids ~module_ids
           ~k
     | Rp_argument_block global ->
         (match Global_module.find_in_parameter_map global visible_arg_map with
          | Some arg_value ->
-             maybe_transl_local_instance ~gm:arg_value ~chain
+             transl_local_instance ~gm:arg_value ~chain
                ~find_impl_by_name ~param_ids ~module_ids
                ~k:(fun main_block module_ids ->
                  let arg_block =
@@ -1594,7 +1594,7 @@ and transl_local_instance ~(gm : Global_module.t) ~chain
                      (arg_params gm.hidden_args))
              then
                Misc.fatal_errorf_doc
-                 "transl_local_instance: %a should have %a as a hidden_arg"
+                 "bind_local_instance: %a should have %a as a hidden_arg"
                  Global_module.print gm
                  Global_module.print global;
              k (Lvar (resolve_param global)) module_ids)
@@ -1658,7 +1658,7 @@ let transl_functorization_make ~params ~modules ~find_impl_by_name
   let body, required_globals =
     Stdlib.List.fold_left_map_cont
       (fun gm module_ids ~k ->
-        maybe_transl_local_instance ~gm ~chain:[]
+        transl_local_instance ~gm ~chain:[]
           ~find_impl_by_name ~param_ids ~module_ids ~k)
       modules
       Global_module.Map.empty
