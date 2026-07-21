@@ -413,7 +413,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       sub.expr sub exp;
       List.iter (sub.case sub) cases;
       List.iter (sub.case sub) effs
-  | Texp_try (exp, cases, effs) ->
+  | Texp_try (exp, _, cases, effs) ->
       sub.expr sub exp;
       List.iter (sub.case sub) cases;
       List.iter (sub.case sub) effs

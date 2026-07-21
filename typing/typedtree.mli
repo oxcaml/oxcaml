@@ -180,6 +180,17 @@ type record_sorts =
   | Variable of Jkind.Sort.Const.t array
   (** This value has the specified sorts for its fields. *)
 
+(** How a function returns; see the [ret_sort] field of [Texp_function]. *)
+type function_return_sort =
+  | Function_returns of Jkind.sort
+  (** The function has at least one direct return site; all of them share
+      this sort. *)
+  | Function_forwards
+  (** The function has no direct return site, and at least one return path
+      tail-forwards an unknown-layout result. *)
+  | Function_never_returns
+  (** Every return path never returns normally. *)
+
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
 
@@ -492,7 +503,10 @@ and expression_desc =
         ret_mode : Mode.Alloc.l modes;
         (* Mode where the function allocates, ie local for a function of
            type 'a -> local_ 'b, and heap for a function of type 'a -> 'b *)
-        ret_sort : Jkind.sort;
+        ret_sort : function_return_sort;
+        (* The sort shared by all of the function's direct return sites, if
+           any; otherwise, whether the function tail-forwards an
+           unknown-layout result or never returns normally. *)
         alloc_mode : alloc_mode;
         (* Mode at which the closure is allocated *)
         zero_alloc : Zero_alloc.t;
@@ -539,11 +553,11 @@ and expression_desc =
             [Texp_match (E0, sort_of_E0, [(P1, E1); (P2 | exception P3, E2);
                               (exception P4, E3)], [(P4, E4)], _)]
          *)
-  | Texp_try of expression * value case list * value case list
+  | Texp_try of expression * Jkind.sort * value case list * value case list
         (** try E with
           | P1 -> E1
           | effect P2 k -> E2
-          [Texp_try (E, [(P1, E1)], [(P2, E2)])]
+          [Texp_try (E, sort_of_result, [(P1, E1)], [(P2, E2)])]
         *)
   | Texp_unboxed_unit
         (** #() *)

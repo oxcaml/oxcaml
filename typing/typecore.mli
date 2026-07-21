@@ -353,6 +353,13 @@ type error =
   | Exclave_returns_not_local
   | Unboxed_int_literals_not_supported
   | Function_type_not_rep of type_expr * Jkind.Violation.t
+  | Function_return_not_rep of type_expr * Jkind.Violation.t
+  | Effect_handler_result_not_value of type_expr * Jkind.Violation.t
+  | Function_return_sort_conflict of
+      { site_sort : Jkind.sort;
+        fun_ret_sort : Jkind.sort;
+        first_return_site : Location.t
+      }
   | Record_projection_not_rep of type_expr * Jkind.Violation.t
   | Record_not_rep of type_expr * Jkind.Violation.t
   | Mutable_var_not_rep of type_expr * Jkind.Violation.t

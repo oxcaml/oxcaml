@@ -92,6 +92,8 @@ type texp_sequence_identifier
 
 type texp_match_identifier
 
+type texp_try_identifier
+
 val mkTexp_ident :
   ?id:texp_ident_identifier ->
   Path.t * Longident.t Location.loc * value_description ->
@@ -131,6 +133,11 @@ val mkTexp_sequence :
 val mkTexp_match :
   ?id:texp_match_identifier ->
   expression * computation case list * partial ->
+  expression_desc
+
+val mkTexp_try :
+  ?id:texp_try_identifier ->
+  expression * value case list ->
   expression_desc
 
 val mkTexp_assert : expression -> Location.t -> expression_desc

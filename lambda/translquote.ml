@@ -3799,7 +3799,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
       let exp = quote_expression ~scopes ~transl stage exp in
       let cases = List.map (quote_case ~scopes ~transl stage loc) cases in
       Exp_desc.match_ loc exp cases
-    | Texp_try (exp, cases, _) ->
+    | Texp_try (exp, _, cases, _) ->
       let exp = quote_expression ~transl ~scopes stage exp
       and cases =
         List.map (quote_value_pattern_case ~scopes ~transl stage loc) cases

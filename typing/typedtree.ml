@@ -160,6 +160,11 @@ type record_sorts =
   | Fixed
   | Variable of Jkind.Sort.Const.t array
 
+type function_return_sort =
+  | Function_returns of Jkind.sort
+  | Function_forwards
+  | Function_never_returns
+
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
 
@@ -292,7 +297,7 @@ and expression_desc =
       { params : function_param list;
         body : function_body;
         ret_mode : Mode.Alloc.l modes;
-        ret_sort : Jkind.sort;
+        ret_sort : function_return_sort;
         alloc_mode : alloc_mode;
         zero_alloc : Zero_alloc.t;
       }
@@ -302,7 +307,7 @@ and expression_desc =
   | Texp_match of
       expression * Jkind.sort * computation case list * value case list
       * partial
-  | Texp_try of expression * value case list * value case list
+  | Texp_try of expression * Jkind.sort * value case list * value case list
   | Texp_unboxed_unit
   | Texp_unboxed_bool of bool
   | Texp_tuple of (string option * expression) list * alloc_mode
@@ -1529,7 +1534,7 @@ let rec fold_antiquote_exp f  acc exp =
       let acc = fold_antiquote_exp f acc exp in
       let acc = fold_antiquote_cases f acc cases in
       fold_antiquote_cases f acc eff_cases
-  | Texp_try (exp, cases, eff_cases) ->
+  | Texp_try (exp, _, cases, eff_cases) ->
       let acc = fold_antiquote_exp f acc exp in
       let acc = fold_antiquote_cases f acc cases in
       fold_antiquote_cases f acc eff_cases
