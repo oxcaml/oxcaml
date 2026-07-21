@@ -384,6 +384,7 @@
   blambda_of_lambda
   bytegen
   byteinstantiator
+  bytefunctorizer
   cmo_io
   bytelibrarian
   bytelink
