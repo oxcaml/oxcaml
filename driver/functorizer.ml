@@ -32,8 +32,8 @@ type state = {
       (** Bundled modules with unsubstituted signatures; substituted in one pass
           at the end of [compute]. *)
   rev_params : (GM.Parameter_name.t * Ident.t) list;
-  param_ids : Ident.t GM.Parameter_name.Map.t;
-  module_ids : Ident.t option GM.Name.Map.t;
+  param_map : Ident.t GM.Parameter_name.Map.t;
+  module_map : Ident.t option GM.Name.Map.t;
       (** Bundled module → its local ident. [None] means the module was only
           ever referenced [Approximate] and gets substituted to [Pruned_<head>];
           can be upgraded to [Some] by a later [Exact] reference. *)
@@ -43,8 +43,8 @@ let empty_state =
   {
     rev_modules = [];
     rev_params = [];
-    param_ids = GM.Parameter_name.Map.empty;
-    module_ids = GM.Name.Map.empty;
+    param_map = GM.Parameter_name.Map.empty;
+    module_map = GM.Name.Map.empty;
   }
 
 let register_parameter p_name state =
@@ -53,11 +53,11 @@ let register_parameter p_name state =
     {
       state with
       rev_params = (p_name, id) :: state.rev_params;
-      param_ids = GM.Parameter_name.Map.add p_name id state.param_ids;
+      param_map = GM.Parameter_name.Map.add p_name id state.param_map;
     } )
 
 let maybe_register_parameter p_name state =
-  match GM.Parameter_name.Map.find_opt p_name state.param_ids with
+  match GM.Parameter_name.Map.find_opt p_name state.param_map with
   | Some id -> (id, state)
   | None -> register_parameter p_name state
 
@@ -90,8 +90,8 @@ let rec insert_module_exact ~chain (gm : GM.t)
   let state =
     {
       state with
-      module_ids =
-        GM.Name.Map.add (GM.to_name gm) (Some new_id) state.module_ids;
+      module_map =
+        GM.Name.Map.add (GM.to_name gm) (Some new_id) state.module_map;
     }
   in
   let chain = CU.Name.of_head_of_global_name (GM.to_name gm) :: chain in
@@ -133,7 +133,7 @@ let rec insert_module_exact ~chain (gm : GM.t)
   { state with rev_modules = (gm, new_id, sign_lazy) :: state.rev_modules }
 
 and maybe_insert_module_exact ~chain (gm : GM.t) swg state =
-  match GM.Name.Map.find_opt (GM.to_name gm) state.module_ids with
+  match GM.Name.Map.find_opt (GM.to_name gm) state.module_map with
   | Some (Some _) -> state
   | Some None | None -> insert_module_exact ~chain gm swg state
 
@@ -141,10 +141,10 @@ and maybe_insert_module ~chain ((gm, prec) : GM.With_precision.t) state =
   match prec with
   | Approximate -> (
       let name = GM.to_name gm in
-      match GM.Name.Map.find_opt name state.module_ids with
+      match GM.Name.Map.find_opt name state.module_map with
       | Some _ -> state
       | None ->
-          { state with module_ids = GM.Name.Map.add name None state.module_ids }
+          { state with module_map = GM.Name.Map.add name None state.module_map }
       )
   | Exact ->
       let swg = validate_and_load ~chain gm in
@@ -214,7 +214,7 @@ let compute (src_names : CU.Name.Set.t) : result =
               Path.Pident (Ident.create_global pruned)
         in
         Subst.add_module orig_ident target subst)
-      state.module_ids Subst.identity
+      state.module_map Subst.identity
   in
   let subst =
     List.fold_left
