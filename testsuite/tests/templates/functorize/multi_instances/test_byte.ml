@@ -1,12 +1,5 @@
 (* TEST
- (* Type identity across bundle applications:
-
-    - [Bundle2] (transparent [type t = P.t] in [Basic_transparent] and
-       [Util_transparent]): intra-app sharing is automatic; cross-app
-       values also mix (both collapse to [int]).
-    - [Bundle_share] (abstract [t], sharing via [.mli] equation):
-       intra-app [Util_share.t = Basic_share.t] holds; cross-app types
-       are fresh so mixing values fails ([bad_mix_share]). *)
+ (* Type identity across bundle applications. *)
 
  readonly_files = "\
    basic_share.mli basic_share.ml util_share.mli util_share.ml \
@@ -144,7 +137,8 @@
  all_modules = "";
  ocamlc.byte;
 
- (* (1) Positive: transparent sharing — within-app + cross-app value mix. *)
+ (* (1) Positive: transparent sharing — within one [R = Make(P_int)()]
+    and also across [R1 = Make(P_int)()], [R2 = Make(P_int)()]. *)
 
  flags = "$flg -I bundle2 -I p -I p_int -I basic_transparent -I util_transparent";
  module = "main_functorize_share.ml";
@@ -171,7 +165,7 @@
  reference = "test_functorize_share.reference";
  check-program-output;
 
- (* (2) Positive: abstract+eq sharing — within-app share. *)
+ (* (2) Positive: abstract+eq sharing — within one [R = Make(P_int)()]. *)
 
  flags = "$flg -I bundle_share -I p -I p_int -I basic_share -I util_share";
  module = "main_functorize_type_share.ml";
@@ -265,10 +259,9 @@
  compiler_reference = "bad_intf_sig_mismatch.reference";
  check-ocamlc.byte-output;
 
- (* (6) Negative: cross-application value mixing fails for the abstract+eq
-    bundle.  (The same conclusion holds for plain-abstract bundles, but is
-    less interesting since there's no intra-bundle sharing to keep apart
-    from cross-application freshness.) *)
+ (* (6) Negative: a value from [R1 = Make(P_int)()] cannot be used
+    where an [R2 = Make(P_int)()] value is expected — each [Make]
+    application gives fresh abstract types. *)
 
  flags = "$flg -I bundle_share -I p -I p_int -I basic_share -I util_share";
  module = "bad_mix_share.ml";
