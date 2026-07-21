@@ -84,12 +84,9 @@ static void print_log(const char* msg, int newline, va_list ap)
 {
   char buf[GC_LOG_LENGTH];
   int pos = 0;
-#ifndef CAML_BARE_METAL
-  /* No wall clock on bare metal: GC log lines are simply untimestamped. */
   if (!(atomic_load_relaxed(&caml_verb_gc) & CAML_GC_MSG_NO_TIMESTAMP)) {
     pos += caml_format_timestamp(buf, sizeof(buf), 1);
   }
-#endif
   pos += snprintf(buf+pos, sizeof(buf)-pos,
                   "[%02d] ",
                   (Caml_state_opt != NULL) ? Caml_state_opt->id : -1);

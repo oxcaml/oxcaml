@@ -57,6 +57,9 @@
 #endif
 
 #ifdef CAML_BARE_METAL
+/* Unlike the other stubbed-out syscalls, [close] reports success: there
+   is nothing to release on bare metal, and failing (e.g. with ENOSYS)
+   would make closing a channel raise a spurious [Sys_error]. */
 static int caml_bare_close(int fd)
 {
   (void)fd;

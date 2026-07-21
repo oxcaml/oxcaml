@@ -34,6 +34,10 @@ CAMLextern void caml_sys_init (const char_os * exe_name, char_os ** argv);
 CAMLnoret CAMLextern void caml_do_exit (int);
 
 #ifdef CAML_BARE_METAL
+/* Provided by the user's platform code, not by the runtime: monotonic
+   time in nanoseconds since an arbitrary fixed point (e.g. boot).
+   Used to implement [Sys.time], to timestamp GC log lines and to
+   derive the startup random seed. */
 CAMLextern uint64_t caml_bare_metal_time_ns(void);
 #endif
 
