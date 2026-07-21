@@ -975,7 +975,7 @@ end
     the same width class. *)
 module LDP_STP_width = struct
   type (_, _) t =
-    | X : ([< `X | `LR], [< `X | `LR]) t
+    | X : ([< `X | `LR | `XZR], [< `X | `LR | `XZR]) t
     | W : ([< `W], [< `W]) t
 end
 
@@ -3028,14 +3028,38 @@ module DSL = struct
 
     let clear_emit_instruction () = emit_instruction := None
 
-    let ins (type num a) (name : (num, a) Instruction_name.t)
-        (operands : (num, a) many) =
-      let instr = Instruction.create name ~operands in
+    let emitted_instruction_count = ref 0
+
+    let emitted_instructions () = !emitted_instruction_count
+
+    let emit_existing instr =
+      (* [emit_string] is always set during final emission, and unset during the
+         measuring and buffering passes ([with_measuring] and
+         [with_redirected_emit] below), so it distinguishes instructions
+         actually emitted from ones merely measured or buffered. *)
+      if Option.is_some !emit_string then incr emitted_instruction_count;
       (* Emit to binary emitter if configured *)
-      (match !emit_instruction with Some emit -> emit instr | None -> ());
+      (match !emit_instruction with
+      | Some emit -> emit instr
+      | None -> ());
       (* Emit to text if configured *)
       let str = Format.asprintf "\t%a\n" Instruction.print instr in
       match !emit_string with None -> () | Some emit_string -> emit_string str
+
+    let ins (type num a) (name : (num, a) Instruction_name.t)
+        (operands : (num, a) many) =
+      emit_existing (Instruction.create name ~operands)
+
+    let with_redirected_emit ~emit_instruction:capture ~f =
+      let saved_emit_string = !emit_string in
+      let saved_emit_instruction = !emit_instruction in
+      emit_string := None;
+      emit_instruction := Some capture;
+      Fun.protect
+        ~finally:(fun () ->
+          emit_string := saved_emit_string;
+          emit_instruction := saved_emit_instruction)
+        f
 
     type measurement =
       { count : int;

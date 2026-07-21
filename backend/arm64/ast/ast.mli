@@ -564,7 +564,7 @@ end
     the same width class. *)
 module LDP_STP_width : sig
   type (_, _) t =
-    | X : ([< `X | `LR], [< `X | `LR]) t
+    | X : ([< `X | `LR | `XZR], [< `X | `LR | `XZR]) t
     | W : ([< `W], [< `W]) t
 end
 
@@ -1854,6 +1854,11 @@ module DSL : sig
     (** Clear the binary emission callback. *)
     val clear_emit_instruction : unit -> unit
 
+    (** Number of instructions actually emitted so far (excluding the measuring
+        and buffering passes). Monotonically increasing; callers interested in a
+        particular region should take deltas. *)
+    val emitted_instructions : unit -> int
+
     (** Passes the instruction to the function provided to [set_emit_string].
         Also passes to [set_emit_instruction] callback if set. (Can't directly
         reference [Emitaux] due to a circular dependency.) *)
@@ -1869,6 +1874,16 @@ module DSL : sig
         be emitted and tracking the minimum [max_displacement] across any
         conditional branches. *)
     val with_measuring : f:(unit -> unit) -> measurement
+
+    (** Pass a previously-built instruction to the emission callbacks, exactly
+        as [ins] does for a newly-built one. *)
+    val emit_existing : Instruction.t -> unit
+
+    (** Execute [f] with text emission disabled and instructions redirected to
+        [emit_instruction], restoring the previous callbacks afterwards. Used to
+        buffer a function body for peephole optimization. *)
+    val with_redirected_emit :
+      emit_instruction:(Instruction.t -> unit) -> f:(unit -> 'a) -> 'a
 
     val ins1 : (singleton, 'a) Instruction_name.t -> 'a Operand.t -> unit
 

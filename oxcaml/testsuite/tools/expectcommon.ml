@@ -22,7 +22,7 @@ type string_constant =
   ; tag : string
   }
 
-type expectation_filter = Principal | X86_64 | Raw | Simplify | Reaper
+type expectation_filter = Principal | X86_64 | ARM64 | Raw | Simplify | Reaper
 
 type expectation_kind = Expect_toplevel | Expect_asm | Expect_fexpr
 
@@ -53,6 +53,7 @@ type correction =
 let filter_of_string = function
   | "Principal" -> Some Principal
   | "X86_64" -> Some X86_64
+  | "ARM64" -> Some ARM64
   | "Raw" -> Some Raw
   | "Simplify" -> Some Simplify
   | "Reaper" -> Some Reaper
@@ -61,6 +62,7 @@ let filter_of_string = function
 let string_of_filter = function
   | Principal -> "Principal"
   | X86_64 -> "X86_64"
+  | ARM64 -> "ARM64"
   | Raw -> "Raw"
   | Simplify -> "Simplify"
   | Reaper -> "Reaper"
@@ -138,12 +140,12 @@ let match_expect_extension (ext : Parsetree.extension) =
       (filters, txt)
     in
     let is_arch_filter = function
-      | X86_64 -> true
+      | X86_64 | ARM64 -> true
       | Principal | Raw | Simplify | Reaper -> false
     in
     let is_pass_filter = function
       | Raw | Simplify | Reaper -> true
-      | Principal | X86_64 -> false
+      | Principal | X86_64 | ARM64 -> false
     in
     let validate_expect_toplevel entries =
       (* Valid formats:
@@ -308,14 +310,15 @@ let parse_contents ~fname contents =
 let current_arch_filter () =
   match Target_system.architecture () with
   | X86_64 -> Some X86_64
-  | AArch64 | IA32 | ARM | POWER | Z | Riscv -> None
+  | AArch64 -> Some ARM64
+  | IA32 | ARM | POWER | Z | Riscv -> None
 
 (* For [%%expect]:
    - {|...|} alone: used for both principal and non-principal
    - {|...|}, Principal{|...|}: first for non-principal, second for principal
 
    For [%%expect_asm]:
-   - All entries must have architecture tags (X86_64)
+   - All entries must have architecture tags (X86_64, ARM64)
 *)
 let eval_expectation expectation ~output =
   let to_update = match expectation.kind with
@@ -457,7 +460,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
         | Raw -> read_dump_file "raw"
         | Simplify -> read_dump_file "simplify"
         | Reaper -> read_dump_file "reaper"
-        | Principal | X86_64 -> "")
+        | Principal | X86_64 | ARM64 -> "")
     |> String.concat ~sep:"\n"
     |> (^) "\n"
   in

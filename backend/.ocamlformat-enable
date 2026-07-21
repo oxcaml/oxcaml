@@ -115,3 +115,5 @@ x86_dsl.ml
 x86_dsl.mli
 x86_peephole/**/*.ml
 x86_peephole/**/*.mli
+arm64_peephole/**/*.ml
+arm64_peephole/**/*.mli

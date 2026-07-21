@@ -72,6 +72,8 @@ module type S = sig
 
   val remove_mutable_load_numbering : numbering -> numbering
 
+  val filter_equations : (rhs -> bool) -> numbering -> numbering
+
   val kill_addr_regs : numbering -> numbering
 end
 
@@ -118,6 +120,11 @@ module Make (Op : Operation) : S with type op = Op.t = struct
     let remove_mutable_loads m =
       { mutable_load_equations = Rhs_map.empty;
         other_equations = m.other_equations
+      }
+
+    let filter keep m =
+      { mutable_load_equations = Rhs_map.filter keep m.mutable_load_equations;
+        other_equations = Rhs_map.filter keep m.other_equations
       }
   end
 
@@ -234,6 +241,10 @@ module Make (Op : Operation) : S with type op = Op.t = struct
 
   let remove_mutable_load_numbering n =
     { n with num_eqs = Equations.remove_mutable_loads n.num_eqs }
+
+  (* Keep only the equations whose right-hand side satisfies [keep]. *)
+  let filter_equations keep n =
+    { n with num_eqs = Equations.filter (fun rhs _ -> keep rhs) n.num_eqs }
 
   (* Forget everything we know about registers of type [Addr]. *)
 
@@ -357,6 +368,19 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | End_region | Dls_get | Tls_get | Domain_index ->
       false
 
+  let is_constant_operation : Operation.t -> bool = function
+    | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
+    | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ->
+      true
+    | Move | Spill | Reload | Opaque | Pause | Stackoffset _ | Load _
+    | Store (_, _, _)
+    | Alloc _ | Poll | Intop _ | Int128op _
+    | Intop_imm (_, _)
+    | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
+    | Specific _ | Name_for_debugger _ | Probe_is_enabled _ | Begin_region
+    | End_region | Dls_get | Tls_get | Domain_index ->
+      false
+
   let kill_loads (n : numbering) : numbering = remove_mutable_load_numbering n
 
   let cse_instruction :
@@ -469,9 +493,28 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
          mappings from hardware registers to value numbers, since the callee
          does not preserve these registers. That doesn't leave much usable
          information: checkbounds could be kept, but won't be usable for CSE as
-         one of their arguments is always a memory load. For simplicity, we just
-         forget everything. *)
-      empty_numbering
+         one of their arguments is always a memory load. *)
+      if !Oxcaml_flags.cfg_cse_constants_across_calls
+      then
+        (* Keep equations over expensive constants: pseudoregister values
+           survive the call, so a constant computed before the call can be
+           reused after it, at the price of a possible spill/reload. This is
+           worthwhile for constants whose materialization is dearer than a stack
+           reload, e.g. symbol addresses loaded through the GOT on arm64.
+           Everything else is forgotten, as described above. *)
+        let n1 =
+          filter_equations
+            (fun (op, args) ->
+              Array.length args = 0
+              && is_constant_operation op
+              && not (is_cheap_operation op))
+            numbering
+        in
+        let n2 = kill_addr_regs n1 in
+        set_unknown_regs n2 (Proc.destroyed_at_terminator terminator.desc)
+      else
+        (* For simplicity, we just forget everything. *)
+        empty_numbering
 
   let cse_blocks : State.t -> Cfg.t -> unit =
    fun state cfg ->
