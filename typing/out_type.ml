@@ -81,10 +81,10 @@ module Style = Misc.Style
    (* CR layouts reisenberg: update when the default changes *)
    This is a challenge, though, because the type in a [val] does not
    explicitly quantify its free variables. So we must collect the free
-   variables, look to see whether any have interesting jkinds, and
-   print the whole set of variables if any of them do. This is all
-   implemented in [extract_qtvs], used also in a number of other places
-   we do quantification (e.g. gadt-syntax constructors).
+   variables ([extract_qtvs], used also in a number of other places we do
+   quantification, e.g. gadt-syntax constructors), look to see whether any
+   have interesting jkinds ([tree_of_qtvs]), and print the whole set of
+   variables if any of them do ([zap_qtvs_if_boring]).
 
    Exception (X1). When we are still in the process of inferring a type,
    there may be an unfilled sort variable. Here is an example:
@@ -1532,7 +1532,7 @@ let rec tree_of_modal_typexp mode modal ty =
         (* Make the names delayed, so that the real type is
            printed once when used as proxy *)
         List.iter Aliases.add_delayed tyl;
-        let tl = tree_of_qtvs tyl in
+        let tl = tree_of_univars tyl in
         let tr = Otyp_poly (tl, tree_of_typexp mode alloc_mode ty) in
         (* Forget names when we leave scope *)
         Variable_names.remove_names tyl;
@@ -1617,24 +1617,23 @@ let rec tree_of_modal_typexp mode modal ty =
 and tree_of_typexp mode alloc_mode ty =
   tree_of_modal_typexp mode (Other alloc_mode) ty
 
-(* qtvs = quantified type variables *)
-(* this silently drops any arguments that are not generic Tvar or Tunivar *)
-and tree_of_qtvs qtvs =
-  let tree_of_qtv v : (string * out_jkind option) option =
+and tree_of_qtv v jkind =
     (* CR layouts: We ignore nullability here to avoid needlessly printing
        ['a : value_or_null] when it's not relevant (most cases).
        Unfortunately, this makes error messages really confusing, because
        we don't consider jkind annotations. *)
-    let tree jkind =
-      Some (Variable_names.name_of_type Variable_names.new_name v,
-            out_jkind_option_of_jkind ~ignore_null:true !printing_env jkind)
-    in
-    match v.desc with
-    | Tvar { jkind } when v.level = generic_level -> tree jkind
-    | Tunivar { jkind } -> tree jkind
-    | _ -> None
-  in
-  List.filter_map tree_of_qtv qtvs
+  Variable_names.name_of_type Variable_names.new_name v,
+  out_jkind_option_of_jkind ~ignore_null:true !printing_env jkind
+
+and tree_of_qtvs qtvs =
+  List.map (fun (v, jkind) -> tree_of_qtv v jkind) qtvs
+
+and tree_of_univars vars =
+  List.filter_map
+    (fun v -> match v.desc with
+       | Tunivar { jkind } -> Some (tree_of_qtv v jkind)
+       | _ -> None)
+    vars
 
 (* qsvs = quantified sort variables (for Trepr) *)
 (* Extract names from type variables corresponding to sort variables *)
@@ -1642,8 +1641,6 @@ and tree_of_qsvs qtvs =
   List.filter_map
     (fun v ->
       match v.desc with
-      | Tvar _ when v.level = generic_level ->
-        Some (Variable_names.name_of_type Variable_names.new_name v)
       | Tunivar _ ->
         Some (Variable_names.name_of_type Variable_names.new_name v)
       | _ -> None)
@@ -1834,7 +1831,7 @@ let zap_qtvs_if_boring qtvs =
   else []
 
 (* Extract the generalized free type variables of [tyl] with their jkinds, as
-   [(var, jkind)] pairs of the real representation, in order of appearance. *)
+   [(var, jkind)], in order of appearance. *)
 let extract_qtvs tyl =
   let fvs = Ctype.free_non_row_variables_of_list tyl in
   (* The [Ctype.free*variables] family of functions returns the free
@@ -1845,7 +1842,6 @@ let extract_qtvs tyl =
   List.filter_map (fun v ->
        match v.desc with
        | Tvar { jkind } when v.level = generic_level -> Some (v, jkind)
-       | Tunivar { jkind } -> Some (v, jkind)
        | _ -> None)
     tfvs
 
@@ -1892,13 +1888,11 @@ let extension_constructor_args_and_ret_type_subtree args ret_type =
       let out_ret = tree_of_typexp Type res in
       let out_args = tree_of_constructor_arguments args in
       let qtvs =
-        List.map
-          (fun (v, jkind) ->
-             Variable_names.name_of_type Variable_names.new_name v,
-             out_jkind_option_of_jkind ~ignore_null:true !printing_env jkind)
-          (extract_qtvs (res :: tys_of_constr_args args))
+        (res :: tys_of_constr_args args)
+        |> extract_qtvs
+        |> tree_of_qtvs |> zap_qtvs_if_boring
       in
-      (out_args, Some (zap_qtvs_if_boring qtvs, out_ret))
+      (out_args, Some (qtvs, out_ret))
 
 let tree_of_single_constructor ~all_void cd =
   let name = Ident.name cd.cd_id in
@@ -2303,18 +2297,14 @@ let tree_of_value_description id decl =
   in
   let oval_poly, qsvs, qtvs =
     let lpoly_vars = Lpoly.get_exn decl.val_lpoly in
-    let tree_of_qtv (v, jkind) =
-      Variable_names.name_of_type Variable_names.new_name v,
-      out_jkind_option_of_jkind ~ignore_null:true !printing_env jkind
-    in
     let qtvs = extract_qtvs [decl.val_type] in
     match maybe_val_poly_shorthand lpoly_vars qtvs with
     | Some unmatched ->
-      true, [], List.map tree_of_qtv unmatched
+      true, [], tree_of_qtvs unmatched
     | None ->
       Jkind_types.Sort.print_with_genvars lpoly_vars
         (fun names ->
-           false, names, zap_qtvs_if_boring (List.map tree_of_qtv qtvs))
+           false, names, zap_qtvs_if_boring (tree_of_qtvs qtvs))
   in
   let apparent_arity =
     let rec count n typ =
@@ -2381,7 +2371,7 @@ let tree_of_method mode (lab, priv, virt, ty) =
   let (ty, tyl) = method_type priv ty in
   let tty = tree_of_typexp mode ty in
   let tyl = List.map Transient_expr.repr tyl in
-  let qtvs = tree_of_qtvs tyl in
+  let qtvs = tree_of_univars tyl in
   let qtvs = zap_qtvs_if_boring qtvs in
   Variable_names.remove_names tyl;
   let priv = priv <> Mpublic in
