@@ -512,7 +512,9 @@ end = struct
           None
       with Not_found -> None
     in
-    match shared_name with Some raw_name -> raw_name | None -> "join_var"
+    match shared_name with
+    | Some raw_name -> "j" ^ raw_name
+    | None -> "join_var"
 end
 
 module Source_env : sig
