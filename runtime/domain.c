@@ -2179,9 +2179,9 @@ void caml_handle_gc_interrupt(void)
 
 #ifdef CAML_BARE_METAL
 
-value caml_process_tick_exn(void)
+caml_result caml_process_tick_res(void)
 {
-  return Val_unit;
+  return Result_unit;
 }
 
 CAMLextern uintnat caml_effective_tick_interval_usec(void)

@@ -158,6 +158,9 @@ typedef uint64_t uintnat;
 #undef HAS_SYS_TIMERFD_H
 #undef HAS_SYS_EVENTFD_H
 #undef HAS_GETRLIMIT
+#undef HAS_LOCALE_H
+#undef HAS_XLOCALE_H
+#undef HAS_LOCALE
 #endif
 
 /* Endianness of floats */

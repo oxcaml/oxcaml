@@ -1401,9 +1401,8 @@ runtime/%.ni.$(O): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlruni_CPPFLAGS)
 $(DEPDIR)/runtime/%.ni.$(D): \
   OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlruni_CPPFLAGS)
 
-runtime/%.nbm.$(O): OC_CFLAGS += $(OC_NATIVE_CFLAGS)
-runtime/%.nbm.$(O): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlrunbaremetal_CPPFLAGS) \
-  $(ocamlrunbaremetal_CFLAGS)
+runtime/%.nbm.$(O): OC_CFLAGS += $(OC_NATIVE_CFLAGS) $(ocamlrunbaremetal_CFLAGS)
+runtime/%.nbm.$(O): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlrunbaremetal_CPPFLAGS)
 
 $(DEPDIR)/runtime/%.nbm.$(D): \
   OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlrunbaremetal_CPPFLAGS)
