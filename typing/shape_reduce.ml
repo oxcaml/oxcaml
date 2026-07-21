@@ -489,8 +489,9 @@ end) = struct
                                            field_value = sh, layout } ->
                   let name = Option.get field_name in
                   let sh = delayed_nf_set_uid sh field_uid in
-                  (* Since this projection only exists for Merlin (see comment above), we
-                     can choose any layout here. Merlin does not consume the layout. *)
+                  (* Since this projection only exists for Merlin (see comment
+                     above), we can choose any layout here. Merlin does not
+                     consume the layout. *)
                   let layout =
                     Option.value layout ~default:(Layout.Base Scannable)
                   in
