@@ -402,8 +402,8 @@ let implementation (input_module_names : CU.Name.Set.t) ~ext
   in
   if not Clflags.(should_stop_after Compiler_pass.Typing) then begin
     let program =
-      Translmod.transl_functorize modulename params modules ~ext ~read_format
-        ~coercion
+      Translmod.transl_functorization modulename params modules ~ext
+        ~read_format ~coercion
     in
     compile_program info program
   end

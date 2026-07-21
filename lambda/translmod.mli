@@ -64,7 +64,7 @@ val transl_instance:
 (** Translate a bundle as a generative functor over [params] whose body
     exposes [modules] (after [coercion]).  Transitive deps are looked up
     on the load path via [base_filename ^ ext] and read by [read_format]. *)
-val transl_functorize:
+val transl_functorization:
       Compilation_unit.t
         -> Global_module.Parameter_name.t list
         -> Global_module.t list
