@@ -1523,6 +1523,14 @@ let rec transl_local_instance ~(gm : Global_module.t) ~chain
       bind_local_instance ~gm ~chain ~find_impl_by_name ~param_map ~module_map
         ~k
 
+(** Bind a fresh local for the instantiation [gm].  Each runtime-param
+    slot is filled from [gm]'s [visible_args] (recursively instantiating
+    the arg) or [hidden_args] (resolved via [param_map]).
+    E.g. for [gm = Foo[A:A_int]{B}] (visible [A:A_int], hidden [B]):
+      let a_int = <inst of A_int, if parameterised>
+      let foo_a_int = Foo a_int_arg_block b_param
+      <k foo_a_int>
+    where [b_param] comes from [param_map]. *)
 and bind_local_instance ~(gm : Global_module.t) ~chain
     ~find_impl_by_name ~param_map ~module_map ~k =
   let cu = cu_of_impl gm in
