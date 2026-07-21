@@ -39,6 +39,16 @@ val is_unknown : 'a t -> bool
 val free_names :
   code_free_names:('code -> Name_occurrences.t) -> 'code t -> Name_occurrences.t
 
+(** The compilation units referenced by an approximation (via its symbols and
+    code IDs), excluding the pseudo-units of predefined-exception and external
+    symbols, which have no cmx data. Used to record which units' cmx data must
+    accompany a reified ([%reify_approx]) approximation; see
+    [Cmx_format.ui_quoted_cmx]. *)
+val compilation_units :
+  code_free_names:('code -> Name_occurrences.t) ->
+  'code t ->
+  Compilation_unit.Set.t
+
 (** A self-contained ("standalone") form of approximations, which names none of
     the hash-consed types. Such values can be marshalled (e.g. into object
     files) and read back in a different compilation, or by another process
@@ -46,11 +56,13 @@ val free_names :
     structures are kept as-is; they marshal fine.)
 
     Compilation units are represented by their pack prefix and name; symbols by
-    their linkage name plus compilation unit; code IDs by their name plus
-    compilation unit (stamps are not preserved); function slots by just their
-    name (stamps likewise not preserved). The ['code] payload of
-    [Closure_approximation] is not saved: it is expected to be recovered at
-    demarshalling time, e.g. by looking up the code from the symbol. *)
+    their linkage name plus compilation unit; code IDs by their name, linkage
+    name and compilation unit (stamps are not preserved as such, but the linkage
+    name incorporates the stamp and so permits exact lookup of exported code at
+    demarshalling time); function slots by just their name (stamps not
+    preserved). The ['code] payload of [Closure_approximation] is not saved: it
+    is expected to be recovered at demarshalling time, e.g. by looking up the
+    code from the symbol or the code ID's linkage name. *)
 module Standalone : sig
   type 'code approx = 'code t
 
@@ -66,7 +78,8 @@ module Standalone : sig
 
   type code_id =
     { code_id_compilation_unit : compilation_unit;
-      code_id_name : string
+      code_id_name : string;
+      code_id_linkage_name : string
     }
 
   type t =
@@ -92,13 +105,15 @@ module Standalone : sig
       the various hash-consed types. Code IDs and function slots are created
       afresh, so their stamps will not match those of the original
       approximation. [find_code] is used to recover the ['code] payload of any
-      [Closure_approximation] (typically by looking up the code from the
-      symbol); if it returns [None], the closure approximation degrades to
-      [Unknown]. *)
+      [Closure_approximation], typically by looking up the code from the symbol,
+      or from [code_id_linkage_name] (the original code ID's full linkage name,
+      which unlike the fresh [code_id] identifies the code exactly); if it
+      returns [None], the closure approximation degrades to [Unknown]. *)
   val to_approximation :
     t ->
     find_code:
       (code_id:Code_id.t ->
+      code_id_linkage_name:Linkage_name.t ->
       function_slot:Function_slot.t ->
       symbol:Symbol.t option ->
       'code option) ->

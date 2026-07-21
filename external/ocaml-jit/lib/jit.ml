@@ -326,6 +326,11 @@ let jit_load_program_top ~phrase_name ppf program :
   | Result obj -> Result obj
   | Exception exn -> Exception exn
 
+let jit_register_symbol symbol obj =
+  let prefixed_symbol = symbol_prefix () ^ symbol in
+  Globals.symbols :=
+    Symbols.add !Globals.symbols prefixed_symbol (Address.of_obj obj)
+
 let jit_lookup_symbol symbol =
   (* Try with symbol prefix first (e.g., "_" on macOS) *)
   let prefixed_symbol = symbol_prefix () ^ symbol in

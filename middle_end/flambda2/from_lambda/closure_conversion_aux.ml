@@ -378,7 +378,12 @@ module Acc = struct
       slot_offsets : Slot_offsets.t;
       code_slot_offsets : Slot_offsets.t Code_id.Map.t;
       closure_infos : closure_info list;
-      symbol_short_name_counter : int
+      symbol_short_name_counter : int;
+      reified_approx_units : Compilation_unit.Set.t
+          (* Compilation units referenced by the approximations reified by
+             [Preify_approx]: their cmx data must be available wherever the
+             marshalled approximations are demarshalled, so they are marked as
+             required by quotes (see [Cmx_format.ui_quoted_cmx]). *)
     }
 
   let manufacture_symbol_short_name t =
@@ -476,7 +481,8 @@ module Acc = struct
       slot_offsets = Slot_offsets.empty;
       code_slot_offsets = Code_id.Map.empty;
       closure_infos = [];
-      symbol_short_name_counter = 0
+      symbol_short_name_counter = 0;
+      reified_approx_units = Compilation_unit.Set.empty
     }
 
   let declared_symbols t = t.declared_symbols
@@ -494,6 +500,14 @@ module Acc = struct
   let code_map t = t.code_map
 
   let free_names t = t.free_names
+
+  let reified_approx_units t = t.reified_approx_units
+
+  let add_reified_approx_units t units =
+    { t with
+      reified_approx_units =
+        Compilation_unit.Set.union units t.reified_approx_units
+    }
 
   let slot_offsets t = t.slot_offsets
 

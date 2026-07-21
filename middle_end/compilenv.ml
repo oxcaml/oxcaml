@@ -79,9 +79,19 @@ let current_generic_fns () = current_unit.uib_generic_fns
 
 let current_sections () = current_unit.uib_file_sections
 
+(* Compilation units referenced by approximations reified via
+   [%reify_approx] (see [Closure_conversion]); marked as required by quotes
+   so that their cmx data is available wherever the marshalled
+   approximations are demarshalled (e.g. at runtime by [Eval]). *)
+let reified_approx_units = ref CU.Set.empty
+
+let record_reified_approx_units units =
+  reified_approx_units := CU.Set.union units !reified_approx_units
+
 let reset unit_info =
   let compilation_unit = Unit_info.modname unit_info in
   Infos_table.clear global_infos_table;
+  reified_approx_units := CU.Set.empty;
   Zero_alloc_info.reset cached_zero_alloc_info;
   Env.set_current_unit unit_info;
   current_unit.uib_unit <- compilation_unit;
@@ -328,7 +338,10 @@ let build_unit_info ~main_module_block_format ~arg_descr =
     ui_imports_cmi = Env.imports();
     ui_imports_cmx = current_unit.uib_imports_cmx;
     ui_quoted_cmi = CU.Name.Set.to_list quoted_intfs_and_deps;
-    ui_quoted_cmx = CU.Set.to_list (Env.quoted_impls ());
+    ui_quoted_cmx =
+      CU.Set.to_list
+        (CU.Set.union (Env.quoted_impls ())
+           (CU.Set.remove current_unit.uib_unit !reified_approx_units));
     ui_format = main_module_block_format;
     ui_generic_fns = current_unit.uib_generic_fns;
     ui_export_info = current_unit.uib_export_info;

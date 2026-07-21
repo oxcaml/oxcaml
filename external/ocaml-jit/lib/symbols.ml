@@ -78,6 +78,8 @@ let from_binary_section (type a r)
       acc := String.Map.add ~key:name ~data:(Address.add_int address offset) !acc);
   !acc
 
+let add t name address = String.Map.add ~key:name ~data:address t
+
 let debug =
   match Sys.getenv_opt "OCAML_JIT_DEBUG" with
   | Some ("true" | "1") -> true

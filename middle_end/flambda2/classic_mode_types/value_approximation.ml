@@ -77,6 +77,30 @@ let rec free_names ~code_free_names approx =
     in
     Name_occurrences.add_function_slot_in_types free_names function_slot
 
+let compilation_units ~code_free_names approx =
+  (* The units of the predefined-exception and external symbols have no cmx
+     data, so are not returned. *)
+  let add_unit unit units =
+    if
+      Compilation_unit.equal unit (Symbol.external_symbols_compilation_unit ())
+      || Compilation_unit.Name.equal
+           (Compilation_unit.name unit)
+           Compilation_unit.Name.predef_exn
+    then units
+    else Compilation_unit.Set.add unit units
+  in
+  let free_names = free_names ~code_free_names approx in
+  let units =
+    Symbol.Set.fold
+      (fun sym units -> add_unit (Symbol.compilation_unit sym) units)
+      (Name_occurrences.symbols free_names)
+      Compilation_unit.Set.empty
+  in
+  Code_id.Set.fold
+    (fun code_id units -> add_unit (Code_id.get_compilation_unit code_id) units)
+    (Name_occurrences.code_ids free_names)
+    units
+
 module Standalone = struct
   type 'code approx = 'code t
 
@@ -92,7 +116,11 @@ module Standalone = struct
 
   type code_id =
     { code_id_compilation_unit : compilation_unit;
-      code_id_name : string
+      code_id_name : string;
+      code_id_linkage_name : string
+          (* The full linkage name, which includes the name stamp. Unlike the
+             stamp itself this is meaningful across compilations, so it can be
+             used to look up exported code at demarshalling time. *)
     }
 
   type t =
@@ -127,7 +155,9 @@ module Standalone = struct
   let create_code_id code_id : code_id =
     { code_id_compilation_unit =
         create_compilation_unit (Code_id.get_compilation_unit code_id);
-      code_id_name = Code_id.name code_id
+      code_id_name = Code_id.name code_id;
+      code_id_linkage_name =
+        Code_id.linkage_name code_id |> Linkage_name.to_string
     }
 
   let rec create (approx : _ approx) : t =
@@ -163,13 +193,15 @@ module Standalone = struct
       (to_compilation_unit symbol_compilation_unit)
       (Linkage_name.of_string linkage_name)
 
-  let to_code_id { code_id_compilation_unit; code_id_name } =
+  let to_code_id
+      { code_id_compilation_unit; code_id_name; code_id_linkage_name = _ } =
     Code_id.create ~name:code_id_name ~debug:Debuginfo.none
       (to_compilation_unit code_id_compilation_unit)
 
   let rec to_approximation t
       ~(find_code :
          code_id:Code_id.t ->
+         code_id_linkage_name:Linkage_name.t ->
          function_slot:Function_slot.t ->
          symbol:Symbol.t option ->
          'code option) : 'code approx =
@@ -178,6 +210,9 @@ module Standalone = struct
     | Value_symbol symbol -> Value_symbol (to_symbol symbol)
     | Value_const descr -> Value_const (Reg_width_const.of_descr descr)
     | Closure_approximation { code_id; function_slot; symbol } -> (
+      let code_id_linkage_name =
+        Linkage_name.of_string code_id.code_id_linkage_name
+      in
       let code_id = to_code_id code_id in
       let function_slot =
         (* The function slot's own compilation unit was not saved; use the code
@@ -187,7 +222,7 @@ module Standalone = struct
           ~name:function_slot ~is_always_immediate:false Flambda_kind.value
       in
       let symbol = Option.map to_symbol symbol in
-      match find_code ~code_id ~function_slot ~symbol with
+      match find_code ~code_id ~code_id_linkage_name ~function_slot ~symbol with
       | None -> Unknown Flambda_kind.value
       | Some code ->
         Closure_approximation { code_id; function_slot; code; symbol })

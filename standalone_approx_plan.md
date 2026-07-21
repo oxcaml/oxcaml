@@ -68,6 +68,12 @@ fine.
   with `Function_slot.create <code_id's comp unit> ~name
   ~is_always_immediate:false Flambda_kind.value` (the slot's own compilation
   unit is not saved; we reuse the code id's).
+- 2026-07-21 addition (from Mark): `code_id` also stores
+  `code_id_linkage_name` — the full linkage name including the name stamp —
+  so that exported code can be looked up exactly at demarshalling time
+  (needed by "inject" for symbol-less local closures; see
+  `inject_plan.md`).  `to_approximation`'s [find_code] callback receives it
+  as `code_id_linkage_name:Linkage_name.t`.
 - consts: stored as `Reg_width_const.Descr.t` directly (decompose with
   `Reg_width_const.descr`, rebuild with `Reg_width_const.of_descr`; the
   private `Descr` constructors are no obstacle to marshalling).
@@ -185,4 +191,7 @@ give the required function.  A convenience wrapper instantiated at
 - [x] Full `make -s test`: 2356 passed, 0 failed (2026-07-21).
 - [ ] Future: convenience demarshal wrapper instantiated at
       [Code_or_metadata.t] (e.g. in flambda_cmx), looking code up from the
-      symbol; exercise [Standalone.to_approximation] round-trip.
+      symbol; exercise [Standalone.to_approximation] round-trip.  The
+      consumer of all this is the "inject" feature — see `inject_plan.md`
+      (in particular its Milestone 2, which also flags an interaction
+      between [@inline always] and our close_primitive-time resolution).

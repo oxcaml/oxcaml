@@ -1,0 +1,5 @@
+ref after eval'd incr: 42
+doubled: 42
+sum: 3
+string: keep-me-alive
+no injections: 42

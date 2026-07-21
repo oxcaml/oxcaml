@@ -141,6 +141,7 @@ type prim =
   | Frame_pointers
   | Identity
   | Reify_approx
+  | Inject
   | Apply of Lambda.region_close * Lambda.layout
   | Revapply of Lambda.region_close * Lambda.layout
   | Atomic of atomic_op * atomic_kind * Lambda.immediate_or_pointer
@@ -1081,6 +1082,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%int_as_pointer" -> Primitive (Pint_as_pointer mode, 1)
     | "%opaque" -> Primitive (Popaque layout, 1)
     | "%reify_approx" -> Reify_approx
+    | "%inject" -> Inject
     | "%sys_argv" -> Sys_argv
     | "%send" -> Send (pos, layout)
     | "%sendself" -> Send_self (pos, layout)
@@ -2296,6 +2298,40 @@ let lambda_of_prim prim_name prim loc args arg_exps =
           ~body:(Lconst (Const_immstring ""))
           ~mode:alloc_heap
           ~ret_mode:alloc_heap
+  | Inject, [injector; injected] ->
+      (* [inject t x] becomes
+         [let t' = t in let x' = x in
+          CamlinternalQuote.inject_with_approx t' x' (reify_approx x')]
+         so that the [Preify_approx] is resolved with the approximation of
+         the injected value at the point of use (see [Closure_conversion]).
+         In bytecode no approximation is available; the empty string is
+         passed instead. *)
+      let injector_id = Ident.create_local "injector" in
+      let injected_id = Ident.create_local "injected" in
+      let approx =
+        if !Clflags.native_code
+        then Lprim (Preify_approx, [Lvar injected_id], loc)
+        else Lconst (Const_immstring "")
+      in
+      let apply =
+        Lapply {
+          ap_func =
+            Lambda.transl_prim "CamlinternalQuote" "inject_with_approx";
+          ap_args = [Lvar injector_id; Lvar injected_id; approx];
+          ap_result_layout = Lambda.layout_any_value;
+          ap_loc = loc;
+          ap_tailcall = Default_tailcall;
+          ap_inlined = Default_inlined;
+          ap_specialised = Default_specialise;
+          ap_probe = None;
+          ap_region_close = Rc_normal;
+          ap_mode = alloc_heap;
+        }
+      in
+      Llet (Strict, Lambda.layout_any_value, injector_id,
+            Lambda.debug_uid_none, injector,
+            Llet (Strict, Lambda.layout_any_value, injected_id,
+                  Lambda.debug_uid_none, injected, apply))
   | Identity, [arg] -> arg
   | Apply (pos, layout), [func; arg]
   | Revapply (pos, layout), [arg; func] ->
@@ -2340,7 +2376,7 @@ let lambda_of_prim prim_name prim loc args arg_exps =
   | (Raise _ | Raise_with_backtrace
     | Lazy_force _ | Loc _ | Primitive _ | Sys_argv | Comparison _
     | Send _ | Send_self _ | Send_cache _ | Frame_pointers | Identity
-    | Reify_approx | Apply _ | Revapply _ | Peek _ | Poke _), _ ->
+    | Reify_approx | Inject | Apply _ | Revapply _ | Peek _ | Poke _), _ ->
       raise(Error(to_location loc, Wrong_arity_builtin_primitive prim_name))
 
 let check_primitive_arity loc p =
@@ -2373,6 +2409,7 @@ let check_primitive_arity loc p =
     | Send _ | Send_self _ -> p.prim_arity = 2
     | Send_cache _ -> p.prim_arity = 4
     | Frame_pointers | Reify_approx -> p.prim_arity = 0
+    | Inject -> p.prim_arity = 2
     | Identity | Peek _ -> p.prim_arity = 1
     | Apply _ | Revapply _ | Poke _ -> p.prim_arity = 2
     | Atomic (op, kind, _) -> p.prim_arity = atomic_arity op kind
@@ -2627,7 +2664,7 @@ let primitive_needs_event_after = function
   | Comparison(comp, knd) ->
       lambda_primitive_needs_event_after (comparison_primitive comp knd)
   | Lazy_force _ | Send _ | Send_self _ | Send_cache _
-  | Apply _ | Revapply _ -> true
+  | Apply _ | Revapply _ | Inject -> true
   | Raise _ | Raise_with_backtrace | Loc _ | Frame_pointers | Identity
   | Reify_approx | Peek _ | Poke _ | Atomic _ | Unsupported _ -> false
 

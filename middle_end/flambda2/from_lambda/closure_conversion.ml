@@ -43,7 +43,9 @@ type 'a close_program_metadata =
 type 'a close_program_result =
   { unit : Flambda_unit.t;
     metadata : 'a close_program_metadata;
-    code_slot_offsets : Slot_offsets.t Code_id.Map.t
+    code_slot_offsets : Slot_offsets.t Code_id.Map.t;
+    reified_approx_units : Compilation_unit.Set.t
+        (* See [Closure_conversion_aux.Acc.reified_approx_units]. *)
   }
 
 type close_functions_result =
@@ -1322,6 +1324,14 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
     let marshalled =
       Value_approximation.Standalone.to_marshalled_string
         (Value_approximation.Standalone.create approx)
+    in
+    let acc =
+      (* Record the compilation units the approximation refers to, so that their
+         cmx data is available wherever the marshalled approximation is
+         demarshalled (e.g. at runtime by [Eval]). *)
+      Acc.add_reified_approx_units acc
+        (Value_approximation.compilation_units
+           ~code_free_names:Code_or_metadata.free_names approx)
     in
     let acc, sym =
       register_const0 acc
@@ -4177,7 +4187,11 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
         ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region
         ~body ~module_symbol ~used_value_slots:Unknown
     in
-    { unit; code_slot_offsets; metadata = Normal }
+    { unit;
+      code_slot_offsets;
+      metadata = Normal;
+      reified_approx_units = Acc.reified_approx_units acc
+    }
   | Classic ->
     let all_code =
       Exported_code.add_code (Acc.code_map acc)
@@ -4214,5 +4228,6 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     in
     { unit;
       code_slot_offsets;
-      metadata = Classic (all_code, reachable_names, cmx, exported_offsets)
+      metadata = Classic (all_code, reachable_names, cmx, exported_offsets);
+      reified_approx_units = Acc.reified_approx_units acc
     }
