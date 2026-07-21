@@ -27,7 +27,7 @@ CAMLprim value total_atomic_reset()
   CAMLprim void __wrap_caml_##name(arg_tys)    \
   {                                            \
     called_##name++;                           \
-    called_total_atomic++;                       \
+    called_total_atomic++;                     \
     __real_caml_##name(args);                  \
   }
 
