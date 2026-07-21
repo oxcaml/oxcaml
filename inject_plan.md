@@ -435,8 +435,48 @@ treatment.
 - [x] Tests: `inject_classic_test.ml` (-Oclassic first compile; real
       approximations; same-unit functions, cross-unit `List.rev`
       monomorphised, local closure, ref).
-- [ ] M2.4: Simplify-time reification (new Flambda primitive; see design
-      above, including the unit-recording note).
+- [x] Symbol-less local closures (2026-07-22).  Two mechanisms:
+      1. *Manufactured lookup symbols* (classic mode): for every reified
+         closure approximation without a symbol, `close_primitive`
+         manufactures a symbol and registers the closure's full
+         approximation in the unit's exported approximations
+         (`Acc.add_symbol_approximation`), rooted via the reified-names
+         accumulator; the standalone form records it in a new
+         `lookup_symbol` field, and the eval side recovers the
+         approximation wholesale (original code ID *and* function slot —
+         necessary because an inlined body's value-slot projections
+         conflict with a fresh-stamped slot in the closure type, producing
+         invalid code).
+      2. *Code lookup by linkage name* (fallback): reified approximations'
+         free names are now extra roots for cmx export reachability
+         (`extra_root_names` threaded through `prepare_cmx*`), so the code
+         of local closures is exported; `Exported_code.find_by_linkage_name`
+         recovers it (with the original code ID) at demarshalling time.
+         `Standalone.to_approximation`'s callback now returns a
+         `closure_resolution` (`Resolved` / `Code` / `Unknown_code`).
+      Tests: local-closure cases in inject_inlining_test.ml (silent
+      [@inlined]) and inject_classic_test.ml.
+- [x] M2.4: Simplify-time reification (2026-07-22).  New Flambda unary
+      primitive `Reify_approx`, emitted by `close_primitive` in simplify
+      mode and resolved in `Simplify_unary_primitive.simplify_reify_approx`
+      from the argument's type: canonical consts and symbols become
+      `Value_const`/`Value_symbol` (symbols recover their full type from
+      the original cmx at demarshal time — and at -O3 most values,
+      including capturing local closures, are lifted to symbols, so this
+      covers a lot); single-closure types become `Closure_approximation`s
+      gated on [not is_my_closure_used] (a fresh-slot closure type would
+      conflict with the inlined body's value-slot projections — remaining
+      CR: needs exported closure types for such closures).  The resolved
+      approximation is marshalled and lifted as an immutable-string
+      constant.  Reified names are accumulated in `Downwards_acc`
+      (mirroring `code_ids_to_remember`, including the save/restore in
+      `Simplify_set_of_closures`), surfaced through `Simplify.run`'s
+      result, recorded to `Compilenv.record_reified_approx_units` and used
+      as `extra_root_names` for the cmx export — the per-phase recording
+      structure anticipated by the earlier design note.  `Reify_approx`
+      never reaches `To_cmm` (fatal there).  Test:
+      inject_inlining_o3_test.ml (control warns; top-level function and
+      capturing local closure both inline silently at -O3).
 - [ ] M4: current-module references.
 - [ ] M3: `<[open]>` modes.
 

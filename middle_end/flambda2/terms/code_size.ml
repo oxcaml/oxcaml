@@ -451,6 +451,8 @@ let unary_prim_size ~machine_width prim =
   | End_region { ghost } | End_try_region { ghost } -> if ghost then 0 else 1
   | Obj_dup _ -> needs_caml_c_call_extcall_size + 1
   | Get_header -> 2
+  (* Resolved during [Simplify]; never reaches code generation. *)
+  | Reify_approx -> 0
   | Peek _ -> 1
   | Make_lazy _ -> alloc_size + 1
 

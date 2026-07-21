@@ -39,15 +39,14 @@ val is_unknown : 'a t -> bool
 val free_names :
   code_free_names:('code -> Name_occurrences.t) -> 'code t -> Name_occurrences.t
 
-(** The compilation units referenced by an approximation (via its symbols and
-    code IDs), excluding the pseudo-units of predefined-exception and external
-    symbols, which have no cmx data. Used to record which units' cmx data must
+(** The compilation units referenced by the given free names (via their symbols
+    and code IDs), excluding the pseudo-units of predefined-exception and
+    external symbols, which have no cmx data. Used with the free names of
+    approximations (see [free_names]) to record which units' cmx data must
     accompany a reified ([%reify_approx]) approximation; see
     [Cmx_format.ui_quoted_cmx]. *)
-val compilation_units :
-  code_free_names:('code -> Name_occurrences.t) ->
-  'code t ->
-  Compilation_unit.Set.t
+val compilation_units_of_free_names :
+  Name_occurrences.t -> Compilation_unit.Set.t
 
 (** A self-contained ("standalone") form of approximations, which names none of
     the hash-consed types. Such values can be marshalled (e.g. into object
@@ -89,7 +88,14 @@ module Standalone : sig
     | Closure_approximation of
         { code_id : code_id;
           function_slot : string;
-          symbol : symbol option
+          symbol : symbol option;
+          lookup_symbol : symbol option
+              (** A symbol under which the closure's full approximation was
+                  registered in its unit's cmx data (manufactured by
+                  [Closure_conversion] for closures that have no symbol of their
+                  own). Looking it up at demarshalling time recovers the
+                  original code ID and function slot, whose stamps are not
+                  preserved in this standalone form. *)
         }
     | Block_approximation of
         Tag.Scannable.t
@@ -98,17 +104,32 @@ module Standalone : sig
         * Alloc_mode.For_types.t
 
   (** Note that the ['code] payload of any [Closure_approximation] is discarded
-      (see above). *)
-  val create : 'code approx -> t
+      (see above). [closure_lookup_symbols] gives, per code ID, the symbol under
+      which the corresponding closure approximation was registered in the
+      current unit's cmx data (see [lookup_symbol] above). *)
+  val create :
+    closure_lookup_symbols:Symbol.t Code_id.Map.t -> 'code approx -> t
+
+  type 'code closure_resolution =
+    | Resolved of 'code approx
+        (** A full replacement approximation, e.g. recovered wholesale from the
+            original unit's cmx data via [lookup_symbol] or [symbol]; the code
+            IDs and function slots therein are the original ones. *)
+    | Code of Code_id.t * 'code
+        (** Code (typically found by linkage name); the code ID given is used in
+            place of the freshly created one, but the function slot remains
+            freshly created (with a new stamp). *)
+    | Unknown_code
 
   (** Reconstruct a normal approximation, using the usual creation functions for
       the various hash-consed types. Code IDs and function slots are created
       afresh, so their stamps will not match those of the original
-      approximation. [find_code] is used to recover the ['code] payload of any
-      [Closure_approximation], typically by looking up the code from the symbol,
-      or from [code_id_linkage_name] (the original code ID's full linkage name,
-      which unlike the fresh [code_id] identifies the code exactly); if it
-      returns [None], the closure approximation degrades to [Unknown]. *)
+      approximation; [find_code] resolves each [Closure_approximation],
+      typically by consulting the original unit's cmx data via [lookup_symbol]
+      or [symbol] (yielding [Resolved], with original IDs), or by looking the
+      code up by [code_id_linkage_name] (the original code ID's full linkage
+      name), yielding [Code]. [Unknown_code] degrades the closure approximation
+      to [Unknown]. *)
   val to_approximation :
     t ->
     find_code:
@@ -116,7 +137,8 @@ module Standalone : sig
       code_id_linkage_name:Linkage_name.t ->
       function_slot:Function_slot.t ->
       symbol:Symbol.t option ->
-      'code option) ->
+      lookup_symbol:Symbol.t option ->
+      'code closure_resolution) ->
     'code approx
 
   val to_marshalled_string : t -> string

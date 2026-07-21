@@ -111,6 +111,7 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
   in
   let dacc = DA.with_denv dacc denv in
   let code_ids_to_remember = DA.code_ids_to_remember outer_dacc in
+  let reified_approx_names = DA.reified_approx_names outer_dacc in
   let code_ids_to_never_delete = DA.code_ids_to_never_delete outer_dacc in
   let code_ids_never_simplified = DA.code_ids_never_simplified outer_dacc in
   let used_value_slots = DA.used_value_slots outer_dacc in
@@ -121,6 +122,7 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
      of these lines below... *)
   dacc
   |> DA.with_code_ids_to_remember ~code_ids_to_remember
+  |> DA.with_reified_approx_names ~reified_approx_names
   |> DA.with_code_ids_to_never_delete ~code_ids_to_never_delete
   |> DA.with_code_ids_never_simplified ~code_ids_never_simplified
   |> DA.with_used_value_slots ~used_value_slots
@@ -142,6 +144,7 @@ let extract_accumulators_from_function outer_dacc ~dacc_after_body
     UA.lifted_constants uacc_after_upwards_traversal
   in
   let code_ids_to_remember = DA.code_ids_to_remember dacc_after_body in
+  let reified_approx_names = DA.reified_approx_names dacc_after_body in
   let code_ids_to_never_delete = DA.code_ids_to_never_delete dacc_after_body in
   let code_ids_never_simplified =
     DA.code_ids_never_simplified dacc_after_body
@@ -158,6 +161,7 @@ let extract_accumulators_from_function outer_dacc ~dacc_after_body
     DA.add_to_lifted_constant_accumulator ~also_add_to_env:() outer_dacc
       lifted_consts_this_function
     |> DA.with_code_ids_to_remember ~code_ids_to_remember
+    |> DA.with_reified_approx_names ~reified_approx_names
     |> DA.with_code_ids_to_never_delete ~code_ids_to_never_delete
     |> DA.with_code_ids_never_simplified ~code_ids_never_simplified
     |> DA.with_used_value_slots ~used_value_slots

@@ -379,11 +379,13 @@ module Acc = struct
       code_slot_offsets : Slot_offsets.t Code_id.Map.t;
       closure_infos : closure_info list;
       symbol_short_name_counter : int;
-      reified_approx_units : Compilation_unit.Set.t
-          (* Compilation units referenced by the approximations reified by
-             [Preify_approx]: their cmx data must be available wherever the
-             marshalled approximations are demarshalled, so they are marked as
-             required by quotes (see [Cmx_format.ui_quoted_cmx]). *)
+      reified_approx_names : Name_occurrences.t
+          (* Free names of the approximations reified by [Preify_approx]. The
+             compilation units they reference must have their cmx data available
+             wherever the marshalled approximations are demarshalled, so they
+             are marked as required by quotes (see [Cmx_format.ui_quoted_cmx]);
+             and the code they reference must be exported to this unit's cmx
+             (see [Flambda_cmx.prepare_cmx_from_approx]). *)
     }
 
   let manufacture_symbol_short_name t =
@@ -482,7 +484,7 @@ module Acc = struct
       code_slot_offsets = Code_id.Map.empty;
       closure_infos = [];
       symbol_short_name_counter = 0;
-      reified_approx_units = Compilation_unit.Set.empty
+      reified_approx_names = Name_occurrences.empty
     }
 
   let declared_symbols t = t.declared_symbols
@@ -501,12 +503,11 @@ module Acc = struct
 
   let free_names t = t.free_names
 
-  let reified_approx_units t = t.reified_approx_units
+  let reified_approx_names t = t.reified_approx_names
 
-  let add_reified_approx_units t units =
+  let add_reified_approx_names t names =
     { t with
-      reified_approx_units =
-        Compilation_unit.Set.union units t.reified_approx_units
+      reified_approx_names = Name_occurrences.union names t.reified_approx_names
     }
 
   let slot_offsets t = t.slot_offsets

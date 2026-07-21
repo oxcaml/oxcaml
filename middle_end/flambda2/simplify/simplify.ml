@@ -21,7 +21,9 @@ type simplify_result =
     final_typing_env : Typing_env.t option;
     all_code : Exported_code.t;
     slot_offsets : Slot_offsets.t;
-    unit : Flambda_unit.t
+    unit : Flambda_unit.t;
+    reified_approx_names : Name_occurrences.t
+        (* See [Downwards_acc.reified_approx_names]. *)
   }
 
 let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
@@ -93,5 +95,6 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
     free_names = name_occurrences;
     final_typing_env;
     all_code;
-    slot_offsets
+    slot_offsets;
+    reified_approx_names = DA.reified_approx_names (UA.creation_dacc uacc)
   }

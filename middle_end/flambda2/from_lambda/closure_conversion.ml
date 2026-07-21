@@ -1316,21 +1316,67 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
         assert false
     in
     k acc [Named.create_simple (Simple.symbol sym)]
+  | Preify_approx, [[arg]] when not (Flambda_features.classic_mode ()) ->
+    (* In simplify mode the approximation is resolved during [Simplify] itself,
+       where the argument's type is known; emit the corresponding Flambda
+       primitive. *)
+    let prim : Lambda_to_flambda_primitives_helpers.expr_primitive =
+      Unary (Reify_approx, Simple arg)
+    in
+    Lambda_to_flambda_primitives_helpers.bind_recs acc None ~register_const0
+      prim dbg k
   | Preify_approx, [[arg]] ->
     (* [reify_approx foo] turns into a constant string literal giving the
        marshalled [Value_approximation.Standalone.t] form of [foo]'s
        approximation. *)
     let approx = find_value_approximation_through_symbol acc env arg in
+    (* For closures that have no symbol of their own, manufacture a symbol and
+       register the closure's full approximation in this unit's cmx data, so
+       that the original code ID and function slot (whose stamps the standalone
+       form does not preserve) can be recovered at demarshalling time. *)
+    let rec assign_lookup_symbols acc lookup_symbols
+        (approx : Env.value_approximation) =
+      match approx with
+      | Closure_approximation { code_id; symbol = None; _ } ->
+        if Code_id.Map.mem code_id lookup_symbols
+        then acc, lookup_symbols
+        else
+          let acc, lookup_symbol =
+            manufacture_symbol acc
+              ("reified_"
+              ^ Linkage_name.to_string (Code_id.linkage_name code_id))
+          in
+          let acc = Acc.add_symbol_approximation acc lookup_symbol approx in
+          let acc =
+            (* Root the lookup symbol so that the approximation (and hence the
+               code) is exported. *)
+            Acc.add_reified_approx_names acc
+              (Name_occurrences.singleton_symbol lookup_symbol Name_mode.normal)
+          in
+          acc, Code_id.Map.add code_id lookup_symbol lookup_symbols
+      | Block_approximation (_, _, fields, _) ->
+        Array.fold_left
+          (fun (acc, lookup_symbols) field ->
+            assign_lookup_symbols acc lookup_symbols field)
+          (acc, lookup_symbols) fields
+      | Closure_approximation { symbol = Some _; _ }
+      | Unknown _ | Value_symbol _ | Value_const _ ->
+        acc, lookup_symbols
+    in
+    let acc, closure_lookup_symbols =
+      assign_lookup_symbols acc Code_id.Map.empty approx
+    in
     let marshalled =
       Value_approximation.Standalone.to_marshalled_string
-        (Value_approximation.Standalone.create approx)
+        (Value_approximation.Standalone.create ~closure_lookup_symbols approx)
     in
     let acc =
-      (* Record the compilation units the approximation refers to, so that their
-         cmx data is available wherever the marshalled approximation is
-         demarshalled (e.g. at runtime by [Eval]). *)
-      Acc.add_reified_approx_units acc
-        (Value_approximation.compilation_units
+      (* Record the approximation's free names: the compilation units they
+         reference must have their cmx data available wherever the marshalled
+         approximation is demarshalled (e.g. at runtime by [Eval]), and the code
+         they reference must be exported to this unit's cmx. *)
+      Acc.add_reified_approx_names acc
+        (Value_approximation.free_names
            ~code_free_names:Code_or_metadata.free_names approx)
     in
     let acc, sym =
@@ -4190,7 +4236,9 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     { unit;
       code_slot_offsets;
       metadata = Normal;
-      reified_approx_units = Acc.reified_approx_units acc
+      reified_approx_units =
+        Value_approximation.compilation_units_of_free_names
+          (Acc.reified_approx_names acc)
     }
   | Classic ->
     let all_code =
@@ -4218,8 +4266,9 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     in
     let reachable_names, cmx =
       Flambda_cmx.prepare_cmx_from_approx ~machine_width:(Acc.machine_width acc)
-        ~approxs:symbols_approximations ~module_symbol ~exported_offsets
-        ~used_value_slots ~sections all_code
+        ~approxs:symbols_approximations ~module_symbol
+        ~extra_root_names:(Acc.reified_approx_names acc)
+        ~exported_offsets ~used_value_slots ~sections all_code
     in
     let unit =
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation
@@ -4229,5 +4278,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     { unit;
       code_slot_offsets;
       metadata = Classic (all_code, reachable_names, cmx, exported_offsets);
-      reified_approx_units = Acc.reified_approx_units acc
+      reified_approx_units =
+        Value_approximation.compilation_units_of_free_names
+          (Acc.reified_approx_names acc)
     }

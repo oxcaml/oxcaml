@@ -1,12 +1,17 @@
 (* TEST
  include eval;
  set OCAML_EVAL_SHOW_WARNINGS = "1";
- reference = "${test_source_directory}/inject_inlining_test.reference";
- flags = "-extension runtime_metaprogramming -Oclassic -w -53";
+ reference = "${test_source_directory}/inject_inlining_o3_test.reference";
+ flags = "-extension runtime_metaprogramming -O3 -w -53";
  native;
 *)
 
-(* Checks that the approximations of injected values propagate to the
+(* As inject_inlining_test.ml, but with the first compilation in simplify
+   mode (-O3): the approximations are reified during Simplify from the
+   arguments' types (mostly as symbol aliases, since simplify mode lifts
+   closures to symbols where possible).
+
+   Checks that the approximations of injected values propagate to the
    runtime compilation of evaluated quotes: [@inlined] on a call to an
    injected function succeeds silently when the approximation (and hence
    the code) is known, and triggers warning 55 when it is not.  The control

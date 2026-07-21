@@ -994,6 +994,82 @@ let simplify_peek ~original_prim dacc ~original_term ~arg:_ ~arg_ty:_
     (P.result_kind' original_prim)
     ~original_term
 
+let simplify_reify_approx dacc ~original_term:_ ~arg ~arg_ty ~result_var =
+  let module VA = Flambda2_classic_mode_types.Value_approximation in
+  let denv = DA.denv dacc in
+  let typing_env = DA.typing_env dacc in
+  (* Convert the argument's type to a classic-mode approximation. Constants and
+     symbols are represented directly (the full approximation of a symbol can be
+     recovered from its unit's cmx data at demarshalling time); for closures,
+     the code ID (and hence the code) is recorded. *)
+  let approx : Code_or_metadata.t VA.t =
+    let unknown : _ VA.t = Unknown K.value in
+    match
+      TE.get_canonical_simple_exn typing_env arg ~min_name_mode:Name_mode.normal
+    with
+    | exception Not_found -> unknown
+    | simple ->
+      Simple.pattern_match' simple
+        ~const:(fun const : _ VA.t -> Value_const const)
+        ~symbol:(fun symbol ~coercion:_ : _ VA.t -> Value_symbol symbol)
+        ~var:(fun _ ~coercion:_ : _ VA.t ->
+          match T.meet_single_closures_entry typing_env arg_ty with
+          | Known_result
+              (function_slot, _alloc_mode, _closures_entry, function_type) -> (
+            let code_id = T.Function_type.code_id function_type in
+            match DE.find_code_exn denv code_id with
+            | exception _ -> unknown
+            | code ->
+              (* Closures whose code uses [my_closure] are not reified for now:
+                 the function slot's stamp is not preserved by the standalone
+                 form, and a mismatched slot in the reconstructed closure type
+                 would conflict with the value-slot projections of the inlined
+                 body. (See inject_plan.md.) *)
+              if
+                Code_metadata.is_my_closure_used
+                  (Code_or_metadata.code_metadata code)
+              then unknown
+              else
+                Closure_approximation
+                  { code_id; function_slot; code; symbol = None })
+          | Need_meet | Invalid -> unknown)
+  in
+  (* Record the approximation's free names: the compilation units they reference
+     are marked as required by quotes, and the code they reference is exported
+     to this unit's cmx. *)
+  let dacc =
+    DA.add_reified_approx_names dacc
+      (VA.free_names ~code_free_names:Code_or_metadata.free_names approx)
+  in
+  let marshalled =
+    VA.Standalone.to_marshalled_string
+      (VA.Standalone.create ~closure_lookup_symbols:Code_id.Map.empty approx)
+  in
+  let sym =
+    Symbol.create
+      (Current_unit.get_cu_exn ())
+      (Linkage_name.of_string
+         (Variable.unique_name (Variable.create "reified_approx" K.value)))
+  in
+  let str_ty =
+    T.this_immutable_string marshalled ~machine_width:(DE.machine_width denv)
+  in
+  let const =
+    RSC.create_immutable_string (DE.are_rebuilding_terms denv) marshalled
+  in
+  let dacc =
+    DA.add_to_lifted_constant_accumulator ~also_add_to_env:() dacc
+      (LCS.singleton
+         (LC.create_definition
+            (LC.Definition.block_like denv sym str_ty
+               ~symbol_projections:Variable.Map.empty const)))
+  in
+  let dacc =
+    DA.add_variable dacc result_var
+      (T.alias_type_of K.value (Simple.symbol sym))
+  in
+  SPR.create (Named.create_simple (Simple.symbol sym)) ~try_reify:false dacc
+
 let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
     ~arg_ty dbg ~result_var =
   let min_name_mode = Bound_var.name_mode result_var in
@@ -1061,6 +1137,7 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
     | End_try_region { ghost = _ } -> simplify_end_try_region
     | Obj_dup { alloc_region } -> simplify_obj_dup dbg ~alloc_region
     | Get_header -> simplify_get_header ~original_prim
+    | Reify_approx -> simplify_reify_approx
     | Peek _ -> simplify_peek ~original_prim
     | Make_lazy _ -> simplify_lazy ~original_prim
   in

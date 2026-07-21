@@ -28,6 +28,9 @@ type t =
     flow_acc : Flow.Acc.t;
     demoted_exn_handlers : Continuation.Set.t;
     code_ids_to_remember : Code_id.Set.t;
+    reified_approx_names : Name_occurrences.t;
+    (* Free names of the approximations reified by [Reify_approx]; see
+       [Simplify_unary_primitive.simplify_reify_approx]. *)
     code_ids_to_never_delete : Code_id.Set.t;
     code_ids_never_simplified : Code_id.Set.t;
     slot_offsets : Slot_offsets.t Code_id.Map.t;
@@ -50,6 +53,7 @@ let print_lifted_cont ppf (denv, original_handlers) =
 let [@ocamlformat "disable"] print ppf
       { denv; continuation_uses_env; shareable_constants; used_value_slots;
         lifted_constants; flow_acc; demoted_exn_handlers; code_ids_to_remember;
+        reified_approx_names = _;
         code_ids_to_never_delete; code_ids_never_simplified; slot_offsets; debuginfo_rewrites;
         are_lifting_conts; lifted_continuations; continuation_lifting_budget;
         continuations_to_specialize; specialization_map; } =
@@ -101,6 +105,7 @@ let create denv slot_offsets continuation_uses_env =
     flow_acc = Flow.Acc.empty ();
     demoted_exn_handlers = Continuation.Set.empty;
     code_ids_to_remember = Code_id.Set.empty;
+    reified_approx_names = Name_occurrences.empty;
     code_ids_to_never_delete = Code_id.Set.empty;
     code_ids_never_simplified = Code_id.Set.empty;
     debuginfo_rewrites = Simple.Map.empty;
@@ -212,6 +217,16 @@ let all_continuations_used t =
   CUE.all_continuations_used t.continuation_uses_env
 
 let with_used_value_slots t ~used_value_slots = { t with used_value_slots }
+
+let add_reified_approx_names t names =
+  { t with
+    reified_approx_names = Name_occurrences.union names t.reified_approx_names
+  }
+
+let reified_approx_names t = t.reified_approx_names
+
+let with_reified_approx_names t ~reified_approx_names =
+  { t with reified_approx_names }
 
 let add_code_ids_to_remember t code_ids =
   if DE.at_unit_toplevel t.denv

@@ -251,13 +251,15 @@ module Acc : sig
 
   val free_names : t -> Name_occurrences.t
 
-  (** Compilation units referenced by the approximations reified by
-      [Preify_approx]; their cmx data must be available wherever the marshalled
-      approximations are demarshalled, so they are marked as required by quotes
-      (see [Cmx_format.ui_quoted_cmx]). *)
-  val reified_approx_units : t -> Compilation_unit.Set.t
+  (** Free names of the approximations reified by [Preify_approx]. The
+      compilation units they reference must have their cmx data available
+      wherever the marshalled approximations are demarshalled, so they are
+      marked as required by quotes (see [Cmx_format.ui_quoted_cmx]); and the
+      code they reference must be exported to this unit's cmx (see
+      [Flambda_cmx.prepare_cmx_from_approx]). *)
+  val reified_approx_names : t -> Name_occurrences.t
 
-  val add_reified_approx_units : t -> Compilation_unit.Set.t -> t
+  val add_reified_approx_names : t -> Name_occurrences.t -> t
 
   val machine_width : t -> Target_system.Machine_width.t
 

@@ -92,6 +92,17 @@ val used_value_slots : t -> Name_occurrences.t
 
 val with_used_value_slots : t -> used_value_slots:Name_occurrences.t -> t
 
+(** Free names of the approximations reified by [Reify_approx]: the compilation
+    units they reference are marked as required by quotes, and the code they
+    reference is exported to this unit's cmx. See
+    [Simplify_unary_primitive.simplify_reify_approx]. *)
+val add_reified_approx_names : t -> Name_occurrences.t -> t
+
+val reified_approx_names : t -> Name_occurrences.t
+
+val with_reified_approx_names :
+  t -> reified_approx_names:Name_occurrences.t -> t
+
 val add_code_ids_to_remember : t -> Code_id.Set.t -> t
 
 val code_ids_to_remember : t -> Code_id.Set.t

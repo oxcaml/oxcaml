@@ -77,7 +77,7 @@ let rec free_names ~code_free_names approx =
     in
     Name_occurrences.add_function_slot_in_types free_names function_slot
 
-let compilation_units ~code_free_names approx =
+let compilation_units_of_free_names free_names =
   (* The units of the predefined-exception and external symbols have no cmx
      data, so are not returned. *)
   let add_unit unit units =
@@ -89,7 +89,6 @@ let compilation_units ~code_free_names approx =
     then units
     else Compilation_unit.Set.add unit units
   in
-  let free_names = free_names ~code_free_names approx in
   let units =
     Symbol.Set.fold
       (fun sym units -> add_unit (Symbol.compilation_unit sym) units)
@@ -130,7 +129,14 @@ module Standalone = struct
     | Closure_approximation of
         { code_id : code_id;
           function_slot : string;
-          symbol : symbol option
+          symbol : symbol option;
+          lookup_symbol : symbol option
+              (* A symbol under which the closure's full approximation was
+                 registered in its unit's cmx data (manufactured by
+                 [Closure_conversion] for closures that have no symbol of their
+                 own). Looking it up at demarshalling time recovers the original
+                 code ID and function slot, whose stamps are not preserved in
+                 this standalone form. *)
         }
     | Block_approximation of
         Tag.Scannable.t
@@ -160,21 +166,29 @@ module Standalone = struct
         Code_id.linkage_name code_id |> Linkage_name.to_string
     }
 
-  let rec create (approx : _ approx) : t =
+  let rec create ~closure_lookup_symbols (approx : _ approx) : t =
     match approx with
     | Unknown kind -> Unknown kind
     | Value_symbol symbol -> Value_symbol (create_symbol symbol)
     | Value_const const -> Value_const (Reg_width_const.descr const)
     | Closure_approximation { code_id; function_slot; code = _; symbol } ->
       (* The code is not saved: at demarshalling time it can be looked up via
-         the symbol, when present (see [to_approximation]). *)
+         the symbol or the lookup symbol, when present (see
+         [to_approximation]). *)
       Closure_approximation
         { code_id = create_code_id code_id;
           function_slot = Function_slot.name function_slot;
-          symbol = Option.map create_symbol symbol
+          symbol = Option.map create_symbol symbol;
+          lookup_symbol =
+            Option.map create_symbol
+              (Code_id.Map.find_opt code_id closure_lookup_symbols)
         }
     | Block_approximation (tag, shape, fields, alloc_mode) ->
-      Block_approximation (tag, shape, Array.map create fields, alloc_mode)
+      Block_approximation
+        ( tag,
+          shape,
+          Array.map (create ~closure_lookup_symbols) fields,
+          alloc_mode )
 
   let to_compilation_unit { pack_prefix; name } =
     let prefix =
@@ -198,18 +212,31 @@ module Standalone = struct
     Code_id.create ~name:code_id_name ~debug:Debuginfo.none
       (to_compilation_unit code_id_compilation_unit)
 
+  type 'code closure_resolution =
+    | Resolved of 'code approx
+      (* A full replacement approximation, e.g. recovered wholesale from the
+         original unit's cmx data via [lookup_symbol] or [symbol]; the code IDs
+         and function slots therein are the original ones. *)
+    | Code of Code_id.t * 'code
+      (* Code (typically found by linkage name); the code ID given is used in
+         place of the freshly created one, but the function slot remains freshly
+         created (with a new stamp). *)
+    | Unknown_code
+
   let rec to_approximation t
       ~(find_code :
          code_id:Code_id.t ->
          code_id_linkage_name:Linkage_name.t ->
          function_slot:Function_slot.t ->
          symbol:Symbol.t option ->
-         'code option) : 'code approx =
+         lookup_symbol:Symbol.t option ->
+         'code closure_resolution) : 'code approx =
     match t with
     | Unknown kind -> Unknown kind
     | Value_symbol symbol -> Value_symbol (to_symbol symbol)
     | Value_const descr -> Value_const (Reg_width_const.of_descr descr)
-    | Closure_approximation { code_id; function_slot; symbol } -> (
+    | Closure_approximation { code_id; function_slot; symbol; lookup_symbol }
+      -> (
       let code_id_linkage_name =
         Linkage_name.of_string code_id.code_id_linkage_name
       in
@@ -222,10 +249,15 @@ module Standalone = struct
           ~name:function_slot ~is_always_immediate:false Flambda_kind.value
       in
       let symbol = Option.map to_symbol symbol in
-      match find_code ~code_id ~code_id_linkage_name ~function_slot ~symbol with
-      | None -> Unknown Flambda_kind.value
-      | Some code ->
-        Closure_approximation { code_id; function_slot; code; symbol })
+      let lookup_symbol = Option.map to_symbol lookup_symbol in
+      match
+        find_code ~code_id ~code_id_linkage_name ~function_slot ~symbol
+          ~lookup_symbol
+      with
+      | Resolved approx -> approx
+      | Code (code_id, code) ->
+        Closure_approximation { code_id; function_slot; code; symbol }
+      | Unknown_code -> Unknown Flambda_kind.value)
     | Block_approximation (tag, shape, fields, alloc_mode) ->
       Block_approximation
         ( tag,

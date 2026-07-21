@@ -192,50 +192,76 @@ let build_injector_export_info (entries : CamlinternalQuote.Injector.entry list)
     | Some ("true" | "1") -> true
     | None | Some _ -> false
   in
-  let find_code ~code_id:_ ~code_id_linkage_name:_ ~function_slot:_ ~symbol =
-    match symbol with
-    | None ->
-      if debug then Format.eprintf "inject: no symbol, cannot recover code@.";
-      (* CR mshinwell: look the code up by [code_id_linkage_name] in the cached
-         units' exported code, to cover closures without symbols (see
-         inject_plan.md, M2.3). *)
-      None
-    | Some symbol -> (
-      match Flambda2_cmx.Flambda_cmx.load_symbol_approx cmx_loader symbol with
-      | Closure_approximation { code; _ } ->
+  let find_code ~code_id ~code_id_linkage_name ~function_slot:_ ~symbol
+      ~lookup_symbol : _ VA.Standalone.closure_resolution =
+    (* Prefer recovering the closure's full approximation wholesale from the
+       original unit's cmx data, via the manufactured lookup symbol or the
+       closure's own symbol: the code IDs and function slots there are the
+       original ones, which existing code and types refer to. Fall back to
+       looking the code up by the (stamp-bearing) linkage name of the original
+       code ID. *)
+    let via_symbol sym : _ VA.Standalone.closure_resolution option =
+      match Flambda2_cmx.Flambda_cmx.load_symbol_approx cmx_loader sym with
+      | exception exn ->
+        (* e.g. [Not_found] if the symbol is absent from its unit's cmx data
+           (which can happen if the data was produced by a different
+           configuration than expected). *)
         if debug
         then
-          Format.eprintf "inject: code for %a: present %b@." F2_symbol.print
-            symbol
-            (Flambda2_terms.Code_or_metadata.code_present code);
-        Some code
+          Format.eprintf "inject: exception looking up %a: %s@." F2_symbol.print
+            sym (Printexc.to_string exn);
+        None
+      | Closure_approximation _ as authoritative ->
+        if debug
+        then
+          Format.eprintf "inject: authoritative approx via %a: %a@."
+            F2_symbol.print sym VA.print authoritative;
+        Some (VA.Standalone.Resolved authoritative)
       | (Unknown _ | Value_symbol _ | Value_const _ | Block_approximation _) as
         approx ->
         if debug
         then
           Format.eprintf "inject: no closure approx for %a: %a@."
-            F2_symbol.print symbol VA.print approx;
-        None)
-  in
-  (* The code IDs and function slots reconstructed from the standalone form have
-     fresh stamps, which would not meet the original ones appearing in the types
-     of the original units (e.g. via the closure types' aliases to the closures'
-     symbols). So, whenever a closure approximation has a symbol, replace it
-     wholesale by the authoritative approximation from the original unit's cmx
-     data. *)
-  let rec prefer_authoritative (approx : _ VA.t) : _ VA.t =
-    match approx with
-    | Closure_approximation { symbol = Some symbol; _ } -> (
-      match Flambda2_cmx.Flambda_cmx.load_symbol_approx cmx_loader symbol with
-      | Closure_approximation _ as authoritative -> authoritative
-      | Unknown _ | Value_symbol _ | Value_const _ | Block_approximation _ ->
-        approx)
-    | Block_approximation (tag, shape, fields, alloc_mode) ->
-      Block_approximation
-        (tag, shape, Array.map prefer_authoritative fields, alloc_mode)
-    | Unknown _ | Value_symbol _ | Value_const _
-    | Closure_approximation { symbol = None; _ } ->
-      approx
+            F2_symbol.print sym VA.print approx;
+        None
+    in
+    let via_linkage_name () : _ VA.Standalone.closure_resolution option =
+      let code_unit =
+        Flambda2_identifiers.Code_id.get_compilation_unit code_id
+      in
+      let (_ : Flambda2_types.Typing_env.Serializable.t option) =
+        Flambda2_cmx.Flambda_cmx.load_cmx_file_contents cmx_loader code_unit
+      in
+      match
+        Flambda2_cmx.Exported_code.find_by_linkage_name
+          (Flambda2_cmx.Flambda_cmx.get_imported_code cmx_loader ())
+          code_id_linkage_name
+      with
+      | Some (original_code_id, code) ->
+        if debug
+        then
+          Format.eprintf "inject: code for linkage name %s: present %b@."
+            (Linkage_name.to_string code_id_linkage_name)
+            (Flambda2_terms.Code_or_metadata.code_present code);
+        Some (VA.Standalone.Code (original_code_id, code))
+      | None ->
+        if debug
+        then
+          Format.eprintf "inject: no code found for linkage name %s@."
+            (Linkage_name.to_string code_id_linkage_name);
+        None
+    in
+    let result =
+      match Option.map via_symbol lookup_symbol with
+      | Some (Some resolution) -> Some resolution
+      | Some None | None -> (
+        match Option.map via_symbol symbol with
+        | Some (Some resolution) -> Some resolution
+        | Some None | None -> via_linkage_name ())
+    in
+    match result with
+    | Some resolution -> resolution
+    | None -> VA.Standalone.Unknown_code
   in
   let field_approxs =
     List.map
@@ -246,9 +272,7 @@ let build_injector_export_info (entries : CamlinternalQuote.Injector.entry list)
           | "" -> unknown
           | marshalled -> (
             match VA.Standalone.of_marshalled_string marshalled with
-            | standalone ->
-              prefer_authoritative
-                (VA.Standalone.to_approximation standalone ~find_code)
+            | standalone -> VA.Standalone.to_approximation standalone ~find_code
             | exception _ -> unknown)
         in
         if debug
@@ -280,6 +304,7 @@ let build_injector_export_info (entries : CamlinternalQuote.Injector.entry list)
   let _reachable_names, raw =
     Flambda2_cmx.Flambda_cmx.prepare_cmx_from_approx
       ~machine_width:injector_machine_width ~approxs ~module_symbol
+      ~extra_root_names:Flambda2_nominal.Name_occurrences.empty
       ~exported_offsets:Flambda2_simplify_shared.Exported_offsets.empty
       ~used_value_slots:Flambda2_identifiers.Value_slot.Set.empty ~sections
       all_code
