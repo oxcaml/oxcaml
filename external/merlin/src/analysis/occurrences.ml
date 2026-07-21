@@ -210,7 +210,10 @@ let get_external_locs ~(config : Mconfig.t) ~current_buffer_path uid :
       in
       Option.map external_locs ~f:(fun (index, locs) ->
           let stats = Stat_check.create ~cache_size:128 index in
-          ( Occurrence_set.of_filtered_lid_set locs ~f:(fun lid ->
+          (* Note: [get_outdated_files] must be evaluated after the [Stat_check.check stats ~file...],
+             as the latter one populates the cache inside [stats] *)
+          let occurrences =
+            Occurrence_set.of_filtered_lid_set locs ~f:(fun lid ->
                 let ({ Location.loc; _ } as lid) =
                   Index_format.Lid.to_lid lid
                 in
@@ -245,8 +248,9 @@ let get_external_locs ~(config : Mconfig.t) ~current_buffer_path uid :
                     | false -> Stale
                   in
                   Some staleness
-                end),
-            Stat_check.get_outdated_files stats )))
+                end)
+          in
+          (occurrences, Stat_check.get_outdated_files stats)))
 
 let lookup_related_uids_in_indexes ~(config : Mconfig.t) uid =
   let title = "lookup_related_uids_in_indexes" in
