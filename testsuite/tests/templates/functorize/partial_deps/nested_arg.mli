@@ -1,3 +1,3 @@
-(* Parameters: P, Q *)
+(* Parameters: P *)
 
 val describe : string
