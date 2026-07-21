@@ -8,3 +8,5 @@ bytegen.ml
 bytegen.mli
 printblambda.ml
 printblambda.mli
+bytefunctorizer.ml
+bytefunctorizer.mli
