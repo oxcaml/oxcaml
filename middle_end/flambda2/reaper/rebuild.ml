@@ -184,7 +184,7 @@ let get_parameters params_decisions =
     [] params_decisions
   |> List.rev
 
-let get_parameters_and_modes params_decisions modes =
+let get_parameters_and_modes params_decisions_and_modes =
   List.fold_left
     (fun acc (param_decision, mode) ->
       match param_decision with
@@ -198,8 +198,7 @@ let get_parameters_and_modes params_decisions modes =
               mode )
             :: acc)
           fields acc) (* CR sspies: Missing debug uid. *)
-    []
-    (List.combine params_decisions modes)
+    [] params_decisions_and_modes
   |> List.rev |> List.split
 
 let get_arity params_decisions =
@@ -1296,12 +1295,10 @@ let rebuild_apply env apply =
             Misc.fatal_errorf
               "Callee is not unboxable in apply %a with unboxed closure"
               Apply.print apply;
-          let callee_fields = get_simple_unboxable env callee in
-          ( Unboxed_fields.fold2_subset_with_kind
-              (fun kind _param callee_field acc ->
-                (Simple.var callee_field, KS.anything kind) :: acc)
-              fields callee_fields [],
-            None )
+          (* The unboxed fields of the closure are passed at the front of the
+             first argument group, in the same order as the parameters
+             introduced in [rebuild_function_params_and_body]. *)
+          get_args_with_kinds env [Unbox fields] [callee], None
       in
       let params_decisions =
         match Code_id.Map.find_opt code_id env.function_params_to_keep with
@@ -2309,46 +2306,39 @@ and rebuild_function_params_and_body (env : env) res code_metadata
         params_decision
         (Bound_parameters.to_list params)
     in
-    let params_decision =
-      Flambda_arity.group_by_parameter
-        (Code_metadata.params_arity code_metadata)
-        params_decision
-    in
-    let params_and_modes =
-      List.map2
-        (fun p -> get_parameters_and_modes p)
-        params_decision
-        (Flambda_arity.group_by_parameter
-           (Code_metadata.params_arity code_metadata)
-           (Code_metadata.param_modes code_metadata))
-    in
-    let params = List.map fst params_and_modes in
-    let modes = List.concat_map snd params_and_modes in
-    let params_from_closure, code_metadata =
+    let my_closure_decision, code_metadata =
       match
         (* TODO move that in the decisions There should be a single record field
            with all the decisions for return params and closure *)
         Analysis.get_unboxed_fields env.uses (Code_id_or_name.var my_closure)
       with
-      | None -> [], code_metadata
+      (* If we're not unboxing we need to "delete" the extra mode we prepend
+         below, ultimately this is a no-op. *)
+      | None -> Delete, code_metadata
       | Some fields ->
-        ( Unboxed_fields.fold_with_kind
-            (fun kind v acc ->
-              Bound_parameter.create v (KS.anything kind) Flambda_debug_uid.none
-              :: acc)
-            (* CR sspies: Missing debug uid. *)
-            fields [],
-          Code_metadata.with_is_my_closure_used false code_metadata )
+        Unbox fields, Code_metadata.with_is_my_closure_used false code_metadata
     in
-    let params =
-      match params with
+    let params_decision_and_modes =
+      Flambda_arity.group_by_parameter
+        (Code_metadata.params_arity code_metadata)
+        (List.combine params_decision (Code_metadata.param_modes code_metadata))
+    in
+    let params_decision_and_modes =
+      match params_decision_and_modes with
       | [] ->
         Misc.fatal_errorf
           "Empty parameter groups when changing calling convention for code id \
            %a"
           Code_id.print code_id
-      | first :: rest -> (params_from_closure @ first) :: rest
+      | first :: rest ->
+        ((my_closure_decision, Alloc_mode.For_types.unknown ()) :: first)
+        :: rest
     in
+    let params_and_modes =
+      List.map get_parameters_and_modes params_decision_and_modes
+    in
+    let params = List.map fst params_and_modes in
+    let modes = List.concat_map snd params_and_modes in
     let params_arity =
       let components_for params =
         Flambda_arity.Component_for_creation.Unboxed_product
@@ -2363,6 +2353,12 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     let code_metadata =
       Code_metadata.with_params_arity params_arity
         (Code_metadata.with_param_modes modes code_metadata)
+    in
+    (* We only change the calling convention if the analysis has shown there are
+       no partial applications. *)
+    let code_metadata =
+      Code_metadata.with_first_complex_local_param
+        First_complex_local_param.Never_partially_applied code_metadata
     in
     let body, res = rebuild_body () in
     let code_metadata = update_size code_metadata body in

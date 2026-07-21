@@ -64,8 +64,15 @@ let get_func_decl_params_arity t code_id =
     then Lambda.Tupled
     else
       let nlocal =
-        Flambda_arity.num_params (Code_metadata.params_arity info)
-        - Code_metadata.first_complex_local_param info
+        match
+          (Code_metadata.first_complex_local_param info
+            : First_complex_local_param.t)
+        with
+        | Index index ->
+          Flambda_arity.num_params (Code_metadata.params_arity info) - index
+        | Never_partially_applied ->
+          (* This value should never be observed. *)
+          0
       in
       Lambda.Curried { nlocal }
   in

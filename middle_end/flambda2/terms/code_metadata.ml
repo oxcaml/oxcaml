@@ -19,7 +19,7 @@ type t =
     newer_version_of : Code_id.t option;
     params_arity : [`Complex] Flambda_arity.t;
     param_modes : Alloc_mode.For_types.t list;
-    first_complex_local_param : int;
+    first_complex_local_param : First_complex_local_param.t;
     (* Note: first_complex_local_param cannot be computed from param_modes,
        because it might be 0 if the closure itself has to be allocated locally,
        for instance as a result of a partial application. *)
@@ -142,7 +142,7 @@ type 'a create_type =
   newer_version_of:Code_id.t option ->
   params_arity:[`Complex] Flambda_arity.t ->
   param_modes:Alloc_mode.For_types.t list ->
-  first_complex_local_param:int ->
+  first_complex_local_param:First_complex_local_param.t ->
   result_arity:[`Unarized] Flambda_arity.t ->
   result_types:Result_types.t Or_unknown_or_bottom.t ->
   result_mode:Lambda.locality_mode ->
@@ -182,13 +182,14 @@ let createk k code_id ~newer_version_of ~params_arity ~param_modes
     ()
   | true, (Always_inline | Unroll _) ->
     Misc.fatal_error "Stubs may not be annotated as [Always_inline] or [Unroll]");
-  if
-    first_complex_local_param < 0
-    || first_complex_local_param > Flambda_arity.num_params params_arity
-  then
-    Misc.fatal_errorf
-      "Illegal first_complex_local_param=%d for params arity: %a"
-      first_complex_local_param Flambda_arity.print params_arity;
+  (match (first_complex_local_param : First_complex_local_param.t) with
+  | Never_partially_applied -> ()
+  | Index index ->
+    if index < 0 || index > Flambda_arity.num_params params_arity
+    then
+      Misc.fatal_errorf
+        "Illegal first_complex_local_param=%d for params arity: %a" index
+        Flambda_arity.print params_arity);
   if
     List.compare_length_with param_modes
       (Flambda_arity.cardinal_unarized params_arity)
@@ -245,6 +246,9 @@ let with_params_arity params_arity t = { t with params_arity }
 
 let with_param_modes param_modes t = { t with param_modes }
 
+let with_first_complex_local_param first_complex_local_param t =
+  { t with first_complex_local_param }
+
 let with_is_tupled is_tupled t = { t with is_tupled }
 
 let with_result_types result_types t = { t with result_types }
@@ -291,7 +295,7 @@ let [@ocamlformat "disable"] print ppf
       @[<hov 1>%t(is_opaque@ %b)%t@]@ \
       @[<hov 1>%t(params_arity@ %t%a%t)%t@]@ \
       @[<hov 1>%t(param_modes@ %t(%a)%t)%t@]@ \
-      @[<hov 1>(first_complex_local_param@ %d)@]@ \
+      @[<hov 1>(first_complex_local_param@ %a)@]@ \
       @[<hov 1>%t(result_arity@ %t%a%t)%t@]@ \
       @[<hov 1>(result_types@ @[<hov 1>(%a)@])@]@ \
       @[<hov 1>(result_mode@ %s)@]@ \
@@ -366,7 +370,7 @@ let [@ocamlformat "disable"] print ppf
     then Flambda_colours.elide
     else Flambda_colours.none)
     Flambda_colours.pop
-    first_complex_local_param
+    First_complex_local_param.print first_complex_local_param
     (if Flambda_arity.is_one_param_of_kind_value result_arity
     then Flambda_colours.elide
     else Flambda_colours.none)
@@ -603,7 +607,8 @@ let approx_equal
   && (Option.equal Code_id.equal) newer_version_of1 newer_version_of2
   && Flambda_arity.equal_ignoring_subkinds params_arity1 params_arity2
   && List.equal Alloc_mode.For_types.equal param_modes1 param_modes2
-  && Int.equal first_complex_local_param1 first_complex_local_param2
+  && First_complex_local_param.equal first_complex_local_param1
+       first_complex_local_param2
   && Flambda_arity.equal_ignoring_subkinds result_arity1 result_arity2
   && Lambda.eq_locality_mode result_mode1 result_mode2
   && Bool.equal stub1 stub2
