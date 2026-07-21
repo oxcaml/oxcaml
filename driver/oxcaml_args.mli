@@ -54,6 +54,8 @@ module type Oxcaml_options = sig
   val no_arm64_peephole_merge_add_immediates : unit -> unit
   val no_arm64_peephole_remove_redundant_cmp : unit -> unit
   val no_arm64_peephole_compose_shift_pairs : unit -> unit
+  val arm64_fuse_frame_ops : unit -> unit
+  val no_arm64_fuse_frame_ops : unit -> unit
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit

@@ -117,16 +117,28 @@ let effects (Instruction.I { name; operands }) : effects =
     }
   | TST | FCMP ->
     { is_barrier = false; writes_flags = true; destinations = Known [] }
-  | STR | STRB | STRH | STR_simd_and_fp | STP _ ->
+  | STR | STRB | STRH | STR_simd_and_fp ->
     (* The first operand of a store is a source, not a destination. *)
     { is_barrier = false; writes_flags = false; destinations = Known [] }
-  | LDP _ ->
-    let destinations =
-      match operands with
-      | Triple (op1, op2, _) ->
+  | STP _ -> (
+    match operands with
+    | Triple (_, _, Mem (Offset_pair _)) ->
+      (* The first two operands of a store pair are sources. *)
+      { is_barrier = false; writes_flags = false; destinations = Known [] }
+    | Triple (_, _, Mem (Pre_pair _ | Post_pair _)) ->
+      (* Pre/post-indexed addressing writes the base register back; the base can
+         be sp, which [Gp] does not represent, so be conservative. *)
+      { is_barrier = false; writes_flags = false; destinations = Unknown })
+  | LDP _ -> (
+    match operands with
+    | Triple (op1, op2, Mem (Offset_pair _)) ->
+      let destinations =
         Known (gp_regs_of_operand op1 @ gp_regs_of_operand op2)
-    in
-    { is_barrier = false; writes_flags = false; destinations }
+      in
+      { is_barrier = false; writes_flags = false; destinations }
+    | Triple (_, _, Mem (Pre_pair _ | Post_pair _)) ->
+      (* Base register write-back on top of the two destinations. *)
+      { is_barrier = false; writes_flags = false; destinations = Unknown })
   | ABS_vector | ADDP_vector | ADDV | ADD_immediate | ADD_shifted_register
   | ADD_vector | ADR | ADRP | AND_immediate | AND_shifted_register | AND_vector
   | ASRV | CLZ | CM_register _ | CM_zero _ | CNT | CNT_vector | CSEL | CSINC

@@ -1404,15 +1404,32 @@ let emit_instr env i =
   | Lprologue ->
     assert (Env.prologue_required env);
     let n = Env.frame_size env in
-    if n > 0 then emit_stack_adjustment (-n);
-    if Env.contains_calls env
+    if n = 16 && Env.contains_calls env && !Oxcaml_flags.arm64_fuse_frame_ops
     then (
-      D.cfi_offset ~reg:(R.gp_encoding R.lr) ~offset:(-8);
-      emit_str_sp_offset O.lr (n - 8))
+      (* Allocate the frame and save lr in a single instruction. lr must stay at
+         the top of the frame ([sp, #8]) to preserve the runtime's frame walking
+         invariant. The zero written to the remaining slot is dead: stack slots
+         are always stored before being read, and the GC only scans slots that
+         the frametable marks live at a call site, which requires a prior
+         store. *)
+      A.ins3 (STP X) O.xzr O.lr (O.mem_pre_pair ~base:R.sp ~offset:(-16));
+      D.cfi_adjust_cfa_offset ~bytes:16;
+      D.cfi_offset ~reg:(R.gp_encoding R.lr) ~offset:(-8))
+    else (
+      if n > 0 then emit_stack_adjustment (-n);
+      if Env.contains_calls env
+      then (
+        D.cfi_offset ~reg:(R.gp_encoding R.lr) ~offset:(-8);
+        emit_str_sp_offset O.lr (n - 8)))
   | Lepilogue_open ->
     let n = Env.frame_size env in
-    if Env.contains_calls env then emit_ldr_sp_offset O.lr (n - 8);
-    if n > 0 then emit_stack_adjustment n
+    if n = 16 && Env.contains_calls env && !Oxcaml_flags.arm64_fuse_frame_ops
+    then (
+      A.ins3 (LDP X) O.xzr O.lr (O.mem_post_pair ~base:R.sp ~offset:16);
+      D.cfi_adjust_cfa_offset ~bytes:(-16))
+    else (
+      if Env.contains_calls env then emit_ldr_sp_offset O.lr (n - 8);
+      if n > 0 then emit_stack_adjustment n)
   | Lepilogue_close ->
     let n = Env.frame_size env in
     if n > 0 then D.cfi_adjust_cfa_offset ~bytes:n

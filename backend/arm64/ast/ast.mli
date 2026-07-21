@@ -564,7 +564,7 @@ end
     the same width class. *)
 module LDP_STP_width : sig
   type (_, _) t =
-    | X : ([< `X | `LR], [< `X | `LR]) t
+    | X : ([< `X | `LR | `XZR], [< `X | `LR | `XZR]) t
     | W : ([< `W], [< `W]) t
 end
 

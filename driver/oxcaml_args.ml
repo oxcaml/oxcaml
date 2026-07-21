@@ -158,6 +158,17 @@ let mk_no_arm64_peephole_compose_shift_pairs f =
     Arg.Unit f,
     " Disable arm64 peephole: compose adjacent shift pairs" )
 
+let mk_arm64_fuse_frame_ops f =
+  ( "-arm64-fuse-frame-ops",
+    Arg.Unit f,
+    " Fuse the arm64 frame allocation and return-address save/restore into \
+     single stp/ldp instructions where possible" )
+
+let mk_no_arm64_fuse_frame_ops f =
+  ( "-no-arm64-fuse-frame-ops",
+    Arg.Unit f,
+    " Do not fuse the arm64 frame allocation and return-address save/restore" )
+
 let mk_cfg_cse_optimize f =
   ("-cfg-cse-optimize", Arg.Unit f, " Apply CSE optimizations to CFG")
 
@@ -1336,6 +1347,8 @@ module type Oxcaml_options = sig
   val no_arm64_peephole_merge_add_immediates : unit -> unit
   val no_arm64_peephole_remove_redundant_cmp : unit -> unit
   val no_arm64_peephole_compose_shift_pairs : unit -> unit
+  val arm64_fuse_frame_ops : unit -> unit
+  val no_arm64_fuse_frame_ops : unit -> unit
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit
@@ -1533,6 +1546,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_arm64_peephole_remove_redundant_cmp;
       mk_no_arm64_peephole_compose_shift_pairs
         F.no_arm64_peephole_compose_shift_pairs;
+      mk_arm64_fuse_frame_ops F.arm64_fuse_frame_ops;
+      mk_no_arm64_fuse_frame_ops F.no_arm64_fuse_frame_ops;
       mk_cfg_stack_checks F.cfg_stack_checks;
       mk_no_cfg_stack_checks F.no_cfg_stack_checks;
       mk_cfg_stack_checks_threshold F.cfg_stack_checks_threshold;
@@ -1875,6 +1890,8 @@ module Oxcaml_options_impl = struct
   let no_arm64_peephole_compose_shift_pairs =
     clear' Oxcaml_flags.arm64_peephole_compose_shift_pairs
 
+  let arm64_fuse_frame_ops = set' Oxcaml_flags.arm64_fuse_frame_ops
+  let no_arm64_fuse_frame_ops = clear' Oxcaml_flags.arm64_fuse_frame_ops
   let cfg_stack_checks = set' Oxcaml_flags.cfg_stack_checks
   let no_cfg_stack_checks = clear' Oxcaml_flags.cfg_stack_checks
 
@@ -1917,6 +1934,7 @@ module Oxcaml_options_impl = struct
     cfg_prologue_validate ();
     x86_peephole_optimize ();
     arm64_peephole_optimize ();
+    arm64_fuse_frame_ops ();
     regalloc_param "SPLIT_AROUND_LOOPS:on";
     regalloc_param "AFFINITY:on";
     regalloc_param "BIT_MATRIX_THRESHOLD:8192";
@@ -2474,6 +2492,7 @@ module Extra_params = struct
     | "cfg-peephole-optimize" -> set' Oxcaml_flags.cfg_peephole_optimize
     | "x86-peephole-optimize" -> set' Oxcaml_flags.x86_peephole_optimize
     | "arm64-peephole-optimize" -> set' Oxcaml_flags.arm64_peephole_optimize
+    | "arm64-fuse-frame-ops" -> set' Oxcaml_flags.arm64_fuse_frame_ops
     | "cfg-stack-checks" -> set' Oxcaml_flags.cfg_stack_checks
     | "cfg-eliminate-dead-trap-handlers" ->
         set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
