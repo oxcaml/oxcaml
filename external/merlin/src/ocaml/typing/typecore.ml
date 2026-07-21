@@ -8865,19 +8865,11 @@ and type_expect_
            exp_env = env }
   | Pexp_stack e ->
       let exp = type_expect env expected_mode e ty_expected_explained in
-<<<<<<< janestreet/merlin-jst:liam-merlin-5.4.0-ox3
-      let unsupported category =
-        raise (error (exp.exp_loc, env, Unsupported_stack_allocation category))
-||||||| oxcaml/oxcaml:172cba3614a4a1e8d621d88e3d11de4ad80bed33
-      let unsupported category =
-        raise (Error (exp.exp_loc, env, Unsupported_stack_allocation category))
-=======
       let always_heap category =
-        raise (Error (exp.exp_loc, env, Always_heap_allocation category))
+        raise (error (exp.exp_loc, env, Always_heap_allocation category))
       in
       let always_static category =
-        raise (Error (exp.exp_loc, env, Always_static_allocation category))
->>>>>>> oxcaml/oxcaml:545a4d6de4632a2a5abb74eb300cd2f70c9f42cf
+        raise (error (exp.exp_loc, env, Always_static_allocation category))
       in
       begin match exp.exp_desc with
       | Texp_function { alloc_mode; _} | Texp_tuple (_, alloc_mode)

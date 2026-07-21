@@ -2210,14 +2210,8 @@ and add_implicit_jkinds env attrs =
    so we need this to take the signature of the previously checked portion
    to support include functor. *)
 
-<<<<<<< janestreet/merlin-jst:liam-merlin-5.4.0-ox3
-and transl_signature ?(keep_warnings = false) env sig_acc {psg_items; psg_modalities; psg_loc} =
-||||||| oxcaml/oxcaml:172cba3614a4a1e8d621d88e3d11de4ad80bed33
-and transl_signature env {psg_items; psg_modalities; psg_loc} =
-=======
-and transl_signature ?(interface_toplevel = false) env
+and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env sig_acc
       {psg_items; psg_modalities; psg_loc} =
->>>>>>> oxcaml/oxcaml:545a4d6de4632a2a5abb74eb300cd2f70c9f42cf
   let names = Signature_names.create () in
 
   (* We assume the structure (described by the signature) to be at legacy mode,

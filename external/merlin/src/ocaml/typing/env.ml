@@ -3031,13 +3031,7 @@ let components_of_functor_appl ~loc ~f_path ~f_comp ~arg env =
         env Subst.identity p addr (Subst.Lazy.of_modtype mty)
         fcomp_res_mode shape
     in
-<<<<<<< janestreet/merlin-jst:liam-merlin-5.4.0-ox3
-    stamped_path_add f_comp.fcomp_cache arg comps;
-||||||| oxcaml/oxcaml:172cba3614a4a1e8d621d88e3d11de4ad80bed33
-    Hashtbl.add f_comp.fcomp_cache arg comps;
-=======
-    if can_load_cmis then Hashtbl.add f_comp.fcomp_cache arg comps;
->>>>>>> oxcaml/oxcaml:545a4d6de4632a2a5abb74eb300cd2f70c9f42cf
+    if can_load_cmis then stamped_path_add f_comp.fcomp_cache arg comps;
     comps
 
 (* Define forward functions *)
@@ -5989,28 +5983,6 @@ type 'acc fold_all_labels_f =
     fold_all_labels_f : 'rcd. 'rcd record_form -> 'rcd gen_label_description -> 'acc -> 'acc
   }
 
-<<<<<<< janestreet/merlin-jst:liam-merlin-5.4.0-ox3
 let fold_all_labels f ident env init =
   let acc_after_legacy = fold_labels Legacy (f.fold_all_labels_f Legacy) ident env init in
   fold_labels Unboxed_product (f.fold_all_labels_f Unboxed_product) ident env acc_after_legacy
-
-let () =
-  let get_current_compilation_unit () =
-    Option.map Unit_info.modname (get_current_unit ())
-  in
-  Compilation_unit.Private.fwd_get_current := get_current_compilation_unit
-||||||| oxcaml/oxcaml:172cba3614a4a1e8d621d88e3d11de4ad80bed33
-      | _ ->
-          None
-    )
-
-let () =
-  let get_current_compilation_unit () =
-    Option.map Unit_info.modname (get_current_unit ())
-  in
-  Compilation_unit.Private.fwd_get_current := get_current_compilation_unit
-=======
-      | _ ->
-          None
-    )
->>>>>>> oxcaml/oxcaml:545a4d6de4632a2a5abb74eb300cd2f70c9f42cf

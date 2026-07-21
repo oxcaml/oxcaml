@@ -108,17 +108,14 @@ val tree_of_type_scheme: type_expr -> out_type
 val tree_of_modalities:
   Types.mutability -> Mode.Modality.Const.t -> Outcometree.out_mode list
 
-<<<<<<< janestreet/merlin-jst:liam-merlin-5.4.0-ox3
 val tree_of_modes:
   Mode.Alloc.Const.t -> Outcometree.out_mode list
-||||||| oxcaml/oxcaml:172cba3614a4a1e8d621d88e3d11de4ad80bed33
-=======
+
 (** [out_jkind_of_jkind env jkind] converts a jkind to an [out_jkind]
     for printing. This uses the same naming scheme as error messages (e.g.,
     ['_representable_layout_N] for sort variables). *)
 val out_jkind_of_jkind: Env.t -> 'd Types.jkind -> out_jkind
 
->>>>>>> oxcaml/oxcaml:545a4d6de4632a2a5abb74eb300cd2f70c9f42cf
 
 val prepared_type_scheme: type_expr printer
 val prepared_type_expr: type_expr printer
