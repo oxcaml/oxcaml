@@ -105,7 +105,7 @@ end
 val run :
   unix:(module Compiler_owee.Unix_intf.S) ->
   temp_dir:string ->
-  ml_objfiles:(string * string list) list ->
+  ml_objfiles:(string * Asm_targets.Asm_symbol.t list) list ->
   startup_obj:string ->
   ccobjs:string list ->
   runtime_libs:string list ->

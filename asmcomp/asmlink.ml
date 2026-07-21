@@ -400,7 +400,9 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
 
 let entry_symbols units =
   List.map
-    (fun compilation_unit -> Cmm_helpers.entry_symbol_name ~compilation_unit ())
+    (fun compilation_unit ->
+      Cmm_helpers.entry_symbol_name ~compilation_unit ()
+      |> Asm_targets.Asm_symbol.create_global)
     units
 
 let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
