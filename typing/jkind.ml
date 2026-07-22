@@ -343,16 +343,22 @@ module Layout = struct
 
   (* The addressability of the kind a layout describes, insofar as it is
      known ([~intrinsic] gives the intrinsic addressability of a sort). A
-     [Maybe_addressable] slot is refined by the sort's intrinsic
-     addressability; this matters when a sort variable was filled after the
-     slot was created, e.g. [Sort (v, _, Maybe_addressable)] with [v] filled
-     by [bits64] IS [bits64], which is addressable. Use this for the left of
-     a subkind check and for equality. *)
+     [Maybe_addressable] slot is refined only when the sort is intrinsically
+     addressable: this matters when a sort variable was filled after the slot
+     was created, e.g. [Sort (v, _, Maybe_addressable)] with [v] filled by
+     [bits64] IS [bits64], which is addressable. The refinement must NOT go
+     the other way: sorts do not carry addressability, so resolving a sort to
+     [bits8] pins nothing - the kind can still be either [bits8] or
+     [bits8 addressable], and only the stored slot records which. Use this
+     for the left of a subkind check and for equality. *)
   let rec addressability_gen ~intrinsic : _ t -> Addressability.t = function
     | Any (_, a) -> a
     | Sort (s, _, a) -> (
       match (a : Addressability.t) with
-      | Maybe_addressable -> intrinsic s
+      | Maybe_addressable -> (
+        match (intrinsic s : Addressability.t) with
+        | Addressable -> Addressable
+        | Unaddressable | Maybe_addressable -> Maybe_addressable)
       | Addressable | Unaddressable -> a)
     | Product (ts, a) -> (
       match (a : Addressability.t) with
@@ -381,9 +387,10 @@ module Layout = struct
   let rec equate_or_equal ~allow_mutation t1 t2 =
     (* Both sides of an equality are descriptions of kinds, so both use the
        refined [addressability] reading. The reads happen after the sort
-       equation, so filled variables refine, and two unfilled variables with
-       differing slots are (conservatively) unequal, mirroring the treatment
-       of scannable axes below. *)
+       equation, so variables filled with intrinsically addressable sorts
+       refine to [Addressable], and nodes with differing slots otherwise are
+       (conservatively) unequal, mirroring the treatment of scannable axes
+       below. *)
     let addressability_equal t1 t2 =
       Addressability.equal (addressability t1) (addressability t2)
     in
@@ -472,9 +479,11 @@ module Layout = struct
 
   (* Meet [a] into [t]'s root addressability, for intersections; [None] means
      the kinds are disjoint. Unlike [meet_root_scannable_axes] this handles
-     [Product]s, whose root slots are meaningful. The slot is first refined as
-     in [addressability]: constraining a kind whose sort has already resolved
-     to an unaddressable base to be addressable must fail, not mark it. *)
+     [Product]s, whose root slots are meaningful. The meet is against the
+     refined [addressability] reading: requiring addressability of a kind
+     recorded as unaddressable (a stored [Unaddressable] slot, or a product of
+     such kinds) fails, while an unconstrained kind accepts the mark - even
+     once its sort has resolved, since sorts don't pin addressability. *)
   let meet_root_addressability t a =
     match (a : Addressability.t) with
     | Maybe_addressable ->
@@ -613,11 +622,11 @@ module Layout = struct
         (Misc.Stdlib.List.some_if_all_elements_are_some components)
     in
     (* The slot meets use the refined [addressability] readings of both
-       sides, taken before this operation equates any sorts: an unfilled
-       variable's [Maybe_addressable] slot is genuinely unconstrained, while
-       a previously filled one pins its sort's intrinsic addressability.
-       (Note that, as for the scannable axes in [sub], sorts equated by a
-       failing intersection stay equated.) *)
+       sides. A [Maybe_addressable] slot stays unconstrained whether or not
+       its sort has resolved (sorts don't pin addressability), so the reads
+       don't depend on the sort equations this operation performs. (Note
+       that, as for the scannable axes in [sub], sorts equated by a failing
+       intersection stay equated.) *)
     let meet_addressability t1 t2 =
       Addressability.meet (addressability t1) (addressability t2)
     in
